@@ -6,7 +6,9 @@
 > que ordem?"***. Os passos de uma fatia moram aqui — **nunca** viram issue separada
 > (`card = fatia`).
 
-**Estado em 14/08/2026:** nada implementado. O bootstrap `[INFRA]` ainda não tem card.
+**Estado em 14/08/2026:** nada implementado. Os seis cards `[INFRA]` de bootstrap existem
+([#42](https://github.com/RodReis/arenahub/issues/42)–[#47](https://github.com/RodReis/arenahub/issues/47),
+ADR-023), todos em Backlog. O board em si continua pendente — ver §4.
 
 ---
 
@@ -100,16 +102,32 @@ seria violar ADR-015, que reserva o Índice para Slices do PRD.
 > a bancada existir. Estes cards `[INFRA]` resolvem a ordem prática; o PI decide se a Slice 1.1
 > perde esse item ou se ele é repetido lá como verificação.
 
-| # | passo | evidência de pronto |
-|---|---|---|
-| 1 | Monorepo pnpm + Turborepo com o layout de `apps/`, `packages/`, `infra/` | `pnpm install --frozen-lockfile` passa |
-| 2 | TypeScript estrito + ESLint + Prettier em `packages/config` | `pnpm lint` e `pnpm typecheck` verdes num repo vazio |
-| 3 | Os 8 comandos obrigatórios existem e falham com mensagem clara quando não há o que rodar | `pnpm test`, `test:integration`, `test:e2e`, `build`, `dev` |
-| 4 | `docker-compose` com Postgres + Redis + MinIO | `docker compose up` sobe os três |
-| 5 | `packages/database` (ADR-020) com Prisma, migration inicial vazia e `seed.ts` | `pnpm --filter database migrate dev` |
-| 6 | `.github/workflows/ci.yml` — build, lint, typecheck, testes, guardas de evidência | CI verde no primeiro PR |
-| 7 | Board no GitHub: 5 colunas, 5 labels `proplan:*` | board existe |
-| 8 | Versionar os arquivos hoje *untracked* | `git status` limpo |
+**O `#` é identidade permanente, não ordem.** Ele é citado de fora — ADR-023 (`DECISIONS.md`), o
+`STATUS.md` §1/§6 e a *exceção de arranque* da §2 apontam para "item 7", "itens 1–6", "itens 1–8".
+Renumerar tornaria essas frases falsas em arquivo que não é do Code. Quem manda na execução é a
+coluna **ordem**.
+
+| # | ordem | passo | card | evidência de pronto |
+|---|---|---|---|---|
+| 7 | **1º** | Board no GitHub: 5 colunas, 5 labels `proplan:*` | — *(exceção de arranque)* | board existe |
+| 1 | 2º | Monorepo pnpm + Turborepo com o layout de `apps/`, `packages/`, `infra/` | [#42](https://github.com/RodReis/arenahub/issues/42) | `pnpm install --frozen-lockfile` passa |
+| 2 | 3º | TypeScript estrito + ESLint + Prettier em `packages/config` | [#43](https://github.com/RodReis/arenahub/issues/43) | `pnpm lint` e `pnpm typecheck` verdes num repo vazio |
+| 4 | 4º | `docker-compose` com Postgres + Redis + MinIO | [#45](https://github.com/RodReis/arenahub/issues/45) | `docker compose up` sobe os três |
+| 3 | 5º | Os 8 comandos obrigatórios existem e falham com mensagem clara quando não há o que rodar | [#44](https://github.com/RodReis/arenahub/issues/44) | `pnpm test`, `test:integration`, `test:e2e`, `build`, `dev` |
+| 5 | 6º | `packages/database` (ADR-020) com Prisma, migration inicial vazia e `seed.ts` | [#46](https://github.com/RodReis/arenahub/issues/46) | `pnpm --filter database migrate dev` |
+| 6 | 7º | `.github/workflows/ci.yml` — build, lint, typecheck, testes, guardas de evidência | [#47](https://github.com/RodReis/arenahub/issues/47) | CI verde no primeiro PR |
+| 8 | ✅ feito | Versionar os arquivos hoje *untracked* | — | `git status --untracked-files=all` vazio, 113 arquivos rastreados |
+
+**Por que o board é o 1º e não o 7º:** é ele que faz o resto virar processo normal. Na ordem
+antiga os itens 1–6 rodavam sob regime reduzido e o item 8 caía depois da exceção já morta.
+A **ordem** corrigiu isso; o **número** ficou onde estava, para não quebrar as citações externas.
+
+**O #4 (docker-compose) subiu na frente do #3.** Os 8 comandos incluem `test:integration`, que
+pressupõe Postgres de pé (Testcontainers). Fixar a mensagem de falha do #3 antes do banco existir
+é fixar duas vezes.
+
+**Item 6 (#47, CI) é o marco:** quando ele fecha, a *exceção de arranque* da §2 morre e o ciclo
+normal vale inteiro.
 
 **Não faça no bootstrap:** módulo de domínio, entidade, endpoint. Bootstrap é encanamento.
 
@@ -125,7 +143,7 @@ seria violar ADR-015, que reserva o Índice para Slices do PRD.
 | F1 | 0.1 Bancada reproduzível | qualquer pessoa reproduz o ambiente e o simulador roda em CI **sem hardware** (`M0-NFR-006`) | `HW-GATE-01` (entrada de bancada: máquina Windows, rede isolada, inventário, consentimento) |
 | F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | hardware |
 | F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | hardware |
-| F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | hardware, **ADR-011** |
+| F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | hardware |
 | F5 | 0.5 Relatório e decisão | decisão de saída do MVP 0 (`MVP-00` §15) com evidência: `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO` | F1–F4 |
 
 **A pergunta que F2 tem de responder e ninguém pode adivinhar:** o SDK do leitor facial exige
@@ -144,7 +162,7 @@ Entrada: decisão de saída do MVP 0 (`MVP-00` §15, `MVP-01` §1) = `GO` ou `GO
 |---|---|---|---|
 | F6 | 1.1 Core seguro e unidade | tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login. **Multiunidade desde o dia 1** (ADR-002): teste de isolamento por `gym_unit_id` junto com o de `tenant_id` | — |
 | F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — |
-| F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | **ADR-008** (base legal, RIPD, papéis); etapa física depende de hardware |
+| F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | etapa física depende de hardware |
 | F9 | 1.4 Decisão online e passagem | Access Decision Engine **na nuvem** (ADR-004), `AccessEvent`, `Passage`, tela pública | lista canônica de razões de `DENY` (`DESIGN-UI` §17 item 2) |
 | F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo e **alerta obrigatório quando o Edge some** (ADR-011) | F6–F9 |
 
@@ -165,7 +183,7 @@ link — não por calendário.
 
 | F | slice | núcleo | bloqueado por |
 |---|---|---|---|
-| F10 | 1.5 Operação offline | snapshot assinado, cache local, fila, reconciliação com idempotência | **ADR-007** (semântica de validade × carência, conflito), **ADR-011** (partes abertas) |
+| F10 | 1.5 Operação offline | snapshot assinado, cache local, fila, reconciliação com idempotência | **ADR-007** (semântica de validade × carência, conflito) |
 
 **Enquanto isto não existir, o combinado é:** a nuvem decide sempre (ADR-004); queda de link ou
 PC desligado caem na **liberação manual pela recepção** com registro (`M1-FR-023`), e o alerta de
