@@ -52,10 +52,55 @@ surpresa.
 
 Quatro pendências, duas delas parciais:
 
-- **ADR-011** — provisionamento de identidade do Edge e credencial de `/api/v1/edge/*`. Bloqueia F4.
-- **ADR-008** — base legal, RIPD e papéis controlador/operador. Bloqueia F8.
+- ~~**ADR-011** — provisionamento de identidade do Edge e credencial de `/api/v1/edge/*`. Bloqueia F4.~~ **Fechado na segunda rodada do mesmo dia.**
+- ~~**ADR-008** — base legal, RIPD e papéis controlador/operador. Bloqueia F8.~~ **Fechado na segunda rodada.** Sobrou transferência internacional de IA, que bloqueia F21.
 - **ADR-013** — o provedor em si, que sai do card `[GATE]` de homologação. Bloqueia F12–F16.
 - **ADR-007** — semântica offline. **Sem urgência**: migrou com F10 para o MVP 1.5.
+
+### Segunda rodada de 14/08/2026 — o que foi decidido e o que isso custou
+
+O PI abriu a sessão pedindo para "continuar". A leitura do repositório mostrou que **não havia
+trabalho de Cowork pendente — havia bloqueio**: 8 specs aprovadas sem board onde criar card, e 33
+travadas por decisão que só o PI toma. Documentar mais não moveria nada. A sessão virou, então,
+uma rodada de decisão.
+
+**ADR-011 fechou inteiro.** Pareamento por código de uso único → segredo por dispositivo no
+mecanismo seguro do Windows; rotação automática pelo agente; revogação imediata no painel. mTLS
+foi considerado e **recusado por custo de operar PKI** para uma unidade piloto — decisão datada,
+com gatilho de reabertura escrito (escala multi-unidade ou exigência enterprise).
+
+**Consequência que virou escopo:** o alerta de heartbeat de F11 passa a ter duas causas
+distintas — Edge ausente e falha de renovação de credencial. Tratar as duas como um alarme só faz
+a recepção ligar para a pessoa errada. Sem isso, a rotação automática se torna um jeito novo de a
+catraca parar em silêncio.
+
+**ADR-008 fechou em três dos quatro pontos — e corrigiu um erro material.** O ADR oferecia
+"legítimo interesse com LIA" como alternativa ao consentimento. **Essa hipótese não existe para
+dado biométrico:** é dado sensível (LGPD art. 5º, II) e o art. 11 é lista fechada onde legítimo
+interesse não figura. Um documento de governança afirmando o contrário é exatamente o papel que
+se entrega numa fiscalização — registrar o erro vale mais que apagá-lo.
+
+Decidido: **consentimento específico e destacado** (art. 11, I), com a alínea "g" recusada por
+ser estreita e por base legal ausente ter sido o fundamento nº 1 da suspensão no caso PR.
+**Academia controladora, ArenaHub operador**, com a fragilidade anotada em vez de escondida — nós
+definimos retenção, motor de decisão e política de log, e quem define meios é controlador; a
+mitigação é virar essas decisões em parâmetro do cliente. **RIPD por template nosso**, assinado
+pela academia, com revisão jurídica antes do primeiro cliente.
+
+**O que ficou explicitamente fora.** O ADR-013 **não** foi levado ao PI: ele já havia decidido que
+o provedor sai da homologação, e pedir a escolha agora seria fazê-lo desdizer o próprio ADR. O
+que sobra ali é modelagem, não fornecedor — as duas políticas do `M2-COMPLIANCE-01` e o **modelo
+de `Payment`, sem campos definidos em documento nenhum**: uma invoice paga em duas tentativas
+(PIX falho + cartão) não cabe no modelo atual. Fica para a rodada seguinte.
+
+**Correção de higiene documental.** O status `planejada` era definido como *"número reservado,
+arquivo não existe"* — mas o ADR-022 criou os 41 ponteiros de uma vez, e 25 arquivos existiam com
+esse status. A definição descrevia um mundo que tinha acabado no dia anterior. Redefinido para
+**"ponteiro criado, MVP ainda não discutido com o PI"**.
+
+**Fronteira respeitada.** O `docs/DEVELOPMENT.md` tem três referências obsoletas a ADR-011 e
+ADR-008 (linhas 128, 147, 168). **Não foram corrigidas aqui:** ADR-021 não dá esse arquivo ao
+Cowork, e ele é do Code. Fica como pendência declarada, não como conserto silencioso.
 
 ### Pendências criadas pelas próprias decisões
 

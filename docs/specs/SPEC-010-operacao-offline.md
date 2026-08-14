@@ -7,13 +7,13 @@
 | **Slice do PRD** | **1.5** — `docs/prd/academia/MVP-01-smart-access.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-01-05-offline-operation.md` |
 | **Status** | `em-revisao` |
-| **ADRs que bloqueiam** | ADR-007 e ADR-011 |
+| **ADRs que bloqueiam** | **ADR-007** apenas — o ADR-011 fechou em 14/08/2026 |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M1-FR/BR/NFR/AC`) e os
 > critérios de aceite **moram no PRD**, na Slice 1.5. Este arquivo não os copia — copiar cria
 > uma segunda verdade que diverge na primeira mudança.
 >
-> **Não pode ser aprovada:** depende de ADR-007 e ADR-011. Enquanto o ADR não fechar, o card não sai do Backlog.
+> **Não pode ser aprovada:** depende de **ADR-007** (o ADR-011 fechou em 14/08/2026). Enquanto o ADR não fechar, o card não sai do Backlog. **Sem urgência:** esta fatia migrou para o MVP 1.5 por ADR-012.
 
 ---
 

@@ -7,13 +7,15 @@
 | **Slice do PRD** | **1.3** — `docs/prd/academia/MVP-01-smart-access.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-01-03-biometrics-device-sync.md` |
 | **Status** | `em-revisao` |
-| **ADRs que bloqueiam** | ADR-008 (base legal, RIPD, papéis) |
+| **ADRs que bloqueiam** | nenhum — **ADR-008 resolvido em 14/08/2026** (consentimento art. 11, I; academia controladora e ArenaHub operador; RIPD por template nosso). O ponto que resta no ADR-008 é transferência internacional de IA de saúde, que é **F21**, não esta fatia |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M1-FR/BR/NFR/AC`) e os
 > critérios de aceite **moram no PRD**, na Slice 1.3. Este arquivo não os copia — copiar cria
 > uma segunda verdade que diverge na primeira mudança.
 >
-> **Não pode ser aprovada:** depende de ADR-008 (base legal, RIPD, papéis). Enquanto o ADR não fechar, o card não sai do Backlog.
+> **Bloqueio removido em 14/08/2026.** O ADR-008 fechou base legal (consentimento art. 11, I), papéis (academia controladora, ArenaHub operador) e RIPD (template nosso, assinatura dela). **Falta o ato de aprovação do PI.**
+>
+> **Escopo que estas decisões acrescentam a esta fatia:** contrato de tratamento do art. 39 com instruções documentadas, e as decisões de retenção/log expostas como **parâmetro do cliente** — é o que sustenta a posição de operador contra reclassificação pela ANPD.
 
 ---
 

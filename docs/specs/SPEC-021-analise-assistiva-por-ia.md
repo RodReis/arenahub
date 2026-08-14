@@ -7,7 +7,7 @@
 | **Slice do PRD** | **3.5** — `docs/prd/academia/MVP-03-health-intelligence.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-03-05-assisted-ai.md` |
 | **Status** | `planejada` |
-| **ADRs que bloqueiam** | nenhum |
+| **ADRs que bloqueiam** | **ADR-008** (ponto remanescente) — transferência internacional de dado sensível, se o provedor de IA estiver fora do Brasil |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M3-FR/BR/NFR/AC`) e os
 > critérios de aceite **moram no PRD**, na Slice 3.5. Este arquivo não os copia — copiar cria

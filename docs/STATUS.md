@@ -3,14 +3,21 @@
 > Kanban e roadmap. **Prosa curta mora aqui, sem detalhe** — detalhe vai para
 > `docs/STATUS-ARQUIVO.md`.
 >
-> **Donos deste arquivo:** o **Cowork** escreve **apenas** no *Índice Fatia ↔ SPEC* (uma linha
-> por spec aprovada). **Todo o resto é do Code.** Se o Cowork precisar mexer em outra seção,
-> para e pergunta ao PI.
+> **Dono deste arquivo: o Cowork, por inteiro** (ADR-021 dissolveu a divisão por seção que valia
+> antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
+> e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 14/08/2026 · **Fase:** documentação e planejamento · **Código:** zero linha
+**Última atualização:** 14/08/2026 *(segunda rodada)* · **Fase:** documentação e planejamento ·
+**Código:** zero linha
 
-**14/08/2026 — oito decisões novas + duas ratificações (ADR-005 e ADR-020).** Restam quatro
-pendências: ADR-013 e ADR-007 inteiros, ADR-011 e ADR-008 em parte.
+**14/08/2026, segunda rodada — ADR-011 e ADR-008 fechados.** F4 e F8 destravadas. Restam **duas**
+pendências, nenhuma no caminho crítico de hoje: ADR-013 (sai da homologação do MVP 2, não de
+escolha) e ADR-007 (migrou com F10 para o MVP 1.5). Um ponto remanescente do ADR-008 mudou de
+dono: bloqueia F21, não F8.
+
+**Correção material registrada:** o ADR-008 oferecia "legítimo interesse com LIA" como base legal
+alternativa. **Essa hipótese não existe para dado biométrico** — é dado sensível, e o art. 11 da
+LGPD é lista fechada onde legítimo interesse não figura. Corrigido no ADR.
 
 ---
 
@@ -23,9 +30,13 @@ O repositório tem PRDs aprovados para planejamento, planos de implementação p
 Nada pode ser codificado até que: (a) a spec da fatia esteja `aprovada-pi` em `docs/specs/`,
 e (b) os ADRs que a bloqueiam estejam resolvidos.
 
-**Próximo movimento:** criar o board e os cards `[INFRA]` de bootstrap; em paralelo, o Cowork
-escreve `SPEC-001` (bancada reproduzível). O MVP 0 depende de hardware, SDK e rede de
-laboratório — nada disso é decisão, é providência.
+**Próximo movimento: o gargalo não é mais documento.** As 41 specs existem, e as cinco do MVP 0
+estão sem ADR bloqueando. O que falta é execução em duas frentes que não dependem uma da outra:
+
+1. **Code:** bootstrap do monorepo e board no GitHub (`DEVELOPMENT.md` §4, itens 1–8).
+2. **PI:** providência física do MVP 0 — hardware Topdata, SDK e rede de laboratório. **Não é
+   decisão, é compra e agendamento**, e é o único caminho para responder se o SDK é Windows-only
+   — pergunta que muda a stack inteira do `edge-agent` e que nenhum documento responde.
 
 ---
 
@@ -52,12 +63,21 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 
 | ADR | o que falta | bloqueia |
 |---|---|---|
-| **ADR-011** *(parcial)* | **provisionamento de identidade** do Edge na instalação e **credencial** de `/api/v1/edge/*`: certificado ou segredo? Rotação e revogação por quem? | F4 |
-| **ADR-008** *(parcial)* | **base legal** (consentimento puro × legítimo interesse com LIA), **RIPD**, e papéis **controlador/operador** entre ArenaHub e academia | F8 |
-| **ADR-013** | provedor de pagamento — sai do card `[GATE]` de homologação, com matriz de critérios já definida no ADR | F12–F16 |
+| **ADR-008** *(ponto remanescente)* | **transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil. **Reapontado:** bloqueava F8 por engano — F8 não chama IA nenhuma | F21 |
+| **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que dá para fechar antes do gate são as duas políticas do `M2-COMPLIANCE-01` e o **modelo de `Payment`, que não tem campos definidos em documento nenhum** — invoice paga em duas tentativas (PIX falho + cartão) não cabe no modelo atual | F12–F16 |
 | **ADR-007** | semântica entre validade e carência offline; conflito de reconciliação; push ou pull de snapshot. **Sem urgência** — migrou com F10 para o MVP 1.5 | F10 |
 
-### 3.2 Decididos em 14/08/2026
+### 3.2 Decididos em 14/08/2026 — segunda rodada
+
+| ADR | decisão |
+|---|---|
+| **ADR-011** *(fecha o ADR)* | **Provisionamento por código de pareamento de uso único**, com TTL curto e vinculado a `tenant_id` + `gym_unit_id`; o agente troca por **segredo próprio por dispositivo**, guardado no DPAPI/Credential Manager. Nenhum segredo dentro do instalador. **mTLS recusado por custo de operar PKI** para uma unidade — decisão datada, reabre em escala ou por exigência enterprise |
+| **ADR-011** *(fecha o ADR)* | **Rotação automática** pelo próprio agente, com credencial de uso de vida curta; **revogação imediata pelo admin do tenant no painel**, sem chamado. **Consequência que vira escopo de F11:** o alerta de heartbeat passa a ter duas causas distintas — Edge ausente e falha de renovação de credencial |
+| **ADR-008** | **Base legal: consentimento específico e destacado (art. 11, I).** A alínea "g" (prevenção à fraude) foi **recusada** — hipótese estreita, com ressalva de direitos fundamentais no próprio texto, e base legal ausente foi o fundamento nº 1 da suspensão no caso PR |
+| **ADR-008** | **Academia é controladora, ArenaHub é operador**, com contrato de tratamento do art. 39 como entregável de F8. **Fragilidade registrada:** definimos retenção, motor de decisão e política de log — quem define meios é controlador, e a ANPD pode reclassificar. Mitigação: virar essas decisões em parâmetro do cliente, com padrão seguro |
+| **ADR-008** | **RIPD: template produzido pelo ArenaHub, adotado e assinado pela academia.** Passa por revisão jurídica antes do primeiro cliente — template errado escala o erro |
+
+### 3.3 Decididos em 14/08/2026 — primeira rodada
 
 | ADR | decisão |
 |---|---|
@@ -104,8 +124,14 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 > Regra (ADR-015): `Slice N.M` = `F<n>` = `SPEC-<nnn>`, mesmo número, alocado uma vez, nunca
 > reaproveitado. Planos de gate não são fatias — viram card `[GATE]`.
 >
-> `status` da spec: `planejada` (número reservado, arquivo não existe) → `rascunho` →
-> `em-revisao` → `aprovada-pi` → `entregue`. Mesmo conjunto em `docs/specs/README.md` §3.
+> `status` da spec: `planejada` → `rascunho` → `em-revisao` → `aprovada-pi` → `entregue`.
+> Mesmo conjunto em `docs/specs/README.md` §3.
+>
+> **Correção de 14/08/2026:** `planejada` era definido como *"número reservado, arquivo não
+> existe"*. Depois do ADR-022 os 41 arquivos-ponteiro passaram a ser criados de uma vez, e 25
+> deles existem com esse status — a definição descrevia um mundo que acabou. `planejada` agora
+> significa: **ponteiro criado, MVP ainda não discutido com o PI.** Não há pergunta apresentada,
+> logo não há o que aprovar.
 
 | F | SPEC | MVP | Slice | título | spec | issue | status |
 |---|---|---|---|---|---|---|---|
@@ -169,6 +195,20 @@ com gates distintos. F8 permanece **uma** fatia, com a etapa de sync físico blo
 4. `docker-compose` local: Postgres + Redis + MinIO.
 5. Colocar sob versionamento os arquivos hoje *untracked* (`CLAUDE.md`, `docs/DESIGN-UI.md`,
    `docs/TESTING.md`, a Especificação Completa e os documentos criados em 14/08/2026).
+
+### Pendência entregue ao Code — arquivo que não é do Cowork
+
+O `docs/DEVELOPMENT.md` ficou com **três referências obsoletas** depois da segunda rodada de
+14/08/2026, e o ADR-021 **não** dá esse arquivo ao Cowork. Correção é do Code:
+
+| linha | o que diz hoje | o que passou a valer |
+|---|---|---|
+| 128 (F4) | bloqueio "hardware, **ADR-011**" | só hardware — ADR-011 fechou |
+| 147 (F8) | bloqueio "**ADR-008** (base legal, RIPD, papéis)" | só a etapa física por hardware — ADR-008 fechou nesses três pontos |
+| 168 (F10) | "**ADR-011** (partes abertas)" | só ADR-007 |
+
+Anotado em vez de corrigido de propósito: consertar arquivo de outro dono sem pedir é a erosão
+que o ADR-021 nomeia — três exceções viram a regra real.
 
 ---
 

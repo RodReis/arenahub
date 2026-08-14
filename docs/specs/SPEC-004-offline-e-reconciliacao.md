@@ -7,13 +7,13 @@
 | **Slice do PRD** | **0.4** — `docs/prd/academia/MVP-00-poc-topdata.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-00-poc-topdata.md` |
 | **Status** | `em-revisao` |
-| **ADRs que bloqueiam** | ADR-011 (provisionamento e credencial do Edge) |
+| **ADRs que bloqueiam** | nenhum — **ADR-011 resolvido em 14/08/2026** (pareamento de uso único, segredo por dispositivo, rotação automática) |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M0-FR/BR/NFR/AC`) e os
 > critérios de aceite **moram no PRD**, na Slice 0.4. Este arquivo não os copia — copiar cria
 > uma segunda verdade que diverge na primeira mudança.
 >
-> **Não pode ser aprovada:** depende de ADR-011 (provisionamento e credencial do Edge). Enquanto o ADR não fechar, o card não sai do Backlog.
+> **Bloqueio removido em 14/08/2026.** O ADR-011 fechou: pareamento por código de uso único, segredo por dispositivo no mecanismo seguro do Windows, rotação automática e revogação no painel. **Falta o ato de aprovação do PI** para o status virar `aprovada-pi` — o portão agora é ele, não o ADR.
 
 ---
 

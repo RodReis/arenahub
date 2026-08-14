@@ -52,7 +52,9 @@ reaproveitado** (ADR-015). `SPEC-<nnn>` e `F<n>` compartilham o número por cons
 ## 3. Ciclo de vida
 
 ```
-planejada          número reservado no Índice, arquivo ainda não existe
+planejada          ponteiro criado, MVP ainda não discutido com o PI
+                   (antes do ADR-022 isto queria dizer "arquivo não existe" —
+                    hoje os 41 arquivos existem; o que falta é a conversa)
    │
    ▼
 rascunho

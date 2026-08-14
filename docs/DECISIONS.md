@@ -262,8 +262,9 @@ allow ilimitado (`M1-BR-008`).
 <a id="adr-008"></a>
 ## ADR-008 — Regime de dado biométrico sob LGPD
 
-**Data:** 14/08/2026 · **Status:** `aceito` na parte estrutural *(consolidação — `M1-BR-004`,
-`M1-BR-005`, `M1-FR-014`, `prd/README.md` §6.4)*, com pontos `abertos` que **exigem o PI**
+**Data:** 14/08/2026 · **Status:** `aceito` *(consolidação — `M1-BR-004`, `M1-BR-005`,
+`M1-FR-014`, `prd/README.md` §6.4; base legal, papéis e RIPD decididos pelo PI na segunda rodada
+de 14/08/2026)* · **Bloqueia:** nada em F8. Resta **um** ponto aberto, e ele bloqueia **F21**
 
 **Contexto — e por que isto não é burocracia.** Em **04/08/2026**, dez dias antes deste ADR, a
 ANPD determinou por Despacho Decisório nº 2/2026/SFI a **suspensão imediata** do
@@ -297,13 +298,59 @@ atuando antes dela. Detalhe e fontes em `docs/LANDSCAPE.md` §4.
    aluno, como se comprova, e o que acontece na virada dos 18 anos. No caso do Paraná, ser menor
    foi agravante — aqui é requisito de entrada.
 
-**Pontos que continuam abertos — bloqueiam F8.**
+**Correção de premissa — a alternativa que este ADR oferecia não existia.**
 
-- **Base legal.** Consentimento puro ou legítimo interesse com LIA documentada?
-- **RIPD.** Relatório de impacto é provável exigência para facial em escala. Quem produz?
-- **Papéis.** ArenaHub é operador e a academia controladora? Isso muda quem responde.
-- **IA de saúde.** Se o provedor de IA estiver fora do Brasil, há transferência internacional
-  de dado sensível a tratar.
+A versão anterior colocava a escolha como *"consentimento puro **ou** legítimo interesse com LIA
+documentada"*. **Legítimo interesse não está disponível para dado biométrico.** Biometria é dado
+pessoal **sensível** (LGPD art. 5º, II), e o art. 11 é **lista fechada** — legítimo interesse
+(art. 7º, IX) não figura nela. Registrar aqui porque documento errado sobre base legal é pior que
+documento ausente: é o que se entrega numa fiscalização.
+
+As hipóteses realmente disponíveis eram duas: consentimento específico e destacado (art. 11, I)
+ou a alínea "g" do art. 11, II — prevenção à fraude e segurança do titular em processo de
+identificação e autenticação.
+
+> **Não somos advogados.** Esta leitura precisa de confirmação de profissional habilitado antes
+> de ir para contrato ou para resposta à ANPD. O que este ADR fixa é a **direção de produto**, e
+> a direção existe para o advogado revisar — não para substituí-lo.
+
+**Decidido pelo PI em 14/08/2026 — segunda rodada.**
+
+9. **Base legal: consentimento específico e destacado (art. 11, I).** É a única coerente com o
+   que já estava decidido: o caminho alternativo não-biométrico de primeira classe (decisão 2) é
+   exatamente o que torna o consentimento **livre**. Sem ele não haveria consentimento válido, e
+   sim coação comercial. A contrapartida é assumida: consentimento é revogável a qualquer tempo,
+   e o produto tem que aguentar — a decisão 3 (bloqueio lógico imediato) já é essa capacidade.
+   **Não usar a alínea "g" como base.** Ela é estreita, traz ressalva expressa de direitos
+   fundamentais no próprio texto, e no caso PR o fundamento nº 1 da suspensão foi ausência de
+   base legal. Apostar nela é apostar contra o precedente mais recente.
+
+10. **Papéis: academia é controladora, ArenaHub é operador.** Leitura padrão de SaaS — a academia
+    decide coletar biometria dos seus alunos e para quê; o ArenaHub trata em nome dela. **Exige
+    contrato de tratamento (art. 39) com instruções documentadas**, e isso é entregável de F8,
+    não papelada de contrato comercial.
+
+    **Fragilidade registrada, não escondida:** o ArenaHub define retenção de 30 dias, o motor de
+    decisão e o que é logado. Quem define finalidade **e meios** é controlador. A ANPD pode
+    reclassificar. **Mitigação de produto:** as decisões que hoje são nossas viram *parâmetro do
+    cliente* com padrão seguro (retenção, política de log, razões de `DENY`), alinhando o papel
+    jurídico ao fato técnico em vez de escolher entre os dois. Gatilho de revisão: primeiro
+    cliente que exigir controladoria conjunta em contrato.
+
+11. **RIPD: ArenaHub produz o template, a academia adota e assina.** Só quem conhece o fluxo do
+    dado consegue descrevê-lo tecnicamente; a academia, como controladora, responde por ele.
+    Vira ativo comercial — cliente que exige RIPD já recebe pronto. **Não adiar até a norma da
+    ANPD sair:** a ANPD está atuando **antes** dela (04/08/2026 é a prova). RIPD é o documento
+    que se quer já ter no dia em que perguntam, não o que se começa nesse dia.
+    **Risco assumido:** template errado escala o erro para todo cliente futuro — por isso ele
+    passa por revisão jurídica antes do primeiro cliente, não depois.
+
+**Continua aberto — e bloqueia F21, não F8.**
+
+- **IA de saúde e transferência internacional.** Se o provedor de IA estiver fora do Brasil, há
+  transferência internacional de dado **sensível** a tratar (cláusulas-padrão, adequação ou
+  consentimento específico para a transferência). Isto é MVP 3 — **F21**, análise assistiva por
+  IA. Estava listado como bloqueio de F8 por engano: F8 não chama IA nenhuma.
 
 ---
 
@@ -381,8 +428,9 @@ POC fazendo exatamente o que existe para fazer.
 <a id="adr-011"></a>
 ## ADR-011 — Ciclo de vida do edge-agent e versionamento do contrato Edge
 
-**Data:** 14/08/2026 · **Status:** `aceito` na máquina e na mitigação *(decidido pelo PI em
-14/08/2026)*, com provisionamento e credencial ainda `abertos` · **Bloqueia:** F4
+**Data:** 14/08/2026 · **Status:** `aceito`, **completo** *(máquina e mitigação decididas pelo PI
+em 14/08/2026; provisionamento e credencial na segunda rodada do mesmo dia)* · **Bloqueia:**
+nada — **F4 destravada**
 
 **Contexto.** O `edge-agent` é missão crítica — se ele para, a catraca para — e roda em
 máquina que **não controlamos**, dentro da academia. A Especificação lhe dá 12
@@ -419,14 +467,40 @@ offline do MVP 1, **a disponibilidade da catraca passa a ser exatamente o uptime
 **Já respondido pelo PRD, agora completo:** serviço Windows, atualização com rollback, janela de
 convivência de duas versões, segredo guardado pelo mecanismo seguro do Windows.
 
-**Continuam abertos — bloqueiam F4.**
+**Decidido pelo PI em 14/08/2026 — provisionamento e credencial.** Eram as duas perguntas que
+faziam F4 implementável mas não instalável em academia real. Fechadas juntas porque são a mesma
+decisão vista de dois ângulos: como o agente *ganha* identidade e o que ele *apresenta* depois.
 
-1. **Provisionamento inicial.** Como o agente ganha identidade na instalação: certificado
-   emitido, código de pareamento, token de uso único? Quem instala fisicamente?
-2. **Credencial.** `/api/v1/edge/*` usa "certificado **ou** segredo" — a barra continua sendo
-   decisão não tomada. Rotação e revogação, como e por quem?
+**1. Provisionamento: código de pareamento de uso único.** O painel gera um código com TTL curto,
+vinculado a `tenant_id` + `gym_unit_id`. Quem instala digita uma vez; o agente troca o código por
+um **segredo próprio, por dispositivo**, e o código morre no primeiro uso. Não há segredo dentro
+do instalador — o pacote de instalação é inerte e pode circular por e-mail sem ser credencial.
 
-**Sem estes dois, F4 é implementável mas não instalável em academia real.**
+**2. Credencial: segredo por dispositivo, guardado pelo mecanismo seguro do Windows.** Resolve a
+barra do `certificado **ou** segredo`: é **segredo**. A guarda é DPAPI/Credential Manager, como
+`MVP-01` §15 já exigia. `/api/v1/edge/*` autentica por esse segredo.
+
+**Por que não mTLS.** Certificado por dispositivo é mais forte — segredo copiado do disco não
+basta. Mas exige operar uma CA: emissão, renovação, CRL ou OCSP. Para **uma** unidade piloto, num
+PC de recepção sem TI, o custo de operar PKI supera o ganho. **Decisão datada, não permanente:**
+multi-unidade em escala, ou exigência de cliente enterprise, reabre isto.
+
+**3. Rotação: automática, pelo próprio agente.** A credencial de uso é de vida curta e o agente a
+renova sozinho contra o segredo de dispositivo. Segredo que nunca muda em máquina compartilhada é
+achado de auditoria — e o caso PR mostrou que controle de acesso é o que a ANPD olha.
+
+**4. Revogação: imediata, pelo admin do tenant, no painel.** Sem chamado e sem suporte no
+caminho. Revogar o dispositivo invalida o segredo na hora; o agente volta a precisar de novo
+pareamento.
+
+**Consequência que precisa virar escopo, não descoberta em produção.** Renovação automática que
+falha silenciosamente derruba a catraca — e sem offline no MVP 1 (ADR-012), derruba de verdade.
+O alerta de heartbeat obrigatório em **F11** (`M1-FR-018`) passa a ter **duas causas distintas**:
+Edge ausente e **falha de renovação de credencial**. Tratar as duas como um alarme só faz a
+recepção ligar para a pessoa errada.
+
+**Risco residual aceito:** um segredo de dispositivo exfiltrado do PC vale até ser revogado.
+Mitigação é a rotação curta e o log de uso por dispositivo, não a arquitetura.
 
 ---
 
@@ -814,6 +888,12 @@ possíveis: fingir que existiam, ou fazer a afirmação virar verdade. A primeir
 | `aprovada-pi` | 8 | F1, F2, F3, F5, F6, F7, F9, F11 | MVP 0 e MVP 1 sem ADR aberto bloqueando |
 | `em-revisao` | 8 | F4, F8, F10, F12–F16 | dependem de ADR-007, ADR-008, ADR-011 ou ADR-013 |
 | `planejada` | 25 | F17–F41 | MVP 3 a 6. **O PI não pode aprovar hoje o que ainda não foi discutido** |
+
+**Atualização de 14/08/2026, segunda rodada.** Com ADR-011 e ADR-008 fechados, **F4 e F8 perderam
+o bloqueio** e aguardam só o ato de aprovação do PI; F10 fica com ADR-007 apenas. `em-revisao`
+passa a ser 8 fatias das quais 2 estão prontas para aprovar. O status `planejada` também mudou de
+significado — não é mais "arquivo não existe", já que os 41 ponteiros foram criados pelo ADR-022;
+hoje quer dizer **"MVP ainda não discutido com o PI"**. Ver `docs/specs/README.md` §3.
 
 **Consequência no ciclo de vida.** O card de fatia passa a ser criado para **todas** as fatias,
 em Backlog. O que muda é a saída: **o card só vai para `proplan:todo` se a spec estiver

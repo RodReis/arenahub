@@ -89,7 +89,7 @@ justifique** e ADR (`docs/prd/README.md` §5.1).
 | `admin-web` | Next.js (SSR) | internet | contínua |
 | `mobile` | Expo / RN | internet | loja (ver `M4-DIST-01`) |
 | `kiosk` | Next.js PWA em quiosque | rede da academia | contínua |
-| `edge-agent` | serviço Windows no **PC da recepção** (ADR-011) | rede local | atualização com rollback (`M1-NFR-006`); abertos: provisionamento e credencial |
+| `edge-agent` | serviço Windows no **PC da recepção** (ADR-011) | rede local | atualização com rollback (`M1-NFR-006`); identidade por **código de pareamento de uso único**, credencial de **segredo por dispositivo** no DPAPI/Credential Manager, rotação automática e revogação no painel (ADR-011) |
 
 O `edge-agent` é o componente de missão crítica hospedado em infraestrutura que **não
 controlamos**. Se ele cair, a catraca para. Todo desenho do módulo `edge` parte disso.
@@ -426,11 +426,16 @@ Está aberto, com ADR correspondente. Não invente resposta — pergunte ao PI.
 |---|---|
 | Semântica de validade × carência offline e conflito de reconciliação | ADR-007 *(sem urgência — migrou com F10 para o MVP 1.5)* |
 | Provedor de pagamento e modelo de `Payment` | ADR-013 *(sai do card `[GATE]` de homologação)* |
-| **Base legal**, RIPD e papéis controlador/operador da biometria | ADR-008, parte aberta |
-| **Provisionamento de identidade** do Edge e **credencial** de `/api/v1/edge/*` | ADR-011, parte aberta |
+| **Transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil | ADR-008, ponto remanescente *(bloqueia **F21**, não F8)* |
 
 **Decididos em 14/08/2026** — não reabrir sem ADR novo: hierarquia de dois níveis (ADR-002),
 decisão de acesso na nuvem (ADR-004), vocabulário único (ADR-005), retenção de 30 dias e
 consentimento de menor (ADR-008), entitlement sem convênio hoje (ADR-009), Edge no PC da
 recepção (ADR-011), offline no MVP 1.5 (ADR-012), âncora de bloqueio configurável (ADR-019) e
 `packages/database` (ADR-020). Detalhe em `docs/DECISIONS.md`.
+
+**Acrescentado na segunda rodada de 14/08/2026:** identidade e credencial do Edge por pareamento
+de uso único + segredo por dispositivo, com rotação automática (ADR-011); base legal da biometria
+por **consentimento específico e destacado**, academia controladora e ArenaHub operador, RIPD por
+template nosso (ADR-008). **Correção registrada:** legítimo interesse não é hipótese disponível
+para dado sensível — o art. 11 da LGPD é lista fechada.

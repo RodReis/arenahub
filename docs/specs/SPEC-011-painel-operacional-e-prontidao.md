@@ -7,7 +7,7 @@
 | **Slice do PRD** | **1.6** — `docs/prd/academia/MVP-01-smart-access.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-01-06-operational-dashboard.md` |
 | **Status** | `aprovada-pi` |
-| **ADRs que bloqueiam** | nenhum |
+| **ADRs que bloqueiam** | nenhum. **Escopo acrescentado por ADR-011 (14/08/2026):** o alerta de heartbeat tem duas causas distintas — Edge ausente e falha de renovação de credencial |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M1-FR/BR/NFR/AC`) e os
 > critérios de aceite **moram no PRD**, na Slice 1.6. Este arquivo não os copia — copiar cria
