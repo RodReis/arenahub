@@ -15,7 +15,11 @@
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "test:e2e": "turbo run test:e2e",
-    "build": "turbo run build"
+    "build": "turbo run build",
+    "docker:up": "docker compose --env-file .env -f infra/docker/docker-compose.yml up -d --wait",
+    "docker:down": "docker compose --env-file .env -f infra/docker/docker-compose.yml down",
+    "docker:reset": "docker compose --env-file .env -f infra/docker/docker-compose.yml down -v",
+    "docker:logs": "docker compose --env-file .env -f infra/docker/docker-compose.yml logs -f"
   },
   "devDependencies": {
     "turbo": "2.10.10"

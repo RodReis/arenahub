@@ -1,0 +1,91 @@
+# Ambiente de desenvolvimento local do ArenaHub.
+#
+# Sobe Postgres, Redis e MinIO. Nada de negocio e pre-criado aqui: sem bucket,
+# sem schema, sem fila. Schema entra pelas migrations (packages/database);
+# dado local entra por seed.
+#
+#   docker compose --env-file .env -f infra/docker/docker-compose.yml up -d
+#
+# O --env-file e obrigatorio. O Compose procura o .env ao lado do YAML, nao na
+# raiz do projeto -- sem a flag, o .env da raiz e ignorado em silencio e as
+# portas caem no valor padrao. Use o script `pnpm docker:up`, que ja passa a
+# flag, em vez de digitar o comando longo.
+#
+# Todas as imagens tem tag fixa. Ambiente reproduzivel e requisito do MVP 0
+# (M0-NFR-006: qualquer pessoa reproduz a bancada).
+
+name: arenahub
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: arenahub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-arenahub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arenahub_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-arenahub}
+      # Ordenacao pt-BR via ICU, nao via locale do sistema.
+      #
+      # A imagem e Alpine (musl) e NAO tem os dados de locale da glibc. Com
+      # `LANG: pt_BR.UTF-8` sozinho o initdb aceita o rotulo, o datcollate
+      # mostra "pt_BR.UTF-8" e a ordenacao cai em byte: 'agua' vem depois de
+      # 'zebra'. Bug silencioso -- o banco mente sobre o proprio collation.
+      #
+      # ICU nao depende do locale do SO e ordena certo. Verificado:
+      # 'acao, acucar, agua, zebra'.
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=pt-BR --encoding=UTF8 --locale=C"
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arenahub} -d ${POSTGRES_DB:-arenahub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:8-alpine
+    container_name: arenahub-redis
+    restart: unless-stopped
+    # appendonly: a fila nao pode perder job num restart de container. Vale
+    # para o dia em que BullMQ for adotado -- ver a nota no README deste
+    # diretorio: provisionar nao e adotar.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: arenahub-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-arenahub}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-arenahub_dev_minio}
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
