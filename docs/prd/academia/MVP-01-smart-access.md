@@ -2,7 +2,7 @@
 
 ## 1. Controle
 
-- Status: RASCUNHO — aguardando revisão
+- Status: APROVADO para planejamento em 14/08/2026
 - Dependência obrigatória: MVP 0 com decisão `GO` ou `GO_WITH_CONSTRAINTS`
 - Resultado: primeira unidade operando acesso físico pelo ArenaHub
 - Modelo financeiro deste MVP: assinatura e confirmação manual, sem gateway de pagamento

@@ -2,7 +2,7 @@
 
 ## 1. Controle
 
-- Status: RASCUNHO — aguardando revisão
+- Status: APROVADO para planejamento em 14/08/2026
 - Dependências: APIs estáveis dos MVPs 1, 2 e 3
 - Resultado: aluno consulta dados e resolve jornadas essenciais sem depender da recepção
 - Canais: aplicativo Expo/React Native e totem Next.js PWA em modo kiosk

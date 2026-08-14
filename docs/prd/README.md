@@ -9,7 +9,8 @@
 - Modelo: SaaS multi-tenant
 - Cliente inaugural: Complexo Arena Positiva
 - Arquitetura: monólito modular no cloud e Edge Agent local
-- Status dos PRDs: aguardando revisão do responsável pelo produto
+- Status dos PRDs: APROVADOS para planejamento
+- Aprovação: 14/08/2026
 - Última revisão estrutural: 14/08/2026
 
 ## 2. Objetivo

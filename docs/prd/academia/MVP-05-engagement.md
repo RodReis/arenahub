@@ -2,7 +2,7 @@
 
 ## 1. Controle
 
-- Status: RASCUNHO — aguardando revisão
+- Status: APROVADO para planejamento em 14/08/2026
 - Dependências: eventos confiáveis de acesso, frequência e avaliações; app do MVP 4 disponível
 - Resultado: engajamento voluntário, mensurável e seguro sem incentivar comportamento excessivo
 - Princípio: participação em ranking e uso público de identidade são opt-in separados

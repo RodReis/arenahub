@@ -2,7 +2,7 @@
 
 ## 1. Controle
 
-- Status: RASCUNHO — aguardando revisão
+- Status: APROVADO para planejamento em 14/08/2026
 - Dependência: MVP 1 concluído e estável
 - Resultado: confirmação financeira ativa ou restaura entitlement automaticamente
 - Princípio: pagamento é evento financeiro; entitlement continua sendo a única fonte de decisão de acesso

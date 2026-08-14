@@ -2,7 +2,7 @@
 
 ## 1. Controle
 
-- Status: RASCUNHO — aguardando revisão
+- Status: APROVADO para planejamento em 14/08/2026
 - Responsável de produto: ArenaHub
 - Tipo: prova técnica descartável com artefatos reutilizáveis apenas após revisão
 - Gate de saída: decisão documentada de `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO`

@@ -2,7 +2,7 @@
 
 ## 1. Controle
 
-- Status: RASCUNHO — aguardando revisão
+- Status: APROVADO para planejamento em 14/08/2026
 - Dependências: dados históricos confiáveis dos MVPs 1 a 5
 - Resultado: risco de churn explicável convertido em tarefa operacional e resultado mensurável
 - Restrição: nenhuma decisão adversa, desconto ou mensagem é executada automaticamente pelo modelo

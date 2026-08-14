@@ -2,7 +2,7 @@
 
 ## 1. Controle
 
-- Status: RASCUNHO — aguardando revisão
+- Status: APROVADO para planejamento em 14/08/2026
 - Dependência: identidade, alunos e eventos de frequência do MVP 1 estáveis
 - Resultado: avaliação física rastreável, comparável e acompanhada por análise assistiva
 - Limite clínico: acompanhamento informativo, nunca diagnóstico ou prescrição médica
