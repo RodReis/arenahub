@@ -51,6 +51,7 @@ existe para expulsar deste repositório.
 | [019](#adr-019) | Contagem de carência e instante de bloqueio | `aceito` | — |
 | [020](#adr-020) | Onde mora o schema Prisma | `aceito` | — |
 | [021](#adr-021) | Escopo de escrita do Cowork na `main` | `aceito` | — |
+| [022](#adr-022) | A Slice do PRD é a spec; o arquivo em `docs/specs/` é ponteiro | `aceito` | — |
 
 ---
 
@@ -775,3 +776,50 @@ A garantia do processo nunca esteve no *quem commita documento* — esteve em **
 arquivo inteiro. Vale a regra inversa e explícita: **se o Code encontrar `STATUS.md` divergente,
 a versão da `main` vence e ele reaplica o próprio progresso por cima** — nunca desfaz linha do
 Cowork.
+
+---
+
+<a id="adr-022"></a>
+## ADR-022 — A Slice do PRD é a spec; o arquivo em `docs/specs/` é ponteiro
+
+**Data:** 14/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 14/08/2026**)*
+· **Emenda** o `CLAUDE.md` → *Ciclo de vida de uma fatia*, passo 1
+
+**Contexto.** O ADR-014 criou `docs/specs/` como artefato próprio. Na prática, o repositório já
+tem **três camadas** descrevendo cada fatia: o PRD (FR/BR/NFR/AC numerados, gates, checklist), o
+plano em `docs/superpowers/plans/` (passos e arquivos) e agora a spec. Escrever uma quarta
+descrição do mesmo escopo produz divergência garantida — é o que o próprio `docs/specs/README.md`
+já alertava.
+
+O gatilho foi concreto: o PI declarou as specs aprovadas quando **nenhuma existia**. Duas saídas
+possíveis: fingir que existiam, ou fazer a afirmação virar verdade. A primeira é exatamente o
+"fechamento frágil" que este processo combate.
+
+**Decisão.**
+
+1. **A `Slice N.M` do PRD é a spec da fatia.** Escopo, requisitos e critérios de aceite moram lá,
+   e só lá.
+2. **`docs/specs/SPEC-<nnn>-<slug>.md` é um ponteiro fino**, com: fatia, MVP, slice, plano de
+   apoio, **status**, **ADRs que bloqueiam**, e quatro seções que o PRD não cobre — decisões
+   específicas da fatia, escopo negativo, invariantes tocadas, perguntas ao PI.
+3. **O arquivo existe para todas as 41 fatias desde já.** Isso torna o token `[SPEC-<nnn>]` do
+   título de issue **verdadeiro** — a regra de ouro do `CLAUDE.md` continua de pé.
+4. **O status é que autoriza, não a existência.** `aprovada-pi` só quando não há ADR aberto
+   bloqueando **e** o PI olhou a fatia de verdade.
+
+**Estado inicial, registrado com honestidade:**
+
+| status | quantas | quais | por quê |
+|---|---|---|---|
+| `aprovada-pi` | 8 | F1, F2, F3, F5, F6, F7, F9, F11 | MVP 0 e MVP 1 sem ADR aberto bloqueando |
+| `em-revisao` | 8 | F4, F8, F10, F12–F16 | dependem de ADR-007, ADR-008, ADR-011 ou ADR-013 |
+| `planejada` | 25 | F17–F41 | MVP 3 a 6. **O PI não pode aprovar hoje o que ainda não foi discutido** |
+
+**Consequência no ciclo de vida.** O card de fatia passa a ser criado para **todas** as fatias,
+em Backlog. O que muda é a saída: **o card só vai para `proplan:todo` se a spec estiver
+`aprovada-pi` e os ADRs listados nela estiverem resolvidos.** Backlog vira estacionamento
+visível; o portão não se moveu, só ficou mais cedo.
+
+**O que este ADR não afrouxa.** Continua proibido codificar fatia com spec fora de
+`aprovada-pi`; continua valendo que decisão de produto é do PI; continua valendo que o Code
+pergunta em vez de assumir. A mudança é de **onde o escopo mora**, não de **quem decide**.

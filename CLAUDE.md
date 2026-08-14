@@ -37,8 +37,8 @@ A divisão é **por arquivo** (ADR-021): documento de governança é do Cowork; 
 
 Isto é convenção **nossa**, executada à mão via GitHub MCP: o **Cowork cria** a issue de fatia, o **Code move e entrega** (e cria a própria issue de correção — ver *Correção: o Code cria a própria issue*). **Nada disso vira código do ArenaHub** — é processo do trio, não feature do produto.
 
-1. **Spec vira `aprovada-pi`** → o **Cowork** pusha a spec na `main`, registra a fatia no **Índice Fatia ↔ SPEC** do `docs/STATUS.md` e cria a issue no board: coluna **Backlog** (`proplan:backlog`), título no **Padrão de título de issue** (ver abaixo), corpo com link para o arquivo da spec, assignee = **PI**.
-2. **Code começa** → move da Backlog para **A Fazer** (`proplan:todo`) ao pegar e para **Em Andamento** (`proplan:doing`) ao iniciar; se atribui.
+1. **Fatia ganha spec** → o **Cowork** pusha o arquivo de spec na `main` (ponteiro para a Slice do PRD — **ADR-022**), registra a fatia no **Índice Fatia ↔ SPEC** do `docs/STATUS.md` e cria a issue no board: coluna **Backlog** (`proplan:backlog`), título no **Padrão de título de issue** (ver abaixo), corpo com link para o arquivo da spec, assignee = **PI**.
+2. **Code começa** → **só se a spec estiver `aprovada-pi` e os ADRs que ela lista estiverem resolvidos.** Move da Backlog para **A Fazer** (`proplan:todo`) ao pegar e para **Em Andamento** (`proplan:doing`) ao iniciar; se atribui. Card em Backlog com spec `em-revisao` ou `planejada` **não se pega**.
 3. **Code entrega** → abre PR com **`refs #N`** no corpo. **NUNCA `closes #N`** — fecharia a issue no merge e **forjaria o aceite do PI**. **O merge é do próprio Code**, com o CI verde — o PI não mergeia. O CI verifica **build, lint, testes e as guardas de evidência** (`docs/TESTING.md`). Rodar `pnpm build` e `pnpm lint` antes de abrir o PR continua valendo, mas agora por economia de ciclo, não porque o CI deixaria passar. Só **depois do merge**, o Code aplica `proplan:done` → card vai para **Feito**, com o **link do PR** no corpo da issue. Declarar "terminei" **sem PR mergeado** é "fechamento frágil" — este processo existe para impedi-lo; não o produza aqui dentro.
 4. **PI aceita** → **só o PI** fecha a issue e aplica `proplan:finalizado`. **A issue só fecha quando o trabalho realmente acabou.** Nenhuma automação pode forjar aceite. O Code **nunca** fecha issue nem move card para Finalizado.
 
@@ -221,7 +221,7 @@ Use a que existir no ambiente; a ausência de uma skill não é desculpa para pu
 - `docs/prd/README.md` — **contrato de produto e engenharia** (documento master): arquitetura de referência, padrões transversais, comandos, estilo, testes, definição de pronto e rastreabilidade. Decisão que o contraria **emenda o parágrafo** com nota apontando o ADR.
 - `docs/prd/academia/MVP-*.md` (MVP-00 a MVP-06) — requisitos por MVP: FR/NFR/BR/AC, slices, gates de entrada e checklists de execução.
 - `docs/Especificação Completa — Plataforma Inteligente de Gestão para Academias.md` — visão ampla de origem. **Não é normativo**: onde conflitar com PRD, ADR ou `CONVENTION.md`, prevalece o documento mais específico.
-- `docs/specs/` — spec por fatia (`SPEC-<nnn>-<slug>.md`). Só o Cowork escreve. `docs/specs/README.md` explica o formato e o que a spec **não** deve duplicar do PRD.
+- `docs/specs/` — spec por fatia (`SPEC-<nnn>-<slug>.md`), **ponteiro para a Slice do PRD** (ADR-022). Só o Cowork escreve. O escopo mora no PRD; a spec acrescenta decisões da fatia, escopo negativo, invariantes tocadas e perguntas ao PI.
 - `docs/DEVELOPMENT.md` — **sua ordem de execução e status por item** (você é o dono; atualize a cada entrega junto com STATUS.md).
 - `docs/ARCHITECTURE.md` — desenho, módulos, dados, resiliência.
 - `docs/DECISIONS.md` — ADRs (ler antes de propor mudança estrutural). **ADR-021** define quem escreve o quê no Git.

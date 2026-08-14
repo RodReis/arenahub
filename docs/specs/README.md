@@ -8,6 +8,9 @@
 
 ---
 
+> **ADR-022 (14/08/2026): a `Slice N.M` do PRD É a spec.** Este arquivo é o ponteiro para ela.
+> As 41 existem desde 14/08/2026 — o que autoriza codificar é o **status**, não a existência.
+
 ## 1. O que a spec é — e o que ela não é
 
 A spec deste projeto é **fina de propósito**.

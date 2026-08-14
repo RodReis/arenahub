@@ -109,47 +109,47 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 
 | F | SPEC | MVP | Slice | título | spec | issue | status |
 |---|---|---|---|---|---|---|---|
-| F1 | SPEC-001 | 0 | 0.1 | Bancada reproduzível | — | — | planejada |
-| F2 | SPEC-002 | 0 | 0.2 | Ciclo de vida facial | — | — | planejada |
-| F3 | SPEC-003 | 0 | 0.3 | Catraca e passagem | — | — | planejada |
-| F4 | SPEC-004 | 0 | 0.4 | Offline e reconciliação | — | — | planejada |
-| F5 | SPEC-005 | 0 | 0.5 | Relatório e decisão | — | — | planejada |
-| F6 | SPEC-006 | 1 | 1.1 | Core seguro e unidade | — | — | planejada |
-| F7 | SPEC-007 | 1 | 1.2 | Aluno, plano e entitlement manual | — | — | planejada |
-| F8 | SPEC-008 | 1 | 1.3 | Consentimento, biometria e sync de dispositivo | — | — | planejada |
-| F9 | SPEC-009 | 1 | 1.4 | Decisão online e passagem | — | — | planejada |
-| F10 | SPEC-010 | **1.5** | 1.5 | Operação offline | — | — | planejada · adiada (ADR-012) |
-| F11 | SPEC-011 | 1 | 1.6 | Painel operacional e prontidão | — | — | planejada |
-| F12 | SPEC-012 | 2 | 2.1 | Ledger operacional e invoice | — | — | planejada |
-| F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | — | — | planejada |
-| F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | — | — | planejada |
-| F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | — | — | planejada |
-| F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | — | — | planejada |
-| F17 | SPEC-017 | 3 | 3.1 | Consentimento e avaliação manual | — | — | planejada |
-| F18 | SPEC-018 | 3 | 3.2 | Histórico e comparativos | — | — | planejada |
-| F19 | SPEC-019 | 3 | 3.3 | Upload e revisão | — | — | planejada |
-| F20 | SPEC-020 | 3 | 3.4 | Metas e frequência | — | — | planejada |
-| F21 | SPEC-021 | 3 | 3.5 | Análise assistiva por IA | — | — | planejada |
-| F22 | SPEC-022 | 3 | 3.6 | Operação e qualidade | — | — | planejada |
-| F23 | SPEC-023 | 4 | 4.1 | Identidade e shell mobile | — | — | planejada |
-| F24 | SPEC-024 | 4 | 4.2 | Carteirinha, plano e frequência | — | — | planejada |
-| F25 | SPEC-025 | 4 | 4.3 | Financeiro mobile | — | — | planejada |
-| F26 | SPEC-026 | 4 | 4.4 | Avaliações e consentimentos no app | — | — | planejada |
-| F27 | SPEC-027 | 4 | 4.5 | Kiosk seguro | — | — | planejada |
-| F28 | SPEC-028 | 4 | 4.6 | Pagamento e desbloqueio no totem | — | — | planejada |
-| F29 | SPEC-029 | 4 | 4.7 | Piloto e distribuição | — | — | planejada |
-| F30 | SPEC-030 | 5 | 5.1 | Preferências e identidade pública | — | — | planejada |
-| F31 | SPEC-031 | 5 | 5.2 | XP e conquistas | — | — | planejada |
-| F32 | SPEC-032 | 5 | 5.3 | Consistência e streak | — | — | planejada |
-| F33 | SPEC-033 | 5 | 5.4 | Rankings privados por padrão | — | — | planejada |
-| F34 | SPEC-034 | 5 | 5.5 | Desafios e notificações | — | — | planejada |
-| F35 | SPEC-035 | 5 | 5.6 | Operação, moderação e experimento | — | — | planejada |
-| F36 | SPEC-036 | 6 | 6.1 | Contrato de dados e baseline analítica | — | — | planejada |
-| F37 | SPEC-037 | 6 | 6.2 | Regras explicáveis e score | — | — | planejada |
-| F38 | SPEC-038 | 6 | 6.3 | CRM de retenção | — | — | planejada |
-| F39 | SPEC-039 | 6 | 6.4 | Experimento operacional | — | — | planejada |
-| F40 | SPEC-040 | 6 | 6.5 | Modelo supervisionado (condicionado a `M6-ML-01`) | — | — | planejada |
-| F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | — | — | planejada |
+| F1 | SPEC-001 | 0 | 0.1 | Bancada reproduzível | [`SPEC-001-bancada-reproduzivel.md`](specs/SPEC-001-bancada-reproduzivel.md) | — | aprovada-pi |
+| F2 | SPEC-002 | 0 | 0.2 | Ciclo de vida facial | [`SPEC-002-ciclo-de-vida-facial.md`](specs/SPEC-002-ciclo-de-vida-facial.md) | — | aprovada-pi |
+| F3 | SPEC-003 | 0 | 0.3 | Catraca e passagem | [`SPEC-003-catraca-e-passagem.md`](specs/SPEC-003-catraca-e-passagem.md) | — | aprovada-pi |
+| F4 | SPEC-004 | 0 | 0.4 | Offline e reconciliação | [`SPEC-004-offline-e-reconciliacao.md`](specs/SPEC-004-offline-e-reconciliacao.md) | — | em-revisao |
+| F5 | SPEC-005 | 0 | 0.5 | Relatório e decisão | [`SPEC-005-relatorio-e-decisao.md`](specs/SPEC-005-relatorio-e-decisao.md) | — | aprovada-pi |
+| F6 | SPEC-006 | 1 | 1.1 | Core seguro e unidade | [`SPEC-006-core-seguro-e-unidade.md`](specs/SPEC-006-core-seguro-e-unidade.md) | — | aprovada-pi |
+| F7 | SPEC-007 | 1 | 1.2 | Aluno, plano e entitlement manual | [`SPEC-007-aluno-plano-e-entitlement-manual.md`](specs/SPEC-007-aluno-plano-e-entitlement-manual.md) | — | aprovada-pi |
+| F8 | SPEC-008 | 1 | 1.3 | Consentimento, biometria e sync de dispositivo | [`SPEC-008-consentimento-biometria-e-sync-de-dispositivo.md`](specs/SPEC-008-consentimento-biometria-e-sync-de-dispositivo.md) | — | em-revisao |
+| F9 | SPEC-009 | 1 | 1.4 | Decisão online e passagem | [`SPEC-009-decisao-online-e-passagem.md`](specs/SPEC-009-decisao-online-e-passagem.md) | — | aprovada-pi |
+| F10 | SPEC-010 | 1.5 | 1.5 | Operação offline | [`SPEC-010-operacao-offline.md`](specs/SPEC-010-operacao-offline.md) | — | em-revisao |
+| F11 | SPEC-011 | 1 | 1.6 | Painel operacional e prontidão | [`SPEC-011-painel-operacional-e-prontidao.md`](specs/SPEC-011-painel-operacional-e-prontidao.md) | — | aprovada-pi |
+| F12 | SPEC-012 | 2 | 2.1 | Ledger operacional e invoice | [`SPEC-012-ledger-operacional-e-invoice.md`](specs/SPEC-012-ledger-operacional-e-invoice.md) | — | em-revisao |
+| F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | [`SPEC-013-pix-e-webhook-idempotente.md`](specs/SPEC-013-pix-e-webhook-idempotente.md) | — | em-revisao |
+| F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | [`SPEC-014-cartao-e-recorrencia.md`](specs/SPEC-014-cartao-e-recorrencia.md) | — | em-revisao |
+| F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | [`SPEC-015-inadimplencia-e-acesso.md`](specs/SPEC-015-inadimplencia-e-acesso.md) | — | em-revisao |
+| F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | [`SPEC-016-estorno-conciliacao-e-operacao.md`](specs/SPEC-016-estorno-conciliacao-e-operacao.md) | — | em-revisao |
+| F17 | SPEC-017 | 3 | 3.1 | Consentimento e avaliação manual | [`SPEC-017-consentimento-e-avaliacao-manual.md`](specs/SPEC-017-consentimento-e-avaliacao-manual.md) | — | planejada |
+| F18 | SPEC-018 | 3 | 3.2 | Histórico e comparativos | [`SPEC-018-historico-e-comparativos.md`](specs/SPEC-018-historico-e-comparativos.md) | — | planejada |
+| F19 | SPEC-019 | 3 | 3.3 | Upload e revisão | [`SPEC-019-upload-e-revisao.md`](specs/SPEC-019-upload-e-revisao.md) | — | planejada |
+| F20 | SPEC-020 | 3 | 3.4 | Metas e frequência | [`SPEC-020-metas-e-frequencia.md`](specs/SPEC-020-metas-e-frequencia.md) | — | planejada |
+| F21 | SPEC-021 | 3 | 3.5 | Análise assistiva por IA | [`SPEC-021-analise-assistiva-por-ia.md`](specs/SPEC-021-analise-assistiva-por-ia.md) | — | planejada |
+| F22 | SPEC-022 | 3 | 3.6 | Operação e qualidade | [`SPEC-022-operacao-e-qualidade.md`](specs/SPEC-022-operacao-e-qualidade.md) | — | planejada |
+| F23 | SPEC-023 | 4 | 4.1 | Identidade e shell mobile | [`SPEC-023-identidade-e-shell-mobile.md`](specs/SPEC-023-identidade-e-shell-mobile.md) | — | planejada |
+| F24 | SPEC-024 | 4 | 4.2 | Carteirinha, plano e frequência | [`SPEC-024-carteirinha-plano-e-frequencia.md`](specs/SPEC-024-carteirinha-plano-e-frequencia.md) | — | planejada |
+| F25 | SPEC-025 | 4 | 4.3 | Financeiro mobile | [`SPEC-025-financeiro-mobile.md`](specs/SPEC-025-financeiro-mobile.md) | — | planejada |
+| F26 | SPEC-026 | 4 | 4.4 | Avaliações e consentimentos | [`SPEC-026-avaliacoes-e-consentimentos.md`](specs/SPEC-026-avaliacoes-e-consentimentos.md) | — | planejada |
+| F27 | SPEC-027 | 4 | 4.5 | Kiosk seguro | [`SPEC-027-kiosk-seguro.md`](specs/SPEC-027-kiosk-seguro.md) | — | planejada |
+| F28 | SPEC-028 | 4 | 4.6 | Pagamento e desbloqueio no totem | [`SPEC-028-pagamento-e-desbloqueio-no-totem.md`](specs/SPEC-028-pagamento-e-desbloqueio-no-totem.md) | — | planejada |
+| F29 | SPEC-029 | 4 | 4.7 | Piloto e distribuição | [`SPEC-029-piloto-e-distribuicao.md`](specs/SPEC-029-piloto-e-distribuicao.md) | — | planejada |
+| F30 | SPEC-030 | 5 | 5.1 | Preferências e identidade pública | [`SPEC-030-preferencias-e-identidade-publica.md`](specs/SPEC-030-preferencias-e-identidade-publica.md) | — | planejada |
+| F31 | SPEC-031 | 5 | 5.2 | XP e conquistas | [`SPEC-031-xp-e-conquistas.md`](specs/SPEC-031-xp-e-conquistas.md) | — | planejada |
+| F32 | SPEC-032 | 5 | 5.3 | Consistência e streak | [`SPEC-032-consistencia-e-streak.md`](specs/SPEC-032-consistencia-e-streak.md) | — | planejada |
+| F33 | SPEC-033 | 5 | 5.4 | Rankings privados por padrão | [`SPEC-033-rankings-privados-por-padrao.md`](specs/SPEC-033-rankings-privados-por-padrao.md) | — | planejada |
+| F34 | SPEC-034 | 5 | 5.5 | Desafios e notificações | [`SPEC-034-desafios-e-notificacoes.md`](specs/SPEC-034-desafios-e-notificacoes.md) | — | planejada |
+| F35 | SPEC-035 | 5 | 5.6 | Operação, moderação e experimento | [`SPEC-035-operacao-moderacao-e-experimento.md`](specs/SPEC-035-operacao-moderacao-e-experimento.md) | — | planejada |
+| F36 | SPEC-036 | 6 | 6.1 | Contrato de dados e baseline analítica | [`SPEC-036-contrato-de-dados-e-baseline-analitica.md`](specs/SPEC-036-contrato-de-dados-e-baseline-analitica.md) | — | planejada |
+| F37 | SPEC-037 | 6 | 6.2 | Regras explicáveis e score | [`SPEC-037-regras-explicaveis-e-score.md`](specs/SPEC-037-regras-explicaveis-e-score.md) | — | planejada |
+| F38 | SPEC-038 | 6 | 6.3 | CRM de retenção | [`SPEC-038-crm-de-retencao.md`](specs/SPEC-038-crm-de-retencao.md) | — | planejada |
+| F39 | SPEC-039 | 6 | 6.4 | Experimento operacional | [`SPEC-039-experimento-operacional.md`](specs/SPEC-039-experimento-operacional.md) | — | planejada |
+| F40 | SPEC-040 | 6 | 6.5 | Modelo supervisionado (condicionado a M6-ML-01) | [`SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md`](specs/SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md) | — | planejada |
+| F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | [`SPEC-041-producao-controlada-e-monitoramento.md`](specs/SPEC-041-producao-controlada-e-monitoramento.md) | — | planejada |
 
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento
