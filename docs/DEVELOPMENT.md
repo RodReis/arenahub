@@ -49,6 +49,12 @@ Checklist obrigatório a cada fatia. Falhou um item, **pare e pergunte ao PI** �
 **Commit em PT-BR.** Mensagem descreve o efeito, não o arquivo: `adiciona bloqueio lógico
 imediato na revogação de biometria`, não `atualiza service`.
 
+> ⚠️ **Depois de clonar, rode `pnpm --filter @arenahub/database generate` antes do primeiro
+> `lint`.** O client do Prisma é gerado, não versionado. Sem ele, `lint` e `typecheck` falham com
+> erro que parece de código (`no-unsafe-call`) mas é de arquivo ausente. **Foi o primeiro defeito
+> que o CI pegou:** passava na máquina de quem já tinha rodado `generate` e falhava no runner
+> limpo — verde local, vermelho remoto.
+
 ### Exceção de arranque — ✅ encerrada em 14/08/2026
 
 **O ciclo acima vale inteiro.** A exceção morreu quando o CI passou a existir

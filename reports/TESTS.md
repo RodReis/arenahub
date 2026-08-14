@@ -5,7 +5,7 @@
 > O CI roda `pnpm test:report --check` e falha se este arquivo divergir do que a execução
 > produz. É a guarda de evidência do `docs/TESTING.md` §5.
 
-**SHA:** `31626b6`
+**SHA:** `4669d5c`
 
 ## Arquivos de teste por nível
 

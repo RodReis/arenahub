@@ -7,8 +7,8 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 14/08/2026 *(segunda rodada)* · **Fase:** bootstrap `[INFRA]` em execução ·
-**Código:** 5 dos 6 cards de bootstrap entregues — #42, #43, #44, #45, #46
+**Última atualização:** 14/08/2026 *(segunda rodada)* · **Fase:** bootstrap `[INFRA]` **concluído** ·
+**Código:** os 6 cards entregues — #42 a #47. **A exceção de arranque morreu.**
 
 **14/08/2026, segunda rodada — ADR-011 e ADR-008 fechados.** F4 e F8 destravadas. Restam **duas**
 pendências, nenhuma no caminho crítico de hoje: ADR-013 (sai da homologação do MVP 2, não de
@@ -24,14 +24,17 @@ LGPD é lista fechada onde legítimo interesse não figura. Corrigido no ADR.
 ## 1. Onde estamos, em três frases
 
 O repositório tem PRDs aprovados para planejamento, planos de implementação por slice e, desde
-14/08/2026, o conjunto de documentos de governança. **Cinco dos seis cards de bootstrap estão
-entregues** (#42, #43, #44, #45, #46): existem monorepo, `packages/config` com TypeScript estrito
-e ESLint, ambiente Docker com Postgres/Redis/MinIO, os oito comandos que **falham com mensagem em
-vez de mentir**, e `packages/database` com Prisma 7 e migration inicial vazia. As pastas de
-`apps/` continuam vazias — bootstrap é encanamento, não feature.
+14/08/2026, o conjunto de documentos de governança. **O bootstrap `[INFRA]` fechou em 14/08/2026** —
+os seis cards (#42 a #47): monorepo, `packages/config` com TypeScript estrito e ESLint, ambiente
+Docker com Postgres/Redis/MinIO, os oito comandos que **falham com mensagem em vez de mentir**,
+`packages/database` com Prisma 7 e migration inicial vazia, e o **CI com a guarda de evidência**.
+As pastas de `apps/` continuam vazias — bootstrap é encanamento, não feature.
 
-**Falta um:** [#47](https://github.com/RodReis/arenahub/issues/47) — o CI. É o marco: quando fecha,
-a *exceção de arranque* morre e o ciclo normal vale inteiro. `.github/` ainda não existe.
+🏁 **A *exceção de arranque* morreu** com o #47. O ciclo normal do `DEVELOPMENT.md` §2 vale
+inteiro: o CI decide o merge, e a guarda de evidência barra relatório que não bate com a execução.
+
+**O gargalo agora é decisão de produto, não encanamento.** Não há mais card `[INFRA]` no caminho;
+o que trava é o que sempre travou — ADR aberto e hardware do MVP 0.
 
 Nada pode ser codificado até que: (a) a spec da fatia esteja `aprovada-pi` em `docs/specs/`,
 e (b) os ADRs que a bloqueiam estejam resolvidos.
@@ -39,10 +42,12 @@ e (b) os ADRs que a bloqueiam estejam resolvidos.
 **Próximo movimento: o gargalo não é mais documento.** As 41 specs existem, e as cinco do MVP 0
 estão sem ADR bloqueando. O que falta é execução em duas frentes que não dependem uma da outra:
 
-1. **Code:** bootstrap do monorepo e board no GitHub (`DEVELOPMENT.md` §4, itens 1–8).
+1. **Code:** ✅ bootstrap entregue. **Resta o board no GitHub** — Projects com 5 colunas, cores e
+   descrições das labels. É ação no GitHub, fora do repositório, e não bloqueia código.
 2. **PI:** providência física do MVP 0 — hardware Topdata, SDK e rede de laboratório. **Não é
    decisão, é compra e agendamento**, e é o único caminho para responder se o SDK é Windows-only
-   — pergunta que muda a stack inteira do `edge-agent` e que nenhum documento responde.
+   — pergunta que muda a stack inteira do `edge-agent` e que nenhum documento responde. **Agora é
+   o único item no caminho crítico**: com o encanamento pronto, F1 depende de bancada, não de nós.
 
 ---
 
@@ -50,10 +55,10 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **43** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **41** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | 0 |
-| Feito | `proplan:done` | PR mergeado com CI verde | **5** — [#42](https://github.com/RodReis/arenahub/issues/42), [#43](https://github.com/RodReis/arenahub/issues/43), [#44](https://github.com/RodReis/arenahub/issues/44), [#45](https://github.com/RodReis/arenahub/issues/45), [#46](https://github.com/RodReis/arenahub/issues/46) |
+| Feito | `proplan:done` | PR mergeado com CI verde | **6** — os seis do bootstrap: [#42](https://github.com/RodReis/arenahub/issues/42), [#43](https://github.com/RodReis/arenahub/issues/43), [#44](https://github.com/RodReis/arenahub/issues/44), [#45](https://github.com/RodReis/arenahub/issues/45), [#46](https://github.com/RodReis/arenahub/issues/46), [#47](https://github.com/RodReis/arenahub/issues/47) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
@@ -225,7 +230,7 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 | ✅ [#44](https://github.com/RodReis/arenahub/issues/44) Os 8 comandos obrigatórios | 3 | os 8 rodam e **falham com mensagem clara** | #42, #43 |
 | ✅ [#45](https://github.com/RodReis/arenahub/issues/45) docker-compose local | 4 | `docker compose up` sobe Postgres, Redis e MinIO | #42 |
 | ✅ [#46](https://github.com/RodReis/arenahub/issues/46) `packages/database` | 5 | `pnpm --filter database migrate dev` | #42, #45 |
-| [#47](https://github.com/RodReis/arenahub/issues/47) CI | 6 | **CI verde no próprio PR** | #42, #43, #44, #46 |
+| ✅ [#47](https://github.com/RodReis/arenahub/issues/47) CI | 6 | **CI verde no próprio PR** | #42, #43, #44, #46 |
 
 **Os outros dois itens da §4 não viraram card, por motivos diferentes:**
 
@@ -242,7 +247,7 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 > **O board deveria ser o item 1:** é ele que faz o resto virar processo normal. Reordenar é do
 > Code, dono do arquivo.
 
-**Sequência real de execução, então:** board → ✅ #42 → ✅ #43 → ✅ #45 → ✅ #44 → ✅ #46 → **#47**. O #47 (CI)
+**Sequência real de execução, então:** board → ✅ #42 → ✅ #43 → ✅ #45 → ✅ #44 → ✅ #46 → ✅ **#47**. O #47 (CI)
 é o marco: quando ele fecha, a exceção de arranque morre e o ciclo normal vale inteiro.
 
 > A ordem acima foi para o `DEVELOPMENT.md` §4 no PR
