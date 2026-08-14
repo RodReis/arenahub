@@ -49,25 +49,44 @@ Checklist obrigatório a cada fatia. Falhou um item, **pare e pergunte ao PI** �
 **Commit em PT-BR.** Mensagem descreve o efeito, não o arquivo: `adiciona bloqueio lógico
 imediato na revogação de biometria`, não `atualiza service`.
 
-### Exceção de arranque
+> ⚠️ **Depois de clonar, rode `pnpm --filter @arenahub/database generate` antes do primeiro
+> `lint`.** O client do Prisma é gerado, não versionado. Sem ele, `lint` e `typecheck` falham com
+> erro que parece de código (`no-unsafe-call`) mas é de arquivo ausente. **Foi o primeiro defeito
+> que o CI pegou:** passava na máquina de quem já tinha rodado `generate` e falhava no runner
+> limpo — verde local, vermelho remoto.
 
-O ciclo acima pressupõe board, CI e comandos `pnpm` — **e nenhum dos três existe ainda**. Não
-há como criar um card para criar o board, nem exigir CI verde do PR que cria o CI. Enquanto o
-bootstrap (§4) não fechar, vale este regime reduzido, **e só ele**:
+### Exceção de arranque — ✅ encerrada em 14/08/2026
 
-| exigência normal | durante o arranque |
-|---|---|
-| card no board antes de começar | dispensado **até o board existir**; o primeiro card criado é o do próprio board |
-| CI verde antes do merge | substituído por execução local dos comandos que já existem, colada no corpo do PR |
-| cobertura ≥ 80% em regras de domínio | **n/a** — bootstrap não tem regra de domínio |
-| OpenAPI e contratos de evento atualizados | **n/a** pelo mesmo motivo |
-| spec `aprovada-pi` | **n/a** — bootstrap é `[INFRA]`, não fatia, e não tem escopo de produto a assumir |
+**O ciclo acima vale inteiro.** A exceção morreu quando o CI passou a existir
+([#47](https://github.com/RodReis/arenahub/issues/47), PR
+[#54](https://github.com/RodReis/arenahub/pull/54)). O que segue é histórico.
 
-**O que continua valendo sem exceção:** PR com `refs #N` quando houver issue, nunca `closes`;
-merge do próprio Code; aceite exclusivo do PI; commit em PT-BR; nenhum segredo versionado.
+Enquanto o bootstrap não fechava, quatro exigências ficaram suspensas: card no board antes de
+começar, CI verde antes do merge, cobertura ≥ 80% e OpenAPI atualizado. As duas primeiras porque
+não há como criar um card para criar o board, nem exigir CI verde do PR que cria o CI; as duas
+últimas porque encanamento não tem regra de domínio. Em lugar do CI, os PRs de bootstrap colaram
+a **execução local** no corpo.
 
-A exceção **morre no item 7 do bootstrap (§4)**. A partir do primeiro card real, o ciclo normal vale
-inteiro — e este bloco vira histórico.
+**O que nunca esteve sob exceção, e continua:** PR com `refs #N`, nunca `closes`; merge do próprio
+Code; aceite exclusivo do PI; commit em PT-BR; nenhum segredo versionado.
+
+> ⚠️ **Uma coisa que a exceção cobria segue pendente: o board (Projects) não existe.** Só as
+> labels `proplan:*`. Enquanto não existir, "mover o card" é aplicar label, não arrastar cartão —
+> o passo 1 do ciclo acima se cumpre pela label. Isso **não** reabre a exceção: o portão de merge,
+> que era o que realmente faltava, está de pé.
+
+#### O que mudou na prática
+
+| exigência | antes | agora |
+|---|---|---|
+| CI verde antes do merge | execução local colada no PR | **o CI decide** — 8 passos, `docs/TESTING.md` §6 |
+| guarda de evidência | não existia | `pnpm test:report --check` **barra o merge** |
+| cobertura ≥ 80% em regra de domínio | `n/a` — não havia regra | vale na primeira fatia com regra |
+| OpenAPI e contratos de evento | `n/a` pelo mesmo motivo | valem quando houver endpoint e evento |
+
+**Quatro dos oito passos do CI ainda falham de propósito** — `test`, `test:integration`, `build`
+e `test:e2e`, porque nenhum workspace os declara. Estão marcados `continue-on-error` no workflow,
+e **cada um perde essa marca na fatia que criar o workspace correspondente**. Ver §4.
 
 ---
 
@@ -126,8 +145,28 @@ A **ordem** corrigiu isso; o **número** ficou onde estava, para não quebrar as
 pressupõe Postgres de pé (Testcontainers). Fixar a mensagem de falha do #3 antes do banco existir
 é fixar duas vezes.
 
-**Item 6 (#47, CI) é o marco:** quando ele fecha, a *exceção de arranque* da §2 morre e o ciclo
-normal vale inteiro.
+**Item 6 (#47, CI) era o marco — e fechou em 14/08/2026.** A *exceção de arranque* da §2 morreu; o
+ciclo normal vale inteiro. **Resta o board**, que é ação no GitHub, fora do repositório: Projects
+com 5 colunas, cores e descrições das labels, e as labels `proplan:*` que ainda não existem.
+
+#### Os quatro passos do CI que ainda falham de propósito
+
+`test`, `test:integration`, `build` e `test:e2e` estão marcados `continue-on-error` no
+`.github/workflows/ci.yml`. Não é tolerância a falha — é o oposto: o guarda de
+`scripts/run-task.mjs` faz cada um **falhar em vez de sair 0 mentindo**, e a marca só evita que o
+pipeline inteiro pare por algo que ainda não pode existir.
+
+**Cada um perde a marca na fatia que criar o workspace correspondente**, e isso é escopo dessa
+fatia, não dívida solta:
+
+| passo | perde `continue-on-error` em |
+|---|---|
+| `build` e `test` | a primeira fatia que criar um app ou pacote com código — na ordem atual, **F6** |
+| `test:integration` | a primeira fatia com repositório e Testcontainers — **F6** |
+| `test:e2e` | a primeira fatia com tela navegável ponta a ponta — **F9** ou **F11** |
+
+Deixar a marca depois que o workspace existir transforma verde em decoração. Quem criar o
+workspace tira a marca no mesmo PR.
 
 **Não faça no bootstrap:** módulo de domínio, entidade, endpoint. Bootstrap é encanamento.
 
@@ -291,3 +330,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | — *(#45)* | — | [#51](https://github.com/RodReis/arenahub/pull/51) | ambiente local: Postgres 17, Redis 8 e MinIO em docker-compose, com healthcheck e tag fixa. Scripts `docker:*` |
 | 14/08/2026 | — *(#44)* | — | [#52](https://github.com/RodReis/arenahub/pull/52) | os 8 comandos falham com mensagem em vez de sair 0 sem rodar nada; guarda da porta 3344 |
 | 14/08/2026 | — *(#46)* | — | [#53](https://github.com/RodReis/arenahub/pull/53) | `packages/database`: Prisma 7, migration inicial **vazia**, client factory e seed vazio |
+| 14/08/2026 | — *(#47)* | — | [#54](https://github.com/RodReis/arenahub/pull/54) | **CI** com os 8 passos e a guarda de evidência. **A exceção de arranque morreu** |

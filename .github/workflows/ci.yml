@@ -1,0 +1,128 @@
+# CI do ArenaHub — o portão de merge.
+#
+# No processo do trio, o merge é do próprio Code: o PI não segura o código na
+# porta da `main`. A única coisa entre uma entrega ruim e a `main` é este
+# arquivo. Por isso ele falha explicitamente e nunca "passa mesmo assim".
+#
+# Ordem por custo crescente — falhe cedo, falhe barato (docs/TESTING.md §6).
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  # PR novo cancela a execução anterior da mesma branch; na main, nunca
+  # cancela — cada commit da main merece seu próprio resultado.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Turbo em CI: sem cor no log, que é o que o guarda de tasks já não depende
+  # mais, mas mantém o log legível no GitHub.
+  TURBO_TELEMETRY_DISABLED: 1
+  DO_NOT_TRACK: 1
+
+jobs:
+  ci:
+    name: build, lint, typecheck e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      # Postgres para `test:integration`. Testcontainers sobe o que precisar
+      # por conta, mas o serviço aqui cobre o caso simples e é mais rápido.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: arenahub
+          POSTGRES_PASSWORD: arenahub_ci
+          POSTGRES_DB: arenahub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenahub -d arenahub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub?schema=public
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # A versão sai do .nvmrc — fonte única com o desenvolvimento local.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # --- 1 de 8 ---------------------------------------------------------
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      # O client do Prisma é gerado, não versionado (`src/generated/` está no
+      # .gitignore). Sem este passo, lint e typecheck falham no CI e passam na
+      # máquina de quem já rodou `generate` -- verde local, vermelho remoto,
+      # que é o pior tipo de divergência. Vem antes do lint de propósito.
+      - name: gerar client do Prisma
+        run: pnpm --filter @arenahub/database generate
+
+      # --- 2 de 8 ---------------------------------------------------------
+      - name: lint
+        run: pnpm lint
+
+      # --- 3 de 8 ---------------------------------------------------------
+      - name: typecheck
+        run: pnpm typecheck
+
+      # --- guardas do próprio repositório ---------------------------------
+      # Não estão na lista dos 8 do TESTING.md §6 porque não são teste de
+      # domínio. Rodam aqui porque um guarda quebrado não avisa que quebrou:
+      # ele simplesmente deixa passar.
+      - name: guardas de scripts/
+        run: pnpm test:guardas
+
+      - name: self-check do gerador de relatório
+        run: pnpm test:report:selfcheck
+
+      # --- 4 a 7 de 8 -----------------------------------------------------
+      # Estes quatro FALHAM HOJE, e falhar é o comportamento correto: nenhum
+      # workspace declara essas tasks (o guarda de scripts/run-task.mjs faz o
+      # comando falhar em vez de sair 0 mentindo).
+      #
+      # NÃO use `continue-on-error` aqui. Ele marca o passo como `success` no
+      # resumo do job, o que é precisamente o verde decorativo que o card #47
+      # proíbe -- um passo que falhou aparecendo como se tivesse passado.
+      #
+      # Em vez disso, o resultado real de cada um vai para o log e para o
+      # resumo do job. Cada linha some na fatia que criar o workspace
+      # correspondente, e o passo vira `run: pnpm <task>` normal:
+      #
+      #   build, test, test:integration -> F6      test:e2e -> F9 ou F11
+      - name: 'pendentes: test, test:integration, build, test:e2e'
+        run: |
+          pendentes=()
+          for task in test test:integration build test:e2e; do
+            if pnpm "$task" > "/tmp/$task.log" 2>&1; then
+              echo "::error::pnpm $task passou, mas nenhum workspace deveria declará-la ainda."
+              echo "Se um workspace passou a declarar a task, tire-a desta lista e"
+              echo "promova-a a passo próprio do CI."
+              exit 1
+            fi
+            pendentes+=("$task")
+            echo "- \`pnpm $task\` falha: nenhum workspace declara a task" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "::notice::${#pendentes[@]} de 8 passos ainda não têm workspace: ${pendentes[*]}"
+
+      # --- 8 de 8 ---------------------------------------------------------
+      # A guarda de evidência. Falha se reports/TESTS.md divergir do que a
+      # execução produz -- número em documento tem de vir de execução, nunca
+      # de prosa (docs/TESTING.md §5). Esta barra o merge desde já.
+      - name: guarda de evidência
+        run: pnpm test:report --check

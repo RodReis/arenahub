@@ -39,7 +39,16 @@ function testarBind(host) {
   });
 }
 
-const resultados = await Promise.all([testarBind('127.0.0.1'), testarBind('0.0.0.0')]);
+// EM SEQUENCIA, nao em paralelo. No Linux, segurar 127.0.0.1 e 0.0.0.0 ao
+// mesmo tempo na mesma porta da EADDRINUSE -- o teste colidiria consigo
+// mesmo e o guarda acusaria porta ocupada estando livre. No Windows nao
+// acontece, entao passava aqui e falhava no CI. Foi o segundo defeito que o
+// CI pegou.
+const resultados = [];
+for (const host of ['127.0.0.1', '0.0.0.0']) {
+  resultados.push(await testarBind(host));
+}
+
 const ocupada = resultados.some((codigo) => codigo === 'EADDRINUSE');
 const outroErro = resultados.find((codigo) => codigo && codigo !== 'EADDRINUSE');
 
