@@ -220,7 +220,7 @@ Duas consequências do Prisma 7 que aparecem no código e valem saber antes de m
 
 | F | slice | o que precisa provar | bloqueado por |
 |---|---|---|---|
-| F1 | 0.1 Bancada reproduzível | qualquer pessoa reproduz o ambiente e o simulador roda em CI **sem hardware** (`M0-NFR-006`) | `HW-GATE-01` (entrada de bancada: máquina Windows, rede isolada, inventário, consentimento) |
+| ✅ F1 | 0.1 Bancada reproduzível | qualquer pessoa reproduz o ambiente e o simulador roda em CI **sem hardware** (`M0-NFR-006`) | — *(entregue; o gate não a bloqueava)* |
 | F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | hardware |
 | F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | hardware |
 | F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | hardware |
@@ -228,6 +228,29 @@ Duas consequências do Prisma 7 que aparecem no código e valem saber antes de m
 
 **A pergunta que F2 tem de responder e ninguém pode adivinhar:** o SDK do leitor facial exige
 Windows e processo nativo? A resposta muda a stack do `edge-agent` (ADR-010).
+
+> ✅ **A F1 estreitou essa pergunta.** A topologia da bancada é **TCP/IP puro** — não há serial,
+> RS-485 nem porta COM entre o PC e o equipamento. Logo **o transporte não é refém do Windows**:
+> socket TCP é socket TCP em qualquer runtime. A dúvida do ADR-010 sobrevive **só** para o SDK de
+> captura biométrica, se ele existir como DLL. Fechar o ADR continua sendo do PI, com o SDK em
+> mãos.
+
+#### O que a bancada é de verdade — e o que isso muda em F2 e F3
+
+A bancada **não é laboratório montado para a POC**: é a catraca **instalada na unidade, em
+teste**, rodando o software que veio de fábrica. Inventário completo em
+`infra/bancada/README.md`; o resumo que muda decisão:
+
+| fato | consequência |
+|---|---|
+| Topdata **Inner Fit**, leitor facial `AYTI11108174` em `192.168.2.188` | alvo conhecido, alcançável só de dentro da rede da unidade |
+| rede `192.168.2.0/24`, **não isolada** | o PRD §4 pede isolada — divergência aberta, decisão do PI |
+| software de fábrica com 48 pessoas cadastradas | **o ArenaHub usa base própria**; importação é fatia futura, fora do MVP 0 |
+| **comandar a catraca tem efeito físico imediato** | F3 precisa de janela combinada, não roda a qualquer hora |
+
+**Os 7 itens do gate seguem em aberto** — o diagnóstico os imprime a cada execução. F1 não
+dependia deles; **F2 e F3 dependem**, em especial do consentimento dos participantes, que é
+pré-requisito de qualquer captura facial.
 
 **A medida que F3 tem de produzir:** latência real p95. O ADR-004 já está decidido (a nuvem
 decide); esta medição **pode reabri-lo** se o p95 passar de 300 ms.
@@ -331,3 +354,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | — *(#44)* | — | [#52](https://github.com/RodReis/arenahub/pull/52) | os 8 comandos falham com mensagem em vez de sair 0 sem rodar nada; guarda da porta 3344 |
 | 14/08/2026 | — *(#46)* | — | [#53](https://github.com/RodReis/arenahub/pull/53) | `packages/database`: Prisma 7, migration inicial **vazia**, client factory e seed vazio |
 | 14/08/2026 | — *(#47)* | — | [#54](https://github.com/RodReis/arenahub/pull/54) | **CI** com os 8 passos e a guarda de evidência. **A exceção de arranque morreu** |
+| 14/08/2026 | **F1** | SPEC-001 | [#55](https://github.com/RodReis/arenahub/pull/55) | bancada reproduzível: `edge-agent` com config, health check, logs e diagnóstico somente-leitura; inventário real da catraca |

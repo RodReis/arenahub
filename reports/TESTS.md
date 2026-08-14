@@ -16,25 +16,14 @@ Classificação por **sufixo de arquivo**, não por pasta (`docs/TESTING.md` §2
 
 | nível | sufixo | arquivos |
 |---|---|---|
-| unitário | `.spec.ts` | 0 |
+| unitário | `.spec.ts` | 3 |
 | contrato | `.contract-spec.ts` | 0 |
 | integração | `.int-spec.ts` | 0 |
 | e2e | `.e2e-spec.ts` | 0 |
 | hardware | `.hw-spec.ts` | 0 |
-| **total** | | **0** |
+| **total** | | **3** |
 
-## Nenhum teste de domínio existe ainda
+## Por SPEC / fatia
 
-Isto não é falha do relatório — é o estado real do repositório. O bootstrap `[INFRA]`
-monta o encanamento; teste de domínio nasce com a primeira fatia que tiver regra a provar.
-
-**Enquanto esta linha existir, nenhum documento deste repositório pode afirmar que há
-cobertura.** Cobertura de regra de domínio: **n/a** — não há regra de domínio.
-
-O que já é verificado por máquina, e vale registrar para não parecer que nada roda:
-
-- `pnpm lint` e `pnpm typecheck` sobre `packages/config` e `packages/database`;
-- `pnpm test:guardas` — 6 casos sobre os guardas de `scripts/`;
-- `pnpm test:report:selfcheck` — o self-check deste gerador.
-
-Nenhum deles é teste de regra de negócio, e por isso nenhum entra na tabela acima.
+> A ligação SPEC ↔ teste vem da tag no teste ou do caminho do módulo
+> (`docs/TESTING.md` §5). Preenchida quando houver teste com tag.

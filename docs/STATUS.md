@@ -7,8 +7,8 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 14/08/2026 *(segunda rodada)* · **Fase:** bootstrap `[INFRA]` **concluído** ·
-**Código:** os 6 cards entregues — #42 a #47. **A exceção de arranque morreu.**
+**Última atualização:** 14/08/2026 *(segunda rodada)* · **Fase:** **MVP 0 em execução** ·
+**Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 **14/08/2026, segunda rodada — ADR-011 e ADR-008 fechados.** F4 e F8 destravadas. Restam **duas**
 pendências, nenhuma no caminho crítico de hoje: ADR-013 (sai da homologação do MVP 2, não de
@@ -44,10 +44,15 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 
 1. **Code:** ✅ bootstrap entregue. **Resta o board no GitHub** — Projects com 5 colunas, cores e
    descrições das labels. É ação no GitHub, fora do repositório, e não bloqueia código.
-2. **PI:** providência física do MVP 0 — hardware Topdata, SDK e rede de laboratório. **Não é
-   decisão, é compra e agendamento**, e é o único caminho para responder se o SDK é Windows-only
-   — pergunta que muda a stack inteira do `edge-agent` e que nenhum documento responde. **Agora é
-   o único item no caminho crítico**: com o encanamento pronto, F1 depende de bancada, não de nós.
+2. **PI:** ✅ **o hardware existe** — a F1 documentou: catraca Topdata Inner Fit instalada e em
+   teste, leitor facial `AYTI11108174` em `192.168.2.188`, tudo por **TCP/IP**. O que falta agora
+   é diferente do que se supunha: **os 7 itens do gate** (PRD §4), sobretudo **consentimento dos
+   participantes** — pré-requisito de qualquer captura facial — e a decisão sobre **rede
+   isolada**, que o PRD exige e a bancada não tem.
+
+> ✅ **A F1 respondeu parte do ADR-010 de graça.** Sem serial nem porta COM no caminho, o
+> transporte não é refém do Windows. A dúvida sobrevive só para o SDK de captura biométrica, se
+> ele existir como DLL.
 
 ---
 
@@ -55,10 +60,10 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **41** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **40** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | 0 |
-| Feito | `proplan:done` | PR mergeado com CI verde | **6** — os seis do bootstrap: [#42](https://github.com/RodReis/arenahub/issues/42), [#43](https://github.com/RodReis/arenahub/issues/43), [#44](https://github.com/RodReis/arenahub/issues/44), [#45](https://github.com/RodReis/arenahub/issues/45), [#46](https://github.com/RodReis/arenahub/issues/46), [#47](https://github.com/RodReis/arenahub/issues/47) |
+| Feito | `proplan:done` | PR mergeado com CI verde | **7** — os seis do bootstrap (#42–#47) e a **primeira fatia**, [F1](https://github.com/RodReis/arenahub/issues/1) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
