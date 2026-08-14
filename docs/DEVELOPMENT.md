@@ -228,7 +228,7 @@ Duas consequências do Prisma 7 que aparecem no código e valem saber antes de m
 | F | slice | o que precisa provar | bloqueado por |
 |---|---|---|---|
 | ✅ F1 | 0.1 Bancada reproduzível | qualquer pessoa reproduz o ambiente e o simulador roda em CI **sem hardware** (`M0-NFR-006`) | — *(entregue; o gate não a bloqueava)* |
-| F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | hardware |
+| 🟡 F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | **parcial** — porta, simulador, mapeamento e regra do `externalEnrollId` entregues; **o `TopdataFacialAdapter` aguarda a documentação do SDK** |
 | F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | hardware |
 | F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | hardware |
 | F5 | 0.5 Relatório e decisão | decisão de saída do MVP 0 (`MVP-00` §15) com evidência: `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO` | F1–F4 |
@@ -261,6 +261,35 @@ pré-requisito de qualquer captura facial.
 
 **A medida que F3 tem de produzir:** latência real p95. O ADR-004 já está decidido (a nuvem
 decide); esta medição **pode reabri-lo** se o p95 passar de 300 ms.
+
+#### F2 entregue pela metade — o que falta, e por quê
+
+A Slice 0.2 divide-se em duas partes com dependências diferentes. **A metade sem hardware está
+entregue** (PR [#56](https://github.com/RodReis/arenahub/pull/56)):
+
+| entregue | pendente |
+|---|---|
+| porta `FacialDeviceAdapter` | **`TopdataFacialAdapter`** |
+| simulador contratual para CI (`M0-NFR-006`) | aceite: 3 identidades no equipamento real |
+| tabela local de mapeamento e estado de sync | |
+| `externalEnrollId` não derivado do CPF | |
+| detecção de dado órfão | |
+
+**Três coisas precisam existir para o adapter real ser escrito, nesta ordem:**
+
+1. **documentação do SDK no repositório** — `docs/vendor/topdata/`. Hoje os manuais (*Manual
+   WebSocket Facial*, *Comandos do Leitor Facial*, *SDK EasyInner*) são PDF fora daqui. **Escrever
+   chamada sem eles seria inventar assinatura**, o que o plano de apoio proíbe: *"este plano não
+   inventa chamadas EasyInner ou protocolo facial"*;
+2. **decidir o transporte** — WebSocket, web server HTTP do equipamento, ou DLL via bridge. A F1
+   já estabeleceu que a topologia é TCP/IP puro, sem porta COM, o que estreita o ADR-010;
+3. **consentimento dos participantes** (gate do PRD §4) — pré-requisito de **qualquer** captura
+   facial, e a regra de arquitetura nº 7 não abre exceção.
+
+> ⚠️ **O stub falha alto, nunca silenciosamente.** `TopdataFacialAdapter` lança
+> `TopdataAdapterNaoImplementadoError` em toda operação, em vez de devolver
+> `{ confirmado: false }`. Erro de programação não pode se disfarçar de erro de operação — o
+> chamador trataria "não há adapter" como "o dispositivo recusou" e seguiria adiante.
 
 ---
 
@@ -362,3 +391,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | — *(#46)* | — | [#53](https://github.com/RodReis/arenahub/pull/53) | `packages/database`: Prisma 7, migration inicial **vazia**, client factory e seed vazio |
 | 14/08/2026 | — *(#47)* | — | [#54](https://github.com/RodReis/arenahub/pull/54) | **CI** com os 8 passos e a guarda de evidência. **A exceção de arranque morreu** |
 | 14/08/2026 | **F1** | SPEC-001 | [#55](https://github.com/RodReis/arenahub/pull/55) | bancada reproduzível: `edge-agent` com config, health check, logs e diagnóstico somente-leitura; inventário real da catraca |
+| 14/08/2026 | **F2** *(parcial)* | SPEC-002 | [#56](https://github.com/RodReis/arenahub/pull/56) | ciclo de vida facial sem hardware: porta, simulador contratual, mapeamento em SQLite, `externalEnrollId` sem CPF. **Adapter Topdata aguarda o SDK** |
