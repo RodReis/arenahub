@@ -1,0 +1,38 @@
+{
+  "name": "@arenahub/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Configuracao compartilhada: TypeScript, ESLint e Prettier",
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint/base.js",
+    "./eslint/money": "./eslint/money.js",
+    "./prettier": "./prettier/index.js",
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/node.json": "./tsconfig/node.json"
+  },
+  "files": [
+    "eslint",
+    "prettier",
+    "tsconfig"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@eslint/js": "9.39.5",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.11.0",
+    "typescript-eslint": "8.67.0"
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "typescript": "5.9.3"
+  },
+  "peerDependencies": {
+    "eslint": "^9",
+    "prettier": "^3",
+    "typescript": "^5.9"
+  }
+}
