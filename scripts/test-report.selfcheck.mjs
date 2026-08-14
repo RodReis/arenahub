@@ -137,6 +137,29 @@ casos.push([
 ]);
 
 casos.push([
+  'o conteudo nao muda entre commits (regressao: o SHA dentro do arquivo tornava a guarda impossivel)',
+  () => {
+    const dir = repositorioFalso(['src/a.spec.ts']);
+    try {
+      const primeiro = gerarEm(dir);
+
+      // Commit novo, SHA novo -- e nada mais mudou no repositorio.
+      writeFileSync(join(dir, 'qualquer.txt'), 'muda o SHA\n');
+      spawnSync('git', ['add', '-A'], { cwd: dir });
+      spawnSync('git', ['commit', '-q', '-m', 'outro commit'], { cwd: dir });
+
+      assert.equal(
+        gerarEm(dir),
+        primeiro,
+        'o relatorio mudou sem que teste algum mudasse -- --check nunca poderia passar',
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+]);
+
+casos.push([
   '--check falha quando o relatorio commitado diverge',
   () => {
     const dir = repositorioFalso(['src/a.spec.ts']);

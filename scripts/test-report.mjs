@@ -47,10 +47,19 @@ function arquivosRastreados() {
   return (r.stdout ?? '').split('\n').filter(Boolean);
 }
 
-function shaAtual() {
-  const r = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: RAIZ, encoding: 'utf8' });
-  return r.status === 0 ? (r.stdout ?? '').trim().slice(0, 7) : 'desconhecido';
-}
+/**
+ * O SHA da execucao NAO entra no arquivo, de proposito.
+ *
+ * Colocar `git rev-parse HEAD` no conteudo torna a guarda impossivel de
+ * satisfazer: gerar o relatorio muda o arquivo, o que exige commit, o que
+ * muda o SHA, o que desatualiza o relatorio. Ciclo infinito -- e foi o
+ * terceiro defeito que o CI pegou.
+ *
+ * O TESTING.md §5 pede "data e SHA da execucao" e diz que vem do CI. Vem
+ * mesmo: sao o timestamp e o SHA do proprio job, que ja ficam no log e na
+ * pagina da execucao. O arquivo commitado carrega o que e reproduzivel a
+ * partir do codigo -- nada que mude a cada commit.
+ */
 
 function gerar() {
   const arquivos = arquivosRastreados();
@@ -69,8 +78,11 @@ function gerar() {
     '>',
     '> O CI roda `pnpm test:report --check` e falha se este arquivo divergir do que a execução',
     '> produz. É a guarda de evidência do `docs/TESTING.md` §5.',
-    '',
-    `**SHA:** \`${shaAtual()}\``,
+    '>',
+    '> **Data e SHA da execução ficam no log do CI, não aqui.** Gravá-los no arquivo tornaria a',
+    '> guarda impossível de satisfazer: gerar mudaria o conteúdo, exigindo commit, que mudaria o',
+    '> SHA, que desatualizaria o relatório. Este arquivo só carrega o que é reproduzível a partir',
+    '> do código.',
     '',
     '## Arquivos de teste por nível',
     '',

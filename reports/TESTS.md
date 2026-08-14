@@ -4,8 +4,11 @@
 >
 > O CI roda `pnpm test:report --check` e falha se este arquivo divergir do que a execução
 > produz. É a guarda de evidência do `docs/TESTING.md` §5.
-
-**SHA:** `1e91b5b`
+>
+> **Data e SHA da execução ficam no log do CI, não aqui.** Gravá-los no arquivo tornaria a
+> guarda impossível de satisfazer: gerar mudaria o conteúdo, exigindo commit, que mudaria o
+> SHA, que desatualizaria o relatório. Este arquivo só carrega o que é reproduzível a partir
+> do código.
 
 ## Arquivos de teste por nível
 

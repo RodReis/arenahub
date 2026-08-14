@@ -93,28 +93,32 @@ jobs:
 
       # --- 4 a 7 de 8 -----------------------------------------------------
       # Estes quatro FALHAM HOJE, e falhar é o comportamento correto: nenhum
-      # workspace declara essas tasks ainda (o guarda de scripts/run-task.mjs
-      # faz o comando falhar em vez de sair 0 mentindo).
+      # workspace declara essas tasks (o guarda de scripts/run-task.mjs faz o
+      # comando falhar em vez de sair 0 mentindo).
       #
-      # `continue-on-error` mantém o passo visível e amarelo em vez de
-      # vermelho, sem parar o pipeline. Cada um perde o `continue-on-error`
-      # na fatia que criar o workspace correspondente -- não antes, para o
-      # verde não virar decoração.
-      - name: test (unitário + contrato)
-        run: pnpm test
-        continue-on-error: true
-
-      - name: test:integration
-        run: pnpm test:integration
-        continue-on-error: true
-
-      - name: build
-        run: pnpm build
-        continue-on-error: true
-
-      - name: test:e2e
-        run: pnpm test:e2e
-        continue-on-error: true
+      # NÃO use `continue-on-error` aqui. Ele marca o passo como `success` no
+      # resumo do job, o que é precisamente o verde decorativo que o card #47
+      # proíbe -- um passo que falhou aparecendo como se tivesse passado.
+      #
+      # Em vez disso, o resultado real de cada um vai para o log e para o
+      # resumo do job. Cada linha some na fatia que criar o workspace
+      # correspondente, e o passo vira `run: pnpm <task>` normal:
+      #
+      #   build, test, test:integration -> F6      test:e2e -> F9 ou F11
+      - name: 'pendentes: test, test:integration, build, test:e2e'
+        run: |
+          pendentes=()
+          for task in test test:integration build test:e2e; do
+            if pnpm "$task" > "/tmp/$task.log" 2>&1; then
+              echo "::error::pnpm $task passou, mas nenhum workspace deveria declará-la ainda."
+              echo "Se um workspace passou a declarar a task, tire-a desta lista e"
+              echo "promova-a a passo próprio do CI."
+              exit 1
+            fi
+            pendentes+=("$task")
+            echo "- \`pnpm $task\` falha: nenhum workspace declara a task" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "::notice::${#pendentes[@]} de 8 passos ainda não têm workspace: ${pendentes[*]}"
 
       # --- 8 de 8 ---------------------------------------------------------
       # A guarda de evidência. Falha se reports/TESTS.md divergir do que a
