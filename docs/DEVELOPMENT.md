@@ -142,9 +142,17 @@ Next.js 16"* sem o número, e a issue proibia deduzir. Ficam aqui porque é onde
 | Node | **22 LTS** (`>=22 <23`) | `engines.node` + `.nvmrc` |
 | pnpm | **10** (`pnpm@10.33.2`) | `packageManager` — trava o formato do lockfile |
 | Turborepo | **2** (`2.10.10`) | `devDependencies` — v2 usa `tasks`, não `pipeline` |
+| TypeScript | **5.9** (`5.9.3`) | `packages/config` |
+| ESLint | **9** (`9.39.5`) | `packages/config` — flat config |
+| typescript-eslint | **8** (`8.67.0`) | `packages/config` |
+| Prettier | **3** (`3.9.6`) | `packages/config` |
 
-⚠️ **Node 24 não serve.** É o LTS mais novo, mas prender o `edge-agent` — serviço Windows com
-SDK nativo (ADR-010) — a um LTS recém-saído troca risco conhecido por risco desconhecido.
+⚠️ **A ponta foi recusada três vezes, pelo mesmo motivo.** Node 24, TypeScript 7 (reescrita
+nativa em Go) e ESLint 10 já existiam quando estas versões foram fixadas. Todos recusados: a
+stack do PRD — NestJS 11, Next.js 16, Prisma, Expo — tem compatibilidade **comprovada** com os
+majors anteriores, e o custo de um major novo demais não aparece no card que o adota, aparece
+nos seguintes. Prender o `edge-agent` (serviço Windows com SDK nativo, ADR-010) a um LTS
+recém-saído troca risco conhecido por risco desconhecido.
 
 ---
 
@@ -261,3 +269,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 |---|---|---|---|---|
 | 14/08/2026 | — | — | [#48](https://github.com/RodReis/arenahub/pull/48) | ordem do bootstrap separada do número do item; 3 bloqueios mortos removidos |
 | 14/08/2026 | — *(#42)* | — | [#49](https://github.com/RodReis/arenahub/pull/49) | esqueleto do monorepo: pnpm workspaces, Turborepo, layout do PRD §5. Node 22 / pnpm 10 / Turbo 2 fixados |
+| 14/08/2026 | — *(#43)* | — | [#50](https://github.com/RodReis/arenahub/pull/50) | `packages/config`: TS estrito, ESLint 9 flat config, Prettier. `any`, promise solta, `console` e literal decimal viram erro |

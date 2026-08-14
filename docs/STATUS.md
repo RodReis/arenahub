@@ -47,10 +47,10 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **46** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **45** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | 0 |
-| Feito | `proplan:done` | PR mergeado com CI verde | **1** — [#42](https://github.com/RodReis/arenahub/issues/42) |
+| Feito | `proplan:done` | PR mergeado com CI verde | **2** — [#42](https://github.com/RodReis/arenahub/issues/42), [#43](https://github.com/RodReis/arenahub/issues/43) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
@@ -218,7 +218,7 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 | card | item §4 | evidência de pronto | depende de |
 |---|---|---|---|
 | ✅ [#42](https://github.com/RodReis/arenahub/issues/42) Monorepo pnpm + Turborepo | 1 | `pnpm install --frozen-lockfile` passa | — |
-| [#43](https://github.com/RodReis/arenahub/issues/43) TS estrito, ESLint, Prettier | 2 | `pnpm lint` e `pnpm typecheck` verdes | #42 |
+| ✅ [#43](https://github.com/RodReis/arenahub/issues/43) TS estrito, ESLint, Prettier | 2 | `pnpm lint` e `pnpm typecheck` verdes | #42 |
 | [#44](https://github.com/RodReis/arenahub/issues/44) Os 8 comandos obrigatórios | 3 | os 8 rodam e **falham com mensagem clara** | #42, #43 |
 | [#45](https://github.com/RodReis/arenahub/issues/45) docker-compose local | 4 | `docker compose up` sobe Postgres, Redis e MinIO | #42 |
 | [#46](https://github.com/RodReis/arenahub/issues/46) `packages/database` | 5 | `pnpm --filter database migrate dev` | #42, #45 |
@@ -239,7 +239,7 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 > **O board deveria ser o item 1:** é ele que faz o resto virar processo normal. Reordenar é do
 > Code, dono do arquivo.
 
-**Sequência real de execução, então:** board → ✅ #42 → #43 → #45 → #44 → #46 → **#47**. O #47 (CI)
+**Sequência real de execução, então:** board → ✅ #42 → ✅ #43 → #45 → #44 → #46 → **#47**. O #47 (CI)
 é o marco: quando ele fecha, a exceção de arranque morre e o ciclo normal vale inteiro.
 
 > A ordem acima foi para o `DEVELOPMENT.md` §4 no PR
@@ -252,11 +252,17 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 **três números que não existiam em documento nenhum ficaram fixados** por decisão do PI:
 **Node 22 LTS, pnpm 10, Turborepo 2**. Registro em `DEVELOPMENT.md` §4. Major não muda sem ADR.
 
-> ⚠️ **Os sete comandos `pnpm` existem mas não verificam nada ainda** — passam com exit 0 porque
-> nenhum workspace declara as tasks. Fazer falhar com mensagem clara é o card
+**#43 entregue em 14/08/2026** — PR [#50](https://github.com/RodReis/arenahub/pull/50). Fixou mais
+quatro versões: **TypeScript 5.9, ESLint 9, typescript-eslint 8, Prettier 3**. TS 7 e ESLint 10 já
+tinham saído e foram recusados pelo mesmo critério do Node 22 — compatibilidade comprovada com
+NestJS 11, Next.js 16, Prisma e Expo vale mais que velocidade de compilador.
+
+> ⚠️ **Verde ainda não quer dizer verificado — mas já quer dizer alguma coisa.** Desde o #43,
+> `pnpm lint` e `pnpm typecheck` **executam de fato** sobre `packages/config`. Os outros cinco
+> (`test`, `test:integration`, `test:e2e`, `build`, `dev`) continuam saindo com exit 0 **sem rodar
+> nada**, porque nenhum workspace declara essas tasks. Fazer falhar com mensagem clara é o card
 > [#44](https://github.com/RodReis/arenahub/issues/44). Até lá, **`pnpm build` verde não é
-> evidência de nada**, e a *definição de pronto* da §3 do `DEVELOPMENT.md` não tem como ser
-> cumprida por execução — só à mão.
+> evidência de nada**.
 
 ### Pendência entregue ao Code — arquivo que não é do Cowork
 
