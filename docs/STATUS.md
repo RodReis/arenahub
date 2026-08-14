@@ -47,10 +47,10 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **45** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **44** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | 0 |
-| Feito | `proplan:done` | PR mergeado com CI verde | **2** — [#42](https://github.com/RodReis/arenahub/issues/42), [#43](https://github.com/RodReis/arenahub/issues/43) |
+| Feito | `proplan:done` | PR mergeado com CI verde | **3** — [#42](https://github.com/RodReis/arenahub/issues/42), [#43](https://github.com/RodReis/arenahub/issues/43), [#45](https://github.com/RodReis/arenahub/issues/45) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
@@ -220,7 +220,7 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 | ✅ [#42](https://github.com/RodReis/arenahub/issues/42) Monorepo pnpm + Turborepo | 1 | `pnpm install --frozen-lockfile` passa | — |
 | ✅ [#43](https://github.com/RodReis/arenahub/issues/43) TS estrito, ESLint, Prettier | 2 | `pnpm lint` e `pnpm typecheck` verdes | #42 |
 | [#44](https://github.com/RodReis/arenahub/issues/44) Os 8 comandos obrigatórios | 3 | os 8 rodam e **falham com mensagem clara** | #42, #43 |
-| [#45](https://github.com/RodReis/arenahub/issues/45) docker-compose local | 4 | `docker compose up` sobe Postgres, Redis e MinIO | #42 |
+| ✅ [#45](https://github.com/RodReis/arenahub/issues/45) docker-compose local | 4 | `docker compose up` sobe Postgres, Redis e MinIO | #42 |
 | [#46](https://github.com/RodReis/arenahub/issues/46) `packages/database` | 5 | `pnpm --filter database migrate dev` | #42, #45 |
 | [#47](https://github.com/RodReis/arenahub/issues/47) CI | 6 | **CI verde no próprio PR** | #42, #43, #44, #46 |
 
@@ -256,6 +256,19 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 quatro versões: **TypeScript 5.9, ESLint 9, typescript-eslint 8, Prettier 3**. TS 7 e ESLint 10 já
 tinham saído e foram recusados pelo mesmo critério do Node 22 — compatibilidade comprovada com
 NestJS 11, Next.js 16, Prisma e Expo vale mais que velocidade de compilador.
+
+**#45 entregue em 14/08/2026** — PR [#51](https://github.com/RodReis/arenahub/pull/51). Postgres 17,
+Redis 8 e MinIO sobem com healthcheck, todas as imagens com **tag fixa** — `latest` quebraria o
+`M0-NFR-006` (qualquer pessoa reproduz a bancada) em silêncio, na máquina de outra pessoa.
+
+> ⚠️ **`docker compose` sem `--env-file .env` ignora o `.env` da raiz.** O Compose procura o
+> arquivo ao lado do YAML, e o nosso vive em `infra/docker/`. Sem a flag, todas as portas caem no
+> padrão sem aviso nenhum. Por isso os scripts **`pnpm docker:up | down | reset | logs`** existem
+> — use-os em vez do comando cru. Descoberto ao subir de verdade, não na leitura.
+
+> ℹ️ **Provisionar não é adotar.** O Redis está no compose para o ambiente local ficar completo.
+> Isso **não** autoriza BullMQ na primeira fatia que parecer conveniente — fila entra só com
+> métrica que a justifique (`CLAUDE.md` → Stack). Registrado também no `infra/docker/README.md`.
 
 > ⚠️ **Verde ainda não quer dizer verificado — mas já quer dizer alguma coisa.** Desde o #43,
 > `pnpm lint` e `pnpm typecheck` **executam de fato** sobre `packages/config`. Os outros cinco

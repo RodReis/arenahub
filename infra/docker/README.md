@@ -46,6 +46,36 @@ Nenhuma usa `latest`. Ambiente reproduzível é requisito do MVP 0 (`M0-NFR-006`
 reproduz a bancada) — tag móvel quebra isso silenciosamente, e o bug aparece na máquina de outra
 pessoa, semanas depois.
 
+## Portas só em `127.0.0.1`
+
+Os quatro mapeamentos fazem bind em loopback, não em `0.0.0.0`. A forma curta do Compose
+(`"5432:5432"`) publicaria em **todas as interfaces** — numa rede compartilhada (coworking, café,
+Wi-Fi de escritório sem isolamento), isso entrega Postgres, Redis e o console do MinIO com a senha
+que está escrita neste repositório a qualquer máquina da LAN.
+
+Custo de fechar: um prefixo por linha. Se algum dia for preciso acessar de outro host, isso é
+mudança consciente no `.env`, não o padrão.
+
+## Ordenação pt-BR vem do ICU, não do locale do sistema
+
+A imagem do Postgres é Alpine (musl) e **não tem os dados de locale da glibc**. Definir só
+`LANG: pt_BR.UTF-8` produz o pior resultado possível: o `initdb` aceita o rótulo, `pg_database`
+passa a exibir `datcollate = pt_BR.UTF-8`, e a ordenação real cai em comparação por byte.
+
+```
+sem ICU:  ação, açúcar, zebra, água     ← "água" depois de "zebra"
+com ICU:  ação, açúcar, água, zebra     ← correto
+```
+
+O banco **mente sobre o próprio collation** — é o tipo de bug que aparece como lista de alunos
+fora de ordem, meses depois, sem ninguém ligar uma coisa à outra.
+
+Por isso o `POSTGRES_INITDB_ARGS` usa `--locale-provider=icu --icu-locale=pt-BR`. O ICU carrega os
+próprios dados e independe do SO.
+
+> ⚠️ **`POSTGRES_INITDB_ARGS` só age quando o banco é criado.** Volume que já existe não muda de
+> collation. Para aplicar numa base já criada: `pnpm docker:reset` — **apaga todo o dado local**.
+
 ## Credenciais
 
 As do `.env.example` são de desenvolvimento e **propositalmente óbvias**. Não servem para nenhum
