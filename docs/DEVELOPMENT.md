@@ -159,14 +159,21 @@ pipeline inteiro pare por algo que ainda não pode existir.
 **Cada um perde a marca na fatia que criar o workspace correspondente**, e isso é escopo dessa
 fatia, não dívida solta:
 
-| passo | perde `continue-on-error` em |
+| passo | vira passo próprio em |
 |---|---|
-| `build` e `test` | a primeira fatia que criar um app ou pacote com código — na ordem atual, **F6** |
+| ✅ `test` e `build` | **F1** — `apps/edge-agent` nasceu e passou a declará-las |
 | `test:integration` | a primeira fatia com repositório e Testcontainers — **F6** |
 | `test:e2e` | a primeira fatia com tela navegável ponta a ponta — **F9** ou **F11** |
 
-Deixar a marca depois que o workspace existir transforma verde em decoração. Quem criar o
-workspace tira a marca no mesmo PR.
+Deixar na lista depois que o workspace existir transforma verde em decoração. **Quem criar o
+workspace promove a task no mesmo PR** — foi o que a F1 fez.
+
+> ⚠️ **Não use task real como exemplo em teste de guarda.** O `scripts/guardas.test.mjs` usava
+> `test` como "task que ninguém declara" — e quebrou o CI da F1, uma fatia que não tinha nada a
+> ver com isso, no dia em que o `edge-agent` passou a declará-la. Para isso existe
+> **`guarda:sentinela`** no `turbo.json`: task válida que **nenhum workspace implementa, e nenhum
+> deve implementar**. Task ausente do `turbo.json` também não serve — nesse caso o próprio Turbo
+> recusa antes de o guarda agir, e o teste passaria a testar outra coisa.
 
 **Não faça no bootstrap:** módulo de domínio, entidade, endpoint. Bootstrap é encanamento.
 
