@@ -37,10 +37,10 @@ existe para expulsar deste repositório.
 | [005](#adr-005) | Vocabulário único de decisão e campos de evento | `aceito` | — |
 | [006](#adr-006) | Idempotência de todo efeito externo | `aceito` | — |
 | [007](#adr-007) | Semântica de validade, carência e conflito offline | `aberto` *(sem urgência)* | F10 (MVP 1.5) |
-| [008](#adr-008) | Regime de dado biométrico sob LGPD | `aceito` com pontos `abertos` | F8 |
+| [008](#adr-008) | Regime de dado biométrico sob LGPD | `aceito` *(1 ponto remanescente)* | **F21** |
 | [009](#adr-009) | Entitlement multi-origem (convênio corporativo) | `aceito` | — |
 | [010](#adr-010) | Dependência do SDK Topdata e a POC como portão | `aceito` | — |
-| [011](#adr-011) | Ciclo de vida do edge-agent e versionamento do contrato Edge | `aceito` com pontos `abertos` | F4 |
+| [011](#adr-011) | Ciclo de vida do edge-agent e versionamento do contrato Edge | `aceito` **completo** | — |
 | [012](#adr-012) | Escopo de operação offline no MVP 1 | `aceito` | — |
 | [013](#adr-013) | Provedor de pagamento e contrato PaymentProvider | `aberto` *(com caminho definido)* | F12–F16 |
 | [014](#adr-014) | Processo unificado no CLAUDE.md | `aceito` | — |
@@ -52,6 +52,7 @@ existe para expulsar deste repositório.
 | [020](#adr-020) | Onde mora o schema Prisma | `aceito` | — |
 | [021](#adr-021) | Escopo de escrita do Cowork na `main` | `aceito` | — |
 | [022](#adr-022) | A Slice do PRD é a spec; o arquivo em `docs/specs/` é ponteiro | `aceito` | — |
+| [023](#adr-023) | Card `[INFRA]` é do Cowork; metadados de board também | `aceito` | — |
 
 ---
 
@@ -909,3 +910,62 @@ visível; o portão não se moveu, só ficou mais cedo.
 **O que este ADR não afrouxa.** Continua proibido codificar fatia com spec fora de
 `aprovada-pi`; continua valendo que decisão de produto é do PI; continua valendo que o Code
 pergunta em vez de assumir. A mudança é de **onde o escopo mora**, não de **quem decide**.
+
+---
+
+<a id="adr-023"></a>
+## ADR-023 — Card `[INFRA]` é do Cowork; metadados de board também
+
+**Data:** 14/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 14/08/2026**,
+terceira rodada)* · **Emenda** o **ADR-021** e o `CLAUDE.md` → *Ciclo de vida de uma fatia*
+
+**Contexto.** O ADR-021 deu ao Cowork a escrita de documento na `main` e listou o que ele **não**
+escreve: código, build, CI, PRD e planos. Ele **não disse nada sobre criar issue que não seja de
+fatia** — a omissão apareceu na prática, quando o PI pediu os cards `[INFRA]` de bootstrap.
+
+O Cowork preparou o texto dos seis cards e **parou**, entregando-os como arquivo fora do
+repositório, com a justificativa de que criar seria a quarta ampliação de escopo em dois dias.
+O PI então autorizou a criação **e** pediu o registro — que é este ADR.
+
+**O ADR-021 previu exatamente isto.** Ele nasceu porque *"três exceções seguidas não são exceção
+— são a regra real, não escrita"*. Autorizar de novo sem escrever repetiria o erro que ele
+diagnosticou.
+
+**Decisão.** Acrescenta-se ao escopo do Cowork:
+
+| ato | por quê |
+|---|---|
+| **Criar issue `[INFRA]`** (processo e infraestrutura, sem `F` e sem `SPEC`) | é planejamento de execução, não implementação — o Code continua sendo quem constrói |
+| **Criar e ajustar metadados do board**: labels `proplan:*`, cor, descrição, milestone | são pré-requisito do ato de criar card; sem a label `Backlog` não há Backlog |
+
+**A fronteira que não se moveu, e é o ponto inteiro:**
+
+1. **O Cowork continua sem implementar código.** Criar o card `[INFRA]` do CI **não é** escrever
+   o `ci.yml` — `.github/**` segue proibido ao Cowork pelo ADR-021.
+2. **O aceite continua exclusivo do PI.** Nenhuma issue fecha sem ele; `proplan:finalizado` é só
+   dele.
+3. **Todo código continua entrando por PR com CI verde.**
+4. **Decisão de produto continua do PI.** O Cowork registra; não decide.
+
+**Criar issue ≠ fechar issue.** A garantia deste processo nunca esteve em *quem abre o trabalho*
+— esteve em **quem o aceita** e em **o código não entrar sem PR**. Ampliar a abertura não toca
+nenhuma das duas.
+
+**Custo assumido conscientemente.** O PI perde um ponto de atrito: antes, o card `[INFRA]` só
+existiria se ele ou o Code o criasse, o que o obrigava a olhar. Agora o Cowork pode encher o
+board sozinho. **Mitigação:** card `[INFRA]` nasce sempre em **Backlog** com assignee **PI** —
+nunca em `todo` — e o Cowork nunca move card para frente. Se o board virar depósito, o problema
+aparece no Backlog, que é onde dá para varrer, e não em trabalho iniciado.
+
+**Consequência imediata registrada.** Em 14/08/2026 foram criados os seis cards de bootstrap —
+[#42](https://github.com/RodReis/arenahub/issues/42) a
+[#47](https://github.com/RodReis/arenahub/issues/47) — correspondendo aos itens 1 a 6 de
+`docs/DEVELOPMENT.md` §4. **O item 7 (board) não recebeu card** — a *exceção de arranque* impede,
+e não há como criar um card para criar o board. **O item 8 (versionar untracked) já estava
+cumprido** e não recebeu card: `git status --untracked-files=all` retorna vazio.
+
+**Divergência de ordem, deixada para o PI.** O `DEVELOPMENT.md` §2 diz que a exceção de arranque
+*"morre no item 7"* — o board — mas o board é o **penúltimo** da lista da §4. Na ordem escrita, os
+itens 1–6 rodam sob regime reduzido e o item 8 cai depois da exceção já morta. O board deveria ser
+o **primeiro**: é ele que faz o resto virar processo normal. Reordenar a §4 é do Code, dono do
+arquivo.

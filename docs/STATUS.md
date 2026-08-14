@@ -207,14 +207,37 @@ com gates distintos. F8 permanece **uma** fatia, com a etapa de sync físico blo
 
 ---
 
-## 6. Trabalho `[INFRA]` conhecido, ainda sem card
+## 6. Trabalho `[INFRA]` de bootstrap
 
-1. Criar board no GitHub com as 5 colunas e as 5 labels `proplan:*`. **Este item não pode ter card** — ver a *exceção de arranque* em `docs/DEVELOPMENT.md` §2.
-2. Bootstrap do monorepo — fazer os 8 comandos obrigatórios existirem antes da primeira feature.
-3. `.github/workflows/ci.yml` com build, lint, typecheck, testes e guardas de evidência.
-4. `docker-compose` local: Postgres + Redis + MinIO.
-5. Colocar sob versionamento os arquivos hoje *untracked* (`CLAUDE.md`, `docs/DESIGN-UI.md`,
-   `docs/TESTING.md`, a Especificação Completa e os documentos criados em 14/08/2026).
+**Os seis cards foram criados em 14/08/2026** pelo Cowork, autorizado pelo **ADR-023**. Todos em
+Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
+
+| card | item §4 | evidência de pronto | depende de |
+|---|---|---|---|
+| [#42](https://github.com/RodReis/arenahub/issues/42) Monorepo pnpm + Turborepo | 1 | `pnpm install --frozen-lockfile` passa | — |
+| [#43](https://github.com/RodReis/arenahub/issues/43) TS estrito, ESLint, Prettier | 2 | `pnpm lint` e `pnpm typecheck` verdes | #42 |
+| [#44](https://github.com/RodReis/arenahub/issues/44) Os 8 comandos obrigatórios | 3 | os 8 rodam e **falham com mensagem clara** | #42, #43 |
+| [#45](https://github.com/RodReis/arenahub/issues/45) docker-compose local | 4 | `docker compose up` sobe Postgres, Redis e MinIO | #42 |
+| [#46](https://github.com/RodReis/arenahub/issues/46) `packages/database` | 5 | `pnpm --filter database migrate dev` | #42, #45 |
+| [#47](https://github.com/RodReis/arenahub/issues/47) CI | 6 | **CI verde no próprio PR** | #42, #43, #44, #46 |
+
+**Os outros dois itens da §4 não viraram card, por motivos diferentes:**
+
+- **Item 7 — board no GitHub.** *Não pode* ter card: não há como criar um card para criar o
+  board (*exceção de arranque*, `docs/DEVELOPMENT.md` §2). Continua pendente: falta o Projects
+  com as 5 colunas, as cores e descrições das labels, e as 4 labels que ainda não existem.
+- **Item 8 — versionar arquivos *untracked*.** ***Já está feito.***
+  `git status --untracked-files=all` retorna vazio, com 113 arquivos rastreados —
+  `CLAUDE.md`, `docs/DESIGN-UI.md` e `docs/TESTING.md` incluídos. Marcar como cumprido na §4.
+
+> ⚠️ **A ordem da §4 está errada e isso não é cosmético.** O `DEVELOPMENT.md` §2 diz que a
+> exceção de arranque *"morre no item 7"* — o board — mas o board é o **penúltimo**. Na ordem
+> escrita, os itens 1–6 rodam sob regime reduzido e o item 8 cai depois da exceção já morta.
+> **O board deveria ser o item 1:** é ele que faz o resto virar processo normal. Reordenar é do
+> Code, dono do arquivo.
+
+**Sequência real de execução, então:** board → #42 → #43 → #45 → #44 → #46 → **#47**. O #47 (CI)
+é o marco: quando ele fecha, a exceção de arranque morre e o ciclo normal vale inteiro.
 
 ### Pendência entregue ao Code — arquivo que não é do Cowork
 
