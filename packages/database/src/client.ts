@@ -20,7 +20,24 @@ export type PrismaClientArenaHub = PrismaClient;
  * sem engine binario nativo: a conexao passa a ser responsabilidade de um
  * driver do ecossistema Node (`pg`, aqui).
  *
+ * QUEM CHAMA E DONO DO POOL. Cada chamada abre um pool `pg` proprio -- e o
+ * que se quer para teste paralelo com Testcontainers, e o que exige
+ * `await client.$disconnect()` no encerramento. Esquecer segura o processo
+ * de pe e, em teste, vaza conexao ate estourar o limite do Postgres.
+ *
+ *   - NestJS: `$disconnect()` no `OnModuleDestroy`;
+ *   - script: `try { ... } finally { await client.$disconnect(); }`;
+ *   - teste: no `afterAll` / `afterEach`, conforme o escopo do client.
+ *
  * `url` omitida cai em DATABASE_URL.
+ *
+ * @example
+ * const db = criarPrismaClient();
+ * try {
+ *   // ...
+ * } finally {
+ *   await db.$disconnect();
+ * }
  */
 export function criarPrismaClient(opcoes: { url?: string } = {}): PrismaClientArenaHub {
   const connectionString = opcoes.url ?? process.env['DATABASE_URL'];
