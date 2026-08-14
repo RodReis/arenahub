@@ -18,11 +18,19 @@
  * codigo generico, proibiria float legitimo (latencia, percentual, peso
  * corporal do MVP 3). Quem a liga e o modulo financeiro, quando existir.
  *
- * Uso:
+ * COMO LIGAR SEM SE MACHUCAR -- por diretorio, o mais estreito possivel,
+ * nunca no workspace inteiro. `0.15` de percentual e `82.4` de peso disparam
+ * a mesma regra que `19.90` de preco: o seletor e sintatico e nao tem como
+ * saber a semantica. Escopo estreito e a mitigacao, nao ha outra ate o tipo
+ * Money existir (MVP 2, card F12).
  *
  *   import base from '@arenahub/config/eslint';
  *   import money from '@arenahub/config/eslint/money';
- *   export default [...base, ...money];
+ *
+ *   export default [
+ *     ...base,
+ *     ...money.map((c) => ({ ...c, files: ['src/billing/domain/**\/*.ts'] })),
+ *   ];
  */
 export default [
   {
@@ -30,7 +38,7 @@ export default [
       'no-restricted-syntax': [
         'error',
         {
-          selector: 'Literal[raw=/^[0-9]*\\.[0-9]+$/]',
+          selector: 'Literal[raw=/^[0-9]*\\.[0-9]+([eE][-+]?[0-9]+)?$/]',
           message:
             'Dinheiro e inteiro na menor unidade monetaria (M2-BR-001). ' +
             'Use centavos: 1990 em vez de 19.90.',
