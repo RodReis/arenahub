@@ -24,8 +24,11 @@ LGPD é lista fechada onde legítimo interesse não figura. Corrigido no ADR.
 ## 1. Onde estamos, em três frases
 
 O repositório tem PRDs aprovados para planejamento, planos de implementação por slice e, desde
-14/08/2026, o conjunto de documentos de governança. **Não existe `package.json`, `apps/`,
-`packages/`, `infra/` nem `.github/`** — o bootstrap do monorepo é a primeira entrega.
+14/08/2026, o conjunto de documentos de governança. **O esqueleto do monorepo existe** desde
+14/08/2026 (card [#42](https://github.com/RodReis/arenahub/issues/42)): `package.json`,
+`pnpm-workspace.yaml`, `turbo.json` e o layout de `apps/`, `packages/` e `infra/` — todas as
+pastas ainda vazias. **Continua não existindo `.github/`** (card
+[#47](https://github.com/RodReis/arenahub/issues/47), o último do bootstrap).
 
 Nada pode ser codificado até que: (a) a spec da fatia esteja `aprovada-pi` em `docs/specs/`,
 e (b) os ADRs que a bloqueiam estejam resolvidos.
@@ -44,10 +47,10 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **41** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **46** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | 0 |
-| Feito | `proplan:done` | PR mergeado com CI verde | 0 |
+| Feito | `proplan:done` | PR mergeado com CI verde | **1** — [#42](https://github.com/RodReis/arenahub/issues/42) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
@@ -214,7 +217,7 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 
 | card | item §4 | evidência de pronto | depende de |
 |---|---|---|---|
-| [#42](https://github.com/RodReis/arenahub/issues/42) Monorepo pnpm + Turborepo | 1 | `pnpm install --frozen-lockfile` passa | — |
+| ✅ [#42](https://github.com/RodReis/arenahub/issues/42) Monorepo pnpm + Turborepo | 1 | `pnpm install --frozen-lockfile` passa | — |
 | [#43](https://github.com/RodReis/arenahub/issues/43) TS estrito, ESLint, Prettier | 2 | `pnpm lint` e `pnpm typecheck` verdes | #42 |
 | [#44](https://github.com/RodReis/arenahub/issues/44) Os 8 comandos obrigatórios | 3 | os 8 rodam e **falham com mensagem clara** | #42, #43 |
 | [#45](https://github.com/RodReis/arenahub/issues/45) docker-compose local | 4 | `docker compose up` sobe Postgres, Redis e MinIO | #42 |
@@ -236,8 +239,24 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 > **O board deveria ser o item 1:** é ele que faz o resto virar processo normal. Reordenar é do
 > Code, dono do arquivo.
 
-**Sequência real de execução, então:** board → #42 → #43 → #45 → #44 → #46 → **#47**. O #47 (CI)
+**Sequência real de execução, então:** board → ✅ #42 → #43 → #45 → #44 → #46 → **#47**. O #47 (CI)
 é o marco: quando ele fecha, a exceção de arranque morre e o ciclo normal vale inteiro.
+
+> A ordem acima foi para o `DEVELOPMENT.md` §4 no PR
+> [#48](https://github.com/RodReis/arenahub/pull/48), como coluna `ordem` **ao lado** do `#`
+> original. Os números dos itens **não foram renumerados de propósito** — o ADR-023 e as §1/§6
+> deste arquivo citam "item 7", "itens 1–6" e "itens 1–8"; renumerar tornaria um ADR aprovado
+> falso, em arquivo que não é do Code.
+
+**#42 entregue em 14/08/2026** — PR [#49](https://github.com/RodReis/arenahub/pull/49). Com ele,
+**três números que não existiam em documento nenhum ficaram fixados** por decisão do PI:
+**Node 22 LTS, pnpm 10, Turborepo 2**. Registro em `DEVELOPMENT.md` §4. Major não muda sem ADR.
+
+> ⚠️ **Os sete comandos `pnpm` existem mas não verificam nada ainda** — passam com exit 0 porque
+> nenhum workspace declara as tasks. Fazer falhar com mensagem clara é o card
+> [#44](https://github.com/RodReis/arenahub/issues/44). Até lá, **`pnpm build` verde não é
+> evidência de nada**, e a *definição de pronto* da §3 do `DEVELOPMENT.md` não tem como ser
+> cumprida por execução — só à mão.
 
 ### Pendência entregue ao Code — arquivo que não é do Cowork
 

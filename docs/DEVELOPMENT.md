@@ -131,6 +131,21 @@ normal vale inteiro.
 
 **Não faça no bootstrap:** módulo de domínio, entidade, endpoint. Bootstrap é encanamento.
 
+#### Versões fixadas — não atualizar major sem ADR
+
+Decisão do PI em 14/08/2026, no card [#42](https://github.com/RodReis/arenahub/issues/42). Não
+estavam escritas em documento nenhum: o `CLAUDE.md` dizia *"Node LTS fixado, compatível com
+Next.js 16"* sem o número, e a issue proibia deduzir. Ficam aqui porque é onde se procura.
+
+| o quê | versão | onde vive |
+|---|---|---|
+| Node | **22 LTS** (`>=22 <23`) | `engines.node` + `.nvmrc` |
+| pnpm | **10** (`pnpm@10.33.2`) | `packageManager` — trava o formato do lockfile |
+| Turborepo | **2** (`2.10.10`) | `devDependencies` — v2 usa `tasks`, não `pipeline` |
+
+⚠️ **Node 24 não serve.** É o LTS mais novo, mas prender o `edge-agent` — serviço Windows com
+SDK nativo (ADR-010) — a um LTS recém-saído troca risco conhecido por risco desconhecido.
+
 ---
 
 ### MVP 0 — POC Topdata · F1 a F5
@@ -244,4 +259,5 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 
 | data | F | SPEC | PR | resumo |
 |---|---|---|---|---|
-| — | — | — | — | nenhuma entrega até 14/08/2026 |
+| 14/08/2026 | — | — | [#48](https://github.com/RodReis/arenahub/pull/48) | ordem do bootstrap separada do número do item; 3 bloqueios mortos removidos |
+| 14/08/2026 | — *(#42)* | — | [#49](https://github.com/RodReis/arenahub/pull/49) | esqueleto do monorepo: pnpm workspaces, Turborepo, layout do PRD §5. Node 22 / pnpm 10 / Turbo 2 fixados |
