@@ -50,6 +50,7 @@ existe para expulsar deste repositório.
 | [018](#adr-018) | A Especificação Completa não é normativa | `aceito` | — |
 | [019](#adr-019) | Contagem de carência e instante de bloqueio | `aceito` | — |
 | [020](#adr-020) | Onde mora o schema Prisma | `aceito` | — |
+| [021](#adr-021) | Escopo de escrita do Cowork na `main` | `aceito` | — |
 
 ---
 
@@ -723,3 +724,54 @@ realmente infra (compose, init de volume, backup).
 acrescentando o pacote, com nota apontando para este ADR. Enquanto a emenda não sair, o layout
 do PRD e o do repositório divergem — e divergência conhecida e não escrita é como a documentação
 começa a mentir.
+
+---
+
+<a id="adr-021"></a>
+## ADR-021 — Escopo de escrita do Cowork na `main`
+
+**Data:** 14/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 14/08/2026**)*
+· **Substitui** a regra de escopo do `CLAUDE.md` → *Dois atores escrevem no Git*
+
+**Contexto.** O `CLAUDE.md` limitava a escrita do Cowork na `main` a **spec + a linha do Índice
+Fatia ↔ SPEC**, com a frase *"qualquer ampliação desse escopo passa pelo PI"*.
+
+Em 14/08/2026 o PI autorizou **três** ampliações em poucas horas: a base documental, o registro
+das decisões de ADR, e os dois documentos que faltavam. Cada uma foi registrada como "exceção,
+não precedente".
+
+**Três exceções seguidas não são exceção — são a regra real, não escrita.** Manter a ficção
+custa duas coisas: uma pergunta desnecessária a cada entrega, e a erosão da própria ideia de que
+regra escrita significa alguma coisa. O `STATUS-ARQUIVO.md` já registrava que a terceira deveria
+virar ADR em vez de exceção. Este é o ADR.
+
+**Decisão.** O Cowork escreve direto na `main`, sem branch, sem PR, sem CI:
+
+| escreve | por quê |
+|---|---|
+| `docs/specs/**` | é o artefato dele |
+| Índice Fatia ↔ SPEC do `docs/STATUS.md` | fonte única da numeração, alocada por ele |
+| `docs/DECISIONS.md` | registrar decisão do PI é função de planejamento |
+| `docs/CONVENTION.md`, `docs/ARCHITECTURE.md` | contrato de domínio e desenho são documento, não implementação |
+| `docs/STATUS.md`, `docs/STATUS-ARQUIVO.md`, `docs/LANDSCAPE.md`, `docs/REVIEW.md`, `docs/TESTING.md` | governança |
+| `CLAUDE.md` | as regras do trio |
+
+**O Cowork continua sem poder escrever:** qualquer coisa em `apps/`, `packages/`, `infra/`,
+`.github/`, `docs/prd/**` e `docs/superpowers/**`. Ou seja: **código, configuração de build, CI e
+os PRDs aprovados.** PRD só muda por emenda que o PI aprova explicitamente.
+
+**O que a decisão não afrouxa — e é o ponto.**
+
+1. **O Cowork continua sem implementar código.** Nunca.
+2. **O aceite continua sendo só do PI.** Nenhuma issue fecha sem ele.
+3. **Toda entrega de código continua por PR com CI verde.** O caminho sem PR vale só para
+   documento.
+4. **Decisão de produto continua sendo do PI.** O Cowork registra decisão; não a toma.
+
+A garantia do processo nunca esteve no *quem commita documento* — esteve em **quem aceita** e em
+**o código não entrar sem PR**. Essas duas não se moveram.
+
+**Conflito no Git.** A divisão por seção do `docs/STATUS.md` some: agora o Cowork escreve o
+arquivo inteiro. Vale a regra inversa e explícita: **se o Code encontrar `STATUS.md` divergente,
+a versão da `main` vence e ele reaplica o próprio progresso por cima** — nunca desfaz linha do
+Cowork.

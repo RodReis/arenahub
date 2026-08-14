@@ -20,18 +20,18 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 ## Papéis e governança
 
 - **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Nunca faz commit, push, PR nem merge** — o PI não toca no Git. O portão do PI é o **aceite na issue**, não o merge: o PI não segura o código na porta da `main`, ele carimba o que já entrou como realmente pronto.
-- **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/specs/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`: **commita e pusha a spec direto na `main`** (sem branch, sem PR), registra a linha da fatia no **Índice Fatia ↔ SPEC** do `docs/STATUS.md` e **cria a issue-fatia no board** (coluna Backlog, assignee PI). **Escreve só isso no Git** — spec, o Índice do `STATUS.md`, e nada mais. **Nunca implementa código** — implementação é exclusiva do Claude Code.
+- **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/specs/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`: **commita e pusha a spec direto na `main`** (sem branch, sem PR), registra a fatia no **Índice Fatia ↔ SPEC** do `docs/STATUS.md` e **cria a issue-fatia no board** (coluna Backlog, assignee PI). Escreve **documento** direto na `main` — o escopo exato está em **ADR-021**. **Nunca implementa código, nunca toca em `apps/`, `packages/`, `infra/`, `.github/`, `docs/prd/**` nem `docs/superpowers/**`** — implementação é exclusiva do Claude Code, e PRD só muda por emenda aprovada pelo PI.
 - **Claude Code (você)** — planeja, codifica, testa (código usar a skill /code-review e para frontend(UX e UI) — pode usar as skills do /impeccable critique layout clarify polish optimize) antes do commit, atualiza a documentação e **sempre commita todos os documentos de `docs/`** junto da entrega — **exceto a spec da fatia e o Índice Fatia ↔ SPEC**, que o Cowork já pôs na `main`. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/specs/`. **Não cria a issue de fatia** (é do Cowork) — pega o card, move pelo fluxo e entrega com PR. **Exceção: cria a própria issue `[FIX]`** de bug com comportamento correto já documentado (ADR/`ARCHITECTURE.md`/spec existente/`STATUS.md`), citando a fonte no corpo — ver *Correção: o Code cria a própria issue* abaixo. Reclassificar fatia como `[FIX]` para pular spec e aval é proibido. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
 
 #### Dois atores escrevem no Git — quem cede no conflito
 
 O Cowork pusha direto na `main` (spec + Índice Fatia ↔ SPEC); o Code entrega por PR. Como o Cowork não abre PR, **ele nunca vê conflito** — quem colide é sempre o Code, com branch aberta enquanto a `main` andou.
 
-**Regra:** o Code **rebase e reaplica** — divergiu da `main`, re-sincroniza e reaplica o próprio trabalho por cima. O Code **nunca desfaz** linha escrita pelo Cowork: se o Índice Fatia ↔ SPEC divergiu, a versão da `main` vence e o Code reaplica o progresso por cima.
+**Regra:** o Code **rebase e reaplica** — divergiu da `main`, re-sincroniza e reaplica o próprio trabalho por cima. O Code **nunca desfaz** linha escrita pelo Cowork: se o `docs/STATUS.md` divergiu, **a versão da `main` vence** e o Code reaplica o próprio progresso por cima.
 
-A colisão é rara **porque a divisão é por seção, não por arquivo**: no `docs/STATUS.md`, o Cowork só toca no **Índice Fatia ↔ SPEC** (uma linha nova por spec aprovada); todo o resto — colunas, progresso, estado das fatias — é do Code. Se o Cowork precisar editar qualquer outra seção, **para e pergunta ao PI** — é sinal de que a divisão não cobre o caso.
+A divisão é **por arquivo** (ADR-021): documento de governança é do Cowork; código, build, CI, PRD e planos são do Code ou do PI. Se o Cowork precisar tocar em algo fora da lista do ADR-021, **para e pergunta ao PI**.
 
-**Importante:** o push do Cowork na `main` é o único caminho do processo sem PR, CI ou aceite. Vale para spec e para essa uma linha do Índice — **nada mais**. Qualquer ampliação desse escopo passa pelo PI.
+**Importante:** o push do Cowork na `main` é o único caminho do processo sem PR, CI ou aceite, e vale **só para documento**. **Todo código entra por PR com CI verde, sem exceção**, e o aceite continua sendo exclusivo do PI — essas duas garantias nunca se moveram.
 
 ### Ciclo de vida de uma fatia (processo do trio — **não é feature do produto**)
 
@@ -224,7 +224,7 @@ Use a que existir no ambiente; a ausência de uma skill não é desculpa para pu
 - `docs/specs/` — spec por fatia (`SPEC-<nnn>-<slug>.md`). Só o Cowork escreve. `docs/specs/README.md` explica o formato e o que a spec **não** deve duplicar do PRD.
 - `docs/DEVELOPMENT.md` — **sua ordem de execução e status por item** (você é o dono; atualize a cada entrega junto com STATUS.md).
 - `docs/ARCHITECTURE.md` — desenho, módulos, dados, resiliência.
-- `docs/DECISIONS.md` — ADRs (ler antes de propor mudança estrutural).
+- `docs/DECISIONS.md` — ADRs (ler antes de propor mudança estrutural). **ADR-021** define quem escreve o quê no Git.
 - `docs/CONVENTION.md` — contrato de domínio do ArenaHub: entidades, estados, invariantes e regras de negócio (o coração do produto).
 - `docs/DESIGN-UI.md` — design UX/UI. **Status `RASCUNHO`** — tela pública da catraca e 8 decisões abertas na §17 aguardam o PI. Não trate como aprovado.
 - `docs/STATUS.md` — Kanban/roadmap deste projeto + **Índice Fatia ↔ SPEC** (fonte única da numeração). Prosa curta, sem detalhe.
