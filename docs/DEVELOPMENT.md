@@ -146,9 +146,11 @@ Next.js 16"* sem o número, e a issue proibia deduzir. Ficam aqui porque é onde
 | ESLint | **9** (`9.39.5`) | `packages/config` — flat config |
 | typescript-eslint | **8** (`8.67.0`) | `packages/config` |
 | Prettier | **3** (`3.9.6`) | `packages/config` |
+| Prisma | **7** (`7.9.1`) | `packages/database` — client TS puro, sem engine nativo |
 | PostgreSQL | **17** (`17-alpine`) | `infra/docker/docker-compose.yml` |
 | Redis | **8** (`8-alpine`) | idem — provisionado, **não adotado** |
 | MinIO | `RELEASE.2025-09-07T16-13-09Z` | idem — tag datada, nunca `latest` |
+| Prisma | **7** (`7.9.1`) | `packages/database` — client TS puro, sem engine nativo |
 
 ⚠️ **A ponta foi recusada três vezes, pelo mesmo motivo.** Node 24, TypeScript 7 (reescrita
 nativa em Go) e ESLint 10 já existiam quando estas versões foram fixadas. Todos recusados: a
@@ -156,6 +158,19 @@ stack do PRD — NestJS 11, Next.js 16, Prisma, Expo — tem compatibilidade **c
 majors anteriores, e o custo de um major novo demais não aparece no card que o adota, aparece
 nos seguintes. Prender o `edge-agent` (serviço Windows com SDK nativo, ADR-010) a um LTS
 recém-saído troca risco conhecido por risco desconhecido.
+
+✅ **O Prisma 7 é a exceção, e a exceção tem critério.** Também é major recém-saído, mas foi
+**aceito** porque a novidade **remove** complexidade em vez de adicionar: o client virou
+TypeScript puro, sem engine binário nativo por plataforma — o que simplifica container e CI. O
+critério não é *"novo é ruim"*, é *"o custo do novo aparece nos cards seguintes"*. Quando o novo
+**reduz** esse custo, ele entra.
+
+Duas consequências do Prisma 7 que aparecem no código e valem saber antes de mexer:
+
+- **driver adapter é obrigatório** — `datasources` deixou de existir. É efeito direto de não haver
+  mais engine nativo: a conexão passa a ser de um driver do ecossistema Node (`@prisma/adapter-pg`);
+- **`prisma.config.ts` substitui** a configuração que morava no schema, e precisa apontar o
+  `dotenv` para a **raiz do monorepo** — o `.env` vive lá, junto do que o `docker-compose` usa.
 
 ---
 
@@ -275,3 +290,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | — *(#43)* | — | [#50](https://github.com/RodReis/arenahub/pull/50) | `packages/config`: TS estrito, ESLint 9 flat config, Prettier. `any`, promise solta, `console` e literal decimal viram erro |
 | 14/08/2026 | — *(#45)* | — | [#51](https://github.com/RodReis/arenahub/pull/51) | ambiente local: Postgres 17, Redis 8 e MinIO em docker-compose, com healthcheck e tag fixa. Scripts `docker:*` |
 | 14/08/2026 | — *(#44)* | — | [#52](https://github.com/RodReis/arenahub/pull/52) | os 8 comandos falham com mensagem em vez de sair 0 sem rodar nada; guarda da porta 3344 |
+| 14/08/2026 | — *(#46)* | — | [#53](https://github.com/RodReis/arenahub/pull/53) | `packages/database`: Prisma 7, migration inicial **vazia**, client factory e seed vazio |

@@ -1,0 +1,26 @@
+// Schema do ArenaHub.
+//
+// PROPOSITALMENTE SEM MODELO. Modelar entidade aqui seria assumir escopo de
+// produto que pertence as fatias: `Tenant` e `GymUnit` nascem em F6 (#6),
+// nao neste card de bootstrap.
+//
+// Quando a primeira entidade chegar, a regra de arquitetura no 2 vale sem
+// excecao (CLAUDE.md):
+//
+//   - `tenant_id` em TODA entidade de negocio;
+//   - `gym_unit_id` quando o dado e fisico;
+//   - o tenant vem da identidade autenticada, nunca do corpo da requisicao
+//     nem do payload de webhook.
+//
+// Convencao de nomes: model em PascalCase singular, coluna em snake_case via
+// @map, tabela em snake_case plural via @@map. Contrato de dominio completo
+// em docs/CONVENTION.md.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
