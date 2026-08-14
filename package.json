@@ -16,6 +16,7 @@
     "test:integration": "node scripts/run-task.mjs test:integration",
     "test:e2e": "node scripts/run-task.mjs test:e2e",
     "build": "node scripts/run-task.mjs build",
+    "test:guardas": "node scripts/guardas.test.mjs",
     "docker:up": "docker compose --env-file .env -f infra/docker/docker-compose.yml up -d --wait",
     "docker:down": "docker compose --env-file .env -f infra/docker/docker-compose.yml down",
     "docker:reset": "docker compose --env-file .env -f infra/docker/docker-compose.yml down -v",

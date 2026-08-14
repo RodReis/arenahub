@@ -47,55 +47,42 @@ function falhaPorTaskAusente() {
   process.exit(1);
 }
 
-// `dev` e persistente: entrega o terminal e so volta no Ctrl+C, entao nao da
-// para inspecionar a saida depois. O guarda tem de vir ANTES -- senao `pnpm
-// dev` num repo sem app sai com 0 imediatamente e mente do mesmo jeito.
-const PERSISTENT = new Set(['dev']);
+// A verificacao vem SEMPRE antes de rodar, e usa --dry=json em vez de ler a
+// saida humana.
+//
+// Duas razoes, as duas descobertas por teste, nao por leitura:
+//
+//   1. A saida humana e colorida. Sob FORCE_COLOR=1 -- que muitos runners de
+//      CI ligam por padrao -- a linha vira
+//      "\x1b[1m Tasks:    \x1b[32m\x1b[1m0 successful\x1b[0m, 0 total\x1b[0m",
+//      e qualquer regex sobre texto falha. O guarda passaria batido
+//      exatamente no CI, que e onde ele mais importa.
+//
+//   2. `dev` e persistente: entrega o terminal e so volta no Ctrl+C, entao
+//      nao ha saida para inspecionar depois.
+//
+// O --dry=json nao leva decoracao ANSI e responde as duas de uma vez.
+const inspecao = spawnSync(TURBO, ['run', task, '--dry=json'], {
+  encoding: 'utf8',
+  shell: true,
+});
 
-if (PERSISTENT.has(task)) {
-  // Binario local, nao `pnpm turbo`: o pnpm escreve avisos no stdout e
-  // contamina o JSON.
-  const inspecao = spawnSync(TURBO, ['run', task, '--dry=json'], {
-    encoding: 'utf8',
-    shell: true,
-  });
-
-  if (inspecao.status === 0) {
-    try {
-      const plano = JSON.parse(inspecao.stdout ?? '{}');
-      // O turbo lista a task mesmo quando o workspace nao a declara --
-      // nesse caso `command` vem como "<NONEXISTENT>". Contar o array nao
-      // basta; o que importa e ter ao menos um comando de verdade.
-      const executaveis = (plano.tasks ?? []).filter(
-        (t) => t.command && t.command !== '<NONEXISTENT>',
-      );
-      if (executaveis.length === 0) {
-        falhaPorTaskAusente();
-      }
-    } catch {
-      // Se o plano nao for legivel, seguir e deixar o turbo decidir e mais
-      // seguro do que falhar por causa do proprio guarda.
+if (inspecao.status === 0) {
+  try {
+    const plano = JSON.parse(inspecao.stdout ?? '{}');
+    // O turbo lista a task mesmo quando o workspace nao a declara -- nesse
+    // caso `command` vem como "<NONEXISTENT>". Contar o array nao basta; o
+    // que importa e haver ao menos um comando de verdade.
+    const executaveis = (plano.tasks ?? []).filter(
+      (t) => t.command && t.command !== '<NONEXISTENT>',
+    );
+    if (executaveis.length === 0) {
+      falhaPorTaskAusente();
     }
+  } catch {
+    // Plano ilegivel: seguir e deixar o turbo decidir e mais seguro do que
+    // falhar por causa do proprio guarda.
   }
-
-  process.exit(spawnSync(TURBO, args, { stdio: 'inherit', shell: true }).status ?? 1);
 }
 
-const result = spawnSync(TURBO, args, { encoding: 'utf8', shell: true });
-
-const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-process.stdout.write(result.stdout ?? '');
-process.stderr.write(result.stderr ?? '');
-
-if (result.status !== 0) {
-  process.exit(result.status ?? 1);
-}
-
-// "Tasks:    0 successful, 0 total" -- nenhum workspace declarou a task.
-const nenhumaTaskRodou = /Tasks:\s+0 successful, 0 total/.test(output);
-
-if (nenhumaTaskRodou) {
-  falhaPorTaskAusente();
-}
-
-process.exit(0);
+process.exit(spawnSync(TURBO, args, { stdio: 'inherit', shell: true }).status ?? 1);

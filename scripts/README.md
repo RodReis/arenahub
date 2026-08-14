@@ -17,10 +17,18 @@ merge (`CLAUDE.md` → *Ciclo de vida de uma fatia*, passo 3).
 
 O Turbo 2.10 não tem flag para isso — verificado em `turbo run --help`.
 
-### Duas particularidades que custaram descoberta
+### A verificação usa `--dry=json`, nunca a saída humana
 
-**`dev` é persistente.** Entrega o terminal e só volta no Ctrl+C, então não dá para inspecionar a
-saída depois de rodar. O guarda dele vem **antes**, via `turbo run dev --dry=json`.
+Três coisas que custaram descoberta, todas por teste:
+
+**A saída humana é colorida.** Sob `FORCE_COLOR=1` — que muitos runners de CI ligam por padrão —
+a linha vira `\x1b[1m Tasks:    \x1b[32m\x1b[1m0 successful\x1b[0m, 0 total\x1b[0m`, e qualquer
+regex sobre texto falha. A primeira versão deste guarda lia texto e **passava batido exatamente no
+CI**, que é onde ele mais importa. O `--dry=json` não leva ANSI.
+
+**`dev` é persistente.** Entrega o terminal e só volta no Ctrl+C, então não há saída para
+inspecionar depois. Como a verificação agora vem sempre antes de rodar, ele deixou de ser caso
+especial.
 
 **`--dry=json` lista a task mesmo quando ela não existe**, marcando `command: "<NONEXISTENT>"`.
 Contar o array não basta — o guarda filtra por comando real.
@@ -48,5 +56,29 @@ Ainda não há API. O guarda existe para que, quando ela nascer, o `dev` dela co
 }
 ```
 
+### Testa as duas interfaces, não só o loopback
+
+`listen(porta, '127.0.0.1')` sozinho **não detecta** processo escutando em `0.0.0.0` — o bind no
+loopback tem sucesso mesmo com a porta ocupada. E `0.0.0.0` é o padrão do Docker e da maioria dos
+serviços, ou seja, o caso mais comum de colisão numa máquina de desenvolvimento.
+
+A primeira versão testava só o loopback: o guarda existia e não guardava nada. Agora testa as
+duas.
+
 Só a `3344` tem esse tratamento. As portas do `docker-compose` são configuráveis por `.env` de
 propósito — ver `infra/docker/README.md`.
+
+## `guardas.test.mjs` — os dois guardas têm teste
+
+```
+pnpm test:guardas
+```
+
+Seis casos, sem framework — os guardas nascem antes do runner de teste existir (`#44` vem antes do
+`#46`/`#47`).
+
+**Dois deles são regressão de defeito real:** a detecção sob `FORCE_COLOR=1` e a porta ocupada em
+`0.0.0.0`. Ambos passaram batido na primeira versão e só apareceram na revisão. Estão aqui para
+não voltarem.
+
+Quando o Jest/Vitest entrar (`#46` em diante), estes casos migram para lá.
