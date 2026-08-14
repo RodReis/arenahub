@@ -49,3 +49,6 @@ pnpm-debug.log*
 # config local do Claude Code (permissoes da sessao)
 .claude/settings.local.json
 .claude/settings.json
+
+# client gerado pelo Prisma (recriado por `pnpm --filter @arenahub/database generate`)
+packages/database/src/generated/
