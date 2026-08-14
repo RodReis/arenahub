@@ -1,0 +1,117 @@
+# CI do ArenaHub — o portão de merge.
+#
+# No processo do trio, o merge é do próprio Code: o PI não segura o código na
+# porta da `main`. A única coisa entre uma entrega ruim e a `main` é este
+# arquivo. Por isso ele falha explicitamente e nunca "passa mesmo assim".
+#
+# Ordem por custo crescente — falhe cedo, falhe barato (docs/TESTING.md §6).
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  # PR novo cancela a execução anterior da mesma branch; na main, nunca
+  # cancela — cada commit da main merece seu próprio resultado.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Turbo em CI: sem cor no log, que é o que o guarda de tasks já não depende
+  # mais, mas mantém o log legível no GitHub.
+  TURBO_TELEMETRY_DISABLED: 1
+  DO_NOT_TRACK: 1
+
+jobs:
+  ci:
+    name: build, lint, typecheck e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      # Postgres para `test:integration`. Testcontainers sobe o que precisar
+      # por conta, mas o serviço aqui cobre o caso simples e é mais rápido.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: arenahub
+          POSTGRES_PASSWORD: arenahub_ci
+          POSTGRES_DB: arenahub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenahub -d arenahub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub?schema=public
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # A versão sai do .nvmrc — fonte única com o desenvolvimento local.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # --- 1 de 8 ---------------------------------------------------------
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      # --- 2 de 8 ---------------------------------------------------------
+      - name: lint
+        run: pnpm lint
+
+      # --- 3 de 8 ---------------------------------------------------------
+      - name: typecheck
+        run: pnpm typecheck
+
+      # --- guardas do próprio repositório ---------------------------------
+      # Não estão na lista dos 8 do TESTING.md §6 porque não são teste de
+      # domínio. Rodam aqui porque um guarda quebrado não avisa que quebrou:
+      # ele simplesmente deixa passar.
+      - name: guardas de scripts/
+        run: pnpm test:guardas
+
+      - name: self-check do gerador de relatório
+        run: pnpm test:report:selfcheck
+
+      # --- 4 a 7 de 8 -----------------------------------------------------
+      # Estes quatro FALHAM HOJE, e falhar é o comportamento correto: nenhum
+      # workspace declara essas tasks ainda (o guarda de scripts/run-task.mjs
+      # faz o comando falhar em vez de sair 0 mentindo).
+      #
+      # `continue-on-error` mantém o passo visível e amarelo em vez de
+      # vermelho, sem parar o pipeline. Cada um perde o `continue-on-error`
+      # na fatia que criar o workspace correspondente -- não antes, para o
+      # verde não virar decoração.
+      - name: test (unitário + contrato)
+        run: pnpm test
+        continue-on-error: true
+
+      - name: test:integration
+        run: pnpm test:integration
+        continue-on-error: true
+
+      - name: build
+        run: pnpm build
+        continue-on-error: true
+
+      - name: test:e2e
+        run: pnpm test:e2e
+        continue-on-error: true
+
+      # --- 8 de 8 ---------------------------------------------------------
+      # A guarda de evidência. Falha se reports/TESTS.md divergir do que a
+      # execução produz -- número em documento tem de vir de execução, nunca
+      # de prosa (docs/TESTING.md §5). Esta barra o merge desde já.
+      - name: guarda de evidência
+        run: pnpm test:report --check

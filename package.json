@@ -15,6 +15,8 @@
     "test": "node scripts/run-task.mjs test",
     "test:integration": "node scripts/run-task.mjs test:integration",
     "test:e2e": "node scripts/run-task.mjs test:e2e",
+    "test:report": "node scripts/test-report.mjs",
+    "test:report:selfcheck": "node scripts/test-report.selfcheck.mjs",
     "build": "node scripts/run-task.mjs build",
     "test:guardas": "node scripts/guardas.test.mjs",
     "docker:up": "docker compose --env-file .env -f infra/docker/docker-compose.yml up -d --wait",
