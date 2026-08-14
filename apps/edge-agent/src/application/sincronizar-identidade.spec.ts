@@ -125,6 +125,66 @@ describe('ciclo de vida facial', () => {
     expect(await dispositivo.listar()).toHaveLength(1);
   });
 
+  it('reenrollment com id novo remove o anterior, sem deixar orfao', async () => {
+    // REGRESSAO. Antes, trocar o externalEnrollId da mesma pessoa deixava o
+    // id antigo no dispositivo para sempre: o registro local passava a
+    // apontar so para o novo, e `cadastrar` e aditivo. Orfao criado pelo
+    // fluxo normal -- recaptura facial e correcao de cadastro acontecem --
+    // e nao por falha de processo. O aceite da Slice 0.2 proibe.
+    const pessoaId = 'pessoa-a';
+    const idAntigo = gerarExternalEnrollId();
+    const idNovo = gerarExternalEnrollId();
+
+    await cadastrarIdentidade(
+      { repo, dispositivo },
+      { pessoaId, externalEnrollId: idAntigo, dispositivoId: DISPOSITIVO, rotulo: 'v1' },
+      AGORA,
+    );
+
+    await cadastrarIdentidade(
+      { repo, dispositivo },
+      { pessoaId, externalEnrollId: idNovo, dispositivoId: DISPOSITIVO, rotulo: 'v2' },
+      AGORA,
+    );
+
+    const noDispositivo = (await dispositivo.listar()).map((i) => i.externalEnrollId);
+
+    expect(noDispositivo).toEqual([idNovo]);
+    expect(noDispositivo).not.toContain(idAntigo);
+    expect(await detectarOrfaos({ repo, dispositivo }, DISPOSITIVO)).toEqual([]);
+  });
+
+  it('se a remocao do enroll anterior falhar, nao cadastra o novo', async () => {
+    // Cadastrar mesmo assim produziria duas identidades para a mesma pessoa,
+    // indistinguiveis sem intervencao. Falhar e recuperavel; duplicar nao.
+    const pessoaId = 'pessoa-a';
+    const idAntigo = gerarExternalEnrollId();
+
+    await cadastrarIdentidade(
+      { repo, dispositivo },
+      { pessoaId, externalEnrollId: idAntigo, dispositivoId: DISPOSITIVO, rotulo: 'v1' },
+      AGORA,
+    );
+
+    dispositivo.programarFalha('remover', 'dispositivo fora do ar');
+
+    const r = await cadastrarIdentidade(
+      { repo, dispositivo },
+      {
+        pessoaId,
+        externalEnrollId: gerarExternalEnrollId(),
+        dispositivoId: DISPOSITIVO,
+        rotulo: 'v2',
+      },
+      AGORA,
+    );
+
+    expect(r.ok).toBe(false);
+    // O dispositivo continua so com o antigo -- estado conhecido, nao misto.
+    expect((await dispositivo.listar()).map((i) => i.externalEnrollId)).toEqual([idAntigo]);
+    expect(repo.buscar(pessoaId, DISPOSITIVO)?.estado).toBe('falha');
+  });
+
   it('detecta identidade que existe no dispositivo e nao aqui', async () => {
     // Cenario real: o software de fabrica cadastrou alguem, ou uma remocao
     // falhou pela metade.

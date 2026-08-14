@@ -35,6 +35,38 @@ export async function cadastrarIdentidade(
   // barata; falha depois do dado estar no equipamento, nao.
   validarExternalEnrollId(entrada.externalEnrollId);
 
+  // REENROLLMENT: a mesma pessoa recebendo um externalEnrollId novo.
+  //
+  // Acontece de verdade -- recaptura facial, ou correcao de cadastro. Sem
+  // este bloco, o id ANTIGO ficava no dispositivo para sempre: o registro
+  // local passava a apontar so para o novo, e `cadastrar` e aditivo. Orfao
+  // criado pelo fluxo normal, nao por falha de processo -- exatamente o que
+  // o aceite da Slice 0.2 proibe.
+  //
+  // Remover ANTES de cadastrar o novo, e nao depois: se o processo morrer no
+  // meio, sobra a pessoa sem identidade no dispositivo (recuperavel pela
+  // fila de pendentes) em vez de duas identidades para a mesma pessoa
+  // (indistinguiveis sem intervencao).
+  const anterior = deps.repo.buscar(entrada.pessoaId, entrada.dispositivoId);
+
+  if (anterior && anterior.externalEnrollId !== entrada.externalEnrollId) {
+    const remocao = await deps.dispositivo.remover(anterior.externalEnrollId);
+
+    if (!remocao.confirmado) {
+      deps.repo.marcarEstado(
+        entrada.pessoaId,
+        entrada.dispositivoId,
+        'falha',
+        agora,
+        `nao foi possivel remover o enroll anterior: ${remocao.razao}`,
+      );
+      return {
+        ok: false,
+        razao: `enroll anterior nao pode ser removido: ${remocao.razao}`,
+      };
+    }
+  }
+
   deps.repo.registrarIntencaoDeCadastro(
     entrada.pessoaId,
     entrada.externalEnrollId,

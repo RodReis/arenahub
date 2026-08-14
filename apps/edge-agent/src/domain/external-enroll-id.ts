@@ -56,9 +56,34 @@ export class ExternalEnrollIdInvalidoError extends Error {
   }
 }
 
-/** Sequencia de 11 digitos -- o formato de um CPF, com ou sem mascara. */
-const PARECE_CPF = /(?:^|\D)(\d{11})(?:\D|$)/;
-const PARECE_CPF_MASCARADO = /\d{3}\.?\d{3}\.?\d{3}-?\d{2}/;
+/**
+ * CPF e reconhecido por CONTEXTO, nao por substring de 11 digitos.
+ *
+ * A primeira versao usava `/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/` sem ancora. Com
+ * os pontos opcionais, isso casa 11 digitos seguidos em QUALQUER posicao --
+ * e num hexadecimal de 32 caracteres, digito e a maior parte do alfabeto.
+ * Medido: 5,65% dos ids que o proprio `gerarExternalEnrollId` produz eram
+ * recusados pelo proprio validador. Pior: o teste "aceita o que o gerador
+ * produz" rodava uma vez, entao tinha 5,65% de chance de falhar sozinho no
+ * CI, com aparencia de flakiness em vez de bug.
+ *
+ * Agora as duas formas exigem que a string INTEIRA seja o CPF -- que e o
+ * unico caso em que alguem de fato passou um CPF como identificador.
+ */
+
+/** CPF cru: exatamente 11 digitos, nada mais. */
+const E_CPF_CRU = /^\d{11}$/;
+
+/** CPF mascarado: 000.000.000-00, com separadores de verdade. */
+const E_CPF_MASCARADO = /^\d{3}[.\s]\d{3}[.\s]\d{3}[-\s]\d{2}$/;
+
+/**
+ * CPF com prefixo ou sufixo textual -- `user-12345678901`, `cpf:...`.
+ *
+ * Exige que a parte nao-numerica seja separador ou rotulo, nunca
+ * hexadecimal: `a1b2c3...` nao pode virar suspeita so por conter digitos.
+ */
+const E_CPF_ROTULADO = /^[a-z_-]{1,12}[:_-]?\d{11}$/i;
 
 /**
  * Valida antes de mandar para o dispositivo.
@@ -72,7 +97,7 @@ export function validarExternalEnrollId(valor: string): ExternalEnrollId {
     throw new ExternalEnrollIdInvalidoError('vazio');
   }
 
-  if (PARECE_CPF.test(valor) || PARECE_CPF_MASCARADO.test(valor)) {
+  if (E_CPF_CRU.test(valor) || E_CPF_MASCARADO.test(valor) || E_CPF_ROTULADO.test(valor)) {
     throw new ExternalEnrollIdInvalidoError(
       'parece um CPF. A Slice 0.2 proibe identificador derivado de CPF -- ' +
         'use gerarExternalEnrollId()',

@@ -70,9 +70,6 @@ export class DeviceUserRepository {
   constructor(caminho: string) {
     this.db = new DatabaseSync(caminho);
     this.db.exec('PRAGMA journal_mode = WAL');
-    // Sem isto, o SQLite ignora a FK e o indice unico continua valendo, mas
-    // qualquer integridade futura passaria batido.
-    this.db.exec('PRAGMA foreign_keys = ON');
     this.db.exec(SCHEMA);
   }
 

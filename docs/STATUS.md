@@ -54,15 +54,27 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 > transporte não é refém do Windows. A dúvida sobrevive só para o SDK de captura biométrica, se
 > ele existir como DLL.
 
+🟡 **A F2 parou na metade, e o motivo é concreto:** a documentação do SDK Topdata está em PDF
+**fora deste repositório**. A metade sem hardware foi entregue — porta, simulador contratual,
+mapeamento local e a regra do `externalEnrollId` sem CPF. O `TopdataFacialAdapter` não: escrever
+chamada sem a documentação seria inventar assinatura, e o plano de apoio proíbe.
+
+**Três coisas destravam a outra metade**, e nenhuma é código:
+
+1. **os manuais no repositório** — `docs/vendor/topdata/`;
+2. **decidir o transporte** — WebSocket, web server HTTP ou DLL via bridge;
+3. **consentimento dos participantes** — gate do PRD §4, pré-requisito de qualquer captura facial
+   (regra de arquitetura nº 7, que não abre exceção).
+
 ---
 
 ## 2. Quadro
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **40** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **39** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | 0 |
+| Em Andamento | `proplan:doing` | Code está implementando | **1** — [F2](https://github.com/RodReis/arenahub/issues/2), entregue pela metade |
 | Feito | `proplan:done` | PR mergeado com CI verde | **7** — os seis do bootstrap (#42–#47) e a **primeira fatia**, [F1](https://github.com/RodReis/arenahub/issues/1) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
 

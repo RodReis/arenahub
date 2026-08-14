@@ -58,9 +58,32 @@ describe('validarExternalEnrollId — a regra do CPF', () => {
     expect(() => validarExternalEnrollId('X'.repeat(32))).toThrow(ExternalEnrollIdInvalidoError);
   });
 
-  it('aceita o que o proprio gerador produz', () => {
-    const id = gerarExternalEnrollId();
+  it('aceita TODO id que o proprio gerador produz', () => {
+    // REGRESSAO. A primeira versao do filtro de CPF recusava 5,65% dos ids
+    // legitimos: `\d{3}\.?\d{3}\.?\d{3}-?\d{2}` sem ancora casa 11 digitos
+    // seguidos em qualquer posicao, e num hexadecimal de 32 caracteres isso
+    // acontece o tempo todo.
+    //
+    // O teste antigo gerava UM id -- entao tinha 5,65% de chance de falhar
+    // sozinho no CI, com cara de flakiness em vez de bug. Por isso este roda
+    // em lote: 5.000 ids, e qualquer recusa e falha determinista.
+    const recusados: string[] = [];
 
-    expect(validarExternalEnrollId(id)).toBe(id);
+    for (let i = 0; i < 5000; i += 1) {
+      const id = gerarExternalEnrollId();
+      try {
+        validarExternalEnrollId(id);
+      } catch {
+        recusados.push(id);
+      }
+    }
+
+    expect(recusados).toEqual([]);
+  });
+
+  it('nao confunde hexadecimal com CPF so porque tem digitos', () => {
+    // O alfabeto hex e majoritariamente digito. Suspeitar de qualquer
+    // sequencia numerica dentro dele torna o filtro inutil.
+    expect(() => validarExternalEnrollId('12345678901abcdef0123456789abcde')).not.toThrow();
   });
 });
