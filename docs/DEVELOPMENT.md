@@ -274,3 +274,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | — *(#42)* | — | [#49](https://github.com/RodReis/arenahub/pull/49) | esqueleto do monorepo: pnpm workspaces, Turborepo, layout do PRD §5. Node 22 / pnpm 10 / Turbo 2 fixados |
 | 14/08/2026 | — *(#43)* | — | [#50](https://github.com/RodReis/arenahub/pull/50) | `packages/config`: TS estrito, ESLint 9 flat config, Prettier. `any`, promise solta, `console` e literal decimal viram erro |
 | 14/08/2026 | — *(#45)* | — | [#51](https://github.com/RodReis/arenahub/pull/51) | ambiente local: Postgres 17, Redis 8 e MinIO em docker-compose, com healthcheck e tag fixa. Scripts `docker:*` |
+| 14/08/2026 | — *(#44)* | — | [#52](https://github.com/RodReis/arenahub/pull/52) | os 8 comandos falham com mensagem em vez de sair 0 sem rodar nada; guarda da porta 3344 |

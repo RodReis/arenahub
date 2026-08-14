@@ -7,8 +7,8 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 14/08/2026 *(segunda rodada)* · **Fase:** documentação e planejamento ·
-**Código:** zero linha
+**Última atualização:** 14/08/2026 *(segunda rodada)* · **Fase:** bootstrap `[INFRA]` em execução ·
+**Código:** 4 dos 6 cards de bootstrap entregues — #42, #43, #44, #45
 
 **14/08/2026, segunda rodada — ADR-011 e ADR-008 fechados.** F4 e F8 destravadas. Restam **duas**
 pendências, nenhuma no caminho crítico de hoje: ADR-013 (sai da homologação do MVP 2, não de
@@ -24,11 +24,14 @@ LGPD é lista fechada onde legítimo interesse não figura. Corrigido no ADR.
 ## 1. Onde estamos, em três frases
 
 O repositório tem PRDs aprovados para planejamento, planos de implementação por slice e, desde
-14/08/2026, o conjunto de documentos de governança. **O esqueleto do monorepo existe** desde
-14/08/2026 (card [#42](https://github.com/RodReis/arenahub/issues/42)): `package.json`,
-`pnpm-workspace.yaml`, `turbo.json` e o layout de `apps/`, `packages/` e `infra/` — todas as
-pastas ainda vazias. **Continua não existindo `.github/`** (card
-[#47](https://github.com/RodReis/arenahub/issues/47), o último do bootstrap).
+14/08/2026, o conjunto de documentos de governança. **Quatro dos seis cards de bootstrap estão
+entregues** (#42, #43, #44, #45): existem monorepo, `packages/config` com TypeScript estrito e
+ESLint, ambiente Docker com Postgres/Redis/MinIO, e os oito comandos que **falham com mensagem em
+vez de mentir**. As pastas de `apps/` continuam vazias — bootstrap é encanamento, não feature.
+
+**Faltam dois:** [#46](https://github.com/RodReis/arenahub/issues/46) (Prisma) e
+[#47](https://github.com/RodReis/arenahub/issues/47) (CI — `.github/` ainda não existe). O #47 é o
+marco: quando fecha, a *exceção de arranque* morre.
 
 Nada pode ser codificado até que: (a) a spec da fatia esteja `aprovada-pi` em `docs/specs/`,
 e (b) os ADRs que a bloqueiam estejam resolvidos.
@@ -50,7 +53,7 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **44** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | 0 |
-| Feito | `proplan:done` | PR mergeado com CI verde | **3** — [#42](https://github.com/RodReis/arenahub/issues/42), [#43](https://github.com/RodReis/arenahub/issues/43), [#45](https://github.com/RodReis/arenahub/issues/45) |
+| Feito | `proplan:done` | PR mergeado com CI verde | **4** — [#42](https://github.com/RodReis/arenahub/issues/42), [#43](https://github.com/RodReis/arenahub/issues/43), [#44](https://github.com/RodReis/arenahub/issues/44), [#45](https://github.com/RodReis/arenahub/issues/45) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
@@ -219,7 +222,7 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 |---|---|---|---|
 | ✅ [#42](https://github.com/RodReis/arenahub/issues/42) Monorepo pnpm + Turborepo | 1 | `pnpm install --frozen-lockfile` passa | — |
 | ✅ [#43](https://github.com/RodReis/arenahub/issues/43) TS estrito, ESLint, Prettier | 2 | `pnpm lint` e `pnpm typecheck` verdes | #42 |
-| [#44](https://github.com/RodReis/arenahub/issues/44) Os 8 comandos obrigatórios | 3 | os 8 rodam e **falham com mensagem clara** | #42, #43 |
+| ✅ [#44](https://github.com/RodReis/arenahub/issues/44) Os 8 comandos obrigatórios | 3 | os 8 rodam e **falham com mensagem clara** | #42, #43 |
 | ✅ [#45](https://github.com/RodReis/arenahub/issues/45) docker-compose local | 4 | `docker compose up` sobe Postgres, Redis e MinIO | #42 |
 | [#46](https://github.com/RodReis/arenahub/issues/46) `packages/database` | 5 | `pnpm --filter database migrate dev` | #42, #45 |
 | [#47](https://github.com/RodReis/arenahub/issues/47) CI | 6 | **CI verde no próprio PR** | #42, #43, #44, #46 |
@@ -239,7 +242,7 @@ Backlog, assignee PI. Correspondem aos itens 1–6 de `docs/DEVELOPMENT.md` §4.
 > **O board deveria ser o item 1:** é ele que faz o resto virar processo normal. Reordenar é do
 > Code, dono do arquivo.
 
-**Sequência real de execução, então:** board → ✅ #42 → ✅ #43 → #45 → #44 → #46 → **#47**. O #47 (CI)
+**Sequência real de execução, então:** board → ✅ #42 → ✅ #43 → ✅ #45 → ✅ #44 → #46 → **#47**. O #47 (CI)
 é o marco: quando ele fecha, a exceção de arranque morre e o ciclo normal vale inteiro.
 
 > A ordem acima foi para o `DEVELOPMENT.md` §4 no PR
@@ -270,12 +273,21 @@ Redis 8 e MinIO sobem com healthcheck, todas as imagens com **tag fixa** — `la
 > Isso **não** autoriza BullMQ na primeira fatia que parecer conveniente — fila entra só com
 > métrica que a justifique (`CLAUDE.md` → Stack). Registrado também no `infra/docker/README.md`.
 
-> ⚠️ **Verde ainda não quer dizer verificado — mas já quer dizer alguma coisa.** Desde o #43,
-> `pnpm lint` e `pnpm typecheck` **executam de fato** sobre `packages/config`. Os outros cinco
-> (`test`, `test:integration`, `test:e2e`, `build`, `dev`) continuam saindo com exit 0 **sem rodar
-> nada**, porque nenhum workspace declara essas tasks. Fazer falhar com mensagem clara é o card
-> [#44](https://github.com/RodReis/arenahub/issues/44). Até lá, **`pnpm build` verde não é
-> evidência de nada**.
+**#44 entregue em 14/08/2026** — PR [#52](https://github.com/RodReis/arenahub/pull/52). **A ressalva
+que vinha desde o #42 morreu aqui.**
+
+> ✅ **Verde agora quer dizer verificado.** `turbo run test` num repositório onde ninguém declara
+> `test` imprimia `WARNING No tasks were executed` e **saía com código 0**. O aviso passa
+> despercebido; o código de saída não — e quem o lê é o CI, que substitui o aceite humano no merge.
+> O guarda `scripts/run-task.mjs` faz o comando **falhar com mensagem** em vez de mentir.
+>
+> Estado dos oito hoje: `install`, `lint` e `typecheck` **passam** porque têm o que rodar; `test`,
+> `test:integration`, `test:e2e`, `build` e `dev` **falham com mensagem** — correto, nenhum
+> workspace os declara ainda. Cada um passa a valer quando o workspace que o usa nascer.
+
+> ℹ️ **A porta 3344 tem guarda** (`scripts/check-port.mjs`), mesmo sem API ainda. Se estiver
+> ocupada, falha — nunca troca. Framework que cai sozinho na porta seguinte deixa dois processos
+> servindo, com o operador falando com um e lendo o log do outro.
 
 ### Pendência entregue ao Code — arquivo que não é do Cowork
 
