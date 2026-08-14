@@ -102,7 +102,7 @@ Fluxo do FIX auto-criado: Code cria em **Backlog** → `todo`/`doing` → PR com
 ## Regras de trabalho
 
 - **Idioma**: documentação, specs, commits e comunicação sempre em português (PT-BR); código e identificadores em inglês.
-- **Sem hardcode e sem dado inventado no caminho de produção.** Dado local de desenvolvimento entra por seed, criado na primeira fatia que precisar. *(Onde mora o schema Prisma — `packages/database` ou `infra/database` — é ADR-020, aberto.)* **Dublê de teste é obrigatório, não proibido** — simulador de leitor Topdata, `FakePaymentProvider`, fake de OCR/IA e de antivírus existem por exigência dos PRDs e vivem no boundary, nunca dentro da regra de domínio. A fronteira está em `docs/TESTING.md`.
+- **Sem hardcode e sem dado inventado no caminho de produção.** Dado local de desenvolvimento entra por seed, criado na primeira fatia que precisar. Seed em `packages/database/prisma/seed.ts` (ADR-020). **Dublê de teste é obrigatório, não proibido** — simulador de leitor Topdata, `FakePaymentProvider`, fake de OCR/IA e de antivírus existem por exigência dos PRDs e vivem no boundary, nunca dentro da regra de domínio. A fronteira está em `docs/TESTING.md`.
 - **Desenvolvimento é local** (docker-compose: Postgres + Redis + MinIO).
 - **Portas**: API `3344` (fixa — se ocupada, falha em vez de trocar); Expo dev server na padrão (`8081`); demais apps na porta padrão do framework. Colisão vira decisão registrada, nunca troca silenciosa.
 - **Nada de dado real de aluno no repositório** — nem em fixture, nem em golden file, nem em log de erro.
@@ -143,7 +143,7 @@ Contrato completo (entidades, estados, invariantes numeradas): `docs/CONVENTION.
 
 ## Stack
 
-Fixada em `docs/prd/README.md` §5/§5.1 e nos índices de plano. O único acréscimo ao layout do PRD é `packages/database`, que **ainda não está no PRD** — ADR-020. Versão exata é decisão registrada — **não atualize major sem ADR**.
+Fixada em `docs/prd/README.md` §5/§5.1 e nos índices de plano. O único acréscimo ao layout do PRD é `packages/database`, ratificado em **ADR-020** — falta a emenda formal ao `prd/README.md` §5. Versão exata é decisão registrada — **não atualize major sem ADR**.
 
 **Monorepo** — pnpm workspaces + Turborepo.
 
@@ -156,7 +156,7 @@ apps/
   edge-agent/   Node.js no PC da academia + SQLite (+ serviço nativo p/ SDK Topdata)
 packages/
   api-contracts/  tipos e schemas compartilhados
-  database/       schema Prisma, migrations, client factory, seed  ← ADR-020 (aberto)
+  database/       schema Prisma, migrations, client factory, seed  ← ADR-020
   ui/             design system
   config/         eslint, tsconfig, prettier
   testing/        utilitários de teste

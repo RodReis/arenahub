@@ -13,6 +13,75 @@
 
 ---
 
+## 2026-08-14 — Oito decisões novas e duas ratificações
+
+Segunda sessão do dia. Com a base documental aprovada e commitada (`0fef95d`), o PI tomou **oito
+decisões novas** (ADR-002, 004, 008, 009, 011, 012, 013 parcial, 019) e **ratificou duas**
+(ADR-005 e ADR-020), em três blocos, na ordem de bloqueio.
+
+### As decisões
+
+| ADR | decisão | consequência que ela cria |
+|---|---|---|
+| **ADR-011** | `edge-agent` no **PC da recepção**, compartilhado | a catraca passa a depender do uptime de um PC compartilhado |
+| **ADR-002** | **dois níveis** (`Tenant` = academia, `GymUnit` = unidade) | multiunidade em uso desde o dia 1; Especificação §6 fica errada |
+| **ADR-012** | **offline sai do MVP 1** e vira MVP 1.5 | F10 muda de MVP sem mudar de número |
+| **ADR-009** | não opera com convênio hoje | `Entitlement.source` nasce extensível; integração fora do roadmap |
+| **ADR-013** | provedor sai da **homologação**, com matriz de critérios | MVP 2 segue bloqueado, mas agora por um gate com critério |
+| **ADR-019** | bloqueio em `due_date + grace_period`, **configurável**; timezone da unidade | `BillingSettings` ganha âncora de bloqueio explícita |
+| **ADR-008** | expurgo de biometria em **30 dias**; **há aluno menor** | consentimento por responsável legal vira escopo obrigatório de F8 |
+| **ADR-004** | **a nuvem decide sempre**, com gatilho de reabertura na medição da POC | o orçamento de 300 ms passa a incluir a internet da academia |
+| **ADR-005** | ratificado | vocabulário único; eventos mantêm `AccessGranted`/`AccessDenied` |
+| **ADR-020** | ratificado | `packages/database`; **exige emenda ao `prd/README.md` §5** |
+
+### O risco que duas decisões criaram juntas
+
+ADR-011 (PC compartilhado) e ADR-012 (sem offline no MVP 1) combinados produzem uma consequência
+que nenhum dos dois tem sozinho: **a disponibilidade da catraca passa a ser exatamente o uptime
+de um PC que outras pessoas usam.** Não é modo degradado — se a máquina desligar, a catraca não
+decide nada.
+
+Foi apresentado ao PI como consequência, não como erro, e ele escolheu **mitigar por processo**:
+serviço Windows com início automático, alerta obrigatório de heartbeat em F11, regra escrita de
+não desligar o PC, e liberação manual pela recepção como fallback declarado. **Risco residual
+aceito conscientemente:** alguém tira da tomada. O primeiro incidente desse tipo é o gatilho
+para priorizar o MVP 1.5 — registrado aqui para que, quando acontecer, ninguém trate como
+surpresa.
+
+### O que ficou aberto
+
+Quatro pendências, duas delas parciais:
+
+- **ADR-011** — provisionamento de identidade do Edge e credencial de `/api/v1/edge/*`. Bloqueia F4.
+- **ADR-008** — base legal, RIPD e papéis controlador/operador. Bloqueia F8.
+- **ADR-013** — o provedor em si, que sai do card `[GATE]` de homologação. Bloqueia F12–F16.
+- **ADR-007** — semântica offline. **Sem urgência**: migrou com F10 para o MVP 1.5.
+
+### Pendências criadas pelas próprias decisões
+
+1. **Especificação §6** precisa de nota de emenda: promete três níveis de hierarquia que o
+   modelo não tem (ADR-002).
+2. **`prd/README.md` §5** precisa de emenda formal acrescentando `packages/database` (ADR-020).
+3. **Especificação §42** tem a conta de carência errada (10 + 3 = 13, não 14) — ADR-019 já
+   registra o correto, mas o texto de origem continua errado.
+
+### Segunda exceção de escrita no Git
+
+O PI autorizou, também pontualmente, que o Cowork commitasse na `main` os documentos alterados
+pelo registro destas decisões.
+
+**Observação que precisa ficar escrita, porque é desconfortável:** esta é a **segunda exceção em
+poucas horas**. Duas exceções seguidas deixam de ser exceção e viram padrão não declarado — que é
+exatamente o tipo de erosão silenciosa que este processo existe para impedir.
+
+Se houver uma terceira, o certo não é abrir outra exceção: é **ampliar formalmente o escopo do
+Cowork por ADR**, para que a regra escrita descreva o que de fato acontece. Regra que se
+contorna toda vez já não é regra — é decoração.
+
+Nenhuma linha de código foi escrita. Nenhum card foi criado.
+
+---
+
 ## 2026-08-14 — Configuração da governança e crítica da base documental
 
 **O que aconteceu.** O PI pediu análise, crítica e configuração dos documentos do projeto. A
@@ -140,7 +209,7 @@ referenciam dois arquivos que ainda não estão no repositório. Fecha no item 8
 
 ### O que ficou aberto
 
-Dez ADRs aguardando o PI (`docs/STATUS.md` §3 — a tabela tem 11 linhas, mas a primeira, ADR-010, já está aceita), mais as decisões já declaradas pendentes nos
+Dez ADRs aguardando o PI, conforme o `docs/STATUS.md` daquela data, mais as decisões já declaradas pendentes nos
 **planos** (`M2-COMPLIANCE-01`, `M3-CLINICAL-01`, `M3-STUDENT-AI-01`, `M4-DIST-01`,
 `M5-RULES-01`) e as 8 de `docs/DESIGN-UI.md` §17.
 

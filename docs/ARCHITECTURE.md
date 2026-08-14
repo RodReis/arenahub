@@ -89,7 +89,7 @@ justifique** e ADR (`docs/prd/README.md` §5.1).
 | `admin-web` | Next.js (SSR) | internet | contínua |
 | `mobile` | Expo / RN | internet | loja (ver `M4-DIST-01`) |
 | `kiosk` | Next.js PWA em quiosque | rede da academia | contínua |
-| `edge-agent` | Node.js no PC da academia | **rede local, sobrevive offline** | **problema aberto — ADR-011** |
+| `edge-agent` | serviço Windows no **PC da recepção** (ADR-011) | rede local | atualização com rollback (`M1-NFR-006`); abertos: provisionamento e credencial |
 
 O `edge-agent` é o componente de missão crítica hospedado em infraestrutura que **não
 controlamos**. Se ele cair, a catraca para. Todo desenho do módulo `edge` parte disso.
@@ -117,8 +117,10 @@ Regras de aplicação (não negociáveis):
    existe bypass silencioso.
 6. Todo caso de uso multi-tenant crítico tem teste que **tenta cruzar tenants e falha**.
 
-> **Aberto:** a Especificação §6 desenha três níveis (`Tenant → Academia → Unidade`), o modelo
-> de dados tem dois (`tenants`, `gym_units`). Ver **ADR-002**.
+> **Resolvido (ADR-002): dois níveis.** `Tenant` é a academia contratante; `GymUnit` é a unidade
+> física. A Especificação §6, que desenha três, é que precisa de nota de emenda. Multiunidade
+> está em uso desde o dia 1 — o teste de isolamento por `gym_unit_id` vale tanto quanto o de
+> `tenant_id`.
 
 ---
 
@@ -152,18 +154,18 @@ antes. Isso é o que permite entrada de aluno corporativo, cortesia e visitante 
 
 ### 4.2 Onde a decisão acontece
 
-**Decisão pertence à nuvem. O Edge decide com snapshot quando — e só quando — a nuvem não
-responde**, dentro da validade e da carência configuradas.
+**Decidido (ADR-004): a nuvem decide. Sempre.** O Edge executa e reporta; não julga.
 
-| modo | quem decide | fonte | limite |
+| modo | quem decide | fonte | quando vale |
 |---|---|---|---|
-| online | `apps/api` | Postgres | p95 < 300 ms fim-a-fim (objetivo) |
-| degradado | `edge-agent` | snapshot SQLite | só dentro de `offline_cache_validity` + `offline_grace_period` |
+| online | `apps/api` | Postgres | **MVP 1** — caminho único |
+| sem nuvem | ninguém decide automaticamente | — | **MVP 1**: liberação manual pela recepção, com registro (`M1-FR-023`) |
+| degradado por snapshot | `edge-agent` | snapshot SQLite | **MVP 1.5** (ADR-012), dentro de `offline_cache_validity` + `offline_grace_period` |
 | snapshot vencido | `edge-agent` | — | **DENY ou fallback operacional explícito. Nunca allow ilimitado** (`M1-BR-008`) |
 
-> A Especificação §99 promete "decisão local < 300 ms" enquanto §26 roteia o caminho normal
-> pela nuvem. Ver **ADR-004** — inclui o risco de o orçamento de 300 ms não caber com
-> round-trip de internet residencial.
+> **Gatilho de reabertura.** O orçamento de 300 ms passa a incluir a internet da academia. A POC
+> (F3) mede o p95 real; **acima de 300 ms, o ADR-004 reabre** e volta a ser decisão do PI. Até
+> essa medição existir, nenhuma promessa de latência é feita a cliente.
 
 ### 4.3 Resposta do motor
 
@@ -277,8 +279,9 @@ histórico seria mentir. O tratamento comercial disso é decisão do PI (**ADR-0
 
 ### 7.1 Postgres é a verdade
 
-- Prisma como ORM; schema, migrations, client factory e `seed.ts` moram juntos — em
-  `packages/database` (proposta) ou `infra/database`: **ADR-020**, aberto.
+- Prisma como ORM; schema, migrations, client factory e `seed.ts` moram em **`packages/database`**
+  (ADR-020). `infra/database/` fica com o que é infraestrutura de verdade. Pendência que sobra:
+  emenda ao `prd/README.md` §5, que ainda não prevê o pacote.
 - Migração é **reversível ou tem rollback documentado** (`docs/prd/README.md` §10.1).
 - Dinheiro é **inteiro na menor unidade** (`M2-BR-001`). Nunca float.
 - Datas persistidas em **UTC (ISO 8601)**; apresentação no timezone da **unidade**.
@@ -355,8 +358,8 @@ acesso às imagens** São exatamente as três coisas que este sistema precisa pr
 | Revogação = bloqueio lógico imediato + `DeviceSyncJob DELETE` + auditoria | `biometrics` |
 | Template biométrico não persistido quando o dispositivo não exigir | `M1-FR-014` |
 | Log de quem acessou template/imagem | `audit` |
-| Expurgo no fim do vínculo, com prazo definido | **aberto — ADR-008** |
-| Consentimento de menor por responsável legal | **aberto — ADR-008** |
+| **Expurgo em 30 dias** após o fim do vínculo, no banco e nos leitores, com evidência | INV-142 (ADR-008) |
+| **Consentimento de menor por responsável legal** — há aluno menor; escopo obrigatório de F8 | INV-143 (ADR-008) |
 | Dado de cartão nunca transita pelo ArenaHub (tokenização hospedada) | `payments` |
 | Segredo em secret manager, nunca no Git | infra |
 | MFA obrigatório para perfis administrativos | `auth` |
@@ -421,12 +424,13 @@ Está aberto, com ADR correspondente. Não invente resposta — pergunte ao PI.
 
 | tema | ADR |
 |---|---|
-| Existe entidade "Academia" entre Tenant e Unidade? | ADR-002 |
-| Onde a decisão de acesso acontece por padrão | ADR-004 |
-| Semântica de validade × carência offline e conflito de reconciliação | ADR-007 |
-| Retenção de biometria, menor de idade, base legal | ADR-008 |
-| Entitlement de convênio corporativo (Wellhub/TotalPass) | ADR-009 |
-| SO, hardware, instalação e atualização do `edge-agent`; versionamento de `/api/v1/edge` | ADR-011 |
-| Contagem de carência e instante de bloqueio | ADR-019 |
-| Provedor de pagamento e modelo de `Payment` | ADR-013 |
-| Escopo de offline no MVP 1 | ADR-012 |
+| Semântica de validade × carência offline e conflito de reconciliação | ADR-007 *(sem urgência — migrou com F10 para o MVP 1.5)* |
+| Provedor de pagamento e modelo de `Payment` | ADR-013 *(sai do card `[GATE]` de homologação)* |
+| **Base legal**, RIPD e papéis controlador/operador da biometria | ADR-008, parte aberta |
+| **Provisionamento de identidade** do Edge e **credencial** de `/api/v1/edge/*` | ADR-011, parte aberta |
+
+**Decididos em 14/08/2026** — não reabrir sem ADR novo: hierarquia de dois níveis (ADR-002),
+decisão de acesso na nuvem (ADR-004), vocabulário único (ADR-005), retenção de 30 dias e
+consentimento de menor (ADR-008), entitlement sem convênio hoje (ADR-009), Edge no PC da
+recepção (ADR-011), offline no MVP 1.5 (ADR-012), âncora de bloqueio configurável (ADR-019) e
+`packages/database` (ADR-020). Detalhe em `docs/DECISIONS.md`.

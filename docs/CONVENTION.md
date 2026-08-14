@@ -70,7 +70,7 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 | `Student` | nome, CPF, RG, data de nascimento, sexo cadastral, telefone, WhatsApp, e-mail, foto, endereço, CEP, cidade, estado, matrícula, unidade, data de cadastro, origem do lead, consultor, status | ~ **(obrigatório — matrícula é única por tenant)** | Especificação §11 |
 | `StudentContact` | nome, parentesco, telefone | ~ | Especificação §11 |
 | `StudentAddress` | **`[indefinido]`** — endereço aparece embutido em `Student` | ~ | `M1` §11 |
-| `Consent` | `student_id`, `type`, `document_version`, `accepted_at`, `revoked_at`, `ip`, `device`. Tipos: `TERMS`, `PRIVACY`, `BIOMETRIC`, `HEALTH_DATA`, `MARKETING`, `RANKING` | ~ | Especificação §75 |
+| `Consent` | `student_id`, `type`, `document_version`, `accepted_at`, `revoked_at`, `ip`, `device`. Tipos: `TERMS`, `PRIVACY`, `BIOMETRIC`, `HEALTH_DATA`, `MARKETING`, `RANKING`. **ADR-008 acrescenta consentimento por responsável legal** para menor de 18 — modelagem é escopo obrigatório de F8 | ~ | Especificação §75 + **ADR-008** |
 | `BiometricIdentity` | `id`, `tenant_id`, `student_id`, `type` (`FACE`\|`FINGERPRINT`\|`OTHER`), `status`, `external_enroll_id`, `consent_status`, `consent_version`, `consented_at`, `revoked_at` | ✔ | Especificação §13 |
 
 > **Conflito conhecido.** `BiometricIdentity.external_enroll_id` é único e **não tem
@@ -85,7 +85,7 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 |---|---|---|---|
 | `Plan` | `id`, `tenant_id`, `name`, `description`, `billing_cycle`, `duration`, `price`, `currency`, `status` | ✔ | Especificação §32 |
 | `Subscription` | `id`, `student_id`, `plan_id`, `status`, `started_at`, `current_period_start`, `current_period_end`, `next_billing_date`, `cancelled_at`, `paused_at`, `provider` | ~ | Especificação §35 |
-| `Entitlement` | **sem lista de campos**. Exemplo mostra: student, tipo (`GYM_ACCESS`), starts, expires, status | ~ | Especificação §19 |
+| `Entitlement` | **sem lista de campos** na origem. Exemplo mostra: student, tipo (`GYM_ACCESS`), starts, expires, status. **ADR-009 acrescenta `source`**, enum extensível: `SUBSCRIPTION`, `COURTESY`, `STAFF`, `TRAINER`, `VISITOR`, `TRIAL`, `DEPENDENT`, `CORPORATE` | ~ | Especificação §19 + **ADR-009** |
 | `Invoice` | `id`, `subscription_id`, `amount`, `due_date`, `status`, `paid_at`, `payment_method`, + itens, subtotal, desconto, total, numeração, `billing_period` | ~ **(unicidade `(tenant_id, subscription_id, billing_period)`)** | Especificação §37, `M2` §11 |
 | `InvoiceItem` | **`[indefinido]`** | ~ | `M2` §11 |
 | `Payment` | **`[indefinido]` — nenhum campo em documento algum** | ~ | ADR-013 |
@@ -93,7 +93,7 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 | `PaymentMethod` | somente token / referência mascarada | ~ | `M2` §11 |
 | `ProviderEvent` | `provider_account_id`, `external_event_id`, payload protegido | ~ | `M2` §11 |
 | `Refund`, `ReconciliationRun`, `ReconciliationItem`, `Receipt` | **`[indefinido]`** | ~ | `M2` §11 |
-| `BillingSettings` | moeda (BRL), `due_date`, `grace_period`, `blocking_policy` | ✔ por tenant | Especificação §42 |
+| `BillingSettings` | moeda (BRL), `due_date`, `grace_period`, `blocking_policy` + **âncora de bloqueio configurável** (ADR-019), padrão = primeiro instante de `due_date + grace_period` | ✔ por tenant | Especificação §42 + **ADR-019** |
 
 `PaymentProvider` é **porta, não entidade**. Contrato vigente (`MVP-02` §12, vence sobre a Especificação §38): `createPix`, `getPaymentStatus`, `createTokenizedSubscription`, `cancelSubscription`,
 `refundPayment`, `verifyAndParseWebhook`. Ver ADR-013.
@@ -287,7 +287,11 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 - **INV-047** Evento local é persistido **antes** de confirmar o efeito físico.
 - **INV-048** Backlog é reconciliado com idempotência **mantendo o horário original**.
 
-### 4.8 Offline (INV-049 a INV-058)
+### 4.8 Offline (INV-049 a INV-058) — **vigente a partir do MVP 1.5**
+
+> **ADR-012 tirou a operação offline do MVP 1.** Até o MVP 1.5 existir, vale a INV-145: a nuvem
+> decide, e queda de link ou Edge ausente caem em liberação manual registrada — nunca em allow
+> local. Este bloco descreve o alvo, não o comportamento do MVP 1.
 
 - **INV-049** A academia não para se a internet cair; o Edge mantém snapshot local.
 - **INV-050** Online: `Gateway → Cloud → Engine`. Offline: `Gateway → cache local`. Retorno: `eventos locais → sincronização → nuvem`.
@@ -341,7 +345,7 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 ### 4.12 Inadimplência e liberação (INV-088 a INV-097)
 
 - **INV-088** Configuração: `due_date`, `grace_period`, `blocking_policy`. **A aritmética do exemplo da Especificação §42 está errada** — ver ADR-019.
-- **INV-089** Bloqueio no primeiro instante após vencimento + carência, no timezone contratual (**qual timezone: ADR-019**).
+- **INV-089** Bloqueio no primeiro instante após vencimento + carência, **no timezone da `GymUnit`**, sem fallback para o tenant (ADR-019). O instante é configurável — ver INV-144.
 - **INV-090** Cadeia de bloqueio: `invoice vencida → carência → Subscription PAST_DUE → Entitlement suspenso → sync → acesso bloqueado`.
 - **INV-091** Cadeia de liberação: `pago → webhook → Payment CONFIRMED → Invoice PAID → Subscription ACTIVE → Entitlement ACTIVE → sync → aluno liberado`.
 - **INV-092** Após compensação, gerar `EntitlementActivated` e **sincronizar imediatamente** com o Edge.
@@ -410,6 +414,14 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 - **INV-140** OCR/IA fora não impede avaliação manual.
 - **INV-141** Análise de IA tem timeout, orçamento e circuit breaker.
 
+### 4.18 Decisões do PI de 14/08/2026 (INV-142 a INV-146)
+
+- **INV-142** *(ADR-008)* **O template biométrico é expurgado em 30 dias após o encerramento do vínculo**, do banco **e** dos leitores, com evidência auditável. O prazo é parâmetro; 30 dias é o padrão e mudá-lo é decisão registrada.
+- **INV-143** *(ADR-008)* **Aluno menor de 18 só tem cadastro biométrico com consentimento de responsável legal**, vinculado e comprovável. Na virada dos 18, o consentimento é revalidado com o próprio aluno.
+- **INV-144** *(ADR-019)* **O instante de bloqueio por inadimplência é configurável em `BillingSettings`**, com padrão no primeiro instante de `due_date + grace_period`, **no timezone da unidade**, sem fallback para o tenant e sem adiamento por feriado.
+- **INV-145** *(ADR-004)* **A decisão de acesso acontece na nuvem.** O Edge executa e reporta; não julga. Enquanto o MVP 1.5 não existir, queda de link ou Edge ausente caem em liberação manual registrada — nunca em allow local.
+- **INV-146** *(ADR-011)* **A ausência do Edge é alerta operacional obrigatório**, não linha de log. Sem operação offline, Edge fora significa catraca parada, e a operação precisa saber no minuto em que acontece.
+
 ---
 
 ## 5. Buracos conhecidos do modelo
@@ -428,7 +440,7 @@ Conceitos usados em telas, menus e regras **sem entidade nem campo**. O Code **n
 | **`SaasPlan`** (Starter/Pro/Enterprise) | §9, §100, §102 | Campo existe no tenant sem tipo; billing da plataforma está **fora de escopo** dos MVPs 1 e 2 |
 | **Aulas / `Class`** | §34 "aulas inclusas" | Sem entidade, agenda, professor ou reserva |
 | **Antifraude, limite de acessos, acesso duplicado** | §20 regras 11-14 | Sem parâmetro, campo ou fonte de configuração |
-| **Nível "Academia"** | §6 | Ver ADR-002 |
+| ~~**Nível "Academia"**~~ | §6 | **Resolvido:** dois níveis (ADR-002). A Especificação §6 precisa de nota de emenda |
 | **`Payment`** | §90, `M2` §11 | Nenhum campo. Ver ADR-013 |
 | **`Passage`** | `M1` §10/§13 | Tem estados, não tem tabela |
 | **Wearable / origem de `HEART_RATE`** | §53, §106 | Nenhuma integração na stack ou nos módulos |
@@ -450,5 +462,5 @@ Conceitos usados em telas, menus e regras **sem entidade nem campo**. O Code **n
 | `assessment_date` × `assessed_at` | `assessed_at` | §2.5 |
 | `Consent.HEALTH_DATA` × `health_consents` | tabela única `Consent` com `type` | §2.2 |
 | entitlement × assinatura no motor | entitlement, sempre | ADR-003 |
-| hierarquia de 2 × 3 níveis | aberto | ADR-002 |
-| carência 3 dias → 13/08 × 14/08 | aberto | ADR-019 |
+| hierarquia de 2 × 3 níveis | **dois níveis** | ADR-002 |
+| carência 3 dias → 13/08 × 14/08 | **13/08**, configurável | ADR-019 |

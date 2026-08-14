@@ -31,25 +31,25 @@ existe para expulsar deste repositório.
 | # | título | status | bloqueia |
 |---|---|---|---|
 | [001](#adr-001) | Monólito modular em monorepo | `aceito` | — |
-| [002](#adr-002) | Hierarquia Tenant → Academia → Unidade | `aberto` | F6 |
+| [002](#adr-002) | Hierarquia Tenant → Academia → Unidade | `aceito` | — |
 | [003](#adr-003) | Entitlement é o único controlador de acesso | `aceito` | — |
-| [004](#adr-004) | Onde a decisão de acesso acontece | `aberto` | F9, F10 |
-| [005](#adr-005) | Vocabulário único de decisão e campos de evento | `proposto` | F9 |
+| [004](#adr-004) | Onde a decisão de acesso acontece | `aceito` | — |
+| [005](#adr-005) | Vocabulário único de decisão e campos de evento | `aceito` | — |
 | [006](#adr-006) | Idempotência de todo efeito externo | `aceito` | — |
-| [007](#adr-007) | Semântica de validade, carência e conflito offline | `aberto` | F10 |
+| [007](#adr-007) | Semântica de validade, carência e conflito offline | `aberto` *(sem urgência)* | F10 (MVP 1.5) |
 | [008](#adr-008) | Regime de dado biométrico sob LGPD | `aceito` com pontos `abertos` | F8 |
-| [009](#adr-009) | Entitlement multi-origem (convênio corporativo) | `proposto` | F7 |
+| [009](#adr-009) | Entitlement multi-origem (convênio corporativo) | `aceito` | — |
 | [010](#adr-010) | Dependência do SDK Topdata e a POC como portão | `aceito` | — |
-| [011](#adr-011) | Ciclo de vida do edge-agent e versionamento do contrato Edge | `aberto` | F4, F10 |
-| [012](#adr-012) | Escopo de operação offline no MVP 1 | `aberto` | F10 |
-| [013](#adr-013) | Provedor de pagamento e contrato PaymentProvider | `aberto` | F12–F16 |
+| [011](#adr-011) | Ciclo de vida do edge-agent e versionamento do contrato Edge | `aceito` com pontos `abertos` | F4 |
+| [012](#adr-012) | Escopo de operação offline no MVP 1 | `aceito` | — |
+| [013](#adr-013) | Provedor de pagamento e contrato PaymentProvider | `aberto` *(com caminho definido)* | F12–F16 |
 | [014](#adr-014) | Processo unificado no CLAUDE.md | `aceito` | — |
 | [015](#adr-015) | Numeração: Slice = Fatia = SPEC | `aceito` | — |
 | [016](#adr-016) | Estratégia de teste e piso de cobertura | `aceito` | — |
 | [017](#adr-017) | Dublês de teste são obrigatórios no boundary | `aceito` | — |
 | [018](#adr-018) | A Especificação Completa não é normativa | `aceito` | — |
-| [019](#adr-019) | Contagem de carência e instante de bloqueio | `aberto` | F15 |
-| [020](#adr-020) | Onde mora o schema Prisma | `proposto` | bootstrap |
+| [019](#adr-019) | Contagem de carência e instante de bloqueio | `aceito` | — |
+| [020](#adr-020) | Onde mora o schema Prisma | `aceito` | — |
 
 ---
 
@@ -64,7 +64,7 @@ integração com hardware de terceiro e conformidade, não escala de tráfego.
 
 **Decisão.** Monólito modular em `apps/api` (NestJS), dentro de monorepo pnpm + Turborepo,
 com `packages/api-contracts`, `packages/ui`, `packages/config` e `packages/testing` — mais
-`packages/database`, que é acréscimo ao PRD e está pendente em **ADR-020**. **Sem microserviço antes de métrica que o justifique.**
+`packages/database`, acréscimo ao PRD ratificado em **ADR-020** (falta a emenda ao §5). **Sem microserviço antes de métrica que o justifique.**
 
 **Consequências.** Deploy único e transação local para o caminho crítico. Em troca, a
 disciplina de fronteira entre módulos precisa ser mantida por revisão — não pelo processo.
@@ -75,7 +75,7 @@ Módulo que lê tabela privada de outro é a forma como monólito modular vira m
 <a id="adr-002"></a>
 ## ADR-002 — Hierarquia Tenant → Academia → Unidade
 
-**Data:** 14/08/2026 · **Status:** `aberto` · **Bloqueia:** F6 (core seguro e unidade)
+**Data:** 14/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 14/08/2026**)*
 
 **Contexto.** A Especificação §6 desenha **três níveis**: `Tenant → Academia → Unidade A/B/C`.
 O modelo de dados (§90, `MVP-01` §11) tem **dois**: `tenants` e `gym_units`. A §9 chama de
@@ -95,11 +95,18 @@ unidades" é representável. Se a resposta vier depois de F6, é migração em t
 | custo depois | migração pesada se a rede aparecer | nenhum |
 | quem precisa | academia única e rede pequena | franquia, grupo econômico, rede multi-marca |
 
-**Recomendação técnica.** Opção A **com a Especificação §6 emendada** para parar de prometer
-três níveis — a menos que o PI já tenha cliente de rede à vista. Renomear expectativa é mais
-barato que carregar um nível vazio.
+**Decisão: opção A — dois níveis.** `Tenant` é a academia contratante; `GymUnit` é a unidade
+física. O Complexo Arena Positiva tem mais de uma unidade sob o mesmo dono, o que cabe em dois
+níveis sem forçar nada.
 
-**Precisa do PI:** existe rede/franquia no horizonte de 12 meses?
+**Consequências.**
+
+1. **A Especificação §6 fica errada** e precisa de nota de emenda: ela desenha três níveis que o
+   modelo não tem e nunca teve.
+2. **Multiunidade está em uso desde o dia 1** — não é cenário futuro. O teste de isolamento por
+   `gym_unit_id` sobe de prioridade em F6, ao lado do isolamento por `tenant_id` (INV-006).
+3. Se aparecer grupo econômico com marcas distintas sob um contratante, é ADR novo **e**
+   migração pesada. O custo está aceito conscientemente.
 
 ---
 
@@ -128,7 +135,7 @@ reintroduz o acoplamento. A partir daqui:
 <a id="adr-004"></a>
 ## ADR-004 — Onde a decisão de acesso acontece
 
-**Data:** 14/08/2026 · **Status:** `aberto` · **Bloqueia:** F9 (decisão online), F10 (offline)
+**Data:** 14/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 14/08/2026**)*
 
 **Contexto.** A Especificação §26 roteia o caminho normal por `Gateway → Cloud → Access
 Engine`; a §99 promete "decisão local < 300 ms"; a §125 diz que o Edge é "offline execution".
@@ -148,18 +155,23 @@ brasileiro com jitter, isso é apertado.
 | complexidade | menor | snapshot precisa ser sempre válido, não só no apagão |
 | risco | catraca lenta ou parada em queda de link | decisão com dado velho no caminho normal |
 
-**Recomendação técnica.** Opção A, **medindo na POC (MVP 0) antes de fixar**. Se a medição
-mostrar p95 acima de 300 ms com link real, migrar para B é decisão de produto — não de
-implementação.
+**Decisão: opção A — a nuvem decide sempre.** Coerente com o ADR-012: sem operação offline no
+MVP 1, não existe snapshot para decidir localmente. O Edge executa e reporta; não julga.
 
-**Precisa do PI + evidência da POC.**
+**Gatilho de reabertura, escrito de propósito.** A POC (F3) mede a latência real ponta a ponta.
+**Se o p95 medido com o link da academia passar de 300 ms, este ADR reabre automaticamente** e
+volta a ser decisão do PI — não vira "a gente otimiza depois". Registrar a medição é entregável
+de F3, não observação de rodapé.
+
+**Consequência aceita:** o orçamento de 300 ms passa a incluir a internet do Arena Positiva.
+Nenhuma promessa de latência pode ser feita a cliente antes dessa medição existir.
 
 ---
 
 <a id="adr-005"></a>
 ## ADR-005 — Vocabulário único de decisão e campos de evento
 
-**Data:** 14/08/2026 · **Status:** `proposto` · **Bloqueia:** F9
+**Data:** 14/08/2026 · **Status:** `aceito` *(ratificado pelo PI em 14/08/2026)*
 
 **Contexto.** Quatro divergências de nome para a mesma coisa, entre a Especificação e os PRDs:
 
@@ -179,16 +191,19 @@ Divergência de vocabulário em código é bug esperando data: alguém compara `
 
 **Ressalva que o próprio PRD cria.** `MVP-01` §13 nomeia os eventos de domínio
 **`AccessGranted`** e **`AccessDenied`** — vocabulário `GRANTED`/`DENIED` de volta, agora no
-contrato de evento. Duas saídas possíveis, e é preciso escolher **antes de F9**:
+contrato de evento. Duas saídas foram consideradas:
 
 - (a) renomear para `AccessAllowed` / `AccessDenied`, mantendo um vocabulário só; ou
 - (b) manter os nomes de evento e fixar por escrito que `AccessGranted` **transporta**
   `outcome: ALLOW` — nome de evento é rótulo histórico, não enum.
 
-*Recomendação: (b).* Nome de evento publicado é caro de mudar; o risco real era o `if`, e o `if`
+**Escolhida: (b).** Nome de evento publicado é caro de mudar; o risco real era o `if`, e o `if`
 usa o enum.
 
-**Precisa do PI:** só ratificação — não há trade-off de produto aqui.
+**Ratificado.** Valem `ALLOW`/`DENY`, `occurred_at`, `gym_unit_id`, `access_policies`, num
+único enum `AccessOutcome` em `packages/api-contracts`. Os eventos mantêm os nomes
+`AccessGranted` e `AccessDenied` (opção *b*): nome de evento publicado é rótulo histórico e caro
+de mudar; o risco real era o `if`, e o `if` usa o enum.
 
 ---
 
@@ -218,7 +233,8 @@ produzir efeito duplo, o Code abre `[FIX]` citando este ADR e conserta.
 <a id="adr-007"></a>
 ## ADR-007 — Semântica de validade, carência e conflito offline
 
-**Data:** 14/08/2026 · **Status:** `aberto` · **Bloqueia:** F10
+**Data:** 14/08/2026 · **Status:** `aberto`, **sem urgência** *(decidido pelo PI em 14/08/2026
+que migra junto com F10 para o MVP 1.5 — ADR-012)* · **Bloqueia:** F10
 
 **Contexto.** A Especificação §27 dá o exemplo "cache válido 12 h, carência 24 h" e **não diz
 o que acontece entre 12 h e 24 h**. Também não define o que fazer quando a nuvem já havia
@@ -268,12 +284,19 @@ atuando antes dela. Detalhe e fontes em `docs/LANDSCAPE.md` §4.
    suspensão no caso PR.
 6. **Ausência de consentimento impede o cadastro biométrico, não a matrícula** (`M1-BR-004`).
 
-**Pontos abertos — bloqueiam F8.**
+**Decidido pelo PI em 14/08/2026.**
 
-- **Retenção.** Qual prazo de expurgo do template após encerramento do vínculo? A LGPD não fixa
-  número; a prática é eliminar ao fim do vínculo. Precisa virar parâmetro com job verificável.
-- **Menor de idade.** Academia tem aluno menor. Consentimento por responsável legal não está
-  modelado em lugar nenhum. No caso PR, ser menor foi **agravante**.
+7. **Retenção: expurgo em 30 dias** após o encerramento do vínculo. Job automático apaga o
+   template do banco **e dos leitores**, com evidência auditável. A janela de 30 dias cobre
+   rematrícula rápida sem transformar o sistema em arquivo permanente de biometria. O prazo é
+   parâmetro, não constante — mas o padrão é 30 dias e mudá-lo é decisão registrada.
+8. **Há aluno menor de 18 no Arena Positiva.** Consentimento por **responsável legal** vira
+   **escopo obrigatório de F8**, não melhoria futura: quem é o responsável, como se vincula ao
+   aluno, como se comprova, e o que acontece na virada dos 18 anos. No caso do Paraná, ser menor
+   foi agravante — aqui é requisito de entrada.
+
+**Pontos que continuam abertos — bloqueiam F8.**
+
 - **Base legal.** Consentimento puro ou legítimo interesse com LIA documentada?
 - **RIPD.** Relatório de impacto é provável exigência para facial em escala. Quem produz?
 - **Papéis.** ArenaHub é operador e a academia controladora? Isso muda quem responde.
@@ -285,7 +308,7 @@ atuando antes dela. Detalhe e fontes em `docs/LANDSCAPE.md` §4.
 <a id="adr-009"></a>
 ## ADR-009 — Entitlement multi-origem (convênio corporativo)
 
-**Data:** 14/08/2026 · **Status:** `proposto` · **Bloqueia:** F7 (modelo de entitlement)
+**Data:** 14/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 14/08/2026**)*
 
 **Contexto.** Wellhub (ex-Gympass) e TotalPass colocam na catraca um aluno que **não existe no
 financeiro da academia**. O Wellhub tem API pública documentada (`Access Control API` +
@@ -296,23 +319,30 @@ nativamente — não é diferencial, é requisito de entrada. Ver `docs/LANDSCAP
 A Especificação §19 **já pede** que o entitlement suporte "planos corporativos", mas nenhum
 PRD modela isso.
 
-**Proposta.** Tratar `Entitlement.source` como polimórfico desde F7, mesmo sem implementar a
-integração:
+**Modelagem adotada.** `Entitlement.source` é polimórfico desde F7, mesmo sem integração:
 
 ```
 SUBSCRIPTION | COURTESY | STAFF | TRAINER | VISITOR | TRIAL | DEPENDENT | CORPORATE
 ```
 
-Com isso, quando a integração chegar (fatia futura), ela cria entitlement de curta duração via
-webhook — sem tocar no motor de acesso. Consequências que **não** são de graça e precisam do PI:
+Com isso, quando a integração chegar, ela cria entitlement de curta duração via webhook — sem
+tocar no motor de acesso. **Os três pontos abaixo não são pendência de hoje: reabrem em ADR novo,
+junto com a decisão comercial de entrar em convênio.**
 
 1. **Receita por evento**, não por ciclo — convive com a recorrência, não substitui.
 2. **Limite por aluno** (ex.: teto de dias/mês) precisa ser política configurável, não
    constante no código: há evidência pública de academias impondo teto quando o repasse cai.
 3. **Idempotência do check-in** — o mesmo evento não pode gerar dois acessos nem dois repasses.
 
-**Precisa do PI:** o Arena Positiva opera com Wellhub/TotalPass hoje? Se sim, isso sobe de
-"campo preparado" para fatia com data.
+**Decisão.** O Arena Positiva **não opera com convênio hoje**. Então:
+
+- `Entitlement.source` nasce como **enum extensível** em F7, com `CORPORATE` já previsto. Custo
+  próximo de zero, e evita que a integração futura precise mexer no motor de acesso.
+- **A integração fica fora do roadmap** até decisão comercial explícita. Não vira fatia, não
+  entra no `STATUS.md`.
+- **Aviso registrado, não recomendação:** Tecnofit, Pacto, Nextfit, ABC Evo e Cloud Gym já
+  integram Wellhub/TotalPass de fábrica. Historicamente isso é questão de *quando*, não de *se*.
+  Quando virar, é ADR novo — não emenda deste.
 
 ---
 
@@ -349,7 +379,8 @@ POC fazendo exatamente o que existe para fazer.
 <a id="adr-011"></a>
 ## ADR-011 — Ciclo de vida do edge-agent e versionamento do contrato Edge
 
-**Data:** 14/08/2026 · **Status:** `aberto` · **Bloqueia:** F4, F10
+**Data:** 14/08/2026 · **Status:** `aceito` na máquina e na mitigação *(decidido pelo PI em
+14/08/2026)*, com provisionamento e credencial ainda `abertos` · **Bloqueia:** F4
 
 **Contexto.** O `edge-agent` é missão crítica — se ele para, a catraca para — e roda em
 máquina que **não controlamos**, dentro da academia. A Especificação lhe dá 12
@@ -364,24 +395,43 @@ responsabilidades e **nenhuma** linha sobre onde ele roda.
 | Janela de convivência do contrato | suporta **a versão atual e a imediatamente anterior** durante rollout | `MVP-01` §19 |
 | Guarda do segredo | mecanismo seguro do Windows; nunca credencial de usuário comum | `MVP-01` §15 |
 
-**Perguntas que continuam abertas.**
+**Decidido pelo PI em 14/08/2026 — máquina.** O `edge-agent` roda no **PC da recepção,
+compartilhado**. Sem hardware dedicado no piloto.
 
-1. **Máquina.** PC da recepção compartilhado ou mini-PC dedicado? Quem compra?
-2. **Provisionamento inicial.** Como o agente ganha identidade na instalação — certificado
+**A consequência, escrita para não ser descoberta em produção.** Como o ADR-012 tirou a operação
+offline do MVP 1, **a disponibilidade da catraca passa a ser exatamente o uptime desse PC**. Não
+é modo degradado: se alguém desligar a máquina, a catraca não decide nada. Isso é diferente de
+"a internet caiu".
+
+**Mitigação decidida — processo e alarme, não arquitetura.**
+
+1. Serviço Windows com **início automático** e reinício automático em falha.
+2. **Alerta operacional quando o Edge some** — o heartbeat já é exigido por `M1-FR-018`; o que
+   este ADR acrescenta é que o alerta é obrigatório em F11, não opcional.
+3. **Regra escrita na academia:** este PC não se desliga. Vai no material de implantação.
+4. **Liberação manual pela recepção** como fallback declarado (`M1-FR-023`), com registro.
+
+**Risco residual aceito conscientemente:** alguém tira da tomada. Nesse caso a fila na recepção
+é o plano, e o incidente vira entrada para o MVP 1.5.
+
+**Já respondido pelo PRD, agora completo:** serviço Windows, atualização com rollback, janela de
+convivência de duas versões, segredo guardado pelo mecanismo seguro do Windows.
+
+**Continuam abertos — bloqueiam F4.**
+
+1. **Provisionamento inicial.** Como o agente ganha identidade na instalação: certificado
    emitido, código de pareamento, token de uso único? Quem instala fisicamente?
-3. **Credencial.** `/api/v1/edge/*` usa "certificado **ou** segredo" — a barra é decisão não
-   tomada. Rotação e revogação, como e por quem?
-4. **PC desligado à noite.** O snapshot expira dormindo. Comportamento na primeira entrada da
-   manhã seguinte?
+2. **Credencial.** `/api/v1/edge/*` usa "certificado **ou** segredo" — a barra continua sendo
+   decisão não tomada. Rotação e revogação, como e por quem?
 
-**Sem 2 e 3, F10 é implementável mas não instalável em academia real.**
+**Sem estes dois, F4 é implementável mas não instalável em academia real.**
 
 ---
 
 <a id="adr-012"></a>
 ## ADR-012 — Escopo de operação offline no MVP 1
 
-**Data:** 14/08/2026 · **Status:** `aberto` · **Bloqueia:** F10 · **Registrado a pedido do PI**
+**Data:** 14/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 14/08/2026**)*
 
 **Contexto.** A Especificação §104 põe no MVP 1 dezesseis itens, incluindo cadastro completo de
 aluno, edge agent, motor de acesso e **operação offline com cache, fila e reconciliação** — que
@@ -399,15 +449,25 @@ tiver entitlement válido"* — **não exige offline nem multiunidade**.
 | aprendizado | offline desenhado sobre suposição | offline desenhado sobre incidente real medido |
 | mitigação da opção B | — | fallback operacional: recepção libera manualmente com registro (já previsto em `M1-FR-023`) |
 
-**Recomendação técnica.** Opção B. O caminho manual já existe por requisito e cobre a queda de
-link no piloto com uma academia. Construir cache, fila, assinatura de snapshot e reconciliação
-antes de qualquer academia usar o sistema é otimizar para um problema ainda não observado.
+**Decisão: opção B — offline sai do MVP 1 e vira MVP 1.5.**
 
-**Contra-argumento honesto:** se o piloto for numa academia com internet ruim e alto fluxo em
-horário de pico, a fila na recepção destrói a percepção do produto na primeira semana — e aí a
-opção A era a certa. **A informação que decide isso é a qualidade do link do Arena Positiva.**
+O MVP 1 entrega acesso online com entitlement manual, que já satisfaz o critério de sucesso da
+própria Especificação §128. A queda de link no piloto é coberta pela liberação manual da
+recepção, que já é requisito (`M1-FR-023`).
 
-**Precisa do PI.**
+**Consequências.**
+
+1. **F10 sai do MVP 1** e passa a compor o **MVP 1.5**. O número da fatia **não muda** — ADR-015
+   proíbe reaproveitar número. O `STATUS.md` registra F10 sob MVP 1.5.
+2. **ADR-007** (semântica de validade × carência, conflito de reconciliação) migra junto e perde
+   urgência.
+3. **ADR-011 fica mais exposto:** sem offline, e com o agente num PC compartilhado, a catraca
+   depende do uptime dessa máquina. Mitigação registrada no próprio ADR-011.
+
+**Contra-argumento que permanece de pé:** se o link do Arena Positiva for ruim e o fluxo de pico
+alto, a fila na recepção machuca a percepção do produto logo na primeira semana. O primeiro
+incidente desse tipo é o gatilho para reavaliar a prioridade do MVP 1.5 — não para improvisar
+cache no meio do MVP 1.
 
 ---
 
@@ -438,9 +498,29 @@ manda perguntar antes. **Vence o PRD**; o plano se ajusta.
 embora a tabela seja citada. Uma invoice paga em duas tentativas (PIX falho + cartão) não cabe
 no modelo atual.
 
-**Precisa do PI:** provedor, e as duas políticas do `M2-COMPLIANCE-01`
-(`KEEP_UNTIL_PERIOD_END` vs `SUSPEND_ON_CONFIRMATION` no refund; limites de desconto,
-pagamento manual e step-up).
+**Decidido pelo PI em 14/08/2026 — o caminho, não o nome.** O provedor **não** é escolhido por
+marca: sai da **homologação**, que já estava prevista como card `[GATE]` do MVP 2. O gate produz
+uma matriz comparativa e a escolha vem com dado.
+
+**A matriz precisa cobrir, no mínimo:**
+
+| critério | por que importa aqui |
+|---|---|
+| Pix Automático | adoção acelerando; o pagador pode **revogar a autorização** no app do banco |
+| Cartão recorrente com tokenização hospedada | INV-098: nenhum dado de cartão toca o backend |
+| Estorno total e parcial | `M2-FR`, política de refund do `M2-COMPLIANCE-01` |
+| Garantia de entrega e **assinatura** de webhook | INV-077; sem HMAC verificável, o provedor está fora |
+| Chave estável de evento externo | INV-076 depende de `external_event_id` confiável |
+| Entrega fora de ordem | INV-079 |
+| Taxa efetiva por método | TCO real, não tabela de vitrine |
+
+**Candidatos levantados** (`docs/LANDSCAPE.md` §4.2): Asaas — único com documentação pública de
+Pix Automático verificada; Pagar.me, Mercado Pago, Iugu, Vindi, Stone, Cielo. Nenhum eliminado.
+
+**Continua aberto:** o provedor e as duas políticas do `M2-COMPLIANCE-01`
+(`KEEP_UNTIL_PERIOD_END` vs `SUSPEND_ON_CONFIRMATION` no refund; limites de desconto, pagamento
+manual e step-up). **MVP 2 segue bloqueado — mas agora por um gate com critério, não por uma
+pergunta em aberto.**
 
 ---
 
@@ -573,7 +653,7 @@ precedência; se a precedência não resolver, **pergunta ao PI**.
 <a id="adr-019"></a>
 ## ADR-019 — Contagem de carência e instante de bloqueio
 
-**Data:** 14/08/2026 · **Status:** `aberto` · **Bloqueia:** F15 (inadimplência e acesso)
+**Data:** 14/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 14/08/2026**)*
 
 **Contexto.** A Especificação §42 dá o exemplo: *"Vencimento 10/08, carência 3 dias, bloqueio
 14/08"*. 10 + 3 = 13, não 14. Ou a carência é de 4 dias, ou o bloqueio ocorre no dia seguinte
@@ -590,18 +670,30 @@ indevida) sistemática. É barato decidir e caro descobrir depois.
    precedência (Especificação §9 e §10).
 3. Dia de vencimento em fim de semana ou feriado adia?
 
-**Recomendação técnica.** Bloqueio no primeiro instante do dia `due_date + grace_period`, no
-timezone da **unidade** (é onde a catraca está), sem adiamento por feriado — e corrigir o
-exemplo da Especificação §42, que está com a conta errada.
+**Decisão.**
 
-**Precisa do PI:** é regra comercial, não técnica.
+1. **Padrão: bloqueio no primeiro instante de `due_date + grace_period`.** Vencimento 10/08 com
+   carência de 3 dias bloqueia em **13/08 às 00:00**; o aluno tem 11 e 12 livres. Confirma o
+   `M2-BR-007` e **corrige o exemplo da Especificação §42**, que erra a conta.
+2. **Não é constante: é configuração.** `BillingSettings` ganha uma **âncora de bloqueio**
+   explícita, com o padrão acima. O PI muda por academia sem tocar em código. Regra comercial que
+   vive dentro de um `if` é regra que ninguém encontra depois.
+3. **Timezone da unidade, sem fallback para o tenant.** É onde a catraca está e onde o aluno vive
+   o horário — e regra financeira com fallback silencioso é exatamente onde bug de um dia se
+   esconde. Consequência: toda consulta de data carrega o `gym_unit_id`, o que a INV-001 já exige
+   de qualquer forma.
+4. **Sem adiamento por feriado ou fim de semana** nesta versão. Se o PI quiser depois, é campo
+   novo na mesma âncora — não regra escondida.
+
+**O que a spec de F15 precisa fechar:** nome e formato do campo de âncora, e o comportamento
+quando a academia troca o valor com aluno **já em carência**.
 
 ---
 
 <a id="adr-020"></a>
 ## ADR-020 — Onde mora o schema Prisma
 
-**Data:** 14/08/2026 · **Status:** `proposto` · **Bloqueia:** bootstrap `[INFRA]`
+**Data:** 14/08/2026 · **Status:** `aceito` *(ratificado pelo PI em 14/08/2026)*
 
 **Contexto.** O layout fixado em `docs/prd/README.md` §5 tem `packages/{api-contracts, ui,
 config, testing}` e `infra/database/`. **`packages/database` não existe no PRD** — apareceu nos
@@ -619,12 +711,15 @@ carrega o `TenantContext` obrigatório — INV-003) e o `seed.ts`?
 | aderência ao PRD | **exige emenda ao §5** | já está lá |
 | `seed.ts` | junto do schema | junto do schema |
 
-**Recomendação técnica.** Opção A **com emenda formal ao `prd/README.md` §5** — porque o client
+**Decisão: opção A**, com **emenda formal ao `prd/README.md` §5** — porque o client
 factory é código de aplicação, não infraestrutura, e separá-lo do schema espalha a regra de
 isolamento de tenant por dois lugares. `infra/database/` continua existindo para o que é
 realmente infra (compose, init de volume, backup).
 
-**Enquanto este ADR não fecha:** os documentos que citam `packages/database` marcam a referência
-como proposta, não como fato do PRD.
+**Ratificado: opção A.** `packages/database` guarda schema, migrations, client factory e seed.
+`infra/database/` fica com o que é realmente infraestrutura (compose, init de volume, backup).
 
-**Precisa do PI:** só ratificação — não há trade-off de produto.
+**Pendência que a ratificação cria:** o `docs/prd/README.md` §5 precisa de **emenda formal**
+acrescentando o pacote, com nota apontando para este ADR. Enquanto a emenda não sair, o layout
+do PRD e o do repositório divergem — e divergência conhecida e não escrita é como a documentação
+começa a mentir.

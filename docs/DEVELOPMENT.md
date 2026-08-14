@@ -131,28 +131,45 @@ seria violar ADR-015, que reserva o Índice para Slices do PRD.
 **A pergunta que F2 tem de responder e ninguém pode adivinhar:** o SDK do leitor facial exige
 Windows e processo nativo? A resposta muda a stack do `edge-agent` (ADR-010).
 
-**A medida que F3 tem de produzir:** latência real p95. Ela decide o ADR-004.
+**A medida que F3 tem de produzir:** latência real p95. O ADR-004 já está decidido (a nuvem
+decide); esta medição **pode reabri-lo** se o p95 passar de 300 ms.
 
 ---
 
-### MVP 1 — Smart Access · F6 a F11
+### MVP 1 — Smart Access · F6 a F9 e F11
 
 Entrada: decisão de saída do MVP 0 (`MVP-00` §15, `MVP-01` §1) = `GO` ou `GO_WITH_CONSTRAINTS`.
 
 | F | slice | núcleo | bloqueado por |
 |---|---|---|---|
-| F6 | 1.1 Core seguro e unidade | tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login | **ADR-002** |
-| F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita** | **ADR-009** |
-| F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo | **ADR-008**; etapa física depende de hardware disponível (`HW-GATE-01`) |
-| F9 | 1.4 Decisão online e passagem | Access Decision Engine, `AccessEvent`, `Passage`, tela pública | **ADR-004**, **ADR-005**, lista de razões (`DESIGN-UI` §17.2) |
-| F10 | 1.5 Operação offline | snapshot assinado, cache, fila, reconciliação | **ADR-004, ADR-007, ADR-011, ADR-012** |
-| F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo, modo degradado visível | F6–F10 |
+| F6 | 1.1 Core seguro e unidade | tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login. **Multiunidade desde o dia 1** (ADR-002): teste de isolamento por `gym_unit_id` junto com o de `tenant_id` | — |
+| F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — |
+| F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | **ADR-008** (base legal, RIPD, papéis); etapa física depende de hardware |
+| F9 | 1.4 Decisão online e passagem | Access Decision Engine **na nuvem** (ADR-004), `AccessEvent`, `Passage`, tela pública | lista canônica de razões de `DENY` (`DESIGN-UI` §17 item 2) |
+| F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo e **alerta obrigatório quando o Edge some** (ADR-011) | F6–F9 |
 
 **Ordem não negociável:** F6 → F7 → F8 → F9. O motor de acesso (F9) **não pode** vir antes de
 aluno, plano e entitlement — a Especificação §127 sugere o contrário e está errada; F9 sem F7
 só se sustenta com stub, e stub em caminho crítico vira produção.
 
+**F10 saiu deste MVP** (ADR-012) e compõe o **MVP 1.5**, abaixo. O número não muda.
+
 **Invariantes que F9 tem de provar com teste, não com revisão:** INV-029, INV-030, INV-035.
+
+---
+
+### MVP 1.5 — Operação offline · F10
+
+Adiado do MVP 1 por **ADR-012**. Entra quando o piloto produzir **incidente medido** de queda de
+link — não por calendário.
+
+| F | slice | núcleo | bloqueado por |
+|---|---|---|---|
+| F10 | 1.5 Operação offline | snapshot assinado, cache local, fila, reconciliação com idempotência | **ADR-007** (semântica de validade × carência, conflito), **ADR-011** (partes abertas) |
+
+**Enquanto isto não existir, o combinado é:** a nuvem decide sempre (ADR-004); queda de link ou
+PC desligado caem na **liberação manual pela recepção** com registro (`M1-FR-023`), e o alerta de
+Edge ausente (F11) é o que avisa a operação. Improvisar cache no meio do MVP 1 é violar ADR-012.
 
 ---
 
