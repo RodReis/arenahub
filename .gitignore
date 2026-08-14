@@ -1,0 +1,51 @@
+# dependencias
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+build/
+out/
+.next/
+.expo/
+*.tsbuildinfo
+
+# turborepo
+.turbo/
+
+# testes
+coverage/
+test-results/
+playwright-report/
+
+# segredos e ambiente local — nunca versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# dados locais
+*.sqlite
+*.sqlite3
+*.db
+
+# grafo de conhecimento (cache local, ver CLAUDE.md)
+graphify-out/
+
+# editor e SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# config local do Claude Code (permissoes da sessao)
+.claude/settings.local.json
+.claude/settings.json

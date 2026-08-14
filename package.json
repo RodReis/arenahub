@@ -1,0 +1,23 @@
+{
+  "name": "arenahub",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SaaS multi-tenant de gestao para academias",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=22.0.0 <23.0.0",
+    "pnpm": ">=10.0.0 <11.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "turbo run test:e2e",
+    "build": "turbo run build"
+  },
+  "devDependencies": {
+    "turbo": "2.10.10"
+  }
+}
