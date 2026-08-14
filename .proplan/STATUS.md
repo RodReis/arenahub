@@ -62,16 +62,15 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [INFRA] docker-compose local: Postgres, Redis e MinIO (#45)
-- [INFRA] TypeScript estrito, ESLint e Prettier em packages/config (#43)
-- [INFRA] Monorepo pnpm + Turborepo com o layout do PRD (#42)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
+- [INFRA] Monorepo pnpm + Turborepo com o layout do PRD (#42, finalizado em: 2026-08-14)
+- [INFRA] TypeScript estrito, ESLint e Prettier em packages/config (#43, finalizado em: 2026-08-14)
+- [INFRA] docker-compose local: Postgres, Redis e MinIO (#45, finalizado em: 2026-08-14)
 - [INFRA] Os 8 comandos obrigatórios existem e falham com mensagem clara (#44, finalizado em: 2026-08-14)
 - [INFRA] packages/database — Prisma, migration inicial e seed (#46, finalizado em: 2026-08-14)
 - [INFRA] CI: build, lint, typecheck, testes e guardas de evidência (#47, finalizado em: 2026-08-14)
