@@ -6,7 +6,8 @@
 | **MVP** | 0 |
 | **Slice do PRD** | **0.4** — `docs/prd/academia/MVP-00-poc-topdata.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-00-poc-topdata.md` |
-| **Status** | `em-revisao` |
+| **Status** | `aprovada-pi` *(14/08/2026, segunda rodada)* |
+| **Issue** | [#4](https://github.com/RodReis/arenahub/issues/4) |
 | **ADRs que bloqueiam** | nenhum — **ADR-011 resolvido em 14/08/2026** (pareamento de uso único, segredo por dispositivo, rotação automática) |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M0-FR/BR/NFR/AC`) e os

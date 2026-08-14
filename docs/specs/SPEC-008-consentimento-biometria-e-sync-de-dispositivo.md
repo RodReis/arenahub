@@ -6,7 +6,8 @@
 | **MVP** | 1 |
 | **Slice do PRD** | **1.3** — `docs/prd/academia/MVP-01-smart-access.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-01-03-biometrics-device-sync.md` |
-| **Status** | `em-revisao` |
+| **Status** | `aprovada-pi` *(14/08/2026, segunda rodada)* |
+| **Issue** | [#8](https://github.com/RodReis/arenahub/issues/8) |
 | **ADRs que bloqueiam** | nenhum — **ADR-008 resolvido em 14/08/2026** (consentimento art. 11, I; academia controladora e ArenaHub operador; RIPD por template nosso). O ponto que resta no ADR-008 é transferência internacional de IA de saúde, que é **F21**, não esta fatia |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M1-FR/BR/NFR/AC`) e os

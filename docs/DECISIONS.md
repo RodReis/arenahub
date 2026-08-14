@@ -889,9 +889,15 @@ possíveis: fingir que existiam, ou fazer a afirmação virar verdade. A primeir
 | `em-revisao` | 8 | F4, F8, F10, F12–F16 | dependem de ADR-007, ADR-008, ADR-011 ou ADR-013 |
 | `planejada` | 25 | F17–F41 | MVP 3 a 6. **O PI não pode aprovar hoje o que ainda não foi discutido** |
 
-**Atualização de 14/08/2026, segunda rodada.** Com ADR-011 e ADR-008 fechados, **F4 e F8 perderam
-o bloqueio** e aguardam só o ato de aprovação do PI; F10 fica com ADR-007 apenas. `em-revisao`
-passa a ser 8 fatias das quais 2 estão prontas para aprovar. O status `planejada` também mudou de
+**Atualização de 14/08/2026, segunda rodada.** Com ADR-011 e ADR-008 fechados, **F4 e F8 foram
+aprovadas pelo PI** e passaram a `aprovada-pi`; F10 fica com ADR-007 apenas. O quadro vira
+**10 `aprovada-pi`** (F1–F9 e F11), **6 `em-revisao`** (F10 e F12–F16) e 25 `planejada`.
+
+**As 41 issues foram criadas em 14/08/2026**, todas em Backlog, conforme este ADR. O PI decidiu
+explicitamente pela leitura do ADR-022 contra a definição antiga de Backlog no `STATUS.md` §2,
+que dizia *"spec aprovada, card criado"* — corrigida na mesma data.
+
+O status `planejada` também mudou de
 significado — não é mais "arquivo não existe", já que os 41 ponteiros foram criados pelo ADR-022;
 hoje quer dizer **"MVP ainda não discutido com o PI"**. Ver `docs/specs/README.md` §3.
 
