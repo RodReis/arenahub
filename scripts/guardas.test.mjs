@@ -40,10 +40,30 @@ const casos = [];
 
 // --- run-task.mjs ----------------------------------------------------------
 
+// Task declarada no turbo.json que NENHUM workspace implementa, e que
+// existe so para este teste.
+//
+// Nao use task real aqui: `test` e `build` ja foram exemplos validos e
+// deixaram de ser quando o primeiro workspace nasceu -- o teste envelheceu
+// junto com o repositorio e quebrou o CI de uma fatia que nao tinha nada com
+// isso.
+//
+// Tambem nao serve task ausente do turbo.json: nesse caso o proprio Turbo
+// recusa com "Could not find task", antes de o guarda entrar em acao. O
+// cenario que interessa e o outro -- task valida, zero workspaces.
+//
+// `guarda:sentinela` existe no turbo.json SO para este teste. NAO a
+// implemente em workspace nenhum: se implementar, este teste para de testar
+// o que importa e o guarda deixa de ter cobertura.
+//
+// (O comentario mora aqui, e nao no turbo.json, porque o Turbo rejeita chave
+// que nao seja task -- tentei e quebrou o `lint` do repositorio inteiro.)
+const TASK_SENTINELA = 'guarda:sentinela';
+
 casos.push([
   'task que nenhum workspace declara falha com exit 1',
   () => {
-    const r = rodarGuardaDeTask('test');
+    const r = rodarGuardaDeTask(TASK_SENTINELA);
     assert.equal(r.status, 1);
     assert.match(r.stderr, /nao executou nada/);
   },
@@ -52,7 +72,7 @@ casos.push([
 casos.push([
   'task ausente falha TAMBEM sob FORCE_COLOR=1 (regressao: a saida colorida quebrava a deteccao por regex)',
   () => {
-    const r = rodarGuardaDeTask('test', { FORCE_COLOR: '1' });
+    const r = rodarGuardaDeTask(TASK_SENTINELA, { FORCE_COLOR: '1' });
     assert.equal(r.status, 1, 'guarda deixou passar sob ANSI -- e o cenario do CI');
   },
 ]);

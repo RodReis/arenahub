@@ -1,0 +1,31 @@
+{
+  "name": "@arenahub/edge-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Agente que roda no PC da academia: executor fisico da catraca",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "diagnostico": "tsx src/diagnostics/run.ts"
+  },
+  "dependencies": {
+    "pino": "10.3.1",
+    "yaml": "2.9.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@arenahub/config": "workspace:*",
+    "@jest/globals": "29.7.0",
+    "@types/node": "26.2.0",
+    "eslint": "9.39.5",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.12",
+    "tsx": "4.23.12",
+    "typescript": "5.9.3"
+  }
+}

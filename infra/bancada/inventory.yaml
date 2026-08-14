@@ -1,0 +1,95 @@
+# Inventário da bancada do MVP 0 — gate de entrada, PRD §4.
+#
+# "Sem esses itens, a POC fica BLOQUEADA; não se substitui hardware real por
+# suposição." Tudo aqui veio de observação direta do equipamento em
+# 14/08/2026 — nada foi inferido. Campo desconhecido fica `null` e explica
+# como obter, nunca recebe palpite.
+
+versao: 1
+atualizadoEm: '2026-08-14'
+observadoPor: PI
+
+# --- Gate de entrada (PRD §4) -----------------------------------------------
+# Marcado só o que tem evidência. O que falta bloqueia a fatia que depender
+# dele, não o MVP inteiro.
+gate:
+  inventarioComSerie: parcial # leitor facial sim; catraca sem nº de série lido
+  firmwareRegistrado: false # não lido no equipamento
+  sdkDisponivelLegalmente: parcial # SDK público; credencial/licença não verificada
+  windowsERedeIsolada: parcial # Windows 11 confirmado; rede NÃO é isolada
+  diagramaFisicoAprovado: false
+  consentimentoParticipantes: false # obrigatório antes de qualquer captura facial
+  paradaDeEmergenciaDefinida: false
+
+dispositivos:
+  - id: catraca-01
+    tipo: catraca
+    fabricante: Topdata
+    modelo: Inner Fit
+    # "Número do Inner" no software de configuração. É o endereço do
+    # equipamento no barramento Topdata, não um número de série.
+    numeroInner: 1
+    numeroSerie: null # não lido — consta na etiqueta física do equipamento
+    firmware: null # não lido — ver menu do equipamento
+    descricaoNoSoftware: 'CATRACA FIT - TOPDATA'
+    tipoDeCatraca: padrao # o software oferece "Padrão" ou "Easy"
+    modoOperacao: liberada-ambos-sentidos
+    instaladaA: esquerda # ao entrar
+    entradas:
+      teclado: true
+      cartao: false
+      biometriaDigital: false # desmarcado no software
+      leitorFacial: true # marcado, e é outro equipamento (ver abaixo)
+
+  - id: facial-01
+    tipo: leitor-facial
+    fabricante: Topdata
+    modelo: null # linha facial; modelo exato não impresso na tela
+    # Identificador que a catraca usa para referenciar este leitor, no campo
+    # "Leitor facial 1" do software.
+    identificador: AYTI11108174
+    numeroSerie: null # presumivelmente o mesmo identificador; confirmar na etiqueta
+    firmware: null # não lido
+    rede:
+      ip: 192.168.2.188 # exibido na própria tela do leitor
+      obtencao: null # DHCP ou fixo — confirmar no menu de rede
+    vinculadoA: catraca-01
+
+hospedeiro:
+  papel: PC que roda o edge-agent
+  so: Windows 11
+  versaoExata: null # `winver` na máquina da bancada
+  arquitetura: null
+  nomeNaRede: null
+
+rede:
+  # O PRD §4 pede rede isolada de laboratório; esta é a rede da unidade.
+  # Divergência registrada, não corrigida por conta própria — a decisão de
+  # montar rede isolada é do PI. Ver o README deste diretório para o que isso
+  # permite e o que não permite.
+  isolada: false
+  faixa: 192.168.2.0/24
+  observacao: rede da unidade; catraca instalada e em teste
+
+  # Topologia confirmada pelo PI em 14/08/2026: TUDO POR TCP/IP.
+  #
+  # Não há serial, RS-485 nem porta COM no caminho entre o PC e o
+  # equipamento. Isso tem consequência de arquitetura (ADR-010): sem
+  # dependência de porta física, o edge-agent não precisa rodar
+  # necessariamente na mesma máquina, e a pergunta "o SDK é Windows-only"
+  # deixa de ser bloqueante para o transporte — continua valendo só para o
+  # SDK de biometria, se ele existir como DLL.
+  topologia: tcp-ip
+  meio: ethernet
+
+# --- Software de fábrica, a ser substituído ---------------------------------
+# A catraca roda hoje o software que veio com ela. O ArenaHub o SUBSTITUI e
+# usa BASE PRÓPRIA — não estende nem sincroniza com esta. Os usuários abaixo
+# entram por importação depois, fora do escopo do MVP 0.
+#
+# Só a quantidade é registrada, nunca identidade: nenhum dado de pessoa entra
+# neste repositório (CLAUDE.md → Regras de trabalho).
+softwareDeFabrica:
+  pessoasCadastradas: 48
+  origem: software de configuração Topdata
+  destino: substituído pelo ArenaHub; usuários importados em fatia futura

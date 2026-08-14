@@ -91,24 +91,34 @@ jobs:
       - name: self-check do gerador de relatório
         run: pnpm test:report:selfcheck
 
-      # --- 4 a 7 de 8 -----------------------------------------------------
-      # Estes quatro FALHAM HOJE, e falhar é o comportamento correto: nenhum
-      # workspace declara essas tasks (o guarda de scripts/run-task.mjs faz o
-      # comando falhar em vez de sair 0 mentindo).
+      # --- 4 de 8 ---------------------------------------------------------
+      # Promovido a passo próprio na F1, quando `apps/edge-agent` nasceu e
+      # passou a declarar `test`. Antes disso vivia na lista de pendentes.
+      - name: test (unitário + contrato)
+        run: pnpm test
+
+      # --- 6 de 8 ---------------------------------------------------------
+      # Promovido na F1, mesmo motivo.
+      - name: build
+        run: pnpm build
+
+      # --- 5 e 7 de 8 -----------------------------------------------------
+      # Ainda sem workspace que as declare, e falhar é o comportamento
+      # correto: o guarda de scripts/run-task.mjs faz o comando falhar em vez
+      # de sair 0 mentindo.
       #
       # NÃO use `continue-on-error` aqui. Ele marca o passo como `success` no
-      # resumo do job, o que é precisamente o verde decorativo que o card #47
-      # proíbe -- um passo que falhou aparecendo como se tivesse passado.
+      # resumo do job -- o verde decorativo que o card #47 proíbe.
       #
-      # Em vez disso, o resultado real de cada um vai para o log e para o
-      # resumo do job. Cada linha some na fatia que criar o workspace
-      # correspondente, e o passo vira `run: pnpm <task>` normal:
+      # Este passo FALHA SE ALGUMA DELAS PASSAR: isso significaria que um
+      # workspace passou a declará-la e a lista ficou desatualizada. Quem
+      # criar o workspace promove a task a passo próprio no mesmo PR.
       #
-      #   build, test, test:integration -> F6      test:e2e -> F9 ou F11
-      - name: 'pendentes: test, test:integration, build, test:e2e'
+      #   test:integration -> F6      test:e2e -> F9 ou F11
+      - name: 'pendentes: test:integration, test:e2e'
         run: |
           pendentes=()
-          for task in test test:integration build test:e2e; do
+          for task in test:integration test:e2e; do
             if pnpm "$task" > "/tmp/$task.log" 2>&1; then
               echo "::error::pnpm $task passou, mas nenhum workspace deveria declará-la ainda."
               echo "Se um workspace passou a declarar a task, tire-a desta lista e"
