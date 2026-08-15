@@ -6,7 +6,9 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
+import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
+import { StudentRepository } from '../../src/modules/students/student.repository.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -28,8 +30,20 @@ describe('F7 -- aluno, plano e entitlement', () => {
   const SENHA = 'senha-de-teste-correta';
 
   const contas = {
-    a: { email: `f7-a-${sufixo}@exemplo.test`, tenantId: '', unidadeId: '', cookie: '' },
-    b: { email: `f7-b-${sufixo}@exemplo.test`, tenantId: '', unidadeId: '', cookie: '' },
+    a: {
+      email: `f7-a-${sufixo}@exemplo.test`,
+      tenantId: '',
+      userId: '',
+      unidadeId: '',
+      cookie: '',
+    },
+    b: {
+      email: `f7-b-${sufixo}@exemplo.test`,
+      tenantId: '',
+      userId: '',
+      unidadeId: '',
+      cookie: '',
+    },
   };
 
   const PERMISSOES = [
@@ -52,7 +66,13 @@ describe('F7 -- aluno, plano e entitlement', () => {
   };
 
   const montarAcademia = async (
-    conta: { email: string; tenantId: string; unidadeId: string; cookie: string },
+    conta: {
+      email: string;
+      tenantId: string;
+      userId: string;
+      unidadeId: string;
+      cookie: string;
+    },
     slug: string,
   ): Promise<void> => {
     const senhas = app.get(PasswordService);
@@ -100,6 +120,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
       .send({ email: conta.email, password: SENHA });
 
     conta.tenantId = tenant.id;
+    conta.userId = user.id;
     conta.unidadeId = unidade.id;
     conta.cookie = cookieDeAcesso(login);
   };
@@ -160,22 +181,55 @@ describe('F7 -- aluno, plano e entitlement', () => {
      * se o lock nao existisse, duas leriam o mesmo `next_value` e o
      * `@@unique([tenantId, membershipNumber])` derrubaria uma delas -- ou,
      * pior, um contador sem constraint geraria matricula repetida.
+     *
+     * PELO REPOSITORIO, E NAO PELA ROTA HTTP, de proposito. A concorrencia
+     * que importa aqui e a do BANCO: 20 transacoes disputando a mesma linha
+     * de contador. Passar por HTTP acrescentaria 20 conexoes simultaneas
+     * disputando um pool `pg` de 10 -- e o que quebrou no CI foi isso
+     * (`read ECONNRESET` no runner lento), nao o lock. O teste media o
+     * transporte junto com a regra, e o transporte era a parte fragil.
+     *
+     * A cobertura HTTP da mesma rota continua nos outros testes deste
+     * arquivo; o que sai daqui e so a disputa de socket.
      */
     it('gera matricula unica e sequencial sob 20 criacoes concorrentes', async () => {
-      const respostas = await Promise.all(
+      const alunos = app.get(StudentRepository);
+
+      const contexto: TenantContext = {
+        tenantId: contas.a.tenantId,
+        actorId: contas.a.userId,
+        sessionId: randomUUID(),
+        permissions: new Set(['student.create']),
+        allowedUnitIds: 'ALL',
+      };
+
+      const criados = await Promise.all(
         Array.from({ length: 20 }, (_, i) =>
-          criarAluno(contas.a, { fullName: `Concorrente ${i}` }),
+          alunos.criar(
+            contexto,
+            {
+              fullName: `Concorrente ${i}`,
+              birthDate: new Date('2000-05-10T00:00:00.000Z'),
+              contacts: [],
+            },
+            `corrida-${i}`,
+            2026,
+          ),
         ),
       );
 
-      expect(respostas.every((r) => r.status === 201)).toBe(true);
-
-      const matriculas = respostas.map(
-        (r) => (r.body as { membershipNumber: string }).membershipNumber,
-      );
+      const matriculas = criados.map((a) => a.membershipNumber);
 
       expect(new Set(matriculas).size).toBe(20);
       expect(matriculas.every((m) => /^AP-\d{4}-\d{8}$/.test(m))).toBe(true);
+
+      // Sequencial de verdade: 20 numeros consecutivos, sem buraco nem
+      // repeticao. Só `Set.size` provaria unicidade, mas nao ordem.
+      const sequenciais = matriculas
+        .map((m) => Number(m.split('-')[2]))
+        .sort((a, b) => a - b);
+
+      expect(sequenciais[19]! - sequenciais[0]!).toBe(19);
     });
 
     /** INV-009, INV-011: a matricula nunca deriva do CPF. */

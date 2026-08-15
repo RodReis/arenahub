@@ -190,7 +190,28 @@ aluno arquivado com entitlement ativo, mesmo sob corrida"* falhou com `Expected:
 Com o lock de volta, passa. Um teste de concorrência que nunca foi visto falhando não prova nada;
 este foi.
 
-## 10. Decisões técnicas que merecem revisão
+## 10. Teste instável corrigido — o CI pegou o que a máquina local escondia
+
+O primeiro CI **falhou** no teste das 20 criações concorrentes, com `read ECONNRESET`. Local,
+passava 3 de 3 — máquina rápida escondia o problema.
+
+**A causa não era o lock.** O teste disparava 20 requisições HTTP simultâneas contra um pool `pg`
+de 10 conexões: as excedentes esperavam a transação anterior liberar (comportamento correto), e
+no runner mais lento do CI o socket do supertest caía antes da resposta. O teste media **o
+transporte junto com a regra**, e o transporte era a parte frágil.
+
+**A correção:** a concorrência passou a ser exercida direto no `StudentRepository`, sem HTTP. A
+disputa que importa — 20 transações sobre a mesma linha de contador — continua idêntica; o que
+saiu foi a disputa por socket. A cobertura HTTP da mesma rota permanece nos outros testes do
+arquivo.
+
+De quebra, a asserção ficou **mais forte**: além de unicidade (`Set.size === 20`), agora exige
+20 sequenciais **consecutivos** (`max - min === 19`) — o que prova ordem, e não só ausência de
+repetição.
+
+**Reverificado:** removi o `FOR UPDATE` e o teste voltou a falhar; com ele, passa.
+
+## 11. Decisões técnicas que merecem revisão
 
 1. **CPF não é persistido em claro.** Guardamos `cpfHash` (SHA-256 com pimenta por tenant, para
    comparar igualdade) e `cpfLast3` (para a recepção conferir). Uma fatia futura que precise
