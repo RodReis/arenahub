@@ -5,6 +5,7 @@ import {
 } from '../domain/access-decision.js';
 import { type EventoReconhecimento } from '../domain/facial-device.js';
 import { type DesfechoPassagem, type TurnstileAdapter } from '../domain/turnstile.js';
+import { FilaPorPessoa } from './fila-por-pessoa.js';
 
 /**
  * Do reconhecimento ate a passagem -- o coracao da Slice 0.3.
@@ -48,13 +49,22 @@ export type DepsPassagem = {
 };
 
 /**
- * Processa um reconhecimento.
+ * Processa um reconhecimento -- SEM serializacao.
+ *
+ * ⚠️ NAO CHAME ESTA FUNCAO DIRETO no caminho de producao. Use
+ * `criarProcessadorDePassagem`, que serializa por pessoa.
+ *
+ * Duas chamadas concorrentes para a MESMA pessoa acionam a catraca duas
+ * vezes, e nenhuma das defesas pega: ambas leem `ultimoAllowEm` antes do
+ * `await`, e cada uma tem `correlationId` proprio, entao o adapter ve dois
+ * comandos distintos. Reproduzido, e proibido pelo `M0-AC-003`.
+ *
+ * Fica exportada porque testar a decisao isolada da fila e legitimo -- mas
+ * o caminho suportado e o processador.
  *
  * O `comandoId` sai do `correlationId`: uma tentativa, um comando. Se o
  * mesmo reconhecimento for reprocessado -- reinicio, fila, retry -- o
- * `comandoId` se repete e o adapter reconhece que ja executou. E assim que
- * `M0-AC-003` (dez acessos, nenhuma dupla liberacao) se sustenta mesmo com
- * reprocessamento.
+ * `comandoId` se repete e o adapter reconhece que ja executou.
  */
 export async function processarReconhecimento(
   deps: DepsPassagem,
@@ -102,6 +112,32 @@ export async function processarReconhecimento(
 }
 
 /**
+ * Cria o processador de passagem -- ESTE e o caminho de producao.
+ *
+ * Serializa por pessoa. Duas tentativas da mesma pessoa nunca correm em
+ * paralelo, entao a janela anti-repique enxerga o `registrarAllow` da
+ * anterior e o `M0-AC-003` se sustenta mesmo com o leitor disparando eventos
+ * em rajada.
+ *
+ * Pessoas diferentes continuam em paralelo: nao ha razao para uma esperar
+ * pela outra.
+ *
+ * Quem conectar `aoReconhecer` do dispositivo usa isto, nao
+ * `processarReconhecimento` direto.
+ */
+export function criarProcessadorDePassagem(
+  deps: DepsPassagem,
+  timeoutMs: number = TIMEOUT_PASSAGEM_MS,
+): (evento: EventoReconhecimento, correlationId: string, agora: Date) => Promise<TentativaPassagem> {
+  const fila = new FilaPorPessoa();
+
+  return (evento, correlationId, agora) =>
+    fila.executar(evento.externalEnrollId, () =>
+      processarReconhecimento(deps, evento, correlationId, agora, timeoutMs),
+    );
+}
+
+/**
  * Percentis de latencia -- `M0-NFR-001` pede p50, p95 e maximo.
  *
  * Funcao pura sobre a lista de medicoes. O `M0-NFR-002` fixa o objetivo de
@@ -115,6 +151,17 @@ export function resumirLatencia(amostras: readonly number[]): {
   n: number;
 } | null {
   if (amostras.length === 0) return null;
+
+  // NaN corrompe o sort em silencio: `NaN - x` e sempre NaN, que o motor
+  // trata como 0, deixando o array mal ordenado sem erro nenhum. Metrica
+  // errada e pior que metrica ausente -- ela sera citada num relatorio.
+  const invalidas = amostras.filter((a) => !Number.isFinite(a));
+  if (invalidas.length > 0) {
+    throw new TypeError(
+      `resumirLatencia recebeu ${invalidas.length} amostra(s) nao finita(s) -- ` +
+        'medicao corrompida, corrija a origem em vez de mascarar o numero',
+    );
+  }
 
   const ordenadas = [...amostras].sort((a, b) => a - b);
   const percentil = (p: number): number => {

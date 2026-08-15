@@ -54,17 +54,27 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 > transporte não é refém do Windows. A dúvida sobrevive só para o SDK de captura biométrica, se
 > ele existir como DLL.
 
-🟡 **A F2 parou na metade, e o motivo é concreto:** a documentação do SDK Topdata está em PDF
-**fora deste repositório**. A metade sem hardware foi entregue — porta, simulador contratual,
-mapeamento local e a regra do `externalEnrollId` sem CPF. O `TopdataFacialAdapter` não: escrever
-chamada sem a documentação seria inventar assinatura, e o plano de apoio proíbe.
+🟡 **F2 e F3 pararam na mesma metade, pelo mesmo motivo:** a documentação do SDK Topdata está em
+PDF **fora deste repositório**. Escrever chamada sem ela seria inventar assinatura, e o plano de
+apoio proíbe.
 
-**Três coisas destravam a outra metade**, e nenhuma é código:
+**O que já está pronto e não depende de hardware** — e não é pouco: porta e simulador dos dois
+dispositivos, mapeamento local, `externalEnrollId` sem CPF, decisão determinística com razão
+estável, prevenção de dupla liberação em duas camadas, e a medição de latência do `M0-NFR-001`.
+**63 testes.** Quando o SDK chegar, o adapter se encaixa numa interface que já tem teste.
 
-1. **os manuais no repositório** — `docs/vendor/topdata/`;
-2. **decidir o transporte** — WebSocket, web server HTTP ou DLL via bridge;
-3. **consentimento dos participantes** — gate do PRD §4, pré-requisito de qualquer captura facial
-   (regra de arquitetura nº 7, que não abre exceção).
+**Quatro coisas destravam a outra metade, e nenhuma é código:**
+
+| # | o quê | trava |
+|---|---|---|
+| 1 | **os manuais no repositório** — `docs/vendor/topdata/` | F2 e F3 |
+| 2 | **decidir o transporte** — WebSocket, web server HTTP ou DLL via bridge | F2 e F3 |
+| 3 | **consentimento dos participantes** — regra nº 7, sem exceção | F2 |
+| 4 | **janela combinada + parada de emergência** — girar a catraca de verdade | **F3** |
+
+> ⚠️ **A F3 é diferente das outras.** Testar o adapter real significa **acionar fisicamente uma
+> catraca instalada e em uso**. Não é questão de acesso ao equipamento — é de combinar horário e
+> ter o procedimento de parada de emergência definido (item 7 do gate).
 
 ---
 
@@ -72,9 +82,9 @@ chamada sem a documentação seria inventar assinatura, e o plano de apoio proí
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **39** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **38** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **1** — [F2](https://github.com/RodReis/arenahub/issues/2), entregue pela metade |
+| Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F3](https://github.com/RodReis/arenahub/issues/3), ambas entregues pela metade |
 | Feito | `proplan:done` | PR mergeado com CI verde | **7** — os seis do bootstrap (#42–#47) e a **primeira fatia**, [F1](https://github.com/RodReis/arenahub/issues/1) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
 

@@ -229,7 +229,7 @@ Duas consequências do Prisma 7 que aparecem no código e valem saber antes de m
 |---|---|---|---|
 | ✅ F1 | 0.1 Bancada reproduzível | qualquer pessoa reproduz o ambiente e o simulador roda em CI **sem hardware** (`M0-NFR-006`) | — *(entregue; o gate não a bloqueava)* |
 | 🟡 F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | **parcial** — porta, simulador, mapeamento e regra do `externalEnrollId` entregues; **o `TopdataFacialAdapter` aguarda a documentação do SDK** |
-| F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | hardware |
+| 🟡 F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | **parcial** — decisão, anti-repique, idempotência e medição entregues; **o `TopdataInnerAdapter` aguarda SDK e janela combinada** |
 | F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | hardware |
 | F5 | 0.5 Relatório e decisão | decisão de saída do MVP 0 (`MVP-00` §15) com evidência: `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO` | F1–F4 |
 
@@ -290,6 +290,37 @@ entregue** (PR [#56](https://github.com/RodReis/arenahub/pull/56)):
 > `TopdataAdapterNaoImplementadoError` em toda operação, em vez de devolver
 > `{ confirmado: false }`. Erro de programação não pode se disfarçar de erro de operação — o
 > chamador trataria "não há adapter" como "o dispositivo recusou" e seguiria adiante.
+
+#### F3 entregue pela metade — e aqui o pendente pesa mais
+
+Mesma divisão da F2, com um agravante: **este código comanda hardware**. Entregue no PR
+[#57](https://github.com/RodReis/arenahub/pull/57):
+
+| entregue | pendente |
+|---|---|
+| decisão local determinística (`M0-FR-005`) | **`TopdataInnerAdapter`** |
+| razões de `DENY` como **código estável** | aceite: comportamento físico real |
+| prevenção de dupla liberação (`M0-AC-003`) | |
+| `DENY` não aciona a catraca (`M0-AC-004`) | |
+| medição p50/p95/máx (`M0-NFR-001`) | |
+| simulador que **conta acionamentos físicos** | |
+
+**O `M0-AC-004` virou estrutura, não disciplina:** o único `liberar()` do orquestrador está
+**depois do `return`** do caminho de negativa. Não há como decidir `DENY` e acionar — não por
+convenção, por topologia do código.
+
+**A dupla liberação é barrada em duas camadas independentes**, porque são causas diferentes:
+
+- **janela anti-repique** — o leitor dispara vários reconhecimentos com a pessoa parada na frente;
+- **`comandoId` derivado do `correlationId`** — reprocessamento: reinício, fila, retry.
+
+> ⚠️ **F3 exige uma coisa que F2 não exigia: janela combinada com a operação.** Testar o adapter
+> real significa **girar a catraca de verdade**, numa unidade em uso. O item 7 do gate
+> (procedimento de parada de emergência) existe exatamente para esse momento.
+
+**O que roda aqui não é o Access Decision Engine.** É o mínimo local para a POC medir latência e
+passagem. O motor real vive na nuvem (ADR-004, regra de arquitetura nº 1: a catraca nunca consulta
+assinatura nem invoice) e nasce em **F9**.
 
 ---
 
@@ -392,3 +423,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | — *(#47)* | — | [#54](https://github.com/RodReis/arenahub/pull/54) | **CI** com os 8 passos e a guarda de evidência. **A exceção de arranque morreu** |
 | 14/08/2026 | **F1** | SPEC-001 | [#55](https://github.com/RodReis/arenahub/pull/55) | bancada reproduzível: `edge-agent` com config, health check, logs e diagnóstico somente-leitura; inventário real da catraca |
 | 14/08/2026 | **F2** *(parcial)* | SPEC-002 | [#56](https://github.com/RodReis/arenahub/pull/56) | ciclo de vida facial sem hardware: porta, simulador contratual, mapeamento em SQLite, `externalEnrollId` sem CPF. **Adapter Topdata aguarda o SDK** |
+| 14/08/2026 | **F3** *(parcial)* | SPEC-003 | [#57](https://github.com/RodReis/arenahub/pull/57) | decisão local, anti-repique, idempotência de comando e medição de latência. **`DENY` não aciona a catraca — estrutural.** Adapter aguarda SDK e janela |

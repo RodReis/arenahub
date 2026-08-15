@@ -4,6 +4,7 @@ import { TurnstileSimulator } from '../adapters/turnstile-simulator.js';
 import { RAZAO_DENY, type PermissaoLocal } from '../domain/access-decision.js';
 import { type EventoReconhecimento } from '../domain/facial-device.js';
 import {
+  criarProcessadorDePassagem,
   processarReconhecimento,
   resumirLatencia,
   type DepsPassagem,
@@ -131,6 +132,62 @@ describe('passagem: do reconhecimento ao giro', () => {
     expect(catraca.acionamentosFisicos).toBe(1);
   });
 
+  it('CONCORRENCIA: duas tentativas simultaneas da mesma pessoa acionam UMA vez', async () => {
+    // REGRESSAO de um HIGH real, reproduzido antes de corrigir: duas
+    // liberacoes fisicas.
+    //
+    // Nenhuma das duas defesas pegava sozinha. A janela anti-repique nao,
+    // porque ambas leem `ultimoAllowEm` ANTES do await e o registro vem
+    // depois. O comandoId idempotente tambem nao, porque cada tentativa tem
+    // correlationId proprio -- para o adapter sao dois comandos distintos.
+    //
+    // O leitor facial dispara em rajada. Isto nao e cenario de laboratorio.
+    const processar = criarProcessadorDePassagem(deps);
+    const e = evento();
+
+    await Promise.all([
+      processar(e, 'corr-A', AGORA),
+      processar(e, 'corr-B', AGORA),
+    ]);
+
+    expect(catraca.acionamentosFisicos).toBe(1);
+  });
+
+  it('pessoas diferentes nao esperam uma pela outra', async () => {
+    // Serializar globalmente resolveria a race e criaria fila na recepcao em
+    // horario de pico. A serializacao e POR PESSOA.
+    const processar = criarProcessadorDePassagem(deps);
+    const idB = 'b'.repeat(32);
+    permissoes.set(idB, { externalEnrollId: idB });
+
+    await Promise.all([
+      processar(evento(), 'corr-A', AGORA),
+      processar(evento(idB), 'corr-B', AGORA),
+    ]);
+
+    expect(catraca.acionamentosFisicos).toBe(2);
+  });
+
+  it('falha numa tentativa nao trava a fila daquela pessoa', async () => {
+    const processar = criarProcessadorDePassagem(deps);
+    const catracaQuebrada = {
+      ...catraca,
+      liberar: () => Promise.reject(new Error('comando falhou')),
+    };
+
+    await expect(
+      criarProcessadorDePassagem({ ...deps, catraca: catracaQuebrada as never })(
+        evento(),
+        'corr-falha',
+        AGORA,
+      ),
+    ).rejects.toThrow('comando falhou');
+
+    // A proxima tentativa da MESMA pessoa continua funcionando.
+    const depois = await processar(evento(), 'corr-ok', AGORA);
+    expect(depois.decisao.resultado).toBe('ALLOW');
+  });
+
   it('depois da janela, a mesma pessoa passa de novo', async () => {
     await processarReconhecimento(deps, evento(), 'corr-1', AGORA);
 
@@ -176,6 +233,14 @@ describe('resumirLatencia — M0-NFR-001', () => {
     const amostras = Array.from({ length: 100 }, (_, i) => i + 1);
 
     expect(resumirLatencia(amostras)).toEqual({ p50: 50, p95: 95, max: 100, n: 100 });
+  });
+
+  it('recusa amostra nao finita em vez de corromper a metrica em silencio', () => {
+    // NaN faz `a - b` devolver NaN, que o motor trata como 0 no sort: o
+    // array fica mal ordenado sem erro nenhum. Metrica errada e pior que
+    // metrica ausente -- ela vai ser citada num relatorio.
+    expect(() => resumirLatencia([10, Number.NaN, 5])).toThrow(TypeError);
+    expect(() => resumirLatencia([10, Number.POSITIVE_INFINITY])).toThrow(TypeError);
   });
 
   it('nao inventa valor que nao foi medido', () => {
