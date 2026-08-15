@@ -32,6 +32,18 @@ class EasyInnerBridge {
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte HabilitarMudancaOnLineOffLine(byte Habilita, byte Tempo);
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
+    static extern byte DefinirPadraoCartao(byte Padrao);
+    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
+    static extern byte ConfigurarAcionamento1(byte Funcao, byte Tempo);
+    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
+    static extern byte ConfigurarLeitor1(byte Operacao);
+    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
+    static extern byte ConfigurarLeitor2(byte Operacao);
+    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
+    static extern byte AcionarRele1(int Inner);
+    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
+    static extern byte ReceberVersaoFirmware(int Inner, ref byte Linha, ref short Variacao, ref byte VersaoAlta, ref byte VersaoBaixa, ref byte VersaoSufixo, ref byte InnerAcessoBio);
+    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte LiberarCatracaEntrada(int Inner);
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte LiberarCatracaSaida(int Inner);
@@ -99,23 +111,49 @@ class EasyInnerBridge {
             case "ping":           return Retorno(PingOnLine(inner));
             case "liberar":        return Liberar(cmd, inner);
             case "receber-evento": return Receber(inner);
+            case "acionar-rele":   return Retorno(AcionarRele1(inner));
+            case "versao":         return Versao(inner);
             default:               return Falha("comando desconhecido: " + nome);
         }
     }
 
     /// <summary>
-    /// Setup da conexao (fora do contrato de 4 comandos do lado Node; chamado
-    /// na inicializacao). DefinirTipoConexao(2)=TCP porta fixa; abre a porta;
-    /// habilita modo online com ping. Retorna o PIOR codigo dos tres.
+    /// Setup + inicializacao online. Segue a maquina de estados do manual
+    /// (PROTOCOLO-CATRACA.md) e o exemplo oficial FrmOnlineController:
+    /// conexao -> padrao de cartao -> modo online -> CONFIGURAR ACIONAMENTO
+    /// (o rele como catraca) -> configurar leitores. Sem o ConfigurarAcionamento1
+    /// a liberacao retorna 1 (erro) -- foi o que travou o primeiro teste.
+    /// Retorna o PIOR codigo de retorno da sequencia.
+    /// Valores do enum oficial: ACIONA_REGISTRO_ENTRADA_OU_SAIDA=1,
+    /// ENTRADA_E_SAIDA=3 (leitor), DESATIVADO=0, PADRAO_TOPDATA=0.
     /// </summary>
     static string Conectar(IDictionary<string, object> cmd) {
         int porta = cmd.ContainsKey("porta") ? Convert.ToInt32(cmd["porta"]) : 3570;
         byte tempo = cmd.ContainsKey("tempo") ? Convert.ToByte(cmd["tempo"]) : (byte)10;
-        byte r1 = DefinirTipoConexao(2);
-        byte r2 = AbrirPortaComunicacao(porta);
-        byte r3 = HabilitarMudancaOnLineOffLine(2, tempo);
-        byte pior = Math.Max(r1, Math.Max(r2, r3));
+
+        byte pior = 0;
+        pior = Math.Max(pior, DefinirTipoConexao(2));
+        pior = Math.Max(pior, AbrirPortaComunicacao(porta));
+        pior = Math.Max(pior, HabilitarMudancaOnLineOffLine(2, tempo));
+        pior = Math.Max(pior, DefinirPadraoCartao(0));      // PADRAO_TOPDATA
+        pior = Math.Max(pior, ConfigurarInnerOnLine());
+        pior = Math.Max(pior, ConfigurarAcionamento1(1, 5)); // ACIONA_REGISTRO_ENTRADA_OU_SAIDA, 5s
+        pior = Math.Max(pior, ConfigurarLeitor1(3));        // ENTRADA_E_SAIDA
+        pior = Math.Max(pior, ConfigurarLeitor2(0));        // DESATIVADO
         return Retorno(pior);
+    }
+
+    /// Diagnostico: le a versao de firmware. Se responder 0, a comunicacao
+    /// bidirecional com a catraca esta OK (o problema, se houver, e de sessao
+    /// online, nao de transporte).
+    static string Versao(int inner) {
+        byte linha = 0, alta = 0, baixa = 0, sufixo = 0, bio = 0;
+        short variacao = 0;
+        byte r = ReceberVersaoFirmware(inner, ref linha, ref variacao, ref alta, ref baixa, ref sufixo, ref bio);
+        return J.Serialize(new Dictionary<string, object> {
+            { "tipo", "retorno" }, { "retorno", (int)r },
+            { "firmware", string.Format("{0}.{1:D2}.{2:D2}", alta, baixa, sufixo) }
+        });
     }
 
     static string Liberar(IDictionary<string, object> cmd, int inner) {
