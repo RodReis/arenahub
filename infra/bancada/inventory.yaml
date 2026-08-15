@@ -6,17 +6,21 @@
 # como obter, nunca recebe palpite.
 
 versao: 1
-atualizadoEm: '2026-08-14'
+atualizadoEm: '2026-08-15'
 observadoPor: PI
+# Atualizado em 15/08/2026 com o levantamento de campo (rede + painel físico da
+# catraca + login autenticado no webserver). Ver
+# docs/field-notes/2026-08-15-hardware-arena-positiva.md. Campos antes `null`
+# preenchidos com valor lido; nada inferido.
 
 # --- Gate de entrada (PRD §4) -----------------------------------------------
 # Marcado só o que tem evidência. O que falta bloqueia a fatia que depender
 # dele, não o MVP inteiro.
 gate:
-  inventarioComSerie: parcial # leitor facial sim; catraca sem nº de série lido
-  firmwareRegistrado: false # não lido no equipamento
+  inventarioComSerie: true # 15/08: catraca 247000797 lida no painel; facial AYTI11108174
+  firmwareRegistrado: true # 15/08: catraca FW 7.05.00 (PCI v3.1) lida no painel
   sdkDisponivelLegalmente: parcial # SDK público; credencial/licença não verificada
-  windowsERedeIsolada: parcial # Windows 11 confirmado; rede NÃO é isolada
+  windowsERedeIsolada: parcial # Windows confirmado; rede NÃO é isolada (ver rede.isolada)
   diagramaFisicoAprovado: false
   consentimentoParticipantes: false # obrigatório antes de qualquer captura facial
   paradaDeEmergenciaDefinida: false
@@ -29,12 +33,17 @@ dispositivos:
     # "Número do Inner" no software de configuração. É o endereço do
     # equipamento no barramento Topdata, não um número de série.
     numeroInner: 1
-    numeroSerie: null # não lido — consta na etiqueta física do equipamento
-    firmware: null # não lido — ver menu do equipamento
+    numeroSerie: '247000797' # 15/08: lido no painel (MENU → informações)
+    firmware: '7.05.00' # 15/08: lido no painel; PCI catraca v3.1; hardware v2.x
     descricaoNoSoftware: 'CATRACA FIT - TOPDATA'
     tipoDeCatraca: padrao # o software oferece "Padrão" ou "Easy"
     modoOperacao: liberada-ambos-sentidos
     instaladaA: esquerda # ao entrar
+    rede:
+      ip: 192.168.2.187 # 15/08: lido no painel (IP do Inner)
+      obtencao: dhcp # 15/08: painel mostra "IP do Inner: DHCP" — pode mudar em reboot
+    # 15/08: painel mostra "IP do Servidor: 192.168.2.106", "Porta Servidor: 3570".
+    # É o PC legado que comanda a catraca hoje (ver field-note §2.2).
     entradas:
       teclado: true
       cartao: false
@@ -44,15 +53,15 @@ dispositivos:
   - id: facial-01
     tipo: leitor-facial
     fabricante: Topdata
-    modelo: null # linha facial; modelo exato não impresso na tela
+    modelo: F4+ # 15/08: etiqueta fisica "F4+ / AI Face Identification" (coberto por PROTOCOLO-FACIAL.md)
     # Identificador que a catraca usa para referenciar este leitor, no campo
     # "Leitor facial 1" do software.
     identificador: AYTI11108174
-    numeroSerie: null # presumivelmente o mesmo identificador; confirmar na etiqueta
-    firmware: null # não lido
+    numeroSerie: AYTI11108174 # 15/08: codigo de barras da etiqueta; patrimonio secundario 255003182
+    firmware: null # não lido — exige login na UI do facial (senha propria, desconhecida)
     rede:
       ip: 192.168.2.188 # exibido na própria tela do leitor
-      obtencao: null # DHCP ou fixo — confirmar no menu de rede
+      obtencao: null # DHCP ou fixo — confirmar no menu de rede do leitor
     vinculadoA: catraca-01
 
 hospedeiro:
