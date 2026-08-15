@@ -52,3 +52,10 @@ pnpm-debug.log*
 
 # client gerado pelo Prisma (recriado por `pnpm --filter @arenahub/database generate`)
 packages/database/src/generated/
+
+# gerado pelo Next a cada build
+next-env.d.ts
+
+# relatorios do Playwright
+playwright-report/
+test-results/

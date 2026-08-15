@@ -1,5 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "//": "Turborepo 2 SANITIZA o ambiente: variavel nao declarada aqui nao chega a task. Sem esta lista, `test:integration` passa na maquina de quem tem `.env` (o dotenv injeta) e falha no CI, onde a variavel vem do ambiente do job -- verde local, vermelho remoto, o pior tipo de divergencia.",
+  "globalEnv": ["CI", "DATABASE_URL", "NODE_ENV", "JWT_ISSUER", "JWT_AUDIENCE", "JWT_PRIVATE_KEY", "JWT_PUBLIC_KEY", "MFA_ENCRYPTION_KEY", "API_INTERNAL_URL"],
   "tasks": {
     "build": {
       "dependsOn": [
