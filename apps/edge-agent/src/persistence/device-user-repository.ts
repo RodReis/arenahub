@@ -66,6 +66,7 @@ const SCHEMA = `
 
 export class DeviceUserRepository {
   private readonly db: DatabaseSync;
+  private fechado = false;
 
   constructor(caminho: string) {
     this.db = new DatabaseSync(caminho);
@@ -148,7 +149,16 @@ export class DeviceUserRepository {
       .map(paraDeviceUser);
   }
 
+  /**
+   * Fecha. Idempotente -- fechar duas vezes e seguro.
+   *
+   * Regra de arquitetura no 4 vale aqui tambem: o shutdown gracioso pode
+   * fechar, e o `finally` de quem chamou fecha de novo. Explodir no segundo
+   * `fechar()` transformaria encerramento limpo em erro.
+   */
   fechar(): void {
+    if (this.fechado) return;
+    this.fechado = true;
     this.db.close();
   }
 }
