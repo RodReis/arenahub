@@ -37,6 +37,8 @@ export default {
       ...base,
       displayName: 'integration',
       roots: ['<rootDir>/test/integration'],
+      // Carrega o `.env` da raiz antes de qualquer suite subir modulo.
+      setupFiles: ['<rootDir>/test/setup-env.ts'],
       // Sufixo `.int-spec.ts` e a convencao do repositorio
       // (`docs/TESTING.md` secao 1) -- e o que o `pnpm test:report`
       // classifica.

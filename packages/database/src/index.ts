@@ -12,3 +12,34 @@
  * atrapalha.
  */
 export { criarPrismaClient, type PrismaClientArenaHub } from './client.js';
+
+/**
+ * O client gerado, para quem precisa ESTENDE-LO em vez de instancia-lo --
+ * caso do `PrismaService` do NestJS, que amarra `$connect`/`$disconnect` ao
+ * ciclo de vida do modulo.
+ *
+ * Quem so precisa de uma conexao usa `criarPrismaClient`.
+ */
+export { PrismaClient } from './generated/client.js';
+export { PrismaPg } from '@prisma/adapter-pg';
+
+/**
+ * Tipos das entidades. Sem eles, um repositorio fora deste pacote nao
+ * consegue NOMEAR o que devolve -- o TypeScript reclama de tipo inferido
+ * nao portavel (TS2742) e exige anotacao.
+ */
+export type {
+  AuditLog,
+  GymUnit,
+  InboxReceipt,
+  Invitation,
+  OutboxEvent,
+  Permission,
+  Role,
+  RolePermission,
+  Session,
+  Tenant,
+  TenantMembership,
+  User,
+  UserRole,
+} from './generated/client.js';
