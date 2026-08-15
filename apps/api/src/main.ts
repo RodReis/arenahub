@@ -1,8 +1,23 @@
 import 'reflect-metadata';
 
-import { NestFactory } from '@nestjs/core';
+import { join } from 'node:path';
 
-import { AppModule } from './app.module.js';
+import { NestFactory } from '@nestjs/core';
+import { config as carregarEnv } from 'dotenv';
+
+// O `.env` vive na raiz do monorepo -- mesma fonte que o docker-compose e o
+// `prisma.config.ts`. Em producao as variaveis vem do ambiente e este
+// arquivo simplesmente nao existe; `dotenv` ignora a ausencia em silencio,
+// que e o comportamento certo aqui.
+//
+// A partir do `cwd`, e nao de `import.meta.url`: o caminho relativo mudaria
+// entre `src/` (tsx) e `dist/` (compilado), e o pnpm ja executa o script com
+// o cwd no workspace.
+//
+// ORDEM IMPORTA: antes de qualquer import que leia `process.env`.
+carregarEnv({ path: join(process.cwd(), '../../.env') });
+
+const { AppModule } = await import('./app.module.js');
 
 /**
  * Porta 3344 e fixa por decisao registrada (`CLAUDE.md`, Regras de trabalho):

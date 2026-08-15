@@ -118,28 +118,31 @@ jobs:
         run: pnpm test:integration
 
       # --- 7 de 8 ---------------------------------------------------------
-      # Ainda sem workspace que a declare, e falhar é o comportamento
-      # correto: o guarda de scripts/run-task.mjs faz o comando falhar em vez
-      # de sair 0 mentindo.
+      # Promovido na F6 (Task 6), quando o Playwright nasceu no admin-web.
+      # Com ele, OS OITO PASSOS têm workspace: a lista de pendentes acabou.
       #
-      # NÃO use `continue-on-error` aqui. Ele marca o passo como `success` no
-      # resumo do job -- o verde decorativo que o card #47 proíbe.
+      # O `seed` roda antes porque a jornada E2E entra com um proprietário
+      # real -- e é o seed que o cria (`CLAUDE.md`: dado local de
+      # desenvolvimento entra por seed).
       #
-      # Este passo FALHA SE ELA PASSAR: isso significaria que um workspace
-      # passou a declará-la e a lista ficou desatualizada. Quem criar o
-      # workspace promove a task a passo próprio no mesmo PR.
-      #
-      #   test:e2e -> F6 (Task 6, Playwright no admin-web)
-      - name: 'pendente: test:e2e'
-        run: |
-          if pnpm test:e2e > /tmp/test-e2e.log 2>&1; then
-            echo "::error::pnpm test:e2e passou, mas nenhum workspace deveria declará-la ainda."
-            echo "Se um workspace passou a declarar a task, tire-a desta lista e"
-            echo "promova-a a passo próprio do CI."
-            exit 1
-          fi
-          echo "- \`pnpm test:e2e\` falha: nenhum workspace declara a task" >> "$GITHUB_STEP_SUMMARY"
-          echo "::notice::1 de 8 passos ainda não tem workspace: test:e2e"
+      # `--with-deps` instala as bibliotecas de sistema do Chromium que o
+      # runner do GitHub não traz.
+      - name: seed de bancada
+        run: pnpm --filter @arenahub/database seed
+
+      - name: instalar navegador do Playwright
+        run: pnpm --filter @arenahub/admin-web exec playwright install --with-deps chromium
+
+      - name: 'test:e2e'
+        run: pnpm test:e2e
+
+      - name: guardar rastro do Playwright quando falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/admin-web/playwright-report/
+          retention-days: 7
 
       # --- 8 de 8 ---------------------------------------------------------
       # A guarda de evidência. Falha se reports/TESTS.md divergir do que a

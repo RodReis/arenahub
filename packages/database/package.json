@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
     "migrate": "prisma migrate dev",
@@ -14,7 +18,8 @@
     "studio": "prisma studio",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test:integration": "vitest run"
+    "test:integration": "vitest run",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.9.1",
