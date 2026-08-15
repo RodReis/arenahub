@@ -1,52 +1,67 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 
 import { type ExternalEnrollId } from './facial-device.js';
 
 /**
- * Geracao do identificador da pessoa no dispositivo.
+ * Identificador da pessoa NO DISPOSITIVO.
  *
- * A Slice 0.2 exige, com todas as letras: `externalEnrollId` **nao derivado
- * do CPF**. O motivo nao e estetico.
+ * O FORMATO VEM DO EQUIPAMENTO, NAO DA NOSSA CONVENIENCIA. O manual e
+ * explicito: "Corresponde ao identificador do usuario. Obrigatorio que o
+ * valor deve estar compreendido entre 1 e 999.999.999.999" -- numerico, 12
+ * digitos. Ver docs/vendor/topdata/PROTOCOLO-FACIAL.md.
  *
- * Derivar do CPF -- mesmo com hash -- transformaria o dispositivo num
- * oraculo: com a base de CPFs do Brasil e o mesmo algoritmo, qualquer um
- * confirma se um CPF esta cadastrado, ou reidentifica quem esta. Hash nao
- * resolve, porque o espaco de CPF e pequeno e enumeravel (10^11, e a maioria
- * invalida pelo digito verificador). Salt por pessoa tambem nao ajuda: o
- * salt teria de viajar junto, e ai nao e mais segredo.
+ * A primeira versao usava UUID hexadecimal de 32 caracteres, escrita antes
+ * de a documentacao chegar. Nao cabia. O erro so apareceria na bancada, com
+ * o leitor recusando todo cadastro -- e por isso a correcao veio antes do
+ * adapter real existir.
  *
- * Identificador opaco e sem relacao com PII resolve por construcao: nao ha o
- * que derivar nem o que confirmar.
+ * ⚠️ CONFIGURACAO DE BANCADA: o leitor precisa estar em "18 digitos" no
+ * menu (Usuarios -> Op. de inscricao -> Formato de ID de usuario) para
+ * aceitar os 12 digitos do SDK. Em 9 digitos, o cadastro falha.
+ *
+ * A REGRA QUE NAO MUDOU: nao derivar de CPF.
+ *
+ * Derivar -- mesmo com hash -- transformaria o dispositivo num oraculo: o
+ * espaco de CPF e pequeno e enumeravel, entao qualquer um com a base e o
+ * mesmo algoritmo confirma quem esta cadastrado. Agora o risco e MAIOR que
+ * antes: 11 digitos de CPF cabem folgadamente nos 12 do enrollid, entao a
+ * tentacao de usar CPF direto e real.
  */
+
+/** Limite do equipamento: 999.999.999.999 (12 digitos). */
+export const ENROLL_ID_MAXIMO = 999_999_999_999;
 
 /**
- * Comprimento maximo tipico de identificador em dispositivo de controle de
- * acesso. UUID sem hifen tem 32 caracteres e cabe com folga.
+ * Piso da faixa que usamos: 100.000.000.000.
  *
- * O limite REAL do equipamento so se conhece com o SDK -- ate la, 32 e
- * conservador. Se o dispositivo aceitar menos, isto muda com o adapter real
- * e a mudanca quebra este teste, que e o comportamento desejado.
+ * Fixar 12 digitos exatos tem duas vantagens praticas -- todo id tem o mesmo
+ * tamanho no log e na tela do equipamento, e nenhum id gerado por nos colide
+ * com os numeros baixos que o software de fabrica usa (a bancada tem
+ * usuarios em `enrollid` 1, 2, 3...).
  */
-const COMPRIMENTO = 32;
+export const ENROLL_ID_MINIMO = 100_000_000_000;
 
-/** Gera um identificador opaco, sem relacao com dado da pessoa. */
+/**
+ * Gera um identificador opaco dentro da faixa do equipamento.
+ *
+ * `randomInt` do node:crypto, nao Math.random: identificador previsivel num
+ * sistema de controle de acesso e problema, nao detalhe.
+ *
+ * A faixa tem 9 * 10^11 valores. Com 5.000 usuarios -- a capacidade maxima
+ * do leitor, segundo a especificacao tecnica -- a chance de colisao e da
+ * ordem de 10^-5. O indice unico do banco pega o resto, e o teste do
+ * repositorio prova.
+ */
 export function gerarExternalEnrollId(): ExternalEnrollId {
-  return randomUUID().replaceAll('-', '');
+  return String(randomInt(ENROLL_ID_MINIMO, ENROLL_ID_MAXIMO + 1));
 }
-
-/** Formato aceito: 32 caracteres hexadecimais minusculos. */
-const FORMATO = /^[0-9a-f]{32}$/;
 
 export function ehExternalEnrollIdValido(valor: string): boolean {
-  return valor.length === COMPRIMENTO && FORMATO.test(valor);
+  if (!/^\d+$/.test(valor)) return false;
+  const numero = Number(valor);
+  return Number.isSafeInteger(numero) && numero >= 1 && numero <= ENROLL_ID_MAXIMO;
 }
 
-/**
- * Erro de quem tentou usar dado de pessoa como identificador.
- *
- * Existe para falhar ALTO na hora, e nao virar dado ruim no dispositivo --
- * de onde sair depois exige acesso fisico ou o SDK.
- */
 export class ExternalEnrollIdInvalidoError extends Error {
   readonly code = 'EDGE_ENROLL_ID_INVALIDO';
 
@@ -57,40 +72,27 @@ export class ExternalEnrollIdInvalidoError extends Error {
 }
 
 /**
- * CPF e reconhecido por CONTEXTO, nao por substring de 11 digitos.
+ * CPF cru: exatamente 11 digitos.
  *
- * A primeira versao usava `/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/` sem ancora. Com
- * os pontos opcionais, isso casa 11 digitos seguidos em QUALQUER posicao --
- * e num hexadecimal de 32 caracteres, digito e a maior parte do alfabeto.
- * Medido: 5,65% dos ids que o proprio `gerarExternalEnrollId` produz eram
- * recusados pelo proprio validador. Pior: o teste "aceita o que o gerador
- * produz" rodava uma vez, entao tinha 5,65% de chance de falhar sozinho no
- * CI, com aparencia de flakiness em vez de bug.
- *
- * Agora as duas formas exigem que a string INTEIRA seja o CPF -- que e o
- * unico caso em que alguem de fato passou um CPF como identificador.
+ * Aqui a checagem importa MAIS que na versao anterior. Antes, o formato do
+ * id era hexadecimal e um CPF ja destoaria; agora o id e numerico e um CPF
+ * de 11 digitos passa no formato sem esforco. A rede de seguranca virou a
+ * unica barreira.
  */
-
-/** CPF cru: exatamente 11 digitos, nada mais. */
 const E_CPF_CRU = /^\d{11}$/;
 
 /** CPF mascarado: 000.000.000-00, com separadores de verdade. */
 const E_CPF_MASCARADO = /^\d{3}[.\s]\d{3}[.\s]\d{3}[-\s]\d{2}$/;
 
-/**
- * CPF com prefixo ou sufixo textual -- `user-12345678901`, `cpf:...`.
- *
- * Exige que a parte nao-numerica seja separador ou rotulo, nunca
- * hexadecimal: `a1b2c3...` nao pode virar suspeita so por conter digitos.
- */
+/** CPF com rotulo: `user-12345678901`, `cpf:...`. */
 const E_CPF_ROTULADO = /^[a-z_-]{1,12}[:_-]?\d{11}$/i;
 
 /**
  * Valida antes de mandar para o dispositivo.
  *
- * A checagem de CPF e uma REDE DE SEGURANCA, nao a regra. A regra e usar
- * `gerarExternalEnrollId`. Isto existe porque a alternativa -- descobrir que
- * alguem passou CPF quando o dado ja esta no equipamento -- e cara demais.
+ * A checagem de CPF e REDE DE SEGURANCA, nao a regra. A regra e usar
+ * `gerarExternalEnrollId`. Isto existe porque descobrir que alguem passou
+ * CPF depois de o dado estar no equipamento e caro demais.
  */
 export function validarExternalEnrollId(valor: string): ExternalEnrollId {
   if (valor.length === 0) {
@@ -106,7 +108,8 @@ export function validarExternalEnrollId(valor: string): ExternalEnrollId {
 
   if (!ehExternalEnrollIdValido(valor)) {
     throw new ExternalEnrollIdInvalidoError(
-      `esperado ${COMPRIMENTO} caracteres hexadecimais, recebido ${valor.length}`,
+      `o equipamento aceita numero de 1 a ${ENROLL_ID_MAXIMO} (12 digitos); ` +
+        `recebido ${JSON.stringify(valor)}`,
     );
   }
 

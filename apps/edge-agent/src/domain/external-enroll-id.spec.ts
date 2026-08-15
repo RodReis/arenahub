@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
+  ENROLL_ID_MAXIMO,
+  ENROLL_ID_MINIMO,
   ExternalEnrollIdInvalidoError,
   ehExternalEnrollIdValido,
   gerarExternalEnrollId,
@@ -10,6 +12,17 @@ import {
 describe('gerarExternalEnrollId', () => {
   it('gera identificador valido', () => {
     expect(ehExternalEnrollIdValido(gerarExternalEnrollId())).toBe(true);
+  });
+
+  it('gera sempre 12 digitos, dentro da faixa do equipamento', () => {
+    // Tamanho fixo mantem log e tela do equipamento legiveis, e o piso alto
+    // evita colidir com os numeros baixos que o software de fabrica usa.
+    for (let i = 0; i < 500; i += 1) {
+      const id = gerarExternalEnrollId();
+      expect(id).toHaveLength(12);
+      expect(Number(id)).toBeGreaterThanOrEqual(ENROLL_ID_MINIMO);
+      expect(Number(id)).toBeLessThanOrEqual(ENROLL_ID_MAXIMO);
+    }
   });
 
   it('nao repete', () => {
@@ -55,7 +68,7 @@ describe('validarExternalEnrollId — a regra do CPF', () => {
 
   it('recusa formato fora do esperado', () => {
     expect(() => validarExternalEnrollId('abc')).toThrow(ExternalEnrollIdInvalidoError);
-    expect(() => validarExternalEnrollId('X'.repeat(32))).toThrow(ExternalEnrollIdInvalidoError);
+    expect(() => validarExternalEnrollId('0')).toThrow(ExternalEnrollIdInvalidoError);
   });
 
   it('aceita TODO id que o proprio gerador produz', () => {
@@ -81,9 +94,18 @@ describe('validarExternalEnrollId — a regra do CPF', () => {
     expect(recusados).toEqual([]);
   });
 
-  it('nao confunde hexadecimal com CPF so porque tem digitos', () => {
-    // O alfabeto hex e majoritariamente digito. Suspeitar de qualquer
-    // sequencia numerica dentro dele torna o filtro inutil.
-    expect(() => validarExternalEnrollId('12345678901abcdef0123456789abcde')).not.toThrow();
+  it('aceita numero de 12 digitos, que e o que o equipamento pede', () => {
+    // O manual: "valor deve estar compreendido entre 1 e 999.999.999.999".
+    expect(() => validarExternalEnrollId('123456789012')).not.toThrow();
+  });
+
+  it('recusa numero acima do limite do equipamento', () => {
+    // Passar disso o leitor recusa -- melhor falhar aqui que na bancada.
+    expect(() => validarExternalEnrollId('1000000000000')).toThrow(ExternalEnrollIdInvalidoError);
+  });
+
+  it('recusa nao-numerico, porque o enrollid do equipamento e numerico', () => {
+    // O UUID hexadecimal da primeira versao cai aqui -- e esse e o ponto.
+    expect(() => validarExternalEnrollId('a'.repeat(32))).toThrow(ExternalEnrollIdInvalidoError);
   });
 });

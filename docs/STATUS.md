@@ -84,8 +84,8 @@ estável, prevenção de dupla liberação em duas camadas, e a medição de lat
 |---|---|---|---|
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **38** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F3](https://github.com/RodReis/arenahub/issues/3), ambas entregues pela metade |
-| Feito | `proplan:done` | PR mergeado com CI verde | **7** — os seis do bootstrap (#42–#47) e a **primeira fatia**, [F1](https://github.com/RodReis/arenahub/issues/1) |
+| Em Andamento | `proplan:doing` | Code está implementando | **1** — [F3](https://github.com/RodReis/arenahub/issues/3), aguardando o SDK EasyInner |
+| Feito | `proplan:done` | PR mergeado com CI verde | **8** — os seis do bootstrap (#42–#47), [F1](https://github.com/RodReis/arenahub/issues/1) e [F2](https://github.com/RodReis/arenahub/issues/2) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
