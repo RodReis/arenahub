@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "diagnostico": "tsx src/diagnostics/run.ts"
+    "diagnostico": "tsx src/diagnostics/run.ts",
+    "bridge:build": "powershell -ExecutionPolicy Bypass -File native/easyinner-bridge/build.ps1"
   },
   "dependencies": {
     "pino": "10.3.1",

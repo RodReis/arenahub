@@ -230,8 +230,8 @@ Duas consequências do Prisma 7 que aparecem no código e valem saber antes de m
 | ✅ F1 | 0.1 Bancada reproduzível | qualquer pessoa reproduz o ambiente e o simulador roda em CI **sem hardware** (`M0-NFR-006`) | — *(entregue; o gate não a bloqueava)* |
 | ✅ F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | — *(adapter real entregue; falta só o aceite na bancada)* |
 | 🟡 F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | **adapter entregue**; falta a **ponte Windows** e a janela combinada |
-| F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | hardware |
-| F5 | 0.5 Relatório e decisão | decisão de saída do MVP 0 (`MVP-00` §15) com evidência: `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO` | F1–F4 |
+| ✅ F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | — *(regra pura; fechou sem hardware — PR #60)* |
+| 🟡 F5 | 0.5 Relatório e decisão | decisão de saída do MVP 0 (`MVP-00` §15) com evidência: `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO` | **relatório parcial entregue** (`docs/reports/MVP-00-relatorio-poc-topdata.md`); latência real é `PENDENTE-POC` — depende da POC física |
 
 **A pergunta que F2 tem de responder e ninguém pode adivinhar:** o SDK do leitor facial exige
 Windows e processo nativo? A resposta muda a stack do `edge-agent` (ADR-010).
@@ -287,6 +287,12 @@ trava a academia e permitir tudo abre a porta.
 > As **limitações por equipamento** do `M0-AC-008` já estão registradas em
 > `LIMITACOES_CONHECIDAS`, com **fonte citada** para cada uma. Limitação sem fonte é opinião, e é
 > este relatório que decide se o MVP 0 vira MVP 1.
+
+> 🟡 **F5 parcial entregue em 15/08/2026** — [`docs/reports/MVP-00-relatorio-poc-topdata.md`](reports/MVP-00-relatorio-poc-topdata.md).
+> A parte que **não** depende de hardware está completa: matriz de compatibilidade (com série/firmware/
+> protocolo verificados em campo), limitações por equipamento, estado das falhas obrigatórias, e a
+> recomendação **`GO_WITH_CONSTRAINTS`**. As células de **latência real** estão `PENDENTE-POC` — só
+> `lab:run` na catraca real as preenche. O gate §15 **não** fecha até isso rodar e o PI assinar.
 
 **A medida que F3 tem de produzir:** latência real p95. O ADR-004 já está decidido (a nuvem
 decide); esta medição **pode reabri-lo** se o p95 passar de 300 ms.

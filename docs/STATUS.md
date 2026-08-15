@@ -54,6 +54,21 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 > transporte não é refém do Windows. A dúvida sobrevive só para o SDK de captura biométrica, se
 > ele existir como DLL.
 
+> 📍 **Levantamento de campo em 15/08/2026** — `docs/field-notes/2026-08-15-hardware-arena-positiva.md`.
+> Rede + **painel físico da catraca**. Inventário ao vivo: Inner serial `247000797` FW `7.05.00` no
+> `.187` (DHCP), facial serial `AYTI11108174` no `.188`. **A catraca aponta para o servidor SDK
+> `192.168.2.106:3570`** — e o `.106` **é o edge-agent legado, ao vivo**: PC Windows rodando
+> `websocket-sharp` na 7792 (o `/pub/chat` do facial) + MySQL 5.6.25. 🔴 **A rede NÃO é isolada** —
+> catraca, facial e legado no mesmo `/24` de produção, com o legado operando; rodar `lab:run` aqui
+> disputa a catraca com o sistema em uso (gate §4). Os dois equipamentos têm **webserver de admin
+> (porta 80) com senha de fábrica trocada** — bloqueia config (18 dígitos, `use_logphoto`).
+>
+> **Leitura de gate (recomendação, não decisão):** `GO_WITH_CONSTRAINTS`. Código de F1–F4 verde em
+> simulador; F4 com evidência real. POC **física** (F2/F3 aceite, F5 decisão) pendente de janela no
+> local com **consentimento + rede isolada/legado desligado + ponte Windows + parada de emergência**
+> — pré-condições do PI, detalhadas na §8 do field-note. O gate §15 só fecha com a POC rodada e a
+> assinatura do PI; **nada aqui declara o MVP 0 concluído.**
+
 ✅ **Os manuais chegaram em 14/08/2026 e destravaram F2 e F3.** Três documentos: os dois do leitor
 facial e o *Manual de Integração SDK Inner Acesso*. Resumos verificáveis em
 `docs/vendor/topdata/`. Os adapters saíram no mesmo dia — **85 testes**.

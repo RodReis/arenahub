@@ -1,0 +1,5 @@
+# Artefatos de build e a DLL proprietaria da Topdata nao entram no repo.
+# A EasyInner.dll e binario licenciado (Portal do Integrador Topdata) e nao
+# pode ser redistribuida. O build script a espera no PATH ou copiada aqui.
+bin/
+*.dll
