@@ -1,5 +1,7 @@
 import { Controller, Get, HttpStatus, HttpException } from '@nestjs/common';
 
+import { Public } from '../common/security/public.decorator.js';
+
 import { lerVersaoDaApi } from '../version.js';
 import { VerificadorDeBanco } from './verificador-de-banco.js';
 
@@ -12,6 +14,8 @@ import { VerificadorDeBanco } from './verificador-de-banco.js';
  *   conserta;
  * - `ready` -- da para mandar trafego? Ai sim consulta a dependencia.
  */
+// Sonda de orquestrador nao tem credencial -- e nao deve precisar de uma.
+@Public()
 @Controller()
 export class HealthController {
   constructor(private readonly banco: VerificadorDeBanco) {}

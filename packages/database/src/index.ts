@@ -20,7 +20,7 @@ export { criarPrismaClient, type PrismaClientArenaHub } from './client.js';
  *
  * Quem so precisa de uma conexao usa `criarPrismaClient`.
  */
-export { PrismaClient } from './generated/client.js';
+export { PrismaClient, Prisma } from './generated/client.js';
 export { PrismaPg } from '@prisma/adapter-pg';
 
 /**

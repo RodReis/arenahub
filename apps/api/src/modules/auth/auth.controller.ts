@@ -3,11 +3,10 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { NaoAutenticadoError } from '../../common/http/erro-de-dominio.js';
+import { Public } from '../../common/security/public.decorator.js';
+import { COOKIE_DE_ACESSO, COOKIE_DE_REFRESH, lerCookie } from './cookies.js';
 import { AuthService, type ParDeTokens } from './auth.service.js';
 import { TokenService } from './token.service.js';
-
-export const COOKIE_DE_ACESSO = 'arenahub_access';
-export const COOKIE_DE_REFRESH = 'arenahub_refresh';
 
 const ACESSO_VALIDO_POR_MS = 10 * 60 * 1000;
 const REFRESH_VALIDO_POR_MS = 14 * 24 * 60 * 60 * 1000;
@@ -34,6 +33,7 @@ export class AuthController {
     private readonly tokens: TokenService,
   ) {}
 
+  @Public()
   @Post('login')
   @HttpCode(200)
   async login(@Body() corpo: unknown, @Res({ passthrough: true }) resposta: Response) {
@@ -48,10 +48,11 @@ export class AuthController {
     return {};
   }
 
+  @Public()
   @Post('refresh')
   @HttpCode(200)
   async refresh(@Req() requisicao: Request, @Res({ passthrough: true }) resposta: Response) {
-    const token = this.lerCookie(requisicao, COOKIE_DE_REFRESH);
+    const token = lerCookie(requisicao.headers.cookie, COOKIE_DE_REFRESH);
 
     if (!token) throw new NaoAutenticadoError();
 
@@ -60,10 +61,11 @@ export class AuthController {
     return {};
   }
 
+  @Public()
   @Post('logout')
   @HttpCode(204)
   async logout(@Req() requisicao: Request, @Res({ passthrough: true }) resposta: Response) {
-    await this.auth.logout(this.lerCookie(requisicao, COOKIE_DE_REFRESH));
+    await this.auth.logout(lerCookie(requisicao.headers.cookie, COOKIE_DE_REFRESH));
 
     resposta.clearCookie(COOKIE_DE_ACESSO, this.opcoesDeCookie());
     resposta.clearCookie(COOKIE_DE_REFRESH, this.opcoesDeCookie());
@@ -71,7 +73,7 @@ export class AuthController {
 
   @Get('me')
   async me(@Req() requisicao: Request) {
-    const token = this.lerCookie(requisicao, COOKIE_DE_ACESSO);
+    const token = lerCookie(requisicao.headers.cookie, COOKIE_DE_ACESSO);
 
     if (!token) throw new NaoAutenticadoError();
 
@@ -111,19 +113,4 @@ export class AuthController {
     };
   }
 
-  private lerCookie(requisicao: Request, nome: string): string | undefined {
-    // Sem `cookie-parser`: uma dependencia a menos para uma leitura de
-    // cabecalho. Se aparecer um segundo lugar precisando disso, extrai.
-    const cabecalho = requisicao.headers.cookie;
-
-    if (!cabecalho) return undefined;
-
-    for (const parte of cabecalho.split(';')) {
-      const [chave, ...resto] = parte.trim().split('=');
-
-      if (chave === nome) return resto.join('=');
-    }
-
-    return undefined;
-  }
 }
