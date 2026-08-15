@@ -98,7 +98,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | 3 | **janela combinada + parada de emergência** | **F3** |
 | 4 | leitor em **18 dígitos** no menu — senão todo cadastro falha | F2 |
 | 5 | 🔴 **cutover: apontar a catraca para o `edge-agent`** — hoje ela disca para o legado `192.168.2.106` e nunca conecta na ponte. Descoberto no teste de giro de 15/08; é ação operacional sobre equipamento em uso, **decisão do PI** | **F3** |
-| 6 | 🔴 **ligar os adapters ao `main.ts`** — eles existem e são testados, mas ninguém os instancia; o `lab:run` do gate **não existe**. Sem isso a janela mede giro e latência da ponte, **não** o ciclo facial nem a latência ponta a ponta. É **fatia nova**, decisão do PI | **F2**, e a parte ponta a ponta de **F3** |
+| 6 | 🔴 **ligar os adapters ao `main.ts`** — eles existem e são testados, mas ninguém os instancia; o `lab:run` do gate **não existe**. Sem isso a janela mede giro e latência da ponte, **não** o ciclo facial nem a latência ponta a ponta. **Fatia nova: o PI decidiu em 15/08 que o Cowork escreve a spec** — insumo técnico pronto em [`docs/notes/composicao-do-edge-agent.md`](notes/composicao-do-edge-agent.md) | **F2**, e a parte ponta a ponta de **F3** |
 
 > 📋 **Roteiro da janela pronto:** [`docs/runbooks/POC-MVP-00-roteiro-de-execucao.md`](runbooks/POC-MVP-00-roteiro-de-execucao.md)
 > — pré-condições, sequência de cutover, coleta de evidência e encerramento. A §0 explica, antes
