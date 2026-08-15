@@ -8,6 +8,7 @@ import { PermissionsGuard } from './common/security/permissions.guard.js';
 import { HealthController } from './health/health.controller.js';
 import { VerificadorDeBanco } from './health/verificador-de-banco.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { IamModule } from './modules/iam/iam.module.js';
 import { TenancyModule } from './modules/tenancy/tenancy.module.js';
 import { PersistenceModule } from './persistence/persistence.module.js';
 
@@ -17,7 +18,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
  * outro modulo (`CLAUDE.md`, regra de arquitetura 9).
  */
 @Module({
-  imports: [PersistenceModule, AuthModule, TenancyModule],
+  imports: [PersistenceModule, AuthModule, IamModule, TenancyModule],
   controllers: [HealthController],
   providers: [
     VerificadorDeBanco,

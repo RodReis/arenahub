@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 
 import { z } from 'zod';
 
@@ -15,6 +15,8 @@ const esquema = z.object({
   JWT_AUDIENCE: z.string().default('arenahub-admin'),
   JWT_PRIVATE_KEY: z.string().optional(),
   JWT_PUBLIC_KEY: z.string().optional(),
+  /** 32 bytes em base64, para AES-256-GCM do segredo TOTP. */
+  MFA_ENCRYPTION_KEY: z.string().optional(),
 });
 
 export interface ConfigDaApi {
@@ -25,6 +27,8 @@ export interface ConfigDaApi {
     emissor: string;
     audiencia: string;
   };
+  /** Chave AES-256 para o segredo TOTP. */
+  mfa: { chave: Buffer };
 }
 
 export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaApi {
@@ -40,7 +44,30 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaAp
       emissor: bruto.JWT_ISSUER,
       audiencia: bruto.JWT_AUDIENCE,
     },
+    mfa: { chave: resolverChaveDeMfa(bruto) },
   };
+}
+
+/**
+ * Mesma regra da chave JWT: obrigatoria em producao, efemera fora dela.
+ *
+ * Chave efemera invalida os segredos TOTP ja gravados a cada reinicio -- o
+ * que e correto em desenvolvimento e inaceitavel em producao, onde perder a
+ * chave significa trancar todo mundo fora da propria conta.
+ */
+function resolverChaveDeMfa(bruto: z.infer<typeof esquema>): Buffer {
+  if (bruto.MFA_ENCRYPTION_KEY) {
+    return Buffer.from(bruto.MFA_ENCRYPTION_KEY, 'base64');
+  }
+
+  if (bruto.NODE_ENV === 'production') {
+    throw new Error(
+      'MFA_ENCRYPTION_KEY e obrigatoria em producao: 32 bytes em base64. ' +
+        'Perder esta chave inutiliza todo segredo TOTP ja cadastrado.',
+    );
+  }
+
+  return randomBytes(32);
 }
 
 /**
