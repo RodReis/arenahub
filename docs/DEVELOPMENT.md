@@ -382,6 +382,32 @@ legado ativo do outro lado, e por isso é **decisão do PI**, não do Code.
 rede/legado, janela com parada de emergência **e o cutover**. Ele não estava na lista de 14/08
 porque ninguém sabia para onde a catraca apontava.
 
+> 📋 **O roteiro de execução da janela está em**
+> [`docs/runbooks/POC-MVP-00-roteiro-de-execucao.md`](runbooks/POC-MVP-00-roteiro-de-execucao.md)
+> — sequência de cutover, coleta de `M0-AC-003`/`004`/`005` e encerramento.
+
+#### 🔴 `lab:run` não existe, e o `main.ts` não liga nos equipamentos
+
+O gate do PRD e o field-note §8 mandam rodar `pnpm --filter edge-agent lab:run`. **Esse script não
+existe** — o `package.json` do `edge-agent` tem `dev`, `start`, `build`, `lint`, `typecheck`,
+`test`, `diagnostico` e `bridge:build`, mais nada.
+
+E a causa é mais funda que um script faltando: **o `main.ts` sobe, valida config e emite
+heartbeat — só.** Os adapters (`TopdataFacialAdapter`, `TopdataInnerAdapter`, ponte) existem,
+estão testados e corretos, mas **ninguém os instancia**. `grep` por `TopdataFacialAdapter` fora da
+própria pasta e dos testes retorna zero usos. O próprio arquivo avisa: *"Adapter de dispositivo,
+fila e reconciliação são das fatias seguintes"*.
+
+| o que a POC mede hoje | como |
+|---|---|
+| ✅ giro, dupla liberação, latência **da ponte** | `driver-teste.mjs` fala direto com o `EasyInnerBridge.exe` |
+| ❌ ciclo facial (`M0-AC-001`/`002`) | ninguém sobe o servidor WebSocket na 7792 |
+| ❌ latência **ponta a ponta** (`M0-NFR-001`) | exige os dois lados ligados no orquestrador |
+
+**Isto não é dívida solta — é escopo que ninguém alocou.** Ligar os adapters ao `main.ts` é fatia
+nova, decisão do PI: tem escopo de produto (o que o agente faz ao subir), e reclassificar como
+correção para pular a spec é o que o `CLAUDE.md` proíbe. Detalhe na §6 do roteiro.
+
 #### 🔴 O ADR-010 fechou — e a resposta é diferente para cada dispositivo
 
 O *Manual de Integração SDK Inner Acesso* (Rev. 00) chegou em 14/08/2026. Resumo em
