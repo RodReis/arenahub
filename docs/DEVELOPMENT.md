@@ -229,7 +229,7 @@ Duas consequências do Prisma 7 que aparecem no código e valem saber antes de m
 |---|---|---|---|
 | ✅ F1 | 0.1 Bancada reproduzível | qualquer pessoa reproduz o ambiente e o simulador roda em CI **sem hardware** (`M0-NFR-006`) | — *(entregue; o gate não a bloqueava)* |
 | ✅ F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | — *(adapter real entregue; falta só o aceite na bancada)* |
-| 🟡 F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | **parcial** — decisão, anti-repique, idempotência e medição entregues; **o `TopdataInnerAdapter` aguarda SDK e janela combinada** |
+| 🟡 F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | **adapter entregue**; falta a **ponte Windows** e a janela combinada |
 | F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | hardware |
 | F5 | 0.5 Relatório e decisão | decisão de saída do MVP 0 (`MVP-00` §15) com evidência: `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO` | F1–F4 |
 
@@ -330,21 +330,54 @@ convenção, por topologia do código.
 > real significa **girar a catraca de verdade**, numa unidade em uso. O item 7 do gate
 > (procedimento de parada de emergência) existe exatamente para esse momento.
 
-#### 🔴 A F3 não destravou com os manuais — e o motivo importa
+#### 🔴 O ADR-010 fechou — e a resposta é diferente para cada dispositivo
 
-Os dois manuais entregues cobrem o **leitor facial**: cadastro de usuário e eventos. **Nenhum
-deles documenta o comando de giro.** Girar a catraca é o **SDK EasyInner**, que é outro documento
-— e o preview público não traz assinatura de função.
+O *Manual de Integração SDK Inner Acesso* (Rev. 00) chegou em 14/08/2026. Resumo em
+[`docs/vendor/topdata/PROTOCOLO-CATRACA.md`](vendor/topdata/PROTOCOLO-CATRACA.md).
 
-Detalhe em [`docs/vendor/topdata/EASYINNER-PENDENTE.md`](vendor/topdata/EASYINNER-PENDENTE.md),
-com o que falta e onde procurar. O caminho mais curto é a **pasta de instalação do SDK na máquina
-da bancada** — ela costuma trazer os arquivos de declaração, que dão a assinatura exata.
+| dispositivo | transporte | roda em Node? |
+|---|---|---|
+| **leitor facial** | WebSocket + JSON, porta 7792 | **sim** |
+| **catraca** | `EasyInner.dll` — binário proprietário, porta 3570 | **não** |
 
-> ⚠️ **O EasyInner pode reabrir o ADR-010 pela porta dos fundos.** O caminho do leitor facial é
-> WebSocket e não depende de Windows. Mas o preview do EasyInner fala em *"cinco arquivos"* e
-> *"serial e TCP/IP"* — se for **DLL nativa sem interface de rede**, a catraca volta a exigir
-> processo Windows, e o plano de apoio já previa isso: *"serviço nativo p/ SDK Topdata"* com
-> bridge por stdin/stdout.
+Três restrições da DLL, todas citadas no manual:
+
+- *"biblioteca de vínculo dinâmico (DLL) para o ambiente **Windows**"*;
+- *"ela é uma biblioteca de **32 bits (x86)**"* — mesmo em SO de 64;
+- exige **.NET Framework 3.5+**.
+
+E o protocolo binário **não é público**: o manual §6.7 diz que a integração direta por TCP/IP
+existe *"conforme documentação de baixo nível e **solicitação de NDA**"*.
+
+> **Conclusão:** a catraca exige um **processo Windows x86 com .NET** falando com a DLL. O plano
+> de apoio já previa — *"serviço nativo p/ SDK Topdata"*. O `edge-agent` conversa com esse
+> processo por uma **ponte**, cujo contrato está em
+> `apps/edge-agent/src/adapters/topdata/easyinner-ponte.ts`.
+>
+> **A forma da ponte é decisão do PI** (serviço .NET com stdio? socket local? fila?) — o manual
+> fecha o *se*, não o *como*.
+
+#### Duas características da DLL que mandam na arquitetura
+
+> *"a EasyInner.dll é uma biblioteca **bloqueante** e **não thread-safe**"* · *"A arquitetura
+> recomendada é criar uma **única thread dedicada**"*
+
+Isso não muda o `edge-agent` — muda a **ponte**, que precisa serializar tudo numa thread só. Está
+registrado no contrato para quem for implementá-la.
+
+#### O que o manual mudou no desenho da F3
+
+| descoberta | efeito |
+|---|---|
+| **giro vem por polling**, não callback — `Origem 6` girou, `Origem 5` tempo esgotou | o adapter faz polling de `ReceberDadosOnLine` após liberar |
+| **o equipamento não tem idempotência** — `LiberarCatracaEntrada(int Inner)`, sem id | a garantia do `M0-AC-003` é **inteiramente nossa** |
+| **quem controla o prazo é a catraca** (`ConfigurarAcionamento`, 0–50 s) | o nosso `timeoutMs` é teto do **nosso** polling, e precisa ser maior |
+| **sem `PingOnline` a catraca cai para offline** | o adapter pinga enquanto espera o giro |
+| **há funções invertidas por sentido** | vira configuração — *"depende da orientação física"*, se descobre testando |
+
+> ⚠️ **`ConfigurarAcionamento1/2` não gira a catraca.** O manual: *"Estes comandos **não devem** ser
+> utilizados em catracas se a intenção for acionar o mecanismo de giro"*. Para girar, é
+> `LiberarCatraca...()`.
 
 **O que roda aqui não é o Access Decision Engine.** É o mínimo local para a POC medir latência e
 passagem. O motor real vive na nuvem (ADR-004, regra de arquitetura nº 1: a catraca nunca consulta
@@ -453,3 +486,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | **F2** *(parcial)* | SPEC-002 | [#56](https://github.com/RodReis/arenahub/pull/56) | ciclo de vida facial sem hardware: porta, simulador contratual, mapeamento em SQLite, `externalEnrollId` sem CPF. **Adapter Topdata aguarda o SDK** |
 | 14/08/2026 | **F3** *(parcial)* | SPEC-003 | [#57](https://github.com/RodReis/arenahub/pull/57) | decisão local, anti-repique, idempotência de comando e medição de latência. **`DENY` não aciona a catraca — estrutural.** Adapter aguarda SDK e janela |
 | 14/08/2026 | **F2** *(fecha)* | SPEC-002 | [#58](https://github.com/RodReis/arenahub/pull/58) | adapter real do leitor facial: servidor WebSocket, protocolo dos manuais, foto desligada no handshake. `externalEnrollId` corrigido para o formato do equipamento |
+| 14/08/2026 | **F3** *(adapter)* | SPEC-003 | [#59](https://github.com/RodReis/arenahub/pull/59) | adapter da catraca sobre ponte EasyInner. **ADR-010 fechado:** catraca exige processo Windows x86; leitor facial não. Contrato da ponte definido |
