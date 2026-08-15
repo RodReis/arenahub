@@ -2,9 +2,11 @@
 
 > **Isto não é spec nem issue.** É material técnico do Code para o Cowork consumir ao escrever a
 > spec da fatia (ADR-023). O escopo de produto continua sendo do PI; o que este documento traz é
-> **o que já existe pronto**, **o que falta compor** e **as perguntas que a spec precisa fechar**.
+> **o que já existe pronto**, **o que falta compor** e **as decisões do PI já registradas** (§5).
 >
 > **Data:** 15/08/2026 · **Autor:** Claude Code, a pedido do PI
+> **Atualizado em 15/08/2026:** as cinco perguntas da §5 foram respondidas pelo PI e viraram
+> decisões. A §5.5 exigiu desambiguação — ver o fato de repositório registrado lá.
 > **Origem:** achado do PR [#64](https://github.com/RodReis/arenahub/pull/64) — o `main.ts` não
 > liga nos equipamentos e o `lab:run` do gate não existe.
 
@@ -95,7 +97,7 @@ Registradas aqui como insumo; a spec as formaliza.
 
 | # | decisão | consequência técnica |
 |---|---|---|
-| 1 | **Falha alto**: dispositivo que não responde impede o agente de subir | sem `try/catch` que engula; o processo sai com código ≠ 0 e mensagem clara. ⚠️ ver §6 |
+| 1 | **Falha alto**: dispositivo que não responde impede o agente de subir | sem `try/catch` que engula; o processo sai com código ≠ 0 e mensagem clara. ⚠️ **refinada na §5.1** — falha alto só depois de N tentativas |
 | 2 | **Um flag por dispositivo** — `FACIAL_MODE` e `CATRACA_MODE`, cada um `real \| simulador` | substitui o `USE_SIMULATOR` booleano; permite ensaiar o facial real com catraca simulada, sem girar nada |
 | 3 | **Grava arquivo de evidência** por execução | tentativas, decisões, latências e percentis; alimenta o relatório F5 sem transcrição à mão |
 
@@ -114,47 +116,77 @@ operacional entram; nome, CPF e foto, não.
 
 ---
 
-## 5. Perguntas abertas — a spec precisa fechá-las
+## 5. Decisões do PI — respondidas em 15/08/2026
 
-### 5.1. 🔴 O arranque automático contradiz o "falha alto"?
+As cinco perguntas desta seção foram levadas ao PI e **estão fechadas**. Ficam registradas com o
+raciocínio original preservado, porque a spec precisa do *porquê*, não só do *quê*.
 
-**A mais importante.** O ADR-011 põe o `edge-agent` no **PC compartilhado da recepção**, com
-**início automático** como serviço. O cenário:
+> **Isto não substitui a spec.** São insumos decididos; a spec do Cowork os transcreve como
+> requisito, com número e rastreabilidade.
+
+### 5.1. ✅ Arranque: retry limitado, depois falha alto
+
+**Era a mais importante.** O ADR-011 põe o `edge-agent` no **PC compartilhado da recepção**, com
+**início automático** como serviço. O cenário que motivou a pergunta:
 
 > O PC reinicia. O Windows sobe o serviço. A catraca ainda está bootando. O agente falha alto e
 > morre. **Ninguém religa** — não há operador olhando, e o alerta de heartbeat (F11) ainda não
 > existe.
 
 "Falha alto" é a decisão certa para invocação manual — quem rodou está olhando a saída. No arranque
-automático, ela transforma uma condição transitória (catraca lenta no boot) em parada permanente.
+automático, ela transformava uma condição transitória (catraca lenta no boot) em parada permanente.
 
-**Sugestão do Code, não decisão:** falha alto **depois** de um número limitado de tentativas de
-conexão, com intervalo. Isso preserva a regra — o agente não opera meio-morto — sem confundir
-*"ainda não subiu"* com *"não vai subir"*. Quantas tentativas e em que intervalo é do PI.
+**Decisão:** o agente tenta conectar **N vezes com intervalo**; esgotado o limite, **falha alto** —
+sai com código ≠ 0, sem `try/catch` que engula. Preserva a regra (nada de operar meio-morto) e
+deixa de confundir *"ainda não subiu"* com *"não vai subir"*.
 
-### 5.2. Qual o comportamento quando o dispositivo cai **depois** de subir?
+**Valor de partida:** 5 tentativas × 3 s (~15 s de janela). Veio da opção aceita, não de medição —
+a spec deve expor os dois números em configuração e a POC física confirma se a janela cobre o boot
+real da catraca.
 
-A decisão nº 1 cobre o **arranque**. Queda em operação é outro caso, e o ADR-011 já obriga alerta
-de heartbeat em F11. Encerrar o processo? Marcar indisponível e seguir? A spec decide.
+### 5.2. ✅ Queda pós-arranque: a mesma política
 
-### 5.3. Onde vive o arquivo de evidência, e qual formato?
+Sem regra separada. Dispositivo que cai **depois** de o agente já ter subido entra no mesmo
+retry limitado; esgotado, o processo encerra com código ≠ 0. Uma regra só, menos superfície de bug
+— e o supervisor de serviço do ADR-011 é quem religa. O alerta de heartbeat continua nascendo em
+F11, sem antecipação para esta fatia.
 
-JSON estruturado (consumível por script) ou Markdown (legível na hora)? Caminho fixo ou por
-configuração? Um por execução ou acumulado?
+### 5.3. ✅ Evidência: JSON, um arquivo por execução
 
-> A guarda de evidência (`scripts/test-report.mjs`) já estabelece um precedente no repositório:
-> arquivo gerado, nunca editado à mão, conferido pelo CI. Vale considerar o mesmo princípio.
+Estruturado e consumível por script, para alimentar o relatório de F5 **sem transcrição à mão**.
 
-### 5.4. O `lab:run` roda o roteiro sozinho ou é interativo?
+Segue o precedente já estabelecido pela guarda de evidência (`scripts/test-report.mjs`): arquivo
+**gerado, nunca editado à mão, conferido pelo CI**. Caminho e nomeação ficam para a spec; o
+princípio, não.
 
-O roteiro da POC exige **observação humana** entre passos — *"a catraca destravou?"*, *"girou no
-sentido esperado?"*. Um script que dispara dez liberações seguidas sem pausa não deixa ninguém
-verificar, e `M0-AC-003` mede acionamento **físico** observado, não retorno de função.
+### 5.4. ✅ `lab:run`: os dois modos, por flag
 
-### 5.5. Esta fatia inclui a reconciliação com a nuvem?
+- **Interativo** (padrão) — pausa entre passos esperando confirmação do operador: *"a catraca
+  destravou?"*, *"girou no sentido esperado?"*. É este modo que satisfaz o `M0-AC-003`, que mede
+  acionamento **físico observado**, não retorno de função.
+- **Headless** (`--headless` ou equivalente) — roda ponta a ponta sem humano, com
+  `FACIAL_MODE`/`CATRACA_MODE` simulados. É o que entra no CI.
 
-`FilaDeEventos` e `reconciliar` existem (F4), mas o `COLLECTOR_URL` é opcional e a POC roda em
-modo bancada. Ligar a fila local é claramente escopo; **enviar para a nuvem** talvez não seja.
+Custa um pouco mais de código no runner. Compra as duas garantias sem escolher entre elas.
+
+### 5.5. ✅ Reconciliação: **sim**, contra o `ColetorSimulado` — não contra a nuvem
+
+A pergunta original tinha duas leituras, e o PI escolheu a executável. O que forçou a
+desambiguação foi um fato do repositório, verificado em 15/08/2026:
+
+- **`apps/api` está vazia** — zero arquivos `.ts`, nenhum `@Controller`. Não existe endpoint de
+  ingestão;
+- a única implementação de `Coletor` é o **`ColetorSimulado`**. Não há adapter HTTP.
+
+**Decisão — leitura (a):** o `main.ts` drena a fila periodicamente via `reconciliar`, apontando
+para o `ColetorSimulado`. Isso fecha a cadeia inteira — reconhecer → decidir → girar → enfileirar →
+drenar — e exercita o `M0-AC-006` (sem duplicação lógica) usando peças que **já existem e já são
+testadas**. A fatia continua sendo composição.
+
+**Fora do escopo, explicitamente:** criar `ColetorHttp` e criar o endpoint de ingestão. Enviar de
+verdade para a nuvem exigiria o bootstrap da API dentro de uma fatia de POC física do MVP 0 — duas
+fatias grudadas. A regra de arquitetura nº 3 (a nuvem é a fonte da verdade) não muda isso: a fonte
+da verdade ainda não foi construída.
 
 ---
 
@@ -168,7 +200,10 @@ Registrado para o escopo negativo da spec:
   *"cada função da DLL exposta aqui é uma função que alguém pode chamar por engano num equipamento
   real"*;
 - **não** mexer nos adapters — eles estão corretos; o que falta é composição;
-- **não** adotar BullMQ/Redis — fila entra só com métrica que a justifique (`CLAUDE.md` → Stack).
+- **não** adotar BullMQ/Redis — fila entra só com métrica que a justifique (`CLAUDE.md` → Stack);
+- **não** criar `ColetorHttp` nem endpoint de ingestão na nuvem — decisão §5.5; a reconciliação
+  desta fatia roda contra o `ColetorSimulado`;
+- **não** antecipar o alerta de heartbeat — ele nasce em **F11** (decisão §5.2).
 
 ---
 
@@ -194,9 +229,13 @@ Para a §4 da spec (`docs/CONVENTION.md` §4) e a rastreabilidade do PRD:
 **Composição, não construção.** As peças difíceis — protocolo, idempotência, anti-repique,
 serialização por pessoa, fila durável — já estão feitas e testadas.
 
-**O risco não é técnico, é de escopo:** as perguntas da §5, sobretudo a §5.1, decidem
-comportamento operacional em produção. Respondê-las com "o que for mais simples" é o que produz o
-serviço que morre no boot e ninguém percebe.
+**O risco era de escopo, e foi fechado.** As cinco perguntas da §5 decidiam comportamento
+operacional em produção — respondê-las com "o que for mais simples" é o que produz o serviço que
+morre no boot e ninguém percebe. Foram ao PI e voltaram decididas em 15/08/2026.
+
+Com a §5.5 resolvida na leitura (a), a fatia **permanece composição**. Sobra de construção nova,
+pequena e delimitada: o laço de retry (§5.1), o runner do `lab:run` nos dois modos (§5.4) e o
+escritor de evidência JSON (§5.3).
 
 ---
 
