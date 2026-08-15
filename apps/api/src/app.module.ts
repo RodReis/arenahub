@@ -9,6 +9,8 @@ import { HealthController } from './health/health.controller.js';
 import { VerificadorDeBanco } from './health/verificador-de-banco.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { IamModule } from './modules/iam/iam.module.js';
+import { MembershipModule } from './modules/membership/membership.module.js';
+import { StudentsModule } from './modules/students/students.module.js';
 import { TenancyModule } from './modules/tenancy/tenancy.module.js';
 import { PersistenceModule } from './persistence/persistence.module.js';
 
@@ -18,7 +20,14 @@ import { PersistenceModule } from './persistence/persistence.module.js';
  * outro modulo (`CLAUDE.md`, regra de arquitetura 9).
  */
 @Module({
-  imports: [PersistenceModule, AuthModule, IamModule, TenancyModule],
+  imports: [
+    PersistenceModule,
+    AuthModule,
+    IamModule,
+    TenancyModule,
+    StudentsModule,
+    MembershipModule,
+  ],
   controllers: [HealthController],
   providers: [
     VerificadorDeBanco,
