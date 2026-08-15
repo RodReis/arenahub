@@ -9,6 +9,7 @@ updated: 2026-08-15
 
 ### Sem épico
 
+- [INFRA] 8 planos mandam criar docs/adr/, contrariando o ADR-021 (#68)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
 - [MVP6][SPEC-040][F40] Modelo supervisionado (condicionado a M6-ML-01) (#40)
 - [MVP6][SPEC-039][F39] Experimento operacional (#39)
@@ -44,7 +45,6 @@ updated: 2026-08-15
 - [MVP1][SPEC-009][F9] Decisão online e passagem (#9)
 - [MVP1][SPEC-008][F8] Consentimento, biometria e sync de dispositivo (#8)
 - [MVP1][SPEC-007][F7] Aluno, plano e entitlement manual (#7)
-- [MVP1][SPEC-006][F6] Core seguro e unidade (#6)
 - [MVP0][SPEC-005][F5] Relatório e decisão (#5)
 
 ## A Fazer
@@ -66,6 +66,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP1][SPEC-006][F6] Core seguro e unidade (#6, finalizado em: 2026-08-15)
 - [MVP0][SPEC-004][F4] Offline e reconciliação (#4, finalizado em: 2026-08-15)
 - [INFRA] Ponte EasyInner nativa (processo .NET x86, stdio) para a catraca (#61, finalizado em: 2026-08-15)
 - [MVP0][SPEC-001][F1] Bancada reproduzível (#1, finalizado em: 2026-08-15)
