@@ -162,11 +162,15 @@ fatia, não dívida solta:
 | passo | vira passo próprio em |
 |---|---|
 | ✅ `test` e `build` | **F1** — `apps/edge-agent` nasceu e passou a declará-las |
-| `test:integration` | a primeira fatia com repositório e Testcontainers — **F6** |
-| `test:e2e` | a primeira fatia com tela navegável ponta a ponta — **F9** ou **F11** |
+| ✅ `test:integration` | **F6** — `apps/api` e `packages/database` nasceram e passaram a declará-la |
+| ✅ `test:e2e` | **F6** — o Playwright nasceu no `apps/admin-web` (Task 6 da fatia) |
 
 Deixar na lista depois que o workspace existir transforma verde em decoração. **Quem criar o
-workspace promove a task no mesmo PR** — foi o que a F1 fez.
+workspace promove a task no mesmo PR** — foi o que a F1 fez, e o que a F6 repetiu duas vezes.
+
+🏁 **A lista acabou na F6.** Os oito comandos têm workspace, e o passo `pendentes` do `ci.yml`
+foi desmontado. Não há mais task que "falha com mensagem" por desenho — daqui em diante,
+vermelho é vermelho.
 
 > ⚠️ **Não use task real como exemplo em teste de guarda.** O `scripts/guardas.test.mjs` usava
 > `test` como "task que ninguém declara" — e quebrou o CI da F1, uma fatia que não tinha nada a
@@ -487,11 +491,20 @@ Entrada: decisão de saída do MVP 0 (`MVP-00` §15, `MVP-01` §1) = `GO` ou `GO
 
 | F | slice | núcleo | bloqueado por |
 |---|---|---|---|
-| F6 | 1.1 Core seguro e unidade | tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login. **Multiunidade desde o dia 1** (ADR-002): teste de isolamento por `gym_unit_id` junto com o de `tenant_id` | — |
+| ✅ F6 | 1.1 Core seguro e unidade | tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login. **Multiunidade desde o dia 1** (ADR-002): teste de isolamento por `gym_unit_id` junto com o de `tenant_id` | — |
 | F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — |
 | F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | etapa física depende de hardware |
 | F9 | 1.4 Decisão online e passagem | Access Decision Engine **na nuvem** (ADR-004), `AccessEvent`, `Passage`, tela pública | lista canônica de razões de `DENY` (`DESIGN-UI` §17 item 2) |
 | F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo e **alerta obrigatório quando o Edge some** (ADR-011) | F6–F9 |
+
+✅ **F6 entregue em 15/08/2026.** `apps/api` (NestJS) e `apps/admin-web` (Next.js) nasceram, com
+schema core, autenticação com rotação de sessão, `TenantContext` obrigatório em repositório
+(INV-003), MFA por TOTP e a jornada E2E do `M1-AC-001`. **123 testes.** Evidência completa,
+incluindo os limites conhecidos, em
+[`docs/operations/smart-access/core-security-evidence.md`](operations/smart-access/core-security-evidence.md).
+
+Com ela **os oito comandos raiz ficaram verdes** — `test:integration` na Task 1 e `test:e2e` na
+Task 6. A lista de pendentes do CI acabou.
 
 **Ordem não negociável:** F6 → F7 → F8 → F9. O motor de acesso (F9) **não pode** vir antes de
 aluno, plano e entitlement — a Especificação §127 sugere o contrário e está errada; F9 sem F7

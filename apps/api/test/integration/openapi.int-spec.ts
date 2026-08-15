@@ -1,0 +1,86 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import type { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+
+import { AppModule } from '../../src/app.module.js';
+import { montarOpenApi } from '../../src/openapi.js';
+
+const CAMINHO_DO_SNAPSHOT = join(
+  process.cwd(),
+  '../../packages/api-contracts/openapi/arenahub-v1.json',
+);
+
+/**
+ * O contrato publicado tem de bater com as rotas que existem de verdade.
+ *
+ * Sem este teste, o snapshot vira documentacao que envelhece: alguem muda
+ * uma rota, esquece de regerar, e quem consome a API descobre a divergencia
+ * em producao.
+ */
+describe('contrato OpenAPI', () => {
+  let app: INestApplication;
+  let documento: ReturnType<typeof montarOpenApi>;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    documento = montarOpenApi(app);
+
+    // `ATUALIZAR_OPENAPI=1 pnpm --filter @arenahub/api test:integration`
+    // regenera o snapshot. Fica aqui, e nao num script `tsx`, porque o
+    // esbuild do `tsx` nao emite `design:paramtypes` e a injecao do Nest
+    // falha em runtime -- o ts-jest emite corretamente.
+    if (process.env['ATUALIZAR_OPENAPI']) {
+      mkdirSync(dirname(CAMINHO_DO_SNAPSHOT), { recursive: true });
+      writeFileSync(CAMINHO_DO_SNAPSHOT, `${JSON.stringify(documento, null, 2)}\n`, 'utf8');
+    }
+  });
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  it('bate com o snapshot versionado', () => {
+    const snapshot: unknown = JSON.parse(readFileSync(CAMINHO_DO_SNAPSHOT, 'utf8'));
+
+    // `paths` e o que interessa: e o contrato com quem consome. Versao muda
+    // a cada release e nao deveria quebrar o teste.
+    expect((documento as { paths: unknown }).paths).toEqual(
+      (snapshot as { paths: unknown }).paths,
+    );
+  });
+
+  it('publica as rotas que a fatia entrega', () => {
+    const caminhos = Object.keys(documento.paths);
+
+    expect(caminhos).toEqual(
+      expect.arrayContaining([
+        '/health/live',
+        '/health/ready',
+        '/version',
+        '/api/v1/auth/login',
+        '/api/v1/auth/refresh',
+        '/api/v1/auth/logout',
+        '/api/v1/auth/me',
+        '/api/v1/units',
+        '/api/v1/units/{id}',
+      ]),
+    );
+  });
+
+  it('nao expoe rota fora de /api/v1, health e version', () => {
+    // Rota que escapou do prefixo e superficie que ninguem revisou.
+    const forasteiras = Object.keys(documento.paths).filter(
+      (caminho) =>
+        !caminho.startsWith('/api/v1/') && !caminho.startsWith('/health') && caminho !== '/version',
+    );
+
+    expect(forasteiras).toEqual([]);
+  });
+});
