@@ -102,33 +102,44 @@ jobs:
       - name: build
         run: pnpm build
 
-      # --- 5 e 7 de 8 -----------------------------------------------------
-      # Ainda sem workspace que as declare, e falhar é o comportamento
+      # --- 5 de 8 ---------------------------------------------------------
+      # Promovido na F6, quando `apps/api` e `packages/database` nasceram e
+      # passaram a declarar a task -- exatamente o que o passo de pendentes
+      # abaixo mandava fazer.
+      #
+      # A migration roda antes: o schema do banco de serviço está vazio, e
+      # `prisma migrate deploy` (não `dev`) é o comando de ambiente não
+      # interativo -- ele aplica o que está versionado e falha se faltar
+      # migration, em vez de gerar uma nova em cima da hora.
+      - name: aplicar migrations
+        run: pnpm --filter @arenahub/database exec prisma migrate deploy
+
+      - name: 'test:integration'
+        run: pnpm test:integration
+
+      # --- 7 de 8 ---------------------------------------------------------
+      # Ainda sem workspace que a declare, e falhar é o comportamento
       # correto: o guarda de scripts/run-task.mjs faz o comando falhar em vez
       # de sair 0 mentindo.
       #
       # NÃO use `continue-on-error` aqui. Ele marca o passo como `success` no
       # resumo do job -- o verde decorativo que o card #47 proíbe.
       #
-      # Este passo FALHA SE ALGUMA DELAS PASSAR: isso significaria que um
-      # workspace passou a declará-la e a lista ficou desatualizada. Quem
-      # criar o workspace promove a task a passo próprio no mesmo PR.
+      # Este passo FALHA SE ELA PASSAR: isso significaria que um workspace
+      # passou a declará-la e a lista ficou desatualizada. Quem criar o
+      # workspace promove a task a passo próprio no mesmo PR.
       #
-      #   test:integration -> F6      test:e2e -> F9 ou F11
-      - name: 'pendentes: test:integration, test:e2e'
+      #   test:e2e -> F6 (Task 6, Playwright no admin-web)
+      - name: 'pendente: test:e2e'
         run: |
-          pendentes=()
-          for task in test:integration test:e2e; do
-            if pnpm "$task" > "/tmp/$task.log" 2>&1; then
-              echo "::error::pnpm $task passou, mas nenhum workspace deveria declará-la ainda."
-              echo "Se um workspace passou a declarar a task, tire-a desta lista e"
-              echo "promova-a a passo próprio do CI."
-              exit 1
-            fi
-            pendentes+=("$task")
-            echo "- \`pnpm $task\` falha: nenhum workspace declara a task" >> "$GITHUB_STEP_SUMMARY"
-          done
-          echo "::notice::${#pendentes[@]} de 8 passos ainda não têm workspace: ${pendentes[*]}"
+          if pnpm test:e2e > /tmp/test-e2e.log 2>&1; then
+            echo "::error::pnpm test:e2e passou, mas nenhum workspace deveria declará-la ainda."
+            echo "Se um workspace passou a declarar a task, tire-a desta lista e"
+            echo "promova-a a passo próprio do CI."
+            exit 1
+          fi
+          echo "- \`pnpm test:e2e\` falha: nenhum workspace declara a task" >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::1 de 8 passos ainda não tem workspace: test:e2e"
 
       # --- 8 de 8 ---------------------------------------------------------
       # A guarda de evidência. Falha se reports/TESTS.md divergir do que a

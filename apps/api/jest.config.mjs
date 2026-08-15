@@ -37,7 +37,10 @@ export default {
       ...base,
       displayName: 'integration',
       roots: ['<rootDir>/test/integration'],
-      testMatch: ['**/*.integration.spec.ts'],
+      // Sufixo `.int-spec.ts` e a convencao do repositorio
+      // (`docs/TESTING.md` secao 1) -- e o que o `pnpm test:report`
+      // classifica.
+      testMatch: ['**/*.int-spec.ts'],
     },
   ],
 };
