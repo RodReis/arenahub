@@ -18,10 +18,10 @@ Classificação por **sufixo de arquivo**, não por pasta (`docs/TESTING.md` §2
 |---|---|---|
 | unitário | `.spec.ts` | 18 |
 | contrato | `.contract-spec.ts` | 0 |
-| integração | `.int-spec.ts` | 5 |
+| integração | `.int-spec.ts` | 7 |
 | e2e | `.e2e-spec.ts` | 1 |
 | hardware | `.hw-spec.ts` | 0 |
-| **total** | | **24** |
+| **total** | | **26** |
 
 ## Por SPEC / fatia
 
