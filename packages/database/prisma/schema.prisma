@@ -1,11 +1,6 @@
 // Schema do ArenaHub.
 //
-// PROPOSITALMENTE SEM MODELO. Modelar entidade aqui seria assumir escopo de
-// produto que pertence as fatias: `Tenant` e `GymUnit` nascem em F6 (#6),
-// nao neste card de bootstrap.
-//
-// Quando a primeira entidade chegar, a regra de arquitetura no 2 vale sem
-// excecao (CLAUDE.md):
+// REGRA DE ARQUITETURA No 2, sem excecao (CLAUDE.md):
 //
 //   - `tenant_id` em TODA entidade de negocio;
 //   - `gym_unit_id` quando o dado e fisico;
@@ -23,4 +18,365 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@map("tenant_status")
+}
+
+enum GymUnitStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("gym_unit_status")
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  ARCHIVED
+
+  @@map("user_status")
+}
+
+enum MembershipStatus {
+  ACTIVE
+  REVOKED
+
+  @@map("membership_status")
+}
+
+/// Estado do segundo fator por usuario. `PENDING` existe porque um perfil
+/// privilegiado pode ter iniciado a inscricao sem te-la confirmado -- e
+/// nesse intervalo ele nao pode receber acesso completo.
+enum MfaStatus {
+  DISABLED
+  PENDING
+  ENABLED
+
+  @@map("mfa_status")
+}
+
+enum SessionStatus {
+  ACTIVE
+  ROTATED
+  REVOKED
+
+  @@map("session_status")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+
+  @@map("invitation_status")
+}
+
+enum ActorType {
+  USER
+  SYSTEM
+  SUPPORT
+
+  @@map("actor_type")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy
+// ---------------------------------------------------------------------------
+
+/// Academia. Nivel de cima da hierarquia decidida no ADR-002.
+model Tenant {
+  id          String       @id @default(uuid()) @db.Uuid
+  /// Global: e o identificador publico do tenant, usado em URL e convite.
+  slug        String       @unique
+  legalName   String       @map("legal_name")
+  displayName String       @map("display_name")
+  status      TenantStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  gymUnits     GymUnit[]
+  memberships  TenantMembership[]
+  roles        Role[]
+  userRoles    UserRole[]
+  sessions     Session[]
+  invitations  Invitation[]
+  auditLogs    AuditLog[]
+  outboxEvents OutboxEvent[]
+
+  @@map("tenants")
+}
+
+/// Unidade fisica. Onde a catraca mora.
+model GymUnit {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  /// Unico dentro do tenant, reutilizavel entre tenants: duas academias sem
+  /// relacao podem ter uma unidade "CENTRO" cada.
+  code     String
+  name     String
+  /// IANA (`America/Sao_Paulo`). O ADR-019 exige timezone da unidade, sem
+  /// fallback -- horario de funcionamento e bloqueio dependem dele.
+  timezone String
+  /// Horario semanal de funcionamento. JSON porque a forma ainda varia por
+  /// academia; vira tabela quando alguem precisar consultar por faixa.
+  openingHours Json          @map("opening_hours")
+  status       GymUnitStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles UserRole[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("gym_units")
+}
+
+// ---------------------------------------------------------------------------
+// Identidade e permissao
+// ---------------------------------------------------------------------------
+
+/// Usuario interno (proprietario, gerente, recepcao, tecnico, suporte).
+///
+/// NAO tem `tenantId`: a mesma pessoa pode atender duas academias, e o
+/// vinculo mora em `TenantMembership`. A regra no 2 continua valendo -- o
+/// que ela exige e que toda entidade de NEGOCIO carregue tenant; identidade
+/// e o ponto onde o vinculo se estabelece, nao onde se pressupoe.
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  /// Normalizado em minusculas antes de gravar; unico globalmente.
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  status       UserStatus @default(ACTIVE)
+  mfaStatus    MfaStatus  @default(DISABLED) @map("mfa_status")
+  /// Segredo TOTP cifrado com AES-256-GCM. Os tres campos andam juntos: sem
+  /// IV e tag nao ha como decifrar, e guardar o segredo em claro
+  /// transformaria leitura de tabela em clonagem de segundo fator.
+  mfaSecretCiphertext Bytes?    @map("mfa_secret_ciphertext")
+  mfaSecretIv         Bytes?    @map("mfa_secret_iv")
+  mfaSecretTag        Bytes?    @map("mfa_secret_tag")
+  /// Ultimo contador TOTP aceito. Impede replay do mesmo codigo dentro da
+  /// janela de validade.
+  mfaLastCounter      BigInt?   @map("mfa_last_counter")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  memberships TenantMembership[]
+  userRoles   UserRole[]
+  sessions    Session[]
+  auditLogs   AuditLog[]
+
+  @@map("users")
+}
+
+/// Vinculo entre usuario e academia.
+model TenantMembership {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@map("tenant_memberships")
+}
+
+/// Papel dentro de um tenant. `isSystem` marca os quatro que o produto cria
+/// e nao deixa apagar (OWNER, MANAGER, RECEPTIONIST, TECH_OPERATOR).
+model Role {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  isSystem  Boolean  @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions RolePermission[]
+  userRoles   UserRole[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+/// Permissao do catalogo (`unit.create`, `access.override`, ...). Global e
+/// estavel: o codigo entra em decorator de rota, entao renomear quebra
+/// autorizacao em producao.
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// Atribuicao de papel. `gymUnitId` nulo = vale no tenant inteiro;
+/// preenchido = escopo restrito aquela unidade.
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  gymUnitId String?  @map("gym_unit_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  gymUnit GymUnit? @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, roleId, gymUnitId])
+  @@index([userId])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------------
+// Sessao e convite
+// ---------------------------------------------------------------------------
+
+/// Sessao de refresh token.
+///
+/// GUARDA HASH, NUNCA O TOKEN. `familyId` agrupa a cadeia de rotacoes: se um
+/// token ja rotacionado reaparece, alguem o copiou, e a familia inteira e
+/// revogada.
+model Session {
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  tenantId  String        @map("tenant_id") @db.Uuid
+  tokenHash String        @unique @map("token_hash")
+  familyId  String        @map("family_id") @db.Uuid
+  status    SessionStatus @default(ACTIVE)
+  expiresAt DateTime      @map("expires_at")
+  rotatedAt DateTime?     @map("rotated_at")
+  revokedAt DateTime?     @map("revoked_at")
+  /// Motivo da revogacao (`logout`, `refresh_reused`, `admin`). Sem isso,
+  /// investigar incidente vira adivinhacao.
+  revokedReason String?  @map("revoked_reason")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("sessions")
+}
+
+/// Convite de uso unico. Tambem guarda so o hash: o link e mostrado uma vez
+/// a quem convidou e nunca mais recuperavel.
+model Invitation {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  email     String
+  roleId    String           @map("role_id") @db.Uuid
+  gymUnitId String?          @map("gym_unit_id") @db.Uuid
+  tokenHash String           @unique @map("token_hash")
+  status    InvitationStatus @default(PENDING)
+  expiresAt DateTime         @map("expires_at")
+  acceptedAt DateTime?       @map("accepted_at")
+  revokedAt  DateTime?       @map("revoked_at")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, email])
+  @@map("invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Auditoria e mensageria
+// ---------------------------------------------------------------------------
+
+/// Trilha de auditoria. SEM `updatedAt` DE PROPOSITO: registro de auditoria
+/// que muda nao e trilha, e rascunho. Correcao entra como novo registro.
+model AuditLog {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  gymUnitId  String?   @map("gym_unit_id") @db.Uuid
+  actorType  ActorType @map("actor_type")
+  actorId    String?   @map("actor_id") @db.Uuid
+  action     String
+  target     String
+  targetId   String?   @map("target_id")
+  correlationId String @map("correlation_id")
+  ipAddress     String? @map("ip_address")
+  userAgent     String? @map("user_agent")
+  /// Metadados ja mascarados na aplicacao. E-mail, CPF e afins nao entram
+  /// em claro -- log nao e lugar de PII (CLAUDE.md, Convencoes).
+  metadata   Json?
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, occurredAt])
+  @@index([correlationId])
+  @@map("audit_logs")
+}
+
+/// Transactional outbox (regra de arquitetura no 5): o evento e gravado na
+/// MESMA transacao da mudanca de estado. Publicar antes de commitar produz
+/// evento de algo que nunca aconteceu.
+///
+/// SEM `updatedAt`: o envelope e imutavel; o que muda e o estado de entrega.
+model OutboxEvent {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  eventType     String    @map("event_type")
+  aggregateType String    @map("aggregate_type")
+  aggregateId   String    @map("aggregate_id") @db.Uuid
+  payload       Json
+  publishedAt   DateTime? @map("published_at")
+  attempts      Int       @default(0)
+  lastError     String?   @map("last_error")
+  occurredAt    DateTime  @default(now()) @map("occurred_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([publishedAt, occurredAt])
+  @@map("outbox_events")
+}
+
+/// Recibo de consumo (regra de arquitetura no 4). A chave unica
+/// (consumidor, evento) e o que torna reprocessar seguro -- nao a esperanca
+/// de que o broker entregue uma vez so.
+model InboxReceipt {
+  id          String   @id @default(uuid()) @db.Uuid
+  consumer    String
+  eventId     String   @map("event_id") @db.Uuid
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@unique([consumer, eventId])
+  @@map("inbox_receipts")
 }
