@@ -408,6 +408,20 @@ fila e reconciliação são das fatias seguintes"*.
 nova, decisão do PI: tem escopo de produto (o que o agente faz ao subir), e reclassificar como
 correção para pular a spec é o que o `CLAUDE.md` proíbe. Detalhe na §6 do roteiro.
 
+> ✅ **Encaminhado em 15/08/2026.** O PI decidiu que **o Cowork escreve a spec**, pelo fluxo normal
+> do ADR-023. O insumo técnico está em
+> [`docs/notes/composicao-do-edge-agent.md`](notes/composicao-do-edge-agent.md): o que já existe
+> pronto, o que falta compor, e as cinco perguntas que a spec precisa fechar.
+>
+> **Três decisões o PI já tomou:** falha alto quando um dispositivo não responde; **um flag por
+> dispositivo** (`FACIAL_MODE` / `CATRACA_MODE`) no lugar do `USE_SIMULATOR` único; e o `lab:run`
+> **grava arquivo de evidência**, em vez de depender de transcrição à mão.
+>
+> ⚠️ **Uma pergunta ficou aberta e é a que mais pesa:** o ADR-011 põe o agente no PC compartilhado
+> da recepção com **início automático**. "Falha alto" é correto na invocação manual, mas no
+> arranque automático transforma catraca lenta no boot em serviço morto que ninguém religa — o
+> alerta de heartbeat só nasce em F11. Ver §5.1 do insumo.
+
 #### 🔴 O ADR-010 fechou — e a resposta é diferente para cada dispositivo
 
 O *Manual de Integração SDK Inner Acesso* (Rev. 00) chegou em 14/08/2026. Resumo em
