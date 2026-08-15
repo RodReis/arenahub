@@ -46,7 +46,6 @@ updated: 2026-08-15
 - [MVP1][SPEC-007][F7] Aluno, plano e entitlement manual (#7)
 - [MVP1][SPEC-006][F6] Core seguro e unidade (#6)
 - [MVP0][SPEC-005][F5] Relatório e decisão (#5)
-- [MVP0][SPEC-004][F4] Offline e reconciliação (#4)
 
 ## A Fazer
 
@@ -67,6 +66,8 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP0][SPEC-004][F4] Offline e reconciliação (#4, finalizado em: 2026-08-15)
+- [INFRA] Ponte EasyInner nativa (processo .NET x86, stdio) para a catraca (#61, finalizado em: 2026-08-15)
 - [MVP0][SPEC-001][F1] Bancada reproduzível (#1, finalizado em: 2026-08-15)
 - [INFRA] Monorepo pnpm + Turborepo com o layout do PRD (#42, finalizado em: 2026-08-14)
 - [INFRA] TypeScript estrito, ESLint e Prettier em packages/config (#43, finalizado em: 2026-08-14)
