@@ -25,6 +25,15 @@ export type ResultadoLiberacao = {
   duracaoMs: number;
 };
 
+/**
+ * Sentido do giro.
+ *
+ * O EasyInner tem funcao separada por sentido -- `LiberarCatracaEntrada`,
+ * `LiberarCatracaSaida`, `LiberarCatracaDoisSentidos` -- entao o sentido nao
+ * e detalhe de implementacao, e parte do comando.
+ */
+export type SentidoGiro = 'entrada' | 'saida' | 'ambos';
+
 export interface TurnstileAdapter {
   readonly nome: string;
 
@@ -37,10 +46,20 @@ export interface TurnstileAdapter {
    * inofensivo -- a rede repete, o processo reinicia, o operador clica duas
    * vezes.
    *
+   * ⚠️ O EQUIPAMENTO NAO AJUDA COM ISSO. O manual do SDK Inner Acesso mostra
+   * a assinatura `LiberarCatracaEntrada(int Inner)` -- nada mais. Nao ha id
+   * de comando no protocolo: chamar duas vezes libera duas vezes. A
+   * idempotencia e inteiramente nossa, e e por isso que `comandoId` existe
+   * aqui e a fila serializa por pessoa.
+   *
    * NAO existe metodo `abrir()` sem `comandoId`. Um comando sem chave seria
    * o caminho por onde a dupla liberacao entraria.
    */
-  liberar(comandoId: string, timeoutMs: number): Promise<ResultadoLiberacao>;
+  liberar(
+    comandoId: string,
+    timeoutMs: number,
+    sentido?: SentidoGiro,
+  ): Promise<ResultadoLiberacao>;
 
   encerrar(): Promise<void>;
 }

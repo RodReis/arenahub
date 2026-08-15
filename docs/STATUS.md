@@ -54,27 +54,33 @@ estão sem ADR bloqueando. O que falta é execução em duas frentes que não de
 > transporte não é refém do Windows. A dúvida sobrevive só para o SDK de captura biométrica, se
 > ele existir como DLL.
 
-🟡 **F2 e F3 pararam na mesma metade, pelo mesmo motivo:** a documentação do SDK Topdata está em
-PDF **fora deste repositório**. Escrever chamada sem ela seria inventar assinatura, e o plano de
-apoio proíbe.
+✅ **Os manuais chegaram em 14/08/2026 e destravaram F2 e F3.** Três documentos: os dois do leitor
+facial e o *Manual de Integração SDK Inner Acesso*. Resumos verificáveis em
+`docs/vendor/topdata/`. Os adapters saíram no mesmo dia — **85 testes**.
 
-**O que já está pronto e não depende de hardware** — e não é pouco: porta e simulador dos dois
-dispositivos, mapeamento local, `externalEnrollId` sem CPF, decisão determinística com razão
-estável, prevenção de dupla liberação em duas camadas, e a medição de latência do `M0-NFR-001`.
-**63 testes.** Quando o SDK chegar, o adapter se encaixa numa interface que já tem teste.
+🔴 **O ADR-010 fechou, com resposta diferente para cada dispositivo:**
 
-**Quatro coisas destravam a outra metade, e nenhuma é código:**
+| dispositivo | transporte | roda em Node? |
+|---|---|---|
+| leitor facial | WebSocket + JSON, porta 7792 | **sim** |
+| catraca | `EasyInner.dll` — binário proprietário, porta 3570 | **não** |
+
+A DLL é **Windows, 32 bits, .NET 3.5+**, e o protocolo binário só sai sob **NDA**. A catraca exige
+um **processo Windows** — o *"serviço nativo p/ SDK Topdata"* que o plano de apoio já previa. O
+contrato da ponte está definido; **a forma dela é decisão do PI**.
+
+**O que ainda trava, e nada disso é código:**
 
 | # | o quê | trava |
 |---|---|---|
-| 1 | **os manuais no repositório** — `docs/vendor/topdata/` | F2 e F3 |
-| 2 | **decidir o transporte** — WebSocket, web server HTTP ou DLL via bridge | F2 e F3 |
-| 3 | **consentimento dos participantes** — regra nº 7, sem exceção | F2 |
-| 4 | **janela combinada + parada de emergência** — girar a catraca de verdade | **F3** |
+| 1 | **decidir a forma da ponte Windows** (ADR-010) | F3 |
+| 2 | **consentimento dos participantes** — regra nº 7, sem exceção | F2 |
+| 3 | **janela combinada + parada de emergência** | **F3** |
+| 4 | leitor em **18 dígitos** no menu — senão todo cadastro falha | F2 |
 
-> ⚠️ **A F3 é diferente das outras.** Testar o adapter real significa **acionar fisicamente uma
-> catraca instalada e em uso**. Não é questão de acesso ao equipamento — é de combinar horário e
-> ter o procedimento de parada de emergência definido (item 7 do gate).
+> ⚠️ **A F3 é diferente das outras.** Testar significa **acionar fisicamente uma catraca instalada
+> e em uso**. Não é acesso ao equipamento — é combinar horário e ter o procedimento de parada de
+> emergência definido (item 7 do gate).
 
 ---
 
