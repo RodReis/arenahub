@@ -492,7 +492,7 @@ Entrada: decisão de saída do MVP 0 (`MVP-00` §15, `MVP-01` §1) = `GO` ou `GO
 | F | slice | núcleo | bloqueado por |
 |---|---|---|---|
 | ✅ F6 | 1.1 Core seguro e unidade | tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login. **Multiunidade desde o dia 1** (ADR-002): teste de isolamento por `gym_unit_id` junto com o de `tenant_id` | — |
-| F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — |
+| 🟡 F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — |
 | F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | etapa física depende de hardware |
 | F9 | 1.4 Decisão online e passagem | Access Decision Engine **na nuvem** (ADR-004), `AccessEvent`, `Passage`, tela pública | lista canônica de razões de `DENY` (`DESIGN-UI` §17 item 2) |
 | F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo e **alerta obrigatório quando o Edge some** (ADR-011) | F6–F9 |
@@ -505,6 +505,28 @@ incluindo os limites conhecidos, em
 
 Com ela **os oito comandos raiz ficaram verdes** — `test:integration` na Task 1 e `test:e2e` na
 Task 6. A lista de pendentes do CI acabou.
+
+🟡 **F7 — backend entregue em 15/08/2026; a interface da recepção fica para o PR seguinte.**
+`Student` com matrícula gerada por contador travado (`SELECT ... FOR UPDATE`, provado com 20
+criações concorrentes), ciclo de vida, `Plan` com janelas em tabela normalizada, assinatura
+manual e **`Entitlement` derivado com snapshot imutável de política**. **229 testes** no
+repositório (106 novos), entre eles **6 propriedades** com fast-check — INV-035 (*entitlement
+expirado nunca é efetivo*) passou a ter prova sobre 500 combinações geradas, não sobre os casos
+que eu lembrei de escrever. Evidência, escopo negativo e limites em
+[`docs/operations/smart-access/students-entitlements-evidence.md`](operations/smart-access/students-entitlements-evidence.md).
+
+> ⚠️ **A fatia ainda não está pronta.** A Task 6 do plano — telas de busca, cadastro, plano e
+> cartão de entitlement — **não entrou neste PR**, por decisão do PI em 15/08/2026 (backend
+> primeiro, PR menor e revisável). Enquanto ela não existir, **`M1-AC-002` e `M1-AC-003` não
+> fecham**: o aceite da Slice 1.2 fala em *"a recepção cadastra e visualiza"*, e hoje isso só
+> acontece por `curl`. A issue [#7](https://github.com/RodReis/arenahub/issues/7) permanece
+> aberta.
+
+> 📌 **Pendência entregue ao Cowork:** o `CONVENTION.md` §3.1 declara as transições de `Student`
+> como `[indefinido]` e manda defini-las *"na spec de F7"* — e a SPEC-007 §2 saiu vazia. A
+> tabela foi adotada do plano de apoio com aval do PI e vive em
+> `apps/api/src/modules/students/domain/student.ts`. O `CONVENTION.md` precisa da emenda; o
+> arquivo é do Cowork (ADR-021), então **não o corrigi daqui**.
 
 **Ordem não negociável:** F6 → F7 → F8 → F9. O motor de acesso (F9) **não pode** vir antes de
 aluno, plano e entitlement — a Especificação §127 sugere o contrário e está errada; F9 sem F7
