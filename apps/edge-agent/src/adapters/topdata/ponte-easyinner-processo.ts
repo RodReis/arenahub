@@ -83,8 +83,9 @@ export class PonteEasyInnerProcesso implements PonteEasyInner {
     });
   }
 
-  async encerrar(): Promise<void> {
+  encerrar(): Promise<void> {
     this.processo.stdin?.end();
     this.processo.kill();
+    return Promise.resolve();
   }
 }
