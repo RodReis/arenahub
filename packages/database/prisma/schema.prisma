@@ -89,6 +89,99 @@ enum ActorType {
   @@map("actor_type")
 }
 
+/// Ciclo de vida comercial do aluno (`M1` secao 10).
+///
+/// As TRANSICOES entre estes estados eram `[indefinido]` no CONVENTION.md
+/// secao 3.1, que mandava defini-las na spec de F7 -- e a spec saiu vazia. A
+/// tabela adotada vive em `student.ts` (STUDENT_TRANSITIONS), decidida nesta
+/// fatia a partir do plano de apoio. O CONVENTION.md secao 3.1 precisa da
+/// emenda correspondente.
+enum StudentStatus {
+  LEAD
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  BLOCKED
+  CANCELLED
+  ARCHIVED
+
+  @@map("student_status")
+}
+
+enum StudentContactType {
+  EMAIL
+  PHONE
+  WHATSAPP
+
+  @@map("student_contact_type")
+}
+
+/// `PAST_DUE` existe no enum e NAO e alcancavel no MVP 1.
+///
+/// O CONVENTION.md secao 3.2 e explicito: sem cobranca automatica, nada leva
+/// a assinatura para PAST_DUE. O valor entra agora porque o modelo e o mesmo
+/// que o MVP 2 vai usar -- criar a coluna depois custaria migration de enum
+/// em tabela ja populada. Nenhuma transicao desta fatia o alcanca.
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  PAUSED
+  CANCELLED
+  EXPIRED
+
+  @@map("subscription_status")
+}
+
+enum EntitlementStatus {
+  SCHEDULED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+
+  @@map("entitlement_status")
+}
+
+/// Origem do direito de acesso (INV-064).
+///
+/// Enum EXTENSIVEL por decisao do ADR-009: convenio corporativo esta fora do
+/// roadmap hoje, mas o campo nao fecha a porta. Acrescentar valor aqui e
+/// migration de enum, nao redesenho de tabela.
+enum EntitlementSource {
+  SUBSCRIPTION
+  COURTESY
+  EMPLOYEE
+  PERSONAL_TRAINER
+  VISITOR
+  TRIAL_CLASS
+  DEPENDENT
+  PARTNER
+  CORPORATE
+
+  @@map("entitlement_source")
+}
+
+/// Tipo de evento da timeline administrativa do aluno.
+enum StudentTimelineEventType {
+  STUDENT_CREATED
+  STUDENT_UPDATED
+  STUDENT_STATUS_CHANGED
+  STUDENT_ARCHIVED
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_ACTIVATED
+  SUBSCRIPTION_PAUSED
+  SUBSCRIPTION_RESUMED
+  SUBSCRIPTION_CANCELLED
+  ENTITLEMENT_ACTIVATED
+  ENTITLEMENT_SUSPENDED
+  ENTITLEMENT_REVOKED
+  ENTITLEMENT_EXPIRED
+  COURTESY_GRANTED
+
+  @@map("student_timeline_event_type")
+}
+
 // ---------------------------------------------------------------------------
 // Tenancy
 // ---------------------------------------------------------------------------
@@ -113,20 +206,26 @@ model Tenant {
   auditLogs    AuditLog[]
   outboxEvents OutboxEvent[]
 
+  students        Student[]
+  studentSequence StudentSequence?
+  plans           Plan[]
+  subscriptions   Subscription[]
+  entitlements    Entitlement[]
+
   @@map("tenants")
 }
 
 /// Unidade fisica. Onde a catraca mora.
 model GymUnit {
-  id       String @id @default(uuid()) @db.Uuid
-  tenantId String @map("tenant_id") @db.Uuid
+  id           String        @id @default(uuid()) @db.Uuid
+  tenantId     String        @map("tenant_id") @db.Uuid
   /// Unico dentro do tenant, reutilizavel entre tenants: duas academias sem
   /// relacao podem ter uma unidade "CENTRO" cada.
-  code     String
-  name     String
+  code         String
+  name         String
   /// IANA (`America/Sao_Paulo`). O ADR-019 exige timezone da unidade, sem
   /// fallback -- horario de funcionamento e bloqueio dependem dele.
-  timezone String
+  timezone     String
   /// Horario semanal de funcionamento. JSON porque a forma ainda varia por
   /// academia; vira tabela quando alguem precisar consultar por faixa.
   openingHours Json          @map("opening_hours")
@@ -153,23 +252,23 @@ model GymUnit {
 /// que ela exige e que toda entidade de NEGOCIO carregue tenant; identidade
 /// e o ponto onde o vinculo se estabelece, nao onde se pressupoe.
 model User {
-  id String @id @default(uuid()) @db.Uuid
+  id                  String     @id @default(uuid()) @db.Uuid
   /// Normalizado em minusculas antes de gravar; unico globalmente.
-  email        String     @unique
-  passwordHash String     @map("password_hash")
-  status       UserStatus @default(ACTIVE)
-  mfaStatus    MfaStatus  @default(DISABLED) @map("mfa_status")
+  email               String     @unique
+  passwordHash        String     @map("password_hash")
+  status              UserStatus @default(ACTIVE)
+  mfaStatus           MfaStatus  @default(DISABLED) @map("mfa_status")
   /// Segredo TOTP cifrado com AES-256-GCM. Os tres campos andam juntos: sem
   /// IV e tag nao ha como decifrar, e guardar o segredo em claro
   /// transformaria leitura de tabela em clonagem de segundo fator.
-  mfaSecretCiphertext Bytes?    @map("mfa_secret_ciphertext")
-  mfaSecretIv         Bytes?    @map("mfa_secret_iv")
-  mfaSecretTag        Bytes?    @map("mfa_secret_tag")
+  mfaSecretCiphertext Bytes?     @map("mfa_secret_ciphertext")
+  mfaSecretIv         Bytes?     @map("mfa_secret_iv")
+  mfaSecretTag        Bytes?     @map("mfa_secret_tag")
   /// Ultimo contador TOTP aceito. Impede replay do mesmo codigo dentro da
   /// janela de validade.
-  mfaLastCounter      BigInt?   @map("mfa_last_counter")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  mfaLastCounter      BigInt?    @map("mfa_last_counter")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
 
   memberships TenantMembership[]
   userRoles   UserRole[]
@@ -270,19 +369,19 @@ model UserRole {
 /// token ja rotacionado reaparece, alguem o copiou, e a familia inteira e
 /// revogada.
 model Session {
-  id        String        @id @default(uuid()) @db.Uuid
-  userId    String        @map("user_id") @db.Uuid
-  tenantId  String        @map("tenant_id") @db.Uuid
-  tokenHash String        @unique @map("token_hash")
-  familyId  String        @map("family_id") @db.Uuid
-  status    SessionStatus @default(ACTIVE)
-  expiresAt DateTime      @map("expires_at")
-  rotatedAt DateTime?     @map("rotated_at")
-  revokedAt DateTime?     @map("revoked_at")
+  id            String        @id @default(uuid()) @db.Uuid
+  userId        String        @map("user_id") @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  tokenHash     String        @unique @map("token_hash")
+  familyId      String        @map("family_id") @db.Uuid
+  status        SessionStatus @default(ACTIVE)
+  expiresAt     DateTime      @map("expires_at")
+  rotatedAt     DateTime?     @map("rotated_at")
+  revokedAt     DateTime?     @map("revoked_at")
   /// Motivo da revogacao (`logout`, `refresh_reused`, `admin`). Sem isso,
   /// investigar incidente vira adivinhacao.
-  revokedReason String?  @map("revoked_reason")
-  createdAt     DateTime @default(now()) @map("created_at")
+  revokedReason String?       @map("revoked_reason")
+  createdAt     DateTime      @default(now()) @map("created_at")
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -295,18 +394,18 @@ model Session {
 /// Convite de uso unico. Tambem guarda so o hash: o link e mostrado uma vez
 /// a quem convidou e nunca mais recuperavel.
 model Invitation {
-  id        String           @id @default(uuid()) @db.Uuid
-  tenantId  String           @map("tenant_id") @db.Uuid
-  email     String
-  roleId    String           @map("role_id") @db.Uuid
-  gymUnitId String?          @map("gym_unit_id") @db.Uuid
-  tokenHash String           @unique @map("token_hash")
-  status    InvitationStatus @default(PENDING)
-  expiresAt DateTime         @map("expires_at")
-  acceptedAt DateTime?       @map("accepted_at")
-  revokedAt  DateTime?       @map("revoked_at")
-  createdAt  DateTime        @default(now()) @map("created_at")
-  updatedAt  DateTime        @updatedAt @map("updated_at")
+  id         String           @id @default(uuid()) @db.Uuid
+  tenantId   String           @map("tenant_id") @db.Uuid
+  email      String
+  roleId     String           @map("role_id") @db.Uuid
+  gymUnitId  String?          @map("gym_unit_id") @db.Uuid
+  tokenHash  String           @unique @map("token_hash")
+  status     InvitationStatus @default(PENDING)
+  expiresAt  DateTime         @map("expires_at")
+  acceptedAt DateTime?        @map("accepted_at")
+  revokedAt  DateTime?        @map("revoked_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -321,21 +420,21 @@ model Invitation {
 /// Trilha de auditoria. SEM `updatedAt` DE PROPOSITO: registro de auditoria
 /// que muda nao e trilha, e rascunho. Correcao entra como novo registro.
 model AuditLog {
-  id         String    @id @default(uuid()) @db.Uuid
-  tenantId   String    @map("tenant_id") @db.Uuid
-  gymUnitId  String?   @map("gym_unit_id") @db.Uuid
-  actorType  ActorType @map("actor_type")
-  actorId    String?   @map("actor_id") @db.Uuid
-  action     String
-  target     String
-  targetId   String?   @map("target_id")
-  correlationId String @map("correlation_id")
-  ipAddress     String? @map("ip_address")
-  userAgent     String? @map("user_agent")
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  gymUnitId     String?   @map("gym_unit_id") @db.Uuid
+  actorType     ActorType @map("actor_type")
+  actorId       String?   @map("actor_id") @db.Uuid
+  action        String
+  target        String
+  targetId      String?   @map("target_id")
+  correlationId String    @map("correlation_id")
+  ipAddress     String?   @map("ip_address")
+  userAgent     String?   @map("user_agent")
   /// Metadados ja mascarados na aplicacao. E-mail, CPF e afins nao entram
   /// em claro -- log nao e lugar de PII (CLAUDE.md, Convencoes).
-  metadata   Json?
-  occurredAt DateTime @default(now()) @map("occurred_at")
+  metadata      Json?
+  occurredAt    DateTime  @default(now()) @map("occurred_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   actor  User?  @relation(fields: [actorId], references: [id], onDelete: SetNull)
@@ -379,4 +478,317 @@ model InboxReceipt {
 
   @@unique([consumer, eventId])
   @@map("inbox_receipts")
+}
+
+// ---------------------------------------------------------------------------
+// Aluno
+// ---------------------------------------------------------------------------
+
+/// Aluno da academia.
+///
+/// A MATRICULA NUNCA DERIVA DO CPF (INV-009, INV-011, INV-012, `M1-BR-001`).
+/// CPF ajuda a detectar duplicidade e nada mais -- nao e identificador
+/// tecnico, nao vai para dispositivo, nao entra em URL.
+///
+/// O CPF e guardado em DOIS campos com finalidades distintas:
+///
+///   - `cpfHash` -- SHA-256 do valor normalizado. E o que a busca por
+///     duplicata compara. Hash e nao cifra porque a operacao necessaria e
+///     igualdade exata, e hash nao tem chave para vazar.
+///   - `cpfLast3` -- os tres ultimos digitos, para a recepcao confirmar
+///     "e este mesmo?" sem que a resposta da API carregue o documento
+///     inteiro.
+///
+/// O CPF completo NAO e persistido. Recuperar o numero a partir do hash
+/// exigiria forca bruta sobre 11 digitos com digito verificador -- viavel
+/// para um alvo, caro para a base inteira. Se uma fatia futura precisar
+/// exibir o CPF completo, isso vira decisao do PI com cifra reversivel, nao
+/// um `ALTER TABLE` silencioso.
+model Student {
+  id               String        @id @default(uuid()) @db.Uuid
+  tenantId         String        @map("tenant_id") @db.Uuid
+  /// `AP-{ano}-{8 digitos}`. IMUTAVEL apos a criacao (INV-010): nenhum caso
+  /// de uso desta fatia a altera, e a unicidade sobrevive ao arquivamento
+  /// (INV-015) porque soft delete nao remove a linha.
+  membershipNumber String        @map("membership_number")
+  fullName         String        @map("full_name")
+  /// `@db.Date`: data de nascimento nao tem hora nem fuso. Gravar como
+  /// timestamp faria 01/01 virar 31/12 na conversao de timezone.
+  birthDate        DateTime      @map("birth_date") @db.Date
+  cpfHash          String?       @map("cpf_hash")
+  cpfLast3         String?       @map("cpf_last3")
+  status           StudentStatus @default(LEAD)
+  /// Preenchido no arquivamento. Soft delete (INV-013): preserva historico
+  /// legal e operacional em vez de apagar.
+  archivedAt       DateTime?     @map("archived_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  /// Trava otimista. Comando concorrente que leu a versao antiga falha em
+  /// vez de sobrescrever decisao que nao viu.
+  version          Int           @default(0)
+
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contacts       StudentContact[]
+  addresses      StudentAddress[]
+  subscriptions  Subscription[]
+  entitlements   Entitlement[]
+  timelineEvents StudentTimelineEvent[]
+
+  @@unique([tenantId, membershipNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, cpfHash])
+  @@index([tenantId, fullName])
+  @@map("students")
+}
+
+/// Contato do aluno. `value` guarda a forma NORMALIZADA (e-mail em
+/// minusculas, telefone so com digitos) -- e o que a deteccao de duplicata
+/// compara. Sem normalizar, "(41) 99999-0000" e "41999990000" seriam pessoas
+/// diferentes.
+model StudentContact {
+  id        String             @id @default(uuid()) @db.Uuid
+  tenantId  String             @map("tenant_id") @db.Uuid
+  studentId String             @map("student_id") @db.Uuid
+  type      StudentContactType
+  value     String
+  isPrimary Boolean            @default(false) @map("is_primary")
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, type, value])
+  @@index([studentId])
+  @@map("student_contacts")
+}
+
+model StudentAddress {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  studentId  String   @map("student_id") @db.Uuid
+  postalCode String   @map("postal_code")
+  street     String
+  number     String?
+  complement String?
+  district   String?
+  city       String
+  state      String
+  latitude   Float?
+  longitude  Float?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@map("student_addresses")
+}
+
+/// Contador de matricula, uma linha por tenant.
+///
+/// EXISTE PARA SER TRAVADO. A geracao roda dentro da transacao de criacao
+/// com `SELECT ... FOR UPDATE` nesta linha: duas recepcionistas cadastrando
+/// ao mesmo tempo serializam aqui, e nao na tabela `students`.
+///
+/// Alternativas descartadas: `COUNT(*)` (reusa numero apos arquivamento),
+/// fragmento de UUID (colide e nao e sequencial), sequence do Postgres
+/// (global, vazaria volume de um tenant para outro).
+model StudentSequence {
+  tenantId  String   @id @map("tenant_id") @db.Uuid
+  /// Proximo numero a emitir. Nunca decrementa, nem quando um aluno e
+  /// arquivado -- reaproveitar matricula quebraria INV-010.
+  nextValue Int      @default(1) @map("next_value")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("student_sequences")
+}
+
+/// Timeline administrativa do aluno.
+///
+/// SEM `updatedAt`, pelo mesmo motivo do `AuditLog`: registro de historico
+/// que muda nao e historico. `payload` chega ja mascarado da aplicacao --
+/// nunca CPF completo, nunca template biometrico (INV-022).
+model StudentTimelineEvent {
+  id            String                   @id @default(uuid()) @db.Uuid
+  tenantId      String                   @map("tenant_id") @db.Uuid
+  studentId     String                   @map("student_id") @db.Uuid
+  type          StudentTimelineEventType
+  actorType     ActorType                @map("actor_type")
+  actorId       String?                  @map("actor_id") @db.Uuid
+  correlationId String                   @map("correlation_id")
+  payload       Json?
+  occurredAt    DateTime                 @default(now()) @map("occurred_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Ordenacao do cursor: `(occurredAt, id)`. O `id` desempata eventos no
+  /// mesmo instante -- sem ele, paginacao por cursor pula ou repete linha.
+  @@index([tenantId, studentId, occurredAt, id])
+  @@map("student_timeline_events")
+}
+
+// ---------------------------------------------------------------------------
+// Plano, assinatura e entitlement
+// ---------------------------------------------------------------------------
+
+/// Plano comercial.
+///
+/// SO carrega o que `M1-FR-009` cobre: unidades, dias, horarios e validade.
+/// As demais regras da Especificacao secao 34 (limite semanal, aulas
+/// inclusas, convidados, fidelidade, multa) sao `[indefinido]` por INV-059 --
+/// NAO inventar campo para elas aqui.
+model Plan {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  name         String
+  description  String?
+  isActive     Boolean   @default(true) @map("is_active")
+  /// Validade de VENDA do plano (ate quando pode ser contratado), diferente
+  /// da vigencia da assinatura de um aluno.
+  salesStartAt DateTime? @map("sales_start_at")
+  salesEndAt   DateTime? @map("sales_end_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  units         PlanUnit[]
+  accessWindows PlanAccessWindow[]
+  subscriptions Subscription[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("plans")
+}
+
+model PlanUnit {
+  planId    String @map("plan_id") @db.Uuid
+  gymUnitId String @map("gym_unit_id") @db.Uuid
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@id([planId, gymUnitId])
+  @@map("plan_units")
+}
+
+/// Janela semanal de acesso, por unidade.
+///
+/// TABELA, NAO JSON. Regra de acesso enterrada em JSON nao validado e o que
+/// o plano de apoio proibe explicitamente -- e o que o motor de decisao de
+/// F9 vai precisar consultar por faixa.
+///
+/// Horario em MINUTOS DESDE A MEIA-NOITE LOCAL, nao string nem timestamp:
+/// inteiro compara e ordena sem parsing, e a conversao para instante so
+/// acontece na avaliacao de uma data concreta, com o timezone da unidade.
+/// Virada de dia (22h-02h) entra como DUAS janelas, nunca como intervalo com
+/// fim menor que o inicio.
+model PlanAccessWindow {
+  id          String @id @default(uuid()) @db.Uuid
+  planId      String @map("plan_id") @db.Uuid
+  gymUnitId   String @map("gym_unit_id") @db.Uuid
+  /// ISO-8601: 1 = segunda ... 7 = domingo.
+  dayOfWeek   Int    @map("day_of_week")
+  startMinute Int    @map("start_minute")
+  endMinute   Int    @map("end_minute")
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, gymUnitId, dayOfWeek])
+  @@map("plan_access_windows")
+}
+
+/// Assinatura: o fato comercial.
+///
+/// A CATRACA NUNCA CONSULTA ESTA TABELA (INV-030, `M1-BR-003`, ADR-003). O
+/// caminho de acesso le `Entitlement`, e so. Esta linha existe para a
+/// recepcao e para derivar o direito -- nao para decidir passagem.
+model Subscription {
+  id          String             @id @default(uuid()) @db.Uuid
+  tenantId    String             @map("tenant_id") @db.Uuid
+  studentId   String             @map("student_id") @db.Uuid
+  planId      String             @map("plan_id") @db.Uuid
+  status      SubscriptionStatus @default(PENDING)
+  startsAt    DateTime           @map("starts_at")
+  /// Nulo = sem termino previsto. A expiracao vem de job, nao de ausencia
+  /// de data.
+  endsAt      DateTime?          @map("ends_at")
+  /// Quem criou/alterou manualmente e por que. No MVP 1 toda mudanca de
+  /// assinatura e manual (INV-061), entao razao e ator sao obrigatorios em
+  /// cada comando -- e ficam aqui na ultima alteracao, alem da timeline.
+  lastActorId String?            @map("last_actor_id") @db.Uuid
+  lastReason  String?            @map("last_reason")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  version     Int                @default(0)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  plan         Plan          @relation(fields: [planId], references: [id])
+  entitlements Entitlement[]
+
+  @@index([tenantId, studentId, status])
+  @@map("subscriptions")
+}
+
+/// Direito de acesso. O QUE A CATRACA CONSULTA.
+///
+/// Regra de arquitetura no 1: `Pagamento -> Invoice -> Subscription ->
+/// Entitlement -> Access Decision Engine`. Esta e a ultima parada antes do
+/// motor, e a primeira que o motor le.
+///
+/// `policySnapshot` e IMUTAVEL: copia das regras do plano no instante da
+/// derivacao. Existe porque o plano pode mudar amanha, e o direito ja
+/// concedido nao pode mudar junto sem alguem decidir isso. Sem o snapshot,
+/// editar um plano reescreveria retroativamente quem podia entrar ontem.
+model Entitlement {
+  id             String            @id @default(uuid()) @db.Uuid
+  tenantId       String            @map("tenant_id") @db.Uuid
+  studentId      String            @map("student_id") @db.Uuid
+  source         EntitlementSource
+  /// Nulo quando a origem nao e assinatura (cortesia, visitante, ...).
+  subscriptionId String?           @map("subscription_id") @db.Uuid
+  status         EntitlementStatus @default(SCHEDULED)
+  startsAt       DateTime          @map("starts_at")
+  endsAt         DateTime          @map("ends_at")
+  /// Obrigatorios para cortesia (INV-063): razao e responsavel.
+  grantedById    String?           @map("granted_by_id") @db.Uuid
+  reason         String?
+  /// Copia congelada das regras do plano. Nunca reescrito apos a criacao.
+  policySnapshot Json              @map("policy_snapshot")
+  suspendedAt    DateTime?         @map("suspended_at")
+  revokedAt      DateTime?         @map("revoked_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  version        Int               @default(0)
+
+  tenant       Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student      Student                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subscription Subscription?           @relation(fields: [subscriptionId], references: [id])
+  unitWindows  EntitlementUnitWindow[]
+
+  /// Indice do caminho quente: o motor de F9 pergunta "que direito valido
+  /// este aluno tem agora?".
+  @@index([tenantId, studentId, status, startsAt, endsAt])
+  @@map("entitlements")
+}
+
+/// Janela de acesso ja resolvida para o entitlement.
+///
+/// Duplica a forma de `PlanAccessWindow` de proposito: aquela pertence ao
+/// plano e MUDA quando o plano muda; esta pertence ao direito concedido e
+/// NAO muda. Ler a do plano no momento da decisao reintroduziria exatamente
+/// a retroatividade que o snapshot existe para impedir.
+model EntitlementUnitWindow {
+  id            String @id @default(uuid()) @db.Uuid
+  entitlementId String @map("entitlement_id") @db.Uuid
+  gymUnitId     String @map("gym_unit_id") @db.Uuid
+  dayOfWeek     Int    @map("day_of_week")
+  startMinute   Int    @map("start_minute")
+  endMinute     Int    @map("end_minute")
+
+  entitlement Entitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  @@index([entitlementId, gymUnitId, dayOfWeek])
+  @@map("entitlement_unit_windows")
 }
