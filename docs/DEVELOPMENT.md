@@ -259,6 +259,35 @@ teste**, rodando o software que veio de fábrica. Inventário completo em
 dependia deles; **F2 e F3 dependem**, em especial do consentimento dos participantes, que é
 pré-requisito de qualquer captura facial.
 
+#### ✅ F4 fechou sozinha — ela nunca dependeu de hardware
+
+A Slice 0.4 é **quase toda regra pura**: fila, idempotência, snapshot, métricas. Nenhuma das cinco
+entregas exige o equipamento, e é por isso que ela passou na frente de F2 e F3 no aceite.
+
+| entrega | onde vive |
+|---|---|
+| fila SQLite de eventos | `persistence/fila-de-eventos.ts` |
+| reenvio idempotente | `application/reconciliar.ts` |
+| simulação de queda cloud | `adapters/coletor-simulado.ts` — **o dublê deduplica**, senão o teste não prova nada |
+| cache local de permissões | `persistence/cache-de-permissoes.ts` |
+| métricas de latência e backlog | `application/relatorio-operacional.ts` |
+
+**Duas decisões que valem registro:**
+
+**`synchronous = FULL`, não o `NORMAL` padrão do WAL.** `NORMAL` devolve *"gravei"* antes de o SO
+escrever no disco — sobrevive a crash de processo, **não a queda de energia**. Numa academia,
+queda de energia é o cenário esperado. O custo é um `fsync` por commit; perder a passagem de quem
+já girou a catraca custa mais.
+
+**O cache de permissões tem prazo, e isso não é opcional.** Snapshot sem validade vira **permissão
+eterna**: um agente desconectado há uma semana continua liberando quem a nuvem já bloqueou.
+`estaValido()` responde o fato — **o que fazer quando vence é decisão do PI**, porque negar tudo
+trava a academia e permitir tudo abre a porta.
+
+> As **limitações por equipamento** do `M0-AC-008` já estão registradas em
+> `LIMITACOES_CONHECIDAS`, com **fonte citada** para cada uma. Limitação sem fonte é opinião, e é
+> este relatório que decide se o MVP 0 vira MVP 1.
+
 **A medida que F3 tem de produzir:** latência real p95. O ADR-004 já está decidido (a nuvem
 decide); esta medição **pode reabri-lo** se o p95 passar de 300 ms.
 
@@ -487,3 +516,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | **F3** *(parcial)* | SPEC-003 | [#57](https://github.com/RodReis/arenahub/pull/57) | decisão local, anti-repique, idempotência de comando e medição de latência. **`DENY` não aciona a catraca — estrutural.** Adapter aguarda SDK e janela |
 | 14/08/2026 | **F2** *(fecha)* | SPEC-002 | [#58](https://github.com/RodReis/arenahub/pull/58) | adapter real do leitor facial: servidor WebSocket, protocolo dos manuais, foto desligada no handshake. `externalEnrollId` corrigido para o formato do equipamento |
 | 14/08/2026 | **F3** *(adapter)* | SPEC-003 | [#59](https://github.com/RodReis/arenahub/pull/59) | adapter da catraca sobre ponte EasyInner. **ADR-010 fechado:** catraca exige processo Windows x86; leitor facial não. Contrato da ponte definido |
+| 14/08/2026 | **F4** | SPEC-004 | [#60](https://github.com/RodReis/arenahub/pull/60) | offline e reconciliação: fila SQLite durável, reenvio idempotente, cache de permissões com prazo, relatório com limitações citadas |
