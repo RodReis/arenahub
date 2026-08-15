@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -47,8 +47,6 @@ updated: 2026-08-14
 - [MVP1][SPEC-006][F6] Core seguro e unidade (#6)
 - [MVP0][SPEC-005][F5] Relatório e decisão (#5)
 - [MVP0][SPEC-004][F4] Offline e reconciliação (#4)
-- [MVP0][SPEC-003][F3] Catraca e passagem (#3)
-- [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 
 ## A Fazer
 
@@ -58,7 +56,8 @@ _(vazio)_
 
 ### Sem épico
 
-- [MVP0][SPEC-001][F1] Bancada reproduzível (#1)
+- [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
+- [MVP0][SPEC-003][F3] Catraca e passagem (#3)
 
 ## Feito
 
@@ -68,6 +67,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP0][SPEC-001][F1] Bancada reproduzível (#1, finalizado em: 2026-08-15)
 - [INFRA] Monorepo pnpm + Turborepo com o layout do PRD (#42, finalizado em: 2026-08-14)
 - [INFRA] TypeScript estrito, ESLint e Prettier em packages/config (#43, finalizado em: 2026-08-14)
 - [INFRA] docker-compose local: Postgres, Redis e MinIO (#45, finalizado em: 2026-08-14)
