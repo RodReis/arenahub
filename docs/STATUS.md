@@ -81,17 +81,23 @@ facial e o *Manual de Integração SDK Inner Acesso*. Resumos verificáveis em
 | catraca | `EasyInner.dll` — binário proprietário, porta 3570 | **não** |
 
 A DLL é **Windows, 32 bits, .NET 3.5+**, e o protocolo binário só sai sob **NDA**. A catraca exige
-um **processo Windows** — o *"serviço nativo p/ SDK Topdata"* que o plano de apoio já previa. O
-contrato da ponte está definido; **a forma dela é decisão do PI**.
+um **processo Windows** — o *"serviço nativo p/ SDK Topdata"* que o plano de apoio já previa.
+
+✅ **A ponte existe desde 15/08/2026** — `EasyInnerBridge.exe`, .NET 4.x x86 falando **stdio**
+(card [#61](https://github.com/RodReis/arenahub/issues/61), PR
+[#62](https://github.com/RodReis/arenahub/pull/62)). No teste com o PI presente ela **carregou a
+DLL sem GPF e escutou na 3570** — mas **a catraca não girou**, porque aponta para o servidor
+legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operacional: o cutover**.
 
 **O que ainda trava, e nada disso é código:**
 
 | # | o quê | trava |
 |---|---|---|
-| 1 | **decidir a forma da ponte Windows** (ADR-010) | F3 |
+| 1 | ✅ ~~decidir a forma da ponte Windows (ADR-010)~~ — **fechado em 15/08/2026**: stdio + .NET 4.x x86, card [#61](https://github.com/RodReis/arenahub/issues/61), PR [#62](https://github.com/RodReis/arenahub/pull/62) | — |
 | 2 | **consentimento dos participantes** — regra nº 7, sem exceção | F2 |
 | 3 | **janela combinada + parada de emergência** | **F3** |
 | 4 | leitor em **18 dígitos** no menu — senão todo cadastro falha | F2 |
+| 5 | 🔴 **cutover: apontar a catraca para o `edge-agent`** — hoje ela disca para o legado `192.168.2.106` e nunca conecta na ponte. Descoberto no teste de giro de 15/08; é ação operacional sobre equipamento em uso, **decisão do PI** | **F3** |
 
 > ⚠️ **A F3 é diferente das outras.** Testar significa **acionar fisicamente uma catraca instalada
 > e em uso**. Não é acesso ao equipamento — é combinar horário e ter o procedimento de parada de

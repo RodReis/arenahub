@@ -228,8 +228,8 @@ Duas consequências do Prisma 7 que aparecem no código e valem saber antes de m
 | F | slice | o que precisa provar | bloqueado por |
 |---|---|---|---|
 | ✅ F1 | 0.1 Bancada reproduzível | qualquer pessoa reproduz o ambiente e o simulador roda em CI **sem hardware** (`M0-NFR-006`) | — *(entregue; o gate não a bloqueava)* |
-| ✅ F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | — *(adapter real entregue; falta só o aceite na bancada)* |
-| 🟡 F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | **adapter entregue**; falta a **ponte Windows** e a janela combinada |
+| 🟡 F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | **código entregue e verde**; falta o aceite físico (`M0-AC-001`/`002`) — **consentimento** e leitor em **18 dígitos** |
+| 🟡 F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | **adapter e ponte entregues** (PR #62); falta o **cutover** — a catraca aponta para o legado `.106` — e a janela combinada |
 | ✅ F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | — *(regra pura; fechou sem hardware — PR #60)* |
 | 🟡 F5 | 0.5 Relatório e decisão | decisão de saída do MVP 0 (`MVP-00` §15) com evidência: `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO` | **relatório parcial entregue** (`docs/reports/MVP-00-relatorio-poc-topdata.md`); latência real é `PENDENTE-POC` — depende da POC física |
 
@@ -365,6 +365,23 @@ convenção, por topologia do código.
 > real significa **girar a catraca de verdade**, numa unidade em uso. O item 7 do gate
 > (procedimento de parada de emergência) existe exatamente para esse momento.
 
+#### 🔴 O que o teste de giro de 15/08/2026 descobriu — e o bloqueio mudou de natureza
+
+Com o PI presente e a catraca liberada, a ponte foi exercitada de verdade. **Ela funciona:**
+compila x86, carrega a `EasyInner.dll` sem GPF, o protocolo stdio responde e a ponte fica em
+`LISTEN` na 3570. **O giro não ocorreu**, e o motivo não é código:
+
+> A catraca tem `ipServer: 192.168.2.106` — ela disca para o **servidor legado**, não para a
+> ponte. Nunca chegou a conectar no `edge-agent`. Lido pela API do equipamento, não deduzido.
+
+**Isso troca o bloqueio de F3 de técnico por operacional.** Não falta implementar nada: falta
+apontar a catraca para o `edge-agent` — o **cutover**. É ação sobre equipamento em uso, com o
+legado ativo do outro lado, e por isso é **decisão do PI**, não do Code.
+
+**Consequência para o gate:** as pré-condições de F3 passaram de três para quatro — consentimento,
+rede/legado, janela com parada de emergência **e o cutover**. Ele não estava na lista de 14/08
+porque ninguém sabia para onde a catraca apontava.
+
 #### 🔴 O ADR-010 fechou — e a resposta é diferente para cada dispositivo
 
 O *Manual de Integração SDK Inner Acesso* (Rev. 00) chegou em 14/08/2026. Resumo em
@@ -389,8 +406,12 @@ existe *"conforme documentação de baixo nível e **solicitação de NDA**"*.
 > processo por uma **ponte**, cujo contrato está em
 > `apps/edge-agent/src/adapters/topdata/easyinner-ponte.ts`.
 >
-> **A forma da ponte é decisão do PI** (serviço .NET com stdio? socket local? fila?) — o manual
-> fecha o *se*, não o *como*.
+> ✅ **A forma da ponte foi decidida em 15/08/2026** — card
+> [#61](https://github.com/RodReis/arenahub/issues/61), PR
+> [#62](https://github.com/RodReis/arenahub/pull/62): **stdio**, runtime **.NET Framework 4.x
+> x86**. O `EasyInnerBridge.exe` vive em `apps/edge-agent/native/easyinner-bridge/`; o lado Node
+> é `PonteEasyInnerProcesso`. A `EasyInner.dll` é binário licenciado e **não entra no
+> repositório**.
 
 #### Duas características da DLL que mandam na arquitetura
 
@@ -523,3 +544,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | **F2** *(fecha)* | SPEC-002 | [#58](https://github.com/RodReis/arenahub/pull/58) | adapter real do leitor facial: servidor WebSocket, protocolo dos manuais, foto desligada no handshake. `externalEnrollId` corrigido para o formato do equipamento |
 | 14/08/2026 | **F3** *(adapter)* | SPEC-003 | [#59](https://github.com/RodReis/arenahub/pull/59) | adapter da catraca sobre ponte EasyInner. **ADR-010 fechado:** catraca exige processo Windows x86; leitor facial não. Contrato da ponte definido |
 | 14/08/2026 | **F4** | SPEC-004 | [#60](https://github.com/RodReis/arenahub/pull/60) | offline e reconciliação: fila SQLite durável, reenvio idempotente, cache de permissões com prazo, relatório com limitações citadas |
+| 15/08/2026 | — *(#61)* | — | [#62](https://github.com/RodReis/arenahub/pull/62) | ponte EasyInner nativa: processo .NET 4.x x86 por stdio + lado Node. **Fecha a forma da ponte do ADR-010.** Ponte carrega a DLL e escuta na 3570; **giro real aguarda cutover** — a catraca aponta para o legado `.106` |
