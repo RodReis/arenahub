@@ -1,10 +1,14 @@
 # CI do ArenaHub — o portão de merge.
 #
 # No processo do trio, o merge é do próprio Code: o PI não segura o código na
-# porta da `main`. A única coisa entre uma entrega ruim e a `main` é este
-# arquivo. Por isso ele falha explicitamente e nunca "passa mesmo assim".
+# porta da `main`. A única coisa entre uma entrega ruim e a `main` são estes
+# dois jobs. Por isso eles falham explicitamente e nunca "passam mesmo assim".
 #
 # Ordem por custo crescente — falhe cedo, falhe barato (docs/TESTING.md §6).
+#
+# DOIS jobs em paralelo, e não um em série: `rapido` não depende de banco nem
+# de navegador, então não tem por que esperar na fila atrás deles. Ambos são
+# obrigatórios para o merge — paralelizar encurta o relógio, não a barra.
 
 name: CI
 
@@ -26,8 +30,97 @@ env:
   DO_NOT_TRACK: 1
 
 jobs:
-  ci:
-    name: build, lint, typecheck e testes
+  # ---------------------------------------------------------------------------
+  # Job rápido: tudo que só precisa de disco e CPU. Sem Postgres, sem
+  # navegador. É aqui que mora a barreira que pega o erro bobo em menos de um
+  # minuto.
+  # ---------------------------------------------------------------------------
+  rapido:
+    name: lint, typecheck, guardas e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # A versão sai do .nvmrc — fonte única com o desenvolvimento local.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # --- 1 de 8 ---------------------------------------------------------
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      # O client do Prisma é gerado, não versionado (`src/generated/` está no
+      # .gitignore). Sem este passo, lint e typecheck falham no CI e passam na
+      # máquina de quem já rodou `generate` -- verde local, vermelho remoto,
+      # que é o pior tipo de divergência. Vem antes do lint de propósito.
+      #
+      # `DATABASE_URL` aqui é de mentira, e é isso mesmo: `prisma generate` lê
+      # o schema e escreve o client -- não abre conexão. O que ele exige é que
+      # a variável EXISTA, porque o `prisma.config.ts` a resolve ao carregar.
+      # Sem ela o passo morre com `PrismaConfigEnvError` antes de gerar nada.
+      #
+      # A URL fica no passo, não no job: dar `env` de banco ao job inteiro
+      # abriria a porta para um teste deste job conectar em algo que não
+      # existe -- este job não tem Postgres, e não deve ter.
+      - name: gerar client do Prisma
+        run: pnpm --filter @arenahub/database generate
+        env:
+          DATABASE_URL: postgresql://prisma:generate@localhost:5432/nao-conecta?schema=public
+
+      # --- 2 de 8 ---------------------------------------------------------
+      - name: lint
+        run: pnpm lint
+
+      # --- 3 de 8 ---------------------------------------------------------
+      - name: typecheck
+        run: pnpm typecheck
+
+      # --- guardas do próprio repositório ---------------------------------
+      # Não estão na lista dos 8 do TESTING.md §6 porque não são teste de
+      # domínio. Rodam aqui porque um guarda quebrado não avisa que quebrou:
+      # ele simplesmente deixa passar.
+      - name: guardas de scripts/
+        run: pnpm test:guardas
+
+      - name: self-check do gerador de relatório
+        run: pnpm test:report:selfcheck
+
+      # --- 8 de 8, promovida para cá --------------------------------------
+      # A guarda de evidência. Falha se reports/TESTS.md divergir do que a
+      # varredura produz -- número em documento tem de vir de execução, nunca
+      # de prosa (docs/TESTING.md §5).
+      #
+      # Ela era o ÚLTIMO passo do workflow antigo, depois do E2E inteiro, e
+      # custava ~4min para reportar um diff de duas linhas (issue #77). Está
+      # aqui porque `--check` não depende de teste ter rodado: ele lê
+      # `git ls-files` e compara com o arquivo commitado. Não afrouxou nada --
+      # continua barrando o merge, só barra mais cedo.
+      - name: guarda de evidência
+        run: pnpm test:report --check
+
+      # --- 4 de 8 ---------------------------------------------------------
+      # Promovido a passo próprio na F1, quando `apps/edge-agent` nasceu e
+      # passou a declarar `test`. Antes disso vivia na lista de pendentes.
+      - name: test (unitário + contrato)
+        run: pnpm test
+
+      # --- 6 de 8 ---------------------------------------------------------
+      # Promovido na F1, mesmo motivo.
+      - name: build
+        run: pnpm build
+
+  # ---------------------------------------------------------------------------
+  # Job pesado: o que precisa de Postgres e de navegador. Roda em paralelo com
+  # o rápido, e duplica o `install` -- o cache do pnpm paga a diferença.
+  # ---------------------------------------------------------------------------
+  pesado:
+    name: integração e E2E
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -58,49 +151,14 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          # A versão sai do .nvmrc — fonte única com o desenvolvimento local.
           node-version-file: .nvmrc
           cache: pnpm
 
-      # --- 1 de 8 ---------------------------------------------------------
       - name: install
         run: pnpm install --frozen-lockfile
 
-      # O client do Prisma é gerado, não versionado (`src/generated/` está no
-      # .gitignore). Sem este passo, lint e typecheck falham no CI e passam na
-      # máquina de quem já rodou `generate` -- verde local, vermelho remoto,
-      # que é o pior tipo de divergência. Vem antes do lint de propósito.
       - name: gerar client do Prisma
         run: pnpm --filter @arenahub/database generate
-
-      # --- 2 de 8 ---------------------------------------------------------
-      - name: lint
-        run: pnpm lint
-
-      # --- 3 de 8 ---------------------------------------------------------
-      - name: typecheck
-        run: pnpm typecheck
-
-      # --- guardas do próprio repositório ---------------------------------
-      # Não estão na lista dos 8 do TESTING.md §6 porque não são teste de
-      # domínio. Rodam aqui porque um guarda quebrado não avisa que quebrou:
-      # ele simplesmente deixa passar.
-      - name: guardas de scripts/
-        run: pnpm test:guardas
-
-      - name: self-check do gerador de relatório
-        run: pnpm test:report:selfcheck
-
-      # --- 4 de 8 ---------------------------------------------------------
-      # Promovido a passo próprio na F1, quando `apps/edge-agent` nasceu e
-      # passou a declarar `test`. Antes disso vivia na lista de pendentes.
-      - name: test (unitário + contrato)
-        run: pnpm test
-
-      # --- 6 de 8 ---------------------------------------------------------
-      # Promovido na F1, mesmo motivo.
-      - name: build
-        run: pnpm build
 
       # --- 5 de 8 ---------------------------------------------------------
       # Promovido na F6, quando `apps/api` e `packages/database` nasceram e
@@ -121,17 +179,45 @@ jobs:
       # Promovido na F6 (Task 6), quando o Playwright nasceu no admin-web.
       # Com ele, OS OITO PASSOS têm workspace: a lista de pendentes acabou.
       #
+      # O `build` roda aqui também, e não só no job rápido: o `webServer` do
+      # playwright.config.ts sobe `next start` e `node dist/main.js`, que são
+      # os artefatos compilados. `dependsOn: ["^build"]` do turbo constrói as
+      # DEPENDÊNCIAS da task, não o próprio app -- sem este passo o E2E sobe
+      # contra um `dist/` que não existe.
+      - name: build
+        run: pnpm build
+
       # O `seed` roda antes porque a jornada E2E entra com um proprietário
       # real -- e é o seed que o cria (`CLAUDE.md`: dado local de
       # desenvolvimento entra por seed).
-      #
-      # `--with-deps` instala as bibliotecas de sistema do Chromium que o
-      # runner do GitHub não traz.
       - name: seed de bancada
         run: pnpm --filter @arenahub/database seed
 
+      # O navegador vem do cache, chaveado pela versão do Playwright no
+      # lockfile: upgrade da lib invalida o cache sozinho, sem ninguém
+      # lembrar de mexer aqui.
+      - name: resolver versão do Playwright
+        id: playwright
+        run: echo "versao=$(node -p "require('./apps/admin-web/package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
+
+      - name: cache do navegador do Playwright
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.versao }}
+
+      # Sem cache: baixa o navegador E as bibliotecas de sistema.
       - name: instalar navegador do Playwright
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: pnpm --filter @arenahub/admin-web exec playwright install --with-deps chromium
+
+      # Com cache: o binário já veio de ~/.cache/ms-playwright, mas as
+      # bibliotecas de sistema moram em /usr e o cache não as traz. Sem este
+      # passo o Chromium existe e não abre.
+      - name: instalar dependências de sistema do Chromium
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: pnpm --filter @arenahub/admin-web exec playwright install-deps chromium
 
       - name: 'test:e2e'
         run: pnpm test:e2e
@@ -143,10 +229,3 @@ jobs:
           name: playwright-report
           path: apps/admin-web/playwright-report/
           retention-days: 7
-
-      # --- 8 de 8 ---------------------------------------------------------
-      # A guarda de evidência. Falha se reports/TESTS.md divergir do que a
-      # execução produz -- número em documento tem de vir de execução, nunca
-      # de prosa (docs/TESTING.md §5). Esta barra o merge desde já.
-      - name: guarda de evidência
-        run: pnpm test:report --check
