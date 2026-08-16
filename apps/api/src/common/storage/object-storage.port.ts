@@ -60,6 +60,32 @@ export interface ObjectStoragePort {
    * ausente faria o job de expurgo travar justamente no caso ja resolvido.
    */
   deletePrivateObject(key: string): Promise<void>;
+
+  /**
+   * Grava um objeto gerado PELO SERVIDOR -- F11, exportacao.
+   *
+   * Diferente de `createPrivateUpload`, que devolve URL para o CLIENTE
+   * enviar. Aqui o conteudo nasce na API (o CSV montado a partir do banco) e
+   * nunca passa pelo navegador de ninguem.
+   */
+  putPrivateObject(entrada: {
+    key: string;
+    body: Buffer;
+    contentType: string;
+  }): Promise<void>;
+
+  /**
+   * URL assinada de leitura, de vida curta.
+   *
+   * Curta de proposito: exportacao carrega evento de acesso de aluno, e um
+   * link que dura o dia inteiro vira link compartilhado por e-mail.
+   */
+  createPrivateDownload(entrada: {
+    key: string;
+    expiresInSeconds: number;
+    /** Nome sugerido ao navegador. */
+    fileName: string;
+  }): Promise<{ downloadUrl: string; expiresAt: string }>;
 }
 
 /** Token de injecao -- a porta e interface, e interface some no runtime. */

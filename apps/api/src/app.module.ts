@@ -11,6 +11,8 @@ import { HealthController } from './health/health.controller.js';
 import { VerificadorDeBanco } from './health/verificador-de-banco.js';
 import { VerificadorDeRedis } from './health/verificador-de-redis.js';
 import { AccessModule } from './modules/access/access.module.js';
+import { AccessQueryModule } from './modules/access-query/access-query.module.js';
+import { ExportsModule } from './modules/exports/exports.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { IamModule } from './modules/iam/iam.module.js';
 import { BiometricsModule } from './modules/biometrics/biometrics.module.js';
@@ -48,6 +50,8 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     EdgeAuthModule,
     DeviceSyncModule,
     AccessModule,
+    AccessQueryModule,
+    ExportsModule,
     OperationsModule,
   ],
   controllers: [HealthController],

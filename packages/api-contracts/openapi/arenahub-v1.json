@@ -943,6 +943,126 @@
         ]
       }
     },
+    "/api/v1/access-events": {
+      "get": {
+        "operationId": "AccessQueryController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AccessQuery"
+        ]
+      }
+    },
+    "/api/v1/access-events/{id}": {
+      "get": {
+        "operationId": "AccessQueryController_detalhar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AccessQuery"
+        ]
+      }
+    },
+    "/api/v1/access-events/exports": {
+      "post": {
+        "operationId": "ExportsController_solicitar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exports"
+        ]
+      }
+    },
+    "/api/v1/exports/{id}": {
+      "get": {
+        "operationId": "ExportsController_consultar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exports"
+        ]
+      }
+    },
+    "/api/v1/exports/{id}/cancel": {
+      "post": {
+        "operationId": "ExportsController_cancelar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exports"
+        ]
+      }
+    },
+    "/api/v1/exports/{id}/download": {
+      "post": {
+        "operationId": "ExportsController_baixar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exports"
+        ]
+      }
+    },
     "/api/v1/operations/overview": {
       "get": {
         "operationId": "OperationsController_panorama",

@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -79,6 +80,44 @@ export class S3ObjectStorageAdapter implements ObjectStoragePort {
    * E o comportamento que o expurgo do INV-142 precisa -- reexecutar nao
    * pode falhar por ja ter dado certo.
    */
+  async putPrivateObject(entrada: {
+    key: string;
+    body: Buffer;
+    contentType: string;
+  }): Promise<void> {
+    await this.cliente.send(
+      new PutObjectCommand({
+        Bucket: this.config.bucket,
+        Key: entrada.key,
+        Body: entrada.body,
+        ContentType: entrada.contentType,
+      }),
+    );
+  }
+
+  async createPrivateDownload(entrada: {
+    key: string;
+    expiresInSeconds: number;
+    fileName: string;
+  }): Promise<{ downloadUrl: string; expiresAt: string }> {
+    const comando = new GetObjectCommand({
+      Bucket: this.config.bucket,
+      Key: entrada.key,
+      // Forca download em vez de abrir no navegador, e com nome legivel. Sem
+      // isto o arquivo chega como o UUID da chave.
+      ResponseContentDisposition: `attachment; filename="${entrada.fileName}"`,
+    });
+
+    const downloadUrl = await getSignedUrl(this.cliente, comando, {
+      expiresIn: entrada.expiresInSeconds,
+    });
+
+    return {
+      downloadUrl,
+      expiresAt: new Date(Date.now() + entrada.expiresInSeconds * 1000).toISOString(),
+    };
+  }
+
   async deletePrivateObject(key: string): Promise<void> {
     await this.cliente.send(
       new DeleteObjectCommand({ Bucket: this.config.bucket, Key: key }),

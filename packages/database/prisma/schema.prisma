@@ -448,6 +448,7 @@ model Tenant {
 
   accessPolicies         AccessPolicy[]
   operationalAlerts      OperationalAlert[]
+  dataExportJobs         DataExportJob[]
   administrativeBlocks   AdministrativeBlock[]
   accessEvents           AccessEvent[]
   accessEventCorrections AccessEventCorrection[]
@@ -1814,4 +1815,61 @@ model OperationalAlert {
   @@index([tenantId, state, severity, lastSeenAt])
   @@index([tenantId, gymUnitId, state])
   @@map("operational_alerts")
+}
+
+/// Estado de uma exportacao.
+enum DataExportStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@map("data_export_status")
+}
+
+/// Exportacao assincrona de eventos -- `M1-NFR-009`.
+///
+/// ASSINCRONA POR EXIGENCIA: "exportacoes grandes sao assincronas e nao
+/// bloqueiam a API". Uma exportacao de 100 mil eventos numa requisicao HTTP
+/// deixaria a operacao esperando -- e a operacao esta com uma pessoa parada
+/// na catraca.
+///
+/// O arquivo vai para storage PRIVADO. `objectKey` e a referencia; a URL de
+/// download e assinada e curta, gerada na hora do pedido, e a autorizacao e
+/// reconferida ali -- quem perdeu a permissao entre pedir e baixar nao baixa.
+model DataExportJob {
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  requesterId String           @map("requester_id") @db.Uuid
+  type        String
+  status      DataExportStatus @default(PENDING)
+
+  /// Filtros normalizados. Ficam guardados para a auditoria responder "o que
+  /// exatamente essa pessoa levou embora?".
+  filters Json
+
+  /// Linhas escritas ate agora. Alimenta o progresso na tela.
+  rowCount Int @default(0) @map("row_count")
+
+  objectKey String? @map("object_key")
+  /// Codigo estavel do erro. Nunca a mensagem crua.
+  errorCode String? @map("error_code")
+
+  /// Depois disto o objeto e apagado pelo expurgo.
+  expiresAt   DateTime? @map("expires_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  /// Dedupe: clique duplo no botao de exportar nao gera dois arquivos.
+  idempotencyKey String @map("idempotency_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, requesterId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@map("data_export_jobs")
 }

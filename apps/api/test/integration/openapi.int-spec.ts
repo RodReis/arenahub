@@ -107,6 +107,13 @@ describe('contrato OpenAPI', () => {
         '/api/v1/operations/overview',
         '/api/v1/operations/alerts',
         '/api/v1/operations/alerts/{id}/acknowledge',
+        // F11 -- consulta e exportacao de eventos.
+        '/api/v1/access-events',
+        '/api/v1/access-events/{id}',
+        '/api/v1/access-events/exports',
+        '/api/v1/exports/{id}',
+        '/api/v1/exports/{id}/cancel',
+        '/api/v1/exports/{id}/download',
       ]),
     );
   });
