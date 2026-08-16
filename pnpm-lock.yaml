@@ -341,6 +341,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@arenahub/access-policy':
+        specifier: workspace:*
+        version: link:../access-policy
       react:
         specifier: 19.2.8
         version: 19.2.8

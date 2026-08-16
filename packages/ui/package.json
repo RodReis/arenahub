@@ -47,6 +47,7 @@
     "node": ">=22.5.0 <23.0.0"
   },
   "dependencies": {
+    "@arenahub/access-policy": "workspace:*",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   }
