@@ -81,6 +81,10 @@ describe('contrato OpenAPI', () => {
         '/api/v1/subscriptions',
         '/api/v1/subscriptions/{id}/actions',
         '/api/v1/entitlements/courtesy',
+        // F8 -- consentimento biometrico.
+        '/api/v1/consent-documents/biometric',
+        '/api/v1/consent-documents/biometric/current',
+        '/api/v1/students/{id}/biometric-consent',
       ]),
     );
   });

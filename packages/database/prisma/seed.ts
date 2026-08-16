@@ -85,6 +85,19 @@ const PERMISSOES = [
   'plan.manage',
   'plan.read',
   'subscription.manage',
+  // F8: consentimento, biometria e sincronizacao de dispositivo.
+  //
+  // `biometric.*` e separado de `student.*` de proposito: quem cadastra aluno
+  // na recepcao nao precisa, por isso, enxergar dado biometrico. Dado
+  // sensivel do art. 11 pede permissao propria -- e foi falha de controle de
+  // acesso que motivou a suspensao da ANPD no caso PR.
+  'consent.manage',
+  'consent.read',
+  'biometric.enroll',
+  'biometric.read',
+  'biometric.revoke',
+  'device.manage',
+  'device.read',
 ];
 
 async function semear(): Promise<void> {

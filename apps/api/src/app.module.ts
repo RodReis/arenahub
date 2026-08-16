@@ -12,6 +12,7 @@ import { VerificadorDeRedis } from './health/verificador-de-redis.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { IamModule } from './modules/iam/iam.module.js';
 import { MembershipModule } from './modules/membership/membership.module.js';
+import { PrivacyModule } from './modules/privacy/privacy.module.js';
 import { StudentsModule } from './modules/students/students.module.js';
 import { TenancyModule } from './modules/tenancy/tenancy.module.js';
 import { PersistenceModule } from './persistence/persistence.module.js';
@@ -30,6 +31,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     TenancyModule,
     StudentsModule,
     MembershipModule,
+    PrivacyModule,
   ],
   controllers: [HealthController],
   providers: [
