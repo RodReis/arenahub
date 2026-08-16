@@ -492,7 +492,7 @@ Entrada: decisão de saída do MVP 0 (`MVP-00` §15, `MVP-01` §1) = `GO` ou `GO
 | F | slice | núcleo | bloqueado por |
 |---|---|---|---|
 | ✅ F6 | 1.1 Core seguro e unidade | tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login. **Multiunidade desde o dia 1** (ADR-002): teste de isolamento por `gym_unit_id` junto com o de `tenant_id` | — |
-| 🟡 F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — |
+| 🟢 F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — *(código completo: backend + interface; aguarda só o aceite do PI)* |
 | 🟡 F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | etapa física depende de hardware |
 | 🟡 F9 | 1.4 Decisão online e passagem | Access Decision Engine **na nuvem** (ADR-004) como função pura versionada, `AccessEvent` imutável, `AccessPassage`, override auditado | medição em hardware pendente; **tela pública** depende do `DESIGN-UI` §12.4 |
 | 🟡 F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo e **alerta obrigatório quando o Edge some** (ADR-011), consulta e exportação de eventos | piloto e ensaio de runbook pendentes |
@@ -506,14 +506,36 @@ incluindo os limites conhecidos, em
 Com ela **os oito comandos raiz ficaram verdes** — `test:integration` na Task 1 e `test:e2e` na
 Task 6. A lista de pendentes do CI acabou.
 
-🟡 **F7 — backend entregue em 15/08/2026; a interface da recepção fica para o PR seguinte.**
-`Student` com matrícula gerada por contador travado (`SELECT ... FOR UPDATE`, provado com 20
-criações concorrentes), ciclo de vida, `Plan` com janelas em tabela normalizada, assinatura
-manual e **`Entitlement` derivado com snapshot imutável de política**. **229 testes** no
-repositório (106 novos), entre eles **6 propriedades** com fast-check — INV-035 (*entitlement
-expirado nunca é efetivo*) passou a ter prova sobre 500 combinações geradas, não sobre os casos
-que eu lembrei de escrever. Evidência, escopo negativo e limites em
-[`docs/operations/smart-access/students-entitlements-evidence.md`](operations/smart-access/students-entitlements-evidence.md).
+🟢 **F7 — backend em 15/08/2026, interface da recepção em 16/08/2026. Código completo; falta o
+aceite do PI.**
+
+**Backend.** `Student` com matrícula gerada por contador travado (`SELECT ... FOR UPDATE`,
+provado com 20 criações concorrentes), ciclo de vida, `Plan` com janelas em tabela normalizada,
+assinatura manual e **`Entitlement` derivado com snapshot imutável de política**. **106 testes
+novos**, entre eles **6 propriedades** com fast-check — INV-035 (*entitlement expirado nunca é
+efetivo*) passou a ter prova sobre 500 combinações geradas, não sobre os casos que eu lembrei de
+escrever.
+
+**Interface.** Cinco telas em `apps/admin-web`: busca, cadastro, ficha, histórico e planos.
+**`M1-AC-002` e `M1-AC-003` fecharam** — o aceite da Slice 1.2 diz *"a recepção cadastra aluno,
+atribui plano e visualiza exatamente quando e onde o acesso é válido"*, e até este PR isso só
+acontecia por `curl`. A ficha responde *"entra agora?"* na primeira linha e mostra a janela como
+`Segunda, 06:00–22:00` com a unidade **pelo nome** — não `startMinute: 360` e um UUID. **43
+testes unitários e 17 E2E novos**, os E2E contra API e banco reais.
+
+De quebra, `students/[id]/biometrics` (F8) deixou de ser rota órfã: agora se chega nela pela
+ficha.
+
+**Duas decisões desta entrega, ambas registradas na evidência:** o **Toast exigido pelo
+`CLAUDE.md` não foi implementado** — o `admin-web` não tem uma linha de CSS e o `DESIGN-UI.md`
+segue `RASCUNHO` com 8 decisões abertas; as telas seguem o `role="alert"`/`role="status"` de F6,
+F9 e F11, e o débito virou sugestão de card `[INFRA]`. E o cliente passou a **espelhar a tabela
+de transições do domínio** para o select não oferecer o que a API recusa — com teste que compara
+as duas tabelas linha a linha, porque o espelho já divergiu uma vez dentro desta própria fatia.
+
+Evidência, escopo negativo e limites em
+[`docs/operations/smart-access/students-entitlements-evidence.md`](operations/smart-access/students-entitlements-evidence.md)
+— §12 cobre a interface.
 
 🟡 **F8 — Tasks 1 a 6 entregues em 16/08/2026, em `SIMULATOR_READY`. A Task 7 não rodou.**
 
@@ -739,3 +761,9 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 14/08/2026 | **F3** *(adapter)* | SPEC-003 | [#59](https://github.com/RodReis/arenahub/pull/59) | adapter da catraca sobre ponte EasyInner. **ADR-010 fechado:** catraca exige processo Windows x86; leitor facial não. Contrato da ponte definido |
 | 14/08/2026 | **F4** | SPEC-004 | [#60](https://github.com/RodReis/arenahub/pull/60) | offline e reconciliação: fila SQLite durável, reenvio idempotente, cache de permissões com prazo, relatório com limitações citadas |
 | 15/08/2026 | — *(#61)* | — | [#62](https://github.com/RodReis/arenahub/pull/62) | ponte EasyInner nativa: processo .NET 4.x x86 por stdio + lado Node. **Fecha a forma da ponte do ADR-010.** Ponte carrega a DLL e escuta na 3570; **giro real aguarda cutover** — a catraca aponta para o legado `.106` |
+| 15/08/2026 | **F6** | SPEC-006 | [#69](https://github.com/RodReis/arenahub/pull/69) | core seguro e unidade: `apps/api` e `apps/admin-web` nasceram, tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login |
+| 15/08/2026 | **F7** *(backend)* | SPEC-007 | [#70](https://github.com/RodReis/arenahub/pull/70) | aluno com matrícula colisão-segura, planos com janelas, assinatura manual, **entitlement derivado com snapshot imutável**, cortesia e timeline. 9 rotas, 106 testes novos |
+| 16/08/2026 | **F8** | SPEC-008 | [#71](https://github.com/RodReis/arenahub/pull/71) | consentimento versionado, `BiometricIdentity` sem coluna de template, fila durável com lease e dead letter, revogação com bloqueio lógico imediato |
+| 16/08/2026 | **F9** | SPEC-009 | [#74](https://github.com/RodReis/arenahub/pull/74) | decisão online na nuvem como função pura versionada, `AccessEvent` imutável, `AccessPassage`, override auditado |
+| 16/08/2026 | **F11** | SPEC-011 | [#75](https://github.com/RodReis/arenahub/pull/75) | painel operacional, saúde de dispositivo, alerta quando o Edge some, consulta e exportação de eventos |
+| 16/08/2026 | **F7** *(interface, fecha)* | SPEC-007 | *(este PR)* | interface da recepção: busca, cadastro, ficha com direitos, histórico e planos. **`M1-AC-002` e `M1-AC-003` fecham** — o aceite deixou de depender de `curl`. 43 unitários + 17 E2E novos. **Toast do `CLAUDE.md` não implementado** — débito anterior à fatia, sugerido card `[INFRA]` |

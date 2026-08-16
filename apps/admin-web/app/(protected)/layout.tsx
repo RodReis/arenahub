@@ -34,6 +34,8 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
           <a href="/access-events">Eventos de acesso</a>
           <a href="/access/override">Liberação manual</a>
           <a href="/operations/devices">Dispositivos</a>
+          <a href="/students">Alunos</a>
+          <a href="/plans">Planos</a>
           <a href="/units">Unidades</a>
         </nav>
         <div>

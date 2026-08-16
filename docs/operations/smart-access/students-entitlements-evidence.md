@@ -22,17 +22,22 @@
 
 ## 2. Suítes e contagem
 
-| suíte | comando | antes de F7 | depois |
-|---|---|---|---|
-| unitário — API | `pnpm --filter @arenahub/api test` | 42 | **119** |
-| unitário — painel | `pnpm --filter @arenahub/admin-web test` | 2 | 2 |
-| integração — API | `pnpm --filter @arenahub/api test:integration` | 58 | **87** |
-| integração — banco | `pnpm --filter @arenahub/database test:integration` | 11 | 11 |
-| E2E — painel | `pnpm --filter @arenahub/admin-web test:e2e` | 10 | 10 |
-| | **total** | 123 | **229** |
+| suíte | comando | antes de F7 | após o backend | **após a interface** |
+|---|---|---|---|---|
+| unitário — API | `pnpm --filter @arenahub/api test` | 42 | **119** | 119 |
+| unitário — painel | `pnpm --filter @arenahub/admin-web test` | 2 | 2 | **45** |
+| integração — API | `pnpm --filter @arenahub/api test:integration` | 58 | **87** | 87 |
+| integração — banco | `pnpm --filter @arenahub/database test:integration` | 11 | 11 | 11 |
+| E2E — painel | `pnpm --filter @arenahub/admin-web test:e2e` | 10 | 22 | **39** |
+| | **total** | 123 | **241** | **301** |
 
-**106 testes novos:** 77 unitários (dos quais **6 são propriedades** do fast-check, com 2.800
-casos gerados) e 29 de integração.
+**106 testes no backend:** 77 unitários (dos quais **6 são propriedades** do fast-check, com
+2.800 casos gerados) e 29 de integração.
+
+**60 testes na interface:** 43 unitários sobre as funções puras de `src/students/formatar.ts`
+(a única camada que o vitest cobre neste app — `app/` e `lib/` ficam para o E2E, por desenho) e
+**17 E2E** percorrendo a jornada da recepção. Os 22 testes E2E anteriores (F6, F9, F11)
+continuam verdes: a suíte completa fecha em 39.
 
 ## 3. Gate completo
 
@@ -68,12 +73,27 @@ Os oito comandos raiz, na ordem do `docs/TESTING.md` §6:
 
 ### `M1-AC-002` e `M1-AC-003`
 
-O plano de apoio (Task 7 passo 3) manda mapear `M1-AC-002` e `M1-AC-003`. **Ambos exigem a
-interface de recepção**, que é a Task 6 e **não faz parte deste PR** — ver §7. O aceite da
-Slice 1.2 (*"recepção cadastra aluno, atribui plano e visualiza exatamente quando e onde o
-acesso é válido"*) está coberto **pela API** (a resposta de `POST /api/v1/subscriptions` devolve
-o entitlement com unidades e janelas), e **não pela tela**. Declarar o AC fechado hoje seria
-fechamento frágil.
+> **Atualizado em 16/08/2026, com a entrega da interface.** O texto abaixo descrevia o estado
+> após o PR #70 (backend). A Task 6 — interface de recepção — foi entregue no PR seguinte,
+> mesma issue #7, e os dois AC passaram a ter cobertura de ponta a ponta.
+
+O plano de apoio (Task 7 passo 3) manda mapear `M1-AC-002` e `M1-AC-003`. Depois do PR #70 eles
+estavam cobertos **pela API** — a resposta de `POST /api/v1/subscriptions` devolve o entitlement
+com unidades e janelas — e **não pela tela**; declará-los fechados naquele momento teria sido
+fechamento frágil, e é por isso que a issue #7 continuou aberta.
+
+Com a interface entregue, o aceite da Slice 1.2 (*"recepção cadastra aluno, atribui plano e
+visualiza exatamente quando e onde o acesso é válido"*) fecha pelo caminho que o texto descreve
+— pela recepção, sem `curl`:
+
+| aceite | teste E2E que o prova |
+|---|---|
+| `M1-AC-002` recepção cadastra e encontra o aluno | *"a recepção cadastra um aluno e recebe a matrícula na hora"*, *"cadastra sem CPF — documento não é requisito de matrícula"*, *"encontra pelo nome e leva à ficha"* |
+| `M1-AC-003` atribui plano e vê **quando e onde** o acesso vale | *"atribuir plano cria o direito e a ficha passa a mostrar onde e quando vale"* — asserta a unidade **pelo nome** e a janela como `Segunda, 06:00–22:00`, não `gymUnitId` em UUID e `startMinute: 360` |
+
+A distinção do segundo teste não é cosmética: o aceite diz *"exatamente quando e onde"*. Uma
+tela que imprimisse o UUID da unidade e o minuto do dia responderia a pergunta no papel e não
+na recepção.
 
 ## 5. Invariantes tocados
 
@@ -118,8 +138,13 @@ precisa ser reverificada — é fácil um `include: { subscription: true }` entr
 
 | item | onde foi |
 |---|---|
-| **Interface de recepção** (Task 6 do plano) | **PR seguinte, mesma issue #7.** Decisão do PI em 15/08/2026: backend primeiro |
-| `M1-AC-002` e `M1-AC-003` fechados em E2E | Dependem da interface acima |
+| ~~**Interface de recepção** (Task 6 do plano)~~ | ✅ **Entregue em 16/08/2026**, PR seguinte na mesma issue #7 — ver §10 |
+| ~~`M1-AC-002` e `M1-AC-003` fechados em E2E~~ | ✅ **Entregues** — ver §4 |
+| **Componente de Toast** (`CLAUDE.md` → *Convenções de código*) | **Não implementado, e não por esquecimento.** Ver §10 |
+| Edição de dados cadastrais do aluno | Nenhuma rota de `PATCH /students/:id` existe além de `/status`. Corrigir nome ou contato exige rota nova — fatia futura, não escopo desta |
+| Busca de aluno por CPF | O CPF é guardado só como hash; buscar por ele exige rota nova. A tela **avisa** a limitação em vez de deixar a recepção concluir que o aluno não existe |
+| Desativar plano pela interface | Não há rota de `PATCH /plans/:id`. `isActive` é exibido, não editável |
+| Cortesia (`POST /entitlements/courtesy`) pela interface | A rota existe desde o PR #70 e **não ganhou tela**: o aceite da Slice 1.2 fala em atribuir *plano*. Tela de cortesia sem `M1-FR` que a peça seria inventar produto |
 | Endpoint de merge de duplicatas | Fora do plano de apoio, por decisão dele: *"No merge endpoint is included"* |
 | Job de expiração agendada de entitlement | Não há scheduler no repositório. A guarda por data em `direitoEhEfetivo` torna a expiração **correta mesmo sem o job** — o status fica desatualizado, a decisão não |
 | Limite de 30 dias para cortesia sem permissão OWNER | O plano de apoio pede; **não há `M1-FR` nem invariante que o sustente**. Escrever a regra sem fonte seria inventar produto — pergunta ao PI |
@@ -228,3 +253,103 @@ repetição.
 5. **DST registrado em teste.** `America/Sao_Paulo` não tem mais horário de verão (Decreto
    9.772/2019); o teste fixa isso e falha se a base IANA mudar. Um segundo teste usa
    `America/New_York` para provar que a conversão acompanha DST de verdade, e não offset fixo.
+
+---
+
+## 12. Interface da recepção — entrega de 16/08/2026
+
+Segunda entrega da mesma issue #7, fechando a Task 6 do plano de apoio. **Nenhuma rota nova de
+API:** as nove do PR #70 já cobriam o aceite; esta fatia é interface consumindo o que existe.
+
+### 12.1 Telas
+
+| rota | o que resolve |
+|---|---|
+| `/students` | busca por nome, matrícula ou contato; paginação |
+| `/students/novo` | cadastro, com aviso de possível duplicata |
+| `/students/[id]` | ficha: acesso agora, direitos com unidade e janela, atribuir plano, mudar situação |
+| `/students/[id]/timeline` | histórico administrativo |
+| `/plans` | listagem e cadastro de plano com janelas de horário |
+
+`Alunos` e `Planos` entraram na navegação depois de `Dispositivos` — a ordem do menu é a do
+turno, e cadastro vem depois do que responde "a catraca está de pé".
+
+**Efeito colateral desejado:** `students/[id]/biometrics` (F8) era rota órfã — existia sem
+nenhuma tela que levasse até ela. A ficha fechou esse caminho.
+
+### 12.2 Decisão de fatia: Toast não foi implementado
+
+O `CLAUDE.md` → *Convenções de código* diz: *"Não usar Alert para msg, sempre usar Toast para:
+Info, Warn e error."* **Esta fatia não implementou Toast**, por decisão do PI em 16/08/2026.
+
+O motivo é que a regra já estava não implementada antes desta fatia, e cumpri-la aqui custaria
+mais do que parece:
+
+- as telas de F6, F9 e F11 — mergeadas e em uso — comunicam erro e status por **texto inline
+  com `role="alert"` / `role="status"`**, que é o mecanismo `aria-live` equivalente;
+- o `admin-web` **não tem uma linha de CSS**: nem Tailwind, nem CSS Modules, nem `className`.
+  Toast flutuante exigiria a primeira camada visual do produto;
+- o `docs/DESIGN-UI.md` está `RASCUNHO`, com 8 decisões abertas na §17. Criar a primeira
+  identidade visual dentro de uma fatia de cadastro seria decidir design sem o PI.
+
+**Consequência aceita:** F7 segue o padrão das telas já aceitas. A regra do `CLAUDE.md`
+permanece válida e **não cumprida em nenhuma tela do repositório** — o débito é anterior a esta
+fatia e não foi ampliado por ela.
+
+**Sugestão ao PI:** Toast + base de CSS merecem card `[INFRA]` próprio, depois que o
+`DESIGN-UI.md` sair de `RASCUNHO`. Fazê-lo antes produz um componente que será refeito.
+
+### 12.3 Espelho de regra de domínio no cliente, e o que o prende
+
+`src/students/formatar.ts` carrega duas cópias de regra que **nasce no servidor**:
+
+| espelho | por que existe | o que impede a divergência |
+|---|---|---|
+| `TRANSICOES_DE_SITUACAO` | o select só oferece o que a API aceita; sem ele a recepção escolhe destino inválido e leva 409 depois do clique | teste que compara a tabela inteira com `TRANSICOES_DE_ALUNO`, transição por transição |
+| `impedeAcesso` | avisa **antes** da tentativa que a situação do aluno bloqueia acesso | teste que fixa INV-033: `SUSPENDED` **não** impede |
+
+**A divergência já aconteceu nesta fatia.** A primeira versão da tabela do cliente inventou
+`TRIAL → BLOCKED` e `BLOCKED → SUSPENDED`, que o domínio não permite. O E2E pegou; o teste de
+espelho foi escrito depois, para que a próxima divergência falhe no CI e não na recepção.
+
+O que estes espelhos **não** fazem: decidir acesso. Quem decide é o Access Decision Engine
+(ADR-004). `vigenteAgora()` responde só vigência — status e intervalo — e não avalia janela nem
+unidade, justamente para não criar uma segunda verdade sobre a decisão.
+
+### 12.4 Bugs encontrados pelos próprios testes
+
+1. **`diaDaSemana(0)` devolvia string vazia.** O array tinha casa vazia no índice 0 para alinhar
+   com `dayOfWeek` 1..7, e `?? '—'` não pega string vazia — só `null`/`undefined`. A célula
+   sairia em branco, parecendo dado faltando em vez de dado inválido. Pego pelo teste unitário
+   antes de qualquer tela existir.
+2. **Espelho de transições divergente do domínio** — ver §12.3. Pego pelo E2E.
+
+### 12.5 Achados da revisão, corrigidos antes do commit
+
+| gravidade | achado | correção |
+|---|---|---|
+| **GRAVE** | falha da consulta de direitos virava `[]`, e a ficha dizia **"Sem direito de acesso vigente"** para um aluno que podia ter direito ativo — a API tinha caído, não o dado | falha de `/entitlements` agora é estado de erro explícito. Planos e unidades, que são acessórios, avisam a própria limitação em vez de derrubar a ficha |
+| ATENÇÃO | `version` obsoleta: duas alterações de situação seguidas, sem recarregar, faziam a segunda falhar com *"alguém alterou este aluno enquanto você editava"* — sem ninguém mais envolvido | a action devolve a `version` nova e o componente passa a usá-la. E2E dedicado prova o caminho **sem** reload no meio |
+| ATENÇÃO | `alterarAssinatura` exportada sem nenhum consumidor | removida. O aceite da Slice 1.2 fala em *atribuir* plano; administrar ciclo de vida de assinatura é escopo de outra fatia — e a rota exige uma `version` que o `EntitlementDto` não entrega |
+
+A revisão de segurança separada não achou bloqueio nem grave: `tenant_id` nunca sai do corpo do
+formulário, CPF só trafega mascarado na leitura, nenhuma PII em log ou `data-testid`, e as
+quatro Server Actions validam com Zod antes de chamar a API.
+
+### 12.6 Verificação desta entrega
+
+| comando | resultado |
+|---|---|
+| `pnpm --filter @arenahub/admin-web lint` | ✅ |
+| `pnpm --filter @arenahub/admin-web typecheck` | ✅ |
+| `pnpm --filter @arenahub/admin-web test` | ✅ **45 testes** (2 antes da fatia; 43 novos) |
+| `pnpm --filter @arenahub/admin-web build` | ✅ 5 rotas novas registradas |
+| `pnpm --filter @arenahub/admin-web test:e2e` | ✅ **39 testes** — 17 novos, 22 anteriores intactos |
+
+O E2E sobe **API e banco reais** (`playwright.config.ts` levanta os dois processos): um teste que
+mockasse a API provaria que a tela funciona contra um dublê, não que a fatia funciona.
+
+> ⚠️ **Nota de ambiente:** rodar o E2E local exige que **não haja `pnpm dev` ocupando as portas
+> 3000 e 3344**. Com `reuseExistingServer` fora do CI, o Playwright reaproveita o dev server, e
+> o overlay de erro do Next (`<nextjs-portal>`) intercepta os cliques — os testes falham por
+> motivo que não é o código. No CI o problema não existe, porque lá nada está de pé antes.

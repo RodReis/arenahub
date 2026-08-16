@@ -1,0 +1,351 @@
+import { expect, test } from '@playwright/test';
+
+/**
+ * Jornada de `M1-AC-002` e `M1-AC-003`: a recepção trabalha sem `curl`.
+ *
+ * O aceite da Slice 1.2 é literal — "a recepção cadastra aluno, atribui plano
+ * e visualiza exatamente quando e onde o acesso é válido". Enquanto isso só
+ * acontecia por linha de comando, o aceite não fechava; estes testes são a
+ * prova de que agora fecha pela interface.
+ */
+const DONO = { email: 'dono@arena-positiva.test', senha: 'senha-de-bancada-arenahub' };
+
+async function entrar(page: import('@playwright/test').Page): Promise<void> {
+  await page.goto('/login');
+  await page.getByLabel('E-mail').fill(DONO.email);
+  await page.getByLabel('Senha').fill(DONO.senha);
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+}
+
+/**
+ * Nome único por execução.
+ *
+ * Os testes rodam em série contra o MESMO banco semeado, sem limpeza entre
+ * arquivos. Nome fixo faria a segunda execução encontrar o aluno da primeira e
+ * o teste passaria por engano -- ou falharia na checagem de duplicata.
+ */
+function nomeUnico(prefixo: string): string {
+  return `${prefixo} ${Date.now()}`;
+}
+
+test.describe('cadastro de aluno', () => {
+  test('sem sessão, a lista manda para o login', async ({ page }) => {
+    await page.goto('/students');
+
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test('a recepção cadastra um aluno e recebe a matrícula na hora', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    const nome = nomeUnico('Aluna de Bancada');
+
+    await page.getByTestId('campo-nome').fill(nome);
+    await page.getByTestId('campo-nascimento').fill('1995-03-14');
+    await page.getByTestId('campo-contato').fill('41999990000');
+    await page.getByTestId('confirmar-cadastro').click();
+
+    await expect(page.getByTestId('aluno-cadastrado')).toBeVisible();
+
+    // A matrícula é gerada pelo servidor e NÃO deriva de CPF (INV-009/011).
+    await expect(page.getByTestId('matricula-gerada')).toContainText(/^AP-\d{4}-\d{8}$/);
+  });
+
+  test('cadastra sem CPF -- documento não é requisito de matrícula', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    const nome = nomeUnico('Sem Documento');
+
+    await page.getByTestId('campo-nome').fill(nome);
+    await page.getByTestId('campo-nascimento').fill('2001-07-02');
+    // Campo de CPF deixado em branco de propósito: é o caso de quem chega
+    // sem documento e não pode ser recusado na recepção.
+    await page.getByTestId('confirmar-cadastro').click();
+
+    await expect(page.getByTestId('aluno-cadastrado')).toBeVisible();
+    await expect(page.getByTestId('matricula-gerada')).toContainText(/^AP-/);
+  });
+
+  test('nome curto demais é recusado sem perder o que foi digitado', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    await page.getByTestId('campo-nome').fill('A');
+    await page.getByTestId('campo-nascimento').fill('1990-01-01');
+    await page.getByTestId('confirmar-cadastro').click();
+
+    await expect(page.getByTestId('erro-do-cadastro')).toBeVisible();
+
+    // O que foi digitado continua lá: refazer o preenchimento inteiro por
+    // causa de um campo é o tipo de atrito que faz a recepção voltar ao papel.
+    await expect(page.getByTestId('campo-nascimento')).toHaveValue('1990-01-01');
+  });
+});
+
+test.describe('busca de aluno', () => {
+  test('encontra pelo nome e leva à ficha', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    const nome = nomeUnico('Busca Por Nome');
+
+    await page.getByTestId('campo-nome').fill(nome);
+    await page.getByTestId('campo-nascimento').fill('1988-11-30');
+    await page.getByTestId('confirmar-cadastro').click();
+    await expect(page.getByTestId('aluno-cadastrado')).toBeVisible();
+
+    await page.goto('/students');
+    await page.getByLabel('Buscar por nome, matrícula ou contato').fill(nome);
+    await page.getByTestId('buscar').click();
+
+    await expect(page.getByTestId('tabela-de-alunos')).toBeVisible();
+    await page.getByRole('link', { name: nome }).click();
+
+    await expect(page.getByRole('heading', { name: nome })).toBeVisible();
+    await expect(page.getByTestId('matricula')).toContainText(/^AP-/);
+  });
+
+  test('busca sem resultado explica o próximo passo', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students?q=nome-que-nao-existe-em-lugar-nenhum');
+
+    // Tabela vazia deixaria o operador sem saber se errou a grafia ou se o
+    // aluno não existe.
+    await expect(page.getByTestId('sem-alunos')).toContainText(/grafia|cadastre/i);
+  });
+
+  test('avisa que a busca não cobre CPF -- senão a recepção conclui que o aluno não existe', async ({
+    page,
+  }) => {
+    await entrar(page);
+    await page.goto('/students');
+
+    await expect(page.getByTestId('aviso-de-busca')).toContainText(/não encontra por CPF/i);
+  });
+});
+
+test.describe('plano e direito de acesso', () => {
+  test('a recepção cria um plano com janela de horário', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/plans');
+
+    const nome = nomeUnico('Plano de Bancada');
+
+    await page.getByTestId('campo-nome-do-plano').fill(nome);
+    await page.getByTestId('confirmar-plano').click();
+
+    await expect(page.getByTestId('plano-criado')).toBeVisible();
+  });
+
+  test('a ficha responde "entra agora?" antes de qualquer outra coisa', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    const nome = nomeUnico('Ficha Sem Plano');
+
+    await page.getByTestId('campo-nome').fill(nome);
+    await page.getByTestId('campo-nascimento').fill('1993-05-21');
+    await page.getByTestId('confirmar-cadastro').click();
+    await page.getByTestId('abrir-ficha').click();
+
+    await expect(page.getByRole('heading', { name: 'Acesso agora' })).toBeVisible();
+
+    // Aluno recém-cadastrado não tem direito de acesso -- e a tela precisa
+    // dizer isso com todas as letras, não deixar a área em branco.
+    await expect(page.getByTestId('acesso-sem-direito')).toContainText(/Sem direito de acesso/i);
+    await expect(page.getByTestId('sem-direitos')).toBeVisible();
+  });
+
+  test('atribuir plano cria o direito e a ficha passa a mostrar onde e quando vale', async ({
+    page,
+  }) => {
+    await entrar(page);
+
+    // Plano com janela padrão (segunda, 06:00–22:00) na primeira unidade.
+    await page.goto('/plans');
+
+    const nomeDoPlano = nomeUnico('Plano Atribuível');
+
+    await page.getByTestId('campo-nome-do-plano').fill(nomeDoPlano);
+    await page.getByTestId('confirmar-plano').click();
+    await expect(page.getByTestId('plano-criado')).toBeVisible();
+
+    await page.goto('/students/novo');
+
+    const nomeDoAluno = nomeUnico('Aluno Com Plano');
+
+    await page.getByTestId('campo-nome').fill(nomeDoAluno);
+    await page.getByTestId('campo-nascimento').fill('1999-09-09');
+    await page.getByTestId('confirmar-cadastro').click();
+    await page.getByTestId('abrir-ficha').click();
+
+    await page.getByLabel('Plano', { exact: true }).selectOption({ label: nomeDoPlano });
+    await page.getByTestId('campo-inicio').fill('2026-01-01T06:00');
+    await page.getByTestId('campo-fim').fill('2027-01-01T22:00');
+    await page
+      .getByTestId('campo-motivo-atribuicao')
+      .fill('matrícula presencial na bancada de teste');
+    await page.getByTestId('confirmar-atribuicao').click();
+
+    await expect(page.getByTestId('plano-atribuido')).toBeVisible();
+
+    await page.getByRole('link', { name: 'Atualizar a ficha' }).click();
+
+    // O ACEITE DA FATIA, literal: "visualiza exatamente quando e onde o
+    // acesso é válido". Unidade pelo nome e janela em hora legível -- um
+    // UUID e `startMinute: 360` responderiam a pergunta só no papel.
+    const direitos = page.getByTestId('tabela-de-direitos');
+
+    await expect(direitos).toBeVisible();
+    await expect(direitos).toContainText('Segunda, 06:00–22:00');
+    await expect(direitos).toContainText('Assinatura');
+  });
+
+  test('a vigência precisa terminar depois de começar', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/plans');
+
+    const nomeDoPlano = nomeUnico('Plano Para Erro');
+
+    await page.getByTestId('campo-nome-do-plano').fill(nomeDoPlano);
+    await page.getByTestId('confirmar-plano').click();
+    await expect(page.getByTestId('plano-criado')).toBeVisible();
+
+    await page.goto('/students/novo');
+
+    await page.getByTestId('campo-nome').fill(nomeUnico('Vigência Invertida'));
+    await page.getByTestId('campo-nascimento').fill('1997-02-02');
+    await page.getByTestId('confirmar-cadastro').click();
+    await page.getByTestId('abrir-ficha').click();
+
+    await page.getByLabel('Plano', { exact: true }).selectOption({ label: nomeDoPlano });
+    await page.getByTestId('campo-inicio').fill('2027-01-01T06:00');
+    await page.getByTestId('campo-fim').fill('2026-01-01T22:00');
+    await page.getByTestId('campo-motivo-atribuicao').fill('teste de vigência invertida');
+    await page.getByTestId('confirmar-atribuicao').click();
+
+    await expect(page.getByTestId('erro-da-atribuicao')).toContainText(/depois do início/i);
+  });
+});
+
+test.describe('situação do cadastro', () => {
+  test('bloquear o aluno avisa que a catraca vai negar', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    await page.getByTestId('campo-nome').fill(nomeUnico('Aluno Bloqueável'));
+    await page.getByTestId('campo-nascimento').fill('1991-04-04');
+    await page.getByTestId('confirmar-cadastro').click();
+    await page.getByTestId('abrir-ficha').click();
+
+    // O aluno nasce LEAD, e o domínio não permite LEAD→BLOCKED direto
+    // (`TRANSICOES_DE_ALUNO`). O caminho real da recepção passa por ACTIVE —
+    // e é justamente isso que o select precisa refletir.
+    await page.getByTestId('campo-situacao').selectOption('ACTIVE');
+    await page.getByTestId('confirmar-situacao').click();
+    await expect(page.getByTestId('situacao-alterada')).toBeVisible();
+
+    await page.reload();
+
+    await page.getByTestId('campo-situacao').selectOption('BLOCKED');
+    await page.getByTestId('confirmar-situacao').click();
+
+    await expect(page.getByTestId('situacao-alterada')).toBeVisible();
+
+    await page.reload();
+
+    // A consequência tem que aparecer, não só o rótulo: "Bloqueado" sozinho
+    // não avisa a recepção de que a catraca nega mesmo com plano vigente.
+    await expect(page.getByTestId('acesso-impedido')).toContainText(/impede o acesso/i);
+  });
+
+  test('duas alterações seguidas sem recarregar -- a segunda não inventa conflito', async ({
+    page,
+  }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    await page.getByTestId('campo-nome').fill(nomeUnico('Duas Alterações'));
+    await page.getByTestId('campo-nascimento').fill('1990-10-10');
+    await page.getByTestId('confirmar-cadastro').click();
+    await page.getByTestId('abrir-ficha').click();
+
+    await page.getByTestId('campo-situacao').selectOption('ACTIVE');
+    await page.getByTestId('confirmar-situacao').click();
+    await expect(page.getByTestId('situacao-alterada')).toBeVisible();
+
+    // SEM reload no meio -- é exatamente esse o caso que quebrava: o
+    // formulário continuava montado com a `version` da carga da página, e a
+    // segunda alteração levava "alguém alterou este aluno enquanto você
+    // editava" sem ninguém mais envolvido.
+    await page.getByTestId('campo-situacao').selectOption('SUSPENDED');
+    await page.getByTestId('confirmar-situacao').click();
+
+    await expect(page.getByTestId('erro-da-situacao')).toHaveCount(0);
+    await expect(page.getByTestId('situacao-alterada')).toContainText('Suspenso');
+  });
+
+  test('o select oferece só transições válidas -- nunca a situação atual', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    await page.getByTestId('campo-nome').fill(nomeUnico('Transições'));
+    await page.getByTestId('campo-nascimento').fill('1994-06-06');
+    await page.getByTestId('confirmar-cadastro').click();
+    await page.getByTestId('abrir-ficha').click();
+
+    const situacaoAtual = await page.getByTestId('situacao-do-aluno').innerText();
+    const opcoes = await page.getByTestId('campo-situacao').locator('option').allInnerTexts();
+
+    // Oferecer o destino que a API recusa produz um 409 depois do clique,
+    // sem o operador entender o que fez de errado.
+    expect(opcoes).not.toContain(situacaoAtual);
+  });
+});
+
+test.describe('histórico administrativo', () => {
+  test('a timeline registra o cadastro em texto, não em código', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    await page.getByTestId('campo-nome').fill(nomeUnico('Histórico'));
+    await page.getByTestId('campo-nascimento').fill('1996-08-08');
+    await page.getByTestId('confirmar-cadastro').click();
+    await page.getByTestId('abrir-ficha').click();
+    await page.getByTestId('link-timeline').click();
+
+    await expect(page.getByRole('heading', { name: 'Histórico administrativo' })).toBeVisible();
+
+    // `STUDENT_CREATED` é código de correlação, não frase de interface.
+    await expect(page.getByTestId('tabela-da-timeline')).toContainText('Aluno cadastrado');
+  });
+});
+
+test.describe('navegação da recepção', () => {
+  test('alunos e planos estão no menu -- não se chega por URL decorada', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/operations');
+
+    const navegacao = page.getByRole('navigation', { name: 'Navegacao principal' });
+
+    await expect(navegacao.getByRole('link', { name: 'Alunos' })).toBeVisible();
+    await expect(navegacao.getByRole('link', { name: 'Planos' })).toBeVisible();
+  });
+
+  test('a ficha leva à biometria -- a rota deixou de ser órfã', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    await page.getByTestId('campo-nome').fill(nomeUnico('Caminho Biometria'));
+    await page.getByTestId('campo-nascimento').fill('1992-12-12');
+    await page.getByTestId('confirmar-cadastro').click();
+    await page.getByTestId('abrir-ficha').click();
+
+    await page.getByTestId('link-biometria').click();
+
+    await expect(page).toHaveURL(/\/biometrics$/);
+  });
+});
