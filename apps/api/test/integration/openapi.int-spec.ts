@@ -85,6 +85,8 @@ describe('contrato OpenAPI', () => {
         '/api/v1/consent-documents/biometric',
         '/api/v1/consent-documents/biometric/current',
         '/api/v1/students/{id}/biometric-consent',
+        // F8 -- rota de Edge, autenticada por assinatura HMAC (nao por cookie).
+        '/api/v1/edge/heartbeat',
       ]),
     );
   });

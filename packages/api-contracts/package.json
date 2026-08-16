@@ -1,0 +1,35 @@
+{
+  "name": "@arenahub/api-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tipos e schemas compartilhados entre API, Edge e clientes",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@arenahub/config": "workspace:*",
+    "@jest/globals": "29.7.0",
+    "@types/node": "26.2.0",
+    "eslint": "9.39.5",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.12",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22.5.0 <23.0.0"
+  }
+}

@@ -497,6 +497,92 @@
           "Membership"
         ]
       }
+    },
+    "/api/v1/consent-documents/biometric/current": {
+      "get": {
+        "operationId": "ConsentController_documentoVigente",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Consent"
+        ]
+      }
+    },
+    "/api/v1/consent-documents/biometric": {
+      "post": {
+        "operationId": "ConsentController_publicarDocumento",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Consent"
+        ]
+      }
+    },
+    "/api/v1/students/{id}/biometric-consent": {
+      "get": {
+        "operationId": "ConsentController_consultar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Consent"
+        ]
+      },
+      "post": {
+        "operationId": "ConsentController_registrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Consent"
+        ]
+      }
+    },
+    "/api/v1/edge/heartbeat": {
+      "post": {
+        "operationId": "EdgeController_heartbeat",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Edge"
+        ]
+      }
     }
   },
   "info": {

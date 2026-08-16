@@ -57,6 +57,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@arenahub/api-contracts':
+        specifier: workspace:*
+        version: link:../../packages/api-contracts
       '@arenahub/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -90,6 +93,9 @@ importers:
       bullmq:
         specifier: 6.1.1
         version: 6.1.1(ioredis@5.9.0)(pg@8.23.0)
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
       ioredis:
         specifier: 5.9.0
         version: 5.9.0
@@ -194,6 +200,34 @@ importers:
       tsx:
         specifier: 4.23.12
         version: 4.23.12
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/api-contracts:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@arenahub/config':
+        specifier: workspace:*
+        version: link:../config
+      '@jest/globals':
+        specifier: 29.7.0
+        version: 29.7.0
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)
+      jest:
+        specifier: 29.7.0
+        version: 29.7.0(@types/node@26.2.0)
+      ts-jest:
+        specifier: 29.4.12
+        version: 29.4.12(@babel/core@7.29.7)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.29.7))(jest-util@29.7.0)(jest@29.7.0(@types/node@26.2.0))(typescript@5.9.3)
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -2391,6 +2425,10 @@ packages:
   expect@29.7.0:
     resolution: {integrity: sha512-2Zks0hf1VLFYI1kbh0I5jP3KHHyCHpkfyHBzsSXRFgl/Bg9mWYfMW8oD+PdMPlEwy5HNsR9JutYy6pMeOh61nw==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
+
+  express@5.1.0:
+    resolution: {integrity: sha512-DT9ck5YIRU+8GYzzU5kT3eHGA5iL+1Zd0EutOmTE9Dtk+Tvuzd23VBU+ec7HPNSTxXYO55gPV/hq4pSBJDjFpA==}
+    engines: {node: '>= 18'}
 
   express@5.2.1:
     resolution: {integrity: sha512-hIS4idWWai69NezIdRt2xFVofaF4j+6INOpJlVOLDO8zXGpUVEVzIYk12UUi2JzjEzWL3IOAxcTubgz9Po0yXw==}
@@ -6395,6 +6433,38 @@ snapshots:
       jest-matcher-utils: 29.7.0
       jest-message-util: 29.7.0
       jest-util: 29.7.0
+
+  express@5.1.0:
+    dependencies:
+      accepts: 2.0.0
+      body-parser: 2.3.0
+      content-disposition: 1.1.0
+      content-type: 1.0.5
+      cookie: 0.7.2
+      cookie-signature: 1.2.2
+      debug: 4.4.3
+      encodeurl: 2.0.0
+      escape-html: 1.0.3
+      etag: 1.8.1
+      finalhandler: 2.1.1
+      fresh: 2.0.0
+      http-errors: 2.0.1
+      merge-descriptors: 2.0.0
+      mime-types: 3.0.2
+      on-finished: 2.4.1
+      once: 1.4.0
+      parseurl: 1.3.3
+      proxy-addr: 2.0.7
+      qs: 6.15.3
+      range-parser: 1.3.0
+      router: 2.2.0
+      send: 1.2.1
+      serve-static: 2.2.1
+      statuses: 2.0.2
+      type-is: 2.1.0
+      vary: 1.1.2
+    transitivePeerDependencies:
+      - supports-color
 
   express@5.2.1:
     dependencies:
