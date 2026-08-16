@@ -9,27 +9,38 @@
  *
  * Traçado do Lucide (ISC), redesenhado em 24x24 com stroke 2.
  */
-export type IconName =
-  | 'check-circle'
-  | 'x-circle'
-  | 'alert-circle'
-  | 'alert-triangle'
-  | 'clock'
-  | 'minus'
-  | 'ban'
-  | 'user-check'
-  | 'user-minus'
-  | 'user-x'
-  | 'user-plus'
-  | 'key-round'
-  | 'scan-face'
-  | 'wifi'
-  | 'wifi-off'
-  | 'copy'
-  | 'refresh-cw'
-  | 'archive'
-  | 'calendar-x'
-  | 'hourglass';
+export const ICON_NAMES = [
+  'check-circle',
+  'x-circle',
+  'alert-circle',
+  'alert-triangle',
+  'clock',
+  'minus',
+  'ban',
+  'user-check',
+  'user-minus',
+  'user-x',
+  'user-plus',
+  'key-round',
+  'scan-face',
+  'wifi',
+  'wifi-off',
+  'copy',
+  'refresh-cw',
+  'archive',
+  'calendar-x',
+  'hourglass',
+] as const;
+
+/**
+ * O tipo DERIVA da lista, nunca o contrario.
+ *
+ * Com a uniao escrita a mao ao lado do array, as duas divergem no primeiro
+ * icone novo -- e a que o teste percorre seria a desatualizada, deixando o
+ * icone recem-adicionado sem cobertura justamente na entrega em que ele
+ * chegou.
+ */
+export type IconName = (typeof ICON_NAMES)[number];
 
 const PATHS: Record<IconName, readonly string[]> = {
   'check-circle': ['M21.8 10A10 10 0 1 1 17 3.34', 'm9 11 3 3L22 4'],
