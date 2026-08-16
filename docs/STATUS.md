@@ -142,7 +142,7 @@ estacionadas: F12–F16 por ADR-013, F17–F41 porque o MVP ainda não foi discu
 > ✅ **Pendência do padrão de título — resolvida em 16/08/2026 pelo ADR-025.** O `CLAUDE.md`
 > definia só `[MVP0]`…`[MVP6]`, e a issue #10 (F10) ficou sem token porque o MVP 1.5 não tinha
 > um. **O PI criou `[MVP1.5]` e `[MVP2.5]`.** Agora são verdade — os MVPs existem e estão
-> escritos, então a regra de ouro está satisfeita. O título da #10 precisa ser corrigido para
+> escritos, então a regra de ouro está satisfeita. O título da #10 **já foi corrigido** para
 > `[MVP1.5][SPEC-010][F10] Operação offline`.
 
 ---
@@ -269,16 +269,21 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F39 | SPEC-039 | 6 | 6.4 | Experimento operacional | [`SPEC-039-experimento-operacional.md`](specs/SPEC-039-experimento-operacional.md) | [#39](https://github.com/RodReis/arenahub/issues/39) | planejada |
 | F40 | SPEC-040 | 6 | 6.5 | Modelo supervisionado (condicionado a M6-ML-01) | [`SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md`](specs/SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md) | [#40](https://github.com/RodReis/arenahub/issues/40) | planejada |
 | F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | [`SPEC-041-producao-controlada-e-monitoramento.md`](specs/SPEC-041-producao-controlada-e-monitoramento.md) | [#41](https://github.com/RodReis/arenahub/issues/41) | planejada |
-| F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | — | aprovada-pi |
-| F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | — | aprovada-pi *(gate: MVP 4)* |
-| F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | — | aprovada-pi *(gate: MVP 4)* |
+| F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | [#81](https://github.com/RodReis/arenahub/issues/81) | aprovada-pi |
+| F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | [#82](https://github.com/RodReis/arenahub/issues/82) | aprovada-pi *(gate: MVP 4)* |
+| F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | aprovada-pi *(gate: MVP 4)* |
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
 > ADR**, não no PRD: o design system é trabalho de plataforma e não tem PRD que o descreva. O
 > ADR-015 foi emendado para admitir isso. A contagem sai de 41 para **44 fatias** — nenhum número
 > reaproveitado.
 >
-> **As três issues ainda não existem** — dependem do board, que continua sendo trabalho `[INFRA]`.
+> ⚠️ **Aqui o número da fatia deixa de coincidir com o da issue — e não volta a coincidir.**
+> F42, F43 e F44 são as issues **#81, #82 e #83**. O alinhamento de F1–F41 com #1–#41 foi
+> acidente de calendário: as 41 issues nasceram em 14/08, antes de qualquer PR, e no GitHub issue
+> e PR dividem o mesmo contador — os PRs #55–#76 consumiram a faixa. **A fonte da numeração é
+> este Índice, nunca o número do GitHub.** A partir daqui a diferença é visível, o que é melhor
+> do que uma coincidência que ensinava a regra errada.
 
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento
