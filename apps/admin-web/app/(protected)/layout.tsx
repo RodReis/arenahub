@@ -24,7 +24,16 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
   return (
     <div>
       <header>
+        {/*
+          A ordem é a do turno: primeiro o que diz se a catraca está de pé,
+          depois a investigação, depois o cadastro. Quem abre o painel com uma
+          pessoa esperando na porta não deveria procurar o link.
+        */}
         <nav aria-label="Navegacao principal">
+          <a href="/operations">Operação</a>
+          <a href="/access-events">Eventos de acesso</a>
+          <a href="/access/override">Liberação manual</a>
+          <a href="/operations/devices">Dispositivos</a>
           <a href="/units">Unidades</a>
         </nav>
         <div>

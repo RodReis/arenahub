@@ -21,6 +21,8 @@
     "test:report:selfcheck": "node scripts/test-report.selfcheck.mjs",
     "build": "node scripts/run-task.mjs build",
     "test:guardas": "node scripts/guardas.test.mjs",
+    "//smoke:smart-access": "Smoke de abertura da unidade (F11). Exige a API de pe; passe --cookie com sessao valida para as verificacoes operacionais.",
+    "smoke:smart-access": "node scripts/smoke/smart-access.mjs",
     "docker:up": "docker compose --env-file .env -f infra/docker/docker-compose.yml up -d --wait",
     "docker:down": "docker compose --env-file .env -f infra/docker/docker-compose.yml down",
     "docker:reset": "docker compose --env-file .env -f infra/docker/docker-compose.yml down -v",

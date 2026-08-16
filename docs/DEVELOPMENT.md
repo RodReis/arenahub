@@ -495,7 +495,7 @@ Entrada: decisão de saída do MVP 0 (`MVP-00` §15, `MVP-01` §1) = `GO` ou `GO
 | 🟡 F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — |
 | 🟡 F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | etapa física depende de hardware |
 | 🟡 F9 | 1.4 Decisão online e passagem | Access Decision Engine **na nuvem** (ADR-004) como função pura versionada, `AccessEvent` imutável, `AccessPassage`, override auditado | medição em hardware pendente; **tela pública** depende do `DESIGN-UI` §12.4 |
-| F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo e **alerta obrigatório quando o Edge some** (ADR-011) | F6–F9 |
+| 🟡 F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo e **alerta obrigatório quando o Edge some** (ADR-011), consulta e exportação de eventos | piloto e ensaio de runbook pendentes |
 
 ✅ **F6 entregue em 15/08/2026.** `apps/api` (NestJS) e `apps/admin-web` (Next.js) nasceram, com
 schema core, autenticação com rotação de sessão, `TenantContext` obrigatório em repositório
@@ -608,6 +608,44 @@ Evidência, limites e o que falta medir em
 > **fechada pelo PI em 16/08/2026** e virou o **ADR-024** (com emenda no mesmo dia). Restam
 > **7** das 8 decisões da §17, não 8 — e a que sobra e importa para esta fatia é a **tela pública
 > da catraca** (item 1). O `STATUS.md` é do Cowork por ADR-021, então **não o corrigi daqui**.
+
+🟡 **F11 — Tasks 1 a 6 entregues em 16/08/2026. O piloto (Task 7) não rodou.**
+
+O painel responde à pergunta que o `psql` respondia: *"a catraca está funcionando?"*. A primeira
+linha da tela diz, em uma frase, se há problema crítico — quem passa entre dois atendimentos lê
+isso e nada mais.
+
+**INV-146 implementado com duas causas, não uma.** O corpo da issue #11 registra o ADR-011
+(segunda rodada) exigindo que o alerta de Edge distinga **ausência** de **falha de renovação de
+credencial** — e o plano de apoio não tinha isso. São códigos separados porque têm a mesma
+consequência (catraca parada) e **ações opostas**: um manda olhar o PC da academia, o outro diz
+explicitamente que *não* é necessário ir até lá.
+
+**Descompasso ADR × schema corrigido:** o ADR-011 diz que a credencial do Edge é "de vida curta e
+o agente a renova sozinho", mas F8 a criou **sem prazo**. Não havia renovação a acompanhar.
+`expiresAt` entrou nulável — nulo significa "sem prazo", não "vencida", senão o primeiro deploy
+derrubaria a catraca de quem já está instalado. E o guard passou a recusar credencial vencida: a
+coluna não é decorativa.
+
+**`fingerprint` único** é o que impede o painel de virar ilegível: sem ele, um Edge fora do ar por
+uma noite geraria ~960 linhas. Condição que persiste atualiza; condição que volta reabre e
+descarta o reconhecimento antigo.
+
+**CSV injection fechada** na exportação. O ataque tem roteiro: cadastra-se aluno chamado
+`=HYPERLINK(...)`, a academia exporta, a recepção abre no Excel e a planilha faz a requisição.
+
+**Fora de escopo, com teste que trava:** `SNAPSHOT_STALE` e `BACKLOG_HIGH` do plano dependem de
+snapshot assinado e fila offline — que são F10 (ADR-012). Alarme que nunca dispara ensina a
+operação a confiar num sensor cego.
+
+**Sem BullMQ**, decisão do PI: o `upsert` idempotente por fingerprint já entrega o que a fila
+distribuída daria. Há teste com dois ciclos simultâneos.
+
+**O que continua em aberto:** o **piloto operacional** (Task 7) não rodou — é turno real, com
+alunos e equipe, e não é código. Os runbooks de instalação, upgrade e rollback estão escritos mas
+**não ensaiados**; a Task 6 exige execução por pessoa diferente do autor, e isso não aconteceu.
+Enquanto o ensaio de rollback com outbox pendente não existir, `M1-NFR-005` e `M1-NFR-006` estão
+**declarados, não verificados**.
 
 **Ordem não negociável:** F6 → F7 → F8 → F9. O motor de acesso (F9) **não pode** vir antes de
 aluno, plano e entitlement — a Especificação §127 sugere o contrário e está errada; F9 sem F7
