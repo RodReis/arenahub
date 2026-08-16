@@ -62,6 +62,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [INFRA] CI: falhar cedo e paralelizar — o ciclo de PR custa ~4min por rodada (#77, finalizado em: 2026-08-16)
 - [MVP1][SPEC-007][F7] Aluno, plano e entitlement manual (#7, finalizado em: 2026-08-16)
 - [MVP1][SPEC-011][F11] Painel operacional e prontidão (#11, finalizado em: 2026-08-16)
 - [MVP1][SPEC-009][F9] Decisão online e passagem (#9, finalizado em: 2026-08-16)
