@@ -1,6 +1,22 @@
-import { carregarConfig, descreverConfig, ConfigInvalidaError } from './config/env.js';
-import { componenteProcesso, montarHeartbeat } from './health/health-check.js';
-import { criarLogger, loggerDaTentativa } from './observability/logger.js';
+import { join } from 'node:path';
+
+import { config as carregarEnv } from 'dotenv';
+
+// O `.env` vive na raiz do monorepo -- mesma fonte que o docker-compose e a
+// API. Em producao o agente roda como servico no Windows, com as variaveis
+// vindo do ambiente; `dotenv` ignora a ausencia do arquivo em silencio, que
+// e o comportamento certo aqui.
+//
+// ORDEM IMPORTA: antes de qualquer import que leia `process.env`. Sem esta
+// linha o agente subia lendo so o ambiente do shell e morria no arranque
+// reclamando de EDGE_AGENT_ID -- com o valor sentado no `.env` ao lado.
+carregarEnv({ path: join(process.cwd(), '../../.env') });
+
+const { carregarConfig, descreverConfig, ConfigInvalidaError } = await import(
+  './config/env.js'
+);
+const { componenteProcesso, montarHeartbeat } = await import('./health/health-check.js');
+const { criarLogger, loggerDaTentativa } = await import('./observability/logger.js');
 
 /**
  * Ponto de entrada do edge-agent.

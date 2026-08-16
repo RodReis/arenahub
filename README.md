@@ -34,6 +34,11 @@ pnpm dev
 | Admin web | http://localhost:3000 |
 | MinIO (console) | http://localhost:9001 |
 
+O `pnpm dev` sobe três processos: API, admin-web e edge-agent (este em modo
+simulador, sem tocar equipamento real). Para mexer na bancada de verdade,
+preencha `TENANT_ID` e `GYM_UNIT_ID` no `.env` — o `.env.example` explica de
+onde tirar os UUIDs, que o seed gera.
+
 Login de desenvolvimento, vindo do seed e **válido só localmente**:
 `dono@arena-positiva.test` / `senha-de-bancada-arenahub`.
 
