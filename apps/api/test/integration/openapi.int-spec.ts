@@ -98,8 +98,9 @@ describe('contrato OpenAPI', () => {
         '/api/v1/edge/sync-results/batch',
         // F8 -- painel de pendencia, rota de operacao (cookie + permissao).
         '/api/v1/device-sync-jobs',
-        // F9 -- decisao online, rota de Edge assinada.
+        // F9 -- decisao online e desfecho da passagem, rotas de Edge assinadas.
         '/api/v1/edge/access-decisions',
+        '/api/v1/edge/access-events/{id}/passage',
       ]),
     );
   });

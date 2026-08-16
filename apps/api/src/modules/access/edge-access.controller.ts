@@ -1,8 +1,9 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Body, Controller, NotFoundException, Param, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 
 import { EdgeRoute } from '../edge-auth/edge-route.decorator.js';
+import { AccessEventRepository } from './access-event.repository.js';
 import {
   DecideOnlineAccessUseCase,
   type DecisaoRespondida,
@@ -31,9 +32,27 @@ const esquemaDeDecisao = z
   })
   .strict();
 
+/**
+ * Desfecho fisico reportado pelo Edge.
+ *
+ * So `CONFIRMED` e `TIMED_OUT`: `PENDING` e estado interno do Edge e
+ * `NOT_APPLICABLE` e consequencia de um `DENY`, que nunca gera comando.
+ * Aceitar os quatro deixaria o Edge escrever estados que ele nao observa.
+ */
+const esquemaDePassagem = z
+  .object({
+    state: z.enum(['CONFIRMED', 'TIMED_OUT']),
+    commandId: z.string().min(1).max(120),
+    reportedAt: z.string().datetime(),
+  })
+  .strict();
+
 @Controller('api/v1/edge')
 export class EdgeAccessController {
-  constructor(private readonly decidir: DecideOnlineAccessUseCase) {}
+  constructor(
+    private readonly decidir: DecideOnlineAccessUseCase,
+    private readonly eventos: AccessEventRepository,
+  ) {}
 
   /**
    * Devolve `ALLOW` ou `DENY` para um reconhecimento.
@@ -68,5 +87,40 @@ export class EdgeAccessController {
       idempotencyKey: dados.idempotencyKey,
       correlationId: requisicao.correlationId ?? 'sem-correlacao',
     });
+  }
+
+  /**
+   * Registra o desfecho fisico da passagem -- `M1-FR-022`.
+   *
+   * Escreve em `AccessPassage`, **nunca no `AccessEvent`**: a decisao e fato
+   * imutavel (`M1-BR-009`), e o giro e outro fato, posterior. Reportar o
+   * mesmo desfecho de novo e inofensivo; reportar um desfecho DIFERENTE do
+   * ja registrado e 409 -- a catraca nao pode ter girado e nao girado.
+   *
+   * O evento e buscado pelo tenant DA ASSINATURA. Um Edge nao fecha passagem
+   * de evento de outra academia nem sabendo o UUID.
+   */
+  @Post('access-events/:id/passage')
+  @EdgeRoute()
+  async registrarPassagem(
+    @Param('id') accessEventId: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ accessEventId: string; state: string }> {
+    const dados = esquemaDePassagem.parse(corpo);
+    const edge = requisicao.edgeContext!;
+
+    const evento = await this.eventos.encontrar(edge.tenantId, accessEventId);
+
+    if (!evento) throw new NotFoundException({ code: 'ACCESS_EVENT_NOT_FOUND' });
+
+    await this.eventos.registrarPassagem(
+      evento.id,
+      dados.state,
+      dados.commandId,
+      new Date(dados.reportedAt),
+    );
+
+    return { accessEventId: evento.id, state: dados.state };
   }
 }

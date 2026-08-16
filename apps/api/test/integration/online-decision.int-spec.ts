@@ -635,6 +635,155 @@ describe('F9 -- decisao online de acesso', () => {
     });
   });
 
+  describe('desfecho da passagem (M1-FR-022)', () => {
+    const decidirEObter = async (): Promise<string> => {
+      await darDireitoVigente(ctx.studentId);
+
+      const resposta = await pedirDecisao();
+      const { accessEventId } = resposta.body as { accessEventId: string };
+
+      await limparDireitos(ctx.studentId);
+
+      return accessEventId;
+    };
+
+    it('registra CONFIRMED sem tocar no evento imutavel', async () => {
+      const accessEventId = await decidirEObter();
+
+      const antes = await db.accessEvent.findUniqueOrThrow({ where: { id: accessEventId } });
+
+      const resposta = await comoEdge(
+        `/api/v1/edge/access-events/${accessEventId}/passage`,
+        {
+          state: 'CONFIRMED',
+          commandId: accessEventId,
+          reportedAt: new Date().toISOString(),
+        },
+      );
+
+      expect(resposta.status).toBe(201);
+
+      const passagem = await db.accessPassage.findUniqueOrThrow({
+        where: { accessEventId },
+      });
+
+      expect(passagem.state).toBe('CONFIRMED');
+
+      // O evento nao mudou -- `M1-BR-009`.
+      const depois = await db.accessEvent.findUniqueOrThrow({ where: { id: accessEventId } });
+
+      expect(depois.outcome).toBe(antes.outcome);
+      expect(depois.occurredAt.toISOString()).toBe(antes.occurredAt.toISOString());
+    });
+
+    it('repetir o mesmo desfecho e inofensivo', async () => {
+      const accessEventId = await decidirEObter();
+
+      const corpo = {
+        state: 'CONFIRMED' as const,
+        commandId: accessEventId,
+        reportedAt: new Date().toISOString(),
+      };
+
+      await comoEdge(`/api/v1/edge/access-events/${accessEventId}/passage`, corpo);
+      const segunda = await comoEdge(
+        `/api/v1/edge/access-events/${accessEventId}/passage`,
+        corpo,
+      );
+
+      expect(segunda.status).toBe(201);
+    });
+
+    it('desfecho DIFERENTE do ja registrado e conflito', async () => {
+      const accessEventId = await decidirEObter();
+
+      await comoEdge(`/api/v1/edge/access-events/${accessEventId}/passage`, {
+        state: 'CONFIRMED',
+        commandId: accessEventId,
+        reportedAt: new Date().toISOString(),
+      });
+
+      const divergente = await comoEdge(
+        `/api/v1/edge/access-events/${accessEventId}/passage`,
+        {
+          state: 'TIMED_OUT',
+          commandId: accessEventId,
+          reportedAt: new Date().toISOString(),
+        },
+      );
+
+      expect(divergente.status).toBe(409);
+    });
+
+    it('nao fecha passagem de evento de outro tenant', async () => {
+      const outroTenant = await db.tenant.create({
+        data: {
+          slug: `f9-vizinho-${sufixo}`,
+          legalName: 'Vizinho LTDA',
+          displayName: 'Vizinho',
+        },
+      });
+
+      const outraUnidade = await db.gymUnit.create({
+        data: {
+          tenantId: outroTenant.id,
+          code: 'UNICA',
+          name: 'Unica',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+
+      const alheio = await db.accessEvent.create({
+        data: {
+          tenantId: outroTenant.id,
+          gymUnitId: outraUnidade.id,
+          outcome: 'ALLOW',
+          reason: 'ACTIVE_ENTITLEMENT',
+          policyVersion: '1.0.0',
+          mode: 'ONLINE',
+          method: 'FACIAL',
+          occurredAt: new Date(),
+          correlationId: randomUUID(),
+          idempotencyKey: `alheio-${randomUUID()}`,
+          detail: {},
+        },
+      });
+
+      const resposta = await comoEdge(
+        `/api/v1/edge/access-events/${alheio.id}/passage`,
+        {
+          state: 'CONFIRMED',
+          commandId: alheio.id,
+          reportedAt: new Date().toISOString(),
+        },
+      );
+
+      expect(resposta.status).toBe(404);
+
+      const passagem = await db.accessPassage.findUnique({
+        where: { accessEventId: alheio.id },
+      });
+
+      expect(passagem).toBeNull();
+    });
+
+    it('recusa estado que o Edge nao observa', async () => {
+      const accessEventId = await decidirEObter();
+
+      const resposta = await comoEdge(
+        `/api/v1/edge/access-events/${accessEventId}/passage`,
+        {
+          state: 'PENDING',
+          commandId: accessEventId,
+          reportedAt: new Date().toISOString(),
+        },
+      );
+
+      expect(resposta.status).toBe(400);
+    });
+  });
+
   describe('deriva de relogio', () => {
     it('registra a deriva mas decide pelo relogio do servidor', async () => {
       await darDireitoVigente(ctx.studentId);
