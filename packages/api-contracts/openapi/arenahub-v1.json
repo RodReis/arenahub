@@ -570,6 +570,191 @@
         ]
       }
     },
+    "/api/v1/devices": {
+      "get": {
+        "operationId": "DevicesController_listar",
+        "parameters": [
+          {
+            "name": "gymUnitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      },
+      "post": {
+        "operationId": "DevicesController_criar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{id}": {
+      "get": {
+        "operationId": "DevicesController_detalhar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      },
+      "patch": {
+        "operationId": "DevicesController_atualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/api/v1/students/{studentId}/biometric-identities": {
+      "get": {
+        "operationId": "BiometricsController_listar",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Biometrics"
+        ]
+      },
+      "post": {
+        "operationId": "BiometricsController_criar",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Biometrics"
+        ]
+      }
+    },
+    "/api/v1/students/{studentId}/biometric-identities/upload": {
+      "post": {
+        "operationId": "BiometricsController_prepararUpload",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Biometrics"
+        ]
+      }
+    },
+    "/api/v1/students/{studentId}/biometric-identities/{identityId}": {
+      "delete": {
+        "operationId": "BiometricsController_revogar",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Biometrics"
+        ]
+      }
+    },
     "/api/v1/edge/heartbeat": {
       "post": {
         "operationId": "EdgeController_heartbeat",
