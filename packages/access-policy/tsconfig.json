@@ -1,0 +1,9 @@
+{
+  "extends": "@arenahub/config/tsconfig/node.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "jest.config.mjs"],
+  "exclude": ["node_modules", "dist"]
+}
