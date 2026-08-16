@@ -40,7 +40,6 @@ updated: 2026-08-16
 - [MVP2][SPEC-014][F14] Cartão e recorrência (#14)
 - [MVP2][SPEC-013][F13] PIX e webhook idempotente (#13)
 - [MVP2][SPEC-012][F12] Ledger operacional e invoice (#12)
-- [SPEC-010][F10] Operação offline (#10)
 
 ## A Fazer
 
@@ -50,6 +49,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP0][SPEC-005][F5] Relatório e decisão (#5)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 - [MVP0][SPEC-003][F3] Catraca e passagem (#3)
