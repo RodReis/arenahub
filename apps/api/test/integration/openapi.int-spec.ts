@@ -70,6 +70,17 @@ describe('contrato OpenAPI', () => {
         '/api/v1/auth/me',
         '/api/v1/units',
         '/api/v1/units/{id}',
+        // F7 -- aluno, plano e entitlement manual.
+        '/api/v1/students',
+        '/api/v1/students/{id}',
+        '/api/v1/students/{id}/status',
+        '/api/v1/students/{id}/entitlements',
+        '/api/v1/students/{id}/timeline',
+        '/api/v1/plans',
+        '/api/v1/plans/{id}',
+        '/api/v1/subscriptions',
+        '/api/v1/subscriptions/{id}/actions',
+        '/api/v1/entitlements/courtesy',
       ]),
     );
   });

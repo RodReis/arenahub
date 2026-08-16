@@ -30,16 +30,43 @@ export { PrismaPg } from '@prisma/adapter-pg';
  */
 export type {
   AuditLog,
+  Entitlement,
+  EntitlementUnitWindow,
   GymUnit,
   InboxReceipt,
   Invitation,
   OutboxEvent,
   Permission,
+  Plan,
+  PlanAccessWindow,
+  PlanUnit,
   Role,
   RolePermission,
   Session,
+  Student,
+  StudentAddress,
+  StudentContact,
+  StudentSequence,
+  StudentTimelineEvent,
+  Subscription,
   Tenant,
   TenantMembership,
   User,
   UserRole,
+} from './generated/client.js';
+
+/**
+ * Enums de status, para o dominio comparar sem string solta.
+ *
+ * Exportados como TIPO, nao como valor: o dominio declara os proprios
+ * literais (funcao pura nao importa client de banco), e estes servem para
+ * amarrar a assinatura de repositorio ao que o Prisma realmente aceita.
+ */
+export type {
+  EntitlementSource,
+  EntitlementStatus,
+  StudentContactType,
+  StudentStatus,
+  StudentTimelineEventType,
+  SubscriptionStatus,
 } from './generated/client.js';

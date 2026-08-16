@@ -78,6 +78,13 @@ const PERMISSOES = [
   'unit.update',
   'user.manage',
   'role.assign',
+  // F7: cadastro de aluno, plano e assinatura manual.
+  'student.create',
+  'student.read',
+  'student.update',
+  'plan.manage',
+  'plan.read',
+  'subscription.manage',
 ];
 
 async function semear(): Promise<void> {
