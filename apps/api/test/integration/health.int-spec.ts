@@ -4,7 +4,9 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
+import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { VerificadorDeBanco } from '../../src/health/verificador-de-banco.js';
+import { VerificadorDeRedis } from '../../src/health/verificador-de-redis.js';
 
 /**
  * `M1-NFR-005` exige RTO documentado; antes disso, exige saber se a API esta
@@ -30,6 +32,13 @@ describe('health e version', () => {
       .useValue({
         verificar: (): Promise<boolean> => Promise.resolve(bancoDisponivel),
       })
+      // Redis e storage entraram no readiness na F8. Esta suite e sobre o
+      // BANCO: mantidos sempre de pe para que a falha aqui signifique o que o
+      // nome do teste diz, e nao "o MinIO local estava fora".
+      .overrideProvider(VerificadorDeRedis)
+      .useValue({ verificar: (): Promise<boolean> => Promise.resolve(true) })
+      .overrideProvider(OBJECT_STORAGE)
+      .useValue({ verificar: (): Promise<boolean> => Promise.resolve(true) })
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -60,7 +69,10 @@ describe('health e version', () => {
       const resposta = await request(servidor()).get('/health/ready');
 
       expect(resposta.status).toBe(200);
-      expect(resposta.body).toEqual({ status: 'ready' });
+      // `dependencies` entrou na F8: readiness passou a dizer QUAL
+      // dependencia esta de pe, nao so que ha alguma. Contrato ampliado --
+      // `status: 'ready'` continua sendo o que a sonda le.
+      expect(resposta.body).toMatchObject({ status: 'ready' });
     });
 
     it('responde 503 com codigo estavel quando o banco nao responde', async () => {

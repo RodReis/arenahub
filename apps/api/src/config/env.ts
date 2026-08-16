@@ -17,7 +17,39 @@ const esquema = z.object({
   JWT_PUBLIC_KEY: z.string().optional(),
   /** 32 bytes em base64, para AES-256-GCM do segredo TOTP. */
   MFA_ENCRYPTION_KEY: z.string().optional(),
+
+  REDIS_URL: z.string().default('redis://127.0.0.1:6379'),
+
+  STORAGE_ENDPOINT: z.string().default('http://127.0.0.1:9000'),
+  STORAGE_REGION: z.string().default('us-east-1'),
+  STORAGE_BUCKET: z.string().default('arenahub-biometrics'),
+  STORAGE_ACCESS_KEY_ID: z.string().optional(),
+  STORAGE_SECRET_ACCESS_KEY: z.string().optional(),
+
+  /**
+   * Teto do arquivo de cadastro, em bytes. Padrao 5 MB.
+   *
+   * Parametro, nao constante: camera de recepcao e celular produzem tamanhos
+   * muito diferentes, e apertar isto no codigo obrigaria deploy para ajustar.
+   */
+  STORAGE_MAX_ENROLLMENT_BYTES: z.coerce.number().int().positive().default(5_242_880),
+
+  /** Validade da URL pre-assinada de cadastro, em segundos. Padrao 5 min. */
+  STORAGE_UPLOAD_TTL_SECONDS: z.coerce.number().int().positive().default(300),
 });
+
+/** Storage privado S3-compativel. MinIO em dev, S3 em producao. */
+export interface ConfigDeStorage {
+  endpoint: string;
+  regiao: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** Teto do arquivo de cadastro, em bytes. */
+  maxBytesDeCadastro: number;
+  /** Validade da URL pre-assinada, em segundos. */
+  ttlDeUploadEmSegundos: number;
+}
 
 export interface ConfigDaApi {
   ambiente: 'development' | 'test' | 'production';
@@ -29,6 +61,8 @@ export interface ConfigDaApi {
   };
   /** Chave AES-256 para o segredo TOTP. */
   mfa: { chave: Buffer };
+  redis: { url: string };
+  storage: ConfigDeStorage;
 }
 
 export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaApi {
@@ -45,6 +79,38 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaAp
       audiencia: bruto.JWT_AUDIENCE,
     },
     mfa: { chave: resolverChaveDeMfa(bruto) },
+    redis: { url: bruto.REDIS_URL },
+    storage: resolverStorage(bruto),
+  };
+}
+
+/**
+ * Mesma regra das demais credenciais: obrigatoria em producao, padrao local
+ * fora dela.
+ *
+ * O padrao aponta para o MinIO do `docker-compose.yml` com as credenciais de
+ * desenvolvimento que ja estao la. Nao e segredo vazado -- e o mesmo valor
+ * publico do compose, marcado como local. Em producao, a ausencia derruba o
+ * arranque em vez de conectar anonimamente e falhar no primeiro cadastro.
+ */
+function resolverStorage(bruto: z.infer<typeof esquema>): ConfigDeStorage {
+  const producao = bruto.NODE_ENV === 'production';
+
+  if (producao && (!bruto.STORAGE_ACCESS_KEY_ID || !bruto.STORAGE_SECRET_ACCESS_KEY)) {
+    throw new Error(
+      'STORAGE_ACCESS_KEY_ID e STORAGE_SECRET_ACCESS_KEY sao obrigatorias em producao. ' +
+        'O bucket guarda imagem de cadastro biometrico: acesso anonimo nao e opcao.',
+    );
+  }
+
+  return {
+    endpoint: bruto.STORAGE_ENDPOINT,
+    regiao: bruto.STORAGE_REGION,
+    bucket: bruto.STORAGE_BUCKET,
+    accessKeyId: bruto.STORAGE_ACCESS_KEY_ID ?? 'arenahub',
+    secretAccessKey: bruto.STORAGE_SECRET_ACCESS_KEY ?? 'arenahub_dev_minio',
+    maxBytesDeCadastro: bruto.STORAGE_MAX_ENROLLMENT_BYTES,
+    ttlDeUploadEmSegundos: bruto.STORAGE_UPLOAD_TTL_SECONDS,
   };
 }
 
