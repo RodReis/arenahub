@@ -515,23 +515,27 @@ expirado nunca é efetivo*) passou a ter prova sobre 500 combinações geradas, 
 que eu lembrei de escrever. Evidência, escopo negativo e limites em
 [`docs/operations/smart-access/students-entitlements-evidence.md`](operations/smart-access/students-entitlements-evidence.md).
 
-🟡 **F8 — entrega parcial em 16/08/2026. A fatia NÃO está concluída.**
+🟡 **F8 — Tasks 1 a 6 entregues em 16/08/2026, em `SIMULATOR_READY`. A Task 7 não rodou.**
 
-Entregues as Tasks 1, 2 e 3 do plano de apoio, mais a revogação da Task 6: consentimento
-versionado com base legal do art. 11, I, `BiometricIdentity` **sem coluna de template ou imagem**
-(INV-020, com dois testes varrendo `information_schema`), inventário de dispositivo, assinatura
-HMAC do Edge com anti-replay por constraint, e revogação com bloqueio lógico imediato (INV-018).
-**333 testes** no repositório.
+A cadeia fecha ponta a ponta em simulador: consentimento → identidade → job → comando durável →
+execução no adapter → resultado → reconciliação → `DELETED`. **497 testes** no repositório.
+
+Consentimento versionado com base legal do art. 11, I; `BiometricIdentity` **sem coluna de
+template ou imagem** (INV-020, com dois testes varrendo `information_schema` e caçando `bytea`);
+assinatura HMAC do Edge com anti-replay por constraint; fila durável no Postgres com lease,
+backoff 1/2/3/5/8 e dead letter visível; worker no Edge Agent que delega ao adapter da F2; e
+revogação com bloqueio lógico imediato (INV-018) que só vira `DELETED` quando **todos** os
+dispositivos confirmam (INV-027).
 
 O delta do ADR-008 entrou no modelo e na regra: consentimento por responsável legal com vínculo
 comprovável e **revalidação na virada dos 18** (INV-143 — a prova continua válida, a autorização
 caduca), log de acesso a dado biométrico, e retenção como parâmetro do cliente (art. 39).
 
-**O que falta para fechar a F8:** a fila durável (Task 4), o worker do Edge (Task 5), a
-reconciliação de exclusão e a UI (Task 6). Hoje os `DeviceSyncJob` nascem em `PENDING` e ninguém
-os consome — **a identidade não chega a dispositivo nenhum**, e `M1-AC-004`/`M1-AC-007`
-continuam em aberto. A Task 7 segue bloqueada pelo gate `M1-HW-01`; a fatia está em
-`SIMULATOR_READY`, como o plano §1 prevê.
+**O que continua em aberto:** `M1-AC-004` e `M1-AC-007` **não estão atendidos fisicamente** —
+nada rodou em hardware homologado, porque o gate `M1-HW-01` não foi atravessado. O expurgo dos 30
+dias está modelado mas sem job agendado, e a lista de hardware homologado segue provisória no
+código até `supported-hardware.md` existir. **BullMQ e WebSocket não entraram**: a entrega durável
+não precisou deles, e `CLAUDE.md` manda usar fila só quando comprovadamente necessário.
 
 Evidência, limites e decisões técnicas em
 [`docs/operations/smart-access/biometric-consent-evidence.md`](operations/smart-access/biometric-consent-evidence.md).
