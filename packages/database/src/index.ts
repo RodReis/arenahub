@@ -29,6 +29,11 @@ export { PrismaPg } from '@prisma/adapter-pg';
  * nao portavel (TS2742) e exige anotacao.
  */
 export type {
+  AccessEvent,
+  AccessEventCorrection,
+  AccessPassage,
+  AccessPolicy,
+  AdministrativeBlock,
   AuditLog,
   BiometricAccessLog,
   BiometricIdentity,
@@ -59,6 +64,7 @@ export type {
   StudentContact,
   StudentSequence,
   StudentTimelineEvent,
+  ManualAccessOverride,
   Subscription,
   Tenant,
   TenantMembership,
@@ -75,6 +81,10 @@ export type {
  * amarrar a assinatura de repositorio ao que o Prisma realmente aceita.
  */
 export type {
+  AccessMethod,
+  AccessMode,
+  AccessOutcome,
+  AccessReason,
   BiometricAccessKind,
   BiometricAccessPurpose,
   BiometricIdentityState,
@@ -90,6 +100,7 @@ export type {
   EdgeNodeStatus,
   EntitlementSource,
   EntitlementStatus,
+  PassageState,
   StudentContactType,
   StudentStatus,
   StudentTimelineEventType,

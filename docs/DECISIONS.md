@@ -53,6 +53,7 @@ existe para expulsar deste repositório.
 | [021](#adr-021) | Escopo de escrita do Cowork na `main` | `aceito` | — |
 | [022](#adr-022) | A Slice do PRD é a spec; o arquivo em `docs/specs/` é ponteiro | `aceito` | — |
 | [023](#adr-023) | Card `[INFRA]` é do Cowork; metadados de board também | `aceito` | — |
+| [024](#adr-024) | Lista canônica de razões de decisão de acesso | `aceito` | — |
 
 ---
 
@@ -969,3 +970,108 @@ cumprido** e não recebeu card: `git status --untracked-files=all` retorna vazio
 itens 1–6 rodam sob regime reduzido e o item 8 cai depois da exceção já morta. O board deveria ser
 o **primeiro**: é ele que faz o resto virar processo normal. Reordenar a §4 é do Code, dono do
 arquivo.
+
+---
+
+<a id="adr-024"></a>
+## ADR-024 — Lista canônica de razões de decisão de acesso
+
+**Data:** 16/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 16/08/2026**)* ·
+**Complementa** o **ADR-005** · **Fecha** `docs/DESIGN-UI.md` §17, item 2
+
+**Contexto.** A pendência estava registrada há dois dias e a fatia F9 esbarrou nela na primeira
+linha de código. O `reason` de uma decisão de acesso não é rótulo de tela: ele é **gravado no
+`AccessEvent`, que é imutável** (`M1-BR-009`). Escolher errado não custa um rename — custa
+migração de dado histórico e reinterpretação de auditoria já entregue.
+
+Três documentos davam três listas diferentes, e nenhuma cobria tudo:
+
+| fonte | razões | buraco |
+|---|---|---|
+| `docs/prd/README.md` §8 | `NO_ENTITLEMENT`, `OUTSIDE_SCHEDULE`, `ADMIN_BLOCK` | estado do aluno não tem rótulo |
+| plano `2026-08-14-mvp-01-04`, Task 1 | acrescenta `STUDENT_INACTIVE`, `STUDENT_BLOCKED` | unidade errada não tem rótulo |
+| `M1-FR-020` | manda avaliar **5 dimensões**: entitlement, status do aluno, unidade, horário, bloqueio | não nomeia nenhuma |
+
+O `M1-FR-020` é o mais exigente dos três e o único normativo sobre *o que avaliar* — mas é mudo
+sobre *como chamar*. As duas listas que nomeiam ficam devendo uma dimensão cada.
+
+**Decisão.** Sete rótulos — um de `ALLOW`, seis de `DENY`:
+
+```ts
+outcome: 'ALLOW' | 'DENY'
+
+ACTIVE_ENTITLEMENT   // ALLOW — único caminho de entrada
+ADMIN_BLOCK          // DENY  — bloqueio administrativo vigente
+STUDENT_BLOCKED      // DENY  — aluno BLOCKED
+STUDENT_INACTIVE     // DENY  — aluno em qualquer outro estado ≠ ACTIVE
+NO_ENTITLEMENT       // DENY  — nenhum direito vigente na data
+WRONG_UNIT           // DENY  — há direito vigente, mas não para esta unidade
+OUTSIDE_SCHEDULE     // DENY  — há direito para esta unidade, fora da janela
+```
+
+**Por que `WRONG_UNIT` existe separado de `NO_ENTITLEMENT`.** As duas negativas exigem **ações
+opostas na recepção**: *"não tem plano"* manda vender; *"tem plano de outra unidade"* manda
+conferir se a pessoa errou de porta. Colapsar as duas economiza um rótulo e custa a ação certa —
+e o operador não tem como distinguir sem consultar o banco, que é exatamente o que o
+`M1-AC-011` proíbe.
+
+**Por que `STUDENT_BLOCKED` existe separado de `STUDENT_INACTIVE`.** `BLOCKED` é decisão
+deliberada sobre a pessoa; `ARCHIVED` é consequência administrativa. `M1-BR-002` trata os dois
+como negativa, mas a recepção age diferente em cada um.
+
+**Ordem de precedência — é a regra `M1-BR-006`, não convenção de código.** Bloqueio
+administrativo → aluno `BLOCKED` → aluno não-`ACTIVE` → sem direito vigente → unidade errada →
+fora da janela. Cada degrau é uma restrição que nenhuma checagem posterior afrouxa.
+
+**Extensão sem migração.** O MVP 2 acrescenta inadimplência (`PAYMENT_OVERDUE`) — **acrescenta,
+não renomeia**. Por isso nenhum rótulo aqui carrega numeração, posição ou prefixo de MVP: a lista
+cresce pelo fim sem tocar no que já foi persistido.
+
+**Relação com o ADR-005.** O ADR-005 fixou o enum `AccessOutcome` (`ALLOW`/`DENY`) em
+`packages/api-contracts` e manteve os nomes de evento `AccessGranted`/`AccessDenied` como rótulo
+histórico. Este ADR **não mexe em nada disso** — só preenche o campo que o ADR-005 deixou vazio:
+*qual* é a razão que acompanha o `outcome`. Os eventos continuam se chamando `AccessGranted` e
+`AccessDenied`, transportando `outcome` **e agora `reason`**.
+
+**Onde a lista mora.** Em `packages/access-policy/src/types.ts`, junto do motor que a produz —
+não em `api-contracts`. Motivo: o motor precisa rodar **também no Edge** (Slice 1.5), onde não há
+Prisma nem NestJS, e `api-contracts` depende de Zod. `api-contracts` re-exporta para quem só
+precisa do tipo. Um enum de domínio mora com a regra que o decide.
+
+**Consequência para o `DESIGN-UI.md`.** O item 2 da §17 sai de *pendente* para *fechado por este
+ADR*. O dicionário de rótulos em pt-BR — o texto que a tela pública mostra — continua sendo
+trabalho de UI e **não é decidido aqui**: este ADR fixa o **código estável**, não a frase.
+
+### Emenda de 16/08/2026 — o oitavo rótulo: `MANUAL_OVERRIDE`
+
+**Decidida pelo PI em 16/08/2026**, durante a implementação da F9.
+
+**O que apareceu.** A lista acima foi fechada olhando o **motor**, que decide a partir de
+entitlement. Mas o `AccessEvent.reason` é gravado também pela **liberação manual da recepção**
+(`M1-FR-023`), que não passa pelo motor — e nenhum dos sete rótulos a descreve.
+
+Escrever `ACTIVE_ENTITLEMENT` num override seria **gravar mentira num fato imutável**: a recepção
+abre a catraca justamente para quem o motor negou, então na maioria dos casos **não há direito
+ativo nenhum**. O defeito não é estético — todo relatório de "acessos por direito válido"
+precisaria lembrar de excluir `mode = OVERRIDE`, e quem esquecesse contaria exceção como regra.
+
+**Decisão.** Acrescenta-se `MANUAL_OVERRIDE` como oitavo rótulo, **exclusivo de
+`mode = OVERRIDE`**:
+
+```ts
+ACTIVE_ENTITLEMENT   // ALLOW — decidido pelo motor
+MANUAL_OVERRIDE      // ALLOW — gravado pelo caso de uso de override  ← novo
+// ... as seis razões de DENY seguem inalteradas
+```
+
+**O motor nunca produz este valor**, e isso é garantido por tipo, não por convenção: o tipo
+`EngineAllowReason` (em `packages/access-policy/src/types.ts`) exclui `MANUAL_OVERRIDE`, e
+`AccessPolicyResult` usa ele — um `evaluateAccess` que tentasse devolvê-lo **não compila**.
+
+**Isto é exatamente o crescimento que o ADR previu.** O corpo acima diz: *"a lista cresce pelo fim
+sem tocar no que já foi persistido"*. `MANUAL_OVERRIDE` entra por `ALTER TYPE ... ADD VALUE` — uma
+linha de migration, zero dado reescrito. A previsão era sobre `PAYMENT_OVERDUE` no MVP 2; valeu
+antes, e pelo mesmo motivo.
+
+**O que não mudou:** as seis razões de `DENY`, a ordem de precedência, e a regra de que só entra
+rótulo que é verdade.

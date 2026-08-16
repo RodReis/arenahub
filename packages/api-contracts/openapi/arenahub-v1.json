@@ -891,6 +891,57 @@
           "EdgeCommands"
         ]
       }
+    },
+    "/api/v1/edge/access-decisions": {
+      "post": {
+        "operationId": "EdgeAccessController_decidirAcesso",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeAccess"
+        ]
+      }
+    },
+    "/api/v1/edge/access-events/{id}/passage": {
+      "post": {
+        "operationId": "EdgeAccessController_registrarPassagem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeAccess"
+        ]
+      }
+    },
+    "/api/v1/access/manual-overrides": {
+      "post": {
+        "operationId": "ManualOverrideController_criar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ManualOverride"
+        ]
+      }
     }
   },
   "info": {

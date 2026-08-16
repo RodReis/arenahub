@@ -494,7 +494,7 @@ Entrada: decisão de saída do MVP 0 (`MVP-00` §15, `MVP-01` §1) = `GO` ou `GO
 | ✅ F6 | 1.1 Core seguro e unidade | tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login. **Multiunidade desde o dia 1** (ADR-002): teste de isolamento por `gym_unit_id` junto com o de `tenant_id` | — |
 | 🟡 F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — |
 | 🟡 F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | etapa física depende de hardware |
-| F9 | 1.4 Decisão online e passagem | Access Decision Engine **na nuvem** (ADR-004), `AccessEvent`, `Passage`, tela pública | lista canônica de razões de `DENY` (`DESIGN-UI` §17 item 2) |
+| 🟡 F9 | 1.4 Decisão online e passagem | Access Decision Engine **na nuvem** (ADR-004) como função pura versionada, `AccessEvent` imutável, `AccessPassage`, override auditado | medição em hardware pendente; **tela pública** depende do `DESIGN-UI` §12.4 |
 | F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo e **alerta obrigatório quando o Edge some** (ADR-011) | F6–F9 |
 
 ✅ **F6 entregue em 15/08/2026.** `apps/api` (NestJS) e `apps/admin-web` (Next.js) nasceram, com
@@ -552,6 +552,62 @@ Evidência, limites e decisões técnicas em
 > tabela foi adotada do plano de apoio com aval do PI e vive em
 > `apps/api/src/modules/students/domain/student.ts`. O `CONVENTION.md` precisa da emenda; o
 > arquivo é do Cowork (ADR-021), então **não o corrigi daqui**.
+
+🟡 **F9 — Tasks 1 a 6 entregues em 16/08/2026. A medição em hardware não rodou.**
+
+O Access Decision Engine existe, e é **função pura versionada** em `packages/access-policy`: sem
+banco, sem rede, sem relógio, sem locale. O "agora" entra por parâmetro e o fuso chega resolvido
+em dia/minuto local. Isso não é preferência de estilo — é o que vai permitir a Slice 1.5 rodar
+**este mesmo código** no Edge, offline, e obter bit a bit a mesma decisão da nuvem. Motor que lê
+relógio global decide diferente em duas máquinas com NTP desalinhado, e a reconciliação vira
+ficção.
+
+**618 testes** no repositório (403 unitários, 215 de integração).
+
+A cadeia fecha na nuvem: HMAC autentica → identidade resolve por `(Edge, device, externalUserId)`
+com tenant e unidade em cada elo → projeção carrega → motor decide → `AccessEvent` e outbox
+gravam **na mesma transação**, antes de a resposta sair. No Edge, máquina de estado persistida em
+SQLite com `synchronous = FULL` grava toda transição **antes do efeito que ela autoriza**.
+
+**Decisões que valem além da fatia:**
+
+- **ADR-024** fechou a lista canônica de razões (pendência do `DESIGN-UI` §17 item 2, que
+  bloqueava o acabamento). Três documentos davam três listas em conflito e nenhuma nomeava
+  "unidade errada". Ficaram 7 rótulos, com `WRONG_UNIT` separado de `NO_ENTITLEMENT` porque as
+  duas negativas pedem ações opostas na recepção.
+- **ADR-024, emenda:** `MANUAL_OVERRIDE` como oitavo rótulo. Override gravando
+  `ACTIVE_ENTITLEMENT` seria mentira num fato imutável — a recepção abre a catraca justamente
+  para quem o motor negou. O motor **não consegue** produzir o valor novo: o tipo
+  `EngineAllowReason` o exclui, e um `evaluateAccess` que tentasse devolvê-lo não compila.
+
+**Dois bugs encontrados e corrigidos dentro da própria fatia:**
+
+1. `@@unique([edgeNodeId, idempotencyKey])` **não protegia o override manual**, que nasce com
+   `edgeNodeId` nulo — em Postgres `NULL ≠ NULL`, então duas linhas com a mesma chave conviviam.
+   Na prática: clique duplo da recepção girando a catraca duas vezes. Fechado por índice parcial
+   escrito à mão, com aviso no schema (o Prisma não modela índice parcial e vai propor apagá-lo).
+2. A projeção passava **todas** as janelas do entitlement ao motor, sem filtrar por unidade. Como
+   `AccessWindow` deliberadamente não carrega unidade, o horário de sábado da unidade B abriria a
+   catraca da unidade A no sábado. Passa em teste unitário; só aparece com duas unidades.
+
+**Carga medida e aprovada** (`M1-NFR-003`): 50 req/s sustentados, zero não-2xx, p99 141 ms.
+A baseline é declarada, não inventada — a unidade piloto não opera, então não existe pico medido.
+
+**O que continua em aberto:** `M1-NFR-002` e `M1-AC-006` **não estão atendidos fisicamente** — a
+bancada estava indisponível. A matriz negativa de 10 casos, o resumo de percentis e o **veredito**
+já rodam no CI; falta a coleta contra o equipamento, que precisa da bancada na frente para ser
+escrita (contra o simulador sairia um script que roda bonito e falha na primeira medição real).
+A tela de override entrou; a **tela pública da catraca não** — ela depende da §12.4 do
+`DESIGN-UI`, que segue `RASCUNHO` aguardando o PI.
+
+Evidência, limites e o que falta medir em
+[`docs/operations/smart-access/online-access-evidence.md`](operations/smart-access/online-access-evidence.md).
+
+> 📌 **Pendência entregue ao Cowork:** o `STATUS.md` §3 ainda lista a **lista canônica de razões
+> de `DENY`** entre as decisões abertas do `DESIGN-UI` §17, dizendo que *"F9 precisa"*. Ela foi
+> **fechada pelo PI em 16/08/2026** e virou o **ADR-024** (com emenda no mesmo dia). Restam
+> **7** das 8 decisões da §17, não 8 — e a que sobra e importa para esta fatia é a **tela pública
+> da catraca** (item 1). O `STATUS.md` é do Cowork por ADR-021, então **não o corrigi daqui**.
 
 **Ordem não negociável:** F6 → F7 → F8 → F9. O motor de acesso (F9) **não pode** vir antes de
 aluno, plano e entitlement — a Especificação §127 sugere o contrário e está errada; F9 sem F7

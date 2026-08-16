@@ -98,6 +98,13 @@ const PERMISSOES = [
   'biometric.revoke',
   'device.manage',
   'device.read',
+  // F9: decisao de acesso e liberacao manual.
+  //
+  // `access.override` e separado de tudo: quem opera a recepcao no dia a dia
+  // consulta eventos (`access.read`), mas ABRIR a catraca a mao e ato
+  // excepcional, auditado, que nem todo perfil precisa ter.
+  'access.read',
+  'access.override',
 ];
 
 async function semear(): Promise<void> {

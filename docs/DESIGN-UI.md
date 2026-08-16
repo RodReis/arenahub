@@ -738,7 +738,7 @@ Nenhuma delas foi inventada aqui — todas são lacunas reais dos PRDs.
 | # | Pendência | Origem | Proposta deste documento |
 |---|---|---|---|
 | 1 | Tela pública da catraca só tem proibições | MVP-01 §14 | §12.4 — aprovar ou substituir |
-| 2 | Lista canônica de razões de `DENY` não está fechada | README §8 dá 3; `M1-FR-020` avalia 5 dimensões; MVP-2 acrescenta inadimplência | fechar a lista antes do dicionário de rótulos |
+| 2 | ~~Lista canônica de razões de `DENY` não está fechada~~ **FECHADA em 16/08/2026** | README §8 dava 3; `M1-FR-020` avalia 5 dimensões; MVP-2 acrescenta inadimplência | **ADR-024** — 7 rótulos (`ACTIVE_ENTITLEMENT` + 6 de `DENY`, incluindo `WRONG_UNIT`). O **dicionário de rótulos em pt-BR** continua aberto: o ADR fixa o código estável, não a frase da tela |
 | 3 | Timeout de inatividade do totem em segundos | `M4-BR-005` só diz "antes da sessão mobile" | sugerido 60 s com aviso aos 20 s |
 | 4 | Dark mode do painel | não consta | v2, após o piloto |
 | 5 | i18n multi-idioma | README §8 fixa só PT-BR | fora de escopo; estruturar rótulos em dicionário desde já |

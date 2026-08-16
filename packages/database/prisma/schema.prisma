@@ -331,6 +331,80 @@ enum BiometricAccessPurpose {
 }
 
 // ---------------------------------------------------------------------------
+// Decisao de acesso (F9)
+// ---------------------------------------------------------------------------
+
+/// Resultado da decisao -- ADR-005 fixou `ALLOW`/`DENY`, nao `GRANTED`/`DENIED`.
+enum AccessOutcome {
+  ALLOW
+  DENY
+
+  @@map("access_outcome")
+}
+
+/// Razao estavel da decisao -- ADR-024.
+///
+/// ESTE ENUM E PERSISTIDO E IMUTAVEL. Renomear um valor aqui nao e refactor:
+/// e reescrever auditoria ja entregue. O MVP 2 ACRESCENTA `PAYMENT_OVERDUE`
+/// pelo fim; nao mexe no que existe.
+///
+/// Espelha `packages/access-policy/src/types.ts`, que e a fonte -- o motor
+/// puro nao pode importar Prisma porque precisa rodar tambem no Edge, onde
+/// nao ha PostgreSQL. `access-reason.spec.ts` guarda a igualdade das duas
+/// listas.
+enum AccessReason {
+  ACTIVE_ENTITLEMENT
+  /// Liberacao manual da recepcao. So valido com `mode = OVERRIDE`.
+  MANUAL_OVERRIDE
+  ADMIN_BLOCK
+  STUDENT_BLOCKED
+  STUDENT_INACTIVE
+  NO_ENTITLEMENT
+  WRONG_UNIT
+  OUTSIDE_SCHEDULE
+
+  @@map("access_reason")
+}
+
+/// Como a decisao foi tomada.
+///
+/// `OFFLINE` ja existe aqui, embora a Slice 1.5 e quem vai produzi-lo: o
+/// campo e imutavel e acrescentar valor a enum depois exige migracao com
+/// tabela em uso. Reservar agora custa uma linha.
+enum AccessMode {
+  ONLINE
+  OFFLINE
+  OVERRIDE
+
+  @@map("access_mode")
+}
+
+/// Como a pessoa se identificou na catraca.
+enum AccessMethod {
+  FACIAL
+  QR
+  CARD
+  PIN
+  MANUAL
+
+  @@map("access_method")
+}
+
+/// Desfecho fisico da passagem -- `M1` §10.
+///
+/// `NOT_APPLICABLE` cobre o `DENY`: nao houve comando, entao nao ha giro a
+/// confirmar. Sem esse valor, todo `DENY` ficaria com passagem nula e
+/// "nulo" teria dois significados (nao se aplica / ainda esperando).
+enum PassageState {
+  NOT_APPLICABLE
+  PENDING
+  CONFIRMED
+  TIMED_OUT
+
+  @@map("passage_state")
+}
+
+// ---------------------------------------------------------------------------
 // Tenancy
 // ---------------------------------------------------------------------------
 
@@ -372,6 +446,12 @@ model Tenant {
   deviceSyncJobs      DeviceSyncJob[]
   deviceCommands      DeviceCommand[]
 
+  accessPolicies         AccessPolicy[]
+  administrativeBlocks   AdministrativeBlock[]
+  accessEvents           AccessEvent[]
+  accessEventCorrections AccessEventCorrection[]
+  manualAccessOverrides  ManualAccessOverride[]
+
   @@map("tenants")
 }
 
@@ -395,6 +475,10 @@ model GymUnit {
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles UserRole[]
+
+  accessPolicies        AccessPolicy[]
+  accessEvents          AccessEvent[]
+  manualAccessOverrides ManualAccessOverride[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -698,6 +782,10 @@ model Student {
   biometricIdentities BiometricIdentity[]
   deviceUsers         DeviceUser[]
 
+  administrativeBlocks  AdministrativeBlock[]
+  accessEvents          AccessEvent[]
+  manualAccessOverrides ManualAccessOverride[]
+
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, status])
   @@index([tenantId, cpfHash])
@@ -930,6 +1018,7 @@ model Entitlement {
   student      Student                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
   subscription Subscription?           @relation(fields: [subscriptionId], references: [id])
   unitWindows  EntitlementUnitWindow[]
+  accessEvents AccessEvent[]
 
   /// Indice do caminho quente: o motor de F9 pergunta "que direito valido
   /// este aluno tem agora?".
@@ -1096,6 +1185,7 @@ model BiometricIdentity {
   consentRecord ConsentRecord   @relation(fields: [consentRecordId], references: [id])
   deviceUsers   DeviceUser[]
   syncJobs      DeviceSyncJob[]
+  accessEvents  AccessEvent[]
 
   @@index([tenantId, studentId, state])
   @@index([tenantId, state])
@@ -1182,11 +1272,12 @@ model EdgeNode {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
-  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  devices     Device[]
-  credentials EdgeCredential[]
-  commands    DeviceCommand[]
-  nonces      ReplayNonce[]
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  devices      Device[]
+  credentials  EdgeCredential[]
+  commands     DeviceCommand[]
+  nonces       ReplayNonce[]
+  accessEvents AccessEvent[]
 
   @@unique([tenantId, code])
   @@index([tenantId, gymUnitId])
@@ -1271,6 +1362,9 @@ model Device {
   edgeNode    EdgeNode?       @relation(fields: [edgeNodeId], references: [id], onDelete: SetNull)
   deviceUsers DeviceUser[]
   syncJobs    DeviceSyncJob[]
+
+  accessEvents          AccessEvent[]
+  manualAccessOverrides ManualAccessOverride[]
 
   @@unique([tenantId, serial])
   @@index([tenantId, gymUnitId, status])
@@ -1378,4 +1472,247 @@ model DeviceCommand {
   @@unique([edgeNodeId, sequence])
   @@index([edgeNodeId, state, sequence])
   @@map("device_commands")
+}
+
+// ---------------------------------------------------------------------------
+// Decisao de acesso e passagem (F9)
+//
+// Regra de arquitetura no 1: a catraca NUNCA consulta assinatura nem invoice.
+// A cadeia e `Pagamento -> Invoice -> Subscription -> Entitlement -> aqui`.
+// Nada nesta secao referencia `Subscription`, e isso e deliberado.
+//
+// `M1-BR-009`: evento de passagem e IMUTAVEL. Correcao e registro NOVO
+// vinculado ao original, nunca `UPDATE`. Por isso `AccessEvent` nao tem
+// `updatedAt` -- a ausencia da coluna e a garantia, nao a disciplina de quem
+// escreve o repositorio.
+// ---------------------------------------------------------------------------
+
+/// Politica de acesso vigente por unidade.
+///
+/// Guarda a VERSAO que o motor usou e a configuracao que valia. Sem isto,
+/// reler uma decisao de seis meses atras aplicaria as regras de hoje, e a
+/// pergunta "por que este aluno entrou naquele dia?" nao teria resposta
+/// verificavel.
+model AccessPolicy {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  gymUnitId String   @map("gym_unit_id") @db.Uuid
+  /// Semver do motor puro (`POLICY_VERSION`). Mudanca de comportamento
+  /// observavel exige numero novo.
+  version   String
+  /// Parametros da unidade. JSON porque a Slice 1.5 acrescenta validade e
+  /// carencia de snapshot, ainda em ADR-007 (`aberto`).
+  config    Json
+  /// Vigencia. Politica nao se edita: publica-se outra e encerra-se esta.
+  startsAt  DateTime @map("starts_at")
+  endsAt    DateTime? @map("ends_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gymUnit GymUnit @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, gymUnitId, startsAt])
+  @@map("access_policies")
+}
+
+/// Bloqueio administrativo sobre um aluno.
+///
+/// E a alavanca que a operacao puxa para barrar ALGUEM AGORA, sem esperar
+/// processo de cadastro nem mexer em entitlement. Por isso precede tudo na
+/// ordem do motor (`M1-BR-006`) e por isso e uma tabela propria: mudar
+/// `Student.status` seria efeito colateral em cascata, e o bloqueio precisa
+/// ser reversivel sem reconstruir estado.
+model AdministrativeBlock {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  studentId String    @map("student_id") @db.Uuid
+  reason    String
+  /// Quem bloqueou. Bloqueio sem responsavel nao e auditavel.
+  actorId   String    @map("actor_id") @db.Uuid
+  startsAt  DateTime  @default(now()) @map("starts_at")
+  /// Nulo = vigente por prazo indeterminado.
+  endsAt    DateTime? @map("ends_at")
+  /// Quem levantou o bloqueio, e quando.
+  liftedAt  DateTime? @map("lifted_at")
+  liftedById String?  @map("lifted_by_id") @db.Uuid
+  liftReason String?  @map("lift_reason")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Caminho quente: "existe bloqueio vigente para este aluno agora?".
+  @@index([tenantId, studentId, liftedAt, startsAt, endsAt])
+  @@map("administrative_blocks")
+}
+
+/// Decisao de acesso -- FATO IMUTAVEL (`M1-BR-009`).
+///
+/// Nao ha `updatedAt` e nao ha caminho de `UPDATE` no repositorio. Corrigir
+/// e criar `AccessEventCorrection` apontando para cá.
+///
+/// `studentId` e nulavel de proposito: o leitor reconhece alguem que a base
+/// nao conhece, e esse `DENY` PRECISA ser registrado -- e justamente o caso
+/// que interessa investigar. Evento sem aluno e evento valido.
+model AccessEvent {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  gymUnitId String @map("gym_unit_id") @db.Uuid
+
+  /// De onde veio. Nulavel porque override manual nasce na nuvem, sem Edge.
+  edgeNodeId String? @map("edge_node_id") @db.Uuid
+  deviceId   String? @map("device_id") @db.Uuid
+
+  /// Nulo quando a identidade nao resolveu para nenhum aluno do tenant.
+  studentId  String? @map("student_id") @db.Uuid
+  /// Biometria usada. Nulo em override e em identidade desconhecida.
+  identityId String? @map("identity_id") @db.Uuid
+  /// O `enrollid` que o leitor informou. Guardado mesmo sem aluno resolvido:
+  /// e a unica pista de quem o equipamento viu.
+  externalUserId String? @map("external_user_id")
+  /// Id do reconhecimento no dispositivo, para casar log fisico com o nosso.
+  recognitionId  String? @map("recognition_id")
+
+  outcome       AccessOutcome
+  reason        AccessReason
+  /// Qual direito autorizou. Nulo em todo `DENY`.
+  entitlementId String?       @map("entitlement_id") @db.Uuid
+  /// Ate quando a decisao vale. Alimenta o cache do Edge na Slice 1.5.
+  validUntil    DateTime?     @map("valid_until")
+  policyVersion String        @map("policy_version")
+  mode          AccessMode
+  method        AccessMethod
+
+  /// Quando o reconhecimento aconteceu no equipamento (relogio do device).
+  recognizedAt DateTime? @map("recognized_at")
+  /// Quando a decisao foi avaliada (relogio do servidor). Os DOIS existem
+  /// porque relogio de catraca derrapa: guardar so um deles apagaria a
+  /// evidencia de deriva justamente quando ela importa.
+  occurredAt   DateTime  @map("occurred_at")
+  receivedAt   DateTime  @default(now()) @map("received_at")
+
+  correlationId String @map("correlation_id")
+  /// Dedupe do evento (ADR-006). Reprocessar e sempre seguro.
+  idempotencyKey String @map("idempotency_key")
+
+  /// Contexto congelado da decisao: entrada do motor, deriva de relogio,
+  /// confianca do reconhecimento. NUNCA CPF, divida, foto ou template.
+  detail Json
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gymUnit     GymUnit            @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+  edgeNode    EdgeNode?          @relation(fields: [edgeNodeId], references: [id], onDelete: SetNull)
+  device      Device?            @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  student     Student?           @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  identity    BiometricIdentity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
+  entitlement Entitlement?       @relation(fields: [entitlementId], references: [id], onDelete: SetNull)
+
+  passage      AccessPassage?
+  override     ManualAccessOverride?
+  corrections  AccessEventCorrection[] @relation("EventoCorrigido")
+  correcoesQueEsteEvento AccessEventCorrection[] @relation("EventoCorretor")
+
+  /// Idempotencia por ORIGEM, nao global: dois Edges podem gerar a mesma
+  /// chave local sem colidir.
+  ///
+  /// ⚠️ ESTE INDICE NAO COBRE O OVERRIDE MANUAL. Override nasce na nuvem com
+  /// `edgeNodeId` NULO, e em Postgres NULL nunca e igual a NULL -- duas
+  /// linhas `(NULL, 'mesma-chave')` convivem aqui sem conflito.
+  ///
+  /// O buraco e fechado por um INDICE PARCIAL escrito a mao, em
+  /// `migrations/20260816140000_access_event_cloud_idempotency`:
+  ///
+  ///     CREATE UNIQUE INDEX ... ON access_events (tenant_id, idempotency_key)
+  ///       WHERE edge_node_id IS NULL;
+  ///
+  /// O Prisma nao modela indice parcial, entao ele NAO aparece neste schema e
+  /// um `prisma migrate dev` futuro vai propor apaga-lo. NAO ACEITE: sem ele,
+  /// clique duplo da recepcao gira a catraca duas vezes.
+  @@unique([edgeNodeId, idempotencyKey])
+  @@index([tenantId, gymUnitId, occurredAt])
+  @@index([tenantId, studentId, occurredAt])
+  @@index([tenantId, outcome, occurredAt])
+  @@map("access_events")
+}
+
+/// Desfecho fisico da passagem -- registro TERMINAL, um por evento.
+///
+/// Separado do `AccessEvent` porque a decisao e o giro acontecem em momentos
+/// diferentes e o evento e imutavel. Escrever o desfecho no proprio evento
+/// exigiria `UPDATE` nele, que e exatamente o que `M1-BR-009` proibe.
+model AccessPassage {
+  id            String       @id @default(uuid()) @db.Uuid
+  accessEventId String       @unique @map("access_event_id") @db.Uuid
+  state         PassageState
+  /// Id do comando enviado ao equipamento. E a chave de idempotencia fisica:
+  /// o mesmo `accessEventId` sempre produz o mesmo comando.
+  commandId     String?      @map("command_id")
+  /// Relogio do equipamento.
+  reportedAt    DateTime?    @map("reported_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  accessEvent AccessEvent @relation(fields: [accessEventId], references: [id], onDelete: Cascade)
+
+  @@map("access_passages")
+}
+
+/// Correcao de um evento -- `M1-BR-009`: "correcoes sao novos registros
+/// vinculados".
+///
+/// O original NUNCA muda. Esta tabela liga o fato errado ao fato certo e diz
+/// quem corrigiu e por que.
+model AccessEventCorrection {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  /// O evento que estava errado.
+  originalEventId   String   @map("original_event_id") @db.Uuid
+  /// O evento novo que passa a valer. Nulo quando a correcao apenas anota
+  /// que o original nao deve ser considerado.
+  correctingEventId String?  @map("correcting_event_id") @db.Uuid
+  reason            String
+  actorId           String   @map("actor_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  originalEvent   AccessEvent @relation("EventoCorrigido", fields: [originalEventId], references: [id], onDelete: Cascade)
+  correctingEvent AccessEvent? @relation("EventoCorretor", fields: [correctingEventId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, originalEventId])
+  @@map("access_event_corrections")
+}
+
+/// Liberacao manual pela recepcao -- `M1-FR-023`, `M1-BR-007`.
+///
+/// `M1-BR-007`: override NUNCA altera assinatura ou entitlement em silencio.
+/// Por isso esta tabela nao tem nenhuma coluna que aponte para eles: nao ha
+/// como escrever o codigo errado sem antes alterar o schema.
+///
+/// `visitorDescription` cobre quem nao e aluno. Minimizado por LGPD: nome e
+/// motivo bastam para a auditoria; documento nao entra.
+model ManualAccessOverride {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  gymUnitId     String  @map("gym_unit_id") @db.Uuid
+  /// Um dos dois esta presente -- aluno conhecido OU visitante descrito.
+  studentId     String? @map("student_id") @db.Uuid
+  visitorDescription String? @map("visitor_description")
+  /// Catraca alvo.
+  deviceId      String  @map("device_id") @db.Uuid
+  /// Minimo de 10 caracteres, validado no boundary. "ok" nao e motivo.
+  reason        String
+  actorId       String  @map("actor_id") @db.Uuid
+  /// O evento que esta liberacao gerou. Um override, um evento.
+  accessEventId String  @unique @map("access_event_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gymUnit     GymUnit     @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+  student     Student?    @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  device      Device      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  accessEvent AccessEvent @relation(fields: [accessEventId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, gymUnitId, createdAt])
+  @@map("manual_access_overrides")
 }
