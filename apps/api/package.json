@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --selectProjects unit",
-    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --selectProjects integration --runInBand"
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --selectProjects integration --runInBand",
+    "//test:load:access": "Exige a API rodando em 3344 e o docker-compose de pe. Nao entra no `pnpm test` -- carga leva minutos e depende de ambiente.",
+    "test:load:access": "tsx test/load/online-access.ts"
   },
   "dependencies": {
     "@arenahub/access-policy": "workspace:*",
@@ -40,10 +42,12 @@
     "@arenahub/config": "workspace:*",
     "@jest/globals": "29.7.0",
     "@nestjs/testing": "11.2.0",
+    "@types/autocannon": "7.12.7",
     "@types/express": "5.0.5",
     "@types/jsonwebtoken": "9.0.10",
     "@types/node": "26.2.0",
     "@types/supertest": "7.2.1",
+    "autocannon": "8.0.0",
     "dotenv": "17.2.4",
     "eslint": "9.39.5",
     "fast-check": "4.9.0",
