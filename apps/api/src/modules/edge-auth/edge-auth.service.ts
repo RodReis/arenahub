@@ -93,6 +93,21 @@ export class EdgeAuthService {
       return { ok: false, motivo: 'EDGE_KEY_UNKNOWN' };
     }
 
+    // Credencial vencida nao autentica -- ADR-011: "a credencial de uso e de
+    // vida curta e o agente a renova sozinho".
+    //
+    // `expiresAt` NULO significa "sem prazo", nao "prazo desconhecido":
+    // credencial criada em F8, antes da coluna existir, continua valendo.
+    // Tratar nulo como vencido derrubaria a catraca de quem ja esta
+    // instalado no primeiro deploy desta fatia.
+    //
+    // Reusa `EDGE_KEY_REVOKED`: para quem opera, vencida e revogada pedem a
+    // mesma acao -- emitir credencial nova. Um codigo proprio distinguiria
+    // dois casos que levam ao mesmo botao.
+    if (credencial.expiresAt !== null && credencial.expiresAt <= agora) {
+      return { ok: false, motivo: 'EDGE_KEY_REVOKED' };
+    }
+
     const segredo = this.decifrarSegredo(credencial.encryptedSecret);
 
     const esperada = assinar(

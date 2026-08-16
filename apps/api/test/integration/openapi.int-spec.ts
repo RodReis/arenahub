@@ -103,6 +103,10 @@ describe('contrato OpenAPI', () => {
         '/api/v1/edge/access-events/{id}/passage',
         // F9 -- liberacao manual, rota de operacao (cookie + permissao).
         '/api/v1/access/manual-overrides',
+        // F11 -- painel operacional.
+        '/api/v1/operations/overview',
+        '/api/v1/operations/alerts',
+        '/api/v1/operations/alerts/{id}/acknowledge',
       ]),
     );
   });

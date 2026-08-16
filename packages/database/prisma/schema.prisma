@@ -447,6 +447,7 @@ model Tenant {
   deviceCommands      DeviceCommand[]
 
   accessPolicies         AccessPolicy[]
+  operationalAlerts      OperationalAlert[]
   administrativeBlocks   AdministrativeBlock[]
   accessEvents           AccessEvent[]
   accessEventCorrections AccessEventCorrection[]
@@ -479,6 +480,7 @@ model GymUnit {
   accessPolicies        AccessPolicy[]
   accessEvents          AccessEvent[]
   manualAccessOverrides ManualAccessOverride[]
+  operationalAlerts     OperationalAlert[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1298,6 +1300,19 @@ model EdgeCredential {
   /// Segredo cifrado. NUNCA em log, nem mascarado (INV-022 por analogia).
   encryptedSecret String    @map("encrypted_secret")
   activeFrom      DateTime  @map("active_from")
+  /// Fim da validade -- ADR-011: "a credencial de uso e de vida curta e o
+  /// agente a renova sozinho".
+  ///
+  /// NULAVEL de proposito, e a nulabilidade tem significado: credencial
+  /// criada antes desta coluna existir (F8) nao tem prazo, e invalida-la
+  /// retroativamente derrubaria a catraca de quem ja esta instalado. Nulo
+  /// significa "sem prazo", nao "prazo desconhecido".
+  ///
+  /// Acrescentada em F11 porque o alerta que o ADR-011 exige -- renovacao que
+  /// falha em silencio -- nao tem sobre o que alertar sem um prazo. A
+  /// rotacao automatica em si continua sendo trabalho do Edge, fora desta
+  /// fatia: o que entra aqui e a capacidade de OBSERVAR que ela falhou.
+  expiresAt       DateTime? @map("expires_at")
   /// Revogacao e IMEDIATA: preenchido, a credencial para de valer no ato.
   revokedAt       DateTime? @map("revoked_at")
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -1715,4 +1730,88 @@ model ManualAccessOverride {
 
   @@index([tenantId, gymUnitId, createdAt])
   @@map("manual_access_overrides")
+}
+
+// ---------------------------------------------------------------------------
+// Operacao (F11)
+//
+// INV-146 (ADR-011): a ausencia do Edge e ALERTA OPERACIONAL OBRIGATORIO, nao
+// linha de log. Sem operacao offline (ADR-012), Edge fora significa catraca
+// parada -- a operacao precisa saber no minuto em que acontece.
+// ---------------------------------------------------------------------------
+
+/// Estado do alerta no tempo.
+///
+/// `ACKNOWLEDGED` existe separado de `RESOLVED` porque significam coisas
+/// diferentes: reconhecer e "estou vendo, estou indo"; resolver e "a condicao
+/// acabou". Confundir os dois deixaria o painel limpo com a catraca ainda
+/// parada.
+enum OperationalAlertState {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+
+  @@map("operational_alert_state")
+}
+
+enum OperationalAlertSeverity {
+  CRITICAL
+  WARNING
+  INFO
+
+  @@map("operational_alert_severity")
+}
+
+/// Alerta operacional -- `M1-FR-030`, `M1-AC-011`.
+///
+/// A CHAVE DESTE MODELO E `fingerprint`. Uma condicao que persiste ATUALIZA a
+/// linha existente; nao cria outra. Sem isso, um Edge fora do ar por uma noite
+/// geraria ~960 linhas (avaliacao a cada 30 s x 8 h) e o painel ficaria
+/// ilegivel exatamente quando mais precisa ser lido.
+///
+/// `impact` e `recommendedAction` sao COLUNAS, nao derivacao de UI: o alerta
+/// e lido por quem esta na recepcao com uma pessoa esperando, e "EDGE_OFFLINE"
+/// sozinho nao diz se e para ligar para o TI ou liberar manualmente.
+model OperationalAlert {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  /// Nulo em alerta que nao pertence a uma unidade especifica.
+  gymUnitId String? @map("gym_unit_id") @db.Uuid
+
+  /// `(tenant, unidade, recurso, recursoId, codigo)` -- ver `alert-rules.ts`.
+  fingerprint String @unique
+
+  code     String
+  severity OperationalAlertSeverity
+  state    OperationalAlertState    @default(OPEN)
+
+  /// Tipo e id do recurso afetado (EDGE, DEVICE, SYNC, QUEUE).
+  resource   String
+  resourceId String @map("resource_id")
+
+  /// Texto em pt-BR, pronto para a tela.
+  impact            String
+  recommendedAction String @map("recommended_action")
+
+  /// Numeros que sustentam o alerta. NUNCA PII -- o painel e lido por quem
+  /// nao deveria ver dado de aluno para consertar um cabo de rede.
+  evidence Json
+
+  firstSeenAt DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+  /// Quem reconheceu, e quando. Reconhecer NAO resolve.
+  acknowledgedAt   DateTime? @map("acknowledged_at")
+  acknowledgedById String?   @map("acknowledged_by_id") @db.Uuid
+  resolvedAt       DateTime? @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gymUnit GymUnit? @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+
+  /// Caminho quente do painel: "o que esta aberto nesta unidade agora?".
+  @@index([tenantId, state, severity, lastSeenAt])
+  @@index([tenantId, gymUnitId, state])
+  @@map("operational_alerts")
 }
