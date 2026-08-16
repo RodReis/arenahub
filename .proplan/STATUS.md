@@ -42,7 +42,6 @@ updated: 2026-08-16
 - [MVP2][SPEC-012][F12] Ledger operacional e invoice (#12)
 - [MVP1][SPEC-011][F11] Painel operacional e prontidão (#11)
 - [SPEC-010][F10] Operação offline (#10)
-- [MVP1][SPEC-009][F9] Decisão online e passagem (#9)
 - [MVP0][SPEC-005][F5] Relatório e decisão (#5)
 
 ## A Fazer
@@ -58,12 +57,15 @@ _(vazio)_
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][SPEC-009][F9] Decisão online e passagem (#9)
 
 ## Finalizado
 
 ### Sem épico
 
+- [MVP1][FIX] pnpm dev nunca funcionou: API morre no arranque e edge-agent não lê o .env (#72, finalizado em: 2026-08-16)
 - [MVP1][SPEC-008][F8] Consentimento, biometria e sync de dispositivo (#8, finalizado em: 2026-08-16)
 - [MVP1][SPEC-007][F7] Aluno, plano e entitlement manual (#7, finalizado em: 2026-08-16)
 - [MVP1][SPEC-006][F6] Core seguro e unidade (#6, finalizado em: 2026-08-15)
