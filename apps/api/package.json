@@ -5,7 +5,8 @@
   "type": "module",
   "description": "API do ArenaHub: monolito modular NestJS, REST /api/v1",
   "scripts": {
-    "dev": "node ../../scripts/check-port.mjs 3344 && tsx watch src/main.ts",
+    "//dev": "tsc --watch, e NAO tsx: o esbuild do tsx nao emite design:paramtypes, e sem esse metadado o Nest nao resolve dependencia por tipo -- a API morria no arranque com UndefinedDependencyException no MfaService. Ver apps/api/README-dev.md.",
+    "dev": "node ../../scripts/check-port.mjs 3344 && node ../../scripts/dev-api.mjs",
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
