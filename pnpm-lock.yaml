@@ -57,6 +57,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@arenahub/access-policy':
+        specifier: workspace:*
+        version: link:../../packages/access-policy
       '@arenahub/api-contracts':
         specifier: workspace:*
         version: link:../../packages/api-contracts
