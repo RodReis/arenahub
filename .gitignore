@@ -53,6 +53,17 @@ pnpm-debug.log*
 # client gerado pelo Prisma (recriado por `pnpm --filter @arenahub/database generate`)
 packages/database/src/generated/
 
+# NÃO ignorar: os tokens do design system são gerados E versionados.
+#
+# `packages/ui/dist-tokens/theme.css` e `packages/ui/src/tokens.generated.ts`
+# saem de `packages/ui/tokens/*.json`, mas entram no repositório de propósito
+# — ao contrário do client do Prisma acima. É o que permite ao CI rodar
+# `build:tokens --check` e reprovar quando alguém edita o CSS à mão ou mexe no
+# JSON sem regerar. Ignorá-los desliga esse guarda em silêncio.
+#
+# Cuidado com o `dist/` do topo deste arquivo: o diretório chama-se
+# `dist-tokens` justamente para não cair naquele padrão.
+
 # gerado pelo Next a cada build
 next-env.d.ts
 

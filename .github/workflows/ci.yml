@@ -73,6 +73,23 @@ jobs:
         env:
           DATABASE_URL: postgresql://prisma:generate@localhost:5432/nao-conecta?schema=public
 
+      # `theme.css` e `tokens.generated.ts` são gerados a partir de
+      # `packages/ui/tokens/*.json` e VERSIONADOS — ao contrário do client do
+      # Prisma acima. A razão é o `--check`: com o gerado no repositório, o CI
+      # compara o que está commitado com o que a fonte produz agora, e reprova
+      # se alguém editou o CSS à mão ou mexeu no JSON sem regerar.
+      #
+      # Este passo é também onde a regra 4 de lint do design system vive
+      # (`docs/design/DS-PAINEL.md` §11). Ela não é sintática — nenhum ESLint
+      # sabe medir contraste —, então roda aqui: par texto/superfície abaixo
+      # do alvo derruba o build, incluindo os pares derivados do accent.
+      #
+      # Vem antes do lint porque é mais barato e porque `tokens.generated.ts`
+      # é fonte de tipo: sem ele, o typecheck falharia apontando para o
+      # sintoma (arquivo inexistente) em vez da causa.
+      - name: tokens do design system (contraste e sincronia)
+        run: pnpm --filter @arenahub/ui build:tokens -- --check
+
       # --- 2 de 8 ---------------------------------------------------------
       - name: lint
         run: pnpm lint

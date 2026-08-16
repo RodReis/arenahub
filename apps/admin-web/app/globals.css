@@ -1,0 +1,80 @@
+/**
+ * Folha de base do painel.
+ *
+ * Importa os tokens gerados por `@arenahub/ui` e aplica o MINIMO: reset,
+ * canvas, tipografia de corpo e foco visivel.
+ *
+ * O que NAO esta aqui, de proposito: estilo de componente. `Button`,
+ * `StateBadge`, `DataTable`, `Toast` e o resto do inventario de 17
+ * (DS-PAINEL.md §9) sao a fatia F42 / SPEC-042. Este arquivo e o encanamento
+ * do card [INFRA] (ADR-025 decisao 1) -- ele faz os tokens CHEGAREM na tela;
+ * quem os usa vem depois, com aceite do PI.
+ */
+
+@import '@arenahub/ui/theme.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Zoom de texto ate 200% sem perda de conteudo -- DS-PAINEL.md §3 e §10.8.
+     Nenhum container de texto usa altura fixa em px. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ah-surface-canvas);
+  color: var(--ah-text-default);
+  font-family: var(--ah-font-sans);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: var(--ah-type-body-weight);
+  -webkit-font-smoothing: antialiased;
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+}
+
+/**
+ * Numeral tabular em tabela, valor, horario e contador -- DS-PAINEL.md §3.
+ *
+ * OBRIGATORIO, nao preferencia: numeral proporcional faz coluna de dinheiro
+ * dancar entre linhas, e o olho perde a comparacao vertical que e a unica
+ * razao de existir uma tabela financeira.
+ */
+table,
+time,
+output,
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Foco visivel em TUDO -- DS-PAINEL.md §10.6.
+ *
+ * `:focus-visible`, nao `:focus`: anel em clique de mouse e ruido que leva
+ * gente a remover o outline inteiro, e ai o teclado perde a navegacao.
+ */
+:focus-visible {
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+/**
+ * `prefers-reduced-motion` ja vem do theme.css gerado, que limita duracao a
+ * 100 ms. Aqui so o que depende de layout do painel.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
