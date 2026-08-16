@@ -1,8 +1,8 @@
 # F8 — Consentimento, biometria e sync · evidência
 
 > **Fatia:** F8 · **Spec:** [`SPEC-008`](../../specs/SPEC-008-consentimento-biometria-e-sync-de-dispositivo.md) · **Issue:** [#8](https://github.com/RodReis/arenahub/issues/8)
-> **Estado:** entrega parcial em 16/08/2026 — Tasks 1, 2, 3 e a revogação da Task 6.
-> **Gate físico `M1-HW-01`: NÃO atravessado.** A fatia está em `SIMULATOR_READY`.
+> **Estado:** Tasks 1 a 6 entregues em 16/08/2026, em `SIMULATOR_READY`.
+> **Gate físico `M1-HW-01`: NÃO atravessado** — a Task 7 não foi executada.
 
 ---
 
@@ -13,16 +13,29 @@
 | 1 — storage privado e readiness | ✅ | `apps/api/src/common/storage/`, `health/` |
 | 2 — schema, consentimento, inventário | ✅ | `packages/database`, `modules/privacy`, `modules/devices` |
 | 3 — assinatura do Edge e anti-replay | ✅ | `packages/api-contracts`, `modules/edge-auth` |
-| 4 — fila BullMQ, DLQ, comandos duráveis | ❌ pendente | — |
-| 5 — worker de sync no Edge Agent | ❌ pendente | — |
-| 6 — revogação | ✅ | `modules/biometrics` |
-| 6 — reconciliação e UI admin | ❌ pendente | — |
+| 4 — fila durável, DLQ, comandos com lease | ✅ | `modules/device-sync` |
+| 5 — worker de sync no Edge Agent | ✅ | `apps/edge-agent/src/cloud/`, `application/device-sync-worker.ts` |
+| 6 — revogação, reconciliação e UI | ✅ | `modules/biometrics`, `apps/admin-web/app/(protected)/` |
 | 7 — sync físico em hardware | 🚫 bloqueado | gate `M1-HW-01` |
 
-**Isto não conclui a F8.** O `M1-AC-004` e o `M1-AC-007` **não** estão atendidos: a identidade
-ainda não chega a dispositivo nenhum, porque a fila e o worker do Edge não existem. O que está
-pronto é a metade de cima da cadeia — consentimento, identidade, alvos de sync e autenticação do
-Edge.
+**A cadeia fecha em simulador:** consentimento → identidade → job → comando durável → execução no
+adapter → resultado → reconciliação → `DELETED`. O que **não** aconteceu é a execução em hardware
+homologado: `M1-AC-004` e `M1-AC-007` seguem **não atendidos fisicamente**, como o plano §1 prevê
+para o estado `SIMULATOR_READY`.
+
+## 1.1 Fila e entrega de comando
+
+- **Comando persistido antes de qualquer notificação.** Socket perdido não é comando perdido — há
+  teste que prova a entrega sem nenhuma notificação ter sido enviada.
+- **Lease de 60 s** com `updateMany` filtrando o estado: dois processos pedindo o mesmo comando
+  fazem o segundo receber `count: 0`. Lease expira, então Edge morto não trava a fila.
+- **Backoff 1/2/3/5/8 min, dead letter na quinta.** Erro permanente pula direto — gastar cinco
+  tentativas repetindo o que já se sabe que falha só atrasa a descoberta.
+- **Resultado repetido idêntico é aceito; diferente é recusado.** O Edge pode ter executado no
+  leitor e morrido antes de reportar: reenviar precisa ser seguro, mudar a história não.
+- **Reconciliação só marca `DELETED` quando nenhum dispositivo tem mais o cadastro** (INV-027).
+  Dispositivo em `FAILED` impede o fechamento — declarar limpo um leitor que ainda tem a biometria
+  seria mentir na auditoria.
 
 ## 2. As três causas da suspensão da ANPD, endereçadas
 
@@ -87,23 +100,38 @@ Dez dos dezessete testes de integração são ataques.
 
 ## 5. Números
 
+Contagem reproduzível em [`reports/TESTS.md`](../../../reports/TESTS.md), gerado por
+`pnpm test:report` e verificado pela guarda de evidência do CI.
+
 | suíte | testes |
 |---|---|
-| `apps/api` unidade | 137 |
-| `apps/api` integração | 144 |
+| `apps/api` unidade | 151 |
+| `apps/api` integração | 158 |
+| `apps/edge-agent` | 136 |
 | `packages/database` integração | 28 |
 | `packages/api-contracts` unidade | 24 |
 
 ## 6. Limites conhecidos
 
-1. **A identidade não chega a dispositivo nenhum.** Os `DeviceSyncJob` são criados e ficam em
-   `PENDING`; não há worker que os consuma. É a Task 4 + 5.
+1. **Nada rodou em hardware.** A cadeia inteira foi exercitada contra o simulador e contra dublês
+   no boundary. `M1-AC-004` e `M1-AC-007` não estão atendidos fisicamente — é a Task 7, bloqueada
+   pelo gate `M1-HW-01`.
 2. **Hardware homologado é lista provisória no código** (`hardware-homologado.ts`). O plano manda
-   derivá-la de `supported-hardware.md`, que só existe depois do gate `M1-HW-01`. O código diz
-   isso em comentário; firmware aceito é *qualquer um*, débito explícito.
-3. **Expurgo dos 30 dias não roda.** Só o parâmetro existe.
-4. **Sem UI.** Toda a fatia é backend; a tela de cadastro e o painel de pendência são Task 6.
-5. **`ADR-003` sobre entrega de comando ao Edge não foi escrito.** O plano mandava criar
+   derivá-la de `supported-hardware.md`, que só existe depois do gate. O código diz isso em
+   comentário; firmware aceito é *qualquer um*, débito explícito.
+3. **Expurgo dos 30 dias não roda.** `TenantPrivacySettings.purgeAfterDays` existe e é parâmetro,
+   mas não há job agendado que o aplique. A referência ao objeto e o carimbo `enrollmentPurgedAt`
+   estão modelados e prontos para o job.
+4. **Sem BullMQ.** A fila vive no Postgres, com o Edge buscando por REST. Redis está provisionado
+   e no readiness, mas nenhuma fila foi criada nele — `CLAUDE.md` manda usar BullMQ *só quando
+   comprovadamente necessário*, e a entrega durável não precisou. Reavaliar quando houver volume.
+5. **Sem WebSocket.** O plano previa `commands.available` como notificação; o poller de 15 s
+   resolve com uma peça a menos. O socket entra quando a latência de sincronização virar queixa
+   real — o desenho já não depende dele.
+6. **UI é leitura, não ação.** As telas mostram consentimento, identidades e a fila; registrar
+   consentimento, capturar foto e revogar continuam sendo chamadas de API. Os formulários são
+   trabalho de UX que a fatia não cobriu.
+7. **`ADR-003` sobre entrega de comando ao Edge não foi escrito.** O plano mandava criar
    `docs/adr/0003-*.md`, o que contraria o ADR-021 (ADR é do Cowork, em `DECISIONS.md`) — ver
    issue [#68](https://github.com/RodReis/arenahub/issues/68). O contrato canônico está
    documentado no próprio `packages/api-contracts/src/edge-auth.ts`, e a decisão precisa virar ADR
