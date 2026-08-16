@@ -1,0 +1,52 @@
+{
+  "$comment": "Camada 3 de 3 -- o que muda POR SUPERFICIE. `data-surface` seleciona esta camada; `data-mode` seleciona a semantica (DS-PAINEL.md §12). Painel e a unica superficie implementada: app e kiosk sao F43/F44, com gate no MVP 4.",
+
+  "panel": {
+    "$source": "docs/design/DS-PAINEL.md",
+    "$surface": "admin-web",
+    "mode": "light",
+    "$modeWhy": "Light-first. A recepcao opera sob luz fluorescente forte e com documento fisico ao lado; light reduz troca de contexto. Dark mode e v2 apos o piloto (DS-PAINEL.md §13 pendencia 1).",
+    "density": "compact",
+    "type": {
+      "body": "body",
+      "$comment": "14/20 -- painel e denso. O app usa 16/24 porque e leitura a distancia de braco."
+    },
+    "size": {
+      "control": 36,
+      "tableRow": 40,
+      "cardPadding": 16,
+      "pageGutter": 24
+    },
+    "radius": {
+      "control": 6,
+      "card": 8,
+      "badge": 4,
+      "modal": 10
+    },
+    "elevation": {
+      "$comment": "Card NAO tem sombra -- tem borda. Superficie plana le melhor em densidade alta (DS-PAINEL.md §4). Sombra so em camada que flutua.",
+      "card": "none",
+      "dropdown": "1",
+      "popover": "2",
+      "modal": "3"
+    },
+    "breakpoint": {
+      "degraded": 1024,
+      "operational": 1280
+    }
+  },
+
+  "app": {
+    "$source": "docs/design/DS-APP.md",
+    "$surface": "mobile",
+    "$status": "NAO IMPLEMENTADA -- fatia F43 (SPEC-043), gate no MVP 4. Declarada aqui para que o build falhe alto se alguem consumir `data-surface=\"app\"` antes da hora, em vez de cair silenciosamente no painel.",
+    "mode": "dark"
+  },
+
+  "totem": {
+    "$source": "docs/design/DS-TOTEM.md",
+    "$surface": "kiosk",
+    "$status": "NAO IMPLEMENTADA -- fatia F44 (SPEC-044), gate no MVP 4.",
+    "mode": "dark"
+  }
+}

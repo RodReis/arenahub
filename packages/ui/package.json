@@ -1,0 +1,44 @@
+{
+  "name": "@arenahub/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Design system do ArenaHub: pipeline de tokens e primitivas compartilhadas",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./theme.css": "./dist-tokens/theme.css",
+    "./tokens": {
+      "types": "./dist/tokens.generated.d.ts",
+      "import": "./dist/tokens.generated.js",
+      "default": "./src/tokens.generated.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "dist-tokens",
+    "src",
+    "tokens"
+  ],
+  "scripts": {
+    "build:tokens": "node scripts/build-tokens.mjs",
+    "build": "node scripts/build-tokens.mjs && tsc -p tsconfig.build.json",
+    "//lint": "Escopo em `src` porque `scripts/build-tokens.mjs` e JavaScript de build que roda em Node, fora do programa TypeScript do pacote -- o parser type-aware exigiria inclui-lo no tsconfig, e incluir arrastaria o pipeline para o typecheck do que ele mesmo gera. Mesmo tratamento dos `scripts/*.mjs` da raiz, que tambem nao sao lintados.",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@arenahub/config": "workspace:*",
+    "@types/node": "26.2.0",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  },
+  "engines": {
+    "node": ">=22.5.0 <23.0.0"
+  }
+}

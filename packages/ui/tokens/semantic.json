@@ -1,0 +1,60 @@
+{
+  "$comment": "Camada 2 de 3 -- PAPEL, nao valor. Todo componente le daqui. Cada entrada aponta para um token primitivo por caminho pontilhado; hex literal nesta camada e erro de build (ver scripts/build-tokens.mjs).",
+
+  "surface": {
+    "canvas":     { "ref": "carbon.50",  "$role": "fundo da pagina" },
+    "raised":     { "ref": "white",      "$role": "card" },
+    "chrome":     { "ref": "carbon.900", "$role": "topbar e sidebar" },
+    "sunken":     { "ref": "carbon.100", "$role": "divisor de linha de tabela" }
+  },
+
+  "border": {
+    "default": { "ref": "carbon.200", "$role": "borda padrao do card" },
+    "strong":  { "ref": "carbon.300", "$role": "divisor forte" },
+    "subtle":  { "ref": "carbon.100" },
+    "hover":   { "ref": "carbon.400" }
+  },
+
+  "text": {
+    "$comment": "Todo par texto/superficie daqui e verificado pelo teste de contraste (regra de lint 4). carbon-400 NAO aparece como texto -- e o ponto da regra.",
+    "strong":      { "ref": "carbon.800", "on": "surface.raised", "$role": "titulo de pagina" },
+    "default":     { "ref": "carbon.700", "on": "surface.raised", "$role": "texto forte" },
+    "label":       { "ref": "carbon.600", "on": "surface.raised", "$role": "rotulo de campo" },
+    "secondary":   { "ref": "carbon.500", "on": "surface.raised", "$role": "texto secundario -- piso para texto informativo" },
+    "onChrome":    { "ref": "carbon.300", "on": "surface.chrome" },
+    "placeholder": { "ref": "carbon.400", "on": "surface.raised", "$exempt": "placeholder", "$why": "WCAG 2.2 §1.4.3 -- texto de placeholder e dica, nao conteudo. O rotulo do campo carrega a informacao." },
+    "icon":        { "ref": "carbon.400", "on": "surface.raised", "$exempt": "decorative", "$why": "icone decorativo nao carrega informacao sozinho -- DS-PAINEL.md §10 item 1 exige rotulo textual junto." }
+  },
+
+  "state": {
+    "$comment": "Fixos por papel. Accent do tenant e PROIBIDO aqui (regra de lint 3): badge de maquina de estado, decisao de acesso, faixa de risco e alerta nunca vestem a cor da academia -- DS-PAINEL.md §2.3.",
+    "success": { "ref": "semantic.success", "bgAlpha": 0.10, "borderAlpha": 0.32 },
+    "warning": { "ref": "semantic.warning", "bgAlpha": 0.10, "borderAlpha": 0.32 },
+    "danger":  { "ref": "semantic.danger",  "bgAlpha": 0.10, "borderAlpha": 0.32 },
+    "info":    { "ref": "semantic.info",    "bgAlpha": 0.10, "borderAlpha": 0.32 },
+    "risk":    { "ref": "semantic.risk",    "bgAlpha": 0.10, "borderAlpha": 0.32 },
+    "neutral": { "ref": "carbon.500",       "bgAlpha": 0.10, "borderAlpha": 0.32 }
+  },
+
+  "action": {
+    "$comment": "RESOLVIDO POR CONTRASTE, nunca por numero fixo de tom -- DS-PAINEL.md §2.3. O resolvedor varre a rampa e escolhe o MENOR tom que atinge o alvo. Trocar o seed do tenant re-resolve; nao ha numero magico a manter.",
+    "solid":    { "resolve": "minToneWithContrast", "against": "#FFFFFF", "target": 4.5, "$expected": "accent.700" },
+    "onSolid":  { "ref": "white" },
+    "text":     { "resolve": "minToneWithContrast", "against": "surface.raised", "target": 4.5, "$expected": "accent.700" },
+    "hover":    { "resolve": "nextDarkerTone", "from": "action.solid", "$expected": "accent.800" },
+    "subtleBg": { "ref": "accent.50" },
+    "focusRing":{ "resolve": "minToneWithContrast", "against": "#FFFFFF", "target": 4.5, "width": 2, "offset": 2 }
+  },
+
+  "control": {
+    "height": { "ref": "size.control" },
+    "radius": { "ref": "radius.control" },
+
+    "disabled": {
+      "$comment": "EXCECAO NOMEADA -- decidida pelo PI em 16/08/2026 (SPEC-042 §5 pergunta 2, opcao A). Fundamento: WCAG 2.2 §1.4.3 isenta componente INATIVO do minimo de contraste. carbon-400 (3.78) reprovaria a regra de lint 4; a alternativa (carbon-500, 6.56) foi recusada porque um desabilitado escuro demais volta a LER como habilitado -- troca uma falha de contraste por uma falha de affordance, que e pior na recepcao. NAO REMOVA esta excecao sem ADR: ela e a resposta escrita a uma pergunta que ja foi feita e respondida.",
+      "bg":     { "ref": "carbon.50" },
+      "border": { "ref": "carbon.100" },
+      "text":   { "ref": "carbon.400", "$exempt": "wcag-1.4.3-inactive" }
+    }
+  }
+}

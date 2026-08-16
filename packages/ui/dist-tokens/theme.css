@@ -1,0 +1,127 @@
+/* GERADO POR scripts/build-tokens.mjs -- NAO EDITE A MAO. */
+/* Fonte: packages/ui/tokens/*.json  ·  Contrato: docs/design/DS-PAINEL.md */
+
+:root {
+  --ah-carbon-50: #F5F7F9;
+  --ah-carbon-100: #E5E9EE;
+  --ah-carbon-200: #CBD1D9;
+  --ah-carbon-300: #A6AEB9;
+  --ah-carbon-400: #7B8491;
+  --ah-carbon-500: #565E69;
+  --ah-carbon-600: #3C424B;
+  --ah-carbon-700: #2B3037;
+  --ah-carbon-800: #1F2328;
+  --ah-carbon-900: #121417;
+
+  --ah-success: #157F3D;
+  --ah-warning: #8A5200;
+  --ah-danger: #C22B2B;
+  --ah-info: #1F5FD0;
+  --ah-risk: #B4470B;
+
+  --ah-accent-50: #E8FBFD;
+  --ah-accent-100: #C2F2F7;
+  --ah-accent-200: #8AE5EF;
+  --ah-accent-300: #4FD5E3;
+  --ah-accent-400: #1FBED0;
+  --ah-accent-500: #00A9B8;
+  --ah-accent-600: #008C99;
+  --ah-accent-700: #00707B;
+  --ah-accent-800: #005760;
+  --ah-accent-900: #003F46;
+
+  --ah-type-display-size: 28px;
+  --ah-type-display-lh: 34px;
+  --ah-type-display-weight: 700;
+  --ah-type-title-size: 20px;
+  --ah-type-title-lh: 26px;
+  --ah-type-title-weight: 600;
+  --ah-type-heading-size: 16px;
+  --ah-type-heading-lh: 22px;
+  --ah-type-heading-weight: 600;
+  --ah-type-body-size: 14px;
+  --ah-type-body-lh: 20px;
+  --ah-type-body-weight: 400;
+  --ah-type-body-strong-size: 14px;
+  --ah-type-body-strong-lh: 20px;
+  --ah-type-body-strong-weight: 600;
+  --ah-type-caption-size: 12px;
+  --ah-type-caption-lh: 16px;
+  --ah-type-caption-weight: 400;
+  --ah-type-mono-size: 12px;
+  --ah-type-mono-lh: 16px;
+  --ah-type-mono-weight: 400;
+
+  --ah-font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
+  --ah-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --ah-elev-1: 0 1px 2px rgb(10 11 13 / .06);
+  --ah-elev-2: 0 4px 12px rgb(10 11 13 / .10);
+  --ah-elev-3: 0 12px 32px rgb(10 11 13 / .18);
+
+  --ah-motion-control: 120ms;
+  --ah-motion-layer: 180ms;
+  --ah-motion-easing: cubic-bezier(.2,0,.2,1);
+}
+
+/* Camada semantica: PAPEL. Componente le daqui, nunca do primitivo. */
+:root {
+  --ah-surface-canvas: #F5F7F9;
+  --ah-surface-raised: #FFFFFF;
+  --ah-surface-chrome: #121417;
+  --ah-surface-sunken: #E5E9EE;
+  --ah-border-default: #CBD1D9;
+  --ah-border-strong: #A6AEB9;
+  --ah-border-subtle: #E5E9EE;
+  --ah-border-hover: #7B8491;
+  --ah-text-strong: #1F2328;
+  --ah-text-default: #2B3037;
+  --ah-text-label: #3C424B;
+  --ah-text-secondary: #565E69;
+  --ah-text-on-chrome: #A6AEB9;
+  --ah-text-placeholder: #7B8491;
+  --ah-text-icon: #7B8491;
+  --ah-state-success: #157F3D;
+  --ah-state-warning: #8A5200;
+  --ah-state-danger: #C22B2B;
+  --ah-state-info: #1F5FD0;
+  --ah-state-risk: #B4470B;
+  --ah-state-neutral: #565E69;
+  --ah-action-on-solid: #FFFFFF;
+  --ah-action-subtle-bg: #E8FBFD;
+  --ah-control-height: 36px;
+  --ah-control-radius: 6px;
+  --ah-control-disabled-bg: #F5F7F9;
+  --ah-control-disabled-border: #E5E9EE;
+  --ah-control-disabled-text: #7B8491;
+}
+
+/* Papeis de acao: RESOLVIDOS por contraste. Runtime sobrescreve por tenant. */
+:root {
+  --ah-action-solid: #00707B;
+  --ah-action-on-solid: #FFFFFF;
+  --ah-action-text: #00707B;
+  --ah-action-hover: #005760;
+  --ah-focus-ring: #00707B;
+  --ah-focus-ring-width: 2px;
+  --ah-focus-ring-offset: 2px;
+}
+
+/* Camada de expressao: por superficie. `data-surface` seleciona. */
+[data-surface="panel"] {
+  --ah-size-control: 36px;
+  --ah-size-table-row: 40px;
+  --ah-size-card-padding: 16px;
+  --ah-size-page-gutter: 24px;
+  --ah-radius-control: 6px;
+  --ah-radius-card: 8px;
+  --ah-radius-badge: 4px;
+  --ah-radius-modal: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 100ms !important;
+    transition-duration: 100ms !important;
+  }
+}

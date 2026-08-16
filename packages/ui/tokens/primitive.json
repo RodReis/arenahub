@@ -1,0 +1,97 @@
+{
+  "$comment": "Camada 1 de 3 -- valor bruto. NENHUM componente le esta camada (regra de lint 2). Fonte: docs/design/DS-PAINEL.md §2.1. Os hex vivem AQUI e em nenhum outro lugar do repositorio: a regra de lint 1 proibe hex literal fora de packages/ui/tokens.",
+  "carbon": {
+    "50":  { "value": "#F5F7F9", "contrastOnWhite": 1.07 },
+    "100": { "value": "#E5E9EE", "contrastOnWhite": 1.22 },
+    "200": { "value": "#CBD1D9", "contrastOnWhite": 1.54 },
+    "300": { "value": "#A6AEB9", "contrastOnWhite": 2.24 },
+    "400": { "value": "#7B8491", "contrastOnWhite": 3.78, "$comment": "REPROVA como texto de corpo em fundo claro (3.78 < 4.5). Existe para borda, icone decorativo e placeholder. Ver a excecao nomeada de controle desabilitado em semantic.json." },
+    "500": { "value": "#565E69", "contrastOnWhite": 6.56 },
+    "600": { "value": "#3C424B", "contrastOnWhite": 10.13 },
+    "700": { "value": "#2B3037", "contrastOnWhite": 13.29 },
+    "800": { "value": "#1F2328", "contrastOnWhite": 15.8 },
+    "900": { "value": "#121417", "contrastOnWhite": 18.45 }
+  },
+
+  "$semanticComment": "Fixos e NAO configuraveis pelo tenant -- DS-PAINEL.md §2.2. Um tenant que pudesse repintar 'erro' quebraria o unico canal que a operacao le sem pensar.",
+  "semantic": {
+    "success": { "value": "#157F3D", "contrastOnWhite": 5.08 },
+    "warning": { "value": "#8A5200", "contrastOnWhite": 6.39 },
+    "danger":  { "value": "#C22B2B", "contrastOnWhite": 5.72 },
+    "info":    { "value": "#1F5FD0", "contrastOnWhite": 5.82 },
+    "risk":    { "value": "#B4470B", "contrastOnWhite": 5.46 }
+  },
+
+  "$accentComment": "Rampa DERIVADA do hex seed do tenant. Os valores abaixo sao o padrao comercial Ciano Arena #00A9B8 (DS-PAINEL.md §13 pendencia 4, fechada em 16/08/2026). Em runtime a rampa vem do tenant; estes existem para o build ter um default e para o teste de contraste ter alvo fixo.",
+  "accent": {
+    "seed": "#00A9B8",
+    "50":  { "value": "#E8FBFD", "contrastOnWhite": 1.06 },
+    "100": { "value": "#C2F2F7", "contrastOnWhite": 1.21 },
+    "200": { "value": "#8AE5EF", "contrastOnWhite": 1.51 },
+    "300": { "value": "#4FD5E3", "contrastOnWhite": 1.94 },
+    "400": { "value": "#1FBED0", "contrastOnWhite": 2.42 },
+    "500": { "value": "#00A9B8", "contrastOnWhite": 2.85 },
+    "600": { "value": "#008C99", "contrastOnWhite": 4.03, "$comment": "REPROVA para texto branco (4.03 < 4.5). O resolvedor pula este tom." },
+    "700": { "value": "#00707B", "contrastOnWhite": 5.83 },
+    "800": { "value": "#005760", "contrastOnWhite": 8.29 },
+    "900": { "value": "#003F46", "contrastOnWhite": 11.24 }
+  },
+
+  "space": {
+    "$comment": "Passo de 4 px -- DS-PAINEL.md §4.",
+    "step": 4,
+    "1": 4, "2": 8, "3": 12, "4": 16, "5": 20, "6": 24, "8": 32, "10": 40, "12": 48
+  },
+
+  "radius": {
+    "control": 6,
+    "card": 8,
+    "badge": 4,
+    "modal": 10
+  },
+
+  "size": {
+    "control": 36,
+    "tableRow": 40,
+    "cardPadding": 16,
+    "pageGutter": 24,
+    "touchTargetMin": 24,
+    "touchTargetRecommended": 32
+  },
+
+  "font": {
+    "sans": "'Inter Variable', Inter, system-ui, sans-serif",
+    "mono": "'JetBrains Mono', ui-monospace, monospace"
+  },
+
+  "type": {
+    "$comment": "size / lineHeight / weight -- DS-PAINEL.md §3.",
+    "display":     { "size": 28, "lineHeight": 34, "weight": 700 },
+    "title":       { "size": 20, "lineHeight": 26, "weight": 600 },
+    "heading":     { "size": 16, "lineHeight": 22, "weight": 600 },
+    "body":        { "size": 14, "lineHeight": 20, "weight": 400 },
+    "body-strong": { "size": 14, "lineHeight": 20, "weight": 600 },
+    "caption":     { "size": 12, "lineHeight": 16, "weight": 400 },
+    "mono":        { "size": 12, "lineHeight": 16, "weight": 400 }
+  },
+
+  "elevation": {
+    "$comment": "Sombra APENAS em camada que flutua. Card nao tem sombra: tem borda carbon-200 -- DS-PAINEL.md §4.",
+    "1": "0 1px 2px rgb(10 11 13 / .06)",
+    "2": "0 4px 12px rgb(10 11 13 / .10)",
+    "3": "0 12px 32px rgb(10 11 13 / .18)"
+  },
+
+  "motion": {
+    "controlFeedback": 120,
+    "layerOpen": 180,
+    "easing": "cubic-bezier(.2,0,.2,1)",
+    "reducedMotionMax": 100
+  },
+
+  "breakpoint": {
+    "$comment": "DS-PAINEL.md §13 pendencia 2, confirmada pelo PI em 16/08/2026 (SPEC-042 §5 pergunta 3).",
+    "degraded": 1024,
+    "operational": 1280
+  }
+}

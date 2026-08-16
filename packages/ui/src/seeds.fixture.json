@@ -1,0 +1,29 @@
+{
+  "$comment": "Seeds hipoteticos de tenant -- ENTRADA do resolvedor de accent, nao token do sistema. Ficam em JSON, e nao no .ts do spec, porque a regra de lint 1 (hex literal fora de tokens/) vale para TODO codigo -- inclusive teste. Enfraquecer a regra para acomodar um spec seria trocar a garantia pela conveniencia; mover o dado para onde dado mora custa um import.",
+  "$why": "Cada matiz aqui tem um tom 'certo' DIFERENTE para acao solida. E o que prova que o resolvedor resolve, em vez de devolver constante.",
+
+  "tenants": [
+    { "nome": "amarelo", "seed": "#FFD400", "$nota": "o caso que quebra numero fixo de tom -- texto branco sobre amarelo claro e ilegivel" },
+    { "nome": "vermelho", "seed": "#C22B2B" },
+    { "nome": "indigo", "seed": "#4B0082" },
+    { "nome": "azul", "seed": "#1F5FD0" },
+    { "nome": "verde", "seed": "#157F3D" },
+    { "nome": "rosa", "seed": "#FF69B4" },
+    { "nome": "ambar-escuro", "seed": "#8A5200" }
+  ],
+
+  "gamutExtremos": [
+    { "nome": "verde-puro", "seed": "#00FF00", "$nota": "croma alto demais para sRGB nas pontas da rampa" },
+    { "nome": "preto", "seed": "#000000", "$nota": "croma zero -- a rampa vira escala de cinza" },
+    { "nome": "branco", "seed": "#FFFFFF", "$nota": "luminosidade maxima" }
+  ],
+
+  "branco": "#FFFFFF",
+
+  "$formasComentario": "Entradas do parser de hex -- validas e invalidas. Nao sao cores do sistema: sao o dado que prova que parseHex aceita a forma curta e RECUSA lixo em vez de devolver preto silenciosamente.",
+  "formas": {
+    "curtaValida": "#FFF",
+    "invalidaHex": "#ZZZ",
+    "invalidaTexto": "nao-e-cor"
+  }
+}

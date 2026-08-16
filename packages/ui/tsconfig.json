@@ -1,0 +1,14 @@
+{
+  "extends": "@arenahub/config/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "resolveJsonModule": true
+  },
+  "$comment": "`scripts/*.mjs` fica FORA: e JavaScript de build que roda em Node, nao codigo do pacote. Incluir arrastaria o pipeline para o programa TypeScript e o ESLint com projectService passaria a exigir que ele estivesse aqui -- duas ferramentas discutindo sobre um arquivo que nenhuma das duas precisa checar.",
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "dist-tokens"]
+}
