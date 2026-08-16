@@ -1,4 +1,5 @@
 import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware.js';
@@ -10,6 +11,8 @@ import { HealthController } from './health/health.controller.js';
 import { VerificadorDeBanco } from './health/verificador-de-banco.js';
 import { VerificadorDeRedis } from './health/verificador-de-redis.js';
 import { AccessModule } from './modules/access/access.module.js';
+import { AccessQueryModule } from './modules/access-query/access-query.module.js';
+import { ExportsModule } from './modules/exports/exports.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { IamModule } from './modules/iam/iam.module.js';
 import { BiometricsModule } from './modules/biometrics/biometrics.module.js';
@@ -17,6 +20,7 @@ import { DeviceSyncModule } from './modules/device-sync/device-sync.module.js';
 import { DevicesModule } from './modules/devices/devices.module.js';
 import { EdgeAuthModule } from './modules/edge-auth/edge-auth.module.js';
 import { MembershipModule } from './modules/membership/membership.module.js';
+import { OperationsModule } from './modules/operations/operations.module.js';
 import { PrivacyModule } from './modules/privacy/privacy.module.js';
 import { StudentsModule } from './modules/students/students.module.js';
 import { TenancyModule } from './modules/tenancy/tenancy.module.js';
@@ -29,6 +33,10 @@ import { PersistenceModule } from './persistence/persistence.module.js';
  */
 @Module({
   imports: [
+    // Agendador do avaliador de alertas (F11, INV-146). `forRoot` uma vez
+    // so, na raiz -- registrar por modulo criaria varios agendadores para o
+    // mesmo `@Interval`.
+    ScheduleModule.forRoot(),
     PersistenceModule,
     StorageModule,
     AuthModule,
@@ -42,6 +50,9 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     EdgeAuthModule,
     DeviceSyncModule,
     AccessModule,
+    AccessQueryModule,
+    ExportsModule,
+    OperationsModule,
   ],
   controllers: [HealthController],
   providers: [
