@@ -1,10 +1,14 @@
 # CI do ArenaHub — o portão de merge.
 #
 # No processo do trio, o merge é do próprio Code: o PI não segura o código na
-# porta da `main`. A única coisa entre uma entrega ruim e a `main` é este
-# arquivo. Por isso ele falha explicitamente e nunca "passa mesmo assim".
+# porta da `main`. A única coisa entre uma entrega ruim e a `main` são estes
+# dois jobs. Por isso eles falham explicitamente e nunca "passam mesmo assim".
 #
 # Ordem por custo crescente — falhe cedo, falhe barato (docs/TESTING.md §6).
+#
+# DOIS jobs em paralelo, e não um em série: `rapido` não depende de banco nem
+# de navegador, então não tem por que esperar na fila atrás deles. Ambos são
+# obrigatórios para o merge — paralelizar encurta o relógio, não a barra.
 
 name: CI
 
@@ -26,30 +30,15 @@ env:
   DO_NOT_TRACK: 1
 
 jobs:
-  ci:
-    name: build, lint, typecheck e testes
+  # ---------------------------------------------------------------------------
+  # Job rápido: tudo que só precisa de disco e CPU. Sem Postgres, sem
+  # navegador. É aqui que mora a barreira que pega o erro bobo em menos de um
+  # minuto.
+  # ---------------------------------------------------------------------------
+  rapido:
+    name: lint, typecheck, guardas e testes
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    services:
-      # Postgres para `test:integration`. Testcontainers sobe o que precisar
-      # por conta, mas o serviço aqui cobre o caso simples e é mais rápido.
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: arenahub
-          POSTGRES_PASSWORD: arenahub_ci
-          POSTGRES_DB: arenahub
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U arenahub -d arenahub"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub?schema=public
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v7
@@ -91,6 +80,19 @@ jobs:
       - name: self-check do gerador de relatório
         run: pnpm test:report:selfcheck
 
+      # --- 8 de 8, promovida para cá --------------------------------------
+      # A guarda de evidência. Falha se reports/TESTS.md divergir do que a
+      # varredura produz -- número em documento tem de vir de execução, nunca
+      # de prosa (docs/TESTING.md §5).
+      #
+      # Ela era o ÚLTIMO passo do workflow antigo, depois do E2E inteiro, e
+      # custava ~4min para reportar um diff de duas linhas (issue #77). Está
+      # aqui porque `--check` não depende de teste ter rodado: ele lê
+      # `git ls-files` e compara com o arquivo commitado. Não afrouxou nada --
+      # continua barrando o merge, só barra mais cedo.
+      - name: guarda de evidência
+        run: pnpm test:report --check
+
       # --- 4 de 8 ---------------------------------------------------------
       # Promovido a passo próprio na F1, quando `apps/edge-agent` nasceu e
       # passou a declarar `test`. Antes disso vivia na lista de pendentes.
@@ -101,6 +103,51 @@ jobs:
       # Promovido na F1, mesmo motivo.
       - name: build
         run: pnpm build
+
+  # ---------------------------------------------------------------------------
+  # Job pesado: o que precisa de Postgres e de navegador. Roda em paralelo com
+  # o rápido, e duplica o `install` -- o cache do pnpm paga a diferença.
+  # ---------------------------------------------------------------------------
+  pesado:
+    name: integração e E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      # Postgres para `test:integration`. Testcontainers sobe o que precisar
+      # por conta, mas o serviço aqui cobre o caso simples e é mais rápido.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: arenahub
+          POSTGRES_PASSWORD: arenahub_ci
+          POSTGRES_DB: arenahub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arenahub -d arenahub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub?schema=public
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: gerar client do Prisma
+        run: pnpm --filter @arenahub/database generate
 
       # --- 5 de 8 ---------------------------------------------------------
       # Promovido na F6, quando `apps/api` e `packages/database` nasceram e
@@ -121,17 +168,45 @@ jobs:
       # Promovido na F6 (Task 6), quando o Playwright nasceu no admin-web.
       # Com ele, OS OITO PASSOS têm workspace: a lista de pendentes acabou.
       #
+      # O `build` roda aqui também, e não só no job rápido: o `webServer` do
+      # playwright.config.ts sobe `next start` e `node dist/main.js`, que são
+      # os artefatos compilados. `dependsOn: ["^build"]` do turbo constrói as
+      # DEPENDÊNCIAS da task, não o próprio app -- sem este passo o E2E sobe
+      # contra um `dist/` que não existe.
+      - name: build
+        run: pnpm build
+
       # O `seed` roda antes porque a jornada E2E entra com um proprietário
       # real -- e é o seed que o cria (`CLAUDE.md`: dado local de
       # desenvolvimento entra por seed).
-      #
-      # `--with-deps` instala as bibliotecas de sistema do Chromium que o
-      # runner do GitHub não traz.
       - name: seed de bancada
         run: pnpm --filter @arenahub/database seed
 
+      # O navegador vem do cache, chaveado pela versão do Playwright no
+      # lockfile: upgrade da lib invalida o cache sozinho, sem ninguém
+      # lembrar de mexer aqui.
+      - name: resolver versão do Playwright
+        id: playwright
+        run: echo "versao=$(node -p "require('./apps/admin-web/package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
+
+      - name: cache do navegador do Playwright
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.versao }}
+
+      # Sem cache: baixa o navegador E as bibliotecas de sistema.
       - name: instalar navegador do Playwright
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: pnpm --filter @arenahub/admin-web exec playwright install --with-deps chromium
+
+      # Com cache: o binário já veio de ~/.cache/ms-playwright, mas as
+      # bibliotecas de sistema moram em /usr e o cache não as traz. Sem este
+      # passo o Chromium existe e não abre.
+      - name: instalar dependências de sistema do Chromium
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: pnpm --filter @arenahub/admin-web exec playwright install-deps chromium
 
       - name: 'test:e2e'
         run: pnpm test:e2e
@@ -143,10 +218,3 @@ jobs:
           name: playwright-report
           path: apps/admin-web/playwright-report/
           retention-days: 7
-
-      # --- 8 de 8 ---------------------------------------------------------
-      # A guarda de evidência. Falha se reports/TESTS.md divergir do que a
-      # execução produz -- número em documento tem de vir de execução, nunca
-      # de prosa (docs/TESTING.md §5). Esta barra o merge desde já.
-      - name: guarda de evidência
-        run: pnpm test:report --check

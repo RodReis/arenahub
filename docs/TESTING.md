@@ -163,6 +163,26 @@ Pipeline mínimo, em ordem de custo crescente (falhe cedo, falhe barato):
 **Barram o merge:** todos os 8. Inclusive a cobertura de 80% em regras de domínio e a guarda de
 evidência.
 
+**Dois jobs paralelos** (issue [#77](https://github.com/RodReis/arenahub/issues/77)). A numeração
+acima é a ordem de **custo**, não a de execução — o que não depende um do outro não espera na fila:
+
+| job | passos | por quê separado |
+|---|---|---|
+| **rapido** | lint, typecheck, guardas, **evidência**, test, build | só precisa de disco e CPU |
+| **pesado** | migrations, test:integration, build, seed, test:e2e | precisa de Postgres e de navegador |
+
+Duas consequências da divisão, ambas deliberadas:
+
+- **A guarda de evidência (8) roda no job rápido, logo após as outras guardas.** `--check` não
+  depende de teste nenhum ter rodado: ele lê `git ls-files` e compara com o `reports/TESTS.md`
+  commitado. Estava por último e custava ~4min para reportar um diff de duas linhas. **Continua
+  barrando o merge** — só barra mais cedo.
+- **`build` (6) roda nos dois jobs.** No pesado porque o `webServer` do Playwright sobe
+  `next start` e `node dist/main.js`, que são artefatos compilados; o `dependsOn: ["^build"]` do
+  turbo constrói as *dependências* da task, nunca o próprio app.
+
+Nenhuma verificação foi removida ou afrouxada: **os dois jobs são obrigatórios** para o merge.
+
 **Não rodam em CI:** teste de hardware real (só na bancada, no gate) e teste de carga (sob
 demanda).
 
