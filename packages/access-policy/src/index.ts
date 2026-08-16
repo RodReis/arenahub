@@ -8,6 +8,7 @@ export {
   type AccessWindow,
   type AllowReason,
   type DenyReason,
+  type EngineAllowReason,
   type EntitlementInput,
   type EntitlementStatus,
   type PolicyVersion,

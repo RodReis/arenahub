@@ -101,6 +101,8 @@ describe('contrato OpenAPI', () => {
         // F9 -- decisao online e desfecho da passagem, rotas de Edge assinadas.
         '/api/v1/edge/access-decisions',
         '/api/v1/edge/access-events/{id}/passage',
+        // F9 -- liberacao manual, rota de operacao (cookie + permissao).
+        '/api/v1/access/manual-overrides',
       ]),
     );
   });

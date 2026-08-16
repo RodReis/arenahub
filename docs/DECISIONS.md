@@ -1041,3 +1041,37 @@ precisa do tipo. Um enum de domínio mora com a regra que o decide.
 **Consequência para o `DESIGN-UI.md`.** O item 2 da §17 sai de *pendente* para *fechado por este
 ADR*. O dicionário de rótulos em pt-BR — o texto que a tela pública mostra — continua sendo
 trabalho de UI e **não é decidido aqui**: este ADR fixa o **código estável**, não a frase.
+
+### Emenda de 16/08/2026 — o oitavo rótulo: `MANUAL_OVERRIDE`
+
+**Decidida pelo PI em 16/08/2026**, durante a implementação da F9.
+
+**O que apareceu.** A lista acima foi fechada olhando o **motor**, que decide a partir de
+entitlement. Mas o `AccessEvent.reason` é gravado também pela **liberação manual da recepção**
+(`M1-FR-023`), que não passa pelo motor — e nenhum dos sete rótulos a descreve.
+
+Escrever `ACTIVE_ENTITLEMENT` num override seria **gravar mentira num fato imutável**: a recepção
+abre a catraca justamente para quem o motor negou, então na maioria dos casos **não há direito
+ativo nenhum**. O defeito não é estético — todo relatório de "acessos por direito válido"
+precisaria lembrar de excluir `mode = OVERRIDE`, e quem esquecesse contaria exceção como regra.
+
+**Decisão.** Acrescenta-se `MANUAL_OVERRIDE` como oitavo rótulo, **exclusivo de
+`mode = OVERRIDE`**:
+
+```ts
+ACTIVE_ENTITLEMENT   // ALLOW — decidido pelo motor
+MANUAL_OVERRIDE      // ALLOW — gravado pelo caso de uso de override  ← novo
+// ... as seis razões de DENY seguem inalteradas
+```
+
+**O motor nunca produz este valor**, e isso é garantido por tipo, não por convenção: o tipo
+`EngineAllowReason` (em `packages/access-policy/src/types.ts`) exclui `MANUAL_OVERRIDE`, e
+`AccessPolicyResult` usa ele — um `evaluateAccess` que tentasse devolvê-lo **não compila**.
+
+**Isto é exatamente o crescimento que o ADR previu.** O corpo acima diz: *"a lista cresce pelo fim
+sem tocar no que já foi persistido"*. `MANUAL_OVERRIDE` entra por `ALTER TYPE ... ADD VALUE` — uma
+linha de migration, zero dado reescrito. A previsão era sobre `PAYMENT_OVERDUE` no MVP 2; valeu
+antes, e pelo mesmo motivo.
+
+**O que não mudou:** as seis razões de `DENY`, a ordem de precedência, e a regra de que só entra
+rótulo que é verdade.

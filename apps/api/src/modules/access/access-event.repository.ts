@@ -1,4 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import type { AccessReason } from '@arenahub/access-policy';
 import type { AccessEvent, Prisma } from '@arenahub/database';
 import { createHash } from 'node:crypto';
 
@@ -25,14 +26,11 @@ export interface DadosDeEvento {
   externalUserId: string | null;
   recognitionId: string | null;
   outcome: 'ALLOW' | 'DENY';
-  reason:
-    | 'ACTIVE_ENTITLEMENT'
-    | 'ADMIN_BLOCK'
-    | 'STUDENT_BLOCKED'
-    | 'STUDENT_INACTIVE'
-    | 'NO_ENTITLEMENT'
-    | 'WRONG_UNIT'
-    | 'OUTSIDE_SCHEDULE';
+  /**
+   * Tipo do `@arenahub/access-policy`, nao literal repetido: acrescentar
+   * razao la e esquecer aqui passaria a NAO compilar, que e o alarme certo.
+   */
+  reason: AccessReason;
   entitlementId: string | null;
   validUntil: Date | null;
   policyVersion: string;

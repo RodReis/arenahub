@@ -64,8 +64,23 @@ export type EntitlementStatus =
  * nenhum rotulo aqui carrega numeracao nem posicao.
  */
 export const ALLOW_REASON = {
-  /** Unico caminho de entrada. Se nao ha direito vigente, nao ha ALLOW. */
+  /** Unico caminho de entrada PELO MOTOR. Sem direito vigente, nao ha ALLOW. */
   ACTIVE_ENTITLEMENT: 'ACTIVE_ENTITLEMENT',
+  /**
+   * Liberacao manual da recepcao -- ADR-024, emenda de 16/08/2026.
+   *
+   * ⚠️ **O MOTOR NUNCA PRODUZ ESTE VALOR.** Ele existe no enum porque e
+   * gravado no mesmo campo `reason` do `AccessEvent`, e o campo precisa de um
+   * rotulo que diga a verdade. Quem o escreve e o caso de uso de override,
+   * sempre com `mode: 'OVERRIDE'`.
+   *
+   * Sem ele, override gravaria `ACTIVE_ENTITLEMENT` -- afirmando um direito
+   * ativo que frequentemente NAO existe (a recepcao abre a catraca
+   * justamente para quem o motor negou). Todo relatorio de "acessos por
+   * direito valido" teria de lembrar de excluir `mode = OVERRIDE`, e quem
+   * esquecesse contaria excecao como regra.
+   */
+  MANUAL_OVERRIDE: 'MANUAL_OVERRIDE',
 } as const;
 
 export const DENY_REASON = {
@@ -85,7 +100,18 @@ export const DENY_REASON = {
 
 export type AllowReason = (typeof ALLOW_REASON)[keyof typeof ALLOW_REASON];
 export type DenyReason = (typeof DENY_REASON)[keyof typeof DENY_REASON];
+
+/** Tudo que pode ser gravado no `AccessEvent.reason`. */
 export type AccessReason = AllowReason | DenyReason;
+
+/**
+ * O que o MOTOR pode devolver -- subconjunto de `AccessReason`.
+ *
+ * `MANUAL_OVERRIDE` fica de fora: ele e gravado pelo caso de uso de override,
+ * nunca calculado a partir de entitlement. A separacao e o que faz o
+ * compilador recusar um motor que tente "decidir" uma liberacao manual.
+ */
+export type EngineAllowReason = typeof ALLOW_REASON.ACTIVE_ENTITLEMENT;
 
 /**
  * Janela de horario ja resolvida.
@@ -140,7 +166,7 @@ export interface AccessPolicyInput {
 export type AccessPolicyResult =
   | {
       readonly outcome: 'ALLOW';
-      readonly reason: AllowReason;
+      readonly reason: EngineAllowReason;
       /** Qual direito autorizou. Rastreabilidade do `M1-FR-021`. */
       readonly entitlementId: string;
       /** Ate quando esta decisao continua valida, ISO-8601. */

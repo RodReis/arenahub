@@ -354,6 +354,8 @@ enum AccessOutcome {
 /// listas.
 enum AccessReason {
   ACTIVE_ENTITLEMENT
+  /// Liberacao manual da recepcao. So valido com `mode = OVERRIDE`.
+  MANUAL_OVERRIDE
   ADMIN_BLOCK
   STUDENT_BLOCKED
   STUDENT_INACTIVE

@@ -928,6 +928,20 @@
           "EdgeAccess"
         ]
       }
+    },
+    "/api/v1/access/manual-overrides": {
+      "post": {
+        "operationId": "ManualOverrideController_criar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ManualOverride"
+        ]
+      }
     }
   },
   "info": {

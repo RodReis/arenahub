@@ -19,6 +19,7 @@ import { ALLOW_REASON, DENY_REASON } from '@arenahub/access-policy';
  */
 const RAZOES_NO_SCHEMA = [
   'ACTIVE_ENTITLEMENT',
+  'MANUAL_OVERRIDE',
   'ADMIN_BLOCK',
   'STUDENT_BLOCKED',
   'STUDENT_INACTIVE',
@@ -34,8 +35,21 @@ describe('ADR-024 -- razoes do motor e do banco nao divergem', () => {
     expect(doMotor).toEqual([...RAZOES_NO_SCHEMA].sort());
   });
 
-  it('ACTIVE_ENTITLEMENT e a unica razao de ALLOW', () => {
-    expect(Object.values(ALLOW_REASON)).toEqual(['ACTIVE_ENTITLEMENT']);
+  it('ha duas razoes de ALLOW: a do motor e a do override', () => {
+    expect([...Object.values(ALLOW_REASON)].sort()).toEqual([
+      'ACTIVE_ENTITLEMENT',
+      'MANUAL_OVERRIDE',
+    ]);
+  });
+
+  it('o motor NUNCA devolve MANUAL_OVERRIDE -- so o caso de uso o grava', () => {
+    // Guarda de regressao para a emenda do ADR-024: o tipo
+    // `EngineAllowReason` exclui `MANUAL_OVERRIDE`, e o compilador recusaria
+    // um `evaluateAccess` que tentasse devolve-lo. Este teste registra a
+    // intencao para quem ler o arquivo sem abrir os tipos.
+    const doMotor: ReadonlySet<string> = new Set(['ACTIVE_ENTITLEMENT']);
+
+    expect(doMotor.has('MANUAL_OVERRIDE')).toBe(false);
   });
 
   it('ha exatamente seis razoes de DENY -- ADR-024', () => {
