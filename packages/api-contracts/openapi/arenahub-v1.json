@@ -768,6 +768,129 @@
           "Edge"
         ]
       }
+    },
+    "/api/v1/device-sync-jobs": {
+      "get": {
+        "operationId": "DeviceSyncController_listar",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DeviceSync"
+        ]
+      }
+    },
+    "/api/v1/edge/commands": {
+      "get": {
+        "operationId": "EdgeCommandsController_listar",
+        "parameters": [
+          {
+            "name": "after",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeCommands"
+        ]
+      }
+    },
+    "/api/v1/edge/commands/{id}/lease": {
+      "post": {
+        "operationId": "EdgeCommandsController_arrendar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeCommands"
+        ]
+      }
+    },
+    "/api/v1/edge/sync-results/batch": {
+      "post": {
+        "operationId": "EdgeCommandsController_receberResultados",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeCommands"
+        ]
+      }
     }
   },
   "info": {

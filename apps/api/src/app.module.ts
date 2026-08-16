@@ -12,6 +12,7 @@ import { VerificadorDeRedis } from './health/verificador-de-redis.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { IamModule } from './modules/iam/iam.module.js';
 import { BiometricsModule } from './modules/biometrics/biometrics.module.js';
+import { DeviceSyncModule } from './modules/device-sync/device-sync.module.js';
 import { DevicesModule } from './modules/devices/devices.module.js';
 import { EdgeAuthModule } from './modules/edge-auth/edge-auth.module.js';
 import { MembershipModule } from './modules/membership/membership.module.js';
@@ -38,6 +39,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     DevicesModule,
     BiometricsModule,
     EdgeAuthModule,
+    DeviceSyncModule,
   ],
   controllers: [HealthController],
   providers: [
