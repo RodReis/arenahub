@@ -16,6 +16,6 @@ import { IdentityResolver } from './identity-resolver.js';
 @Module({
   imports: [EdgeAuthModule],
   providers: [IdentityResolver, AccessProjectionRepository, AccessEventRepository],
-  exports: [AccessEventRepository],
+  exports: [IdentityResolver, AccessProjectionRepository, AccessEventRepository],
 })
 export class AccessModule {}
