@@ -9,6 +9,7 @@ import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.j
 import { AccessEventRepository } from '../../src/modules/access/access-event.repository.js';
 import { AccessProjectionRepository } from '../../src/modules/access/access-projection.repository.js';
 import { IdentityResolver } from '../../src/modules/access/identity-resolver.js';
+import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { EdgeAuthService } from '../../src/modules/edge-auth/edge-auth.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
@@ -191,7 +192,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
     a.studentId = aluno.id;
 
     const operador = await db.user.create({
-      data: { email: `f9-op-${sufixo}@exemplo.test`, passwordHash: 'x'.repeat(60) },
+      data: { email: `f9-op-${sufixo}@exemplo.test`, passwordHash: await app.get(PasswordService).gerarHash('f9-acesso-senha-de-teste') },
     });
 
     await db.tenantMembership.create({

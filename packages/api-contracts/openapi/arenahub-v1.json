@@ -891,6 +891,20 @@
           "EdgeCommands"
         ]
       }
+    },
+    "/api/v1/edge/access-decisions": {
+      "post": {
+        "operationId": "EdgeAccessController_decidirAcesso",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeAccess"
+        ]
+      }
     }
   },
   "info": {
