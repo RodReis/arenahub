@@ -59,8 +59,19 @@ jobs:
       # .gitignore). Sem este passo, lint e typecheck falham no CI e passam na
       # máquina de quem já rodou `generate` -- verde local, vermelho remoto,
       # que é o pior tipo de divergência. Vem antes do lint de propósito.
+      #
+      # `DATABASE_URL` aqui é de mentira, e é isso mesmo: `prisma generate` lê
+      # o schema e escreve o client -- não abre conexão. O que ele exige é que
+      # a variável EXISTA, porque o `prisma.config.ts` a resolve ao carregar.
+      # Sem ela o passo morre com `PrismaConfigEnvError` antes de gerar nada.
+      #
+      # A URL fica no passo, não no job: dar `env` de banco ao job inteiro
+      # abriria a porta para um teste deste job conectar em algo que não
+      # existe -- este job não tem Postgres, e não deve ter.
       - name: gerar client do Prisma
         run: pnpm --filter @arenahub/database generate
+        env:
+          DATABASE_URL: postgresql://prisma:generate@localhost:5432/nao-conecta?schema=public
 
       # --- 2 de 8 ---------------------------------------------------------
       - name: lint
