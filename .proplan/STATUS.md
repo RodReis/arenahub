@@ -57,14 +57,13 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [MVP1][SPEC-009][F9] Decisão online e passagem (#9)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
+- [MVP1][SPEC-009][F9] Decisão online e passagem (#9, finalizado em: 2026-08-16)
 - [MVP1][FIX] pnpm dev nunca funcionou: API morre no arranque e edge-agent não lê o .env (#72, finalizado em: 2026-08-16)
 - [MVP1][SPEC-008][F8] Consentimento, biometria e sync de dispositivo (#8, finalizado em: 2026-08-16)
 - [MVP1][SPEC-007][F7] Aluno, plano e entitlement manual (#7, finalizado em: 2026-08-16)
