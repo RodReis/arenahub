@@ -9,6 +9,8 @@ updated: 2026-08-16
 
 ### Sem épico
 
+- [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
+- [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [INFRA] 8 planos mandam criar docs/adr/, contrariando o ADR-021 (#68)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
 - [MVP6][SPEC-040][F40] Modelo supervisionado (condicionado a M6-ML-01) (#40)
@@ -49,6 +51,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP2.5][SPEC-042][F42] Design system da superfície admin-web (#81)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP0][SPEC-005][F5] Relatório e decisão (#5)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
@@ -62,6 +65,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [INFRA] Pipeline de tokens do design system e esqueleto de packages/ui (#79, finalizado em: 2026-08-16)
 - [INFRA] CI: falhar cedo e paralelizar — o ciclo de PR custa ~4min por rodada (#77, finalizado em: 2026-08-16)
 - [MVP1][SPEC-007][F7] Aluno, plano e entitlement manual (#7, finalizado em: 2026-08-16)
 - [MVP1][SPEC-011][F11] Painel operacional e prontidão (#11, finalizado em: 2026-08-16)
