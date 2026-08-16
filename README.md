@@ -39,8 +39,26 @@ simulador, sem tocar equipamento real). Para mexer na bancada de verdade,
 preencha `TENANT_ID` e `GYM_UNIT_ID` no `.env` — o `.env.example` explica de
 onde tirar os UUIDs, que o seed gera.
 
-Login de desenvolvimento, vindo do seed e **válido só localmente**:
-`dono@arena-positiva.test` / `senha-de-bancada-arenahub`.
+### Login
+
+Em http://localhost:3000, com o usuário que o seed cria:
+
+| campo | valor |
+|---|---|
+| e-mail | `dono@arena-positiva.test` |
+| senha | `senha-de-bancada-arenahub` |
+
+É `OWNER` do tenant `arena-positiva`, com a unidade `MATRIZ` já criada — ou
+seja, entra com todas as permissões.
+
+> Esta senha está versionada no seed **de propósito**: é credencial de bancada
+> e só existe no banco local. Produção e homologação usam secret manager.
+> Se o login não aceitar, o seed não rodou nesse banco — `pnpm dev:setup`
+> resolve, e rodar de novo é seguro.
+
+Outros acessos locais: o console do MinIO usa `arenahub` /
+`arenahub_dev_minio`, e o Postgres, `arenahub` / `arenahub_dev` (ambos vêm do
+`.env.example`).
 
 ### Pré-requisitos
 
