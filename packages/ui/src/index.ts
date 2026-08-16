@@ -1,15 +1,19 @@
 /**
  * `@arenahub/ui` -- design system do ArenaHub.
  *
- * Esta entrega e o card `[INFRA]` do ADR-025 decisao 1: **pipeline de tokens
- * e esqueleto**, mecanica de build sem decisao de produto.
+ * O pipeline de tokens veio do card `[INFRA]` do ADR-025 decisao 1: mecanica
+ * de build sem decisao de produto.
  *
- * Os COMPONENTES nao moram aqui ainda -- `StateBadge`, `ProblemDetail`,
- * `DataFreshness`, `Toast`, `state-labels.ts` e o resto do inventario de 17
- * (DS-PAINEL.md §9) sao a fatia **F42 / SPEC-042**, que consome este pipeline.
- * A separacao e o proprio ADR-025: rotulo pt-BR de enum de dominio e decisao
- * de produto e passa pelo aceite do PI; JSON virando CSS nao decide nada.
+ * Os COMPONENTES sao a fatia **F42 / SPEC-042**, que consome esse pipeline.
+ * `Icon` e `Ausente` abrem a fila por serem os unicos sem rotulo de dominio:
+ * `StateBadge`, `ProblemDetail`, `DataFreshness`, `Toast` e `state-labels.ts`
+ * chegam nas tarefas seguintes. A separacao e o proprio ADR-025: rotulo pt-BR
+ * de enum de dominio e decisao de produto e passa pelo aceite do PI; JSON
+ * virando CSS nao decide nada.
  */
+
+export { Ausente } from './components/Ausente.js';
+export { Icon, type IconName } from './components/Icon.js';
 
 export {
   AA_LARGE,
