@@ -30,6 +30,16 @@ export { PrismaPg } from '@prisma/adapter-pg';
  */
 export type {
   AuditLog,
+  BiometricAccessLog,
+  BiometricIdentity,
+  ConsentDocument,
+  ConsentRecord,
+  Device,
+  DeviceCommand,
+  DeviceSyncJob,
+  DeviceUser,
+  EdgeCredential,
+  EdgeNode,
   Entitlement,
   EntitlementUnitWindow,
   GymUnit,
@@ -43,6 +53,7 @@ export type {
   Role,
   RolePermission,
   Session,
+  ReplayNonce,
   Student,
   StudentAddress,
   StudentContact,
@@ -51,6 +62,7 @@ export type {
   Subscription,
   Tenant,
   TenantMembership,
+  TenantPrivacySettings,
   User,
   UserRole,
 } from './generated/client.js';
@@ -63,6 +75,19 @@ export type {
  * amarrar a assinatura de repositorio ao que o Prisma realmente aceita.
  */
 export type {
+  BiometricAccessKind,
+  BiometricAccessPurpose,
+  BiometricIdentityState,
+  ConsentDecision,
+  ConsentDocumentType,
+  ConsentSubjectKind,
+  DeviceCommandState,
+  DeviceKind,
+  DeviceStatus,
+  DeviceSyncJobState,
+  DeviceSyncOperation,
+  DeviceUserState,
+  EdgeNodeStatus,
   EntitlementSource,
   EntitlementStatus,
   StudentContactType,

@@ -493,7 +493,7 @@ Entrada: decisão de saída do MVP 0 (`MVP-00` §15, `MVP-01` §1) = `GO` ou `GO
 |---|---|---|---|
 | ✅ F6 | 1.1 Core seguro e unidade | tenant, `TenantContext`, RBAC, MFA administrativo, auditoria de login. **Multiunidade desde o dia 1** (ADR-002): teste de isolamento por `gym_unit_id` junto com o de `tenant_id` | — |
 | 🟡 F7 | 1.2 Aluno, plano e entitlement manual | `Student`, `Plan`, `Subscription` manual, **`Entitlement` como derivação explícita**, com `source` como enum extensível (ADR-009) | — |
-| F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | etapa física depende de hardware |
+| 🟡 F8 | 1.3 Consentimento, biometria e sync | `Consent`, `BiometricIdentity`, `DeviceUser`, fila individual por usuário×dispositivo, **expurgo em 30 dias** e **consentimento por responsável legal** (ADR-008) | etapa física depende de hardware |
 | F9 | 1.4 Decisão online e passagem | Access Decision Engine **na nuvem** (ADR-004), `AccessEvent`, `Passage`, tela pública | lista canônica de razões de `DENY` (`DESIGN-UI` §17 item 2) |
 | F11 | 1.6 Painel e prontidão | dashboard operacional, saúde de dispositivo e **alerta obrigatório quando o Edge some** (ADR-011) | F6–F9 |
 
@@ -514,6 +514,31 @@ repositório (106 novos), entre eles **6 propriedades** com fast-check — INV-0
 expirado nunca é efetivo*) passou a ter prova sobre 500 combinações geradas, não sobre os casos
 que eu lembrei de escrever. Evidência, escopo negativo e limites em
 [`docs/operations/smart-access/students-entitlements-evidence.md`](operations/smart-access/students-entitlements-evidence.md).
+
+🟡 **F8 — Tasks 1 a 6 entregues em 16/08/2026, em `SIMULATOR_READY`. A Task 7 não rodou.**
+
+A cadeia fecha ponta a ponta em simulador: consentimento → identidade → job → comando durável →
+execução no adapter → resultado → reconciliação → `DELETED`. **497 testes** no repositório.
+
+Consentimento versionado com base legal do art. 11, I; `BiometricIdentity` **sem coluna de
+template ou imagem** (INV-020, com dois testes varrendo `information_schema` e caçando `bytea`);
+assinatura HMAC do Edge com anti-replay por constraint; fila durável no Postgres com lease,
+backoff 1/2/3/5/8 e dead letter visível; worker no Edge Agent que delega ao adapter da F2; e
+revogação com bloqueio lógico imediato (INV-018) que só vira `DELETED` quando **todos** os
+dispositivos confirmam (INV-027).
+
+O delta do ADR-008 entrou no modelo e na regra: consentimento por responsável legal com vínculo
+comprovável e **revalidação na virada dos 18** (INV-143 — a prova continua válida, a autorização
+caduca), log de acesso a dado biométrico, e retenção como parâmetro do cliente (art. 39).
+
+**O que continua em aberto:** `M1-AC-004` e `M1-AC-007` **não estão atendidos fisicamente** —
+nada rodou em hardware homologado, porque o gate `M1-HW-01` não foi atravessado. O expurgo dos 30
+dias está modelado mas sem job agendado, e a lista de hardware homologado segue provisória no
+código até `supported-hardware.md` existir. **BullMQ e WebSocket não entraram**: a entrega durável
+não precisou deles, e `CLAUDE.md` manda usar fila só quando comprovadamente necessário.
+
+Evidência, limites e decisões técnicas em
+[`docs/operations/smart-access/biometric-consent-evidence.md`](operations/smart-access/biometric-consent-evidence.md).
 
 > ⚠️ **A fatia ainda não está pronta.** A Task 6 do plano — telas de busca, cadastro, plano e
 > cartão de entitlement — **não entrou neste PR**, por decisão do PI em 15/08/2026 (backend

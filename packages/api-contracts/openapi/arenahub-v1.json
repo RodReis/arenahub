@@ -497,6 +497,400 @@
           "Membership"
         ]
       }
+    },
+    "/api/v1/consent-documents/biometric/current": {
+      "get": {
+        "operationId": "ConsentController_documentoVigente",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Consent"
+        ]
+      }
+    },
+    "/api/v1/consent-documents/biometric": {
+      "post": {
+        "operationId": "ConsentController_publicarDocumento",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Consent"
+        ]
+      }
+    },
+    "/api/v1/students/{id}/biometric-consent": {
+      "get": {
+        "operationId": "ConsentController_consultar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Consent"
+        ]
+      },
+      "post": {
+        "operationId": "ConsentController_registrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Consent"
+        ]
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "operationId": "DevicesController_listar",
+        "parameters": [
+          {
+            "name": "gymUnitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      },
+      "post": {
+        "operationId": "DevicesController_criar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{id}": {
+      "get": {
+        "operationId": "DevicesController_detalhar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      },
+      "patch": {
+        "operationId": "DevicesController_atualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/api/v1/students/{studentId}/biometric-identities": {
+      "get": {
+        "operationId": "BiometricsController_listar",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Biometrics"
+        ]
+      },
+      "post": {
+        "operationId": "BiometricsController_criar",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Biometrics"
+        ]
+      }
+    },
+    "/api/v1/students/{studentId}/biometric-identities/upload": {
+      "post": {
+        "operationId": "BiometricsController_prepararUpload",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Biometrics"
+        ]
+      }
+    },
+    "/api/v1/students/{studentId}/biometric-identities/{identityId}": {
+      "delete": {
+        "operationId": "BiometricsController_revogar",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Biometrics"
+        ]
+      }
+    },
+    "/api/v1/edge/heartbeat": {
+      "post": {
+        "operationId": "EdgeController_heartbeat",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Edge"
+        ]
+      }
+    },
+    "/api/v1/device-sync-jobs": {
+      "get": {
+        "operationId": "DeviceSyncController_listar",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DeviceSync"
+        ]
+      }
+    },
+    "/api/v1/edge/commands": {
+      "get": {
+        "operationId": "EdgeCommandsController_listar",
+        "parameters": [
+          {
+            "name": "after",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeCommands"
+        ]
+      }
+    },
+    "/api/v1/edge/commands/{id}/lease": {
+      "post": {
+        "operationId": "EdgeCommandsController_arrendar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeCommands"
+        ]
+      }
+    },
+    "/api/v1/edge/sync-results/batch": {
+      "post": {
+        "operationId": "EdgeCommandsController_receberResultados",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeCommands"
+        ]
+      }
     }
   },
   "info": {
