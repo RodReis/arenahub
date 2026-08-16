@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121417;-webkit-font-smoothing:antialiased}
+a{color:#4FD5E3}a:hover{color:#C2F2F7}
+</style>
+</helmet>
+<div style="font-family:'Inter',system-ui,sans-serif;color:#F5F7F9;background:#121417;min-height:100vh;padding:0 0 80px">
+
+  <div style="background:#0A0B0D;padding:56px 64px 48px;border-bottom:1px solid #2B3037">
+    <div style="max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:18px;font-weight:800;letter-spacing:-0.02em">arenahub<span style="color:#4FD5E3">.</span></span>
+        <span style="width:1px;height:16px;background:#2B3037"></span>
+        <span style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#7B8491">Design system · superfície app do aluno</span>
+      </div>
+      <div style="font-size:40px;line-height:46px;font-weight:800;letter-spacing:-0.02em;max-width:760px;text-wrap:pretty">App do aluno — leve, encorajador, orientado a progresso</div>
+      <div style="font-size:15px;line-height:23px;color:#A6AEB9;max-width:720px">Dark-first, porque o uso acontece dentro da academia e é sobre carbono que o accent da academia aparece. Toque de 44 px, corpo de 16 px, cantos generosos. O app renderiza a decisão do backend — nunca recalcula estado financeiro, de acesso ou de saúde.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+        <span style="height:26px;padding:0 12px;border-radius:999px;background:#1F2328;border:1px solid #2B3037;color:#E5E9EE;font-size:12px;font-weight:600;display:inline-flex;align-items:center">data-surface="app"</span>
+        <span style="height:26px;padding:0 12px;border-radius:999px;background:#1F2328;border:1px solid #2B3037;color:#E5E9EE;font-size:12px;font-weight:600;display:inline-flex;align-items:center">data-mode="dark" por padrão</span>
+        <span style="height:26px;padding:0 12px;border-radius:999px;background:#1F2328;border:1px solid #2B3037;color:#E5E9EE;font-size:12px;font-weight:600;display:inline-flex;align-items:center">Expo · tokens compartilhados</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width:1120px;margin:0 auto;padding:0 64px;display:flex;flex-direction:column;gap:40px">
+
+    <div style="margin-top:40px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7B8491">01</div>
+      <h2 style="font-size:22px;line-height:28px;font-weight:700;color:#FFFFFF;margin:4px 0 6px">Superfícies em dark</h2>
+      <div style="font-size:14px;line-height:21px;color:#A6AEB9;max-width:680px;margin-bottom:18px">Em dark, elevação é luminância, não sombra. Cada camada sobe um passo de carbono.</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <sc-for list="{{ surfaces }}" as="s" hint-placeholder-count="4">
+          <div style="border-radius:16px;overflow:hidden;border:1px solid #2B3037">
+            <div style="height:88px;background:{{ s.hex }}"></div>
+            <div style="padding:12px 14px;background:#181B1F">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#F5F7F9">{{ s.token }}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7B8491;margin-top:2px">{{ s.hex }}</div>
+              <div style="font-size:12px;line-height:17px;color:#A6AEB9;margin-top:6px">{{ s.use }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+        <div style="background:#181B1F;border-radius:16px;padding:18px 20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px">Texto sobre carbon-900</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ textTokens }}" as="t" hint-placeholder-count="4">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                <span style="font-size:15px;color:{{ t.hex }}">{{ t.sample }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7B8491;white-space:nowrap">{{ t.token }} · {{ t.ratio }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:#181B1F;border-radius:16px;padding:18px 20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px">Accent resolvido para dark</div>
+          <div style="font-size:12px;line-height:17px;color:#A6AEB9;margin-bottom:12px">Ação sólida é o menor tom com contraste ≥ 4,5 sobre carbon-950: <strong>accent-400</strong>. Texto e link usam accent-300.</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ accent }}" as="a" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="width:36px;height:24px;border-radius:6px;background:{{ a.hex }};flex-shrink:0"></span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:12px;width:88px;color:#F5F7F9">{{ a.token }}</span>
+                <span style="font-size:12px;font-weight:600;color:#3DDC84;width:52px;text-align:right;font-variant-numeric:tabular-nums">{{ a.ratio }}</span>
+                <span style="flex:1;font-size:12px;color:#A6AEB9">{{ a.role }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7B8491">02</div>
+      <h2 style="font-size:22px;line-height:28px;font-weight:700;color:#FFFFFF;margin:4px 0 6px">Semânticos em dark</h2>
+      <div style="font-size:14px;line-height:21px;color:#A6AEB9;max-width:680px;margin-bottom:18px">Fundo do badge a 18% do tom, borda a 34%, texto e ícone no tom sólido. Fixos e não configuráveis.</div>
+      <div style="background:#181B1F;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <sc-for list="{{ semantic }}" as="s" hint-placeholder-count="6">
+          <div style="display:flex;align-items:center;gap:16px">
+            <span style="width:30px;height:30px;border-radius:8px;background:{{ s.hex }};flex-shrink:0"></span>
+            <span style="width:220px">
+              <span style="display:block;font-size:13px;font-weight:600">{{ s.role }}</span>
+              <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:11px;color:#7B8491">{{ s.hex }} · {{ s.ratio }}</span>
+            </span>
+            <span style="display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;background:{{ s.bg }};border:1px solid {{ s.bd }};color:{{ s.hex }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ s.d }}"></path></svg>{{ s.example }}</span>
+            <span style="flex:1;font-size:12px;color:#7B8491">{{ s.note }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7B8491">03</div>
+      <h2 style="font-size:22px;line-height:28px;font-weight:700;color:#FFFFFF;margin:4px 0 18px">Tipografia e escala</h2>
+      <div style="background:#181B1F;border-radius:16px;overflow:hidden">
+        <sc-for list="{{ type }}" as="t" hint-placeholder-count="7">
+          <div style="display:grid;grid-template-columns:120px 130px 1fr;gap:16px;align-items:center;min-height:60px;padding:12px 20px;border-bottom:1px solid #1F2328;box-sizing:border-box">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#F5F7F9">{{ t.token }}</span>
+            <span style="font-size:12px;color:#7B8491;font-variant-numeric:tabular-nums">{{ t.spec }}</span>
+            <span style="font-size:{{ t.size }};line-height:{{ t.lh }};font-weight:{{ t.weight }};font-family:{{ t.family }};color:#FFFFFF">{{ t.sample }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+        <div style="background:#181B1F;border-radius:16px;padding:18px 20px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Espaço, raio, toque</div>
+          <sc-for list="{{ spacing }}" as="p" hint-placeholder-count="6">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px;border-bottom:1px solid #1F2328">
+              <span style="font-size:13px;color:#A6AEB9">{{ p.label }}</span>
+              <span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">{{ p.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="background:#181B1F;border-radius:16px;padding:18px 20px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Movimento</div>
+          <sc-for list="{{ motion }}" as="m" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px;border-bottom:1px solid #1F2328">
+              <span style="font-size:13px;color:#A6AEB9">{{ m.label }}</span>
+              <span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">{{ m.value }}</span>
+            </div>
+          </sc-for>
+          <div style="font-size:12px;line-height:17px;color:#7B8491;margin-top:12px">Progresso, streak e XP animam em 400 ms com ease-out — é o único lugar do sistema onde a animação é celebrativa.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7B8491">04</div>
+      <h2 style="font-size:22px;line-height:28px;font-weight:700;color:#FFFFFF;margin:4px 0 18px">Controles · 48 px de altura, raio 12 px</h2>
+      <div style="background:#181B1F;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <button style="height:48px;padding:0 22px;border:none;border-radius:12px;background:#1FBED0;color:#0A0B0D;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer" style-hover="background:#4FD5E3">Abrir carteirinha</button>
+          <button style="height:48px;padding:0 22px;border:1px solid #2B3037;border-radius:12px;background:transparent;color:#4FD5E3;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="border-color:#4FD5E3">Secundária</button>
+          <button style="height:48px;padding:0 22px;border:none;border-radius:12px;background:transparent;color:#4FD5E3;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:#1F2328">Ghost</button>
+          <button style="height:48px;padding:0 22px;border:1px solid rgba(255,107,107,.5);border-radius:12px;background:transparent;color:#FF6B6B;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:rgba(255,107,107,.10)">Cancelar plano</button>
+          <button disabled="disabled" style="height:48px;padding:0 22px;border:1px solid #1F2328;border-radius:12px;background:#1F2328;color:#565E69;font-size:15px;font-weight:600;font-family:inherit;cursor:not-allowed">Desabilitada</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;border-top:1px solid #2B3037;padding-top:20px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label for="app-a" style="font-size:13px;font-weight:600;color:#A6AEB9">Campo padrão</label>
+            <input id="app-a" placeholder="nome@email.com" style="height:48px;border:1px solid #2B3037;border-radius:12px;background:#121417;color:#F5F7F9;padding:0 14px;font-size:16px;font-family:inherit;box-sizing:border-box;width:100%" style-focus="border-color:#4FD5E3;outline:2px solid #4FD5E3;outline-offset:2px">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label for="app-b" style="font-size:13px;font-weight:600;color:#A6AEB9">Numérico</label>
+            <input id="app-b" inputmode="numeric" placeholder="0000 0000 0000 0000" style="height:48px;border:1px solid #2B3037;border-radius:12px;background:#121417;color:#F5F7F9;padding:0 14px;font-size:16px;font-family:'JetBrains Mono',monospace;box-sizing:border-box;width:100%" style-focus="border-color:#4FD5E3;outline:2px solid #4FD5E3;outline-offset:2px">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:13px;font-weight:600;color:#A6AEB9">Alternador de aba</span>
+            <div style="display:flex;background:#121417;border-radius:12px;padding:4px;gap:4px">
+              <span style="flex:1;height:40px;border-radius:9px;background:#1FBED0;color:#0A0B0D;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">PIX</span>
+              <span style="flex:1;height:40px;border-radius:9px;color:#A6AEB9;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">Cartão</span>
+            </div>
+          </div>
+        </div>
+        <div style="border-top:1px solid #2B3037;padding-top:20px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#7B8491;margin-bottom:12px">Barra de abas · 4 destinos, ícone mais rótulo</div>
+          <div style="display:flex;background:#0A0B0D;border-radius:12px;border:1px solid #1F2328;padding:6px;max-width:390px">
+            <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+              <span style="flex:1;height:48px;color:{{ t.c }};font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.d }}"></path></svg>
+                {{ t.label }}
+              </span>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7B8491">05</div>
+      <h2 style="font-size:22px;line-height:28px;font-weight:700;color:#FFFFFF;margin:4px 0 18px">Cards do app</h2>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start">
+        <div style="background:#1F2328;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:16px;font-weight:600">Mensal Fit</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;background:rgba(61,220,132,.16);border:1px solid rgba(61,220,132,.34);color:#3DDC84"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20 M8.5 12.2l2.4 2.4 4.6-5"></path></svg>Ativa</span>
+          </div>
+          <div style="font-size:14px;line-height:20px;color:#A6AEB9">Próxima cobrança em 01/09 · R$ 129,90 no PIX</div>
+          <div style="font-size:12px;color:#7B8491;border-top:1px solid #2B3037;padding-top:10px">Card de estado usa carbon-800 — um passo acima do fundo.</div>
+        </div>
+        <div style="background:#181B1F;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:16px;font-weight:600">Frequência · 30 dias</div>
+          <div style="display:flex;align-items:flex-end;gap:5px;height:52px">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="14">
+              <span style="flex:1;border-radius:3px;background:{{ b.c }};height:{{ b.h }}"></span>
+            </sc-for>
+          </div>
+          <div style="font-size:12px;color:#7B8491">Dia sem treino é um traço de 8 px em carbon-800 — nunca uma barra vazia de altura total, que lê como falha.</div>
+        </div>
+        <div style="background:#181B1F;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5A524" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1.2 3.6-3 5-3 8.6a3 3 0 0 0 6 .4c1.6 1.2 2.4 2.6 2.4 4a5.4 5.4 0 0 1-10.8 0C6.6 10.4 10.8 8.4 12 3z"></path></svg>
+            <span style="font-size:15px;font-weight:600">6 semanas consecutivas</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <span style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;font-size:12px;font-weight:600;background:#121417;border:1px solid #2B3037;color:#A6AEB9">30 dias de sequência</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;font-size:12px;font-weight:600;background:#121417;border:1px solid #2B3037;color:#A6AEB9">1.240 XP</span>
+          </div>
+          <div style="font-size:12px;line-height:17px;color:#7B8491;border-top:1px solid #2B3037;padding-top:10px">XP não usa vocabulário financeiro: nada de carteira, saldo ou resgatar.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7B8491">06</div>
+      <h2 style="font-size:22px;line-height:28px;font-weight:700;color:#FFFFFF;margin:4px 0 6px">Padrões que o app não pode errar</h2>
+      <div style="font-size:14px;line-height:21px;color:#A6AEB9;max-width:680px;margin-bottom:18px">Três telas carregam risco real: pagamento, carteirinha e saúde. Cada uma tem uma regra que não é preferência.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:#181B1F;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#7B8491">Pagamento</div>
+          <div style="background:#121417;border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6AB0FF" stroke-width="2" stroke-linecap="round"><path d="M12 2.5a9.5 9.5 0 1 0 9.5 9.5"></path></svg>
+            <div style="font-size:17px;font-weight:700">Aguardando confirmação</div>
+            <div style="font-size:13px;line-height:19px;color:#A6AEB9">O banco confirma em até 30 s. Você pode sair desta tela.</div>
+          </div>
+          <div style="font-size:13px;line-height:19px;color:#F5F7F9">Nunca “Pago”. O retorno visual do checkout não confirma pagamento — só o webhook confirma. A tela mostra o SLO real e permite sair sem perder o contexto.</div>
+        </div>
+        <div style="background:#181B1F;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#7B8491">Carteirinha</div>
+          <div style="background:#121417;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="width:36px;height:36px;border-radius:18px;background:#1F2328;border:1px solid #2B3037;color:#4FD5E3;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">RR</span>
+              <span style="flex:1">
+                <span style="display:block;font-size:14px;font-weight:600">Rodrigo R.</span>
+                <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:11px;color:#7B8491">GYM-2026-00001284</span>
+              </span>
+            </div>
+            <div style="height:4px;border-radius:2px;background:#1F2328;overflow:hidden"><span style="display:block;height:100%;width:62%;background:#4FD5E3"></span></div>
+            <div style="font-size:12px;color:#7B8491">Código renova em 28 s · token opaco, sem PII</div>
+          </div>
+          <div style="font-size:13px;line-height:19px;color:#F5F7F9">A carteirinha é mostrada a terceiros: nada de CPF, nome completo ou valor em aberto na mesma tela. QR grande com barra de validade decrescente.</div>
+        </div>
+        <div style="background:#181B1F;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#7B8491">Saúde e IA</div>
+          <div style="display:flex;gap:8px;align-items:flex-start;background:#121417;border-radius:12px;padding:12px 14px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6AB0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px;flex-shrink:0"><path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20 M12 11v5 M12 7.5v.01"></path></svg>
+            <span style="font-size:13px;line-height:19px;color:#A6AEB9">Esta análise acompanha sua evolução e não é diagnóstico médico. <a href="#" style="font-weight:600">Falar com um profissional</a></span>
+          </div>
+          <div style="font-size:13px;line-height:19px;color:#F5F7F9">O aviso é <strong>persistente e não dispensável</strong>, e o canal para falar com um profissional fica ao lado dele. Todo gráfico tem tabela equivalente por alternador.</div>
+        </div>
+        <div style="background:#181B1F;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#7B8491">Engajamento</div>
+          <div style="background:#121417;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;color:#F5F7F9">Participar do ranking</span><span style="width:40px;height:22px;border-radius:11px;background:#1F2328;border:1px solid #2B3037;display:flex;align-items:center;padding:0 3px"><span style="width:16px;height:16px;border-radius:8px;background:#565E69"></span></span></div>
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;color:#F5F7F9">Mostrar meu nome</span><span style="width:40px;height:22px;border-radius:11px;background:#1F2328;border:1px solid #2B3037;display:flex;align-items:center;padding:0 3px"><span style="width:16px;height:16px;border-radius:8px;background:#565E69"></span></span></div>
+          </div>
+          <div style="font-size:13px;line-height:19px;color:#F5F7F9">Todos os toggles nascem <strong>desligados</strong>. Opt-out e denúncia ficam a no máximo dois toques. Streak rompido usa fato, não julgamento: “Sua sequência recomeça hoje”.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7B8491">07</div>
+      <h2 style="font-size:22px;line-height:28px;font-weight:700;color:#FFFFFF;margin:4px 0 18px">Tom de voz</h2>
+      <div style="background:#181B1F;border-radius:16px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid #2B3037">
+          <div style="padding:12px 20px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#3DDC84">Escrever assim</div>
+          <div style="padding:12px 20px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#FF6B6B;border-left:1px solid #2B3037">Nunca assim</div>
+        </div>
+        <sc-for list="{{ voice }}" as="v" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #1F2328">
+            <div style="padding:14px 20px;font-size:14px;line-height:20px;color:#F5F7F9">{{ v.good }}</div>
+            <div style="padding:14px 20px;font-size:14px;line-height:20px;color:#7B8491;border-left:1px solid #2B3037">{{ v.bad }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="background:#181B1F;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:14px;font-weight:600">Regras estruturais do app</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px">
+        <sc-for list="{{ rules }}" as="r" hint-placeholder-count="6">
+          <span style="font-size:13px;line-height:19px;color:#F5F7F9">· {{ r }}</span>
+        </sc-for>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const I = {
+      check: 'M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20 M8.5 12.2l2.4 2.4 4.6-5',
+      x: 'M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20 M9.2 9.2l5.6 5.6 M14.8 9.2l-5.6 5.6',
+      alert: 'M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20 M12 7.5v5 M12 16.2v.01',
+      tri: 'M12 3.5 2.8 19.5h18.4L12 3.5z M12 10v4 M12 16.8v.01',
+      clock: 'M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20 M12 7v5.2l3.2 1.9',
+      minus: 'M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20 M8 12h8',
+      home: 'M3 11l9-8 9 8 M5 9.5V21h14V9.5h-14',
+      pay: 'M2.5 6.5h19v11h-19z M12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+      act: 'M3 12h4l3 8 4-16 3 8h4',
+      trophy: 'M8 21h8 M12 17v4 M7 4h10v4a5 5 0 0 1-10 0V4z M7 5H4v2a3 3 0 0 0 3 3 M17 5h3v2a3 3 0 0 1-3 3'
+    };
+    const T = {
+      ok:   ['#3DDC84','rgba(61,220,132,.16)','rgba(61,220,132,.34)'],
+      warn: ['#F5A524','rgba(245,165,36,.16)','rgba(245,165,36,.34)'],
+      err:  ['#FF6B6B','rgba(255,107,107,.16)','rgba(255,107,107,.34)'],
+      info: ['#6AB0FF','rgba(106,176,255,.16)','rgba(106,176,255,.34)'],
+      risk: ['#FF8A3D','rgba(255,138,61,.16)','rgba(255,138,61,.34)'],
+      neu:  ['#7B8491','rgba(123,132,145,.16)','rgba(123,132,145,.34)']
+    };
+    const freq = [2,0,1,2,0,2,1,0,2,2,0,1,2,1];
+
+    return {
+      surfaces: [
+        { token:'carbon-900', hex:'#121417', use:'fundo da tela' },
+        { token:'carbon-850', hex:'#181B1F', use:'card padrão' },
+        { token:'carbon-800', hex:'#1F2328', use:'card de destaque, avatar, chip' },
+        { token:'carbon-700', hex:'#2B3037', use:'borda e divisor' }
+      ],
+      textTokens: [
+        { token:'#FFFFFF', hex:'#FFFFFF', ratio:'18.45', sample:'Título e valor em destaque' },
+        { token:'carbon-50', hex:'#F5F7F9', ratio:'17.18', sample:'Texto de corpo' },
+        { token:'carbon-300', hex:'#A6AEB9', ratio:'8.24', sample:'Texto secundário e apoio' },
+        { token:'carbon-400', hex:'#7B8491', ratio:'4.88', sample:'Legenda, carimbo de atualização' }
+      ],
+      accent: [
+        { token:'accent-300', hex:'#4FD5E3', ratio:'10.51', role:'texto, link, ícone de ação, foco' },
+        { token:'accent-400', hex:'#1FBED0', ratio:'8.20', role:'ação sólida — texto em carbon-950' },
+        { token:'accent-500', hex:'#00A9B8', ratio:'6.47', role:'indicador ao vivo, barra de progresso' },
+        { token:'accent-900 @ 24%', hex:'rgba(0,87,96,.24)', ratio:'—', role:'fundo sutil de seleção' }
+      ],
+      semantic: [
+        { role:'Sucesso · plano ativo', hex:'#3DDC84', ratio:'10.34', bg:T.ok[1], bd:T.ok[2], d:I.check, example:'Ativa', note:'confirmação de pagamento, meta atingida' },
+        { role:'Atenção · em atraso', hex:'#F5A524', ratio:'9.04', bg:T.warn[1], bd:T.warn[2], d:I.alert, example:'Em atraso', note:'também streak e chama de sequência' },
+        { role:'Erro · falha', hex:'#FF6B6B', ratio:'6.65', bg:T.err[1], bd:T.err[2], d:I.x, example:'Falhou', note:'pagamento recusado, alerta de saúde' },
+        { role:'Informação · processando', hex:'#6AB0FF', ratio:'8.14', bg:T.info[1], bd:T.info[2], d:I.clock, example:'Processando', note:'aguardando webhook, aviso de IA' },
+        { role:'Risco alto', hex:'#FF8A3D', ratio:'7.87', bg:T.risk[1], bd:T.risk[2], d:I.tri, example:'Alto', note:'não exibido ao aluno — só no painel' },
+        { role:'Neutro · sem dado', hex:'#7B8491', ratio:'4.88', bg:T.neu[1], bd:T.neu[2], d:I.minus, example:'Não informado', note:'ausência de dado nunca é zero' }
+      ],
+      type: [
+        ['display','32 / 38 · 800','32px','38px',800,"'Inter',sans-serif",'R$ 129,90'],
+        ['title','24 / 30 · 700','24px','30px',700,"'Inter',sans-serif",'Boa tarde, Rodrigo'],
+        ['heading','18 / 24 · 600','18px','24px',600,"'Inter',sans-serif",'Aguardando confirmação'],
+        ['body','16 / 24 · 400','16px','24px',400,"'Inter',sans-serif",'Sua sequência recomeça hoje.'],
+        ['body-strong','16 / 24 · 600','16px','24px',600,"'Inter',sans-serif",'Mensal Fit'],
+        ['caption','13 / 18 · 400','13px','18px',400,"'Inter',sans-serif",'Atualizado às 14:32'],
+        ['mono','13 / 18 · 400','13px','18px',400,"'JetBrains Mono',monospace",'GYM-2026-00001284']
+      ].map(t => ({ token: t[0], spec: t[1], size: t[2], lh: t[3], weight: t[4], family: t[5], sample: t[6] })),
+      spacing: [
+        { label:'Passo efetivo', value:'8 px' },
+        { label:'Padding de card', value:'20 px' },
+        { label:'Altura de controle', value:'48 px' },
+        { label:'Alvo de toque mínimo', value:'44 × 44 px' },
+        { label:'Gutter de tela', value:'16 px' },
+        { label:'Raio · controle / card / badge', value:'12 / 16 / pill' }
+      ],
+      motion: [
+        { label:'Transição de tela', value:'260 ms · spring' },
+        { label:'Progresso, streak, XP', value:'400 ms · ease-out' },
+        { label:'Feedback de toque', value:'120 ms' },
+        { label:'Reduced motion', value:'só opacidade ≤ 100 ms' }
+      ],
+      tabs: [
+        { label:'Início', d:I.home, c:'#4FD5E3' },
+        { label:'Pagar', d:I.pay, c:'#7B8491' },
+        { label:'Evolução', d:I.act, c:'#7B8491' },
+        { label:'Ranking', d:I.trophy, c:'#7B8491' }
+      ],
+      bars: freq.map(v => ({ h: v === 0 ? '8px' : (v === 1 ? '55%' : '100%'), c: v === 0 ? '#1F2328' : '#1FBED0' })),
+      voice: [
+        { good:'Sua sequência recomeça hoje.', bad:'Você perdeu sua sequência.' },
+        { good:'Aguardando confirmação do banco.', bad:'Pagamento aprovado!' },
+        { good:'Fatura de agosto vencida em 10/08. O acesso é liberado assim que o pagamento for confirmado.', bad:'Você está inadimplente e bloqueado.' },
+        { good:'Ponto de atenção: hidratação abaixo da faixa nas duas últimas medições.', bad:'Você está desidratado.' },
+        { good:'Não foi possível carregar sua frequência. Tentar novamente.', bad:'Erro 500: falha interna do servidor.' },
+        { good:'1.240 XP no total · +10 por treino.', bad:'Saldo de 1.240 pontos · resgatar.' }
+      ],
+      rules: [
+        'O app não recalcula estado financeiro, de acesso ou de saúde — renderiza a decisão do backend com o enum recebido.',
+        'Nenhum if (dueDate < today) no cliente. O backend manda estado e rótulo; o app escolhe cor e ícone.',
+        'Toda data e horário no timezone da unidade, nunca do aparelho.',
+        'Valor monetário chega em centavos inteiros e nunca é calculado no cliente.',
+        'Ausência de dado renderiza “—”; no gráfico, a linha quebra em vez de plotar zero.',
+        'Foco visível de 2 px em accent-300 em todo controle, inclusive com teclado externo.',
+        'Aviso de IA persistente e não dispensável em toda tela de saúde.',
+        'Opt-in de engajamento sempre desligado por padrão, com opt-out a dois toques.'
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -237,27 +237,65 @@ produzir efeito duplo, o Code abre `[FIX]` citando este ADR e conserta.
 <a id="adr-007"></a>
 ## ADR-007 — Semântica de validade, carência e conflito offline
 
-**Data:** 14/08/2026 · **Status:** `aberto`, **sem urgência** *(decidido pelo PI em 14/08/2026
-que migra junto com F10 para o MVP 1.5 — ADR-012)* · **Bloqueia:** F10
+**Data:** 14/08/2026 · **Status:** `aceito` *(as quatro perguntas foram **respondidas pelo PI em
+16/08/2026**; migrou com F10 para o MVP 1.5 em 14/08/2026 — ADR-012)* · **Bloqueia:** nada.
+**F10 destravada**
 
 **Contexto.** A Especificação §27 dá o exemplo "cache válido 12 h, carência 24 h" e **não diz
 o que acontece entre 12 h e 24 h**. Também não define o que fazer quando a nuvem já havia
 revogado o direito de quem entrou offline.
 
-**Perguntas que precisam de resposta antes de F10:**
-
-1. Entre `cache_validity` e `grace_period`, o Edge (a) decide normalmente, (b) decide com
-   aviso visível na recepção, ou (c) só permite quem já tem entitlement confirmado?
-2. Passado o `grace_period` com `offline_access_enabled = true`, o comportamento é `DENY` ou
-   "fallback operacional explícito"? Qual, exatamente — liberação assistida com registro?
-3. Aluno entrou offline com entitlement revogado na nuvem: o evento entra como
-   `ALLOWED_OFFLINE_CONFLICT` (aceito e sinalizado) ou é rejeitado? *(Recomendação técnica:
-   aceito e sinalizado — negar um giro que fisicamente aconteceu é falsificar histórico.)*
-4. O snapshot é **push** (nuvem empurra) ou **pull** (Edge busca)? Isso decide o tempo de
-   propagação de uma revogação.
-
 **Invariante já fixada e não sujeita a discussão:** dado offline vencido **nunca** resulta em
 allow ilimitado (`M1-BR-008`).
+
+**Decidido pelo PI em 16/08/2026.**
+
+1. **Entre `cache_validity` e `grace_period`: decide, sinaliza e restringe.** O Edge decide com
+   aviso visível na recepção, **mas só para entitlement que estava `ACTIVE` no snapshot e cuja
+   validade não termina dentro da janela de carência**. O evento é marcado como degradado.
+
+   *Por que não a opção (a).* "Decide normalmente" tornaria `cache_validity` e `grace_period`
+   indistinguíveis — se nada muda às 12 h, o segundo parâmetro é decorativo e o operador não tem
+   como saber que está operando com dado velho. A opção (c) foi descartada por ambiguidade:
+   offline, tudo que o Edge tem **é** o snapshot, então "entitlement confirmado" não se
+   distingue de "entitlement em cache" sem uma definição extra que ninguém pediu.
+
+2. **Passado o `grace_period`: `DENY` do motor, liberação assistida do operador.** A pergunta
+   original oferecia uma dicotomia falsa. `DENY` e fallback não competem: **o motor nunca se
+   autoautoriza** (`M1-BR-008`), e o caminho humano — liberação assistida com identificação do
+   operador, motivo e auditoria — já é exigido como caminho de primeira classe pela decisão 2 do
+   **ADR-008**. `DENY` puro, sem caminho humano, não é mais seguro: empurra a recepção para
+   destravar a catraca na mão, sem registro nenhum.
+
+3. **Conflito offline: aceito e sinalizado — com uma exceção.** O evento entra como
+   `ALLOWED_OFFLINE_CONFLICT`. Negar um giro que fisicamente aconteceu falsifica frequência e
+   quebra a conciliação. **Aceitar registra a passagem; não revalida o direito.**
+
+   **Exceção — revogação de consentimento biométrico.** O **ADR-008** decisão 3 exige bloqueio
+   lógico **imediato** na revogação. Um giro biométrico depois da revogação não é conflito
+   operacional, é tratamento de dado sem base legal. Logo: revogação de consentimento entra numa
+   **denylist carregada no snapshot** e bloqueia mesmo offline. Revogação de direito por
+   pagamento continua no caminho normal — aceita e sinalizada.
+
+4. **A conexão é sempre iniciada pelo Edge: stream persistente + polling de reconciliação.** A
+   pergunta confundia quem inicia a *conexão* com quem inicia a *mensagem*. O Edge está atrás de
+   NAT, num PC compartilhado (**ADR-011**) — exigir que a nuvem o alcance significa porta de
+   entrada, IP estável ou túnel, e a rede real do cliente não sustenta isso. O Edge abre a
+   conexão; o stream dá propagação de revogação em segundos; o polling periódico reconcilia e
+   cobre a queda do stream.
+
+**Duas consequências que a spec de F10 precisa absorver.**
+
+1. **A decisão 1 depende da decisão 4 para ser barata.** Restringir o allow na carência a
+   entitlement que não expira dentro da janela só não vira negativa frequente porque o stream
+   mantém o snapshot fresco. Se o link do Arena Positiva cair muito, o sintoma vai parecer bug de
+   acesso e não de rede. **Requisito derivado:** o painel operacional (F11) mostra a **idade do
+   snapshot**, não apenas online/offline — o `DataFreshness` de `docs/design/DS-PAINEL.md` §8.2 já
+   pede exatamente isso.
+2. **A decisão 3 exige campo que não existe.** Não há hoje denylist de consentimento revogado no
+   contrato de snapshot: F8 entregou bloqueio lógico **na nuvem**, não uma lista que o Edge
+   carregue. Isso é escopo real de F10 e provavelmente altera o contrato de snapshot que F4 já
+   implementou — alteração de contrato Edge é versionada por **ADR-011**.
 
 ---
 
@@ -1075,3 +1113,122 @@ antes, e pelo mesmo motivo.
 
 **O que não mudou:** as seis razões de `DENY`, a ordem de precedência, e a regra de que só entra
 rótulo que é verdade.
+
+---
+
+<a id="adr-025"></a>
+## ADR-025 — MVP 2.5: o design system é fatia, não `[INFRA]`
+
+**Data:** 16/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 16/08/2026**)*
+· **Emenda** o **ADR-015** e o `CLAUDE.md` → *Padrão de título de issue*
+
+**Contexto.** O PR #76 entregou a interface da recepção e registrou uma dívida: o `admin-web`
+está na `main` com F6, F7 e F11 **sem uma linha de CSS**. O Toast exigido pelo `CLAUDE.md` não
+foi implementado, e a entrega sugeriu resolver com um card `[INFRA]`.
+
+`[INFRA]` pula spec e pula o aceite do PI. Um design system decide a aparência de toda tela
+existente e fixa os **rótulos pt-BR de enum de domínio** — isso é decisão de produto. Empacotar
+como infraestrutura é a mesma reclassificação que o `CLAUDE.md` já proíbe no `[FIX]`: trocar o
+rótulo do card para escapar do portão.
+
+Do outro lado, o pipeline de build — JSON de token virando `theme.css` e `tokens.ts` — não tem
+decisão nenhuma a tomar. Mandá-lo para uma spec só atrasa mecânica pura.
+
+**Decisão 1 — o trabalho se parte em dois.**
+
+| parte | forma | por quê |
+|---|---|---|
+| Pipeline de tokens (`primitive`/`semantic`/`expression.json` → `theme.css` + `tokens.ts`), Tailwind v4 `@theme`, esqueleto de `packages/ui`, as 6 regras de lint | card **`[INFRA]`** | mecânica de build, zero decisão de produto |
+| Componentes, `state-labels.ts`, Toast, superfícies | **fatia com spec** | aparência e texto de tela são produto |
+
+**Decisão 2 — cria-se o MVP 2.5, Design System.** Mesmo padrão do MVP 1.5 (ADR-012): numeração
+com meio para não renumerar o que já está escrito em documento e PRD. Três Slices, **definidas
+aqui** porque o design system não tem PRD:
+
+| Slice | fatia | spec | superfície | fonte de verdade |
+|---|---|---|---|---|
+| **2.5.1** | F42 | SPEC-042 | `admin-web` | `docs/design/DS-PAINEL.md` |
+| **2.5.2** | F43 | SPEC-043 | `mobile` | `docs/design/DS-APP.md` |
+| **2.5.3** | F44 | SPEC-044 | `kiosk` | `docs/design/DS-TOTEM.md` |
+
+**Decisão 3 — emenda ao ADR-015.** O ADR-015 dizia *"41 fatias, F1 a F41"* e amarrava fatia a
+Slice do PRD. Passa a valer: **a fatia nasce de uma Slice; a Slice normalmente mora no PRD, e
+excepcionalmente num ADR**, quando o trabalho é de plataforma e não tem PRD que o descreva. O que
+**não** muda: um número por Slice, alocado uma vez no Índice do `STATUS.md`, nunca reaproveitado,
+nunca sufixado. A contagem vai de 41 para **44 fatias**.
+
+**Decisão 4 — dois tokens novos de título.** `[MVP1.5]` e `[MVP2.5]`. O `[MVP1.5]` estava
+pendente desde a criação do MVP 1.5: a issue #10 (F10) ficou sem token de MVP porque o
+`CLAUDE.md` só previa `[MVP0]`…`[MVP6]`, e inventar violaria a regra de ouro *"só entra token
+que é verdade"*. Agora é verdade — o MVP existe e está escrito.
+
+**Gate de entrada, por fatia — e é aqui que mora o risco.**
+
+- **F42 não tem gate.** A dívida é ativa: cada fatia de UI nova aprofunda o retrofit.
+- **F43 e F44 têm gate: o PI priorizar o MVP 4.** As superfícies `mobile` e `kiosk` **não
+  existem** — `apps/mobile` e `apps/kiosk` não foram criados, e as features que as usariam são
+  F23–F29.
+
+**Risco registrado, não escondido.** F43 e F44 constroem componente sem consumidor. Componente
+sem uso real erra em silêncio: só a tela que o usa revela que o token está errado, que o alvo de
+toque não cabe, que o estado que faltava era outro. A mitigação é o gate — as duas ficam
+`aprovada-pi` para não precisarem de nova rodada, mas **não se pegam antes do MVP 4**. Se na
+prática forem reescritas ao entrar o MVP 4, o erro terá sido nosso e está previsto aqui.
+
+**O que este ADR não faz.** Não aprova o MVP 4 e não antecipa nenhuma feature dele. Aprova o
+**contrato de design** das três superfícies, que já estava escrito, e dá a ele numeração e
+portão.
+
+---
+
+<a id="adr-026"></a>
+## ADR-026 — `docs/design/**` é fonte de verdade de design
+
+**Data:** 16/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 16/08/2026**)*
+· **Emenda** o **ADR-021** · **Rebaixa** `docs/DESIGN-UI.md`
+
+**Contexto.** O PI produziu e colocou no repositório seis arquivos em `docs/design/`: três
+contratos por superfície (`DS-PAINEL.md`, `DS-APP.md`, `DS-TOTEM.md`) e três protótipos
+navegáveis (`.dc.html`). Eles são mais completos e mais específicos que o `docs/DESIGN-UI.md`,
+que segue `RASCUNHO` com 8 pendências.
+
+**Decisão 1 — os três `.md` de `docs/design/` são o contrato de implementação de UI.** Onde
+divergirem do `DESIGN-UI.md`, **eles vencem**. O `DESIGN-UI.md` passa a ser documento de
+**direção** — de onde saiu Carbono Adaptativo e o pipeline de accent —, não de contrato. As specs
+042–044 apontam para `docs/design/`, nunca para o `DESIGN-UI.md`.
+
+**Decisão 2 — os `.dc.html` são referência visual, não código a instalar.** São bundles
+autocontidos, com CSS, fontes e imagens **inline**. Colar isso em `packages/ui` produz
+exatamente o hex literal espalhado que a regra 1 de lint (`DS-PAINEL.md` §11) existe para
+proibir. Servem para conferir intenção; a implementação nasce dos tokens.
+
+**Decisão 3 — `docs/design/**` entra no escopo de escrita do Cowork.** O ADR-021 listou o que o
+Cowork escreve na `main` e `docs/design/` não existia. Fica somado à tabela, pelo mesmo critério
+dos outros: é documento, não implementação. **`apps/`, `packages/`, `infra/`, `.github/`,
+`docs/prd/**` e `docs/superpowers/**` continuam fora.**
+
+**Ressalva — o que "fonte de verdade de design" não alcança.**
+
+Design decide cor, tipo, espaço, componente, layout, movimento, tom de voz e regra de lint.
+**Não decide enum de domínio.** Enum é contrato: mora no `CONVENTION.md` e nos ADRs, é gravado em
+tabela e, no caso de `AccessEvent`, é **imutável** (`M1-BR-009`).
+
+O caso concreto que motivou a ressalva: os três documentos listam as razões técnicas de `DENY`
+como `NO_ENTITLEMENT`, `OUTSIDE_SCHEDULE`, `WRONG_UNIT`, `ADMIN_BLOCK` e `SUBSCRIPTION_OVERDUE`.
+O **ADR-024** fixou seis razões de `DENY`, e `SUBSCRIPTION_OVERDUE` não é uma delas; faltam
+`STUDENT_BLOCKED` e `STUDENT_INACTIVE`, que a **F9 já entregou** e que o código já grava.
+
+Os documentos de design foram escritos a partir da Especificação e do `ARCHITECTURE.md` §4.3, os
+dois desatualizados — é **omissão herdada, não decisão de design**. Tratá-la como fonte de
+verdade apagaria dois rótulos já persistidos em evento imutável, que é precisamente o custo que o
+ADR-024 nomeia: *"não custa um rename — custa migração de dado histórico"*.
+
+**Portanto:** neste ponto quem cede é o documento de design. `docs/design/DS-PAINEL.md` §8.5,
+`docs/design/DS-TOTEM.md` §8 e `docs/ARCHITECTURE.md` §4.3 são corrigidos para as oito razões do
+ADR-024. `SUBSCRIPTION_OVERDUE` **não é razão do motor** — a permissão do ADR-003 era para razão
+*exibida*, derivada de metadado gravado no entitlement na suspensão, e isso é assunto do MVP 2,
+não do dicionário de acesso.
+
+**Regra geral que fica:** quando um documento de design e um ADR de domínio divergirem sobre
+**nome de estado, razão ou enum**, o ADR vence e o documento de design é corrigido. Sobre
+qualquer outra coisa, o documento de design vence.

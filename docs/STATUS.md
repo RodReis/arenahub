@@ -129,19 +129,21 @@ entrada. Decisão do PI em 14/08/2026: vale o ADR-022.
 `#N` = `F<n>` — issue #8 é a fatia F8. Coincidência de numeração, não garantia: **a fonte única
 continua sendo o Índice da §5**, não o número do GitHub.
 
-**Do Backlog, 10 são pegáveis hoje** — F1–F9 e F11, todas `aprovada-pi` e sem ADR bloqueando.
-As outras 31 estão estacionadas: F10 por ADR-007, F12–F16 por ADR-013, e F17–F41 porque o MVP
-ainda não foi discutido com o PI.
+**Do Backlog, 12 são pegáveis hoje** — F1–F11 (todas `aprovada-pi`, ADR-007 fechou e destravou
+F10) e **F42**, assim que o card `[INFRA]` do pipeline de tokens sair. As outras 32 estão
+estacionadas: F12–F16 por ADR-013, F17–F41 porque o MVP ainda não foi discutido com o PI, e
+**F43–F44 pelo gate do MVP 4** — as superfícies `mobile` e `kiosk` não existem.
 
 > ⚠️ **O board (Projects) ainda não existe** — só as labels, criadas automaticamente pela API ao
 > aplicar `proplan:backlog`. Elas nasceram **sem cor e sem descrição**, e as outras quatro
 > (`todo`, `doing`, `done`, `finalizado`) **só existirão quando forem usadas pela primeira vez**.
 > Criar o Projects com as cinco colunas e dar cor/descrição às labels continua sendo `[INFRA]`.
 
-> ⚠️ **Pendência do padrão de título:** o `CLAUDE.md` define `[MVP0]`…`[MVP6]` e **não tem token
-> para MVP 1.5**, criado pelo ADR-012. A issue #10 (F10) ficou **sem token de MVP** — inventar
-> `[MVP1.5]` violaria a regra de ouro *"só entra token que é verdade"*. **Decisão do PI:** criar o
-> token ou aceitar a ausência.
+> ✅ **Pendência do padrão de título — resolvida em 16/08/2026 pelo ADR-025.** O `CLAUDE.md`
+> definia só `[MVP0]`…`[MVP6]`, e a issue #10 (F10) ficou sem token porque o MVP 1.5 não tinha
+> um. **O PI criou `[MVP1.5]` e `[MVP2.5]`.** Agora são verdade — os MVPs existem e estão
+> escritos, então a regra de ouro está satisfeita. O título da #10 precisa ser corrigido para
+> `[MVP1.5][SPEC-010][F10] Operação offline`.
 
 ---
 
@@ -155,7 +157,7 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 |---|---|---|
 | **ADR-008** *(ponto remanescente)* | **transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil. **Reapontado:** bloqueava F8 por engano — F8 não chama IA nenhuma | F21 |
 | **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que dá para fechar antes do gate são as duas políticas do `M2-COMPLIANCE-01` e o **modelo de `Payment`, que não tem campos definidos em documento nenhum** — invoice paga em duas tentativas (PIX falho + cartão) não cabe no modelo atual | F12–F16 |
-| **ADR-007** | semântica entre validade e carência offline; conflito de reconciliação; push ou pull de snapshot. **Sem urgência** — migrou com F10 para o MVP 1.5 | F10 |
+| ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
 
 ### 3.2 Decididos em 14/08/2026 — segunda rodada
 
@@ -195,8 +197,9 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 |---|---|---|---|---|
 | **0** | Hardware e protocolo Topdata comprovados em bancada | hardware + SDK + rede de laboratório | F1–F5 | não iniciado |
 | **1** | Academia operando acesso online, com assinatura manual | decisão de saída do MVP 0 (`MVP-00` §15) = `GO` ou `GO_WITH_CONSTRAINTS` | F6–F9, F11 | bloqueado por MVP 0 |
-| **1.5** | Operação offline: snapshot, fila e reconciliação | MVP 1 em piloto, com incidente de link medido | F10 | adiado por **ADR-012** |
+| **1.5** | Operação offline: snapshot, fila e reconciliação | MVP 1 em piloto, com incidente de link medido | F10 | adiado por **ADR-012**. **ADR-007 fechado em 16/08 — spec aprovada** |
 | **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | bloqueado por ADR-013 |
+| **2.5** | Design system: tokens, `packages/ui` e as três superfícies | **F42 sem gate** (dívida ativa: `admin-web` está na `main` sem CSS) · **F43 e F44 têm gate:** o PI priorizar o MVP 4 | F42–F44 | criado por **ADR-025**. F42 pegável assim que o card `[INFRA]` do pipeline de tokens sair |
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis + protocolo clínico | F17–F22 | bloqueado por MVP 1 |
 | **4** | Autosserviço: app do aluno e totem | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado |
 | **5** | Engajamento opt-in mensurável | eventos confiáveis + app do MVP 4 | F30–F35 | bloqueado |
@@ -234,7 +237,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F7 | SPEC-007 | 1 | 1.2 | Aluno, plano e entitlement manual | [`SPEC-007-aluno-plano-e-entitlement-manual.md`](specs/SPEC-007-aluno-plano-e-entitlement-manual.md) | [#7](https://github.com/RodReis/arenahub/issues/7) | aprovada-pi |
 | F8 | SPEC-008 | 1 | 1.3 | Consentimento, biometria e sync de dispositivo | [`SPEC-008-consentimento-biometria-e-sync-de-dispositivo.md`](specs/SPEC-008-consentimento-biometria-e-sync-de-dispositivo.md) | [#8](https://github.com/RodReis/arenahub/issues/8) | aprovada-pi |
 | F9 | SPEC-009 | 1 | 1.4 | Decisão online e passagem | [`SPEC-009-decisao-online-e-passagem.md`](specs/SPEC-009-decisao-online-e-passagem.md) | [#9](https://github.com/RodReis/arenahub/issues/9) | aprovada-pi |
-| F10 | SPEC-010 | 1.5 | 1.5 | Operação offline | [`SPEC-010-operacao-offline.md`](specs/SPEC-010-operacao-offline.md) | [#10](https://github.com/RodReis/arenahub/issues/10) | em-revisao |
+| F10 | SPEC-010 | 1.5 | 1.5 | Operação offline | [`SPEC-010-operacao-offline.md`](specs/SPEC-010-operacao-offline.md) | [#10](https://github.com/RodReis/arenahub/issues/10) | aprovada-pi |
 | F11 | SPEC-011 | 1 | 1.6 | Painel operacional e prontidão | [`SPEC-011-painel-operacional-e-prontidao.md`](specs/SPEC-011-painel-operacional-e-prontidao.md) | [#11](https://github.com/RodReis/arenahub/issues/11) | aprovada-pi |
 | F12 | SPEC-012 | 2 | 2.1 | Ledger operacional e invoice | [`SPEC-012-ledger-operacional-e-invoice.md`](specs/SPEC-012-ledger-operacional-e-invoice.md) | [#12](https://github.com/RodReis/arenahub/issues/12) | em-revisao |
 | F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | [`SPEC-013-pix-e-webhook-idempotente.md`](specs/SPEC-013-pix-e-webhook-idempotente.md) | [#13](https://github.com/RodReis/arenahub/issues/13) | em-revisao |
@@ -266,6 +269,16 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F39 | SPEC-039 | 6 | 6.4 | Experimento operacional | [`SPEC-039-experimento-operacional.md`](specs/SPEC-039-experimento-operacional.md) | [#39](https://github.com/RodReis/arenahub/issues/39) | planejada |
 | F40 | SPEC-040 | 6 | 6.5 | Modelo supervisionado (condicionado a M6-ML-01) | [`SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md`](specs/SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md) | [#40](https://github.com/RodReis/arenahub/issues/40) | planejada |
 | F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | [`SPEC-041-producao-controlada-e-monitoramento.md`](specs/SPEC-041-producao-controlada-e-monitoramento.md) | [#41](https://github.com/RodReis/arenahub/issues/41) | planejada |
+| F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | — | aprovada-pi |
+| F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | — | aprovada-pi *(gate: MVP 4)* |
+| F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | — | aprovada-pi *(gate: MVP 4)* |
+
+> **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
+> ADR**, não no PRD: o design system é trabalho de plataforma e não tem PRD que o descreva. O
+> ADR-015 foi emendado para admitir isso. A contagem sai de 41 para **44 fatias** — nenhum número
+> reaproveitado.
+>
+> **As três issues ainda não existem** — dependem do board, que continua sendo trabalho `[INFRA]`.
 
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento

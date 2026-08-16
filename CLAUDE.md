@@ -58,7 +58,7 @@ Todo título de card **começa** com tokens em colchetes, **nesta ordem**, segui
 
 **Forma:** `[MVP<n>][SPEC-<nnn>][<fatia|tipo>] <título livre>`
 
-- **`[MVP<n>]`** — `[MVP0]`…`[MVP6]`, quando a fatia pertence a um MVP conhecido.
+- **`[MVP<n>]`** — `[MVP0]`…`[MVP6]`, mais `[MVP1.5]` (ADR-012) e `[MVP2.5]` (ADR-025), quando a fatia pertence a um MVP conhecido.
 - **`[SPEC-<nnn>]`** — 3 dígitos (`[SPEC-024]`), quando há spec. **Permanece** em correção que conserta comportamento definido numa spec.
 - **`[F<n>]`** — a fatia (`[F18]`). Para card que **não é fatia**, entra no lugar um **token de tipo**: `[FIX]` (correção de bug), `[GATE]` (homologação/portão de entrada de MVP) ou `[INFRA]` (processo/infra).
 
@@ -226,7 +226,8 @@ Use a que existir no ambiente; a ausência de uma skill não é desculpa para pu
 - `docs/ARCHITECTURE.md` — desenho, módulos, dados, resiliência.
 - `docs/DECISIONS.md` — ADRs (ler antes de propor mudança estrutural). **ADR-021** define quem escreve o quê no Git.
 - `docs/CONVENTION.md` — contrato de domínio do ArenaHub: entidades, estados, invariantes e regras de negócio (o coração do produto).
-- `docs/DESIGN-UI.md` — design UX/UI. **Status `RASCUNHO`** — tela pública da catraca e 8 decisões abertas na §17 aguardam o PI. Não trate como aprovado.
+- `docs/design/` — **contrato de implementação de UI por superfície** (ADR-026): `DS-PAINEL.md` (`admin-web`), `DS-APP.md` (`mobile`), `DS-TOTEM.md` (`kiosk`). Onde divergirem do `DESIGN-UI.md`, **eles vencem**. Os `.dc.html` são protótipo visual, **não código a instalar** — colá-los produz o hex literal que a lint proíbe. **Exceção:** sobre nome de estado, razão ou enum, o ADR de domínio vence e o documento de design é corrigido.
+- `docs/DESIGN-UI.md` — **documento de direção**, não de contrato (rebaixado por ADR-026): de onde saíram Carbono Adaptativo e o pipeline de accent. Status `RASCUNHO`; as pendências da §17 que sobraram estão espelhadas em `docs/design/*.md` §12–§13.
 - `docs/STATUS.md` — Kanban/roadmap deste projeto + **Índice Fatia ↔ SPEC** (fonte única da numeração). Prosa curta, sem detalhe.
 - `docs/STATUS-ARQUIVO.md` — histórico detalhado que complementa o STATUS.md: prosa longa mora aqui, com detalhe.
 - `docs/LANDSCAPE.md` — **cenário competitivo datado**: o que o mercado já faz, o que morreu por causa disso, e os gatilhos que obrigam a revisar. Evita reconstruir o que já existe de graça.

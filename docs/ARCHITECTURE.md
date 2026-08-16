@@ -179,9 +179,20 @@ antes. Isso é o que permite entrada de aluno corporativo, cortesia e visitante 
 }
 ```
 
-Razões conhecidas hoje: `ACTIVE_ENTITLEMENT` (allow); `NO_ENTITLEMENT`, `OUTSIDE_SCHEDULE`,
-`ADMIN_BLOCK`, `SUBSCRIPTION_OVERDUE`, `UNIT_NOT_ALLOWED`, `STUDENT_INACTIVE` (deny).
-**A lista canônica ainda não está fechada** — `docs/DESIGN-UI.md` §17 item 2 depende dela.
+**Lista canônica fechada pelo ADR-024 em 16/08/2026** — oito rótulos, dois de `ALLOW` e seis de
+`DENY`:
+
+`ACTIVE_ENTITLEMENT` e `MANUAL_OVERRIDE` (allow); `ADMIN_BLOCK`, `STUDENT_BLOCKED`,
+`STUDENT_INACTIVE`, `NO_ENTITLEMENT`, `WRONG_UNIT`, `OUTSIDE_SCHEDULE` (deny).
+
+A lista mora em `packages/access-policy/src/types.ts`, junto do motor que a produz — o motor roda
+também no Edge, onde não há Zod.
+
+> **Correção de 16/08/2026.** Este parágrafo listava `SUBSCRIPTION_OVERDUE` e `UNIT_NOT_ALLOWED`,
+> e dizia que a lista não estava fechada. `UNIT_NOT_ALLOWED` virou `WRONG_UNIT`;
+> `SUBSCRIPTION_OVERDUE` **não é razão do motor** — a catraca não consulta assinatura nem invoice
+> (Regra de arquitetura 1, ADR-003), e inadimplência chega como `NO_ENTITLEMENT`. A versão errada
+> deste parágrafo foi copiada para os três documentos de `docs/design/`, corrigidos junto.
 
 ### 4.4 A tela pública nunca vaza
 
