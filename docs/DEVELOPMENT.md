@@ -6,9 +6,12 @@
 > que ordem?"***. Os passos de uma fatia moram aqui — **nunca** viram issue separada
 > (`card = fatia`).
 
-**Estado em 14/08/2026:** nada implementado. Os seis cards `[INFRA]` de bootstrap existem
-([#42](https://github.com/RodReis/arenahub/issues/42)–[#47](https://github.com/RodReis/arenahub/issues/47),
-ADR-023), todos em Backlog. O board em si continua pendente — ver §4.
+**Estado em 16/08/2026:** bootstrap fechado ([#42](https://github.com/RodReis/arenahub/issues/42)–[#47](https://github.com/RodReis/arenahub/issues/47))
+e a *exceção de arranque* morreu — o CI decide o merge. Entregues: **F1, F4, F6, F7, F8, F9 e F11**,
+mais a ponte EasyInner ([#61](https://github.com/RodReis/arenahub/issues/61)) e o **pipeline de
+tokens** ([#79](https://github.com/RodReis/arenahub/issues/79)). **F2 e F3 estão em andamento e não
+travam em código** — dependem de consentimento, cutover da catraca e janela combinada com o PI.
+Registro linha a linha na §5. O board (Projects) em si continua pendente — ver §4.
 
 ---
 
@@ -767,3 +770,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 16/08/2026 | **F9** | SPEC-009 | [#74](https://github.com/RodReis/arenahub/pull/74) | decisão online na nuvem como função pura versionada, `AccessEvent` imutável, `AccessPassage`, override auditado |
 | 16/08/2026 | **F11** | SPEC-011 | [#75](https://github.com/RodReis/arenahub/pull/75) | painel operacional, saúde de dispositivo, alerta quando o Edge some, consulta e exportação de eventos |
 | 16/08/2026 | **F7** *(interface, fecha)* | SPEC-007 | [#76](https://github.com/RodReis/arenahub/pull/76) | interface da recepção: busca, cadastro, ficha com direitos, histórico e planos. **`M1-AC-002` e `M1-AC-003` fecham** — o aceite deixou de depender de `curl`. 43 unitários + 17 E2E novos. **Toast do `CLAUDE.md` não implementado** — débito anterior à fatia, sugerido card `[INFRA]` |
+| 16/08/2026 | — *(#79)* | — | [#80](https://github.com/RodReis/arenahub/pull/80) | pipeline de tokens e esqueleto de `packages/ui`: três camadas de token, resolvedor de accent OKLCH por contraste calculado, 5 regras de lint e `globals.css` no `admin-web`. **Guardas testadas falhando, não só passando.** Metade sem decisão de produto do ADR-025 — **desbloqueia F42**. Componentes e `state-labels.ts` ficam para a fatia |
