@@ -9,6 +9,8 @@
     "pnpm": ">=10.0.0 <11.0.0"
   },
   "scripts": {
+    "//setup": "`setup` e comando NATIVO do pnpm (instala o proprio pnpm) e nao chega ao script. Dai o nome `dev:setup`.",
+    "dev:setup": "node scripts/setup.mjs",
     "dev": "node scripts/run-task.mjs dev",
     "lint": "node scripts/run-task.mjs lint",
     "typecheck": "node scripts/run-task.mjs typecheck",
