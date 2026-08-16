@@ -178,8 +178,156 @@ enum StudentTimelineEventType {
   ENTITLEMENT_REVOKED
   ENTITLEMENT_EXPIRED
   COURTESY_GRANTED
+  BIOMETRIC_CONSENT_ACCEPTED
+  BIOMETRIC_CONSENT_REFUSED
+  BIOMETRIC_CONSENT_REVOKED
+  BIOMETRIC_IDENTITY_CREATED
+  BIOMETRIC_IDENTITY_REVOKED
+  BIOMETRIC_IDENTITY_DELETED
 
   @@map("student_timeline_event_type")
+}
+
+/// Tipo de documento de consentimento.
+///
+/// Lista fechada: cada tipo tem base legal propria. Biometria e o unico
+/// dado sensivel do art. 11 nesta fatia -- os demais entram nas fatias que
+/// os pedirem (avaliacao fisica em F17, imagem em F19).
+enum ConsentDocumentType {
+  BIOMETRIC
+
+  @@map("consent_document_type")
+}
+
+/// Decisao do titular sobre um documento de consentimento.
+///
+/// RECUSAR E DECISAO VALIDA, nao ausencia de resposta: `REFUSED` registrado
+/// e o que prova que houve escolha livre (INV-022b). Sem ele, "nao consta"
+/// e indistinguivel de "nunca perguntamos".
+enum ConsentDecision {
+  ACCEPTED
+  REFUSED
+
+  @@map("consent_decision")
+}
+
+/// Quem prestou o consentimento.
+///
+/// INV-143 (ADR-008): menor de 18 so tem cadastro biometrico com
+/// consentimento de responsavel legal. O tipo fica na propria decisao para
+/// que a revalidacao na virada dos 18 seja consulta, nao arqueologia.
+enum ConsentSubjectKind {
+  /// O proprio aluno, maior de 18 na data da decisao.
+  STUDENT
+  /// Responsavel legal por aluno menor de 18.
+  LEGAL_GUARDIAN
+
+  @@map("consent_subject_kind")
+}
+
+/// Estado da identidade biometrica.
+///
+/// A ordem importa e e a do INV-019: revogar desativa logicamente ANTES de
+/// a exclusao fisica acontecer. `REVOKED` ja bloqueia; `DELETION_PENDING`
+/// diz que os leitores ainda nao confirmaram; `DELETED` so quando todos
+/// confirmaram (INV-018, INV-027).
+enum BiometricIdentityState {
+  ACTIVE
+  REVOKED
+  DELETION_PENDING
+  DELETED
+
+  @@map("biometric_identity_state")
+}
+
+/// Estado operacional do Edge (PC da academia).
+enum EdgeNodeStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@map("edge_node_status")
+}
+
+/// Estado do dispositivo fisico (leitor facial, catraca).
+enum DeviceStatus {
+  ACTIVE
+  MAINTENANCE
+  RETIRED
+
+  @@map("device_status")
+}
+
+/// Categoria do dispositivo. Amplia quando outro tipo for homologado.
+enum DeviceKind {
+  FACIAL_READER
+  TURNSTILE
+
+  @@map("device_kind")
+}
+
+/// Estado do cadastro do aluno DENTRO de um dispositivo.
+enum DeviceUserState {
+  PENDING
+  SYNCED
+  REMOVAL_PENDING
+  REMOVED
+  FAILED
+
+  @@map("device_user_state")
+}
+
+/// Operacao de sincronizacao. Nao ha lote: INV-023 -- o protocolo facial
+/// exige fila individual por usuario e por dispositivo (INV-024).
+enum DeviceSyncOperation {
+  UPSERT
+  DELETE
+
+  @@map("device_sync_operation")
+}
+
+/// Estado do job de sincronizacao, visivel no painel de pendencia.
+enum DeviceSyncJobState {
+  PENDING
+  PROCESSING
+  SYNCED
+  RETRYING
+  FAILED
+  REMOVED
+
+  @@map("device_sync_job_state")
+}
+
+/// Estado do comando duravel entregue ao Edge.
+enum DeviceCommandState {
+  AVAILABLE
+  LEASED
+  ACKNOWLEDGED
+  FAILED
+
+  @@map("device_command_state")
+}
+
+/// O que foi acessado no registro de acesso a dado biometrico.
+///
+/// ADR-008: log de acesso a template e imagem foi UMA DAS TRES CAUSAS da
+/// suspensao da ANPD no caso da rede estadual do PR (04/08/2026). Nao e
+/// item de observabilidade -- e prova de controle de acesso.
+enum BiometricAccessKind {
+  ENROLLMENT_IMAGE
+  IDENTITY_METADATA
+
+  @@map("biometric_access_kind")
+}
+
+/// Por que o dado biometrico foi acessado.
+enum BiometricAccessPurpose {
+  ENROLLMENT
+  DEVICE_SYNC
+  REVOCATION
+  PURGE
+  AUDIT
+
+  @@map("biometric_access_purpose")
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +359,18 @@ model Tenant {
   plans           Plan[]
   subscriptions   Subscription[]
   entitlements    Entitlement[]
+
+  consentDocuments    ConsentDocument[]
+  consentRecords      ConsentRecord[]
+  biometricIdentities BiometricIdentity[]
+  biometricAccessLogs BiometricAccessLog[]
+  privacySettings     TenantPrivacySettings?
+  edgeNodes           EdgeNode[]
+  edgeCredentials     EdgeCredential[]
+  devices             Device[]
+  deviceUsers         DeviceUser[]
+  deviceSyncJobs      DeviceSyncJob[]
+  deviceCommands      DeviceCommand[]
 
   @@map("tenants")
 }
@@ -534,6 +694,10 @@ model Student {
   entitlements   Entitlement[]
   timelineEvents StudentTimelineEvent[]
 
+  consentRecords      ConsentRecord[]
+  biometricIdentities BiometricIdentity[]
+  deviceUsers         DeviceUser[]
+
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, status])
   @@index([tenantId, cpfHash])
@@ -791,4 +955,427 @@ model EntitlementUnitWindow {
 
   @@index([entitlementId, gymUnitId, dayOfWeek])
   @@map("entitlement_unit_windows")
+}
+
+// ---------------------------------------------------------------------------
+// Consentimento e biometria (F8)
+//
+// Base legal: CONSENTIMENTO ESPECIFICO E DESTACADO (LGPD art. 11, I), fixado
+// no ADR-008. Legitimo interesse NAO e hipotese disponivel para dado
+// sensivel -- o art. 11 e lista fechada.
+//
+// Em 04/08/2026 a ANPD suspendeu reconhecimento facial na rede estadual do
+// PR por tres causas: falta de base legal, ausencia de comprovacao de
+// seguranca e falha no controle de acesso as imagens. As tres tem contraparte
+// aqui: ConsentRecord, ausencia de coluna de template e BiometricAccessLog.
+// ---------------------------------------------------------------------------
+
+/// Versao publicada de um termo de consentimento.
+///
+/// IMUTAVEL depois de publicado. Corrigir texto exige VERSAO NOVA, nunca
+/// UPDATE: o registro de consentimento aponta para esta linha, e reescrever
+/// o texto mudaria retroativamente aquilo que a pessoa aceitou.
+///
+/// `contentSha256` e o que torna a prova verificavel -- guardar so a versao
+/// deixaria "v2" significar uma coisa hoje e outra depois de um deploy.
+model ConsentDocument {
+  id            String              @id @default(uuid()) @db.Uuid
+  /// `null` = documento global do ArenaHub, valido para todo tenant que nao
+  /// publicou o proprio. A academia e controladora (ADR-008) e pode
+  /// publicar o seu.
+  tenantId      String?             @map("tenant_id") @db.Uuid
+  type          ConsentDocumentType
+  /// Inteiro crescente por (escopo, tipo). Sem semver: termo juridico nao
+  /// tem "correcao compativel".
+  version       Int
+  /// Finalidade especifica (art. 11, I exige "para finalidades especificas").
+  /// Texto em pt-BR, exibido ao titular.
+  purpose       String
+  content       String
+  /// SHA-256 do `content`, em hex minusculo.
+  contentSha256 String              @map("content_sha256")
+  effectiveFrom DateTime            @map("effective_from")
+  /// Preenchido quando uma versao nova entra. Documento aposentado continua
+  /// existindo: ha consentimento vivo apontando para ele.
+  retiredAt     DateTime?           @map("retired_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  tenant  Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  records ConsentRecord[]
+
+  @@unique([tenantId, type, version])
+  @@index([tenantId, type, effectiveFrom])
+  @@map("consent_documents")
+}
+
+/// Decisao do titular sobre um documento. IMUTAVEL (INV-021).
+///
+/// Nunca sofre UPDATE de decisao: revogar CRIA linha nova apontando para a
+/// anterior em `revokesRecordId`. Reescrever a decisao apagaria a prova de
+/// que houve consentimento no periodo em que a biometria funcionou -- que e
+/// exatamente o que a ANPD pede para ver.
+///
+/// Guarda ator, IP e user-agent porque o INV-021 exige, e porque "quem
+/// coletou" e a primeira pergunta numa fiscalizacao.
+model ConsentRecord {
+  id               String             @id @default(uuid()) @db.Uuid
+  tenantId         String             @map("tenant_id") @db.Uuid
+  studentId        String             @map("student_id") @db.Uuid
+  documentId       String             @map("document_id") @db.Uuid
+  decision         ConsentDecision
+  /// Quem prestou: o proprio aluno ou responsavel legal (INV-143).
+  subjectKind      ConsentSubjectKind @map("subject_kind")
+  /// Nome do responsavel legal, quando `subjectKind = LEGAL_GUARDIAN`.
+  /// INV-143 exige vinculo COMPROVAVEL -- nome e grau de parentesco sao o
+  /// minimo; o documento comprobatorio entra em `evidence`.
+  guardianName     String?            @map("guardian_name")
+  guardianRelation String?            @map("guardian_relation")
+  /// Idade do aluno na data da decisao, em anos completos.
+  ///
+  /// Congelada de proposito: saber que a pessoa tinha 16 quando o
+  /// responsavel consentiu e o que dispara a revalidacao na virada dos 18
+  /// (INV-143). Recalcular pela data de nascimento diria a idade de HOJE,
+  /// nao a da decisao.
+  subjectAgeYears  Int                @map("subject_age_years")
+  /// Ator interno que registrou (recepcao). Nao e o titular.
+  actorId          String?            @map("actor_id") @db.Uuid
+  actorIp          String?            @map("actor_ip")
+  actorUserAgent   String?            @map("actor_user_agent")
+  /// Evidencia adicional em JSON: canal, documento do responsavel, hash de
+  /// assinatura. NUNCA imagem nem template.
+  evidence         Json?
+  occurredAt       DateTime           @map("occurred_at")
+  /// Preenchido quando uma decisao posterior substitui esta.
+  supersededAt     DateTime?          @map("superseded_at")
+  /// Aponta para a decisao que esta linha revoga.
+  revokesRecordId  String?            @map("revokes_record_id") @db.Uuid
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  document   ConsentDocument     @relation(fields: [documentId], references: [id])
+  identities BiometricIdentity[]
+
+  @@index([tenantId, studentId, occurredAt])
+  @@index([tenantId, documentId])
+  @@map("consent_records")
+}
+
+/// Identidade biometrica do aluno. Entidade SEPARADA do cadastro (INV-016).
+///
+/// NAO EXISTE COLUNA DE TEMPLATE NEM DE IMAGEM AQUI, e isso e requisito, nao
+/// omissao (INV-020): o template vive no leitor, a imagem de cadastro vive
+/// no object storage privado, e esta tabela guarda so a REFERENCIA
+/// (`enrollmentObjectKey`). A nuvem nao acumula biometria bruta.
+///
+/// `enrollmentObjectKey` fica nulo apos o expurgo (INV-142) sem que a linha
+/// morra: o historico de que houve identidade e o que a auditoria consulta.
+model BiometricIdentity {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  tenantId            String                 @map("tenant_id") @db.Uuid
+  studentId           String                 @map("student_id") @db.Uuid
+  state               BiometricIdentityState @default(ACTIVE)
+  /// Consentimento que autorizou esta identidade. Sem ele a identidade nao
+  /// nasce (INV-017).
+  consentRecordId     String                 @map("consent_record_id") @db.Uuid
+  /// Chave no object storage privado. `null` depois do expurgo.
+  enrollmentObjectKey String?                @map("enrollment_object_key")
+  /// Instante em que o objeto de cadastro foi apagado do storage.
+  /// Evidencia auditavel do expurgo (INV-142).
+  enrollmentPurgedAt  DateTime?              @map("enrollment_purged_at")
+  revokedAt           DateTime?              @map("revoked_at")
+  revokedReason       String?                @map("revoked_reason")
+  /// So quando TODOS os dispositivos-alvo confirmaram remocao (INV-027).
+  deletedAt           DateTime?              @map("deleted_at")
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+  version             Int                    @default(0)
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student       Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  consentRecord ConsentRecord   @relation(fields: [consentRecordId], references: [id])
+  deviceUsers   DeviceUser[]
+  syncJobs      DeviceSyncJob[]
+
+  @@index([tenantId, studentId, state])
+  @@index([tenantId, state])
+  @@map("biometric_identities")
+}
+
+/// Registro de acesso a dado biometrico (ADR-008).
+///
+/// Existe porque a falha no controle de acesso as imagens foi uma das tres
+/// causas da suspensao da ANPD no caso PR. Toda leitura de imagem de
+/// cadastro ou de metadado de identidade passa por aqui.
+///
+/// NAO guarda o dado acessado -- guarda QUEM, QUANDO, O QUE e PARA QUE
+/// (INV-022: template e imagem nunca aparecem em log).
+model BiometricAccessLog {
+  id            String                 @id @default(uuid()) @db.Uuid
+  tenantId      String                 @map("tenant_id") @db.Uuid
+  identityId    String                 @map("identity_id") @db.Uuid
+  kind          BiometricAccessKind
+  purpose       BiometricAccessPurpose
+  /// Ator humano; nulo quando o acesso e de processo (sync, expurgo).
+  actorId       String?                @map("actor_id") @db.Uuid
+  /// `USER` ou `SYSTEM` -- o worker de sync tambem presta contas.
+  actorType     ActorType              @map("actor_type")
+  actorIp       String?                @map("actor_ip")
+  correlationId String                 @map("correlation_id")
+  occurredAt    DateTime               @default(now()) @map("occurred_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, identityId, occurredAt])
+  @@index([tenantId, occurredAt])
+  @@map("biometric_access_logs")
+}
+
+/// Politica de privacidade biometrica POR TENANT.
+///
+/// ADR-008 exige retencao e log expostos como PARAMETRO DO CLIENTE -- e o
+/// que sustenta a posicao de operador (art. 39) contra reclassificacao pela
+/// ANPD: quem decide o prazo e a academia controladora, nao nos.
+///
+/// INV-142: 30 dias e o PADRAO, nao a constante.
+model TenantPrivacySettings {
+  tenantId               String   @id @map("tenant_id") @db.Uuid
+  /// Dias apos o encerramento do vinculo ate o expurgo do template e da
+  /// imagem, no banco E nos leitores.
+  purgeAfterDays         Int      @default(30) @map("purge_after_days")
+  /// Retencao do log de acesso biometrico, em dias. Padrao 5 anos: prazo
+  /// prescricional civil, com folga sobre a fiscalizacao.
+  accessLogRetentionDays Int      @default(1825) @map("access_log_retention_days")
+  /// Instrucoes documentadas do controlador (art. 39). Texto do contrato de
+  /// tratamento vigente entre a academia e o ArenaHub.
+  processingInstructions String?  @map("processing_instructions")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_privacy_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Edge, dispositivos e sincronizacao (F8)
+//
+// A nuvem e a fonte da verdade; o Edge e executor fisico (regra de
+// arquitetura no 3). Comando e DURAVEL: o WebSocket so avisa que ha
+// trabalho, e perder o socket nao perde comando.
+// ---------------------------------------------------------------------------
+
+/// PC da academia que fala com os leitores. Um por unidade, tipicamente.
+model EdgeNode {
+  id            String         @id @default(uuid()) @db.Uuid
+  tenantId      String         @map("tenant_id") @db.Uuid
+  /// Dado fisico: exige `gym_unit_id` (regra de arquitetura no 2).
+  gymUnitId     String         @map("gym_unit_id") @db.Uuid
+  /// Identificador estavel, escolhido na instalacao. Aparece no painel.
+  code          String
+  status        EdgeNodeStatus @default(ACTIVE)
+  agentVersion  String?        @map("agent_version")
+  lastHeartbeat DateTime?      @map("last_heartbeat")
+  /// Diferenca observada entre o relogio do Edge e o da nuvem, em
+  /// milissegundos. Assinatura HMAC tem janela de +-300 s: relogio torto e
+  /// causa comum de 401 em campo, e sem esta coluna vira caca ao fantasma.
+  clockOffsetMs Int?           @map("clock_offset_ms")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  devices     Device[]
+  credentials EdgeCredential[]
+  commands    DeviceCommand[]
+  nonces      ReplayNonce[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, gymUnitId])
+  @@map("edge_nodes")
+}
+
+/// Credencial HMAC do Edge.
+///
+/// O segredo e guardado CIFRADO (AES-256-GCM), como o segredo TOTP da F6.
+/// Duas credenciais ativas convivem por ate 24 h para permitir rotacao sem
+/// janela de indisponibilidade -- cada uma com `keyId` distinto.
+model EdgeCredential {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  edgeNodeId      String    @map("edge_node_id") @db.Uuid
+  /// Vai no header `X-Edge-Key-Id`. Publico: identifica, nao autentica.
+  keyId           String    @unique @map("key_id")
+  /// Segredo cifrado. NUNCA em log, nem mascarado (INV-022 por analogia).
+  encryptedSecret String    @map("encrypted_secret")
+  activeFrom      DateTime  @map("active_from")
+  /// Revogacao e IMEDIATA: preenchido, a credencial para de valer no ato.
+  revokedAt       DateTime? @map("revoked_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  edgeNode EdgeNode @relation(fields: [edgeNodeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, edgeNodeId, revokedAt])
+  @@map("edge_credentials")
+}
+
+/// Nonce ja usado, para barrar repeticao de requisicao assinada.
+///
+/// A unicidade `(edgeNodeId, keyId, nonceHash)` e o mecanismo: o INSERT
+/// acontece DENTRO da transacao da requisicao, e a violacao de unique e o
+/// que responde `EDGE_REPLAY_DETECTED`. Verificar antes e inserir depois
+/// deixaria a janela de corrida aberta entre as duas operacoes.
+///
+/// `expiresAt` permite limpeza: a janela de assinatura e de +-300 s, entao
+/// nonce mais velho que isso nao serve para repetir nada.
+model ReplayNonce {
+  id         String   @id @default(uuid()) @db.Uuid
+  edgeNodeId String   @map("edge_node_id") @db.Uuid
+  keyId      String   @map("key_id")
+  /// SHA-256 do nonce recebido. O valor bruto nao precisa ser guardado.
+  nonceHash  String   @map("nonce_hash")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  edgeNode EdgeNode @relation(fields: [edgeNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([edgeNodeId, keyId, nonceHash])
+  @@index([expiresAt])
+  @@map("replay_nonces")
+}
+
+/// Dispositivo fisico homologado (leitor facial, catraca).
+///
+/// `model` e `firmware` sao conferidos contra `supported-hardware.md`:
+/// hardware desconhecido responde `DEVICE_UNSUPPORTED_HARDWARE`, nao 500.
+model Device {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @map("tenant_id") @db.Uuid
+  gymUnitId     String       @map("gym_unit_id") @db.Uuid
+  edgeNodeId    String?      @map("edge_node_id") @db.Uuid
+  kind          DeviceKind
+  model         String
+  firmware      String?
+  /// Serie do fabricante. Unico por tenant -- o mesmo leitor nao pode estar
+  /// cadastrado duas vezes.
+  serial        String
+  status        DeviceStatus @default(ACTIVE)
+  /// Capacidades declaradas (suporta exclusao individual, tamanho de foto).
+  /// JSON porque varia por modelo e ainda esta sendo levantado na bancada.
+  capabilities  Json?
+  lastHeartbeat DateTime?    @map("last_heartbeat")
+  lastSyncAt    DateTime?    @map("last_sync_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  edgeNode    EdgeNode?       @relation(fields: [edgeNodeId], references: [id], onDelete: SetNull)
+  deviceUsers DeviceUser[]
+  syncJobs    DeviceSyncJob[]
+
+  @@unique([tenantId, serial])
+  @@index([tenantId, gymUnitId, status])
+  @@map("devices")
+}
+
+/// Mapeamento `Student.id -> DeviceUser -> enrollid` (INV-026).
+///
+/// `externalUserId` e gerado POR DISPOSITIVO e NAO DERIVA DO CPF (INV-012,
+/// INV-025). Usar CPF como id de leitor exporia documento a quem tiver
+/// acesso fisico ao equipamento.
+model DeviceUser {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  deviceId       String          @map("device_id") @db.Uuid
+  studentId      String          @map("student_id") @db.Uuid
+  identityId     String          @map("identity_id") @db.Uuid
+  /// O `enrollid` dentro do leitor.
+  externalUserId String          @map("external_user_id")
+  state          DeviceUserState @default(PENDING)
+  syncedAt       DateTime?       @map("synced_at")
+  removedAt      DateTime?       @map("removed_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device   Device            @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  student  Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  identity BiometricIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, externalUserId])
+  @@unique([deviceId, identityId])
+  @@index([tenantId, state])
+  @@index([tenantId, studentId])
+  @@map("device_users")
+}
+
+/// Uma operacao de sync por identidade E por dispositivo (INV-024).
+///
+/// `idempotencyKey` unica impede o mesmo trabalho logico de virar dois jobs
+/// quando o outbox reprocessa (regra de arquitetura no 4).
+model DeviceSyncJob {
+  id             String              @id @default(uuid()) @db.Uuid
+  tenantId       String              @map("tenant_id") @db.Uuid
+  deviceId       String              @map("device_id") @db.Uuid
+  identityId     String              @map("identity_id") @db.Uuid
+  operation      DeviceSyncOperation
+  state          DeviceSyncJobState  @default(PENDING)
+  attempts       Int                 @default(0)
+  /// Backoff de 1/2/3/5/8 minutos; DLQ na quinta tentativa.
+  nextAttemptAt  DateTime?           @map("next_attempt_at")
+  lastAttemptAt  DateTime?           @map("last_attempt_at")
+  /// Codigo estavel do erro. Nunca a mensagem crua do SDK -- ela carrega
+  /// caminho de arquivo e, as vezes, dado do usuario.
+  errorCode      String?             @map("error_code")
+  /// Chave logica do trabalho: `{identityId}:{deviceId}:{operation}`.
+  idempotencyKey String              @unique @map("idempotency_key")
+  correlationId  String              @map("correlation_id")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device   Device            @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  identity BiometricIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, state, nextAttemptAt])
+  @@index([tenantId, identityId])
+  @@index([tenantId, deviceId, state])
+  @@map("device_sync_jobs")
+}
+
+/// Comando DURAVEL para o Edge executar.
+///
+/// Persistido antes de qualquer notificacao. O WebSocket avisa que ha
+/// trabalho; se o socket cair, o comando continua aqui e o Edge o busca por
+/// REST assinado. Notificacao perdida nao e comando perdido.
+///
+/// `sequence` da ordem estavel para o `GET /edge/commands?after=`.
+model DeviceCommand {
+  id             String             @id @default(uuid()) @db.Uuid
+  tenantId       String             @map("tenant_id") @db.Uuid
+  edgeNodeId     String             @map("edge_node_id") @db.Uuid
+  /// Cresce por Edge. `BigInt` porque e contador perpetuo.
+  sequence       BigInt
+  type           String
+  /// Instrucao para o adapter. NUNCA template bruto: leva a referencia do
+  /// objeto e o `externalUserId`, e o Edge busca a imagem por URL assinada.
+  payload        Json
+  state          DeviceCommandState @default(AVAILABLE)
+  availableAt    DateTime           @default(now()) @map("available_at")
+  /// Lease de 60 s, renovavel. Comando arrendado que expira volta a
+  /// AVAILABLE -- Edge que morreu no meio nao trava a fila.
+  leasedAt       DateTime?          @map("leased_at")
+  leaseExpiresAt DateTime?          @map("lease_expires_at")
+  acknowledgedAt DateTime?          @map("acknowledged_at")
+  /// Mesmo comando logico nunca vira dois (regra de arquitetura no 4).
+  idempotencyKey String             @unique @map("idempotency_key")
+  correlationId  String             @map("correlation_id")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  edgeNode EdgeNode @relation(fields: [edgeNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([edgeNodeId, sequence])
+  @@index([edgeNodeId, state, sequence])
+  @@map("device_commands")
 }
