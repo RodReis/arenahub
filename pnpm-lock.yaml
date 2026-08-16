@@ -163,6 +163,9 @@ importers:
 
   apps/edge-agent:
     dependencies:
+      '@arenahub/api-contracts':
+        specifier: workspace:*
+        version: link:../../packages/api-contracts
       pino:
         specifier: 10.3.1
         version: 10.3.1

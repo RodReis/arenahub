@@ -35,6 +35,22 @@ export const esquemaConfig = z.object({
   COLLECTOR_URL: z.url().optional(),
   COLLECTOR_HMAC_SECRET: segredo.optional(),
 
+  /**
+   * API do ArenaHub, para buscar comando de sincronizacao (F8).
+   *
+   * Ausente = modo bancada: o agente nao busca comando e a fila da nuvem
+   * simplesmente nao existe para ele. E o que permite rodar F1-F5 sem
+   * depender da API.
+   */
+  CLOUD_API_URL: z.url().optional(),
+  /** `keyId` da credencial. Publico: identifica, nao autentica. */
+  CLOUD_EDGE_KEY_ID: z.string().min(1).optional(),
+  /** Segredo HMAC. NUNCA em log, nem mascarado. */
+  CLOUD_EDGE_SECRET: segredo.optional(),
+
+  /** Intervalo de busca por comando, em ms. */
+  SYNC_POLL_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   /**
@@ -51,7 +67,10 @@ export const esquemaConfig = z.object({
 export type Config = z.infer<typeof esquemaConfig>;
 
 /** Campos que nunca aparecem em log, diagnostico ou mensagem de erro. */
-const CAMPOS_SECRETOS = ['COLLECTOR_HMAC_SECRET'] as const satisfies readonly (keyof Config)[];
+const CAMPOS_SECRETOS = [
+  'COLLECTOR_HMAC_SECRET',
+  'CLOUD_EDGE_SECRET',
+] as const satisfies readonly (keyof Config)[];
 
 export class ConfigInvalidaError extends Error {
   readonly code = 'EDGE_CONFIG_INVALIDA';
