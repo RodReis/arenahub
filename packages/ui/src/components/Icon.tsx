@@ -30,6 +30,11 @@ export const ICON_NAMES = [
   'archive',
   'calendar-x',
   'hourglass',
+  'mail',
+  'lock',
+  'eye',
+  'eye-off',
+  'dumbbell',
 ] as const;
 
 /**
@@ -96,6 +101,21 @@ const PATHS: Record<IconName, readonly string[]> = {
   archive: ['M3 3h18v4H3z', 'M5 7v13h14V7', 'M10 12h4'],
   'calendar-x': ['M3 5h18v16H3z', 'M8 3v4', 'M16 3v4', 'M3 10h18', 'm10 14 4 4', 'm14 14-4 4'],
   hourglass: ['M6 2h12', 'M6 22h12', 'M8 2c0 5 8 5 8 10s-8 5-8 10'],
+  mail: ['M2 5h20v14H2z', 'm2 6 10 7 10-7'],
+  lock: ['M4 11h16v10H4z', 'M8 11V7a4 4 0 0 1 8 0v4'],
+  eye: ['M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'],
+  'eye-off': [
+    'm2 2 20 20',
+    'M6.7 6.7C3.9 8.4 2 12 2 12s4 7 10 7c2 0 3.7-.8 5.1-1.8',
+    'M9.9 5.2A9.6 9.6 0 0 1 12 5c6 0 10 7 10 7a19 19 0 0 1-2.8 3.6',
+    'M9.9 9.9a3 3 0 0 0 4.2 4.2',
+  ],
+  /**
+   * Halter na HORIZONTAL, nao na diagonal. O tracado diagonal do Lucide vira
+   * rabisco a 16 px -- as barras das pontas somem e sobra um X. Redesenhado
+   * reto: barra central, dois pesos, dois colares.
+   */
+  dumbbell: ['M6 6v12', 'M18 6v12', 'M3 9v6', 'M21 9v6', 'M6 12h12'],
 };
 
 export function Icon({ name }: { name: IconName }) {
