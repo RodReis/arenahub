@@ -14,14 +14,30 @@
 
 export { Ausente } from './components/Ausente.js';
 export { Button } from './components/Button.js';
+export { ConsentCard } from './components/ConsentCard.js';
 export { DataFreshness } from './components/DataFreshness.js';
 export { EmptyState } from './components/EmptyState.js';
 export { Icon, type IconName } from './components/Icon.js';
 export { MaskedCPF } from './components/MaskedCPF.js';
 export { Money } from './components/Money.js';
 export { ProblemDetail, type ProblemJson } from './components/ProblemDetail.js';
+export { SensitiveAction } from './components/SensitiveAction.js';
 export { StateBadge } from './components/StateBadge.js';
 export { ToastProvider, useToast, type ToastKind } from './components/Toast.js';
+
+/**
+ * Contratos sem tela -- SPEC-042 §3. Props e token de componente cujo MVP dono
+ * ainda nao chegou; a implementacao vem com a fatia que tiver o que renderizar.
+ */
+export {
+  AI_DISCLAIMER_CODE,
+  RISK_BANDS,
+  type AIDisclaimerProps,
+  type AsyncJobStatusProps,
+  type ChartWithTableProps,
+  type FieldReviewProps,
+  type RiskBandProps,
+} from './contracts/future-components.js';
 export { TenantDateTime } from './components/TenantDateTime.js';
 
 export {

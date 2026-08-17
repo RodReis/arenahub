@@ -1,0 +1,43 @@
+/**
+ * `SensitiveAction` -- DS-PAINEL.md §8.3. Le so a camada semantica (regra 2).
+ *
+ * Tem sombra, ao contrario do card: e camada que FLUTUA sobre o conteudo (§4).
+ */
+.caixa {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--ah-surface-raised);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-modal);
+  box-shadow: var(--ah-elev-3);
+}
+
+.resumo {
+  margin: 0;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+.motivo {
+  padding: 8px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-control);
+  font-family: inherit;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  resize: vertical;
+}
+
+.erro {
+  margin: 0;
+  color: var(--ah-state-danger);
+}
+
+.acoes {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
