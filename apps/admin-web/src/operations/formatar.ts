@@ -80,26 +80,18 @@ export const ROTULO_DE_ESTADO_DE_ALERTA: Record<string, string> = {
   RESOLVED: 'Resolvido',
 };
 
-/**
- * Razões de decisão em pt-BR — ADR-024.
+/*
+ * `ROTULO_DE_RAZAO` e `ROTULO_DE_PASSAGEM` MUDARAM DE CASA -- agora vivem em
+ * `packages/ui/src/domain/state-labels.ts`, o dicionario canonico (§7).
  *
- * O código é estável e serve à correlação; a frase é de interface. Sem a
- * tradução, a recepção veria `WRONG_UNIT` e abriria chamado para descobrir o
- * que fazer.
+ * As 8 frases de razao foram para la BYTE A BYTE: elas ja diziam O QUE
+ * ACONTECEU ("o plano vale em outra unidade"), nao o que o sistema concluiu,
+ * e por isso venceram o rotulo curto que o contrato propunha.
  *
- * As frases dizem O QUE ACONTECEU, não o que o sistema concluiu: "o plano
- * vale em outra unidade" é acionável; "unidade errada" acusa o aluno.
+ * Unica frase que mudou: `passage.NOT_APPLICABLE`, de `'—'` para "Não confirma
+ * giro" (PI, 16/08/2026) -- o travessao colapsava "equipamento nao confirma
+ * giro" com "dado ausente".
  */
-export const ROTULO_DE_RAZAO: Record<string, string> = {
-  ACTIVE_ENTITLEMENT: 'Plano válido',
-  MANUAL_OVERRIDE: 'Liberado manualmente pela recepção',
-  NO_ENTITLEMENT: 'Sem plano vigente',
-  WRONG_UNIT: 'O plano vale em outra unidade',
-  OUTSIDE_SCHEDULE: 'Fora do horário do plano',
-  STUDENT_BLOCKED: 'Aluno bloqueado',
-  STUDENT_INACTIVE: 'Cadastro não está ativo',
-  ADMIN_BLOCK: 'Bloqueio administrativo',
-};
 
 export const ROTULO_DE_MODO: Record<string, string> = {
   ONLINE: 'Online',
@@ -113,13 +105,6 @@ export const ROTULO_DE_METODO: Record<string, string> = {
   CARD: 'Cartão',
   PIN: 'PIN',
   MANUAL: 'Manual',
-};
-
-export const ROTULO_DE_PASSAGEM: Record<string, string> = {
-  NOT_APPLICABLE: '—',
-  PENDING: 'Aguardando giro',
-  CONFIRMED: 'Passou',
-  TIMED_OUT: 'Não passou',
 };
 
 /** Instante no fuso de Brasília, legível. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  ROTULO_DE_RAZAO,
+  ROTULO_DE_MODO,
   ROTULO_DE_SEVERIDADE,
   estaSilencioso,
   idadeLegivel,
@@ -62,43 +62,28 @@ describe('silêncio', () => {
   });
 });
 
+/*
+ * Os testes de `ROTULO_DE_RAZAO` e `ROTULO_DE_PASSAGEM` MUDARAM DE CASA junto
+ * com os dicionarios, para `packages/ui/src/domain/state-labels.spec.ts`. La
+ * eles ficaram mais fortes: a cobertura das razoes deixou de ser uma lista
+ * escrita a mao e passa a percorrer `ALLOW_REASON`/`DENY_REASON` de
+ * `@arenahub/access-policy`, entao um codigo novo no motor falha o teste em vez
+ * de chegar a tela como badge vazio.
+ *
+ * UMA diferenca de comportamento veio junto, e e deliberada: `traduzir()` caia
+ * para o codigo cru (`PAYMENT_OVERDUE` aparecia assim na tela) e `stateLabel`
+ * devolve `undefined`, que o `StateBadge` renderiza como `—`. A troca e a
+ * decisao do §7: codigo em ingles na tela vaza dominio para o usuario.
+ */
 describe('dicionários', () => {
-  it('traduz as oito razões do ADR-024', () => {
-    const codigos = [
-      'ACTIVE_ENTITLEMENT',
-      'MANUAL_OVERRIDE',
-      'NO_ENTITLEMENT',
-      'WRONG_UNIT',
-      'OUTSIDE_SCHEDULE',
-      'STUDENT_BLOCKED',
-      'STUDENT_INACTIVE',
-      'ADMIN_BLOCK',
-    ];
-
-    for (const codigo of codigos) {
-      expect(ROTULO_DE_RAZAO[codigo]).toBeDefined();
-      expect(ROTULO_DE_RAZAO[codigo]).not.toBe(codigo);
-    }
-  });
-
-  it('distingue "sem plano" de "plano de outra unidade"', () => {
-    // O ADR-024 separou as duas razões porque pedem ações opostas na
-    // recepção. Se a tela usasse a mesma frase, a separação teria sido em vão.
-    expect(ROTULO_DE_RAZAO['NO_ENTITLEMENT']).not.toBe(ROTULO_DE_RAZAO['WRONG_UNIT']);
-  });
-
-  it('descreve o que aconteceu, não acusa o aluno', () => {
-    expect(ROTULO_DE_RAZAO['WRONG_UNIT']).toContain('outra unidade');
-  });
-
   it('traduz severidade', () => {
     expect(ROTULO_DE_SEVERIDADE['CRITICAL']).toBe('Crítico');
   });
 
   it('cai para o próprio código quando não conhece', () => {
-    // Valor novo do servidor aparece feio mas correto. Mostrar "—" esconderia
-    // justamente o caso que ninguém previu.
-    expect(traduzir(ROTULO_DE_RAZAO, 'PAYMENT_OVERDUE')).toBe('PAYMENT_OVERDUE');
+    // Vale para os dicionarios que FICARAM (modo, metodo, severidade): valor
+    // novo do servidor aparece feio mas correto.
+    expect(traduzir(ROTULO_DE_MODO, 'DESCONHECIDO')).toBe('DESCONHECIDO');
   });
 });
 

@@ -1,8 +1,20 @@
 import type { Metadata } from 'next';
 
+import {
+  Ausente,
+  DataTable,
+  EmptyState,
+  PageHeader,
+  ProblemDetail,
+  TenantDateTime,
+} from '@arenahub/ui';
+
 import { chamarApi } from '../../../../../lib/api/server-client';
-import { instanteLegivel, traduzir } from '../../../../../src/operations/formatar';
+import { traduzir } from '../../../../../src/operations/formatar';
 import { ROTULO_DE_EVENTO } from '../../../../../src/students/formatar';
+
+/** Fuso FIXO, preservado de `instanteLegivel` -- mesma divida das outras telas. */
+const FUSO_PROVISORIO = 'America/Sao_Paulo';
 
 export const metadata: Metadata = {
   title: 'Histórico do aluno — ArenaHub',
@@ -84,10 +96,19 @@ export default async function PaginaDaTimeline({
   if (!resposta.ok || !resposta.dados) {
     return (
       <section aria-labelledby="titulo-timeline">
-        <h1 id="titulo-timeline">Histórico administrativo</h1>
-        <p role="alert" data-testid="erro-da-timeline">
-          Não foi possível carregar o histórico ({resposta.erro?.code ?? 'erro'}).
-        </p>
+        <PageHeader id="titulo-timeline" title="Histórico administrativo" />
+        <ProblemDetail
+          testId="erro-da-timeline"
+          problem={{
+            ...(resposta.erro ?? {
+              type: 'about:blank',
+              status: 0,
+              code: 'erro',
+              correlationId: '',
+            }),
+            title: `Não foi possível carregar o histórico (${resposta.erro?.code ?? 'erro'}).`,
+          }}
+        />
         <p>
           <a href={`/students/${id}`}>Voltar para a ficha</a>
         </p>
@@ -102,7 +123,7 @@ export default async function PaginaDaTimeline({
 
   return (
     <section aria-labelledby="titulo-timeline">
-      <h1 id="titulo-timeline">Histórico administrativo</h1>
+      <PageHeader id="titulo-timeline" title="Histórico administrativo" />
 
       {aluno ? (
         <p data-testid="aluno-da-timeline">
@@ -114,44 +135,46 @@ export default async function PaginaDaTimeline({
         <a href={`/students/${id}`}>Voltar para a ficha</a>
       </p>
 
-      {eventos.length === 0 ? (
-        <p data-testid="sem-eventos-na-timeline">
-          Nenhum evento registrado para este aluno ainda.
-        </p>
-      ) : (
-        <table data-testid="tabela-da-timeline">
-          <caption>Eventos, do mais recente para o mais antigo</caption>
-          <thead>
-            <tr>
-              <th scope="col">Quando</th>
-              <th scope="col">O que aconteceu</th>
-              <th scope="col">Detalhe</th>
-            </tr>
-          </thead>
-          <tbody>
-            {eventos.map((evento) => (
-              <tr key={evento.id} data-testid={`evento-${evento.id}`}>
-                <td>
-                  <time dateTime={evento.occurredAt}>{instanteLegivel(evento.occurredAt)}</time>
-                </td>
-                <td>{traduzir(ROTULO_DE_EVENTO, evento.type)}</td>
-                <td>{detalhe(evento.payload) || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {proximoCursor ? (
-        <p>
-          <a
-            href={`/students/${id}/timeline?cursor=${encodeURIComponent(proximoCursor)}`}
-            data-testid="proxima-pagina-da-timeline"
-          >
-            Eventos mais antigos
-          </a>
-        </p>
-      ) : null}
+      <DataTable
+        testId="tabela-da-timeline"
+        rows={eventos}
+        rowKey={(evento) => evento.id}
+        rowTestId={(evento) => `evento-${evento.id}`}
+        caption="Eventos, do mais recente para o mais antigo"
+        columns={[
+          {
+            key: 'quando',
+            header: 'Quando',
+            render: (e) => <TenantDateTime iso={e.occurredAt} timeZone={FUSO_PROVISORIO} />,
+          },
+          {
+            key: 'evento',
+            header: 'O que aconteceu',
+            /*
+             * `ROTULO_DE_EVENTO` FICA: tipo de evento de timeline nao e maquina
+             * de estado, e o §7 define 11 e nenhuma o cobre. Entra no achado
+             * dos oito dicionarios sem casa, que e decisao do Cowork + PI.
+             */
+            render: (e) => traduzir(ROTULO_DE_EVENTO, e.type),
+          },
+          {
+            key: 'detalhe',
+            header: 'Detalhe',
+            render: (e) => detalhe(e.payload) || <Ausente />,
+          },
+        ]}
+        {...(proximoCursor
+          ? {
+              nextHref: `/students/${id}/timeline?cursor=${encodeURIComponent(proximoCursor)}`,
+            }
+          : {})}
+        empty={
+          <EmptyState
+            testId="sem-eventos-na-timeline"
+            title="Nenhum evento registrado para este aluno ainda."
+          />
+        }
+      />
     </section>
   );
 }
