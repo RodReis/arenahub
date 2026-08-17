@@ -212,9 +212,14 @@ resumo para o relatório de gate.
 | **reconhecimento** facial (`M0-FR-004`) | `sendlog` recebido com `enrollid` correto, método `facial` |
 | **cadeia ponta a ponta** (rosto → decisão local → giro) | `lab:run` construído; múltiplos `desfecho:"girou"` |
 | **`M0-AC-003`** (sem dupla) ao vivo | janela anti-repique negou rajadas (`DENY` por `REPETICAO`), 0 duplas |
-| **`M0-AC-004`** (DENY não aciona) | desconhecido → `DENY`, catraca não acionada |
+| decisão de `DENY` para desconhecido | desconhecido → `DENY`, **comando de liberação não enviado** |
 | sentido de giro da instalação | **`--sentido saida` gira para ENTRADA** nesta catraca (dado de campo) |
 | latência do ArenaHub | **0–1 ms** do reconhecimento ao comando (não é o gargalo) |
+
+> ⚠️ **Nada nesta tabela fecha o `M0-AC-004`.** O que se provou é que o **ArenaHub** não manda
+> liberar quem recebeu `DENY` — comportamento do nosso software. O `M0-AC-004` exige que **ninguém
+> passe** sem decisão, e isso é do **equipamento**: com a catraca em `acionamento1:8` o braço gira
+> livre, então "catraca não acionada" não significa "ninguém entrou". Ver §9.6.
 
 ### 9.5. Código entregue (fora do fluxo de spec, PI assumiu o escopo)
 
