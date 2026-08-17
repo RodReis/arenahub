@@ -297,13 +297,19 @@ correção para pular a spec é o que o `CLAUDE.md` proíbe explicitamente.
 
 O que não for anotado **não aconteceu**. O gate §15 exige evidência auditável.
 
-- [ ] tabela de dez liberações (§4.3) preenchida à mão
-- [ ] p50, p95, máximo — **marcados como latência da ponte**, não ponta a ponta
-- [ ] `origem` de cada evento (6 = giro, 5 = timeout)
-- [ ] sentido que funcionou (`invertido` true ou false)
-- [ ] observação do `M0-AC-004` (60 s sem comando, sem giro)
-- [ ] estado final: catraca voltou ao legado ou ficou no ArenaHub
-- [ ] **o que não foi medido e por quê** — F2 inteira, latência ponta a ponta
+- [x] tabela de dez liberações (§4.3) preenchida — **três séries, 30 comandos** (relatório §9)
+- [x] p50, p95, máximo — coletados e **marcados como latência da ponte + tempo humano**, não ponta a ponta (relatório §3)
+- [x] `origem` de cada evento (6 = giro, 5 = timeout) — 28 × `origem:6`, 2 × `origem:5`
+- [x] sentido que funcionou — `invertido:false` para entrada **e** saída dirigidas
+- [ ] observação do `M0-AC-004` (60 s sem comando, sem giro) — **não rodou**: catraca em `acionamento1:8` (gira livre), exige modo bloqueado (relatório §9.2)
+- [x] estado final: **catraca devolvida ao legado** (`ipServer` → `192.168.2.106`, legado religado)
+- [x] **o que não foi medido e por quê** — F2 inteira (facial), latência ponta a ponta (relatório §9.2)
+
+> **Janela de 17/08/2026 executada.** Resultado consolidado em
+> [`docs/reports/MVP-00-relatorio-poc-topdata.md`](../reports/MVP-00-relatorio-poc-topdata.md) §9.
+> `M0-AC-003` (sem dupla) e `M0-AC-005` (giro confirmado) provados; `M0-AC-004`, F2 e latência
+> ponta a ponta seguem pendentes. **O gate §15 não fecha** — falta o ciclo facial e a assinatura
+> do PI.
 
 Depois da janela: atualizar `docs/reports/MVP-00-relatorio-poc-topdata.md` (as células
 `PENDENTE-POC`), o `STATUS.md` e o `DEVELOPMENT.md`, e comentar nas issues #2 e #3.
