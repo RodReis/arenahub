@@ -1031,29 +1031,26 @@ export function StateBadge({ machine, state, live = false }: Props) {
 }
 ```
 
-- [ ] **Passo 5: acrescentar os tokens de raio e texto que faltam**
+- [ ] **Passo 5: ~~acrescentar tokens~~ — NÃO FAÇA. Os dois já existem.**
 
-O pipeline gerou cor e tipografia, mas `--ah-radius-badge` e `--ah-text-muted` precisam existir na
-camada semântica. Em `packages/ui/tokens/semantic.json`, acrescentar:
+> 🔴 **Passo errado, descoberto na execução de 16/08/2026.** Este passo mandava criar
+> `--ah-radius-badge` e `text.muted`. Nenhum dos dois deve ser criado:
+>
+> - **`--ah-radius-badge` já existe**, em `theme.css:118`. Sai da camada de **expressão**
+>   (`tokens/expression.json` → `[data-surface="panel"]`), não da semântica. O plano supôs que a
+>   semântica era a única fonte de token; não é — `radius.*` e `size.*` vivem na expressão, porque
+>   variam por superfície.
+> - **`text.muted` seria a segunda verdade que o pipeline existe para impedir.**
+>   `semantic.json` já tem `text.secondary` → `carbon.500`, com `$role` escrito: *"piso para texto
+>   informativo"*. O `CONTRAST_REPORT` já mede **6.56** sobre `surface.raised` — exatamente o ref e
+>   o ratio que este passo pedia. Use `--ah-text-secondary`.
+>
+> **Lição para as tarefas seguintes:** antes de acrescentar token, procure em
+> `dist-tokens/theme.css` **e** nas três camadas (`primitive`, `semantic`, `expression`). Token novo
+> com valor idêntico a um existente é duplicata, e o `$role` do existente costuma já dizer para que
+> ele serve.
 
-```json
-"radius": {
-  "control": { "value": "6px" },
-  "card":    { "value": "8px" },
-  "badge":   { "value": "4px" },
-  "modal":   { "value": "10px" }
-},
-"text": {
-  "muted": { "ref": "carbon.500" }
-}
-```
-
-`text.muted` referencia `carbon-500` (6.56), **não** `carbon-400` (3.78) — texto informativo tem
-de passar em 4.5. Regenerar:
-
-```bash
-pnpm --filter @arenahub/ui build:tokens
-```
+Nenhum token muda nesta tarefa. Se `pnpm build` mexer em `theme.css`, é LF→CRLF — restaure.
 
 - [ ] **Passo 6: rodar e ver passar**
 
@@ -1076,6 +1073,17 @@ git commit -m "feat(ui): StateBadge com icone e rotulo -- cor nunca e o unico ca
 ```
 
 ---
+
+> 📌 **Da Task 3, para todas as tarefas com CSS Module.** Duas coisas já resolvidas, não repita a
+> descoberta:
+>
+> - **`packages/ui/src/css-modules.d.ts` existe.** Sem a declaração ambiente, o TypeScript trata
+>   `import estilos from './X.module.css'` como `any` implícito e o lint reprova com
+>   `no-unsafe-assignment`. Já está lá; nenhum componente novo precisa criá-la.
+> - **O acesso é `estilos['badge']`, não `estilos.badge`.** O `noPropertyAccessFromIndexSignature`
+>   do tsconfig base reprova o acesso por ponto com TS4111. Os blocos de código deste plano usam
+>   `estilos.nome` — **troque para colchete** ao implementar.
+> - **O Vitest resolve `.module.css` sem configuração.** Não mexa no `vitest.config.ts` por isso.
 
 ## Task 4: `Button`
 
