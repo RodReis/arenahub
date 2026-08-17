@@ -11,7 +11,6 @@ updated: 2026-08-17
 
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
-- [INFRA] 8 planos mandam criar docs/adr/, contrariando o ADR-021 (#68)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
 - [MVP6][SPEC-040][F40] Modelo supervisionado (condicionado a M6-ML-01) (#40)
 - [MVP6][SPEC-039][F39] Experimento operacional (#39)
@@ -62,6 +61,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [INFRA] 8 planos mandam criar docs/adr/, contrariando o ADR-021 (#68, finalizado em: 2026-08-17)
 - [MVP1][FIX] eslint do admin-web não carrega o ruleset design-system — 4 violações da regra 5 passam no CI (#85, finalizado em: 2026-08-17)
 - [MVP0][SPEC-005][F5] Relatório e decisão (#5, finalizado em: 2026-08-17)
 - [MVP0][SPEC-003][F3] Catraca e passagem (#3, finalizado em: 2026-08-17)
