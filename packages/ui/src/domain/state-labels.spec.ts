@@ -68,6 +68,37 @@ describe('state-labels', () => {
   });
 
   /**
+   * Os outros SETE pontos onde producao e contrato divergem, e producao vence.
+   *
+   * Este teste existe porque o `DS-PAINEL.md` §7 publica uma frase diferente
+   * em cada um destes -- alguem lendo o contrato lado a lado com o codigo vai
+   * concluir que o codigo esta errado e "consertar". Aqui o conserto derruba
+   * a suite, e a mensagem diz de onde a frase veio.
+   *
+   * A regra que decide e a mesma do `LEAD`: frase de TELA e do codigo em
+   * producao; nome de CODIGO e do contrato.
+   */
+  it.each([
+    // O que o `DS-PAINEL.md` §7 publica para cada um, e que NAO prevaleceu:
+    //   entitlement.ACTIVE ............ "Válido"
+    //   subscription.PENDING .......... "Aguardando início"
+    //   syncJob.PENDING ............... "Na fila"
+    //   syncJob.PROCESSING ............ "Processando"
+    //   biometric.ACTIVE .............. "Cadastrada"
+    //   biometric.DELETION_PENDING .... "Exclusão em andamento"
+    //   biometric.DELETED ............. "Excluída"
+    ['entitlement', 'ACTIVE', 'Ativo'],
+    ['subscription', 'PENDING', 'Pendente'],
+    ['syncJob', 'PENDING', 'Aguardando'],
+    ['syncJob', 'PROCESSING', 'Em andamento'],
+    ['biometric', 'ACTIVE', 'Ativa'],
+    ['biometric', 'DELETION_PENDING', 'Revogada — aguardando exclusão nos leitores'],
+    ['biometric', 'DELETED', 'Excluída de todos os leitores'],
+  ] as const)('%s.%s mantem a frase de producao, nao a do contrato', (maquina, estado, producao) => {
+    expect(stateLabel(maquina, estado)?.label).toBe(producao);
+  });
+
+  /**
    * As DUAS unicas frases que mudam nesta fatia -- aprovadas pelo PI em
    * 16/08/2026.
    */

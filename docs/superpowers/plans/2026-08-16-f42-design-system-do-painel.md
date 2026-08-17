@@ -563,6 +563,26 @@ Esperado: FAIL — `Cannot find module './state-labels.js'`.
 
 - [ ] **Passo 4: implementar `packages/ui/src/domain/state-labels.ts`**
 
+> ✅ **ENTREGUE em 16/08/2026, commit `d2fffdf`.** Se você está lendo isto numa tarefa posterior,
+> **o arquivo real é a fonte, não este bloco.**
+>
+> 🔴 **Sete rótulos deste bloco estavam ERRADOS** e foram corrigidos na implementação. Eles traziam
+> a frase do `DS-PAINEL.md` §7 onde a produção diz outra coisa — contradizendo a *Regra de
+> precedência* que este mesmo plano define ("frase de tela: o código existente vence"):
+>
+> | chave | este bloco dizia | produção diz, e prevaleceu |
+> |---|---|---|
+> | `entitlement.ACTIVE` | Válido | **Ativo** |
+> | `subscription.PENDING` | Aguardando início | **Pendente** |
+> | `syncJob.PENDING` | Na fila | **Aguardando** |
+> | `syncJob.PROCESSING` | Processando | **Em andamento** |
+> | `biometric.ACTIVE` | Cadastrada | **Ativa** |
+> | `biometric.DELETION_PENDING` | Exclusão em andamento | **Revogada — aguardando exclusão nos leitores** |
+> | `biometric.DELETED` | Excluída | **Excluída de todos os leitores** |
+>
+> Os sete estão travados por teste em `state-labels.spec.ts` — "mantem a frase de producao, nao a
+> do contrato". O bloco abaixo fica como registro do que foi planejado; **leia o arquivo entregue.**
+
 ```ts
 import { ALLOW_REASON, DENY_REASON } from '@arenahub/access-policy';
 
@@ -810,14 +830,12 @@ Esperado: PASS, 12 testes.
 O teste prova o que ele lista. Este passo pega o que ele não lista. Para **cada** par
 `codigo: 'frase'` das cinco fontes, confirme que a frase em `state-labels.ts` é idêntica:
 
+⚠️ **Node não importa `.ts` direto** — `node --input-type=module -e "import … .ts"` falha, e
+`console.log` em teste do Vitest não chega ao stdout desta configuração. Leia o arquivo e compare
+com as fontes:
+
 ```bash
-node --input-type=module -e "
-import { STATE_LABELS } from './packages/ui/src/domain/state-labels.ts';
-const achatado = Object.fromEntries(
-  Object.values(STATE_LABELS).flatMap((m) => Object.entries(m).map(([k, v]) => [k, v.label])),
-);
-console.log(JSON.stringify(achatado, null, 2));
-"
+grep -E "label:" packages/ui/src/domain/state-labels.ts
 ```
 
 Compare a saída com os dicionários de `src/operations/formatar.ts`, `src/students/formatar.ts`,
@@ -897,7 +915,7 @@ describe('StateBadge', () => {
     const { container } = render(<StateBadge machine="access" state="X" />);
     render(<StateBadge machine="entitlement" state="ACTIVE" />);
 
-    expect(screen.getByText('Válido').closest('[data-tone]')).toHaveAttribute(
+    expect(screen.getByText('Ativo').closest('[data-tone]')).toHaveAttribute(
       'data-tone',
       'success',
     );
@@ -3312,6 +3330,31 @@ Aplicar `proplan:done` na #81 e pôr o link do PR no corpo da issue. **Não fech
 e aplica `proplan:finalizado`.
 
 ---
+
+## Achado da Task 2: oito dicionários pt-BR sem casa no §7
+
+Descoberto na conferência cruzada de 16/08/2026. O §7 do contrato define **11 máquinas de
+estado**, e é isso que o `state-labels.ts` consolida. Mas a produção tem **mais oito dicionários
+pt-BR** que não são máquina de estado e, portanto, **continuam duplicados depois desta fatia**:
+
+| dicionário | onde | é máquina de estado? |
+|---|---|---|
+| `ROTULO_DE_SEVERIDADE` | `src/operations/formatar.ts` | não — severidade de alerta |
+| `ROTULO_DE_ESTADO_DE_ALERTA` | `src/operations/formatar.ts` | **sim, de fato** — só não está no §7 |
+| `ROTULO_DE_MODO` | `src/operations/formatar.ts` | não — modo da decisão |
+| `ROTULO_DE_METODO` | `src/operations/formatar.ts` | não — método de autenticação |
+| `ROTULO_DE_ORIGEM` | `src/students/formatar.ts` | não — origem do entitlement (ADR-009) |
+| `ROTULO_DE_EVENTO` | `src/students/formatar.ts` | não — tipo de evento de timeline |
+| `MOTIVO_EM_PORTUGUES` | `biometrics/page.tsx` | não — frase explicativa de bloqueio |
+| `ROTULO_DE_OPERACAO` | `devices/page.tsx` | não — `UPSERT`/`DELETE` |
+
+A Task 10 remove as duplicatas do que migrou; **estas não têm para onde migrar**. Se a intenção
+do §7 é *"um único lugar com rótulo pt-BR"*, falta decidir o destino — e a decisão não é uniforme:
+`ROTULO_DE_ESTADO_DE_ALERTA` é máquina de estado e provavelmente pertence ao §7; `ROTULO_DE_METODO`
+e `ROTULO_DE_OPERACAO` não são estado e talvez devam ficar onde estão.
+
+**Fora do escopo desta fatia** — é decisão de produto, portanto Cowork + PI. Registrado aqui para
+não sumir.
 
 ## Pendências que ficam para o Cowork
 
