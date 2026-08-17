@@ -48,8 +48,14 @@ export function PasswordField({ id, label, ...resto }: Props) {
            * O rotulo diz a ACAO disponivel, nao o estado atual: "Senha oculta"
            * descreveria a situacao e deixaria quem usa leitor de tela sem
            * saber que ha um botao ali. `aria-pressed` carrega o estado.
+           *
+           * E NAO repete a palavra do rotulo do campo. "Mostrar senha" fazia
+           * `getByLabel('Senha')` casar o input E o botao -- campo ambiguo para
+           * quem navega por rotulo. `aria-controls` amarra os dois sem
+           * duplicar a palavra.
            */
-          aria-label={revelada ? 'Ocultar senha' : 'Mostrar senha'}
+          aria-label={revelada ? 'Ocultar' : 'Mostrar'}
+          aria-controls={id}
           aria-pressed={revelada}
           onClick={() => setRevelada((atual) => !atual)}
         >

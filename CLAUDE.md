@@ -191,6 +191,7 @@ pnpm dev | lint | typecheck | test | test:integration | test:e2e | build
 - Dado de desenvolvimento vem de seed; dublê de teste vive no boundary (ver `docs/TESTING.md`).
 - Nunca logar template biométrico, token de pagamento, dado de cartão ou PII em erro.
 - Contrato de domínio completo (entidades, estados, invariantes): `docs/CONVENTION.md`.
+- Autorizado a subir o docker, se estuver off.
 
 ## Grafo de conhecimento (graphify)
 
@@ -204,14 +205,16 @@ pnpm dev | lint | typecheck | test | test:integration | test:e2e | build
 
 Use a que existir no ambiente; a ausência de uma skill não é desculpa para pular a disciplina que ela representa.
 
-- `superpowers:brainstorming` — antes de implementar feature não-trivial
-- `superpowers:writing-plans` — pra task com mais de 1 etapa de DB/API
-- `superpowers:test-driven-development` — feature crítica (LGPD, isolamento de tenant, decisão de acesso, idempotência financeira)
-- `superpowers:systematic-debugging` — bugs reportados
-- `superpowers:verification-before-completion` — antes de declarar "pronto"
+- `superpowers:brainstorming` — Activates before writing code
+- `superpowers:using-git-worktrees` — Activates with approved design. Cria um espaço de trabalho isolado em um novo branch
+- `superpowers:writing-plans` — Activates with approved design.
+- `superpowers:executing-plans` - Activates with plan.
+- `superpowers:test-driven-development` — feature crítica (LGPD, isolamento de tenant, decisão de acesso, idempotência financeira).
+- `superpowers:requesting-code-review` — Ativa-se entre tarefas. Analisa o código em relação ao plano e relata problemas por gravidade.
+- `superpowers:finishing-a-development-branch` — Ativa-se quando as tarefas são concluídas. Verifica os testes, apresenta opções (merge/PR/keep/discard) e limpa a árvore de trabalho.
 - `engineering:code-review` — em todas as tarefas, não apenas em revisões
 - `document-skills:frontend-design` — UI distinta (não cair em shadcn-default genérico)
-- `superpowers-chrome:browsing` / Playwright — smoke ao vivo
+- `Playwright` / Playwright — smoke ao vivo
 - `impeccable` — critique craft layout delight clarify polish optimize *(se instalado)*
 - `context7` — documentação atualizada de biblioteca *(se instalado)*
 - `expo` — implementação do mobile *(se instalado)*

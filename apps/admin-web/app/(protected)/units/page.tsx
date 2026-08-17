@@ -63,12 +63,20 @@ export default async function PaginaDeUnidades() {
         rowKey={(unidade) => unidade.id}
         caption="Unidades da sua academia"
         columns={[
-          { key: 'codigo', header: 'Código', numeric: true, render: (u) => u.code },
+          /*
+           * Cabecalhos SEM acento, byte a byte como estavam.
+           *
+           * O E2E afirma `columnheader { name: 'Codigo' }` por TEXTO -- acentuar
+           * aqui quebra a rede que prova que a migracao nao mudou
+           * comportamento. Corrigir a grafia e trabalho do card que tambem
+           * atualiza o teste, nao desta fatia.
+           */
+          { key: 'codigo', header: 'Codigo', numeric: true, render: (u) => u.code },
           { key: 'nome', header: 'Nome', render: (u) => u.name },
-          { key: 'fuso', header: 'Fuso horário', render: (u) => u.timezone },
+          { key: 'fuso', header: 'Fuso horario', render: (u) => u.timezone },
           {
             key: 'situacao',
-            header: 'Situação',
+            header: 'Situacao',
             /*
              * Ternario, nao `StateBadge`: o §7 define 11 maquinas de estado e
              * NENHUMA e de unidade. Inventar `machine="unit"` no dicionario
