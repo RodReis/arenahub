@@ -172,17 +172,6 @@ export function janelaLegivel(janela: {
   return `${diaDaSemana(janela.dayOfWeek)}, ${horaDoMinuto(janela.startMinute)}–${horaDoMinuto(janela.endMinute)}`;
 }
 
-/** Data (sem hora) no formato brasileiro. */
-export function dataLegivel(iso: string | null): string {
-  if (!iso) return '—';
-
-  const data = new Date(iso);
-
-  if (!Number.isFinite(data.getTime())) return '—';
-
-  return data.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-}
-
 /**
  * O direito de acesso vale neste instante?
  *

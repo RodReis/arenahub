@@ -114,11 +114,22 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **37** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **33** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F3](https://github.com/RodReis/arenahub/issues/3), aguardando gate e ponte |
-| Feito | `proplan:done` | PR mergeado com CI verde | **8** — os seis do bootstrap (#42–#47), [F1](https://github.com/RodReis/arenahub/issues/1) e [F4](https://github.com/RodReis/arenahub/issues/4) |
-| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | 0 |
+| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e o `[FIX]` [#85](https://github.com/RodReis/arenahub/issues/85) |
+| Feito | `proplan:done` | PR mergeado com CI verde | 0 |
+| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **20** |
+
+> ⚠️ **Números conferidos no board em 17/08/2026.** A linha de *Em Andamento* dizia
+> *"F2 e F3"*, mas a issue [#3](https://github.com/RodReis/arenahub/issues/3) não carrega
+> `proplan:doing` — quem está em andamento com a F2 é a **F10**, destravada pelo fecho do
+> ADR-007. As colunas *Feito* e *Finalizado* também estavam trocadas: os cards do bootstrap,
+> F1 e F4 já foram aceitos pelo PI e contam em **Finalizado**, não em *Feito*.
+>
+> 🔒 **A F10 está destravada e parada ao mesmo tempo.** O ADR-007 fechou e a spec é
+> `aprovada-pi`, mas o **ADR-012 mantém o MVP 1.5 fechado** até o piloto produzir incidente
+> medido de queda de link. Pegável tecnicamente, parada processualmente — improvisar cache
+> antes disso é violar o ADR.
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
 contradizia o **ADR-022**: *"o card de fatia passa a ser criado para **todas** as fatias, em

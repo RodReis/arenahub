@@ -107,17 +107,6 @@ export const ROTULO_DE_METODO: Record<string, string> = {
   MANUAL: 'Manual',
 };
 
-/** Instante no fuso de Brasília, legível. */
-export function instanteLegivel(iso: string | null): string {
-  if (!iso) return '—';
-
-  const data = new Date(iso);
-
-  if (!Number.isFinite(data.getTime())) return '—';
-
-  return data.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-}
-
 /** Traduz um código, caindo para o próprio código quando não conhece. */
 export function traduzir(dicionario: Record<string, string>, codigo: string): string {
   // Cair para o código é deliberado: um valor novo do servidor aparece como
