@@ -7,10 +7,14 @@ import {
   PageHeader,
   ProblemDetail,
   StateBadge,
+  TenantDateTime,
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
-import { dataLegivel, impedeAcesso } from '../../../src/students/formatar';
+import { impedeAcesso } from '../../../src/students/formatar';
+
+/** Fuso FIXO, preservado de `dataLegivel` -- mesma divida das outras telas. */
+const FUSO_PROVISORIO = 'America/Sao_Paulo';
 
 export const metadata: Metadata = {
   title: 'Alunos — ArenaHub',
@@ -168,7 +172,7 @@ export default async function PaginaDeAlunos({
             key: 'nascimento',
             header: 'Nascimento',
             render: (aluno) => (
-              <time dateTime={aluno.birthDate}>{dataLegivel(aluno.birthDate)}</time>
+              <TenantDateTime iso={aluno.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
             ),
           },
           {

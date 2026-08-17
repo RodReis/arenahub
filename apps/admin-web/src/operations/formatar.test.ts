@@ -5,7 +5,6 @@ import {
   ROTULO_DE_SEVERIDADE,
   estaSilencioso,
   idadeLegivel,
-  instanteLegivel,
   traduzir,
 } from './formatar';
 
@@ -84,16 +83,5 @@ describe('dicionários', () => {
     // Vale para os dicionarios que FICARAM (modo, metodo, severidade): valor
     // novo do servidor aparece feio mas correto.
     expect(traduzir(ROTULO_DE_MODO, 'DESCONHECIDO')).toBe('DESCONHECIDO');
-  });
-});
-
-describe('instante legível', () => {
-  it('formata no fuso de Brasília', () => {
-    // 17:00Z = 14:00 em São Paulo.
-    expect(instanteLegivel('2026-08-16T17:00:00.000Z')).toContain('14:00');
-  });
-
-  it('devolve travessão para nulo', () => {
-    expect(instanteLegivel(null)).toBe('—');
   });
 });

@@ -5,7 +5,6 @@ import {
   ROTULO_DE_EVENTO,
   ROTULO_DE_ORIGEM,
   ROTULO_DE_SITUACAO,
-  dataLegivel,
   diaDaSemana,
   horaDoMinuto,
   impedeAcesso,
@@ -172,17 +171,6 @@ describe('vigência do direito de acesso', () => {
   it('data inválida não vira vigente por acidente', () => {
     expect(vigenteAgora({ ...base, startsAt: 'não é data' }, AGORA)).toBe(false);
     expect(vigenteAgora({ ...base, endsAt: '' }, AGORA)).toBe(false);
-  });
-});
-
-describe('datas', () => {
-  it('formata no padrão brasileiro', () => {
-    expect(dataLegivel('2026-08-16T12:00:00.000Z')).toBe('16/08/2026');
-  });
-
-  it('ausência e lixo viram traço, nunca "Invalid Date"', () => {
-    expect(dataLegivel(null)).toBe('—');
-    expect(dataLegivel('não é data')).toBe('—');
   });
 });
 
