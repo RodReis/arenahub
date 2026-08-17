@@ -137,22 +137,31 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **34** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **32** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
+| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e o `[INFRA]` [#68](https://github.com/RodReis/arenahub/issues/68) |
 | Feito | `proplan:done` | PR mergeado com CI verde | 0 |
-| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **20** |
+| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **21** |
 
-> ⚠️ **Números conferidos no board em 17/08/2026.** A linha de *Em Andamento* dizia
-> *"F2 e F3"*, mas a issue [#3](https://github.com/RodReis/arenahub/issues/3) não carrega
-> `proplan:doing` — quem está em andamento com a F2 é a **F10**, destravada pelo fecho do
-> ADR-007. As colunas *Feito* e *Finalizado* também estavam trocadas: os cards do bootstrap,
-> F1 e F4 já foram aceitos pelo PI e contam em **Finalizado**, não em *Feito*.
+> ⚠️ **Números conferidos na API do board às 22h de 17/08/2026** — não estimados. A linha de
+> *Em Andamento* já dissera *"F2 e F3"*, mas a issue [#3](https://github.com/RodReis/arenahub/issues/3)
+> não carrega `proplan:doing`. As colunas *Feito* e *Finalizado* também estavam trocadas: os cards
+> do bootstrap, F1 e F4 já foram aceitos pelo PI e contam em **Finalizado**, não em *Feito*.
 >
-> 📌 **Leitura de 17/08, depois das janelas físicas:** F2 e F3 foram **provadas ao vivo**, mas
-> nenhuma das duas avança de coluna — falta **PR mergeado**, o `M0-AC-002` (remoção das três
-> identidades com confirmação de ausência) e o **modo bloqueado da catraca**. A F3 seguir sem
-> `proplan:doing` no board é coerente: o que falta nela não é código.
+> 🔒 **A F10 está destravada e parada ao mesmo tempo.** O ADR-007 fechou e a spec é
+> `aprovada-pi`, mas o **ADR-012 mantém o MVP 1.5 fechado** até o piloto produzir incidente
+> medido de queda de link. Pegável tecnicamente, parada processualmente — improvisar cache
+> antes disso é violar o ADR.
+>
+> 📌 **Leitura de 17/08, depois das janelas físicas:** F2 e F3 foram **provadas ao vivo**. A F2
+> continua em *Em Andamento* — falta **PR mergeado**, o `M0-AC-002` (remoção das três identidades
+> com confirmação de ausência) e o **modo bloqueado da catraca**.
+>
+> 🔴 **Tensão registrada, não resolvida: a [F3](https://github.com/RodReis/arenahub/issues/3) está
+> `proplan:finalizado`, mas o `M0-AC-004` não fechou.** O aceite do PI é soberano e não se desfaz
+> aqui — mas a catraca em `acionamento1: 8` deixa entrar sem reconhecimento (§1, linha 7), e isso
+> é pré-requisito do gate §15 do MVP 0, independentemente do estado do card. **Fatia aceita ≠ gate
+> fechado.** Quem for assinar a saída do MVP 0 precisa ler as duas coisas juntas.
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
 contradizia o **ADR-022**: *"o card de fatia passa a ser criado para **todas** as fatias, em
