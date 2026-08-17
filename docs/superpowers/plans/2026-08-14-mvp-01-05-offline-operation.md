@@ -34,7 +34,7 @@ apps/edge-agent/src/persistence/{access-cache,offline-outbox}.repository.ts
 packages/contracts/src/offline-access.ts
 packages/database/prisma/migrations/*_offline_snapshots/
 apps/edge-agent/test/faults/*
-docs/adr/0004-offline-snapshot-and-expiry.md
+docs/DECISIONS.md
 docs/operations/smart-access/offline-policy.md
 ```
 
@@ -249,7 +249,7 @@ git commit -m "feat(offline): reconcile access backlog exactly once logically"
 
 **Files:**
 - Create: `apps/edge-agent/test/faults/offline-shift.test.ts`
-- Create: `docs/adr/0004-offline-snapshot-and-expiry.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 - Create: `docs/operations/smart-access/offline-policy.md`
 - Create: `docs/operations/smart-access/offline-evidence.md`
 - Modify: `docs/prd/academia/MVP-01-smart-access.md` after evidence
@@ -284,7 +284,7 @@ pnpm --filter edge-agent test:hardware:offline
 Map `M1-FR-025`–`029`, `M1-BR-008/009`, `M1-NFR-002`–`004/006`, `M1-AC-009/010` to reports and exact approved policy.
 
 ```bash
-git add docs/adr/0004-offline-snapshot-and-expiry.md docs/operations/smart-access/offline-policy.md docs/operations/smart-access/offline-evidence.md docs/prd/academia/MVP-01-smart-access.md apps/edge-agent/test/faults
+git add docs/DECISIONS.md docs/operations/smart-access/offline-policy.md docs/operations/smart-access/offline-evidence.md docs/prd/academia/MVP-01-smart-access.md apps/edge-agent/test/faults
 git commit -m "docs(offline): record outage and recovery evidence"
 ```
 

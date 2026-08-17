@@ -48,7 +48,7 @@ git commit -m "docs(health): approve privacy and access boundaries"
 **Files:**
 - Create: `docs/operations/health/health-protocol.schema.json`
 - Create: `docs/operations/health/health-protocol.json`
-- Create: `docs/adr/0006-health-quantities-and-protocol.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 
 - [ ] **Step 1: Define a strict JSON Schema**
 
@@ -69,7 +69,7 @@ Create vectors for every conversion, exact boundary, absent value, height zero r
 - [ ] **Step 5: Approve and commit**
 
 ```bash
-git add docs/operations/health/health-protocol.schema.json docs/operations/health/health-protocol.json docs/adr/0006-health-quantities-and-protocol.md
+git add docs/operations/health/health-protocol.schema.json docs/operations/health/health-protocol.json docs/DECISIONS.md
 git commit -m "docs(health): define versioned assessment protocol"
 ```
 
@@ -107,7 +107,7 @@ If only `CSV_CANONICAL_V1`, Slice 3.3 parser suffices. Any vendor CSV/PDF/image/
 - Create: `docs/operations/health/ai-provider-scorecard.md`
 - Create: `docs/operations/health/ai-capabilities.schema.json`
 - Create: `docs/operations/health/ai-capabilities.json`
-- Create: `docs/adr/0007-health-ai-provider.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 
 - [ ] **Step 1: Apply privacy eliminators**
 

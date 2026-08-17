@@ -60,7 +60,7 @@ packages/database/
 packages/contracts/src/{auth,tenancy,problem}.ts
 infra/docker/compose.yaml
 infra/docker/.env.example
-docs/adr/0002-auth-and-tenant-context.md
+docs/DECISIONS.md
 ```
 
 ## Task 1: Add API, web and PostgreSQL workspaces
@@ -382,7 +382,7 @@ git commit -m "feat(admin): add secure tenant and unit journey"
 ## Task 7: Close slice 1.1 with contract and security evidence
 
 **Files:**
-- Create: `docs/adr/0002-auth-and-tenant-context.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 - Create: `docs/operations/smart-access/core-security-evidence.md`
 - Modify: `docs/prd/academia/MVP-01-smart-access.md` only after evidence exists
 
@@ -409,7 +409,7 @@ Expected: all PASS. Inspect structured logs and database fixtures for passwords,
 Evidence records command, timestamp, commit, Testcontainer/PostgreSQL version and mappings `M1-FR-001`–`005`, `M1-NFR-001/005/007/008/010`, `M1-AC-001`. Then mark only Slice 1.1 evidence in the PRD.
 
 ```bash
-git add packages/contracts/openapi docs/adr/0002-auth-and-tenant-context.md docs/operations/smart-access/core-security-evidence.md docs/prd/academia/MVP-01-smart-access.md
+git add packages/contracts/openapi docs/DECISIONS.md docs/operations/smart-access/core-security-evidence.md docs/prd/academia/MVP-01-smart-access.md
 git commit -m "docs(core): record slice 1.1 evidence"
 ```
 

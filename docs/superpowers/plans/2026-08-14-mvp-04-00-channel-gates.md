@@ -64,7 +64,7 @@ git commit -m "docs(channels): inventory upstream student contracts"
 - Create: `docs/operations/app-totem/identity-threat-model.md`
 - Create: `docs/operations/app-totem/identity-capabilities.json`
 - Create: `docs/operations/app-totem/identity-capabilities.schema.json`
-- Create: `docs/adr/0008-student-channel-identity.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 
 - [ ] **Step 1: Definir ativação e recuperação**
 
@@ -87,7 +87,7 @@ Cubra token interceptado/reutilizado/expirado, enumeração, SIM/e-mail comprome
 Privacidade, Segurança, Produto e Operação assinam `M4-IDENTITY-01`.
 
 ```bash
-git add docs/operations/app-totem/identity-policy.md docs/operations/app-totem/identity-threat-model.md docs/operations/app-totem/identity-capabilities.json docs/operations/app-totem/identity-capabilities.schema.json docs/adr/0008-student-channel-identity.md
+git add docs/operations/app-totem/identity-policy.md docs/operations/app-totem/identity-threat-model.md docs/operations/app-totem/identity-capabilities.json docs/operations/app-totem/identity-capabilities.schema.json docs/DECISIONS.md
 git commit -m "docs(channels): approve student identity policy"
 ```
 
@@ -98,7 +98,7 @@ git commit -m "docs(channels): approve student identity policy"
 - Create: `docs/operations/app-totem/mobile-platform.json`
 - Create: `docs/operations/app-totem/mobile-device-matrix.md`
 - Create: `docs/operations/app-totem/mobile-deep-links.md`
-- Create: `docs/adr/0009-mobile-platform.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 
 - [ ] **Step 1: Consultar documentação oficial atual**
 
@@ -120,7 +120,7 @@ Expected: PASS com versões exatas e nenhuma incompatibilidade aberta.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add docs/operations/app-totem/mobile-platform.schema.json docs/operations/app-totem/mobile-platform.json docs/operations/app-totem/mobile-device-matrix.md docs/operations/app-totem/mobile-deep-links.md docs/adr/0009-mobile-platform.md
+git add docs/operations/app-totem/mobile-platform.schema.json docs/operations/app-totem/mobile-platform.json docs/operations/app-totem/mobile-device-matrix.md docs/operations/app-totem/mobile-deep-links.md docs/DECISIONS.md
 git commit -m "docs(mobile): fix platform and device matrix"
 ```
 
@@ -131,7 +131,7 @@ git commit -m "docs(mobile): fix platform and device matrix"
 - Create: `docs/operations/app-totem/qr-credential.json`
 - Create: `docs/operations/app-totem/qr-validator-inventory.md`
 - Create: `docs/operations/app-totem/qr-golden/README.md`
-- Create: `docs/adr/0010-rotating-membership-qr.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 
 - [ ] **Step 1: Inventariar validação física**
 
@@ -155,7 +155,7 @@ Run: `pnpm docs:validate -- docs/operations/app-totem/qr-credential.schema.json 
 Expected: PASS.
 
 ```bash
-git add docs/operations/app-totem/qr-credential.schema.json docs/operations/app-totem/qr-credential.json docs/operations/app-totem/qr-validator-inventory.md docs/operations/app-totem/qr-golden docs/adr/0010-rotating-membership-qr.md
+git add docs/operations/app-totem/qr-credential.schema.json docs/operations/app-totem/qr-credential.json docs/operations/app-totem/qr-validator-inventory.md docs/operations/app-totem/qr-golden docs/DECISIONS.md
 git commit -m "docs(access): homologate rotating qr contract"
 ```
 
@@ -167,7 +167,7 @@ git commit -m "docs(access): homologate rotating qr contract"
 - Create: `docs/operations/app-totem/kiosk-device-inventory.md`
 - Create: `docs/operations/app-totem/kiosk-lockdown.md`
 - Create: `docs/operations/app-totem/kiosk-threat-model.md`
-- Create: `docs/adr/0011-kiosk-device-security.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 
 - [ ] **Step 1: Inventariar equipamento e SO**
 
@@ -191,7 +191,7 @@ Run: `pnpm docs:validate -- docs/operations/app-totem/kiosk-platform.schema.json
 Expected: PASS.
 
 ```bash
-git add docs/operations/app-totem/kiosk-platform.schema.json docs/operations/app-totem/kiosk-platform.json docs/operations/app-totem/kiosk-device-inventory.md docs/operations/app-totem/kiosk-lockdown.md docs/operations/app-totem/kiosk-threat-model.md docs/adr/0011-kiosk-device-security.md
+git add docs/operations/app-totem/kiosk-platform.schema.json docs/operations/app-totem/kiosk-platform.json docs/operations/app-totem/kiosk-device-inventory.md docs/operations/app-totem/kiosk-lockdown.md docs/operations/app-totem/kiosk-threat-model.md docs/DECISIONS.md
 git commit -m "docs(kiosk): approve device and lockdown profile"
 ```
 
@@ -236,7 +236,7 @@ git commit -m "docs(channels): homologate payment journeys"
 - Create: `docs/operations/app-totem/version-policy.schema.json`
 - Create: `docs/operations/app-totem/crash-provider-scorecard.md`
 - Create: `docs/operations/app-totem/legal-content.md`
-- Create: `docs/adr/0012-mobile-distribution-and-telemetry.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 
 - [ ] **Step 1: Avaliar push e privacidade**
 
@@ -267,7 +267,7 @@ Crie `docs/superpowers/plans/2026-08-14-mvp-04-push-provider-adapter.md` e `docs
 - [ ] **Step 6: Commit**
 
 ```bash
-git add docs/operations/app-totem/push-provider-scorecard.md docs/operations/app-totem/push-capabilities.json docs/operations/app-totem/push-capabilities.schema.json docs/operations/app-totem/distribution-policy.md docs/operations/app-totem/version-policy.json docs/operations/app-totem/version-policy.schema.json docs/operations/app-totem/crash-provider-scorecard.md docs/operations/app-totem/legal-content.md docs/adr/0012-mobile-distribution-and-telemetry.md
+git add docs/operations/app-totem/push-provider-scorecard.md docs/operations/app-totem/push-capabilities.json docs/operations/app-totem/push-capabilities.schema.json docs/operations/app-totem/distribution-policy.md docs/operations/app-totem/version-policy.json docs/operations/app-totem/version-policy.schema.json docs/operations/app-totem/crash-provider-scorecard.md docs/operations/app-totem/legal-content.md docs/DECISIONS.md
 git commit -m "docs(channels): approve distribution and telemetry gates"
 ```
 

@@ -137,7 +137,7 @@ packages/contracts/               DTOs/eventos Zod e OpenAPI gerado
 packages/access-policy/           engine puro compartilhado cloud/Edge
 packages/testing/                 builders, clocks e fixtures multi-tenant
 infra/docker/                     PostgreSQL, Redis e MinIO locais
-docs/adr/                         decisões arquiteturais imutáveis por commit
+docs/DECISIONS.md                 ADRs — arquivo único, numeração sequencial (ADR-021)
 docs/operations/smart-access/     runbooks, hardware suportado e evidências
 ```
 

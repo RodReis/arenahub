@@ -37,7 +37,7 @@ apps/admin-web/app/(protected)/operations/devices/*
 packages/contracts/src/{biometrics,devices,edge-auth}.ts
 packages/database/prisma/migrations/*_biometrics_devices/
 infra/docker/compose.yaml
-docs/adr/0003-edge-auth-and-command-delivery.md
+docs/DECISIONS.md
 docs/operations/smart-access/supported-hardware.md
 ```
 
@@ -334,7 +334,7 @@ Map `M1-FR-013`–`018`, `M1-BR-004/005`, `M1-AC-004/007` to commands, device in
 - [ ] **Step 5: Commit only sanitized evidence**
 
 ```bash
-git add docs/adr/0003-edge-auth-and-command-delivery.md docs/operations/smart-access/supported-hardware.md docs/operations/smart-access/biometric-sync-evidence.md docs/prd/academia/MVP-01-smart-access.md packages/contracts/openapi
+git add docs/DECISIONS.md docs/operations/smart-access/supported-hardware.md docs/operations/smart-access/biometric-sync-evidence.md docs/prd/academia/MVP-01-smart-access.md packages/contracts/openapi
 git commit -m "docs(sync): record physical biometric evidence"
 ```
 

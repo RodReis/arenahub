@@ -121,7 +121,7 @@ Test invalid signature, changed raw body, stale/replayed delivery, unknown event
 ## Task 4: Approve the provider and capability manifest
 
 **Files:**
-- Create: `docs/adr/0005-payment-provider.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 - Create: `docs/operations/smart-billing/payment-provider-capabilities.schema.json`
 - Create: `docs/operations/smart-billing/payment-provider-capabilities.json`
 
@@ -144,7 +144,7 @@ Produto, Financeiro, Técnico and Legal/Privacy sign. Missing approval keeps sta
 - [ ] **Step 5: Commit only approved sanitized artifacts**
 
 ```bash
-git add docs/adr/0005-payment-provider.md docs/operations/smart-billing/payment-provider-capabilities.schema.json docs/operations/smart-billing/payment-provider-capabilities.json
+git add docs/DECISIONS.md docs/operations/smart-billing/payment-provider-capabilities.schema.json docs/operations/smart-billing/payment-provider-capabilities.json
 git commit -m "docs(billing): approve payment provider capability gate"
 ```
 
