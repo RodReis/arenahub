@@ -1,0 +1,39 @@
+/**
+ * Badge -- DS-PAINEL.md §2.2: fundo = tom a 10%, borda = tom a 32%, texto e
+ * icone = tom solido. `color-mix` resolve isso sem gerar 18 tokens extras.
+ *
+ * ACCENT E PROIBIDO AQUI (regra 3 de lint): badge fala de ESTADO, e o accent
+ * do tenant e ACAO. Um tenant com accent vermelho faria "Ativo" parecer erro.
+ *
+ * Le so a camada semantica (regra 2): `--ah-state-*` e `--ah-text-secondary`,
+ * nunca `--ah-carbon-*`.
+ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid;
+  border-radius: var(--ah-radius-badge);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge[data-tone='success'] { color: var(--ah-state-success); }
+.badge[data-tone='warning'] { color: var(--ah-state-warning); }
+.badge[data-tone='danger']  { color: var(--ah-state-danger); }
+.badge[data-tone='info']    { color: var(--ah-state-info); }
+.badge[data-tone='risk']    { color: var(--ah-state-risk); }
+.badge[data-tone='neutral'] { color: var(--ah-state-neutral); }
+
+.badge[data-tone] {
+  background: color-mix(in srgb, currentColor 10%, var(--ah-surface-raised));
+  border-color: color-mix(in srgb, currentColor 32%, transparent);
+}
+
+/* Ausencia de dado NAO e zero nem badge vazio -- §10 item 5. */
+.ausente {
+  color: var(--ah-text-secondary);
+}

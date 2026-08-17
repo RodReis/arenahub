@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { PageHeader, ProblemDetail } from '@arenahub/ui';
+
 import { chamarApi } from '../../../../lib/api/server-client';
 import { FormularioDeOverride } from './formulario-de-override';
 
@@ -37,10 +39,19 @@ export default async function PaginaDeOverride() {
   if (!unidades.ok) {
     return (
       <section aria-labelledby="titulo-override">
-        <h1 id="titulo-override">Liberação manual</h1>
-        <p role="alert" data-testid="erro-de-permissao">
-          Sem permissão para abrir esta tela ({unidades.erro?.code ?? 'erro'}).
-        </p>
+        <PageHeader id="titulo-override" title="Liberação manual" />
+        <ProblemDetail
+          testId="erro-de-permissao"
+          problem={{
+            ...(unidades.erro ?? {
+              type: 'about:blank',
+              status: 0,
+              code: 'erro',
+              correlationId: '',
+            }),
+            title: `Sem permissão para abrir esta tela (${unidades.erro?.code ?? 'erro'}).`,
+          }}
+        />
       </section>
     );
   }
@@ -61,7 +72,7 @@ export default async function PaginaDeOverride() {
 
   return (
     <section aria-labelledby="titulo-override">
-      <h1 id="titulo-override">Liberação manual</h1>
+      <PageHeader id="titulo-override" title="Liberação manual" />
 
       <p>
         Abre a catraca para alguém, com motivo e responsável registrados. Use quando o
@@ -69,6 +80,14 @@ export default async function PaginaDeOverride() {
         autorizado.
       </p>
 
+      {/*
+        Estes dois seguem como `<p role="alert">`, e nao viram `ProblemDetail`.
+        Nao ha erro de servidor aqui: o componente sempre imprime
+        `code · correlationId`, e "SEM_CATRACA · " na tela e ruido para a
+        recepcao. Tambem nao viram `EmptyState`: nao sao "lista vazia", sao
+        IMPEDIMENTO para a acao que a tela existe para fazer, e rebaixar o
+        anuncio tiraria o aviso de quem usa leitor de tela.
+      */}
       {listaDeUnidades.length === 0 ? (
         <p role="alert" data-testid="sem-unidade">
           Nenhuma unidade disponível para o seu perfil.

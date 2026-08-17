@@ -1,14 +1,23 @@
 import type { Metadata } from 'next';
 
-import { chamarApi } from '../../../lib/api/server-client';
 import {
-  ROTULO_DE_METODO,
-  ROTULO_DE_MODO,
-  ROTULO_DE_PASSAGEM,
-  ROTULO_DE_RAZAO,
-  instanteLegivel,
-  traduzir,
-} from '../../../src/operations/formatar';
+  Ausente,
+  DataTable,
+  EmptyState,
+  PageHeader,
+  ProblemDetail,
+  StateBadge,
+  TenantDateTime,
+} from '@arenahub/ui';
+
+import { chamarApi } from '../../../lib/api/server-client';
+import { ROTULO_DE_METODO, ROTULO_DE_MODO, traduzir } from '../../../src/operations/formatar';
+
+/**
+ * Fuso FIXO, preservado de `instanteLegivel` -- mesma divida das outras telas.
+ * O evento traz `gymUnitId`, nao o fuso da unidade.
+ */
+const FUSO_PROVISORIO = 'America/Sao_Paulo';
 
 export const metadata: Metadata = {
   title: 'Eventos de acesso — ArenaHub',
@@ -73,10 +82,19 @@ export default async function PaginaDeEventos({
   if (!resposta.ok) {
     return (
       <section aria-labelledby="titulo-eventos">
-        <h1 id="titulo-eventos">Eventos de acesso</h1>
-        <p role="alert" data-testid="erro-de-permissao">
-          Sem permissão para consultar eventos ({resposta.erro?.code ?? 'erro'}).
-        </p>
+        <PageHeader id="titulo-eventos" title="Eventos de acesso" />
+        <ProblemDetail
+          testId="erro-de-permissao"
+          problem={{
+            ...(resposta.erro ?? {
+              type: 'about:blank',
+              status: 0,
+              code: 'erro',
+              correlationId: '',
+            }),
+            title: `Sem permissão para consultar eventos (${resposta.erro?.code ?? 'erro'}).`,
+          }}
+        />
       </section>
     );
   }
@@ -96,7 +114,7 @@ export default async function PaginaDeEventos({
 
   return (
     <section aria-labelledby="titulo-eventos">
-      <h1 id="titulo-eventos">Eventos de acesso</h1>
+      <PageHeader id="titulo-eventos" title="Eventos de acesso" />
 
       {/* GET, não Server Action: filtro é navegação, e navegação vai na URL. */}
       <form method="get" action="/access-events">
@@ -138,63 +156,77 @@ export default async function PaginaDeEventos({
         </p>
       ) : null}
 
-      {pagina.eventos.length === 0 ? (
-        <p data-testid="sem-eventos">
-          Nenhum evento no período. Ajuste os filtros ou amplie o intervalo.
-        </p>
-      ) : (
-        <table data-testid="tabela-de-eventos">
-          <caption>Eventos, do mais recente para o mais antigo</caption>
-          <thead>
-            <tr>
-              <th scope="col">Quando</th>
-              <th scope="col">Aluno</th>
-              <th scope="col">Resultado</th>
-              <th scope="col">Motivo</th>
-              <th scope="col">Origem</th>
-              <th scope="col">Método</th>
-              <th scope="col">Passagem</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagina.eventos.map((evento) => (
-              <tr key={evento.id} data-testid={`evento-${evento.id}`}>
-                <td>
-                  <time dateTime={evento.occurredAt}>{instanteLegivel(evento.occurredAt)}</time>
-                </td>
-                <td>
-                  {evento.student ? (
-                    `${evento.student.fullName} (${evento.student.membershipNumber})`
-                  ) : (
-                    // Sem aluno resolvido, mostra o que o leitor viu -- é a
-                    // única pista de quem tentou passar.
-                    <span data-testid="aluno-nao-identificado">
-                      não identificado{evento.externalUserId ? ` (id ${evento.externalUserId})` : ''}
-                    </span>
-                  )}
-                </td>
-                <td>{evento.outcome === 'ALLOW' ? 'Liberado' : 'Negado'}</td>
-                <td>{traduzir(ROTULO_DE_RAZAO, evento.reason)}</td>
-                <td>{traduzir(ROTULO_DE_MODO, evento.mode)}</td>
-                <td>{traduzir(ROTULO_DE_METODO, evento.method)}</td>
-                <td>
-                  {evento.passageState
-                    ? traduzir(ROTULO_DE_PASSAGEM, evento.passageState)
-                    : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {pagina.proximoCursor ? (
-        <p>
-          <a href={proximaUrl()} data-testid="proxima-pagina">
-            Próxima página
-          </a>
-        </p>
-      ) : null}
+      <DataTable
+        testId="tabela-de-eventos"
+        rows={pagina.eventos}
+        rowKey={(evento) => evento.id}
+        rowTestId={(evento) => `evento-${evento.id}`}
+        caption="Eventos, do mais recente para o mais antigo"
+        columns={[
+          {
+            key: 'quando',
+            header: 'Quando',
+            render: (e) => <TenantDateTime iso={e.occurredAt} timeZone={FUSO_PROVISORIO} />,
+          },
+          {
+            key: 'aluno',
+            header: 'Aluno',
+            render: (evento) =>
+              evento.student ? (
+                `${evento.student.fullName} (${evento.student.membershipNumber})`
+              ) : (
+                // Sem aluno resolvido, mostra o que o leitor viu -- é a
+                // única pista de quem tentou passar.
+                <span data-testid="aluno-nao-identificado">
+                  não identificado{evento.externalUserId ? ` (id ${evento.externalUserId})` : ''}
+                </span>
+              ),
+          },
+          {
+            key: 'resultado',
+            header: 'Resultado',
+            /*
+             * Ternario preservado: `ALLOW`/`DENY` e o RESULTADO da decisao,
+             * nao um estado de maquina -- a razao ao lado e que carrega o
+             * badge.
+             */
+            render: (e) => (e.outcome === 'ALLOW' ? 'Liberado' : 'Negado'),
+          },
+          {
+            key: 'motivo',
+            header: 'Motivo',
+            /*
+             * `ROTULO_DE_RAZAO` morreu: as 8 frases estavam identicas ao
+             * dicionario canonico, que as herdou desta tela por serem as que
+             * dizem O QUE ACONTECEU ("o plano vale em outra unidade"), nao o
+             * que o sistema concluiu.
+             */
+            render: (e) => <StateBadge machine="accessReason" state={e.reason} />,
+          },
+          { key: 'origem', header: 'Origem', render: (e) => traduzir(ROTULO_DE_MODO, e.mode) },
+          { key: 'metodo', header: 'Método', render: (e) => traduzir(ROTULO_DE_METODO, e.method) },
+          {
+            key: 'passagem',
+            header: 'Passagem',
+            /*
+             * `NOT_APPLICABLE` deixa de ser `'—'` e passa a dizer "Não confirma
+             * giro" (PI, 16/08/2026): o travessao colapsava "equipamento nao
+             * confirma giro" com "dado ausente", que e o oposto do que este
+             * estado existe para impedir.
+             */
+            render: (e) =>
+              e.passageState ? <StateBadge machine="passage" state={e.passageState} /> : <Ausente />,
+          },
+        ]}
+        {...(pagina.proximoCursor ? { nextHref: proximaUrl() } : {})}
+        empty={
+          <EmptyState
+            testId="sem-eventos"
+            title="Nenhum evento no período."
+            hint="Ajuste os filtros ou amplie o intervalo."
+          />
+        }
+      />
     </section>
   );
 }

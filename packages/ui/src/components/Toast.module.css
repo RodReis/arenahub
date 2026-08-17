@@ -1,0 +1,93 @@
+/**
+ * Toast -- CLAUDE.md → Convencoes: "sempre usar Toast para Info, Warn e error".
+ *
+ * ACCENT E PROIBIDO AQUI (regra 3): toast de erro fala de ESTADO. Le so a
+ * camada semantica (regra 2).
+ */
+.regiao {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 380px;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--ah-surface-raised);
+  border: 1px solid;
+  border-left-width: 1px;
+  border-radius: var(--ah-radius-card);
+  box-shadow: var(--ah-elev-2);
+  animation: entrar var(--ah-motion-layer) var(--ah-motion-easing);
+}
+
+.toast[data-kind='error'] {
+  color: var(--ah-state-danger);
+}
+
+.toast[data-kind='warn'] {
+  color: var(--ah-state-warning);
+}
+
+.toast[data-kind='info'] {
+  color: var(--ah-state-info);
+}
+
+.toast[data-kind] {
+  border-color: color-mix(in srgb, currentColor 32%, transparent);
+}
+
+.mensagem {
+  flex: 1;
+  color: var(--ah-text-default);
+}
+
+.dispensar {
+  display: inline-flex;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/**
+ * `prefers-reduced-motion` -- DS-PAINEL.md §4: so opacidade, ate 100 ms.
+ *
+ * A translacao sai inteira. Quem pediu menos movimento nao quer nada
+ * deslizando no canto da tela.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: aparecer 100ms var(--ah-motion-easing);
+  }
+}

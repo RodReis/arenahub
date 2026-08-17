@@ -1,0 +1,100 @@
+/**
+ * Tela de login -- unica superficie do painel sem o shell.
+ *
+ * Le so a camada semantica de tokens (regra 2 de lint). O modo e `light`,
+ * como o `DS-PAINEL.md` §1 e o `.dc.html` fixam: canvas carbono claro, card
+ * branco com BORDA (o painel nao usa sombra -- §4).
+ */
+.tela {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--ah-surface-canvas);
+}
+
+.cartao {
+  width: 100%;
+  max-width: 380px;
+  padding: 32px;
+  background: var(--ah-surface-raised);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+}
+
+.marca {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  text-align: center;
+}
+
+/**
+ * Accent aqui e legitimo: marca e identidade do tenant, nao estado de maquina
+ * -- a proibicao da regra 3 vale para badge, decisao de acesso e alerta.
+ */
+.simbolo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--ah-action-solid);
+  color: var(--ah-action-on-solid);
+}
+
+.simbolo svg {
+  width: 28px;
+  height: 28px;
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ah-type-title-size);
+  line-height: var(--ah-type-title-lh);
+  font-weight: var(--ah-type-title-weight);
+}
+
+.subtitulo {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/**
+ * O botao ocupa a largura do cartao: e a unica acao da tela, e alinhar a
+ * esquerda num formulario de duas linhas deixa um vazio a direita que parece
+ * campo faltando.
+ */
+.formulario > button {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/**
+ * Erro do formulario -- fundo, borda e ICONE, nao so cor (§10 item 1).
+ */
+.erro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ah-danger) 32%, transparent);
+  border-radius: var(--ah-radius-control);
+  background: color-mix(in srgb, var(--ah-danger) 8%, var(--ah-surface-raised));
+  color: var(--ah-danger);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}

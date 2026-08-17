@@ -1,12 +1,16 @@
 import type { Metadata } from 'next';
 
-import { chamarApi } from '../../../lib/api/server-client';
 import {
-  ROTULO_DE_SITUACAO,
-  dataLegivel,
-  impedeAcesso,
-} from '../../../src/students/formatar';
-import { traduzir } from '../../../src/operations/formatar';
+  DataTable,
+  EmptyState,
+  MaskedCPF,
+  PageHeader,
+  ProblemDetail,
+  StateBadge,
+} from '@arenahub/ui';
+
+import { chamarApi } from '../../../lib/api/server-client';
+import { dataLegivel, impedeAcesso } from '../../../src/students/formatar';
 
 export const metadata: Metadata = {
   title: 'Alunos — ArenaHub',
@@ -63,10 +67,19 @@ export default async function PaginaDeAlunos({
   if (!resposta.ok) {
     return (
       <section aria-labelledby="titulo-alunos">
-        <h1 id="titulo-alunos">Alunos</h1>
-        <p role="alert" data-testid="erro-de-permissao">
-          Sem permissão para consultar alunos ({resposta.erro?.code ?? 'erro'}).
-        </p>
+        <PageHeader id="titulo-alunos" title="Alunos" />
+        <ProblemDetail
+          testId="erro-de-permissao"
+          problem={{
+            ...(resposta.erro ?? {
+              type: 'about:blank',
+              status: 0,
+              code: 'erro',
+              correlationId: '',
+            }),
+            title: `Sem permissão para consultar alunos (${resposta.erro?.code ?? 'erro'}).`,
+          }}
+        />
       </section>
     );
   }
@@ -97,13 +110,15 @@ export default async function PaginaDeAlunos({
 
   return (
     <section aria-labelledby="titulo-alunos">
-      <h1 id="titulo-alunos">Alunos</h1>
-
-      <p>
-        <a href="/students/novo" data-testid="novo-aluno">
-          Cadastrar aluno
-        </a>
-      </p>
+      <PageHeader
+        id="titulo-alunos"
+        title="Alunos"
+        actions={
+          <a href="/students/novo" data-testid="novo-aluno">
+            Cadastrar aluno
+          </a>
+        }
+      />
 
       {/* GET, não Server Action: busca é navegação, e navegação vai na URL. */}
       <form method="get" action="/students">
@@ -131,59 +146,75 @@ export default async function PaginaDeAlunos({
         A busca não encontra por CPF. Use nome, número de matrícula ou telefone.
       </p>
 
-      {alunos.length === 0 ? (
-        <p data-testid="sem-alunos">
-          {termo
-            ? 'Nenhum aluno encontrado com esse termo. Confira a grafia ou cadastre um novo aluno.'
-            : 'Nenhum aluno cadastrado ainda. Comece cadastrando o primeiro.'}
-        </p>
-      ) : (
-        <table data-testid="tabela-de-alunos">
-          <caption>Alunos, do cadastro mais recente para o mais antigo</caption>
-          <thead>
-            <tr>
-              <th scope="col">Matrícula</th>
-              <th scope="col">Nome</th>
-              <th scope="col">Nascimento</th>
-              <th scope="col">CPF</th>
-              <th scope="col">Situação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {alunos.map((aluno) => (
-              <tr key={aluno.id} data-testid={`aluno-${aluno.id}`}>
-                <td>{aluno.membershipNumber}</td>
-                <td>
-                  <a href={`/students/${aluno.id}`}>{aluno.fullName}</a>
-                </td>
-                <td>
-                  <time dateTime={aluno.birthDate}>{dataLegivel(aluno.birthDate)}</time>
-                </td>
-                <td>{aluno.cpfMasked ?? '—'}</td>
-                <td>
-                  {/*
-                    Todo estado tem TEXTO, cor é complemento. E o texto diz
-                    a consequência: "Bloqueado" sozinho não avisa a recepção
-                    de que a catraca vai negar.
-                  */}
-                  {traduzir(ROTULO_DE_SITUACAO, aluno.status)}
-                  {impedeAcesso(aluno.status) ? (
-                    <span data-testid={`sem-acesso-${aluno.id}`}> — sem acesso à catraca</span>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {proxima ? (
-        <p>
-          <a href={proxima} data-testid="proxima-pagina">
-            Próxima página
-          </a>
-        </p>
-      ) : null}
+      <DataTable
+        testId="tabela-de-alunos"
+        rows={alunos}
+        rowKey={(aluno) => aluno.id}
+        rowTestId={(aluno) => `aluno-${aluno.id}`}
+        caption="Alunos, do cadastro mais recente para o mais antigo"
+        columns={[
+          {
+            key: 'matricula',
+            header: 'Matrícula',
+            numeric: true,
+            render: (aluno) => aluno.membershipNumber,
+          },
+          {
+            key: 'nome',
+            header: 'Nome',
+            render: (aluno) => <a href={`/students/${aluno.id}`}>{aluno.fullName}</a>,
+          },
+          {
+            key: 'nascimento',
+            header: 'Nascimento',
+            render: (aluno) => (
+              <time dateTime={aluno.birthDate}>{dataLegivel(aluno.birthDate)}</time>
+            ),
+          },
+          {
+            key: 'cpf',
+            header: 'CPF',
+            /*
+             * `MaskedCPF` recebe a mascara que a API ja devolve -- o painel
+             * nunca ve o documento inteiro. Sem CPF, `—` com rotulo de
+             * ausencia, que e o que a tela ja fazia.
+             */
+            render: (aluno) => <MaskedCPF masked={aluno.cpfMasked} />,
+          },
+          {
+            key: 'situacao',
+            header: 'Situação',
+            render: (aluno) => (
+              <>
+                {/*
+                  Todo estado tem TEXTO, cor é complemento. E o texto diz
+                  a consequência: "Bloqueado" sozinho não avisa a recepção
+                  de que a catraca vai negar.
+                */}
+                <StateBadge machine="student" state={aluno.status} />
+                {impedeAcesso(aluno.status) ? (
+                  <span data-testid={`sem-acesso-${aluno.id}`}> — sem acesso à catraca</span>
+                ) : null}
+              </>
+            ),
+          },
+        ]}
+        {...(proxima ? { nextHref: proxima } : {})}
+        empty={
+          <EmptyState
+            testId="sem-alunos"
+            title={
+              termo
+                ? 'Nenhum aluno encontrado com esse termo.'
+                : 'Nenhum aluno cadastrado ainda.'
+            }
+            hint={
+              termo ? 'Confira a grafia ou cadastre um novo aluno.' : 'Comece cadastrando o primeiro.'
+            }
+            action={<a href="/students/novo">Cadastrar aluno</a>}
+          />
+        }
+      />
     </section>
   );
 }

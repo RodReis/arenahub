@@ -1,0 +1,26 @@
+/**
+ * `ConsentCard` -- DS-PAINEL.md §9. Le so a camada semantica (regra 2).
+ *
+ * Card do painel tem BORDA, nao sombra (§4): superficie plana le melhor em
+ * densidade alta.
+ */
+.cartao {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 16px;
+  background: var(--ah-surface-raised);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+}
+
+.cartao dt {
+  color: var(--ah-text-label);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.cartao dd {
+  margin: 0;
+}

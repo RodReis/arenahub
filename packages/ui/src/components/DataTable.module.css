@@ -1,0 +1,55 @@
+/**
+ * Tabela -- DS-PAINEL.md §4: linha de 40 px, gutter de 16 px.
+ *
+ * Le so a camada semantica (regra 2). Sem sombra: card do painel tem borda, e
+ * superficie plana le melhor em densidade alta.
+ */
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--ah-surface-raised);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+}
+
+.legenda {
+  padding: 12px 16px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  text-align: left;
+}
+
+.tabela th,
+.tabela td {
+  height: 40px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+  text-align: left;
+}
+
+.tabela th {
+  color: var(--ah-text-label);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.paginacao {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.contador {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}

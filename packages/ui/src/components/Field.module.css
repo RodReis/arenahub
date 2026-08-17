@@ -1,0 +1,115 @@
+/**
+ * Campo -- DS-PAINEL.md §6: altura 36 px, raio 6 px, borda `carbon-200`,
+ * foco 2 px + offset 2 px.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-border-default` resolve
+ * para carbon-200, `--ah-focus-ring` para accent-700.
+ */
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rotulo {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  color: var(--ah-text-label);
+}
+
+/**
+ * Unidade AO LADO do rotulo, nunca no placeholder -- §6. Placeholder some
+ * quando alguem digita, e ai o campo perde a unidade justo enquanto o valor
+ * esta sendo conferido.
+ */
+.unidade {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ah-text-secondary);
+}
+
+/**
+ * A BORDA mora na moldura, nao no input.
+ *
+ * Com icone e botao de revelar dentro do campo, a borda no proprio `<input>`
+ * cortaria os dois para fora dela. A moldura desenha a caixa; o input fica
+ * transparente por dentro.
+ */
+.moldura {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-control);
+  background: var(--ah-surface-raised);
+}
+
+/**
+ * O anel de foco acompanha a MOLDURA, senao ele apareceria em volta do texto
+ * e deixaria icone e botao visualmente fora do campo focado.
+ */
+.moldura:focus-within {
+  border-color: var(--ah-focus-ring);
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+/**
+ * Borda em erro E texto de erro abaixo. Cor sozinha nao e canal (§10 item 1):
+ * quem nao distingue vermelho de cinza le a frase.
+ */
+.moldura[data-erro='true'] {
+  border-color: var(--ah-danger);
+}
+
+.moldura:has(.controle:disabled) {
+  background: var(--ah-surface-canvas);
+  border-color: var(--ah-border-subtle);
+}
+
+/* Decorativo: o rotulo e o canal, o icone so ancora o olho. */
+.adorno {
+  display: flex;
+  color: var(--ah-text-secondary);
+}
+
+.controle {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: var(--ah-text-default);
+  font-family: inherit;
+  font-size: var(--ah-type-body-size);
+}
+
+/* O anel vive na moldura -- dois aneis concentricos seriam ruido. */
+.controle:focus-visible {
+  outline: none;
+}
+
+.controle:disabled {
+  /* Excecao nomeada de contraste -- WCAG 2.2 §1.4.3, decisao do PI (opcao A). */
+  color: var(--ah-text-disabled);
+  cursor: not-allowed;
+}
+
+.dica {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--ah-text-secondary);
+}
+
+.erro {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--ah-danger);
+}

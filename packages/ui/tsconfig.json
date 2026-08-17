@@ -1,14 +1,16 @@
 {
   "extends": "@arenahub/config/tsconfig/base.json",
   "compilerOptions": {
-    "lib": ["ES2023", "DOM"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"],
+    "jsx": "react-jsx",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
     "resolveJsonModule": true
   },
   "$comment": "`scripts/*.mjs` fica FORA: e JavaScript de build que roda em Node, nao codigo do pacote. Incluir arrastaria o pipeline para o programa TypeScript e o ESLint com projectService passaria a exigir que ele estivesse aqui -- duas ferramentas discutindo sobre um arquivo que nenhuma das duas precisa checar.",
-  "include": ["src/**/*.ts"],
+  "$comment-setup": "`vitest.setup.ts` fica DENTRO, ao contrario dos `scripts/*.mjs`: o `import '@testing-library/jest-dom/vitest'` dele e o que declara `toHaveAttribute` e companhia no `Assertion` do Vitest. Fora do programa, a declaracao nao existe e todo spec de componente quebra no typecheck. Ele nao entra no `dist`: o `tsconfig.build.json` reescreve o `include` para so `src`.",
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
   "exclude": ["node_modules", "dist", "dist-tokens"]
 }

@@ -1,5 +1,14 @@
 import type { Metadata } from 'next';
 
+import {
+  DataTable,
+  EmptyState,
+  PageHeader,
+  ProblemDetail,
+  StateBadge,
+  TenantDateTime,
+} from '@arenahub/ui';
+
 import { chamarApi } from '../../../../../lib/api/server-client';
 
 export const metadata: Metadata = {
@@ -47,18 +56,20 @@ const MOTIVO_EM_PORTUGUES: Record<string, string> = {
   CONSENT_DOCUMENT_RETIRED: 'O termo aceito foi substituído por uma versão nova.',
 };
 
-const ROTULO_DE_ESTADO: Record<string, string> = {
-  ACTIVE: 'Ativa',
-  REVOKED: 'Revogada',
-  DELETION_PENDING: 'Revogada — aguardando exclusão nos leitores',
-  DELETED: 'Excluída de todos os leitores',
-};
+/*
+ * `ROTULO_DE_ESTADO` e `formatarInstante` MORRERAM -- a segunda copia dos dois,
+ * gemea da que saiu de `devices/page.tsx`. As quatro frases daqui sao as que
+ * venceram no dicionario canonico: elas ja diziam "Revogada — aguardando
+ * exclusao nos leitores" onde o contrato §7 propunha o generico "Exclusao em
+ * andamento", e a producao venceu.
+ */
 
-function formatarInstante(iso: string | null): string {
-  if (!iso) return '—';
-
-  return new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-}
+/**
+ * Fuso FIXO, preservado da implementacao anterior -- mesma divida de
+ * `devices/page.tsx`. A rota de identidades nao devolve o fuso da unidade, e
+ * busca-lo exigiria chamada nova, que e comportamento.
+ */
+const FUSO_PROVISORIO = 'America/Sao_Paulo';
 
 /**
  * Biometria de um aluno: consentimento, identidade e estado da exclusão.
@@ -82,10 +93,19 @@ export default async function PaginaDeBiometria({
   if (!consentimento.ok && consentimento.erro?.code === 'STUDENT_NOT_FOUND') {
     return (
       <section aria-labelledby="titulo-biometria">
-        <h1 id="titulo-biometria">Biometria</h1>
-        <p role="alert" data-testid="aluno-nao-encontrado">
-          Aluno não encontrado.
-        </p>
+        <PageHeader id="titulo-biometria" title="Biometria" />
+        <ProblemDetail
+          testId="aluno-nao-encontrado"
+          problem={{
+            ...(consentimento.erro ?? {
+              type: 'about:blank',
+              status: 404,
+              code: 'STUDENT_NOT_FOUND',
+              correlationId: '',
+            }),
+            title: 'Aluno não encontrado.',
+          }}
+        />
       </section>
     );
   }
@@ -93,10 +113,19 @@ export default async function PaginaDeBiometria({
   if (!consentimento.ok) {
     return (
       <section aria-labelledby="titulo-biometria">
-        <h1 id="titulo-biometria">Biometria</h1>
-        <p role="alert" data-testid="erro-de-permissao">
-          Sem permissão para ver a biometria ({consentimento.erro?.code}).
-        </p>
+        <PageHeader id="titulo-biometria" title="Biometria" />
+        <ProblemDetail
+          testId="erro-de-permissao"
+          problem={{
+            ...(consentimento.erro ?? {
+              type: 'about:blank',
+              status: 0,
+              code: 'erro',
+              correlationId: '',
+            }),
+            title: `Sem permissão para ver a biometria (${consentimento.erro?.code}).`,
+          }}
+        />
       </section>
     );
   }
@@ -106,7 +135,7 @@ export default async function PaginaDeBiometria({
 
   return (
     <section aria-labelledby="titulo-biometria">
-      <h1 id="titulo-biometria">Biometria</h1>
+      <PageHeader id="titulo-biometria" title="Biometria" />
 
       <h2>Consentimento</h2>
 
@@ -155,38 +184,56 @@ export default async function PaginaDeBiometria({
 
       <h2>Identidades biométricas</h2>
 
-      {lista.length === 0 ? (
-        <p data-testid="sem-identidade">Nenhuma identidade biométrica cadastrada.</p>
-      ) : (
-        <table data-testid="tabela-de-identidades">
-          <caption>Cadastros biométricos deste aluno</caption>
-          <thead>
-            <tr>
-              <th scope="col">Situação</th>
-              <th scope="col">Cadastrada em</th>
-              <th scope="col">Revogada em</th>
-              <th scope="col">Excluída em</th>
-              <th scope="col">Imagem de cadastro</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lista.map((identidade) => (
-              <tr key={identidade.id} data-testid={`identidade-${identidade.id}`}>
-                <td>{ROTULO_DE_ESTADO[identidade.state] ?? identidade.state}</td>
-                <td>{formatarInstante(identidade.createdAt)}</td>
-                <td>{formatarInstante(identidade.revokedAt)}</td>
-                <td>{formatarInstante(identidade.deletedAt)}</td>
-                {/*
-                  Presença, nunca a imagem nem o caminho dela (INV-022).
-                  Depois do expurgo (INV-142) esta coluna passa a dizer
-                  "expurgada", que é a evidência auditável de que sumiu.
-                */}
-                <td>{identidade.hasEnrollmentObject ? 'Guardada' : 'Expurgada'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        testId="tabela-de-identidades"
+        rows={lista}
+        rowKey={(identidade) => identidade.id}
+        rowTestId={(identidade) => `identidade-${identidade.id}`}
+        caption="Cadastros biométricos deste aluno"
+        columns={[
+          {
+            key: 'situacao',
+            header: 'Situação',
+            /*
+             * `biometric.REVOKED` e tom NEUTRO, nao erro: revogar consentimento
+             * e direito do titular (ADR-008 decisao 3), nao falha do sistema.
+             * A justificativa vive no `state-labels.ts`, para ninguem
+             * "consertar" a diferenca para `entitlement.REVOKED`.
+             */
+            render: (identidade) => (
+              <StateBadge machine="biometric" state={identidade.state} />
+            ),
+          },
+          {
+            key: 'cadastrada',
+            header: 'Cadastrada em',
+            render: (i) => <TenantDateTime iso={i.createdAt} timeZone={FUSO_PROVISORIO} />,
+          },
+          {
+            key: 'revogada',
+            header: 'Revogada em',
+            render: (i) => <TenantDateTime iso={i.revokedAt} timeZone={FUSO_PROVISORIO} />,
+          },
+          {
+            key: 'excluida',
+            header: 'Excluída em',
+            render: (i) => <TenantDateTime iso={i.deletedAt} timeZone={FUSO_PROVISORIO} />,
+          },
+          {
+            key: 'imagem',
+            header: 'Imagem de cadastro',
+            /*
+             * Presença, nunca a imagem nem o caminho dela (INV-022).
+             * Depois do expurgo (INV-142) esta coluna passa a dizer
+             * "expurgada", que é a evidência auditável de que sumiu.
+             */
+            render: (i) => (i.hasEnrollmentObject ? 'Guardada' : 'Expurgada'),
+          },
+        ]}
+        empty={
+          <EmptyState testId="sem-identidade" title="Nenhuma identidade biométrica cadastrada." />
+        }
+      />
     </section>
   );
 }

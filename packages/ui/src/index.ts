@@ -1,15 +1,60 @@
 /**
  * `@arenahub/ui` -- design system do ArenaHub.
  *
- * Esta entrega e o card `[INFRA]` do ADR-025 decisao 1: **pipeline de tokens
- * e esqueleto**, mecanica de build sem decisao de produto.
+ * O pipeline de tokens veio do card `[INFRA]` do ADR-025 decisao 1: mecanica
+ * de build sem decisao de produto.
  *
- * Os COMPONENTES nao moram aqui ainda -- `StateBadge`, `ProblemDetail`,
- * `DataFreshness`, `Toast`, `state-labels.ts` e o resto do inventario de 17
- * (DS-PAINEL.md §9) sao a fatia **F42 / SPEC-042**, que consome este pipeline.
- * A separacao e o proprio ADR-025: rotulo pt-BR de enum de dominio e decisao
- * de produto e passa pelo aceite do PI; JSON virando CSS nao decide nada.
+ * Os COMPONENTES sao a fatia **F42 / SPEC-042**, que consome esse pipeline.
+ * `Icon` e `Ausente` abriram a fila por serem os unicos sem rotulo de dominio;
+ * `state-labels.ts` chega em seguida por ser pre-requisito do `StateBadge`.
+ * `ProblemDetail`, `DataFreshness` e `Toast` vem nas tarefas seguintes. A
+ * separacao e o proprio ADR-025: rotulo pt-BR de enum de dominio e decisao de
+ * produto e passa pelo aceite do PI; JSON virando CSS nao decide nada.
  */
+
+export { Ausente } from './components/Ausente.js';
+export { Button } from './components/Button.js';
+export { ConsentCard } from './components/ConsentCard.js';
+export { DataFreshness } from './components/DataFreshness.js';
+export { DataTable, type Column } from './components/DataTable.js';
+export { ElevatedSessionBanner } from './components/ElevatedSessionBanner.js';
+export { EmptyState } from './components/EmptyState.js';
+export { Field } from './components/Field.js';
+export { Icon, type IconName } from './components/Icon.js';
+export { PasswordField } from './components/PasswordField.js';
+export { MaskedCPF } from './components/MaskedCPF.js';
+export { Money } from './components/Money.js';
+export { ProblemDetail, type ProblemJson } from './components/ProblemDetail.js';
+export { SensitiveAction } from './components/SensitiveAction.js';
+export { StateBadge } from './components/StateBadge.js';
+export { ToastProvider, useToast, type ToastKind } from './components/Toast.js';
+
+export { AppShell } from './components/shell/AppShell.js';
+export { NavLink } from './components/shell/NavLink.js';
+export { PageHeader } from './components/shell/PageHeader.js';
+
+/**
+ * Contratos sem tela -- SPEC-042 §3. Props e token de componente cujo MVP dono
+ * ainda nao chegou; a implementacao vem com a fatia que tiver o que renderizar.
+ */
+export {
+  AI_DISCLAIMER_CODE,
+  RISK_BANDS,
+  type AIDisclaimerProps,
+  type AsyncJobStatusProps,
+  type ChartWithTableProps,
+  type FieldReviewProps,
+  type RiskBandProps,
+} from './contracts/future-components.js';
+export { TenantDateTime } from './components/TenantDateTime.js';
+
+export {
+  STATE_LABELS,
+  stateLabel,
+  type StateLabel,
+  type StateMachine,
+  type Tone,
+} from './domain/state-labels.js';
 
 export {
   AA_LARGE,

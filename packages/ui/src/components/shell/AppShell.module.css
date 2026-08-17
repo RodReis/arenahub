@@ -1,0 +1,162 @@
+/**
+ * Shell do painel -- DS-PAINEL.md §5. Le so a camada semantica (regra 2).
+ *
+ * Accent E permitido aqui: o item ativo da navegacao e ACAO/localizacao, nao
+ * estado de dominio.
+ */
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/**
+ * Skip link -- invisivel ate receber foco.
+ *
+ * `clip-path` em vez de `display:none`: escondido de verdade nao entra na
+ * ordem de tabulacao, e um skip link fora da tabulacao nao pula nada.
+ */
+.pular {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 100;
+  padding: 8px 12px;
+  background: var(--ah-surface-raised);
+  color: var(--ah-action-text);
+  border-radius: var(--ah-radius-control);
+  clip-path: inset(50%);
+}
+
+.pular:focus-visible {
+  clip-path: none;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 52px;
+  padding: 0 24px;
+  background: var(--ah-surface-chrome);
+  color: var(--ah-text-on-chrome);
+}
+
+.logo {
+  color: var(--ah-surface-raised);
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: var(--ah-type-heading-weight);
+}
+
+.direita {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/**
+ * Controle GHOST sobre o chrome escuro -- WCAG 2.2 §1.4.3.
+ *
+ * O `Button` nao sabe onde esta: o `ghost` usa `--ah-action-text`
+ * (`accent-700`), resolvido por contraste contra fundo CLARO. Sobre
+ * `surface.chrome` da 3.16, e o axe-core reprova -- o "Sair" ficava ilegivel
+ * no canto da topbar.
+ *
+ * A correcao vive AQUI, e nao no `Button`, porque quem conhece o fundo e o
+ * shell. `text.onChrome` ja e verificado contra `surface.chrome` no pipeline
+ * de tokens, entao o par nao pode divergir sem quebrar o build.
+ */
+.topbar [data-variant='ghost'] {
+  color: var(--ah-text-on-chrome);
+}
+
+.topbar [data-variant='ghost']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ah-text-on-chrome) 12%, transparent);
+}
+
+.corpo {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 224px 1fr;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 12px;
+  background: var(--ah-surface-chrome);
+}
+
+.navlink {
+  padding: 8px 12px;
+  border-radius: var(--ah-radius-control);
+  color: var(--ah-text-on-chrome);
+  text-decoration: none;
+}
+
+.navlink:hover {
+  background: color-mix(in srgb, var(--ah-surface-raised) 8%, transparent);
+}
+
+/**
+ * Item ativo: fundo E peso, nao so cor. O `aria-current` carrega a mesma
+ * informacao para quem nao ve a tela -- os dois canais saem do mesmo atributo,
+ * entao nao podem divergir (§10 item 1).
+ */
+.navlink[aria-current='page'] {
+  background: color-mix(in srgb, var(--ah-surface-raised) 14%, transparent);
+  color: var(--ah-surface-raised);
+  font-weight: 600;
+}
+
+.conteudo {
+  padding: 24px;
+  background: var(--ah-surface-canvas);
+}
+
+.cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.linha-titulo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.titulo {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-title-size);
+  line-height: var(--ah-type-title-lh);
+  font-weight: var(--ah-type-title-weight);
+}
+
+.acoes {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/**
+ * 1024 px = modo DEGRADADO, confirmado pelo PI. A sidebar vira faixa
+ * horizontal rolavel; a operacao continua possivel, so mais apertada. Abaixo
+ * disso nao ha promessa -- o painel e ferramenta de balcao, nao app de bolso.
+ */
+@media (max-width: 1279px) {
+  .corpo {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+  }
+}
