@@ -9,7 +9,6 @@ updated: 2026-08-17
 
 ### Sem épico
 
-- [MVP1][FIX] eslint do admin-web não carrega o ruleset design-system — 4 violações da regra 5 passam no CI (#85)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [INFRA] 8 planos mandam criar docs/adr/, contrariando o ADR-021 (#68)
@@ -63,6 +62,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP1][FIX] eslint do admin-web não carrega o ruleset design-system — 4 violações da regra 5 passam no CI (#85, finalizado em: 2026-08-17)
 - [MVP0][SPEC-005][F5] Relatório e decisão (#5, finalizado em: 2026-08-17)
 - [MVP0][SPEC-003][F3] Catraca e passagem (#3, finalizado em: 2026-08-17)
 - [MVP2.5][SPEC-042][F42] Design system da superfície admin-web (#81, finalizado em: 2026-08-17)
