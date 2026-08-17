@@ -7,8 +7,27 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 14/08/2026 *(segunda rodada)* · **Fase:** **MVP 0 em execução** ·
+**Última atualização:** 17/08/2026 *(janelas físicas do MVP 0)* · **Fase:** **MVP 0 em execução** ·
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
+
+🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
+(30 comandos, 28 giros confirmados por sensor, 0 duplas) e, na segunda janela, **o ciclo facial
+rodou ponta a ponta**: leitor conecta → ArenaHub cadastra → rosto reconhecido → `sendlog` recebido
+→ decisão local → catraca destrava → giro confirmado. Detalhe no field-note
+`docs/field-notes/2026-08-17-ciclo-facial-ao-vivo.md` e no §9 do relatório de POC — **ambos ainda
+fora da `main`**, ver o aviso abaixo. Sem link enquanto não entrarem.
+
+🔴 **Isso não fecha o gate, e um achado é sério.** A catraca está em `acionamento1: 8`
+(*liberada nos dois sentidos*): **entra-se empurrando o braço, sem reconhecimento nenhum**. Todos
+os giros medidos são reais, mas teriam acontecido **sem o comando** — a garantia física de que só
+quem tem direito entra **não está valendo** hoje na bancada. É config do equipamento, não código,
+e só se muda pela API/SDK. **`M0-AC-004` não fecha antes disso.**
+
+⚠️ **O código de 17/08 não está na `main` e não tem PR.** As branches `feat/f2-facial-senduser`
+(fix `senduser` do firmware v2.16, `conectar` na ponte, `lab:run`) e `docs/f3-poc-fisica-17-08`
+(relatório da janela da catraca) vivem só no remoto. **Elas colidem entre si** — as duas escrevem
+uma seção `## 9` diferente no mesmo `docs/reports/MVP-00-relatorio-poc-topdata.md`. Resolver é do
+Code; registrado aqui porque avanço fora da `main` é o *fechamento frágil* do `CLAUDE.md` §3.
 
 **14/08/2026, segunda rodada — ADR-011 e ADR-008 fechados.** F4 e F8 destravadas. Restam **duas**
 pendências, nenhuma no caminho crítico de hoje: ADR-013 (sai da homologação do MVP 2, não de
@@ -94,11 +113,15 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | # | o quê | trava |
 |---|---|---|
 | 1 | ✅ ~~decidir a forma da ponte Windows (ADR-010)~~ — **fechado em 15/08/2026**: stdio + .NET 4.x x86, card [#61](https://github.com/RodReis/arenahub/issues/61), PR [#62](https://github.com/RodReis/arenahub/pull/62) | — |
-| 2 | **consentimento dos participantes** — regra nº 7, sem exceção | F2 |
-| 3 | **janela combinada + parada de emergência** | **F3** |
-| 4 | leitor em **18 dígitos** no menu — senão todo cadastro falha | F2 |
-| 5 | 🔴 **cutover: apontar a catraca para o `edge-agent`** — hoje ela disca para o legado `192.168.2.106` e nunca conecta na ponte. Descoberto no teste de giro de 15/08; é ação operacional sobre equipamento em uso, **decisão do PI** | **F3** |
-| 6 | 🔴 **ligar os adapters ao `main.ts`** — eles existem e são testados, mas ninguém os instancia; o `lab:run` do gate **não existe**. Sem isso a janela mede giro e latência da ponte, **não** o ciclo facial nem a latência ponta a ponta. **Fatia nova: o PI decidiu em 15/08 que o Cowork escreve a spec** — insumo técnico pronto em [`docs/notes/composicao-do-edge-agent.md`](notes/composicao-do-edge-agent.md) | **F2**, e a parte ponta a ponta de **F3** |
+| 2 | ✅ ~~**consentimento dos participantes**~~ — **assinado e em mãos na janela de 17/08** | — |
+| 3 | ✅ ~~**janela combinada + parada de emergência**~~ — **duas janelas executadas em 17/08**, com parada definida (cortar a fonte da catraca) | — |
+| 4 | ✅ ~~leitor em **18 dígitos**~~ — resolvido pelo menu físico do leitor; `setuserinfo` confirmado ao vivo em 17/08 | — |
+| 5 | ✅ ~~**cutover: apontar a catraca para o `edge-agent`**~~ — **feito e devolvido** em 17/08 (`.106` → `.190` → `.106`, legado religado). O mesmo vale para o leitor facial, pelo menu físico, **sem depender da senha de admin** | — |
+| 6 | ✅ ~~**ligar os adapters ao `main.ts`** — fatia nova~~ — **a fatia nova morreu em 17/08, por decisão do PI**: o `lab:run` foi construído dentro da janela e absorvido por **F2/F5**, sem número novo. ⚠️ **Consequência aberta na linha 8** | — |
+| 7 | 🔴 **catraca em `acionamento1: 8` — entra sem reconhecimento.** *Liberada nos dois sentidos* em repouso; o `liberar` não destrava nada porque nada está travado. Modo bloqueado **não aparece no menu do painel**: só pela API/SDK, com endpoint e valor **não confirmados** nos manuais que temos. Chutar escrita de `acionamento` em catraca de produção foi recusado, corretamente | **`M0-AC-004`**, logo o **gate §15** |
+| 8 | 🟠 **composição de PRODUÇÃO do `edge-agent` ficou sem dono.** Ordem de inicialização, o que o agente faz ao subir, o que acontece quando um dispositivo não responde — falha alto ou degrada. O `lab:run` é **bancada**; nada disso está decidido. **Precisa de número antes de F9 ir a piloto** — decisão do PI, insumo pronto em [`docs/notes/composicao-do-edge-agent.md`](notes/composicao-do-edge-agent.md) | **MVP 1** |
+| 9 | 🟠 **relógio do leitor facial.** O `ocorridoEm` veio congelado em `15:47:28` em todos os reconhecimentos de 17/08 — timestamp fixo embaralha a ordem de eventos (`M0-FR-004`). Decisão do PI em 17/08: **acertar o relógio *e* o Edge carimbar `recebidoEm` como critério de ordenação quando o `ocorridoEm` for implausível**, preservando o original (`M0-BR-004`) | **F2** |
+| 10 | 🟠 **consumir o `senduser` para detectar órfãos** entre leitor e nuvem — leitura de reconciliação que vira **alerta**, nunca cadastro. Decisão do PI em 17/08; **fora de F2**, fatia futura do MVP 1 **ainda sem número** | **MVP 1** |
 
 > 📋 **Roteiro da janela pronto:** [`docs/runbooks/POC-MVP-00-roteiro-de-execucao.md`](runbooks/POC-MVP-00-roteiro-de-execucao.md)
 > — pré-condições, sequência de cutover, coleta de evidência e encerramento. A §0 explica, antes
@@ -125,6 +148,11 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 > `proplan:doing` — quem está em andamento com a F2 é a **F10**, destravada pelo fecho do
 > ADR-007. As colunas *Feito* e *Finalizado* também estavam trocadas: os cards do bootstrap,
 > F1 e F4 já foram aceitos pelo PI e contam em **Finalizado**, não em *Feito*.
+>
+> 📌 **Leitura de 17/08, depois das janelas físicas:** F2 e F3 foram **provadas ao vivo**, mas
+> nenhuma das duas avança de coluna — falta **PR mergeado**, o `M0-AC-002` (remoção das três
+> identidades com confirmação de ausência) e o **modo bloqueado da catraca**. A F3 seguir sem
+> `proplan:doing` no board é coerente: o que falta nela não é código.
 
 **Definição de Backlog corrigida em 14/08/2026.** Dizia *"spec aprovada, card criado"*, o que
 contradizia o **ADR-022**: *"o card de fatia passa a ser criado para **todas** as fatias, em
@@ -165,6 +193,20 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 | **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que dá para fechar antes do gate são as duas políticas do `M2-COMPLIANCE-01` e o **modelo de `Payment`, que não tem campos definidos em documento nenhum** — invoice paga em duas tentativas (PIX falho + cartão) não cabe no modelo atual | F12–F16 |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
 
+> 🔴 **Correção material no ADR-007, registrada em 17/08/2026.** A *"Consequência 2"* do ADR-007
+> afirma que a denylist de consentimento revogado *"provavelmente altera o contrato de snapshot que
+> F4 já implementou"*. **Esse contrato não existe.** A F4 entregou
+> `apps/edge-agent/src/persistence/cache-de-permissoes.ts` — cache local **de laboratório** da
+> Slice 0.4, com três colunas, populado à mão, **sem** `schemaVersion`, assinatura, `tenant_id`,
+> `gym_unit_id` nem expiração de snapshot. O snapshot assinado e versionado de `M1-FR-025`/`026` e
+> `INV-054`/`055` é **escopo virgem de F10**.
+>
+> **Efeito:** não há bump, migração nem compatibilidade retroativa a manter — a denylist entra como
+> campo **de nascença**, em `schemaVersion: 1`. Decisão do PI em 17/08: **versiona dentro da F10**,
+> registrado na `SPEC-010`; o primeiro **ADR de contrato de Edge nasce quando houver Edge instalado
+> em cliente**. Mesma disciplina da correção do ADR-008: premissa errada em ADR aceito se corrige
+> no lugar, não se herda.
+
 ### 3.2 Decididos em 14/08/2026 — segunda rodada
 
 | ADR | decisão |
@@ -201,7 +243,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 
 | MVP | entrega | gate de entrada | fatias | estado |
 |---|---|---|---|---|
-| **0** | Hardware e protocolo Topdata comprovados em bancada | hardware + SDK + rede de laboratório | F1–F5 | não iniciado |
+| **0** | Hardware e protocolo Topdata comprovados em bancada | hardware + SDK + rede de laboratório | F1–F5 | **em execução — cadeia física provada em 17/08**; gate §15 aberto (modo bloqueado da catraca, `M0-AC-002`, latência real e assinatura do PI) |
 | **1** | Academia operando acesso online, com assinatura manual | decisão de saída do MVP 0 (`MVP-00` §15) = `GO` ou `GO_WITH_CONSTRAINTS` | F6–F9, F11 | bloqueado por MVP 0 |
 | **1.5** | Operação offline: snapshot, fila e reconciliação | MVP 1 em piloto, com incidente de link medido | F10 | adiado por **ADR-012**. **ADR-007 fechado em 16/08 — spec aprovada** |
 | **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | bloqueado por ADR-013 |
