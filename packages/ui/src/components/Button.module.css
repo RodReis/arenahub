@@ -1,0 +1,90 @@
+/**
+ * Controles -- DS-PAINEL.md §6.
+ *
+ * Le so a camada semantica (regra 2): `--ah-control-*`, `--ah-action-*`,
+ * `--ah-state-danger`. Nunca `--ah-carbon-*` nem `--ah-accent-<n>`.
+ *
+ * Accent E permitido aqui, ao contrario do badge: botao primario e ACAO, e
+ * acao e exatamente o papel do accent do tenant.
+ */
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ah-control-height);
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--ah-control-radius);
+  font-family: inherit;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--ah-motion-control) var(--ah-motion-easing),
+    border-color var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.botao[data-variant='solid'] {
+  background: var(--ah-action-solid);
+  color: var(--ah-action-on-solid);
+}
+
+.botao[data-variant='solid']:hover:not(:disabled) {
+  background: var(--ah-action-hover);
+}
+
+.botao[data-variant='outline'] {
+  background: var(--ah-surface-raised);
+  border-color: var(--ah-border-default);
+  color: var(--ah-text-label);
+}
+
+.botao[data-variant='outline']:hover:not(:disabled) {
+  border-color: var(--ah-border-strong);
+}
+
+.botao[data-variant='ghost'] {
+  background: transparent;
+  color: var(--ah-action-text);
+}
+
+.botao[data-variant='ghost']:hover:not(:disabled) {
+  background: var(--ah-surface-canvas);
+}
+
+/**
+ * Destrutivo e OUTLINE, nao solido.
+ *
+ * Um botao vermelho preenchido compete com o primario e vira o elemento mais
+ * pesado da tela -- e a acao destrutiva nao e a que a recepcao faz mais vezes.
+ * O peso visual entra no hover, quando a intencao ja existe.
+ */
+.botao[data-variant='destructive'] {
+  background: var(--ah-surface-raised);
+  border-color: var(--ah-state-danger);
+  color: var(--ah-state-danger);
+}
+
+.botao[data-variant='destructive']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ah-state-danger) 6%, var(--ah-surface-raised));
+}
+
+/**
+ * Disabled -- EXCECAO NOMEADA de contraste, decidida pelo PI (opcao A).
+ *
+ * `--ah-control-disabled-text` resolve para carbon-400 (3.78), abaixo do alvo
+ * de 4.5. WCAG 2.2 §1.4.3 isenta componente inativo. `carbon-500` foi
+ * RECUSADO: um desabilitado escuro demais volta a ler como habilitado,
+ * trocando falha de contraste por falha de affordance -- pior na recepcao.
+ *
+ * A isencao esta declarada em `tokens/semantic.json` como `$exempt`. Remover
+ * de la derruba o build, e e assim que a justificativa fica presa ao token.
+ */
+.botao:disabled {
+  background: var(--ah-control-disabled-bg);
+  border-color: var(--ah-control-disabled-border);
+  color: var(--ah-control-disabled-text);
+  cursor: not-allowed;
+}
