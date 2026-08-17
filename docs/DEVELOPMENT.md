@@ -9,9 +9,13 @@
 **Estado em 16/08/2026:** bootstrap fechado ([#42](https://github.com/RodReis/arenahub/issues/42)–[#47](https://github.com/RodReis/arenahub/issues/47))
 e a *exceção de arranque* morreu — o CI decide o merge. Entregues: **F1, F4, F6, F7, F8, F9 e F11**,
 mais a ponte EasyInner ([#61](https://github.com/RodReis/arenahub/issues/61)) e o **pipeline de
-tokens** ([#79](https://github.com/RodReis/arenahub/issues/79)). **F2 e F3 estão em andamento e não
+tokens** ([#79](https://github.com/RodReis/arenahub/issues/79)). **F2 e F3 não
 travam em código** — dependem de consentimento, cutover da catraca e janela combinada com o PI.
 Registro linha a linha na §5. O board (Projects) em si continua pendente — ver §4.
+
+> ⚠️ **No board, `proplan:doing` são F2 e F10** — não F2 e F3. A F10 destravou com o fecho do
+> ADR-007, mas o **ADR-012 mantém o MVP 1.5 fechado** até o piloto produzir incidente medido de
+> queda de link: ela está tecnicamente pegável e processualmente parada.
 
 ---
 
@@ -771,4 +775,5 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 16/08/2026 | **F11** | SPEC-011 | [#75](https://github.com/RodReis/arenahub/pull/75) | painel operacional, saúde de dispositivo, alerta quando o Edge some, consulta e exportação de eventos |
 | 16/08/2026 | **F7** *(interface, fecha)* | SPEC-007 | [#76](https://github.com/RodReis/arenahub/pull/76) | interface da recepção: busca, cadastro, ficha com direitos, histórico e planos. **`M1-AC-002` e `M1-AC-003` fecham** — o aceite deixou de depender de `curl`. 43 unitários + 17 E2E novos. **Toast do `CLAUDE.md` não implementado** — débito anterior à fatia, sugerido card `[INFRA]` |
 | 16/08/2026 | — *(#79)* | — | [#80](https://github.com/RodReis/arenahub/pull/80) | pipeline de tokens e esqueleto de `packages/ui`: três camadas de token, resolvedor de accent OKLCH por contraste calculado, 5 regras de lint e `globals.css` no `admin-web`. **Guardas testadas falhando, não só passando.** Metade sem decisão de produto do ADR-025 — **desbloqueia F42**. Componentes e `state-labels.ts` ficam para a fatia |
+| 17/08/2026 | — *(#85)* | — | *(PR desta entrega)* | `[FIX]`: o `eslint.config.js` do painel importava só o config base, nunca o `design-system` — `pnpm lint` saía **exit 0 com violações vivas** da regra 5 do DS §11. Eram 2, não as 4 do card: a F42 já migrara as duas páginas `.tsx`. `instanteLegivel` já era **código morto** (zero callers) e saiu; `dataLegivel` tinha um caller vivo e migrou para `TenantDateTime`. **Nenhum `eslint-disable` foi preciso** — o caminho 1 do card saiu limpo. Fuso segue `FUSO_PROVISORIO`: ler o da unidade é fatia (escopo negativo do card) |
 | 17/08/2026 | **F42** | SPEC-042 | [#86](https://github.com/RodReis/arenahub/pull/86) | design system do painel: `state-labels.ts` com as 8 razões do ADR-024, 15 componentes, contrato dos 6 de MVP futuro, **as 11 telas de F6/F7/F11 mais o login estilizadas**, axe-core nos fluxos essenciais. Fatia de **extração**: matou 5 dicionários duplicados, 2 cópias de `formatarInstante`, 11 blocos de erro e 12 tabelas soltas. **Fecha o Toast do `CLAUDE.md`.** Dois bugs reais achados: contraste 3.16 do "Sair" sobre o chrome (pego pelo axe) e `aria-label` do revelar-senha tornando o campo ambíguo. 200 unitários + 46 E2E |
