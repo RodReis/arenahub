@@ -1,0 +1,44 @@
+/**
+ * `ProblemDetail` -- DS-PAINEL.md §8.1. Le so a camada semantica (regra 2).
+ *
+ * Borda a 32% do tom de erro, como o badge: erro na tela e informacao de
+ * estado, nao alarme decorativo. Sem sombra -- card do painel tem borda (§4).
+ */
+.problema {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--ah-surface-raised);
+  border: 1px solid color-mix(in srgb, var(--ah-state-danger) 32%, transparent);
+  border-radius: var(--ah-radius-card);
+}
+
+.titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ah-state-danger);
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: var(--ah-type-heading-weight);
+}
+
+.contexto,
+.acao {
+  margin: 0;
+  color: var(--ah-text-default);
+}
+
+/**
+ * Codigo e `correlationId` em mono: sao string tecnica que alguem le em voz
+ * alta no telefone com o suporte. Proporcional embaralha 0/O e 1/l.
+ */
+.codigo {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+  line-height: var(--ah-type-mono-lh);
+}

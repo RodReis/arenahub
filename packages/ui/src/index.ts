@@ -19,7 +19,9 @@ export { EmptyState } from './components/EmptyState.js';
 export { Icon, type IconName } from './components/Icon.js';
 export { MaskedCPF } from './components/MaskedCPF.js';
 export { Money } from './components/Money.js';
+export { ProblemDetail, type ProblemJson } from './components/ProblemDetail.js';
 export { StateBadge } from './components/StateBadge.js';
+export { ToastProvider, useToast, type ToastKind } from './components/Toast.js';
 export { TenantDateTime } from './components/TenantDateTime.js';
 
 export {
