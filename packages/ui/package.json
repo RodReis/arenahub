@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Design system do ArenaHub: pipeline de tokens e primitivas compartilhadas",
+  "//exports": "O `dist` e o entrypoint, e o build COPIA os `.module.css` para la. O `tsc` sozinho nao copia: ele transpila o `.tsx` e deixa `import './Button.module.css'` apontando para um arquivo que nunca chegou. Apontar o entrypoint para `src` nao resolve -- os imports internos usam extensao `.js` (NodeNext), e o bundler lendo `.tsx` nao mapeia `.js` de volta.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -25,7 +26,7 @@
   ],
   "scripts": {
     "build:tokens": "node scripts/build-tokens.mjs",
-    "build": "node scripts/build-tokens.mjs && tsc -p tsconfig.build.json",
+    "build": "node scripts/build-tokens.mjs && tsc -p tsconfig.build.json && node scripts/copy-css.mjs",
     "//lint": "Escopo em `src` porque `scripts/build-tokens.mjs` e JavaScript de build que roda em Node, fora do programa TypeScript do pacote -- o parser type-aware exigiria inclui-lo no tsconfig, e incluir arrastaria o pipeline para o typecheck do que ele mesmo gera. Mesmo tratamento dos `scripts/*.mjs` da raiz, que tambem nao sao lintados.",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
