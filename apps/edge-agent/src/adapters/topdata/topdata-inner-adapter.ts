@@ -64,6 +64,22 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
     private readonly invertido = false,
   ) {}
 
+  /**
+   * Abre a porta e roda a inicializacao ONLINE completa da catraca.
+   *
+   * ⚠️ CHAME ANTES do primeiro `liberar`. Sem isto o giro e recusado com
+   * `retorno 1` -- a init parcial de `testarConexao` nao roda o
+   * `ConfigurarAcionamento1`, que e o que habilita o rele como catraca.
+   * Achado de campo 17/08/2026; ver o comando `conectar` da ponte.
+   *
+   * A catraca e cliente: apos este comando ela ainda leva alguns segundos
+   * para discar de volta. Confirme com `testarConexao()` antes de liberar.
+   */
+  async conectar(porta: number, tempo = 10): Promise<boolean> {
+    const r = await this.ponte.executar({ cmd: 'conectar', porta, tempo });
+    return r.tipo === 'retorno' && r.retorno === 0;
+  }
+
   /** A catraca responde? `TestarConexaoInner`. */
   async testarConexao(): Promise<boolean> {
     const r = await this.ponte.executar({ cmd: 'testar-conexao', inner: this.inner });

@@ -83,11 +83,120 @@ arquitetura nº 3); o ack só confirma o recebimento.
 > para a conexão viver. Também: registrar `senduser` no resumo verificável de
 > `docs/vendor/topdata/` quando houver manual da revisão `v2.16`.
 
-## 3. O que ainda falta para o gate
+## 3. `lab:run` construído e a cadeia física ponta a ponta
 
-- **latência ponta a ponta** (`M0-NFR-001`, rosto → decisão → giro): exige o facial e a catraca no
-  mesmo orquestrador (`lab:run`), que ainda não existe;
-- **`M0-AC-004`** (catraca não gira sem comando): a catraca está em `acionamento1:8` (liberada);
+Ainda na mesma janela, com o PI assumindo o escopo, o `lab:run` foi **construído** (antes não
+existia — era o bloqueio nº 1 do runbook §0). Ele liga `facial.aoReconhecer` → decisão LOCAL
+(`orquestrar-passagem`, MVP 0) → `catraca.liberar`, e coleta latência. Peça pura testada no CI
+(`src/lab/lab-run.ts` + `.spec.ts`); wiring de I/O em `lab-run-cli.ts` (não roda no CI).
+
+**Uso:** `pnpm --filter @arenahub/edge-agent lab:run -- --permitidos <enrollid> [--sentido saida] [--invertido]`
+
+### 3.1. Bug de inicialização online — `retorno 1` no `liberar`
+
+Primeira execução do `lab:run` recusava todo `liberar` com **`retorno 1`**. Causa: o
+`TopdataInnerAdapter.testarConexao()` roda só `ConfigurarInnerOnLine` — **não** o
+`ConfigurarAcionamento1`, que define o relé como catraca. Sem ele a catraca aceita a conexão mas
+recusa o giro (comentário no `EasyInnerBridge.cs` já anotava isso). Os scripts manuais de F3
+funcionavam porque mandavam o comando `conectar` (init completa); o adapter não o expunha.
+
+**Fix (TDD):** comando `conectar` adicionado ao `esquemaComandoPonte` + método
+`TopdataInnerAdapter.conectar(porta, tempo)` que dispara a init online completa. O `lab:run` chama
+`conectar` antes do primeiro `liberar`. Verificado ao vivo: o `liberar` passou a ser aceito.
+
+### 3.2. 🔴 Sentido de giro — dado de campo desta instalação
+
+Provado ao vivo qual comando gira para dentro nesta catraca — **não se deduz, o manual é explícito**:
+
+| `--sentido` | `--invertido` | lado físico que liberou |
+|---|---|---|
+| `entrada` | false | **saída** (invertido pela instalação) |
+| `entrada` | true | **os dois** (`<>`) |
+| **`saida`** | **false** | **ENTRADA (pra dentro)** ✅ |
+
+**Configuração correta da bancada Arena Positiva: `--sentido saida --invertido` ausente.** A
+saída física é livre pela própria catraca (giro solto no sentido de sair), então o ArenaHub só
+comanda a entrada. Isto é dado de campo por instalação, **não** default universal — por isso o
+`lab:run` mantém `--sentido` configurável em vez de fixar o valor no código.
+
+### 3.3. Cadeia física ponta a ponta — provada
+
+Com a combinação certa, a cadeia rodou num único laço automático, sem comando manual:
+
+**rosto → facial reconhece → ArenaHub decide ALLOW (local) → catraca destrava (entrada) → giro →
+sensor confirma (`origem:6`).**
+
+Evidência da sessão: múltiplos `desfecho:"girou"` (giro confirmado), `desfecho:"timeout"` (destravou,
+não passou a tempo), e a **janela anti-repique** negando rajadas (`DENY` por `REPETICAO`) — `M0-AC-003`
+sustentado ao vivo, 0 duplas. `M0-AC-004`: os `DENY` não acionam a catraca (estrutura do
+`orquestrar-passagem`).
+
+> ⚠️ **A latência (`M0-NFR-001`) NÃO foi medida como ponta a ponta real.** A decisão é LOCAL e
+> síncrona, então `latenciaDecisaoMs` arredonda a 0 — não há a rede da nuvem no laço (isso é F9,
+> MVP 1). O que se provou é a CADEIA FÍSICA funcionando, não o número de latência do gate.
+
+### 3.4. 🔴 Demora perceptível reconhecimento → liberação (observação do PI)
+
+O PI observou ao vivo uma **demora perceptível entre o rosto ser reconhecido e a catraca
+liberar**. O dado é real e precisa de investigação — mas o `latenciaDecisaoMs: 0` do log prova que
+**a demora NÃO está na decisão do ArenaHub** (local, síncrona). Ela está num dos trechos que o
+`lab:run` hoje **não instrumenta**:
+
+1. **leitor facial**: tempo entre ver o rosto e emitir o `sendlog` (processamento no equipamento);
+2. **rede WebSocket**: o `sendlog` viajando do leitor `.188` até o edge-agent;
+3. **ponte + catraca**: o `liberar` chegando à DLL e a catraca destravando.
+
+**Medição por etapa feita ao vivo (17/08)** — instrumentado com timestamps em cada ponto:
+
+| etapa | medido |
+|---|---|
+| `sendlog` recebido → `liberar` enviado (**o ArenaHub**) | **0–1 ms** |
+| `liberar` → catraca confirmou giro | 2600–5076 ms (**inclui tempo humano** de girar) |
+
+**Conclusão: o ArenaHub NÃO é o gargalo.** Do reconhecimento recebido ao comando da catraca são
+0–1 ms. A demora perceptível está **no leitor facial** — o tempo entre a pessoa aparecer na câmera
+e o equipamento processar o rosto e emitir o `sendlog`. Isso é interno ao hardware Topdata, **fora
+do nosso código**; não há o que otimizar no ArenaHub para reduzi-la.
+
+### 3.5. 🔴 Achado extra — `ocorridoEm` do leitor congelado
+
+Em todas as medições o `sendlog` trouxe **o mesmo `ocorridoEm` (`2026-08-17T15:47:28`)**, apesar
+de os reconhecimentos ocorrerem minutos depois. O leitor está emitindo um timestamp **fixo** — ou o
+relógio dele está parado/errado, ou o firmware `v2.16` reusa o horário do último cadastro. Isto
+importa: o `M0-FR-004` usa `ocorridoEm` do equipamento para ordenar eventos, e um timestamp
+congelado **embaralha a ordem**. **Pendência:** acertar o relógio do leitor (menu `Sistema → Data
+e Hora`) e reavaliar se o `ocorridoEm` passa a variar; se não variar mesmo com relógio certo, o
+edge-agent precisa carimbar o horário de recebimento como fallback — decisão para a spec de F2.
+
+## 4. 🔴 A catraca deixa entrar SEM reconhecimento — furo de config, não de código
+
+Achado crítico, confirmado ao vivo pelo PI: **sem passar o rosto, a pessoa entra empurrando a
+catraca.** A regra "entrada exige decisão" **não está valendo** na config atual da bancada.
+
+Causa: `acionamento1: 8` (`CATRACA_LIBERADA_DOIS_SENTIDOS`) — a catraca está em modo **liberada
+nos dois sentidos** em repouso. O `liberar` do ArenaHub não *destrava* nada, porque a catraca
+nunca esteve travada. Todos os giros provados hoje são reais, mas teriam acontecido **mesmo sem o
+comando** — o `origem:6` prova que a pessoa girou, não que só quem é reconhecido entra.
+
+**Para a regra valer**, a catraca precisa ir para **modo bloqueado** (travada em repouso, destrava
+só com o `liberar`). Isso é mudar `acionamento1` de `8` para o modo bloqueado — **config do
+equipamento, não do ArenaHub**. O modo **não aparece no menu do painel** desta catraca; só se muda
+pela API/SDK. Não foi feito nesta janela: o endpoint de escrita e o valor exato do modo bloqueado
+**não estão confirmados** nos manuais que temos (só o `GET /configuracaoacesso`), e chutar escrita
+de `acionamento` em catraca de produção foi recusado. **Pendência para a próxima janela, com o
+manual do SDK na mão.** Reversão é trivial: voltar `acionamento1` para `8`.
+
+> **Consequência para o gate:** o `M0-AC-004` (entrada não abre sem comando) **não pode fechar**
+> enquanto a catraca estiver em `acionamento1:8`. A cadeia de código está provada; a *garantia
+> física* de que ninguém entra sem direito depende deste ajuste de config.
+
+## 5. O que ainda falta para o gate
+
+- **modo bloqueado da catraca** (`acionamento1:8` → bloqueado) — §4, pré-requisito de `M0-AC-004`;
+- **latência ponta a ponta REAL** (`M0-NFR-001`): exige a decisão pela nuvem (F9, MVP 1), não a
+  local do `lab:run`. Medido hoje: o ArenaHub responde em 0–1 ms; a demora percebida é do leitor;
+- **relógio do leitor** (`ocorridoEm` congelado, §3.5) — afeta ordenação de eventos;
+- **devolução dos equipamentos ao legado** (facial e catraca em `.190` ao fim desta janela);
 - **assinatura do PI** (`M0-AC-010`).
 
 ---

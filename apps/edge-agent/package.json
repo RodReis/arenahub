@@ -11,6 +11,8 @@
     "lint": "eslint .",
     "//test:hardware:access": "Exige a bancada montada (leitor + catraca). NAO roda no CI nem no `pnpm test`.",
     "test:hardware:access": "tsx src/diagnostics/medir-passagem-online.ts",
+    "//lab:run": "MVP 0: cadeia fisica ponta a ponta (facial -> decisao local -> catraca). Exige bancada montada. NAO roda no CI.",
+    "lab:run": "tsx src/lab/lab-run-cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "diagnostico": "tsx src/diagnostics/run.ts",

@@ -1,6 +1,6 @@
 # Relatório da POC Topdata — MVP 0 (Slice 0.5 / F5)
 
-**Status: PARCIAL — F3 física coletada em 17/08/2026; ciclo facial (F2) e latência ponta a ponta seguem `PENDENTE-POC`.** · **Data:** 15/08/2026, atualizado 17/08/2026 · **Fatia:** F5 · **Spec:** SPEC-005
+**Status: PARCIAL — duas janelas físicas em 17/08/2026 (catraca e ciclo facial); cadeia provada ponta a ponta, mas latência real e bloqueio da catraca seguem pendentes.** · **Data:** 15/08/2026, atualizado 17/08/2026 · **Fatia:** F5 · **Spec:** SPEC-005
 
 > **O que este relatório é.** O entregável da Slice 0.5 (`MVP-00` §6): matriz de compatibilidade,
 > limitações por equipamento, runbook e recomendação de gate (`GO`/`GO_WITH_CONSTRAINTS`/`NO_GO`).
@@ -96,10 +96,10 @@ por teste de simulador, marca-se ✅ (simulado); a validação **física** é `P
 |---|---|---|
 | leitor indisponível na inicialização | ✅ `health-check` | `PENDENTE-POC` |
 | catraca desconectada durante comando | ✅ adapter/orquestração | `PENDENTE-POC` |
-| reconhecimento duplicado | ✅ `orquestrar-passagem` (prevenção de dupla liberação) | ✅ **17/08: 30 comandos → 0 duplas** (§9) |
-| usuário inexistente | ✅ | `PENDENTE-POC` |
+| reconhecimento duplicado | ✅ `orquestrar-passagem` (prevenção de dupla liberação) | ✅ **17/08: 30 comandos → 0 duplas** (§9.1); anti-repique negou rajadas ao vivo (§9.4) |
+| usuário inexistente | ✅ | ✅ **17/08: DENY para desconhecido no `lab:run`** (§9.4) |
 | `enrollid` já utilizado | ✅ `external-enroll-id` | `PENDENTE-POC` |
-| timeout sem giro | ✅ | ✅ **17/08: `origem:5` capturado** (liberou, ninguém passou) (§9) |
+| timeout sem giro | ✅ | ✅ **17/08: `origem:5` capturado** (liberou, ninguém passou) (§9.1) |
 | queda do coletor cloud | ✅ `reconciliar`/`coletor-simulado` | n/a (simulável) |
 | queda da rede local | ✅ fila SQLite | `PENDENTE-POC` |
 | reinício abrupto com fila pendente | ✅ `fila-de-eventos` (`synchronous=FULL`) | `PENDENTE-POC` |
@@ -143,9 +143,16 @@ por teste de simulador, marca-se ✅ (simulado); a validação **física** é `P
 
 ---
 
-## 9. Janela física de 17/08/2026 — F3 (catraca) coletada
+## 9. Janelas físicas de 17/08/2026
 
-Primeira janela física executada. Pré-condições do §7 cumpridas: legado `.106` desligado,
+Duas janelas executadas no mesmo dia, na unidade, com a catraca Topdata Inner Fit instalada:
+a **primeira** (§9.1–§9.3) mediu a catraca isolada (F3); a **segunda** (§9.4–§9.6) ligou o leitor
+facial e fechou a cadeia ponta a ponta (F2/F5). Detalhe da segunda no field-note
+`docs/field-notes/2026-08-17-ciclo-facial-ao-vivo.md`.
+
+### Primeira janela — catraca (F3)
+
+Pré-condições do §7 cumpridas: legado `.106` desligado,
 consentimento assinado em mãos, academia vazia, parada de emergência definida (cortar a fonte da
 catraca). Cutover feito: `ipServer` da catraca `192.168.2.106` → `192.168.2.190` (PC da ponte),
 firewall de entrada 3570 aberto. **Ao fim da janela o `ipServer` foi devolvido para `.106` e o
@@ -173,10 +180,12 @@ legado religado** (runbook §5).
 - **`M0-AC-004`** (60 s sem comando = sem giro): **não roda** — a catraca está com
   `acionamento1:8` (`CATRACA_LIBERADA_DOIS_SENTIDOS`), o braço gira livre por configuração. O teste
   exige modo bloqueado, que é escrita na config da catraca, não realizada nesta janela.
-- **F2 — ciclo facial** (`M0-AC-001`/`002`): **não tocado.** O servidor WebSocket 7792 e o
-  `lab:run` que instancia os adapters ponta a ponta **não existem** — é fatia nova, spec do Cowork
-  (`STATUS.md` item 6). O leitor facial não reconheceu ninguém nesta janela.
-- **Latência ponta a ponta** (`M0-NFR-001`, rosto → decisão → giro): não medível sem F2.
+- **F2 — ciclo facial** (`M0-AC-001`/`002`): **não tocado nesta janela.** O leitor facial não
+  reconheceu ninguém aqui, e o `lab:run` ainda não existia neste momento. ➡️ **Resolvido na segunda
+  janela do mesmo dia** — ver §9.4: o `lab:run` foi construído dentro dela e o ciclo facial rodou
+  ponta a ponta.
+- **Latência ponta a ponta** (`M0-NFR-001`, rosto → decisão → giro): não medível nesta janela.
+  Segue pendente mesmo depois da segunda — exige a nuvem no laço (F9), ver §9.6.
 
 ### 9.3. Correção de um mal-entendido de método
 
@@ -186,6 +195,51 @@ bloqueia, por design. Quem faz o loop de espera (pausa + ping até o prazo) é o
 que varre a fila em rajada perde o evento assíncrono de giro — foi o que causou os primeiros
 "sem-evento" desta janela. **Não há bug na ponte nem no adapter**; o erro estava no script de
 coleta descartável, corrigido para espelhar o adapter.
+
+---
+
+### Segunda janela — ciclo facial e cadeia ponta a ponta (F2/F5)
+
+Detalhe completo no field-note `docs/field-notes/2026-08-17-ciclo-facial-ao-vivo.md`; aqui, o
+resumo para o relatório de gate.
+
+### 9.4. O que foi provado ao vivo
+
+| item | evidência |
+|---|---|
+| leitor facial conecta e registra (`reg`) | firmware `ai518_fp26v_v2.16`, serial `AYTI11108174` |
+| **cadastro** pelo ArenaHub (`M0-FR-002`) | `setuserinfo` confirmado pelo leitor |
+| **reconhecimento** facial (`M0-FR-004`) | `sendlog` recebido com `enrollid` correto, método `facial` |
+| **cadeia ponta a ponta** (rosto → decisão local → giro) | `lab:run` construído; múltiplos `desfecho:"girou"` |
+| **`M0-AC-003`** (sem dupla) ao vivo | janela anti-repique negou rajadas (`DENY` por `REPETICAO`), 0 duplas |
+| **`M0-AC-004`** (DENY não aciona) | desconhecido → `DENY`, catraca não acionada |
+| sentido de giro da instalação | **`--sentido saida` gira para ENTRADA** nesta catraca (dado de campo) |
+| latência do ArenaHub | **0–1 ms** do reconhecimento ao comando (não é o gargalo) |
+
+### 9.5. Código entregue (fora do fluxo de spec, PI assumiu o escopo)
+
+- **`senduser`** do firmware v2.16: aceito + ack (sem ele o leitor derrubava a conexão);
+- **`conectar`** na ponte/adapter: init online completa (sem ela o `liberar` voltava `retorno 1`);
+- **`lab:run`**: liga facial → decisão local → catraca, com `--permitidos`, `--sentido`, `--invertido`;
+- **sentido** repassado por `orquestrar-passagem`.
+
+Tudo com TDD, na branch `feat/f2-facial-senduser`. Suíte do edge-agent verde (180 testes).
+
+### 9.6. Bloqueios que o campo revelou — nenhum fecha o gate hoje
+
+- 🔴 **catraca em `acionamento1:8` (liberada dois sentidos): entra sem reconhecimento.** A regra
+  "entrada exige decisão" não vale até a catraca ir para modo bloqueado — config do equipamento,
+  não do ArenaHub. Modo não está no menu do painel; só via API, com endpoint/valor não confirmados.
+  **Pré-requisito de `M0-AC-004`.**
+- 🔴 **latência ponta a ponta real** (`M0-NFR-001`) exige a nuvem no laço (F9). A demora percebida é
+  do **leitor facial** processando o rosto, não do ArenaHub (medido: 0–1 ms nosso).
+- 🔴 **relógio do leitor**: `ocorridoEm` congelado em `15:47:28` — afeta ordenação (`M0-FR-004`).
+- ✅ **devolução — feita.** Facial e catraca voltaram para `.106` e o legado foi religado ao fim do
+  dia (runbook §5). O registro de "ficaram em `.190`" foi escrito durante a janela, antes do
+  encerramento; corrigido aqui.
+
+> **O gate §15 continua não fechando.** A cadeia física está provada, mas `M0-AC-004` depende do
+> bloqueio da catraca, `M0-NFR-001` da latência real, e falta a assinatura do PI (`M0-AC-010`).
 
 ---
 

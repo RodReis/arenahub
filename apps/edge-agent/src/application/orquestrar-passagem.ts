@@ -4,7 +4,11 @@ import {
   type PermissaoLocal,
 } from '../domain/access-decision.js';
 import { type EventoReconhecimento } from '../domain/facial-device.js';
-import { type DesfechoPassagem, type TurnstileAdapter } from '../domain/turnstile.js';
+import {
+  type DesfechoPassagem,
+  type SentidoGiro,
+  type TurnstileAdapter,
+} from '../domain/turnstile.js';
 import { FilaPorPessoa } from './fila-por-pessoa.js';
 
 /**
@@ -46,6 +50,14 @@ export type DepsPassagem = {
   registrarAllow: (externalEnrollId: string, em: Date) => void;
   /** Relogio monotonico, para medir latencia sem sofrer com ajuste de hora. */
   agoraMonotonicoMs: () => number;
+  /**
+   * Sentido do giro a comandar. Default `entrada`.
+   *
+   * Qual sentido gira fisicamente para dentro DEPENDE DA INSTALACAO -- o
+   * manual e explicito que se descobre testando. Na bancada da Arena, o
+   * mapeamento sentido -> lado fisico e um dado de campo, nao uma constante.
+   */
+  sentido?: SentidoGiro;
 };
 
 /**
@@ -94,7 +106,7 @@ export async function processarReconhecimento(
     };
   }
 
-  const resultado = await deps.catraca.liberar(correlationId, timeoutMs);
+  const resultado = await deps.catraca.liberar(correlationId, timeoutMs, deps.sentido);
 
   // Só depois de liberar de fato: registrar antes faria uma falha de
   // comando consumir a janela anti-repique e negar a proxima tentativa
