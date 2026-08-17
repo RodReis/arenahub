@@ -53,7 +53,6 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
-- [MVP0][SPEC-005][F5] Relatório e decisão (#5)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 
 ## Feito
@@ -64,6 +63,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP0][SPEC-005][F5] Relatório e decisão (#5, finalizado em: 2026-08-17)
 - [MVP0][SPEC-003][F3] Catraca e passagem (#3, finalizado em: 2026-08-17)
 - [MVP2.5][SPEC-042][F42] Design system da superfície admin-web (#81, finalizado em: 2026-08-17)
 - [INFRA] Pipeline de tokens do design system e esqueleto de packages/ui (#79, finalizado em: 2026-08-16)
