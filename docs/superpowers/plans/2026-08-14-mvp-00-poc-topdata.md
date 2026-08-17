@@ -71,7 +71,7 @@ Este plano **não inventa chamadas EasyInner ou protocolo facial**. A implementa
 /docs/lab/topdata/runbook.md                  instalação, execução e rollback
 /docs/lab/topdata/decision-policy.md           critérios GO/GO_WITH_CONSTRAINTS/NO_GO
 /docs/lab/topdata/simulator-network.txt        topologia não física usada no CI
-/docs/adr/0001-edge-runtime-and-bridge.md       decisão Node + bridge externo
+/docs/DECISIONS.md                             ADR novo: decisão Node + bridge externo
 ```
 
 ## Task 1: Bootstrap reproduzível do monorepo e Edge Agent
@@ -2282,7 +2282,7 @@ git commit -m "test(edge): automate MVP zero simulator acceptance"
 - Create: `docs/lab/topdata/runbook.md`
 - Create: `docs/lab/topdata/decision-policy.md`
 - Create: `docs/lab/topdata/simulator-network.txt`
-- Create: `docs/adr/0001-edge-runtime-and-bridge.md`
+- Modify: `docs/DECISIONS.md` — decisão estrutural vira ADR novo em `docs/DECISIONS.md`, aprovado pelo PI
 
 - [ ] **Step 1: Create the machine-readable inventory contract**
 
@@ -2532,10 +2532,11 @@ Create `docs/lab/topdata/decision-policy.md`:
 O relatório exige no mínimo dez amostras físicas de latência. `GO` e `GO_WITH_CONSTRAINTS` só valem com assinatura técnica e operacional. Restrições são propagadas ao MVP 1. `NO_GO` bloqueia o planejamento físico do MVP 1.
 ```
 
-Create `docs/adr/0001-edge-runtime-and-bridge.md`:
+Decisão estrutural vira **ADR novo em `docs/DECISIONS.md`, aprovado pelo PI** — o número sai da
+sequência que já vale naquele arquivo, nunca de uma numeração paralela. Conteúdo a submeter:
 
 ```markdown
-# ADR 0001 — Runtime do Edge e isolamento do SDK
+## ADR-NNN — Runtime do Edge e isolamento do SDK
 
 ## Status
 
@@ -2572,7 +2573,7 @@ Expected: code commands PASS; `lab:gate` exits `2` until the real local inventor
 Commit:
 
 ```bash
-git add apps/edge-agent/config/lab-inventory.schema.json apps/edge-agent/config/lab-inventory.simulator.json apps/edge-agent/config/lab-env.simulator.ps1 apps/edge-agent/scripts apps/edge-agent/package.json docs/lab docs/adr
+git add apps/edge-agent/config/lab-inventory.schema.json apps/edge-agent/config/lab-inventory.simulator.json apps/edge-agent/config/lab-env.simulator.ps1 apps/edge-agent/scripts apps/edge-agent/package.json docs/lab docs/DECISIONS.md
 git commit -m "docs(edge): define Topdata hardware gate and lab evidence"
 ```
 
