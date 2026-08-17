@@ -1,0 +1,24 @@
+/**
+ * Frescor do dado -- DS-PAINEL.md §8.2. Le so a camada semantica (regra 2).
+ */
+.carimbo,
+.indisponivel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.carimbo[data-state='current'] {
+  color: var(--ah-text-secondary);
+}
+
+.carimbo[data-state='stale'] {
+  color: var(--ah-state-warning);
+}
+
+.indisponivel {
+  color: var(--ah-state-danger);
+}

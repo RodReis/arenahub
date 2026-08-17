@@ -14,8 +14,13 @@
 
 export { Ausente } from './components/Ausente.js';
 export { Button } from './components/Button.js';
+export { DataFreshness } from './components/DataFreshness.js';
+export { EmptyState } from './components/EmptyState.js';
 export { Icon, type IconName } from './components/Icon.js';
+export { MaskedCPF } from './components/MaskedCPF.js';
+export { Money } from './components/Money.js';
 export { StateBadge } from './components/StateBadge.js';
+export { TenantDateTime } from './components/TenantDateTime.js';
 
 export {
   STATE_LABELS,

@@ -21,6 +21,24 @@
  * hex no repositorio, e a regra 1 existe justamente para manter assim.
  */
 
+/**
+ * Os componentes que as regras 5 e 6 existem para PROTEGER.
+ *
+ * Uma regra que diz "so dentro de TenantDateTime" precisa deixar o proprio
+ * `TenantDateTime` formatar data -- senao o unico lugar autorizado do
+ * repositorio e o unico que nao consegue fazer o trabalho, e a saida vira um
+ * `eslint-disable` solto, que e exatamente o que a regra queria impedir.
+ *
+ * A lista e nominal e curta de proposito: um glob generoso (`**\/*[Dd]ate*`)
+ * abriria a excecao para qualquer arquivo com "date" no nome.
+ */
+const FORMATADORES_AUTORIZADOS = [
+  '**/TenantDateTime.tsx',
+  '**/TenantDateTime.spec.tsx',
+  '**/Money.tsx',
+  '**/Money.spec.tsx',
+];
+
 /** Arquivos onde `--ah-action-*` e proibido -- regra 3. */
 const ESTADO_FILES = [
   '**/*[Bb]adge*.{ts,tsx}',
@@ -115,6 +133,21 @@ export default [
             'Dinheiro e inteiro na menor unidade monetaria (M2-BR-001).',
         },
       ],
+    },
+  },
+
+  // --- Excecao nominal das regras 5 e 6 ---------------------------------
+  // `TenantDateTime` e `Money` sao os componentes que estas duas regras
+  // existem para proteger: a mensagem de cada uma diz "so dentro de X". Sem
+  // esta excecao, X e o unico arquivo do repositorio proibido de fazer o
+  // trabalho que so ele pode fazer.
+  //
+  // Desliga so `no-restricted-syntax`, e so nestes quatro arquivos. Todo o
+  // resto das regras continua valendo neles.
+  {
+    files: FORMATADORES_AUTORIZADOS,
+    rules: {
+      'no-restricted-syntax': 'off',
     },
   },
 
