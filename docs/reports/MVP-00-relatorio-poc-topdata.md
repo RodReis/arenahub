@@ -1,6 +1,6 @@
 # Relatório da POC Topdata — MVP 0 (Slice 0.5 / F5)
 
-**Status: PARCIAL — `PENDENTE-POC`.** · **Data:** 15/08/2026 · **Fatia:** F5 · **Spec:** SPEC-005
+**Status: PARCIAL — F3 física coletada em 17/08/2026; ciclo facial (F2) e latência ponta a ponta seguem `PENDENTE-POC`.** · **Data:** 15/08/2026, atualizado 17/08/2026 · **Fatia:** F5 · **Spec:** SPEC-005
 
 > **O que este relatório é.** O entregável da Slice 0.5 (`MVP-00` §6): matriz de compatibilidade,
 > limitações por equipamento, runbook e recomendação de gate (`GO`/`GO_WITH_CONSTRAINTS`/`NO_GO`).
@@ -57,10 +57,20 @@ automaticamente).
 |---|---|---|---|---|
 | reconhecimento → decisão | `PENDENTE-POC` | `PENDENTE-POC` | `PENDENTE-POC` | — |
 | decisão → comando de liberação | `PENDENTE-POC` | `PENDENTE-POC` | `PENDENTE-POC` | — |
-| comando → confirmação de giro | `PENDENTE-POC` | `PENDENTE-POC` | `PENDENTE-POC` | — |
+| **comando `liberar` → retorno da DLL** (latência de máquina) | ~74 ms | — | — | 30 |
+| comando → confirmação de giro (`origem:6`) — **inclui tempo humano** | 1784 ms | 3552 ms | 3552 ms | 28 |
 
 > A infraestrutura de medição existe: `montarRelatorio()` calcula p50/p95/máx e taxa de erro a
-> partir das latências coletadas. Só falta a coleta real, que é a saída de `lab:run`.
+> partir das latências coletadas. As duas primeiras linhas seguem `PENDENTE-POC` porque exigem o
+> **ciclo facial** (F2) ligado — o `lab:run` que instancia os adapters ponta a ponta ainda não
+> existe (fatia nova, ver §9).
+>
+> ⚠️ **As duas latências coletadas em 17/08 medem coisas diferentes.** O `liberar → retorno da
+> DLL` (~74 ms) é a latência **de máquina** — bem abaixo do objetivo de 300 ms do `M0-NFR-002`.
+> Já `comando → confirmação de giro` (p95 3552 ms) é dominado pelo **tempo humano** de girar o
+> braço da catraca à mão, porque não há passagem automática na bancada; **não** é o número do
+> `M0-NFR-001` (que exige rosto → decisão → giro, ainda não medível). Registrar o segundo como se
+> fosse ponta a ponta seria o número inventado que a guarda de evidência existe para barrar.
 
 ## 4. Limitações conhecidas por equipamento — `M0-AC-008`
 
@@ -86,10 +96,10 @@ por teste de simulador, marca-se ✅ (simulado); a validação **física** é `P
 |---|---|---|
 | leitor indisponível na inicialização | ✅ `health-check` | `PENDENTE-POC` |
 | catraca desconectada durante comando | ✅ adapter/orquestração | `PENDENTE-POC` |
-| reconhecimento duplicado | ✅ `orquestrar-passagem` (prevenção de dupla liberação) | `PENDENTE-POC` |
+| reconhecimento duplicado | ✅ `orquestrar-passagem` (prevenção de dupla liberação) | ✅ **17/08: 30 comandos → 0 duplas** (§9) |
 | usuário inexistente | ✅ | `PENDENTE-POC` |
 | `enrollid` já utilizado | ✅ `external-enroll-id` | `PENDENTE-POC` |
-| timeout sem giro | ✅ | `PENDENTE-POC` |
+| timeout sem giro | ✅ | ✅ **17/08: `origem:5` capturado** (liberou, ninguém passou) (§9) |
 | queda do coletor cloud | ✅ `reconciliar`/`coletor-simulado` | n/a (simulável) |
 | queda da rede local | ✅ fila SQLite | `PENDENTE-POC` |
 | reinício abrupto com fila pendente | ✅ `fila-de-eventos` (`synchronous=FULL`) | `PENDENTE-POC` |
@@ -130,6 +140,52 @@ por teste de simulador, marca-se ✅ (simulado); a validação **física** é `P
 
 > **Este documento não fecha o gate.** É a recomendação de campo que o prepara. O MVP 1 não começa
 > até o gate possuir a assinatura e a evidência física (`MVP-00` §15).
+
+---
+
+## 9. Janela física de 17/08/2026 — F3 (catraca) coletada
+
+Primeira janela física executada. Pré-condições do §7 cumpridas: legado `.106` desligado,
+consentimento assinado em mãos, academia vazia, parada de emergência definida (cortar a fonte da
+catraca). Cutover feito: `ipServer` da catraca `192.168.2.106` → `192.168.2.190` (PC da ponte),
+firewall de entrada 3570 aberto. **Ao fim da janela o `ipServer` foi devolvido para `.106` e o
+legado religado** (runbook §5).
+
+### 9.1. O que foi provado
+
+| item | evidência |
+|---|---|
+| ponte EasyInner conecta à catraca real | `versao` → `retorno:0`, firmware `7.05.01` |
+| catraca disca para a ponte após cutover | conexão estabelecida ~4–6 s após a ponte subir |
+| `liberar` aceito pela DLL | **30/30** `retorno:0` (três séries) |
+| giro confirmado por sensor óptico (`origem:6`, `M0-AC-005`) | **28** giros confirmados |
+| distingue "liberou sem passagem" (`origem:5`) | 2 casos, corretamente rotulados como timeout |
+| **`M0-AC-003` — sem dupla ativação** | **30 comandos → 0 eventos extras** |
+| ambos os sentidos sob comando dirigido | 5 `entrada` + 5 `saida`, 10/10 giros |
+
+**Séries executadas:**
+1. 10 liberações `entrada` — 8 giros, 2 timeouts (humano), 0 duplas;
+2. 10 liberações `entrada` — 10 giros, 0 timeouts, 0 duplas;
+3. 5 `entrada` + 5 `saida` — 10 giros, 0 timeouts, 0 duplas.
+
+### 9.2. O que NÃO foi provado, e por quê
+
+- **`M0-AC-004`** (60 s sem comando = sem giro): **não roda** — a catraca está com
+  `acionamento1:8` (`CATRACA_LIBERADA_DOIS_SENTIDOS`), o braço gira livre por configuração. O teste
+  exige modo bloqueado, que é escrita na config da catraca, não realizada nesta janela.
+- **F2 — ciclo facial** (`M0-AC-001`/`002`): **não tocado.** O servidor WebSocket 7792 e o
+  `lab:run` que instancia os adapters ponta a ponta **não existem** — é fatia nova, spec do Cowork
+  (`STATUS.md` item 6). O leitor facial não reconheceu ninguém nesta janela.
+- **Latência ponta a ponta** (`M0-NFR-001`, rosto → decisão → giro): não medível sem F2.
+
+### 9.3. Correção de um mal-entendido de método
+
+A escuta de evento (`receber-evento`) é um **poll instantâneo** — a ponte `.cs` `Receber()` não
+bloqueia, por design. Quem faz o loop de espera (pausa + ping até o prazo) é o chamador, e o
+`topdata-inner-adapter.esperarDesfecho` **já faz isso corretamente**. Um driver de teste ingênuo
+que varre a fila em rajada perde o evento assíncrono de giro — foi o que causou os primeiros
+"sem-evento" desta janela. **Não há bug na ponte nem no adapter**; o erro estava no script de
+coleta descartável, corrigido para espelhar o adapter.
 
 ---
 
