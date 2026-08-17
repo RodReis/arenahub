@@ -70,3 +70,30 @@ next-env.d.ts
 # relatorios do Playwright
 playwright-report/
 test-results/
+
+# cache local do gstack (log de browse, inventario de skills)
+.gstack/
+
+# insumo de design que NAO entra no repositorio
+#
+# `uploads/` sao os arquivos que o Rodrigo joga na ferramenta de design: prints
+# de WhatsApp, capturas de tela e COPIAS de documentos que ja vivem versionados
+# em `docs/` -- `uploads/DESIGN-UI.md` e byte a byte igual a `docs/DESIGN-UI.md`.
+# Versionar a copia cria uma segunda verdade que diverge na primeira edicao.
+#
+# `.thumbnail`, `ios-frame.jsx` e `support.js` sao andaime da propria
+# ferramenta, nao material do produto.
+docs/design/uploads/
+docs/design/.thumbnail
+docs/design/ios-frame.jsx
+docs/design/support.js
+
+# telas do Stitch: 27 pares `code.html` + `screen.png`, 6.8 MB.
+#
+# Ficam FORA -- sao exploracao visual, e o contrato de UI e o `DS-PAINEL.md`
+# (ADR-026). Os tres `design_system_*.md` do mesmo diretorio ENTRAM: sao texto,
+# sao leves, e F43 (mobile) e F44 (totem) vao precisar deles. A negacao abaixo
+# depende de o diretorio nao estar ignorado por inteiro -- por isso o padrao
+# mira nos subdiretorios de tela, nao na pasta-mae.
+docs/design/stitch_system_specification_analysis/*/
+!docs/design/stitch_system_specification_analysis/*.md
