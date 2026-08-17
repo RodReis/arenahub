@@ -92,6 +92,28 @@ export const esquemaSendLog = z.object({
   record: z.array(esquemaRegistroLog),
 });
 
+/**
+ * `senduser` -- o leitor sincroniza a base de usuarios DELE para o servidor.
+ *
+ * Achado de campo em 17/08/2026: o firmware `ai518_fp26v_v2.16` envia
+ * `senduser` logo apos o `reg`, um por usuario cadastrado. Nao estava nos
+ * manuais que temos (`docs/vendor/topdata/PROTOCOLO-FACIAL.md` descreve
+ * revisoes anteriores). Como o `reg`, a resposta e OBRIGATORIA: sem o ack o
+ * leitor reenvia e DERRUBA a conexao num loop de ~5s -- observado ao vivo.
+ *
+ * O corpo (`record`, `admin`, foto em backupnum 50) NAO nos interessa: nao
+ * importamos a base do leitor, a nuvem e a fonte da verdade (regra de
+ * arquitetura no 3). Por isso `.loose()` e nenhum campo alem do minimo para
+ * identificar a mensagem -- so precisamos reconhece-la e responder.
+ */
+export const esquemaSendUser = z
+  .object({
+    cmd: z.literal('senduser'),
+    sn: z.string().min(1),
+    enrollid: z.number().int().optional(),
+  })
+  .loose();
+
 /** Retorno generico: todo `ret` tem pelo menos isto. */
 export const esquemaRetorno = z
   .object({
@@ -123,11 +145,13 @@ export const esquemaRetGetUserList = esquemaRetorno.extend({
 export const esquemaMensagemDoEquipamento = z.union([
   esquemaReg,
   esquemaSendLog,
+  esquemaSendUser,
   esquemaRetorno,
 ]);
 
 export type Reg = z.infer<typeof esquemaReg>;
 export type SendLog = z.infer<typeof esquemaSendLog>;
+export type SendUser = z.infer<typeof esquemaSendUser>;
 export type Retorno = z.infer<typeof esquemaRetorno>;
 export type RetGetUserList = z.infer<typeof esquemaRetGetUserList>;
 
@@ -145,6 +169,15 @@ export function respostaReg(agora: Date): string {
     result: true,
     cloudtime: formatarDataHora(agora),
   });
+}
+
+/**
+ * Ack do `senduser`. OBRIGATORIO, como o do `reg`: sem ele o leitor v2.16
+ * reenvia e derruba a conexao. So confirma o recebimento -- nao persistimos
+ * a base do leitor (regra de arquitetura no 3).
+ */
+export function respostaSendUser(): string {
+  return JSON.stringify({ ret: 'senduser', result: true });
 }
 
 /**
