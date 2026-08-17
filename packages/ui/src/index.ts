@@ -16,6 +16,8 @@ export { Ausente } from './components/Ausente.js';
 export { Button } from './components/Button.js';
 export { ConsentCard } from './components/ConsentCard.js';
 export { DataFreshness } from './components/DataFreshness.js';
+export { DataTable, type Column } from './components/DataTable.js';
+export { ElevatedSessionBanner } from './components/ElevatedSessionBanner.js';
 export { EmptyState } from './components/EmptyState.js';
 export { Icon, type IconName } from './components/Icon.js';
 export { MaskedCPF } from './components/MaskedCPF.js';
@@ -24,6 +26,10 @@ export { ProblemDetail, type ProblemJson } from './components/ProblemDetail.js';
 export { SensitiveAction } from './components/SensitiveAction.js';
 export { StateBadge } from './components/StateBadge.js';
 export { ToastProvider, useToast, type ToastKind } from './components/Toast.js';
+
+export { AppShell } from './components/shell/AppShell.js';
+export { NavLink } from './components/shell/NavLink.js';
+export { PageHeader } from './components/shell/PageHeader.js';
 
 /**
  * Contratos sem tela -- SPEC-042 §3. Props e token de componente cujo MVP dono
