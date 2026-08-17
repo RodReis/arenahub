@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { Ausente, DataTable, EmptyState, PageHeader, ProblemDetail } from '@arenahub/ui';
+
 import { chamarApi } from '../../../lib/api/server-client';
 import { ReconhecerAlerta } from './reconhecer-alerta';
 import {
@@ -87,10 +89,19 @@ export default async function PaginaDeOperacao() {
   if (!panorama.ok) {
     return (
       <section aria-labelledby="titulo-operacao">
-        <h1 id="titulo-operacao">Operação</h1>
-        <p role="alert" data-testid="erro-de-permissao">
-          Sem permissão para ver o painel operacional ({panorama.erro?.code ?? 'erro'}).
-        </p>
+        <PageHeader id="titulo-operacao" title="Operação" />
+        <ProblemDetail
+          testId="erro-de-permissao"
+          problem={{
+            ...(panorama.erro ?? {
+              type: 'about:blank',
+              status: 0,
+              code: 'erro',
+              correlationId: '',
+            }),
+            title: `Sem permissão para ver o painel operacional (${panorama.erro?.code ?? 'erro'}).`,
+          }}
+        />
       </section>
     );
   }
@@ -115,7 +126,7 @@ export default async function PaginaDeOperacao() {
 
   return (
     <section aria-labelledby="titulo-operacao">
-      <h1 id="titulo-operacao">Operação</h1>
+      <PageHeader id="titulo-operacao" title="Operação" />
 
       {/*
         Resumo em uma frase, antes de qualquer tabela. Quem passa pela tela
@@ -134,136 +145,156 @@ export default async function PaginaDeOperacao() {
 
       <h2>Alertas</h2>
 
-      {listaDeAlertas.length === 0 ? (
-        <p data-testid="sem-alertas">
-          Nenhum alerta aberto. Edge e dispositivos respondendo, sincronização em dia.
-        </p>
-      ) : (
-        <table data-testid="tabela-de-alertas">
-          <caption>Alertas abertos, os críticos primeiro</caption>
-          <thead>
-            <tr>
-              <th scope="col">Severidade</th>
-              <th scope="col">Situação</th>
-              <th scope="col">O que isso impede</th>
-              <th scope="col">O que fazer</th>
-              <th scope="col">Desde</th>
-              <th scope="col">Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...criticos, ...demais].map((alerta) => (
-              <tr key={alerta.id} data-testid={`alerta-${alerta.code}`}>
-                <td>
-                  {/*
-                    Texto, não só cor. Um painel que diz "crítico" apenas por
-                    vermelho não diz nada para quem não distingue vermelho.
-                  */}
-                  {traduzir(ROTULO_DE_SEVERIDADE, alerta.severity)}
-                </td>
-                <td>{traduzir(ROTULO_DE_ESTADO_DE_ALERTA, alerta.state)}</td>
-                <td>{alerta.impact}</td>
-                <td>{alerta.recommendedAction}</td>
-                <td>
-                  <time dateTime={alerta.firstSeenAt}>{idadeLegivel(alerta.firstSeenAt, agora)}</time>
-                </td>
-                <td>
-                  {alerta.state === 'OPEN' ? (
-                    <ReconhecerAlerta alertaId={alerta.id} />
-                  ) : (
-                    <span>—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        testId="tabela-de-alertas"
+        rows={[...criticos, ...demais]}
+        rowKey={(alerta) => alerta.id}
+        rowTestId={(alerta) => `alerta-${alerta.code}`}
+        caption="Alertas abertos, os críticos primeiro"
+        columns={[
+          {
+            key: 'severidade',
+            header: 'Severidade',
+            /*
+             * Texto, não só cor. Um painel que diz "crítico" apenas por
+             * vermelho não diz nada para quem não distingue vermelho.
+             *
+             * `ROTULO_DE_SEVERIDADE` e `ROTULO_DE_ESTADO_DE_ALERTA` FICAM: o §7
+             * define 11 maquinas e nenhuma cobre alerta operacional. O plano
+             * ja registrou `ROTULO_DE_ESTADO_DE_ALERTA` como "maquina de estado
+             * de fato, so nao esta no §7" -- dar-lhe casa e decisao do Cowork.
+             */
+            render: (a) => traduzir(ROTULO_DE_SEVERIDADE, a.severity),
+          },
+          {
+            key: 'situacao',
+            header: 'Situação',
+            render: (a) => traduzir(ROTULO_DE_ESTADO_DE_ALERTA, a.state),
+          },
+          { key: 'impede', header: 'O que isso impede', render: (a) => a.impact },
+          { key: 'fazer', header: 'O que fazer', render: (a) => a.recommendedAction },
+          {
+            key: 'desde',
+            header: 'Desde',
+            /*
+             * `idadeLegivel` FICA, e nao vira `TenantDateTime`: ele devolve
+             * idade relativa ("ha 3 h"), nao instante -- e e o que a operacao
+             * precisa ler de relance num alerta aberto.
+             */
+            render: (a) => (
+              <time dateTime={a.firstSeenAt}>{idadeLegivel(a.firstSeenAt, agora)}</time>
+            ),
+          },
+          {
+            key: 'acao',
+            header: 'Ação',
+            render: (a) =>
+              a.state === 'OPEN' ? <ReconhecerAlerta alertaId={a.id} /> : <span>—</span>,
+          },
+        ]}
+        empty={
+          <EmptyState
+            testId="sem-alertas"
+            title="Nenhum alerta aberto."
+            hint="Edge e dispositivos respondendo, sincronização em dia."
+          />
+        }
+      />
 
       <h2>Edge</h2>
 
-      {dados.edges.length === 0 ? (
-        <p data-testid="sem-edge">
-          Nenhum Edge cadastrado. Sem Edge, a catraca não decide nada.
-        </p>
-      ) : (
-        <table data-testid="tabela-de-edges">
-          <caption>Agentes instalados nas unidades</caption>
-          <thead>
-            <tr>
-              <th scope="col">Código</th>
-              <th scope="col">Estado</th>
-              <th scope="col">Último sinal</th>
-              <th scope="col">Versão</th>
-              <th scope="col">Relógio</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dados.edges.map((edge) => (
-              <tr key={edge.id} data-testid={`edge-${edge.codigo}`}>
-                <td>{edge.codigo}</td>
-                <td>
-                  {estaSilencioso(edge.ultimoHeartbeat, agora)
-                    ? 'Sem resposta'
-                    : 'Respondendo'}
-                </td>
-                <td>
-                  <time dateTime={edge.ultimoHeartbeat ?? undefined}>
-                    {idadeLegivel(edge.ultimoHeartbeat, agora)}
-                  </time>
-                </td>
-                <td>{edge.agentVersion ?? '—'}</td>
-                <td>
-                  {edge.derivaMs === null
-                    ? '—'
-                    : `${edge.derivaMs > 0 ? '+' : ''}${Math.round(edge.derivaMs / 1000)}s`}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        testId="tabela-de-edges"
+        rows={dados.edges}
+        rowKey={(edge) => edge.id}
+        rowTestId={(edge) => `edge-${edge.codigo}`}
+        caption="Agentes instalados nas unidades"
+        columns={[
+          { key: 'codigo', header: 'Código', numeric: true, render: (e) => e.codigo },
+          {
+            key: 'estado',
+            header: 'Estado',
+            /*
+             * "Respondendo"/"Sem resposta" e DERIVADO do heartbeat, nao um
+             * estado que o servidor emite -- nao ha maquina no §7 para isso.
+             */
+            render: (e) =>
+              estaSilencioso(e.ultimoHeartbeat, agora) ? 'Sem resposta' : 'Respondendo',
+          },
+          {
+            key: 'sinal',
+            header: 'Último sinal',
+            render: (e) => (
+              <time dateTime={e.ultimoHeartbeat ?? undefined}>
+                {idadeLegivel(e.ultimoHeartbeat, agora)}
+              </time>
+            ),
+          },
+          { key: 'versao', header: 'Versão', render: (e) => e.agentVersion ?? <Ausente /> },
+          {
+            key: 'relogio',
+            header: 'Relógio',
+            numeric: true,
+            render: (e) =>
+              e.derivaMs === null ? (
+                <Ausente />
+              ) : (
+                `${e.derivaMs > 0 ? '+' : ''}${Math.round(e.derivaMs / 1000)}s`
+              ),
+          },
+        ]}
+        empty={
+          <EmptyState
+            testId="sem-edge"
+            title="Nenhum Edge cadastrado."
+            hint="Sem Edge, a catraca não decide nada."
+          />
+        }
+      />
 
       <h2>Dispositivos</h2>
 
-      {dados.dispositivos.length === 0 ? (
-        <p data-testid="sem-dispositivo">Nenhum leitor ou catraca cadastrado.</p>
-      ) : (
-        <table data-testid="tabela-de-dispositivos">
-          <caption>Leitores e catracas</caption>
-          <thead>
-            <tr>
-              <th scope="col">Série</th>
-              <th scope="col">Tipo</th>
-              <th scope="col">Estado</th>
-              <th scope="col">Último sinal</th>
-              <th scope="col">Última sincronização</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dados.dispositivos.map((dispositivo) => (
-              <tr key={dispositivo.id} data-testid={`dispositivo-${dispositivo.serial}`}>
-                <td>{dispositivo.serial}</td>
-                <td>{dispositivo.kind === 'TURNSTILE' ? 'Catraca' : 'Leitor facial'}</td>
-                <td>
-                  {dispositivo.status !== 'ACTIVE'
-                    ? // Equipamento em manutenção não é falha: alguém já sabe.
-                      'Em manutenção'
-                    : estaSilencioso(dispositivo.ultimoHeartbeat, agora)
-                      ? 'Sem resposta'
-                      : 'Respondendo'}
-                </td>
-                <td>
-                  <time dateTime={dispositivo.ultimoHeartbeat ?? undefined}>
-                    {idadeLegivel(dispositivo.ultimoHeartbeat, agora)}
-                  </time>
-                </td>
-                <td>{idadeLegivel(dispositivo.ultimoSync, agora)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        testId="tabela-de-dispositivos"
+        rows={dados.dispositivos}
+        rowKey={(dispositivo) => dispositivo.id}
+        rowTestId={(dispositivo) => `dispositivo-${dispositivo.serial}`}
+        caption="Leitores e catracas"
+        columns={[
+          { key: 'serie', header: 'Série', numeric: true, render: (d) => d.serial },
+          {
+            key: 'tipo',
+            header: 'Tipo',
+            render: (d) => (d.kind === 'TURNSTILE' ? 'Catraca' : 'Leitor facial'),
+          },
+          {
+            key: 'estado',
+            header: 'Estado',
+            render: (d) =>
+              d.status !== 'ACTIVE'
+                ? // Equipamento em manutenção não é falha: alguém já sabe.
+                  'Em manutenção'
+                : estaSilencioso(d.ultimoHeartbeat, agora)
+                  ? 'Sem resposta'
+                  : 'Respondendo',
+          },
+          {
+            key: 'sinal',
+            header: 'Último sinal',
+            render: (d) => (
+              <time dateTime={d.ultimoHeartbeat ?? undefined}>
+                {idadeLegivel(d.ultimoHeartbeat, agora)}
+              </time>
+            ),
+          },
+          {
+            key: 'sincronizacao',
+            header: 'Última sincronização',
+            render: (d) => idadeLegivel(d.ultimoSync, agora),
+          },
+        ]}
+        empty={<EmptyState testId="sem-dispositivo" title="Nenhum leitor ou catraca cadastrado." />}
+      />
 
       <h2>Sincronização de biometria</h2>
 
