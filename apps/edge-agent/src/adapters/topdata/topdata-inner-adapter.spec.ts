@@ -78,6 +78,18 @@ describe('TopdataInnerAdapter', () => {
     adapter = new TopdataInnerAdapter(ponte, logger, 1);
   });
 
+  it('conectar dispara a sequencia de inicializacao online da ponte', async () => {
+    // Achado de campo 17/08/2026: sem a init online completa (que roda o
+    // ConfigurarAcionamento1), o `liberar` volta `retorno 1` -- a catraca
+    // aceita a conexao mas recusa o giro. `testarConexao` sozinho nao basta;
+    // o `lab:run` precisa deste passo antes do primeiro `liberar`.
+    await adapter.conectar(3570, 10);
+
+    const conectar = ponte.recebidos.find((c) => c.cmd === 'conectar');
+    expect(conectar).toBeDefined();
+    expect(conectar).toMatchObject({ cmd: 'conectar', porta: 3570 });
+  });
+
   it('libera e confirma o giro pela Origem 6', async () => {
     // O manual: o giro nao vem por callback. Vem por polling de
     // ReceberDadosOnLine, e Origem 6 e o sensor optico confirmando.

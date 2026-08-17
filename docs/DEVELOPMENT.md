@@ -239,10 +239,10 @@ Duas consequências do Prisma 7 que aparecem no código e valem saber antes de m
 | F | slice | o que precisa provar | bloqueado por |
 |---|---|---|---|
 | ✅ F1 | 0.1 Bancada reproduzível | qualquer pessoa reproduz o ambiente e o simulador roda em CI **sem hardware** (`M0-NFR-006`) | — *(entregue; o gate não a bloqueava)* |
-| 🟡 F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | **código entregue e verde**; falta o aceite físico (`M0-AC-001`/`002`) — **consentimento** e leitor em **18 dígitos** |
-| 🟡 F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | **adapter e ponte entregues** (PR #62); falta o **cutover** — a catraca aponta para o legado `.106` — e a janela combinada |
+| 🟡 F2 | 0.2 Ciclo de vida facial | cadastrar, atualizar e remover identidade no leitor, com confirmação | **17/08: cadastro + reconhecimento provados AO VIVO** — leitor conecta, `setuserinfo` confirmado, `sendlog` recebido (field-note 17/08). Fix `senduser` (firmware v2.16) entregue. Falta: relógio do leitor (`ocorridoEm` congelado) e assinatura do PI |
+| 🟡 F3 | 0.3 Catraca e passagem | abrir catraca e **confirmar giro**; medir latência ponta a ponta | **17/08: giro real confirmado** (`origem:6`), 30+ comandos sem dupla (`M0-AC-003`), entrada e saída. Cutover feito e devolvido. Fix `conectar` (init online). **🔴 falta: catraca em `acionamento1:8` deixa entrar sem reconhecimento — modo bloqueado pendente**; latência real (nuvem, F9) |
 | ✅ F4 | 0.4 Offline e reconciliação | comportamento com link derrubado; eventos não se perdem | — *(regra pura; fechou sem hardware — PR #60)* |
-| 🟡 F5 | 0.5 Relatório e decisão | decisão de saída do MVP 0 (`MVP-00` §15) com evidência: `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO` | **relatório parcial entregue** (`docs/reports/MVP-00-relatorio-poc-topdata.md`); latência real é `PENDENTE-POC` — depende da POC física |
+| 🟡 F5 | 0.5 Relatório e decisão | decisão de saída do MVP 0 (`MVP-00` §15) com evidência: `GO`, `GO_WITH_CONSTRAINTS` ou `NO_GO` | **17/08: `lab:run` construído e cadeia física ponta a ponta provada** (rosto → decisão local → giro). Relatório §9 atualizado. Latência do ArenaHub 0–1 ms; a real (nuvem) é F9. Gate §15 não fecha sem bloqueio da catraca + assinatura |
 
 **A pergunta que F2 tem de responder e ninguém pode adivinhar:** o SDK do leitor facial exige
 Windows e processo nativo? A resposta muda a stack do `edge-agent` (ADR-010).

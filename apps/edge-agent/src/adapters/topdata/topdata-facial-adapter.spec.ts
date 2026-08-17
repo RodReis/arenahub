@@ -268,6 +268,27 @@ describe('TopdataFacialAdapter', () => {
     expect(eventos[0]).not.toHaveProperty('image');
   });
 
+  it('responde ao senduser — sem ack o leitor v2.16 derruba a conexao', async () => {
+    // Achado de campo 17/08/2026: o firmware ai518_fp26v_v2.16 envia `senduser`
+    // (sincronizacao da base de usuarios do leitor) apos o reg. Sem resposta,
+    // ele reenvia e derruba a conexao num loop de ~5s. A resposta e um ack
+    // simples com o proprio nome do comando -- mesmo contrato do reg.
+    leitor.enviar({
+      cmd: 'senduser',
+      sn: leitor.sn,
+      enrollid: 12345,
+      name: 'Fulano',
+      backupnum: 0,
+      admin: 0,
+      record: '0',
+    });
+
+    await leitor.esperar(() => leitor.recebidos.some((m) => m['ret'] === 'senduser'));
+
+    const resposta = leitor.recebidos.find((m) => m['ret'] === 'senduser');
+    expect(resposta?.['result']).toBe(true);
+  });
+
   it('recusa externalEnrollId que nao cabe no equipamento', async () => {
     // O UUID hexadecimal da primeira versao da F2 cai aqui. Falhar alto e
     // melhor que recusa silenciosa no leitor.

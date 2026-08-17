@@ -95,6 +95,22 @@ export const TIPO_CONEXAO_TCP_PORTA_FIXA = 2;
  * precisar, com a mesma justificativa que esta exige.
  */
 export const esquemaComandoPonte = z.discriminatedUnion('cmd', [
+  /**
+   * Abre a porta e roda a sequencia de inicializacao ONLINE completa:
+   * `AbrirPortaComunicacao` + `ConfigurarInnerOnLine` + `ConfigurarAcionamento1`
+   * + `ConfigurarLeitor1/2`.
+   *
+   * ⚠️ Sem este passo o `liberar` volta `retorno 1` -- a catraca aceita a
+   * conexao mas recusa o giro, porque falta o `ConfigurarAcionamento1` que
+   * define o rele como catraca. `testar-conexao` sozinho NAO basta: ele so
+   * roda `ConfigurarInnerOnLine`. Achado de campo 17/08/2026.
+   */
+  z.object({
+    cmd: z.literal('conectar'),
+    porta: z.number().int().positive(),
+    tempo: z.number().int().positive().default(10),
+  }),
+
   /** Testa se a catraca esta conectada. `TestarConexaoInner`. */
   z.object({
     cmd: z.literal('testar-conexao'),

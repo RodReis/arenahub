@@ -15,6 +15,7 @@ import {
   esquemaReg,
   esquemaSendLog,
   respostaReg,
+  respostaSendUser,
 } from './protocolo.js';
 
 /**
@@ -138,12 +139,20 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
       return;
     }
 
+    if ('cmd' in mensagem && mensagem.cmd === 'senduser') {
+      // O leitor sincroniza a base dele. Nao importamos (a nuvem e a fonte da
+      // verdade), mas o ack e obrigatorio: sem ele o firmware v2.16 derruba a
+      // conexao num loop. Ver protocolo.ts / esquemaSendUser.
+      this.enviar(respostaSendUser());
+      return;
+    }
+
     if ('cmd' in mensagem && mensagem.cmd === 'sendlog') {
       this.tratarSendLog(json);
       return;
     }
 
-    if ('ret' in mensagem) {
+    if ('ret' in mensagem && typeof mensagem.ret === 'string') {
       this.resolverPendente(mensagem.ret, mensagem);
     }
   }
