@@ -56,6 +56,26 @@
   gap: 12px;
 }
 
+/**
+ * Controle GHOST sobre o chrome escuro -- WCAG 2.2 §1.4.3.
+ *
+ * O `Button` nao sabe onde esta: o `ghost` usa `--ah-action-text`
+ * (`accent-700`), resolvido por contraste contra fundo CLARO. Sobre
+ * `surface.chrome` da 3.16, e o axe-core reprova -- o "Sair" ficava ilegivel
+ * no canto da topbar.
+ *
+ * A correcao vive AQUI, e nao no `Button`, porque quem conhece o fundo e o
+ * shell. `text.onChrome` ja e verificado contra `surface.chrome` no pipeline
+ * de tokens, entao o par nao pode divergir sem quebrar o build.
+ */
+.topbar [data-variant='ghost'] {
+  color: var(--ah-text-on-chrome);
+}
+
+.topbar [data-variant='ghost']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ah-text-on-chrome) 12%, transparent);
+}
+
 .corpo {
   flex: 1;
   display: grid;
