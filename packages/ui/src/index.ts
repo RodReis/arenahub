@@ -14,6 +14,7 @@
 
 export { Ausente } from './components/Ausente.js';
 export { Icon, type IconName } from './components/Icon.js';
+export { StateBadge } from './components/StateBadge.js';
 
 export {
   STATE_LABELS,
