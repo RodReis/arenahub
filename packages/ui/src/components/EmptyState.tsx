@@ -13,11 +13,21 @@ interface Props {
    * dizem o proximo passo em vez de so constatar a ausencia.
    */
   readonly action?: ReactNode;
+  /**
+   * `data-testid` do bloco INTEIRO -- titulo, dica e acao dentro dele.
+   *
+   * Os E2E que este componente herda afirmam sobre o conteudo do vazio
+   * (`toContainText(/grafia|cadastre/i)`), nao so sobre sua presenca.
+   */
+  readonly testId?: string;
 }
 
-export function EmptyState({ title, hint, action }: Props) {
+export function EmptyState({ title, hint, action, testId }: Props) {
   return (
-    <div className={estilos['vazio']}>
+    <div
+      className={estilos['vazio']}
+      {...(testId !== undefined ? { 'data-testid': testId } : {})}
+    >
       <p className={estilos['titulo']}>{title}</p>
       {hint ? <p className={estilos['dica']}>{hint}</p> : null}
       {action}

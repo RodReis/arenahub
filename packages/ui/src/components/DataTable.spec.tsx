@@ -94,6 +94,33 @@ describe('DataTable', () => {
     expect(screen.getByText(/2 itens carregados/)).toBeInTheDocument();
   });
 
+  /**
+   * REGRESSAO: as 12 tabelas que este componente substitui carregam
+   * `data-testid` que os 39 E2E ja procuram (`tabela-de-alunos`,
+   * `tabela-de-unidades`, `tabela-de-direitos`). Sem repassar, a migracao
+   * derruba a rede de seguranca que existe justamente para provar que ela nao
+   * mudou comportamento.
+   */
+  it('repassa o testid da tabela', () => {
+    render(tabela({ testId: 'tabela-de-alunos' }));
+
+    expect(screen.getByTestId('tabela-de-alunos').tagName).toBe('TABLE');
+  });
+
+  /** Cada linha carrega o proprio testid -- `aluno-${id}` no E2E de alunos. */
+  it('repassa o testid por linha', () => {
+    render(tabela({ rowTestId: (linha) => `aluno-${linha.id}` }));
+
+    expect(screen.getByTestId('aluno-1').tagName).toBe('TR');
+    expect(screen.getByTestId('aluno-2')).toBeInTheDocument();
+  });
+
+  it('sem testid, nao poluí o DOM com atributo vazio', () => {
+    const { container } = render(tabela());
+
+    expect(container.querySelectorAll('[data-testid]').length).toBe(0);
+  });
+
   it('coluna numerica liga numeral tabular', () => {
     const colunas: readonly Column<Linha>[] = [
       { key: 'id', header: 'Matrícula', numeric: true, render: (linha) => linha.id },

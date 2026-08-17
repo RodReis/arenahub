@@ -18,6 +18,16 @@ interface Props<T> {
   readonly empty: ReactNode;
   readonly prevHref?: string;
   readonly nextHref?: string;
+  /**
+   * `data-testid` da `<table>`.
+   *
+   * Existe porque as tabelas que este componente substitui ja carregam testid
+   * que os E2E procuram. A migracao troca a aparencia, nao o comportamento --
+   * e testid perdido derruba o teste que provaria isso.
+   */
+  readonly testId?: string;
+  /** `data-testid` por linha, ex.: `aluno-${id}`. */
+  readonly rowTestId?: (row: T) => string;
 }
 
 /**
@@ -41,12 +51,17 @@ export function DataTable<T>({
   empty,
   prevHref,
   nextHref,
+  testId,
+  rowTestId,
 }: Props<T>) {
   if (rows.length === 0) return <>{empty}</>;
 
   return (
     <>
-      <table className={estilos['tabela']}>
+      <table
+        className={estilos['tabela']}
+        {...(testId !== undefined ? { 'data-testid': testId } : {})}
+      >
         <caption className={estilos['legenda']}>{caption}</caption>
         <thead>
           <tr>
@@ -59,7 +74,10 @@ export function DataTable<T>({
         </thead>
         <tbody>
           {rows.map((linha) => (
-            <tr key={rowKey(linha)}>
+            <tr
+              key={rowKey(linha)}
+              {...(rowTestId !== undefined ? { 'data-testid': rowTestId(linha) } : {})}
+            >
               {columns.map((coluna) => (
                 <td key={coluna.key} {...(coluna.numeric === true ? { 'data-numeric': '' } : {})}>
                   {coluna.render(linha)}

@@ -24,6 +24,11 @@ interface Props {
   /** O proximo passo. Opcional porque nem todo erro sabe qual e. */
   readonly hint?: string;
   readonly onRetry?: () => void;
+  /**
+   * `data-testid` do bloco de erro -- as 6 telas que este componente
+   * substitui ja carregam `erro-de-permissao`.
+   */
+  readonly testId?: string;
 }
 
 /**
@@ -34,9 +39,13 @@ interface Props {
  * Stack, detalhe interno e PII nunca aparecem -- nem na tela, nem no log de
  * erro do navegador.
  */
-export function ProblemDetail({ problem, context, hint, onRetry }: Props) {
+export function ProblemDetail({ problem, context, hint, onRetry, testId }: Props) {
   return (
-    <div className={estilos['problema']} role="alert">
+    <div
+      className={estilos['problema']}
+      role="alert"
+      {...(testId !== undefined ? { 'data-testid': testId } : {})}
+    >
       <p className={estilos['titulo']}>
         <Icon name="alert-circle" />
         {problem.title}
