@@ -246,13 +246,25 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **31** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **32** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
-| Feito | `proplan:done` | PR mergeado com CI verde | **3** — o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94), a [F12](https://github.com/RodReis/arenahub/issues/12) e a [F13](https://github.com/RodReis/arenahub/issues/13), aguardando aceite do PI |
-| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **22** |
+| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e o `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101) |
+| Feito | `proplan:done` | PR mergeado com CI verde | 0 |
+| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **25** |
 
-> ⚠️ **Números reconferidos na API do board em 18/08/2026** — não estimados. A composição de
+> ⚠️ **Reconferido na API do board em 18/08/2026, fim de tarde.** *Feito* voltou a **0** e
+> *Finalizado* subiu de 22 para **25**: o PI aceitou o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94),
+> a [F12](https://github.com/RodReis/arenahub/issues/12) e a [F13](https://github.com/RodReis/arenahub/issues/13),
+> esvaziando a fila de aceite no mesmo dia em que ela se formou.
+>
+> 📌 **O `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101) está em *Em Andamento* com
+> uma parte já na `main`.** O card tem três itens; o PR [#103](https://github.com/RodReis/arenahub/pull/103)
+> mergeou o primeiro — banco da suíte E2E separado do de desenvolvimento. Faltam o expurgo do
+> resíduo já acumulado (1016 tenants no banco de dev) e o seed de demonstração, então o card
+> **não** vai para *Feito*: `proplan:done` afirma card inteiro entregue, e afirmar isso com dois
+> terços em aberto é o tipo de sinal falso que o quadro existe para não dar.
+>
+> ⚠️ **Leitura anterior de 18/08/2026, preservada** — não estimados. A composição de
 > *Em Andamento* mudou desde a leitura anterior: o `[INFRA]` [#68](https://github.com/RodReis/arenahub/issues/68)
 > **foi aceito pelo PI e conta em Finalizado** (21 → 22), e entrou no lugar dele o `[INFRA]`
 > [#94](https://github.com/RodReis/arenahub/issues/94) — `apt-get` do Chromium pendurando e

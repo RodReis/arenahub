@@ -79,7 +79,8 @@ Outros acessos locais: o console do MinIO usa `arenahub` /
 | `pnpm typecheck` | TypeScript estrito |
 | `pnpm test` | testes de unidade |
 | `pnpm test:integration` | testes que usam Postgres (exige containers de pé) |
-| `pnpm test:e2e` | Playwright |
+| `pnpm test:e2e` | Playwright — **recria o banco de E2E antes**, ver abaixo |
+| `pnpm db:e2e` | recria o banco dedicado ao E2E; roda sozinho antes do `test:e2e` |
 | `pnpm build` | compila tudo |
 | `pnpm test:report` | regenera `reports/TESTS.md` — **o CI cobra** |
 | `pnpm docker:up` / `docker:down` | containers, sem o resto do setup |
@@ -88,6 +89,18 @@ Outros acessos locais: o console do MinIO usa `arenahub` /
 A porta da API é **3344 fixa**: se estiver ocupada, o processo falha em vez de
 escorregar para a próxima. Framework que troca de porta sozinho deixa dois
 processos servindo, com o operador falando com um e lendo o log do outro.
+
+**O E2E usa banco próprio.** A suíte cria aluno, plano e dispositivo e não
+limpa o que criou — como um operador de verdade não apaga quem acabou de
+cadastrar. Apontada para o banco de desenvolvimento, ela o enchia de resíduo
+com epoch no nome, até a tela de Alunos exibir o rastro da própria suíte em vez
+do produto.
+
+Por isso existe `E2E_DATABASE_URL`, no `.env` (copie do `.env.example` e
+**ajuste a porta** para a do seu Postgres). Mesmo servidor, banco separado,
+recriado do zero antes de cada execução — recriar antes, e não limpar depois,
+é o que faz suíte interrompida no meio não sujar a próxima. Sem a variável, o
+E2E para e diz o que falta, em vez de escrever no banco errado.
 
 ## Estrutura
 

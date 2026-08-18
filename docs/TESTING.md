@@ -32,6 +32,45 @@ substitui outro.
 **Classificação é por sufixo de arquivo, não por pasta ou por intenção.** O relatório da §5
 depende disso: um arquivo mal nomeado desaparece da contagem sem ninguém notar.
 
+### 1.1 Qual banco cada nível usa
+
+Nenhum nível escreve no banco de desenvolvimento. Os caminhos são diferentes porque os níveis
+falham de formas diferentes:
+
+| nível | banco | quem limpa |
+|---|---|---|
+| **Integração** | Testcontainers, ou o Postgres local via `DATABASE_URL` | o próprio teste, com `deleteMany` |
+| **E2E** | banco **dedicado**, `E2E_DATABASE_URL` | ninguém — o banco é **recriado do zero** antes de cada execução |
+
+**O E2E não limpa, e isso é deliberado.** Ele exercita o fluxo como um operador faria, e um
+operador não apaga o aluno que acabou de cadastrar. A consequência é que limpeza no fim não
+serviria: quando a suíte quebra no meio — ou leva `Ctrl+C` — o passo de limpeza simplesmente não
+roda. Foi assim que o banco de desenvolvimento acumulou **1016 tenants** com epoch no nome
+(`Caminho Biometria 1787060177858`), até a tela de Alunos passar a exibir o rastro da própria
+suíte em vez do produto.
+
+Por isso o `pretest:e2e` **recria o banco antes**, e não depois: a próxima execução não herda
+nada, independentemente de como a anterior terminou. Mesmo Postgres, banco separado — não é
+preciso container novo.
+
+```
+pnpm db:e2e     # recria o banco de E2E (roda sozinho antes de test:e2e)
+```
+
+Duas guardas, porque o comando é destrutivo:
+
+- **`E2E_DATABASE_URL` não tem valor padrão nem cai para `DATABASE_URL`.** Faltando a variável, o
+  script para e diz o que fazer. Um fallback silencioso para o banco de dev é exatamente o defeito
+  que esta separação existe para impedir, e um default embutido carregaria a porta da máquina de
+  quem o escreveu.
+- **O nome do banco precisa terminar em `_e2e`.** Um `E2E_DATABASE_URL` mal copiado apontando para
+  `arenahub` destruiria o ambiente de quem rodou.
+
+> ⚠️ **Agente de IA:** o Prisma 7 recusa `migrate reset` quando detecta `AI_AGENT` no ambiente e
+> exige consentimento humano em `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`. O bloqueio não
+> atinge pessoa nem CI. **Não embutir o consentimento no script** — a guarda existe para o caso em
+> que o alvo não é um banco descartável.
+
 ---
 
 ## 2. Cobertura
