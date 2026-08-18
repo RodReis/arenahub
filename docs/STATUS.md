@@ -276,7 +276,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **32** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
-| Feito | `proplan:done` | PR mergeado com CI verde | **1** — o `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101), aguardando aceite do PI |
+| Feito | `proplan:done` | PR mergeado com CI verde | **2** — os `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101) e [#105](https://github.com/RodReis/arenahub/issues/105), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **25** |
 
 > ⚠️ **Reconferido na API do board em 18/08/2026, fim de tarde.** *Feito* voltou a **0** e
@@ -298,11 +298,23 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 > timeout curto mais uma tentativa extra — **não basta quando o mirror fica fora por minutos**:
 > as duas tentativas caem dentro da mesma janela. A #94 deixou registrada a opção 3 (container do
 > Playwright) com a condição *"só se voltar a cair"*; **voltou, quatro vezes**. Virou o card
-> [`#105`](https://github.com/RodReis/arenahub/issues/105), aberto pelo Code com autorização
-> explícita do PI — pela regra, `[INFRA]` é do Cowork e o Code só abre `[FIX]`, e o PI liberou a
-> exceção para não travar a entrega. **O risco a conferir primeiro está no corpo do card:** com
-> `container:` no job, o Postgres deixa de atender em `localhost` e passa a atender no label do
-> serviço, então as três `*_DATABASE_URL` mudam junto.
+> [`#105`](https://github.com/RodReis/arenahub/issues/105), **resolvido no mesmo dia** pelo PR
+> [#106](https://github.com/RodReis/arenahub/pull/106): o job roda dentro de
+> `mcr.microsoft.com/playwright:v1.62.1-noble` e não chama `apt-get` em nenhum passo. O card foi
+> aberto pelo Code com autorização explícita do PI — pela regra, `[INFRA]` é do Cowork e o Code só
+> abre `[FIX]`; o PI liberou a exceção para não travar a entrega.
+>
+> 💰 **O container custa ~50s por execução** (4m30s contra 3m39s), e o PI aceitou o trade-off
+> sabendo o número: os 50s pagam a eliminação de uma classe de falha que derrubou o CI quatro
+> vezes num único dia. O job caiu de 23 para 14 passos.
+>
+> 🪤 **Três armadilhas no caminho, e nenhuma aparece sem execução real no runner.** Vale registrar
+> porque a próxima mudança de infraestrutura vai esbarrar nas mesmas: (1) a env var da imagem
+> **não chega ao job** — o runner troca o `HOME` e monta ambiente próprio, e verificar com
+> `docker run` não prova nada sobre isso; (2) declarada no job, **o Turbo a descarta** — o
+> `turbo.json` avisa em letra maiúscula que sanitiza o ambiente, e a variável precisa estar nos
+> dois lugares; (3) o Postgres **muda de endereço** ao entrar num container. A terceira estava
+> prevista no card e acertou de primeira; as duas primeiras só apareceram no CI.
 >
 > ⚠️ **Leitura anterior de 18/08/2026, preservada** — não estimados. A composição de
 > *Em Andamento* mudou desde a leitura anterior: o `[INFRA]` [#68](https://github.com/RodReis/arenahub/issues/68)
