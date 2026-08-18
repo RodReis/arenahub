@@ -3,6 +3,8 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { Button, Field, SelectField, TextareaField } from '@arenahub/ui';
+
 import {
   liberarAcessoManual,
   type EstadoDoOverride,
@@ -23,6 +25,10 @@ interface Catraca {
 interface Props {
   unidades: Unidade[];
   catracas: Catraca[];
+  /** Aluno vindo da ficha, pela query string. Ver `page.tsx`. */
+  alunoInicial?: string | undefined;
+  /** Nome de quem chegou pela ficha -- rotulo de tela, nunca vai para a API. */
+  nomeDoAlunoInicial?: string | undefined;
 }
 
 const ESTADO_INICIAL: EstadoDoOverride = {};
@@ -57,14 +63,19 @@ function BotaoDeConfirmacao() {
  * e dizer "pronto, pode passar" antes disso mandaria o operador embora sem
  * saber que falhou.
  */
-export function FormularioDeOverride({ unidades, catracas }: Props) {
+export function FormularioDeOverride({
+  unidades,
+  catracas,
+  alunoInicial,
+  nomeDoAlunoInicial,
+}: Props) {
   const [estado, acao] = useActionState(liberarAcessoManual, ESTADO_INICIAL);
 
   const [confirmando, setConfirmando] = useState(false);
   const [unidadeId, setUnidadeId] = useState(unidades[0]?.id ?? '');
   const [catracaId, setCatracaId] = useState('');
   const [tipoDeSujeito, setTipoDeSujeito] = useState<'aluno' | 'visitante'>('aluno');
-  const [studentId, setStudentId] = useState('');
+  const [studentId, setStudentId] = useState(alunoInicial ?? '');
   const [visitante, setVisitante] = useState('');
   const [motivo, setMotivo] = useState('');
 
@@ -162,54 +173,51 @@ export function FormularioDeOverride({ unidades, catracas }: Props) {
 
           <BotaoDeConfirmacao />
 
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => setConfirmando(false)}
             data-testid="voltar-para-edicao"
           >
             Voltar e corrigir
-          </button>
+          </Button>
         </section>
       ) : (
         <section aria-labelledby="titulo-dados">
           <h2 id="titulo-dados">Dados da liberação</h2>
 
-          <p>
-            <label htmlFor="unidade">Unidade</label>
-            <select
-              id="unidade"
-              value={unidadeId}
-              onChange={(evento) => {
-                setUnidadeId(evento.target.value);
-                // Catraca de outra unidade seria recusada pela API; limpar
-                // aqui evita o erro em vez de explicá-lo depois.
-                setCatracaId('');
-              }}
-            >
-              {unidades.map((unidade) => (
-                <option key={unidade.id} value={unidade.id}>
-                  {unidade.name}
-                </option>
-              ))}
-            </select>
-          </p>
+          <SelectField
+            id="unidade"
+            label="Unidade"
+            value={unidadeId}
+            onChange={(evento) => {
+              setUnidadeId(evento.target.value);
+              // Catraca de outra unidade seria recusada pela API; limpar
+              // aqui evita o erro em vez de explicá-lo depois.
+              setCatracaId('');
+            }}
+          >
+            {unidades.map((unidade) => (
+              <option key={unidade.id} value={unidade.id}>
+                {unidade.name}
+              </option>
+            ))}
+          </SelectField>
 
-          <p>
-            <label htmlFor="catraca">Catraca</label>
-            <select
-              id="catraca"
-              value={catracaId}
-              onChange={(evento) => setCatracaId(evento.target.value)}
-              data-testid="selecao-de-catraca"
-            >
-              <option value="">Selecione…</option>
-              {catracasDaUnidade.map((catraca) => (
-                <option key={catraca.id} value={catraca.id}>
-                  {catraca.model} — {catraca.serial}
-                </option>
-              ))}
-            </select>
-          </p>
+          <SelectField
+            id="catraca"
+            label="Catraca"
+            value={catracaId}
+            onChange={(evento) => setCatracaId(evento.target.value)}
+            data-testid="selecao-de-catraca"
+          >
+            <option value="">Selecione…</option>
+            {catracasDaUnidade.map((catraca) => (
+              <option key={catraca.id} value={catraca.id}>
+                {catraca.model} — {catraca.serial}
+              </option>
+            ))}
+          </SelectField>
 
           <fieldset>
             <legend>Quem vai passar</legend>
@@ -237,59 +245,64 @@ export function FormularioDeOverride({ unidades, catracas }: Props) {
             </p>
 
             {tipoDeSujeito === 'aluno' ? (
-              <p>
-                <label htmlFor="aluno">Identificador do aluno</label>
-                <input
+              <>
+                {/*
+                  Quem chegou pela ficha ve o NOME no rotulo, e nao so o UUID no
+                  campo. O identificador continua visivel e editavel de
+                  proposito: e ele que vai no comando, e esconder o dado que a
+                  acao usa faria a tela mentir sobre o que envia.
+                */}
+                <Field
                   id="aluno"
+                  label={
+                    nomeDoAlunoInicial === undefined
+                      ? 'Identificador do aluno'
+                      : `Aluno: ${nomeDoAlunoInicial}`
+                  }
                   value={studentId}
                   onChange={(evento) => setStudentId(evento.target.value)}
                   data-testid="campo-aluno"
+                  {...(nomeDoAlunoInicial === undefined
+                    ? {}
+                    : { hint: 'Veio da ficha do aluno. Confira antes de liberar.' })}
                 />
-              </p>
+              </>
             ) : (
-              <p>
-                <label htmlFor="visitante">Quem é o visitante</label>
-                <input
-                  id="visitante"
-                  value={visitante}
-                  onChange={(evento) => setVisitante(evento.target.value)}
-                  maxLength={120}
-                  data-testid="campo-visitante"
-                />
-                {/*
-                  LGPD: o mínimo que identifica para a auditoria. Documento
-                  de quem nem é cliente ampliaria o tratamento sem base legal
-                  que o justifique.
-                */}
-                <small>Nome e contexto bastam. Não registre documento.</small>
-              </p>
+              /*
+                LGPD: o mínimo que identifica para a auditoria. Documento de
+                quem nem é cliente ampliaria o tratamento sem base legal que o
+                justifique -- por isso a dica diz o que NÃO registrar.
+              */
+              <Field
+                id="visitante"
+                label="Quem é o visitante"
+                value={visitante}
+                onChange={(evento) => setVisitante(evento.target.value)}
+                maxLength={120}
+                data-testid="campo-visitante"
+                hint="Nome e contexto bastam. Não registre documento."
+              />
             )}
           </fieldset>
 
-          <p>
-            <label htmlFor="motivo">Motivo</label>
-            <textarea
-              id="motivo"
-              value={motivo}
-              onChange={(evento) => setMotivo(evento.target.value)}
-              rows={3}
-              maxLength={300}
-              data-testid="campo-motivo"
-            />
-            <small>
-              Mínimo de 10 caracteres. Este texto é o que vai explicar a liberação numa
-              auditoria daqui a seis meses.
-            </small>
-          </p>
-
-          <button
+          <TextareaField
+            id="motivo"
+            label="Motivo"
+            value={motivo}
+            onChange={(evento) => setMotivo(evento.target.value)}
+            rows={3}
+            maxLength={300}
+            data-testid="campo-motivo"
+            hint="Mínimo de 10 caracteres. Este texto é o que vai explicar a liberação numa auditoria daqui a seis meses."
+          />
+          <Button
             type="button"
             disabled={!podeConfirmar}
             onClick={() => setConfirmando(true)}
             data-testid="revisar-liberacao"
           >
             Revisar
-          </button>
+          </Button>
         </section>
       )}
     </form>

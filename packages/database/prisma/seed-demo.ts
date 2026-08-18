@@ -78,6 +78,23 @@ const DISPOSITIVO = {
 };
 
 /**
+ * A catraca que o leitor comanda.
+ *
+ * Entra na demonstracao porque a tela de **liberacao manual** so lista
+ * dispositivo de tipo `TURNSTILE` e status `ACTIVE` -- sem ela o formulario nem
+ * renderiza, e a tela responde "Nenhuma catraca ativa cadastrada". Uma
+ * demonstracao com leitor e sem catraca deixa inacessivel justamente a acao que
+ * a recepcao usa quando alguem trava na porta.
+ *
+ * No mundo real sao dois equipamentos: o leitor reconhece, a catraca gira.
+ */
+const CATRACA = {
+  serial: 'DEMO-CATRACA-01',
+  model: 'Inner Turn',
+  firmware: '2.0.1',
+};
+
+/**
  * O PC da academia que roda o edge-agent.
  *
  * Entra na demonstracao porque sem ele o painel estampa "Sem Edge, a catraca
@@ -153,6 +170,23 @@ async function semearDemonstracao(): Promise<void> {
         status: 'ACTIVE',
         // Batimento recente: sem isso o painel mostra o leitor como mudo, que
         // e um alarme -- e alarme falso no seed treina a ignorar alarme.
+        lastHeartbeat: agora,
+        lastSyncAt: agora,
+      },
+      update: { edgeNodeId: edge.id, lastHeartbeat: agora, lastSyncAt: agora },
+    });
+
+    await db.device.upsert({
+      where: { tenantId_serial: { tenantId: tenant.id, serial: CATRACA.serial } },
+      create: {
+        tenantId: tenant.id,
+        gymUnitId: unidade.id,
+        edgeNodeId: edge.id,
+        kind: 'TURNSTILE',
+        model: CATRACA.model,
+        firmware: CATRACA.firmware,
+        serial: CATRACA.serial,
+        status: 'ACTIVE',
         lastHeartbeat: agora,
         lastSyncAt: agora,
       },
@@ -353,7 +387,7 @@ async function semearDemonstracao(): Promise<void> {
     }
 
     console.info(
-      `[demo] ${String(ALUNOS.length)} alunos, 1 dispositivo, ${String(eventos)} eventos de acesso.`,
+      `[demo] ${String(ALUNOS.length)} alunos, 1 leitor + 1 catraca, ${String(eventos)} eventos de acesso.`,
     );
     console.info('[demo] nenhum dado real -- nomes inventados, sem CPF.');
   } finally {

@@ -15,7 +15,7 @@ export const CARBON = {
 } as const;
 
 export const SEMANTIC_COLOR = {
-  "success": "#157F3D",
+  "success": "#13763A",
   "warning": "#8A5200",
   "danger": "#C22B2B",
   "info": "#1F5FD0",
@@ -120,44 +120,44 @@ export const CONTRAST_REPORT = [
   },
   {
     "role": "state.success",
-    "fg": "#157F3D",
-    "bg": "white",
-    "value": 5.08,
+    "fg": "#13763A",
+    "bg": "#e7f1eb",
+    "value": 4.94,
     "exempt": null
   },
   {
     "role": "state.warning",
     "fg": "#8A5200",
-    "bg": "white",
-    "value": 6.39,
+    "bg": "#f3eee6",
+    "value": 5.53,
     "exempt": null
   },
   {
     "role": "state.danger",
     "fg": "#C22B2B",
-    "bg": "white",
-    "value": 5.72,
+    "bg": "#f9eaea",
+    "value": 4.89,
     "exempt": null
   },
   {
     "role": "state.info",
     "fg": "#1F5FD0",
-    "bg": "white",
-    "value": 5.82,
+    "bg": "#e9effa",
+    "value": 5.04,
     "exempt": null
   },
   {
     "role": "state.risk",
     "fg": "#B4470B",
-    "bg": "white",
-    "value": 5.46,
+    "bg": "#f8ede7",
+    "value": 4.75,
     "exempt": null
   },
   {
     "role": "state.neutral",
     "fg": "#565E69",
-    "bg": "white",
-    "value": 6.56,
+    "bg": "#eeeff0",
+    "value": 5.7,
     "exempt": null
   }
 ] as const;

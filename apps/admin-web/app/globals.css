@@ -11,7 +11,12 @@
  * quem os usa vem depois, com aceite do PI.
  */
 
+@import 'tailwindcss';
 @import '@arenahub/ui/theme.css';
+@import "shadcn/tailwind.css";
+/*---break---
+ */
+@custom-variant dark (&:is(.dark *));
 
 *,
 *::before,
@@ -76,5 +81,278 @@ output,
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Elemento estrutural -- F46, issue #99.
+ *
+ * O bloco acima era o encanamento: tokens chegando na tela. Faltava o degrau
+ * seguinte, e a falta tinha um custo medido: `<h2>` do navegador renderiza a
+ * 24px, enquanto o `<h1>` do painel (`--ah-type-title-size`) e 20px. A
+ * hierarquia estava INVERTIDA em pixels -- cinco subtitulos gritando mais alto
+ * que o titulo, em 13 telas que ja consumiam o design system e envelopavam
+ * tudo em HTML sem estilo.
+ *
+ * Isto NAO e estilo de componente (esse mora em `packages/ui`). E o contrato
+ * de elemento: o que `<section>`, `<h2>`, `<dl>` e `<ul>` valem quando a tela
+ * os usa direto. Sem isso, quem decide o espacamento e a margem de user-agent
+ * -- e o PRODUCT.md conta cada pixel de respiro nao escolhido como uma linha a
+ * menos com o aluno esperando.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * ESCALA: o `<h1>` e do `PageHeader`; daqui para baixo tudo desce um degrau.
+ * `heading` (16/22/600) para `<h2>`, `body-strong` para `<h3>` -- a diferenca
+ * entre eles e peso, nao tamanho, porque em 14px de corpo mais um degrau de
+ * tamanho viraria ruido.
+ */
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: var(--ah-type-heading-weight);
+}
+
+h2 {
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+}
+
+h3,
+h4 {
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+}
+
+p {
+  margin: 0;
+}
+
+/**
+ * `<section>` e o card do painel: borda, nunca sombra (DS-PAINEL §4). Sombra
+ * fica reservada para camada que FLUTUA -- dropdown, popover, modal. Superficie
+ * plana le melhor em densidade alta, e e o que separa este painel de um
+ * dashboard generico.
+ *
+ * `> h2` ganha o respiro; o primeiro nao, senao o card abre com buraco.
+ */
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: var(--ah-size-card-padding);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+/* Card dentro de card e sempre erro: a segunda borda nao acrescenta divisao
+   nenhuma, so encolhe a area util. Aninhado vira agrupamento sem moldura. */
+section section {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/**
+ * `<dl>` de rotulo+valor -- o par que o painel mais usa fora de tabela.
+ *
+ * Grade de duas colunas em vez do default: `<dd>` do navegador vem com 40px de
+ * indentacao herdados de documento, que aqui viram desalinhamento entre seis
+ * numeros que definem o turno. `auto` na primeira coluna deixa o rotulo
+ * encolher ao proprio texto e os valores alinharem.
+ */
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
+  align-items: baseline;
+}
+
+dt {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+/* `dd` herda a indentacao de documento; aqui ela e ruido. */
+dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Lista de navegacao ou de fato -- sem marcador e sem a indentacao de 40px.
+ * O painel nao tem prosa: `<ul>` aqui e sempre um agrupamento de links ou de
+ * linhas, nunca um texto corrido com topicos.
+ */
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/**
+ * Link fora de componente. `--ah-action-text` e o papel de acao resolvido por
+ * contraste, entao acompanha o accent do tenant sem precisar de valor fixo.
+ */
+a {
+  color: var(--ah-action-text);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/**
+ * Texto de apoio -- o `<small>` que explica por que o CPF nao e obrigatorio e
+ * o que impede a recepcao de recusar quem chegou sem documento. No default do
+ * navegador ele cai para ~11px cinza e some sob luz fluorescente.
+ */
+small {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/**
+ * Codigo tecnico: `correlationId`, matricula, `enrollid`. O tamanho ja vinha do
+ * bloco de cima; falta o tratamento que o separa do texto ao redor.
+ */
+code,
+kbd,
+samp {
+  padding: 1px 4px;
+  border-radius: var(--ah-radius-badge);
+  background: var(--ah-surface-sunken);
+  color: var(--ah-text-secondary);
+}
+/*---break---
+ */
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+/*---break---
+ */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+/*---break---
+ */
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+/*---break---
+ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }

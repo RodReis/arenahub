@@ -3,6 +3,10 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { Button, SelectField } from '@arenahub/ui';
+
+import estilos from '../../../formulario.module.css';
+
 import { alterarSituacao, type EstadoDaSituacao } from '../../../actions/students';
 import { ROTULO_DE_SITUACAO, situacoesPossiveis } from '../../../../src/students/formatar';
 
@@ -18,9 +22,9 @@ function BotaoDeAlteracao() {
   const { pending } = useFormStatus();
 
   return (
-    <button type="submit" disabled={pending} data-testid="confirmar-situacao">
+    <Button type="submit" disabled={pending} data-testid="confirmar-situacao">
       {pending ? 'Alterando…' : 'Alterar situação'}
-    </button>
+    </Button>
   );
 }
 
@@ -57,7 +61,7 @@ export function AlterarSituacao({ studentId, situacaoAtual, version }: Props) {
   }
 
   return (
-    <form action={acao}>
+    <form className={estilos['formulario']} action={acao}>
       {estado.erro ? (
         <p role="alert" data-testid="erro-da-situacao">
           {estado.erro}
@@ -73,30 +77,28 @@ export function AlterarSituacao({ studentId, situacaoAtual, version }: Props) {
       <input type="hidden" name="studentId" value={studentId} />
       <input type="hidden" name="version" value={versaoVigente} />
 
-      <p>
-        <label htmlFor="situacao">Nova situação</label>
-        {/*
-          `key` pela situação vigente: quando ela muda, os destinos possíveis
-          mudam junto e o select precisa remontar. Sem a chave, o React
-          reaproveita o elemento e mantém selecionada uma opção que acabou de
-          sair da lista.
-        */}
-        <select
-          key={situacaoVigente}
-          id="situacao"
-          name="status"
-          defaultValue=""
-          required
-          data-testid="campo-situacao"
-        >
-          <option value="">Selecione…</option>
-          {destinos.map((destino) => (
-            <option key={destino} value={destino}>
-              {ROTULO_DE_SITUACAO[destino] ?? destino}
-            </option>
-          ))}
-        </select>
-      </p>
+      {/*
+        `key` pela situação vigente: quando ela muda, os destinos possíveis
+        mudam junto e o select precisa remontar. Sem a chave, o React
+        reaproveita o elemento e mantém selecionada uma opção que acabou de
+        sair da lista.
+      */}
+      <SelectField
+        key={situacaoVigente}
+        id="situacao"
+        name="status"
+        label="Nova situação"
+        defaultValue=""
+        required
+        data-testid="campo-situacao"
+      >
+        <option value="">Selecione…</option>
+        {destinos.map((destino) => (
+          <option key={destino} value={destino}>
+            {ROTULO_DE_SITUACAO[destino] ?? destino}
+          </option>
+        ))}
+      </SelectField>
 
       <BotaoDeAlteracao />
     </form>

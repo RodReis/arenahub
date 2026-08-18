@@ -3,6 +3,10 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { Button, Field, SelectField, TextareaField } from '@arenahub/ui';
+
+import estilos from '../../../formulario.module.css';
+
 import { atribuirPlano, type EstadoDaAssinatura } from '../../../actions/membership';
 
 interface Plano {
@@ -33,9 +37,9 @@ function BotaoDeAtribuicao() {
   const { pending } = useFormStatus();
 
   return (
-    <button type="submit" disabled={pending} data-testid="confirmar-atribuicao">
+    <Button type="submit" disabled={pending} data-testid="confirmar-atribuicao">
       {pending ? 'Atribuindo…' : 'Atribuir plano'}
-    </button>
+    </Button>
   );
 }
 
@@ -75,7 +79,7 @@ export function AtribuirPlano({ studentId, planos, impedido }: Props) {
   }
 
   return (
-    <form action={acao}>
+    <form className={estilos['formulario']} action={acao}>
       {estado.erro ? (
         <p role="alert" data-testid="erro-da-atribuicao">
           {estado.erro}
@@ -96,58 +100,55 @@ export function AtribuirPlano({ studentId, planos, impedido }: Props) {
 
       <input type="hidden" name="studentId" value={studentId} />
 
-      <p>
-        <label htmlFor="plano">Plano</label>
-        <select id="plano" name="planId" defaultValue={estado.valores?.planId ?? ''} required>
-          <option value="">Selecione…</option>
-          {ativos.map((plano) => (
-            <option key={plano.id} value={plano.id}>
-              {plano.name}
-            </option>
-          ))}
-        </select>
-      </p>
+      <SelectField
+        id="plano"
+        name="planId"
+        label="Plano"
+        defaultValue={estado.valores?.planId ?? ''}
+        required
+      >
+        <option value="">Selecione…</option>
+        {ativos.map((plano) => (
+          <option key={plano.id} value={plano.id}>
+            {plano.name}
+          </option>
+        ))}
+      </SelectField>
 
-      <p>
-        <label htmlFor="inicio">Início da vigência</label>
-        <input
-          type="datetime-local"
+      {/* Início e fim lado a lado: são a mesma decisão, lida de uma vez. */}
+      <div className={estilos['par']}>
+        <Field
           id="inicio"
           name="startsAt"
+          label="Início da vigência"
+          type="datetime-local"
           defaultValue={estado.valores?.startsAt ?? ''}
           required
           data-testid="campo-inicio"
         />
-      </p>
 
-      <p>
-        <label htmlFor="fim">Fim da vigência</label>
-        <input
-          type="datetime-local"
+        <Field
           id="fim"
           name="endsAt"
+          label="Fim da vigência"
+          type="datetime-local"
           defaultValue={estado.valores?.endsAt ?? ''}
           required
           data-testid="campo-fim"
         />
-      </p>
+      </div>
 
-      <p>
-        <label htmlFor="motivo-atribuicao">Motivo</label>
-        <textarea
-          id="motivo-atribuicao"
-          name="reason"
-          defaultValue={estado.valores?.reason ?? ''}
-          rows={2}
-          maxLength={300}
-          required
-          data-testid="campo-motivo-atribuicao"
-        />
-        <small>
-          Registrado na auditoria. Ex.: &quot;matrícula presencial, pagamento em dinheiro,
-          recibo 481&quot;.
-        </small>
-      </p>
+      <TextareaField
+        id="motivo-atribuicao"
+        name="reason"
+        label="Motivo"
+        defaultValue={estado.valores?.reason ?? ''}
+        rows={2}
+        maxLength={300}
+        required
+        data-testid="campo-motivo-atribuicao"
+        hint="Registrado na auditoria. Ex.: “matrícula presencial, pagamento em dinheiro, recibo 481”."
+      />
 
       <BotaoDeAtribuicao />
     </form>

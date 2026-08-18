@@ -3,6 +3,10 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { Button, Field, TextareaField } from '@arenahub/ui';
+
+import estilos from './plans.module.css';
+
 import { cadastrarPlano, type EstadoDoPlano } from '../../actions/membership';
 
 interface Unidade {
@@ -38,9 +42,9 @@ function BotaoDePlano() {
   const { pending } = useFormStatus();
 
   return (
-    <button type="submit" disabled={pending} data-testid="confirmar-plano">
+    <Button type="submit" disabled={pending} data-testid="confirmar-plano">
       {pending ? 'Criando…' : 'Criar plano'}
-    </button>
+    </Button>
   );
 }
 
@@ -117,55 +121,49 @@ export function FormularioDePlano({ unidades }: Props) {
   }
 
   return (
-    <form action={acao}>
+    <form className={estilos['formulario']} action={acao}>
       {estado.erro ? (
         <p role="alert" data-testid="erro-do-plano">
           {estado.erro}
         </p>
       ) : null}
 
-      <p>
-        <label htmlFor="nome-do-plano">Nome do plano</label>
-        <input
-          id="nome-do-plano"
-          name="name"
-          defaultValue={estado.valores?.name ?? ''}
-          maxLength={120}
-          required
-          data-testid="campo-nome-do-plano"
-        />
-      </p>
+      <Field
+        id="nome-do-plano"
+        name="name"
+        label="Nome do plano"
+        defaultValue={estado.valores?.name ?? ''}
+        maxLength={120}
+        required
+        data-testid="campo-nome-do-plano"
+      />
 
-      <p>
-        <label htmlFor="descricao">Descrição (opcional)</label>
-        <textarea
-          id="descricao"
-          name="description"
-          defaultValue={estado.valores?.description ?? ''}
-          rows={2}
-          maxLength={500}
-        />
-      </p>
+      <TextareaField
+        id="descricao"
+        name="description"
+        label="Descrição"
+        defaultValue={estado.valores?.description ?? ''}
+        rows={2}
+        maxLength={500}
+      />
 
-      <fieldset>
+      <fieldset className={estilos['grupo']}>
         <legend>Unidades onde o plano vale</legend>
 
         {unidades.map((unidade) => (
-          <p key={unidade.id}>
-            <label>
-              <input
-                type="checkbox"
-                name="gymUnitIds"
-                value={unidade.id}
-                defaultChecked={unidade.id === unidades[0]?.id}
-              />
-              {unidade.name}
-            </label>
-          </p>
+          <label key={unidade.id} className={estilos['marcador']}>
+            <input
+              type="checkbox"
+              name="gymUnitIds"
+              value={unidade.id}
+              defaultChecked={unidade.id === unidades[0]?.id}
+            />
+            {unidade.name}
+          </label>
         ))}
       </fieldset>
 
-      <fieldset>
+      <fieldset className={estilos['grupo']}>
         <legend>Janelas de horário</legend>
 
         {/*
@@ -177,7 +175,7 @@ export function FormularioDePlano({ unidades }: Props) {
           O acesso vale só dentro destas janelas. Use 24:00 para indicar o fim do dia.
         </p>
 
-        <table data-testid="tabela-de-janelas">
+        <table className={estilos["janelas"]} data-testid="tabela-de-janelas">
           <caption>Uma linha por dia e faixa de horário</caption>
           <thead>
             <tr>
@@ -238,23 +236,29 @@ export function FormularioDePlano({ unidades }: Props) {
                   />
                 </td>
                 <td>
-                  <button
+                  <Button
                     type="button"
+                    variant="destructive"
                     onClick={() => remover(linha.chave)}
                     disabled={linhas.length === 1}
                     data-testid={`remover-janela-${linha.chave}`}
                   >
                     Remover
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        <button type="button" onClick={adicionar} data-testid="adicionar-janela">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={adicionar}
+          data-testid="adicionar-janela"
+        >
           Adicionar janela
-        </button>
+        </Button>
       </fieldset>
 
       <BotaoDePlano />

@@ -73,6 +73,21 @@ const contrast = (a, b) => {
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
+/**
+ * Mistura `fg` sobre `bg` na proporcao `p` -- o mesmo que `color-mix` faz em
+ * runtime. Existe para o gate medir o par REAL: o badge de estado nao pinta
+ * sobre branco, pinta sobre 10% de si mesmo (DS-PAINEL §2.2).
+ */
+const mix = (fg, bg, p) => {
+  const a = parseHex(fg);
+  const b = parseHex(bg);
+  const hex = (n) => Math.round(n).toString(16).padStart(2, '0');
+  return `#${a.map((v, i) => hex(v * p + b[i] * (1 - p))).join('')}`;
+};
+
+/** Fundo do badge -- DS-PAINEL §2.2: tom a 10% sobre a superficie do card. */
+const TINT_DO_BADGE = 0.1;
+
 /* -------------------------------------------------------- resolucao de `ref` */
 
 const WHITE = '#FFFFFF';
@@ -194,15 +209,29 @@ if (disabledText && !disabledText.$exempt) {
   );
 }
 
-// Badge de estado: o tom solido tem de passar sobre o fundo do card.
+/**
+ * Badge de estado -- o tom solido tem de passar sobre O FUNDO QUE ELE PINTA.
+ *
+ * Media contra BRANCO ate 18/08/2026, e o par estava errado: o badge usa
+ * `color-mix(currentColor 10%, surface-raised)` como fundo (§2.2), nao branco.
+ * A diferenca nao e academica -- `success` passava com 5.08 sobre branco e
+ * entregava 4.44 sobre o proprio tint, reprovando o alvo de 4.5 na tela. O
+ * axe pegou; o gate que existe para pegar antes, nao.
+ *
+ * O tint e mais claro que o solido, entao medir sobre branco e sempre
+ * OTIMISTA: nenhuma cor passa aqui e falha la, e o inverso acontecia.
+ */
 for (const [name, def] of Object.entries(semantic.state ?? {})) {
   if (name.startsWith('$')) continue;
   const fg = resolveRef(def.ref, `semantic.state.${name}`);
   if (!fg) continue;
-  const value = round2(contrast(fg, WHITE));
-  contrastReport.push({ role: `state.${name}`, fg, bg: 'white', value, exempt: null });
+  const fundo = mix(fg, WHITE, TINT_DO_BADGE);
+  const value = round2(contrast(fg, fundo));
+  contrastReport.push({ role: `state.${name}`, fg, bg: fundo, value, exempt: null });
   if (value < 4.5) {
-    errors.push(`contraste reprovado: state.${name} (${fg}) sobre branco = ${value}, alvo 4.5.`);
+    errors.push(
+      `contraste reprovado: state.${name} (${fg}) sobre o proprio tint de 10% (${fundo}) = ${value}, alvo 4.5.`,
+    );
   }
 }
 

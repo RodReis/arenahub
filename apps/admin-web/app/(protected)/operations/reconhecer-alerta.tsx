@@ -3,6 +3,8 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { Button } from '@arenahub/ui';
+
 import {
   reconhecerAlerta,
   type EstadoDoReconhecimento,
@@ -14,9 +16,9 @@ function Botao() {
   const { pending } = useFormStatus();
 
   return (
-    <button type="submit" disabled={pending} data-testid="reconhecer">
+    <Button type="submit" variant="outline" disabled={pending} data-testid="reconhecer">
       {pending ? 'Reconhecendo…' : 'Reconhecer'}
-    </button>
+    </Button>
   );
 }
 

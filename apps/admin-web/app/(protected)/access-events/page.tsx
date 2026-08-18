@@ -2,13 +2,18 @@ import type { Metadata } from 'next';
 
 import {
   Ausente,
+  Button,
   DataTable,
   EmptyState,
+  Field,
   PageHeader,
   ProblemDetail,
+  SelectField,
   StateBadge,
   TenantDateTime,
 } from '@arenahub/ui';
+
+import estilos from './access-events.module.css';
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { ROTULO_DE_METODO, ROTULO_DE_MODO, traduzir } from '../../../src/operations/formatar';
@@ -117,34 +122,43 @@ export default async function PaginaDeEventos({
       <PageHeader id="titulo-eventos" title="Eventos de acesso" />
 
       {/* GET, não Server Action: filtro é navegação, e navegação vai na URL. */}
-      <form method="get" action="/access-events">
-        <p>
-          <label htmlFor="de">De</label>
-          <input type="datetime-local" id="de" name="from" defaultValue={texto('from') ?? ''} />
+      <form className={estilos['filtro']} method="get" action="/access-events">
+        <Field
+          id="de"
+          name="from"
+          label="De"
+          type="datetime-local"
+          defaultValue={texto('from') ?? ''}
+        />
 
-          <label htmlFor="ate">Até</label>
-          <input type="datetime-local" id="ate" name="to" defaultValue={texto('to') ?? ''} />
-        </p>
+        <Field
+          id="ate"
+          name="to"
+          label="Até"
+          type="datetime-local"
+          defaultValue={texto('to') ?? ''}
+        />
 
-        <p>
-          <label htmlFor="resultado">Resultado</label>
-          <select id="resultado" name="outcome" defaultValue={texto('outcome') ?? ''}>
-            <option value="">Todos</option>
-            <option value="ALLOW">Liberado</option>
-            <option value="DENY">Negado</option>
-          </select>
+        <SelectField
+          id="resultado"
+          name="outcome"
+          label="Resultado"
+          defaultValue={texto('outcome') ?? ''}
+        >
+          <option value="">Todos</option>
+          <option value="ALLOW">Liberado</option>
+          <option value="DENY">Negado</option>
+        </SelectField>
 
-          <label htmlFor="modo">Origem</label>
-          <select id="modo" name="mode" defaultValue={texto('mode') ?? ''}>
-            <option value="">Todas</option>
-            <option value="ONLINE">Online</option>
-            <option value="OVERRIDE">Liberação manual</option>
-          </select>
-        </p>
+        <SelectField id="modo" name="mode" label="Origem" defaultValue={texto('mode') ?? ''}>
+          <option value="">Todas</option>
+          <option value="ONLINE">Online</option>
+          <option value="OVERRIDE">Liberação manual</option>
+        </SelectField>
 
-        <button type="submit" data-testid="filtrar">
+        <Button type="submit" variant="outline" data-testid="filtrar">
           Filtrar
-        </button>
+        </Button>
       </form>
 
       {pagina.periodoLimitado ? (

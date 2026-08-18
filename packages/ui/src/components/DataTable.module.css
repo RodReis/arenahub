@@ -4,6 +4,22 @@
  * Le so a camada semantica (regra 2). Sem sombra: card do painel tem borda, e
  * superficie plana le melhor em densidade alta.
  */
+/**
+ * Rola a TABELA, nao a pagina -- issue #99.
+ *
+ * `max-width: 100%` mais `overflow-x: auto` mantem o container dentro do pai e
+ * dao a ele a barra. Sem isto a tabela empurra o grid do shell e a rolagem
+ * horizontal vaza para o documento, que e o que o §10.8 proibe a 200% de zoom.
+ *
+ * O foco visivel vem do `:focus-visible` global; aqui so garantimos que o anel
+ * nao seja cortado pela propria rolagem.
+ */
+.rolagem {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--ah-radius-card);
+}
+
 .tabela {
   width: 100%;
   border-collapse: collapse;

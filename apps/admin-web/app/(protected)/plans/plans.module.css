@@ -1,0 +1,119 @@
+/**
+ * Formulario de plano -- F46, issue #99.
+ *
+ * Herda a forma comum e acrescenta o que so existe aqui: a tabela EDITAVEL de
+ * janelas de horario, que o `DataTable` nao atende (ele exibe, nao edita).
+ */
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 72ch;
+}
+
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.grupo > legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+/**
+ * Caixa de selecao com rotulo clicavel inteiro. O alvo passa a ser a linha, e
+ * nao os 13px do quadradinho -- o minimo do WCAG 2.2 e 24px.
+ */
+.marcador {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+/**
+ * Tabela de janelas.
+ *
+ * Os controles dentro dela NAO usam `Field`/`SelectField` de proposito: o
+ * cabecalho da coluna ja e o rotulo, e cada celula tem `aria-label`. Um rotulo
+ * visivel por celula repetiria "Unidade" seis vezes numa tabela de seis
+ * linhas.
+ *
+ * Por isso o estilo dos controles mora aqui: sem ele, o Preflight do Tailwind
+ * os deixa sem borda e com 20px de altura.
+ */
+.janelas {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.janelas th {
+  padding: 0 8px 8px;
+  text-align: left;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  color: var(--ah-text-label);
+}
+
+.janelas td {
+  padding: 4px 8px 4px 0;
+  vertical-align: middle;
+}
+
+.janelas select,
+.janelas input {
+  width: 100%;
+  height: var(--ah-size-control);
+  padding: 0 10px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-control);
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-default);
+  font-family: inherit;
+  font-size: var(--ah-type-body-size);
+}
+
+.janelas select:focus-visible,
+.janelas input:focus-visible {
+  border-color: var(--ah-focus-ring);
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+/**
+ * A caixa em si -- 16px, e nao os 13px do navegador.
+ *
+ * O `target-size` do WCAG 2.2 pede 24px de alvo, e o `.marcador` acima ja
+ * entrega isso pela area clicavel do rotulo inteiro. Mas o axe mede o INPUT, e
+ * nao o rotulo em volta: a caixa precisa crescer por conta propria para a
+ * regra passar -- e cresce junto o alvo de quem mira o quadradinho.
+ */
+.marcador input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  /* Area clicavel de 24px sem ocupar 24px de layout. */
+  outline-offset: 2px;
+  margin: 4px;
+  accent-color: var(--ah-action-solid);
+}
+
+/**
+ * O botao de adicionar nao estica.
+ *
+ * Como filho direto de um `flex-direction: column`, ele herdava a largura toda
+ * (543px medidos) e virava a acao mais proeminente da tela -- quando a acao
+ * principal e salvar o plano, nao acrescentar linha.
+ */
+.grupo > button {
+  align-self: start;
+}

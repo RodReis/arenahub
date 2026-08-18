@@ -1,9 +1,10 @@
-import { AppShell, Button, NavLink, ToastProvider } from '@arenahub/ui';
+import { AppShell, Button, ToastProvider } from '@arenahub/ui';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { chamarApi } from '../../lib/api/server-client';
 import { sair } from '../actions/auth';
+import { Navegacao } from './navegacao';
 
 interface Perfil {
   id: string;
@@ -67,10 +68,13 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
             A ordem é a do turno: primeiro o que diz se a catraca está de pé,
             depois a investigação, depois o cadastro. Quem abre o painel com uma
             pessoa esperando na porta não deveria procurar o link.
+
+            `Navegacao` é o único pedaço cliente do shell, e existe porque ler o
+            pathname no servidor não é suportado pelo Next -- e porque layout
+            não re-renderiza na navegação, então uma rota passada daqui ficaria
+            congelada na tela de entrada.
           */
-          NAVEGACAO.map((item) => (
-            <NavLink key={item.href} href={item.href} label={item.label} />
-          ))
+          <Navegacao itens={NAVEGACAO} />
         }
       >
         {children}

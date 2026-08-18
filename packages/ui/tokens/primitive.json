@@ -15,7 +15,7 @@
 
   "$semanticComment": "Fixos e NAO configuraveis pelo tenant -- DS-PAINEL.md §2.2. Um tenant que pudesse repintar 'erro' quebraria o unico canal que a operacao le sem pensar.",
   "semantic": {
-    "success": { "value": "#157F3D", "contrastOnWhite": 5.08 },
+    "success": { "value": "#13763A", "contrastOnWhite": 5.71 },
     "warning": { "value": "#8A5200", "contrastOnWhite": 6.39 },
     "danger":  { "value": "#C22B2B", "contrastOnWhite": 5.72 },
     "info":    { "value": "#1F5FD0", "contrastOnWhite": 5.82 },

@@ -3,6 +3,10 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { Button, Field, SelectField } from '@arenahub/ui';
+
+import estilos from '../../../formulario.module.css';
+
 import { cadastrarAluno, type EstadoDoCadastro } from '../../../actions/students';
 
 const ESTADO_INICIAL: EstadoDoCadastro = {};
@@ -25,9 +29,9 @@ function BotaoDeCadastro() {
   const { pending } = useFormStatus();
 
   return (
-    <button type="submit" disabled={pending} data-testid="confirmar-cadastro">
+    <Button type="submit" disabled={pending} data-testid="confirmar-cadastro">
       {pending ? 'Cadastrando…' : 'Cadastrar aluno'}
-    </button>
+    </Button>
   );
 }
 
@@ -91,79 +95,67 @@ export function FormularioDeCadastro() {
   }
 
   return (
-    <form action={acao}>
+    <form className={estilos['formulario']} action={acao}>
       {estado.erro ? (
         <p role="alert" data-testid="erro-do-cadastro">
           {estado.erro}
         </p>
       ) : null}
 
-      <p>
-        <label htmlFor="nome">Nome completo</label>
-        <input
-          id="nome"
-          name="fullName"
-          defaultValue={estado.valores?.fullName ?? ''}
-          maxLength={160}
-          required
-          data-testid="campo-nome"
-        />
-      </p>
+      <Field
+        id="nome"
+        name="fullName"
+        label="Nome completo"
+        defaultValue={estado.valores?.fullName ?? ''}
+        maxLength={160}
+        required
+        data-testid="campo-nome"
+      />
 
-      <p>
-        <label htmlFor="nascimento">Data de nascimento</label>
-        <input
-          type="date"
-          id="nascimento"
-          name="birthDate"
-          defaultValue={estado.valores?.birthDate ?? ''}
-          required
-          data-testid="campo-nascimento"
-        />
-      </p>
+      <Field
+        id="nascimento"
+        name="birthDate"
+        label="Data de nascimento"
+        type="date"
+        defaultValue={estado.valores?.birthDate ?? ''}
+        required
+        data-testid="campo-nascimento"
+      />
 
-      <fieldset>
+      <fieldset className={estilos['grupo']}>
         <legend>Contato</legend>
 
-        <p>
-          <label htmlFor="contatoTipo">Tipo</label>
-          <select
-            id="contatoTipo"
-            name="contatoTipo"
-            defaultValue={estado.valores?.contatoTipo ?? 'PHONE'}
-          >
-            <option value="PHONE">Telefone</option>
-            <option value="WHATSAPP">WhatsApp</option>
-            <option value="EMAIL">E-mail</option>
-          </select>
-        </p>
+        <SelectField
+          id="contatoTipo"
+          name="contatoTipo"
+          label="Tipo"
+          defaultValue={estado.valores?.contatoTipo ?? 'PHONE'}
+        >
+          <option value="PHONE">Telefone</option>
+          <option value="WHATSAPP">WhatsApp</option>
+          <option value="EMAIL">E-mail</option>
+        </SelectField>
 
-        <p>
-          <label htmlFor="contatoValor">Contato</label>
-          <input
-            id="contatoValor"
-            name="contatoValor"
-            defaultValue={estado.valores?.contatoValor ?? ''}
-            maxLength={160}
-            data-testid="campo-contato"
-          />
-        </p>
+        <Field
+          id="contatoValor"
+          name="contatoValor"
+          label="Contato"
+          defaultValue={estado.valores?.contatoValor ?? ''}
+          maxLength={160}
+          data-testid="campo-contato"
+        />
       </fieldset>
 
-      <p>
-        <label htmlFor="cpf">CPF (opcional)</label>
-        <input
-          id="cpf"
-          name="cpf"
-          defaultValue={estado.valores?.cpf ?? ''}
-          inputMode="numeric"
-          data-testid="campo-cpf"
-        />
-        <small>
-          A matrícula não depende do CPF. Quem chega sem documento é cadastrado normalmente.
-          Quando informado, o CPF é guardado cifrado e nunca aparece por inteiro nas telas.
-        </small>
-      </p>
+      <Field
+        id="cpf"
+        name="cpf"
+        label="CPF"
+        unit="opcional"
+        defaultValue={estado.valores?.cpf ?? ''}
+        inputMode="numeric"
+        data-testid="campo-cpf"
+        hint="A matrícula não depende do CPF. Quem chega sem documento é cadastrado normalmente. Quando informado, o CPF é guardado cifrado e nunca aparece por inteiro nas telas."
+      />
 
       <BotaoDeCadastro />
     </form>

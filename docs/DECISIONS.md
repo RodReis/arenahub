@@ -1536,3 +1536,64 @@ O Cowork registra a decisão e a divergência; não a bloqueia.
    entrar em execução** — antes do PR, não antes do rótulo.
 4. Se a homologação do ADR-013 mudar o desenho de alguma dessas fatias, **a spec aprovada não vira
    escudo**: vale o desenho novo, e a spec é corrigida.
+
+---
+
+## ADR-031 — Tailwind e shadcn/ui entram no `admin-web`, com o design system próprio mantido
+
+**Data:** 18/08/2026 · **Decisor:** PI · **Status:** aceito
+
+### Contexto
+
+A F46 aplicava o DS-PAINEL nas telas do `admin-web`. Faltavam dois componentes que o inventário do
+§9 nunca listou — `select` e `textarea` — e cinco dos seis formulários dependiam deles: cada tela
+remontava `<p><label><select>` por conta própria, produzindo 53 controles crus com altura medida
+entre 19 e 24 px contra os 36 px do contrato.
+
+O Code havia escrito `SelectField` e `TextareaField` reusando o CSS do `Field`. O PI determinou o
+uso do shadcn/ui para componentes.
+
+**A decisão contraria dois documentos**, e os dois foram corrigidos em vez de ignorados: o
+`PRODUCT.md` listava "shadcn copiado inteiro" como anti-referência, e o `DESIGN-UI.md` §3.4 dizia
+`packages/ui` próprio sem copiar shadcn.
+
+### Decisão
+
+Tailwind v4, PostCSS e shadcn/ui entram no `admin-web`. O design system próprio **permanece** como
+fonte do que é específico do produto.
+
+O que ficou do `init`: Tailwind, PostCSS, a fonte `Geist` em `--font-sans` e a paleta do shadcn
+(`--primary`, `--chart-*`, `--sidebar-*`) no `globals.css`.
+
+**Os dois sistemas convivem porque os prefixos não colidem.** O painel lê `--ah-*` e continua em
+Inter Variable — medido no navegador, o `body` renderiza `"Inter Variable"` e o canvas segue
+`#F5F7F9`. A inversão carbono/accent, que era a preocupação do `PRODUCT.md`, sobrevive por isso.
+
+**Regra que a decisão cria:** componente do shadcn que quebre teclado, leitor de tela ou E2E não
+entra. Foi o que barrou o `Select` dele — é `<div role="combobox">` com zero `<option>`, e
+derrubaria os oito `selectOption` da suíte mais o teste que lê `<option>` para conferir que só
+transições válidas aparecem.
+
+### Consequências
+
+**Positivas.** O ecossistema shadcn fica disponível para o que o `packages/ui` não cobre.
+
+**Negativas, medidas.**
+
+- **Uma regressão real.** O Preflight do Tailwind zerou os controles ainda não migrados: borda
+  0 px, fundo transparente, 20 px de altura. Antes eram feios com a borda do navegador; depois
+  ficaram invisíveis. Isso transformou a migração dos seis formulários de melhoria em conserto
+  obrigatório — feito no mesmo PR.
+- **Duas fontes de verdade para cor** no `globals.css`, e 135 linhas somadas.
+- **O lint de design não enxerga classe utilitária.** As regras 1, 2 e 3 do DS-PAINEL §11 são
+  aplicadas por seletor de AST em JS/TS; um hex literal escrito em `className` passa direto. O gate
+  de contraste do build também não cobre o que o Tailwind pinta.
+- **Nenhum componente do shadcn está em uso.** Os três instalados (`select`, `textarea`, `button`)
+  foram removidos por não passarem no critério acima, e com eles saíram `@base-ui/react`,
+  `lucide-react` e `tw-animate-css`, que ficaram órfãos.
+
+### Alternativa descartada
+
+Migrar com os componentes do shadcn e reescrever os nove testes que dependem de `<select>` nativo.
+Descartada pelo PI: o escopo da F46 é aplicar o design system, não reescrever a suíte de
+acessibilidade.

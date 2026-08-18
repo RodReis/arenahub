@@ -30,7 +30,26 @@ interface Dispositivo {
  * cliente não descobre unidades nem dispositivos por conta própria, e o
  * escopo de unidade do operador já vem aplicado pela API.
  */
-export default async function PaginaDeOverride() {
+export default async function PaginaDeOverride({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  /**
+   * Aluno vindo da ficha -- issue #99.
+   *
+   * Antes disto o formulario pedia o identificador do aluno num campo de texto
+   * livre, e a ficha, que TEM o id em maos (usa em tres links), nao oferecia
+   * caminho ate aqui. A recepcionista pescava o UUID da barra de enderecos e
+   * digitava, com fila no balcao -- para a acao que existe justamente porque
+   * alguem esta parado na catraca.
+   *
+   * O `nome` viaja junto so para a tela poder dizer de QUEM se trata. Quem
+   * manda no comando e o `id`; o nome e rotulo, e a API nao o recebe.
+   */
+  const parametros = await searchParams;
+  const alunoDaFicha = texto(parametros['aluno']);
+  const nomeDoAluno = texto(parametros['nome']);
   const [unidades, dispositivos] = await Promise.all([
     chamarApi<Unidade[]>('/api/v1/units'),
     chamarApi<Dispositivo[]>('/api/v1/devices'),
@@ -98,8 +117,18 @@ export default async function PaginaDeOverride() {
           acesso manualmente.
         </p>
       ) : (
-        <FormularioDeOverride unidades={listaDeUnidades} catracas={catracas} />
+        <FormularioDeOverride
+          unidades={listaDeUnidades}
+          catracas={catracas}
+          alunoInicial={alunoDaFicha}
+          nomeDoAlunoInicial={nomeDoAluno}
+        />
       )}
     </section>
   );
+}
+
+/** `searchParams` pode devolver array quando a chave repete; aqui so a primeira vale. */
+function texto(valor: string | string[] | undefined): string | undefined {
+  return Array.isArray(valor) ? valor[0] : valor;
 }
