@@ -243,11 +243,25 @@ async function semearDemonstracao(): Promise<void> {
       select: { id: true },
     });
 
-    // Idempotencia dos eventos: `AccessEvent` nao tem chave natural para
-    // upsert (a unica e `(edgeNodeId, idempotencyKey)`, e aqui nao ha edge),
-    // entao a checagem e por presenca -- rodar de novo nao acumula passagem.
+    // Idempotencia dos eventos: a chave `(edgeNodeId, idempotencyKey)` ja
+    // garante que rodar de novo nao duplica, mas a checagem por presenca evita
+    // o trabalho inteiro -- e evita erro de unicidade virar ruido no console.
     const jaHaEventos = await db.accessEvent.count({
       where: { tenantId: tenant.id, deviceId: dispositivo.id },
+    });
+
+    // O bloqueado tem plano em dia e MESMO ASSIM bate na porta fechada -- e o
+    // caso que separa "tem direito" de "pode entrar". Sem uma negativa no
+    // banco, o filtro "Resultado: Negado" da tela devolve vazio, a coluna de
+    // motivo so mostra um valor, e o painel estampa "Negados: 0" -- tres
+    // lugares onde a demonstracao esconderia metade do produto.
+    const bloqueados = await db.student.findMany({
+      where: {
+        tenantId: tenant.id,
+        membershipNumber: { startsWith: PREFIXO },
+        status: 'BLOCKED',
+      },
+      select: { id: true },
     });
 
     let eventos = 0;
@@ -288,9 +302,47 @@ async function semearDemonstracao(): Promise<void> {
               // Deterministica: mesma execucao do seed produz a mesma chave,
               // entao rodar de novo nao acumula passagem duplicada.
               idempotencyKey: `seed-demo-${String(dia)}-${String(indice)}`,
-              // `detail` guarda o payload cru que o Edge mandou. Aqui nao veio
-              // Edge nenhum: a origem fica explicita para quem investigar um
-              // evento nao procurar hardware que nunca existiu.
+              // `detail` guarda o payload cru que o Edge mandou. Aqui nao
+              // houve leitura de verdade: a origem fica explicita para quem
+              // investigar nao procurar uma passagem que nunca aconteceu.
+              detail: { origem: 'seed-demo' },
+            },
+          });
+
+          eventos += 1;
+        }
+      }
+
+      // Tentativas NEGADAS do aluno bloqueado -- uma por dia, sempre no mesmo
+      // horario: quem bate na porta fechada tende a insistir na mesma rotina,
+      // e a repeticao e o que faz a recepcao reparar.
+      //
+      // `STUDENT_BLOCKED`, e nao `NO_ENTITLEMENT`: ele TEM direito ativo (a
+      // regra de arquitetura no 1 -- pagamento nao controla acesso). Quem nega
+      // e a situacao do cadastro, e o motivo na tela precisa dizer isso.
+      for (const [indice, aluno] of bloqueados.entries()) {
+        for (let dia = 3; dia >= 0; dia -= 1) {
+          const quando = new Date(agora.getTime() - dia * UM_DIA);
+          quando.setHours(7, 40, 0, 0);
+
+          if (quando > agora) continue;
+
+          await db.accessEvent.create({
+            data: {
+              tenantId: tenant.id,
+              gymUnitId: unidade.id,
+              deviceId: dispositivo.id,
+              edgeNodeId: edge.id,
+              studentId: aluno.id,
+              outcome: 'DENY',
+              reason: 'STUDENT_BLOCKED',
+              policyVersion: '1',
+              mode: 'ONLINE',
+              method: 'FACIAL',
+              occurredAt: quando,
+              recognizedAt: quando,
+              correlationId: `seed-demo-deny-${String(dia)}-${String(indice)}`,
+              idempotencyKey: `seed-demo-deny-${String(dia)}-${String(indice)}`,
               detail: { origem: 'seed-demo' },
             },
           });
