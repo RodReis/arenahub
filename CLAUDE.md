@@ -208,7 +208,7 @@ pnpm dev | lint | typecheck | test | test:integration | test:e2e | build
 - Dado de desenvolvimento vem de seed; dublê de teste vive no boundary (ver `docs/TESTING.md`).
 - Nunca logar template biométrico, token de pagamento, dado de cartão ou PII em erro.
 - Contrato de domínio completo (entidades, estados, invariantes): `docs/CONVENTION.md`.
-- Autorizado a subir o docker, se estiver off. Criar sempre um nova, com novas portas, nunca usr as que ja etão configurada no docker.
+- Autorizado a subir o docker, se estiver off. Criar sempre um nova, com novas portas, nunca usar as que ja etão configurada no docker.
 
 ## Grafo de conhecimento (graphify)
 

@@ -275,8 +275,8 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 |---|---|---|---|
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **32** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e o `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101) |
-| Feito | `proplan:done` | PR mergeado com CI verde | 0 |
+| Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
+| Feito | `proplan:done` | PR mergeado com CI verde | **1** — o `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **25** |
 
 > ⚠️ **Reconferido na API do board em 18/08/2026, fim de tarde.** *Feito* voltou a **0** e
@@ -284,12 +284,22 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 > a [F12](https://github.com/RodReis/arenahub/issues/12) e a [F13](https://github.com/RodReis/arenahub/issues/13),
 > esvaziando a fila de aceite no mesmo dia em que ela se formou.
 >
-> 📌 **O `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101) fechou os três itens**,
-> pelos PRs [#103](https://github.com/RodReis/arenahub/pull/103) (banco do E2E),
+> 📌 **O `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101) fechou os três itens** e
+> está em *Feito*, esperando o aceite do PI. Entregue pelos PRs
+> [#103](https://github.com/RodReis/arenahub/pull/103) (banco do E2E),
 > [#104](https://github.com/RodReis/arenahub/pull/104) (banco da integração, expurgo e seed de
-> demonstração) e o commit `c9eeff2` (line ending). Ficou em *Em Andamento* enquanto só um dos
+> demonstração) e pelo commit `c9eeff2` (line ending). Ficou em *Em Andamento* enquanto só um dos
 > três estava pronto — `proplan:done` afirma card inteiro entregue, e afirmar isso com dois terços
 > em aberto é o sinal falso que o quadro existe para não dar.
+>
+> ⚠️ **O `apt-get` do Chromium derrubou o CI duas vezes neste card** (runs `32169931742` e
+> `32171334856`), com o mesmo timeout de 8 min que o `[INFRA]`
+> [#94](https://github.com/RodReis/arenahub/issues/94) mitigou em 18/08. A mitigação de lá —
+> timeout curto mais uma tentativa extra — **não basta quando o mirror fica fora por minutos**:
+> as duas tentativas caem dentro da mesma janela. A issue #94 deixou registrada a opção 3
+> (container do Playwright) com a condição *"só se voltar a cair"*; **voltou, quatro vezes**.
+> Passou no rerun, e o card não foi aberto porque isso é decisão de infraestrutura fora do
+> escopo do #101 — fica anotado aqui para o PI decidir.
 >
 > ⚠️ **Leitura anterior de 18/08/2026, preservada** — não estimados. A composição de
 > *Em Andamento* mudou desde a leitura anterior: o `[INFRA]` [#68](https://github.com/RodReis/arenahub/issues/68)
