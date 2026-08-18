@@ -172,14 +172,27 @@ terminal. Inadimplência usa **`SUSPENDED`**.
 ### 3.4 `Invoice`
 `DRAFT | OPEN | PAID | OVERDUE | CANCELLED | REFUNDED`
 `OPEN → OVERDUE` por job idempotente; `→ PAID` por confirmação do provedor.
-**`PAID` nunca volta a `OPEN`** (INV-069). **`[indefinido]`:** gatilho de `DRAFT → OPEN`;
-condições de `CANCELLED`.
+**`PAID` nunca volta a `OPEN`** (INV-069).
+
+**Fechado na F12** (18/08/2026), decisão do Code registrada no PR — ambos reversíveis, então não
+viraram ADR:
+
+- **`DRAFT → OPEN`** acontece quando a invoice tem **ao menos um item e um vencimento**. Invoice
+  sem item não tem o que cobrar, e abrir uma vazia produziria cobrança de zero que ninguém sabe
+  interpretar.
+- **`CANCELLED`** só a partir de `DRAFT` ou `OPEN`. Invoice **paga** que precisa voltar atrás é
+  **estorno**, com estado próprio: cancelar uma paga apagaria o fato de que o dinheiro entrou
+  (INV-069, INV-073).
 
 ### 3.5 `Payment` / `PaymentAttempt`
-`PENDING | PROCESSING | CONFIRMED | FAILED | CANCELLED | REFUND_PENDING | REFUNDED`
-`CREATED | REQUIRES_ACTION | PROCESSING | SUCCEEDED | FAILED`
-**Grafo inteiro `[indefinido]`.** Depende do **ADR-027** (modelo), não do provedor — são dois
-grafos de entidades diferentes, não duas versões do mesmo. A **autorização revogada pelo pagador**
+`Payment`: `PENDING | CONFIRMED | FAILED | CANCELLED | REFUND_PENDING | REFUNDED`
+`PaymentAttempt`: `CREATED | REQUIRES_ACTION | PROCESSING | SUCCEEDED | FAILED`
+
+**Fechado pelo ADR-027 e implementado na F12** (18/08/2026). São dois
+grafos de entidades diferentes, não duas versões do mesmo: a tentativa responde *o que eu tentei*,
+o pagamento responde *que dinheiro foi reconhecido*. `CONFIRMED` não volta atrás — é o par de
+INV-069 do lado do pagamento. Invoice paga em duas tentativas (PIX falho + cartão) tem **duas**
+linhas em `payment_attempts` e **uma** em `payments`; a falha continua no histórico. A **autorização revogada pelo pagador**
 (Pix Automático) é estado do *mandato*: vive no `PaymentMethod`, não no `Payment` — ver ADR-027.
 
 ### 3.6 `Device`
