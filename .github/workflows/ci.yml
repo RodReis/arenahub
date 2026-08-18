@@ -166,6 +166,11 @@ jobs:
       # `pretest:e2e` recria este banco do zero antes de cada execucao, entao
       # nao e preciso cria-lo no service container.
       E2E_DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub_e2e?schema=public
+      # Banco separado para a integracao, pelo mesmo motivo do E2E: de 20
+      # suites, 3 apagam o tenant no fim e 17 deixam. E NAO o mesmo banco do
+      # E2E -- as duas suites rodam no mesmo job, e uma derrubaria o banco sob
+      # os pes da outra.
+      INTEGRATION_DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub_int?schema=public
 
     steps:
       - uses: actions/checkout@v7

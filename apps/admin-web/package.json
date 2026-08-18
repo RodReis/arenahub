@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "pretest:e2e": "node --env-file-if-exists=../../.env ../../scripts/preparar-banco-e2e.mjs"
+    "pretest:e2e": "node --env-file-if-exists=../../.env ../../scripts/preparar-banco-de-teste.mjs e2e"
   },
   "dependencies": {
     "@arenahub/ui": "workspace:*",

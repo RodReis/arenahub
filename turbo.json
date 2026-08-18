@@ -5,6 +5,7 @@
     "CI",
     "DATABASE_URL",
     "E2E_DATABASE_URL",
+    "INTEGRATION_DATABASE_URL",
     "NODE_ENV",
     "JWT_ISSUER",
     "JWT_AUDIENCE",

@@ -39,8 +39,19 @@ falham de formas diferentes:
 
 | nível | banco | quem limpa |
 |---|---|---|
-| **Integração** | Testcontainers, ou o Postgres local via `DATABASE_URL` | o próprio teste, com `deleteMany` |
+| **Integração** | banco **dedicado**, `INTEGRATION_DATABASE_URL` | 3 das 20 suítes apagam o tenant; as outras 17 não |
 | **E2E** | banco **dedicado**, `E2E_DATABASE_URL` | ninguém — o banco é **recriado do zero** antes de cada execução |
+
+> ⚠️ **Correção de 18/08/2026:** este documento afirmava que a integração usava
+> Testcontainers. **Não usa.** O `setup-env.ts` carrega o `.env` da raiz e as
+> suítes falam com o mesmo Postgres local — e foi assim que 1085 tenants de
+> teste e 802 usuários `@exemplo.test` se acumularam no banco de
+> desenvolvimento sem ninguém notar. Testcontainers segue disponível para
+> quando uma suíte precisar de instância própria; nenhuma precisou até agora.
+
+**Bancos separados entre si**, e não um só para as duas suítes: elas podem
+rodar ao mesmo tempo, e o `migrate reset` de uma derrubaria o banco sob os pés
+da outra.
 
 **O E2E não limpa, e isso é deliberado.** Ele exercita o fluxo como um operador faria, e um
 operador não apaga o aluno que acabou de cadastrar. A consequência é que limpeza no fim não
@@ -55,16 +66,21 @@ preciso container novo.
 
 ```
 pnpm db:e2e     # recria o banco de E2E (roda sozinho antes de test:e2e)
+pnpm db:int     # idem para a integração (roda sozinho antes de test:integration)
 ```
 
 Duas guardas, porque o comando é destrutivo:
 
-- **`E2E_DATABASE_URL` não tem valor padrão nem cai para `DATABASE_URL`.** Faltando a variável, o
-  script para e diz o que fazer. Um fallback silencioso para o banco de dev é exatamente o defeito
-  que esta separação existe para impedir, e um default embutido carregaria a porta da máquina de
-  quem o escreveu.
-- **O nome do banco precisa terminar em `_e2e`.** Um `E2E_DATABASE_URL` mal copiado apontando para
-  `arenahub` destruiria o ambiente de quem rodou.
+- **A variável não tem valor padrão nem cai para `DATABASE_URL`.** Faltando, o script para e diz o
+  que fazer. Um fallback silencioso para o banco de dev é exatamente o defeito que esta separação
+  existe para impedir, e um default embutido carregaria a porta da máquina de quem o escreveu.
+- **O nome do banco precisa terminar no sufixo da suíte** (`_e2e` ou `_int`). Uma URL mal copiada
+  apontando para `arenahub` destruiria o ambiente de quem rodou.
+
+A **integração** é a exceção deliberada da primeira regra: sem
+`INTEGRATION_DATABASE_URL` ela cai no `DATABASE_URL`, em vez de parar. O motivo é a assimetria de
+dano — ela limpa em parte e nunca recria banco, então cair no de desenvolvimento **suja**; no E2E,
+onde roda `migrate reset`, **apagaria**.
 
 > ⚠️ **Agente de IA:** o Prisma 7 recusa `migrate reset` quando detecta `AI_AGENT` no ambiente e
 > exige consentimento humano em `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`. O bloqueio não

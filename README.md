@@ -78,9 +78,11 @@ Outros acessos locais: o console do MinIO usa `arenahub` /
 | `pnpm lint` | ESLint em todos os workspaces |
 | `pnpm typecheck` | TypeScript estrito |
 | `pnpm test` | testes de unidade |
-| `pnpm test:integration` | testes que usam Postgres (exige containers de pé) |
-| `pnpm test:e2e` | Playwright — **recria o banco de E2E antes**, ver abaixo |
-| `pnpm db:e2e` | recria o banco dedicado ao E2E; roda sozinho antes do `test:e2e` |
+| `pnpm test:integration` | testes que usam Postgres (exige containers de pé) — **banco próprio**, ver abaixo |
+| `pnpm test:e2e` | Playwright — **banco próprio**, ver abaixo |
+| `pnpm db:e2e` / `db:int` | recriam os bancos de teste; rodam sozinhos antes das suítes |
+| `pnpm db:demo` | popula o banco de desenvolvimento com dado de demonstração |
+| `pnpm db:expurgar` | limpa resíduo de teste do banco de desenvolvimento (sem `--confirmar`, só relata) |
 | `pnpm build` | compila tudo |
 | `pnpm test:report` | regenera `reports/TESTS.md` — **o CI cobra** |
 | `pnpm docker:up` / `docker:down` | containers, sem o resto do setup |
@@ -90,17 +92,30 @@ A porta da API é **3344 fixa**: se estiver ocupada, o processo falha em vez de
 escorregar para a próxima. Framework que troca de porta sozinho deixa dois
 processos servindo, com o operador falando com um e lendo o log do outro.
 
-**O E2E usa banco próprio.** A suíte cria aluno, plano e dispositivo e não
-limpa o que criou — como um operador de verdade não apaga quem acabou de
-cadastrar. Apontada para o banco de desenvolvimento, ela o enchia de resíduo
-com epoch no nome, até a tela de Alunos exibir o rastro da própria suíte em vez
-do produto.
+**As suítes de teste usam bancos próprios.** Elas criam aluno, plano e
+dispositivo e não limpam o que criaram — o E2E porque um operador de verdade
+não apaga quem acabou de cadastrar; a integração porque só 3 de 20 suítes
+apagam o tenant no fim. Apontadas para o banco de desenvolvimento, encheram-no
+com mais de mil tenants de teste e milhares de alunos com epoch no nome, até a
+tela de Alunos exibir o rastro das suítes em vez do produto.
 
-Por isso existe `E2E_DATABASE_URL`, no `.env` (copie do `.env.example` e
-**ajuste a porta** para a do seu Postgres). Mesmo servidor, banco separado,
-recriado do zero antes de cada execução — recriar antes, e não limpar depois,
-é o que faz suíte interrompida no meio não sujar a próxima. Sem a variável, o
-E2E para e diz o que falta, em vez de escrever no banco errado.
+Por isso existem `E2E_DATABASE_URL` e `INTEGRATION_DATABASE_URL` no `.env`
+(copie do `.env.example` e **ajuste a porta** para a do seu Postgres). Mesmo
+servidor, bancos separados — e separados **entre si** também: as duas suítes
+podem rodar juntas, e uma derrubaria o banco sob os pés da outra.
+
+O de E2E é recriado do zero antes de cada execução. Recriar antes, e não limpar
+depois, é o que faz suíte interrompida no meio não sujar a próxima.
+
+**Para popular o painel**, rode `pnpm db:demo`: doze alunos com nomes
+inventados, um leitor facial, um Edge e uma semana de passagens. Sem isso o
+painel abre com "Nenhum evento no período" — banco vazio, não bug, mas quem
+olha a tela não tem como saber a diferença. É separado do seed base porque
+este roda também antes das suítes, e dado de demonstração faria os testes
+herdarem registro que não criaram.
+
+**Se o seu banco já está sujo** de antes desta separação, `pnpm db:expurgar`
+relata o que encontrou; com `--confirmar`, apaga.
 
 ## Estrutura
 
