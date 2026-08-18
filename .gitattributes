@@ -1,0 +1,39 @@
+# Normalizacao de fim de linha -- card [INFRA], issue #101.
+#
+# O repo tinha 470 arquivos "modificados" sem uma linha de conteudo alterada:
+# arvore de trabalho em CRLF, blobs em LF, sem `.gitattributes` e sem
+# `core.autocrlf`. `git diff --ignore-cr-at-eol` zerava tudo.
+#
+# Nesse estado um `git commit -a` produz commit de 470 arquivos com zero
+# mudanca semantica, todo PR nasce ilegivel, e os dois atores que escrevem
+# neste repo (Cowork em `docs/`, Code no resto) colidem em qualquer arquivo.
+#
+# `core.autocrlf input` resolvia, mas e config de maquina: some quando alguem
+# clonar de novo. O `.gitattributes` viaja com o repo.
+
+# Padrao: Git detecta texto e normaliza para LF no blob.
+* text=auto eol=lf
+
+# Script de shell -- LF e obrigatorio, nao preferencia: CRLF quebra o shebang.
+*.sh text eol=lf
+
+# PowerShell e nativo do Windows e espera CRLF.
+*.ps1 text eol=crlf
+
+# Binarios -- nunca normalizar. Normalizar corrompe.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+
+# Lockfile -- gerado por ferramenta, ilegivel em diff e sem valor em review.
+pnpm-lock.yaml -diff linguist-generated

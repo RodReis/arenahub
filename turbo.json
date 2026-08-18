@@ -1,7 +1,18 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "//": "Turborepo 2 SANITIZA o ambiente: variavel nao declarada aqui nao chega a task. Sem esta lista, `test:integration` passa na maquina de quem tem `.env` (o dotenv injeta) e falha no CI, onde a variavel vem do ambiente do job -- verde local, vermelho remoto, o pior tipo de divergencia. | `build:tokens` gera theme.css e tokens.generated.ts a partir de packages/ui/tokens/*.json, e precede `lint` e `typecheck` porque tokens.generated.ts e FONTE DE TIPO: sem ele o typecheck falha por arquivo inexistente, apontando para o sintoma em vez da causa. O comentario mora aqui, e nao dentro da task, porque o Turbo so aceita a chave `//` exata e no topo.",
-  "globalEnv": ["CI", "DATABASE_URL", "NODE_ENV", "JWT_ISSUER", "JWT_AUDIENCE", "JWT_PRIVATE_KEY", "JWT_PUBLIC_KEY", "MFA_ENCRYPTION_KEY", "API_INTERNAL_URL"],
+  "globalEnv": [
+    "CI",
+    "DATABASE_URL",
+    "E2E_DATABASE_URL",
+    "NODE_ENV",
+    "JWT_ISSUER",
+    "JWT_AUDIENCE",
+    "JWT_PRIVATE_KEY",
+    "JWT_PUBLIC_KEY",
+    "MFA_ENCRYPTION_KEY",
+    "API_INTERNAL_URL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": [
