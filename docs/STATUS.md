@@ -42,6 +42,22 @@ ADR-013 ainda aberto. O Cowork recomendou o contrário e a divergência está re
 checklist §6 dessas specs **continua desmarcado** no item dos ADRs, e **nenhum card sai do
 Backlog** por isso — quem segura F13–F16 é a entrada do MVP 2.
 
+✅ **18/08/2026 — a catraca livre é decisão operacional, não defeito.** O PI esclareceu: a
+Arena Positiva opera **de propósito** com o braço destravado **enquanto cadastra os alunos** —
+travar antes de todo mundo estar cadastrado prenderia sócio na porta. Quando o cadastro terminar,
+a catraca passa a travada. **Isso corrige o motivo registrado no field-note de 17/08 e no §9.2 do
+relatório de POC**, que trataram a config como *"furo"* e *"achado crítico"* — a observação física
+estava certa, a leitura da causa não. E **confirma o `GO_WITH_CONSTRAINTS`**: o `M0-AC-004` não é
+mensurável enquanto a academia estiver, por escolha, em modo aberto.
+
+⚠️ **O que sobrevive, e vira o risco a vigiar.** No dia em que a academia trocar para travada, a
+troca **pode não segurar**: a Topdata documenta que a config enviada pelo SDK sobrescreve a do
+equipamento ao entrar online, e o `EasyInnerBridge.cs` manda `ConfigurarAcionamento1(1, 5)` em
+**toda** conexão. Se `Funcao = 1` **não** for o modo travado, o ArenaHub vai **destravar a catraca
+de volta** a cada reconexão — silenciosamente, meses depois, com o cadastro pronto e todo mundo
+achando que o acesso está controlado. Saber o que é `1` é a única coisa entre isso e um incidente;
+a tabela está no *Manual de Integração SDK Inner Acesso* que o PI já tem desde 14/08. Ver ADR-028.
+
 🔴 **18/08/2026 — o bloqueio do gate §15 estava mal diagnosticado (ADR-028).** O modo de
 acionamento da catraca **é código do `edge-agent`**, não configuração do equipamento: a ponte já
 manda `ConfigurarAcionamento1(1, 5)` em toda conexão, e a Topdata documenta que a config do SDK
@@ -149,7 +165,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | 4 | ✅ ~~leitor em **18 dígitos**~~ — resolvido pelo menu físico do leitor; `setuserinfo` confirmado ao vivo em 17/08 | — |
 | 5 | ✅ ~~**cutover: apontar a catraca para o `edge-agent`**~~ — **feito e devolvido** em 17/08 (`.106` → `.190` → `.106`, legado religado). O mesmo vale para o leitor facial, pelo menu físico, **sem depender da senha de admin** | — |
 | 6 | ✅ ~~**ligar os adapters ao `main.ts`** — fatia nova~~ — **a fatia nova morreu em 17/08, por decisão do PI**: o `lab:run` foi construído dentro da janela e absorvido por **F2/F5**, sem número novo. ⚠️ **Consequência aberta na linha 8** | — |
-| 7 | 🔴 **catraca em `acionamento1: 8` — entra sem reconhecimento.** ⚠️ **Diagnóstico corrigido em 18/08 pelo ADR-028:** o modo **não** é config de equipamento nem depende do menu do painel — o `EasyInnerBridge.cs` já chama `ConfigurarAcionamento1(1, 5)` a cada `conectar`, e a Topdata documenta que a config do SDK **sobrescreve** a do WebServer ao entrar online. É **parâmetro de código**, com reversão trivial. O que falta é a **tabela do enum `Funcao`**, que está no manual do SDK / `Lab EasyInner` do portal do integrador — obtenção de documento, não janela de bancada | **`M0-AC-004`**, logo o **gate §15** |
+| 7 | 🟡 **catraca em `acionamento1: 8` — livre por decisão operacional.** A academia opera destravada **enquanto cadastra os alunos** (esclarecido pelo PI em 18/08); trava quando o cadastro fechar. **Não é defeito** — é fase. ⚠️ **O risco é a troca não segurar:** o `EasyInnerBridge.cs` manda `ConfigurarAcionamento1(1, 5)` em toda conexão e a config do SDK sobrescreve a do equipamento; se `Funcao = 1` não for o modo travado, o ArenaHub destrava de volta a cada reconexão. Falta ler a tabela do enum no manual que o PI já tem (ADR-028) | **restrição 2 do ADR-029** — condição de saída do MVP 1 |
 | 8 | 🟠 **composição de PRODUÇÃO do `edge-agent` ficou sem dono.** Ordem de inicialização, o que o agente faz ao subir, o que acontece quando um dispositivo não responde — falha alto ou degrada. O `lab:run` é **bancada**; nada disso está decidido. **Precisa de número antes de F9 ir a piloto** — decisão do PI, insumo pronto em [`docs/notes/composicao-do-edge-agent.md`](notes/composicao-do-edge-agent.md) | **MVP 1** |
 | 9 | 🟠 **relógio do leitor facial.** O `ocorridoEm` veio congelado em `15:47:28` em todos os reconhecimentos de 17/08 — timestamp fixo embaralha a ordem de eventos (`M0-FR-004`). Decisão do PI em 17/08: **acertar o relógio *e* o Edge carimbar `recebidoEm` como critério de ordenação quando o `ocorridoEm` for implausível**, preservando o original (`M0-BR-004`) | **F2** |
 | 10 | 🟠 **consumir o `senduser` para detectar órfãos** entre leitor e nuvem — leitura de reconciliação que vira **alerta**, nunca cadastro. Decisão do PI em 17/08; **fora de F2**, fatia futura do MVP 1 **ainda sem número** | **MVP 1** |
