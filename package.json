@@ -15,6 +15,8 @@
     "lint": "node scripts/run-task.mjs lint",
     "typecheck": "node scripts/run-task.mjs typecheck",
     "test": "node scripts/run-task.mjs test",
+    "//test:integration": "O `pretest` prepara o banco UMA vez, na raiz. Dois pacotes rodam integracao (apps/api com Jest, packages/database com vitest); preparar dentro de cada um faria o segundo derrubar o banco enquanto o primeiro ainda escreve nele.",
+    "pretest:integration": "node --env-file-if-exists=.env scripts/preparar-banco-de-teste.mjs integration",
     "test:integration": "node scripts/run-task.mjs test:integration",
     "test:e2e": "node scripts/run-task.mjs test:e2e",
     "//db:teste": "Recriam os bancos dedicados as suites (DROP + migrate + seed). Rodam sozinhos antes de test:e2e e test:integration; existem como comando proprio para quando a suite quebra no meio e o banco fica sujo.",
