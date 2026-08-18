@@ -61,6 +61,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [INFRA][FIX] CI: rodar o job de E2E no container do Playwright, tirando o apt-get do caminho (#105, finalizado em: 2026-08-18)
 - [INFRA] Banco de teste separado do de dev, seed de demonstração e line ending (#101, finalizado em: 2026-08-18)
 - [MVP2][SPEC-013][F13] PIX e webhook idempotente (#13, finalizado em: 2026-08-18)
 - [INFRA] CI: apt-get do Chromium pendura e derruba o job de E2E no timeout (#94, finalizado em: 2026-08-18)
