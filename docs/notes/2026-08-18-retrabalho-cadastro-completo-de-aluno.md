@@ -93,6 +93,8 @@ listagem e blocos da ficha**, lidos da cadeia real.
 | CNPJ | aluno é pessoa física. CNPJ implica empresa pagadora — entidade própria, não coluna em `students`. `EntitlementSource.CORPORATE` já existe no enum, esperando modelagem. Exige ADR |
 | Resp. Contrato | é **relação**, não campo: `FamilyGroup`/`FamilyMember` já existem, e o responsável legal do menor é escopo obrigatório da **F8** (ADR-008). Resolver aqui duplicaria |
 | Professores | vínculo N:N aluno↔staff. `PERSONAL_TRAINER` existe como papel; o vínculo não. Pertence ao **MVP 3** |
+| Estado civil | **revertido em 18/08:** *"só informação inútil"*. Nenhum caso de uso consome. Coletar dado pessoal que nada usa é o que o princípio da necessidade proíbe (LGPD art. 6º, III) |
+| Profissão | idem |
 
 ### 3.6 A Especificação §11 pede e o PI não listou
 
@@ -164,16 +166,16 @@ foto não entra. Isso cai no segundo caso da tabela *O que pode bloquear o desen
 `CLAUDE.md`: **para a entrega até estar certo**. Endereço reto para a **F8**, que já trata
 consentimento e biometria.
 
-### 6.3 Estado civil e profissão — o que falta antes de codificar
+### 6.3 Estado civil e profissão — retirados
 
-Não são dado sensível (art. 5º, II) — não param a fatia. Mas o **princípio da necessidade**
-(art. 6º, III) exige finalidade declarada: coletar dado que nenhum caso de uso consome é
-exatamente o que o princípio proíbe.
+Entraram e saíram no mesmo dia. O PI: *"só informação inútil"*. Está certo, e o motivo é o
+mesmo que faria a fatia parar: **nenhum caso de uso do produto consome estado civil ou
+profissão**. Coletar dado pessoal que nada usa é exatamente o que o princípio da necessidade
+proíbe (LGPD art. 6º, III), e o custo aparece depois — no aviso de privacidade, no relatório de
+impacto, no titular que pede exclusão de um dado que o sistema nunca precisou.
 
-Antes do merge: **uma linha do PI dizendo para que servem** (contrato? segmentação de CRM?
-exigência do cliente inaugural?), registrada no corpo da issue e refletida no aviso de
-privacidade do tenant. Ambos **opcionais**, sempre. Sem a linha, entram como campo morto — e
-campo morto de dado pessoal é passivo, não funcionalidade.
+Se algum dia um caso de uso pedir, volta com a finalidade junto. É uma coluna opcional; adiar não
+custa nada, adiantar custa.
 
 ### 6.4 API — o buraco que ninguém viu
 
@@ -202,6 +204,31 @@ Nome e nascimento são os **únicos** obrigatórios. Máscaras de CPF, CEP, tele
 `CLAUDE.md`. Toast, nunca `alert`. Rascunho preservado entre passos — quem digita 22 campos e
 perde tudo na validação do passo 3 não digita de novo.
 
+### 6.6 Unidade — decidido em 18/08
+
+`Student` **passa a ter `gym_unit_id`**, obrigatório. A Especificação §11 pede "unidade" nas
+informações administrativas, a regra de arquitetura nº 2 manda ter `gym_unit_id` quando o dado é
+físico, e todas as tabelas vizinhas — `Device`, `AccessEvent`, `PlanUnit` — já têm.
+
+**A premissa, escrita para poder ser contestada em uma palavra:** `gym_unit_id` é a **unidade de
+origem** do aluno — onde ele se cadastrou e para onde a recepção o conta. **Não é controle de
+acesso.** Quem decide em qual unidade o aluno entra continua sendo o plano, via `PlanUnit` e
+`EntitlementUnitWindow`. Ler `students.gym_unit_id` na decisão de acesso criaria uma segunda fonte
+de verdade sobre direito de entrar — a mesma regra de arquitetura nº 1 que tira Venc. Plano do
+formulário.
+
+Consequências que o Code precisa tratar:
+
+- **Migration com backfill.** Há alunos cadastrados sem unidade. Com uma única unidade ativa
+  (`MATRIZ`), o backfill é direto; a coluna nasce `NOT NULL` **depois** do backfill, em dois
+  passos, nunca em um.
+- **Listagem e busca passam a filtrar por unidade** quando há unidade selecionada no cabeçalho —
+  hoje o painel mostra *"Unidade não selecionada"* e lista tudo.
+- **Permissão por unidade já existe** (`M1-FR-003`, escopo por unidade quando configurado). O
+  filtro do aluno tem que respeitá-la, não reimplementá-la.
+- **Transferência entre unidades** é ação auditada, não edição de campo solta. Fica registrada
+  como pendência de comportamento — não bloqueia a coluna.
+
 ## 7. Fora de escopo, com motivo
 
 - **Nome social** — não pedido e não especificado. Se o cliente inaugural precisar, é campo à
@@ -223,12 +250,13 @@ para o corpo da issue**, com o parágrafo de origem. Custa um parágrafo por car
 
 ## 9. Pendências que precisam do PI
 
+**Fechadas em 18/08:** finalidade de estado civil e profissão *(resolvida retirando os campos)* e
+unidade do aluno *(sim — `gym_unit_id`, §6.6)*.
+
 | # | pergunta | trava o quê |
 |---|---|---|
-| 1 | **Para que servem estado civil e profissão?** Uma linha basta | merge da F45 (§6.3) |
-| 2 | **Aluno pertence a uma unidade?** A Espec §11 pede "unidade" e `Student` não tem `gym_unit_id`. A regra de arquitetura nº 2 manda tê-lo quando o dado é físico. Multi-unidade muda busca, listagem e permissão | modelagem da F45 — decidir **antes** da migration |
-| 3 | **Origem do lead — quais valores?** Indicação, redes, passagem, campanha, outro? | passo 3 do formulário |
-| 4 | **Foto entra em qual fatia?** Recomendação: F8, junto do consentimento | §6.2 |
+| 1 | **Origem do lead — quais valores?** Indicação, redes, passagem na porta, campanha, outro? | passo 3 do formulário |
+| 2 | **Foto entra em qual fatia?** Recomendação: F8, junto do consentimento | §6.2 |
 
 As demais decisões (nome de coluna, tabela vs. campo para emergência, ordem de implementação,
 como testar) são do Code, decididas na hora e registradas no PR.

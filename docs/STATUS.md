@@ -129,8 +129,19 @@ Cowork.** Vira o card [`#101`](https://github.com/RodReis/arenahub/issues/101).
 duas em [`docs/notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md`](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md).
 Decisões travadas na mesma conversa: **CPF continua opcional** (INV-009/011 — o mockup que o
 marcava obrigatório é que está errado); **CNPJ, responsável de contrato e professores ficam fora**;
-**estado civil e profissão entram** e precisam de finalidade declarada antes do merge (LGPD art.
-6º, III); **foto fica fora** por risco de reclassificação como biometria (art. 11) e vai para a F8.
+**estado civil e profissão entraram e saíram no mesmo dia** — *"só informação inútil"*, e é a
+decisão certa: dado pessoal que nenhum caso de uso consome é passivo, não funcionalidade (LGPD
+art. 6º, III); **foto fica fora** por risco de reclassificação como biometria (art. 11) e vai para
+a F8.
+
+🏢 **18/08/2026 — o aluno passa a pertencer a uma unidade.** `students` ganha **`gym_unit_id`
+obrigatório**: a Especificação §11 pede "unidade", a regra de arquitetura nº 2 manda tê-lo quando o
+dado é físico, e `Device`, `AccessEvent` e `PlanUnit` já têm. **É unidade de origem, não controle
+de acesso** — quem decide onde o aluno entra continua sendo o plano, por `PlanUnit` e
+`EntitlementUnitWindow`; ler `students.gym_unit_id` na decisão de acesso criaria a segunda fonte de
+verdade que a regra de arquitetura nº 1 proíbe. Migration em **dois passos** (coluna anulável →
+backfill para `MATRIZ` → `NOT NULL`), listagem passa a filtrar pela unidade do cabeçalho, e
+transferência entre unidades vira ação auditada — não edição de campo solta.
 
 ## 1. Onde estamos, em três frases
 
