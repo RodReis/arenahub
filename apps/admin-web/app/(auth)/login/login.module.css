@@ -1,55 +1,135 @@
 /**
- * Tela de login -- unica superficie do painel sem o shell.
+ * Tela de login -- unica superficie do painel sem o shell, e por isso a unica
+ * chance de identidade que o produto tem.
  *
- * Le so a camada semantica de tokens (regra 2 de lint). O modo e `light`,
- * como o `DS-PAINEL.md` §1 e o `.dc.html` fixam: canvas carbono claro, card
- * branco com BORDA (o painel nao usa sombra -- §4).
+ * Le so a camada semantica de tokens (regra 2 de lint). O modo e `light`, como
+ * o `DS-PAINEL.md` §1 fixa: canvas carbono claro, card branco com BORDA -- o
+ * painel nao usa sombra (§4).
+ *
+ * DUAS COLUNAS -- F46, issue #99, referencia visual aprovada pelo PI.
+ *
+ * A esquerda escura nao e decoracao: e onde o produto diz o que faz, para o
+ * time da academia que entra aqui uma vez por turno. A direita e trabalho --
+ * formulario sem cartao, porque cartao dentro de metade de tela ja delimitada
+ * e moldura sobre moldura.
+ *
+ * Abaixo de 1024px a coluna escura SOME, e nao encolhe: espremida ela vira
+ * faixa de cor sem texto legivel, ocupando altura que o formulario precisa.
  */
 .tela {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  min-height: 100dvh;
+}
+
+/* -------------------------------------------------------------- identidade */
+
+.identidade {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 48px;
+  background: var(--ah-surface-chrome);
+  color: var(--ah-text-on-chrome);
+}
+
+.wordmark {
+  font-size: var(--ah-type-title-size);
+  line-height: var(--ah-type-title-lh);
+  font-weight: var(--ah-type-title-weight);
+  color: var(--ah-surface-raised);
+}
+
+/**
+ * O ponto da marca em `--ah-text-on-chrome`, e NAO no accent.
+ *
+ * Mesma decisao que o `AppShell` ja tomou para o `ghost` na topbar: o accent e
+ * calibrado contra fundo CLARO, e sobre o carbono escuro `--ah-action-text`
+ * entrega 3.17 -- passa raspando para texto grande e reprova para este ponto,
+ * que e miudo. Sobre escuro quem carrega a marca e o contraste, nao o matiz.
+ */
+.wordmark span {
+  color: var(--ah-text-on-chrome);
+}
+
+.discurso {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/**
+ * A frase que diz o que o produto faz. `display` e o topo da escala (28px), e
+ * nao um tamanho novo: o painel tem sete degraus fixos e inventar um oitavo
+ * aqui criaria uma escala paralela que nada mais usa.
+ *
+ * `text-wrap: balance` para as duas linhas ficarem parelhas -- titulo com uma
+ * palavra orfa na segunda linha le como erro de layout.
+ */
+.frase {
+  margin: 0;
+  /*
+    `max-width` em `ch` conta CARACTERES, e a conta muda com o tamanho da
+    fonte: 22ch de um texto de 28px cabe muito menos palavra que 22ch de 14px.
+    A primeira versao estrangulou a frase em cinco linhas -- "Da / matricula /
+    ao resultado / fisico / do aluno." --, que le como erro de layout, nao como
+    frase. Aqui a medida e generosa e o `balance` faz o resto.
+  */
+  max-width: 24ch;
+  font-size: var(--ah-type-display-size);
+  line-height: var(--ah-type-display-lh);
+  font-weight: var(--ah-type-display-weight);
+  color: var(--ah-surface-raised);
+  text-wrap: balance;
+}
+
+.apoio {
+  margin: 0;
+  /* 48ch fica na faixa confortavel de leitura sem espremer em cinco linhas. */
+  max-width: 48ch;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  text-wrap: pretty;
+}
+
+/**
+ * Versao e fuso -- diagnostico, nao enfeite.
+ *
+ * E o que o suporte pede primeiro quando alguem liga: qual versao esta no ar e
+ * em que fuso a tela le as datas. Fica aqui porque esta e a unica pagina que
+ * todo mundo ve antes de entrar.
+ */
+.rodape {
+  margin: 0;
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+  line-height: var(--ah-type-mono-lh);
+}
+
+/* --------------------------------------------------------------- trabalho */
+
+.trabalho {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100dvh;
   padding: 24px;
   background: var(--ah-surface-canvas);
 }
 
-.cartao {
+/**
+ * Sem cartao: a coluna ja e a moldura. `max-width` em `ch` acompanha o tamanho
+ * do texto quando alguem usa zoom de 200%, coisa que largura em px nao faz.
+ */
+.painel {
   width: 100%;
-  max-width: 380px;
-  padding: 32px;
-  background: var(--ah-surface-raised);
-  border: 1px solid var(--ah-border-default);
-  border-radius: var(--ah-radius-card);
+  max-width: 42ch;
 }
 
-.marca {
+.cabecalho {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 28px;
-  text-align: center;
-}
-
-/**
- * Accent aqui e legitimo: marca e identidade do tenant, nao estado de maquina
- * -- a proibicao da regra 3 vale para badge, decisao de acesso e alerta.
- */
-.simbolo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  background: var(--ah-action-solid);
-  color: var(--ah-action-on-solid);
-}
-
-.simbolo svg {
-  width: 28px;
-  height: 28px;
+  gap: 4px;
+  margin-bottom: 24px;
 }
 
 .titulo {
@@ -73,7 +153,7 @@
 }
 
 /**
- * O botao ocupa a largura do cartao: e a unica acao da tela, e alinhar a
+ * O botao ocupa a largura do painel: e a unica acao da tela, e alinhar a
  * esquerda num formulario de duas linhas deixa um vazio a direita que parece
  * campo faltando.
  */
@@ -97,4 +177,21 @@
   color: var(--ah-danger);
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
+}
+
+/* ------------------------------------------------------------ estreito */
+
+@media (max-width: 1023px) {
+  .tela {
+    grid-template-columns: 1fr;
+  }
+
+  /**
+   * A coluna de identidade sai do fluxo inteira. Reduzi-la a uma faixa de cor
+   * gastaria altura que o formulario precisa, sem entregar o texto que
+   * justifica a coluna.
+   */
+  .identidade {
+    display: none;
+  }
 }
