@@ -71,8 +71,12 @@ não de imitação.
   `DESIGN-UI.md` §3.4 chama de "design system genérico": nenhuma biblioteca pronta tem
   `ProblemDetail`, `StateBadge` de 11 máquinas ou `TenantDateTime`, e montar o painel em volta de
   cards genéricos esconde exatamente o que o produto tem de específico.
-- **shadcn copiado inteiro.** Ele assume `primary` colorido e `neutral` decorativo; o ArenaHub
-  inverte isso — carbono é estrutura, accent é ação. Herdar a semântica dele quebra a inversão.
+- ~~**shadcn copiado inteiro.**~~ **Revogado pelo PI em 18/08/2026.** Tailwind e shadcn entraram
+  no `admin-web`; a preocupação original continua válida e virou convenção em vez de proibição: o
+  painel lê `--ah-*` e o shadcn lê `--*`, então a inversão carbono/accent sobrevive porque os dois
+  sistemas usam prefixos diferentes. **Componente do shadcn que quebre teclado, leitor de tela ou
+  E2E não entra** — foi o que barrou o `Select` dele, que é `<div role="combobox">` sem `<option>`
+  e derrubaria os oito `selectOption` da suíte.
 - **Motivacional agressivo ou linguagem de culpa.** Vale no app do aluno e vale em dobro aqui: a
   recepção não é responsável pelo estado do aluno.
 - **Cheio de animação de transição.** A promessa é p95 < 300 ms na catraca; a interface não pode

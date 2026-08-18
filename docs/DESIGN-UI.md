@@ -84,7 +84,7 @@ O accent do tenant entra apenas na camada 1, como rampa gerada. Isso permite tro
 |---|---|---|
 | Estilo web | Tailwind CSS v4 com `@theme` | tokens viram CSS custom properties nativas; accent por tenant sem rebuild |
 | Primitivos acessíveis | Radix Primitives | cobre foco, `aria-*` e teclado de dialog, popover, tabs — exigências de `M1-NFR-008` |
-| Componentes | `packages/ui` próprio, sem copiar shadcn inteiro | shadcn assume `primary` colorido e `neutral` decorativo; nossa inversão exige tokens próprios |
+| Componentes | `packages/ui` próprio **+ shadcn disponível** (PI, 18/08/2026) | o próprio continua sendo a fonte do que é específico — `StateBadge`, `ProblemDetail`, `TenantDateTime`. O shadcn entra onde não quebra teclado, leitor de tela nem E2E; a inversão carbono/accent sobrevive porque os prefixos (`--ah-*` e `--*`) não colidem |
 | Ícones | Lucide | licença permissiva, cobertura suficiente, peso consistente |
 | Gráficos | Recharts no web | precisa de `<table>` equivalente ao lado (MVP-03 §14) — não usar canvas puro |
 | Mobile | Expo + `unistyles` ou StyleSheet tipado sobre os mesmos tokens em JS | tokens compartilhados via `packages/ui/tokens` (JSON → CSS + TS) |
