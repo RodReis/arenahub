@@ -224,17 +224,33 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.versao }}
 
+      # Os dois passos abaixo chamam `apt-get` por baixo, e o mirror do runner
+      # (`azure.archive.ubuntu.com`) já caiu três vezes -- ver #94. Sem timeout
+      # próprio o `apt-get` fica pendurado até o `timeout-minutes: 20` do JOB
+      # estourar: 20 minutos gastos para não produzir sinal nenhum.
+      #
+      # `timeout-minutes` no passo faz a queda aparecer no passo certo e devolve
+      # o resto do orçamento; a repetição cobre o mirror que volta em segundos.
+      # Uma tentativa extra, não um laço: mirror fora do ar por minutos é para
+      # falhar rápido, não para insistir.
+
       # Sem cache: baixa o navegador E as bibliotecas de sistema.
       - name: instalar navegador do Playwright
         if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: pnpm --filter @arenahub/admin-web exec playwright install --with-deps chromium
+        timeout-minutes: 8
+        run: >-
+          pnpm --filter @arenahub/admin-web exec playwright install --with-deps chromium
+          || pnpm --filter @arenahub/admin-web exec playwright install --with-deps chromium
 
       # Com cache: o binário já veio de ~/.cache/ms-playwright, mas as
       # bibliotecas de sistema moram em /usr e o cache não as traz. Sem este
       # passo o Chromium existe e não abre.
       - name: instalar dependências de sistema do Chromium
         if: steps.cache-playwright.outputs.cache-hit == 'true'
-        run: pnpm --filter @arenahub/admin-web exec playwright install-deps chromium
+        timeout-minutes: 8
+        run: >-
+          pnpm --filter @arenahub/admin-web exec playwright install-deps chromium
+          || pnpm --filter @arenahub/admin-web exec playwright install-deps chromium
 
       - name: 'test:e2e'
         run: pnpm test:e2e
