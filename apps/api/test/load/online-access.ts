@@ -156,6 +156,7 @@ async function semear(db: ReturnType<typeof criarPrismaClient>): Promise<Context
   const aluno = await db.student.create({
     data: {
       tenantId: tenant.id,
+      gymUnitId: unidade.id,
       membershipNumber: `ML-${sufixo}`,
       fullName: 'Aluno Carga',
       birthDate: new Date('1990-01-01T00:00:00.000Z'),

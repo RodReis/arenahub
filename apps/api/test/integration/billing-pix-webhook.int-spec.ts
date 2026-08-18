@@ -156,6 +156,19 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
     });
     cenario.tenantId = tenant.id;
 
+    // A F45 tornou `students.gym_unit_id` obrigatorio: todo aluno nasce numa
+    // unidade de origem. Cobranca nao consulta unidade -- ela existe aqui so
+    // para o aluno da fixture ser valido.
+    const unidade = await db.gymUnit.create({
+      data: {
+        tenantId: tenant.id,
+        code: `UNI-${sufixo}`,
+        name: 'Unidade da fixture',
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+      },
+    });
+
     const vizinho = await db.tenant.create({
       data: {
         slug: `f13-vizinho-${sufixo}`,
@@ -192,6 +205,7 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
     const aluno = await db.student.create({
       data: {
         tenantId: tenant.id,
+        gymUnitId: unidade.id,
         fullName: 'Aluno F13',
         membershipNumber: `f13-${sufixo}`,
         birthDate: new Date('1992-03-10T00:00:00Z'),

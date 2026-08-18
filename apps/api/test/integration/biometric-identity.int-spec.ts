@@ -85,6 +85,7 @@ describe('F8 -- identidade biometrica e dispositivos', () => {
       .send({
         fullName: 'Aluno Biometrico',
         birthDate: nascimento.toISOString().slice(0, 10),
+        gymUnitId: conta.gymUnitId,
         contacts: [],
       });
 

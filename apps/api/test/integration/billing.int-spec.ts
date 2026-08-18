@@ -62,6 +62,19 @@ describe('F12 -- invoice e pagamento manual', () => {
       },
     });
 
+    // A F45 tornou `students.gym_unit_id` obrigatorio: todo aluno nasce numa
+    // unidade de origem. Cobranca nao consulta unidade -- ela existe aqui so
+    // para o aluno da fixture ser valido.
+    const unidade = await db.gymUnit.create({
+      data: {
+        tenantId: tenant.id,
+        code: `UNI-${rotulo}-${sufixo}`,
+        name: 'Unidade da fixture',
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+      },
+    });
+
     // `audit_logs.actor_id` tem FK para `users`: o operador precisa
     // EXISTIR. Descobri isso pelo teste -- com UUID solto, o registro de
     // pagamento manual quebrava na auditoria, que e justamente a mitigacao
@@ -86,6 +99,7 @@ describe('F12 -- invoice e pagamento manual', () => {
     const aluno = await db.student.create({
       data: {
         tenantId: tenant.id,
+        gymUnitId: unidade.id,
         fullName: `Aluno ${rotulo}`,
         membershipNumber: `${rotulo}-${sufixo}`,
         birthDate: new Date('1990-05-20T00:00:00Z'),

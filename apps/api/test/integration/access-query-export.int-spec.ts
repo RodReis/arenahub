@@ -146,6 +146,7 @@ describe('F11 -- consulta e exportacao de eventos', () => {
     const aluno = await db.student.create({
       data: {
         tenantId: a.tenantId,
+        gymUnitId: a.gymUnitId,
         membershipNumber: `MQ-${sufixo}`,
         // Nome com formula E com virgula: o pior caso do CSV numa linha so.
         fullName: '=HYPERLINK("http://atacante.test"), Silva',

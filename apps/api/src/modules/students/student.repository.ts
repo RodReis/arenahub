@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, Student, StudentStatus } from '@arenahub/database';
+import type {
+  LeadSource,
+  Prisma,
+  Student,
+  StudentAddress,
+  StudentContact,
+  StudentRegisteredSex,
+  StudentStatus,
+} from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -14,17 +22,69 @@ import { alunoRecebeAcessoNormal } from './domain/student.js';
 
 /** Contato normalizado, pronto para gravar. */
 export interface ContatoDeEntrada {
-  type: 'EMAIL' | 'PHONE' | 'WHATSAPP';
+  type: 'EMAIL' | 'PHONE' | 'WHATSAPP' | 'EMERGENCY';
   value: string;
   isPrimary: boolean;
+  /** So `EMERGENCY` preenche: nome de quem atende e parentesco. */
+  label?: string | undefined;
+  relationship?: string | undefined;
+}
+
+/** Endereco do aluno. Ja normalizado -- CEP em digitos, UF em maiusculas. */
+export interface EnderecoDeEntrada {
+  postalCode: string;
+  street: string;
+  number?: string | undefined;
+  complement?: string | undefined;
+  district?: string | undefined;
+  city: string;
+  state: string;
 }
 
 export interface DadosDeCriacaoDeAluno {
   fullName: string;
   birthDate: Date;
+  /** Unidade de ORIGEM, obrigatoria (F45). Nunca lida na decisao de acesso. */
+  gymUnitId: string;
   cpf?: string | undefined;
+  rg?: string | undefined;
+  registeredSex?: StudentRegisteredSex | undefined;
+  leadSource?: LeadSource | undefined;
+  advisorUserId?: string | undefined;
+  status?: StudentStatus | undefined;
   contacts: readonly ContatoDeEntrada[];
+  address?: EnderecoDeEntrada | undefined;
 }
+
+/**
+ * Campos editaveis do cadastro (`PATCH /students/:id`).
+ *
+ * `membershipNumber` e `tenantId` NAO estao aqui, e a ausencia e a regra:
+ * matricula e imutavel (INV-010) e tenant vem da identidade (regra no 2).
+ * `status` tambem fica de fora -- tem endpoint proprio, com maquina de
+ * estados que valida a transicao.
+ *
+ * `undefined` significa "nao mexer"; `null` significa "apagar". Sem essa
+ * distincao nao haveria como limpar um RG digitado errado.
+ */
+export interface DadosDeEdicaoDeAluno {
+  fullName?: string | undefined;
+  birthDate?: Date | undefined;
+  gymUnitId?: string | undefined;
+  cpf?: string | null | undefined;
+  rg?: string | null | undefined;
+  registeredSex?: StudentRegisteredSex | null | undefined;
+  leadSource?: LeadSource | null | undefined;
+  advisorUserId?: string | null | undefined;
+  contacts?: readonly ContatoDeEntrada[] | undefined;
+  address?: EnderecoDeEntrada | null | undefined;
+}
+
+/** Aluno com endereco e contatos, para o `GET /students/:id`. */
+export type AlunoComDetalhes = Student & {
+  contacts: StudentContact[];
+  addresses: StudentAddress[];
+};
 
 /** Possivel duplicata, ja mascarada para exibicao (INV-014). */
 export interface CandidatoADuplicata {
@@ -33,6 +93,50 @@ export interface CandidatoADuplicata {
   fullName: string;
   status: StudentStatus;
   motivo: 'CPF' | 'EMAIL' | 'PHONE' | 'NAME_AND_BIRTH_DATE';
+}
+
+/**
+ * Valor do contato na forma que vai para o banco.
+ *
+ * UM lugar so, de proposito: a deteccao de duplicata (INV-014) compara o
+ * valor gravado com o valor recebido, e as duas normalizacoes divergirem
+ * significa duplicata que nunca aparece. Antes da F45 esta expressao estava
+ * escrita duas vezes; `EMERGENCY` seria a terceira.
+ *
+ * `EMERGENCY` normaliza como telefone -- e um telefone, o de outra pessoa.
+ */
+/**
+ * Endereco pronto para gravar.
+ *
+ * `undefined` vira `null` porque a coluna e anulavel e o `tsconfig` roda com
+ * `exactOptionalPropertyTypes`: "campo ausente" e "campo vazio" sao coisas
+ * distintas para o TypeScript, e o Prisma so aceita a segunda.
+ */
+function linhaDeEndereco(endereco: EnderecoDeEntrada): {
+  postalCode: string;
+  street: string;
+  number: string | null;
+  complement: string | null;
+  district: string | null;
+  city: string;
+  state: string;
+} {
+  return {
+    postalCode: endereco.postalCode,
+    street: endereco.street,
+    number: endereco.number ?? null,
+    complement: endereco.complement ?? null,
+    district: endereco.district ?? null,
+    city: endereco.city,
+    state: endereco.state,
+  };
+}
+
+function normalizarValorDeContato(
+  tipo: ContatoDeEntrada['type'],
+  valor: string,
+): string {
+  return tipo === 'EMAIL' ? normalizarEmail(valor) : normalizarTelefone(valor);
 }
 
 /**
@@ -137,10 +241,12 @@ export class StudentRepository {
     }
 
     for (const contato of dados.contacts) {
-      const valor =
-        contato.type === 'EMAIL'
-          ? normalizarEmail(contato.value)
-          : normalizarTelefone(contato.value);
+      // Contato de emergencia e de OUTRA pessoa: o telefone do conjuge nao
+      // torna dois alunos a mesma pessoa. Comparar por ele produziria
+      // duplicata falsa em toda familia que se cadastra junto.
+      if (contato.type === 'EMERGENCY') continue;
+
+      const valor = normalizarValorDeContato(contato.type, contato.value);
 
       const porContato = await this.db.student.findMany({
         where: {
@@ -196,15 +302,31 @@ export class StudentRepository {
           // tres ultimos digitos (para a recepcao conferir).
           cpfHash: dados.cpf ? calcularHashDeCpf(contexto.tenantId, dados.cpf) : null,
           cpfLast3: dados.cpf ? ultimosTresDigitosDoCpf(dados.cpf) : null,
+          // Unidade de ORIGEM (F45). Obrigatoria no modelo; quem valida que
+          // ela pertence a este tenant e o controller, antes de chegar aqui.
+          gymUnitId: dados.gymUnitId,
+          rg: dados.rg ?? null,
+          registeredSex: dados.registeredSex ?? null,
+          leadSource: dados.leadSource ?? null,
+          advisorUserId: dados.advisorUserId ?? null,
+          ...(dados.status ? { status: dados.status } : {}),
+          // `student_addresses` existe desde a F7 e nunca foi escrita por
+          // nada. Aqui ela passa a ser.
+          ...(dados.address
+            ? {
+                addresses: {
+                  create: [{ tenantId: contexto.tenantId, ...linhaDeEndereco(dados.address) }],
+                },
+              }
+            : {}),
           contacts: {
             create: dados.contacts.map((contato) => ({
               tenantId: contexto.tenantId,
               type: contato.type,
-              value:
-                contato.type === 'EMAIL'
-                  ? normalizarEmail(contato.value)
-                  : normalizarTelefone(contato.value),
+              value: normalizarValorDeContato(contato.type, contato.value),
               isPrimary: contato.isPrimary,
+              label: contato.label ?? null,
+              relationship: contato.relationship ?? null,
             })),
           },
         },
@@ -257,6 +379,149 @@ export class StudentRepository {
   }
 
   /**
+   * Aluno com endereco e contatos (`GET /students/:id`).
+   *
+   * Separado do `encontrar`: a decisao de acesso e a checagem de
+   * elegibilidade nao precisam de endereco, e carregar duas relacoes em toda
+   * consulta de catraca seria custo por nada.
+   */
+  async encontrarComDetalhes(
+    contexto: TenantContext,
+    id: string,
+  ): Promise<AlunoComDetalhes | null> {
+    return this.db.student.findFirst({
+      where: { id, tenantId: contexto.tenantId },
+      include: {
+        contacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] },
+        // Uma linha hoje, mas a tabela e 1:N: ordenar deixa a leitura
+        // deterministica em vez de depender da ordem fisica das paginas.
+        addresses: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+  }
+
+  /**
+   * Edita dado cadastral com trava otimista.
+   *
+   * ATE A F45 NAO EXISTIA EDICAO: so `PATCH /students/:id/status`. Um
+   * formulario de vinte e dois campos sem edicao torna todo CEP digitado
+   * errado permanente.
+   *
+   * `version` no filtro pelo mesmo motivo do `alterarStatus`: duas
+   * recepcionistas na mesma ficha, uma sobrescreveria a outra em silencio.
+   * `count === 0` devolve `null` e quem chama traduz para conflito.
+   *
+   * CONTATOS E ENDERECO SAO SUBSTITUIDOS, nao mesclados: o formulario manda
+   * a lista inteira, e "apagar o que sumiu" e a unica leitura que permite
+   * remover um contato. Mesclar exigiria id estavel por linha na UI, que a
+   * fatia nao tem -- e mesclagem silenciosa deixaria contato antigo vivo
+   * depois de a recepcao te-lo apagado da tela.
+   */
+  async atualizar(
+    contexto: TenantContext,
+    id: string,
+    versaoEsperada: number,
+    dados: DadosDeEdicaoDeAluno,
+    correlationId: string,
+  ): Promise<Student | null> {
+    return this.db.$transaction(async (tx) => {
+      const alterados = await tx.student.updateMany({
+        where: { id, tenantId: contexto.tenantId, version: versaoEsperada },
+        data: {
+          version: { increment: 1 },
+          ...(dados.fullName !== undefined ? { fullName: dados.fullName } : {}),
+          ...(dados.birthDate !== undefined ? { birthDate: dados.birthDate } : {}),
+          ...(dados.gymUnitId !== undefined ? { gymUnitId: dados.gymUnitId } : {}),
+          ...(dados.rg !== undefined ? { rg: dados.rg } : {}),
+          ...(dados.registeredSex !== undefined ? { registeredSex: dados.registeredSex } : {}),
+          ...(dados.leadSource !== undefined ? { leadSource: dados.leadSource } : {}),
+          ...(dados.advisorUserId !== undefined ? { advisorUserId: dados.advisorUserId } : {}),
+          // Os dois campos de CPF andam JUNTOS: hash sem os ultimos digitos
+          // esconde o aluno da recepcao, e ultimos digitos sem hash o
+          // esconde da deteccao de duplicata.
+          ...(dados.cpf !== undefined
+            ? dados.cpf === null
+              ? { cpfHash: null, cpfLast3: null }
+              : {
+                  cpfHash: calcularHashDeCpf(contexto.tenantId, dados.cpf),
+                  cpfLast3: ultimosTresDigitosDoCpf(dados.cpf),
+                }
+            : {}),
+        },
+      });
+
+      if (alterados.count === 0) return null;
+
+      if (dados.contacts !== undefined) {
+        await tx.studentContact.deleteMany({ where: { studentId: id, tenantId: contexto.tenantId } });
+
+        if (dados.contacts.length > 0) {
+          await tx.studentContact.createMany({
+            data: dados.contacts.map((contato) => ({
+              tenantId: contexto.tenantId,
+              studentId: id,
+              type: contato.type,
+              value: normalizarValorDeContato(contato.type, contato.value),
+              isPrimary: contato.isPrimary,
+              label: contato.label ?? null,
+              relationship: contato.relationship ?? null,
+            })),
+          });
+        }
+      }
+
+      if (dados.address !== undefined) {
+        await tx.studentAddress.deleteMany({ where: { studentId: id, tenantId: contexto.tenantId } });
+
+        if (dados.address !== null) {
+          await tx.studentAddress.create({
+            data: { tenantId: contexto.tenantId, studentId: id, ...linhaDeEndereco(dados.address) },
+          });
+        }
+      }
+
+      await tx.studentTimelineEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: id,
+          type: 'STUDENT_UPDATED',
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          correlationId,
+          // Nomes dos campos tocados, NUNCA os valores: a timeline diria o
+          // CPF e o endereco de quem quer que a leia (INV-022).
+          payload: { campos: Object.keys(dados).filter((c) => dados[c as keyof DadosDeEdicaoDeAluno] !== undefined) },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'student.updated',
+          target: 'student',
+          targetId: id,
+          correlationId,
+          metadata: { campos: Object.keys(dados).filter((c) => dados[c as keyof DadosDeEdicaoDeAluno] !== undefined) },
+        },
+      });
+
+      await tx.outboxEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          eventType: 'StudentUpdated',
+          aggregateType: 'Student',
+          aggregateId: id,
+          payload: { studentId: id },
+        },
+      });
+
+      return tx.student.findFirstOrThrow({ where: { id, tenantId: contexto.tenantId } });
+    });
+  }
+
+  /**
    * Existe e esta apto a receber direito novo?
    *
    * ESTE METODO E A PORTA PUBLICA do modulo `students` para o `membership`
@@ -290,7 +555,19 @@ export class StudentRepository {
    */
   async buscar(
     contexto: TenantContext,
-    filtro: { termo?: string | undefined; limite: number; cursor?: string | undefined },
+    filtro: {
+      termo?: string | undefined;
+      limite: number;
+      cursor?: string | undefined;
+      /**
+       * Unidade de ORIGEM (F45). Opcional de proposito: o painel ainda nao
+       * tem seletor de unidade no cabecalho -- ele mostra um indicador
+       * estatico, e criar o seletor e decisao de produto adiada
+       * (`DS-PAINEL.md` §5). Ausente, a listagem segue mostrando o tenant
+       * inteiro, como antes desta fatia.
+       */
+      gymUnitId?: string | undefined;
+    },
   ): Promise<Student[]> {
     const termo = filtro.termo?.trim();
 
@@ -309,7 +586,11 @@ export class StudentRepository {
       : {};
 
     return this.db.student.findMany({
-      where: { tenantId: contexto.tenantId, ...condicoes },
+      where: {
+        tenantId: contexto.tenantId,
+        ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
+        ...condicoes,
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: filtro.limite,
       ...(filtro.cursor ? { cursor: { id: filtro.cursor }, skip: 1 } : {}),
