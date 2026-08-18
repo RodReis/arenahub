@@ -33,7 +33,8 @@ Code; registrado aqui porque avanço fora da `main` é o *fechamento frágil* do
 errado: a Slice 2.1 (invoice, ledger, pagamento manual) **não chama um único método de
 `PaymentProvider`**, e o `MVP-02` §5 põe o gate de homologação antes da **Slice 2.2**, não da 2.1.
 O que de fato falta para F12 é o **modelo de `Payment`**, decidível sem provedor — virou o
-**ADR-027**, com recomendação técnica escrita e **quatro perguntas ao PI**. O ADR-013 segue
+**ADR-027**. Em 18/08 o PI **aceitou a recomendação técnica** e respondeu três das quatro
+perguntas; a quarta (dupla permissão) virou **emenda ao PRD**, ainda pendente. O ADR-013 segue
 `aberto` só para o provedor e as políticas de refund, bloqueando F13–F16. ⚠️ **Isso não torna F12
 pegável:** a entrada do MVP 2 exige MVP 1 estável, e o MVP 1 depende do gate §15 do MVP 0.
 
@@ -208,7 +209,7 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 |---|---|---|
 | **ADR-008** *(ponto remanescente)* | **transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil. **Reapontado:** bloqueava F8 por engano — F8 não chama IA nenhuma | F21 |
 | **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que sobrou aqui são as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites). O **modelo de `Payment` saiu deste ADR em 18/08/2026** e virou o ADR-027 | F13–F16 |
-| **ADR-027** *(novo, 18/08/2026)* | **modelo de `Payment` e `PaymentAttempt`** — campos e grafo de estado, hoje `[indefinido]` em documento nenhum. **Não depende do provedor:** o pagamento manual da Slice 2.1 não passa por adapter algum. A recomendação técnica já está escrita; faltam **quatro respostas suas** — pagamento parcial, limite da dupla permissão, estorno de pagamento manual e sobrepagamento | F12–F16 |
+| **ADR-027** | **modelo de `Payment` e `PaymentAttempt`** — recomendação técnica **aceita em 18/08/2026**, com três respostas fechadas (só valor integral; estorno manual só por contra-lançamento; sobrepagamento vira crédito). **Trava numa emenda ao `MVP-02`:** tirar a dupla permissão da Slice 2.1 (§7) e acrescentar `account_credits` ao §11. **Emenda de PRD é sua** — o Cowork não escreve em `docs/prd/**` | F12–F16 |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
 
 > 🔴 **Correção material no ADR-007, registrada em 17/08/2026.** A *"Consequência 2"* do ADR-007

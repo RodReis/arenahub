@@ -1241,8 +1241,9 @@ qualquer outra coisa, o documento de design vence.
 <a id="adr-027"></a>
 ## ADR-027 — Modelo de `Payment` e `PaymentAttempt`
 
-**Data:** 18/08/2026 · **Status:** `proposto` *(recomendação técnica formulada — **aguardando o
-PI**)* · **Recorta** o **ADR-013** · **Bloqueia:** F12 a F16
+**Data:** 18/08/2026 · **Status:** `proposto` *(recomendação técnica **aceita pelo PI em
+18/08/2026**; 3 das 4 perguntas respondidas — **falta uma emenda ao PRD**)* · **Recorta** o
+**ADR-013** · **Bloqueia:** F12 a F16
 
 **Contexto — e a correção que este ADR carrega.** O ADR-013 empacotou duas coisas de natureza
 diferente: **qual provedor** (que sai da homologação, card `[GATE]`) e **como o pagamento é
@@ -1311,14 +1312,52 @@ de *a cobrança aconteceu e falhou*. Tratar como falha de pagamento é exatament
 `LANDSCAPE.md` §4.2 nomeia: cobrança indevida e churn silencioso. **Esta parte é decidível agora
 porque não depende de qual provedor implementa o mandato.**
 
-### Perguntas ao PI — as quatro que faltam
+### Perguntas ao PI — respondidas em 18/08/2026
 
-| # | pergunta | por que é sua, e não minha |
+| # | pergunta | resposta do PI |
 |---|---|---|
-| 1 | **Pagamento parcial existe?** A invoice só vira `PAID` quando a soma dos `payments` confirmados iguala o total, ou o recepcionista pode registrar R$ 80 de uma mensalidade de R$ 120 e deixar saldo? | muda a regra de `OPEN → PAID` e cria — ou não — o conceito de saldo devedor |
-| 2 | **Qual é o limite da dupla permissão** do pagamento manual (`MVP-02` §7, Slice 2.1), em reais, e **quem é o segundo aprovador**: outro recepcionista serve, ou precisa de gerente? | é política de controle interno, não modelagem |
-| 3 | **Pagamento manual pode ser estornado** pelo sistema, ou só anulado por contra-lançamento auditado? | dinheiro recebido na mão não volta pelo caminho por onde o PIX volta |
-| 4 | **Sobrepagamento** (entrou mais que o total da invoice): rejeita, aceita e gera crédito para o próximo ciclo, ou aceita e abre refund? | as três são defensáveis; a escolha é de produto |
+| 1 | Pagamento parcial existe? | **Não.** A invoice só vira `PAID` com o valor **integral**; registro parcial é rejeitado. Não existe saldo devedor no MVP 2 |
+| 2 | Limite da dupla permissão do pagamento manual e quem aprova | **Sai do MVP 2.** ⛔ Isso **contradiz o `MVP-02` §7, Slice 2.1**, que é PRD aprovado — o PI decidiu **emendar o PRD**. Enquanto a emenda não estiver no arquivo, este ADR não fecha |
+| 3 | Pagamento manual pode ser estornado pelo sistema? | **Não.** Só **contra-lançamento auditado**, com motivo e autor. O `payment` original nunca muda de estado; a devolução física acontece fora do sistema |
+| 4 | Sobrepagamento | **Aceita e vira crédito** do aluno, abatido na próxima invoice |
+
+### Consequências dessas respostas
+
+**1. A resposta 4 cria uma tabela que o PRD não lista.** O `MVP-02` §11 enumera as tabelas do
+MVP 2 e **não tem crédito de aluno**. Acrescentar é ampliar modelo aprovado — o mesmo caso que o
+ADR-013 apontou no contrato `PaymentProvider`, e que o `prd/README.md` §10.2 manda perguntar antes
+de fazer. **Vai na mesma emenda da resposta 2.** Campos propostos:
+
+`account_credits`: `id`, `tenant_id`, `student_id`, `origin_payment_id`, `amount_minor`,
+`currency`, `status` (`AVAILABLE | APPLIED | EXPIRED`), `applied_to_invoice_id`, `created_at`.
+Crédito **não é dinheiro devolvível** no MVP 2 — só abate invoice.
+
+**2. Assimetria deliberada entre as respostas 1 e 4.** R$ 119 de uma mensalidade de R$ 120 é
+**rejeitado**; R$ 121 é **aceito** e gera R$ 1 de crédito. Isso só é coerente se a política da
+academia for **não aceitar pagamento parcial no balcão**. Se na prática a recepção aceita, a
+resposta 1 precisa ser reaberta: dinheiro que entra sem registro é pior que modelo complicado.
+
+**3. Risco de controle interno — registrado porque não pode ficar implícito.** Com a dupla
+permissão fora (2), sem desfazimento pelo sistema (3) e com crédito gerado por sobrepagamento (4),
+**some o único gate de dois olhos do fluxo de dinheiro manual**: um recepcionista sozinho registra
+um pagamento manual inflado, gera crédito e não há aprovação na entrada nem estorno na saída — só
+contra-lançamento posterior, se alguém perceber.
+
+**Mitigação mínima que este ADR carrega:** todo `payment` com `method = MANUAL` grava
+`recognized_by_user_id` e entra na timeline de auditoria financeira da Slice 2.1; todo
+`account_credit` guarda `origin_payment_id`. **Isso detecta depois — não impede antes.** A
+diferença é deliberada e é do PI.
+
+### O que falta para este ADR virar `aceito`
+
+Uma **emenda ao `docs/prd/academia/MVP-02-smart-billing.md`**, cobrindo dois pontos:
+
+1. **§7, Slice 2.1** — remover *"pagamento manual com dupla permissão quando acima do limite"*,
+   substituindo por *"pagamento manual com registro auditado do operador"*, com data e motivo.
+2. **§11, modelo de dados** — acrescentar `account_credits` à lista de tabelas.
+
+O Cowork **não escreve em `docs/prd/**`** (ADR-021): o texto é do PI. Enquanto a emenda não
+existir no arquivo, o ADR-027 permanece `proposto` e a F12 permanece bloqueada por ele.
 
 ### Escopo negativo
 
