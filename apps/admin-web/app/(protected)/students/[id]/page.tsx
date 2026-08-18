@@ -235,6 +235,33 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             Sem direito de acesso vigente. Atribua um plano abaixo para liberar a catraca.
           </p>
         )}
+
+        {/*
+          A saida imediata, e so quando o acesso FALHA -- issue #99.
+
+          Quem descobre aqui que a pessoa nao entra precisa agir agora, com ela
+          parada na catraca. Antes, o caminho era voltar a barra lateral,
+          escolher "Liberacao manual" e digitar o UUID num campo de texto livre
+          -- que esta ficha ja tinha em maos e usava em tres links, sem oferecer
+          este. A jornada principal do produto estava partida no meio.
+
+          Nao aparece quando o acesso esta vigente: liberacao manual e ato
+          excepcional e auditado (`access.override` e permissao propria), e
+          oferece-la a quem ja pode passar convida ao uso banal.
+
+          `encodeURIComponent` no nome porque ele vem do cadastro e pode ter
+          acento, espaco ou `&`.
+        */}
+        {bloqueado || vigentes.length === 0 ? (
+          <p>
+            <a
+              href={`/access/override?aluno=${aluno.id}&nome=${encodeURIComponent(aluno.fullName)}`}
+              data-testid="link-liberacao-manual"
+            >
+              Liberar a catraca manualmente
+            </a>
+          </p>
+        ) : null}
       </section>
 
       <section aria-labelledby="titulo-direitos">

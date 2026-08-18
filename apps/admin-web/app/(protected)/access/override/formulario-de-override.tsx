@@ -23,6 +23,10 @@ interface Catraca {
 interface Props {
   unidades: Unidade[];
   catracas: Catraca[];
+  /** Aluno vindo da ficha, pela query string. Ver `page.tsx`. */
+  alunoInicial?: string | undefined;
+  /** Nome de quem chegou pela ficha -- rotulo de tela, nunca vai para a API. */
+  nomeDoAlunoInicial?: string | undefined;
 }
 
 const ESTADO_INICIAL: EstadoDoOverride = {};
@@ -57,14 +61,19 @@ function BotaoDeConfirmacao() {
  * e dizer "pronto, pode passar" antes disso mandaria o operador embora sem
  * saber que falhou.
  */
-export function FormularioDeOverride({ unidades, catracas }: Props) {
+export function FormularioDeOverride({
+  unidades,
+  catracas,
+  alunoInicial,
+  nomeDoAlunoInicial,
+}: Props) {
   const [estado, acao] = useActionState(liberarAcessoManual, ESTADO_INICIAL);
 
   const [confirmando, setConfirmando] = useState(false);
   const [unidadeId, setUnidadeId] = useState(unidades[0]?.id ?? '');
   const [catracaId, setCatracaId] = useState('');
   const [tipoDeSujeito, setTipoDeSujeito] = useState<'aluno' | 'visitante'>('aluno');
-  const [studentId, setStudentId] = useState('');
+  const [studentId, setStudentId] = useState(alunoInicial ?? '');
   const [visitante, setVisitante] = useState('');
   const [motivo, setMotivo] = useState('');
 
@@ -238,13 +247,26 @@ export function FormularioDeOverride({ unidades, catracas }: Props) {
 
             {tipoDeSujeito === 'aluno' ? (
               <p>
-                <label htmlFor="aluno">Identificador do aluno</label>
+                <label htmlFor="aluno">
+                  {nomeDoAlunoInicial === undefined
+                    ? 'Identificador do aluno'
+                    : `Aluno: ${nomeDoAlunoInicial}`}
+                </label>
                 <input
                   id="aluno"
                   value={studentId}
                   onChange={(evento) => setStudentId(evento.target.value)}
                   data-testid="campo-aluno"
                 />
+                {/*
+                  Quem chegou pela ficha ve o NOME no rotulo, e nao so o UUID no
+                  campo. O identificador continua visivel e editavel de
+                  proposito: e ele que vai no comando, e esconder o dado que a
+                  acao usa faria a tela mentir sobre o que envia.
+                */}
+                {nomeDoAlunoInicial === undefined ? null : (
+                  <small>Veio da ficha do aluno. Confira antes de liberar.</small>
+                )}
               </p>
             ) : (
               <p>
