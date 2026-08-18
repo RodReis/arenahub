@@ -381,6 +381,11 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               Consentimento e biometria
             </a>
           </li>
+          <li>
+            <a href={`/students/${aluno.id}/billing`} data-testid="link-financeiro">
+              Financeiro e cobranças
+            </a>
+          </li>
         </ul>
       </section>
     </section>
