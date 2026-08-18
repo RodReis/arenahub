@@ -157,11 +157,21 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 |---|---|---|---|
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **32** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e o `[INFRA]` [#68](https://github.com/RodReis/arenahub/issues/68) |
+| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94) |
 | Feito | `proplan:done` | PR mergeado com CI verde | 0 |
-| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **21** |
+| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **22** |
 
-> ⚠️ **Números conferidos na API do board às 22h de 17/08/2026** — não estimados. A linha de
+> ⚠️ **Números reconferidos na API do board em 18/08/2026** — não estimados. A composição de
+> *Em Andamento* mudou desde a leitura anterior: o `[INFRA]` [#68](https://github.com/RodReis/arenahub/issues/68)
+> **foi aceito pelo PI e conta em Finalizado** (21 → 22), e entrou no lugar dele o `[INFRA]`
+> [#94](https://github.com/RodReis/arenahub/issues/94) — `apt-get` do Chromium pendurando e
+> derrubando o job de E2E no timeout de 20 min. O total de *Em Andamento* continua **3** por
+> coincidência, não por imobilidade.
+>
+> 📌 **A label `proplan:todo` passou a existir em 18/08/2026**, criada ao pegar o #94. As colunas
+> *A Fazer* e *Feito* seguem em 0: o card foi de Backlog direto para *Em Andamento*.
+>
+> ⚠️ **Leitura de 22h de 17/08/2026, preservada:** não estimados. A linha de
 > *Em Andamento* já dissera *"F2 e F3"*, mas a issue [#3](https://github.com/RodReis/arenahub/issues/3)
 > não carrega `proplan:doing`. As colunas *Feito* e *Finalizado* também estavam trocadas: os cards
 > do bootstrap, F1 e F4 já foram aceitos pelo PI e contam em **Finalizado**, não em *Feito*.
