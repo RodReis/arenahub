@@ -17,6 +17,8 @@
     "test": "node scripts/run-task.mjs test",
     "test:integration": "node scripts/run-task.mjs test:integration",
     "test:e2e": "node scripts/run-task.mjs test:e2e",
+    "//db:e2e": "Recria o banco dedicado a suite E2E (DROP + migrate + seed). Roda sozinho antes de test:e2e; existe como comando proprio para quando a suite quebra no meio e o banco fica sujo.",
+    "db:e2e": "node --env-file-if-exists=.env scripts/preparar-banco-e2e.mjs",
     "test:report": "node scripts/test-report.mjs",
     "test:report:selfcheck": "node scripts/test-report.selfcheck.mjs",
     "build": "node scripts/run-task.mjs build",

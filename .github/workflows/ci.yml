@@ -160,6 +160,12 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub?schema=public
+      # Banco separado para a suite E2E -- card [INFRA], issue #101. A suite
+      # CRIA aluno, plano e dispositivo e NAO limpa; apontada para o banco
+      # acima, contamina o que `test:integration` acabou de limpar. O
+      # `pretest:e2e` recria este banco do zero antes de cada execucao, entao
+      # nao e preciso cria-lo no service container.
+      E2E_DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub_e2e?schema=public
 
     steps:
       - uses: actions/checkout@v7
