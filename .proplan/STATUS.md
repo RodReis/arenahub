@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -40,7 +40,6 @@ updated: 2026-08-17
 - [MVP2][SPEC-015][F15] Inadimplência e acesso (#15)
 - [MVP2][SPEC-014][F14] Cartão e recorrência (#14)
 - [MVP2][SPEC-013][F13] PIX e webhook idempotente (#13)
-- [MVP2][SPEC-012][F12] Ledger operacional e invoice (#12)
 
 ## A Fazer
 
@@ -50,8 +49,8 @@ _(vazio)_
 
 ### Sem épico
 
-- [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
+- [MVP1.5][SPEC-010][F10] Operação offline (#10)
 
 ## Feito
 
@@ -61,6 +60,8 @@ _(vazio)_
 
 ### Sem épico
 
+- [INFRA] CI: apt-get do Chromium pendura e derruba o job de E2E no timeout (#94, finalizado em: 2026-08-18)
+- [MVP2][SPEC-012][F12] Ledger operacional e invoice (#12, finalizado em: 2026-08-18)
 - [INFRA] 8 planos mandam criar docs/adr/, contrariando o ADR-021 (#68, finalizado em: 2026-08-17)
 - [MVP1][FIX] eslint do admin-web não carrega o ruleset design-system — 4 violações da regra 5 passam no CI (#85, finalizado em: 2026-08-17)
 - [MVP0][SPEC-005][F5] Relatório e decisão (#5, finalizado em: 2026-08-17)
