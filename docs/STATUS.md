@@ -118,6 +118,33 @@ implementação:**
    período`, `Unidade não selecionada`: banco vazio, não bug. O `CLAUDE.md` prevê seed em
    `packages/database/prisma/seed.ts` "na primeira fatia que precisar" — nenhuma precisou.
 
+🧽 **18/08/2026, fim de tarde — os itens 2 e 3 acima estão resolvidos, e o item 2 estava com a
+causa errada.** PRs [#103](https://github.com/RodReis/arenahub/pull/103) e
+[#104](https://github.com/RodReis/arenahub/pull/104).
+
+O diagnóstico culpava o E2E. **A maior fonte era a integração.** Dos 1086 tenants no banco de
+desenvolvimento, **nenhum** tinha epoch no nome: eram `f7-rede-a-a6b8b550`, `academia-2d849fb4` —
+sufixo hex, criados pelas suítes de integração, das quais **17 de 20 não apagam o tenant no fim**.
+O E2E contribuiu com 143 alunos dentro do tenant real; a integração, com 1085 tenants inteiros e
+802 usuários `@exemplo.test`.
+
+Junto veio uma afirmação falsa no `docs/TESTING.md`: dizia que a integração usava Testcontainers.
+**Não usa** — fala com o mesmo Postgres local, pelo mesmo `DATABASE_URL`. Corrigido.
+
+Cada suíte ganhou banco próprio (`E2E_DATABASE_URL`, `INTEGRATION_DATABASE_URL`), recriado do zero
+antes de rodar. **Recriar antes, e não limpar depois**, é o que faz suíte interrompida no meio não
+sujar a próxima — foi a limpeza-no-fim que nunca rodava que deixou o resíduo se acumular por três
+dias sem ninguém notar. O banco de dev voltou a **1 tenant, 0 alunos, 1 usuário**.
+
+O item 3 virou `pnpm db:demo`: doze alunos com nome de gente, um leitor facial, um Edge e uma
+semana de passagens. Separado do seed base porque **este roda também antes das suítes** — dado de
+demonstração faria os testes herdarem registro que não criaram.
+
+> 📌 **O que o expurgo ensinou, e vale além deste card:** a primeira versão do script listava as
+> tabelas a mão, apagou tenant e aluno, e **declarou vitória com 37 planos com epoch ainda no
+> banco**. Conferir o resultado — em vez de confiar na mensagem de sucesso — foi o que pegou. A
+> versão final varre o catálogo do Postgres, então tabela nova entra sozinha.
+
 **O que isso ensina, e é o item que vale além destas três fatias:** sete PRDs, 44 fatias e 30 ADRs
 especificaram domínio com rigor e **não especificaram superfície nenhuma** até o `DS-PAINEL.md`
 aparecer em 16/08, com onze fatias entregues. O projeto adiou 100% do feedback visual. Nenhum
@@ -257,12 +284,12 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 > a [F12](https://github.com/RodReis/arenahub/issues/12) e a [F13](https://github.com/RodReis/arenahub/issues/13),
 > esvaziando a fila de aceite no mesmo dia em que ela se formou.
 >
-> 📌 **O `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101) está em *Em Andamento* com
-> uma parte já na `main`.** O card tem três itens; o PR [#103](https://github.com/RodReis/arenahub/pull/103)
-> mergeou o primeiro — banco da suíte E2E separado do de desenvolvimento. Faltam o expurgo do
-> resíduo já acumulado (1016 tenants no banco de dev) e o seed de demonstração, então o card
-> **não** vai para *Feito*: `proplan:done` afirma card inteiro entregue, e afirmar isso com dois
-> terços em aberto é o tipo de sinal falso que o quadro existe para não dar.
+> 📌 **O `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101) fechou os três itens**,
+> pelos PRs [#103](https://github.com/RodReis/arenahub/pull/103) (banco do E2E),
+> [#104](https://github.com/RodReis/arenahub/pull/104) (banco da integração, expurgo e seed de
+> demonstração) e o commit `c9eeff2` (line ending). Ficou em *Em Andamento* enquanto só um dos
+> três estava pronto — `proplan:done` afirma card inteiro entregue, e afirmar isso com dois terços
+> em aberto é o sinal falso que o quadro existe para não dar.
 >
 > ⚠️ **Leitura anterior de 18/08/2026, preservada** — não estimados. A composição de
 > *Em Andamento* mudou desde a leitura anterior: o `[INFRA]` [#68](https://github.com/RodReis/arenahub/issues/68)
