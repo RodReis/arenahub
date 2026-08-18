@@ -96,6 +96,42 @@ LGPD é lista fechada onde legítimo interesse não figura. Corrigido no ADR.
 
 ---
 
+🖥️ **18/08/2026 — o PI olhou o painel pela primeira vez, e o painel não se sustenta.** Prints de
+`Unidades`, `Eventos de acesso`, `Liberação manual`, `Dispositivos`, `Alunos` e `Planos` mostram
+HTML sem estilo, listas com dado de teste e telas vazias. **Nenhuma das três causas é defeito de
+implementação:**
+
+1. **A ordem do roadmap.** A **F42** (design system do painel) foi alocada no **MVP 2.5** — depois
+   de todo o MVP 1 e do MVP 2. O plano mandou construir onze telas antes de existir superfície, e
+   foi cumprido à risca. **Corrigido:** a F46 passa na frente do resto do MVP 1.
+2. **O banco de desenvolvimento é o banco dos testes E2E.** `Caminho Biometria 1787060177858`,
+   `Plano Atribuível 1786909436454` e companhia são alunos e planos criados pelo Playwright, com
+   epoch no nome e sem limpeza — os testes de integração limpam, os E2E não. O painel parece
+   quebrado porque está exibindo o resíduo da própria suíte.
+3. **Não existe seed de demonstração.** `Nenhum dispositivo cadastrado`, `Nenhum evento no
+   período`, `Unidade não selecionada`: banco vazio, não bug. O `CLAUDE.md` prevê seed em
+   `packages/database/prisma/seed.ts` "na primeira fatia que precisar" — nenhuma precisou.
+
+**O que isso ensina, e é o item que vale além destas três fatias:** sete PRDs, 44 fatias e 30 ADRs
+especificaram domínio com rigor e **não especificaram superfície nenhuma** até o `DS-PAINEL.md`
+aparecer em 16/08, com onze fatias entregues. O projeto adiou 100% do feedback visual. Nenhum
+processo corrige o que ninguém olhou.
+
+🧹 **18/08/2026 — 470 arquivos "modificados" na `main` eram line ending, não trabalho.** A árvore
+estava com CRLF e os blobs com LF, sem `.gitattributes` e sem `core.autocrlf` — todo arquivo do
+repositório, código incluído, aparecia sujo no `git status`. Um `commit -a` produziria um commit de
+470 arquivos com zero mudança semântica, e todo PR nasceria ilegível. **Mitigado** com
+`core.autocrlf=input` local (2 arquivos sujos depois disso, ambos deste registro). **A correção
+definitiva é um `.gitattributes` com `* text=auto eol=lf` na raiz — arquivo do Code, não do
+Cowork.** Vira o card [`#101`](https://github.com/RodReis/arenahub/issues/101).
+
+✅ **18/08/2026 — F45 e F46 aprovadas pelo PI, com a ordem invertida: F46 primeiro.** Escopo das
+duas em [`docs/notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md`](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md).
+Decisões travadas na mesma conversa: **CPF continua opcional** (INV-009/011 — o mockup que o
+marcava obrigatório é que está errado); **CNPJ, responsável de contrato e professores ficam fora**;
+**estado civil e profissão entram** e precisam de finalidade declarada antes do merge (LGPD art.
+6º, III); **foto fica fora** por risco de reclassificação como biometria (art. 11) e vai para a F8.
+
 ## 1. Onde estamos, em três frases
 
 O repositório tem PRDs aprovados para planejamento, planos de implementação por slice e, desde
@@ -398,6 +434,8 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | [#81](https://github.com/RodReis/arenahub/issues/81) | aprovada-pi |
 | F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | [#82](https://github.com/RodReis/arenahub/issues/82) | aprovada-pi *(gate: MVP 4)* |
 | F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | aprovada-pi *(gate: MVP 4)* |
+| F45 | — | 1 | — | Cadastro completo de aluno (retrabalho da Slice 1.2) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#100](https://github.com/RodReis/arenahub/issues/100) | escopo definido |
+| F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **próxima a entrar** |
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
 > ADR**, não no PRD: o design system é trabalho de plataforma e não tem PRD que o descreva. O
@@ -410,6 +448,13 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 > e PR dividem o mesmo contador — os PRs #55–#76 consumiram a faixa. **A fonte da numeração é
 > este Índice, nunca o número do GitHub.** A partir daqui a diferença é visível, o que é melhor
 > do que uma coincidência que ensinava a regra errada.
+
+> **F45 e F46 criadas em 18/08/2026, por decisão do PI.** F45 é **retrabalho da Slice 1.2**: a
+> F7 entregou quatro campos onde a Especificação §11 lista dezoito, e `student_addresses` nasceu
+> órfã — criada, nunca escrita. F46 aplica no `admin-web` o design system que a F42 contratou e
+> nenhuma tela usa. **Nenhuma das duas tem SPEC**: o gate de spec morreu em 18/08 e o escopo mora
+> no documento de retrabalho, linkado acima. Coluna `SPEC` fica vazia de propósito — inventar
+> `SPEC-045` seria criar artefato que o processo aposentou. A contagem vai de 44 para **46**.
 
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento
