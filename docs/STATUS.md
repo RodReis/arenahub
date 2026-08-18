@@ -42,6 +42,15 @@ ADR-013 ainda aberto. O Cowork recomendou o contrário e a divergência está re
 checklist §6 dessas specs **continua desmarcado** no item dos ADRs, e **nenhum card sai do
 Backlog** por isso — quem segura F13–F16 é a entrada do MVP 2.
 
+✂️ **18/08/2026 — o processo foi cortado, por decisão do PI.** O gate de spec `aprovada-pi`
+**morreu**: ele exigia aprovar um arquivo-ponteiro cujo conteúdo mora no PRD e travava
+desenvolvimento sem decidir nada. `docs/specs/**` deixa de ser artefato de processo — os arquivos
+ficam como histórico e **não bloqueiam ninguém**. O ciclo da fatia virou três passos (card → PR
+com CI verde → aceite do PI) e **só duas coisas podem parar código**: decisão de produto que a
+Slice do PRD não define, e LGPD/dado biométrico. **ADR passa a existir só para escolha cara de
+desfazer** — decisão sobre o próprio processo não vira mais ADR. Tudo no `CLAUDE.md`; não foi
+escrito ADR para isso, de propósito.
+
 ✅ **18/08/2026 — a catraca livre é decisão operacional, não defeito.** O PI esclareceu: a
 Arena Positiva opera **de propósito** com o braço destravado **enquanto cadastra os alunos** —
 travar antes de todo mundo estar cadastrado prenderia sócio na porta. Quando o cadastro terminar,

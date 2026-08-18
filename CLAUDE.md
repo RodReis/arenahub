@@ -20,8 +20,8 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 ## Papéis e governança
 
 - **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Nunca faz commit, push, PR nem merge** — o PI não toca no Git. O portão do PI é o **aceite na issue**, não o merge: o PI não segura o código na porta da `main`, ele carimba o que já entrou como realmente pronto.
-- **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/specs/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`: **commita e pusha a spec direto na `main`** (sem branch, sem PR), registra a fatia no **Índice Fatia ↔ SPEC** do `docs/STATUS.md` e **cria a issue-fatia no board** (coluna Backlog, assignee PI). Escreve **documento** direto na `main` — o escopo exato está em **ADR-021**. Por **ADR-023**, também **cria a issue `[INFRA]`** (processo e infraestrutura, sem `F` e sem `SPEC`) e os **metadados do board** — labels `proplan:*`, cor, descrição, milestone. Card `[INFRA]` nasce sempre em **Backlog** com assignee **PI**, nunca em `todo`, e o Cowork **nunca move card para frente**. **Nunca implementa código, nunca toca em `apps/`, `packages/`, `infra/`, `.github/`, `docs/prd/**` nem `docs/superpowers/**`** — implementação é exclusiva do Claude Code, e PRD só muda por emenda aprovada pelo PI. Criar o card `[INFRA]` do CI **não é** escrever o `ci.yml`.
-- **Claude Code (você)** — planeja, codifica, testa (código usar a skill /code-review e para frontend(UX e UI) — pode usar as skills do /impeccable critique layout clarify polish optimize) antes do commit, atualiza a documentação e **sempre commita todos os documentos de `docs/`** junto da entrega — **exceto a spec da fatia e o Índice Fatia ↔ SPEC**, que o Cowork já pôs na `main`. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/specs/`. **Não cria a issue de fatia nem a `[INFRA]`** (são do Cowork — ADR-023) — pega o card, move pelo fluxo e entrega com PR. **Exceção: cria a própria issue `[FIX]`** de bug com comportamento correto já documentado (ADR/`ARCHITECTURE.md`/spec existente/`STATUS.md`), citando a fonte no corpo — ver *Correção: o Code cria a própria issue* abaixo. Reclassificar fatia como `[FIX]` para pular spec e aval é proibido. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
+- **Claude Cowork (planejamento)** — mantém `docs/` e registra decisões. **Não cria spec e não aprova nada.** A Slice do PRD **é** a especificação (ADR-022); `docs/specs/**` deixou de ser artefato de processo em **18/08/2026** — os arquivos existentes ficam como histórico e não bloqueiam ninguém. Cria a issue-fatia e a `[INFRA]` no board (Backlog, assignee PI) e os metadados de label (ADR-023). Escreve documento direto na `main` — escopo no **ADR-021**. **Decide sozinho tudo que é reversível e reporta depois; só pergunta ao PI o que é caro de desfazer.** Nunca implementa código, nunca toca em `apps/`, `packages/`, `infra/`, `.github/`, `docs/prd/**` nem `docs/superpowers/**`.
+- **Claude Code (você)** — planeja, codifica, testa (usar a skill /code-review; para frontend, as skills do /impeccable) antes do commit, atualiza a documentação e **commita os documentos de `docs/`** junto da entrega. **Implementa a partir deste arquivo + `docs/` + a Slice do PRD da fatia** — não espera spec nem aprovação de ninguém. **Não cria a issue de fatia nem a `[INFRA]`** (são do Cowork — ADR-023); pega o card, move pelo fluxo e entrega com PR. Cria a própria issue `[FIX]` de bug. Pode criticar arquitetura, **não escopo**. **Só para e pergunta em dois casos** — ver *O que pode bloquear o desenvolvimento*. Fora deles: decide, implementa, e registra a decisão no corpo do PR.
 
 #### Dois atores escrevem no Git — quem cede no conflito
 
@@ -33,16 +33,23 @@ A divisão é **por arquivo** (ADR-021): documento de governança é do Cowork; 
 
 **Importante:** o push do Cowork na `main` é o único caminho do processo sem PR, CI ou aceite, e vale **só para documento**. **Todo código entra por PR com CI verde, sem exceção**, e o aceite continua sendo exclusivo do PI — essas duas garantias nunca se moveram.
 
-### Ciclo de vida de uma fatia (processo do trio — **não é feature do produto**)
+### Ciclo de vida de uma fatia — três passos
 
-Isto é convenção **nossa**, executada à mão via GitHub MCP: o **Cowork cria** a issue de fatia, o **Code move e entrega** (e cria a própria issue de correção — ver *Correção: o Code cria a própria issue*). **Nada disso vira código do ArenaHub** — é processo do trio, não feature do produto.
+> **Simplificado em 18/08/2026 por decisão do PI.** O gate de spec `aprovada-pi` **morreu**: ele
+> exigia aprovar um arquivo-ponteiro cujo conteúdo real mora no PRD, e travava desenvolvimento sem
+> decidir nada. O que ficou é o que pegava erro de verdade: **CI verde** e **aceite do PI**.
 
-1. **Fatia ganha spec** → o **Cowork** pusha o arquivo de spec na `main` (ponteiro para a Slice do PRD — **ADR-022**), registra a fatia no **Índice Fatia ↔ SPEC** do `docs/STATUS.md` e cria a issue no board: coluna **Backlog** (`proplan:backlog`), título no **Padrão de título de issue** (ver abaixo), corpo com link para o arquivo da spec, assignee = **PI**.
-2. **Code começa** → **só se a spec estiver `aprovada-pi` e os ADRs que ela lista estiverem resolvidos.** Move da Backlog para **A Fazer** (`proplan:todo`) ao pegar e para **Em Andamento** (`proplan:doing`) ao iniciar; se atribui. Card em Backlog com spec `em-revisao` ou `planejada` **não se pega**.
-3. **Code entrega** → abre PR com **`refs #N`** no corpo. **NUNCA `closes #N`** — fecharia a issue no merge e **forjaria o aceite do PI**. **O merge é do próprio Code**, com o CI verde — o PI não mergeia. O CI verifica **build, lint, testes e as guardas de evidência** (`docs/TESTING.md`). Rodar `pnpm build` e `pnpm lint` antes de abrir o PR continua valendo, mas agora por economia de ciclo, não porque o CI deixaria passar. Só **depois do merge**, o Code aplica `proplan:done` → card vai para **Feito**, com o **link do PR** no corpo da issue. Declarar "terminei" **sem PR mergeado** é "fechamento frágil" — este processo existe para impedi-lo; não o produza aqui dentro.
-4. **PI aceita** → **só o PI** fecha a issue e aplica `proplan:finalizado`. **A issue só fecha quando o trabalho realmente acabou.** Nenhuma automação pode forjar aceite. O Code **nunca** fecha issue nem move card para Finalizado.
+1. **Card existe** → o Cowork cria a issue no board (Backlog, `proplan:backlog`, assignee PI),
+   título no *Padrão de título de issue*, corpo com link para a **Slice do PRD**.
+2. **Code pega e entrega** → move para `todo` ao pegar, `doing` ao iniciar, implementa a partir da
+   Slice, abre PR com **`refs #N`** (**nunca `closes #N`** — forjaria o aceite do PI) e **mergeia
+   ele mesmo com o CI verde**. O CI verifica build, lint, testes e as **guardas de evidência**
+   (`docs/TESTING.md`). Depois do merge, aplica `proplan:done` com o link do PR no corpo da issue.
+3. **PI aceita** → **só o PI** fecha a issue e aplica `proplan:finalizado`. Nenhuma automação pode
+   forjar aceite.
 
-**`card = fatia`** — uma issue por fatia, **nunca por passo da spec**. Os passos vivem no `docs/DEVELOPMENT.md`.
+**`card = fatia`** — uma issue por fatia, **nunca por passo**. Os passos vivem no
+`docs/DEVELOPMENT.md`.
 
 ### Fatia = Slice do PRD
 
@@ -74,30 +81,32 @@ Exemplos:
 
 O par MVP↔SPEC↔Fatia deriva do **Índice Fatia ↔ SPEC** do `docs/STATUS.md` (fonte única). Card de teste/descartável leva `[TEST]` no lugar do tipo.
 
-### Fatia exige spec. Correção de bug documentado, não.
+### O que pode bloquear o desenvolvimento — a lista inteira
 
-A regra *"sem spec `aprovada-pi` → não codificar"* existe para impedir **escopo assumido** — o Code inventando o que fazer. Ela **não se aplica** quando não há escopo a assumir:
+**São dois casos. Não há terceiro.** Documento não bloqueia código; ADR não bloqueia código;
+"falta a spec" não bloqueia nada. Se você está parado por qualquer outro motivo, o motivo está
+errado — implemente e registre a decisão no PR.
 
-| tipo | precisa de spec? | por quê |
-|---|---|---|
-| **Fatia** (escopo novo, comportamento novo) | **Sim** | há decisões de produto a tomar — são do PI |
-| **Correção de bug já documentado** (o comportamento correto está escrito num ADR, no `ARCHITECTURE.md`, no `CONVENTION.md` ou numa spec existente) | **Não** | não há o que decidir: o certo já está definido. Basta o item no `STATUS.md` + a regra escrita |
-| **Bug sem comportamento correto definido** | **Sim** — ou pelo menos perguntar ao PI | se o certo ainda não foi decidido, decidir é do PI |
+| bloqueia | por quê |
+|---|---|
+| **A Slice do PRD não define o comportamento, e escolher é decisão de produto** — preço, política, o que o usuário vê | escolher no lugar do PI é escopo assumido, que é o erro que este processo existe para impedir. Pergunte, em uma linha, e siga com o resto da fatia enquanto espera |
+| **LGPD e dado biométrico** | é lei com multa, não convenção nossa. Biometria é dado sensível: art. 11 é lista fechada, **legítimo interesse não existe** para ela. Consentimento, retenção, titular e transferência internacional **param a entrega** até estarem certos |
 
-Exemplo: webhook de pagamento processado duas vezes — não tem spec e **não precisa**: o comportamento correto (idempotência por `provider_account_id + external_event_id`) já está escrito neste arquivo → *Regras de arquitetura* item 4, no `ARCHITECTURE.md` §9 e no `CONVENTION.md` INV-076. Implementar direto.
+Tudo o mais — nome de campo, ordem de implementação, estrutura de pasta, dublê de teste, como
+testar, se cabe refactor junto — **é do Code, decide na hora**. Errou? É reversível: corrige no
+próximo PR.
 
-#### Correção: o Code cria a própria issue
+**ADR só para escolha cara de desfazer** — migração de dado histórico, contrato com terceiro,
+regime legal, decisão que outro sistema já consome. **Decisão sobre o próprio processo não vira
+ADR** (mudou em 18/08/2026: onze dos trinta primeiros ADRs eram sobre como trabalhar, e isso
+custava mais do que resolvia). Muda-se este arquivo e pronto.
 
-Para bug de comportamento documentado, **o próprio Code cria o card `[FIX]`** (Backlog) e segue o fluxo normal — não espera o Cowork criar nem o PI pegar. **Motivo:** criar issue ≠ fechar issue. O aceite continua sendo só do PI, então nada da garantia se perde; o Code só ganha o ato de abrir o trabalho.
+#### Correção de bug: o Code cria a própria issue
 
-**Duas condições, ambas obrigatórias:**
-
-1. O comportamento correto **já está escrito** num ADR, no `ARCHITECTURE.md`, no `CONVENTION.md`, numa spec existente ou como item no `STATUS.md`.
-2. O corpo da issue **cita essa fonte** (link/âncora do doc que define o certo).
-
-Se o Code precisa **decidir** qual é o comportamento correto, não é correção — é **fatia**: volta pro Cowork + PI (a decisão é de produto). O risco que estas condições fecham não é *quem cria*, é a **reclassificação**: rotular de `[FIX]` uma fatia para escapar da spec e do aval. A citação obrigatória é o que mantém honesto — é o mesmo *"só entra token que é verdade"* do Padrão de título: sem parágrafo que define o certo, não é bug.
-
-Fluxo do FIX auto-criado: Code cria em **Backlog** → `todo`/`doing` → PR com **`refs #N`** (nunca `closes`) → `proplan:done` após o merge. **Só o PI** fecha e aplica `proplan:finalizado`.
+Bug de comportamento já documentado (ADR, `ARCHITECTURE.md`, `CONVENTION.md`, `STATUS.md`): o
+Code cria o card `[FIX]` em Backlog, cita a fonte no corpo e segue o fluxo normal. Não espera
+ninguém. Se o comportamento correto **ainda não existe** e escolhê-lo é decisão de produto, cai no
+primeiro caso da tabela acima.
 
 ## Regras de trabalho
 
