@@ -1,6 +1,7 @@
 import { type PermissaoLocal } from '../domain/access-decision.js';
 import { type EventoReconhecimento } from '../domain/facial-device.js';
 import { type SentidoGiro, type TurnstileAdapter } from '../domain/turnstile.js';
+import { RastreadorDeRelogio } from '../domain/plausibilidade-de-relogio.js';
 import {
   criarProcessadorDePassagem,
   type TentativaPassagem,
@@ -26,14 +27,49 @@ export interface DepsBancadaLab {
   agoraMonotonicoMs: () => number;
   /** Sentido do giro. Default `entrada`. Ver DepsPassagem.sentido. */
   sentido?: SentidoGiro;
+  /**
+   * Nome do leitor, para separar a regua de relogio por dispositivo.
+   *
+   * A bancada tem um leitor so; o MVP 1 poe dois na mesma unidade, e cada
+   * um tem seu proprio relogio. Regua compartilhada faria dois leitores
+   * intercalando eventos legitimos marcarem um ao outro como retrocesso.
+   */
+  nomeDoLeitor?: string;
+  /**
+   * Avisado quando o horario do equipamento nao merece confianca.
+   *
+   * Callback em vez de logger direto: a bancada nao decide COMO se loga --
+   * o CLI tem `pino`, o teste quer inspecionar. Timestamp errado em silencio
+   * foi o que fez o achado de 17/08 aparecer so na analise do relatorio.
+   */
+  aoDetectarRelogioImplausivel?: (aviso: {
+    dispositivo: string;
+    razao: string;
+    ocorridoEm: Date;
+    recebidoEm: Date;
+  }) => void;
 }
+
+/**
+ * A tentativa mais o veredito sobre o relogio do equipamento.
+ *
+ * Sai daqui, e nao de dentro de `orquestrar-passagem`, porque a ordenacao
+ * serve a FILA DE EVENTOS -- nao a decisao de acesso. O motor decide com o
+ * `agora` do Edge; o relogio do leitor so influencia em que ordem os
+ * eventos sobem para o coletor.
+ */
+export type TentativaComRelogio = TentativaPassagem & {
+  /** Chave de ordenacao. Ausente = o `ocorridoEm` serve, o caso normal. */
+  ordenarPor?: Date;
+  relogioImplausivel: boolean;
+};
 
 export interface BancadaLab {
   processar: (
     evento: EventoReconhecimento,
     correlationId: string,
     agora: Date,
-  ) => Promise<TentativaPassagem>;
+  ) => Promise<TentativaComRelogio>;
   /** Latencias de decisao coletadas, para `resumirLatencia`. */
   latencias: () => readonly number[];
 }
@@ -59,15 +95,43 @@ export function criarBancadaLab(deps: DepsBancadaLab): BancadaLab {
     sentido: deps.sentido ?? 'entrada',
   });
 
+  // Regua de relogio por dispositivo. Ver `plausibilidade-de-relogio.ts`.
+  const relogios = new RastreadorDeRelogio();
+  const leitor = deps.nomeDoLeitor ?? 'facial';
+
   return {
     processar: async (evento, correlationId, agora) => {
+      // ANTES de decidir: a chave de ordenacao vale para o evento, e evento
+      // NEGADO tambem sobe para o coletor. Avaliar so no ALLOW deixaria
+      // metade dos eventos sem chave.
+      const relogio = relogios.avaliar(leitor, evento.ocorridoEm, evento.recebidoEm);
+
+      if (relogio.implausivel) {
+        // Timestamp errado calado foi o que fez o achado de 17/08 aparecer
+        // so na analise do relatorio, e nao na bancada.
+        deps.aoDetectarRelogioImplausivel?.({
+          dispositivo: leitor,
+          razao: relogio.razao ?? 'desconhecida',
+          ocorridoEm: evento.ocorridoEm,
+          recebidoEm: evento.recebidoEm,
+        });
+      }
+
       const r = await processador(evento, correlationId, agora);
+
       // So a latencia de quem foi ao menos decidido para ALLOW alimenta o
       // M0-NFR-001: o DENY nao mede a cadeia fisica, retorna antes dela.
       if (r.decisao.resultado === 'ALLOW') {
         latenciasColetadas.push(r.latenciaDecisaoMs);
       }
-      return r;
+
+      return {
+        ...r,
+        relogioImplausivel: relogio.implausivel,
+        // Ausente quando o `ocorridoEm` serve: a fila resolve pelo COALESCE
+        // e a linha nao carrega copia do que ja esta la.
+        ...(relogio.implausivel ? { ordenarPor: relogio.ordenarPor } : {}),
+      };
     },
     latencias: () => latenciasColetadas,
   };

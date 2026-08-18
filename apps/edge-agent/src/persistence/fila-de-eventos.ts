@@ -75,6 +75,19 @@ export type EventoParaEnviar = {
    * reconciliacao precisa preservar.
    */
   ocorridoEm: Date;
+  /**
+   * Chave de ordenacao, quando ela difere do `ocorridoEm`.
+   *
+   * Existe porque o horario do equipamento nem sempre merece confianca: em
+   * 17/08/2026 o leitor mandou o MESMO `ocorridoEm` em todos os
+   * reconhecimentos, e timestamp congelado embaralha a fila. Quem decide e o
+   * `avaliarRelogio` (`domain/plausibilidade-de-relogio.ts`).
+   *
+   * NAO substitui o `ocorridoEm`: o que sobe para o coletor continua sendo o
+   * horario que o equipamento afirmou (`M0-BR-004`). Ausente = o
+   * `ocorridoEm` serve, que e o caso normal.
+   */
+  ordenarPor?: Date;
   /** Corpo do evento, ja serializado. NUNCA PII, nunca biometria. */
   payload: string;
 };
@@ -86,7 +99,7 @@ export type EventoEnfileirado = EventoParaEnviar & {
   enfileiradoEm: string;
 };
 
-const SCHEMA = `
+const SCHEMA_TABELA = `
   CREATE TABLE IF NOT EXISTS fila_eventos (
     evento_id      TEXT PRIMARY KEY,
     tenant_id      TEXT NOT NULL,
@@ -98,14 +111,44 @@ const SCHEMA = `
     estado         TEXT NOT NULL DEFAULT 'pendente',
     tentativas     INTEGER NOT NULL DEFAULT 0,
     ultima_falha   TEXT,
-    enfileirado_em TEXT NOT NULL
+    enfileirado_em TEXT NOT NULL,
+    ordenar_por    TEXT
   );
+`;
 
+const SCHEMA_INDICE = `
   -- Ordem de envio: por ocorrencia, nao por insercao. Se o processo
   -- reiniciar e reprocessar, a ordem cronologica se mantem.
+  --
+  -- COALESCE(ordenar_por, ocorrido_em): o horario do equipamento manda,
+  -- exceto quando ele mesmo nao merece confianca -- relogio parado,
+  -- retrocedendo ou no futuro (ver domain/plausibilidade-de-relogio.ts).
+  -- O indice repete a expressao do ORDER BY, senao nao seria usado.
   CREATE INDEX IF NOT EXISTS idx_fila_pendentes
-    ON fila_eventos (estado, ocorrido_em);
+    ON fila_eventos (estado, COALESCE(ordenar_por, ocorrido_em));
 `;
+
+/**
+ * Coluna nova numa base que ja existe.
+ *
+ * Um agente que ja rodava antes desta mudanca tem backlog gravado sem
+ * `ordenar_por`. O `M0-NFR-003` diz que reinicio nao perde evento --
+ * atualizar o binario e uma forma de reinicio, entao a coluna entra por
+ * ALTER, nao por recriar a tabela.
+ *
+ * SQLite nao tem `ADD COLUMN IF NOT EXISTS`, entao a checagem e explicita:
+ * `PRAGMA table_info` diz se a coluna ja esta la. Engolir a excecao de
+ * coluna duplicada tambem funcionaria, mas esconderia qualquer OUTRO erro
+ * de ALTER atras do mesmo `catch`.
+ */
+function migrarOrdenarPor(db: DatabaseSync): void {
+  const colunas = db.prepare(`PRAGMA table_info(fila_eventos)`).all();
+  const jaTem = colunas.some((c) => c['name'] === 'ordenar_por');
+
+  if (!jaTem) {
+    db.exec(`ALTER TABLE fila_eventos ADD COLUMN ordenar_por TEXT`);
+  }
+}
 
 export class FilaDeEventos {
   private readonly db: DatabaseSync;
@@ -123,7 +166,12 @@ export class FilaDeEventos {
     // esperado numa academia, nao a exceção.
     this.db.exec('PRAGMA synchronous = FULL');
 
-    this.db.exec(SCHEMA);
+    // Ordem importa: o SCHEMA cria a tabela NOVA ja com a coluna e o indice
+    // que a usa; a migracao cobre a tabela que ja existia sem ela. O indice
+    // vem depois porque referencia `ordenar_por`.
+    this.db.exec(SCHEMA_TABELA);
+    migrarOrdenarPor(this.db);
+    this.db.exec(SCHEMA_INDICE);
   }
 
   /**
@@ -140,8 +188,9 @@ export class FilaDeEventos {
       .prepare(
         `INSERT INTO fila_eventos
            (evento_id, tenant_id, gym_unit_id, edge_agent_id, tipo,
-            ocorrido_em, payload, estado, tentativas, ultima_falha, enfileirado_em)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente', 0, NULL, ?)
+            ocorrido_em, payload, estado, tentativas, ultima_falha, enfileirado_em,
+            ordenar_por)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente', 0, NULL, ?, ?)
          ON CONFLICT (evento_id) DO NOTHING`,
       )
       .run(
@@ -153,6 +202,10 @@ export class FilaDeEventos {
         evento.ocorridoEm.toISOString(),
         evento.payload,
         agora.toISOString(),
+        // NULL quando o horario do equipamento serve -- o caso normal. O
+        // COALESCE do ORDER BY resolve, e a linha nao carrega copia do que
+        // ja esta em `ocorrido_em`.
+        evento.ordenarPor?.toISOString() ?? null,
       );
 
     // `changes` ja diz se inseriu. A versao anterior fazia dois COUNT(*)
@@ -172,7 +225,7 @@ export class FilaDeEventos {
       .prepare(
         `SELECT * FROM fila_eventos
           WHERE estado = 'pendente'
-          ORDER BY ocorrido_em
+          ORDER BY COALESCE(ordenar_por, ocorrido_em)
           LIMIT ?`,
       )
       .all(limite)
@@ -233,7 +286,7 @@ export class FilaDeEventos {
       .prepare(
         `SELECT * FROM fila_eventos
           WHERE estado = 'quarentena'
-          ORDER BY ocorrido_em
+          ORDER BY COALESCE(ordenar_por, ocorrido_em)
           LIMIT ?`,
       )
       .all(limite)
@@ -314,6 +367,9 @@ function paraEvento(linha: Record<string, unknown>): EventoEnfileirado {
     tipo: texto(linha['tipo'], 'tipo'),
     ocorridoEm: new Date(texto(linha['ocorrido_em'], 'ocorrido_em')),
     payload: texto(linha['payload'], 'payload'),
+    ...(linha['ordenar_por'] === null || linha['ordenar_por'] === undefined
+      ? {}
+      : { ordenarPor: new Date(texto(linha['ordenar_por'], 'ordenar_por')) }),
     estado: texto(linha['estado'], 'estado') as EstadoEvento,
     tentativas: numero(linha['tentativas']),
     ultimaFalha: linha['ultima_falha'] === null ? null : texto(linha['ultima_falha'], 'ultima_falha'),

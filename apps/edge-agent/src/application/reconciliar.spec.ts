@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -197,6 +198,54 @@ describe('reconciliacao offline', () => {
 
     expect(coletor.todos.map((e) => e.eventoId)).toEqual(['evt-1', 'evt-2', 'evt-3']);
   });
+
+  it('ordena pelo recebimento quando o equipamento congela o horario', async () => {
+    // O caso medido em 17/08/2026: o leitor mandou o MESMO `ocorridoEm` em
+    // todos os reconhecimentos. Sem chave de ordenacao propria, os tres
+    // empatam e o SQLite devolve em ordem arbitraria.
+    const congelado = new Date('2026-08-17T15:47:28.000Z');
+
+    fila.enfileirar(
+      { ...evento(3, congelado), ordenarPor: new Date(AGORA.getTime() + 3000) },
+      AGORA,
+    );
+    fila.enfileirar(
+      { ...evento(1, congelado), ordenarPor: new Date(AGORA.getTime() + 1000) },
+      AGORA,
+    );
+    fila.enfileirar(
+      { ...evento(2, congelado), ordenarPor: new Date(AGORA.getTime() + 2000) },
+      AGORA,
+    );
+
+    await reconciliar({ fila, coletor });
+
+    expect(coletor.todos.map((e) => e.eventoId)).toEqual(['evt-1', 'evt-2', 'evt-3']);
+  });
+
+  it('sobe o ocorridoEm original mesmo quando ordenou pelo recebimento', async () => {
+    // `M0-BR-004`: o fallback decide ORDEM, nao substitui FATO. O que chega
+    // ao coletor continua sendo o horario que o equipamento afirmou -- ainda
+    // que a gente saiba que ele esta errado.
+    const congelado = new Date('2026-08-17T15:47:28.000Z');
+
+    fila.enfileirar({ ...evento(1, congelado), ordenarPor: AGORA }, AGORA);
+
+    await reconciliar({ fila, coletor });
+
+    expect(coletor.recebido('evt-1')?.ocorridoEm).toEqual(congelado);
+  });
+
+  it('cai no ocorridoEm quando nao ha chave de ordenacao', async () => {
+    // Compatibilidade: evento enfileirado sem `ordenarPor` -- inclusive
+    // linha gravada por versao anterior -- ordena como sempre ordenou.
+    fila.enfileirar(evento(2, new Date(AGORA.getTime() + 2000)), AGORA);
+    fila.enfileirar(evento(1, new Date(AGORA.getTime() + 1000)), AGORA);
+
+    await reconciliar({ fila, coletor });
+
+    expect(coletor.todos.map((e) => e.eventoId)).toEqual(['evt-1', 'evt-2']);
+  });
 });
 
 describe('FilaDeEventos — durabilidade', () => {
@@ -271,5 +320,44 @@ describe('FilaDeEventos — durabilidade', () => {
     expect(removidos).toBe(1);
     expect(fila.backlog).toBe(1);
     fila.fechar();
+  });
+
+  it('abre banco de versao anterior, sem a coluna de ordenacao', () => {
+    // `M0-NFR-003`: reinicio nao perde evento. Um agente que ja rodava antes
+    // desta mudanca tem backlog gravado sem `ordenar_por` -- se o ALTER nao
+    // fosse idempotente, a atualizacao derrubaria a fila em vez de migra-la.
+    const banco = new DatabaseSync(caminho);
+    banco.exec(`
+      CREATE TABLE fila_eventos (
+        evento_id      TEXT PRIMARY KEY,
+        tenant_id      TEXT NOT NULL,
+        gym_unit_id    TEXT NOT NULL,
+        edge_agent_id  TEXT NOT NULL,
+        tipo           TEXT NOT NULL,
+        ocorrido_em    TEXT NOT NULL,
+        payload        TEXT NOT NULL,
+        estado         TEXT NOT NULL DEFAULT 'pendente',
+        tentativas     INTEGER NOT NULL DEFAULT 0,
+        ultima_falha   TEXT,
+        enfileirado_em TEXT NOT NULL
+      );
+      INSERT INTO fila_eventos
+        (evento_id, tenant_id, gym_unit_id, edge_agent_id, tipo,
+         ocorrido_em, payload, enfileirado_em)
+      VALUES ('evt-antigo', 't', 'g', 'e', 'passagem',
+              '2026-08-14T12:00:00.000Z', '{}', '2026-08-14T12:00:00.000Z');
+    `);
+    banco.close();
+
+    const fila = new FilaDeEventos(caminho);
+
+    expect(fila.backlog).toBe(1);
+    expect(fila.proximosPendentes(5)[0]?.eventoId).toBe('evt-antigo');
+
+    // Abrir duas vezes tambem: o ALTER nao pode explodir no segundo start.
+    fila.fechar();
+    const denovo = new FilaDeEventos(caminho);
+    expect(denovo.backlog).toBe(1);
+    denovo.fechar();
   });
 });

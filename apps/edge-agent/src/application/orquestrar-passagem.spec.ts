@@ -14,7 +14,7 @@ const ENROLL = 'a'.repeat(32);
 const AGORA = new Date('2026-08-14T12:00:00.000Z');
 
 function evento(externalEnrollId = ENROLL): EventoReconhecimento {
-  return { externalEnrollId, ocorridoEm: AGORA, metodo: 'facial' };
+  return { externalEnrollId, ocorridoEm: AGORA, recebidoEm: AGORA, metodo: 'facial' };
 }
 
 describe('passagem: do reconhecimento ao giro', () => {
