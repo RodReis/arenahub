@@ -296,10 +296,13 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 > `32171334856`), com o mesmo timeout de 8 min que o `[INFRA]`
 > [#94](https://github.com/RodReis/arenahub/issues/94) mitigou em 18/08. A mitigação de lá —
 > timeout curto mais uma tentativa extra — **não basta quando o mirror fica fora por minutos**:
-> as duas tentativas caem dentro da mesma janela. A issue #94 deixou registrada a opção 3
-> (container do Playwright) com a condição *"só se voltar a cair"*; **voltou, quatro vezes**.
-> Passou no rerun, e o card não foi aberto porque isso é decisão de infraestrutura fora do
-> escopo do #101 — fica anotado aqui para o PI decidir.
+> as duas tentativas caem dentro da mesma janela. A #94 deixou registrada a opção 3 (container do
+> Playwright) com a condição *"só se voltar a cair"*; **voltou, quatro vezes**. Virou o card
+> [`#105`](https://github.com/RodReis/arenahub/issues/105), aberto pelo Code com autorização
+> explícita do PI — pela regra, `[INFRA]` é do Cowork e o Code só abre `[FIX]`, e o PI liberou a
+> exceção para não travar a entrega. **O risco a conferir primeiro está no corpo do card:** com
+> `container:` no job, o Postgres deixa de atender em `localhost` e passa a atender no label do
+> serviço, então as três `*_DATABASE_URL` mudam junto.
 >
 > ⚠️ **Leitura anterior de 18/08/2026, preservada** — não estimados. A composição de
 > *Em Andamento* mudou desde a leitura anterior: o `[INFRA]` [#68](https://github.com/RodReis/arenahub/issues/68)
