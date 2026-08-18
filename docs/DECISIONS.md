@@ -57,7 +57,9 @@ existe para expulsar deste repositório.
 | [025](#adr-025) | MVP 2.5: o design system é fatia, não `[INFRA]` | `aceito` | — |
 | [026](#adr-026) | `docs/design/**` é fonte de verdade de design | `aceito` | — |
 | [027](#adr-027) | Modelo de `Payment` e `PaymentAttempt` | `aceito` | — |
-| [028](#adr-028) | Modo de acionamento da catraca é código, não config do equipamento | `proposto` | **`M0-AC-004` → gate §15 → MVP 1** |
+| [028](#adr-028) | Modo de acionamento da catraca é código, não config do equipamento | `proposto` | — *(virou restrição 2 do ADR-029)* |
+| [029](#adr-029) | Gate §15 do MVP 0: `GO_WITH_CONSTRAINTS` | `aceito` | — **destrava o MVP 1** |
+| [030](#adr-030) | Aprovação antecipada das SPEC-012 a 016, com o ADR-013 aberto | `aceito` | — |
 
 ---
 
@@ -1446,3 +1448,91 @@ Este ADR **não** afirma qual valor de `Funcao` é o correto — afirma que a pe
 por documento, não por tentativa em equipamento de produção, e que a resposta se aplica por
 código. Também **não** altera a `SPEC-002` por conta própria: a decisão 4 é do PI e só ele a
 revisa.
+
+---
+
+<a id="adr-029"></a>
+## ADR-029 — Gate §15 do MVP 0: `GO_WITH_CONSTRAINTS`
+
+**Data:** 18/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 18/08/2026**)*
+· **Fecha** o gate §15 do `MVP-00` · **Destrava:** MVP 1 (F6–F9, F11)
+
+**Decisão.** `GO_WITH_CONSTRAINTS`. **O MVP 1 começa.** O `M0-AC-010` — *"a decisão final e suas
+restrições são aprovadas por tecnologia e operação"* — está satisfeito por **Rodrigo Reis (PI)**,
+acumulando os dois papéis, em 18/08/2026.
+
+**Evidência que sustenta.** Duas janelas físicas em 17/08/2026, registradas no field-note
+`docs/field-notes/2026-08-17-ciclo-facial-ao-vivo.md` e no relatório
+`docs/reports/MVP-00-relatorio-poc-topdata.md`:
+
+- a catraca girou por comando — 30 comandos, **28 giros confirmados por sensor** (`origem:6`),
+  2 timeouts (`origem:5`), **0 duplas**, entrada e saída → `M0-AC-003`;
+- o **ciclo facial rodou ponta a ponta**: leitor conecta → ArenaHub cadastra → rosto reconhecido →
+  `sendlog` recebido → decisão local → catraca destrava → giro confirmado;
+- cutover `.106` → `.190` → `.106` executado e o legado religado ao fim da janela.
+
+**O que não fechou — e não se finge que fechou.**
+
+| critério | por que não fechou | vira |
+|---|---|---|
+| `M0-AC-004` — *acessos negados não acionam fisicamente a catraca* | **a medição está confundida**, não o critério: com a catraca em `acionamento1:8` o braço gira livre, e giro observado não distingue "o sistema acionou" de "a pessoa empurrou". A causa **ainda não está diagnosticada** — ver ADR-028 | **restrição 1 e 2** |
+| `M0-AC-002` — remoção dos três usuários confirmada no dispositivo | não executado | **restrição 4** |
+| `M0-AC-008` — p50/p95/máximo reais | **impossível dentro do MVP 0**: a latência ponta a ponta depende da decisão pela nuvem, que é F9, do MVP 1. Um critério de saída mensurável só no MVP seguinte não pode travar o anterior — é exatamente o caso que o `GO_WITH_CONSTRAINTS` existe para resolver | **restrição 3** |
+| relógio do leitor facial (`ocorridoEm` congelado) | achado de 17/08, já decidido: acertar o relógio **e** carimbar `recebidoEm` como critério de ordenação quando o `ocorridoEm` for implausível | escopo de **F2** |
+
+### As restrições — são normativas, não recomendação
+
+1. **Nenhuma unidade entra em operação real com a catraca em modo livre.** Bancada e piloto
+   interno, sim. Academia com aluno pagante, **não**, enquanto o braço girar sem comando.
+2. **`M0-AC-004` é condição de saída do MVP 1.** O MVP 1 não fecha sem evidência de que acesso
+   negado não abre a catraca, **com a catraca em modo bloqueado**.
+3. **`M0-AC-008` real é medido na F9**, com decisão pela nuvem, e entra no relatório do MVP 1 —
+   p50, p95, máximo, taxa de erro e limitações por equipamento.
+4. **`M0-AC-002` roda antes** de qualquer dado biométrico de pessoa real entrar na bancada.
+
+### O que esta decisão afirma, e o que não afirma
+
+**Não afirma** que a garantia física de que só quem tem direito entra está provada. Ela **não
+está**. Afirma que a falha é **conhecida, nomeada, datada e carregada como restrição escrita**, e
+que o custo de segurar o MVP 1 inteiro por ela é maior que o de carregá-la — **sob a condição de
+que nada vá a produção antes de fechá-la** (restrição 1).
+
+Quem ler este ADR depois de um incidente vai encontrar a falha descrita aqui antes de ela
+acontecer. Essa é a diferença entre `GO_WITH_CONSTRAINTS` e um `GO` que teria dito que estava tudo
+certo.
+
+---
+
+<a id="adr-030"></a>
+## ADR-030 — Aprovação antecipada das SPEC-012 a 016, com o ADR-013 aberto
+
+**Data:** 18/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em 18/08/2026**)*
+· **Contraria** o checklist §6 das próprias specs e o `CLAUDE.md` → *Antes de codificar*
+
+**Decisão do PI.** As `SPEC-012` a `SPEC-016` passam a `aprovada-pi` **agora**, sem esperar o
+ADR-013 nem o preenchimento das seções vazias.
+
+**O que isso contraria, textualmente.** O §6 de cada spec exige três marcas antes de codificar:
+status `aprovada-pi`, **"os ADRs listados acima estão resolvidos"** e evidência do gate de entrada
+do MVP. A segunda **não está satisfeita** para F13–F16: o **ADR-013 continua `aberto`**, e a
+`SPEC-015` depende também do campo de âncora do ADR-019. As `SPEC-012` a `016` também estão com
+**§2, §3, §4 e §5 vazias** — não têm escopo negativo, invariantes tocadas nem perguntas ao PI.
+
+**A recomendação do Cowork foi contrária**, e fica registrada: aprovar não destrava fatia nenhuma
+— F13–F16 continuam impegáveis pela **entrada do MVP 2** (MVP 1 estável + provedor homologado), e
+o efeito prático é só a mudança do rótulo. O risco é o *aceite narrado* que o ADR-016 existe para
+expulsar: um `aprovada-pi` que não significa "revisado", e sim "carimbado".
+
+**Por que fica assim mesmo.** Aprovar spec é prerrogativa exclusiva do PI (`ADR-014`, `ADR-021`).
+O Cowork registra a decisão e a divergência; não a bloqueia.
+
+### Consequências, e o que continua valendo
+
+1. **O `[ ] Os ADRs listados acima estão resolvidos` permanece desmarcado** nas `SPEC-013` a
+   `016`. `aprovada-pi` **não** o marca, e nenhum PR de F13–F16 abre com ele desmarcado.
+2. **Nenhum card sai do Backlog por causa desta decisão.** O gate de entrada do MVP 2 é o que
+   segura, e ele não é spec.
+3. As seções vazias continuam sendo dívida. Preenchê-las é trabalho do Cowork **quando a fatia for
+   entrar em execução** — antes do PR, não antes do rótulo.
+4. Se a homologação do ADR-013 mudar o desenho de alguma dessas fatias, **a spec aprovada não vira
+   escudo**: vale o desenho novo, e a spec é corrigida.

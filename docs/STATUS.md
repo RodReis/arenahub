@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 18/08/2026 *(ADR-013 partido: o modelo de `Payment` virou ADR-027)* · **Fase:** **MVP 0 em execução** ·
+**Última atualização:** 18/08/2026 *(gate §15 assinado: `GO_WITH_CONSTRAINTS` — o MVP 1 começou)*
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -28,6 +28,19 @@ e só se muda pela API/SDK. **`M0-AC-004` não fecha antes disso.**
 (relatório da janela da catraca) vivem só no remoto. **Elas colidem entre si** — as duas escrevem
 uma seção `## 9` diferente no mesmo `docs/reports/MVP-00-relatorio-poc-topdata.md`. Resolver é do
 Code; registrado aqui porque avanço fora da `main` é o *fechamento frágil* do `CLAUDE.md` §3.
+
+🏁 **18/08/2026 — o gate §15 do MVP 0 foi assinado: `GO_WITH_CONSTRAINTS` (ADR-029). O MVP 1
+começou.** O `M0-AC-010` está satisfeito pelo PI, acumulando tecnologia e operação. **Quatro
+restrições são normativas:** (1) nenhuma unidade opera com aluno real enquanto a catraca girar
+livre; (2) `M0-AC-004` é **condição de saída do MVP 1**, com a catraca em modo bloqueado; (3)
+`M0-AC-008` real é medido na **F9** — ele era **impossível** dentro do MVP 0, porque depende da
+decisão pela nuvem; (4) `M0-AC-002` roda antes de dado biométrico real entrar na bancada.
+**F6–F9 e F11 estão liberadas.**
+
+📌 **18/08/2026 — SPEC-012 a 016 marcadas `aprovada-pi` por decisão do PI (ADR-030)**, com o
+ADR-013 ainda aberto. O Cowork recomendou o contrário e a divergência está registrada no ADR. O
+checklist §6 dessas specs **continua desmarcado** no item dos ADRs, e **nenhum card sai do
+Backlog** por isso — quem segura F13–F16 é a entrada do MVP 2.
 
 🔴 **18/08/2026 — o bloqueio do gate §15 estava mal diagnosticado (ADR-028).** O modo de
 acionamento da catraca **é código do `edge-agent`**, não configuração do equipamento: a ponte já
@@ -271,8 +284,8 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 
 | MVP | entrega | gate de entrada | fatias | estado |
 |---|---|---|---|---|
-| **0** | Hardware e protocolo Topdata comprovados em bancada | hardware + SDK + rede de laboratório | F1–F5 | **em execução — cadeia física provada em 17/08**; gate §15 aberto (modo bloqueado da catraca, `M0-AC-002`, latência real e assinatura do PI) |
-| **1** | Academia operando acesso online, com assinatura manual | decisão de saída do MVP 0 (`MVP-00` §15) = `GO` ou `GO_WITH_CONSTRAINTS` | F6–F9, F11 | bloqueado por MVP 0 |
+| **0** | Hardware e protocolo Topdata comprovados em bancada | hardware + SDK + rede de laboratório | F1–F5 | ✅ **ENCERRADO em 18/08/2026** — gate §15 assinado `GO_WITH_CONSTRAINTS` (ADR-029), com quatro restrições normativas herdadas pelo MVP 1 |
+| **1** | Academia operando acesso online, com assinatura manual | ✅ **atendido** — `GO_WITH_CONSTRAINTS` em 18/08/2026 (ADR-029) | F6–F9, F11 | **liberado — em execução**. Carrega as restrições 1 a 4 do ADR-029; `M0-AC-004` é condição de saída |
 | **1.5** | Operação offline: snapshot, fila e reconciliação | MVP 1 em piloto, com incidente de link medido | F10 | adiado por **ADR-012**. **ADR-007 fechado em 16/08 — spec aprovada** |
 | **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | entrada bloqueada pelo **MVP 1** (que depende do MVP 0). Por ADR: **F12 livre** desde 18/08; F13–F16 esperam o ADR-013 |
 | **2.5** | Design system: tokens, `packages/ui` e as três superfícies | **F42 sem gate** (dívida ativa: `admin-web` está na `main` sem CSS) · **F43 e F44 têm gate:** o PI priorizar o MVP 4 | F42–F44 | criado por **ADR-025**. F42 pegável assim que o card `[INFRA]` do pipeline de tokens sair |
@@ -315,11 +328,11 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F9 | SPEC-009 | 1 | 1.4 | Decisão online e passagem | [`SPEC-009-decisao-online-e-passagem.md`](specs/SPEC-009-decisao-online-e-passagem.md) | [#9](https://github.com/RodReis/arenahub/issues/9) | aprovada-pi |
 | F10 | SPEC-010 | 1.5 | 1.5 | Operação offline | [`SPEC-010-operacao-offline.md`](specs/SPEC-010-operacao-offline.md) | [#10](https://github.com/RodReis/arenahub/issues/10) | aprovada-pi |
 | F11 | SPEC-011 | 1 | 1.6 | Painel operacional e prontidão | [`SPEC-011-painel-operacional-e-prontidao.md`](specs/SPEC-011-painel-operacional-e-prontidao.md) | [#11](https://github.com/RodReis/arenahub/issues/11) | aprovada-pi |
-| F12 | SPEC-012 | 2 | 2.1 | Ledger operacional e invoice | [`SPEC-012-ledger-operacional-e-invoice.md`](specs/SPEC-012-ledger-operacional-e-invoice.md) | [#12](https://github.com/RodReis/arenahub/issues/12) | em-revisao |
-| F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | [`SPEC-013-pix-e-webhook-idempotente.md`](specs/SPEC-013-pix-e-webhook-idempotente.md) | [#13](https://github.com/RodReis/arenahub/issues/13) | em-revisao |
-| F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | [`SPEC-014-cartao-e-recorrencia.md`](specs/SPEC-014-cartao-e-recorrencia.md) | [#14](https://github.com/RodReis/arenahub/issues/14) | em-revisao |
-| F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | [`SPEC-015-inadimplencia-e-acesso.md`](specs/SPEC-015-inadimplencia-e-acesso.md) | [#15](https://github.com/RodReis/arenahub/issues/15) | em-revisao |
-| F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | [`SPEC-016-estorno-conciliacao-e-operacao.md`](specs/SPEC-016-estorno-conciliacao-e-operacao.md) | [#16](https://github.com/RodReis/arenahub/issues/16) | em-revisao |
+| F12 | SPEC-012 | 2 | 2.1 | Ledger operacional e invoice | [`SPEC-012-ledger-operacional-e-invoice.md`](specs/SPEC-012-ledger-operacional-e-invoice.md) | [#12](https://github.com/RodReis/arenahub/issues/12) | `aprovada-pi` |
+| F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | [`SPEC-013-pix-e-webhook-idempotente.md`](specs/SPEC-013-pix-e-webhook-idempotente.md) | [#13](https://github.com/RodReis/arenahub/issues/13) | `aprovada-pi` |
+| F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | [`SPEC-014-cartao-e-recorrencia.md`](specs/SPEC-014-cartao-e-recorrencia.md) | [#14](https://github.com/RodReis/arenahub/issues/14) | `aprovada-pi` |
+| F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | [`SPEC-015-inadimplencia-e-acesso.md`](specs/SPEC-015-inadimplencia-e-acesso.md) | [#15](https://github.com/RodReis/arenahub/issues/15) | `aprovada-pi` |
+| F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | [`SPEC-016-estorno-conciliacao-e-operacao.md`](specs/SPEC-016-estorno-conciliacao-e-operacao.md) | [#16](https://github.com/RodReis/arenahub/issues/16) | `aprovada-pi` |
 | F17 | SPEC-017 | 3 | 3.1 | Consentimento e avaliação manual | [`SPEC-017-consentimento-e-avaliacao-manual.md`](specs/SPEC-017-consentimento-e-avaliacao-manual.md) | [#17](https://github.com/RodReis/arenahub/issues/17) | planejada |
 | F18 | SPEC-018 | 3 | 3.2 | Histórico e comparativos | [`SPEC-018-historico-e-comparativos.md`](specs/SPEC-018-historico-e-comparativos.md) | [#18](https://github.com/RodReis/arenahub/issues/18) | planejada |
 | F19 | SPEC-019 | 3 | 3.3 | Upload e revisão | [`SPEC-019-upload-e-revisao.md`](specs/SPEC-019-upload-e-revisao.md) | [#19](https://github.com/RodReis/arenahub/issues/19) | planejada |

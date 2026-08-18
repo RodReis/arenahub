@@ -6,7 +6,7 @@
 | **MVP** | 2 |
 | **Slice do PRD** | **2.1** — `docs/prd/academia/MVP-02-smart-billing.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-02-01-ledger-invoice.md` |
-| **Status** | `em-revisao` |
+| **Status** | `aprovada-pi` *(18/08/2026 — ver ADR-030)* |
 | **ADRs que bloqueiam** | **nenhum** — ADR-027 fechado em 18/08/2026; o ADR-013 nunca a bloqueou |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M2-FR/BR/NFR/AC`) e os
@@ -18,8 +18,10 @@
 > chama um único método de `PaymentProvider`, e o `MVP-02` §5 põe o gate de homologação antes da
 > **Slice 2.2**.
 >
-> **O que falta para virar `aprovada-pi`:** preencher §3, §4 e §5 deste arquivo. E, para o card
-> sair do Backlog, a **entrada do MVP 2** — MVP 1 estável (`MVP-02` §5).
+> ⚠️ **`aprovada-pi` por decisão do PI em 18/08/2026, com as §2 a §5 ainda vazias** — ver
+> **ADR-030**. Diferente das F13–F16, aqui **nenhum ADR está pendente**: o §6 fica satisfeito
+> assim que as seções forem preenchidas, o que é dívida do Cowork **antes do PR**. **O card não
+> sai do Backlog por causa desta aprovação** — quem segura é a entrada do MVP 2 (MVP 1 estável).
 
 ---
 
