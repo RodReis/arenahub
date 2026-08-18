@@ -113,3 +113,49 @@
   line-height: 16px;
   color: var(--ah-danger);
 }
+
+/**
+ * Seta do `SelectField` -- desenhada, nao icone.
+ *
+ * `appearance: none` no controle tira a seta nativa, que vinha com a altura do
+ * navegador e furava os 36px do contrato. Esta e um triangulo em `border`, sem
+ * SVG e sem entrar no catalogo de icones: seta de select e decoracao, nao
+ * vocabulario semantico.
+ */
+.seta {
+  width: 0;
+  height: 0;
+  flex: none;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--ah-text-secondary);
+}
+
+/**
+ * `<select>` precisa perder a aparencia nativa para a moldura valer -- senao o
+ * navegador desenha a propria borda dentro da nossa.
+ */
+select.controle {
+  appearance: none;
+  cursor: pointer;
+}
+
+/**
+ * Moldura de texto longo: a do `Field` e fixa em 36px, que e a altura de um
+ * controle de uma linha. Aqui a altura vem do `rows` do proprio `<textarea>`.
+ */
+.moldura-alta {
+  height: auto;
+  align-items: stretch;
+  padding: 8px 10px;
+}
+
+.controle-alto {
+  height: auto;
+  line-height: var(--ah-type-body-lh);
+  /*
+    So na vertical: redimensionar na horizontal estoura a coluna do formulario
+    e leva a pagina inteira a rolar de lado.
+  */
+  resize: vertical;
+}

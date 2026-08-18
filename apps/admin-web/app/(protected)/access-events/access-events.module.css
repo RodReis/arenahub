@@ -1,0 +1,30 @@
+/**
+ * Filtro de eventos -- F46, issue #99.
+ *
+ * Linha unica que quebra sozinha: `flex-wrap` mais `min-width` nos campos faz
+ * o formulario passar de quatro colunas a duas e a uma conforme a largura,
+ * sem media query e sem breakpoint decorado.
+ *
+ * `align-items: end` porque os campos tem rotulo em cima e o botao nao: sem
+ * isso o botao subiria e ficaria alinhado ao rotulo, nao ao controle.
+ */
+.filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.filtro > * {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+/**
+ * O botao nao estica junto: ele tem largura de conteudo, e um "Filtrar" de
+ * 400px pareceria a acao principal da tela -- que e ler a tabela, nao filtrar.
+ */
+.filtro > button {
+  flex: 0 0 auto;
+}

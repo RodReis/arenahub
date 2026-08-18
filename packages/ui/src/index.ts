@@ -25,8 +25,10 @@ export { PasswordField } from './components/PasswordField.js';
 export { MaskedCPF } from './components/MaskedCPF.js';
 export { Money } from './components/Money.js';
 export { ProblemDetail, type ProblemJson } from './components/ProblemDetail.js';
+export { SelectField } from './components/SelectField.js';
 export { SensitiveAction } from './components/SensitiveAction.js';
 export { StateBadge } from './components/StateBadge.js';
+export { TextareaField } from './components/TextareaField.js';
 export { ToastProvider, useToast, type ToastKind } from './components/Toast.js';
 
 export { AppShell } from './components/shell/AppShell.js';
