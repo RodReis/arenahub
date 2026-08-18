@@ -249,7 +249,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **31** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
-| Feito | `proplan:done` | PR mergeado com CI verde | **2** — o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94) e a [F12](https://github.com/RodReis/arenahub/issues/12), aguardando aceite do PI |
+| Feito | `proplan:done` | PR mergeado com CI verde | **3** — o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94), a [F12](https://github.com/RodReis/arenahub/issues/12) e a [F13](https://github.com/RodReis/arenahub/issues/13), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **22** |
 
 > ⚠️ **Números reconferidos na API do board em 18/08/2026** — não estimados. A composição de
@@ -419,7 +419,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F10 | SPEC-010 | 1.5 | 1.5 | Operação offline | [`SPEC-010-operacao-offline.md`](specs/SPEC-010-operacao-offline.md) | [#10](https://github.com/RodReis/arenahub/issues/10) | aprovada-pi |
 | F11 | SPEC-011 | 1 | 1.6 | Painel operacional e prontidão | [`SPEC-011-painel-operacional-e-prontidao.md`](specs/SPEC-011-painel-operacional-e-prontidao.md) | [#11](https://github.com/RodReis/arenahub/issues/11) | aprovada-pi |
 | F12 | SPEC-012 | 2 | 2.1 | Ledger operacional e invoice | [`SPEC-012-ledger-operacional-e-invoice.md`](specs/SPEC-012-ledger-operacional-e-invoice.md) | [#12](https://github.com/RodReis/arenahub/issues/12) | `aprovada-pi` |
-| F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | [`SPEC-013-pix-e-webhook-idempotente.md`](specs/SPEC-013-pix-e-webhook-idempotente.md) | [#13](https://github.com/RodReis/arenahub/issues/13) | `aprovada-pi` |
+| F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | [`SPEC-013-pix-e-webhook-idempotente.md`](specs/SPEC-013-pix-e-webhook-idempotente.md) | [#13](https://github.com/RodReis/arenahub/issues/13) | ✅ **entregue** em 18/08/2026 ([#102](https://github.com/RodReis/arenahub/pull/102)) |
 | F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | [`SPEC-014-cartao-e-recorrencia.md`](specs/SPEC-014-cartao-e-recorrencia.md) | [#14](https://github.com/RodReis/arenahub/issues/14) | `aprovada-pi` |
 | F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | [`SPEC-015-inadimplencia-e-acesso.md`](specs/SPEC-015-inadimplencia-e-acesso.md) | [#15](https://github.com/RodReis/arenahub/issues/15) | `aprovada-pi` |
 | F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | [`SPEC-016-estorno-conciliacao-e-operacao.md`](specs/SPEC-016-estorno-conciliacao-e-operacao.md) | [#16](https://github.com/RodReis/arenahub/issues/16) | `aprovada-pi` |
