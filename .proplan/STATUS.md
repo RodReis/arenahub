@@ -10,7 +10,6 @@ updated: 2026-08-18
 ### Sem épico
 
 - [MVP1][F45] Cadastro completo de aluno (retrabalho da Slice 1.2) (#100)
-- [MVP2.5][F46] Design system aplicado ao `admin-web` (#99)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
@@ -61,6 +60,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP2.5][F46] Design system aplicado ao `admin-web` (#99, finalizado em: 2026-08-18)
 - [INFRA][FIX] CI: rodar o job de E2E no container do Playwright, tirando o apt-get do caminho (#105, finalizado em: 2026-08-18)
 - [INFRA] Banco de teste separado do de dev, seed de demonstração e line ending (#101, finalizado em: 2026-08-18)
 - [MVP2][SPEC-013][F13] PIX e webhook idempotente (#13, finalizado em: 2026-08-18)
