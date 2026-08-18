@@ -1,0 +1,72 @@
+/**
+ * Forma comum de formulario do painel -- F46, issue #99.
+ *
+ * Compartilhado entre as telas porque a alternativa era cada uma inventar o
+ * proprio espacamento, que e exatamente como o painel chegou a 53 controles
+ * crus com sete alturas diferentes.
+ *
+ * O que NAO esta aqui: estilo de controle. Isso e `Field`, `SelectField` e
+ * `TextareaField` -- este arquivo cuida so do arranjo entre eles.
+ */
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /*
+    A largura existe para o olho nao percorrer 1200px entre o rotulo e o
+    campo. Em `ch` e nao em px porque acompanha o zoom de 200% -- largura fixa
+    ficaria estreita demais quando o texto cresce.
+  */
+  max-width: 64ch;
+}
+
+/**
+ * `<fieldset>` agrupa sem moldura.
+ *
+ * O navegador desenha um entalhe em volta que, dentro de um card que ja tem
+ * borda, vira moldura sobre moldura. O agrupamento fica por conta da legenda e
+ * do espacamento -- e continua existindo para o leitor de tela, que e o motivo
+ * de o `<fieldset>` estar aqui em vez de um `<div>`.
+ */
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.grupo > legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+/**
+ * Linha de acoes. `flex-start` porque o botao primario fica a esquerda, junto
+ * do fluxo de leitura -- alinhar a direita num formulario de coluna unica
+ * obriga o olho a voltar depois de cada campo.
+ */
+.acoes {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/**
+ * Dois campos por linha quando ambos sao curtos (data de inicio e fim, tipo e
+ * valor de contato). Quebra sozinho no estreito, sem media query.
+ */
+.par {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.par > * {
+  flex: 1 1 200px;
+  min-width: 0;
+}
