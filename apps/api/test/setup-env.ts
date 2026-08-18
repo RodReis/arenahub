@@ -9,3 +9,35 @@ import { config as carregarEnv } from 'dotenv';
 // fileURLToPath, e nao url.pathname: em Windows o pathname vem como
 // "/C:/..." e quebra.
 carregarEnv({ path: fileURLToPath(new URL('../../../.env', import.meta.url)) });
+
+/**
+ * Banco DEDICADO a integracao -- card [INFRA], issue #101.
+ *
+ * Mesmo redirecionamento de `packages/database/test/setup-env.ts`, e duplicado
+ * de proposito: sao dois runners (Jest aqui, vitest la) em pacotes separados, e
+ * um pacote compartilhado para seis linhas custa mais do que resolve. Mexeu
+ * aqui, mexa la.
+ *
+ * As suites de integracao escrevem em Postgres de verdade, e a maioria NAO
+ * limpa o que cria: de 20 suites, 3 apagam o tenant no fim. As outras 17
+ * deixam. Apontadas para o `DATABASE_URL` de desenvolvimento, encheram o banco
+ * com 1062 tenants de teste (`f7-rede-a-a6b8b550`, `academia-2d849fb4`) e 3752
+ * alunos -- o painel passou a exibir o rastro da suite em vez do produto.
+ *
+ * O `docs/TESTING.md` dizia que aqui havia Testcontainers. Nao ha: e o mesmo
+ * Postgres local, pelo mesmo `DATABASE_URL`.
+ *
+ * `INTEGRATION_DATABASE_URL` separa. Banco proprio, e NAO o mesmo do E2E:
+ * rodar as duas suites ao mesmo tempo faria uma derrubar o banco sob os pes da
+ * outra.
+ *
+ * Sem a variavel, cai no `DATABASE_URL` -- diferente do E2E, onde a ausencia e
+ * erro. O motivo e a assimetria de dano: a integracao LIMPA parcialmente e nao
+ * recria banco, enquanto o E2E dispara `migrate reset`. Aqui, cair no banco de
+ * desenvolvimento suja; la, apagaria.
+ */
+const urlDaIntegracao = process.env['INTEGRATION_DATABASE_URL'];
+
+if (urlDaIntegracao) {
+  process.env['DATABASE_URL'] = urlDaIntegracao;
+}
