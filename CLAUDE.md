@@ -5,8 +5,9 @@
 Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 - **Pense antes de codificar.** Não presuma: declare suposições, exponha
-  interpretações alternativas, aponte a abordagem mais simples. Em dúvida, pare
-  e pergunte ao PI (já é regra: sem spec → perguntar).
+  interpretações alternativas, aponte a abordagem mais simples. Em dúvida sobre
+  **escopo de produto ou LGPD**, pare e pergunte. Em dúvida técnica, decida e
+  registre no PR — ver *O que pode bloquear o desenvolvimento*.
 - **Simplicidade primeiro.** Código mínimo que resolve. Sem abstração de uso
   único, sem flexibilidade não pedida, sem tratar cenário impossível.
 - **Alterações cirúrgicas.** Cada linha alterada rastreável ao pedido. Não
@@ -25,7 +26,7 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 #### Dois atores escrevem no Git — quem cede no conflito
 
-O Cowork pusha direto na `main` (spec + Índice Fatia ↔ SPEC); o Code entrega por PR. Como o Cowork não abre PR, **ele nunca vê conflito** — quem colide é sempre o Code, com branch aberta enquanto a `main` andou.
+O Cowork pusha documento direto na `main`; o Code entrega por PR. Como o Cowork não abre PR, **ele nunca vê conflito** — quem colide é sempre o Code, com branch aberta enquanto a `main` andou.
 
 **Regra:** o Code **rebase e reaplica** — divergiu da `main`, re-sincroniza e reaplica o próprio trabalho por cima. O Code **nunca desfaz** linha escrita pelo Cowork: se o `docs/STATUS.md` divergiu, **a versão da `main` vence** e o Code reaplica o próprio progresso por cima.
 
@@ -132,7 +133,7 @@ Cinco pilares (`docs/Especificação Completa — Plataforma Inteligente de Gest
 
 **O que o ArenaHub não é** (`docs/prd/README.md` §3): não é ERP contábil, não emite nota fiscal, não é prontuário médico, não é adquirente, não substitui prescrição profissional.
 
-**Estado atual: documentação e planos. Zero linha de código.** O repositório não tem `package.json`, `apps/`, `packages/`, `infra/` nem `.github/`. O bootstrap do monorepo é trabalho **`[INFRA]`**, anterior a qualquer fatia — ver `docs/DEVELOPMENT.md` §4 e a *exceção de arranque* da §2.
+**Estado atual (18/08/2026): MVP 1 em execução.** O bootstrap fechou, o monorepo existe com `apps/`, `packages/`, `infra/` e `.github/`, e o MVP 0 encerrou em 18/08 com `GO_WITH_CONSTRAINTS` (ADR-029) — com quatro restrições que o MVP 1 carrega. Estado corrente sempre no `docs/STATUS.md`, nunca aqui.
 
 ## Regras de arquitetura (não violar)
 
@@ -235,7 +236,7 @@ Use a que existir no ambiente; a ausência de uma skill não é desculpa para pu
 - `docs/prd/README.md` — **contrato de produto e engenharia** (documento master): arquitetura de referência, padrões transversais, comandos, estilo, testes, definição de pronto e rastreabilidade. Decisão que o contraria **emenda o parágrafo** com nota apontando o ADR.
 - `docs/prd/academia/MVP-*.md` (MVP-00 a MVP-06) — requisitos por MVP: FR/NFR/BR/AC, slices, gates de entrada e checklists de execução.
 - `docs/Especificação Completa — Plataforma Inteligente de Gestão para Academias.md` — visão ampla de origem. **Não é normativo**: onde conflitar com PRD, ADR ou `CONVENTION.md`, prevalece o documento mais específico.
-- `docs/specs/` — spec por fatia (`SPEC-<nnn>-<slug>.md`), **ponteiro para a Slice do PRD** (ADR-022). Só o Cowork escreve. O escopo mora no PRD; a spec acrescenta decisões da fatia, escopo negativo, invariantes tocadas e perguntas ao PI.
+- `docs/specs/` — **histórico, não processo** (desde 18/08/2026). Eram ponteiros para a Slice do PRD (ADR-022); deixaram de ser artefato obrigatório e **não bloqueiam nem exigem aprovação**. O escopo mora no PRD. Não se criam novas.
 - `docs/DEVELOPMENT.md` — **sua ordem de execução e status por item** (você é o dono; atualize a cada entrega junto com STATUS.md).
 - `docs/ARCHITECTURE.md` — desenho, módulos, dados, resiliência.
 - `docs/DECISIONS.md` — ADRs (ler antes de propor mudança estrutural). **ADR-021** define quem escreve o quê no Git.
