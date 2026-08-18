@@ -157,6 +157,17 @@ jobs:
     # junto.
     container: mcr.microsoft.com/playwright:v1.62.1-noble
 
+    # A imagem guarda os navegadores em `/ms-playwright` e anuncia isso pela
+    # env var `PLAYWRIGHT_BROWSERS_PATH` que ela mesma define. Essa var NAO
+    # chega ao processo do job: o runner troca o `HOME` para `/github/home` e
+    # monta o proprio ambiente, entao o Playwright volta ao padrao
+    # `~/.cache/ms-playwright` -- um caminho vazio -- e morre com
+    # "Executable doesn't exist at /github/home/.cache/ms-playwright/...".
+    #
+    # Repetir a var aqui e o que faz o job enxergar os navegadores que a imagem
+    # ja traz. O valor ESPELHA o `ENV` do Dockerfile oficial: se a imagem mudar
+    # de caminho, este valor muda junto.
+
     services:
       # Postgres para `test:integration` e para o E2E, cada um no seu banco.
       #
@@ -178,6 +189,12 @@ jobs:
           --health-retries 10
 
     env:
+      # Onde a imagem guarda os navegadores -- ver o bloco do `container`
+      # acima. Sem esta linha o Playwright procura em `~/.cache/ms-playwright`,
+      # que dentro do job e `/github/home/.cache/ms-playwright`, e nao acha
+      # nada.
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+
       # `postgres`, e NÃO `localhost`: com o job dentro de um container, o
       # runner liga os dois por uma rede Docker e o serviço passa a atender
       # pelo LABEL dele. Em `localhost` mora o próprio job.
