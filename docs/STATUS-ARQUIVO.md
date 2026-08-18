@@ -13,6 +13,84 @@
 
 ---
 
+## 2026-08-18 — O painel foi visto pela primeira vez, e o diagnóstico não era o esperado
+
+O PI abriu o `admin-web` e mandou os prints de seis telas: `Unidades`, `Eventos de acesso`,
+`Liberação manual`, `Dispositivos`, `Alunos` e `Planos`. HTML cru, sem estilo, com dado de teste
+na listagem e caixas vazias no operacional. A reação registrada foi literal: *"o projeto todo está
+assim, esquisito, não é nada do que especifiquei"*, seguida de *"estou querendo deletar ele e
+começar do zero"*.
+
+**O ponto de partida da conversa foi um pedido diferente:** adicionar ao cadastro de aluno os 26
+campos de uma grade de sistema legado, porque a Especificação §10 diz *"cadastro completo de
+alunos"* e a F7 entregou quatro campos. A investigação do pedido é que abriu o resto.
+
+### O que se descobriu, em ordem
+
+**Metade dos campos pedidos já existia.** `student_addresses` foi criada na F7 com CEP,
+logradouro, número, complemento, bairro, cidade e estado — e **nunca foi escrita por nada**: nem
+endpoint, nem seed, nem tela. Tabela órfã desde o nascimento. `student_contacts` aceita telefone,
+WhatsApp e e-mail; o formulário oferecia um contato só.
+
+**Não existe endpoint que edite dado cadastral de aluno.** Só `PATCH /students/:id/status`. Um
+cadastro em quatro passos sem edição significa que CEP digitado errado é permanente. Ninguém tinha
+percebido porque a F7 satisfez o `M1-FR-006` como ele está escrito, e ele não menciona edição.
+
+**Um terço da lista pedida não é campo.** Plano, Inc. Plano, Venc. Plano, Data Mat. e Últ. Acesso
+saem de `Subscription`, `Entitlement` e `AccessEvent`. Vieram da grade de listagem do legado, e
+grade de listagem não é formulário. Campo editável de vencimento de plano seria uma segunda fonte
+de verdade sobre direito de acesso — e a que a catraca **não** consulta. Regra de arquitetura nº 1.
+
+**O mockup contrariava o próprio domínio.** A tela que o PI desenhou marcava CPF, telefone e
+e-mail como **obrigatórios**. INV-009 e INV-011 dizem o contrário, e a F7 foi implementada assim
+de propósito: menor de idade e quem chega sem documento precisam ser cadastrados. Decisão do PI na
+hora: **o mockup é corrigido, não o domínio.**
+
+**Foto é o único campo do §11 que toca o art. 11 da LGPD.** Foto de rosto guardada ao lado de um
+sistema de reconhecimento facial é candidata a reclassificação como dado biométrico pela ANPD, e
+biometria é lista fechada — legítimo interesse não existe. Sai da F45 e vai para a F8, junto do
+consentimento.
+
+### As três causas do "esquisito"
+
+Nenhuma é defeito de implementação, e é isso que importa para a decisão de não recomeçar.
+
+**1 — A ordem do roadmap fez exatamente o que mandava.** A F42 (design system do painel) está no
+MVP 2.5, depois de todo o MVP 1 e do MVP 2. Onze telas foram construídas antes de existir
+superfície, porque o plano dizia para construir. O Code seguiu o plano.
+
+**2 — O banco de desenvolvimento é o banco dos testes E2E.** O `playwright.config.ts` sobe a API
+local, que usa o mesmo `DATABASE_URL` de dev (`localhost:5442/arenahub`), e os E2E não limpam o que
+criam. Os testes de integração limpam. Daí `Caminho Biometria 1787060177858` e `Plano Atribuível
+1786909436454` na listagem: o produto estava exibindo o resíduo da suíte.
+
+**3 — Nunca houve seed de demonstração.** O `CLAUDE.md` prevê o seed "na primeira fatia que
+precisar" e nenhuma fatia precisou, porque cada uma criava o próprio dado nos testes. O painel
+operacional de um banco vazio parece um sistema morto mesmo estando correto.
+
+### O achado lateral que valia por si
+
+`git status` na `main` acusava **470 arquivos modificados**. Nenhum era trabalho: a árvore estava
+com CRLF, os blobs com LF, sem `.gitattributes` e sem `core.autocrlf`. `git diff
+--ignore-cr-at-eol` zerava tudo. Nesse estado, qualquer `commit -a` produz um commit de 470
+arquivos com zero mudança semântica, todo PR nasce ilegível e os dois atores colidem em tudo.
+Mitigado na hora com `core.autocrlf=input` local — caiu para 2 arquivos, ambos deste registro. A
+correção definitiva é um `.gitattributes` na raiz, que é arquivo do Code.
+
+### O que ficou decidido
+
+F45 (cadastro completo) e F46 (design system aplicado ao painel) aprovadas, **com a ordem
+invertida**: F46 primeiro, para que o PI pare de julgar o produto por telas que o roadmap mandou
+deixar sem design. Mais um card `[INFRA]` para separar o banco de teste do de desenvolvimento,
+criar seed de demonstração e fechar o line ending.
+
+**A lição de método, registrada porque vai se repetir:** a Especificação enumera, o PRD é o
+normativo (ADR-018), e o que o PRD não repete não vira critério de aceite. A Slice 1.2 dizia
+*"cadastro e busca de aluno"* — o Code entregou exatamente isso. Fatia que dependa de lista de
+campos da Especificação passa a copiar a lista para o corpo da issue.
+
+---
+
 ## 2026-08-14 — Oito decisões novas e duas ratificações
 
 Segunda sessão do dia. Com a base documental aprovada e commitada (`0fef95d`), o PI tomou **oito

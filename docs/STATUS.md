@@ -82,8 +82,14 @@ errado: a Slice 2.1 (invoice, ledger, pagamento manual) **não chama um único m
 O que de fato falta para F12 é o **modelo de `Payment`**, decidível sem provedor — virou o
 **ADR-027**. Em 18/08 o PI **aceitou a recomendação técnica** e respondeu três das quatro
 perguntas; a quarta (dupla permissão) virou **emenda ao PRD**, ainda pendente. O ADR-013 segue
-`aberto` só para o provedor e as políticas de refund, bloqueando F13–F16. ⚠️ **Isso não torna F12
+`aberto` só para o provedor e as políticas de refund. ⚠️ **Isso não torna F12
 pegável:** a entrada do MVP 2 exige MVP 1 estável, e o MVP 1 depende do gate §15 do MVP 0.
+
+📌 **18/08/2026 — F13 tampouco esperava o ADR-013, e foi entregue.** O gate escolhe **marca de
+provedor**; a Slice 2.2 escreve contra a porta `PaymentProvider`, com `FakePaymentProvider` no
+boundary — dublê que o `docs/TESTING.md` §3 já previa. Trocar o fake pelo adapter homologado é um
+`useClass` no módulo, não reescrita. **Restam F14–F16 dependentes do gate** por razão real: cartão
+tokenizado e estorno exigem capacidade que só a homologação confirma.
 
 **14/08/2026, segunda rodada — ADR-011 e ADR-008 fechados.** F4 e F8 destravadas. Restam **duas**
 pendências, nenhuma no caminho crítico de hoje: ADR-013 (sai da homologação do MVP 2, não de
@@ -95,6 +101,53 @@ alternativa. **Essa hipótese não existe para dado biométrico** — é dado se
 LGPD é lista fechada onde legítimo interesse não figura. Corrigido no ADR.
 
 ---
+
+🖥️ **18/08/2026 — o PI olhou o painel pela primeira vez, e o painel não se sustenta.** Prints de
+`Unidades`, `Eventos de acesso`, `Liberação manual`, `Dispositivos`, `Alunos` e `Planos` mostram
+HTML sem estilo, listas com dado de teste e telas vazias. **Nenhuma das três causas é defeito de
+implementação:**
+
+1. **A ordem do roadmap.** A **F42** (design system do painel) foi alocada no **MVP 2.5** — depois
+   de todo o MVP 1 e do MVP 2. O plano mandou construir onze telas antes de existir superfície, e
+   foi cumprido à risca. **Corrigido:** a F46 passa na frente do resto do MVP 1.
+2. **O banco de desenvolvimento é o banco dos testes E2E.** `Caminho Biometria 1787060177858`,
+   `Plano Atribuível 1786909436454` e companhia são alunos e planos criados pelo Playwright, com
+   epoch no nome e sem limpeza — os testes de integração limpam, os E2E não. O painel parece
+   quebrado porque está exibindo o resíduo da própria suíte.
+3. **Não existe seed de demonstração.** `Nenhum dispositivo cadastrado`, `Nenhum evento no
+   período`, `Unidade não selecionada`: banco vazio, não bug. O `CLAUDE.md` prevê seed em
+   `packages/database/prisma/seed.ts` "na primeira fatia que precisar" — nenhuma precisou.
+
+**O que isso ensina, e é o item que vale além destas três fatias:** sete PRDs, 44 fatias e 30 ADRs
+especificaram domínio com rigor e **não especificaram superfície nenhuma** até o `DS-PAINEL.md`
+aparecer em 16/08, com onze fatias entregues. O projeto adiou 100% do feedback visual. Nenhum
+processo corrige o que ninguém olhou.
+
+🧹 **18/08/2026 — 470 arquivos "modificados" na `main` eram line ending, não trabalho.** A árvore
+estava com CRLF e os blobs com LF, sem `.gitattributes` e sem `core.autocrlf` — todo arquivo do
+repositório, código incluído, aparecia sujo no `git status`. Um `commit -a` produziria um commit de
+470 arquivos com zero mudança semântica, e todo PR nasceria ilegível. **Mitigado** com
+`core.autocrlf=input` local (2 arquivos sujos depois disso, ambos deste registro). **A correção
+definitiva é um `.gitattributes` com `* text=auto eol=lf` na raiz — arquivo do Code, não do
+Cowork.** Vira o card [`#101`](https://github.com/RodReis/arenahub/issues/101).
+
+✅ **18/08/2026 — F45 e F46 aprovadas pelo PI, com a ordem invertida: F46 primeiro.** Escopo das
+duas em [`docs/notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md`](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md).
+Decisões travadas na mesma conversa: **CPF continua opcional** (INV-009/011 — o mockup que o
+marcava obrigatório é que está errado); **CNPJ, responsável de contrato e professores ficam fora**;
+**estado civil e profissão entraram e saíram no mesmo dia** — *"só informação inútil"*, e é a
+decisão certa: dado pessoal que nenhum caso de uso consome é passivo, não funcionalidade (LGPD
+art. 6º, III); **foto fica fora** por risco de reclassificação como biometria (art. 11) e vai para
+a F8.
+
+🏢 **18/08/2026 — o aluno passa a pertencer a uma unidade.** `students` ganha **`gym_unit_id`
+obrigatório**: a Especificação §11 pede "unidade", a regra de arquitetura nº 2 manda tê-lo quando o
+dado é físico, e `Device`, `AccessEvent` e `PlanUnit` já têm. **É unidade de origem, não controle
+de acesso** — quem decide onde o aluno entra continua sendo o plano, por `PlanUnit` e
+`EntitlementUnitWindow`; ler `students.gym_unit_id` na decisão de acesso criaria a segunda fonte de
+verdade que a regra de arquitetura nº 1 proíbe. Migration em **dois passos** (coluna anulável →
+backfill para `MATRIZ` → `NOT NULL`), listagem passa a filtrar pela unidade do cabeçalho, e
+transferência entre unidades vira ação auditada — não edição de campo solta.
 
 ## 1. Onde estamos, em três frases
 
@@ -242,7 +295,7 @@ continua sendo o Índice da §5**, não o número do GitHub.
 
 **Do Backlog, 12 são pegáveis hoje** — F1–F11 (todas `aprovada-pi`, ADR-007 fechou e destravou
 F10) e **F42**, assim que o card `[INFRA]` do pipeline de tokens sair. As outras 32 estão
-estacionadas: **F12 não está mais parada por ADR** (o ADR-027 fechou em 18/08) — faltam a spec preenchida e a entrada do MVP 2; F13–F16 por ADR-013, F17–F41 porque o MVP ainda não foi discutido com o PI, e
+estacionadas: **F12 e F13 não estão mais paradas por ADR** — o ADR-027 fechou em 18/08 e F13 escreve contra a porta, sem depender da marca do provedor; F14–F16 seguem no ADR-013, F17–F41 porque o MVP ainda não foi discutido com o PI, e
 **F43–F44 pelo gate do MVP 4** — as superfícies `mobile` e `kiosk` não existem.
 
 > ⚠️ **O board (Projects) ainda não existe** — só as labels, criadas automaticamente pela API ao
@@ -267,7 +320,7 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 | ADR | o que falta | bloqueia |
 |---|---|---|
 | **ADR-008** *(ponto remanescente)* | **transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil. **Reapontado:** bloqueava F8 por engano — F8 não chama IA nenhuma | F21 |
-| **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que sobrou aqui são as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites). O **modelo de `Payment` saiu deste ADR em 18/08/2026** e virou o ADR-027 | F13–F16 |
+| **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que sobrou aqui são as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites). O **modelo de `Payment` saiu deste ADR em 18/08/2026** e virou o ADR-027; **F13 saiu em 18/08** — escreve contra `PaymentProvider`, não contra a marca | F14–F16 |
 | ~~**ADR-027**~~ | **FECHADO em 18/08/2026.** Modelo de `Payment`/`PaymentAttempt` decidido e `MVP-02` §7/§11 emendados. **F12 sem ADR bloqueando** — faltam a spec preenchida e a entrada do MVP 2 | — |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
 
@@ -324,7 +377,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **0** | Hardware e protocolo Topdata comprovados em bancada | hardware + SDK + rede de laboratório | F1–F5 | ✅ **ENCERRADO em 18/08/2026** — gate §15 assinado `GO_WITH_CONSTRAINTS` (ADR-029), com quatro restrições normativas herdadas pelo MVP 1 |
 | **1** | Academia operando acesso online, com assinatura manual | ✅ **atendido** — `GO_WITH_CONSTRAINTS` em 18/08/2026 (ADR-029) | F6–F9, F11 | **liberado — em execução**. Carrega as restrições 1 a 4 do ADR-029; `M0-AC-004` é condição de saída |
 | **1.5** | Operação offline: snapshot, fila e reconciliação | MVP 1 em piloto, com incidente de link medido | F10 | adiado por **ADR-012**. **ADR-007 fechado em 16/08 — spec aprovada** |
-| **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | entrada bloqueada pelo **MVP 1** (que depende do MVP 0). Por ADR: **F12 livre** desde 18/08; F13–F16 esperam o ADR-013 |
+| **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | entrada bloqueada pelo **MVP 1** (que depende do MVP 0). Por ADR: **F12 e F13 livres** desde 18/08 — ambas escrevem atrás de `PaymentProvider`; **F14–F16** esperam o gate do provedor, que decide capacidade de cartão e estorno |
 | **2.5** | Design system: tokens, `packages/ui` e as três superfícies | **F42 sem gate** (dívida ativa: `admin-web` está na `main` sem CSS) · **F43 e F44 têm gate:** o PI priorizar o MVP 4 | F42–F44 | criado por **ADR-025**. F42 pegável assim que o card `[INFRA]` do pipeline de tokens sair |
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis + protocolo clínico | F17–F22 | bloqueado por MVP 1 |
 | **4** | Autosserviço: app do aluno e totem | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado |
@@ -398,6 +451,8 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | [#81](https://github.com/RodReis/arenahub/issues/81) | aprovada-pi |
 | F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | [#82](https://github.com/RodReis/arenahub/issues/82) | aprovada-pi *(gate: MVP 4)* |
 | F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | aprovada-pi *(gate: MVP 4)* |
+| F45 | — | 1 | — | Cadastro completo de aluno (retrabalho da Slice 1.2) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#100](https://github.com/RodReis/arenahub/issues/100) | escopo definido |
+| F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **próxima a entrar** |
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
 > ADR**, não no PRD: o design system é trabalho de plataforma e não tem PRD que o descreva. O
@@ -410,6 +465,13 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 > e PR dividem o mesmo contador — os PRs #55–#76 consumiram a faixa. **A fonte da numeração é
 > este Índice, nunca o número do GitHub.** A partir daqui a diferença é visível, o que é melhor
 > do que uma coincidência que ensinava a regra errada.
+
+> **F45 e F46 criadas em 18/08/2026, por decisão do PI.** F45 é **retrabalho da Slice 1.2**: a
+> F7 entregou quatro campos onde a Especificação §11 lista dezoito, e `student_addresses` nasceu
+> órfã — criada, nunca escrita. F46 aplica no `admin-web` o design system que a F42 contratou e
+> nenhuma tela usa. **Nenhuma das duas tem SPEC**: o gate de spec morreu em 18/08 e o escopo mora
+> no documento de retrabalho, linkado acima. Coluna `SPEC` fica vazia de propósito — inventar
+> `SPEC-045` seria criar artefato que o processo aposentou. A contagem vai de 44 para **46**.
 
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento
