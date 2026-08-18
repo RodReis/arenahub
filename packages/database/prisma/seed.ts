@@ -105,6 +105,92 @@ const PERMISSOES = [
   // excepcional, auditado, que nem todo perfil precisa ter.
   'access.read',
   'access.override',
+  // F12: financeiro. `billing.payment.manual` e separado de
+  // `billing.manage` pelo mesmo motivo de `access.override`: reconhecer
+  // dinheiro sem passar por provedor e ato excepcional, e nem todo perfil
+  // do financeiro precisa dele.
+  'billing.read',
+  'billing.manage',
+  'billing.payment.manual',
+];
+
+
+/**
+ * Catalogo de planos da Arena Positiva.
+ *
+ * Valores em CENTAVOS (INV-065): R$ 150,00 = 15000. Nunca float.
+ *
+ * Os beneficios saem dos encartes impressos que o PI forneceu em
+ * 18/08/2026. A periodicidade da bioimpedancia e o que diferencia os dois
+ * programas -- 30 dias no de adultos e idosos, 60 no de protocolos
+ * especificos -- e por isso ela e CAMPO, nao prosa: o MVP 3 vai ler para
+ * saber quando a proxima avaliacao vence.
+ *
+ * "Teste de ECG" entra como `UNDER_REVIEW`: o encarte imprime "em
+ * avaliacao", que nao e incluso nem ausente.
+ */
+const BENEFICIOS_COMUNS = [
+  { item: 'Cafe com e sem acucar', detail: 'Disponivel aos alunos' },
+  { item: 'Fone de ouvido disponivel', detail: 'Disponivel aos alunos' },
+  { item: 'Toalha de higiene pessoal', detail: 'Disponivel aos alunos' },
+  { item: 'Consulta inicial (anamnese)', detail: 'Consulta inicial' },
+  { item: 'Definicao dos objetivos', detail: 'Definicao individual dos objetivos' },
+  { item: 'Treino disponivel no aplicativo', detail: 'Acesso ao treino pelo aplicativo' },
+  { item: 'Atualizacoes periodicas do treino', detail: 'Atualizacoes conforme acompanhamento' },
+];
+
+const CATALOGO = [
+  {
+    name: 'Programa Adultos e Idosos',
+    description:
+      'Para adultos e idosos que desejam preservar forca, autonomia e qualidade de vida.',
+    amountMinor: 15_000,
+    memberLimit: null,
+    beneficios: [
+      ...BENEFICIOS_COMUNS,
+      { item: 'Avaliacao funcional', detail: 'Equilibrio, mobilidade, forca e autonomia' },
+      { item: 'Bioimpedancia', detail: 'Inicial + uma bioimpedancia a cada 30 dias', everyDays: 30 },
+      { item: 'Prescricao do treinamento', detail: 'Treinamento prescrito conforme avaliacao' },
+      { item: 'Afericao de pressao arterial', detail: 'Acompanhamento previsto no programa' },
+      {
+        item: 'Aplicacao de protocolos especificos',
+        detail: '50+, 60+, 70+: dor no joelho, obesidade, osteopenia, osteoporose',
+      },
+      {
+        item: 'Teste de ECG',
+        detail: 'O projeto registra: avaliar se e possivel inserir',
+        status: 'UNDER_REVIEW' as const,
+      },
+    ],
+  },
+  {
+    name: 'Clinica de Musculacao',
+    description:
+      'Para alunos que necessitam de protocolos especificos e acompanhamento tecnico ampliado.',
+    amountMinor: 15_000,
+    memberLimit: null,
+    beneficios: [
+      ...BENEFICIOS_COMUNS,
+      { item: 'Bioimpedancia', detail: 'Inicial + uma bioimpedancia a cada 60 dias', everyDays: 60 },
+      { item: 'Prescricao do treinamento', detail: 'Treinamento prescrito conforme avaliacao' },
+      { item: 'Consulta tecnica aprofundada', detail: 'Acompanhamento tecnico ampliado' },
+      { item: 'Adaptacoes do treinamento', detail: 'Conforme idade, condicao clinica e limitacoes' },
+    ],
+  },
+  {
+    name: 'Plano Familia',
+    description: 'Plano familiar com ate 3 membros.',
+    amountMinor: 20_000,
+    memberLimit: 3,
+    beneficios: BENEFICIOS_COMUNS,
+  },
+  {
+    name: 'Diaria',
+    description: 'Acesso avulso de um dia.',
+    amountMinor: 3_000,
+    memberLimit: null,
+    beneficios: [{ item: 'Acesso a academia', detail: 'Um dia' }],
+  },
 ];
 
 async function semear(): Promise<void> {
@@ -164,6 +250,54 @@ async function semear(): Promise<void> {
       create: { ...UNIDADE, tenantId: tenant.id, openingHours: {} },
       update: {},
     });
+
+
+    // Vigencia do preco: ancorada no passado para que qualquer invoice de
+    // desenvolvimento encontre preco vigente. Reajuste futuro entra como
+    // LINHA NOVA com `validFrom` proprio -- nunca editando esta.
+    const VIGENCIA_INICIAL = new Date('2026-01-01T00:00:00Z');
+
+    for (const definicao of CATALOGO) {
+      const plano = await db.plan.upsert({
+        where: { tenantId_name: { tenantId: tenant.id, name: definicao.name } },
+        create: { tenantId: tenant.id, name: definicao.name, description: definicao.description },
+        update: { description: definicao.description },
+      });
+
+      await db.planPrice.upsert({
+        where: { planId_validFrom: { planId: plano.id, validFrom: VIGENCIA_INICIAL } },
+        create: {
+          tenantId: tenant.id,
+          planId: plano.id,
+          amountMinor: definicao.amountMinor,
+          validFrom: VIGENCIA_INICIAL,
+        },
+        update: { amountMinor: definicao.amountMinor },
+      });
+
+      // Beneficio nao tem chave natural estavel alem de (plano, item):
+      // apaga e reescreve mantem o seed idempotente sem inventar id.
+      await db.planBenefit.deleteMany({ where: { planId: plano.id } });
+      await db.planBenefit.createMany({
+        data: definicao.beneficios.map((beneficio, posicao) => ({
+          tenantId: tenant.id,
+          planId: plano.id,
+          item: beneficio.item,
+          detail: beneficio.detail,
+          status: 'status' in beneficio ? beneficio.status : ('INCLUDED' as const),
+          everyDays: 'everyDays' in beneficio ? beneficio.everyDays : null,
+          position: posicao,
+        })),
+      });
+    }
+
+    await db.billingSettings.upsert({
+      where: { tenantId: tenant.id },
+      create: { tenantId: tenant.id, dueDay: 10, graceDays: 5 },
+      update: {},
+    });
+
+    console.info(`[seed] catalogo com ${String(CATALOGO.length)} planos e precos vigentes.`);
 
     console.info(`[seed] tenant "${TENANT.slug}" pronto, com dono ${DONO.email}.`);
   } finally {

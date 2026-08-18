@@ -455,6 +455,17 @@ model Tenant {
   manualAccessOverrides  ManualAccessOverride[]
 
   @@map("tenants")
+  planPrices      PlanPrice[]
+  planBenefits    PlanBenefit[]
+  familyGroups    FamilyGroup[]
+  familyMembers   FamilyMember[]
+  billingSettings BillingSettings?
+  invoices        Invoice[]
+  invoiceItems    InvoiceItem[]
+  payments        Payment[]
+  paymentAttempts PaymentAttempt[]
+  accountCredits  AccountCredit[]
+  invoiceSequence InvoiceSequence?
 }
 
 /// Unidade fisica. Onde a catraca mora.
@@ -794,6 +805,9 @@ model Student {
   @@index([tenantId, cpfHash])
   @@index([tenantId, fullName])
   @@map("students")
+  familyMemberships FamilyMember[]
+  invoices          Invoice[]
+  accountCredits    AccountCredit[]
 }
 
 /// Contato do aluno. `value` guarda a forma NORMALIZADA (e-mail em
@@ -915,6 +929,8 @@ model Plan {
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
   @@map("plans")
+  prices   PlanPrice[]
+  benefits PlanBenefit[]
 }
 
 model PlanUnit {
@@ -984,6 +1000,8 @@ model Subscription {
 
   @@index([tenantId, studentId, status])
   @@map("subscriptions")
+  familyGroup FamilyGroup?
+  invoices    Invoice[]
 }
 
 /// Direito de acesso. O QUE A CATRACA CONSULTA.
@@ -1872,4 +1890,385 @@ model DataExportJob {
   @@unique([tenantId, requesterId, idempotencyKey])
   @@index([tenantId, status, createdAt])
   @@map("data_export_jobs")
+}
+
+// ---------------------------------------------------------------------------
+// FINANCEIRO -- MVP 2, Slice 2.1 (F12)
+//
+// Regra de arquitetura no 1: `Pagamento -> Invoice -> Subscription ->
+// Entitlement -> Access Decision Engine`. NADA aqui e consultado pela
+// catraca. O financeiro move entitlement por evento, nunca por leitura
+// direta.
+//
+// INV-065 / `M2-BR-001`: dinheiro e INTEIRO na menor unidade monetaria.
+// `Int` em centavos, nunca `Float`, nunca `Decimal` -- centavo nao tem
+// fracao, e float em dinheiro e o bug que so aparece na conciliacao.
+//
+// Sem `gym_unit_id` em nenhuma tabela financeira: pagamento nao e dado
+// fisico (`CLAUDE.md`, regra de arquitetura 2, e ADR-027).
+// ---------------------------------------------------------------------------
+
+/// Status do beneficio no plano.
+///
+/// NAO e booleano porque o encarte da Arena Positiva ja imprimiu o
+/// meio-termo: "Teste de ECG -- em avaliacao".
+enum PlanBenefitStatus {
+  INCLUDED
+  UNDER_REVIEW
+}
+
+/// Preco do plano, COM VIGENCIA (decisao do PI em 18/08/2026).
+///
+/// Reajuste NAO reescreve o catalogo: entra linha nova com `validFrom`
+/// proprio. Preserva historico, permite reajuste agendado, e a invoice ja
+/// aberta nunca muda de valor (INV-068) porque copia o valor na abertura.
+model PlanPrice {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  planId     String   @map("plan_id") @db.Uuid
+  /// Centavos. INV-065.
+  amountMinor Int     @map("amount_minor")
+  currency   String   @default("BRL")
+  /// Inclusivo: preco que vale a partir de 01/06 ja vale as 00:00 de 01/06.
+  validFrom  DateTime @map("valid_from")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, validFrom])
+  @@index([tenantId, planId, validFrom])
+  @@map("plan_prices")
+}
+
+/// Beneficio incluso no plano -- TABELA, NAO TEXTO.
+///
+/// Decisao do PI em 18/08/2026, a partir dos encartes: o mesmo item
+/// ("Bioimpedancia") aparece nos dois programas com periodicidade
+/// DIFERENTE -- 30 dias no de adultos e idosos, 60 no de protocolos
+/// especificos. Isso e regra que o MVP 3 vai ler para saber quando a
+/// proxima avaliacao vence; em `description` viraria prosa inconsultavel.
+model PlanBenefit {
+  id       String            @id @default(uuid()) @db.Uuid
+  tenantId String            @map("tenant_id") @db.Uuid
+  planId   String            @map("plan_id") @db.Uuid
+  item     String
+  status   PlanBenefitStatus @default(INCLUDED)
+  /// Periodicidade em dias. Nulo = beneficio sem recorrencia.
+  everyDays Int?             @map("every_days")
+  detail    String?
+  /// Ordem de exibicao, para a tela espelhar o encarte impresso.
+  position  Int              @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, planId, position])
+  @@map("plan_benefits")
+}
+
+/// Papel no grupo familiar.
+///
+/// O titular responde pela cobranca; o dependente tem direito de acesso e
+/// nao tem invoice. Sem este campo, "quem paga" so se descobriria por
+/// convencao.
+enum FamilyMemberRole {
+  HOLDER
+  DEPENDENT
+}
+
+/// Grupo familiar: UMA assinatura, UMA invoice, N direitos de acesso.
+///
+/// POR QUE ISSO NAO MEXE NO MOTOR DE ACESSO. `Entitlement` ja tem
+/// `student_id` PROPRIO e `subscription_id` NULAVEL: F9 sempre leu o direito
+/// PELO ALUNO, nunca pela assinatura. O plano familiar muda so a
+/// cardinalidade da derivacao, de 1:1 para 1:N -- `Subscription.student_id`
+/// continua sendo o titular, e nada do MVP 1 precisou ser reescrito.
+model FamilyGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  subscriptionId String   @unique @map("subscription_id") @db.Uuid
+  /// Limite de membros do plano. 3 no plano familiar da Arena Positiva.
+  memberLimit    Int      @map("member_limit")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  members      FamilyMember[]
+
+  @@index([tenantId])
+  @@map("family_groups")
+}
+
+model FamilyMember {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  groupId   String           @map("group_id") @db.Uuid
+  studentId String           @map("student_id") @db.Uuid
+  role      FamilyMemberRole @default(DEPENDENT)
+  joinedAt  DateTime         @default(now()) @map("joined_at")
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group  FamilyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  student Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Mesmo aluno nao entra duas vezes no mesmo grupo.
+  @@unique([groupId, studentId])
+  @@index([tenantId, studentId])
+  @@map("family_members")
+}
+
+/// Configuracao financeira por tenant (`M2-FR-001`).
+///
+/// A ancora de bloqueio e CONFIGURAVEL (ADR-019, INV-144), com padrao no
+/// primeiro instante de `due_date + grace_period`, no timezone da unidade,
+/// sem fallback para o tenant e sem adiamento por feriado.
+model BillingSettings {
+  tenantId String @id @map("tenant_id") @db.Uuid
+  currency String @default("BRL")
+  /// Dia do mes do vencimento (1-28). Limitado a 28 para existir em
+  /// fevereiro sem regra de excecao.
+  dueDay    Int   @map("due_day")
+  /// Dias de carencia depois do vencimento antes do bloqueio.
+  graceDays Int   @default(0) @map("grace_days")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("billing_settings")
+}
+
+/// `CONVENTION.md` 3.4. `PAID` nunca volta a `OPEN` (INV-069).
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+/// Como o dinheiro foi reconhecido.
+///
+/// `MANUAL` e o que faz a Slice 2.1 fechar SEM adapter nenhum (ADR-027):
+/// dinheiro ou transferencia reconhecidos na recepcao. Os demais chegam com
+/// o provedor homologado, na Slice 2.2.
+enum PaymentMethodKind {
+  MANUAL
+  PIX
+  CARD
+}
+
+/// `CONVENTION.md` 3.5, lado do `Payment` (ADR-027).
+/// `CONFIRMED` nao volta atras -- e o par de INV-069 do lado do pagamento.
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+}
+
+/// `CONVENTION.md` 3.5, lado da tentativa (ADR-027).
+enum PaymentAttemptStatus {
+  CREATED
+  REQUIRES_ACTION
+  PROCESSING
+  SUCCEEDED
+  FAILED
+}
+
+/// Credito do aluno por sobrepagamento (ADR-027, resposta 4 do PI).
+/// NAO e dinheiro devolvivel no MVP 2 -- so abate invoice.
+enum AccountCreditStatus {
+  AVAILABLE
+  APPLIED
+  EXPIRED
+}
+
+/// Invoice: o que o aluno deve.
+///
+/// `totalMinor` e COPIA, nao calculo em tempo de leitura: INV-068 diz que
+/// moeda e valor nao mudam depois da abertura, e o preco do plano pode
+/// mudar amanha. Copiar congela; recalcular reescreveria o passado.
+model Invoice {
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  subscriptionId String        @map("subscription_id") @db.Uuid
+  /// Aluno cobrado. No plano familiar e o TITULAR -- dependente tem acesso,
+  /// nao tem invoice.
+  studentId      String        @map("student_id") @db.Uuid
+  /// Periodo de competencia, primeiro dia. Une com a assinatura para dar a
+  /// unicidade de INV-066.
+  billingPeriod  DateTime      @map("billing_period") @db.Date
+  status         InvoiceStatus @default(DRAFT)
+  /// Numero sequencial legivel por tenant. Nao e o id.
+  number         Int
+  currency       String        @default("BRL")
+  /// Centavos, todos. INV-065.
+  subtotalMinor  Int           @map("subtotal_minor")
+  discountMinor  Int           @default(0) @map("discount_minor")
+  totalMinor     Int           @map("total_minor")
+  dueAt          DateTime      @map("due_at")
+  /// Instante a partir do qual a inadimplencia bloqueia (ADR-019/INV-144).
+  blockAt        DateTime?     @map("block_at")
+  paidAt         DateTime?     @map("paid_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  version        Int           @default(0)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription  @relation(fields: [subscriptionId], references: [id])
+  student      Student       @relation(fields: [studentId], references: [id])
+  items        InvoiceItem[]
+  payments     Payment[]
+  attempts     PaymentAttempt[]
+
+  /// INV-066: invoice unica por assinatura e periodo.
+  @@unique([tenantId, subscriptionId, billingPeriod])
+  /// Numeracao legivel, sem buraco nem repeticao dentro do tenant.
+  @@unique([tenantId, number])
+  @@index([tenantId, status, dueAt])
+  @@map("invoices")
+}
+
+/// Item da invoice. Imutavel depois do pagamento (INV-067).
+model InvoiceItem {
+  id              String @id @default(uuid()) @db.Uuid
+  tenantId        String @map("tenant_id") @db.Uuid
+  invoiceId       String @map("invoice_id") @db.Uuid
+  description     String
+  quantity        Int    @default(1)
+  /// Centavos. INV-065.
+  unitAmountMinor Int    @map("unit_amount_minor")
+  totalMinor      Int    @map("total_minor")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, invoiceId])
+  @@map("invoice_items")
+}
+
+/// Pagamento: QUE DINHEIRO FOI RECONHECIDO (ADR-027).
+///
+/// Separado de `PaymentAttempt` porque respondem perguntas diferentes:
+/// tentativa e "o que eu tentei", pagamento e "o que entrou". Invoice paga
+/// em duas tentativas (PIX falho + cartao) tem DUAS tentativas e UM
+/// pagamento -- e a falha continua no historico, que e o ponto.
+model Payment {
+  id        String            @id @default(uuid()) @db.Uuid
+  tenantId  String            @map("tenant_id") @db.Uuid
+  invoiceId String            @map("invoice_id") @db.Uuid
+  /// Centavos. INV-065.
+  amountMinor Int             @map("amount_minor")
+  currency  String            @default("BRL")
+  method    PaymentMethodKind
+  status    PaymentStatus     @default(PENDING)
+  paidAt    DateTime?         @map("paid_at")
+
+  /// Quem reconheceu, preenchido SO quando `method = MANUAL`.
+  ///
+  /// Com a dupla permissao fora do MVP 2 (emenda de 18/08/2026), este campo
+  /// e a mitigacao que sobrou: o controle deixou de ser preventivo e passou
+  /// a ser DETECTIVO. Ele nao impede o registro inflado -- permite achar
+  /// depois. A diferenca e deliberada e e do PI (ADR-027, consequencia 3).
+  recognizedByUserId String? @map("recognized_by_user_id") @db.Uuid
+
+  /// Nulo em pagamento manual: dinheiro na recepcao nao tem tentativa.
+  attemptId         String? @unique @map("attempt_id") @db.Uuid
+  providerAccountId String? @map("provider_account_id")
+  externalPaymentId String? @map("external_payment_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice         @relation(fields: [invoiceId], references: [id])
+  attempt PaymentAttempt? @relation(fields: [attemptId], references: [id])
+  credits AccountCredit[]
+
+  /// ADR-006 / INV-076: idempotencia do evento externo.
+  @@unique([providerAccountId, externalPaymentId])
+  @@index([tenantId, invoiceId, status])
+  @@map("payments")
+}
+
+/// Tentativa de pagamento: O QUE FOI TENTADO (ADR-027).
+///
+/// Sucesso posterior nao apaga a falha anterior -- por isso a tentativa e
+/// tabela propria e nao um campo de status no pagamento.
+model PaymentAttempt {
+  id              String               @id @default(uuid()) @db.Uuid
+  tenantId        String               @map("tenant_id") @db.Uuid
+  invoiceId       String               @map("invoice_id") @db.Uuid
+  method          PaymentMethodKind
+  status          PaymentAttemptStatus @default(CREATED)
+  /// Chave enviada ao provedor. Constraint do `MVP-02` 11.
+  idempotencyKey  String               @map("idempotency_key")
+  providerAccountId String?            @map("provider_account_id")
+  externalPaymentId String?            @map("external_payment_id")
+  /// Codigo estavel do erro. Nunca a mensagem crua (`CLAUDE.md`).
+  failureCode       String?            @map("failure_code")
+  /// Falha permanente nao se repete sozinha; transitoria pode.
+  failureIsPermanent Boolean?          @map("failure_is_permanent")
+  requestedAt     DateTime             @default(now()) @map("requested_at")
+  settledAt       DateTime?            @map("settled_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice  @relation(fields: [invoiceId], references: [id])
+  payment Payment?
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, invoiceId, status])
+  @@map("payment_attempts")
+}
+
+/// Credito do aluno por sobrepagamento (ADR-027, resposta 4 do PI).
+///
+/// R$ 121 numa mensalidade de R$ 120 vira R$ 1 de credito, abatido na
+/// proxima invoice. NAO e dinheiro devolvivel no MVP 2.
+///
+/// `originPaymentId` e obrigatorio: credito sem origem rastreavel e
+/// exatamente o buraco de controle que a emenda de 18/08 deixou aberto do
+/// lado preventivo -- aqui ele fecha do lado detectivo.
+model AccountCredit {
+  id              String              @id @default(uuid()) @db.Uuid
+  tenantId        String              @map("tenant_id") @db.Uuid
+  studentId       String              @map("student_id") @db.Uuid
+  originPaymentId String              @map("origin_payment_id") @db.Uuid
+  /// Centavos. INV-065.
+  amountMinor     Int                 @map("amount_minor")
+  currency        String              @default("BRL")
+  status          AccountCreditStatus @default(AVAILABLE)
+  appliedToInvoiceId String?          @map("applied_to_invoice_id") @db.Uuid
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  origin  Payment @relation(fields: [originPaymentId], references: [id])
+
+  @@index([tenantId, studentId, status])
+  @@map("account_credits")
+}
+
+/// Numeracao da invoice por tenant.
+///
+/// Mesmo padrao de `StudentSequence`, e pelas mesmas razoes: `COUNT(*) + 1`
+/// reusa numero depois de cancelamento, fragmento de UUID nao e sequencial,
+/// e `SEQUENCE` do Postgres e global -- o tenant B veria o volume do A.
+model InvoiceSequence {
+  tenantId  String   @id @map("tenant_id") @db.Uuid
+  /// Proximo numero a emitir. Nunca decrementa.
+  nextValue Int      @default(1) @map("next_value")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_sequences")
 }
