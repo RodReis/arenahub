@@ -465,6 +465,7 @@ model Tenant {
   payments        Payment[]
   paymentAttempts PaymentAttempt[]
   accountCredits  AccountCredit[]
+  invoiceSequence InvoiceSequence?
 }
 
 /// Unidade fisica. Onde a catraca mora.
@@ -2254,4 +2255,20 @@ model AccountCredit {
 
   @@index([tenantId, studentId, status])
   @@map("account_credits")
+}
+
+/// Numeracao da invoice por tenant.
+///
+/// Mesmo padrao de `StudentSequence`, e pelas mesmas razoes: `COUNT(*) + 1`
+/// reusa numero depois de cancelamento, fragmento de UUID nao e sequencial,
+/// e `SEQUENCE` do Postgres e global -- o tenant B veria o volume do A.
+model InvoiceSequence {
+  tenantId  String   @id @map("tenant_id") @db.Uuid
+  /// Proximo numero a emitir. Nunca decrementa.
+  nextValue Int      @default(1) @map("next_value")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_sequences")
 }

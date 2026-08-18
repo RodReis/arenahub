@@ -19,6 +19,7 @@ import { BiometricsModule } from './modules/biometrics/biometrics.module.js';
 import { DeviceSyncModule } from './modules/device-sync/device-sync.module.js';
 import { DevicesModule } from './modules/devices/devices.module.js';
 import { EdgeAuthModule } from './modules/edge-auth/edge-auth.module.js';
+import { BillingModule } from './modules/billing/billing.module.js';
 import { MembershipModule } from './modules/membership/membership.module.js';
 import { OperationsModule } from './modules/operations/operations.module.js';
 import { PrivacyModule } from './modules/privacy/privacy.module.js';
@@ -43,6 +44,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     IamModule,
     TenancyModule,
     StudentsModule,
+    BillingModule,
     MembershipModule,
     PrivacyModule,
     DevicesModule,
