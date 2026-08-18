@@ -7,13 +7,16 @@
 | **Slice do PRD** | **2.1** — `docs/prd/academia/MVP-02-smart-billing.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-02-01-ledger-invoice.md` |
 | **Status** | `em-revisao` |
-| **ADRs que bloqueiam** | ADR-013 (provedor) |
+| **ADRs que bloqueiam** | ADR-027 (modelo de `Payment`). **Não mais o ADR-013** |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M2-FR/BR/NFR/AC`) e os
 > critérios de aceite **moram no PRD**, na Slice 2.1. Este arquivo não os copia — copiar cria
 > uma segunda verdade que diverge na primeira mudança.
 >
-> **Não pode ser aprovada:** depende de ADR-013 (provedor). Enquanto o ADR não fechar, o card não sai do Backlog.
+> **Não pode ser aprovada:** depende do **ADR-027** (modelo de `Payment` e `PaymentAttempt`).
+> **Não depende do ADR-013** — corrigido em 18/08/2026: a Slice 2.1 não chama um único método de
+> `PaymentProvider`, e o `MVP-02` §5 põe o gate de homologação antes da **Slice 2.2**, não da 2.1.
+> Além do ADR, a **entrada do MVP 2** exige MVP 1 estável (`MVP-02` §5 e `STATUS.md` §4).
 
 ---
 

@@ -436,7 +436,8 @@ Está aberto, com ADR correspondente. Não invente resposta — pergunte ao PI.
 | tema | ADR |
 |---|---|
 | Semântica de validade × carência offline e conflito de reconciliação | ADR-007 *(sem urgência — migrou com F10 para o MVP 1.5)* |
-| Provedor de pagamento e modelo de `Payment` | ADR-013 *(sai do card `[GATE]` de homologação)* |
+| Provedor de pagamento | ADR-013 *(sai do card `[GATE]` de homologação)* |
+| Modelo de `Payment` e `PaymentAttempt` | ADR-027 *(recorta o ADR-013 em 18/08/2026 — não depende do provedor)* |
 | **Transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil | ADR-008, ponto remanescente *(bloqueia **F21**, não F8)* |
 
 **Decididos em 14/08/2026** — não reabrir sem ADR novo: hierarquia de dois níveis (ADR-002),

@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 17/08/2026 *(janelas físicas do MVP 0)* · **Fase:** **MVP 0 em execução** ·
+**Última atualização:** 18/08/2026 *(ADR-013 partido: o modelo de `Payment` virou ADR-027)* · **Fase:** **MVP 0 em execução** ·
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -28,6 +28,14 @@ e só se muda pela API/SDK. **`M0-AC-004` não fecha antes disso.**
 (relatório da janela da catraca) vivem só no remoto. **Elas colidem entre si** — as duas escrevem
 uma seção `## 9` diferente no mesmo `docs/reports/MVP-00-relatorio-poc-topdata.md`. Resolver é do
 Code; registrado aqui porque avanço fora da `main` é o *fechamento frágil* do `CLAUDE.md` §3.
+
+📌 **18/08/2026 — o ADR-013 foi partido em dois, por decisão do PI.** O bloqueio de F12 estava
+errado: a Slice 2.1 (invoice, ledger, pagamento manual) **não chama um único método de
+`PaymentProvider`**, e o `MVP-02` §5 põe o gate de homologação antes da **Slice 2.2**, não da 2.1.
+O que de fato falta para F12 é o **modelo de `Payment`**, decidível sem provedor — virou o
+**ADR-027**, com recomendação técnica escrita e **quatro perguntas ao PI**. O ADR-013 segue
+`aberto` só para o provedor e as políticas de refund, bloqueando F13–F16. ⚠️ **Isso não torna F12
+pegável:** a entrada do MVP 2 exige MVP 1 estável, e o MVP 1 depende do gate §15 do MVP 0.
 
 **14/08/2026, segunda rodada — ADR-011 e ADR-008 fechados.** F4 e F8 destravadas. Restam **duas**
 pendências, nenhuma no caminho crítico de hoje: ADR-013 (sai da homologação do MVP 2, não de
@@ -174,7 +182,7 @@ continua sendo o Índice da §5**, não o número do GitHub.
 
 **Do Backlog, 12 são pegáveis hoje** — F1–F11 (todas `aprovada-pi`, ADR-007 fechou e destravou
 F10) e **F42**, assim que o card `[INFRA]` do pipeline de tokens sair. As outras 32 estão
-estacionadas: F12–F16 por ADR-013, F17–F41 porque o MVP ainda não foi discutido com o PI, e
+estacionadas: F12 por **ADR-027**, F13–F16 por ADR-013 + ADR-027, F17–F41 porque o MVP ainda não foi discutido com o PI, e
 **F43–F44 pelo gate do MVP 4** — as superfícies `mobile` e `kiosk` não existem.
 
 > ⚠️ **O board (Projects) ainda não existe** — só as labels, criadas automaticamente pela API ao
@@ -199,7 +207,8 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 | ADR | o que falta | bloqueia |
 |---|---|---|
 | **ADR-008** *(ponto remanescente)* | **transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil. **Reapontado:** bloqueava F8 por engano — F8 não chama IA nenhuma | F21 |
-| **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que dá para fechar antes do gate são as duas políticas do `M2-COMPLIANCE-01` e o **modelo de `Payment`, que não tem campos definidos em documento nenhum** — invoice paga em duas tentativas (PIX falho + cartão) não cabe no modelo atual | F12–F16 |
+| **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que sobrou aqui são as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites). O **modelo de `Payment` saiu deste ADR em 18/08/2026** e virou o ADR-027 | F13–F16 |
+| **ADR-027** *(novo, 18/08/2026)* | **modelo de `Payment` e `PaymentAttempt`** — campos e grafo de estado, hoje `[indefinido]` em documento nenhum. **Não depende do provedor:** o pagamento manual da Slice 2.1 não passa por adapter algum. A recomendação técnica já está escrita; faltam **quatro respostas suas** — pagamento parcial, limite da dupla permissão, estorno de pagamento manual e sobrepagamento | F12–F16 |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
 
 > 🔴 **Correção material no ADR-007, registrada em 17/08/2026.** A *"Consequência 2"* do ADR-007
@@ -255,7 +264,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **0** | Hardware e protocolo Topdata comprovados em bancada | hardware + SDK + rede de laboratório | F1–F5 | **em execução — cadeia física provada em 17/08**; gate §15 aberto (modo bloqueado da catraca, `M0-AC-002`, latência real e assinatura do PI) |
 | **1** | Academia operando acesso online, com assinatura manual | decisão de saída do MVP 0 (`MVP-00` §15) = `GO` ou `GO_WITH_CONSTRAINTS` | F6–F9, F11 | bloqueado por MVP 0 |
 | **1.5** | Operação offline: snapshot, fila e reconciliação | MVP 1 em piloto, com incidente de link medido | F10 | adiado por **ADR-012**. **ADR-007 fechado em 16/08 — spec aprovada** |
-| **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | bloqueado por ADR-013 |
+| **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | entrada bloqueada pelo **MVP 1** (que depende do MVP 0). Por ADR: F12 espera o **ADR-027**; F13–F16 esperam ADR-027 **e** ADR-013 |
 | **2.5** | Design system: tokens, `packages/ui` e as três superfícies | **F42 sem gate** (dívida ativa: `admin-web` está na `main` sem CSS) · **F43 e F44 têm gate:** o PI priorizar o MVP 4 | F42–F44 | criado por **ADR-025**. F42 pegável assim que o card `[INFRA]` do pipeline de tokens sair |
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis + protocolo clínico | F17–F22 | bloqueado por MVP 1 |
 | **4** | Autosserviço: app do aluno e totem | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado |

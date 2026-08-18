@@ -88,8 +88,8 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 | `Entitlement` | **sem lista de campos** na origem. Exemplo mostra: student, tipo (`GYM_ACCESS`), starts, expires, status. **ADR-009 acrescenta `source`**, enum extensível: `SUBSCRIPTION`, `COURTESY`, `STAFF`, `TRAINER`, `VISITOR`, `TRIAL`, `DEPENDENT`, `CORPORATE` | ~ | Especificação §19 + **ADR-009** |
 | `Invoice` | `id`, `subscription_id`, `amount`, `due_date`, `status`, `paid_at`, `payment_method`, + itens, subtotal, desconto, total, numeração, `billing_period` | ~ **(unicidade `(tenant_id, subscription_id, billing_period)`)** | Especificação §37, `M2` §11 |
 | `InvoiceItem` | **`[indefinido]`** | ~ | `M2` §11 |
-| `Payment` | **`[indefinido]` — nenhum campo em documento algum** | ~ | ADR-013 |
-| `PaymentAttempt` | **`[indefinido]`** | ~ | `M2` §11 |
+| `Payment` | **`[indefinido]` — nenhum campo em documento algum** | ~ | **ADR-027** |
+| `PaymentAttempt` | **`[indefinido]`** | ~ | `M2` §11 + **ADR-027** |
 | `PaymentMethod` | somente token / referência mascarada | ~ | `M2` §11 |
 | `ProviderEvent` | `provider_account_id`, `external_event_id`, payload protegido | ~ | `M2` §11 |
 | `Refund`, `ReconciliationRun`, `ReconciliationItem`, `Receipt` | **`[indefinido]`** | ~ | `M2` §11 |
@@ -178,8 +178,9 @@ condições de `CANCELLED`.
 ### 3.5 `Payment` / `PaymentAttempt`
 `PENDING | PROCESSING | CONFIRMED | FAILED | CANCELLED | REFUND_PENDING | REFUNDED`
 `CREATED | REQUIRES_ACTION | PROCESSING | SUCCEEDED | FAILED`
-**Grafo inteiro `[indefinido]`.** Depende de ADR-013. Acrescentar estado de **autorização
-revogada pelo pagador** (Pix Automático) — ver ADR-013.
+**Grafo inteiro `[indefinido]`.** Depende do **ADR-027** (modelo), não do provedor — são dois
+grafos de entidades diferentes, não duas versões do mesmo. A **autorização revogada pelo pagador**
+(Pix Automático) é estado do *mandato*: vive no `PaymentMethod`, não no `Payment` — ver ADR-027.
 
 ### 3.6 `Device`
 `PROVISIONING | ONLINE | DEGRADED | OFFLINE | RETIRED`
@@ -441,7 +442,7 @@ Conceitos usados em telas, menus e regras **sem entidade nem campo**. O Code **n
 | **Aulas / `Class`** | §34 "aulas inclusas" | Sem entidade, agenda, professor ou reserva |
 | **Antifraude, limite de acessos, acesso duplicado** | §20 regras 11-14 | Sem parâmetro, campo ou fonte de configuração |
 | ~~**Nível "Academia"**~~ | §6 | **Resolvido:** dois níveis (ADR-002). A Especificação §6 precisa de nota de emenda |
-| **`Payment`** | §90, `M2` §11 | Nenhum campo. Ver ADR-013 |
+| **`Payment`** | §90, `M2` §11 | Nenhum campo. Ver **ADR-027** |
 | **`Passage`** | `M1` §10/§13 | Tem estados, não tem tabela |
 | **Wearable / origem de `HEART_RATE`** | §53, §106 | Nenhuma integração na stack ou nos módulos |
 

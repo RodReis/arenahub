@@ -42,7 +42,7 @@ existe para expulsar deste repositório.
 | [010](#adr-010) | Dependência do SDK Topdata e a POC como portão | `aceito` | — |
 | [011](#adr-011) | Ciclo de vida do edge-agent e versionamento do contrato Edge | `aceito` **completo** | — |
 | [012](#adr-012) | Escopo de operação offline no MVP 1 | `aceito` | — |
-| [013](#adr-013) | Provedor de pagamento e contrato PaymentProvider | `aberto` *(com caminho definido)* | F12–F16 |
+| [013](#adr-013) | Provedor de pagamento e contrato PaymentProvider | `aberto` *(com caminho definido)* | F13–F16 *(o modelo de `Payment` saiu para o ADR-027)* |
 | [014](#adr-014) | Processo unificado no CLAUDE.md | `aceito` | — |
 | [015](#adr-015) | Numeração: Slice = Fatia = SPEC | `aceito` | — |
 | [016](#adr-016) | Estratégia de teste e piso de cobertura | `aceito` | — |
@@ -54,6 +54,9 @@ existe para expulsar deste repositório.
 | [022](#adr-022) | A Slice do PRD é a spec; o arquivo em `docs/specs/` é ponteiro | `aceito` | — |
 | [023](#adr-023) | Card `[INFRA]` é do Cowork; metadados de board também | `aceito` | — |
 | [024](#adr-024) | Lista canônica de razões de decisão de acesso | `aceito` | — |
+| [025](#adr-025) | MVP 2.5: o design system é fatia, não `[INFRA]` | `aceito` | — |
+| [026](#adr-026) | `docs/design/**` é fonte de verdade de design | `aceito` | — |
+| [027](#adr-027) | Modelo de `Payment` e `PaymentAttempt` | `proposto` | **F12–F16** |
 
 ---
 
@@ -1232,3 +1235,94 @@ não do dicionário de acesso.
 **Regra geral que fica:** quando um documento de design e um ADR de domínio divergirem sobre
 **nome de estado, razão ou enum**, o ADR vence e o documento de design é corrigido. Sobre
 qualquer outra coisa, o documento de design vence.
+
+---
+
+<a id="adr-027"></a>
+## ADR-027 — Modelo de `Payment` e `PaymentAttempt`
+
+**Data:** 18/08/2026 · **Status:** `proposto` *(recomendação técnica formulada — **aguardando o
+PI**)* · **Recorta** o **ADR-013** · **Bloqueia:** F12 a F16
+
+**Contexto — e a correção que este ADR carrega.** O ADR-013 empacotou duas coisas de natureza
+diferente: **qual provedor** (que sai da homologação, card `[GATE]`) e **como o pagamento é
+modelado** (que não depende de provedor nenhum). Enquanto as duas viveram no mesmo ADR, a F12
+apareceu bloqueada por um gate que não a alcança:
+
+- o `MVP-02` §5 diz *"Antes da **Slice 2.2**, uma decisão registrada deve comparar ao menos…"* —
+  o gate é pré-requisito da **2.2**, não da 2.1;
+- os cinco itens da Slice 2.1 (configurações financeiras por tenant, invoice/itens/numeração,
+  criação pelo ciclo da assinatura, **pagamento manual com dupla permissão**, timeline e
+  auditoria) não chamam um único método de `PaymentProvider`;
+- o *pagamento manual* é precisamente um pagamento **sem adapter** — dinheiro ou transferência
+  reconhecidos na recepção.
+
+**Decidido pelo PI em 18/08/2026:** partir. O ADR-013 segue `aberto` só para o provedor e as duas
+políticas do `M2-COMPLIANCE-01`, bloqueando F13–F16. O modelo vem para cá.
+
+**O que já está fixado e não se reabre.** O `MVP-02` §11 já separa `payments` de
+`payment_attempts` — a forma de duas tabelas **não é invenção deste ADR**, é leitura do PRD. O
+`CONVENTION.md` §2.3 e §3.5 registram as duas como `[indefinido]` em campo e em grafo de estado;
+é esse vazio que este ADR fecha. Também continuam valendo, sem reabertura: **dinheiro é inteiro
+na menor unidade** (`M2-BR-001`), **moeda e valor não mudam depois que a invoice abre**
+(`MVP-02` §11), **`PAID` nunca volta a `OPEN`** (INV-069) e **idempotência por
+`(provider_account_id, external_event_id)`** (ADR-006, INV-076).
+
+### Recomendação técnica
+
+**1. As duas tabelas respondem perguntas diferentes.**
+
+| entidade | pergunta que responde | cardinalidade |
+|---|---|---|
+| `PaymentAttempt` | *o que eu tentei?* — uma tentativa contra um método/provedor, com sua chave de idempotência | invoice 1 → N |
+| `Payment` | *que dinheiro foi reconhecido?* — fato consumado contra a invoice | invoice 1 → 0..N |
+
+Isso resolve o caso que o próprio ADR-013 levantou — **invoice paga em duas tentativas (PIX falho
++ cartão)**: as duas tentativas ficam em `payment_attempts`, com a falha preservada; só a segunda
+produz um `payment`. Sucesso posterior não apaga o histórico da falha.
+
+**2. Campos propostos.**
+
+`payments`: `id`, `tenant_id`, `invoice_id`, `amount_minor` (inteiro), `currency`, `method`,
+`status`, `paid_at`, `recognized_by_user_id` (preenchido só quando `method = MANUAL`),
+`attempt_id` (nulável — pagamento manual não tem tentativa), `provider_account_id` e
+`external_payment_id` (nuláveis, pelo mesmo motivo), `created_at`.
+
+`payment_attempts`: `id`, `tenant_id`, `invoice_id`, `payment_method_id`, `idempotency_key`,
+`status`, `provider_account_id`, `external_payment_id`, `failure_code`, `failure_is_permanent`,
+`requested_at`, `settled_at`.
+
+**Sem `gym_unit_id` em nenhuma das duas** — pagamento não é dado físico (`CLAUDE.md`, regra de
+arquitetura 2). O enum `method` inclui `MANUAL`, e é ele que faz a Slice 2.1 fechar sem adapter
+nenhum.
+
+**3. Os dois grafos do `CONVENTION.md` §3.5 são de entidades diferentes, não versões concorrentes
+do mesmo.** Leitura proposta:
+
+- `Payment`: `PENDING → CONFIRMED → REFUND_PENDING → REFUNDED`, com `FAILED` e `CANCELLED` como
+  saídas de `PENDING`. `CONFIRMED` não volta atrás — é o par de INV-069 do lado do pagamento.
+- `PaymentAttempt`: `CREATED → REQUIRES_ACTION → PROCESSING → SUCCEEDED | FAILED`.
+
+**4. `autorização revogada` não é estado de `Payment`.** O ADR-013 observou, com razão, que o Pix
+Automático traz um estado que cartão não tem: o pagador cancela a autorização no app do banco. Mas
+quem é revogado é o **mandato**, não o pagamento. O lugar é o `PaymentMethod`
+(`ACTIVE | REVOKED_BY_PAYER | EXPIRED`), e o efeito é *a próxima cobrança não acontece* — distinto
+de *a cobrança aconteceu e falhou*. Tratar como falha de pagamento é exatamente o erro que o
+`LANDSCAPE.md` §4.2 nomeia: cobrança indevida e churn silencioso. **Esta parte é decidível agora
+porque não depende de qual provedor implementa o mandato.**
+
+### Perguntas ao PI — as quatro que faltam
+
+| # | pergunta | por que é sua, e não minha |
+|---|---|---|
+| 1 | **Pagamento parcial existe?** A invoice só vira `PAID` quando a soma dos `payments` confirmados iguala o total, ou o recepcionista pode registrar R$ 80 de uma mensalidade de R$ 120 e deixar saldo? | muda a regra de `OPEN → PAID` e cria — ou não — o conceito de saldo devedor |
+| 2 | **Qual é o limite da dupla permissão** do pagamento manual (`MVP-02` §7, Slice 2.1), em reais, e **quem é o segundo aprovador**: outro recepcionista serve, ou precisa de gerente? | é política de controle interno, não modelagem |
+| 3 | **Pagamento manual pode ser estornado** pelo sistema, ou só anulado por contra-lançamento auditado? | dinheiro recebido na mão não volta pelo caminho por onde o PIX volta |
+| 4 | **Sobrepagamento** (entrou mais que o total da invoice): rejeita, aceita e gera crédito para o próximo ciclo, ou aceita e abre refund? | as três são defensáveis; a escolha é de produto |
+
+### Escopo negativo
+
+Este ADR **não** escolhe provedor, **não** define o contrato `PaymentProvider` (isso é ADR-013 +
+`MVP-02` §12) e **não** decide as políticas de refund do `M2-COMPLIANCE-01`. Ele também **não
+torna a F12 pegável**: a entrada do MVP 2 exige MVP 1 estável, e o MVP 1 depende do gate §15 do
+MVP 0, hoje aberto pelo modo `acionamento1: 8` da catraca.
