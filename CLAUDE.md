@@ -116,6 +116,13 @@ primeiro caso da tabela acima.
 - **Desenvolvimento é local** (docker-compose: Postgres + Redis + MinIO).
 - **Portas**: API `3344` (fixa — se ocupada, falha em vez de trocar); Expo dev server na padrão (`8081`); demais apps na porta padrão do framework. Colisão vira decisão registrada, nunca troca silenciosa.
 - **Nada de dado real de aluno no repositório** — nem em fixture, nem em golden file, nem em log de erro.
+- **Nunca afirmar estado de CI, PR ou job sem verificar no momento da fala.** Se o PI diz que
+  terminou, a resposta é `gh pr checks <n>` — nunca contradizer sem checar. Silêncio de
+  ferramenta não é evidência de nada: um watcher que emudece parece idêntico a um job que ainda
+  roda. Para esperar CI, usar **`gh pr checks <n> --watch`** em background (ele bloqueia até o
+  fim e devolve código de saída), nunca loop de monitor artesanal — o loop que espera "todos
+  saírem de `pending`" fica girando calado quando uma chamada falha, e foi assim que uma entrega
+  pronta ficou parada até o PI olhar por conta própria (18/08/2026, PR #102).
 
 ## O que é
 
