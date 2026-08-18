@@ -97,3 +97,6 @@ docs/design/support.js
 # mira nos subdiretorios de tela, nao na pasta-mae.
 docs/design/stitch_system_specification_analysis/*/
 !docs/design/stitch_system_specification_analysis/*.md
+
+# Artefato do MCP do Playwright -- snapshot e log de sessao de browser.
+.playwright-mcp/

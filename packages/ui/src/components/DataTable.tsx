@@ -58,6 +58,27 @@ export function DataTable<T>({
 
   return (
     <>
+      {/*
+        Container de rolagem -- issue #99.
+
+        Tabela larga (7 colunas em `/access-events`) estourava a pagina inteira
+        a 640px, o equivalente a 1280 com zoom de 200%: 142px de excesso, com o
+        DS-PAINEL §10.8 proibindo rolagem horizontal nesse zoom. Rolar A TABELA
+        em vez da PAGINA e a diferenca entre varrer uma coluna e varrer cada
+        frase do painel nos dois eixos.
+
+        `tabIndex={0}` nao e enfeite: container rolavel sem foco e inalcancavel
+        por teclado -- quem nao usa mouse simplesmente nao chega nas colunas da
+        direita. Com ele, a regiao entra na ordem de tabulacao e rola com as
+        setas. O `role="region"` + `aria-label` dao ao leitor de tela o nome do
+        que rola, senao o anuncio e um "region" mudo.
+      */}
+      <div
+        className={estilos['rolagem']}
+        role="region"
+        aria-label={caption}
+        tabIndex={0}
+      >
       <table
         className={estilos['tabela']}
         {...(testId !== undefined ? { 'data-testid': testId } : {})}
@@ -87,6 +108,7 @@ export function DataTable<T>({
           ))}
         </tbody>
       </table>
+      </div>
 
       {prevHref !== undefined || nextHref !== undefined ? (
         <nav className={estilos['paginacao']} aria-label="Paginação">

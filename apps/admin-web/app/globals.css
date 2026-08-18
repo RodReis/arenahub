@@ -78,3 +78,148 @@ output,
     scroll-behavior: auto;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Elemento estrutural -- F46, issue #99.
+ *
+ * O bloco acima era o encanamento: tokens chegando na tela. Faltava o degrau
+ * seguinte, e a falta tinha um custo medido: `<h2>` do navegador renderiza a
+ * 24px, enquanto o `<h1>` do painel (`--ah-type-title-size`) e 20px. A
+ * hierarquia estava INVERTIDA em pixels -- cinco subtitulos gritando mais alto
+ * que o titulo, em 13 telas que ja consumiam o design system e envelopavam
+ * tudo em HTML sem estilo.
+ *
+ * Isto NAO e estilo de componente (esse mora em `packages/ui`). E o contrato
+ * de elemento: o que `<section>`, `<h2>`, `<dl>` e `<ul>` valem quando a tela
+ * os usa direto. Sem isso, quem decide o espacamento e a margem de user-agent
+ * -- e o PRODUCT.md conta cada pixel de respiro nao escolhido como uma linha a
+ * menos com o aluno esperando.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * ESCALA: o `<h1>` e do `PageHeader`; daqui para baixo tudo desce um degrau.
+ * `heading` (16/22/600) para `<h2>`, `body-strong` para `<h3>` -- a diferenca
+ * entre eles e peso, nao tamanho, porque em 14px de corpo mais um degrau de
+ * tamanho viraria ruido.
+ */
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: var(--ah-type-heading-weight);
+}
+
+h2 {
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+}
+
+h3,
+h4 {
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+}
+
+p {
+  margin: 0;
+}
+
+/**
+ * `<section>` e o card do painel: borda, nunca sombra (DS-PAINEL §4). Sombra
+ * fica reservada para camada que FLUTUA -- dropdown, popover, modal. Superficie
+ * plana le melhor em densidade alta, e e o que separa este painel de um
+ * dashboard generico.
+ *
+ * `> h2` ganha o respiro; o primeiro nao, senao o card abre com buraco.
+ */
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: var(--ah-size-card-padding);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+/* Card dentro de card e sempre erro: a segunda borda nao acrescenta divisao
+   nenhuma, so encolhe a area util. Aninhado vira agrupamento sem moldura. */
+section section {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/**
+ * `<dl>` de rotulo+valor -- o par que o painel mais usa fora de tabela.
+ *
+ * Grade de duas colunas em vez do default: `<dd>` do navegador vem com 40px de
+ * indentacao herdados de documento, que aqui viram desalinhamento entre seis
+ * numeros que definem o turno. `auto` na primeira coluna deixa o rotulo
+ * encolher ao proprio texto e os valores alinharem.
+ */
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
+  align-items: baseline;
+}
+
+dt {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+/* `dd` herda a indentacao de documento; aqui ela e ruido. */
+dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Lista de navegacao ou de fato -- sem marcador e sem a indentacao de 40px.
+ * O painel nao tem prosa: `<ul>` aqui e sempre um agrupamento de links ou de
+ * linhas, nunca um texto corrido com topicos.
+ */
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/**
+ * Link fora de componente. `--ah-action-text` e o papel de acao resolvido por
+ * contraste, entao acompanha o accent do tenant sem precisar de valor fixo.
+ */
+a {
+  color: var(--ah-action-text);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/**
+ * Texto de apoio -- o `<small>` que explica por que o CPF nao e obrigatorio e
+ * o que impede a recepcao de recusar quem chegou sem documento. No default do
+ * navegador ele cai para ~11px cinza e some sob luz fluorescente.
+ */
+small {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/**
+ * Codigo tecnico: `correlationId`, matricula, `enrollid`. O tamanho ja vinha do
+ * bloco de cima; falta o tratamento que o separa do texto ao redor.
+ */
+code,
+kbd,
+samp {
+  padding: 1px 4px;
+  border-radius: var(--ah-radius-badge);
+  background: var(--ah-surface-sunken);
+  color: var(--ah-text-secondary);
+}

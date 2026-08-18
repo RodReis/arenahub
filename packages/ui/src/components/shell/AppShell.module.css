@@ -158,5 +158,28 @@
     flex-direction: row;
     gap: 8px;
     overflow-x: auto;
+
+    /**
+     * `min-width: 0` -- issue #99.
+     *
+     * Item de grid nasce com `min-width: auto`, que o faz RECUSAR encolher
+     * abaixo do proprio conteudo. Sem isto, os sete links em linha somam mais
+     * que o viewport, a faixa empurra o grid inteiro, e o `overflow-x: auto`
+     * acima rola a faixa sem impedir o estrago: a pagina toda ganha rolagem
+     * horizontal.
+     *
+     * Media a 640px (o equivalente a 1280 com zoom de 200%): 183px de excesso
+     * em `/access-events`, com a `<nav>` a 808px. Viola DS-PAINEL §10.8, que
+     * proibe rolagem horizontal a 200% -- ler uma frase varrendo os dois eixos
+     * e exatamente o que a regra existe para impedir.
+     *
+     * `min-width: 0` no `.conteudo` pelo mesmo motivo: tabela larga dentro
+     * dele reproduz o problema por outro caminho.
+     */
+    min-width: 0;
+  }
+
+  .conteudo {
+    min-width: 0;
   }
 }
