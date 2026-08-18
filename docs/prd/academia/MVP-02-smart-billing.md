@@ -98,7 +98,7 @@ PIX, cartão tokenizado e recorrência são capacidades obrigatórias do gate. P
 - configurações financeiras por tenant;
 - invoice, itens e numeração;
 - criação pelo ciclo da assinatura;
-- pagamento manual com dupla permissão quando acima do limite;
+- pagamento manual com registro auditado do operador; *(emenda de 18/08/2026 — a dupla permissão sai do MVP 2; o controle passa a ser detectivo, via timeline de auditoria financeira, e não preventivo)*
 - timeline e auditoria financeira.
 
 Aceite: o financeiro gera e acompanha uma invoice sem alterar entitlement diretamente.
@@ -200,6 +200,7 @@ Transições são implementadas por máquina de estados testada. Eventos externo
 billing_settings
 invoices, invoice_items
 payments, payment_attempts
+account_credits      # credito de aluno por sobrepagamento; abate invoice, nao devolve dinheiro
 payment_methods      # somente token/referência mascarada
 provider_events      # payload protegido, retenção definida
 refunds

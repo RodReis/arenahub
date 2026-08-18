@@ -183,7 +183,7 @@ continua sendo o Índice da §5**, não o número do GitHub.
 
 **Do Backlog, 12 são pegáveis hoje** — F1–F11 (todas `aprovada-pi`, ADR-007 fechou e destravou
 F10) e **F42**, assim que o card `[INFRA]` do pipeline de tokens sair. As outras 32 estão
-estacionadas: F12 por **ADR-027**, F13–F16 por ADR-013 + ADR-027, F17–F41 porque o MVP ainda não foi discutido com o PI, e
+estacionadas: **F12 não está mais parada por ADR** (o ADR-027 fechou em 18/08) — faltam a spec preenchida e a entrada do MVP 2; F13–F16 por ADR-013, F17–F41 porque o MVP ainda não foi discutido com o PI, e
 **F43–F44 pelo gate do MVP 4** — as superfícies `mobile` e `kiosk` não existem.
 
 > ⚠️ **O board (Projects) ainda não existe** — só as labels, criadas automaticamente pela API ao
@@ -209,7 +209,7 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 |---|---|---|
 | **ADR-008** *(ponto remanescente)* | **transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil. **Reapontado:** bloqueava F8 por engano — F8 não chama IA nenhuma | F21 |
 | **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que sobrou aqui são as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites). O **modelo de `Payment` saiu deste ADR em 18/08/2026** e virou o ADR-027 | F13–F16 |
-| **ADR-027** | **modelo de `Payment` e `PaymentAttempt`** — recomendação técnica **aceita em 18/08/2026**, com três respostas fechadas (só valor integral; estorno manual só por contra-lançamento; sobrepagamento vira crédito). **Trava numa emenda ao `MVP-02`:** tirar a dupla permissão da Slice 2.1 (§7) e acrescentar `account_credits` ao §11. **Emenda de PRD é sua** — o Cowork não escreve em `docs/prd/**` | F12–F16 |
+| ~~**ADR-027**~~ | **FECHADO em 18/08/2026.** Modelo de `Payment`/`PaymentAttempt` decidido e `MVP-02` §7/§11 emendados. **F12 sem ADR bloqueando** — faltam a spec preenchida e a entrada do MVP 2 | — |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
 
 > 🔴 **Correção material no ADR-007, registrada em 17/08/2026.** A *"Consequência 2"* do ADR-007
@@ -265,7 +265,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **0** | Hardware e protocolo Topdata comprovados em bancada | hardware + SDK + rede de laboratório | F1–F5 | **em execução — cadeia física provada em 17/08**; gate §15 aberto (modo bloqueado da catraca, `M0-AC-002`, latência real e assinatura do PI) |
 | **1** | Academia operando acesso online, com assinatura manual | decisão de saída do MVP 0 (`MVP-00` §15) = `GO` ou `GO_WITH_CONSTRAINTS` | F6–F9, F11 | bloqueado por MVP 0 |
 | **1.5** | Operação offline: snapshot, fila e reconciliação | MVP 1 em piloto, com incidente de link medido | F10 | adiado por **ADR-012**. **ADR-007 fechado em 16/08 — spec aprovada** |
-| **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | entrada bloqueada pelo **MVP 1** (que depende do MVP 0). Por ADR: F12 espera o **ADR-027**; F13–F16 esperam ADR-027 **e** ADR-013 |
+| **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | entrada bloqueada pelo **MVP 1** (que depende do MVP 0). Por ADR: **F12 livre** desde 18/08; F13–F16 esperam o ADR-013 |
 | **2.5** | Design system: tokens, `packages/ui` e as três superfícies | **F42 sem gate** (dívida ativa: `admin-web` está na `main` sem CSS) · **F43 e F44 têm gate:** o PI priorizar o MVP 4 | F42–F44 | criado por **ADR-025**. F42 pegável assim que o card `[INFRA]` do pipeline de tokens sair |
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis + protocolo clínico | F17–F22 | bloqueado por MVP 1 |
 | **4** | Autosserviço: app do aluno e totem | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado |

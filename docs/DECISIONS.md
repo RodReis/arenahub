@@ -36,7 +36,7 @@ existe para expulsar deste repositório.
 | [004](#adr-004) | Onde a decisão de acesso acontece | `aceito` | — |
 | [005](#adr-005) | Vocabulário único de decisão e campos de evento | `aceito` | — |
 | [006](#adr-006) | Idempotência de todo efeito externo | `aceito` | — |
-| [007](#adr-007) | Semântica de validade, carência e conflito offline | `aberto` *(sem urgência)* | F10 (MVP 1.5) |
+| [007](#adr-007) | Semântica de validade, carência e conflito offline | `aceito` *(fechado pelo PI em 16/08/2026)* | — |
 | [008](#adr-008) | Regime de dado biométrico sob LGPD | `aceito` *(1 ponto remanescente)* | **F21** |
 | [009](#adr-009) | Entitlement multi-origem (convênio corporativo) | `aceito` | — |
 | [010](#adr-010) | Dependência do SDK Topdata e a POC como portão | `aceito` | — |
@@ -56,7 +56,7 @@ existe para expulsar deste repositório.
 | [024](#adr-024) | Lista canônica de razões de decisão de acesso | `aceito` | — |
 | [025](#adr-025) | MVP 2.5: o design system é fatia, não `[INFRA]` | `aceito` | — |
 | [026](#adr-026) | `docs/design/**` é fonte de verdade de design | `aceito` | — |
-| [027](#adr-027) | Modelo de `Payment` e `PaymentAttempt` | `proposto` | **F12–F16** |
+| [027](#adr-027) | Modelo de `Payment` e `PaymentAttempt` | `aceito` | — |
 
 ---
 
@@ -1241,9 +1241,9 @@ qualquer outra coisa, o documento de design vence.
 <a id="adr-027"></a>
 ## ADR-027 — Modelo de `Payment` e `PaymentAttempt`
 
-**Data:** 18/08/2026 · **Status:** `proposto` *(recomendação técnica **aceita pelo PI em
-18/08/2026**; 3 das 4 perguntas respondidas — **falta uma emenda ao PRD**)* · **Recorta** o
-**ADR-013** · **Bloqueia:** F12 a F16
+**Data:** 18/08/2026 · **Status:** `aceito` *(decisão nova — **decidida pelo PI em
+18/08/2026**; as quatro perguntas respondidas e a emenda ao PRD aplicada no mesmo dia)*
+· **Recorta** o **ADR-013** · **Emenda** o `MVP-02` §7 e §11 · **Bloqueia:** nada
 
 **Contexto — e a correção que este ADR carrega.** O ADR-013 empacotou duas coisas de natureza
 diferente: **qual provedor** (que sai da homologação, card `[GATE]`) e **como o pagamento é
@@ -1348,16 +1348,20 @@ contra-lançamento posterior, se alguém perceber.
 `account_credit` guarda `origin_payment_id`. **Isso detecta depois — não impede antes.** A
 diferença é deliberada e é do PI.
 
-### O que falta para este ADR virar `aceito`
+### Emenda ao PRD — aplicada em 18/08/2026
 
-Uma **emenda ao `docs/prd/academia/MVP-02-smart-billing.md`**, cobrindo dois pontos:
+O `MVP-02` foi emendado no mesmo dia. O `§7` foi escrito pelo PI; o `§11` foi aplicado pelo Cowork
+com **autorização explícita do PI, válida só para esta emenda** — exceção pontual ao ADR-021,
+registrada aqui com data para não virar precedente:
 
-1. **§7, Slice 2.1** — remover *"pagamento manual com dupla permissão quando acima do limite"*,
-   substituindo por *"pagamento manual com registro auditado do operador"*, com data e motivo.
-2. **§11, modelo de dados** — acrescentar `account_credits` à lista de tabelas.
+1. **§7, Slice 2.1** — *"pagamento manual com dupla permissão quando acima do limite"* passou a
+   *"pagamento manual com registro auditado do operador"*. O controle deixa de ser preventivo e
+   passa a ser detectivo. **A consequência 3 acima é o preço dessa troca, e é conhecido.**
+2. **§11** — `account_credits` acrescentado ao modelo de dados.
 
-O Cowork **não escreve em `docs/prd/**`** (ADR-021): o texto é do PI. Enquanto a emenda não
-existir no arquivo, o ADR-027 permanece `proposto` e a F12 permanece bloqueada por ele.
+Com isso o ADR-027 fecha. **A F12 deixa de ter ADR bloqueando.** O que ainda falta nela é
+preencher a `SPEC-012` (§3, §4 e §5 vazias) e a **entrada do MVP 2**, que exige MVP 1 estável e
+não depende de decisão nenhuma deste arquivo.
 
 ### Escopo negativo
 
