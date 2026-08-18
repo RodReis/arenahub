@@ -57,6 +57,7 @@ existe para expulsar deste repositório.
 | [025](#adr-025) | MVP 2.5: o design system é fatia, não `[INFRA]` | `aceito` | — |
 | [026](#adr-026) | `docs/design/**` é fonte de verdade de design | `aceito` | — |
 | [027](#adr-027) | Modelo de `Payment` e `PaymentAttempt` | `aceito` | — |
+| [028](#adr-028) | Modo de acionamento da catraca é código, não config do equipamento | `proposto` | **`M0-AC-004` → gate §15 → MVP 1** |
 
 ---
 
@@ -1369,3 +1370,79 @@ Este ADR **não** escolhe provedor, **não** define o contrato `PaymentProvider`
 `MVP-02` §12) e **não** decide as políticas de refund do `M2-COMPLIANCE-01`. Ele também **não
 torna a F12 pegável**: a entrada do MVP 2 exige MVP 1 estável, e o MVP 1 depende do gate §15 do
 MVP 0, hoje aberto pelo modo `acionamento1: 8` da catraca.
+
+---
+
+<a id="adr-028"></a>
+## ADR-028 — O modo de acionamento da catraca é código do edge-agent, não configuração do equipamento
+
+**Data:** 18/08/2026 · **Status:** `proposto` *(correção factual com uma decisão pendente —
+**aguardando o PI**)* · **Corrige** a *decisão 4* da `SPEC-002` · **Bloqueia:** `M0-AC-004`, logo
+o **gate §15 do MVP 0**, logo o **MVP 1 inteiro**
+
+**Contexto.** Desde 17/08/2026 o repositório registra, em quatro lugares (`STATUS.md` §1 linha 7,
+field-note de 17/08 §4, relatório de POC §9.2 e `SPEC-002` decisão 4), que a catraca em
+`acionamento1: 8` (`CATRACA_LIBERADA_DOIS_SENTIDOS`) deixa entrar sem reconhecimento, e que
+mudar isso é *"configuração do equipamento, não do ArenaHub"*, *"de ninguém como código"*,
+pendente de *"o manual do SDK na mão"*.
+
+**Três achados de 18/08/2026 dizem que essa leitura está errada.**
+
+**1. O ArenaHub já escreve o acionamento — em toda conexão.** A ponte nativa
+(`apps/edge-agent/native/easyinner-bridge/EasyInnerBridge.cs`) declara
+`ConfigurarAcionamento1(byte Funcao, byte Tempo)` e a chama dentro do `Conectar`:
+
+```csharp
+pior = Math.Max(pior, ConfigurarAcionamento1(1, 5)); // ACIONA_REGISTRO_ENTRADA_OU_SAIDA, 5s
+```
+
+O modo **não é um valor achado no equipamento**: é um literal no nosso código, passado a cada
+`conectar`. O comentário do próprio arquivo já listava parte do enum
+(`ACIONA_REGISTRO_ENTRADA_OU_SAIDA = 1`).
+
+**2. A Topdata documenta que a config do SDK sobrescreve a do WebServer.** A base de
+conhecimento do integrador é explícita: no momento em que o equipamento entra em modo online via
+SDK, a DLL envia o conjunto de parâmetros do buffer e substitui o que foi configurado à mão;
+*"o software é sempre a fonte de verdade das configurações"*; e **não há forma** de manter a
+configuração feita pelo WebServer depois que o equipamento entra em online pelo SDK.
+
+**Consequência direta:** procurar o modo bloqueado *"no menu do painel"* era caminho morto por
+construção. Mesmo que estivesse lá, o `conectar` do ArenaHub apagaria na conexão seguinte.
+
+**3. O `acionamento1: 8` lido em 15/08 é config do software legado, não do equipamento.** A
+leitura foi feita com a catraca ainda apontada para o `.106` — o legado — e antes de a ponte
+existir. Não é padrão de fábrica nem escolha de instalação: é o que o software anterior mandava.
+
+**O que isto muda, na prática.** A pendência sai de *"tarefa de hardware sem manual, para a
+próxima janela"* e vira **um parâmetro de código do `edge-agent`**, com reversão trivial (voltar o
+literal) e sem tocar em nada no equipamento. Deixa de depender de janela física para **decidir**;
+a janela continua necessária só para **provar**.
+
+### O que continua desconhecido, e é honesto dizer
+
+**A tabela completa do enum `Funcao` não está no repositório.** O que temos é o comentário da
+ponte, com um único valor de acionamento (`=1`). Não sabemos:
+
+- se `Funcao = 1` **já é** o modo travado-em-repouso — o nome *"aciona no registro de entrada ou
+  saída"* sugere que o relé só atua quando há registro, o que seria exatamente o comportamento
+  desejado — e, se for, o furo de 17/08 tem outra causa (mecânica ou de sentido de instalação);
+- ou qual outro valor corresponde a **bloqueada em repouso**.
+
+**Onde a resposta está:** no manual do SDK Inner Acesso e na ferramenta `Lab EasyInner`, ambos no
+portal do integrador Topdata — que o `PROTOCOLO-CATRACA.md` §"o que ainda falta" já listava como
+pendência (*"os exemplos de código da SDK"* e *"cadastro de integrador"*). **Isto é obtenção de
+documento, não janela de bancada.**
+
+### Decisão pedida ao PI
+
+| # | pergunta |
+|---|---|
+| 1 | Autoriza tratar o modo de acionamento como **escopo de código** (parâmetro configurável da ponte, com default explícito e registrado), corrigindo a *decisão 4* da `SPEC-002`? |
+| 2 | Quem busca o enum no portal do integrador — e o cadastro de integrador Topdata está feito? Sem isso, o valor continua desconhecido e nenhuma janela resolve |
+
+### Escopo negativo
+
+Este ADR **não** afirma qual valor de `Funcao` é o correto — afirma que a pergunta é respondível
+por documento, não por tentativa em equipamento de produção, e que a resposta se aplica por
+código. Também **não** altera a `SPEC-002` por conta própria: a decisão 4 é do PI e só ele a
+revisa.

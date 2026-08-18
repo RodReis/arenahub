@@ -29,6 +29,15 @@ e só se muda pela API/SDK. **`M0-AC-004` não fecha antes disso.**
 uma seção `## 9` diferente no mesmo `docs/reports/MVP-00-relatorio-poc-topdata.md`. Resolver é do
 Code; registrado aqui porque avanço fora da `main` é o *fechamento frágil* do `CLAUDE.md` §3.
 
+🔴 **18/08/2026 — o bloqueio do gate §15 estava mal diagnosticado (ADR-028).** O modo de
+acionamento da catraca **é código do `edge-agent`**, não configuração do equipamento: a ponte já
+manda `ConfigurarAcionamento1(1, 5)` em toda conexão, e a Topdata documenta que a config do SDK
+**sobrescreve** a do WebServer quando o equipamento entra online — procurar o modo no menu do
+painel era caminho morto por construção. O `acionamento1: 8` lido em 15/08 era config do
+**software legado**. Isso tira a pendência da fila de "próxima janela física" e põe num parâmetro
+de código; falta a tabela do enum `Funcao`, que se busca no portal do integrador. **Corrige a
+decisão 4 da `SPEC-002` — revisão é do PI.**
+
 📌 **18/08/2026 — o ADR-013 foi partido em dois, por decisão do PI.** O bloqueio de F12 estava
 errado: a Slice 2.1 (invoice, ledger, pagamento manual) **não chama um único método de
 `PaymentProvider`**, e o `MVP-02` §5 põe o gate de homologação antes da **Slice 2.2**, não da 2.1.
@@ -127,7 +136,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | 4 | ✅ ~~leitor em **18 dígitos**~~ — resolvido pelo menu físico do leitor; `setuserinfo` confirmado ao vivo em 17/08 | — |
 | 5 | ✅ ~~**cutover: apontar a catraca para o `edge-agent`**~~ — **feito e devolvido** em 17/08 (`.106` → `.190` → `.106`, legado religado). O mesmo vale para o leitor facial, pelo menu físico, **sem depender da senha de admin** | — |
 | 6 | ✅ ~~**ligar os adapters ao `main.ts`** — fatia nova~~ — **a fatia nova morreu em 17/08, por decisão do PI**: o `lab:run` foi construído dentro da janela e absorvido por **F2/F5**, sem número novo. ⚠️ **Consequência aberta na linha 8** | — |
-| 7 | 🔴 **catraca em `acionamento1: 8` — entra sem reconhecimento.** *Liberada nos dois sentidos* em repouso; o `liberar` não destrava nada porque nada está travado. Modo bloqueado **não aparece no menu do painel**: só pela API/SDK, com endpoint e valor **não confirmados** nos manuais que temos. Chutar escrita de `acionamento` em catraca de produção foi recusado, corretamente | **`M0-AC-004`**, logo o **gate §15** |
+| 7 | 🔴 **catraca em `acionamento1: 8` — entra sem reconhecimento.** ⚠️ **Diagnóstico corrigido em 18/08 pelo ADR-028:** o modo **não** é config de equipamento nem depende do menu do painel — o `EasyInnerBridge.cs` já chama `ConfigurarAcionamento1(1, 5)` a cada `conectar`, e a Topdata documenta que a config do SDK **sobrescreve** a do WebServer ao entrar online. É **parâmetro de código**, com reversão trivial. O que falta é a **tabela do enum `Funcao`**, que está no manual do SDK / `Lab EasyInner` do portal do integrador — obtenção de documento, não janela de bancada | **`M0-AC-004`**, logo o **gate §15** |
 | 8 | 🟠 **composição de PRODUÇÃO do `edge-agent` ficou sem dono.** Ordem de inicialização, o que o agente faz ao subir, o que acontece quando um dispositivo não responde — falha alto ou degrada. O `lab:run` é **bancada**; nada disso está decidido. **Precisa de número antes de F9 ir a piloto** — decisão do PI, insumo pronto em [`docs/notes/composicao-do-edge-agent.md`](notes/composicao-do-edge-agent.md) | **MVP 1** |
 | 9 | 🟠 **relógio do leitor facial.** O `ocorridoEm` veio congelado em `15:47:28` em todos os reconhecimentos de 17/08 — timestamp fixo embaralha a ordem de eventos (`M0-FR-004`). Decisão do PI em 17/08: **acertar o relógio *e* o Edge carimbar `recebidoEm` como critério de ordenação quando o `ocorridoEm` for implausível**, preservando o original (`M0-BR-004`) | **F2** |
 | 10 | 🟠 **consumir o `senduser` para detectar órfãos** entre leitor e nuvem — leitura de reconciliação que vira **alerta**, nunca cadastro. Decisão do PI em 17/08; **fora de F2**, fatia futura do MVP 1 **ainda sem número** | **MVP 1** |
