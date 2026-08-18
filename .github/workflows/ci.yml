@@ -193,6 +193,10 @@ jobs:
       # acima. Sem esta linha o Playwright procura em `~/.cache/ms-playwright`,
       # que dentro do job e `/github/home/.cache/ms-playwright`, e nao acha
       # nada.
+      #
+      # Declarar AQUI nao basta: a task passa pelo Turbo, que sanitiza o
+      # ambiente e descarta variavel fora do `globalEnv`. Esta precisa estar
+      # NOS DOIS lugares -- aqui e no `turbo.json`.
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
       # `postgres`, e NÃO `localhost`: com o job dentro de um container, o
