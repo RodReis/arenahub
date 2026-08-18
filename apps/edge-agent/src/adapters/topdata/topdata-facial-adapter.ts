@@ -216,6 +216,9 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
         // Horario DO EQUIPAMENTO (M0-FR-004), nao o de recebimento. Usar o
         // nosso embaralharia a ordem quando ha fila ou reconexao.
         ocorridoEm: interpretarDataHora(registro.time),
+        // O nosso, carimbado sempre -- e so para ORDENAR quando o do
+        // equipamento for implausivel. Ver `plausibilidade-de-relogio.ts`.
+        recebidoEm: new Date(),
         metodo: 'facial',
         ...(log.data.logindex !== undefined
           ? { idExternoDoEvento: String(log.data.logindex) }

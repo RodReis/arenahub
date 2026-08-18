@@ -33,6 +33,18 @@ export type EventoReconhecimento = {
    * ordem quando ha fila ou reconexao.
    */
   ocorridoEm: Date;
+  /**
+   * Quando NOS recebemos -- carimbado pelo Edge, sempre.
+   *
+   * Nao substitui o `ocorridoEm`: existe para ORDENAR quando o horario do
+   * equipamento for implausivel (relogio parado, retrocedendo ou no futuro).
+   * A janela de 17/08/2026 mediu esse caso -- `ocorridoEm` congelado em
+   * `15:47:28` em todo reconhecimento. Ver `plausibilidade-de-relogio.ts`.
+   *
+   * O fallback decide **ordem**; o `ocorridoEm` continua sendo o **fato**
+   * que sobe para o coletor (`M0-BR-004`).
+   */
+  recebidoEm: Date;
   metodo: MetodoReconhecimento;
   /** Identificador do proprio evento no dispositivo, quando houver. */
   idExternoDoEvento?: string;

@@ -89,8 +89,17 @@ export class FacialSimulator implements FacialDeviceAdapter {
     externalEnrollId: ExternalEnrollId,
     ocorridoEm: Date,
     metodo: EventoReconhecimento['metodo'] = 'facial',
+    /**
+     * Quando o Edge recebeu. Default: o proprio `ocorridoEm` -- equipamento
+     * com relogio certo.
+     *
+     * Passar valor diferente e como se simula RELOGIO ERRADO, o caso medido
+     * em 17/08/2026. Sem este parametro, o simulador so conseguiria produzir
+     * bancada saudavel, e o ramo de fallback ficaria sem exercicio no CI.
+     */
+    recebidoEm: Date = ocorridoEm,
   ): void {
-    const evento: EventoReconhecimento = { externalEnrollId, ocorridoEm, metodo };
+    const evento: EventoReconhecimento = { externalEnrollId, ocorridoEm, recebidoEm, metodo };
     for (const ouvinte of this.ouvintes) ouvinte(evento);
   }
 

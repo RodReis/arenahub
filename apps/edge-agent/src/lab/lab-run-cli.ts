@@ -117,6 +117,19 @@ async function main(): Promise<void> {
     permitidos,
     agoraMonotonicoMs: () => Number(process.hrtime.bigint() / 1_000_000n),
     sentido,
+    nomeDoLeitor: facial.nome,
+    // Relogio errado precisa APARECER na bancada. Em 17/08 o `ocorridoEm`
+    // congelado so foi notado na analise do relatorio, depois da janela.
+    aoDetectarRelogioImplausivel: (a) =>
+      logger.warn(
+        {
+          dispositivo: a.dispositivo,
+          razao: a.razao,
+          ocorridoEm: Number.isNaN(a.ocorridoEm.getTime()) ? 'invalido' : a.ocorridoEm.toISOString(),
+          recebidoEm: a.recebidoEm.toISOString(),
+        },
+        'relogio do equipamento implausivel -- ordenando pelo recebimento',
+      ),
   });
 
   let seq = 0;
@@ -129,6 +142,7 @@ async function main(): Promise<void> {
           {
             enrollid: evento.externalEnrollId,
             decisao: r.decisao.resultado,
+            relogioImplausivel: r.relogioImplausivel,
             desfecho: r.desfecho,
             latenciaDecisaoMs: r.latenciaDecisaoMs,
             duracaoPassagemMs: r.duracaoPassagemMs,
