@@ -466,6 +466,8 @@ model Tenant {
   paymentAttempts PaymentAttempt[]
   accountCredits  AccountCredit[]
   invoiceSequence InvoiceSequence?
+  providerAccounts ProviderAccount[]
+  providerEvents   ProviderEvent[]
 }
 
 /// Unidade fisica. Onde a catraca mora.
@@ -2271,4 +2273,86 @@ model InvoiceSequence {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("invoice_sequences")
+}
+
+// ---------------------------------------------------------------------------
+// Provedor de pagamento (F13)
+// ---------------------------------------------------------------------------
+
+/// Conta do tenant no provedor de pagamento.
+///
+/// EXISTE POR CAUSA DA INV-078: o webhook NAO confia no tenant do payload.
+/// Quem diz de qual tenant e o evento e a conta que o provedor identifica na
+/// requisicao -- payload e dado de terceiro, e terceiro nao decide multi-tenancy.
+///
+/// `signingSecret` e o segredo do HMAC da assinatura (INV-077). Cifrado em
+/// repouso pela mesma razao que token de provedor (`MVP-02` 11): o banco nao
+/// e lugar de segredo em claro.
+///
+/// `provider` e string, nao enum: o provedor sai do card `[GATE]` do MVP 2 e
+/// ainda nao foi escolhido (ADR-013). Enum aqui congelaria em migration uma
+/// decisao que e do PI.
+model ProviderAccount {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  /// Slug do provedor homologado. Minusculo, sem espaco.
+  provider String
+  /// Identificador da conta NO PROVEDOR. E o que chega na requisicao de
+  /// webhook e resolve o tenant.
+  externalAccountId String @map("external_account_id")
+  /// Segredo do HMAC, cifrado. Nunca sai em resposta de API, nunca em log.
+  signingSecretEncrypted String @map("signing_secret_encrypted")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events ProviderEvent[]
+
+  /// O par (provedor, conta) e o que a requisicao carrega -- por isso a
+  /// unicidade e global, nao por tenant: duas contas iguais em tenants
+  /// diferentes tornariam a resolucao ambigua, que e o buraco da INV-078.
+  @@unique([provider, externalAccountId])
+  @@index([tenantId, provider])
+  @@map("provider_accounts")
+}
+
+/// Inbox de webhook do provedor (regra de arquitetura no 4, INV-076).
+///
+/// A unicidade `(provider_account_id, external_event_id)` E a idempotencia.
+/// Nao e o `if (jaProcessei)` do codigo -- esse perde a corrida entre duas
+/// entregas simultaneas do mesmo evento. O banco nao perde.
+///
+/// `occurredAt` e o instante DO PROVEDOR, nao o nosso: e com ele que a
+/// INV-079 decide se o evento chegou fora de ordem. Relogio local nao serve
+/// -- a ordem que importa e a da origem.
+model ProviderEvent {
+  id                String @id @default(uuid()) @db.Uuid
+  tenantId          String @map("tenant_id") @db.Uuid
+  providerAccountId String @map("provider_account_id") @db.Uuid
+  /// Chave estavel do evento no provedor (INV-076). Criterio de homologacao
+  /// do ADR-013: provedor sem isso nao passa no gate.
+  externalEventId String @map("external_event_id")
+  eventType       String @map("event_type")
+  /// Pagamento a que o evento se refere, quando ha. Nulo em evento que nao
+  /// e de pagamento.
+  externalPaymentId String? @map("external_payment_id")
+  /// Payload ja verificado. Retencao definida em `MVP-02` 11; NUNCA contem
+  /// PAN/CVV -- a tokenizacao e hospedada (INV-098).
+  payload Json
+  /// Instante no PROVEDOR. Base da ordenacao logica (INV-079).
+  occurredAt DateTime @map("occurred_at")
+  /// Nulo enquanto nao aplicado. Evento recebido != evento aplicado: um
+  /// evento fora de ordem e persistido e NAO aplicado.
+  processedAt DateTime? @map("processed_at")
+  /// Por que o evento nao mudou estado, quando nao mudou. Codigo estavel.
+  skippedReason String? @map("skipped_reason")
+  receivedAt    DateTime @default(now()) @map("received_at")
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account ProviderAccount @relation(fields: [providerAccountId], references: [id])
+
+  @@unique([providerAccountId, externalEventId])
+  @@index([tenantId, externalPaymentId])
+  @@map("provider_events")
 }

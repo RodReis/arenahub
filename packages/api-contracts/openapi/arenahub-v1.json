@@ -373,6 +373,52 @@
         ]
       }
     },
+    "/api/v1/invoices/{id}/payments/pix": {
+      "post": {
+        "operationId": "BillingController_criarCobrancaPix",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}/status": {
+      "get": {
+        "operationId": "BillingController_consultarStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/students/{id}/invoices": {
       "get": {
         "operationId": "BillingController_listarDoAluno",
@@ -416,6 +462,29 @@
         },
         "tags": [
           "Billing"
+        ]
+      }
+    },
+    "/api/v1/webhooks/payments/{provider}": {
+      "post": {
+        "operationId": "WebhookController_receber",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
         ]
       }
     },
