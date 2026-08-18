@@ -195,19 +195,21 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 |---|---|---|---|
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **32** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94) |
-| Feito | `proplan:done` | PR mergeado com CI verde | 0 |
+| Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
+| Feito | `proplan:done` | PR mergeado com CI verde | **1** — o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **22** |
 
 > ⚠️ **Números reconferidos na API do board em 18/08/2026** — não estimados. A composição de
 > *Em Andamento* mudou desde a leitura anterior: o `[INFRA]` [#68](https://github.com/RodReis/arenahub/issues/68)
 > **foi aceito pelo PI e conta em Finalizado** (21 → 22), e entrou no lugar dele o `[INFRA]`
 > [#94](https://github.com/RodReis/arenahub/issues/94) — `apt-get` do Chromium pendurando e
-> derrubando o job de E2E no timeout de 20 min. O total de *Em Andamento* continua **3** por
-> coincidência, não por imobilidade.
+> derrubando o job de E2E no timeout de 20 min — percorreu Backlog → *Em Andamento* → **Feito**
+> no mesmo dia, com o merge do PR [#95](https://github.com/RodReis/arenahub/pull/95).
 >
-> 📌 **A label `proplan:todo` passou a existir em 18/08/2026**, criada ao pegar o #94. As colunas
-> *A Fazer* e *Feito* seguem em 0: o card foi de Backlog direto para *Em Andamento*.
+> 📌 **A coluna *Feito* deixou de ser 0 pela primeira vez.** É o estado que faltava exercitar:
+> PR mergeado com CI verde, **issue ainda aberta**, esperando o aceite do PI. As labels
+> `proplan:todo` e `proplan:done` também **passaram a existir em 18/08/2026** — nasceram ao pegar
+> e ao entregar o #94.
 >
 > ⚠️ **Leitura de 22h de 17/08/2026, preservada:** não estimados. A linha de
 > *Em Andamento* já dissera *"F2 e F3"*, mas a issue [#3](https://github.com/RodReis/arenahub/issues/3)
