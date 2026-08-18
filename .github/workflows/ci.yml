@@ -141,9 +141,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # O job roda DENTRO da imagem oficial do Playwright -- issue #105.
+    #
+    # Ela já traz o Chromium e as bibliotecas de sistema dele, então some o
+    # `apt-get` do caminho crítico. Era ele que dependia do mirror
+    # `azure.archive.ubuntu.com`, fora do ar QUATRO vezes em 18/08/2026: as
+    # duas primeiras derrubaram o job aos 20 min (antes do #94), as outras
+    # duas no timeout de 8 min que o #94 criou. Timeout curto mais uma
+    # tentativa extra faz a queda aparecer no passo certo, mas não cobre
+    # mirror fora por minutos -- as duas tentativas caem na mesma janela.
+    #
+    # A tag SEGUE a versão de `@playwright/test` no `apps/admin-web`. Imagem e
+    # biblioteca desalinhadas quebram de formas obscuras: o driver da lib fala
+    # com um navegador que não é o dele. Ao subir o Playwright, suba aqui
+    # junto.
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
+
     services:
-      # Postgres para `test:integration`. Testcontainers sobe o que precisar
-      # por conta, mas o serviço aqui cobre o caso simples e é mais rápido.
+      # Postgres para `test:integration` e para o E2E, cada um no seu banco.
+      #
+      # NÃO é Testcontainers: as suítes falam com este serviço pelas
+      # `*_DATABASE_URL` abaixo. O comentário anterior dizia o contrário e
+      # estava errado -- mesma correção feita no `docs/TESTING.md` na #101.
       postgres:
         image: postgres:17-alpine
         env:
@@ -159,18 +178,25 @@ jobs:
           --health-retries 10
 
     env:
-      DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub?schema=public
+      # `postgres`, e NÃO `localhost`: com o job dentro de um container, o
+      # runner liga os dois por uma rede Docker e o serviço passa a atender
+      # pelo LABEL dele. Em `localhost` mora o próprio job.
+      #
+      # Errar isso não dá erro de rede legível -- dá recusa de conexão ou
+      # `database does not exist`, que parecem problema de migration e mandam
+      # quem investiga para o lado errado.
+      DATABASE_URL: postgresql://arenahub:arenahub_ci@postgres:5432/arenahub?schema=public
       # Banco separado para a suite E2E -- card [INFRA], issue #101. A suite
       # CRIA aluno, plano e dispositivo e NAO limpa; apontada para o banco
       # acima, contamina o que `test:integration` acabou de limpar. O
       # `pretest:e2e` recria este banco do zero antes de cada execucao, entao
       # nao e preciso cria-lo no service container.
-      E2E_DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub_e2e?schema=public
+      E2E_DATABASE_URL: postgresql://arenahub:arenahub_ci@postgres:5432/arenahub_e2e?schema=public
       # Banco separado para a integracao, pelo mesmo motivo do E2E: de 20
       # suites, 3 apagam o tenant no fim e 17 deixam. E NAO o mesmo banco do
       # E2E -- as duas suites rodam no mesmo job, e uma derrubaria o banco sob
       # os pes da outra.
-      INTEGRATION_DATABASE_URL: postgresql://arenahub:arenahub_ci@localhost:5432/arenahub_int?schema=public
+      INTEGRATION_DATABASE_URL: postgresql://arenahub:arenahub_ci@postgres:5432/arenahub_int?schema=public
 
     steps:
       - uses: actions/checkout@v7
@@ -221,47 +247,18 @@ jobs:
       - name: seed de bancada
         run: pnpm --filter @arenahub/database seed
 
-      # O navegador vem do cache, chaveado pela versão do Playwright no
-      # lockfile: upgrade da lib invalida o cache sozinho, sem ninguém
-      # lembrar de mexer aqui.
-      - name: resolver versão do Playwright
-        id: playwright
-        run: echo "versao=$(node -p "require('./apps/admin-web/package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
-
-      - name: cache do navegador do Playwright
-        id: cache-playwright
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.versao }}
-
-      # Os dois passos abaixo chamam `apt-get` por baixo, e o mirror do runner
-      # (`azure.archive.ubuntu.com`) já caiu três vezes -- ver #94. Sem timeout
-      # próprio o `apt-get` fica pendurado até o `timeout-minutes: 20` do JOB
-      # estourar: 20 minutos gastos para não produzir sinal nenhum.
+      # Sem passo de navegador: a imagem do job já traz o Chromium em
+      # `/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`) e as bibliotecas de
+      # sistema dele. Saíram daqui, com a #105:
       #
-      # `timeout-minutes` no passo faz a queda aparecer no passo certo e devolve
-      # o resto do orçamento; a repetição cobre o mirror que volta em segundos.
-      # Uma tentativa extra, não um laço: mirror fora do ar por minutos é para
-      # falhar rápido, não para insistir.
-
-      # Sem cache: baixa o navegador E as bibliotecas de sistema.
-      - name: instalar navegador do Playwright
-        if: steps.cache-playwright.outputs.cache-hit != 'true'
-        timeout-minutes: 8
-        run: >-
-          pnpm --filter @arenahub/admin-web exec playwright install --with-deps chromium
-          || pnpm --filter @arenahub/admin-web exec playwright install --with-deps chromium
-
-      # Com cache: o binário já veio de ~/.cache/ms-playwright, mas as
-      # bibliotecas de sistema moram em /usr e o cache não as traz. Sem este
-      # passo o Chromium existe e não abre.
-      - name: instalar dependências de sistema do Chromium
-        if: steps.cache-playwright.outputs.cache-hit == 'true'
-        timeout-minutes: 8
-        run: >-
-          pnpm --filter @arenahub/admin-web exec playwright install-deps chromium
-          || pnpm --filter @arenahub/admin-web exec playwright install-deps chromium
+      #   - `playwright install --with-deps chromium` e `install-deps`, os dois
+      #     passos que chamavam `apt-get` e dependiam do mirror do Ubuntu;
+      #   - o cache de `~/.cache/ms-playwright`, que a imagem torna trabalho
+      #     morto: ela aponta o Playwright para `/ms-playwright`, então o cache
+      #     seria restaurado num caminho que ninguém lê;
+      #   - o passo que resolvia a versão do Playwright para chavear esse cache.
+      #
+      # A versão agora vive na tag da imagem, no topo do job.
 
       - name: 'test:e2e'
         run: pnpm test:e2e
