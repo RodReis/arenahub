@@ -118,6 +118,33 @@ implementação:**
    período`, `Unidade não selecionada`: banco vazio, não bug. O `CLAUDE.md` prevê seed em
    `packages/database/prisma/seed.ts` "na primeira fatia que precisar" — nenhuma precisou.
 
+🎨 **18/08/2026, noite — o item 1 fechou: o painel tem superfície.** PR
+[#107](https://github.com/RodReis/arenahub/pull/107), F46.
+
+Precedido de uma crítica `/impeccable` com dois assessments isolados. O veredito importa porque
+contraria a leitura de manhã: **não era design ruim nem AI slop.** O código tem argumento onde
+slop tem preenchimento — recusa `?? []` porque "falha não é lista vazia", estado desconhecido vira
+`—` em vez de código em inglês. O problema era que **o design system foi construído e as telas não
+o vestiram**.
+
+O número que resume: `<h2>` do navegador renderiza a **24px**, e o `<h1>` do painel a **20px**. A
+hierarquia estava invertida em pixels, em 13 telas que já consumiam o design system e envelopavam
+tudo em HTML sem estilo. Altura de controle: **19–24px antes, 36px agora**.
+
+> ⚠️ **Dois defeitos que estavam escondidos atrás de guarda verde**, e valem além desta fatia:
+>
+> - **O gate de contraste media o par errado.** O comentário dizia "o tom sólido tem de passar
+>   sobre o fundo do card"; o código media contra **branco**. O badge pinta sobre 10% de si mesmo,
+>   e `success` entregava **4.44** na tela contra o alvo de 4.5. O `axe` pegou numa varredura
+>   manual; o gate que existe para pegar antes, não.
+> - **A suíte de acessibilidade passava 7/7 num falso verde.** O banco de E2E nasce vazio, e tela
+>   vazia não tem o que varrer: sem aluno `ACTIVE` não existe o badge que reprovava. É consequência
+>   direta do isolamento feito horas antes no #101 — a correção de um problema criou a cegueira do
+>   outro.
+>
+> A lição comum: **guarda verde não é prova de conformidade quando ela mede o alvo errado ou varre
+> o vazio.**
+
 🧽 **18/08/2026, fim de tarde — os itens 2 e 3 acima estão resolvidos, e o item 2 estava com a
 causa errada.** PRs [#103](https://github.com/RodReis/arenahub/pull/103) e
 [#104](https://github.com/RodReis/arenahub/pull/104).
@@ -273,11 +300,11 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **32** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **31** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
-| Feito | `proplan:done` | PR mergeado com CI verde | **2** — os `[INFRA]` [#101](https://github.com/RodReis/arenahub/issues/101) e [#105](https://github.com/RodReis/arenahub/issues/105), aguardando aceite do PI |
-| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **25** |
+| Feito | `proplan:done` | PR mergeado com CI verde | **1** — a [F46](https://github.com/RodReis/arenahub/issues/99), aguardando aceite do PI |
+| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **27** |
 
 > ⚠️ **Reconferido na API do board em 18/08/2026, fim de tarde.** *Feito* voltou a **0** e
 > *Finalizado* subiu de 22 para **25**: o PI aceitou o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94),
@@ -516,7 +543,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | [#82](https://github.com/RodReis/arenahub/issues/82) | aprovada-pi *(gate: MVP 4)* |
 | F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | aprovada-pi *(gate: MVP 4)* |
 | F45 | — | 1 | — | Cadastro completo de aluno (retrabalho da Slice 1.2) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#100](https://github.com/RodReis/arenahub/issues/100) | escopo definido |
-| F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **próxima a entrar** |
+| F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **entregue** — PR [#107](https://github.com/RodReis/arenahub/pull/107), aguardando aceite |
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
 > ADR**, não no PRD: o design system é trabalho de plataforma e não tem PRD que o descreva. O
