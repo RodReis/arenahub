@@ -105,6 +105,13 @@ const PERMISSOES = [
   // excepcional, auditado, que nem todo perfil precisa ter.
   'access.read',
   'access.override',
+  // F12: financeiro. `billing.payment.manual` e separado de
+  // `billing.manage` pelo mesmo motivo de `access.override`: reconhecer
+  // dinheiro sem passar por provedor e ato excepcional, e nem todo perfil
+  // do financeiro precisa dele.
+  'billing.read',
+  'billing.manage',
+  'billing.payment.manual',
 ];
 
 

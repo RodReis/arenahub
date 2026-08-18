@@ -252,6 +252,45 @@ export class BillingRepository {
   }
 
   /**
+   * Invoices do aluno, mais recente primeiro.
+   *
+   * Escopo do tenant no `where`, sempre: regra de arquitetura no 2. Sem
+   * ele, um id de outro tenant devolveria dado que nao e de quem pergunta.
+   */
+  async listarInvoicesDoAluno(
+    contexto: TenantContext,
+    studentId: string,
+  ): Promise<InvoiceComItens[]> {
+    return this.db.invoice.findMany({
+      where: { tenantId: contexto.tenantId, studentId },
+      include: { items: true, payments: true },
+      orderBy: { billingPeriod: 'desc' },
+    });
+  }
+
+  /**
+   * Timeline financeira da invoice -- a auditoria da Slice 2.1.
+   *
+   * Junta o que aconteceu com o dinheiro: abertura, pagamento e credito
+   * gerado. E o controle DETECTIVO que substituiu a dupla permissao
+   * (ADR-027): sem esta leitura, o registro manual inflado nao teria onde
+   * ser percebido.
+   */
+  async timelineDaInvoice(
+    contexto: TenantContext,
+    invoiceId: string,
+  ): Promise<InvoiceComTimeline | null> {
+    return this.db.invoice.findFirst({
+      where: { id: invoiceId, tenantId: contexto.tenantId },
+      include: {
+        items: true,
+        payments: { orderBy: { createdAt: 'asc' } },
+        attempts: { orderBy: { requestedAt: 'asc' } },
+      },
+    });
+  }
+
+  /**
    * Proximo numero de invoice do tenant.
    *
    * Mesmo padrao de `StudentRepository.proximaMatricula`, e pelas mesmas
@@ -308,3 +347,11 @@ export class BillingRepository {
     });
   }
 }
+
+export type InvoiceComItens = Prisma.InvoiceGetPayload<{
+  include: { items: true; payments: true };
+}>;
+
+export type InvoiceComTimeline = Prisma.InvoiceGetPayload<{
+  include: { items: true; payments: true; attempts: true };
+}>;
