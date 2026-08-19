@@ -13,6 +13,87 @@
 
 ---
 
+## 2026-08-19 — Duas guardas de CI passavam verde sem verificar o que prometiam
+
+PR [#116](https://github.com/RodReis/arenahub/pull/116), issues
+[#111](https://github.com/RodReis/arenahub/issues/111) e
+[#112](https://github.com/RodReis/arenahub/issues/112). Ambas achadas na revisão da
+[#110](https://github.com/RodReis/arenahub/issues/110) e deixadas de fora daquele diff **de
+propósito** — mudança de guarda escondida dentro de correção de UI é o tipo de diff que ninguém
+revisa direito.
+
+### O relatório de evidência subcontava, e o self-check não pegava
+
+`"Button.spec.tsx".endsWith(".spec.ts")` é `false` — termina em `x`. Com um sufixo único por
+nível, os **17 arquivos `.spec.tsx`** não entravam em nível nenhum: os testes de componente de
+`packages/ui`. O `reports/TESTS.md`, que é a guarda que barra merge (`TESTING.md` §5), afirmava
+**79 arquivos** onde havia **96**. Unitários: 50 → 67.
+
+O gerador **tinha** self-check, e ele passava. Essa é a lição que sobra: o self-check garantia que
+o gerador **conta o que ele acha**, não que ele **ache tudo**. Um teste que só exercita o caminho
+que o autor imaginou tem exatamente esse ponto cego.
+
+A precedência entre níveis continua vindo do **ponto literal**, não da ordem do array:
+`.int-spec.ts` não casa `.spec.ts` porque o caractere antes de `spec` é `-`. Afrouxar para
+`-spec.ts` faria integração vazar para unitário — e o self-check ganhou caso para isso.
+
+`docs/TESTING.md` §2 mandava usar `*.test.tsx` para web: sufixo que **não existe em nenhum arquivo
+do repositório**. Corrigido para `*.spec.tsx`.
+
+### O lint não carregava react-hooks nem jsx-a11y
+
+Nenhuma das quatro configs referenciava os plugins. O `admin-web` usa `useActionState` e
+`useFormStatus` em oito telas — sem `rules-of-hooks`, hook fora de ordem e dependência faltante só
+apareciam em **runtime**, e a F45 já tinha mostrado que defeito de runtime nesta app sobrevive a
+55 E2E verdes.
+
+Config novo (`packages/config/eslint/react.js`) em vez de acréscimo ao `base.js`: a `api` e o
+`edge-agent` não têm JSX e não devem pagar o custo de carregar plugin de React.
+
+**O lint verde foi verificado com canário**, não aceito de cara: violação plantada com hook
+condicional, dep faltante, `<img>` sem alt, label solto e `role="checkbox"` sem `aria-checked`. As
+7 classes de regra dispararam. Lint verde sem canário não distingue *"nada errado"* de *"plugin
+não carregou"* — e o *"não carregou"* era exatamente o estado anterior.
+
+### Duas decisões registradas, ambas reversíveis
+
+O `eslint-plugin-react-hooks` **v7** traz o React Compiler inteiro: 16 regras no `recommended`,
+incluindo `immutability`, `purity` e `static-components`. **Ficaram de fora.** Adotar o compiler é
+decisão de arquitetura com custo próprio, não efeito colateral de uma issue de lint.
+
+O `jsx-a11y` entrou como **subconjunto nominal** (11 regras), não como preset: cada uma corresponde
+a uma linha do `DS-PAINEL.md` §10. O preset completo traria regra sobre elemento que não usamos, e
+o ruído faz o time desligar o plugin em vez de ler o aviso.
+
+### A adoção acusou uma violação real, como a issue previu
+
+`Button` passava `children` por spread, e a `anchor-has-content` não conseguia provar que o `<a>`
+tinha conteúdo. `children` virou prop **explícita e obrigatória** — `ButtonHTMLAttributes` a traz
+opcional, e botão sem conteúdo é anunciado pelo leitor de tela como alvo sem nome. Nenhum chamador
+quebrou: não existe `<Button />` auto-fechado no repositório.
+
+### O que a revisão de código acrescentou
+
+Veredito APPROVE, 0 CRITICAL/HIGH/MEDIUM. Dois LOW, ambos corrigidos no próprio PR:
+
+1. O nível **`segurança`** (`.sec-spec.ts`) está no `TESTING.md` §2 desde o bootstrap e **nunca
+   esteve no classificador**. Não era regressão — mas a issue é literalmente *"o classificador não
+   conta o que existe"*, e deixar de fora o único nível restante seria consertar metade do defeito.
+   A linha sai zerada hoje; no dia em que o primeiro teste de isolamento de tenant for escrito, ele
+   conta em vez de sumir.
+2. A justificativa das regras `jsx-a11y` citava o `DS-PAINEL.md` §11, que é a lista de regras de
+   lint do design system. O que o comentário descreve é o §10, *Acessibilidade WCAG 2.2 AA*.
+
+### O `--watch` mentiu de novo, de um jeito novo
+
+`gh pr checks 116 --watch` saiu **0** enquanto `gh pr checks` respondia **"no checks reported on
+the branch"**: o rollup do PR ainda não havia populado, e o watch leu *"nenhum check"* como *"nada
+falhou"*. Variante do que o PR #102 já tinha ensinado. O verde real veio de `gh run watch
+<id> --exit-status` mais conferência job a job — `lint, typecheck, guardas e testes` e `integração
+e E2E`, ambos `success` no SHA `1ba5b09`.
+
+---
+
 ## 2026-08-18 — O painel foi visto pela primeira vez, e o diagnóstico não era o esperado
 
 O PI abriu o `admin-web` e mandou os prints de seis telas: `Unidades`, `Eventos de acesso`,

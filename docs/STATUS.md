@@ -313,11 +313,17 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **31** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **30** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
-| Feito | `proplan:done` | PR mergeado com CI verde | **2** — [F46](https://github.com/RodReis/arenahub/issues/99) e [F45](https://github.com/RodReis/arenahub/issues/100), aguardando aceite do PI |
-| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **27** |
+| Feito | `proplan:done` | PR mergeado com CI verde | **2** — [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
+| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **31** |
+
+> ✅ **19/08/2026 — as duas `[INFRA]` de guarda de CI entregues, PR [#116](https://github.com/RodReis/arenahub/pull/116).**
+> Contagem reconferida na API do board no mesmo dia: *Finalizado* subiu de 27 para **31** (o PI
+> aceitou F45, F46 e mais duas), e *Feito* voltou a se formar com [#111](https://github.com/RodReis/arenahub/issues/111)
+> e [#112](https://github.com/RodReis/arenahub/issues/112). Detalhe da entrega no
+> [`STATUS-ARQUIVO.md`](STATUS-ARQUIVO.md).
 
 > ⚠️ **Reconferido na API do board em 18/08/2026, fim de tarde.** *Feito* voltou a **0** e
 > *Finalizado* subiu de 22 para **25**: o PI aceitou o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94),
