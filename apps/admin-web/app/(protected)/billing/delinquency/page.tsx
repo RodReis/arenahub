@@ -7,6 +7,7 @@ import {
   EmptyState,
   AcoesDaLinha,
   Identidade,
+  Telefone,
   Money,
   PageHeader,
   ProblemDetail,
@@ -19,7 +20,6 @@ import {
   linkDeCobranca,
   motivosDaLinha,
   situacaoVisivel,
-  telefoneLegivel,
 } from '../../../../src/billing/inadimplencia';
 import estilos from './delinquency.module.css';
 
@@ -214,11 +214,18 @@ export default async function InadimplenciaPage() {
                 <Identidade
                   nome={linha.studentName}
                   secundario={
-                    linha.telefone === null ||
-                    linkDeCobranca(linha.telefone, linha.studentName, linha.invoiceNumber) === null ? (
+                    linha.telefone === null ? (
                       <span className={estilos['semTelefone']}>sem telefone cadastrado</span>
                     ) : (
-                      telefoneLegivel(linha.telefone)
+                      /*
+                        `Telefone` do DS: mostra o numero E abre a conversa. A
+                        mensagem vem daqui porque e desta tela -- "lembrando da
+                        fatura 8222" nao serve para a ficha do aluno.
+                      */
+                      <Telefone
+                        numero={linha.telefone}
+                        mensagem={mensagemDeCobranca(linha.studentName, linha.invoiceNumber)}
+                      />
                     )
                   }
                 />
@@ -319,4 +326,17 @@ export default async function InadimplenciaPage() {
       />
     </section>
   );
+}
+
+/**
+ * A mensagem que abre a conversa de cobrança.
+ *
+ * Vive aqui e não no `Telefone` do DS: o texto é desta tela. "Lembrando da
+ * fatura 8222" não serve para a ficha do aluno nem para a avaliação vencida —
+ * um texto genérico no componente obrigaria cada tela a contorná-lo.
+ */
+function mensagemDeCobranca(nomeDoAluno: string, numeroDaFatura: number): string {
+  const primeiroNome = nomeDoAluno.trim().split(/\s+/)[0] ?? '';
+
+  return `Ola, ${primeiroNome}! Passando para lembrar da fatura ${String(numeroDaFatura)}, que esta em aberto. Qualquer duvida e so chamar.`;
 }

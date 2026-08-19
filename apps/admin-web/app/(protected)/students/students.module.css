@@ -93,3 +93,30 @@
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
 }
+
+/*
+ * MATRICULA E CPF na mesma linha de apoio da identidade.
+ *
+ * O papel `code` do DataTable dava isto quando a matricula era coluna propria;
+ * agora que ela vive DENTRO da identidade, o tratamento vem para ca.
+ */
+.matricula {
+  font-family: var(--ah-font-mono);
+  letter-spacing: 0.01em;
+}
+
+/* Separador visualmente MAIS FRACO que os dois dados que ele separa. */
+.separador {
+  color: var(--ah-border-strong);
+}
+
+.plano {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.nomeDoPlano {
+  color: var(--ah-text-default);
+  white-space: nowrap;
+}

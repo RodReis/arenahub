@@ -192,6 +192,15 @@ interface AlunoDto {
   status: string;
   archivedAt: string | null;
   version: number;
+  /**
+   * Plano da assinatura que vale agora. `null` quando o aluno não tem nenhuma
+   * — que é o caso normal de um interessado, não um erro.
+   */
+  planName: string | null;
+  /** Situação da assinatura, para a lista distinguir ativo de em atraso. */
+  subscriptionStatus: string | null;
+  /** Telefone principal, para o atalho de conversa na lista. */
+  phone: string | null;
 }
 
 interface ContatoDto {
@@ -271,7 +280,7 @@ export class StudentsController {
       ...(situacao.success ? { status: situacao.data } : {}),
     });
 
-    return encontrados.map((a) => this.paraDto(a));
+    return encontrados.map((a) => this.paraDtoDaLista(a));
   }
 
   @Get(':id')
@@ -470,6 +479,34 @@ export class StudentsController {
       status: aluno.status,
       archivedAt: aluno.archivedAt?.toISOString() ?? null,
       version: aluno.version,
+      planName: null,
+      subscriptionStatus: null,
+      phone: null,
+    };
+  }
+
+  /**
+   * DTO da LISTA -- carrega plano e telefone, que a ficha não precisa.
+   *
+   * Separado de `paraDto` porque são perguntas diferentes: a lista responde
+   * "quem são estes alunos?" e a ficha responde "quem é este aluno?". Devolver
+   * os mesmos campos nas duas faria a ficha carregar dado que ninguém lê ali,
+   * ou a lista ficar sem o que a recepção veio buscar.
+   */
+  private paraDtoDaLista(aluno: AlunoComVinculos): AlunoDto {
+    const assinatura = aluno.subscriptions?.[0];
+
+    return {
+      ...this.paraDto(aluno),
+      planName: assinatura?.plan.name ?? null,
+      subscriptionStatus: assinatura?.status ?? null,
+      phone: aluno.contacts?.[0]?.value ?? null,
     };
   }
 }
+
+/** O aluno como a busca o devolve: com a assinatura vigente e o telefone. */
+type AlunoComVinculos = Student & {
+  subscriptions?: { status: string; plan: { name: string } }[];
+  contacts?: { value: string }[];
+};

@@ -5,8 +5,11 @@ import {
   DataTable,
   EmptyState,
   Field,
+  Ausente,
+  Consequencia,
   Identidade,
   MaskedCPF,
+  Telefone,
   PageHeader,
   ProblemDetail,
   SelectField,
@@ -33,6 +36,9 @@ interface Aluno {
   fullName: string;
   birthDate: string;
   cpfMasked: string | null;
+  planName: string | null;
+  subscriptionStatus: string | null;
+  phone: string | null;
   status: string;
   archivedAt: string | null;
   version: number;
@@ -263,14 +269,6 @@ export default async function PaginaDeAlunos({
         caption="Alunos, do cadastro mais recente para o mais antigo"
         columns={[
           {
-            key: 'matricula',
-            header: 'Matrícula',
-            role: 'code',
-            // Sem `.matricula` local: o papel `code` do DataTable ja da mono,
-            // tabular-nums e tom secundario a coluna inteira.
-            render: (aluno) => aluno.membershipNumber,
-          },
-          {
             key: 'aluno',
             header: 'Aluno',
             /*
@@ -293,15 +291,69 @@ export default async function PaginaDeAlunos({
              * documento.
              */
             role: 'identity',
+            /*
+              MATRICULA E CPF NA MESMA LINHA de apoio, separados por `·`.
+              Antes eram duas colunas (matricula a esquerda, CPF sob o nome), e
+              o olho atravessava a linha entre duas metades da MESMA resposta:
+              "e esta pessoa?". Juntos, a conferencia de documento acontece num
+              ponto so.
+
+              O separador nao aparece quando falta o CPF -- e falta em 13 de 16
+              alunos, porque cadastrar sem documento e o caminho normal
+              (INV-009/011). Um `·` orfao viraria sujeira em quase toda linha.
+            */
             render: (aluno) => (
               <Identidade
                 nome={aluno.fullName}
                 href={`/students/${aluno.id}`}
-                {...(aluno.cpfMasked
-                  ? { secundario: <MaskedCPF masked={aluno.cpfMasked} /> }
-                  : {})}
+                secundario={
+                  <>
+                    <span className={estilos['matricula']}>{aluno.membershipNumber}</span>
+                    {aluno.cpfMasked ? (
+                      <>
+                        <span className={estilos['separador']}> · </span>
+                        <MaskedCPF masked={aluno.cpfMasked} />
+                      </>
+                    ) : null}
+                  </>
+                }
               />
             ),
+          },
+          {
+            key: 'plano',
+            header: 'Plano',
+            /*
+              O PLANO E METADE DA RESPOSTA na recepcao ("ele tem Mensal Fit ou
+              Anual Black?"), e ate esta fatia descobri-lo exigia abrir a ficha
+              de cada aluno. A API passou a devolve-lo com a assinatura
+              vigente.
+
+              `Ausente` e nao "sem plano": interessado sem assinatura e o
+              caminho normal do funil, nao uma falha -- e `—` com rotulo diz
+              "nao ha", enquanto "sem plano" soa como diagnostico.
+            */
+            render: (aluno) =>
+              aluno.planName === null ? (
+                <Ausente />
+              ) : (
+                <span className={estilos['plano']}>
+                  <span className={estilos['nomeDoPlano']}>{aluno.planName}</span>
+                  {aluno.subscriptionStatus === 'PAST_DUE' ? (
+                    <Consequencia tom="danger">assinatura em atraso</Consequencia>
+                  ) : null}
+                </span>
+              ),
+          },
+          {
+            key: 'contato',
+            header: 'Contato',
+            /*
+              A recepcao fala com o aluno por WhatsApp. Exibir o numero como
+              texto significa copiar, abrir o aplicativo, colar e digitar --
+              quatro passos com alguem esperando no balcao.
+            */
+            render: (aluno) => <Telefone numero={aluno.phone} />,
           },
           {
             key: 'nascimento',

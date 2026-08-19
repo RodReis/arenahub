@@ -604,6 +604,35 @@ export class StudentRepository {
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: filtro.limite,
       ...(filtro.cursor ? { cursor: { id: filtro.cursor }, skip: 1 } : {}),
+      /**
+       * O PLANO VEM JUNTO -- a lista responde "quem e este aluno?", e o plano
+       * e metade da resposta na recepcao ("ele tem Mensal Fit ou Anual
+       * Black?"). Sem isto, descobrir exigia abrir a ficha de cada um.
+       *
+       * SO A ASSINATURA QUE VALE AGORA: `ACTIVE` ou `PAST_DUE`, a mais
+       * recente. Um aluno pode ter historico de assinaturas canceladas, e
+       * mostrar a antiga diria que ele tem plano que nao tem.
+       *
+       * `take: 1` no include, e nao um segundo `findMany`: a alternativa seria
+       * uma consulta por aluno, que e o N+1 que o `docs/REVIEW.md` §3.4 barra.
+       */
+      include: {
+        subscriptions: {
+          where: { status: { in: ['ACTIVE', 'PAST_DUE'] } },
+          orderBy: { startsAt: 'desc' },
+          take: 1,
+          select: {
+            status: true,
+            plan: { select: { name: true } },
+          },
+        },
+        contacts: {
+          where: { type: 'PHONE' },
+          orderBy: { isPrimary: 'desc' },
+          take: 1,
+          select: { value: true },
+        },
+      },
     });
   }
 

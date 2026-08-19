@@ -131,12 +131,22 @@
 /*
  * IDENTIDADE -- quem a linha e. A coluna que o olho procura ao varrer.
  *
- * Sem largura maxima e com `width: 100%` no lugar certo? Nao: e a coluna que
- * PODE crescer, mas nao a que deve dominar. O teto existe porque nome de 60
- * caracteres nao pode empurrar o estado para fora da primeira dobra.
+ * `max-inline-size` SOZINHO NAO FUNCIONA em celula de tabela: com
+ * `table-layout: auto`, o navegador trata largura de `<td>` como sugestao e
+ * distribui a sobra pela coluna mais flexivel de qualquer jeito. Foi o que
+ * apareceu na tela de alunos -- a identidade ficou com 629 px dos 1134 da
+ * tabela, com o conteudo ocupando 250 px e o resto virando vao. O olho
+ * atravessava o vazio entre o nome e a data.
+ *
+ * `width: 1%` com `min-inline-size` e o idioma que a tabela entende: encolhe
+ * ao conteudo, com um piso para o nome nao espremer. A SOBRA vai para a
+ * coluna de apoio, que e a unica desenhada para receber -- e quando nao ha
+ * apoio, sobra distribuida entre poucas colunas e melhor que um vao numa so.
  */
 .tabela th[data-role='identity'],
 .tabela td[data-role='identity'] {
+  inline-size: 1%;
+  min-inline-size: 22ch;
   max-inline-size: 32ch;
 }
 
