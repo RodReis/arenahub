@@ -54,7 +54,17 @@
   font-size: var(--ah-type-mono-size);
   line-height: var(--ah-type-mono-lh);
   font-variant-numeric: tabular-nums;
+  /*
+   * A matricula e ANCORA DE CONFERENCIA, nao de varredura: ninguem le a
+   * coluna de cima a baixo -- procura-se uma matricula especifica, ja
+   * sabendo qual. Por isso ela recua para `carbon-400`, o tom que o
+   * DS-PAINEL §2.1 reserva a texto de apoio... e NAO recua: 3.78 reprova
+   * como corpo, e o §2.1 e explicito de que carbon-400 e so para borda,
+   * icone e placeholder. Fica em `--ah-text-secondary` (6.56) com o recuo
+   * feito por TAMANHO e espacamento, que nao custa legibilidade.
+   */
   color: var(--ah-text-secondary);
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
@@ -89,16 +99,27 @@
   color: var(--ah-text-secondary);
 }
 
-/*
- * Consequencia do estado, ao lado do badge. `caption` porque e explicacao do
- * badge, nao um segundo estado -- dois textos do mesmo tamanho na celula
- * fariam parecer que o aluno tem duas situacoes.
+/**
+ * A CONSEQUENCIA CARREGA O TOM DO PROBLEMA, e nao o cinza de legenda.
+ *
+ * "sem acesso a catraca" e a resposta a pergunta que traz a recepcao a esta
+ * tela: *por que ele nao passou?* (PRODUCT.md, principio 1 -- a excecao e o
+ * caso principal). Medido antes: cor `#565E69`, 12 px, peso 400 -- os
+ * MESMOS tres valores da legenda "Alunos, do cadastro mais recente" e do
+ * aviso sobre busca por CPF. Passava em contraste (6.56) e ainda assim
+ * desaparecia, porque contraste diz se da para LER, nao se da para ACHAR.
+ *
+ * `--ah-state-danger` e nao accent: e ESTADO, e accent em badge de maquina
+ * de estado e erro de lint (regra 3). Peso 500 em vez de 600 porque ela
+ * acompanha o badge, nao compete com ele.
  */
 .consequencia {
-  margin-left: 6px;
+  margin-left: 8px;
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
-  color: var(--ah-text-secondary);
+  font-weight: 500;
+  color: var(--ah-state-danger);
+  white-space: nowrap;
 }
 
 /**

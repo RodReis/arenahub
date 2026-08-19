@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/select';
 import { mascararCep, mascararCpf, mascararTelefone } from '@/lib/mascaras';
 
+import { estadoDoPasso as calcularEstadoDoPasso } from '../../../../src/students/trilha';
+
 import { cadastrarAluno, type EstadoDoCadastro } from '../../../actions/students';
 import estilos from './wizard.module.css';
 
@@ -411,6 +413,19 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
 
   const ehUltimo = passo === PASSOS.length - 1;
 
+  /**
+   * Preenchimento do passo. A regra e pura e mora em `src/students/trilha.ts`
+   * -- aqui so entram os tres estados do React que ela precisa ler.
+   *
+   * NAO inclui "atual", e isso e deliberado: preenchimento e posicao sao
+   * eixos INDEPENDENTES. Junta-los criou um ponto cego visto na tela -- com a
+   * unidade em falta e a pessoa parada no passo 3, "atual" vencia "pendente"
+   * e a trilha ficava calada enquanto o toast pedia a unidade. Por isso o
+   * markup carrega `data-estado` e `data-atual` separados.
+   */
+  const estadoDoPasso = (indice: number) =>
+    calcularEstadoDoPasso(indice, OBRIGATORIOS, valor, Boolean(faltando));
+
   return (
     <div className={estilos['wizard']}>
       <nav className={estilos['trilha']} aria-label="Etapas do cadastro">
@@ -419,26 +434,50 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
             <li key={titulo}>
               <button
                 type="button"
-                className={`${estilos['passo']} ${indice === passo ? estilos['passoAtual'] : ''}`}
+                className={estilos['passo']}
+                /*
+                  O ESTADO VAI NUM `data-`, e nao em classe concatenada: com
+                  quatro estados, a expressao ternaria aninhada que havia aqui
+                  ja estava ilegivel, e o CSS passa a selecionar por
+                  `[data-estado=...]` em vez de por nome de classe montado em
+                  JavaScript.
+                */
+                data-estado={estadoDoPasso(indice)}
+                data-atual={indice === passo ? 'true' : undefined}
                 onClick={() => setPasso(indice)}
                 // `aria-current` é o que anuncia "você está aqui" para o
                 // leitor de tela; o destaque visual sozinho não faz isso.
                 {...(indice === passo ? { 'aria-current': 'step' as const } : {})}
                 data-testid={`ir-para-passo-${indice + 1}`}
               >
-                <span
-                  className={`${estilos['numero']} ${
-                    indice === passo
-                      ? estilos['numeroAtual']
-                      : indice < passo
-                        ? estilos['numeroConcluido']
-                        : ''
-                  }`}
-                  aria-hidden="true"
-                >
-                  {indice + 1}
+                <span className={estilos['numero']} aria-hidden="true">
+                  {/*
+                    ÍCONE ALÉM DE COR -- DS-PAINEL §10: nenhum estado se
+                    comunica por cor sozinha. Pronto vira ✓ e pendente vira !;
+                    quem não distingue verde de vermelho, quem opera com
+                    brilho baixo e quem imprime a tela leem a mesma coisa.
+                    O número volta quando não há o que dizer.
+                  */}
+                  {estadoDoPasso(indice) === 'pendente'
+                    ? '!'
+                    : estadoDoPasso(indice) === 'pronto' && indice !== passo
+                      ? '✓'
+                      : indice + 1}
                 </span>
-                {titulo}
+
+                <span className={estilos['tituloDaTrilha']}>{titulo}</span>
+
+                {/*
+                  O leitor de tela NÃO recebe o ícone (o `<span>` acima é
+                  `aria-hidden`): recebe esta frase, que diz o mesmo em
+                  palavras. Sem ela, quem usa leitor ouviria só o título do
+                  passo e perderia a informação inteira.
+                */}
+                {estadoDoPasso(indice) === 'pronto' ? (
+                  <span className={estilos['apenasLeitor']}>— preenchido</span>
+                ) : estadoDoPasso(indice) === 'pendente' ? (
+                  <span className={estilos['apenasLeitor']}>— falta preencher</span>
+                ) : null}
               </button>
             </li>
           ))}
