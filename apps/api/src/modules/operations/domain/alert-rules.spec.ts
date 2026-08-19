@@ -5,9 +5,11 @@ import {
   LIMITES_PADRAO,
   avaliarDispositivo,
   avaliarEdge,
+  avaliarFinanceiro,
   avaliarSync,
   impressaoDigital,
   type EstadoDeSync,
+  type EstadoDoFinanceiro,
   type EstadoDoDispositivo,
   type EstadoDoEdge,
 } from './alert-rules.js';
@@ -348,5 +350,149 @@ describe('escopo desta fatia (ADR-012)', () => {
   it('os limites padrao batem com o plano', () => {
     expect(LIMITES_PADRAO.heartbeatMaximoMs).toBe(90_000);
     expect(LIMITES_PADRAO.taxaMinimaDeSync).toBe(0.99);
+  });
+});
+
+/**
+ * Saude do webhook e da conciliacao -- F16.
+ *
+ * O que estes testes protegem: o alerta de SILENCIO. Backlog e visivel (a fila
+ * cresce), mas webhook mudo nao produz erro nenhum -- tudo parece calmo
+ * enquanto nenhum pagamento e reconhecido. E a falha que so aparece quando um
+ * aluno reclama na recepcao.
+ */
+describe('avaliarFinanceiro', () => {
+  const AGORA_F16 = new Date('2026-08-19T12:00:00.000Z');
+
+  function financeiro(sobrescreve: Partial<EstadoDoFinanceiro> = {}): EstadoDoFinanceiro {
+    return {
+      providerAccountId: 'conta-1',
+      eventoPendenteMaisAntigo: null,
+      eventosPendentes: 0,
+      ultimoEventoRecebido: new Date('2026-08-19T11:59:00.000Z'),
+      divergenciasEmAberto: 0,
+      ...sobrescreve,
+    };
+  }
+
+  it('tudo em dia nao gera alerta', () => {
+    expect(avaliarFinanceiro(financeiro(), AGORA_F16)).toHaveLength(0);
+  });
+
+  it('evento pendente ha 20 min vira WEBHOOK_BACKLOG', () => {
+    const alertas = avaliarFinanceiro(
+      financeiro({
+        eventoPendenteMaisAntigo: new Date('2026-08-19T11:40:00.000Z'),
+        eventosPendentes: 3,
+      }),
+      AGORA_F16,
+    );
+
+    expect(alertas.map((a) => a.codigo)).toContain('WEBHOOK_BACKLOG');
+    expect(alertas[0]?.evidencia['eventosPendentes']).toBe(3);
+  });
+
+  it('evento pendente ha 5 min NAO alerta -- reentrega normal do provedor', () => {
+    // Alertar no SLO de 30 s acusaria toda reentrega. O limite e trinta vezes
+    // o SLO: o que sobra ali nao e lentidao, e travamento.
+    const alertas = avaliarFinanceiro(
+      financeiro({ eventoPendenteMaisAntigo: new Date('2026-08-19T11:55:00.000Z') }),
+      AGORA_F16,
+    );
+
+    expect(alertas.map((a) => a.codigo)).not.toContain('WEBHOOK_BACKLOG');
+  });
+
+  it('sem evento ha tres dias vira WEBHOOK_SILENCIOSO', () => {
+    const alertas = avaliarFinanceiro(
+      financeiro({ ultimoEventoRecebido: new Date('2026-08-16T12:00:00.000Z') }),
+      AGORA_F16,
+    );
+
+    expect(alertas.map((a) => a.codigo)).toContain('WEBHOOK_SILENCIOSO');
+  });
+
+  it('CONTA NOVA NAO ALERTA SILENCIO -- nunca recebeu evento nenhum', () => {
+    // Sem esta guarda, cadastrar a conta do provedor geraria alarme no mesmo
+    // dia, antes de existir cobranca capaz de gerar evento.
+    const alertas = avaliarFinanceiro(financeiro({ ultimoEventoRecebido: null }), AGORA_F16);
+
+    expect(alertas.map((a) => a.codigo)).not.toContain('WEBHOOK_SILENCIOSO');
+  });
+
+  it('um dia sem evento nao alerta -- academia pequena passa um dia sem PIX', () => {
+    const alertas = avaliarFinanceiro(
+      financeiro({ ultimoEventoRecebido: new Date('2026-08-18T12:00:00.000Z') }),
+      AGORA_F16,
+    );
+
+    expect(alertas.map((a) => a.codigo)).not.toContain('WEBHOOK_SILENCIOSO');
+  });
+
+  it('divergencia em aberto vira RECONCILIATION_PENDING, severidade INFO', () => {
+    const alertas = avaliarFinanceiro(financeiro({ divergenciasEmAberto: 4 }), AGORA_F16);
+    const alerta = alertas.find((a) => a.codigo === 'RECONCILIATION_PENDING');
+
+    // INFO e nao WARNING: divergencia de conciliacao nao para a catraca. Subir
+    // a severidade a nivelaria com Edge offline, e a operacao perderia a
+    // distincao que faz o painel valer.
+    expect(alerta?.severidade).toBe('INFO');
+    expect(alerta?.evidencia['divergenciasEmAberto']).toBe(4);
+  });
+
+  it('BACKLOG E SILENCIO SAO ALERTAS DIFERENTES -- as acoes sao opostas', () => {
+    // Backlog manda olhar o processamento; silencio manda olhar a configuracao
+    // do webhook no provedor. Um codigo so faria a operacao ligar para a
+    // pessoa errada -- mesmo criterio que separou EDGE_OFFLINE de
+    // EDGE_CREDENTIAL_EXPIRING (ADR-011).
+    const alertas = avaliarFinanceiro(
+      financeiro({
+        eventoPendenteMaisAntigo: new Date('2026-08-16T11:00:00.000Z'),
+        eventosPendentes: 2,
+        ultimoEventoRecebido: new Date('2026-08-16T12:00:00.000Z'),
+      }),
+      AGORA_F16,
+    );
+
+    expect(alertas.map((a) => a.codigo).sort()).toEqual(['WEBHOOK_BACKLOG', 'WEBHOOK_SILENCIOSO']);
+    expect(alertas[0]?.acaoRecomendada).not.toBe(alertas[1]?.acaoRecomendada);
+  });
+
+  it('todo alerta financeiro tem impacto e acao em pt-BR', () => {
+    const alertas = avaliarFinanceiro(
+      financeiro({
+        eventoPendenteMaisAntigo: new Date('2026-08-16T11:00:00.000Z'),
+        ultimoEventoRecebido: new Date('2026-08-16T12:00:00.000Z'),
+        divergenciasEmAberto: 1,
+      }),
+      AGORA_F16,
+    );
+
+    expect(alertas).toHaveLength(3);
+
+    for (const alerta of alertas) {
+      expect(alerta.impacto.length).toBeGreaterThan(20);
+      expect(alerta.acaoRecomendada.length).toBeGreaterThan(20);
+      expect(alerta.recurso).toBe('BILLING');
+    }
+  });
+
+  it('evidencia financeira nao carrega PII nem valor de aluno', () => {
+    const alertas = avaliarFinanceiro(
+      financeiro({
+        eventoPendenteMaisAntigo: new Date('2026-08-16T11:00:00.000Z'),
+        divergenciasEmAberto: 1,
+      }),
+      AGORA_F16,
+    );
+
+    for (const alerta of alertas) {
+      const chaves = Object.keys(alerta.evidencia).join(',').toLowerCase();
+
+      expect(chaves).not.toContain('cpf');
+      expect(chaves).not.toContain('student');
+      expect(chaves).not.toContain('nome');
+      expect(chaves).not.toContain('amount');
+    }
   });
 });
