@@ -30,8 +30,16 @@
 export interface TentativaDeCobranca {
   /** Quantas tentativas JA FORAM FEITAS para esta invoice. Nunca negativo. */
   readonly tentativasFeitas: number;
-  /** A ultima falha e definitiva? `undefined` quando ainda nao houve falha. */
-  readonly ultimaFalhaEPermanente?: boolean;
+  /**
+   * A ultima falha e definitiva? `undefined` quando ainda nao houve falha.
+   *
+   * O `| undefined` e explicito porque o projeto usa
+   * `exactOptionalPropertyTypes`: sem ele, "campo ausente" e "campo presente
+   * valendo undefined" seriam tipos diferentes, e quem le do banco tem o
+   * segundo. Os TRES estados importam -- nunca falhou, falhou e da para
+   * repetir, falhou e nao adianta.
+   */
+  readonly ultimaFalhaEPermanente?: boolean | undefined;
 }
 
 export interface PoliticaDeRetry {

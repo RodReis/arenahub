@@ -11,6 +11,9 @@ import {
 } from './billing.repository.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
+import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
+import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
+import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
 
 const esquemaDeAbertura = z
   .object({
@@ -24,6 +27,28 @@ const esquemaDeAbertura = z
      * abrir a invoice de setembro.
      */
     emQue: z.iso.datetime(),
+  })
+  .strict();
+
+/**
+ * Metodo de pagamento tokenizado. `MVP-02` 7, Slice 2.3.
+ *
+ * `.strict()` NAO E DETALHE AQUI: e o que faz uma requisicao com
+ * `cardNumber` ser RECUSADA no boundary em vez de ignorada em silencio. Se um
+ * front mal escrito mandar o cartao junto, a resposta e 400 -- e nao um 201
+ * que esconde o PAN tendo chegado ao servidor (INV-098).
+ */
+const esquemaDeMetodoTokenizado = z
+  .object({
+    studentId: z.uuid(),
+    /** Token do cofre do provedor. NUNCA o numero do cartao. */
+    externalTokenId: z.string().min(8).max(255),
+    brand: z.string().min(1).max(40).optional(),
+    /** Exatamente 4 digitos -- e o maximo que a bandeira permite exibir. */
+    last4: z.string().regex(/^[0-9]{4}$/).optional(),
+    expMonth: z.number().int().min(1).max(12).optional(),
+    expYear: z.number().int().min(2020).max(2100).optional(),
+    tornarPadrao: z.boolean().optional(),
   })
   .strict();
 
@@ -99,12 +124,35 @@ interface StatusDePagamentoDto {
   occurredAt: string;
 }
 
+interface MetodoDePagamentoDto {
+  id: string;
+  provider: string;
+  brand: string | null;
+  last4: string | null;
+  isDefault: boolean;
+}
+
+interface CobrancaNoCartaoDto {
+  paymentAttemptId: string;
+  externalSubscriptionId: string;
+  amountMinor: number;
+  currency: string;
+}
+
+interface RecorrenciaCanceladaDto {
+  subscriptionId: string;
+  canceladasNoProvedor: number;
+}
+
 @Controller('api/v1')
 export class BillingController {
   constructor(
     private readonly billing: BillingRepository,
     private readonly cobrancaPix: CriarCobrancaPixUseCase,
     private readonly statusDePagamento: ConsultarStatusDePagamentoUseCase,
+    private readonly metodoDePagamento: RegistrarMetodoDePagamentoUseCase,
+    private readonly cobrancaNoCartao: CobrarAssinaturaNoCartaoUseCase,
+    private readonly cancelamentoDeRecorrencia: CancelarRecorrenciaUseCase,
     private readonly contexto: TenantContextService,
   ) {}
 
@@ -193,6 +241,73 @@ export class BillingController {
       expiresAt: cobranca.expiresAt.toISOString(),
       amountMinor: cobranca.amountMinor,
       currency: cobranca.currency,
+    };
+  }
+
+  /**
+   * Registra o metodo de pagamento tokenizado do aluno. Slice 2.3.
+   *
+   * O CORPO NAO TEM E NAO PODE TER DADO DE CARTAO (INV-098, `M2-FR-011`). O
+   * token chega pronto do checkout hospedado do provedor -- o cartao vai do
+   * navegador do aluno direto para a Getnet (ADR-032). O `.strict()` do
+   * schema recusa a requisicao que trouxer `cardNumber` junto, em vez de
+   * ignorar o campo e devolver 201 com o PAN ja tendo chegado ao servidor.
+   */
+  @Post('payment-methods')
+  @RequirePermissions('billing.manage')
+  async registrarMetodoDePagamento(@Body() corpo: unknown): Promise<MetodoDePagamentoDto> {
+    const dados = esquemaDeMetodoTokenizado.parse(corpo);
+
+    const metodo = await this.metodoDePagamento.executar(this.contexto.require(), dados);
+
+    return {
+      id: metodo.id,
+      provider: metodo.provider,
+      brand: metodo.brand,
+      last4: metodo.last4,
+      isDefault: metodo.isDefault,
+    };
+  }
+
+  /**
+   * Cobra a invoice no cartao padrao do aluno. Slice 2.3.
+   *
+   * NAO CONFIRMA PAGAMENTO -- devolve a tentativa. A confirmacao vem por
+   * webhook (INV-076) ou pela consulta ativa, como no PIX.
+   */
+  @Post('invoices/:id/payments/card')
+  @RequirePermissions('billing.manage')
+  async cobrarNoCartao(@Param('id') id: string): Promise<CobrancaNoCartaoDto> {
+    const cobranca = await this.cobrancaNoCartao.executar(this.contexto.require(), {
+      invoiceId: id,
+      agora: new Date(),
+    });
+
+    return {
+      paymentAttemptId: cobranca.paymentAttemptId,
+      externalSubscriptionId: cobranca.externalSubscriptionId,
+      amountMinor: cobranca.amountMinor,
+      currency: cobranca.currency,
+    };
+  }
+
+  /**
+   * Cancela a recorrencia de cartao da assinatura. Slice 2.3.
+   *
+   * CANCELAR A RECORRENCIA NAO CANCELA A ASSINATURA: o aluno que pagou ate o
+   * dia 30 continua entrando ate o dia 30. Quem decide acesso e o entitlement
+   * (regra de arquitetura no 1), e esta rota nao o toca.
+   */
+  @Post('subscriptions/:id/recurrence/cancel')
+  @RequirePermissions('billing.manage')
+  async cancelarRecorrencia(@Param('id') id: string): Promise<RecorrenciaCanceladaDto> {
+    const resultado = await this.cancelamentoDeRecorrencia.executar(this.contexto.require(), {
+      subscriptionId: id,
+    });
+
+    return {
+      subscriptionId: resultado.subscriptionId,
+      canceladasNoProvedor: resultado.canceladasNoProvedor,
     };
   }
 

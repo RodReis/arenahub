@@ -2102,6 +2102,15 @@ model BillingSettings {
   dueDay    Int   @map("due_day")
   /// Dias de carencia depois do vencimento antes do bloqueio.
   graceDays Int   @default(0) @map("grace_days")
+  /// Dias apos o vencimento em que cada tentativa de cobranca acontece.
+  ///
+  /// O TAMANHO DA LISTA E O MAXIMO DE TENTATIVAS -- nao existe um segundo
+  /// campo `maxTentativas` que possa discordar dela. Lista vazia desliga a
+  /// cobranca automatica.
+  ///
+  /// Padrao `[0, 3, 7]` decidido pelo PI em 19/08/2026. Por tenant para que
+  /// uma academia ajuste sem deploy.
+  retryOffsetDays Int[] @default([0, 3, 7]) @map("retry_offset_days")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

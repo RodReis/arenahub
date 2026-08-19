@@ -3,6 +3,9 @@ import { Module } from '@nestjs/common';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { BillingController } from './billing.controller.js';
 import { BillingRepository } from './billing.repository.js';
+import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
+import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
+import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { ProcessarWebhookDePagamentoUseCase } from './processar-webhook-de-pagamento.use-case.js';
@@ -45,6 +48,9 @@ import { WebhookController } from './webhook.controller.js';
     ProcessarWebhookDePagamentoUseCase,
     TenantContextService,
     ProviderAccountResolver,
+    RegistrarMetodoDePagamentoUseCase,
+    CobrarAssinaturaNoCartaoUseCase,
+    CancelarRecorrenciaUseCase,
     { provide: PAYMENT_PROVIDER, useClass: FakePaymentProvider },
   ],
   exports: [BillingRepository, PAYMENT_PROVIDER],

@@ -186,21 +186,32 @@ describe('FakePaymentProvider.verifyAndParseWebhook -- INV-077', () => {
 });
 
 describe('FakePaymentProvider -- metodos de fatia futura', () => {
-  it.each([
-    ['createTokenizedSubscription', () => new FakePaymentProvider().createTokenizedSubscription({
-      externalAccountId: CONTA,
-      cardToken: 'tok_x',
-      amountMinor: 1,
-      currency: 'BRL',
-      idempotencyKey: 'k',
-    })],
-    ['cancelSubscription', () => new FakePaymentProvider().cancelSubscription('sub_x')],
-    ['refundPayment', () => new FakePaymentProvider().refundPayment({
-      externalPaymentId: 'fake_pay_x',
-      amountMinor: 1,
-      idempotencyKey: 'k',
-    })],
-  ])('%s estoura em vez de devolver dado inventado', (_nome, chamada) => {
-    expect(chamada).toThrow(ErroDoProvedor);
+  /**
+   * `createTokenizedSubscription` e `cancelSubscription` SAIRAM desta lista
+   * na F14, que os implementou. Sobrou `refundPayment`, da F16.
+   *
+   * A lista encolhe a cada fatia, e e assim que ela avisa: um metodo que
+   * continua aqui e um metodo que ninguem escreveu ainda -- melhor estourar
+   * do que devolver dado inventado que passa por resposta de provedor.
+   */
+  it('refundPayment estoura em vez de devolver dado inventado', () => {
+    expect(() =>
+      new FakePaymentProvider().refundPayment({
+        externalPaymentId: 'fake_pay_x',
+        amountMinor: 1,
+        idempotencyKey: 'k',
+      }),
+    ).toThrow(ErroDoProvedor);
+  });
+
+  it('cancelSubscription de assinatura inexistente e NOT_FOUND, nao sucesso', () => {
+    /**
+     * Nao e "metodo nao implementado": e a resposta certa. Quem chama precisa
+     * distinguir "cancelei" de "nao havia nada" -- o caso de uso trata o
+     * NOT_FOUND como estado ja alcancado, mas essa e decisao DELE.
+     */
+    expect(() => new FakePaymentProvider().cancelSubscription('sub_inexistente')).toThrow(
+      ErroDoProvedor,
+    );
   });
 });
