@@ -42,62 +42,20 @@
   flex: 0 0 auto;
 }
 
-/**
- * Matricula em MONO -- DS-PAINEL.md §3: dado tecnico usa JetBrains Mono.
- *
- * `tabular-nums` alinha os digitos coluna a coluna: com fonte proporcional,
- * uma coluna de matriculas fica com as bordas serrilhadas e o olho perde a
- * referencia ao varrer de cima para baixo.
- */
-.matricula {
-  font-family: var(--ah-font-mono);
-  font-size: var(--ah-type-mono-size);
-  line-height: var(--ah-type-mono-lh);
-  font-variant-numeric: tabular-nums;
-  /*
-   * A matricula e ANCORA DE CONFERENCIA, nao de varredura: ninguem le a
-   * coluna de cima a baixo -- procura-se uma matricula especifica, ja
-   * sabendo qual. Por isso ela recua para `carbon-400`, o tom que o
-   * DS-PAINEL §2.1 reserva a texto de apoio... e NAO recua: 3.78 reprova
-   * como corpo, e o §2.1 e explicito de que carbon-400 e so para borda,
-   * icone e placeholder. Fica em `--ah-text-secondary` (6.56) com o recuo
-   * feito por TAMANHO e espacamento, que nao custa legibilidade.
-   */
-  color: var(--ah-text-secondary);
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-}
-
-/**
- * Nome e CPF empilhados numa celula so -- e o que o mockup faz.
- *
- * Junta as duas informacoes que identificam a pessoa no mesmo bloco visual,
- * em vez de espalha-las por colunas distantes: quem confere documento no
- * balcao le nome e documento junto, nao em pontos opostos da linha.
- */
-.identificacao {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 0;
-}
-
-.nome {
-  font-size: var(--ah-type-body-strong-size);
-  line-height: var(--ah-type-body-strong-lh);
-  font-weight: var(--ah-type-body-strong-weight);
-}
-
 /*
- * O CPF mascarado e contexto, nao titulo: cai para `caption` e para o texto
- * secundario, senao competiria com o nome pelo mesmo peso visual.
+ * `.matricula`, `.identificacao`, `.nome` e `.documento` SAIRAM.
+ *
+ * Nao foram removidas por estarem sem uso: foram removidas porque o padrao de
+ * tabela passou a fazer o que elas faziam. Mono, `tabular-nums` e tom
+ * secundario na matricula sao o papel de coluna `code`; nome e CPF empilhados
+ * sao o `Identidade`. Manter as duas versoes e como um sistema deixa de ser
+ * sistema -- a proxima tela copiaria a classe local e a tabela voltaria a ter
+ * duas linguagens.
+ *
+ * `.consequencia` FICA: o `Consequencia` do design system cobre o padrao, mas
+ * esta tela ainda usa a classe local, e troca-la e mudanca de comportamento
+ * fora do escopo desta migracao.
  */
-.documento {
-  font-family: var(--ah-font-mono);
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
-  color: var(--ah-text-secondary);
-}
 
 /**
  * A CONSEQUENCIA CARREGA O TOM DO PROBLEMA, e nao o cinza de legenda.
