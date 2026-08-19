@@ -8,7 +8,6 @@ import {
   estornoEhTotal,
   suspendeAcessoAgora,
   validarPedidoDeEstorno,
-  type MetodoDoPagamento,
   type PoliticaDeAcessoNoEstorno,
 } from './domain/estorno.js';
 import {
@@ -130,7 +129,7 @@ export class EstornarPagamentoUseCase {
     validarPedidoDeEstorno(
       {
         status: pagamento.status,
-        method: pagamento.method as MetodoDoPagamento,
+        method: pagamento.method,
         amountMinor: pagamento.amountMinor,
         currency: pagamento.currency,
       },

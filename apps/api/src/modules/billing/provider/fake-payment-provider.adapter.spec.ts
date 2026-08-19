@@ -257,7 +257,7 @@ describe('FakePaymentProvider.refundPayment -- F16', () => {
     ).toThrow(ErroDoProvedor);
   });
 
-  it('recusa estorno de pagamento inexistente', async () => {
+  it('recusa estorno de pagamento inexistente', () => {
     expect(() =>
       new FakePaymentProvider().refundPayment({
         externalPaymentId: 'fake_pay_inexistente',

@@ -65,7 +65,7 @@ function canonico(valor: unknown): string {
     return `[${valor.map(canonico).join(',')}]`;
   }
 
-  const chaves = Object.keys(valor as Record<string, unknown>).sort();
+  const chaves = Object.keys(valor).sort();
 
   return `{${chaves
     .map((c) => `${JSON.stringify(c)}:${canonico((valor as Record<string, unknown>)[c])}`)

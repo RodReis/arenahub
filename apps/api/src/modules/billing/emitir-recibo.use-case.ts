@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 import { Injectable } from '@nestjs/common';
 
 import type { Prisma } from '@arenahub/database';

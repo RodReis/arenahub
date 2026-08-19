@@ -11,10 +11,7 @@ import {
   PagamentoManualNaoEstornavelError,
 } from '../../src/modules/billing/domain/estorno.js';
 import { EmitirReciboUseCase } from '../../src/modules/billing/emitir-recibo.use-case.js';
-import {
-  EstornarPagamentoUseCase,
-  EstornoJaEmAndamentoError,
-} from '../../src/modules/billing/estornar-pagamento.use-case.js';
+import { EstornarPagamentoUseCase } from '../../src/modules/billing/estornar-pagamento.use-case.js';
 import {
   FakePaymentProvider,
   PROVEDOR_FAKE,
@@ -66,8 +63,6 @@ describe('F16 -- estorno, conciliacao e recibo', () => {
    * um motivo que nao e o que eles testam.
    */
   const AGORA = new Date('2026-12-05T12:00:00.000Z');
-  const JANELA = { de: new Date('2026-08-01T00:00:00Z'), ate: new Date('2026-09-01T00:00:00Z') };
-
   /**
    * Janela EXCLUSIVA dos testes de conciliacao, separada da dos de estorno.
    *
