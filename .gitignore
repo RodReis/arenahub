@@ -100,3 +100,7 @@ docs/design/stitch_system_specification_analysis/*/
 
 # Artefato do MCP do Playwright -- snapshot e log de sessao de browser.
 .playwright-mcp/
+
+# dado real de aluno da importacao Pacto (F47/ADR-033) -- NUNCA versionar.
+# a seed le de PACTO_IMPORT_JSON_PATH, fora da arvore do repositorio.
+packages/database/prisma/import/*.json
