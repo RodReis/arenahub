@@ -204,7 +204,11 @@ export default async function InadimplenciaPage() {
               <div className={estilos['identidade']}>
                 <span className={estilos['nome']}>{linha.studentName}</span>
 
-                {linha.telefone === null ? (
+                {linha.telefone === null || linkDeCobranca(
+                  linha.telefone,
+                  linha.studentName,
+                  linha.invoiceNumber,
+                ) === null ? (
                   <span className={estilos['semTelefone']}>sem telefone cadastrado</span>
                 ) : (
                   <span className={estilos['telefone']}>{telefoneLegivel(linha.telefone)}</span>
@@ -283,7 +287,9 @@ export default async function InadimplenciaPage() {
                 ) : (
                   <Button
                     variant="solid"
-                    href={linkDeCobranca(linha.telefone, linha.studentName, linha.invoiceNumber)}
+                    href={
+                      linkDeCobranca(linha.telefone, linha.studentName, linha.invoiceNumber) ?? '#'
+                    }
                   >
                     Cobrar no WhatsApp
                   </Button>

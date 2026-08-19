@@ -227,7 +227,23 @@ export class ConsultarInadimplenciaUseCase {
         return pesoDeB - pesoDeA;
       }
 
-      return a.dueAt.getTime() - b.dueAt.getTime();
+      if (a.dueAt.getTime() !== b.dueAt.getTime()) {
+        return a.dueAt.getTime() - b.dueAt.getTime();
+      }
+
+      /**
+       * DESEMPATE FINAL PELO ID, apontado pela revisao.
+       *
+       * Duas faturas do mesmo valor, mesmo atraso e mesmo vencimento -- o caso
+       * comum de faturamento em lote de um plano so -- empatavam em todos os
+       * criterios, e a ordem caia para o que o Postgres devolvesse. Sem chave
+       * de desempate no `ORDER BY`, isso NAO e estavel: as duas trocavam de
+       * lugar entre recargas, sem nenhum dado ter mudado.
+       *
+       * A fila de cobranca dançando sozinha faz quem trabalha nela perder a
+       * marca de onde parou.
+       */
+      return a.invoiceId.localeCompare(b.invoiceId);
     });
   }
 

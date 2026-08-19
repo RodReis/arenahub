@@ -11,15 +11,16 @@
  * nenhum de texto.
  */
 .area {
-  color: var(--ah-text-muted);
+  color: var(--ah-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
 .vazio {
   margin: 0;
   padding: 24px 0;
-  color: var(--ah-text-muted);
-  font-size: var(--ah-text-sm);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
 }
 
 /*

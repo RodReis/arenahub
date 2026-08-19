@@ -42,8 +42,18 @@ export function linkDeCobranca(
   telefone: string,
   nomeDoAluno: string,
   numeroDaFatura: number,
-): string {
+): string | null {
   const numero = apenasDigitos(telefone);
+
+  /**
+   * SEM DIGITO NAO HA LINK, apontado pela revisao. `wa.me/?text=...` abre o
+   * WhatsApp sem destinatario -- a recepcao clica, o app abre vazio, e ela nao
+   * entende o que aconteceu. Devolver `null` faz a tela cair no mesmo caminho
+   * de "sem telefone", que ao menos explica.
+   */
+  if (numero === '') {
+    return null;
+  }
   const primeiroNome = nomeDoAluno.trim().split(/\s+/)[0] ?? '';
 
   const mensagem = `Ola, ${primeiroNome}! Passando para lembrar da fatura ${String(numeroDaFatura)}, que esta em aberto. Qualquer duvida e so chamar.`;

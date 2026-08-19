@@ -22,17 +22,35 @@
  * Abaixo de 900px vira uma coluna -- lado a lado, o grafico ficaria com 200px
  * e as barras viravam tracinhos.
  */
+/*
+ * FUNDO AFUNDADO NO BLOCO, e nao sombra nos cards.
+ *
+ * O PI pediu "borda, sombra, qualquer coisa" para dar peso. O `DS-PAINEL.md`
+ * §4 e explicito no sentido contrario -- "sombra APENAS em camada que flutua;
+ * card nao tem sombra, tem borda; superficie plana le melhor em densidade
+ * alta" --, e e contrato do ADR-026, nao preferencia.
+ *
+ * A causa do "sem peso" nao era falta de sombra: era falta de SEPARACAO entre
+ * o bloco do gestor e a fila de cobranca, que eram duas superficies brancas
+ * encostadas. Afundar o fundo do bloco e deixar os cards brancos por cima
+ * cria a divisao por contraste de superficie -- o mesmo recurso que o mockup
+ * do Dashboard usa --, respeita o DS e resolve tambem o degrau de altura.
+ */
 .visaoDoGestor {
   display: grid;
   grid-template-columns: 1fr 1.4fr;
   /*
-   * `start` e nao o `stretch` padrao do grid: visto na tela, o card do dinheiro
-   * esticava ate a altura do grafico e sobrava um vazio de 80px sob a linha de
-   * numeros -- espaco morto que parecia conteudo faltando.
+   * `stretch` de volta: com fundo proprio, os dois cards com a MESMA altura
+   * formam uma faixa, e o degrau que `start` produzia ficava evidente contra
+   * o fundo afundado. O vazio que `start` tinha vindo consertar sumiu quando
+   * as faixas zeradas sairam do grafico.
    */
-  align-items: start;
-  gap: 24px;
+  align-items: stretch;
+  gap: 16px;
   margin: 0 0 40px;
+  padding: 16px;
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-sunken);
 }
 
 @media (max-width: 900px) {
@@ -41,21 +59,39 @@
   }
 }
 
+/*
+ * Sem borda: contra o fundo afundado, a diferenca de superficie ja separa. A
+ * borda cinza por cima disso viraria uma segunda linha no mesmo lugar --
+ * ruido, nao definicao.
+ */
 .dinheiro,
 .composicao {
-  padding: 24px;
-  border: 1px solid var(--ah-border-subtle);
-  border-radius: var(--ah-radius-md);
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border-radius: var(--ah-radius-card);
   background: var(--ah-surface-raised);
+}
+
+/*
+ * O grafico centraliza no espaco que sobra em vez de encostar no topo -- era
+ * o vazio de ~30px sob as barras que o PI circulou.
+ */
+.composicao > :last-child {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
 }
 
 .rotulo {
   margin: 0;
-  font-size: var(--ah-text-xs);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ah-text-muted);
+  color: var(--ah-text-secondary);
 }
 
 /*
@@ -91,13 +127,15 @@
 }
 
 .secundarios dt {
-  font-size: var(--ah-text-xs);
-  color: var(--ah-text-muted);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
 }
 
 .secundarios dd {
   margin: 2px 0 0;
-  font-size: var(--ah-text-lg);
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
   font-weight: 600;
   color: var(--ah-text-strong);
   font-variant-numeric: tabular-nums;
@@ -105,7 +143,8 @@
 
 .tituloDoBloco {
   margin: 0 0 16px;
-  font-size: var(--ah-text-sm);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
   font-weight: 600;
   color: var(--ah-text-default);
 }
@@ -117,21 +156,28 @@
  * quem olha assume ordem cronologica e desconfia da tela quando o segundo item
  * tem menos dias que o primeiro.
  */
+/*
+ * O titulo da fila abre o SEGUNDO bloco, entao carrega o respiro que separa as
+ * duas leituras. Sem ele, "Fila de cobranca" colava no resumo e as duas
+ * perguntas -- "quanto e onde" e "quem eu cobro" -- pareciam a mesma.
+ */
 .tituloDaFila {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 12px;
   margin: 0 0 12px;
-  font-size: var(--ah-text-lg);
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
   font-weight: 600;
   color: var(--ah-text-strong);
 }
 
 .apoioDoTitulo {
-  font-size: var(--ah-text-xs);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
   font-weight: 400;
-  color: var(--ah-text-muted);
+  color: var(--ah-text-secondary);
 }
 
 /* ─── Célula de identidade ─────────────────────────────────────────────── */
@@ -155,15 +201,17 @@
  */
 .telefone {
   font-family: var(--ah-font-mono);
-  font-size: var(--ah-text-xs);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
   font-variant-numeric: tabular-nums;
-  color: var(--ah-text-muted);
+  color: var(--ah-text-secondary);
 }
 
 .semTelefone {
-  font-size: var(--ah-text-xs);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
   font-style: italic;
-  color: var(--ah-text-muted);
+  color: var(--ah-text-secondary);
 }
 
 /*
@@ -187,7 +235,7 @@
   border-radius: 999px;
   background: var(--ah-surface-sunken);
   font-size: 11px;
-  color: var(--ah-text-muted);
+  color: var(--ah-text-secondary);
   white-space: nowrap;
 }
 
@@ -203,12 +251,12 @@
 .numero {
   font-family: var(--ah-font-mono);
   font-variant-numeric: tabular-nums;
-  color: var(--ah-text-muted);
+  color: var(--ah-text-secondary);
 }
 
 .vencimento {
   font-size: 11px;
-  color: var(--ah-text-muted);
+  color: var(--ah-text-secondary);
   white-space: nowrap;
 }
 
@@ -217,7 +265,8 @@
  * isto ele competia com o numero da fatura, que ninguem compara entre linhas.
  */
 .valor {
-  font-size: var(--ah-text-md);
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
   font-weight: 600;
   color: var(--ah-text-strong);
   font-variant-numeric: tabular-nums;

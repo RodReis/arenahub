@@ -67,16 +67,38 @@ interface Props {
  * nao muda nada, que e o comportamento correto.
  */
 function useCoresDosTokens(tokens: readonly string[]): readonly string[] {
-  const [cores, setCores] = useState<readonly string[]>([]);
   const chave = tokens.join('|');
 
-  useEffect(() => {
-    const estilo = getComputedStyle(document.documentElement);
+  /**
+   * ESTADO INICIAL LAZY, para o caso de navegacao dentro do app.
+   *
+   * A revisao apontou flash de cor no primeiro paint: `cores` nascia vazio, as
+   * barras caiam no fallback `currentColor` e so assumiam a cor de severidade
+   * depois do efeito. Numa navegacao client-side o `document` ja existe, entao
+   * da para resolver ANTES do primeiro paint.
+   *
+   * No SSR puro o flash permanece, e e inerente: resolver `var(--token)` exige
+   * um documento com CSS aplicado, que o servidor nao tem. O fallback e um
+   * cinza legivel, nao um buraco.
+   */
+  const [cores, setCores] = useState<readonly string[]>(() => lerCores(chave));
 
-    setCores(chave.split('|').map((token) => estilo.getPropertyValue(token).trim()));
+  useEffect(() => {
+    setCores(lerCores(chave));
   }, [chave]);
 
   return cores;
+}
+
+/** Resolve os tokens. Devolve vazio no servidor, onde nao ha documento. */
+function lerCores(chave: string): readonly string[] {
+  if (typeof document === 'undefined') {
+    return [];
+  }
+
+  const estilo = getComputedStyle(document.documentElement);
+
+  return chave.split('|').map((token) => estilo.getPropertyValue(token).trim());
 }
 
 export function BarrasDeFaixa({ faixas, descricao, testId }: Props) {
@@ -129,7 +151,20 @@ export function BarrasDeFaixa({ faixas, descricao, testId }: Props) {
         </tbody>
       </table>
 
-      <ResponsiveContainer width="100%" height={comValor.length * 48}>
+      {/*
+        `aria-hidden` NO WRAPPER e o que de fato tira o SVG da arvore de
+        acessibilidade.
+        
+        ACHADO PELA REVISAO, e o comentario anterior afirmava algo FALSO: eu
+        dizia que `accessibilityLayer={false}` fazia o SVG "sumir" para o
+        leitor de tela. Conferido na fonte do recharts 3.10.1
+        (`container/RootSurface.js`), ele apenas zera `role` e `tabIndex` --
+        nunca aplica `aria-hidden`. Os `<text>` do eixo e dos rotulos
+        continuavam na arvore, e quem le por audio ouviria cada faixa DUAS
+        vezes: uma pela tabela, outra pelos textos soltos do grafico.
+      */}
+      <div aria-hidden="true">
+        <ResponsiveContainer width="100%" height={comValor.length * 48}>
         <BarChart
           data={comValor}
           layout="vertical"
@@ -176,7 +211,8 @@ export function BarrasDeFaixa({ faixas, descricao, testId }: Props) {
             />
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
