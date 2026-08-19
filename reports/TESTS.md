@@ -16,12 +16,12 @@ Classificação por **sufixo de arquivo**, não por pasta (`docs/TESTING.md` §2
 
 | nível | sufixo | arquivos |
 |---|---|---|
-| unitário | `.spec.ts` | 48 |
+| unitário | `.spec.ts` | 50 |
 | contrato | `.contract-spec.ts` | 0 |
-| integração | `.int-spec.ts` | 22 |
+| integração | `.int-spec.ts` | 23 |
 | e2e | `.e2e-spec.ts` | 6 |
 | hardware | `.hw-spec.ts` | 0 |
-| **total** | | **76** |
+| **total** | | **79** |
 
 ## Por SPEC / fatia
 
