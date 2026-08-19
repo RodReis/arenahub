@@ -673,6 +673,29 @@
         ]
       }
     },
+    "/api/v1/refunds/{id}/observe": {
+      "post": {
+        "operationId": "EstornoConciliacaoController_observar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EstornoConciliacao"
+        ]
+      }
+    },
     "/api/v1/reconciliation/runs": {
       "post": {
         "operationId": "EstornoConciliacaoController_conciliar",

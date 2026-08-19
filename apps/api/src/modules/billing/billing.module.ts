@@ -16,6 +16,7 @@ import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { EmitirReciboUseCase } from './emitir-recibo.use-case.js';
 import { EstornarPagamentoUseCase } from './estornar-pagamento.use-case.js';
 import { EstornoConciliacaoController } from './estorno-conciliacao.controller.js';
+import { ObservarEstornoUseCase } from './observar-estorno.use-case.js';
 import { ResolverDivergenciaUseCase } from './resolver-divergencia.use-case.js';
 import { ProcessarWebhookDePagamentoUseCase } from './processar-webhook-de-pagamento.use-case.js';
 import { FakePaymentProvider } from './provider/fake-payment-provider.adapter.js';
@@ -71,6 +72,7 @@ import { WebhookController } from './webhook.controller.js';
     ConsultarInadimplenciaUseCase,
     LiberacaoFinanceiraUseCase,
     EstornarPagamentoUseCase,
+    ObservarEstornoUseCase,
     ConciliarMovimentosUseCase,
     ResolverDivergenciaUseCase,
     EmitirReciboUseCase,

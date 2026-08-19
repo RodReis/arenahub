@@ -151,7 +151,22 @@ Para mudar: `billing_settings.refund_access_policy` do tenant. **É decisão do 
 recusa com `BILLING_MANUAL_PAYMENT_NOT_REFUNDABLE` (ADR-027). A devolução física acontece fora do
 sistema e entra como contra-lançamento auditado, que não é desta fatia.
 
-### 4.4 Erros comuns
+### 4.4 Estorno preso em "em andamento"
+
+O estorno dos dois provedores é **assíncrono**: a confirmação chega depois. Se ela não chegar, o
+estorno fica `PROCESSING` — e enquanto ficar, **nenhum novo estorno daquele pagamento é aceito**
+(`BILLING_REFUND_ALREADY_IN_FLIGHT`).
+
+**Como destravar:** `POST /api/v1/refunds/:id/observe`. A consulta ativa pergunta ao provedor e
+aplica o que ele responder — confirma ou marca como falho. Falho **libera** o pagamento para nova
+tentativa.
+
+Permissão: `billing.read`. Consultar não decide nada sobre dinheiro — quem decide é o provedor.
+
+**Se o provedor ainda responder "pendente":** nada muda, e está certo. Espere e repita; um estorno
+recém-pedido leva minutos.
+
+### 4.5 Erros comuns
 
 | código | o que fazer |
 |---|---|

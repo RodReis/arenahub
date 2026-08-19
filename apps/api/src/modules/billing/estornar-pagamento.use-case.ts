@@ -123,8 +123,28 @@ export class EstornarPagamentoUseCase {
     const confirmados = await this.db.refund.aggregate({
       where: { tenantId: contexto.tenantId, paymentId: pagamento.id, status: 'CONFIRMED' },
       _sum: { amountMinor: true },
+      _count: true,
     });
     const jaEstornadoMinor = confirmados._sum.amountMinor ?? 0;
+
+    /**
+     * Quantos estornos deste pagamento JA FALHARAM.
+     *
+     * ISTO E UMA CONTAGEM, e a F14 ensinou que contagem em chave de
+     * idempotencia cobra o aluno em dobro -- mas a armadilha de la era contar
+     * algo que MUDA durante a operacao (tentativas em voo). `FAILED` e estado
+     * TERMINAL: uma vez falho, nunca mais muda, e duas requisicoes concorrentes
+     * leem o mesmo numero e montam a MESMA chave. E o que se quer: elas sao o
+     * mesmo pedido, e a segunda tem de ser recusada.
+     *
+     * Sem este componente, uma nova tentativa depois de falha montaria a chave
+     * identica a da tentativa falha e colidiria na unicidade -- o pagamento
+     * ficaria impossivel de estornar para sempre. Achado por teste, depois de
+     * a revisao apontar o ramo assincrono.
+     */
+    const falhos = await this.db.refund.count({
+      where: { tenantId: contexto.tenantId, paymentId: pagamento.id, status: 'FAILED' },
+    });
 
     validarPedidoDeEstorno(
       {
@@ -175,8 +195,11 @@ export class EstornarPagamentoUseCase {
      *
      * A chave sozinha ainda nao basta: quem fecha a janela e o indice parcial
      * `refunds_payment_id_em_voo_key`.
+     *
+     * `falhos` entra para que uma nova tentativa depois de recusa transitoria
+     * do provedor gere chave NOVA -- ver o comentario onde ele e lido.
      */
-    const idempotencyKey = `refund:${pagamento.id}:${jaEstornadoMinor}:${entrada.amountMinor}`;
+    const idempotencyKey = `refund:${pagamento.id}:${jaEstornadoMinor}:${entrada.amountMinor}:${falhos}`;
 
     let refund: { id: string };
 

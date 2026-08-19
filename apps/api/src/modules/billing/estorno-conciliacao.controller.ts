@@ -10,6 +10,7 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 import { ConciliarMovimentosUseCase } from './conciliar-movimentos.use-case.js';
 import { EmitirReciboUseCase } from './emitir-recibo.use-case.js';
 import { EstornarPagamentoUseCase } from './estornar-pagamento.use-case.js';
+import { ObservarEstornoUseCase } from './observar-estorno.use-case.js';
 import { ResolverDivergenciaUseCase } from './resolver-divergencia.use-case.js';
 
 import type { Request } from 'express';
@@ -105,6 +106,7 @@ interface ItemDeConciliacaoDto {
 export class EstornoConciliacaoController {
   constructor(
     private readonly estorno: EstornarPagamentoUseCase,
+    private readonly observarEstorno: ObservarEstornoUseCase,
     private readonly conciliacao: ConciliarMovimentosUseCase,
     private readonly resolucao: ResolverDivergenciaUseCase,
     private readonly recibo: EmitirReciboUseCase,
@@ -166,6 +168,27 @@ export class EstornoConciliacaoController {
       politicaDeAcesso: resultado.politicaDeAcesso,
       acessoSuspenso: resultado.acessoSuspenso,
     };
+  }
+
+  /**
+   * Consulta ativa do estorno -- fecha o que ficou pendente no provedor.
+   *
+   * `billing.read` e nao `billing.refund`: consultar nao decide nada sobre
+   * dinheiro. O desfecho quem decide e o provedor; esta rota so pergunta e
+   * aplica o que ele responder. Exigir a permissao de estornar aqui impediria
+   * a conferencia diaria de destravar um estorno preso.
+   */
+  @Post('refunds/:id/observe')
+  @RequirePermissions('billing.read')
+  async observar(
+    @Param('id') refundId: string,
+    @Req() requisicao: Request,
+  ): Promise<{ refundId: string; status: string; mudou: boolean; acessoSuspenso: boolean }> {
+    return this.observarEstorno.executar(
+      this.contexto.require(),
+      { refundId, agora: new Date() },
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
   }
 
   @Post('reconciliation/runs')
@@ -240,8 +263,15 @@ export class EstornoConciliacaoController {
     );
   }
 
+  /**
+   * `receipt.issue` e nao `receipt.read`: emitir CONSOME numero sequencial
+   * imutavel do tenant (INV-075), e numeracao gasta nao volta. Autorizar uma
+   * escrita com a permissao de leitura quebraria a simetria que o resto do
+   * modulo estabelece -- `billing.refund` e separada de `billing.manage` pela
+   * mesma razao. Achado na revisao de codigo.
+   */
   @Post('payments/:id/receipt')
-  @RequirePermissions('receipt.read')
+  @RequirePermissions('receipt.issue')
   async emitirRecibo(@Param('id') paymentId: string) {
     return this.recibo.executar(this.contexto.require(), { paymentId, agora: new Date() });
   }

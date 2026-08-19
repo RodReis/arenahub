@@ -131,6 +131,9 @@ const PERMISSOES = [
   'reconciliation.read',
   'reconciliation.resolve',
   'receipt.read',
+  // Emitir recibo CONSOME numeracao sequencial imutavel -- e escrita, e nao
+  // pode ser autorizada pela permissao de leitura.
+  'receipt.issue',
 ];
 
 

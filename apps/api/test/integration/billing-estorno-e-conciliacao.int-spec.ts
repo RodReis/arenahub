@@ -12,6 +12,7 @@ import {
 } from '../../src/modules/billing/domain/estorno.js';
 import { EmitirReciboUseCase } from '../../src/modules/billing/emitir-recibo.use-case.js';
 import { EstornarPagamentoUseCase } from '../../src/modules/billing/estornar-pagamento.use-case.js';
+import { ObservarEstornoUseCase } from '../../src/modules/billing/observar-estorno.use-case.js';
 import {
   FakePaymentProvider,
   PROVEDOR_FAKE,
@@ -37,6 +38,7 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
 describe('F16 -- estorno, conciliacao e recibo', () => {
   let db: PrismaService;
   let estornar: EstornarPagamentoUseCase;
+  let observar: ObservarEstornoUseCase;
   let conciliar: ConciliarMovimentosUseCase;
   let resolver: ResolverDivergenciaUseCase;
   let recibo: EmitirReciboUseCase;
@@ -171,6 +173,7 @@ describe('F16 -- estorno, conciliacao e recibo', () => {
     db = moduleRef.get(PrismaService);
     senhas = moduleRef.get(PasswordService);
     estornar = moduleRef.get(EstornarPagamentoUseCase);
+    observar = moduleRef.get(ObservarEstornoUseCase);
     conciliar = moduleRef.get(ConciliarMovimentosUseCase);
     resolver = moduleRef.get(ResolverDivergenciaUseCase);
     recibo = moduleRef.get(EmitirReciboUseCase);
@@ -752,7 +755,158 @@ describe('F16 -- estorno, conciliacao e recibo', () => {
     });
   });
 
+  /**
+   * ESTORNO ASSINCRONO -- o ramo que a primeira versao desta fatia deixou sem
+   * saida, e que nenhum teste tocava porque o duble sempre confirmava na hora.
+   *
+   * Achado pela revisao de codigo. O defeito nao era so um `Refund` preso em
+   * `PROCESSING`: o indice parcial `refunds_payment_id_em_voo_key` passaria a
+   * bloquear PARA SEMPRE qualquer estorno seguinte daquele pagamento -- a
+   * guarda contra devolver em dobro viraria a guarda contra devolver.
+   */
+  describe('estorno assincrono', () => {
+    it('provedor que responde PENDING deixa o estorno em PROCESSING', async () => {
+      provedor.simularEstornoAssincrono();
+      const { paymentId, invoiceId } = await pagamentoConfirmado();
+
+      const resultado = await estornar.executar(
+        contexto,
+        { paymentId, amountMinor: 12_000, reason: 'estorno assincrono', agora: AGORA },
+        'corr-async-1',
+      );
+
+      expect(resultado.status).toBe('PROCESSING');
+
+      // A invoice NAO fecha ainda: o dinheiro nao voltou.
+      const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+      expect(invoice.status).toBe('PAID');
+    });
+
+    it('OBSERVAR FECHA O ESTORNO quando o provedor confirma depois', async () => {
+      provedor.simularEstornoAssincrono();
+      const { paymentId, invoiceId } = await pagamentoConfirmado();
+
+      const pedido = await estornar.executar(
+        contexto,
+        { paymentId, amountMinor: 12_000, reason: 'confirma depois', agora: AGORA },
+        'corr-async-2',
+      );
+      expect(pedido.status).toBe('PROCESSING');
+
+      const refund = await db.refund.findUniqueOrThrow({ where: { id: pedido.refundId } });
+      provedor.simularDesfechoDoEstorno(refund.externalRefundId ?? '', 'CONFIRMED');
+
+      const desfecho = await observar.executar(
+        contexto,
+        { refundId: pedido.refundId, agora: AGORA },
+        'corr-async-2',
+      );
+
+      expect(desfecho.status).toBe('CONFIRMED');
+      expect(desfecho.mudou).toBe(true);
+
+      const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+      expect(invoice.status).toBe('REFUNDED');
+    });
+
+    it('ESTORNO FALHO LIBERA O PAGAMENTO para nova tentativa', async () => {
+      // A metade que importa do desfecho negativo: sem ela, uma recusa
+      // transitoria do provedor viraria bloqueio permanente daquele pagamento.
+      provedor.simularEstornoAssincrono();
+      const { paymentId } = await pagamentoConfirmado();
+
+      const pedido = await estornar.executar(
+        contexto,
+        { paymentId, amountMinor: 12_000, reason: 'vai falhar', agora: AGORA },
+        'corr-async-3',
+      );
+
+      const refund = await db.refund.findUniqueOrThrow({ where: { id: pedido.refundId } });
+      provedor.simularDesfechoDoEstorno(refund.externalRefundId ?? '', 'FAILED');
+
+      const desfecho = await observar.executar(
+        contexto,
+        { refundId: pedido.refundId, agora: AGORA },
+        'corr-async-3',
+      );
+      expect(desfecho.status).toBe('FAILED');
+
+      // O indice parcial liberou: um novo estorno do MESMO pagamento passa.
+      const segundo = await estornar.executar(
+        contexto,
+        { paymentId, amountMinor: 12_000, reason: 'segunda tentativa', agora: AGORA },
+        'corr-async-4',
+      );
+
+      expect(segundo.refundId).not.toBe(pedido.refundId);
+    });
+
+    it('observar duas vezes nao aplica o desfecho em dobro', async () => {
+      provedor.simularEstornoAssincrono();
+      const { paymentId } = await pagamentoConfirmado();
+
+      const pedido = await estornar.executar(
+        contexto,
+        { paymentId, amountMinor: 12_000, reason: 'idempotencia da observacao', agora: AGORA },
+        'corr-async-5',
+      );
+      const refund = await db.refund.findUniqueOrThrow({ where: { id: pedido.refundId } });
+      provedor.simularDesfechoDoEstorno(refund.externalRefundId ?? '', 'CONFIRMED');
+
+      const primeira = await observar.executar(
+        contexto,
+        { refundId: pedido.refundId, agora: AGORA },
+        'corr-async-5',
+      );
+      const segunda = await observar.executar(
+        contexto,
+        { refundId: pedido.refundId, agora: AGORA },
+        'corr-async-5',
+      );
+
+      expect(primeira.mudou).toBe(true);
+      // Terminal nao se reobserva: reprocessar e seguro (INV-086).
+      expect(segunda.mudou).toBe(false);
+      expect(segunda.status).toBe('CONFIRMED');
+
+      const eventos = await db.outboxEvent.count({
+        where: {
+          tenantId: contexto.tenantId,
+          eventType: 'PaymentRefunded',
+          aggregateId: paymentId,
+        },
+      });
+      expect(eventos).toBe(1);
+    });
+
+    it('provedor ainda PENDING nao muda nada', async () => {
+      provedor.simularEstornoAssincrono();
+      const { paymentId } = await pagamentoConfirmado();
+
+      const pedido = await estornar.executar(
+        contexto,
+        { paymentId, amountMinor: 12_000, reason: 'ainda pendente', agora: AGORA },
+        'corr-async-6',
+      );
+
+      const desfecho = await observar.executar(
+        contexto,
+        { refundId: pedido.refundId, agora: AGORA },
+        'corr-async-6',
+      );
+
+      expect(desfecho.mudou).toBe(false);
+      expect(desfecho.status).toBe('PROCESSING');
+    });
+  });
+
   describe('isolamento de tenant', () => {
+    // O duble e compartilhado: o bloco anterior ligou o modo assincrono, e
+    // herda-lo aqui faria o estorno voltar PROCESSING sem ninguem ter pedido.
+    beforeAll(() => {
+      provedor.simularEstornoSincrono();
+    });
+
     it('estorno de pagamento de outro tenant nao e encontrado', async () => {
       const outro = await db.tenant.create({
         data: {
@@ -771,6 +925,75 @@ describe('F16 -- estorno, conciliacao e recibo', () => {
           { paymentId, amountMinor: 12_000, reason: 'travessia de tenant', agora: AGORA },
           'corr-12',
         ),
+      ).rejects.toThrow();
+
+      await db.tenant.delete({ where: { id: outro.id } });
+    });
+
+    it('conciliacao de conta de outro tenant nao e encontrada', async () => {
+      const outro = await db.tenant.create({
+        data: {
+          slug: `f16-conc-${sufixo}`,
+          legalName: `Outro conc ${sufixo}`,
+          displayName: `Outro conc ${sufixo}`,
+        },
+        select: { id: true },
+      });
+
+      await expect(
+        conciliar.executar(
+          { ...contexto, tenantId: outro.id },
+          { providerAccountId, de: JANELA_CONC.de, ate: JANELA_CONC.ate, agora: AGORA },
+        ),
+      ).rejects.toThrow();
+
+      await db.tenant.delete({ where: { id: outro.id } });
+    });
+
+    it('divergencia de outro tenant nao e resolvivel', async () => {
+      const item = await db.reconciliationItem.findFirstOrThrow({
+        where: { tenantId: contexto.tenantId },
+        select: { id: true },
+      });
+
+      const outro = await db.tenant.create({
+        data: {
+          slug: `f16-res-${sufixo}`,
+          legalName: `Outro res ${sufixo}`,
+          displayName: `Outro res ${sufixo}`,
+        },
+        select: { id: true },
+      });
+
+      await expect(
+        resolver.executar(
+          { ...contexto, tenantId: outro.id },
+          {
+            itemId: item.id,
+            comando: 'ACCEPT_DOCUMENTED_DIFFERENCE',
+            reason: 'travessia de tenant',
+            agora: AGORA,
+          },
+          'corr-tenant-2',
+        ),
+      ).rejects.toThrow();
+
+      await db.tenant.delete({ where: { id: outro.id } });
+    });
+
+    it('recibo de pagamento de outro tenant nao e emitido', async () => {
+      const { paymentId } = await pagamentoConfirmado();
+      const outro = await db.tenant.create({
+        data: {
+          slug: `f16-rec-${sufixo}`,
+          legalName: `Outro rec ${sufixo}`,
+          displayName: `Outro rec ${sufixo}`,
+        },
+        select: { id: true },
+      });
+
+      await expect(
+        recibo.executar({ ...contexto, tenantId: outro.id }, { paymentId, agora: AGORA }),
       ).rejects.toThrow();
 
       await db.tenant.delete({ where: { id: outro.id } });

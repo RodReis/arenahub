@@ -59,6 +59,7 @@ interface EstornoEmMemoria {
   amountMinor: number;
   currency: string;
   occurredAt: Date;
+  status: 'PENDING' | 'CONFIRMED' | 'FAILED';
 }
 
 /**
@@ -101,6 +102,56 @@ export class FakePaymentProvider implements PaymentProvider {
 
   /** Estornos na ordem em que ocorreram, para o extrato. */
   private readonly estornos: EstornoEmMemoria[] = [];
+
+  /**
+   * O estorno confirma na hora, ou fica pendente?
+   *
+   * PADRAO SINCRONO por conveniencia dos testes que nao estao testando isso --
+   * mas os DOIS provedores homologados sao assincronos, e um duble que so
+   * soubesse confirmar na hora ensinaria o caso de uso a assumir sincronismo.
+   * `simularEstornoAssincrono()` liga o modo que o mundo real usa.
+   */
+  private estornoAssincrono = false;
+
+  /** Passa a devolver `PENDING` em `refundPayment`, como os provedores reais. */
+  simularEstornoAssincrono(): void {
+    this.estornoAssincrono = true;
+  }
+
+  /**
+   * Volta ao modo sincrono.
+   *
+   * Existe porque a instancia do duble e COMPARTILHADA entre os testes da
+   * suite: sem desligar, o bloco seguinte herdaria o modo assincrono sem ter
+   * pedido, e falharia por um motivo que nao tem nada a ver com o que ele
+   * testa. Estado de duble que vaza entre casos e a forma mais chata de teste
+   * flaky.
+   */
+  simularEstornoSincrono(): void {
+    this.estornoAssincrono = false;
+  }
+
+  /** Confirma (ou reprova) um estorno pendente, como o provedor faria depois. */
+  simularDesfechoDoEstorno(externalRefundId: string, status: 'CONFIRMED' | 'FAILED'): void {
+    const estorno = this.estornos.find((e) => e.externalRefundId === externalRefundId);
+
+    if (!estorno) {
+      throw new ErroDoProvedor('PROVIDER_NOT_FOUND', false, 'estorno inexistente no provedor');
+    }
+
+    estorno.status = status;
+
+    if (status === 'CONFIRMED') {
+      const cobranca = this.cobrancas.get(estorno.externalPaymentId);
+      const jaEstornado = this.estornos
+        .filter((e) => e.externalPaymentId === estorno.externalPaymentId && e.status === 'CONFIRMED')
+        .reduce((soma, e) => soma + e.amountMinor, 0);
+
+      if (cobranca && jaEstornado >= cobranca.amountMinor) {
+        cobranca.status = 'REFUNDED';
+      }
+    }
+  }
 
   registrarConta(externalAccountId: string, segredo: string): void {
     this.segredos.set(externalAccountId, segredo);
@@ -384,13 +435,16 @@ export class FakePaymentProvider implements PaymentProvider {
     if (existente) {
       return Promise.resolve({
         externalRefundId: existente.externalRefundId,
-        status: 'CONFIRMED',
+        status: existente.status,
         amountMinor: existente.amountMinor,
       });
     }
 
+    // So o que NAO FALHOU consome saldo: um estorno recusado nao devolveu
+    // dinheiro nenhum, e conta-lo impediria a retentativa legitima. Mesmo
+    // criterio do dominio, que soma apenas `CONFIRMED`.
     const jaEstornado = this.estornos
-      .filter((e) => e.externalPaymentId === input.externalPaymentId)
+      .filter((e) => e.externalPaymentId === input.externalPaymentId && e.status !== 'FAILED')
       .reduce((soma, e) => soma + e.amountMinor, 0);
 
     if (jaEstornado + input.amountMinor > cobranca.amountMinor) {
@@ -408,18 +462,35 @@ export class FakePaymentProvider implements PaymentProvider {
       amountMinor: input.amountMinor,
       currency: cobranca.currency,
       occurredAt: cobranca.occurredAt,
+      status: this.estornoAssincrono ? 'PENDING' : 'CONFIRMED',
     };
 
     this.estornosPorChave.set(input.idempotencyKey, estorno);
     this.estornos.push(estorno);
 
-    if (jaEstornado + input.amountMinor === cobranca.amountMinor) {
+    // So o estorno JA CONFIRMADO move o pagamento. No modo assincrono quem
+    // move e `simularDesfechoDoEstorno`, como o provedor real faz depois.
+    if (estorno.status === 'CONFIRMED' && jaEstornado + input.amountMinor === cobranca.amountMinor) {
       cobranca.status = 'REFUNDED';
     }
 
     return Promise.resolve({
       externalRefundId: estorno.externalRefundId,
-      status: 'CONFIRMED',
+      status: estorno.status,
+      amountMinor: estorno.amountMinor,
+    });
+  }
+
+  getRefundStatus(externalRefundId: string): Promise<ProviderRefund> {
+    const estorno = this.estornos.find((e) => e.externalRefundId === externalRefundId);
+
+    if (!estorno) {
+      throw new ErroDoProvedor('PROVIDER_NOT_FOUND', false, 'estorno inexistente no provedor');
+    }
+
+    return Promise.resolve({
+      externalRefundId: estorno.externalRefundId,
+      status: estorno.status,
       amountMinor: estorno.amountMinor,
     });
   }
@@ -460,7 +531,15 @@ export class FakePaymentProvider implements PaymentProvider {
       );
 
     const estornos = this.estornos
-      .filter((e) => e.externalAccountId === input.externalAccountId && naJanela(e.occurredAt))
+      .filter(
+        (e) =>
+          e.externalAccountId === input.externalAccountId &&
+          // Estorno PENDENTE nao aparece em extrato: o dinheiro ainda nao
+          // voltou. Inclui-lo faria a conciliacao acusar `MISSING_INTERNAL`
+          // de um movimento que nenhum lado considera concluido.
+          e.status === 'CONFIRMED' &&
+          naJanela(e.occurredAt),
+      )
       .map(
         (e): ProviderMovement => ({
           externalMovementId: `mov_${e.externalRefundId}`,

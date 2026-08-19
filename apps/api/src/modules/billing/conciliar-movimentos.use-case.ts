@@ -110,7 +110,20 @@ export class ConciliarMovimentosUseCase {
       select: { id: true, status: true, movementsImported: true, itemsOpen: true },
     });
 
-    if (existente && existente.status !== 'FAILED') {
+    /**
+     * `COMPLETED` devolve o resultado; `RUNNING` e `FAILED` reexecutam.
+     *
+     * `RUNNING` ENTRA NA REEXECUCAO por achado da revisao de codigo: se o
+     * processo morrer entre criar a run e concluir a transacao, ela fica
+     * `RUNNING` para sempre -- e tratar isso como "ja existe" faria toda
+     * tentativa seguinte devolver a run travada, deixando aquela janela
+     * impossivel de conciliar sem mexer no banco. Justo o que o aceite da
+     * fatia proibe.
+     *
+     * Reexecutar e seguro (INV-086): a transacao limpa o resultado parcial
+     * antes de gravar o novo.
+     */
+    if (existente && existente.status === 'COMPLETED') {
       return {
         runId: existente.id,
         status: existente.status,

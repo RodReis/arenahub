@@ -100,8 +100,9 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 | `BillingSettings` | moeda (BRL), `due_date`, `grace_period`, `blocking_policy` + **âncora de bloqueio configurável** (ADR-019), padrão = primeiro instante de `due_date + grace_period` | ✔ por tenant | Especificação §42 + **ADR-019** |
 
 `PaymentProvider` é **porta, não entidade**. Contrato vigente (`MVP-02` §12, vence sobre a Especificação §38): `createPix`, `getPaymentStatus`, `createTokenizedSubscription`, `cancelSubscription`,
-`refundPayment`, `verifyAndParseWebhook` — mais **`listMovements`** (extrato por janela fechada),
-sétimo método acrescentado pela **F16** com emenda ao `MVP-02` §12 no mesmo PR. Ver ADR-013 e ADR-032.
+`refundPayment`, `verifyAndParseWebhook` — mais **`listMovements`** (extrato por janela fechada) e
+**`getRefundStatus`** (consulta ativa do estorno) — sétimo e oitavo métodos acrescentados pela
+**F16**, com emenda ao `MVP-02` §12 no mesmo PR. Ver ADR-013 e ADR-032.
 
 ### 2.4 Dispositivos e acesso
 

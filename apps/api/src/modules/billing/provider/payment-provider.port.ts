@@ -183,6 +183,18 @@ export interface PaymentProvider {
   cancelSubscription(externalSubscriptionId: string): Promise<void>;
   refundPayment(input: RefundInput): Promise<ProviderRefund>;
   /**
+   * Estado do estorno NO PROVEDOR. Consulta ativa, par de `getPaymentStatus`.
+   *
+   * OITAVO METODO, emendado ao `MVP-02` 12 junto de `listMovements`. Existe
+   * pela mesma razao que a consulta de pagamento (INV-083): o estorno dos dois
+   * provedores homologados e ASSINCRONO, e um estorno cuja confirmacao so pode
+   * chegar por webhook fica preso para sempre quando o webhook nao chega -- e
+   * preso nao e so um registro feio: o indice parcial de exclusao mutua
+   * bloqueia todo estorno seguinte daquele pagamento, inclusive o parcial
+   * legitimo.
+   */
+  getRefundStatus(externalRefundId: string): Promise<ProviderRefund>;
+  /**
    * Extrato da conta numa janela fechada. `MVP-02` 7: "importacao ou consulta
    * de extrato".
    *
