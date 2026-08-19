@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, SelectField, TextareaField } from '@arenahub/ui';
+import { Button, Field, SelectField, TextareaField, useToastDeErro } from '@arenahub/ui';
 
 import {
   liberarAcessoManual,
@@ -70,6 +70,11 @@ export function FormularioDeOverride({
   nomeDoAlunoInicial,
 }: Props) {
   const [estado, acao] = useActionState(liberarAcessoManual, ESTADO_INICIAL);
+  // Erro vira TOAST -- CLAUDE.md: "sempre usar Toast para: Info, Warn e
+  // error". O toast ja carrega `role="alert"`, entao o anuncio ao leitor de
+  // tela nao regride com a saida do `<p role="alert">`.
+  useToastDeErro(estado.erro, 'error', 'erro-do-override');
+
 
   const [confirmando, setConfirmando] = useState(false);
   const [unidadeId, setUnidadeId] = useState(unidades[0]?.id ?? '');
@@ -123,11 +128,6 @@ export function FormularioDeOverride({
 
   return (
     <form action={acao}>
-      {estado.erro ? (
-        <p role="alert" data-testid="erro-do-override">
-          {estado.erro}
-        </p>
-      ) : null}
 
       {/* Passo 2: revisão. Os campos viram somente-leitura e viajam como hidden. */}
       {confirmando ? (

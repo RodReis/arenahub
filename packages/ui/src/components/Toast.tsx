@@ -11,6 +11,13 @@ interface Toast {
   readonly id: number;
   readonly kind: ToastKind;
   readonly message: string;
+  /**
+   * `data-testid` do toast. Existe porque as telas que trocaram
+   * `<p role="alert">` por toast ja carregavam testid que os E2E procuram --
+   * a troca muda ONDE a mensagem aparece, nao SE ela aparece, e um testid
+   * perdido derruba justamente o teste que provaria isso.
+   */
+  readonly testId?: string | undefined;
 }
 
 const ICONE: Record<ToastKind, IconName> = {
@@ -20,7 +27,7 @@ const ICONE: Record<ToastKind, IconName> = {
 };
 
 interface ToastApi {
-  readonly show: (kind: ToastKind, message: string) => void;
+  readonly show: (kind: ToastKind, message: string, testId?: string) => void;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -35,7 +42,7 @@ const ToastContext = createContext<ToastApi | null>(null);
 export function ToastProvider({ children }: { readonly children: ReactNode }) {
   const [toasts, setToasts] = useState<readonly Toast[]>([]);
 
-  const show = useCallback((kind: ToastKind, message: string) => {
+  const show = useCallback((kind: ToastKind, message: string, testId?: string) => {
     setToasts((atuais) => {
       /**
        * Id derivado do tamanho da fila, nao de relogio nem de aleatorio.
@@ -46,7 +53,7 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
        */
       const proximo = (atuais[atuais.length - 1]?.id ?? 0) + 1;
 
-      return [...atuais, { id: proximo, kind, message }];
+      return [...atuais, { id: proximo, kind, message, testId }];
     });
   }, []);
 
@@ -65,6 +72,7 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
             key={toast.id}
             className={estilos['toast']}
             data-kind={toast.kind}
+            {...(toast.testId !== undefined ? { 'data-testid': toast.testId } : {})}
             /**
              * Erro INTERROMPE o leitor de tela (`alert`); confirmacao espera a
              * pausa (`status`). "Falha ao salvar" precisa chegar antes de a

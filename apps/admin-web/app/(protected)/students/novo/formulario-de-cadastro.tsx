@@ -3,6 +3,8 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { useToastDeErro } from '@arenahub/ui';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -175,6 +177,17 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
    */
   const [faltando, setFaltando] = useState<string | null>(null);
 
+  /*
+   * Os dois erros da tela viram TOAST -- CLAUDE.md: "sempre usar Toast para:
+   * Info, Warn e error".
+   *
+   * SAO DOIS `useToastDeErro`, e nao um `faltando ?? estado.erro`: os dois
+   * tem vida propria, e coalescer faria o erro do servidor sumir do aviso
+   * enquanto um campo obrigatorio estivesse pendente.
+   */
+  useToastDeErro(estado.erro, 'error', 'erro-do-cadastro');
+  useToastDeErro(faltando, 'warn', 'erro-do-cadastro');
+
   const valor = (campo: string): string => rascunho[campo] ?? '';
 
   const anotar = (campo: string, novo: string): void => {
@@ -238,6 +251,19 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
   ) => (
     <>
       <Select
+        /*
+         * `items` E O QUE FAZ O GATILHO MOSTRAR O ROTULO, e nao o valor cru.
+         *
+         * Sem ele, `Select.Value` do Base UI renderiza o proprio `value`: a
+         * combo de sexo exibia "FEMALE" e a de unidade, o UUID
+         * `c89a3ee6-f2e5-...`. Visto na tela, nao deduzido. O `items` da ao
+         * componente o mapa valor -> rotulo, que e o mecanismo oficial da
+         * biblioteca para isso (docs do Select, "Formatting the value").
+         *
+         * A lista sai das MESMAS `opcoes` que montam o menu: um so lugar
+         * define rotulo, entao gatilho e menu nao podem divergir.
+         */
+        items={opcoes.map(([chave, texto]) => ({ value: chave, label: texto }))}
         // `''` e nao `undefined`: o Base UI decide no PRIMEIRO render se o
         // componente e controlado, e `undefined` o faz nascer
         // nao-controlado e virar controlado na primeira selecao -- duas
@@ -435,12 +461,6 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
         campo, que e o outro caminho de envio.
       */}
       <form className={estilos['cartao']} action={enviar}>
-        {estado.erro || faltando ? (
-          <p className={estilos['erro']} role="alert" data-testid="erro-do-cadastro">
-            {faltando ?? estado.erro}
-          </p>
-        ) : null}
-
         {/*
           Todos os passos ficam montados; só o corrente aparece. `hidden` no
           contêiner tira o bloco da árvore de acessibilidade junto — sem ele o

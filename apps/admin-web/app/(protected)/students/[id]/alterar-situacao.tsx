@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, SelectField } from '@arenahub/ui';
+import { Button, SelectField, useToastDeErro } from '@arenahub/ui';
 
 import estilos from '../../../formulario.module.css';
 
@@ -40,6 +40,11 @@ function BotaoDeAlteracao() {
  */
 export function AlterarSituacao({ studentId, situacaoAtual, version }: Props) {
   const [estado, acao] = useActionState(alterarSituacao, ESTADO_INICIAL);
+  // Erro vira TOAST -- CLAUDE.md: "sempre usar Toast para: Info, Warn e
+  // error". O toast ja carrega `role="alert"`, entao o anuncio ao leitor de
+  // tela nao regride com a saida do `<p role="alert">`.
+  useToastDeErro(estado.erro, 'error', 'erro-da-situacao');
+
 
   // Depois de uma alteração, a verdade é o que a API devolveu -- não o que
   // veio na carga da página. `revalidatePath` atualiza o Server Component,
@@ -62,11 +67,6 @@ export function AlterarSituacao({ studentId, situacaoAtual, version }: Props) {
 
   return (
     <form className={estilos['formulario']} action={acao}>
-      {estado.erro ? (
-        <p role="alert" data-testid="erro-da-situacao">
-          {estado.erro}
-        </p>
-      ) : null}
 
       {estado.sucesso ? (
         <p role="status" data-testid="situacao-alterada">

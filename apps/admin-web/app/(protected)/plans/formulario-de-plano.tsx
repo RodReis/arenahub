@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, TextareaField } from '@arenahub/ui';
+import { Button, Field, TextareaField, useToastDeErro } from '@arenahub/ui';
 
 import estilos from './plans.module.css';
 
@@ -61,6 +61,11 @@ function BotaoDePlano() {
  */
 export function FormularioDePlano({ unidades }: Props) {
   const [estado, acao] = useActionState(cadastrarPlano, ESTADO_INICIAL);
+  // Erro vira TOAST -- CLAUDE.md: "sempre usar Toast para: Info, Warn e
+  // error". O toast ja carrega `role="alert"`, entao o anuncio ao leitor de
+  // tela nao regride com a saida do `<p role="alert">`.
+  useToastDeErro(estado.erro, 'error', 'erro-do-plano');
+
 
   const [linhas, setLinhas] = useState<LinhaDeJanela[]>([
     {
@@ -122,12 +127,6 @@ export function FormularioDePlano({ unidades }: Props) {
 
   return (
     <form className={estilos['formulario']} action={acao}>
-      {estado.erro ? (
-        <p role="alert" data-testid="erro-do-plano">
-          {estado.erro}
-        </p>
-      ) : null}
-
       <Field
         id="nome-do-plano"
         name="name"

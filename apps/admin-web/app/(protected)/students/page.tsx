@@ -1,17 +1,21 @@
 import type { Metadata } from 'next';
 
 import {
+  Button,
   DataTable,
   EmptyState,
+  Field,
   MaskedCPF,
   PageHeader,
   ProblemDetail,
+  SelectField,
   StateBadge,
   TenantDateTime,
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { impedeAcesso } from '../../../src/students/formatar';
+import estilos from './students.module.css';
 
 /** Fuso FIXO, preservado de `dataLegivel` -- mesma divida das outras telas. */
 const FUSO_PROVISORIO = 'America/Sao_Paulo';
@@ -33,7 +37,34 @@ interface Aluno {
   version: number;
 }
 
+interface Unidade {
+  id: string;
+  name: string;
+}
+
 const POR_PAGINA = 20;
+
+/**
+ * As sete situacoes, com o rotulo pt-BR que a tela ja usa.
+ *
+ * A ORDEM E A DO CICLO DE VIDA, nao alfabetica: interessado vira
+ * experimental, que vira ativo, que pode ser suspenso ou bloqueado. Quem
+ * procura "os bloqueados" acha no fim, onde o problema mora.
+ *
+ * Os rotulos repetem `STATE_LABELS` do design system de proposito: aquele
+ * mapa e para BADGE (traduz o que veio da API), e este e para FILTRO (monta a
+ * opcao antes de existir dado). Importar um no outro acoplaria a lista de
+ * opcoes da tela a um mapa que existe para renderizar celula.
+ */
+const SITUACOES = [
+  ['LEAD', 'Interessado'],
+  ['TRIAL', 'Experimental'],
+  ['ACTIVE', 'Ativo'],
+  ['SUSPENDED', 'Suspenso'],
+  ['BLOCKED', 'Bloqueado'],
+  ['CANCELLED', 'Cancelado'],
+  ['ARCHIVED', 'Arquivado'],
+] as const;
 
 /**
  * Busca de alunos — `M1-AC-002`, Slice 1.2.
@@ -56,9 +87,14 @@ export default async function PaginaDeAlunos({
   };
 
   const termo = texto('q');
+  const situacao = texto('status');
+  const unidade = texto('gymUnitId');
+
   const consulta = new URLSearchParams();
 
   if (termo) consulta.set('q', termo);
+  if (situacao) consulta.set('status', situacao);
+  if (unidade) consulta.set('gymUnitId', unidade);
 
   const cursor = texto('cursor');
 
@@ -66,7 +102,22 @@ export default async function PaginaDeAlunos({
 
   consulta.set('limit', String(POR_PAGINA));
 
-  const resposta = await chamarApi<Aluno[]>(`/api/v1/students?${consulta.toString()}`);
+  /*
+   * As unidades vao JUNTO da listagem, nao em cascata.
+   *
+   * As duas chamadas nao dependem uma da outra, e `await` em sequencia
+   * somaria os dois tempos de rede em cada carregamento da tela.
+   *
+   * A lista de unidades e do FILTRO: falhar ao busca-la nao pode derrubar a
+   * pagina de alunos. Sem ela, o filtro de unidade simplesmente nao aparece,
+   * e o resto da tela funciona como antes.
+   */
+  const [resposta, respostaDeUnidades] = await Promise.all([
+    chamarApi<Aluno[]>(`/api/v1/students?${consulta.toString()}`),
+    chamarApi<Unidade[]>('/api/v1/units'),
+  ]);
+
+  const unidades = respostaDeUnidades.ok ? (respostaDeUnidades.dados ?? []) : [];
 
   if (!resposta.ok) {
     return (
@@ -104,7 +155,12 @@ export default async function PaginaDeAlunos({
 
     const proxima = new URLSearchParams();
 
+    // Os filtros VAO JUNTO da proxima pagina. Sem isto, clicar em "Proximos"
+    // com o filtro "Bloqueado" ligado devolveria a base inteira -- a pessoa
+    // acharia que a tela perdeu o filtro sozinha.
     if (termo) proxima.set('q', termo);
+    if (situacao) proxima.set('status', situacao);
+    if (unidade) proxima.set('gymUnitId', unidade);
     proxima.set('cursor', ultimo.id);
 
     return `/students?${proxima.toString()}`;
@@ -117,28 +173,76 @@ export default async function PaginaDeAlunos({
       <PageHeader
         id="titulo-alunos"
         title="Alunos"
+        breadcrumb={<span>Cadastros</span>}
         actions={
-          <a href="/students/novo" data-testid="novo-aluno">
-            Cadastrar aluno
-          </a>
+          /*
+            A ACAO PRIMARIA E UM BOTAO SOLIDO, e nao um link cru.
+            "Cadastrar aluno" e o que a recepcao vem fazer nesta tela depois
+            de nao achar a pessoa na busca -- com peso de link, competia em
+            igualdade com os nomes dos alunos da tabela.
+
+            `href` renderiza um `<a>` de verdade: quem navega tem de poder
+            abrir em outra aba e copiar o endereco -- coisas que um
+            `<button onClick>` nao devolve nem com JavaScript.
+          */
+          <Button href="/students/novo" data-testid="novo-aluno">
+            Novo aluno
+          </Button>
         }
       />
 
-      {/* GET, não Server Action: busca é navegação, e navegação vai na URL. */}
-      <form method="get" action="/students">
-        <p>
-          <label htmlFor="busca">Buscar por nome, matrícula ou contato</label>
-          <input
-            type="search"
+      {/* GET, não Server Action: busca e filtro são navegação, e navegação vai na URL. */}
+      <form className={estilos['filtro']} method="get" action="/students">
+        {/*
+          A largura extra vai no WRAPPER, e nao no `Field`: o componente
+          espalha as props restantes no proprio `<input>`, entao um
+          `className` ali estilizaria o controle em vez da coluna do flex.
+        */}
+        <div className={estilos['busca']}>
+          <Field
             id="busca"
             name="q"
+            type="search"
+            label="Buscar por nome, matrícula ou contato"
             defaultValue={termo ?? ''}
             placeholder="Ex.: Maria, AP-2026-00000001, (41) 99999-0000"
           />
-          <button type="submit" data-testid="buscar">
-            Buscar
-          </button>
-        </p>
+        </div>
+
+        <SelectField id="situacao" name="status" label="Situação" defaultValue={situacao ?? ''}>
+          <option value="">Todas</option>
+          {SITUACOES.map(([chave, rotulo]) => (
+            <option key={chave} value={chave}>
+              {rotulo}
+            </option>
+          ))}
+        </SelectField>
+
+        {/*
+          O filtro de unidade só aparece com MAIS DE UMA unidade. Numa
+          academia de endereço único, ele seria um controle com uma opção só —
+          ocupa espaço, sugere uma escolha que não existe e ainda esconde um
+          modo de errar (filtrar pela única unidade e achar que filtrou algo).
+        */}
+        {unidades.length > 1 ? (
+          <SelectField
+            id="unidade"
+            name="gymUnitId"
+            label="Unidade"
+            defaultValue={unidade ?? ''}
+          >
+            <option value="">Todas</option>
+            {unidades.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
+
+        <Button type="submit" variant="outline" data-testid="buscar">
+          Filtrar
+        </Button>
       </form>
 
       {/*
@@ -146,7 +250,7 @@ export default async function PaginaDeAlunos({
         procurar por ele exigiria rota nova. Dizer isso aqui evita a recepção
         digitar o CPF, não achar ninguém e concluir que o aluno não existe.
       */}
-      <p role="note" data-testid="aviso-de-busca">
+      <p className={estilos['aviso']} role="note" data-testid="aviso-de-busca">
         A busca não encontra por CPF. Use nome, número de matrícula ou telefone.
       </p>
 
@@ -161,29 +265,52 @@ export default async function PaginaDeAlunos({
             key: 'matricula',
             header: 'Matrícula',
             numeric: true,
-            render: (aluno) => aluno.membershipNumber,
+            render: (aluno) => (
+              <span className={estilos['matricula']}>{aluno.membershipNumber}</span>
+            ),
           },
           {
-            key: 'nome',
-            header: 'Nome',
-            render: (aluno) => <a href={`/students/${aluno.id}`}>{aluno.fullName}</a>,
+            key: 'aluno',
+            header: 'Aluno',
+            /*
+             * NOME E CPF NA MESMA CELULA, empilhados -- como no mockup.
+             *
+             * Sao a mesma pergunta ("e esta pessoa?"), e quem confere
+             * documento no balcao le os dois juntos. Em colunas separadas, o
+             * olho atravessa a linha inteira entre uma metade e outra da
+             * resposta.
+             *
+             * `MaskedCPF` recebe a mascara que a API ja devolve -- o painel
+             * nunca ve o documento inteiro.
+             *
+             * SEM CPF, A LINHA NAO GANHA UM `—`. Cadastrar sem documento e o
+             * caminho normal (INV-009/011), e nesta base 13 de 16 alunos nao
+             * tem CPF: um travessao por linha viraria uma coluna de ausencia
+             * sob os nomes, chamando atencao para o que NAO e problema. A
+             * marca de ausencia continua existindo onde ela responde a uma
+             * pergunta -- na ficha do aluno, onde a pessoa foi procurar o
+             * documento.
+             */
+            render: (aluno) => (
+              <span className={estilos['identificacao']}>
+                <a className={estilos['nome']} href={`/students/${aluno.id}`}>
+                  {aluno.fullName}
+                </a>
+                {aluno.cpfMasked ? (
+                  <span className={estilos['documento']}>
+                    <MaskedCPF masked={aluno.cpfMasked} />
+                  </span>
+                ) : null}
+              </span>
+            ),
           },
           {
             key: 'nascimento',
             header: 'Nascimento',
+            numeric: true,
             render: (aluno) => (
               <TenantDateTime iso={aluno.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
             ),
-          },
-          {
-            key: 'cpf',
-            header: 'CPF',
-            /*
-             * `MaskedCPF` recebe a mascara que a API ja devolve -- o painel
-             * nunca ve o documento inteiro. Sem CPF, `—` com rotulo de
-             * ausencia, que e o que a tela ja fazia.
-             */
-            render: (aluno) => <MaskedCPF masked={aluno.cpfMasked} />,
           },
           {
             key: 'situacao',
@@ -197,7 +324,9 @@ export default async function PaginaDeAlunos({
                 */}
                 <StateBadge machine="student" state={aluno.status} />
                 {impedeAcesso(aluno.status) ? (
-                  <span data-testid={`sem-acesso-${aluno.id}`}> — sem acesso à catraca</span>
+                  <span className={estilos['consequencia']} data-testid={`sem-acesso-${aluno.id}`}>
+                    sem acesso à catraca
+                  </span>
                 ) : null}
               </>
             ),
@@ -207,13 +336,21 @@ export default async function PaginaDeAlunos({
         empty={
           <EmptyState
             testId="sem-alunos"
+            /*
+              A mensagem separa "nao ha aluno" de "nao ha aluno ASSIM".
+              Dizer "nenhum aluno cadastrado" a quem filtrou por "Bloqueado"
+              afirmaria que a base esta vazia -- e o proximo passo seria
+              cadastrar alguem que ja existe.
+            */
             title={
-              termo
-                ? 'Nenhum aluno encontrado com esse termo.'
+              termo || situacao || unidade
+                ? 'Nenhum aluno encontrado com esses filtros.'
                 : 'Nenhum aluno cadastrado ainda.'
             }
             hint={
-              termo ? 'Confira a grafia ou cadastre um novo aluno.' : 'Comece cadastrando o primeiro.'
+              termo || situacao || unidade
+                ? 'Confira a grafia, amplie os filtros ou cadastre um novo aluno.'
+                : 'Comece cadastrando o primeiro.'
             }
             action={<a href="/students/novo">Cadastrar aluno</a>}
           />

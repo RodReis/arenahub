@@ -567,6 +567,15 @@ export class StudentRepository {
        * inteiro, como antes desta fatia.
        */
       gymUnitId?: string | undefined;
+      /**
+       * Situacao do aluno. Opcional: ausente, a listagem mostra TODAS as
+       * situacoes -- que e o que a tela fazia antes do filtro existir.
+       *
+       * Filtra pela COLUNA, nao por regra derivada: "sem acesso a catraca" e
+       * consequencia do status (`impedeAcesso`), nao um status por si. Quem
+       * quer ver os bloqueados filtra por `BLOCKED`.
+       */
+      status?: StudentStatus | undefined;
     },
   ): Promise<Student[]> {
     const termo = filtro.termo?.trim();
@@ -589,6 +598,7 @@ export class StudentRepository {
       where: {
         tenantId: contexto.tenantId,
         ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
+        ...(filtro.status ? { status: filtro.status } : {}),
         ...condicoes,
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
