@@ -498,6 +498,7 @@ model Tenant {
   invoiceItems    InvoiceItem[]
   payments        Payment[]
   paymentAttempts PaymentAttempt[]
+  paymentMethods  PaymentMethod[]
   accountCredits  AccountCredit[]
   invoiceSequence InvoiceSequence?
   providerAccounts ProviderAccount[]
@@ -849,6 +850,7 @@ model Student {
   contacts       StudentContact[]
   addresses      StudentAddress[]
   subscriptions  Subscription[]
+  paymentMethods PaymentMethod[]
   entitlements   Entitlement[]
   timelineEvents StudentTimelineEvent[]
 
@@ -2124,6 +2126,80 @@ enum InvoiceStatus {
 /// `MANUAL` e o que faz a Slice 2.1 fechar SEM adapter nenhum (ADR-027):
 /// dinheiro ou transferencia reconhecidos na recepcao. Os demais chegam com
 /// o provedor homologado, na Slice 2.2.
+/// Estado de um metodo de pagamento tokenizado.
+///
+/// `EXPIRED` NAO e derivado da data de validade em consulta: o cartao pode
+/// ser recusado por expiracao antes do mes gravado (reemissao, bloqueio do
+/// emissor) e continuar valendo depois dele (renovacao automatica pela
+/// bandeira, que mantem o token). Quem manda e a resposta do provedor.
+enum PaymentMethodStatus {
+  ACTIVE
+  EXPIRED
+  REMOVED
+
+  @@map("payment_method_status")
+}
+
+/// Metodo de pagamento tokenizado do aluno. `MVP-02` 7, Slice 2.3.
+///
+/// O QUE ESTA TABELA NAO TEM, E NUNCA PODE TER (INV-098): numero do cartao,
+/// PAN, CVV, trilha. A tokenizacao e HOSPEDADA -- o dado vai do navegador do
+/// aluno direto para o provedor, e o backend recebe so o token. Coluna de PAN
+/// aqui nao seria "campo faltando": seria o ArenaHub entrando no escopo do
+/// PCI DSS.
+///
+/// A Getnet expoe DOIS caminhos de tokenizacao e so um satisfaz o INV-098 --
+/// `POST /v1/tokens/card` chamado pelo backend recebe `card_number` cru.
+/// Vale exclusivamente o caminho do cliente (Get Checkout / iframe). Ver
+/// ADR-032.
+///
+/// `brand`, `last4`, `expMonth` e `expYear` sao o que a bandeira permite
+/// exibir, e existem por uma razao operacional: sem eles a recepcao nao tem
+/// como dizer QUAL cartao falhou quando o aluno tem dois.
+model PaymentMethod {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  /// Slug do provedor que guarda o token. Hoje `getnet` (ADR-032).
+  provider String
+  /// Identificador do token NO PROVEDOR. Nao e o cartao -- e a referencia a
+  /// ele no cofre do provedor, inutil fora dali.
+  externalTokenId String @map("external_token_id")
+
+  /// Bandeira, como o provedor devolveu. String e nao enum: bandeira nova
+  /// nao deve exigir migration.
+  brand String?
+  /// Ultimos quatro digitos. E o maximo que a bandeira permite exibir.
+  last4    String? @db.VarChar(4)
+  expMonth Int?    @map("exp_month")
+  expYear  Int?    @map("exp_year")
+
+  status PaymentMethodStatus @default(ACTIVE)
+
+  /// O metodo usado na cobranca recorrente quando o aluno nao escolhe outro.
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// O token e unico no provedor: reenviar o mesmo cartao devolve o mesmo
+  /// token, e sem esta chave o aluno acumularia metodos duplicados a cada
+  /// tentativa de cadastro interrompida.
+  @@unique([provider, externalTokenId])
+  /// UM metodo padrao ATIVO por aluno -- indice PARCIAL, declarado na
+  /// migration porque o Prisma nao modela unicidade condicional. Sem ele
+  /// "qual cartao cobrar?" teria duas respostas e a escolha cairia na ordem
+  /// de insercao, o mesmo defeito que `provider_accounts.capability` veio
+  /// consertar. A garantia mora em
+  /// `payment_methods_tenant_id_student_id_default_key`.
+  @@index([tenantId, studentId, status])
+  @@map("payment_methods")
+}
+
 enum PaymentMethodKind {
   MANUAL
   PIX
@@ -2355,14 +2431,34 @@ model InvoiceSequence {
 /// repouso pela mesma razao que token de provedor (`MVP-02` 11): o banco nao
 /// e lugar de segredo em claro.
 ///
-/// `provider` e string, nao enum: o provedor sai do card `[GATE]` do MVP 2 e
-/// ainda nao foi escolhido (ADR-013). Enum aqui congelaria em migration uma
-/// decisao que e do PI.
+/// `provider` e string, nao enum: em 19/08/2026 sao `sicoob` e `getnet`
+/// (ADR-032), mas trocar de PSP e decisao do PI e nao deve custar migration.
+/// A COLUNA QUE O CODIGO CONSULTA E `capability`, nunca esta -- ver abaixo.
+
+/// Capacidade que uma conta de provedor atende (ADR-032).
+///
+/// EXISTE PORQUE SAO DOIS PROVEDORES: Sicoob para PIX, Getnet para cartao.
+/// Sem ela, `findFirst({ active: true })` devolve qualquer conta ativa do
+/// tenant -- e a cobranca PIX sairia pela conta de cartao dependendo da ordem
+/// de insercao no banco, silenciosamente.
+enum ProviderCapability {
+  PIX
+  CARD
+
+  @@map("provider_capability")
+}
+
 model ProviderAccount {
   id       String @id @default(uuid()) @db.Uuid
   tenantId String @map("tenant_id") @db.Uuid
   /// Slug do provedor homologado. Minusculo, sem espaco.
   provider String
+  /// O QUE esta conta sabe fazer, nao QUEM ela e.
+  ///
+  /// O roteamento pergunta pela CAPACIDADE e nunca pela marca: trocar o
+  /// Sicoob por outro PSP e mudar a linha de `provider` e escrever um
+  /// adapter, sem tocar em caso de uso nenhum.
+  capability ProviderCapability
   /// Identificador da conta NO PROVEDOR. E o que chega na requisicao de
   /// webhook e resolve o tenant.
   externalAccountId String @map("external_account_id")
@@ -2379,6 +2475,16 @@ model ProviderAccount {
   /// unicidade e global, nao por tenant: duas contas iguais em tenants
   /// diferentes tornariam a resolucao ambigua, que e o buraco da INV-078.
   @@unique([provider, externalAccountId])
+  /// UMA conta ATIVA por capacidade por tenant -- indice PARCIAL
+  /// (`WHERE active`), declarado na migration porque o Prisma nao modela
+  /// unicidade condicional. `@@index` aqui existe so para o planner; a
+  /// garantia mora em `provider_accounts_tenant_id_capability_active_key`.
+  ///
+  /// Parcial de proposito: conta desativada nao disputa roteamento, e exigir
+  /// unicidade sobre ela impediria trocar de PSP -- a conta antiga precisa
+  /// seguir existindo, inativa, para os eventos historicos continuarem
+  /// resolviveis.
+  @@index([tenantId, capability, active])
   @@index([tenantId, provider])
   @@map("provider_accounts")
 }

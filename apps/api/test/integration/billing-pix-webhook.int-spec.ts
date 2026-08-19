@@ -182,6 +182,9 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
       data: {
         tenantId: tenant.id,
         provider: PROVEDOR_FAKE,
+        // A conta que atende PIX. Obrigatoria desde a F14 (ADR-032): com dois
+        // provedores, "conta ativa do tenant" deixou de identificar uma so.
+        capability: 'PIX',
         externalAccountId: CONTA_NO_PROVEDOR,
         // Em producao vive cifrado; aqui o valor nao sai deste arquivo.
         signingSecretEncrypted: SEGREDO,

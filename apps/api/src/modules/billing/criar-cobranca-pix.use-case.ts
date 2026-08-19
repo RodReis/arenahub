@@ -5,6 +5,7 @@ import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { podeTransicionar } from './domain/invoice.js';
+import { ProviderAccountResolver } from './provider/provider-account.resolver.js';
 import {
   ErroDoProvedor,
   PAYMENT_PROVIDER,
@@ -47,16 +48,6 @@ export class InvoiceNaoCobravelError extends ErroDeDominio {
   }
 }
 
-export class ContaDoProvedorAusenteError extends ErroDeDominio {
-  constructor() {
-    super(
-      'PROVIDER_ACCOUNT_MISSING',
-      409,
-      'Tenant sem conta ativa no provedor de pagamento; configure antes de cobrar',
-    );
-  }
-}
-
 export class InvoiceNaoEncontradaParaCobrancaError extends ErroDeDominio {
   constructor() {
     super('INVOICE_NOT_FOUND', 404, 'Invoice nao encontrada');
@@ -88,6 +79,7 @@ export class CriarCobrancaPixUseCase {
   constructor(
     private readonly db: PrismaService,
     @Inject(PAYMENT_PROVIDER) private readonly provedor: PaymentProvider,
+    private readonly contas: ProviderAccountResolver,
   ) {}
 
   /**
@@ -116,13 +108,15 @@ export class CriarCobrancaPixUseCase {
       throw new InvoiceNaoCobravelError(invoice.status);
     }
 
-    const conta = await this.db.providerAccount.findFirst({
-      where: { tenantId: contexto.tenantId, active: true },
-    });
-
-    if (!conta) {
-      throw new ContaDoProvedorAusenteError();
-    }
+    /**
+     * PEDE A CONTA DE PIX, nao "uma conta ativa qualquer".
+     *
+     * Ate 19/08/2026 esta linha era `findFirst({ tenantId, active: true })`,
+     * o que bastava com um provedor so. Com Sicoob e Getnet cadastrados no
+     * mesmo tenant (ADR-032), ela devolveria a conta de CARTAO metade das
+     * vezes -- dependendo da ordem de insercao, sem erro e sem log.
+     */
+    const conta = await this.contas.resolver(contexto, 'PIX');
 
     /**
      * REUSO DA TENTATIVA PENDENTE: pedir o PIX de novo enquanto o anterior
