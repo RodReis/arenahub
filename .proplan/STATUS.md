@@ -9,7 +9,7 @@ updated: 2026-08-19
 
 ### Sem épico
 
-- [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118)
+- [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
