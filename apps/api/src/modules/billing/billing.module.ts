@@ -3,11 +3,15 @@ import { Module } from '@nestjs/common';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { BillingController } from './billing.controller.js';
 import { BillingRepository } from './billing.repository.js';
+import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
+import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
+import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { ProcessarWebhookDePagamentoUseCase } from './processar-webhook-de-pagamento.use-case.js';
 import { FakePaymentProvider } from './provider/fake-payment-provider.adapter.js';
 import { PAYMENT_PROVIDER } from './provider/payment-provider.port.js';
+import { ProviderAccountResolver } from './provider/provider-account.resolver.js';
 import { WebhookController } from './webhook.controller.js';
 
 /**
@@ -20,13 +24,20 @@ import { WebhookController } from './webhook.controller.js';
  * modulo, nunca a tabela.
  *
  * O PROVEDOR E REGISTRADO PELO TOKEN, nao pela classe: o caso de uso depende
- * de `PaymentProvider`, e trocar o duble pelo adapter homologado (quando o
- * card `[GATE]` do ADR-013 escolher um) nao toca em nenhum caso de uso.
+ * de `PaymentProvider`, e trocar o duble pelo adapter real nao toca em
+ * nenhum caso de uso.
  *
- * ENQUANTO O PROVEDOR NAO FOR ESCOLHIDO, o `FakePaymentProvider` e o unico
- * adapter que existe. Ele nao e "modo de teste": e o estado real do sistema
- * ate a homologacao acontecer. Um adapter real entra aqui como mais um
- * `useClass`, decidido por ambiente.
+ * SAO DOIS PROVEDORES (ADR-032): Sicoob para PIX, Getnet para cartao. QUAL
+ * conta atende cada capacidade sai do `ProviderAccountResolver`, que le
+ * `provider_accounts.capability` -- nunca de um `if` por marca.
+ *
+ * O `FakePaymentProvider` continua sendo o unico adapter que existe: os dois
+ * adapters reais dependem de credencial e sandbox, e a matriz do gate
+ * (`docs/reports/MVP-02-matriz-de-homologacao-de-provedor.md`) marcou como
+ * NAO VERIFICADO justamente o que eles precisariam honrar -- assinatura de
+ * webhook, estorno parcial, chave estavel de evento. Escrever adapter contra
+ * documentacao nao confirmada produziria codigo que parece pronto e falha na
+ * primeira chamada real.
  */
 @Module({
   controllers: [BillingController, WebhookController],
@@ -36,6 +47,10 @@ import { WebhookController } from './webhook.controller.js';
     ConsultarStatusDePagamentoUseCase,
     ProcessarWebhookDePagamentoUseCase,
     TenantContextService,
+    ProviderAccountResolver,
+    RegistrarMetodoDePagamentoUseCase,
+    CobrarAssinaturaNoCartaoUseCase,
+    CancelarRecorrenciaUseCase,
     { provide: PAYMENT_PROVIDER, useClass: FakePaymentProvider },
   ],
   exports: [BillingRepository, PAYMENT_PROVIDER],

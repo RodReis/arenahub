@@ -118,6 +118,7 @@ export type {
   OperationalAlertSeverity,
   OperationalAlertState,
   PassageState,
+  ProviderCapability,
   StudentContactType,
   StudentRegisteredSex,
   StudentStatus,

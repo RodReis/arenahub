@@ -114,6 +114,21 @@ describe('contrato OpenAPI', () => {
         '/api/v1/exports/{id}',
         '/api/v1/exports/{id}/cancel',
         '/api/v1/exports/{id}/download',
+        // F12 e F13 -- invoice, pagamento manual, PIX e webhook.
+        // NAO ESTAVAM AQUI: a lista parou na F11, e as duas fatias entregaram
+        // rota sem declara-la. O snapshot pegava a mudanca, esta lista nao --
+        // ela e a que diz, em prosa, o que a fatia PROMETEU publicar.
+        '/api/v1/invoices',
+        '/api/v1/invoices/{id}',
+        '/api/v1/invoices/{id}/manual-payment',
+        '/api/v1/invoices/{id}/payments/pix',
+        '/api/v1/payments/{id}/status',
+        '/api/v1/students/{id}/invoices',
+        '/api/v1/webhooks/payments/{provider}',
+        // F14 -- cartao e recorrencia.
+        '/api/v1/payment-methods',
+        '/api/v1/invoices/{id}/payments/card',
+        '/api/v1/subscriptions/{id}/recurrence/cancel',
       ]),
     );
   });

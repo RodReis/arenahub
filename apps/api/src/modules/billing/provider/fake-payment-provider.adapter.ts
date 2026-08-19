@@ -54,6 +54,14 @@ interface CobrancaEmMemoria {
  * assinando com a mesma funcao do adapter e o unico jeito de a verificacao
  * ser exercitada de ponta a ponta sem provedor real.
  */
+/**
+ * Prefixos de token que o duble recusa, para exercitar os dois lados da
+ * politica de retry sem provedor real. Nao existem no mundo real -- e por
+ * isso comecam com `tok_fake_`, que nenhum cofre de verdade emite.
+ */
+export const TOKEN_RECUSADO_DEFINITIVO = 'tok_fake_recusa_definitiva';
+export const TOKEN_RECUSADO_TEMPORARIO = 'tok_fake_recusa_temporaria';
+
 export function assinarCorpo(rawBody: Buffer, segredo: string): string {
   return createHmac('sha256', segredo).update(rawBody).digest('hex');
 }
@@ -67,6 +75,12 @@ export class FakePaymentProvider implements PaymentProvider {
    * `provider_accounts`; aqui o teste registra o que precisa.
    */
   private readonly segredos = new Map<string, string>();
+
+  /** Assinaturas por chave de idempotencia -- o que torna o retry seguro. */
+  private readonly assinaturas = new Map<string, string>();
+
+  /** Assinaturas ainda nao canceladas. Cancelar duas vezes tem de reprovar. */
+  private readonly assinaturasVivas = new Set<string>();
 
   registrarConta(externalAccountId: string, segredo: string): void {
     this.segredos.set(externalAccountId, segredo);
@@ -242,20 +256,70 @@ export class FakePaymentProvider implements PaymentProvider {
    * (`MVP-02` 12); estourar aqui e melhor que devolver dado inventado que
    * faria um teste futuro passar por engano.
    */
-  createTokenizedSubscription(_input: SubscriptionInput): Promise<ProviderSubscription> {
-    throw new ErroDoProvedor(
-      'PROVIDER_INVALID_REQUEST',
-      false,
-      'assinatura tokenizada e da fatia F14, ainda nao implementada no duble',
-    );
+  /**
+   * Assinatura tokenizada -- F14.
+   *
+   * O DUBLE NAO RECEBE, NAO GUARDA E NAO SABE INVENTAR numero de cartao: a
+   * entrada e `cardToken`, que no mundo real vem do checkout hospedado do
+   * provedor (INV-098). Um fake que aceitasse PAN daria a impressao de que o
+   * caminho existe, e alguem o implementaria contra o adapter real.
+   */
+  createTokenizedSubscription(input: SubscriptionInput): Promise<ProviderSubscription> {
+    if (input.amountMinor <= 0) {
+      throw new ErroDoProvedor(
+        'PROVIDER_INVALID_REQUEST',
+        false,
+        'cobranca no cartao exige valor positivo',
+      );
+    }
+
+    /**
+     * TOKEN RECUSADO POR CONVENCAO, para que o caminho de falha seja
+     * exercitavel sem provedor real. `recuperavel: false` traduz a recusa
+     * DEFINITIVA (cartao cancelado, conta encerrada) -- e o que faz a
+     * politica de retry parar em vez de repetir.
+     */
+    if (input.cardToken.startsWith(TOKEN_RECUSADO_DEFINITIVO)) {
+      throw new ErroDoProvedor('PROVIDER_REJECTED', false, 'cartao recusado em definitivo');
+    }
+
+    if (input.cardToken.startsWith(TOKEN_RECUSADO_TEMPORARIO)) {
+      throw new ErroDoProvedor('PROVIDER_REJECTED', true, 'saldo insuficiente');
+    }
+
+    /**
+     * Idempotencia DO LADO DO PROVEDOR, igual a do PIX: mesma chave devolve a
+     * MESMA assinatura. Sem isto, um retry de rede criaria duas recorrencias
+     * cobrando o aluno em dobro todo mes -- e o teste nunca veria.
+     */
+    const existente = this.assinaturas.get(input.idempotencyKey);
+    if (existente) {
+      return Promise.resolve({ externalSubscriptionId: existente, status: 'ACTIVE' });
+    }
+
+    const externalSubscriptionId = `fake_sub_${randomUUID()}`;
+    this.assinaturas.set(input.idempotencyKey, externalSubscriptionId);
+    this.assinaturasVivas.add(externalSubscriptionId);
+
+    return Promise.resolve({ externalSubscriptionId, status: 'ACTIVE' });
   }
 
-  cancelSubscription(_externalSubscriptionId: string): Promise<void> {
-    throw new ErroDoProvedor(
-      'PROVIDER_INVALID_REQUEST',
-      false,
-      'cancelamento de assinatura e da fatia F14, ainda nao implementado no duble',
-    );
+  cancelSubscription(externalSubscriptionId: string): Promise<void> {
+    /**
+     * Cancelar o que nao existe e `PROVIDER_NOT_FOUND`, e nao sucesso
+     * silencioso: quem chama precisa poder distinguir "cancelei" de "nao
+     * havia nada". O caso de uso trata o `NOT_FOUND` como estado ja
+     * alcancado -- mas essa e decisao DELE, nao do provedor.
+     */
+    if (!this.assinaturasVivas.delete(externalSubscriptionId)) {
+      throw new ErroDoProvedor(
+        'PROVIDER_NOT_FOUND',
+        false,
+        'assinatura inexistente ou ja cancelada no provedor',
+      );
+    }
+
+    return Promise.resolve();
   }
 
   refundPayment(_input: RefundInput): Promise<ProviderRefund> {
