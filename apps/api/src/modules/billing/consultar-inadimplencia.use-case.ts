@@ -231,10 +231,27 @@ export class ConsultarInadimplenciaUseCase {
     });
   }
 
-  /** Agrupa a divida por idade. Ver o comentario de `FaixaDeAtraso`. */
+  /**
+   * Agrupa a divida por idade. Ver o comentario de `FaixaDeAtraso`.
+   *
+   * TODA LINHA CAI EM EXATAMENTE UMA FAIXA. A soma das barras tem de bater com
+   * o numero grande ao lado -- se uma fatura escapar, o grafico contradiz o
+   * total e quem confere perde a confianca na tela inteira.
+   *
+   * O caso que escapava, achado testando os limites: bloqueado com
+   * `diasEmAtraso === 0`. Parece impossivel, mas nao e -- academia com
+   * `graceDays = 0` bloqueia na meia-noite do dia do vencimento, entao uma
+   * fatura que venceu as 14h ja esta bloqueada as 20h com ZERO dia inteiro de
+   * atraso. O piso da primeira faixa de bloqueio precisa ser -1, e nao 0.
+   */
   private faixas(linhas: readonly LinhaDeInadimplencia[]): readonly FaixaDeAtraso[] {
     return FAIXAS.map((faixa, indice) => {
-      const piso = indice === 0 ? -1 : (FAIXAS[indice - 1]?.ate ?? 0);
+      /**
+       * O piso da PRIMEIRA faixa de bloqueio e -1 para incluir o dia zero. As
+       * demais herdam o teto da anterior, o que fecha a escada sem buraco nem
+       * sobreposicao.
+       */
+      const piso = indice <= 1 ? -1 : (FAIXAS[indice - 1]?.ate ?? 0);
 
       const daFaixa = linhas.filter((linha) =>
         faixa.rotulo === 'Em carência'

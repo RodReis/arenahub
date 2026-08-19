@@ -429,6 +429,130 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
     }
   });
 
+  it('a soma das faixas BATE com o total em atraso', async () => {
+    /**
+     * INVARIANTE DO GRAFICO, e ela nao e cosmetica: as barras ficam ao lado do
+     * numero grande, e se uma fatura escapar da classificacao o grafico
+     * contradiz o total -- quem confere perde a confianca na tela inteira.
+     *
+     * O caso que escapava, achado testando os limites: BLOQUEADO com
+     * `diasEmAtraso === 0`. Parece impossivel ate lembrar que academia com
+     * `graceDays = 0` bloqueia na meia-noite do dia do vencimento -- uma
+     * fatura que venceu as 14h ja esta bloqueada as 20h, com zero dia INTEIRO
+     * de atraso. O piso da primeira faixa era 0 e a linha sumia.
+     */
+    const painel = await consultar.executar(contexto, JA_BLOQUEIA);
+
+    const somaDasFaixas = painel.faixas.reduce((soma, faixa) => soma + faixa.minorTotal, 0);
+    const somaDasQuantidades = painel.faixas.reduce((soma, faixa) => soma + faixa.quantidade, 0);
+
+    expect(somaDasFaixas).toBe(painel.resumo.emAtrasoMinor);
+    expect(somaDasQuantidades).toBe(painel.linhas.length);
+  });
+
+  it('bloqueado com ZERO dia de atraso nao some do grafico', async () => {
+    /**
+     * O caso concreto: `graceDays = 0`, fatura vencida ha poucas horas. Antes
+     * da correcao ela contava no total e nao aparecia em faixa nenhuma.
+     */
+    const tenantSemCarencia = await tenantVazio(`zerodia-${sufixo}`);
+
+    try {
+      await db.billingSettings.create({
+        data: { tenantId: tenantSemCarencia, dueDay: 10, graceDays: 0 },
+      });
+
+      const unidade = await db.gymUnit.create({
+        data: {
+          tenantId: tenantSemCarencia,
+          code: 'MTZ',
+          name: 'Matriz',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+
+      const aluno = await db.student.create({
+        data: {
+          tenantId: tenantSemCarencia,
+          gymUnitId: unidade.id,
+          membershipNumber: `Z-${sufixo}`,
+          fullName: 'Aluno Zero Dia',
+          birthDate: new Date('2000-01-01T00:00:00Z'),
+          status: 'ACTIVE',
+        },
+      });
+
+      const plano = await db.plan.create({
+        data: { tenantId: tenantSemCarencia, name: `Plano Z ${sufixo}` },
+      });
+
+      const assinatura = await db.subscription.create({
+        data: {
+          tenantId: tenantSemCarencia,
+          studentId: aluno.id,
+          planId: plano.id,
+          status: 'ACTIVE',
+          startsAt: new Date('2026-08-01T00:00:00Z'),
+        },
+      });
+
+      /** Venceu as 14h; sao 20h do MESMO dia -- zero dia inteiro de atraso. */
+      await db.invoice.create({
+        data: {
+          tenantId: tenantSemCarencia,
+          subscriptionId: assinatura.id,
+          studentId: aluno.id,
+          billingPeriod: new Date('2026-08-01T00:00:00Z'),
+          number: 1,
+          status: 'OPEN',
+          currency: 'BRL',
+          subtotalMinor: 9990,
+          totalMinor: 9990,
+          dueAt: new Date('2026-08-10T14:00:00.000Z'),
+        },
+      });
+
+      const painel = await consultar.executar(
+        { ...contexto, tenantId: tenantSemCarencia },
+        new Date('2026-08-10T23:00:00.000Z'),
+      );
+
+      expect(painel.linhas).toHaveLength(1);
+      expect(painel.linhas[0]?.diasEmAtraso).toBe(0);
+      expect(painel.linhas[0]?.situacao).toBe('BLOQUEADO');
+
+      const somaDasFaixas = painel.faixas.reduce((soma, faixa) => soma + faixa.minorTotal, 0);
+      expect(somaDasFaixas).toBe(9990);
+    } finally {
+      await db.tenant.delete({ where: { id: tenantSemCarencia } });
+    }
+  });
+
+  it('a fila vem ordenada por URGENCIA, nao por data', async () => {
+    /**
+     * Quem trabalha esta fila tem meia hora entre um aluno e outro. Ordenar
+     * por vencimento responde "quem venceu primeiro?", que ninguem pergunta.
+     *
+     * O peso e `valor x dias`, e quem esta EM CARENCIA vai para o fim sempre:
+     * ainda entra na academia, e cobrar quem esta no prazo combinado queima a
+     * relacao por nada.
+     */
+    const painel = await consultar.executar(contexto, JA_BLOQUEIA);
+
+    const situacoes = painel.linhas.map((linha) => linha.situacao);
+    const primeiroEmCarencia = situacoes.indexOf('EM_CARENCIA');
+
+    if (primeiroEmCarencia !== -1) {
+      expect(situacoes.slice(primeiroEmCarencia)).not.toContain('BLOQUEADO');
+    }
+
+    const bloqueados = painel.linhas.filter((l) => l.situacao === 'BLOQUEADO');
+    const pesos = bloqueados.map((l) => l.amountMinor * Math.max(l.diasEmAtraso, 1));
+
+    expect([...pesos].sort((a, b) => b - a)).toEqual(pesos);
+  });
+
   it('INV-006: a CONSULTA nao ve o inadimplente de outro tenant', async () => {
     /**
      * `docs/TESTING.md` 5: "todo caso de uso multi-tenant critico tem teste
