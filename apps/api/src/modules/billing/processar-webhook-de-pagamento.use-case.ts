@@ -210,6 +210,88 @@ export class ProcessarWebhookDePagamentoUseCase {
   }
 
   /**
+   * Reprocessa um evento JA GUARDADO e ainda nao aplicado. F16, `M2-FR-020`.
+   *
+   * NAO REVERIFICA A ASSINATURA, e nao e descuido: a verificacao aconteceu
+   * quando o evento chegou (INV-077), e refaze-la exigiria reter o corpo bruto
+   * e os headers indefinidamente -- payload cru guardado a mais e superficie
+   * de vazamento, e o `MVP-02` §15 pede retencao minima. O que se reprocessa e
+   * um registro que ja passou pela porta.
+   *
+   * SEGURO POR CONSTRUCAO (INV-086): passa pela MESMA `decidirSobreEvento` do
+   * caminho normal. Evento ja aplicado devolve `false` sem tocar em nada; o
+   * `processedAt: null` no filtro e conveniencia de leitura, nao a garantia.
+   *
+   * DEVOLVE `false` EM VEZ DE ESTOURAR quando o evento nao muda estado: a
+   * resolucao de divergencia precisa distinguir "reprocessei e nada mudou" de
+   * "falhou", e as duas coisas sao resultados legitimos.
+   */
+  async reprocessarEventoGuardado(tenantId: string, providerEventId: string): Promise<boolean> {
+    return this.db.$transaction(async (tx) => {
+      const registro = await tx.providerEvent.findFirst({
+        where: { id: providerEventId, tenantId },
+        select: {
+          id: true,
+          eventType: true,
+          externalPaymentId: true,
+          occurredAt: true,
+          processedAt: true,
+          account: { select: { externalAccountId: true } },
+        },
+      });
+
+      if (!registro || registro.processedAt !== null) {
+        return false;
+      }
+
+      const alvo = registro.externalPaymentId
+        ? await this.localizarPagamento(tx, tenantId, registro.externalPaymentId)
+        : null;
+
+      const decisao = decidirSobreEvento(
+        {
+          externalEventId: providerEventId,
+          tipo: registro.eventType,
+          occurredAt: registro.occurredAt,
+        },
+        alvo?.estado ?? { status: 'PENDING', ultimoEventoAplicadoEm: null },
+        // `false`: o evento ja esta guardado por definicao, e passar `true`
+        // aqui o descartaria como duplicata -- que e justamente o que o
+        // reprocessamento existe para nao fazer.
+        false,
+      );
+
+      const agora = registro.occurredAt;
+
+      if (!decisao.aplicar || !alvo) {
+        await tx.providerEvent.update({
+          where: { id: registro.id },
+          data: {
+            skippedReason: decisao.aplicar ? 'TIPO_DESCONHECIDO' : decisao.motivo,
+            processedAt: agora,
+          },
+        });
+
+        return false;
+      }
+
+      await this.aplicar(tx, {
+        tenantId,
+        registroId: registro.id,
+        attemptId: alvo.attemptId,
+        invoiceId: alvo.invoiceId,
+        externalPaymentId: registro.externalPaymentId ?? '',
+        providerAccountId: registro.account.externalAccountId,
+        novoStatus: decisao.novoStatus,
+        occurredAt: registro.occurredAt,
+        agora,
+      });
+
+      return true;
+    });
+  }
+
+  /**
    * Acha a tentativa que originou o pagamento e monta o estado atual.
    *
    * A busca e pela TENTATIVA, nao pelo pagamento: no PIX o pagamento so
