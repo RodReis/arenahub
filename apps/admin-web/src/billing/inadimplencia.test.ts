@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { linkDeCobranca, situacaoVisivel } from './inadimplencia';
+import {
+  linkDeCobranca,
+  motivosDaLinha,
+  situacaoVisivel,
+  telefoneLegivel,
+} from './inadimplencia';
 
 describe('situacaoVisivel', () => {
   it('mostra a situacao real quando nao ha liberacao', () => {
@@ -97,5 +102,80 @@ describe('linkDeCobranca', () => {
     const link = linkDeCobranca('41998765432', '   ', 8221);
 
     expect(link).toContain('https://wa.me/5541998765432');
+  });
+});
+
+describe('telefoneLegivel', () => {
+  it('formata celular de 11 digitos', () => {
+    expect(telefoneLegivel('41998765432')).toBe('(41) 99876-5432');
+  });
+
+  it('formata fixo de 10 digitos', () => {
+    expect(telefoneLegivel('4133334444')).toBe('(41) 3333-4444');
+  });
+
+  it('tira o DDI antes de formatar', () => {
+    expect(telefoneLegivel('5541998765432')).toBe('(41) 99876-5432');
+  });
+
+  it('devolve como veio o que nao reconhece', () => {
+    /**
+     * Inventar formato para numero estrangeiro ou mal cadastrado produziria um
+     * telefone com aparencia de certo e digitos no lugar errado -- pior que
+     * mostrar o valor cru, que pelo menos denuncia o cadastro ruim.
+     */
+    expect(telefoneLegivel('+1 415 555 0000')).toBe('+1 415 555 0000');
+  });
+
+  it('nulo continua nulo', () => {
+    expect(telefoneLegivel(null)).toBeNull();
+  });
+});
+
+describe('motivosDaLinha', () => {
+  it('sempre diz quantos dias de atraso', () => {
+    const motivos = motivosDaLinha({ diasEmAtraso: 12, situacao: 'BLOQUEADO', liberadoAte: null });
+
+    expect(motivos).toContain('12 dias de atraso');
+  });
+
+  it('singular no primeiro dia', () => {
+    const motivos = motivosDaLinha({ diasEmAtraso: 1, situacao: 'EM_CARENCIA', liberadoAte: null });
+
+    expect(motivos).toContain('1 dia de atraso');
+  });
+
+  it('quem esta bloqueado ganha o motivo do bloqueio', () => {
+    const motivos = motivosDaLinha({ diasEmAtraso: 6, situacao: 'BLOQUEADO', liberadoAte: null });
+
+    expect(motivos).toContain('sem acesso à catraca');
+  });
+
+  it('LIBERADO nao diz que esta sem acesso -- ele entra', () => {
+    /**
+     * O contrario faria a recepcao barrar quem tem passagem autorizada, que e
+     * o oposto do que a liberacao existe para permitir.
+     */
+    const motivos = motivosDaLinha({
+      diasEmAtraso: 6,
+      situacao: 'BLOQUEADO',
+      liberadoAte: '2026-08-22T00:00:00.000Z',
+    });
+
+    expect(motivos).toContain('liberado com prazo');
+    expect(motivos).not.toContain('sem acesso à catraca');
+  });
+
+  it('nunca passa de tres motivos', () => {
+    /**
+     * A partir do quarto chip o olho para de ler e a linha vira ruido.
+     */
+    const motivos = motivosDaLinha({
+      diasEmAtraso: 40,
+      situacao: 'BLOQUEADO',
+      liberadoAte: '2026-08-22T00:00:00.000Z',
+    });
+
+    expect(motivos.length).toBeLessThanOrEqual(3);
   });
 });

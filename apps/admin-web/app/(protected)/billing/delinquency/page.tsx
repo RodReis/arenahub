@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import {
+  BarrasDeFaixa,
   Button,
   DataTable,
   EmptyState,
@@ -12,7 +13,12 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
-import { linkDeCobranca, situacaoVisivel } from '../../../../src/billing/inadimplencia';
+import {
+  linkDeCobranca,
+  motivosDaLinha,
+  situacaoVisivel,
+  telefoneLegivel,
+} from '../../../../src/billing/inadimplencia';
 import estilos from './delinquency.module.css';
 
 export const metadata: Metadata = {
@@ -43,7 +49,31 @@ interface Painel {
     bloqueados: number;
     taxaDeInadimplencia: number | null;
   };
+  faixas: { rotulo: string; minorTotal: number; quantidade: number }[];
   linhas: Linha[];
+}
+
+/**
+ * Cor por SEVERIDADE, nao por variedade.
+ *
+ * A escala vai de neutro a perigo conforme a divida envelhece: quem esta na
+ * carencia AINDA ENTRA na academia, e pinta-lo de vermelho faria a recepcao
+ * barrar por engano. O que passou de 30 dias e perda provavel.
+ *
+ * TOKENS DE ESTADO, nao de accent: `--ah-accent-*` nao acompanha o seed do
+ * tenant (regra 2 do DS §11), e a paleta do grafico sairia errada na academia
+ * que tem outra cor de marca. A lint pegou isto, e estava certa.
+ */
+const COR_DA_FAIXA: Readonly<Record<string, string>> = {
+  'Em carência': '--ah-state-neutral',
+  'Até 15 dias': '--ah-state-warning',
+  '16 a 30 dias': '--ah-state-risk',
+  'Mais de 30 dias': '--ah-state-danger',
+};
+
+/** Formata centavos para o rotulo do grafico, que recebe texto pronto. */
+function reais(minor: number): string {
+  return `R$ ${(minor / 100).toFixed(2).replace('.', ',')}`;
 }
 
 export default async function InadimplenciaPage() {
@@ -69,7 +99,7 @@ export default async function InadimplenciaPage() {
     );
   }
 
-  const { resumo, linhas } = resposta.dados;
+  const { resumo, faixas, linhas } = resposta.dados;
 
   return (
     <section aria-labelledby="titulo-inadimplencia">
@@ -80,104 +110,142 @@ export default async function InadimplenciaPage() {
       />
 
       {/*
-        Tres numeros que respondem "quao ruim esta?" antes de a pessoa ler uma
-        linha da tabela. O de dinheiro vem primeiro porque e o que o dono da
-        academia pergunta.
+        BLOCO 1 -- O GESTOR.
+
+        Duas colunas: o dinheiro a esquerda, a composicao dele a direita. O
+        valor total e a RESPOSTA da tela, entao ele nao divide peso com os
+        outros numeros -- os tres cards iguais da versao anterior obrigavam a
+        pessoa a ler os tres para descobrir qual importava.
       */}
-      <dl className={estilos['resumo']} data-testid="resumo-da-inadimplencia">
-        <div className={estilos['cartao']}>
-          <dt>Em atraso</dt>
-          <dd className={estilos['destaque']}>
+      <section className={estilos['visaoDoGestor']} aria-label="Visão geral da inadimplência">
+        <div className={estilos['dinheiro']}>
+          <p className={estilos['rotulo']}>Em atraso agora</p>
+          <p className={estilos['valorGigante']}>
             <Money cents={resumo.emAtrasoMinor} currency="BRL" />
-          </dd>
-          <p className={estilos['apoio']}>
-            {resumo.faturasVencidas === 1
-              ? '1 fatura vencida'
-              : `${String(resumo.faturasVencidas)} faturas vencidas`}
           </p>
+
+          <dl className={estilos['secundarios']}>
+            <div>
+              <dt>Faturas</dt>
+              <dd>{resumo.faturasVencidas}</dd>
+            </div>
+            <div>
+              <dt>Sem acesso</dt>
+              <dd>{resumo.bloqueados}</dd>
+            </div>
+            <div>
+              <dt>Taxa</dt>
+              <dd>
+                {/*
+                  `—` e nao `0%` quando nao ha assinatura pagante: academia sem
+                  aluno nao tem inadimplencia zero, tem uma taxa que nao existe.
+                */}
+                {resumo.taxaDeInadimplencia === null
+                  ? '—'
+                  : `${String(resumo.taxaDeInadimplencia).replace('.', ',')}%`}
+              </dd>
+            </div>
+          </dl>
         </div>
 
-        <div className={estilos['cartao']}>
-          <dt>Taxa de inadimplência</dt>
-          <dd className={estilos['destaque']}>
-            {/*
-              `—` e nao `0%` quando nao ha assinatura pagante: academia sem
-              aluno nao tem inadimplencia zero, tem uma taxa que nao existe --
-              e "0%" seria uma meta batida em cima de nada.
-            */}
-            {/*
-              `replace` e nao `toLocaleString`: a regra 5 do DS proibe
-              formatacao por locale fora de `TenantDateTime`, e ela esta certa
-              em ser conservadora -- `toLocaleString` num numero e inofensivo,
-              mas a regra nao consegue distinguir de uma data, e afrouxa-la
-              abriria a porta que ela existe para fechar.
+        <div className={estilos['composicao']}>
+          <h2 className={estilos['tituloDoBloco']}>Onde está o dinheiro parado</h2>
+          {/*
+            NAO E EVOLUCAO MENSAL, e a escolha e deliberada: o sistema tem UM
+            mes de dado. Uma linha temporal com um ponto so nao informa nada, e
+            desenha-la com meses vazios antes faria a curva subir do zero,
+            sugerindo uma piora que nao aconteceu.
 
-              A taxa vem do backend com uma casa decimal; so a virgula muda.
-            */}
-            {resumo.taxaDeInadimplencia === null
-              ? '—'
-              : `${String(resumo.taxaDeInadimplencia).replace('.', ',')}%`}
-          </dd>
-          <p className={estilos['apoio']}>sobre assinaturas ativas e em atraso</p>
+            A composicao responde hoje o que o gestor pergunta: quanto da
+            divida ja e velha demais para voltar.
+          */}
+          <BarrasDeFaixa
+            testId="faixas-de-atraso"
+            descricao="Valor em atraso por faixa de tempo"
+            faixas={faixas.map((faixa) => ({
+              rotulo: faixa.rotulo,
+              valor: faixa.minorTotal,
+              tokenDeCor: COR_DA_FAIXA[faixa.rotulo] ?? '--ah-text-muted',
+              valorLegivel: reais(faixa.minorTotal),
+            }))}
+          />
         </div>
+      </section>
 
-        <div className={estilos['cartao']}>
-          <dt>Bloqueados por cobrança</dt>
-          <dd className={estilos['destaque']}>{resumo.bloqueados}</dd>
-          <p className={estilos['apoio']}>desbloqueio automático no pagamento</p>
-        </div>
-      </dl>
+      {/*
+        BLOCO 2 -- A RECEPCAO.
+
+        Ordenada por URGENCIA (valor x dias), nao por data: quem trabalha esta
+        fila tem meia hora entre um aluno e outro e precisa saber por onde
+        COMECAR, nao quem venceu primeiro.
+      */}
+      <h2 className={estilos['tituloDaFila']}>
+        Fila de cobrança
+        <span className={estilos['apoioDoTitulo']}>maior valor parado há mais tempo primeiro</span>
+      </h2>
 
       <DataTable
         testId="tabela-de-inadimplencia"
         rows={linhas}
         rowKey={(linha) => linha.invoiceId}
         rowTestId={(linha) => `fatura-${linha.invoiceId}`}
-        caption="Faturas vencidas em aberto, da mais antiga para a mais recente"
+        caption="Faturas vencidas em aberto, da mais urgente para a menos urgente"
         columns={[
           {
             key: 'aluno',
             header: 'Aluno',
-            render: (linha) => linha.studentName,
+            /*
+              NOME, TELEFONE E MOTIVOS numa celula so. Sao a mesma pergunta --
+              "quem e, como falo com ela, e por que esta aqui?" -- e em colunas
+              separadas o olho atravessa a linha inteira entre uma metade e
+              outra da resposta. Mesma correcao feita na lista de alunos (F45).
+            */
+            render: (linha) => (
+              <div className={estilos['identidade']}>
+                <span className={estilos['nome']}>{linha.studentName}</span>
+
+                {linha.telefone === null ? (
+                  <span className={estilos['semTelefone']}>sem telefone cadastrado</span>
+                ) : (
+                  <span className={estilos['telefone']}>{telefoneLegivel(linha.telefone)}</span>
+                )}
+
+                <ul className={estilos['motivos']}>
+                  {motivosDaLinha(linha).map((motivo) => (
+                    <li key={motivo} className={estilos['motivo']}>
+                      {motivo}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ),
           },
           {
             key: 'fatura',
             header: 'Fatura',
             numeric: true,
-            render: (linha) => <span className={estilos['numero']}>{linha.invoiceNumber}</span>,
+            render: (linha) => (
+              <div className={estilos['fatura']}>
+                <span className={estilos['numero']}>{linha.invoiceNumber}</span>
+                <span className={estilos['vencimento']}>
+                  venceu em{' '}
+                  <TenantDateTime iso={linha.dueAt} timeZone={linha.fusoDaUnidade} format="date" />
+                </span>
+              </div>
+            ),
           },
           {
             key: 'valor',
             header: 'Valor',
             numeric: true,
-            render: (linha) => <Money cents={linha.amountMinor} currency={linha.currency} />,
-          },
-          {
-            key: 'vencimento',
-            header: 'Vencimento',
             /*
-              FUSO DA UNIDADE, nao fixo. As outras telas ainda carregam um
-              `FUSO_PROVISORIO` hardcodado; aqui isso seria pior que divida
-              tecnica: o backend decide o bloqueio no fuso da unidade, SEM
-              fallback (ADR-019 §3), e mostrar a data noutro fuso faria a tela
-              divergir em um dia da regra que ela esta exibindo.
+              O VALOR ORDENA A FILA, entao carrega o maior peso tipografico da
+              linha. Na versao anterior tinha o mesmo tamanho do numero da
+              fatura, que ninguem precisa comparar entre linhas.
             */
             render: (linha) => (
-              <TenantDateTime iso={linha.dueAt} timeZone={linha.fusoDaUnidade} format="date" />
-            ),
-          },
-          {
-            key: 'atraso',
-            header: 'Atraso',
-            numeric: true,
-            /*
-              O atraso carrega cor de estado porque e ele que ORDENA a urgencia
-              da fila de cobranca -- mesma correcao de hierarquia da lista de
-              alunos (F45): contraste diz se da para ler, nao se da para achar.
-            */
-            render: (linha) => (
-              <span className={estilos['atraso']}>
-                {linha.diasEmAtraso === 1 ? '1 dia' : `${String(linha.diasEmAtraso)} dias`}
+              <span className={estilos['valor']}>
+                <Money cents={linha.amountMinor} currency={linha.currency} />
               </span>
             ),
           },
@@ -191,29 +259,35 @@ export default async function InadimplenciaPage() {
           {
             key: 'acoes',
             header: 'Ações',
+            /*
+              PADRAO DO MOCKUP DE RETENCAO: secundario discreto + primario
+              solido. A acao que a tela existe para provocar e cobrar, e ela
+              precisa PARECER a acao -- dois botoes de peso igual fazem a
+              pessoa escolher em vez de agir.
+            */
             render: (linha) => (
               <div className={estilos['acoes']}>
-                {/*
-                  LINK, nao integracao. O envio e do OPERADOR: `wa.me` abre o
-                  WhatsApp dele com a mensagem pronta, e a pessoa revisa antes
-                  de mandar. API oficial exigiria provedor, template homologado
-                  e consentimento de contato -- fatia propria (decisao do PI,
-                  19/08/2026).
+                <Button variant="ghost" href={`/students/${linha.studentId}`}>
+                  Ver aluno
+                </Button>
 
-                  SEM TELEFONE NAO HA BOTAO: um link morto na tabela faz a
-                  recepcao clicar e nao entender por que nada acontece.
-                */}
-                {linha.telefone !== null && (
+                {linha.telefone === null ? (
+                  /*
+                    SEM TELEFONE, A ACAO E CADASTRAR UM. A versao anterior
+                    escondia o botao, deixando a linha com uma acao so e um
+                    buraco que nao explicava nada.
+                  */
+                  <Button variant="outline" href={`/students/${linha.studentId}`}>
+                    Cadastrar telefone
+                  </Button>
+                ) : (
                   <Button
-                    variant="outline"
+                    variant="solid"
                     href={linkDeCobranca(linha.telefone, linha.studentName, linha.invoiceNumber)}
                   >
                     Cobrar no WhatsApp
                   </Button>
                 )}
-                <Button variant="solid" href={`/students/${linha.studentId}`}>
-                  Abrir ficha
-                </Button>
               </div>
             ),
           },

@@ -49,6 +49,25 @@ export interface LinhaDeInadimplencia {
   readonly fusoDaUnidade: string;
 }
 
+/**
+ * Composicao da divida por idade do atraso.
+ *
+ * POR QUE ISTO E O GRAFICO, e nao a evolucao mensal que se costuma desenhar:
+ * o sistema tem UM mes de dado. Uma linha temporal com um ponto so nao e
+ * informacao -- e desenha-la com meses vazios antes faria a curva subir do
+ * zero, sugerindo uma piora que nao aconteceu.
+ *
+ * A composicao, por outro lado, responde hoje a pergunta que o gestor faz:
+ * "quanto do meu dinheiro ja e velho demais para voltar?". Divida de mais de
+ * 30 dias raramente e paga, e ver o peso dela e o que decide se a academia
+ * muda a politica de cobranca.
+ */
+export interface FaixaDeAtraso {
+  readonly rotulo: string;
+  readonly minorTotal: number;
+  readonly quantidade: number;
+}
+
 export interface ResumoDaInadimplencia {
   readonly emAtrasoMinor: number;
   readonly faturasVencidas: number;
@@ -59,8 +78,25 @@ export interface ResumoDaInadimplencia {
 
 export interface PainelDeInadimplencia {
   readonly resumo: ResumoDaInadimplencia;
+  readonly faixas: readonly FaixaDeAtraso[];
   readonly linhas: readonly LinhaDeInadimplencia[];
 }
+
+/**
+ * As quatro idades da divida.
+ *
+ * Os cortes nao sao redondos por estetica: 15 e 30 dias sao onde a
+ * probabilidade de recuperacao cai de forma visivel na cobranca de
+ * mensalidade. "Em carencia" fica separado porque essa pessoa AINDA ENTRA --
+ * juntar com quem ja esta bloqueado misturaria dinheiro em risco com dinheiro
+ * apenas atrasado.
+ */
+const FAIXAS: ReadonlyArray<{ rotulo: string; ate: number }> = [
+  { rotulo: 'Em carência', ate: 0 },
+  { rotulo: 'Até 15 dias', ate: 15 },
+  { rotulo: '16 a 30 dias', ate: 30 },
+  { rotulo: 'Mais de 30 dias', ate: Number.POSITIVE_INFINITY },
+];
 
 const UM_DIA_EM_MS = 86_400_000;
 
@@ -154,7 +190,66 @@ export class ConsultarInadimplenciaUseCase {
       fusoDaUnidade: invoice.student.gymUnit.timezone,
     }));
 
-    return { resumo: await this.resumo(contexto, linhas), linhas };
+    return {
+      resumo: await this.resumo(contexto, linhas),
+      faixas: this.faixas(linhas),
+      linhas: this.ordenadasPorUrgencia(linhas),
+    };
+  }
+
+  /**
+   * A fila de cobranca, na ordem em que a recepcao deve trabalhar.
+   *
+   * NAO E POR DATA. Ordenar por vencimento responde "quem venceu primeiro?",
+   * que ninguem pergunta. A recepcao tem meia hora entre um aluno e outro e
+   * precisa saber POR ONDE COMECAR -- e comeca por onde ha mais dinheiro
+   * parado ha mais tempo.
+   *
+   * O peso e `valor x dias`: uma fatura de R$ 350 com 12 dias vem antes de uma
+   * de R$ 130 com 30, porque recupera mais. Empate desempata pelo mais antigo,
+   * que e determinstico e reproduz a mesma ordem entre recargas.
+   *
+   * Quem esta EM CARENCIA vai para o fim, sempre: ainda entra na academia, e
+   * cobrar quem esta no prazo combinado queima a relacao por nada.
+   */
+  private ordenadasPorUrgencia(
+    linhas: readonly LinhaDeInadimplencia[],
+  ): readonly LinhaDeInadimplencia[] {
+    return [...linhas].sort((a, b) => {
+      if (a.situacao !== b.situacao) {
+        return a.situacao === 'BLOQUEADO' ? -1 : 1;
+      }
+
+      const pesoDeA = a.amountMinor * Math.max(a.diasEmAtraso, 1);
+      const pesoDeB = b.amountMinor * Math.max(b.diasEmAtraso, 1);
+
+      if (pesoDeA !== pesoDeB) {
+        return pesoDeB - pesoDeA;
+      }
+
+      return a.dueAt.getTime() - b.dueAt.getTime();
+    });
+  }
+
+  /** Agrupa a divida por idade. Ver o comentario de `FaixaDeAtraso`. */
+  private faixas(linhas: readonly LinhaDeInadimplencia[]): readonly FaixaDeAtraso[] {
+    return FAIXAS.map((faixa, indice) => {
+      const piso = indice === 0 ? -1 : (FAIXAS[indice - 1]?.ate ?? 0);
+
+      const daFaixa = linhas.filter((linha) =>
+        faixa.rotulo === 'Em carência'
+          ? linha.situacao === 'EM_CARENCIA'
+          : linha.situacao === 'BLOQUEADO' &&
+            linha.diasEmAtraso > piso &&
+            linha.diasEmAtraso <= faixa.ate,
+      );
+
+      return {
+        rotulo: faixa.rotulo,
+        minorTotal: daFaixa.reduce((soma, linha) => soma + linha.amountMinor, 0),
+        quantidade: daFaixa.length,
+      };
+    });
   }
 
   /**

@@ -178,6 +178,7 @@ interface PainelDeInadimplenciaDto {
     bloqueados: number;
     taxaDeInadimplencia: number | null;
   };
+  faixas: { rotulo: string; minorTotal: number; quantidade: number }[];
   linhas: {
     invoiceId: string;
     invoiceNumber: number;
@@ -390,6 +391,7 @@ export class BillingController {
 
     return {
       resumo: painel.resumo,
+      faixas: [...painel.faixas],
       linhas: painel.linhas.map((linha) => ({
         ...linha,
         dueAt: linha.dueAt.toISOString(),
