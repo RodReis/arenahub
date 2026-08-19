@@ -238,7 +238,11 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
   ) => (
     <>
       <Select
-        value={valor(campo) || undefined}
+        // `''` e nao `undefined`: o Base UI decide no PRIMEIRO render se o
+        // componente e controlado, e `undefined` o faz nascer
+        // nao-controlado e virar controlado na primeira selecao -- duas
+        // fontes de verdade para o mesmo valor.
+        value={valor(campo)}
         // O Base UI entrega `null` quando a seleção é limpa; o rascunho
         // guarda string, e `''` é o que representa "campo não informado" no
         // resto do formulário.
@@ -317,16 +321,30 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
             verdade — botão que navega tem de ser link, senão perde abrir em
             nova aba, copiar endereço e o anúncio de "link" do leitor de tela.
           */}
-          <Button
-            render={<a href={`/students/${estado.sucesso.studentId}`} />}
-            data-testid="abrir-ficha"
-          >
-            Abrir a ficha e atribuir um plano
-          </Button>
+          {/*
+            O TEXTO VAI DENTRO DO `render`, e não como filho do `Button`:
+            com um elemento vazio no `render`, o Base UI monta o `<a>` sem os
+            filhos e o botão sai como um retângulo colorido sem texto nenhum.
+            Visto na tela, não deduzido.
 
-          <Button render={<a href="/students/novo" />} variant="outline">
-            Cadastrar outro aluno
-          </Button>
+            `nativeButton={false}` porque o elemento renderizado é um `<a>`:
+            sem isso o Base UI avisa que a semântica nativa se perde — e o
+            aviso está certo, quem navega tem de ser link.
+          */}
+          <Button
+            render={
+              <a href={`/students/${estado.sucesso.studentId}`} data-testid="abrir-ficha">
+                Abrir a ficha e atribuir um plano
+              </a>
+            }
+            nativeButton={false}
+          />
+
+          <Button
+            render={<a href="/students/novo">Cadastrar outro aluno</a>}
+            nativeButton={false}
+            variant="outline"
+          />
         </div>
       </div>
     );
@@ -639,9 +657,11 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
         </div>
 
         <div className={estilos['acoes']}>
-          <Button render={<a href="/students" />} variant="ghost">
-            Cancelar
-          </Button>
+          <Button
+            render={<a href="/students">Cancelar</a>}
+            nativeButton={false}
+            variant="ghost"
+          />
 
           {passo > 0 ? (
             <Button

@@ -148,10 +148,27 @@
 
 .grade {
   display: grid;
-  /* Duas colunas quando cabem, uma quando não. `auto-fit` + `minmax` resolve
-     sem media query: o campo decide a quebra pela largura que precisa. */
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  /* DUAS colunas, e não `auto-fit`: com `auto-fit` a grade virava três a
+     1440px e quatro a 1920px, e aí um campo com dica longa (o CPF) esticava
+     a linha inteira e abria um buraco sob os vizinhos. Duas colunas é o que
+     o mockup pede e o que mantém a leitura previsível em qualquer monitor.
+
+     `minmax(0, 1fr)` e não `1fr`: sem o mínimo zero, um campo largo empurra
+     a coluna e estoura a página na horizontal. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Cada campo alinha pelo topo da própria célula. Sem isto, o campo curto
+     ao lado de um com dica de três linhas fica centralizado na altura e
+     desalinha dos rótulos vizinhos. */
+  align-items: start;
   gap: 16px 20px;
+}
+
+/* Uma coluna quando não cabem duas: em 375px, meia largura não comporta nem
+   o rótulo nem a máscara. */
+@media (max-width: 48rem) {
+  .grade {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Campo que ocupa a linha inteira: logradouro e nome não cabem em meia
