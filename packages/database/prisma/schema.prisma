@@ -396,6 +396,11 @@ enum AccessReason {
   NO_ENTITLEMENT
   WRONG_UNIT
   OUTSIDE_SCHEDULE
+  /// F15 -- direito suspenso por inadimplencia. Acrescentado PELO FIM.
+  PAYMENT_OVERDUE
+  /// F15 -- liberacao financeira excepcional, com prazo. Nao e o mesmo que
+  /// `MANUAL_OVERRIDE`: aquele e por passagem, este e por periodo.
+  FINANCIAL_OVERRIDE
 
   @@map("access_reason")
 }
@@ -501,6 +506,7 @@ model Tenant {
   paymentMethods  PaymentMethod[]
   accountCredits  AccountCredit[]
   invoiceSequence InvoiceSequence?
+  financialOverrides FinancialAccessOverride[]
   providerAccounts ProviderAccount[]
   providerEvents   ProviderEvent[]
 }
@@ -851,6 +857,7 @@ model Student {
   addresses      StudentAddress[]
   subscriptions  Subscription[]
   paymentMethods PaymentMethod[]
+  financialOverrides FinancialAccessOverride[]
   entitlements   Entitlement[]
   timelineEvents StudentTimelineEvent[]
 
@@ -1795,6 +1802,52 @@ model AccessEventCorrection {
 ///
 /// `visitorDescription` cobre quem nao e aluno. Minimizado por LGPD: nome e
 /// motivo bastam para a auditoria; documento nao entra.
+/// Liberacao financeira excepcional -- F15, Slice 2.4: "override financeiro
+/// excepcional auditado e com expiracao".
+///
+/// NAO E O MESMO QUE `ManualAccessOverride` (F9), e a diferenca importa:
+///
+/// - o da F9 e por PASSAGEM -- amarrado a um `accessEventId`, a recepcao abre
+///   a catraca para a pessoa que esta na frente dela, uma vez;
+/// - este e por PERIODO -- vale para toda tentativa ate expirar, e existe
+///   para o caso "o aluno jura que pagou, o PIX ainda nao caiu".
+///
+/// Reusar o da F9 obrigaria a recepcao a repetir a liberacao a cada entrada
+/// durante tres dias, o que na pratica vira ninguem conferir mais nada.
+///
+/// EXPIRA SOZINHO, e isso e o ponto. Liberacao sem prazo vira permanente por
+/// esquecimento -- e a Slice 2.4 pede "com expiracao" justamente por isso.
+model FinancialAccessOverride {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  /// Por que a recepcao liberou. Obrigatoria: sem motivo, a auditoria nao
+  /// explica nada depois -- mesmo criterio do pagamento manual (ADR-027).
+  reason String
+
+  /// Quando a liberacao para de valer. O motor compara com o instante da
+  /// tentativa, entao nao ha job para "desligar" nada.
+  expiresAt DateTime @map("expires_at")
+
+  /// Quem liberou. `User` e global (o vinculo mora em `TenantMembership`),
+  /// e por isso a FK nao carrega tenant -- quem confere e o caso de uso.
+  actorId String @map("actor_id") @db.Uuid
+
+  /// Revogacao manual antes do prazo, quando a recepcao percebe o engano.
+  revokedAt   DateTime? @map("revoked_at")
+  revokedById String?   @map("revoked_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// A consulta do motor: "ha liberacao viva para este aluno agora?".
+  @@index([tenantId, studentId, expiresAt])
+  @@map("financial_access_overrides")
+}
+
 model ManualAccessOverride {
   id            String  @id @default(uuid()) @db.Uuid
   tenantId      String  @map("tenant_id") @db.Uuid
@@ -2094,6 +2147,15 @@ model FamilyMember {
 /// A ancora de bloqueio e CONFIGURAVEL (ADR-019, INV-144), com padrao no
 /// primeiro instante de `due_date + grace_period`, no timezone da unidade,
 /// sem fallback para o tenant e sem adiamento por feriado.
+/// Como se conta o instante de bloqueio por inadimplencia -- ADR-019.
+enum BlockAnchor {
+  /// Primeiro instante de `due_at + grace_days`, no fuso da UNIDADE.
+  /// Vencimento 10/08 com carencia 3 bloqueia em 13/08 as 00:00 locais.
+  DUE_PLUS_GRACE
+
+  @@map("block_anchor")
+}
+
 model BillingSettings {
   tenantId String @id @map("tenant_id") @db.Uuid
   currency String @default("BRL")
@@ -2111,6 +2173,15 @@ model BillingSettings {
   /// Padrao `[0, 3, 7]` decidido pelo PI em 19/08/2026. Por tenant para que
   /// uma academia ajuste sem deploy.
   retryOffsetDays Int[] @default([0, 3, 7]) @map("retry_offset_days")
+  /// Ancora do bloqueio por inadimplencia -- ADR-019 2: "nao e constante, e
+  /// CONFIGURACAO". O PI muda por academia sem tocar em codigo; regra
+  /// comercial que vive dentro de um `if` e regra que ninguem encontra
+  /// depois.
+  ///
+  /// Ha um valor so hoje, e isso e deliberado: uma segunda politica (adiar
+  /// por feriado, por exemplo) entra como valor NOVO, nao como excecao
+  /// escondida no meio do job.
+  blockAnchor BlockAnchor @default(DUE_PLUS_GRACE) @map("block_anchor")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

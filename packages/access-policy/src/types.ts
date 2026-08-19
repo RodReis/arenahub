@@ -17,8 +17,21 @@
  *
  * Mudanca de comportamento observavel exige numero novo, mesmo que o
  * diff pareca pequeno.
+ *
+ * ## Historico
+ *
+ * - **1.0.0** (F9) -- versao inicial.
+ * - **1.1.0** (F15) -- direito SUSPENSO dentro do periodo passa a devolver
+ *   `PAYMENT_OVERDUE` em vez de `NO_ENTITLEMENT`. O desfecho continua `DENY`:
+ *   ninguem entra que nao entrava antes, e ninguem deixa de entrar. Mas o
+ *   `reason` gravado MUDA, e ele e o campo que responde "por que este aluno
+ *   nao passou?" -- reler um evento de 1.0.0 com a regra de hoje diria que a
+ *   pessoa estava devendo quando o motor da epoca nao sabia disso.
+ *
+ *   Minor e nao major porque nenhuma decisao virou de ALLOW para DENY nem o
+ *   contrario -- so a explicacao ficou mais especifica.
  */
-export const POLICY_VERSION = '1.0.0';
+export const POLICY_VERSION = '1.1.0';
 
 export type PolicyVersion = typeof POLICY_VERSION;
 
@@ -67,6 +80,21 @@ export const ALLOW_REASON = {
   /** Unico caminho de entrada PELO MOTOR. Sem direito vigente, nao ha ALLOW. */
   ACTIVE_ENTITLEMENT: 'ACTIVE_ENTITLEMENT',
   /**
+   * Liberacao financeira excepcional -- F15, Slice 2.4.
+   *
+   * ⚠️ **O MOTOR TAMBEM NAO PRODUZ ESTE VALOR**, pela mesma razao de
+   * `MANUAL_OVERRIDE`: o motor puro nao consulta banco, e a liberacao vive
+   * numa tabela. Quem a le e o caso de uso, ANTES de chamar `evaluateAccess`
+   * -- e se houver liberacao viva, ele grava direto, sem passar pelo motor.
+   *
+   * Razao propria e nao `MANUAL_OVERRIDE`: as duas sao liberacoes humanas,
+   * mas nascem de decisoes diferentes e prestam contas em relatorios
+   * diferentes. "Quantas vezes a recepcao abriu a catraca na mao" e "quantos
+   * alunos entraram devendo" sao perguntas distintas, e um rotulo so
+   * obrigaria todo relatorio a cruzar com outra tabela para desempatar.
+   */
+  FINANCIAL_OVERRIDE: 'FINANCIAL_OVERRIDE',
+  /**
    * Liberacao manual da recepcao -- ADR-024, emenda de 16/08/2026.
    *
    * ⚠️ **O MOTOR NUNCA PRODUZ ESTE VALOR.** Ele existe no enum porque e
@@ -90,12 +118,33 @@ export const DENY_REASON = {
   STUDENT_BLOCKED: 'STUDENT_BLOCKED',
   /** Aluno em qualquer outro estado que nao `ACTIVE`. */
   STUDENT_INACTIVE: 'STUDENT_INACTIVE',
-  /** Nenhum direito vigente na data -- inclui expirado, suspenso e revogado. */
+  /**
+   * Nenhum direito vigente na data -- inclui expirado e revogado.
+   *
+   * ⚠️ **Deixou de incluir suspenso por divida na F15.** Suspensao por
+   * inadimplencia passou a ter razao propria (`PAYMENT_OVERDUE`) porque as
+   * duas situacoes exigem acoes OPOSTAS da recepcao: "nao tem plano" manda
+   * vender um; "esta devendo" manda cobrar. Colapsar as duas fazia a tela
+   * dizer a mesma coisa nos dois casos.
+   */
   NO_ENTITLEMENT: 'NO_ENTITLEMENT',
   /** Ha direito vigente, mas nao vale para ESTA unidade. */
   WRONG_UNIT: 'WRONG_UNIT',
   /** Ha direito vigente para esta unidade, mas fora da janela de horario. */
   OUTSIDE_SCHEDULE: 'OUTSIDE_SCHEDULE',
+  /**
+   * Direito SUSPENSO por inadimplencia -- F15, Slice 2.4.
+   *
+   * ACRESCENTADO PELO FIM (ADR-024): o enum e persistido e imutavel, e
+   * renomear valor aqui nao e refactor, e reescrever auditoria ja entregue.
+   *
+   * A REGRA No 1 CONTINUA VALENDO. O motor NAO consulta invoice nem
+   * assinatura: ele le `entitlement.status === 'SUSPENDED'`. Quem traduz
+   * divida em suspensao e o job de vencimento, do lado do financeiro. Esta
+   * razao diz POR QUE o direito esta suspenso, nao cria caminho novo entre
+   * pagamento e catraca.
+   */
+  PAYMENT_OVERDUE: 'PAYMENT_OVERDUE',
 } as const;
 
 export type AllowReason = (typeof ALLOW_REASON)[keyof typeof ALLOW_REASON];

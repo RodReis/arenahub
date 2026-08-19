@@ -144,6 +144,21 @@ export const STATE_LABELS: Dictionary = {
       tone: 'success',
       icon: 'user-check',
     },
+    /**
+     * F15 -- rotulo PROPRIO, e nao reuso do de cima.
+     *
+     * As duas sao liberacoes humanas, mas quem le o historico precisa
+     * distinguir "a recepcao abriu a catraca" de "o aluno entrou devendo, com
+     * prazo". A segunda tem consequencia financeira e vence sozinha.
+     *
+     * `warning` e nao `success`: entrou, mas ha pendencia. Pintar de verde
+     * faria a linha parecer normal num relatorio de inadimplencia.
+     */
+    [ALLOW_REASON.FINANCIAL_OVERRIDE]: {
+      label: 'Liberado com pagamento pendente',
+      tone: 'warning',
+      icon: 'alert-circle',
+    },
     [DENY_REASON.ADMIN_BLOCK]: {
       label: 'Bloqueio administrativo',
       tone: 'danger',
@@ -173,6 +188,21 @@ export const STATE_LABELS: Dictionary = {
       label: 'Fora do horário do plano',
       tone: 'warning',
       icon: 'clock',
+    },
+    /**
+     * F15 -- separada de `NO_ENTITLEMENT` de proposito.
+     *
+     * O rotulo diz o que a recepcao PRECISA FAZER, e as duas acoes sao
+     * opostas: "sem plano vigente" manda vender um; "pagamento em atraso"
+     * manda cobrar. Ate a F15 as duas situacoes liam a mesma frase.
+     *
+     * `warning` e nao `danger`: o aluno TEM plano, e a situacao se resolve
+     * com um pagamento. `danger` e para quem nao tem direito nenhum.
+     */
+    [DENY_REASON.PAYMENT_OVERDUE]: {
+      label: 'Pagamento em atraso',
+      tone: 'warning',
+      icon: 'alert-circle',
     },
   },
 

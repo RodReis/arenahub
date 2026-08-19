@@ -26,6 +26,9 @@ const RAZOES_NO_SCHEMA = [
   'NO_ENTITLEMENT',
   'WRONG_UNIT',
   'OUTSIDE_SCHEDULE',
+  // F15 -- acrescentadas PELO FIM, como o ADR-024 exige.
+  'PAYMENT_OVERDUE',
+  'FINANCIAL_OVERRIDE',
 ] as const;
 
 describe('ADR-024 -- razoes do motor e do banco nao divergem', () => {
@@ -35,9 +38,17 @@ describe('ADR-024 -- razoes do motor e do banco nao divergem', () => {
     expect(doMotor).toEqual([...RAZOES_NO_SCHEMA].sort());
   });
 
-  it('ha duas razoes de ALLOW: a do motor e a do override', () => {
+  it('ha tres razoes de ALLOW: a do motor e as DUAS de liberacao humana', () => {
+    /**
+     * `FINANCIAL_OVERRIDE` entrou na F15. Razao propria e nao reuso de
+     * `MANUAL_OVERRIDE` porque as duas nascem de decisoes diferentes e
+     * prestam contas em relatorios diferentes: "quantas vezes a recepcao
+     * abriu a catraca na mao" e "quantos alunos entraram devendo" sao
+     * perguntas distintas.
+     */
     expect([...Object.values(ALLOW_REASON)].sort()).toEqual([
       'ACTIVE_ENTITLEMENT',
+      'FINANCIAL_OVERRIDE',
       'MANUAL_OVERRIDE',
     ]);
   });
@@ -52,7 +63,14 @@ describe('ADR-024 -- razoes do motor e do banco nao divergem', () => {
     expect(doMotor.has('MANUAL_OVERRIDE')).toBe(false);
   });
 
-  it('ha exatamente seis razoes de DENY -- ADR-024', () => {
-    expect(Object.values(DENY_REASON)).toHaveLength(6);
+  it('ha exatamente sete razoes de DENY -- ADR-024 mais a F15', () => {
+    /**
+     * O NUMERO E DE PROPOSITO, e nao `.length` de si mesmo: uma razao nova
+     * tem de ser uma DECISAO, com ADR e migration, nunca um valor que alguem
+     * acrescentou ao objeto e o teste aceitou calado.
+     *
+     * Era seis ate a F15, que acrescentou `PAYMENT_OVERDUE` pelo fim.
+     */
+    expect(Object.values(DENY_REASON)).toHaveLength(7);
   });
 });
