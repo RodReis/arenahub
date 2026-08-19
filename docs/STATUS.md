@@ -313,11 +313,20 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **30** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **29** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
-| Feito | `proplan:done` | PR mergeado com CI verde | **2** — [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
+| Feito | `proplan:done` | PR mergeado com CI verde | **3** — [F14](https://github.com/RodReis/arenahub/issues/14), [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **31** |
+
+> 💳 **19/08/2026 — F14 entregue, e o MVP 2 voltou a andar.** Cartão tokenizado, recorrência,
+> política de retry (D+0/D+3/D+7 por decisão do PI) e cancelamento — PR
+> [#117](https://github.com/RodReis/arenahub/pull/117). 🔴 **A fatia produziu um defeito crítico
+> que foi achado e corrigido antes do PR:** a chave de idempotência derivava de uma **contagem**, e
+> duas cobranças concorrentes cobravam o aluno **em dobro** — medido, não deduzido. Fechado por
+> índice parcial no banco. **Os adapters reais não foram escritos:** dependem de credencial e
+> sandbox, e a matriz do gate marcou como não verificado justamente o que eles teriam de honrar.
+> **F15 está livre; F16 espera** as duas políticas do `M2-COMPLIANCE-01`.
 
 > ✅ **19/08/2026 — as duas `[INFRA]` de guarda de CI entregues, PR [#116](https://github.com/RodReis/arenahub/pull/116).**
 > Contagem reconferida na API do board no mesmo dia: *Finalizado* subiu de 27 para **31** (o PI
@@ -539,7 +548,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F11 | SPEC-011 | 1 | 1.6 | Painel operacional e prontidão | [`SPEC-011-painel-operacional-e-prontidao.md`](specs/SPEC-011-painel-operacional-e-prontidao.md) | [#11](https://github.com/RodReis/arenahub/issues/11) | aprovada-pi |
 | F12 | SPEC-012 | 2 | 2.1 | Ledger operacional e invoice | [`SPEC-012-ledger-operacional-e-invoice.md`](specs/SPEC-012-ledger-operacional-e-invoice.md) | [#12](https://github.com/RodReis/arenahub/issues/12) | `aprovada-pi` |
 | F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | [`SPEC-013-pix-e-webhook-idempotente.md`](specs/SPEC-013-pix-e-webhook-idempotente.md) | [#13](https://github.com/RodReis/arenahub/issues/13) | ✅ **entregue** em 18/08/2026 ([#102](https://github.com/RodReis/arenahub/pull/102)) |
-| F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | [`SPEC-014-cartao-e-recorrencia.md`](specs/SPEC-014-cartao-e-recorrencia.md) | [#14](https://github.com/RodReis/arenahub/issues/14) | `aprovada-pi` |
+| F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | [`SPEC-014-cartao-e-recorrencia.md`](specs/SPEC-014-cartao-e-recorrencia.md) | [#14](https://github.com/RodReis/arenahub/issues/14) | ✅ **entregue** em 19/08/2026 ([#117](https://github.com/RodReis/arenahub/pull/117)) |
 | F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | [`SPEC-015-inadimplencia-e-acesso.md`](specs/SPEC-015-inadimplencia-e-acesso.md) | [#15](https://github.com/RodReis/arenahub/issues/15) | `aprovada-pi` |
 | F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | [`SPEC-016-estorno-conciliacao-e-operacao.md`](specs/SPEC-016-estorno-conciliacao-e-operacao.md) | [#16](https://github.com/RodReis/arenahub/issues/16) | `aprovada-pi` |
 | F17 | SPEC-017 | 3 | 3.1 | Consentimento e avaliação manual | [`SPEC-017-consentimento-e-avaliacao-manual.md`](specs/SPEC-017-consentimento-e-avaliacao-manual.md) | [#17](https://github.com/RodReis/arenahub/issues/17) | planejada |

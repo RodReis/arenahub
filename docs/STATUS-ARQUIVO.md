@@ -13,6 +13,98 @@
 
 ---
 
+## 2026-08-19 — O provedor foi decidido, e a F14 quase cobrou o aluno duas vezes
+
+### O gate que nunca existiu
+
+O ADR-013 mandou a escolha do provedor sair de um card `[GATE]` com matriz comparativa. **Esse
+card nunca chegou a ser criado no board** — F14, F15 e F16 ficaram paradas por um portão que não
+existia em lugar nenhum.
+
+O que destravou não foi a matriz: foi um **fato que não estava em documento nenhum**, nem no
+`LANDSCAPE.md` §4.2 nem no ADR-013. O PI informou que **a Arena Positiva já recebe pela Sicoob**.
+
+Isso muda a pergunta. O Sicoob é **banco, não adquirente**: as APIs públicas cobrem Pix
+recebimentos, cobrança bancária e transferências, e **não há cartão tokenizado, cofre de tokens
+nem assinatura**. O `MVP-02` §5 exige as três capacidades de um provedor único — logo, provedor
+único é impossível com o Sicoob, e trocá-lo custaria à academia o relacionamento bancário que ela
+já tem. Daí o **ADR-032**: Sicoob para PIX, Getnet para cartão, com emenda ao §5.
+
+O gate virou **verificação** em vez de competição, registrada em
+[`reports/MVP-02-matriz-de-homologacao-de-provedor.md`](reports/MVP-02-matriz-de-homologacao-de-provedor.md).
+Nada foi verificado em sandbox — os dois portais exigem credencial —, e os itens marcados ❓
+precisam de confirmação antes de virar adapter.
+
+### O defeito crítico que a fatia produziu
+
+A chave de idempotência da cobrança de cartão era `card:<invoice>:<tentativas já feitas>`,
+**derivada de uma contagem**. Parecia certa: incluir o índice da tentativa é o que impede a segunda
+tentativa de reusar a chave da primeira.
+
+Mas **contagem muda entre a leitura e a escrita** — que é exatamente a janela que a idempotência
+existe para fechar. Duas requisições concorrentes para a mesma invoice leem `0` e `1`, montam `:0`
+e `:1`, e a constraint `(tenant_id, idempotency_key)` **nunca dispara**.
+
+**Foi medido, não deduzido:** sondei com `Promise.allSettled` contra Postgres real, e o resultado
+foi **2 sucessos, 2 tentativas gravadas, duas chamadas ao provedor**. Aluno cobrado em dobro, sem
+erro e sem log.
+
+A lição não é "faltou um teste de concorrência". É que **a constraint que existia protegia contra o
+caso errado**: reenvio da *mesma* chave. O caso real não repete chave — gera duas diferentes. Uma
+guarda pode estar presente, verde, e defendendo outra coisa.
+
+O conserto mora **no banco**: índice parcial `UNIQUE (tenant_id, invoice_id) WHERE method = 'CARD'
+AND status = 'PROCESSING'`. Um `if (jaExiste)` no código perderia a mesma corrida que tentaria
+fechar — mesma tese do inbox de webhook da F13 (INV-076). O `P2002` vira 409 de domínio, porque um
+500 faria a recepção clicar de novo.
+
+A revisão de código chegou ao mesmo diagnóstico de forma independente, com veredito BLOCK.
+
+### Um segundo bug, latente, criado pela própria decisão dos dois provedores
+
+`criar-cobranca-pix.use-case.ts` resolvia a conta com `findFirst({ tenantId, active: true })` —
+**qualquer** conta ativa. Correto com um provedor. Com Sicoob e Getnet no mesmo tenant, devolveria
+a conta de **cartão** metade das vezes, conforme a ordem de inserção, e a cobrança PIX iria para o
+lugar errado.
+
+Corrigido com `ProviderAccount.capability` e um resolvedor que **pergunta pela capacidade, nunca
+pela marca**: nenhum caso de uso menciona `sicoob` ou `getnet`. Trocar de PSP é escrever um adapter
+e atualizar uma linha — nem migration, porque `provider` continua `String`.
+
+**Não virou registry.** Sem config declarativa, sem fallback, sem descoberta em runtime — a
+extensibilidade já mora na interface `PaymentProvider`, e maquinário a mais seria abstração
+especulativa contra provedores hipotéticos. Quando o terceiro chegar, trará exigência que ninguém
+previu: a Getnet exige tokenização no cliente, o Sicoob exige certificado ICP-Brasil em arquivo, e
+nenhum "gateway genérico" prevê certificado digital.
+
+### O que a verificação por mutação achou
+
+Três guardas foram testadas plantando o defeito que elas deveriam pegar.
+
+A **guarda de PCI** pegou o atalho real — o endpoint da Getnet que recebe `card_number` cru, mais
+fácil de implementar que o Get Checkout. Mas, escrevendo-a, descobri que ela reprovava o próprio
+`payment-provider.port.ts`, cujo **comentário** diz *"PAN e CVV nunca chegam aqui"*: acusava a
+documentação da regra que defende, e a saída mais barata para calá-la seria apagar a frase que
+ensina a próxima pessoa.
+
+A **política de retry** teve duas de três mutações pegas. A terceira **passou limpo**, e isso
+corrigiu um erro meu: eu afirmava no código que `setUTCDate` protege contra horário de verão.
+**Não protege** — em UTC não existe DST, e a soma em milissegundos é equivalente por construção. O
+teste passava com as duas implementações, ou seja, não provava nada. Comentário e caso reescritos
+para dizer o que é verdade.
+
+### O que ficou de fora, e por quê
+
+**Os adapters reais não foram escritos.** Dependem de credencial e sandbox, e a matriz do gate
+marcou como **não verificado** exatamente o que eles teriam de honrar — assinatura de webhook,
+estorno parcial, chave estável de evento. Adapter contra documentação não confirmada produz código
+que parece pronto e falha na primeira chamada real.
+
+**A UI de cartão é do provedor** (Get Checkout) — esta fatia é de backend. **F15** é o job de
+vencimento; **F16** é estorno, e ainda depende das duas políticas do `M2-COMPLIANCE-01`.
+
+---
+
 ## 2026-08-19 — Duas guardas de CI passavam verde sem verificar o que prometiam
 
 PR [#116](https://github.com/RodReis/arenahub/pull/116), issues
