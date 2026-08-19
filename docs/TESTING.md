@@ -260,13 +260,10 @@ demanda).
 
 ## 8. Registro de execuções
 
-*(uma linha por execução relevante. Só entra o que tem SHA e saída de máquina.)*
-
-| data | SHA | F/SPEC | total | passou | falhou | cobertura domínio |
-|---|---|---|---|---|---|---|
-| — | — | — | — | — | — | — |
-
-**Nenhuma execução até 14/08/2026.** O repositório não tem código nem runner configurado.
+O registro vivo é `reports/TESTS.md` — gerado por `pnpm test:report`, commitado no PR, verificado
+pela guarda `pnpm test:report --check` (§5/§6). Este arquivo não duplica a tabela: uma tabela
+escrita à mão aqui divergiria do gerador na primeira execução e violaria o princípio do topo deste
+documento (*evidência é saída de máquina, nunca prosa*).
 
 ---
 
@@ -278,4 +275,4 @@ demanda).
 - [ ] `.github/workflows/ci.yml` com os 8 passos
 - [ ] Portão de cobertura de 80% em regras de domínio ligado
 - [ ] Simulador Topdata rodando em CI sem hardware (`M0-NFR-006`)
-- [ ] Primeira linha real na tabela da §8
+- [ ] Primeiro `reports/TESTS.md` real gerado e commitado
