@@ -146,7 +146,7 @@ CREATE UNIQUE INDEX "reconciliation_runs_tenant_id_provider_account_id_period_st
 CREATE INDEX "external_movements_tenant_id_external_payment_id_idx" ON "external_movements"("tenant_id", "external_payment_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "external_movements_tenant_id_external_movement_id_key" ON "external_movements"("tenant_id", "external_movement_id");
+CREATE UNIQUE INDEX "external_movements_tenant_id_run_id_external_movement_id_key" ON "external_movements"("tenant_id", "run_id", "external_movement_id");
 
 -- CreateIndex
 CREATE INDEX "reconciliation_items_tenant_id_status_created_at_idx" ON "reconciliation_items"("tenant_id", "status", "created_at");

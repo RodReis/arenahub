@@ -116,6 +116,21 @@ const PERMISSOES = [
   // mesmo motivo dos dois acima -- liberar o acesso de quem DEVE, sem o
   // pagamento entrar, e ato excepcional com prazo e nome gravados.
   'billing.override.financial',
+  // F16: estorno e conciliacao.
+  //
+  // `billing.refund` e o terceiro ato excepcional do financeiro, pela mesma
+  // logica dos dois acima: quem abre invoice nao precisa poder DEVOLVER o
+  // dinheiro que ja entrou. Alem da permissao, o estorno exige step-up MFA
+  // na propria requisicao (INV-074).
+  //
+  // `reconciliation.read` e `reconciliation.resolve` sao separadas porque
+  // olhar a fila de divergencia e trabalho de conferencia diario, e fecha-la
+  // e decisao que assume a diferenca -- quem confere nem sempre e quem
+  // decide.
+  'billing.refund',
+  'reconciliation.read',
+  'reconciliation.resolve',
+  'receipt.read',
 ];
 
 

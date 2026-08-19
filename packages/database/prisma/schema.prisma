@@ -2929,8 +2929,15 @@ model ExternalMovement {
   tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   run    ReconciliationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
-  /// Reimportar a mesma pagina do extrato nao duplica movimento (INV-086).
-  @@unique([tenantId, externalMovementId])
+  /// Reimportar a mesma pagina do extrato NA MESMA EXECUCAO nao duplica
+  /// movimento (INV-086).
+  ///
+  /// A UNICIDADE INCLUI A RUN, e nao e frouxidao: o mesmo movimento aparece
+  /// legitimamente em duas execucoes -- janelas que se sobrepoem, ou a
+  /// reconciliacao de agosto rodada de novo em setembro. Unicidade so por
+  /// `(tenant, movimento)` faria a segunda execucao FALHAR, e conciliar duas
+  /// vezes e justamente o que a operacao precisa poder fazer.
+  @@unique([tenantId, runId, externalMovementId])
   @@index([tenantId, externalPaymentId])
   @@map("external_movements")
 }

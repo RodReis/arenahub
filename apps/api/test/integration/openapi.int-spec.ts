@@ -134,6 +134,13 @@ describe('contrato OpenAPI', () => {
         '/api/v1/billing/delinquency/apply',
         '/api/v1/billing/financial-overrides',
         '/api/v1/billing/financial-overrides/{id}/revoke',
+        // F16 -- estorno, conciliacao e recibo.
+        '/api/v1/payments/{id}/refunds',
+        '/api/v1/payments/{id}/receipt',
+        '/api/v1/receipts/{id}',
+        '/api/v1/reconciliation/runs',
+        '/api/v1/reconciliation/items',
+        '/api/v1/reconciliation/items/{id}/resolve',
       ]),
     );
   });
