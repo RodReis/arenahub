@@ -5,6 +5,9 @@ import {
   Button,
   DataTable,
   EmptyState,
+  AcoesDaLinha,
+  Identidade,
+  Telefone,
   Money,
   PageHeader,
   ProblemDetail,
@@ -17,7 +20,6 @@ import {
   linkDeCobranca,
   motivosDaLinha,
   situacaoVisivel,
-  telefoneLegivel,
 } from '../../../../src/billing/inadimplencia';
 import estilos from './delinquency.module.css';
 
@@ -194,25 +196,39 @@ export default async function InadimplenciaPage() {
           {
             key: 'aluno',
             header: 'Aluno',
+            role: 'identity',
             /*
               NOME, TELEFONE E MOTIVOS numa celula so. Sao a mesma pergunta --
               "quem e, como falo com ela, e por que esta aqui?" -- e em colunas
               separadas o olho atravessa a linha inteira entre uma metade e
               outra da resposta. Mesma correcao feita na lista de alunos (F45).
+
+              `Identidade` do DS substitui o `.identidade` local, que era o
+              MESMO bloco escrito em `/students` com gap e padding levemente
+              diferentes. Os CHIPS DE MOTIVO ficam: eles sao especificos desta
+              fila -- respondem "por que esta pessoa aparece aqui?", pergunta
+              que nenhuma outra tabela do painel faz.
             */
             render: (linha) => (
-              <div className={estilos['identidade']}>
-                <span className={estilos['nome']}>{linha.studentName}</span>
-
-                {linha.telefone === null || linkDeCobranca(
-                  linha.telefone,
-                  linha.studentName,
-                  linha.invoiceNumber,
-                ) === null ? (
-                  <span className={estilos['semTelefone']}>sem telefone cadastrado</span>
-                ) : (
-                  <span className={estilos['telefone']}>{telefoneLegivel(linha.telefone)}</span>
-                )}
+              <div className={estilos['celulaDoAluno']}>
+                <Identidade
+                  nome={linha.studentName}
+                  secundario={
+                    linha.telefone === null ? (
+                      <span className={estilos['semTelefone']}>sem telefone cadastrado</span>
+                    ) : (
+                      /*
+                        `Telefone` do DS: mostra o numero E abre a conversa. A
+                        mensagem vem daqui porque e desta tela -- "lembrando da
+                        fatura 8222" nao serve para a ficha do aluno.
+                      */
+                      <Telefone
+                        numero={linha.telefone}
+                        mensagem={mensagemDeCobranca(linha.studentName, linha.invoiceNumber)}
+                      />
+                    )
+                  }
+                />
 
                 <ul className={estilos['motivos']}>
                   {motivosDaLinha(linha).map((motivo) => (
@@ -227,7 +243,7 @@ export default async function InadimplenciaPage() {
           {
             key: 'fatura',
             header: 'Fatura',
-            numeric: true,
+            role: 'code',
             render: (linha) => (
               <div className={estilos['fatura']}>
                 <span className={estilos['numero']}>{linha.invoiceNumber}</span>
@@ -241,7 +257,7 @@ export default async function InadimplenciaPage() {
           {
             key: 'valor',
             header: 'Valor',
-            numeric: true,
+            role: 'value',
             /*
               O VALOR ORDENA A FILA, entao carrega o maior peso tipografico da
               linha. Na versao anterior tinha o mesmo tamanho do numero da
@@ -256,6 +272,7 @@ export default async function InadimplenciaPage() {
           {
             key: 'acesso',
             header: 'Acesso',
+            role: 'state',
             render: (linha) => (
               <StateBadge machine="delinquencyAccess" state={situacaoVisivel(linha)} />
             ),
@@ -263,6 +280,7 @@ export default async function InadimplenciaPage() {
           {
             key: 'acoes',
             header: 'Ações',
+            role: 'actions',
             /*
               PADRAO DO MOCKUP DE RETENCAO: secundario discreto + primario
               solido. A acao que a tela existe para provocar e cobrar, e ela
@@ -270,7 +288,7 @@ export default async function InadimplenciaPage() {
               pessoa escolher em vez de agir.
             */
             render: (linha) => (
-              <div className={estilos['acoes']}>
+              <AcoesDaLinha>
                 <Button variant="ghost" href={`/students/${linha.studentId}`}>
                   Ver aluno
                 </Button>
@@ -294,7 +312,7 @@ export default async function InadimplenciaPage() {
                     Cobrar no WhatsApp
                   </Button>
                 )}
-              </div>
+              </AcoesDaLinha>
             ),
           },
         ]}
@@ -308,4 +326,17 @@ export default async function InadimplenciaPage() {
       />
     </section>
   );
+}
+
+/**
+ * A mensagem que abre a conversa de cobrança.
+ *
+ * Vive aqui e não no `Telefone` do DS: o texto é desta tela. "Lembrando da
+ * fatura 8222" não serve para a ficha do aluno nem para a avaliação vencida —
+ * um texto genérico no componente obrigaria cada tela a contorná-lo.
+ */
+function mensagemDeCobranca(nomeDoAluno: string, numeroDaFatura: number): string {
+  const primeiroNome = nomeDoAluno.trim().split(/\s+/)[0] ?? '';
+
+  return `Ola, ${primeiroNome}! Passando para lembrar da fatura ${String(numeroDaFatura)}, que esta em aberto. Qualquer duvida e so chamar.`;
 }

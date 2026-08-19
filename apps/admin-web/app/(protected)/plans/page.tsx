@@ -1,6 +1,13 @@
 import type { Metadata } from 'next';
 
-import { DataTable, EmptyState, PageHeader, ProblemDetail } from '@arenahub/ui';
+import {
+  DataTable,
+  EmptyState,
+  EstadoSimples,
+  Identidade,
+  PageHeader,
+  ProblemDetail,
+} from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { janelaLegivel } from '../../../src/students/formatar';
@@ -110,27 +117,58 @@ export default async function PaginaDePlanos() {
           {
             key: 'plano',
             header: 'Plano',
+            role: 'identity',
+            /*
+             * Nome mais descricao empilhados -- que e exatamente o que o
+             * `<>{name}<small> — {desc}</small></>` desenhava a mao, com o
+             * travessao fazendo o trabalho que a hierarquia visual faz melhor.
+             *
+             * `semAvatar`: plano nao e pessoa nem equipamento. Uma inicial num
+             * circulo daria rosto a um contrato.
+             *
+             * A descricao so entra QUANDO EXISTE: passar `secundario={null}`
+             * reservaria a segunda linha em toda linha da tabela, e a maioria
+             * dos planos nao tem descricao.
+             */
             render: (plano) => (
-              <>
-                {plano.name}
-                {plano.description ? <small> — {plano.description}</small> : null}
-              </>
+              <Identidade
+                semAvatar
+                nome={plano.name}
+                {...(plano.description ? { secundario: plano.description } : {})}
+              />
             ),
           },
           {
             key: 'situacao',
             header: 'Situação',
+            role: 'state',
             /*
-             * Ternario, nao `StateBadge`: `isActive` e booleano, nao maquina
-             * de estado -- o §7 nao define uma para plano.
+             * `EstadoSimples`, nao `StateBadge`: `isActive` e booleano, nao
+             * maquina de estado -- o §7 nao define uma para plano.
+             *
+             * O que mudou e so a FORMA. O texto cru desta coluna ficava sem
+             * peso ao lado das colunas com badge nas outras telas; agora ela
+             * tem ponto, icone e rotulo -- sem fingir que existe uma maquina.
              *
              * Todo estado tem TEXTO: "Inativo" some se for só uma cor.
              */
-            render: (plano) => (plano.isActive ? 'Ativo' : 'Inativo'),
+            render: (plano) =>
+              plano.isActive ? (
+                <EstadoSimples label="Ativo" tom="positivo" />
+              ) : (
+                <EstadoSimples label="Inativo" tom="neutro" />
+              ),
           },
           {
             key: 'unidades',
             header: 'Unidades',
+            /*
+             * SEM `role`, e nao `support`: nome de unidade e curto e vem em
+             * lista vertical, entao o PISO de 32ch do papel `support` reservaria
+             * espaco que a coluna nao usa -- e o roubaria de "Janelas de
+             * horário" ao lado, que e a frase de verdade desta tabela. Duas
+             * colunas `support` numa tabela de quatro somam 64ch de minimo.
+             */
             render: (plano) => (
               <ul>
                 {plano.gymUnitIds.map((unidadeId) => (
@@ -142,6 +180,9 @@ export default async function PaginaDePlanos() {
           {
             key: 'janelas',
             header: 'Janelas de horário',
+            /* A coluna mais longa da tabela: uma linha por janela, cada uma com
+             * unidade, dias e horario. */
+            role: 'support',
             render: (plano) => (
               <ul>
                 {plano.janelas.map((janela, indice) => (

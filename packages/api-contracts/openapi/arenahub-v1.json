@@ -282,6 +282,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "ordem",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "direcao",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {

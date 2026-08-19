@@ -5,7 +5,9 @@ import {
   Button,
   DataTable,
   EmptyState,
+  EstadoSimples,
   Field,
+  Identidade,
   PageHeader,
   ProblemDetail,
   SelectField,
@@ -180,35 +182,65 @@ export default async function PaginaDeEventos({
           {
             key: 'quando',
             header: 'Quando',
+            role: 'moment',
             render: (e) => <TenantDateTime iso={e.occurredAt} timeZone={FUSO_PROVISORIO} />,
           },
           {
             key: 'aluno',
             header: 'Aluno',
+            role: 'identity',
+            /*
+             * NOME E MATRICULA EMPILHADOS, nao "Nome (MAT-001)" numa linha so:
+             * a matricula entre parenteses competia com o nome na varredura, e
+             * quem procura uma pessoa nesta lista procura o NOME.
+             *
+             * `Identidade` traz o avatar -- numa lista de passagens, a marca
+             * circular deixa varrer por forma antes de ler letra nenhuma.
+             */
             render: (evento) =>
               evento.student ? (
-                `${evento.student.fullName} (${evento.student.membershipNumber})`
+                <Identidade
+                  nome={evento.student.fullName}
+                  secundario={evento.student.membershipNumber}
+                />
               ) : (
                 // Sem aluno resolvido, mostra o que o leitor viu -- é a
-                // única pista de quem tentou passar.
-                <span data-testid="aluno-nao-identificado">
-                  não identificado{evento.externalUserId ? ` (id ${evento.externalUserId})` : ''}
-                </span>
+                // única pista de quem tentou passar. SEM AVATAR: inventar uma
+                // inicial para "não identificado" daria rosto a quem o sistema
+                // nao reconheceu, que e o oposto do que a linha diz.
+                <Identidade
+                  semAvatar
+                  testId="aluno-nao-identificado"
+                  nome="não identificado"
+                  {...(evento.externalUserId
+                    ? { secundario: `id ${evento.externalUserId}` }
+                    : {})}
+                />
               ),
           },
           {
             key: 'resultado',
             header: 'Resultado',
+            role: 'state',
             /*
              * Ternario preservado: `ALLOW`/`DENY` e o RESULTADO da decisao,
              * nao um estado de maquina -- a razao ao lado e que carrega o
              * badge.
+             *
+             * A FORMA mudou para `EstadoSimples`: texto cru ao lado de uma
+             * coluna com badge fazia a tabela ter duas linguagens visuais.
              */
-            render: (e) => (e.outcome === 'ALLOW' ? 'Liberado' : 'Negado'),
+            render: (e) =>
+              e.outcome === 'ALLOW' ? (
+                <EstadoSimples label="Liberado" tom="positivo" />
+              ) : (
+                <EstadoSimples label="Negado" tom="negativo" />
+              ),
           },
           {
             key: 'motivo',
             header: 'Motivo',
+            role: 'state',
             /*
              * `ROTULO_DE_RAZAO` morreu: as 8 frases estavam identicas ao
              * dicionario canonico, que as herdou desta tela por serem as que
@@ -217,11 +249,12 @@ export default async function PaginaDeEventos({
              */
             render: (e) => <StateBadge machine="accessReason" state={e.reason} />,
           },
-          { key: 'origem', header: 'Origem', render: (e) => traduzir(ROTULO_DE_MODO, e.mode) },
-          { key: 'metodo', header: 'Método', render: (e) => traduzir(ROTULO_DE_METODO, e.method) },
+          { key: 'origem', header: 'Origem', role: 'state', render: (e) => traduzir(ROTULO_DE_MODO, e.mode) },
+          { key: 'metodo', header: 'Método', role: 'state', render: (e) => traduzir(ROTULO_DE_METODO, e.method) },
           {
             key: 'passagem',
             header: 'Passagem',
+            role: 'state',
             /*
              * `NOT_APPLICABLE` deixa de ser `'—'` e passa a dizer "Não confirma
              * giro" (PI, 16/08/2026): o travessao colapsava "equipamento nao

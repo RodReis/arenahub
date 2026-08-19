@@ -1,0 +1,101 @@
+/**
+ * Celulas de tabela -- DS-PAINEL.md §5 e §9.
+ *
+ * Le so a camada semantica (regra de lint 2). Sem hex literal (regra 1).
+ * Nenhum `--ah-action-*` aqui: sao celulas de ESTADO, e a regra 3 proibe o
+ * accent do tenant em badge, alerta e grafico de estado.
+ */
+
+/**
+ * CONSEQUENCIA -- o que o estado custa, dito ao lado do estado.
+ *
+ * Peso 500 e nao 600: precisa ser lido, nao competir com o badge que vem
+ * antes. A hierarquia da celula e badge > consequencia, e inverter isso faria
+ * a recepcao ler a consequencia como se fosse o estado.
+ */
+.consequencia {
+  margin-inline-start: 8px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.consequencia[data-tom='neutro'] {
+  color: var(--ah-text-secondary);
+}
+
+.consequencia[data-tom='danger'] {
+  color: var(--ah-state-danger);
+}
+
+/**
+ * ACOES -- encostadas a direita, na ordem em que a linha as oferece.
+ *
+ * `justify-content: flex-end` porque a coluna de acao e a ultima e o olho
+ * volta pela direita: acao alinhada a esquerda numa coluna larga fica orfa no
+ * meio do vazio.
+ */
+.acoes {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.semAcao {
+  color: var(--ah-text-secondary);
+}
+
+/**
+ * ESTADO SIMPLES -- a forma do badge, sem fingir que e uma maquina de estado.
+ *
+ * Mesma altura, mesmo gap e mesmo tamanho de icone do `StateBadge`, porque
+ * duas linguagens visuais para "situacao" na mesma tabela e o que fazia oito
+ * celulas parecerem esquecidas. O que NAO se copia e a borda: badge de maquina
+ * canonica tem moldura; este nao tem, e a diferenca e o sinal honesto de que
+ * um estado e rastreado e o outro e derivado.
+ */
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.estado svg {
+  inline-size: 14px;
+  block-size: 14px;
+  flex-shrink: 0;
+}
+
+.estado[data-tom='neutro'] {
+  color: var(--ah-text-secondary);
+}
+
+.estado[data-tom='positivo'] {
+  color: var(--ah-state-success);
+}
+
+.estado[data-tom='atencao'] {
+  color: var(--ah-state-warning);
+}
+
+.estado[data-tom='negativo'] {
+  color: var(--ah-state-danger);
+}
+
+/**
+ * IDADE -- `help` porque o instante exato esta no `title`.
+ *
+ * O cursor e a unica pista de que ha mais informacao ali; sem ele, ninguem
+ * descobre que passar o mouse revela a hora.
+ */
+.idade {
+  cursor: help;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

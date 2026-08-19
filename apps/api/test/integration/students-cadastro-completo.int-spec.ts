@@ -512,7 +512,10 @@ describe('F45 -- cadastro completo de aluno', () => {
 
       expect(criacao.status).toBe(201);
       expect(JSON.stringify(corpo(criacao))).not.toContain(cpf);
-      expect(corpo(criacao).cpfMasked).toMatch(/^•••\.•••\.\*\*\d-\d{2}$/);
+      // `•` em toda posicao oculta: a mascara preserva a FORMA de um CPF
+      // (`XXX.XXX.XXX-XX`), que e o que permite conferir contra o documento na
+      // mao. O padrao anterior misturava `•` e `*` e nao parecia um CPF.
+      expect(corpo(criacao).cpfMasked).toMatch(/^•••\.•••\.••\d-\d{2}$/);
 
       const linha = await db.student.findFirstOrThrow({ where: { id: corpo(criacao).id } });
 

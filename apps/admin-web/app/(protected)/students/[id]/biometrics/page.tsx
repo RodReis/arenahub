@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import {
   DataTable,
   EmptyState,
+  EstadoSimples,
   PageHeader,
   ProblemDetail,
   StateBadge,
@@ -194,6 +195,7 @@ export default async function PaginaDeBiometria({
           {
             key: 'situacao',
             header: 'Situação',
+            role: 'state',
             /*
              * `biometric.REVOKED` e tom NEUTRO, nao erro: revogar consentimento
              * e direito do titular (ADR-008 decisao 3), nao falha do sistema.
@@ -207,16 +209,19 @@ export default async function PaginaDeBiometria({
           {
             key: 'cadastrada',
             header: 'Cadastrada em',
+            role: 'moment',
             render: (i) => <TenantDateTime iso={i.createdAt} timeZone={FUSO_PROVISORIO} />,
           },
           {
             key: 'revogada',
             header: 'Revogada em',
+            role: 'moment',
             render: (i) => <TenantDateTime iso={i.revokedAt} timeZone={FUSO_PROVISORIO} />,
           },
           {
             key: 'excluida',
             header: 'Excluída em',
+            role: 'moment',
             render: (i) => <TenantDateTime iso={i.deletedAt} timeZone={FUSO_PROVISORIO} />,
           },
           {
@@ -226,8 +231,28 @@ export default async function PaginaDeBiometria({
              * Presença, nunca a imagem nem o caminho dela (INV-022).
              * Depois do expurgo (INV-142) esta coluna passa a dizer
              * "expurgada", que é a evidência auditável de que sumiu.
+             *
+             * `EstadoSimples`, nao `StateBadge`: presenca do objeto e um
+             * BOOLEANO derivado, nao maquina de estado -- o §7 nao a cobre, e a
+             * maquina que existe (`biometric`) ja e a coluna ao lado. O que
+             * mudou e so a forma: o texto cru ficava sem peso ao lado do badge.
+             *
+             * Os dois tons sao NEUTROS de proposito. "Expurgada" e o resultado
+             * CORRETO do INV-142, nao uma falha: pinta-la de vermelho mandaria
+             * a recepcao abrir chamado sobre um expurgo que funcionou.
+             *
+             * O ICONE e que separa os dois, e por isso ele e explicito: dois
+             * `tom="neutro"` cairiam no mesmo `minus` do padrao, e a coluna
+             * teria a MESMA marca para significados opostos -- pior que o texto
+             * cru que ela substitui, que ao menos diferia.
              */
-            render: (i) => (i.hasEnrollmentObject ? 'Guardada' : 'Expurgada'),
+            role: 'state',
+            render: (i) =>
+              i.hasEnrollmentObject ? (
+                <EstadoSimples label="Guardada" tom="neutro" icone="lock" />
+              ) : (
+                <EstadoSimples label="Expurgada" tom="neutro" icone="archive" />
+              ),
           },
         ]}
         empty={

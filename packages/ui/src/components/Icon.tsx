@@ -31,6 +31,7 @@ export const ICON_NAMES = [
   'calendar-x',
   'hourglass',
   'mail',
+  'message-circle',
   'lock',
   'eye',
   'eye-off',
@@ -102,6 +103,10 @@ const PATHS: Record<IconName, readonly string[]> = {
   'calendar-x': ['M3 5h18v16H3z', 'M8 3v4', 'M16 3v4', 'M3 10h18', 'm10 14 4 4', 'm14 14-4 4'],
   hourglass: ['M6 2h12', 'M6 22h12', 'M8 2c0 5 8 5 8 10s-8 5-8 10'],
   mail: ['M2 5h20v14H2z', 'm2 6 10 7 10-7'],
+  // Balao de conversa: o atalho de WhatsApp na celula de telefone. Contorno
+  // aberto no canto inferior esquerdo -- e o que distingue "conversa" de
+  // "nuvem" numa marca de 14 px.
+  'message-circle': ['M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-4-.9L3 21l1.9-4.9A8.4 8.4 0 0 1 4 11.5a8.4 8.4 0 0 1 8.5-8.5A8.4 8.4 0 0 1 21 11.5z'],
   lock: ['M4 11h16v10H4z', 'M8 11V7a4 4 0 0 1 8 0v4'],
   eye: ['M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'],
   'eye-off': [

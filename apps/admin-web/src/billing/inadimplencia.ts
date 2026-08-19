@@ -84,47 +84,14 @@ function apenasDigitos(telefone: string): string {
   return digitos;
 }
 
-/**
- * Telefone legivel na propria linha da tabela.
+/*
+ * `telefoneLegivel` MIGROU para `Telefone` do design system.
  *
- * O PI pediu o numero VISIVEL, e a razao e operacional: a recepcao liga do
- * telefone fixo tanto quanto manda mensagem, e um numero escondido dentro de
- * um link `wa.me` obriga a abrir o WhatsApp so para le-lo.
- *
- * Formata o que reconhece e devolve o resto como veio -- inventar formato para
- * numero estrangeiro ou mal cadastrado produziria um telefone com aparencia de
- * certo e digitos no lugar errado.
+ * A formatacao e a mesma em qualquer lugar onde ha telefone; manter as duas
+ * copias faria elas divergirem na primeira correcao -- foi assim que o painel
+ * chegou a seis padroes de celula duplicados. O defeito do `+1 415 555 0000`,
+ * achado por teste nesta fatia, foi junto com ela.
  */
-export function telefoneLegivel(telefone: string | null): string | null {
-  if (telefone === null) {
-    return null;
-  }
-
-  /**
-   * `+` NA ENTRADA E NUMERO INTERNACIONAL -- devolve como veio.
-   *
-   * DEFEITO ACHADO PELO TESTE, e ele nao era hipotetico: `+1 415 555 0000`
-   * tem onze digitos e saia formatado como `(14) 15555-0000`, um telefone
-   * brasileiro que nao existe. Contar digitos nao distingue origem; o `+`
-   * distingue, e e o unico sinal confiavel que o cadastro guarda.
-   */
-  if (telefone.trim().startsWith('+') && !telefone.replace(/\D/g, '').startsWith('55')) {
-    return telefone;
-  }
-
-  const digitos = telefone.replace(/\D/g, '');
-  const nacionais = digitos.length > 11 && digitos.startsWith('55') ? digitos.slice(2) : digitos;
-
-  if (nacionais.length === 11) {
-    return `(${nacionais.slice(0, 2)}) ${nacionais.slice(2, 7)}-${nacionais.slice(7)}`;
-  }
-
-  if (nacionais.length === 10) {
-    return `(${nacionais.slice(0, 2)}) ${nacionais.slice(2, 6)}-${nacionais.slice(6)}`;
-  }
-
-  return telefone;
-}
 
 /**
  * Os motivos que explicam POR QUE esta pessoa esta na fila.

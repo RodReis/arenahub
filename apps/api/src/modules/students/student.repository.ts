@@ -576,6 +576,16 @@ export class StudentRepository {
        * quer ver os bloqueados filtra por `BLOCKED`.
        */
       status?: StudentStatus | undefined;
+      /**
+       * Coluna e direcao da ordenacao. Ausente, mantem o padrao historico
+       * (cadastro mais recente primeiro), que e o que a tela sempre mostrou.
+       *
+       * LISTA BRANCA, nao string livre: `orderBy` montado com entrada do
+       * usuario e injecao de campo -- o Prisma recusaria coluna inexistente,
+       * mas ordenar por `cpfHash` vazaria a ordem do hash.
+       */
+      ordem?: 'nome' | 'matricula' | 'nascimento' | undefined;
+      direcao?: 'asc' | 'desc' | undefined;
     },
   ): Promise<Student[]> {
     const termo = filtro.termo?.trim();
@@ -601,9 +611,38 @@ export class StudentRepository {
         ...(filtro.status ? { status: filtro.status } : {}),
         ...condicoes,
       },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      orderBy: ordenacao(filtro.ordem, filtro.direcao),
       take: filtro.limite,
       ...(filtro.cursor ? { cursor: { id: filtro.cursor }, skip: 1 } : {}),
+      /**
+       * O PLANO VEM JUNTO -- a lista responde "quem e este aluno?", e o plano
+       * e metade da resposta na recepcao ("ele tem Mensal Fit ou Anual
+       * Black?"). Sem isto, descobrir exigia abrir a ficha de cada um.
+       *
+       * SO A ASSINATURA QUE VALE AGORA: `ACTIVE` ou `PAST_DUE`, a mais
+       * recente. Um aluno pode ter historico de assinaturas canceladas, e
+       * mostrar a antiga diria que ele tem plano que nao tem.
+       *
+       * `take: 1` no include, e nao um segundo `findMany`: a alternativa seria
+       * uma consulta por aluno, que e o N+1 que o `docs/REVIEW.md` §3.4 barra.
+       */
+      include: {
+        subscriptions: {
+          where: { status: { in: ['ACTIVE', 'PAST_DUE'] } },
+          orderBy: { startsAt: 'desc' },
+          take: 1,
+          select: {
+            status: true,
+            plan: { select: { name: true } },
+          },
+        },
+        contacts: {
+          where: { type: 'PHONE' },
+          orderBy: { isPrimary: 'desc' },
+          take: 1,
+          select: { value: true },
+        },
+      },
     });
   }
 
@@ -688,5 +727,31 @@ export class StudentRepository {
 
       return tx.student.findFirstOrThrow({ where: { id, tenantId: contexto.tenantId } });
     });
+  }
+}
+
+/**
+ * Traduz a ordem pedida para o `orderBy` do Prisma.
+ *
+ * O `id` entra SEMPRE como ultimo criterio: sem desempate estavel, duas linhas
+ * com o mesmo nome trocam de lugar entre paginas, e a paginacao por cursor
+ * repete ou pula registro. E o bug classico de lista ordenada por campo
+ * repetido.
+ */
+function ordenacao(
+  ordem: 'nome' | 'matricula' | 'nascimento' | undefined,
+  direcao: 'asc' | 'desc' | undefined,
+): Prisma.StudentOrderByWithRelationInput[] {
+  const dir = direcao ?? 'asc';
+
+  switch (ordem) {
+    case 'nome':
+      return [{ fullName: dir }, { id: 'desc' }];
+    case 'matricula':
+      return [{ membershipNumber: dir }, { id: 'desc' }];
+    case 'nascimento':
+      return [{ birthDate: dir }, { id: 'desc' }];
+    default:
+      return [{ createdAt: 'desc' }, { id: 'desc' }];
   }
 }

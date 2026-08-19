@@ -4,7 +4,6 @@ import {
   linkDeCobranca,
   motivosDaLinha,
   situacaoVisivel,
-  telefoneLegivel,
 } from './inadimplencia';
 
 describe('situacaoVisivel', () => {
@@ -116,32 +115,6 @@ describe('linkDeCobranca -- entrada sem digito', () => {
   });
 });
 
-describe('telefoneLegivel', () => {
-  it('formata celular de 11 digitos', () => {
-    expect(telefoneLegivel('41998765432')).toBe('(41) 99876-5432');
-  });
-
-  it('formata fixo de 10 digitos', () => {
-    expect(telefoneLegivel('4133334444')).toBe('(41) 3333-4444');
-  });
-
-  it('tira o DDI antes de formatar', () => {
-    expect(telefoneLegivel('5541998765432')).toBe('(41) 99876-5432');
-  });
-
-  it('devolve como veio o que nao reconhece', () => {
-    /**
-     * Inventar formato para numero estrangeiro ou mal cadastrado produziria um
-     * telefone com aparencia de certo e digitos no lugar errado -- pior que
-     * mostrar o valor cru, que pelo menos denuncia o cadastro ruim.
-     */
-    expect(telefoneLegivel('+1 415 555 0000')).toBe('+1 415 555 0000');
-  });
-
-  it('nulo continua nulo', () => {
-    expect(telefoneLegivel(null)).toBeNull();
-  });
-});
 
 describe('motivosDaLinha', () => {
   it('sempre diz quantos dias de atraso', () => {

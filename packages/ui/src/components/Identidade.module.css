@@ -1,0 +1,98 @@
+/**
+ * Identidade da linha -- DS-PAINEL.md §5.
+ *
+ * Le so a camada semantica (regra de lint 2). Sem hex literal (regra 1).
+ */
+
+.identidade {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-inline-size: 0;
+}
+
+/**
+ * O AVATAR -- 28 px, e o tamanho e uma decisao, nao um arredondamento.
+ *
+ * A linha tem 40 px (DS-PAINEL §4). Um avatar de 32 px deixaria 4 px de folga
+ * em cima e embaixo e obrigaria toda linha com identidade a crescer, quebrando
+ * o ritmo que a densidade depende. 28 px cabe com respiro e continua legivel a
+ * duas iniciais.
+ *
+ * `flex-shrink: 0` porque avatar espremido vira elipse -- e elipse le como
+ * defeito, nao como design.
+ */
+.avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  inline-size: 28px;
+  block-size: 28px;
+  overflow: hidden;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: 50%;
+  background: var(--ah-surface-sunken);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  font-weight: 600;
+  /*
+   * Duas iniciais num circulo de 28 px ficam apertadas com o tracking normal
+   * da fonte; -0.02em devolve o respiro sem encostar as letras.
+   */
+  letter-spacing: -0.02em;
+  line-height: 1;
+  user-select: none;
+}
+
+.foto {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+/*
+ * `min-width: 0` no filho de flex -- sem isso o texto longo NAO trunca, ele
+ * empurra o container. E o unico jeito de `text-overflow` funcionar dentro de
+ * um flex, e a razao de a coluna de identidade ter teto no `DataTable`.
+ */
+.texto {
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.nome {
+  overflow: hidden;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+  color: var(--ah-text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Link herda o peso do nome: numa tabela densa, azul-sublinhado em quarenta
+ * linhas vira uma parede de decoracao. O affordance vem do hover e do foco --
+ * e o foco visivel do painel ja e anel de 2 px, que nao depende de cor.
+ */
+a.nome {
+  color: var(--ah-text-strong);
+  text-decoration: none;
+}
+
+a.nome:hover {
+  text-decoration: underline;
+}
+
+.secundario {
+  overflow: hidden;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

@@ -182,7 +182,19 @@
 
 /* ─── Célula de identidade ─────────────────────────────────────────────── */
 
-.identidade {
+/*
+ * Empilha a identidade (do DS) sobre os chips de motivo. O `.identidade`
+ * local foi embora com o componente `Identidade`; o que sobrou aqui e so o
+ * arranjo vertical dos dois blocos, que e desta tela.
+ */
+.celulaDoAluno {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-block: 4px;
+}
+
+.identidadeAntiga {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -281,13 +293,6 @@
  * `flex-wrap` porque a 1024px a coluna encolhe e os dois nao cabem lado a lado
  * -- empilhar e melhor que cortar o rotulo.
  */
-.acoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
 /* ─── Movimento ────────────────────────────────────────────────────────── */
 
 /*

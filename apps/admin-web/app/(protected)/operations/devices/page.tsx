@@ -4,6 +4,7 @@ import {
   Ausente,
   DataTable,
   EmptyState,
+  EstadoSimples,
   PageHeader,
   ProblemDetail,
   StateBadge,
@@ -131,8 +132,8 @@ export default async function PaginaDeSincronizacao() {
         rowKey={(dispositivo) => dispositivo.id}
         caption="Leitores e catracas desta academia"
         columns={[
-          { key: 'modelo', header: 'Modelo', render: (d) => d.model },
-          { key: 'serie', header: 'Série', numeric: true, render: (d) => d.serial },
+          { key: 'modelo', header: 'Modelo', role: 'identity', render: (d) => d.model },
+          { key: 'serie', header: 'Série', role: 'code', render: (d) => d.serial },
           {
             key: 'situacao',
             header: 'Situação',
@@ -144,16 +145,31 @@ export default async function PaginaDeSincronizacao() {
              * devolve `ACTIVE`, que nao existe la -- o badge cairia em `—` e a
              * recepcao perderia a informacao. Alinhar os dois e mudanca de
              * contrato de API, nao de aparencia.
+             *
+             * O que MUDOU foi a forma: `EstadoSimples` da a esta celula a
+             * mesma altura, gap e icone do badge -- antes ela era texto cru ao
+             * lado de colunas com badge, e a tabela parecia ter duas
+             * linguagens visuais. Sem borda, porque a moldura e o sinal
+             * honesto de que o estado e rastreado por uma maquina; este e
+             * derivado.
              */
-            render: (d) => (d.status === 'ACTIVE' ? 'Ativo' : 'Fora de operação'),
+            role: 'state',
+            render: (d) =>
+              d.status === 'ACTIVE' ? (
+                <EstadoSimples label="Ativo" tom="positivo" />
+              ) : (
+                <EstadoSimples label="Fora de operação" tom="negativo" />
+              ),
           },
           {
             key: 'contato',
+            role: 'moment',
             header: 'Último contato',
             render: (d) => <TenantDateTime iso={d.lastHeartbeat} timeZone={FUSO_PROVISORIO} />,
           },
           {
             key: 'sincronizacao',
+            role: 'moment',
             header: 'Última sincronização',
             render: (d) => <TenantDateTime iso={d.lastSyncAt} timeZone={FUSO_PROVISORIO} />,
           },
@@ -172,6 +188,7 @@ export default async function PaginaDeSincronizacao() {
         columns={[
           {
             key: 'operacao',
+            role: 'identity',
             header: 'Operação',
             render: (job) => ROTULO_DE_OPERACAO[job.operation] ?? job.operation,
           },
@@ -185,20 +202,23 @@ export default async function PaginaDeSincronizacao() {
              */
             render: (job) => <StateBadge machine="syncJob" state={job.state} />,
           },
-          { key: 'tentativas', header: 'Tentativas', numeric: true, render: (job) => job.attempts },
+          { key: 'tentativas', header: 'Tentativas', role: 'value', render: (job) => job.attempts },
           {
             key: 'ultima',
+            role: 'moment',
             header: 'Última tentativa',
             render: (job) => <TenantDateTime iso={job.lastAttemptAt} timeZone={FUSO_PROVISORIO} />,
           },
           {
             key: 'proxima',
+            role: 'moment',
             header: 'Próxima tentativa',
             render: (job) => <TenantDateTime iso={job.nextAttemptAt} timeZone={FUSO_PROVISORIO} />,
           },
           {
             key: 'acao',
             header: 'O que fazer',
+            role: 'support',
             /*
              * A ação recomendada vem da API, não da tela: o mesmo texto
              * serve para o painel e para qualquer outro consumidor.

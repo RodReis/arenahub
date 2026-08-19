@@ -113,3 +113,269 @@
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
 }
+
+/* ---------------------------------------------------------------------------
+ * PAPEL DE COLUNA -- o que faz treze tabelas parecerem a mesma tabela.
+ *
+ * A tela declara O QUE a coluna e (`role`), nao quanto ela mede. A proporcao
+ * sai daqui, e sai igual em todo lugar -- que e a diferenca entre um design
+ * system e treze telas que se parecem por coincidencia.
+ *
+ * POR QUE ISTO PRECISOU EXISTIR: `numeric` prometia alinhamento e nao entregava
+ * nada. Ele so emitia `data-numeric`, e o `globals.css` do painel ja aplicava
+ * `tabular-nums` a tabela inteira -- oito colunas o usavam achando que
+ * alinhava. Coluna de dinheiro alinhada a esquerda obriga a comparar valores
+ * digito a digito, que e o trabalho que a tabela existe para poupar.
+ * ------------------------------------------------------------------------- */
+
+/*
+ * IDENTIDADE -- quem a linha e. A coluna que o olho procura ao varrer.
+ *
+ * `max-inline-size` SOZINHO NAO FUNCIONA em celula de tabela: com
+ * `table-layout: auto`, o navegador trata largura de `<td>` como sugestao e
+ * distribui a sobra pela coluna mais flexivel de qualquer jeito. Foi o que
+ * apareceu na tela de alunos -- a identidade ficou com 629 px dos 1134 da
+ * tabela, com o conteudo ocupando 250 px e o resto virando vao. O olho
+ * atravessava o vazio entre o nome e a data.
+ *
+ * `width: 1%` com `min-inline-size` e o idioma que a tabela entende: encolhe
+ * ao conteudo, com um piso para o nome nao espremer. A SOBRA vai para a
+ * coluna de apoio, que e a unica desenhada para receber -- e quando nao ha
+ * apoio, sobra distribuida entre poucas colunas e melhor que um vao numa so.
+ */
+.tabela th[data-role='identity'],
+.tabela td[data-role='identity'] {
+  inline-size: 1%;
+  min-inline-size: 22ch;
+  max-inline-size: 32ch;
+}
+
+/*
+ * CODIGO -- identificador legivel, a esquerda e em mono.
+ *
+ * Mono porque codigo se le caractere a caractere (o `0` e o `O` precisam ser
+ * distinguiveis), secundario porque ele identifica sem ser o que se procura --
+ * quem varre a lista procura o NOME, e acha o codigo depois de achar a linha.
+ */
+.tabela th[data-role='code'],
+.tabela td[data-role='code'] {
+  inline-size: 1%;
+  white-space: nowrap;
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+  line-height: var(--ah-type-mono-lh);
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-secondary);
+  letter-spacing: 0.01em;
+}
+
+/*
+ * ROTULO -- dado curto e fechado. Encolhe ao conteudo.
+ *
+ * Nasceu de um vao real: o nome do plano estava como `support`, cujo piso de
+ * 32ch esticava a coluna e abria um buraco ate a coluna seguinte. Apoio e para
+ * FRASE da API; rotulo e para nome que cabe em duas palavras.
+ */
+.tabela th[data-role='label'],
+.tabela td[data-role='label'] {
+  inline-size: 1%;
+  white-space: nowrap;
+}
+
+/*
+ * ESTADO -- badge nao cresce, e afastar o estado do nome quebra a leitura.
+ * `width: 1%` mais `white-space: nowrap` e o idioma do HTML para "o menor
+ * possivel": a tabela distribui o resto entre as outras.
+ */
+.tabela th[data-role='state'],
+.tabela td[data-role='state'] {
+  inline-size: 1%;
+  white-space: nowrap;
+}
+
+/*
+ * VALOR -- alinhado A DIREITA, que e o que `numeric` prometia e nunca fez.
+ *
+ * Alinhamento a direita nao e estetica: e o que poe as casas decimais na mesma
+ * coluna vertical, e comparar R$ 1.200,00 com R$ 145,60 de relance depende
+ * disso. Com `tabular-nums`, os digitos tambem tem a mesma largura.
+ */
+.tabela th[data-role='value'],
+.tabela td[data-role='value'] {
+  inline-size: 1%;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* MOMENTO -- data e hora tem largura previsivel; quebrar linha nelas e ruido. */
+.tabela th[data-role='moment'],
+.tabela td[data-role='moment'] {
+  inline-size: 1%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * DUAS COLUNAS DE APOIO NA MESMA TABELA -- o piso NAO compoe.
+ *
+ * Cada `support` reivindica 32ch de minimo. Duas somam 64ch, e numa tabela de
+ * cinco colunas isso empurra estado e valor para fora da primeira dobra: o
+ * mesmo defeito que o teto sozinho causava, pelo lado oposto. Achado ao migrar
+ * as treze telas, e confirmado a 640px (o equivalente a 1280 com zoom de 200%,
+ * que o DS-PAINEL §10.8 governa): so a tabela de alertas, a unica com dois
+ * `support`, passa a rolar.
+ *
+ * `data-support-pair` no `<table>` divide o piso pela metade quando a tabela
+ * declara que tem duas colunas de apoio. Nao e caso geral -- a tabela de
+ * alertas e a unica do painel onde impacto e acao precisam ser lidos na mesma
+ * varredura.
+ */
+.tabela[data-support-pair] th[data-role='support'],
+.tabela[data-support-pair] td[data-role='support'] {
+  min-inline-size: 18ch;
+}
+
+/*
+ * APOIO -- cede espaco, mas tem PISO.
+ *
+ * So o teto nao bastou, e o defeito apareceu na tela: com um botao largo na
+ * coluna de acoes, a frase foi espremida a 182 px e quebrou em SEIS linhas --
+ * a mesma quebra de ritmo que o teto existia para impedir, pelo lado oposto.
+ * Uma coluna que so tem maximo cede tudo ao vizinho mais teimoso.
+ *
+ * `min-inline-size` em ch e nao em px porque o que importa e quantos
+ * CARACTERES cabem por linha: 32ch e o piso onde uma frase operacional ainda
+ * quebra em duas ou tres linhas, nao em seis.
+ */
+.tabela th[data-role='support'],
+.tabela td[data-role='support'] {
+  min-inline-size: 32ch;
+  max-inline-size: 44ch;
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * ACOES -- encosta a direita e NAO DITA a largura da tabela.
+ *
+ * `width: 1%` sozinho nao segurou: `white-space: nowrap` fazia um botao de
+ * rotulo longo ("Aceitar diferenca documentada") reservar 261 px e comer a
+ * coluna de apoio. O rotulo do botao e do dominio -- o verbo real e exigencia
+ * do DS-PAINEL §6, entao encurtar o texto para caber nao e opcao.
+ *
+ * A saida e deixar o BOTAO quebrar em duas linhas quando precisar: a coluna
+ * fica estreita, a linha cresce um pouco, e a frase ao lado continua legivel.
+ */
+.tabela th[data-role='actions'],
+.tabela td[data-role='actions'] {
+  inline-size: 1%;
+  text-align: right;
+  /*
+   * `nowrap` de volta, com TETO no botao em vez de na coluna.
+   *
+   * Vi as duas falhas na tela: sem teto, um rotulo longo reservava 261 px e
+   * espremia a coluna de apoio; com teto de 22ch na CELULA, dois botoes que
+   * deveriam ficar lado a lado empilharam e um deles quebrou em tres linhas.
+   *
+   * O teto certo e no BOTAO -- ele quebra quando o proprio rotulo e longo
+   * demais, e a celula continua livre para arranjar dois controles em linha.
+   */
+  white-space: nowrap;
+}
+
+/*
+ * O botao DENTRO da celula de acao acompanha a coluna.
+ *
+ * Visto na tela: com `white-space: normal` na celula, o botao quebrou em tres
+ * linhas e o TEXTO TRANSBORDOU a propria moldura -- altura do controle fixa em
+ * 36 px (DS-PAINEL §4) contra tres linhas de rotulo. `height: auto` deixa o
+ * botao crescer com o que ele diz; o `min-height` preserva o alvo de toque.
+ *
+ * O rotulo nao encurta: verbo real e exigencia do §6, e "Aceitar" sozinho nao
+ * diz o que se aceita.
+ */
+.tabela td[data-role='actions'] button,
+.tabela td[data-role='actions'] a {
+  height: auto;
+  min-height: 36px;
+  /*
+   * 24ch: cabe "Aceitar diferenca documentada" em duas linhas e "Cobrar no
+   * WhatsApp" em UMA. Sem o teto, o primeiro reservava a largura inteira da
+   * frase e comia a coluna vizinha.
+   */
+  max-inline-size: 24ch;
+  padding-block: 6px;
+  text-align: center;
+  white-space: normal;
+}
+
+/*
+ * ALTURA MINIMA, NAO FIXA -- DS-PAINEL §4 diz 40 px, e o `height: 40px` acima
+ * cumpre isso na linha simples. Celula composta (identidade com avatar,
+ * apoio de duas linhas) precisa CRESCER; travar em 40 px cortaria conteudo,
+ * e o §10.8 proibe altura fixa em container de texto por causa do zoom de 200%.
+ *
+ * O que mantem o ritmo nao e a altura igual: e o padding vertical constante.
+ */
+.tabela td {
+  height: auto;
+  min-height: 40px;
+  padding-block: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+ * CABECALHO -- fundo proprio e ordenacao.
+ * ------------------------------------------------------------------------- */
+
+/*
+ * O CABECALHO GANHA SUPERFICIE, e nao e enfeite: numa tabela de vinte linhas
+ * que rola, a faixa e o que separa "titulo da coluna" de "primeira linha de
+ * dado". Sem ela, o olho volta ao topo e le o cabecalho como se fosse conteudo.
+ *
+ * `sunken` e nao `raised`: o cabecalho e o fundo sobre o qual as linhas
+ * flutuam, nao um card em cima delas.
+ */
+.tabela thead th {
+  background: var(--ah-surface-sunken);
+  border-bottom: 1px solid var(--ah-border-default);
+}
+
+/*
+ * ORDENACAO -- o cabecalho inteiro e o alvo, nao so a seta.
+ *
+ * Alvo de 14 px e alvo que se erra; o `th` ja tem 40 px de altura, e usa-lo
+ * inteiro custa nada. Ver DS-PAINEL §10 sobre tamanho de alvo.
+ */
+.ordenar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ordenar:hover {
+  color: var(--ah-text-strong);
+}
+
+/*
+ * A SETA SEMPRE OCUPA LUGAR, mesmo inativa (`↕`).
+ *
+ * Seta que aparece so na coluna ordenada faria as outras deslocarem o texto a
+ * cada clique -- e um cabecalho que se move e um cabecalho que a pessoa perde.
+ * Inativa fica fraca; ativa ganha peso.
+ */
+.seta {
+  color: var(--ah-text-placeholder);
+  font-size: var(--ah-type-caption-size);
+  line-height: 1;
+}
+
+.ordenar[data-ativa] {
+  color: var(--ah-text-strong);
+}
+
+.ordenar[data-ativa] .seta {
+  color: var(--ah-action-text);
+}

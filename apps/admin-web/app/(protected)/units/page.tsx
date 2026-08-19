@@ -1,6 +1,13 @@
 import type { Metadata } from 'next';
 
-import { DataTable, EmptyState, PageHeader, ProblemDetail } from '@arenahub/ui';
+import {
+  DataTable,
+  EmptyState,
+  EstadoSimples,
+  Identidade,
+  PageHeader,
+  ProblemDetail,
+} from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
 
@@ -71,20 +78,56 @@ export default async function PaginaDeUnidades() {
            * comportamento. Corrigir a grafia e trabalho do card que tambem
            * atualiza o teste, nao desta fatia.
            */
-          { key: 'codigo', header: 'Codigo', numeric: true, render: (u) => u.code },
-          { key: 'nome', header: 'Nome', render: (u) => u.name },
-          { key: 'fuso', header: 'Fuso horario', render: (u) => u.timezone },
+          /*
+           * `code` e nao `value`: codigo de unidade ("AP-01") se le caractere a
+           * caractere, nao se soma. Era `numeric: true`, que nunca alinhou nada
+           * -- o `globals.css` ja dava `tabular-nums` a tabela inteira.
+           */
+          { key: 'codigo', header: 'Codigo', role: 'code', render: (u) => u.code },
+          {
+            key: 'nome',
+            header: 'Nome',
+            role: 'identity',
+            /*
+             * `semAvatar`: unidade e um ENDERECO, nao uma pessoa. A inicial num
+             * circulo daria a cada linha um rosto que ela nao tem -- enfeite
+             * fingindo ser informacao.
+             *
+             * O fuso NAO desce para o `secundario` do bloco, embora coubesse: o
+             * E2E afirma cabecalho por texto, e fundir duas colunas numa apaga
+             * um `columnheader`. Migrar aparencia nao pode custar a rede que
+             * prova que a aparencia foi a unica coisa que mudou.
+             */
+            render: (u) => <Identidade semAvatar nome={u.name} />,
+          },
+          /*
+           * `code` e nao `support`: "America/Sao_Paulo" e um identificador IANA,
+           * nao frase da API. `support` reservaria 32ch de piso a uma string de
+           * 17 caracteres e abriria um vao ate a coluna seguinte.
+           */
+          { key: 'fuso', header: 'Fuso horario', role: 'code', render: (u) => u.timezone },
           {
             key: 'situacao',
             header: 'Situacao',
+            role: 'state',
             /*
-             * Ternario, nao `StateBadge`: o §7 define 11 maquinas de estado e
-             * NENHUMA e de unidade. Inventar `machine="unit"` no dicionario
-             * canonico seria decisao de produto, e ela nao e minha.
+             * `EstadoSimples`, nao `StateBadge`: o §7 define 11 maquinas de
+             * estado e NENHUMA e de unidade. Inventar `machine="unit"` no
+             * dicionario canonico seria decisao de produto, e ela nao e minha.
+             *
+             * O que mudou e so a FORMA: antes era texto cru ao lado de colunas
+             * com badge, e a tabela parecia ter duas linguagens visuais.
+             * `EstadoSimples` da a ela ponto, icone e rotulo -- sem fingir que
+             * existe uma maquina por tras.
              *
              * Texto, nao so cor: `M1-NFR-008` exige WCAG 2.2 AA.
              */
-            render: (u) => (u.status === 'ACTIVE' ? 'Ativa' : 'Inativa'),
+            render: (u) =>
+              u.status === 'ACTIVE' ? (
+                <EstadoSimples label="Ativa" tom="positivo" />
+              ) : (
+                <EstadoSimples label="Inativa" tom="neutro" />
+              ),
           },
         ]}
         empty={

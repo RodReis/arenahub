@@ -147,6 +147,46 @@ O **seletor de unidade** fica no topbar porque toda data, horário e política d
 
 ---
 
+### 5.1 Papel de coluna — o vocabulário da tabela
+
+A tela declara **o que a coluna é**, não quanto ela mede. A proporção sai do
+design system, e sai igual nas treze tabelas do painel.
+
+| `role` | o que é | como se comporta |
+|---|---|---|
+| `identity` | quem/o que a linha é | primeira coluna, cresce até 32ch |
+| `code` | identificador legível: matrícula, série, nº de fatura | mono, **à esquerda**, largura mínima |
+| `state` | badge ou rótulo de situação | estreita e fixa |
+| `value` | número comparável: dinheiro, contador | **à direita**, tabular-nums |
+| `moment` | data, hora, idade | largura previsível, não quebra |
+| `support` | texto de apoio vindo da API | 32–44ch; **a única que cede** |
+| `actions` | botão ou form na linha | encosta à direita, não cresce |
+
+**`code` e `value` são coisas diferentes, e confundi-los é o erro comum.**
+Ninguém soma matrícula. Alinhada à direita, com larguras diferentes
+(`AP-2026-00000147` ao lado de `DEMO-012`), ela abre um vão irregular até a
+coluna seguinte — código se compara **caractere a caractere**, e para isso o que
+importa é começarem no mesmo ponto. Dinheiro é o oposto: alinhado à direita, as
+casas decimais caem na mesma vertical e a comparação é de relance.
+
+**Uma coluna de apoio por tabela, de preferência.** Duas somam 64ch de piso e
+empurram estado e valor para fora da primeira dobra. Quando forem mesmo duas —
+o painel tem um caso, "o que isso impede" + "o que fazer" na tela de operação —
+o `DataTable` divide o piso sozinho, derivando de quantas colunas declararam
+`support`.
+
+**`numeric` está deprecado.** Ele só emitia `data-numeric`, sem regra de CSS no
+design system, e o `globals.css` já aplicava `tabular-nums` à tabela inteira.
+Oito colunas o usavam achando que alinhavam à direita. Nenhuma alinhava.
+
+**Avatar em `Identidade`.** Numa lista de quarenta linhas, a marca circular é o
+que o olho encontra antes de ler qualquer letra. É **carbono**, não uma paleta
+por pessoa: os cinco tons semânticos são reservados a estado (§2), e um aluno
+"verde" competiria com o badge "Ativo" na coluna ao lado. O componente aceita
+`fotoUrl` e ninguém passa — o único retrato que o ArenaHub guarda é a imagem
+biométrica, cujo consentimento declara finalidade de identificação na catraca,
+não exibição em lista administrativa. Ligar a foto é decisão do PI (LGPD art. 11).
+
 ## 6. Controles
 
 | Variante | Especificação |
@@ -299,7 +339,12 @@ Em `DENY` a razão pública é **sempre a mesma frase genérica**. A razão téc
 | `Button` | solid / outline / ghost / destructive |
 | `StateBadge` | §7 — 11 máquinas, ~40 estados |
 | `ProblemDetail` | `application/problem+json` |
-| `DataTable` | paginação por cursor |
+| `DataTable` | paginação por cursor · **papel de coluna** (ver §5.1) |
+| `Identidade` | avatar + nome + dado de apoio, empilhados |
+| `EstadoSimples` | estado **sem** máquina canônica — ícone, cor e texto |
+| `Consequencia` | o que o estado custa, ao lado do estado |
+| `AcoesDaLinha` · `AusenteDeAcao` | ações da linha · "nada a fazer", com rótulo |
+| `Idade` | idade relativa, instante exato no `title` |
 | `DataFreshness` | atual / desatualizado / indisponível |
 | `TenantDateTime` | timezone da **unidade**, nunca do navegador |
 | `Money` | centavos inteiros, nunca `float` |

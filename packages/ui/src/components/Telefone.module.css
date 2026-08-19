@@ -1,0 +1,51 @@
+/**
+ * Telefone com atalho de WhatsApp -- DS-PAINEL.md §9.
+ *
+ * Le so a camada semantica (regra de lint 2).
+ */
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ah-text-default);
+  text-decoration: none;
+}
+
+/*
+ * O ICONE E O AFFORDANCE, nao o sublinhado.
+ *
+ * Numa lista de quarenta linhas, quarenta numeros sublinhados viram uma parede
+ * de decoracao. O balao diz "da para conversar" sem pintar a coluna inteira; o
+ * sublinhado aparece no hover, quando o alvo ja esta sob o cursor.
+ */
+.link:hover .numero {
+  text-decoration: underline;
+}
+
+.link svg {
+  inline-size: 14px;
+  block-size: 14px;
+  flex-shrink: 0;
+  color: var(--ah-text-icon);
+}
+
+/*
+ * O icone ganha cor de ACAO no hover, e so nele: accent em quarenta linhas
+ * faria a tabela inteira parecer clicavel, que e o que o DS-PAINEL §2 reserva
+ * para acao de verdade.
+ */
+.link:hover svg {
+  color: var(--ah-action-text);
+}
+
+.numero {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.texto {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ah-text-default);
+}

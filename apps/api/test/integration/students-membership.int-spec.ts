@@ -277,7 +277,11 @@ describe('F7 -- aluno, plano e entitlement', () => {
       });
 
       expect(JSON.stringify(resposta.body)).not.toContain('52998224725');
-      expect((resposta.body as { cpfMasked: string }).cpfMasked).toBe('•••.•••.**7-25');
+      // `•` em toda posicao oculta, nunca `*` misturado com `•`: a mascara
+      // preserva a FORMA de um CPF para a recepcao conferir o documento na
+      // mao. O formato anterior (`**7-25`) misturava dois caracteres e nao
+      // parecia um CPF -- corrigido junto do padrao de tabela.
+      expect((resposta.body as { cpfMasked: string }).cpfMasked).toBe('•••.•••.••7-25');
 
       const gravado = await db.student.findUniqueOrThrow({
         where: { id: (resposta.body as { id: string }).id },
