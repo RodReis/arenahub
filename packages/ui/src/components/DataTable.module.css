@@ -170,6 +170,19 @@
 }
 
 /*
+ * ROTULO -- dado curto e fechado. Encolhe ao conteudo.
+ *
+ * Nasceu de um vao real: o nome do plano estava como `support`, cujo piso de
+ * 32ch esticava a coluna e abria um buraco ate a coluna seguinte. Apoio e para
+ * FRASE da API; rotulo e para nome que cabe em duas palavras.
+ */
+.tabela th[data-role='label'],
+.tabela td[data-role='label'] {
+  inline-size: 1%;
+  white-space: nowrap;
+}
+
+/*
  * ESTADO -- badge nao cresce, e afastar o estado do nome quebra a leitura.
  * `width: 1%` mais `white-space: nowrap` e o idioma do HTML para "o menor
  * possivel": a tabela distribui o resto entre as outras.
@@ -308,4 +321,61 @@
   height: auto;
   min-height: 40px;
   padding-block: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+ * CABECALHO -- fundo proprio e ordenacao.
+ * ------------------------------------------------------------------------- */
+
+/*
+ * O CABECALHO GANHA SUPERFICIE, e nao e enfeite: numa tabela de vinte linhas
+ * que rola, a faixa e o que separa "titulo da coluna" de "primeira linha de
+ * dado". Sem ela, o olho volta ao topo e le o cabecalho como se fosse conteudo.
+ *
+ * `sunken` e nao `raised`: o cabecalho e o fundo sobre o qual as linhas
+ * flutuam, nao um card em cima delas.
+ */
+.tabela thead th {
+  background: var(--ah-surface-sunken);
+  border-bottom: 1px solid var(--ah-border-default);
+}
+
+/*
+ * ORDENACAO -- o cabecalho inteiro e o alvo, nao so a seta.
+ *
+ * Alvo de 14 px e alvo que se erra; o `th` ja tem 40 px de altura, e usa-lo
+ * inteiro custa nada. Ver DS-PAINEL §10 sobre tamanho de alvo.
+ */
+.ordenar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ordenar:hover {
+  color: var(--ah-text-strong);
+}
+
+/*
+ * A SETA SEMPRE OCUPA LUGAR, mesmo inativa (`↕`).
+ *
+ * Seta que aparece so na coluna ordenada faria as outras deslocarem o texto a
+ * cada clique -- e um cabecalho que se move e um cabecalho que a pessoa perde.
+ * Inativa fica fraca; ativa ganha peso.
+ */
+.seta {
+  color: var(--ah-text-placeholder);
+  font-size: var(--ah-type-caption-size);
+  line-height: 1;
+}
+
+.ordenar[data-ativa] {
+  color: var(--ah-text-strong);
+}
+
+.ordenar[data-ativa] .seta {
+  color: var(--ah-action-text);
 }

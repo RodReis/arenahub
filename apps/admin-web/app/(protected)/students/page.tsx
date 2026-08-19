@@ -103,6 +103,14 @@ export default async function PaginaDeAlunos({
   if (situacao) consulta.set('status', situacao);
   if (unidade) consulta.set('gymUnitId', unidade);
 
+  const ordem = texto('ordem');
+  const direcao = texto('direcao') === 'desc' ? 'desc' : 'asc';
+
+  if (ordem) {
+    consulta.set('ordem', ordem);
+    consulta.set('direcao', direcao);
+  }
+
   const cursor = texto('cursor');
 
   if (cursor) consulta.set('cursor', cursor);
@@ -266,10 +274,35 @@ export default async function PaginaDeAlunos({
         rows={alunos}
         rowKey={(aluno) => aluno.id}
         rowTestId={(aluno) => `aluno-${aluno.id}`}
+        /*
+          Ordenacao por URL, nao por estado de componente. Ordenar no cliente
+          reordenaria as vinte linhas carregadas, nao as mil que existem -- e a
+          recepcao acharia que viu o maior valor quando viu o maior da pagina.
+          Pela URL, o servidor ordena a base inteira e o link e compartilhavel.
+
+          O CURSOR SAI ao trocar a ordem: ele aponta para uma posicao na ordem
+          ANTERIOR, e mante-lo pularia ou repetiria registros.
+        */
+        sort={{
+          key: ordem ?? '',
+          direction: direcao,
+          href: (chave, sentido) => {
+            const url = new URLSearchParams();
+
+            if (termo) url.set('q', termo);
+            if (situacao) url.set('status', situacao);
+            if (unidade) url.set('gymUnitId', unidade);
+            url.set('ordem', chave);
+            url.set('direcao', sentido);
+
+            return `/students?${url.toString()}`;
+          },
+        }}
         caption="Alunos, do cadastro mais recente para o mais antigo"
         columns={[
           {
             key: 'aluno',
+            sortKey: 'nome',
             header: 'Aluno',
             /*
              * NOME E CPF NA MESMA CELULA, empilhados -- como no mockup.
@@ -291,38 +324,37 @@ export default async function PaginaDeAlunos({
              * documento.
              */
             role: 'identity',
+            render: (aluno) => <Identidade nome={aluno.fullName} href={`/students/${aluno.id}`} />,
+          },
+          {
+            key: 'matricula',
+            sortKey: 'matricula',
+            header: 'Matrícula',
+            role: 'code',
+            render: (aluno) => aluno.membershipNumber,
+          },
+          {
+            key: 'cpf',
+            header: 'CPF',
+            role: 'code',
             /*
-              MATRICULA E CPF NA MESMA LINHA de apoio, separados por `·`.
-              Antes eram duas colunas (matricula a esquerda, CPF sob o nome), e
-              o olho atravessava a linha entre duas metades da MESMA resposta:
-              "e esta pessoa?". Juntos, a conferencia de documento acontece num
-              ponto so.
-
-              O separador nao aparece quando falta o CPF -- e falta em 13 de 16
-              alunos, porque cadastrar sem documento e o caminho normal
-              (INV-009/011). Um `·` orfao viraria sujeira em quase toda linha.
+              Coluna propria, e nao linha de apoio sob o nome: empilhados, os
+              dois criavam uma segunda linha em apenas 3 de 16 alunos --
+              buracos irregulares sob os nomes. Em coluna, a ausencia e uma
+              celula vazia como qualquer outra.
             */
-            render: (aluno) => (
-              <Identidade
-                nome={aluno.fullName}
-                href={`/students/${aluno.id}`}
-                secundario={
-                  <>
-                    <span className={estilos['matricula']}>{aluno.membershipNumber}</span>
-                    {aluno.cpfMasked ? (
-                      <>
-                        <span className={estilos['separador']}> · </span>
-                        <MaskedCPF masked={aluno.cpfMasked} />
-                      </>
-                    ) : null}
-                  </>
-                }
-              />
-            ),
+            render: (aluno) =>
+              aluno.cpfMasked === null ? <Ausente /> : <MaskedCPF masked={aluno.cpfMasked} />,
           },
           {
             key: 'plano',
             header: 'Plano',
+            /*
+              `code` e nao `support`: nome de plano e dado CURTO e fechado, e o
+              piso de 32ch do apoio esticava a coluna, abrindo o vao que ficava
+              entre PLANO e CONTATO. Apoio e para frase da API, nao para rotulo.
+            */
+            role: 'label',
             /*
               O PLANO E METADE DA RESPOSTA na recepcao ("ele tem Mensal Fit ou
               Anual Black?"), e ate esta fatia descobri-lo exigia abrir a ficha
@@ -357,6 +389,7 @@ export default async function PaginaDeAlunos({
           },
           {
             key: 'nascimento',
+            sortKey: 'nascimento',
             header: 'Nascimento',
             role: 'moment',
             render: (aluno) => (

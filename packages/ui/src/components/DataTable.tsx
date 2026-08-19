@@ -16,6 +16,9 @@ import estilos from './DataTable.module.css';
  *   com larguras diferentes ("AP-2026-00000147" vs "DEMO-012") abre um vao
  *   irregular ate a coluna seguinte. Codigo se COMPARA CARACTERE A CARACTERE,
  *   e para isso o que importa e comecarem no mesmo ponto.
+ * - `label`    -- dado curto e FECHADO: nome de plano, tipo de dispositivo,
+ *   origem. Nao e `code` (nao se le caractere a caractere, entao nao e mono) e
+ *   nao e `support` (nao tem piso, porque nao e frase). Encolhe ao conteudo.
  * - `state`    -- badge ou rotulo de situacao. Estreita e fixa: badge nao
  *   cresce, e deixar a coluna crescer afasta o estado do nome.
  * - `value`    -- numero comparavel entre linhas (dinheiro, contador,
@@ -29,6 +32,7 @@ import estilos from './DataTable.module.css';
 export type ColumnRole =
   | 'identity'
   | 'code'
+  | 'label'
   | 'state'
   | 'value'
   | 'moment'
@@ -39,6 +43,15 @@ export interface Column<T> {
   readonly key: string;
   readonly header: string;
   readonly render: (row: T) => ReactNode;
+  /**
+   * Torna o cabeçalho clicável, ordenando por esta coluna.
+   *
+   * A tela recebe a chave e devolve o `href` — a ordenação é NAVEGAÇÃO, não
+   * estado de componente. Ordenar no cliente mentiria numa lista paginada por
+   * cursor: reordenaria as vinte linhas carregadas, não as mil que existem, e
+   * a recepção acharia que viu o maior valor quando viu o maior da página.
+   */
+  readonly sortKey?: string;
   /**
    * O papel da coluna. Ver `ColumnRole`.
    *
@@ -77,6 +90,17 @@ interface Props<T> {
   readonly testId?: string;
   /** `data-testid` por linha, ex.: `aluno-${id}`. */
   readonly rowTestId?: (row: T) => string;
+  /**
+   * Ordenação vigente e como mudá-la.
+   *
+   * `href` recebe a chave e a direção, e devolve o link — quem monta a URL é a
+   * tela, que sabe quais outros filtros precisam sobreviver ao clique.
+   */
+  readonly sort?: {
+    readonly key: string;
+    readonly direction: 'asc' | 'desc';
+    readonly href: (key: string, direction: 'asc' | 'desc') => string;
+  };
 }
 
 /**
@@ -102,6 +126,7 @@ export function DataTable<T>({
   nextHref,
   testId,
   rowTestId,
+  sort,
 }: Props<T>) {
   if (rows.length === 0) return <>{empty}</>;
 
@@ -144,16 +169,48 @@ export function DataTable<T>({
         <caption className={estilos['legenda']}>{caption}</caption>
         <thead>
           <tr>
-            {columns.map((coluna) => (
-              <th
-                key={coluna.key}
-                scope="col"
-                {...(coluna.role !== undefined ? { 'data-role': coluna.role } : {})}
-                {...(coluna.numeric === true ? { 'data-numeric': '' } : {})}
-              >
-                {coluna.header}
-              </th>
-            ))}
+            {columns.map((coluna) => {
+              const ordenavel = coluna.sortKey !== undefined && sort !== undefined;
+              const ativa = ordenavel && sort.key === coluna.sortKey;
+              /*
+                Clicar na coluna JÁ ordenada inverte; clicar em outra começa
+                ascendente. É o que todo mundo espera de tabela, e quebrar a
+                convenção aqui não compraria nada.
+              */
+              const proxima: 'asc' | 'desc' = ativa && sort.direction === 'asc' ? 'desc' : 'asc';
+
+              return (
+                <th
+                  key={coluna.key}
+                  scope="col"
+                  {...(coluna.role !== undefined ? { 'data-role': coluna.role } : {})}
+                  {...(coluna.numeric === true ? { 'data-numeric': '' } : {})}
+                  /*
+                    `aria-sort` é o que faz o leitor de tela anunciar "ordenado
+                    de forma crescente" ao entrar na coluna. Sem ele, a seta é
+                    informação só para quem enxerga.
+                  */
+                  {...(ativa
+                    ? { 'aria-sort': sort.direction === 'asc' ? 'ascending' : 'descending' }
+                    : {})}
+                >
+                  {ordenavel ? (
+                    <a
+                      className={estilos['ordenar']}
+                      href={sort.href(coluna.sortKey, proxima)}
+                      data-ativa={ativa ? '' : undefined}
+                    >
+                      {coluna.header}
+                      <span className={estilos['seta']} aria-hidden="true">
+                        {ativa ? (sort.direction === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </a>
+                  ) : (
+                    coluna.header
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>

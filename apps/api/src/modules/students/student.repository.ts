@@ -576,6 +576,16 @@ export class StudentRepository {
        * quer ver os bloqueados filtra por `BLOCKED`.
        */
       status?: StudentStatus | undefined;
+      /**
+       * Coluna e direcao da ordenacao. Ausente, mantem o padrao historico
+       * (cadastro mais recente primeiro), que e o que a tela sempre mostrou.
+       *
+       * LISTA BRANCA, nao string livre: `orderBy` montado com entrada do
+       * usuario e injecao de campo -- o Prisma recusaria coluna inexistente,
+       * mas ordenar por `cpfHash` vazaria a ordem do hash.
+       */
+      ordem?: 'nome' | 'matricula' | 'nascimento' | undefined;
+      direcao?: 'asc' | 'desc' | undefined;
     },
   ): Promise<Student[]> {
     const termo = filtro.termo?.trim();
@@ -601,7 +611,7 @@ export class StudentRepository {
         ...(filtro.status ? { status: filtro.status } : {}),
         ...condicoes,
       },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      orderBy: ordenacao(filtro.ordem, filtro.direcao),
       take: filtro.limite,
       ...(filtro.cursor ? { cursor: { id: filtro.cursor }, skip: 1 } : {}),
       /**
@@ -717,5 +727,31 @@ export class StudentRepository {
 
       return tx.student.findFirstOrThrow({ where: { id, tenantId: contexto.tenantId } });
     });
+  }
+}
+
+/**
+ * Traduz a ordem pedida para o `orderBy` do Prisma.
+ *
+ * O `id` entra SEMPRE como ultimo criterio: sem desempate estavel, duas linhas
+ * com o mesmo nome trocam de lugar entre paginas, e a paginacao por cursor
+ * repete ou pula registro. E o bug classico de lista ordenada por campo
+ * repetido.
+ */
+function ordenacao(
+  ordem: 'nome' | 'matricula' | 'nascimento' | undefined,
+  direcao: 'asc' | 'desc' | undefined,
+): Prisma.StudentOrderByWithRelationInput[] {
+  const dir = direcao ?? 'asc';
+
+  switch (ordem) {
+    case 'nome':
+      return [{ fullName: dir }, { id: 'desc' }];
+    case 'matricula':
+      return [{ membershipNumber: dir }, { id: 'desc' }];
+    case 'nascimento':
+      return [{ birthDate: dir }, { id: 'desc' }];
+    default:
+      return [{ createdAt: 'desc' }, { id: 'desc' }];
   }
 }

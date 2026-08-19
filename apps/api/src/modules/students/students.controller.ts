@@ -176,6 +176,9 @@ const esquemaDeStatus = z
   })
   .strict();
 
+/** Colunas por onde a listagem aceita ordenar. Lista branca. */
+const ordemDeListagem = z.enum(['nome', 'matricula', 'nascimento']);
+
 /** DTO de saida. Nunca a entidade -- e nunca o CPF completo. */
 interface AlunoDto {
   id: string;
@@ -252,6 +255,8 @@ export class StudentsController {
     @Query('cursor') cursor?: string,
     @Query('gymUnitId') gymUnitId?: string,
     @Query('status') status?: string,
+    @Query('ordem') ordem?: string,
+    @Query('direcao') direcao?: string,
   ): Promise<AlunoDto[]> {
     // Teto de 100: sem ele, `?limit=1000000` vira exportacao da base inteira
     // numa requisicao.
@@ -278,6 +283,15 @@ export class StudentsController {
       // Ausente, a listagem segue como antes desta fatia.
       gymUnitId,
       ...(situacao.success ? { status: situacao.data } : {}),
+      /*
+       * Ordem invalida vira "sem ordem", nao 400 -- mesmo criterio do filtro
+       * de situacao logo acima: o parametro chega da URL, que a recepcao
+       * edita e o navegador restaura de sessao antiga.
+       */
+      ...(ordemDeListagem.safeParse(ordem).success
+        ? { ordem: ordem as 'nome' | 'matricula' | 'nascimento' }
+        : {}),
+      ...(direcao === 'asc' || direcao === 'desc' ? { direcao } : {}),
     });
 
     return encontrados.map((a) => this.paraDtoDaLista(a));
