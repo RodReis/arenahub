@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-08-18
+updated: 2026-08-19
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,7 +9,8 @@ updated: 2026-08-18
 
 ### Sem épico
 
-- [MVP1][F45] Cadastro completo de aluno (retrabalho da Slice 1.2) (#100)
+- [INFRA] ESLint nao carrega react-hooks nem jsx-a11y no admin-web (#112)
+- [INFRA][FIX] O relatorio de evidencia nao conta os 17 arquivos .spec.tsx (#111)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
@@ -60,6 +61,9 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP1][SPEC-008][FIX] Hierarquia achatada na lista e trilha do wizard que marca posicao em vez de preenchimento (#114, finalizado em: 2026-08-19)
+- [MVP1][SPEC-008][FIX] Combos mostram valor cru, erro nao vira Toast e a lista nao tem filtro (#110, finalizado em: 2026-08-19)
+- [MVP1][F45] Cadastro completo de aluno (retrabalho da Slice 1.2) (#100, finalizado em: 2026-08-19)
 - [MVP2.5][F46] Design system aplicado ao `admin-web` (#99, finalizado em: 2026-08-18)
 - [INFRA][FIX] CI: rodar o job de E2E no container do Playwright, tirando o apt-get do caminho (#105, finalizado em: 2026-08-18)
 - [INFRA] Banco de teste separado do de dev, seed de demonstração e line ending (#101, finalizado em: 2026-08-18)
