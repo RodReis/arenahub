@@ -9,8 +9,7 @@ updated: 2026-08-19
 
 ### Sem épico
 
-- [INFRA] ESLint nao carrega react-hooks nem jsx-a11y no admin-web (#112)
-- [INFRA][FIX] O relatorio de evidencia nao conta os 17 arquivos .spec.tsx (#111)
+- [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
@@ -39,8 +38,6 @@ updated: 2026-08-19
 - [MVP3][SPEC-018][F18] Histórico e comparativos (#18)
 - [MVP3][SPEC-017][F17] Consentimento e avaliação manual (#17)
 - [MVP2][SPEC-016][F16] Estorno, conciliação e operação (#16)
-- [MVP2][SPEC-015][F15] Inadimplência e acesso (#15)
-- [MVP2][SPEC-014][F14] Cartão e recorrência (#14)
 
 ## A Fazer
 
@@ -50,6 +47,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP2][SPEC-015][F15] Inadimplência e acesso (#15)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 
@@ -61,6 +59,9 @@ _(vazio)_
 
 ### Sem épico
 
+- [INFRA][FIX] O relatorio de evidencia nao conta os 17 arquivos .spec.tsx (#111, finalizado em: 2026-08-19)
+- [INFRA] ESLint nao carrega react-hooks nem jsx-a11y no admin-web (#112, finalizado em: 2026-08-19)
+- [MVP2][SPEC-014][F14] Cartão e recorrência (#14, finalizado em: 2026-08-19)
 - [MVP1][SPEC-008][FIX] Hierarquia achatada na lista e trilha do wizard que marca posicao em vez de preenchimento (#114, finalizado em: 2026-08-19)
 - [MVP1][SPEC-008][FIX] Combos mostram valor cru, erro nao vira Toast e a lista nao tem filtro (#110, finalizado em: 2026-08-19)
 - [MVP1][F45] Cadastro completo de aluno (retrabalho da Slice 1.2) (#100, finalizado em: 2026-08-19)
