@@ -18,7 +18,7 @@ import { TenantContextService } from '../../common/tenant/tenant-context.service
 import { MembershipRepository } from '../iam/membership.repository.js';
 import { GymUnitRepository } from '../tenancy/gym-unit.repository.js';
 import { normalizarCep, ufEhValida } from './domain/endereco.js';
-import { cpfEhValido, mascararCpf } from './domain/identificacao.js';
+import { cpfEhValido, formatarCpf } from './domain/identificacao.js';
 import { transicionarAluno } from './domain/student.js';
 import {
   StudentRepository,
@@ -179,13 +179,14 @@ const esquemaDeStatus = z
 /** Colunas por onde a listagem aceita ordenar. Lista branca. */
 const ordemDeListagem = z.enum(['nome', 'matricula', 'nascimento']);
 
-/** DTO de saida. Nunca a entidade -- e nunca o CPF completo. */
+/** DTO de saida. Nunca a entidade. */
 interface AlunoDto {
   id: string;
   membershipNumber: string;
   fullName: string;
   birthDate: string;
-  cpfMasked: string | null;
+  /** CPF completo, formatado (ADR-034). */
+  cpf: string | null;
   /** RG vai INTEIRO: nao e chave de nada e a recepcao precisa conferir. */
   rg: string | null;
   registeredSex: string | null;
@@ -484,7 +485,7 @@ export class StudentsController {
       // `@db.Date` volta como Date a meia-noite UTC; `toISOString` mantem o
       // dia correto porque a gravacao tambem foi em UTC.
       birthDate: aluno.birthDate.toISOString().slice(0, 10),
-      cpfMasked: mascararCpf(aluno.cpfLast3),
+      cpf: formatarCpf(aluno.cpf),
       rg: aluno.rg,
       registeredSex: aluno.registeredSex,
       leadSource: aluno.leadSource,

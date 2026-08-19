@@ -7,8 +7,8 @@ import {
   Field,
   Ausente,
   Consequencia,
+  Cpf,
   Identidade,
-  MaskedCPF,
   Telefone,
   PageHeader,
   ProblemDetail,
@@ -35,7 +35,7 @@ interface Aluno {
   membershipNumber: string;
   fullName: string;
   birthDate: string;
-  cpfMasked: string | null;
+  cpf: string | null;
   planName: string | null;
   subscriptionStatus: string | null;
   phone: string | null;
@@ -312,8 +312,8 @@ export default async function PaginaDeAlunos({
              * olho atravessa a linha inteira entre uma metade e outra da
              * resposta.
              *
-             * `MaskedCPF` recebe a mascara que a API ja devolve -- o painel
-             * nunca ve o documento inteiro.
+             * `Cpf` recebe o documento completo, formatado pela API
+             * (ADR-034).
              *
              * SEM CPF, A LINHA NAO GANHA UM `—`. Cadastrar sem documento e o
              * caminho normal (INV-009/011), e nesta base 13 de 16 alunos nao
@@ -343,8 +343,7 @@ export default async function PaginaDeAlunos({
               buracos irregulares sob os nomes. Em coluna, a ausencia e uma
               celula vazia como qualquer outra.
             */
-            render: (aluno) =>
-              aluno.cpfMasked === null ? <Ausente /> : <MaskedCPF masked={aluno.cpfMasked} />,
+            render: (aluno) => (aluno.cpf === null ? <Ausente /> : <Cpf value={aluno.cpf} />),
           },
           {
             key: 'plano',

@@ -22,7 +22,7 @@ Todos são **Server Components por padrão**. Só `Toast`, `SensitiveAction` e
 | `Button` | quatro variantes, com a exceção nomeada de contraste no *Disabled* |
 | `TenantDateTime` | data e hora no fuso da **unidade**, nunca no do navegador |
 | `Money` | centavos inteiros — aritmética em `number` fora dele é erro de lint |
-| `MaskedCPF` | recusa CPF que não chegou mascarado da API |
+| `Cpf` | exibe o CPF completo formatado pela API (ADR-034) |
 | `Toast` | info / warn / error, fechando a dívida do `CLAUDE.md` |
 | `SensitiveAction` | motivo obrigatório + verbo real, nunca "OK" |
 | `ConsentCard` | versão, data, IP e dispositivo do consentimento |

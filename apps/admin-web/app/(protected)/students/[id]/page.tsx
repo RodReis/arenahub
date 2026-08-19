@@ -3,9 +3,9 @@ import type { Metadata } from 'next';
 import {
   Ausente,
   Consequencia,
+  Cpf,
   DataTable,
   EmptyState,
-  MaskedCPF,
   PageHeader,
   ProblemDetail,
   StateBadge,
@@ -38,7 +38,7 @@ interface Aluno {
   membershipNumber: string;
   fullName: string;
   birthDate: string;
-  cpfMasked: string | null;
+  cpf: string | null;
   status: string;
   archivedAt: string | null;
   version: number;
@@ -193,7 +193,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
           o travessao do `Ausente`. Trocar mudaria texto de tela numa fatia que
           muda aparencia.
         */}
-        <dd>{aluno.cpfMasked ? <MaskedCPF masked={aluno.cpfMasked} /> : 'não informado'}</dd>
+        <dd>{aluno.cpf ? <Cpf value={aluno.cpf} /> : 'não informado'}</dd>
 
         <dt>Situação</dt>
         {/*

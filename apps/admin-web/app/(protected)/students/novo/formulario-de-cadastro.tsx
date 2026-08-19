@@ -521,7 +521,7 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
               id="cpf"
               rotulo="CPF"
               marca="opcional"
-              dica="A matrícula não depende do CPF: quem chega sem documento é cadastrado normalmente. Quando informado, fica guardado cifrado e nunca aparece por inteiro nas telas."
+              dica="A matrícula não depende do CPF: quem chega sem documento é cadastrado normalmente."
             >
               {entrada('cpf', {
                 mascara: mascararCpf,

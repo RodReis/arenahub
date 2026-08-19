@@ -16,7 +16,6 @@ import {
   formatarMatricula,
   normalizarEmail,
   normalizarTelefone,
-  ultimosTresDigitosDoCpf,
 } from './domain/identificacao.js';
 import { alunoRecebeAcessoNormal } from './domain/student.js';
 
@@ -298,10 +297,10 @@ export class StudentRepository {
           membershipNumber,
           fullName: dados.fullName,
           birthDate: dados.birthDate,
-          // O CPF completo nao e persistido: so o hash (para comparar) e os
-          // tres ultimos digitos (para a recepcao conferir).
+          // CPF em claro (ADR-034) + hash, que continua sendo o indice de
+          // busca por duplicata (evita varredura de tabela em texto claro).
+          cpf: dados.cpf ?? null,
           cpfHash: dados.cpf ? calcularHashDeCpf(contexto.tenantId, dados.cpf) : null,
-          cpfLast3: dados.cpf ? ultimosTresDigitosDoCpf(dados.cpf) : null,
           // Unidade de ORIGEM (F45). Obrigatoria no modelo; quem valida que
           // ela pertence a este tenant e o controller, antes de chegar aqui.
           gymUnitId: dados.gymUnitId,
@@ -436,15 +435,15 @@ export class StudentRepository {
           ...(dados.registeredSex !== undefined ? { registeredSex: dados.registeredSex } : {}),
           ...(dados.leadSource !== undefined ? { leadSource: dados.leadSource } : {}),
           ...(dados.advisorUserId !== undefined ? { advisorUserId: dados.advisorUserId } : {}),
-          // Os dois campos de CPF andam JUNTOS: hash sem os ultimos digitos
-          // esconde o aluno da recepcao, e ultimos digitos sem hash o
-          // esconde da deteccao de duplicata.
+          // `cpf` e `cpfHash` andam JUNTOS: hash sem o campo em claro esconde
+          // o aluno da recepcao, e o campo em claro sem hash o esconde da
+          // deteccao de duplicata.
           ...(dados.cpf !== undefined
             ? dados.cpf === null
-              ? { cpfHash: null, cpfLast3: null }
+              ? { cpf: null, cpfHash: null }
               : {
+                  cpf: dados.cpf,
                   cpfHash: calcularHashDeCpf(contexto.tenantId, dados.cpf),
-                  cpfLast3: ultimosTresDigitosDoCpf(dados.cpf),
                 }
             : {}),
         },

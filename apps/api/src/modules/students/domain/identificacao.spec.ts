@@ -3,12 +3,11 @@ import { describe, expect, it } from '@jest/globals';
 import {
   calcularHashDeCpf,
   cpfEhValido,
+  formatarCpf,
   formatarMatricula,
-  mascararCpf,
   normalizarCpf,
   normalizarEmail,
   normalizarTelefone,
-  ultimosTresDigitosDoCpf,
 } from './identificacao.js';
 
 /**
@@ -93,27 +92,16 @@ describe('calcularHashDeCpf', () => {
 });
 
 describe('exibicao do CPF', () => {
-  it('extrai os tres ultimos digitos', () => {
-    expect(ultimosTresDigitosDoCpf('529.982.247-25')).toBe('725');
+  it('formata o CPF completo com pontuacao (ADR-034)', () => {
+    expect(formatarCpf(CPF_VALIDO)).toBe('529.982.247-25');
   });
 
-  it('mascara mostrando so os tres ultimos, na FORMA de um CPF', () => {
-    // `•` em toda posicao oculta, nunca `*` misturado com `•`: a recepcao usa
-    // isto para conferir o documento na mao, e um formato que nao parece um
-    // CPF a obriga a decifrar antes de comparar. O teste anterior afirmava
-    // `**7-25`, que era o bug -- e o comentario da propria funcao ja descrevia
-    // a forma certa.
-    expect(mascararCpf('725')).toBe('•••.•••.••7-25');
-  });
-
-  it('tem o mesmo comprimento de um CPF formatado', () => {
-    // 14 caracteres: `XXX.XXX.XXX-XX`. Se a mascara encolher ou crescer, ela
-    // deixa de alinhar com o documento que esta sendo conferido ao lado.
-    expect(mascararCpf('725')).toHaveLength('529.982.247-25'.length);
+  it('normaliza antes de formatar, entao aceita entrada ja pontuada', () => {
+    expect(formatarCpf('529.982.247-25')).toBe('529.982.247-25');
   });
 
   it('devolve null quando nao ha CPF', () => {
-    expect(mascararCpf(null)).toBeNull();
+    expect(formatarCpf(null)).toBeNull();
   });
 });
 

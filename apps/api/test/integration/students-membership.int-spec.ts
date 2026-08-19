@@ -267,27 +267,23 @@ describe('F7 -- aluno, plano e entitlement', () => {
     });
 
     /**
-     * O CPF completo nao volta na resposta nem fica no banco -- so o hash e
-     * os tres ultimos digitos.
+     * ADR-034: o CPF completo volta na resposta e fica no banco em claro.
+     * `cpfHash` continua gravado -- e o indice que a deteccao de duplicata
+     * usa, sem precisar varrer a tabela em texto claro.
      */
-    it('nunca devolve nem persiste o CPF completo', async () => {
+    it('devolve e persiste o CPF completo (ADR-034)', async () => {
       const resposta = await criarAluno(contas.a, {
         fullName: 'Com Documento',
         cpf: '529.982.247-25',
       });
 
-      expect(JSON.stringify(resposta.body)).not.toContain('52998224725');
-      // `•` em toda posicao oculta, nunca `*` misturado com `•`: a mascara
-      // preserva a FORMA de um CPF para a recepcao conferir o documento na
-      // mao. O formato anterior (`**7-25`) misturava dois caracteres e nao
-      // parecia um CPF -- corrigido junto do padrao de tabela.
-      expect((resposta.body as { cpfMasked: string }).cpfMasked).toBe('•••.•••.••7-25');
+      expect((resposta.body as { cpf: string }).cpf).toBe('529.982.247-25');
 
       const gravado = await db.student.findUniqueOrThrow({
         where: { id: (resposta.body as { id: string }).id },
       });
 
-      expect(gravado.cpfLast3).toBe('725');
+      expect(gravado.cpf).toBe('529.982.247-25');
       expect(gravado.cpfHash).not.toContain('52998224725');
     });
 
