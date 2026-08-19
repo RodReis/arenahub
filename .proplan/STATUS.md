@@ -10,6 +10,7 @@ updated: 2026-08-19
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa)
+- [INFRA] CPF em claro: gravar completo e exibir sem mascara (#122)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
@@ -37,7 +38,6 @@ updated: 2026-08-19
 - [MVP3][SPEC-019][F19] Upload e revisão (#19)
 - [MVP3][SPEC-018][F18] Histórico e comparativos (#18)
 - [MVP3][SPEC-017][F17] Consentimento e avaliação manual (#17)
-- [MVP2][SPEC-016][F16] Estorno, conciliação e operação (#16)
 
 ## A Fazer
 
@@ -58,6 +58,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP2][SPEC-016][F16] Estorno, conciliação e operação (#16, finalizado em: 2026-08-19)
 - [MVP2][SPEC-015][F15] Inadimplência e acesso (#15, finalizado em: 2026-08-19)
 - [INFRA][FIX] O relatorio de evidencia nao conta os 17 arquivos .spec.tsx (#111, finalizado em: 2026-08-19)
 - [INFRA] ESLint nao carrega react-hooks nem jsx-a11y no admin-web (#112, finalizado em: 2026-08-19)
