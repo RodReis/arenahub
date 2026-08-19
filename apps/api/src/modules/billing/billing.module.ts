@@ -4,6 +4,7 @@ import { TenantContextService } from '../../common/tenant/tenant-context.service
 import { BillingController } from './billing.controller.js';
 import { BillingRepository } from './billing.repository.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
+import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
 import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
@@ -54,6 +55,7 @@ import { WebhookController } from './webhook.controller.js';
     CobrarAssinaturaNoCartaoUseCase,
     CancelarRecorrenciaUseCase,
     AplicarInadimplenciaUseCase,
+    ConsultarInadimplenciaUseCase,
     LiberacaoFinanceiraUseCase,
     { provide: PAYMENT_PROVIDER, useClass: FakePaymentProvider },
   ],

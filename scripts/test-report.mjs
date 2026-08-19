@@ -39,6 +39,11 @@ const DESTINO = join(RAIZ, 'reports', 'TESTS.md');
  * antes de `spec` e `-`. Afrouxar para `-spec.ts` faria integracao vazar para
  * unitario -- o self-check cobre exatamente esse caso.
  *
+ * `.test.ts` ENTROU NA F15, pelo mesmo motivo do `.tsx`: o `admin-web` usa
+ * esse sufixo (o `vitest.config` dele so casa `*.test.ts`), e os 6 arquivos
+ * de la nao entravam em nivel nenhum. A issue #111 consertou o `.tsx` e
+ * passou por cima deste -- guarda conserta o que alguem lembrou de olhar.
+ *
  * O nivel `seguranca` estava no TESTING.md §2 e NAO estava aqui, desde o
  * bootstrap. Nenhum `.sec-spec.ts` existe hoje, entao a linha sai zerada --
  * mas no dia em que o primeiro for escrito (isolamento de tenant, autorizacao,
@@ -46,7 +51,7 @@ const DESTINO = join(RAIZ, 'reports', 'TESTS.md');
  * um paragrafo acima. Achado na revisao desta issue.
  */
 const NIVEIS = [
-  { nome: 'unitário', sufixos: ['.spec.ts', '.spec.tsx'] },
+  { nome: 'unitário', sufixos: ['.spec.ts', '.spec.tsx', '.test.ts', '.test.tsx'] },
   { nome: 'contrato', sufixos: ['.contract-spec.ts', '.contract-spec.tsx'] },
   { nome: 'integração', sufixos: ['.int-spec.ts', '.int-spec.tsx'] },
   { nome: 'e2e', sufixos: ['.e2e-spec.ts', '.e2e-spec.tsx'] },

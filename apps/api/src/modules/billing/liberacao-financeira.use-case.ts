@@ -85,7 +85,7 @@ export class LiberacaoFinanceiraUseCase {
    */
   async conceder(
     contexto: TenantContext,
-    entrada: { studentId: string; reason: string; dias?: number; agora: Date },
+    entrada: { studentId: string; reason: string; dias?: number | undefined; agora: Date },
   ): Promise<LiberacaoConcedida> {
     const dias = entrada.dias ?? DIAS_PADRAO_DE_LIBERACAO;
 

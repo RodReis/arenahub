@@ -1,0 +1,96 @@
+/**
+ * Inadimplência e cobrança -- F15, Slice 2.4.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`,
+ * `--ah-border-*` e `--ah-state-*`, nunca `--ah-carbon-*` cru.
+ */
+
+/**
+ * Cartoes de resumo em linha que quebra sozinha.
+ *
+ * `auto-fit` com `minmax` e nao numero fixo de colunas: sao tres cartoes hoje,
+ * e um quarto ("recuperado no mes") ja esta previsto. Fixar `repeat(3, 1fr)`
+ * exigiria editar o CSS junto -- e foi assim que a grade do wizard virou
+ * quatro colunas sem ninguem pedir (defeito da F45).
+ *
+ * `260px` de minimo porque o cartao de dinheiro precisa caber "R$ 3.487,60"
+ * mais o rotulo sem quebrar no meio do valor.
+ */
+.resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin: 0 0 24px;
+}
+
+.cartao {
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-md);
+  background: var(--ah-surface-raised);
+}
+
+.cartao dt {
+  margin: 0 0 8px;
+  font-size: var(--ah-text-xs);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ah-text-muted);
+}
+
+/*
+ * O numero e o conteudo do cartao -- 28px contra os 12px do rotulo. Contraste
+ * de ESCALA e o que faz a pessoa achar a resposta sem ler; sem ele, rotulo e
+ * valor competem e a tela vira uma parede uniforme (a licao da F45).
+ */
+.destaque {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 600;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.apoio {
+  margin: 8px 0 0;
+  font-size: var(--ah-text-xs);
+  color: var(--ah-text-muted);
+}
+
+/*
+ * Numero da fatura em mono com `tabular-nums`: e um identificador que a
+ * recepcao compara com o extrato, e digito que dança de largura entre linhas
+ * torna a conferencia visual mais lenta.
+ */
+.numero {
+  font-family: var(--ah-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-muted);
+}
+
+/*
+ * O atraso carrega `--ah-state-danger` e peso 500 porque e ESTADO, nao dado
+ * neutro: e a coluna que ordena a urgencia da fila de cobranca. Mesma correcao
+ * de hierarquia feita na lista de alunos (F45, PR #115).
+ */
+.atraso {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--ah-state-danger);
+}
+
+/*
+ * As duas acoes lado a lado, sem esticar: botao que ocupa a celula inteira
+ * pareceria a acao principal da tela, que e ler a tabela.
+ *
+ * `flex-wrap` porque a 1024px a coluna encolhe e os dois botoes nao cabem em
+ * linha -- empilhar e melhor que cortar o rotulo.
+ */
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}

@@ -31,6 +31,8 @@ export type StateMachine =
   | 'accessReason'
   | 'passage'
   | 'invoice'
+  /** F15 -- situacao de ACESSO de quem esta devendo. Nao e o estado da invoice. */
+  | 'delinquencyAccess'
   | 'payment'
   | 'reconciliation'
   | 'riskBand';
@@ -232,6 +234,23 @@ export const STATE_LABELS: Dictionary = {
     OVERDUE: { label: 'Vencida', tone: 'warning', icon: 'alert-circle' },
     CANCELLED: { label: 'Cancelada', tone: 'neutral', icon: 'x-circle' },
     REFUNDED: { label: 'Estornada', tone: 'neutral', icon: 'refresh-cw' },
+  },
+
+  /**
+   * Situacao de ACESSO de quem esta devendo -- F15, Slice 2.4.
+   *
+   * NAO E O ESTADO DA INVOICE. A mesma invoice `OVERDUE` aparece aqui como
+   * `EM_CARENCIA` ou `BLOQUEADO`, conforme o instante de bloqueio ja tenha
+   * passado -- e e essa a pergunta que a recepcao faz olhando a tela: "este
+   * aluno entra agora?". Reusar a maquina `invoice` responderia outra coisa.
+   *
+   * `EM_CARENCIA` e `warning` e nao `danger`: o aluno ENTRA. Pintar de
+   * vermelho quem ainda tem acesso faria a recepcao barrar por engano.
+   */
+  delinquencyAccess: {
+    EM_CARENCIA: { label: 'Em carência', tone: 'warning', icon: 'clock' },
+    BLOQUEADO: { label: 'Bloqueado', tone: 'danger', icon: 'x-circle' },
+    LIBERADO: { label: 'Liberado com pendência', tone: 'info', icon: 'user-check' },
   },
 
   payment: {

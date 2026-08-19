@@ -1,4 +1,13 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
+  Req,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -11,7 +20,10 @@ import {
 } from './billing.repository.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
+import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
+import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
+import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
 import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
 
@@ -49,6 +61,21 @@ const esquemaDeMetodoTokenizado = z
     expMonth: z.number().int().min(1).max(12).optional(),
     expYear: z.number().int().min(2020).max(2100).optional(),
     tornarPadrao: z.boolean().optional(),
+  })
+  .strict();
+
+/**
+ * Liberacao financeira excepcional. Slice 2.4.
+ *
+ * `reason` obrigatoria e com tamanho minimo: liberar acesso de quem deve e ato
+ * excepcional, e sem motivo a auditoria nao explica nada depois -- mesmo
+ * criterio do pagamento manual (ADR-027).
+ */
+const esquemaDeLiberacao = z
+  .object({
+    studentId: z.uuid(),
+    reason: z.string().min(3).max(300),
+    dias: z.number().int().min(1).max(30).optional(),
   })
   .strict();
 
@@ -144,6 +171,40 @@ interface RecorrenciaCanceladaDto {
   canceladasNoProvedor: number;
 }
 
+interface PainelDeInadimplenciaDto {
+  resumo: {
+    emAtrasoMinor: number;
+    faturasVencidas: number;
+    bloqueados: number;
+    taxaDeInadimplencia: number | null;
+  };
+  linhas: {
+    invoiceId: string;
+    invoiceNumber: number;
+    studentId: string;
+    studentName: string;
+    amountMinor: number;
+    currency: string;
+    dueAt: string;
+    diasEmAtraso: number;
+    situacao: string;
+    telefone: string | null;
+    liberadoAte: string | null;
+  }[];
+}
+
+interface ResultadoDaInadimplenciaDto {
+  invoicesVencidas: number;
+  assinaturasEmAtraso: number;
+  direitosSuspensos: number;
+}
+
+interface LiberacaoDto {
+  id: string;
+  studentId: string;
+  expiresAt: string;
+}
+
 @Controller('api/v1')
 export class BillingController {
   constructor(
@@ -153,6 +214,9 @@ export class BillingController {
     private readonly metodoDePagamento: RegistrarMetodoDePagamentoUseCase,
     private readonly cobrancaNoCartao: CobrarAssinaturaNoCartaoUseCase,
     private readonly cancelamentoDeRecorrencia: CancelarRecorrenciaUseCase,
+    private readonly inadimplencia: ConsultarInadimplenciaUseCase,
+    private readonly aplicarInadimplencia: AplicarInadimplenciaUseCase,
+    private readonly liberacao: LiberacaoFinanceiraUseCase,
     private readonly contexto: TenantContextService,
   ) {}
 
@@ -309,6 +373,77 @@ export class BillingController {
       subscriptionId: resultado.subscriptionId,
       canceladasNoProvedor: resultado.canceladasNoProvedor,
     };
+  }
+
+  /**
+   * O painel de inadimplencia e cobranca. Slice 2.4.
+   *
+   * SO LE: quem bloqueia e o job, quem desbloqueia e o webhook. Uma tela que
+   * corrigisse estado faria a situacao do aluno depender de alguem te-la
+   * aberto.
+   */
+  @Get('billing/delinquency')
+  @RequirePermissions('billing.read')
+  async consultarInadimplencia(): Promise<PainelDeInadimplenciaDto> {
+    const painel = await this.inadimplencia.executar(this.contexto.require(), new Date());
+
+    return {
+      resumo: painel.resumo,
+      linhas: painel.linhas.map((linha) => ({
+        ...linha,
+        dueAt: linha.dueAt.toISOString(),
+        liberadoAte: linha.liberadoAte?.toISOString() ?? null,
+      })),
+    };
+  }
+
+  /**
+   * Roda o job de vencimento sob demanda. `M2-FR-013`: reexecutavel.
+   *
+   * EXISTE COMO ROTA porque nao ha agendador no MVP 2 -- fila entra "so
+   * quando comprovadamente necessario" (`CLAUDE.md`). Chamar duas vezes tem o
+   * mesmo efeito de chamar uma, entao um agendador externo (cron do sistema)
+   * resolve sem risco.
+   */
+  @Post('billing/delinquency/apply')
+  @RequirePermissions('billing.manage')
+  async aplicarInadimplenciaAgora(): Promise<ResultadoDaInadimplenciaDto> {
+    return this.aplicarInadimplencia.executar(this.contexto.require().tenantId, new Date());
+  }
+
+  /**
+   * Libera o acesso de quem esta devendo, por prazo. Slice 2.4.
+   *
+   * PERMISSAO PROPRIA, separada de `billing.manage`: liberar quem deve e ato
+   * excepcional, e nem todo perfil do financeiro precisa dele. Mesmo criterio
+   * de `billing.payment.manual` (F12) e `access.override` (F9).
+   */
+  @Post('billing/financial-overrides')
+  @RequirePermissions('billing.override.financial')
+  async liberarFinanceiramente(@Body() corpo: unknown): Promise<LiberacaoDto> {
+    const dados = esquemaDeLiberacao.parse(corpo);
+
+    const liberacao = await this.liberacao.conceder(this.contexto.require(), {
+      ...dados,
+      agora: new Date(),
+    });
+
+    return {
+      id: liberacao.id,
+      studentId: liberacao.studentId,
+      expiresAt: liberacao.expiresAt.toISOString(),
+    };
+  }
+
+  /** Encerra a liberacao antes do prazo, quando a recepcao percebe o engano. */
+  @Post('billing/financial-overrides/:id/revoke')
+  @RequirePermissions('billing.override.financial')
+  @HttpCode(204)
+  async revogarLiberacao(@Param('id') id: string): Promise<void> {
+    await this.liberacao.revogar(this.contexto.require(), {
+      overrideId: id,
+      agora: new Date(),
+    });
   }
 
   /**
