@@ -316,7 +316,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **29** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
-| Feito | `proplan:done` | PR mergeado com CI verde | **3** — [F14](https://github.com/RodReis/arenahub/issues/14), [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
+| Feito | `proplan:done` | PR mergeado com CI verde | **4** — [F14](https://github.com/RodReis/arenahub/issues/14), [F15](https://github.com/RodReis/arenahub/issues/15), [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **31** |
 
 > 💳 **19/08/2026 — F14 entregue, e o MVP 2 voltou a andar.** Cartão tokenizado, recorrência,
@@ -333,6 +333,14 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 > aceitou F45, F46 e mais duas), e *Feito* voltou a se formar com [#111](https://github.com/RodReis/arenahub/issues/111)
 > e [#112](https://github.com/RodReis/arenahub/issues/112). Detalhe da entrega no
 > [`STATUS-ARQUIVO.md`](STATUS-ARQUIVO.md).
+
+> 🔒 **19/08/2026 — F15 entregue: a regra nº 1 fechou o circuito.** A cadeia
+> `Invoice vencida → Subscription PAST_DUE → Entitlement SUSPENDED → DENY` existe, e a catraca
+> continua sem saber o que é uma invoice. Razão de negativa nova (`PAYMENT_OVERDUE`), liberação
+> financeira com prazo, e a tela do gestor com gráfico de composição da dívida.
+> ⚠️ **O `POLICY_VERSION` subiu para 1.1.0** — o desfecho não mudou, mas o `reason` gravado sim.
+> **Não há evolução mensal no gráfico:** o sistema tem um mês de dado, e uma linha com um ponto
+> mentiria. **F16 é a última do MVP 2** e ainda espera as duas políticas do `M2-COMPLIANCE-01`.
 
 > 💳 **19/08/2026 — o provedor de pagamento foi decidido, e são dois (ADR-032).** **Sicoob para
 > PIX** (a academia já recebe por lá) e **Getnet/Santander para cartão tokenizado e recorrência**
@@ -549,7 +557,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F12 | SPEC-012 | 2 | 2.1 | Ledger operacional e invoice | [`SPEC-012-ledger-operacional-e-invoice.md`](specs/SPEC-012-ledger-operacional-e-invoice.md) | [#12](https://github.com/RodReis/arenahub/issues/12) | `aprovada-pi` |
 | F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | [`SPEC-013-pix-e-webhook-idempotente.md`](specs/SPEC-013-pix-e-webhook-idempotente.md) | [#13](https://github.com/RodReis/arenahub/issues/13) | ✅ **entregue** em 18/08/2026 ([#102](https://github.com/RodReis/arenahub/pull/102)) |
 | F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | [`SPEC-014-cartao-e-recorrencia.md`](specs/SPEC-014-cartao-e-recorrencia.md) | [#14](https://github.com/RodReis/arenahub/issues/14) | ✅ **entregue** em 19/08/2026 ([#117](https://github.com/RodReis/arenahub/pull/117)) |
-| F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | [`SPEC-015-inadimplencia-e-acesso.md`](specs/SPEC-015-inadimplencia-e-acesso.md) | [#15](https://github.com/RodReis/arenahub/issues/15) | `aprovada-pi` |
+| F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | [`SPEC-015-inadimplencia-e-acesso.md`](specs/SPEC-015-inadimplencia-e-acesso.md) | [#15](https://github.com/RodReis/arenahub/issues/15) | ✅ **entregue** em 19/08/2026 |
 | F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | [`SPEC-016-estorno-conciliacao-e-operacao.md`](specs/SPEC-016-estorno-conciliacao-e-operacao.md) | [#16](https://github.com/RodReis/arenahub/issues/16) | `aprovada-pi` |
 | F17 | SPEC-017 | 3 | 3.1 | Consentimento e avaliação manual | [`SPEC-017-consentimento-e-avaliacao-manual.md`](specs/SPEC-017-consentimento-e-avaliacao-manual.md) | [#17](https://github.com/RodReis/arenahub/issues/17) | planejada |
 | F18 | SPEC-018 | 3 | 3.2 | Histórico e comparativos | [`SPEC-018-historico-e-comparativos.md`](specs/SPEC-018-historico-e-comparativos.md) | [#18](https://github.com/RodReis/arenahub/issues/18) | planejada |
