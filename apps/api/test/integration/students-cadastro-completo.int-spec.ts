@@ -19,7 +19,7 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
  *   - edicao respeita `version` (trava otimista);
  *   - unidade de outro tenant e recusada -- aluno nao muda de academia;
  *   - duplicata continua AVISANDO, nao bloqueando (INV-014);
- *   - CPF nunca aparece por inteiro (INV-012).
+ *   - CPF completo persiste e volta na resposta (ADR-034).
  *
  * A prova de que `gym_unit_id` NAO entra na decisao de acesso e estrutural e
  * mora em `src/modules/access/gym-unit-nao-decide-acesso.spec.ts`: teste de
@@ -38,7 +38,7 @@ interface CorpoDeAluno {
   id: string;
   membershipNumber: string;
   fullName: string;
-  cpfMasked: string | null;
+  cpf: string | null;
   rg: string | null;
   registeredSex: string | null;
   leadSource: string | null;
@@ -215,7 +215,7 @@ describe('F45 -- cadastro completo de aluno', () => {
       expect(resposta.status).toBe(201);
       expect(corpo(resposta).membershipNumber).toMatch(/^AP-\d{4}-\d{8}$/);
       expect(corpo(resposta).gymUnitId).toBe(contas.a.unidadeId);
-      expect(corpo(resposta).cpfMasked).toBeNull();
+      expect(corpo(resposta).cpf).toBeNull();
     });
 
     it('recusa unidade de outro tenant, sem confirmar que ela existe', async () => {
@@ -505,25 +505,20 @@ describe('F45 -- cadastro completo de aluno', () => {
   });
 
   describe('CPF', () => {
-    it('continua cifrado e mascarado -- nunca por inteiro (INV-012)', async () => {
+    it('persiste e devolve o CPF completo (ADR-034)', async () => {
       const cpf = '11144477735';
 
       const criacao = await criar(contas.a, { fullName: 'Com CPF', cpf });
 
       expect(criacao.status).toBe(201);
-      expect(JSON.stringify(corpo(criacao))).not.toContain(cpf);
-      // `•` em toda posicao oculta: a mascara preserva a FORMA de um CPF
-      // (`XXX.XXX.XXX-XX`), que e o que permite conferir contra o documento na
-      // mao. O padrao anterior misturava `•` e `*` e nao parecia um CPF.
-      expect(corpo(criacao).cpfMasked).toMatch(/^•••\.•••\.••\d-\d{2}$/);
+      expect(corpo(criacao).cpf).toBe('111.444.777-35');
 
       const linha = await db.student.findFirstOrThrow({ where: { id: corpo(criacao).id } });
 
-      // No banco: hash e tres digitos. O numero em si nao existe em lugar
-      // nenhum.
+      expect(linha.cpf).toBe(cpf);
+      // `cpfHash` continua gravado: e o indice que a deteccao de duplicata
+      // usa (INV-014), sem varrer a tabela em texto claro.
       expect(linha.cpfHash).not.toBeNull();
-      expect(linha.cpfHash).not.toContain(cpf);
-      expect(linha.cpfLast3).toBe('735');
     });
 
     it('duplicata de CPF avisa, e nao bloqueia (INV-014)', async () => {

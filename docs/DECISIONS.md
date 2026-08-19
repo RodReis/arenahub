@@ -1760,3 +1760,73 @@ O acervo é **dado real de aluno** e o `CLAUDE.md` proíbe dado real no reposit�
 golden file ou log. A seed vive em `packages/database/prisma/seed.ts` (ADR-020) e **lê o JSON de
 caminho externo, fora da árvore versionada**, com o caminho no `.gitignore`. O arquivo nunca é
 commitado; a seed sem o arquivo não falha, apenas não importa nada.
+
+## ADR-034 — CPF passa a ser persistido em claro e exibido sem máscara
+
+**Data:** 19/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 19/08/2026**
+· **Reverte:** a postura hoje documentada em três lugares do `schema.prisma` (Student, comentários
+de `AuditLog`/`BiometricIdentity`) de que "o CPF completo NÃO é persistido" · **Coordena com:**
+ADR-033/F47 (#118)
+
+**Contexto.** Desde a F45, o cadastro de aluno guarda só `cpfHash` (SHA-256 com pimenta por
+tenant, para detectar duplicata) e `cpfLast3` (três últimos dígitos, para a recepção confirmar
+identidade). O comentário do `Student` no schema previa esta decisão: *"se uma fatia futura
+precisar exibir o CPF completo, isso vira decisão do PI com cifra reversível, não um `ALTER TABLE`
+silencioso."* Esta é essa fatia.
+
+**Motivação declarada pelo PI.** A importação da base legada Pacto (F47/#118) traz **1.618 CPFs
+completos e válidos** (100% com dígito verificador correto) para 1.926 alunos. Guardar só o hash
+descartaria dado que a academia já possuía no sistema anterior — e a recepção precisa do número
+completo tanto para conferência no balcão quanto para casar registro com o CSV da catraca (fatia
+de ativação, sequenciada depois da F47).
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **`cpf String?` em claro no `Student`**, com migration | É o pedido central: aluno cadastrado ou importado passa a ter o número completo gravado |
+| 2 | **`cpfHash` fica** | Continua sendo o índice de busca de duplicata (`@@index([tenantId, cpfHash])`); trocá-lo por busca em texto claro é varredura de tabela |
+| 3 | **`cpfLast3` sai** | Com o número inteiro gravado, `cpfLast3` vira dado derivado que pode divergir do `cpf` — dois campos como fonte da verdade para o mesmo dígito é o tipo de duplicação que gera bug de sincronização |
+| 4 | **API devolve `cpf` completo** no DTO da ficha e da lista (`AlunoDto`) | Troca `cpfMasked: mascararCpf(cpfLast3)` por `cpf` direto |
+| 5 | **`MaskedCPF` perde a validação que lança erro em runtime** | O componente hoje recusa qualquer valor sem `•` de propósito — vira exibição direta do campo, ou é descontinuado em favor de `<span data-numeric>{cpf}</span>` |
+| 6 | **Quem vê: `student.read`, sem permissão nova** | Mesma trilha de acesso que já existe para o resto da ficha (nome, endereço, contatos). Criar `student.cpf.read` seria granularidade não pedida — a recepção que hoje vê a ficha já lida com dado sensível equivalente (endereço, telefone) |
+| 7 | **Sem trilha de auditoria dedicada à leitura do CPF** | Mesmo tratamento do resto da ficha — não há log de acesso por campo hoje, e criar um só para CPF seria inconsistente com o resto do cadastro |
+| 8 | **CPF nunca em log — regra que já existia, reafirmada** | `CLAUDE.md` já proíbe PII em log de erro; o `logger.ts` do edge-agent já redige `cpf`/`*.cpf`. Esta decisão não relaxa isso: campo de log de requisição da API precisa redigir `cpf` explicitamente onde ainda não redige |
+| 9 | **Exportações (`/exports`) e relatórios podem conter CPF completo, sem restrição extra** | Segue a mesma regra de acesso da ficha — quem já podia exportar já tinha o dado disponível na tela |
+| 10 | **Base legal para os 1.618 CPFs importados da F47: execução de contrato / legítimo interesse** | O vínculo contratual já existia no Pacto (matrícula ativa ou inativa); o CPF migra junto com o vínculo, para a mesma finalidade (identificação do aluno), sem mudança de finalidade que exigisse novo consentimento |
+
+### Coordenação com a F47 (#118)
+
+A regra 8 do ADR-033 grava `cpfHash` via `calcularHashDeCpf` e não cita `cpfLast3` nem `cpf` em
+claro — foi escrita antes desta decisão. **Esta fatia entra primeiro**: a seed da F47 já nasce
+gravando `cpf` em claro (regra 1 acima), sem precisar de migration adicional depois.
+
+### O que muda no código
+
+- `packages/database/prisma/schema.prisma` — campo `cpf String?`, remoção de `cpfLast3`, reescrita
+  do comentário do `Student` que hoje afirma o oposto.
+- `apps/api/src/modules/students/domain/identificacao.ts` — `ultimosTresDigitosDoCpf` e
+  `mascararCpf` deixam de ser usadas no caminho de exibição; `calcularHashDeCpf` continua para
+  duplicata.
+- `apps/api/src/modules/students/student.repository.ts` — `criar`/`atualizar` gravam `cpf` além de
+  `cpfHash`; `buscarCandidatosADuplicata` mantém a busca por `cpfHash`.
+- `apps/api/src/modules/students/students.controller.ts` — `AlunoDto.cpfMasked` vira `cpf`;
+  `paraDto` devolve `aluno.cpf` em vez de `mascararCpf(aluno.cpfLast3)`.
+- `packages/ui/src/components/MaskedCPF.tsx` — remove a checagem que lança erro em valor sem `•`.
+- `apps/admin-web/app/(protected)/students/page.tsx` e `[id]/page.tsx` — trocam `cpfMasked` por
+  `cpf` na interface local.
+- `apps/admin-web/app/(protected)/students/novo/formulario-de-cadastro.tsx` — dica do campo CPF
+  deixa de afirmar "nunca aparece por inteiro nas telas".
+- Testes que hoje afirmam ausência do CPF completo (`students-membership.int-spec.ts`,
+  `students-cadastro-completo.int-spec.ts`, `identificacao.spec.ts`, `MaskedCPF.spec.tsx`)
+  **invertem** para afirmar presença — cada inversão leva comentário citando este ADR.
+- **Não muda:** `apps/edge-agent/src/domain/external-enroll-id.ts` (barreira contra CPF no
+  dispositivo biométrico) e `apps/edge-agent/src/observability/logger.ts` (redação de log) — são
+  proteções independentes de onde o CPF é persistido no banco da nuvem.
+
+### Risco aceito pelo PI
+
+A tela de listagem é usada no balcão, com o aluno do outro lado e outros na fila (`PRODUCT.md`).
+Uma lista de CPFs completos em monitor voltado para a recepção expõe dado pessoal de terceiros —
+não do aluno atendido, dos outros da fila. **O PI decidiu com o custo registrado ao lado do
+benefício; não bloqueia a fatia.**

@@ -32,7 +32,7 @@ export { EmptyState } from './components/EmptyState.js';
 export { Field } from './components/Field.js';
 export { Icon, type IconName } from './components/Icon.js';
 export { PasswordField } from './components/PasswordField.js';
-export { MaskedCPF } from './components/MaskedCPF.js';
+export { Cpf } from './components/Cpf.js';
 export { Money } from './components/Money.js';
 export { ProblemDetail, type ProblemJson } from './components/ProblemDetail.js';
 export { SelectField } from './components/SelectField.js';

@@ -798,23 +798,17 @@ model InboxReceipt {
 /// Aluno da academia.
 ///
 /// A MATRICULA NUNCA DERIVA DO CPF (INV-009, INV-011, INV-012, `M1-BR-001`).
-/// CPF ajuda a detectar duplicidade e nada mais -- nao e identificador
-/// tecnico, nao vai para dispositivo, nao entra em URL.
+/// CPF ajuda a detectar duplicidade e identifica o aluno para a recepcao --
+/// nao e identificador tecnico, nao vai para dispositivo, nao entra em URL.
 ///
-/// O CPF e guardado em DOIS campos com finalidades distintas:
+/// O CPF e guardado em DOIS campos com finalidades distintas (ADR-034):
 ///
+///   - `cpf` -- o numero completo, em claro. Decisao do PI: a importacao da
+///     base legada (F47/ADR-033) traz 1.618 CPFs completos que a recepcao
+///     precisa conferir no balcao e casar com o CSV da catraca.
 ///   - `cpfHash` -- SHA-256 do valor normalizado. E o que a busca por
-///     duplicata compara. Hash e nao cifra porque a operacao necessaria e
-///     igualdade exata, e hash nao tem chave para vazar.
-///   - `cpfLast3` -- os tres ultimos digitos, para a recepcao confirmar
-///     "e este mesmo?" sem que a resposta da API carregue o documento
-///     inteiro.
-///
-/// O CPF completo NAO e persistido. Recuperar o numero a partir do hash
-/// exigiria forca bruta sobre 11 digitos com digito verificador -- viavel
-/// para um alvo, caro para a base inteira. Se uma fatia futura precisar
-/// exibir o CPF completo, isso vira decisao do PI com cifra reversivel, nao
-/// um `ALTER TABLE` silencioso.
+///     duplicata compara; manter o indice em hash evita varredura de tabela
+///     ao comparar texto claro.
 model Student {
   id               String                @id @default(uuid()) @db.Uuid
   tenantId         String                @map("tenant_id") @db.Uuid
@@ -826,8 +820,9 @@ model Student {
   /// `@db.Date`: data de nascimento nao tem hora nem fuso. Gravar como
   /// timestamp faria 01/01 virar 31/12 na conversao de timezone.
   birthDate        DateTime              @map("birth_date") @db.Date
+  /// Numero completo, em claro (ADR-034). Nunca em log (CLAUDE.md).
+  cpf              String?
   cpfHash          String?               @map("cpf_hash")
-  cpfLast3         String?               @map("cpf_last3")
   /// Texto livre e opcional. RG nao tem formato nacional unico -- cada
   /// estado emite o seu, e validar digito verificador aqui seria inventar
   /// regra que orgao nenhum garante.
