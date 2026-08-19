@@ -44,6 +44,50 @@
   text-align: left;
 }
 
+/**
+ * RASTREAMENTO DE LINHA -- o que faltava numa tabela de 40 px e 7 colunas.
+ *
+ * A 1280 px a coluna mais a direita fica a mais de mil pixels da primeira, e
+ * o olho perde a linha no meio do caminho. Quem confere "este aluno esta
+ * bloqueado?" desliza o dedo pela tela; a marca de hover faz esse trabalho
+ * sem tirar a mao do mouse.
+ *
+ * `--ah-surface-sunken` e nao um tom de accent: hover de LEITURA nao e acao,
+ * e pintar a linha com a cor do tenant faria toda a tabela parecer
+ * selecionavel. O DS-PAINEL §6 reserva `carbon-50` ao hover de ghost pela
+ * mesma razao.
+ *
+ * `background-color` sozinho: e a unica propriedade que o compositor resolve
+ * sem recalcular layout, e a promessa de p95 < 300 ms na catraca nao
+ * sobrevive a uma tabela que reflui a cada movimento do mouse.
+ */
+.tabela tbody tr {
+  transition: background-color var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.tabela tbody tr:hover {
+  background: var(--ah-surface-sunken);
+}
+
+/*
+ * Teclado tem a MESMA marca do mouse. A linha nao e focavel por si, mas o
+ * link dentro dela e -- e sem isto quem navega por Tab perde a referencia de
+ * linha que o mouse ganha de graca.
+ */
+.tabela tbody tr:focus-within {
+  background: var(--ah-surface-sunken);
+}
+
+/**
+ * Sem transicao para quem pediu menos movimento. A marca CONTINUA -- ela e
+ * informacao, nao decoracao; o que sai e a interpolacao.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .tabela tbody tr {
+    transition: none;
+  }
+}
+
 .tabela th {
   color: var(--ah-text-label);
   font-size: var(--ah-type-caption-size);

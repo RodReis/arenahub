@@ -91,12 +91,42 @@
   cursor: default;
 }
 
-/* O passo corrente carrega peso E cor. Só cor não sobrevive a daltonismo
-   nem a monitor mal calibrado (DS-PAINEL.md §10). */
-.passoAtual {
+/**
+ * QUATRO ESTADOS, e cada um diz uma coisa diferente:
+ *
+ *   atual    -- onde a pessoa esta agora
+ *   pronto   -- os obrigatorios deste passo estao preenchidos
+ *   pendente -- falta obrigatorio, e o envio ja foi tentado
+ *   aberto   -- nem visitado, nem cobrado (o padrao)
+ *
+ * Antes eram dois, e `atual` e `concluido` pintavam IGUAL -- medido:
+ * `background: #00707B` nos dois. A trilha marcava presenca, nao progresso.
+ *
+ * Cor nunca vem sozinha: o numero vira `✓` ou `!` no markup, e o leitor de
+ * tela recebe a frase em `.apenasLeitor`. Sao os tres canais que o
+ * DS-PAINEL §10 exige.
+ */
+/*
+ * DOIS EIXOS, dois atributos: `data-atual` diz ONDE a pessoa esta,
+ * `data-estado` diz O QUE FALTA. Junta-los escondia a pendencia do proprio
+ * passo em que a pessoa estava parada -- visto na tela, com o toast pedindo
+ * a unidade e a trilha calada.
+ */
+.passo[data-atual] {
   background: var(--ah-action-subtle-bg);
   color: var(--ah-text-strong);
   font-weight: 600;
+}
+
+/*
+ * A pendencia sobrevive ao passo atual: e a unica que precisa vencer.
+ *
+ * Atributo repetido pelo mesmo motivo da regra do `.numero` abaixo -- hoje as
+ * duas nem colidem (uma pinta `background`, a outra `color`), mas ficariam
+ * ambiguas no dia em que alguem acrescentasse `background` aqui.
+ */
+.passo[data-estado='pendente'][data-estado='pendente'] {
+  color: var(--ah-state-danger);
 }
 
 .numero {
@@ -113,13 +143,83 @@
   background: var(--ah-surface-raised);
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
+  transition:
+    background-color var(--ah-motion-control) var(--ah-motion-easing),
+    border-color var(--ah-motion-control) var(--ah-motion-easing),
+    color var(--ah-motion-control) var(--ah-motion-easing);
 }
 
-.numeroAtual,
-.numeroConcluido {
+/* Onde a pessoa esta: accent solido, porque navegar E a acao desta trilha. */
+.passo[data-atual] .numero {
   background: var(--ah-action-solid);
   border-color: var(--ah-action-solid);
   color: var(--ah-action-on-solid);
+}
+
+/**
+ * Pronto e CONTORNO, nao preenchimento.
+ *
+ * Um segundo circulo solido competiria com o passo atual e a trilha voltaria
+ * a ter dois estados indistinguiveis -- o defeito que este bloco corrige. O
+ * ✓ verde sobre fundo claro diz "feito" sem gritar "estou aqui".
+ */
+.passo[data-estado='pronto']:not([data-atual]) .numero {
+  border-color: var(--ah-state-success);
+  color: var(--ah-state-success);
+  font-weight: 700;
+}
+
+/**
+ * PENDENTE VENCE ATE O PASSO ATUAL, e a vitoria e ESTRUTURAL.
+ *
+ * Estar no passo que falta preencher e o momento em que a marca mais importa:
+ * e onde a pessoa vai agir. Deixar o accent do "voce esta aqui" cobrir o
+ * aviso mandaria procurar o problema em outro lugar.
+ *
+ * O SELETOR REPETE `[data-estado='pendente']` de proposito. Sem a repeticao,
+ * esta regra e `.passo[data-atual] .numero` tem especificidade IDENTICA
+ * (0,0,3,0), e pendente so ganhava por vir depois no arquivo -- uma garantia
+ * que morre em silencio no dia em que alguem inserir uma regra entre as duas
+ * ou importar outra folha depois desta. Duplicar o atributo leva a
+ * especificidade a (0,0,4,0) e torna a precedencia independente de ordem, que
+ * e o mesmo tratamento que `pronto` ja recebia com `:not([data-atual])`.
+ */
+.passo[data-estado='pendente'][data-estado='pendente'] .numero {
+  background: var(--ah-surface-raised);
+  border-color: var(--ah-state-danger);
+  color: var(--ah-state-danger);
+  font-weight: 700;
+}
+
+/* O titulo ocupa o espaco restante; a frase do leitor nao empurra nada. */
+.tituloDaTrilha {
+  min-width: 0;
+}
+
+/**
+ * Visivel so para leitor de tela.
+ *
+ * `display: none` e `visibility: hidden` tirariam o texto da arvore de
+ * acessibilidade junto -- e o texto e justamente o que substitui o icone
+ * para quem nao ve. Este e o recorte de 1px, que mantem o conteudo anunciavel
+ * e fora da tela.
+ */
+.apenasLeitor {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .numero {
+    transition: none;
+  }
 }
 
 .aviso {
