@@ -1,9 +1,11 @@
 import base from '@arenahub/config/eslint';
 import designSystem from '@arenahub/config/eslint/design-system';
+import react from '@arenahub/config/eslint/react';
 
 export default [
   ...base,
   ...designSystem,
+  ...react,
   {
     // `tokens/**` e a UNICA fonte legitima de hex do repositorio -- e o que a
     // regra 1 protege. `*.generated.ts` e saida do pipeline, nao codigo a mao.

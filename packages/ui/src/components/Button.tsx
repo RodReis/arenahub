@@ -1,4 +1,4 @@
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes } from 'react';
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'react';
 
 import estilos from './Button.module.css';
 
@@ -6,6 +6,18 @@ type Variant = 'solid' | 'outline' | 'ghost' | 'destructive';
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   readonly variant?: Variant;
+  /**
+   * OBRIGATORIO, e nao herdado por spread: botao ou link sem conteudo e
+   * anunciado pelo leitor de tela como um alvo sem nome -- quem navega por
+   * audio ouve "link" e nada mais. `ButtonHTMLAttributes` traz `children`
+   * opcional; aqui ele deixa de ser.
+   *
+   * Tambem e o que a `jsx-a11y/anchor-has-content` (issue #112) precisa
+   * enxergar: com `children` no spread ela nao consegue provar que o `<a>`
+   * tem conteudo, e acusa o componente sem que exista defeito. Explicito,
+   * a regra le o que o tipo ja garante.
+   */
+  readonly children: ReactNode;
   /**
    * Presente, o componente renderiza um `<a>` de verdade em vez de `<button>`.
    *
@@ -32,7 +44,7 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
  * responsabilidade de quem chama -- o componente so garante que a variante
  * exista e pareca perigosa.
  */
-export function Button({ variant = 'solid', type = 'button', href, ...resto }: Props) {
+export function Button({ variant = 'solid', type = 'button', href, children, ...resto }: Props) {
   /*
    * `type` NAO acompanha o `<a>`: em ancora o atributo significa "tipo MIME do
    * destino", nao "papel no formulario" -- um `type="button"` ali seria
@@ -41,8 +53,16 @@ export function Button({ variant = 'solid', type = 'button', href, ...resto }: P
   if (href !== undefined) {
     const props = resto as AnchorHTMLAttributes<HTMLAnchorElement>;
 
-    return <a {...props} href={href} data-variant={variant} className={estilos['botao']} />;
+    return (
+      <a {...props} href={href} data-variant={variant} className={estilos['botao']}>
+        {children}
+      </a>
+    );
   }
 
-  return <button {...resto} type={type} data-variant={variant} className={estilos['botao']} />;
+  return (
+    <button {...resto} type={type} data-variant={variant} className={estilos['botao']}>
+      {children}
+    </button>
+  );
 }

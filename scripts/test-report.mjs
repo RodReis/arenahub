@@ -25,13 +25,33 @@ import { fileURLToPath } from 'node:url';
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DESTINO = join(RAIZ, 'reports', 'TESTS.md');
 
-/** Niveis do TESTING.md §2, na ordem em que aparecem la. */
+/**
+ * Niveis do TESTING.md §2, na ordem em que aparecem la.
+ *
+ * CADA NIVEL TEM LISTA DE SUFIXOS, nao um so: teste de componente React
+ * termina em `.spec.tsx`, e `"Button.spec.tsx".endsWith(".spec.ts")` e
+ * `false` -- termina em `x`. Com um sufixo unico os 17 testes de componente
+ * do design system nao entravam em nivel nenhum, e a guarda de evidencia
+ * afirmava 79 arquivos onde havia 96 (issue #111).
+ *
+ * A precedencia entre niveis continua vindo do PONTO LITERAL no sufixo, nao
+ * da ordem deste array: `.int-spec.ts` nao casa `.spec.ts` porque o caractere
+ * antes de `spec` e `-`. Afrouxar para `-spec.ts` faria integracao vazar para
+ * unitario -- o self-check cobre exatamente esse caso.
+ *
+ * O nivel `seguranca` estava no TESTING.md §2 e NAO estava aqui, desde o
+ * bootstrap. Nenhum `.sec-spec.ts` existe hoje, entao a linha sai zerada --
+ * mas no dia em que o primeiro for escrito (isolamento de tenant, autorizacao,
+ * idempotencia) ele contaria zero em silencio, que e a mesma falha do `.tsx`
+ * um paragrafo acima. Achado na revisao desta issue.
+ */
 const NIVEIS = [
-  { nome: 'unitário', sufixo: '.spec.ts' },
-  { nome: 'contrato', sufixo: '.contract-spec.ts' },
-  { nome: 'integração', sufixo: '.int-spec.ts' },
-  { nome: 'e2e', sufixo: '.e2e-spec.ts' },
-  { nome: 'hardware', sufixo: '.hw-spec.ts' },
+  { nome: 'unitário', sufixos: ['.spec.ts', '.spec.tsx'] },
+  { nome: 'contrato', sufixos: ['.contract-spec.ts', '.contract-spec.tsx'] },
+  { nome: 'integração', sufixos: ['.int-spec.ts', '.int-spec.tsx'] },
+  { nome: 'e2e', sufixos: ['.e2e-spec.ts', '.e2e-spec.tsx'] },
+  { nome: 'hardware', sufixos: ['.hw-spec.ts', '.hw-spec.tsx'] },
+  { nome: 'segurança', sufixos: ['.sec-spec.ts', '.sec-spec.tsx'] },
 ];
 
 /**
@@ -66,7 +86,7 @@ function gerar() {
 
   const porNivel = NIVEIS.map((nivel) => ({
     ...nivel,
-    arquivos: arquivos.filter((a) => a.endsWith(nivel.sufixo)),
+    arquivos: arquivos.filter((a) => nivel.sufixos.some((s) => a.endsWith(s))),
   }));
 
   const total = porNivel.reduce((soma, n) => soma + n.arquivos.length, 0);
@@ -90,7 +110,9 @@ function gerar() {
     '',
     '| nível | sufixo | arquivos |',
     '|---|---|---|',
-    ...porNivel.map((n) => `| ${n.nome} | \`${n.sufixo}\` | ${n.arquivos.length} |`),
+    ...porNivel.map(
+      (n) => `| ${n.nome} | ${n.sufixos.map((s) => `\`${s}\``).join(', ')} | ${n.arquivos.length} |`,
+    ),
     `| **total** | | **${total}** |`,
     '',
   ];
