@@ -122,6 +122,38 @@ casos.push([
 ]);
 
 casos.push([
+  'conta teste de componente React: .spec.tsx entra como unitário (regressao #111)',
+  () => {
+    // `"Button.spec.tsx".endsWith(".spec.ts")` e `false` -- termina em `x`.
+    // Enquanto o nivel teve UM sufixo, os 17 testes de componente do design
+    // system nao entravam em balde nenhum e o total mentia para menos.
+    const dir = repositorioFalso(['src/Button.spec.tsx', 'src/util.spec.ts']);
+    try {
+      const r = gerarEm(dir);
+      assert.equal(contagem(r, 'unitário'), 2, '.spec.tsx nao foi contado como unitário');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+]);
+
+casos.push([
+  'nao confunde nivel em .tsx: .int-spec.tsx nao entra como unitário',
+  () => {
+    // A precedencia vem do ponto literal, nao da ordem do array -- e ela
+    // precisa valer nos dois sufixos, nao so no `.ts`.
+    const dir = repositorioFalso(['src/x.int-spec.tsx']);
+    try {
+      const r = gerarEm(dir);
+      assert.equal(contagem(r, 'integração'), 1);
+      assert.equal(contagem(r, 'unitário'), 0, '.int-spec.tsx vazou para o nivel unitário');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+]);
+
+casos.push([
   'ignora arquivo nao rastreado pelo Git',
   () => {
     const dir = repositorioFalso(['src/a.spec.ts']);
