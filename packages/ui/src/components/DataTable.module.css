@@ -194,6 +194,26 @@
 }
 
 /*
+ * DUAS COLUNAS DE APOIO NA MESMA TABELA -- o piso NAO compoe.
+ *
+ * Cada `support` reivindica 32ch de minimo. Duas somam 64ch, e numa tabela de
+ * cinco colunas isso empurra estado e valor para fora da primeira dobra: o
+ * mesmo defeito que o teto sozinho causava, pelo lado oposto. Achado ao migrar
+ * as treze telas, e confirmado a 640px (o equivalente a 1280 com zoom de 200%,
+ * que o DS-PAINEL §10.8 governa): so a tabela de alertas, a unica com dois
+ * `support`, passa a rolar.
+ *
+ * `data-support-pair` no `<table>` divide o piso pela metade quando a tabela
+ * declara que tem duas colunas de apoio. Nao e caso geral -- a tabela de
+ * alertas e a unica do painel onde impacto e acao precisam ser lidos na mesma
+ * varredura.
+ */
+.tabela[data-support-pair] th[data-role='support'],
+.tabela[data-support-pair] td[data-role='support'] {
+  min-inline-size: 18ch;
+}
+
+/*
  * APOIO -- cede espaco, mas tem PISO.
  *
  * So o teto nao bastou, e o defeito apareceu na tela: com um botao largo na

@@ -130,6 +130,15 @@ export function DataTable<T>({
       >
       <table
         className={estilos['tabela']}
+        /*
+         * Duas colunas de apoio dividem o piso pela metade -- ver o comentario
+         * em `DataTable.module.css`. Derivado das colunas e nao declarado pela
+         * tela: quem escreve a tabela ja disse quais colunas sao de apoio, e
+         * pedir a informacao duas vezes deixa as duas divergirem.
+         */
+        {...(columns.filter((c) => c.role === 'support').length > 1
+          ? { 'data-support-pair': '' }
+          : {})}
         {...(testId !== undefined ? { 'data-testid': testId } : {})}
       >
         <caption className={estilos['legenda']}>{caption}</caption>
