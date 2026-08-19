@@ -1,6 +1,16 @@
 import type { Metadata } from 'next';
 
-import { Ausente, DataTable, EmptyState, PageHeader, ProblemDetail } from '@arenahub/ui';
+import {
+  AcoesDaLinha,
+  Ausente,
+  AusenteDeAcao,
+  DataTable,
+  EmptyState,
+  EstadoSimples,
+  Idade,
+  PageHeader,
+  ProblemDetail,
+} from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { ReconhecerAlerta } from './reconhecer-alerta';
@@ -155,6 +165,7 @@ export default async function PaginaDeOperacao() {
           {
             key: 'severidade',
             header: 'Severidade',
+            role: 'state',
             /*
              * Texto, não só cor. Um painel que diz "crítico" apenas por
              * vermelho não diz nada para quem não distingue vermelho.
@@ -164,32 +175,71 @@ export default async function PaginaDeOperacao() {
              * ja registrou `ROTULO_DE_ESTADO_DE_ALERTA` como "maquina de estado
              * de fato, so nao esta no §7" -- dar-lhe casa e decisao do Cowork.
              */
-            render: (a) => traduzir(ROTULO_DE_SEVERIDADE, a.severity),
+            render: (a) => (
+              <EstadoSimples
+                label={traduzir(ROTULO_DE_SEVERIDADE, a.severity)}
+                tom={TOM_DA_SEVERIDADE[a.severity] ?? 'neutro'}
+              />
+            ),
           },
           {
             key: 'situacao',
             header: 'Situação',
+            role: 'state',
             render: (a) => traduzir(ROTULO_DE_ESTADO_DE_ALERTA, a.state),
           },
-          { key: 'impede', header: 'O que isso impede', render: (a) => a.impact },
-          { key: 'fazer', header: 'O que fazer', render: (a) => a.recommendedAction },
+          {
+            key: 'impede',
+            header: 'O que isso impede',
+            role: 'support',
+            render: (a) => a.impact,
+          },
+          {
+            key: 'fazer',
+            header: 'O que fazer',
+            role: 'support',
+            /*
+             * DUAS COLUNAS DE APOIO LADO A LADO -- e o unico lugar do painel
+             * onde isso acontece, e e deliberado: "o que impede" e "o que
+             * fazer" respondem perguntas diferentes que a operacao le juntas.
+             * Quem esta decidindo se acorda alguem as 6h precisa do impacto e
+             * da acao na mesma varredura.
+             *
+             * O papel `support` da a cada uma piso e teto, entao elas dividem
+             * o espaco em vez de uma engolir a outra -- que era o que
+             * acontecia antes, sem largura declarada.
+             */
+            render: (a) => a.recommendedAction,
+          },
           {
             key: 'desde',
             header: 'Desde',
+            role: 'moment',
             /*
              * `idadeLegivel` FICA, e nao vira `TenantDateTime`: ele devolve
              * idade relativa ("ha 3 h"), nao instante -- e e o que a operacao
              * precisa ler de relance num alerta aberto.
              */
-            render: (a) => (
-              <time dateTime={a.firstSeenAt}>{idadeLegivel(a.firstSeenAt, agora)}</time>
-            ),
+            render: (a) => <Idade iso={a.firstSeenAt} texto={idadeLegivel(a.firstSeenAt, agora)} />,
           },
           {
             key: 'acao',
             header: 'Ação',
+            role: 'actions',
+            /*
+             * `AusenteDeAcao` no lugar de `<span>—</span>`: o travessao cru era
+             * lido como pontuacao solta pelo leitor de tela, sem dizer se a
+             * coluna estava vazia por falta de dado ou por nao haver acao. Sao
+             * coisas diferentes, e agora o `aria-label` diz qual.
+             */
             render: (a) =>
-              a.state === 'OPEN' ? <ReconhecerAlerta alertaId={a.id} /> : <span>—</span>,
+              a.state === 'OPEN' ? (
+                <AcoesDaLinha>
+                  <ReconhecerAlerta alertaId={a.id} />
+                </AcoesDaLinha>
+              ) : (
+                <AusenteDeAcao />
+              ),
           },
         ]}
         empty={
@@ -234,7 +284,7 @@ export default async function PaginaDeOperacao() {
           {
             key: 'relogio',
             header: 'Relógio',
-            numeric: true,
+            role: 'value',
             render: (e) =>
               e.derivaMs === null ? (
                 <Ausente />
@@ -345,3 +395,16 @@ export default async function PaginaDeOperacao() {
     </section>
   );
 }
+
+/**
+ * O tom visual de cada severidade.
+ *
+ * `CRITICAL` significa **a catraca não está funcionando agora** — nada mais
+ * ganha `negativo`. Uma severidade que se aplica a tudo não prioriza nada, e o
+ * painel vira um mar vermelho que a operação aprende a ignorar.
+ */
+const TOM_DA_SEVERIDADE: Readonly<Record<string, 'neutro' | 'atencao' | 'negativo'>> = {
+  CRITICAL: 'negativo',
+  WARNING: 'atencao',
+  INFO: 'neutro',
+};

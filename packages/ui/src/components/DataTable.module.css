@@ -226,9 +226,18 @@
 .tabela th[data-role='actions'],
 .tabela td[data-role='actions'] {
   inline-size: 1%;
-  max-inline-size: 22ch;
   text-align: right;
-  white-space: normal;
+  /*
+   * `nowrap` de volta, com TETO no botao em vez de na coluna.
+   *
+   * Vi as duas falhas na tela: sem teto, um rotulo longo reservava 261 px e
+   * espremia a coluna de apoio; com teto de 22ch na CELULA, dois botoes que
+   * deveriam ficar lado a lado empilharam e um deles quebrou em tres linhas.
+   *
+   * O teto certo e no BOTAO -- ele quebra quando o proprio rotulo e longo
+   * demais, e a celula continua livre para arranjar dois controles em linha.
+   */
+  white-space: nowrap;
 }
 
 /*
@@ -246,6 +255,12 @@
 .tabela td[data-role='actions'] a {
   height: auto;
   min-height: 36px;
+  /*
+   * 24ch: cabe "Aceitar diferenca documentada" em duas linhas e "Cobrar no
+   * WhatsApp" em UMA. Sem o teto, o primeiro reservava a largura inteira da
+   * frase e comia a coluna vizinha.
+   */
+  max-inline-size: 24ch;
   padding-block: 6px;
   text-align: center;
   white-space: normal;

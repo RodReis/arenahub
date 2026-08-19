@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import {
+  AusenteDeAcao,
   DataTable,
   EmptyState,
   Money,
@@ -142,21 +143,36 @@ export default async function PaginaFinanceiroDoAluno({
           {
             key: 'numero',
             header: 'Nº',
-            render: (invoice) => <output data-numeric>{invoice.number}</output>,
+            /*
+             * `code` e nao `value`: numero de fatura IDENTIFICA, nao se compara
+             * nem se soma. Alinhado a direita, "7" e "1042" abririam um vao
+             * irregular ate a competencia ao lado.
+             *
+             * O `<output data-numeric>` saiu junto: `data-numeric` so pedia
+             * `tabular-nums`, que o papel `code` ja da -- e `<output>` e o
+             * elemento de RESULTADO DE CALCULO, que numero de fatura nao e.
+             */
+            role: 'code',
+            render: (invoice) => invoice.number,
           },
           {
             key: 'competencia',
             header: 'Competência',
+            role: 'moment',
             render: (invoice) => <TenantDateTime iso={invoice.billingPeriod} timeZone={FUSO_PROVISORIO} />,
           },
           {
             key: 'situacao',
             header: 'Situação',
+            role: 'state',
             render: (invoice) => <StateBadge machine="invoice" state={invoice.status} />,
           },
           {
             key: 'valor',
             header: 'Valor',
+            /* Dinheiro E o numero que se compara entre linhas -- `value` poe as
+             * casas decimais na mesma coluna vertical. */
+            role: 'value',
             render: (invoice) => (
               <Money cents={invoice.totalMinor} currency={invoice.currency} />
             ),
@@ -164,6 +180,7 @@ export default async function PaginaFinanceiroDoAluno({
           {
             key: 'vencimento',
             header: 'Vence em',
+            role: 'moment',
             render: (invoice) => <TenantDateTime iso={invoice.dueAt} timeZone={FUSO_PROVISORIO} />,
           },
           {
@@ -174,10 +191,20 @@ export default async function PaginaFinanceiroDoAluno({
              * permissão fora do MVP 2 (ADR-027), esta coluna é o controle
              * DETECTIVO que sobrou: sem ela, dinheiro registrado no balcão
              * não teria onde ser percebido.
+             *
+             * `support` e nao `actions`: a coluna e o REGISTRO do recebimento,
+             * texto de apoio vindo da API -- nao tem botao nem form.
              */
+            role: 'support',
             render: (invoice) =>
               invoice.payments.length === 0 ? (
-                <span>—</span>
+                /*
+                 * `AusenteDeAcao` e nao `<span>—</span>`: o travessao cru era
+                 * bug de a11y silencioso -- lido como pontuacao solta, deixava
+                 * quem usa leitor de tela sem saber se a fatura nao tem
+                 * recebimento ou se o dado nao carregou.
+                 */
+                <AusenteDeAcao />
               ) : (
                 <ul>
                   {invoice.payments.map((pagamento) => (

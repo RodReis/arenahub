@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import {
   Ausente,
+  Consequencia,
   DataTable,
   EmptyState,
   MaskedCPF,
@@ -298,11 +299,26 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             {
               key: 'situacao',
               header: 'Situação',
+              role: 'state',
               render: (direito) => (
                 <>
                   <StateBadge machine="entitlement" state={direito.status} />
                   {vigenteAgora(direito, agora) ? (
-                    <span data-testid={`vigente-${direito.id}`}> — vale agora</span>
+                    /*
+                     * `Consequencia` e nao um `<span>` nu: e o mesmo padrao de
+                     * `/students` -- o estado ja foi dito pelo badge, e isto
+                     * responde a pergunta seguinte ("e dai?"). Era justamente
+                     * este o `<span>` sem tratamento nenhum que o componente
+                     * cita: gemeo visivel la, invisivel aqui.
+                     *
+                     * `tom="neutro"`: "vale agora" e a boa noticia. O `danger`
+                     * fica reservado a consequencia que BARRA o aluno.
+                     *
+                     * O testid e o TEXTO seguem byte a byte -- o E2E procura
+                     * `vigente-${id}`, e o espaco antes do travessao continua
+                     * onde estava.
+                     */
+                    <Consequencia testId={`vigente-${direito.id}`}> — vale agora</Consequencia>
                   ) : null}
                 </>
               ),
@@ -311,14 +327,21 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               key: 'origem',
               header: 'Origem',
               /*
+               * `code`: origem e um ENUM curto e fechado ("Assinatura",
+               * "Cortesia") -- identifica a linha sem ser o que se procura.
+               * Nao e `state`, porque nao e situacao: um direito cancelado
+               * continua tendo vindo de uma assinatura.
+               *
                * `ROTULO_DE_ORIGEM` FICA: origem do entitlement (ADR-009) e enum
                * extensivel, nao maquina de estado -- o §7 nao a cobre.
                */
+              role: 'code',
               render: (d) => traduzir(ROTULO_DE_ORIGEM, d.source),
             },
             {
               key: 'vigencia',
               header: 'Vigência',
+              role: 'moment',
               render: (d) => (
                 <>
                   <TenantDateTime iso={d.startsAt} timeZone={FUSO_PROVISORIO} format="date" /> até{' '}
@@ -329,6 +352,13 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             {
               key: 'onde',
               header: 'Onde e quando vale',
+              /*
+               * `support`: uma lista de janelas por unidade e o texto mais longo
+               * da tabela, e e a coluna que deve ceder espaco -- com piso, para
+               * "Centro — seg a sex, 06:00 as 22:00" nao quebrar palavra a
+               * palavra.
+               */
+              role: 'support',
               render: (direito) =>
                 direito.janelas.length === 0 ? (
                   <Ausente />
@@ -347,6 +377,21 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             {
               key: 'motivo',
               header: 'Motivo',
+              /*
+               * SEM `role`, e nao `support`. O padrao caberia pelo tipo do dado
+               * (texto livre da API), mas `support` traz um PISO de 32ch, e
+               * "Onde e quando vale" ao lado ja o reivindica: duas colunas com
+               * 32ch de minimo somam 64ch numa tabela de cinco, e o piso que
+               * existe para impedir quebra em seis linhas passaria a EMPURRAR a
+               * vigencia e o estado para fora da primeira dobra.
+               *
+               * `reason` tambem e curto na pratica -- motivo de cortesia, nao
+               * frase operacional como `recommendedAction`. Sem role, a coluna
+               * cai no neutro de antes, que e o que ela precisa.
+               *
+               * Coluna de DADO, por isso `Ausente` e nao `AusenteDeAcao`: nao ha
+               * acao nenhuma nesta tabela.
+               */
               render: (d) => d.reason ?? <Ausente />,
             },
           ]}

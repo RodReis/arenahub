@@ -145,21 +145,42 @@ export default async function PaginaDaTimeline({
           {
             key: 'quando',
             header: 'Quando',
+            role: 'moment',
             render: (e) => <TenantDateTime iso={e.occurredAt} timeZone={FUSO_PROVISORIO} />,
           },
           {
             key: 'evento',
             header: 'O que aconteceu',
             /*
+             * `identity` e nao `state`: numa trilha de auditoria a linha E o
+             * evento -- e ele que o olho procura ao varrer "o que aconteceu com
+             * este cadastro". A situacao do aluno nao e coluna desta tela.
+             *
              * `ROTULO_DE_EVENTO` FICA: tipo de evento de timeline nao e maquina
              * de estado, e o §7 define 11 e nenhuma o cobre. Entra no achado
              * dos oito dicionarios sem casa, que e decisao do Cowork + PI.
+             *
+             * SEM `Identidade`: nao ha nome mais dado de apoio empilhados aqui,
+             * so um rotulo. Envolver texto simples no bloco de identidade
+             * acrescentaria o wrapper sem acrescentar informacao.
              */
+            role: 'identity',
             render: (e) => traduzir(ROTULO_DE_EVENTO, e.type),
           },
           {
             key: 'detalhe',
             header: 'Detalhe',
+            /*
+             * `support`: `detalhe()` serializa um `payload` de shape livre, e o
+             * resultado e a unica coisa nesta tabela que pode virar frase longa
+             * -- e a coluna que CEDE espaco, com piso para nao quebrar em seis
+             * linhas.
+             *
+             * `Ausente` e nao `AusenteDeAcao`: coluna de DADO. A distincao e a
+             * pergunta que o leitor de tela responde -- "nao ha dado" nao e a
+             * mesma coisa que "nao ha acao".
+             */
+            role: 'support',
             render: (e) => detalhe(e.payload) || <Ausente />,
           },
         ]}
