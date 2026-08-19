@@ -76,6 +76,45 @@ test.describe('cadastro de aluno', () => {
     await expect(page.getByTestId('campo-birthDate')).toHaveValue('1990-01-01');
   });
 
+  test('formulário vazio não é enviado -- e a tela leva ao campo que falta', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    // Vai direto ao último passo sem preencher nada, que é o caminho que a
+    // navegação por trilha permite.
+    await page.getByTestId('ir-para-passo-4').click();
+    await page.getByTestId('confirmar-cadastro').click();
+
+    // ANTES DA CORREÇÃO ISTO NÃO ACONTECIA: o `required` do HTML não vale
+    // para campo dentro de contêiner `hidden`, então o navegador dava o
+    // formulário vazio por válido, o envio seguia e a recepção ficava
+    // olhando para um botão que não fazia nada. Medido no navegador:
+    // `form.checkValidity()` devolvia `true` com os 22 campos vazios.
+    await expect(page.getByTestId('erro-do-cadastro')).toContainText(/nome completo/i);
+
+    // E não basta avisar: a mensagem tem de vir junto com o passo onde o
+    // campo mora, senão manda procurar em quatro telas.
+    await expect(page.getByTestId('campo-fullName')).toBeVisible();
+
+    // Nada foi cadastrado.
+    await expect(page.getByTestId('aluno-cadastrado')).toHaveCount(0);
+  });
+
+  test('falta só a unidade: a tela leva ao passo administrativo', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students/novo');
+
+    await page.getByTestId('campo-fullName').fill(nomeUnico('Sem Unidade'));
+    await page.getByTestId('campo-birthDate').fill('1990-01-01');
+
+    await page.getByTestId('ir-para-passo-4').click();
+    await page.getByTestId('confirmar-cadastro').click();
+
+    await expect(page.getByTestId('erro-do-cadastro')).toContainText(/unidade/i);
+    // Passo 3 é onde a unidade mora.
+    await expect(page.getByTestId('campo-gymUnitId')).toBeVisible();
+  });
+
   test('o rascunho sobrevive à navegação entre os quatro passos', async ({ page }) => {
     await entrar(page);
     await page.goto('/students/novo');

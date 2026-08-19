@@ -236,6 +236,13 @@ describe('F45 -- cadastro completo de aluno', () => {
       expect(resposta.status).toBe(400);
     });
 
+    it('recusa consultor de outro tenant tambem na criacao', async () => {
+      const resposta = await criar(contas.a, { advisorUserId: contas.b.userId });
+
+      expect(resposta.status).toBe(404);
+      expect(corpo(resposta).code).toBe('ADVISOR_NOT_FOUND');
+    });
+
     it('continua recusando tenantId e membershipNumber no corpo', async () => {
       // `.strict()` do Zod. Aceitar qualquer um dos dois deixaria o cliente
       // escolher o tenant (regra no 2) ou a matricula (INV-010).
@@ -429,6 +436,34 @@ describe('F45 -- cadastro completo de aluno', () => {
         .set('Cookie', contas.b.cookie);
 
       expect(ficha(fichaDoAluno).fullName).toBe('Aluno Do Vizinho');
+    });
+
+    it('recusa consultor de outro tenant', async () => {
+      // MESMA ASSIMETRIA QUE A UNIDADE FECHOU. `User` e entidade GLOBAL --
+      // nao tem `tenant_id`, o vinculo mora em `TenantMembership` --, entao a
+      // FK aceita qualquer usuario do sistema inteiro. Sem esta checagem, a
+      // recepcao da academia A poderia pendurar um funcionario da academia B
+      // como consultor do proprio aluno, e o banco nao reclamaria.
+      const aluno = await criar(contas.a, { fullName: 'Consultor Alheio' });
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/students/${corpo(aluno).id}`)
+        .set('Cookie', contas.a.cookie)
+        .send({ version: corpo(aluno).version, advisorUserId: contas.b.userId });
+
+      expect(resposta.status).toBe(404);
+      expect(corpo(resposta).code).toBe('ADVISOR_NOT_FOUND');
+    });
+
+    it('aceita consultor do proprio tenant', async () => {
+      const aluno = await criar(contas.a, { fullName: 'Consultor Proprio' });
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/students/${corpo(aluno).id}`)
+        .set('Cookie', contas.a.cookie)
+        .send({ version: corpo(aluno).version, advisorUserId: contas.a.userId });
+
+      expect(resposta.status).toBe(200);
     });
 
     it('recusa mudar a unidade para a de outro tenant', async () => {

@@ -15,6 +15,7 @@ import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import { MembershipRepository } from '../iam/membership.repository.js';
 import { GymUnitRepository } from '../tenancy/gym-unit.repository.js';
 import { normalizarCep, ufEhValida } from './domain/endereco.js';
 import { cpfEhValido, mascararCpf } from './domain/identificacao.js';
@@ -216,6 +217,7 @@ export class StudentsController {
   constructor(
     private readonly alunos: StudentRepository,
     private readonly unidades: GymUnitRepository,
+    private readonly membros: MembershipRepository,
     private readonly contexto: TenantContextService,
   ) {}
 
@@ -263,6 +265,10 @@ export class StudentsController {
     const contexto = this.contexto.require();
 
     await this.exigirUnidadeDoTenant(dados.gymUnitId);
+
+    if (dados.advisorUserId !== undefined) {
+      await this.exigirConsultorDoTenant(dados.advisorUserId);
+    }
 
     const candidatos = await this.alunos.buscarCandidatosADuplicata(contexto, dados);
 
@@ -340,6 +346,11 @@ export class StudentsController {
       await this.exigirUnidadeDoTenant(dados.gymUnitId);
     }
 
+    // `null` limpa o consultor e nao precisa de checagem -- so um valor novo.
+    if (dados.advisorUserId) {
+      await this.exigirConsultorDoTenant(dados.advisorUserId);
+    }
+
     const aluno = await this.alunos.atualizar(
       contexto,
       id,
@@ -362,6 +373,24 @@ export class StudentsController {
    * 404 e nao 403 pelo motivo de sempre: 403 confirmaria que o UUID existe
    * em outra academia.
    */
+  /**
+   * O consultor e membro ATIVO deste tenant?
+   *
+   * SEM ISTO A FK NAO PROTEGE NADA. `User` e entidade global de proposito --
+   * a mesma pessoa atende duas academias, e o vinculo mora em
+   * `TenantMembership` --, entao `advisor_user_id -> users(id)` aceita
+   * qualquer usuario do sistema, inclusive um que so pertence a outra
+   * academia. O banco nao reclama; a regra de arquitetura no 2 sim.
+   *
+   * A checagem espelha a da unidade: mesma forma, mesmo 404, mesmo motivo de
+   * nao ser 403.
+   */
+  private async exigirConsultorDoTenant(advisorUserId: string): Promise<void> {
+    const ehMembro = await this.membros.ehMembroAtivo(this.contexto.require(), advisorUserId);
+
+    if (!ehMembro) throw new NotFoundException({ code: 'ADVISOR_NOT_FOUND' });
+  }
+
   private async exigirUnidadeDoTenant(gymUnitId: string): Promise<void> {
     const unidade = await this.unidades.encontrar(this.contexto.require(), gymUnitId);
 

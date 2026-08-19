@@ -61,6 +61,26 @@ const UFS = [
   'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
 ] as const;
 
+/**
+ * Os tres campos obrigatorios, e em que passo cada um mora.
+ *
+ * ESTA LISTA EXISTE PORQUE O `required` DO HTML NAO FUNCIONA AQUI. Campo
+ * dentro de um contêiner `hidden` fica FORA da validacao nativa do
+ * navegador -- medido: com o formulario inteiro vazio, indo direto ao passo
+ * 4, `form.checkValidity()` devolve `true` e nenhum campo aparece como
+ * invalido. Sem esta checagem em JS, o clique em "Cadastrar aluno" envia um
+ * formulario vazio e a pessoa fica olhando para um botao que nao faz nada.
+ *
+ * O passo entra junto do campo porque a mensagem sozinha nao resolve: dizer
+ * "informe a unidade" a quem esta no passo 4 manda procurar em vinte e dois
+ * campos espalhados por quatro telas.
+ */
+const OBRIGATORIOS = [
+  { campo: 'fullName', passo: 0, rotulo: 'o nome completo' },
+  { campo: 'birthDate', passo: 0, rotulo: 'a data de nascimento' },
+  { campo: 'gymUnitId', passo: 2, rotulo: 'a unidade' },
+] as const;
+
 interface Unidade {
   id: string;
   code: string;
@@ -146,6 +166,15 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
   // não pode apagar o que foi digitado no passo 1.
   const [rascunho, setRascunho] = useState<Rascunho>(estado.valores ?? {});
 
+  /**
+   * Erro de campo obrigatorio, detectado no cliente.
+   *
+   * Separado de `estado.erro` (que vem do servidor) porque os dois tem vida
+   * diferente: este some assim que a pessoa preenche o campo; aquele so
+   * muda quando o formulario e reenviado.
+   */
+  const [faltando, setFaltando] = useState<string | null>(null);
+
   const valor = (campo: string): string => rascunho[campo] ?? '';
 
   const anotar = (campo: string, novo: string): void => {
@@ -175,7 +204,16 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
       name={campo}
       type={extras.tipo ?? 'text'}
       value={valor(campo)}
-      required={extras.obrigatorio ?? false}
+      // SEM `required` NATIVO, e o motivo e observado, nao teorico: campo
+      // obrigatorio dentro de um contêiner `hidden` faz o navegador barrar o
+      // envio, tentar focar o campo para apontar o erro, falhar porque ele
+      // esta escondido, e desistir em silencio -- console diz "An invalid
+      // form control with name='fullName' is not focusable", nenhum POST
+      // sai e a tela nao muda. Quem valida e `faltaObrigatorio`, que ainda
+      // leva a pessoa ao passo onde o campo mora.
+      // `aria-required` fica: a informacao continua chegando ao leitor de
+      // tela, sem acionar a validacao nativa.
+      aria-required={extras.obrigatorio ? true : undefined}
       {...(extras.maxLength ? { maxLength: extras.maxLength } : {})}
       {...(extras.placeholder ? { placeholder: extras.placeholder } : {})}
       {...(extras.inputMode ? { inputMode: extras.inputMode } : {})}
@@ -197,7 +235,6 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
     campo: string,
     opcoes: readonly (readonly [string, string])[],
     placeholder: string,
-    obrigatorio = false,
   ) => (
     <>
       <Select
@@ -220,7 +257,13 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
         </SelectContent>
       </Select>
 
-      <input type="hidden" name={campo} value={valor(campo)} required={obrigatorio} />
+      {/*
+        SEM `required`: o atributo e invalido num `<input type="hidden">` por
+        especificacao, e nao validava nada mesmo -- campo dentro de contêiner
+        `hidden` fica fora da validacao nativa. Quem barra o envio e
+        `faltaObrigatorio`, que ainda leva a pessoa ao passo certo.
+      */}
+      <input type="hidden" name={campo} value={valor(campo)} />
     </>
   );
 
@@ -289,6 +332,39 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
     );
   }
 
+  /**
+   * Barra o envio quando falta obrigatorio, e LEVA ao passo onde ele mora.
+   *
+   * Devolver `false` sozinho deixaria a pessoa presa: ela ve a mensagem no
+   * passo 4 e o campo esta no passo 1. Levar sem avisar seria pior ainda --
+   * a tela mudaria sem explicacao.
+   */
+  const faltaObrigatorio = (): boolean => {
+    const pendente = OBRIGATORIOS.find((o) => valor(o.campo).trim() === '');
+
+    if (!pendente) {
+      setFaltando(null);
+      return false;
+    }
+
+    setFaltando(`Antes de concluir, informe ${pendente.rotulo}.`);
+    setPasso(pendente.passo);
+
+    return true;
+  };
+
+  /**
+   * Envia, ou barra e leva ao passo do campo que falta.
+   *
+   * Devolver sem chamar `acao` deixa o formulario como esta -- nada vai ao
+   * servidor, e o rascunho continua inteiro.
+   */
+  const enviar = (formulario: FormData): void => {
+    if (faltaObrigatorio()) return;
+
+    acao(formulario);
+  };
+
   const ehUltimo = passo === PASSOS.length - 1;
 
   return (
@@ -329,10 +405,21 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
         </p>
       </nav>
 
-      <form className={estilos['cartao']} action={acao}>
-        {estado.erro ? (
+      {/*
+        A VALIDACAO ENVOLVE A ACTION, e nao vive num `onSubmit`.
+        Com `action`, o React roda o envio dentro de uma Transition, e o
+        `preventDefault` do `onSubmit` NAO a cancela -- os dois sao caminhos
+        alternativos, nao encadeados (documentacao do `<form>` no React).
+        Medido: com `onSubmit`, o clique no formulario vazio nao produzia
+        erro nenhum e a tela ficava parada no passo 4.
+
+        Envolver a action funciona para o clique E para o Enter dentro de um
+        campo, que e o outro caminho de envio.
+      */}
+      <form className={estilos['cartao']} action={enviar}>
+        {estado.erro || faltando ? (
           <p className={estilos['erro']} role="alert" data-testid="erro-do-cadastro">
-            {estado.erro}
+            {faltando ?? estado.erro}
           </p>
         ) : null}
 
@@ -514,7 +601,6 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
                 'gymUnitId',
                 unidades.map((u) => [u.id, u.name] as const),
                 'Selecione a unidade',
-                true,
               )}
             </Campo>
 
