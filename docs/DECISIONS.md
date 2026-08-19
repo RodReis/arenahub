@@ -1693,3 +1693,70 @@ desconto, pagamento manual e step-up. São decisão de produto, e bloqueiam **F1
 confirmado se o Sicoob o oferece. A consequência de modelagem registrada no ADR-013 permanece
 válida para quando entrar: `autorização revogada` é estado de primeira classe, **distinto** de
 `pagamento falhou`.
+
+---
+
+## ADR-033 — Importação da base legada do Pacto: 1.926 alunos entram como `CANCELLED`
+
+**Data:** 19/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 19/08/2026**
+· **Destrava:** F47 · **Depende de** `Plan` "Programa Adultos e Idosos" já cadastrado
+
+**Contexto.** A Arena Positiva opera hoje no Pacto. O acervo é de **1.926 alunos**, dos quais
+**258 ativos** segundo o relatório e **347** segundo o CSV da catraca. O PI quer o acervo inteiro
+no ArenaHub — inativo, para histórico e para que o retorno de um ex-aluno seja reativação e não
+recadastro.
+
+Migração de dado histórico é, pelo `CLAUDE.md`, caso de ADR: é cara de desfazer e outro sistema
+(a catraca) já consome o resultado.
+
+**A fonte não é um banco, é um PDF.** O Pacto entrega o *Relatório Geral de Clientes* em 243
+páginas. Um primeiro extrator produziu 1.934 registros que **pareciam corretos e não eram**:
+nome truncado no primeiro token em 1934/1934, endereço zerado em 1934/1934, nome de plano
+colapsado (15 valores no lugar de 29 — `PLANO INDIVIDUAL 3X` e `7X` viraram a mesma string), e
+as colunas `data_nascimento` e `data_matricula` **invertidas**. O defeito comum era ler o PDF
+com `extract_text()`, que descarta as coordenadas: sem coordenada não há coluna, e sem coluna
+todo campo vira adivinhação posicional. O extrator atual lê por caractere e agrupa por posição
+X; entrega **1.926 registros** com 8 rejeitados (2 nascimentos impossíveis — `14/03/0056`,
+`14/03/1191` — e 6 nomes que no Pacto são só `K`, `MARRYY`, `teste`).
+
+**Consequência para o processo:** nenhuma importação entra sem **relatório de preenchimento por
+campo**. Foi o `logradouro 0/1934` que denunciou o extrator quebrado. Importação que só grava e
+diz "sucesso" é como esses registros viraram lixo no Pacto.
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **Status `CANCELLED`, nunca `ARCHIVED`** | `ARCHIVED` é terminal (`ARCHIVED: new Set([])`, INV-013). Importar arquivado impediria para sempre a reativação, que é o objetivo. `CANCELLED → ACTIVE` é transição válida. Esconder ex-aluno de lista operacional é filtro de tela, não status |
+| 2 | **Todos apontam para o `Plan` "Programa Adultos e Idosos"** | Os 29 nomes de plano do Pacto são **descartados**. Recriá-los no ArenaHub importaria a bagunça comercial do sistema antigo; o plano original fica como texto em `Subscription.lastReason`, para rastreio |
+| 3 | **`Subscription` `CANCELLED`, e nenhum `Entitlement`** | Regra de arquitetura nº 1: entitlement é o que libera catraca. Aluno importado **não entra na academia** |
+| 4 | **Nenhum `ConsentRecord`, nenhuma biometria** | Regra nº 7. O consentimento é colhido na recepção quando o aluno voltar |
+| 5 | **`membershipNumber = AP-2026-{matrícula do Pacto em 8 dígitos}`** | Dá idempotência (regra nº 4) sem migration: `UNIQUE (tenant_id, membership_number)` já existe. A importação fecha elevando `student_sequences.next_value` para **3000**, acima da maior matrícula do Pacto (2240), para aluno novo não colidir |
+| 6 | **Endereço só completo; `state = 'GO'` fixo** | `street`, `city`, `postalCode` e `state` são `NOT NULL`, e o relatório não traz UF. Registro com só o bairro fica **sem** endereço, em vez de entrar pela metade |
+| 7 | **Os 20 sem data de nascimento não entram** | `birthDate` é `NOT NULL` e inventar data é dado falso no caminho de produção. Saem em lista de pendência para a recepção |
+| 8 | **Menores de idade entram** | Decisão do PI. Ver *Riscos aceitos* |
+
+### O que o PI decidiu e este ADR registra como risco aceito
+
+- **Retenção de ex-aluno.** O contrato acabou; manter o cadastro para reativação não é execução
+  de contrato. O PI decidiu manter a base. **Não há LIA registrada nem canal de oposição.**
+- **315 menores de 18 anos**, o mais novo com 9. O schema **não tem campo de responsável legal**
+  e o relatório não traz um. Entram como cadastro; **não podem receber biometria** enquanto não
+  houver consentimento de responsável (regra nº 7, LGPD art. 14). Isso reaparece na fatia de
+  biometria e não é resolvido aqui.
+
+### O que fica de fora desta decisão
+
+**A ativação dos alunos correntes.** O `Pessoas1.csv` da catraca traz 347 linhas, e **77 delas
+(22%) não casam automaticamente**: a coluna `Matricula` vem vazia em 346/347, e o número
+utilizável está em `Cartao` — que **não é** a matrícula. Casar por `Cartao` troca aluno em 50
+casos e libera a catraca para a pessoa errada. A ordem de casamento é **CPF → nome completo +
+nascimento → cartão**, e as 77 linhas conflitantes vão para conferência humana. Isso é fatia
+própria, sequenciada depois da F47.
+
+### Regra que este ADR não afrouxa
+
+O acervo é **dado real de aluno** e o `CLAUDE.md` proíbe dado real no repositório — em fixture,
+golden file ou log. A seed vive em `packages/database/prisma/seed.ts` (ADR-020) e **lê o JSON de
+caminho externo, fora da árvore versionada**, com o caminho no `.gitignore`. O arquivo nunca é
+commitado; a seed sem o arquivo não falha, apenas não importa nada.

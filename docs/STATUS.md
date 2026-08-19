@@ -581,6 +581,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | aprovada-pi *(gate: MVP 4)* |
 | F45 | — | 1 | — | Cadastro completo de aluno (retrabalho da Slice 1.2) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#100](https://github.com/RodReis/arenahub/issues/100) | **entregue** — aguardando aceite |
 | F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **entregue** — PR [#107](https://github.com/RodReis/arenahub/pull/107), aguardando aceite |
+| F47 | — | 1 | — | Importação da base legada Pacto (1.926 alunos) | [ADR-033](DECISIONS.md#adr-033--importação-da-base-legada-do-pacto-1926-alunos-entram-como-cancelled) | [#118](https://github.com/RodReis/arenahub/issues/118) | planejada |
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
 > ADR**, não no PRD: o design system é trabalho de plataforma e não tem PRD que o descreva. O
