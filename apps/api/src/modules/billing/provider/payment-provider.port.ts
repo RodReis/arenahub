@@ -115,6 +115,37 @@ export interface ProviderRefund {
 }
 
 /**
+ * Janela do extrato. FECHADA de proposito -- `ate` e exclusivo.
+ *
+ * Conciliar "ate agora" produziria divergencia falsa em toda execucao: o
+ * pagamento de trinta segundos atras ainda nao apareceu no extrato do banco, e
+ * viraria `MISSING_EXTERNAL` sem nada de errado ter acontecido.
+ */
+export interface ListMovementsInput {
+  externalAccountId: string;
+  de: Date;
+  ate: Date;
+}
+
+/** Uma linha do extrato, ja normalizada pelo adapter. */
+export interface ProviderMovement {
+  /** Id do movimento no provedor. E o que da idempotencia a importacao. */
+  externalMovementId: string;
+  /** Pagamento a que o movimento se refere, quando ha. */
+  externalPaymentId: string | null;
+  tipo: 'PAYMENT' | 'REFUND';
+  /**
+   * Centavos, sempre POSITIVO. A direcao mora em `tipo`, nao no sinal: valor
+   * negativo em campo monetario e a forma mais facil de uma soma dar
+   * silenciosamente o numero errado.
+   */
+  amountMinor: number;
+  currency: string;
+  /** Instante NO PROVEDOR. */
+  occurredAt: Date;
+}
+
+/**
  * Requisicao crua de webhook.
  *
  * CORPO BRUTO, nao objeto ja parseado (`MVP-02` 13): a assinatura HMAC e
@@ -151,6 +182,22 @@ export interface PaymentProvider {
   createTokenizedSubscription(input: SubscriptionInput): Promise<ProviderSubscription>;
   cancelSubscription(externalSubscriptionId: string): Promise<void>;
   refundPayment(input: RefundInput): Promise<ProviderRefund>;
+  /**
+   * Extrato da conta numa janela fechada. `MVP-02` 7: "importacao ou consulta
+   * de extrato".
+   *
+   * SETIMO METODO -- o PRD 12 declarava seis. A ampliacao foi decidida pelo PI
+   * em 19/08/2026 e o `MVP-02` 12 foi EMENDADO no mesmo PR, com nota apontando
+   * esta fatia. Mesmo precedente do ADR-027, que emendou a 11 ao criar
+   * `account_credits`.
+   *
+   * POR QUE NAO DAVA PARA EVITAR: sem extrato, a conciliacao so enxerga o que
+   * o webhook entregou -- e o caso que ela existe para achar e exatamente o
+   * dinheiro que o provedor tem e cujo webhook nunca chegou
+   * (`MISSING_EXTERNAL`). Conciliar `provider_events` contra `payments`
+   * compararia o nosso registro com a nossa copia do registro dele.
+   */
+  listMovements(input: ListMovementsInput): Promise<readonly ProviderMovement[]>;
   /**
    * Verifica assinatura e origem ANTES de qualquer processamento (INV-077).
    *

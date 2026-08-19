@@ -492,23 +492,30 @@ model Tenant {
   accessEvents           AccessEvent[]
   accessEventCorrections AccessEventCorrection[]
   manualAccessOverrides  ManualAccessOverride[]
+  planPrices             PlanPrice[]
+  planBenefits           PlanBenefit[]
+  familyGroups           FamilyGroup[]
+  familyMembers          FamilyMember[]
+  billingSettings        BillingSettings?
+  invoices               Invoice[]
+  invoiceItems           InvoiceItem[]
+  payments               Payment[]
+  paymentAttempts        PaymentAttempt[]
+  paymentMethods         PaymentMethod[]
+  accountCredits         AccountCredit[]
+  invoiceSequence        InvoiceSequence?
+  financialOverrides     FinancialAccessOverride[]
+  providerAccounts       ProviderAccount[]
+  providerEvents         ProviderEvent[]
+
+  refunds             Refund[]
+  receipts            Receipt[]
+  receiptSequence     ReceiptSequence?
+  reconciliationRuns  ReconciliationRun[]
+  externalMovements   ExternalMovement[]
+  reconciliationItems ReconciliationItem[]
 
   @@map("tenants")
-  planPrices      PlanPrice[]
-  planBenefits    PlanBenefit[]
-  familyGroups    FamilyGroup[]
-  familyMembers   FamilyMember[]
-  billingSettings BillingSettings?
-  invoices        Invoice[]
-  invoiceItems    InvoiceItem[]
-  payments        Payment[]
-  paymentAttempts PaymentAttempt[]
-  paymentMethods  PaymentMethod[]
-  accountCredits  AccountCredit[]
-  invoiceSequence InvoiceSequence?
-  financialOverrides FinancialAccessOverride[]
-  providerAccounts ProviderAccount[]
-  providerEvents   ProviderEvent[]
 }
 
 /// Unidade fisica. Onde a catraca mora.
@@ -572,12 +579,12 @@ model User {
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")
 
-  memberships TenantMembership[]
-  userRoles   UserRole[]
-  sessions    Session[]
-  auditLogs   AuditLog[]
+  memberships     TenantMembership[]
+  userRoles       UserRole[]
+  sessions        Session[]
+  auditLogs       AuditLog[]
   /// Alunos de quem este usuario e consultor responsavel.
-  advisedStudents Student[] @relation("StudentAdvisor")
+  advisedStudents Student[]          @relation("StudentAdvisor")
 
   @@map("users")
 }
@@ -809,18 +816,18 @@ model InboxReceipt {
 /// exibir o CPF completo, isso vira decisao do PI com cifra reversivel, nao
 /// um `ALTER TABLE` silencioso.
 model Student {
-  id               String        @id @default(uuid()) @db.Uuid
-  tenantId         String        @map("tenant_id") @db.Uuid
+  id               String                @id @default(uuid()) @db.Uuid
+  tenantId         String                @map("tenant_id") @db.Uuid
   /// `AP-{ano}-{8 digitos}`. IMUTAVEL apos a criacao (INV-010): nenhum caso
   /// de uso desta fatia a altera, e a unicidade sobrevive ao arquivamento
   /// (INV-015) porque soft delete nao remove a linha.
-  membershipNumber String        @map("membership_number")
-  fullName         String        @map("full_name")
+  membershipNumber String                @map("membership_number")
+  fullName         String                @map("full_name")
   /// `@db.Date`: data de nascimento nao tem hora nem fuso. Gravar como
   /// timestamp faria 01/01 virar 31/12 na conversao de timezone.
-  birthDate        DateTime      @map("birth_date") @db.Date
-  cpfHash          String?       @map("cpf_hash")
-  cpfLast3         String?       @map("cpf_last3")
+  birthDate        DateTime              @map("birth_date") @db.Date
+  cpfHash          String?               @map("cpf_hash")
+  cpfLast3         String?               @map("cpf_last3")
   /// Texto livre e opcional. RG nao tem formato nacional unico -- cada
   /// estado emite o seu, e validar digito verificador aqui seria inventar
   /// regra que orgao nenhum garante.
@@ -833,33 +840,33 @@ model Student {
   /// esta coluna numa decisao de acesso criaria a segunda fonte de verdade
   /// que a regra de arquitetura no 1 proibe -- ha teste que prova que nao
   /// acontece (`gym-unit-nao-decide-acesso.spec.ts`).
-  gymUnitId        String        @map("gym_unit_id") @db.Uuid
+  gymUnitId        String                @map("gym_unit_id") @db.Uuid
   /// Consultor responsavel (Espec 11). FK, nao texto livre: texto livre nao
   /// sobrevive a saida do funcionario.
-  advisorUserId    String?       @map("advisor_user_id") @db.Uuid
-  status           StudentStatus @default(LEAD)
+  advisorUserId    String?               @map("advisor_user_id") @db.Uuid
+  status           StudentStatus         @default(LEAD)
   /// Preenchido no arquivamento. Soft delete (INV-013): preserva historico
   /// legal e operacional em vez de apagar.
-  archivedAt       DateTime?     @map("archived_at")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  archivedAt       DateTime?             @map("archived_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
   /// Trava otimista. Comando concorrente que leu a versao antiga falha em
   /// vez de sobrescrever decisao que nao viu.
-  version          Int           @default(0)
+  version          Int                   @default(0)
 
-  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   /// `RESTRICT`: apagar unidade que ainda tem aluno falha, em vez de deixar
   /// aluno orfao ou apagado junto.
-  gymUnit        GymUnit                @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
+  gymUnit            GymUnit                   @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
   /// `SET NULL`: o aluno continua existindo depois que o consultor sai.
-  advisor        User?                  @relation("StudentAdvisor", fields: [advisorUserId], references: [id], onDelete: SetNull)
-  contacts       StudentContact[]
-  addresses      StudentAddress[]
-  subscriptions  Subscription[]
-  paymentMethods PaymentMethod[]
+  advisor            User?                     @relation("StudentAdvisor", fields: [advisorUserId], references: [id], onDelete: SetNull)
+  contacts           StudentContact[]
+  addresses          StudentAddress[]
+  subscriptions      Subscription[]
+  paymentMethods     PaymentMethod[]
   financialOverrides FinancialAccessOverride[]
-  entitlements   Entitlement[]
-  timelineEvents StudentTimelineEvent[]
+  entitlements       Entitlement[]
+  timelineEvents     StudentTimelineEvent[]
 
   consentRecords      ConsentRecord[]
   biometricIdentities BiometricIdentity[]
@@ -868,6 +875,9 @@ model Student {
   administrativeBlocks  AdministrativeBlock[]
   accessEvents          AccessEvent[]
   manualAccessOverrides ManualAccessOverride[]
+  familyMemberships     FamilyMember[]
+  invoices              Invoice[]
+  accountCredits        AccountCredit[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -875,9 +885,6 @@ model Student {
   @@index([tenantId, cpfHash])
   @@index([tenantId, fullName])
   @@map("students")
-  familyMemberships FamilyMember[]
-  invoices          Invoice[]
-  accountCredits    AccountCredit[]
 }
 
 /// Contato do aluno. `value` guarda a forma NORMALIZADA (e-mail em
@@ -885,21 +892,21 @@ model Student {
 /// compara. Sem normalizar, "(41) 99999-0000" e "41999990000" seriam pessoas
 /// diferentes.
 model StudentContact {
-  id        String             @id @default(uuid()) @db.Uuid
-  tenantId  String             @map("tenant_id") @db.Uuid
-  studentId String             @map("student_id") @db.Uuid
-  type      StudentContactType
-  value     String
+  id           String             @id @default(uuid()) @db.Uuid
+  tenantId     String             @map("tenant_id") @db.Uuid
+  studentId    String             @map("student_id") @db.Uuid
+  type         StudentContactType
+  value        String
   /// Nome de quem atende. So `EMERGENCY` preenche -- nos demais tipos o
   /// contato E o aluno, e repetir o nome dele em cada linha nao informa.
-  label     String?
+  label        String?
   /// Parentesco ou vinculo ("conjuge", "mae", "vizinha"). Texto livre: a
   /// lista de vinculos possiveis nao fecha, e enum que nao fecha vira
   /// `OUTRO` em metade das linhas.
   relationship String?
-  isPrimary Boolean            @default(false) @map("is_primary")
-  createdAt DateTime           @default(now()) @map("created_at")
-  updatedAt DateTime           @updatedAt @map("updated_at")
+  isPrimary    Boolean            @default(false) @map("is_primary")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -1002,12 +1009,12 @@ model Plan {
   units         PlanUnit[]
   accessWindows PlanAccessWindow[]
   subscriptions Subscription[]
+  prices        PlanPrice[]
+  benefits      PlanBenefit[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
   @@map("plans")
-  prices   PlanPrice[]
-  benefits PlanBenefit[]
 }
 
 model PlanUnit {
@@ -1074,11 +1081,11 @@ model Subscription {
   student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   plan         Plan          @relation(fields: [planId], references: [id])
   entitlements Entitlement[]
+  familyGroup  FamilyGroup?
+  invoices     Invoice[]
 
   @@index([tenantId, studentId, status])
   @@map("subscriptions")
-  familyGroup FamilyGroup?
-  invoices    Invoice[]
 }
 
 /// Direito de acesso. O QUE A CATRACA CONSULTA.
@@ -1605,9 +1612,9 @@ model DeviceCommand {
 /// pergunta "por que este aluno entrou naquele dia?" nao teria resposta
 /// verificavel.
 model AccessPolicy {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  gymUnitId String   @map("gym_unit_id") @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  gymUnitId String    @map("gym_unit_id") @db.Uuid
   /// Semver do motor puro (`POLICY_VERSION`). Mudanca de comportamento
   /// observavel exige numero novo.
   version   String
@@ -1615,9 +1622,9 @@ model AccessPolicy {
   /// carencia de snapshot, ainda em ADR-007 (`aberto`).
   config    Json
   /// Vigencia. Politica nao se edita: publica-se outra e encerra-se esta.
-  startsAt  DateTime @map("starts_at")
+  startsAt  DateTime  @map("starts_at")
   endsAt    DateTime? @map("ends_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   gymUnit GymUnit @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
@@ -1634,20 +1641,20 @@ model AccessPolicy {
 /// `Student.status` seria efeito colateral em cascata, e o bloqueio precisa
 /// ser reversivel sem reconstruir estado.
 model AdministrativeBlock {
-  id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String    @map("tenant_id") @db.Uuid
-  studentId String    @map("student_id") @db.Uuid
-  reason    String
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  studentId  String    @map("student_id") @db.Uuid
+  reason     String
   /// Quem bloqueou. Bloqueio sem responsavel nao e auditavel.
-  actorId   String    @map("actor_id") @db.Uuid
-  startsAt  DateTime  @default(now()) @map("starts_at")
+  actorId    String    @map("actor_id") @db.Uuid
+  startsAt   DateTime  @default(now()) @map("starts_at")
   /// Nulo = vigente por prazo indeterminado.
-  endsAt    DateTime? @map("ends_at")
+  endsAt     DateTime? @map("ends_at")
   /// Quem levantou o bloqueio, e quando.
-  liftedAt  DateTime? @map("lifted_at")
-  liftedById String?  @map("lifted_by_id") @db.Uuid
-  liftReason String?  @map("lift_reason")
-  createdAt DateTime  @default(now()) @map("created_at")
+  liftedAt   DateTime? @map("lifted_at")
+  liftedById String?   @map("lifted_by_id") @db.Uuid
+  liftReason String?   @map("lift_reason")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -1675,9 +1682,9 @@ model AccessEvent {
   deviceId   String? @map("device_id") @db.Uuid
 
   /// Nulo quando a identidade nao resolveu para nenhum aluno do tenant.
-  studentId  String? @map("student_id") @db.Uuid
+  studentId      String? @map("student_id") @db.Uuid
   /// Biometria usada. Nulo em override e em identidade desconhecida.
-  identityId String? @map("identity_id") @db.Uuid
+  identityId     String? @map("identity_id") @db.Uuid
   /// O `enrollid` que o leitor informou. Guardado mesmo sem aluno resolvido:
   /// e a unica pista de quem o equipamento viu.
   externalUserId String? @map("external_user_id")
@@ -1702,7 +1709,7 @@ model AccessEvent {
   occurredAt   DateTime  @map("occurred_at")
   receivedAt   DateTime  @default(now()) @map("received_at")
 
-  correlationId String @map("correlation_id")
+  correlationId  String @map("correlation_id")
   /// Dedupe do evento (ADR-006). Reprocessar e sempre seguro.
   idempotencyKey String @map("idempotency_key")
 
@@ -1720,9 +1727,9 @@ model AccessEvent {
   identity    BiometricIdentity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
   entitlement Entitlement?       @relation(fields: [entitlementId], references: [id], onDelete: SetNull)
 
-  passage      AccessPassage?
-  override     ManualAccessOverride?
-  corrections  AccessEventCorrection[] @relation("EventoCorrigido")
+  passage                AccessPassage?
+  override               ManualAccessOverride?
+  corrections            AccessEventCorrection[] @relation("EventoCorrigido")
   correcoesQueEsteEvento AccessEventCorrection[] @relation("EventoCorretor")
 
   /// Idempotencia por ORIGEM, nao global: dois Edges podem gerar a mesma
@@ -1786,8 +1793,8 @@ model AccessEventCorrection {
   actorId           String   @map("actor_id") @db.Uuid
   createdAt         DateTime @default(now()) @map("created_at")
 
-  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  originalEvent   AccessEvent @relation("EventoCorrigido", fields: [originalEventId], references: [id], onDelete: Cascade)
+  tenant          Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  originalEvent   AccessEvent  @relation("EventoCorrigido", fields: [originalEventId], references: [id], onDelete: Cascade)
   correctingEvent AccessEvent? @relation("EventoCorretor", fields: [correctingEventId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, originalEventId])
@@ -1844,25 +1851,28 @@ model FinancialAccessOverride {
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   /// A consulta do motor: "ha liberacao viva para este aluno agora?".
-  @@index([tenantId, studentId, expiresAt])
+  /// `map` explicito porque a migration da F15 criou o indice com este nome.
+  /// Sem ele, o Prisma pede um RENAME em toda migration seguinte -- drift que
+  /// nao muda nada e polui o diff de quem vier depois.
+  @@index([tenantId, studentId, expiresAt], map: "financial_access_overrides_tenant_student_expires_idx")
   @@map("financial_access_overrides")
 }
 
 model ManualAccessOverride {
-  id            String  @id @default(uuid()) @db.Uuid
-  tenantId      String  @map("tenant_id") @db.Uuid
-  gymUnitId     String  @map("gym_unit_id") @db.Uuid
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  gymUnitId          String   @map("gym_unit_id") @db.Uuid
   /// Um dos dois esta presente -- aluno conhecido OU visitante descrito.
-  studentId     String? @map("student_id") @db.Uuid
-  visitorDescription String? @map("visitor_description")
+  studentId          String?  @map("student_id") @db.Uuid
+  visitorDescription String?  @map("visitor_description")
   /// Catraca alvo.
-  deviceId      String  @map("device_id") @db.Uuid
+  deviceId           String   @map("device_id") @db.Uuid
   /// Minimo de 10 caracteres, validado no boundary. "ok" nao e motivo.
-  reason        String
-  actorId       String  @map("actor_id") @db.Uuid
+  reason             String
+  actorId            String   @map("actor_id") @db.Uuid
   /// O evento que esta liberacao gerou. Um override, um evento.
-  accessEventId String  @unique @map("access_event_id") @db.Uuid
-  createdAt     DateTime @default(now()) @map("created_at")
+  accessEventId      String   @unique @map("access_event_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   gymUnit     GymUnit     @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
@@ -1915,8 +1925,8 @@ enum OperationalAlertSeverity {
 /// e lido por quem esta na recepcao com uma pessoa esperando, e "EDGE_OFFLINE"
 /// sozinho nao diz se e para ligar para o TI ou liberar manualmente.
 model OperationalAlert {
-  id        String @id @default(uuid()) @db.Uuid
-  tenantId  String @map("tenant_id") @db.Uuid
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
   /// Nulo em alerta que nao pertence a uma unidade especifica.
   gymUnitId String? @map("gym_unit_id") @db.Uuid
 
@@ -1939,8 +1949,8 @@ model OperationalAlert {
   /// nao deveria ver dado de aluno para consertar um cabo de rede.
   evidence Json
 
-  firstSeenAt DateTime  @default(now()) @map("first_seen_at")
-  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+  firstSeenAt      DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt       DateTime  @default(now()) @map("last_seen_at")
   /// Quem reconheceu, e quando. Reconhecer NAO resolve.
   acknowledgedAt   DateTime? @map("acknowledged_at")
   acknowledgedById String?   @map("acknowledged_by_id") @db.Uuid
@@ -2046,15 +2056,15 @@ enum PlanBenefitStatus {
 /// proprio. Preserva historico, permite reajuste agendado, e a invoice ja
 /// aberta nunca muda de valor (INV-068) porque copia o valor na abertura.
 model PlanPrice {
-  id         String   @id @default(uuid()) @db.Uuid
-  tenantId   String   @map("tenant_id") @db.Uuid
-  planId     String   @map("plan_id") @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  planId      String   @map("plan_id") @db.Uuid
   /// Centavos. INV-065.
-  amountMinor Int     @map("amount_minor")
-  currency   String   @default("BRL")
+  amountMinor Int      @map("amount_minor")
+  currency    String   @default("BRL")
   /// Inclusivo: preco que vale a partir de 01/06 ja vale as 00:00 de 01/06.
-  validFrom  DateTime @map("valid_from")
-  createdAt  DateTime @default(now()) @map("created_at")
+  validFrom   DateTime @map("valid_from")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
@@ -2072,16 +2082,16 @@ model PlanPrice {
 /// especificos. Isso e regra que o MVP 3 vai ler para saber quando a
 /// proxima avaliacao vence; em `description` viraria prosa inconsultavel.
 model PlanBenefit {
-  id       String            @id @default(uuid()) @db.Uuid
-  tenantId String            @map("tenant_id") @db.Uuid
-  planId   String            @map("plan_id") @db.Uuid
-  item     String
-  status   PlanBenefitStatus @default(INCLUDED)
+  id        String            @id @default(uuid()) @db.Uuid
+  tenantId  String            @map("tenant_id") @db.Uuid
+  planId    String            @map("plan_id") @db.Uuid
+  item      String
+  status    PlanBenefitStatus @default(INCLUDED)
   /// Periodicidade em dias. Nulo = beneficio sem recorrencia.
-  everyDays Int?             @map("every_days")
+  everyDays Int?              @map("every_days")
   detail    String?
   /// Ordem de exibicao, para a tela espelhar o encarte impresso.
-  position  Int              @default(0)
+  position  Int               @default(0)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
@@ -2132,9 +2142,9 @@ model FamilyMember {
   role      FamilyMemberRole @default(DEPENDENT)
   joinedAt  DateTime         @default(now()) @map("joined_at")
 
-  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  group  FamilyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  student Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  tenant  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group   FamilyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   /// Mesmo aluno nao entra duas vezes no mesmo grupo.
   @@unique([groupId, studentId])
@@ -2157,13 +2167,13 @@ enum BlockAnchor {
 }
 
 model BillingSettings {
-  tenantId String @id @map("tenant_id") @db.Uuid
-  currency String @default("BRL")
+  tenantId        String      @id @map("tenant_id") @db.Uuid
+  currency        String      @default("BRL")
   /// Dia do mes do vencimento (1-28). Limitado a 28 para existir em
   /// fevereiro sem regra de excecao.
-  dueDay    Int   @map("due_day")
+  dueDay          Int         @map("due_day")
   /// Dias de carencia depois do vencimento antes do bloqueio.
-  graceDays Int   @default(0) @map("grace_days")
+  graceDays       Int         @default(0) @map("grace_days")
   /// Dias apos o vencimento em que cada tentativa de cobranca acontece.
   ///
   /// O TAMANHO DA LISTA E O MAXIMO DE TENTATIVAS -- nao existe um segundo
@@ -2172,7 +2182,7 @@ model BillingSettings {
   ///
   /// Padrao `[0, 3, 7]` decidido pelo PI em 19/08/2026. Por tenant para que
   /// uma academia ajuste sem deploy.
-  retryOffsetDays Int[] @default([0, 3, 7]) @map("retry_offset_days")
+  retryOffsetDays Int[]       @default([0, 3, 7]) @map("retry_offset_days")
   /// Ancora do bloqueio por inadimplencia -- ADR-019 2: "nao e constante, e
   /// CONFIGURACAO". O PI muda por academia sem tocar em codigo; regra
   /// comercial que vive dentro de um `if` e regra que ninguem encontra
@@ -2181,7 +2191,28 @@ model BillingSettings {
   /// Ha um valor so hoje, e isso e deliberado: uma segunda politica (adiar
   /// por feriado, por exemplo) entra como valor NOVO, nao como excecao
   /// escondida no meio do job.
-  blockAnchor BlockAnchor @default(DUE_PLUS_GRACE) @map("block_anchor")
+  blockAnchor     BlockAnchor @default(DUE_PLUS_GRACE) @map("block_anchor")
+
+  /// O que o estorno faz com o acesso. `M2-COMPLIANCE-01`, decidido pelo PI
+  /// em 19/08/2026: mantem ate o fim do periodo pago.
+  ///
+  /// Por tenant, como a ancora de bloqueio e pelo mesmo motivo (ADR-019): e
+  /// regra COMERCIAL, e regra comercial que vive dentro de um `if` e regra
+  /// que ninguem encontra depois.
+  refundAccessPolicy RefundAccessPolicy @default(KEEP_UNTIL_PERIOD_END) @map("refund_access_policy")
+
+  /// Teto do estorno, em centavos, por operacao. Nulo = sem teto.
+  ///
+  /// RECUSA, NAO APROVA: acima do teto a operacao e barrada com erro de
+  /// dominio. Nao existe papel de aprovador no MVP 2, e inventar uma fila de
+  /// aprovacao que ninguem opera produziria estorno travado para sempre.
+  refundLimitMinor Int? @map("refund_limit_minor")
+
+  /// Teto do pagamento manual, em centavos. Nulo = sem teto. INV-072.
+  manualPaymentLimitMinor Int? @map("manual_payment_limit_minor")
+
+  /// Teto do desconto, em centavos. Nulo = sem teto.
+  discountLimitMinor Int? @map("discount_limit_minor")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2242,14 +2273,14 @@ model PaymentMethod {
   studentId String @map("student_id") @db.Uuid
 
   /// Slug do provedor que guarda o token. Hoje `getnet` (ADR-032).
-  provider String
+  provider        String
   /// Identificador do token NO PROVEDOR. Nao e o cartao -- e a referencia a
   /// ele no cofre do provedor, inutil fora dali.
   externalTokenId String @map("external_token_id")
 
   /// Bandeira, como o provedor devolveu. String e nao enum: bandeira nova
   /// nao deve exigir migration.
-  brand String?
+  brand    String?
   /// Ultimos quatro digitos. E o maximo que a bandeira permite exibir.
   last4    String? @db.VarChar(4)
   expMonth Int?    @map("exp_month")
@@ -2345,12 +2376,14 @@ model Invoice {
   updatedAt      DateTime      @updatedAt @map("updated_at")
   version        Int           @default(0)
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  subscription Subscription  @relation(fields: [subscriptionId], references: [id])
-  student      Student       @relation(fields: [studentId], references: [id])
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription     @relation(fields: [subscriptionId], references: [id])
+  student      Student          @relation(fields: [studentId], references: [id])
   items        InvoiceItem[]
   payments     Payment[]
   attempts     PaymentAttempt[]
+  refunds      Refund[]
+  receipts     Receipt[]
 
   /// INV-066: invoice unica por assinatura e periodo.
   @@unique([tenantId, subscriptionId, billingPeriod])
@@ -2385,15 +2418,15 @@ model InvoiceItem {
 /// em duas tentativas (PIX falho + cartao) tem DUAS tentativas e UM
 /// pagamento -- e a falha continua no historico, que e o ponto.
 model Payment {
-  id        String            @id @default(uuid()) @db.Uuid
-  tenantId  String            @map("tenant_id") @db.Uuid
-  invoiceId String            @map("invoice_id") @db.Uuid
+  id          String            @id @default(uuid()) @db.Uuid
+  tenantId    String            @map("tenant_id") @db.Uuid
+  invoiceId   String            @map("invoice_id") @db.Uuid
   /// Centavos. INV-065.
-  amountMinor Int             @map("amount_minor")
-  currency  String            @default("BRL")
-  method    PaymentMethodKind
-  status    PaymentStatus     @default(PENDING)
-  paidAt    DateTime?         @map("paid_at")
+  amountMinor Int               @map("amount_minor")
+  currency    String            @default("BRL")
+  method      PaymentMethodKind
+  status      PaymentStatus     @default(PENDING)
+  paidAt      DateTime?         @map("paid_at")
 
   /// Quem reconheceu, preenchido SO quando `method = MANUAL`.
   ///
@@ -2415,6 +2448,8 @@ model Payment {
   invoice Invoice         @relation(fields: [invoiceId], references: [id])
   attempt PaymentAttempt? @relation(fields: [attemptId], references: [id])
   credits AccountCredit[]
+  refunds Refund[]
+  receipt Receipt?
 
   /// ADR-006 / INV-076: idempotencia do evento externo.
   @@unique([providerAccountId, externalPaymentId])
@@ -2427,21 +2462,21 @@ model Payment {
 /// Sucesso posterior nao apaga a falha anterior -- por isso a tentativa e
 /// tabela propria e nao um campo de status no pagamento.
 model PaymentAttempt {
-  id              String               @id @default(uuid()) @db.Uuid
-  tenantId        String               @map("tenant_id") @db.Uuid
-  invoiceId       String               @map("invoice_id") @db.Uuid
-  method          PaymentMethodKind
-  status          PaymentAttemptStatus @default(CREATED)
+  id                 String               @id @default(uuid()) @db.Uuid
+  tenantId           String               @map("tenant_id") @db.Uuid
+  invoiceId          String               @map("invoice_id") @db.Uuid
+  method             PaymentMethodKind
+  status             PaymentAttemptStatus @default(CREATED)
   /// Chave enviada ao provedor. Constraint do `MVP-02` 11.
-  idempotencyKey  String               @map("idempotency_key")
-  providerAccountId String?            @map("provider_account_id")
-  externalPaymentId String?            @map("external_payment_id")
+  idempotencyKey     String               @map("idempotency_key")
+  providerAccountId  String?              @map("provider_account_id")
+  externalPaymentId  String?              @map("external_payment_id")
   /// Codigo estavel do erro. Nunca a mensagem crua (`CLAUDE.md`).
-  failureCode       String?            @map("failure_code")
+  failureCode        String?              @map("failure_code")
   /// Falha permanente nao se repete sozinha; transitoria pode.
-  failureIsPermanent Boolean?          @map("failure_is_permanent")
-  requestedAt     DateTime             @default(now()) @map("requested_at")
-  settledAt       DateTime?            @map("settled_at")
+  failureIsPermanent Boolean?             @map("failure_is_permanent")
+  requestedAt        DateTime             @default(now()) @map("requested_at")
+  settledAt          DateTime?            @map("settled_at")
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoice Invoice  @relation(fields: [invoiceId], references: [id])
@@ -2469,17 +2504,17 @@ model PaymentAttempt {
 /// exatamente o buraco de controle que a emenda de 18/08 deixou aberto do
 /// lado preventivo -- aqui ele fecha do lado detectivo.
 model AccountCredit {
-  id              String              @id @default(uuid()) @db.Uuid
-  tenantId        String              @map("tenant_id") @db.Uuid
-  studentId       String              @map("student_id") @db.Uuid
-  originPaymentId String              @map("origin_payment_id") @db.Uuid
+  id                 String              @id @default(uuid()) @db.Uuid
+  tenantId           String              @map("tenant_id") @db.Uuid
+  studentId          String              @map("student_id") @db.Uuid
+  originPaymentId    String              @map("origin_payment_id") @db.Uuid
   /// Centavos. INV-065.
-  amountMinor     Int                 @map("amount_minor")
-  currency        String              @default("BRL")
-  status          AccountCreditStatus @default(AVAILABLE)
-  appliedToInvoiceId String?          @map("applied_to_invoice_id") @db.Uuid
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
+  amountMinor        Int                 @map("amount_minor")
+  currency           String              @default("BRL")
+  status             AccountCreditStatus @default(AVAILABLE)
+  appliedToInvoiceId String?             @map("applied_to_invoice_id") @db.Uuid
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -2537,27 +2572,28 @@ enum ProviderCapability {
 }
 
 model ProviderAccount {
-  id       String @id @default(uuid()) @db.Uuid
-  tenantId String @map("tenant_id") @db.Uuid
+  id                     String             @id @default(uuid()) @db.Uuid
+  tenantId               String             @map("tenant_id") @db.Uuid
   /// Slug do provedor homologado. Minusculo, sem espaco.
-  provider String
+  provider               String
   /// O QUE esta conta sabe fazer, nao QUEM ela e.
   ///
   /// O roteamento pergunta pela CAPACIDADE e nunca pela marca: trocar o
   /// Sicoob por outro PSP e mudar a linha de `provider` e escrever um
   /// adapter, sem tocar em caso de uso nenhum.
-  capability ProviderCapability
+  capability             ProviderCapability
   /// Identificador da conta NO PROVEDOR. E o que chega na requisicao de
   /// webhook e resolve o tenant.
-  externalAccountId String @map("external_account_id")
+  externalAccountId      String             @map("external_account_id")
   /// Segredo do HMAC, cifrado. Nunca sai em resposta de API, nunca em log.
-  signingSecretEncrypted String @map("signing_secret_encrypted")
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  signingSecretEncrypted String             @map("signing_secret_encrypted")
+  active                 Boolean            @default(true)
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
 
-  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  events ProviderEvent[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events             ProviderEvent[]
+  reconciliationRuns ReconciliationRun[]
 
   /// O par (provedor, conta) e o que a requisicao carrega -- por isso a
   /// unicidade e global, nao por tenant: duas contas iguais em tenants
@@ -2587,27 +2623,27 @@ model ProviderAccount {
 /// INV-079 decide se o evento chegou fora de ordem. Relogio local nao serve
 /// -- a ordem que importa e a da origem.
 model ProviderEvent {
-  id                String @id @default(uuid()) @db.Uuid
-  tenantId          String @map("tenant_id") @db.Uuid
-  providerAccountId String @map("provider_account_id") @db.Uuid
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  providerAccountId String    @map("provider_account_id") @db.Uuid
   /// Chave estavel do evento no provedor (INV-076). Criterio de homologacao
   /// do ADR-013: provedor sem isso nao passa no gate.
-  externalEventId String @map("external_event_id")
-  eventType       String @map("event_type")
+  externalEventId   String    @map("external_event_id")
+  eventType         String    @map("event_type")
   /// Pagamento a que o evento se refere, quando ha. Nulo em evento que nao
   /// e de pagamento.
-  externalPaymentId String? @map("external_payment_id")
+  externalPaymentId String?   @map("external_payment_id")
   /// Payload ja verificado. Retencao definida em `MVP-02` 11; NUNCA contem
   /// PAN/CVV -- a tokenizacao e hospedada (INV-098).
-  payload Json
+  payload           Json
   /// Instante no PROVEDOR. Base da ordenacao logica (INV-079).
-  occurredAt DateTime @map("occurred_at")
+  occurredAt        DateTime  @map("occurred_at")
   /// Nulo enquanto nao aplicado. Evento recebido != evento aplicado: um
   /// evento fora de ordem e persistido e NAO aplicado.
-  processedAt DateTime? @map("processed_at")
+  processedAt       DateTime? @map("processed_at")
   /// Por que o evento nao mudou estado, quando nao mudou. Codigo estavel.
-  skippedReason String? @map("skipped_reason")
-  receivedAt    DateTime @default(now()) @map("received_at")
+  skippedReason     String?   @map("skipped_reason")
+  receivedAt        DateTime  @default(now()) @map("received_at")
 
   tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   account ProviderAccount @relation(fields: [providerAccountId], references: [id])
@@ -2615,4 +2651,359 @@ model ProviderEvent {
   @@unique([providerAccountId, externalEventId])
   @@index([tenantId, externalPaymentId])
   @@map("provider_events")
+}
+
+// ---------------------------------------------------------------------------
+// Estorno, conciliacao e recibo -- F16, `MVP-02` 7 (Slice 2.5) e 11
+// ---------------------------------------------------------------------------
+
+/// Politica de acesso quando o estorno CONFIRMA. `M2-COMPLIANCE-01`.
+///
+/// Decidida pelo PI em 19/08/2026: `KEEP_UNTIL_PERIOD_END`. O aluno estornado
+/// continua entrando ate o fim do periodo que ja estava pago.
+///
+/// POR QUE E ENUM, E NAO UM `if` NO CASO DE USO: a segunda politica ja existe
+/// no documento (`SUSPEND_ON_CONFIRMATION`), e a escolha e por tenant. Uma
+/// academia que mude de ideia muda uma linha da tabela -- nao um deploy.
+///
+/// NENHUMA DAS DUAS E RETROATIVA (INV-094, `M2-BR-009`): a politica vale a
+/// partir do instante da confirmacao. Acesso que ja aconteceu aconteceu, e
+/// reescrever historico de catraca seria inventar que alguem nao entrou.
+enum RefundAccessPolicy {
+  /// Mantem o entitlement ate o fim do periodo pago. Padrao do PI.
+  KEEP_UNTIL_PERIOD_END
+  /// Suspende o entitlement no instante da confirmacao.
+  SUSPEND_ON_CONFIRMATION
+
+  @@map("refund_access_policy")
+}
+
+/// Estado do estorno. `MVP-02` 10 nao declara este grafo -- `Refund` esta
+/// `[indefinido]` no `CONVENTION.md` 2.3 --, entao ele espelha o unico que o
+/// PRD declara para o lado do provedor (`ProviderRefund`), mais os dois
+/// estados que so existem do nosso lado.
+///
+/// `REQUESTED` e o instante entre a nossa decisao e a chamada ao provedor:
+/// ele existe porque a chave de idempotencia precisa estar GRAVADA antes do
+/// efeito externo (INV-084). Sem ele, uma falha de rede depois da chamada
+/// deixaria dinheiro estornado sem registro nosso.
+enum RefundStatus {
+  REQUESTED
+  PROCESSING
+  CONFIRMED
+  FAILED
+
+  @@map("refund_status")
+}
+
+/// Estorno: movimento PROPRIO, nunca uma edicao do pagamento (INV-069).
+///
+/// A invoice NAO volta a `OPEN` quando o dinheiro sai -- ela vira `REFUNDED`,
+/// que e um terceiro fato, nao a negacao do segundo. Reabrir diria que o
+/// aluno nunca pagou, e ele pagou.
+///
+/// O QUE ESTA TABELA NAO ESTORNA: pagamento `MANUAL`. Por decisao do PI no
+/// ADR-027, dinheiro reconhecido na recepcao nao tem o que o provedor
+/// devolva -- a devolucao fisica acontece fora do sistema, e o que entra aqui
+/// seria um estorno que nenhuma API confirma. Contra-lancamento auditado e o
+/// caminho, e ele nao e desta fatia.
+model Refund {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  paymentId String @map("payment_id") @db.Uuid
+  /// Denormalizado de proposito: a fila de conciliacao filtra por invoice, e
+  /// alcancar a invoice pelo pagamento em toda linha da lista seria um join a
+  /// mais por um dado que nunca muda depois de gravado.
+  invoiceId String @map("invoice_id") @db.Uuid
+
+  /// Centavos. INV-065 -- nunca float.
+  ///
+  /// PARCIAL E PERMITIDO pelo tipo, e isso e deliberado: o `RefundInput` da
+  /// porta ja aceita valor, e a matriz de homologacao marcou estorno parcial
+  /// como NAO VERIFICADO nos dois provedores. Modelar so o total obrigaria
+  /// migration quando a verificacao chegar.
+  amountMinor Int    @map("amount_minor")
+  currency    String @default("BRL")
+
+  status RefundStatus @default(REQUESTED)
+
+  /// Razao obrigatoria, mesmo padrao do pagamento manual (INV-072/INV-126).
+  /// A trilha e DETECTIVA (ADR-027): nao impede o estorno indevido, permite
+  /// acha-lo depois.
+  reason String
+
+  /// Quem pediu. Nunca nulo: estorno sem ator nao e auditavel.
+  requestedByUserId String @map("requested_by_user_id") @db.Uuid
+
+  /// Politica aplicada NO INSTANTE DA CONFIRMACAO, gravada aqui.
+  ///
+  /// Copia, nao referencia: a politica do tenant pode mudar depois, e a
+  /// pergunta "por que este aluno continuou entrando?" tem que ser
+  /// respondivel com o valor que valia naquele dia. Ler a configuracao atual
+  /// para explicar decisao antiga e como reescrever o passado.
+  appliedAccessPolicy RefundAccessPolicy? @map("applied_access_policy")
+
+  /// Chave enviada ao provedor. Gravada ANTES da chamada (INV-084).
+  idempotencyKey   String  @map("idempotency_key")
+  /// Id do estorno no provedor. Nulo ate a chamada voltar.
+  externalRefundId String? @map("external_refund_id")
+  /// Codigo estavel da falha. Nunca a mensagem crua (`CLAUDE.md`).
+  failureCode      String? @map("failure_code")
+
+  requestedAt DateTime  @default(now()) @map("requested_at")
+  settledAt   DateTime? @map("settled_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@unique([tenantId, idempotencyKey])
+  /// NO MAXIMO UM estorno em voo por pagamento -- indice PARCIAL
+  /// (`WHERE status IN ('REQUESTED','PROCESSING')`), declarado na migration
+  /// porque o Prisma nao modela unicidade condicional.
+  ///
+  /// A LICAO E DA F14, QUE COBROU O ALUNO EM DOBRO: um `if (jaExiste)` perde
+  /// a corrida entre duas requisicoes concorrentes, porque entre a leitura e
+  /// a escrita cabe a outra. Aqui o erro seria devolver o dinheiro duas
+  /// vezes. O banco nao perde a corrida.
+  @@index([tenantId, paymentId, status])
+  @@index([tenantId, status, requestedAt])
+  @@map("refunds")
+}
+
+/// Recibo NAO FISCAL (INV-075, `M2-FR-018`).
+///
+/// NAO E NOTA FISCAL, e o produto inteiro depende dessa distincao: o ArenaHub
+/// nao emite documento fiscal (`docs/prd/README.md` 3). O texto impresso diz
+/// "RECIBO NAO FISCAL" em caixa alta porque um recibo que PARECE nota e pior
+/// que recibo nenhum -- a academia o entregaria no lugar da nota que ela
+/// ainda precisa emitir.
+///
+/// SNAPSHOT, NAO VISTA: o conteudo e congelado na emissao. Renderizar o
+/// recibo lendo invoice e aluno ao vivo faria o documento de marco mudar
+/// quando o aluno trocasse de nome em agosto -- e um recibo que muda depois
+/// de entregue nao prova nada.
+model Receipt {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  /// `@unique` no campo, e nao so no par com o tenant: `Receipt` e 1-1 com
+  /// `Payment`, e o Prisma exige unicidade do lado que define a relacao. O
+  /// par `(tenant, pagamento)` seria redundante -- o id do pagamento ja e
+  /// global.
+  paymentId String @unique @map("payment_id") @db.Uuid
+  invoiceId String @map("invoice_id") @db.Uuid
+
+  /// Numero sequencial por tenant. Mesmo padrao de `InvoiceSequence`, pelas
+  /// mesmas razoes: `COUNT(*) + 1` reusa numero, e `SEQUENCE` do Postgres e
+  /// global -- o tenant B veria o volume do A.
+  number Int
+
+  /// O documento congelado. Contem o que sera impresso e nada mais.
+  ///
+  /// O QUE NUNCA ENTRA AQUI: PAN, CVV, token do provedor, id de webhook,
+  /// CPF completo (INV-098, INV-133). O recibo e entregue em papel para o
+  /// aluno e fica no historico -- e o lugar errado para qualquer segredo.
+  snapshot Json
+
+  /// SHA-256 do `snapshot` em JSON canonico. E o codigo de verificacao
+  /// impresso: confere se o papel bate com o registro (INV-075,
+  /// "identificadores verificaveis").
+  verificationHash String @map("verification_hash")
+
+  issuedAt DateTime @default(now()) @map("issued_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  /// UM recibo por pagamento -- garantido pelo `@unique` em `paymentId`.
+  /// Reemitir devolve o MESMO documento; gerar um segundo com numero novo
+  /// faria parecer que o aluno pagou duas vezes.
+  @@unique([tenantId, number])
+  @@map("receipts")
+}
+
+/// Numeracao do recibo por tenant. Gemea de `InvoiceSequence`.
+model ReceiptSequence {
+  tenantId  String   @id @map("tenant_id") @db.Uuid
+  /// Proximo numero a emitir. Nunca decrementa.
+  nextValue Int      @default(1) @map("next_value")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("receipt_sequences")
+}
+
+/// Uma execucao de conciliacao sobre um intervalo FECHADO. `M2-FR-019`.
+///
+/// O intervalo e fechado de proposito: conciliar "ate agora" produziria
+/// divergencia falsa toda vez, porque o pagamento de trinta segundos atras
+/// ainda nao apareceu no extrato do banco. `MISSING_EXTERNAL` so e verdade
+/// depois que a janela fechou.
+model ReconciliationRun {
+  id                String @id @default(uuid()) @db.Uuid
+  tenantId          String @map("tenant_id") @db.Uuid
+  /// Conta cujo extrato foi lido. UUID interno -- aqui HA relacao, ao
+  /// contrario de `Payment.provider_account_id`, que guarda o id externo.
+  providerAccountId String @map("provider_account_id") @db.Uuid
+
+  /// Intervalo fechado, em UTC. `periodEnd` e exclusivo.
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+
+  status ReconciliationRunStatus @default(RUNNING)
+
+  /// Contagens do resultado, para a tela nao recontar a cada abertura.
+  movementsImported Int @default(0) @map("movements_imported")
+  itemsOpen         Int @default(0) @map("items_open")
+
+  /// Codigo estavel quando a execucao falha (provedor fora, por exemplo).
+  failureCode String? @map("failure_code")
+
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account   ProviderAccount      @relation(fields: [providerAccountId], references: [id])
+  movements ExternalMovement[]
+  items     ReconciliationItem[]
+
+  /// Reexecutar a MESMA janela na MESMA conta e idempotente: devolve a
+  /// execucao que ja existe em vez de criar divergencia duplicada (INV-086).
+  @@unique([tenantId, providerAccountId, periodStart, periodEnd])
+  @@index([tenantId, startedAt])
+  @@map("reconciliation_runs")
+}
+
+enum ReconciliationRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+
+  @@map("reconciliation_run_status")
+}
+
+/// Tipo do movimento no extrato. Dinheiro que entra ou que volta.
+enum ExternalMovementKind {
+  PAYMENT
+  REFUND
+
+  @@map("external_movement_kind")
+}
+
+/// Uma linha do extrato do provedor, normalizada.
+///
+/// POR QUE PERSISTIR EM VEZ DE COMPARAR EM MEMORIA: a divergencia precisa
+/// continuar explicavel depois. Um item `MISSING_INTERNAL` aberto em marco e
+/// resolvido em abril tem que mostrar QUAL linha do extrato o gerou -- e o
+/// extrato do provedor nao e consultavel para tras indefinidamente.
+///
+/// Note que `externalAccountId` e o id EXTERNO (string do provedor), igual ao
+/// que `Payment.provider_account_id` guarda -- e por isso que o casamento
+/// entre os dois lados funciona por comparacao direta.
+model ExternalMovement {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  runId    String @map("run_id") @db.Uuid
+
+  /// Id do movimento NO PROVEDOR. E o que da a idempotencia da importacao.
+  externalMovementId String  @map("external_movement_id")
+  /// Id do pagamento no provedor, quando o movimento se refere a um.
+  externalPaymentId  String? @map("external_payment_id")
+  /// Conta no provedor, id EXTERNO -- casa com `Payment.provider_account_id`.
+  externalAccountId  String  @map("external_account_id")
+
+  kind ExternalMovementKind
+
+  /// Centavos. INV-065. Sempre POSITIVO: a direcao mora em `kind`, nao no
+  /// sinal -- valor negativo em coluna monetaria e a forma mais facil de uma
+  /// soma silenciosamente dar o numero errado.
+  amountMinor Int    @map("amount_minor")
+  currency    String @default("BRL")
+
+  /// Instante NO PROVEDOR.
+  occurredAt DateTime @map("occurred_at")
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run    ReconciliationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  /// Reimportar a mesma pagina do extrato nao duplica movimento (INV-086).
+  @@unique([tenantId, externalMovementId])
+  @@index([tenantId, externalPaymentId])
+  @@map("external_movements")
+}
+
+/// Estado da divergencia. `MVP-02` 10, literal -- estes cinco nomes vem do
+/// PRD e nao foram inventados aqui.
+enum ReconciliationItemStatus {
+  MATCHED
+  MISSING_INTERNAL
+  MISSING_EXTERNAL
+  AMOUNT_MISMATCH
+  RESOLVED
+
+  @@map("reconciliation_item_status")
+}
+
+/// Como o operador resolveu a divergencia. Lista FECHADA.
+///
+/// FECHADA E O PONTO INTEIRO (`M2-AC-010`): o aceite da fatia e "operador
+/// resolve divergencia SEM EDITAR BANCO". Um comando generico de edicao seria
+/// exatamente o `UPDATE` manual que este modelo existe para tornar
+/// desnecessario -- so que por dentro da aplicacao, parecendo seguro.
+enum ReconciliationResolution {
+  /// O evento existe no inbox e nunca foi aplicado. Reprocessa pelo MESMO
+  /// caminho idempotente do webhook -- nao por um atalho de escrita.
+  REPROCESS_PROVIDER_EVENT
+  /// Diferenca real, explicada e aceita (tarifa do provedor, por exemplo).
+  /// Nao move dinheiro: registra que alguem olhou e decidiu.
+  ACCEPT_DOCUMENTED_DIFFERENCE
+
+  @@map("reconciliation_resolution")
+}
+
+/// Uma divergencia entre o nosso registro e o extrato do provedor.
+///
+/// TODO MOVIMENTO VIRA LINHA AQUI, inclusive o que bateu (`MATCHED`). Guardar
+/// so o que deu errado responderia "quais divergencias houve?" mas nunca
+/// "conciliei 100%?" -- que e a metrica que o `MVP-02` 3 cobra.
+model ReconciliationItem {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  runId    String @map("run_id") @db.Uuid
+
+  status ReconciliationItemStatus
+
+  /// Lado interno, quando existe. Nulo em `MISSING_INTERNAL`.
+  paymentId          String? @map("payment_id") @db.Uuid
+  refundId           String? @map("refund_id") @db.Uuid
+  /// Lado externo, quando existe. Nulo em `MISSING_EXTERNAL`.
+  externalMovementId String? @map("external_movement_id")
+
+  /// Os dois valores, lado a lado. A tela mostra ambos sem recalcular, e a
+  /// diferenca fica evidente sem o operador fazer conta de cabeca.
+  internalAmountMinor Int? @map("internal_amount_minor")
+  externalAmountMinor Int? @map("external_amount_minor")
+
+  /// Texto em pt-BR, pronto para a tela: o que fazer com esta linha.
+  recommendedAction String @map("recommended_action")
+
+  /// Resolucao, quando houve. APPEND-ONLY na pratica: o item vai de aberto
+  /// para `RESOLVED` uma vez, e o que aconteceu fica gravado. Nao ha caminho
+  /// de volta -- desfazer resolucao seria apagar a decisao de alguem.
+  resolution       ReconciliationResolution?
+  resolutionReason String?                   @map("resolution_reason")
+  resolvedByUserId String?                   @map("resolved_by_user_id") @db.Uuid
+  resolvedAt       DateTime?                 @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run    ReconciliationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, runId])
+  @@map("reconciliation_items")
 }
