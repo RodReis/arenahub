@@ -38,6 +38,12 @@ const DESTINO = join(RAIZ, 'reports', 'TESTS.md');
  * da ordem deste array: `.int-spec.ts` nao casa `.spec.ts` porque o caractere
  * antes de `spec` e `-`. Afrouxar para `-spec.ts` faria integracao vazar para
  * unitario -- o self-check cobre exatamente esse caso.
+ *
+ * O nivel `seguranca` estava no TESTING.md §2 e NAO estava aqui, desde o
+ * bootstrap. Nenhum `.sec-spec.ts` existe hoje, entao a linha sai zerada --
+ * mas no dia em que o primeiro for escrito (isolamento de tenant, autorizacao,
+ * idempotencia) ele contaria zero em silencio, que e a mesma falha do `.tsx`
+ * um paragrafo acima. Achado na revisao desta issue.
  */
 const NIVEIS = [
   { nome: 'unitário', sufixos: ['.spec.ts', '.spec.tsx'] },
@@ -45,6 +51,7 @@ const NIVEIS = [
   { nome: 'integração', sufixos: ['.int-spec.ts', '.int-spec.tsx'] },
   { nome: 'e2e', sufixos: ['.e2e-spec.ts', '.e2e-spec.tsx'] },
   { nome: 'hardware', sufixos: ['.hw-spec.ts', '.hw-spec.tsx'] },
+  { nome: 'segurança', sufixos: ['.sec-spec.ts', '.sec-spec.tsx'] },
 ];
 
 /**

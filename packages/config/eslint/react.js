@@ -52,9 +52,10 @@ const config = [
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'error',
 
-      // --- Acessibilidade: o que o DS-PAINEL.md §11 exige ---------------
+      // --- Acessibilidade: o que o DS-PAINEL.md §10 exige ---------------
       // Subconjunto nominal, nao o `recommended` inteiro: cada regra aqui
-      // corresponde a uma linha do contrato de design. Ligar o preset todo
+      // corresponde a uma linha do §10 (WCAG 2.2 AA) -- nao do §11, que e a
+      // lista de regras de lint do design system e vive em design-system.js. Ligar o preset todo
       // traria regra sobre `<marquee>` e sobre ARIA que nao usamos, e o
       // ruido faria o time desligar o plugin em vez de ler o aviso.
       'jsx-a11y/alt-text': 'error',
