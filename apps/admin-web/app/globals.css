@@ -206,6 +206,39 @@ a {
 }
 
 /**
+ * LINK QUE É BOTÃO usa a cor da própria variante.
+ *
+ * `Button render={<a>}` renderiza um `<a>` de verdade — o certo, porque quem
+ * navega tem de ser link. Mas a regra `a` acima mora fora de `@layer` e por
+ * isso vence as classes utilitárias do Tailwind, que vivem em layer: ela
+ * pintava o texto de teal, e o botão primário TEM fundo teal. Medido:
+ * `rgb(0,112,123)` sobre `rgb(0,112,123)` — contraste 1:1, o botão aparecendo
+ * como um retângulo colorido vazio.
+ *
+ * TRÊS TENTATIVAS ERRADAS ANTES DESTA, todas medidas na tela:
+ *   - `color: inherit` puxa a cor do PAI (texto do card, cinza) → 2.28, que
+ *     reprova AA;
+ *   - `revert-layer` não faz nada, porque a regra ofensora não está em layer;
+ *   - `a:not([data-slot='button'])` aumentou a especificidade do seletor `a`,
+ *     que passou a vencer o CSS module da navegação e derrubou os links do
+ *     menu de 8.24 para 3.17. Regressão numa tela que a fatia nem toca.
+ *
+ * Nomear a cor por variante é o que resolve sem mexer na especificidade de
+ * `a`: cada variante já tem seu token, e aqui só se declara qual.
+ */
+a[data-slot='button'] {
+  text-decoration: none;
+}
+
+a[data-slot='button'].bg-primary {
+  color: var(--primary-foreground);
+}
+
+a[data-slot='button']:not(.bg-primary) {
+  color: var(--foreground);
+}
+
+/**
  * Texto de apoio -- o `<small>` que explica por que o CPF nao e obrigatorio e
  * o que impede a recepcao de recusar quem chegou sem documento. No default do
  * navegador ele cai para ~11px cinza e some sob luz fluorescente.
