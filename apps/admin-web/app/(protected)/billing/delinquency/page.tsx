@@ -15,9 +15,6 @@ import { chamarApi } from '../../../../lib/api/server-client';
 import { linkDeCobranca, situacaoVisivel } from '../../../../src/billing/inadimplencia';
 import estilos from './delinquency.module.css';
 
-/** Fuso FIXO, preservado das outras telas -- mesma divida registrada la. */
-const FUSO_PROVISORIO = 'America/Sao_Paulo';
-
 export const metadata: Metadata = {
   title: 'Inadimplência e cobrança — ArenaHub',
 };
@@ -36,6 +33,7 @@ interface Linha {
   situacao: string;
   telefone: string | null;
   liberadoAte: string | null;
+  fusoDaUnidade: string;
 }
 
 interface Painel {
@@ -157,8 +155,15 @@ export default async function InadimplenciaPage() {
           {
             key: 'vencimento',
             header: 'Vencimento',
+            /*
+              FUSO DA UNIDADE, nao fixo. As outras telas ainda carregam um
+              `FUSO_PROVISORIO` hardcodado; aqui isso seria pior que divida
+              tecnica: o backend decide o bloqueio no fuso da unidade, SEM
+              fallback (ADR-019 §3), e mostrar a data noutro fuso faria a tela
+              divergir em um dia da regra que ela esta exibindo.
+            */
             render: (linha) => (
-              <TenantDateTime iso={linha.dueAt} timeZone={FUSO_PROVISORIO} format="date" />
+              <TenantDateTime iso={linha.dueAt} timeZone={linha.fusoDaUnidade} format="date" />
             ),
           },
           {

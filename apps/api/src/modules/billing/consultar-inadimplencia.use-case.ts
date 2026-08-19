@@ -37,6 +37,16 @@ export interface LinhaDeInadimplencia {
   readonly telefone: string | null;
   /** Ha liberacao financeira viva? A tela precisa nao oferecer outra. */
   readonly liberadoAte: Date | null;
+  /**
+   * Fuso da UNIDADE do aluno -- ADR-019 3, sem fallback.
+   *
+   * Vai para a tela porque o vencimento e exibido nele: com `America/Manaus`
+   * (UTC-4) e a tela fixada em Sao Paulo, a data mostrada poderia divergir em
+   * um dia da que o backend usou para decidir o bloqueio. Reintroduzir o
+   * fallback na exibicao seria o mesmo bug de um dia, num lugar onde ele
+   * parece inofensivo.
+   */
+  readonly fusoDaUnidade: string;
 }
 
 export interface ResumoDaInadimplencia {
@@ -141,6 +151,7 @@ export class ConsultarInadimplenciaUseCase {
         invoice.student.contacts[0]?.value ??
         null,
       liberadoAte: liberadoAte.get(invoice.studentId) ?? null,
+      fusoDaUnidade: invoice.student.gymUnit.timezone,
     }));
 
     return { resumo: await this.resumo(contexto, linhas), linhas };

@@ -168,7 +168,6 @@ export class AplicarInadimplenciaUseCase {
     diasDeCarencia: number,
   ): Promise<ResultadoDaInadimplencia> {
     const ids = invoices.map((invoice) => invoice.id);
-    const subscriptionIds = [...new Set(invoices.map((invoice) => invoice.subscriptionId))];
 
     /**
      * CONGELA O INSTANTE na primeira vez que a invoice e vista bloqueando.
@@ -199,6 +198,34 @@ export class AplicarInadimplenciaUseCase {
       where: { id: { in: ids }, tenantId, status: 'OPEN' },
       data: { status: 'OVERDUE', version: { increment: 1 } },
     });
+
+    /**
+     * RELE DENTRO DA TRANSACAO quais invoices continuam devendo.
+     *
+     * DEFEITO REAL, achado pela revisao de codigo e reproduzido antes de
+     * corrigir: os `subscriptionIds` vinham da leitura PRE-TRANSACAO. Se o
+     * webhook de pagamento comitasse na janela entre a leitura e a escrita, o
+     * job suspendia de volta um entitlement que o pagamento acabara de
+     * reativar -- medido: `invoicesVencidas: 0` (a invoice ja estava paga) e
+     * `direitosSuspensos: 1`. O aluno pagava e ficava bloqueado na catraca.
+     *
+     * A lista boa e a que o BANCO ve agora, dentro da transacao. Invoice que
+     * virou `PAID` no meio some daqui, e a assinatura dela nao e tocada.
+     */
+    const aindaDevendo = await tx.invoice.findMany({
+      where: { id: { in: ids }, tenantId, status: 'OVERDUE' },
+      select: { subscriptionId: true },
+    });
+
+    const subscriptionIds = [...new Set(aindaDevendo.map((i) => i.subscriptionId))];
+
+    if (subscriptionIds.length === 0) {
+      return {
+        invoicesVencidas: invoicesVencidas.count,
+        assinaturasEmAtraso: 0,
+        direitosSuspensos: 0,
+      };
+    }
 
     const assinaturasEmAtraso = await tx.subscription.updateMany({
       where: { id: { in: subscriptionIds }, tenantId, status: 'ACTIVE' },

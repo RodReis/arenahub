@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { POLICY_VERSION } from '@arenahub/access-policy';
 import { CABECALHOS, assinar } from '@arenahub/api-contracts';
 import request from 'supertest';
 
@@ -275,7 +276,16 @@ describe('F9 -- decisao online de acesso', () => {
 
       expect(corpo.outcome).toBe('ALLOW');
       expect(corpo.reason).toBe('ACTIVE_ENTITLEMENT');
-      expect(corpo.policyVersion).toBe('1.0.0');
+      /*
+        DERIVADO da fonte, nao literal: `POLICY_VERSION` sobe quando o motor
+        muda de comportamento observavel (foi para 1.1.0 na F15, que
+        acrescentou `PAYMENT_OVERDUE`). Fixar o numero aqui faria toda fatia
+        que mexe na politica quebrar um teste que nao tem nada a ver com ela.
+
+        O que importa e que a decisao carregue a versao VIGENTE -- e e isso
+        que a comparacao afirma.
+      */
+      expect(corpo.policyVersion).toBe(POLICY_VERSION);
       expect(corpo.validUntil).not.toBeNull();
 
       // O evento ja existe quando a resposta sai -- `M1` §3.

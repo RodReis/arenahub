@@ -133,6 +133,96 @@ describe('instanteDeBloqueio -- a conta do ADR-019', () => {
   });
 });
 
+describe('meia-noite local -- os fusos que costumam quebrar', () => {
+  /**
+   * A revisao de codigo suspeitou que a correcao de deslocamento nao
+   * convergiria em fusos de meia hora no dia da transicao. Varri 2026 inteiro
+   * nestes fusos e nao houve divergencia -- mas o caso fica aqui para que a
+   * proxima mudanca na conta seja obrigada a continuar valendo neles.
+   */
+  const DIFICEIS = [
+    'Australia/Lord_Howe',
+    'Pacific/Chatham',
+    'Australia/Sydney',
+    'Pacific/Auckland',
+    'America/Santiago',
+    'Asia/Tehran',
+    'Asia/Kolkata',
+  ];
+
+  it.each(DIFICEIS)('resolve o ano inteiro de 2026 em %s sem falhar', (fuso) => {
+    for (let mes = 1; mes <= 12; mes += 1) {
+      for (let dia = 1; dia <= 28; dia += 1) {
+        const vencimento = new Date(Date.UTC(2026, mes - 1, dia, 12, 0, 0));
+
+        const bloqueio = instanteDeBloqueio(
+          vencimento,
+          politica({ diasDeCarencia: 3, fusoDaUnidade: fuso }),
+        );
+
+        expect(Number.isFinite(bloqueio.getTime())).toBe(true);
+      }
+    }
+  });
+
+  it('06/09/2026 em Santiago: o dia em que a MEIA-NOITE NAO EXISTE', () => {
+    /**
+     * O ACHADO DA VARREDURA, e o caso mais dificil deste arquivo.
+     *
+     * O horario de verao do Chile comeca a meia-noite: o relogio pula de
+     * 23:59 direto para 01:00, e as 00:00 daquele dia SIMPLESMENTE NAO
+     * ACONTECEM. Nao ha ponto fixo -- o laco de correcao oscila entre 03:00Z
+     * e 04:00Z para sempre, e um algoritmo que aceitasse o ultimo palpite
+     * devolveria um ou outro conforme a PARIDADE do numero de passadas.
+     *
+     * Bloqueio uma hora deslocado, sem erro, uma vez por ano. A funcao devolve
+     * o PRIMEIRO INSTANTE QUE EXISTE naquele dia -- 01:00 local --, que e a
+     * leitura fiel do ADR-019: o dia comecou, so comecou mais tarde.
+     */
+    const bloqueio = instanteDeBloqueio(
+      new Date('2026-09-03T12:00:00.000Z'),
+      politica({ diasDeCarencia: 3, fusoDaUnidade: 'America/Santiago' }),
+    );
+
+    const local = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Santiago',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(bloqueio);
+
+    /** Dia 06, como pedido -- e 01:00, porque 00:00 nao existe. */
+    expect(local).toContain('2026-09-06');
+    expect(local).toContain('01:00');
+  });
+
+  it('o resultado E meia-noite local, e nao um instante qualquer', () => {
+    /**
+     * O que a funcao promete. Sem esta verificacao, uma conta que devolvesse
+     * 23h ou 01h locais passaria em todos os casos acima -- eles so provam
+     * que ela nao explode.
+     */
+    for (const fuso of DIFICEIS) {
+      const bloqueio = instanteDeBloqueio(
+        new Date('2026-06-01T12:00:00.000Z'),
+        politica({ diasDeCarencia: 3, fusoDaUnidade: fuso }),
+      );
+
+      const local = new Intl.DateTimeFormat('en-CA', {
+        timeZone: fuso,
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      }).format(bloqueio);
+
+      expect(local).toBe('00:00');
+    }
+  });
+});
+
 describe('deveBloquear', () => {
   const VENCIMENTO = new Date('2026-08-10T14:00:00.000Z');
 

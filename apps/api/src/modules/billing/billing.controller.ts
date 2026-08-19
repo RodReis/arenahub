@@ -190,6 +190,7 @@ interface PainelDeInadimplenciaDto {
     situacao: string;
     telefone: string | null;
     liberadoAte: string | null;
+    fusoDaUnidade: string;
   }[];
 }
 

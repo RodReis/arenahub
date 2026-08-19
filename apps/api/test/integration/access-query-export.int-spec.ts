@@ -373,6 +373,13 @@ describe('F11 -- consulta e exportacao de eventos', () => {
       };
 
       expect(corpo.evento.id).toBe(original);
+      /*
+        LITERAL de proposito, e nao `POLICY_VERSION`: este caso le um evento
+        GRAVADO PELA FIXTURE com `1.0.0`, e o valor tem de sair da consulta
+        exatamente como entrou. Derivar da constante afirmaria que evento
+        historico e relido com a politica de hoje -- que e justamente o que
+        gravar a versao existe para impedir (`M1-BR-009`).
+      */
       expect(corpo.policyVersion).toBe('1.0.0');
       expect(Array.isArray(corpo.correcoes)).toBe(true);
     });

@@ -134,18 +134,68 @@ function dataLocalDe(instante: Date, timeZone: string): DataLocal {
  * e por isso que a soma de carencia pode ser feita antes de chegar aqui.
  */
 function meiaNoiteLocalEmUtc(data: DataLocal, timeZone: string): Date {
-  let palpite = Date.UTC(data.ano, data.mes - 1, data.dia, 0, 0, 0, 0);
+  const alvo = Date.UTC(data.ano, data.mes - 1, data.dia, 0, 0, 0, 0);
+  let palpite = alvo;
 
-  for (let passada = 0; passada < 2; passada += 1) {
-    const deslocamento = deslocamentoEmMs(new Date(palpite), timeZone);
-    const corrigido = Date.UTC(data.ano, data.mes - 1, data.dia, 0, 0, 0, 0) - deslocamento;
+  /**
+   * ## O dia em que a meia-noite NAO EXISTE
+   *
+   * A revisao de codigo suspeitou que duas passadas nao bastariam em fusos de
+   * meia hora. Varri 2026 inteiro nos fusos citados e eles convergem -- mas a
+   * varredura achou OUTRO caso, pior e real: **06/09/2026 em
+   * `America/Santiago`**.
+   *
+   * O horario de verao do Chile comeca a meia-noite: o relogio pula de 23:59
+   * direto para 01:00, e **as 00:00 daquele dia simplesmente nao acontecem**.
+   * O ponto fixo nao existe, e o laco oscila entre 03:00Z e 04:00Z para
+   * sempre -- duas passadas, oito, mil.
+   *
+   * Um laco que aceitasse o ultimo palpite devolveria 03:00Z ou 04:00Z
+   * conforme a paridade do numero de passadas. Bloqueio uma hora deslocado,
+   * sem erro, uma vez por ano, na academia que ninguem olha -- o "bug de um
+   * dia escondido" que o ADR-019 existe para impedir, na sua forma mais
+   * dificil de achar.
+   *
+   * ## O que fazemos: a PRIMEIRA hora que existe
+   *
+   * Quando a meia-noite nao existe, o bloqueio vale do primeiro instante que
+   * existe naquele dia -- 01:00 local, no caso do Chile. E a leitura fiel do
+   * ADR-019 ("primeiro instante de `due_date + grace_period`"): o dia comecou,
+   * so comecou mais tarde.
+   *
+   * Detectamos pela ida e volta: se o palpite convertido de volta para data
+   * local cair no DIA CERTO, ele serve -- ainda que a hora nao seja 00:00.
+   * Se cair em outro dia, e defeito de verdade e falhamos alto.
+   */
+  for (let passada = 0; passada < 4; passada += 1) {
+    const corrigido = alvo - deslocamentoEmMs(new Date(palpite), timeZone);
 
-    if (corrigido === palpite) break;
+    if (corrigido === palpite) {
+      return new Date(palpite);
+    }
 
     palpite = corrigido;
   }
 
-  return new Date(palpite);
+  /**
+   * Nao houve ponto fixo. Dos dois candidatos da oscilacao, vale o MAIS CEDO
+   * que ainda cai no dia certo -- e o primeiro instante que existe.
+   */
+  const candidatos = [palpite, alvo - deslocamentoEmMs(new Date(palpite), timeZone)].sort(
+    (a, b) => a - b,
+  );
+
+  for (const candidato of candidatos) {
+    const local = dataLocalDe(new Date(candidato), timeZone);
+
+    if (local.ano === data.ano && local.mes === data.mes && local.dia === data.dia) {
+      return new Date(candidato);
+    }
+  }
+
+  throw new RangeError(
+    `nao foi possivel resolver o inicio de ${String(data.ano)}-${String(data.mes)}-${String(data.dia)} em ${timeZone}`,
+  );
 }
 
 /**

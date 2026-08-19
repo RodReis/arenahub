@@ -129,6 +129,11 @@ describe('contrato OpenAPI', () => {
         '/api/v1/payment-methods',
         '/api/v1/invoices/{id}/payments/card',
         '/api/v1/subscriptions/{id}/recurrence/cancel',
+        // F15 -- inadimplencia e acesso.
+        '/api/v1/billing/delinquency',
+        '/api/v1/billing/delinquency/apply',
+        '/api/v1/billing/financial-overrides',
+        '/api/v1/billing/financial-overrides/{id}/revoke',
       ]),
     );
   });
