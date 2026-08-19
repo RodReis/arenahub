@@ -68,34 +68,16 @@ export function calcularHashDeCpf(tenantId: string, cpf: string): string {
 }
 
 /**
- * Os tres ultimos digitos, para a recepcao confirmar "e este mesmo?".
- *
- * O CPF completo NAO e persistido nem devolvido pela API (`CLAUDE.md`:
- * nunca logar PII; INV-022 para o principio geral).
+ * Formata o CPF completo para exibicao: `12345678901` vira `123.456.789-01`
+ * (ADR-034 -- o numero completo e persistido e devolvido pela API, sem
+ * ocultar digitos).
  */
-export function ultimosTresDigitosDoCpf(cpf: string): string {
-  return normalizarCpf(cpf).slice(-3);
-}
+export function formatarCpf(cpf: string | null): string | null {
+  if (cpf === null) return null;
 
-/**
- * Mascara de exibicao. Os tres ultimos digitos de `12345678901` viram
- * `•••.•••.••9-01`.
- *
- * UM SO CARACTERE DE OCULTACAO, e isso era um bug de verdade: a versao
- * anterior misturava `•` e `*` na mesma string (`•••.•••.**1-91`), e o
- * resultado nao parecia um CPF -- a recepcao, que usa isto para confirmar
- * "e este mesmo?", tinha de decifrar o formato antes de comparar o numero.
- * O proprio comentario da funcao ja descrevia a forma certa; o codigo e que
- * nao a seguia.
- *
- * A FORMA DO CPF E PRESERVADA (`XXX.XXX.XXX-XX`) porque e ela que permite
- * comparar de relance com o documento na mao: contar posicao em `•••.•••.••9`
- * e imediato, em `***.***.**9` nao.
- */
-export function mascararCpf(ultimos3: string | null): string | null {
-  if (ultimos3 === null) return null;
+  const digitos = normalizarCpf(cpf);
 
-  return `•••.•••.••${ultimos3.slice(0, 1)}-${ultimos3.slice(1)}`;
+  return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`;
 }
 
 /**
