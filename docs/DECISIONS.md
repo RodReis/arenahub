@@ -60,6 +60,8 @@ existe para expulsar deste repositório.
 | [028](#adr-028) | Modo de acionamento da catraca é código, não config do equipamento | `proposto` | — *(virou restrição 2 do ADR-029)* |
 | [029](#adr-029) | Gate §15 do MVP 0: `GO_WITH_CONSTRAINTS` | `aceito` | — **destrava o MVP 1** |
 | [030](#adr-030) | Aprovação antecipada das SPEC-012 a 016, com o ADR-013 aberto | `aceito` | — |
+| [031](#adr-031) | Tailwind e shadcn/ui no `admin-web` | `aceito` | — |
+| [032](#adr-032) | Dois provedores: Sicoob para PIX, Getnet para cartão | `aceito` | — **fecha o ADR-013 e destrava F14–F16** |
 
 ---
 
@@ -596,7 +598,12 @@ cache no meio do MVP 1.
 <a id="adr-013"></a>
 ## ADR-013 — Provedor de pagamento e contrato PaymentProvider
 
-**Data:** 14/08/2026 · **Status:** `aberto` · **Bloqueia:** F12 a F16 (MVP 2 inteiro)
+**Data:** 14/08/2026 · **Status:** `fechado` em 19/08/2026 pelo **ADR-032** · **Bloqueia:** nada
+
+> ✅ **Fechado em 19/08/2026.** O PI escolheu **Sicoob para PIX e Getnet (Santander) para
+> cartão** — ver **[ADR-032](#adr-032)**, que carrega a decisão, a matriz de verificação e as
+> duas políticas do `M2-COMPLIANCE-01` que continuam abertas. O texto abaixo fica como
+> **histórico**: é o raciocínio que levou ao gate, e a matriz de critérios que ele produziu.
 
 **Contexto.** O provedor não foi escolhido, mas o MVP 2 inteiro depende dele: formato e
 garantia de entrega de webhook, recorrência de cartão, PIX, estorno parcial, tokenização,
@@ -1597,3 +1604,92 @@ transições válidas aparecem.
 Migrar com os componentes do shadcn e reescrever os nove testes que dependem de `<select>` nativo.
 Descartada pelo PI: o escopo da F46 é aplicar o design system, não reescrever a suíte de
 acessibilidade.
+
+---
+
+<a id="adr-032"></a>
+## ADR-032 — Dois provedores de pagamento: Sicoob para PIX, Getnet para cartão
+
+**Data:** 19/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 19/08/2026**
+· **Fecha** o [ADR-013](#adr-013) · **Emenda** o `MVP-02` §5 · **Destrava:** F14, F15 e F16
+
+**Contexto.** O ADR-013 mandou a escolha do provedor sair de um card `[GATE]` de homologação,
+com matriz comparativa. Esse card **nunca chegou a ser criado**, e F14–F16 ficaram paradas no
+Backlog por um portão que não existia no board.
+
+Em 19/08 o PI trouxe o fato que faltava e que **não estava em documento nenhum** — nem no
+`LANDSCAPE.md` §4.2, nem no ADR-013: **a Arena Positiva já recebe pela Sicoob.**
+
+**Decisão.** **PIX pelo Sicoob. Cartão tokenizado e recorrência pela Getnet (Santander).**
+
+O gate deixou de ser competição entre marcas e virou **verificação** dos dois escolhidos, feita
+em [`docs/reports/MVP-02-matriz-de-homologacao-de-provedor.md`](reports/MVP-02-matriz-de-homologacao-de-provedor.md).
+
+**Por que dois, e não um.** O Sicoob é **banco, não adquirente**: as APIs públicas cobrem Pix
+recebimentos, cobrança bancária e pagamentos/transferências. **Não há cartão tokenizado, cofre
+de tokens nem assinatura.** O `MVP-02` §5 exige as três capacidades do provedor único —
+logo, provedor único é impossível com o Sicoob, e trocar o Sicoob custaria à academia o
+relacionamento bancário que ela já tem.
+
+**Emenda ao `MVP-02` §5.** Onde se lia *"Um segundo provedor não faz parte deste MVP"*, passa a
+valer: **PIX e cartão podem vir de provedores distintos, cada um atrás da mesma porta
+`PaymentProvider`.** A vedação original continua válida no que importava — não existem **dois
+adapters concorrentes para a mesma capacidade**, que era o custo que ela evitava.
+
+### Consequência estrutural: a porta já comportava dois
+
+A F13 acertou a forma sem saber. `ProviderAccount` tem coluna `provider` com
+`@@unique([provider, externalAccountId])`; a rota é `/api/v1/webhooks/payments/:provider`; e o
+provedor é injetado por **token** (`PAYMENT_PROVIDER`), não por classe.
+
+O que muda: a escolha do adapter deixa de ser **por ambiente** e passa a ser **por método** —
+`createPix` → Sicoob; `createTokenizedSubscription` e `cancelSubscription` → Getnet. Roteamento
+é decisão técnica do Code, registrada no PR da fatia.
+
+### A regra que a fatia de cartão não pode violar (INV-098)
+
+A Getnet tem **dois caminhos** de tokenização, e só um satisfaz o INV-098:
+
+- 🔴 `POST /v1/tokens/card` **chamado pelo backend** recebe `card_number` cru — o PAN passaria
+  pelo nosso servidor e jogaria o `apps/api` para dentro do escopo PCI DSS;
+- ✅ **Get Checkout / iframe / SDK no cliente** — o dado vai do navegador direto para a Getnet e
+  o backend recebe **só o token**.
+
+**O ArenaHub implementa exclusivamente o segundo.** Variável com `cardNumber`, `pan` ou `cvv` em
+`apps/api` é defeito de PCI, não campo faltando.
+
+### O achado que ainda pode voltar à mesa
+
+**A assinatura de webhook não está confirmada em nenhum dos dois provedores.** O ADR-013 é
+categórico — *"sem HMAC verificável, o provedor está fora"* — e o INV-077 exige verificar
+assinatura e origem antes de qualquer processamento.
+
+Isso **não bloqueia a F14**, que cria e cancela assinatura: confirmação por webhook é caminho da
+F13 e da F15. Mas **bloqueia dinheiro real em produção**, e precisa de resposta com credencial
+em mãos. Se um dos dois não assinar, a saída não é aceitar: é **consulta ativa**
+(`getPaymentStatus`) como fonte de verdade, com o webhook tratado como gatilho não confiável —
+forma que a F13 já implementou.
+
+### Limite de confiança desta decisão
+
+A matriz foi montada a partir de **documentação pública e fontes secundárias**. Os dois portais
+de desenvolvedor exigem credencial (`developers.sicoob.com.br` é SPA;
+`developers.getnet.com.br` devolve **403** a cliente automatizado), então **nada foi verificado
+em sandbox**. Os itens marcados ❓ na matriz — estorno parcial, chave estável de evento, entrega
+fora de ordem, assinatura de webhook — precisam de confirmação antes de virar código de adapter.
+
+**Registrado também:** há relato público de desenvolvedores a quem o suporte do Sicoob respondeu
+que *"não há documentação, trabalhem por tentativa e erro"*. Contra o critério *"sandbox e
+qualidade da documentação"* do ADR-013, é dado ruim — e é a razão de a matriz marcar tanto item
+como ❓ em vez de assumir paridade com um gateway maduro.
+
+### O que continua aberto
+
+As **duas políticas do `M2-COMPLIANCE-01`**, que já estavam abertas no ADR-013 e **não** são
+resolvidas aqui: `KEEP_UNTIL_PERIOD_END` vs `SUSPEND_ON_CONFIRMATION` no refund, e os limites de
+desconto, pagamento manual e step-up. São decisão de produto, e bloqueiam **F16**, não F14.
+
+**Pix Automático não entra no MVP 2.** A recorrência vem do cartão, pela Getnet. Não foi
+confirmado se o Sicoob o oferece. A consequência de modelagem registrada no ADR-013 permanece
+válida para quando entrar: `autorização revogada` é estado de primeira classe, **distinto** de
+`pagamento falhou`.

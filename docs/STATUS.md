@@ -325,6 +325,15 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 > e [#112](https://github.com/RodReis/arenahub/issues/112). Detalhe da entrega no
 > [`STATUS-ARQUIVO.md`](STATUS-ARQUIVO.md).
 
+> 💳 **19/08/2026 — o provedor de pagamento foi decidido, e são dois (ADR-032).** **Sicoob para
+> PIX** (a academia já recebe por lá) e **Getnet/Santander para cartão tokenizado e recorrência**
+> — o Sicoob é banco, não adquirente, e **não tem cartão nem assinatura**. O card `[GATE]` do
+> ADR-013 **nunca chegou a ser criado no board**, e F14–F16 ficaram paradas por um portão que não
+> existia. Emenda o `MVP-02` §5 (*"um segundo provedor não faz parte deste MVP"*). Verificação em
+> [`reports/MVP-02-matriz-de-homologacao-de-provedor.md`](reports/MVP-02-matriz-de-homologacao-de-provedor.md).
+> ⚠️ **Um achado segue aberto:** a **assinatura de webhook não está confirmada em nenhum dos dois**
+> — não bloqueia F14, bloqueia dinheiro real em produção.
+
 > ⚠️ **Reconferido na API do board em 18/08/2026, fim de tarde.** *Feito* voltou a **0** e
 > *Finalizado* subiu de 22 para **25**: o PI aceitou o `[INFRA]` [#94](https://github.com/RodReis/arenahub/issues/94),
 > a [F12](https://github.com/RodReis/arenahub/issues/12) e a [F13](https://github.com/RodReis/arenahub/issues/13),
@@ -430,7 +439,7 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 | ADR | o que falta | bloqueia |
 |---|---|---|
 | **ADR-008** *(ponto remanescente)* | **transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil. **Reapontado:** bloqueava F8 por engano — F8 não chama IA nenhuma | F21 |
-| **ADR-013** | provedor de pagamento — **não é decisão sua hoje**: sai do card `[GATE]` de homologação, com a matriz de critérios já definida no ADR. O que sobrou aqui são as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites). O **modelo de `Payment` saiu deste ADR em 18/08/2026** e virou o ADR-027; **F13 saiu em 18/08** — escreve contra `PaymentProvider`, não contra a marca | F14–F16 |
+| **ADR-013** | ✅ **fechado em 19/08/2026 pelo ADR-032**: **Sicoob para PIX, Getnet (Santander) para cartão**. O card `[GATE]` nunca chegou a existir no board, e o que faltava não era matriz — era o fato de que **a academia já recebe pela Sicoob**. Restam abertas só as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites), que bloqueiam **F16**, não F14 | ~~F14–F16~~ → **F16** |
 | ~~**ADR-027**~~ | **FECHADO em 18/08/2026.** Modelo de `Payment`/`PaymentAttempt` decidido e `MVP-02` §7/§11 emendados. **F12 sem ADR bloqueando** — faltam a spec preenchida e a entrada do MVP 2 | — |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
 
@@ -487,7 +496,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **0** | Hardware e protocolo Topdata comprovados em bancada | hardware + SDK + rede de laboratório | F1–F5 | ✅ **ENCERRADO em 18/08/2026** — gate §15 assinado `GO_WITH_CONSTRAINTS` (ADR-029), com quatro restrições normativas herdadas pelo MVP 1 |
 | **1** | Academia operando acesso online, com assinatura manual | ✅ **atendido** — `GO_WITH_CONSTRAINTS` em 18/08/2026 (ADR-029) | F6–F9, F11 | **liberado — em execução**. Carrega as restrições 1 a 4 do ADR-029; `M0-AC-004` é condição de saída |
 | **1.5** | Operação offline: snapshot, fila e reconciliação | MVP 1 em piloto, com incidente de link medido | F10 | adiado por **ADR-012**. **ADR-007 fechado em 16/08 — spec aprovada** |
-| **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | entrada bloqueada pelo **MVP 1** (que depende do MVP 0). Por ADR: **F12 e F13 livres** desde 18/08 — ambas escrevem atrás de `PaymentProvider`; **F14–F16** esperam o gate do provedor, que decide capacidade de cartão e estorno |
+| **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | **provedor decidido em 19/08 (ADR-032): Sicoob PIX + Getnet cartão** — F14 e F15 destravadas, F16 ainda espera as duas políticas do `M2-COMPLIANCE-01`. F12 e F13 já entregues |
 | **2.5** | Design system: tokens, `packages/ui` e as três superfícies | **F42 sem gate** (dívida ativa: `admin-web` está na `main` sem CSS) · **F43 e F44 têm gate:** o PI priorizar o MVP 4 | F42–F44 | criado por **ADR-025**. F42 pegável assim que o card `[INFRA]` do pipeline de tokens sair |
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis + protocolo clínico | F17–F22 | bloqueado por MVP 1 |
 | **4** | Autosserviço: app do aluno e totem | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado |
