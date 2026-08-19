@@ -25,12 +25,39 @@ const esquemaDeCadastro = z.object({
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe a data de nascimento'),
+  /**
+   * Unidade de origem. Obrigatória desde a F45 — e é o único campo que a
+   * fatia acrescentou à lista de obrigatórios. Nome, nascimento e unidade
+   * são os três; todo o resto do formulário é opcional.
+   */
+  gymUnitId: z.string().uuid('Selecione a unidade do aluno'),
   // CPF é opcional por decisão de produto: a matrícula não depende dele
   // (INV-009/011), e exigi-lo na recepção travaria o cadastro de menor de
-  // idade e de quem esqueceu o documento.
+  // idade e de quem esqueceu o documento. O mockup marcava CPF, telefone e
+  // e-mail como obrigatórios — o PI decidiu em 18/08 que o mockup é que se
+  // corrige.
   cpf: z.string().trim().optional(),
-  contatoTipo: z.enum(['EMAIL', 'PHONE', 'WHATSAPP']),
-  contatoValor: z.string().trim().max(160, 'Contato longo demais').optional(),
+  rg: z.string().trim().max(40, 'RG longo demais').optional(),
+  registeredSex: z.enum(['FEMALE', 'MALE', 'NOT_INFORMED']).optional(),
+  leadSource: z
+    .enum(['INDICACAO', 'REDES_SOCIAIS', 'PASSAGEM_NA_PORTA', 'CAMPANHA', 'SITE', 'OUTRO'])
+    .optional(),
+  advisorUserId: z.string().uuid().optional(),
+  status: z.enum(['LEAD', 'TRIAL', 'ACTIVE']).optional(),
+  telefone: z.string().trim().max(160).optional(),
+  whatsapp: z.string().trim().max(160).optional(),
+  email: z.string().trim().max(160).optional(),
+  // Endereço: ou vem inteiro o suficiente, ou não vem. Ver `montarEndereco`.
+  cep: z.string().trim().optional(),
+  logradouro: z.string().trim().max(200).optional(),
+  numero: z.string().trim().max(20).optional(),
+  complemento: z.string().trim().max(120).optional(),
+  bairro: z.string().trim().max(120).optional(),
+  cidade: z.string().trim().max(120).optional(),
+  uf: z.string().trim().optional(),
+  emergenciaNome: z.string().trim().max(160).optional(),
+  emergenciaParentesco: z.string().trim().max(80).optional(),
+  emergenciaTelefone: z.string().trim().max(160).optional(),
 });
 
 const esquemaDeSituacao = z.object({
@@ -54,14 +81,16 @@ export interface EstadoDoCadastro {
     /** Cadastros parecidos: a API avisa, não bloqueia (INV-014). */
     duplicatas: { studentId: string; membershipNumber: string; fullName: string; motivo: string }[];
   };
-  /** Devolvidos para o formulário não perder o preenchimento em erro. */
-  valores?: {
-    fullName?: string;
-    birthDate?: string;
-    cpf?: string;
-    contatoTipo?: string;
-    contatoValor?: string;
-  };
+  /**
+   * Devolvidos para o formulário não perder o preenchimento em erro.
+   *
+   * Com vinte e dois campos em quatro passos, perder o rascunho não é
+   * inconveniência: é a recepção digitando tudo de novo com o aluno de pé na
+   * frente dela. `Record` genérico porque o wizard devolve o rascunho
+   * inteiro, e enumerar campo a campo aqui só criaria um segundo lugar para
+   * esquecer de atualizar.
+   */
+  valores?: Record<string, string>;
 }
 
 export interface EstadoDaSituacao {
@@ -118,6 +147,113 @@ function frase(codigo: string, padrao: string): string {
   return MENSAGEM[codigo] ?? `${padrao} (${codigo || 'erro'}).`;
 }
 
+/**
+ * Campos que o wizard envia. Uma lista só, e não um `for` sobre o FormData:
+ * ler o FormData inteiro deixaria passar qualquer campo injetado no HTML
+ * para dentro do corpo da requisição.
+ */
+const CAMPOS_DO_CADASTRO = [
+  'fullName',
+  'birthDate',
+  'gymUnitId',
+  'cpf',
+  'rg',
+  'registeredSex',
+  'leadSource',
+  'advisorUserId',
+  'status',
+  'telefone',
+  'whatsapp',
+  'email',
+  'cep',
+  'logradouro',
+  'numero',
+  'complemento',
+  'bairro',
+  'cidade',
+  'uf',
+  'emergenciaNome',
+  'emergenciaParentesco',
+  'emergenciaTelefone',
+] as const;
+
+type DadosDoCadastro = z.infer<typeof esquemaDeCadastro>;
+
+interface ContatoDaApi {
+  type: 'EMAIL' | 'PHONE' | 'WHATSAPP' | 'EMERGENCY';
+  value: string;
+  isPrimary: boolean;
+  label?: string;
+  relationship?: string;
+}
+
+/**
+ * Contatos do aluno, na ordem em que a recepção os informou.
+ *
+ * O primeiro telefone é o primário. O contato de EMERGÊNCIA é de OUTRA
+ * pessoa e por isso nunca é primário: marcá-lo faria a academia ligar para a
+ * mãe do aluno achando que ligava para ele.
+ */
+function montarContatos(dados: DadosDoCadastro): ContatoDaApi[] {
+  const contatos: ContatoDaApi[] = [];
+
+  if (dados.telefone) {
+    contatos.push({ type: 'PHONE', value: dados.telefone, isPrimary: true });
+  }
+
+  if (dados.whatsapp) {
+    contatos.push({ type: 'WHATSAPP', value: dados.whatsapp, isPrimary: false });
+  }
+
+  if (dados.email) {
+    contatos.push({ type: 'EMAIL', value: dados.email, isPrimary: false });
+  }
+
+  if (dados.emergenciaTelefone) {
+    contatos.push({
+      type: 'EMERGENCY',
+      value: dados.emergenciaTelefone,
+      isPrimary: false,
+      ...(dados.emergenciaNome ? { label: dados.emergenciaNome } : {}),
+      ...(dados.emergenciaParentesco ? { relationship: dados.emergenciaParentesco } : {}),
+    });
+  }
+
+  return contatos;
+}
+
+/**
+ * Endereço, ou `undefined` quando ele não foi informado.
+ *
+ * A API exige CEP, logradouro, cidade e UF juntos — endereço pela metade não
+ * localiza ninguém. Mandar os quatro só quando os quatro existem evita o 400
+ * que diria "CEP inválido" para quem simplesmente não preencheu endereço
+ * nenhum.
+ */
+function montarEndereco(dados: DadosDoCadastro):
+  | {
+      postalCode: string;
+      street: string;
+      city: string;
+      state: string;
+      number?: string;
+      complement?: string;
+      district?: string;
+    }
+  | undefined {
+  if (!dados.cep || !dados.logradouro || !dados.cidade || !dados.uf) return undefined;
+
+  return {
+    postalCode: dados.cep,
+    street: dados.logradouro,
+    city: dados.cidade,
+    state: dados.uf,
+    ...(dados.numero ? { number: dados.numero } : {}),
+    ...(dados.complemento ? { complement: dados.complemento } : {}),
+    ...(dados.bairro ? { district: dados.bairro } : {}),
+  };
+}
+
 interface AlunoCriado {
   id: string;
   membershipNumber: string;
@@ -133,17 +269,21 @@ export async function cadastrarAluno(
   _anterior: EstadoDoCadastro,
   formulario: FormData,
 ): Promise<EstadoDoCadastro> {
-  const bruto = {
-    fullName: texto(formulario, 'fullName'),
-    birthDate: texto(formulario, 'birthDate'),
-    cpf: texto(formulario, 'cpf'),
-    contatoTipo: texto(formulario, 'contatoTipo') || 'PHONE',
-    contatoValor: texto(formulario, 'contatoValor'),
-  };
+  const bruto: Record<string, string> = {};
+
+  for (const campo of CAMPOS_DO_CADASTRO) {
+    bruto[campo] = texto(formulario, campo);
+  }
 
   const valores = { ...bruto };
 
-  const validado = esquemaDeCadastro.safeParse(bruto);
+  // Campo vazio é campo NÃO INFORMADO, não string vazia: `""` chegaria à API
+  // como `rg: ""` e seria gravado como RG em branco em vez de ausente.
+  const preenchidos = Object.fromEntries(
+    Object.entries(bruto).filter(([, valor]) => valor !== ''),
+  );
+
+  const validado = esquemaDeCadastro.safeParse(preenchidos);
 
   if (!validado.success) {
     return {
@@ -152,20 +292,24 @@ export async function cadastrarAluno(
     };
   }
 
+  const dados = validado.data;
+
   // O schema da API é `.strict()`: campo extra vira 400. Por isso o corpo é
   // montado por omissão condicional, nunca por spread do formulário inteiro.
-  const contatos =
-    bruto.contatoValor !== ''
-      ? [{ type: bruto.contatoTipo, value: bruto.contatoValor, isPrimary: true }]
-      : [];
-
   const resposta = await chamarApi<AlunoCriado>('/api/v1/students', {
     metodo: 'POST',
     corpo: {
-      fullName: validado.data.fullName,
-      birthDate: validado.data.birthDate,
-      ...(bruto.cpf !== '' ? { cpf: bruto.cpf } : {}),
-      contacts: contatos,
+      fullName: dados.fullName,
+      birthDate: dados.birthDate,
+      gymUnitId: dados.gymUnitId,
+      ...(dados.cpf ? { cpf: dados.cpf } : {}),
+      ...(dados.rg ? { rg: dados.rg } : {}),
+      ...(dados.registeredSex ? { registeredSex: dados.registeredSex } : {}),
+      ...(dados.leadSource ? { leadSource: dados.leadSource } : {}),
+      ...(dados.advisorUserId ? { advisorUserId: dados.advisorUserId } : {}),
+      ...(dados.status ? { status: dados.status } : {}),
+      contacts: montarContatos(dados),
+      ...(montarEndereco(dados) ? { address: montarEndereco(dados) } : {}),
     },
   });
 

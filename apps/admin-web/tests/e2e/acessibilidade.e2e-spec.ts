@@ -1,6 +1,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { cadastrarAluno } from './cadastro-de-aluno';
+
 /**
  * WCAG 2.2 AA nos fluxos essenciais -- DS-PAINEL.md §10.
  *
@@ -45,10 +47,10 @@ async function criarAlunoAtivoComPlano(page: Page): Promise<void> {
   await page.getByTestId('confirmar-plano').click();
   await expect(page.getByTestId('plano-criado')).toBeVisible();
 
-  await page.goto('/students/novo');
-  await page.getByTestId('campo-nome').fill(`Aluna A11y ${sufixo}`);
-  await page.getByTestId('campo-nascimento').fill('1994-05-20');
-  await page.getByTestId('confirmar-cadastro').click();
+  // O cadastro virou um wizard de quatro passos na F45; `cadastrarAluno`
+  // guarda a navegação entre eles, para este teste continuar sendo sobre
+  // acessibilidade e não sobre o fluxo do formulário.
+  await cadastrarAluno(page, { nome: `Aluna A11y ${sufixo}`, nascimento: '1994-05-20' });
   await page.getByTestId('abrir-ficha').click();
 
   await page.getByLabel('Plano', { exact: true }).selectOption({ label: `Plano A11y ${sufixo}` });

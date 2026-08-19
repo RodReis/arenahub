@@ -194,6 +194,19 @@ decisão certa: dado pessoal que nenhum caso de uso consome é passivo, não fun
 art. 6º, III); **foto fica fora** por risco de reclassificação como biometria (art. 11) e vai para
 a F8.
 
+✅ **18/08/2026 — F45 entregue.** Modelo, API e wizard de quatro passos. O que a fatia fecha:
+`student_addresses` deixou de ser tabela órfã, o aluno passou a ter **unidade de origem**
+(`gym_unit_id` obrigatório, com migration em três passos e backfill provado contra base populada)
+e **passou a existir edição de dado cadastral** — até aqui só havia `PATCH /:id/status`, e um CEP
+digitado errado era permanente. `gym_unit_id` **não entra na decisão de acesso**, e há teste
+estrutural que falha se alguém o acrescentar ao `select` do módulo de acesso — verificado por
+mutação, não só escrito. **Uma divergência contra a issue, registrada no PR:** ela manda a
+listagem filtrar "pela unidade do cabeçalho", mas o cabeçalho não tem seletor — só o indicador
+estático, e criar o seletor é decisão de produto adiada (`DS-PAINEL.md` §5). O filtro existe no
+backend; a listagem segue mostrando o tenant inteiro. **Origem do lead ficou com seis valores**
+por decisão do PI nesta conversa: indicação, redes sociais, passagem na porta, campanha, site e
+outro.
+
 🏢 **18/08/2026 — o aluno passa a pertencer a uma unidade.** `students` ganha **`gym_unit_id`
 obrigatório**: a Especificação §11 pede "unidade", a regra de arquitetura nº 2 manda tê-lo quando o
 dado é físico, e `Device`, `AccessEvent` e `PlanUnit` já têm. **É unidade de origem, não controle
@@ -303,7 +316,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **31** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
-| Feito | `proplan:done` | PR mergeado com CI verde | **1** — a [F46](https://github.com/RodReis/arenahub/issues/99), aguardando aceite do PI |
+| Feito | `proplan:done` | PR mergeado com CI verde | **2** — [F46](https://github.com/RodReis/arenahub/issues/99) e [F45](https://github.com/RodReis/arenahub/issues/100), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **27** |
 
 > ⚠️ **Reconferido na API do board em 18/08/2026, fim de tarde.** *Feito* voltou a **0** e
@@ -542,7 +555,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | [#81](https://github.com/RodReis/arenahub/issues/81) | aprovada-pi |
 | F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | [#82](https://github.com/RodReis/arenahub/issues/82) | aprovada-pi *(gate: MVP 4)* |
 | F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | aprovada-pi *(gate: MVP 4)* |
-| F45 | — | 1 | — | Cadastro completo de aluno (retrabalho da Slice 1.2) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#100](https://github.com/RodReis/arenahub/issues/100) | escopo definido |
+| F45 | — | 1 | — | Cadastro completo de aluno (retrabalho da Slice 1.2) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#100](https://github.com/RodReis/arenahub/issues/100) | **entregue** — aguardando aceite |
 | F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **entregue** — PR [#107](https://github.com/RodReis/arenahub/pull/107), aguardando aceite |
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio

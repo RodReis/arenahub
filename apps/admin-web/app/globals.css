@@ -274,31 +274,53 @@ samp {
 }
 /*---break---
  */
+/**
+ * PONTE ENTRE O SHADCN E O DESIGN SYSTEM DO PAINEL.
+ *
+ * O `shadcn add` grava aqui uma paleta neutra propria -- `oklch(0.205 0 0)`
+ * e parentes, cinza sem opiniao nenhuma. Deixa-la como veio faria todo
+ * componente shadcn sair com o visual default do shadcn, que e exatamente o
+ * que o ADR-026 e o ADR-031 mandam nao acontecer: o DS proprio E o contrato,
+ * e o shadcn e o mecanismo (acessibilidade, teclado, foco), nao a aparencia.
+ *
+ * Por isso cada token do shadcn aponta para o token `--ah-*` correspondente.
+ * Trocar o accent em `@arenahub/ui` passa a atravessar os componentes
+ * shadcn junto, em vez de deixar dois sistemas de cor divergirem em
+ * silencio.
+ *
+ * NAO reintroduza valor literal aqui. A lint proibe hex solto no painel, e
+ * o motivo e este: cor que nao vem do token nao acompanha o tema.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: var(--ah-surface-canvas);
+  --foreground: var(--ah-text-default);
+  --card: var(--ah-surface-raised);
+  --card-foreground: var(--ah-text-default);
+  --popover: var(--ah-surface-raised);
+  --popover-foreground: var(--ah-text-default);
+  /* Acao primaria: o teal do painel, nao o preto do shadcn. */
+  --primary: var(--ah-action-solid);
+  --primary-foreground: var(--ah-action-on-solid);
+  --secondary: var(--ah-surface-sunken);
+  --secondary-foreground: var(--ah-text-strong);
+  --muted: var(--ah-surface-sunken);
+  /* `--ah-text-secondary`, e nao `-placeholder`: texto auxiliar precisa
+     passar em contraste de texto, nao de dica. */
+  --muted-foreground: var(--ah-text-secondary);
+  --accent: var(--ah-action-subtle-bg);
+  --accent-foreground: var(--ah-action-hover);
+  --destructive: var(--ah-danger);
+  --border: var(--ah-border-default);
+  --input: var(--ah-border-default);
+  --ring: var(--ah-focus-ring);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  /* Raio do DS (6px), nao os 10px do shadcn: controle do painel tem forma
+     propria, definida em `--ah-control-radius`. */
+  --radius: var(--ah-control-radius);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);

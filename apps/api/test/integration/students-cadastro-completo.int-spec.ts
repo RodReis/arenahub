@@ -26,6 +26,55 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
  * comportamento so pegaria esse defeito com um cenario que ninguem lembra de
  * escrever -- aluno cuja unidade de origem diverge do plano.
  */
+/**
+ * Forma do que a API devolve, declarada aqui de proposito.
+ *
+ * `supertest` tipa `response.body` como `any`, e `any` faz o teste passar
+ * mesmo quando o campo deixa de existir: `body.gymUnitId` viraria `undefined`
+ * e o `expect` compararia `undefined` com `undefined` em silencio. Com o tipo
+ * declarado, tirar um campo do DTO quebra a COMPILACAO do teste.
+ */
+interface CorpoDeAluno {
+  id: string;
+  membershipNumber: string;
+  fullName: string;
+  cpfMasked: string | null;
+  rg: string | null;
+  registeredSex: string | null;
+  leadSource: string | null;
+  gymUnitId: string;
+  version: number;
+  code?: string;
+  duplicateCandidates?: { studentId: string; motivo: string }[];
+}
+
+/** `GET /students/:id`: sempre traz contatos e endereco. */
+interface FichaDeAluno extends CorpoDeAluno {
+  contacts: { type: string; value: string; label: string | null; relationship: string | null }[];
+  address: {
+    postalCode: string;
+    street: string;
+    number: string | null;
+    city: string;
+    state: string;
+  } | null;
+}
+
+/** `response.body` com a forma acima. */
+function corpo(resposta: request.Response): CorpoDeAluno {
+  return resposta.body as CorpoDeAluno;
+}
+
+/** A ficha completa, do `GET /students/:id`. */
+function ficha(resposta: request.Response): FichaDeAluno {
+  return resposta.body as FichaDeAluno;
+}
+
+/** Listagem: o `GET /students` devolve um array. */
+function lista(resposta: request.Response): CorpoDeAluno[] {
+  return resposta.body as CorpoDeAluno[];
+}
+
 describe('F45 -- cadastro completo de aluno', () => {
   let app: INestApplication;
   let db: PrismaService;
@@ -164,9 +213,9 @@ describe('F45 -- cadastro completo de aluno', () => {
       const resposta = await criar(contas.a);
 
       expect(resposta.status).toBe(201);
-      expect(resposta.body.membershipNumber).toMatch(/^AP-\d{4}-\d{8}$/);
-      expect(resposta.body.gymUnitId).toBe(contas.a.unidadeId);
-      expect(resposta.body.cpfMasked).toBeNull();
+      expect(corpo(resposta).membershipNumber).toMatch(/^AP-\d{4}-\d{8}$/);
+      expect(corpo(resposta).gymUnitId).toBe(contas.a.unidadeId);
+      expect(corpo(resposta).cpfMasked).toBeNull();
     });
 
     it('recusa unidade de outro tenant, sem confirmar que ela existe', async () => {
@@ -175,7 +224,7 @@ describe('F45 -- cadastro completo de aluno', () => {
       const resposta = await criar(contas.a, { gymUnitId: contas.b.unidadeId });
 
       expect(resposta.status).toBe(404);
-      expect(resposta.body.code).toBe('GYM_UNIT_NOT_FOUND');
+      expect(corpo(resposta).code).toBe('GYM_UNIT_NOT_FOUND');
     });
 
     it('recusa cadastro sem unidade', async () => {
@@ -227,15 +276,15 @@ describe('F45 -- cadastro completo de aluno', () => {
 
       expect(criacao.status).toBe(201);
 
-      const ficha = await request(servidor())
-        .get(`/api/v1/students/${criacao.body.id}`)
+      const fichaDoAluno = await request(servidor())
+        .get(`/api/v1/students/${corpo(criacao).id}`)
         .set('Cookie', contas.a.cookie);
 
-      expect(ficha.status).toBe(200);
+      expect(fichaDoAluno.status).toBe(200);
 
       // CEP e UF voltam NORMALIZADOS: "80010-000" gravado so com digitos,
       // "pr" como "PR". Sem isso o mesmo endereco teria tres formas no banco.
-      expect(ficha.body.address).toMatchObject({
+      expect(ficha(fichaDoAluno).address).toMatchObject({
         postalCode: '80010000',
         street: 'Rua das Flores',
         number: '123',
@@ -243,7 +292,7 @@ describe('F45 -- cadastro completo de aluno', () => {
         state: 'PR',
       });
 
-      const emergencia = ficha.body.contacts.find((c: { type: string }) => c.type === 'EMERGENCY');
+      const emergencia = ficha(fichaDoAluno).contacts.find((c) => c.type === 'EMERGENCY');
 
       expect(emergencia).toMatchObject({
         value: '41988881111',
@@ -251,9 +300,9 @@ describe('F45 -- cadastro completo de aluno', () => {
         relationship: 'mae',
       });
 
-      expect(ficha.body.rg).toBe('12.345.678-9');
-      expect(ficha.body.registeredSex).toBe('FEMALE');
-      expect(ficha.body.leadSource).toBe('INDICACAO');
+      expect(ficha(fichaDoAluno).rg).toBe('12.345.678-9');
+      expect(ficha(fichaDoAluno).registeredSex).toBe('FEMALE');
+      expect(ficha(fichaDoAluno).leadSource).toBe('INDICACAO');
     });
 
     it('recusa CEP e UF invalidos', async () => {
@@ -285,7 +334,7 @@ describe('F45 -- cadastro completo de aluno', () => {
       });
 
       expect(irmao.status).toBe(201);
-      expect(irmao.body.duplicateCandidates).toHaveLength(0);
+      expect(corpo(irmao).duplicateCandidates).toHaveLength(0);
     });
   });
 
@@ -294,10 +343,10 @@ describe('F45 -- cadastro completo de aluno', () => {
       const criacao = await criar(contas.a, { fullName: 'Nome Errado' });
 
       const edicao = await request(servidor())
-        .patch(`/api/v1/students/${criacao.body.id}`)
+        .patch(`/api/v1/students/${corpo(criacao).id}`)
         .set('Cookie', contas.a.cookie)
         .send({
-          version: criacao.body.version,
+          version: corpo(criacao).version,
           fullName: 'Nome Certo',
           address: {
             postalCode: '01310-100',
@@ -308,43 +357,43 @@ describe('F45 -- cadastro completo de aluno', () => {
         });
 
       expect(edicao.status).toBe(200);
-      expect(edicao.body.fullName).toBe('Nome Certo');
-      expect(edicao.body.version).toBe(criacao.body.version + 1);
+      expect(corpo(edicao).fullName).toBe('Nome Certo');
+      expect(corpo(edicao).version).toBe(corpo(criacao).version + 1);
 
-      const ficha = await request(servidor())
-        .get(`/api/v1/students/${criacao.body.id}`)
+      const fichaDoAluno = await request(servidor())
+        .get(`/api/v1/students/${corpo(criacao).id}`)
         .set('Cookie', contas.a.cookie);
 
-      expect(ficha.body.address.city).toBe('Sao Paulo');
+      expect(ficha(fichaDoAluno).address?.city).toBe('Sao Paulo');
     });
 
     it('recusa escrita com versao velha, em vez de sobrescrever', async () => {
       // Duas recepcionistas na mesma ficha: sem esta trava, a segunda apaga
       // a correcao da primeira sem ninguem perceber.
       const criacao = await criar(contas.a, { fullName: 'Disputado' });
-      const versaoVelha = criacao.body.version;
+      const versaoVelha = corpo(criacao).version;
 
       const primeira = await request(servidor())
-        .patch(`/api/v1/students/${criacao.body.id}`)
+        .patch(`/api/v1/students/${corpo(criacao).id}`)
         .set('Cookie', contas.a.cookie)
         .send({ version: versaoVelha, rg: '11.111.111-1' });
 
       expect(primeira.status).toBe(200);
 
       const segunda = await request(servidor())
-        .patch(`/api/v1/students/${criacao.body.id}`)
+        .patch(`/api/v1/students/${corpo(criacao).id}`)
         .set('Cookie', contas.a.cookie)
         .send({ version: versaoVelha, rg: '22.222.222-2' });
 
       expect(segunda.status).toBe(404);
-      expect(segunda.body.code).toBe('STUDENT_VERSION_CONFLICT');
+      expect(corpo(segunda).code).toBe('STUDENT_VERSION_CONFLICT');
 
-      const ficha = await request(servidor())
-        .get(`/api/v1/students/${criacao.body.id}`)
+      const fichaDoAluno = await request(servidor())
+        .get(`/api/v1/students/${corpo(criacao).id}`)
         .set('Cookie', contas.a.cookie);
 
       // O valor da PRIMEIRA sobrevive: a segunda foi recusada, nao aplicada.
-      expect(ficha.body.rg).toBe('11.111.111-1');
+      expect(ficha(fichaDoAluno).rg).toBe('11.111.111-1');
     });
 
     it('null apaga o campo; ausente nao mexe nele', async () => {
@@ -355,43 +404,43 @@ describe('F45 -- cadastro completo de aluno', () => {
       });
 
       const edicao = await request(servidor())
-        .patch(`/api/v1/students/${criacao.body.id}`)
+        .patch(`/api/v1/students/${corpo(criacao).id}`)
         .set('Cookie', contas.a.cookie)
-        .send({ version: criacao.body.version, rg: null });
+        .send({ version: corpo(criacao).version, rg: null });
 
       expect(edicao.status).toBe(200);
-      expect(edicao.body.rg).toBeNull();
+      expect(corpo(edicao).rg).toBeNull();
       // `registeredSex` nao foi mandado: continua como estava.
-      expect(edicao.body.registeredSex).toBe('MALE');
+      expect(corpo(edicao).registeredSex).toBe('MALE');
     });
 
     it('nao edita aluno de outro tenant', async () => {
       const alheio = await criar(contas.b, { fullName: 'Aluno Do Vizinho' });
 
       const invasao = await request(servidor())
-        .patch(`/api/v1/students/${alheio.body.id}`)
+        .patch(`/api/v1/students/${corpo(alheio).id}`)
         .set('Cookie', contas.a.cookie)
-        .send({ version: alheio.body.version, fullName: 'Renomeado Por Estranho' });
+        .send({ version: corpo(alheio).version, fullName: 'Renomeado Por Estranho' });
 
       expect(invasao.status).toBe(404);
 
-      const ficha = await request(servidor())
-        .get(`/api/v1/students/${alheio.body.id}`)
+      const fichaDoAluno = await request(servidor())
+        .get(`/api/v1/students/${corpo(alheio).id}`)
         .set('Cookie', contas.b.cookie);
 
-      expect(ficha.body.fullName).toBe('Aluno Do Vizinho');
+      expect(ficha(fichaDoAluno).fullName).toBe('Aluno Do Vizinho');
     });
 
     it('recusa mudar a unidade para a de outro tenant', async () => {
       const aluno = await criar(contas.a, { fullName: 'Nao Se Move' });
 
       const resposta = await request(servidor())
-        .patch(`/api/v1/students/${aluno.body.id}`)
+        .patch(`/api/v1/students/${corpo(aluno).id}`)
         .set('Cookie', contas.a.cookie)
-        .send({ version: aluno.body.version, gymUnitId: contas.b.unidadeId });
+        .send({ version: corpo(aluno).version, gymUnitId: contas.b.unidadeId });
 
       expect(resposta.status).toBe(404);
-      expect(resposta.body.code).toBe('GYM_UNIT_NOT_FOUND');
+      expect(corpo(resposta).code).toBe('GYM_UNIT_NOT_FOUND');
     });
 
     it('registra na timeline os campos tocados, nunca os valores', async () => {
@@ -400,12 +449,12 @@ describe('F45 -- cadastro completo de aluno', () => {
       const aluno = await criar(contas.a, { fullName: 'Auditado' });
 
       await request(servidor())
-        .patch(`/api/v1/students/${aluno.body.id}`)
+        .patch(`/api/v1/students/${corpo(aluno).id}`)
         .set('Cookie', contas.a.cookie)
-        .send({ version: aluno.body.version, cpf: '11144477735', rg: '44.444.444-4' });
+        .send({ version: corpo(aluno).version, cpf: '11144477735', rg: '44.444.444-4' });
 
       const eventos = await db.studentTimelineEvent.findMany({
-        where: { studentId: aluno.body.id, type: 'STUDENT_UPDATED' },
+        where: { studentId: corpo(aluno).id, type: 'STUDENT_UPDATED' },
       });
 
       expect(eventos).toHaveLength(1);
@@ -427,10 +476,10 @@ describe('F45 -- cadastro completo de aluno', () => {
       const criacao = await criar(contas.a, { fullName: 'Com CPF', cpf });
 
       expect(criacao.status).toBe(201);
-      expect(JSON.stringify(criacao.body)).not.toContain(cpf);
-      expect(criacao.body.cpfMasked).toMatch(/^•••\.•••\.\*\*\d-\d{2}$/);
+      expect(JSON.stringify(corpo(criacao))).not.toContain(cpf);
+      expect(corpo(criacao).cpfMasked).toMatch(/^•••\.•••\.\*\*\d-\d{2}$/);
 
-      const linha = await db.student.findFirstOrThrow({ where: { id: criacao.body.id } });
+      const linha = await db.student.findFirstOrThrow({ where: { id: corpo(criacao).id } });
 
       // No banco: hash e tres digitos. O numero em si nao existe em lugar
       // nenhum.
@@ -449,8 +498,8 @@ describe('F45 -- cadastro completo de aluno', () => {
       // 201, nao 409: bloquear deixaria de fora gemeos, homonimos e a pessoa
       // que trocou de telefone. Quem decide e a recepcao.
       expect(segundo.status).toBe(201);
-      expect(segundo.body.duplicateCandidates).toContainEqual(
-        expect.objectContaining({ studentId: primeiro.body.id, motivo: 'CPF' }),
+      expect(corpo(segundo).duplicateCandidates).toContainEqual(
+        expect.objectContaining({ studentId: corpo(primeiro).id, motivo: 'CPF' }),
       );
     });
   });
@@ -470,11 +519,11 @@ describe('F45 -- cadastro completo de aluno', () => {
         .get('/api/v1/students?limit=100')
         .set('Cookie', contas.a.cookie);
 
-      const idsDaFilial = daFilial.body.map((a: { id: string }) => a.id);
-      const idsDeTodos = todos.body.map((a: { id: string }) => a.id);
+      const idsDaFilial = lista(daFilial).map((a) => a.id);
+      const idsDeTodos = lista(todos).map((a) => a.id);
 
-      expect(idsDaFilial).toContain(naFilial.body.id);
-      expect(idsDeTodos).toContain(naFilial.body.id);
+      expect(idsDaFilial).toContain(corpo(naFilial).id);
+      expect(idsDeTodos).toContain(corpo(naFilial).id);
       // A filial tem menos gente que a academia inteira -- e o filtro e o que
       // faz a diferenca.
       expect(idsDaFilial.length).toBeLessThan(idsDeTodos.length);
