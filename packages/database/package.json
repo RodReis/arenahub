@@ -16,9 +16,11 @@
     "generate": "prisma generate",
     "seed": "tsx prisma/seed.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
+    "import:pacto": "tsx prisma/import-pacto.ts",
     "studio": "prisma studio",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "test": "vitest run --config vitest.unit.config.ts",
     "test:integration": "vitest run",
     "build": "tsc -p tsconfig.build.json"
   },
