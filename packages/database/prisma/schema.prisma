@@ -112,8 +112,42 @@ enum StudentContactType {
   EMAIL
   PHONE
   WHATSAPP
+  /// Contato de terceiro, para quando o aluno passa mal na academia. Usa
+  /// `label` (nome de quem atende) e `relationship` (parentesco) -- os dois
+  /// unicos campos que so este tipo preenche. Tabela propria guardaria tres
+  /// strings e duplicaria a normalizacao de telefone que ja existe aqui.
+  EMERGENCY
 
   @@map("student_contact_type")
+}
+
+/// Sexo CADASTRAL: espelha o documento civil, e nada mais.
+///
+/// Identidade de genero e nome social sao OUTRA coisa, nao foram pedidos, e
+/// se um dia entrarem sao campos proprios -- reaproveitar este seria erro de
+/// modelagem antes de ser erro de tratamento.
+enum StudentRegisteredSex {
+  FEMALE
+  MALE
+  NOT_INFORMED
+
+  @@map("student_registered_sex")
+}
+
+/// De onde veio o aluno. Valores decididos pelo PI em 18/08/2026.
+///
+/// Enum, nao texto livre: "indicacao", "Indicacao" e "indic." sao a mesma
+/// origem para a recepcao e tres linhas distintas em qualquer relatorio.
+/// `OUTRO` e a valvula de escape; acrescentar valor e migration de enum.
+enum LeadSource {
+  INDICACAO
+  REDES_SOCIAIS
+  PASSAGEM_NA_PORTA
+  CAMPANHA
+  SITE
+  OUTRO
+
+  @@map("lead_source")
 }
 
 /// `PAST_DUE` existe no enum e NAO e alcancavel no MVP 1.
@@ -490,6 +524,7 @@ model GymUnit {
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles UserRole[]
+  students  Student[]
 
   accessPolicies        AccessPolicy[]
   accessEvents          AccessEvent[]
@@ -534,6 +569,8 @@ model User {
   userRoles   UserRole[]
   sessions    Session[]
   auditLogs   AuditLog[]
+  /// Alunos de quem este usuario e consultor responsavel.
+  advisedStudents Student[] @relation("StudentAdvisor")
 
   @@map("users")
 }
@@ -777,6 +814,22 @@ model Student {
   birthDate        DateTime      @map("birth_date") @db.Date
   cpfHash          String?       @map("cpf_hash")
   cpfLast3         String?       @map("cpf_last3")
+  /// Texto livre e opcional. RG nao tem formato nacional unico -- cada
+  /// estado emite o seu, e validar digito verificador aqui seria inventar
+  /// regra que orgao nenhum garante.
+  rg               String?
+  registeredSex    StudentRegisteredSex? @map("registered_sex")
+  leadSource       LeadSource?           @map("lead_source")
+  /// UNIDADE DE ORIGEM -- onde o aluno se cadastrou e para onde a recepcao o
+  /// conta. NAO E CONTROLE DE ACESSO: quem decide em qual unidade ele entra
+  /// continua sendo o plano, por `PlanUnit` e `EntitlementUnitWindow`. Ler
+  /// esta coluna numa decisao de acesso criaria a segunda fonte de verdade
+  /// que a regra de arquitetura no 1 proibe -- ha teste que prova que nao
+  /// acontece (`gym-unit-nao-decide-acesso.spec.ts`).
+  gymUnitId        String        @map("gym_unit_id") @db.Uuid
+  /// Consultor responsavel (Espec 11). FK, nao texto livre: texto livre nao
+  /// sobrevive a saida do funcionario.
+  advisorUserId    String?       @map("advisor_user_id") @db.Uuid
   status           StudentStatus @default(LEAD)
   /// Preenchido no arquivamento. Soft delete (INV-013): preserva historico
   /// legal e operacional em vez de apagar.
@@ -788,6 +841,11 @@ model Student {
   version          Int           @default(0)
 
   tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// `RESTRICT`: apagar unidade que ainda tem aluno falha, em vez de deixar
+  /// aluno orfao ou apagado junto.
+  gymUnit        GymUnit                @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
+  /// `SET NULL`: o aluno continua existindo depois que o consultor sai.
+  advisor        User?                  @relation("StudentAdvisor", fields: [advisorUserId], references: [id], onDelete: SetNull)
   contacts       StudentContact[]
   addresses      StudentAddress[]
   subscriptions  Subscription[]
@@ -803,6 +861,7 @@ model Student {
   manualAccessOverrides ManualAccessOverride[]
 
   @@unique([tenantId, membershipNumber])
+  @@index([tenantId, gymUnitId])
   @@index([tenantId, status])
   @@index([tenantId, cpfHash])
   @@index([tenantId, fullName])
@@ -822,6 +881,13 @@ model StudentContact {
   studentId String             @map("student_id") @db.Uuid
   type      StudentContactType
   value     String
+  /// Nome de quem atende. So `EMERGENCY` preenche -- nos demais tipos o
+  /// contato E o aluno, e repetir o nome dele em cada linha nao informa.
+  label     String?
+  /// Parentesco ou vinculo ("conjuge", "mae", "vizinha"). Texto livre: a
+  /// lista de vinculos possiveis nao fecha, e enum que nao fecha vira
+  /// `OUTRO` em metade das linhas.
+  relationship String?
   isPrimary Boolean            @default(false) @map("is_primary")
   createdAt DateTime           @default(now()) @map("created_at")
   updatedAt DateTime           @updatedAt @map("updated_at")

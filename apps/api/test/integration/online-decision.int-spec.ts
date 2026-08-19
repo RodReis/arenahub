@@ -208,6 +208,7 @@ describe('F9 -- decisao online de acesso', () => {
     const aluno = await db.student.create({
       data: {
         tenantId: tenant.id,
+          gymUnitId: ctx.gymUnitId,
         membershipNumber: `MO-${sufixo}`,
         fullName: 'Aluno Online',
         birthDate: new Date('1994-02-02T00:00:00.000Z'),

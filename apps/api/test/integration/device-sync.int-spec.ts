@@ -117,6 +117,7 @@ describe('F8 -- fila de sincronizacao', () => {
       .send({
         fullName: 'Aluno Sync',
         birthDate: nascimento.toISOString().slice(0, 10),
+        gymUnitId: conta.gymUnitId,
         contacts: [],
       });
 

@@ -135,6 +135,9 @@ describe('F7 -- aluno, plano e entitlement', () => {
       .send({
         fullName: 'Aluno De Teste',
         birthDate: '2000-05-10',
+        // Obrigatorio desde a F45: unidade de ORIGEM, nunca controle de
+        // acesso. Cada chamada pode sobrescrever pelo `...dados`.
+        gymUnitId: conta.unidadeId,
         contacts: [],
         ...dados,
       });
@@ -210,6 +213,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
             {
               fullName: `Concorrente ${i}`,
               birthDate: new Date('2000-05-10T00:00:00.000Z'),
+              gymUnitId: contas.a.unidadeId,
               contacts: [],
             },
             `corrida-${i}`,

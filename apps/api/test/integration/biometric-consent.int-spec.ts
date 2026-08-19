@@ -29,8 +29,8 @@ describe('F8 -- consentimento biometrico', () => {
   const SENHA = 'senha-de-teste-correta';
 
   const contas = {
-    a: { email: `f8-a-${sufixo}@exemplo.test`, tenantId: '', cookie: '' },
-    b: { email: `f8-b-${sufixo}@exemplo.test`, tenantId: '', cookie: '' },
+    a: { email: `f8-a-${sufixo}@exemplo.test`, tenantId: '', gymUnitId: '', cookie: '' },
+    b: { email: `f8-b-${sufixo}@exemplo.test`, tenantId: '', gymUnitId: '', cookie: '' },
   };
 
   const PERMISSOES = [
@@ -51,7 +51,7 @@ describe('F8 -- consentimento biometrico', () => {
   };
 
   const montarAcademia = async (
-    conta: { email: string; tenantId: string; cookie: string },
+    conta: { email: string; tenantId: string; gymUnitId: string; cookie: string },
     slug: string,
   ): Promise<void> => {
     const senhas = app.get(PasswordService);
@@ -84,11 +84,25 @@ describe('F8 -- consentimento biometrico', () => {
       data: { tenantId: tenant.id, userId: user.id, roleId: papel.id },
     });
 
+    // A F45 tornou `students.gym_unit_id` obrigatorio: todo aluno nasce numa
+    // unidade de ORIGEM. Consentimento biometrico nao consulta unidade -- ela
+    // existe aqui so para o aluno da fixture ser valido.
+    const unidade = await db.gymUnit.create({
+      data: {
+        tenantId: tenant.id,
+        code: 'CENTRO',
+        name: `Centro ${slug}`,
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+      },
+    });
+
     const login = await request(servidor())
       .post('/api/v1/auth/login')
       .send({ email: conta.email, password: SENHA });
 
     conta.tenantId = tenant.id;
+    conta.gymUnitId = unidade.id;
     conta.cookie = cookieDeAcesso(login);
   };
 
@@ -113,7 +127,12 @@ describe('F8 -- consentimento biometrico', () => {
     const resposta = await request(servidor())
       .post('/api/v1/students')
       .set('Cookie', conta.cookie)
-      .send({ fullName: 'Aluno De Teste', birthDate: nascimento, contacts: [] });
+      .send({
+        fullName: 'Aluno De Teste',
+        birthDate: nascimento,
+        gymUnitId: conta.gymUnitId,
+        contacts: [],
+      });
 
     expect(resposta.status).toBe(201);
 

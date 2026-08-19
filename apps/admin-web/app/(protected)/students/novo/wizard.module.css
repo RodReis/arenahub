@@ -1,0 +1,263 @@
+/**
+ * Layout do cadastro em quatro passos — F45.
+ *
+ * Duas colunas: a trilha de passos à esquerda, o passo corrente à direita.
+ * A trilha fica visível o tempo todo de propósito — quem preenche vinte e
+ * dois campos precisa ver onde está e quanto falta, e um stepper que só
+ * aparece no topo some assim que a página rola.
+ *
+ * COR sempre de token `--ah-*` — cor fora do token não acompanha o tema
+ * (DS-PAINEL.md §2). ESPAÇAMENTO em px, como o resto do painel
+ * (`formulario.module.css`): o DS não publica escala de espaço, e escrever
+ * `var(--ah-space-6, 24px)` fingiria uma dependência inexistente — o
+ * fallback venceria sempre, e no dia em que o token nascesse a tela mudaria
+ * sozinha, sem ninguém ter pedido.
+ */
+
+.wizard {
+  display: grid;
+  /* A trilha tem largura própria e o passo fica com o resto. `minmax(0, 1fr)`
+     e não `1fr`: sem o mínimo zero, um campo largo empurra a coluna e
+     estoura a página na horizontal — a regressão que a F46 corrigiu a 200%
+     de zoom. */
+  grid-template-columns: minmax(13rem, 15rem) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+/* Abaixo do tablet a trilha vira cabeçalho: duas colunas em 375px deixariam
+   os campos com menos de metade da tela. */
+@media (max-width: 60rem) {
+  .wizard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.trilha {
+  position: sticky;
+  /* Gruda abaixo do cabeçalho da aplicação ao rolar. */
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: var(--ah-surface-raised);
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-control-radius);
+  box-shadow: var(--ah-elev-1);
+}
+
+@media (max-width: 60rem) {
+  .trilha {
+    position: static;
+  }
+}
+
+.passos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.passo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--ah-control-radius);
+  background: transparent;
+  color: var(--ah-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.passo:hover:not(:disabled) {
+  background: var(--ah-surface-sunken);
+}
+
+.passo:focus-visible {
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+.passo:disabled {
+  cursor: default;
+}
+
+/* O passo corrente carrega peso E cor. Só cor não sobrevive a daltonismo
+   nem a monitor mal calibrado (DS-PAINEL.md §10). */
+.passoAtual {
+  background: var(--ah-action-subtle-bg);
+  color: var(--ah-text-strong);
+  font-weight: 600;
+}
+
+.numero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 1.75rem = 28px. Não é alvo de toque: o alvo é o botão inteiro, que tem
+     a altura de controle do DS. */
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--ah-border-default);
+  background: var(--ah-surface-raised);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.numeroAtual,
+.numeroConcluido {
+  background: var(--ah-action-solid);
+  border-color: var(--ah-action-solid);
+  color: var(--ah-action-on-solid);
+}
+
+.aviso {
+  margin: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--ah-border-subtle);
+  color: var(--ah-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.cartao {
+  padding: 24px;
+  background: var(--ah-surface-raised);
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-control-radius);
+  box-shadow: var(--ah-elev-1);
+}
+
+.tituloDoPasso {
+  margin: 0 0 20px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--ah-text-strong);
+}
+
+.grade {
+  display: grid;
+  /* Duas colunas quando cabem, uma quando não. `auto-fit` + `minmax` resolve
+     sem media query: o campo decide a quebra pela largura que precisa. */
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 16px 20px;
+}
+
+/* Campo que ocupa a linha inteira: logradouro e nome não cabem em meia
+   coluna sem truncar. */
+.larguraTotal {
+  grid-column: 1 / -1;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rotulo {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--ah-text-label);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.marca {
+  color: var(--ah-text-secondary);
+  font-weight: 400;
+}
+
+.dica {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.secao {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.secao + .secao {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.legenda {
+  padding: 0;
+  margin-bottom: 16px;
+  color: var(--ah-text-strong);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.acoes {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* Empurra "Voltar" e "Continuar" para a direita, deixando "Cancelar" na
+   esquerda: ação destrutiva longe da ação que se repete. */
+.aDireita {
+  margin-left: auto;
+}
+
+.erro {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: var(--ah-control-radius);
+  border: 1px solid var(--ah-danger);
+  /* Fundo neutro com borda de erro: fundo vermelho atrás de texto escuro
+     reprova em contraste. */
+  background: var(--ah-surface-raised);
+  color: var(--ah-danger);
+  font-size: 0.875rem;
+}
+
+.sucesso {
+  padding: 24px;
+  background: var(--ah-surface-raised);
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-control-radius);
+  box-shadow: var(--ah-elev-1);
+}
+
+.matricula {
+  font-family: var(--ah-font-mono);
+  font-size: 1.125rem;
+}
+
+.duplicatas {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--ah-warning);
+  border-radius: var(--ah-control-radius);
+  background: var(--ah-surface-raised);
+}
+
+.listaDeDuplicatas {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

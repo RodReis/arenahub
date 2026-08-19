@@ -182,6 +182,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
     const aluno = await db.student.create({
       data: {
         tenantId: a.tenantId,
+          gymUnitId: a.gymUnitId,
         membershipNumber: `M-${sufixo}`,
         fullName: 'Aluna Acesso',
         birthDate: new Date('1996-05-10T00:00:00.000Z'),
@@ -278,6 +279,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
       const outroAluno = await db.student.create({
         data: {
           tenantId: a.tenantId,
+            gymUnitId: a.gymUnitId,
           membershipNumber: `M-REV-${sufixo}`,
           fullName: 'Aluno Revogado',
           birthDate: new Date('1990-01-01T00:00:00.000Z'),
@@ -608,6 +610,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
       const bloqueado = await db.student.create({
         data: {
           tenantId: a.tenantId,
+            gymUnitId: a.gymUnitId,
           membershipNumber: `M-BLQ-${sufixo}`,
           fullName: 'Aluno Bloqueado',
           birthDate: new Date('1988-03-03T00:00:00.000Z'),
@@ -640,6 +643,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
       const liberado = await db.student.create({
         data: {
           tenantId: a.tenantId,
+            gymUnitId: a.gymUnitId,
           membershipNumber: `M-LIB-${sufixo}`,
           fullName: 'Aluno Liberado',
           birthDate: new Date('1988-03-03T00:00:00.000Z'),

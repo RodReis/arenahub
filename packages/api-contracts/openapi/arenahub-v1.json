@@ -266,6 +266,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "gymUnitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -293,6 +301,27 @@
     "/api/v1/students/{id}": {
       "get": {
         "operationId": "StudentsController_detalhar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Students"
+        ]
+      },
+      "patch": {
+        "operationId": "StudentsController_editar",
         "parameters": [
           {
             "name": "id",

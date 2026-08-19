@@ -169,6 +169,7 @@ describe('F9 -- liberacao manual', () => {
     const aluno = await db.student.create({
       data: {
         tenantId: tenant.id,
+          gymUnitId: ctx.gymUnitId,
         membershipNumber: `MOV-${sufixo}`,
         fullName: 'Aluno Override',
         birthDate: new Date('1991-07-07T00:00:00.000Z'),

@@ -111,6 +111,19 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
     });
     cenario.tenantId = tenant.id;
 
+    // A F45 tornou `students.gym_unit_id` obrigatorio: todo aluno nasce numa
+    // unidade de origem. Cobranca nao consulta unidade -- ela existe aqui so
+    // para o aluno da fixture ser valido.
+    const unidade = await db.gymUnit.create({
+      data: {
+        tenantId: tenant.id,
+        code: `UNI-${sufixo}`,
+        name: 'Unidade da fixture',
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+      },
+    });
+
     const plano = await db.plan.create({
       data: { tenantId: tenant.id, name: `Plano F12 ${sufixo}` },
     });
@@ -127,6 +140,7 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
     const aluno = await db.student.create({
       data: {
         tenantId: tenant.id,
+        gymUnitId: unidade.id,
         fullName: 'Aluno F12',
         membershipNumber: `f12-${sufixo}`,
         birthDate: new Date('1990-05-20T00:00:00Z'),

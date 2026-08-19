@@ -47,6 +47,7 @@ describe('constraints de biometria e dispositivos', () => {
     const aluno = await db.student.create({
       data: {
         tenantId: tenant.id,
+        gymUnitId: unidade.id,
         membershipNumber: `AP-2026-${randomUUID().slice(0, 8)}`,
         fullName: 'Aluno de Teste',
         birthDate: new Date('2000-01-01T00:00:00.000Z'),

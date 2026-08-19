@@ -200,6 +200,9 @@ async function semearDemonstracao(): Promise<void> {
         where: { tenantId_membershipNumber: { tenantId: tenant.id, membershipNumber: matricula } },
         create: {
           tenantId: tenant.id,
+          // Unidade de origem, obrigatoria desde a F45. A unidade vem do seed
+          // base, conferida acima.
+          gymUnitId: unidade.id,
           membershipNumber: matricula,
           fullName: definicao.nome,
           birthDate: new Date(definicao.nascimento),

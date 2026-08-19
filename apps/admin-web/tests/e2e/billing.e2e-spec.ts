@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { cadastrarAluno } from './cadastro-de-aluno';
+
 /**
  * Jornada da Slice 2.1: a recepção cobra e recebe dinheiro no balcão.
  *
@@ -32,13 +34,10 @@ function nomeUnico(prefixo: string): string {
  * quem ainda nao tem plano.
  */
 async function alunoRecemCadastrado(page: import('@playwright/test').Page): Promise<string> {
-  await page.goto('/students/novo');
-
-  await page.getByTestId('campo-nome').fill(nomeUnico('Aluno Financeiro'));
-  await page.getByTestId('campo-nascimento').fill('1990-05-20');
-  await page.getByTestId('confirmar-cadastro').click();
-
-  await expect(page.getByTestId('aluno-cadastrado')).toBeVisible();
+  await cadastrarAluno(page, {
+    nome: nomeUnico('Aluno Financeiro'),
+    nascimento: '1990-05-20',
+  });
   await page.getByTestId('abrir-ficha').click();
   await expect(page).toHaveURL(/\/students\/[0-9a-f-]{36}/);
 
