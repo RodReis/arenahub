@@ -7,6 +7,7 @@ import { AppModule } from '../../src/app.module.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import {
   CobrancaEsgotadaError,
+  CobrancaJaEmAndamentoError,
   CobrarAssinaturaNoCartaoUseCase,
 } from '../../src/modules/billing/cobrar-assinatura-no-cartao.use-case.js';
 import { CancelarRecorrenciaUseCase } from '../../src/modules/billing/cancelar-recorrencia.use-case.js';
@@ -303,6 +304,54 @@ describe('F14 -- cartao, recorrencia e politica de retry', () => {
       where: { tenantId: contexto.tenantId, invoiceId, method: 'CARD' },
     });
     expect(quantas).toBe(3);
+  });
+
+  it('duas cobrancas CONCORRENTES nao cobram o aluno duas vezes', async () => {
+    /**
+     * DEFEITO REAL, achado sondando a fatia antes do PR -- e nao previsto por
+     * nenhum caso escrito ate aqui.
+     *
+     * A chave de idempotencia e `card:<invoice>:<tentativas ja feitas>`,
+     * derivada de uma CONTAGEM. Contagem muda entre a leitura e a escrita:
+     * duas requisicoes concorrentes leem 0 e 1, montam `:0` e `:1`, e a
+     * constraint `(tenant_id, idempotency_key)` NUNCA dispara. Medido: 2
+     * sucessos, 2 tentativas gravadas, aluno cobrado em dobro.
+     *
+     * Quem fecha a janela e o indice parcial
+     * `payment_attempts_uma_cobranca_de_cartao_em_voo` -- no BANCO, porque um
+     * `if (jaExiste)` no codigo perde a mesma corrida. Mesma tese do inbox de
+     * webhook da F13 (INV-076).
+     */
+    periodo += 1;
+    const invoiceId = await novaInvoice();
+
+    await db.paymentMethod.updateMany({
+      where: { tenantId: contexto.tenantId, studentId },
+      data: { externalTokenId: `tok_concorrente_${sufixo}` },
+    });
+
+    const resultados = await Promise.allSettled([
+      cobrar.executar(contexto, { invoiceId, agora: VENCIMENTO }),
+      cobrar.executar(contexto, { invoiceId, agora: VENCIMENTO }),
+    ]);
+
+    const sucessos = resultados.filter((r) => r.status === 'fulfilled');
+    expect(sucessos).toHaveLength(1);
+
+    const gravadas = await db.paymentAttempt.count({
+      where: { tenantId: contexto.tenantId, invoiceId, method: 'CARD' },
+    });
+    expect(gravadas).toBe(1);
+
+    /**
+     * A perdedora recebe 409 de dominio, nao 500 do Prisma: erro de servidor
+     * faria a recepcao clicar de novo, que e o oposto do que se quer.
+     */
+    const perdedora = resultados.find((r) => r.status === 'rejected');
+    expect(perdedora).toBeDefined();
+    if (perdedora?.status === 'rejected') {
+      expect(perdedora.reason).toBeInstanceOf(CobrancaJaEmAndamentoError);
+    }
   });
 
   it('cancelar a recorrencia NAO cancela a assinatura', async () => {

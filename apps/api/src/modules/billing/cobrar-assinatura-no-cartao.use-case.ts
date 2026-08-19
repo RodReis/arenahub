@@ -69,6 +69,21 @@ export class CobrancaEsgotadaError extends ErroDeDominio {
   }
 }
 
+export class CobrancaJaEmAndamentoError extends ErroDeDominio {
+  constructor() {
+    /**
+     * 409: nao ha nada de errado com o pedido -- ja existe uma cobranca desta
+     * invoice em voo. Devolver 500 mandaria a recepcao tentar de novo, que e
+     * exatamente o que nao pode acontecer.
+     */
+    super(
+      'CARD_CHARGE_ALREADY_IN_FLIGHT',
+      409,
+      'Ja existe uma cobranca desta invoice em andamento; aguarde o desfecho',
+    );
+  }
+}
+
 export interface CobrancaNoCartaoCriada {
   readonly paymentAttemptId: string;
   readonly externalSubscriptionId: string;
@@ -174,20 +189,43 @@ export class CobrarAssinaturaNoCartaoUseCase {
      * INDICE da tentativa: sem ele, a segunda tentativa da mesma invoice
      * reusaria a chave da primeira e o provedor devolveria a cobranca
      * recusada em vez de tentar de novo.
+     *
+     * A CHAVE SOZINHA NAO BASTA, e isso foi medido: ela deriva de uma
+     * CONTAGEM, e contagem muda entre a leitura e a escrita -- duas
+     * requisicoes concorrentes leem 0 e 1, montam `:0` e `:1`, e a constraint
+     * de idempotencia nunca dispara. Quem fecha a janela e o indice parcial
+     * `payment_attempts_uma_cobranca_de_cartao_em_voo`, no banco: um
+     * `if (jaExiste)` aqui perderia a mesma corrida.
      */
     const idempotencyKey = `card:${invoice.id}:${tentativasFeitas}`;
 
-    const tentativa = await this.db.paymentAttempt.create({
-      data: {
-        tenantId: contexto.tenantId,
-        invoiceId: invoice.id,
-        method: 'CARD',
-        status: 'PROCESSING',
-        idempotencyKey,
-        providerAccountId: conta.id,
-      },
-      select: { id: true },
-    });
+    let tentativa: { id: string };
+
+    try {
+      tentativa = await this.db.paymentAttempt.create({
+        data: {
+          tenantId: contexto.tenantId,
+          invoiceId: invoice.id,
+          method: 'CARD',
+          status: 'PROCESSING',
+          idempotencyKey,
+          providerAccountId: conta.id,
+        },
+        select: { id: true },
+      });
+    } catch (erro) {
+      /**
+       * P2002 = violacao de unicidade. Aqui ela significa uma coisa so: outra
+       * requisicao ja colocou uma cobranca desta invoice em voo. Traduzir
+       * para erro de dominio e o que impede um 500 -- e um 500 faria a
+       * recepcao clicar de novo.
+       */
+      if (erroDeUnicidade(erro)) {
+        throw new CobrancaJaEmAndamentoError();
+      }
+
+      throw erro;
+    }
 
     try {
       const assinatura = await this.provedor.createTokenizedSubscription({
@@ -230,4 +268,15 @@ export class CobrarAssinaturaNoCartaoUseCase {
       throw erro;
     }
   }
+}
+
+/**
+ * Violacao de unicidade do Prisma (P2002).
+ *
+ * Checagem estrutural em vez de `instanceof PrismaClientKnownRequestError`:
+ * importar a classe de erro do Prisma no caso de uso amarraria a regra de
+ * negocio ao ORM, e o `code` e contrato publico e estavel.
+ */
+function erroDeUnicidade(erro: unknown): boolean {
+  return typeof erro === 'object' && erro !== null && 'code' in erro && erro.code === 'P2002';
 }

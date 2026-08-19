@@ -2377,6 +2377,14 @@ model PaymentAttempt {
   payment Payment?
 
   @@unique([tenantId, idempotencyKey])
+  /// NO MAXIMO UMA cobranca de cartao em voo por invoice -- indice PARCIAL
+  /// (`method = 'CARD' AND status = 'PROCESSING'`), declarado na migration
+  /// porque o Prisma nao modela unicidade condicional.
+  ///
+  /// Sem ele, duas requisicoes concorrentes para a mesma invoice cobram o
+  /// aluno DUAS VEZES: a chave de idempotencia deriva da contagem de
+  /// tentativas, e contagem muda entre a leitura e a escrita -- justamente a
+  /// janela que a idempotencia existe para fechar.
   @@index([tenantId, invoiceId, status])
   @@map("payment_attempts")
 }
