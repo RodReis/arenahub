@@ -78,7 +78,14 @@ export default async function PaginaDeConciliacao() {
         altera valor — cada uma registra uma decisão auditada.
       </p>
 
-      <section className={estilos['resumo']} aria-label="Resumo da conciliação">
+      {/*
+        `div` e nao `section`: o `globals.css` da a TODO `section` o desenho de
+        card -- borda, fundo e `flex-direction: column`. Envolver os dois
+        cartoes numa `section` produzia card dentro de card (que o proprio
+        comentario de la chama de erro) e empilhava o que devia ficar lado a
+        lado. Visto no navegador, nao deduzido.
+      */}
+      <div className={estilos['resumo']} role="group" aria-label="Resumo da conciliação">
         <div className={estilos['cartao']}>
           <span className={estilos['rotulo']}>Pendentes</span>
           <strong className={estilos['numero']} data-tom={emAberto.length > 0 ? 'alerta' : 'ok'}>
@@ -95,7 +102,7 @@ export default async function PaginaDeConciliacao() {
           */}
           <span className={estilos['apoio']}>movimentos sem divergência</span>
         </div>
-      </section>
+      </div>
 
       <DataTable
         caption="Movimentos conciliados e divergências"
@@ -124,7 +131,9 @@ export default async function PaginaDeConciliacao() {
               item.internalAmountMinor === null ? (
                 <span className={estilos['ausente']}>não registrado</span>
               ) : (
-                <Money cents={item.internalAmountMinor} />
+                <span className={estilos['valor']}>
+                  <Money cents={item.internalAmountMinor} />
+                </span>
               ),
           },
           {
@@ -135,7 +144,9 @@ export default async function PaginaDeConciliacao() {
               item.externalAmountMinor === null ? (
                 <span className={estilos['ausente']}>não reportado</span>
               ) : (
-                <Money cents={item.externalAmountMinor} />
+                <span className={estilos['valor']}>
+                  <Money cents={item.externalAmountMinor} />
+                </span>
               ),
           },
           {

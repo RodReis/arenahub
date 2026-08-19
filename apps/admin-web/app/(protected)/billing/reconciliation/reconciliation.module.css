@@ -22,6 +22,17 @@
   margin: 0 0 32px;
 }
 
+/*
+ * O cartao NAO cresce para dividir a linha inteira.
+ *
+ * Dois numeros de um digito esticados por 700px cada leem como area vazia com
+ * um digito perdido no canto. Largura fixa deixa o par compacto e o olho
+ * compara os dois de relance -- que e para isso que eles estao lado a lado.
+ */
+.cartao {
+  flex: 0 0 auto;
+}
+
 .cartao {
   display: flex;
   flex-direction: column;
@@ -79,12 +90,31 @@
   font-style: italic;
 }
 
+/*
+ * Os dois valores lado a lado sao A TAREFA desta tela.
+ *
+ * Numeral tabular alinha as casas entre linhas, e sem isso a comparacao visual
+ * -- que e o trabalho inteiro do operador aqui -- exige ler digito a digito.
+ */
+.valor {
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-strong);
+}
+
+ /*
+  * A acao recomendada e APOIO, nao protagonista.
+  *
+  * Vista no navegador com texto real, ela ocupava tres linhas e dominava a
+  * tabela -- empurrando para a margem justamente os dois valores que o
+  * operador veio comparar. Fica mais estreita e em tom secundario: quem ja
+  * sabe o que fazer le a situacao e os numeros; quem nao sabe le a frase.
+  */
 .acao {
   display: block;
-  max-inline-size: 34ch;
+  max-inline-size: 28ch;
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
-  color: var(--ah-text-default);
+  color: var(--ah-text-secondary);
 }
 
 .resolvido {

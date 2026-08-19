@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useTransition } from 'react';
 
 import { Button, SensitiveAction, useToastDeErro } from '@arenahub/ui';
 
@@ -30,6 +30,16 @@ const RESUMO: Readonly<Record<string, string>> = {
 export function FormularioDeResolucao({ item }: { item: ItemDeConciliacao }) {
   const [estado, acao] = useActionState(resolverDivergencia, ESTADO_INICIAL);
   const [comandoAberto, setComandoAberto] = useState<string | null>(null);
+  /**
+   * `startTransition` porque o `SensitiveAction` confirma por CALLBACK, nao
+   * por submit de formulario -- e chamar a acao do `useActionState` fora de
+   * uma transicao deixa `isPending` sem atualizar.
+   *
+   * VISTO NO NAVEGADOR, nao deduzido: o React reclamou em console e a
+   * consequencia era real -- o botao nao desabilitava durante o envio, entao
+   * dava para clicar duas vezes numa acao que fecha pendencia financeira.
+   */
+  const [enviando, iniciarEnvio] = useTransition();
 
   useToastDeErro(estado.erro, 'error', 'erro-da-resolucao');
 
@@ -60,7 +70,9 @@ export function FormularioDeResolucao({ item }: { item: ItemDeConciliacao }) {
             formulario.set('itemId', item.id);
             formulario.set('comando', comandoAberto);
             formulario.set('reason', motivo);
-            acao(formulario);
+            iniciarEnvio(() => {
+              acao(formulario);
+            });
             setComandoAberto(null);
           }}
           onCancel={() => setComandoAberto(null)}
@@ -76,6 +88,10 @@ export function FormularioDeResolucao({ item }: { item: ItemDeConciliacao }) {
           key={comando}
           type="button"
           variant="outline"
+          // Sem isto, a linha aceita um segundo clique enquanto o primeiro
+          // ainda esta em voo -- e o servidor recusa com 409, mas a operadora
+          // ve um erro onde na verdade deu certo.
+          disabled={enviando}
           onClick={() => setComandoAberto(comando)}
           data-testid={`resolver-${comando}`}
         >
