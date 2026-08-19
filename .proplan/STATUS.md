@@ -47,7 +47,6 @@ _(vazio)_
 
 ### Sem épico
 
-- [MVP2][SPEC-015][F15] Inadimplência e acesso (#15)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 
@@ -59,6 +58,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP2][SPEC-015][F15] Inadimplência e acesso (#15, finalizado em: 2026-08-19)
 - [INFRA][FIX] O relatorio de evidencia nao conta os 17 arquivos .spec.tsx (#111, finalizado em: 2026-08-19)
 - [INFRA] ESLint nao carrega react-hooks nem jsx-a11y no admin-web (#112, finalizado em: 2026-08-19)
 - [MVP2][SPEC-014][F14] Cartão e recorrência (#14, finalizado em: 2026-08-19)
