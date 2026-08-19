@@ -205,7 +205,9 @@ payment_methods      # somente token/referência mascarada
 provider_events      # payload protegido, retenção definida
 refunds
 reconciliation_runs, reconciliation_items
+external_movements   # linhas do extrato do provedor, normalizadas -- emenda da F16
 receipts
+receipt_sequences    # numeracao do recibo por tenant -- emenda da F16
 outbox_events, inbox_receipts, audit_logs
 ```
 
@@ -227,8 +229,29 @@ interface PaymentProvider {
   cancelSubscription(externalSubscriptionId: string): Promise<void>;
   refundPayment(input: RefundInput): Promise<ProviderRefund>;
   verifyAndParseWebhook(input: RawWebhook): Promise<ProviderEvent>;
+  listMovements(input: ListMovementsInput): Promise<readonly ProviderMovement[]>;
+  getRefundStatus(externalRefundId: string): Promise<ProviderRefund>;
 }
 ```
+
+> **Emenda de 19/08/2026 — F16 (`SPEC-016`), Slice 2.5.** `listMovements` e `getRefundStatus` são
+> o **sétimo** e o **oitavo** métodos; esta seção declarava seis. A ampliação foi aprovada pelo PI e é emendada aqui no mesmo PR que a
+> implementa — mesmo precedente do **ADR-027**, que emendou a §11 ao criar `account_credits`.
+>
+> **Por que não dava para evitar:** a §7 exige "importação ou consulta de extrato", e sem extrato a
+> conciliação só enxerga o que o webhook entregou. O caso que ela existe para achar é justamente o
+> dinheiro que o provedor tem e cujo webhook **nunca chegou** (`MISSING_EXTERNAL`) — conciliar
+> `provider_events` contra `payments` compararia o nosso registro com a nossa cópia do registro
+> dele. A janela é **fechada** (`ate` exclusivo): conciliar período em curso produz divergência
+> falsa, porque o provedor leva minutos a horas para publicar no extrato.
+>
+> **`getRefundStatus` foi acrescentado depois, pela revisão de código da própria fatia.** O estorno
+> dos dois provedores é **assíncrono**, e a primeira versão contava com o webhook para fechá-lo — só
+> que não havia tipo de evento de estorno. O `Refund` ficaria `PROCESSING` para sempre e o índice
+> parcial de exclusão mútua passaria a bloquear **todo estorno seguinte** daquele pagamento: a
+> guarda contra devolver em dobro viraria a guarda contra devolver. A consulta ativa é o par do
+> `getPaymentStatus`/INV-083, e pela mesma razão — desfecho que só chega por webhook fica preso
+> quando o webhook não chega.
 
 Erros do provedor são traduzidos para códigos internos estáveis e classificados como recuperáveis ou permanentes.
 

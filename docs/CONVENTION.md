@@ -92,11 +92,17 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 | `PaymentAttempt` | **`[indefinido]`** | ~ | `M2` §11 + **ADR-027** |
 | `PaymentMethod` | somente token / referência mascarada | ~ | `M2` §11 |
 | `ProviderEvent` | `provider_account_id`, `external_event_id`, payload protegido | ~ | `M2` §11 |
-| `Refund`, `ReconciliationRun`, `ReconciliationItem`, `Receipt` | **`[indefinido]`** | ~ | `M2` §11 |
+| `Refund` | `id`, `tenant_id`, `payment_id`, `invoice_id`, `amount_minor`, `currency`, `status`, `reason`, `requested_by_user_id`, `applied_access_policy`, `idempotency_key`, `external_refund_id`, `failure_code`, `requested_at`, `settled_at` — **F16** | ✔ | `M2` §11 + **F16** |
+| `Receipt` | `id`, `tenant_id`, `payment_id` (único), `invoice_id`, `number`, `snapshot`, `verification_hash`, `issued_at` — **F16**. Numeração por `ReceiptSequence`, gêmea de `InvoiceSequence` | ✔ | `M2` §11 + **F16** |
+| `ReconciliationRun` | `id`, `tenant_id`, `provider_account_id`, `period_start`, `period_end`, `status`, `movements_imported`, `items_open`, `failure_code`, `started_at`, `finished_at` — **F16** | ✔ | `M2` §11 + **F16** |
+| `ExternalMovement` | `id`, `tenant_id`, `run_id`, `external_movement_id`, `external_payment_id`, `external_account_id`, `kind`, `amount_minor`, `currency`, `occurred_at` — **F16**, ampliação do §11 emendada no PRD | ✔ | **F16** |
+| `ReconciliationItem` | `id`, `tenant_id`, `run_id`, `status`, `payment_id`, `refund_id`, `external_movement_id`, `internal_amount_minor`, `external_amount_minor`, `recommended_action`, `resolution`, `resolution_reason`, `resolved_by_user_id`, `resolved_at` — **F16** | ✔ | `M2` §11 + **F16** |
 | `BillingSettings` | moeda (BRL), `due_date`, `grace_period`, `blocking_policy` + **âncora de bloqueio configurável** (ADR-019), padrão = primeiro instante de `due_date + grace_period` | ✔ por tenant | Especificação §42 + **ADR-019** |
 
 `PaymentProvider` é **porta, não entidade**. Contrato vigente (`MVP-02` §12, vence sobre a Especificação §38): `createPix`, `getPaymentStatus`, `createTokenizedSubscription`, `cancelSubscription`,
-`refundPayment`, `verifyAndParseWebhook`. Ver ADR-013.
+`refundPayment`, `verifyAndParseWebhook` — mais **`listMovements`** (extrato por janela fechada) e
+**`getRefundStatus`** (consulta ativa do estorno) — sétimo e oitavo métodos acrescentados pela
+**F16**, com emenda ao `MVP-02` §12 no mesmo PR. Ver ADR-013 e ADR-032.
 
 ### 2.4 Dispositivos e acesso
 
@@ -194,6 +200,24 @@ o pagamento responde *que dinheiro foi reconhecido*. `CONFIRMED` não volta atr�
 INV-069 do lado do pagamento. Invoice paga em duas tentativas (PIX falho + cartão) tem **duas**
 linhas em `payment_attempts` e **uma** em `payments`; a falha continua no histórico. A **autorização revogada pelo pagador**
 (Pix Automático) é estado do *mandato*: vive no `PaymentMethod`, não no `Payment` — ver ADR-027.
+
+### 3.5.1 `Refund` / `ReconciliationItem`
+
+`Refund`: `REQUESTED | PROCESSING | CONFIRMED | FAILED`
+`ReconciliationItem`: `MATCHED | MISSING_INTERNAL | MISSING_EXTERNAL | AMOUNT_MISMATCH | RESOLVED`
+
+**Definidos pela F16** (19/08/2026) — eram `[indefinido]`. O grafo do estorno é próprio, e não uma
+extensão do `Payment`: `REQUESTED` existe porque a chave de idempotência precisa estar **gravada
+antes** do efeito externo (INV-084), e sem esse estado uma falha de rede depois da chamada deixaria
+dinheiro estornado sem registro nosso. `CONFIRMED` e `FAILED` são **terminais**: confirmação
+atrasada do provedor não reescreve resultado já aplicado (INV-079).
+
+Os cinco estados do item vêm do `MVP-02` §10, literais. `RESOLVED` é de mão única — desfazer
+resolução apagaria a decisão de alguém.
+
+**Estorno parcial não move a invoice:** ela só vira `REFUNDED` quando a soma dos estornos
+confirmados fecha o pagamento. Dizer `REFUNDED` sobre invoice que reteve 60% mentiria para a
+conciliação, que soma pelos estados.
 
 ### 3.6 `Device`
 `PROVISIONING | ONLINE | DEGRADED | OFFLINE | RETIRED`
@@ -340,6 +364,18 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 - **INV-073** **Ação manual nunca apaga o evento externo original.**
 - **INV-074** Estorno e pagamento manual exigem step-up authentication conforme valor.
 - **INV-075** Recibo é **não fiscal**, com identificadores verificáveis.
+- **INV-147** **Pagamento manual não é estornado pelo sistema** (ADR-027): não há provedor que o
+  devolva. A devolução física acontece fora e entra como contra-lançamento auditado. — *F16*
+- **INV-148** **Um estorno em voo por pagamento**, garantido por índice parcial no banco
+  (`refunds_payment_id_em_voo_key`), nunca por `if` no código. Estornos parciais somados nunca
+  excedem o pagamento. — *F16*
+- **INV-149** **Conciliação casa por `(pagamento externo, tipo)`**, nunca por valor ou proximidade
+  de data: um pagamento e seu estorno de mesmo valor casariam entre si, e a conciliação fecharia em
+  zero com o dinheiro tendo ido e voltado sem nenhuma ponta registrada. — *F16*
+- **INV-150** **Janela de conciliação é fechada** (`ate` exclusivo, no passado): conciliar período
+  em curso produz `MISSING_EXTERNAL` de pagamento que o provedor ainda não publicou. — *F16*
+- **INV-151** **Divergência resolve por comando de lista fechada**, com razão e ator — nunca por
+  edição direta de valor (`M2-AC-010`). — *F16*
 
 ### 4.11 Webhooks e idempotência (INV-076 a INV-087)
 
@@ -410,6 +446,9 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 
 - **INV-126** Ações auditáveis: alteração/exclusão/arquivamento de aluno, cancelamento, desconto, pagamento manual, estorno, liberação manual, alteração de avaliação, cadastro e exclusão de biometria, função, assinatura manual, cortesia, bloqueio, dispositivo, override.
 - **INV-127** Auditoria financeira é **imutável para usuários do tenant**.
+- **INV-152** **Resolução de divergência de conciliação é ação auditável.** Não constava do
+  INV-126, mas `M2-FR-020` exige auditoria nela — e fechar pendência financeira sem trilha é o
+  buraco que o resto do módulo evita. Lacuna do INV-126 registrada pela F16 para emenda. — *F16*
 - **INV-128** Privacidade por design: sempre o *mínimo dado necessário*.
 - **INV-129** Foto e documento em storage privado com URL temporária.
 - **INV-130** Arquivo temporário de OCR tem retenção curta e **deleção verificável**.

@@ -6,10 +6,12 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 import {
   avaliarDispositivo,
   avaliarEdge,
+  avaliarFinanceiro,
   avaliarSync,
   impressaoDigital,
   type Alerta,
   type EstadoDeSync,
+  type EstadoDoFinanceiro,
   type EstadoDoDispositivo,
   type EstadoDoEdge,
 } from './domain/alert-rules.js';
@@ -214,6 +216,7 @@ export class OperationsRepository {
     edges: EstadoDoEdge[];
     dispositivos: EstadoDoDispositivo[];
     sync: EstadoDeSync[];
+    financeiro: EstadoDoFinanceiro[];
   }> {
     const agora = new Date();
     const inicioDoDia = new Date(agora);
@@ -274,7 +277,10 @@ export class OperationsRepository {
       }),
     );
 
+    const financeiro = await this.coletarEstadoFinanceiro(tenantId);
+
     return {
+      financeiro,
       edges: edges.map((e) => ({
         edgeNodeId: e.id,
         codigo: e.code,
@@ -481,6 +487,7 @@ export class OperationsRepository {
       ...estado.edges.flatMap((e) => avaliarEdge(e, agora)),
       ...estado.dispositivos.flatMap((d) => avaliarDispositivo(d, agora)),
       ...estado.sync.flatMap((s) => avaliarSync(s)),
+      ...estado.financeiro.flatMap((f) => avaliarFinanceiro(f, agora)),
     ];
 
     await this.registrarAlertas(tenantId, alertas, agora);
@@ -490,6 +497,55 @@ export class OperationsRepository {
     await this.resolverAusentes(tenantId, ativos, agora);
 
     return { ativos: alertas.length };
+  }
+
+  /**
+   * Saude do webhook e da conciliacao, por conta do provedor -- F16.
+   *
+   * POR CONTA, e nao por tenant: com dois provedores (ADR-032), o PIX pode
+   * estar mudo enquanto o cartao vai bem. Agregar por tenant esconderia
+   * exatamente a metade quebrada.
+   */
+  private async coletarEstadoFinanceiro(tenantId: string): Promise<EstadoDoFinanceiro[]> {
+    const contas = await this.db.providerAccount.findMany({
+      where: { tenantId, active: true },
+      select: { id: true },
+    });
+
+    return Promise.all(
+      contas.map(async (conta) => {
+        const [pendentes, maisAntigo, ultimo, divergencias] = await Promise.all([
+          this.db.providerEvent.count({
+            where: { tenantId, providerAccountId: conta.id, processedAt: null },
+          }),
+          this.db.providerEvent.findFirst({
+            where: { tenantId, providerAccountId: conta.id, processedAt: null },
+            orderBy: { receivedAt: 'asc' },
+            select: { receivedAt: true },
+          }),
+          this.db.providerEvent.findFirst({
+            where: { tenantId, providerAccountId: conta.id },
+            orderBy: { receivedAt: 'desc' },
+            select: { receivedAt: true },
+          }),
+          this.db.reconciliationItem.count({
+            where: {
+              tenantId,
+              run: { providerAccountId: conta.id },
+              status: { in: ['MISSING_INTERNAL', 'MISSING_EXTERNAL', 'AMOUNT_MISMATCH'] },
+            },
+          }),
+        ]);
+
+        return {
+          providerAccountId: conta.id,
+          eventosPendentes: pendentes,
+          eventoPendenteMaisAntigo: maisAntigo?.receivedAt ?? null,
+          ultimoEventoRecebido: ultimo?.receivedAt ?? null,
+          divergenciasEmAberto: divergencias,
+        };
+      }),
+    );
   }
 
   async listarTenantsAtivos(): Promise<string[]> {

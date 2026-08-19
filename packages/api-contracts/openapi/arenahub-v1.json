@@ -650,6 +650,149 @@
         ]
       }
     },
+    "/api/v1/payments/{id}/refunds": {
+      "post": {
+        "operationId": "EstornoConciliacaoController_estornar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EstornoConciliacao"
+        ]
+      }
+    },
+    "/api/v1/refunds/{id}/observe": {
+      "post": {
+        "operationId": "EstornoConciliacaoController_observar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EstornoConciliacao"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/runs": {
+      "post": {
+        "operationId": "EstornoConciliacaoController_conciliar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EstornoConciliacao"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/items": {
+      "get": {
+        "operationId": "EstornoConciliacaoController_listarItens",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EstornoConciliacao"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/items/{id}/resolve": {
+      "post": {
+        "operationId": "EstornoConciliacaoController_resolver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EstornoConciliacao"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}/receipt": {
+      "post": {
+        "operationId": "EstornoConciliacaoController_emitirRecibo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EstornoConciliacao"
+        ]
+      }
+    },
+    "/api/v1/receipts/{id}": {
+      "get": {
+        "operationId": "EstornoConciliacaoController_consultarRecibo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EstornoConciliacao"
+        ]
+      }
+    },
     "/api/v1/plans": {
       "post": {
         "operationId": "MembershipController_criarPlano",

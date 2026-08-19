@@ -55,6 +55,34 @@ export const CODIGO_DE_ALERTA = {
   DLQ_NON_EMPTY: 'DLQ_NON_EMPTY',
   /** Relogio do Edge fora do limite aprovado. */
   CLOCK_DRIFT: 'CLOCK_DRIFT',
+  /**
+   * Evento do provedor recebido e NAO aplicado ha tempo demais -- F16.
+   *
+   * Recebido != aplicado: um evento fora de ordem, de tipo desconhecido ou
+   * cujo pagamento nao foi localizado fica guardado sem mudar estado. Isso e
+   * correto pontualmente e sintoma quando persiste -- o dinheiro entrou no
+   * provedor e o aluno continua bloqueado na catraca.
+   */
+  WEBHOOK_BACKLOG: 'WEBHOOK_BACKLOG',
+  /**
+   * Conta do provedor sem NENHUM evento na janela esperada -- F16.
+   *
+   * SEPARADO DE `WEBHOOK_BACKLOG` porque as duas falhas tem acoes OPOSTAS,
+   * pelo mesmo criterio que separou `EDGE_OFFLINE` de
+   * `EDGE_CREDENTIAL_EXPIRING` (ADR-011). Backlog manda olhar o
+   * processamento; silencio manda olhar a configuracao do webhook no
+   * provedor -- e silencio e a falha PIOR, porque nao produz erro nenhum:
+   * tudo parece calmo enquanto nenhum pagamento e reconhecido.
+   */
+  WEBHOOK_SILENCIOSO: 'WEBHOOK_SILENCIOSO',
+  /**
+   * Divergencia de conciliacao em aberto -- F16, `M2-FR-020`.
+   *
+   * O `MVP-02` §3 pede divergencia "visivel no mesmo dia operacional". Sem
+   * alerta, ela so aparece para quem abrir a tela de conciliacao por conta
+   * propria -- e a fila que ninguem abre e a fila que nao existe.
+   */
+  RECONCILIATION_PENDING: 'RECONCILIATION_PENDING',
 } as const;
 
 export type CodigoDeAlerta = (typeof CODIGO_DE_ALERTA)[keyof typeof CODIGO_DE_ALERTA];
@@ -71,8 +99,15 @@ export type Severidade = 'CRITICAL' | 'WARNING' | 'INFO';
 export interface Alerta {
   readonly codigo: CodigoDeAlerta;
   readonly severidade: Severidade;
-  /** Tipo do recurso afetado, para agrupar no painel. */
-  readonly recurso: 'EDGE' | 'DEVICE' | 'SYNC' | 'QUEUE';
+  /**
+   * Tipo do recurso afetado, para agrupar no painel.
+   *
+   * `BILLING` entrou na F16: a saude do webhook de pagamento e da conciliacao
+   * e operacional, nao financeira -- quem age sobre ela e a mesma pessoa que
+   * olha catraca parada, e um painel separado so para dinheiro seria uma
+   * segunda tela que ninguem abre.
+   */
+  readonly recurso: 'EDGE' | 'DEVICE' | 'SYNC' | 'QUEUE' | 'BILLING';
   readonly recursoId: string;
   readonly gymUnitId: string | null;
   /**
@@ -96,6 +131,10 @@ export interface LimitesDeAlerta {
   readonly derivaMaximaMs: number;
   /** Taxa diaria minima de sync, 0..1. */
   readonly taxaMinimaDeSync: number;
+  /** Evento recebido e nao aplicado por mais que isto = backlog. */
+  readonly backlogDeWebhookMaximoMs: number;
+  /** Conta ativa sem evento nenhum por mais que isto = silencio suspeito. */
+  readonly silencioDeWebhookMaximoMs: number;
 }
 
 /**
@@ -113,6 +152,18 @@ export const LIMITES_PADRAO: LimitesDeAlerta = {
   antecedenciaDeCredencialMs: 24 * 3_600_000,
   derivaMaximaMs: 5 * 60_000,
   taxaMinimaDeSync: 0.99,
+  /**
+   * 15 min. O `M2-NFR-001` exige p95 de webhook a entitlement abaixo de 30 s;
+   * alertar em 30 s acusaria toda reentrega normal do provedor. Quinze minutos
+   * e trinta vezes o SLO -- o que sobra ali nao e lentidao, e travamento.
+   */
+  backlogDeWebhookMaximoMs: 15 * 60_000,
+  /**
+   * 48 h. Uma academia pequena passa um dia sem PIX sem que nada esteja
+   * errado; dois dias uteis seguidos sem UM evento e configuracao quebrada, e
+   * nao movimento fraco.
+   */
+  silencioDeWebhookMaximoMs: 48 * 3_600_000,
 };
 
 /** O que o avaliador precisa saber sobre um Edge. */
@@ -355,6 +406,102 @@ export function avaliarSync(
         },
       });
     }
+  }
+
+  return alertas;
+}
+
+/** O que o avaliador precisa saber sobre o financeiro de um tenant -- F16. */
+export interface EstadoDoFinanceiro {
+  /** Conta do provedor, id INTERNO. Agrupa o alerta. */
+  readonly providerAccountId: string;
+  /** Evento mais antigo recebido e ainda nao aplicado. Nulo = fila limpa. */
+  readonly eventoPendenteMaisAntigo: Date | null;
+  readonly eventosPendentes: number;
+  /** Ultimo evento recebido, aplicado ou nao. Nulo = nunca chegou nenhum. */
+  readonly ultimoEventoRecebido: Date | null;
+  /** Divergencias de conciliacao ainda em aberto. */
+  readonly divergenciasEmAberto: number;
+}
+
+/**
+ * Saude do webhook de pagamento e da conciliacao -- F16, INV-138.
+ *
+ * Funcao pura, como as demais: o "agora" entra por parametro. Um alerta que
+ * so pode ser testado esperando 15 minutos reais nao seria testado.
+ */
+export function avaliarFinanceiro(
+  estado: EstadoDoFinanceiro,
+  agora: Date,
+  limites: LimitesDeAlerta = LIMITES_PADRAO,
+): Alerta[] {
+  const alertas: Alerta[] = [];
+
+  if (estado.eventoPendenteMaisAntigo) {
+    const idadeMs = agora.getTime() - estado.eventoPendenteMaisAntigo.getTime();
+
+    if (idadeMs > limites.backlogDeWebhookMaximoMs) {
+      alertas.push({
+        codigo: CODIGO_DE_ALERTA.WEBHOOK_BACKLOG,
+        severidade: 'WARNING',
+        recurso: 'BILLING',
+        recursoId: estado.providerAccountId,
+        gymUnitId: null,
+        impacto:
+          'Ha pagamento confirmado no provedor que ainda nao virou liberacao aqui. ' +
+          'O aluno pagou e continua sendo recusado na catraca.',
+        acaoRecomendada:
+          'Abra a conciliacao do periodo e reprocesse os eventos pendentes; se persistir, ' +
+          'consulte o status do pagamento pela API do provedor.',
+        evidencia: {
+          eventosPendentes: estado.eventosPendentes,
+          idadeEmMinutos: Math.floor(idadeMs / 60_000),
+        },
+      });
+    }
+  }
+
+  /**
+   * Conta que NUNCA recebeu evento nao alerta.
+   *
+   * Conta recem-cadastrada tem `ultimoEventoRecebido` nulo, e acusar silencio
+   * nela geraria alarme no dia da configuracao -- antes de existir cobranca
+   * para gerar evento. O silencio que importa e o de quem JA recebeu e parou.
+   */
+  if (estado.ultimoEventoRecebido) {
+    const silencioMs = agora.getTime() - estado.ultimoEventoRecebido.getTime();
+
+    if (silencioMs > limites.silencioDeWebhookMaximoMs) {
+      alertas.push({
+        codigo: CODIGO_DE_ALERTA.WEBHOOK_SILENCIOSO,
+        severidade: 'WARNING',
+        recurso: 'BILLING',
+        recursoId: estado.providerAccountId,
+        gymUnitId: null,
+        impacto:
+          'Nenhum evento do provedor chega ha dois dias uteis. Se houver pagamento acontecendo, ' +
+          'nenhum esta sendo reconhecido -- e nada nesta tela vai ficar vermelho por isso.',
+        acaoRecomendada:
+          'Confira no painel do provedor se a URL do webhook segue cadastrada e ativa; ' +
+          'depois rode uma conciliacao do periodo para achar o que faltou.',
+        evidencia: { silencioEmHoras: Math.floor(silencioMs / 3_600_000) },
+      });
+    }
+  }
+
+  if (estado.divergenciasEmAberto > 0) {
+    alertas.push({
+      codigo: CODIGO_DE_ALERTA.RECONCILIATION_PENDING,
+      severidade: 'INFO',
+      recurso: 'BILLING',
+      recursoId: estado.providerAccountId,
+      gymUnitId: null,
+      impacto:
+        'Ha movimento do provedor que nao bate com o registro do ArenaHub. ' +
+        'Enquanto ficar assim, o fechamento do mes nao esta conferido.',
+      acaoRecomendada: 'Abra a fila de conciliacao e resolva cada divergencia com o motivo.',
+      evidencia: { divergenciasEmAberto: estado.divergenciasEmAberto },
+    });
   }
 
   return alertas;

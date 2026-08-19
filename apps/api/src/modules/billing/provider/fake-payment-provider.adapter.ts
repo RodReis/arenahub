@@ -3,9 +3,11 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   ErroDoProvedor,
   type CreatePixInput,
+  type ListMovementsInput,
   type PaymentProvider,
   type PixCharge,
   type ProviderEvent,
+  type ProviderMovement,
   type ProviderPayment,
   type ProviderRefund,
   type ProviderSubscription,
@@ -41,10 +43,23 @@ export const PROVEDOR_FAKE = 'fake';
 
 interface CobrancaEmMemoria {
   externalPaymentId: string;
+  /** Conta que recebeu. O extrato filtra por ela. */
+  externalAccountId: string;
   status: StatusNoProvedor;
   amountMinor: number;
   currency: string;
   occurredAt: Date;
+}
+
+/** Estorno registrado no duble. Vira linha de extrato como `REFUND`. */
+interface EstornoEmMemoria {
+  externalRefundId: string;
+  externalPaymentId: string;
+  externalAccountId: string;
+  amountMinor: number;
+  currency: string;
+  occurredAt: Date;
+  status: 'PENDING' | 'CONFIRMED' | 'FAILED';
 }
 
 /**
@@ -82,6 +97,62 @@ export class FakePaymentProvider implements PaymentProvider {
   /** Assinaturas ainda nao canceladas. Cancelar duas vezes tem de reprovar. */
   private readonly assinaturasVivas = new Set<string>();
 
+  /** Estornos por chave de idempotencia -- o que torna o retry seguro. */
+  private readonly estornosPorChave = new Map<string, EstornoEmMemoria>();
+
+  /** Estornos na ordem em que ocorreram, para o extrato. */
+  private readonly estornos: EstornoEmMemoria[] = [];
+
+  /**
+   * O estorno confirma na hora, ou fica pendente?
+   *
+   * PADRAO SINCRONO por conveniencia dos testes que nao estao testando isso --
+   * mas os DOIS provedores homologados sao assincronos, e um duble que so
+   * soubesse confirmar na hora ensinaria o caso de uso a assumir sincronismo.
+   * `simularEstornoAssincrono()` liga o modo que o mundo real usa.
+   */
+  private estornoAssincrono = false;
+
+  /** Passa a devolver `PENDING` em `refundPayment`, como os provedores reais. */
+  simularEstornoAssincrono(): void {
+    this.estornoAssincrono = true;
+  }
+
+  /**
+   * Volta ao modo sincrono.
+   *
+   * Existe porque a instancia do duble e COMPARTILHADA entre os testes da
+   * suite: sem desligar, o bloco seguinte herdaria o modo assincrono sem ter
+   * pedido, e falharia por um motivo que nao tem nada a ver com o que ele
+   * testa. Estado de duble que vaza entre casos e a forma mais chata de teste
+   * flaky.
+   */
+  simularEstornoSincrono(): void {
+    this.estornoAssincrono = false;
+  }
+
+  /** Confirma (ou reprova) um estorno pendente, como o provedor faria depois. */
+  simularDesfechoDoEstorno(externalRefundId: string, status: 'CONFIRMED' | 'FAILED'): void {
+    const estorno = this.estornos.find((e) => e.externalRefundId === externalRefundId);
+
+    if (!estorno) {
+      throw new ErroDoProvedor('PROVIDER_NOT_FOUND', false, 'estorno inexistente no provedor');
+    }
+
+    estorno.status = status;
+
+    if (status === 'CONFIRMED') {
+      const cobranca = this.cobrancas.get(estorno.externalPaymentId);
+      const jaEstornado = this.estornos
+        .filter((e) => e.externalPaymentId === estorno.externalPaymentId && e.status === 'CONFIRMED')
+        .reduce((soma, e) => soma + e.amountMinor, 0);
+
+      if (cobranca && jaEstornado >= cobranca.amountMinor) {
+        cobranca.status = 'REFUNDED';
+      }
+    }
+  }
+
   registrarConta(externalAccountId: string, segredo: string): void {
     this.segredos.set(externalAccountId, segredo);
   }
@@ -107,6 +178,7 @@ export class FakePaymentProvider implements PaymentProvider {
 
     const cobranca: CobrancaEmMemoria = {
       externalPaymentId: `fake_pay_${randomUUID()}`,
+      externalAccountId: input.externalAccountId,
       status: 'PENDING',
       amountMinor: input.amountMinor,
       currency: input.currency,
@@ -322,11 +394,180 @@ export class FakePaymentProvider implements PaymentProvider {
     return Promise.resolve();
   }
 
-  refundPayment(_input: RefundInput): Promise<ProviderRefund> {
-    throw new ErroDoProvedor(
-      'PROVIDER_INVALID_REQUEST',
-      false,
-      'estorno e da fatia F15, ainda nao implementado no duble',
+  /**
+   * Estorno -- F16.
+   *
+   * CONFIRMA NA HORA, e isso e uma simplificacao deliberada do DUBLE, nao do
+   * dominio: nos dois provedores homologados o estorno e assincrono, e a
+   * confirmacao chega por webhook. O caso de uso trata `PENDING` e a
+   * confirmacao tardia porque e assim que o mundo real funciona -- quem quiser
+   * exercitar esse caminho usa `simularEstornoPendente`, abaixo.
+   *
+   * Um duble que so soubesse confirmar na hora ensinaria o caso de uso a
+   * assumir sincronismo, e o adapter real quebraria isso na primeira chamada.
+   */
+  refundPayment(input: RefundInput): Promise<ProviderRefund> {
+    const cobranca = this.cobrancas.get(input.externalPaymentId);
+
+    if (!cobranca) {
+      throw new ErroDoProvedor('PROVIDER_NOT_FOUND', false, 'pagamento inexistente no provedor');
+    }
+
+    if (cobranca.status !== 'CONFIRMED' && cobranca.status !== 'REFUNDED') {
+      throw new ErroDoProvedor(
+        'PROVIDER_INVALID_REQUEST',
+        false,
+        'so pagamento confirmado pode ser estornado',
+      );
+    }
+
+    if (input.amountMinor <= 0) {
+      throw new ErroDoProvedor('PROVIDER_INVALID_REQUEST', false, 'estorno exige valor positivo');
+    }
+
+    /**
+     * Idempotencia DO LADO DO PROVEDOR, igual a do PIX e da assinatura: mesma
+     * chave devolve o MESMO estorno. Sem isto, um retry de rede devolveria o
+     * dinheiro duas vezes -- e o teste nunca veria, porque as duas chamadas
+     * respondem sucesso.
+     */
+    const existente = this.estornosPorChave.get(input.idempotencyKey);
+    if (existente) {
+      return Promise.resolve({
+        externalRefundId: existente.externalRefundId,
+        status: existente.status,
+        amountMinor: existente.amountMinor,
+      });
+    }
+
+    // So o que NAO FALHOU consome saldo: um estorno recusado nao devolveu
+    // dinheiro nenhum, e conta-lo impediria a retentativa legitima. Mesmo
+    // criterio do dominio, que soma apenas `CONFIRMED`.
+    const jaEstornado = this.estornos
+      .filter((e) => e.externalPaymentId === input.externalPaymentId && e.status !== 'FAILED')
+      .reduce((soma, e) => soma + e.amountMinor, 0);
+
+    if (jaEstornado + input.amountMinor > cobranca.amountMinor) {
+      throw new ErroDoProvedor(
+        'PROVIDER_INVALID_REQUEST',
+        false,
+        'estorno acumulado excede o valor do pagamento',
+      );
+    }
+
+    const estorno: EstornoEmMemoria = {
+      externalRefundId: `fake_ref_${randomUUID()}`,
+      externalPaymentId: input.externalPaymentId,
+      externalAccountId: cobranca.externalAccountId,
+      amountMinor: input.amountMinor,
+      currency: cobranca.currency,
+      occurredAt: cobranca.occurredAt,
+      status: this.estornoAssincrono ? 'PENDING' : 'CONFIRMED',
+    };
+
+    this.estornosPorChave.set(input.idempotencyKey, estorno);
+    this.estornos.push(estorno);
+
+    // So o estorno JA CONFIRMADO move o pagamento. No modo assincrono quem
+    // move e `simularDesfechoDoEstorno`, como o provedor real faz depois.
+    if (estorno.status === 'CONFIRMED' && jaEstornado + input.amountMinor === cobranca.amountMinor) {
+      cobranca.status = 'REFUNDED';
+    }
+
+    return Promise.resolve({
+      externalRefundId: estorno.externalRefundId,
+      status: estorno.status,
+      amountMinor: estorno.amountMinor,
+    });
+  }
+
+  getRefundStatus(externalRefundId: string): Promise<ProviderRefund> {
+    const estorno = this.estornos.find((e) => e.externalRefundId === externalRefundId);
+
+    if (!estorno) {
+      throw new ErroDoProvedor('PROVIDER_NOT_FOUND', false, 'estorno inexistente no provedor');
+    }
+
+    return Promise.resolve({
+      externalRefundId: estorno.externalRefundId,
+      status: estorno.status,
+      amountMinor: estorno.amountMinor,
+    });
+  }
+
+  /**
+   * Extrato da conta numa janela fechada -- F16.
+   *
+   * DERIVADO DO PROPRIO ESTADO do duble, e nao de uma lista que o teste
+   * planta: um extrato inventado a parte poderia discordar das cobrancas que
+   * o mesmo objeto criou, e a conciliacao passaria a testar a coerencia da
+   * fixture em vez da regra de casamento.
+   *
+   * So entra o que o provedor considera dinheiro movimentado: cobranca
+   * PENDENTE nao aparece em extrato nenhum, porque ninguem pagou.
+   */
+  listMovements(input: ListMovementsInput): Promise<readonly ProviderMovement[]> {
+    const naJanela = (quando: Date): boolean =>
+      quando.getTime() >= input.de.getTime() && quando.getTime() < input.ate.getTime();
+
+    // As cobrancas ficam indexadas sob DUAS chaves (idempotencia e id do
+    // pagamento); o `Set` desduplica o que sairia repetido no extrato.
+    const pagamentos = [...new Set(this.cobrancas.values())]
+      .filter(
+        (c) =>
+          c.externalAccountId === input.externalAccountId &&
+          (c.status === 'CONFIRMED' || c.status === 'REFUNDED') &&
+          naJanela(c.occurredAt),
+      )
+      .map(
+        (c): ProviderMovement => ({
+          externalMovementId: `mov_${c.externalPaymentId}`,
+          externalPaymentId: c.externalPaymentId,
+          tipo: 'PAYMENT',
+          amountMinor: c.amountMinor,
+          currency: c.currency,
+          occurredAt: c.occurredAt,
+        }),
+      );
+
+    const estornos = this.estornos
+      .filter(
+        (e) =>
+          e.externalAccountId === input.externalAccountId &&
+          // Estorno PENDENTE nao aparece em extrato: o dinheiro ainda nao
+          // voltou. Inclui-lo faria a conciliacao acusar `MISSING_INTERNAL`
+          // de um movimento que nenhum lado considera concluido.
+          e.status === 'CONFIRMED' &&
+          naJanela(e.occurredAt),
+      )
+      .map(
+        (e): ProviderMovement => ({
+          externalMovementId: `mov_${e.externalRefundId}`,
+          externalPaymentId: e.externalPaymentId,
+          tipo: 'REFUND',
+          amountMinor: e.amountMinor,
+          currency: e.currency,
+          occurredAt: e.occurredAt,
+        }),
+      );
+
+    return Promise.resolve(
+      [...pagamentos, ...estornos].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime()),
     );
+  }
+
+  /**
+   * Remove um movimento do extrato sem tocar no nosso lado.
+   *
+   * EXISTE PARA UM CENARIO SO, e ele e o unico que justifica conciliacao:
+   * o dinheiro que o provedor NAO reporta e que nos registramos
+   * (`MISSING_EXTERNAL`). Sem um jeito de produzi-lo, esse ramo da matriz de
+   * casamento ficaria sem teste -- e e o ramo que pega perda de receita.
+   */
+  esquecerMovimentoDoExtrato(externalPaymentId: string): void {
+    const cobranca = this.cobrancas.get(externalPaymentId);
+    if (cobranca) {
+      cobranca.status = 'PENDING';
+    }
   }
 }

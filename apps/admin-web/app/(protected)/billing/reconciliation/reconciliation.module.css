@@ -1,0 +1,126 @@
+/*
+ * Conciliação financeira — F16, Slice 2.5.
+ *
+ * Cor, tipografia, superfície e raio saem de token `--ah-*` (DS-PAINEL.md):
+ * hex literal é proibido pela lint, e a cor certa muda com o tema. Espaçamento
+ * em px acompanha o que a F15 já faz nesta área — a escala de espaço ainda não
+ * é token, e inventar `--ah-space-4` aqui produziria variável que não existe.
+ */
+
+.intro {
+  max-inline-size: 68ch;
+  margin: 0 0 24px;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-secondary);
+}
+
+.resumo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0 0 32px;
+}
+
+/*
+ * O cartao NAO cresce para dividir a linha inteira.
+ *
+ * Dois numeros de um digito esticados por 700px cada leem como area vazia com
+ * um digito perdido no canto. Largura fixa deixa o par compacto e o olho
+ * compara os dois de relance -- que e para isso que eles estao lado a lado.
+ */
+.cartao {
+  flex: 0 0 auto;
+}
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 12rem;
+  padding: 16px 20px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.rotulo {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.numero {
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  color: var(--ah-text-strong);
+  /* Numeral tabular: dois contadores lado a lado com larguras de dígito
+     diferentes ficam desalinhados a cada atualização da fila. */
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Pendência ganha cor de alerta SÓ quando existe.
+ *
+ * Zero em vermelho ensinaria a operação a ignorar a cor — e é justamente a cor
+ * que faz alguém abrir esta tela no dia em que há divergência.
+ */
+.numero[data-tom='alerta'] {
+  color: var(--ah-state-warning);
+}
+
+.numero[data-tom='ok'] {
+  color: var(--ah-state-success);
+}
+
+.apoio {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * Ausência é visualmente MAIS FRACA que um valor.
+ *
+ * "não reportado" com o mesmo peso de R$ 120,00 competiria com o número que o
+ * operador está comparando — e a comparação é a tarefa inteira desta tela.
+ */
+.ausente {
+  color: var(--ah-text-secondary);
+  font-style: italic;
+}
+
+/*
+ * Os dois valores lado a lado sao A TAREFA desta tela.
+ *
+ * Numeral tabular alinha as casas entre linhas, e sem isso a comparacao visual
+ * -- que e o trabalho inteiro do operador aqui -- exige ler digito a digito.
+ */
+.valor {
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-strong);
+}
+
+ /*
+  * A acao recomendada e APOIO, nao protagonista.
+  *
+  * Vista no navegador com texto real, ela ocupava tres linhas e dominava a
+  * tabela -- empurrando para a margem justamente os dois valores que o
+  * operador veio comparar. Fica mais estreita e em tom secundario: quem ja
+  * sabe o que fazer le a situacao e os numeros; quem nao sabe le a frase.
+  */
+.acao {
+  display: block;
+  max-inline-size: 28ch;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.resolvido {
+  display: block;
+  max-inline-size: 34ch;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}

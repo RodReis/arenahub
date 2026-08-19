@@ -326,7 +326,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 > duas cobranças concorrentes cobravam o aluno **em dobro** — medido, não deduzido. Fechado por
 > índice parcial no banco. **Os adapters reais não foram escritos:** dependem de credencial e
 > sandbox, e a matriz do gate marcou como não verificado justamente o que eles teriam de honrar.
-> **F15 está livre; F16 espera** as duas políticas do `M2-COMPLIANCE-01`.
+> ~~**F15 está livre; F16 espera** as duas políticas do `M2-COMPLIANCE-01`.~~ **As duas políticas foram decididas pelo PI em 19/08/2026** — `KEEP_UNTIL_PERIOD_END` e teto por tenant. **F16 entregue; o MVP 2 fechou o escopo de código.**
 
 > ✅ **19/08/2026 — as duas `[INFRA]` de guarda de CI entregues, PR [#116](https://github.com/RodReis/arenahub/pull/116).**
 > Contagem reconferida na API do board no mesmo dia: *Finalizado* subiu de 27 para **31** (o PI
@@ -456,7 +456,7 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 | ADR | o que falta | bloqueia |
 |---|---|---|
 | **ADR-008** *(ponto remanescente)* | **transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil. **Reapontado:** bloqueava F8 por engano — F8 não chama IA nenhuma | F21 |
-| **ADR-013** | ✅ **fechado em 19/08/2026 pelo ADR-032**: **Sicoob para PIX, Getnet (Santander) para cartão**. O card `[GATE]` nunca chegou a existir no board, e o que faltava não era matriz — era o fato de que **a academia já recebe pela Sicoob**. Restam abertas só as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites), que bloqueiam **F16**, não F14 | ~~F14–F16~~ → **F16** |
+| **ADR-013** | ✅ **fechado**; as duas políticas do `M2-COMPLIANCE-01` que restavam foram decididas pelo PI em 19/08/2026 e implementadas na F16. **Nada mais bloqueia o MVP 2.** Histórico: fechado em 19/08/2026 pelo ADR-032: **Sicoob para PIX, Getnet (Santander) para cartão**. O card `[GATE]` nunca chegou a existir no board, e o que faltava não era matriz — era o fato de que **a academia já recebe pela Sicoob**. Restam abertas só as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites), que bloqueiam **F16**, não F14 | ~~F14–F16~~ → **F16** |
 | ~~**ADR-027**~~ | **FECHADO em 18/08/2026.** Modelo de `Payment`/`PaymentAttempt` decidido e `MVP-02` §7/§11 emendados. **F12 sem ADR bloqueando** — faltam a spec preenchida e a entrada do MVP 2 | — |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
 
@@ -558,7 +558,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F13 | SPEC-013 | 2 | 2.2 | PIX e webhook idempotente | [`SPEC-013-pix-e-webhook-idempotente.md`](specs/SPEC-013-pix-e-webhook-idempotente.md) | [#13](https://github.com/RodReis/arenahub/issues/13) | ✅ **entregue** em 18/08/2026 ([#102](https://github.com/RodReis/arenahub/pull/102)) |
 | F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | [`SPEC-014-cartao-e-recorrencia.md`](specs/SPEC-014-cartao-e-recorrencia.md) | [#14](https://github.com/RodReis/arenahub/issues/14) | ✅ **entregue** em 19/08/2026 ([#117](https://github.com/RodReis/arenahub/pull/117)) |
 | F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | [`SPEC-015-inadimplencia-e-acesso.md`](specs/SPEC-015-inadimplencia-e-acesso.md) | [#15](https://github.com/RodReis/arenahub/issues/15) | ✅ **entregue** em 19/08/2026 |
-| F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | [`SPEC-016-estorno-conciliacao-e-operacao.md`](specs/SPEC-016-estorno-conciliacao-e-operacao.md) | [#16](https://github.com/RodReis/arenahub/issues/16) | `aprovada-pi` |
+| F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | [`SPEC-016-estorno-conciliacao-e-operacao.md`](specs/SPEC-016-estorno-conciliacao-e-operacao.md) | [#16](https://github.com/RodReis/arenahub/issues/16) | ✅ **entregue** em 19/08/2026 |
 | F17 | SPEC-017 | 3 | 3.1 | Consentimento e avaliação manual | [`SPEC-017-consentimento-e-avaliacao-manual.md`](specs/SPEC-017-consentimento-e-avaliacao-manual.md) | [#17](https://github.com/RodReis/arenahub/issues/17) | planejada |
 | F18 | SPEC-018 | 3 | 3.2 | Histórico e comparativos | [`SPEC-018-historico-e-comparativos.md`](specs/SPEC-018-historico-e-comparativos.md) | [#18](https://github.com/RodReis/arenahub/issues/18) | planejada |
 | F19 | SPEC-019 | 3 | 3.3 | Upload e revisão | [`SPEC-019-upload-e-revisao.md`](specs/SPEC-019-upload-e-revisao.md) | [#19](https://github.com/RodReis/arenahub/issues/19) | planejada |

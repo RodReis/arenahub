@@ -27,6 +27,13 @@ const NAVEGACAO = [
     chega aqui vinda de "quem esta devendo?", nao de "que planos existem?".
   */
   { href: '/billing/delinquency', label: 'Cobrança' },
+  /*
+    Depois de Cobranca, e nao dentro dela: sao publicos diferentes. Cobranca e
+    a recepcao perguntando "quem esta devendo?"; Conciliacao e quem fecha o mes
+    perguntando "o extrato bate?". Aninhar a segunda na primeira esconderia a
+    conferencia mensal atras de uma tela de uso diario.
+  */
+  { href: '/billing/reconciliation', label: 'Conciliação' },
   { href: '/units', label: 'Unidades' },
 ] as const;
 
