@@ -2,11 +2,60 @@ import type { ReactNode } from 'react';
 
 import estilos from './DataTable.module.css';
 
+/**
+ * O PAPEL da coluna, nao a sua aparencia.
+ *
+ * Declarar `role` em vez de largura e alinhamento e o que faz treze tabelas
+ * parecerem a mesma tabela. Quem escreve a tela responde "o que esta coluna
+ * E"; a proporcao entre as colunas sai disso, e sai igual em todo lugar.
+ *
+ * - `identity` -- quem/o que a linha e. Primeira coluna, a mais larga, e a
+ *   que o olho procura ao varrer verticalmente.
+ * - `code`     -- identificador legivel (matricula, serie, numero da fatura).
+ *   Monoespacado e A ESQUERDA: ninguem soma matricula, e alinha-la a direita
+ *   com larguras diferentes ("AP-2026-00000147" vs "DEMO-012") abre um vao
+ *   irregular ate a coluna seguinte. Codigo se COMPARA CARACTERE A CARACTERE,
+ *   e para isso o que importa e comecarem no mesmo ponto.
+ * - `state`    -- badge ou rotulo de situacao. Estreita e fixa: badge nao
+ *   cresce, e deixar a coluna crescer afasta o estado do nome.
+ * - `value`    -- numero comparavel entre linhas (dinheiro, contador,
+ *   matricula). ALINHA A DIREITA de verdade, que e o que `numeric` prometia.
+ * - `moment`   -- data, hora ou idade. Largura previsivel, nao quebra.
+ * - `support`  -- texto de apoio vindo da API. E o unico que cede espaco: sem
+ *   teto, uma frase de tres linhas empurra para a margem justamente o dado
+ *   que a tela existe para comparar.
+ * - `actions`  -- botao ou form na linha. Encosta a direita e nao cresce.
+ */
+export type ColumnRole =
+  | 'identity'
+  | 'code'
+  | 'state'
+  | 'value'
+  | 'moment'
+  | 'support'
+  | 'actions';
+
 export interface Column<T> {
   readonly key: string;
   readonly header: string;
   readonly render: (row: T) => ReactNode;
-  /** Liga numeral tabular -- coluna de valor, horario, matricula ou contador. */
+  /**
+   * O papel da coluna. Ver `ColumnRole`.
+   *
+   * Opcional para nao quebrar as tabelas que ainda nao declararam -- elas caem
+   * no comportamento neutro de antes.
+   */
+  readonly role?: ColumnRole;
+  /**
+   * Liga numeral tabular.
+   *
+   * MANTIDO POR COMPATIBILIDADE, mas `role: 'value'` e o caminho: `numeric`
+   * so emitia `data-numeric`, e o `globals.css` do painel ja aplica
+   * `tabular-nums` a tabela inteira -- ou seja, ele nunca alinhou nada. Oito
+   * colunas o usavam achando que alinhava.
+   *
+   * @deprecated Use `role: 'value'`.
+   */
   readonly numeric?: boolean;
 }
 
@@ -87,7 +136,12 @@ export function DataTable<T>({
         <thead>
           <tr>
             {columns.map((coluna) => (
-              <th key={coluna.key} scope="col">
+              <th
+                key={coluna.key}
+                scope="col"
+                {...(coluna.role !== undefined ? { 'data-role': coluna.role } : {})}
+                {...(coluna.numeric === true ? { 'data-numeric': '' } : {})}
+              >
                 {coluna.header}
               </th>
             ))}
@@ -100,7 +154,11 @@ export function DataTable<T>({
               {...(rowTestId !== undefined ? { 'data-testid': rowTestId(linha) } : {})}
             >
               {columns.map((coluna) => (
-                <td key={coluna.key} {...(coluna.numeric === true ? { 'data-numeric': '' } : {})}>
+                <td
+                  key={coluna.key}
+                  {...(coluna.role !== undefined ? { 'data-role': coluna.role } : {})}
+                  {...(coluna.numeric === true ? { 'data-numeric': '' } : {})}
+                >
                   {coluna.render(linha)}
                 </td>
               ))}

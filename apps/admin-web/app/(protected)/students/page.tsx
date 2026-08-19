@@ -5,6 +5,7 @@ import {
   DataTable,
   EmptyState,
   Field,
+  Identidade,
   MaskedCPF,
   PageHeader,
   ProblemDetail,
@@ -264,10 +265,10 @@ export default async function PaginaDeAlunos({
           {
             key: 'matricula',
             header: 'Matrícula',
-            numeric: true,
-            render: (aluno) => (
-              <span className={estilos['matricula']}>{aluno.membershipNumber}</span>
-            ),
+            role: 'code',
+            // Sem `.matricula` local: o papel `code` do DataTable ja da mono,
+            // tabular-nums e tom secundario a coluna inteira.
+            render: (aluno) => aluno.membershipNumber,
           },
           {
             key: 'aluno',
@@ -291,23 +292,21 @@ export default async function PaginaDeAlunos({
              * pergunta -- na ficha do aluno, onde a pessoa foi procurar o
              * documento.
              */
+            role: 'identity',
             render: (aluno) => (
-              <span className={estilos['identificacao']}>
-                <a className={estilos['nome']} href={`/students/${aluno.id}`}>
-                  {aluno.fullName}
-                </a>
-                {aluno.cpfMasked ? (
-                  <span className={estilos['documento']}>
-                    <MaskedCPF masked={aluno.cpfMasked} />
-                  </span>
-                ) : null}
-              </span>
+              <Identidade
+                nome={aluno.fullName}
+                href={`/students/${aluno.id}`}
+                {...(aluno.cpfMasked
+                  ? { secundario: <MaskedCPF masked={aluno.cpfMasked} /> }
+                  : {})}
+              />
             ),
           },
           {
             key: 'nascimento',
             header: 'Nascimento',
-            numeric: true,
+            role: 'moment',
             render: (aluno) => (
               <TenantDateTime iso={aluno.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
             ),
@@ -315,6 +314,7 @@ export default async function PaginaDeAlunos({
           {
             key: 'situacao',
             header: 'Situação',
+            role: 'state',
             render: (aluno) => (
               <>
                 {/*

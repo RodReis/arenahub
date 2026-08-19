@@ -1,6 +1,16 @@
 import type { Metadata } from 'next';
 
-import { DataTable, EmptyState, Money, PageHeader, ProblemDetail, StateBadge } from '@arenahub/ui';
+import {
+  AcoesDaLinha,
+  AusenteDeAcao,
+  DataTable,
+  EmptyState,
+  Identidade,
+  Money,
+  PageHeader,
+  ProblemDetail,
+  StateBadge,
+} from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
 import { diferencaMinor } from '../../../../src/billing/conciliacao';
@@ -119,40 +129,56 @@ export default async function PaginaDeConciliacao() {
         }
         columns={[
           {
+            key: 'movimento',
+            header: 'Movimento',
+            role: 'identity',
+            /*
+              A identidade da linha é o MOVIMENTO, não o aluno: a conciliação
+              compara dinheiro que entrou com dinheiro que o provedor reporta,
+              e quem paga não é a pergunta desta tela. `semAvatar` porque
+              movimento financeiro não tem rosto — pôr uma inicial aqui seria
+              enfeite fingindo ser informação.
+            */
+            render: (item) => (
+              <Identidade
+                semAvatar
+                nome={referenciaLegivel(item)}
+                secundario={<span>{DESCRICAO_DO_ITEM[item.status] ?? ''}</span>}
+              />
+            ),
+          },
+          {
             key: 'situacao',
             header: 'Situação',
+            role: 'state',
             render: (item) => <StateBadge machine="reconciliation" state={item.status} />,
           },
           {
             key: 'interno',
             header: 'ArenaHub',
-            numeric: true,
+            role: 'value',
             render: (item) =>
               item.internalAmountMinor === null ? (
                 <span className={estilos['ausente']}>não registrado</span>
               ) : (
-                <span className={estilos['valor']}>
-                  <Money cents={item.internalAmountMinor} />
-                </span>
+                <Money cents={item.internalAmountMinor} />
               ),
           },
           {
             key: 'externo',
             header: 'Provedor',
-            numeric: true,
+            role: 'value',
             render: (item) =>
               item.externalAmountMinor === null ? (
                 <span className={estilos['ausente']}>não reportado</span>
               ) : (
-                <span className={estilos['valor']}>
-                  <Money cents={item.externalAmountMinor} />
-                </span>
+                <Money cents={item.externalAmountMinor} />
               ),
           },
           {
             key: 'diferenca',
             header: 'Diferença',
-            numeric: true,
+            role: 'value',
             render: (item) => {
               const diferenca = diferencaMinor(item.internalAmountMinor, item.externalAmountMinor);
 
@@ -164,27 +190,62 @@ export default async function PaginaDeConciliacao() {
               return diferenca === null ? (
                 <span className={estilos['ausente']}>—</span>
               ) : (
-                <Money cents={diferenca} />
+                <span className={estilos['diferenca']} data-sinal={diferenca === 0 ? 'zero' : 'nao-zero'}>
+                  <Money cents={diferenca} />
+                </span>
               );
             },
           },
           {
             key: 'acao',
             header: 'O que fazer',
+            role: 'support',
             render: (item) =>
               item.status === 'RESOLVED' ? (
                 <span className={estilos['resolvido']}>{item.resolutionReason}</span>
               ) : (
-                <span className={estilos['acao']}>{item.recommendedAction}</span>
+                <span>{item.recommendedAction}</span>
               ),
           },
           {
             key: 'resolver',
-            header: 'Resolver',
-            render: (item) => <FormularioDeResolucao item={item} />,
+            header: '',
+            role: 'actions',
+            render: (item) =>
+              item.status === 'MATCHED' || item.status === 'RESOLVED' ? (
+                <AusenteDeAcao />
+              ) : (
+                <AcoesDaLinha>
+                  <FormularioDeResolucao item={item} />
+                </AcoesDaLinha>
+              ),
           },
         ]}
       />
     </>
   );
 }
+
+/**
+ * A referência que identifica o movimento na conversa com o provedor.
+ *
+ * O id externo é o que a operadora digita no painel do banco para achar a
+ * mesma transação — é ele que identifica a linha, não o UUID interno, que não
+ * existe em lugar nenhum fora daqui.
+ */
+function referenciaLegivel(item: ItemDeConciliacao): string {
+  if (item.externalMovementId !== null) {
+    return item.externalMovementId;
+  }
+
+  return item.paymentId !== null ? `Pagamento ${item.paymentId.slice(0, 8)}` : 'Movimento sem referência';
+}
+
+/** Uma linha dizendo de que LADO está o problema, sob a referência. */
+const DESCRICAO_DO_ITEM: Readonly<Record<string, string>> = {
+  MATCHED: 'os dois lados batem',
+  MISSING_INTERNAL: 'só no extrato do provedor',
+  MISSING_EXTERNAL: 'só nos registros do ArenaHub',
+  AMOUNT_MISMATCH: 'valores diferentes nos dois lados',
+  RESOLVED: 'decidido e registrado',
+};
