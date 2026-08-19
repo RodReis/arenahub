@@ -1,10 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { POLICY_VERSION, evaluateAccess } from '@arenahub/access-policy';
+import {
+  POLICY_VERSION,
+  evaluateAccess,
+  type AllowReason,
+  type DenyReason,
+} from '@arenahub/access-policy';
 
 import type { ContextoDoEdge } from '../edge-auth/edge-auth.service.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { AccessEventRepository } from './access-event.repository.js';
 import { AccessProjectionRepository } from './access-projection.repository.js';
+import { LiberacaoFinanceiraUseCase } from '../billing/liberacao-financeira.use-case.js';
 import { IdentityResolver } from './identity-resolver.js';
 
 /**
@@ -64,6 +70,7 @@ export class DecideOnlineAccessUseCase {
     private readonly identidades: IdentityResolver,
     private readonly projecao: AccessProjectionRepository,
     private readonly eventos: AccessEventRepository,
+    private readonly liberacaoFinanceira: LiberacaoFinanceiraUseCase,
   ) {}
 
   async executar(
@@ -109,6 +116,49 @@ export class DecideOnlineAccessUseCase {
 
     const decisao = evaluateAccess(entradaDaPolitica);
 
+    /**
+     * LIBERACAO FINANCEIRA -- F15, Slice 2.4.
+     *
+     * DEPOIS DO MOTOR, e so quando a negativa foi por DIVIDA. O motor puro
+     * nao consulta banco (ele roda tambem no Edge, sem PostgreSQL), entao a
+     * liberacao nao pode entrar nele -- mesma arquitetura de
+     * `MANUAL_OVERRIDE`, ADR-024.
+     *
+     * SO CONVERTE `PAYMENT_OVERDUE`. Uma liberacao financeira nao pode passar
+     * por cima de bloqueio administrativo, aluno `BLOCKED` ou horario fora da
+     * janela: ela responde por divida, e nada mais. Aplicar antes do motor,
+     * ou a qualquer DENY, transformaria a valvula da recepcao em chave-mestra
+     * -- e o `M1-BR-006` diz que a politica mais restritiva prevalece.
+     */
+    if (decisao.outcome === 'DENY' && decisao.reason === 'PAYMENT_OVERDUE') {
+      const liberacao = await this.liberacaoFinanceira.liberacaoVigente(
+        edge.tenantId,
+        identidade.studentId,
+        new Date(avaliadoEm),
+      );
+
+      if (liberacao) {
+        return this.registrar(edge, entrada, {
+          outcome: 'ALLOW',
+          /**
+           * `FINANCIAL_OVERRIDE`, nunca `ACTIVE_ENTITLEMENT`: o direito
+           * continua SUSPENSO, e afirmar o contrario gravaria mentira num
+           * fato imutavel. Todo relatorio de "acesso por direito valido"
+           * teria de lembrar de excluir este caso.
+           */
+          reason: 'FINANCIAL_OVERRIDE',
+          entitlementId: null,
+          validUntil: null,
+          studentId: identidade.studentId,
+          identityId: identidade.identityId,
+          deviceId: identidade.deviceId,
+          avaliadoEm,
+          derivaMs,
+          detalheExtra: { financialOverrideId: liberacao.id, overrideReason: liberacao.reason },
+        });
+      }
+    }
+
     return this.registrar(edge, entrada, {
       outcome: decisao.outcome,
       reason: decisao.reason,
@@ -146,14 +196,18 @@ export class DecideOnlineAccessUseCase {
     entrada: ReconhecimentoRecebido,
     decisao: {
       outcome: 'ALLOW' | 'DENY';
-      reason:
-        | 'ACTIVE_ENTITLEMENT'
-        | 'ADMIN_BLOCK'
-        | 'STUDENT_BLOCKED'
-        | 'STUDENT_INACTIVE'
-        | 'NO_ENTITLEMENT'
-        | 'WRONG_UNIT'
-        | 'OUTSIDE_SCHEDULE';
+      /**
+       * DERIVADO DA FONTE, nao reescrito a mao.
+       *
+       * Ate a F15 esta era uma uniao literal de sete strings -- uma TERCEIRA
+       * copia da lista de razoes, alem de `types.ts` e do enum do Prisma. Ao
+       * acrescentar `PAYMENT_OVERDUE` o compilador acusou a copia, que e
+       * exatamente o que o comentario do enum no schema pedia para evitar:
+       * "espelha `packages/access-policy/src/types.ts`, que e a fonte".
+       *
+       * Agora a proxima razao entra em UM lugar e o resto acompanha.
+       */
+      reason: AllowReason | DenyReason;
       entitlementId: string | null;
       validUntil: Date | null;
       studentId: string | null;

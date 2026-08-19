@@ -1,0 +1,338 @@
+/**
+ * Inadimplência e cobrança -- F15, Slice 2.4.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`,
+ * `--ah-border-*` e `--ah-state-*`, nunca `--ah-carbon-*` cru.
+ *
+ * ## A tese do layout
+ *
+ * Duas audiencias, dois blocos, pesos diferentes. O gestor pergunta "quanto e
+ * onde"; a recepcao pergunta "quem eu cobro agora". A versao anterior tratava
+ * as duas com o mesmo tom -- tres cards iguais e uma tabela plana --, e o
+ * resultado nao respondia bem nenhuma das duas.
+ */
+
+/* ─── Bloco do gestor ──────────────────────────────────────────────────── */
+
+/*
+ * Dinheiro a esquerda, composicao a direita. `1fr 1.4fr` e nao `1fr 1fr`: o
+ * grafico precisa de largura para os rotulos ("Mais de 30 dias") caberem sem
+ * quebrar, e o numero grande ocupa menos do que parece.
+ *
+ * Abaixo de 900px vira uma coluna -- lado a lado, o grafico ficaria com 200px
+ * e as barras viravam tracinhos.
+ */
+/*
+ * FUNDO AFUNDADO NO BLOCO, e nao sombra nos cards.
+ *
+ * O PI pediu "borda, sombra, qualquer coisa" para dar peso. O `DS-PAINEL.md`
+ * §4 e explicito no sentido contrario -- "sombra APENAS em camada que flutua;
+ * card nao tem sombra, tem borda; superficie plana le melhor em densidade
+ * alta" --, e e contrato do ADR-026, nao preferencia.
+ *
+ * A causa do "sem peso" nao era falta de sombra: era falta de SEPARACAO entre
+ * o bloco do gestor e a fila de cobranca, que eram duas superficies brancas
+ * encostadas. Afundar o fundo do bloco e deixar os cards brancos por cima
+ * cria a divisao por contraste de superficie -- o mesmo recurso que o mockup
+ * do Dashboard usa --, respeita o DS e resolve tambem o degrau de altura.
+ */
+.visaoDoGestor {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  /*
+   * `stretch` de volta: com fundo proprio, os dois cards com a MESMA altura
+   * formam uma faixa, e o degrau que `start` produzia ficava evidente contra
+   * o fundo afundado. O vazio que `start` tinha vindo consertar sumiu quando
+   * as faixas zeradas sairam do grafico.
+   */
+  align-items: stretch;
+  gap: 16px;
+  margin: 0 0 40px;
+  padding: 16px;
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-sunken);
+}
+
+@media (max-width: 900px) {
+  .visaoDoGestor {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*
+ * Sem borda: contra o fundo afundado, a diferenca de superficie ja separa. A
+ * borda cinza por cima disso viraria uma segunda linha no mesmo lugar --
+ * ruido, nao definicao.
+ */
+.dinheiro,
+.composicao {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+/*
+ * O grafico centraliza no espaco que sobra em vez de encostar no topo -- era
+ * o vazio de ~30px sob as barras que o PI circulou.
+ */
+.composicao > :last-child {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+}
+
+.rotulo {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * O NUMERO E A RESPOSTA DA TELA. `clamp` porque 48px fixos estouram a coluna a
+ * 900px, e 32px fixos desperdicam a tela do gestor a 1440px.
+ *
+ * `text-wrap: balance` nao serve aqui (e um numero, nao frase); o que impede
+ * quebra feia e `white-space: nowrap` com o `clamp` conservador no minimo.
+ */
+.valorGigante {
+  margin: 8px 0 0;
+  font-size: clamp(2rem, 1.2rem + 2.4vw, 3rem);
+  line-height: 1.05;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * Os tres numeros de apoio NAO sao cards. Sao uma linha de dados sob o valor
+ * principal -- transforma-los em caixas repetiria o erro da versao anterior,
+ * em que tudo tinha o mesmo peso.
+ */
+.secundarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin: 24px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.secundarios dt {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.secundarios dd {
+  margin: 2px 0 0;
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: 600;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.tituloDoBloco {
+  margin: 0 0 16px;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: 600;
+  color: var(--ah-text-default);
+}
+
+/* ─── Bloco da recepção ────────────────────────────────────────────────── */
+
+/*
+ * O titulo da fila explica a ORDENACAO, que nao e obvia. Sem a frase de apoio,
+ * quem olha assume ordem cronologica e desconfia da tela quando o segundo item
+ * tem menos dias que o primeiro.
+ */
+/*
+ * O titulo da fila abre o SEGUNDO bloco, entao carrega o respiro que separa as
+ * duas leituras. Sem ele, "Fila de cobranca" colava no resumo e as duas
+ * perguntas -- "quanto e onde" e "quem eu cobro" -- pareciam a mesma.
+ */
+.tituloDaFila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 12px;
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: 600;
+  color: var(--ah-text-strong);
+}
+
+.apoioDoTitulo {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 400;
+  color: var(--ah-text-secondary);
+}
+
+/* ─── Célula de identidade ─────────────────────────────────────────────── */
+
+.identidade {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.nome {
+  font-weight: 500;
+  color: var(--ah-text-strong);
+}
+
+/*
+ * O telefone e DADO OPERACIONAL, nao decoracao: a recepcao liga do fixo tanto
+ * quanto manda mensagem. Mono com `tabular-nums` porque numero que dança de
+ * largura entre linhas torna a conferencia visual mais lenta.
+ */
+.telefone {
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-secondary);
+}
+
+.semTelefone {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-style: italic;
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * Chips de motivo -- o padrao do mockup de retencao que o PI aprovou.
+ *
+ * Fundo tenue e nao borda colorida: `border-left` grosso como acento e o
+ * reflexo de template que o DS proibe, e um contorno cheio em cada chip
+ * criaria mais linhas que texto numa celula ja densa.
+ */
+.motivos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.motivo {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ah-surface-sunken);
+  font-size: 11px;
+  color: var(--ah-text-secondary);
+  white-space: nowrap;
+}
+
+/* ─── Fatura e valor ───────────────────────────────────────────────────── */
+
+.fatura {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+.numero {
+  font-family: var(--ah-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-secondary);
+}
+
+.vencimento {
+  font-size: 11px;
+  color: var(--ah-text-secondary);
+  white-space: nowrap;
+}
+
+/*
+ * O valor ordena a fila, entao e o maior peso da linha depois do nome. Sem
+ * isto ele competia com o numero da fatura, que ninguem compara entre linhas.
+ */
+.valor {
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: 600;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Ações ────────────────────────────────────────────────────────────── */
+
+/*
+ * Nao esticam: botao ocupando a celula inteira pareceria a acao principal da
+ * TELA, quando e a acao de UMA linha.
+ *
+ * `flex-wrap` porque a 1024px a coluna encolhe e os dois nao cabem lado a lado
+ * -- empilhar e melhor que cortar o rotulo.
+ */
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ─── Movimento ────────────────────────────────────────────────────────── */
+
+/*
+ * ENTRADA DA TABELA, uma vez, na carga.
+ *
+ * `animation` e nao `transition` de propriedade: o conteudo ja nasce visivel e
+ * a animacao apenas o traz -- reveal preso a uma classe que so chega por JS
+ * pausa em aba oculta e em renderizador sem cabeca, e a secao inteira embarca
+ * em branco.
+ *
+ * So `opacity` e `transform`: as duas que o compositor resolve sem refluxo.
+ * Animar `height` numa tabela de vinte linhas custaria layout a cada quadro.
+ */
+@keyframes entradaDaLinha {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.identidade,
+.fatura {
+  animation: entradaDaLinha 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/*
+ * SEM ESCALONAMENTO POR LINHA, e a ausencia e deliberada.
+ *
+ * O `DataTable` do DS nao expoe o indice da linha ao CSS, entao um
+ * `animation-delay: calc(var(--indice) * 40ms)` ficaria com a variavel
+ * indefinida e TODAS as linhas entrariam juntas -- comentario prometendo
+ * cascata, comportamento entregando bloco. Expor o indice so para isto mudaria
+ * a API de um componente que dez telas consomem, o que a fatia nao justifica.
+ *
+ * A entrada unica ja resolve o que motivou a animacao: a tabela chega em vez
+ * de aparecer.
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  .identidade,
+  .fatura {
+    animation: none;
+  }
+}

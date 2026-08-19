@@ -31,6 +31,8 @@ export type StateMachine =
   | 'accessReason'
   | 'passage'
   | 'invoice'
+  /** F15 -- situacao de ACESSO de quem esta devendo. Nao e o estado da invoice. */
+  | 'delinquencyAccess'
   | 'payment'
   | 'reconciliation'
   | 'riskBand';
@@ -144,6 +146,21 @@ export const STATE_LABELS: Dictionary = {
       tone: 'success',
       icon: 'user-check',
     },
+    /**
+     * F15 -- rotulo PROPRIO, e nao reuso do de cima.
+     *
+     * As duas sao liberacoes humanas, mas quem le o historico precisa
+     * distinguir "a recepcao abriu a catraca" de "o aluno entrou devendo, com
+     * prazo". A segunda tem consequencia financeira e vence sozinha.
+     *
+     * `warning` e nao `success`: entrou, mas ha pendencia. Pintar de verde
+     * faria a linha parecer normal num relatorio de inadimplencia.
+     */
+    [ALLOW_REASON.FINANCIAL_OVERRIDE]: {
+      label: 'Liberado com pagamento pendente',
+      tone: 'warning',
+      icon: 'alert-circle',
+    },
     [DENY_REASON.ADMIN_BLOCK]: {
       label: 'Bloqueio administrativo',
       tone: 'danger',
@@ -174,6 +191,21 @@ export const STATE_LABELS: Dictionary = {
       tone: 'warning',
       icon: 'clock',
     },
+    /**
+     * F15 -- separada de `NO_ENTITLEMENT` de proposito.
+     *
+     * O rotulo diz o que a recepcao PRECISA FAZER, e as duas acoes sao
+     * opostas: "sem plano vigente" manda vender um; "pagamento em atraso"
+     * manda cobrar. Ate a F15 as duas situacoes liam a mesma frase.
+     *
+     * `warning` e nao `danger`: o aluno TEM plano, e a situacao se resolve
+     * com um pagamento. `danger` e para quem nao tem direito nenhum.
+     */
+    [DENY_REASON.PAYMENT_OVERDUE]: {
+      label: 'Pagamento em atraso',
+      tone: 'warning',
+      icon: 'alert-circle',
+    },
   },
 
   /**
@@ -202,6 +234,23 @@ export const STATE_LABELS: Dictionary = {
     OVERDUE: { label: 'Vencida', tone: 'warning', icon: 'alert-circle' },
     CANCELLED: { label: 'Cancelada', tone: 'neutral', icon: 'x-circle' },
     REFUNDED: { label: 'Estornada', tone: 'neutral', icon: 'refresh-cw' },
+  },
+
+  /**
+   * Situacao de ACESSO de quem esta devendo -- F15, Slice 2.4.
+   *
+   * NAO E O ESTADO DA INVOICE. A mesma invoice `OVERDUE` aparece aqui como
+   * `EM_CARENCIA` ou `BLOQUEADO`, conforme o instante de bloqueio ja tenha
+   * passado -- e e essa a pergunta que a recepcao faz olhando a tela: "este
+   * aluno entra agora?". Reusar a maquina `invoice` responderia outra coisa.
+   *
+   * `EM_CARENCIA` e `warning` e nao `danger`: o aluno ENTRA. Pintar de
+   * vermelho quem ainda tem acesso faria a recepcao barrar por engano.
+   */
+  delinquencyAccess: {
+    EM_CARENCIA: { label: 'Em carência', tone: 'warning', icon: 'clock' },
+    BLOQUEADO: { label: 'Bloqueado', tone: 'danger', icon: 'x-circle' },
+    LIBERADO: { label: 'Liberado com pendência', tone: 'info', icon: 'user-check' },
   },
 
   payment: {

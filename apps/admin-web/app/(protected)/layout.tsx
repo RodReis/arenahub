@@ -22,6 +22,11 @@ const NAVEGACAO = [
   { href: '/operations/devices', label: 'Dispositivos' },
   { href: '/students', label: 'Alunos' },
   { href: '/plans', label: 'Planos' },
+  /*
+    Depois de Planos porque cobranca e consequencia da assinatura -- a recepcao
+    chega aqui vinda de "quem esta devendo?", nao de "que planos existem?".
+  */
+  { href: '/billing/delinquency', label: 'Cobrança' },
   { href: '/units', label: 'Unidades' },
 ] as const;
 

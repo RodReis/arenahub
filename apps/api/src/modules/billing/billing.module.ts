@@ -3,7 +3,10 @@ import { Module } from '@nestjs/common';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { BillingController } from './billing.controller.js';
 import { BillingRepository } from './billing.repository.js';
+import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
+import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
+import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
 import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
@@ -51,8 +54,20 @@ import { WebhookController } from './webhook.controller.js';
     RegistrarMetodoDePagamentoUseCase,
     CobrarAssinaturaNoCartaoUseCase,
     CancelarRecorrenciaUseCase,
+    AplicarInadimplenciaUseCase,
+    ConsultarInadimplenciaUseCase,
+    LiberacaoFinanceiraUseCase,
     { provide: PAYMENT_PROVIDER, useClass: FakePaymentProvider },
   ],
-  exports: [BillingRepository, PAYMENT_PROVIDER],
+  /**
+   * `LiberacaoFinanceiraUseCase` e exportado porque o modulo de ACESSO precisa
+   * saber se ha liberacao viva antes de negar por divida.
+   *
+   * REGRA DE ARQUITETURA No 9: o acesso consome um CASO DE USO PUBLICO, nunca
+   * a tabela `financial_access_overrides`. Se a forma da liberacao mudar --
+   * virar por unidade, ganhar aprovacao em dois niveis --, quem se ajusta e
+   * este modulo, e o de acesso nem fica sabendo.
+   */
+  exports: [BillingRepository, PAYMENT_PROVIDER, LiberacaoFinanceiraUseCase],
 })
 export class BillingModule {}

@@ -16,6 +16,7 @@ export { Ausente } from './components/Ausente.js';
 export { Button } from './components/Button.js';
 export { ConsentCard } from './components/ConsentCard.js';
 export { DataFreshness } from './components/DataFreshness.js';
+export { BarrasDeFaixa, type FaixaDeBarra } from './components/BarrasDeFaixa.js';
 export { DataTable, type Column } from './components/DataTable.js';
 export { ElevatedSessionBanner } from './components/ElevatedSessionBanner.js';
 export { EmptyState } from './components/EmptyState.js';

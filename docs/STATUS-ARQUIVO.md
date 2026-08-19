@@ -13,6 +13,85 @@
 
 ---
 
+## 2026-08-19 — F15: a regra nº 1 fechou o circuito, e um gráfico quase mentiu
+
+### A cadeia inteira existe agora
+
+`Invoice vencida → Subscription PAST_DUE → Entitlement SUSPENDED → DENY`. A catraca continua sem
+saber o que é uma invoice: ela lê entitlement, como sempre leu. Este é o ponto em que a regra de
+arquitetura nº 1 deixa de ser texto e vira código.
+
+Descoberta ao mapear: **o desbloqueio já existia**. A F13 construiu a volta — `PAST_DUE → ACTIVE`,
+`SUSPENDED → ACTIVE`, com `REVOKED` que não ressuscita — antes de existir quem suspendesse. A F15
+construiu só a ida.
+
+### `PAYMENT_OVERDUE`: por que uma razão nova
+
+Até aqui, entitlement suspenso caía em `NO_ENTITLEMENT`. As duas situações exigem ações **opostas**
+de quem está no balcão: *"não tem plano"* manda vender um, *"está devendo"* manda cobrar.
+Colapsadas, a tela dizia a mesma coisa nos dois casos.
+
+Distinção que só apareceu escrevendo o teste: suspenso com o período **já vencido** volta a ser
+`NO_ENTITLEMENT` — não é inadimplência, é plano vencido, e dizer "pague para liberar" a quem não
+tem mais plano manda a recepção cobrar dívida que não existe.
+
+O `POLICY_VERSION` subiu para **1.1.0**. O próprio arquivo exige: *"mudança de comportamento
+observável exige número novo"*. Ninguém passou a entrar nem deixou de entrar — mas o `reason`
+gravado mudou, e ele é o campo que responde *"por que este aluno não passou?"*.
+
+### O dia em que a meia-noite não existe
+
+A revisão suspeitou que a conta de fuso não convergiria em fusos de meia hora (Lord Howe, Chatham).
+Varri 3360 combinações e eles convergem — **o achado específico não reproduzia**.
+
+Mas a crítica de fundo estava certa, e a varredura achou algo pior: **06/09/2026 em
+`America/Santiago`**. O horário de verão do Chile começa à meia-noite — o relógio pula de 23:59
+direto para 01:00, e **as 00:00 daquele dia não acontecem**. Não há ponto fixo: o algoritmo oscila
+entre 03:00Z e 04:00Z, e o código anterior devolveria um ou outro conforme a **paridade** do número
+de passadas. Bloqueio uma hora deslocado, sem erro, uma vez por ano.
+
+A função passou a devolver o primeiro instante que existe naquele dia — leitura fiel do ADR-019: o
+dia começou, só começou mais tarde.
+
+### A corrida que desfazia um pagamento
+
+Os `subscriptionIds` vinham da leitura pré-transação. Interceptando a leitura para simular o
+webhook comitando na janela: **`direitosSuspensos: 1`** — o entitlement de quem acabou de pagar era
+suspenso de volta, com `suspendedAt` gravado *depois* do pagamento. Corrigido relendo dentro da
+transação quais invoices continuam devendo.
+
+### O gráfico que quase mentiu
+
+O PI pediu gráficos. O primeiro instinto — evolução mensal — não sobreviveu ao dado: **existe um
+mês de invoice no banco**. Uma linha com um ponto não informa nada, e desenhá-la com meses vazios
+antes faria a curva subir do zero, sugerindo uma piora que não aconteceu.
+
+Entregue: composição da dívida por idade, que responde hoje o que o gestor pergunta — *quanto já é
+velho demais para voltar*. A evolução entra quando houver três meses.
+
+**E o gráfico quase mentiu de outro jeito:** bloqueado com `diasEmAtraso === 0` não caía em faixa
+nenhuma, então a fatura contava no total e não aparecia em barra alguma. Parece impossível até
+lembrar que academia com `graceDays = 0` bloqueia na meia-noite do dia do vencimento — venceu às
+14h, às 20h já está bloqueada com zero dia inteiro. As barras não somavam o número grande ao lado.
+
+### Três defeitos que só o navegador mostrou
+
+1. **A migration da tabela de liberação financeira não existia.** O modelo estava no schema, a
+   tabela não. Typecheck, lint e build passavam — o client Prisma vem do schema, não do banco. A
+   tela deu 500.
+2. **Loop infinito de render** no hook que lê tokens de cor: `[tokens]` compara por identidade, e o
+   array chega novo a cada render. `Maximum update depth exceeded`, e o **gráfico ficou sem barras**.
+3. Faixas zeradas reservavam altura com rótulos flutuando, e o card do dinheiro esticava com 80px
+   de vazio.
+
+### A guarda de evidência subcontava de novo
+
+O `admin-web` usa `.test.ts` — o `vitest.config` dele só casa esse sufixo —, e os 6 arquivos de lá
+nunca entraram no relatório. A issue #111 consertou o `.spec.tsx` de manhã e passou por cima deste.
+Segunda dose da mesma lição: **guarda conserta o que alguém lembrou de olhar**.
+
+---
+
 ## 2026-08-19 — O provedor foi decidido, e a F14 quase cobrou o aluno duas vezes
 
 ### O gate que nunca existiu

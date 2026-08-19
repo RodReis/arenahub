@@ -112,6 +112,10 @@ const PERMISSOES = [
   'billing.read',
   'billing.manage',
   'billing.payment.manual',
+  // F15: liberacao financeira excepcional. Separada de `billing.manage` pelo
+  // mesmo motivo dos dois acima -- liberar o acesso de quem DEVE, sem o
+  // pagamento entrar, e ato excepcional com prazo e nome gravados.
+  'billing.override.financial',
 ];
 
 

@@ -493,6 +493,71 @@
         ]
       }
     },
+    "/api/v1/billing/delinquency": {
+      "get": {
+        "operationId": "BillingController_consultarInadimplencia",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/api/v1/billing/delinquency/apply": {
+      "post": {
+        "operationId": "BillingController_aplicarInadimplenciaAgora",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/api/v1/billing/financial-overrides": {
+      "post": {
+        "operationId": "BillingController_liberarFinanceiramente",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/api/v1/billing/financial-overrides/{id}/revoke": {
+      "post": {
+        "operationId": "BillingController_revogarLiberacao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/payments/{id}/status": {
       "get": {
         "operationId": "BillingController_consultarStatus",

@@ -1,0 +1,43 @@
+/**
+ * Barras de composicao por faixa.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, nunca
+ * `--ah-carbon-*` cru.
+ */
+
+/*
+ * `currentColor` no SVG herda daqui -- e por isso o rotulo do eixo e o numero
+ * na ponta da barra acompanham o tema sem que o componente conheca token
+ * nenhum de texto.
+ */
+.area {
+  color: var(--ah-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.vazio {
+  margin: 0;
+  padding: 24px 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+}
+
+/*
+ * Visivel para leitor de tela, fora da tela para quem enxerga.
+ *
+ * `clip-path` mais 1px de tamanho, e nao `display: none` nem
+ * `visibility: hidden`: os dois ULTIMOS removem o elemento da arvore de
+ * acessibilidade, que e exatamente o contrario do que se quer aqui.
+ */
+.somenteLeitorDeTela {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

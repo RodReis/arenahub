@@ -67,7 +67,33 @@ export function evaluateAccess(input: AccessPolicyInput): AccessPolicyResult {
   const vigentes = input.entitlements.filter((e) => estaVigente(e, avaliadoEm));
 
   if (vigentes.length === 0) {
-    return { outcome: 'DENY', reason: DENY_REASON.NO_ENTITLEMENT, policyVersion: POLICY_VERSION };
+    /**
+     * SUSPENSO POR DIVIDA NAO E O MESMO QUE SEM PLANO -- F15.
+     *
+     * As duas situacoes exigem acoes OPOSTAS de quem esta no balcao: "nao tem
+     * plano" manda vender um; "esta devendo" manda cobrar. Ate a F15 as duas
+     * saiam como `NO_ENTITLEMENT`, e a tela dizia a mesma coisa nos dois
+     * casos.
+     *
+     * O MOTOR CONTINUA SEM SABER O QUE E UMA INVOICE (regra de arquitetura no
+     * 1). Ele le `status === 'SUSPENDED'` e a janela de datas -- nada mais.
+     * Quem traduziu divida em suspensao foi o job de vencimento, do lado do
+     * financeiro, muito antes desta funcao rodar.
+     *
+     * A janela de DATAS importa: um direito suspenso cujo periodo ja acabou
+     * nao e um inadimplente, e um plano vencido. Dizer "pague para liberar" a
+     * quem nao tem mais plano mandaria a recepcao cobrar uma divida que nao
+     * existe.
+     */
+    const suspensoNoPeriodo = input.entitlements.some(
+      (e) => e.status === 'SUSPENDED' && dentroDoPeriodo(e, avaliadoEm),
+    );
+
+    return {
+      outcome: 'DENY',
+      reason: suspensoNoPeriodo ? DENY_REASON.PAYMENT_OVERDUE : DENY_REASON.NO_ENTITLEMENT,
+      policyVersion: POLICY_VERSION,
+    };
   }
 
   // 5. Dos vigentes, os que valem NESTA unidade.
@@ -118,13 +144,24 @@ export function evaluateAccess(input: AccessPolicyInput): AccessPolicyResult {
 function estaVigente(entitlement: EntitlementInput, avaliadoEm: number): boolean {
   if (entitlement.status !== 'ACTIVE') return false;
 
+  return dentroDoPeriodo(entitlement, avaliadoEm);
+}
+
+/**
+ * O instante cai dentro da janela do direito? So a DATA -- status nao entra.
+ *
+ * Extraida de `estaVigente` na F15, porque a razao `PAYMENT_OVERDUE` precisa
+ * da mesma pergunta sobre um direito que NAO esta ativo: um suspenso cujo
+ * periodo ja acabou e plano vencido, nao inadimplencia.
+ */
+function dentroDoPeriodo(entitlement: EntitlementInput, avaliadoEm: number): boolean {
   const inicio = Date.parse(entitlement.startsAt);
   const fim = Date.parse(entitlement.endsAt);
 
-  // Direito com data corrompida e direito que nao vale. Ver a nota sobre NaN
-  // acima: sem este guarda, `avaliadoEm >= NaN` seria `false` e o entitlement
-  // sairia do filtro por acidente -- resultado certo por motivo errado, que
-  // deixa de valer assim que a comparacao mudar de sinal.
+  // Direito com data corrompida e direito que nao vale. Sem este guarda,
+  // `avaliadoEm >= NaN` seria `false` e o entitlement sairia do filtro por
+  // acidente -- resultado certo por motivo errado, que deixa de valer assim
+  // que a comparacao mudar de sinal.
   if (!Number.isFinite(inicio) || !Number.isFinite(fim)) return false;
 
   return avaliadoEm >= inicio && avaliadoEm <= fim;

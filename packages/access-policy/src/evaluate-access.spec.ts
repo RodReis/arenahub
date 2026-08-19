@@ -101,7 +101,7 @@ describe('evaluateAccess -- direito (M1-BR-003)', () => {
     expect(resultado).toMatchObject({ outcome: 'DENY', reason: 'NO_ENTITLEMENT' });
   });
 
-  it.each<EntitlementInput['status']>(['SCHEDULED', 'SUSPENDED', 'REVOKED', 'EXPIRED'])(
+  it.each<EntitlementInput['status']>(['SCHEDULED', 'REVOKED', 'EXPIRED'])(
     'nega entitlement %s -- so ACTIVE abre catraca',
     (status) => {
       const resultado = evaluateAccess(entrada({ entitlements: [entitlement({ status })] }));
@@ -109,6 +109,74 @@ describe('evaluateAccess -- direito (M1-BR-003)', () => {
       expect(resultado).toMatchObject({ outcome: 'DENY', reason: 'NO_ENTITLEMENT' });
     },
   );
+
+  /**
+   * `SUSPENDED` SAIU da lista acima na F15.
+   *
+   * O desfecho continua `DENY` -- ninguem passou a entrar. O que mudou e o
+   * `reason`, e ele e o campo que responde "por que este aluno nao passou?".
+   * "Nao tem plano" manda a recepcao vender um; "esta devendo" manda cobrar.
+   * Colapsadas, a tela dizia a mesma coisa nos dois casos.
+   */
+  it('nega entitlement SUSPENDED com razao PROPRIA -- e devedor, nao sem-plano', () => {
+    const resultado = evaluateAccess(
+      entrada({ entitlements: [entitlement({ status: 'SUSPENDED' })] }),
+    );
+
+    expect(resultado).toMatchObject({ outcome: 'DENY', reason: 'PAYMENT_OVERDUE' });
+  });
+
+  it('suspenso com periodo JA VENCIDO volta a ser NO_ENTITLEMENT', () => {
+    /**
+     * Um direito suspenso cujo periodo acabou nao e inadimplencia: e plano
+     * vencido. Dizer "pague para liberar" a quem nao tem mais plano mandaria
+     * a recepcao cobrar uma divida que nao existe.
+     */
+    const resultado = evaluateAccess(
+      entrada({
+        entitlements: [
+          entitlement({
+            status: 'SUSPENDED',
+            startsAt: '2026-01-01T00:00:00.000Z',
+            endsAt: '2026-02-01T00:00:00.000Z',
+          }),
+        ],
+      }),
+    );
+
+    expect(resultado).toMatchObject({ outcome: 'DENY', reason: 'NO_ENTITLEMENT' });
+  });
+
+  it('suspenso NAO ganha razao propria quando existe outro direito ATIVO', () => {
+    /**
+     * Aluno com dois planos, um suspenso e um em dia, ENTRA -- e o motor nao
+     * chega a olhar a razao de negativa. Sem este caso, um `some()` mal
+     * colocado poderia negar quem tem direito valido.
+     */
+    const resultado = evaluateAccess(
+      entrada({
+        entitlements: [entitlement({ status: 'SUSPENDED' }), entitlement({ status: 'ACTIVE' })],
+      }),
+    );
+
+    expect(resultado).toMatchObject({ outcome: 'ALLOW', reason: 'ACTIVE_ENTITLEMENT' });
+  });
+
+  it('aluno BLOCKED continua BLOCKED mesmo devendo -- a ordem das regras nao muda', () => {
+    /**
+     * `PAYMENT_OVERDUE` entra no passo 4 do motor, depois de bloqueio
+     * administrativo e situacao do aluno. Inadimplencia nao pode mascarar uma
+     * decisao deliberada sobre a pessoa (`M1-BR-006`).
+     */
+    const resultado = evaluateAccess(
+      entrada({
+        student: { status: 'BLOCKED' },
+        entitlements: [entitlement({ status: 'SUSPENDED' })],
+      }),
+    );
+
+    expect(resultado).toMatchObject({ outcome: 'DENY', reason: 'STUDENT_BLOCKED' });
+  });
 
   it('nega direito que ainda nao comecou', () => {
     const resultado = evaluateAccess(
