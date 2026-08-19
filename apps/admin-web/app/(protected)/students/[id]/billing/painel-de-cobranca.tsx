@@ -3,7 +3,7 @@
 import { useActionState, useId, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { EmptyState, Field, Money, SensitiveAction, useToast } from '@arenahub/ui';
+import { EmptyState, Field, Money, SensitiveAction, useToast, useToastDeErro } from '@arenahub/ui';
 
 import {
   abrirCobranca,
@@ -62,6 +62,12 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
   const idDoValor = useId();
   const { show } = useToast();
 
+  // Os dois erros da tela viram toast -- CLAUDE.md: "sempre usar Toast para:
+  // Info, Warn e error". Gerar cobranca e receber pagamento sao acoes
+  // distintas, e cada uma anuncia a propria falha.
+  useToastDeErro(estadoDaInvoice.erro, 'error', 'erro-ao-gerar');
+  useToastDeErro(estadoDoPagamento.erro, 'error', 'erro-ao-receber');
+
   const confirmarRecebimento = (motivo: string): void => {
     if (!cobrando) return;
 
@@ -78,18 +84,6 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
   return (
     <section aria-labelledby="titulo-cobranca">
       <h2 id="titulo-cobranca">Cobrança</h2>
-
-      {estadoDaInvoice.erro ? (
-        <p role="alert" data-testid="erro-ao-gerar">
-          {estadoDaInvoice.erro}
-        </p>
-      ) : null}
-
-      {estadoDoPagamento.erro ? (
-        <p role="alert" data-testid="erro-ao-receber">
-          {estadoDoPagamento.erro}
-        </p>
-      ) : null}
 
       {/*
         Sobrepagamento vira crédito do aluno (ADR-027, resposta 4). Sem este

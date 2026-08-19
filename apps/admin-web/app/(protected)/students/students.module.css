@@ -1,0 +1,116 @@
+/**
+ * Lista de alunos -- mockup `docs/design/cadastro de aluno - lista.png`.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`
+ * e `--ah-border-*`, nunca `--ah-carbon-*` cru.
+ */
+
+/**
+ * Filtro em LINHA UNICA que quebra sozinha, igual ao de eventos de acesso.
+ * `flex-wrap` mais `min-width` no campo desce de tres colunas para uma
+ * conforme a largura, sem media query e sem breakpoint decorado.
+ *
+ * `align-items: end` porque os campos tem rotulo em cima e o botao nao: sem
+ * isso o botao subiria e alinharia com o rotulo, nao com o controle.
+ */
+.filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.filtro > * {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+/*
+ * A busca por texto e o campo principal: ela ganha o dobro do espaco dos
+ * dois selects, que sao refinamento.
+ */
+.busca {
+  flex: 2 1 280px;
+}
+
+/*
+ * O botao nao estica junto: um "Filtrar" de 400px pareceria a acao principal
+ * da tela, que e ler a tabela.
+ */
+.filtro > button {
+  flex: 0 0 auto;
+}
+
+/**
+ * Matricula em MONO -- DS-PAINEL.md §3: dado tecnico usa JetBrains Mono.
+ *
+ * `tabular-nums` alinha os digitos coluna a coluna: com fonte proporcional,
+ * uma coluna de matriculas fica com as bordas serrilhadas e o olho perde a
+ * referencia ao varrer de cima para baixo.
+ */
+.matricula {
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+  line-height: var(--ah-type-mono-lh);
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-secondary);
+  white-space: nowrap;
+}
+
+/**
+ * Nome e CPF empilhados numa celula so -- e o que o mockup faz.
+ *
+ * Junta as duas informacoes que identificam a pessoa no mesmo bloco visual,
+ * em vez de espalha-las por colunas distantes: quem confere documento no
+ * balcao le nome e documento junto, nao em pontos opostos da linha.
+ */
+.identificacao {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+}
+
+.nome {
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+/*
+ * O CPF mascarado e contexto, nao titulo: cai para `caption` e para o texto
+ * secundario, senao competiria com o nome pelo mesmo peso visual.
+ */
+.documento {
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * Consequencia do estado, ao lado do badge. `caption` porque e explicacao do
+ * badge, nao um segundo estado -- dois textos do mesmo tamanho na celula
+ * fariam parecer que o aluno tem duas situacoes.
+ */
+.consequencia {
+  margin-left: 6px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/**
+ * O aviso da busca por CPF fica DISCRETO e ancorado ao campo.
+ *
+ * Ele explica um limite da ferramenta, nao um problema com o dado da tela --
+ * com peso de paragrafo normal, competia com o conteudo que a pessoa veio
+ * ler.
+ */
+.aviso {
+  margin: 0 0 16px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}

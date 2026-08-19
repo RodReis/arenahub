@@ -155,9 +155,23 @@ const esquemaDeEdicao = z
   })
   .strict();
 
+/**
+ * As sete situacoes do aluno. UMA lista, usada pela transicao de status E pelo
+ * filtro da listagem -- duas copias divergem na primeira situacao nova.
+ */
+const situacaoDoAluno = z.enum([
+  'LEAD',
+  'TRIAL',
+  'ACTIVE',
+  'SUSPENDED',
+  'BLOCKED',
+  'CANCELLED',
+  'ARCHIVED',
+]);
+
 const esquemaDeStatus = z
   .object({
-    status: z.enum(['LEAD', 'TRIAL', 'ACTIVE', 'SUSPENDED', 'BLOCKED', 'CANCELLED', 'ARCHIVED']),
+    status: situacaoDoAluno,
     version: z.number().int().min(0),
   })
   .strict();
@@ -228,10 +242,22 @@ export class StudentsController {
     @Query('limit') limite?: string,
     @Query('cursor') cursor?: string,
     @Query('gymUnitId') gymUnitId?: string,
+    @Query('status') status?: string,
   ): Promise<AlunoDto[]> {
     // Teto de 100: sem ele, `?limit=1000000` vira exportacao da base inteira
     // numa requisicao.
     const take = Math.min(Number(limite) || 20, 100);
+
+    /*
+     * Situacao invalida na querystring vira "sem filtro", nao 400.
+     *
+     * O parametro chega da URL, que a recepcao edita, colega manda por chat e
+     * navegador restaura de sessao antiga -- devolver erro numa LISTAGEM por
+     * causa de um `?status=ATIVO` datilografado troca a tela inteira por uma
+     * pagina de erro. `safeParse` degrada para a lista completa, que e o que a
+     * tela ja mostrava antes do filtro existir.
+     */
+    const situacao = situacaoDoAluno.safeParse(status);
 
     const encontrados = await this.alunos.buscar(this.contexto.require(), {
       termo,
@@ -242,6 +268,7 @@ export class StudentsController {
       // e criar o seletor e decisao de produto adiada (`DS-PAINEL.md` §5).
       // Ausente, a listagem segue como antes desta fatia.
       gymUnitId,
+      ...(situacao.success ? { status: situacao.data } : {}),
     });
 
     return encontrados.map((a) => this.paraDto(a));

@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 
-import { Button, Field, Icon, PasswordField } from '@arenahub/ui';
+import { Button, Field, PasswordField, useToastDeErro } from '@arenahub/ui';
 
 import { entrar, type EstadoDoFormulario } from '../../actions/auth';
 import estilos from './login.module.css';
@@ -15,19 +15,14 @@ const ESTADO_INICIAL: EstadoDoFormulario = {};
  */
 export function FormularioDeLogin() {
   const [estado, acao, enviando] = useActionState(entrar, ESTADO_INICIAL);
+  // Erro vira TOAST -- CLAUDE.md: "sempre usar Toast para: Info, Warn e
+  // error". O toast ja carrega `role="alert"`, entao o anuncio ao leitor de
+  // tela nao regride com a saida do `<p role="alert">`.
+  useToastDeErro(estado.erro, 'error', 'erro-de-login');
+
 
   return (
     <form className={estilos['formulario']} action={acao} noValidate>
-      {estado.erro ? (
-        // `alert` + `tabIndex` para o leitor de tela anunciar e o teclado
-        // alcancar. Erro que so muda a cor da borda nao existe para quem
-        // navega por teclado ou nao distingue cores.
-        <p className={estilos['erro']} role="alert" tabIndex={-1} data-testid="erro-de-login">
-          <Icon name="alert-circle" />
-          {estado.erro}
-        </p>
-      ) : null}
-
       <Field
         id="email"
         name="email"

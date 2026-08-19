@@ -1,4 +1,4 @@
-import { AppShell, Button, ToastProvider } from '@arenahub/ui';
+import { AppShell, Button } from '@arenahub/ui';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
@@ -37,48 +37,48 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
 
   if (!resposta.ok || !resposta.dados) redirect('/login');
 
+  // O `ToastProvider` subiu para o layout raiz: a tela de login tambem
+  // precisa dele, e ela fica fora de `(protected)`.
   return (
-    <ToastProvider>
-      <AppShell
+    <AppShell
+      /*
+        `navLabel` sem acento: o E2E que ja roda na `main` procura
+        `getByRole('navigation', { name: 'Navegacao principal' })`. Esta
+        fatia muda aparencia, nao comportamento -- corrigir a grafia dos dois
+        lados junto e card separado.
+      */
+      navLabel="Navegacao principal"
+      /*
+        Indicador de unidade, nao seletor. A TROCA exige decisao de produto
+        sobre persistencia e escopo de sessao (DS-PAINEL.md §5); enquanto ela
+        nao existe, a ausencia fica visivel em vez de silenciosa.
+      */
+      unitSelector={<span data-testid="unidade-ativa">Unidade não selecionada</span>}
+      user={
+        <>
+          <span data-testid="usuario-logado">{resposta.dados.email}</span>
+          <form action={sair}>
+            <Button type="submit" variant="ghost">
+              Sair
+            </Button>
+          </form>
+        </>
+      }
+      nav={
         /*
-          `navLabel` sem acento: o E2E que ja roda na `main` procura
-          `getByRole('navigation', { name: 'Navegacao principal' })`. Esta
-          fatia muda aparencia, nao comportamento -- corrigir a grafia dos dois
-          lados junto e card separado.
-        */
-        navLabel="Navegacao principal"
-        /*
-          Indicador de unidade, nao seletor. A TROCA exige decisao de produto
-          sobre persistencia e escopo de sessao (DS-PAINEL.md §5); enquanto ela
-          nao existe, a ausencia fica visivel em vez de silenciosa.
-        */
-        unitSelector={<span data-testid="unidade-ativa">Unidade não selecionada</span>}
-        user={
-          <>
-            <span data-testid="usuario-logado">{resposta.dados.email}</span>
-            <form action={sair}>
-              <Button type="submit" variant="ghost">
-                Sair
-              </Button>
-            </form>
-          </>
-        }
-        nav={
-          /*
-            A ordem é a do turno: primeiro o que diz se a catraca está de pé,
-            depois a investigação, depois o cadastro. Quem abre o painel com uma
-            pessoa esperando na porta não deveria procurar o link.
+          A ordem é a do turno: primeiro o que diz se a catraca está de pé,
+          depois a investigação, depois o cadastro. Quem abre o painel com uma
+          pessoa esperando na porta não deveria procurar o link.
 
-            `Navegacao` é o único pedaço cliente do shell, e existe porque ler o
-            pathname no servidor não é suportado pelo Next -- e porque layout
-            não re-renderiza na navegação, então uma rota passada daqui ficaria
-            congelada na tela de entrada.
-          */
-          <Navegacao itens={NAVEGACAO} />
-        }
-      >
-        {children}
-      </AppShell>
-    </ToastProvider>
+          `Navegacao` é o único pedaço cliente do shell, e existe porque ler o
+          pathname no servidor não é suportado pelo Next -- e porque layout
+          não re-renderiza na navegação, então uma rota passada daqui ficaria
+          congelada na tela de entrada.
+        */
+        <Navegacao itens={NAVEGACAO} />
+      }
+    >
+      {children}
+    </AppShell>
   );
 }

@@ -564,4 +564,75 @@ describe('F45 -- cadastro completo de aluno', () => {
       expect(idsDaFilial.length).toBeLessThan(idsDeTodos.length);
     });
   });
+  /**
+   * Filtro de SITUACAO da listagem -- a barra de filtros da lista de alunos.
+   *
+   * Vive junto do filtro de unidade porque os dois compoem: a recepcao filtra
+   * "bloqueados NA filial", nao um ou outro.
+   */
+  describe('listagem por situacao', () => {
+    it('devolve so a situacao pedida, e todas quando nao ha filtro', async () => {
+      const interessado = corpo(
+        await criar(contas.a, { fullName: `Interessado ${sufixo}`, status: 'LEAD' }),
+      );
+      const ativo = corpo(await criar(contas.a, { fullName: `Ativo ${sufixo}`, status: 'ACTIVE' }));
+
+      const soAtivos = await request(servidor())
+        .get('/api/v1/students?status=ACTIVE&limit=100')
+        .set('Cookie', contas.a.cookie);
+
+      const ids = lista(soAtivos).map((a) => a.id);
+
+      expect(ids).toContain(ativo.id);
+      expect(ids).not.toContain(interessado.id);
+
+      const todos = await request(servidor())
+        .get('/api/v1/students?limit=100')
+        .set('Cookie', contas.a.cookie);
+
+      expect(lista(todos).map((a) => a.id)).toEqual(expect.arrayContaining([ativo.id, interessado.id]));
+    });
+
+    /**
+     * SITUACAO INVALIDA NAO DERRUBA A TELA.
+     *
+     * O parametro vem da URL, que a recepcao edita, colega manda por chat e
+     * navegador restaura de sessao antiga. Um `?status=ATIVO` datilografado
+     * devolvendo 400 trocaria a lista inteira por uma pagina de erro -- entao
+     * degrada para "sem filtro", que e o que a tela mostrava antes.
+     */
+    it('ignora situacao invalida em vez de recusar a listagem', async () => {
+      const aluno = corpo(await criar(contas.a, { fullName: `Situacao Torta ${sufixo}` }));
+
+      const resposta = await request(servidor())
+        .get('/api/v1/students?status=ATIVO&limit=100')
+        .set('Cookie', contas.a.cookie);
+
+      expect(resposta.status).toBe(200);
+      expect(lista(resposta).map((a) => a.id)).toContain(aluno.id);
+    });
+
+    /** Os dois filtros compoem: "bloqueados NA filial", nao um ou outro. */
+    it('combina situacao e unidade', async () => {
+      const naFilial = corpo(
+        await criar(contas.a, {
+          fullName: `Ativo Da Filial ${sufixo}`,
+          gymUnitId: contas.a.outraUnidadeId,
+          status: 'ACTIVE',
+        }),
+      );
+      const naMatriz = corpo(
+        await criar(contas.a, { fullName: `Ativo Da Matriz ${sufixo}`, status: 'ACTIVE' }),
+      );
+
+      const resposta = await request(servidor())
+        .get(`/api/v1/students?status=ACTIVE&gymUnitId=${contas.a.outraUnidadeId}&limit=100`)
+        .set('Cookie', contas.a.cookie);
+
+      const ids = lista(resposta).map((a) => a.id);
+
+      expect(ids).toContain(naFilial.id);
+      expect(ids).not.toContain(naMatriz.id);
+    });
+  });
 });

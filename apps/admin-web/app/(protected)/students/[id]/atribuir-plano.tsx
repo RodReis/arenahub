@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, SelectField, TextareaField } from '@arenahub/ui';
+import { Button, Field, SelectField, TextareaField, useToastDeErro } from '@arenahub/ui';
 
 import estilos from '../../../formulario.module.css';
 
@@ -52,6 +52,11 @@ function BotaoDeAtribuicao() {
  */
 export function AtribuirPlano({ studentId, planos, impedido }: Props) {
   const [estado, acao] = useActionState(atribuirPlano, ESTADO_INICIAL);
+  // Erro vira TOAST -- CLAUDE.md: "sempre usar Toast para: Info, Warn e
+  // error". O toast ja carrega `role="alert"`, entao o anuncio ao leitor de
+  // tela nao regride com a saida do `<p role="alert">`.
+  useToastDeErro(estado.erro, 'error', 'erro-da-atribuicao');
+
 
   const ativos = planos.filter((plano) => plano.isActive);
 
@@ -80,11 +85,6 @@ export function AtribuirPlano({ studentId, planos, impedido }: Props) {
 
   return (
     <form className={estilos['formulario']} action={acao}>
-      {estado.erro ? (
-        <p role="alert" data-testid="erro-da-atribuicao">
-          {estado.erro}
-        </p>
-      ) : null}
 
       {/*
         Aviso ANTES da tentativa. A API recusaria com `STUDENT_NOT_ELIGIBLE`,
