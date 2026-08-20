@@ -140,6 +140,27 @@ extração. Da ferramenta pessoal **não** vieram dieta, treino, suplementação
 macros: lá é uma pessoa cuidando de si com o próprio médico; aqui seria a academia praticando ato
 clínico. `MVP-03` §6, §7 (Slices 3.1 e 3.5), §10 e §12 emendados.
 
+📄 **19/08/2026 — os dois rascunhos que destravam a F17 estão escritos, e nenhum está aprovado.**
+`docs/operations/health-intelligence/` recebeu o **termo de consentimento de saúde** e a
+**política de retenção e correção**. Ambos marcados 🔴 **RASCUNHO**: existem para encurtar a
+revisão jurídica, não para substituí-la — quem escreveu não é advogado, e **nenhum dos dois pode
+ser mostrado a aluno**.
+
+O que o PI precisa decidir antes de mandar ao advogado: **(1)** consentimento único ou **dois
+separados** — o rascunho propõe separar *avaliação de saúde* de *análise por IA*, porque amarrar
+as duas torna o consentimento menos livre, que foi o fundamento nº 1 da suspensão da ANPD no caso
+do PR; **(2)** se a transferência internacional entra como aceite do titular ou como cláusula
+contratual do DPA (art. 33 admite os dois); **(3)** se a F17 reusa o mecanismo de responsável
+legal da F8, incluindo o reconsentimento na virada dos 18; **(4)** os nove prazos de retenção; e
+**(5)** se a série temporal é eliminada ou anonimizada na revogação — com o alerta de que
+anonimizar série individual é frágil, porque data de nascimento mais sequência de medições
+reidentifica.
+
+O princípio que orientou os prazos: **biometria é substituível, histórico corporal não é.** Por
+isso o ECG tem prazo **mais curto** que os demais arquivos (maior potencial de dano, menor uso
+legítimo — o ArenaHub não o interpreta), enquanto consentimento e log de acesso duram **mais** que
+o dado que autorizaram: são a prova de que o tratamento era lícito enquanto durou.
+
 Aplicado no mesmo dia ao `MVP-03`: **§6** (ECG deixa de ser exclusão absoluta e ganha a fronteira
 de *citar sem interpretar*; o gate de protocolo clínico do §5 sai), **§12**
 (`pendingMedicalReferral` e `pendingReferralSince` no contrato de saída, mais a regra de que
