@@ -18,7 +18,14 @@ interface Perfil {
 const NAVEGACAO = [
   { href: '/operations', label: 'Operação' },
   { href: '/access-events', label: 'Eventos de acesso' },
-  { href: '/access/override', label: 'Liberação manual' },
+  /*
+    "Liberação manual" SAIU do menu na issue #118: virou o botão "Liberar" na
+    grade de Alunos, direto na linha de quem está BLOCKED -- um clique em vez
+    de abrir a tela, escolher unidade e catraca e preencher motivo. A rota
+    `/access/override` continua existindo (a liberação de CATRACA física é
+    caso diferente, ver `botao-de-liberacao.tsx`), só não tem mais item fixo
+    no menu.
+  */
   { href: '/operations/devices', label: 'Dispositivos' },
   { href: '/students', label: 'Alunos' },
   { href: '/plans', label: 'Planos' },
