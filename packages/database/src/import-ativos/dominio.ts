@@ -6,6 +6,8 @@
  * decidem se uma pessoa entra na academia sem subir infraestrutura.
  */
 
+import { createHash } from 'node:crypto';
+
 /// Espelho de `normalizarCpf`/`cpfEhValido` em
 /// `apps/api/src/modules/students/domain/identificacao.ts`. Este pacote
 /// (`packages/database`) tem `rootDir: "."` no `tsconfig.json` e nao
@@ -13,12 +15,12 @@
 /// pacote, nao duplicacao por descuido. Comportamento tem que ficar
 /// identico ao original, sobretudo o digito verificador e a recusa de
 /// sequencias repetidas como `11111111111`.
-function normalizarCpf(valor: string): string {
+export function normalizarCpf(valor: string): string {
   return valor.replace(/\D/g, '');
 }
 
 /// Ver nota acima em `normalizarCpf`: mesma origem, mesmo motivo de copia.
-function cpfEhValido(valor: string): boolean {
+export function cpfEhValido(valor: string): boolean {
   const digitos = normalizarCpf(valor);
 
   if (digitos.length !== 11) return false;
@@ -36,6 +38,36 @@ function cpfEhValido(valor: string): boolean {
   };
 
   return verificador(9) === Number(digitos[9]) && verificador(10) === Number(digitos[10]);
+}
+
+/**
+ * Hash do CPF para busca por igualdade -- espelho de `calcularHashDeCpf` em
+ * `apps/api/src/modules/students/domain/identificacao.ts`, pela MESMA
+ * fronteira de pacote das funcoes acima.
+ *
+ * COPIA QUE TEM DE FICAR BYTE A BYTE IGUAL: `cpfHash` e o indice de busca
+ * por duplicata. Hash diferente do que a API grava produz duas linhas para
+ * a mesma pessoa que nenhuma consulta aproxima -- exatamente o duplicado que
+ * a F48 existe para evitar. A pimenta por tenant vem junto: dois tenants com
+ * o mesmo aluno produzem hashes diferentes, entao vazar a tabela de um nao
+ * permite cruzar bases.
+ */
+export function calcularHashDeCpf(tenantId: string, cpf: string): string {
+  return createHash('sha256').update(`${tenantId}:${normalizarCpf(cpf)}`).digest('hex');
+}
+
+/**
+ * Formata a matricula: `AP-{ano}-{8 digitos}`.
+ *
+ * Espelho de `formatarMatricula` em
+ * `apps/api/src/modules/students/domain/identificacao.ts` -- mesma fronteira
+ * de pacote das funcoes de CPF acima. NAO DERIVA DE CPF (INV-009, INV-011).
+ * O ano entra por parametro, nunca de `new Date()` aqui dentro: funcao pura
+ * nao le relogio (`CLAUDE.md`), e teste que dependesse do ano corrente
+ * quebraria em 1o de janeiro.
+ */
+export function formatarMatricula(ano: number, sequencial: number): string {
+  return `AP-${ano}-${String(sequencial).padStart(8, '0')}`;
 }
 
 /** Menor e maior idade que um cadastro de academia admite. */
@@ -180,9 +212,14 @@ export type Casamento =
  *   2. nome normalizado UNICO -- vale so para quem nao tem CPF no arquivo
  *   3. qualquer outra coisa -- pendencia humana
  *
- * NUNCA escolhe entre dois candidatos e NUNCA cria aluno novo. A base ja tem
- * 1.926 pessoas da F47: adivinhar aqui produz o aluno duplicado que a
- * recepcao descobre seis meses depois, com dois historicos pela metade.
+ * NUNCA ESCOLHE ENTRE DOIS CANDIDATOS. `AMBIGUO` e pendencia humana: chutar
+ * entre dois cadastros parecidos daria a uma pessoa o acesso e o historico
+ * de outra.
+ *
+ * `NAO_ENCONTRADO` NAO E O MESMO CASO -- e o que a F49 mudou. Nao achar
+ * ninguem virou cadastro novo (ver `importar.ts`); achar dois continua
+ * parando. Esta funcao segue apenas RELATANDO o que viu: quem decide o que
+ * fazer com cada veredito e o chamador.
  */
 export function decidirCasamento(
   entrada: { nome: string; cpf: string },
