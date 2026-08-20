@@ -35,7 +35,6 @@ updated: 2026-08-20
 - [MVP3][SPEC-020][F20] Metas e frequência (#20)
 - [MVP3][SPEC-019][F19] Upload e revisão (#19)
 - [MVP3][SPEC-018][F18] Histórico e comparativos (#18)
-- [MVP3][SPEC-017][F17] Consentimento e avaliação manual (#17)
 
 ## A Fazer
 
@@ -57,6 +56,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP3][SPEC-017][F17] Consentimento e avaliação manual (#17, finalizado em: 2026-08-20)
 - [INFRA] TESTS.md: historico append-only por entrega com cobertura real (#125, finalizado em: 2026-08-20)
 - [INFRA] CPF em claro: gravar completo e exibir sem mascara (#122, finalizado em: 2026-08-20)
 - [MVP2][SPEC-016][F16] Estorno, conciliação e operação (#16, finalizado em: 2026-08-19)
