@@ -62,8 +62,11 @@ describe('montarSnapshot', () => {
           .map((j) => j.dayOfWeek)
           .sort((a, b) => a - b);
 
-        // ISO-8601, como o schema declara: 1 = segunda ... 7 = domingo.
-        expect(dias).toEqual([1, 2, 3, 4, 5, 6, 7]);
+        // EIXO DO MOTOR: 0 = domingo ... 6 = sabado (`Date.getDay()`), e NAO
+        // o ISO-8601 que o schema declara. Quem decide se a porta abre e o
+        // motor -- ver o bloco em `montarSnapshot`. Gravar ISO nega todo
+        // mundo no domingo, e so no domingo.
+        expect(dias).toEqual([0, 1, 2, 3, 4, 5, 6]);
       }
 
       // Sem janela = `unitIds: []` = todo mundo negado. Nunca vazio.

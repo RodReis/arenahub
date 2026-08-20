@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { evaluateAccess, resolverHoraLocal } from '@arenahub/access-policy';
+
 import { criarPrismaClient, type PrismaClientArenaHub } from '../src/index.js';
 import {
   importarPessoasAtivas,
@@ -323,8 +325,82 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     // esta na lista. Direito sem janela = unitIds vazio = todo mundo negado.
     // Contar linhas nao pega isso; conferir a UNIDADE pega.
     expect([...new Set(janelas.map((j) => j.gymUnitId))]).toEqual([gymUnitId]);
-    expect(janelas.map((j) => j.dayOfWeek).sort()).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    // 0..6, EIXO DO MOTOR (`Date.getDay()`, domingo = 0) -- nao ISO 1..7. Ver
+    // o bloco em `montarSnapshot`. Travar o eixo errado aqui e o que fazia a
+    // suite reprovar quem consertasse o defeito de domingo.
+    expect(janelas.map((j) => j.dayOfWeek).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(janelas.every((j) => j.startMinute === 0 && j.endMinute === 1440)).toBe(true);
+  });
+
+  it('a catraca ABRE de verdade para quem foi importado -- inclusive no DOMINGO', async () => {
+    const aluno = await criarAlunoCancelado({ nome: 'PAULA DOMINGO' });
+
+    await importar([
+      registroDe(aluno, { codigoPerfil: '1', dataInicio: '20260803', dataFim: '20260902' }),
+    ]);
+
+    // Le do banco EXATAMENTE como `AccessProjectionRepository` le: `unitIds`
+    // sai do `distinct` de `EntitlementUnitWindow`, nunca de outra coluna.
+    const direito = await db.entitlement.findFirstOrThrow({
+      where: { studentId: aluno.id },
+      select: { id: true, status: true, startsAt: true, endsAt: true },
+    });
+    const janelas = await db.entitlementUnitWindow.findMany({
+      where: { entitlementId: direito.id },
+      select: { gymUnitId: true, dayOfWeek: true, startMinute: true, endMinute: true },
+    });
+
+    const entrada = (instante: string) => {
+      const local = resolverHoraLocal(instante, 'America/Sao_Paulo');
+
+      return {
+        evaluatedAt: instante,
+        unitId: gymUnitId,
+        localDayOfWeek: local.dayOfWeek,
+        localMinuteOfDay: local.minuteOfDay,
+        student: { status: 'ACTIVE' as const },
+        adminBlock: { active: false },
+        entitlements: [
+          {
+            id: direito.id,
+            status: direito.status,
+            startsAt: direito.startsAt.toISOString(),
+            endsAt: direito.endsAt.toISOString(),
+            unitIds: [...new Set(janelas.map((j) => j.gymUnitId))],
+            windows: janelas.map((j) => ({
+              dayOfWeek: j.dayOfWeek,
+              startMinute: j.startMinute,
+              endMinute: j.endMinute,
+            })),
+          },
+        ],
+      };
+    };
+
+    // DOMINGO, 10:00 em Sao Paulo. E o unico dia que expoe o eixo trocado: de
+    // segunda a sabado os eixos ISO (1..7) e do motor (0..6) coincidem, entao
+    // a semana toda passa mesmo com o defeito. Aqui o motor calcula `0`; se o
+    // seed gravasse `7`, nenhuma janela casaria e viria OUTSIDE_SCHEDULE.
+    const domingo = evaluateAccess(entrada('2026-08-23T13:00:00.000Z'));
+
+    expect(domingo.outcome).toBe('ALLOW');
+    if (domingo.outcome === 'ALLOW') expect(domingo.entitlementId).toBe(direito.id);
+
+    // Um dia de semana tambem, para o teste nao virar "so domingo funciona".
+    expect(evaluateAccess(entrada('2026-08-24T13:00:00.000Z')).outcome).toBe('ALLOW');
+
+    // E o comportamento ANTIGO (direito sem janela nenhuma), para provar que
+    // e a janela que sustenta o ALLOW: sem linha, `unitIds` fica vazio e o
+    // motor nega com WRONG_UNIT -- o defeito que a Task 6 corrigiu.
+    const semJanela = evaluateAccess({
+      ...entrada('2026-08-24T13:00:00.000Z'),
+      entitlements: [
+        { ...entrada('2026-08-24T13:00:00.000Z').entitlements[0]!, unitIds: [], windows: [] },
+      ],
+    });
+
+    expect(semJanela.outcome).toBe('DENY');
+    if (semJanela.outcome === 'DENY') expect(semJanela.reason).toBe('WRONG_UNIT');
   });
 
   it('NAO emite cobranca -- essas pessoas ja pagaram no Pacto', async () => {

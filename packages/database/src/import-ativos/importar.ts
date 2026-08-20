@@ -218,10 +218,36 @@ type SnapshotDePolitica = {
  * hoje. Funcionario que abre as 5h e professor que fecha as 23h tambem nao
  * cabem numa grade comercial.
  *
- * Mesma forma que `montarSnapshotDePolitica` / `montarSnapshotDeVinculo`
- * produzem em `apps/api/src/modules/membership/domain/entitlement.ts`.
- * Replicada, e nao importada, pela FRONTEIRA DE PACOTE explicada no topo do
- * arquivo.
+ * Mesma forma que `montarSnapshotDePolitica` produz em
+ * `apps/api/src/modules/membership/domain/entitlement.ts`. Replicada, e nao
+ * importada, pela FRONTEIRA DE PACOTE explicada no topo do arquivo.
+ *
+ * ---------------------------------------------------------------------------
+ * O EIXO DE `dayOfWeek` E 0..6 (DOMINGO = 0). NAO "CORRIJA" PARA ISO 1..7.
+ * ---------------------------------------------------------------------------
+ *
+ * Existem dois eixos em uso no repositorio, e eles divergem:
+ *
+ *   - O SCHEMA documenta ISO-8601 (`1 = segunda ... 7 = domingo`).
+ *   - O MOTOR DE DECISAO consome `Date.getDay()` (`0 = domingo ... 6 =
+ *     sabado`): `resolverHoraLocal` mapeia `Sun: 0` em
+ *     `packages/access-policy/src/local-time.ts`, e `AccessWindow.dayOfWeek`
+ *     em `types.ts` documenta o mesmo eixo.
+ *
+ * A F48 SEGUE O MOTOR, porque e o motor que decide se a porta abre. Gravar
+ * ISO aqui produz um defeito que so aparece no DOMINGO: de segunda a sabado
+ * os dois eixos coincidem (1..6 existe nos dois), entao a semana inteira
+ * funciona por coincidencia; no domingo o motor calcula `0`, a linha gravada
+ * diz `7`, nenhuma janela casa e a decisao vira `DENY` / `OUTSIDE_SCHEDULE`
+ * para as ~340 pessoas de uma vez.
+ *
+ * A divergencia no RESTO do sistema (o caminho normal da API grava o mesmo
+ * eixo ISO) e CONHECIDA, e PRE-EXISTENTE a esta fatia e tem card proprio --
+ * consertar `plan.ts` / `membership.controller.ts` aqui esta explicitamente
+ * fora do escopo da F48 (ruling do PI). Nao unifique por conta propria.
+ *
+ * Ha teste que prova este eixo perguntando ao motor de verdade, num DOMINGO,
+ * se a porta abre (`test/import-ativos.int-spec.ts`).
  */
 export function montarSnapshot(
   plano: { id: string; name: string } | null,
@@ -231,7 +257,8 @@ export function montarSnapshot(
   const unidades = [...gymUnitIds].sort();
 
   const janelas: JanelaDoSnapshot[] = unidades.flatMap((gymUnitId) =>
-    [1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => ({
+    // 0..6, eixo do motor -- ver o bloco acima antes de mexer.
+    [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
       gymUnitId,
       dayOfWeek,
       startMinute: 0,
@@ -582,11 +609,18 @@ async function gravarPessoa(
  * sai dele, e ler o relogio aqui dentro tornaria o teste de fronteira
  * impossivel de escrever sem congelar o tempo global.
  *
- * NAO abre transacao por registro, de proposito. Cada gravacao ja e
- * idempotente por conta propria, entao uma interrupcao no meio deixa o banco
- * num estado que a proxima execucao completa -- transacao por linha daria
- * atomicidade que nao muda o resultado de nenhuma re-execucao, ao custo de
- * segurar uma conexao por pessoa.
+ * ABRE UMA TRANSACAO POR PESSOA, e isso e deliberado. Cada gravacao e
+ * idempotente por conta propria, mas idempotencia so conserta o estado se
+ * houver uma proxima execucao: morrer no meio de uma pessoa deixaria
+ * `status: ACTIVE` + credencial gravada e NENHUM direito -- cadastro ativo
+ * com a porta fechada, que nao vira pendencia, nao entra em contador nenhum,
+ * e so aparece quando a pessoa e barrada na catraca. Sao ~340 transacoes
+ * curtas, nao uma gigante. Nao remova a transacao "porque a escrita ja e
+ * idempotente": as duas garantias respondem a perguntas diferentes.
+ *
+ * Um erro numa pessoa nao mata a importacao: a linha vira pendencia
+ * `erro ao gravar` e o laco segue, para nao perder as pendencias e os
+ * contadores de quem ja passou.
  */
 export async function importarPessoasAtivas(
   db: PrismaClientArenaHub,

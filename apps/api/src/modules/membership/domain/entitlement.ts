@@ -194,35 +194,3 @@ export function montarSnapshotDePolitica(
     janelas,
   };
 }
-
-/**
- * Snapshot do direito que vem de VINCULO, nao de plano (F48).
- *
- * Janela livre -- sete dias, do minuto zero ao 1440. Funcionario que abre a
- * academia as 5h e professor que fecha as 23h nao cabem numa grade de
- * horario comercial, e inventar uma criaria a negacao que a recepcao teria
- * de contornar na mao todo dia.
- */
-export function montarSnapshotDeVinculo(
-  perfil: string,
-  gymUnitIds: readonly string[],
-): SnapshotDePolitica {
-  const unidades = [...gymUnitIds].sort();
-
-  const janelas: JanelaDeAcesso[] = unidades.flatMap((gymUnitId) =>
-    [1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => ({
-      gymUnitId,
-      dayOfWeek,
-      startMinute: 0,
-      endMinute: 1440,
-    })),
-  );
-
-  return {
-    planId: null,
-    planName: `Vinculo ${perfil}`,
-    snapshotVersion: 1,
-    gymUnitIds: unidades,
-    janelas,
-  };
-}
