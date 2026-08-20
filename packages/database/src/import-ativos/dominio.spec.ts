@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { nascimentoEhPlausivel, parsearDataDoPacto } from './dominio.js';
+import {
+  nascimentoEhPlausivel,
+  origemDoDireito,
+  parsearDataDoPacto,
+  traduzirPerfil,
+} from './dominio.js';
 
 describe('parsearDataDoPacto', () => {
   it('converte AAAAMMDD em data', () => {
@@ -45,5 +50,35 @@ describe('nascimentoEhPlausivel', () => {
 
   it('recusa idade impossivel', () => {
     expect(nascimentoEhPlausivel(new Date('1890-01-01T00:00:00.000Z'), agora)).toBe(false);
+  });
+});
+
+describe('traduzirPerfil', () => {
+  it('mapeia os quatro codigos que a academia usa', () => {
+    expect(traduzirPerfil('0')).toBe('ADMIN');
+    expect(traduzirPerfil('1')).toBe('STUDENT');
+    expect(traduzirPerfil('2')).toBe('STAFF');
+    expect(traduzirPerfil('3')).toBe('TRAINER');
+  });
+
+  it('devolve nulo para codigo de teste -- 4, 5 e 6 so aparecem em lixo', () => {
+    expect(traduzirPerfil('6')).toBeNull();
+    expect(traduzirPerfil('')).toBeNull();
+    expect(traduzirPerfil('9')).toBeNull();
+  });
+});
+
+describe('origemDoDireito', () => {
+  it('aluno entra por assinatura', () => {
+    expect(origemDoDireito('STUDENT')).toBe('SUBSCRIPTION');
+  });
+
+  it('professor entra como personal, nao como funcionario', () => {
+    expect(origemDoDireito('TRAINER')).toBe('PERSONAL_TRAINER');
+  });
+
+  it('funcionario e administrador entram por vinculo', () => {
+    expect(origemDoDireito('STAFF')).toBe('EMPLOYEE');
+    expect(origemDoDireito('ADMIN')).toBe('EMPLOYEE');
   });
 });

@@ -75,3 +75,39 @@ export function nascimentoEhPlausivel(nascimento: Date, agora: Date): boolean {
 
   return anos >= IDADE_MINIMA_ANOS && anos <= IDADE_MAXIMA_ANOS;
 }
+
+/** Os quatro papeis que a academia opera hoje. Espelha `StudentProfile`. */
+export type PerfilImportado = 'ADMIN' | 'STUDENT' | 'STAFF' | 'TRAINER';
+
+/**
+ * `Codigo Perfil` do Pacto para o papel do ArenaHub.
+ *
+ * LISTA FECHADA, e o desconhecido vira `null`: os codigos 4, 5 e 6
+ * aparecem no arquivo apenas em registros de teste, e adivinhar o
+ * significado deles daria acesso a alguem que nem existe.
+ */
+const PERFIL_POR_CODIGO: Record<string, PerfilImportado> = {
+  '0': 'ADMIN',
+  '1': 'STUDENT',
+  '2': 'STAFF',
+  '3': 'TRAINER',
+};
+
+export function traduzirPerfil(codigo: string): PerfilImportado | null {
+  return PERFIL_POR_CODIGO[codigo.trim()] ?? null;
+}
+
+/**
+ * De onde vem o direito de acesso desse papel.
+ *
+ * O perfil NAO decide acesso -- ele diz qual `EntitlementSource` origina o
+ * direito. Quem decide continua sendo o `Entitlement` (regra no 1).
+ */
+export function origemDoDireito(
+  perfil: PerfilImportado,
+): 'SUBSCRIPTION' | 'EMPLOYEE' | 'PERSONAL_TRAINER' {
+  if (perfil === 'STUDENT') return 'SUBSCRIPTION';
+  if (perfil === 'TRAINER') return 'PERSONAL_TRAINER';
+
+  return 'EMPLOYEE';
+}
