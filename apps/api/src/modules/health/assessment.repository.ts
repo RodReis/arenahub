@@ -313,15 +313,35 @@ export class AssessmentRepository {
   /**
    * Trava a linha da avaliacao ate o fim da transacao (`SELECT ... FOR UPDATE`).
    *
-   * **Sem isto o INV-102 nao vale sob concorrencia, e foi medido: 25/25.** As
-   * medidas moram em OUTRA tabela, entao `deleteMany`/`createMany` em
-   * `body_measurements` nao colide com o `UPDATE` de `body_assessments`. Em
-   * READ COMMITTED -- o padrao do Postgres -- publicar commitava no meio da
-   * edicao, e a avaliacao ja PUBLICADA terminava carregando o valor do
-   * rascunho: numero oficial alterado sem virar correcao.
+   * **Por que existe.** As medidas moram em OUTRA tabela, entao
+   * `deleteMany`/`createMany` em `body_measurements` nao colide com o
+   * `UPDATE` de `body_assessments`. Em READ COMMITTED -- o padrao do Postgres
+   * -- nada serializa as duas transacoes por conta propria: publicar pode
+   * commitar no meio da edicao, e a edicao termina gravando medida numa
+   * avaliacao que ja virou oficial. Ler o status DEPOIS da trava e o que
+   * torna a checagem confiavel: quem chegou primeiro termina, e o segundo
+   * enxerga o estado ja commitado.
    *
-   * Ler o status depois da trava e o que torna a checagem confiavel: quem
-   * chegou primeiro termina, e o segundo enxerga o estado JA commitado.
+   * ⚠️ **NENHUM TESTE DEFENDE ESTA TRAVA. Remover nao quebra nada, e mesmo
+   * assim ela FICA -- decisao do PI em 20/08/2026.**
+   *
+   * Nao e descuido: escrevi tres testes para ela e os tres estavam errados.
+   *
+   *   1. reprovava toda avaliacao publicada com o valor da edicao -- mas ha
+   *      ordem LEGITIMA que produz isso (a edicao commita enquanto ainda e
+   *      rascunho, e publicar congela o valor dela). Falso positivo no CI;
+   *   2. tentou separar as ordens por `medida.createdAt` vs `publishedAt` --
+   *      irrecuperavel, porque um vem de `now()` do POSTGRES e o outro de
+   *      `new Date()` do NODE, e o skew entre containers inverte a comparacao;
+   *   3. tentou deduzir a ordem do par de status HTTP -- e PASSOU NA MUTACAO,
+   *      ou seja, virou guarda decorativa.
+   *
+   * A raiz e que as duas ordens produzem estado final IDENTICO visto de fora.
+   * O que resta provado, por teste sequencial e determinista, e o essencial:
+   * **publicada, nada muda** -- a edicao que chega depois recebe 409.
+   *
+   * Se for remover isto algum dia, saiba o que esta removendo: a janela e
+   * real, so nao e observavel pela API.
    *
    * Devolve `null` quando a avaliacao nao existe no tenant -- 404, nao 409.
    */

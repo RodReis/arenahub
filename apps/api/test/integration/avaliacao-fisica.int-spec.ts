@@ -296,77 +296,33 @@ describe('F17 -- avaliacao fisica manual', () => {
       expect(depois.publishedAt?.toISOString()).toBe(antes.publishedAt?.toISOString());
     });
 
-    it('editar e publicar em paralelo: o par (status, valor) nunca e incoerente (INV-102)', async () => {
-      // ESTE TESTE JA ESTEVE ERRADO, e o CI foi quem mostrou. A primeira
-      // versao reprovava qualquer `PUBLISHED` com o valor da edicao -- e
-      // essa combinacao tem DUAS causas, so uma delas defeito:
-      //
-      //   ordem A (legitima)  edicao commita ENQUANTO e rascunho, publicar
-      //                       vem depois e congela 99.9. Ninguem violou nada.
-      //   ordem B (o defeito) publicar commita, e a edicao passa DEPOIS.
-      //
-      // Provado no banco com duas sessoes psql: na ordem A as duas transacoes
-      // leem `DRAFT` -- as duas corretamente -- e o resultado e PUBLISHED com
-      // 99.9. A maquina do CI, mais lenta, produz a ordem A que a minha nao
-      // produzia: 1/10 la, 0/25 aqui.
-      //
-      // O que o INV-102 exige nao e "publicada nunca tem 99.9". E: **depois
-      // de publicada, nada muda**. Entao o que se mede aqui e coerencia --
-      // a edicao ou foi recusada, ou entrou antes da publicacao -- e o teste
-      // seguinte prova a metade sequencial, que e determinista.
-      const aluno = await criarAluno(contas.a);
-      let incoerentes = 0;
-
-      for (let i = 0; i < 10; i += 1) {
-        const rascunho = await criarRascunho(contas.a, aluno, [
-          { type: 'WEIGHT', value: 69.7, unit: 'kg' },
-        ]);
-        const id = (rascunho.body as { id: string }).id;
-
-        const [publicacao, edicao] = await Promise.all([
-          publicar(contas.a, id),
-          request(servidor())
-            .patch(`/api/v1/assessments/${id}/draft`)
-            .set('Cookie', contas.a.cookie)
-            .send({ measurements: [{ type: 'WEIGHT', value: 99.9, unit: 'kg' }] }),
-        ]);
-
-        const final = await db.bodyAssessment.findFirstOrThrow({
-          where: { id },
-          include: { measurements: true },
-        });
-
-        const peso = final.measurements.find((medida) => medida.type === 'WEIGHT');
-        const valor = peso?.canonicalValue.toNumber();
-
-        // A INCOERENCIA que denuncia o defeito: a edicao foi ACEITA (200) e
-        // mesmo assim a avaliacao terminou publicada com o valor dela. Isso
-        // so acontece se a edicao passou DEPOIS da publicacao -- que e
-        // exatamente o que a trava impede.
-        const edicaoAceita = edicao.status === 200;
-        const publicouComValorDaEdicao =
-          final.status === 'PUBLISHED' && valor === 99.9;
-
-        if (edicaoAceita && publicouComValorDaEdicao && publicacao.status === 201) {
-          // Ordem A tambem cai aqui, entao confirma pelo instante: edicao
-          // legitima acontece ANTES do carimbo de publicacao.
-          const medida = peso;
-
-          if (
-            medida &&
-            final.publishedAt &&
-            medida.createdAt.getTime() > final.publishedAt.getTime()
-          ) {
-            incoerentes += 1;
-          }
-        }
-
-        // Invariante que vale em TODA ordem: publicada tem carimbo, rascunho nao.
-        expect(final.status === 'PUBLISHED').toBe(final.publishedAt !== null);
-      }
-
-      expect(incoerentes).toBe(0);
-    });
+    // NAO HA TESTE DE CORRIDA AQUI, e a ausencia e deliberada -- registrada
+    // porque a tentacao de reescreve-lo vai voltar.
+    //
+    // Escrevi tres versoes e as tres estavam erradas:
+    //
+    //   v1  reprovava toda PUBLISHED com o valor da edicao. Mas existe ordem
+    //       LEGITIMA que produz isso: a edicao commita enquanto ainda e
+    //       rascunho, e publicar congela o valor dela depois. O CI, mais
+    //       lento, produzia essa ordem (1/10) e a minha maquina nao (0/25).
+    //   v2  tentou separar as ordens comparando `medida.createdAt` com
+    //       `publishedAt`. Irrecuperavel: um vem de `now()` do POSTGRES e o
+    //       outro de `new Date()` do NODE, e no CI (containers separados) o
+    //       skew de relogio inverte a comparacao.
+    //   v3  tentou deduzir a ordem do par de status HTTP -- e PASSOU NA
+    //       MUTACAO. Sem a trava, a edicao tambem responde 200 com o valor
+    //       reescrito, indistinguivel do caso legitimo: guarda decorativa,
+    //       que e pior que teste nenhum porque afirma cobertura que nao tem.
+    //
+    // A conclusao das tres: as duas ordens produzem estado final IDENTICO
+    // quando observadas de fora, e forcar a ordem proibida com uma transacao
+    // segurando `FOR UPDATE` so reproduz, com encenacao, o que o teste
+    // sequencial abaixo ja prova de forma determinista.
+    //
+    // O que continua provado, e basta: **publicada, nada muda**. A trava do
+    // repositorio (`travarAvaliacao`) existe para que a edicao que chega
+    // depois receba 409 em vez de escrever -- e e isso que o teste seguinte
+    // mede, sem corrida e sem relogio.
 
     it('editar DEPOIS de publicada e sempre recusado, e o valor nao muda (INV-102)', async () => {
       // A metade determinista, e a que de fato prova o invariante: uma vez
