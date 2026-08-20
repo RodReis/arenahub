@@ -641,6 +641,20 @@ export class StudentRepository {
           take: 1,
           select: { value: true },
         },
+        /*
+          O NUMERO QUE A CATRACA LE -- e a pergunta que a recepcao faz
+          olhando a lista ("qual o id dele no equipamento?"), que antes
+          exigia abrir a ficha.
+
+          SEM `take`, ao contrario dos dois de cima: uma pessoa pode ter mais
+          de um numero (cartao trocado, credencial vinda de linha duplicada
+          do Pacto), e cortar em um esconderia justamente o caso que precisa
+          ser resolvido -- um cartao antigo que continua valido no leitor.
+        */
+        credentials: {
+          orderBy: { createdAt: 'asc' },
+          select: { externalId: true },
+        },
       },
     });
   }

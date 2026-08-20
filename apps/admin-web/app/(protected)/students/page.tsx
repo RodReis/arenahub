@@ -32,6 +32,8 @@ export const dynamic = 'force-dynamic';
 interface Aluno {
   id: string;
   membershipNumber: string;
+  /** Números do leitor, já sem repetidos. Vazio antes da primeira credencial. */
+  deviceIds: string[];
   fullName: string;
   birthDate: string;
   cpf: string | null;
@@ -263,11 +265,30 @@ export default async function PaginaDeAlunos({
             render: (aluno) => <Identidade nome={aluno.fullName} href={`/students/${aluno.id}`} />,
           },
           {
-            key: 'matricula',
-            sortKey: 'matricula',
-            header: 'Matrícula',
+            key: 'catraca',
+            header: 'ID da catraca',
             role: 'code',
-            render: (aluno) => aluno.membershipNumber,
+            /*
+              O NÚMERO DO EQUIPAMENTO NO LUGAR DA MATRÍCULA.
+
+              A matrícula é identificador nosso, e a recepção não a usa para
+              nada olhando a lista -- ela pergunta pelo nome. O número do
+              leitor é o que ela precisa quando confere quem passou na
+              catraca ou por que alguém não passou.
+
+              A matrícula não sumiu: continua na ficha do aluno, que é onde
+              se responde "quem é esta pessoa no nosso cadastro?".
+
+              DOIS NÚMEROS APARECEM OS DOIS. Quem tem dois tem dois cartões
+              vivos no leitor -- herança de linha duplicada no Pacto -- e é
+              exatamente o caso que precisa ser visto para desativar o
+              antigo. Esconder o segundo esconderia o problema.
+
+              `Ausente` quando não há: aluno cadastrado pela recepção ainda
+              não tem credencial, e isso é o caminho normal, não falha.
+            */
+            render: (aluno) =>
+              aluno.deviceIds.length === 0 ? <Ausente /> : aluno.deviceIds.join(', '),
           },
           {
             key: 'cpf',
@@ -319,7 +340,14 @@ export default async function PaginaDeAlunos({
               A recepcao fala com o aluno por WhatsApp. Exibir o numero como
               texto significa copiar, abrir o aplicativo, colar e digitar --
               quatro passos com alguem esperando no balcao.
+
+              `label` e nao ausencia de papel: telefone tem largura previsivel
+              e nao e frase da API. Sem papel declarado, esta era a UNICA
+              coluna da tabela sem `inline-size: 1%` -- e por isso recebia
+              TODA a sobra da linha, abrindo um vao de mais de cem pixels ate
+              a data de nascimento. A coluna crescia sem ter o que mostrar.
             */
+            role: 'label',
             render: (aluno) => <Telefone numero={aluno.phone} />,
           },
           {

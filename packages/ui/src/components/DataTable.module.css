@@ -148,6 +148,17 @@
   inline-size: 1%;
   min-inline-size: 22ch;
   max-inline-size: 32ch;
+  /*
+   * `overflow: hidden` fecha o teto acima. Sem ele, o teto limita a LARGURA
+   * DA COLUNA mas nao contem o conteudo: o nome longo transborda por cima da
+   * coluna vizinha, e foi o que aconteceu na tela de alunos -- "WAGNUZIA
+   * SILVA CARDOSO MOREIRA" atravessando o ID da catraca.
+   *
+   * Sozinho ele tambem nao resolve (medido: a celula continuava a 242 px com
+   * conteudo de 287 px). Os dois lados sao necessarios, e o outro esta em
+   * `Identidade.module.css`: o wrapper precisa ser `flex`, nao `inline-flex`.
+   */
+  overflow: hidden;
 }
 
 /*

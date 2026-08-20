@@ -4,8 +4,24 @@
  * Le so a camada semantica (regra de lint 2). Sem hex literal (regra 1).
  */
 
+/*
+ * `flex`, e NAO `inline-flex` -- a diferenca decide se o nome longo trunca.
+ *
+ * `inline-flex` se dimensiona PELO CONTEUDO: a caixa cresce ate caber o nome
+ * inteiro e ignora a largura de quem a contem. O `min-inline-size: 0` do
+ * `.texto` e o `text-overflow` do `.nome` continuam corretos, mas nao tem
+ * contra o que truncar -- a reticencia so aparece quando algum ancestral
+ * impoe um limite, e `inline-flex` nunca impunha.
+ *
+ * Medido na tela de alunos a 1280 px: a celula tinha 242 px e o conteudo
+ * 287 px, com os 45 px de sobra passando POR CIMA da coluna vizinha. Com
+ * `flex`, a caixa herda a largura da celula e o nome trunca em 171 px.
+ *
+ * `block` sozinho nao serve: o avatar e o texto precisam do alinhamento
+ * vertical que o flex da.
+ */
 .identidade {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
   min-inline-size: 0;
