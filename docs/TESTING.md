@@ -174,29 +174,48 @@ estorno.
 
 ## 5. Relatório de evidência
 
-**Objetivo:** ligar cada SPEC/fatia aos testes que a provam, com número que veio de execução.
+**Objetivo:** ligar cada entrega (Issue/SPEC/PR) aos testes que a provou, com número que veio de
+execução — e manter o histórico de entregas passadas **imutável**, não sobrescrito a cada run.
 
-**Artefato:** `reports/TESTS.md`, gerado por `pnpm test:report`, **commitado no PR**. O CI
-roda `pnpm test:report --check` e falha se o arquivo commitado divergir do que a execução
-produz — é a guarda de evidência citada no `CLAUDE.md`.
+**Artefato:** `reports/TESTS.md`, gerado por `pnpm test:report`, **commitado no PR**. Duas
+seções: **Estado atual** (última execução, uma linha por nível) e **Histórico por entrega**
+(*append-only* — uma linha nova a cada entrega, linhas anteriores nunca mudam).
 
-**Conteúdo mínimo de cada linha do relatório:**
+**Conteúdo de cada linha, por nível** (unitário/contrato/integração/e2e/hardware/segurança —
+§1):
 
 | campo | vem de |
 |---|---|
-| SPEC / fatia | tag no teste ou caminho do módulo |
-| nível | sufixo do arquivo |
-| total / passou / falhou / pulado | saída do runner |
-| cobertura de regra de domínio | saída do coverage |
-| data e SHA da execução | CI |
+| Data | data da execução (só na linha de histórico, não no `--check`) |
+| Issue / SPEC / PR | flag de quem entrega (`--issue`, `--spec`, `--pr`) — só na linha de histórico |
+| nível | sufixo do arquivo (§1) |
+| testes / pass / falha | saída `--json` do runner (Jest e Vitest têm o mesmo schema) |
+| cobertura % | `coverage-summary.json` (`total.lines.pct`), gerado por `--coverage
+  --coverage.reporter=json-summary` (Vitest) / `--coverageReporters=json-summary` (Jest) |
+
+**Fluxo de entrega — dois comandos, dois momentos:**
+
+```
+pnpm test:report                                   # atualiza "Estado atual", sem tocar histórico
+pnpm test:report --issue 122 --spec F47 --pr 123    # ambos: atualiza estado atual E ANEXA linha ao histórico
+```
+
+Quem entrega roda o segundo comando **localmente, antes do commit final do PR** — é o mesmo
+momento em que hoje se roda `pnpm test:report` sem flag. `--spec` aceita `SPEC-nnn`, `F<n>` (fatia
+sem SPEC no Índice do `STATUS.md`) ou fica de fora quando o card não tem nenhum dos dois
+(`[INFRA]` sem F).
+
+**O que o `--check` do CI valida — e o que não valida.** `pnpm test:report --check` roda **sem
+flag**: ele regenera a seção "Estado atual" (roda os testes, lê os números) e compara com o que
+está commitado. **Ele não pode validar Issue/SPEC/PR da última linha do histórico** — esses
+valores vêm de fora do repositório (o board, a issue), e o CI não tem como adivinhá-los. A
+garantia do CI é *"os números da última entrega batem com uma execução real"*, não *"a
+Issue/SPEC/PR estão corretos"* — essa segunda parte é responsabilidade de quem roda o comando com
+as flags, e revisão humana no PR continua sendo a rede de segurança para isso.
 
 **O gerador tem um self-check** (`pnpm test:report:selfcheck`): um teste do próprio gerador,
 que garante que ele conta o que existe. Gerador de relatório sem teste é a forma mais elegante
 de mentir com número.
-
-> **Nada disso existe ainda.** `scripts/`, `reports/` e `.github/workflows/ci.yml` fazem parte
-> do bootstrap (`docs/DEVELOPMENT.md` §4, bootstrap `[INFRA]`). Enquanto não existirem, **não há relatório e não
-> há evidência** — e nenhum documento deste repositório pode afirmar que há.
 
 ---
 

@@ -31,6 +31,7 @@
   "devDependencies": {
     "@arenahub/config": "workspace:*",
     "@types/node": "^26.2.0",
+    "@vitest/coverage-v8": "4.1.10",
     "dotenv": "17.2.4",
     "eslint": "9.39.5",
     "prisma": "7.9.1",
