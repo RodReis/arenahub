@@ -106,11 +106,16 @@ export type MotivoDePendencia =
   | 'nao encontrado no cadastro'
   | 'nascimento implausivel'
   | 'aluno sem periodo de plano'
-  | 'credencial ja pertence a outro aluno';
+  | 'credencial ja pertence a outro aluno'
+  | 'bloqueado no ArenaHub, veio como ativo no arquivo'
+  | 'arquivado no ArenaHub, veio como ativo no arquivo'
+  | 'erro ao gravar';
 
 export interface Pendencia {
   readonly nome: string;
   readonly motivo: MotivoDePendencia;
+  /** So em `erro ao gravar`: a mensagem, para o operador saber o que houve. */
+  readonly detalhe?: string;
 }
 
 /** Quantos dos casados tinham cada campo. Ver a nota em `ResultadoDaAtivacao`. */
@@ -190,19 +195,36 @@ type SnapshotDePolitica = {
 };
 
 /**
- * Mesma forma que `montarSnapshotDeVinculo` produz em
- * `apps/api/src/modules/membership/domain/entitlement.ts`. Replicada, e nao
- * importada, pela FRONTEIRA DE PACOTE explicada no topo do arquivo: o pacote
- * de banco nao alcanca `apps/api` no typecheck, e inverter essa dependencia
- * por um objeto de cinco campos custaria mais do que resolve. `seed-demo.ts`
- * ja carrega a mesma nota para o snapshot de plano.
+ * Copia congelada da politica, com JANELA LIVRE em todas as unidades.
  *
- * Janela livre -- sete dias, do minuto zero ao 1440. Funcionario que abre a
- * academia as 5h e professor que fecha as 23h nao cabem numa grade
- * comercial, e inventar uma criaria a negacao que a recepcao teria de
- * contornar na mao todo dia.
+ * AS LINHAS DE JANELA NAO SAO DECORACAO -- ELAS SAO A UNICA FONTE DAS
+ * UNIDADES ONDE O DIREITO VALE. `AccessProjectionRepository` monta
+ * `unitIds` exclusivamente a partir de `EntitlementUnitWindow`
+ * (`access-projection.repository.ts`: `[...new Set(unitWindows.map((j) =>
+ * j.gymUnitId))]`), e `evaluate-access.ts` nega com `WRONG_UNIT` quando
+ * `unitIds` nao contem a unidade da catraca. Direito sem janela =
+ * `unitIds: []` = TODO MUNDO NEGADO, com a razao mais confusa possivel
+ * numa academia de uma unidade so.
+ *
+ * (Janela VAZIA de fato significa "sem restricao de HORARIO" -- e o que
+ * `dentroDeAlgumaJanela` faz com lista vazia. Mas o horario e o passo 6 do
+ * motor; a UNIDADE e o passo 5, e nele nao existe fallback. Foi essa
+ * meia-verdade que produziu o defeito.)
+ *
+ * Por isso PLANO e VINCULO usam o MESMO construtor: a diferenca entre eles
+ * e so a identidade do plano, e ter dois construtores foi o que permitiu um
+ * sair sem janela. Sete dias, do minuto zero ao 1440 -- a base do Pacto nao
+ * traz grade de horario, e inventar uma negaria acesso que a pessoa ja tem
+ * hoje. Funcionario que abre as 5h e professor que fecha as 23h tambem nao
+ * cabem numa grade comercial.
+ *
+ * Mesma forma que `montarSnapshotDePolitica` / `montarSnapshotDeVinculo`
+ * produzem em `apps/api/src/modules/membership/domain/entitlement.ts`.
+ * Replicada, e nao importada, pela FRONTEIRA DE PACOTE explicada no topo do
+ * arquivo.
  */
-function montarSnapshotDeVinculo(
+export function montarSnapshot(
+  plano: { id: string; name: string } | null,
   perfil: PerfilImportado,
   gymUnitIds: readonly string[],
 ): SnapshotDePolitica {
@@ -218,33 +240,11 @@ function montarSnapshotDeVinculo(
   );
 
   return {
-    planId: null,
-    planName: `Vinculo ${perfil}`,
+    planId: plano?.id ?? null,
+    planName: plano?.name ?? `Vinculo ${perfil}`,
     snapshotVersion: 1,
     gymUnitIds: unidades,
     janelas,
-  };
-}
-
-/**
- * Snapshot do direito que vem de PLANO. Mesma forma que
- * `montarSnapshotDePolitica` -- ver a nota de replicacao acima.
- *
- * Sem janela de horario: o plano importado do Pacto nao traz grade, e
- * inventar uma negaria acesso que a pessoa ja tem hoje. `janelas: []` e como
- * o motor le "sem restricao de horario" (e o que `seed-demo.ts` ja grava).
- */
-function montarSnapshotDePlano(
-  planId: string,
-  planName: string,
-  gymUnitIds: readonly string[],
-): SnapshotDePolitica {
-  return {
-    planId,
-    planName,
-    snapshotVersion: 1,
-    gymUnitIds: [...gymUnitIds].sort(),
-    janelas: [],
   };
 }
 
@@ -380,6 +380,201 @@ async function criarDireito(
   }
 }
 
+/** O que a gravacao de UMA pessoa produziu -- o laco traduz em contador. */
+interface EfeitoDaPessoa {
+  nascimento: boolean;
+  nascimentoImplausivel: boolean;
+  cartao: boolean;
+  facial: boolean;
+  credencialDeOutroAluno: boolean;
+  telefone: boolean;
+  email: boolean;
+  endereco: boolean;
+  semPeriodoDePlano: boolean;
+  direitoDePlanoCriado: boolean;
+  direitoDeVinculoCriado: boolean;
+}
+
+/**
+ * Grava UMA pessoa, inteira. Roda dentro de uma transacao (ver o laco).
+ *
+ * Nao empurra pendencia nem incrementa contador: devolve o que aconteceu e
+ * deixa o laco traduzir. Assim um `rollback` nao deixa contador contando o
+ * que o banco desfez.
+ */
+async function gravarPessoa(
+  db: Escritor,
+  alvo: AlvoDaAtivacao,
+  registro: RegistroDePessoaAtiva,
+  contexto: { studentId: string; perfil: PerfilImportado; agora: Date },
+): Promise<EfeitoDaPessoa> {
+  const { studentId, perfil, agora } = contexto;
+
+  const nascimento = parsearDataDoPacto(registro.dataNascimento);
+  const nascimentoBom = nascimento !== null && nascimentoEhPlausivel(nascimento, agora);
+
+  await db.student.update({
+    where: { id: studentId },
+    data: {
+      profile: perfil,
+      status: 'ACTIVE',
+      // Ausente ou implausivel NAO apaga o que ja esta no banco.
+      ...(nascimentoBom ? { birthDate: nascimento } : {}),
+    },
+  });
+
+  const cartao = await gravarCredencial(
+    db,
+    alvo.tenantId,
+    studentId,
+    'TURNSTILE_CARD',
+    registro.cartao,
+  );
+  const facial = await gravarCredencial(
+    db,
+    alvo.tenantId,
+    studentId,
+    'FACIAL_ENROLL_ID',
+    registro.identificadorFacial,
+  );
+
+  const telefone = await gravarContato(db, alvo.tenantId, studentId, 'PHONE', registro.telefone);
+  const celular = await gravarContato(db, alvo.tenantId, studentId, 'WHATSAPP', registro.celular);
+  const email = await gravarContato(db, alvo.tenantId, studentId, 'EMAIL', registro.email);
+
+  // Endereco so com logradouro E CEP: pela metade nao entrega carta nem
+  // localiza ninguem, e ocuparia o lugar do endereco bom que a recepcao
+  // digitaria depois. Nunca sobrescreve endereco existente.
+  const street = registro.endereco.trim();
+  const postalCode = registro.cep.trim();
+  let endereco = false;
+
+  if (street !== '' && postalCode !== '') {
+    const jaTem = await db.studentAddress.findFirst({ where: { studentId }, select: { id: true } });
+
+    if (!jaTem) {
+      const municipio = registro.municipio.trim();
+
+      await db.studentAddress.create({
+        data: {
+          tenantId: alvo.tenantId,
+          studentId,
+          street,
+          district: registro.bairro.trim() || null,
+          city: municipio === '' ? MUNICIPIO_PADRAO : municipio,
+          state: UF_PADRAO,
+          postalCode,
+        },
+      });
+    }
+
+    endereco = true;
+  }
+
+  const efeito: EfeitoDaPessoa = {
+    nascimento: nascimentoBom,
+    nascimentoImplausivel: nascimento !== null && !nascimentoBom,
+    cartao: cartao === true,
+    facial: facial === true,
+    credencialDeOutroAluno: cartao === false || facial === false,
+    telefone: telefone || celular,
+    email,
+    endereco,
+    semPeriodoDePlano: false,
+    direitoDePlanoCriado: false,
+    direitoDeVinculoCriado: false,
+  };
+
+  const source = origemDoDireito(perfil);
+
+  if (perfil === 'STUDENT') {
+    const inicio = parsearDataDoPacto(registro.dataInicio);
+    const fim = parsearDataDoPacto(registro.dataFim);
+
+    if (inicio === null || fim === null) {
+      // ATIVAR CADASTRO NAO E DAR ACESSO (regra de arquitetura no 1). Sem
+      // periodo nao ha o que congelar no snapshot, entao nao ha direito -- o
+      // cadastro fica ACTIVE e a catraca continua fechada ate alguem resolver
+      // a pendencia.
+      return { ...efeito, semPeriodoDePlano: true };
+    }
+
+    // Idempotencia por chave natural `(tenantId, studentId, planId,
+    // startsAt)`: mesma pessoa, mesmo plano, mesma data de inicio e a mesma
+    // assinatura -- nao uma segunda a cada execucao.
+    const assinatura = await db.subscription.findFirst({
+      where: { tenantId: alvo.tenantId, studentId, planId: alvo.planId, startsAt: inicio },
+      select: { id: true },
+    });
+
+    const subscriptionId =
+      assinatura?.id ??
+      (
+        await db.subscription.create({
+          data: {
+            tenantId: alvo.tenantId,
+            studentId,
+            planId: alvo.planId,
+            status: 'ACTIVE',
+            startsAt: inicio,
+            endsAt: fim,
+            // SEM Invoice: vincular plano nao e cobrar. Essas pessoas ja
+            // pagaram no sistema antigo.
+            lastReason: 'Importacao da base ativa do Pacto (F48)',
+          },
+          select: { id: true },
+        })
+      ).id;
+
+    const jaTemDireito = await db.entitlement.findFirst({
+      where: { tenantId: alvo.tenantId, studentId, source, startsAt: inicio },
+      select: { id: true },
+    });
+
+    if (jaTemDireito) return efeito;
+
+    await criarDireito(db, {
+      tenantId: alvo.tenantId,
+      studentId,
+      source,
+      subscriptionId,
+      startsAt: inicio,
+      endsAt: fim,
+      reason: 'Importacao da base ativa do Pacto (F48)',
+      snapshot: montarSnapshot({ id: alvo.planId, name: alvo.planName }, perfil, alvo.gymUnitIds),
+    });
+
+    return { ...efeito, direitoDePlanoCriado: true };
+  }
+
+  // Vinculo (ADMIN, STAFF, TRAINER): periodo nao vem do arquivo.
+  // Idempotencia por `(tenantId, studentId, source)` -- uma pessoa tem um
+  // direito por vinculo, nao um por execucao do seed.
+  const jaTemVinculo = await db.entitlement.findFirst({
+    where: { tenantId: alvo.tenantId, studentId, source },
+    select: { id: true },
+  });
+
+  if (jaTemVinculo) return efeito;
+
+  const fimDoVinculo = new Date(agora);
+
+  fimDoVinculo.setUTCMonth(fimDoVinculo.getUTCMonth() + MESES_DE_VINCULO);
+
+  await criarDireito(db, {
+    tenantId: alvo.tenantId,
+    studentId,
+    source,
+    subscriptionId: null,
+    startsAt: agora,
+    endsAt: fimDoVinculo,
+    reason: `Vinculo (perfil ${perfil}) -- importacao da base ativa do Pacto (F48)`,
+    snapshot: montarSnapshot(null, perfil, alvo.gymUnitIds),
+  });
+
+  return { ...efeito, direitoDeVinculoCriado: true };
+}
+
 /**
  * Ativa as pessoas que treinam hoje.
  *
@@ -421,7 +616,7 @@ export async function importarPessoasAtivas(
   // meio. Reler por linha custaria uma consulta por pessoa sem mudar nada.
   const alunos = await db.student.findMany({
     where: { tenantId: alvo.tenantId },
-    select: { id: true, fullName: true, cpf: true },
+    select: { id: true, fullName: true, cpf: true, status: true },
   });
 
   const candidatos: CandidatoDeAluno[] = alunos.map((aluno) => ({
@@ -429,6 +624,10 @@ export async function importarPessoasAtivas(
     nomeNormalizado: normalizarNome(aluno.fullName),
     cpfNormalizado: aluno.cpf === null ? null : normalizarCpf(aluno.cpf),
   }));
+
+  // Situacao atual no ArenaHub, para nao reativar quem a recepcao bloqueou
+  // de proposito. Vem da mesma leitura -- nao custa consulta extra.
+  const situacaoAtual = new Map(alunos.map((aluno) => [aluno.id, aluno.status]));
 
   for (const registro of registros) {
     if (ehRegistroDeTeste(registro.nome)) {
@@ -460,185 +659,78 @@ export async function importarPessoasAtivas(
 
     const { studentId } = casamento;
 
+    // --- a recepcao vence o arquivo antigo (I3) ----------------------------
+    //
+    // `BLOCKED` e `ARCHIVED` sao decisao DELIBERADA de quem esta no balcao,
+    // tomada depois da exportacao do Pacto. Reativar em silencio devolveria
+    // a catraca a quem alguem bloqueou de proposito -- e ninguem veria.
+    // Vira pendencia: a recepcao decide, nao o arquivo.
+    const situacao = situacaoAtual.get(studentId);
+
+    if (situacao === 'BLOCKED' || situacao === 'ARCHIVED') {
+      pendencias.push({
+        nome: registro.nome,
+        motivo:
+          situacao === 'BLOCKED'
+            ? 'bloqueado no ArenaHub, veio como ativo no arquivo'
+            : 'arquivado no ArenaHub, veio como ativo no arquivo',
+      });
+      continue;
+    }
+
     casados += 1;
     if (casamento.tipo === 'CPF') casadosPorCpf += 1;
     else casadosPorNome += 1;
 
-    // --- cadastro ---------------------------------------------------------
-    const nascimento = parsearDataDoPacto(registro.dataNascimento);
-    const nascimentoBom = nascimento !== null && nascimentoEhPlausivel(nascimento, agora);
-
-    if (nascimento !== null && !nascimentoBom) {
-      pendencias.push({ nome: registro.nome, motivo: 'nascimento implausivel' });
-    }
-
-    if (nascimentoBom) preenchimento.nascimento += 1;
-
-    await db.student.update({
-      where: { id: studentId },
-      data: {
-        profile: perfil,
-        status: 'ACTIVE',
-        // Ausente ou implausivel NAO apaga o que ja esta no banco.
-        ...(nascimentoBom ? { birthDate: nascimento } : {}),
-      },
-    });
-
-    // --- credenciais do leitor --------------------------------------------
-    const cartao = await gravarCredencial(
-      db,
-      alvo.tenantId,
-      studentId,
-      'TURNSTILE_CARD',
-      registro.cartao,
-    );
-    const facial = await gravarCredencial(
-      db,
-      alvo.tenantId,
-      studentId,
-      'FACIAL_ENROLL_ID',
-      registro.identificadorFacial,
-    );
-
-    if (cartao === true) preenchimento.cartao += 1;
-    if (facial === true) preenchimento.facial += 1;
-
-    if (cartao === false || facial === false) {
-      pendencias.push({ nome: registro.nome, motivo: 'credencial ja pertence a outro aluno' });
-    }
-
-    // --- contatos ----------------------------------------------------------
-    const telefone = await gravarContato(db, alvo.tenantId, studentId, 'PHONE', registro.telefone);
-    const celular = await gravarContato(db, alvo.tenantId, studentId, 'WHATSAPP', registro.celular);
-    const email = await gravarContato(db, alvo.tenantId, studentId, 'EMAIL', registro.email);
-
-    if (telefone || celular) preenchimento.telefone += 1;
-    if (email) preenchimento.email += 1;
-
-    // --- endereco ----------------------------------------------------------
-    //
-    // So grava com logradouro E CEP. Endereco pela metade nao entrega carta
-    // nem localiza ninguem, e ocuparia o lugar do endereco bom que a
-    // recepcao digitaria depois.
-    const street = registro.endereco.trim();
-    const postalCode = registro.cep.trim();
-
-    if (street !== '' && postalCode !== '') {
-      const jaTem = await db.studentAddress.findFirst({
-        where: { studentId },
-        select: { id: true },
-      });
-
-      if (!jaTem) {
-        const municipio = registro.municipio.trim();
-
-        await db.studentAddress.create({
-          data: {
-            tenantId: alvo.tenantId,
-            studentId,
-            street,
-            district: registro.bairro.trim() || null,
-            city: municipio === '' ? MUNICIPIO_PADRAO : municipio,
-            state: UF_PADRAO,
-            postalCode,
-          },
-        });
-      }
-
-      preenchimento.endereco += 1;
-    }
-
-    // --- direito de acesso --------------------------------------------------
-    const source = origemDoDireito(perfil);
-
-    if (perfil === 'STUDENT') {
-      const inicio = parsearDataDoPacto(registro.dataInicio);
-      const fim = parsearDataDoPacto(registro.dataFim);
-
-      if (inicio === null || fim === null) {
-        // ATIVAR CADASTRO NAO E DAR ACESSO (regra de arquitetura no 1). Sem
-        // periodo nao ha o que congelar no snapshot, entao nao ha direito --
-        // o cadastro fica ACTIVE e a catraca continua fechada ate alguem
-        // resolver a pendencia.
-        pendencias.push({ nome: registro.nome, motivo: 'aluno sem periodo de plano' });
-        continue;
-      }
-
-      // Idempotencia por chave natural `(tenantId, studentId, planId,
-      // startsAt)`: mesma pessoa, mesmo plano, mesma data de inicio e a mesma
-      // assinatura -- nao uma segunda a cada execucao.
-      const assinatura = await db.subscription.findFirst({
-        where: { tenantId: alvo.tenantId, studentId, planId: alvo.planId, startsAt: inicio },
-        select: { id: true },
-      });
-
-      const subscriptionId =
-        assinatura?.id ??
-        (
-          await db.subscription.create({
-            data: {
-              tenantId: alvo.tenantId,
-              studentId,
-              planId: alvo.planId,
-              status: 'ACTIVE',
-              startsAt: inicio,
-              endsAt: fim,
-              // SEM Invoice: vincular plano nao e cobrar. Essas pessoas ja
-              // pagaram no sistema antigo.
-              lastReason: 'Importacao da base ativa do Pacto (F48)',
-            },
-            select: { id: true },
-          })
-        ).id;
-
-      const jaTemDireito = await db.entitlement.findFirst({
-        where: { tenantId: alvo.tenantId, studentId, source, startsAt: inicio },
-        select: { id: true },
-      });
-
-      if (!jaTemDireito) {
-        await criarDireito(db, {
-          tenantId: alvo.tenantId,
-          studentId,
-          source,
-          subscriptionId,
-          startsAt: inicio,
-          endsAt: fim,
-          reason: 'Importacao da base ativa do Pacto (F48)',
-          snapshot: montarSnapshotDePlano(alvo.planId, alvo.planName, alvo.gymUnitIds),
-        });
-      }
-
-      direitosPorPlano += 1;
-      continue;
-    }
-
-    // Vinculo (ADMIN, STAFF, TRAINER): periodo nao vem do arquivo.
-    // Idempotencia por `(tenantId, studentId, source)` -- uma pessoa tem um
-    // direito por vinculo, nao um por execucao do seed.
-    const jaTemVinculo = await db.entitlement.findFirst({
-      where: { tenantId: alvo.tenantId, studentId, source },
-      select: { id: true },
-    });
-
-    if (!jaTemVinculo) {
-      const fimDoVinculo = new Date(agora);
-
-      fimDoVinculo.setUTCMonth(fimDoVinculo.getUTCMonth() + MESES_DE_VINCULO);
-
-      await criarDireito(db, {
-        tenantId: alvo.tenantId,
+    try {
+      // UMA TRANSACAO POR PESSOA (I1). Cada gravacao e idempotente, mas isso
+      // so conserta o estado se houver proxima execucao: morrer no meio de
+      // uma pessoa deixaria `status: ACTIVE` + credencial gravada e NENHUM
+      // direito -- cadastro ativo com porta fechada, que nao vira pendencia,
+      // nao entra em contador nenhum, e so aparece quando a pessoa e barrada.
+      // Sao ~340 transacoes curtas, nao uma gigante.
+      const efeito = await db.$transaction(async (tx) => gravarPessoa(tx, alvo, registro, {
         studentId,
-        source,
-        subscriptionId: null,
-        startsAt: agora,
-        endsAt: fimDoVinculo,
-        reason: `Vinculo (perfil ${perfil}) -- importacao da base ativa do Pacto (F48)`,
-        snapshot: montarSnapshotDeVinculo(perfil, alvo.gymUnitIds),
+        perfil,
+        agora,
+      }));
+
+      if (efeito.nascimentoImplausivel) {
+        pendencias.push({ nome: registro.nome, motivo: 'nascimento implausivel' });
+      }
+
+      if (efeito.credencialDeOutroAluno) {
+        pendencias.push({ nome: registro.nome, motivo: 'credencial ja pertence a outro aluno' });
+      }
+
+      if (efeito.semPeriodoDePlano) {
+        pendencias.push({ nome: registro.nome, motivo: 'aluno sem periodo de plano' });
+      }
+
+      if (efeito.nascimento) preenchimento.nascimento += 1;
+      if (efeito.cartao) preenchimento.cartao += 1;
+      if (efeito.facial) preenchimento.facial += 1;
+      if (efeito.telefone) preenchimento.telefone += 1;
+      if (efeito.email) preenchimento.email += 1;
+      if (efeito.endereco) preenchimento.endereco += 1;
+
+      // CONTAM DIREITO CRIADO, nao pessoa que passou pelo ramo (C2). Na
+      // segunda execucao vem zero, que e a verdade -- e a leitura contraria
+      // ("331 direitos por plano" quando nenhum foi criado) e exatamente o
+      // que esconderia um defeito de concessao de acesso.
+      if (efeito.direitoDePlanoCriado) direitosPorPlano += 1;
+      if (efeito.direitoDeVinculoCriado) direitosPorVinculo += 1;
+    } catch (erro: unknown) {
+      // UM ERRO NUMA PESSOA NAO PODE MATAR A IMPORTACAO (I2). Sem isto, uma
+      // falha de banco na linha 200 perde as pendencias e os contadores das
+      // 199 anteriores -- e ninguem fica sabendo quantas pessoas ja entraram.
+      // A transacao acima ja desfez a pessoa que falhou.
+      pendencias.push({
+        nome: registro.nome,
+        motivo: 'erro ao gravar',
+        detalhe: erro instanceof Error ? erro.message : String(erro),
       });
     }
-
-    direitosPorVinculo += 1;
   }
 
   return {
