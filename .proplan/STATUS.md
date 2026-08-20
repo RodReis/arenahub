@@ -57,6 +57,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [INFRA] TESTS.md: historico append-only por entrega com cobertura real (#125, finalizado em: 2026-08-20)
 - [INFRA] CPF em claro: gravar completo e exibir sem mascara (#122, finalizado em: 2026-08-20)
 - [MVP2][SPEC-016][F16] Estorno, conciliação e operação (#16, finalizado em: 2026-08-19)
 - [MVP2][SPEC-015][F15] Inadimplência e acesso (#15, finalizado em: 2026-08-19)
