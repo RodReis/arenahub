@@ -45,6 +45,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 
@@ -56,7 +57,6 @@ _(vazio)_
 
 ### Sem épico
 
-- [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
 - [INFRA] CPF em claro: gravar completo e exibir sem mascara (#122, finalizado em: 2026-08-20)
 - [MVP2][SPEC-016][F16] Estorno, conciliação e operação (#16, finalizado em: 2026-08-19)
 - [MVP2][SPEC-015][F15] Inadimplência e acesso (#15, finalizado em: 2026-08-19)
