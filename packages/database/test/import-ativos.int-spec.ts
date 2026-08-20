@@ -569,8 +569,14 @@ describe('importacao da base ativa do Pacto (F48)', () => {
       cartao: '4801',
     });
 
+    const contador = async (): Promise<number> =>
+      (await db.studentSequence.findUniqueOrThrow({ where: { tenantId: alvo.tenantId } }))
+        .nextValue;
+
     const primeira = await importar([linha]);
+    const depoisDaPrimeira = await contador();
     const segunda = await importar([linha]);
+    const depoisDaSegunda = await contador();
 
     expect(primeira.criados).toBe(1);
     // A LEITURA QUE PROVA A IDEMPOTENCIA: na segunda passada ela ja existe no
@@ -588,6 +594,11 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     // tambem o que pendura no id -- direito, assinatura e credencial em
     // dobro seriam quebra de idempotencia com a mesma contagem de alunos.
     expect(alunos).toHaveLength(1);
+    // O CONTADOR TAMBEM E ESTADO. Se a segunda execucao consumisse um numero
+    // (criando e falhando, ou reservando antes de decidir), a matricula
+    // seguinte pularia -- e "roda duas vezes, mesmo banco" seria mentira numa
+    // tabela que ninguem olha.
+    expect(depoisDaSegunda).toBe(depoisDaPrimeira);
     expect(await db.entitlement.count({ where: { studentId: alunos[0]!.id } })).toBe(1);
     expect(await db.subscription.count({ where: { studentId: alunos[0]!.id } })).toBe(1);
     expect(await db.studentCredential.count({ where: { studentId: alunos[0]!.id } })).toBe(1);

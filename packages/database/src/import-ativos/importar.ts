@@ -404,7 +404,10 @@ async function criarPessoa(
   db: Escritor,
   alvo: AlvoDaAtivacao,
   registro: RegistroDePessoaAtiva,
-  contexto: { perfil: PerfilImportado; agora: Date },
+  // So `agora`: o PERFIL nao entra aqui de proposito. Quem grava `profile` e
+  // `status` e `gravarPessoa`, na mesma transacao, logo em seguida -- receber
+  // o perfil sem usa-lo sugeriria que esta funcao decide o papel da pessoa.
+  contexto: { agora: Date },
 ): Promise<PessoaCriada> {
   const gymUnitId = alvo.gymUnitIds[0];
 
@@ -939,7 +942,7 @@ export async function importarPessoasAtivas(
           };
         }
 
-        const criada = await criarPessoa(tx, alvo, registro, { perfil, agora });
+        const criada = await criarPessoa(tx, alvo, registro, { agora });
 
         return {
           criada,
