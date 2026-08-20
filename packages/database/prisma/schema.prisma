@@ -558,6 +558,7 @@ model Tenant {
   bodyAssessments      BodyAssessment[]
   bodyMeasurements     BodyMeasurement[]
   studentHealthContext StudentHealthContext[]
+  healthGoals          HealthGoal[]
 
   @@map("tenants")
 }
@@ -631,6 +632,7 @@ model User {
   advisedStudents       Student[]              @relation("StudentAdvisor")
   evaluatedAssessments  BodyAssessment[]       @relation("AssessmentEvaluator")
   recordedHealthContext StudentHealthContext[] @relation("HealthContextRecorder")
+  authoredHealthGoals   HealthGoal[]           @relation("HealthGoalAuthor")
 
   @@map("users")
 }
@@ -915,6 +917,7 @@ model Student {
   consentRecords      ConsentRecord[]
   bodyAssessments     BodyAssessment[]
   healthContext       StudentHealthContext[]
+  healthGoals         HealthGoal[]
   biometricIdentities BiometricIdentity[]
   deviceUsers         DeviceUser[]
   credentials         StudentCredential[]
@@ -3321,4 +3324,68 @@ model StudentHealthContext {
   /// a corrida por construcao (mesma classe do bug da F14).
   @@index([tenantId, studentId, factor])
   @@map("student_health_context")
+}
+
+/// Meta de composicao corporal do aluno (`M3-FR-012`, F18).
+///
+/// Guarda o BASELINE junto do alvo de proposito: a avaliacao que serviu de
+/// ponto de partida pode ser corrigida depois (INV-102), e uma meta que
+/// recalculasse o proprio ponto de partida mudaria de significado sozinha.
+/// O que o aluno combinou com o avaliador fica congelado aqui.
+///
+/// A meta NAO edita avaliacao nenhuma (Slice 3.4: "progresso calculado, sem
+/// editar avaliacoes") -- ela e um alvo ao lado da serie, nunca um ponto
+/// dentro dela.
+model HealthGoal {
+  id        String              @id @default(uuid()) @db.Uuid
+  tenantId  String              @map("tenant_id") @db.Uuid
+  studentId String              @map("student_id") @db.Uuid
+  /// Tipo medido a que a meta se refere. Mesma lista fechada das medidas:
+  /// meta de tipo livre nao teria serie com que ser comparada.
+  type      BodyMeasurementType
+
+  /// Valor de partida, na unidade canonica do tipo. `Decimal` e nao `Float`
+  /// pela mesma razao de `BodyMeasurement`: o progresso subtrai numeros
+  /// proximos.
+  baselineValue Decimal          @map("baseline_value") @db.Decimal(10, 4)
+  targetValue   Decimal          @map("target_value") @db.Decimal(10, 4)
+  /// Unidade canonica do tipo. `null` apenas para tipo adimensional
+  /// (`VISCERAL_FAT_LEVEL`), igual a `BodyMeasurement`.
+  unit          MeasurementUnit?
+
+  /// Prazo combinado. Meta vencida continua existindo e visivel: apagar
+  /// esconderia que o combinado nao foi cumprido.
+  deadline DateTime @db.Date
+
+  /// Quem registrou -- o avaliador ou o personal, nunca a recepcao.
+  createdByUserId String @map("created_by_user_id") @db.Uuid
+
+  /// Preenchido quando o alvo e atingido (evento `HealthGoalReached`).
+  achievedAt DateTime? @map("achieved_at")
+  /// Preenchido ao encerrar a meta. Linha encerrada continua existindo.
+  closedAt   DateTime? @map("closed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("HealthGoalAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  /// ⚠️ UMA META ATIVA POR TIPO E POR ALUNO e garantido por INDICE PARCIAL
+  /// escrito a mao, em `migrations/20260820_f18_uma_meta_ativa_por_tipo`:
+  ///
+  ///     CREATE UNIQUE INDEX ... ON health_goals
+  ///       (tenant_id, student_id, type) WHERE closed_at IS NULL;
+  ///
+  /// Parcial em `closed_at IS NULL` porque meta ENCERRADA nao disputa nada, e
+  /// exigir unicidade sobre ela impediria o aluno de ter uma meta nova de
+  /// peso depois de bater a anterior -- que e o caso comum, nao a excecao.
+  ///
+  /// Como na F17, o Prisma nao modela indice parcial: ele NAO aparece neste
+  /// schema e um `prisma migrate dev` futuro vai propor apaga-lo. NAO ACEITE.
+  /// Sem ele, dois cliques criam duas metas ativas do mesmo tipo e o
+  /// comparativo passa a ter dois alvos sem criterio de desempate.
+  @@index([tenantId, studentId, type])
+  @@map("health_goals")
 }
