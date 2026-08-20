@@ -24,16 +24,16 @@
     "coberturaPct": 99.5
   },
   "packages/database#test": {
-    "testes": 14,
-    "pass": 14,
+    "testes": 44,
+    "pass": 44,
     "falha": 0,
-    "coberturaPct": 100
+    "coberturaPct": 42.1
   },
   "packages/database#test:integration": {
-    "testes": 33,
-    "pass": 33,
+    "testes": 48,
+    "pass": 48,
     "falha": 0,
-    "coberturaPct": 93.75
+    "coberturaPct": 94.2
   },
   "packages/access-policy#test": {
     "testes": 64,

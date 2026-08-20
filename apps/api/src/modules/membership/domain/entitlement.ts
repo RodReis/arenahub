@@ -166,7 +166,13 @@ export function direitoEhEfetivo(
  * o plano segue a vida dele.
  */
 export interface SnapshotDePolitica {
-  planId: string;
+  /**
+   * NULO quando o direito nao vem de plano (vinculo de funcionario,
+   * professor, administrador -- F48). O snapshot continua sendo a copia
+   * congelada das regras que valiam quando o direito nasceu; a regra, nesse
+   * caso, e "acesso liberado por vinculo".
+   */
+  planId: string | null;
   planName: string;
   /** Versao do formato do snapshot, para leitura futura saber o que espera. */
   snapshotVersion: 1;

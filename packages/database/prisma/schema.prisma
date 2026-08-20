@@ -121,6 +121,36 @@ enum StudentContactType {
   @@map("student_contact_type")
 }
 
+/// Papel da pessoa na academia. NAO decide acesso -- origina um
+/// `Entitlement` (F48). Ler isto dentro do motor de decisao criaria a
+/// segunda fonte de verdade que a regra de arquitetura no 1 proibe.
+enum StudentProfile {
+  /// Acesso liberado por vinculo.
+  ADMIN
+  /// Acesso controlado: depende de plano vigente. E o caso comum.
+  STUDENT
+  /// Funcionario. Acesso liberado por vinculo.
+  STAFF
+  /// Professor ou personal. Acesso liberado por vinculo.
+  TRAINER
+
+  @@map("student_profile")
+}
+
+/// Tipo de credencial que o equipamento le para identificar a pessoa.
+///
+/// NAO E BIOMETRIA: e o numero que o leitor usa como chave. O template
+/// facial vive no equipamento e no `BiometricIdentity`, que exige
+/// consentimento (INV-017) e nao e tocado por aqui.
+enum StudentCredentialKind {
+  /// Cartao de proximidade.
+  TURNSTILE_CARD
+  /// `enrollid` do cadastro facial dentro do leitor.
+  FACIAL_ENROLL_ID
+
+  @@map("student_credential_kind")
+}
+
 /// Sexo CADASTRAL: espelha o documento civil, e nada mais.
 ///
 /// Identidade de genero e nome social sao OUTRA coisa, nao foram pedidos, e
@@ -476,11 +506,12 @@ model Tenant {
   auditLogs    AuditLog[]
   outboxEvents OutboxEvent[]
 
-  students        Student[]
-  studentSequence StudentSequence?
-  plans           Plan[]
-  subscriptions   Subscription[]
-  entitlements    Entitlement[]
+  students           Student[]
+  studentCredentials StudentCredential[]
+  studentSequence    StudentSequence?
+  plans              Plan[]
+  subscriptions      Subscription[]
+  entitlements       Entitlement[]
 
   consentDocuments    ConsentDocument[]
   consentRecords      ConsentRecord[]
@@ -855,6 +886,9 @@ model Student {
   /// sobrevive a saida do funcionario.
   advisorUserId    String?               @map("advisor_user_id") @db.Uuid
   status           StudentStatus         @default(LEAD)
+  /// Papel da pessoa (F48). Default `STUDENT` porque e o caso comum e
+  /// porque as 1.926 linhas ja existentes precisam de um valor.
+  profile          StudentProfile        @default(STUDENT)
   /// Preenchido no arquivamento. Soft delete (INV-013): preserva historico
   /// legal e operacional em vez de apagar.
   archivedAt       DateTime?             @map("archived_at")
@@ -883,6 +917,7 @@ model Student {
   healthContext       StudentHealthContext[]
   biometricIdentities BiometricIdentity[]
   deviceUsers         DeviceUser[]
+  credentials         StudentCredential[]
 
   administrativeBlocks  AdministrativeBlock[]
   accessEvents          AccessEvent[]
@@ -925,6 +960,33 @@ model StudentContact {
   @@index([tenantId, type, value])
   @@index([studentId])
   @@map("student_contacts")
+}
+
+/// Identificador que o equipamento usa para reconhecer a pessoa (F48).
+///
+/// Tabela propria, e nao coluna em `Student`, por dois motivos que a coluna
+/// nao daria: uma pessoa troca de cartao e re-enrola a face (varias
+/// credenciais ao longo do tempo), e o numero precisa ser unico dentro do
+/// tenant -- garantia que so o banco entrega.
+model StudentCredential {
+  id         String                @id @default(uuid()) @db.Uuid
+  tenantId   String                @map("tenant_id") @db.Uuid
+  studentId  String                @map("student_id") @db.Uuid
+  kind       StudentCredentialKind
+  /// O numero como o leitor o conhece. Texto, nao inteiro: e chave externa
+  /// de equipamento, e zero a esquerda importa.
+  externalId String                @map("external_id")
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Dois alunos nao dividem o mesmo numero: seria a catraca abrindo para a
+  /// pessoa errada.
+  @@unique([tenantId, kind, externalId])
+  @@index([tenantId, studentId])
+  @@map("student_credentials")
 }
 
 model StudentAddress {

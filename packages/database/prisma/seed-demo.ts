@@ -242,6 +242,18 @@ async function semearDemonstracao(): Promise<void> {
       // nao importada: o pacote de banco nao depende da API, e inverter essa
       // dependencia por um objeto de cinco campos custaria mais do que
       // resolve. Sem janela de horario -- acesso o dia todo, o caso simples.
+      //
+      // CUIDADO AO COPIAR ESTE TRECHO: `janelas: []` no snapshot dispensa
+      // restricao de HORARIO, mas quem define as UNIDADES do direito sao as
+      // linhas de `EntitlementUnitWindow` -- `access-projection.repository.ts`
+      // monta `unitIds` so a partir delas, e `evaluate-access.ts` nega com
+      // `WRONG_UNIT` se a unidade da catraca nao estiver na lista.
+      //
+      // ESTE SEED NAO GRAVA NENHUMA LINHA DE JANELA, entao os alunos de
+      // demonstracao aparecem com direito ATIVO na ficha e seriam negados na
+      // catraca com `WRONG_UNIT`. Para o painel, que le o direito, isso nao
+      // atrapalha; para exercitar decisao de acesso, atrapalha. Fora do
+      // escopo da F48 -- corrigir exige mexer no comportamento deste seed.
       const snapshot = {
         planId: plano.id,
         planName: plano.name,
