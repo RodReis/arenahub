@@ -205,6 +205,16 @@ interface AlunoDto {
   subscriptionStatus: string | null;
   /** Telefone principal, para o atalho de conversa na lista. */
   phone: string | null;
+  /**
+   * Numeros que o equipamento le para reconhecer a pessoa, ja sem repetidos.
+   *
+   * LISTA, e nao um valor: cartao trocado e credencial vinda de linha
+   * duplicada do Pacto deixam a mesma pessoa com dois numeros vivos no
+   * leitor, e esconder o segundo esconderia o problema.
+   *
+   * Vazia na ficha, que nao carrega credenciais -- so a lista as busca.
+   */
+  deviceIds: string[];
 }
 
 interface ContatoDto {
@@ -497,6 +507,7 @@ export class StudentsController {
       planName: null,
       subscriptionStatus: null,
       phone: null,
+      deviceIds: [],
     };
   }
 
@@ -516,12 +527,29 @@ export class StudentsController {
       planName: assinatura?.plan.name ?? null,
       subscriptionStatus: assinatura?.status ?? null,
       phone: aluno.contacts?.[0]?.value ?? null,
+      deviceIds: numerosDeEquipamento(aluno.credentials ?? []),
     };
   }
+}
+
+/**
+ * Os numeros distintos que o equipamento le, na ordem em que foram gravados.
+ *
+ * DEDUPLICA porque cartao e reconhecimento facial guardam o MESMO numero na
+ * base do Pacto (`2061` nos dois): mostrar "2061, 2061" na tela nao informa
+ * nada e ainda sugere duas credenciais diferentes onde ha uma.
+ *
+ * O que sobra depois da deduplicacao e o que importa: quem tem dois numeros
+ * de verdade tem dois cartoes vivos no leitor -- caso que a recepcao precisa
+ * ver para desativar o antigo.
+ */
+function numerosDeEquipamento(credenciais: readonly { externalId: string }[]): string[] {
+  return [...new Set(credenciais.map((c) => c.externalId))];
 }
 
 /** O aluno como a busca o devolve: com a assinatura vigente e o telefone. */
 type AlunoComVinculos = Student & {
   subscriptions?: { status: string; plan: { name: string } }[];
   contacts?: { value: string }[];
+  credentials?: { externalId: string }[];
 };
