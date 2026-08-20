@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -34,6 +34,15 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     bruno: '52998224725',
     carla: '15350946056',
     diego: '40364019808',
+    karina: '95705331029',
+    leo: '02270481216',
+    mira: '25395558616',
+    nilo: '81957649674',
+    olga: '26967752065',
+    pedro: '06099568760',
+    quezia: '34362583343',
+    tulio: '91917739974',
+    ursula: '31350038415',
   } as const;
 
   beforeAll(async () => {
@@ -68,6 +77,15 @@ describe('importacao da base ativa do Pacto (F48)', () => {
       planName: plano.name,
       gymUnitIds: [unidade.id],
     };
+
+    // Contador em 3000, como a F47 deixou a base real de proposito: as
+    // matriculas emitidas depois da importacao historica nao podem colidir
+    // com as importadas. A fixture reproduz esse estado inicial.
+    await db.$executeRaw`
+      INSERT INTO student_sequences (tenant_id, next_value, updated_at)
+      VALUES (${tenant.id}::uuid, 3000, now())
+      ON CONFLICT (tenant_id) DO UPDATE SET next_value = 3000, updated_at = now()
+    `;
   });
 
   afterAll(async () => {
@@ -80,8 +98,34 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     await db?.$disconnect();
   });
 
-  /** Numero de matricula unico por chamada -- a coluna e UNIQUE por tenant. */
-  let proximaMatricula = 0;
+  /**
+   * Matricula da fixture, EMITIDA PELO MESMO CONTADOR que a producao usa.
+   *
+   * Contador proprio no teste nao serve mais: a F49 tambem consome
+   * `student_sequences` a cada pessoa que cadastra, entao dois contadores
+   * independentes se cruzam e a colisao no UNIQUE aparece conforme a ordem
+   * dos testes -- que e a definicao de teste inutil. Uma fonte so, como no
+   * banco de verdade.
+   *
+   * O `UPDATE ... RETURNING` incrementa e devolve na MESMA instrucao, entao
+   * nao ha janela entre ler e gravar.
+   */
+  async function emitirMatricula(): Promise<string> {
+    const linhas = await db.$queryRaw<{ next_value: number }[]>`
+      UPDATE student_sequences
+      SET next_value = next_value + 1, updated_at = now()
+      WHERE tenant_id = ${alvo.tenantId}::uuid
+      RETURNING next_value - 1 AS next_value
+    `;
+
+    const sequencial = linhas[0]?.next_value;
+
+    if (sequencial === undefined) {
+      throw new Error('Contador do tenant nao existe -- o `beforeAll` devia te-lo criado.');
+    }
+
+    return `AP-2026-${String(sequencial).padStart(8, '0')}`;
+  }
 
   /**
    * Insere um aluno no estado que a F47 deixou: `CANCELLED`, sem credencial,
@@ -92,14 +136,14 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     cpf?: string | null;
     status?: 'CANCELLED' | 'BLOCKED' | 'ARCHIVED';
   }): Promise<{ id: string; fullName: string; cpf: string | null }> {
-    proximaMatricula += 1;
+    const membershipNumber = await emitirMatricula();
 
     return db.student.create({
       data: {
         tenantId: alvo.tenantId,
         gymUnitId,
-        membershipNumber: `AP-2026-${String(proximaMatricula).padStart(8, '0')}`,
-        fullName: dados.nome ?? `PESSOA SINTETICA ${proximaMatricula}`,
+        membershipNumber,
+        fullName: dados.nome ?? `PESSOA SINTETICA ${membershipNumber}`,
         birthDate: new Date(Date.UTC(1990, 0, 15)),
         cpf: dados.cpf ?? null,
         status: dados.status ?? 'CANCELLED',
@@ -462,18 +506,346 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(await db.student.count({ where: { tenantId: alvo.tenantId } })).toBe(antes);
   });
 
-  it('nunca cria aluno: quem nao casa vira pendencia', async () => {
+  // ==========================================================================
+  // F49 -- quem nao casa com o cadastro passa a ser CADASTRADO.
+  //
+  // A F48 empurrava essas linhas para pendencia humana. Na rodada real foram
+  // 49 pessoas que a F47 nunca trouxe -- nao casamento perdido por grafia.
+  // ==========================================================================
+
+  it('cadastra quem nao existe no cadastro, com matricula e status ACTIVE', async () => {
     const antes = await db.student.count({ where: { tenantId: alvo.tenantId } });
 
     const resultado = await importar([
-      registroDe(null, { nome: 'KARINA QUE NUNCA EXISTIU', cpf: '' }),
+      registroDe(null, {
+        nome: 'KARINA QUE NUNCA EXISTIU',
+        cpf: CPF.karina,
+        dataNascimento: '10/03/1988',
+        dataInicio: '20260803',
+        dataFim: '20260902',
+      }),
     ]);
 
+    expect(resultado.criados).toBe(1);
+    // NAO conta como casado: sao coisas diferentes, e e a queda de `criados`
+    // a zero na segunda execucao que prova a idempotencia no relatorio.
     expect(resultado.casados).toBe(0);
-    expect(resultado.pendencias).toEqual([
-      { nome: 'KARINA QUE NUNCA EXISTIU', motivo: 'nao encontrado no cadastro' },
+    expect(await db.student.count({ where: { tenantId: alvo.tenantId } })).toBe(antes + 1);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'KARINA QUE NUNCA EXISTIU' },
+    });
+
+    // `AP-{ano}-{8 digitos}` -- o formato de `formatarMatricula`. Nao basta
+    // "tem matricula": numero fora do formato quebra a leitura da recepcao e
+    // colide com a sequencia do tenant.
+    expect(criada.membershipNumber).toMatch(/^AP-2026-\d{8}$/);
+    expect(criada.status).toBe('ACTIVE');
+    expect(criada.profile).toBe('STUDENT');
+    expect(criada.gymUnitId).toBe(gymUnitId);
+    expect(criada.birthDate.toISOString().slice(0, 10)).toBe('1988-03-10');
+    // `cpf` e `cpfHash` andam juntos -- o hash e o indice da busca por
+    // duplicata, e hash diferente do que a API grava esconde o duplicado.
+    expect(criada.cpf).toBe(CPF.karina);
+    expect(criada.cpfHash).toBe(
+      createHash('sha256').update(`${alvo.tenantId}:${CPF.karina}`).digest('hex'),
+    );
+
+    // A matricula saiu do CONTADOR do tenant, e nao de um numero inventado:
+    // o contador avancou. Sem isso, a proxima criacao colidiria no UNIQUE.
+    const contador = await db.studentSequence.findUniqueOrThrow({
+      where: { tenantId: alvo.tenantId },
+    });
+
+    expect(contador.nextValue).toBeGreaterThan(Number(criada.membershipNumber.slice(-8)));
+  });
+
+  it('rodar duas vezes NAO cria a pessoa de novo -- a segunda casa com a primeira', async () => {
+    const linha = registroDe(null, {
+      nome: 'LEO CRIADO UMA VEZ SO',
+      cpf: CPF.leo,
+      dataInicio: '20260803',
+      dataFim: '20260902',
+      cartao: '4801',
+    });
+
+    const primeira = await importar([linha]);
+    const segunda = await importar([linha]);
+
+    expect(primeira.criados).toBe(1);
+    // A LEITURA QUE PROVA A IDEMPOTENCIA: na segunda passada ela ja existe no
+    // banco, entao casa por CPF em vez de nascer outra vez.
+    expect(segunda.criados).toBe(0);
+    expect(segunda.casados).toBe(1);
+    expect(segunda.casadosPorCpf).toBe(1);
+
+    const alunos = await db.student.findMany({
+      where: { tenantId: alvo.tenantId, fullName: 'LEO CRIADO UMA VEZ SO' },
+      select: { id: true },
+    });
+
+    // Contagem por nome NAO basta sozinha: e por isso que abaixo se confere
+    // tambem o que pendura no id -- direito, assinatura e credencial em
+    // dobro seriam quebra de idempotencia com a mesma contagem de alunos.
+    expect(alunos).toHaveLength(1);
+    expect(await db.entitlement.count({ where: { studentId: alunos[0]!.id } })).toBe(1);
+    expect(await db.subscription.count({ where: { studentId: alunos[0]!.id } })).toBe(1);
+    expect(await db.studentCredential.count({ where: { studentId: alunos[0]!.id } })).toBe(1);
+    expect(segunda.direitosPorPlano).toBe(0);
+  });
+
+  it('cadastrado sem data de nascimento recebe placeholder E vira pendencia', async () => {
+    const resultado = await importar([
+      registroDe(null, { nome: 'MIRA SEM NASCIMENTO', cpf: CPF.mira, dataNascimento: '' }),
     ]);
+
+    expect(resultado.criados).toBe(1);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'MIRA SEM NASCIMENTO' },
+    });
+
+    // `birthDate` e NOT NULL: sem data no arquivo, o cadastro so existe com
+    // marcador. 1900-01-01 e impossivel de proposito (`nascimentoEhPlausivel`
+    // recusa acima de 110 anos), entao ninguem digita isso por engano.
+    expect(criada.birthDate.toISOString().slice(0, 10)).toBe('1900-01-01');
+    expect(criada.status).toBe('ACTIVE');
+    // E O PAR INSEPARAVEL: sem a pendencia, existe no banco uma pessoa com
+    // data que ninguem escolheu e ninguem consegue distinguir de data real.
+    expect(resultado.pendencias).toContainEqual({
+      nome: 'MIRA SEM NASCIMENTO',
+      motivo: 'cadastrado sem data de nascimento',
+    });
+    // UMA pendencia para UMA causa: `nascimento implausivel` NAO pode vir
+    // junto -- e a mesma falta de data, e duas linhas fariam a recepcao
+    // procurar dois problemas onde existe um. (`aluno sem periodo de plano`
+    // vem tambem, e esta certo: e outro problema, de outra causa.)
+    expect(resultado.pendencias).not.toContainEqual({
+      nome: 'MIRA SEM NASCIMENTO',
+      motivo: 'nascimento implausivel',
+    });
+  });
+
+  it('data de nascimento IMPLAUSIVEL no arquivo tambem cai no placeholder', async () => {
+    // O arquivo do Pacto traz nascimentos em 2026 -- alguem digitou a data de
+    // hoje no campo errado. Gravar isso criaria um "recem-nascido" matriculado.
+    const resultado = await importar([
+      registroDe(null, {
+        nome: 'URSULA NASCIDA ONTEM',
+        cpf: CPF.ursula,
+        dataNascimento: '01/08/2026',
+      }),
+    ]);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'URSULA NASCIDA ONTEM' },
+    });
+
+    expect(criada.birthDate.toISOString().slice(0, 10)).toBe('1900-01-01');
+    expect(resultado.pendencias).toContainEqual({
+      nome: 'URSULA NASCIDA ONTEM',
+      motivo: 'cadastrado sem data de nascimento',
+    });
+  });
+
+  it('funcionario criado ganha direito por VINCULO, sem assinatura', async () => {
+    const resultado = await importar([
+      registroDe(null, {
+        nome: 'NILO FUNCIONARIO NOVO',
+        cpf: CPF.nilo,
+        codigoPerfil: '2',
+        dataInicio: '',
+        dataFim: '',
+      }),
+    ]);
+
+    expect(resultado.criados).toBe(1);
+    expect(resultado.direitosPorVinculo).toBe(1);
+    expect(resultado.direitosPorPlano).toBe(0);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'NILO FUNCIONARIO NOVO' },
+    });
+
+    expect(criada.profile).toBe('STAFF');
+    expect(criada.status).toBe('ACTIVE');
+
+    const direitos = await db.entitlement.findMany({ where: { studentId: criada.id } });
+
+    expect(direitos).toHaveLength(1);
+    expect(direitos[0]!.source).toBe('EMPLOYEE');
+    expect(direitos[0]!.subscriptionId).toBeNull();
+    // Funcionario nao paga mensalidade: assinatura falsa poluiria o financeiro.
+    expect(await db.subscription.count({ where: { studentId: criada.id } })).toBe(0);
+    expect(await db.invoice.count({ where: { studentId: criada.id } })).toBe(0);
+
+    // Direito sem janela = `unitIds` vazio = catraca fechada com WRONG_UNIT.
+    const janelas = await db.entitlementUnitWindow.findMany({
+      where: { entitlementId: direitos[0]!.id },
+      select: { gymUnitId: true },
+    });
+
+    expect([...new Set(janelas.map((j) => j.gymUnitId))]).toEqual([gymUnitId]);
+  });
+
+  it('professor criado ganha direito PERSONAL_TRAINER', async () => {
+    const resultado = await importar([
+      registroDe(null, { nome: 'OLGA PROFESSORA NOVA', cpf: CPF.olga, codigoPerfil: '3' }),
+    ]);
+
+    expect(resultado.criados).toBe(1);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'OLGA PROFESSORA NOVA' },
+    });
+    const direito = await db.entitlement.findFirstOrThrow({ where: { studentId: criada.id } });
+
+    expect(criada.profile).toBe('TRAINER');
+    expect(direito.source).toBe('PERSONAL_TRAINER');
+    expect(await db.subscription.count({ where: { studentId: criada.id } })).toBe(0);
+  });
+
+  it('aluno criado SEM periodo e ativado, mas NAO ganha entitlement nenhum', async () => {
+    const resultado = await importar([
+      registroDe(null, {
+        nome: 'PEDRO CRIADO SEM PERIODO',
+        cpf: CPF.pedro,
+        codigoPerfil: '1',
+        dataInicio: '',
+        dataFim: '',
+      }),
+    ]);
+
+    expect(resultado.criados).toBe(1);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'PEDRO CRIADO SEM PERIODO' },
+    });
+
+    expect(criada.status).toBe('ACTIVE');
+    // A REGRA No 1 APLICADA A QUEM NASCEU AGORA: cadastrar e ativar nao e dar
+    // acesso. So `Entitlement` decide, e sem periodo nao ha o que congelar.
+    expect(await db.entitlement.count({ where: { studentId: criada.id } })).toBe(0);
+    expect(await db.subscription.count({ where: { studentId: criada.id } })).toBe(0);
+    expect(resultado.pendencias).toContainEqual({
+      nome: 'PEDRO CRIADO SEM PERIODO',
+      motivo: 'aluno sem periodo de plano',
+    });
+  });
+
+  it('duas linhas do arquivo para a mesma pessoa criam UMA -- a segunda vira pendencia', async () => {
+    const antes = await db.student.count({ where: { tenantId: alvo.tenantId } });
+
+    // O caso real: a mesma pessoa aparece 2x (cartoes 174 e 28) com CPF e
+    // celular INVERTIDOS entre as linhas. Ninguem existe no banco antes disto.
+    const resultado = await importar([
+      registroDe(null, {
+        nome: 'QUEZIA DUAS LINHAS',
+        cpf: CPF.quezia,
+        cartao: '174',
+        celular: '62988881111',
+      }),
+      registroDe(null, {
+        nome: 'QUEZIA DUAS LINHAS',
+        cpf: CPF.quezia,
+        cartao: '28',
+        celular: '62988882222',
+      }),
+    ]);
+
+    expect(resultado.criados).toBe(1);
+    expect(await db.student.count({ where: { tenantId: alvo.tenantId } })).toBe(antes + 1);
+    expect(resultado.pendencias).toContainEqual({
+      nome: 'QUEZIA DUAS LINHAS',
+      motivo: 'duplicata dentro do arquivo',
+    });
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'QUEZIA DUAS LINHAS' },
+    });
+
+    // A PRIMEIRA OCORRENCIA VENCE, INTEIRA. Se a segunda tivesse sido
+    // reprocessada, o cartao 28 e o celular ...2222 estariam la tambem -- e
+    // seria o codigo escolhendo em silencio qual versao da pessoa e a boa.
+    const credenciais = await db.studentCredential.findMany({
+      where: { studentId: criada.id },
+      select: { externalId: true },
+    });
+
+    expect(credenciais.map((c) => c.externalId)).toEqual(['174']);
+
+    const contatos = await db.studentContact.findMany({
+      where: { studentId: criada.id },
+      select: { value: true },
+    });
+
+    expect(contatos.map((c) => c.value)).toEqual(['62988881111']);
+  });
+
+  it('duas linhas com o mesmo NOME e sem CPF tambem criam uma so', async () => {
+    const antes = await db.student.count({ where: { tenantId: alvo.tenantId } });
+
+    // Sem CPF o casamento cai para nome normalizado -- caixa e espaco
+    // diferentes tem de continuar sendo a mesma pessoa.
+    const resultado = await importar([
+      registroDe(null, { nome: 'RUI SOMENTE NOME', cpf: '' }),
+      registroDe(null, { nome: '  rui somente nome  ', cpf: '' }),
+    ]);
+
+    expect(resultado.criados).toBe(1);
+    expect(await db.student.count({ where: { tenantId: alvo.tenantId } })).toBe(antes + 1);
+    expect(resultado.pendencias).toContainEqual({
+      nome: '  rui somente nome  ',
+      motivo: 'duplicata dentro do arquivo',
+    });
+  });
+
+  it('AMBIGUO continua pendencia -- nao cria pessoa nova para escapar da escolha', async () => {
+    // Dois cadastros com o MESMO nome normalizado e sem CPF: `decidirCasamento`
+    // devolve AMBIGUO.
+    await criarAlunoCancelado({ nome: 'SONIA HOMONIMA' });
+    await criarAlunoCancelado({ nome: 'SONIA HOMONIMA' });
+
+    const antes = await db.student.count({ where: { tenantId: alvo.tenantId } });
+
+    const resultado = await importar([registroDe(null, { nome: 'SONIA HOMONIMA', cpf: '' })]);
+
+    // A TENTACAO QUE ESTE TESTE EXISTE PARA BARRAR: "nao sei qual dos dois,
+    // entao cadastro um terceiro". Isso trocaria um problema visivel (uma
+    // pendencia) por um invisivel (tres cadastros da mesma pessoa).
+    expect(resultado.criados).toBe(0);
+    expect(resultado.casados).toBe(0);
     expect(await db.student.count({ where: { tenantId: alvo.tenantId } })).toBe(antes);
+    expect(resultado.pendencias).toEqual([
+      { nome: 'SONIA HOMONIMA', motivo: 'mais de um candidato no cadastro' },
+    ]);
+  });
+
+  it('quem e criado recebe o mesmo tratamento de quem casou -- endereco inclusive', async () => {
+    await importar([
+      registroDe(null, {
+        nome: 'TULIO COM ENDERECO',
+        cpf: CPF.tulio,
+        endereco: 'RUA SINTETICA 500',
+        bairro: 'CENTRO',
+        cep: '75380000',
+        municipio: 'Trindade',
+      }),
+    ]);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'TULIO COM ENDERECO' },
+    });
+    const endereco = await db.studentAddress.findFirstOrThrow({
+      where: { studentId: criada.id },
+    });
+
+    // E o motivo de a criacao chamar `gravarPessoa` em vez de ter um caminho
+    // proprio: caminho paralelo diverge na proxima fatia sem ninguem notar.
+    expect(endereco.street).toBe('RUA SINTETICA 500');
+    expect(endereco.postalCode).toBe('75380000');
+    expect(endereco.city).toBe('Trindade');
+    expect(endereco.state).toBe('GO');
   });
 
   it('credencial que ja pertence a outro aluno vira pendencia, nao muda de dono', async () => {
