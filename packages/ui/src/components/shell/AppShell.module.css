@@ -115,6 +115,21 @@
 .conteudo {
   padding: 24px;
   background: var(--ah-surface-canvas);
+  /**
+   * `min-width: 0` TAMBEM no desktop -- a issue #99 corrigiu isto so dentro
+   * do `@media (max-width: 1279px)`, e o mesmo defeito continuava acima.
+   *
+   * Item de grid nasce com `min-width: auto`, que o faz RECUSAR encolher
+   * abaixo do proprio conteudo: uma tabela larga empurra a coluna `1fr`, o
+   * grid inteiro cresce, e a PAGINA ganha rolagem horizontal em vez de a
+   * tabela ganhar a dela -- que e o que o `overflow-x` do `DataTable` existe
+   * para dar.
+   *
+   * Medido em `/students` a 1280px: 1402px de conteudo para 1265px de
+   * viewport, com a coluna SITUACAO cortada fora da tela. O `.rolagem` do
+   * DataTable nunca chegava a rolar, porque o pai cedia primeiro.
+   */
+  min-width: 0;
 }
 
 .cabecalho {
@@ -173,13 +188,9 @@
      * proibe rolagem horizontal a 200% -- ler uma frase varrendo os dois eixos
      * e exatamente o que a regra existe para impedir.
      *
-     * `min-width: 0` no `.conteudo` pelo mesmo motivo: tabela larga dentro
-     * dele reproduz o problema por outro caminho.
+     * O `.conteudo` tinha a mesma regra aqui, e ela SUBIU para a declaracao
+     * base: o defeito nao era do modo degradado, so tinha sido medido nele.
      */
-    min-width: 0;
-  }
-
-  .conteudo {
     min-width: 0;
   }
 }

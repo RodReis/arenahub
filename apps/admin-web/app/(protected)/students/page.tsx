@@ -340,7 +340,14 @@ export default async function PaginaDeAlunos({
               A recepcao fala com o aluno por WhatsApp. Exibir o numero como
               texto significa copiar, abrir o aplicativo, colar e digitar --
               quatro passos com alguem esperando no balcao.
+
+              `label` e nao ausencia de papel: telefone tem largura previsivel
+              e nao e frase da API. Sem papel declarado, esta era a UNICA
+              coluna da tabela sem `inline-size: 1%` -- e por isso recebia
+              TODA a sobra da linha, abrindo um vao de mais de cem pixels ate
+              a data de nascimento. A coluna crescia sem ter o que mostrar.
             */
+            role: 'label',
             render: (aluno) => <Telefone numero={aluno.phone} />,
           },
           {
