@@ -2,29 +2,31 @@
 
 > **Gerado por `pnpm test:report`. Não edite à mão.**
 >
-> O CI roda `pnpm test:report --check` e falha se este arquivo divergir do que a execução
-> produz. É a guarda de evidência do `docs/TESTING.md` §5.
+> O CI roda `pnpm test:report --check` e falha se a seção "Estado atual" divergir do que a
+> execução produz. É a guarda de evidência do `docs/TESTING.md` §5.
 >
-> **Data e SHA da execução ficam no log do CI, não aqui.** Gravá-los no arquivo tornaria a
-> guarda impossível de satisfazer: gerar mudaria o conteúdo, exigindo commit, que mudaria o
-> SHA, que desatualizaria o relatório. Este arquivo só carrega o que é reproduzível a partir
-> do código.
+> **O `--check` valida só os números.** Issue/SPEC/PR do histórico vêm de fora do
+> repositório e são responsabilidade de quem roda `pnpm test:report --issue N` antes do
+> commit — revisão humana no PR é a rede de segurança para esse dado, não o CI.
 
-## Arquivos de teste por nível
+## Estado atual
 
-Classificação por **sufixo de arquivo**, não por pasta (`docs/TESTING.md` §2).
+Última execução — regenerado a cada `pnpm test:report`, não acumulado.
 
-| nível | sufixo | arquivos |
-|---|---|---|
-| unitário | `.spec.ts`, `.spec.tsx`, `.test.ts`, `.test.tsx` | 83 |
-| contrato | `.contract-spec.ts`, `.contract-spec.tsx` | 0 |
-| integração | `.int-spec.ts`, `.int-spec.tsx` | 28 |
-| e2e | `.e2e-spec.ts`, `.e2e-spec.tsx` | 6 |
-| hardware | `.hw-spec.ts`, `.hw-spec.tsx` | 0 |
-| segurança | `.sec-spec.ts`, `.sec-spec.tsx` | 0 |
-| **total** | | **117** |
+| nível | testes | pass | falha | cobertura % |
+|---|---:|---:|---:|---:|
+| unitário | 985 | 985 | 0 | 94.5 |
+| contrato | 0 | 0 | 0 | — |
+| integração | 401 | 401 | 0 | 84.6 |
+| e2e | 0 | 0 | 0 | — |
+| hardware | 0 | 0 | 0 | — |
+| segurança | 0 | 0 | 0 | — |
 
-## Por SPEC / fatia
+## Histórico por entrega
 
-> A ligação SPEC ↔ teste vem da tag no teste ou do caminho do módulo
-> (`docs/TESTING.md` §5). Preenchida quando houver teste com tag.
+Append-only — linhas de entregas passadas são imutáveis.
+
+| Data | Issue | SPEC | Nível | testes | pass | falha | cobertura % | PR |
+|---|---|---|---|---:|---:|---:|---:|---|
+| 2026-08-20 | #125 | — | unitário | 985 | 985 | 0 | 94.5 | — |
+| 2026-08-20 | #125 | — | integração | 401 | 401 | 0 | 84.6 | — |

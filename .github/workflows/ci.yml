@@ -115,9 +115,13 @@ jobs:
       #
       # Ela era o ÚLTIMO passo do workflow antigo, depois do E2E inteiro, e
       # custava ~4min para reportar um diff de duas linhas (issue #77). Está
-      # aqui porque `--check` não depende de teste ter rodado: ele lê
-      # `git ls-files` e compara com o arquivo commitado. Não afrouxou nada --
-      # continua barrando o merge, só barra mais cedo.
+      # aqui porque `--check` não depende de teste ter rodado NESTE job: ele
+      # audita se `reports/TESTS.md` bate com `reports/.test-report-cache.json`
+      # -- os dois commitados por quem entregou (`pnpm test:report --issue N`,
+      # rodado localmente antes do commit final). Não afrouxou nada -- continua
+      # barrando o merge, só barra mais cedo, e além disso ficou determinístico
+      # (não re-executa nada, então o crash intermitente do Jest no Windows,
+      # docs/TESTING.md §5, não pode fazer `--check` mudar de opinião).
       - name: guarda de evidência
         run: pnpm test:report --check
 

@@ -2,205 +2,268 @@
 /**
  * Gera `reports/TESTS.md` -- a guarda de evidencia do docs/TESTING.md §5.
  *
- *   node scripts/test-report.mjs           gera o arquivo
- *   node scripts/test-report.mjs --check    falha se o commitado divergir
+ *   node scripts/test-report.mjs                                  atualiza "Estado atual"
+ *   node scripts/test-report.mjs --issue 122 --spec F47 --pr 123  idem, e ANEXA linha ao historico
+ *   node scripts/test-report.mjs --check                          audita "Estado atual" x cache commitado
  *
  * O principio do TESTING.md e um so: "evidencia e saida de maquina, nunca
- * prosa". Este gerador conta ARQUIVO DE TESTE QUE EXISTE NO DISCO. Ele nao
- * inventa linha, nao estima e nao herda numero de execucao anterior.
+ * prosa". Este gerador RODA cada pacote com --json e --coverage e le o que
+ * o runner realmente produziu -- nao conta arquivo no disco, nao inventa
+ * linha, nao herda numero de execucao anterior.
  *
- * Hoje o repositorio nao tem nenhum teste de dominio, e o relatorio diz
- * exatamente isso. Relatorio que afirma cobertura sem teste e a forma mais
- * elegante de mentir com numero -- e e justamente o que esta guarda existe
- * para impedir.
+ * "Estado atual" e SEMPRE regravado (nao acumula). "Historico por entrega" e
+ * APPEND-ONLY -- linha de entrega passada e imutavel, e so cresce quando
+ * `--issue`/`--spec`/`--pr` sao passados (issue e obrigatoria para anexar;
+ * spec e pr sao opcionais -- ha card [INFRA] sem SPEC e, no fluxo local, pr
+ * ainda nao existe antes do commit).
  *
- * A classificacao e por SUFIXO de arquivo, nao por pasta nem por intencao
- * (TESTING.md §2).
+ * Logica pura (agregacao, formatacao, texto) mora em `test-report.core.mjs`
+ * -- este arquivo so cuida de I/O de processo (rodar Jest/Vitest, ler/
+ * escrever arquivo).
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { randomBytes } from 'node:crypto';
+
+import { acumularNoNivel, gerar, secaoEstadoAtual } from './test-report.core.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DESTINO = join(RAIZ, 'reports', 'TESTS.md');
+/**
+ * Cache do ULTIMO resultado bem-sucedido de cada ALVO (chave: `pacote#script`),
+ * commitado junto do TESTS.md -- e o que da ao fallback (ver `rodarAlvo`) o
+ * numero EXATO (nao o `%` ja arredondado que aparece na tabela), e granularidade
+ * por ALVO em vez de por nivel inteiro (um nivel pode ter mais de um alvo).
+ */
+const CACHE = join(RAIZ, 'reports', '.test-report-cache.json');
 
 /**
- * Niveis do TESTING.md §2, na ordem em que aparecem la.
+ * Um ALVO por script de teste que existe no monorepo hoje. Cada alvo roda em
+ * UM pacote e produz UM nivel -- nenhum script mistura sufixos (confirmado
+ * pelos `testMatch`/`include` de cada `jest.config.mjs`/`vitest.config.ts`):
+ * `test` sempre e unitario, `test:integration` sempre e integracao. Isso
+ * evita reparsear caminho de arquivo por sufixo -- o proprio comando ja diz
+ * o nivel.
  *
- * CADA NIVEL TEM LISTA DE SUFIXOS, nao um so: teste de componente React
- * termina em `.spec.tsx`, e `"Button.spec.tsx".endsWith(".spec.ts")` e
- * `false` -- termina em `x`. Com um sufixo unico os 17 testes de componente
- * do design system nao entravam em nivel nenhum, e a guarda de evidencia
- * afirmava 79 arquivos onde havia 96 (issue #111).
- *
- * A precedencia entre niveis continua vindo do PONTO LITERAL no sufixo, nao
- * da ordem deste array: `.int-spec.ts` nao casa `.spec.ts` porque o caractere
- * antes de `spec` e `-`. Afrouxar para `-spec.ts` faria integracao vazar para
- * unitario -- o self-check cobre exatamente esse caso.
- *
- * `.test.ts` ENTROU NA F15, pelo mesmo motivo do `.tsx`: o `admin-web` usa
- * esse sufixo (o `vitest.config` dele so casa `*.test.ts`), e os 6 arquivos
- * de la nao entravam em nivel nenhum. A issue #111 consertou o `.tsx` e
- * passou por cima deste -- guarda conserta o que alguem lembrou de olhar.
- *
- * O nivel `seguranca` estava no TESTING.md §2 e NAO estava aqui, desde o
- * bootstrap. Nenhum `.sec-spec.ts` existe hoje, entao a linha sai zerada --
- * mas no dia em que o primeiro for escrito (isolamento de tenant, autorizacao,
- * idempotencia) ele contaria zero em silencio, que e a mesma falha do `.tsx`
- * um paragrafo acima. Achado na revisao desta issue.
+ * `runner` decide como extrair total/pass/falha (schema `--json` e IDENTICO
+ * entre Jest e Vitest -- confirmado rodando os dois) e como pedir cobertura
+ * (flag diferente por runner).
  */
-const NIVEIS = [
-  { nome: 'unitário', sufixos: ['.spec.ts', '.spec.tsx', '.test.ts', '.test.tsx'] },
-  { nome: 'contrato', sufixos: ['.contract-spec.ts', '.contract-spec.tsx'] },
-  { nome: 'integração', sufixos: ['.int-spec.ts', '.int-spec.tsx'] },
-  { nome: 'e2e', sufixos: ['.e2e-spec.ts', '.e2e-spec.tsx'] },
-  { nome: 'hardware', sufixos: ['.hw-spec.ts', '.hw-spec.tsx'] },
-  { nome: 'segurança', sufixos: ['.sec-spec.ts', '.sec-spec.tsx'] },
+const ALVOS = [
+  { pacote: 'apps/api', nivel: 'unitário', script: 'test', runner: 'jest' },
+  { pacote: 'apps/api', nivel: 'integração', script: 'test:integration', runner: 'jest' },
+  { pacote: 'apps/admin-web', nivel: 'unitário', script: 'test', runner: 'vitest' },
+  { pacote: 'packages/ui', nivel: 'unitário', script: 'test', runner: 'vitest' },
+  { pacote: 'packages/database', nivel: 'unitário', script: 'test', runner: 'vitest' },
+  { pacote: 'packages/database', nivel: 'integração', script: 'test:integration', runner: 'vitest' },
+  { pacote: 'packages/access-policy', nivel: 'unitário', script: 'test', runner: 'jest' },
+  { pacote: 'apps/edge-agent', nivel: 'unitário', script: 'test', runner: 'jest' },
 ];
 
-/**
- * Lista arquivos rastreados pelo Git. Usar o Git, e nao varrer o disco,
- * garante que node_modules e artefato de build ficam de fora sem precisar
- * manter uma lista de exclusao que envelhece.
- */
-function arquivosRastreados() {
-  const r = spawnSync('git', ['ls-files'], { cwd: RAIZ, encoding: 'utf8' });
-  if (r.status !== 0) {
-    throw new Error('git ls-files falhou -- este script precisa rodar dentro do repositorio.');
-  }
-  return (r.stdout ?? '').split('\n').filter(Boolean);
+function argumento(nome) {
+  const i = process.argv.indexOf(`--${nome}`);
+  return i === -1 ? null : (process.argv[i + 1] ?? null);
 }
 
 /**
- * O SHA da execucao NAO entra no arquivo, de proposito.
- *
- * Colocar `git rev-parse HEAD` no conteudo torna a guarda impossivel de
- * satisfazer: gerar o relatorio muda o arquivo, o que exige commit, o que
- * muda o SHA, o que desatualiza o relatorio. Ciclo infinito -- e foi o
- * terceiro defeito que o CI pegou.
- *
- * O TESTING.md §5 pede "data e SHA da execucao" e diz que vem do CI. Vem
- * mesmo: sao o timestamp e o SHA do proprio job, que ja ficam no log e na
- * pagina da execucao. O arquivo commitado carrega o que e reproduzivel a
- * partir do codigo -- nada que mude a cada commit.
+ * Arquivo temporario unico por chamada -- dois `pnpm test:report`
+ * concorrentes (CI + local, ou dois jobs do mesmo workflow) nao disputam o
+ * mesmo caminho.
  */
+function caminhoTemporario(sufixo) {
+  return join(tmpdir(), `arenahub-test-report-${randomBytes(6).toString('hex')}-${sufixo}.json`);
+}
 
-function gerar() {
-  const arquivos = arquivosRastreados();
+function chaveDoAlvo(alvo) {
+  return `${alvo.pacote}#${alvo.script}`;
+}
 
-  const porNivel = NIVEIS.map((nivel) => ({
-    ...nivel,
-    arquivos: arquivos.filter((a) => nivel.sufixos.some((s) => a.endsWith(s))),
-  }));
+function lerCache() {
+  if (!existsSync(CACHE)) return {};
+  try {
+    return JSON.parse(readFileSync(CACHE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
 
-  const total = porNivel.reduce((soma, n) => soma + n.arquivos.length, 0);
+function escreverCache(cache) {
+  mkdirSync(dirname(CACHE), { recursive: true });
+  writeFileSync(CACHE, JSON.stringify(cache, null, 2) + '\n', 'utf8');
+}
 
-  const linhas = [
-    '# TESTS.md — relatório de evidência',
-    '',
-    '> **Gerado por `pnpm test:report`. Não edite à mão.**',
-    '>',
-    '> O CI roda `pnpm test:report --check` e falha se este arquivo divergir do que a execução',
-    '> produz. É a guarda de evidência do `docs/TESTING.md` §5.',
-    '>',
-    '> **Data e SHA da execução ficam no log do CI, não aqui.** Gravá-los no arquivo tornaria a',
-    '> guarda impossível de satisfazer: gerar mudaria o conteúdo, exigindo commit, que mudaria o',
-    '> SHA, que desatualizaria o relatório. Este arquivo só carrega o que é reproduzível a partir',
-    '> do código.',
-    '',
-    '## Arquivos de teste por nível',
-    '',
-    'Classificação por **sufixo de arquivo**, não por pasta (`docs/TESTING.md` §2).',
-    '',
-    '| nível | sufixo | arquivos |',
-    '|---|---|---|',
-    ...porNivel.map(
-      (n) => `| ${n.nome} | ${n.sufixos.map((s) => `\`${s}\``).join(', ')} | ${n.arquivos.length} |`,
-    ),
-    `| **total** | | **${total}** |`,
-    '',
-  ];
+/**
+ * Roda `pnpm --filter <pacote> <script>` com as flags de JSON + cobertura do
+ * runner. Devolve os numeros ja extraidos -- nunca o JSON cru, para o
+ * chamador nao precisar saber o schema de cada runner.
+ *
+ * O SCRIPT PODE FALHAR (teste vermelho) e isso E ESPERADO: o proposito do
+ * relatorio e mostrar falha, nao escondê-la atras de um script que aborta --
+ * quando o Jest/Vitest RODOU e escreveu o `--outputFile`, o resultado (com
+ * `falha > 0`) entra normalmente.
+ *
+ * Devolve `null` (nunca lanca) quando o PROCESSO nao chegou a escrever o
+ * JSON -- caso conhecido: `test:integration` do `apps/api` crasha com exit
+ * nativo do Windows (3221226505) DEPOIS de 360+ testes passarem, bug
+ * pre-existente do Jest com `--experimental-vm-modules` nesta plataforma,
+ * nao regressao desta fatia. Tratar como "alvo zerado" mentiria queda de
+ * cobertura que nao aconteceu -- o chamador usa o ultimo valor do CACHE.
+ */
+function rodarAlvo(alvo) {
+  const arquivoTeste = caminhoTemporario('teste');
+  const flagsComuns =
+    alvo.runner === 'jest'
+      ? ['--json', `--outputFile=${arquivoTeste}`, '--coverage', '--coverageReporters=json-summary']
+      : ['--reporter=json', `--outputFile=${arquivoTeste}`, '--coverage', '--coverage.reporter=json-summary'];
 
-  if (total === 0) {
-    linhas.push(
-      '## Nenhum teste de domínio existe ainda',
-      '',
-      'Isto não é falha do relatório — é o estado real do repositório. O bootstrap `[INFRA]`',
-      'monta o encanamento; teste de domínio nasce com a primeira fatia que tiver regra a provar.',
-      '',
-      '**Enquanto esta linha existir, nenhum documento deste repositório pode afirmar que há',
-      'cobertura.** Cobertura de regra de domínio: **n/a** — não há regra de domínio.',
-      '',
-      'O que já é verificado por máquina, e vale registrar para não parecer que nada roda:',
-      '',
-      '- `pnpm lint` e `pnpm typecheck` sobre `packages/config` e `packages/database`;',
-      '- `pnpm test:guardas` — 6 casos sobre os guardas de `scripts/`;',
-      '- `pnpm test:report:selfcheck` — o self-check deste gerador.',
-      '',
-      'Nenhum deles é teste de regra de negócio, e por isso nenhum entra na tabela acima.',
-      '',
+  const cwd = join(RAIZ, alvo.pacote);
+
+  // SEM `--`: `pnpm run <script>` ja repassa argumento extra ao script. Um
+  // `--` literal aqui chega ATE O JEST como argumento de pattern de teste
+  // (nao como separador), e o Jest interpreta cada flag como um regex de
+  // arquivo que nao bate com nada -- "No tests found" silencioso.
+  const execucao = spawnSync('pnpm', ['run', alvo.script, ...flagsComuns], {
+    cwd,
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  });
+
+  if (!existsSync(arquivoTeste)) {
+    console.warn(
+      `[test:report] AVISO: ${alvo.pacote} (${alvo.script}) nao produziu saida -- ` +
+        `processo terminou com status ${String(execucao.status)} sem escrever o resultado. ` +
+        'Mantendo o numero da ultima execucao bem-sucedida para este alvo.',
     );
-  } else {
-    linhas.push(
-      '## Por SPEC / fatia',
-      '',
-      '> A ligação SPEC ↔ teste vem da tag no teste ou do caminho do módulo',
-      '> (`docs/TESTING.md` §5). Preenchida quando houver teste com tag.',
-      '',
-    );
+    return null;
   }
 
-  return linhas.join('\n');
+  const resultado = JSON.parse(readFileSync(arquivoTeste, 'utf8'));
+  rmSync(arquivoTeste, { force: true });
+
+  const coberturaPath = join(cwd, 'coverage', 'coverage-summary.json');
+  let coberturaPct = null;
+  if (existsSync(coberturaPath)) {
+    const resumo = JSON.parse(readFileSync(coberturaPath, 'utf8'));
+    coberturaPct = resumo.total?.lines?.pct ?? null;
+  }
+
+  return {
+    testes: resultado.numTotalTests ?? 0,
+    pass: resultado.numPassedTests ?? 0,
+    falha: resultado.numFailedTests ?? 0,
+    coberturaPct,
+  };
+}
+
+/**
+ * Roda todos os ALVOS e agrega por nivel. ALVO que falhou usa o valor do
+ * CACHE (ultima execucao bem-sucedida DAQUELE alvo), nao zero. ALVO que teve
+ * sucesso atualiza o cache antes de devolver.
+ */
+function rodarTodosOsAlvos() {
+  const cache = lerCache();
+  const porNivel = new Map();
+
+  for (const alvo of ALVOS) {
+    const chave = chaveDoAlvo(alvo);
+    const r = rodarAlvo(alvo);
+
+    const resultado = r ?? cache[chave] ?? { testes: 0, pass: 0, falha: 0, coberturaPct: null };
+    if (r) cache[chave] = r;
+
+    acumularNoNivel(porNivel, alvo.nivel, resultado);
+  }
+
+  escreverCache(cache);
+
+  return porNivel;
+}
+
+/**
+ * Reconstroi o "por nivel" a partir do CACHE commitado, sem rodar nada --
+ * usado por `--check` (ver comentario em `main`).
+ */
+function porNivelDoCache() {
+  const cache = lerCache();
+  const porNivel = new Map();
+
+  for (const alvo of ALVOS) {
+    const resultado = cache[chaveDoAlvo(alvo)];
+    if (!resultado) continue;
+    acumularNoNivel(porNivel, alvo.nivel, resultado);
+  }
+
+  return porNivel;
 }
 
 function main() {
-  const conteudo = gerar();
   const verificar = process.argv.includes('--check');
+  const issue = argumento('issue');
+  const spec = argumento('spec');
+  const pr = argumento('pr');
 
-  if (!verificar) {
-    mkdirSync(dirname(DESTINO), { recursive: true });
-    writeFileSync(DESTINO, conteudo, 'utf8');
-    console.info(`[test:report] ${DESTINO} atualizado.`);
+  if (verificar) {
+    // `--check` NAO roda teste nenhum -- so compara o "Estado atual"
+    // commitado contra o que o CACHE (tambem commitado) reconstroi. Rodar
+    // os testes aqui tornaria a guarda NAO-DETERMINISTICA: o crash
+    // intermitente do Jest no Windows (`apps/api#test:integration`, ver
+    // `rodarAlvo`) fez duas chamadas seguidas de `--check` discordarem entre
+    // si sobre o mesmo commit -- guarda que muda de opiniao sem o codigo
+    // mudar nao prova nada. O comando SEM `--check` e quem roda de verdade
+    // e atualiza cache + TESTS.md; `--check` so audita que os dois arquivos
+    // combinam.
+    if (!existsSync(DESTINO) || !existsSync(CACHE)) {
+      console.error(
+        [
+          '',
+          'ERRO: reports/TESTS.md ou reports/.test-report-cache.json nao existe.',
+          '',
+          'A guarda de evidencia (docs/TESTING.md §5) exige os dois commitados no PR.',
+          'Rode `pnpm test:report` e commite o resultado.',
+          '',
+        ].join('\n'),
+      );
+      return 1;
+    }
+
+    const commitado = readFileSync(DESTINO, 'utf8').replace(/\r\n/g, '\n');
+    const conteudo = gerar({ porNivel: porNivelDoCache(), entrega: null, conteudoAnterior: commitado });
+
+    if (secaoEstadoAtual(commitado) !== secaoEstadoAtual(conteudo)) {
+      console.error(
+        [
+          '',
+          'ERRO: "Estado atual" de reports/TESTS.md nao bate com reports/.test-report-cache.json.',
+          '',
+          'O relatorio commitado nao corresponde ao cache commitado junto dele.',
+          'Isso e exatamente o que a guarda de evidencia existe para pegar:',
+          'numero em documento tem de vir de execucao, nunca de prosa.',
+          '',
+          'Rode `pnpm test:report` (ou `pnpm test:report --issue N --spec ... --pr ...`',
+          'se esta entregando uma fatia) e commite o resultado (TESTS.md + cache juntos).',
+          '',
+        ].join('\n'),
+      );
+      return 1;
+    }
+
+    console.info('[test:report] "Estado atual" confere com o cache commitado.');
     return 0;
   }
 
-  if (!existsSync(DESTINO)) {
-    console.error(
-      [
-        '',
-        'ERRO: reports/TESTS.md nao existe.',
-        '',
-        'A guarda de evidencia (docs/TESTING.md §5) exige o relatorio commitado no PR.',
-        'Rode `pnpm test:report` e commite o resultado.',
-        '',
-      ].join('\n'),
-    );
-    return 1;
-  }
+  const porNivel = rodarTodosOsAlvos();
 
-  // Normaliza fim de linha: o repositorio roda em Windows e Linux, e CRLF vs
-  // LF nao e divergencia de conteudo.
-  const commitado = readFileSync(DESTINO, 'utf8').replace(/\r\n/g, '\n');
+  const entrega = issue ? { issue, spec, pr, data: new Date().toISOString().slice(0, 10) } : null;
 
-  if (commitado.trim() !== conteudo.trim()) {
-    console.error(
-      [
-        '',
-        'ERRO: reports/TESTS.md divergiu do que a execucao produz.',
-        '',
-        'O relatorio commitado nao corresponde ao estado real do repositorio.',
-        'Isso e exatamente o que a guarda de evidencia existe para pegar:',
-        'numero em documento tem de vir de execucao, nunca de prosa.',
-        '',
-        'Rode `pnpm test:report` e commite o resultado.',
-        '',
-      ].join('\n'),
-    );
-    return 1;
-  }
+  const conteudoAnterior = existsSync(DESTINO) ? readFileSync(DESTINO, 'utf8') : null;
+  const conteudo = gerar({ porNivel, entrega, conteudoAnterior });
 
-  console.info('[test:report] relatorio confere com a execucao.');
+  mkdirSync(dirname(DESTINO), { recursive: true });
+  writeFileSync(DESTINO, conteudo, 'utf8');
+  console.info(`[test:report] ${DESTINO} atualizado.`);
   return 0;
 }
 
