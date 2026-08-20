@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  decidirCasamento,
   nascimentoEhPlausivel,
+  normalizarNome,
   origemDoDireito,
   parsearDataDoPacto,
   traduzirPerfil,
+  type CandidatoDeAluno,
 } from './dominio.js';
 
 describe('parsearDataDoPacto', () => {
@@ -80,5 +83,65 @@ describe('origemDoDireito', () => {
   it('funcionario e administrador entram por vinculo', () => {
     expect(origemDoDireito('STAFF')).toBe('EMPLOYEE');
     expect(origemDoDireito('ADMIN')).toBe('EMPLOYEE');
+  });
+});
+
+describe('normalizarNome', () => {
+  it('tira acento, caixa e espaco duplicado', () => {
+    expect(normalizarNome('  MARTA   Mirella  Militão ')).toBe('marta mirella militao');
+  });
+
+  it('iguala as duas grafias de Wagnusia/Wagnuzia? nao -- s e z sao letras diferentes', () => {
+    expect(normalizarNome('Wagnusia')).not.toBe(normalizarNome('Wagnuzia'));
+  });
+});
+
+describe('decidirCasamento', () => {
+  const maria: CandidatoDeAluno = {
+    id: 'id-maria',
+    nomeNormalizado: 'maria silva',
+    cpfNormalizado: '70310310105',
+  };
+  const outraMaria: CandidatoDeAluno = {
+    id: 'id-maria-2',
+    nomeNormalizado: 'maria silva',
+    cpfNormalizado: null,
+  };
+
+  it('casa por CPF, mesmo com o nome escrito diferente', () => {
+    const r = decidirCasamento({ nome: 'MARIA SILVA DE SOUZA', cpf: '703.103.101-05' }, [maria]);
+    expect(r).toEqual({ tipo: 'CPF', studentId: 'id-maria' });
+  });
+
+  it('casa por nome unico quando o registro nao tem CPF', () => {
+    const r = decidirCasamento({ nome: 'Maria Silva', cpf: '' }, [maria]);
+    expect(r).toEqual({ tipo: 'NOME', studentId: 'id-maria' });
+  });
+
+  it('recusa quando o nome aparece duas vezes -- homonimo nao se adivinha', () => {
+    const r = decidirCasamento({ nome: 'Maria Silva', cpf: '' }, [maria, outraMaria]);
+    expect(r).toEqual({ tipo: 'AMBIGUO' });
+  });
+
+  it('CPF vence nome: o mesmo nome de duas pessoas nao atrapalha quem tem documento', () => {
+    const r = decidirCasamento({ nome: 'Maria Silva', cpf: '70310310105' }, [maria, outraMaria]);
+    expect(r).toEqual({ tipo: 'CPF', studentId: 'id-maria' });
+  });
+
+  it('recusa CPF invalido e cai para o nome', () => {
+    // 111.111.111-11 passa na aritmetica e nao existe como documento.
+    const r = decidirCasamento({ nome: 'Maria Silva', cpf: '11111111111' }, [maria]);
+    expect(r).toEqual({ tipo: 'NOME', studentId: 'id-maria' });
+  });
+
+  it('nao encontra quando ninguem bate', () => {
+    const r = decidirCasamento({ nome: 'Joao Ninguem', cpf: '' }, [maria]);
+    expect(r).toEqual({ tipo: 'NAO_ENCONTRADO' });
+  });
+
+  it('recusa quando dois candidatos tem o MESMO CPF -- base duplicada', () => {
+    const gemeo: CandidatoDeAluno = { ...maria, id: 'id-maria-3' };
+    const r = decidirCasamento({ nome: 'Maria', cpf: '70310310105' }, [maria, gemeo]);
+    expect(r).toEqual({ tipo: 'AMBIGUO' });
   });
 });
