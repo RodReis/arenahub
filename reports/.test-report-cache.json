@@ -21,7 +21,7 @@
     "testes": 175,
     "pass": 175,
     "falha": 0,
-    "coberturaPct": 99.5
+    "coberturaPct": 99.51
   },
   "packages/database#test": {
     "testes": 44,
@@ -31,7 +31,7 @@
   },
   "packages/database#test:integration": {
     "testes": 60,
-    "pass": 60,
+    "pass": 50,
     "falha": 0,
     "coberturaPct": 95.2
   },
