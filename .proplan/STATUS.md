@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-08-19
+updated: 2026-08-20
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,8 +9,6 @@ updated: 2026-08-19
 
 ### Sem épico
 
-- [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa)
-- [INFRA] CPF em claro: gravar completo e exibir sem mascara (#122)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
@@ -58,6 +56,8 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [INFRA] CPF em claro: gravar completo e exibir sem mascara (#122, finalizado em: 2026-08-20)
 - [MVP2][SPEC-016][F16] Estorno, conciliação e operação (#16, finalizado em: 2026-08-19)
 - [MVP2][SPEC-015][F15] Inadimplência e acesso (#15, finalizado em: 2026-08-19)
 - [INFRA][FIX] O relatorio de evidencia nao conta os 17 arquivos .spec.tsx (#111, finalizado em: 2026-08-19)
