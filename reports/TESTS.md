@@ -28,5 +28,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 
 | Data | Issue | SPEC | Nível | testes | pass | falha | cobertura % | PR |
 |---|---|---|---|---:|---:|---:|---:|---|
-| 2026-08-20 | #125 | — | unitário | 985 | 985 | 0 | 94.5 | — |
-| 2026-08-20 | #125 | — | integração | 401 | 401 | 0 | 84.6 | — |
+| 2026-08-20 | #125 | — | unitário | 985 | 985 | 0 | 94.5 | #126 |
+| 2026-08-20 | #125 | — | integração | 401 | 401 | 0 | 84.6 | #126 |
