@@ -229,6 +229,15 @@ enum StudentTimelineEventType {
 /// os pedirem (avaliacao fisica em F17, imagem em F19).
 enum ConsentDocumentType {
   BIOMETRIC
+  /// Registro de composicao corporal e avaliacao fisica (F17).
+  ///
+  /// NAO E GATE: a Arena Positiva ja coleta peso, gordura e medidas ha anos
+  /// como parte do servico contratado, e trocar caderno por sistema e
+  /// mudanca de MEIO DE REGISTRO, nao inicio de tratamento (STATUS 20/08,
+  /// mesmo raciocinio do ADR-034 decisao 10). Existe para dar trilha e
+  /// permitir revogacao; o ato genuinamente novo -- enviar numero a um
+  /// terceiro fora do Brasil -- e aceite da F21, nao desta fatia.
+  HEALTH
 
   @@map("consent_document_type")
 }
@@ -515,6 +524,10 @@ model Tenant {
   externalMovements   ExternalMovement[]
   reconciliationItems ReconciliationItem[]
 
+  bodyAssessments      BodyAssessment[]
+  bodyMeasurements     BodyMeasurement[]
+  studentHealthContext StudentHealthContext[]
+
   @@map("tenants")
 }
 
@@ -579,12 +592,14 @@ model User {
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")
 
-  memberships     TenantMembership[]
-  userRoles       UserRole[]
-  sessions        Session[]
-  auditLogs       AuditLog[]
+  memberships           TenantMembership[]
+  userRoles             UserRole[]
+  sessions              Session[]
+  auditLogs             AuditLog[]
   /// Alunos de quem este usuario e consultor responsavel.
-  advisedStudents Student[]          @relation("StudentAdvisor")
+  advisedStudents       Student[]              @relation("StudentAdvisor")
+  evaluatedAssessments  BodyAssessment[]       @relation("AssessmentEvaluator")
+  recordedHealthContext StudentHealthContext[] @relation("HealthContextRecorder")
 
   @@map("users")
 }
@@ -864,6 +879,8 @@ model Student {
   timelineEvents     StudentTimelineEvent[]
 
   consentRecords      ConsentRecord[]
+  bodyAssessments     BodyAssessment[]
+  healthContext       StudentHealthContext[]
   biometricIdentities BiometricIdentity[]
   deviceUsers         DeviceUser[]
 
@@ -3008,4 +3025,238 @@ model ReconciliationItem {
   @@index([tenantId, status, createdAt])
   @@index([tenantId, runId])
   @@map("reconciliation_items")
+}
+
+// ---------------------------------------------------------------------------
+// F17 -- Saude: avaliacao fisica manual, medidas e contexto do aluno.
+//
+// Tres coisas que o desenho existe para garantir:
+//
+// - **INV-102** avaliacao PUBLICADA e imutavel. Correcao cria versao nova
+//   apontando para a anterior (`supersedesAssessmentId`), nunca UPDATE.
+// - **INV-104** ausencia de dado NAO E ZERO. Toda medida e LINHA, nunca
+//   coluna: campo que o aparelho nao reporta simplesmente nao gera linha.
+//   Coluna anulavel por tipo convidaria alguem a preencher com `0`.
+// - **INV-105** a unidade ORIGINAL sobrevive junto do valor canonico.
+// ---------------------------------------------------------------------------
+
+/// Estado da avaliacao. So ha dois, e a transicao e de mao unica.
+enum AssessmentStatus {
+  /// Editavel. Nao entra em grafico, comparativo nem historico oficial.
+  DRAFT
+  /// IMUTAVEL (INV-102). Correcao cria outra avaliacao vinculada.
+  PUBLISHED
+
+  @@map("assessment_status")
+}
+
+/// De onde veio o numero. Proveniencia e requisito (`M3-NFR-006`), nao enfeite.
+enum MeasurementSource {
+  /// Digitado pelo avaliador.
+  MANUAL
+  /// Balanca de bioimpedancia (ex.: `CF610_G` da Arena Positiva).
+  DEVICE
+  /// Extraido de arquivo por OCR/parser -- SEMPRE via confirmacao humana
+  /// (INV-103). O valor so chega aqui depois de confirmado; a fatia que
+  /// produz a extracao e a F19.
+  IMPORT
+
+  @@map("measurement_source")
+}
+
+/// Fator individual que muda como o laudo deve ser lido (ADR-037).
+///
+/// LISTA FECHADA, sem campo de texto livre: fator individual e dado de saude
+/// (art. 11), e campo aberto preenchido no balcao vira deposito de
+/// informacao medica com finalidade impossivel de enumerar.
+///
+/// Cada fator SUPRIME alerta especifico de forma deterministica -- nenhum
+/// gera texto. Fator novo entra por PR **com o teste que prova o que ele
+/// suprime**; sem teste, nao entra.
+enum HealthContextFactor {
+  /// Suprime alerta de agua intracelular alta.
+  SUPLEMENTACAO_CREATINA
+  /// Suprime alertas de compartimento ABSOLUTO; mantem os de RAZAO.
+  COMPOSICAO_ATIPICA
+  /// BLOQUEIA a analise: a avaliacao e registrada, nao interpretada.
+  GESTANTE_OU_POS_PARTO
+  /// Invalida a leitura de agua; demais campos seguem.
+  EDEMA_RELATADO
+  /// Idem `EDEMA_RELATADO`.
+  USO_DE_DIURETICO
+  /// Suprime comparacao com faixa populacional; mantem a com o proprio historico.
+  ATLETA_COMPETITIVO
+
+  @@map("health_context_factor")
+}
+
+/// Tipo de medida corporal. Espelha `TipoDeMedida` do dominio.
+///
+/// Lista fechada de proposito: tipo livre viraria taxonomia paralela por
+/// academia, e comparar historico entre unidades deixaria de funcionar.
+enum BodyMeasurementType {
+  WEIGHT
+  HEIGHT
+  BODY_FAT_PERCENT
+  BODY_FAT_MASS
+  LEAN_BODY_MASS
+  SKELETAL_MUSCLE_MASS
+  TOTAL_BODY_WATER
+  INTRACELLULAR_WATER
+  EXTRACELLULAR_WATER
+  PROTEIN_MASS
+  MINERAL_MASS
+  VISCERAL_FAT_LEVEL
+  BASAL_METABOLIC_RATE
+  WAIST_CIRCUMFERENCE
+  HIP_CIRCUMFERENCE
+
+  @@map("body_measurement_type")
+}
+
+/// Unidade em que o valor foi MEDIDO. Espelha `UnidadeDeMedida` do dominio.
+enum MeasurementUnit {
+  KG
+  G
+  LB
+  CM
+  M
+  IN
+  PERCENT
+  KCAL
+  L
+
+  @@map("measurement_unit")
+}
+
+/// Avaliacao fisica de um aluno, em rascunho ou publicada.
+model BodyAssessment {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  studentId String           @map("student_id") @db.Uuid
+  status    AssessmentStatus @default(DRAFT)
+
+  /// Instante em que a MEDICAO aconteceu -- nao o do cadastro. Avaliacao de
+  /// ontem digitada hoje ordena por ontem, ou o comparativo mente.
+  assessedAt  DateTime  @map("assessed_at")
+  /// Preenchido na publicacao. A partir dai a linha nao sofre UPDATE de
+  /// conteudo (INV-102).
+  publishedAt DateTime? @map("published_at")
+
+  source          MeasurementSource @default(MANUAL)
+  /// Referencia da origem: id do arquivo importado, serial do aparelho.
+  sourceReference String?           @map("source_reference")
+
+  /// Quem registrou. Exigido pelo INV-101 e pela secao 14 do MVP-03
+  /// ("aluno ve quem registrou e quando").
+  evaluatorUserId String @map("evaluator_user_id") @db.Uuid
+
+  /// Avaliacao que esta corrige (INV-102). A corrigida permanece publicada e
+  /// visivel: apagar destruiria a prova de que o numero errado circulou.
+  supersedesAssessmentId String? @unique @map("supersedes_assessment_id") @db.Uuid
+
+  /// Observacao do avaliador sobre a MEDICAO (jejum, horario, aparelho).
+  /// NAO e campo clinico: contexto de saude e lista fechada, em
+  /// `StudentHealthContext` (ADR-037).
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  evaluator User    @relation("AssessmentEvaluator", fields: [evaluatorUserId], references: [id], onDelete: Restrict)
+
+  supersedes   BodyAssessment? @relation("AssessmentCorrection", fields: [supersedesAssessmentId], references: [id], onDelete: Restrict)
+  supersededBy BodyAssessment? @relation("AssessmentCorrection")
+
+  measurements BodyMeasurement[]
+
+  @@index([tenantId, studentId, assessedAt])
+  @@index([tenantId, studentId, status, publishedAt])
+  @@map("body_assessments")
+}
+
+/// Uma medida de uma avaliacao. LINHA por medida, nunca coluna por tipo.
+///
+/// O par ORIGINAL (`originalValue`/`originalUnit`) e o CANONICO convivem de
+/// proposito (INV-105): o canonico serve a comparacao e ao grafico; o
+/// original prova o que foi medido, e sobrevive a qualquer mudanca futura na
+/// tabela de fatores.
+///
+/// `Decimal` e nao `Float`: `0.1 + 0.2` em binario nao fecha, e comparativo
+/// de composicao corporal subtrai numeros proximos -- onde o erro aparece.
+model BodyMeasurement {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  assessmentId String @map("assessment_id") @db.Uuid
+
+  type BodyMeasurementType
+
+  /// Valor e unidade COMO MEDIDOS. `originalUnit` e `null` apenas para tipo
+  /// adimensional (`VISCERAL_FAT_LEVEL`).
+  originalValue Decimal          @map("original_value") @db.Decimal(10, 4)
+  originalUnit  MeasurementUnit? @map("original_unit")
+
+  /// Valor na unidade canonica do tipo, para comparacao. Calculado por
+  /// `converterParaCanonica`, com precisao INTEIRA -- arredondar aqui
+  /// contaminaria o comparativo (INV-106).
+  canonicalValue Decimal          @map("canonical_value") @db.Decimal(10, 4)
+  canonicalUnit  MeasurementUnit? @map("canonical_unit")
+
+  source MeasurementSource @default(MANUAL)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assessment BodyAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  /// Um tipo por avaliacao: duas linhas de `WEIGHT` na mesma medicao seriam
+  /// duas verdades sobre o mesmo instante, e o grafico teria de escolher uma
+  /// sem criterio.
+  @@unique([assessmentId, type])
+  @@index([tenantId, assessmentId])
+  @@map("body_measurements")
+}
+
+/// Fator de contexto ATIVO de um aluno (ADR-037).
+///
+/// Registrado pelo AVALIADOR, nunca pela recepcao. Desativar cria
+/// `deactivatedAt` em vez de apagar: o snapshot da F21 precisa saber o que
+/// valia na data da analise, nao o que vale hoje.
+model StudentHealthContext {
+  id        String              @id @default(uuid()) @db.Uuid
+  tenantId  String              @map("tenant_id") @db.Uuid
+  studentId String              @map("student_id") @db.Uuid
+  factor    HealthContextFactor
+
+  /// Quem registrou o fator. Slice 3.1 do MVP-03: "com autor e versao".
+  recordedByUserId String @map("recorded_by_user_id") @db.Uuid
+
+  recordedAt    DateTime  @map("recorded_at")
+  /// Preenchido ao desativar. Linha desativada continua existindo.
+  deactivatedAt DateTime? @map("deactivated_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation("HealthContextRecorder", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+
+  /// ⚠️ UM FATOR ATIVO POR ALUNO e garantido por INDICE PARCIAL escrito a
+  /// mao, em `migrations/20260820140000_f17_um_fator_ativo_por_aluno`:
+  ///
+  ///     CREATE UNIQUE INDEX ... ON student_health_context
+  ///       (tenant_id, student_id, factor) WHERE deactivated_at IS NULL;
+  ///
+  /// Nao da para declara-lo aqui: `@@unique` cobriria tambem as linhas
+  /// DESATIVADAS, e impediria reativar um fator que o aluno ja teve --
+  /// gestante que engravida de novo, atleta que volta a competir.
+  ///
+  /// O Prisma nao modela indice parcial, entao ele NAO aparece neste schema e
+  /// um `prisma migrate dev` futuro vai propor apaga-lo. NAO ACEITE: sem ele,
+  /// dois cliques criam o mesmo fator duas vezes -- `findFirst` + `if` perde
+  /// a corrida por construcao (mesma classe do bug da F14).
+  @@index([tenantId, studentId, factor])
+  @@map("student_health_context")
 }

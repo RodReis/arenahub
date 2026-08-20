@@ -134,6 +134,17 @@ const PERMISSOES = [
   // Emitir recibo CONSOME numeracao sequencial imutavel -- e escrita, e nao
   // pode ser autorizada pela permissao de leitura.
   'receipt.issue',
+  // F17: avaliacao fisica manual e contexto de saude.
+  //
+  // Separadas de `student.*` pelo mesmo motivo de `biometric.*`: composicao
+  // corporal e dado de saude (art. 11), e quem atende a recepcao nao precisa
+  // ver o percentual de gordura de ninguem para matricular.
+  //
+  // `health.assess` e do AVALIADOR, nao da recepcao (ADR-037): quem registra
+  // fator de contexto e quem mede, porque o fator so faz sentido junto da
+  // medicao que ele explica.
+  'health.read',
+  'health.assess',
 ];
 
 

@@ -142,6 +142,14 @@ describe('contrato OpenAPI', () => {
         '/api/v1/reconciliation/runs',
         '/api/v1/reconciliation/items',
         '/api/v1/reconciliation/items/{id}/resolve',
+        // F17 -- avaliacao fisica manual e contexto de saude.
+        '/api/v1/students/{id}/assessments',
+        '/api/v1/assessments/{id}',
+        '/api/v1/assessments/{id}/draft',
+        '/api/v1/assessments/{id}/publish',
+        '/api/v1/assessments/{id}/corrections',
+        '/api/v1/students/{id}/health-context',
+        '/api/v1/students/{id}/health-context/{factor}',
       ]),
     );
   });
