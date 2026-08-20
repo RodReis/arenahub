@@ -43,6 +43,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     quezia: '34362583343',
     tulio: '91917739974',
     ursula: '31350038415',
+    vera: '36829112192',
   } as const;
 
   beforeAll(async () => {
@@ -605,10 +606,14 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(segunda.direitosPorPlano).toBe(0);
   });
 
-  it('cadastrado sem data de nascimento recebe placeholder E vira pendencia', async () => {
-    const resultado = await importar([
-      registroDe(null, { nome: 'MIRA SEM NASCIMENTO', cpf: CPF.mira, dataNascimento: '' }),
-    ]);
+  it('cadastrado sem data de nascimento recebe placeholder E vira pendencia -- em TODA execucao', async () => {
+    const linha = registroDe(null, {
+      nome: 'MIRA SEM NASCIMENTO',
+      cpf: CPF.mira,
+      dataNascimento: '',
+    });
+
+    const resultado = await importar([linha]);
 
     expect(resultado.criados).toBe(1);
 
@@ -635,6 +640,76 @@ describe('importacao da base ativa do Pacto (F48)', () => {
       nome: 'MIRA SEM NASCIMENTO',
       motivo: 'nascimento implausivel',
     });
+
+    // ------------------------------------------------------------------
+    // A SEGUNDA EXECUCAO TEM DE AVISAR IGUAL. Aqui a pessoa ja existe,
+    // entao ela CASA em vez de nascer -- e o aviso emitido "quando cria"
+    // sumiria justamente na rodada em que o `1900-01-01` continua no banco.
+    //
+    // Consequencia pratica: a recepcao roda o seed de novo antes de
+    // corrigir as 3 pessoas, o bloco de aviso some da tela, e a data falsa
+    // fica no banco sem rastro nenhum. Nada no admin-web sabe ler
+    // `1900-01-01` como "nao sabemos".
+    //
+    // O criterio e sobre O ESTADO NO BANCO, nao sobre o que aconteceu
+    // nesta execucao.
+    // ------------------------------------------------------------------
+    const segunda = await importar([linha]);
+
+    expect(segunda.criados).toBe(0);
+    expect(segunda.casados).toBe(1);
+    expect(segunda.pendencias).toContainEqual({
+      nome: 'MIRA SEM NASCIMENTO',
+      motivo: 'cadastrado sem data de nascimento',
+    });
+
+    // E a data continua sendo o placeholder -- o aviso nao pode ser eco de
+    // uma correcao que nao houve.
+    const depois = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'MIRA SEM NASCIMENTO' },
+    });
+
+    expect(depois.birthDate.toISOString().slice(0, 10)).toBe('1900-01-01');
+  });
+
+  it('corrigida a data de nascimento, o aviso do placeholder PARA de aparecer', async () => {
+    const linha = registroDe(null, {
+      nome: 'VERA CORRIGIDA NA RECEPCAO',
+      cpf: CPF.vera,
+      dataNascimento: '',
+    });
+
+    const primeira = await importar([linha]);
+
+    expect(primeira.pendencias).toContainEqual({
+      nome: 'VERA CORRIGIDA NA RECEPCAO',
+      motivo: 'cadastrado sem data de nascimento',
+    });
+
+    // A recepcao faz o que a pendencia pediu: poe a data de verdade.
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'VERA CORRIGIDA NA RECEPCAO' },
+    });
+
+    await db.student.update({
+      where: { id: criada.id },
+      data: { birthDate: new Date(Date.UTC(1991, 6, 22)) },
+    });
+
+    // O AVISO TEM DE CALAR. Um aviso que nunca some deixa de ser lido, e a
+    // proxima pessoa com data falsa passa despercebida no meio do ruido.
+    // E o que prova que a condicao le o BANCO, e nao um marcador do arquivo:
+    // a linha do arquivo continua sem data, e mesmo assim nao ha pendencia.
+    const segunda = await importar([linha]);
+
+    expect(segunda.pendencias).not.toContainEqual({
+      nome: 'VERA CORRIGIDA NA RECEPCAO',
+      motivo: 'cadastrado sem data de nascimento',
+    });
+    // E a data da recepcao sobrevive: arquivo vazio nao apaga dado bom.
+    const depois = await db.student.findUniqueOrThrow({ where: { id: criada.id } });
+
+    expect(depois.birthDate.toISOString().slice(0, 10)).toBe('1991-07-22');
   });
 
   it('data de nascimento IMPLAUSIVEL no arquivo tambem cai no placeholder', async () => {

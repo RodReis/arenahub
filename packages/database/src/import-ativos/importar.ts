@@ -91,6 +91,20 @@ const MUNICIPIO_PADRAO = 'Trindade';
 const NASCIMENTO_PLACEHOLDER = new Date(Date.UTC(1900, 0, 1));
 
 /**
+ * A data gravada e o placeholder -- ou seja, "nao sabemos o nascimento"?
+ *
+ * Compara por VALOR (`getTime`), nunca por identidade: o `Date` que volta do
+ * banco e outro objeto, e `===` seria sempre `false` -- um aviso que nunca
+ * dispara e pior que aviso nenhum, porque parece que alguem cuidou.
+ *
+ * `birthDate` e `@db.Date` (sem hora nem fuso), entao a comparacao e exata e
+ * nao precisa de tolerancia.
+ */
+function ehNascimentoPlaceholder(nascimento: Date): boolean {
+  return nascimento.getTime() === NASCIMENTO_PLACEHOLDER.getTime();
+}
+
+/**
  * Espelho de `normalizarTelefone` de
  * `apps/api/src/modules/students/domain/identificacao.ts`. Copia deliberada
  * por FRONTEIRA DE PACOTE: `packages/database` tem `rootDir: "."` no
@@ -820,7 +834,7 @@ export async function importarPessoasAtivas(
   // casar com a primeira em vez de criar um segundo cadastro.
   const alunos = await db.student.findMany({
     where: { tenantId: alvo.tenantId },
-    select: { id: true, fullName: true, cpf: true, status: true },
+    select: { id: true, fullName: true, cpf: true, status: true, birthDate: true },
   });
 
   // Mutavel de proposito: `criarPessoa` empurra o cadastro novo aqui.
@@ -833,6 +847,24 @@ export async function importarPessoasAtivas(
   // Situacao atual no ArenaHub, para nao reativar quem a recepcao bloqueou
   // de proposito. Vem da mesma leitura -- nao custa consulta extra.
   const situacaoAtual = new Map(alunos.map((aluno) => [aluno.id, aluno.status]));
+
+  // Quem esta com o PLACEHOLDER de nascimento gravado, vindo da MESMA leitura
+  // acima -- nao custa consulta extra.
+  //
+  // O aviso e sobre O ESTADO NO BANCO, e nao sobre o que esta execucao fez.
+  // Emiti-lo so "quando cria" o fazia sumir exatamente na rodada em que a
+  // data falsa continua la: na segunda passada a pessoa CASA em vez de
+  // nascer. Se a recepcao rodasse o seed de novo antes de corrigir as 3
+  // pessoas, o bloco de aviso sumia da tela e o `1900-01-01` ficava no banco
+  // sem rastro visivel -- nada no `admin-web` sabe ler essa data como "nao
+  // sabemos".
+  //
+  // O mapa e mutavel porque quem nasce agora entra nele na hora, e porque
+  // quem tem a data corrigida sai: o aviso para de aparecer quando o
+  // problema acaba, que e o que o mantem digno de ser lido.
+  const comNascimentoPlaceholder = new Set(
+    alunos.filter((aluno) => ehNascimentoPlaceholder(aluno.birthDate)).map((aluno) => aluno.id),
+  );
 
   // Quem NASCEU nesta execucao. Casar com alguem deste conjunto significa
   // que DUAS LINHAS DO ARQUIVO sao a mesma pessoa -- o caso da linha 174 e
@@ -973,18 +1005,32 @@ export async function importarPessoasAtivas(
           })(),
         });
 
-        if (criada.nascimentoPlaceholder) {
-          // NAO PODE ACONTECER CALADO: o cadastro existe com uma data que
-          // ninguem escolheu. A pendencia e o unico jeito de a recepcao
-          // saber quais linhas precisam da data de verdade.
-          pendencias.push({ nome: registro.nome, motivo: 'cadastrado sem data de nascimento' });
-        }
+        if (criada.nascimentoPlaceholder) comNascimentoPlaceholder.add(studentId);
       }
 
-      // Em quem foi CRIADO, nascimento ruim ja virou `cadastrado sem data de
-      // nascimento` acima -- e a mesma causa. Duas pendencias para uma linha
-      // fariam a recepcao procurar dois problemas onde ha um.
-      if (efeito.nascimentoImplausivel && criada === null) {
+      // `gravarPessoa` acabou de gravar uma data BOA vinda do arquivo: o
+      // placeholder deixou de existir nesta linha, entao o aviso nao se
+      // aplica mais. E o caso de quem foi cadastrado sem data numa rodada e
+      // ganhou a data numa exportacao posterior do Pacto -- avisar ali seria
+      // mandar a recepcao corrigir o que o proprio seed ja corrigiu.
+      if (efeito.nascimento) comNascimentoPlaceholder.delete(studentId);
+
+      // NAO PODE ACONTECER CALADO, EM NENHUMA EXECUCAO: existe no banco uma
+      // pessoa com data que ninguem escolheu, e a pendencia e o unico jeito
+      // de a recepcao saber quais linhas precisam da data de verdade.
+      //
+      // Le o ESTADO (o `birthDate` gravado), nao o evento (`criada`): quem
+      // ja existia com o placeholder tambem entra, e quem teve a data
+      // corrigida sai sozinho na proxima rodada.
+      if (comNascimentoPlaceholder.has(studentId)) {
+        pendencias.push({ nome: registro.nome, motivo: 'cadastrado sem data de nascimento' });
+      }
+
+      // Quem esta com o placeholder ja virou `cadastrado sem data de
+      // nascimento` acima -- e a mesma causa (nao ha data boa). Duas
+      // pendencias para uma linha fariam a recepcao procurar dois problemas
+      // onde ha um.
+      if (efeito.nascimentoImplausivel && !comNascimentoPlaceholder.has(studentId)) {
         pendencias.push({ nome: registro.nome, motivo: 'nascimento implausivel' });
       }
 
