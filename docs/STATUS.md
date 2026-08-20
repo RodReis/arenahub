@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 19/08/2026 *(MVP 3: ADR-035 e ADR-036; o ADR-008 fechou por inteiro)*
+**Última atualização:** 19/08/2026 *(MVP 3: ADR-035, ADR-036 e ADR-037; o ADR-008 fechou por inteiro)*
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -120,6 +120,25 @@ As três emendas que os ADR-035/036 exigiam estavam paradas porque o ADR-021 fec
 para materializar decisão já registrada em ADR aceito, citando o ADR na emenda — requisito novo
 continua sendo do Code ou do PI. Regra no `CLAUDE.md`; a linha riscada e o porquê ficaram na
 **emenda ao ADR-021** (não virou ADR novo: processo não vira mais ADR desde 18/08).
+
+🧬 **19/08/2026 — contexto de saúde do aluno, e por que ele decide se o MVP 3 será usado ou
+abandonado (ADR-037).** O PI trouxe a ferramenta pessoal que usa para ler a própria bioimpedância,
+e a melhor parte dela não era o cálculo: era a lista de **fatores individuais** que mudam como o
+laudo deve ser lido. Sem isso, o produto erra de forma previsível — no laudo real de 03/08, com
+**69,7 kg de massa livre de gordura** contra a faixa do aparelho de **52,0–64,8**, *seis campos
+saem "acima" numa única medição* e nenhum significa o que o aparelho sugere. Ferramenta que
+dispara seis alertas falsos por avaliação é abandonada na terceira semana — e junto param de ser
+lidos os alertas verdadeiros.
+
+**Decidido:** lista **fechada** de fatores (`student_health_context`), cada um **suprimindo**
+alerta específico de forma determinística e testada, **sem nenhum campo de texto livre** — fator
+individual é dado sensível, e campo aberto no balcão vira depósito de informação médica sem
+finalidade no termo. Quem registra é o **avaliador**, não a recepção. **"Alerta clínico" sai do
+vocabulário do produto**: o que existe é *valor fora da faixa do equipamento*, e a dúvida vai para
+`questionsForProfessional`. **Exames laboratoriais ficam fora do MVP 3** — nem anexo, nem
+extração. Da ferramenta pessoal **não** vieram dieta, treino, suplementação nem recálculo de
+macros: lá é uma pessoa cuidando de si com o próprio médico; aqui seria a academia praticando ato
+clínico. `MVP-03` §6, §7 (Slices 3.1 e 3.5), §10 e §12 emendados.
 
 Aplicado no mesmo dia ao `MVP-03`: **§6** (ECG deixa de ser exclusão absoluta e ganha a fronteira
 de *citar sem interpretar*; o gate de protocolo clínico do §5 sai), **§12**

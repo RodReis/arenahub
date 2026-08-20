@@ -79,7 +79,11 @@ health_report.export
 - treinamento de modelo proprietário;
 - **interpretação de qualquer achado clínico vindo de equipamento do aluno** — inclusive
   reclassificar, normalizar para taxonomia própria, atribuir faixa de referência ou gerar texto
-  explicativo personalizado por achado.
+  explicativo personalizado por achado;
+- **exames laboratoriais** — nem anexo, nem extração, nem acompanhamento de tendência
+  ([ADR-037](../../DECISIONS.md#adr-037), 19/08/2026). Faixa de referência de exame varia por
+  laboratório, método e sexo, e lê-la é ato clínico bem mais claro que ler composição corporal.
+  Entra como fatia própria se o PI priorizar, com ADR novo.
 
 > **Emenda de 19/08/2026 — [ADR-035](../../DECISIONS.md#adr-035), decidida pelo PI.** Laudo de
 > **eletrocardiograma** (ECG) **deixa de ser exclusão absoluta** e passa a ser escopo, com uma
@@ -110,11 +114,35 @@ health_report.export
 - consentimento de saúde;
 - formulário versionado;
 - unidades canônicas e validações;
+- **contexto de saúde do aluno — lista fechada de fatores, registrada pelo avaliador**;
 - avaliação imutável após publicação;
 - correção por nova revisão vinculada;
 - auditoria.
 
 Aceite: avaliador registra e publica avaliação consistente sem substituir silenciosamente o histórico.
+
+> **Emenda de 19/08/2026 — [ADR-037](../../DECISIONS.md#adr-037).** O **contexto de saúde** é uma
+> lista fechada de fatores que mudam como o laudo deve ser lido, e **cada fator suprime um alerta
+> específico** — nenhum gera texto. **Não há campo de texto livre**: fator individual é dado de
+> saúde (art. 11), e campo aberto preenchido no balcão vira depósito de informação médica sem
+> finalidade declarada no termo.
+>
+> | fator | efeito determinístico |
+> |---|---|
+> | `suplementacao_creatina` | suprime alerta de água intracelular alta |
+> | `composicao_atipica` | suprime alertas de compartimento **absoluto** (água total, proteína, minerais, massa livre de gordura); **mantém** os de **razão** |
+> | `gestante_ou_pos_parto` | **bloqueia** a análise — a avaliação é registrada, não interpretada |
+> | `edema_relatado` | invalida a leitura de água; demais campos seguem |
+> | `uso_de_diuretico` | idem `edema_relatado` |
+> | `atleta_competitivo` | suprime comparação com faixa populacional; mantém comparação com o próprio histórico |
+>
+> **Por que isto existe:** no laudo real de 03/08/2026, com 69,7 kg de massa livre de gordura
+> contra a faixa do aparelho de 52,0–64,8 kg, **seis campos saem "acima" numa única medição** —
+> e nenhum significa o que o aparelho sugere. Produto que dispara seis alertas falsos por
+> avaliação é abandonado na terceira semana, e junto param de ser lidos os alertas verdadeiros.
+>
+> Fator novo entra por PR do Code **com o teste que prova o que ele suprime**. Sem teste, não
+> entra. Quem registra é o **avaliador**, com autor e versão — nunca a recepção.
 
 ### Slice 3.2 — Histórico e comparativos
 
@@ -149,6 +177,7 @@ Aceite: meta e frequência usam dados rastreáveis e deixam limitações explíc
 
 - `AIProvider` abstrato;
 - minimização e pseudonimização de entrada;
+- **fatores de contexto no snapshot, com o que cada um suprimiu** (ADR-037);
 - prompt versionado;
 - saída estruturada validada;
 - aviso de não diagnóstico;
@@ -209,6 +238,7 @@ assessment_revisions
 body_measurements
 segmental_measurements
 health_measurements
+student_health_context
 health_goals
 assessment_imports
 imported_fields
@@ -264,6 +294,11 @@ interface HealthAnalysisOutput {
   // ADR-035 — estado, não dado clínico. A IA sabe que há pendência; não sabe qual é.
   pendingMedicalReferral: boolean;
   pendingReferralSince: string | null;
+
+  // ADR-037 — o que a regra já suprimiu, para a análise não reintroduzir em prosa.
+  contextFactors: string[];
+  suppressedFindings: Array<{ metric: string; reason: string }>;
+  analysisBlocked: boolean;          // gestante_ou_pos_parto
 }
 ```
 
@@ -278,6 +313,20 @@ Texto livre é sanitizado e validado contra políticas antes de publicação.
 > totem. O tom muda; a existência do item, não. Suprimir um ponto de atenção no app porque a
 > linguagem ali é mais leve é omissão de dado de saúde ao titular (LGPD art. 18), não adaptação
 > de voz.
+
+> **Emenda de 19/08/2026 — [ADR-037](../../DECISIONS.md#adr-037).** Três campos novos, e uma
+> palavra que sai do vocabulário.
+>
+> `contextFactors` e `suppressedFindings` existem para a IA **não reintroduzir em prosa o alerta
+> que a regra determinística já tirou** — sem eles, o modelo lê "água intracelular 31,5 acima de
+> 30,4" e escreve o ponto de atenção que o fator `suplementacao_creatina` acabou de suprimir.
+> `analysisBlocked` cobre o caso em que a medição não é interpretável (gestação): a avaliação é
+> **registrada e não analisada**, e a tela diz isso.
+>
+> **"Alerta clínico" não existe neste produto.** O que existe é **valor fora da faixa do
+> equipamento** — o fato, com a faixa ao lado, sem conduta. A dúvida vai para
+> `questionsForProfessional`, que é onde ela tem dono. O nome governa o que o modelo gera:
+> *"alerta clínico"* convida a diagnosticar.
 
 ## 13. Eventos
 

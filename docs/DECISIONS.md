@@ -1993,3 +1993,73 @@ bloqueando.**
 **Continua aberto**, e não é ADR: a assinatura do DPA (decisão 3) e o número real de avaliações
 por mês. Nenhum dos dois impede começar F17–F20, que não chamam IA nenhuma.
 
+---
+
+<a id="adr-037"></a>
+## ADR-037 — Contexto de saúde do aluno: lista fechada que suprime alerta, não texto que gera texto
+
+**Data:** 19/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 19/08/2026**
+· **Emenda:** `MVP-03` §6, §7 (Slices 3.1 e 3.5), §10 e §12 · **Depende de:** ADR-035, ADR-036
+· **Condiciona:** F17 e F21
+
+**Contexto.** O PI mantém uma ferramenta pessoal de análise de bioimpedância, e a melhor parte
+dela não é o cálculo — é uma lista de **fatores individuais** que mudam como o laudo deve ser
+lido: usa creatina, massa muscular atípica, oscilação sazonal. Sem eles, a análise erra de forma
+previsível e grosseira.
+
+**O problema é real e mensurável no próprio dado que originou esta decisão.** Com **69,7 kg de
+massa livre de gordura** contra a faixa do aparelho de **52,0–64,8 kg**, praticamente todo
+compartimento sai "acima": água total, água intracelular, água extracelular, massa proteica,
+minerais. São **seis alarmes** num único laudo, e nenhum deles significa o que o aparelho sugere.
+No mesmo laudo, o `BMR` de 1.875 kcal é marcado "insuficiente" contra uma faixa calculada por
+outra fórmula (ADR-036).
+
+**Um produto que dispara seis alertas falsos por avaliação é abandonado na terceira semana.** O
+professor para de ler, e junto param de ser lidos os alertas verdadeiros. Isso não é risco
+teórico: é o modo de falha mais comum de ferramenta clínica assistiva.
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **Lista fechada de fatores**, tabela `student_health_context`. **Nenhum campo de texto livre** | Fator individual é dado de saúde (LGPD art. 11). Textarea preenchida pela recepção vira depósito de informação médica não estruturada, sem finalidade declarada no termo — o primeiro item que uma fiscalização abre. Lista fechada tem finalidade enumerável e cabe no consentimento |
+| 2 | **Cada fator SUPRIME alerta específico**; nenhum fator gera texto | Supressão é regra determinística, testável e reversível. Geração é prompt, e prompt não tem teste que falha |
+| 3 | **O fator viaja no snapshot**, para a análise saber o que já foi suprimido e por quê | Sem isso a IA reintroduz em prosa o alerta que a regra tirou |
+| 4 | **`gestante_ou_pos_parto` e `edema_relatado` bloqueiam ou invalidam a análise**, não apenas suprimem | Bioimpedância não é válida na gestação. Aqui o certo é não analisar, e dizer que não analisou |
+| 5 | **"Alerta clínico" não existe no vocabulário do produto.** O que existe é **`valorForaDaFaixaDoEquipamento`** | O nome governa o que o modelo gera. "Alerta clínico" convida a diagnosticar; a formulação neutra descreve o fato e manda a dúvida para `questionsForProfessional` |
+| 6 | **Quem preenche é o avaliador**, com `student_health_context.registered_by` e histórico versionado — nunca a recepção | É informação de saúde declarada, com consequência sobre o que o sistema mostra. Precisa de dono identificável |
+| 7 | **Exames laboratoriais ficam FORA do MVP 3** — nem anexo, nem extração | Faixa de referência de exame varia por laboratório, método e sexo; interpretá-la é ato clínico muito mais claro que ler composição corporal. Entra como fatia própria se o PI priorizar, com ADR novo |
+
+### Os fatores da lista inicial
+
+| fator | efeito determinístico |
+|---|---|
+| `suplementacao_creatina` | suprime alerta de **água intracelular** alta; anota o efeito conhecido sobre creatinina sérica caso exame entre no escopo um dia |
+| `composicao_atipica` | suprime alertas de **compartimento absoluto** (água total, proteína, minerais, massa livre de gordura). **Mantém** os de razão — ex. água extracelular / água total |
+| `gestante_ou_pos_parto` | **bloqueia** a análise; a avaliação é registrada, não interpretada |
+| `edema_relatado` | invalida leitura de **água**; os demais campos seguem |
+| `uso_de_diuretico` | idem `edema_relatado` |
+| `atleta_competitivo` | suprime comparação com **faixa populacional**; mantém comparação com o **próprio histórico** |
+
+A lista cresce por PR do Code, não por campo livre. Fator novo exige o teste que prova o que ele
+suprime — sem teste, não entra.
+
+### O que veio da ferramenta pessoal e o que ficou de fora
+
+**Copiado:** o conceito de fator individual; *"tendência é mais informativa que valor isolado"*;
+*"priorize o que mudou"*; *"não listar tudo que está normal — economia cognitiva"*; rastrear o
+encaminhamento enquanto estiver aberto; e a recusa a tom motivacional sem número atrás.
+
+**Deixado de fora, de propósito:** ajuste de **dieta, treino e suplementação**, recálculo de
+macros, e leitura de exame de sangue. Na ferramenta pessoal isso é uma pessoa cuidando de si, com
+o próprio médico. No produto seria a academia praticando ato clínico sem competência nem registro.
+**A diferença não é de rigor técnico — é de quem é o titular do dado e quem responde pelo
+conselho.** O `MVP-03` §6 já exclui prescrição de treino e dieta; esta decisão acrescenta os
+exames.
+
+### Risco assumido
+
+Lista fechada erra por omissão: um fator que ninguém previu não tem como ser registrado, e o
+alerta falso aparece. **É o erro certo a cometer** — falta um fator, adiciona-se um item com
+teste; sobra um campo livre, não há como recolher o dado de saúde que já foi digitado nele.
+
