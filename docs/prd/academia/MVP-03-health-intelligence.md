@@ -124,8 +124,8 @@ Aceite: avaliador registra e publica avaliação consistente sem substituir sile
 > **Emenda de 19/08/2026 — [ADR-037](../../DECISIONS.md#adr-037).** O **contexto de saúde** é uma
 > lista fechada de fatores que mudam como o laudo deve ser lido, e **cada fator suprime um alerta
 > específico** — nenhum gera texto. **Não há campo de texto livre**: fator individual é dado de
-> saúde (art. 11), e campo aberto preenchido no balcão vira depósito de informação médica sem
-> finalidade declarada no termo.
+> saúde (art. 11), e campo aberto preenchido no balcão vira depósito de informação médica com
+> finalidade impossível de enumerar.
 >
 > | fator | efeito determinístico |
 > |---|---|

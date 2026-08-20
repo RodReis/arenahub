@@ -402,9 +402,9 @@ identificação e autenticação.
   IA. Estava listado como bloqueio de F8 por engano: F8 não chama IA nenhuma.
 
   **Como fechou:** o PI decidiu em 19/08/2026 por **provedor externo com pseudonimização na
-  entrada** (snapshot numérico, sem nome, sem CPF, sem imagem) **mais DPA com cláusula explícita
-  de não-treinamento**, assinado antes da primeira chamada com dado real. Detalhe, modelos e
-  custo no **ADR-036**. **A F21 deixa de ter ADR bloqueando** — resta a assinatura do DPA, que é
+  entrada** (snapshot numérico, sem nome, sem CPF, sem imagem) **mais contrato com cláusula
+  explícita de não-treinamento**, firmado antes da primeira chamada com dado real. Detalhe, modelos e
+  custo no **ADR-036**. **A F21 deixa de ter ADR bloqueando** — resta firmar o contrato, que é
   ato de terceiro, não decisão pendente.
 
   ⚠️ **O que este fechamento não cobre:** achado cardíaco. O **ADR-035** mantém o ECG **fora** do
@@ -1949,7 +1949,7 @@ não ter.
 |---|---|---|
 | 1 | **Duas chamadas, dois modelos.** `claude-haiku-4-5` na **extração** dos campos do laudo; `claude-sonnet-4-6` na **análise** | São tarefas diferentes. Extração é mecânica, alto volume, e tem conferência humana campo a campo depois (Slice 3.3) — modelo barato serve. Análise escreve texto que o aluno lê e o avaliador usa; ali trocar 39,8 por 38,9 é o erro que não pode acontecer |
 | 2 | **Provedor externo, com pseudonimização na entrada** — snapshot numérico, sem nome, sem CPF, sem imagem, sem identificador direto | §15 do `MVP-03`. É o que torna a transferência internacional defensável em vez de apenas declarada |
-| 3 | **DPA com cláusula explícita de não-treinamento, assinado antes da primeira chamada com dado real** | §15 exige contrato explícito. É o único item desta decisão que não é código e depende de terceiro — **começar por ele** |
+| 3 | **Contrato com o provedor proibindo uso dos dados para treinamento**, firmado antes da primeira chamada com dado real | §15 do `MVP-03` já exige contrato explícito. É o único item desta decisão que não é código e depende de terceiro |
 | 4 | **Teto de gasto por tenant, com degradação para modo manual** | O `M3-NFR-005` já pede *timeout, orçamento e circuit breaker*. "Orçamento" é literalmente isto: estourou o teto, a análise desliga e a avaliação manual continua funcionando (`M3-NFR-004`), em vez de faturar sem limite |
 | 5 | **A troca de modelo é `useClass` no módulo, não reescrita** | Mesmo padrão que a F13 usou com `PaymentProvider`. Se o Sonnet se mostrar caro demais ou fraco demais com dado real, troca-se sem tocar em regra de domínio |
 
@@ -1983,6 +1983,34 @@ teto é várias vezes maior. **Puxar o número real antes de fixar o teto da dec
   subestima a análise em ~2×. Foi o erro da primeira estimativa desta conversa, corrigido aqui.
 - Contexto do Haiku 4.5 é **200K**, não 1M. Dois laudos cabem com folga; um lote grande, não.
 
+### Retificação de 20/08/2026 — a base legal, e o que de fato exige aceite
+
+Este ADR foi escrito assumindo que **todo** o tratamento de dado de saúde do MVP 3 dependia de
+consentimento novo. **Está errado, e o erro é do Cowork:** ele aplicou a este MVP a régua do
+ADR-008, que é de biometria.
+
+**Não é o mesmo caso.** Biometria facial a academia **não coletava** antes do ArenaHub — tratamento
+novo, do zero, consentimento destacado. **Composição corporal a Arena Positiva já coleta há anos**,
+com aparelho próprio, como serviço contratado; o catálogo da F12 **vende** bioimpedância a cada
+30 dias (adultos) e 60 (clínica). Registrar isso no ArenaHub em vez de no papel ou no Pacto é
+**troca de meio de registro, não início de tratamento** — exatamente o raciocínio da **decisão 10
+do ADR-034** para os 1.618 CPFs importados.
+
+**O que sobra, e é só isto:** enviar os números a um **terceiro, fora do Brasil**, é o único ato
+que a academia não praticava antes. Ele não muda a natureza do registro; muda para onde o dado
+vai. Logo:
+
+- **F17, F18, F19, F20 e F22 não dependem de aceite novo.** A base é o contrato de matrícula, se
+  a avaliação física constar como serviço — o que num plano que vende bioimpedância periódica é
+  quase certo. **Conferir o contrato substitui redigir documento.**
+- **O aceite específico é da F21**, e cobre a saída dos dados, não o registro. Recusá-lo deixa o
+  aluno com avaliação, histórico, comparativos e metas — tudo, menos o texto gerado.
+- **O ECG não precisa de aceite próprio:** quem anexa é o aluno, ou o avaliador com o arquivo que
+  o aluno trouxe. O ato de anexar é o aceite, e o ADR-035 garante que o sistema só guarda e repete.
+
+**Consequência prática:** nenhuma trava de LGPD segura o desenvolvimento nem a operação das
+fatias do MVP 3 com aluno real, exceto o aceite da F21.
+
 ### O que isto fecha, e o que continua aberto
 
 **Fecha** o item que restava do **ADR-008** — *"transferência internacional de dado sensível, se o
@@ -1990,7 +2018,7 @@ provedor de IA de saúde estiver fora do Brasil"* — pela combinação das deci
 pseudonimização na entrada mais contrato com não-treinamento. **A F21 deixa de ter ADR
 bloqueando.**
 
-**Continua aberto**, e não é ADR: a assinatura do DPA (decisão 3) e o número real de avaliações
+**Continua aberto**, e não é ADR: o contrato da decisão 3 e o número real de avaliações
 por mês. Nenhum dos dois impede começar F17–F20, que não chamam IA nenhuma.
 
 ---
@@ -2022,7 +2050,7 @@ teórico: é o modo de falha mais comum de ferramenta clínica assistiva.
 
 | # | decisão | por quê |
 |---|---|---|
-| 1 | **Lista fechada de fatores**, tabela `student_health_context`. **Nenhum campo de texto livre** | Fator individual é dado de saúde (LGPD art. 11). Textarea preenchida pela recepção vira depósito de informação médica não estruturada, sem finalidade declarada no termo — o primeiro item que uma fiscalização abre. Lista fechada tem finalidade enumerável e cabe no consentimento |
+| 1 | **Lista fechada de fatores**, tabela `student_health_context`. **Nenhum campo de texto livre** | Fator individual é dado de saúde (LGPD art. 11). Textarea preenchida pela recepção vira depósito de informação médica não estruturada, com finalidade impossível de enumerar. Lista fechada tem finalidade enumerável e comportamento previsível |
 | 2 | **Cada fator SUPRIME alerta específico**; nenhum fator gera texto | Supressão é regra determinística, testável e reversível. Geração é prompt, e prompt não tem teste que falha |
 | 3 | **O fator viaja no snapshot**, para a análise saber o que já foi suprimido e por quê | Sem isso a IA reintroduz em prosa o alerta que a regra tirou |
 | 4 | **`gestante_ou_pos_parto` e `edema_relatado` bloqueiam ou invalidam a análise**, não apenas suprimem | Bioimpedância não é válida na gestação. Aqui o certo é não analisar, e dizer que não analisou |

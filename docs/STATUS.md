@@ -109,7 +109,7 @@ atrial`: entra no produto como anexo e citação literal, **nunca interpretado**
 payload da IA** — só um booleano de pendência viaja (**ADR-035**). O gate de *protocolo clínico*
 do `MVP-03` §5 foi recusado pelo PI e substituído por essa linha. **(3)** IA decidida:
 `claude-haiku-4-5` na extração, `claude-sonnet-4-6` na análise, provedor externo com
-pseudonimização e DPA de não-treinamento — **fecha o ponto remanescente do ADR-008 e destrava a
+pseudonimização e contrato de não-treinamento — **fecha o ponto remanescente do ADR-008 e destrava a
 F21** (**ADR-036**). **(4)** Custo estimado em **~US$ 28/mês** para 300 avaliações; o "300" é
 premissa, não dado — o número real tende ao total de alunos com o benefício, e o catálogo da F12
 dá bioimpedância a cada 30/60 dias.
@@ -140,26 +140,30 @@ extração. Da ferramenta pessoal **não** vieram dieta, treino, suplementação
 macros: lá é uma pessoa cuidando de si com o próprio médico; aqui seria a academia praticando ato
 clínico. `MVP-03` §6, §7 (Slices 3.1 e 3.5), §10 e §12 emendados.
 
-📄 **19/08/2026 — os dois rascunhos que destravam a F17 estão escritos, e nenhum está aprovado.**
-`docs/operations/health-intelligence/` recebeu o **termo de consentimento de saúde** e a
-**política de retenção e correção**. Ambos marcados 🔴 **RASCUNHO**: existem para encurtar a
-revisão jurídica, não para substituí-la — quem escreveu não é advogado, e **nenhum dos dois pode
-ser mostrado a aluno**.
+✅ **20/08/2026 — RETIFICAÇÃO: a F17 não espera consentimento nenhum, e o Cowork errou a régua.**
+O Cowork vinha tratando composição corporal como tratou biometria no ADR-008 — e **não são o mesmo
+caso**. Biometria facial a academia **não coletava** antes do ArenaHub: era tratamento novo, do
+zero, e por isso exigiu consentimento destacado. **Peso, gordura e medidas a Arena Positiva já
+coleta há anos**, com aparelho próprio, como parte do serviço que o aluno contratou — o plano
+inclusive **vende** bioimpedância a cada 30/60 dias (catálogo da F12). Trocar o papel ou o Pacto
+pelo ArenaHub é **mudança de meio de registro, não início de tratamento**.
 
-O que o PI precisa decidir antes de mandar ao advogado: **(1)** consentimento único ou **dois
-separados** — o rascunho propõe separar *avaliação de saúde* de *análise por IA*, porque amarrar
-as duas torna o consentimento menos livre, que foi o fundamento nº 1 da suspensão da ANPD no caso
-do PR; **(2)** se a transferência internacional entra como aceite do titular ou como cláusula
-contratual do DPA (art. 33 admite os dois); **(3)** se a F17 reusa o mecanismo de responsável
-legal da F8, incluindo o reconsentimento na virada dos 18; **(4)** os nove prazos de retenção; e
-**(5)** se a série temporal é eliminada ou anonimizada na revogação — com o alerta de que
-anonimizar série individual é frágil, porque data de nascimento mais sequência de medições
-reidentifica.
+O raciocínio já estava no repositório: **ADR-034 decisão 10** usou exatamente isto para os 1.618
+CPFs da base Pacto — *o vínculo contratual já existia, o dado migra junto com o vínculo, para a
+mesma finalidade, sem mudança de finalidade que exigisse novo consentimento*. Avaliação física é
+o mesmo caso.
 
-O princípio que orientou os prazos: **biometria é substituível, histórico corporal não é.** Por
-isso o ECG tem prazo **mais curto** que os demais arquivos (maior potencial de dano, menor uso
-legítimo — o ArenaHub não o interpreta), enquanto consentimento e log de acesso duram **mais** que
-o dado que autorizaram: são a prova de que o tratamento era lícito enquanto durou.
+**O que muda:** **F17 sem trava** — o avaliador que mede hoje pode medir no ArenaHub, com aluno
+real. **O único ato genuinamente novo é enviar os números a um terceiro fora do Brasil**, o que a
+academia não fazia com caderno nem com o Pacto. Esse aceite é **da F21**, não da F17, e recusá-lo
+deixa o aluno com avaliação, histórico, gráficos, comparativos e metas — tudo menos o texto
+gerado. **O ECG se resolve sozinho:** quem anexa é o aluno ou o avaliador com o arquivo que o
+aluno trouxe, e o ADR-035 garante que o sistema só guarda e repete.
+
+**Ação barata que fecha o assunto:** conferir se avaliação física consta como serviço no contrato
+de matrícula da Arena Positiva. Se consta — e num plano que vende bioimpedância periódica quase
+certamente consta — a base legal do registro **já existe e já está assinada**. Não há documento a
+criar; há documento a apontar.
 
 Aplicado no mesmo dia ao `MVP-03`: **§6** (ECG deixa de ser exclusão absoluta e ganha a fronteira
 de *citar sem interpretar*; o gate de protocolo clínico do §5 sai), **§12**
@@ -523,7 +527,7 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 
 | ADR | o que falta | bloqueia |
 |---|---|---|
-| ~~**ADR-008**~~ *(ponto remanescente)* | ✅ **FECHADO em 19/08/2026 pelo ADR-036.** Transferência internacional resolvida por **pseudonimização na entrada + DPA com não-treinamento**; modelos decididos (`claude-haiku-4-5` na extração, `claude-sonnet-4-6` na análise). **A F21 deixa de ter ADR bloqueando** — resta assinar o DPA, que é ato de terceiro. O escopo do ECG saiu no ADR-035: guardar e citar sim, interpretar não | ~~F21~~ → **—** |
+| ~~**ADR-008**~~ *(ponto remanescente)* | ✅ **FECHADO em 19/08/2026 pelo ADR-036.** Transferência internacional resolvida por **pseudonimização na entrada + contrato de não-treinamento**; modelos decididos (`claude-haiku-4-5` na extração, `claude-sonnet-4-6` na análise). **A F21 deixa de ter ADR bloqueando** — resta firmar o contrato, que é ato de terceiro. O escopo do ECG saiu no ADR-035: guardar e citar sim, interpretar não | ~~F21~~ → **—** |
 | **ADR-013** | ✅ **fechado**; as duas políticas do `M2-COMPLIANCE-01` que restavam foram decididas pelo PI em 19/08/2026 e implementadas na F16. **Nada mais bloqueia o MVP 2.** Histórico: fechado em 19/08/2026 pelo ADR-032: **Sicoob para PIX, Getnet (Santander) para cartão**. O card `[GATE]` nunca chegou a existir no board, e o que faltava não era matriz — era o fato de que **a academia já recebe pela Sicoob**. Restam abertas só as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites), que bloqueiam **F16**, não F14 | ~~F14–F16~~ → **F16** |
 | ~~**ADR-027**~~ | **FECHADO em 18/08/2026.** Modelo de `Payment`/`PaymentAttempt` decidido e `MVP-02` §7/§11 emendados. **F12 sem ADR bloqueando** — faltam a spec preenchida e a entrada do MVP 2 | — |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
