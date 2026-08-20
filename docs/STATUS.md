@@ -387,7 +387,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 |---|---|---|---|
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **29** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **2** — [F2](https://github.com/RodReis/arenahub/issues/2) e [F10](https://github.com/RodReis/arenahub/issues/10) |
+| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e [F17](https://github.com/RodReis/arenahub/issues/17) |
 | Feito | `proplan:done` | PR mergeado com CI verde | **4** — [F14](https://github.com/RodReis/arenahub/issues/14), [F15](https://github.com/RodReis/arenahub/issues/15), [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **31** |
 
@@ -631,7 +631,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F14 | SPEC-014 | 2 | 2.3 | Cartão e recorrência | [`SPEC-014-cartao-e-recorrencia.md`](specs/SPEC-014-cartao-e-recorrencia.md) | [#14](https://github.com/RodReis/arenahub/issues/14) | ✅ **entregue** em 19/08/2026 ([#117](https://github.com/RodReis/arenahub/pull/117)) |
 | F15 | SPEC-015 | 2 | 2.4 | Inadimplência e acesso | [`SPEC-015-inadimplencia-e-acesso.md`](specs/SPEC-015-inadimplencia-e-acesso.md) | [#15](https://github.com/RodReis/arenahub/issues/15) | ✅ **entregue** em 19/08/2026 |
 | F16 | SPEC-016 | 2 | 2.5 | Estorno, conciliação e operação | [`SPEC-016-estorno-conciliacao-e-operacao.md`](specs/SPEC-016-estorno-conciliacao-e-operacao.md) | [#16](https://github.com/RodReis/arenahub/issues/16) | ✅ **entregue** em 19/08/2026 |
-| F17 | SPEC-017 | 3 | 3.1 | Consentimento e avaliação manual | [`SPEC-017-consentimento-e-avaliacao-manual.md`](specs/SPEC-017-consentimento-e-avaliacao-manual.md) | [#17](https://github.com/RodReis/arenahub/issues/17) | planejada |
+| F17 | SPEC-017 | 3 | 3.1 | Consentimento e avaliação manual | [`SPEC-017-consentimento-e-avaliacao-manual.md`](specs/SPEC-017-consentimento-e-avaliacao-manual.md) | [#17](https://github.com/RodReis/arenahub/issues/17) | ✅ **entregue** em 20/08/2026 |
 | F18 | SPEC-018 | 3 | 3.2 | Histórico e comparativos | [`SPEC-018-historico-e-comparativos.md`](specs/SPEC-018-historico-e-comparativos.md) | [#18](https://github.com/RodReis/arenahub/issues/18) | planejada |
 | F19 | SPEC-019 | 3 | 3.3 | Upload e revisão | [`SPEC-019-upload-e-revisao.md`](specs/SPEC-019-upload-e-revisao.md) | [#19](https://github.com/RodReis/arenahub/issues/19) | planejada |
 | F20 | SPEC-020 | 3 | 3.4 | Metas e frequência | [`SPEC-020-metas-e-frequencia.md`](specs/SPEC-020-metas-e-frequencia.md) | [#20](https://github.com/RodReis/arenahub/issues/20) | planejada |

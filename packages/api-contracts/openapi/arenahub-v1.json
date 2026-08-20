@@ -1586,6 +1586,217 @@
           "Operations"
         ]
       }
+    },
+    "/api/v1/students/{id}/assessments": {
+      "get": {
+        "operationId": "AssessmentController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Assessment"
+        ]
+      },
+      "post": {
+        "operationId": "AssessmentController_criar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Assessment"
+        ]
+      }
+    },
+    "/api/v1/assessments/{id}": {
+      "get": {
+        "operationId": "AssessmentController_consultar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Assessment"
+        ]
+      }
+    },
+    "/api/v1/assessments/{id}/draft": {
+      "patch": {
+        "operationId": "AssessmentController_editarRascunho",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Assessment"
+        ]
+      }
+    },
+    "/api/v1/assessments/{id}/publish": {
+      "post": {
+        "operationId": "AssessmentController_publicar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Assessment"
+        ]
+      }
+    },
+    "/api/v1/assessments/{id}/corrections": {
+      "post": {
+        "operationId": "AssessmentController_corrigir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Assessment"
+        ]
+      }
+    },
+    "/api/v1/students/{id}/health-context": {
+      "get": {
+        "operationId": "AssessmentController_consultarContexto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Assessment"
+        ]
+      },
+      "post": {
+        "operationId": "AssessmentController_ativarFator",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Assessment"
+        ]
+      }
+    },
+    "/api/v1/students/{id}/health-context/{factor}": {
+      "delete": {
+        "operationId": "AssessmentController_desativarFator",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "factor",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Assessment"
+        ]
+      }
     }
   },
   "info": {
