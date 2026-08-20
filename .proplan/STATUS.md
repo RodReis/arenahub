@@ -57,6 +57,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][F51] ID da catraca no lugar da matricula na lista de alunos (#136, finalizado em: 2026-08-20)
 - [MVP1][F50] Ajustes na tela de Alunos: busca automatica, botao Liberar e logo do WhatsApp (#134, finalizado em: 2026-08-20)
 - [MVP1][F48] Ativacao da base corrente do Pacto (~340 ativos) (#130, finalizado em: 2026-08-20)
 - [MVP1][F49] Cadastro de quem o arquivo traz e o cadastro nao tem (49 pessoas) (#132, finalizado em: 2026-08-20)
