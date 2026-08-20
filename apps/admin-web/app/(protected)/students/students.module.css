@@ -35,14 +35,6 @@
 }
 
 /*
- * O botao nao estica junto: um "Filtrar" de 400px pareceria a acao principal
- * da tela, que e ler a tabela.
- */
-.filtro > button {
-  flex: 0 0 auto;
-}
-
-/*
  * `.matricula`, `.identificacao`, `.nome` e `.documento` SAIRAM.
  *
  * Nao foram removidas por estarem sem uso: foram removidas porque o padrao de
@@ -52,33 +44,10 @@
  * sistema -- a proxima tela copiaria a classe local e a tabela voltaria a ter
  * duas linguagens.
  *
- * `.consequencia` FICA: o `Consequencia` do design system cobre o padrao, mas
- * esta tela ainda usa a classe local, e troca-la e mudanca de comportamento
- * fora do escopo desta migracao.
+ * `.consequencia` SAIU na issue #118: o aviso "sem acesso a catraca" foi
+ * removido a pedido do PI. O botao "Liberar" (`.liberar`, mais abaixo) cobre
+ * o mesmo caso -- bloqueado por atraso -- com uma acao, nao so um aviso.
  */
-
-/**
- * A CONSEQUENCIA CARREGA O TOM DO PROBLEMA, e nao o cinza de legenda.
- *
- * "sem acesso a catraca" e a resposta a pergunta que traz a recepcao a esta
- * tela: *por que ele nao passou?* (PRODUCT.md, principio 1 -- a excecao e o
- * caso principal). Medido antes: cor `#565E69`, 12 px, peso 400 -- os
- * MESMOS tres valores da legenda "Alunos, do cadastro mais recente" e do
- * aviso sobre busca por CPF. Passava em contraste (6.56) e ainda assim
- * desaparecia, porque contraste diz se da para LER, nao se da para ACHAR.
- *
- * `--ah-state-danger` e nao accent: e ESTADO, e accent em badge de maquina
- * de estado e erro de lint (regra 3). Peso 500 em vez de 600 porque ela
- * acompanha o badge, nao compete com ele.
- */
-.consequencia {
-  margin-left: 8px;
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
-  font-weight: 500;
-  color: var(--ah-state-danger);
-  white-space: nowrap;
-}
 
 /**
  * O aviso da busca por CPF fica DISCRETO e ancorado ao campo.

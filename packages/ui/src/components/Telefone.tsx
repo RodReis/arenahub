@@ -1,5 +1,5 @@
 import { Ausente } from './Ausente.js';
-import { Icon } from './Icon.js';
+import { IconeWhatsApp } from './IconeWhatsApp.js';
 import estilos from './Telefone.module.css';
 
 interface Props {
@@ -62,7 +62,7 @@ export function Telefone({ numero, mensagem, testId }: Props) {
       title={`Conversar com ${legivel} no WhatsApp`}
       {...(testId !== undefined ? { 'data-testid': testId } : {})}
     >
-      <Icon name="message-circle" />
+      <IconeWhatsApp />
       <span className={estilos['numero']}>{legivel}</span>
     </a>
   );

@@ -366,3 +366,69 @@ export async function alterarSituacao(
     sucesso: { status: resposta.dados.status, version: resposta.dados.version },
   };
 }
+
+/**
+ * Liberação financeira em um clique — issue #118, botão na grade de Alunos.
+ *
+ * NÃO é o override da F9 (`liberarAcessoManual`): aquele abre a catraca
+ * fisicamente, exige unidade, dispositivo e motivo de 10+ caracteres. Este é
+ * `billing/financial-overrides` (Slice 2.4) — libera por PRAZO, prazo padrão
+ * de 3 dias já decidido pelo PI (`DIAS_PADRAO_DE_LIBERACAO`), sem tocar
+ * entitlement nem invoice. Regra de arquitetura nº 1 continua valendo.
+ *
+ * O motivo é fixo: a grade de Alunos não sabe qual invoice está em atraso
+ * (isso é cálculo de `billing/delinquency`), então não há dado real para
+ * compor um motivo mais específico sem uma segunda chamada.
+ */
+const esquemaDeLiberacaoFinanceira = z.object({
+  studentId: z.string().uuid(),
+});
+
+const MOTIVO_DA_LIBERACAO_RAPIDA =
+  'Liberação rápida pela recepção — tolerância de pagamento';
+
+export interface EstadoDaLiberacaoFinanceira {
+  erro?: string;
+  sucesso?: { studentId: string; expiresAt: string };
+}
+
+const MENSAGEM_DA_LIBERACAO: Record<string, string> = {
+  STUDENT_NOT_FOUND: 'Aluno não encontrado nesta academia.',
+  FORBIDDEN: 'Seu perfil não tem permissão para liberar financeiramente.',
+};
+
+export async function liberarFinanceiramente(
+  _anterior: EstadoDaLiberacaoFinanceira,
+  formulario: FormData,
+): Promise<EstadoDaLiberacaoFinanceira> {
+  const validado = esquemaDeLiberacaoFinanceira.safeParse({
+    studentId: texto(formulario, 'studentId'),
+  });
+
+  if (!validado.success) {
+    return { erro: 'Aluno inválido.' };
+  }
+
+  const resposta = await chamarApi<{ id: string; studentId: string; expiresAt: string }>(
+    '/api/v1/billing/financial-overrides',
+    {
+      metodo: 'POST',
+      corpo: {
+        studentId: validado.data.studentId,
+        reason: MOTIVO_DA_LIBERACAO_RAPIDA,
+      },
+    },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro: MENSAGEM_DA_LIBERACAO[resposta.erro?.code ?? ''] ?? 'Não foi possível liberar o aluno.',
+    };
+  }
+
+  revalidatePath('/students');
+
+  return {
+    sucesso: { studentId: resposta.dados.studentId, expiresAt: resposta.dados.expiresAt },
+  };
+}
