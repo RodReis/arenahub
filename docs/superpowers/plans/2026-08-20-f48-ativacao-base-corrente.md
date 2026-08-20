@@ -1199,11 +1199,11 @@ describe('importacao da base ativa (F48)', () => {
 
   it('casa por CPF mesmo com o nome escrito diferente do banco', async () => {
     const aluno = await criarAlunoCancelado({
-      nome: 'ZOETE LOPES DE SOUZA',
-      cpf: '02721337106',
+      nome: 'ZORAIDE LOPES INVENTADA',
+      cpf: '11144477735',
     });
 
-    await importar([registroDe(aluno, { nome: 'Zoete Lopes de Souza ' })]);
+    await importar([registroDe(aluno, { nome: 'Zoraide Lopes Inventada ' })]);
 
     const atualizado = await db.student.findUniqueOrThrow({ where: { id: aluno.id } });
     expect(atualizado.status).toBe('ACTIVE');

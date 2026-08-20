@@ -258,10 +258,10 @@ só diz "sucesso" é como esses registros viraram lixo no Pacto.
 
 ### Pendências previstas
 
-- **Duplicatas:** "Luiz Felipe Silva Costa" (cartões 971 e 972, mesmo CPF
-  `70217337120`); "Wagnusia/Wagnuzia Silva Cardoso Moreira" (727 e 1335)
-- **CPF trocado entre linhas:** "Bruna Barbara Militao Vieira" aparece 2× com CPF e
-  celular invertidos entre si (`06290375741`/`21983331634`)
+- **Duplicatas:** uma pessoa aparece 2× com dois cartões diferentes e o mesmo CPF;
+  outra, 2× com o sobrenome grafado de dois jeitos (uma letra de diferença)
+- **CPF trocado entre linhas:** uma pessoa aparece 2× com CPF e celular invertidos
+  entre si — o valor do documento numa linha é o do telefone na outra
 - **Nascimento impossível:** 5 registros com data em 2026/2022
 - **~40 sem CPF:** resolvidos por nome único, ou pendência
 - **Perfil STUDENT sem período**
