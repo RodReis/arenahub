@@ -296,16 +296,26 @@ describe('F17 -- avaliacao fisica manual', () => {
       expect(depois.publishedAt?.toISOString()).toBe(antes.publishedAt?.toISOString());
     });
 
-    it('editar e publicar em paralelo nao altera a publicada (INV-102)', async () => {
-      // A REGRESSAO QUE ESTE TESTE EXISTE PARA IMPEDIR, medida antes do
-      // conserto: 25/25 avaliacoes PUBLICADAS terminavam com o valor da
-      // edicao concorrente. As medidas moram em outra tabela, entao o
-      // `deleteMany`/`createMany` nao colide com o `UPDATE` da avaliacao --
-      // em READ COMMITTED nada serializava as duas transacoes.
+    it('editar e publicar em paralelo: o par (status, valor) nunca e incoerente (INV-102)', async () => {
+      // ESTE TESTE JA ESTEVE ERRADO, e o CI foi quem mostrou. A primeira
+      // versao reprovava qualquer `PUBLISHED` com o valor da edicao -- e
+      // essa combinacao tem DUAS causas, so uma delas defeito:
       //
-      // Repete porque a janela e estreita: uma passada so pode nao pegar.
+      //   ordem A (legitima)  edicao commita ENQUANTO e rascunho, publicar
+      //                       vem depois e congela 99.9. Ninguem violou nada.
+      //   ordem B (o defeito) publicar commita, e a edicao passa DEPOIS.
+      //
+      // Provado no banco com duas sessoes psql: na ordem A as duas transacoes
+      // leem `DRAFT` -- as duas corretamente -- e o resultado e PUBLISHED com
+      // 99.9. A maquina do CI, mais lenta, produz a ordem A que a minha nao
+      // produzia: 1/10 la, 0/25 aqui.
+      //
+      // O que o INV-102 exige nao e "publicada nunca tem 99.9". E: **depois
+      // de publicada, nada muda**. Entao o que se mede aqui e coerencia --
+      // a edicao ou foi recusada, ou entrou antes da publicacao -- e o teste
+      // seguinte prova a metade sequencial, que e determinista.
       const aluno = await criarAluno(contas.a);
-      let vazou = 0;
+      let incoerentes = 0;
 
       for (let i = 0; i < 10; i += 1) {
         const rascunho = await criarRascunho(contas.a, aluno, [
@@ -313,7 +323,7 @@ describe('F17 -- avaliacao fisica manual', () => {
         ]);
         const id = (rascunho.body as { id: string }).id;
 
-        await Promise.allSettled([
+        const [publicacao, edicao] = await Promise.all([
           publicar(contas.a, id),
           request(servidor())
             .patch(`/api/v1/assessments/${id}/draft`)
@@ -327,13 +337,60 @@ describe('F17 -- avaliacao fisica manual', () => {
         });
 
         const peso = final.measurements.find((medida) => medida.type === 'WEIGHT');
+        const valor = peso?.canonicalValue.toNumber();
 
-        if (final.status === 'PUBLISHED' && peso?.canonicalValue.toNumber() === 99.9) {
-          vazou += 1;
+        // A INCOERENCIA que denuncia o defeito: a edicao foi ACEITA (200) e
+        // mesmo assim a avaliacao terminou publicada com o valor dela. Isso
+        // so acontece se a edicao passou DEPOIS da publicacao -- que e
+        // exatamente o que a trava impede.
+        const edicaoAceita = edicao.status === 200;
+        const publicouComValorDaEdicao =
+          final.status === 'PUBLISHED' && valor === 99.9;
+
+        if (edicaoAceita && publicouComValorDaEdicao && publicacao.status === 201) {
+          // Ordem A tambem cai aqui, entao confirma pelo instante: edicao
+          // legitima acontece ANTES do carimbo de publicacao.
+          const medida = peso;
+
+          if (
+            medida &&
+            final.publishedAt &&
+            medida.createdAt.getTime() > final.publishedAt.getTime()
+          ) {
+            incoerentes += 1;
+          }
         }
+
+        // Invariante que vale em TODA ordem: publicada tem carimbo, rascunho nao.
+        expect(final.status === 'PUBLISHED').toBe(final.publishedAt !== null);
       }
 
-      expect(vazou).toBe(0);
+      expect(incoerentes).toBe(0);
+    });
+
+    it('editar DEPOIS de publicada e sempre recusado, e o valor nao muda (INV-102)', async () => {
+      // A metade determinista, e a que de fato prova o invariante: uma vez
+      // publicada, a rota de rascunho recusa e o numero permanece.
+      const aluno = await criarAluno(contas.a);
+
+      for (let i = 0; i < 5; i += 1) {
+        const id = await publicada(contas.a, aluno, [
+          { type: 'WEIGHT', value: 69.7, unit: 'kg' },
+        ]);
+
+        const edicao = await request(servidor())
+          .patch(`/api/v1/assessments/${id}/draft`)
+          .set('Cookie', contas.a.cookie)
+          .send({ measurements: [{ type: 'WEIGHT', value: 99.9, unit: 'kg' }] });
+
+        expect(edicao.status).toBe(409);
+
+        const peso = await db.bodyMeasurement.findFirstOrThrow({
+          where: { assessmentId: id, type: 'WEIGHT' },
+        });
+
+        expect(peso.canonicalValue.toNumber()).toBeCloseTo(69.7, 4);
+      }
     });
 
     it('recusa publicar rascunho sem medida', async () => {
