@@ -9,6 +9,7 @@ updated: 2026-08-20
 
 ### Sem épico
 
+- [MVP1][FIX] eixo de dayOfWeek divergente entre gravacao e motor nega acesso aos domingos (#129)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
@@ -56,6 +57,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][F48] Ativacao da base corrente do Pacto (~340 ativos) (#130, finalizado em: 2026-08-20)
+- [MVP1][F49] Cadastro de quem o arquivo traz e o cadastro nao tem (49 pessoas) (#132, finalizado em: 2026-08-20)
 - [MVP3][SPEC-017][F17] Consentimento e avaliação manual (#17, finalizado em: 2026-08-20)
 - [INFRA] TESTS.md: historico append-only por entrega com cobertura real (#125, finalizado em: 2026-08-20)
 - [INFRA] CPF em claro: gravar completo e exibir sem mascara (#122, finalizado em: 2026-08-20)
