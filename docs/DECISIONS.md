@@ -895,8 +895,35 @@ virar ADR em vez de exceção. Este é o ADR.
 | `CLAUDE.md` | as regras do trio |
 
 **O Cowork continua sem poder escrever:** qualquer coisa em `apps/`, `packages/`, `infra/`,
-`.github/`, `docs/prd/**` e `docs/superpowers/**`. Ou seja: **código, configuração de build, CI e
+`.github/`, ~~`docs/prd/**`~~ e `docs/superpowers/**`. Ou seja: **código, configuração de build, CI e
 os PRDs aprovados.** PRD só muda por emenda que o PI aprova explicitamente.
+
+> ### Emenda de 19/08/2026 — o Cowork passa a escrever emenda de PRD
+>
+> **Autorizado pelo PI em 19/08/2026.** Não virou ADR novo: desde o corte de 18/08 o `CLAUDE.md`
+> diz que **decisão sobre o próprio processo não vira ADR** — muda-se o arquivo. Fica registrado
+> aqui porque a linha riscada acima estava neste ADR, e deixá-la de pé criaria duas verdades.
+>
+> **O que mudou.** O Cowork escreve em `docs/prd/**` **apenas** para materializar decisão do PI
+> **já registrada em ADR aceito**, citando o ADR dentro da própria emenda. Requisito novo, escopo
+> novo, ou comportamento que não venha de um ADR: continua sendo do Code ou do PI.
+>
+> **Por que.** A regra original protegia contra o Cowork inventar escopo de produto — risco real.
+> Mas ela também impedia o Cowork de **transcrever** para o PRD uma decisão que o próprio PI já
+> tinha tomado e que o próprio Cowork já tinha escrito no ADR. O efeito prático em 19/08 foi um
+> ADR-035 correto no `DECISIONS.md` e um `MVP-03` §6 dizendo o **oposto** dele, com a
+> reconciliação virando tarefa de outro agente. Documento que contradiz documento é o defeito que
+> o ADR-022 e o ADR-018 já tentaram matar duas vezes.
+>
+> **A cláusula "PRD só muda por emenda que o PI aprova explicitamente" não se moveu** — o que
+> mudou é quem digita. O ADR aceito **é** a aprovação explícita; sem ele, o Cowork não escreve
+> uma linha lá.
+>
+> **Risco assumido.** Se um ADR estiver mal escrito, o erro agora se propaga para o PRD sem
+> passar por revisão do Code. Mitigação: toda emenda cita o ADR de origem, então o caminho de
+> volta é um `grep` — e reverter documento é barato.
+>
+> Primeira aplicação: `MVP-03` §6, §12 e §16 (ADR-035 e ADR-036), em 19/08/2026.
 
 **O que a decisão não afrouxa — e é o ponto.**
 

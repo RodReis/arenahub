@@ -114,11 +114,19 @@ F21** (**ADR-036**). **(4)** Custo estimado em **~US$ 28/mês** para 300 avalia�
 premissa, não dado — o número real tende ao total de alunos com o benefício, e o catálogo da F12
 dá bioimpedância a cada 30/60 dias.
 
-⚠️ **Três coisas ficaram fora do meu alcance e são do Code ou do PI.** A emenda ao
-`docs/prd/academia/MVP-03-health-intelligence.md` — §6 (ECG deixa de ser exclusão absoluta), §12
-(`HealthAnalysisOutput` ganha `pendingMedicalReferral`) e §16 (o *orçamento* do `M3-NFR-005` vira
-teto de gasto por tenant) — **o Cowork não escreve em `docs/prd/**` (ADR-021)**. Os ADR-035 e
-ADR-036 registram o que o PRD precisa dizer; quem escreve lá é outro.
+✍️ **19/08/2026 — o Cowork passa a escrever emenda de PRD, e o `MVP-03` já saiu emendado.**
+As três emendas que os ADR-035/036 exigiam estavam paradas porque o ADR-021 fechava
+`docs/prd/**` para o Cowork. **O PI ampliou o escopo em 19/08:** o Cowork escreve no PRD **só**
+para materializar decisão já registrada em ADR aceito, citando o ADR na emenda — requisito novo
+continua sendo do Code ou do PI. Regra no `CLAUDE.md`; a linha riscada e o porquê ficaram na
+**emenda ao ADR-021** (não virou ADR novo: processo não vira mais ADR desde 18/08).
+
+Aplicado no mesmo dia ao `MVP-03`: **§6** (ECG deixa de ser exclusão absoluta e ganha a fronteira
+de *citar sem interpretar*; o gate de protocolo clínico do §5 sai), **§12**
+(`pendingMedicalReferral` e `pendingReferralSince` no contrato de saída, mais a regra de que
+`attentionPoints` aparece nas três superfícies) e **§16** (`M3-NFR-005` vira teto de gasto por
+tenant com degradação para modo manual; entra o **`M3-NFR-009`** de pseudonimização testada).
+**O motivo de estar parado era só quem digitava — o conteúdo já estava decidido.**
 
 ---
 

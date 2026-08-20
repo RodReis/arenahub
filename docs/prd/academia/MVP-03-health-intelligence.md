@@ -2,7 +2,8 @@
 
 ## 1. Controle
 
-- Status: APROVADO para planejamento em 14/08/2026
+- Status: APROVADO para planejamento em 14/08/2026 · **emendado em 19/08/2026** (§6, §12, §16 —
+  ADR-035 e ADR-036, decididos pelo PI)
 - Dependência: identidade, alunos e eventos de frequência do MVP 1 estáveis
 - Resultado: avaliação física rastreável, comparável e acompanhada por análise assistiva
 - Limite clínico: acompanhamento informativo, nunca diagnóstico ou prescrição médica
@@ -75,7 +76,32 @@ health_report.export
 - ranking e gamificação, tratados no MVP 5;
 - wearables em tempo real;
 - ingestão direta de equipamento não homologado;
-- treinamento de modelo proprietário.
+- treinamento de modelo proprietário;
+- **interpretação de qualquer achado clínico vindo de equipamento do aluno** — inclusive
+  reclassificar, normalizar para taxonomia própria, atribuir faixa de referência ou gerar texto
+  explicativo personalizado por achado.
+
+> **Emenda de 19/08/2026 — [ADR-035](../../DECISIONS.md#adr-035), decidida pelo PI.** Laudo de
+> **eletrocardiograma** (ECG) **deixa de ser exclusão absoluta** e passa a ser escopo, com uma
+> fronteira estreita: o ArenaHub **anexa o arquivo e cita o achado do aparelho literalmente**, com
+> `origem` e `classificado_por: equipamento`, e **nada além disso**. A base é a exclusão da **RDC
+> 657/2022** da ANVISA — software que apenas armazena, arquiva, transmite ou exibe não é
+> dispositivo médico; interpretar é o que enquadra.
+>
+> Consequências normativas desta emenda:
+>
+> 1. **O ECG não entra no payload enviado à IA.** Viaja só o par `pendingMedicalReferral` /
+>    `pendingReferralSince` (§12) — sem traçado, sem o texto do achado, sem bpm de origem ECG.
+>    Exige teste que **falha** se campo de origem `ECG` vazar para o snapshot.
+> 2. **A extração do ECG não usa IA.** O PDF do OmronConnect tem camada de texto legível por
+>    `pdftotext`; parser determinístico, não adapter de OCR.
+> 3. **Achado aberto vira pendência visível** na lista de alunos, resolvida por
+>    `Registrar encaminhamento` (data + responsável), emitindo `HealthReferralRegistered`.
+> 4. O texto que o aluno lê sobre a pendência é **fixo, revisado por profissional de saúde e
+>    idêntico para todos** — não gerado, não personalizado.
+>
+> O **gate de protocolo clínico** do §5 foi **recusado pelo PI em 19/08/2026** e substituído por
+> esta fronteira. Os demais itens do §5 seguem valendo.
 
 ## 7. Slices verticais
 
@@ -234,10 +260,24 @@ interface HealthAnalysisOutput {
   goalProgress: string[];
   questionsForProfessional: string[];
   disclaimerCode: 'NOT_MEDICAL_DIAGNOSIS';
+
+  // ADR-035 — estado, não dado clínico. A IA sabe que há pendência; não sabe qual é.
+  pendingMedicalReferral: boolean;
+  pendingReferralSince: string | null;
 }
 ```
 
 Texto livre é sanitizado e validado contra políticas antes de publicação.
+
+> **Emenda de 19/08/2026 — [ADR-035](../../DECISIONS.md#adr-035).** Os dois campos novos existem
+> para impedir o defeito oposto ao de interpretar: sem eles, a análise diria *"sua evolução está
+> ótima"* com uma pendência cardíaca aberta na ficha. Com o texto do achado, a IA viraria a
+> intérprete. O booleano é o único caminho que evita os dois.
+>
+> **`attentionPoints` e `questionsForProfessional` aparecem nas três superfícies** — painel, app e
+> totem. O tom muda; a existência do item, não. Suprimir um ponto de atenção no app porque a
+> linguagem ali é mais leve é omissão de dado de saúde ao titular (LGPD art. 18), não adaptação
+> de voz.
 
 ## 13. Eventos
 
@@ -280,7 +320,13 @@ AIAnalysisRejected
 - `M3-NFR-002`: visualização de histórico p95 menor que 1 s para até cinco anos de avaliações.
 - `M3-NFR-003`: upload não bloqueia request durante extração.
 - `M3-NFR-004`: indisponibilidade de OCR/IA não impede avaliação manual.
-- `M3-NFR-005`: análise de IA possui timeout, orçamento e circuit breaker.
+- `M3-NFR-005`: análise de IA possui timeout, **teto de gasto por tenant** e circuit breaker.
+  Estourado o teto, a análise **degrada para modo manual** — a avaliação continua funcionando
+  (`M3-NFR-004`), em vez de faturar sem limite. Teto é parâmetro do cliente, não constante
+  ([ADR-036](../../DECISIONS.md#adr-036)).
+- `M3-NFR-009`: o snapshot enviado ao provedor de IA é **pseudonimizado** — sem nome, sem CPF, sem
+  imagem, sem identificador direto — e **nenhum campo de origem `ECG`** o integra. Testado, não
+  declarado ([ADR-035](../../DECISIONS.md#adr-035), [ADR-036](../../DECISIONS.md#adr-036)).
 - `M3-NFR-006`: todo dado oficial possui proveniência consultável.
 - `M3-NFR-007`: WCAG 2.2 AA nos formulários, tabelas e gráficos essenciais.
 - `M3-NFR-008`: exclusão e exportação respeitam política LGPD testada.
