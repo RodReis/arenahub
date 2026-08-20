@@ -44,6 +44,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     tulio: '91917739974',
     ursula: '31350038415',
     vera: '36829112192',
+    xenia: '61885159200',
   } as const;
 
   beforeAll(async () => {
@@ -710,6 +711,38 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     const depois = await db.student.findUniqueOrThrow({ where: { id: criada.id } });
 
     expect(depois.birthDate.toISOString().slice(0, 10)).toBe('1991-07-22');
+  });
+
+  it('quando o arquivo passa a trazer a data, o aviso do placeholder cala na mesma rodada', async () => {
+    // Cadastrada sem data numa rodada; numa exportacao posterior do Pacto a
+    // data aparece. `gravarPessoa` grava a data boa por cima do placeholder,
+    // entao o problema deixou de existir NESTA rodada -- avisar aqui seria
+    // mandar a recepcao corrigir o que o proprio seed acabou de corrigir.
+    const semData = registroDe(null, {
+      nome: 'XENIA DATA CHEGOU DEPOIS',
+      cpf: CPF.xenia,
+      dataNascimento: '',
+    });
+
+    const primeira = await importar([semData]);
+
+    expect(primeira.pendencias).toContainEqual({
+      nome: 'XENIA DATA CHEGOU DEPOIS',
+      motivo: 'cadastrado sem data de nascimento',
+    });
+
+    const segunda = await importar([{ ...semData, dataNascimento: '05/09/1993' }]);
+
+    expect(segunda.pendencias).not.toContainEqual({
+      nome: 'XENIA DATA CHEGOU DEPOIS',
+      motivo: 'cadastrado sem data de nascimento',
+    });
+
+    const depois = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'XENIA DATA CHEGOU DEPOIS' },
+    });
+
+    expect(depois.birthDate.toISOString().slice(0, 10)).toBe('1993-09-05');
   });
 
   it('data de nascimento IMPLAUSIVEL no arquivo tambem cai no placeholder', async () => {
