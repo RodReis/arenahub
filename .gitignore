@@ -104,3 +104,13 @@ docs/design/stitch_system_specification_analysis/*/
 # dado real de aluno da importacao Pacto (F47/ADR-033) -- NUNCA versionar.
 # a seed le de PACTO_IMPORT_JSON_PATH, fora da arvore do repositorio.
 packages/database/prisma/import/*.json
+
+# andaime de ferramenta local de agente -- nao e material do produto.
+#
+# `.claude/hooks/` e o hook do war-room; `.codex/` e `.war-room-runtime/` sao
+# config e endpoint da propria ferramenta, gerados na maquina de quem roda.
+# `.claude/settings.json` fica DE FORA desta regra de proposito: config de
+# projeto e decisao de versionar, nao andaime.
+.claude/hooks/
+.codex/
+.war-room-runtime/
