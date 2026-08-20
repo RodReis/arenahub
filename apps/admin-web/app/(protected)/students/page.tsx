@@ -4,7 +4,6 @@ import {
   Button,
   DataTable,
   EmptyState,
-  Field,
   Ausente,
   Consequencia,
   Cpf,
@@ -12,13 +11,13 @@ import {
   Telefone,
   PageHeader,
   ProblemDetail,
-  SelectField,
   StateBadge,
   TenantDateTime,
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
-import { impedeAcesso } from '../../../src/students/formatar';
+import { BotaoDeLiberacao } from './botao-de-liberacao';
+import { FiltroDeAlunos } from './filtro-de-alunos';
 import estilos from './students.module.css';
 
 /** Fuso FIXO, preservado de `dataLegivel` -- mesma divida das outras telas. */
@@ -50,28 +49,6 @@ interface Unidade {
 }
 
 const POR_PAGINA = 20;
-
-/**
- * As sete situacoes, com o rotulo pt-BR que a tela ja usa.
- *
- * A ORDEM E A DO CICLO DE VIDA, nao alfabetica: interessado vira
- * experimental, que vira ativo, que pode ser suspenso ou bloqueado. Quem
- * procura "os bloqueados" acha no fim, onde o problema mora.
- *
- * Os rotulos repetem `STATE_LABELS` do design system de proposito: aquele
- * mapa e para BADGE (traduz o que veio da API), e este e para FILTRO (monta a
- * opcao antes de existir dado). Importar um no outro acoplaria a lista de
- * opcoes da tela a um mapa que existe para renderizar celula.
- */
-const SITUACOES = [
-  ['LEAD', 'Interessado'],
-  ['TRIAL', 'Experimental'],
-  ['ACTIVE', 'Ativo'],
-  ['SUSPENDED', 'Suspenso'],
-  ['BLOCKED', 'Bloqueado'],
-  ['CANCELLED', 'Cancelado'],
-  ['ARCHIVED', 'Arquivado'],
-] as const;
 
 /**
  * Busca de alunos — `M1-AC-002`, Slice 1.2.
@@ -206,59 +183,18 @@ export default async function PaginaDeAlunos({
         }
       />
 
-      {/* GET, não Server Action: busca e filtro são navegação, e navegação vai na URL. */}
-      <form className={estilos['filtro']} method="get" action="/students">
-        {/*
-          A largura extra vai no WRAPPER, e nao no `Field`: o componente
-          espalha as props restantes no proprio `<input>`, entao um
-          `className` ali estilizaria o controle em vez da coluna do flex.
-        */}
-        <div className={estilos['busca']}>
-          <Field
-            id="busca"
-            name="q"
-            type="search"
-            label="Buscar por nome, matrícula ou contato"
-            defaultValue={termo ?? ''}
-            placeholder="Ex.: Maria, AP-2026-00000001, (41) 99999-0000"
-          />
-        </div>
-
-        <SelectField id="situacao" name="status" label="Situação" defaultValue={situacao ?? ''}>
-          <option value="">Todas</option>
-          {SITUACOES.map(([chave, rotulo]) => (
-            <option key={chave} value={chave}>
-              {rotulo}
-            </option>
-          ))}
-        </SelectField>
-
-        {/*
-          O filtro de unidade só aparece com MAIS DE UMA unidade. Numa
-          academia de endereço único, ele seria um controle com uma opção só —
-          ocupa espaço, sugere uma escolha que não existe e ainda esconde um
-          modo de errar (filtrar pela única unidade e achar que filtrou algo).
-        */}
-        {unidades.length > 1 ? (
-          <SelectField
-            id="unidade"
-            name="gymUnitId"
-            label="Unidade"
-            defaultValue={unidade ?? ''}
-          >
-            <option value="">Todas</option>
-            {unidades.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
-
-        <Button type="submit" variant="outline" data-testid="buscar">
-          Filtrar
-        </Button>
-      </form>
+      {/*
+        Busca automática, sem botão -- issue #118. O componente cliente
+        escreve na URL sozinho (3+ caracteres, com atraso; situação e
+        unidade na hora), e a página continua Server Component em volta
+        dele.
+      */}
+      <FiltroDeAlunos
+        unidades={unidades}
+        termoInicial={termo ?? ''}
+        situacaoInicial={situacao ?? ''}
+        unidadeInicial={unidade ?? ''}
+      />
 
       {/*
         A busca não cobre CPF -- o documento é guardado só como hash, e
@@ -399,21 +335,21 @@ export default async function PaginaDeAlunos({
             key: 'situacao',
             header: 'Situação',
             role: 'state',
-            render: (aluno) => (
-              <>
-                {/*
-                  Todo estado tem TEXTO, cor é complemento. E o texto diz
-                  a consequência: "Bloqueado" sozinho não avisa a recepção
-                  de que a catraca vai negar.
-                */}
-                <StateBadge machine="student" state={aluno.status} />
-                {impedeAcesso(aluno.status) ? (
-                  <span className={estilos['consequencia']} data-testid={`sem-acesso-${aluno.id}`}>
-                    sem acesso à catraca
-                  </span>
-                ) : null}
-              </>
-            ),
+            render: (aluno) => <StateBadge machine="student" state={aluno.status} />,
+          },
+          {
+            key: 'acao',
+            header: '',
+            role: 'actions',
+            /*
+              SÓ para BLOCKED -- issue #118. É o status que o job de
+              inadimplência aplica (M2-BR-007): cobre quem foi bloqueado por
+              atraso, sem oferecer "liberação financeira" para os 1.926
+              alunos importados da #118 (CANCELLED, sem cobrança real) nem
+              para cancelamento por outro motivo.
+            */
+            render: (aluno) =>
+              aluno.status === 'BLOCKED' ? <BotaoDeLiberacao studentId={aluno.id} /> : null,
           },
         ]}
         {...(proxima ? { nextHref: proxima } : {})}

@@ -186,8 +186,12 @@ test.describe('busca de aluno', () => {
     await cadastrarAluno(page, { nome, nascimento: '1988-11-30' });
 
     await page.goto('/students');
+    // Busca automática -- issue #118: sem botão "Filtrar", o campo dispara
+    // sozinho 300ms depois de parar de digitar (3+ caracteres). Espera pela
+    // troca de URL em vez de um clique que não existe mais.
+    const urlAntes = page.url();
     await page.getByLabel('Buscar por nome, matrícula ou contato').fill(nome);
-    await page.getByTestId('buscar').click();
+    await page.waitForFunction((anterior) => window.location.href !== anterior, urlAntes);
 
     await expect(page.getByTestId('tabela-de-alunos')).toBeVisible();
     await page.getByRole('link', { name: nome }).click();
