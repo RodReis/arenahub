@@ -4,6 +4,7 @@ import type { StatusDeAluno } from '../../students/domain/student.js';
 import {
   direitoEhEfetivo,
   montarSnapshotDePolitica,
+  montarSnapshotDeVinculo,
   TRANSICOES_DE_ENTITLEMENT,
   transicionarEntitlement,
   TransicaoDeEntitlementInvalidaError,
@@ -243,5 +244,29 @@ describe('montarSnapshotDePolitica', () => {
     montarSnapshotDePolitica('p', 'n', unidades, []);
 
     expect(unidades[0]).toBe(OUTRA_UNIDADE);
+  });
+});
+
+describe('montarSnapshotDeVinculo', () => {
+  it('monta snapshot sem plano, com janela livre', () => {
+    const snapshot = montarSnapshotDeVinculo('STAFF', ['unidade-1']);
+
+    expect(snapshot.planId).toBeNull();
+    expect(snapshot.planName).toBe('Vinculo STAFF');
+    expect(snapshot.gymUnitIds).toEqual(['unidade-1']);
+    // Sete dias, do primeiro ao ultimo minuto: vinculo nao tem horario.
+    expect(snapshot.janelas).toHaveLength(7);
+    expect(snapshot.janelas[0]).toEqual({
+      gymUnitId: 'unidade-1',
+      dayOfWeek: 1,
+      startMinute: 0,
+      endMinute: 1440,
+    });
+  });
+
+  it('cobre todas as unidades informadas', () => {
+    const snapshot = montarSnapshotDeVinculo('TRAINER', ['u1', 'u2']);
+
+    expect(snapshot.janelas).toHaveLength(14);
   });
 });
