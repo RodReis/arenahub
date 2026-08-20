@@ -220,19 +220,25 @@ async function ativar(): Promise<void> {
       { medida: 'casados', valor: resultado.casados },
       { medida: 'casados por CPF', valor: resultado.casadosPorCpf },
       { medida: 'casados por nome', valor: resultado.casadosPorNome },
+      // F49: na SEGUNDA execucao este numero tem de ser 0 e `casados` sobe
+      // na mesma medida. Se `criados` repetir o valor da primeira, a
+      // idempotencia quebrou e o relatorio mostra isso sem consultar o banco.
+      { medida: 'criados (nao existiam no cadastro)', valor: resultado.criados },
       { medida: 'direitos por plano', valor: resultado.direitosPorPlano },
       { medida: 'direitos por vinculo', valor: resultado.direitosPorVinculo },
       { medida: 'pendencias', valor: resultado.pendencias.length },
     ]);
 
-    const total = resultado.casados;
+    // Preenchimento cobre casados E criados: os dois passam pela mesma
+    // gravacao, e dividir por `casados` so daria porcentagem acima de 100%.
+    const total = resultado.casados + resultado.criados;
     const { preenchimento } = resultado;
 
     // Campo a campo, escrito na mao em vez de `Object.entries`: a ordem fica
     // estavel e o compilador reclama se um campo do relatorio sumir do
     // resultado -- que e exatamente o defeito que este relatorio existe para
     // pegar.
-    console.info('[seed-ativos] preenchimento GRAVADO (sobre os casados):');
+    console.info('[seed-ativos] preenchimento GRAVADO (sobre casados + criados):');
     console.table([
       { campo: 'nascimento', preenchidos: preenchimento.nascimento, total },
       { campo: 'cartao', preenchidos: preenchimento.cartao, total },
@@ -244,6 +250,22 @@ async function ativar(): Promise<void> {
 
     // A lista completa, nao um resumo: cada linha aqui e uma pessoa que a
     // recepcao vai ter de resolver na mao, e um contador nao diz quem.
+    // DESTAQUE SEPARADO, antes da lista geral: cadastro com `1900-01-01` e
+    // uma pessoa no banco com data que ninguem escolheu. Perdida no meio de
+    // dezenas de outras pendencias, ninguem corrige -- e uma data falsa
+    // indistinguivel de data real e exatamente o que nao pode passar calado.
+    const semNascimento = resultado.pendencias.filter(
+      (p) => p.motivo === 'cadastrado sem data de nascimento',
+    );
+
+    if (semNascimento.length > 0) {
+      console.warn(
+        `[seed-ativos] ATENCAO: ${String(semNascimento.length)} pessoa(s) cadastrada(s) com ` +
+          'data de nascimento PLACEHOLDER (1900-01-01). A recepcao precisa corrigir:',
+      );
+      console.table(semNascimento.map((p) => ({ nome: p.nome })));
+    }
+
     console.info(`[seed-ativos] pendencias (${String(resultado.pendencias.length)}):`);
     console.table(resultado.pendencias);
   } finally {

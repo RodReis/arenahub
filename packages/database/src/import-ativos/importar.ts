@@ -24,13 +24,31 @@
  *   - NENHUMA `BiometricIdentity` nem `ConsentRecord` (regra no 7). O numero
  *     do leitor entra como `StudentCredential`, que e identificador de
  *     equipamento; biometria exige consentimento e nao e escopo desta fatia.
- *   - NUNCA cria aluno. Quem nao casa vira pendencia humana.
  *   - Campo vazio no arquivo NAO apaga dado existente no banco.
+ *
+ * O QUE MUDOU NA F49: quem nao casa com o cadastro DEIXOU de virar pendencia
+ * e passa a ser CADASTRADO. Investigacao do PI sobre a rodada real (347
+ * linhas, 284 casadas, 49 nao encontradas) mostrou que os 49 nao eram
+ * casamento perdido por grafia -- nome parecido e CPF foram conferidos no
+ * banco, nenhum bate. Sao pessoas que o import historico (F47) nunca trouxe.
+ * Deixa-las de fora significaria a catraca fechada para 49 pessoas que
+ * treinam hoje.
+ *
+ * O que a F49 NAO afrouxou:
+ *   - `AMBIGUO` continua pendencia. Nao encontrar ninguem e uma coisa;
+ *     escolher entre dois candidatos e outra, e essa o seed nunca faz.
+ *   - Idempotencia: quem foi criado na primeira execucao CASA na segunda,
+ *     porque a criacao entra na lista de candidatos em memoria e persiste
+ *     no banco para a proxima leitura.
  */
 import type { PrismaClientArenaHub } from '../client.js';
 import {
+  calcularHashDeCpf,
+  cpfEhValido,
   decidirCasamento,
+  formatarMatricula,
   nascimentoEhPlausivel,
+  normalizarCpf,
   normalizarNome,
   origemDoDireito,
   parsearDataDoPacto,
@@ -58,6 +76,21 @@ const UF_PADRAO = 'GO';
 const MUNICIPIO_PADRAO = 'Trindade';
 
 /**
+ * Nascimento de quem e cadastrado sem data no arquivo (F49).
+ *
+ * `Student.birthDate` e NOT NULL e nao ha data para gravar -- sao 3 linhas
+ * do arquivo real. A escolha do PI foi cadastrar com marcador em vez de
+ * deixar a pessoa de fora.
+ *
+ * 1900-01-01 e IMPOSSIVEL de proposito: `nascimentoEhPlausivel` recusa
+ * qualquer coisa acima de 110 anos, entao ninguem digita isso por engano e
+ * ninguem confunde com data real. E toda linha assim vira pendencia
+ * `cadastrado sem data de nascimento` -- data falsa que ninguem consegue
+ * distinguir de data real e exatamente o que nao pode acontecer calado.
+ */
+const NASCIMENTO_PLACEHOLDER = new Date(Date.UTC(1900, 0, 1));
+
+/**
  * Espelho de `normalizarTelefone` de
  * `apps/api/src/modules/students/domain/identificacao.ts`. Copia deliberada
  * por FRONTEIRA DE PACOTE: `packages/database` tem `rootDir: "."` no
@@ -65,11 +98,6 @@ const MUNICIPIO_PADRAO = 'Trindade';
  * `dominio.ts` ja carrega para `normalizarCpf`.
  */
 function normalizarTelefone(valor: string): string {
-  return valor.replace(/\D/g, '');
-}
-
-/** Ver nota acima: mesma origem, mesmo motivo de copia. */
-function normalizarCpf(valor: string): string {
   return valor.replace(/\D/g, '');
 }
 
@@ -103,7 +131,8 @@ export interface RegistroDePessoaAtiva {
 export type MotivoDePendencia =
   | 'perfil desconhecido'
   | 'mais de um candidato no cadastro'
-  | 'nao encontrado no cadastro'
+  | 'cadastrado sem data de nascimento'
+  | 'duplicata dentro do arquivo'
   | 'nascimento implausivel'
   | 'aluno sem periodo de plano'
   | 'credencial ja pertence a outro aluno'
@@ -118,7 +147,10 @@ export interface Pendencia {
   readonly detalhe?: string;
 }
 
-/** Quantos dos casados tinham cada campo. Ver a nota em `ResultadoDaAtivacao`. */
+/**
+ * Quantos dos GRAVADOS (casados + criados) tinham cada campo. Ver a nota em
+ * `ResultadoDaAtivacao`.
+ */
 export interface PreenchimentoPorCampo {
   nascimento: number;
   cartao: number;
@@ -142,6 +174,14 @@ export interface ResultadoDaAtivacao {
   descartados: number;
   /** Linhas que casaram com um aluno ja cadastrado. */
   casados: number;
+  /**
+   * Linhas que nao casaram com ninguem e viraram cadastro NOVO (F49).
+   *
+   * Separado de `casados` de proposito: na segunda execucao este numero cai
+   * a zero e `casados` sobe -- e essa e a leitura que prova a idempotencia
+   * no relatorio, sem consultar o banco.
+   */
+  criados: number;
   /** Casados por CPF valido e unico -- o casamento forte. */
   casadosPorCpf: number;
   /** Casados por nome normalizado unico -- o casamento fraco. */
@@ -275,7 +315,13 @@ export function montarSnapshot(
   };
 }
 
-/** So os delegates que a gravacao usa -- o teste injeta o client inteiro. */
+/**
+ * So os delegates que a gravacao usa -- o teste injeta o client inteiro.
+ *
+ * `$executeRaw` / `$queryRaw` entraram na F49: a matricula sai do contador
+ * `student_sequences` com `SELECT ... FOR UPDATE`, e o Prisma nao expoe
+ * lock de linha pelo client tipado.
+ */
 type Escritor = Pick<
   PrismaClientArenaHub,
   | 'student'
@@ -285,7 +331,126 @@ type Escritor = Pick<
   | 'subscription'
   | 'entitlement'
   | 'entitlementUnitWindow'
+  | '$executeRaw'
+  | '$queryRaw'
 >;
+
+/**
+ * Proxima matricula do tenant, DENTRO da transacao recebida.
+ *
+ * Copia do padrao de `StudentRepository.proximaMatricula`
+ * (`apps/api/src/modules/students/student.repository.ts`), pela mesma
+ * fronteira de pacote das funcoes de CPF -- e pelo mesmo motivo de sempre:
+ * `packages/database` nao alcanca `apps/api` no typecheck.
+ *
+ * `ON CONFLICT DO NOTHING` cria a linha do contador sem corrida; o
+ * `SELECT ... FOR UPDATE` serializa as emissoes concorrentes na linha do
+ * contador, e nao na tabela `students`. O lock NAO e teatro: sem ele duas
+ * transacoes leriam o mesmo `next_value` e a segunda quebraria no UNIQUE de
+ * `membership_number` -- a pessoa viraria `erro ao gravar` em vez de entrar.
+ *
+ * Alternativas descartadas sao as mesmas do original: `COUNT(*) + 1` reusa
+ * numero apos arquivamento (quebra INV-010); fragmento de UUID colide e nao
+ * e sequencial; `SEQUENCE` do Postgres e global e vazaria volume entre
+ * tenants.
+ */
+async function proximaMatricula(db: Escritor, tenantId: string, ano: number): Promise<string> {
+  await db.$executeRaw`
+    INSERT INTO student_sequences (tenant_id, next_value, updated_at)
+    VALUES (${tenantId}::uuid, 1, now())
+    ON CONFLICT (tenant_id) DO NOTHING
+  `;
+
+  const travadas = await db.$queryRaw<{ next_value: number }[]>`
+    SELECT next_value FROM student_sequences
+    WHERE tenant_id = ${tenantId}::uuid
+    FOR UPDATE
+  `;
+
+  const sequencial = travadas[0]?.next_value ?? 1;
+
+  await db.$executeRaw`
+    UPDATE student_sequences
+    SET next_value = ${sequencial + 1}, updated_at = now()
+    WHERE tenant_id = ${tenantId}::uuid
+  `;
+
+  return formatarMatricula(ano, sequencial);
+}
+
+/** O que a criacao de uma pessoa nova produziu -- o laco traduz em pendencia. */
+interface PessoaCriada {
+  readonly studentId: string;
+  /** `true` quando o nascimento veio do placeholder, nao do arquivo. */
+  readonly nascimentoPlaceholder: boolean;
+}
+
+/**
+ * Cadastra quem o arquivo traz e o cadastro nao tem (F49).
+ *
+ * SO CRIA A LINHA MINIMA de `Student`. Credencial, contato, endereco, plano
+ * e direito continuam saindo de `gravarPessoa`, que roda logo depois: quem
+ * e criado recebe EXATAMENTE o mesmo tratamento de quem casou, e nao um
+ * caminho paralelo que diverge na proxima fatia.
+ *
+ * `gymUnitId` e a PRIMEIRA unidade do tenant. E unidade de ORIGEM, nao
+ * controle de acesso (ver o comentario da coluna no schema) -- quem decide
+ * onde a pessoa entra continua sendo `EntitlementUnitWindow`. A academia
+ * opera uma unidade so; com mais de uma, o arquivo do Pacto nao traz de qual
+ * unidade a pessoa e, e a primeira e um chute honesto e corrigivel na
+ * recepcao, ao contrario de nao cadastrar.
+ */
+async function criarPessoa(
+  db: Escritor,
+  alvo: AlvoDaAtivacao,
+  registro: RegistroDePessoaAtiva,
+  contexto: { perfil: PerfilImportado; agora: Date },
+): Promise<PessoaCriada> {
+  const gymUnitId = alvo.gymUnitIds[0];
+
+  if (gymUnitId === undefined) {
+    // Sem unidade nao ha `Student` possivel (coluna NOT NULL). Falhar aqui
+    // vira pendencia `erro ao gravar` da linha, e nao um cadastro invalido.
+    throw new Error('Tenant sem unidade: nao ha `gymUnitId` para o cadastro novo.');
+  }
+
+  const nascimentoDoArquivo = parsearDataDoPacto(registro.dataNascimento);
+  const nascimentoBom =
+    nascimentoDoArquivo !== null && nascimentoEhPlausivel(nascimentoDoArquivo, contexto.agora);
+
+  const cpf = normalizarCpf(registro.cpf);
+  // CPF invalido NAO e gravado: `cpfEhValido` e o mesmo criterio que
+  // `decidirCasamento` usa para casar. Gravar um CPF que o casamento ignora
+  // produziria uma coluna que parece identificador e nao identifica nada.
+  const cpfBom = cpf !== '' && cpfEhValido(cpf);
+
+  const membershipNumber = await proximaMatricula(
+    db,
+    alvo.tenantId,
+    contexto.agora.getUTCFullYear(),
+  );
+
+  const criado = await db.student.create({
+    data: {
+      tenantId: alvo.tenantId,
+      gymUnitId,
+      membershipNumber,
+      fullName: registro.nome.trim(),
+      birthDate: nascimentoBom ? nascimentoDoArquivo : NASCIMENTO_PLACEHOLDER,
+      // `cpf` e `cpfHash` andam JUNTOS -- hash sem o campo em claro esconde
+      // o dado, campo sem hash quebra a busca por duplicata.
+      cpf: cpfBom ? cpf : null,
+      cpfHash: cpfBom ? calcularHashDeCpf(alvo.tenantId, cpf) : null,
+      // Status e perfil sao responsabilidade de `gravarPessoa`, que roda em
+      // seguida na MESMA transacao. `LEAD` (o default do schema) e o estado
+      // correto de quem ainda nao foi ativado -- e se a transacao morrer no
+      // meio, nao sobra ninguem `ACTIVE` sem direito.
+    },
+    select: { id: true },
+  });
+
+  return { studentId: criado.id, nascimentoPlaceholder: !nascimentoBom };
+}
 
 /**
  * Grava a credencial do leitor.
@@ -640,19 +805,22 @@ export async function importarPessoasAtivas(
 
   let descartados = 0;
   let casados = 0;
+  let criados = 0;
   let casadosPorCpf = 0;
   let casadosPorNome = 0;
   let direitosPorPlano = 0;
   let direitosPorVinculo = 0;
 
-  // A lista de candidatos e lida UMA vez e nao muda durante o laco: este
-  // seed nunca cria aluno, entao nao ha candidato novo para aparecer no
-  // meio. Reler por linha custaria uma consulta por pessoa sem mudar nada.
+  // A lista de candidatos e lida UMA vez do banco e CRESCE durante o laco
+  // (F49): quem e criado entra nela na hora. E isso -- e nao uma releitura
+  // por linha -- que faz a segunda ocorrencia da mesma pessoa no arquivo
+  // casar com a primeira em vez de criar um segundo cadastro.
   const alunos = await db.student.findMany({
     where: { tenantId: alvo.tenantId },
     select: { id: true, fullName: true, cpf: true, status: true },
   });
 
+  // Mutavel de proposito: `criarPessoa` empurra o cadastro novo aqui.
   const candidatos: CandidatoDeAluno[] = alunos.map((aluno) => ({
     id: aluno.id,
     nomeNormalizado: normalizarNome(aluno.fullName),
@@ -662,6 +830,17 @@ export async function importarPessoasAtivas(
   // Situacao atual no ArenaHub, para nao reativar quem a recepcao bloqueou
   // de proposito. Vem da mesma leitura -- nao custa consulta extra.
   const situacaoAtual = new Map(alunos.map((aluno) => [aluno.id, aluno.status]));
+
+  // Quem NASCEU nesta execucao. Casar com alguem deste conjunto significa
+  // que DUAS LINHAS DO ARQUIVO sao a mesma pessoa -- o caso da linha 174 e
+  // da 28 do arquivo real, com CPF e celular invertidos entre elas. A
+  // primeira cria; a segunda vira pendencia em vez de sobrescrever calada os
+  // dados da primeira com os da segunda.
+  //
+  // NAO CONFUNDIR COM IDEMPOTENCIA: na SEGUNDA EXECUCAO o conjunto comeca
+  // vazio e a pessoa ja veio do banco, entao ela casa normalmente e e
+  // reprocessada -- que e o comportamento certo.
+  const criadosNestaExecucao = new Set<string>();
 
   for (const registro of registros) {
     if (ehRegistroDeTeste(registro.nome)) {
@@ -683,15 +862,17 @@ export async function importarPessoasAtivas(
       continue;
     }
 
-    if (casamento.tipo === 'NAO_ENCONTRADO') {
-      // NUNCA cria aluno novo. A base ja tem os 1.926 da F47: adivinhar aqui
-      // produz o duplicado que a recepcao descobre seis meses depois, com
-      // dois historicos pela metade.
-      pendencias.push({ nome: registro.nome, motivo: 'nao encontrado no cadastro' });
+    // --- duas linhas do arquivo para a mesma pessoa (F49) ------------------
+    //
+    // Ja casa: a primeira ocorrencia criou o cadastro e o poz na lista de
+    // candidatos. Reprocessar aqui gravaria por cima os dados da segunda
+    // linha -- e no arquivo real as duas divergem (CPF e celular trocados),
+    // entao "o ultimo vence" seria escolher em silencio qual versao da
+    // pessoa e a verdadeira. Vira pendencia: a recepcao decide.
+    if (casamento.tipo !== 'NAO_ENCONTRADO' && criadosNestaExecucao.has(casamento.studentId)) {
+      pendencias.push({ nome: registro.nome, motivo: 'duplicata dentro do arquivo' });
       continue;
     }
-
-    const { studentId } = casamento;
 
     // --- a recepcao vence o arquivo antigo (I3) ----------------------------
     //
@@ -699,22 +880,35 @@ export async function importarPessoasAtivas(
     // tomada depois da exportacao do Pacto. Reativar em silencio devolveria
     // a catraca a quem alguem bloqueou de proposito -- e ninguem veria.
     // Vira pendencia: a recepcao decide, nao o arquivo.
-    const situacao = situacaoAtual.get(studentId);
+    //
+    // Nao se aplica a quem sera criado agora: cadastro que nao existe nao
+    // tem decisao de balcao para respeitar.
+    if (casamento.tipo !== 'NAO_ENCONTRADO') {
+      const situacao = situacaoAtual.get(casamento.studentId);
 
-    if (situacao === 'BLOCKED' || situacao === 'ARCHIVED') {
-      pendencias.push({
-        nome: registro.nome,
-        motivo:
-          situacao === 'BLOCKED'
-            ? 'bloqueado no ArenaHub, veio como ativo no arquivo'
-            : 'arquivado no ArenaHub, veio como ativo no arquivo',
-      });
-      continue;
+      if (situacao === 'BLOCKED' || situacao === 'ARCHIVED') {
+        pendencias.push({
+          nome: registro.nome,
+          motivo:
+            situacao === 'BLOCKED'
+              ? 'bloqueado no ArenaHub, veio como ativo no arquivo'
+              : 'arquivado no ArenaHub, veio como ativo no arquivo',
+        });
+        continue;
+      }
     }
 
-    casados += 1;
-    if (casamento.tipo === 'CPF') casadosPorCpf += 1;
-    else casadosPorNome += 1;
+    if (casamento.tipo === 'CPF') {
+      casados += 1;
+      casadosPorCpf += 1;
+    } else if (casamento.tipo === 'NOME') {
+      casados += 1;
+      casadosPorNome += 1;
+    }
+
+    // `null` = ninguem no cadastro, entao a transacao abaixo cria. O narrow
+    // acontece AQUI, fora da closure, para nao precisar de cast la dentro.
+    const existente = casamento.tipo === 'NAO_ENCONTRADO' ? null : casamento.studentId;
 
     try {
       // UMA TRANSACAO POR PESSOA (I1). Cada gravacao e idempotente, mas isso
@@ -723,13 +917,71 @@ export async function importarPessoasAtivas(
       // direito -- cadastro ativo com porta fechada, que nao vira pendencia,
       // nao entra em contador nenhum, e so aparece quando a pessoa e barrada.
       // Sao ~340 transacoes curtas, nao uma gigante.
-      const efeito = await db.$transaction(async (tx) => gravarPessoa(tx, alvo, registro, {
-        studentId,
-        perfil,
-        agora,
-      }));
+      //
+      // A CRIACAO (F49) ENTRA NA MESMA TRANSACAO. Cadastrar fora dela
+      // deixaria, num erro de credencial ou de direito, uma pessoa nova
+      // `LEAD` sem nada -- que na proxima execucao casaria por nome e
+      // seguiria adiante escondendo a falha original.
+      const resultadoDaPessoa = await db.$transaction(async (tx) => {
+        // `criada` e `existente` sao mutuamente exclusivos por construcao:
+        // so se cria quando nao ha existente. O `if` (em vez de `??`)
+        // mantem isso visivel para o compilador, sem fallback inventado
+        // para um caso que nao ocorre.
+        if (existente !== null) {
+          return {
+            criada: null,
+            studentId: existente,
+            efeito: await gravarPessoa(tx, alvo, registro, {
+              studentId: existente,
+              perfil,
+              agora,
+            }),
+          };
+        }
 
-      if (efeito.nascimentoImplausivel) {
+        const criada = await criarPessoa(tx, alvo, registro, { perfil, agora });
+
+        return {
+          criada,
+          studentId: criada.studentId,
+          efeito: await gravarPessoa(tx, alvo, registro, {
+            studentId: criada.studentId,
+            perfil,
+            agora,
+          }),
+        };
+      });
+
+      const { criada, studentId, efeito } = resultadoDaPessoa;
+
+      if (criada !== null) {
+        criados += 1;
+        criadosNestaExecucao.add(studentId);
+        // Entra na lista de candidatos DEPOIS do commit: uma linha seguinte
+        // do arquivo com o mesmo CPF ou o mesmo nome casa com esta, em vez
+        // de criar um segundo cadastro.
+        candidatos.push({
+          id: studentId,
+          nomeNormalizado: normalizarNome(registro.nome),
+          cpfNormalizado: (() => {
+            const cpf = normalizarCpf(registro.cpf);
+
+            return cpf !== '' && cpfEhValido(cpf) ? cpf : null;
+          })(),
+        });
+
+        if (criada.nascimentoPlaceholder) {
+          // NAO PODE ACONTECER CALADO: o cadastro existe com uma data que
+          // ninguem escolheu. A pendencia e o unico jeito de a recepcao
+          // saber quais linhas precisam da data de verdade.
+          pendencias.push({ nome: registro.nome, motivo: 'cadastrado sem data de nascimento' });
+        }
+      }
+
+      // Em quem foi CRIADO, nascimento ruim ja virou `cadastrado sem data de
+      // nascimento` acima -- e a mesma causa. Duas pendencias para uma linha
+      // fariam a recepcao procurar dois problemas onde ha um.
+      if (efeito.nascimentoImplausivel && criada === null) {
         pendencias.push({ nome: registro.nome, motivo: 'nascimento implausivel' });
       }
 
@@ -771,6 +1023,7 @@ export async function importarPessoasAtivas(
     lidos: registros.length,
     descartados,
     casados,
+    criados,
     casadosPorCpf,
     casadosPorNome,
     direitosPorPlano,
