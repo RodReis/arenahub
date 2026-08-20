@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 18/08/2026 *(gate §15 assinado: `GO_WITH_CONSTRAINTS` — o MVP 1 começou)*
+**Última atualização:** 19/08/2026 *(MVP 3: ADR-035 e ADR-036; o ADR-008 fechou por inteiro)*
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -99,6 +99,26 @@ dono: bloqueia F21, não F8.
 **Correção material registrada:** o ADR-008 oferecia "legítimo interesse com LIA" como base legal
 alternativa. **Essa hipótese não existe para dado biométrico** — é dado sensível, e o art. 11 da
 LGPD é lista fechada onde legítimo interesse não figura. Corrigido no ADR.
+
+🩺 **19/08/2026 — o MVP 3 saiu do papel, e o último ADR do ADR-008 caiu.** O PI trouxe os arquivos
+reais da bioimpedância da Arena Positiva e decidiu quatro coisas. **(1)** O equipamento é uma
+**balança bluetooth de consumo** (`CF610_G`), cujo app exporta **dois PNGs da mesma medição** —
+não são duas fontes, e a extração precisa deduplicar por `(device_id, measured_at)` ou a IA lerá
+como corroboração. **(2)** Junto veio um **ECG do OMRON HEM-7530T** com `Possível fibrilação
+atrial`: entra no produto como anexo e citação literal, **nunca interpretado**, e **fica fora do
+payload da IA** — só um booleano de pendência viaja (**ADR-035**). O gate de *protocolo clínico*
+do `MVP-03` §5 foi recusado pelo PI e substituído por essa linha. **(3)** IA decidida:
+`claude-haiku-4-5` na extração, `claude-sonnet-4-6` na análise, provedor externo com
+pseudonimização e DPA de não-treinamento — **fecha o ponto remanescente do ADR-008 e destrava a
+F21** (**ADR-036**). **(4)** Custo estimado em **~US$ 28/mês** para 300 avaliações; o "300" é
+premissa, não dado — o número real tende ao total de alunos com o benefício, e o catálogo da F12
+dá bioimpedância a cada 30/60 dias.
+
+⚠️ **Três coisas ficaram fora do meu alcance e são do Code ou do PI.** A emenda ao
+`docs/prd/academia/MVP-03-health-intelligence.md` — §6 (ECG deixa de ser exclusão absoluta), §12
+(`HealthAnalysisOutput` ganha `pendingMedicalReferral`) e §16 (o *orçamento* do `M3-NFR-005` vira
+teto de gasto por tenant) — **o Cowork não escreve em `docs/prd/**` (ADR-021)**. Os ADR-035 e
+ADR-036 registram o que o PRD precisa dizer; quem escreve lá é outro.
 
 ---
 
@@ -431,7 +451,7 @@ continua sendo o Índice da §5**, não o número do GitHub.
 
 **Do Backlog, 12 são pegáveis hoje** — F1–F11 (todas `aprovada-pi`, ADR-007 fechou e destravou
 F10) e **F42**, assim que o card `[INFRA]` do pipeline de tokens sair. As outras 32 estão
-estacionadas: **F12 e F13 não estão mais paradas por ADR** — o ADR-027 fechou em 18/08 e F13 escreve contra a porta, sem depender da marca do provedor; F14–F16 seguem no ADR-013, F17–F41 porque o MVP ainda não foi discutido com o PI, e
+estacionadas: **F12 e F13 não estão mais paradas por ADR** — o ADR-027 fechou em 18/08 e F13 escreve contra a porta, sem depender da marca do provedor; F14–F16 seguem no ADR-013; **F17–F22 já não estão paradas por ADR** — o ADR-036 fechou o último ponto do ADR-008 em 19/08 e quem as segura agora é só a entrada do MVP 3; F23–F41 porque o MVP ainda não foi discutido com o PI, e
 **F43–F44 pelo gate do MVP 4** — as superfícies `mobile` e `kiosk` não existem.
 
 > ⚠️ **O board (Projects) ainda não existe** — só as labels, criadas automaticamente pela API ao
@@ -455,7 +475,7 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 
 | ADR | o que falta | bloqueia |
 |---|---|---|
-| **ADR-008** *(ponto remanescente)* | **transferência internacional** de dado sensível, se o provedor de IA de saúde estiver fora do Brasil. **Reapontado:** bloqueava F8 por engano — F8 não chama IA nenhuma | F21 |
+| ~~**ADR-008**~~ *(ponto remanescente)* | ✅ **FECHADO em 19/08/2026 pelo ADR-036.** Transferência internacional resolvida por **pseudonimização na entrada + DPA com não-treinamento**; modelos decididos (`claude-haiku-4-5` na extração, `claude-sonnet-4-6` na análise). **A F21 deixa de ter ADR bloqueando** — resta assinar o DPA, que é ato de terceiro. O escopo do ECG saiu no ADR-035: guardar e citar sim, interpretar não | ~~F21~~ → **—** |
 | **ADR-013** | ✅ **fechado**; as duas políticas do `M2-COMPLIANCE-01` que restavam foram decididas pelo PI em 19/08/2026 e implementadas na F16. **Nada mais bloqueia o MVP 2.** Histórico: fechado em 19/08/2026 pelo ADR-032: **Sicoob para PIX, Getnet (Santander) para cartão**. O card `[GATE]` nunca chegou a existir no board, e o que faltava não era matriz — era o fato de que **a academia já recebe pela Sicoob**. Restam abertas só as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites), que bloqueiam **F16**, não F14 | ~~F14–F16~~ → **F16** |
 | ~~**ADR-027**~~ | **FECHADO em 18/08/2026.** Modelo de `Payment`/`PaymentAttempt` decidido e `MVP-02` §7/§11 emendados. **F12 sem ADR bloqueando** — faltam a spec preenchida e a entrada do MVP 2 | — |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |
@@ -515,7 +535,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **1.5** | Operação offline: snapshot, fila e reconciliação | MVP 1 em piloto, com incidente de link medido | F10 | adiado por **ADR-012**. **ADR-007 fechado em 16/08 — spec aprovada** |
 | **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | **provedor decidido em 19/08 (ADR-032): Sicoob PIX + Getnet cartão** — F14 e F15 destravadas, F16 ainda espera as duas políticas do `M2-COMPLIANCE-01`. F12 e F13 já entregues |
 | **2.5** | Design system: tokens, `packages/ui` e as três superfícies | **F42 sem gate** (dívida ativa: `admin-web` está na `main` sem CSS) · **F43 e F44 têm gate:** o PI priorizar o MVP 4 | F42–F44 | criado por **ADR-025**. F42 pegável assim que o card `[INFRA]` do pipeline de tokens sair |
-| **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis + protocolo clínico | F17–F22 | bloqueado por MVP 1 |
+| **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis (o *protocolo clínico* como gate **caiu em 19/08** — decisão do PI, ADR-035) | F17–F22 | **bloqueado só por MVP 1.** ADR-008 e ADR-036 fechados; F17–F20 não chamam IA e são as primeiras pegáveis quando o MVP 1 estabilizar |
 | **4** | Autosserviço: app do aluno e totem | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado |
 | **5** | Engajamento opt-in mensurável | eventos confiáveis + app do MVP 4 | F30–F35 | bloqueado |
 | **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | bloqueado |
