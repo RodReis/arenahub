@@ -312,7 +312,8 @@ allow ilimitado (`M1-BR-008`).
 
 **Data:** 14/08/2026 · **Status:** `aceito` *(consolidação — `M1-BR-004`, `M1-BR-005`,
 `M1-FR-014`, `prd/README.md` §6.4; base legal, papéis e RIPD decididos pelo PI na segunda rodada
-de 14/08/2026)* · **Bloqueia:** nada em F8. Resta **um** ponto aberto, e ele bloqueia **F21**
+de 14/08/2026)* · **Bloqueia:** nada. O último ponto aberto — transferência internacional — **fechou em
+19/08/2026 pelo ADR-036**
 
 **Contexto — e por que isto não é burocracia.** Em **04/08/2026**, dez dias antes deste ADR, a
 ANPD determinou por Despacho Decisório nº 2/2026/SFI a **suspensão imediata** do
@@ -393,12 +394,21 @@ identificação e autenticação.
     **Risco assumido:** template errado escala o erro para todo cliente futuro — por isso ele
     passa por revisão jurídica antes do primeiro cliente, não depois.
 
-**Continua aberto — e bloqueia F21, não F8.**
+**~~Continua aberto~~ — FECHADO em 19/08/2026 pelo [ADR-036](#adr-036).**
 
 - **IA de saúde e transferência internacional.** Se o provedor de IA estiver fora do Brasil, há
   transferência internacional de dado **sensível** a tratar (cláusulas-padrão, adequação ou
   consentimento específico para a transferência). Isto é MVP 3 — **F21**, análise assistiva por
   IA. Estava listado como bloqueio de F8 por engano: F8 não chama IA nenhuma.
+
+  **Como fechou:** o PI decidiu em 19/08/2026 por **provedor externo com pseudonimização na
+  entrada** (snapshot numérico, sem nome, sem CPF, sem imagem) **mais DPA com cláusula explícita
+  de não-treinamento**, assinado antes da primeira chamada com dado real. Detalhe, modelos e
+  custo no **ADR-036**. **A F21 deixa de ter ADR bloqueando** — resta a assinatura do DPA, que é
+  ato de terceiro, não decisão pendente.
+
+  ⚠️ **O que este fechamento não cobre:** achado cardíaco. O **ADR-035** mantém o ECG **fora** do
+  payload enviado à IA — pseudonimizar não autoriza interpretar.
 
 ---
 
@@ -885,8 +895,35 @@ virar ADR em vez de exceção. Este é o ADR.
 | `CLAUDE.md` | as regras do trio |
 
 **O Cowork continua sem poder escrever:** qualquer coisa em `apps/`, `packages/`, `infra/`,
-`.github/`, `docs/prd/**` e `docs/superpowers/**`. Ou seja: **código, configuração de build, CI e
+`.github/`, ~~`docs/prd/**`~~ e `docs/superpowers/**`. Ou seja: **código, configuração de build, CI e
 os PRDs aprovados.** PRD só muda por emenda que o PI aprova explicitamente.
+
+> ### Emenda de 19/08/2026 — o Cowork passa a escrever emenda de PRD
+>
+> **Autorizado pelo PI em 19/08/2026.** Não virou ADR novo: desde o corte de 18/08 o `CLAUDE.md`
+> diz que **decisão sobre o próprio processo não vira ADR** — muda-se o arquivo. Fica registrado
+> aqui porque a linha riscada acima estava neste ADR, e deixá-la de pé criaria duas verdades.
+>
+> **O que mudou.** O Cowork escreve em `docs/prd/**` **apenas** para materializar decisão do PI
+> **já registrada em ADR aceito**, citando o ADR dentro da própria emenda. Requisito novo, escopo
+> novo, ou comportamento que não venha de um ADR: continua sendo do Code ou do PI.
+>
+> **Por que.** A regra original protegia contra o Cowork inventar escopo de produto — risco real.
+> Mas ela também impedia o Cowork de **transcrever** para o PRD uma decisão que o próprio PI já
+> tinha tomado e que o próprio Cowork já tinha escrito no ADR. O efeito prático em 19/08 foi um
+> ADR-035 correto no `DECISIONS.md` e um `MVP-03` §6 dizendo o **oposto** dele, com a
+> reconciliação virando tarefa de outro agente. Documento que contradiz documento é o defeito que
+> o ADR-022 e o ADR-018 já tentaram matar duas vezes.
+>
+> **A cláusula "PRD só muda por emenda que o PI aprova explicitamente" não se moveu** — o que
+> mudou é quem digita. O ADR aceito **é** a aprovação explícita; sem ele, o Cowork não escreve
+> uma linha lá.
+>
+> **Risco assumido.** Se um ADR estiver mal escrito, o erro agora se propaga para o PRD sem
+> passar por revisão do Code. Mitigação: toda emenda cita o ADR de origem, então o caminho de
+> volta é um `grep` — e reverter documento é barato.
+>
+> Primeira aplicação: `MVP-03` §6, §12 e §16 (ADR-035 e ADR-036), em 19/08/2026.
 
 **O que a decisão não afrouxa — e é o ponto.**
 
@@ -1830,3 +1867,199 @@ A tela de listagem é usada no balcão, com o aluno do outro lado e outros na fi
 Uma lista de CPFs completos em monitor voltado para a recepção expõe dado pessoal de terceiros —
 não do aluno atendido, dos outros da fila. **O PI decidiu com o custo registrado ao lado do
 benefício; não bloqueia a fatia.**
+
+---
+
+<a id="adr-035"></a>
+## ADR-035 — ECG no MVP 3: o ArenaHub guarda e cita, nunca interpreta
+
+**Data:** 19/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 19/08/2026**
+· **Emenda material:** `docs/prd/academia/MVP-03-health-intelligence.md` §6 *(Fora de escopo)* e
+§12 *(saída estruturada da IA)* — **a emenda ao PRD é do Code ou do PI; o Cowork não escreve em
+`docs/prd/**` (ADR-021)** · **Bloqueia:** nada; **condiciona** F19 e F21
+
+**Contexto.** A bioimpedância da Arena Positiva sai de uma balança bluetooth de consumo
+(`CF610_G`, MAC `CF:E8:CC:12:00:11`). Junto dela o PI trouxe um terceiro arquivo que **não é
+bioimpedância**: um ECG de 30 s do **OMRON HEM-7530T** via OmronConnect (algoritmo AliveCor),
+carregando `Análise instantânea: Possível fibrilação atrial`, 99 bpm e as tags
+`Atividade: Alta, Tontura`.
+
+O PI quer o arquivo dentro do produto e **recusou o gate clínico** que o §5 do `MVP-03` previa,
+por considerá-lo trava sem propósito. A recusa é aceita, e o gate não volta — mas ela obriga a
+escrever a linha que o gate escondia.
+
+**A linha não é "com laudo médico" versus "sem laudo médico". É armazenar versus interpretar.**
+A **RDC 657/2022** da ANVISA exclui do regime de dispositivo médico o software que apenas
+**armazena, arquiva, transmite ou exibe** dado de saúde. O que enquadra um software como
+dispositivo médico é ele próprio **interpretar** — classificar, diagnosticar, apoiar decisão
+clínica. O ArenaHub cabe inteiro do lado de fora, desde que não atravesse essa linha.
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **O ECG entra**: arquivo anexado à ficha, no mesmo storage privado dos demais laudos | É o pedido do PI, e guardar documento não é interpretar |
+| 2 | **O achado é citação literal, com crédito de origem** — grava-se `Possível fibrilação atrial` exatamente como o aparelho escreveu, com `origem: OMRON HEM-7530T · OmronConnect` e `classificado_por: equipamento` | Repetir o que o fabricante afirmou é exibição. Reescrever com palavra própria é assumir a autoria da classificação |
+| 3 | **Proibido reclassificar, normalizar para taxonomia própria ou inventar faixa de referência** para qualquer campo vindo do ECG | Normalizar é interpretar disfarçado de padronização |
+| 4 | **O ECG fica fora do snapshot enviado à IA.** Vai apenas o booleano `pendenciaMedicaAberta` e a data `pendenciaDesde` — sem traçado, sem o texto do achado, sem bpm do ECG | Sem o booleano a análise diria *"está tudo ótimo"* com pendência cardíaca aberta, o que é pior que silêncio. Com o texto do achado, a IA vira a intérprete e o produto vira dispositivo médico |
+| 5 | **A IA nunca gera pesquisa, estudo ou material explicativo sobre o achado do aluno** | Conteúdo que **muda porque este aluno tem este achado** é personalizado por condição clínica, logo é suporte à decisão clínica — mesmo sem prescrever nada. Somado ao risco concreto de um modelo alucinar referência médica em português |
+| 6 | **No lugar da pesquisa: texto fixo**, curto, escrito uma vez, **revisado por profissional de saúde**, idêntico para qualquer achado e para qualquer aluno | Igual para todos = não personalizado = não clínico. E não custa chamada de IA |
+| 7 | **Achado aberto vira pendência visível** — badge na lista de alunos, não só na ficha — resolvida por `Registrar encaminhamento` com data e responsável, emitindo `HealthReferralRegistered` no outbox | O que a academia responde num processo não é se o software era regulado; é **o que ela fez depois de saber**. O registro é a prova de que agiu |
+| 8 | **O parser do ECG não usa IA.** O PDF do OmronConnect tem camada de texto extraível — `pdftotext` lê `Paciente`, `Gravado`, `Frequência cardíaca`, `Duração`, `Tags` e `Análise instantânea` direto | Custo zero, determinístico e reprodutível. Mandar para OCR seria pagar para introduzir erro |
+
+### O que sustenta a decisão 7, e o que a enfraquece
+
+**A favor do risco baixo:** o `MVP-03` §6 já exclui `prescrição de treino ou dieta`, e o PI
+confirmou em 19/08/2026 que **o ArenaHub não emite plano de treino**. Sem prescrição, não há ato
+do sistema ligando o achado cardíaco a uma orientação de intensidade — a exposição civil cai
+materialmente, e a guarda original ("bloquear publicação de plano") perde o alvo.
+
+**Contra:** o dado continua no banco. `tontura` + `possível fibrilação atrial` +
+`Atividade: Alta`, com carimbo de 12/08/2026, é registro de que a academia sabia. A decisão 7 é
+o que transforma esse registro de passivo em prova de diligência. Ela é barata; não pular.
+
+### Consequências de implementação
+
+- `HealthAnalysisOutput` (§12 do PRD) ganha `pendingMedicalReferral: boolean` e
+  `pendingReferralSince: string | null`. O texto que o aluno lê sobre a pendência é **template
+  disparado pelo booleano**, não geração.
+- O montador do snapshot precisa de **teste que falha** se qualquer campo de origem `ECG` vazar
+  para o payload da IA. É a guarda executável desta decisão — sem ela, a regra é prosa.
+- A extração do ECG é parser de texto, não adapter de OCR. Vive no mesmo boundary da Slice 3.3.
+
+---
+
+<a id="adr-036"></a>
+## ADR-036 — Modelos de IA do MVP 3, e o fechamento do ADR-008
+
+**Data:** 19/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 19/08/2026**
+· **Fecha** o ponto remanescente do **ADR-008** (transferência internacional de dado sensível)
+· **Destrava:** **F21** · **Depende de:** ADR-035 (o que **não** vai para a IA)
+
+**Contexto.** A Slice 3.5 exige `AIProvider` abstrato, minimização e pseudonimização de entrada,
+prompt versionado, saída estruturada validada e reprodutibilidade. Faltavam duas coisas para
+poder implementar: **qual provedor** — que é o ponto que sobrou aberto no ADR-008 desde 14/08 — e
+**qual modelo**, que ninguém tinha decidido porque parecia detalhe técnico e não é: modelo
+pequeno erra número, e número errado numa ficha de saúde é o defeito que este MVP existe para
+não ter.
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **Duas chamadas, dois modelos.** `claude-haiku-4-5` na **extração** dos campos do laudo; `claude-sonnet-4-6` na **análise** | São tarefas diferentes. Extração é mecânica, alto volume, e tem conferência humana campo a campo depois (Slice 3.3) — modelo barato serve. Análise escreve texto que o aluno lê e o avaliador usa; ali trocar 39,8 por 38,9 é o erro que não pode acontecer |
+| 2 | **Provedor externo, com pseudonimização na entrada** — snapshot numérico, sem nome, sem CPF, sem imagem, sem identificador direto | §15 do `MVP-03`. É o que torna a transferência internacional defensável em vez de apenas declarada |
+| 3 | **DPA com cláusula explícita de não-treinamento, assinado antes da primeira chamada com dado real** | §15 exige contrato explícito. É o único item desta decisão que não é código e depende de terceiro — **começar por ele** |
+| 4 | **Teto de gasto por tenant, com degradação para modo manual** | O `M3-NFR-005` já pede *timeout, orçamento e circuit breaker*. "Orçamento" é literalmente isto: estourou o teto, a análise desliga e a avaliação manual continua funcionando (`M3-NFR-004`), em vez de faturar sem limite |
+| 5 | **A troca de modelo é `useClass` no módulo, não reescrita** | Mesmo padrão que a F13 usou com `PaymentProvider`. Se o Sonnet se mostrar caro demais ou fraco demais com dado real, troca-se sem tocar em regra de domínio |
+
+### Custo — a conta que sustentou a escolha
+
+Premissas: 2 imagens por avaliação (os dois PNGs da balança; o ECG é parser de texto, **não passa
+por IA** — ADR-035 §8), imagem 1848×2600 redimensionada para 1114×1568 ≈ **2.329 tokens**;
+extração ~6.200 in / ~2.000 out; análise ~3.400 in / ~1.500 de texto + ~2.000 de *thinking*
+(cobrado como saída). **Sem cache** — com ~10 avaliações/dia espalhadas, o cache de prompt
+praticamente não bate.
+
+| arranjo | por avaliação | 300/mês | +20% de reprocessamento |
+|---|---|---|---|
+| tudo Haiku 4.5 | US$ 0,027 | US$ 8,12 | ~US$ 10 |
+| **Haiku + Sonnet 4.6** ← escolhido | US$ 0,079 | US$ 23,66 | **~US$ 28** |
+| Haiku + Opus 4.8 | US$ 0,121 | US$ 36,20 | ~US$ 43 |
+
+**O "300/mês" é premissa, não dado.** O número derivável do catálogo da F12 é outro: o plano dá
+bioimpedância a cada **30 dias** (adultos) e **60** (clínica), então avaliações/mês tende ao
+número de alunos ativos com o benefício. Com a base da F47 (1.926 alunos, ainda `CANCELLED`), o
+teto é várias vezes maior. **Puxar o número real antes de fixar o teto da decisão 4.**
+
+### Notas de implementação — erram silenciosamente se ignoradas
+
+- **`claude-haiku-4-5` não aceita `output_config.effort`** e não tem *adaptive thinking*: a
+  chamada retorna erro. O adapter precisa ramificar por modelo — a mesma função servindo os dois
+  quebra na extração.
+- **`claude-sonnet-4-6` usa `thinking: {type: 'adaptive'}`**; `budget_tokens` está depreciado
+  nele e não deve entrar em código novo.
+- **Tokens de *thinking* são cobrados como saída.** Qualquer estimativa de custo que os ignore
+  subestima a análise em ~2×. Foi o erro da primeira estimativa desta conversa, corrigido aqui.
+- Contexto do Haiku 4.5 é **200K**, não 1M. Dois laudos cabem com folga; um lote grande, não.
+
+### O que isto fecha, e o que continua aberto
+
+**Fecha** o item que restava do **ADR-008** — *"transferência internacional de dado sensível, se o
+provedor de IA de saúde estiver fora do Brasil"* — pela combinação das decisões 2 e 3:
+pseudonimização na entrada mais contrato com não-treinamento. **A F21 deixa de ter ADR
+bloqueando.**
+
+**Continua aberto**, e não é ADR: a assinatura do DPA (decisão 3) e o número real de avaliações
+por mês. Nenhum dos dois impede começar F17–F20, que não chamam IA nenhuma.
+
+---
+
+<a id="adr-037"></a>
+## ADR-037 — Contexto de saúde do aluno: lista fechada que suprime alerta, não texto que gera texto
+
+**Data:** 19/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 19/08/2026**
+· **Emenda:** `MVP-03` §6, §7 (Slices 3.1 e 3.5), §10 e §12 · **Depende de:** ADR-035, ADR-036
+· **Condiciona:** F17 e F21
+
+**Contexto.** O PI mantém uma ferramenta pessoal de análise de bioimpedância, e a melhor parte
+dela não é o cálculo — é uma lista de **fatores individuais** que mudam como o laudo deve ser
+lido: usa creatina, massa muscular atípica, oscilação sazonal. Sem eles, a análise erra de forma
+previsível e grosseira.
+
+**O problema é real e mensurável no próprio dado que originou esta decisão.** Com **69,7 kg de
+massa livre de gordura** contra a faixa do aparelho de **52,0–64,8 kg**, praticamente todo
+compartimento sai "acima": água total, água intracelular, água extracelular, massa proteica,
+minerais. São **seis alarmes** num único laudo, e nenhum deles significa o que o aparelho sugere.
+No mesmo laudo, o `BMR` de 1.875 kcal é marcado "insuficiente" contra uma faixa calculada por
+outra fórmula (ADR-036).
+
+**Um produto que dispara seis alertas falsos por avaliação é abandonado na terceira semana.** O
+professor para de ler, e junto param de ser lidos os alertas verdadeiros. Isso não é risco
+teórico: é o modo de falha mais comum de ferramenta clínica assistiva.
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **Lista fechada de fatores**, tabela `student_health_context`. **Nenhum campo de texto livre** | Fator individual é dado de saúde (LGPD art. 11). Textarea preenchida pela recepção vira depósito de informação médica não estruturada, sem finalidade declarada no termo — o primeiro item que uma fiscalização abre. Lista fechada tem finalidade enumerável e cabe no consentimento |
+| 2 | **Cada fator SUPRIME alerta específico**; nenhum fator gera texto | Supressão é regra determinística, testável e reversível. Geração é prompt, e prompt não tem teste que falha |
+| 3 | **O fator viaja no snapshot**, para a análise saber o que já foi suprimido e por quê | Sem isso a IA reintroduz em prosa o alerta que a regra tirou |
+| 4 | **`gestante_ou_pos_parto` e `edema_relatado` bloqueiam ou invalidam a análise**, não apenas suprimem | Bioimpedância não é válida na gestação. Aqui o certo é não analisar, e dizer que não analisou |
+| 5 | **"Alerta clínico" não existe no vocabulário do produto.** O que existe é **`valorForaDaFaixaDoEquipamento`** | O nome governa o que o modelo gera. "Alerta clínico" convida a diagnosticar; a formulação neutra descreve o fato e manda a dúvida para `questionsForProfessional` |
+| 6 | **Quem preenche é o avaliador**, com `student_health_context.registered_by` e histórico versionado — nunca a recepção | É informação de saúde declarada, com consequência sobre o que o sistema mostra. Precisa de dono identificável |
+| 7 | **Exames laboratoriais ficam FORA do MVP 3** — nem anexo, nem extração | Faixa de referência de exame varia por laboratório, método e sexo; interpretá-la é ato clínico muito mais claro que ler composição corporal. Entra como fatia própria se o PI priorizar, com ADR novo |
+
+### Os fatores da lista inicial
+
+| fator | efeito determinístico |
+|---|---|
+| `suplementacao_creatina` | suprime alerta de **água intracelular** alta; anota o efeito conhecido sobre creatinina sérica caso exame entre no escopo um dia |
+| `composicao_atipica` | suprime alertas de **compartimento absoluto** (água total, proteína, minerais, massa livre de gordura). **Mantém** os de razão — ex. água extracelular / água total |
+| `gestante_ou_pos_parto` | **bloqueia** a análise; a avaliação é registrada, não interpretada |
+| `edema_relatado` | invalida leitura de **água**; os demais campos seguem |
+| `uso_de_diuretico` | idem `edema_relatado` |
+| `atleta_competitivo` | suprime comparação com **faixa populacional**; mantém comparação com o **próprio histórico** |
+
+A lista cresce por PR do Code, não por campo livre. Fator novo exige o teste que prova o que ele
+suprime — sem teste, não entra.
+
+### O que veio da ferramenta pessoal e o que ficou de fora
+
+**Copiado:** o conceito de fator individual; *"tendência é mais informativa que valor isolado"*;
+*"priorize o que mudou"*; *"não listar tudo que está normal — economia cognitiva"*; rastrear o
+encaminhamento enquanto estiver aberto; e a recusa a tom motivacional sem número atrás.
+
+**Deixado de fora, de propósito:** ajuste de **dieta, treino e suplementação**, recálculo de
+macros, e leitura de exame de sangue. Na ferramenta pessoal isso é uma pessoa cuidando de si, com
+o próprio médico. No produto seria a academia praticando ato clínico sem competência nem registro.
+**A diferença não é de rigor técnico — é de quem é o titular do dado e quem responde pelo
+conselho.** O `MVP-03` §6 já exclui prescrição de treino e dieta; esta decisão acrescenta os
+exames.
+
+### Risco assumido
+
+Lista fechada erra por omissão: um fator que ninguém previu não tem como ser registrado, e o
+alerta falso aparece. **É o erro certo a cometer** — falta um fator, adiciona-se um item com
+teste; sobra um campo livre, não há como recolher o dado de saúde que já foi digitado nele.
+

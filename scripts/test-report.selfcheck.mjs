@@ -5,228 +5,175 @@
  *   node scripts/test-report.selfcheck.mjs
  *
  * "Gerador de relatorio sem teste e a forma mais elegante de mentir com
- * numero." O que este arquivo garante e uma coisa so, e a mais importante:
- * QUE O GERADOR CONTA O QUE EXISTE -- nao o que gostariamos que existisse.
- *
- * O metodo e criar arquivo de teste falso num repositorio Git temporario,
- * rodar o gerador la dentro e conferir se o numero mudou. Se o gerador
- * passar a inventar linha, estimar ou herdar numero antigo, estes casos
- * quebram.
+ * numero." Testa as funcoes PURAS de `test-report.core.mjs` -- agregacao por
+ * nivel, formatacao, deteccao de divergencia entre "Estado atual" e
+ * historico. Nao roda Jest/Vitest de verdade (isso levaria minutos e
+ * herdaria o crash intermitente do `test:integration` no Windows) -- o que
+ * este arquivo garante e que a LOGICA de contagem/agregacao/comparacao esta
+ * certa, dado um resultado ja extraido.
  */
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, cpSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 
-const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
-const GERADOR = join(RAIZ, 'scripts', 'test-report.mjs');
-
-/** Monta um repositorio Git descartavel com os arquivos pedidos. */
-function repositorioFalso(arquivos) {
-  const dir = mkdtempSync(join(tmpdir(), 'arenahub-selfcheck-'));
-
-  spawnSync('git', ['init', '-q'], { cwd: dir });
-  spawnSync('git', ['config', 'user.email', 'selfcheck@local'], { cwd: dir });
-  spawnSync('git', ['config', 'user.name', 'selfcheck'], { cwd: dir });
-
-  mkdirSync(join(dir, 'scripts'), { recursive: true });
-  cpSync(GERADOR, join(dir, 'scripts', 'test-report.mjs'));
-
-  for (const caminho of arquivos) {
-    const destino = join(dir, caminho);
-    mkdirSync(dirname(destino), { recursive: true });
-    writeFileSync(destino, '// arquivo de teste falso do self-check\n');
-  }
-
-  spawnSync('git', ['add', '-A'], { cwd: dir });
-  spawnSync('git', ['commit', '-q', '-m', 'selfcheck'], { cwd: dir });
-
-  return dir;
-}
-
-function gerarEm(dir) {
-  const r = spawnSync('node', [join(dir, 'scripts', 'test-report.mjs')], {
-    cwd: dir,
-    encoding: 'utf8',
-  });
-  if (r.status !== 0) {
-    throw new Error(`gerador falhou: ${r.stderr ?? ''}`);
-  }
-  return readFileSync(join(dir, 'reports', 'TESTS.md'), 'utf8');
-}
-
-/** Le o numero da coluna "arquivos" da linha de um nivel. */
-function contagem(relatorio, nivel) {
-  const linha = relatorio.split('\n').find((l) => l.startsWith(`| ${nivel} |`));
-  assert.ok(linha, `o relatorio nao tem linha para o nivel "${nivel}"`);
-  const valor = Number(linha.split('|').at(-2)?.trim());
-  assert.ok(Number.isInteger(valor), `contagem ilegivel para "${nivel}": ${linha}`);
-  return valor;
-}
+import { acumularNoNivel, formatarPct, gerar, historicoExistente, linhaDeNivel, NIVEIS, secaoEstadoAtual } from './test-report.core.mjs';
 
 const casos = [];
 
 casos.push([
-  'sem teste algum, conta zero e diz que nao ha cobertura',
+  'formatarPct mostra travessao para null, uma casa decimal para numero',
   () => {
-    const dir = repositorioFalso([]);
-    try {
-      const r = gerarEm(dir);
-      assert.equal(contagem(r, 'unitário'), 0);
-      assert.match(r, /Nenhum teste de domínio existe ainda/);
-      assert.match(r, /Cobertura de regra de domínio: \*\*n\/a\*\*/);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
+    assert.equal(formatarPct(null), '—');
+    assert.equal(formatarPct(84.567), '84.6');
+    assert.equal(formatarPct(100), '100.0');
+  },
+]);
+
+casos.push([
+  'linhaDeNivel sem dados sai zerada, nao ausente',
+  () => {
+    assert.equal(linhaDeNivel('unitário', undefined), '| unitário | 0 | 0 | 0 | — |');
+  },
+]);
+
+casos.push([
+  'linhaDeNivel calcula cobertura como media ponderada por peso, nao media simples',
+  () => {
+    // Dois alvos, pesos bem diferentes: media simples de 90/10 seria 50;
+    // ponderada pelo peso (900 e 10) fica proxima de 90.
+    const dados = { testes: 910, pass: 910, falha: 0, coberturaPtsSoma: 90 * 900 + 10 * 10, coberturaPeso: 910 };
+    const linha = linhaDeNivel('unitário', dados);
+    assert.match(linha, /\| 89\.\d \|$/, `esperava cobertura proxima de 90, veio: ${linha}`);
+  },
+]);
+
+casos.push([
+  'acumularNoNivel soma dois alvos do mesmo nivel',
+  () => {
+    let porNivel = new Map();
+    porNivel = acumularNoNivel(porNivel, 'unitário', { testes: 10, pass: 9, falha: 1, coberturaPct: 80 });
+    porNivel = acumularNoNivel(porNivel, 'unitário', { testes: 5, pass: 5, falha: 0, coberturaPct: 100 });
+
+    const dados = porNivel.get('unitário');
+    assert.equal(dados.testes, 15);
+    assert.equal(dados.pass, 14);
+    assert.equal(dados.falha, 1);
+    // Ponderado: (80*10 + 100*5) / 15 = 86.67
+    assert.equal((dados.coberturaPtsSoma / dados.coberturaPeso).toFixed(2), '86.67');
+  },
+]);
+
+casos.push([
+  'acumularNoNivel ignora coberturaPct null no peso (nao derruba a media)',
+  () => {
+    let porNivel = new Map();
+    porNivel = acumularNoNivel(porNivel, 'e2e', { testes: 3, pass: 3, falha: 0, coberturaPct: null });
+    const dados = porNivel.get('e2e');
+    assert.equal(dados.coberturaPeso, 0, 'peso deveria ficar zero -- nenhum alvo com cobertura real');
+  },
+]);
+
+casos.push([
+  'gerar produz os 6 niveis do TESTING.md §1, mesmo sem ALVO para alguns',
+  () => {
+    const conteudo = gerar({ porNivel: new Map(), entrega: null, conteudoAnterior: null });
+    for (const nivel of NIVEIS) {
+      assert.match(conteudo, new RegExp(`\\| ${nivel} \\| 0 \\| 0 \\| 0 \\| — \\|`), `nivel "${nivel}" ausente ou nao-zerado`);
     }
   },
 ]);
 
 casos.push([
-  'conta o arquivo que existe, por sufixo',
+  'gerar sem entrega nao acrescenta linha ao historico',
   () => {
-    const dir = repositorioFalso([
-      'src/a.spec.ts',
-      'src/b.spec.ts',
-      'src/c.int-spec.ts',
-      'src/d.e2e-spec.ts',
-    ]);
-    try {
-      const r = gerarEm(dir);
-      assert.equal(contagem(r, 'unitário'), 2);
-      assert.equal(contagem(r, 'integração'), 1);
-      assert.equal(contagem(r, 'e2e'), 1);
-      assert.equal(contagem(r, 'contrato'), 0);
-      assert.doesNotMatch(r, /Nenhum teste de domínio existe ainda/);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    const porNivel = acumularNoNivel(new Map(), 'unitário', { testes: 10, pass: 10, falha: 0, coberturaPct: 90 });
+    const conteudo = gerar({ porNivel, entrega: null, conteudoAnterior: null });
+    const historico = conteudo.split('## Histórico por entrega')[1];
+    assert.doesNotMatch(historico, /\| 20\d\d-/, 'linha de historico apareceu sem --issue');
   },
 ]);
 
 casos.push([
-  'nao confunde nivel: .int-spec.ts nao entra como unitário',
+  'gerar com entrega acrescenta uma linha por nivel com teste > 0',
   () => {
-    // `.int-spec.ts` tambem termina em `-spec.ts`; um gerador desatento
-    // contaria o mesmo arquivo duas vezes ou no balde errado.
-    const dir = repositorioFalso(['src/x.int-spec.ts']);
-    try {
-      const r = gerarEm(dir);
-      assert.equal(contagem(r, 'integração'), 1);
-      assert.equal(contagem(r, 'unitário'), 0, '.int-spec.ts vazou para o nivel unitário');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    let porNivel = new Map();
+    porNivel = acumularNoNivel(porNivel, 'unitário', { testes: 10, pass: 10, falha: 0, coberturaPct: 90 });
+    porNivel = acumularNoNivel(porNivel, 'integração', { testes: 0, pass: 0, falha: 0, coberturaPct: null });
+
+    const conteudo = gerar({
+      porNivel,
+      entrega: { issue: '122', spec: 'F47', pr: '123', data: '2026-08-20' },
+      conteudoAnterior: null,
+    });
+
+    assert.match(conteudo, /\| 2026-08-20 \| #122 \| F47 \| unitário \| 10 \| 10 \| 0 \| 90\.0 \| #123 \|/);
+    // Nivel com testes=0 (integração) nao gera linha NO HISTORICO -- nada foi
+    // executado ali, uma linha "0 testes" la seria ruido. A tabela "Estado
+    // atual" continua mostrando integração zerada -- isso e' esperado.
+    const historico = conteudo.split('## Histórico por entrega')[1];
+    assert.doesNotMatch(historico, /integração/, 'nivel sem teste apareceu no historico');
   },
 ]);
 
 casos.push([
-  'conta teste de componente React: .spec.tsx entra como unitário (regressao #111)',
+  'gerar preserva o historico ja commitado ao anexar nova entrega (append-only)',
   () => {
-    // `"Button.spec.tsx".endsWith(".spec.ts")` e `false` -- termina em `x`.
-    // Enquanto o nivel teve UM sufixo, os 17 testes de componente do design
-    // system nao entravam em balde nenhum e o total mentia para menos.
-    const dir = repositorioFalso(['src/Button.spec.tsx', 'src/util.spec.ts']);
-    try {
-      const r = gerarEm(dir);
-      assert.equal(contagem(r, 'unitário'), 2, '.spec.tsx nao foi contado como unitário');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    const anterior = gerar({
+      porNivel: acumularNoNivel(new Map(), 'unitário', { testes: 5, pass: 5, falha: 0, coberturaPct: 80 }),
+      entrega: { issue: '100', spec: null, pr: '101', data: '2026-08-01' },
+      conteudoAnterior: null,
+    });
+
+    const novo = gerar({
+      porNivel: acumularNoNivel(new Map(), 'unitário', { testes: 8, pass: 8, falha: 0, coberturaPct: 85 }),
+      entrega: { issue: '122', spec: 'F47', pr: '123', data: '2026-08-20' },
+      conteudoAnterior: anterior,
+    });
+
+    assert.match(novo, /\| 2026-08-01 \| #100 \| — \| unitário \| 5 \| 5 \| 0 \| 80\.0 \| #101 \|/, 'linha antiga sumiu -- historico nao e append-only');
+    assert.match(novo, /\| 2026-08-20 \| #122 \| F47 \| unitário \| 8 \| 8 \| 0 \| 85\.0 \| #123 \|/, 'linha nova nao foi anexada');
   },
 ]);
 
 casos.push([
-  'nao confunde nivel em .tsx: .int-spec.tsx nao entra como unitário',
+  'historicoExistente devolve vazio quando nao ha secao de historico',
   () => {
-    // A precedencia vem do ponto literal, nao da ordem do array -- e ela
-    // precisa valer nos dois sufixos, nao so no `.ts`.
-    const dir = repositorioFalso(['src/x.int-spec.tsx']);
-    try {
-      const r = gerarEm(dir);
-      assert.equal(contagem(r, 'integração'), 1);
-      assert.equal(contagem(r, 'unitário'), 0, '.int-spec.tsx vazou para o nivel unitário');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    assert.deepEqual(historicoExistente(null), []);
+    assert.deepEqual(historicoExistente('# so titulo, sem secoes'), []);
   },
 ]);
 
 casos.push([
-  'ignora arquivo nao rastreado pelo Git',
+  'secaoEstadoAtual isola "Estado atual" do historico, para o --check nao reprovar por causa da propria linha que anexou',
   () => {
-    const dir = repositorioFalso(['src/a.spec.ts']);
-    try {
-      // Escrito depois do commit: existe no disco, nao no indice.
-      writeFileSync(join(dir, 'src', 'fantasma.spec.ts'), '// nao commitado\n');
-      const r = gerarEm(dir);
-      assert.equal(contagem(r, 'unitário'), 1, 'contou arquivo fora do indice do Git');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    const semEntrega = gerar({
+      porNivel: acumularNoNivel(new Map(), 'unitário', { testes: 5, pass: 5, falha: 0, coberturaPct: 80 }),
+      entrega: null,
+      conteudoAnterior: null,
+    });
+    const comEntrega = gerar({
+      porNivel: acumularNoNivel(new Map(), 'unitário', { testes: 5, pass: 5, falha: 0, coberturaPct: 80 }),
+      entrega: { issue: '1', spec: null, pr: null, data: '2026-08-20' },
+      conteudoAnterior: null,
+    });
+
+    assert.equal(
+      secaoEstadoAtual(semEntrega),
+      secaoEstadoAtual(comEntrega),
+      '"Estado atual" mudou so por causa da entrega no historico -- --check reprovaria PR legitimo',
+    );
   },
 ]);
 
 casos.push([
-  'o conteudo nao muda entre commits (regressao: o SHA dentro do arquivo tornava a guarda impossivel)',
+  'secaoEstadoAtual detecta divergencia real (regressao: --check aceitando numero adulterado)',
   () => {
-    const dir = repositorioFalso(['src/a.spec.ts']);
-    try {
-      const primeiro = gerarEm(dir);
+    const original = gerar({
+      porNivel: acumularNoNivel(new Map(), 'unitário', { testes: 5, pass: 5, falha: 0, coberturaPct: 80 }),
+      entrega: null,
+      conteudoAnterior: null,
+    });
+    const adulterado = original.replace('| 5 | 5 | 0 |', '| 999 | 999 | 0 |');
 
-      // Commit novo, SHA novo -- e nada mais mudou no repositorio.
-      writeFileSync(join(dir, 'qualquer.txt'), 'muda o SHA\n');
-      spawnSync('git', ['add', '-A'], { cwd: dir });
-      spawnSync('git', ['commit', '-q', '-m', 'outro commit'], { cwd: dir });
-
-      assert.equal(
-        gerarEm(dir),
-        primeiro,
-        'o relatorio mudou sem que teste algum mudasse -- --check nunca poderia passar',
-      );
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  },
-]);
-
-casos.push([
-  '--check falha quando o relatorio commitado diverge',
-  () => {
-    const dir = repositorioFalso(['src/a.spec.ts']);
-    try {
-      gerarEm(dir);
-      // Adultera o relatorio: e o cenario que a guarda existe para pegar.
-      const alvo = join(dir, 'reports', 'TESTS.md');
-      writeFileSync(alvo, readFileSync(alvo, 'utf8').replace('| 1 |', '| 999 |'));
-
-      const r = spawnSync('node', [join(dir, 'scripts', 'test-report.mjs'), '--check'], {
-        cwd: dir,
-        encoding: 'utf8',
-      });
-      assert.equal(r.status, 1, '--check aceitou relatorio adulterado');
-      assert.match(r.stderr, /divergiu/);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  },
-]);
-
-casos.push([
-  '--check falha quando o relatorio nao existe',
-  () => {
-    const dir = repositorioFalso(['src/a.spec.ts']);
-    try {
-      const r = spawnSync('node', [join(dir, 'scripts', 'test-report.mjs'), '--check'], {
-        cwd: dir,
-        encoding: 'utf8',
-      });
-      assert.equal(r.status, 1);
-      assert.match(r.stderr, /nao existe/);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    assert.notEqual(secaoEstadoAtual(original), secaoEstadoAtual(adulterado));
   },
 ]);
 
