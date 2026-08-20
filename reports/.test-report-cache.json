@@ -27,13 +27,13 @@
     "testes": 44,
     "pass": 44,
     "falha": 0,
-    "coberturaPct": 42.1
+    "coberturaPct": 35.06
   },
   "packages/database#test:integration": {
-    "testes": 48,
-    "pass": 48,
+    "testes": 60,
+    "pass": 60,
     "falha": 0,
-    "coberturaPct": 94.2
+    "coberturaPct": 95.2
   },
   "packages/access-policy#test": {
     "testes": 64,
