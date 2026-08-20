@@ -93,5 +93,11 @@
     "$comment": "DS-PAINEL.md §13 pendencia 2, confirmada pelo PI em 16/08/2026 (SPEC-042 §5 pergunta 3).",
     "degraded": 1024,
     "operational": 1280
+  },
+
+  "brand": {
+    "$comment": "Cores FIXAS de marca de terceiro, nunca configuraveis pelo tenant e fora do pipeline de CSS var/contraste -- build-tokens.mjs nao itera esta chave de proposito. Existem para o hex do logo (IconeWhatsApp) satisfazer a regra de lint 1 (hex so dentro de packages/ui/tokens) sem virar token semantico do produto, que sugeriria papel configuravel. Issue #118.",
+    "whatsapp": "#25D366",
+    "whatsappGlifo": "#FFFFFF"
   }
 }

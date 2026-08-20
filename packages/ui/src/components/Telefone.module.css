@@ -23,20 +23,17 @@
   text-decoration: underline;
 }
 
+/*
+ * SEM `color` aqui: o logo do WhatsApp (`IconeWhatsApp`) carrega a propria
+ * cor de marca no `fill`, ao contrario dos outros icones do catalogo -- que
+ * usam `currentColor` e por isso dependiam desta regra. Herdar
+ * `var(--ah-text-icon)` faria os caminhos brancos do glifo desaparecerem
+ * sobre o fundo verde.
+ */
 .link svg {
   inline-size: 14px;
   block-size: 14px;
   flex-shrink: 0;
-  color: var(--ah-text-icon);
-}
-
-/*
- * O icone ganha cor de ACAO no hover, e so nele: accent em quarenta linhas
- * faria a tabela inteira parecer clicavel, que e o que o DS-PAINEL §2 reserva
- * para acao de verdade.
- */
-.link:hover svg {
-  color: var(--ah-action-text);
 }
 
 .numero {

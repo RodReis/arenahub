@@ -67,6 +67,17 @@ export const BREAKPOINT = {
   "operational": 1280
 } as const;
 
+/**
+ * Cores FIXAS de marca de terceiro -- nunca entram no CSS var do tenant nem
+ * no checador de contraste (`brand` fica de fora do resto do pipeline de
+ * proposito). Existem para um componente de logo (ex.: `IconeWhatsApp`)
+ * usar sem hex literal cru, satisfazendo a regra de lint 1.
+ */
+export const BRAND = {
+  "whatsapp": "#25D366",
+  "whatsappGlifo": "#FFFFFF"
+} as const;
+
 /** Contraste efetivo de cada papel, medido no build. */
 export const CONTRAST_REPORT = [
   {

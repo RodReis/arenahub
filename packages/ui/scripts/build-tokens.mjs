@@ -423,6 +423,18 @@ export const BREAKPOINT = ${JSON.stringify(
   2,
 )} as const;
 
+/**
+ * Cores FIXAS de marca de terceiro -- nunca entram no CSS var do tenant nem
+ * no checador de contraste (\`brand\` fica de fora do resto do pipeline de
+ * proposito). Existem para um componente de logo (ex.: \`IconeWhatsApp\`)
+ * usar sem hex literal cru, satisfazendo a regra de lint 1.
+ */
+export const BRAND = ${JSON.stringify(
+  Object.fromEntries(Object.entries(primitive.brand).filter(([k]) => !k.startsWith('$'))),
+  null,
+  2,
+)} as const;
+
 /** Contraste efetivo de cada papel, medido no build. */
 export const CONTRAST_REPORT = ${JSON.stringify(contrastReport, null, 2)} as const;
 `;
