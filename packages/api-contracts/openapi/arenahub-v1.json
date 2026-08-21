@@ -1980,6 +1980,52 @@
           "HealthProgress"
         ]
       }
+    },
+    "/api/v1/students/{id}/ai-analyses": {
+      "post": {
+        "operationId": "AiAnalysisController_gerar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AiAnalysis"
+        ]
+      }
+    },
+    "/api/v1/students/{id}/ai-analyses/latest": {
+      "get": {
+        "operationId": "AiAnalysisController_ultima",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AiAnalysis"
+        ]
+      }
     }
   },
   "info": {

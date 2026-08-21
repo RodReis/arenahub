@@ -269,6 +269,16 @@ enum ConsentDocumentType {
   /// terceiro fora do Brasil -- e aceite da F21, nao desta fatia.
   HEALTH
 
+  /// Envio dos numeros de composicao corporal a um provedor de IA fora do
+  /// Brasil (F21, ADR-036).
+  ///
+  /// TIPO PROPRIO e nao versao do `HEALTH`, e a distincao e o produto: o
+  /// ADR-036 (retificacao de 20/08) decidiu que recusar a IA deixa o aluno
+  /// com avaliacao, historico, comparativos e metas -- tudo, menos o texto
+  /// gerado. Se fosse versao do `HEALTH`, revogar a IA revogaria junto o
+  /// registro da avaliacao, que e o oposto do combinado.
+  AI_ANALYSIS
+
   @@map("consent_document_type")
 }
 
@@ -296,6 +306,26 @@ enum ConsentSubjectKind {
   LEGAL_GUARDIAN
 
   @@map("consent_subject_kind")
+}
+
+/// De QUEM e a assinatura -- eixo introduzido pela F21.
+///
+/// Ate a F20 toda decisao era do titular, e o papel era implicito. O aceite
+/// da analise por IA exige DUAS assinaturas de naturezas diferentes:
+///
+///   - `STUDENT_CONSENT` -- consentimento do titular (LGPD art. 11). So ele
+///     autoriza o dado a sair do pais;
+///   - `PROFESSIONAL_ENDORSEMENT` -- endosso do profissional que pediu a
+///     analise. NAO e consentimento: e o humano no circuito que a regra de
+///     arquitetura no 8 exige.
+///
+/// Guardar as duas na mesma coluna `subject_kind` misturaria "quem consentiu"
+/// com "quem operou" -- duas perguntas separadas numa fiscalizacao.
+enum ConsentSignerRole {
+  STUDENT_CONSENT
+  PROFESSIONAL_ENDORSEMENT
+
+  @@map("consent_signer_role")
 }
 
 /// Estado da identidade biometrica.
@@ -560,6 +590,7 @@ model Tenant {
   studentHealthContext StudentHealthContext[]
   healthGoals          HealthGoal[]
   attendanceSessions   StudentAttendanceSession[]
+  aiAnalyses           AiAnalysis[]
 
   @@map("tenants")
 }
@@ -635,6 +666,7 @@ model User {
   evaluatedAssessments  BodyAssessment[]       @relation("AssessmentEvaluator")
   recordedHealthContext StudentHealthContext[] @relation("HealthContextRecorder")
   authoredHealthGoals   HealthGoal[]           @relation("HealthGoalAuthor")
+  requestedAiAnalyses   AiAnalysis[]           @relation("AiAnalysisRequester")
 
   @@map("users")
 }
@@ -921,6 +953,7 @@ model Student {
   healthContext       StudentHealthContext[]
   healthGoals         HealthGoal[]
   attendanceSessions  StudentAttendanceSession[]
+  aiAnalyses          AiAnalysis[]
   biometricIdentities BiometricIdentity[]
   deviceUsers         DeviceUser[]
   credentials         StudentCredential[]
@@ -1318,6 +1351,12 @@ model ConsentRecord {
   /// (INV-143). Recalcular pela data de nascimento diria a idade de HOJE,
   /// nao a da decisao.
   subjectAgeYears  Int                @map("subject_age_years")
+  /// De quem e esta assinatura (F21).
+  ///
+  /// `STUDENT_CONSENT` por padrao: toda linha anterior a F21 e consentimento
+  /// do titular, e o default preserva o significado do historico sem
+  /// reescrever linha nenhuma.
+  signerRole       ConsentSignerRole  @default(STUDENT_CONSENT) @map("signer_role")
   /// Ator interno que registrou (recepcao). Nao e o titular.
   actorId          String?            @map("actor_id") @db.Uuid
   actorIp          String?            @map("actor_ip")
@@ -3463,4 +3502,105 @@ model StudentAttendanceSession {
   @@unique([tenantId, studentId, sessionDate, gymUnitId, policyVersion])
   @@index([tenantId, studentId, sessionDate])
   @@map("student_attendance_sessions")
+}
+
+
+/// Desfecho de uma analise por IA.
+enum AiAnalysisStatus {
+  /// Saida validada e gravada. E a unica que a tela mostra.
+  PUBLISHED
+  /// Recusada pela validacao (`M3-BR-010`). A linha FICA: `M3-AC-008` exige
+  /// registrar a rejeicao, e apagar esconderia que o modelo tentou.
+  REJECTED
+  /// O provedor falhou (timeout, indisponibilidade, teto de gasto).
+  FAILED
+
+  @@map("ai_analysis_status")
+}
+
+/// Versao de prompt usada nas analises (`M3-FR-016`).
+///
+/// Tabela propria e nao string solta na analise: o mesmo prompt gera centenas
+/// de analises, e reproduzir uma analise de tres meses atras exige o TEXTO
+/// que a gerou -- nao o nome dele.
+model AiPromptVersion {
+  id        String @id @default(uuid()) @db.Uuid
+  /// `analise-de-saude@3`. Unico globalmente: prompt e do produto, nao do
+  /// tenant.
+  name      String @unique
+  content   String
+  /// SHA-256 do `content`, em hex minusculo. E o que prova que o texto nao
+  /// mudou por baixo de uma analise ja publicada.
+  contentSha256 String @map("content_sha256")
+  createdAt DateTime @default(now()) @map("created_at")
+  /// Preenchido quando uma versao nova entra. Versao aposentada continua
+  /// existindo: ha analise publicada apontando para ela.
+  retiredAt DateTime? @map("retired_at")
+
+  analyses AiAnalysis[]
+
+  @@map("ai_prompt_versions")
+}
+
+/// Analise assistiva por IA de um aluno (`M3-FR-015`, `M3-FR-016`, F21).
+///
+/// ---------------------------------------------------------------------------
+/// O QUE ESTA TABELA NAO GUARDA: O SNAPSHOT COM DADO PESSOAL.
+/// ---------------------------------------------------------------------------
+///
+/// `snapshot` e o payload PSEUDONIMIZADO -- exatamente o que foi enviado ao
+/// provedor, sem nome, sem CPF, sem `student_id`, sem nada de ECG
+/// (`M3-NFR-009`, ADR-035). Guardar o enviado e o que torna a analise
+/// REPRODUZIVEL: sem ele, "por que a IA disse isso" nao tem resposta.
+///
+/// O vinculo com o aluno mora na COLUNA `student_id`, nao dentro do JSON. E a
+/// separacao que permite auditar de quem e a analise sem que o provedor
+/// jamais tenha sabido.
+model AiAnalysis {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  studentId String           @map("student_id") @db.Uuid
+  status    AiAnalysisStatus
+
+  /// Identificador OPACO enviado ao provedor. Nao deriva do aluno.
+  analysisRef String @unique @map("analysis_ref")
+
+  /// O payload pseudonimizado, como foi enviado.
+  snapshot Json
+  /// A saida VALIDADA. Nulo quando `REJECTED` ou `FAILED` -- saida recusada
+  /// nao vira conteudo, nem "para consulta".
+  output   Json?
+
+  /// Por que foi recusada (`M3-AC-008`). Nulo quando publicada.
+  rejectionReason String? @map("rejection_reason")
+  rejectionDetail String? @map("rejection_detail")
+
+  promptVersionId String @map("prompt_version_id") @db.Uuid
+  /// Modelo exato (`claude-sonnet-4-6`). String e nao enum: modelo novo do
+  /// provedor nao pode exigir migration.
+  model           String
+
+  /// Custo em MILESIMOS de centavo de dolar, inteiro (`M3-FR-016`).
+  ///
+  /// Inteiro pela mesma regra de arquitetura no 6 que vale para dinheiro:
+  /// `float` acumula erro, e o teto de gasto por tenant (`M3-NFR-005`) soma
+  /// milhares destes valores.
+  costMicros    Int @map("cost_micros")
+  latencyMs     Int @map("latency_ms")
+  inputTokens   Int @map("input_tokens")
+  outputTokens  Int @map("output_tokens")
+
+  /// Quem pediu a analise. E o profissional que endossou (F21).
+  requestedByUserId String @map("requested_by_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student       Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  promptVersion AiPromptVersion @relation(fields: [promptVersionId], references: [id], onDelete: Restrict)
+  requestedBy   User            @relation("AiAnalysisRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("ai_analyses")
 }
