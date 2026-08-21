@@ -107,7 +107,19 @@ export class ImportService {
     sessao?: {
       reviewSessionId?: string | undefined;
       sourceLabel?: string | undefined;
+      /**
+       * Ultimo arquivo da medicao -- so ele dispara a publicacao automatica
+       * (ADR-039). Quem envia e quem sabe se ainda vem arquivo; o servidor
+       * nao tem como adivinhar.
+       */
+      ultimoDaSessao?: boolean | undefined;
     },
+    /**
+     * O "agora" entra por parametro como no resto do modulo (`CLAUDE.md`:
+     * caso de uso nao le relogio). Opcional so para nao quebrar chamador
+     * antigo; o controller sempre passa.
+     */
+    agora: Date = new Date(),
   ): Promise<ResultadoDoUpload> {
     const aluno = await this.alunos.encontrar(contexto, studentId);
 
@@ -239,9 +251,50 @@ export class ImportService {
         },
       );
 
+      // PUBLICACAO AUTOMATICA (ADR-039).
+      //
+      // Ate 21/08/2026 o valor extraido esperava confirmacao campo a campo
+      // antes de virar historico. O PI operou o fluxo e o removeu: a recepcao
+      // anexa o arquivo e pronto -- nao ha avaliador a cada medicao para
+      // conferir sessenta campos, e uma tela que ninguem usa nao protege
+      // ninguem. O laudo ficava parado em `EXTRACTED` e a academia voltava
+      // ao papel.
+      //
+      // Baixa confianca NAO segura nada (decisao explicita do PI): a
+      // alternativa de reter so o campo duvidoso foi apresentada e recusada.
+      // Meia avaliacao publicada e mais dificil de explicar ao aluno que uma
+      // avaliacao inteira com um numero a corrigir.
+      //
+      // O que NAO mudou: a proveniencia continua gravada (valor extraido,
+      // arquivo, confianca) e erro vira CORRECAO VINCULADA (INV-102), nunca
+      // `UPDATE` na avaliacao publicada.
+      // SO O ULTIMO ARQUIVO DA SESSAO PUBLICA.
+      //
+      // O servidor nao tem como saber se ainda vem arquivo -- quem sabe e
+      // quem esta enviando. Publicar a cada upload fazia o PRIMEIRO arquivo
+      // confirmar a sessao inteira sozinho: nascia uma avaliacao com os dados
+      // de um laudo so, e os outros dois chegavam numa sessao ja confirmada.
+      // Exatamente a avaliacao incompleta que esta fatia existe para impedir,
+      // agora por outro caminho.
+      //
+      // `ultimoDaSessao` ausente NAO publica: numa sessao de um arquivo so o
+      // cliente marca o unico como ultimo, e um cliente que esquecer de
+      // marcar deixa a importacao em `EXTRACTED` -- visivel na fila da F22 e
+      // revisavel a mao. Preferivel a publicar cedo demais.
+      const publicada =
+        sessao?.ultimoDaSessao === true
+          ? await this.publicarAutomaticamente(
+              contexto,
+              importacao.id,
+              uploaderId,
+              extracao.measuredAt ?? agora,
+              agora,
+            )
+          : false;
+
       return {
         id: importacao.id,
-        status: 'EXTRACTED',
+        status: publicada ? 'CONFIRMED' : 'EXTRACTED',
         camposExtraidos: extracao.campos.length,
         motivoDaFalha: null,
         reviewSessionId,
@@ -325,6 +378,84 @@ export class ImportService {
    * (Task 4) se aplica -- e ai sim faz sentido reusar `confirmarSessao`
    * inteiro, inclusive a consolidacao entre arquivos.
    */
+  /**
+   * Publica a extracao sem passar por humano (ADR-039).
+   *
+   * Marca todo campo lido como `CONFIRMED` -- inclusive o de baixa confianca,
+   * por decisao explicita do PI -- e confirma pelo mesmo caminho que o
+   * avaliador usaria. Reusar `confirmar` em vez de escrever um atalho e
+   * deliberado: a conversao para unidade canonica, a criacao da avaliacao, a
+   * publicacao e o expurgo do arquivo continuam sendo UM caminho so, e um
+   * atalho paralelo divergiria dele na primeira mudanca.
+   *
+   * FALHA AQUI NAO DERRUBA O UPLOAD. O arquivo ja esta guardado e extraido;
+   * se a publicacao nao acontecer, a importacao fica em `EXTRACTED` e a tela
+   * de revisao continua funcionando como caminho manual. Perder o arquivo
+   * inteiro porque a publicacao falhou seria pior que publicar depois.
+   *
+   * Devolve `true` quando publicou.
+   */
+  private async publicarAutomaticamente(
+    contexto: TenantContext,
+    importId: string,
+    autorId: string,
+    assessedAt: Date,
+    agora: Date,
+  ): Promise<boolean> {
+    try {
+      const importacao = await this.importacoes.encontrar(contexto, importId);
+
+      if (importacao === null) return false;
+
+      // Resolve os campos de TODOS os arquivos da sessao, nao so os deste.
+      //
+      // Resolver so o arquivo atual deixava os anteriores PENDING para
+      // sempre: `confirmarSessao` chama `revisaoCompleta` sobre a sessao
+      // inteira, batia em `IMPORT_HAS_PENDING_FIELDS` e nada publicava --
+      // com o upload respondendo 201, porque a falha e silenciosa por
+      // desenho. Mesma classe do bug anterior (dado incompleto), agora por
+      // cautela demais em vez de pressa demais.
+      const idsParaResolver =
+        importacao.reviewSessionId === null
+          ? [importId]
+          : ((await this.importacoes.encontrarSessao(contexto, importacao.reviewSessionId))
+              ?.importIds ?? [importId]);
+
+      const campos = (
+        await Promise.all(
+          idsParaResolver.map(async (id) => {
+            const alvo = await this.importacoes.encontrar(contexto, id);
+
+            return (alvo?.campos ?? []).map((campo) => ({ importId: id, campo }));
+          }),
+        )
+      ).flat();
+
+      for (const { importId: alvo, campo } of campos) {
+        if (campo.state !== 'PENDING') continue;
+
+        // Campo que o extrator nao conseguiu ler vira DISCARDED, nao
+        // CONFIRMED: confirmar ausencia gravaria "medi e nao achei" como se
+        // fosse medida, e `valoresAceitos` recusaria o valor nulo adiante.
+        const decisao = campo.extractedValue === null ? 'DISCARDED' : 'CONFIRMED';
+
+        await this.importacoes.revisarCampo(contexto, alvo, campo.id, {
+          state: decisao,
+          reviewedValue: null,
+          reviewedUnit: null,
+        });
+      }
+
+      await this.confirmar(contexto, importId, autorId, assessedAt, agora);
+
+      return true;
+    } catch {
+      // Silencioso de proposito -- ver o comentario do metodo. O upload ja
+      // respondeu 201 com o arquivo salvo; a revisao manual segue disponivel.
+      return false;
+    }
+  }
+
   async confirmar(
     contexto: TenantContext,
     importId: string,

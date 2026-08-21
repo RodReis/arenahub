@@ -16,6 +16,8 @@ import { TenantContextService } from '../../common/tenant/tenant-context.service
 import { ImportService } from './import.service.js';
 import { TAMANHO_MAXIMO_BYTES } from './domain/arquivo-de-importacao.js';
 import { UNIDADES_DE_MEDIDA, type UnidadeDeMedida } from './domain/medida.js';
+import { lerFaixa, type Leitura } from './domain/leitura-de-faixa.js';
+import type { CampoExtraido } from './domain/revisao-de-importacao.js';
 
 /**
  * Upload e revisao de arquivo (F19, Slice 3.3).
@@ -72,6 +74,15 @@ const esquemaDoEnvio = z
   .object({
     reviewSessionId: z.uuid().optional(),
     sourceLabel: z.string().min(1).max(120).optional(),
+    /**
+     * `"true"` marca o ULTIMO arquivo da medicao e dispara a publicacao
+     * automatica (ADR-039). Chega como STRING porque o corpo e
+     * `multipart/form-data`, onde tudo e texto -- `z.boolean()` recusaria.
+     */
+    ultimoDaSessao: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((valor) => valor === 'true'),
   })
   .partial();
 
@@ -83,6 +94,19 @@ interface CampoDto {
   confidence: number | null;
   sourceLocation: string | null;
   sourceLabel: string | null;
+  /** Faixa do laudo, guardada junto do campo (muda com firmware). */
+  referenceMin: number | null;
+  referenceMax: number | null;
+  standardPercent: number | null;
+  /**
+   * Leitura do valor contra a faixa, RESOLVIDA NO SERVIDOR.
+   *
+   * Se cada superficie calculasse a sua, o painel e o totem discordariam no
+   * dia em que uma faixa mudasse -- o mesmo braco verde num, amarelo no
+   * outro. `UNKNOWN` quando falta valor ou falta faixa: nunca `WITHIN` por
+   * omissao, que leria como "dentro do normal" um dado que ninguem mediu.
+   */
+  leitura: Leitura;
   state: string;
   reviewedValue: number | null;
   reviewedUnit: string | null;
@@ -112,10 +136,13 @@ export class ImportController {
   /**
    * Recebe o arquivo (`M3-FR-009`).
    *
-   * `health.assess` e nao `health.read`: importar laudo e ato de quem avalia.
+   * `health.upload` e nao `health.assess` (ADR-039): com a publicacao
+   * automatica quem anexa e a RECEPCAO, e ela nao ve nem edita dado de
+   * saude. A separacao do ADR-037 continua -- so mudou que anexar deixou de
+   * exigir a permissao de quem mede.
    */
   @Post('students/:id/assessment-imports')
-  @RequirePermissions('health.assess')
+  @RequirePermissions('health.upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: TAMANHO_MAXIMO_BYTES } }))
   async enviar(
     @Param('id') studentId: string,
@@ -145,7 +172,12 @@ export class ImportController {
         conteudo: new Uint8Array(arquivo.buffer),
       },
       uploader,
-      { reviewSessionId: dados.reviewSessionId, sourceLabel: dados.sourceLabel },
+      {
+        reviewSessionId: dados.reviewSessionId,
+        sourceLabel: dados.sourceLabel,
+        ultimoDaSessao: dados.ultimoDaSessao,
+      },
+      new Date(),
     );
 
     return {
@@ -240,18 +272,7 @@ export class ImportController {
         type: linha.type,
         concordante: linha.concordante,
         origens: [...linha.origens],
-        campos: linha.campos.map((campo) => ({
-          id: campo.id,
-          type: campo.type,
-          extractedValue: campo.extractedValue,
-          extractedUnit: campo.extractedUnit,
-          confidence: campo.confidence,
-          sourceLocation: campo.sourceLocation,
-          sourceLabel: campo.sourceLabel,
-          state: campo.state,
-          reviewedValue: campo.reviewedValue,
-          reviewedUnit: campo.reviewedUnit,
-        })),
+        campos: linha.campos.map(paraCampoDto),
       })),
       podeConfirmar: sessao.podeConfirmar.pronta
         ? { pronta: true }
@@ -295,18 +316,7 @@ export class ImportController {
       failureReason: importacao.failureReason,
       assessmentId: importacao.assessmentId,
       createdAt: importacao.createdAt.toISOString(),
-      fields: importacao.campos.map((campo) => ({
-        id: campo.id,
-        type: campo.type,
-        extractedValue: campo.extractedValue,
-        extractedUnit: campo.extractedUnit,
-        confidence: campo.confidence,
-        sourceLocation: campo.sourceLocation,
-        sourceLabel: campo.sourceLabel,
-        state: campo.state,
-        reviewedValue: campo.reviewedValue,
-        reviewedUnit: campo.reviewedUnit,
-      })),
+      fields: importacao.campos.map(paraCampoDto),
     };
   }
 
@@ -378,4 +388,36 @@ export class ImportController {
 
     return ator;
   }
+}
+
+/**
+ * Um campo extraido, como a tela de revisao precisa dele.
+ *
+ * Existe em vez de dois mapeamentos inline porque a rota da sessao e a do
+ * import avulso devolvem o MESMO campo -- e quando eram duas copias, a
+ * segunda ficou sem `sourceLabel` por um tempo sem ninguem notar.
+ *
+ * A `leitura` sai daqui e nao do cliente: e a mesma razao do
+ * `body-evolution`. Faixa de referencia e do fabricante, muda com firmware,
+ * e duas superficies calculando a sua propria discordariam no dia da troca.
+ */
+function paraCampoDto(campo: CampoExtraido): CampoDto {
+  const valor = campo.reviewedValue ?? campo.extractedValue;
+
+  return {
+    id: campo.id,
+    type: campo.type,
+    extractedValue: campo.extractedValue,
+    extractedUnit: campo.extractedUnit,
+    confidence: campo.confidence,
+    sourceLocation: campo.sourceLocation,
+    sourceLabel: campo.sourceLabel,
+    referenceMin: campo.referenceMin,
+    referenceMax: campo.referenceMax,
+    standardPercent: campo.standardPercent,
+    leitura: lerFaixa(valor, campo.referenceMin, campo.referenceMax),
+    state: campo.state,
+    reviewedValue: campo.reviewedValue,
+    reviewedUnit: campo.reviewedUnit,
+  };
 }

@@ -248,10 +248,15 @@ export async function enviarArquivos(
   let sessionId: string | undefined;
   let enviados = 0;
 
-  for (const arquivo of arquivos) {
+  for (const [indice, arquivo] of arquivos.entries()) {
+    const ultimo = indice === arquivos.length - 1;
     const envio = new FormData();
     envio.append('file', arquivo);
     if (sessionId !== undefined) envio.append('reviewSessionId', sessionId);
+    // Só o ÚLTIMO publica (ADR-039). Marcar todos faria o primeiro arquivo
+    // confirmar a sessão sozinho, criando uma avaliação com um laudo só --
+    // e os demais chegariam numa sessão já fechada.
+    envio.append('ultimoDaSessao', ultimo ? 'true' : 'false');
     // O rotulo de origem e o nome do arquivo sem extensao: e o que o
     // avaliador reconhece na coluna "Origem" ao conferir contra o papel.
     envio.append('sourceLabel', arquivo.name.replace(/\.[^.]+$/, '').slice(0, 120));

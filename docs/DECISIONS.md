@@ -2121,3 +2121,70 @@ dois valores genuinamente diferentes seriam fundidos e o número errado viraria 
 de "confirmado por dois arquivos". Mitigação: a tolerância deriva da **precisão impressa no
 laudo**, não de estimativa, e a assimetria é deliberada — mostrar divergência falsa custa um
 clique, escondê-la custa um dado errado no prontuário do aluno.
+
+---
+
+<a id="adr-039"></a>
+## ADR-039 — Laudo de bioimpedância publica automaticamente, sem revisão campo a campo
+
+**Data:** 21/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 21/08/2026**
+· **Revoga:** a regra de arquitetura nº 8 do `CLAUDE.md` **na parte do OCR** e o `M3-BR-006`
+· **Emenda material:** `MVP-03` §7 (Slice 3.3), §8 (`M3-FR-011`) e §14 (`M3-AC-005`)
+· **NÃO revoga:** ADR-035 (ECG), `M3-AC-007` e `M3-AC-008` (consentimento e saída de IA)
+
+**Contexto.** O desenho da Slice 3.3 exigia confirmação humana campo a campo antes de qualquer
+valor extraído virar histórico. O PI operou o fluxo e concluiu que ele não corresponde ao trabalho
+real da academia: **a recepção anexa o arquivo do aluno e pronto** — não há avaliador disponível a
+cada medição para conferir sessenta e sete campos contra o papel, e a avaliação precisa estar no
+app do aluno quando ele sai da balança, não quando alguém tiver tempo.
+
+Uma tela que ninguém usa não protege ninguém: o resultado previsível da confirmação obrigatória
+era o laudo ficar parado em `EXTRACTED`, e a academia voltar ao papel.
+
+**Decisão.**
+
+1. **O valor extraído é publicado automaticamente.** Anexou, extraiu, gravou, o aluno vê. Sem
+   revisão campo a campo, sem estado intermediário esperando humano.
+
+2. **Baixa confiança não segura nada** (decisão explícita do PI em 21/08/2026). Campo que o
+   extrator leu mal entra igual. A alternativa — segurar o duvidoso — foi apresentada e recusada:
+   meia avaliação publicada é pior de explicar ao aluno do que uma avaliação inteira com um número
+   a corrigir.
+
+3. **Nasce `health.upload`**, permissão de ANEXAR sem ver nem editar dado de saúde. A recepção
+   recebe só ela. A separação do **ADR-037** continua de pé: quem anexa não é quem lê o percentual
+   de gordura dos outros alunos.
+
+4. **Publica o ÚLTIMO arquivo da medição, não cada upload.** Quem envia marca o último
+   (`ultimoDaSessao`); o servidor não tem como saber se ainda vem arquivo. Sem essa marcação, o
+   primeiro laudo confirmava a sessão sozinho e nascia uma avaliação com um arquivo só — os outros
+   dois chegavam numa sessão já fechada, que é a avaliação incompleta que esta fatia existe para
+   impedir, chegando por outro caminho. **Marcação ausente não publica**: a importação fica em
+   `EXTRACTED`, visível na fila da F22 e revisável à mão — preferível a publicar cedo demais.
+
+5. **A correção continua existindo** e não muda: avaliação publicada não sofre `UPDATE`; erro vira
+   **correção vinculada** (INV-102, `M3-AC-002`). O que sai é a barreira ANTES da publicação, não a
+   trilha depois dela.
+
+**O que esta decisão NÃO alcança.**
+
+- **ECG segue o ADR-035**: guardado e citado, nunca interpretado. Publicar automaticamente o bpm
+  medido é uma coisa; classificar um achado cardíaco é outra, e essa continua fora — RDC 657/2022.
+- **A análise de IA segue exigindo o aceite duplo** (`M3-AC-007`) e a validação de saída
+  (`M3-BR-010`). Publicar valor medido não é o mesmo que rodar IA sobre saúde de quem não
+  consentiu; são decisões diferentes, e só a primeira foi tomada aqui.
+
+**Por que ADR e não só um PR.** A regra 8 e o `M3-BR-006` estão escritos em três documentos. Mudar
+o código sem registrar deixaria o repositório afirmando o contrário do que o sistema faz — e o
+próximo a ler reimplementaria a revisão que esta decisão acabou de remover.
+
+### Risco assumido
+
+**O OCR vai errar, e o erro chega ao aluno antes de qualquer humano.** Vírgula deslocada, campo
+borrado, laudo de modelo novo: o número entra no histórico, aparece no app e alimenta o
+comparativo até alguém notar.
+
+O PI conhece o risco e o aceita: a proveniência continua gravada (valor extraído, arquivo de
+origem, confiança), e a correção vinculada permite consertar sem apagar. **O que se perdeu é a
+chance de pegar o erro antes de o aluno vê-lo** — e essa é a troca, explícita, por um fluxo que a
+academia consegue operar todo mês.

@@ -145,6 +145,11 @@ const PERMISSOES = [
   // medicao que ele explica.
   'health.read',
   'health.assess',
+  // ANEXAR sem ver nem editar dado de saude (ADR-039). E o que a recepcao
+  // recebe: ela anexa o laudo do aluno, o sistema extrai e publica sozinho,
+  // e ela nunca ve o percentual de gordura de ninguem. Mantem a separacao do
+  // ADR-037 de pe com o fluxo automatico.
+  'health.upload',
 ];
 
 
