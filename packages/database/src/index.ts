@@ -62,6 +62,7 @@ export type {
   PlanPrice,
   BillingSettings,
   GymUnit,
+  HealthGoal,
   InboxReceipt,
   Invitation,
   OutboxEvent,
