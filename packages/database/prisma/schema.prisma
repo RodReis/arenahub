@@ -559,6 +559,7 @@ model Tenant {
   bodyMeasurements     BodyMeasurement[]
   studentHealthContext StudentHealthContext[]
   healthGoals          HealthGoal[]
+  attendanceSessions   StudentAttendanceSession[]
 
   @@map("tenants")
 }
@@ -589,6 +590,7 @@ model GymUnit {
   accessEvents          AccessEvent[]
   manualAccessOverrides ManualAccessOverride[]
   operationalAlerts     OperationalAlert[]
+  attendanceSessions    StudentAttendanceSession[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -918,6 +920,7 @@ model Student {
   bodyAssessments     BodyAssessment[]
   healthContext       StudentHealthContext[]
   healthGoals         HealthGoal[]
+  attendanceSessions  StudentAttendanceSession[]
   biometricIdentities BiometricIdentity[]
   deviceUsers         DeviceUser[]
   credentials         StudentCredential[]
@@ -3395,4 +3398,69 @@ model HealthGoal {
   /// comparativo passa a ter dois alvos sem criterio de desempate.
   @@index([tenantId, studentId, type])
   @@map("health_goals")
+}
+
+
+/// Sessao de frequencia: UM DIA em que o aluno entrou pelo menos uma vez
+/// (`M3-FR-013`, `M3-BR-008`, Slice 3.4).
+///
+/// PROJECAO, nao fato. A verdade sao os `access_events` e `access_passages`
+/// do MVP 1, que esta tabela NUNCA altera nem apaga -- `M3-BR-008` exige
+/// agrupar "sem apagar eventos brutos". Apagar todas as linhas de uma
+/// `policy_version` e reprojetar a partir das passagens tem de produzir
+/// exatamente o mesmo resultado; e por isso que `passage_ids` viaja junto.
+///
+/// NAO HA `ended_at` NEM DURACAO, e a ausencia e deliberada: a Slice 3.4
+/// proibe inferir duracao "quando nao houver saida confiavel", e hoje nao ha
+/// -- a catraca opera liberada nos dois sentidos (ADR-029), entao ninguem
+/// registra saida. `first_passage_at` e `last_passage_at` existem para
+/// AUDITAR o agrupamento; subtrair um do outro produziria um numero com cara
+/// de medida que na verdade e a distancia entre duas entradas.
+model StudentAttendanceSession {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+  gymUnitId String @map("gym_unit_id") @db.Uuid
+
+  /// O DIA LOCAL da unidade, `AAAA-MM-DD`. `@db.Date` e nao `DateTime`: a
+  /// sessao E o dia, e guardar um instante convidaria a reconverter fuso na
+  /// leitura -- aplicando o fuso duas vezes, que e o erro classico aqui.
+  sessionDate DateTime @map("session_date") @db.Date
+
+  /// Extremos das passagens do dia. Para auditoria, NAO para subtrair.
+  firstPassageAt DateTime @map("first_passage_at")
+  lastPassageAt  DateTime @map("last_passage_at")
+
+  /// Quantas passagens confirmadas caIram neste dia. Sempre >= 1.
+  passageCount Int @map("passage_count")
+
+  /// Ids das passagens que formaram a sessao, em ordem cronologica. E o que
+  /// torna a projecao auditavel e reconstruivel: sem eles, reprojetar teria
+  /// de confiar no agregado que ele mesmo quer refazer.
+  passageIds String[] @map("passage_ids") @db.Uuid
+
+  /// Regra que formou esta linha (`dia-civil-local@1`). Trocar de politica e
+  /// REPROJETAR numa versao nova, nunca migrar numero ja calculado: sessoes
+  /// de versoes diferentes contam coisas diferentes, e a versao e o que torna
+  /// isso visIvel em vez de silencioso.
+  policyVersion String @map("policy_version")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  gymUnit GymUnit @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+
+  /// UMA sessao por (aluno, dia, unidade, politica). E a garantia de
+  /// idempotencia da reprojecao: rodar o projetor duas vezes sobre as mesmas
+  /// passagens nao pode dobrar a frequencia do aluno. No banco e nao num
+  /// `if`, pela mesma razao da F14, F17 e F18 -- guarda que le antes de
+  /// escrever perde a corrida por construcao.
+  ///
+  /// A politica entra na chave para que duas versoes possam COEXISTIR
+  /// enquanto se compara uma com a outra; o leitor filtra pela vigente.
+  @@unique([tenantId, studentId, sessionDate, gymUnitId, policyVersion])
+  @@index([tenantId, studentId, sessionDate])
+  @@map("student_attendance_sessions")
 }

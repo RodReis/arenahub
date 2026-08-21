@@ -18,6 +18,8 @@ import { StudentRepository } from '../students/student.repository.js';
 import { GoalRepository } from './goal.repository.js';
 import { HealthExportService } from './health-export.service.js';
 import { HealthProgressService, type ComparativoDeTipo } from './health-progress.service.js';
+import { AttendanceService, type FrequenciaDoAluno, type MetaComProgresso } from './attendance.service.js';
+import { GRANULARIDADES, ehGranularidade, type Granularidade } from './domain/frequencia.js';
 import { converterParaCanonica, type TipoDeMedida, type UnidadeDeMedida } from './domain/medida.js';
 import { PERIODOS, dataLocalIso, ehPeriodo, type Periodo } from './domain/periodo.js';
 import type { Variacao } from './domain/comparativo.js';
@@ -173,6 +175,66 @@ interface MetaDto {
   closedAt: string | null;
 }
 
+interface BaldeDto {
+  label: string;
+  sessions: number;
+  passages: number;
+}
+
+interface SessaoDto {
+  date: string;
+  gymUnitId: string;
+  firstPassageAt: string;
+  lastPassageAt: string;
+  passages: number;
+  passageIds: readonly string[];
+}
+
+/**
+ * Frequencia do aluno.
+ *
+ * NAO ha campo de duracao nem de tempo de permanencia, e a ausencia e
+ * deliberada -- ver o topo de `domain/frequencia.ts`. `dataQuality` existe
+ * porque frequencia zero tem duas causas que pedem acoes opostas: o aluno nao
+ * veio, ou o sistema nao viu.
+ */
+interface FrequenciaDto {
+  studentId: string;
+  period: string;
+  granularity: string;
+  timezone: string;
+  policyVersion: string;
+  dataQuality: string;
+  totalSessions: number;
+  totalPassages: number;
+  buckets: readonly BaldeDto[];
+  consistency: {
+    weeksWithSession: number;
+    eligibleWeeks: number;
+    ratio: number | null;
+  };
+  sessions: readonly SessaoDto[];
+}
+
+interface ProgressoDto {
+  baseline: number;
+  target: number;
+  current: number | null;
+  fraction: number | null;
+  state: string;
+  daysToDeadline: number;
+  overdue: boolean;
+}
+
+interface MetaComProgressoDto {
+  id: string;
+  studentId: string;
+  type: string;
+  unit: string | null;
+  deadline: string;
+  progress: ProgressoDto;
+}
+
 @Controller('api/v1')
 export class HealthProgressController {
   constructor(
@@ -180,6 +242,7 @@ export class HealthProgressController {
     private readonly metas: GoalRepository,
     private readonly alunos: StudentRepository,
     private readonly exportacoes: HealthExportService,
+    private readonly frequencia: AttendanceService,
     private readonly contexto: TenantContextService,
   ) {}
 
@@ -321,6 +384,68 @@ export class HealthProgressController {
    * aquele id existe em algum lugar (INV-006, oraculo de existencia entre
    * academias).
    */
+  /**
+   * Frequencia do aluno (`M3-FR-013`, `M3-BR-008`, `M3-AC-006`).
+   *
+   * `granularity` invalida responde 400 pela mesma razao de `period`: quem
+   * pediu ANUAL e recebeu SEMANAL calado leria o grafico errado sem saber.
+   */
+  @Get('students/:id/attendance')
+  @RequirePermissions('health.read')
+  async frequenciaDoAluno(
+    @Param('id') studentId: string,
+    @Query('period') period?: string,
+    @Query('granularity') granularity?: string,
+  ): Promise<FrequenciaDto> {
+    const periodo = this.exigirPeriodo(period);
+    const granularidade = this.exigirGranularidade(granularity);
+
+    const frequencia = await this.frequencia.frequenciaDoAluno(
+      this.contexto.require(),
+      studentId,
+      periodo,
+      granularidade,
+      new Date(),
+    );
+
+    return paraFrequenciaDto(frequencia, studentId);
+  }
+
+  /**
+   * Metas ativas com PROGRESSO calculado (Slice 3.4).
+   *
+   * Rota separada de `GET health-goals` de proposito: aquela devolve a meta
+   * como ela foi cadastrada, esta devolve o quanto do caminho foi andado. O
+   * calculo le a serie publicada e a baseline congelada; nao edita avaliacao
+   * nenhuma.
+   */
+  @Get('students/:id/health-goals/progress')
+  @RequirePermissions('health.read')
+  async progressoDasMetas(@Param('id') studentId: string): Promise<MetaComProgressoDto[]> {
+    const metas = await this.frequencia.metasComProgresso(
+      this.contexto.require(),
+      studentId,
+      new Date(),
+    );
+
+    return metas.map((meta) => paraMetaComProgressoDto(meta, studentId));
+  }
+
+  private exigirGranularidade(granularity: string | undefined): Granularidade {
+    // Padrao SEMANAL: e a unidade em que o aluno pensa a propria rotina
+    // ("treino tres vezes por semana").
+    if (granularity === undefined || granularity === '') return 'SEMANAL';
+
+    if (!ehGranularidade(granularity)) {
+      throw new BadRequestException({
+        code: 'HEALTH_INVALID_GRANULARITY',
+        detail: `granularidade invalida; use uma de ${GRANULARIDADES.join(', ')}`,
+      });
+    }
+
+    return granularity;
+  }
+
   private async exigirAluno(studentId: string): Promise<void> {
     const aluno = await this.alunos.encontrar(this.contexto.require(), studentId);
 
@@ -413,5 +538,56 @@ function paraMetaDto(
     createdByUserId: meta.createdByUserId,
     achievedAt: meta.achievedAt?.toISOString() ?? null,
     closedAt: meta.closedAt?.toISOString() ?? null,
+  };
+}
+
+function paraFrequenciaDto(frequencia: FrequenciaDoAluno, studentId: string): FrequenciaDto {
+  return {
+    studentId,
+    period: frequencia.periodo,
+    granularity: frequencia.granularidade,
+    timezone: frequencia.fuso,
+    policyVersion: frequencia.policyVersion,
+    dataQuality: frequencia.qualidade,
+    totalSessions: frequencia.totalDeSessoes,
+    totalPassages: frequencia.totalDePassagens,
+    buckets: frequencia.baldes.map((balde) => ({
+      label: balde.rotulo,
+      sessions: balde.sessoes,
+      passages: balde.passagens,
+    })),
+    consistency: {
+      weeksWithSession: frequencia.consistencia.semanasComSessao,
+      eligibleWeeks: frequencia.consistencia.semanasElegiveis,
+      ratio: frequencia.consistencia.proporcao,
+    },
+    sessions: frequencia.sessoes.map((sessao) => ({
+      // Ja e `AAAA-MM-DD` no fuso da unidade -- a tela nao reconverte.
+      date: sessao.dataLocal,
+      gymUnitId: sessao.gymUnitId,
+      firstPassageAt: sessao.primeiraEm.toISOString(),
+      lastPassageAt: sessao.ultimaEm.toISOString(),
+      passages: sessao.passagens,
+      passageIds: sessao.passageIds,
+    })),
+  };
+}
+
+function paraMetaComProgressoDto(meta: MetaComProgresso, studentId: string): MetaComProgressoDto {
+  return {
+    id: meta.id,
+    studentId,
+    type: meta.type,
+    unit: meta.unidade,
+    deadline: meta.deadline.toISOString(),
+    progress: {
+      baseline: meta.progresso.baseline,
+      target: meta.progresso.alvo,
+      current: meta.progresso.atual,
+      fraction: meta.progresso.fracao,
+      state: meta.progresso.estado,
+      daysToDeadline: meta.progresso.diasAteOPrazo,
+      overdue: meta.progresso.vencida,
+    },
   };
 }

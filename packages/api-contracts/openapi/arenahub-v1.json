@@ -1918,6 +1918,68 @@
           "HealthProgress"
         ]
       }
+    },
+    "/api/v1/students/{id}/attendance": {
+      "get": {
+        "operationId": "HealthProgressController_frequenciaDoAluno",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HealthProgress"
+        ]
+      }
+    },
+    "/api/v1/students/{id}/health-goals/progress": {
+      "get": {
+        "operationId": "HealthProgressController_progressoDasMetas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HealthProgress"
+        ]
+      }
     }
   },
   "info": {

@@ -6,6 +6,8 @@ import { StudentsModule } from '../students/students.module.js';
 import { TenancyModule } from '../tenancy/tenancy.module.js';
 import { AssessmentController } from './assessment.controller.js';
 import { AssessmentRepository } from './assessment.repository.js';
+import { AttendanceRepository } from './attendance.repository.js';
+import { AttendanceService } from './attendance.service.js';
 import { GoalRepository } from './goal.repository.js';
 import { HealthExportService } from './health-export.service.js';
 import { HealthProgressController } from './health-progress.controller.js';
@@ -21,6 +23,10 @@ import { HealthProgressService } from './health-progress.service.js';
  * Exporta o repositorio porque a F18 (historico e comparativos) e a F21
  * (analise assistiva) leem avaliacao publicada, e nenhuma delas pode tocar
  * `body_assessments` por fora.
+ *
+ * A F20 (frequencia) LE `access_events`/`access_passages` pelo Prisma em modo
+ * somente-leitura, e nunca escreve neles: a projecao de sessao e uma tabela
+ * propria, e `M3-BR-008` exige agrupar "sem apagar eventos brutos".
  */
 @Module({
   // `TenancyModule` entra pela F18: o corte de periodo do grafico cai na
@@ -32,6 +38,8 @@ import { HealthProgressService } from './health-progress.service.js';
   controllers: [AssessmentController, HealthProgressController],
   providers: [
     AssessmentRepository,
+    AttendanceRepository,
+    AttendanceService,
     GoalRepository,
     HealthProgressService,
     HealthExportService,
