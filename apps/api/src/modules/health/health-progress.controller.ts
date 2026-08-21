@@ -20,7 +20,15 @@ import { HealthExportService } from './health-export.service.js';
 import { HealthProgressService, type ComparativoDeTipo } from './health-progress.service.js';
 import { AttendanceService, type FrequenciaDoAluno, type MetaComProgresso } from './attendance.service.js';
 import { GRANULARIDADES, ehGranularidade, type Granularidade } from './domain/frequencia.js';
-import { converterParaCanonica, type TipoDeMedida, type UnidadeDeMedida } from './domain/medida.js';
+import {
+  converterParaCanonica,
+  // As listas vivem no DOMINIO desde a F19: tres consumidores precisavam
+  // delas em runtime e cada um mantinha a propria copia.
+  TIPOS_DE_MEDIDA as TIPOS,
+  UNIDADES_DE_MEDIDA as UNIDADES,
+  type TipoDeMedida,
+  type UnidadeDeMedida,
+} from './domain/medida.js';
 import { PERIODOS, dataLocalIso, ehPeriodo, type Periodo } from './domain/periodo.js';
 import type { Variacao } from './domain/comparativo.js';
 
@@ -41,35 +49,6 @@ import type { Variacao } from './domain/comparativo.js';
  * qualquer forma (INV-106).
  */
 
-const TIPOS: readonly TipoDeMedida[] = [
-  'WEIGHT',
-  'HEIGHT',
-  'BODY_FAT_PERCENT',
-  'BODY_FAT_MASS',
-  'LEAN_BODY_MASS',
-  'SKELETAL_MUSCLE_MASS',
-  'TOTAL_BODY_WATER',
-  'INTRACELLULAR_WATER',
-  'EXTRACELLULAR_WATER',
-  'PROTEIN_MASS',
-  'MINERAL_MASS',
-  'VISCERAL_FAT_LEVEL',
-  'BASAL_METABOLIC_RATE',
-  'WAIST_CIRCUMFERENCE',
-  'HIP_CIRCUMFERENCE',
-];
-
-const UNIDADES: readonly UnidadeDeMedida[] = [
-  'kg',
-  'g',
-  'lb',
-  'cm',
-  'm',
-  'in',
-  'percent',
-  'kcal',
-  'L',
-];
 
 /**
  * Meta como o avaliador combinou com o aluno.

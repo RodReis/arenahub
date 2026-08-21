@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 1231 | 1231 | 0 | 92.8 |
+| unitário | 1265 | 1265 | 0 | 93.0 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 492 | 492 | 0 | 85.9 |
+| integração | 531 | 531 | 0 | 85.5 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -46,3 +46,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-21 | #20 | F20 | integração | 492 | 481 | 0 | 85.9 | [#141](https://github.com/RodReis/arenahub/pull/141) |
 | 2026-08-21 | #21 | F21 | unitário | 1231 | 1231 | 0 | 92.8 | [#142](https://github.com/RodReis/arenahub/pull/142) |
 | 2026-08-21 | #21 | F21 | integração | 450 | 450 | 0 | 85.9 | [#142](https://github.com/RodReis/arenahub/pull/142) |
+| 2026-08-21 | #19 | F19 | unitário | 1265 | 1265 | 0 | 93.0 | — |
+| 2026-08-21 | #19 | F19 | integração | 531 | 531 | 0 | 85.5 | — |
