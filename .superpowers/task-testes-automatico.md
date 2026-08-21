@@ -2,7 +2,7 @@
 
 STATUS: concluído, com um bug reportado (não corrigido — fora do escopo, `src` intocado).
 
-Commit: (ver `git log -1` após o commit desta entrega)
+Commit: `d1d09e006f4af212a4b073f01013ef5167d4f07c`
 
 ## Números reais
 
