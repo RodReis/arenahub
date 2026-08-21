@@ -24,12 +24,19 @@ console.log('login ok');
 
 const fs = await import('node:fs/promises');
 
-async function enviar(caminho, nome, sessionId) {
-  const conteudo = await fs.readFile(caminho);
+async function enviar(caminho, nome, sessionId, ultimo = false) {
+  let conteudo = await fs.readFile(caminho);
+  const ehPdf = nome.endsWith('.pdf');
+
+  // O ECG real chega como PDF; o fixture e o texto ja extraido. O prefixo
+  // satisfaz a checagem de assinatura, e o extrator le o resto como UTF-8.
+  if (ehPdf) conteudo = Buffer.concat([Buffer.from('%PDF-1.7'), conteudo]);
+
   const fd = new FormData();
-  fd.append('file', new Blob([conteudo], { type: 'text/csv' }), nome);
+  fd.append('file', new Blob([conteudo], { type: ehPdf ? 'application/pdf' : 'text/csv' }), nome);
   if (sessionId) fd.append('reviewSessionId', sessionId);
   fd.append('sourceLabel', nome.replace(/\.[^.]+$/, ''));
+  fd.append('ultimoDaSessao', ultimo ? 'true' : 'false');
 
   const r = await fetch(`${API}/api/v1/students/${STUDENT}/assessment-imports`, {
     method: 'POST',
@@ -50,5 +57,8 @@ const sessionId = JSON.parse(a.corpo).reviewSessionId;
 
 const b = await enviar('.superpowers/unique.csv', 'Unique Health.csv', sessionId);
 console.log('arquivo 2:', b.status, b.corpo);
+
+const c = await enviar('.superpowers/ecg.txt', 'ECG 30s.pdf', sessionId, true);
+console.log('arquivo 3 (ultimo):', c.status, c.corpo);
 
 console.log(`\nURL: http://localhost:3001/students/${STUDENT}/health/imports/${sessionId}`);

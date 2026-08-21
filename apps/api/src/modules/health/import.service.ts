@@ -5,6 +5,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 
@@ -33,7 +34,11 @@ import {
   type ValorAceito,
 } from './domain/revisao-de-importacao.js';
 import type { UnidadeDeMedida } from './domain/medida.js';
-import { consolidar, type LinhaConsolidada } from './domain/consolidacao-de-laudos.js';
+import {
+  consolidar,
+  desempatarPorOrigem,
+  type LinhaConsolidada,
+} from './domain/consolidacao-de-laudos.js';
 import { sessaoPodeConfirmar, type AvaliacaoDaSessao } from './domain/sessao-de-revisao.js';
 import {
   DOCUMENT_EXTRACTOR,
@@ -86,6 +91,8 @@ export interface ResultadoDoUpload {
 
 @Injectable()
 export class ImportService {
+  private readonly log = new Logger(ImportService.name);
+
   constructor(
     private readonly importacoes: ImportRepository,
     private readonly avaliacoes: AssessmentRepository,
@@ -449,9 +456,18 @@ export class ImportService {
       await this.confirmar(contexto, importId, autorId, assessedAt, agora);
 
       return true;
-    } catch {
-      // Silencioso de proposito -- ver o comentario do metodo. O upload ja
-      // respondeu 201 com o arquivo salvo; a revisao manual segue disponivel.
+    } catch (erro: unknown) {
+      // Silencioso PARA O CLIENTE, nao para quem opera: o upload ja respondeu
+      // 201 com o arquivo salvo e a revisao manual segue disponivel, mas
+      // engolir o motivo sem registrar deixaria a publicacao falhando em
+      // producao sem ninguem saber por que -- que foi exatamente o que
+      // aconteceu na primeira execucao ao vivo.
+      this.log.warn(
+        `publicacao automatica falhou para ${importId}: ${
+          erro instanceof Error ? erro.message : String(erro)
+        }`,
+      );
+
       return false;
     }
   }
@@ -840,7 +856,15 @@ function valoresAceitosDaSessao(linhas: readonly LinhaConsolidada[]): ValorAceit
     const aceitosDaLinha = valoresAceitos(linha.campos);
 
     if (aceitosDaLinha.length > 1) {
-      throw new MedidaDuplicadaNaSessaoError(linha.type);
+      // Antes de desistir, ha regra de origem para o tipo? So o `HEART_RATE`
+      // tem: a balanca reporta repouso e o ECG mede o coracao, e com a
+      // publicacao automatica ninguem esta ali para escolher (ADR-039).
+      const vencedor = desempatarPorOrigem(linha);
+
+      if (vencedor === null) throw new MedidaDuplicadaNaSessaoError(linha.type);
+
+      aceitos.push(...valoresAceitos([vencedor]));
+      continue;
     }
 
     aceitos.push(...aceitosDaLinha);

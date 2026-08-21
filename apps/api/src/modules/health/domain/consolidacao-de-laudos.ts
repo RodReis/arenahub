@@ -107,3 +107,44 @@ export function consolidar(campos: readonly CampoExtraido[]): LinhaConsolidada[]
 
   return linhas;
 }
+
+/**
+ * Qual origem vence quando dois aparelhos medem o MESMO tipo e discordam.
+ *
+ * So o `HEART_RATE` tem regra: o app da balanca reporta frequencia de
+ * repouso e o ECG mede o coracao por trinta segundos. Sao medicoes
+ * diferentes do mesmo numero, e com a publicacao automatica (ADR-039)
+ * ninguem esta ali para escolher.
+ *
+ * Decisao do PI em 21/08/2026: **o ECG vence para bpm** -- e o aparelho
+ * feito para isso. O valor da balanca continua gravado como campo extraido
+ * (proveniencia), so nao vira a medida da avaliacao.
+ *
+ * Fora do `HEART_RATE` NAO ha desempate por origem: divergencia entre dois
+ * laudos de bioimpedancia e sinal de problema no aparelho, e escolher um
+ * lado esconderia isso.
+ */
+export function origemQueVence(tipo: TipoDeMedida): string | null {
+  return tipo === 'HEART_RATE' ? 'ECG' : null;
+}
+
+/**
+ * Resolve a linha divergente pela origem, quando ha regra para o tipo.
+ *
+ * `null` quando nao ha regra, quando nenhuma origem casa ou quando DUAS
+ * casam -- nesses casos o conflito e real e tem de subir, em vez de a
+ * funcao escolher por conta propria.
+ */
+export function desempatarPorOrigem(linha: LinhaConsolidada): CampoExtraido | null {
+  const marca = origemQueVence(linha.type);
+
+  if (marca === null) return null;
+
+  // Casa por PREFIXO e sem caixa: o rotulo vem do nome do arquivo que a
+  // recepcao anexou ("ECG 30s", "ecg-agosto"), nao de uma lista fechada.
+  const vencedores = linha.campos.filter((campo) =>
+    (campo.sourceLabel ?? '').toUpperCase().startsWith(marca),
+  );
+
+  return vencedores.length === 1 ? (vencedores[0] ?? null) : null;
+}

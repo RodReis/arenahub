@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { consolidar, equivalentes, toleranciaDe } from './consolidacao-de-laudos.js';
+import { consolidar, desempatarPorOrigem, equivalentes, toleranciaDe } from './consolidacao-de-laudos.js';
 import type { CampoExtraido } from './revisao-de-importacao.js';
 
 function campo(over: Partial<CampoExtraido> & Pick<CampoExtraido, 'id' | 'type'>): CampoExtraido {
@@ -100,5 +100,69 @@ describe('consolidar laudos da mesma medicao', () => {
     ]);
 
     expect(linhas.map((linha) => linha.type)).toEqual(['WEIGHT', 'BODY_FAT_PERCENT']);
+  });
+});
+
+describe('desempate por origem -- so o bpm tem regra', () => {
+  /**
+   * O caso real que travou a publicacao automatica na primeira execucao ao
+   * vivo: o app da balanca reporta 84 bpm de repouso e o ECG mede 92 em
+   * trinta segundos. Sao medicoes diferentes do mesmo numero, e sem humano
+   * para escolher (ADR-039) a confirmacao morria com "mais de um valor
+   * aceito para HEART_RATE".
+   *
+   * Decisao do PI: o ECG vence. E o aparelho feito para medir coracao.
+   */
+  it('bpm: o ECG vence a balanca', () => {
+    const [linha] = consolidar([
+      campo({
+        id: 'balanca',
+        type: 'HEART_RATE',
+        extractedValue: 84,
+        state: 'CONFIRMED',
+        sourceLabel: 'Unique Health',
+      }),
+      campo({
+        id: 'ecg',
+        type: 'HEART_RATE',
+        extractedValue: 92,
+        state: 'CONFIRMED',
+        sourceLabel: 'ECG 30s',
+      }),
+    ]);
+
+    expect(desempatarPorOrigem(linha!)?.id).toBe('ecg');
+  });
+
+  it('casa o rotulo sem caixa e por prefixo -- o nome vem do arquivo anexado', () => {
+    const [linha] = consolidar([
+      campo({ id: 'a', type: 'HEART_RATE', extractedValue: 84, sourceLabel: 'Unique Health' }),
+      campo({ id: 'b', type: 'HEART_RATE', extractedValue: 92, sourceLabel: 'ecg-agosto' }),
+    ]);
+
+    expect(desempatarPorOrigem(linha!)?.id).toBe('b');
+  });
+
+  /**
+   * Fora do bpm NAO ha desempate, e isso e o ponto: dois laudos de
+   * bioimpedancia discordando no peso e sinal de problema no aparelho.
+   * Escolher um lado esconderia o defeito em vez de mostra-lo.
+   */
+  it('peso divergente NAO se resolve por origem', () => {
+    const [linha] = consolidar([
+      campo({ id: 'a', type: 'WEIGHT', extractedValue: 88.4, extractedUnit: 'kg', sourceLabel: 'CF610_G' }),
+      campo({ id: 'b', type: 'WEIGHT', extractedValue: 92.1, extractedUnit: 'kg', sourceLabel: 'ECG 30s' }),
+    ]);
+
+    expect(desempatarPorOrigem(linha!)).toBeNull();
+  });
+
+  it('dois bpm da MESMA origem nao se resolvem -- o conflito e real', () => {
+    const [linha] = consolidar([
+      campo({ id: 'a', type: 'HEART_RATE', extractedValue: 84, sourceLabel: 'ECG 30s' }),
+      campo({ id: 'b', type: 'HEART_RATE', extractedValue: 92, sourceLabel: 'ECG 30s' }),
+    ]);
+
+    expect(desempatarPorOrigem(linha!)).toBeNull();
   });
 });
