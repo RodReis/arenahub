@@ -71,6 +71,21 @@ export class SessaoNaoEncontradaError extends ErroDeDominio {
 }
 
 /**
+ * O `reviewSessionId` do pedido pertence a OUTRO aluno.
+ *
+ * Sem esta checagem, um upload malicioso ou por engano anexaria o arquivo do
+ * aluno B a sessao do aluno A -- `encontrarSessao` deriva `studentId` da
+ * PRIMEIRA linha da sessao, e a confirmacao gravaria a medida de B na ficha
+ * de A. Corrupcao de dado de saude entre pacientes, mesmo dentro do mesmo
+ * tenant (nao e so isolamento de tenant que protege aqui).
+ */
+export class SessaoDeOutroAlunoError extends ErroDeDominio {
+  constructor() {
+    super('SESSION_STUDENT_MISMATCH', 409, 'a sessao de revisao pertence a outro aluno');
+  }
+}
+
+/**
  * Duas confirmacoes concorrentes da mesma sessao -- a segunda chega aqui.
  *
  * O INDICE PARCIAL do banco e quem garante isto (nunca um `if`): a segunda
@@ -109,6 +124,8 @@ export interface ImportacaoComCampos {
   readonly assessmentId: string | null;
   readonly reviewSessionId: string | null;
   readonly sourceLabel: string | null;
+  /** Chave no storage privado. `null` quando o arquivo ja foi expurgado. */
+  readonly objectKey: string | null;
   readonly createdAt: Date;
   readonly campos: readonly CampoExtraido[];
 }
@@ -121,6 +138,8 @@ export interface SessaoComArquivos {
   /** Campos de TODOS os arquivos da sessao, achatados. */
   readonly campos: readonly CampoExtraido[];
   readonly importIds: readonly string[];
+  /** Chave no storage privado de cada import, na MESMA ordem de `importIds`. */
+  readonly objectKeys: readonly (string | null)[];
   /**
    * O que cada arquivo guardou em `extracted_attributes` -- OPACO
    * (ADR-035), carregado ate a confirmacao migrar o que for dado de
@@ -348,6 +367,7 @@ export class ImportRepository {
       arquivos,
       campos,
       importIds: linhas.map((linha) => linha.id),
+      objectKeys: linhas.map((linha) => linha.objectKey),
       atributosPorImport: linhas.map((linha) => atributosOpacos(linha.extractedAttributes)),
     };
   }
@@ -610,6 +630,7 @@ function paraImportacaoComCampos(linha: ImportacaoComCamposDoPrisma): Importacao
     assessmentId: linha.assessmentId,
     reviewSessionId: linha.reviewSessionId,
     sourceLabel: linha.sourceLabel,
+    objectKey: linha.objectKey,
     createdAt: linha.createdAt,
     campos: linha.fields.map((campo) => ({
       id: campo.id,

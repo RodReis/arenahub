@@ -343,6 +343,87 @@ describe('F-multiarquivo -- sessao de revisao', () => {
       expect(tipos).toContain('BONE_MASS'); // so no Unique Health
     });
 
+    /**
+     * FIX Critical 3 (revisao adversarial) -- campo PENDING sozinho (numa
+     * linha CONCORDANTE, nao divergente) passava batido pela porta de
+     * `sessaoPodeConfirmar` -- ela so bloqueia PENDING em linha DIVERGENTE
+     * com mais de um campo. `valoresAceitos` pula estado PENDING em
+     * silencio, entao a confirmacao seguia sem a medida -- e o arquivo e
+     * apagado logo depois, tornando o valor IRRECUPERAVEL. `confirmar`
+     * (import isolado, F19) ja fechava esta porta com `revisaoCompleta`;
+     * este teste prova que `confirmarSessao` fecha a MESMA porta agora.
+     */
+    it('campo PENDING sozinho (so um arquivo mediu) impede a confirmacao da sessao', async () => {
+      const studentId = await criarAluno(contas.a);
+
+      const envioBio = await enviar(contas.a, studentId, BIO_CSV, 'cf610g.csv', 'text/csv', {
+        sourceLabel: 'CF610_G',
+      });
+      expect(envioBio.status).toBe(201);
+      const reviewSessionId = (envioBio.body as { reviewSessionId: string }).reviewSessionId;
+
+      // `BONE_MASS` so existe no Unique Health -- nao ha divergencia (nao
+      // ha outro campo do mesmo tipo para comparar), so ausencia de decisao.
+      const envioUnique = await enviar(contas.a, studentId, UNIQUE_CSV, 'unique.csv', 'text/csv', {
+        reviewSessionId,
+        sourceLabel: 'Unique Health',
+      });
+      expect(envioUnique.status).toBe(201);
+
+      const antes = await detalharSessao(contas.a, reviewSessionId);
+      const linhas = (antes.body as SessaoResposta).linhas;
+
+      // Confirma TUDO exceto BONE_MASS -- que fica PENDING de proposito.
+      for (const linha of linhas) {
+        if (linha.type === 'BONE_MASS') continue;
+
+        for (const campo of linha.campos) {
+          if (campo.state !== 'PENDING') continue;
+
+          const linhaDoCampo = await db.importedField.findUniqueOrThrow({
+            where: { id: campo.id },
+            select: { importId: true },
+          });
+
+          await revisar(contas.a, linhaDoCampo.importId, campo.id, { state: 'CONFIRMED' });
+        }
+      }
+
+      const resposta = await confirmarSessao(contas.a, reviewSessionId);
+
+      expect(resposta.status).toBe(409);
+      expect((resposta.body as { code: string }).code).toBe('IMPORT_HAS_PENDING_FIELDS');
+
+      // Nenhuma avaliacao nasceu, e o arquivo NAO foi apagado -- o valor
+      // pendente continua recuperavel.
+      const avaliacoes = await db.bodyAssessment.count({ where: { studentId } });
+      expect(avaliacoes).toBe(0);
+
+      const importsComArquivo = await db.assessmentImport.findMany({
+        where: { reviewSessionId },
+        select: { objectKey: true },
+      });
+      expect(importsComArquivo.every((i) => i.objectKey !== null)).toBe(true);
+    });
+
+    /**
+     * O teste MAIS IMPORTANTE da fatia -- e o unico que prova concorrencia de
+     * verdade, nao serializacao acidental (as duas chamadas disparam ANTES
+     * de qualquer `await` resolver, via `Promise.allSettled` sobre as duas
+     * promises ja criadas).
+     *
+     * FIX Important 5 (revisao adversarial): a asserção original so contava
+     * `bodyAssessment.findMany({ where: { studentId } })` sem filtrar por
+     * status -- antes do fix do Critical 2, a PERDEDORA da corrida publicava
+     * a propria avaliacao (orfa, sem import apontando pra ela) e a contagem
+     * batia 2, fazendo o teste falhar CORRETAMENTE. Depois do fix, a
+     * perdedora nunca publica (o rascunho dela e apagado no `catch`), entao
+     * a asserção de contagem passaria mesmo se o reordenamento estivesse
+     * incompleto e deixasse um DRAFT orfao para tras -- a contagem simples
+     * nao pegaria isso. As asserções abaixo fecham essa lacuna: contam
+     * PUBLICADAS e RASCUNHOS separadamente, e conferem que a UNICA avaliacao
+     * publicada e exatamente a que a resposta 201 devolveu.
+     */
     it('confirmar duas vezes NAO cria duas avaliacoes', async () => {
       const { studentId, reviewSessionId } = await prepararSessaoCompleta();
       await confirmarTodosOsCampos(contas.a, reviewSessionId);
@@ -351,9 +432,6 @@ describe('F-multiarquivo -- sessao de revisao', () => {
         confirmarSessao(contas.a, reviewSessionId),
         confirmarSessao(contas.a, reviewSessionId),
       ]);
-
-      const avaliacoes = await db.bodyAssessment.findMany({ where: { studentId } });
-      expect(avaliacoes).toHaveLength(1);
 
       // As DUAS chamadas HTTP respondem (uma 201, uma 409) -- `allSettled`
       // nunca rejeita a promise do supertest; quem falha e o STATUS.
@@ -366,6 +444,35 @@ describe('F-multiarquivo -- sessao de revisao', () => {
         (r) => r.status === 'fulfilled' && r.value.status === 409,
       );
       expect(conflitos).toHaveLength(1);
+
+      const vencedora = sucessos[0];
+      if (vencedora === undefined || vencedora.status !== 'fulfilled') {
+        throw new Error('vencedora nao cumpriu');
+      }
+      const assessmentIdVencedor = (vencedora.value.body as { assessmentId: string }).assessmentId;
+
+      // Nenhuma avaliacao PUBLICADA alem da vencedora -- se a perdedora
+      // tivesse publicado a propria (Critical 2, corrigido), apareceria aqui.
+      const publicadas = await db.bodyAssessment.findMany({
+        where: { studentId, status: 'PUBLISHED' },
+      });
+      expect(publicadas).toHaveLength(1);
+      expect(publicadas[0]?.id).toBe(assessmentIdVencedor);
+
+      // Nenhum RASCUNHO orfao para tras -- se a limpeza do `catch` nao
+      // rodasse, o rascunho da perdedora ficaria aqui, visivel em
+      // `listarDoAluno` (F19/F17), que lista TODOS os status.
+      const rascunhos = await db.bodyAssessment.findMany({
+        where: { studentId, status: 'DRAFT' },
+      });
+      expect(rascunhos).toHaveLength(0);
+
+      // TODOS os tres imports da sessao apontam para a MESMA avaliacao
+      // vencedora -- nao ha import "perdido" apontando para o rascunho
+      // apagado da perdedora.
+      const imports = await db.assessmentImport.findMany({ where: { reviewSessionId } });
+      expect(imports).toHaveLength(3);
+      expect(imports.every((i) => i.assessmentId === assessmentIdVencedor)).toBe(true);
     });
   });
 
@@ -394,6 +501,58 @@ describe('F-multiarquivo -- sessao de revisao', () => {
       const resposta = await confirmarSessao(contas.a, randomUUID());
 
       expect(resposta.status).toBe(404);
+    });
+  });
+
+  /**
+   * FIX Critical 1 (revisao adversarial) -- corrupcao de dado de saude ENTRE
+   * PACIENTES, dentro do MESMO tenant.
+   *
+   * `reviewSessionId` chega no CORPO do pedido e, antes do fix, era gravado
+   * as cegas por `criar` -- nada conferia que a sessao pertencia ao MESMO
+   * aluno do upload. Um upload para o aluno B carregando o `reviewSessionId`
+   * do aluno A anexava o arquivo de B a sessao de A; `encontrarSessao` deriva
+   * `studentId` da PRIMEIRA linha da sessao, entao a confirmacao gravaria a
+   * MEDIDA DE B na ficha de A -- pior que vazamento de tenant, e o tipo de
+   * corrupcao que a arquitetura de isolamento nem sempre cobre (o `tenantId`
+   * bate; e o `studentId` DENTRO do tenant que nao tinha guarda nenhuma).
+   */
+  describe('reviewSessionId de outro aluno (corrupcao entre pacientes)', () => {
+    it('upload para o aluno B com a sessao do aluno A e recusado', async () => {
+      const alunoA = await criarAluno(contas.a);
+      const alunoB = await criarAluno(contas.a);
+
+      const envioA = await enviar(contas.a, alunoA, BIO_CSV, 'a.csv', 'text/csv', {
+        sourceLabel: 'CF610_G',
+      });
+      expect(envioA.status).toBe(201);
+      const sessaoDeA = (envioA.body as { reviewSessionId: string }).reviewSessionId;
+
+      // Ataque: upload para B carregando o reviewSessionId de A.
+      const envioB = await enviar(contas.a, alunoB, UNIQUE_CSV, 'b.csv', 'text/csv', {
+        reviewSessionId: sessaoDeA,
+        sourceLabel: 'Unique Health',
+      });
+
+      expect(envioB.status).toBe(409);
+      expect((envioB.body as { code: string }).code).toBe('SESSION_STUDENT_MISMATCH');
+
+      // A sessao de A continua com UM arquivo so -- o de B nunca entrou.
+      const imports = await db.assessmentImport.findMany({
+        where: { reviewSessionId: sessaoDeA },
+      });
+      expect(imports).toHaveLength(1);
+      expect(imports[0]?.studentId).toBe(alunoA);
+
+      // Confirmando a sessao de A, a medida de B NUNCA aparece na ficha dele.
+      await confirmarTodosOsCampos(contas.a, sessaoDeA);
+      const confirmacao = await confirmarSessao(contas.a, sessaoDeA);
+      expect(confirmacao.status).toBe(201);
+
+      const avaliacoesDeA = await db.bodyAssessment.count({ where: { studentId: alunoA } });
+      expect(avaliacoesDeA).toBe(1);
+      const avaliacoesDeB = await db.bodyAssessment.count({ where: { studentId: alunoB } });
+      expect(avaliacoesDeB).toBe(0);
     });
   });
 

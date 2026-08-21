@@ -17,6 +17,7 @@ import {
   ImportacaoNaoEncontradaError,
   RevisaoIncompletaError,
   SessaoBloqueadaError,
+  SessaoDeOutroAlunoError,
   type ImportacaoComCampos,
   type SessaoComArquivos,
 } from './import.repository.js';
@@ -129,6 +130,25 @@ export class ImportService {
     // pedido, uma NOVA nasce aqui. O cliente com um unico arquivo devolve o
     // id gerado e nunca mais o usa -- visto de fora, o fluxo F19 nao muda.
     const reviewSessionId = sessao?.reviewSessionId ?? randomUUID();
+
+    // CRITICO: sem esta checagem, um `reviewSessionId` de OUTRO aluno no
+    // corpo do pedido anexaria este arquivo a sessao dele -- e
+    // `encontrarSessao` deriva `studentId` da primeira linha da sessao, entao
+    // a confirmacao gravaria a medida deste aluno na ficha do outro.
+    // Corrupcao de dado de saude entre pacientes, nao so falta de isolamento
+    // de tenant (o `tenantId` ja protege isso; o `studentId` dentro do MESMO
+    // tenant nao tinha guarda nenhuma). So valida quando a sessao ja existe
+    // -- sessao nova (gerada acima) nao tem dono ainda.
+    if (sessao?.reviewSessionId !== undefined) {
+      const sessaoExistente = await this.importacoes.encontrarSessao(
+        contexto,
+        sessao.reviewSessionId,
+      );
+
+      if (sessaoExistente !== null && sessaoExistente.studentId !== studentId) {
+        throw new SessaoDeOutroAlunoError();
+      }
+    }
 
     const importacao = await this.importacoes.criar(contexto, {
       studentId,
@@ -408,30 +428,60 @@ export class ImportService {
    *   2. consolida os campos de todos com `consolidar` (Task 3);
    *   3. valida com `sessaoPodeConfirmar` (Task 4); bloqueio vira 409 com o
    *      `motivo` do dominio como `code`;
-   *   4. `valoresAceitos` roda sobre os campos ACEITOS de todas as linhas;
-   *   5. UMA `criarRascunho` + `publicar`, com `sourceReference: sessionId`;
-   *   6. `confirmar` de cada import da sessao, todos apontando para a MESMA
-   *      avaliacao;
-   *   7. apaga os arquivos de todos os imports;
-   *   8. TUDO dentro de uma unica logica atomica -- ver nota abaixo sobre a
-   *      transacao.
+   *   4. valida com `revisaoCompleta` (INV-103) sobre TODOS os campos da
+   *      sessao -- ver nota "NENHUM CAMPO PENDENTE PASSA EM SILENCIO" abaixo;
+   *   5. `valoresAceitos` roda sobre os campos ACEITOS de todas as linhas;
+   *   6. cria o RASCUNHO (ainda nao publicado);
+   *   7. LIGA os imports ao rascunho -- e AQUI que o indice parcial dispara;
+   *   8. so DEPOIS de ligar com sucesso, publica;
+   *   9. apaga os arquivos de todos os imports (storage + banco).
    *
-   * ## Por que a "transacao unica" e o REPOSITORIO, nao um `$transaction`
-   * amarrando os dois lados aqui
+   * ---------------------------------------------------------------------------
+   * NENHUM CAMPO PENDENTE PASSA EM SILENCIO (fix Critical 3, revisao adversarial)
+   * ---------------------------------------------------------------------------
    *
-   * `criarRascunho`/`publicar` (em `AssessmentRepository`) e `confirmarSessao`
-   * (em `ImportRepository`) cada um abre a PROPRIA transacao Prisma -- e nao
-   * ha, neste `PrismaService`, um jeito de compartilhar um `tx` entre dois
-   * repositorios injetados independentemente sem reescrever a assinatura de
-   * TODOS os metodos que participam (o padrao que `AssessmentRepository` ja
-   * usa nas suas proprias operacoes de varias tabelas). A garantia de
-   * idempotencia que IMPORTA -- nunca duas avaliacoes da mesma sessao -- nao
-   * depende de as duas transacoes serem uma so: ela e o INDICE PARCIAL do
-   * banco, que se aplica no momento exato em que `confirmarSessao` tenta
-   * gravar `assessment_id`. Se a avaliacao for criada e a etapa 6 falhar por
-   * corrida, a avaliacao fica orfa (sem import apontando para ela) --
-   * consequencia aceita: FICA UM RASCUNHO/PUBLICADA ORFAO, nunca uma
-   * DUPLICATA, que era o risco que a Task 5 existe para eliminar.
+   * `sessaoPodeConfirmar` so bloqueia PENDING numa linha DIVERGENTE com mais
+   * de um campo -- e o motivo e correto: e a regra de negocio sobre
+   * DIVERGENCIA (Task 4). Mas um campo PENDING numa linha com UM SO campo
+   * (ex.: `BONE_MASS` que so um dos dois arquivos mediu) passa por essa porta
+   * sem ninguem ter decidido nada sobre ele -- `valoresAceitos` simplesmente
+   * PULA estado `PENDING` (nunca vira medida), e a confirmacao seguia em
+   * frente sem avisar. O valor nao seria so omitido: o arquivo e apagado
+   * logo depois, entao seria IRRECUPERAVEL. `confirmar` (import isolado) ja
+   * fecha esta porta com `revisaoCompleta`; `confirmarSessao` precisa da
+   * MESMA garantia sobre o conjunto inteiro da sessao, ou o caminho novo
+   * teria uma janela que o caminho antigo nunca teve.
+   *
+   * ---------------------------------------------------------------------------
+   * A ORDEM QUE IMPEDE AVALIACAO PUBLICADA ORFA (fix Critical 2, revisao adversarial)
+   * ---------------------------------------------------------------------------
+   *
+   * A versao anterior desta funcao publicava a avaliacao ANTES de ligar os
+   * imports a ela. Em duas confirmacoes concorrentes, as DUAS criavam e
+   * PUBLICAVAM o proprio rascunho antes de qualquer uma tentar o UPDATE que o
+   * indice parcial protege -- a perdedora recebia 409 limpo, mas a
+   * `BodyAssessment` dela ja estava `PUBLISHED` e NINGUEM a desfazia. Ela
+   * aparecia em `listarPublicadasDoAluno` (F18) como uma segunda medicao do
+   * mesmo mes -- exatamente a duplicata que o indice parcial existe para
+   * impedir, so que por um caminho que o indice nao cobre.
+   *
+   * A ordem corrigida elimina a janela: PUBLICAR so acontece DEPOIS que
+   * `ImportRepository.confirmarSessao` (o UPDATE protegido pelo indice)
+   * termina com sucesso. A perdedora nunca chega a publicar -- e o rascunho
+   * dela, que ficaria orfao em DRAFT (visivel em `listarDoAluno`, que lista
+   * todos os status), e apagado explicitamente no `catch` antes de
+   * repropagar o erro.
+   *
+   * ## Por que nao e uma unica transacao Prisma
+   *
+   * `criarRascunho` (em `AssessmentRepository`) e o `confirmarSessao` do
+   * repositorio (em `ImportRepository`) cada um abre a PROPRIA transacao --
+   * nao ha, neste `PrismaService`, um jeito de compartilhar um `tx` entre
+   * dois repositorios injetados independentemente sem reescrever a
+   * assinatura de todos os metodos participantes. A garantia que IMPORTA --
+   * nunca duas avaliacoes PUBLICADAS da mesma sessao -- nao depende disso:
+   * ela e o indice parcial, e a ordem acima garante que so o vencedor da
+   * corrida chega a publicar.
    */
   async confirmarSessao(
     contexto: TenantContext,
@@ -449,6 +499,15 @@ export class ImportService {
       throw new SessaoBloqueadaError(avaliacaoDaSessao.motivo);
     }
 
+    // INV-103 sobre o CONJUNTO INTEIRO da sessao -- ver nota "NENHUM CAMPO
+    // PENDENTE PASSA EM SILENCIO" acima. `sessaoPodeConfirmar` cobre
+    // divergencia; isto cobre campo pendente SOZINHO numa linha concordante.
+    const pronta = revisaoCompleta(sessao.campos);
+
+    if (!pronta.pronta) {
+      throw new RevisaoIncompletaError(pronta.motivo, pronta.campoId);
+    }
+
     // `valoresAceitos` opera por CAMPO (CONFIRMED/CORRECTED/DISCARDED), e
     // essa decisao e do avaliador em CADA campo, nao da linha consolidada:
     // por isso roda sobre os campos ACEITOS de TODAS as linhas, achatados --
@@ -462,6 +521,8 @@ export class ImportService {
 
     const dispositivo = dadosDoAparelho(sessao.atributosPorImport);
 
+    // Nasce como RASCUNHO -- NAO publicado. Publicar so acontece depois que
+    // o vinculo com os imports (abaixo) vencer a corrida do indice parcial.
     const avaliacao = await this.avaliacoes.criarRascunho(contexto, sessao.studentId, {
       assessedAt,
       evaluatorUserId: revisorId,
@@ -474,18 +535,31 @@ export class ImportService {
       ...(dispositivo ?? {}),
     });
 
+    try {
+      // E AQUI que o indice parcial dispara: a perdedora de uma corrida
+      // recebe `SessaoJaConfirmadaError` NESTE ponto -- ANTES de publicar.
+      await this.importacoes.confirmarSessao(
+        contexto,
+        reviewSessionId,
+        sessao.importIds,
+        avaliacao.id,
+        revisorId,
+        agora,
+      );
+    } catch (erro) {
+      // O rascunho perdeu a corrida: apaga para nao ficar orfao em DRAFT
+      // (visivel em `listarDoAluno`, que lista todos os status) e repropaga
+      // o mesmo erro -- o cliente ve o 409 de sempre.
+      await this.avaliacoes.excluirRascunho(contexto, avaliacao.id);
+
+      throw erro;
+    }
+
+    // So o VENCEDOR chega aqui -- a perdedora ja lancou e voltou no catch
+    // acima sem nunca publicar.
     await this.avaliacoes.publicar(contexto, avaliacao.id, agora);
 
-    await this.importacoes.confirmarSessao(
-      contexto,
-      reviewSessionId,
-      sessao.importIds,
-      avaliacao.id,
-      revisorId,
-      agora,
-    );
-
-    await this.importacoes.esquecerArquivosDaSessao(contexto, sessao.importIds);
+    await this.apagarArquivosDaSessao(contexto, sessao.importIds, sessao.objectKeys);
 
     return { assessmentId: avaliacao.id };
   }
@@ -507,10 +581,22 @@ export class ImportService {
   /**
    * Remove o arquivo do storage e a chave da linha.
    *
+   * ---------------------------------------------------------------------------
+   * FIX Important 4 (revisao adversarial): O OBJETO PRECISA SER APAGADO DE VERDADE.
+   * ---------------------------------------------------------------------------
+   *
+   * A versao anterior so limpava `objectKey` no banco -- o objeto ficava
+   * ORFAO no bucket para sempre, nunca apagado. Documento de saude tem
+   * retencao curta e delecao VERIFICAVEL (`MVP-03` 15); um objeto que
+   * ninguem mais referencia mas continua existindo no storage e exatamente
+   * o gap que a politica de retencao proibe.
+   *
    * Falha de storage NAO derruba a operacao: a avaliacao ja foi criada e
    * desfaze-la por causa de um objeto orfao seria trocar um problema pequeno
    * (lixo no bucket) por um grande (dado de saude perdido). O objeto vira
-   * pendencia de limpeza, que e o que a F22 tem de mostrar.
+   * pendencia de limpeza, que e o que a F22 tem de mostrar -- por isso o
+   * `deletePrivateObject` entra no MESMO `try` silencioso que ja protegia
+   * `esquecerArquivo`, e nao um `throw` novo.
    */
   private async apagarArquivo(contexto: TenantContext, importId: string): Promise<void> {
     const importacao = await this.importacoes.encontrar(contexto, importId);
@@ -518,10 +604,41 @@ export class ImportService {
     if (importacao === null) return;
 
     try {
+      if (importacao.objectKey !== null) {
+        await this.storage.deletePrivateObject(importacao.objectKey);
+      }
+
       await this.importacoes.esquecerArquivo(contexto, importId);
     } catch {
       // Deliberadamente silencioso aqui: ver o bloco acima.
     }
+  }
+
+  /**
+   * Como `apagarArquivo`, para TODOS os imports de uma sessao (Task 5).
+   *
+   * Mesma regra: falha de storage NAO derruba a requisicao -- a avaliacao ja
+   * foi publicada, e um objeto orfao e pendencia de limpeza, nao motivo para
+   * devolver 500 depois que o dado de saude ja esta salvo. Cada import e
+   * tratado no proprio `try`: um objeto que falha ao apagar nao impede a
+   * limpeza dos outros da mesma sessao.
+   */
+  private async apagarArquivosDaSessao(
+    contexto: TenantContext,
+    importIds: readonly string[],
+    objectKeys: readonly (string | null)[],
+  ): Promise<void> {
+    for (const objectKey of objectKeys) {
+      try {
+        if (objectKey !== null) {
+          await this.storage.deletePrivateObject(objectKey);
+        }
+      } catch {
+        // Deliberadamente silencioso -- ver `apagarArquivo`.
+      }
+    }
+
+    await this.importacoes.esquecerArquivosDaSessao(contexto, importIds);
   }
 }
 

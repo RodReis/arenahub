@@ -243,6 +243,26 @@ export class AssessmentRepository {
     });
   }
 
+  /**
+   * Apaga um RASCUNHO -- nunca uma avaliacao publicada.
+   *
+   * Existe para a sessao multiarquivo (Task 5, fix Critical 2): quando duas
+   * confirmacoes concorrentes da mesma sessao criam cada uma o proprio
+   * rascunho e so uma consegue LIGAR os imports a ele (indice parcial), a
+   * perdedora precisa desfazer o proprio rascunho -- senao ele fica orfao,
+   * visivel em `listarDoAluno` (todos os status) como uma avaliacao fantasma
+   * que nenhum arquivo referencia. `BodyMeasurement` cascade-apaga junto
+   * (`onDelete: Cascade` no schema).
+   *
+   * Filtra por `status: 'DRAFT'`: apagar avaliacao PUBLICADA destruiria
+   * historico oficial, e isso nunca e o caso de uso desta funcao.
+   */
+  async excluirRascunho(contexto: TenantContext, assessmentId: string): Promise<void> {
+    await this.db.bodyAssessment.deleteMany({
+      where: { id: assessmentId, tenantId: contexto.tenantId, status: 'DRAFT' },
+    });
+  }
+
   async encontrar(
     contexto: TenantContext,
     assessmentId: string,
