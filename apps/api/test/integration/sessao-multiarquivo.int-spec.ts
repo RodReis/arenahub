@@ -175,7 +175,7 @@ describe('F-multiarquivo -- sessao de revisao', () => {
     conteudo: Buffer,
     nome: string,
     tipo: string,
-    campos: { reviewSessionId?: string; sourceLabel?: string } = {},
+    campos: { reviewSessionId?: string; sourceLabel?: string; ultimoDaSessao?: string } = {},
   ): Promise<request.Response> => {
     let requisicao = request(servidor())
       .post(`/api/v1/students/${studentId}/assessment-imports`)
@@ -341,44 +341,25 @@ describe('F-multiarquivo -- sessao de revisao', () => {
   });
 
   /**
-   * BUG REPORTADO, NAO CORRIGIDO AQUI (fora do escopo desta entrega --
-   * `import.service.ts` esta fora dos arquivos que esta tarefa pode tocar).
+   * BUG CORRIGIDO (era reportado como bug antes desta entrega, agora
+   * fechado em `import.service.ts`): ADR-039 fazia `enviar` chamar
+   * `publicarAutomaticamente` -> `confirmar` apos CADA arquivo, nao so o
+   * ultimo da sessao -- o segundo arquivo de uma sessao de tres ja
+   * confirmava a SESSAO INTEIRA sozinho, antes do terceiro chegar e antes
+   * de QUALQUER revisao humana. Produzia 1 avaliacao publicada incompleta,
+   * 1 rascunho orfao e 1 arquivo perdido em `EXTRACTED`.
    *
-   * ADR-039 fez `enviar` chamar `publicarAutomaticamente` -> `confirmar`
-   * apos CADA arquivo, nao so o ultimo da sessao. Para sessao de UM arquivo
-   * isso e exatamente a intencao (ver 'ADR-039' em `upload-e-revisao`). Mas
-   * para sessao de VARIOS arquivos, `confirmar` delega para
-   * `confirmarSessao` assim que `sessao.importIds.length > 1` -- ou seja, o
-   * SEGUNDO arquivo de uma sessao de tres ja tenta confirmar a SESSAO
-   * INTEIRA, antes do terceiro chegar e antes de QUALQUER revisao humana
-   * acontecer. Nao ha hoje nenhum sinal (campo, flag, rota) que diga "mais
-   * arquivos vem por ai" -- o service nao tem como saber.
-   *
-   * O efeito observado (reproduzido rodando a suite untada com log): o
-   * PRIMEIRO arquivo publica sozinho (rota antiga, sem exigir bioimpedancia
-   * nem consolidacao) com `sourceReference` = seu proprio importId. O
-   * SEGUNDO arquivo, ao chegar, ve a sessao com 2 imports e tenta
-   * `confirmarSessao` -- que cria uma SEGUNDA avaliacao (`sourceReference`
-   * = reviewSessionId, os dois indices parciais nao colidem por serem
-   * valores DIFERENTES) e essa fica em DRAFT, nunca publicada, porque o
-   * vinculo dos imports falha por algum import ja pertencer a outra
-   * avaliacao. O TERCEIRO arquivo (ECG) fica para tras em `EXTRACTED`, sem
-   * avaliacao nenhuma, porque a excecao do vinculo e engolida
-   * silenciosamente por `publicarAutomaticamente`.
-   *
-   * Resultado: sessao de 3 arquivos produz 1 avaliacao PUBLICADA (so com os
-   * dados do primeiro arquivo), 1 rascunho ORFAO, e 1 arquivo perdido em
-   * `EXTRACTED` -- exatamente o oposto da garantia "tres arquivos, uma
-   * avaliacao com os dados de todos" que esta fatia (ADR-038, Task 5)
-   * existe para proteger.
-   *
-   * Os 4 testes abaixo continuam PROVANDO a garantia certa (o codigo nao
-   * mudou, so o comportamento do service por cima dele) -- marcados
-   * `.skip` em vez de reescritos para aceitar o resultado errado como novo
-   * "certo", porque nao e: e um bug.
+   * A correcao: `enviar` so publica quando o CHAMADOR marca
+   * `ultimoDaSessao: 'true'` no upload -- ausente ou falso, a importacao
+   * fica `EXTRACTED` (visivel na fila F22, revisavel a mao). Os testes deste
+   * bloco NAO marcam nenhum upload como ultimo -- exercitam o caminho MANUAL
+   * (revisar campo a campo, confirmar a sessao explicitamente pela rota).
+   * O caminho AUTOMATICO (ultimo arquivo marcado, publica sozinho com dados
+   * de TODOS os arquivos) esta provado em 'ultimoDaSessao pina o bug da
+   * cascata' logo abaixo.
    */
   describe('tres arquivos, uma avaliacao', () => {
-    it.skip('tres arquivos viram UMA avaliacao com as medidas de todos', async () => {
+    it('tres arquivos viram UMA avaliacao com as medidas de todos', async () => {
       const { studentId, reviewSessionId } = await prepararSessaoCompleta();
 
       await confirmarTodosOsCampos(contas.a, reviewSessionId);
@@ -415,11 +396,7 @@ describe('F-multiarquivo -- sessao de revisao', () => {
      * (import isolado, F19) ja fechava esta porta com `revisaoCompleta`;
      * este teste prova que `confirmarSessao` fecha a MESMA porta agora.
      */
-    // .skip -- mesmo bug do teste anterior (ver comentario antes de
-    // `describe('tres arquivos, uma avaliacao')`): o segundo arquivo ja
-    // confirma a sessao sozinho, antes deste teste conseguir deixar
-    // BONE_MASS pendente de proposito.
-    it.skip('campo PENDING sozinho (so um arquivo mediu) impede a confirmacao da sessao', async () => {
+    it('campo PENDING sozinho (so um arquivo mediu) impede a confirmacao da sessao', async () => {
       const studentId = await criarAluno(contas.a);
 
       const envioBio = await enviar(contas.a, studentId, BIO_CSV, 'cf610g.csv', 'text/csv', {
@@ -490,10 +467,7 @@ describe('F-multiarquivo -- sessao de revisao', () => {
      * PUBLICADAS e RASCUNHOS separadamente, e conferem que a UNICA avaliacao
      * publicada e exatamente a que a resposta 201 devolveu.
      */
-    // .skip -- mesmo bug (ver comentario antes de `describe('tres
-    // arquivos, uma avaliacao')`): a sessao ja esta confirmada (errado)
-    // antes das duas chamadas concorrentes deste teste acontecerem.
-    it.skip('confirmar duas vezes NAO cria duas avaliacoes', async () => {
+    it('confirmar duas vezes NAO cria duas avaliacoes', async () => {
       const { studentId, reviewSessionId } = await prepararSessaoCompleta();
       await confirmarTodosOsCampos(contas.a, reviewSessionId);
 
@@ -574,10 +548,7 @@ describe('F-multiarquivo -- sessao de revisao', () => {
      * esta chamada. A sessao confirma normalmente, com UMA medida `WEIGHT`
      * so.
      */
-    // .skip -- mesmo bug (ver comentario antes de `describe('tres
-    // arquivos, uma avaliacao')`): a sessao ja confirma sozinha ao subir o
-    // segundo arquivo, antes deste teste alcancar o passo do campo isolado.
-    it.skip('confirmar o gemeo escondido pela rota de campo isolado (F19) nao trava a sessao', async () => {
+    it('confirmar o gemeo escondido pela rota de campo isolado (F19) nao trava a sessao', async () => {
       const studentId = await criarAluno(contas.a);
 
       const envioBio = await enviar(contas.a, studentId, BIO_CSV, 'cf610g.csv', 'text/csv', {
@@ -636,6 +607,72 @@ describe('F-multiarquivo -- sessao de revisao', () => {
     });
   });
 
+  /**
+   * PINA O BUG DA CASCATA (ver comentario acima de `describe('tres
+   * arquivos, uma avaliacao')`) -- nao pode voltar.
+   *
+   * Duas academias enviam dois arquivos da MESMA sessao; so o SEGUNDO e
+   * marcado `ultimoDaSessao: 'true'`. Antes da correcao, o SEGUNDO arquivo
+   * via a sessao com `importIds.length > 1` e delegava para
+   * `confirmarSessao` incondicionalmente -- e o PRIMEIRO arquivo ja tinha
+   * publicado SOZINHO (rota antiga, sem consolidacao) no proprio upload
+   * dele. Resultado: 1 avaliacao publicada so com os dados do primeiro
+   * arquivo, mais uma segunda tentativa (do segundo arquivo) que nascia
+   * ORFA em DRAFT. A correcao gateia a publicacao por `ultimoDaSessao`, e
+   * so o UPLOAD MARCADO chama `confirmar`/`confirmarSessao` -- o primeiro
+   * arquivo fica `EXTRACTED` esperando o segundo.
+   */
+  describe('ultimoDaSessao pina o bug da cascata', () => {
+    it('so o arquivo marcado como ultimo publica, com os dados dos DOIS arquivos', async () => {
+      const studentId = await criarAluno(contas.a);
+
+      const envioBio = await enviar(contas.a, studentId, BIO_CSV, 'cf610g.csv', 'text/csv', {
+        sourceLabel: 'CF610_G',
+      });
+      expect(envioBio.status).toBe(201);
+      // Sem `ultimoDaSessao`: o primeiro arquivo NAO publica sozinho.
+      expect(envioBio.body).toMatchObject({ status: 'EXTRACTED' });
+      const reviewSessionId = (envioBio.body as { reviewSessionId: string }).reviewSessionId;
+
+      const envioUnique = await enviar(contas.a, studentId, UNIQUE_CSV, 'unique.csv', 'text/csv', {
+        reviewSessionId,
+        sourceLabel: 'Unique Health',
+        ultimoDaSessao: 'true',
+      });
+      expect(envioUnique.status).toBe(201);
+
+      // Nenhum campo foi revisado a mao -- a publicacao automatica no
+      // segundo upload marca tudo CONFIRMED/DISCARDED e confirma sozinha,
+      // exatamente como no caminho de UM arquivo.
+      const avaliacoes = await db.bodyAssessment.findMany({ where: { studentId } });
+      expect(avaliacoes).toHaveLength(1);
+      expect(avaliacoes[0]?.status).toBe('PUBLISHED');
+
+      const assessmentId = avaliacoes[0]!.id;
+
+      const imports = await db.assessmentImport.findMany({ where: { assessmentId } });
+      expect(imports).toHaveLength(2);
+
+      const medidas = await db.bodyMeasurement.findMany({ where: { assessmentId } });
+      const tipos = medidas.map((m) => m.type);
+
+      // Dados dos DOIS arquivos, nao so do primeiro (o bug produzia uma
+      // avaliacao com so os campos do CF610_G).
+      expect(tipos).toContain('SKELETAL_MUSCLE_MASS'); // so no CF610_G
+      expect(tipos).toContain('BONE_MASS'); // so no Unique Health
+
+      // WEIGHT concorda entre os dois arquivos e deve virar UMA medida so.
+      const pesos = medidas.filter((m) => m.type === 'WEIGHT');
+      expect(pesos).toHaveLength(1);
+
+      // Nenhum rascunho orfao para tras -- a assinatura do bug original.
+      const rascunhos = await db.bodyAssessment.findMany({
+        where: { studentId, status: 'DRAFT' },
+      });
+      expect(rascunhos).toHaveLength(0);
+    });
+  });
+
   describe('sessaoPodeConfirmar (Task 4) na porta da frente', () => {
     /**
      * Fix round 2: `UNIQUE_CSV` NAO serve mais para este teste -- ele MEDE
@@ -672,7 +709,7 @@ describe('F-multiarquivo -- sessao de revisao', () => {
      * nao corrigido aqui (fora do escopo desta tarefa, e `import.service.ts`
      * esta fora dos arquivos que esta entrega pode tocar).
      */
-    it.skip('recusa sessao sem bioimpedancia', async () => {
+    it('recusa sessao sem bioimpedancia', async () => {
       const studentId = await criarAluno(contas.a);
 
       const envio = await enviar(contas.a, studentId, ECG_PDF, 'so-ecg.pdf', 'application/pdf', {
@@ -719,6 +756,7 @@ describe('F-multiarquivo -- sessao de revisao', () => {
 
       const envioA = await enviar(contas.a, alunoA, BIO_CSV, 'a.csv', 'text/csv', {
         sourceLabel: 'CF610_G',
+        ultimoDaSessao: 'true',
       });
       expect(envioA.status).toBe(201);
       const sessaoDeA = (envioA.body as { reviewSessionId: string }).reviewSessionId;
@@ -785,21 +823,25 @@ describe('F-multiarquivo -- sessao de revisao', () => {
     });
 
     /**
-     * ADR-039: upload sozinho (sessao de UM arquivo) ja publica no proprio
-     * `enviar`, pela rota antiga de import isolado (`confirmar`, nao
-     * `confirmarSessao`) -- que nunca exigiu bioimpedancia (ver o teste
-     * seguinte). Chamar a rota de SESSAO depois disso e redundante: a
-     * sessao ja esta confirmada, e a chamada responde 409, nao 201. A
-     * garantia que o titulo descreve (uma sessao de UM arquivo com
-     * bioimpedancia vira UMA avaliacao, sem exigir ECG) continua valendo --
-     * so o MOMENTO em que ela acontece mudou, de "depois que um humano
-     * chama confirm" para "no proprio upload".
+     * ADR-039 + fix do bug de cascata: o upload so publica sozinho quando o
+     * CHAMADOR marca `ultimoDaSessao: 'true'` -- sem a flag, a importacao
+     * fica `EXTRACTED` (mais seguro, revisavel a mao). Aqui a sessao tem UM
+     * arquivo so e ele E o ultimo, entao a flag e exatamente o que o
+     * admin-web manda no arquivo final do lote. A publicacao acontece pela
+     * rota antiga de import isolado (`confirmar`, nao `confirmarSessao`) --
+     * que nunca exigiu bioimpedancia (ver o teste seguinte). Chamar a rota
+     * de SESSAO depois disso e redundante: a sessao ja esta confirmada, e a
+     * chamada responde 409, nao 201. A garantia que o titulo descreve (uma
+     * sessao de UM arquivo com bioimpedancia vira UMA avaliacao, sem exigir
+     * ECG) continua valendo -- so o MOMENTO mudou, de "depois que um humano
+     * chama confirm" para "no proprio upload, quando marcado como ultimo".
      */
     it('sessao de UM arquivo com bioimpedancia confirma sozinha, sem exigir ECG', async () => {
       const studentId = await criarAluno(contas.a);
 
       const envio = await enviar(contas.a, studentId, BIO_CSV, 'sozinho.csv', 'text/csv', {
         sourceLabel: 'CF610_G',
+        ultimoDaSessao: 'true',
       });
 
       expect(envio.body).toMatchObject({ status: 'CONFIRMED' });
@@ -826,14 +868,16 @@ describe('F-multiarquivo -- sessao de revisao', () => {
      * existe para pegar.
      *
      * Depois de ADR-039, a rota chega a rodar SOZINHA no proprio upload
-     * (`enviar` -> `publicarAutomaticamente` -> `confirmar`) -- nao precisa
-     * mais de uma chamada humana explicita para provar a ausencia da
-     * exigencia de bioimpedancia.
+     * (`enviar` -> `publicarAutomaticamente` -> `confirmar`) quando marcado
+     * como o ultimo arquivo da sessao -- nao precisa mais de uma chamada
+     * humana explicita para provar a ausencia da exigencia de bioimpedancia.
      */
     it('a rota antiga (import isolado) nao exige bioimpedancia', async () => {
       const studentId = await criarAluno(contas.a);
 
-      const envio = await enviar(contas.a, studentId, UNIQUE_CSV, 'generico.csv', 'text/csv');
+      const envio = await enviar(contas.a, studentId, UNIQUE_CSV, 'generico.csv', 'text/csv', {
+        ultimoDaSessao: 'true',
+      });
 
       expect(envio.status).toBe(201);
       expect(envio.body).toMatchObject({ status: 'CONFIRMED' });

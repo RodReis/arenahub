@@ -268,6 +268,13 @@ describe('F19 -- upload e revisao', () => {
     Buffer.from('conteudo do laudo'),
   ]);
 
+  /**
+   * Este arquivo so testa upload de UM arquivo por vez (F19) -- cada upload
+   * E o ultimo (e unico) da propria sessao, entao `ultimoDaSessao: 'true'`
+   * vai em TODO envio daqui. Sem ela, a importacao ficaria `EXTRACTED`
+   * esperando um segundo arquivo que nunca chega (ver `sessao-multiarquivo`
+   * para o caso de sessao com varios arquivos).
+   */
   const enviar = async (
     conta: { cookie: string },
     studentId: string,
@@ -278,6 +285,7 @@ describe('F19 -- upload e revisao', () => {
     request(servidor())
       .post(`/api/v1/students/${studentId}/assessment-imports`)
       .set('Cookie', conta.cookie)
+      .field('ultimoDaSessao', 'true')
       .attach('file', conteudo, { filename: nome, contentType: tipo });
 
   interface CampoResposta {
