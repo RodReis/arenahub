@@ -1797,6 +1797,104 @@
           "Assessment"
         ]
       }
+    },
+    "/api/v1/students/{id}/health-progress": {
+      "get": {
+        "operationId": "HealthProgressController_historico",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HealthProgress"
+        ]
+      }
+    },
+    "/api/v1/students/{id}/health-goals": {
+      "get": {
+        "operationId": "HealthProgressController_listarMetas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HealthProgress"
+        ]
+      },
+      "post": {
+        "operationId": "HealthProgressController_criarMeta",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HealthProgress"
+        ]
+      }
+    },
+    "/api/v1/health-goals/{id}/close": {
+      "post": {
+        "operationId": "HealthProgressController_encerrarMeta",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HealthProgress"
+        ]
+      }
     }
   },
   "info": {

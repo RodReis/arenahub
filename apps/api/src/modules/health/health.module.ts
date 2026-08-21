@@ -6,6 +6,7 @@ import { TenancyModule } from '../tenancy/tenancy.module.js';
 import { AssessmentController } from './assessment.controller.js';
 import { AssessmentRepository } from './assessment.repository.js';
 import { GoalRepository } from './goal.repository.js';
+import { HealthProgressController } from './health-progress.controller.js';
 import { HealthProgressService } from './health-progress.service.js';
 
 /**
@@ -24,7 +25,7 @@ import { HealthProgressService } from './health-progress.service.js';
   // meia-noite LOCAL da unidade, e o fuso vem do repositorio publico dela --
   // nunca de `db.gymUnit` daqui (regra de arquitetura no 9).
   imports: [StudentsModule, TenancyModule],
-  controllers: [AssessmentController],
+  controllers: [AssessmentController, HealthProgressController],
   providers: [AssessmentRepository, GoalRepository, HealthProgressService, TenantContextService],
   exports: [AssessmentRepository],
 })
