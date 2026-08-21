@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 19/08/2026 *(MVP 3: ADR-035, ADR-036 e ADR-037; o ADR-008 fechou por inteiro)*
+**Última atualização:** 19/08/2026 *(MVP 3: ADR-035, ADR-037; o ADR-008 fechou por inteiro)*
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -108,9 +108,7 @@ como corroboração. **(2)** Junto veio um **ECG do OMRON HEM-7530T** com `Poss�
 atrial`: entra no produto como anexo e citação literal, **nunca interpretado**, e **fica fora do
 payload da IA** — só um booleano de pendência viaja (**ADR-035**). O gate de *protocolo clínico*
 do `MVP-03` §5 foi recusado pelo PI e substituído por essa linha. **(3)** IA decidida:
-`claude-haiku-4-5` na extração, `claude-sonnet-4-6` na análise, provedor externo com
-pseudonimização e contrato de não-treinamento — **fecha o ponto remanescente do ADR-008 e destrava a
-F21** (**ADR-036**). **(4)** Custo estimado em **~US$ 28/mês** para 300 avaliações; o "300" é
+`claude-haiku-4-5` na extração, `claude-sonnet-4-6` na análise. F21** (**ADR-036**). **(4)** Custo estimado em **~US$ 28/mês** para 300 avaliações; o "300" é
 premissa, não dado — o número real tende ao total de alunos com o benefício, e o catálogo da F12
 dá bioimpedância a cada 30/60 dias.
 
@@ -527,7 +525,7 @@ Ordenadas por quanto travam. Detalhe e opções em `docs/DECISIONS.md`.
 
 | ADR | o que falta | bloqueia |
 |---|---|---|
-| ~~**ADR-008**~~ *(ponto remanescente)* | ✅ **FECHADO em 19/08/2026 pelo ADR-036.** Transferência internacional resolvida por **pseudonimização na entrada + contrato de não-treinamento**; modelos decididos (`claude-haiku-4-5` na extração, `claude-sonnet-4-6` na análise). **A F21 deixa de ter ADR bloqueando** — resta firmar o contrato, que é ato de terceiro. O escopo do ECG saiu no ADR-035: guardar e citar sim, interpretar não | ~~F21~~ → **—** |
+| ~~**ADR-008**~~ *(ponto remanescente)* | ✅ **FECHADO em 19/08/2026 pelo ADR-036.**; modelos decididos (`claude-haiku-4-5` na extração, `claude-sonnet-4-6` na análise). **A F21 deixa de ter ADR bloqueando** — resta firmar o contrato, que é ato de terceiro. O escopo do ECG saiu no ADR-035: guardar e citar sim, interpretar não | ~~F21~~ → **—** |
 | **ADR-013** | ✅ **fechado**; as duas políticas do `M2-COMPLIANCE-01` que restavam foram decididas pelo PI em 19/08/2026 e implementadas na F16. **Nada mais bloqueia o MVP 2.** Histórico: fechado em 19/08/2026 pelo ADR-032: **Sicoob para PIX, Getnet (Santander) para cartão**. O card `[GATE]` nunca chegou a existir no board, e o que faltava não era matriz — era o fato de que **a academia já recebe pela Sicoob**. Restam abertas só as **duas políticas do `M2-COMPLIANCE-01`** (refund e limites), que bloqueiam **F16**, não F14 | ~~F14–F16~~ → **F16** |
 | ~~**ADR-027**~~ | **FECHADO em 18/08/2026.** Modelo de `Payment`/`PaymentAttempt` decidido e `MVP-02` §7/§11 emendados. **F12 sem ADR bloqueando** — faltam a spec preenchida e a entrada do MVP 2 | — |
 | ~~**ADR-007**~~ | **FECHADO em 16/08/2026.** As quatro perguntas foram respondidas: decide-sinaliza-restringe na carência; `DENY` do motor com liberação assistida do operador depois dela; conflito aceito e sinalizado, com exceção para revogação de consentimento; conexão sempre iniciada pelo Edge, stream mais polling. **F10 destravada** | — |

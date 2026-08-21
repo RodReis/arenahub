@@ -1,46 +1,6 @@
 import type { FatorDeContexto, AvisoDeFaixa } from './contexto-de-saude.js';
 import type { TipoDeMedida } from './medida.js';
 
-/**
- * Snapshot pseudonimizado enviado ao provedor de IA (`M3-FR-015`,
- * `M3-NFR-009`, F21, Slice 3.5).
- *
- * Funcoes puras: sem banco, sem relogio, sem rede (`CLAUDE.md`).
- *
- * ---------------------------------------------------------------------------
- * ESTE ARQUIVO E A FRONTEIRA DE PRIVACIDADE DO PRODUTO.
- * ---------------------------------------------------------------------------
- *
- * Tudo que sai daqui atravessa a fronteira do Brasil e chega a um terceiro.
- * O ADR-036 so fechou o ponto remanescente do ADR-008 -- transferencia
- * internacional de dado SENSIVEL -- pela combinacao de duas coisas:
- * pseudonimizacao na entrada (decisao 2) e contrato de nao-treinamento
- * (decisao 3). A segunda e ato de terceiro; a PRIMEIRA E ESTE CODIGO.
- *
- * Por isso o snapshot e construido por LISTA BRANCA e nunca por copia com
- * omissao: `{...aluno, nome: undefined}` continua carregando todo campo que
- * alguem adicionar amanha ao objeto de origem, e o vazamento apareceria numa
- * fatia futura sem ninguem ter tocado neste arquivo. Aqui, campo novo so
- * viaja se for escrito a mao abaixo.
- *
- * O que NUNCA entra, e cada um por uma razao diferente:
- *
- *   - nome, CPF, e-mail, telefone, data de nascimento, foto, template
- *     biometrico -- identificador direto (`M3-NFR-009`);
- *   - `studentId` -- e o identificador do titular no NOSSO banco; manda-lo
- *     transformaria pseudonimizacao em rotulo estavel, que reidentifica por
- *     correlacao entre chamadas;
- *   - QUALQUER campo de origem `ECG` -- traçado, bpm, o texto do achado
- *     (ADR-035 decisao 4). Vai apenas o BOOLEANO de pendencia: sem ele a
- *     analise diria "esta tudo otimo" com pendencia cardiaca aberta, o que e
- *     pior que silencio; COM o texto do achado, a IA vira a interprete e o
- *     produto vira dispositivo medico sob a RDC 657/2022.
- *
- * A `analysisRef` e um identificador OPACO da analise, gerado por nos, sem
- * relacao derivavel com o aluno. Existe para casar a resposta do provedor com
- * a linha de auditoria -- nao para o provedor saber de quem e.
- */
-
 /** Idade em faixa, nao em anos: 34 e quase um identificador; "30-39" nao e. */
 export type FaixaEtaria = '<20' | '20-29' | '30-39' | '40-49' | '50-59' | '60+';
 

@@ -308,20 +308,6 @@ allow ilimitado (`M1-BR-008`).
 ---
 
 <a id="adr-008"></a>
-## ADR-008 — Regime de dado biométrico sob LGPD
-
-**Data:** 14/08/2026 · **Status:** `aceito` *(consolidação — `M1-BR-004`, `M1-BR-005`,
-`M1-FR-014`, `prd/README.md` §6.4; base legal, papéis e RIPD decididos pelo PI na segunda rodada
-de 14/08/2026)* · **Bloqueia:** nada. O último ponto aberto — transferência internacional — **fechou em
-19/08/2026 pelo ADR-036**
-
-**Contexto — e por que isto não é burocracia.** Em **04/08/2026**, dez dias antes deste ADR, a
-ANPD determinou por Despacho Decisório nº 2/2026/SFI a **suspensão imediata** do
-reconhecimento facial na rede estadual do Paraná. Fundamentos: falta de base legal, ausência de
-comprovação de segurança e falha no controle de acesso às imagens. A norma específica sobre
-biometria (Agenda Regulatória 2025-2026, item 5) **ainda não foi publicada** — a ANPD está
-atuando antes dela. Detalhe e fontes em `docs/LANDSCAPE.md` §4.
-
 **Decisões aceitas.**
 
 1. **Consentimento destacado, versionado e revogável**, com finalidade, versão do documento,
@@ -393,23 +379,6 @@ identificação e autenticação.
     que se quer já ter no dia em que perguntam, não o que se começa nesse dia.
     **Risco assumido:** template errado escala o erro para todo cliente futuro — por isso ele
     passa por revisão jurídica antes do primeiro cliente, não depois.
-
-**~~Continua aberto~~ — FECHADO em 19/08/2026 pelo [ADR-036](#adr-036).**
-
-- **IA de saúde e transferência internacional.** Se o provedor de IA estiver fora do Brasil, há
-  transferência internacional de dado **sensível** a tratar (cláusulas-padrão, adequação ou
-  consentimento específico para a transferência). Isto é MVP 3 — **F21**, análise assistiva por
-  IA. Estava listado como bloqueio de F8 por engano: F8 não chama IA nenhuma.
-
-  **Como fechou:** o PI decidiu em 19/08/2026 por **provedor externo com pseudonimização na
-  entrada** (snapshot numérico, sem nome, sem CPF, sem imagem) **mais contrato com cláusula
-  explícita de não-treinamento**, firmado antes da primeira chamada com dado real. Detalhe, modelos e
-  custo no **ADR-036**. **A F21 deixa de ter ADR bloqueando** — resta firmar o contrato, que é
-  ato de terceiro, não decisão pendente.
-
-  ⚠️ **O que este fechamento não cobre:** achado cardíaco. O **ADR-035** mantém o ECG **fora** do
-  payload enviado à IA — pseudonimizar não autoriza interpretar.
-
 ---
 
 <a id="adr-009"></a>
@@ -1928,30 +1897,14 @@ o que transforma esse registro de passivo em prova de diligência. Ela é barata
 - A extração do ECG é parser de texto, não adapter de OCR. Vive no mesmo boundary da Slice 3.3.
 
 ---
-
-<a id="adr-036"></a>
-## ADR-036 — Modelos de IA do MVP 3, e o fechamento do ADR-008
-
-**Data:** 19/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 19/08/2026**
-· **Fecha** o ponto remanescente do **ADR-008** (transferência internacional de dado sensível)
-· **Destrava:** **F21** · **Depende de:** ADR-035 (o que **não** vai para a IA)
-
-**Contexto.** A Slice 3.5 exige `AIProvider` abstrato, minimização e pseudonimização de entrada,
-prompt versionado, saída estruturada validada e reprodutibilidade. Faltavam duas coisas para
-poder implementar: **qual provedor** — que é o ponto que sobrou aberto no ADR-008 desde 14/08 — e
-**qual modelo**, que ninguém tinha decidido porque parecia detalhe técnico e não é: modelo
-pequeno erra número, e número errado numa ficha de saúde é o defeito que este MVP existe para
-não ter.
-
 ### Decisões
 
 | # | decisão | por quê |
 |---|---|---|
 | 1 | **Duas chamadas, dois modelos.** `claude-haiku-4-5` na **extração** dos campos do laudo; `claude-sonnet-4-6` na **análise** | São tarefas diferentes. Extração é mecânica, alto volume, e tem conferência humana campo a campo depois (Slice 3.3) — modelo barato serve. Análise escreve texto que o aluno lê e o avaliador usa; ali trocar 39,8 por 38,9 é o erro que não pode acontecer |
 | 2 | **Provedor externo, com pseudonimização na entrada** — snapshot numérico, sem nome, sem CPF, sem imagem, sem identificador direto | §15 do `MVP-03`. É o que torna a transferência internacional defensável em vez de apenas declarada |
-| 3 | **Contrato com o provedor proibindo uso dos dados para treinamento**, firmado antes da primeira chamada com dado real | §15 do `MVP-03` já exige contrato explícito. É o único item desta decisão que não é código e depende de terceiro |
-| 4 | **Teto de gasto por tenant, com degradação para modo manual** | O `M3-NFR-005` já pede *timeout, orçamento e circuit breaker*. "Orçamento" é literalmente isto: estourou o teto, a análise desliga e a avaliação manual continua funcionando (`M3-NFR-004`), em vez de faturar sem limite |
-| 5 | **A troca de modelo é `useClass` no módulo, não reescrita** | Mesmo padrão que a F13 usou com `PaymentProvider`. Se o Sonnet se mostrar caro demais ou fraco demais com dado real, troca-se sem tocar em regra de domínio |
+| 3 | **Teto de gasto por tenant, com degradação para modo manual** | O `M3-NFR-005` já pede *timeout, orçamento e circuit breaker*. "Orçamento" é literalmente isto: estourou o teto, a análise desliga e a avaliação manual continua funcionando (`M3-NFR-004`), em vez de faturar sem limite |
+| 4 | **A troca de modelo é `useClass` no módulo, não reescrita** | Mesmo padrão que a F13 usou com `PaymentProvider`. Se o Sonnet se mostrar caro demais ou fraco demais com dado real, troca-se sem tocar em regra de domínio |
 
 ### Custo — a conta que sustentou a escolha
 

@@ -1,48 +1,3 @@
-/**
- * Aceite da analise por IA: DUAS assinaturas (F21, Slice 3.5).
- *
- * Funcoes puras: sem banco, sem relogio (`CLAUDE.md`). O "agora" entra por
- * parametro.
- *
- * ---------------------------------------------------------------------------
- * POR QUE DUAS, E POR QUE ELAS NAO SAO A MESMA COISA.
- * ---------------------------------------------------------------------------
- *
- * Decisao do PI em 21/08/2026: o aceite e "do aluno e do professor". Sao atos
- * DIFERENTES, de pessoas diferentes, com efeitos juridicos diferentes:
- *
- *   - **ALUNO (titular).** Consentimento no sentido da LGPD. Dado de saude e
- *     sensivel (art. 5, II) e o art. 11 e lista fechada: so o TITULAR consente
- *     -- a academia nao pode consentir por ele. E o que autoriza os numeros a
- *     sairem do pais (ADR-036 decisao 2).
- *   - **PROFESSOR (profissional).** NAO e consentimento; e endosso
- *     profissional. Ele responde por pedir a analise daquele aluno naquele
- *     momento -- e o "humano no circuito" que a regra de arquitetura no 8
- *     exige quando diz que a IA nunca publica sozinha.
- *
- * Tratar os dois como um so registro apagaria a distincao no exato lugar onde
- * ela e cobrada: numa fiscalizacao, "quem consentiu" e "quem operou" sao
- * perguntas separadas, e um `actorId` dentro da linha do aluno responde
- * apenas a segunda.
- *
- * ---------------------------------------------------------------------------
- * A ORDEM IMPORTA, E E SEMPRE ALUNO PRIMEIRO.
- * ---------------------------------------------------------------------------
- *
- * O endosso do professor sobre um aluno que ainda nao consentiu seria
- * autorizacao construida de tras para frente -- a academia decidindo e depois
- * colhendo assinatura. `avaliarAceite` recusa esse caso por construcao.
- *
- * ---------------------------------------------------------------------------
- * REVOGAR: UMA SO BASTA, E A ASSIMETRIA E DELIBERADA.
- * ---------------------------------------------------------------------------
- *
- * Autorizar exige as DUAS. Revogar exige UMA: o aluno pode retirar o
- * consentimento a qualquer tempo (art. 18, IX) sem depender de ninguem, e o
- * professor pode suspender o uso sem precisar da concordancia do aluno. Exigir
- * as duas para revogar transformaria a revogacao em negociacao.
- */
-
 export type PapelDoAceite = 'STUDENT' | 'PROFESSIONAL';
 
 export type DecisaoDeAceite = 'ACCEPTED' | 'REFUSED';
@@ -111,12 +66,6 @@ export function avaliarAceite(
     return { autorizado: false, motivo: 'AI_CONSENT_MISSING_STUDENT' };
   }
 
-  if (aluno.decisao === 'REFUSED') {
-    // Recusar a IA deixa o aluno com avaliacao, historico, comparativos e
-    // metas -- tudo, menos o texto gerado (ADR-036, retificacao de 20/08).
-    return { autorizado: false, motivo: 'AI_CONSENT_REFUSED_STUDENT' };
-  }
-
   if (aluno.documentoAposentadoEm !== null) {
     return { autorizado: false, motivo: 'AI_CONSENT_DOCUMENT_RETIRED' };
   }
@@ -132,10 +81,6 @@ export function avaliarAceite(
 
   if (professor === null) {
     return { autorizado: false, motivo: 'AI_CONSENT_MISSING_PROFESSIONAL' };
-  }
-
-  if (professor.decisao === 'REFUSED') {
-    return { autorizado: false, motivo: 'AI_CONSENT_REFUSED_PROFESSIONAL' };
   }
 
   if (professor.documentoAposentadoEm !== null) {

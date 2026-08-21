@@ -252,41 +252,16 @@ enum StudentTimelineEventType {
   @@map("student_timeline_event_type")
 }
 
-/// Tipo de documento de consentimento.
-///
-/// Lista fechada: cada tipo tem base legal propria. Biometria e o unico
-/// dado sensivel do art. 11 nesta fatia -- os demais entram nas fatias que
-/// os pedirem (avaliacao fisica em F17, imagem em F19).
 enum ConsentDocumentType {
   BIOMETRIC
-  /// Registro de composicao corporal e avaliacao fisica (F17).
-  ///
-  /// NAO E GATE: a Arena Positiva ja coleta peso, gordura e medidas ha anos
-  /// como parte do servico contratado, e trocar caderno por sistema e
-  /// mudanca de MEIO DE REGISTRO, nao inicio de tratamento (STATUS 20/08,
-  /// mesmo raciocinio do ADR-034 decisao 10). Existe para dar trilha e
-  /// permitir revogacao; o ato genuinamente novo -- enviar numero a um
-  /// terceiro fora do Brasil -- e aceite da F21, nao desta fatia.
+
   HEALTH
 
-  /// Envio dos numeros de composicao corporal a um provedor de IA fora do
-  /// Brasil (F21, ADR-036).
-  ///
-  /// TIPO PROPRIO e nao versao do `HEALTH`, e a distincao e o produto: o
-  /// ADR-036 (retificacao de 20/08) decidiu que recusar a IA deixa o aluno
-  /// com avaliacao, historico, comparativos e metas -- tudo, menos o texto
-  /// gerado. Se fosse versao do `HEALTH`, revogar a IA revogaria junto o
-  /// registro da avaliacao, que e o oposto do combinado.
   AI_ANALYSIS
 
   @@map("consent_document_type")
 }
 
-/// Decisao do titular sobre um documento de consentimento.
-///
-/// RECUSAR E DECISAO VALIDA, nao ausencia de resposta: `REFUSED` registrado
-/// e o que prova que houve escolha livre (INV-022b). Sem ele, "nao consta"
-/// e indistinguivel de "nunca perguntamos".
 enum ConsentDecision {
   ACCEPTED
   REFUSED

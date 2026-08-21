@@ -8,24 +8,6 @@ import {
   type RespostaDaIa,
 } from './ai-provider.port.js';
 
-/**
- * Dublê do provedor de IA, no BOUNDARY (`docs/TESTING.md` 3).
- *
- * NAO E CODIGO DE TESTE QUE VAZOU PARA PRODUCAO -- e o adapter que responde
- * enquanto o contrato do ADR-036 decisao 3 (clausula de nao-treinamento) nao
- * estiver firmado. Ate la, a fatia inteira funciona ponta a ponta sem que um
- * unico numero de aluno atravesse a fronteira do pais.
- *
- * A saida e DETERMINISTICA e derivada do snapshot: mesma entrada, mesma
- * analise. Isso importa mais do que parece -- o aceite da Slice 3.5 exige que
- * a analise "possa ser reproduzida dentro das limitacoes do modelo", e um
- * fake que sorteasse texto tornaria todo teste de integracao instavel.
- *
- * O texto que ele gera cita SO numeros que estao no snapshot e evita
- * vocabulario clinico -- ou seja, passa pela propria validacao da regra no 8.
- * Um fake que produzisse saida invalida faria o caminho feliz nunca ser
- * exercitado.
- */
 @Injectable()
 export class FakeAiProviderAdapter implements AiProvider {
   /**

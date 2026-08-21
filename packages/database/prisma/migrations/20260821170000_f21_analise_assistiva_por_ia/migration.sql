@@ -2,23 +2,8 @@
 
 -- 1. O ACEITE DA F21: tipo proprio, e nao versao do documento de saude.
 --
--- O ADR-036 (retificacao de 20/08) decidiu que recusar a IA deixa o aluno com
--- avaliacao, historico, comparativos e metas -- tudo, menos o texto gerado.
--- Se fosse versao do `HEALTH`, revogar a IA revogaria junto o registro da
--- avaliacao, que e o oposto do combinado.
 ALTER TYPE "consent_document_type" ADD VALUE IF NOT EXISTS 'AI_ANALYSIS';
 
--- 2. DE QUEM E A ASSINATURA -- eixo novo, por decisao do PI em 21/08/2026.
---
--- O aceite da analise exige DUAS assinaturas de naturezas diferentes:
---
---   - consentimento do TITULAR (LGPD art. 11 -- dado sensivel e lista
---     fechada; a academia nao pode consentir pelo aluno);
---   - endosso do PROFISSIONAL que pediu a analise -- nao e consentimento, e o
---     humano no circuito que a regra de arquitetura no 8 exige.
---
--- Guardar as duas na mesma coluna `subject_kind` misturaria "quem consentiu"
--- com "quem operou". Sao perguntas separadas numa fiscalizacao.
 CREATE TYPE "consent_signer_role" AS ENUM ('STUDENT_CONSENT', 'PROFESSIONAL_ENDORSEMENT');
 
 -- `DEFAULT` preserva o significado do historico: toda linha anterior a F21 e

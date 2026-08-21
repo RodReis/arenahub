@@ -68,8 +68,6 @@ describe('avaliarAceite -- recusa', () => {
       ADULTO,
     );
 
-    // Recusar deixa o aluno com avaliacao, historico, comparativos e metas --
-    // tudo, menos o texto gerado (ADR-036, retificacao de 20/08).
     expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_STUDENT' });
   });
 

@@ -2,8 +2,6 @@
 
 ## 1. Controle
 
-- Status: APROVADO para planejamento em 14/08/2026 · **emendado em 19/08/2026** (§6, §12, §16 —
-  ADR-035 e ADR-036, decididos pelo PI)
 - Dependência: identidade, alunos e eventos de frequência do MVP 1 estáveis
 - Resultado: avaliação física rastreável, comparável e acompanhada por análise assistiva
 - Limite clínico: acompanhamento informativo, nunca diagnóstico ou prescrição médica

@@ -55,83 +55,25 @@ export const CODIGO_DE_ALERTA = {
   DLQ_NON_EMPTY: 'DLQ_NON_EMPTY',
   /** Relogio do Edge fora do limite aprovado. */
   CLOCK_DRIFT: 'CLOCK_DRIFT',
-  /**
-   * Evento do provedor recebido e NAO aplicado ha tempo demais -- F16.
-   *
-   * Recebido != aplicado: um evento fora de ordem, de tipo desconhecido ou
-   * cujo pagamento nao foi localizado fica guardado sem mudar estado. Isso e
-   * correto pontualmente e sintoma quando persiste -- o dinheiro entrou no
-   * provedor e o aluno continua bloqueado na catraca.
-   */
-  WEBHOOK_BACKLOG: 'WEBHOOK_BACKLOG',
-  /**
-   * Conta do provedor sem NENHUM evento na janela esperada -- F16.
-   *
-   * SEPARADO DE `WEBHOOK_BACKLOG` porque as duas falhas tem acoes OPOSTAS,
-   * pelo mesmo criterio que separou `EDGE_OFFLINE` de
-   * `EDGE_CREDENTIAL_EXPIRING` (ADR-011). Backlog manda olhar o
-   * processamento; silencio manda olhar a configuracao do webhook no
-   * provedor -- e silencio e a falha PIOR, porque nao produz erro nenhum:
-   * tudo parece calmo enquanto nenhum pagamento e reconhecido.
-   */
-  WEBHOOK_SILENCIOSO: 'WEBHOOK_SILENCIOSO',
-  /**
-   * Divergencia de conciliacao em aberto -- F16, `M2-FR-020`.
-   *
-   * O `MVP-02` §3 pede divergencia "visivel no mesmo dia operacional". Sem
-   * alerta, ela so aparece para quem abrir a tela de conciliacao por conta
-   * propria -- e a fila que ninguem abre e a fila que nao existe.
-   */
-  RECONCILIATION_PENDING: 'RECONCILIATION_PENDING',
 
-  /**
-   * Importacao de laudo esperando revisao humana ha tempo demais -- F22.
-   *
-   * NAO e erro: a importacao esta funcionando exatamente como deveria, e o
-   * INV-103 exige que alguem olhe campo a campo. O alerta existe porque a
-   * fila que ninguem abre e a fila que nao existe -- e nesta a espera tem um
-   * custo concreto: o aluno mediu, pagou pela bioimpedancia e nao ve o
-   * resultado.
-   */
+  WEBHOOK_BACKLOG: 'WEBHOOK_BACKLOG',
+
+  WEBHOOK_SILENCIOSO: 'WEBHOOK_SILENCIOSO',
+
+  RECONCILIATION_PENDING: 'RECONCILIATION_PENDING',
+ 
   HEALTH_IMPORT_PENDING_REVIEW: 'HEALTH_IMPORT_PENDING_REVIEW',
-  /**
-   * Extracao falhou ou o antivirus recusou o arquivo -- F22.
-   *
-   * As duas juntas de proposito: quem opera a recepcao age igual nas duas --
-   * fala com o aluno e digita a avaliacao a mao. Separar em dois alertas
-   * dobraria a tela sem dobrar a acao.
-   */
+
   HEALTH_IMPORT_FAILED: 'HEALTH_IMPORT_FAILED',
-  /**
-   * Analise de IA rejeitada pela validacao -- F22, `M3-AC-008`.
-   *
-   * Rejeicao ISOLADA e o sistema funcionando: a regra no 8 recusou uma saida
-   * ruim, que e o trabalho dela. O que este alerta vigia e a TAXA: quando
-   * muitas caem seguidas, o problema deixou de ser o modelo tropecando e
-   * passou a ser prompt, snapshot ou versao de modelo -- e ai alguem precisa
-   * olhar antes que a academia conclua que "a IA nao funciona".
-   */
+
   HEALTH_AI_REJECTION_RATE_HIGH: 'HEALTH_AI_REJECTION_RATE_HIGH',
-  /**
-   * Gasto de IA perto do teto do tenant -- F22, `M3-NFR-005`, ADR-036 dec. 4.
-   *
-   * Alerta ANTES de estourar, nao depois: estourado o teto a analise degrada
-   * para modo manual (`M3-NFR-004`) e a academia descobre pelo aluno
-   * reclamando que o resumo sumiu. Avisar em 80% da o tempo de decidir se
-   * aumenta o teto ou se aceita a degradacao.
-   */
+
   HEALTH_AI_BUDGET_NEAR_LIMIT: 'HEALTH_AI_BUDGET_NEAR_LIMIT',
 } as const;
 
 export type CodigoDeAlerta = (typeof CODIGO_DE_ALERTA)[keyof typeof CODIGO_DE_ALERTA];
 
-/**
- * Severidade.
- *
- * `CRITICAL` significa **a catraca nao esta funcionando agora**. Nada mais
- * ganha esse rotulo: uma severidade que se aplica a tudo nao prioriza nada, e
- * o painel vira um mar vermelho que a operacao aprende a ignorar.
- */
+
 export type Severidade = 'CRITICAL' | 'WARNING' | 'INFO';
 
 export interface Alerta {
@@ -619,14 +561,7 @@ export interface EstadoDaSaude {
   readonly analisesRejeitadas: number;
   /** Gasto acumulado no periodo, em milesimos de centavo de dolar. */
   readonly gastoMicros: number;
-  /**
-   * Teto do tenant, na mesma unidade. `null` quando NAO configurado.
-   *
-   * `null` desliga o alerta de orcamento em vez de assumir um teto: o
-   * ADR-036 decisao 4 diz que o teto e parametro do cliente, e inventar um
-   * numero aqui cortaria a analise de uma academia que nunca combinou limite
-   * nenhum.
-   */
+
   readonly tetoMicros: number | null;
 }
 

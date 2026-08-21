@@ -70,11 +70,6 @@ import { HealthProgressService } from './health-progress.service.js';
     { provide: DOCUMENT_EXTRACTOR, useExisting: FakeOcrExtractorAdapter },
     FakeMalwareScannerAdapter,
     { provide: MALWARE_SCANNER, useExisting: FakeMalwareScannerAdapter },
-    // O FAKE responde por padrao, e isso NAO e provisorio por descuido: o
-    // ADR-036 decisao 3 exige contrato com clausula de nao-treinamento
-    // firmado ANTES da primeira chamada com dado real, e ele nao esta
-    // firmado. Trocar pelo adapter real e `useClass` aqui -- mas so depois
-    // do contrato, que o codigo nao sabe conferir.
     FakeAiProviderAdapter,
     { provide: AI_PROVIDER, useExisting: FakeAiProviderAdapter },
     GoalRepository,

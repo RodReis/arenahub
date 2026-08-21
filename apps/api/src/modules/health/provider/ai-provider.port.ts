@@ -1,23 +1,5 @@
 import type { SnapshotDeAnalise } from '../domain/snapshot-de-analise.js';
 
-/**
- * Fronteira do provedor de IA. Contrato da Slice 3.5 (`AIProvider` abstrato).
- *
- * EXISTE COMO PORTA por duas razoes, e a segunda e a que importa hoje:
- *
- *   1. O ADR-036 decisao 5 diz que trocar de modelo e `useClass` no modulo,
- *      nao reescrita -- mesmo padrao que a F13 usou com `PaymentProvider`.
- *   2. **O CONTRATO COM O PROVEDOR NAO ESTA FIRMADO.** O ADR-036 decisao 3
- *      exige clausula de nao-treinamento assinada ANTES da primeira chamada
- *      com dado real, e isso e ato de terceiro. Ate la o adapter real fica
- *      desligado por configuracao e o fake responde -- a fatia inteira e
- *      testavel sem que um unico numero de aluno saia do pais.
- *
- * O `AiAnalysisModule` liga o fake por padrao. Trocar exige mudar a variavel
- * de ambiente E ter o contrato -- e o codigo nao sabe conferir a segunda,
- * entao ela esta escrita aqui e no PR.
- */
-
 export type CodigoDeErroDaIa =
   | 'AI_PROVIDER_UNAVAILABLE'
   | 'AI_PROVIDER_TIMEOUT'
