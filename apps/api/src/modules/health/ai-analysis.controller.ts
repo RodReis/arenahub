@@ -45,11 +45,15 @@ export class AiAnalysisController {
   /**
    * Gera a analise (`M3-FR-015`).
    *
-   * `health.assess` e nao `health.read`: pedir a analise e o ato do
-   * PROFISSIONAL que endossa (F21), nao consulta de quem passa pela recepcao.
-   * Quem tem `health.read` le o resultado; quem tem `health.assess` o produz.
+   * `health.assess` e nao `health.read`: quem tem `health.read` LE o
+   * resultado; quem tem `health.assess` o PRODUZ -- e produzir envia dado de
+   * saude a um provedor externo, o que a recepcao nao faz.
    *
-
+   * O endosso do profissional saiu do ACEITE com o ADR-040 (a analise nao
+   * espera ninguem endossar), mas isso nao afrouxou quem pode DISPARAR o
+   * envio: sao coisas diferentes, e confundi-las daria a quem atende o
+   * balcao o poder de mandar saude de aluno para fora.
+   */
   @Post('students/:id/ai-analyses')
   @RequirePermissions('health.assess')
   async gerar(@Param('id') studentId: string, @Req() req: Request): Promise<AnaliseDto> {

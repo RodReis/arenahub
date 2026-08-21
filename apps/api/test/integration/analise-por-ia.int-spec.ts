@@ -268,14 +268,30 @@ describe('F21 -- analise assistiva por IA', () => {
       expect(analises).toBe(0);
     });
 
-    it('so o aluno nao basta', async () => {
+    /**
+     * O ENDOSSO SAIU (ADR-040, decisao do PI em 21/08/2026).
+     *
+     * O aceite era duplo -- aluno consentia, profissional endossava. Agora a
+     * analise entra direto e fica disponivel para o aluno, sem esperar
+     * ninguem. Este teste prova o caminho novo ponta a ponta: SEM nenhuma
+     * assinatura de profissional, a analise sai e e publicada.
+     *
+     * O consentimento do TITULAR continua obrigatorio -- os testes vizinhos
+     * cobrem a ausencia e a recusa dele, que e o que a LGPD exige e o que
+     * esta decisao nao alcanca.
+     */
+    it('so o consentimento do aluno BASTA -- ninguem precisa endossar', async () => {
       const aluno = await criarAluno(contas.a);
       await assinar(contas.a, aluno, 'STUDENT_CONSENT');
 
       const resposta = await gerar(contas.a, aluno);
 
-      expect(resposta.status).toBe(403);
-      expect((resposta.body as { code: string }).code).toBe('AI_CONSENT_MISSING_PROFESSIONAL');
+      expect(resposta.status).toBe(201);
+
+      const gravadas = await db.aiAnalysis.findMany({ where: { studentId: aluno } });
+
+      expect(gravadas).toHaveLength(1);
+      expect(gravadas[0]?.status).toBe('PUBLISHED');
     });
 
     /**

@@ -2187,3 +2187,58 @@ O PI conhece o risco e o aceita: a proveniência continua gravada (valor extraí
 origem, confiança), e a correção vinculada permite consertar sem apagar. **O que se perdeu é a
 chance de pegar o erro antes de o aluno vê-lo** — e essa é a troca, explícita, por um fluxo que a
 academia consegue operar todo mês.
+
+---
+
+<a id="adr-040"></a>
+## ADR-040 — Sai o endosso do profissional; fica o consentimento do titular
+
+**Data:** 21/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 21/08/2026**
+· **Emenda material:** `MVP-03` §12 e §14 (`M3-AC-007`)
+· **NÃO alcança:** LGPD art. 11, ADR-035, `M3-BR-010`
+
+**Contexto.** O aceite da análise por IA era **duplo**: o aluno consentia e o profissional
+endossava, nessa ordem. Junto com a publicação automática do ADR-039, o endosso virou o último
+ponto onde o laudo esperava por alguém — a análise ficava pronta e parada até um profissional
+assinar.
+
+O PI removeu o endosso: **a análise entra direto e fica disponível para o aluno.**
+
+**Decisão.**
+
+1. **O endosso do profissional deixa de ser exigido.** Somem quatro ramos de `avaliarAceite`:
+   `AI_CONSENT_MISSING_PROFESSIONAL`, `AI_CONSENT_REFUSED_PROFESSIONAL`, a checagem de documento
+   aposentado do profissional e `AI_CONSENT_OUT_OF_ORDER` — este último só existia para comparar o
+   instante do endosso com o do consentimento, e sem endosso não há o que ordenar.
+
+2. **Os quatro motivos órfãos saem do enum.** Motivo que nenhum caminho emite é código morto que o
+   próximo leitor tenta implementar de novo.
+
+3. **O ECG passa a exibir tudo o que o aparelho reportou** — achado, frequência, duração, instante
+   e marcações — cada campo ausente virando traço (INV-104). **Exibir é o limite**: nada lê o texto
+   para decidir cor, ordem ou rótulo de gravidade.
+
+**O que esta decisão NÃO alcança — e por quê.**
+
+**O consentimento do ALUNO permanece obrigatório.** Não é escolha de produto: dado de saúde é
+sensível (LGPD art. 5, II) e o art. 11 é **lista fechada** — legítimo interesse não existe para
+ele. Enviar a saúde de quem não consentiu a um provedor externo não fica legal porque o processo
+ficou mais rápido, e o `CLAUDE.md` lista LGPD entre as duas únicas coisas que param a entrega.
+Continuam bloqueando: ausência de consentimento, recusa, documento aposentado e a virada dos 18
+(INV-143).
+
+**Quem pode DISPARAR a análise não mudou.** `health.assess` segue exigida na rota: produzir a
+análise envia dado de saúde para fora, e isso a recepção não faz. Sair do *aceite* e sair do
+*controle de acesso* são coisas diferentes; confundi-las daria a quem atende o balcão o poder de
+mandar saúde de aluno para um provedor externo.
+
+**O ADR-035 continua inteiro.** O ECG é exibido, nunca interpretado.
+
+### Risco assumido
+
+**A análise chega ao aluno sem um profissional ter lido antes.** O texto sai validado contra
+invenção de número e linguagem de diagnóstico (`M3-BR-010`), mas ninguém confere o tom nem o
+contexto antes de o aluno ver.
+
+O PI aceita: a análise já carrega o aviso de não-diagnóstico, e a alternativa — esperar endosso —
+era o gargalo que fazia o resultado não chegar.
