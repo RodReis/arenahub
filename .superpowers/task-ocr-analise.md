@@ -2,7 +2,7 @@
 
 STATUS: concluido.
 
-Commit SHA: (ver `git log -1` apos o commit desta entrega)
+Commit SHA: `621d8281c4b960910f113c1eaca058eee2dae9c0`
 
 ## Numeros reais
 
