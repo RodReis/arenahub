@@ -28,6 +28,30 @@ export const ROTULO_DE_TIPO: Record<string, string> = {
   BASAL_METABOLIC_RATE: 'Taxa metabólica basal',
   WAIST_CIRCUMFERENCE: 'Circunferência da cintura',
   HIP_CIRCUMFERENCE: 'Circunferência do quadril',
+
+  // Composição que os laudos multiarquivo trouxeram.
+  BONE_MASS: 'Massa óssea',
+  BODY_CELL_MASS: 'Massa celular',
+  SUBCUTANEOUS_FAT_MASS: 'Gordura subcutânea',
+  SUBCUTANEOUS_FAT_PERCENT: 'Gordura subcutânea (%)',
+  SKELETAL_MUSCLE_PERCENT: 'Músculo esquelético (%)',
+  MUSCLE_MASS: 'Massa muscular',
+  PROTEIN_PERCENT: 'Proteínas (%)',
+  WAIST_HIP_RATIO: 'Relação cintura-quadril',
+  HEART_RATE: 'Frequência cardíaca',
+
+  // Segmentares. O lado vem primeiro no rótulo curto da tabela porque a
+  // coluna é estreita e o par esquerdo/direito é o que o avaliador compara.
+  SEGMENTAL_FAT_MASS_ARM_LEFT: 'Gordura — braço esquerdo',
+  SEGMENTAL_FAT_MASS_ARM_RIGHT: 'Gordura — braço direito',
+  SEGMENTAL_FAT_MASS_TRUNK: 'Gordura — tronco',
+  SEGMENTAL_FAT_MASS_LEG_LEFT: 'Gordura — perna esquerda',
+  SEGMENTAL_FAT_MASS_LEG_RIGHT: 'Gordura — perna direita',
+  SEGMENTAL_MUSCLE_MASS_ARM_LEFT: 'Músculo — braço esquerdo',
+  SEGMENTAL_MUSCLE_MASS_ARM_RIGHT: 'Músculo — braço direito',
+  SEGMENTAL_MUSCLE_MASS_TRUNK: 'Músculo — tronco',
+  SEGMENTAL_MUSCLE_MASS_LEG_LEFT: 'Músculo — perna esquerda',
+  SEGMENTAL_MUSCLE_MASS_LEG_RIGHT: 'Músculo — perna direita',
 };
 
 /** Unidades como se escrevem para o aluno. */
