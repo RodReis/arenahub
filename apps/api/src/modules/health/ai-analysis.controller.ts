@@ -49,10 +49,6 @@ export class AiAnalysisController {
    * PROFISSIONAL que endossa (F21), nao consulta de quem passa pela recepcao.
    * Quem tem `health.read` le o resultado; quem tem `health.assess` o produz.
    *
-   * Sem o aceite duplo responde 403 com o motivo -- `AI_CONSENT_MISSING_STUDENT`,
-   * `AI_CONSENT_MISSING_PROFESSIONAL`, `AI_CONSENT_REFUSED_STUDENT`... A tela
-   * usa o codigo para dizer QUAL assinatura falta, em vez de um "proibido"
-   * que nao ajuda ninguem no balcao.
    */
   @Post('students/:id/ai-analyses')
   @RequirePermissions('health.assess')

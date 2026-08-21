@@ -188,7 +188,7 @@ describe('avaliarAceite -- assinatura substituida', () => {
 describe('substituiveis -- o defeito que este desenho existe para impedir', () => {
   /**
    * O `registrarDecisao` da F8 marca como substituida TODA decisao viva do
-   * documento. Aplicado ao aceite duplo, o endosso do professor apagaria o
+   * documento. Aplicado ao aceite direto e automatico, autorizado pela academia
    * consentimento do aluno -- e a autorizacao ficaria de pe com uma
    * assinatura so.
    */

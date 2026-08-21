@@ -33,7 +33,7 @@ import type { TipoDeMedida } from './domain/medida.js';
  * arquitetura: e o ponto onde o dado do aluno atravessa a fronteira do PAIS.
  * A ordem das operacoes aqui e a defesa:
  *
- *   1. o aceite DUPLO e conferido (`M3-AC-007`);
+ *   1. o aceite direto e automatico;
  *   2. o snapshot e montado por lista branca (`M3-NFR-009`);
  *   3. a pseudonimizacao e CONFERIDA antes do envio;
  *   4. so entao o provedor e chamado;
