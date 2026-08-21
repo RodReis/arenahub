@@ -5,6 +5,26 @@
  * e `--ah-border-*`, nunca `--ah-carbon-*` cru.
  */
 
+/* Cabeçalho: nome · idade · altura, matrícula. */
+.cabecalho {
+  margin-bottom: 16px;
+}
+
+.nomeDoAluno {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-title-size);
+  font-weight: 600;
+}
+
+.matricula {
+  margin: 4px 0 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Três cartões de arquivo. */
 .arquivos {
   display: flex;
   flex-wrap: wrap;
@@ -15,10 +35,43 @@
 }
 
 .arquivo {
-  padding: 8px 12px;
+  min-width: 220px;
+  flex: 1 1 220px;
+  padding: 12px 16px;
   border: 1px solid var(--ah-border-default);
   border-radius: var(--ah-radius-card);
   background: var(--ah-surface-raised);
+  font-size: var(--ah-type-body-size);
+}
+
+.nomeDoArquivo {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.subtituloDoArquivo {
+  margin: 2px 0 8px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+.contagemDoArquivo {
+  margin: 8px 0 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+/* Faixa de aviso persistente sobre a origem dos valores. */
+.avisoDeOcr {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--ah-border-default);
+  border-left: 3px solid var(--ah-state-warning);
+  border-radius: var(--ah-radius-card);
+  background: color-mix(in srgb, var(--ah-state-warning) 8%, var(--ah-surface-raised));
+  color: var(--ah-text-default);
   font-size: var(--ah-type-body-size);
 }
 
@@ -33,6 +86,14 @@
   .tela {
     grid-template-columns: 1fr;
   }
+}
+
+/* Painéis de largura cheia abaixo da grade principal: segmentos e histórico. */
+.paineisCompletos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-top: 24px;
 }
 
 .tabela {
@@ -87,6 +148,30 @@
   font-size: var(--ah-type-body-size);
 }
 
+.textoDeRodape {
+  margin: 16px 0 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+}
+
+.botoesDeRodape {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.descartar {
+  border: 1px solid var(--ah-state-danger);
+  color: var(--ah-state-danger);
+  background: var(--ah-surface-raised);
+  border-radius: var(--ah-radius-control);
+  height: var(--ah-size-control);
+  padding: 0 16px;
+}
+
 .painel {
   padding: var(--ah-size-card-padding);
   border: 1px solid var(--ah-border-default);
@@ -99,13 +184,23 @@
   font-size: var(--ah-type-title-size);
 }
 
-.blocoAparelho {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--ah-border-subtle);
+/* Aviso persistente da análise de IA -- não dispensável, regra de arquitetura 8. */
+.avisoDeIa {
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid var(--ah-border-default);
+  border-left: 3px solid var(--ah-state-info);
+  border-radius: var(--ah-radius-card);
+  background: color-mix(in srgb, var(--ah-state-info) 8%, var(--ah-surface-raised));
+  font-size: var(--ah-type-caption-size);
+  color: var(--ah-text-default);
 }
 
-.rotuloDoAparelho {
+.blocoDaAnalise {
+  margin-top: 16px;
+}
+
+.rotuloDaAnalise {
   margin: 0 0 4px;
   color: var(--ah-text-secondary);
   font-size: var(--ah-type-caption-size);
@@ -113,8 +208,65 @@
   letter-spacing: 0.02em;
 }
 
+.rodapeDaAnalise {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ah-border-subtle);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+/* Achado do ECG -- ADR-035: atribuído ao aparelho, sem botão. */
+.avisoDoAparelho {
+  margin-top: 12px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+/* Segmentos: braço/tronco/perna, gordura e músculo. */
+.tabelaDeSegmentos {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabelaDeSegmentos th,
+.tabelaDeSegmentos td {
+  padding: 8px 12px 8px 0;
+  text-align: left;
+  font-size: var(--ah-type-body-size);
+  vertical-align: middle;
+}
+
+.tabelaDeSegmentos th {
+  color: var(--ah-text-secondary);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.trilhaDaBarra {
+  width: 100%;
+  min-width: 96px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--ah-surface-sunken);
+}
+
+.barraDoSegmento {
+  height: 100%;
+  border-radius: 4px;
+  /* Carbono, nao accent -- DS-PAINEL.md §2.3 reserva accent a ACAO; esta
+     barra mede magnitude, e o badge de leitura ao lado ja carrega o
+     julgamento de estado. */
+  background: var(--ah-border-strong);
+}
+
+.valorDoSegmento {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .acoes {
-  margin-top: 24px;
   display: flex;
   align-items: center;
   gap: 12px;

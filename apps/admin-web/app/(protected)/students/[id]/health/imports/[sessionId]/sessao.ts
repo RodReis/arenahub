@@ -1,8 +1,11 @@
-import type { AtributosDoAparelho } from './painel-de-analise';
-import type { LinhaDeRevisao, PodeConfirmar } from './revisao-de-campos';
+import type { CampoDaLinha, LinhaDeRevisao, PodeConfirmar } from './revisao-de-campos';
+
+export interface AtributosDoAparelho {
+  readonly ecgFinding?: string | null;
+}
 
 /**
- * Mapeamento puro da sessao de revisao -- Task 9, fix round 1.
+ * Mapeamento puro da sessao de revisao -- Task 9, rebuild multiarquivo.
  *
  * Vive em arquivo PROPRIO (sem `server-only` na cadeia de imports) para que
  * o teste possa importar so a logica, sem montar `page.tsx` inteiro (que
@@ -80,4 +83,56 @@ export function atributosDoAparelho(sessao: SessaoDeRevisao): AtributosDoAparelh
   }
 
   return {};
+}
+
+export interface CartaoDeArquivo {
+  readonly importId: string;
+  readonly sourceLabel: string;
+  readonly tipoDeLaudo: string;
+  readonly totalDeCampos: number;
+  /** `null` quando nenhum campo do arquivo trouxe confianca (extrator deterministico). */
+  readonly confidenceMedia: number | null;
+  /** Extraído quando todo campo do arquivo já saiu do estado `PENDING`; Revisar caso contrário. */
+  readonly estado: 'EXTRACTED' | 'PENDING_REVIEW';
+}
+
+/**
+ * Um cartao por arquivo enviado -- mock do PI, item "Três file cards".
+ *
+ * A contagem de campos e a confianca media SO CONSIDERAM os campos cujo
+ * `importId` resolveu para este arquivo (`comImportId` acima) -- um campo
+ * sem import resolvido (rotulo ambiguo) nao pode ser atribuido a um cartao
+ * especifico sem mentir sobre a origem.
+ */
+export function cartoesDeArquivo(
+  arquivos: readonly ArquivoDaSessao[],
+  linhasComImportId: readonly LinhaDeRevisao[],
+): CartaoDeArquivo[] {
+  const todosOsCampos: CampoDaLinha[] = linhasComImportId.flatMap((linha) => linha.campos);
+
+  return arquivos.map((arquivo) => {
+    const camposDoArquivo = todosOsCampos.filter((campo) => campo.importId === arquivo.importId);
+    const comConfidence = camposDoArquivo.filter(
+      (campo): campo is CampoDaLinha & { confidence: number } => campo.confidence !== null,
+    );
+
+    const confidenceMedia =
+      comConfidence.length === 0
+        ? null
+        : comConfidence.reduce((soma, campo) => soma + campo.confidence, 0) / comConfidence.length;
+
+    const estado: CartaoDeArquivo['estado'] =
+      camposDoArquivo.length > 0 && camposDoArquivo.every((campo) => campo.state !== 'PENDING')
+        ? 'EXTRACTED'
+        : 'PENDING_REVIEW';
+
+    return {
+      importId: arquivo.importId,
+      sourceLabel: arquivo.sourceLabel,
+      tipoDeLaudo: arquivo.tipoDeLaudo,
+      totalDeCampos: camposDoArquivo.length,
+      confidenceMedia,
+      estado,
+    };
+  });
 }

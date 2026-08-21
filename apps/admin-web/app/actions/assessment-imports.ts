@@ -62,6 +62,12 @@ const esquemaDeConfirmacao = z.object({
   assessedAt: z.string().min(1, 'Informe a data da medicao'),
 });
 
+const esquemaDeDescarte = z.object({
+  studentId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  importIds: z.array(z.string().uuid()).min(1),
+});
+
 export interface EstadoDaRevisao {
   erro?: string;
 }
@@ -69,6 +75,11 @@ export interface EstadoDaRevisao {
 export interface EstadoDaConfirmacao {
   erro?: string;
   sucesso?: { assessmentId: string };
+}
+
+export interface EstadoDoDescarte {
+  erro?: string;
+  sucesso?: boolean;
 }
 
 export async function revisarCampo(
@@ -160,4 +171,42 @@ export async function confirmarSessao(
   revalidatePath(`/students/${analisado.data.studentId}/health`);
 
   return { sucesso: { assessmentId: resposta.dados.assessmentId } };
+}
+
+/**
+ * Descarta a sessao INTEIRA -- botao "Descartar extração" do mock do PI.
+ *
+ * A API nao tem rota de descarte por sessao (so `POST .../:id/discard`, por
+ * import): esta acao chama o endpoint UMA VEZ por arquivo. Se um descarte no
+ * meio falhar, os arquivos ja descartados ficam descartados (a acao de
+ * descartar e idempotente do lado da API) e o erro aparece na tela -- quem
+ * usa tenta de novo, e os que ja foram nao duplicam efeito.
+ */
+export async function descartarSessao(
+  _anterior: EstadoDoDescarte,
+  formulario: FormData,
+): Promise<EstadoDoDescarte> {
+  const analisado = esquemaDeDescarte.safeParse({
+    studentId: formulario.get('studentId'),
+    sessionId: formulario.get('sessionId'),
+    importIds: formulario.getAll('importId'),
+  });
+
+  if (!analisado.success) {
+    return { erro: analisado.error.issues[0]?.message ?? 'Confira os dados informados.' };
+  }
+
+  for (const importId of analisado.data.importIds) {
+    const resposta = await chamarApi(`/api/v1/assessment-imports/${importId}/discard`, {
+      metodo: 'POST',
+    });
+
+    if (!resposta.ok) {
+      return { erro: mensagemDe(resposta.erro?.code, 'Não foi possível descartar a extração.') };
+    }
+  }
+
+  revalidatePath(`/students/${analisado.data.studentId}/health`);
+
+  return { sucesso: true };
 }

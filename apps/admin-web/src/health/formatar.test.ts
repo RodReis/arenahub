@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  confiancaLegivel,
+  faixaLegivel,
   MOTIVO_DE_AUSENCIA,
   percentualLegivel,
   rotuloDeTipo,
@@ -140,6 +142,48 @@ describe('simboloDeUnidade', () => {
 
   it('unidade nula sai vazia', () => {
     expect(simboloDeUnidade(null)).toBe('');
+  });
+});
+
+describe('faixaLegivel', () => {
+  it('escreve as duas pontas com o simbolo da unidade', () => {
+    expect(faixaLegivel(60.6, 82, 'kg')).toBe('60,6 – 82,0 kg');
+  });
+
+  it('so o minimo escreve com o sinal de maior-ou-igual', () => {
+    expect(faixaLegivel(60.6, null, 'kg')).toBe('≥ 60,6 kg');
+  });
+
+  it('so o maximo escreve com o sinal de menor-ou-igual', () => {
+    expect(faixaLegivel(null, 82, 'kg')).toBe('≤ 82,0 kg');
+  });
+
+  it('ausencia nas duas pontas vira travessao', () => {
+    expect(faixaLegivel(null, null, 'kg')).toBe('—');
+  });
+
+  /**
+   * REGRESSAO vista ao vivo: uma versao da API que ainda nao mandava
+   * `referenceMin`/`referenceMax` fazia esses campos chegarem `undefined`
+   * (chave ausente do JSON), nao `null`. `Intl.NumberFormat.format(undefined)`
+   * nao lanca -- devolve a STRING "NaN", que passou batido porque só `null`
+   * era verificado. `undefined` tem de virar `—`, exatamente como `null`.
+   */
+  it('undefined nas duas pontas vira travessao, nunca NaN', () => {
+    expect(faixaLegivel(undefined, undefined, 'kg')).toBe('—');
+  });
+});
+
+describe('confiancaLegivel', () => {
+  it('classifica em alta, media e baixa', () => {
+    expect(confiancaLegivel(0.9)).toBe('alta');
+    expect(confiancaLegivel(0.7)).toBe('média');
+    expect(confiancaLegivel(0.3)).toBe('baixa');
+  });
+
+  it('ausencia (null ou undefined) nao vira uma faixa de confianca', () => {
+    expect(confiancaLegivel(null)).toBeNull();
+    expect(confiancaLegivel(undefined)).toBeNull();
   });
 });
 

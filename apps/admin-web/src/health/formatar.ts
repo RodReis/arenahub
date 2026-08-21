@@ -177,6 +177,51 @@ export function percentualLegivel(valor: number | null): string {
  * ruído. A data completa está na tabela ao lado, essa sim com
  * `TenantDateTime`.
  */
+/**
+ * Faixa de referencia legivel: "60,6 – 82,0 kg". Ausencia (`null` OU
+ * `undefined` -- um payload de API pode simplesmente OMITIR a chave em vez
+ * de mandar `null`) nas duas pontas vira traço. O card `FieldReview` do
+ * `DS-PAINEL.md` §8.4 so mostra faixa quando o laudo trouxe alguma borda.
+ *
+ * `undefined` tratado igual a `null` de proposito: `Intl.NumberFormat`
+ * aceita `undefined` sem lançar e devolve "NaN" — um bug visto ao vivo
+ * (contra uma versao da API que ainda nao mandava `referenceMin`), silencioso
+ * o bastante para passar batido se so `null` fosse verificado.
+ */
+export function faixaLegivel(
+  min: number | null | undefined,
+  max: number | null | undefined,
+  unidade: string | null,
+): string {
+  if (min == null && max == null) return '—';
+
+  const simbolo = simboloDeUnidade(unidade);
+  const comSimbolo = (valor: number): string =>
+    simbolo === '%' ? `${UMA_CASA.format(valor)}%` : `${UMA_CASA.format(valor)}${simbolo ? ` ${simbolo}` : ''}`;
+
+  if (min != null && max != null) return `${UMA_CASA.format(min)} – ${comSimbolo(max)}`;
+  if (min != null) return `≥ ${comSimbolo(min)}`;
+
+  return `≤ ${comSimbolo(max as number)}`;
+}
+
+/**
+ * Confiança em faixa qualitativa -- alta/média/baixa.
+ *
+ * ponytail: limiares (0,85 / 0,6) são um corte razoável sem valor do PRD
+ * publicando faixas oficiais; ajustar quando a spec de confiança do
+ * extrator vier com números próprios.
+ */
+export function confiancaLegivel(
+  confidence: number | null | undefined,
+): 'alta' | 'média' | 'baixa' | null {
+  if (confidence == null) return null;
+  if (confidence >= 0.85) return 'alta';
+  if (confidence >= 0.6) return 'média';
+
+  return 'baixa';
+}
+
 export function rotuloDoEixo(isoLocal: string): string {
   // `AAAA-MM-DDTHH:mm...` — posições fixas no formato ISO 8601.
   const [ano = '', mes = '', dia = ''] = isoLocal.slice(0, 10).split('-');

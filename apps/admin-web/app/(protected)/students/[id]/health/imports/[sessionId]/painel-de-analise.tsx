@@ -1,60 +1,80 @@
-import { Ausente } from '@arenahub/ui';
+import { TenantDateTime } from '@arenahub/ui';
 
 import estilos from './sessao.module.css';
 
 /**
- * Painel de análise à direita da revisão -- Task 9.
+ * Painel "Análise de acompanhamento" -- mock do PI + `DS-PAINEL.md` §8.4.
  *
- * Regra 3 do brief (ADR-035 e decisão 2 do PI): o achado do ECG é TEXTO
- * atribuído ao aparelho, nunca cartão de encaminhamento, alerta ou ação
- * pendente. O ArenaHub armazena e cita, nunca interpreta -- por isso não há
- * botão nenhum aqui, só a frase e a atribuição.
+ * O aviso é PERSISTENTE e NÃO dispensável (regra de arquitetura 8): nenhum
+ * botão de fechar, nenhum estado que o esconda depois da primeira leitura.
  *
- * O rótulo é "Sugerido pelo aparelho", nunca "Metas": misturar os dois
- * confundiria a sugestão do fabricante com a meta que o profissional definiu.
+ * `modelVersion`/`promptVersion`/janela do snapshot NÃO aparecem aqui:
+ * `GET /students/:id/ai-analyses/latest` não devolve esses campos (só
+ * `id`, `generatedAt` e a saída validada) -- `promptVersionId` existe no
+ * repositório, mas o controller não o expõe. Inventar aqui violaria a regra
+ * de não fabricar dado; o rodapé mostra só o que a API garante: o instante
+ * de geração.
  */
 
-export interface AtributosDoAparelho {
-  readonly ecgFinding?: string | null;
-  readonly suggestedTargets?: readonly { readonly label: string; readonly value: string }[];
+export interface AnaliseDeAcompanhamento {
+  readonly summary: string;
+  readonly positivePoints: readonly string[];
+  readonly attentionPoints: readonly string[];
+  readonly questionsForProfessional: readonly string[];
+  readonly generatedAt: string;
 }
 
 interface Props {
-  readonly atributos: AtributosDoAparelho;
+  readonly analise: AnaliseDeAcompanhamento | null;
+  readonly timeZone: string;
 }
 
-export function PainelDeAnalise({ atributos }: Props) {
-  const { ecgFinding, suggestedTargets = [] } = atributos;
+function ListaOuVazia({ titulo, itens }: { titulo: string; itens: readonly string[] }) {
+  if (itens.length === 0) return null;
 
   return (
+    <div className={estilos['blocoDaAnalise']}>
+      <p className={estilos['rotuloDaAnalise']}>{titulo}</p>
+      <ul>
+        {itens.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function PainelDeAnalise({ analise, timeZone }: Props) {
+  return (
     <aside className={estilos['painel']} aria-labelledby="titulo-painel-analise">
-      <h2 id="titulo-painel-analise">Análise</h2>
+      <h2 id="titulo-painel-analise">Análise de acompanhamento</h2>
 
-      <div className={estilos['blocoAparelho']}>
-        <p className={estilos['rotuloDoAparelho']}>Achado do ECG</p>
-        {ecgFinding ? (
-          <p data-testid="achado-ecg">
-            {ecgFinding} <em>— relatado pelo aparelho</em>
-          </p>
-        ) : (
-          <p data-testid="achado-ecg-ausente">
-            <Ausente /> nenhum achado relatado pelo aparelho
-          </p>
-        )}
-      </div>
+      <p className={estilos['avisoDeIa']} role="note" data-testid="aviso-de-ia">
+        Esta análise organiza os dados dos três laudos para conversa com o profissional. Não é
+        diagnóstico e não substitui avaliação médica.
+      </p>
 
-      {suggestedTargets.length > 0 ? (
-        <div className={estilos['blocoAparelho']}>
-          <p className={estilos['rotuloDoAparelho']}>Sugerido pelo aparelho</p>
-          <ul>
-            {suggestedTargets.map((alvo) => (
-              <li key={alvo.label}>
-                {alvo.label}: {alvo.value}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      {analise === null ? (
+        <p data-testid="analise-ausente">Nenhuma análise publicada para este aluno ainda.</p>
+      ) : (
+        <>
+          <div className={estilos['blocoDaAnalise']}>
+            <p className={estilos['rotuloDaAnalise']}>Resumo</p>
+            <p data-testid="resumo-da-analise">{analise.summary}</p>
+          </div>
+
+          <ListaOuVazia titulo="Pontos positivos" itens={analise.positivePoints} />
+          <ListaOuVazia titulo="Pontos de atenção" itens={analise.attentionPoints} />
+          <ListaOuVazia
+            titulo="Perguntas para o profissional"
+            itens={analise.questionsForProfessional}
+          />
+
+          <p className={estilos['rodapeDaAnalise']}>
+            Gerada em <TenantDateTime iso={analise.generatedAt} timeZone={timeZone} format="datetime" />
+          </p>
+        </>
+      )}
     </aside>
   );
 }
