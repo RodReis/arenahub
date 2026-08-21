@@ -49,7 +49,7 @@ explicação, em vez de reescritos para um resultado que é, na verdade, incorre
 
 STATUS: concluído parcialmente. **Encontrei um segundo gap no fix, reportando em vez de corrigir.**
 
-Commit: `bd39b25` *(preencher com `git rev-parse HEAD` após o commit desta rodada)*
+Commit: `65bca145139b99f2fb61812fc24fb35df67cc59a`
 
 ### O que o PI corrigiu
 
