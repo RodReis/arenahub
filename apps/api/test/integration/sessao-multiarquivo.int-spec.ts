@@ -12,8 +12,6 @@ import { AppModule } from '../../src/app.module.js';
 import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { FakeMalwareScannerAdapter } from '../../src/modules/health/provider/fake-malware-scanner.adapter.js';
-import { DOCUMENT_EXTRACTOR } from '../../src/modules/health/provider/document-extractor.port.js';
-import { LaudoBioimpedanciaExtractor } from '../../src/modules/health/provider/laudo-bioimpedancia.extractor.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -32,11 +30,12 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
  *   - isolamento entre tenants tambem vale para SESSAO (INV-006);
  *   - o fluxo de UM arquivo (F19) continua identico visto de fora.
  *
- * `DOCUMENT_EXTRACTOR` e sobrescrito para `LaudoBioimpedanciaExtractor`
- * NESTA suite -- ela le os CSVs reais com `faixa_min`/`faixa_max`/
- * `percentual_padrao` e o ECG textual, formato que o dublê de OCR da F19
- * (`FakeOcrExtractorAdapter`) nao entende. F19 continua usando o dublê dela
- * em `upload-e-revisao.int-spec.ts`, sem qualquer alteracao.
+ * Nao ha override de `DOCUMENT_EXTRACTOR` aqui: em producao o roteador
+ * (`DocumentExtractorRouterAdapter`) ja manda CSV e PDF -- os dois tipos que
+ * esta suite usa -- para `LaudoBioimpedanciaExtractor`, entao a suite exercita
+ * o wiring real. F19 (`upload-e-revisao.int-spec.ts`) sobrescreve para
+ * `FakeOcrExtractorAdapter`: o fixture PDF dela e generico (so a assinatura
+ * de bytes), o caso que o dublê de OCR ainda cobre em producao.
  */
 describe('F-multiarquivo -- sessao de revisao', () => {
   let app: INestApplication;
@@ -314,8 +313,6 @@ describe('F-multiarquivo -- sessao de revisao', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(OBJECT_STORAGE)
       .useValue(storageFalso)
-      .overrideProvider(DOCUMENT_EXTRACTOR)
-      .useClass(LaudoBioimpedanciaExtractor)
       .compile();
 
     app = moduleRef.createNestApplication();

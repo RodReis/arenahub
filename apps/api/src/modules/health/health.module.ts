@@ -15,8 +15,10 @@ import { ImportController } from './import.controller.js';
 import { ImportRepository } from './import.repository.js';
 import { ImportService } from './import.service.js';
 import { CsvDocumentExtractorAdapter } from './provider/csv-document-extractor.adapter.js';
+import { DocumentExtractorRouterAdapter } from './provider/document-extractor-router.adapter.js';
 import { DOCUMENT_EXTRACTOR } from './provider/document-extractor.port.js';
 import { FakeOcrExtractorAdapter } from './provider/fake-ocr-extractor.adapter.js';
+import { LaudoBioimpedanciaExtractor } from './provider/laudo-bioimpedancia.extractor.js';
 import { MALWARE_SCANNER } from './provider/malware-scanner.port.js';
 import { FakeMalwareScannerAdapter } from './provider/fake-malware-scanner.adapter.js';
 import { AiAnalysisRepository } from './ai-analysis.repository.js';
@@ -66,12 +68,17 @@ import { HealthProgressService } from './health-progress.service.js';
     AiAnalysisService,
     ImportRepository,
     ImportService,
-    // O parser de CSV e PRODUCAO -- deterministico, sem terceiro. O OCR de
-    // imagem e PDF e dublê (ADR-017) ate existir extrator real; o roteador
-    // manda CSV para o parser de verdade em qualquer ambiente.
+    // O parser de CSV e PRODUCAO -- deterministico, sem terceiro. CSV e PDF
+    // (laudo de bioimpedancia e ECG) tem extrator real (`LaudoBioimpedanciaExtractor`);
+    // so imagem (PNG/JPEG) ainda depende do dublê de OCR (ADR-017), ate
+    // existir extrator real para ela. `DocumentExtractorRouterAdapter` manda
+    // cada tipo para quem tem implementacao de verdade -- nunca o dublê no
+    // lugar de um extrator real.
     CsvDocumentExtractorAdapter,
     FakeOcrExtractorAdapter,
-    { provide: DOCUMENT_EXTRACTOR, useExisting: FakeOcrExtractorAdapter },
+    LaudoBioimpedanciaExtractor,
+    DocumentExtractorRouterAdapter,
+    { provide: DOCUMENT_EXTRACTOR, useExisting: DocumentExtractorRouterAdapter },
     FakeMalwareScannerAdapter,
     { provide: MALWARE_SCANNER, useExisting: FakeMalwareScannerAdapter },
     FakeAiProviderAdapter,

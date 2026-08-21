@@ -10,7 +10,7 @@ import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js'
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { FakeMalwareScannerAdapter } from '../../src/modules/health/provider/fake-malware-scanner.adapter.js';
 import { FakeOcrExtractorAdapter } from '../../src/modules/health/provider/fake-ocr-extractor.adapter.js';
-import { ErroDeExtracao } from '../../src/modules/health/provider/document-extractor.port.js';
+import { DOCUMENT_EXTRACTOR, ErroDeExtracao } from '../../src/modules/health/provider/document-extractor.port.js';
 import { ErroDoScanner } from '../../src/modules/health/provider/malware-scanner.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
@@ -28,6 +28,14 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
  *   - INV-140: extrator fora nao impede avaliacao manual;
  *   - executavel disfarcado de PDF e recusado pela ASSINATURA;
  *   - isolamento entre tenants (INV-006).
+ *
+ * `DOCUMENT_EXTRACTOR` e sobrescrito para `FakeOcrExtractorAdapter` NESTA
+ * suite: em producao o roteador (`DocumentExtractorRouterAdapter`) manda PDF
+ * para o extrator real de bioimpedancia/ECG, mas o fixture `PDF` deste
+ * arquivo e generico (so a assinatura de bytes) -- exatamente o caso que o
+ * dublê de OCR ainda cobre (imagem/PDF sem extrator real). Sem o override, o
+ * PDF cairia no extrator real e os campos plantados aqui (confidence
+ * 0.42/0.97, falha programada) nunca apareceriam.
  */
 describe('F19 -- upload e revisao', () => {
   let app: INestApplication;
@@ -224,6 +232,11 @@ describe('F19 -- upload e revisao', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(OBJECT_STORAGE)
       .useValue(storageFalso)
+      .overrideProvider(DOCUMENT_EXTRACTOR)
+      .useFactory({
+        factory: (adapter: FakeOcrExtractorAdapter) => adapter,
+        inject: [FakeOcrExtractorAdapter],
+      })
       .compile();
 
     app = moduleRef.createNestApplication();
