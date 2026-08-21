@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -12,6 +13,7 @@ import {
 import { OBJECT_STORAGE, type ObjectStoragePort } from '../../common/storage/object-storage.port.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { StudentRepository } from '../students/student.repository.js';
+import { AiAnalysisService } from './ai-analysis.service.js';
 import { AssessmentRepository } from './assessment.repository.js';
 import {
   ImportRepository,
@@ -97,6 +99,7 @@ export class ImportService {
     private readonly importacoes: ImportRepository,
     private readonly avaliacoes: AssessmentRepository,
     private readonly alunos: StudentRepository,
+    private readonly analiseDeIa: AiAnalysisService,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
     @Inject(MALWARE_SCANNER) private readonly antivirus: MalwareScanner,
     @Inject(DOCUMENT_EXTRACTOR) private readonly extrator: DocumentExtractor,
@@ -455,6 +458,17 @@ export class ImportService {
 
       await this.confirmar(contexto, importId, autorId, assessedAt, agora);
 
+      // ANALISE AUTOMATICA (ADR-039/ADR-040): a medida que acabou de ser
+      // publicada fica disponivel para o aluno imediatamente, sem esperar
+      // ninguem pedir a analise pela tela.
+      //
+      // `gerarAnaliseAutomatica` NUNCA propaga erro para ca -- consentimento
+      // ausente/recusado (ForbiddenException) e qualquer outra falha do
+      // provedor (M3-NFR-004) sao tratados e logados la dentro, exatamente
+      // como o expurgo do arquivo alguns passos abaixo: a avaliacao ja esta
+      // publicada e salva, e isso e o que importa para o fluxo do upload.
+      await this.gerarAnaliseAutomatica(contexto, importacao.studentId, autorId, agora);
+
       return true;
     } catch (erro: unknown) {
       // Silencioso PARA O CLIENTE, nao para quem opera: o upload ja respondeu
@@ -469,6 +483,50 @@ export class ImportService {
       );
 
       return false;
+    }
+  }
+
+  /**
+   * Gera a analise assistiva logo apos a publicacao automatica (ADR-039,
+   * ADR-040). Reusa `AiAnalysisService.gerar` inteiro -- snapshot,
+   * pseudonimizacao, chamada ao provedor e validacao da saida sao a MESMA
+   * logica que a rota manual de analise usa; duplicar aqui divergiria na
+   * primeira mudanca de regra.
+   *
+   * ---------------------------------------------------------------------------
+   * SEM CONSENTIMENTO, SEM ANALISE -- E ISSO NUNCA FALHA O UPLOAD (ADR-040).
+   * ---------------------------------------------------------------------------
+   *
+   * `gerar` lanca `ForbiddenException` quando o aluno nunca consentiu ou
+   * recusou (LGPD art. 11, `M3-AC-007`): aqui isso NAO e erro do upload, e o
+   * resultado ESPERADO para todo aluno sem aceite. A avaliacao publicada nao
+   * muda -- so fica sem analise, exatamente como fica ate hoje quando ninguem
+   * pede a analise pela tela.
+   *
+   * Qualquer outra falha (provedor fora do ar, teto de gasto do tenant
+   * estourado) tambem e engolida e logada: `gerar` ja devolve
+   * `status: 'FAILED'` registrado no proprio `AiAnalysisRepository` para essa
+   * classe de erro (`M3-NFR-004`), entao nao ha nada a mais para fazer aqui
+   * alem de nao deixar a excecao subir e derrubar a resposta do upload.
+   */
+  private async gerarAnaliseAutomatica(
+    contexto: TenantContext,
+    studentId: string,
+    solicitanteId: string,
+    agora: Date,
+  ): Promise<void> {
+    try {
+      await this.analiseDeIa.gerar(contexto, studentId, solicitanteId, agora);
+    } catch (erro: unknown) {
+      const semConsentimento = erro instanceof ForbiddenException;
+
+      this.log.warn(
+        semConsentimento
+          ? `analise automatica nao gerada para aluno ${studentId}: sem consentimento vigente`
+          : `analise automatica falhou para aluno ${studentId}: ${
+              erro instanceof Error ? erro.message : String(erro)
+            }`,
+      );
     }
   }
 

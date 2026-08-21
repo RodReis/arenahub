@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 
 import type { DocumentExtractor, PedidoDeExtracao, ResultadoDaExtracao } from './document-extractor.port.js';
+import { ANTHROPIC_OCR_EXTRACTOR } from './anthropic-ocr-extractor.token.js';
 import { FakeOcrExtractorAdapter } from './fake-ocr-extractor.adapter.js';
 import { LaudoBioimpedanciaExtractor } from './laudo-bioimpedancia.extractor.js';
 
@@ -13,18 +14,20 @@ import { LaudoBioimpedanciaExtractor } from './laudo-bioimpedancia.extractor.js'
  *
  * CSV e PDF (laudo de bioimpedancia e ECG do OmronConnect) tem implementacao
  * REAL em `LaudoBioimpedanciaExtractor` -- superset do parser generico de CSV
- * (Slice 3.3) mais o texto de ECG (ADR-035 decisao 8). Imagem (PNG/JPEG) nao
- * tem OCR de verdade ainda: so o dublê (`FakeOcrExtractorAdapter`) responde
- * por ela. O roteador manda cada tipo para quem tem implementacao real,
- * igual ao `FakeOcrExtractorAdapter` ja faz para CSV dentro dele mesmo --
- * sem isto, o dublê seria o que roda em producao para todo tipo de arquivo,
- * exatamente o problema que este arquivo resolve.
+ * (Slice 3.3) mais o texto de ECG (ADR-035 decisao 8). Imagem (PNG/JPEG) vai
+ * para o OCR real da Anthropic (`AnthropicOcrExtractorAdapter`, ADR-036)
+ * quando `ANTHROPIC_API_KEY` esta configurada; sem a chave, `ocrReal` chega
+ * `null` (ver `health.module.ts`) e o dublê responde -- nunca os dois runtimes
+ * ao mesmo tempo, e nunca o dublê em producao com a chave presente.
  */
 @Injectable()
 export class DocumentExtractorRouterAdapter implements DocumentExtractor {
   constructor(
     private readonly laudo: LaudoBioimpedanciaExtractor,
     private readonly fakeOcr: FakeOcrExtractorAdapter,
+    @Optional()
+    @Inject(ANTHROPIC_OCR_EXTRACTOR)
+    private readonly ocrReal: DocumentExtractor | null,
   ) {}
 
   extrair(pedido: PedidoDeExtracao): Promise<ResultadoDaExtracao> {
@@ -32,7 +35,7 @@ export class DocumentExtractorRouterAdapter implements DocumentExtractor {
       return this.laudo.extrair(pedido);
     }
 
-    // PNG/JPEG: OCR de imagem ainda nao existe -- so o dublê responde.
-    return this.fakeOcr.extrair(pedido);
+    // PNG/JPEG: OCR real quando ha chave configurada; dublê caso contrario.
+    return (this.ocrReal ?? this.fakeOcr).extrair(pedido);
   }
 }

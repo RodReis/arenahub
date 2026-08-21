@@ -17,6 +17,7 @@
     "test:load:access": "tsx test/load/online-access.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.120.0",
     "@arenahub/access-policy": "workspace:*",
     "@arenahub/api-contracts": "workspace:*",
     "@arenahub/database": "workspace:*",

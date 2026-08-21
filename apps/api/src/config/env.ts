@@ -36,6 +36,17 @@ const esquema = z.object({
 
   /** Validade da URL pre-assinada de cadastro, em segundos. Padrao 5 min. */
   STORAGE_UPLOAD_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+
+  /**
+   * Chave da API da Anthropic (extracao de laudo e analise assistiva, ADR-036).
+   *
+   * OPCIONAL de proposito, inclusive em producao: sem ela o modulo de saude
+   * cai para o dublê de OCR/IA em vez de derrubar o processo -- a alternativa
+   * (exigir a chave) tiraria do ar toda a Slice 3.3/3.5 por falta de uma
+   * variavel que nao trava nenhuma outra funcionalidade da API. O aviso alto
+   * de log fica a cargo de quem consome (`health.module.ts`), nao daqui.
+   */
+  ANTHROPIC_API_KEY: z.string().optional(),
 });
 
 /** Storage privado S3-compativel. MinIO em dev, S3 em producao. */
@@ -63,6 +74,8 @@ export interface ConfigDaApi {
   mfa: { chave: Buffer };
   redis: { url: string };
   storage: ConfigDeStorage;
+  /** `null` quando a variavel nao esta definida -- nunca string vazia (INV-104). */
+  anthropicApiKey: string | null;
 }
 
 export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaApi {
@@ -81,6 +94,7 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaAp
     mfa: { chave: resolverChaveDeMfa(bruto) },
     redis: { url: bruto.REDIS_URL },
     storage: resolverStorage(bruto),
+    anthropicApiKey: bruto.ANTHROPIC_API_KEY ?? null,
   };
 }
 

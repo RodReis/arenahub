@@ -1,5 +1,7 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { Module } from '@nestjs/common';
 
+import { carregarConfig } from '../../config/env.js';
 import { StorageModule } from '../../common/storage/storage.module.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { StudentsModule } from '../students/students.module.js';
@@ -14,21 +16,26 @@ import { BodyEvolutionService } from './body-evolution.service.js';
 import { ImportController } from './import.controller.js';
 import { ImportRepository } from './import.repository.js';
 import { ImportService } from './import.service.js';
+import { escolherOcrReal, escolherProvedorDeIa } from './provider/anthropic-gate.js';
+import { ANTHROPIC_OCR_EXTRACTOR } from './provider/anthropic-ocr-extractor.token.js';
 import { CsvDocumentExtractorAdapter } from './provider/csv-document-extractor.adapter.js';
 import { DocumentExtractorRouterAdapter } from './provider/document-extractor-router.adapter.js';
-import { DOCUMENT_EXTRACTOR } from './provider/document-extractor.port.js';
+import { DOCUMENT_EXTRACTOR, type DocumentExtractor } from './provider/document-extractor.port.js';
 import { FakeOcrExtractorAdapter } from './provider/fake-ocr-extractor.adapter.js';
 import { LaudoBioimpedanciaExtractor } from './provider/laudo-bioimpedancia.extractor.js';
 import { MALWARE_SCANNER } from './provider/malware-scanner.port.js';
 import { FakeMalwareScannerAdapter } from './provider/fake-malware-scanner.adapter.js';
 import { AiAnalysisRepository } from './ai-analysis.repository.js';
 import { AiAnalysisService } from './ai-analysis.service.js';
-import { AI_PROVIDER } from './provider/ai-provider.port.js';
+import { AI_PROVIDER, type AiProvider } from './provider/ai-provider.port.js';
 import { FakeAiProviderAdapter } from './provider/fake-ai-provider.adapter.js';
 import { GoalRepository } from './goal.repository.js';
 import { HealthExportService } from './health-export.service.js';
 import { HealthProgressController } from './health-progress.controller.js';
 import { HealthProgressService } from './health-progress.service.js';
+
+/** Token do cliente Anthropic, `null` quando nao ha `ANTHROPIC_API_KEY`. */
+const ANTHROPIC_CLIENT = Symbol('ANTHROPIC_CLIENT');
 
 /**
  * Avaliacao fisica, medidas e contexto de saude (F17, Slice 3.1).
@@ -70,10 +77,10 @@ import { HealthProgressService } from './health-progress.service.js';
     ImportService,
     // O parser de CSV e PRODUCAO -- deterministico, sem terceiro. CSV e PDF
     // (laudo de bioimpedancia e ECG) tem extrator real (`LaudoBioimpedanciaExtractor`);
-    // so imagem (PNG/JPEG) ainda depende do dublê de OCR (ADR-017), ate
-    // existir extrator real para ela. `DocumentExtractorRouterAdapter` manda
-    // cada tipo para quem tem implementacao de verdade -- nunca o dublê no
-    // lugar de um extrator real.
+    // imagem (PNG/JPEG) vai para o OCR real da Anthropic quando ha chave
+    // (ADR-036) -- `DocumentExtractorRouterAdapter` manda cada tipo para quem
+    // tem implementacao de verdade, e o dublê so responde na ausencia da
+    // chave ou em teste.
     CsvDocumentExtractorAdapter,
     FakeOcrExtractorAdapter,
     LaudoBioimpedanciaExtractor,
@@ -82,7 +89,43 @@ import { HealthProgressService } from './health-progress.service.js';
     FakeMalwareScannerAdapter,
     { provide: MALWARE_SCANNER, useExisting: FakeMalwareScannerAdapter },
     FakeAiProviderAdapter,
-    { provide: AI_PROVIDER, useExisting: FakeAiProviderAdapter },
+    /**
+     * Cliente Anthropic unico do modulo, `null` sem `ANTHROPIC_API_KEY` --
+     * OCR e analise dependem dele, e um cliente so evita duas leituras de
+     * config divergentes.
+     */
+    {
+      provide: ANTHROPIC_CLIENT,
+      useFactory: (): Anthropic | null => {
+        const config = carregarConfig();
+
+        return config.anthropicApiKey === null
+          ? null
+          : new Anthropic({ apiKey: config.anthropicApiKey });
+      },
+    },
+    /**
+     * OCR real (ADR-036): `null` sem chave OU em teste -- o roteador cai
+     * para o dublê nos dois casos (`@Optional` em
+     * `DocumentExtractorRouterAdapter`). Regra em `escolherOcrReal`
+     * (`anthropic-gate.ts`), testada isoladamente sem subir o modulo inteiro.
+     */
+    {
+      provide: ANTHROPIC_OCR_EXTRACTOR,
+      inject: [ANTHROPIC_CLIENT],
+      useFactory: (client: Anthropic | null): DocumentExtractor | null =>
+        escolherOcrReal(client, carregarConfig().ambiente),
+    },
+    /**
+     * Analise assistiva (ADR-036): mesma regra do OCR -- real com chave fora
+     * de teste, dublê caso contrario. Regra em `escolherProvedorDeIa`.
+     */
+    {
+      provide: AI_PROVIDER,
+      inject: [ANTHROPIC_CLIENT, FakeAiProviderAdapter],
+      useFactory: (client: Anthropic | null, fake: FakeAiProviderAdapter): AiProvider =>
+        escolherProvedorDeIa(client, carregarConfig().ambiente, fake),
+    },
     GoalRepository,
     HealthProgressService,
     HealthExportService,
