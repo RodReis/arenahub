@@ -215,6 +215,9 @@ export class ImportRepository {
         extractedUnit: doBanco(campo.extractedUnit),
         confidence: campo.confidence === null ? null : campo.confidence.toNumber(),
         sourceLocation: campo.sourceLocation,
+        // Coluna ainda nao existe no Prisma (F-multiarquivo persiste em fatia
+        // posterior) -- `null` aqui e ausencia real, nao palpite.
+        sourceLabel: null,
         state: campo.state,
         reviewedValue: campo.reviewedValue === null ? null : campo.reviewedValue.toNumber(),
         reviewedUnit: doBanco(campo.reviewedUnit),

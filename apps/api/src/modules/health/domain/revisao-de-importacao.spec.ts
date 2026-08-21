@@ -19,6 +19,7 @@ function campo(sobrescreve: Partial<CampoExtraido> = {}): CampoExtraido {
     state: 'PENDING',
     reviewedValue: null,
     reviewedUnit: null,
+    sourceLabel: null,
     ...sobrescreve,
   };
 }

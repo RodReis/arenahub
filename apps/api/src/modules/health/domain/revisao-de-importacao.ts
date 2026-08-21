@@ -65,6 +65,14 @@ export interface CampoExtraido {
   /** Preenchido quando `CORRECTED`. */
   readonly reviewedValue: number | null;
   readonly reviewedUnit: UnidadeDeMedida | null;
+  /**
+   * Nome do arquivo/aparelho de origem (ex.: "CF610_G", "ECG 30s").
+   *
+   * `null` quando a origem nao e rastreada. Usado so para exibicao -- a
+   * consolidacao de multiplos laudos (F-multiarquivo) mostra de onde cada
+   * valor veio, nunca para decidir equivalencia.
+   */
+  readonly sourceLabel: string | null;
 }
 
 export type MotivoDeBloqueio =
