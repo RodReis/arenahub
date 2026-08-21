@@ -87,4 +87,17 @@ describe('consolidar laudos da mesma medicao', () => {
       ),
     ).toBe(false);
   });
+
+  it('preserva a ordem de primeira aparicao entre tipos diferentes', () => {
+    // consolidar() agrupa por Map, cuja ordem de iteracao e a de insercao --
+    // mas isso e detalhe de implementacao ate um teste travar o contrato.
+    // Sem essa garantia, a tela de revisao poderia reordenar as linhas entre
+    // recarregamentos sem nenhum dado ter mudado.
+    const linhas = consolidar([
+      campo({ id: 'a', type: 'WEIGHT', extractedValue: 92.25, extractedUnit: 'kg' }),
+      campo({ id: 'b', type: 'BODY_FAT_PERCENT', extractedValue: 18.5, extractedUnit: 'percent' }),
+    ]);
+
+    expect(linhas.map((linha) => linha.type)).toEqual(['WEIGHT', 'BODY_FAT_PERCENT']);
+  });
 });

@@ -1,3 +1,4 @@
+import { ErroDeDominio } from '../../../common/http/erro-de-dominio.js';
 import { converterParaCanonica, type TipoDeMedida } from './medida.js';
 import type { CampoExtraido } from './revisao-de-importacao.js';
 
@@ -50,7 +51,12 @@ export function equivalentes(a: CampoExtraido, b: CampoExtraido): boolean {
     });
 
     return Math.abs(canonicaA.canonicalValue - canonicaB.canonicalValue) <= toleranciaDe(a.type);
-  } catch {
+  } catch (erro) {
+    // Bug de programação (ex.: TypeError) não é divergência -- tem que
+    // estourar, não virar um "false" plausível que esconde o bug num
+    // resultado de revisão normal.
+    if (!(erro instanceof ErroDeDominio)) throw erro;
+
     // Valor fora da faixa plausível ou unidade incompatível NÃO é "não sei" —
     // é exatamente a divergência que o humano precisa ver. Nunca propagar o
     // throw: um campo implausível derrubaria a tela de revisão inteira.
