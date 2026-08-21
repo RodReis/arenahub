@@ -1,0 +1,275 @@
+import { Injectable } from '@nestjs/common';
+
+import { REGIAO_DO_TIPO, TIPOS_DE_MEDIDA, UNIDADES_DE_MEDIDA } from '../domain/medida.js';
+import type { TipoDeMedida, UnidadeDeMedida } from '../domain/medida.js';
+import type { TipoDeLaudo } from '../domain/sessao-de-revisao.js';
+import {
+  ErroDeExtracao,
+  type CampoProposto,
+  type DocumentExtractor,
+  type PedidoDeExtracao,
+  type ResultadoDaExtracao,
+} from './document-extractor.port.js';
+
+/**
+ * Extrator dos laudos reais de bioimpedancia (CSV) e ECG textual (Slice
+ * multiarquivo, Task 6).
+ *
+ * ---------------------------------------------------------------------------
+ * ESTENDE O FORMATO DO `CsvDocumentExtractorAdapter`, NAO O SUBSTITUI.
+ * ---------------------------------------------------------------------------
+ *
+ * Mesmo cabecalho `tipo,valor,unidade`, mais tres colunas OPCIONAIS que os
+ * laudos de bioimpedancia trazem e o CSV generico nao precisa:
+ *
+ *     tipo,valor,unidade,faixa_min,faixa_max,percentual_padrao
+ *     WEIGHT,88.40,kg,60.6,82.0,
+ *     SEGMENTAL_FAT_MASS_TRUNK,10.40,kg,,,230.1
+ *
+ * Os segmentares nao vem com faixa min/max -- vem com `percentual_padrao`
+ * (indice do fabricante). As medidas "planas" (peso, massa muscular) vem
+ * com faixa e sem percentual. `confidence` fica `null` como no
+ * `CsvDocumentExtractorAdapter`: parser deterministico nao estima confianca.
+ *
+ * ---------------------------------------------------------------------------
+ * MESMO ARQUIVO TAMBEM LE O ECG TEXTUAL (`ADR-035` decisao 8).
+ * ---------------------------------------------------------------------------
+ *
+ * O ECG real chega como PDF do OmronConnect, e o texto ja vem extraido da
+ * camada de texto (`pdftotext`, custo zero). O `bpm` numerico vira
+ * `CampoProposto` do tipo `HEART_RATE` -- e MEDIDA, entra no historico. O
+ * achado ("Ritmo nao classificado", "Possivel fibrilacao atrial") e TEXTO
+ * OPACO em `atributos.ecgFinding`: guardado e citado, nunca interpretado.
+ * Nenhuma linha deste arquivo compara, mapeia severidade ou ramifica sobre
+ * esse valor -- isso seria decidir clinicamente, e e a linha que a RDC
+ * 657/2022 traca entre guardar dado de saude e ser dispositivo medico.
+ *
+ * ---------------------------------------------------------------------------
+ * INDICE PROPRIETARIO DO FABRICANTE NUNCA VIRA MEDIDA (spec §4.4).
+ * ---------------------------------------------------------------------------
+ *
+ * Idade corporal, pontuacao de saude, tipo corporal, peso ideal e "controles"
+ * sugeridos pelo aparelho sao formula proprietaria que muda com firmware --
+ * comparar no tempo produziria tendencia falsa. Por isso este extrator so
+ * reconhece tipo presente em `TIPOS_DE_MEDIDA`; qualquer outra linha do CSV e
+ * ignorada, exatamente como no `CsvDocumentExtractorAdapter`.
+ */
+@Injectable()
+export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
+  extrair(pedido: PedidoDeExtracao): Promise<ResultadoDaExtracao> {
+    if (pedido.tipo === 'CSV') {
+      return Promise.resolve(this.extrairCsv(pedido.conteudo));
+    }
+
+    // ECG chega como PDF (o texto ja extraido da camada de texto). Qualquer
+    // outro tipo nao e reconhecido por este extrator.
+    if (pedido.tipo === 'PDF') {
+      return Promise.resolve(this.extrairEcg(pedido.conteudo));
+    }
+
+    return Promise.reject(
+      new ErroDeExtracao(
+        'EXTRACTOR_UNSUPPORTED_TYPE',
+        false,
+        `extrator de laudo de bioimpedancia nao le ${pedido.tipo}`,
+      ),
+    );
+  }
+
+  private extrairCsv(conteudo: Uint8Array): ResultadoDaExtracao {
+    const texto = new TextDecoder('utf-8').decode(conteudo);
+    const linhas = texto
+      .split(/\r?\n/)
+      .map((linha) => linha.trim())
+      .filter((linha) => linha !== '');
+
+    if (linhas.length < 2) {
+      throw new ErroDeExtracao(
+        'EXTRACTOR_NO_CONTENT',
+        false,
+        'CSV sem cabecalho ou sem linha de dados',
+      );
+    }
+
+    const cabecalho = linhas[0]!.split(',').map((c) => c.trim().toLowerCase());
+    const iTipo = cabecalho.indexOf('tipo');
+    const iValor = cabecalho.indexOf('valor');
+    const iUnidade = cabecalho.indexOf('unidade');
+    const iFaixaMin = cabecalho.indexOf('faixa_min');
+    const iFaixaMax = cabecalho.indexOf('faixa_max');
+    const iPercentualPadrao = cabecalho.indexOf('percentual_padrao');
+
+    if (iTipo < 0 || iValor < 0) {
+      throw new ErroDeExtracao(
+        'EXTRACTOR_NO_CONTENT',
+        false,
+        'CSV sem as colunas obrigatorias `tipo` e `valor`',
+      );
+    }
+
+    const campos: CampoProposto[] = [];
+
+    for (const linha of linhas.slice(1)) {
+      const celulas = linha.split(',').map((c) => c.trim());
+
+      const tipo = celulas[iTipo]?.toUpperCase();
+      const bruto = celulas[iValor]?.replace(',', '.');
+
+      // Linha ilegivel ou tipo do fabricante (idade corporal, pontuacao,
+      // peso ideal) e IGNORADA, nao derruba o arquivo -- mesma regra do
+      // `CsvDocumentExtractorAdapter`.
+      if (!tipo || !bruto) continue;
+      if (!ehTipoDeMedida(tipo)) continue;
+
+      const valor = Number(bruto);
+
+      if (!Number.isFinite(valor)) continue;
+
+      const unidadeBruta = iUnidade >= 0 ? celulas[iUnidade]?.toLowerCase() : undefined;
+      const unidade =
+        unidadeBruta && ehUnidade(unidadeBruta) ? (unidadeBruta as UnidadeDeMedida) : null;
+
+      campos.push({
+        type: tipo,
+        value: valor,
+        unit: unidade,
+        confidence: null,
+        sourceLocation: `linha ${linhas.indexOf(linha) + 1}`,
+        referenceMin: lerNumeroOpcional(celulas, iFaixaMin),
+        referenceMax: lerNumeroOpcional(celulas, iFaixaMax),
+        standardPercent: lerNumeroOpcional(celulas, iPercentualPadrao),
+      });
+    }
+
+    if (campos.length === 0) {
+      throw new ErroDeExtracao(
+        'EXTRACTOR_NO_CONTENT',
+        false,
+        'nenhuma linha do CSV produziu medida reconhecivel',
+      );
+    }
+
+    const temSegmentarOuMassaMuscular = campos.some(
+      (campo) => REGIAO_DO_TIPO[campo.type] !== null || campo.type === 'SKELETAL_MUSCLE_MASS',
+    );
+
+    const sourceLabel = detectarOrigemCsv(cabecalho, campos);
+
+    return {
+      campos,
+      measuredAt: null,
+      extractor: 'laudo-bioimpedancia@1',
+      tipoDeLaudo: temSegmentarOuMassaMuscular ? 'BIOIMPEDANCE' : 'UNKNOWN',
+      // `exactOptionalPropertyTypes`: so inclui a chave quando ha valor --
+      // `sourceLabel: undefined` explicito nao e a mesma coisa que omitir.
+      ...(sourceLabel !== undefined ? { sourceLabel } : {}),
+    };
+  }
+
+  private extrairEcg(conteudo: Uint8Array): ResultadoDaExtracao {
+    const texto = new TextDecoder('utf-8').decode(conteudo);
+
+    const bpm = capturar(texto, /Frequencia cardiaca:\s*(\d+(?:[.,]\d+)?)\s*BPM/i);
+    const achado = capturar(texto, /Analise instantanea:\s*(.+)/i);
+    const linhaTags = capturar(texto, /Tags:\s*(.+)/i);
+    const duracao = capturar(texto, /Duracao:\s*(\d+(?:[.,]\d+)?)\s*s/i);
+    const gravadoEm = capturar(texto, /Gravado:\s*(.+)/i);
+
+    const ehEcg = /Analise instantanea:/i.test(texto) || /Frequencia cardiaca:/i.test(texto);
+
+    if (!ehEcg) {
+      throw new ErroDeExtracao(
+        'EXTRACTOR_NO_CONTENT',
+        false,
+        'texto nao contem marcadores de ECG reconhecidos',
+      );
+    }
+
+    const campos: CampoProposto[] = [];
+
+    if (bpm) {
+      const valor = Number(bpm.replace(',', '.'));
+
+      if (Number.isFinite(valor)) {
+        campos.push({
+          type: 'HEART_RATE',
+          value: valor,
+          unit: null,
+          confidence: null,
+          sourceLocation: null,
+        });
+      }
+    }
+
+    // `atributos` guarda o achado como TEXTO OPACO -- nenhuma linha deste
+    // metodo le `ecgFinding` para decidir nada (ADR-035).
+    const atributos: Record<string, unknown> = {};
+
+    if (achado) atributos['ecgFinding'] = achado;
+    if (linhaTags) atributos['ecgTags'] = linhaTags.split(',').map((tag) => tag.trim());
+    if (duracao) atributos['ecgDurationSeconds'] = Number(duracao.replace(',', '.'));
+    if (gravadoEm) atributos['ecgRecordedAt'] = gravadoEm;
+
+    return {
+      campos,
+      measuredAt: null,
+      extractor: 'laudo-bioimpedancia@1',
+      tipoDeLaudo: 'ECG',
+      atributos,
+    };
+  }
+}
+
+function ehTipoDeMedida(valor: string): valor is TipoDeMedida {
+  return (TIPOS_DE_MEDIDA as readonly string[]).includes(valor);
+}
+
+function ehUnidade(valor: string): boolean {
+  return (UNIDADES_DE_MEDIDA as readonly string[]).includes(valor);
+}
+
+/** Le uma celula numerica opcional. Ausente ou em branco vira `null`, nunca `0` (INV-104). */
+function lerNumeroOpcional(celulas: readonly string[], indice: number): number | null {
+  if (indice < 0) return null;
+
+  const bruto = celulas[indice]?.replace(',', '.');
+
+  if (!bruto) return null;
+
+  const valor = Number(bruto);
+
+  return Number.isFinite(valor) ? valor : null;
+}
+
+function capturar(texto: string, expressao: RegExp): string | null {
+  const resultado = expressao.exec(texto);
+
+  return resultado?.[1]?.trim() ?? null;
+}
+
+/**
+ * Rotulo da origem do laudo, pelas colunas que so um dos dois formatos traz.
+ *
+ * `percentual_padrao` e exclusivo do `CF610_G` (indice do fabricante nos
+ * segmentares). Os campos exclusivos do `UNIQUE_HEALTH` (`BONE_MASS`,
+ * `BODY_CELL_MASS`, `WAIST_HIP_RATIO`) sao o outro sinal. Sem nenhum dos
+ * dois, o rotulo fica indefinido -- nao se inventa fabricante.
+ */
+function detectarOrigemCsv(
+  cabecalho: readonly string[],
+  campos: readonly CampoProposto[],
+): string | undefined {
+  if (cabecalho.includes('percentual_padrao') && campos.some((c) => c.standardPercent !== null)) {
+    return 'CF610_G';
+  }
+
+  const temCampoExclusivoUniqueHealth = campos.some((campo) =>
+    (['BONE_MASS', 'BODY_CELL_MASS', 'WAIST_HIP_RATIO'] as const).includes(
+      campo.type as 'BONE_MASS' | 'BODY_CELL_MASS' | 'WAIST_HIP_RATIO',
+    ),
+  );
+
+  if (temCampoExclusivoUniqueHealth) return 'UNIQUE_HEALTH';
+
+  return undefined;
+}
