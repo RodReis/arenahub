@@ -256,7 +256,25 @@ export class AssessmentRepository {
    * `selecionarFolhas`, no dominio. Fazer o filtro aqui no `WHERE`
    * esconderia do dominio a informacao de que houve correcao.
    *
-   * Ambos os indices que esta consulta usa ja existem no schema:
+   * ## O CORTE DE PERIODO E POR CADEIA, NAO POR LINHA
+   *
+   * DEFEITO REAL, achado na revisao adversarial desta fatia -- e do pior
+   * tipo, porque o dado nao aparecia errado: ele DESAPARECIA.
+   *
+   * `POST /assessments/:id/corrections` aceita `assessedAt` livre do corpo,
+   * entao a correcao pode carimbar data diferente da original (o caso real e
+   * perceber o erro meses depois e REMEDIR o aluno). Com o corte aplicado
+   * linha a linha, bastava a original cair dentro da janela e a correcao
+   * fora: a consulta trazia a original ja marcada como corrigida, sem a
+   * folha; `selecionarFolhas` descartava a original -- correto, ela foi
+   * corrigida -- e o tipo sumia INTEIRO da tela, como se o aluno nunca
+   * tivesse sido medido.
+   *
+   * O `OR` abaixo mantem a cadeia junta: a avaliacao entra se ELA ou a
+   * CORRECAO dela cai no periodo. A folha sempre chega acompanhada, e o
+   * dominio decide com a cadeia completa na mao.
+   *
+   * Os indices que esta consulta usa ja existem no schema:
    * `(tenant_id, student_id, assessed_at)` e
    * `(tenant_id, student_id, status, published_at)`.
    */
@@ -272,7 +290,21 @@ export class AssessmentRepository {
         status: 'PUBLISHED',
         // `null` = periodo ALL, sem corte. `new Date(0)` filtraria por 1970
         // sem necessidade.
-        ...(desde !== null ? { assessedAt: { gte: desde } } : {}),
+        ...(desde !== null
+          ? {
+              OR: [
+                { assessedAt: { gte: desde } },
+                // A correcao esta na janela: traz a original junto, senao a
+                // folha chegaria orfa e o dominio nao saberia o que ela
+                // substitui.
+                { supersededBy: { assessedAt: { gte: desde } } },
+                // A original esta na janela: traz a correcao junto, senao a
+                // original seria descartada por `selecionarFolhas` e o tipo
+                // sumiria da tela.
+                { supersedes: { assessedAt: { gte: desde } } },
+              ],
+            }
+          : {}),
       },
       include: {
         measurements: true,

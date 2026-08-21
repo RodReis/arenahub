@@ -334,6 +334,50 @@ describe('F18 -- historico e comparativos', () => {
     expect(original?.status).toBe('PUBLISHED');
   });
 
+  it('correcao com data diferente da original nao faz a medicao SUMIR do periodo', async () => {
+    // ACHADO NA REVISAO ADVERSARIAL DESTA FATIA, e o pior tipo de defeito:
+    // o dado nao aparece errado, ele DESAPARECE.
+    //
+    // `POST /assessments/:id/corrections` aceita `assessedAt` livre do corpo,
+    // entao a correcao pode carimbar uma data diferente da original -- o caso
+    // real e perceber o erro meses depois e REMEDIR o aluno.
+    //
+    // O corte de periodo filtra linha a linha. Com a original DENTRO da
+    // janela e a correcao FORA, a consulta trazia a original (marcada como
+    // corrigida) sem trazer a folha; `selecionarFolhas` descartava a
+    // original, e o tipo sumia inteiro da tela -- sem aviso, como se o aluno
+    // nunca tivesse sido medido.
+    const aluno = await criarAluno(contas.a);
+
+    const agora = new Date();
+    const dentroDaJanela = new Date(agora.getTime() - 5 * 86_400_000).toISOString();
+
+    const original = await publicada(contas.a, aluno, dentroDaJanela, [
+      { type: 'WEIGHT', value: 90, unit: 'kg' },
+    ]);
+
+    // A correcao remede o aluno e carimba data ANTIGA -- fora de `30D`.
+    const correcao = await request(servidor())
+      .post(`/api/v1/assessments/${original}/corrections`)
+      .set('Cookie', contas.a.cookie)
+      .send({
+        assessedAt: '2020-01-10T12:00:00.000Z',
+        measurements: [{ type: 'WEIGHT', value: 81, unit: 'kg' }],
+      });
+
+    expect(correcao.status).toBe(201);
+
+    const corpo = (await historico(contas.a, aluno, '30D')).body as HistoricoResposta;
+    const peso = corpo.measurements.find((m) => m.type === 'WEIGHT');
+
+    // O peso do aluno NAO pode sumir da tela. Ou aparece o valor corrigido,
+    // ou aparece vazio com razao -- nunca o tipo inteiro desaparecendo.
+    expect(peso).toBeDefined();
+    expect(peso?.current).not.toBeNull();
+    // E o valor exibido e o CORRIGIDO, nunca o numero que foi substituido.
+    expect(peso?.current?.value).toBe(81);
+  });
+
   it('campo ausente nao vira ponto nem zero (INV-104, M3-AC-004)', async () => {
     const aluno = await criarAluno(contas.a);
 
