@@ -3204,6 +3204,28 @@ enum BodyMeasurementType {
   BASAL_METABOLIC_RATE
   WAIST_CIRCUMFERENCE
   HIP_CIRCUMFERENCE
+  // Segmentares (F-multiarquivo): alimentam o boneco do aluno.
+  SEGMENTAL_FAT_MASS_ARM_LEFT
+  SEGMENTAL_FAT_MASS_ARM_RIGHT
+  SEGMENTAL_FAT_MASS_TRUNK
+  SEGMENTAL_FAT_MASS_LEG_LEFT
+  SEGMENTAL_FAT_MASS_LEG_RIGHT
+  SEGMENTAL_MUSCLE_MASS_ARM_LEFT
+  SEGMENTAL_MUSCLE_MASS_ARM_RIGHT
+  SEGMENTAL_MUSCLE_MASS_TRUNK
+  SEGMENTAL_MUSCLE_MASS_LEG_LEFT
+  SEGMENTAL_MUSCLE_MASS_LEG_RIGHT
+  // Composicao que os laudos trazem e o enum nao tinha.
+  BONE_MASS
+  BODY_CELL_MASS
+  SUBCUTANEOUS_FAT_MASS
+  SUBCUTANEOUS_FAT_PERCENT
+  SKELETAL_MUSCLE_PERCENT
+  MUSCLE_MASS
+  PROTEIN_PERCENT
+  WAIST_HIP_RATIO
+  // Cardiaco. NUNCA interpretado (ADR-035).
+  HEART_RATE
 
   @@map("body_measurement_type")
 }
@@ -3265,9 +3287,17 @@ model BodyAssessment {
   supersededBy BodyAssessment? @relation("AssessmentCorrection")
 
   measurements BodyMeasurement[]
-  /// A importacao que originou esta avaliacao, quando ela veio de arquivo
-  /// (F19). Nula em avaliacao digitada a mao.
-  import       AssessmentImport?
+  /// Os arquivos que originaram esta avaliacao. Vazio em avaliacao
+  /// digitada a mao; um ou mais quando veio de laudo.
+  imports      AssessmentImport[]
+
+  /// Indices, classificacoes e sugestoes DO APARELHO (idade corporal,
+  /// pontuacao, tipo de corpo, peso ideal). Nao sao medidas: nao entram no
+  /// grafico de evolucao, porque a formula e proprietaria e muda com
+  /// firmware. Ver §4.4 da spec.
+  deviceReport Json?   @map("device_report")
+  deviceModel  String? @map("device_model")
+  deviceSerial String? @map("device_serial")
 
   @@index([tenantId, studentId, assessedAt])
   @@index([tenantId, studentId, status, publishedAt])
@@ -3669,7 +3699,14 @@ model AssessmentImport {
   reviewedAt       DateTime? @map("reviewed_at")
 
   /// A avaliacao que nasceu desta importacao. Nula ate a confirmacao.
-  assessmentId String? @unique @map("assessment_id") @db.Uuid
+  assessmentId String? @map("assessment_id") @db.Uuid
+
+  /// Agrupa os arquivos da MESMA medicao. Todos os arquivos de uma sessao
+  /// confirmam juntos e produzem UMA avaliacao.
+  reviewSessionId String? @map("review_session_id") @db.Uuid
+  /// Rotulo de origem exibido na revisao (`CF610_G`, `Unique Health`,
+  /// `ECG 30s`). Derivado do conteudo, nunca do nome do arquivo.
+  sourceLabel     String? @map("source_label")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3683,6 +3720,7 @@ model AssessmentImport {
 
   @@index([tenantId, studentId, createdAt])
   @@index([tenantId, status, createdAt])
+  @@index([tenantId, reviewSessionId])
   @@map("assessment_imports")
 }
 
@@ -3718,6 +3756,23 @@ model ImportedField {
   reviewedValue Decimal?         @map("reviewed_value") @db.Decimal(10, 4)
   reviewedUnit  MeasurementUnit? @map("reviewed_unit")
 
+  /// De qual arquivo veio este campo. E a coluna "Origem" da tela.
+  sourceLabel String? @map("source_label")
+
+  /// Quando outro arquivo trouxe o MESMO tipo com valor equivalente, este
+  /// campo aponta para o primeiro e nao vira linha propria na revisao.
+  /// Divergencia NUNCA e deduplicada: fica como duas linhas para o humano
+  /// escolher.
+  agreesWithFieldId String? @map("agrees_with_field_id") @db.Uuid
+
+  /// Faixa de referencia VIGENTE no laudo, guardada junto da medida: ela e
+  /// do fabricante e muda com firmware. Em tabela global, a leitura de
+  /// agosto deixaria de fazer sentido em dezembro.
+  referenceMin Decimal? @map("reference_min") @db.Decimal(10, 4)
+  referenceMax Decimal? @map("reference_max") @db.Decimal(10, 4)
+  /// Percentual do padrao que o aparelho reporta (233,3% no braco direito).
+  standardPercent Decimal? @map("standard_percent") @db.Decimal(7, 2)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -3725,5 +3780,6 @@ model ImportedField {
   import AssessmentImport @relation(fields: [importId], references: [id], onDelete: Cascade)
 
   @@index([importId, state])
+  @@index([importId, agreesWithFieldId])
   @@map("imported_fields")
 }
