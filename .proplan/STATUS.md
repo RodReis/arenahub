@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-08-20
+updated: 2026-08-21
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -35,7 +35,6 @@ updated: 2026-08-20
 - [MVP3][SPEC-021][F21] Análise assistiva por IA (#21)
 - [MVP3][SPEC-020][F20] Metas e frequência (#20)
 - [MVP3][SPEC-019][F19] Upload e revisão (#19)
-- [MVP3][SPEC-018][F18] Histórico e comparativos (#18)
 
 ## A Fazer
 
@@ -57,6 +56,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-018][F18] Histórico e comparativos (#18, finalizado em: 2026-08-21)
 - [MVP1][F51] ID da catraca no lugar da matricula na lista de alunos (#136, finalizado em: 2026-08-20)
 - [MVP1][F50] Ajustes na tela de Alunos: busca automatica, botao Liberar e logo do WhatsApp (#134, finalizado em: 2026-08-20)
 - [MVP1][F48] Ativacao da base corrente do Pacto (~340 ativos) (#130, finalizado em: 2026-08-20)
