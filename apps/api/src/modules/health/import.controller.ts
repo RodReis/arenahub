@@ -62,6 +62,19 @@ const esquemaDeConfirmacao = z
   })
   .strict();
 
+/**
+ * O corpo do upload viaja como `multipart/form-data` (o arquivo vai no
+ * campo `file`), entao `reviewSessionId`/`sourceLabel` chegam como CAMPOS DE
+ * TEXTO do mesmo formulario -- nao um `Body()` JSON separado. `z.uuid()`
+ * valida o formato antes de tratar como id de sessao real.
+ */
+const esquemaDoEnvio = z
+  .object({
+    reviewSessionId: z.uuid().optional(),
+    sourceLabel: z.string().min(1).max(120).optional(),
+  })
+  .partial();
+
 interface CampoDto {
   id: string;
   type: string;
@@ -69,6 +82,7 @@ interface CampoDto {
   extractedUnit: string | null;
   confidence: number | null;
   sourceLocation: string | null;
+  sourceLabel: string | null;
   state: string;
   reviewedValue: number | null;
   reviewedUnit: string | null;
@@ -106,11 +120,19 @@ export class ImportController {
   async enviar(
     @Param('id') studentId: string,
     @UploadedFile() arquivo: ArquivoRecebido | undefined,
-  ): Promise<{ id: string; status: string; extractedFields: number; failureReason: string | null }> {
+    @Body() corpo: unknown,
+  ): Promise<{
+    id: string;
+    status: string;
+    extractedFields: number;
+    failureReason: string | null;
+    reviewSessionId: string;
+  }> {
     if (!arquivo) {
       throw new BadRequestException({ code: 'FILE_REQUIRED' });
     }
 
+    const dados = esquemaDoEnvio.parse(corpo);
     const contexto = this.contexto.require();
     const uploader = this.exigirAtor();
 
@@ -123,6 +145,7 @@ export class ImportController {
         conteudo: new Uint8Array(arquivo.buffer),
       },
       uploader,
+      { reviewSessionId: dados.reviewSessionId, sourceLabel: dados.sourceLabel },
     );
 
     return {
@@ -130,6 +153,7 @@ export class ImportController {
       status: resultado.status,
       extractedFields: resultado.camposExtraidos,
       failureReason: resultado.motivoDaFalha,
+      reviewSessionId: resultado.reviewSessionId,
     };
   }
 
@@ -169,6 +193,82 @@ export class ImportController {
     }));
   }
 
+  /**
+   * A sessao como a tela de revisao precisa dela (Task 5): arquivos, linhas
+   * consolidadas entre eles e se pode confirmar.
+   *
+   * Rota `assessment-imports/sessions/:sessionId` tem DOIS segmentos depois
+   * de `assessment-imports/`, entao `:id` (UM segmento) nunca a engoliria --
+   * mas fica ANTES de `:id` de qualquer jeito, seguindo o mesmo cuidado de
+   * `pending` acima: registrar rota literal perto de `:id` e um lugar onde
+   * vale nao confiar so na contagem de segmentos.
+   */
+  @Get('assessment-imports/sessions/:sessionId')
+  @RequirePermissions('health.read')
+  async detalharSessao(@Param('sessionId') sessionId: string): Promise<{
+    sessionId: string;
+    arquivos: { importId: string; sourceLabel: string; tipoDeLaudo: string }[];
+    linhas: {
+      type: string;
+      concordante: boolean;
+      origens: string[];
+      campos: CampoDto[];
+    }[];
+    podeConfirmar: { pronta: boolean; motivo?: string };
+  }> {
+    const sessao = await this.importacoes.detalharSessao(this.contexto.require(), sessionId);
+
+    return {
+      sessionId: sessao.sessionId,
+      arquivos: sessao.arquivos.map((arquivo) => ({
+        importId: arquivo.importId,
+        sourceLabel: arquivo.sourceLabel,
+        tipoDeLaudo: arquivo.tipoDeLaudo,
+      })),
+      linhas: sessao.linhas.map((linha) => ({
+        type: linha.type,
+        concordante: linha.concordante,
+        origens: [...linha.origens],
+        campos: linha.campos.map((campo) => ({
+          id: campo.id,
+          type: campo.type,
+          extractedValue: campo.extractedValue,
+          extractedUnit: campo.extractedUnit,
+          confidence: campo.confidence,
+          sourceLocation: campo.sourceLocation,
+          sourceLabel: campo.sourceLabel,
+          state: campo.state,
+          reviewedValue: campo.reviewedValue,
+          reviewedUnit: campo.reviewedUnit,
+        })),
+      })),
+      podeConfirmar: sessao.podeConfirmar.pronta
+        ? { pronta: true }
+        : { pronta: false, motivo: sessao.podeConfirmar.motivo },
+    };
+  }
+
+  /**
+   * Confirma a sessao inteira e cria UMA avaliacao com as medidas de TODOS
+   * os arquivos (Task 5).
+   */
+  @Post('assessment-imports/sessions/:sessionId/confirm')
+  @RequirePermissions('health.assess')
+  async confirmarSessao(
+    @Param('sessionId') sessionId: string,
+    @Body() corpo: unknown,
+  ): Promise<{ assessmentId: string }> {
+    const dados = esquemaDeConfirmacao.parse(corpo);
+
+    return this.importacoes.confirmarSessao(
+      this.contexto.require(),
+      sessionId,
+      this.exigirAtor(),
+      new Date(dados.assessedAt),
+      new Date(),
+    );
+  }
+
   @Get('assessment-imports/:id')
   @RequirePermissions('health.read')
   async detalhar(@Param('id') importId: string): Promise<ImportacaoDto> {
@@ -191,6 +291,7 @@ export class ImportController {
         extractedUnit: campo.extractedUnit,
         confidence: campo.confidence,
         sourceLocation: campo.sourceLocation,
+        sourceLabel: campo.sourceLabel,
         state: campo.state,
         reviewedValue: campo.reviewedValue,
         reviewedUnit: campo.reviewedUnit,

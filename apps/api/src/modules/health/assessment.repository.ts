@@ -43,6 +43,15 @@ export interface DadosDaAvaliacao {
    */
   source?: 'MANUAL' | 'DEVICE' | 'IMPORT' | undefined;
   sourceReference?: string | undefined;
+  /**
+   * Indice, classificacao ou sugestao do APARELHO (idade corporal,
+   * pontuacao, tipo de corpo, achado de ECG). Nunca vira `BodyMeasurement`
+   * -- e formula proprietaria que muda com firmware (spec §4.4) -- so
+   * acompanha a avaliacao como referencia opaca (ADR-035).
+   */
+  deviceReport?: Record<string, unknown> | undefined;
+  deviceModel?: string | undefined;
+  deviceSerial?: string | undefined;
 }
 
 /** Unidade do dominio (minuscula) para o enum do Prisma (maiuscula). */
@@ -82,6 +91,12 @@ export class AssessmentRepository {
           sourceReference: dados.sourceReference ?? null,
           evaluatorUserId: dados.evaluatorUserId,
           notes: dados.notes ?? null,
+          deviceReport:
+            dados.deviceReport === undefined
+              ? Prisma.JsonNull
+              : (dados.deviceReport as Prisma.InputJsonValue),
+          deviceModel: dados.deviceModel ?? null,
+          deviceSerial: dados.deviceSerial ?? null,
         },
       });
 

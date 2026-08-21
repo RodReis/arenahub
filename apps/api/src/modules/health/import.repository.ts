@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -6,6 +7,7 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 import type { CampoExtraido, EstadoDoCampo } from './domain/revisao-de-importacao.js';
 import type { TipoDeArquivo } from './domain/arquivo-de-importacao.js';
 import type { TipoDeMedida, UnidadeDeMedida } from './domain/medida.js';
+import type { ArquivoDaSessao, TipoDeLaudo } from './domain/sessao-de-revisao.js';
 
 /**
  * Importacoes de arquivo e seus campos em revisao (F19).
@@ -51,6 +53,37 @@ export class RevisaoIncompletaError extends ErroDeDominio {
   }
 }
 
+/**
+ * A sessao nao pode virar avaliacao ainda -- `motivo` e o codigo do dominio
+ * (`sessaoPodeConfirmar`), verbatim: `SESSION_EMPTY`, `BIOIMPEDANCE_REQUIRED`
+ * ou `DIVERGENCE_UNRESOLVED`.
+ */
+export class SessaoBloqueadaError extends ErroDeDominio {
+  constructor(motivo: string) {
+    super(motivo, 409, 'a sessao de revisao nao pode ser confirmada');
+  }
+}
+
+export class SessaoNaoEncontradaError extends ErroDeDominio {
+  constructor() {
+    super('SESSION_NOT_FOUND', 404, 'sessao de revisao nao encontrada');
+  }
+}
+
+/**
+ * Duas confirmacoes concorrentes da mesma sessao -- a segunda chega aqui.
+ *
+ * O INDICE PARCIAL do banco e quem garante isto (nunca um `if`): a segunda
+ * transacao que tenta gravar `assessment_id` para o mesmo `review_session_id`
+ * ja confirmado leva `P2002`, e este erro traduz o `P2002` cru num 409 de
+ * dominio -- o cliente nunca ve o erro do Postgres.
+ */
+export class SessaoJaConfirmadaError extends ErroDeDominio {
+  constructor() {
+    super('SESSION_ALREADY_CONFIRMED', 409, 'a sessao de revisao ja foi confirmada');
+  }
+}
+
 export class CampoNaoEncontradoError extends ErroDeDominio {
   constructor() {
     super('IMPORT_FIELD_NOT_FOUND', 404, 'campo de importacao nao encontrado');
@@ -74,8 +107,26 @@ export interface ImportacaoComCampos {
   readonly extractor: string | null;
   readonly failureReason: string | null;
   readonly assessmentId: string | null;
+  readonly reviewSessionId: string | null;
+  readonly sourceLabel: string | null;
   readonly createdAt: Date;
   readonly campos: readonly CampoExtraido[];
+}
+
+/** Uma sessao de revisao: todos os arquivos e campos que a compoem. */
+export interface SessaoComArquivos {
+  readonly reviewSessionId: string;
+  readonly studentId: string;
+  readonly arquivos: readonly ArquivoDaSessao[];
+  /** Campos de TODOS os arquivos da sessao, achatados. */
+  readonly campos: readonly CampoExtraido[];
+  readonly importIds: readonly string[];
+  /**
+   * O que cada arquivo guardou em `extracted_attributes` -- OPACO
+   * (ADR-035), carregado ate a confirmacao migrar o que for dado de
+   * aparelho para `BodyAssessment.deviceReport`. Nunca interpretado aqui.
+   */
+  readonly atributosPorImport: readonly (Record<string, unknown> | null)[];
 }
 
 @Injectable()
@@ -90,6 +141,8 @@ export class ImportRepository {
       fileType: TipoDeArquivo;
       fileSizeBytes: number;
       uploadedByUserId: string;
+      reviewSessionId?: string | undefined;
+      sourceLabel?: string | undefined;
     },
   ): Promise<{ id: string }> {
     return this.db.assessmentImport.create({
@@ -101,6 +154,8 @@ export class ImportRepository {
         fileType: dados.fileType,
         fileSizeBytes: dados.fileSizeBytes,
         uploadedByUserId: dados.uploadedByUserId,
+        reviewSessionId: dados.reviewSessionId ?? null,
+        sourceLabel: dados.sourceLabel ?? null,
       },
       select: { id: true },
     });
@@ -146,6 +201,17 @@ export class ImportRepository {
    * Numa transacao: importacao marcada como extraida sem os campos deixaria a
    * tela de revisao vazia, e o avaliador concluiria que o arquivo nao tinha
    * nada -- quando na verdade a gravacao morreu no meio.
+   *
+   * NAO calcula `agreesWithFieldId` aqui: no momento em que UM arquivo e
+   * extraido, os outros arquivos da sessao podem nao ter chegado ainda --
+   * `enviarSegundoArquivo` pode rodar minutos depois. A deduplicacao entre
+   * arquivos so faz sentido com a SESSAO INTEIRA na mao, e por isso mora em
+   * `gravarConcordancias`, chamada por quem le a sessao (`detalharSessao` no
+   * service).
+   *
+   * `sourceLabel` do ARQUIVO (nao do campo) so sobrescreve quando
+   * `sourceLabelDoArquivo` vem preenchido: a F19 (import avulso) chama sem
+   * rotulo do extrator, e nao deve perder o que `criar` ja gravou do pedido.
    */
   async gravarExtracao(
     contexto: TenantContext,
@@ -158,7 +224,16 @@ export class ImportRepository {
       unit: UnidadeDeMedida | null;
       confidence: number | null;
       sourceLocation: string | null;
+      sourceLabel: string | null;
+      referenceMin: number | null;
+      referenceMax: number | null;
+      standardPercent: number | null;
     }[],
+    extra: {
+      sourceLabelDoArquivo: string | null;
+      tipoDeLaudo: TipoDeLaudo | null;
+      atributos: Record<string, unknown> | null;
+    },
   ): Promise<void> {
     await this.db.$transaction(async (tx) => {
       await tx.importedField.createMany({
@@ -171,14 +246,57 @@ export class ImportRepository {
           extractedUnit: paraBanco(campo.unit),
           confidence: campo.confidence,
           sourceLocation: campo.sourceLocation,
+          sourceLabel: campo.sourceLabel,
+          referenceMin: campo.referenceMin,
+          referenceMax: campo.referenceMax,
+          standardPercent: campo.standardPercent,
         })),
       });
 
+      const atributosParaGravar: Prisma.InputJsonValue | typeof Prisma.JsonNull =
+        extra.tipoDeLaudo === null && extra.atributos === null
+          ? Prisma.JsonNull
+          : { tipoDeLaudo: extra.tipoDeLaudo, ...extra.atributos };
+
       await tx.assessmentImport.updateMany({
         where: { id: importId, tenantId: contexto.tenantId },
-        data: { status: 'EXTRACTED', extractor, objectKey },
+        data: {
+          status: 'EXTRACTED',
+          extractor,
+          objectKey,
+          ...(extra.sourceLabelDoArquivo !== null
+            ? { sourceLabel: extra.sourceLabelDoArquivo }
+            : {}),
+          extractedAttributes: atributosParaGravar,
+        },
       });
     });
+  }
+
+  /**
+   * Grava, PARA CADA CAMPO ALVO, o id do campo com quem ele concorda --
+   * resultado de `consolidar()` no dominio, ja resolvido para ids reais.
+   *
+   * `null` apaga a concordancia (o campo passou a divergir, ou a sessao
+   * mudou de composicao). A trava de integridade e do CHAMADOR
+   * (`import.service.ts`): este metodo so grava o par que recebe, e por
+   * isso o service NUNCA monta o par a partir de dois conjuntos de campos
+   * diferentes -- ver a nota em `detalharSessao`.
+   */
+  async gravarConcordancias(
+    contexto: TenantContext,
+    pares: readonly { campoId: string; agreesWithFieldId: string | null }[],
+  ): Promise<void> {
+    if (pares.length === 0) return;
+
+    await this.db.$transaction(
+      pares.map((par) =>
+        this.db.importedField.updateMany({
+          where: { id: par.campoId, tenantId: contexto.tenantId },
+          data: { agreesWithFieldId: par.agreesWithFieldId },
+        }),
+      ),
+    );
   }
 
   async encontrar(
@@ -192,37 +310,126 @@ export class ImportRepository {
 
     if (linha === null) return null;
 
+    return paraImportacaoComCampos(linha);
+  }
+
+  /**
+   * Todos os arquivos e campos de UMA sessao de revisao (tenant-scoped).
+   *
+   * `null` quando a sessao nao existe NESTE tenant -- o controller traduz
+   * isso em 404, nunca em lista vazia (que pareceria "sessao existe, sem
+   * arquivo").
+   */
+  async encontrarSessao(
+    contexto: TenantContext,
+    reviewSessionId: string,
+  ): Promise<SessaoComArquivos | null> {
+    const linhas = await this.db.assessmentImport.findMany({
+      where: { tenantId: contexto.tenantId, reviewSessionId },
+      include: { fields: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (linhas.length === 0) return null;
+
+    const primeira = linhas[0]!;
+
+    const arquivos: ArquivoDaSessao[] = linhas.map((linha) => ({
+      importId: linha.id,
+      sourceLabel: linha.sourceLabel ?? linha.originalFilename,
+      tipoDeLaudo: tipoDeLaudoDoAtributos(linha.extractedAttributes),
+    }));
+
+    const campos = linhas.flatMap((linha) => paraImportacaoComCampos(linha).campos);
+
     return {
-      id: linha.id,
-      studentId: linha.studentId,
-      status: linha.status,
-      originalFilename: linha.originalFilename,
-      fileType: linha.fileType,
-      extractor: linha.extractor,
-      failureReason: linha.failureReason,
-      assessmentId: linha.assessmentId,
-      createdAt: linha.createdAt,
-      campos: linha.fields.map((campo) => ({
-        id: campo.id,
-        // SEM `toLowerCase()`: `TipoDeMedida` ja e MAIUSCULO no dominio,
-        // identico ao enum do Prisma. Baixar a caixa produzia
-        // `body_fat_percent`, que a tabela de unidades nao conhece -- e o
-        // erro so aparecia na CONFIRMACAO, com "unidade percent nao se aplica
-        // a body_fat_percent". Mesma classe do bug da unidade `L`: converter
-        // caixa cegamente entre camadas cujo formato ja coincide.
-        type: campo.type,
-        extractedValue: campo.extractedValue === null ? null : campo.extractedValue.toNumber(),
-        extractedUnit: doBanco(campo.extractedUnit),
-        confidence: campo.confidence === null ? null : campo.confidence.toNumber(),
-        sourceLocation: campo.sourceLocation,
-        // Coluna ainda nao existe no Prisma (F-multiarquivo persiste em fatia
-        // posterior) -- `null` aqui e ausencia real, nao palpite.
-        sourceLabel: null,
-        state: campo.state,
-        reviewedValue: campo.reviewedValue === null ? null : campo.reviewedValue.toNumber(),
-        reviewedUnit: doBanco(campo.reviewedUnit),
-      })),
+      reviewSessionId,
+      studentId: primeira.studentId,
+      arquivos,
+      campos,
+      importIds: linhas.map((linha) => linha.id),
+      atributosPorImport: linhas.map((linha) => atributosOpacos(linha.extractedAttributes)),
     };
+  }
+
+  /** Como `encontrarSessao`, mas lanca 404 de dominio em vez de devolver `null`. */
+  async encontrarSessaoOuFalhar(
+    contexto: TenantContext,
+    reviewSessionId: string,
+  ): Promise<SessaoComArquivos> {
+    const sessao = await this.encontrarSessao(contexto, reviewSessionId);
+
+    if (sessao === null) throw new SessaoNaoEncontradaError();
+
+    return sessao;
+  }
+
+  /**
+   * Confirma TODOS os imports `EXTRACTED` de uma sessao, apontando para a
+   * MESMA avaliacao (Task 5).
+   *
+   * A GARANTIA DE IDEMPOTENCIA NAO ESTA AQUI DENTRO -- esta no INDICE
+   * PARCIAL do banco (`assessment_imports_session_assessment_uq`). Este
+   * metodo so tenta gravar; se outra transacao venceu a corrida, o Postgres
+   * recusa com `P2002` e este metodo traduz isso em `SessaoJaConfirmadaError`
+   * (409) -- nunca deixa o erro cru do driver vazar para o controller.
+   */
+  async confirmarSessao(
+    contexto: TenantContext,
+    reviewSessionId: string,
+    importIds: readonly string[],
+    assessmentId: string,
+    reviewerUserId: string,
+    agora: Date,
+  ): Promise<void> {
+    try {
+      await this.db.$transaction(async (tx) => {
+        for (const importId of importIds) {
+          const afetadas = await tx.assessmentImport.updateMany({
+            where: {
+              id: importId,
+              tenantId: contexto.tenantId,
+              reviewSessionId,
+              status: 'EXTRACTED',
+            },
+            data: {
+              status: 'CONFIRMED',
+              assessmentId,
+              reviewedByUserId: reviewerUserId,
+              reviewedAt: agora,
+            },
+          });
+
+          // Outra transacao levou EXTRACTED embora entre a leitura da sessao
+          // (no service) e este UPDATE -- a mesma classe de corrida que o
+          // indice parcial cobre, so que chegando por um caminho diferente
+          // (import ja no estado terminal, sem violar o indice). Sinaliza o
+          // mesmo 409: o cliente nao distingue as duas causas.
+          if (afetadas.count === 0) throw new SessaoJaConfirmadaError();
+        }
+      });
+    } catch (erro: unknown) {
+      // P2002 e o INDICE PARCIAL vencendo a corrida: duas confirmacoes
+      // concorrentes da MESMA sessao passam as duas pela checagem de
+      // aplicacao antes de qualquer uma escrever, e o banco e quem decide
+      // qual das duas transacoes commita.
+      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002') {
+        throw new SessaoJaConfirmadaError();
+      }
+
+      throw erro;
+    }
+  }
+
+  /** Apaga a chave do arquivo de TODOS os imports de uma sessao. */
+  async esquecerArquivosDaSessao(
+    contexto: TenantContext,
+    importIds: readonly string[],
+  ): Promise<void> {
+    await this.db.assessmentImport.updateMany({
+      where: { id: { in: [...importIds] }, tenantId: contexto.tenantId },
+      data: { objectKey: null },
+    });
   }
 
   /**
@@ -383,4 +590,75 @@ function doBanco(valor: string | null): UnidadeDeMedida | null {
 /** Dominio para o enum do Prisma. Simetrico de `DO_BANCO`. */
 function paraBanco(valor: UnidadeDeMedida | null): never | null {
   return valor === null ? null : (valor.toUpperCase() as never);
+}
+
+/** A linha do Prisma com os campos incluidos -- o shape que `encontrar` e `encontrarSessao` leem. */
+type ImportacaoComCamposDoPrisma = Prisma.AssessmentImportGetPayload<{
+  include: { fields: true };
+}>;
+
+/** Traduz a linha do Prisma (import + campos) para o formato do dominio. */
+function paraImportacaoComCampos(linha: ImportacaoComCamposDoPrisma): ImportacaoComCampos {
+  return {
+    id: linha.id,
+    studentId: linha.studentId,
+    status: linha.status,
+    originalFilename: linha.originalFilename,
+    fileType: linha.fileType,
+    extractor: linha.extractor,
+    failureReason: linha.failureReason,
+    assessmentId: linha.assessmentId,
+    reviewSessionId: linha.reviewSessionId,
+    sourceLabel: linha.sourceLabel,
+    createdAt: linha.createdAt,
+    campos: linha.fields.map((campo) => ({
+      id: campo.id,
+      // SEM `toLowerCase()`: `TipoDeMedida` ja e MAIUSCULO no dominio,
+      // identico ao enum do Prisma. Baixar a caixa produzia
+      // `body_fat_percent`, que a tabela de unidades nao conhece -- e o
+      // erro so aparecia na CONFIRMACAO, com "unidade percent nao se aplica
+      // a body_fat_percent". Mesma classe do bug da unidade `L`: converter
+      // caixa cegamente entre camadas cujo formato ja coincide.
+      type: campo.type,
+      extractedValue: campo.extractedValue === null ? null : campo.extractedValue.toNumber(),
+      extractedUnit: doBanco(campo.extractedUnit),
+      confidence: campo.confidence === null ? null : campo.confidence.toNumber(),
+      sourceLocation: campo.sourceLocation,
+      sourceLabel: campo.sourceLabel,
+      state: campo.state,
+      reviewedValue: campo.reviewedValue === null ? null : campo.reviewedValue.toNumber(),
+      reviewedUnit: doBanco(campo.reviewedUnit),
+    })),
+  };
+}
+
+/**
+ * O `tipoDeLaudo` que o extrator classificou, lido de volta de
+ * `extracted_attributes` -- ele NAO tem coluna propria (Task 2 nao previu
+ * uma, e criar uma so para isto seria coluna de uso unico). `null` quando a
+ * importacao ainda nao foi extraida, ou o extrator nao classificou.
+ */
+function tipoDeLaudoDoAtributos(atributos: Prisma.JsonValue): TipoDeLaudo {
+  if (atributos === null || typeof atributos !== 'object' || Array.isArray(atributos)) {
+    return 'UNKNOWN';
+  }
+
+  const valor = (atributos as Record<string, unknown>)['tipoDeLaudo'];
+
+  return valor === 'BIOIMPEDANCE' || valor === 'ECG' ? valor : 'UNKNOWN';
+}
+
+/**
+ * `extracted_attributes` cru, sem o `tipoDeLaudo` que `tipoDeLaudoDoAtributos`
+ * ja extrai -- devolvido OPACO (ADR-035): nenhuma chave e interpretada aqui,
+ * so repassada para quem monta `deviceReport` na confirmacao.
+ */
+function atributosOpacos(atributos: Prisma.JsonValue): Record<string, unknown> | null {
+  if (atributos === null || typeof atributos !== 'object' || Array.isArray(atributos)) {
+    return null;
+  }
+
+  const { tipoDeLaudo: _tipoDeLaudo, ...resto } = atributos as Record<string, unknown>;
+
+  return Object.keys(resto).length === 0 ? null : resto;
 }

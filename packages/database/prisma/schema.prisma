@@ -3708,6 +3708,13 @@ model AssessmentImport {
   /// `ECG 30s`). Derivado do conteudo, nunca do nome do arquivo.
   sourceLabel     String? @map("source_label")
 
+  /// Dado do APARELHO que o extrator separa em `atributos` (Task 6): achado
+  /// de ECG, tags, duracao -- OPACO de proposito (ADR-035), nunca
+  /// interpretado. Guardado aqui, POR ARQUIVO, porque a extracao e a
+  /// confirmacao nao coincidem numa sessao com varios arquivos; na
+  /// confirmacao ele migra para `BodyAssessment.deviceReport`.
+  extractedAttributes Json? @map("extracted_attributes")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -3718,6 +3725,23 @@ model AssessmentImport {
   assessment BodyAssessment? @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
   fields     ImportedField[]
 
+  /// ⚠️ UMA SESSAO PRODUZ NO MAXIMO UMA AVALIACAO -- garantido por INDICE
+  /// PARCIAL escrito a mao, em
+  /// `migrations/20260821240000_sessao_idempotente`:
+  ///
+  ///     CREATE UNIQUE INDEX ... ON assessment_imports (review_session_id)
+  ///       WHERE assessment_id IS NOT NULL AND review_session_id IS NOT NULL;
+  ///
+  /// Nao da para declarar isso aqui: `@@unique([reviewSessionId])` bloquearia
+  /// TODAS as linhas da mesma sessao ainda em revisao (`assessment_id` nulo),
+  /// e uma sessao com tres arquivos pendentes já tem tres linhas com o mesmo
+  /// `review_session_id` antes de qualquer confirmacao existir.
+  ///
+  /// O Prisma nao modela indice parcial: ele NAO aparece neste schema e um
+  /// `prisma migrate dev` futuro vai propor apaga-lo. NAO ACEITE -- e a
+  /// mesma classe de garantia da F17/F18: duas confirmacoes concorrentes da
+  /// mesma sessao passam as duas pela checagem de aplicacao antes de
+  /// qualquer uma escrever, e sem o indice as duas criariam avaliacao.
   @@index([tenantId, studentId, createdAt])
   @@index([tenantId, status, createdAt])
   @@index([tenantId, reviewSessionId])
