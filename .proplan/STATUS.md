@@ -9,7 +9,6 @@ updated: 2026-08-21
 
 ### Sem épico
 
-- [MVP1][FIX] eixo de dayOfWeek divergente entre gravacao e motor nega acesso aos domingos (#129)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
@@ -31,10 +30,6 @@ updated: 2026-08-21
 - [MVP4][SPEC-025][F25] Financeiro mobile (#25)
 - [MVP4][SPEC-024][F24] Carteirinha, plano e frequência (#24)
 - [MVP4][SPEC-023][F23] Identidade e shell mobile (#23)
-- [MVP3][SPEC-022][F22] Operação e qualidade (#22)
-- [MVP3][SPEC-021][F21] Análise assistiva por IA (#21)
-- [MVP3][SPEC-020][F20] Metas e frequência (#20)
-- [MVP3][SPEC-019][F19] Upload e revisão (#19)
 
 ## A Fazer
 
@@ -49,13 +44,19 @@ _(vazio)_
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][FIX] eixo de dayOfWeek divergente entre gravacao e motor nega acesso aos domingos (#129)
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-020][F20] Metas e frequência (#20, finalizado em: 2026-08-21)
+- [MVP3][SPEC-021][F21] Análise assistiva por IA (#21, finalizado em: 2026-08-21)
+- [MVP3][SPEC-019][F19] Upload e revisão (#19, finalizado em: 2026-08-21)
+- [MVP3][SPEC-022][F22] Operação e qualidade (#22, finalizado em: 2026-08-21)
 - [MVP3][SPEC-018][F18] Histórico e comparativos (#18, finalizado em: 2026-08-21)
 - [MVP1][F51] ID da catraca no lugar da matricula na lista de alunos (#136, finalizado em: 2026-08-20)
 - [MVP1][F50] Ajustes na tela de Alunos: busca automatica, botao Liberar e logo do WhatsApp (#134, finalizado em: 2026-08-20)
