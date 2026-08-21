@@ -83,6 +83,44 @@ export const CODIGO_DE_ALERTA = {
    * propria -- e a fila que ninguem abre e a fila que nao existe.
    */
   RECONCILIATION_PENDING: 'RECONCILIATION_PENDING',
+
+  /**
+   * Importacao de laudo esperando revisao humana ha tempo demais -- F22.
+   *
+   * NAO e erro: a importacao esta funcionando exatamente como deveria, e o
+   * INV-103 exige que alguem olhe campo a campo. O alerta existe porque a
+   * fila que ninguem abre e a fila que nao existe -- e nesta a espera tem um
+   * custo concreto: o aluno mediu, pagou pela bioimpedancia e nao ve o
+   * resultado.
+   */
+  HEALTH_IMPORT_PENDING_REVIEW: 'HEALTH_IMPORT_PENDING_REVIEW',
+  /**
+   * Extracao falhou ou o antivirus recusou o arquivo -- F22.
+   *
+   * As duas juntas de proposito: quem opera a recepcao age igual nas duas --
+   * fala com o aluno e digita a avaliacao a mao. Separar em dois alertas
+   * dobraria a tela sem dobrar a acao.
+   */
+  HEALTH_IMPORT_FAILED: 'HEALTH_IMPORT_FAILED',
+  /**
+   * Analise de IA rejeitada pela validacao -- F22, `M3-AC-008`.
+   *
+   * Rejeicao ISOLADA e o sistema funcionando: a regra no 8 recusou uma saida
+   * ruim, que e o trabalho dela. O que este alerta vigia e a TAXA: quando
+   * muitas caem seguidas, o problema deixou de ser o modelo tropecando e
+   * passou a ser prompt, snapshot ou versao de modelo -- e ai alguem precisa
+   * olhar antes que a academia conclua que "a IA nao funciona".
+   */
+  HEALTH_AI_REJECTION_RATE_HIGH: 'HEALTH_AI_REJECTION_RATE_HIGH',
+  /**
+   * Gasto de IA perto do teto do tenant -- F22, `M3-NFR-005`, ADR-036 dec. 4.
+   *
+   * Alerta ANTES de estourar, nao depois: estourado o teto a analise degrada
+   * para modo manual (`M3-NFR-004`) e a academia descobre pelo aluno
+   * reclamando que o resumo sumiu. Avisar em 80% da o tempo de decidir se
+   * aumenta o teto ou se aceita a degradacao.
+   */
+  HEALTH_AI_BUDGET_NEAR_LIMIT: 'HEALTH_AI_BUDGET_NEAR_LIMIT',
 } as const;
 
 export type CodigoDeAlerta = (typeof CODIGO_DE_ALERTA)[keyof typeof CODIGO_DE_ALERTA];
@@ -107,7 +145,7 @@ export interface Alerta {
    * olha catraca parada, e um painel separado so para dinheiro seria uma
    * segunda tela que ninguem abre.
    */
-  readonly recurso: 'EDGE' | 'DEVICE' | 'SYNC' | 'QUEUE' | 'BILLING';
+  readonly recurso: 'EDGE' | 'DEVICE' | 'SYNC' | 'QUEUE' | 'BILLING' | 'HEALTH';
   readonly recursoId: string;
   readonly gymUnitId: string | null;
   /**
@@ -135,6 +173,15 @@ export interface LimitesDeAlerta {
   readonly backlogDeWebhookMaximoMs: number;
   /** Conta ativa sem evento nenhum por mais que isto = silencio suspeito. */
   readonly silencioDeWebhookMaximoMs: number;
+
+  /** Importacao esperando revisao por mais que isto ja alerta -- F22. */
+  readonly esperaDeRevisaoMaximaMs: number;
+  /** Taxa de rejeicao de IA aceitavel, 0..1 -- F22. */
+  readonly taxaMaximaDeRejeicaoDeIa: number;
+  /** Minimo de analises no periodo para a taxa significar algo -- F22. */
+  readonly minimoDeAnalisesParaTaxa: number;
+  /** Fracao do teto de gasto que ja dispara aviso, 0..1 -- F22. */
+  readonly fracaoDeAvisoDeOrcamento: number;
 }
 
 /**
@@ -164,6 +211,33 @@ export const LIMITES_PADRAO: LimitesDeAlerta = {
    * nao movimento fraco.
    */
   silencioDeWebhookMaximoMs: 48 * 3_600_000,
+
+  /**
+   * 48 h para revisar um laudo importado.
+   *
+   * Nao e SLA de operacao: e o ponto em que a espera deixa de ser "ainda nao
+   * deu tempo" e vira "ninguem viu". Dois dias uteis cobrem fim de semana sem
+   * alertar a academia toda segunda-feira de manha.
+   */
+  esperaDeRevisaoMaximaMs: 48 * 3_600_000,
+  /**
+   * 30% de rejeicao.
+   *
+   * Rejeicao existe e e saudavel -- a regra no 8 recusando saida ruim. Um
+   * terco delas caindo indica causa sistemica, nao azar. O numero e chute
+   * informado: sem dado de producao nenhum limiar aqui e derivado, e fingir
+   * precisao seria pior que declarar a origem.
+   */
+  taxaMaximaDeRejeicaoDeIa: 0.3,
+  /**
+   * 5 analises.
+   *
+   * Sem minimo, UMA rejeicao em UMA analise vira "100% de rejeicao" e alarme
+   * no primeiro uso do recurso. Taxa sobre amostra minuscula nao e taxa.
+   */
+  minimoDeAnalisesParaTaxa: 5,
+  /** 80% do teto -- tempo de decidir antes de a analise degradar. */
+  fracaoDeAvisoDeOrcamento: 0.8,
 };
 
 /** O que o avaliador precisa saber sobre um Edge. */
@@ -523,4 +597,162 @@ export function impressaoDigital(
   return [tenantId, alerta.gymUnitId ?? '-', alerta.recurso, alerta.recursoId, alerta.codigo].join(
     ':',
   );
+}
+
+/**
+ * Estado da operacao de saude, por tenant -- F22, Slice 3.6.
+ *
+ * Um objeto por TENANT e nao por importacao: os alertas daqui sao sobre a
+ * FILA e a TAXA, nao sobre um arquivo especifico. Alertar por importacao
+ * produziria um alarme por laudo pendente, e trinta alarmes iguais na tela
+ * ensinam a operacao a fecha-los sem ler.
+ */
+export interface EstadoDaSaude {
+  /** Importacoes em `EXTRACTED` esperando revisao humana. */
+  readonly importacoesPendentes: number;
+  /** A mais antiga delas. `null` quando nao ha nenhuma. */
+  readonly pendenteMaisAntiga: Date | null;
+  /** Importacoes em `FAILED` ou `INFECTED` sem tratamento. */
+  readonly importacoesComFalha: number;
+  /** Analises de IA no periodo de apuracao. */
+  readonly analisesNoPeriodo: number;
+  readonly analisesRejeitadas: number;
+  /** Gasto acumulado no periodo, em milesimos de centavo de dolar. */
+  readonly gastoMicros: number;
+  /**
+   * Teto do tenant, na mesma unidade. `null` quando NAO configurado.
+   *
+   * `null` desliga o alerta de orcamento em vez de assumir um teto: o
+   * ADR-036 decisao 4 diz que o teto e parametro do cliente, e inventar um
+   * numero aqui cortaria a analise de uma academia que nunca combinou limite
+   * nenhum.
+   */
+  readonly tetoMicros: number | null;
+}
+
+/**
+ * Alertas da operacao de saude (Slice 3.6).
+ *
+ * Nenhum deles e `CRITICAL`, e isso e deliberado: `CRITICAL` significa "a
+ * catraca nao esta funcionando agora". Laudo esperando revisao e analise
+ * rejeitada sao problemas reais e nenhum deles impede alguem de treinar --
+ * dar a eles o mesmo peso da catraca parada faria a operacao aprender a
+ * ignorar o vermelho.
+ */
+export function avaliarSaude(
+  estado: EstadoDaSaude,
+  agora: Date,
+  limites: LimitesDeAlerta = LIMITES_PADRAO,
+): Alerta[] {
+  const alertas: Alerta[] = [];
+
+  if (estado.pendenteMaisAntiga !== null) {
+    const esperaMs = agora.getTime() - estado.pendenteMaisAntiga.getTime();
+
+    if (esperaMs > limites.esperaDeRevisaoMaximaMs) {
+      alertas.push({
+        codigo: CODIGO_DE_ALERTA.HEALTH_IMPORT_PENDING_REVIEW,
+        severidade: 'WARNING',
+        recurso: 'HEALTH',
+        recursoId: 'importacoes',
+        gymUnitId: null,
+        impacto:
+          'Ha laudo importado esperando revisao. O aluno mediu, pagou pela ' +
+          'bioimpedancia e ainda nao ve o resultado no historico.',
+        acaoRecomendada:
+          'Abra a fila de importacoes e revise os campos extraidos; ' +
+          'o valor do OCR precisa ser confirmado ou corrigido antes de virar historico.',
+        evidencia: {
+          pendentes: estado.importacoesPendentes,
+          esperaEmHoras: Math.floor(esperaMs / 3_600_000),
+        },
+      });
+    }
+  }
+
+  if (estado.importacoesComFalha > 0) {
+    alertas.push({
+      codigo: CODIGO_DE_ALERTA.HEALTH_IMPORT_FAILED,
+      severidade: 'WARNING',
+      recurso: 'HEALTH',
+      recursoId: 'importacoes',
+      gymUnitId: null,
+      impacto:
+        'Arquivo enviado que nao virou avaliacao -- extracao falhou ou o ' +
+        'antivirus recusou. O aluno acha que o laudo foi registrado.',
+      acaoRecomendada:
+        'Confira a lista de falhas: se o arquivo estiver integro, digite a ' +
+        'avaliacao a mao (a avaliacao manual nunca depende do OCR); se o ' +
+        'antivirus recusou, peca outro arquivo ao aluno.',
+      evidencia: { falhas: estado.importacoesComFalha },
+    });
+  }
+
+  /**
+   * A taxa so significa algo com amostra minima.
+   *
+   * Sem o piso, UMA rejeicao na PRIMEIRA analise da academia viraria "100% de
+   * rejeicao" -- alarme no dia em que o recurso foi ligado, que e a forma
+   * mais rapida de a operacao desconfiar do painel inteiro.
+   */
+  if (estado.analisesNoPeriodo >= limites.minimoDeAnalisesParaTaxa) {
+    const taxa = estado.analisesRejeitadas / estado.analisesNoPeriodo;
+
+    if (taxa > limites.taxaMaximaDeRejeicaoDeIa) {
+      alertas.push({
+        codigo: CODIGO_DE_ALERTA.HEALTH_AI_REJECTION_RATE_HIGH,
+        severidade: 'WARNING',
+        recurso: 'HEALTH',
+        recursoId: 'ai-analyses',
+        gymUnitId: null,
+        impacto:
+          'Muitas analises seguidas foram recusadas pela validacao. Os alunos ' +
+          'pedem o resumo e nao recebem -- e a academia conclui que a IA nao funciona.',
+        acaoRecomendada:
+          'Abra as analises rejeitadas e leia o motivo: rejeicao repetida pelo ' +
+          'mesmo motivo aponta prompt, snapshot ou versao de modelo, nao azar.',
+        evidencia: {
+          analises: estado.analisesNoPeriodo,
+          rejeitadas: estado.analisesRejeitadas,
+          // Percentual inteiro: a tela nao precisa de casa decimal para
+          // decidir se alguem olha.
+          taxaPercentual: Math.round(taxa * 100),
+        },
+      });
+    }
+  }
+
+  // Teto NAO configurado nao alerta -- e o padrao hoje, e inventar um numero
+  // cortaria a analise de quem nunca combinou limite (ADR-036 decisao 4).
+  if (estado.tetoMicros !== null && estado.tetoMicros > 0) {
+    const fracao = estado.gastoMicros / estado.tetoMicros;
+
+    if (fracao >= limites.fracaoDeAvisoDeOrcamento) {
+      const estourou = fracao >= 1;
+
+      alertas.push({
+        codigo: CODIGO_DE_ALERTA.HEALTH_AI_BUDGET_NEAR_LIMIT,
+        severidade: 'WARNING',
+        recurso: 'HEALTH',
+        recursoId: 'ai-budget',
+        gymUnitId: null,
+        impacto: estourou
+          ? 'O teto de gasto com IA foi atingido: a analise esta degradada para ' +
+            'modo manual e nenhum resumo novo sera gerado neste periodo.'
+          : 'O gasto com IA esta perto do teto combinado. Ao estourar, a analise ' +
+            'degrada para modo manual sem aviso novo.',
+        acaoRecomendada: estourou
+          ? 'Decida entre aumentar o teto do periodo ou manter a degradacao ate a virada.'
+          : 'Revise o teto do periodo se o volume de avaliacoes cresceu.',
+        evidencia: {
+          gastoMicros: estado.gastoMicros,
+          tetoMicros: estado.tetoMicros,
+          usoPercentual: Math.round(fracao * 100),
+          estourou,
+        },
+      });
+    }
+  }
+
+  return alertas;
 }

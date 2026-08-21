@@ -2050,6 +2050,20 @@
         ]
       }
     },
+    "/api/v1/assessment-imports/pending": {
+      "get": {
+        "operationId": "ImportController_fila",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Import"
+        ]
+      }
+    },
     "/api/v1/assessment-imports/{id}": {
       "get": {
         "operationId": "ImportController_detalhar",

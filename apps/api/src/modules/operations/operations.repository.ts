@@ -7,11 +7,13 @@ import {
   avaliarDispositivo,
   avaliarEdge,
   avaliarFinanceiro,
+  avaliarSaude,
   avaliarSync,
   impressaoDigital,
   type Alerta,
   type EstadoDeSync,
   type EstadoDoFinanceiro,
+  type EstadoDaSaude,
   type EstadoDoDispositivo,
   type EstadoDoEdge,
 } from './domain/alert-rules.js';
@@ -217,6 +219,7 @@ export class OperationsRepository {
     dispositivos: EstadoDoDispositivo[];
     sync: EstadoDeSync[];
     financeiro: EstadoDoFinanceiro[];
+    saude: EstadoDaSaude;
   }> {
     const agora = new Date();
     const inicioDoDia = new Date(agora);
@@ -277,10 +280,14 @@ export class OperationsRepository {
       }),
     );
 
-    const financeiro = await this.coletarEstadoFinanceiro(tenantId);
+    const [financeiro, saude] = await Promise.all([
+      this.coletarEstadoFinanceiro(tenantId),
+      this.coletarEstadoDeSaude(tenantId, agora),
+    ]);
 
     return {
       financeiro,
+      saude,
       edges: edges.map((e) => ({
         edgeNodeId: e.id,
         codigo: e.code,
@@ -488,6 +495,10 @@ export class OperationsRepository {
       ...estado.dispositivos.flatMap((d) => avaliarDispositivo(d, agora)),
       ...estado.sync.flatMap((s) => avaliarSync(s)),
       ...estado.financeiro.flatMap((f) => avaliarFinanceiro(f, agora)),
+      // F22: a operacao de saude entra no MESMO painel. Quem age sobre laudo
+      // parado e a mesma pessoa que olha catraca -- uma segunda tela so para
+      // saude seria uma tela que ninguem abre.
+      ...avaliarSaude(estado.saude, agora),
     ];
 
     await this.registrarAlertas(tenantId, alertas, agora);
@@ -497,6 +508,58 @@ export class OperationsRepository {
     await this.resolverAusentes(tenantId, ativos, agora);
 
     return { ativos: alertas.length };
+  }
+
+  /**
+   * Estado da operacao de SAUDE -- F22, Slice 3.6.
+   *
+   * Um objeto por TENANT: os alertas sao sobre a FILA e a TAXA, nao sobre um
+   * arquivo especifico. Coletar por importacao produziria um alarme por laudo
+   * pendente, e trinta alarmes iguais ensinam a operacao a fecha-los sem ler.
+   *
+   * A janela da taxa de rejeicao e de 7 DIAS: curta o bastante para a taxa
+   * refletir o modelo e o prompt de agora, longa o bastante para nao oscilar
+   * a cada analise numa academia com dez avaliacoes por semana.
+   */
+  private async coletarEstadoDeSaude(tenantId: string, agora: Date): Promise<EstadoDaSaude> {
+    const seteDiasAtras = new Date(agora.getTime() - 7 * 86_400_000);
+
+    const [pendentes, maisAntiga, falhas, analises, rejeitadas, gasto, ajustes] =
+      await Promise.all([
+        this.db.assessmentImport.count({ where: { tenantId, status: 'EXTRACTED' } }),
+        this.db.assessmentImport.findFirst({
+          where: { tenantId, status: 'EXTRACTED' },
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        }),
+        this.db.assessmentImport.count({
+          where: { tenantId, status: { in: ['FAILED', 'INFECTED'] } },
+        }),
+        this.db.aiAnalysis.count({ where: { tenantId, createdAt: { gte: seteDiasAtras } } }),
+        this.db.aiAnalysis.count({
+          where: { tenantId, status: 'REJECTED', createdAt: { gte: seteDiasAtras } },
+        }),
+        this.db.aiAnalysis.aggregate({
+          where: { tenantId, createdAt: { gte: seteDiasAtras } },
+          _sum: { costMicros: true },
+        }),
+        // O teto e parametro do CLIENTE (ADR-036 decisao 4). Ainda nao ha
+        // tela para configura-lo, entao ele e `null` -- e `null` DESLIGA o
+        // alerta, em vez de assumir um numero que ninguem combinou.
+        Promise.resolve(null),
+      ]);
+
+    void ajustes;
+
+    return {
+      importacoesPendentes: pendentes,
+      pendenteMaisAntiga: maisAntiga?.createdAt ?? null,
+      importacoesComFalha: falhas,
+      analisesNoPeriodo: analises,
+      analisesRejeitadas: rejeitadas,
+      gastoMicros: gasto._sum.costMicros ?? 0,
+      tetoMicros: null,
+    };
   }
 
   /**

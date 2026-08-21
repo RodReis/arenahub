@@ -6,10 +6,12 @@ import {
   avaliarDispositivo,
   avaliarEdge,
   avaliarFinanceiro,
+  avaliarSaude,
   avaliarSync,
   impressaoDigital,
   type EstadoDeSync,
   type EstadoDoFinanceiro,
+  type EstadoDaSaude,
   type EstadoDoDispositivo,
   type EstadoDoEdge,
 } from './alert-rules.js';
@@ -494,5 +496,201 @@ describe('avaliarFinanceiro', () => {
       expect(chaves).not.toContain('nome');
       expect(chaves).not.toContain('amount');
     }
+  });
+});
+
+describe('avaliarSaude -- operacao da Slice 3.6 (F22)', () => {
+  const AGORA = new Date('2026-08-21T12:00:00.000Z');
+
+  function estado(sobrescreve: Partial<EstadoDaSaude> = {}): EstadoDaSaude {
+    return {
+      importacoesPendentes: 0,
+      pendenteMaisAntiga: null,
+      importacoesComFalha: 0,
+      analisesNoPeriodo: 0,
+      analisesRejeitadas: 0,
+      gastoMicros: 0,
+      tetoMicros: null,
+      ...sobrescreve,
+    };
+  }
+
+  it('operacao saudavel nao gera alerta nenhum', () => {
+    expect(avaliarSaude(estado(), AGORA)).toEqual([]);
+  });
+
+  /**
+   * Nenhum alerta desta fatia e CRITICAL, e isso e deliberado: CRITICAL
+   * significa "a catraca nao esta funcionando agora". Laudo esperando revisao
+   * nao impede ninguem de treinar, e dar a ele o mesmo peso faria a operacao
+   * aprender a ignorar o vermelho.
+   */
+  it('nenhum alerta de saude e CRITICAL', () => {
+    const todos = avaliarSaude(
+      estado({
+        pendenteMaisAntiga: new Date('2026-08-01T12:00:00.000Z'),
+        importacoesPendentes: 3,
+        importacoesComFalha: 2,
+        analisesNoPeriodo: 10,
+        analisesRejeitadas: 9,
+        gastoMicros: 100,
+        tetoMicros: 100,
+      }),
+      AGORA,
+    );
+
+    expect(todos).toHaveLength(4);
+    expect(todos.every((a) => a.severidade !== 'CRITICAL')).toBe(true);
+    expect(todos.every((a) => a.recurso === 'HEALTH')).toBe(true);
+  });
+
+  describe('importacao esperando revisao', () => {
+    it('alerta quando a espera passa do limite', () => {
+      const alertas = avaliarSaude(
+        estado({
+          importacoesPendentes: 2,
+          pendenteMaisAntiga: new Date('2026-08-18T12:00:00.000Z'),
+        }),
+        AGORA,
+      );
+
+      expect(alertas).toHaveLength(1);
+      expect(alertas[0]).toMatchObject({
+        codigo: 'HEALTH_IMPORT_PENDING_REVIEW',
+        severidade: 'WARNING',
+      });
+      expect(alertas[0]!.evidencia['esperaEmHoras']).toBe(72);
+    });
+
+    it('nao alerta enquanto a espera e normal', () => {
+      // Revisar em algumas horas e o fluxo funcionando -- alertar ai seria
+      // acusar a operacao de estar trabalhando.
+      const alertas = avaliarSaude(
+        estado({
+          importacoesPendentes: 1,
+          pendenteMaisAntiga: new Date('2026-08-21T06:00:00.000Z'),
+        }),
+        AGORA,
+      );
+
+      expect(alertas).toEqual([]);
+    });
+
+    it('sem pendencia nao alerta', () => {
+      expect(avaliarSaude(estado({ importacoesPendentes: 0 }), AGORA)).toEqual([]);
+    });
+  });
+
+  describe('importacao com falha', () => {
+    it('alerta e diz para digitar a mao', () => {
+      const alertas = avaliarSaude(estado({ importacoesComFalha: 1 }), AGORA);
+
+      expect(alertas[0]!.codigo).toBe('HEALTH_IMPORT_FAILED');
+      // INV-140: o caminho manual sempre existiu, e a acao recomendada tem de
+      // dizer isso -- senao a recepcao fica esperando o OCR voltar.
+      expect(alertas[0]!.acaoRecomendada).toContain('a mao');
+    });
+
+    it('zero falhas nao alerta', () => {
+      expect(avaliarSaude(estado({ importacoesComFalha: 0 }), AGORA)).toEqual([]);
+    });
+  });
+
+  describe('taxa de rejeicao da IA (M3-AC-008)', () => {
+    /**
+     * Rejeicao isolada e o sistema FUNCIONANDO -- a regra no 8 recusando saida
+     * ruim. O que se vigia e a taxa.
+     */
+    it('nao alerta com poucas analises, mesmo com rejeicao alta', () => {
+      // 1 de 1 seria "100% de rejeicao" -- alarme no primeiro uso do recurso.
+      const alertas = avaliarSaude(
+        estado({ analisesNoPeriodo: 1, analisesRejeitadas: 1 }),
+        AGORA,
+      );
+
+      expect(alertas).toEqual([]);
+    });
+
+    it('alerta quando a taxa passa do limite com amostra suficiente', () => {
+      const alertas = avaliarSaude(
+        estado({ analisesNoPeriodo: 10, analisesRejeitadas: 4 }),
+        AGORA,
+      );
+
+      expect(alertas[0]).toMatchObject({ codigo: 'HEALTH_AI_REJECTION_RATE_HIGH' });
+      expect(alertas[0]!.evidencia['taxaPercentual']).toBe(40);
+    });
+
+    it('taxa dentro do aceitavel nao alerta', () => {
+      // 2 de 10 = 20%, abaixo dos 30%: rejeicao existe e e saudavel.
+      expect(
+        avaliarSaude(estado({ analisesNoPeriodo: 10, analisesRejeitadas: 2 }), AGORA),
+      ).toEqual([]);
+    });
+  });
+
+  describe('teto de gasto (M3-NFR-005, ADR-036 decisao 4)', () => {
+    /**
+     * Teto NAO configurado e o padrao hoje. Inventar um numero cortaria a
+     * analise de uma academia que nunca combinou limite nenhum.
+     */
+    it('sem teto configurado NAO alerta, por mais que gaste', () => {
+      expect(
+        avaliarSaude(estado({ gastoMicros: 999_999, tetoMicros: null }), AGORA),
+      ).toEqual([]);
+    });
+
+    it('alerta ANTES de estourar', () => {
+      const alertas = avaliarSaude(
+        estado({ gastoMicros: 85, tetoMicros: 100 }),
+        AGORA,
+      );
+
+      expect(alertas[0]).toMatchObject({ codigo: 'HEALTH_AI_BUDGET_NEAR_LIMIT' });
+      expect(alertas[0]!.evidencia['estourou']).toBe(false);
+      // Avisar antes da tempo de decidir; avisar depois faz a academia
+      // descobrir pelo aluno reclamando que o resumo sumiu.
+      expect(alertas[0]!.impacto).toContain('perto do teto');
+    });
+
+    it('estourado, o impacto muda de tom', () => {
+      const alertas = avaliarSaude(
+        estado({ gastoMicros: 120, tetoMicros: 100 }),
+        AGORA,
+      );
+
+      expect(alertas[0]!.evidencia['estourou']).toBe(true);
+      expect(alertas[0]!.impacto).toContain('degradada');
+    });
+
+    it('gasto folgado nao alerta', () => {
+      expect(avaliarSaude(estado({ gastoMicros: 10, tetoMicros: 100 }), AGORA)).toEqual([]);
+    });
+
+    it('teto zero nao divide por zero', () => {
+      expect(avaliarSaude(estado({ gastoMicros: 10, tetoMicros: 0 }), AGORA)).toEqual([]);
+    });
+  });
+
+  describe('todo alerta e acionavel', () => {
+    it('declara impacto e acao, nunca so o diagnostico', () => {
+      const todos = avaliarSaude(
+        estado({
+          pendenteMaisAntiga: new Date('2026-08-01T12:00:00.000Z'),
+          importacoesComFalha: 1,
+          analisesNoPeriodo: 10,
+          analisesRejeitadas: 9,
+          gastoMicros: 100,
+          tetoMicros: 100,
+        }),
+        AGORA,
+      );
+
+      for (const alerta of todos) {
+        // "Sem impacto declarado" e como um alerta vira ruido.
+        expect(alerta.impacto.length).toBeGreaterThan(20);
+        expect(alerta.acaoRecomendada.length).toBeGreaterThan(20);
+      }
+    });
   });
 });
