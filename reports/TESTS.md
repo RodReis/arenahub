@@ -40,5 +40,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-20 | #134 | F50 | integração | 450 | 440 | 0 | 85.5 | #135 |
 | 2026-08-21 | #18 | SPEC-018 | unitário | 1120 | 1120 | 0 | 92.3 | [#138](https://github.com/RodReis/arenahub/pull/138) |
 | 2026-08-21 | #18 | SPEC-018 | integração | 472 | 472 | 0 | 85.5 | [#138](https://github.com/RodReis/arenahub/pull/138) |
-| 2026-08-21 | #129 | FIX | unitário | 1129 | 1129 | 0 | 92.3 | — |
-| 2026-08-21 | #129 | FIX | integração | 472 | 472 | 0 | 85.5 | — |
+| 2026-08-21 | #129 | FIX | unitário | 1129 | 1129 | 0 | 92.3 | [#140](https://github.com/RodReis/arenahub/pull/140) |
+| 2026-08-21 | #129 | FIX | integração | 472 | 472 | 0 | 85.5 | [#140](https://github.com/RodReis/arenahub/pull/140) |
