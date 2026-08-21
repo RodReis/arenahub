@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { PERIODOS, inicioDoPeriodo, type Periodo } from './periodo.js';
+import { PERIODOS, dataLocalIso, inicioDoPeriodo, type Periodo } from './periodo.js';
 
 /**
  * F18 -- filtro de periodo do grafico (`M3-FR-008`: 30D, 90D, 6M, 1A e todo
@@ -21,6 +21,35 @@ const AGORA = new Date('2026-08-20T15:00:00.000Z');
 describe('PERIODOS', () => {
   it('cobre exatamente os cinco periodos do M3-FR-008', () => {
     expect([...PERIODOS]).toEqual(['30D', '90D', '6M', '1Y', 'ALL']);
+  });
+});
+
+/**
+ * `dataLocalIso` existe porque o painel NAO pode formatar data por conta
+ * propria (regra 5 de lint). Se ela errar o fuso, o eixo do grafico carimba a
+ * medicao de ontem como hoje -- exatamente o bug que aquela regra evita.
+ */
+describe('dataLocalIso', () => {
+  it('devolve a data local em AAAA-MM-DD', () => {
+    expect(dataLocalIso(new Date('2026-06-10T12:00:00.000Z'), SP)).toBe('2026-06-10');
+  });
+
+  it('usa o fuso da unidade, nao UTC', () => {
+    // 02:00 UTC ainda e o dia ANTERIOR em Sao Paulo (UTC-3).
+    expect(dataLocalIso(new Date('2026-06-10T02:00:00.000Z'), SP)).toBe('2026-06-09');
+  });
+
+  it('fusos diferentes dao dias diferentes para o mesmo instante', () => {
+    const instante = new Date('2026-06-10T02:00:00.000Z');
+
+    expect(dataLocalIso(instante, SP)).toBe('2026-06-09');
+    expect(dataLocalIso(instante, 'Europe/Lisbon')).toBe('2026-06-10');
+  });
+
+  it('preenche mes e dia com zero a esquerda', () => {
+    // Janeiro e onde codigo de data costuma errar: `1` em vez de `01` faria o
+    // recorte do eixo devolver "/1" no painel.
+    expect(dataLocalIso(new Date('2026-01-05T12:00:00.000Z'), SP)).toBe('2026-01-05');
   });
 });
 

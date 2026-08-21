@@ -51,6 +51,24 @@ function dataLocal(instante: Date, fuso: string): { ano: number; mes: number; di
   return { ano: buscar('year'), mes: buscar('month'), dia: buscar('day') };
 }
 
+/**
+ * A DATA local de um instante, como `AAAA-MM-DD`.
+ *
+ * Serve ao rotulo do eixo do grafico: o painel nao pode formatar data por
+ * conta propria (regra 5 de lint reserva isso ao `TenantDateTime`, que
+ * renderiza `<time>` e nao cabe dentro de um SVG), entao o servidor -- que ja
+ * conhece o fuso da unidade -- entrega o dia pronto.
+ *
+ * `en-CA` porque o locale canadense JA formata em `AAAA-MM-DD`: montar a
+ * string por concatenacao exigiria zero-padding manual, que e onde este tipo
+ * de codigo costuma errar em janeiro.
+ */
+export function dataLocalIso(instante: Date, fuso: string): string {
+  const { ano, mes, dia } = dataLocal(instante, fuso);
+
+  return `${String(ano).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+
 /** Ultimo dia do mes -- fevereiro tem 28 ou 29, e nenhum mes tem 31 sempre. */
 function ultimoDiaDoMes(ano: number, mes: number): number {
   return new Date(Date.UTC(ano, mes, 0)).getUTCDate();

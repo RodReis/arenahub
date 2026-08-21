@@ -17,6 +17,7 @@ export { Button } from './components/Button.js';
 export { ConsentCard } from './components/ConsentCard.js';
 export { DataFreshness } from './components/DataFreshness.js';
 export { BarrasDeFaixa, type FaixaDeBarra } from './components/BarrasDeFaixa.js';
+export { SerieDeMedidas, type PontoDaSerie } from './components/SerieDeMedidas.js';
 export { DataTable, type Column, type ColumnRole } from './components/DataTable.js';
 export { Identidade, iniciaisDe } from './components/Identidade.js';
 export { Telefone, formatarTelefone } from './components/Telefone.js';

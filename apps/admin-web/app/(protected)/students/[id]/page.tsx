@@ -458,6 +458,11 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               Financeiro e cobranças
             </a>
           </li>
+          <li>
+            <a href={`/students/${aluno.id}/health`} data-testid="link-evolucao">
+              Evolução corporal
+            </a>
+          </li>
         </ul>
       </section>
     </section>

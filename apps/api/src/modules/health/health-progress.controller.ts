@@ -16,7 +16,7 @@ import { StudentRepository } from '../students/student.repository.js';
 import { GoalRepository } from './goal.repository.js';
 import { HealthProgressService, type ComparativoDeTipo } from './health-progress.service.js';
 import { converterParaCanonica, type TipoDeMedida, type UnidadeDeMedida } from './domain/medida.js';
-import { PERIODOS, ehPeriodo, type Periodo } from './domain/periodo.js';
+import { PERIODOS, dataLocalIso, ehPeriodo, type Periodo } from './domain/periodo.js';
 import type { Variacao } from './domain/comparativo.js';
 
 /**
@@ -98,6 +98,19 @@ interface VariacaoDto {
 interface PontoDto {
   assessmentId: string;
   assessedAt: string;
+  /**
+   * A DATA local da medição (`AAAA-MM-DD`), no fuso da unidade.
+   *
+   * Existe porque o eixo do gráfico precisa de uma STRING dentro do SVG, e a
+   * regra 5 de lint do painel reserva a formatação de data ao componente
+   * `TenantDateTime` (que renderiza `<time>`, impossível ali). Em vez de
+   * abrir exceção na lint, o servidor -- que já conhece o fuso -- entrega o
+   * dia pronto.
+   *
+   * `assessedAt` continua sendo o instante UTC completo: quem precisa de hora
+   * ou de outro formato usa ele com `TenantDateTime`.
+   */
+  assessedAtLocal: string;
   value: number;
 }
 
@@ -170,7 +183,7 @@ export class HealthProgressController {
       studentId,
       period: historico.periodo,
       timezone: historico.fuso,
-      measurements: historico.tipos.map(paraComparativoDto),
+      measurements: historico.tipos.map((tipo) => paraComparativoDto(tipo, historico.fuso)),
     };
   }
 
@@ -278,22 +291,23 @@ function paraVariacaoDto(variacao: Variacao): VariacaoDto {
   };
 }
 
-function pontoDto(ponto: { id: string; assessedAt: Date; valor: number }): PontoDto {
+function pontoDto(ponto: { id: string; assessedAt: Date; valor: number }, fuso: string): PontoDto {
   return {
     assessmentId: ponto.id,
     assessedAt: ponto.assessedAt.toISOString(),
+    assessedAtLocal: dataLocalIso(ponto.assessedAt, fuso),
     value: ponto.valor,
   };
 }
 
-function paraComparativoDto(comparativo: ComparativoDeTipo): ComparativoDto {
+function paraComparativoDto(comparativo: ComparativoDeTipo, fuso: string): ComparativoDto {
   const ponto = (p: { id: string; assessedAt: Date; valor: number } | null): PontoDto | null =>
-    p === null ? null : pontoDto(p);
+    p === null ? null : pontoDto(p, fuso);
 
   return {
     type: comparativo.type,
     unit: comparativo.unidade,
-    points: comparativo.comparativo.pontos.map(pontoDto),
+    points: comparativo.comparativo.pontos.map((p) => pontoDto(p, fuso)),
     first: ponto(comparativo.comparativo.primeira),
     previous: ponto(comparativo.comparativo.anterior),
     current: ponto(comparativo.comparativo.atual),
