@@ -134,8 +134,8 @@ export const UNIDADES_DE_MEDIDA: readonly UnidadeDeMedida[] = [
  * Massa em `kg`, comprimento em `cm`: sao as unidades que o aparelho da
  * academia ja usa, entao o caso comum nao converte nada.
  *
- * `VISCERAL_FAT_LEVEL` e adimensional (indice do aparelho, 1 a 59) e por
- * isso nao aparece aqui -- ver `TIPOS_ADIMENSIONAIS`.
+ * Tres tipos ficam com `null` por serem adimensionais -- indice do aparelho,
+ * razao e contagem por minuto. Ver `TIPOS_ADIMENSIONAIS`.
  */
 export const UNIDADE_CANONICA: Readonly<Record<TipoDeMedida, UnidadeDeMedida | null>> = {
   WEIGHT: 'kg',
@@ -204,7 +204,16 @@ const EQUIVALENTES: Readonly<Record<string, readonly UnidadeDeMedida[]>> = {
   kg: ['L'],
 };
 
-/** Tipos sem unidade: indice adimensional do proprio aparelho. */
+/**
+ * Tipos sem unidade do enum `UnidadeDeMedida`, por tres razoes distintas:
+ *
+ * - `VISCERAL_FAT_LEVEL` e indice adimensional do aparelho (1 a 59);
+ * - `WAIST_HIP_RATIO` e razao entre dois comprimentos -- a unidade se cancela;
+ * - `HEART_RATE` e contagem por minuto, grandeza que o enum nao modela.
+ *
+ * O que os tres tem em comum e so o efeito: `converterParaCanonica` nao
+ * multiplica por fator nenhum e guarda o valor como veio.
+ */
 const TIPOS_ADIMENSIONAIS: ReadonlySet<TipoDeMedida> = new Set([
   'VISCERAL_FAT_LEVEL',
   'WAIST_HIP_RATIO',
