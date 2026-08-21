@@ -15,7 +15,8 @@ import { chamarApi } from '../../lib/api/server-client';
  */
 const esquemaDeJanela = z.object({
   gymUnitId: z.string().uuid(),
-  dayOfWeek: z.coerce.number().int().min(1).max(7),
+  // 0 = domingo ... 6 = sabado -- eixo do motor de decisao. Ver #129.
+  dayOfWeek: z.coerce.number().int().min(0).max(6),
   startMinute: z.coerce.number().int().min(0).max(1440),
   endMinute: z.coerce.number().int().min(0).max(1440),
 });

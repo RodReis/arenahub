@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { evaluateAccess } from './evaluate-access.js';
+import { resolverHoraLocal } from './local-time.js';
 import {
   POLICY_VERSION,
   type AccessPolicyInput,
@@ -432,5 +433,83 @@ describe('evaluateAccess -- dado corrompido nunca vira ALLOW', () => {
     );
 
     expect(resultado).toMatchObject({ outcome: 'DENY', reason: 'NO_ENTITLEMENT' });
+  });
+});
+
+/**
+ * OS SETE DIAS, ponta a ponta -- #129.
+ *
+ * O defeito que este bloco existe para impedir: quem gravava a janela usava
+ * ISO-8601 (`1 = segunda ... 7 = domingo`) e quem decide le `Date.getDay()`
+ * (`0 = domingo ... 6 = sabado`). De segunda a sabado os eixos coincidem, e
+ * a suite inteira passava. So o DOMINGO divergia -- e negava todo aluno
+ * cadastrado pelo caminho normal da API, com `OUTSIDE_SCHEDULE`.
+ *
+ * O teste roda `resolverHoraLocal` de verdade em vez de fixar
+ * `localDayOfWeek` na mao, porque a mao e exatamente onde o eixo errado se
+ * esconde: fixar o numero testaria o motor contra a suposicao do autor do
+ * teste, e nao contra o que o relogio produz. Sete datas reais, uma por dia
+ * da semana, convertidas pelo mesmo caminho da producao.
+ */
+describe('evaluateAccess -- eixo de dayOfWeek nos sete dias (#129)', () => {
+  // Semana de 16 a 22/08/2026: domingo a sabado. 15:00Z = 12:00 em Sao Paulo.
+  const SEMANA = [
+    { rotulo: 'domingo', instante: '2026-08-16T15:00:00.000Z', esperado: 0 },
+    { rotulo: 'segunda', instante: '2026-08-17T15:00:00.000Z', esperado: 1 },
+    { rotulo: 'terca', instante: '2026-08-18T15:00:00.000Z', esperado: 2 },
+    { rotulo: 'quarta', instante: '2026-08-19T15:00:00.000Z', esperado: 3 },
+    { rotulo: 'quinta', instante: '2026-08-20T15:00:00.000Z', esperado: 4 },
+    { rotulo: 'sexta', instante: '2026-08-21T15:00:00.000Z', esperado: 5 },
+    { rotulo: 'sabado', instante: '2026-08-22T15:00:00.000Z', esperado: 6 },
+  ] as const;
+
+  it.each(SEMANA)(
+    'libera $rotulo quando a janela do dia esta gravada no eixo do motor',
+    ({ instante, esperado }) => {
+      const local = resolverHoraLocal(instante, 'America/Sao_Paulo');
+
+      // O elo que ninguem testava junto: o dia que o relogio produz tem de
+      // ser o mesmo numero que a janela gravada carrega.
+      expect(local.dayOfWeek).toBe(esperado);
+
+      const janelaDoDia: AccessWindow = {
+        dayOfWeek: esperado,
+        startMinute: 6 * 60,
+        endMinute: 22 * 60,
+      };
+
+      const resultado = evaluateAccess(
+        entrada({
+          evaluatedAt: instante,
+          localDayOfWeek: local.dayOfWeek,
+          localMinuteOfDay: local.minuteOfDay,
+          entitlements: [entitlement({ windows: [janelaDoDia] })],
+        }),
+      );
+
+      expect(resultado).toMatchObject({ outcome: 'ALLOW', reason: 'ACTIVE_ENTITLEMENT' });
+    },
+  );
+
+  /**
+   * A REGRESSAO EXATA, escrita como o defeito acontecia: janela de domingo
+   * gravada no eixo ISO (`7`), avaliada num domingo real. Antes da correcao
+   * isto era o comportamento de producao para toda a base.
+   */
+  it('nega domingo quando a janela foi gravada em ISO (7) -- o defeito do #129', () => {
+    const local = resolverHoraLocal('2026-08-16T15:00:00.000Z', 'America/Sao_Paulo');
+
+    const resultado = evaluateAccess(
+      entrada({
+        evaluatedAt: '2026-08-16T15:00:00.000Z',
+        localDayOfWeek: local.dayOfWeek,
+        localMinuteOfDay: local.minuteOfDay,
+        entitlements: [
+          entitlement({ windows: [{ dayOfWeek: 7, startMinute: 6 * 60, endMinute: 22 * 60 }] }),
+        ],
+      }),
+    );
+
+    expect(resultado).toMatchObject({ outcome: 'DENY', reason: 'OUTSIDE_SCHEDULE' });
   });
 });

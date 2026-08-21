@@ -28,6 +28,9 @@ interface LinhaDeJanela {
 
 const ESTADO_INICIAL: EstadoDoPlano = {};
 
+// `valor` é o eixo do motor de decisão: 0 = domingo ... 6 = sábado (#129).
+// A ordem de exibição começa na segunda porque é assim que a recepção lê uma
+// grade de horário -- o domingo fica no fim da lista, com o valor 0.
 const DIAS = [
   { valor: '1', rotulo: 'Segunda' },
   { valor: '2', rotulo: 'Terça' },
@@ -35,7 +38,7 @@ const DIAS = [
   { valor: '4', rotulo: 'Quinta' },
   { valor: '5', rotulo: 'Sexta' },
   { valor: '6', rotulo: 'Sábado' },
-  { valor: '7', rotulo: 'Domingo' },
+  { valor: '0', rotulo: 'Domingo' },
 ];
 
 function BotaoDePlano() {

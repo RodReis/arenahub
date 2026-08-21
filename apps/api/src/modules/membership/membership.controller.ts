@@ -15,7 +15,8 @@ import {
 const janela = z
   .object({
     gymUnitId: z.uuid(),
-    dayOfWeek: z.number().int().min(1).max(7),
+    // 0 = domingo ... 6 = sabado -- eixo do motor de decisao. Ver #129.
+    dayOfWeek: z.number().int().min(0).max(6),
     startMinute: z.number().int().min(0).max(MINUTOS_POR_DIA),
     endMinute: z.number().int().min(0).max(MINUTOS_POR_DIA),
   })

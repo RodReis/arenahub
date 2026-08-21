@@ -31,9 +31,20 @@ describe('validarJanelas', () => {
     expect(validadas.map((j) => j.dayOfWeek)).toEqual([1, 3]);
   });
 
-  it('recusa dia da semana fora de 1..7', () => {
-    expect(() => validarJanelas([janela(0, 480, 720)])).toThrow(JanelaDeAcessoInvalidaError);
-    expect(() => validarJanelas([janela(8, 480, 720)])).toThrow(JanelaDeAcessoInvalidaError);
+  it('recusa dia da semana fora de 0..6', () => {
+    expect(() => validarJanelas([janela(-1, 480, 720)])).toThrow(JanelaDeAcessoInvalidaError);
+    expect(() => validarJanelas([janela(7, 480, 720)])).toThrow(JanelaDeAcessoInvalidaError);
+  });
+
+  /**
+   * O `7` recusado acima e o ISO-8601 de DOMINGO, e recusa-lo e o ponto
+   * (#129): enquanto a validacao aceitava 1..7, o domingo entrava como `7`,
+   * o motor procurava por `0` e negava todo mundo com `OUTSIDE_SCHEDULE`.
+   * Aceitar `7` de novo faz este teste falhar antes de alguem descobrir na
+   * porta da academia.
+   */
+  it('aceita domingo como 0, o eixo do motor de decisao', () => {
+    expect(validarJanelas([janela(0, 480, 720)]).map((j) => j.dayOfWeek)).toEqual([0]);
   });
 
   it('recusa janela de duracao zero', () => {

@@ -280,25 +280,23 @@ type SnapshotDePolitica = {
  * O EIXO DE `dayOfWeek` E 0..6 (DOMINGO = 0). NAO "CORRIJA" PARA ISO 1..7.
  * ---------------------------------------------------------------------------
  *
- * Existem dois eixos em uso no repositorio, e eles divergem:
+ * `0 = domingo ... 6 = sabado`, o eixo de `Date.getDay()` que o MOTOR DE
+ * DECISAO consome: `resolverHoraLocal` mapeia `Sun: 0` em
+ * `packages/access-policy/src/local-time.ts`, e `AccessWindow.dayOfWeek` em
+ * `types.ts` documenta o mesmo. O eixo e do motor porque e o motor que decide
+ * se a porta abre.
  *
- *   - O SCHEMA documenta ISO-8601 (`1 = segunda ... 7 = domingo`).
- *   - O MOTOR DE DECISAO consome `Date.getDay()` (`0 = domingo ... 6 =
- *     sabado`): `resolverHoraLocal` mapeia `Sun: 0` em
- *     `packages/access-policy/src/local-time.ts`, e `AccessWindow.dayOfWeek`
- *     em `types.ts` documenta o mesmo eixo.
+ * HISTORICO, que explica por que este bloco existe: quando a F48 foi escrita,
+ * o resto do sistema gravava ISO-8601 (`1 = segunda ... 7 = domingo`) e so o
+ * motor lia 0..6. A F48 seguiu o motor de proposito e deixou a divergencia
+ * para um card proprio -- a #129, fechada em 21/08/2026, que unificou todo o
+ * repositorio neste eixo e travou a faixa por CHECK no banco.
  *
- * A F48 SEGUE O MOTOR, porque e o motor que decide se a porta abre. Gravar
- * ISO aqui produz um defeito que so aparece no DOMINGO: de segunda a sabado
- * os dois eixos coincidem (1..6 existe nos dois), entao a semana inteira
- * funciona por coincidencia; no domingo o motor calcula `0`, a linha gravada
- * diz `7`, nenhuma janela casa e a decisao vira `DENY` / `OUTSIDE_SCHEDULE`
- * para as ~340 pessoas de uma vez.
- *
- * A divergencia no RESTO do sistema (o caminho normal da API grava o mesmo
- * eixo ISO) e CONHECIDA, e PRE-EXISTENTE a esta fatia e tem card proprio --
- * consertar `plan.ts` / `membership.controller.ts` aqui esta explicitamente
- * fora do escopo da F48 (ruling do PI). Nao unifique por conta propria.
+ * Entao NAO existe mais divergencia a preservar aqui: este bloco continua
+ * como aviso porque ISO 1..7 e a convencao mais comum em outros sistemas, e
+ * "consertar" para ela produz um defeito que so aparece no DOMINGO -- de
+ * segunda a sabado os eixos coincidem (1..6 existe nos dois) e a semana
+ * inteira funciona por coincidencia.
  *
  * Ha teste que prova este eixo perguntando ao motor de verdade, num DOMINGO,
  * se a porta abre (`test/import-ativos.int-spec.ts`).
