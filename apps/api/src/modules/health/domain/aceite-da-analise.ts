@@ -66,6 +66,15 @@ export function avaliarAceite(
     return { autorizado: false, motivo: 'AI_CONSENT_MISSING_STUDENT' };
   }
 
+  // Recusa vem logo depois da existencia, como em `avaliarConsentimento`
+  // (F8): quem disse NAO ja decidiu, e nenhuma checagem posterior --
+  // documento aposentado, virada dos 18, ordem das assinaturas -- pode
+  // transformar isso em autorizacao. Sem este ramo a decisao era LIDA e
+  // ignorada, e a analise rodava sobre dado de saude de quem recusou.
+  if (aluno.decisao === 'REFUSED') {
+    return { autorizado: false, motivo: 'AI_CONSENT_REFUSED_STUDENT' };
+  }
+
   if (aluno.documentoAposentadoEm !== null) {
     return { autorizado: false, motivo: 'AI_CONSENT_DOCUMENT_RETIRED' };
   }
@@ -81,6 +90,10 @@ export function avaliarAceite(
 
   if (professor === null) {
     return { autorizado: false, motivo: 'AI_CONSENT_MISSING_PROFESSIONAL' };
+  }
+
+  if (professor.decisao === 'REFUSED') {
+    return { autorizado: false, motivo: 'AI_CONSENT_REFUSED_PROFESSIONAL' };
   }
 
   if (professor.documentoAposentadoEm !== null) {
