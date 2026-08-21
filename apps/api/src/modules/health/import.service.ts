@@ -201,6 +201,11 @@ export class ImportService {
     }
   }
 
+  /** A fila de importacoes que precisam de atencao -- painel da F22. */
+  async fila(contexto: TenantContext) {
+    return this.importacoes.pendentesEFalhas(contexto);
+  }
+
   /** A importacao com os campos em ORDEM DE REVISAO -- menor confianca antes. */
   async detalhar(contexto: TenantContext, importId: string): Promise<ImportacaoComCampos> {
     const importacao = await this.importacoes.encontrar(contexto, importId);

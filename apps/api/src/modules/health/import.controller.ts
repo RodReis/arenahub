@@ -133,6 +133,42 @@ export class ImportController {
     };
   }
 
+  /**
+   * Fila de importacoes que precisam de atencao -- o painel da F22.
+   *
+   * `EXTRACTED` (esperando revisao), `FAILED` e `INFECTED` num lugar so:
+   * quem opera a recepcao age sobre as tres da mesma tela, e separar em
+   * abas produziria uma aba que ninguem abre.
+   *
+   * Rota ANTES de `assessment-imports/:id` de proposito: registrada depois,
+   * o Nest casaria `pending` como um `:id` e a fila responderia 404.
+   */
+  @Get('assessment-imports/pending')
+  @RequirePermissions('health.read')
+  async fila(): Promise<
+    {
+      id: string;
+      studentId: string;
+      status: string;
+      originalFilename: string;
+      failureReason: string | null;
+      pendingFields: number;
+      createdAt: string;
+    }[]
+  > {
+    const fila = await this.importacoes.fila(this.contexto.require());
+
+    return fila.map((linha) => ({
+      id: linha.id,
+      studentId: linha.studentId,
+      status: linha.status,
+      originalFilename: linha.originalFilename,
+      failureReason: linha.failureReason,
+      pendingFields: linha.camposPendentes,
+      createdAt: linha.createdAt.toISOString(),
+    }));
+  }
+
   @Get('assessment-imports/:id')
   @RequirePermissions('health.read')
   async detalhar(@Param('id') importId: string): Promise<ImportacaoDto> {

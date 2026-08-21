@@ -617,4 +617,99 @@ describe('F19 -- upload e revisao', () => {
       expect(resposta.status).toBe(404);
     });
   });
+
+  /**
+   * F22 -- Slice 3.6: a operacao ve o que precisa de atencao.
+   *
+   * Fica NESTE arquivo porque a fila e alimentada pelo fluxo de upload que os
+   * blocos acima exercitam: um spec separado teria de recriar tudo isso so
+   * para ter o que listar.
+   */
+  describe('F22 -- painel de importacoes (Slice 3.6)', () => {
+    it('lista pendentes e falhas na MESMA fila', async () => {
+      const aluno = await criarAluno(contas.a);
+
+      await enviar(contas.a, aluno, Buffer.from(CSV), 'ok.csv', 'text/csv');
+
+      ocr.programarFalha(new ErroDeExtracao('EXTRACTOR_UNAVAILABLE', true, 'fora'));
+      await enviar(contas.a, aluno, PDF, 'falha.pdf', 'application/pdf');
+      ocr.resetar();
+
+      const resposta = await request(servidor())
+        .get('/api/v1/assessment-imports/pending')
+        .set('Cookie', contas.a.cookie);
+
+      expect(resposta.status).toBe(200);
+
+      const fila = resposta.body as { status: string; originalFilename: string }[];
+      const nomes = fila.map((l) => l.originalFilename);
+
+      // Quem age sobre as duas e a mesma pessoa -- separar em abas produziria
+      // uma aba que ninguem abre.
+      expect(nomes).toContain('ok.csv');
+      expect(nomes).toContain('falha.pdf');
+    });
+
+    it('a fila diz QUANTOS campos faltam revisar', async () => {
+      const aluno = await criarAluno(contas.a);
+      const envio = await enviar(contas.a, aluno, Buffer.from(CSV), 'dois.csv', 'text/csv');
+      const importId = (envio.body as { id: string }).id;
+
+      const antes = await request(servidor())
+        .get('/api/v1/assessment-imports/pending')
+        .set('Cookie', contas.a.cookie);
+
+      const linha = (antes.body as { id: string; pendingFields: number }[]).find(
+        (l) => l.id === importId,
+      );
+      expect(linha?.pendingFields).toBe(2);
+
+      const importacao = await detalhar(contas.a, importId);
+      await revisar(contas.a, importId, importacao.fields[0]!.id, { state: 'CONFIRMED' });
+
+      const depois = await request(servidor())
+        .get('/api/v1/assessment-imports/pending')
+        .set('Cookie', contas.a.cookie);
+
+      const atualizada = (depois.body as { id: string; pendingFields: number }[]).find(
+        (l) => l.id === importId,
+      );
+      expect(atualizada?.pendingFields).toBe(1);
+    });
+
+    it('importacao CONFIRMADA sai da fila', async () => {
+      const aluno = await criarAluno(contas.a);
+      const envio = await enviar(contas.a, aluno, Buffer.from(CSV), 'sai.csv', 'text/csv');
+      const importId = (envio.body as { id: string }).id;
+      const importacao = await detalhar(contas.a, importId);
+
+      for (const campo of importacao.fields) {
+        await revisar(contas.a, importId, campo.id, { state: 'CONFIRMED' });
+      }
+
+      await confirmar(contas.a, importId);
+
+      const resposta = await request(servidor())
+        .get('/api/v1/assessment-imports/pending')
+        .set('Cookie', contas.a.cookie);
+
+      const ids = (resposta.body as { id: string }[]).map((l) => l.id);
+
+      // Fila que nao esvazia e fila que a operacao aprende a ignorar.
+      expect(ids).not.toContain(importId);
+    });
+
+    it('a fila da academia B nao mostra importacao da academia A', async () => {
+      const aluno = await criarAluno(contas.a);
+      const envio = await enviar(contas.a, aluno, Buffer.from(CSV), 'a.csv', 'text/csv');
+
+      const resposta = await request(servidor())
+        .get('/api/v1/assessment-imports/pending')
+        .set('Cookie', contas.b.cookie);
+
+      const ids = (resposta.body as { id: string }[]).map((l) => l.id);
+
+      expect(ids).not.toContain((envio.body as { id: string }).id);
+    });
+  });
 });
