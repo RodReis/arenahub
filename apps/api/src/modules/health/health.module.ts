@@ -9,6 +9,8 @@ import { AssessmentRepository } from './assessment.repository.js';
 import { AttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
 import { AiAnalysisController } from './ai-analysis.controller.js';
+import { BodyEvolutionController } from './body-evolution.controller.js';
+import { BodyEvolutionService } from './body-evolution.service.js';
 import { ImportController } from './import.controller.js';
 import { ImportRepository } from './import.repository.js';
 import { ImportService } from './import.service.js';
@@ -51,6 +53,7 @@ import { HealthProgressService } from './health-progress.service.js';
   controllers: [
     AssessmentController,
     HealthProgressController,
+    BodyEvolutionController,
     AiAnalysisController,
     ImportController,
   ],
@@ -58,6 +61,7 @@ import { HealthProgressService } from './health-progress.service.js';
     AssessmentRepository,
     AttendanceRepository,
     AttendanceService,
+    BodyEvolutionService,
     AiAnalysisRepository,
     AiAnalysisService,
     ImportRepository,

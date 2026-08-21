@@ -13,40 +13,21 @@ import {
 } from './domain/contexto-de-saude.js';
 import {
   converterParaCanonica,
+  // As listas vivem no DOMINIO desde a F19 (`domain/medida.ts`): tres
+  // consumidores precisavam delas em runtime e cada um mantinha a propria
+  // copia. Esta copia LOCAL ficou parada em 15 tipos quando a fatia
+  // multiarquivo acrescentou os 10 segmentares -- achado ao escrever o
+  // teste de integracao da Task 8, que tentou gravar
+  // `SEGMENTAL_FAT_MASS_TRUNK` e levou 400 (`VALIDATION_FAILED`): o Zod
+  // recusava um tipo que o proprio dominio ja aceitava havia uma fatia.
+  // `health-progress.controller.ts` ja importa a lista do dominio; esta e
+  // a ultima copia divergente.
+  TIPOS_DE_MEDIDA as TIPOS,
+  UNIDADES_DE_MEDIDA as UNIDADES,
   type MedidaCanonica,
   type TipoDeMedida,
   type UnidadeDeMedida,
 } from './domain/medida.js';
-
-const TIPOS: readonly TipoDeMedida[] = [
-  'WEIGHT',
-  'HEIGHT',
-  'BODY_FAT_PERCENT',
-  'BODY_FAT_MASS',
-  'LEAN_BODY_MASS',
-  'SKELETAL_MUSCLE_MASS',
-  'TOTAL_BODY_WATER',
-  'INTRACELLULAR_WATER',
-  'EXTRACELLULAR_WATER',
-  'PROTEIN_MASS',
-  'MINERAL_MASS',
-  'VISCERAL_FAT_LEVEL',
-  'BASAL_METABOLIC_RATE',
-  'WAIST_CIRCUMFERENCE',
-  'HIP_CIRCUMFERENCE',
-];
-
-const UNIDADES: readonly UnidadeDeMedida[] = [
-  'kg',
-  'g',
-  'lb',
-  'cm',
-  'm',
-  'in',
-  'percent',
-  'kcal',
-  'L',
-];
 
 /**
  * Medida como o avaliador digitou.
