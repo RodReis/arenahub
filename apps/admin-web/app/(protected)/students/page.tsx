@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import {
+  AcoesDaLinha,
   Button,
   DataTable,
   EmptyState,
@@ -12,16 +13,12 @@ import {
   PageHeader,
   ProblemDetail,
   StateBadge,
-  TenantDateTime,
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { BotaoDeLiberacao } from './botao-de-liberacao';
 import { FiltroDeAlunos } from './filtro-de-alunos';
 import estilos from './students.module.css';
-
-/** Fuso FIXO, preservado de `dataLegivel` -- mesma divida das outras telas. */
-const FUSO_PROVISORIO = 'America/Sao_Paulo';
 
 export const metadata: Metadata = {
   title: 'Alunos — ArenaHub',
@@ -351,15 +348,6 @@ export default async function PaginaDeAlunos({
             render: (aluno) => <Telefone numero={aluno.phone} />,
           },
           {
-            key: 'nascimento',
-            sortKey: 'nascimento',
-            header: 'Nascimento',
-            role: 'moment',
-            render: (aluno) => (
-              <TenantDateTime iso={aluno.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
-            ),
-          },
-          {
             key: 'situacao',
             header: 'Situação',
             role: 'state',
@@ -370,14 +358,27 @@ export default async function PaginaDeAlunos({
             header: '',
             role: 'actions',
             /*
-              SÓ para BLOCKED -- issue #118. É o status que o job de
-              inadimplência aplica (M2-BR-007): cobre quem foi bloqueado por
-              atraso, sem oferecer "liberação financeira" para os 1.926
-              alunos importados da #118 (CANCELLED, sem cobrança real) nem
-              para cancelamento por outro motivo.
+              Bioimpedância abre a evolução corporal do aluno, de onde se
+              chega às sessões de revisão. Fica na grid porque a academia
+              mede TODO MÊS: sem o atalho, cada avaliação custa abrir a ficha
+              e procurar a aba.
+
+              `ghost` ao lado do sólido de propósito -- a liberação financeira
+              é a ação urgente da tela; ir para a avaliação é navegação.
+
+              A liberação é SÓ para BLOCKED (issue #118): é o status que o job
+              de inadimplência aplica (M2-BR-007), sem oferecer "liberação
+              financeira" para os 1.926 alunos importados (CANCELLED, sem
+              cobrança real) nem para cancelamento por outro motivo.
             */
-            render: (aluno) =>
-              aluno.status === 'BLOCKED' ? <BotaoDeLiberacao studentId={aluno.id} /> : null,
+            render: (aluno) => (
+              <AcoesDaLinha>
+                <Button variant="ghost" href={`/students/${aluno.id}/health`}>
+                  Bioimpedância
+                </Button>
+                {aluno.status === 'BLOCKED' ? <BotaoDeLiberacao studentId={aluno.id} /> : null}
+              </AcoesDaLinha>
+            ),
           },
         ]}
         {...(proxima ? { nextHref: proxima } : {})}
