@@ -431,8 +431,9 @@ export class ImportService {
    *   4. valida com `revisaoCompleta` (INV-103) sobre TODOS os campos da
    *      sessao -- ver nota "NENHUM CAMPO PENDENTE PASSA EM SILENCIO" abaixo;
    *   5. `valoresAceitos` roda sobre os campos ACEITOS de todas as linhas;
-   *   6. cria o RASCUNHO (ainda nao publicado);
-   *   7. LIGA os imports ao rascunho -- e AQUI que o indice parcial dispara;
+   *   6. cria o RASCUNHO (ainda nao publicado) -- e AQUI que o indice
+   *      parcial de `body_assessments` dispara (ver nota abaixo);
+   *   7. LIGA os imports ao rascunho;
    *   8. so DEPOIS de ligar com sucesso, publica;
    *   9. apaga os arquivos de todos os imports (storage + banco).
    *
@@ -458,19 +459,22 @@ export class ImportService {
    *
    * A versao anterior desta funcao publicava a avaliacao ANTES de ligar os
    * imports a ela. Em duas confirmacoes concorrentes, as DUAS criavam e
-   * PUBLICAVAM o proprio rascunho antes de qualquer uma tentar o UPDATE que o
-   * indice parcial protege -- a perdedora recebia 409 limpo, mas a
+   * PUBLICAVAM o proprio rascunho -- a perdedora recebia 409 limpo, mas a
    * `BodyAssessment` dela ja estava `PUBLISHED` e NINGUEM a desfazia. Ela
    * aparecia em `listarPublicadasDoAluno` (F18) como uma segunda medicao do
-   * mesmo mes -- exatamente a duplicata que o indice parcial existe para
-   * impedir, so que por um caminho que o indice nao cobre.
+   * mesmo mes.
    *
-   * A ordem corrigida elimina a janela: PUBLICAR so acontece DEPOIS que
-   * `ImportRepository.confirmarSessao` (o UPDATE protegido pelo indice)
-   * termina com sucesso. A perdedora nunca chega a publicar -- e o rascunho
-   * dela, que ficaria orfao em DRAFT (visivel em `listarDoAluno`, que lista
-   * todos os status), e apagado explicitamente no `catch` antes de
-   * repropagar o erro.
+   * A ordem corrigida elimina a janela: a corrida e decidida no PRIMEIRO
+   * passo que grava algo -- `criarRascunho` (INSERT em `body_assessments`),
+   * protegido pelo indice parcial `body_assessments_import_source_reference_uq`
+   * (fix round 2; ver `AvaliacaoJaExisteParaOrigemError` em
+   * `domain/avaliacao.ts` para o porque o indice mora nesta tabela e nao em
+   * `assessment_imports`). A perdedora recebe 409 NESTE ponto, antes mesmo
+   * de existir um rascunho seu para desfazer. PUBLICAR so acontece depois
+   * que o vinculo com os imports (`ImportRepository.confirmarSessao`,
+   * checagem defensiva) termina com sucesso -- se essa etapa falhar por
+   * outro motivo, o rascunho (que neste ponto so o vencedor possui) e
+   * apagado explicitamente no `catch` antes de repropagar o erro.
    *
    * ## Por que nao e uma unica transacao Prisma
    *
@@ -499,10 +503,24 @@ export class ImportService {
       throw new SessaoBloqueadaError(avaliacaoDaSessao.motivo);
     }
 
-    // INV-103 sobre o CONJUNTO INTEIRO da sessao -- ver nota "NENHUM CAMPO
-    // PENDENTE PASSA EM SILENCIO" acima. `sessaoPodeConfirmar` cobre
-    // divergencia; isto cobre campo pendente SOZINHO numa linha concordante.
-    const pronta = revisaoCompleta(sessao.campos);
+    // INV-103 sobre o que o AVALIADOR de fato VE E PODE AGIR -- os campos das
+    // linhas CONSOLIDADAS, nao `sessao.campos` cru.
+    //
+    // Fix round 2 (achado ao rodar contra Postgres real pela primeira vez):
+    // `consolidar()` (Task 3) colapsa uma linha CONCORDANTE para UM campo
+    // representante -- os outros que concordam com ele (ex.: `WEIGHT` do
+    // segundo arquivo, 88,4 contra 88,40 do primeiro) NUNCA aparecem em
+    // `linha.campos`, e portanto a tela de revisao nunca oferece um botao
+    // para confirma-los. Validar `revisaoCompleta` sobre `sessao.campos`
+    // (todos os campos crus) exigia que um campo IMPOSSIVEL DE REVISAR pela
+    // tela deixasse de ser PENDING -- a sessao nunca confirmava, mesmo com
+    // 100% dos campos VISIVEIS revisados. `agreesWithFieldId` (gravado por
+    // `gravarConcordancias` acima) e exatamente o registro de que aquele
+    // campo NAO precisa de decisao propria: ele HERDA a decisao do
+    // representante. Por isso a checagem roda sobre os campos das `linhas`
+    // (o que a tela mostra), nao sobre o conjunto cru inteiro.
+    const camposVisiveis = linhas.flatMap((linha) => linha.campos);
+    const pronta = revisaoCompleta(camposVisiveis);
 
     if (!pronta.pronta) {
       throw new RevisaoIncompletaError(pronta.motivo, pronta.campoId);
@@ -521,8 +539,11 @@ export class ImportService {
 
     const dispositivo = dadosDoAparelho(sessao.atributosPorImport);
 
-    // Nasce como RASCUNHO -- NAO publicado. Publicar so acontece depois que
-    // o vinculo com os imports (abaixo) vencer a corrida do indice parcial.
+    // E AQUI (dentro de `criarRascunho`) QUE O INDICE PARCIAL DISPARA: se
+    // outra transacao ja confirmou esta MESMA sessao, o INSERT de
+    // `body_assessments` com este `sourceReference` leva `P2002`, traduzido
+    // em `AvaliacaoJaExisteParaOrigemError` (409) -- a perdedora nunca chega
+    // a criar rascunho nenhum, e portanto nunca precisa ser desfeita.
     const avaliacao = await this.avaliacoes.criarRascunho(contexto, sessao.studentId, {
       assessedAt,
       evaluatorUserId: revisorId,
@@ -535,9 +556,12 @@ export class ImportService {
       ...(dispositivo ?? {}),
     });
 
+    // Se chegou ate aqui, o INSERT do rascunho venceu a corrida -- este
+    // processo E o dono da sessao. Se o vinculo com os imports (checagem
+    // defensiva, ver `SessaoJaConfirmadaError`) ainda assim falhar por outro
+    // motivo, o rascunho e desfeito para nao ficar orfao em DRAFT (visivel
+    // em `listarDoAluno`, que lista todos os status).
     try {
-      // E AQUI que o indice parcial dispara: a perdedora de uma corrida
-      // recebe `SessaoJaConfirmadaError` NESTE ponto -- ANTES de publicar.
       await this.importacoes.confirmarSessao(
         contexto,
         reviewSessionId,
@@ -547,9 +571,6 @@ export class ImportService {
         agora,
       );
     } catch (erro) {
-      // O rascunho perdeu a corrida: apaga para nao ficar orfao em DRAFT
-      // (visivel em `listarDoAluno`, que lista todos os status) e repropaga
-      // o mesmo erro -- o cliente ve o 409 de sempre.
       await this.avaliacoes.excluirRascunho(contexto, avaliacao.id);
 
       throw erro;

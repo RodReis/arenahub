@@ -11,6 +11,7 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import {
   AvaliacaoImutavelError,
+  AvaliacaoJaExisteParaOrigemError,
   AvaliacaoNaoEncontradaError,
   correcaoPermitida,
   publicar,
@@ -74,36 +75,53 @@ function unidadeParaBanco(unidade: MedidaCanonica['originalUnit']): 'KG' | 'G' |
 export class AssessmentRepository {
   constructor(private readonly db: PrismaService) {}
 
-  /** Cria o rascunho com as medidas ja convertidas. */
+  /**
+   * Cria o rascunho com as medidas ja convertidas.
+   *
+   * `source: 'IMPORT'` com `sourceReference` repetido (a MESMA sessao ou o
+   * MESMO import avulso confirmado duas vezes) leva `P2002` do indice
+   * parcial `body_assessments_import_source_reference_uq` -- traduzido aqui
+   * em `AvaliacaoJaExisteParaOrigemError` (409), nunca deixando o erro cru
+   * do driver vazar. Ver o comentario do erro para o porque o indice mora
+   * NESTA tabela, e nao em `assessment_imports` (Task 5, fix round 2).
+   */
   async criarRascunho(
     contexto: TenantContext,
     studentId: string,
     dados: DadosDaAvaliacao,
   ): Promise<AvaliacaoComMedidas> {
-    return this.db.$transaction(async (tx) => {
-      const avaliacao = await tx.bodyAssessment.create({
-        data: {
-          tenantId: contexto.tenantId,
-          studentId,
-          status: 'DRAFT',
-          assessedAt: dados.assessedAt,
-          source: dados.source ?? 'MANUAL',
-          sourceReference: dados.sourceReference ?? null,
-          evaluatorUserId: dados.evaluatorUserId,
-          notes: dados.notes ?? null,
-          deviceReport:
-            dados.deviceReport === undefined
-              ? Prisma.JsonNull
-              : (dados.deviceReport as Prisma.InputJsonValue),
-          deviceModel: dados.deviceModel ?? null,
-          deviceSerial: dados.deviceSerial ?? null,
-        },
+    try {
+      return await this.db.$transaction(async (tx) => {
+        const avaliacao = await tx.bodyAssessment.create({
+          data: {
+            tenantId: contexto.tenantId,
+            studentId,
+            status: 'DRAFT',
+            assessedAt: dados.assessedAt,
+            source: dados.source ?? 'MANUAL',
+            sourceReference: dados.sourceReference ?? null,
+            evaluatorUserId: dados.evaluatorUserId,
+            notes: dados.notes ?? null,
+            deviceReport:
+              dados.deviceReport === undefined
+                ? Prisma.JsonNull
+                : (dados.deviceReport as Prisma.InputJsonValue),
+            deviceModel: dados.deviceModel ?? null,
+            deviceSerial: dados.deviceSerial ?? null,
+          },
+        });
+
+        await this.gravarMedidas(tx, contexto, avaliacao.id, dados.medidas);
+
+        return this.exigirComMedidas(tx, contexto, avaliacao.id);
       });
+    } catch (erro: unknown) {
+      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002') {
+        throw new AvaliacaoJaExisteParaOrigemError();
+      }
 
-      await this.gravarMedidas(tx, contexto, avaliacao.id, dados.medidas);
-
-      return this.exigirComMedidas(tx, contexto, avaliacao.id);
-    });
+      throw erro;
+    }
   }
 
   /**

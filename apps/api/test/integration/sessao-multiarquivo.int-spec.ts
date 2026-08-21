@@ -240,6 +240,21 @@ describe('F-multiarquivo -- sessao de revisao', () => {
    * estado global compartilhado entre testes (a mesma armadilha que ja
    * mordeu este repo: dublê com estado vaza de um bloco para o proximo).
    */
+  /**
+   * Confirma a sessao como um revisor de VERDADE resolveria -- e nao "clica
+   * CONFIRMED em tudo que estiver PENDING".
+   *
+   * Fix round 2 (achado ao rodar contra Postgres real): uma linha
+   * DIVERGENTE (`concordante: false`, mais de um campo -- ex.: `HEART_RATE`
+   * 84 do Unique Health contra 92 do ECG) exige que o revisor ESCOLHA UM
+   * lado. Confirmar os DOIS lados nao e "resolver a divergencia mais
+   * rapido" -- e o mesmo erro que um usuario real nunca cometeria, porque a
+   * tela so oferece "qual dos dois esta certo", nunca "os dois". Confirmar
+   * ambos produzia duas medidas do MESMO tipo na mesma avaliacao, e o
+   * `@@unique([assessmentId, type])` do banco estourava um erro cru na
+   * confirmacao -- sintoma correto de um teste que simulava um usuario que
+   * nao existe.
+   */
   const confirmarTodosOsCampos = async (
     conta: (typeof contas)['a'],
     sessionId: string,
@@ -247,15 +262,21 @@ describe('F-multiarquivo -- sessao de revisao', () => {
     const antes = (await detalharSessao(conta, sessionId)).body as SessaoResposta;
 
     for (const linha of antes.linhas) {
-      for (const campo of linha.campos) {
-        if (campo.state !== 'PENDING') continue;
+      const divergente = !linha.concordante && linha.campos.length > 1;
+      const pendentes = linha.campos.filter((campo) => campo.state === 'PENDING');
 
+      for (const [indice, campo] of pendentes.entries()) {
         const linhaDoCampo = await db.importedField.findUniqueOrThrow({
           where: { id: campo.id },
           select: { importId: true },
         });
 
-        await revisar(conta, linhaDoCampo.importId, campo.id, { state: 'CONFIRMED' });
+        // Numa linha divergente, so o PRIMEIRO candidato pendente e
+        // confirmado; os outros sao descartados -- exatamente a escolha
+        // que `sessaoPodeConfirmar` exige do revisor.
+        const decisao = divergente && indice > 0 ? 'DISCARDED' : 'CONFIRMED';
+
+        await revisar(conta, linhaDoCampo.importId, campo.id, { state: decisao });
       }
     }
 
@@ -477,11 +498,21 @@ describe('F-multiarquivo -- sessao de revisao', () => {
   });
 
   describe('sessaoPodeConfirmar (Task 4) na porta da frente', () => {
+    /**
+     * Fix round 2: `UNIQUE_CSV` NAO serve mais para este teste -- ele MEDE
+     * composicao corporal (massa ossea, massa celular, percentual de
+     * gordura, relacao cintura-quadril), entao classifica como
+     * `BIOIMPEDANCE` (o classificador foi corrigido, fora desta fatia, para
+     * aceitar QUALQUER medida de composicao corporal, nao so segmentar --
+     * `laudo-bioimpedancia.extractor.ts`, `temComposicaoCorporal`). O UNICO
+     * arquivo genuinamente sem bioimpedancia no conjunto de fixtures e o
+     * ECG, que so produz `HEART_RATE`.
+     */
     it('recusa sessao sem bioimpedancia', async () => {
       const studentId = await criarAluno(contas.a);
 
-      const envio = await enviar(contas.a, studentId, UNIQUE_CSV, 'so-unique.csv', 'text/csv', {
-        sourceLabel: 'Unique Health',
+      const envio = await enviar(contas.a, studentId, ECG_PDF, 'so-ecg.pdf', 'application/pdf', {
+        sourceLabel: 'ECG 30s',
       });
       const reviewSessionId = (envio.body as { reviewSessionId: string }).reviewSessionId;
 

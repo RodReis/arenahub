@@ -88,10 +88,14 @@ export class SessaoDeOutroAlunoError extends ErroDeDominio {
 /**
  * Duas confirmacoes concorrentes da mesma sessao -- a segunda chega aqui.
  *
- * O INDICE PARCIAL do banco e quem garante isto (nunca um `if`): a segunda
- * transacao que tenta gravar `assessment_id` para o mesmo `review_session_id`
- * ja confirmado leva `P2002`, e este erro traduz o `P2002` cru num 409 de
- * dominio -- o cliente nunca ve o erro do Postgres.
+ * A GARANTIA PRINCIPAL contra confirmacao dupla ja aconteceu ANTES deste
+ * ponto, em `AssessmentRepository.criarRascunho` (indice parcial
+ * `body_assessments_import_source_reference_uq`, fix Task 5 round 2) -- lá o
+ * `P2002` vira `AvaliacaoJaExisteParaOrigemError`. Este erro aqui e a
+ * checagem DEFENSIVA de `ImportRepository.confirmarSessao`: se o numero de
+ * linhas afetadas nao bater com o numero de imports esperado (um import
+ * mudou de status por outro caminho entre a leitura da sessao e o UPDATE),
+ * sinaliza o mesmo 409 -- o cliente nao precisa distinguir as duas causas.
  */
 export class SessaoJaConfirmadaError extends ErroDeDominio {
   constructor() {
@@ -388,11 +392,32 @@ export class ImportRepository {
    * Confirma TODOS os imports `EXTRACTED` de uma sessao, apontando para a
    * MESMA avaliacao (Task 5).
    *
-   * A GARANTIA DE IDEMPOTENCIA NAO ESTA AQUI DENTRO -- esta no INDICE
-   * PARCIAL do banco (`assessment_imports_session_assessment_uq`). Este
-   * metodo so tenta gravar; se outra transacao venceu a corrida, o Postgres
-   * recusa com `P2002` e este metodo traduz isso em `SessaoJaConfirmadaError`
-   * (409) -- nunca deixa o erro cru do driver vazar para o controller.
+   * ---------------------------------------------------------------------------
+   * FIX ROUND 2: UM UPDATE SO, NAO UM LOOP -- e a garantia mora em OUTRA tabela.
+   * ---------------------------------------------------------------------------
+   *
+   * A versao anterior fazia um `updateMany` POR IMPORT, dentro de um loop, e
+   * dependia de um indice parcial em `assessment_imports (review_session_id)`
+   * para pegar corrida. Rodando contra Postgres de verdade pela primeira vez,
+   * isso quebrou de um jeito diferente do esperado: uma sessao de TRES
+   * arquivos tem TRES linhas com o MESMO `review_session_id`, e assim que a
+   * PRIMEIRA linha do loop recebia `assessment_id`, a SEGUNDA linha do MESMO
+   * loop (mesma sessao, mesma chamada, sem corrida nenhuma) já violava aquele
+   * indice -- a primeira confirmacao de qualquer sessao multiarquivo sempre
+   * falhava. O indice tinha o formato errado: unicidade por LINHA de import
+   * nunca poderia expressar "N linhas legitimamente compartilham uma
+   * avaliacao". Ver `AvaliacaoJaExisteParaOrigemError`
+   * (`domain/avaliacao.ts`) para onde a garantia foi para -- a INSERCAO da
+   * `body_assessments` em `AssessmentRepository.criarRascunho`, que e
+   * estruturalmente UMA linha por tentativa de confirmacao.
+   *
+   * Este metodo agora so faz o UPDATE em massa (todos os ids de uma vez); a
+   * idempotencia contra confirmacao dupla ja foi decidida ANTES desta
+   * chamada, no `criarRascunho`. O que resta aqui e defensivo: se `count`
+   * nao bater com `importIds.length`, algum import mudou de status por um
+   * caminho diferente (ex.: descartado) entre a leitura da sessao e este
+   * UPDATE -- sinaliza o mesmo 409, mas essa NAO e mais a linha de defesa
+   * principal contra confirmacao dupla.
    */
   async confirmarSessao(
     contexto: TenantContext,
@@ -402,43 +427,22 @@ export class ImportRepository {
     reviewerUserId: string,
     agora: Date,
   ): Promise<void> {
-    try {
-      await this.db.$transaction(async (tx) => {
-        for (const importId of importIds) {
-          const afetadas = await tx.assessmentImport.updateMany({
-            where: {
-              id: importId,
-              tenantId: contexto.tenantId,
-              reviewSessionId,
-              status: 'EXTRACTED',
-            },
-            data: {
-              status: 'CONFIRMED',
-              assessmentId,
-              reviewedByUserId: reviewerUserId,
-              reviewedAt: agora,
-            },
-          });
+    const afetadas = await this.db.assessmentImport.updateMany({
+      where: {
+        id: { in: [...importIds] },
+        tenantId: contexto.tenantId,
+        reviewSessionId,
+        status: 'EXTRACTED',
+      },
+      data: {
+        status: 'CONFIRMED',
+        assessmentId,
+        reviewedByUserId: reviewerUserId,
+        reviewedAt: agora,
+      },
+    });
 
-          // Outra transacao levou EXTRACTED embora entre a leitura da sessao
-          // (no service) e este UPDATE -- a mesma classe de corrida que o
-          // indice parcial cobre, so que chegando por um caminho diferente
-          // (import ja no estado terminal, sem violar o indice). Sinaliza o
-          // mesmo 409: o cliente nao distingue as duas causas.
-          if (afetadas.count === 0) throw new SessaoJaConfirmadaError();
-        }
-      });
-    } catch (erro: unknown) {
-      // P2002 e o INDICE PARCIAL vencendo a corrida: duas confirmacoes
-      // concorrentes da MESMA sessao passam as duas pela checagem de
-      // aplicacao antes de qualquer uma escrever, e o banco e quem decide
-      // qual das duas transacoes commita.
-      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002') {
-        throw new SessaoJaConfirmadaError();
-      }
-
-      throw erro;
-    }
+    if (afetadas.count !== importIds.length) throw new SessaoJaConfirmadaError();
   }
 
   /** Apaga a chave do arquivo de TODOS os imports de uma sessao. */
