@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { REGIAO_DO_TIPO, TIPOS_DE_MEDIDA, UNIDADES_DE_MEDIDA } from '../domain/medida.js';
+import { TIPOS_DE_MEDIDA, UNIDADES_DE_MEDIDA } from '../domain/medida.js';
 import type { TipoDeMedida, UnidadeDeMedida } from '../domain/medida.js';
 import type { TipoDeLaudo } from '../domain/sessao-de-revisao.js';
 import {
@@ -149,17 +149,13 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
       );
     }
 
-    const temSegmentarOuMassaMuscular = campos.some(
-      (campo) => REGIAO_DO_TIPO[campo.type] !== null || campo.type === 'SKELETAL_MUSCLE_MASS',
-    );
-
     const sourceLabel = detectarOrigemCsv(cabecalho, campos);
 
     return {
       campos,
       measuredAt: null,
       extractor: 'laudo-bioimpedancia@1',
-      tipoDeLaudo: temSegmentarOuMassaMuscular ? 'BIOIMPEDANCE' : 'UNKNOWN',
+      tipoDeLaudo: temComposicaoCorporal(campos) ? 'BIOIMPEDANCE' : 'UNKNOWN',
       // `exactOptionalPropertyTypes`: so inclui a chave quando ha valor --
       // `sourceLabel: undefined` explicito nao e a mesma coisa que omitir.
       ...(sourceLabel !== undefined ? { sourceLabel } : {}),
@@ -222,6 +218,19 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
 
 function ehTipoDeMedida(valor: string): valor is TipoDeMedida {
   return (TIPOS_DE_MEDIDA as readonly string[]).includes(valor);
+}
+
+/**
+ * Um laudo e de bioimpedancia quando traz QUALQUER medida de composicao
+ * corporal. A regra estreita (so segmentar ou massa esqueletica) recusava o
+ * relatorio da Unique Health, que traz massa ossea, massa celular e relacao
+ * cintura-quadril sem nenhum segmentar -- e a sessao inteira seria bloqueada
+ * por falta de bioimpedancia (Task 4, `sessaoPodeConfirmar`). So o ECG
+ * produz `HEART_RATE` sozinho; qualquer outro tipo veio de um aparelho de
+ * bioimpedancia, seja qual for o subconjunto de campos que ele imprime.
+ */
+function temComposicaoCorporal(campos: readonly CampoProposto[]): boolean {
+  return campos.some((campo) => campo.type !== 'HEART_RATE');
 }
 
 function ehUnidade(valor: string): boolean {

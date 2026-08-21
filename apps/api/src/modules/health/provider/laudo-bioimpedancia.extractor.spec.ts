@@ -60,6 +60,31 @@ describe('extrator de laudo de bioimpedancia', () => {
     expect(r.sourceLabel).toBe('CF610_G');
   });
 
+  it('classifica o laudo da Unique Health como BIOIMPEDANCE mesmo sem segmentar', async () => {
+    // Fix round 1: a regra estreita (so segmentar ou SKELETAL_MUSCLE_MASS)
+    // recusava este laudo -- ele traz massa ossea, massa celular e relacao
+    // cintura-quadril, sem nenhum segmentar. Sessao com so este arquivo
+    // seria bloqueada por falta de bioimpedancia (Task 4).
+    const r = await extrator.extrair({
+      tipo: 'CSV',
+      conteudo: lerFixture('laudo-unique-health-sintetico.csv'),
+    });
+
+    expect(r.tipoDeLaudo).toBe('BIOIMPEDANCE');
+  });
+
+  it('NAO classifica como BIOIMPEDANCE um CSV so com HEART_RATE (formato do ECG)', async () => {
+    const extrator2 = new LaudoBioimpedanciaExtractor();
+    const csvSoFrequencia = 'tipo,valor,unidade\nHEART_RATE,84,\n';
+
+    const r = await extrator2.extrair({
+      tipo: 'CSV',
+      conteudo: new TextEncoder().encode(csvSoFrequencia),
+    });
+
+    expect(r.tipoDeLaudo).toBe('UNKNOWN');
+  });
+
   it('le bpm do ECG como MEDIDA e o achado como ATRIBUTO', async () => {
     const r = await extrator.extrair({
       tipo: 'PDF',
