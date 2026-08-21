@@ -42,7 +42,28 @@ function vigente(
 ): AssinaturaRegistrada | null {
   const vivas = assinaturas
     .filter((a) => a.papel === papel && a.substituidaEm === null)
-    .sort((a, b) => b.em.getTime() - a.em.getTime());
+    // Mais recente primeiro; NO EMPATE, a recusa vence.
+    //
+    // `Array.prototype.sort` e estavel, entao empate no `em` preservaria a
+    // ordem de chegada -- que e a ordem em que o Postgres devolveu as linhas,
+    // sem nenhuma garantia. Duas assinaturas vivas do MESMO papel com o mesmo
+    // instante sao alcancaveis: `occurred_at` nao tem unicidade, o `agora` e o
+    // mesmo `Date` para os dois papeis dentro de uma transacao, e nada no
+    // banco impede duas linhas vivas do mesmo papel.
+    //
+    // Sem este desempate, um ACCEPTED e um REFUSED gravados no mesmo instante
+    // autorizavam ou bloqueavam conforme a ordem fisica das linhas -- a
+    // analise rodava sobre dado de saude de quem recusou por sorte de
+    // ordenacao. Na duvida entre autorizar e bloquear, bloqueia.
+    .sort((a, b) => {
+      const porInstante = b.em.getTime() - a.em.getTime();
+
+      if (porInstante !== 0) return porInstante;
+
+      if (a.decisao === b.decisao) return 0;
+
+      return a.decisao === 'REFUSED' ? -1 : 1;
+    });
 
   return vivas[0] ?? null;
 }

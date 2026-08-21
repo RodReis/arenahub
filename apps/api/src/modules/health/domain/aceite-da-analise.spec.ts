@@ -183,6 +183,59 @@ describe('avaliarAceite -- assinatura substituida', () => {
 
     expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_STUDENT' });
   });
+
+  /**
+   * Empate no instante: a recusa vence, venha na ordem que vier.
+   *
+   * `occurred_at` nao tem unicidade e o `agora` e o mesmo `Date` para os dois
+   * papeis dentro de uma transacao, entao duas assinaturas vivas do mesmo
+   * papel no mesmo instante sao alcancaveis. Como `sort` e estavel, sem
+   * desempate o vencedor era a ordem em que o Postgres devolveu as linhas --
+   * e a analise rodava sobre dado de quem recusou por sorte de ordenacao.
+   *
+   * Os dois casos existem de proposito: um sozinho passaria mesmo sem o
+   * desempate, bastando a ordem de chegada ser favoravel.
+   */
+  it('no empate de instante a recusa vence -- recusa chegando primeiro', () => {
+    const r = avaliarAceite(
+      [
+        assinatura('STUDENT', { decisao: 'REFUSED', em: ONTEM }),
+        assinatura('STUDENT', { decisao: 'ACCEPTED', em: ONTEM }),
+        assinatura('PROFESSIONAL', { em: HOJE }),
+      ],
+      ADULTO,
+    );
+
+    expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_STUDENT' });
+  });
+
+  it('no empate de instante a recusa vence -- recusa chegando depois', () => {
+    // O par invertido existe de proposito: um caso sozinho passaria mesmo sem
+    // desempate, bastando a ordem de chegada ser favoravel.
+    const r = avaliarAceite(
+      [
+        assinatura('STUDENT', { decisao: 'ACCEPTED', em: ONTEM }),
+        assinatura('STUDENT', { decisao: 'REFUSED', em: ONTEM }),
+        assinatura('PROFESSIONAL', { em: HOJE }),
+      ],
+      ADULTO,
+    );
+
+    expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_STUDENT' });
+  });
+
+  it('no empate de instante a recusa do professor tambem vence', () => {
+    const r = avaliarAceite(
+      [
+        assinatura('STUDENT', { em: ONTEM }),
+        assinatura('PROFESSIONAL', { decisao: 'ACCEPTED', em: HOJE }),
+        assinatura('PROFESSIONAL', { decisao: 'REFUSED', em: HOJE }),
+      ],
+      ADULTO,
+    );
+
+    expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_PROFESSIONAL' });
+  });
 });
 
 describe('substituiveis -- o defeito que este desenho existe para impedir', () => {
