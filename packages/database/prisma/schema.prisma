@@ -591,6 +591,8 @@ model Tenant {
   healthGoals          HealthGoal[]
   attendanceSessions   StudentAttendanceSession[]
   aiAnalyses           AiAnalysis[]
+  assessmentImports    AssessmentImport[]
+  importedFields       ImportedField[]
 
   @@map("tenants")
 }
@@ -667,6 +669,8 @@ model User {
   recordedHealthContext StudentHealthContext[] @relation("HealthContextRecorder")
   authoredHealthGoals   HealthGoal[]           @relation("HealthGoalAuthor")
   requestedAiAnalyses   AiAnalysis[]           @relation("AiAnalysisRequester")
+  uploadedImports       AssessmentImport[]     @relation("ImportUploader")
+  reviewedImports       AssessmentImport[]     @relation("ImportReviewer")
 
   @@map("users")
 }
@@ -954,6 +958,7 @@ model Student {
   healthGoals         HealthGoal[]
   attendanceSessions  StudentAttendanceSession[]
   aiAnalyses          AiAnalysis[]
+  assessmentImports   AssessmentImport[]
   biometricIdentities BiometricIdentity[]
   deviceUsers         DeviceUser[]
   credentials         StudentCredential[]
@@ -3285,6 +3290,9 @@ model BodyAssessment {
   supersededBy BodyAssessment? @relation("AssessmentCorrection")
 
   measurements BodyMeasurement[]
+  /// A importacao que originou esta avaliacao, quando ela veio de arquivo
+  /// (F19). Nula em avaliacao digitada a mao.
+  import       AssessmentImport?
 
   @@index([tenantId, studentId, assessedAt])
   @@index([tenantId, studentId, status, publishedAt])
@@ -3603,4 +3611,144 @@ model AiAnalysis {
   @@index([tenantId, studentId, createdAt])
   @@index([tenantId, createdAt])
   @@map("ai_analyses")
+}
+
+
+/// Estado de uma importacao de arquivo (F19).
+enum AssessmentImportStatus {
+  /// Arquivo recebido, ainda nao escaneado nem extraido.
+  RECEIVED
+  /// Antivirus recusou. O arquivo NAO fica no storage.
+  INFECTED
+  /// Extracao rodou; ha campos esperando revisao humana (INV-103).
+  EXTRACTED
+  /// Extrator falhou. A avaliacao manual continua funcionando (INV-140).
+  FAILED
+  /// Revisada e convertida em avaliacao. Terminal.
+  CONFIRMED
+  /// Descartada pelo avaliador sem virar avaliacao. Terminal.
+  DISCARDED
+
+  @@map("assessment_import_status")
+}
+
+/// O que o avaliador decidiu sobre um campo extraido (F19).
+enum ImportedFieldState {
+  /// Ainda nao revisado. NAO vira medida.
+  PENDING
+  /// O valor do OCR esta certo.
+  CONFIRMED
+  /// O avaliador digitou outro valor; o do OCR fica guardado.
+  CORRECTED
+  /// Nao e medida valida -- ruido do OCR, campo que o aparelho nao mediu.
+  DISCARDED
+
+  @@map("imported_field_state")
+}
+
+/// Arquivo importado para virar avaliacao (`M3-FR-009`, F19, Slice 3.3).
+///
+/// ---------------------------------------------------------------------------
+/// A IMPORTACAO NAO E UMA AVALIACAO. ELA VIRA UMA, DEPOIS DE REVISADA.
+/// ---------------------------------------------------------------------------
+///
+/// Tabela separada de `body_assessments` porque `M3-BR-006` e INV-103 exigem
+/// confirmacao humana ANTES de o dado existir como historico. Gravar direto
+/// na avaliacao com um flag "revisada" faria o valor do OCR ja estar no
+/// grafico esperando alguem desmarcar -- e um esquecimento viraria dado
+/// oficial.
+///
+/// `assessmentId` so e preenchido na confirmacao: ate la, a importacao existe
+/// e a avaliacao nao.
+model AssessmentImport {
+  id        String                 @id @default(uuid()) @db.Uuid
+  tenantId  String                 @map("tenant_id") @db.Uuid
+  studentId String                 @map("student_id") @db.Uuid
+  status    AssessmentImportStatus @default(RECEIVED)
+
+  /// Nome que o arquivo tinha no computador de quem enviou. Guardado para a
+  /// tela; NUNCA usado para decidir tipo -- extensao e controlada por quem
+  /// envia (ver `aceitarArquivo`).
+  originalFilename String  @map("original_filename")
+  /// Tipo REAL, decidido pela assinatura nos primeiros bytes.
+  fileType         String  @map("file_type")
+  fileSizeBytes    Int     @map("file_size_bytes")
+  /// Chave no storage privado. Fica NULA quando o arquivo e expurgado apos a
+  /// confirmacao (`M3-NFR` -- temporarios tem retencao curta e delecao
+  /// verificavel), sem que a linha morra: o historico de que houve
+  /// importacao e o que a auditoria consulta.
+  objectKey        String? @map("object_key")
+
+  /// Veredito do antivirus. Nulo enquanto nao escaneou.
+  scanResult String? @map("scan_result")
+  /// Qual implementacao extraiu (`csv@1`, `fake-ocr@1`). Auditoria.
+  extractor  String?
+  /// Por que falhou, quando `FAILED` ou `INFECTED`.
+  failureReason String? @map("failure_reason")
+
+  /// Quem enviou o arquivo.
+  uploadedByUserId String  @map("uploaded_by_user_id") @db.Uuid
+  /// Quem confirmou a revisao. Nulo ate a confirmacao -- e o registro de que
+  /// um HUMANO decidiu (INV-103).
+  reviewedByUserId String? @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt       DateTime? @map("reviewed_at")
+
+  /// A avaliacao que nasceu desta importacao. Nula ate a confirmacao.
+  assessmentId String? @unique @map("assessment_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  uploadedBy User            @relation("ImportUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy User?           @relation("ImportReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+  assessment BodyAssessment? @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  fields     ImportedField[]
+
+  @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, status, createdAt])
+  @@map("assessment_imports")
+}
+
+/// Um campo extraido de um arquivo, com o estado da revisao (`M3-FR-010`).
+///
+/// ---------------------------------------------------------------------------
+/// O VALOR DO EXTRATOR NUNCA E SOBRESCRITO.
+/// ---------------------------------------------------------------------------
+///
+/// `extracted_value` e o que a maquina leu; `reviewed_value` e o que o humano
+/// decidiu. Guardar so um deles destruiria a proveniencia que o aceite da
+/// Slice 3.3 exige ("a proveniencia permanece visivel") -- e sem ela ninguem
+/// consegue, meses depois, descobrir que o OCR lia virgula errado num
+/// modelo especifico de laudo.
+model ImportedField {
+  id       String             @id @default(uuid()) @db.Uuid
+  tenantId String             @map("tenant_id") @db.Uuid
+  importId String             @map("import_id") @db.Uuid
+  type     BodyMeasurementType
+  state    ImportedFieldState @default(PENDING)
+
+  /// O que a maquina leu. Nulo quando o extrator marcou o campo como ilegivel.
+  extractedValue Decimal?         @map("extracted_value") @db.Decimal(10, 4)
+  extractedUnit  MeasurementUnit? @map("extracted_unit")
+  /// 0..1 quando o extrator informa. NULO quando ele nao mede confianca
+  /// (parser de CSV) -- e `null` NAO e zero: zero significaria "o extrator
+  /// acha que errou" e ordenaria a fila como o campo mais suspeito do laudo.
+  confidence     Decimal?         @db.Decimal(5, 4)
+  /// Pagina e linha, quando o extrator informa.
+  sourceLocation String?          @map("source_location")
+
+  /// O que o humano decidiu. Preenchido quando `CORRECTED`.
+  reviewedValue Decimal?         @map("reviewed_value") @db.Decimal(10, 4)
+  reviewedUnit  MeasurementUnit? @map("reviewed_unit")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  import AssessmentImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([importId, state])
+  @@map("imported_fields")
 }

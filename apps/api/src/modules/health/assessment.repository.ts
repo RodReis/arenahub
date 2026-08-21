@@ -33,6 +33,16 @@ export interface DadosDaAvaliacao {
   evaluatorUserId: string;
   notes?: string | undefined;
   medidas: readonly MedidaCanonica[];
+  /**
+   * De onde vieram os numeros. `MANUAL` por padrao -- o caminho que sempre
+   * existiu.
+   *
+   * `IMPORT` entra pela F19, e nao e cosmetico: o aluno ve na ficha que
+   * aquele numero veio de arquivo, e a auditoria chega ao arquivo pelo
+   * `sourceReference` (o id da importacao).
+   */
+  source?: 'MANUAL' | 'DEVICE' | 'IMPORT' | undefined;
+  sourceReference?: string | undefined;
 }
 
 /** Unidade do dominio (minuscula) para o enum do Prisma (maiuscula). */
@@ -68,7 +78,8 @@ export class AssessmentRepository {
           studentId,
           status: 'DRAFT',
           assessedAt: dados.assessedAt,
-          source: 'MANUAL',
+          source: dados.source ?? 'MANUAL',
+          sourceReference: dados.sourceReference ?? null,
           evaluatorUserId: dados.evaluatorUserId,
           notes: dados.notes ?? null,
         },

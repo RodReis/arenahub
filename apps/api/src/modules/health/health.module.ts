@@ -9,6 +9,14 @@ import { AssessmentRepository } from './assessment.repository.js';
 import { AttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
 import { AiAnalysisController } from './ai-analysis.controller.js';
+import { ImportController } from './import.controller.js';
+import { ImportRepository } from './import.repository.js';
+import { ImportService } from './import.service.js';
+import { CsvDocumentExtractorAdapter } from './provider/csv-document-extractor.adapter.js';
+import { DOCUMENT_EXTRACTOR } from './provider/document-extractor.port.js';
+import { FakeOcrExtractorAdapter } from './provider/fake-ocr-extractor.adapter.js';
+import { MALWARE_SCANNER } from './provider/malware-scanner.port.js';
+import { FakeMalwareScannerAdapter } from './provider/fake-malware-scanner.adapter.js';
 import { AiAnalysisRepository } from './ai-analysis.repository.js';
 import { AiAnalysisService } from './ai-analysis.service.js';
 import { AI_PROVIDER } from './provider/ai-provider.port.js';
@@ -40,13 +48,28 @@ import { HealthProgressService } from './health-progress.service.js';
   // `StorageModule` entra pela exportacao (F18): o CSV nasce na API e vai
   // para o bucket privado, com URL assinada curta -- nunca pelo navegador.
   imports: [StudentsModule, TenancyModule, StorageModule],
-  controllers: [AssessmentController, HealthProgressController, AiAnalysisController],
+  controllers: [
+    AssessmentController,
+    HealthProgressController,
+    AiAnalysisController,
+    ImportController,
+  ],
   providers: [
     AssessmentRepository,
     AttendanceRepository,
     AttendanceService,
     AiAnalysisRepository,
     AiAnalysisService,
+    ImportRepository,
+    ImportService,
+    // O parser de CSV e PRODUCAO -- deterministico, sem terceiro. O OCR de
+    // imagem e PDF e dublê (ADR-017) ate existir extrator real; o roteador
+    // manda CSV para o parser de verdade em qualquer ambiente.
+    CsvDocumentExtractorAdapter,
+    FakeOcrExtractorAdapter,
+    { provide: DOCUMENT_EXTRACTOR, useExisting: FakeOcrExtractorAdapter },
+    FakeMalwareScannerAdapter,
+    { provide: MALWARE_SCANNER, useExisting: FakeMalwareScannerAdapter },
     // O FAKE responde por padrao, e isso NAO e provisorio por descuido: o
     // ADR-036 decisao 3 exige contrato com clausula de nao-treinamento
     // firmado ANTES da primeira chamada com dado real, e ele nao esta

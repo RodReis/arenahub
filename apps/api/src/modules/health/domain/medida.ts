@@ -47,6 +47,46 @@ export type TipoDeMedida =
   | 'HIP_CIRCUMFERENCE';
 
 /**
+ * As mesmas listas, em RUNTIME.
+ *
+ * Existem porque tipo do TypeScript some na compilacao, e tres consumidores
+ * precisam da lista viva: o Zod do controller, o parser de CSV da F19 e a
+ * guarda de cobertura de fatores. Antes desta fatia cada um mantinha a
+ * propria copia -- e copia de lista fechada diverge na primeira adicao, com
+ * o sintoma aparecendo longe da causa (um tipo aceito pela API e recusado
+ * pelo import, ou vice-versa).
+ */
+export const TIPOS_DE_MEDIDA: readonly TipoDeMedida[] = [
+  'WEIGHT',
+  'HEIGHT',
+  'BODY_FAT_PERCENT',
+  'BODY_FAT_MASS',
+  'LEAN_BODY_MASS',
+  'SKELETAL_MUSCLE_MASS',
+  'TOTAL_BODY_WATER',
+  'INTRACELLULAR_WATER',
+  'EXTRACELLULAR_WATER',
+  'PROTEIN_MASS',
+  'MINERAL_MASS',
+  'VISCERAL_FAT_LEVEL',
+  'BASAL_METABOLIC_RATE',
+  'WAIST_CIRCUMFERENCE',
+  'HIP_CIRCUMFERENCE',
+];
+
+export const UNIDADES_DE_MEDIDA: readonly UnidadeDeMedida[] = [
+  'kg',
+  'g',
+  'lb',
+  'cm',
+  'm',
+  'in',
+  'percent',
+  'kcal',
+  'L',
+];
+
+/**
  * Unidade canonica de cada tipo -- a unidade em que o valor e ARMAZENADO
  * para comparacao, alem do par original preservado.
  *
