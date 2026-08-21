@@ -3,34 +3,66 @@ import { Ausente } from '@arenahub/ui';
 import estilos from './sessao.module.css';
 
 /**
- * Achado cardíaco reportado pelo aparelho -- ADR-035, decisão 2 do PI.
+ * O que o ECG reportou -- ADR-035, decisões do PI em 21/08/2026.
  *
- * NENHUM BOTÃO. O ArenaHub armazena e cita o texto do ECG, nunca interpreta:
- * o profissional já conversou com o aluno antes do upload, e um botão de
- * "Registrar encaminhamento" ou um badge "Exige leitura médica" faria a
- * plataforma tomar uma posição clínica que a RDC 657/2022 reserva a
- * dispositivo médico registrado.
+ * MOSTRA A INFORMAÇÃO, NÃO A INTERPRETA. Achado, frequência, duração e tags
+ * aparecem como o aparelho os escreveu, atribuídos a ele.
+ *
+ * NENHUM BOTÃO, NENHUMA CONDUTA. A RDC 657/2022 da ANVISA isenta o software
+ * que apenas armazena, arquiva, transmite ou exibe dado de saúde; o que
+ * enquadra como dispositivo médico é interpretar -- classificar, pontuar,
+ * sinalizar gravidade, recomendar encaminhamento. Por isso nada aqui lê o
+ * conteúdo do texto para decidir como exibi-lo: nem cor por gravidade, nem
+ * ordem por urgência, nem badge derivado da palavra.
  */
 
 interface Props {
-  readonly ecgFinding?: string | null | undefined;
+  /** `extracted_attributes` do arquivo de ECG, opaco (ADR-035). */
+  readonly atributos?: Record<string, unknown> | null | undefined;
 }
 
-export function AchadoDoEcg({ ecgFinding }: Props) {
+/** Lê uma chave como texto, sem interpretar o conteúdo. */
+function texto(atributos: Record<string, unknown> | null | undefined, chave: string): string | null {
+  const valor = atributos?.[chave];
+
+  return typeof valor === 'string' && valor !== '' ? valor : null;
+}
+
+export function AchadoDoEcg({ atributos }: Props) {
+  const achado = texto(atributos, 'ecgFinding');
+  const frequencia = atributos?.['ecgHeartRate'];
+  const duracao = atributos?.['ecgDurationSeconds'];
+  const gravadoEm = texto(atributos, 'ecgRecordedAt');
+  const bruto = atributos?.['ecgTags'];
+  const tags = Array.isArray(bruto) ? bruto.filter((t): t is string => typeof t === 'string') : [];
+
   return (
     <section className={estilos['painel']} aria-labelledby="titulo-achado-ecg">
-      <h2 id="titulo-achado-ecg">Achado cardíaco reportado pelo aparelho</h2>
+      <h2 id="titulo-achado-ecg">Eletrocardiograma — reportado pelo aparelho</h2>
 
-      {ecgFinding ? (
-        <p data-testid="achado-ecg">{ecgFinding}</p>
-      ) : (
-        <p data-testid="achado-ecg-ausente">
-          <Ausente /> nenhum achado relatado pelo aparelho
-        </p>
-      )}
+      <dl className={estilos['listaDoAparelho']}>
+        <dt>Análise do aparelho</dt>
+        <dd data-testid="achado-ecg">{achado ?? <Ausente />}</dd>
+
+        <dt>Frequência cardíaca</dt>
+        <dd data-testid="ecg-frequencia">
+          {typeof frequencia === 'number' ? `${frequencia} bpm` : <Ausente />}
+        </dd>
+
+        <dt>Duração</dt>
+        <dd data-testid="ecg-duracao">
+          {typeof duracao === 'number' ? `${duracao} s` : <Ausente />}
+        </dd>
+
+        <dt>Gravado em</dt>
+        <dd data-testid="ecg-gravado-em">{gravadoEm ?? <Ausente />}</dd>
+
+        <dt>Marcações</dt>
+        <dd data-testid="ecg-tags">{tags.length > 0 ? tags.join(', ') : <Ausente />}</dd>
+      </dl>
 
       <p className={estilos['avisoDoAparelho']}>
-        Esse achado é do equipamento, não da plataforma, e não constitui diagnóstico.
+        Estas informações são do equipamento, não da plataforma, e não constituem diagnóstico.
       </p>
     </section>
   );

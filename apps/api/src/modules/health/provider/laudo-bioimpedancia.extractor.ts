@@ -205,6 +205,14 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
     if (duracao) atributos['ecgDurationSeconds'] = Number(duracao.replace(',', '.'));
     if (gravadoEm) atributos['ecgRecordedAt'] = gravadoEm;
 
+    // O bpm vai nos DOIS lugares de proposito: como `HEART_RATE` ele e medida
+    // comparavel mes a mes; aqui e o numero que o laudo imprimiu, exibido
+    // junto do resto do que o aparelho reportou. Nao e duplicacao -- sao
+    // papeis diferentes do mesmo numero.
+    const bpmNumerico = bpm ? Number(bpm.replace(',', '.')) : Number.NaN;
+
+    if (Number.isFinite(bpmNumerico)) atributos['ecgHeartRate'] = bpmNumerico;
+
     return {
       campos,
       measuredAt: null,

@@ -73,16 +73,14 @@ export function comImportId(sessao: SessaoDeRevisao): LinhaDeRevisao[] {
  * achado -- os dois sao coisas diferentes que por acaso vivem no mesmo
  * objeto (bug real da Task 9, corrigido na revisao).
  */
-export function atributosDoAparelho(sessao: SessaoDeRevisao): AtributosDoAparelho {
-  for (const arquivo of sessao.arquivos) {
-    const achado = arquivo.atributos?.['ecgFinding'];
+export function atributosDoAparelho(
+  sessao: SessaoDeRevisao,
+): Record<string, unknown> | null {
+  // O arquivo de ECG e o que carrega `ecgFinding`. A PRESENCA da chave e o
+  // criterio -- nunca o conteudo dela, que ninguem le para decidir nada.
+  const doEcg = sessao.arquivos.find((arquivo) => arquivo.atributos?.['ecgFinding'] !== undefined);
 
-    if (typeof achado === 'string' && achado !== '') {
-      return { ecgFinding: achado };
-    }
-  }
-
-  return {};
+  return doEcg?.atributos ?? null;
 }
 
 export interface CartaoDeArquivo {

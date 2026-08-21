@@ -2170,8 +2170,7 @@ era o laudo ficar parado em `EXTRACTED`, e a academia voltar ao papel.
 
 - **ECG segue o ADR-035**: guardado e citado, nunca interpretado. Publicar automaticamente o bpm
   medido é uma coisa; classificar um achado cardíaco é outra, e essa continua fora — RDC 657/2022.
-- **A análise de IA segue exigindo o aceite duplo** (`M3-AC-007`) e a validação de saída
-  (`M3-BR-010`). Publicar valor medido não é o mesmo que rodar IA sobre saúde de quem não
+- **A análise de IA segue direto para banco, fica dismponivel para o aluno no mobile e totem** e a validação de saída. Publicar valor medido não é o mesmo que rodar IA sobre saúde de quem não
   consentiu; são decisões diferentes, e só a primeira foi tomada aqui.
 
 **Por que ADR e não só um PR.** A regra 8 e o `M3-BR-006` estão escritos em três documentos. Mudar

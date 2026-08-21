@@ -61,6 +61,17 @@ export interface CampoExtraido {
   readonly confidence: number | null;
   /** Onde no documento (pagina, linha), quando o extrator informa. */
   readonly sourceLocation: string | null;
+  /**
+   * Faixa de referencia VIGENTE no laudo, guardada junto do campo.
+   *
+   * E do fabricante e muda com firmware: em tabela global, a leitura de
+   * agosto deixaria de fazer sentido em dezembro. `null` quando o laudo nao
+   * imprime faixa para aquele campo -- ausencia, nunca zero (INV-104).
+   */
+  readonly referenceMin: number | null;
+  readonly referenceMax: number | null;
+  /** Percentual do padrao que o aparelho reporta (233,3% num braco). */
+  readonly standardPercent: number | null;
   readonly state: EstadoDoCampo;
   /** Preenchido quando `CORRECTED`. */
   readonly reviewedValue: number | null;

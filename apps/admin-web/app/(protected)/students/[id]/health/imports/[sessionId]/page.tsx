@@ -207,7 +207,7 @@ export default async function PaginaDaRevisao({
         />
       </div>
 
-      <AchadoDoEcg ecgFinding={atributosDoAparelho(sessao).ecgFinding} />
+      <AchadoDoEcg atributos={atributosDoAparelho(sessao)} />
 
       <div className={estilos['paineisCompletos']}>
         <PainelDeSegmentos titulo="Gordura por segmento" regioes={regioes} chave="fat" testId="painel-gordura" />

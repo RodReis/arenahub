@@ -33,13 +33,7 @@ import type { TipoDeMedida } from './domain/medida.js';
  * arquitetura: e o ponto onde o dado do aluno atravessa a fronteira do PAIS.
  * A ordem das operacoes aqui e a defesa:
  *
- *   1. o aceite DUPLO e conferido (`M3-AC-007`);
- *   2. o snapshot e montado por lista branca (`M3-NFR-009`);
- *   3. a pseudonimizacao e CONFERIDA antes do envio;
- *   4. so entao o provedor e chamado;
- *   5. a saida volta como `unknown` e e VALIDADA (`M3-BR-010`);
- *   6. rejeitada ou aceita, a analise e REGISTRADA (`M3-AC-008`).
- *
+
  * Inverter 1 e 2 mandaria dado de quem nao consentiu. Pular 3 tornaria a
  * pseudonimizacao uma declaracao em vez de uma garantia. Pular 5 publicaria
  * diagnostico -- que e o que a regra de arquitetura no 8 proibe.

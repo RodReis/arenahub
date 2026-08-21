@@ -8,6 +8,7 @@ function campo(over: Partial<CampoExtraido> & Pick<CampoExtraido, 'id' | 'type'>
     extractedValue: null, extractedUnit: null, confidence: null,
     sourceLocation: null, state: 'PENDING', reviewedValue: null,
     reviewedUnit: null, sourceLabel: null,
+    referenceMin: null, referenceMax: null, standardPercent: null,
     ...over,
   };
 }

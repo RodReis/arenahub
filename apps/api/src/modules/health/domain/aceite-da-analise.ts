@@ -19,15 +19,17 @@ export interface AssinaturaRegistrada {
   readonly sujeito: 'STUDENT' | 'LEGAL_GUARDIAN' | null;
 }
 
+/**
+ * Os quatro motivos do PROFESSOR sairam com o ADR-040 (`MISSING_PROFESSIONAL`,
+ * `REFUSED_PROFESSIONAL`, `OUT_OF_ORDER`): nenhum caminho os emitia depois que
+ * o endosso deixou de ser exigido, e motivo que ninguem emite e codigo morto
+ * que o proximo leitor tenta implementar de novo.
+ */
 export type MotivoDeBloqueio =
   | 'AI_CONSENT_MISSING_STUDENT'
-  | 'AI_CONSENT_MISSING_PROFESSIONAL'
   | 'AI_CONSENT_REFUSED_STUDENT'
-  | 'AI_CONSENT_REFUSED_PROFESSIONAL'
   | 'AI_CONSENT_DOCUMENT_RETIRED'
-  | 'AI_CONSENT_REVALIDATION_REQUIRED'
-  /** O professor endossou antes de o aluno consentir. */
-  | 'AI_CONSENT_OUT_OF_ORDER';
+  | 'AI_CONSENT_REVALIDATION_REQUIRED';
 
 export type AvaliacaoDeAceite =
   | { readonly autorizado: true }
@@ -81,7 +83,6 @@ export function avaliarAceite(
   idadeAtualEmAnos: number,
 ): AvaliacaoDeAceite {
   const aluno = vigente(assinaturas, 'STUDENT');
-  const professor = vigente(assinaturas, 'PROFESSIONAL');
 
   if (aluno === null) {
     return { autorizado: false, motivo: 'AI_CONSENT_MISSING_STUDENT' };
@@ -109,24 +110,25 @@ export function avaliarAceite(
     return { autorizado: false, motivo: 'AI_CONSENT_REVALIDATION_REQUIRED' };
   }
 
-  if (professor === null) {
-    return { autorizado: false, motivo: 'AI_CONSENT_MISSING_PROFESSIONAL' };
-  }
-
-  if (professor.decisao === 'REFUSED') {
-    return { autorizado: false, motivo: 'AI_CONSENT_REFUSED_PROFESSIONAL' };
-  }
-
-  if (professor.documentoAposentadoEm !== null) {
-    return { autorizado: false, motivo: 'AI_CONSENT_DOCUMENT_RETIRED' };
-  }
-
-  // O endosso nao pode preceder o consentimento: seria a academia decidindo
-  // primeiro e colhendo a assinatura do titular depois.
-  if (professor.em.getTime() < aluno.em.getTime()) {
-    return { autorizado: false, motivo: 'AI_CONSENT_OUT_OF_ORDER' };
-  }
-
+  // ---------------------------------------------------------------------
+  // O ENDOSSO DO PROFESSOR SAIU (ADR-040). O CONSENTIMENTO DO TITULAR NAO.
+  // ---------------------------------------------------------------------
+  //
+  // O aceite era DUPLO: o aluno consentia e o professor endossava. O PI
+  // removeu o endosso em 21/08/2026 -- a analise entra direto e fica
+  // disponivel, sem esperar ninguem endossar.
+  //
+  // O que fica e o consentimento do ALUNO, e ele nao e escolha de produto:
+  // dado de saude e sensivel (LGPD art. 5, II) e o art. 11 e LISTA FECHADA
+  // -- legitimo interesse nao existe para ele. Enviar saude de quem nao
+  // consentiu a um provedor externo nao vira legal porque o processo ficou
+  // mais rapido, e o `CLAUDE.md` lista LGPD entre as duas unicas coisas que
+  // param a entrega.
+  //
+  // Por isso os ramos acima permanecem: falta de consentimento, recusa,
+  // documento aposentado e a virada dos 18 continuam bloqueando. Sumiram
+  // apenas os quatro ramos do professor -- inclusive `OUT_OF_ORDER`, que so
+  // fazia sentido comparando endosso com consentimento.
   return { autorizado: true };
 }
 

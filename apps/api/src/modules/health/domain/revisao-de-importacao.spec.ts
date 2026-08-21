@@ -20,6 +20,9 @@ function campo(sobrescreve: Partial<CampoExtraido> = {}): CampoExtraido {
     reviewedValue: null,
     reviewedUnit: null,
     sourceLabel: null,
+    referenceMin: null,
+    referenceMax: null,
+    standardPercent: null,
     ...sobrescreve,
   };
 }

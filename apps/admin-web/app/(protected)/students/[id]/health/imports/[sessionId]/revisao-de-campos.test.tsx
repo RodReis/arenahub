@@ -168,22 +168,48 @@ describe('revisao de campos', () => {
   });
 });
 
-describe('achado do ECG', () => {
-  it('exibe o achado do ECG como texto do aparelho, sem acao', () => {
-    render(<AchadoDoEcg ecgFinding="Ritmo nao classificado" />);
+describe('informacoes do ECG', () => {
+  it('exibe TUDO que o aparelho reportou, sem acao nenhuma', () => {
+    render(
+      <AchadoDoEcg
+        atributos={{
+          ecgFinding: 'Ritmo nao classificado',
+          ecgHeartRate: 92,
+          ecgDurationSeconds: 30,
+          ecgRecordedAt: 'segunda-feira, 3 de agosto de 2026 as 08:10:00',
+          ecgTags: ['Atividade:Alta', 'Tontura'],
+        }}
+      />,
+    );
 
-    expect(screen.getByText(/ritmo nao classificado/i)).toBeInTheDocument();
-    expect(screen.getByText(/não constitui diagnóstico/i)).toBeInTheDocument();
-    // ADR-035 e decisao 2 do PI: nada de encaminhamento nesta tela, NENHUM botao.
+    expect(screen.getByTestId('achado-ecg')).toHaveTextContent('Ritmo nao classificado');
+    expect(screen.getByTestId('ecg-frequencia')).toHaveTextContent('92 bpm');
+    expect(screen.getByTestId('ecg-duracao')).toHaveTextContent('30 s');
+    expect(screen.getByTestId('ecg-tags')).toHaveTextContent('Atividade:Alta, Tontura');
+    expect(screen.getByText(/não constituem diagnóstico/i)).toBeInTheDocument();
+
+    // ADR-035: exibir e o limite. NENHUM botao, nenhuma conduta, nenhum
+    // rotulo de gravidade derivado do texto -- interpretar enquadraria o
+    // produto como dispositivo medico (RDC 657/2022).
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(screen.queryByText(/encaminhamento/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/exige leitura m[eé]dica/i)).not.toBeInTheDocument();
   });
 
-  it('mostra ausencia quando nenhum arquivo trouxe achado', () => {
+  it('cada informacao ausente vira traco, nunca zero nem branco (INV-104)', () => {
+    render(<AchadoDoEcg atributos={{ ecgFinding: 'Ritmo normal' }} />);
+
+    // O achado veio; frequencia, duracao e tags nao. Cada uma some sozinha.
+    expect(screen.getByTestId('achado-ecg')).toHaveTextContent('Ritmo normal');
+    expect(screen.getByTestId('ecg-frequencia')).toHaveTextContent('—');
+    expect(screen.getByTestId('ecg-duracao')).toHaveTextContent('—');
+    expect(screen.getByTestId('ecg-tags')).toHaveTextContent('—');
+  });
+
+  it('sem arquivo de ECG na sessao, mostra ausencia em tudo', () => {
     render(<AchadoDoEcg />);
 
-    expect(screen.getByTestId('achado-ecg-ausente')).toBeInTheDocument();
+    expect(screen.getByTestId('achado-ecg')).toHaveTextContent('—');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
@@ -234,7 +260,10 @@ describe('atributosDoAparelho', () => {
       ],
     };
 
-    expect(atributosDoAparelho(sessao)).toEqual({});
+    // `null` e nao `{}`: "nao ha arquivo de ECG nesta sessao" e diferente de
+    // "ha um ECG que nao reportou nada", e a tela mostra as duas coisas
+    // igual -- traco em cada linha -- mas o dado nao pode confundi-las.
+    expect(atributosDoAparelho(sessao)).toBeNull();
   });
 });
 

@@ -241,7 +241,7 @@ describe('F21 -- analise assistiva por IA', () => {
     await app.close();
   });
 
-  describe('o aceite DUPLO (M3-AC-007)', () => {
+  describe('o aceite DIRETO', () => {
     it('gera a analise com as duas assinaturas', async () => {
       const aluno = await alunoPronto(contas.a);
 
