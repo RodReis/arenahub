@@ -2043,3 +2043,81 @@ exames.
 Lista fechada erra por omissão: um fator que ninguém previu não tem como ser registrado, e o
 alerta falso aparece. **É o erro certo a cometer** — falta um fator, adiciona-se um item com
 teste; sobra um campo livre, não há como recolher o dado de saúde que já foi digitado nele.
+
+---
+
+<a id="adr-038"></a>
+## ADR-038 — Uma medição, três arquivos: a importação passa a ser N:1 com a avaliação
+
+**Data:** 21/08/2026 · **Status:** `proposto` — aguarda decisão do PI
+· **Emenda material:** `MVP-03` §7 (Slice 3.3) e §8 (`M3-FR-009`, `M3-FR-011`)
+· **Depende de:** ADR-035 (ECG), ADR-020 (`packages/database`)
+· **Condiciona:** a fatia da avaliação multiarquivo; o contrato que F26–F28 consomem
+
+**Contexto.** A Arena Positiva mede o aluno uma vez por mês e sai com **três arquivos da mesma
+medição**: o relatório da balança `CF610_G`, o relatório de análise do Unique Health — que lê a
+**mesma** balança (`CF:E8:CC:12:00:11`), no **mesmo** instante, com o **mesmo** peso — e um ECG de
+30 s do OMRON HEM-7530T.
+
+A F19 entregou o caminho de importação com **um arquivo = uma importação = uma avaliação**:
+`AssessmentImport.assessmentId` é `@unique` e `BodyAssessment.import` é singular. Três arquivos
+produziriam **três avaliações no mesmo instante** — três pontos no gráfico para uma medição só, e
+o comparativo da F18 passaria a mentir sobre a evolução do aluno.
+
+O modelo não está errado: ele resolve o caso que a Slice 3.3 descreve. O que mudou é o fato
+operacional — a academia não gera um laudo por medição, gera três.
+
+**Decisão.**
+
+1. **A relação vira N:1.** `@unique` sai de `assessmentId`; `BodyAssessment.import` vira
+   `imports AssessmentImport[]`. Cada arquivo permanece sua própria importação, com seu antivírus,
+   seu extrator e sua proveniência — o que muda é o destino.
+
+2. **Nasce a sessão de revisão.** Os arquivos sobem, formam um conjunto pendente, e o avaliador
+   confirma **uma vez**. A avaliação nasce nesse commit, com as medidas de todos os arquivos. O
+   INV-103 é preservado e melhor servido: uma decisão humana em vez de três.
+
+3. **Campo concordante é deduplicado; divergente, nunca.** Quando dois arquivos trazem o mesmo
+   tipo com valor equivalente, a revisão mostra uma linha com o selo de duas origens. Quando
+   divergem, mostra as duas **sem pré-seleção** — escolher por quem avalia é o erro que este
+   processo existe para impedir.
+
+4. **Bioimpedância é obrigatória, ECG é opcional.** Conjunto sem laudo de composição corporal não
+   vira avaliação: seria um ponto vazio na série da F18.
+
+5. **O enum de medidas cresce de 15 para 34** — 10 segmentares (que alimentam a visualização
+   corporal do aluno), 8 de composição que os laudos já traziam e o modelo não guardava, e
+   `HEART_RATE`. O `M3-FR-005` já exigia medidas segmentares; esta é a dívida sendo paga.
+
+6. **Índice, classificação e sugestão do fabricante NÃO viram medida.** Idade corporal, pontuação
+   de saúde, tipo de corpo, peso ideal e os "controles" sugeridos pela balança vão para
+   `BodyAssessment.deviceReport`, fora do gráfico de evolução. **Critério: vira medida o que é
+   medido e comparável; vira atributo o que é índice proprietário.** Comparar mês a mês um número
+   cuja fórmula pode mudar num firmware novo produziria tendência falsa — e o aluno leria como
+   progresso o que foi só troca de algoritmo.
+
+7. **O ECG segue o ADR-035, sem exceção.** Guarda-se `HEART_RATE` como medida e o achado, as tags
+   e as observações como texto atribuído ao aparelho. **Nenhuma linha de código lê o achado para
+   decidir coisa alguma** — não alerta, não encaminha, não bloqueia. O PI registrou em 21/08/2026
+   que o anexo do arquivo já pressupõe conversa presencial com o aluno, então não há pendência a
+   criar. O card de encaminhamento sai da tela.
+
+**Por que não uma entidade agrupadora nova.** Os três arquivos *já são* a mesma avaliação — mesmo
+instante, mesma balança. Uma tabela intermediária acrescentaria um nível de indireção para
+expressar o que `BodyAssessment` já expressa, e todo consumidor pagaria o join.
+
+**Por que isto é ADR e não decisão de PR.** Migração de schema com `@unique` removido é cara de
+desfazer depois que dado histórico existir, e o contrato de evolução corporal será consumido pelo
+app e pelo totem (F26–F28) — outro sistema passando a depender da forma.
+
+**Custo de reverter.** Hoje, baixo: nenhuma avaliação de produção tem importação associada (a
+migration da F19 é a mais recente). Depois da primeira importação real de três arquivos, voltar
+para 1:1 exige escolher qual dos arquivos "é" a avaliação e descartar a proveniência dos outros.
+
+### Risco assumido
+
+**A deduplicação pode esconder divergência real.** Se a tolerância de comparação for larga demais,
+dois valores genuinamente diferentes seriam fundidos e o número errado viraria histórico com selo
+de "confirmado por dois arquivos". Mitigação: a tolerância deriva da **precisão impressa no
+laudo**, não de estimativa, e a assimetria é deliberada — mostrar divergência falsa custa um
+clique, escondê-la custa um dado errado no prontuário do aluno.
