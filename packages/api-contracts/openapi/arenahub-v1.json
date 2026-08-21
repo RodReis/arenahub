@@ -1981,6 +1981,37 @@
         ]
       }
     },
+    "/api/v1/students/{id}/body-evolution": {
+      "get": {
+        "operationId": "BodyEvolutionController_evolucaoDoAluno",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BodyEvolution"
+        ]
+      }
+    },
     "/api/v1/students/{id}/ai-analyses": {
       "post": {
         "operationId": "AiAnalysisController_gerar",
@@ -2056,6 +2087,52 @@
         "parameters": [],
         "responses": {
           "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Import"
+        ]
+      }
+    },
+    "/api/v1/assessment-imports/sessions/{sessionId}": {
+      "get": {
+        "operationId": "ImportController_detalharSessao",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Import"
+        ]
+      }
+    },
+    "/api/v1/assessment-imports/sessions/{sessionId}/confirm": {
+      "post": {
+        "operationId": "ImportController_confirmarSessao",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
             "description": ""
           }
         },
