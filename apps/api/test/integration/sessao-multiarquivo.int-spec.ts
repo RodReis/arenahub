@@ -8,9 +8,14 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
+import { Prisma } from '@arenahub/database';
+
 import { AppModule } from '../../src/app.module.js';
+import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
+import { AssessmentRepository } from '../../src/modules/health/assessment.repository.js';
+import { AvaliacaoJaExisteParaOrigemError } from '../../src/modules/health/domain/avaliacao.js';
 import { FakeMalwareScannerAdapter } from '../../src/modules/health/provider/fake-malware-scanner.adapter.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
@@ -41,6 +46,7 @@ describe('F-multiarquivo -- sessao de revisao', () => {
   let app: INestApplication;
   let db: PrismaService;
   let scanner: FakeMalwareScannerAdapter;
+  let avaliacoesRepo: AssessmentRepository;
 
   const sufixo = randomUUID().slice(0, 8);
   const SENHA = 'senha-de-teste-correta';
@@ -320,6 +326,7 @@ describe('F-multiarquivo -- sessao de revisao', () => {
 
     db = app.get(PrismaService);
     scanner = app.get(FakeMalwareScannerAdapter);
+    avaliacoesRepo = app.get(AssessmentRepository);
 
     await montarAcademia(contas.a, `fma-academia-a-${sufixo}`);
     await montarAcademia(contas.b, `fma-academia-b-${sufixo}`);
@@ -492,6 +499,94 @@ describe('F-multiarquivo -- sessao de revisao', () => {
       expect(imports).toHaveLength(3);
       expect(imports.every((i) => i.assessmentId === assessmentIdVencedor)).toBe(true);
     });
+
+    /**
+     * FIX (revisao adversarial, achado contra Postgres real): "sessao
+     * permanentemente travada, com erro que mente sobre a causa".
+     *
+     * `consolidar()` colapsa a linha CONCORDANTE de `WEIGHT` (88,40 do
+     * CF610_G e 88,4 do Unique Health concordam dentro da tolerancia) para
+     * UM representante -- o gemeo NUNCA aparece em `linha.campos`, entao a
+     * tela de revisao normal nunca oferece um botao para confirma-lo. Mas a
+     * rota de campo isolado da F19 (`POST .../fields/:fieldId`, mesma
+     * permissao `health.assess`) aceita QUALQUER campo do import, sem saber
+     * que ele e um gemeo escondido -- e nada a protegia.
+     *
+     * Reproduz exatamente a sequencia do achado:
+     *   1. sobe CF610_G + Unique Health na mesma sessao (WEIGHT concorda,
+     *      colapsa para um representante);
+     *   2. revisa normalmente -- todo campo VISIVEL confirmado;
+     *   3. confirma o gemeo escondido pela rota de campo isolado (F19);
+     *   4. confirma a sessao.
+     *
+     * Antes do fix: passo 4 falhava com 409 `SESSION_ALREADY_CONFIRMED`
+     * (mentindo sobre a causa -- o problema era medida duplicada, nao
+     * confirmacao dupla) e a sessao ficava travada PARA SEMPRE, porque
+     * nenhuma tentativa futura resolve um conflito que esta nos DADOS.
+     *
+     * Depois do fix: `valoresAceitosDaSessao` roda `valoresAceitos` POR
+     * LINHA consolidada -- a linha `WEIGHT` so tem o representante em
+     * `linha.campos`, entao o gemeo confirmado por fora NUNCA e visto por
+     * esta chamada. A sessao confirma normalmente, com UMA medida `WEIGHT`
+     * so.
+     */
+    it('confirmar o gemeo escondido pela rota de campo isolado (F19) nao trava a sessao', async () => {
+      const studentId = await criarAluno(contas.a);
+
+      const envioBio = await enviar(contas.a, studentId, BIO_CSV, 'cf610g.csv', 'text/csv', {
+        sourceLabel: 'CF610_G',
+      });
+      expect(envioBio.status).toBe(201);
+      const reviewSessionId = (envioBio.body as { reviewSessionId: string }).reviewSessionId;
+
+      const envioUnique = await enviar(contas.a, studentId, UNIQUE_CSV, 'unique.csv', 'text/csv', {
+        reviewSessionId,
+        sourceLabel: 'Unique Health',
+      });
+      expect(envioUnique.status).toBe(201);
+
+      // Passo 2: revisao normal -- todo campo VISIVEL confirmado. A tela
+      // NUNCA mostra o gemeo de WEIGHT que concordou e foi colapsado.
+      const depoisDaRevisaoNormal = await confirmarTodosOsCampos(contas.a, reviewSessionId);
+      const linhaWeight = depoisDaRevisaoNormal.linhas.find((l) => l.type === 'WEIGHT');
+      expect(linhaWeight?.campos).toHaveLength(1); // so o representante, o gemeo esta escondido.
+
+      // Passo 3: acha o gemeo ESCONDIDO direto no banco (a API nunca o
+      // expõe) e confirma pela rota de campo isolado da F19 -- exatamente
+      // o caminho que o achado da revisao adversarial usou.
+      const camposWeightNoBanco = await db.importedField.findMany({
+        where: {
+          type: 'WEIGHT',
+          import: { reviewSessionId },
+        },
+        select: { id: true, importId: true, state: true },
+      });
+      expect(camposWeightNoBanco).toHaveLength(2); // representante + gemeo.
+
+      const gemeoEscondido = camposWeightNoBanco.find((c) => c.state === 'PENDING');
+      expect(gemeoEscondido).toBeDefined();
+
+      const confirmacaoDoGemeo = await revisar(
+        contas.a,
+        gemeoEscondido!.importId,
+        gemeoEscondido!.id,
+        { state: 'CONFIRMED' },
+      );
+      expect(confirmacaoDoGemeo.status).toBe(201);
+
+      // Passo 4: confirma a sessao -- DEVE suceder, nao travar.
+      const resposta = await confirmarSessao(contas.a, reviewSessionId);
+
+      expect(resposta.status).toBe(201);
+      const { assessmentId } = resposta.body as { assessmentId: string };
+
+      const medidas = await db.bodyMeasurement.findMany({ where: { assessmentId } });
+      const pesos = medidas.filter((m) => m.type === 'WEIGHT');
+      expect(pesos).toHaveLength(1); // UMA medida, nao duas -- P2002 nao escapou.
+
+      const avaliacoes = await db.bodyAssessment.count({ where: { studentId } });
+      expect(avaliacoes).toBe(1);
+    });
   });
 
   describe('sessaoPodeConfirmar (Task 4) na porta da frente', () => {
@@ -663,6 +758,77 @@ describe('F-multiarquivo -- sessao de revisao', () => {
 
       const avaliacoes = await db.bodyAssessment.count({ where: { studentId } });
       expect(avaliacoes).toBe(1);
+    });
+  });
+
+  /**
+   * FIX (revisao adversarial, parte b) -- `AssessmentRepository.criarRascunho`
+   * so pode traduzir P2002 para `AvaliacaoJaExisteParaOrigemError` quando o
+   * indice violado e `body_assessments_import_source_reference_uq`. A MESMA
+   * transacao tambem grava `body_measurements`, que tem seu PROPRIO
+   * `@@unique([assessmentId, type])` -- e um catch cego que traduzisse
+   * QUALQUER P2002 para "sessao ja confirmada" faria essa causa
+   * DESAPARECER atras de uma mensagem que MENTE sobre o problema (foi assim
+   * que o defeito de medida duplicada ficou invisivel).
+   *
+   * Chama `criarRascunho` DIRETO (sem passar pelo dedup do service, que
+   * agora impede este cenario de acontecer pela API publica) com DUAS
+   * medidas do MESMO tipo -- violacao deliberada de
+   * `body_measurements_assessment_id_type_key` -- e prova que o erro que
+   * escapa NAO e `AvaliacaoJaExisteParaOrigemError`.
+   */
+  describe('P2002 de outra origem nao vira "sessao ja confirmada"', () => {
+    it('violar o unique de body_measurements propaga o erro como ele mesmo', async () => {
+      const studentId = await criarAluno(contas.a);
+
+      // `evaluatorUserId` tem FK (`onDelete: Restrict`) -- precisa ser um
+      // usuario REAL, ou o `create` falha antes de chegar perto do unique
+      // que este teste quer violar.
+      const avaliador = await db.user.findFirstOrThrow({ where: { email: contas.a.email } });
+
+      const contexto: TenantContext = {
+        tenantId: contas.a.tenantId,
+        actorId: randomUUID(),
+        sessionId: randomUUID(),
+        permissions: new Set(),
+        allowedUnitIds: 'ALL',
+      };
+
+      const medidaDuplicada = {
+        type: 'WEIGHT' as const,
+        originalValue: 88.4,
+        originalUnit: 'kg' as const,
+        canonicalValue: 88.4,
+        canonicalUnit: 'kg' as const,
+      };
+
+      let erroCapturado: unknown;
+
+      try {
+        await avaliacoesRepo.criarRascunho(contexto, studentId, {
+          assessedAt: new Date('2026-08-10T12:00:00.000Z'),
+          evaluatorUserId: avaliador.id,
+          // DUAS medidas do MESMO tipo -- viola
+          // `body_measurements_assessment_id_type_key`, NAO o indice de
+          // sessao. Sem `source: 'IMPORT'`/`sourceReference`: este teste
+          // isola a causa, garantindo que nem o indice novo participa.
+          medidas: [medidaDuplicada, medidaDuplicada],
+        });
+      } catch (erro) {
+        erroCapturado = erro;
+      }
+
+      // O erro que ESCAPOU nao pode ser "sessao ja confirmada" -- essa
+      // causa e de OUTRO indice, e disfarça-la e o defeito que este teste
+      // existe para pegar.
+      expect(erroCapturado).not.toBeInstanceOf(AvaliacaoJaExisteParaOrigemError);
+
+      // E, positivamente, o erro que escapou e o P2002 CRU do Prisma --
+      // prova de que a narrow por `meta.target` funcionou (reconheceu que
+      // este P2002 NAO era do indice de sessao), em vez de algum outro erro
+      // ter mascarado o cenario.
+      expect(erroCapturado).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+      expect((erroCapturado as Prisma.PrismaClientKnownRequestError).code).toBe('P2002');
     });
   });
 });

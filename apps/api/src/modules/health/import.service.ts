@@ -15,6 +15,7 @@ import { AssessmentRepository } from './assessment.repository.js';
 import {
   ImportRepository,
   ImportacaoNaoEncontradaError,
+  MedidaDuplicadaNaSessaoError,
   RevisaoIncompletaError,
   SessaoBloqueadaError,
   SessaoDeOutroAlunoError,
@@ -29,6 +30,7 @@ import {
   valoresAceitos,
   type CampoExtraido,
   type EstadoDoCampo,
+  type ValorAceito,
 } from './domain/revisao-de-importacao.js';
 import type { UnidadeDeMedida } from './domain/medida.js';
 import { consolidar, type LinhaConsolidada } from './domain/consolidacao-de-laudos.js';
@@ -527,11 +529,10 @@ export class ImportService {
     }
 
     // `valoresAceitos` opera por CAMPO (CONFIRMED/CORRECTED/DISCARDED), e
-    // essa decisao e do avaliador em CADA campo, nao da linha consolidada:
-    // por isso roda sobre os campos ACEITOS de TODAS as linhas, achatados --
-    // igual `confirmar` faz para um import so, so que com o conjunto inteiro
-    // da sessao.
-    const aceitos = valoresAceitos(sessao.campos);
+    // essa decisao e do avaliador em CADA campo -- mas roda POR LINHA
+    // consolidada, nunca sobre `sessao.campos` cru achatado. Ver
+    // `valoresAceitosDaSessao` abaixo para o porque.
+    const aceitos = valoresAceitosDaSessao(linhas);
 
     const medidas = aceitos.map((valor) =>
       converterParaCanonica({ type: valor.type, value: valor.value, unit: valor.unit }),
@@ -664,6 +665,60 @@ export class ImportService {
 }
 
 /**
+ * `valoresAceitos` (Task 3), rodado POR LINHA CONSOLIDADA -- nunca sobre
+ * `sessao.campos` cru achatado (fix, revisao adversarial contra Postgres
+ * real: "sessao permanentemente travada com erro que mente sobre a causa").
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE RODAR SOBRE O CRU ACHATADO ERA ERRADO
+ * ---------------------------------------------------------------------------
+ *
+ * `consolidar()` colapsa uma linha CONCORDANTE para UM campo representante
+ * -- o gemeo que concorda com ele (ex.: `WEIGHT` 88,4 do segundo arquivo,
+ * concordando com 88,40 do primeiro) NUNCA aparece na tela de revisao
+ * (`linha.campos`). Mas nada IMPEDIA esse gemeo de ser confirmado por fora
+ * da tela -- a rota de campo isolado (`POST .../fields/:fieldId`, F19)
+ * aceita qualquer campo do import, sem saber que ele e um gemeo escondido.
+ * Rodar `valoresAceitos` sobre `sessao.campos` cru pegava OS DOIS lados
+ * (representante + gemeo) quando isso acontecia, produzindo DUAS medidas do
+ * MESMO tipo -- e o `@@unique([assessmentId, type])` do banco estourava
+ * `P2002` DENTRO de `criarRascunho`. Pior: se o rascunho ainda assim
+ * chegasse a existir antes do estouro, a sessao ficava presa em 409
+ * `SESSION_ALREADY_CONFIRMED` PARA SEMPRE -- mensagem que MENTE sobre a
+ * causa (o problema nao e confirmacao duplicada, e medida duplicada), e
+ * nenhuma tentativa futura resolve sozinha porque o conflito esta nos
+ * DADOS revisados, nao numa corrida.
+ *
+ * ---------------------------------------------------------------------------
+ * A REGRA CORRIGIDA
+ * ---------------------------------------------------------------------------
+ *
+ * Por LINHA: linha CONCORDANTE tem exatamente um campo em `linha.campos`
+ * (o representante) -- `valoresAceitos` sobre ele produz no maximo UM valor,
+ * trivialmente. Linha DIVERGENTE tem o grupo INTEIRO -- se mais de um
+ * campo do grupo foi ACEITO (CONFIRMED/CORRECTED) de verdade, isso e um
+ * CONFLITO REAL que o avaliador precisa resolver (descartar um dos lados),
+ * nao um bug de programacao: falha com `MedidaDuplicadaNaSessaoError`,
+ * nomeando o TIPO em conflito, em vez de deixar o Postgres estourar um
+ * P2002 cru mais tarde.
+ */
+function valoresAceitosDaSessao(linhas: readonly LinhaConsolidada[]): ValorAceito[] {
+  const aceitos: ValorAceito[] = [];
+
+  for (const linha of linhas) {
+    const aceitosDaLinha = valoresAceitos(linha.campos);
+
+    if (aceitosDaLinha.length > 1) {
+      throw new MedidaDuplicadaNaSessaoError(linha.type);
+    }
+
+    aceitos.push(...aceitosDaLinha);
+  }
+
+  return aceitos;
+}
+
+/**
  * Traduz `LinhaConsolidada[]` (Task 3) em pares `(campoId, agreesWithFieldId)`
  * prontos para `gravarConcordancias`.
  *
@@ -724,6 +779,18 @@ function paresDeConcordancia(
  *
  * `undefined` quando nenhum import da sessao trouxe atributo: nao grava
  * `deviceReport: {}` para uma avaliacao manual/sem aparelho.
+ *
+ * ponytail: o `reduce` faz merge raso (`{ ...acc, ...atributos }`) sem
+ * checar colisao de chave -- se DOIS arquivos da sessao trouxessem a MESMA
+ * chave (ex.: dois ECGs, cada um com `ecgFinding`), o do arquivo que entrou
+ * DEPOIS sobrescreve o anterior em silencio, sem aviso nem erro. Inofensivo
+ * hoje: uma sessao tem no maximo UM ECG (a bioimpedancia nao produz
+ * `atributos`), e o conteudo e opaco (texto de exibicao, nunca decidido em
+ * cima) -- perder um `ecgFinding` duplicado nao muda nenhuma medida nem
+ * decisao clinica. Se um dia a sessao aceitar mais de um arquivo do MESMO
+ * tipo de aparelho (dois ECGs, por exemplo), trocar por um merge que
+ * detecta colisao de chave e decide (namespacing por `sourceLabel`, ou
+ * agregar em array) em vez de sobrescrever.
  */
 function dadosDoAparelho(
   atributosPorImport: readonly (Record<string, unknown> | null)[],

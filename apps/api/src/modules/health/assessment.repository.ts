@@ -84,6 +84,24 @@ export class AssessmentRepository {
    * em `AvaliacaoJaExisteParaOrigemError` (409), nunca deixando o erro cru
    * do driver vazar. Ver o comentario do erro para o porque o indice mora
    * NESTA tabela, e nao em `assessment_imports` (Task 5, fix round 2).
+   *
+   * ---------------------------------------------------------------------------
+   * SO ESTE INDICE -- NUNCA "QUALQUER P2002" (fix, revisao adversarial)
+   * ---------------------------------------------------------------------------
+   *
+   * Esta transacao tambem grava `body_measurements`, que tem seu PROPRIO
+   * `@@unique([assessmentId, type])` -- duas medidas do MESMO tipo (ex.:
+   * dois `WEIGHT`, quando um gemeo escondido pela consolidacao e confirmado
+   * por fora da tela de revisao) tambem estouram `P2002`, por um indice
+   * DIFERENTE. Um catch cego que traduzisse QUALQUER `P2002` para
+   * "sessao ja confirmada" faria essa segunda causa desaparecer atras de
+   * uma mensagem que MENTE sobre o problema -- foi exatamente assim que o
+   * defeito de medida duplicada ficou invisivel ate a revisao adversarial
+   * contra Postgres real. `erro.meta.target` traz o nome da CONSTRAINT que
+   * violou; so quando ele aponta para o indice desta tabela e que o erro
+   * vira `AvaliacaoJaExisteParaOrigemError`. Qualquer outra violacao de
+   * unicidade (ex.: `body_measurements`) sobe como ELA MESMA, para o
+   * proximo bug desta classe aparecer alto, nao disfarcado.
    */
   async criarRascunho(
     contexto: TenantContext,
@@ -116,7 +134,11 @@ export class AssessmentRepository {
         return this.exigirComMedidas(tx, contexto, avaliacao.id);
       });
     } catch (erro: unknown) {
-      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002') {
+      if (
+        erro instanceof Prisma.PrismaClientKnownRequestError &&
+        erro.code === 'P2002' &&
+        violaIndiceDeOrigem(erro)
+      ) {
         throw new AvaliacaoJaExisteParaOrigemError();
       }
 
@@ -550,4 +572,53 @@ export class AssessmentRepository {
 
     return avaliacao;
   }
+}
+
+/**
+ * O `P2002` veio do indice `body_assessments_import_source_reference_uq`,
+ * e nao de outra violacao de unicidade na MESMA transacao (ex.:
+ * `body_measurements_assessment_id_type_key`)?
+ *
+ * ---------------------------------------------------------------------------
+ * A FORMA REAL DE `erro.meta` (Prisma 7, driver adapter) NAO E `{ target }`
+ * ---------------------------------------------------------------------------
+ *
+ * A doc classica do Prisma (e a primeira versao desta funcao) supunha
+ * `erro.meta.target` como string ou array de campos -- formato de versoes
+ * anteriores, SEM driver adapter. Rodando contra Postgres de verdade
+ * (`@prisma/adapter-pg`, a configuracao deste projeto), o formato observado
+ * e outro:
+ *
+ *     {
+ *       modelName: "BodyAssessment",
+ *       driverAdapterError: { cause: { originalMessage:
+ *         "duplicate key value violates unique constraint
+ *          \"body_assessments_import_source_reference_uq\"",
+ *         constraint: { fields: ["source_reference"] } } }
+ *     }
+ *
+ * `target` simplesmente NAO EXISTE nesse objeto -- checar por ele fazia esta
+ * funcao devolver `false` SEMPRE, e todo P2002 (inclusive o esperado, da
+ * MESMA sessao confirmada duas vezes) escapava cru em vez de virar
+ * `AvaliacaoJaExisteParaOrigemError`. O nome da constraint mora dentro de
+ * `originalMessage` (texto livre do Postgres) -- e por isso a checagem e
+ * "contem o nome do indice", nao igualdade estrita de um campo estruturado
+ * que este driver nao garante.
+ */
+function violaIndiceDeOrigem(erro: Prisma.PrismaClientKnownRequestError): boolean {
+  const meta: unknown = erro.meta;
+
+  if (meta === null || typeof meta !== 'object') return false;
+
+  const driverError: unknown = (meta as Record<string, unknown>)['driverAdapterError'];
+
+  if (driverError === null || typeof driverError !== 'object') return false;
+
+  const cause: unknown = (driverError as Record<string, unknown>)['cause'];
+
+  if (cause === null || typeof cause !== 'object') return false;
+
+  const mensagem: unknown = (cause as Record<string, unknown>)['originalMessage'];
+
+  return typeof mensagem === 'string' && mensagem.includes('body_assessments_import_source_reference_uq');
 }

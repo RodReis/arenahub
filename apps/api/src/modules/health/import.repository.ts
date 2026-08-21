@@ -109,6 +109,39 @@ export class CampoNaoEncontradoError extends ErroDeDominio {
   }
 }
 
+/**
+ * Um TIPO de medida tem mais de um valor ACEITO na sessao -- dois campos
+ * divergentes foram os DOIS confirmados/corrigidos, em vez de um confirmado
+ * e o(s) outro(s) descartado(s) (revisao adversarial, achado contra
+ * Postgres real).
+ *
+ * `consolidar()` NUNCA deduplica uma linha DIVERGENTE (e correto: o humano
+ * precisa decidir qual valor vale) -- mas nada IMPEDIA o avaliador de
+ * confirmar os DOIS lados pela rota de campo isolado (`POST
+ * assessment-imports/:id/fields/:fieldId`, F19), que aceita qualquer campo
+ * do import sem saber que ele pertence a uma linha divergente de outra
+ * sessao. Sem esta checagem, duas medidas do MESMO tipo entrariam na MESMA
+ * avaliacao e o `@@unique([assessmentId, type])` do banco estourava um
+ * P2002 cru, sem dizer qual tipo nem por que -- e pior, se o rascunho
+ * chegasse a ser criado antes do estouro, a sessao ficava travada em 409
+ * `SESSION_ALREADY_CONFIRMED` para sempre (nenhuma tentativa futura resolve
+ * sozinha, porque o conflito esta nos DADOS revisados, nao numa corrida).
+ *
+ * O `title` carrega o TIPO em conflito, pela mesma razao de
+ * `RevisaoIncompletaError`: o `application/problem+json` do projeto nao
+ * carrega campos extras, e sem o tipo no titulo o avaliador nao saberia
+ * qual dos vinte campos da sessao decidir de novo.
+ */
+export class MedidaDuplicadaNaSessaoError extends ErroDeDominio {
+  constructor(tipo: string) {
+    super(
+      'SESSION_MEASUREMENT_CONFLICT',
+      409,
+      `mais de um valor aceito para o tipo ${tipo}; descarte um dos campos divergentes`,
+    );
+  }
+}
+
 export type StatusDaImportacao =
   | 'RECEIVED'
   | 'INFECTED'
