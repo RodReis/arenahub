@@ -49,3 +49,95 @@
   border-bottom-color: var(--ah-accent-600);
   font-weight: 600;
 }
+
+/*
+ * Envio dos laudos do mês.
+ *
+ * Bloco próprio acima do histórico: é o que a academia FAZ nesta tela toda
+ * medição, enquanto o gráfico é o que ela consulta. Sem o contorno, o
+ * seletor de arquivo flutuava solto entre o título e os períodos, parecendo
+ * parte do filtro.
+ */
+.envio {
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.tituloDoEnvio {
+  margin: 0 0 4px;
+  font-size: var(--ah-type-body-size);
+  font-weight: 600;
+  color: var(--ah-text-strong);
+}
+
+.ajudaDoEnvio {
+  margin: 0 0 12px;
+  max-width: 68ch;
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * Seletor e botão na mesma linha, quebrando junto no estreito. O motivo do
+ * bloqueio entra como terceiro item e ocupa a linha inteira quando quebra.
+ */
+.linhaDoEnvio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.motivoDoBotao {
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * O input nativo sai da vista mas CONTINUA no fluxo de foco -- `display:
+ * none` ou `visibility: hidden` o tirariam da navegação por teclado, e o
+ * campo ficaria inalcançável para quem não usa mouse.
+ */
+.seletorNativo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * O `<label>` faz o papel do botão: clique e Enter já abrem o seletor pelo
+ * comportamento nativo, sem JavaScript. O anel de foco vem do input
+ * escondido, por isso `:focus-within` no irmão adjacente.
+ */
+.botaoDeEscolher {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-control);
+  background: var(--ah-surface-canvas);
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-size);
+  cursor: pointer;
+}
+
+.botaoDeEscolher:hover {
+  border-color: var(--ah-border-hover);
+}
+
+.seletorNativo:focus-visible + .botaoDeEscolher {
+  outline: 2px solid var(--ah-accent-600);
+  outline-offset: 2px;
+}
+
+.nomesDosArquivos {
+  color: var(--ah-text-secondary);
+  overflow-wrap: anywhere;
+}

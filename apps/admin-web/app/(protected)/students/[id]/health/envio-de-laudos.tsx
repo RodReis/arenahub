@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button, useToastDeErro } from '@arenahub/ui';
 
 import { enviarArquivos, type EstadoDoEnvio } from '../../../../actions/assessment-imports';
+import estilos from './health.module.css';
 
 const ESTADO_INICIAL: EstadoDoEnvio = {};
 
@@ -36,7 +37,8 @@ interface Props {
  */
 export function EnvioDeLaudos({ studentId }: Props) {
   const [estado, acao] = useActionState(enviarArquivos, ESTADO_INICIAL);
-  const [quantidade, setQuantidade] = useState(0);
+  const [nomes, setNomes] = useState<readonly string[]>([]);
+  const quantidade = nomes.length;
   const entrada = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -57,16 +59,31 @@ export function EnvioDeLaudos({ studentId }: Props) {
     if (sessaoCriada === undefined) return;
 
     if (entrada.current !== null) entrada.current.value = '';
+    setNomes([]);
 
     router.push(`/students/${studentId}/health/imports/${sessaoCriada}`);
   }, [sessaoCriada, studentId, router]);
 
   return (
-    <form action={acao} data-testid="envio-de-laudos">
+    <form action={acao} data-testid="envio-de-laudos" className={estilos['envio']}>
       <input type="hidden" name="studentId" value={studentId} />
 
-      <label htmlFor="arquivos-do-laudo">
-        Laudos da avaliação
+      <h2 className={estilos['tituloDoEnvio']}>Laudos da avaliação</h2>
+
+      <p className={estilos['ajudaDoEnvio']}>
+        Envie os arquivos da mesma medição juntos — balança, análise e ECG. Eles viram{' '}
+        <strong>uma</strong> avaliação, gravada e disponível para o aluno na hora.
+      </p>
+
+      <div className={estilos['linhaDoEnvio']}>
+        {/*
+          O `input[type=file]` nativo escreve "Choose Files / No file chosen"
+          em INGLÊS -- texto do navegador, que o HTML não deixa traduzir, e a
+          interface do ArenaHub é pt-BR (`CLAUDE.md`). Por isso ele fica
+          visualmente escondido e um `<label>` estilizado o dispara: o label
+          nativo já abre o seletor no clique e no Enter, sem JavaScript, e
+          continua sendo o rótulo acessível do campo.
+        */}
         <input
           ref={entrada}
           id="arquivos-do-laudo"
@@ -74,31 +91,50 @@ export function EnvioDeLaudos({ studentId }: Props) {
           type="file"
           multiple
           accept={TIPOS_ACEITOS}
-          onChange={(evento) => setQuantidade(evento.target.files?.length ?? 0)}
+          className={estilos['seletorNativo']}
+          onChange={(evento) =>
+            setNomes(Array.from(evento.target.files ?? [], (arquivo) => arquivo.name))
+          }
           data-testid="seletor-de-laudos"
         />
-      </label>
 
-      <p>
-        Envie os arquivos da mesma medição juntos — balança, análise e ECG. Eles viram{' '}
-        <strong>uma</strong> avaliação depois da sua conferência campo a campo.
-      </p>
+        <label htmlFor="arquivos-do-laudo" className={estilos['botaoDeEscolher']}>
+          Escolher arquivos
+        </label>
 
-      <BotaoDeEnvio quantidade={quantidade} />
+        <span className={estilos['nomesDosArquivos']} data-testid="arquivos-escolhidos">
+          {nomes.length === 0 ? 'Nenhum arquivo escolhido' : nomes.join(', ')}
+        </span>
+
+        <BotaoDeEnvio quantidade={quantidade} />
+      </div>
     </form>
   );
 }
 
 function BotaoDeEnvio({ quantidade }: { readonly quantidade: number }) {
   const { pending } = useFormStatus();
+  const semArquivo = quantidade === 0;
 
   return (
-    <Button type="submit" variant="solid" disabled={pending || quantidade === 0}>
-      {pending
-        ? 'Enviando…'
-        : quantidade === 0
-          ? 'Enviar laudos'
-          : `Enviar ${quantidade} arquivo${quantidade > 1 ? 's' : ''}`}
-    </Button>
+    <>
+      <Button type="submit" variant="solid" disabled={pending || semArquivo}>
+        {pending
+          ? 'Enviando…'
+          : semArquivo
+            ? 'Enviar laudos'
+            : `Enviar ${quantidade} arquivo${quantidade > 1 ? 's' : ''}`}
+      </Button>
+
+      {/*
+        Botão desabilitado sem explicação é beco sem saída: quem olha não
+        sabe se falta escolher arquivo, se falta permissão, ou se quebrou.
+      */}
+      {semArquivo && !pending ? (
+        <span className={estilos['motivoDoBotao']} data-testid="motivo-envio-bloqueado">
+          Escolha ao menos um arquivo para habilitar o envio.
+        </span>
+      ) : null}
+    </>
   );
 }
