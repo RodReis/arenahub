@@ -1,0 +1,121 @@
+/**
+ * Revisao de campos multiarquivo -- Task 9, F-multiarquivo.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`
+ * e `--ah-border-*`, nunca `--ah-carbon-*` cru.
+ */
+
+.arquivos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.arquivo {
+  padding: 8px 12px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+  font-size: var(--ah-type-body-size);
+}
+
+.tela {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .tela {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabela th,
+.tabela td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--ah-border-subtle);
+  font-size: var(--ah-type-body-size);
+}
+
+.tabela th {
+  color: var(--ah-text-secondary);
+  font-weight: 600;
+}
+
+/*
+ * Linha divergente e destacada -- Regra 1 do brief: nunca colapsa, sempre
+ * agrupada e visualmente distinta. O fundo sozinho nao bastaria para quem nao
+ * distingue cor (WCAG 1.4.1): a borda esquerda mais grossa sobrevive.
+ */
+.linhaDivergente {
+  background: color-mix(in srgb, var(--ah-state-warning) 8%, var(--ah-surface-raised));
+  border-left: 3px solid var(--ah-state-warning);
+}
+
+.origem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-badge);
+  font-size: var(--ah-type-caption-size);
+  color: var(--ah-text-secondary);
+  white-space: nowrap;
+}
+
+.opcaoDivergente {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.motivo {
+  margin-top: 8px;
+  color: var(--ah-state-warning);
+  font-size: var(--ah-type-body-size);
+}
+
+.painel {
+  padding: var(--ah-size-card-padding);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.painel h2 {
+  margin-top: 0;
+  font-size: var(--ah-type-title-size);
+}
+
+.blocoAparelho {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.rotuloDoAparelho {
+  margin: 0 0 4px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.acoes {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
