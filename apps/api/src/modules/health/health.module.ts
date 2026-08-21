@@ -8,6 +8,11 @@ import { AssessmentController } from './assessment.controller.js';
 import { AssessmentRepository } from './assessment.repository.js';
 import { AttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
+import { AiAnalysisController } from './ai-analysis.controller.js';
+import { AiAnalysisRepository } from './ai-analysis.repository.js';
+import { AiAnalysisService } from './ai-analysis.service.js';
+import { AI_PROVIDER } from './provider/ai-provider.port.js';
+import { FakeAiProviderAdapter } from './provider/fake-ai-provider.adapter.js';
 import { GoalRepository } from './goal.repository.js';
 import { HealthExportService } from './health-export.service.js';
 import { HealthProgressController } from './health-progress.controller.js';
@@ -35,11 +40,20 @@ import { HealthProgressService } from './health-progress.service.js';
   // `StorageModule` entra pela exportacao (F18): o CSV nasce na API e vai
   // para o bucket privado, com URL assinada curta -- nunca pelo navegador.
   imports: [StudentsModule, TenancyModule, StorageModule],
-  controllers: [AssessmentController, HealthProgressController],
+  controllers: [AssessmentController, HealthProgressController, AiAnalysisController],
   providers: [
     AssessmentRepository,
     AttendanceRepository,
     AttendanceService,
+    AiAnalysisRepository,
+    AiAnalysisService,
+    // O FAKE responde por padrao, e isso NAO e provisorio por descuido: o
+    // ADR-036 decisao 3 exige contrato com clausula de nao-treinamento
+    // firmado ANTES da primeira chamada com dado real, e ele nao esta
+    // firmado. Trocar pelo adapter real e `useClass` aqui -- mas so depois
+    // do contrato, que o codigo nao sabe conferir.
+    FakeAiProviderAdapter,
+    { provide: AI_PROVIDER, useExisting: FakeAiProviderAdapter },
     GoalRepository,
     HealthProgressService,
     HealthExportService,
