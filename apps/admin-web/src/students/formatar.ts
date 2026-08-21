@@ -128,23 +128,23 @@ export const ROTULO_DE_EVENTO: Record<string, string> = {
   BIOMETRIC_IDENTITY_DELETED: 'Biometria removida',
 };
 
-const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 /**
  * Dia da semana da janela de acesso.
  *
- * `dayOfWeek` é 1..7 (ISO-8601: 1 = segunda). Fora da faixa vira '—' em vez de
- * `undefined`, que apareceria literalmente na tabela.
+ * `dayOfWeek` é 0..6 (0 = domingo), o eixo do motor de decisão -- ver #129.
+ * Fora da faixa vira '—' em vez de `undefined`, que apareceria literalmente na
+ * tabela.
  *
- * A faixa é conferida antes de indexar: um array com casa vazia no índice 0
- * devolveria string vazia para `dayOfWeek: 0`, e `?? '—'` não pega string
- * vazia -- a célula sairia em branco, parecendo dado faltando em vez de dado
- * inválido.
+ * A faixa é conferida antes de indexar porque `?? '—'` não pega string vazia:
+ * sem a checagem, um índice inválido deixaria a célula em branco, parecendo
+ * dado faltando em vez de dado inválido.
  */
 export function diaDaSemana(dia: number): string {
-  if (!Number.isInteger(dia) || dia < 1 || dia > 7) return '—';
+  if (!Number.isInteger(dia) || dia < 0 || dia > 6) return '—';
 
-  return DIAS[dia - 1]!;
+  return DIAS[dia]!;
 }
 
 /**

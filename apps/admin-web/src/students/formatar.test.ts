@@ -118,14 +118,20 @@ describe('janela de acesso', () => {
     expect(horaDoMinuto(12.5)).toBe('—');
   });
 
-  it('dayOfWeek é ISO -- 1 é segunda, 7 é domingo', () => {
-    expect(diaDaSemana(1)).toBe('Segunda');
-    expect(diaDaSemana(7)).toBe('Domingo');
+  /**
+   * Eixo do motor de decisão: 0 = domingo ... 6 = sábado (#129). Os sete dias
+   * são conferidos um a um porque o defeito original só aparecia em UM deles
+   * -- um teste que checa duas pontas não pega um eixo deslocado no meio.
+   */
+  it('dayOfWeek é 0..6 -- 0 é domingo, 6 é sábado', () => {
+    expect(
+      [0, 1, 2, 3, 4, 5, 6].map((dia) => diaDaSemana(dia)),
+    ).toEqual(['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']);
   });
 
   it('dia fora da faixa vira traço', () => {
-    expect(diaDaSemana(0)).toBe('—');
-    expect(diaDaSemana(8)).toBe('—');
+    expect(diaDaSemana(-1)).toBe('—');
+    expect(diaDaSemana(7)).toBe('—');
   });
 
   it('monta a janela numa linha só', () => {

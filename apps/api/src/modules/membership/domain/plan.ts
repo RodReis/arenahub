@@ -15,8 +15,18 @@ import { ErroDeDominio } from '../../../common/http/erro-de-dominio.js';
 /** Minutos desde a meia-noite local. */
 export const MINUTOS_POR_DIA = 24 * 60;
 
-/** ISO-8601: 1 = segunda ... 7 = domingo. */
-export type DiaDaSemana = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+/**
+ * 0 = domingo ... 6 = sabado. Mesmo eixo de `Date.getDay()`, de
+ * `resolverHoraLocal` e de `AccessWindow.dayOfWeek`.
+ *
+ * O eixo e do MOTOR, nao ISO-8601, e essa escolha nao e estetica: e o motor
+ * que decide se a porta abre, e ele le `Date.getDay()`. Ate 21/08/2026 este
+ * arquivo validava ISO 1..7 enquanto o motor consumia 0..6 -- segunda a
+ * sabado coincidiam (1..6 existe nos dois eixos) e o DOMINGO negava todo
+ * mundo com `OUTSIDE_SCHEDULE`, porque o `7` gravado nao existe no eixo do
+ * motor. Ver issue #129.
+ */
+export type DiaDaSemana = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface JanelaDeAcesso {
   gymUnitId: string;
@@ -43,8 +53,8 @@ export class JanelaDeAcessoInvalidaError extends ErroDeDominio {
  * motor de decisao de F9 e um deles.
  */
 function validarJanelaIsolada(janela: JanelaDeAcesso): void {
-  if (!Number.isInteger(janela.dayOfWeek) || janela.dayOfWeek < 1 || janela.dayOfWeek > 7) {
-    throw new JanelaDeAcessoInvalidaError('dia da semana deve estar entre 1 e 7 (ISO-8601)');
+  if (!Number.isInteger(janela.dayOfWeek) || janela.dayOfWeek < 0 || janela.dayOfWeek > 6) {
+    throw new JanelaDeAcessoInvalidaError('dia da semana deve estar entre 0 e 6 (0 = domingo)');
   }
 
   if (!Number.isInteger(janela.startMinute) || !Number.isInteger(janela.endMinute)) {
@@ -132,22 +142,34 @@ export function momentoLocal(
   const buscar = (tipo: string): string =>
     partes.find((p) => p.type === tipo)?.value ?? '';
 
+  // 0 = domingo ... 6 = sabado -- eixo do motor de decisao (#129). Este mapa
+  // dizia `Sun: 7` e era a SEGUNDA fonte do mesmo defeito, duplicando
+  // `resolverHoraLocal` com o eixo trocado.
   const dias: Record<string, number> = {
+    Sun: 0,
     Mon: 1,
     Tue: 2,
     Wed: 3,
     Thu: 4,
     Fri: 5,
     Sat: 6,
-    Sun: 7,
   };
 
   // `hour12: false` produz "24" para meia-noite em alguns runtimes; 24:00 e
   // 00:00 do mesmo dia.
   const hora = Number(buscar('hour')) % 24;
 
+  const dia = dias[buscar('weekday')];
+
+  // Falhar alto em vez de cair para um dia qualquer: com `?? 0` um fuso sem
+  // tzdata viraria "domingo" silenciosamente, e a janela de domingo abriria
+  // a catraca em qualquer dia da semana. Mesma escolha de `resolverHoraLocal`.
+  if (dia === undefined) {
+    throw new RangeError(`fuso desconhecido ou sem tzdata: ${timezone}`);
+  }
+
   return {
-    dayOfWeek: dias[buscar('weekday')] ?? 0,
+    dayOfWeek: dia,
     minute: hora * 60 + Number(buscar('minute')),
   };
 }

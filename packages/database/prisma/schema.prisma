@@ -1119,7 +1119,10 @@ model PlanAccessWindow {
   id          String @id @default(uuid()) @db.Uuid
   planId      String @map("plan_id") @db.Uuid
   gymUnitId   String @map("gym_unit_id") @db.Uuid
-  /// ISO-8601: 1 = segunda ... 7 = domingo.
+  /// 0 = domingo ... 6 = sabado. Eixo do motor de decisao (#129).
+  /// A faixa e travada por CHECK na migration `20260821100000_fix129_eixo_de_day_of_week`
+  /// -- o Prisma nao modela CHECK, entao ele vive na migration e NAO sobrevive a um
+  /// `db push` que recrie a tabela.
   dayOfWeek   Int    @map("day_of_week")
   startMinute Int    @map("start_minute")
   endMinute   Int    @map("end_minute")
@@ -1218,6 +1221,10 @@ model EntitlementUnitWindow {
   id            String @id @default(uuid()) @db.Uuid
   entitlementId String @map("entitlement_id") @db.Uuid
   gymUnitId     String @map("gym_unit_id") @db.Uuid
+  /// 0 = domingo ... 6 = sabado. Eixo do motor de decisao (#129).
+  /// A faixa e travada por CHECK na migration `20260821100000_fix129_eixo_de_day_of_week`
+  /// -- o Prisma nao modela CHECK, entao ele vive na migration e NAO sobrevive a um
+  /// `db push` que recrie a tabela.
   dayOfWeek     Int    @map("day_of_week")
   startMinute   Int    @map("start_minute")
   endMinute     Int    @map("end_minute")
