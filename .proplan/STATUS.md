@@ -44,15 +44,14 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [MVP1][FIX] eixo de dayOfWeek divergente entre gravacao e motor nega acesso aos domingos (#129)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] eixo de dayOfWeek divergente entre gravacao e motor nega acesso aos domingos (#129, finalizado em: 2026-08-21)
 - [MVP3][SPEC-020][F20] Metas e frequência (#20, finalizado em: 2026-08-21)
 - [MVP3][SPEC-021][F21] Análise assistiva por IA (#21, finalizado em: 2026-08-21)
 - [MVP3][SPEC-019][F19] Upload e revisão (#19, finalizado em: 2026-08-21)
