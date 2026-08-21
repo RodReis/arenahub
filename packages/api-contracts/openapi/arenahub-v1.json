@@ -1873,6 +1873,29 @@
         ]
       }
     },
+    "/api/v1/students/{id}/health-exports": {
+      "post": {
+        "operationId": "HealthProgressController_exportar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HealthProgress"
+        ]
+      }
+    },
     "/api/v1/health-goals/{id}/close": {
       "post": {
         "operationId": "HealthProgressController_encerrarMeta",

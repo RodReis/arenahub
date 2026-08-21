@@ -7,13 +7,16 @@ import {
   Param,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { StudentRepository } from '../students/student.repository.js';
 import { GoalRepository } from './goal.repository.js';
+import { HealthExportService } from './health-export.service.js';
 import { HealthProgressService, type ComparativoDeTipo } from './health-progress.service.js';
 import { converterParaCanonica, type TipoDeMedida, type UnidadeDeMedida } from './domain/medida.js';
 import { PERIODOS, dataLocalIso, ehPeriodo, type Periodo } from './domain/periodo.js';
@@ -85,6 +88,28 @@ const esquemaDeMeta = z
   })
   .strict();
 
+/**
+ * Pedido de exportacao.
+ *
+ * `idempotencyKey` obrigatoria, como na F11: clique duplo no botao devolve o
+ * MESMO arquivo, e nao dois objetos no storage com o mesmo conteudo.
+ */
+const esquemaDeExportacao = z
+  .object({
+    idempotencyKey: z.string().min(8).max(120),
+  })
+  .strict();
+
+interface ExportacaoDeSaudeDto {
+  id: string;
+  status: string;
+  /** Medidas escritas -- uma linha por medida, nao por avaliacao. */
+  rowCount: number;
+  downloadUrl: string;
+  /** A URL e curta: o arquivo carrega dado de saude. */
+  expiresAt: string;
+}
+
 interface VariacaoDto {
   absolute: number | null;
   percent: number | null;
@@ -154,6 +179,7 @@ export class HealthProgressController {
     private readonly progresso: HealthProgressService,
     private readonly metas: GoalRepository,
     private readonly alunos: StudentRepository,
+    private readonly exportacoes: HealthExportService,
     private readonly contexto: TenantContextService,
   ) {}
 
@@ -241,6 +267,42 @@ export class HealthProgressController {
     });
 
     return paraMetaDto(meta, studentId);
+  }
+
+  /**
+   * Exporta o historico corporal do aluno em CSV (`M3-FR-017`, `M3-AC-010`).
+   *
+   * Sincrono: o historico de UM aluno tem dezenas de linhas, e polling para
+   * isso custaria mais ao operador que a espera. A F11 e assincrona porque
+   * exporta ate 100 mil eventos -- ordem de grandeza diferente.
+   *
+   * `health.read` e nao uma permissao propria: quem pode VER o historico pode
+   * levar o proprio historico embora. Exigir permissao extra para exportar o
+   * que ja esta na tela seria teatro -- a pessoa copiaria da tela.
+   */
+  @Post('students/:id/health-exports')
+  @RequirePermissions('health.read')
+  async exportar(
+    @Param('id') studentId: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<ExportacaoDeSaudeDto> {
+    const dados = esquemaDeExportacao.parse(corpo);
+
+    const { job, downloadUrl, expiresAt } = await this.exportacoes.exportar(
+      this.contexto.require(),
+      studentId,
+      dados.idempotencyKey,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    return {
+      id: job.id,
+      status: job.status,
+      rowCount: job.rowCount,
+      downloadUrl,
+      expiresAt,
+    };
   }
 
   /** Encerra a meta. Encerrada nao some -- deixa de disputar o tipo. */

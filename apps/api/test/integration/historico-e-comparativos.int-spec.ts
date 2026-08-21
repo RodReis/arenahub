@@ -6,6 +6,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
+import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
@@ -38,6 +39,40 @@ describe('F18 -- historico e comparativos', () => {
   };
 
   const PERMISSOES = ['student.create', 'student.read', 'health.read', 'health.assess'];
+
+  /** Objetos gravados pelo storage falso, para inspecionar o CSV de verdade. */
+  const gravados = new Map<string, Buffer>();
+
+  const storageFalso = {
+    createPrivateUpload: () =>
+      Promise.resolve({ uploadUrl: 'https://storage.test/x', expiresAt: '' }),
+    headPrivateObject: () => Promise.resolve({ size: 1, contentType: 'text/csv' }),
+    deletePrivateObject: (key: string) => {
+      gravados.delete(key);
+
+      return Promise.resolve();
+    },
+    putPrivateObject: (entrada: { key: string; body: Buffer }) => {
+      gravados.set(entrada.key, entrada.body);
+
+      return Promise.resolve();
+    },
+    createPrivateDownload: (entrada: { key: string }) =>
+      Promise.resolve({
+        downloadUrl: `https://storage.test/${entrada.key}?assinada=1`,
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      }),
+    verificar: () => Promise.resolve(true),
+  };
+
+  /** O CSV escrito pela ultima exportacao, como texto. */
+  const csvGravado = (): string => {
+    const ultimo = [...gravados.values()].at(-1);
+
+    expect(ultimo).toBeDefined();
+
+    return (ultimo as Buffer).toString('utf8');
+  };
 
   const servidor = (): Parameters<typeof request>[0] =>
     app.getHttpServer() as Parameters<typeof request>[0];
@@ -203,7 +238,10 @@ describe('F18 -- historico e comparativos', () => {
   };
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(OBJECT_STORAGE)
+      .useValue(storageFalso)
+      .compile();
 
     app = moduleRef.createNestApplication();
     await app.init();
@@ -465,6 +503,190 @@ describe('F18 -- historico e comparativos', () => {
     const corpo = (await historico(contas.a, aluno)).body as HistoricoResposta;
 
     expect(corpo.timezone).toBe('America/Sao_Paulo');
+  });
+
+  describe('exportacao (M3-FR-017, M3-AC-010)', () => {
+    const exportar = async (
+      conta: (typeof contas)['a'],
+      studentId: string,
+      chave: string,
+    ): Promise<request.Response> =>
+      request(servidor())
+        .post(`/api/v1/students/${studentId}/health-exports`)
+        .set('Cookie', conta.cookie)
+        .send({ idempotencyKey: chave });
+
+    it('exporta avaliacoes, medidas, origem e datas (M3-AC-010)', async () => {
+      const aluno = await criarAluno(contas.a);
+
+      await publicada(contas.a, aluno, '2026-01-10T12:00:00.000Z', [
+        { type: 'WEIGHT', value: 90, unit: 'kg' },
+        { type: 'BODY_FAT_PERCENT', value: 28, unit: 'percent' },
+      ]);
+      await publicada(contas.a, aluno, '2026-06-10T12:00:00.000Z', [
+        { type: 'WEIGHT', value: 81.25, unit: 'kg' },
+      ]);
+
+      const resposta = await exportar(contas.a, aluno, `f18-export-${sufixo}-1`);
+
+      expect(resposta.status).toBe(201);
+
+      const corpo = resposta.body as { rowCount: number; downloadUrl: string };
+
+      // Uma linha por MEDIDA, nao por avaliacao: 2 + 1.
+      expect(corpo.rowCount).toBe(3);
+      expect(corpo.downloadUrl).toContain('assinada=1');
+
+      const csv = csvGravado();
+
+      expect(csv).toContain('assessment_id');
+      expect(csv).toContain('WEIGHT');
+      expect(csv).toContain('BODY_FAT_PERCENT');
+      expect(csv).toContain('Aluno De Teste');
+      // Origem e datas, exigidas pelo `M3-AC-010`.
+      expect(csv).toContain('MANUAL');
+      expect(csv).toContain('2026-06-10T12:00:00.000Z');
+    });
+
+    it('preserva o decimal exato, sem passar por number (INV-106)', async () => {
+      const aluno = await criarAluno(contas.a);
+
+      await publicada(contas.a, aluno, '2026-06-10T12:00:00.000Z', [
+        { type: 'WEIGHT', value: 81.25, unit: 'kg' },
+      ]);
+
+      await exportar(contas.a, aluno, `f18-export-${sufixo}-decimal`);
+
+      // O `Decimal(10,4)` do banco chega como texto: `81.25` vira `81.25`, e
+      // nao `81.2500000001`. Quem confere a planilha contra o laudo veria a
+      // diferenca.
+      expect(csvGravado()).toContain('81.25');
+    });
+
+    it('preserva a unidade ORIGINAL junto da canonica (INV-105)', async () => {
+      const aluno = await criarAluno(contas.a);
+
+      // Medido em libras: o canonico vira kg, mas o arquivo tem de provar em
+      // que unidade a balanca reportava.
+      await publicada(contas.a, aluno, '2026-06-10T12:00:00.000Z', [
+        { type: 'WEIGHT', value: 200, unit: 'lb' },
+      ]);
+
+      await exportar(contas.a, aluno, `f18-export-${sufixo}-unidade`);
+
+      const csv = csvGravado();
+
+      expect(csv).toContain('LB');
+      expect(csv).toContain('KG');
+      expect(csv).toContain('200');
+    });
+
+    it('leva a cadeia de correcao, com a original marcada (INV-102)', async () => {
+      const aluno = await criarAluno(contas.a);
+
+      const errada = await publicada(contas.a, aluno, '2026-06-10T12:00:00.000Z', [
+        { type: 'WEIGHT', value: 499, unit: 'kg' },
+      ]);
+
+      const correcao = await request(servidor())
+        .post(`/api/v1/assessments/${errada}/corrections`)
+        .set('Cookie', contas.a.cookie)
+        .send({
+          assessedAt: '2026-06-10T12:00:00.000Z',
+          measurements: [{ type: 'WEIGHT', value: 81, unit: 'kg' }],
+        });
+
+      expect(correcao.status).toBe(201);
+
+      const resposta = await exportar(contas.a, aluno, `f18-export-${sufixo}-correcao`);
+
+      expect((resposta.body as { rowCount: number }).rowCount).toBe(2);
+
+      const csv = csvGravado();
+
+      // A ORIGINAL continua no arquivo -- ela prova que o numero errado
+      // circulou. Some do grafico, nao da auditoria.
+      expect(csv).toContain('499');
+      expect(csv).toContain('true');
+      // E a correcao aponta o que ela substitui.
+      expect(csv).toContain(errada);
+    });
+
+    it('NAO leva CPF nem fator de contexto de saude (art. 11, ADR-037)', async () => {
+      const aluno = await criarAluno(contas.a);
+
+      await publicada(contas.a, aluno, '2026-06-10T12:00:00.000Z', [
+        { type: 'WEIGHT', value: 81, unit: 'kg' },
+      ]);
+
+      const fator = await request(servidor())
+        .post(`/api/v1/students/${aluno}/health-context`)
+        .set('Cookie', contas.a.cookie)
+        .send({ factor: 'ATLETA_COMPETITIVO' });
+
+      expect(fator.status).toBe(201);
+
+      await exportar(contas.a, aluno, `f18-export-${sufixo}-lgpd`);
+
+      const csv = csvGravado();
+
+      // Fator de contexto e dado de saude sensivel e NAO entra numa planilha
+      // que a academia manda por e-mail.
+      expect(csv).not.toContain('ATLETA_COMPETITIVO');
+      expect(csv.toLowerCase()).not.toContain('cpf');
+    });
+
+    it('a mesma chave de idempotencia devolve o mesmo arquivo', async () => {
+      const aluno = await criarAluno(contas.a);
+
+      await publicada(contas.a, aluno, '2026-06-10T12:00:00.000Z', [
+        { type: 'WEIGHT', value: 81, unit: 'kg' },
+      ]);
+
+      const chave = `f18-export-${sufixo}-idem`;
+
+      const primeira = await exportar(contas.a, aluno, chave);
+      const segunda = await exportar(contas.a, aluno, chave);
+
+      expect(primeira.status).toBe(201);
+      expect(segunda.status).toBe(201);
+
+      // Clique duplo no botao NAO gera dois arquivos no storage.
+      expect((segunda.body as { id: string }).id).toBe((primeira.body as { id: string }).id);
+    });
+
+    it('registra na auditoria o instante em que o dado saiu', async () => {
+      const aluno = await criarAluno(contas.a);
+
+      await publicada(contas.a, aluno, '2026-06-10T12:00:00.000Z', [
+        { type: 'WEIGHT', value: 81, unit: 'kg' },
+      ]);
+
+      await exportar(contas.a, aluno, `f18-export-${sufixo}-auditoria`);
+
+      // Para a LGPD o que importa e QUANDO o dado deixou o sistema.
+      const trilha = await db.auditLog.findFirst({
+        where: { tenantId: contas.a.tenantId, action: 'health.exported', targetId: aluno },
+      });
+
+      expect(trilha).not.toBeNull();
+      expect(trilha?.action).toBe('health.exported');
+      // Quem levou o dado embora, e quantas linhas saíram.
+      expect(trilha?.actorId).not.toBeNull();
+      expect((trilha?.metadata as { rowCount: number } | null)?.rowCount).toBe(1);
+    });
+
+    it('academia B nao exporta historico de aluno da academia A (INV-006)', async () => {
+      const aluno = await criarAluno(contas.a);
+
+      await publicada(contas.a, aluno, '2026-06-10T12:00:00.000Z', [
+        { type: 'WEIGHT', value: 81, unit: 'kg' },
+      ]);
+
+      const resposta = await exportar(contas.b, aluno, `f18-export-${sufixo}-vazamento`);
+
+      expect(resposta.status).toBe(404);
+    });
   });
 
   it('academia B nao le historico de aluno da academia A (INV-006)', async () => {
