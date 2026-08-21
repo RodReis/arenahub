@@ -11,7 +11,6 @@ import { selecionarFolhas, type AvaliacaoDaSerie } from './domain/comparativo.js
 import { leituraDoPercentual, lerFaixa, type Leitura } from './domain/leitura-de-faixa.js';
 import {
   REGIAO_DO_TIPO,
-  TIPOS_SEGMENTARES,
   type RegiaoCorporal,
   type TipoDeMedida,
 } from './domain/medida.js';
@@ -193,7 +192,7 @@ export class BodyEvolutionService {
       const porTipo = new Map<TipoDeMedida, FaixaDoFabricante>();
 
       for (const campo of importacao.fields) {
-        porTipo.set(campo.type as TipoDeMedida, faixaDoCampo(campo));
+        porTipo.set(campo.type, faixaDoCampo(campo));
       }
 
       resultado.set(importacao.assessmentId, porTipo);
@@ -250,7 +249,7 @@ function montarRegioes(
   }
 
   for (const medida of medidas) {
-    const regiao = REGIAO_DO_TIPO[medida.type as TipoDeMedida];
+    const regiao = REGIAO_DO_TIPO[medida.type];
 
     if (regiao === null) continue;
 
@@ -300,7 +299,7 @@ function leituraDaMedida(
 ): Leitura {
   if (medida === null) return 'UNKNOWN';
 
-  const faixa = faixas.get(medida.type as TipoDeMedida);
+  const faixa = faixas.get(medida.type);
 
   if (faixa === undefined) return 'UNKNOWN';
 
@@ -328,7 +327,7 @@ function montarMetricas(
   faixas: ReadonlyMap<TipoDeMedida, FaixaDoFabricante>,
 ): MetricaDoMes[] {
   return medidas
-    .filter((medida) => REGIAO_DO_TIPO[medida.type as TipoDeMedida] === null)
+    .filter((medida) => REGIAO_DO_TIPO[medida.type] === null)
     .filter((medida) => medida.type !== 'HEART_RATE')
     .map((medida) => ({
       type: medida.type,

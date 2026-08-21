@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 
 import { TIPOS_DE_MEDIDA, UNIDADES_DE_MEDIDA } from '../domain/medida.js';
 import type { TipoDeMedida, UnidadeDeMedida } from '../domain/medida.js';
-import type { TipoDeLaudo } from '../domain/sessao-de-revisao.js';
 import {
   ErroDeExtracao,
   type CampoProposto,

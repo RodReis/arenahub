@@ -9,7 +9,7 @@ function campo(over: Partial<CampoExtraido> & Pick<CampoExtraido, 'id' | 'type'>
     sourceLocation: null, state: 'PENDING', reviewedValue: null,
     reviewedUnit: null, sourceLabel: null,
     ...over,
-  } as CampoExtraido;
+  };
 }
 
 describe('consolidar laudos da mesma medicao', () => {
