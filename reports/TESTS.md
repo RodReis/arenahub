@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 1129 | 1129 | 0 | 92.3 |
+| unitário | 1170 | 1170 | 0 | 92.5 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 472 | 472 | 0 | 85.5 |
+| integração | 492 | 481 | 0 | 85.9 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -42,3 +42,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-21 | #18 | SPEC-018 | integração | 472 | 472 | 0 | 85.5 | [#138](https://github.com/RodReis/arenahub/pull/138) |
 | 2026-08-21 | #129 | FIX | unitário | 1129 | 1129 | 0 | 92.3 | [#140](https://github.com/RodReis/arenahub/pull/140) |
 | 2026-08-21 | #129 | FIX | integração | 472 | 472 | 0 | 85.5 | [#140](https://github.com/RodReis/arenahub/pull/140) |
+| 2026-08-21 | #20 | F20 | unitário | 1170 | 1170 | 0 | 92.5 | — |
+| 2026-08-21 | #20 | F20 | integração | 492 | 481 | 0 | 85.9 | — |
