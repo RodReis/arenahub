@@ -18,6 +18,7 @@ import {
   valorLegivel,
   variacaoLegivel,
 } from '../../../../../src/health/formatar';
+import { EnvioDeLaudos } from './envio-de-laudos';
 import { FiltroDePeriodo } from './filtro-de-periodo';
 
 export const metadata: Metadata = {
@@ -313,6 +314,12 @@ export default async function PaginaDaEvolucao({
   return (
     <section aria-labelledby="titulo-evolucao">
       <PageHeader id="titulo-evolucao" title={`Evolução corporal — ${aluno.fullName}`} />
+
+      {/*
+        O envio vem ANTES do histórico de propósito: é o que a academia faz
+        todo mês ao abrir esta tela, e o gráfico é o que ela consulta depois.
+      */}
+      <EnvioDeLaudos studentId={id} />
 
       <FiltroDePeriodo
         studentId={id}

@@ -210,3 +210,78 @@ export async function descartarSessao(
 
   return { sucesso: true };
 }
+
+export interface EstadoDoEnvio {
+  erro?: string;
+  sucesso?: { sessionId: string; enviados: number };
+}
+
+/**
+ * Envia os arquivos do mes e abre UMA sessao de revisao com todos.
+ *
+ * O primeiro arquivo cria a sessao; os demais entram nela pelo
+ * `reviewSessionId` que a API devolveu. Em serie, e nao em paralelo, de
+ * proposito: a sessao so existe DEPOIS que o primeiro upload responde, e
+ * disparar os tres juntos abriria tres sessoes -- exatamente as tres
+ * avaliacoes separadas que esta fatia existe para impedir.
+ *
+ * Falha no meio NAO desfaz o que subiu: os arquivos ja processados ficam na
+ * sessao, e a tela de revisao mostra o que chegou. Apagar seria pior -- quem
+ * enviou tres laudos e viu o terceiro falhar prefere revisar os dois que
+ * subiram a recomecar do zero.
+ */
+export async function enviarArquivos(
+  _anterior: EstadoDoEnvio,
+  formulario: FormData,
+): Promise<EstadoDoEnvio> {
+  const studentId = formulario.get('studentId');
+  const arquivos = formulario.getAll('arquivos').filter((a): a is File => a instanceof File);
+
+  if (typeof studentId !== 'string' || studentId === '') {
+    return { erro: 'Aluno não informado.' };
+  }
+
+  if (arquivos.length === 0) {
+    return { erro: 'Escolha ao menos um arquivo.' };
+  }
+
+  let sessionId: string | undefined;
+  let enviados = 0;
+
+  for (const arquivo of arquivos) {
+    const envio = new FormData();
+    envio.append('file', arquivo);
+    if (sessionId !== undefined) envio.append('reviewSessionId', sessionId);
+    // O rotulo de origem e o nome do arquivo sem extensao: e o que o
+    // avaliador reconhece na coluna "Origem" ao conferir contra o papel.
+    envio.append('sourceLabel', arquivo.name.replace(/\.[^.]+$/, '').slice(0, 120));
+
+    const resposta = await chamarApi<{ reviewSessionId: string }>(
+      `/api/v1/students/${studentId}/assessment-imports`,
+      { metodo: 'POST', formulario: envio },
+    );
+
+    if (!resposta.ok) {
+      const detalhe = mensagemDe(resposta.erro?.code, 'Não foi possível enviar o arquivo.');
+
+      return {
+        erro:
+          enviados === 0
+            ? detalhe
+            : `${detalhe} ${enviados} arquivo(s) já entraram na sessão e podem ser revisados.`,
+        ...(sessionId === undefined ? {} : { sucesso: { sessionId, enviados } }),
+      };
+    }
+
+    sessionId ??= resposta.dados?.reviewSessionId;
+    enviados += 1;
+  }
+
+  if (sessionId === undefined) {
+    return { erro: 'A API não devolveu a sessão de revisão.' };
+  }
+
+  revalidatePath(`/students/${studentId}/health`);
+
+  return { sucesso: { sessionId, enviados } };
+}
