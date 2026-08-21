@@ -207,7 +207,17 @@ export class ImportController {
   @RequirePermissions('health.read')
   async detalharSessao(@Param('sessionId') sessionId: string): Promise<{
     sessionId: string;
-    arquivos: { importId: string; sourceLabel: string; tipoDeLaudo: string }[];
+    arquivos: {
+      importId: string;
+      sourceLabel: string;
+      tipoDeLaudo: string;
+      /**
+       * `extracted_attributes` cru do arquivo, OPACO (ADR-035) -- carrega
+       * coisas como `ecgFinding`, nunca interpretado aqui nem no cliente,
+       * so citado como texto atribuido ao aparelho.
+       */
+      atributos: Record<string, unknown> | null;
+    }[];
     linhas: {
       type: string;
       concordante: boolean;
@@ -224,6 +234,7 @@ export class ImportController {
         importId: arquivo.importId,
         sourceLabel: arquivo.sourceLabel,
         tipoDeLaudo: arquivo.tipoDeLaudo,
+        atributos: arquivo.atributos ?? null,
       })),
       linhas: sessao.linhas.map((linha) => ({
         type: linha.type,

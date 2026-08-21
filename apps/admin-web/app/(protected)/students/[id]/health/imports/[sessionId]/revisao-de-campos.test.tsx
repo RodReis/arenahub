@@ -6,6 +6,7 @@ import { ToastProvider } from '@arenahub/ui';
 
 import { PainelDeAnalise } from './painel-de-analise';
 import { RevisaoDeCampos, type LinhaDeRevisao } from './revisao-de-campos';
+import { atributosDoAparelho, type SessaoDeRevisao } from './sessao';
 
 /**
  * Testes da revisão multiarquivo -- Task 9.
@@ -129,5 +130,55 @@ describe('revisao de campos', () => {
     render(<RevisaoDeCampos linhas={[linhaSemValor]} />);
     expect(screen.getByText('—')).toBeInTheDocument();
     expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+});
+
+describe('atributosDoAparelho', () => {
+  /**
+   * Regressao do fix round 1: `sourceLabel` ("ECG 30s") e o achado
+   * ("Ritmo nao classificado — fibrilacao atrial suspeita") sao coisas
+   * DIFERENTES de proposito neste fixture. A versao com bug lia
+   * `campo.sourceLabel` como se fosse o achado -- um profissional veria o
+   * NOME DO APARELHO onde esperava o resultado clinico. Se alguem reintroduz
+   * aquela substituicao, este teste falha porque o texto batido vira o
+   * rotulo do arquivo, nao o achado.
+   */
+  it('le o achado do ECG do atributo do arquivo, nao do sourceLabel', () => {
+    const sessao: SessaoDeRevisao = {
+      sessionId: 'sessao-1',
+      podeConfirmar: { pronta: true },
+      linhas: [],
+      arquivos: [
+        {
+          importId: 'import-bio',
+          sourceLabel: 'CF610_G',
+          tipoDeLaudo: 'BIOIMPEDANCE',
+          atributos: null,
+        },
+        {
+          importId: 'import-ecg',
+          sourceLabel: 'ECG 30s',
+          tipoDeLaudo: 'ECG',
+          atributos: { ecgFinding: 'Ritmo nao classificado — fibrilacao atrial suspeita' },
+        },
+      ],
+    };
+
+    expect(atributosDoAparelho(sessao)).toEqual({
+      ecgFinding: 'Ritmo nao classificado — fibrilacao atrial suspeita',
+    });
+  });
+
+  it('nao ha achado quando nenhum arquivo trouxe atributo', () => {
+    const sessao: SessaoDeRevisao = {
+      sessionId: 'sessao-2',
+      podeConfirmar: { pronta: true },
+      linhas: [],
+      arquivos: [
+        { importId: 'import-bio', sourceLabel: 'CF610_G', tipoDeLaudo: 'BIOIMPEDANCE', atributos: null },
+      ],
+    };
+
+    expect(atributosDoAparelho(sessao)).toEqual({});
   });
 });

@@ -15,6 +15,14 @@ export interface ArquivoDaSessao {
   readonly importId: string;
   readonly sourceLabel: string;
   readonly tipoDeLaudo: TipoDeLaudo;
+  /**
+   * `extracted_attributes` cru do ARQUIVO, OPACO (ADR-035): nenhuma funcao
+   * deste dominio le o conteudo para decidir nada -- so viaja ate a tela de
+   * revisao citar o texto (ex.: `ecgFinding`). Ausente ou `null` quando o
+   * arquivo nao trouxe atributo nenhum, ou quando quem monta o objeto (como
+   * os testes puros deste arquivo) nao precisa dele.
+   */
+  readonly atributos?: Record<string, unknown> | null;
 }
 
 export type MotivoDeBloqueioDaSessao =

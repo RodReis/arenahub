@@ -361,6 +361,10 @@ export class ImportRepository {
       importId: linha.id,
       sourceLabel: linha.sourceLabel ?? linha.originalFilename,
       tipoDeLaudo: tipoDeLaudoDoAtributos(linha.extractedAttributes),
+      // OPACO (ADR-035): mesma extracao que `atributosPorImport` abaixo, so
+      // que presa ao ARQUIVO dono -- e o que faltava para a tela de revisao
+      // citar o achado do ECG sem ter que adivinhar de qual arquivo ele veio.
+      atributos: atributosOpacos(linha.extractedAttributes),
     }));
 
     const campos = linhas.flatMap((linha) => paraImportacaoComCampos(linha).campos);

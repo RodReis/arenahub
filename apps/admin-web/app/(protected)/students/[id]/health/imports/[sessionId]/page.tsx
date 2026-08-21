@@ -4,8 +4,9 @@ import { PageHeader, ProblemDetail } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../../../../lib/api/server-client';
 import estilos from './sessao.module.css';
-import { PainelDeAnalise, type AtributosDoAparelho } from './painel-de-analise';
-import { RevisaoDeCampos, type LinhaDeRevisao, type PodeConfirmar } from './revisao-de-campos';
+import { atributosDoAparelho, comImportId, type SessaoDeRevisao } from './sessao';
+import { PainelDeAnalise } from './painel-de-analise';
+import { RevisaoDeCampos } from './revisao-de-campos';
 
 export const metadata: Metadata = {
   title: 'Revisão de avaliação — ArenaHub',
@@ -15,72 +16,6 @@ export const dynamic = 'force-dynamic';
 
 interface Aluno {
   fullName: string;
-}
-
-interface ArquivoDaSessao {
-  importId: string;
-  sourceLabel: string;
-  tipoDeLaudo: string;
-}
-
-interface SessaoDeRevisao {
-  sessionId: string;
-  arquivos: ArquivoDaSessao[];
-  linhas: LinhaDeRevisao[];
-  podeConfirmar: PodeConfirmar;
-}
-
-/**
- * Resolve o `importId` dono de cada campo, casando `sourceLabel`.
- *
- * ponytail: `GET .../sessions/:id` devolve `arquivos[].sourceLabel` e
- * `linhas[].campos[].sourceLabel` separadamente, sem o par explicito --
- * casar pelo rotulo e a unica ponte disponivel sem tocar `apps/api`
- * (fora do escopo desta tarefa). Ceiling: dois arquivos com o MESMO rotulo
- * na mesma sessao ficam ambiguos, e o campo perde o `importId` (o formulario
- * ainda funciona para o vencedor; so o descarte do concorrente correspondente
- * fica pendente). Corrigir de verdade pede a API devolver o `importId` por
- * campo em `detalharSessao` (Task 5/`import.controller.ts`).
- */
-function resolverImportId(
-  sourceLabel: string | null,
-  arquivos: readonly ArquivoDaSessao[],
-): string | undefined {
-  if (sourceLabel === null) return undefined;
-
-  const candidatos = arquivos.filter((arquivo) => arquivo.sourceLabel === sourceLabel);
-
-  return candidatos.length === 1 ? candidatos[0]!.importId : undefined;
-}
-
-function comImportId(sessao: SessaoDeRevisao): LinhaDeRevisao[] {
-  return sessao.linhas.map((linha) => ({
-    ...linha,
-    campos: linha.campos.map((campo) => ({
-      ...campo,
-      importId: resolverImportId(campo.sourceLabel, sessao.arquivos),
-    })),
-  }));
-}
-
-/**
- * Achado do ECG -- ADR-035: `HEART_RATE` carrega texto atribuido ao
- * aparelho, nunca metrica classificada. Vem como campo comum na sessao, e
- * esta funcao so extrai o rotulo -- a REGRA de nao interpretar ja vive no
- * servidor (`body-evolution.service.ts`), aqui e so leitura.
- */
-function atributosDoAparelho(sessao: SessaoDeRevisao): AtributosDoAparelho {
-  for (const linha of sessao.linhas) {
-    if (linha.type !== 'HEART_RATE') continue;
-
-    const campo = linha.campos[0];
-
-    if (campo?.sourceLabel !== null && campo?.sourceLabel !== undefined) {
-      return { ecgFinding: campo.sourceLabel };
-    }
-  }
-
-  return {};
 }
 
 export default async function PaginaDaRevisao({
