@@ -2049,7 +2049,7 @@ teste; sobra um campo livre, não há como recolher o dado de saúde que já foi
 <a id="adr-038"></a>
 ## ADR-038 — Uma medição, três arquivos: a importação passa a ser N:1 com a avaliação
 
-**Data:** 21/08/2026 · **Status:** `proposto` — aguarda decisão do PI
+**Data:** 21/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 21/08/2026**
 · **Emenda material:** `MVP-03` §7 (Slice 3.3) e §8 (`M3-FR-009`, `M3-FR-011`)
 · **Depende de:** ADR-035 (ECG), ADR-020 (`packages/database`)
 · **Condiciona:** a fatia da avaliação multiarquivo; o contrato que F26–F28 consomem
