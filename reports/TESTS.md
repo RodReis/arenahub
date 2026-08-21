@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 1053 | 1053 | 0 | 92.1 |
+| unitário | 1120 | 1120 | 0 | 92.3 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 450 | 440 | 0 | 85.5 |
+| integração | 472 | 472 | 0 | 85.5 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -38,3 +38,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-20 | #132 | F49 | integração | 450 | 450 | 0 | 85.5 | #133 |
 | 2026-08-20 | #134 | F50 | unitário | 1053 | 1053 | 0 | 92.1 | #135 |
 | 2026-08-20 | #134 | F50 | integração | 450 | 440 | 0 | 85.5 | #135 |
+| 2026-08-21 | #18 | SPEC-018 | unitário | 1120 | 1120 | 0 | 92.3 | — |
+| 2026-08-21 | #18 | SPEC-018 | integração | 472 | 472 | 0 | 85.5 | — |

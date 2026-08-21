@@ -1,9 +1,15 @@
 import { Module } from '@nestjs/common';
 
+import { StorageModule } from '../../common/storage/storage.module.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { StudentsModule } from '../students/students.module.js';
+import { TenancyModule } from '../tenancy/tenancy.module.js';
 import { AssessmentController } from './assessment.controller.js';
 import { AssessmentRepository } from './assessment.repository.js';
+import { GoalRepository } from './goal.repository.js';
+import { HealthExportService } from './health-export.service.js';
+import { HealthProgressController } from './health-progress.controller.js';
+import { HealthProgressService } from './health-progress.service.js';
 
 /**
  * Avaliacao fisica, medidas e contexto de saude (F17, Slice 3.1).
@@ -17,9 +23,20 @@ import { AssessmentRepository } from './assessment.repository.js';
  * `body_assessments` por fora.
  */
 @Module({
-  imports: [StudentsModule],
-  controllers: [AssessmentController],
-  providers: [AssessmentRepository, TenantContextService],
+  // `TenancyModule` entra pela F18: o corte de periodo do grafico cai na
+  // meia-noite LOCAL da unidade, e o fuso vem do repositorio publico dela --
+  // nunca de `db.gymUnit` daqui (regra de arquitetura no 9).
+  // `StorageModule` entra pela exportacao (F18): o CSV nasce na API e vai
+  // para o bucket privado, com URL assinada curta -- nunca pelo navegador.
+  imports: [StudentsModule, TenancyModule, StorageModule],
+  controllers: [AssessmentController, HealthProgressController],
+  providers: [
+    AssessmentRepository,
+    GoalRepository,
+    HealthProgressService,
+    HealthExportService,
+    TenantContextService,
+  ],
   exports: [AssessmentRepository],
 })
 export class HealthModule {}

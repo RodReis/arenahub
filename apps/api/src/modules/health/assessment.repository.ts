@@ -20,6 +20,14 @@ import type { MedidaCanonica } from './domain/medida.js';
 /** Avaliacao com as medidas que ela carrega. */
 export type AvaliacaoComMedidas = BodyAssessment & { measurements: BodyMeasurement[] };
 
+/**
+ * Avaliacao publicada como a serie do historico precisa dela: com as medidas
+ * e com a correcao que a substitui, quando existe (INV-102).
+ */
+export type AvaliacaoPublicada = AvaliacaoComMedidas & {
+  supersededBy: { id: string } | null;
+};
+
 export interface DadosDaAvaliacao {
   assessedAt: Date;
   evaluatorUserId: string;
@@ -228,6 +236,81 @@ export class AssessmentRepository {
       where: { tenantId: contexto.tenantId, studentId },
       include: { measurements: true },
       orderBy: [{ assessedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  /**
+   * Serie PUBLICADA do aluno para o grafico de historico (F18).
+   *
+   * Tres diferencas de `listarDoAluno`, e cada uma existe por um motivo:
+   *
+   * - so `PUBLISHED`: rascunho e numero que ninguem conferiu ainda, e um
+   *   ponto no grafico e oficial por definicao;
+   * - ordem CRESCENTE por `assessedAt`: a serie e lida da esquerda para a
+   *   direita, e desempata por `id` para que a mesma entrada gere sempre o
+   *   mesmo grafico (aceite da Slice 3.2);
+   * - corte por periodo (`M3-FR-008`), quando houver.
+   *
+   * `supersededBy` vem junto porque a correcao SUBSTITUI a original na serie
+   * (INV-102) -- as duas seguem publicadas, e quem filtra e
+   * `selecionarFolhas`, no dominio. Fazer o filtro aqui no `WHERE`
+   * esconderia do dominio a informacao de que houve correcao.
+   *
+   * ## O CORTE DE PERIODO E POR CADEIA, NAO POR LINHA
+   *
+   * DEFEITO REAL, achado na revisao adversarial desta fatia -- e do pior
+   * tipo, porque o dado nao aparecia errado: ele DESAPARECIA.
+   *
+   * `POST /assessments/:id/corrections` aceita `assessedAt` livre do corpo,
+   * entao a correcao pode carimbar data diferente da original (o caso real e
+   * perceber o erro meses depois e REMEDIR o aluno). Com o corte aplicado
+   * linha a linha, bastava a original cair dentro da janela e a correcao
+   * fora: a consulta trazia a original ja marcada como corrigida, sem a
+   * folha; `selecionarFolhas` descartava a original -- correto, ela foi
+   * corrigida -- e o tipo sumia INTEIRO da tela, como se o aluno nunca
+   * tivesse sido medido.
+   *
+   * O `OR` abaixo mantem a cadeia junta: a avaliacao entra se ELA ou a
+   * CORRECAO dela cai no periodo. A folha sempre chega acompanhada, e o
+   * dominio decide com a cadeia completa na mao.
+   *
+   * Os indices que esta consulta usa ja existem no schema:
+   * `(tenant_id, student_id, assessed_at)` e
+   * `(tenant_id, student_id, status, published_at)`.
+   */
+  async listarPublicadasDoAluno(
+    contexto: TenantContext,
+    studentId: string,
+    desde: Date | null,
+  ): Promise<AvaliacaoPublicada[]> {
+    return this.db.bodyAssessment.findMany({
+      where: {
+        tenantId: contexto.tenantId,
+        studentId,
+        status: 'PUBLISHED',
+        // `null` = periodo ALL, sem corte. `new Date(0)` filtraria por 1970
+        // sem necessidade.
+        ...(desde !== null
+          ? {
+              OR: [
+                { assessedAt: { gte: desde } },
+                // A correcao esta na janela: traz a original junto, senao a
+                // folha chegaria orfa e o dominio nao saberia o que ela
+                // substitui.
+                { supersededBy: { assessedAt: { gte: desde } } },
+                // A original esta na janela: traz a correcao junto, senao a
+                // original seria descartada por `selecionarFolhas` e o tipo
+                // sumiria da tela.
+                { supersedes: { assessedAt: { gte: desde } } },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        measurements: true,
+        supersededBy: { select: { id: true } },
+      },
+      orderBy: [{ assessedAt: 'asc' }, { id: 'asc' }],
     });
   }
 

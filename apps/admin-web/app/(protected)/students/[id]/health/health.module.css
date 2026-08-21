@@ -1,0 +1,51 @@
+/**
+ * Evolução corporal do aluno -- F18, Slice 3.2.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`
+ * e `--ah-border-*`, nunca `--ah-carbon-*` cru.
+ */
+
+/*
+ * Períodos em linha única que quebra sozinha, como o filtro da lista de
+ * alunos. São cinco links curtos: `flex-wrap` resolve sem media query.
+ */
+.filtro {
+  margin-bottom: 24px;
+}
+
+.filtro ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * O link ativo NÃO se distingue só pela cor.
+ *
+ * `aria-current` já resolve para leitor de tela, mas quem enxerga com
+ * daltonismo precisa de outro sinal: a borda inferior mais grossa e o peso do
+ * texto sobrevivem a qualquer perda de percepção de cor (WCAG 1.4.1 --
+ * `M3-NFR-007` exige AA).
+ */
+.filtro a {
+  display: inline-block;
+  padding: 6px 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--ah-text-secondary);
+  text-decoration: none;
+  font-size: var(--ah-type-body-size);
+}
+
+.filtro a:hover {
+  color: var(--ah-text-strong);
+  border-bottom-color: var(--ah-border-strong);
+}
+
+.filtro a[aria-current='page'] {
+  color: var(--ah-text-strong);
+  border-bottom-color: var(--ah-accent-600);
+  font-weight: 600;
+}
