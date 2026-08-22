@@ -9,7 +9,6 @@ updated: 2026-08-22
 
 ### Sem épico
 
-- [MVP3][SPEC-021][FIX] aceite duplo autoriza analise mesmo com recusa — CI da main vermelho (#146)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
@@ -52,6 +51,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-021][FIX] aceite duplo autoriza analise mesmo com recusa — CI da main vermelho (#146, finalizado em: 2026-08-22)
 - [MVP3][SPEC-019][FIX] publicacao automatica trava com laudo ilegivel, valor implausivel e tipo de laudo indistinguivel (#147, finalizado em: 2026-08-22)
 - [MVP2.5][FIX] pnpm dev serve o dist velho de @arenahub/ui e o painel abre com layout de dias atras (#148, finalizado em: 2026-08-22)
 - [MVP1][FIX] eixo de dayOfWeek divergente entre gravacao e motor nega acesso aos domingos (#129, finalizado em: 2026-08-21)
