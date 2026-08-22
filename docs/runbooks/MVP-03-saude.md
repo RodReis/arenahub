@@ -51,7 +51,7 @@ falhou, ou o antivírus recusou.
 |---|---|---|
 | antivírus recusou | `status: INFECTED` | **Não insista com o mesmo arquivo.** Peça outro ao aluno — de preferência exportado de novo pelo app da balança |
 | extrator fora do ar | `FAILED` com `EXTRACTOR_UNAVAILABLE` / `TIMEOUT` | Tente de novo mais tarde; se pressa, digite a avaliação à mão |
-| arquivo sem conteúdo legível | `FAILED` com `EXTRACTOR_NO_CONTENT` | O CSV não tem as colunas `tipo` e `valor`, ou o PDF não tem camada de texto. Digite à mão |
+| arquivo sem conteúdo legível | `FAILED` com `EXTRACTOR_NO_CONTENT` | O CSV não tem as colunas `tipo` e `valor`, ou o PDF não tem camada de texto (traçado puro, PDF protegido por senha). O PDF do OmronConnect **tem** camada de texto e é lido desde 22/08/2026 — se um ECG do aparelho cair aqui, é defeito, não limitação. Digite à mão |
 
 **A saída que sempre existe: digitar à mão.** O INV-140 é explícito — OCR fora
 **não impede** avaliação manual. Se a fila de falhas está crescendo e o aluno
@@ -149,7 +149,16 @@ Registrado aqui para não virar surpresa:
   não foi puxado.
 - **Não há OCR de verdade.** Imagem e PDF passam por dublê. O extrator de CSV
   é produção.
-- **O parser de ECG não existe** (ADR-035 decisão 8). A pendência médica que a
-  análise de IA sabe reportar fica sempre `false` até ele existir.
+- ~~**O parser de ECG não existe**~~ **Existe desde 22/08/2026** (ADR-035 decisão 8,
+  implementada). O PDF do OmronConnect passa por extração da camada de texto
+  (`unpdf`) e rende frequência, duração, achado do aparelho, marcações e as
+  observações que quem operou digitou — tudo como atributo opaco, exibido e
+  nunca interpretado.
+  **A pendência médica continua sempre `false`**, agora por dívida e não por
+  falta de parser: `ai-analysis.service.ts` fixa `pendenciaMedicaAberta: false`
+  com um `TODO(F19)` que apontava para este parser. Ligar os dois é trabalho de
+  outra entrega, e exige decidir o que conta como pendência — o achado do
+  aparelho não é diagnóstico, e transformá-lo em pendência automática seria
+  interpretá-lo, que é o que o ADR-035 proíbe.
 - **O piloto com profissionais e alunos consentidos** (item da Slice 3.6) é
   operação em turno real, com gente — não é código, e não foi feito.

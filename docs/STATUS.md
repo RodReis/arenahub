@@ -7,7 +7,8 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 19/08/2026 *(MVP 3: ADR-035, ADR-037; o ADR-008 fechou por inteiro)*
+**Última atualização:** 22/08/2026 *(avaliação e histórico viraram uma tela; a análise de IA e o
+ECG em PDF passaram a funcionar de verdade — correção de 22/08 no ADR-041)*
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -389,6 +390,18 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | Feito | `proplan:done` | PR mergeado com CI verde | **4** — [F14](https://github.com/RodReis/arenahub/issues/14), [F15](https://github.com/RodReis/arenahub/issues/15), [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **31** |
 
+> 🩺 **22/08/2026 — a avaliação virou UMA tela, e três funcionalidades que pareciam prontas não
+> estavam.** As quatro abas saíram (não existem na referência de design e escondiam três quartos
+> do conteúdo); `/students/:id/health` e a rota da sessão passaram a renderizar o **mesmo**
+> componente, com seletor de medição. 🔴 **O que a entrega descobriu, e nenhum teste pegava:**
+> **nenhuma análise de IA jamais publicou** — o prompt pedia "o JSON do schema" sem mostrar o
+> schema, e `validarSaida` rejeitava tudo; **o ECG em PDF nunca foi lido** — a camada de texto do
+> ADR-035 §8 nunca foi implementada, e o extrator decodificava bytes comprimidos como UTF-8; e
+> **`consent_documents` estava vazia**, então nenhum aluno podia aceitar a análise. Os três tinham
+> o mesmo padrão: **o dublê de teste devolvia o formato certo por construção**, e a suíte provava
+> a metade que existia. Corrigidos e verificados com o laudo real do PI. Detalhe no
+> `DEVELOPMENT.md` §5 e na correção de 22/08 do ADR-041.
+>
 > 💳 **19/08/2026 — F14 entregue, e o MVP 2 voltou a andar.** Cartão tokenizado, recorrência,
 > política de retry (D+0/D+3/D+7 por decisão do PI) e cancelamento — PR
 > [#117](https://github.com/RodReis/arenahub/pull/117). 🔴 **A fatia produziu um defeito crítico

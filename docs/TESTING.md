@@ -123,7 +123,8 @@ domínio.**
 | Leitor facial Topdata | `FacialDeviceAdapter` | simulador contratual | `M0-NFR-006` exige CI **sem hardware** |
 | Catraca Topdata | `TurnstileAdapter` | simulador contratual | idem |
 | Provedor de pagamento | `PaymentProvider` | `FakePaymentProvider` | não se testa cobrança real em CI |
-| Extração de laudo | `DocumentExtractor` | fake + golden files **anonimizados** | OCR é não-determinístico |
+| Extração de laudo — imagem | `DocumentExtractor` (OCR) | fake + golden files **anonimizados** | OCR é não-determinístico |
+| Extração de laudo — CSV e PDF | nenhum — o parser real roda no teste | fixture de verdade (CSV; PDF com camada de texto) | Determinístico: ou lê, ou falha. Dublê aqui provaria o dublê. **Foi o que aconteceu até 22/08:** o fixture de ECG era um `.txt` com o texto já extraído — o resultado do passo que o extrator não executava — e a suíte passava com o ECG quebrado em produção |
 | Análise de IA | `AIProvider` | fake determinístico | custo, latência e variação |
 | Antivírus de upload | `MalwareScanner` | fake | não há vírus em CI |
 | Notificação | `NotificationChannel` | fake | não se manda push para gente real |

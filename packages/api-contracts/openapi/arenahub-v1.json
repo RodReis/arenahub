@@ -2118,6 +2118,29 @@
         ]
       }
     },
+    "/api/v1/students/{studentId}/assessment-sessions": {
+      "get": {
+        "operationId": "ImportController_sessoesDoAluno",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Import"
+        ]
+      }
+    },
     "/api/v1/assessment-imports/sessions/{sessionId}": {
       "get": {
         "operationId": "ImportController_detalharSessao",

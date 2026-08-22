@@ -195,7 +195,25 @@ não exibição em lista administrativa. Ligar a foto é decisão do PI (LGPD ar
 | Outline | borda `carbon-200`, texto `carbon-600`, hover borda `carbon-400` |
 | Ghost | sem borda, texto `accent-700`, hover fundo `carbon-50` |
 | Destructive | borda e texto `#C22B2B`, fundo branco, hover `rgba(194,43,43,.06)` |
+| Icon | quadrado 32 px, fundo transparente, glifo em `--ah-text-icon`; hover troca **cor E superfície** |
 | Disabled | fundo `carbon-50`, borda `carbon-100`, texto `carbon-400` |
+
+**`Icon` é a ação de LINHA de tabela, e por isso 32 px e não 36.** Numa linha de
+40 px (§4), três controles de 36 px empilham a linha inteira e a densidade — que
+é a funcionalidade, não o enfeite — vai embora. Nasceu em 22/08/2026 de três
+telas que escreviam o mesmo botão à mão.
+
+Duas regras que ele carrega e as outras variantes não têm:
+
+- **`aria-label` é obrigatório, garantido pelo TIPO.** Ícone sozinho não tem nome
+  acessível: quem navega por áudio ouve "link" e nada mais. O compilador recusa
+  `variant="icon"` sem rótulo — não é convenção, é erro de build.
+- **`data-acao` marca o ícone que MUDA ESTADO** (liberar catraca), e só ele
+  carrega a cor de ação. Os que navegam ficam em carbono, por §2.3.
+
+Ícone desabilitado **não** ganha a caixa cinza do `Disabled` acima: num glifo
+transparente isso desenha uma caixa que não existia, e a linha pisca de forma
+quando a ação fica indisponível. Só a cor do glifo muda.
 
 Botão destrutivo usa o **verbo real** ("Revogar biometria"), nunca "OK".
 
@@ -336,7 +354,7 @@ Em `DENY` a razão pública é **sempre a mesma frase genérica**. A razão téc
 
 | Componente | Requisito |
 |---|---|
-| `Button` | solid / outline / ghost / destructive |
+| `Button` | solid / outline / ghost / destructive / **icon** (§6) · aceita `href` e renderiza `<a>` |
 | `StateBadge` | §7 — 11 máquinas, ~40 estados |
 | `ProblemDetail` | `application/problem+json` |
 | `DataTable` | paginação por cursor · **papel de coluna** (ver §5.1) |
