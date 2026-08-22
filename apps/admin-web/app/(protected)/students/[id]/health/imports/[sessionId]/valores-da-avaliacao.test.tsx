@@ -320,6 +320,26 @@ describe('informacoes do ECG', () => {
     expect(screen.getByTestId('achado-ecg')).toHaveTextContent('—');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
+
+  /**
+   * OBSERVAÇÕES é o campo que quem operou o aparelho digitou.
+   *
+   * Aparece VERBATIM e só quando existe: a maioria dos laudos vem sem, e uma
+   * linha "Observações —" em todo ECG ocuparia espaço para dizer que ninguém
+   * escreveu nada. As outras cinco são sempre esperadas, e por isso mostram
+   * o traço.
+   */
+  it('mostra as observações do operador, verbatim', () => {
+    render(<AchadoDoEcg atributos={{ ecgNotes: '9 okjgfs' }} />);
+
+    expect(screen.getByTestId('ecg-observacoes')).toHaveTextContent('9 okjgfs');
+  });
+
+  it('laudo sem observações não renderiza a linha', () => {
+    render(<AchadoDoEcg atributos={{ ecgFinding: 'Ritmo normal' }} />);
+
+    expect(screen.queryByTestId('ecg-observacoes')).not.toBeInTheDocument();
+  });
 });
 
 describe('atributosDoAparelho', () => {

@@ -144,6 +144,37 @@ describe('extrator de laudo de bioimpedancia', () => {
   });
 
   /**
+   * OBSERVACOES -- texto que quem operou o aparelho digitou.
+   *
+   * Opaco como o achado (ADR-035): guardado e exibido verbatim, nunca
+   * interpretado. Ausente na maioria dos laudos, entao a chave so entra
+   * quando ha o que guardar.
+   */
+  it('guarda as observacoes do operador, quando o laudo traz', async () => {
+    const comNota = [
+      'Frequencia cardiaca: 88 BPM',
+      'Observacoes: tontura ao levantar',
+      'Analise instantanea: Ritmo nao classificado',
+    ].join('\n');
+
+    const r = await extrator.extrair({
+      tipo: 'PDF',
+      conteudo: new TextEncoder().encode(gerarPdfDeTexto(comNota)),
+    });
+
+    expect(r.atributos?.['ecgNotes']).toBe('tontura ao levantar');
+  });
+
+  it('laudo sem observacoes nao inventa a chave', async () => {
+    const r = await extrator.extrair({
+      tipo: 'PDF',
+      conteudo: lerFixture('ecg-omron-sintetico.pdf'),
+    });
+
+    expect(r.atributos?.['ecgNotes']).toBeUndefined();
+  });
+
+  /**
    * O LAUDO REAL E EM PT-BR, COM ACENTO -- e os padroes daqui nao tem.
    *
    * O Omron imprime "Frequência cardíaca" e "Análise instantânea"; os regex

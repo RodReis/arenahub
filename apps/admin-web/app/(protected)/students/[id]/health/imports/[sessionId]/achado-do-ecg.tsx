@@ -43,6 +43,7 @@ export function AchadoDoEcg({ atributos, arquivo }: Props) {
   const frequencia = atributos?.['ecgHeartRate'];
   const duracao = atributos?.['ecgDurationSeconds'];
   const gravadoEm = texto(atributos, 'ecgRecordedAt');
+  const observacoes = texto(atributos, 'ecgNotes');
   const bruto = atributos?.['ecgTags'];
   const tags = Array.isArray(bruto) ? bruto.filter((t): t is string => typeof t === 'string') : [];
 
@@ -67,25 +68,59 @@ export function AchadoDoEcg({ atributos, arquivo }: Props) {
         </p>
       ) : null}
 
+      {/*
+        Cada par em seu `<div>`: é o que o `.listaDoAparelho` estiliza (rótulo
+        à esquerda, valor à direita). Com `<dt>`/`<dd>` soltos no `<dl>`, a
+        regra `> div` não pegava nada e a lista saía com a indentação nativa
+        do navegador.
+      */}
       <dl className={estilos['listaDoAparelho']}>
-        <dt>Análise do aparelho</dt>
-        <dd data-testid="achado-ecg">{achado ?? <Ausente />}</dd>
+        <div>
+          <dt>Análise do aparelho</dt>
+          <dd data-testid="achado-ecg">{achado ?? <Ausente />}</dd>
+        </div>
 
-        <dt>Frequência cardíaca</dt>
-        <dd data-testid="ecg-frequencia">
-          {typeof frequencia === 'number' ? `${frequencia} bpm` : <Ausente />}
-        </dd>
+        <div>
+          <dt>Frequência cardíaca</dt>
+          <dd data-testid="ecg-frequencia">
+            {typeof frequencia === 'number' ? `${frequencia} bpm` : <Ausente />}
+          </dd>
+        </div>
 
-        <dt>Duração</dt>
-        <dd data-testid="ecg-duracao">
-          {typeof duracao === 'number' ? `${duracao} s` : <Ausente />}
-        </dd>
+        <div>
+          <dt>Duração</dt>
+          <dd data-testid="ecg-duracao">
+            {typeof duracao === 'number' ? `${duracao} s` : <Ausente />}
+          </dd>
+        </div>
 
-        <dt>Gravado em</dt>
-        <dd data-testid="ecg-gravado-em">{gravadoEm ?? <Ausente />}</dd>
+        <div>
+          <dt>Gravado em</dt>
+          <dd data-testid="ecg-gravado-em">{gravadoEm ?? <Ausente />}</dd>
+        </div>
 
-        <dt>Marcações</dt>
-        <dd data-testid="ecg-tags">{tags.length > 0 ? tags.join(', ') : <Ausente />}</dd>
+        <div>
+          <dt>Marcações</dt>
+          <dd data-testid="ecg-tags">{tags.length > 0 ? tags.join(', ') : <Ausente />}</dd>
+        </div>
+
+        {/*
+          OBSERVAÇÕES só aparece quando existe.
+          ---------------------------------------------------------------
+          É texto que quem operou o aparelho digitou, e a maioria dos laudos
+          vem sem. Uma linha "Observações —" em todo ECG ocuparia espaço
+          para dizer que ninguém escreveu nada; as outras cinco linhas são
+          sempre esperadas, e por isso mostram o traço.
+
+          Verbatim e nunca interpretado (ADR-035): é o mesmo tratamento do
+          achado do aparelho.
+        */}
+        {observacoes === null ? null : (
+          <div>
+            <dt>Observações</dt>
+            <dd data-testid="ecg-observacoes">{observacoes}</dd>
+          </div>
+        )}
       </dl>
 
       <p className={estilos['avisoDoAparelho']}>

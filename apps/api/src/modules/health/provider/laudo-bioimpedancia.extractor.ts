@@ -190,6 +190,9 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
     const linhaTags = capturar(texto, /Tags:\s*(.+)/i);
     const duracao = capturar(texto, /Duracao:\s*(\d+(?:[.,]\d+)?)\s*s/i);
     const gravadoEm = capturar(texto, /Gravado:\s*(.+)/i);
+    // Texto que QUEM OPEROU o aparelho digitou. Opaco como o achado: exibido
+    // verbatim, nunca interpretado nem usado para decidir nada (ADR-035).
+    const observacoes = capturar(texto, /Observacoes:\s*(.+)/i);
 
     const ehEcg = /Analise instantanea:/i.test(texto) || /Frequencia cardiaca:/i.test(texto);
 
@@ -225,6 +228,7 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
     if (linhaTags) atributos['ecgTags'] = linhaTags.split(',').map((tag) => tag.trim());
     if (duracao) atributos['ecgDurationSeconds'] = Number(duracao.replace(',', '.'));
     if (gravadoEm) atributos['ecgRecordedAt'] = gravadoEm;
+    if (observacoes) atributos['ecgNotes'] = observacoes;
 
     // O bpm vai nos DOIS lugares de proposito: como `HEART_RATE` ele e medida
     // comparavel mes a mes; aqui e o numero que o laudo imprimiu, exibido
