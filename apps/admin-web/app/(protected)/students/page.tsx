@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 
 import {
-  AcoesDaLinha,
   Button,
   DataTable,
   EmptyState,
@@ -16,6 +15,7 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
+import { AcoesDoAluno } from './acoes-do-aluno';
 import { BotaoDeLiberacao } from './botao-de-liberacao';
 import { FiltroDeAlunos } from './filtro-de-alunos';
 import estilos from './students.module.css';
@@ -355,16 +355,16 @@ export default async function PaginaDeAlunos({
           },
           {
             key: 'acao',
-            header: '',
+            header: 'Ação',
             role: 'actions',
             /*
-              Bioimpedância abre a evolução corporal do aluno, de onde se
-              chega às sessões de revisão. Fica na grid porque a academia
-              mede TODO MÊS: sem o atalho, cada avaliação custa abrir a ficha
-              e procurar a aba.
+              Quatro ações como ÍCONE, não como botão de texto: com quatro
+              rótulos por linha a coluna comia mais largura que o nome do
+              aluno, e a tabela passava a rolar horizontalmente num monitor
+              de 1280 -- que é o monitor da recepção (`PRODUCT.md`).
 
-              `ghost` ao lado do sólido de propósito -- a liberação financeira
-              é a ação urgente da tela; ir para a avaliação é navegação.
+              Cada ícone carrega `aria-label` e `title`: forma sozinha é
+              canal único, e isso o PRODUCT.md proíbe. Ver `acoes-do-aluno`.
 
               A liberação é SÓ para BLOCKED (issue #118): é o status que o job
               de inadimplência aplica (M2-BR-007), sem oferecer "liberação
@@ -372,12 +372,11 @@ export default async function PaginaDeAlunos({
               cobrança real) nem para cancelamento por outro motivo.
             */
             render: (aluno) => (
-              <AcoesDaLinha>
-                <Button variant="ghost" href={`/students/${aluno.id}/health`}>
-                  Bioimpedância
-                </Button>
-                {aluno.status === 'BLOCKED' ? <BotaoDeLiberacao studentId={aluno.id} /> : null}
-              </AcoesDaLinha>
+              <AcoesDoAluno
+                studentId={aluno.id}
+                podeLiberar={aluno.status === 'BLOCKED'}
+                liberacao={<BotaoDeLiberacao studentId={aluno.id} />}
+              />
             ),
           },
         ]}

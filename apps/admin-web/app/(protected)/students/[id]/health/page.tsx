@@ -331,7 +331,7 @@ export default async function PaginaDaEvolucao({
         <EmptyState
           testId="sem-medicoes"
           title="Nenhuma medição publicada neste período."
-          hint="Avaliações em rascunho não aparecem aqui — só o que já foi publicado. Amplie o período ou publique a avaliação."
+          hint="Envie os laudos da medição acima — a avaliação é publicada na hora. Se já houve medição antes, amplie o período."
         />
       ) : (
         historico.measurements.map((comparativo) => (

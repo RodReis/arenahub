@@ -312,6 +312,10 @@ export const STATE_LABELS: Dictionary = {
   fileReviewState: {
     EXTRACTED: { label: 'Extraído', tone: 'success', icon: 'check-circle' },
     PENDING_REVIEW: { label: 'Revisar', tone: 'warning', icon: 'alert-circle' },
+    // "Não foi possível ler" e não "Falhou": diz o que aconteceu com o
+    // ARQUIVO, não que o sistema quebrou -- um PDF de traçado de ECG é
+    // ilegível para o extrator e isso é normal, não defeito.
+    FAILED: { label: 'Não foi possível ler', tone: 'danger', icon: 'x-circle' },
   },
 };
 

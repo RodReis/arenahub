@@ -21,11 +21,13 @@ import {
   MedidaDuplicadaNaSessaoError,
   RevisaoIncompletaError,
   SessaoBloqueadaError,
+  SessaoSemMedidaPlausivelError,
   SessaoDeOutroAlunoError,
   type ImportacaoComCampos,
   type SessaoComArquivos,
 } from './import.repository.js';
 import { aceitarArquivo } from './domain/arquivo-de-importacao.js';
+import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import { converterParaCanonica } from './domain/medida.js';
 import {
   ordemDeRevisao,
@@ -38,10 +40,15 @@ import {
 import type { UnidadeDeMedida } from './domain/medida.js';
 import {
   consolidar,
-  desempatarPorOrigem,
+  campoQueVirouMedida,
   type LinhaConsolidada,
 } from './domain/consolidacao-de-laudos.js';
-import { sessaoPodeConfirmar, type AvaliacaoDaSessao } from './domain/sessao-de-revisao.js';
+import {
+  sessaoPodeConfirmar,
+  type ArquivoDaSessao,
+  type AvaliacaoDaSessao,
+  type TipoDeLaudo,
+} from './domain/sessao-de-revisao.js';
 import {
   DOCUMENT_EXTRACTOR,
   ErroDeExtracao,
@@ -91,6 +98,16 @@ export interface ResultadoDoUpload {
   readonly reviewSessionId: string;
 }
 
+/**
+ * Vida da URL assinada do laudo -- cinco minutos.
+ *
+ * Longo o bastante para a tela carregar a miniatura e o avaliador abrir o
+ * original numa aba; curto o bastante para que o link colado em outro lugar
+ * ja esteja morto. Laudo e dado de saude: o padrao aqui e o menor prazo que
+ * ainda funciona, nunca o maior que ninguem reclama.
+ */
+const SEGUNDOS_DE_VIDA_DA_URL_DO_LAUDO = 300;
+
 @Injectable()
 export class ImportService {
   private readonly log = new Logger(ImportService.name);
@@ -117,6 +134,12 @@ export class ImportService {
     sessao?: {
       reviewSessionId?: string | undefined;
       sourceLabel?: string | undefined;
+      /**
+       * Que laudo e este, DECLARADO por quem envia (cada arquivo tem seu
+       * campo na tela). Vence o que o extrator classificou -- ver a nota em
+       * `gravarExtracao` abaixo.
+       */
+      tipoDeLaudo?: TipoDeLaudo | undefined;
       /**
        * Ultimo arquivo da medicao -- so ele dispara a publicacao automatica
        * (ADR-039). Quem envia e quem sabe se ainda vem arquivo; o servidor
@@ -256,7 +279,15 @@ export class ImportService {
         })),
         {
           sourceLabelDoArquivo: extracao.sourceLabel ?? null,
-          tipoDeLaudo: extracao.tipoDeLaudo ?? null,
+          // O DECLARADO vence o classificado.
+          //
+          // O OCR de imagem devolve `BIOIMPEDANCE` fixo para toda foto, o
+          // que faz balanca e app de analise chegarem indistinguiveis -- e
+          // ai a precedencia do ADR-041 nao tem em que se apoiar. Quem
+          // envia sabe qual arquivo e qual (a tela pede cada laudo no seu
+          // campo), e essa informacao e mais confiavel que qualquer
+          // classificacao por imagem.
+          tipoDeLaudo: sessao?.tipoDeLaudo ?? extracao.tipoDeLaudo ?? null,
           atributos: extracao.atributos ?? null,
         },
       );
@@ -318,7 +349,32 @@ export class ImportService {
         contexto,
         importacao.id,
         daExtracao?.codigo ?? 'EXTRACTOR_UNAVAILABLE',
+        // O tipo DECLARADO sobrevive a falha: quem enviou disse que era um
+        // ECG, e o extrator nao ter conseguido ler nao muda isso.
+        sessao?.tipoDeLaudo ?? null,
       );
+
+      // ---------------------------------------------------------------------
+      // O ULTIMO ARQUIVO FALHOU -- E OS OUTROS DA SESSAO NAO TEM CULPA.
+      // ---------------------------------------------------------------------
+      //
+      // Achado na primeira medicao real com os tres laudos do PI: o ECG e um
+      // PDF de tracado, sem texto extraivel (`EXTRACTOR_NO_CONTENT`). Como
+      // ele era o ultimo da sessao, este `catch` retornava aqui e a
+      // publicacao NUNCA acontecia -- a balanca e a analise, extraidas com
+      // sucesso, ficavam paradas em `EXTRACTED` para sempre.
+      //
+      // O arquivo ilegivel e o caso COMUM, nao a excecao: tracado de ECG,
+      // foto tremida, laudo de modelo que o extrator ainda nao conhece. Um
+      // deles nao pode segurar a medicao inteira -- a bioimpedancia e o que
+      // vira avaliacao, e ela chegou inteira.
+      //
+      // O import falho continua `FAILED` e visivel na fila da F22: quem
+      // opera ve que aquele laudo nao entrou, e a avaliacao publicada diz
+      // quais arquivos a compuseram.
+      if (sessao?.ultimoDaSessao === true) {
+        await this.publicarAutomaticamente(contexto, importacao.id, uploaderId, agora, agora);
+      }
 
       return {
         id: importacao.id,
@@ -737,11 +793,53 @@ export class ImportService {
     // essa decisao e do avaliador em CADA campo -- mas roda POR LINHA
     // consolidada, nunca sobre `sessao.campos` cru achatado. Ver
     // `valoresAceitosDaSessao` abaixo para o porque.
-    const aceitos = valoresAceitosDaSessao(linhas);
+    const aceitos = valoresAceitosDaSessao(linhas, sessao.arquivos);
 
-    const medidas = aceitos.map((valor) =>
-      converterParaCanonica({ type: valor.type, value: valor.value, unit: valor.unit }),
-    );
+    // ---------------------------------------------------------------------
+    // VALOR IMPLAUSIVEL DESCARTA O CAMPO, NAO A MEDICAO.
+    // ---------------------------------------------------------------------
+    //
+    // `converterParaCanonica` recusa o que nao pode ser verdade -- 92,3% de
+    // gordura corporal, 300 kg de massa ossea. A validacao esta certa; o
+    // que estava errado era o ALCANCE dela: um `map` cru fazia UM campo
+    // implausivel derrubar a avaliacao inteira, e a medicao boa ficava
+    // parada em `EXTRACTED` sem que ninguem soubesse por que.
+    //
+    // Achado com o laudo real do PI: o OCR leu o PESO (92,3 kg, impresso em
+    // destaque no meio da rosca do `CF610_G`) como se fosse o percentual de
+    // gordura. Trinta campos corretos ficaram reféns de um.
+    //
+    // O campo implausivel NAO some: continua gravado como campo extraido
+    // (proveniencia intacta) e a tela de avaliacao mostra que ele nao foi
+    // publicado. Publicar 30 medidas e dizer qual falta e melhor que nao
+    // publicar nada e nao dizer nada -- que era o comportamento anterior.
+    const medidas: ReturnType<typeof converterParaCanonica>[] = [];
+    const implausiveis: string[] = [];
+
+    for (const valor of aceitos) {
+      try {
+        medidas.push(
+          converterParaCanonica({ type: valor.type, value: valor.value, unit: valor.unit }),
+        );
+      } catch (erro) {
+        // So erro de DOMINIO vira descarte. `TypeError` e companhia sao bug
+        // de programacao e tem que estourar -- engoli-los aqui esconderia o
+        // defeito num resultado de publicacao aparentemente normal.
+        if (!(erro instanceof ErroDeDominio)) throw erro;
+
+        implausiveis.push(valor.type);
+      }
+    }
+
+    if (implausiveis.length > 0) {
+      this.log.warn(
+        `campos descartados por valor implausivel na sessao ${reviewSessionId}: ${implausiveis.join(', ')}`,
+      );
+    }
+
+    // Nenhuma medida sobrou -- nao ha avaliacao a publicar, e dizer isso e
+    // melhor que criar uma avaliacao vazia.
+    if (medidas.length === 0) throw new SessaoSemMedidaPlausivelError();
 
     const dispositivo = dadosDoAparelho(sessao.atributosPorImport);
 
@@ -768,10 +866,16 @@ export class ImportService {
     // motivo, o rascunho e desfeito para nao ficar orfao em DRAFT (visivel
     // em `listarDoAluno`, que lista todos os status).
     try {
+      // `importIdsConfirmaveis` e nao `importIds`: um laudo `FAILED` (o
+      // extrator nao conseguiu ler) fica na sessao mas NAO pode receber
+      // `assessment_id` -- a constraint
+      // `assessment_imports_avaliacao_so_em_confirmada` proibe. Passar a
+      // lista inteira fazia a contagem nao bater e estourar
+      // `SESSION_ALREADY_CONFIRMED`, que mente sobre a causa.
       await this.importacoes.confirmarSessao(
         contexto,
         reviewSessionId,
-        sessao.importIds,
+        sessao.importIdsConfirmaveis,
         avaliacao.id,
         revisorId,
         agora,
@@ -803,6 +907,52 @@ export class ImportService {
 
     await this.importacoes.descartar(contexto, importId, revisorId, agora);
     await this.apagarArquivo(contexto, importId);
+  }
+
+  /**
+   * URL assinada do arquivo original, para a tela mostrar a MINIATURA do
+   * laudo em vez do nome do arquivo (ADR-041).
+   *
+   * ---------------------------------------------------------------------------
+   * POR QUE URL ASSINADA E NAO STREAM PELA API
+   * ---------------------------------------------------------------------------
+   *
+   * `createPrivateDownload` ja existe e ja e usado pela exportacao (F11): a
+   * porta de storage sabe assinar leitura de vida curta, e reusa-la mantem
+   * UM caminho de leitura auditavel em vez de dois. Um endpoint que
+   * transmite bytes pela API seria mais codigo para fazer o que o storage ja
+   * faz -- e faz pior, porque prende o processo Node enquanto o navegador
+   * baixa.
+   *
+   * `expiresInSeconds` e CURTO de proposito: laudo de bioimpedancia e dado
+   * de saude (LGPD art. 11), e link de vida longa vira link reencaminhado
+   * por WhatsApp, fora de qualquer controle de acesso.
+   *
+   * ---------------------------------------------------------------------------
+   * `null` E UMA RESPOSTA, NAO UMA FALHA
+   * ---------------------------------------------------------------------------
+   *
+   * Depois da confirmacao o arquivo e EXPURGADO e `objectKey` fica nulo --
+   * politica de retencao curta (`MVP-03` 15), nao bug. A tela precisa saber
+   * a diferenca entre "ainda carregando" e "nao existe mais": devolver URL
+   * que aponta para objeto apagado produziria o icone de imagem quebrada,
+   * que nao explica nada a quem esta olhando.
+   */
+  async urlDoArquivo(
+    contexto: TenantContext,
+    importId: string,
+  ): Promise<{ url: string; contentType: string } | null> {
+    const importacao = await this.importacoes.encontrar(contexto, importId);
+
+    if (importacao === null || importacao.objectKey === null) return null;
+
+    const assinada = await this.storage.createPrivateDownload({
+      key: importacao.objectKey,
+      expiresInSeconds: SEGUNDOS_DE_VIDA_DA_URL_DO_LAUDO,
+      fileName: importacao.originalFilename,
+    });
+
+    return { url: assinada.downloadUrl, contentType: importacao.fileType };
   }
 
   /**
@@ -907,25 +1057,29 @@ export class ImportService {
  * nomeando o TIPO em conflito, em vez de deixar o Postgres estourar um
  * P2002 cru mais tarde.
  */
-function valoresAceitosDaSessao(linhas: readonly LinhaConsolidada[]): ValorAceito[] {
+function valoresAceitosDaSessao(
+  linhas: readonly LinhaConsolidada[],
+  arquivos: readonly ArquivoDaSessao[],
+): ValorAceito[] {
   const aceitos: ValorAceito[] = [];
 
   for (const linha of linhas) {
     const aceitosDaLinha = valoresAceitos(linha.campos);
 
-    if (aceitosDaLinha.length > 1) {
-      // Antes de desistir, ha regra de origem para o tipo? So o `HEART_RATE`
-      // tem: a balanca reporta repouso e o ECG mede o coracao, e com a
-      // publicacao automatica ninguem esta ali para escolher (ADR-039).
-      const vencedor = desempatarPorOrigem(linha);
+    if (aceitosDaLinha.length === 0) continue;
 
-      if (vencedor === null) throw new MedidaDuplicadaNaSessaoError(linha.type);
+    // `campoQueVirouMedida` e a MESMA funcao que o DTO da sessao usa para
+    // dizer a tela qual campo foi publicado -- fonte unica, deliberada:
+    // duas implementacoes do mesmo criterio divergiam num caso real (linha
+    // divergente com um campo aceito e outro descartado), e a tela apontava
+    // para um campo que o banco nao gravou. Ver a nota da funcao.
+    const vencedor = campoQueVirouMedida(linha, arquivos);
 
-      aceitos.push(...valoresAceitos([vencedor]));
-      continue;
-    }
+    // `null` com pelo menos um aceito so acontece quando ha DOIS aceitos e o
+    // desempate nao resolve -- dois laudos do mesmo tipo discordando.
+    if (vencedor === null) throw new MedidaDuplicadaNaSessaoError(linha.type);
 
-    aceitos.push(...aceitosDaLinha);
+    aceitos.push(...valoresAceitos([vencedor]));
   }
 
   return aceitos;

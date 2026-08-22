@@ -84,6 +84,20 @@ export interface CampoExtraido {
    * valor veio, nunca para decidir equivalencia.
    */
   readonly sourceLabel: string | null;
+  /**
+   * O ARQUIVO dono deste campo.
+   *
+   * Existe porque casar campo com arquivo por `sourceLabel` nao funciona: o
+   * rotulo do CAMPO vem do nome do arquivo enviado ("WhatsApp Image 2026-08-04
+   * at 08.21.31") e o do ARQUIVO vem do conteudo extraido ("CF610_G"), e os
+   * dois quase nunca coincidem. Quem precisa saber de qual laudo um valor
+   * veio -- o desempate por origem (ADR-041) e a tela de revisao -- precisa
+   * do vinculo REAL, que e a chave estrangeira, nunca de dois textos que por
+   * acaso podem bater.
+   *
+   * `null` so em campo montado fora do banco (dubles de teste puro).
+   */
+  readonly importId: string | null;
 }
 
 export type MotivoDeBloqueio =

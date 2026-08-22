@@ -2242,3 +2242,100 @@ contexto antes de o aluno ver.
 
 O PI aceita: a análise já carrega o aviso de não-diagnóstico, e a alternativa — esperar endosso —
 era o gargalo que fazia o resultado não chegar.
+
+---
+
+<a id="adr-041"></a>
+## ADR-041 — Divergência entre laudos: a balança vence, o ECG vence o bpm
+
+**Data:** 21/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 21/08/2026**
+· **Emenda:** ADR-039 (acrescenta a decisão 6) · **Depende de:** ADR-039, ADR-038
+· **NÃO alcança:** LGPD art. 11, ADR-035, INV-102, INV-104
+
+**Contexto.** O ADR-039 tirou a confirmação campo a campo, mas deixou um caso sem regra: **o que
+acontece quando dois laudos da mesma medição discordam.** Enquanto havia revisão humana, a
+resposta era óbvia — o avaliador escolhia. Sem ela, `desempatarPorOrigem` só tinha regra para
+`HEART_RATE`, e todo o resto caía em `MedidaDuplicadaNaSessaoError`: a publicação automática
+**falhava em silêncio** e a sessão voltava para a revisão manual que o ADR-039 tinha acabado de
+remover.
+
+Foi o que aconteceu na primeira execução ao vivo. Três arquivos da mesma medição de 04/08 — a
+balança `CF610_G`, o app `Unique Health` e um ECG — divergiram na massa de gordura: **22,5 kg
+contra 20,0 kg**. Nenhuma avaliação foi publicada, e a tela pediu 31 conferências.
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **Fora do bpm, vence a BALANÇA de bioimpedância** | Ela **mediu** o corpo; o app de análise **derivou** números a partir da medição dela. Entre o medido e o calculado em cima, publica-se o medido |
+| 2 | **No `HEART_RATE`, vence o ECG** (já valia, agora está escrito) | A balança reporta repouso, o ECG mede o coração por trinta segundos. É o aparelho feito para isso |
+| 3 | **A precedência é por TIPO DE LAUDO, nunca por nome de arquivo** | O rótulo é escolhido por quem anexa. Um arquivo chamado `ecg-agosto.pdf` pode ser a exportação da balança, e a versão anterior — que casava prefixo de `sourceLabel` — daria a vitória a ele |
+| 4 | **Dois laudos do MESMO tipo discordando NÃO se resolvem** | É sinal de defeito no aparelho, e escolher um lado esconderia o defeito. O campo fica de fora da avaliação e a tela **diz quais campos ficaram** |
+| 5 | **O valor perdedor continua gravado** como campo extraído | Proveniência não se apaga. Ele só não vira a medida da avaliação |
+| 6 | **A tela LÊ a decisão do servidor** (`campoPublicadoId`), nunca a recalcula | Duas implementações da mesma regra divergem na primeira mudança — com a tela mostrando um valor e o histórico do aluno guardando outro |
+
+### O caso que fica sem resposta, de propósito
+
+Quando a balança e o app discordam, a decisão 1 escolhe **sempre** a balança — inclusive quando é
+a balança que está errada. Não há como distinguir os dois casos sem alguém olhar, e olhar é
+exatamente o que o ADR-039 removeu.
+
+**Isso não é mitigado, é aceito**: a correção vinculada (INV-102) continua sendo o caminho, como
+já era para todo erro de OCR sob o ADR-039. O que esta decisão acrescenta é que o erro passa a ter
+uma direção previsível, em vez de a avaliação inteira não ser publicada.
+
+### Risco assumido
+
+O risco do ADR-039 não mudou de tamanho, mudou de forma. Antes, divergência = nenhuma avaliação
+publicada (falha visível, fluxo travado). Agora, divergência = avaliação publicada com o valor da
+balança (falha silenciosa, fluxo funcionando).
+
+**A troca é deliberada:** um sistema que não publica é abandonado na terceira semana; um que
+publica com um número a corrigir é usado e corrigido. Mas o número errado chega ao aluno antes de
+qualquer humano — e a decisão 4 existe para que ao menos a divergência **entre aparelhos do mesmo
+tipo** nunca seja resolvida por chute.
+
+### Emenda de 21/08/2026 — o tipo do laudo é DECLARADO, não classificado
+
+A primeira execução com os três laudos reais do PI reprovou o mecanismo da decisão 3. O extrator
+de imagem (`anthropic-ocr@1`) devolve **`tipoDeLaudo: 'BIOIMPEDANCE'` fixo para toda foto**:
+balança e app de análise chegavam à API indistinguíveis, e a precedência não tinha em que se
+apoiar. Resultado: `mais de um valor aceito para o tipo BODY_FAT_MASS` e **nenhuma avaliação
+publicada**.
+
+**Decisão do PI:** a tela pede cada laudo no **seu campo** — Relatório de medição (balança),
+Análise de composição (app), Eletrocardiograma — cada um com a **miniatura do laudo esperado** ao
+lado. O campo declara o tipo; o OCR não classifica mais nada.
+
+| # | decisão | por quê |
+|---|---|---|
+| 7 | **Três campos de upload rotulados**, e o tipo viaja declarado (`tipoDeLaudo` no envio) | Quem anexa sabe qual arquivo é qual. Classificar por imagem falhou no primeiro teste real |
+| 8 | **Miniatura de exemplo ao lado de cada campo** | "Relatório de medição" e "Análise de composição" são dois títulos parecidos para dois papéis coloridos parecidos. A imagem é o rótulo que a recepção lê de relance |
+| 9 | **`BIOIMPEDANCE_ANALYSIS` nasce como tipo próprio** | Sem separá-lo de `BIOIMPEDANCE`, a regra "o medido vence o derivado" não tem dois lados para comparar |
+| 10 | **Só a balança é obrigatória** | O app deriva números da medição dela; sozinho, não há medição para publicar |
+
+### Três defeitos que a mesma execução revelou
+
+Nenhum deles é da precedência — todos são casos que o ADR-039 não previu, e que só apareceram com
+arquivo de verdade:
+
+1. **O último arquivo da sessão falhando levava a medição junto.** O ECG é PDF de traçado, sem
+   texto extraível (`EXTRACTOR_NO_CONTENT`); como era o último, o `catch` de `enviar` retornava
+   sem publicar, e a balança + análise ficavam paradas em `EXTRACTED` para sempre. **Corrigido:**
+   o arquivo ilegível é o caso comum, não a exceção, e não pode segurar os outros.
+
+2. **Import `FAILED` na lista de confirmação estourava erro que mentia.** A constraint
+   `assessment_imports_avaliacao_so_em_confirmada` recusa ligar avaliação a import que falhou; a
+   contagem não batia e virava `SESSION_ALREADY_CONFIRMED` — que não resolve em nenhuma tentativa
+   futura. **Corrigido:** só os imports `EXTRACTED` entram na confirmação.
+
+3. **Um valor implausível derrubava a avaliação inteira.** O OCR leu o **peso** (92,3 kg, impresso
+   em destaque no meio da rosca do `CF610_G`) como **percentual de gordura**, e
+   `converterParaCanonica` recusou — corretamente. Mas trinta campos corretos ficavam reféns de
+   um. **Corrigido:** o campo implausível é descartado com registro em log, a avaliação publica o
+   resto, e o valor certo veio do outro laudo (24,4%) exatamente como a decisão 1 manda.
+
+**O que os três têm em comum:** a publicação automática removeu o humano do caminho, e cada
+caminho de erro que antes terminava em "o avaliador resolve na tela" passou a terminar em nada
+publicado e ninguém avisado. O ADR-039 assumiu o risco do valor errado publicado; não tinha como
+prever o risco simétrico — **o valor certo não publicado, em silêncio**.

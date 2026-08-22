@@ -59,35 +59,123 @@
  * parte do filtro.
  */
 .envio {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   padding: 16px;
   border: 1px solid var(--ah-border-subtle);
   border-radius: var(--ah-radius-card);
   background: var(--ah-surface-raised);
 }
 
+.cabecalhoDoEnvio {
+  margin-bottom: 12px;
+}
+
 .tituloDoEnvio {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   font-size: var(--ah-type-body-size);
   font-weight: 600;
   color: var(--ah-text-strong);
 }
 
 .ajudaDoEnvio {
-  margin: 0 0 12px;
-  max-width: 68ch;
+  margin: 0;
+  max-width: 72ch;
   color: var(--ah-text-secondary);
 }
 
 /*
- * Seletor e botão na mesma linha, quebrando junto no estreito. O motivo do
- * bloqueio entra como terceiro item e ocupa a linha inteira quando quebra.
+ * Os tres laudos lado a lado, quebrando junto no estreito.
+ *
+ * `auto-fit` com `minmax` em vez de tres colunas fixas: num monitor de
+ * 1280 com o menu lateral, tres cartoes de 280px cabem; abaixo disso eles
+ * empilham sozinhos, sem breakpoint.
  */
-.linhaDoEnvio {
+.laudos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.laudo {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-canvas);
+}
+
+/*
+ * A miniatura do laudo esperado.
+ *
+ * Altura fixa e `object-position: top`: o que identifica cada laudo esta no
+ * TOPO (o titulo "Relatorio de medicao", "Unique Health", a faixa de dados
+ * do ECG). Centralizar cortaria justamente a parte que distingue um do
+ * outro.
+ */
+.exemploDoLaudo {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-control);
+  background: var(--ah-surface-sunken);
+}
+
+.dadosDoLaudo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.tituloDoLaudo {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ah-text-strong);
+}
+
+.obrigatorio {
+  font-weight: 400;
+  color: var(--ah-text-secondary);
+}
+
+.aparelhoDoLaudo {
+  margin: 0 0 4px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+.semArquivo,
+.comArquivo {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  overflow-wrap: anywhere;
+}
+
+.semArquivo {
+  color: var(--ah-text-secondary);
+}
+
+/* Arquivo escolhido e um ESTADO, e estado carrega mais de um canal: peso e
+   cor, nunca so a cor (`PRODUCT.md`, principio 3). */
+.comArquivo {
+  color: var(--ah-text-default);
+  font-weight: 500;
+}
+
+.rodapeDoEnvio {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+  margin-top: 12px;
 }
 
 .motivoDoBotao {
@@ -114,30 +202,34 @@
 /*
  * O `<label>` faz o papel do botão: clique e Enter já abrem o seletor pelo
  * comportamento nativo, sem JavaScript. O anel de foco vem do input
- * escondido, por isso `:focus-within` no irmão adjacente.
+ * escondido, por isso o seletor no irmão adjacente.
  */
 .botaoDeEscolher {
   display: inline-flex;
   align-items: center;
-  padding: 6px 14px;
+  padding: 5px 12px;
   border: 1px solid var(--ah-border-default);
   border-radius: var(--ah-radius-control);
-  background: var(--ah-surface-canvas);
+  background: var(--ah-surface-raised);
   color: var(--ah-text-strong);
-  font-size: var(--ah-type-body-size);
+  font-size: var(--ah-type-caption-size);
   cursor: pointer;
+  transition: border-color 120ms ease-out, background-color 120ms ease-out;
 }
 
 .botaoDeEscolher:hover {
   border-color: var(--ah-border-hover);
+  background: var(--ah-surface-sunken);
 }
 
 .seletorNativo:focus-visible + .botaoDeEscolher {
-  outline: 2px solid var(--ah-accent-600);
+  outline: 2px solid var(--ah-focus-ring);
   outline-offset: 2px;
 }
 
-.nomesDosArquivos {
-  color: var(--ah-text-secondary);
-  overflow-wrap: anywhere;
+@media (prefers-reduced-motion: reduce) {
+  .botaoDeEscolher {
+    transition: none;
+  }
 }
+

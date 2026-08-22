@@ -18,6 +18,22 @@ const config: NextConfig = {
    * que os consome.
    */
   transpilePackages: ['@arenahub/ui'],
+  /**
+   * Server Actions aceitam ate 10 MB de corpo -- o MESMO teto que a API
+   * aplica em `TAMANHO_MAXIMO_BYTES`.
+   *
+   * O padrao do Next e 1 MB, e o envio de laudos passa disso com folga: os
+   * arquivos reais da academia tem 1,4 MB e 2,1 MB, e vao TODOS no mesmo
+   * pedido. O erro aparecia como "Body exceeded 1 MB limit" na tela, longe
+   * da causa -- o arquivo era valido e a API o teria aceitado.
+   *
+   * Alinhado ao limite da API de proposito: dois tetos diferentes fariam o
+   * arquivo passar num e morrer no outro, com a mensagem culpando a camada
+   * errada.
+   */
+  experimental: {
+    serverActions: { bodySizeLimit: '10mb' },
+  },
 };
 
 export default config;

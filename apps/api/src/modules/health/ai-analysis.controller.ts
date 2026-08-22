@@ -78,6 +78,26 @@ export class AiAnalysisController {
     };
   }
 
+  /**
+   * Por que NAO ha analise -- consumido pela tela de avaliacao.
+   *
+   * Rota separada de `latest` de proposito: `latest` responde 404 quando
+   * nao ha analise, e 404 nao carrega motivo. Espremer o motivo dentro dele
+   * exigiria trocar o 404 por um 200 com corpo vazio, e ai todo consumidor
+   * (totem, app) passaria a tratar "nao existe" como "existe e esta vazio".
+   *
+   * Devolve so o veredito do aceite -- NUNCA a assinatura, a data ou o
+   * documento: quem opera a recepcao precisa saber que FALTA consentimento,
+   * nao o conteudo dele.
+   */
+  @Get('students/:id/ai-analyses/consent')
+  @RequirePermissions('health.read')
+  async aceite(
+    @Param('id') studentId: string,
+  ): Promise<{ autorizado: boolean; motivo: string | null }> {
+    return this.analises.estadoDoAceite(this.contexto.require(), studentId, new Date());
+  }
+
   /** A ultima analise publicada -- consumida por totem e app. */
   @Get('students/:id/ai-analyses/latest')
   @RequirePermissions('health.read')

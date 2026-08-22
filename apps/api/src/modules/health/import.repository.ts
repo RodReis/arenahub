@@ -64,6 +64,28 @@ export class SessaoBloqueadaError extends ErroDeDominio {
   }
 }
 
+/**
+ * Nenhuma medida da sessao passou na faixa plausivel.
+ *
+ * Diferente de `SessaoBloqueadaError`: la a sessao esta incompleta (falta o
+ * laudo da balanca, ha divergencia aberta); aqui os arquivos vieram, foram
+ * lidos, e TODO valor extraido e impossivel -- foto ilegivel, laudo de
+ * modelo que o extrator confunde inteiro.
+ *
+ * O erro existe para nao criar avaliacao VAZIA: uma avaliacao publicada sem
+ * medida nenhuma apareceria no historico do aluno como um ponto no grafico
+ * que nao mede nada.
+ */
+export class SessaoSemMedidaPlausivelError extends ErroDeDominio {
+  constructor() {
+    super(
+      'SESSION_NO_PLAUSIBLE_MEASURE',
+      422,
+      'nenhum valor extraido dos laudos esta numa faixa plausivel',
+    );
+  }
+}
+
 export class SessaoNaoEncontradaError extends ErroDeDominio {
   constructor() {
     super('SESSION_NOT_FOUND', 404, 'sessao de revisao nao encontrada');
@@ -175,6 +197,22 @@ export interface SessaoComArquivos {
   /** Campos de TODOS os arquivos da sessao, achatados. */
   readonly campos: readonly CampoExtraido[];
   readonly importIds: readonly string[];
+  /**
+   * So os imports que PODEM virar avaliacao (`EXTRACTED`).
+   *
+   * Um laudo que o extrator nao conseguiu ler fica `FAILED` e continua na
+   * sessao -- ele existe, o arquivo esta guardado, e a fila da F22 o mostra
+   * -- mas nao pode receber `assessment_id`: a constraint
+   * `assessment_imports_avaliacao_so_em_confirmada` proibe, e com razao
+   * (avaliacao ligada a import que falhou seria proveniencia mentirosa).
+   *
+   * Sem esta separacao, `confirmarSessao` comparava a contagem de linhas
+   * atualizadas com o total da sessao, nao batia por causa do `FAILED`, e
+   * estourava `SESSION_ALREADY_CONFIRMED` -- um erro que MENTE sobre a
+   * causa e nao resolve em nenhuma tentativa futura. Achado com os tres
+   * laudos reais: o ECG e PDF de tracado, sem texto extraivel.
+   */
+  readonly importIdsConfirmaveis: readonly string[];
   /** Chave no storage privado de cada import, na MESMA ordem de `importIds`. */
   readonly objectKeys: readonly (string | null)[];
   /**
@@ -240,14 +278,28 @@ export class ImportRepository {
     });
   }
 
+  /**
+   * `tipoDeLaudo` e gravado MESMO na falha -- e a unica informacao do
+   * arquivo que nao depende do extrator ter funcionado.
+   *
+   * Sem isto, o laudo que falha perde o tipo e vira `UNKNOWN` na tela: a
+   * aba do ECG nao conseguia dizer "o ECG veio e nao pode ser lido" porque
+   * nao sabia mais que aquele arquivo ERA um ECG. Quem enviou declarou o
+   * tipo no campo; o fracasso da leitura nao apaga essa declaracao.
+   */
   async marcarFalha(
     contexto: TenantContext,
     importId: string,
     motivo: string,
+    tipoDeLaudo?: string | null,
   ): Promise<void> {
     await this.db.assessmentImport.updateMany({
       where: { id: importId, tenantId: contexto.tenantId },
-      data: { status: 'FAILED', failureReason: motivo },
+      data: {
+        status: 'FAILED',
+        failureReason: motivo,
+        ...(tipoDeLaudo ? { extractedAttributes: { tipoDeLaudo } } : {}),
+      },
     });
   }
 
@@ -361,7 +413,7 @@ export class ImportRepository {
   ): Promise<ImportacaoComCampos | null> {
     const linha = await this.db.assessmentImport.findFirst({
       where: { id: importId, tenantId: contexto.tenantId },
-      include: { fields: true },
+      include: { fields: { orderBy: { id: 'asc' } } },
     });
 
     if (linha === null) return null;
@@ -382,7 +434,20 @@ export class ImportRepository {
   ): Promise<SessaoComArquivos | null> {
     const linhas = await this.db.assessmentImport.findMany({
       where: { tenantId: contexto.tenantId, reviewSessionId },
-      include: { fields: true },
+      // ORDEM EXPLICITA DOS CAMPOS, e nao so dos arquivos.
+      //
+      // Sem `orderBy` no `include`, o Postgres devolve os campos na ordem
+      // FISICA da tabela -- que muda quando uma linha e reescrita (um
+      // `UPDATE` de `state`, por exemplo, move a tupla). Observado ao vivo:
+      // a mesma sessao renderizou "Peso" na 1a linha e, depois da
+      // publicacao automatica marcar os campos, na 10a. A tela parecia
+      // embaralhar sozinha entre dois carregamentos.
+      //
+      // `id` e uuid v4 -- nao carrega ordem semantica, mas e ESTAVEL, que e
+      // o que falta aqui. Ordenar por `type` daria uma ordem alfabetica que
+      // separa "Peso" de "Altura"; a ordem de insercao agrupa o que veio do
+      // mesmo laudo, que e como quem confere le.
+      include: { fields: { orderBy: { id: 'asc' } } },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -394,6 +459,12 @@ export class ImportRepository {
       importId: linha.id,
       sourceLabel: linha.sourceLabel ?? linha.originalFilename,
       tipoDeLaudo: tipoDeLaudoDoAtributos(linha.extractedAttributes),
+      // O status REAL do import. A tela precisa distinguir "extraido",
+      // "esperando revisao" e "o extrator nao conseguiu ler" -- sem isto,
+      // um laudo `FAILED` (zero campos) caia na mesma cesta de "pendente de
+      // revisao" e pedia uma acao que nao existe para ele.
+      status: linha.status,
+      failureReason: linha.failureReason,
       // OPACO (ADR-035): mesma extracao que `atributosPorImport` abaixo, so
       // que presa ao ARQUIVO dono -- e o que faltava para a tela de revisao
       // citar o achado do ECG sem ter que adivinhar de qual arquivo ele veio.
@@ -408,6 +479,9 @@ export class ImportRepository {
       arquivos,
       campos,
       importIds: linhas.map((linha) => linha.id),
+      importIdsConfirmaveis: linhas
+        .filter((linha) => linha.status === 'EXTRACTED')
+        .map((linha) => linha.id),
       objectKeys: linhas.map((linha) => linha.objectKey),
       atributosPorImport: linhas.map((linha) => atributosOpacos(linha.extractedAttributes)),
     };
@@ -478,6 +552,17 @@ export class ImportRepository {
         reviewedAt: agora,
       },
     });
+
+    // LISTA VAZIA E CONFIRMACAO DUPLICADA, NAO SUCESSO.
+    //
+    // `importIds` aqui e `importIdsConfirmaveis` -- so os `EXTRACTED`. Numa
+    // sessao JA confirmada, nenhum import esta `EXTRACTED`, a lista chega
+    // vazia, e `0 !== 0` e falso: a guarda nao disparava e a segunda
+    // confirmacao respondia 201, criando uma avaliacao duplicada. Regressao
+    // introduzida junto com `importIdsConfirmaveis` e pega pelo teste de
+    // integracao que ja existia -- por isso a checagem de vazio vem ANTES da
+    // comparacao de contagem.
+    if (importIds.length === 0) throw new SessaoJaConfirmadaError();
 
     if (afetadas.count !== importIds.length) throw new SessaoJaConfirmadaError();
   }
@@ -675,6 +760,9 @@ function paraImportacaoComCampos(linha: ImportacaoComCamposDoPrisma): Importacao
     createdAt: linha.createdAt,
     campos: linha.fields.map((campo) => ({
       id: campo.id,
+      // O arquivo dono -- vinculo REAL, nunca casamento por rotulo de texto
+      // (ver `CampoExtraido.importId`).
+      importId: linha.id,
       // SEM `toLowerCase()`: `TipoDeMedida` ja e MAIUSCULO no dominio,
       // identico ao enum do Prisma. Baixar a caixa produzia
       // `body_fat_percent`, que a tabela de unidades nao conhece -- e o
@@ -710,7 +798,21 @@ function tipoDeLaudoDoAtributos(atributos: Prisma.JsonValue): TipoDeLaudo {
 
   const valor = (atributos as Record<string, unknown>)['tipoDeLaudo'];
 
-  return valor === 'BIOIMPEDANCE' || valor === 'ECG' ? valor : 'UNKNOWN';
+  // Lista derivada de `TipoDeLaudo` -- e um `satisfies` de proposito: tipo
+  // novo no dominio que ninguem adicionar aqui vira `UNKNOWN` em silencio, e
+  // foi assim que `BIOIMPEDANCE_ANALYSIS` apareceu como "UNKNOWN" na tela
+  // no mesmo dia em que foi criado. O `satisfies` nao impede o esquecimento
+  // (a leitura e de JSON, sem tipo em runtime), mas deixa a lista ao lado da
+  // definicao em vez de espalhada em literais soltos.
+  const CONHECIDOS = [
+    'BIOIMPEDANCE',
+    'BIOIMPEDANCE_ANALYSIS',
+    'ECG',
+  ] as const satisfies readonly TipoDeLaudo[];
+
+  return (CONHECIDOS as readonly string[]).includes(valor as string)
+    ? (valor as TipoDeLaudo)
+    : 'UNKNOWN';
 }
 
 /**

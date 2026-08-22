@@ -189,6 +189,36 @@ export class AiAnalysisService {
 
     return { id: registro.id, status: 'PUBLISHED', saida: validacao.saida, motivoDaRecusa: null };
   }
+  /**
+   * O estado do aceite, SEM gerar nada.
+   *
+   * A tela precisa distinguir tres coisas que hoje parecem iguais ("nenhuma
+   * analise publicada"): o aluno nunca fez avaliacao, o aluno nunca
+   * consentiu, ou o aluno recusou. So a primeira e um estado normal de
+   * espera -- as outras duas exigem ACAO de quem opera, e uma tela que as
+   * achata em silencio faz a recepcao esperar por algo que nunca vai chegar
+   * sozinho.
+   *
+   * Le a MESMA `avaliarAceite` que `gerar` usa: um segundo criterio aqui
+   * diria "pode" onde a geracao diz "nao pode".
+   */
+  async estadoDoAceite(
+    contexto: TenantContext,
+    studentId: string,
+    agora: Date,
+  ): Promise<{ autorizado: boolean; motivo: string | null }> {
+    const aluno = await this.alunos.encontrar(contexto, studentId);
+
+    if (aluno === null) throw new NotFoundException({ code: 'STUDENT_NOT_FOUND' });
+
+    const assinaturas = await this.analises.assinaturasDoAceite(contexto, studentId);
+    const aceite = avaliarAceite(assinaturas, calcularIdadeEmAnos(aluno.birthDate, agora));
+
+    return aceite.autorizado
+      ? { autorizado: true, motivo: null }
+      : { autorizado: false, motivo: aceite.motivo };
+  }
+
 
   /** A ultima analise PUBLICADA do aluno -- o que totem e app consomem. */
   async ultimaPublicada(

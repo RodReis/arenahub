@@ -734,7 +734,7 @@ assinatura profissional — **ainda não existe**). Pode andar em paralelo ao MV
 |---|---|---|
 | F17 | 3.1 Consentimento e avaliação manual | avaliação publicada é **imutável** (INV-102) |
 | F18 | 3.2 Histórico e comparativos | ausência de dado **não é zero** (INV-104) |
-| F19 | 3.3 Upload e revisão | **OCR nunca publica sozinho** (INV-103). **Emendada em 21/08 (ADR-038):** um arquivo = uma importação, mas N arquivos da mesma medição = **uma sessão de revisão** = uma avaliação |
+| F19 | 3.3 Upload e publicação | **Emendada três vezes em 21/08.** **ADR-038:** um arquivo = uma importação, mas N arquivos da mesma medição = **uma sessão** = uma avaliação. **ADR-039:** o OCR **passa a publicar sozinho** — INV-103 revogado para extração (segue valendo para a análise de IA). **ADR-041:** divergência entre laudos resolve por precedência de origem (a balança vence; o ECG vence o bpm), e dois laudos do mesmo tipo discordando **não** se resolvem |
 | F20 | 3.4 Metas e frequência | **`Goal` deixou de ser buraco: `health_goals` entrou na F18** (decisão do PI, 21/08 — `M3-FR-007` compara "atual, anterior, primeira e **meta**", e o comparativo sem meta ficaria incompleto). Resta a esta fatia o **progresso calculado** e a **frequência** (`student_attendance_sessions`) |
 | F21 | 3.5 Análise assistiva por IA | schema fechado, `NOT_MEDICAL_DIAGNOSIS`, snapshot auditável |
 | F22 | 3.6 Operação e qualidade | custo, latência, circuit breaker |

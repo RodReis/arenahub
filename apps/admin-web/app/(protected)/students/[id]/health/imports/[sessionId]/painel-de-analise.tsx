@@ -27,7 +27,34 @@ export interface AnaliseDeAcompanhamento {
 interface Props {
   readonly analise: AnaliseDeAcompanhamento | null;
   readonly timeZone: string;
+  /**
+   * Por que não há análise, quando não há.
+   *
+   * `null` significa "há análise, ou o motivo não pôde ser consultado".
+   * Sem isto o painel dizia só "Nenhuma análise publicada", que trata três
+   * situações diferentes como uma: o aluno ainda não tem avaliação, o aluno
+   * nunca consentiu, e o aluno recusou. Só a primeira passa sozinha — as
+   * outras duas esperam ação de quem opera, e o silêncio fazia a recepção
+   * aguardar por algo que nunca chegaria.
+   */
+  readonly motivoDaAusencia?: string | null;
 }
+
+const SEM_ANALISE = 'Nenhuma análise publicada para este aluno ainda.';
+
+/**
+ * O motivo em linguagem de quem opera, com a AÇÃO junto.
+ *
+ * Regra do `PRODUCT.md`: erro sempre traz ação possível, nunca detalhe
+ * técnico. `AI_CONSENT_MISSING_STUDENT` não diz nada a quem está no balcão;
+ * "o aluno precisa aceitar" diz.
+ */
+const MOTIVO_LEGIVEL: Record<string, string> = {
+  AI_CONSENT_MISSING_STUDENT:
+    'A análise não foi gerada: o aluno ainda não aceitou o envio dos dados de saúde para análise. O aceite é registrado na ficha do aluno.',
+  AI_CONSENT_REFUSED_STUDENT:
+    'A análise não foi gerada: o aluno recusou o envio dos dados de saúde para análise. A avaliação continua publicada e visível para ele.',
+};
 
 function ListaOuVazia({ titulo, itens }: { titulo: string; itens: readonly string[] }) {
   if (itens.length === 0) return null;
@@ -44,7 +71,7 @@ function ListaOuVazia({ titulo, itens }: { titulo: string; itens: readonly strin
   );
 }
 
-export function PainelDeAnalise({ analise, timeZone }: Props) {
+export function PainelDeAnalise({ analise, timeZone, motivoDaAusencia }: Props) {
   return (
     <aside className={estilos['painel']} aria-labelledby="titulo-painel-analise">
       <h2 id="titulo-painel-analise">Análise de acompanhamento</h2>
@@ -55,7 +82,7 @@ export function PainelDeAnalise({ analise, timeZone }: Props) {
       </p>
 
       {analise === null ? (
-        <p data-testid="analise-ausente">Nenhuma análise publicada para este aluno ainda.</p>
+        <p data-testid="analise-ausente">{MOTIVO_LEGIVEL[motivoDaAusencia ?? ''] ?? SEM_ANALISE}</p>
       ) : (
         <>
           <div className={estilos['blocoDaAnalise']}>

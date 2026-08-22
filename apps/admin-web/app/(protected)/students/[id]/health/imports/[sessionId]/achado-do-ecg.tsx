@@ -19,6 +19,16 @@ import estilos from './sessao.module.css';
 interface Props {
   /** `extracted_attributes` do arquivo de ECG, opaco (ADR-035). */
   readonly atributos?: Record<string, unknown> | null | undefined;
+  /**
+   * Em que pé está o arquivo de ECG desta sessão.
+   *
+   * Sem isto a aba mostrava cinco traços e nada mais — e três situações
+   * bem diferentes ficavam idênticas: não enviaram ECG, enviaram e o
+   * extrator não conseguiu ler, enviaram e o aparelho não reportou nada.
+   * Só a terceira é "não há o que mostrar"; as outras duas pedem ação de
+   * quem opera.
+   */
+  readonly arquivo?: { readonly estado: string; readonly motivoDaFalha: string | null } | undefined;
 }
 
 /** Lê uma chave como texto, sem interpretar o conteúdo. */
@@ -28,7 +38,7 @@ function texto(atributos: Record<string, unknown> | null | undefined, chave: str
   return typeof valor === 'string' && valor !== '' ? valor : null;
 }
 
-export function AchadoDoEcg({ atributos }: Props) {
+export function AchadoDoEcg({ atributos, arquivo }: Props) {
   const achado = texto(atributos, 'ecgFinding');
   const frequencia = atributos?.['ecgHeartRate'];
   const duracao = atributos?.['ecgDurationSeconds'];
@@ -39,6 +49,23 @@ export function AchadoDoEcg({ atributos }: Props) {
   return (
     <section className={estilos['painel']} aria-labelledby="titulo-achado-ecg">
       <h2 id="titulo-achado-ecg">Eletrocardiograma — reportado pelo aparelho</h2>
+
+      {/*
+        A explicação vem ANTES da lista de traços: quem abre a aba e vê
+        cinco "—" precisa saber o porquê no mesmo olhar, não depois de
+        procurar.
+      */}
+      {arquivo === undefined ? (
+        <p className={estilos['avisoDoAparelho']} data-testid="ecg-sem-arquivo">
+          Nenhum arquivo de ECG foi enviado nesta medição.
+        </p>
+      ) : arquivo.estado === 'FAILED' ? (
+        <p className={estilos['avisoDoAparelho']} data-testid="ecg-nao-lido">
+          O arquivo de ECG foi enviado, mas o extrator não conseguiu lê-lo — traçado em PDF e foto
+          tremida costumam dar nisso. O arquivo continua guardado; os valores abaixo ficam vazios
+          porque nada foi extraído dele.
+        </p>
+      ) : null}
 
       <dl className={estilos['listaDoAparelho']}>
         <dt>Análise do aparelho</dt>

@@ -1,11 +1,11 @@
-import type { CampoDaLinha, LinhaDeRevisao, PodeConfirmar } from './revisao-de-campos';
+import type { LinhaDeRevisao } from './valores-da-avaliacao';
 
 export interface AtributosDoAparelho {
   readonly ecgFinding?: string | null;
 }
 
 /**
- * Mapeamento puro da sessao de revisao -- Task 9, rebuild multiarquivo.
+ * Mapeamento puro da sessao de revisao.
  *
  * Vive em arquivo PROPRIO (sem `server-only` na cadeia de imports) para que
  * o teste possa importar so a logica, sem montar `page.tsx` inteiro (que
@@ -16,10 +16,14 @@ export interface ArquivoDaSessao {
   importId: string;
   sourceLabel: string;
   tipoDeLaudo: string;
+  /** `EXTRACTED`, `FAILED`, `CONFIRMED`… — o status real do import. */
+  status?: string;
+  /** Por que o extrator não conseguiu ler, quando não conseguiu. */
+  failureReason?: string | null;
   /**
    * `extracted_attributes` cru do arquivo, OPACO (ADR-035) -- carrega
    * `ecgFinding` quando o arquivo e um ECG. Nunca interpretado aqui, so
-   * repassado para `PainelDeAnalise` citar como texto.
+   * repassado para a tela citar como texto.
    */
   atributos: Record<string, unknown> | null;
 }
@@ -28,40 +32,7 @@ export interface SessaoDeRevisao {
   sessionId: string;
   arquivos: ArquivoDaSessao[];
   linhas: LinhaDeRevisao[];
-  podeConfirmar: PodeConfirmar;
-}
-
-/**
- * Resolve o `importId` dono de cada campo, casando `sourceLabel`.
- *
- * ponytail: `GET .../sessions/:id` devolve `arquivos[].sourceLabel` e
- * `linhas[].campos[].sourceLabel` separadamente, sem o par explicito --
- * casar pelo rotulo e a unica ponte disponivel sem tocar `apps/api`
- * (fora do escopo desta tarefa). Ceiling: dois arquivos com o MESMO rotulo
- * na mesma sessao ficam ambiguos, e o campo perde o `importId` (o formulario
- * ainda funciona para o vencedor; so o descarte do concorrente correspondente
- * fica pendente). Corrigir de verdade pede a API devolver o `importId` por
- * campo em `detalharSessao` (Task 5/`import.controller.ts`).
- */
-function resolverImportId(
-  sourceLabel: string | null,
-  arquivos: readonly ArquivoDaSessao[],
-): string | undefined {
-  if (sourceLabel === null) return undefined;
-
-  const candidatos = arquivos.filter((arquivo) => arquivo.sourceLabel === sourceLabel);
-
-  return candidatos.length === 1 ? candidatos[0]!.importId : undefined;
-}
-
-export function comImportId(sessao: SessaoDeRevisao): LinhaDeRevisao[] {
-  return sessao.linhas.map((linha) => ({
-    ...linha,
-    campos: linha.campos.map((campo) => ({
-      ...campo,
-      importId: resolverImportId(campo.sourceLabel, sessao.arquivos),
-    })),
-  }));
+  podeConfirmar: { pronta: boolean; motivo?: string };
 }
 
 /**
@@ -71,13 +42,11 @@ export function comImportId(sessao: SessaoDeRevisao): LinhaDeRevisao[] {
  * arquivo do tipo ECG e quem carrega o atributo; `sourceLabel` e so o nome
  * do aparelho/arquivo ("ECG 30s") e NUNCA deve ser usado como substituto do
  * achado -- os dois sao coisas diferentes que por acaso vivem no mesmo
- * objeto (bug real da Task 9, corrigido na revisao).
+ * objeto.
  */
 export function atributosDoAparelho(
   sessao: SessaoDeRevisao,
 ): Record<string, unknown> | null {
-  // O arquivo de ECG e o que carrega `ecgFinding`. A PRESENCA da chave e o
-  // criterio -- nunca o conteudo dela, que ninguem le para decidir nada.
   const doEcg = sessao.arquivos.find((arquivo) => arquivo.atributos?.['ecgFinding'] !== undefined);
 
   return doEcg?.atributos ?? null;
@@ -88,49 +57,64 @@ export interface CartaoDeArquivo {
   readonly sourceLabel: string;
   readonly tipoDeLaudo: string;
   readonly totalDeCampos: number;
-  /** `null` quando nenhum campo do arquivo trouxe confianca (extrator deterministico). */
-  readonly confidenceMedia: number | null;
-  /** Extraído quando todo campo do arquivo já saiu do estado `PENDING`; Revisar caso contrário. */
-  readonly estado: 'EXTRACTED' | 'PENDING_REVIEW';
+  /**
+   * O que a tela mostra sobre este laudo.
+   *
+   * `FAILED` é um estado próprio, não "pendente de revisão": o extrator não
+   * conseguiu ler o arquivo, e não há revisão que resolva isso — pedir uma
+   * ação inexistente é pior que dizer que falhou.
+   */
+  readonly estado: 'EXTRACTED' | 'PENDING_REVIEW' | 'FAILED';
+  /** Por que falhou, para o cartão explicar em vez de só sinalizar. */
+  readonly motivoDaFalha: string | null;
+  /**
+   * URL assinada do arquivo original, de vida curta.
+   *
+   * `null` quando o arquivo já foi expurgado após a publicação (retenção
+   * curta, `MVP-03` §15) -- ausência real, não falha de carregamento.
+   */
+  readonly url: string | null;
+  /** `image/png`, `application/pdf`… `null` junto com `url`. */
+  readonly contentType: string | null;
 }
 
 /**
- * Um cartao por arquivo enviado -- mock do PI, item "Três file cards".
+ * Um cartao por arquivo enviado.
  *
- * A contagem de campos e a confianca media SO CONSIDERAM os campos cujo
- * `importId` resolveu para este arquivo (`comImportId` acima) -- um campo
- * sem import resolvido (rotulo ambiguo) nao pode ser atribuido a um cartao
- * especifico sem mentir sobre a origem.
+ * A contagem de campos casa por `importId` -- o vinculo REAL gravado no
+ * banco. A versao anterior casava por `sourceLabel`, e isso nunca funcionou
+ * no caso real: o rotulo do CAMPO vem do nome do arquivo enviado
+ * (`WhatsApp Image 2026-08-04 at 08.21.31`) e o do ARQUIVO vem do conteudo
+ * extraido (`CF610_G`), entao os dois textos raramente coincidiam e a
+ * contagem saia zerada.
  */
 export function cartoesDeArquivo(
   arquivos: readonly ArquivoDaSessao[],
-  linhasComImportId: readonly LinhaDeRevisao[],
+  linhas: readonly LinhaDeRevisao[],
+  urls: ReadonlyMap<string, { url: string | null; contentType: string | null }> = new Map(),
 ): CartaoDeArquivo[] {
-  const todosOsCampos: CampoDaLinha[] = linhasComImportId.flatMap((linha) => linha.campos);
+  const todosOsCampos = linhas.flatMap((linha) => linha.campos);
 
   return arquivos.map((arquivo) => {
     const camposDoArquivo = todosOsCampos.filter((campo) => campo.importId === arquivo.importId);
-    const comConfidence = camposDoArquivo.filter(
-      (campo): campo is CampoDaLinha & { confidence: number } => campo.confidence !== null,
-    );
-
-    const confidenceMedia =
-      comConfidence.length === 0
-        ? null
-        : comConfidence.reduce((soma, campo) => soma + campo.confidence, 0) / comConfidence.length;
+    const assinada = urls.get(arquivo.importId);
 
     const estado: CartaoDeArquivo['estado'] =
-      camposDoArquivo.length > 0 && camposDoArquivo.every((campo) => campo.state !== 'PENDING')
-        ? 'EXTRACTED'
-        : 'PENDING_REVIEW';
+      arquivo.status === 'FAILED'
+        ? 'FAILED'
+        : camposDoArquivo.length > 0 && camposDoArquivo.every((campo) => campo.state !== 'PENDING')
+          ? 'EXTRACTED'
+          : 'PENDING_REVIEW';
 
     return {
       importId: arquivo.importId,
       sourceLabel: arquivo.sourceLabel,
       tipoDeLaudo: arquivo.tipoDeLaudo,
       totalDeCampos: camposDoArquivo.length,
-      confidenceMedia,
       estado,
+      motivoDaFalha: arquivo.failureReason ?? null,
+      url: assinada?.url ?? null,
+      contentType: assinada?.contentType ?? null,
     };
   });
 }

@@ -2035,6 +2035,29 @@
         ]
       }
     },
+    "/api/v1/students/{id}/ai-analyses/consent": {
+      "get": {
+        "operationId": "AiAnalysisController_aceite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AiAnalysis"
+        ]
+      }
+    },
     "/api/v1/students/{id}/ai-analyses/latest": {
       "get": {
         "operationId": "AiAnalysisController_ultima",
@@ -2133,6 +2156,29 @@
         ],
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Import"
+        ]
+      }
+    },
+    "/api/v1/assessment-imports/{id}/file-url": {
+      "get": {
+        "operationId": "ImportController_urlDoArquivo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": ""
           }
         },

@@ -16,6 +16,7 @@ import { TenantContextService } from '../../common/tenant/tenant-context.service
 import { ImportService } from './import.service.js';
 import { TAMANHO_MAXIMO_BYTES } from './domain/arquivo-de-importacao.js';
 import { UNIDADES_DE_MEDIDA, type UnidadeDeMedida } from './domain/medida.js';
+import { campoQueVirouMedida } from './domain/consolidacao-de-laudos.js';
 import { lerFaixa, type Leitura } from './domain/leitura-de-faixa.js';
 import type { CampoExtraido } from './domain/revisao-de-importacao.js';
 
@@ -75,6 +76,27 @@ const esquemaDoEnvio = z
     reviewSessionId: z.uuid().optional(),
     sourceLabel: z.string().min(1).max(120).optional(),
     /**
+     * QUAL laudo e este -- declarado por QUEM ENVIA, nunca adivinhado.
+     *
+     * O OCR de imagem devolve `BIOIMPEDANCE` fixo para toda foto
+     * (`anthropic-ocr-extractor.adapter.ts`): balanca e app de analise
+     * chegam com o MESMO tipo, e a precedencia do ADR-041 ("a balanca
+     * vence") nao tem como escolher entre dois `BIOIMPEDANCE`. Foi o que
+     * travou a primeira medicao real: `mais de um valor aceito para o tipo
+     * BODY_FAT_MASS`, e nenhuma avaliacao publicada.
+     *
+     * Classificar aparelho por imagem e o caminho fragil -- num teste com
+     * tres arquivos reais o rotulo ja saiu errado em um deles. A tela pede
+     * cada laudo no SEU campo (Balanca / Analise / ECG), e o campo diz o
+     * que o arquivo e. Determinstico, visivel para quem envia, e sem
+     * depender de o modelo acertar.
+     *
+     * Ausente mantem o comportamento antigo (o extrator decide): a rota
+     * continua servindo o cliente que ainda nao manda o campo.
+     */
+    tipoDeLaudo: z.enum(['BIOIMPEDANCE', 'BIOIMPEDANCE_ANALYSIS', 'ECG']).optional(),
+
+    /**
      * `"true"` marca o ULTIMO arquivo da medicao e dispara a publicacao
      * automatica (ADR-039). Chega como STRING porque o corpo e
      * `multipart/form-data`, onde tudo e texto -- `z.boolean()` recusaria.
@@ -88,6 +110,8 @@ const esquemaDoEnvio = z
 
 interface CampoDto {
   id: string;
+  /** Arquivo dono deste campo. `null` so em campo sem vinculo no banco. */
+  importId: string | null;
   type: string;
   extractedValue: number | null;
   extractedUnit: string | null;
@@ -175,6 +199,7 @@ export class ImportController {
       {
         reviewSessionId: dados.reviewSessionId,
         sourceLabel: dados.sourceLabel,
+        tipoDeLaudo: dados.tipoDeLaudo,
         ultimoDaSessao: dados.ultimoDaSessao,
       },
       new Date(),
@@ -243,6 +268,8 @@ export class ImportController {
       importId: string;
       sourceLabel: string;
       tipoDeLaudo: string;
+      status: string;
+      failureReason: string | null;
       /**
        * `extracted_attributes` cru do arquivo, OPACO (ADR-035) -- carrega
        * coisas como `ecgFinding`, nunca interpretado aqui nem no cliente,
@@ -255,6 +282,8 @@ export class ImportController {
       concordante: boolean;
       origens: string[];
       campos: CampoDto[];
+      /** Campo que virou a medida. `null` quando a divergencia nao se resolve. */
+      campoPublicadoId: string | null;
     }[];
     podeConfirmar: { pronta: boolean; motivo?: string };
   }> {
@@ -266,6 +295,10 @@ export class ImportController {
         importId: arquivo.importId,
         sourceLabel: arquivo.sourceLabel,
         tipoDeLaudo: arquivo.tipoDeLaudo,
+        // Status e motivo da falha: a tela distingue o laudo que entrou do
+        // que o extrator nao conseguiu ler, e diz POR QUE nao leu.
+        status: arquivo.status ?? 'UNKNOWN',
+        failureReason: arquivo.failureReason ?? null,
         atributos: arquivo.atributos ?? null,
       })),
       linhas: sessao.linhas.map((linha) => ({
@@ -273,7 +306,23 @@ export class ImportController {
         concordante: linha.concordante,
         origens: [...linha.origens],
         campos: linha.campos.map(paraCampoDto),
+        /**
+         * Qual campo VIROU a medida da avaliacao (ADR-041).
+         *
+         * A tela nao pode deduzir isso da ordem do array: a precedencia de
+         * origem mora no dominio (`desempatarPorOrigem`), e uma segunda
+         * implementacao no cliente divergiria da primeira na primeira
+         * mudanca de regra -- com a tela mostrando um valor e o historico
+         * guardando outro, que e a pior forma de erro possivel em dado de
+         * saude.
+         *
+         * `null` quando a divergencia NAO se resolve (dois laudos do mesmo
+         * tipo discordando): ai nao houve vencedor, a confirmacao falhou, e
+         * a tela precisa dizer isso em vez de eleger um lado.
+         */
+        campoPublicadoId: campoQueVirouMedida(linha, sessao.arquivos)?.id ?? null,
       })),
+
       podeConfirmar: sessao.podeConfirmar.pronta
         ? { pronta: true }
         : { pronta: false, motivo: sessao.podeConfirmar.motivo },
@@ -299,6 +348,28 @@ export class ImportController {
       new Date(dados.assessedAt),
       new Date(),
     );
+  }
+
+  /**
+   * URL assinada do arquivo original -- a tela mostra a MINIATURA do laudo
+   * em vez do nome do arquivo (ADR-041).
+   *
+   * `health.read` e nao `health.assess`: ver o laudo que ja esta na tela de
+   * revisao e leitura, e quem opera a revisao ja tem essa permissao.
+   *
+   * Devolve `{ url: null }` -- e nao 404 -- quando o arquivo foi expurgado
+   * apos a confirmacao: para quem chama, "esta importacao existe e o arquivo
+   * ja foi apagado" e uma resposta legitima, nao um recurso ausente. Um 404
+   * aqui faria a tela tratar retencao cumprida como erro.
+   */
+  @Get('assessment-imports/:id/file-url')
+  @RequirePermissions('health.read')
+  async urlDoArquivo(
+    @Param('id') importId: string,
+  ): Promise<{ url: string | null; contentType: string | null }> {
+    const arquivo = await this.importacoes.urlDoArquivo(this.contexto.require(), importId);
+
+    return arquivo ?? { url: null, contentType: null };
   }
 
   @Get('assessment-imports/:id')
@@ -406,6 +477,10 @@ function paraCampoDto(campo: CampoExtraido): CampoDto {
 
   return {
     id: campo.id,
+    // O arquivo dono do campo -- a tela precisa dele para ligar valor a
+    // laudo. Casar por `sourceLabel` nao serve: o rotulo do campo vem do
+    // nome do arquivo enviado e o do arquivo vem do conteudo extraido.
+    importId: campo.importId,
     type: campo.type,
     extractedValue: campo.extractedValue,
     extractedUnit: campo.extractedUnit,
