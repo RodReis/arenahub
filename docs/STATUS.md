@@ -586,9 +586,17 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | **provedor decidido em 19/08 (ADR-032): Sicoob PIX + Getnet cartão** — F14 e F15 destravadas, F16 ainda espera as duas políticas do `M2-COMPLIANCE-01`. F12 e F13 já entregues |
 | **2.5** | Design system: tokens, `packages/ui` e as três superfícies | **F42 sem gate** (dívida ativa: `admin-web` está na `main` sem CSS) · **F43 e F44 têm gate:** o PI priorizar o MVP 4 | F42–F44 | criado por **ADR-025**. F42 pegável assim que o card `[INFRA]` do pipeline de tokens sair |
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis (o *protocolo clínico* como gate **caiu em 19/08** — decisão do PI, ADR-035) | F17–F22 | **bloqueado só por MVP 1.** ADR-008 e ADR-036 fechados; F17–F20 não chamam IA e são as primeiras pegáveis quando o MVP 1 estabilizar |
-| **4** | Autosserviço: app do aluno e totem | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado |
+| **3.5** | Totem: tela pública configurável + autosserviço do aluno | MVP 1 estável + PIX operando (F13 ✅) | F49–F52 | criado por **ADR-042** em 22/08/2026. **Antecipa a decisão, não a execução** — o kiosk nasce configurável em vez de ser retrabalhado depois. Antecipa a execução das Slices 4.5 e 4.6 |
+| **4** | Autosserviço: **app do aluno** (o totem saiu para o MVP 3.5) | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado — e **vem depois do MVP 3.5**, decisão do PI em 22/08 (ADR-042). **Slices 4.5 e 4.6 são executadas no MVP 3.5**; o texto e o aceite continuam no PRD MVP-04 §7, sem cópia |
 | **5** | Engajamento opt-in mensurável | eventos confiáveis + app do MVP 4 | F30–F35 | bloqueado |
 | **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | bloqueado |
+
+
+**Ordem de execução (decisão do PI em 22/08/2026, ADR-042):**
+`MVP 1 → MVP 2 → MVP 3 → **MVP 3.5 (totem)** → MVP 4 (app mobile) → MVP 5 → MVP 6`.
+O totem vem **antes** do app: ele não depende do celular do aluno e alcança todo mundo que passa
+pela recepção. A fila de itens do `docs/DEVELOPMENT.md` precisa refletir isso — arquivo do Code,
+tarefa registrada na F49.
 
 **Observação sobre o MVP 3:** o índice do plano declara que **o MVP 2 não é dependência
 funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
@@ -661,6 +669,12 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **entregue** — PR [#107](https://github.com/RodReis/arenahub/pull/107), aguardando aceite |
 | F47 | — | 1 | — | Importação da base legada Pacto (1.926 alunos) | [ADR-033](DECISIONS.md#adr-033--importação-da-base-legada-do-pacto-1926-alunos-entram-como-cancelled) | [#118](https://github.com/RodReis/arenahub/issues/118) | planejada |
 | F48 | — | 1 | — | Ativação da base corrente do Pacto (~340 ativos) | [design](superpowers/specs/2026-08-20-ativacao-base-corrente-design.md) | — | **entregue** — aguardando aceite |
+| F49 | SPEC-049 | 3.5 | 3.5.1 | Kiosk seguro, provisionamento e sessão efêmera | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.5](prd/academia/MVP-04-app-totem.md) | [#150](https://github.com/RodReis/arenahub/issues/150) | aprovada-pi |
+| F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | aprovada-pi |
+| F51 | SPEC-051 | 3.5 | 3.5.3 | Tela pública (hero): blocos, mídia e patrocínio | [ADR-042](DECISIONS.md#adr-042) | [#152](https://github.com/RodReis/arenahub/issues/152) | aprovada-pi |
+| F52 | SPEC-052 | 3.5 | 3.5.4 | Área do aluno no totem: identificação, pagamento e evolução | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.6](prd/academia/MVP-04-app-totem.md) | [#153](https://github.com/RodReis/arenahub/issues/153) | aprovada-pi |
+
+
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
 > ADR**, não no PRD: o design system é trabalho de plataforma e não tem PRD que o descreva. O
@@ -680,6 +694,22 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 > nenhuma tela usa. **Nenhuma das duas tem SPEC**: o gate de spec morreu em 18/08 e o escopo mora
 > no documento de retrabalho, linkado acima. Coluna `SPEC` fica vazia de propósito — inventar
 > `SPEC-045` seria criar artefato que o processo aposentou. A contagem vai de 44 para **46**.
+
+> **F49–F52 criadas em 22/08/2026 por ADR-042.** As Slices 3.5.1–3.5.4 são definidas **no próprio
+> ADR** — mesmo mecanismo do ADR-025 para as 2.5.x. As 3.5.1 e 3.5.4 **citam** as Slices 4.5 e
+> 4.6 do `MVP-04` em vez de copiá-las: quem executa lê o PRD, e não existe segunda versão do
+> mesmo texto. As 3.5.2 e 3.5.3 são escopo novo, sem PRD que as descreva.
+>
+> **O ADR-042 antecipa a decisão, não a execução.** O PI o pediu para que o totem, quando começar
+> a ser desenvolvido, já nasça sabendo que é configurável — em vez de nascer com valor fixo em
+> tela e ser retrabalhado, como aconteceu com o `admin-web` (F42 e F46). A consequência
+> normativa está na Decisão 0: **nenhuma tela do `kiosk` nasce com valor fixo** naquilo que a
+> Decisão 6 não trava, desde o primeiro commit da superfície.
+>
+> **Ranking e gamificação sai do escopo desta fatia**: o módulo depende da F33 (MVP 5) e, pela
+> Decisão 5, módulo cuja fatia de origem não foi entregue **não aparece no painel**. A contagem
+> vai de 48 para **52 fatias** — nenhum número reaproveitado, `SPEC-049` a `SPEC-052` alocados
+> aqui pela primeira vez.
 
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento

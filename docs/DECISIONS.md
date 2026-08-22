@@ -62,6 +62,15 @@ existe para expulsar deste repositório.
 | [030](#adr-030) | Aprovação antecipada das SPEC-012 a 016, com o ADR-013 aberto | `aceito` | — |
 | [031](#adr-031) | Tailwind e shadcn/ui no `admin-web` | `aceito` | — |
 | [032](#adr-032) | Dois provedores: Sicoob para PIX, Getnet para cartão | `aceito` | — **fecha o ADR-013 e destrava F14–F16** |
+| [033](#adr-033) | Importação da base legada do Pacto: 1.926 alunos entram como `CANCELLED` | `aceito` | — |
+| [034](#adr-034) | CPF passa a ser persistido em claro e exibido sem máscara | `aceito` | — |
+| [035](#adr-035) | ECG no MVP 3: o ArenaHub guarda e cita, nunca interpreta | `aceito` | — |
+| [037](#adr-037) | Contexto de saúde do aluno: lista fechada que suprime alerta | `aceito` | — |
+| [038](#adr-038) | Uma medição, três arquivos: a importação passa a ser N:1 | `aceito` | — |
+| [039](#adr-039) | Laudo de bioimpedância publica automaticamente | `aceito` | — |
+| [040](#adr-040) | Sai o endosso do profissional; fica o consentimento do titular | `aceito` | — |
+| [041](#adr-041) | Divergência entre laudos: a balança vence, o ECG vence o bpm | `aceito` | — |
+| [042](#adr-042) | **MVP 3.5: o totem antecipado, e a tela pública como produto** | `aceito` | — **cria F49–F52** |
 
 ---
 
@@ -2339,3 +2348,406 @@ arquivo de verdade:
 caminho de erro que antes terminava em "o avaliador resolve na tela" passou a terminar em nada
 publicado e ninguém avisado. O ADR-039 assumiu o risco do valor errado publicado; não tinha como
 prever o risco simétrico — **o valor certo não publicado, em silêncio**.
+
+---
+
+<a id="adr-042"></a>
+## ADR-042 — MVP 3.5: o totem antecipado, e a tela pública como produto
+
+**Data:** 22/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 22/08/2026**
+· **Specs F49–F52 aprovadas pelo PI em 22/08/2026**
+· **Emenda** o **ADR-015** (numeração) e o **ADR-025** (precedente de MVP com meio)
+· **Emenda** `docs/prd/academia/MVP-04-app-totem.md` §5 e §7 — antecipação das Slices 4.5 e 4.6
+· **Alcança** `docs/design/DS-TOTEM.md` §11 regra 9 e §12 pendências 1 e 4
+· **NÃO alcança:** Regra de arquitetura 1 (entitlement), ADR-024 (razões de acesso),
+  `M4-BR-007` (tela pública sem valor), DS-TOTEM §8, §9 e §11 regras 1–8 e 10–12
+
+**Contexto.** Em 22/08/2026 o PI trouxe cinco telas de protótipo de uma superfície que **não
+existe em PRD nenhum**: *Personalização do totem*, no `admin-web`, com cinco abas — Marca,
+Aparência, Blocos públicos, Módulos e Sessão — e pré-visualização das sete telas do totem.
+
+Três fatos que o protótipo tornou visíveis, e que o roadmap não previa:
+
+1. **A tela pública é o produto, não a moldura.** Palavras do PI: *"a hero do totem é a área
+   pública, área que fica visível para o público que está passando na frente dele, onde vai
+   mostrar patrocinadores, eventos, informações e outras coisas importantes."* O roadmap tratava
+   o totem como terminal de autosserviço — uma fila de alunos resolvendo pendência. É o
+   contrário: o totem passa a maior parte do dia **sem ninguém na frente dele**, e é nesse tempo
+   que ele trabalha. A jornada do aluno (identificar, pagar, ver evolução) é o **segundo** papel,
+   atrás de uma ação deliberada.
+
+2. **A personalização cruza três MVPs.** A aba Módulos liga *Bioimpedância* e *Evolução*
+   (MVP 3, F17–F19) e *Ranking e gamificação* (MVP 5, Slice 5.4). A aba Blocos públicos e a de
+   Marca não têm origem em MVP nenhum. Alocar isso "no MVP 3", como o pedido original dizia,
+   colocaria uma superfície `kiosk` inteira dentro do PRD de *Health Intelligence*.
+
+3. **O protótipo fecha duas pendências abertas do `DS-TOTEM.md` §12.** A aba Sessão define o
+   timeout de inatividade (pendência 1 — 60 s por padrão, com aviso a um terço do tempo) e o
+   aviso sonoro na recusa (pendência 4 — ligado por padrão, configurável). Ambas estavam com
+   proposta escrita e sem decisão. **Este ADR as fecha exatamente como o DS propunha.**
+
+E um fato que ele tornou visível **contra** o desenho existente: a publicação por heartbeat
+contradiz a regra não negociável 9 do `DS-TOTEM.md` — *"accent resolvido em provisionamento,
+nunca em runtime"*. A Decisão 3 resolve.
+
+---
+
+### Decisão 0 — este ADR antecipa a **decisão**, não a execução
+
+**Palavras do PI, em 22/08/2026:** *"estou antecipando ele, pois quando começar a desenvolver o
+totem ele já sabe que ele é configurável."*
+
+Isto é o ponto inteiro, e vale mais que a criação do MVP. **O que chega cedo é o registro, não o
+código.** O PI pode manter a execução onde estiver na fila; o que ele não aceita é o totem nascer
+com valores fixos em tela e a configurabilidade chegar depois como retrabalho.
+
+**O precedente que justifica.** Foi exatamente isso que aconteceu com o `admin-web`: F6, F7 e F11
+entraram na `main` **sem uma linha de CSS**, e o design system chegou depois — F42 contratou, F46
+reaplicou, e as duas viraram retrabalho registrado no `STATUS.md`. A decisão existia; ela só não
+tinha chegado antes de o código existir.
+
+**A consequência operacional, que é o que este ADR compra:**
+
+> **Nenhuma tela do `kiosk` nasce com valor fixo naquilo que a Decisão 6 não trava.** Marca,
+> cor de destaque, tempo de sessão, ordem e tempo dos blocos, módulos habilitados e textos de
+> chamada são **lidos da configuração desde o primeiro commit da superfície** — mesmo que, na
+> primeira entrega, o único valor que exista seja o padrão do seed.
+
+Ler de um objeto de configuração com um valor padrão custa quase nada quando a tela está sendo
+escrita. Custa uma fatia inteira quando ela já existe.
+
+**A fatia que carrega o peso disto é a F49**, não a F50: quem constrói o kiosk seguro já
+constrói lendo `KioskConfig`. A F50 acrescenta o painel que escreve nele e a publicação
+versionada — não o conceito de haver configuração.
+
+---
+
+### Decisão 1 — cria-se o MVP 3.5, Totem
+
+Mesmo mecanismo do MVP 1.5 (ADR-012) e do MVP 2.5 (ADR-025): **numeração com meio, para não
+renumerar o que já está escrito em PRD.** O MVP 3.5 antecipa o totem para antes do app mobile.
+
+| | |
+|---|---|
+| **entrega** | O totem existindo como mídia da academia e como autosserviço do aluno |
+| **gate de entrada** | MVP 1 estável (identidade e decisão de acesso) + MVP 2 com PIX operando (F13 entregue) |
+| **fatias** | F49–F52 |
+| **token de título** | `[MVP3.5]` — quinto token de meio, ao lado de `[MVP1.5]` e `[MVP2.5]` |
+
+**Por que antes do MVP 4 e não dentro dele.** O MVP 4 entrega app mobile *e* totem, com gate de
+"APIs estáveis dos MVPs 1, 2 e 3". O totem não precisa do app: precisa de identidade, de
+entitlement e de PIX — que existem. Manter os dois amarrados adia a superfície que a academia
+usa o dia inteiro por causa de uma que o aluno usa no celular.
+
+
+**Decisão do PI em 22/08/2026, explícita: o totem é desenvolvido ANTES do mobile.** A ordem
+canônica passa a ser:
+
+```
+MVP 1 → MVP 2 → MVP 3 → MVP 3.5 (totem, F49–F52) → MVP 4 (app mobile, F23–F29) → MVP 5 → MVP 6
+```
+
+Isto não é só posição na tabela do roadmap: **é a ordem em que o `docs/DEVELOPMENT.md` deve
+listar os itens**, e o `DEVELOPMENT.md` é do Code (o ADR-021 não o dá ao Cowork). Fica como
+tarefa da F49: reordenar a fila de execução para que o totem apareça antes do app, citando este
+ADR.
+
+**Por que a ordem é essa, e não a inversa.** O totem não depende do app: depende de identidade,
+entitlement e PIX — que já existem. O app do aluno depende de mais coisas e chega a uma pessoa
+por vez, no celular dela. O totem chega a **todo mundo que passa pela recepção**, inclusive quem
+nunca vai instalar aplicativo nenhum — e, pela Decisão 4 e pela hero da Decisão 2, ele trabalha
+também quando não há ninguém na frente dele.
+
+Consequência para as Slices 4.1–4.4 e 4.7 (o app): **não mudam de conteúdo, mudam de vez na
+fila.** Nenhuma renumeração — é para isso que o MVP com meio existe.
+
+**O que este ADR NÃO faz:** não move as Slices 4.5 e 4.6 do PRD do MVP 4. O texto e o aceite
+delas continuam onde estão, e a emenda ao `MVP-04` §5/§7 apenas registra que **são executadas no
+MVP 3.5**. Duas verdades sobre a mesma Slice é o defeito que o ADR-021 e a emenda de 19/08
+existem para impedir.
+
+---
+
+### Decisão 2 — quatro Slices, definidas aqui
+
+Definidas **neste ADR**, não no PRD — pelo mesmo motivo do ADR-025: a Slice 3.5.2 e a 3.5.3 são
+trabalho que nenhum PRD descreve. As 3.5.1 e 3.5.4 **citam** o PRD do MVP 4 em vez de reescrevê-lo.
+
+| Slice | fatia | spec | escopo | fonte de verdade |
+|---|---|---|---|---|
+| **3.5.1** | F49 | SPEC-049 | Kiosk seguro, provisionamento e sessão efêmera | `MVP-04` §7 Slice 4.5 · `M4-FR-015` a `019`, `M4-BR-004` a `006` |
+| **3.5.2** | F50 | SPEC-050 | Contrato de configuração, painel e publicação | **este ADR**, Decisões 3, 5, 6 e 8 |
+| **3.5.3** | F51 | SPEC-051 | **Tela pública (hero):** blocos, mídia, patrocínio | **este ADR**, Decisões 4 e 7 |
+| **3.5.4** | F52 | SPEC-052 | Área do aluno: identificação, pagamento e evolução | `MVP-04` §7 Slice 4.6 · `M4-FR-016`, `020`, `021`, `M4-BR-001`, `007` |
+
+**Sobre a numeração — `SPEC-045` a `SPEC-048` ficam queimados.** O ADR-015 exige `F<n>` e
+`SPEC-<nnn>` **iguais**. As fatias F45–F48 nasceram sem spec (o gate de spec morreu em 18/08), e
+o `STATUS.md` chegou a citar `SPEC-045` como exemplo de artefato que não deveria existir. Reusar
+esses quatro números aqui criaria justamente o par torto que a regra proíbe — **F49 é `SPEC-049`,
+e 045 a 048 não são alocados a ninguém, nunca.**
+
+**Ordem obrigatória:** F49 → F50 → F51 e F52 em paralelo. Sem F49 não há totem provisionado em
+que publicar; sem F50 não há contrato de configuração para F51 e F52 lerem.
+
+**E a F49 já nasce lendo a configuração** — Decisão 0. Ela não espera a F50 para saber que
+existe `KioskConfig`; espera a F50 apenas para que alguém possa escrever nele pelo painel.
+
+**Aceite de cada uma:**
+
+- **F49** — bateria automatizada e manual comprova que dado do aluno A não aparece para o aluno B,
+  e que o encerramento limpa memória, storage, cache visual, clipboard, autofill e fila de
+  impressão. *(idêntico ao aceite da Slice 4.5 — não foi reescrito.)*
+- **F50** — o gerente altera marca, cor, sessão e módulos no painel, publica, e o totem passa a
+  refletir a mudança sem interromper aluno em sessão. Descartar restaura o publicado.
+- **F51** — o totem roda os blocos habilitados na ordem definida, com o tempo configurado, sem
+  rede disponível, servindo mídia do cache local; a faixa de patrocinadores permanece fixa.
+- **F52** — aluno com pendência identifica-se, paga por PIX e tem o entitlement restaurado pelo
+  fluxo do MVP 2, sem bypass local. *(idêntico ao aceite da Slice 4.6.)*
+
+---
+
+### Decisão 3 — publicar **reinicia a superfície**; o accent continua resolvido no boot
+
+**O conflito.** `DS-TOTEM.md` §11 regra 9: *"accent resolvido em provisionamento, nunca em
+runtime"*. A tela de personalização diz: *"Publicar envia a configuração ao TOTEM 01 no próximo
+heartbeat"*. Trocar cor por heartbeat é runtime — contraria uma regra marcada como não negociável.
+
+**Decisão do PI:** vence a regra do DS. **Publicar não repinta a tela — ele reinicia a
+aplicação do kiosk, fora de sessão.**
+
+| passo | comportamento |
+|---|---|
+| 1 | `POST .../config/publish` cria uma **versão nova e imutável** da configuração |
+| 2 | O `POST /api/v1/kiosk/heartbeat` devolve `configVersion` no corpo da resposta |
+| 3 | O kiosk compara com a versão que carregou no boot. Igual: nada acontece |
+| 4 | Diferente **e sem sessão de aluno aberta**: baixa a configuração, valida, e **reinicia a aplicação** |
+| 5 | Diferente **e com sessão aberta**: **espera o encerramento** e reinicia no atrator |
+
+**Consequências que isto compra:**
+
+- O accent, o alto contraste e a moldura continuam resolvidos **uma vez, no boot** — a regra 9
+  sobrevive intacta e sem emenda.
+- Nenhuma sessão de aluno é interrompida por publicação — o que a própria tela já promete
+  (*"A sessão em andamento não é interrompida"*).
+- A reinicialização é o mesmo caminho já exercitado pela atualização controlada (`M4-FR-022`),
+  em vez de um segundo mecanismo de aplicação de tema.
+
+**Consequência que isto custa, e é aceita:** a mudança não é instantânea. Com heartbeat de 30 s e
+um totem em uso, o gerente pode esperar minutos para ver a cor nova. **A tela precisa dizer
+isso** — "aguardando o totem ficar livre" é um estado de publicação, não um erro.
+
+**`docs/design/DS-TOTEM.md` não é escrito pelo Cowork** (ADR-021 — a lista não inclui
+`docs/design/**`). Fica para o Code, na F50: acrescentar à regra 9 a frase *"— publicar cria
+versão nova e reinicia a superfície fora de sessão"*, citando este ADR. **A regra não muda de
+sentido; ganha o mecanismo que a mantém verdadeira.**
+
+---
+
+### Decisão 4 — patrocínio é vitrine, não mídia
+
+A faixa de patrocinadores é o único item do protótipo que não é configuração de produto: é
+**receita**. Publicidade paga no totem não existe em PRD nenhum e seria o sexto vetor de negócio
+do ArenaHub.
+
+**Decisão do PI: entra, mas só como vitrine estática.**
+
+| entra | não entra |
+|---|---|
+| Nome do patrocinador em texto | Contagem de impressão ou de exibição |
+| Logotipo em SVG, até 6 por unidade | Clique, QR ou qualquer chamada para ação |
+| Rótulo configurável da faixa (padrão: *"Espaço patrocinado"*) | Período de veiculação, campanha, agendamento |
+| Posição fixa no rodapé, sempre visível, fora do rodízio | Relatório de veiculação para a academia |
+
+**Por que o corte é exatamente aqui.** No momento em que o ArenaHub **conta** exibições, ele
+produz o número em que um contrato de patrocínio se apoia — e passa a responder pela exatidão
+dele. Isso é produto de mídia: exige modelo de campanha, período, e relatório auditável. A
+vitrine estática não promete número nenhum: a academia vende o espaço por conta própria e o
+ArenaHub só desenha.
+
+**O rótulo é obrigatório e não pode ser esvaziado.** Publicidade identificada como tal é
+exigência do CDC art. 36, e a faixa fica ao lado de conteúdo informativo da própria academia —
+sem rótulo, os dois se confundem. Se o campo vier vazio, vale o padrão.
+
+**Gatilho de revisão:** o primeiro pedido de "quantas vezes meu logo apareceu" abre fatia
+própria e ADR próprio. Não se resolve com um contador acrescentado em silêncio.
+
+---
+
+### Decisão 5 — módulo desligado remove a etapa; o que ele nunca remove
+
+A aba Módulos avisa: *"Desligar um módulo remove a ação da tela interna e a etapa correspondente
+do fluxo — não apenas esconde o botão."* Está certo, e precisa de duas travas.
+
+**Trava 1 — desligar é no servidor, nunca no cliente.** O `GET /api/v1/kiosk/config` devolve os
+módulos habilitados, e os endpoints de módulo desligado **respondem 404 para aquele dispositivo**.
+Um kiosk com devtools aberto não reabilita nada. Isso é a mesma disciplina do `M4-FR-018`
+(*"expor apenas endpoints e campos necessários à jornada kiosk"*).
+
+**Trava 2 — cada módulo carrega o gate da fatia que o alimenta.** Módulo cuja fatia de origem não
+foi entregue **não aparece no painel** — não aparece desligado, não aparece cinza: não existe.
+
+| módulo | fatia de origem | estado em 22/08/2026 |
+|---|---|---|
+| Pagamento por PIX e cartão | F13 ✅ / F14 ✅ (MVP 2) | disponível |
+| Bioimpedância na balança | F17 ✅ / F18 ✅ (MVP 3) | disponível — resumo apenas, conforme `DS-TOTEM.md` §9.2 |
+| Acompanhamento da evolução | F18 ✅ (MVP 3) | disponível |
+| Ranking e gamificação | **F33 (MVP 5) — planejada** | **não aparece no painel até a F33 entregar** |
+
+O protótipo mostra os quatro ligados. **Ranking sai da entrega desta fatia** e volta com o MVP 5.
+
+**O que módulo nenhum remove, em nenhuma configuração:**
+
+- A tela de resultado de acesso e a frase pública única em `DENY` (ADR-024, `DS-TOTEM.md` §8).
+- O caminho alternativo à biometria (Regra de arquitetura 7).
+- *"Preciso de mais tempo"* durante a contagem (`DS-TOTEM.md` §11 regra 5, WCAG 2.2 AA).
+- A limpeza de sessão no encerramento (`M4-FR-020`).
+- A assinatura discreta do ArenaHub no rodapé (`DS-TOTEM.md` §11 regra 10).
+
+---
+
+### Decisão 6 — a lista fechada do que **não** é configurável
+
+O protótipo já declara parte disso em tela. Fica normativo:
+
+| não configurável | onde está fixado |
+|---|---|
+| Tipografia, escala e alvo de toque (display 64 px, corpo 24 px, ação 88 px) | `DS-TOTEM.md` §3, §4, §11.2 |
+| Contraste mínimo de 7:1 | `DS-TOTEM.md` §11.3 |
+| Light mode e alternância de tema | `DS-TOTEM.md` §11.8 — só alto contraste sob demanda |
+| Comportamento de encerramento: corte em 0 ms + limpeza completa | `M4-FR-020`, `DS-TOTEM.md` §11.6 |
+| A frase pública de `DENY` | ADR-024, `DS-TOTEM.md` §8 |
+| Exibir valor ou motivo de pendência na tela pública | `M4-BR-007`, `DS-TOTEM.md` §9.1 |
+| A assinatura do ArenaHub no rodapé | `DS-TOTEM.md` §11.10 |
+| Efeito visual atrás de texto, valor, QR ou botão | `DS-TOTEM.md` §11.7 — o atrator é o único lugar com efeito |
+
+**A cor de destaque é escolha entre quatro, não campo livre de hex.** O tom aplicado é **derivado
+por contraste sobre carbono**, nunca o hex bruto — o protótipo já diz isso e está correto
+(`DS-TOTEM.md` §2.1).
+
+**Precedência do alto contraste:** o interruptor da aba Aparência define o **padrão de boot** da
+unidade. O botão *"Alto contraste"* na tela do totem é do **aluno**, vale só para a sessão dele, e
+**sempre vence** o padrão enquanto a sessão durar. Gerente não pode desligar a acessibilidade de
+quem está usando; encerrada a sessão, volta o padrão da unidade.
+
+---
+
+### Decisão 7 — MP4 e link do Instagram, com o risco escrito
+
+**Decisão do PI: as duas origens entram.** Upload de MP4 até 40 MB **e** link de reel do
+Instagram, baixado uma vez e servido do cache local do totem.
+
+**O risco, registrado porque foi assumido e não mitigado:** o Instagram não expõe URL estável de
+mídia. Buscar um reel exige extração não oficial (`yt-dlp` ou equivalente), que quebra sem aviso a
+cada mudança da Meta. Isso não é defeito do ArenaHub e não terá correção nossa — é dependência de
+um contrato que não existe.
+
+**As três travas que tornam o risco tolerável:**
+
+1. **O download acontece uma vez, no ato de salvar o bloco** — nunca em runtime, nunca no totem.
+   Falhou? O painel diz que falhou, **no momento em que o gerente está olhando**, e oferece o
+   upload de MP4 como caminho.
+2. **O totem nunca fala com o Instagram.** Ele serve do object storage e do cache local. Extração
+   quebrada não derruba tela pública nenhuma que já esteja publicada.
+3. **Mídia já baixada continua funcionando** mesmo depois de a extração quebrar. O que se perde é
+   a capacidade de adicionar *nova* mídia por link — degradação, não queda.
+
+**A tela precisa dizer isso.** O campo de link não pode prometer o que a Meta não garante:
+o texto abaixo dele diz que a mídia é copiada no momento do salvamento e que mudanças posteriores
+no Instagram não se refletem no totem.
+
+**Toda mídia enviada passa pelo antivírus do boundary** antes de ir para o object storage —
+o mesmo dublê e a mesma fronteira de `docs/TESTING.md`, já exigidos pelo MVP 3.
+
+---
+
+### Decisão 8 — escopo da configuração: tenant → unidade → dispositivo
+
+A configuração resolve em **três camadas, com a mais específica vencendo**:
+
+```
+tenant (marca, patrocinadores padrão)
+  └── gym_unit (aparência, blocos, módulos, sessão)
+        └── kiosk_device (sobrescreve o que a unidade define)
+```
+
+**Por quê três e não uma.** A academia tem uma marca; a unidade tem uma recepção com luz própria
+(o alto contraste da aba Aparência é recomendado *"em recepção com luz direta"*); e um totem na
+porta da musculação não mostra o mesmo que um na entrada. O protótipo já opera no nível do
+dispositivo — *"Configure o TOTEM 01 · Recepção"*.
+
+**`tenant_id` obrigatório em toda linha; `gym_unit_id` obrigatório quando o dado é físico**
+(Regra de arquitetura 2). O tenant vem da identidade autenticada do gerente no painel e da
+identidade do dispositivo no kiosk — **nunca do corpo da requisição**.
+
+---
+
+### Modelo de dados
+
+```text
+kiosk_configurations      versão imutável publicada; rascunho é a versão sem published_at
+kiosk_config_blocks       bloco público: tipo, posição, habilitado, payload
+kiosk_sponsors            nome, logo opcional, posição — máximo 6 por configuração
+kiosk_media_assets        MP4/SVG no object storage: checksum, origem, duração, bytes
+```
+
+**Publicar cria versão nova; nunca altera a publicada.** É o que permite *Descartar* restaurar o
+publicado, o que dá ao heartbeat um número para comparar, e o que torna reversível uma
+configuração que ficou ilegível na recepção — sem isso, "voltar" seria refazer de memória.
+
+### API
+
+```text
+GET    /api/v1/admin/kiosk-devices/:id/config            rascunho + publicado
+PUT    /api/v1/admin/kiosk-devices/:id/config            salva rascunho
+POST   /api/v1/admin/kiosk-devices/:id/config/publish    cria versão
+DELETE /api/v1/admin/kiosk-devices/:id/config/draft      descartar
+POST   /api/v1/admin/kiosk-media                         upload MP4/SVG + antivírus
+GET    /api/v1/kiosk/config                              versão publicada, do lado do totem
+POST   /api/v1/kiosk/heartbeat                           passa a devolver configVersion
+```
+
+O `heartbeat` já existe no `MVP-04` §10. **Ganha um campo, não um endpoint.**
+
+### Requisitos funcionais e regras de negócio desta fatia
+
+- `M3.5-FR-001`: configurar marca, aparência, blocos, módulos e sessão por dispositivo, herdando de unidade e tenant.
+- `M3.5-FR-002`: publicar cria versão imutável e o heartbeat passa a anunciá-la.
+- `M3.5-FR-003`: o kiosk aplica versão nova reiniciando fora de sessão de aluno.
+- `M3.5-FR-004`: rodar blocos públicos habilitados na ordem definida, com tempo por bloco de 8, 12, 20 ou 30 s.
+- `M3.5-FR-005`: servir toda mídia do cache local, sem rede e sem script de terceiro na tela pública.
+- `M3.5-FR-006`: exibir faixa de patrocinadores fixa, rotulada, fora do rodízio.
+- `M3.5-FR-007`: desligar módulo remove a etapa do fluxo e o endpoint correspondente para aquele dispositivo.
+- `M3.5-BR-001`: nenhuma configuração pode expor valor, motivo de pendência ou nome completo na tela pública.
+- `M3.5-BR-002`: nenhuma configuração pode reduzir contraste, tipografia, alvo de toque ou remover *"Preciso de mais tempo"*.
+- `M3.5-BR-003`: alto contraste escolhido pelo aluno vence o padrão da unidade enquanto durar a sessão.
+- `M3.5-BR-004`: módulo cuja fatia de origem não foi entregue não aparece no painel.
+- `M3.5-BR-005`: publicação nunca interrompe sessão de aluno em andamento.
+- `M3.5-BR-006`: a faixa de patrocinadores não conta exibição, não aceita clique e não agenda veiculação.
+
+---
+
+### Riscos assumidos
+
+| risco | por que se aceita |
+|---|---|
+| Extração de reel do Instagram quebra sem aviso | Decisão do PI, com as três travas da Decisão 7. Degrada, não derruba |
+| Publicação lenta em totem ocupado | Preço de não interromper aluno em sessão. A tela mostra o estado de espera |
+| Vitrine de patrocínio vira pedido de métrica | Gatilho explícito na Decisão 4: abre fatia e ADR próprios |
+| Totem antecipado sem app mobile no ar | O totem não depende do app; o `M4-BR-007` e o `DS-TOTEM.md` §9 já assumem aluno sem celular na mão |
+
+### O que este ADR não decide
+
+1. **O que o totem imprime** — pendência 2 do `DS-TOTEM.md` §12, continua aberta, sem impacto nesta fatia.
+2. **Layout da tela pública da catraca** — pendência 3 do §12. A tela de *resultado de acesso* é
+   outra superfície que não a hero do totem; este ADR não a toca.
+3. **Áudio na tela pública.** O protótipo diz *"reproduz sem som, com legenda"* e está certo —
+   recepção não tem áudio confiável. Se o PI quiser som, é decisão nova.
+4. **Conteúdo dos blocos Eventos, Material informativo, Instagram e Informação da academia.**
+   Esta fatia entrega o **mecanismo**; o payload de cada tipo de bloco é definido na F51.
+
+### Dívida de índice, apontada e não corrigida
+
+O índice no topo deste arquivo **para no ADR-032**: os ADRs 033 a 041 não foram indexados, e o
+**ADR-036 é citado no `CLAUDE.md` e no `STATUS.md` sem existir neste arquivo**. Ambos são
+anteriores a este ADR e não são escopo dele — ficam apontados, não apagados, conforme a diretriz
+de alterações cirúrgicas do `CLAUDE.md`.

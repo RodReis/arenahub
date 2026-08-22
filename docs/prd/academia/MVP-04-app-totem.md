@@ -38,6 +38,14 @@ Entregar autosserviço seguro para situação cadastral, carteirinha, frequênci
 - [ ] política de publicação nas lojas decidida antes do rollout público;
 - [ ] conteúdo de privacidade, termos e suporte aprovado.
 
+
+> **Emenda de 22/08/2026 — ADR-042.** As Slices **4.5** e **4.6** passam a ser **executadas no
+> MVP 3.5**, que antecipa o totem para antes do app mobile. O texto, os requisitos e o aceite
+> delas **continuam sendo os desta seção** — o ADR-042 as cita, não as copia. Consequência para
+> os gates acima: os itens de *threat model do kiosk* e de *inventário de dispositivos do totem*
+> passam a ser gate do **MVP 3.5**; os demais continuam sendo gate do MVP 4. Materializa decisão
+> do PI de 22/08/2026 registrada em [ADR-042](../../DECISIONS.md#adr-042).
+
 ## 6. Escopo
 
 ### App incluído
@@ -79,6 +87,15 @@ Entregar autosserviço seguro para situação cadastral, carteirinha, frequênci
 Se o gate de push não estiver atendido, a capacidade é formalmente transferida para a Slice 5.5 e não bloqueia a saída do MVP 4. Notificações internas no app continuam obrigatórias.
 
 ## 7. Slices verticais
+
+
+> **Emenda de 22/08/2026 — ADR-042.** As Slices **4.5 — Kiosk seguro** e **4.6 — Pagamento e
+> desbloqueio no totem** são executadas como **F49 (Slice 3.5.1)** e **F52 (Slice 3.5.4)** do
+> MVP 3.5. Elas ganham uma exigência que não estava escrita aqui: pela Decisão 0 do ADR-042,
+> **nenhuma tela do `kiosk` nasce com valor fixo** naquilo que a Decisão 6 do mesmo ADR não
+> trava — marca, cor, tempo de sessão, blocos e módulos são lidos de `KioskConfig` desde o
+> primeiro commit. Materializa decisão do PI de 22/08/2026 registrada em
+> [ADR-042](../../DECISIONS.md#adr-042).
 
 ### Slice 4.1 — Identidade e shell mobile
 
