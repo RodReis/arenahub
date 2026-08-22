@@ -44,7 +44,29 @@ export type TipoDeMedida =
   | 'VISCERAL_FAT_LEVEL'
   | 'BASAL_METABOLIC_RATE'
   | 'WAIST_CIRCUMFERENCE'
-  | 'HIP_CIRCUMFERENCE';
+  | 'HIP_CIRCUMFERENCE'
+  // Segmentares (F-multiarquivo): alimentam o boneco do aluno.
+  | 'SEGMENTAL_FAT_MASS_ARM_LEFT'
+  | 'SEGMENTAL_FAT_MASS_ARM_RIGHT'
+  | 'SEGMENTAL_FAT_MASS_TRUNK'
+  | 'SEGMENTAL_FAT_MASS_LEG_LEFT'
+  | 'SEGMENTAL_FAT_MASS_LEG_RIGHT'
+  | 'SEGMENTAL_MUSCLE_MASS_ARM_LEFT'
+  | 'SEGMENTAL_MUSCLE_MASS_ARM_RIGHT'
+  | 'SEGMENTAL_MUSCLE_MASS_TRUNK'
+  | 'SEGMENTAL_MUSCLE_MASS_LEG_LEFT'
+  | 'SEGMENTAL_MUSCLE_MASS_LEG_RIGHT'
+  // Composicao que os laudos trazem e o enum nao tinha.
+  | 'BONE_MASS'
+  | 'BODY_CELL_MASS'
+  | 'SUBCUTANEOUS_FAT_MASS'
+  | 'SUBCUTANEOUS_FAT_PERCENT'
+  | 'SKELETAL_MUSCLE_PERCENT'
+  | 'MUSCLE_MASS'
+  | 'PROTEIN_PERCENT'
+  | 'WAIST_HIP_RATIO'
+  // Cardiaco. NUNCA interpretado (ADR-035).
+  | 'HEART_RATE';
 
 /**
  * As mesmas listas, em RUNTIME.
@@ -72,6 +94,25 @@ export const TIPOS_DE_MEDIDA: readonly TipoDeMedida[] = [
   'BASAL_METABOLIC_RATE',
   'WAIST_CIRCUMFERENCE',
   'HIP_CIRCUMFERENCE',
+  'SEGMENTAL_FAT_MASS_ARM_LEFT',
+  'SEGMENTAL_FAT_MASS_ARM_RIGHT',
+  'SEGMENTAL_FAT_MASS_TRUNK',
+  'SEGMENTAL_FAT_MASS_LEG_LEFT',
+  'SEGMENTAL_FAT_MASS_LEG_RIGHT',
+  'SEGMENTAL_MUSCLE_MASS_ARM_LEFT',
+  'SEGMENTAL_MUSCLE_MASS_ARM_RIGHT',
+  'SEGMENTAL_MUSCLE_MASS_TRUNK',
+  'SEGMENTAL_MUSCLE_MASS_LEG_LEFT',
+  'SEGMENTAL_MUSCLE_MASS_LEG_RIGHT',
+  'BONE_MASS',
+  'BODY_CELL_MASS',
+  'SUBCUTANEOUS_FAT_MASS',
+  'SUBCUTANEOUS_FAT_PERCENT',
+  'SKELETAL_MUSCLE_PERCENT',
+  'MUSCLE_MASS',
+  'PROTEIN_PERCENT',
+  'WAIST_HIP_RATIO',
+  'HEART_RATE',
 ];
 
 export const UNIDADES_DE_MEDIDA: readonly UnidadeDeMedida[] = [
@@ -93,10 +134,10 @@ export const UNIDADES_DE_MEDIDA: readonly UnidadeDeMedida[] = [
  * Massa em `kg`, comprimento em `cm`: sao as unidades que o aparelho da
  * academia ja usa, entao o caso comum nao converte nada.
  *
- * `VISCERAL_FAT_LEVEL` e adimensional (indice do aparelho, 1 a 59) e por
- * isso nao aparece aqui -- ver `TIPOS_ADIMENSIONAIS`.
+ * Tres tipos ficam com `null` por serem adimensionais -- indice do aparelho,
+ * razao e contagem por minuto. Ver `TIPOS_ADIMENSIONAIS`.
  */
-const UNIDADE_CANONICA: Readonly<Record<TipoDeMedida, UnidadeDeMedida | null>> = {
+export const UNIDADE_CANONICA: Readonly<Record<TipoDeMedida, UnidadeDeMedida | null>> = {
   WEIGHT: 'kg',
   HEIGHT: 'cm',
   BODY_FAT_PERCENT: 'percent',
@@ -112,6 +153,25 @@ const UNIDADE_CANONICA: Readonly<Record<TipoDeMedida, UnidadeDeMedida | null>> =
   BASAL_METABOLIC_RATE: 'kcal',
   WAIST_CIRCUMFERENCE: 'cm',
   HIP_CIRCUMFERENCE: 'cm',
+  SEGMENTAL_FAT_MASS_ARM_LEFT: 'kg',
+  SEGMENTAL_FAT_MASS_ARM_RIGHT: 'kg',
+  SEGMENTAL_FAT_MASS_TRUNK: 'kg',
+  SEGMENTAL_FAT_MASS_LEG_LEFT: 'kg',
+  SEGMENTAL_FAT_MASS_LEG_RIGHT: 'kg',
+  SEGMENTAL_MUSCLE_MASS_ARM_LEFT: 'kg',
+  SEGMENTAL_MUSCLE_MASS_ARM_RIGHT: 'kg',
+  SEGMENTAL_MUSCLE_MASS_TRUNK: 'kg',
+  SEGMENTAL_MUSCLE_MASS_LEG_LEFT: 'kg',
+  SEGMENTAL_MUSCLE_MASS_LEG_RIGHT: 'kg',
+  BONE_MASS: 'kg',
+  BODY_CELL_MASS: 'kg',
+  SUBCUTANEOUS_FAT_MASS: 'kg',
+  SUBCUTANEOUS_FAT_PERCENT: 'percent',
+  SKELETAL_MUSCLE_PERCENT: 'percent',
+  MUSCLE_MASS: 'kg',
+  PROTEIN_PERCENT: 'percent',
+  WAIST_HIP_RATIO: null,
+  HEART_RATE: null,
 };
 
 /**
@@ -144,8 +204,21 @@ const EQUIVALENTES: Readonly<Record<string, readonly UnidadeDeMedida[]>> = {
   kg: ['L'],
 };
 
-/** Tipos sem unidade: indice adimensional do proprio aparelho. */
-const TIPOS_ADIMENSIONAIS: ReadonlySet<TipoDeMedida> = new Set(['VISCERAL_FAT_LEVEL']);
+/**
+ * Tipos sem unidade do enum `UnidadeDeMedida`, por tres razoes distintas:
+ *
+ * - `VISCERAL_FAT_LEVEL` e indice adimensional do aparelho (1 a 59);
+ * - `WAIST_HIP_RATIO` e razao entre dois comprimentos -- a unidade se cancela;
+ * - `HEART_RATE` e contagem por minuto, grandeza que o enum nao modela.
+ *
+ * O que os tres tem em comum e so o efeito: `converterParaCanonica` nao
+ * multiplica por fator nenhum e guarda o valor como veio.
+ */
+const TIPOS_ADIMENSIONAIS: ReadonlySet<TipoDeMedida> = new Set([
+  'VISCERAL_FAT_LEVEL',
+  'WAIST_HIP_RATIO',
+  'HEART_RATE',
+]);
 
 /**
  * Faixa plausivel por tipo, na unidade CANONICA.
@@ -171,6 +244,25 @@ const FAIXA_PLAUSIVEL: Readonly<Record<TipoDeMedida, { min: number; max: number 
   BASAL_METABOLIC_RATE: { min: 300, max: 5_000 },
   WAIST_CIRCUMFERENCE: { min: 20, max: 250 },
   HIP_CIRCUMFERENCE: { min: 20, max: 250 },
+  SEGMENTAL_FAT_MASS_ARM_LEFT: { min: 0.05, max: 15 },
+  SEGMENTAL_FAT_MASS_ARM_RIGHT: { min: 0.05, max: 15 },
+  SEGMENTAL_FAT_MASS_TRUNK: { min: 0.1, max: 80 },
+  SEGMENTAL_FAT_MASS_LEG_LEFT: { min: 0.1, max: 30 },
+  SEGMENTAL_FAT_MASS_LEG_RIGHT: { min: 0.1, max: 30 },
+  SEGMENTAL_MUSCLE_MASS_ARM_LEFT: { min: 0.3, max: 15 },
+  SEGMENTAL_MUSCLE_MASS_ARM_RIGHT: { min: 0.3, max: 15 },
+  SEGMENTAL_MUSCLE_MASS_TRUNK: { min: 5, max: 60 },
+  SEGMENTAL_MUSCLE_MASS_LEG_LEFT: { min: 1, max: 30 },
+  SEGMENTAL_MUSCLE_MASS_LEG_RIGHT: { min: 1, max: 30 },
+  BONE_MASS: { min: 0.5, max: 10 },
+  BODY_CELL_MASS: { min: 5, max: 100 },
+  SUBCUTANEOUS_FAT_MASS: { min: 0.5, max: 150 },
+  SUBCUTANEOUS_FAT_PERCENT: { min: 1, max: 70 },
+  SKELETAL_MUSCLE_PERCENT: { min: 10, max: 70 },
+  MUSCLE_MASS: { min: 1, max: 200 },
+  PROTEIN_PERCENT: { min: 5, max: 40 },
+  WAIST_HIP_RATIO: { min: 0.5, max: 1.5 },
+  HEART_RATE: { min: 30, max: 220 },
 };
 
 export class MedidaInvalidaError extends ErroDeDominio {
@@ -341,3 +433,47 @@ export function arredondarParaExibicao(valor: number, casas: number): number {
 
   return Math.round(valor * fator) / fator;
 }
+
+/** Região do corpo de um tipo segmentar. */
+export type RegiaoCorporal = 'ARM_LEFT' | 'ARM_RIGHT' | 'TRUNK' | 'LEG_LEFT' | 'LEG_RIGHT';
+
+export const TIPOS_SEGMENTARES: readonly TipoDeMedida[] = [
+  'SEGMENTAL_FAT_MASS_ARM_LEFT',
+  'SEGMENTAL_FAT_MASS_ARM_RIGHT',
+  'SEGMENTAL_FAT_MASS_TRUNK',
+  'SEGMENTAL_FAT_MASS_LEG_LEFT',
+  'SEGMENTAL_FAT_MASS_LEG_RIGHT',
+  'SEGMENTAL_MUSCLE_MASS_ARM_LEFT',
+  'SEGMENTAL_MUSCLE_MASS_ARM_RIGHT',
+  'SEGMENTAL_MUSCLE_MASS_TRUNK',
+  'SEGMENTAL_MUSCLE_MASS_LEG_LEFT',
+  'SEGMENTAL_MUSCLE_MASS_LEG_RIGHT',
+];
+
+/**
+ * Região de cada tipo. `null` para o que não é segmentar.
+ *
+ * Record COMPLETO de propósito: tipo novo sem entrada aqui quebra a
+ * compilação, em vez de sumir calado do boneco.
+ */
+export const REGIAO_DO_TIPO: Readonly<Record<TipoDeMedida, RegiaoCorporal | null>> = {
+  WEIGHT: null, HEIGHT: null, BODY_FAT_PERCENT: null, BODY_FAT_MASS: null,
+  LEAN_BODY_MASS: null, SKELETAL_MUSCLE_MASS: null, TOTAL_BODY_WATER: null,
+  INTRACELLULAR_WATER: null, EXTRACELLULAR_WATER: null, PROTEIN_MASS: null,
+  MINERAL_MASS: null, VISCERAL_FAT_LEVEL: null, BASAL_METABOLIC_RATE: null,
+  WAIST_CIRCUMFERENCE: null, HIP_CIRCUMFERENCE: null,
+  BONE_MASS: null, BODY_CELL_MASS: null, SUBCUTANEOUS_FAT_MASS: null,
+  SUBCUTANEOUS_FAT_PERCENT: null, SKELETAL_MUSCLE_PERCENT: null,
+  MUSCLE_MASS: null, PROTEIN_PERCENT: null, WAIST_HIP_RATIO: null,
+  HEART_RATE: null,
+  SEGMENTAL_FAT_MASS_ARM_LEFT: 'ARM_LEFT',
+  SEGMENTAL_FAT_MASS_ARM_RIGHT: 'ARM_RIGHT',
+  SEGMENTAL_FAT_MASS_TRUNK: 'TRUNK',
+  SEGMENTAL_FAT_MASS_LEG_LEFT: 'LEG_LEFT',
+  SEGMENTAL_FAT_MASS_LEG_RIGHT: 'LEG_RIGHT',
+  SEGMENTAL_MUSCLE_MASS_ARM_LEFT: 'ARM_LEFT',
+  SEGMENTAL_MUSCLE_MASS_ARM_RIGHT: 'ARM_RIGHT',
+  SEGMENTAL_MUSCLE_MASS_TRUNK: 'TRUNK',
+  SEGMENTAL_MUSCLE_MASS_LEG_LEFT: 'LEG_LEFT',
+  SEGMENTAL_MUSCLE_MASS_LEG_RIGHT: 'LEG_RIGHT',
+};

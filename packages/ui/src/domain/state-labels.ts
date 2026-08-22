@@ -35,7 +35,21 @@ export type StateMachine =
   | 'delinquencyAccess'
   | 'payment'
   | 'reconciliation'
-  | 'riskBand';
+  | 'riskBand'
+  /**
+   * F-multiarquivo -- leitura de um valor extraido contra a faixa do
+   * fabricante (`apps/api/.../domain/leitura-de-faixa.ts`). Resolvida no
+   * SERVIDOR (ver o cabecalho daquele arquivo): o painel so rotula o que
+   * chegou pronto, nunca recalcula.
+   */
+  | 'leitura'
+  /**
+   * F-multiarquivo -- estado do CARTAO de arquivo na tela de revisao
+   * (mock do PI: "Extraído" / "Revisar"). Derivado no cliente a partir de
+   * `campo.state` de cada campo do arquivo (`cartoesDeArquivo`, `sessao.ts`)
+   * -- nao e maquina de estado persistida, so um resumo por arquivo.
+   */
+  | 'fileReviewState';
 
 type Dictionary = Readonly<Record<StateMachine, Readonly<Record<string, StateLabel>>>>;
 
@@ -277,6 +291,31 @@ export const STATE_LABELS: Dictionary = {
     MEDIUM: { label: 'Médio', tone: 'warning', icon: 'alert-circle' },
     HIGH: { label: 'Alto', tone: 'risk', icon: 'alert-triangle' },
     CRITICAL: { label: 'Crítico', tone: 'danger', icon: 'alert-triangle' },
+  },
+
+  /**
+   * `BELOW`/`ABOVE` NAO tem tom fixo de bem/mal aqui -- depende da metrica
+   * (gordura ALTA e atencao, massa muscular ALTA e o oposto). Este dicionario
+   * so nomeia a POSICAO contra a faixa; quem le decide o que ela significa
+   * para aquele tipo de medida, exatamente como o servidor ja decide (nunca
+   * o cliente).`warning` em `BELOW`/`ABOVE` e neutro-de-atencao: chama o
+   * olho sem afirmar "ruim".
+   */
+  leitura: {
+    WITHIN: { label: 'Dentro da faixa', tone: 'success', icon: 'check-circle' },
+    AT_LIMIT: { label: 'No limite', tone: 'warning', icon: 'alert-circle' },
+    BELOW: { label: 'Abaixo da faixa', tone: 'warning', icon: 'alert-circle' },
+    ABOVE: { label: 'Acima da faixa', tone: 'warning', icon: 'alert-circle' },
+    UNKNOWN: { label: 'Sem faixa publicada', tone: 'neutral', icon: 'minus' },
+  },
+
+  fileReviewState: {
+    EXTRACTED: { label: 'Extraído', tone: 'success', icon: 'check-circle' },
+    PENDING_REVIEW: { label: 'Revisar', tone: 'warning', icon: 'alert-circle' },
+    // "Não foi possível ler" e não "Falhou": diz o que aconteceu com o
+    // ARQUIVO, não que o sistema quebrou -- um PDF de traçado de ECG é
+    // ilegível para o extrator e isso é normal, não defeito.
+    FAILED: { label: 'Não foi possível ler', tone: 'danger', icon: 'x-circle' },
   },
 };
 

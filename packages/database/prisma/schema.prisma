@@ -3204,6 +3204,28 @@ enum BodyMeasurementType {
   BASAL_METABOLIC_RATE
   WAIST_CIRCUMFERENCE
   HIP_CIRCUMFERENCE
+  // Segmentares (F-multiarquivo): alimentam o boneco do aluno.
+  SEGMENTAL_FAT_MASS_ARM_LEFT
+  SEGMENTAL_FAT_MASS_ARM_RIGHT
+  SEGMENTAL_FAT_MASS_TRUNK
+  SEGMENTAL_FAT_MASS_LEG_LEFT
+  SEGMENTAL_FAT_MASS_LEG_RIGHT
+  SEGMENTAL_MUSCLE_MASS_ARM_LEFT
+  SEGMENTAL_MUSCLE_MASS_ARM_RIGHT
+  SEGMENTAL_MUSCLE_MASS_TRUNK
+  SEGMENTAL_MUSCLE_MASS_LEG_LEFT
+  SEGMENTAL_MUSCLE_MASS_LEG_RIGHT
+  // Composicao que os laudos trazem e o enum nao tinha.
+  BONE_MASS
+  BODY_CELL_MASS
+  SUBCUTANEOUS_FAT_MASS
+  SUBCUTANEOUS_FAT_PERCENT
+  SKELETAL_MUSCLE_PERCENT
+  MUSCLE_MASS
+  PROTEIN_PERCENT
+  WAIST_HIP_RATIO
+  // Cardiaco. NUNCA interpretado (ADR-035).
+  HEART_RATE
 
   @@map("body_measurement_type")
 }
@@ -3238,7 +3260,21 @@ model BodyAssessment {
   publishedAt DateTime? @map("published_at")
 
   source          MeasurementSource @default(MANUAL)
-  /// Referencia da origem: id do arquivo importado, serial do aparelho.
+  /// Referencia da origem: id do arquivo importado (import avulso, F19) OU
+  /// id da sessao de revisao (multiarquivo, Task 5), serial do aparelho.
+  ///
+  /// ⚠️ Quando `source = 'IMPORT'`, este valor e UNICO por indice parcial
+  /// escrito a mao (`body_assessments_import_source_reference_uq`, em
+  /// `migrations/20260821250000_sessao_idempotente_fix_indice`):
+  ///
+  ///     CREATE UNIQUE INDEX ... ON body_assessments (source_reference)
+  ///       WHERE source = 'IMPORT' AND source_reference IS NOT NULL;
+  ///
+  /// E a garantia de que confirmar duas vezes a MESMA sessao (ou o MESMO
+  /// import avulso) nunca cria duas avaliacoes -- ver
+  /// `AvaliacaoJaExisteParaOrigemError` em `domain/avaliacao.ts`. O Prisma
+  /// nao modela indice parcial: ele NAO aparece neste schema e um
+  /// `prisma migrate dev` futuro vai propor apaga-lo. NAO ACEITE.
   sourceReference String?           @map("source_reference")
 
   /// Quem registrou. Exigido pelo INV-101 e pela secao 14 do MVP-03
@@ -3265,9 +3301,17 @@ model BodyAssessment {
   supersededBy BodyAssessment? @relation("AssessmentCorrection")
 
   measurements BodyMeasurement[]
-  /// A importacao que originou esta avaliacao, quando ela veio de arquivo
-  /// (F19). Nula em avaliacao digitada a mao.
-  import       AssessmentImport?
+  /// Os arquivos que originaram esta avaliacao. Vazio em avaliacao
+  /// digitada a mao; um ou mais quando veio de laudo.
+  imports      AssessmentImport[]
+
+  /// Indices, classificacoes e sugestoes DO APARELHO (idade corporal,
+  /// pontuacao, tipo de corpo, peso ideal). Nao sao medidas: nao entram no
+  /// grafico de evolucao, porque a formula e proprietaria e muda com
+  /// firmware. Ver §4.4 da spec.
+  deviceReport Json?   @map("device_report")
+  deviceModel  String? @map("device_model")
+  deviceSerial String? @map("device_serial")
 
   @@index([tenantId, studentId, assessedAt])
   @@index([tenantId, studentId, status, publishedAt])
@@ -3669,7 +3713,21 @@ model AssessmentImport {
   reviewedAt       DateTime? @map("reviewed_at")
 
   /// A avaliacao que nasceu desta importacao. Nula ate a confirmacao.
-  assessmentId String? @unique @map("assessment_id") @db.Uuid
+  assessmentId String? @map("assessment_id") @db.Uuid
+
+  /// Agrupa os arquivos da MESMA medicao. Todos os arquivos de uma sessao
+  /// confirmam juntos e produzem UMA avaliacao.
+  reviewSessionId String? @map("review_session_id") @db.Uuid
+  /// Rotulo de origem exibido na revisao (`CF610_G`, `Unique Health`,
+  /// `ECG 30s`). Derivado do conteudo, nunca do nome do arquivo.
+  sourceLabel     String? @map("source_label")
+
+  /// Dado do APARELHO que o extrator separa em `atributos` (Task 6): achado
+  /// de ECG, tags, duracao -- OPACO de proposito (ADR-035), nunca
+  /// interpretado. Guardado aqui, POR ARQUIVO, porque a extracao e a
+  /// confirmacao nao coincidem numa sessao com varios arquivos; na
+  /// confirmacao ele migra para `BodyAssessment.deviceReport`.
+  extractedAttributes Json? @map("extracted_attributes")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3681,8 +3739,25 @@ model AssessmentImport {
   assessment BodyAssessment? @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
   fields     ImportedField[]
 
+  /// ⚠️ UMA SESSAO PRODUZ NO MAXIMO UMA AVALIACAO -- mas a garantia NAO mora
+  /// nesta tabela (fix Task 5 round 2, achado ao rodar contra Postgres real
+  /// pela primeira vez). Uma tentativa de indice parcial AQUI
+  /// (`ON assessment_imports (review_session_id) WHERE assessment_id IS NOT
+  /// NULL`) parecia certa mas quebrava toda sessao com mais de UM arquivo:
+  /// as N linhas de uma sessao PRECISAM compartilhar o mesmo
+  /// `review_session_id` com `assessment_id` preenchido depois de
+  /// confirmadas, e um indice UNIQUE por linha nao consegue expressar "N
+  /// linhas legitimas, mas so uma origem por avaliacao".
+  ///
+  /// A garantia real mora em `BodyAssessment.sourceReference`, ver o indice
+  /// parcial `body_assessments_import_source_reference_uq` em
+  /// `migrations/20260821250000_sessao_idempotente_fix_indice` e o comentario
+  /// de `AvaliacaoJaExisteParaOrigemError` (`domain/avaliacao.ts`) -- cada
+  /// tentativa de confirmacao cria EXATAMENTE UMA `BodyAssessment`, e e ali
+  /// que a unicidade por origem (sessao ou import avulso) faz sentido.
   @@index([tenantId, studentId, createdAt])
   @@index([tenantId, status, createdAt])
+  @@index([tenantId, reviewSessionId])
   @@map("assessment_imports")
 }
 
@@ -3718,6 +3793,23 @@ model ImportedField {
   reviewedValue Decimal?         @map("reviewed_value") @db.Decimal(10, 4)
   reviewedUnit  MeasurementUnit? @map("reviewed_unit")
 
+  /// De qual arquivo veio este campo. E a coluna "Origem" da tela.
+  sourceLabel String? @map("source_label")
+
+  /// Quando outro arquivo trouxe o MESMO tipo com valor equivalente, este
+  /// campo aponta para o primeiro e nao vira linha propria na revisao.
+  /// Divergencia NUNCA e deduplicada: fica como duas linhas para o humano
+  /// escolher.
+  agreesWithFieldId String? @map("agrees_with_field_id") @db.Uuid
+
+  /// Faixa de referencia VIGENTE no laudo, guardada junto da medida: ela e
+  /// do fabricante e muda com firmware. Em tabela global, a leitura de
+  /// agosto deixaria de fazer sentido em dezembro.
+  referenceMin Decimal? @map("reference_min") @db.Decimal(10, 4)
+  referenceMax Decimal? @map("reference_max") @db.Decimal(10, 4)
+  /// Percentual do padrao que o aparelho reporta (233,3% no braco direito).
+  standardPercent Decimal? @map("standard_percent") @db.Decimal(7, 2)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -3725,5 +3817,6 @@ model ImportedField {
   import AssessmentImport @relation(fields: [importId], references: [id], onDelete: Cascade)
 
   @@index([importId, state])
+  @@index([importId, agreesWithFieldId])
   @@map("imported_fields")
 }

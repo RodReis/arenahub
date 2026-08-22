@@ -3,12 +3,14 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { AcoesDaLinha, Button, useToastDeErro } from '@arenahub/ui';
+import { useToastDeErro } from '@arenahub/ui';
 
 import {
   liberarFinanceiramente,
   type EstadoDaLiberacaoFinanceira,
 } from '../../actions/students';
+import { IconeCatraca } from './acoes-do-aluno';
+import estilos from './students.module.css';
 
 const ESTADO_INICIAL: EstadoDaLiberacaoFinanceira = {};
 
@@ -36,22 +38,39 @@ export function BotaoDeLiberacao({ studentId }: Props) {
   );
 
   return (
-    <AcoesDaLinha>
-      <form action={acao}>
-        <input type="hidden" name="studentId" value={studentId} />
-        <BotaoInterno studentId={studentId} />
-      </form>
-    </AcoesDaLinha>
+    <form action={acao}>
+      <input type="hidden" name="studentId" value={studentId} />
+      <BotaoInterno studentId={studentId} />
+    </form>
   );
 }
 
+/**
+ * O ícone da liberação.
+ *
+ * `aria-label` muda com o estado (`Liberando…`) porque um botão que só troca
+ * de aparência não diz nada a quem usa leitor de tela -- e esta ação demora o
+ * suficiente para alguém clicar duas vezes achando que não pegou.
+ *
+ * `disabled` no pending é o que impede a segunda liberação: a ação grava
+ * auditoria (`reason`, `actorId`) a cada chamada, e dois cliques deixariam
+ * dois registros do mesmo ato.
+ */
 function BotaoInterno({ studentId }: Props) {
   const { pending } = useFormStatus();
+  const rotulo = pending ? 'Liberando catraca…' : 'Liberar catraca';
 
   return (
-    <Button type="submit" variant="solid" disabled={pending} data-testid={`liberar-${studentId}`}>
-      {pending ? 'Liberando…' : 'Liberar'}
-    </Button>
+    <button
+      type="submit"
+      className={estilos['acaoLiberar']}
+      disabled={pending}
+      aria-label={rotulo}
+      title={rotulo}
+      data-testid={`liberar-${studentId}`}
+    >
+      <IconeCatraca />
+    </button>
   );
 }
 

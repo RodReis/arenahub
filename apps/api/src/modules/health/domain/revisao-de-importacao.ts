@@ -61,10 +61,43 @@ export interface CampoExtraido {
   readonly confidence: number | null;
   /** Onde no documento (pagina, linha), quando o extrator informa. */
   readonly sourceLocation: string | null;
+  /**
+   * Faixa de referencia VIGENTE no laudo, guardada junto do campo.
+   *
+   * E do fabricante e muda com firmware: em tabela global, a leitura de
+   * agosto deixaria de fazer sentido em dezembro. `null` quando o laudo nao
+   * imprime faixa para aquele campo -- ausencia, nunca zero (INV-104).
+   */
+  readonly referenceMin: number | null;
+  readonly referenceMax: number | null;
+  /** Percentual do padrao que o aparelho reporta (233,3% num braco). */
+  readonly standardPercent: number | null;
   readonly state: EstadoDoCampo;
   /** Preenchido quando `CORRECTED`. */
   readonly reviewedValue: number | null;
   readonly reviewedUnit: UnidadeDeMedida | null;
+  /**
+   * Nome do arquivo/aparelho de origem (ex.: "CF610_G", "ECG 30s").
+   *
+   * `null` quando a origem nao e rastreada. Usado so para exibicao -- a
+   * consolidacao de multiplos laudos (F-multiarquivo) mostra de onde cada
+   * valor veio, nunca para decidir equivalencia.
+   */
+  readonly sourceLabel: string | null;
+  /**
+   * O ARQUIVO dono deste campo.
+   *
+   * Existe porque casar campo com arquivo por `sourceLabel` nao funciona: o
+   * rotulo do CAMPO vem do nome do arquivo enviado ("WhatsApp Image 2026-08-04
+   * at 08.21.31") e o do ARQUIVO vem do conteudo extraido ("CF610_G"), e os
+   * dois quase nunca coincidem. Quem precisa saber de qual laudo um valor
+   * veio -- o desempate por origem (ADR-041) e a tela de revisao -- precisa
+   * do vinculo REAL, que e a chave estrangeira, nunca de dois textos que por
+   * acaso podem bater.
+   *
+   * `null` so em campo montado fora do banco (dubles de teste puro).
+   */
+  readonly importId: string | null;
 }
 
 export type MotivoDeBloqueio =

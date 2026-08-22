@@ -18,6 +18,7 @@ import {
   valorLegivel,
   variacaoLegivel,
 } from '../../../../../src/health/formatar';
+import { EnvioDeLaudos } from './envio-de-laudos';
 import { FiltroDePeriodo } from './filtro-de-periodo';
 
 export const metadata: Metadata = {
@@ -314,6 +315,12 @@ export default async function PaginaDaEvolucao({
     <section aria-labelledby="titulo-evolucao">
       <PageHeader id="titulo-evolucao" title={`Evolução corporal — ${aluno.fullName}`} />
 
+      {/*
+        O envio vem ANTES do histórico de propósito: é o que a academia faz
+        todo mês ao abrir esta tela, e o gráfico é o que ela consulta depois.
+      */}
+      <EnvioDeLaudos studentId={id} />
+
       <FiltroDePeriodo
         studentId={id}
         periodoAtual={periodo}
@@ -324,7 +331,7 @@ export default async function PaginaDaEvolucao({
         <EmptyState
           testId="sem-medicoes"
           title="Nenhuma medição publicada neste período."
-          hint="Avaliações em rascunho não aparecem aqui — só o que já foi publicado. Amplie o período ou publique a avaliação."
+          hint="Envie os laudos da medição acima — a avaliação é publicada na hora. Se já houve medição antes, amplie o período."
         />
       ) : (
         historico.measurements.map((comparativo) => (

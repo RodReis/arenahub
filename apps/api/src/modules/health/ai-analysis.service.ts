@@ -33,13 +33,7 @@ import type { TipoDeMedida } from './domain/medida.js';
  * arquitetura: e o ponto onde o dado do aluno atravessa a fronteira do PAIS.
  * A ordem das operacoes aqui e a defesa:
  *
- *   1. o aceite direto e automatico;
- *   2. o snapshot e montado por lista branca (`M3-NFR-009`);
- *   3. a pseudonimizacao e CONFERIDA antes do envio;
- *   4. so entao o provedor e chamado;
- *   5. a saida volta como `unknown` e e VALIDADA (`M3-BR-010`);
- *   6. rejeitada ou aceita, a analise e REGISTRADA (`M3-AC-008`).
- *
+
  * Inverter 1 e 2 mandaria dado de quem nao consentiu. Pular 3 tornaria a
  * pseudonimizacao uma declaracao em vez de uma garantia. Pular 5 publicaria
  * diagnostico -- que e o que a regra de arquitetura no 8 proibe.
@@ -195,6 +189,36 @@ export class AiAnalysisService {
 
     return { id: registro.id, status: 'PUBLISHED', saida: validacao.saida, motivoDaRecusa: null };
   }
+  /**
+   * O estado do aceite, SEM gerar nada.
+   *
+   * A tela precisa distinguir tres coisas que hoje parecem iguais ("nenhuma
+   * analise publicada"): o aluno nunca fez avaliacao, o aluno nunca
+   * consentiu, ou o aluno recusou. So a primeira e um estado normal de
+   * espera -- as outras duas exigem ACAO de quem opera, e uma tela que as
+   * achata em silencio faz a recepcao esperar por algo que nunca vai chegar
+   * sozinho.
+   *
+   * Le a MESMA `avaliarAceite` que `gerar` usa: um segundo criterio aqui
+   * diria "pode" onde a geracao diz "nao pode".
+   */
+  async estadoDoAceite(
+    contexto: TenantContext,
+    studentId: string,
+    agora: Date,
+  ): Promise<{ autorizado: boolean; motivo: string | null }> {
+    const aluno = await this.alunos.encontrar(contexto, studentId);
+
+    if (aluno === null) throw new NotFoundException({ code: 'STUDENT_NOT_FOUND' });
+
+    const assinaturas = await this.analises.assinaturasDoAceite(contexto, studentId);
+    const aceite = avaliarAceite(assinaturas, calcularIdadeEmAnos(aluno.birthDate, agora));
+
+    return aceite.autorizado
+      ? { autorizado: true, motivo: null }
+      : { autorizado: false, motivo: aceite.motivo };
+  }
+
 
   /** A ultima analise PUBLICADA do aluno -- o que totem e app consomem. */
   async ultimaPublicada(

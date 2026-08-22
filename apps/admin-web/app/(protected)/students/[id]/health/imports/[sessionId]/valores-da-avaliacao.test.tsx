@@ -1,0 +1,452 @@
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+
+import { AbasDaAvaliacao, ehAba } from './abas-da-avaliacao';
+import { AchadoDoEcg } from './achado-do-ecg';
+import { CartoesDeArquivo } from './cartoes-de-arquivo';
+import { ValoresDaAvaliacao, type LinhaDeRevisao } from './valores-da-avaliacao';
+import {
+  atributosDoAparelho,
+  cartoesDeArquivo,
+  type ArquivoDaSessao,
+  type SessaoDeRevisao,
+} from './sessao';
+
+/**
+ * Testes da tela de avaliação publicada (ADR-041).
+ *
+ * `ValoresDaAvaliacao` é componente de SERVIDOR puro -- sem estado, sem
+ * evento, sem Server Action. Por isso este arquivo não precisa mais de
+ * `ToastProvider` nem de mock das actions: a tela deixou de agir e passou a
+ * só mostrar.
+ */
+
+const linhaConcordante: LinhaDeRevisao = {
+  type: 'WEIGHT',
+  concordante: true,
+  origens: ['Balança', 'App de análise'],
+  campoPublicadoId: 'campo-1',
+  campos: [
+    {
+      id: 'campo-1',
+      type: 'WEIGHT',
+      extractedValue: 82.4,
+      extractedUnit: 'KG',
+      confidence: 0.92,
+      referenceMin: 60.6,
+      referenceMax: 82,
+      sourceLabel: 'Balança',
+      state: 'CONFIRMED',
+      leitura: 'ABOVE',
+      importId: 'import-1',
+    },
+  ],
+};
+
+/**
+ * Divergência RESOLVIDA pelo servidor: a balança venceu (ADR-041 decisão 1).
+ * Os dois campos continuam vindo da API -- proveniência não se apaga -- mas
+ * só o vencedor aparece na tela.
+ */
+const linhaDivergenteResolvida: LinhaDeRevisao = {
+  type: 'BODY_FAT_PERCENT',
+  concordante: false,
+  origens: ['Balança', 'App de análise'],
+  campoPublicadoId: 'campo-2a',
+  campos: [
+    {
+      id: 'campo-2a',
+      type: 'BODY_FAT_PERCENT',
+      extractedValue: 18.2,
+      extractedUnit: 'PERCENT',
+      confidence: 0.7,
+      referenceMin: 10,
+      referenceMax: 20,
+      sourceLabel: 'Balança',
+      state: 'CONFIRMED',
+      leitura: 'WITHIN',
+      importId: 'import-1',
+    },
+    {
+      id: 'campo-2b',
+      type: 'BODY_FAT_PERCENT',
+      extractedValue: 19.5,
+      extractedUnit: 'PERCENT',
+      confidence: 0.4,
+      referenceMin: 10,
+      referenceMax: 20,
+      sourceLabel: 'App de análise',
+      state: 'DISCARDED',
+      leitura: 'WITHIN',
+      importId: 'import-2',
+    },
+  ],
+};
+
+/** Divergência que o servidor NÃO resolveu -- dois laudos do mesmo tipo. */
+const linhaEmConflito: LinhaDeRevisao = {
+  ...linhaDivergenteResolvida,
+  type: 'SKELETAL_MUSCLE_MASS',
+  campoPublicadoId: null,
+};
+
+const linhaSemValor: LinhaDeRevisao = {
+  type: 'VISCERAL_FAT_LEVEL',
+  concordante: true,
+  origens: ['Balança'],
+  campoPublicadoId: 'campo-3',
+  campos: [
+    {
+      id: 'campo-3',
+      type: 'VISCERAL_FAT_LEVEL',
+      extractedValue: null,
+      extractedUnit: null,
+      confidence: null,
+      referenceMin: null,
+      referenceMax: null,
+      sourceLabel: 'Balança',
+      state: 'CONFIRMED',
+      leitura: 'UNKNOWN',
+      importId: 'import-1',
+    },
+  ],
+};
+
+describe('valores da avaliação publicada', () => {
+  it('mostra uma linha por medida, com valor, faixa e leitura', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante]} />);
+
+    expect(screen.getAllByRole('row')).toHaveLength(2); // cabeçalho + 1
+    expect(screen.getByText(/60,6/)).toBeInTheDocument();
+    expect(screen.getByText(/acima da faixa/i)).toBeInTheDocument();
+  });
+
+  /**
+   * O núcleo do ADR-041: a tela não pede escolha nenhuma. Nenhum rádio,
+   * nenhum botão de confirmar, nenhum contador de pendências -- se algum
+   * deles voltar, a publicação automática deixou de ser automática sem
+   * ninguém perceber.
+   */
+  it('NÃO oferece escolha: sem rádio, sem botão, sem contador', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante, linhaDivergenteResolvida]} />);
+
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByText(/exigem? confer[êe]ncia/i)).not.toBeInTheDocument();
+  });
+
+  /** Pedido explícito do PI: a coluna Origem saiu. */
+  it('não mostra a coluna Origem', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante]} />);
+
+    expect(screen.queryByRole('columnheader', { name: /origem/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/2 arquivos/i)).not.toBeInTheDocument();
+  });
+
+  it('não usa mais o título "Revisão campo a campo"', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante]} />);
+
+    expect(screen.queryByText(/revis[ãa]o campo a campo/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Divergência resolvida mostra UMA linha -- a do vencedor -- e nunca a do
+   * perdedor. Exibir os dois valores publicados sugeriria que a avaliação
+   * gravou os dois, e ela gravou um.
+   */
+  it('divergência resolvida vira uma linha só, com o valor que venceu', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaDivergenteResolvida]} />);
+
+    expect(screen.getAllByRole('row')).toHaveLength(2);
+    expect(screen.getByText(/18,2/)).toBeInTheDocument();
+    expect(screen.queryByText(/19,5/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Conflito não resolvido NÃO some em silêncio: o campo fica de fora da
+   * avaliação, e quem lê precisa saber quais campos ficaram -- senão vai
+   * procurá-los no histórico achando que se perderam.
+   */
+  it('avisa quais campos ficaram de fora quando os laudos discordam', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante, linhaEmConflito]} />);
+
+    expect(screen.getByTestId('aviso-de-conflito')).toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(2); // só a concordante
+  });
+
+  it('não mostra aviso de conflito quando tudo foi publicado', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante, linhaDivergenteResolvida]} />);
+
+    expect(screen.queryByTestId('aviso-de-conflito')).not.toBeInTheDocument();
+  });
+
+  it('valor ausente é travessão, nunca zero (INV-104)', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaSemValor]} />);
+
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2); // valor E faixa
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('o nome do campo é cabeçalho de linha, para o leitor de tela', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante]} />);
+
+    expect(screen.getByRole('rowheader', { name: /peso/i })).toBeInTheDocument();
+  });
+});
+
+describe('cartões de laudo com miniatura (ADR-041)', () => {
+  const arquivos: ArquivoDaSessao[] = [
+    { importId: 'import-1', sourceLabel: 'Balança', tipoDeLaudo: 'BIOIMPEDANCE', atributos: null },
+    { importId: 'import-2', sourceLabel: 'ECG 30s', tipoDeLaudo: 'ECG', atributos: null },
+  ];
+
+  it('mostra a IMAGEM do laudo, não o nome do arquivo', () => {
+    const cartoes = cartoesDeArquivo(
+      arquivos,
+      [linhaConcordante],
+      new Map([['import-1', { url: 'https://storage/assinada', contentType: 'image/png' }]]),
+    );
+
+    render(<CartoesDeArquivo cartoes={cartoes} />);
+
+    const imagem = screen.getByRole('img', { name: /bioimped[âa]ncia/i });
+    expect(imagem).toHaveAttribute('src', 'https://storage/assinada');
+    // O nome cru do arquivo não aparece em lugar nenhum do cartão.
+    expect(screen.queryByText('Balança')).not.toBeInTheDocument();
+  });
+
+  it('PDF vira link para o original -- prévia falsa seria pior que nenhuma', () => {
+    const cartoes = cartoesDeArquivo(
+      arquivos,
+      [linhaConcordante],
+      new Map([['import-1', { url: 'https://storage/doc', contentType: 'application/pdf' }]]),
+    );
+
+    render(<CartoesDeArquivo cartoes={cartoes} />);
+
+    expect(screen.getByTestId('previa-documento-import-1')).toHaveTextContent(/abrir pdf/i);
+  });
+
+  /**
+   * Arquivo expurgado pela retenção curta (`MVP-03` §15) não é falha de
+   * carregamento: a tela DIZ que o arquivo não existe mais, em vez de
+   * mostrar ícone de imagem quebrada.
+   */
+  it('arquivo já expurgado explica a ausência, não quebra a imagem', () => {
+    const cartoes = cartoesDeArquivo(arquivos, [linhaConcordante], new Map());
+
+    render(<CartoesDeArquivo cartoes={cartoes} />);
+
+    expect(screen.getByTestId('previa-ausente-import-1')).toHaveTextContent(/expurgado/i);
+    expect(screen.queryAllByRole('img')).toHaveLength(0);
+  });
+
+  /**
+   * Regressão: a contagem casa por `importId`, nunca por `sourceLabel`. Com
+   * o casamento por rótulo, o campo com `sourceLabel` "Balança" e o arquivo
+   * com rótulo "CF610_G" nunca batiam, e todo cartão saía com zero campos.
+   */
+  it('conta os campos pelo importId, não pelo rótulo de origem', () => {
+    const cartoes = cartoesDeArquivo(arquivos, [linhaConcordante]);
+
+    expect(cartoes.find((c) => c.importId === 'import-1')?.totalDeCampos).toBe(1);
+    expect(cartoes.find((c) => c.importId === 'import-2')?.totalDeCampos).toBe(0);
+  });
+});
+
+describe('informacoes do ECG', () => {
+  it('exibe TUDO que o aparelho reportou, sem acao nenhuma', () => {
+    render(
+      <AchadoDoEcg
+        atributos={{
+          ecgFinding: 'Ritmo nao classificado',
+          ecgHeartRate: 92,
+          ecgDurationSeconds: 30,
+          ecgRecordedAt: 'segunda-feira, 3 de agosto de 2026 as 08:10:00',
+          ecgTags: ['Atividade:Alta', 'Tontura'],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('achado-ecg')).toHaveTextContent('Ritmo nao classificado');
+    expect(screen.getByTestId('ecg-frequencia')).toHaveTextContent('92 bpm');
+    expect(screen.getByTestId('ecg-duracao')).toHaveTextContent('30 s');
+    expect(screen.getByTestId('ecg-tags')).toHaveTextContent('Atividade:Alta, Tontura');
+    expect(screen.getByText(/não constituem diagnóstico/i)).toBeInTheDocument();
+
+    // ADR-035: exibir e o limite. NENHUM botao, nenhuma conduta, nenhum
+    // rotulo de gravidade derivado do texto -- interpretar enquadraria o
+    // produto como dispositivo medico (RDC 657/2022).
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByText(/encaminhamento/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/exige leitura m[eé]dica/i)).not.toBeInTheDocument();
+  });
+
+  it('cada informacao ausente vira traco, nunca zero nem branco (INV-104)', () => {
+    render(<AchadoDoEcg atributos={{ ecgFinding: 'Ritmo normal' }} />);
+
+    expect(screen.getByTestId('achado-ecg')).toHaveTextContent('Ritmo normal');
+    expect(screen.getByTestId('ecg-frequencia')).toHaveTextContent('—');
+    expect(screen.getByTestId('ecg-duracao')).toHaveTextContent('—');
+    expect(screen.getByTestId('ecg-tags')).toHaveTextContent('—');
+  });
+
+  it('sem arquivo de ECG na sessao, mostra ausencia em tudo', () => {
+    render(<AchadoDoEcg />);
+
+    expect(screen.getByTestId('achado-ecg')).toHaveTextContent('—');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+});
+
+describe('atributosDoAparelho', () => {
+  /**
+   * Regressao: `sourceLabel` ("ECG 30s") e o achado ("Ritmo nao
+   * classificado...") sao coisas DIFERENTES de proposito neste fixture. A
+   * versao com bug lia `campo.sourceLabel` como se fosse o achado -- um
+   * profissional veria o NOME DO APARELHO onde esperava o resultado.
+   */
+  it('le o achado do ECG do atributo do arquivo, nao do sourceLabel', () => {
+    const sessao: SessaoDeRevisao = {
+      sessionId: 'sessao-1',
+      podeConfirmar: { pronta: true },
+      linhas: [],
+      arquivos: [
+        {
+          importId: 'import-bio',
+          sourceLabel: 'CF610_G',
+          tipoDeLaudo: 'BIOIMPEDANCE',
+          atributos: null,
+        },
+        {
+          importId: 'import-ecg',
+          sourceLabel: 'ECG 30s',
+          tipoDeLaudo: 'ECG',
+          atributos: { ecgFinding: 'Ritmo nao classificado — fibrilacao atrial suspeita' },
+        },
+      ],
+    };
+
+    expect(atributosDoAparelho(sessao)).toEqual({
+      ecgFinding: 'Ritmo nao classificado — fibrilacao atrial suspeita',
+    });
+  });
+
+  it('nao ha achado quando nenhum arquivo trouxe atributo', () => {
+    const sessao: SessaoDeRevisao = {
+      sessionId: 'sessao-2',
+      podeConfirmar: { pronta: true },
+      linhas: [],
+      arquivos: [
+        {
+          importId: 'import-bio',
+          sourceLabel: 'CF610_G',
+          tipoDeLaudo: 'BIOIMPEDANCE',
+          atributos: null,
+        },
+      ],
+    };
+
+    expect(atributosDoAparelho(sessao)).toBeNull();
+  });
+});
+
+describe('abas da avaliação', () => {
+  const caminho = '/students/aluno-1/health/imports/sessao-1';
+
+  it('marca a aba ativa com dois canais: peso e aria-current', () => {
+    render(<AbasDaAvaliacao caminho={caminho} ativa="segmentos" />);
+
+    const ativa = screen.getByTestId('aba-segmentos');
+    expect(ativa).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('aba-valores')).not.toHaveAttribute('aria-current');
+  });
+
+  /**
+   * A aba viaja na URL, não em estado de cliente: o link é compartilhável,
+   * o botão voltar funciona e a página continua Server Component. Se isto
+   * virar `<button>`, a tela passou a exigir JavaScript para trocar de aba.
+   */
+  it('as abas são links de verdade, com a aba na query', () => {
+    render(<AbasDaAvaliacao caminho={caminho} ativa="valores" />);
+
+    expect(screen.getByTestId('aba-historico')).toHaveAttribute(
+      'href',
+      `${caminho}?aba=historico`,
+    );
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+
+  /**
+   * A contagem existe para evitar o clique numa aba vazia. Zero é uma
+   * contagem legítima -- e é justamente a mais útil de saber antes.
+   */
+  it('mostra a contagem quando ela existe, inclusive zero', () => {
+    render(
+      <AbasDaAvaliacao
+        caminho={caminho}
+        ativa="valores"
+        contagens={{ valores: 31, segmentos: 0 }}
+      />,
+    );
+
+    expect(screen.getByTestId('aba-valores')).toHaveTextContent('31');
+    expect(screen.getByTestId('aba-segmentos')).toHaveTextContent('0');
+    // Sem contagem informada, nada de número inventado.
+    expect(screen.getByTestId('aba-ecg')).toHaveTextContent(/^ECG$/);
+  });
+
+  it('aba inválida na URL não é aba', () => {
+    expect(ehAba('valores')).toBe(true);
+    expect(ehAba('inexistente')).toBe(false);
+    expect(ehAba(undefined)).toBe(false);
+  });
+});
+
+/**
+ * A aba do ECG precisa dizer POR QUE está vazia.
+ *
+ * Cinco traços sem explicação tratam três situações diferentes como uma: não
+ * enviaram ECG, enviaram e o extrator não leu, enviaram e o aparelho não
+ * reportou nada. Só a terceira é "não há o que mostrar".
+ */
+describe('ECG — a ausência explicada', () => {
+  it('sem arquivo de ECG na sessão, diz que não foi enviado', () => {
+    render(<AchadoDoEcg />);
+
+    expect(screen.getByTestId('ecg-sem-arquivo')).toHaveTextContent(/nenhum arquivo de ecg/i);
+    expect(screen.queryByTestId('ecg-nao-lido')).not.toBeInTheDocument();
+  });
+
+  it('arquivo enviado que o extrator não leu explica isso, sem culpar quem enviou', () => {
+    render(
+      <AchadoDoEcg arquivo={{ estado: 'FAILED', motivoDaFalha: 'EXTRACTOR_NO_CONTENT' }} />,
+    );
+
+    const aviso = screen.getByTestId('ecg-nao-lido');
+    expect(aviso).toHaveTextContent(/não conseguiu lê-lo/i);
+    // O arquivo NÃO se perdeu -- dizer isso evita o reenvio desnecessário.
+    expect(aviso).toHaveTextContent(/continua guardado/i);
+  });
+
+  /**
+   * Arquivo lido com sucesso mas sem achado: aqui o vazio é a resposta
+   * correta, e um aviso a mais só faria ruído.
+   */
+  it('arquivo lido sem achado não ganha aviso nenhum', () => {
+    render(<AchadoDoEcg arquivo={{ estado: 'EXTRACTED', motivoDaFalha: null }} />);
+
+    expect(screen.queryByTestId('ecg-sem-arquivo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ecg-nao-lido')).not.toBeInTheDocument();
+    expect(screen.getByTestId('achado-ecg')).toHaveTextContent('—');
+  });
+
+  /** ADR-035 continua valendo: explicar a ausência não é interpretar o laudo. */
+  it('nenhum botão aparece, mesmo com o aviso de falha', () => {
+    render(
+      <AchadoDoEcg arquivo={{ estado: 'FAILED', motivoDaFalha: 'EXTRACTOR_NO_CONTENT' }} />,
+    );
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+});

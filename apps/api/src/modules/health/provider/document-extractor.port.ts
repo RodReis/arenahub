@@ -1,5 +1,6 @@
 import type { TipoDeArquivo } from '../domain/arquivo-de-importacao.js';
 import type { TipoDeMedida, UnidadeDeMedida } from '../domain/medida.js';
+import type { TipoDeLaudo } from '../domain/sessao-de-revisao.js';
 
 /**
  * Fronteira da extracao de documento (`DocumentExtractor`, ADR-017).
@@ -55,6 +56,16 @@ export interface CampoProposto {
   readonly confidence: number | null;
   /** Pagina e linha, quando o extrator informa (`M3-FR-010`). */
   readonly sourceLocation: string | null;
+  /** Piso da faixa de referencia do fabricante, quando o laudo informa. */
+  readonly referenceMin?: number | null;
+  /** Teto da faixa de referencia do fabricante, quando o laudo informa. */
+  readonly referenceMax?: number | null;
+  /**
+   * Percentual do padrao do fabricante (ex.: 230.1 = 230,1% do valor de
+   * referencia), quando o laudo traz essa coluna -- sobretudo nos
+   * segmentares, que nao vem com faixa min/max e sim com este indice.
+   */
+  readonly standardPercent?: number | null;
 }
 
 export interface ResultadoDaExtracao {
@@ -69,6 +80,17 @@ export interface ResultadoDaExtracao {
   readonly measuredAt: Date | null;
   /** Qual implementacao respondeu, para auditoria. */
   readonly extractor: string;
+  /**
+   * Dado do laudo que NAO e medida corporal (spec §4.4): achado textual de
+   * ECG, tags do aparelho, idade corporal/pontuacao/peso ideal proprietarios.
+   * Nunca vira `CampoProposto` -- e por isso fica separado, num mapa opaco
+   * que ninguem interpreta (ADR-035).
+   */
+  readonly atributos?: Record<string, unknown>;
+  /** Rotulo da origem do laudo (ex.: `CF610_G`, `UNIQUE_HEALTH`), para auditoria e exibicao. */
+  readonly sourceLabel?: string;
+  /** Classificacao do laudo (spec §3.2): bioimpedancia, ECG ou desconhecido. */
+  readonly tipoDeLaudo?: TipoDeLaudo;
 }
 
 export interface PedidoDeExtracao {

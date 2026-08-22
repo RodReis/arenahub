@@ -27,18 +27,23 @@ function assinatura(
 
 const ADULTO = 36;
 
-describe('avaliarAceite -- exige as DUAS assinaturas', () => {
-  it('autoriza com aluno e professor aceitos, nessa ordem', () => {
+describe('avaliarAceite -- so o consentimento do TITULAR (ADR-040)', () => {
+  it('autoriza com aluno e professor aceitos', () => {
     const r = avaliarAceite([assinatura('STUDENT'), assinatura('PROFESSIONAL')], ADULTO);
 
     expect(r).toEqual({ autorizado: true });
   });
 
-  it('so o aluno nao basta', () => {
-    expect(avaliarAceite([assinatura('STUDENT')], ADULTO)).toEqual({
-      autorizado: false,
-      motivo: 'AI_CONSENT_MISSING_PROFESSIONAL',
-    });
+  /**
+   * O ENDOSSO DO PROFESSOR SAIU (ADR-040, decisao do PI em 21/08/2026).
+   *
+   * O aceite era duplo; agora a analise entra direto e fica disponivel para
+   * o aluno. O consentimento do TITULAR permanece porque nao e escolha de
+   * produto: dado de saude e sensivel (LGPD art. 5, II) e o art. 11 e lista
+   * fechada -- so o titular consente.
+   */
+  it('so o aluno BASTA -- ninguem mais precisa endossar', () => {
+    expect(avaliarAceite([assinatura('STUDENT')], ADULTO)).toEqual({ autorizado: true });
   });
 
   /**
@@ -71,13 +76,18 @@ describe('avaliarAceite -- recusa', () => {
     expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_STUDENT' });
   });
 
-  it('recusa do professor bloqueia, mesmo com o aluno aceitando', () => {
+  /**
+   * Espelho do de cima depois do ADR-040: o professor deixou de ter voto.
+   * Se ele recusa e o titular consentiu, a analise sai -- a decisao sobre o
+   * proprio dado de saude e do aluno.
+   */
+  it('recusa do professor NAO bloqueia -- ele nao decide pelo titular', () => {
     const r = avaliarAceite(
       [assinatura('STUDENT'), assinatura('PROFESSIONAL', { decisao: 'REFUSED' })],
       ADULTO,
     );
 
-    expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_PROFESSIONAL' });
+    expect(r).toEqual({ autorizado: true });
   });
 
   it('documento aposentado nao autoriza analise nova', () => {
@@ -95,16 +105,18 @@ describe('avaliarAceite -- recusa', () => {
 
 describe('avaliarAceite -- a ordem das assinaturas', () => {
   /**
-   * Endosso antes do consentimento seria autorizacao construida de tras para
-   * frente: a academia decide e depois colhe a assinatura do titular.
+   * `AI_CONSENT_OUT_OF_ORDER` SAIU com o ADR-040: a regra comparava o
+   * instante do endosso com o do consentimento, e sem endosso obrigatorio
+   * nao ha o que ordenar. Endosso anterior ao consentimento passou a ser
+   * irrelevante, nao invalido.
    */
-  it('recusa professor que endossou ANTES de o aluno consentir', () => {
+  it('endosso anterior ao consentimento nao invalida mais nada', () => {
     const r = avaliarAceite(
       [assinatura('STUDENT', { em: HOJE }), assinatura('PROFESSIONAL', { em: ONTEM })],
       ADULTO,
     );
 
-    expect(r).toMatchObject({ motivo: 'AI_CONSENT_OUT_OF_ORDER' });
+    expect(r).toEqual({ autorizado: true });
   });
 
   it('aceita as duas no mesmo instante', () => {
@@ -183,12 +195,72 @@ describe('avaliarAceite -- assinatura substituida', () => {
 
     expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_STUDENT' });
   });
+
+  /**
+   * Empate no instante: a recusa vence, venha na ordem que vier.
+   *
+   * `occurred_at` nao tem unicidade e o `agora` e o mesmo `Date` para os dois
+   * papeis dentro de uma transacao, entao duas assinaturas vivas do mesmo
+   * papel no mesmo instante sao alcancaveis. Como `sort` e estavel, sem
+   * desempate o vencedor era a ordem em que o Postgres devolveu as linhas --
+   * e a analise rodava sobre dado de quem recusou por sorte de ordenacao.
+   *
+   * Os dois casos existem de proposito: um sozinho passaria mesmo sem o
+   * desempate, bastando a ordem de chegada ser favoravel.
+   */
+  it('no empate de instante a recusa vence -- recusa chegando primeiro', () => {
+    const r = avaliarAceite(
+      [
+        assinatura('STUDENT', { decisao: 'REFUSED', em: ONTEM }),
+        assinatura('STUDENT', { decisao: 'ACCEPTED', em: ONTEM }),
+        assinatura('PROFESSIONAL', { em: HOJE }),
+      ],
+      ADULTO,
+    );
+
+    expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_STUDENT' });
+  });
+
+  it('no empate de instante a recusa vence -- recusa chegando depois', () => {
+    // O par invertido existe de proposito: um caso sozinho passaria mesmo sem
+    // desempate, bastando a ordem de chegada ser favoravel.
+    const r = avaliarAceite(
+      [
+        assinatura('STUDENT', { decisao: 'ACCEPTED', em: ONTEM }),
+        assinatura('STUDENT', { decisao: 'REFUSED', em: ONTEM }),
+        assinatura('PROFESSIONAL', { em: HOJE }),
+      ],
+      ADULTO,
+    );
+
+    expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_STUDENT' });
+  });
+
+  /**
+   * O empate do PROFESSOR deixou de importar com o ADR-040, mas o desempate
+   * em si continua sendo a garantia que impede analise sobre dado de quem
+   * recusou -- so que agora ele so tem um papel a proteger. Este caso cobre
+   * o empate TRIPLO do aluno: se o desempate falhasse, a ordem fisica das
+   * linhas decidiria, e uma recusa perderia por sorte de ordenacao.
+   */
+  it('empate de tres assinaturas vivas do aluno: a recusa ainda vence', () => {
+    const r = avaliarAceite(
+      [
+        assinatura('STUDENT', { decisao: 'ACCEPTED', em: ONTEM }),
+        assinatura('STUDENT', { decisao: 'ACCEPTED', em: ONTEM }),
+        assinatura('STUDENT', { decisao: 'REFUSED', em: ONTEM }),
+        assinatura('PROFESSIONAL', { em: HOJE }),
+      ],
+      ADULTO,
+    );
+
+    expect(r).toMatchObject({ motivo: 'AI_CONSENT_REFUSED_STUDENT' });
+  });
 });
 
 describe('substituiveis -- o defeito que este desenho existe para impedir', () => {
   /**
    * O `registrarDecisao` da F8 marca como substituida TODA decisao viva do
-   * documento. Aplicado ao aceite direto e automatico, autorizado pela academia
    * consentimento do aluno -- e a autorizacao ficaria de pe com uma
    * assinatura so.
    */

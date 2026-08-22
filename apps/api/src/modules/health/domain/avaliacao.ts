@@ -47,6 +47,36 @@ export class AvaliacaoSemMedidaError extends ErroDeDominio {
   }
 }
 
+/**
+ * Duas confirmacoes concorrentes da MESMA origem (sessao de revisao ou
+ * import avulso) -- a segunda chega aqui (fix Task 5 round 2).
+ *
+ * `source_reference` guarda o id que identifica a MEDICAO (o `reviewSessionId`
+ * de uma sessao multiarquivo, ou o `importId` de um import avulso, F19) --
+ * os dois vem do mesmo espaco de UUID e nunca colidem. O INDICE PARCIAL
+ * `body_assessments_import_source_reference_uq`
+ * (`ON body_assessments (source_reference) WHERE source = 'IMPORT'`) e quem
+ * garante isto, nunca um `if` na aplicacao: a segunda transacao que tenta
+ * criar uma `BodyAssessment` com o MESMO `source_reference` leva `P2002`,
+ * e este erro traduz o `P2002` cru num 409 de dominio.
+ *
+ * NAO E POR LINHA DE `assessment_imports`: uma sessao de tres arquivos tem
+ * tres linhas apontando para a MESMA avaliacao, e um indice em
+ * `assessment_imports` nao consegue expressar "as tres linhas legitimamente
+ * compartilham uma origem, mas duas TENTATIVAS de confirmacao nao podem
+ * criar duas avaliacoes" -- so a tabela de avaliacoes, onde cada tentativa
+ * cria EXATAMENTE UMA linha, tem o formato certo para essa garantia.
+ */
+export class AvaliacaoJaExisteParaOrigemError extends ErroDeDominio {
+  constructor() {
+    super(
+      'SESSION_ALREADY_CONFIRMED',
+      409,
+      'ja existe avaliacao para esta origem (sessao ou import ja confirmado)',
+    );
+  }
+}
+
 export class CorrecaoDeRascunhoError extends ErroDeDominio {
   constructor() {
     super(
