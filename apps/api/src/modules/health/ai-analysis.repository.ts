@@ -74,7 +74,6 @@ export class AiAnalysisRepository {
    * ⚠️ ESTE E O PONTO QUE DIVERGE DA F8, E A DIVERGENCIA E O DESENHO.
    *
    * `ConsentRepository.registrarDecisao` marca como substituida TODA decisao
-   * viva do documento. Aplicado ao aceite duplo, o endosso do professor
    * apagaria o consentimento do aluno -- e a autorizacao ficaria de pe com
    * uma assinatura so, que e exatamente o que o desenho de duas existe para
    * impedir. O `signerRole` no `where` e o que fecha isso.

@@ -1,0 +1,7 @@
+tipo,valor,unidade,faixa_min,faixa_max,percentual_padrao
+WEIGHT,88.4,kg,61,82,
+BONE_MASS,3.60,kg,3.1,3.8,
+BODY_CELL_MASS,44.00,kg,35.6,43.5,
+SUBCUTANEOUS_FAT_PERCENT,20.10,percent,8.6,16.7,
+WAIST_HIP_RATIO,0.88,,0.8,0.9,
+HEART_RATE,84,,55,100,

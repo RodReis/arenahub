@@ -2043,3 +2043,299 @@ exames.
 Lista fechada erra por omissão: um fator que ninguém previu não tem como ser registrado, e o
 alerta falso aparece. **É o erro certo a cometer** — falta um fator, adiciona-se um item com
 teste; sobra um campo livre, não há como recolher o dado de saúde que já foi digitado nele.
+
+---
+
+<a id="adr-038"></a>
+## ADR-038 — Uma medição, três arquivos: a importação passa a ser N:1 com a avaliação
+
+**Data:** 21/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 21/08/2026**
+· **Emenda material:** `MVP-03` §7 (Slice 3.3) e §8 (`M3-FR-009`, `M3-FR-011`)
+· **Depende de:** ADR-035 (ECG), ADR-020 (`packages/database`)
+· **Condiciona:** a fatia da avaliação multiarquivo; o contrato que F26–F28 consomem
+
+**Contexto.** A Arena Positiva mede o aluno uma vez por mês e sai com **três arquivos da mesma
+medição**: o relatório da balança `CF610_G`, o relatório de análise do Unique Health — que lê a
+**mesma** balança (`CF:E8:CC:12:00:11`), no **mesmo** instante, com o **mesmo** peso — e um ECG de
+30 s do OMRON HEM-7530T.
+
+A F19 entregou o caminho de importação com **um arquivo = uma importação = uma avaliação**:
+`AssessmentImport.assessmentId` é `@unique` e `BodyAssessment.import` é singular. Três arquivos
+produziriam **três avaliações no mesmo instante** — três pontos no gráfico para uma medição só, e
+o comparativo da F18 passaria a mentir sobre a evolução do aluno.
+
+O modelo não está errado: ele resolve o caso que a Slice 3.3 descreve. O que mudou é o fato
+operacional — a academia não gera um laudo por medição, gera três.
+
+**Decisão.**
+
+1. **A relação vira N:1.** `@unique` sai de `assessmentId`; `BodyAssessment.import` vira
+   `imports AssessmentImport[]`. Cada arquivo permanece sua própria importação, com seu antivírus,
+   seu extrator e sua proveniência — o que muda é o destino.
+
+2. **Nasce a sessão de revisão.** Os arquivos sobem, formam um conjunto pendente, e o avaliador
+   confirma **uma vez**. A avaliação nasce nesse commit, com as medidas de todos os arquivos. O
+   INV-103 é preservado e melhor servido: uma decisão humana em vez de três.
+
+3. **Campo concordante é deduplicado; divergente, nunca.** Quando dois arquivos trazem o mesmo
+   tipo com valor equivalente, a revisão mostra uma linha com o selo de duas origens. Quando
+   divergem, mostra as duas **sem pré-seleção** — escolher por quem avalia é o erro que este
+   processo existe para impedir.
+
+4. **Bioimpedância é obrigatória, ECG é opcional.** Conjunto sem laudo de composição corporal não
+   vira avaliação: seria um ponto vazio na série da F18.
+
+5. **O enum de medidas cresce de 15 para 34** — 10 segmentares (que alimentam a visualização
+   corporal do aluno), 8 de composição que os laudos já traziam e o modelo não guardava, e
+   `HEART_RATE`. O `M3-FR-005` já exigia medidas segmentares; esta é a dívida sendo paga.
+
+6. **Índice, classificação e sugestão do fabricante NÃO viram medida.** Idade corporal, pontuação
+   de saúde, tipo de corpo, peso ideal e os "controles" sugeridos pela balança vão para
+   `BodyAssessment.deviceReport`, fora do gráfico de evolução. **Critério: vira medida o que é
+   medido e comparável; vira atributo o que é índice proprietário.** Comparar mês a mês um número
+   cuja fórmula pode mudar num firmware novo produziria tendência falsa — e o aluno leria como
+   progresso o que foi só troca de algoritmo.
+
+7. **O ECG segue o ADR-035, sem exceção.** Guarda-se `HEART_RATE` como medida e o achado, as tags
+   e as observações como texto atribuído ao aparelho. **Nenhuma linha de código lê o achado para
+   decidir coisa alguma** — não alerta, não encaminha, não bloqueia. O PI registrou em 21/08/2026
+   que o anexo do arquivo já pressupõe conversa presencial com o aluno, então não há pendência a
+   criar. O card de encaminhamento sai da tela.
+
+**Por que não uma entidade agrupadora nova.** Os três arquivos *já são* a mesma avaliação — mesmo
+instante, mesma balança. Uma tabela intermediária acrescentaria um nível de indireção para
+expressar o que `BodyAssessment` já expressa, e todo consumidor pagaria o join.
+
+**Por que isto é ADR e não decisão de PR.** Migração de schema com `@unique` removido é cara de
+desfazer depois que dado histórico existir, e o contrato de evolução corporal será consumido pelo
+app e pelo totem (F26–F28) — outro sistema passando a depender da forma.
+
+**Custo de reverter.** Hoje, baixo: nenhuma avaliação de produção tem importação associada (a
+migration da F19 é a mais recente). Depois da primeira importação real de três arquivos, voltar
+para 1:1 exige escolher qual dos arquivos "é" a avaliação e descartar a proveniência dos outros.
+
+### Risco assumido
+
+**A deduplicação pode esconder divergência real.** Se a tolerância de comparação for larga demais,
+dois valores genuinamente diferentes seriam fundidos e o número errado viraria histórico com selo
+de "confirmado por dois arquivos". Mitigação: a tolerância deriva da **precisão impressa no
+laudo**, não de estimativa, e a assimetria é deliberada — mostrar divergência falsa custa um
+clique, escondê-la custa um dado errado no prontuário do aluno.
+
+---
+
+<a id="adr-039"></a>
+## ADR-039 — Laudo de bioimpedância publica automaticamente, sem revisão campo a campo
+
+**Data:** 21/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 21/08/2026**
+· **Revoga:** a regra de arquitetura nº 8 do `CLAUDE.md` **na parte do OCR** e o `M3-BR-006`
+· **Emenda material:** `MVP-03` §7 (Slice 3.3), §8 (`M3-FR-011`) e §14 (`M3-AC-005`)
+· **NÃO revoga:** ADR-035 (ECG), `M3-AC-007` e `M3-AC-008` (consentimento e saída de IA)
+
+**Contexto.** O desenho da Slice 3.3 exigia confirmação humana campo a campo antes de qualquer
+valor extraído virar histórico. O PI operou o fluxo e concluiu que ele não corresponde ao trabalho
+real da academia: **a recepção anexa o arquivo do aluno e pronto** — não há avaliador disponível a
+cada medição para conferir sessenta e sete campos contra o papel, e a avaliação precisa estar no
+app do aluno quando ele sai da balança, não quando alguém tiver tempo.
+
+Uma tela que ninguém usa não protege ninguém: o resultado previsível da confirmação obrigatória
+era o laudo ficar parado em `EXTRACTED`, e a academia voltar ao papel.
+
+**Decisão.**
+
+1. **O valor extraído é publicado automaticamente.** Anexou, extraiu, gravou, o aluno vê. Sem
+   revisão campo a campo, sem estado intermediário esperando humano.
+
+2. **Baixa confiança não segura nada** (decisão explícita do PI em 21/08/2026). Campo que o
+   extrator leu mal entra igual. A alternativa — segurar o duvidoso — foi apresentada e recusada:
+   meia avaliação publicada é pior de explicar ao aluno do que uma avaliação inteira com um número
+   a corrigir.
+
+3. **Nasce `health.upload`**, permissão de ANEXAR sem ver nem editar dado de saúde. A recepção
+   recebe só ela. A separação do **ADR-037** continua de pé: quem anexa não é quem lê o percentual
+   de gordura dos outros alunos.
+
+4. **Publica o ÚLTIMO arquivo da medição, não cada upload.** Quem envia marca o último
+   (`ultimoDaSessao`); o servidor não tem como saber se ainda vem arquivo. Sem essa marcação, o
+   primeiro laudo confirmava a sessão sozinho e nascia uma avaliação com um arquivo só — os outros
+   dois chegavam numa sessão já fechada, que é a avaliação incompleta que esta fatia existe para
+   impedir, chegando por outro caminho. **Marcação ausente não publica**: a importação fica em
+   `EXTRACTED`, visível na fila da F22 e revisável à mão — preferível a publicar cedo demais.
+
+5. **A correção continua existindo** e não muda: avaliação publicada não sofre `UPDATE`; erro vira
+   **correção vinculada** (INV-102, `M3-AC-002`). O que sai é a barreira ANTES da publicação, não a
+   trilha depois dela.
+
+**O que esta decisão NÃO alcança.**
+
+- **ECG segue o ADR-035**: guardado e citado, nunca interpretado. Publicar automaticamente o bpm
+  medido é uma coisa; classificar um achado cardíaco é outra, e essa continua fora — RDC 657/2022.
+- **A análise de IA segue direto para banco, fica dismponivel para o aluno no mobile e totem** e a validação de saída. Publicar valor medido não é o mesmo que rodar IA sobre saúde de quem não
+  consentiu; são decisões diferentes, e só a primeira foi tomada aqui.
+
+**Por que ADR e não só um PR.** A regra 8 e o `M3-BR-006` estão escritos em três documentos. Mudar
+o código sem registrar deixaria o repositório afirmando o contrário do que o sistema faz — e o
+próximo a ler reimplementaria a revisão que esta decisão acabou de remover.
+
+### Risco assumido
+
+**O OCR vai errar, e o erro chega ao aluno antes de qualquer humano.** Vírgula deslocada, campo
+borrado, laudo de modelo novo: o número entra no histórico, aparece no app e alimenta o
+comparativo até alguém notar.
+
+O PI conhece o risco e o aceita: a proveniência continua gravada (valor extraído, arquivo de
+origem, confiança), e a correção vinculada permite consertar sem apagar. **O que se perdeu é a
+chance de pegar o erro antes de o aluno vê-lo** — e essa é a troca, explícita, por um fluxo que a
+academia consegue operar todo mês.
+
+---
+
+<a id="adr-040"></a>
+## ADR-040 — Sai o endosso do profissional; fica o consentimento do titular
+
+**Data:** 21/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 21/08/2026**
+· **Emenda material:** `MVP-03` §12 e §14 (`M3-AC-007`)
+· **NÃO alcança:** LGPD art. 11, ADR-035, `M3-BR-010`
+
+**Contexto.** O aceite da análise por IA era **duplo**: o aluno consentia e o profissional
+endossava, nessa ordem. Junto com a publicação automática do ADR-039, o endosso virou o último
+ponto onde o laudo esperava por alguém — a análise ficava pronta e parada até um profissional
+assinar.
+
+O PI removeu o endosso: **a análise entra direto e fica disponível para o aluno.**
+
+**Decisão.**
+
+1. **O endosso do profissional deixa de ser exigido.** Somem quatro ramos de `avaliarAceite`:
+   `AI_CONSENT_MISSING_PROFESSIONAL`, `AI_CONSENT_REFUSED_PROFESSIONAL`, a checagem de documento
+   aposentado do profissional e `AI_CONSENT_OUT_OF_ORDER` — este último só existia para comparar o
+   instante do endosso com o do consentimento, e sem endosso não há o que ordenar.
+
+2. **Os quatro motivos órfãos saem do enum.** Motivo que nenhum caminho emite é código morto que o
+   próximo leitor tenta implementar de novo.
+
+3. **O ECG passa a exibir tudo o que o aparelho reportou** — achado, frequência, duração, instante
+   e marcações — cada campo ausente virando traço (INV-104). **Exibir é o limite**: nada lê o texto
+   para decidir cor, ordem ou rótulo de gravidade.
+
+**O que esta decisão NÃO alcança — e por quê.**
+
+**O consentimento do ALUNO permanece obrigatório.** Não é escolha de produto: dado de saúde é
+sensível (LGPD art. 5, II) e o art. 11 é **lista fechada** — legítimo interesse não existe para
+ele. Enviar a saúde de quem não consentiu a um provedor externo não fica legal porque o processo
+ficou mais rápido, e o `CLAUDE.md` lista LGPD entre as duas únicas coisas que param a entrega.
+Continuam bloqueando: ausência de consentimento, recusa, documento aposentado e a virada dos 18
+(INV-143).
+
+**Quem pode DISPARAR a análise não mudou.** `health.assess` segue exigida na rota: produzir a
+análise envia dado de saúde para fora, e isso a recepção não faz. Sair do *aceite* e sair do
+*controle de acesso* são coisas diferentes; confundi-las daria a quem atende o balcão o poder de
+mandar saúde de aluno para um provedor externo.
+
+**O ADR-035 continua inteiro.** O ECG é exibido, nunca interpretado.
+
+### Risco assumido
+
+**A análise chega ao aluno sem um profissional ter lido antes.** O texto sai validado contra
+invenção de número e linguagem de diagnóstico (`M3-BR-010`), mas ninguém confere o tom nem o
+contexto antes de o aluno ver.
+
+O PI aceita: a análise já carrega o aviso de não-diagnóstico, e a alternativa — esperar endosso —
+era o gargalo que fazia o resultado não chegar.
+
+---
+
+<a id="adr-041"></a>
+## ADR-041 — Divergência entre laudos: a balança vence, o ECG vence o bpm
+
+**Data:** 21/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 21/08/2026**
+· **Emenda:** ADR-039 (acrescenta a decisão 6) · **Depende de:** ADR-039, ADR-038
+· **NÃO alcança:** LGPD art. 11, ADR-035, INV-102, INV-104
+
+**Contexto.** O ADR-039 tirou a confirmação campo a campo, mas deixou um caso sem regra: **o que
+acontece quando dois laudos da mesma medição discordam.** Enquanto havia revisão humana, a
+resposta era óbvia — o avaliador escolhia. Sem ela, `desempatarPorOrigem` só tinha regra para
+`HEART_RATE`, e todo o resto caía em `MedidaDuplicadaNaSessaoError`: a publicação automática
+**falhava em silêncio** e a sessão voltava para a revisão manual que o ADR-039 tinha acabado de
+remover.
+
+Foi o que aconteceu na primeira execução ao vivo. Três arquivos da mesma medição de 04/08 — a
+balança `CF610_G`, o app `Unique Health` e um ECG — divergiram na massa de gordura: **22,5 kg
+contra 20,0 kg**. Nenhuma avaliação foi publicada, e a tela pediu 31 conferências.
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **Fora do bpm, vence a BALANÇA de bioimpedância** | Ela **mediu** o corpo; o app de análise **derivou** números a partir da medição dela. Entre o medido e o calculado em cima, publica-se o medido |
+| 2 | **No `HEART_RATE`, vence o ECG** (já valia, agora está escrito) | A balança reporta repouso, o ECG mede o coração por trinta segundos. É o aparelho feito para isso |
+| 3 | **A precedência é por TIPO DE LAUDO, nunca por nome de arquivo** | O rótulo é escolhido por quem anexa. Um arquivo chamado `ecg-agosto.pdf` pode ser a exportação da balança, e a versão anterior — que casava prefixo de `sourceLabel` — daria a vitória a ele |
+| 4 | **Dois laudos do MESMO tipo discordando NÃO se resolvem** | É sinal de defeito no aparelho, e escolher um lado esconderia o defeito. O campo fica de fora da avaliação e a tela **diz quais campos ficaram** |
+| 5 | **O valor perdedor continua gravado** como campo extraído | Proveniência não se apaga. Ele só não vira a medida da avaliação |
+| 6 | **A tela LÊ a decisão do servidor** (`campoPublicadoId`), nunca a recalcula | Duas implementações da mesma regra divergem na primeira mudança — com a tela mostrando um valor e o histórico do aluno guardando outro |
+
+### O caso que fica sem resposta, de propósito
+
+Quando a balança e o app discordam, a decisão 1 escolhe **sempre** a balança — inclusive quando é
+a balança que está errada. Não há como distinguir os dois casos sem alguém olhar, e olhar é
+exatamente o que o ADR-039 removeu.
+
+**Isso não é mitigado, é aceito**: a correção vinculada (INV-102) continua sendo o caminho, como
+já era para todo erro de OCR sob o ADR-039. O que esta decisão acrescenta é que o erro passa a ter
+uma direção previsível, em vez de a avaliação inteira não ser publicada.
+
+### Risco assumido
+
+O risco do ADR-039 não mudou de tamanho, mudou de forma. Antes, divergência = nenhuma avaliação
+publicada (falha visível, fluxo travado). Agora, divergência = avaliação publicada com o valor da
+balança (falha silenciosa, fluxo funcionando).
+
+**A troca é deliberada:** um sistema que não publica é abandonado na terceira semana; um que
+publica com um número a corrigir é usado e corrigido. Mas o número errado chega ao aluno antes de
+qualquer humano — e a decisão 4 existe para que ao menos a divergência **entre aparelhos do mesmo
+tipo** nunca seja resolvida por chute.
+
+### Emenda de 21/08/2026 — o tipo do laudo é DECLARADO, não classificado
+
+A primeira execução com os três laudos reais do PI reprovou o mecanismo da decisão 3. O extrator
+de imagem (`anthropic-ocr@1`) devolve **`tipoDeLaudo: 'BIOIMPEDANCE'` fixo para toda foto**:
+balança e app de análise chegavam à API indistinguíveis, e a precedência não tinha em que se
+apoiar. Resultado: `mais de um valor aceito para o tipo BODY_FAT_MASS` e **nenhuma avaliação
+publicada**.
+
+**Decisão do PI:** a tela pede cada laudo no **seu campo** — Relatório de medição (balança),
+Análise de composição (app), Eletrocardiograma — cada um com a **miniatura do laudo esperado** ao
+lado. O campo declara o tipo; o OCR não classifica mais nada.
+
+| # | decisão | por quê |
+|---|---|---|
+| 7 | **Três campos de upload rotulados**, e o tipo viaja declarado (`tipoDeLaudo` no envio) | Quem anexa sabe qual arquivo é qual. Classificar por imagem falhou no primeiro teste real |
+| 8 | **Miniatura de exemplo ao lado de cada campo** | "Relatório de medição" e "Análise de composição" são dois títulos parecidos para dois papéis coloridos parecidos. A imagem é o rótulo que a recepção lê de relance |
+| 9 | **`BIOIMPEDANCE_ANALYSIS` nasce como tipo próprio** | Sem separá-lo de `BIOIMPEDANCE`, a regra "o medido vence o derivado" não tem dois lados para comparar |
+| 10 | **Só a balança é obrigatória** | O app deriva números da medição dela; sozinho, não há medição para publicar |
+
+### Três defeitos que a mesma execução revelou
+
+Nenhum deles é da precedência — todos são casos que o ADR-039 não previu, e que só apareceram com
+arquivo de verdade:
+
+1. **O último arquivo da sessão falhando levava a medição junto.** O ECG é PDF de traçado, sem
+   texto extraível (`EXTRACTOR_NO_CONTENT`); como era o último, o `catch` de `enviar` retornava
+   sem publicar, e a balança + análise ficavam paradas em `EXTRACTED` para sempre. **Corrigido:**
+   o arquivo ilegível é o caso comum, não a exceção, e não pode segurar os outros.
+
+2. **Import `FAILED` na lista de confirmação estourava erro que mentia.** A constraint
+   `assessment_imports_avaliacao_so_em_confirmada` recusa ligar avaliação a import que falhou; a
+   contagem não batia e virava `SESSION_ALREADY_CONFIRMED` — que não resolve em nenhuma tentativa
+   futura. **Corrigido:** só os imports `EXTRACTED` entram na confirmação.
+
+3. **Um valor implausível derrubava a avaliação inteira.** O OCR leu o **peso** (92,3 kg, impresso
+   em destaque no meio da rosca do `CF610_G`) como **percentual de gordura**, e
+   `converterParaCanonica` recusou — corretamente. Mas trinta campos corretos ficavam reféns de
+   um. **Corrigido:** o campo implausível é descartado com registro em log, a avaliação publica o
+   resto, e o valor certo veio do outro laudo (24,4%) exatamente como a decisão 1 manda.
+
+**O que os três têm em comum:** a publicação automática removeu o humano do caminho, e cada
+caminho de erro que antes terminava em "o avaliador resolve na tela" passou a terminar em nada
+publicado e ninguém avisado. O ADR-039 assumiu o risco do valor errado publicado; não tinha como
+prever o risco simétrico — **o valor certo não publicado, em silêncio**.

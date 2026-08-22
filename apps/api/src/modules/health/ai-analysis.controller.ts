@@ -45,14 +45,14 @@ export class AiAnalysisController {
   /**
    * Gera a analise (`M3-FR-015`).
    *
-   * `health.assess` e nao `health.read`: pedir a analise e o ato do
-   * PROFISSIONAL que endossa (F21), nao consulta de quem passa pela recepcao.
-   * Quem tem `health.read` le o resultado; quem tem `health.assess` o produz.
+   * `health.assess` e nao `health.read`: quem tem `health.read` LE o
+   * resultado; quem tem `health.assess` o PRODUZ -- e produzir envia dado de
+   * saude a um provedor externo, o que a recepcao nao faz.
    *
-   * Sem o aceite duplo responde 403 com o motivo -- `AI_CONSENT_MISSING_STUDENT`,
-   * `AI_CONSENT_MISSING_PROFESSIONAL`, `AI_CONSENT_REFUSED_STUDENT`... A tela
-   * usa o codigo para dizer QUAL assinatura falta, em vez de um "proibido"
-   * que nao ajuda ninguem no balcao.
+   * O endosso do profissional saiu do ACEITE com o ADR-040 (a analise nao
+   * espera ninguem endossar), mas isso nao afrouxou quem pode DISPARAR o
+   * envio: sao coisas diferentes, e confundi-las daria a quem atende o
+   * balcao o poder de mandar saude de aluno para fora.
    */
   @Post('students/:id/ai-analyses')
   @RequirePermissions('health.assess')
@@ -76,6 +76,26 @@ export class AiAnalysisController {
       analysis: resultado.saida,
       rejectionReason: resultado.motivoDaRecusa,
     };
+  }
+
+  /**
+   * Por que NAO ha analise -- consumido pela tela de avaliacao.
+   *
+   * Rota separada de `latest` de proposito: `latest` responde 404 quando
+   * nao ha analise, e 404 nao carrega motivo. Espremer o motivo dentro dele
+   * exigiria trocar o 404 por um 200 com corpo vazio, e ai todo consumidor
+   * (totem, app) passaria a tratar "nao existe" como "existe e esta vazio".
+   *
+   * Devolve so o veredito do aceite -- NUNCA a assinatura, a data ou o
+   * documento: quem opera a recepcao precisa saber que FALTA consentimento,
+   * nao o conteudo dele.
+   */
+  @Get('students/:id/ai-analyses/consent')
+  @RequirePermissions('health.read')
+  async aceite(
+    @Param('id') studentId: string,
+  ): Promise<{ autorizado: boolean; motivo: string | null }> {
+    return this.analises.estadoDoAceite(this.contexto.require(), studentId, new Date());
   }
 
   /** A ultima analise publicada -- consumida por totem e app. */

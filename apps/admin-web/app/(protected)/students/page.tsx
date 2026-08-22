@@ -12,16 +12,13 @@ import {
   PageHeader,
   ProblemDetail,
   StateBadge,
-  TenantDateTime,
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
+import { AcoesDoAluno } from './acoes-do-aluno';
 import { BotaoDeLiberacao } from './botao-de-liberacao';
 import { FiltroDeAlunos } from './filtro-de-alunos';
 import estilos from './students.module.css';
-
-/** Fuso FIXO, preservado de `dataLegivel` -- mesma divida das outras telas. */
-const FUSO_PROVISORIO = 'America/Sao_Paulo';
 
 export const metadata: Metadata = {
   title: 'Alunos — ArenaHub',
@@ -351,15 +348,6 @@ export default async function PaginaDeAlunos({
             render: (aluno) => <Telefone numero={aluno.phone} />,
           },
           {
-            key: 'nascimento',
-            sortKey: 'nascimento',
-            header: 'Nascimento',
-            role: 'moment',
-            render: (aluno) => (
-              <TenantDateTime iso={aluno.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
-            ),
-          },
-          {
             key: 'situacao',
             header: 'Situação',
             role: 'state',
@@ -367,17 +355,29 @@ export default async function PaginaDeAlunos({
           },
           {
             key: 'acao',
-            header: '',
+            header: 'Ação',
             role: 'actions',
             /*
-              SÓ para BLOCKED -- issue #118. É o status que o job de
-              inadimplência aplica (M2-BR-007): cobre quem foi bloqueado por
-              atraso, sem oferecer "liberação financeira" para os 1.926
-              alunos importados da #118 (CANCELLED, sem cobrança real) nem
-              para cancelamento por outro motivo.
+              Quatro ações como ÍCONE, não como botão de texto: com quatro
+              rótulos por linha a coluna comia mais largura que o nome do
+              aluno, e a tabela passava a rolar horizontalmente num monitor
+              de 1280 -- que é o monitor da recepção (`PRODUCT.md`).
+
+              Cada ícone carrega `aria-label` e `title`: forma sozinha é
+              canal único, e isso o PRODUCT.md proíbe. Ver `acoes-do-aluno`.
+
+              A liberação é SÓ para BLOCKED (issue #118): é o status que o job
+              de inadimplência aplica (M2-BR-007), sem oferecer "liberação
+              financeira" para os 1.926 alunos importados (CANCELLED, sem
+              cobrança real) nem para cancelamento por outro motivo.
             */
-            render: (aluno) =>
-              aluno.status === 'BLOCKED' ? <BotaoDeLiberacao studentId={aluno.id} /> : null,
+            render: (aluno) => (
+              <AcoesDoAluno
+                studentId={aluno.id}
+                podeLiberar={aluno.status === 'BLOCKED'}
+                liberacao={<BotaoDeLiberacao studentId={aluno.id} />}
+              />
+            ),
           },
         ]}
         {...(proxima ? { nextHref: proxima } : {})}

@@ -89,3 +89,84 @@
   color: var(--ah-text-default);
   white-space: nowrap;
 }
+
+/*
+ * As quatro acoes de linha, como icone.
+ *
+ * Alvo de 32px: acima do minimo do WCAG 2.2 (2.5.8, 24px) e do que a mao
+ * acerta no balcao com o aluno esperando. `gap: 2px` mantem os quatro
+ * proximos sem que um clique pegue o vizinho.
+ */
+.acoes {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: flex-end;
+}
+
+.acao,
+.acaoLiberar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--ah-radius-control);
+  background: transparent;
+  /* `--ah-text-icon` e o papel certo: existe para glifo, e nao herda a
+     escala de contraste de texto corrido. */
+  color: var(--ah-text-icon);
+  cursor: pointer;
+  transition: color 120ms ease-out, background-color 120ms ease-out,
+    border-color 120ms ease-out;
+}
+
+/*
+ * Hover traz DOIS canais -- cor E superficie: o realce so por cor
+ * desaparece para quem opera com brilho baixo, que e o caso do balcao sob
+ * luz fluorescente forte.
+ */
+.acao:hover,
+.acaoLiberar:hover:not(:disabled) {
+  color: var(--ah-text-strong);
+  background: var(--ah-surface-sunken);
+  border-color: var(--ah-border-default);
+}
+
+.acao:focus-visible,
+.acaoLiberar:focus-visible {
+  outline: 2px solid var(--ah-focus-ring);
+  outline-offset: 2px;
+}
+
+.acao:active,
+.acaoLiberar:active:not(:disabled) {
+  background: var(--ah-surface-canvas);
+}
+
+/*
+ * A liberacao e a unica acao que MUDA estado -- as outras tres navegam.
+ * Por isso ela carrega a cor de acao, e as outras ficam em carbono: o
+ * accent e acao, carbono e estrutura (`DS-PAINEL` 2.3).
+ */
+.acaoLiberar {
+  color: var(--ah-action-text);
+}
+
+.acaoLiberar:disabled {
+  color: var(--ah-control-disabled-text);
+  cursor: progress;
+}
+
+.acaoDeFormulario {
+  display: inline-flex;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acao,
+  .acaoLiberar {
+    transition: none;
+  }
+}

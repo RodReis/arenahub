@@ -16,9 +16,14 @@ function campo(sobrescreve: Partial<CampoExtraido> = {}): CampoExtraido {
     extractedUnit: 'kg',
     confidence: 0.95,
     sourceLocation: 'pagina 1, linha 3',
+    importId: 'import-1',
     state: 'PENDING',
     reviewedValue: null,
     reviewedUnit: null,
+    sourceLabel: null,
+    referenceMin: null,
+    referenceMax: null,
+    standardPercent: null,
     ...sobrescreve,
   };
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  confiancaLegivel,
+  faixaLegivel,
   MOTIVO_DE_AUSENCIA,
   percentualLegivel,
   rotuloDeTipo,
@@ -98,6 +100,38 @@ describe('rotuloDeTipo', () => {
     // que veio do servidor.
     expect(rotuloDeTipo('TIPO_NOVO')).toBe('TIPO_NOVO');
   });
+
+  /**
+   * Guarda de cobertura: o fallback acima é rede de segurança, não licença
+   * para deixar tipo sem rótulo.
+   *
+   * Os 19 tipos da avaliação multiarquivo entraram no domínio e NINGUÉM
+   * traduziu aqui -- a tela de revisão exibiu `SEGMENTAL_FAT_MASS_ARM_LEFT`
+   * e `BONE_MASS` crus para o avaliador, porque o `?? tipo` engoliu a falta
+   * em silêncio. Esta lista quebra quando um tipo novo chega sem rótulo.
+   */
+  it('todo tipo do domínio tem rótulo em português', () => {
+    const TIPOS_DO_DOMINIO = [
+      'WEIGHT', 'HEIGHT', 'BODY_FAT_PERCENT', 'BODY_FAT_MASS', 'LEAN_BODY_MASS',
+      'SKELETAL_MUSCLE_MASS', 'TOTAL_BODY_WATER', 'INTRACELLULAR_WATER',
+      'EXTRACELLULAR_WATER', 'PROTEIN_MASS', 'MINERAL_MASS', 'VISCERAL_FAT_LEVEL',
+      'BASAL_METABOLIC_RATE', 'WAIST_CIRCUMFERENCE', 'HIP_CIRCUMFERENCE',
+      'BONE_MASS', 'BODY_CELL_MASS', 'SUBCUTANEOUS_FAT_MASS',
+      'SUBCUTANEOUS_FAT_PERCENT', 'SKELETAL_MUSCLE_PERCENT', 'MUSCLE_MASS',
+      'PROTEIN_PERCENT', 'WAIST_HIP_RATIO', 'HEART_RATE',
+      'SEGMENTAL_FAT_MASS_ARM_LEFT', 'SEGMENTAL_FAT_MASS_ARM_RIGHT',
+      'SEGMENTAL_FAT_MASS_TRUNK', 'SEGMENTAL_FAT_MASS_LEG_LEFT',
+      'SEGMENTAL_FAT_MASS_LEG_RIGHT', 'SEGMENTAL_MUSCLE_MASS_ARM_LEFT',
+      'SEGMENTAL_MUSCLE_MASS_ARM_RIGHT', 'SEGMENTAL_MUSCLE_MASS_TRUNK',
+      'SEGMENTAL_MUSCLE_MASS_LEG_LEFT', 'SEGMENTAL_MUSCLE_MASS_LEG_RIGHT',
+    ];
+
+    expect(TIPOS_DO_DOMINIO).toHaveLength(34);
+
+    const semRotulo = TIPOS_DO_DOMINIO.filter((tipo) => rotuloDeTipo(tipo) === tipo);
+
+    expect(semRotulo).toEqual([]);
+  });
 });
 
 describe('simboloDeUnidade', () => {
@@ -108,6 +142,48 @@ describe('simboloDeUnidade', () => {
 
   it('unidade nula sai vazia', () => {
     expect(simboloDeUnidade(null)).toBe('');
+  });
+});
+
+describe('faixaLegivel', () => {
+  it('escreve as duas pontas com o simbolo da unidade', () => {
+    expect(faixaLegivel(60.6, 82, 'kg')).toBe('60,6 – 82,0 kg');
+  });
+
+  it('so o minimo escreve com o sinal de maior-ou-igual', () => {
+    expect(faixaLegivel(60.6, null, 'kg')).toBe('≥ 60,6 kg');
+  });
+
+  it('so o maximo escreve com o sinal de menor-ou-igual', () => {
+    expect(faixaLegivel(null, 82, 'kg')).toBe('≤ 82,0 kg');
+  });
+
+  it('ausencia nas duas pontas vira travessao', () => {
+    expect(faixaLegivel(null, null, 'kg')).toBe('—');
+  });
+
+  /**
+   * REGRESSAO vista ao vivo: uma versao da API que ainda nao mandava
+   * `referenceMin`/`referenceMax` fazia esses campos chegarem `undefined`
+   * (chave ausente do JSON), nao `null`. `Intl.NumberFormat.format(undefined)`
+   * nao lanca -- devolve a STRING "NaN", que passou batido porque só `null`
+   * era verificado. `undefined` tem de virar `—`, exatamente como `null`.
+   */
+  it('undefined nas duas pontas vira travessao, nunca NaN', () => {
+    expect(faixaLegivel(undefined, undefined, 'kg')).toBe('—');
+  });
+});
+
+describe('confiancaLegivel', () => {
+  it('classifica em alta, media e baixa', () => {
+    expect(confiancaLegivel(0.9)).toBe('alta');
+    expect(confiancaLegivel(0.7)).toBe('média');
+    expect(confiancaLegivel(0.3)).toBe('baixa');
+  });
+
+  it('ausencia (null ou undefined) nao vira uma faixa de confianca', () => {
+    expect(confiancaLegivel(null)).toBeNull();
+    expect(confiancaLegivel(undefined)).toBeNull();
   });
 });
 

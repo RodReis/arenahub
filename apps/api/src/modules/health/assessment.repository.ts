@@ -11,6 +11,7 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import {
   AvaliacaoImutavelError,
+  AvaliacaoJaExisteParaOrigemError,
   AvaliacaoNaoEncontradaError,
   correcaoPermitida,
   publicar,
@@ -43,6 +44,15 @@ export interface DadosDaAvaliacao {
    */
   source?: 'MANUAL' | 'DEVICE' | 'IMPORT' | undefined;
   sourceReference?: string | undefined;
+  /**
+   * Indice, classificacao ou sugestao do APARELHO (idade corporal,
+   * pontuacao, tipo de corpo, achado de ECG). Nunca vira `BodyMeasurement`
+   * -- e formula proprietaria que muda com firmware (spec §4.4) -- so
+   * acompanha a avaliacao como referencia opaca (ADR-035).
+   */
+  deviceReport?: Record<string, unknown> | undefined;
+  deviceModel?: string | undefined;
+  deviceSerial?: string | undefined;
 }
 
 /** Unidade do dominio (minuscula) para o enum do Prisma (maiuscula). */
@@ -65,30 +75,75 @@ function unidadeParaBanco(unidade: MedidaCanonica['originalUnit']): 'KG' | 'G' |
 export class AssessmentRepository {
   constructor(private readonly db: PrismaService) {}
 
-  /** Cria o rascunho com as medidas ja convertidas. */
+  /**
+   * Cria o rascunho com as medidas ja convertidas.
+   *
+   * `source: 'IMPORT'` com `sourceReference` repetido (a MESMA sessao ou o
+   * MESMO import avulso confirmado duas vezes) leva `P2002` do indice
+   * parcial `body_assessments_import_source_reference_uq` -- traduzido aqui
+   * em `AvaliacaoJaExisteParaOrigemError` (409), nunca deixando o erro cru
+   * do driver vazar. Ver o comentario do erro para o porque o indice mora
+   * NESTA tabela, e nao em `assessment_imports` (Task 5, fix round 2).
+   *
+   * ---------------------------------------------------------------------------
+   * SO ESTE INDICE -- NUNCA "QUALQUER P2002" (fix, revisao adversarial)
+   * ---------------------------------------------------------------------------
+   *
+   * Esta transacao tambem grava `body_measurements`, que tem seu PROPRIO
+   * `@@unique([assessmentId, type])` -- duas medidas do MESMO tipo (ex.:
+   * dois `WEIGHT`, quando um gemeo escondido pela consolidacao e confirmado
+   * por fora da tela de revisao) tambem estouram `P2002`, por um indice
+   * DIFERENTE. Um catch cego que traduzisse QUALQUER `P2002` para
+   * "sessao ja confirmada" faria essa segunda causa desaparecer atras de
+   * uma mensagem que MENTE sobre o problema -- foi exatamente assim que o
+   * defeito de medida duplicada ficou invisivel ate a revisao adversarial
+   * contra Postgres real. `erro.meta.target` traz o nome da CONSTRAINT que
+   * violou; so quando ele aponta para o indice desta tabela e que o erro
+   * vira `AvaliacaoJaExisteParaOrigemError`. Qualquer outra violacao de
+   * unicidade (ex.: `body_measurements`) sobe como ELA MESMA, para o
+   * proximo bug desta classe aparecer alto, nao disfarcado.
+   */
   async criarRascunho(
     contexto: TenantContext,
     studentId: string,
     dados: DadosDaAvaliacao,
   ): Promise<AvaliacaoComMedidas> {
-    return this.db.$transaction(async (tx) => {
-      const avaliacao = await tx.bodyAssessment.create({
-        data: {
-          tenantId: contexto.tenantId,
-          studentId,
-          status: 'DRAFT',
-          assessedAt: dados.assessedAt,
-          source: dados.source ?? 'MANUAL',
-          sourceReference: dados.sourceReference ?? null,
-          evaluatorUserId: dados.evaluatorUserId,
-          notes: dados.notes ?? null,
-        },
+    try {
+      return await this.db.$transaction(async (tx) => {
+        const avaliacao = await tx.bodyAssessment.create({
+          data: {
+            tenantId: contexto.tenantId,
+            studentId,
+            status: 'DRAFT',
+            assessedAt: dados.assessedAt,
+            source: dados.source ?? 'MANUAL',
+            sourceReference: dados.sourceReference ?? null,
+            evaluatorUserId: dados.evaluatorUserId,
+            notes: dados.notes ?? null,
+            deviceReport:
+              dados.deviceReport === undefined
+                ? Prisma.JsonNull
+                : (dados.deviceReport as Prisma.InputJsonValue),
+            deviceModel: dados.deviceModel ?? null,
+            deviceSerial: dados.deviceSerial ?? null,
+          },
+        });
+
+        await this.gravarMedidas(tx, contexto, avaliacao.id, dados.medidas);
+
+        return this.exigirComMedidas(tx, contexto, avaliacao.id);
       });
+    } catch (erro: unknown) {
+      if (
+        erro instanceof Prisma.PrismaClientKnownRequestError &&
+        erro.code === 'P2002' &&
+        violaIndiceDeOrigem(erro)
+      ) {
+        throw new AvaliacaoJaExisteParaOrigemError();
+      }
 
-      await this.gravarMedidas(tx, contexto, avaliacao.id, dados.medidas);
-
-      return this.exigirComMedidas(tx, contexto, avaliacao.id);
-    });
+      throw erro;
+    }
   }
 
   /**
@@ -225,6 +280,26 @@ export class AssessmentRepository {
       await this.gravarMedidas(tx, contexto, correcao.id, dados.medidas);
 
       return this.exigirComMedidas(tx, contexto, correcao.id);
+    });
+  }
+
+  /**
+   * Apaga um RASCUNHO -- nunca uma avaliacao publicada.
+   *
+   * Existe para a sessao multiarquivo (Task 5, fix Critical 2): quando duas
+   * confirmacoes concorrentes da mesma sessao criam cada uma o proprio
+   * rascunho e so uma consegue LIGAR os imports a ele (indice parcial), a
+   * perdedora precisa desfazer o proprio rascunho -- senao ele fica orfao,
+   * visivel em `listarDoAluno` (todos os status) como uma avaliacao fantasma
+   * que nenhum arquivo referencia. `BodyMeasurement` cascade-apaga junto
+   * (`onDelete: Cascade` no schema).
+   *
+   * Filtra por `status: 'DRAFT'`: apagar avaliacao PUBLICADA destruiria
+   * historico oficial, e isso nunca e o caso de uso desta funcao.
+   */
+  async excluirRascunho(contexto: TenantContext, assessmentId: string): Promise<void> {
+    await this.db.bodyAssessment.deleteMany({
+      where: { id: assessmentId, tenantId: contexto.tenantId, status: 'DRAFT' },
     });
   }
 
@@ -497,4 +572,53 @@ export class AssessmentRepository {
 
     return avaliacao;
   }
+}
+
+/**
+ * O `P2002` veio do indice `body_assessments_import_source_reference_uq`,
+ * e nao de outra violacao de unicidade na MESMA transacao (ex.:
+ * `body_measurements_assessment_id_type_key`)?
+ *
+ * ---------------------------------------------------------------------------
+ * A FORMA REAL DE `erro.meta` (Prisma 7, driver adapter) NAO E `{ target }`
+ * ---------------------------------------------------------------------------
+ *
+ * A doc classica do Prisma (e a primeira versao desta funcao) supunha
+ * `erro.meta.target` como string ou array de campos -- formato de versoes
+ * anteriores, SEM driver adapter. Rodando contra Postgres de verdade
+ * (`@prisma/adapter-pg`, a configuracao deste projeto), o formato observado
+ * e outro:
+ *
+ *     {
+ *       modelName: "BodyAssessment",
+ *       driverAdapterError: { cause: { originalMessage:
+ *         "duplicate key value violates unique constraint
+ *          \"body_assessments_import_source_reference_uq\"",
+ *         constraint: { fields: ["source_reference"] } } }
+ *     }
+ *
+ * `target` simplesmente NAO EXISTE nesse objeto -- checar por ele fazia esta
+ * funcao devolver `false` SEMPRE, e todo P2002 (inclusive o esperado, da
+ * MESMA sessao confirmada duas vezes) escapava cru em vez de virar
+ * `AvaliacaoJaExisteParaOrigemError`. O nome da constraint mora dentro de
+ * `originalMessage` (texto livre do Postgres) -- e por isso a checagem e
+ * "contem o nome do indice", nao igualdade estrita de um campo estruturado
+ * que este driver nao garante.
+ */
+function violaIndiceDeOrigem(erro: Prisma.PrismaClientKnownRequestError): boolean {
+  const meta: unknown = erro.meta;
+
+  if (meta === null || typeof meta !== 'object') return false;
+
+  const driverError: unknown = (meta as Record<string, unknown>)['driverAdapterError'];
+
+  if (driverError === null || typeof driverError !== 'object') return false;
+
+  const cause: unknown = (driverError as Record<string, unknown>)['cause'];
+
+  if (cause === null || typeof cause !== 'object') return false;
+
+  const mensagem: unknown = (cause as Record<string, unknown>)['originalMessage'];
+
+  return typeof mensagem === 'string' && mensagem.includes('body_assessments_import_source_reference_uq');
 }

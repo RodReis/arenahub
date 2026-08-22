@@ -2,6 +2,10 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   MedidaInvalidaError,
+  REGIAO_DO_TIPO,
+  TIPOS_DE_MEDIDA,
+  TIPOS_SEGMENTARES,
+  UNIDADE_CANONICA,
   UnidadeIncompativelError,
   arredondarParaExibicao,
   calcularImc,
@@ -145,5 +149,37 @@ describe('arredondarParaExibicao', () => {
     expect(arredondarParaExibicao(21.99943, 2)).toBe(22);
     expect(arredondarParaExibicao(21.994, 2)).toBe(21.99);
     expect(arredondarParaExibicao(69.853_18, 1)).toBe(69.9);
+  });
+});
+
+describe('tipos novos da avaliacao multiarquivo', () => {
+  it('cobre os 34 tipos, com os 10 segmentares', () => {
+    expect(TIPOS_DE_MEDIDA).toHaveLength(34);
+    expect(TIPOS_SEGMENTARES).toHaveLength(10);
+  });
+
+  it('converte massa segmentar mantendo kg como canonica', () => {
+    const medida = converterParaCanonica({
+      type: 'SEGMENTAL_MUSCLE_MASS_ARM_RIGHT',
+      value: 3.4,
+      unit: 'kg',
+    });
+
+    expect(medida.canonicalValue).toBeCloseTo(3.4, 4);
+    expect(medida.canonicalUnit).toBe('kg');
+    expect(medida.originalValue).toBeCloseTo(3.4, 4);
+  });
+
+  it('mapeia cada segmentar a sua regiao e os demais a null', () => {
+    expect(REGIAO_DO_TIPO.SEGMENTAL_FAT_MASS_TRUNK).toBe('TRUNK');
+    expect(REGIAO_DO_TIPO.SEGMENTAL_MUSCLE_MASS_LEG_LEFT).toBe('LEG_LEFT');
+    expect(REGIAO_DO_TIPO.WEIGHT).toBeNull();
+  });
+
+  it('da unidade canonica a todo tipo novo nao adimensional', () => {
+    expect(UNIDADE_CANONICA.BONE_MASS).toBe('kg');
+    expect(UNIDADE_CANONICA.SUBCUTANEOUS_FAT_PERCENT).toBe('percent');
+    expect(UNIDADE_CANONICA.HEART_RATE).toBeNull();
+    expect(UNIDADE_CANONICA.WAIST_HIP_RATIO).toBeNull();
   });
 });

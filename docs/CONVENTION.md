@@ -125,15 +125,28 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 
 | entidade | campos declarados | `tenant_id` | origem |
 |---|---|---|---|
-| `BodyAssessment` | **metadados** (`M3` §10): `id`, `tenant_id`, `student_id`, `status`, `assessed_at`, `published_at`, `source`, `source_reference`, `evaluator_user_id`, `supersedes_assessment_id`. **medidas** (Especificação §47): `weight`, `height`, `bmi`, `body_fat_percentage`, `body_fat_mass`, `lean_mass`, `skeletal_muscle_mass`, `body_water_percentage`, `visceral_fat`, `basal_metabolic_rate`, `metabolic_age`, `waist_hip_ratio`. `source`: `MANUAL`\|`DEVICE`\|`IMPORT`\|`IMAGE_AI`\|`API` | ✔ | Especificação §47/§49, `M3` §10 |
-| `SegmentalMeasurement` | segmentos `left_arm`, `right_arm`, `left_leg`, `right_leg`, `trunk`; grandezas: massa muscular, gordura, água, impedância | ~ | Especificação §48 |
+| `BodyAssessment` | **metadados** (`M3` §10): `id`, `tenant_id`, `student_id`, `status`, `assessed_at`, `published_at`, `source`, `source_reference`, `evaluator_user_id`, `supersedes_assessment_id`, `device_report` (JSON, ver INV-151). **medidas** (Especificação §47, ampliadas em 21/08 — ADR-038): 34 tipos em `BodyMeasurement.type`, não mais colunas soltas — lista dos 19 novos logo abaixo. `source`: `MANUAL`\|`DEVICE`\|`IMPORT`\|`IMAGE_AI`\|`API` | ✔ | Especificação §47/§49, `M3` §10, ADR-038 |
+| `SegmentalMeasurement` | **superada por ADR-038**: os 10 tipos segmentares (braço/perna esquerdo-direito, tronco; massa gorda e muscular) entraram no enum `BodyMeasurement.type`, não numa tabela própria — mesma razão do item acima | ~ | ADR-038 |
 | `HealthMeasurement` | `student_id`, `measurement_type`, `value`, `unit`, `measured_at`, `source`, `device`. Tipos: `HEART_RATE`, `RESTING_HEART_RATE`, `BLOOD_PRESSURE`, `OXYGEN_SATURATION` | ~ | Especificação §53 |
 | `HealthGoal` | baseline, alvo, unidade, prazo, responsável | ~ | `M3-FR-012` |
-| `AssessmentImport`, `ImportedField` | confiança e localização de origem por campo | ~ | `M3-FR-010` |
+| `AssessmentImport`, `ImportedField` | confiança e localização de origem por campo. Desde ADR-038, **N importações apontam para 1 avaliação** (`assessmentId` deixou de ser `@unique`) via `reviewSessionId` compartilhado — ver §4.19 | ~ | `M3-FR-010`, ADR-038 |
 | `AIAnalysis` | `id`, `student_id`, `type`, `source_period`, `model`, `prompt_version`, `input_snapshot`, `output`, `created_at`, + custo e latência | ~ | Especificação §54/§56 |
 
 > **Unificação obrigatória.** `assessment_date` (Especificação §47) e `assessed_at` (`M3` §10) são o
 > mesmo campo. Vence **`assessed_at`**.
+
+> **Os 19 tipos que a ADR-038 acrescentou a `BodyMeasurement.type`** (o enum tinha 15; passou a 34
+> — fonte: `medida.ts`):
+> - **10 segmentares** (alimentam o boneco do aluno por região — braço esq./dir., perna esq./dir.,
+>   tronco; massa gorda e massa muscular de cada um): `SEGMENTAL_FAT_MASS_ARM_LEFT`,
+>   `SEGMENTAL_FAT_MASS_ARM_RIGHT`, `SEGMENTAL_FAT_MASS_TRUNK`, `SEGMENTAL_FAT_MASS_LEG_LEFT`,
+>   `SEGMENTAL_FAT_MASS_LEG_RIGHT`, `SEGMENTAL_MUSCLE_MASS_ARM_LEFT`,
+>   `SEGMENTAL_MUSCLE_MASS_ARM_RIGHT`, `SEGMENTAL_MUSCLE_MASS_TRUNK`,
+>   `SEGMENTAL_MUSCLE_MASS_LEG_LEFT`, `SEGMENTAL_MUSCLE_MASS_LEG_RIGHT`.
+> - **8 de composição** que os laudos já traziam e o enum não guardava: `BONE_MASS`,
+>   `BODY_CELL_MASS`, `SUBCUTANEOUS_FAT_MASS`, `SUBCUTANEOUS_FAT_PERCENT`,
+>   `SKELETAL_MUSCLE_PERCENT`, `MUSCLE_MASS`, `PROTEIN_PERCENT`, `WAIST_HIP_RATIO`.
+> - **1 cardíaco:** `HEART_RATE` — nunca interpretado (ADR-035, INV-152).
 
 ### 2.6 Engajamento e retenção
 
@@ -245,6 +258,8 @@ streak e ranking dependem de `CONFIRMED` (INV-114).
 ### 3.10 `BodyAssessment`
 Estados citados em prosa, **nomes nunca enumerados**: rascunho → publicada.
 Publicada é **imutável**; correção cria nova versão vinculada por `supersedes_assessment_id`.
+Desde ADR-038, uma avaliação nascida de importação pode ter **N `AssessmentImport`** apontando
+para ela (§4.19) — a imutabilidade e a correção não mudam: o vínculo N:1 é só a origem do dado.
 
 ### 3.11 `Consent`
 Sem enumeração — estado derivado de `accepted_at` / `revoked_at`.
@@ -474,6 +489,15 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 - **INV-144** *(ADR-019)* **O instante de bloqueio por inadimplência é configurável em `BillingSettings`**, com padrão no primeiro instante de `due_date + grace_period`, **no timezone da unidade**, sem fallback para o tenant e sem adiamento por feriado.
 - **INV-145** *(ADR-004)* **A decisão de acesso acontece na nuvem.** O Edge executa e reporta; não julga. Enquanto o MVP 1.5 não existir, queda de link ou Edge ausente caem em liberação manual registrada — nunca em allow local.
 - **INV-146** *(ADR-011)* **A ausência do Edge é alerta operacional obrigatório**, não linha de log. Sem operação offline, Edge fora significa catraca parada, e a operação precisa saber no minuto em que acontece.
+
+### 4.19 Avaliação multiarquivo (INV-147 a INV-152) — *(ADR-038, 21/08/2026)*
+
+- **INV-147** **Uma medição pode ter N arquivos importados, mas nunca mais de uma avaliação.** `AssessmentImport.assessmentId` deixou de ser `@unique`; `BodyAssessment.import` é `imports AssessmentImport[]`. A garantia de unicidade mora em `BodyAssessment.source_reference` — índice único parcial `(source_reference) WHERE source = 'IMPORT'` —, não em `assessment_imports`: uma sessão de três arquivos produz três linhas de importação apontando para a mesma linha de avaliação, e é a avaliação, não a importação, que precisa ser única por origem.
+- **INV-148** **A sessão de revisão confirma uma vez só, e a confirmação cria a avaliação com as medidas de todos os arquivos da sessão.** Não há confirmação parcial por arquivo depois que a sessão existe.
+- **INV-149** **Bioimpedância é obrigatória; ECG é opcional.** Um conjunto de arquivos sem nenhum laudo de composição corporal não pode virar avaliação — seria um ponto vazio na série de evolução (INV-104). Classificação do laudo: `BIOIMPEDANCE` é **qualquer medida diferente de `HEART_RATE`**; laudo só com `HEART_RATE` classifica `ECG`.
+- **INV-150** **Campo concordante entre arquivos deduplica; campo divergente nunca funde automaticamente — exige escolha humana explícita, sem pré-seleção.** A sessão não pode ser confirmada enquanto **qualquer** campo divergente estiver com pelo menos um lado `PENDING`. A tolerância de equivalência deriva da precisão impressa no laudo (não de estimativa) e é assimétrica de propósito: mostrar divergência que era só arredondamento custa um clique ao avaliador; fundir valores que realmente divergem grava um número errado como confirmado por duas fontes.
+- **INV-151** **Índice, classificação e sugestão proprietários do fabricante nunca viram medida.** Idade corporal, pontuação de saúde, tipo de corpo, peso ideal sugerido e classificações do aparelho vão para `BodyAssessment.deviceReport` (JSON opaco), fora do gráfico de evolução. Critério: vira medida o que é medido e comparável entre aparelhos; vira atributo o que é índice ou fórmula proprietária do fabricante, que pode mudar num firmware novo e produziria tendência falsa se comparado mês a mês.
+- **INV-152** **O ECG nunca é interpretado, mesmo dentro da avaliação multiarquivo (ADR-035, sem exceção).** `HEART_RATE` é medida oficial; achado do aparelho, tags e observações do ECG são texto atribuído ao aparelho em `deviceReport`, e nenhuma regra lê esse texto para decidir, alertar, bloquear ou encaminhar.
 
 ---
 

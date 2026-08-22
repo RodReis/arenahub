@@ -1,0 +1,434 @@
+/**
+ * Revisao de campos multiarquivo -- Task 9, F-multiarquivo.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`
+ * e `--ah-border-*`, nunca `--ah-carbon-*` cru.
+ */
+
+/* Cabeçalho: nome · idade · altura, matrícula. */
+.cabecalho {
+  margin-bottom: 12px;
+}
+
+.nomeDoAluno {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-title-size);
+  font-weight: 600;
+}
+
+.matricula {
+  margin: 4px 0 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Três cartões de arquivo. */
+.arquivos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * Cartao de laudo: a MINIATURA e o conteudo (ADR-041), nao o nome do
+ * arquivo. Por isso a imagem ocupa o cartao inteiro e o texto vira legenda
+ * curta embaixo -- inverte a hierarquia anterior, em que o nome do arquivo
+ * era o titulo e nao dizia nada.
+ */
+.arquivo {
+  min-width: 200px;
+  flex: 1 1 200px;
+  max-width: 300px;
+  overflow: hidden;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+  font-size: var(--ah-type-body-size);
+}
+
+/*
+ * Proporcao fixa: sem ela o cartao pula de altura quando cada miniatura
+ * termina de carregar, e tres laudos produzem tres saltos em sequencia
+ * (CLS). A altura e reservada antes de a imagem chegar.
+ */
+.previaImagem {
+  display: block;
+  aspect-ratio: 4 / 3;
+  background: var(--ah-surface-sunken);
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.previaImagem img {
+  width: 100%;
+  height: 100%;
+  /* `contain` e nao `cover`: laudo cortado esconde justamente a linha de
+     numero que alguem quer conferir. */
+  object-fit: contain;
+}
+
+.previaImagem:focus-visible {
+  outline: 2px solid var(--ah-focus-ring);
+  outline-offset: 2px;
+}
+
+/*
+ * SEM `aspect-ratio` aqui, ao contrario de `.previaImagem`.
+ *
+ * A proporcao existe para RESERVAR o espaco de uma imagem que ainda vai
+ * chegar. Documento e arquivo expurgado nao tem imagem chegando -- a caixa
+ * de 4:3 vazia so anuncia um buraco. Isto e o caso COMUM, nao a excecao: o
+ * arquivo e expurgado logo apos a publicacao (`MVP-03` 15), entao a maioria
+ * dos cartoes cai aqui.
+ */
+.previaDocumento,
+.previaAusente {
+  display: block;
+  margin: 0;
+  padding: 12px;
+  background: var(--ah-surface-sunken);
+  border-bottom: 1px solid var(--ah-border-subtle);
+  font-size: var(--ah-type-caption-size);
+  line-height: 1.4;
+}
+
+.previaDocumento {
+  color: var(--ah-action-text);
+  text-decoration: underline;
+}
+
+.previaAusente {
+  color: var(--ah-text-secondary);
+}
+
+.dadosDoArquivo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.subtituloDoArquivo {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+/* Faixa de aviso persistente sobre a origem dos valores. */
+.avisoDeOcr {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  /* Borda CHEIA na cor do estado, nunca faixa lateral: a listra de 3px a
+     esquerda e decorativa -- some no primeiro reflow em coluna estreita e
+     nao carrega significado que o fundo ja nao carregue. */
+  border: 1px solid color-mix(in srgb, var(--ah-state-warning) 45%, var(--ah-border-default));
+  border-radius: var(--ah-radius-card);
+  background: color-mix(in srgb, var(--ah-state-warning) 8%, var(--ah-surface-raised));
+  color: var(--ah-text-default);
+  font-size: var(--ah-type-body-size);
+}
+
+.tela {
+  display: grid;
+  /*
+   * A analise e leitura de apoio, nao o conteudo principal -- por isso
+   * largura FIXA em vez de fracao: com `1fr` ela crescia junto com a tela e
+   * ficava com meia coluna vazia embaixo do texto, que foi o espaco em
+   * branco que sobrava em 1440px.
+   */
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .tela {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Painéis de largura cheia abaixo da grade principal: segmentos e histórico. */
+/*
+ * Os dois paineis de segmento -- EMPILHADOS, nao lado a lado.
+ *
+ * A linha de cada segmento tem quatro coisas em sequencia: rotulo, barra,
+ * valor e badge de leitura. Isso pede ~460px para nao cortar nada, e a
+ * coluna de conteudo (que divide a tela com o painel de analise) nao tem
+ * 920px para dois deles. Duas tentativas de `auto-fit` com piso maior
+ * falharam pelo mesmo motivo: o grid CABIA, o conteudo nao -- "Sem faixa
+ * publicada" saia cortado no painel da esquerda.
+ *
+ * Empilhar custa scroll; espremer custa informacao ilegivel. Numa tela cuja
+ * funcao e conferir numero contra papel, a segunda e pior.
+ *
+ * Acima de 1600px os dois voltam a caber lado a lado de verdade.
+ */
+.paineisCompletos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 1600px) {
+  .paineisCompletos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/*
+ * A tabela rola DENTRO de si em tela estreita, nunca empurra a pagina.
+ * Sem isto, quatro colunas num monitor de 1280 com o painel de analise ao
+ * lado produzem barra horizontal no BODY -- e ai o cabecalho da tela sai de
+ * vista junto.
+ */
+.rolagemDaTabela {
+  overflow-x: auto;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.legendaDaTabela {
+  margin-bottom: 12px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  text-align: left;
+}
+
+.tabela th,
+.tabela td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--ah-border-subtle);
+  font-size: var(--ah-type-body-size);
+}
+
+.tabela thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/*
+ * O nome do campo e cabecalho de LINHA (`<th scope="row">`), nao celula: com
+ * 31 medidas, o leitor de tela anuncia "Peso, 92,3 kg" em vez de ler quatro
+ * numeros soltos sem saber de qual medida sao.
+ */
+.nomeDoCampo {
+  color: var(--ah-text-default);
+  font-weight: 500;
+}
+
+/*
+ * Numero alinha a direita e usa numeral tabular: e o que faz 92,3 e 180,0
+ * empilharem com a virgula na mesma coluna, e a varredura vertical de 31
+ * linhas depende disso.
+ */
+.colunaNumerica {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Campos que nao entraram na avaliacao porque os laudos discordam. */
+.avisoDeConflito {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-warning) 45%, var(--ah-border-default));
+  border-radius: var(--ah-radius-card);
+  background: color-mix(in srgb, var(--ah-state-warning) 8%, var(--ah-surface-raised));
+  color: var(--ah-text-default);
+  font-size: var(--ah-type-body-size);
+}
+
+.painel {
+  padding: var(--ah-size-card-padding);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.painel h2 {
+  margin-top: 0;
+  font-size: var(--ah-type-title-size);
+}
+
+/* Aviso persistente da análise de IA -- não dispensável, regra de arquitetura 8. */
+.avisoDeIa {
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-info) 45%, var(--ah-border-default));
+  border-radius: var(--ah-radius-card);
+  background: color-mix(in srgb, var(--ah-state-info) 8%, var(--ah-surface-raised));
+  font-size: var(--ah-type-caption-size);
+  color: var(--ah-text-default);
+}
+
+.blocoDaAnalise {
+  margin-top: 16px;
+}
+
+.rotuloDaAnalise {
+  margin: 0 0 4px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.rodapeDaAnalise {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ah-border-subtle);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+/* Achado do ECG -- ADR-035: atribuído ao aparelho, sem botão. */
+.avisoDoAparelho {
+  margin-top: 12px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+/* Segmentos: braço/tronco/perna, gordura e músculo. */
+/*
+ * A tabela de segmentos rola DENTRO do painel quando nao cabe -- nunca
+ * corta o badge de leitura, que e a informacao que faz alguem olhar duas
+ * vezes para um numero.
+ */
+.tabelaDeSegmentos {
+  width: 100%;
+  min-width: 380px;
+  border-collapse: collapse;
+}
+
+.painel:has(.tabelaDeSegmentos) {
+  overflow-x: auto;
+}
+
+.tabelaDeSegmentos th,
+.tabelaDeSegmentos td {
+  padding: 8px 12px 8px 0;
+  text-align: left;
+  font-size: var(--ah-type-body-size);
+  vertical-align: middle;
+}
+
+.tabelaDeSegmentos th {
+  color: var(--ah-text-secondary);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.trilhaDaBarra {
+  width: 100%;
+  min-width: 96px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--ah-surface-sunken);
+}
+
+.barraDoSegmento {
+  height: 100%;
+  border-radius: 4px;
+  /* Carbono, nao accent -- DS-PAINEL.md §2.3 reserva accent a ACAO; esta
+     barra mede magnitude, e o badge de leitura ao lado ja carrega o
+     julgamento de estado. */
+  background: var(--ah-border-strong);
+}
+
+.valorDoSegmento {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/*
+ * Abas -- navegacao entre secoes da avaliacao.
+ *
+ * Sublinhado como marcador de aba ativa, e nao fundo preenchido: com o
+ * painel de analise ao lado, um bloco colorido competiria com os badges de
+ * leitura da tabela, que sao o que precisa saltar aos olhos.
+ */
+.abas {
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.abas ul {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+
+.abas a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 2px solid transparent;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.abas a:hover {
+  color: var(--ah-text-default);
+  border-bottom-color: var(--ah-border-default);
+}
+
+.abas a:focus-visible {
+  outline: 2px solid var(--ah-focus-ring);
+  outline-offset: -2px;
+}
+
+/*
+ * A aba ativa carrega DOIS canais, nunca so a cor: peso da fonte e a linha
+ * embaixo. Quem opera com brilho baixo ou nao distingue cor chega a mesma
+ * leitura (`PRODUCT.md`, principio 3).
+ */
+.abas a[aria-current='page'] {
+  color: var(--ah-text-strong);
+  font-weight: 600;
+  border-bottom-color: var(--ah-action-solid);
+}
+
+.contagemDaAba {
+  padding: 1px 6px;
+  border-radius: var(--ah-radius-badge);
+  background: var(--ah-surface-sunken);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+/* A coluna de conteudo das abas -- o painel de analise fica ao lado dela. */
+.conteudo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .abas a {
+    transition: none;
+  }
+}

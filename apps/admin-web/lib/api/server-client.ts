@@ -36,7 +36,20 @@ export interface RespostaDaApi<T> {
  */
 export async function chamarApi<T>(
   caminho: string,
-  opcoes: { metodo?: string; corpo?: unknown; correlationId?: string } = {},
+  opcoes: {
+    metodo?: string;
+    corpo?: unknown;
+    /**
+     * Upload de arquivo. Vai no lugar de `corpo`.
+     *
+     * O `content-type` de `multipart/form-data` carrega um BOUNDARY que o
+     * runtime gera junto com o corpo -- por isso ele NAO e declarado aqui.
+     * Declarar `multipart/form-data` sem boundary faz o servidor recusar o
+     * corpo inteiro, e o erro sai como "arquivo ausente", longe da causa.
+     */
+    formulario?: FormData;
+    correlationId?: string;
+  } = {},
 ): Promise<RespostaDaApi<T>> {
   const armazem = await cookies();
   const cabecalhoDeCookie = armazem
@@ -44,14 +57,22 @@ export async function chamarApi<T>(
     .map((c) => `${c.name}=${c.value}`)
     .join('; ');
 
+  const formulario = opcoes.formulario;
+
+  // `BodyInit | undefined` numa variavel so, resolvida ANTES do literal:
+  // com `exactOptionalPropertyTypes`, espalhar um ternario dentro do objeto
+  // faz o TS ver `body: FormData | undefined`, que `RequestInit` recusa.
+  const corpo: BodyInit | undefined =
+    formulario ?? (opcoes.corpo === undefined ? undefined : JSON.stringify(opcoes.corpo));
+
   const resposta = await fetch(`${URL_INTERNA}${caminho}`, {
     method: opcoes.metodo ?? 'GET',
     headers: {
-      'content-type': 'application/json',
+      ...(formulario === undefined ? { 'content-type': 'application/json' } : {}),
       ...(cabecalhoDeCookie ? { cookie: cabecalhoDeCookie } : {}),
       ...(opcoes.correlationId ? { 'x-correlation-id': opcoes.correlationId } : {}),
     },
-    ...(opcoes.corpo === undefined ? {} : { body: JSON.stringify(opcoes.corpo) }),
+    ...(corpo === undefined ? {} : { body: corpo }),
     cache: 'no-store',
   });
 
