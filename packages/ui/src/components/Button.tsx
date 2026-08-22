@@ -2,10 +2,10 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'reac
 
 import estilos from './Button.module.css';
 
-type Variant = 'solid' | 'outline' | 'ghost' | 'destructive';
+type Variant = 'solid' | 'outline' | 'ghost' | 'destructive' | 'icon';
 
-interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-  readonly variant?: Variant;
+interface PropsBase extends ButtonHTMLAttributes<HTMLButtonElement> {
+  readonly variant?: Exclude<Variant, 'icon'>;
   /**
    * OBRIGATORIO, e nao herdado por spread: botao ou link sem conteudo e
    * anunciado pelo leitor de tela como um alvo sem nome -- quem navega por
@@ -32,6 +32,26 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
    */
   readonly href?: string;
 }
+
+/**
+ * A variante `icon` EXIGE `aria-label`, e o tipo e quem garante isso.
+ *
+ * Icone sozinho nao tem nome acessivel: quem navega por audio ouve "link" e
+ * nada mais. Documentar a exigencia num comentario nao impede o esquecimento
+ * -- o tipo impede, e o erro aparece em `pnpm typecheck` em vez de numa
+ * auditoria de acessibilidade seis meses depois.
+ *
+ * `data-acao` marca o icone que MUDA ESTADO (liberar catraca), em oposicao
+ * ao que navega. So ele carrega a cor de acao -- accent e acao, carbono e
+ * estrutura (DS-PAINEL §2.3).
+ */
+interface PropsDeIcone extends Omit<PropsBase, 'variant'> {
+  readonly variant: 'icon';
+  readonly 'aria-label': string;
+  readonly 'data-acao'?: boolean;
+}
+
+type Props = PropsBase | PropsDeIcone;
 
 /**
  * Botao do painel -- DS-PAINEL.md §6. Altura 36 px, raio 6 px.

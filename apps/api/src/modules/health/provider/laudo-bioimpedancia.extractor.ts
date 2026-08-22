@@ -55,15 +55,13 @@ import {
  */
 @Injectable()
 export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
-  extrair(pedido: PedidoDeExtracao): Promise<ResultadoDaExtracao> {
+  async extrair(pedido: PedidoDeExtracao): Promise<ResultadoDaExtracao> {
     if (pedido.tipo === 'CSV') {
-      return Promise.resolve(this.extrairCsv(pedido.conteudo));
+      return this.extrairCsv(pedido.conteudo);
     }
 
-    // ECG chega como PDF (o texto ja extraido da camada de texto). Qualquer
-    // outro tipo nao e reconhecido por este extrator.
     if (pedido.tipo === 'PDF') {
-      return Promise.resolve(this.extrairEcg(pedido.conteudo));
+      return this.extrairEcg(await textoDoPdf(pedido.conteudo));
     }
 
     return Promise.reject(
@@ -107,6 +105,9 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
     }
 
     const campos: CampoProposto[] = [];
+    // Recomendacoes do aparelho (INV-151): guardadas como ATRIBUTO, nunca
+    // como medida. Ver `RECOMENDACAO_DO_APARELHO` para o porque.
+    const recomendacoes: Record<string, unknown> = {};
 
     for (const linha of linhas.slice(1)) {
       const celulas = linha.split(',').map((c) => c.trim());
@@ -118,6 +119,25 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
       // peso ideal) e IGNORADA, nao derruba o arquivo -- mesma regra do
       // `CsvDocumentExtractorAdapter`.
       if (!tipo || !bruto) continue;
+
+      // ANTES da guarda de `ehTipoDeMedida`: as recomendacoes NAO estao em
+      // `TIPOS_DE_MEDIDA` de proposito (INV-151), entao a guarda as
+      // descartaria. Aqui elas saem da linha do CSV para `atributos`, sem
+      // nunca virar `CampoProposto`.
+      const recomendacao = RECOMENDACAO_DO_APARELHO[tipo];
+
+      if (recomendacao !== undefined) {
+        const valor = Number(bruto);
+
+        // Valor ilegivel nao vira `0` (INV-104): a chave simplesmente nao
+        // entra, e a tela mostra ausencia em vez de um zero inventado.
+        if (Number.isFinite(valor)) {
+          recomendacoes[recomendacao] = valor;
+        }
+
+        continue;
+      }
+
       if (!ehTipoDeMedida(tipo)) continue;
 
       const valor = Number(bruto);
@@ -158,17 +178,21 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
       // `exactOptionalPropertyTypes`: so inclui a chave quando ha valor --
       // `sourceLabel: undefined` explicito nao e a mesma coisa que omitir.
       ...(sourceLabel !== undefined ? { sourceLabel } : {}),
+      // Laudo sem nenhuma recomendacao nao grava `atributos: {}` -- ausencia
+      // de recomendacao e diferente de recomendacao vazia.
+      ...(Object.keys(recomendacoes).length > 0 ? { atributos: recomendacoes } : {}),
     };
   }
 
-  private extrairEcg(conteudo: Uint8Array): ResultadoDaExtracao {
-    const texto = new TextDecoder('utf-8').decode(conteudo);
-
+  private extrairEcg(texto: string): ResultadoDaExtracao {
     const bpm = capturar(texto, /Frequencia cardiaca:\s*(\d+(?:[.,]\d+)?)\s*BPM/i);
     const achado = capturar(texto, /Analise instantanea:\s*(.+)/i);
     const linhaTags = capturar(texto, /Tags:\s*(.+)/i);
     const duracao = capturar(texto, /Duracao:\s*(\d+(?:[.,]\d+)?)\s*s/i);
     const gravadoEm = capturar(texto, /Gravado:\s*(.+)/i);
+    // Texto que QUEM OPEROU o aparelho digitou. Opaco como o achado: exibido
+    // verbatim, nunca interpretado nem usado para decidir nada (ADR-035).
+    const observacoes = capturar(texto, /Observacoes:\s*(.+)/i);
 
     const ehEcg = /Analise instantanea:/i.test(texto) || /Frequencia cardiaca:/i.test(texto);
 
@@ -204,6 +228,7 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
     if (linhaTags) atributos['ecgTags'] = linhaTags.split(',').map((tag) => tag.trim());
     if (duracao) atributos['ecgDurationSeconds'] = Number(duracao.replace(',', '.'));
     if (gravadoEm) atributos['ecgRecordedAt'] = gravadoEm;
+    if (observacoes) atributos['ecgNotes'] = observacoes;
 
     // O bpm vai nos DOIS lugares de proposito: como `HEART_RATE` ele e medida
     // comparavel mes a mes; aqui e o numero que o laudo imprimiu, exibido
@@ -221,6 +246,100 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
       atributos,
     };
   }
+}
+
+/**
+ * As "Recomendacoes de condicao fisica" do laudo -> chave em `atributos`.
+ *
+ * ---------------------------------------------------------------------------
+ * ISTO NAO E MEDIDA, E POR ISSO NAO ESTA EM `TIPOS_DE_MEDIDA` (INV-151).
+ * ---------------------------------------------------------------------------
+ *
+ * Peso padrao, os tres "controles" e a ingestao recomendada sao FORMULA
+ * PROPRIETARIA do fabricante, nao grandeza medida. O criterio da INV-151:
+ * vira medida o que e medido e comparavel entre aparelhos; vira atributo o
+ * que e indice do fabricante, que muda num firmware novo e produziria
+ * tendencia falsa comparado mes a mes. ADR-038 diz o mesmo, e o proprio
+ * laudo carimba "nao e recomendado como base para dados medicos".
+ *
+ * Consequencia pratica: estes cinco valores sao EXIBIDOS (card "Metas e
+ * controle") e nada mais -- nao entram no grafico de evolucao, nao viram
+ * `BodyMeasurement`, e nenhuma linha do sistema decide nada em cima deles.
+ * Meta oficial de aluno e a da F20 (`HealthGoal`), que tem baseline, alvo e
+ * responsavel -- coisa diferente de sugestao de balanca.
+ *
+ * A chave carrega o prefixo `device` para deixar a origem obvia em
+ * `deviceReport`, onde convive com `ecgFinding` e afins.
+ */
+const RECOMENDACAO_DO_APARELHO: Readonly<Record<string, string>> = {
+  STANDARD_WEIGHT: 'deviceStandardWeightKg',
+  WEIGHT_CONTROL: 'deviceWeightControlKg',
+  FAT_CONTROL: 'deviceFatControlKg',
+  MUSCLE_CONTROL: 'deviceMuscleControlKg',
+  RECOMMENDED_INTAKE: 'deviceRecommendedIntakeKcal',
+};
+
+/**
+ * A CAMADA DE TEXTO do PDF -- o passo que faltava (ADR-035 decisao 8).
+ *
+ * ---------------------------------------------------------------------------
+ * O QUE ESTAVA ERRADO.
+ * ---------------------------------------------------------------------------
+ *
+ * `extrairEcg` recebia os BYTES do PDF e fazia
+ * `new TextDecoder('utf-8').decode(...)` neles. Num PDF de verdade o texto
+ * vive comprimido em streams `FlateDecode`: decodificar os bytes crus como
+ * UTF-8 devolve lixo binario, nenhum regex casa, e o arquivo termina em
+ * `EXTRACTOR_NO_CONTENT`. Ou seja, o ECG NUNCA funcionou em producao -- e o
+ * comentario do `import.service.ts` ja tratava isso como fato consumado ("o
+ * ECG e um PDF de tracado, sem texto extraivel").
+ *
+ * O defeito sobreviveu porque o fixture de teste e um `.txt` com o texto ja
+ * extraido: ele E o resultado do passo que nao existia. A suite provava a
+ * metade que existia.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE `unpdf`, E NAO OCR.
+ * ---------------------------------------------------------------------------
+ *
+ * O ADR-035 e explicito: mandar para OCR um arquivo que JA TRAZ o texto e
+ * "pagar para introduzir erro". O Omron imprime frequencia, duracao e achado
+ * como texto de verdade; so o TRACADO e imagem, e o tracado nao vira medida.
+ *
+ * `unpdf` roda em Node puro, sem binario nativo e sem dependencia externa --
+ * ao contrario do `pdftotext`, que exigiria o poppler instalado no host e no
+ * container de CI.
+ *
+ * NORMALIZA ACENTO porque o laudo real e pt-BR ("Frequência cardíaca") e os
+ * padroes deste arquivo sao escritos sem acento. Sem isso o extrator leria o
+ * PDF corretamente e ainda assim nao casaria nada -- falha identica a de
+ * antes, com causa diferente.
+ */
+async function textoDoPdf(conteudo: Uint8Array): Promise<string> {
+  const { extractText, getDocumentProxy } = await import('unpdf');
+
+  let texto: string;
+
+  try {
+    const pdf = await getDocumentProxy(conteudo);
+    const extraido = await extractText(pdf, { mergePages: true });
+
+    texto = Array.isArray(extraido.text) ? extraido.text.join('\n') : extraido.text;
+  } catch (erro) {
+    // PDF corrompido ou protegido por senha nao e falha do sistema: e um
+    // arquivo que nao da para ler. `false` em `recuperavel` -- tentar de novo
+    // com o mesmo arquivo daria o mesmo resultado.
+    throw new ErroDeExtracao(
+      'EXTRACTOR_NO_CONTENT',
+      false,
+      `PDF ilegivel: ${erro instanceof Error ? erro.message : 'erro desconhecido'}`,
+    );
+  }
+
+  // `NFD` separa a letra do acento; a faixa combina os acentos soltos e some
+  // com eles. "Frequência" vira "Frequencia", que e como os padroes acima
+  // estao escritos.
+  return texto.normalize('NFD').replace(new RegExp('[\u0300-\u036f]', 'gu'), '');
 }
 
 function ehTipoDeMedida(valor: string): valor is TipoDeMedida {

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { Button } from '@arenahub/ui';
 
 import estilos from './students.module.css';
 
@@ -86,35 +86,35 @@ interface Props {
 export function AcoesDoAluno({ studentId, podeLiberar, liberacao }: Props) {
   return (
     <div className={estilos['acoes']}>
-      <Link
-        className={estilos['acao']}
+      <Button
+        variant="icon"
         href={`/students/${studentId}`}
         aria-label="Editar cadastro"
         title="Editar cadastro"
         data-testid={`acao-editar-${studentId}`}
       >
         <IconeEditar />
-      </Link>
+      </Button>
 
-      <Link
-        className={estilos['acao']}
+      <Button
+        variant="icon"
         href={`/students/${studentId}/health`}
         aria-label="Bioimpedância e evolução corporal"
         title="Bioimpedância"
         data-testid={`acao-bioimpedancia-${studentId}`}
       >
         <IconeBioimpedancia />
-      </Link>
+      </Button>
 
-      <Link
-        className={estilos['acao']}
+      <Button
+        variant="icon"
         href={`/students/${studentId}/billing`}
         aria-label="Cobrança do aluno"
         title="Cobrança"
         data-testid={`acao-pagamento-${studentId}`}
       >
         <IconePagamento />
-      </Link>
+      </Button>
 
       {/*
         A liberação NÃO vira ícone fantasma quando não se aplica: um botão

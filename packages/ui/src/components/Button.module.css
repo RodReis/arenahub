@@ -26,6 +26,19 @@
     border-color var(--ah-motion-control) var(--ah-motion-easing);
 }
 
+/*
+ * `prefers-reduced-motion` NAO E OPCIONAL (`PRODUCT.md`, acessibilidade).
+ *
+ * Estava em cada tela que escrevia o proprio botao -- e some junto com elas
+ * na migracao. Aqui vale para as cinco variantes de uma vez, que e onde
+ * deveria estar desde o inicio.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .botao {
+    transition: none;
+  }
+}
+
 .botao[data-variant='solid'] {
   background: var(--ah-action-solid);
   color: var(--ah-action-on-solid);
@@ -52,6 +65,59 @@
 
 .botao[data-variant='ghost']:hover:not(:disabled) {
   background: var(--ah-surface-canvas);
+}
+
+/**
+ * Icone sozinho -- a acao de LINHA de tabela.
+ *
+ * Quadrado de 32px em vez da altura de 36px do controle: numa tabela de
+ * linha 40px (DS-PAINEL §4), tres botoes de 36px empilham a linha inteira e
+ * a densidade -- que e a funcionalidade, nao o enfeite -- vai embora.
+ *
+ * `--ah-text-icon` e o papel certo: existe para glifo e nao herda a escala
+ * de contraste de texto corrido.
+ *
+ * Nasceu do `.acao` que tres telas do painel escreviam a mao. Estava certo
+ * em tudo, menos em existir fora do design system: o mesmo botao definido em
+ * cada tela diverge no primeiro ajuste, e um `title` sem `aria-label` numa
+ * delas nao aparece em revisao de outra.
+ *
+ * ACESSIBILIDADE NAO E OPCIONAL AQUI: icone sozinho nao tem nome acessivel.
+ * Quem usa esta variante DEVE passar `aria-label` -- o tipo do componente
+ * exige.
+ */
+.botao[data-variant='icon'] {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  color: var(--ah-text-icon);
+}
+
+/*
+ * Hover traz DOIS canais -- cor E superficie: realce so por cor desaparece
+ * para quem opera com brilho baixo, que e o caso do balcao sob luz
+ * fluorescente forte.
+ */
+.botao[data-variant='icon']:hover:not(:disabled) {
+  color: var(--ah-text-strong);
+  background: var(--ah-surface-sunken);
+  border-color: var(--ah-border-default);
+}
+
+.botao[data-variant='icon']:active:not(:disabled) {
+  background: var(--ah-surface-canvas);
+}
+
+/*
+ * `data-acao` marca o icone que MUDA ESTADO, e nao o que navega.
+ *
+ * Accent e acao; carbono e estrutura (DS-PAINEL §2.3). Editar, ver
+ * bioimpedancia e abrir cobranca sao navegacao -- ficam em carbono. Liberar
+ * a catraca muda o mundo, e so ela carrega a cor de acao.
+ */
+.botao[data-variant='icon'][data-acao] {
+  color: var(--ah-action-text);
 }
 
 /**
@@ -87,4 +153,17 @@
   border-color: var(--ah-control-disabled-border);
   color: var(--ah-control-disabled-text);
   cursor: not-allowed;
+}
+
+/*
+ * Icone desabilitado NAO ganha caixa cinza.
+ *
+ * O desabilitado padrao pinta fundo e borda -- correto num botao com rotulo,
+ * que ja e uma caixa. Num icone transparente de 32px isso desenha uma caixa
+ * que nao existia, e a linha da tabela pisca de forma quando a acao fica
+ * indisponivel. So a cor do glifo muda.
+ */
+.botao[data-variant='icon']:disabled {
+  background: transparent;
+  border-color: transparent;
 }

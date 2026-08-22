@@ -1,6 +1,0 @@
-Paciente: Aluno Sintetico
-Gravado: segunda-feira, 3 de agosto de 2026 as 08:10:00
-Frequencia cardiaca: 92 BPM
-Duracao: 30s
-Tags: Atividade:Alta
-Analise instantanea: Ritmo nao classificado

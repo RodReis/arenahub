@@ -88,13 +88,33 @@
   }
 }
 
-.tabela th {
+/*
+ * `thead th`, nao `th` solto.
+ *
+ * O seletor sem escopo foi escrito quando so existia cabecalho de COLUNA.
+ * Com `rowHeader`, ele passou a pegar o cabecalho de LINHA tambem, e os
+ * rotulos de campo sairam em caixa alta com tracking de eyebrow ("PESO",
+ * "MASSA OSSEA") -- estilo de rotulo aplicado a conteudo.
+ */
+.tabela thead th {
   color: var(--ah-text-label);
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/*
+ * Cabecalho de LINHA e conteudo: o nome do campo que a linha mede.
+ *
+ * Peso visual acima da celula comum (e a ancora que o olho usa para achar a
+ * linha), abaixo do cabecalho de coluna (que rotula a tabela inteira).
+ */
+.tabela tbody th {
+  color: var(--ah-text-default);
+  font-weight: 500;
+  text-align: left;
 }
 
 .tabela tbody tr:last-child td {

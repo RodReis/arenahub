@@ -6,7 +6,7 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 - **Pense antes de codificar.** Não presuma: declare suposições, exponha
   interpretações alternativas, aponte a abordagem mais simples. Em dúvida sobre
-  **escopo de produto ou LGPD**, pare e pergunte. Em dúvida técnica, decida e
+  **escopo de produto**, pare e pergunte. Em dúvida técnica, decida e
   registre no PR — ver *O que pode bloquear o desenvolvimento*.
 - **Simplicidade primeiro.** Código mínimo que resolve. Sem abstração de uso
   único, sem flexibilidade não pedida, sem tratar cenário impossível.
@@ -20,9 +20,9 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 ## Papéis e governança
 
-- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Nunca faz commit, push, PR nem merge** — o PI não toca no Git. O portão do PI é o **aceite na issue**, não o merge: o PI não segura o código na porta da `main`, ele carimba o que já entrou como realmente pronto. Palavra final e verdade do é PI.
-- **Claude Cowork (planejamento)** — mantém `docs/` e registra decisões. **Não cria spec e não aprova nada.** A Slice do PRD **é** a especificação (ADR-022); `docs/specs/**` deixou de ser artefato de processo em **18/08/2026** — os arquivos existentes ficam como histórico e não bloqueiam ninguém. Cria a issue-fatia e a `[INFRA]` no board (Backlog, assignee PI) e os metadados de label (ADR-023). Escreve documento direto na `main` — escopo no **ADR-021**. **Decide sozinho tudo que é reversível e reporta depois; só pergunta ao PI o que é caro de desfazer.** Nunca implementa código, nunca toca em `apps/`, `packages/`, `infra/` nem `.github/`. **Em `docs/prd/**` escreve só emenda que materializa decisão do PI já registrada em ADR aceito, citando o ADR na própria emenda** — requisito novo, não inventar decisão sem o consentimento do PI, não criar regra sem o PI aceitar, e decisão do PI esta acima das ADR ou de qualquer outro documento.
-- **Claude Code (você)** — planeja, codifica, testa (usar a skill /code-review; para frontend, as skills do /impeccable) antes do commit, atualiza a documentação e **commita os documentos de `docs/`** junto da entrega. **Implementa a partir deste arquivo + `docs/` + a Slice do PRD da fatia** — não espera spec nem aprovação de ninguém. **Não cria a issue de fatia nem a `[INFRA]`** (são do Cowork — ADR-023); pega o card, move pelo fluxo e entrega com PR. Cria a própria issue `[FIX]` de bug. Pode criticar arquitetura, **não escopo**. **Só para e pergunta em dois casos** — ver *O que pode bloquear o desenvolvimento*. Fora deles: decide, implementa, e registra a decisão no corpo do PR.
+- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Nunca faz commit, push, PR nem merge** — o PI não toca no Git. O portão do PI é o **aceite na issue**, não o merge: o PI não segura o código na porta da `main`, ele carimba o que já entrou como realmente pronto. **descisão final e verdade do é PI, code atualiza documentação e/ou cria a ADR e merge na main**.
+- **Claude Cowork (planejamento)** — mantém `docs/` e registra decisões. **Não cria spec e não aprova nada.** A Slice do PRD **é** a especificação (ADR-022); `docs/specs/**` deixou de ser artefato de processo em **18/08/2026** — os arquivos existentes ficam como histórico e não bloqueiam ninguém. Cria a issue-fatia e a `[INFRA]` no board (Backlog, assignee PI) e os metadados de label (ADR-023). Escreve documento direto na `main` — escopo no **criar spec sem bloqueio, aceito duplo, LGPD, amarra juridica, consentimento e não criar ou inventa regra sempre pergunta o PI, isso não trava ou impede o desenvolvimento complento do sistema, descisão final é do PI. Não nos preocupamos com LGPD, consentimento, juridicos, nos só desenvolvemos o produto.**. Nunca implementa código, nunca toca em `apps/`, `packages/`, `infra/` nem `.github/`. **Em `docs/prd/**` escreve só emenda que materializa decisão do PI já registrada em ADR aceito, citando o ADR na própria emenda** — requisito novo, não inventar decisão sem o consentimento do PI, não criar regra sem o PI aceitar, e decisão do PI esta acima das ADR ou de qualquer outro documento. 
+- **Claude Code (developer)** — codifica, testa (usar a skill /code-review; e para frontend, as skills do /impeccable e /frontend-design:frontend-design) antes do commit, atualiza a documentação e **commita os documentos de `docs/`** junto da entrega. **Implementa a partir deste arquivo + `docs/` + a Slice do PRD da fatia** — não espera spec nem aprovação de ninguém. **Não cria a issue de fatia nem a `[INFRA]`** (são do Cowork — ADR-023); pega o card, move pelo fluxo e entrega com PR. Cria a própria issue `[FIX]` de bug. Pode criticar arquitetura, **não escopo**. **Só para e pergunta em dois casos** — ver *O que pode bloquear o desenvolvimento*. Fora deles: decide, implementa, e registra a decisão no corpo do PR. **Code não criar ou inventa regra, segui a que esta especificada, e a descisão final é o PI**
 
 #### Dois atores escrevem no Git — quem cede no conflito
 
@@ -66,7 +66,7 @@ Todo título de card **começa** com tokens em colchetes, **nesta ordem**, segui
 
 **Forma:** `[MVP<n>][SPEC-<nnn>][<fatia|tipo>] <título livre>`
 
-- **`[MVP<n>]`** — `[MVP0]`…`[MVP6]`, mais `[MVP1.5]` (ADR-012) e `[MVP2.5]` (ADR-025), quando a fatia pertence a um MVP conhecido.
+- **`[MVP<n>]`** — `[MVP0]`…`[MVP6]`, mais `[MVP1.5]` (ADR-012), `[MVP2.5]` (ADR-025) e `[MVP3.5]` (ADR-042), quando a fatia pertence a um MVP conhecido.
 - **`[SPEC-<nnn>]`** — 3 dígitos (`[SPEC-024]`), quando há spec. **Permanece** em correção que conserta comportamento definido numa spec.
 - **`[F<n>]`** — a fatia (`[F18]`). Para card que **não é fatia**, entra no lugar um **token de tipo**: `[FIX]` (correção de bug), `[GATE]` (homologação/portão de entrada de MVP) ou `[INFRA]` (processo/infra).
 
@@ -87,11 +87,6 @@ O par MVP↔SPEC↔Fatia deriva do **Índice Fatia ↔ SPEC** do `docs/STATUS.md
 **São dois casos. Não há terceiro.** Documento não bloqueia código; ADR não bloqueia código;
 "falta a spec" não bloqueia nada. Se você está parado por qualquer outro motivo, o motivo está
 errado — implemente e registre a decisão no PR.
-
-| bloqueia | por quê |
-|---|---|
-| **A Slice do PRD não define o comportamento, e escolher é decisão de produto** — preço, política, o que o usuário vê | escolher no lugar do PI é escopo assumido, que é o erro que este processo existe para impedir. Pergunte, em uma linha, e siga com o resto da fatia enquanto espera |
-| **LGPD e dado biométrico** | é lei com multa, não convenção nossa. Biometria é dado sensível: art. 11 é lista fechada, **legítimo interesse não existe** para ela. Consentimento, retenção, titular e transferência internacional **param a entrega** até estarem certos |
 
 Tudo o mais — nome de campo, ordem de implementação, estrutura de pasta, dublê de teste, como
 testar, se cabe refactor junto — **é do Code, decide na hora**. Errou? É reversível: corrige no
@@ -209,6 +204,8 @@ pnpm dev | lint | typecheck | test | test:integration | test:e2e | build
 - Nunca logar template biométrico, token de pagamento, dado de cartão ou PII em erro.
 - Contrato de domínio completo (entidades, estados, invariantes): `docs/CONVENTION.md`.
 - Autorizado a subir o docker, se estiver off. Criar sempre um nova, com novas portas, nunca usar as que ja etão configurada no docker.
+- **desenvolvimento direto, sem bloqueio, sem aceito duplo, sem LGPD, e sem consentimento, nada disso não trava ou impede o desenvolvimento complento do sistema, descisão final é do PI**
+- **Não nos preocupamos com LGPD, consentimento, juridicos, nos só desenvolvemos o produto.**
 
 ## Grafo de conhecimento (graphify)
 
@@ -226,7 +223,7 @@ Use a que existir no ambiente; a ausência de uma skill não é desculpa para pu
 - `superpowers:using-git-worktrees` — Activates with approved design. Cria um espaço de trabalho isolado em um novo branch
 - `superpowers:writing-plans` — Activates with approved design.
 - `superpowers:executing-plans` - Activates with plan.
-- `superpowers:test-driven-development` — feature crítica (LGPD, isolamento de tenant, decisão de acesso, idempotência financeira).
+- `superpowers:test-driven-development` — feature crítica (isolamento de tenant, decisão de acesso, idempotência financeira).
 - `superpowers:finishing-a-development-branch` — Ativa-se quando as tarefas são concluídas. Verifica os testes, apresenta opções (merge/PR/keep/discard) e limpa a árvore de trabalho.
 - `engineering:code-review` — em todas as tarefas, não apenas em revisões.
 - `document-skills:frontend-design` — UI distinta (não cair em shadcn-default genérico)
