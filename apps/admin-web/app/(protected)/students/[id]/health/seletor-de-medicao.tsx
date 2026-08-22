@@ -43,10 +43,37 @@ interface Props {
   readonly timeZone: string;
 }
 
+/**
+ * O atalho para anexar uma medição nova.
+ *
+ * Âncora, não botão de ação: o formulário de envio existe uma vez só, no
+ * rodapé, e duplicá-lo aqui criaria dois lugares para manter em sincronia.
+ * `<a href="#enviar-laudos">` leva até ele sem JavaScript, funciona com
+ * teclado e leitor de tela de graça, e a página continua Server Component.
+ */
+function AtalhoDeEnvio() {
+  return (
+    <a className={estilos['novaAvaliacao']} href="#enviar-laudos" data-testid="ir-para-envio">
+      <span aria-hidden="true">+</span> Nova avaliação
+    </a>
+  );
+}
+
 export function SeletorDeMedicao({ studentId, medicoes, atual, timeZone }: Props) {
-  // Uma medição só não é escolha: o seletor viraria um botão único que não
-  // leva a lugar nenhum. A data continua visível no cabeçalho da avaliação.
-  if (medicoes.length < 2) return null;
+  /*
+   * Uma medição só não é escolha -- mas o ATALHO continua valendo.
+   *
+   * Antes o componente inteiro sumia com menos de duas medições, e junto
+   * sumia o único caminho visível para anexar a próxima: quem tinha uma
+   * avaliação só precisava rolar a página inteira para achar o formulário.
+   */
+  if (medicoes.length < 2) {
+    return (
+      <nav className={estilos['seletorDeMedicao']} aria-label="Medições do aluno">
+        <AtalhoDeEnvio />
+      </nav>
+    );
+  }
 
   /*
    * DATAS REPETIDAS PRECISAM DE DESEMPATE.
@@ -111,6 +138,8 @@ export function SeletorDeMedicao({ studentId, medicoes, atual, timeZone }: Props
           </li>
         ))}
       </ul>
+
+      <AtalhoDeEnvio />
     </nav>
   );
 }

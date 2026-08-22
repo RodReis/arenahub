@@ -116,11 +116,14 @@ describe('seletor de medição', () => {
   });
 
   /**
-   * Uma medição só não é escolha: o seletor viraria um botão único que não
-   * leva a lugar nenhum. A data continua no cabeçalho da avaliação.
+   * Uma medição só não é ESCOLHA -- mas o atalho de envio continua valendo.
+   *
+   * Antes o componente sumia inteiro, e com ele o único caminho visível para
+   * anexar a próxima medição: quem tinha uma avaliação só precisava rolar a
+   * página toda até o formulário no rodapé.
    */
-  it('não aparece quando há menos de duas medições', () => {
-    const { container } = render(
+  it('com uma medição só, esconde a lista mas mantém o atalho de envio', () => {
+    render(
       <SeletorDeMedicao
         studentId="aluno-1"
         medicoes={[medicao('s1', '2026-08-03T10:47:00.000Z')]}
@@ -129,6 +132,30 @@ describe('seletor de medição', () => {
       />,
     );
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByTestId('ir-para-envio')).toBeInTheDocument();
+    // A fila de datas não aparece: uma data sozinha não é escolha.
+    expect(screen.queryByTestId('medicao-s1')).not.toBeInTheDocument();
+  });
+
+  /**
+   * O atalho é ÂNCORA, não botão de ação: o formulário existe uma vez só, no
+   * rodapé. Se isto virar `<button>`, a tela passou a exigir JavaScript para
+   * uma navegação que o `<a>` faz de graça.
+   */
+  it('o atalho de envio é uma âncora para o formulário', () => {
+    render(
+      <SeletorDeMedicao
+        studentId="aluno-1"
+        medicoes={[
+          medicao('s1', '2026-08-03T10:47:00.000Z'),
+          medicao('s2', '2026-04-30T08:24:00.000Z'),
+        ]}
+        atual="s1"
+        timeZone={FUSO}
+      />,
+    );
+
+    expect(screen.getByTestId('ir-para-envio')).toHaveAttribute('href', '#enviar-laudos');
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 });

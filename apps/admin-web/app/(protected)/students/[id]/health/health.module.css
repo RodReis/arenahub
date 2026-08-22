@@ -86,6 +86,56 @@
   padding: 0;
   list-style: none;
   overflow-x: auto;
+  /*
+   * A lista fica com o espaço que sobra e o atalho encosta à direita.
+   * `min-width: 0` é o que permite o `overflow-x` de fato rolar dentro de um
+   * flex item -- sem ele o conteúdo empurra o container e o atalho sai da
+   * tela na primeira ficha com muitas medições.
+   */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
+ * "Nova avaliação" -- a AÇÃO da tela, e a única aqui.
+ *
+ * Accent, porque accent é ação (DS-PAINEL §2.3); as datas ao lado são
+ * navegação e ficam em carbono. Encosta à direita da linha do seletor, onde
+ * o olho já termina a varredura das datas.
+ *
+ * `margin-left: auto` e não `justify-content: space-between` no pai: com
+ * uma medição só a lista não existe, e o `space-between` deixaria o atalho
+ * grudado no rótulo em vez de na borda.
+ */
+.novaAvaliacao {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--ah-action-solid);
+  border-radius: var(--ah-radius-control);
+  color: var(--ah-action-text);
+  font-size: var(--ah-type-body-size);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 120ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.novaAvaliacao:hover {
+  background: var(--ah-action-subtle-bg);
+}
+
+.novaAvaliacao:focus-visible {
+  outline: 2px solid var(--ah-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .novaAvaliacao {
+    transition: none;
+  }
 }
 
 .seletorDeMedicao a {
