@@ -65,11 +65,29 @@
  */
 .seletorDeMedicao {
   display: flex;
-  align-items: baseline;
+  /*
+   * `center` e nao `baseline`: o atalho e um `Button` de 36px de altura, e
+   * alinhar pela linha de base do texto dele o desencaixaria da fila de
+   * datas -- a base do rotulo dentro de um controle nao e a base do
+   * controle.
+   */
+  align-items: center;
   gap: 12px;
   margin-bottom: 16px;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+/*
+ * O atalho encosta a direita; a fila de datas fica com o resto da linha.
+ *
+ * Ancorado no `data-testid` e nao em `> a:last-child`: o seletor posicional
+ * pegaria QUALQUER ancora que viesse por ultimo, e a proxima pessoa que
+ * acrescentasse um link aqui empurraria o botao sem entender por que.
+ */
+.seletorDeMedicao [data-testid='ir-para-envio'] {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .rotuloDoSeletor {
@@ -94,48 +112,6 @@
    */
   flex: 1 1 auto;
   min-width: 0;
-}
-
-/*
- * "Nova avaliação" -- a AÇÃO da tela, e a única aqui.
- *
- * Accent, porque accent é ação (DS-PAINEL §2.3); as datas ao lado são
- * navegação e ficam em carbono. Encosta à direita da linha do seletor, onde
- * o olho já termina a varredura das datas.
- *
- * `margin-left: auto` e não `justify-content: space-between` no pai: com
- * uma medição só a lista não existe, e o `space-between` deixaria o atalho
- * grudado no rótulo em vez de na borda.
- */
-.novaAvaliacao {
-  margin-left: auto;
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--ah-action-solid);
-  border-radius: var(--ah-radius-control);
-  color: var(--ah-action-text);
-  font-size: var(--ah-type-body-size);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: background-color 120ms cubic-bezier(0.2, 0, 0.2, 1);
-}
-
-.novaAvaliacao:hover {
-  background: var(--ah-action-subtle-bg);
-}
-
-.novaAvaliacao:focus-visible {
-  outline: 2px solid var(--ah-focus-ring);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .novaAvaliacao {
-    transition: none;
-  }
 }
 
 .seletorDeMedicao a {

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { TenantDateTime } from '@arenahub/ui';
+import { Button, TenantDateTime } from '@arenahub/ui';
 
 import estilos from './health.module.css';
 
@@ -46,16 +46,22 @@ interface Props {
 /**
  * O atalho para anexar uma medição nova.
  *
- * Âncora, não botão de ação: o formulário de envio existe uma vez só, no
- * rodapé, e duplicá-lo aqui criaria dois lugares para manter em sincronia.
- * `<a href="#enviar-laudos">` leva até ele sem JavaScript, funciona com
- * teclado e leitor de tela de graça, e a página continua Server Component.
+ * `Button` do design system com `href` — ele renderiza um `<a>` de verdade
+ * (`DS-PAINEL.md` §6 e §9). A primeira versão desta tela estilizou uma
+ * âncora à mão, com padding, borda e hover próprios: um quinto botão
+ * paralelo aos quatro que o contrato define, divergindo do resto do painel
+ * na primeira mudança de token.
+ *
+ * `outline` e não `solid`: enviar laudo é a ação desta linha, mas não é a
+ * ação da tela — a tela existe para CONSULTAR a avaliação. Solid aqui
+ * competiria com os badges de leitura, que são o que precisa saltar aos
+ * olhos numa conferência.
  */
 function AtalhoDeEnvio() {
   return (
-    <a className={estilos['novaAvaliacao']} href="#enviar-laudos" data-testid="ir-para-envio">
-      <span aria-hidden="true">+</span> Nova avaliação
-    </a>
+    <Button variant="outline" href="#enviar-laudos" data-testid="ir-para-envio">
+      Nova avaliação
+    </Button>
   );
 }
 
