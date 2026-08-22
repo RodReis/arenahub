@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "//": "Turborepo 2 SANITIZA o ambiente: variavel nao declarada aqui nao chega a task. Sem esta lista, `test:integration` passa na maquina de quem tem `.env` (o dotenv injeta) e falha no CI, onde a variavel vem do ambiente do job -- verde local, vermelho remoto, o pior tipo de divergencia. | `build:tokens` gera theme.css e tokens.generated.ts a partir de packages/ui/tokens/*.json, e precede `lint` e `typecheck` porque tokens.generated.ts e FONTE DE TIPO: sem ele o typecheck falha por arquivo inexistente, apontando para o sintoma em vez da causa. O comentario mora aqui, e nao dentro da task, porque o Turbo so aceita a chave `//` exata e no topo.",
+  "//": "Turborepo 2 SANITIZA o ambiente: variavel nao declarada aqui nao chega a task. Sem esta lista, `test:integration` passa na maquina de quem tem `.env` (o dotenv injeta) e falha no CI, onde a variavel vem do ambiente do job -- verde local, vermelho remoto, o pior tipo de divergencia. | A task `dev` declara `dependsOn: [^build]` porque `@arenahub/ui` e consumido pelo `exports.import` do pacote, que aponta para `dist/` -- gitignorado e escrito so pelo `build`. Sem isso, `pnpm dev` sobe o `next dev` sobre o `dist` da ULTIMA vez que alguem buildou NAQUELA arvore: o painel abre com o layout de dias atras, sem erro nenhum, e duas arvores do mesmo commit servem telas diferentes. O `transpilePackages` do next.config nao salva -- ele compila o que o resolver entregou, e o resolver entregou o `dist` velho. | `build:tokens` gera theme.css e tokens.generated.ts a partir de packages/ui/tokens/*.json, e precede `lint` e `typecheck` porque tokens.generated.ts e FONTE DE TIPO: sem ele o typecheck falha por arquivo inexistente, apontando para o sintoma em vez da causa. O comentario mora aqui, e nao dentro da task, porque o Turbo so aceita a chave `//` exata e no topo.",
   "globalEnv": [
     "CI",
     "DATABASE_URL",
@@ -44,6 +44,9 @@
       ]
     },
     "dev": {
+      "dependsOn": [
+        "^build"
+      ],
       "cache": false,
       "persistent": true
     },
