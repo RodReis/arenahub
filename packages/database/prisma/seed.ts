@@ -337,12 +337,108 @@ async function semear(): Promise<void> {
 
     console.info(`[seed] catalogo com ${String(CATALOGO.length)} planos e precos vigentes.`);
 
+    await semearAceiteDaAnalise(db, tenant.id);
+
     console.info(`[seed] tenant "${TENANT.slug}" pronto, com dono ${DONO.email}.`);
   } finally {
     // Sem `$disconnect` o pool segura o processo de pe -- o `client.ts`
     // avisa disso explicitamente.
     await db.$disconnect();
   }
+}
+
+/**
+ * Aceite da analise por IA para TODOS os alunos ativos.
+ *
+ * A tela de saude mostrava "a analise nao foi gerada: o aluno ainda nao
+ * aceitou" para todo mundo, porque `consent_documents` estava vazia -- sem
+ * documento publicado, ninguem tem o que aceitar, e nenhuma analise roda.
+ * Isso deixava a coluna de analise permanentemente vazia em desenvolvimento.
+ *
+ * Cria o documento `AI_ANALYSIS` do tenant e uma assinatura `ACCEPTED` por
+ * aluno `ACTIVE`. Dado de desenvolvimento, como manda o `CLAUDE.md`: entra
+ * por seed, nunca por hardcode no caminho de producao.
+ *
+ * IDEMPOTENTE como o resto do arquivo: o documento tem chave natural
+ * (`tenantId`, `type`, `version`) e a assinatura so e criada para aluno que
+ * ainda nao a tem.
+ */
+async function semearAceiteDaAnalise(
+  db: Awaited<ReturnType<typeof criarPrismaClient>>,
+  tenantId: string,
+): Promise<void> {
+  const CONTEUDO =
+    'Autorizo o uso dos meus dados de avaliacao fisica para gerar analise ' +
+    'de acompanhamento assistida por inteligencia artificial, destinada a ' +
+    'conversa com o profissional que me acompanha. A analise nao e ' +
+    'diagnostico e nao substitui avaliacao medica.';
+
+  // `createHash` e do mesmo `node:crypto` ja importado no topo.
+  const { createHash } = await import('node:crypto');
+  const sha = createHash('sha256').update(CONTEUDO, 'utf8').digest('hex');
+
+  const documento = await db.consentDocument.upsert({
+    where: { tenantId_type_version: { tenantId, type: 'AI_ANALYSIS', version: 1 } },
+    create: {
+      tenantId,
+      type: 'AI_ANALYSIS',
+      version: 1,
+      purpose: 'Analise de acompanhamento assistida por IA sobre avaliacoes fisicas',
+      content: CONTEUDO,
+      contentSha256: sha,
+      effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+    },
+    update: {},
+  });
+
+  const ativos = await db.student.findMany({
+    where: { tenantId, status: 'ACTIVE' },
+    select: { id: true, birthDate: true },
+  });
+
+  const jaTemAceite = new Set(
+    (
+      await db.consentRecord.findMany({
+        where: { tenantId, documentId: documento.id },
+        select: { studentId: true },
+      })
+    ).map((registro) => registro.studentId),
+  );
+
+  const agora = new Date();
+  const novos = ativos.filter((aluno) => !jaTemAceite.has(aluno.id));
+
+  if (novos.length > 0) {
+    await db.consentRecord.createMany({
+      data: novos.map((aluno) => ({
+        tenantId,
+        studentId: aluno.id,
+        documentId: documento.id,
+        decision: 'ACCEPTED' as const,
+        subjectKind: 'STUDENT' as const,
+        // `subjectAgeYears` e a idade CONGELADA na data da decisao -- o
+        // schema exige o campo, entao calculamos a partir do nascimento em
+        // vez de inventar um numero.
+        subjectAgeYears: idadeEmAnos(aluno.birthDate, agora),
+        occurredAt: agora,
+      })),
+    });
+  }
+
+  console.info(
+    `[seed] aceite de analise por IA: ${String(novos.length)} novo(s), ` +
+      `${String(ativos.length)} aluno(s) ativo(s) no total.`,
+  );
+}
+
+/** Idade em anos completos numa data de referencia. */
+function idadeEmAnos(nascimento: Date, referencia: Date): number {
+  let idade = referencia.getUTCFullYear() - nascimento.getUTCFullYear();
+  const mes = referencia.getUTCMonth() - nascimento.getUTCMonth();
+
+  if (mes < 0 || (mes === 0 && referencia.getUTCDate() < nascimento.getUTCDate())) idade -= 1;
+
+  return idade;
 }
 
 try {
