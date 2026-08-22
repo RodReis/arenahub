@@ -3,14 +3,13 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { useToastDeErro } from '@arenahub/ui';
+import { Button, useToastDeErro } from '@arenahub/ui';
 
 import {
   liberarFinanceiramente,
   type EstadoDaLiberacaoFinanceira,
 } from '../../actions/students';
 import { IconeCatraca } from './acoes-do-aluno';
-import estilos from './students.module.css';
 
 const ESTADO_INICIAL: EstadoDaLiberacaoFinanceira = {};
 
@@ -61,16 +60,22 @@ function BotaoInterno({ studentId }: Props) {
   const rotulo = pending ? 'Liberando catraca…' : 'Liberar catraca';
 
   return (
-    <button
+    <Button
+      variant="icon"
+      /*
+        `data-acao` porque esta e a unica das quatro que MUDA ESTADO -- as
+        outras tres navegam. Accent e acao; carbono e estrutura
+        (`DS-PAINEL` §2.3).
+      */
+      data-acao
       type="submit"
-      className={estilos['acaoLiberar']}
       disabled={pending}
       aria-label={rotulo}
       title={rotulo}
       data-testid={`liberar-${studentId}`}
     >
       <IconeCatraca />
-    </button>
+    </Button>
   );
 }
 

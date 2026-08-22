@@ -52,14 +52,16 @@ interface Props {
  * paralelo aos quatro que o contrato define, divergindo do resto do painel
  * na primeira mudança de token.
  *
- * `outline` e não `solid`: enviar laudo é a ação desta linha, mas não é a
- * ação da tela — a tela existe para CONSULTAR a avaliação. Solid aqui
- * competiria com os badges de leitura, que são o que precisa saltar aos
- * olhos numa conferência.
+ * `solid` porque é a MESMA COISA que "Novo aluno" na lista de alunos: o
+ * botão de criar, no cabeçalho da tela. A regra do painel já estava escrita
+ * lá — "a ação primária é um botão sólido" — e esta tela a contrariava por
+ * um argumento próprio ("aqui se consulta, não se cria"). Duas telas com o
+ * mesmo papel e pesos diferentes é justamente o que faz o painel parecer
+ * montado por pessoas que não se falaram.
  */
 function AtalhoDeEnvio() {
   return (
-    <Button variant="outline" href="#enviar-laudos" data-testid="ir-para-envio">
+    <Button href="#enviar-laudos" data-testid="ir-para-envio">
       Nova avaliação
     </Button>
   );
