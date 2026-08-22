@@ -164,27 +164,49 @@ describe('valores da avaliação publicada', () => {
   });
 
   /**
-   * Conflito não resolvido NÃO some em silêncio: o campo fica de fora da
-   * avaliação, e quem lê precisa saber quais campos ficaram -- senão vai
-   * procurá-los no histórico achando que se perderam.
+   * Campo em conflito continua FORA da tabela: exibir um dos lados sugeriria
+   * que ele foi o publicado quando nada foi. O aviso em texto saiu (pedido do
+   * PI), mas a linha nunca entrou -- e é isso que este teste protege.
    */
-  it('avisa quais campos ficaram de fora quando os laudos discordam', () => {
+  it('campo em conflito não entra na tabela', () => {
     render(<ValoresDaAvaliacao linhas={[linhaConcordante, linhaEmConflito]} />);
 
-    expect(screen.getByTestId('aviso-de-conflito')).toBeInTheDocument();
-    expect(screen.getAllByRole('row')).toHaveLength(2); // só a concordante
+    expect(screen.getAllByRole('row')).toHaveLength(2); // cabeçalho + a concordante
+    expect(screen.queryByTestId(`linha-${linhaEmConflito.type}`)).not.toBeInTheDocument();
   });
 
-  it('não mostra aviso de conflito quando tudo foi publicado', () => {
-    render(<ValoresDaAvaliacao linhas={[linhaConcordante, linhaDivergenteResolvida]} />);
+  /**
+   * MEDIDA SEM FAIXA VAI PARA A TABELA DE BAIXO.
+   *
+   * "Sem faixa publicada" repetido em dez linhas ocupava a coluna Leitura
+   * inteira sem informar nada, e competia com os badges que importam. Quem
+   * varre a tabela procura o que saiu da faixa.
+   */
+  it('separa em duas tabelas: com faixa e sem faixa', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante, linhaSemValor]} />);
 
-    expect(screen.queryByTestId('aviso-de-conflito')).not.toBeInTheDocument();
+    const comFaixa = screen.getByTestId('tabela-de-valores');
+    const semFaixa = screen.getByTestId('tabela-sem-faixa');
+
+    // `linhaConcordante` tem faixa (60,6–82); `linhaSemValor` não tem nenhuma.
+    expect(comFaixa).toHaveTextContent(/peso/i);
+    expect(semFaixa).toHaveTextContent(/gordura visceral/i);
+    expect(semFaixa).not.toHaveTextContent(/sem faixa publicada/i);
+    // A tabela de baixo não tem coluna de leitura -- ela não teria o que dizer.
+    expect(semFaixa.querySelectorAll('thead th')).toHaveLength(2);
+  });
+
+  /** Tabela sem nenhuma linha não é renderizada -- cabeçalho vazio não informa. */
+  it('não renderiza a tabela sem faixa quando todos os campos têm faixa', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante]} />);
+
+    expect(screen.queryByTestId('tabela-sem-faixa')).not.toBeInTheDocument();
   });
 
   it('valor ausente é travessão, nunca zero (INV-104)', () => {
     render(<ValoresDaAvaliacao linhas={[linhaSemValor]} />);
 
-    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2); // valor E faixa
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 

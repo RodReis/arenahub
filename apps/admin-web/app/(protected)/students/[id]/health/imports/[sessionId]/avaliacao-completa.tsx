@@ -2,7 +2,6 @@ import { PageHeader, ProblemDetail } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../../../../lib/api/server-client';
 import { AchadoDoEcg } from './achado-do-ecg';
-import { AvisoDeExtracao } from './aviso-de-extracao';
 import { CabecalhoDaSessao } from './cabecalho-da-sessao';
 import { CartoesDeArquivo } from './cartoes-de-arquivo';
 import { HistoricoDeComposicao, type MesDoHistorico } from './historico-de-composicao';
@@ -255,15 +254,8 @@ export async function AvaliacaoCompleta({
         agora={new Date()}
       />
 
-      {/*
-        O que fica FORA das abas é o que vale em qualquer uma: de quais
-        laudos a avaliação nasceu, o aviso de que os valores foram extraídos
-        automaticamente, e a análise. Enfiar o aviso numa aba só o esconderia
-        de quem abre as outras três.
-      */}
+      {/* De quais laudos esta avaliação nasceu. */}
       <CartoesDeArquivo cartoes={cartoes} />
-
-      <AvisoDeExtracao />
 
       {/*
         UMA PÁGINA, ROLAGEM CONTÍNUA -- sem abas.

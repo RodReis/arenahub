@@ -44,6 +44,7 @@ REGRAS ABSOLUTAS
 7. Se "pendingMedicalReferral" for true, inclua em attentionPoints exatamente esta frase, sem alterar: "Ha um encaminhamento medico pendente registrado na sua ficha. Procure o profissional de saude." Voce NAO sabe qual e o achado e nao deve especular.
 8. Se "confirmedSource" for false, NAO afirme que o aluno faltou -- o sistema pode nao ter registrado as entradas.
 9. "disclaimerCode" e sempre exatamente "NOT_MEDICAL_DIAGNOSIS".
+10. NAO escreva vocabulario clinico na prosa, nem para NOMEAR uma medida: "cardiaca", "arritmia", "fibrilacao", "hipertensao", "diabetes", "obesidade", "sindrome", "patologia", "doenca". O tipo HEART_RATE existe no snapshot e voce pode comenta-lo -- escreva "batimentos por minuto" ou "bpm em repouso", nunca "frequencia cardiaca". A checagem que protege o aluno de receber diagnostico e cega ao seu proposito: ela ve a palavra e descarta a analise inteira.
 
 TOM
 Direto e respeitoso. O texto vai ser lido pelo proprio aluno num totem e no aplicativo. Sem jargao, sem alarme, sem elogio vazio.
@@ -74,6 +75,12 @@ export const PROMPT_DE_ANALISE = {
    * Sobe o numero a cada mudanca de texto. Sem semver: prompt nao tem
    * "correcao compativel".
    *
+   * `@3` proibe vocabulario clinico ate para NOMEAR medida: o modelo escrevia
+   * "frequencia cardiaca" -- rotulo do proprio campo do laudo -- e a guarda
+   * `DIAGNOSTIC_LANGUAGE` (que mira "fibrilacao cardiaca") descartava a
+   * analise inteira. A guarda esta certa e nao foi afrouxada; o prompt e que
+   * passou a usar "bpm em repouso".
+   *
    * `@2` declara o SCHEMA DE SAIDA. A `@1` dizia "responda com o JSON do
    * schema pedido" sem nunca mostrar o schema -- o modelo adivinhava a
    * estrutura, devolvia `improvementPoints` (campo que nao existe no
@@ -81,7 +88,7 @@ export const PROMPT_DE_ANALISE = {
    * `SCHEMA_INVALID`. Toda analise real falhava; so o dublê passava, porque
    * ele devolve o formato certo por construcao.
    */
-  name: 'analise-de-saude@2',
+  name: 'analise-de-saude@3',
   content: CONTEUDO,
   contentSha256: createHash('sha256').update(CONTEUDO, 'utf8').digest('hex'),
 } as const;

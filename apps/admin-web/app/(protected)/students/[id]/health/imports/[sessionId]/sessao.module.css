@@ -119,20 +119,6 @@
   font-size: var(--ah-type-caption-size);
 }
 
-/* Faixa de aviso persistente sobre a origem dos valores. */
-.avisoDeOcr {
-  margin: 0 0 16px;
-  padding: 12px 16px;
-  /* Borda CHEIA na cor do estado, nunca faixa lateral: a listra de 3px a
-     esquerda e decorativa -- some no primeiro reflow em coluna estreita e
-     nao carrega significado que o fundo ja nao carregue. */
-  border: 1px solid color-mix(in srgb, var(--ah-state-warning) 45%, var(--ah-border-default));
-  border-radius: var(--ah-radius-card);
-  background: color-mix(in srgb, var(--ah-state-warning) 8%, var(--ah-surface-raised));
-  color: var(--ah-text-default);
-  font-size: var(--ah-type-body-size);
-}
-
 .tela {
   display: grid;
   /*
@@ -225,6 +211,21 @@
   overflow-x: auto;
 }
 
+/*
+ * A segunda tabela do painel -- "outras medidas registradas".
+ *
+ * Separada da primeira por espaco e por uma regra, nao por outro card:
+ * card dentro de card e sempre errado (`PRODUCT.md`, anti-referencias), e
+ * as duas tabelas respondem a MESMA pergunta ("o que este laudo mediu?").
+ * O que muda entre elas e se ha faixa para comparar -- diferenca de grau,
+ * nao de assunto, e grau se resolve com hierarquia dentro do mesmo painel.
+ */
+.blocoSecundario {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
 .tabela {
   width: 100%;
   border-collapse: collapse;
@@ -274,17 +275,6 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-/* Campos que nao entraram na avaliacao porque os laudos discordam. */
-.avisoDeConflito {
-  margin: 0 0 16px;
-  padding: 12px 16px;
-  border: 1px solid color-mix(in srgb, var(--ah-state-warning) 45%, var(--ah-border-default));
-  border-radius: var(--ah-radius-card);
-  background: color-mix(in srgb, var(--ah-state-warning) 8%, var(--ah-surface-raised));
-  color: var(--ah-text-default);
-  font-size: var(--ah-type-body-size);
 }
 
 .painel {

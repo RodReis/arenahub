@@ -70,6 +70,19 @@ export interface Column<T> {
    * @deprecated Use `role: 'value'`.
    */
   readonly numeric?: boolean;
+  /**
+   * Esta coluna e o CABECALHO DA LINHA (`<th scope="row">`), nao uma celula.
+   *
+   * Ligue quando a primeira coluna identifica a linha e a tabela e larga o
+   * bastante para o leitor de tela precisar da ancora: com quatro colunas de
+   * numero, `scope="row"` faz ele anunciar "Peso, 92,3 kg" em vez de ler os
+   * numeros soltos sem dizer de qual medida sao (WCAG 2.2 AA, `M3-NFR-007`).
+   *
+   * Opcional e desligado por padrao: as tabelas que este componente ja serve
+   * usam `<td>` em todas as celulas, e mudar isso de uma vez alteraria a
+   * semantica de doze telas num commit que nao e sobre elas.
+   */
+  readonly rowHeader?: boolean;
 }
 
 interface Props<T> {
@@ -219,15 +232,37 @@ export function DataTable<T>({
               key={rowKey(linha)}
               {...(rowTestId !== undefined ? { 'data-testid': rowTestId(linha) } : {})}
             >
-              {columns.map((coluna) => (
-                <td
-                  key={coluna.key}
-                  {...(coluna.role !== undefined ? { 'data-role': coluna.role } : {})}
-                  {...(coluna.numeric === true ? { 'data-numeric': '' } : {})}
-                >
-                  {coluna.render(linha)}
-                </td>
-              ))}
+              {columns.map((coluna) => {
+                const atributos = {
+                  ...(coluna.role !== undefined ? { 'data-role': coluna.role } : {}),
+                  ...(coluna.numeric === true ? { 'data-numeric': '' } : {}),
+                };
+
+                /*
+                 * `rowHeader` emite `<th scope="row">` no lugar de `<td>`.
+                 *
+                 * Numa tabela larga, isso e o que faz o leitor de tela
+                 * anunciar "Peso, 92,3 kg" em vez de ler quatro numeros
+                 * soltos sem dizer de qual medida sao. E OPCIONAL porque as
+                 * doze tabelas que este componente ja serve usam `<td>` em
+                 * todas as celulas -- ligar por padrao mudaria a semantica
+                 * delas de uma vez, e cabecalho de linha so faz sentido
+                 * quando a primeira coluna IDENTIFICA a linha.
+                 */
+                if (coluna.rowHeader === true) {
+                  return (
+                    <th key={coluna.key} scope="row" {...atributos}>
+                      {coluna.render(linha)}
+                    </th>
+                  );
+                }
+
+                return (
+                  <td key={coluna.key} {...atributos}>
+                    {coluna.render(linha)}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
