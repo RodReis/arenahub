@@ -454,6 +454,36 @@ describe('metas e controle — recomendações do aparelho (INV-151)', () => {
    * Zero é um valor MEDIDO ("controle muscular: 0 kg" = não precisa mudar),
    * não ausência. Tratá-lo como falta esconderia a recomendação de quem lê.
    */
+  /**
+   * SINAL SÓ NO AJUSTE.
+   *
+   * "Peso padrão +82,1 kg" lia como se o aluno tivesse de GANHAR 82 kg --
+   * 82,1 é o peso de referência que o aparelho calculou, não uma meta de
+   * ganho. Já "−10,1 kg" de controle é ajuste: sem o sinal, não se sabe se
+   * é para perder ou ganhar.
+   */
+  it('medida não leva sinal; ajuste leva', () => {
+    render(
+      <MetasEControle
+        deviceReport={{
+          deviceStandardWeightKg: 82.1,
+          deviceWeightControlKg: -10.1,
+          deviceRecommendedIntakeKcal: 2437,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('recomendacao-deviceStandardWeightKg')).toHaveTextContent(
+      /^82,1 kg$/,
+    );
+    expect(screen.getByTestId('recomendacao-deviceRecommendedIntakeKcal')).toHaveTextContent(
+      /^2\.437 kcal\/dia$/,
+    );
+    expect(screen.getByTestId('recomendacao-deviceWeightControlKg')).toHaveTextContent(
+      /^-10,1 kg$/,
+    );
+  });
+
   it('zero é valor, não ausência', () => {
     render(<MetasEControle deviceReport={{ deviceMuscleControlKg: 0 }} />);
 

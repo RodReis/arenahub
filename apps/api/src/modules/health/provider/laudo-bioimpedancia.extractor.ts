@@ -55,15 +55,13 @@ import {
  */
 @Injectable()
 export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
-  extrair(pedido: PedidoDeExtracao): Promise<ResultadoDaExtracao> {
+  async extrair(pedido: PedidoDeExtracao): Promise<ResultadoDaExtracao> {
     if (pedido.tipo === 'CSV') {
-      return Promise.resolve(this.extrairCsv(pedido.conteudo));
+      return this.extrairCsv(pedido.conteudo);
     }
 
-    // ECG chega como PDF (o texto ja extraido da camada de texto). Qualquer
-    // outro tipo nao e reconhecido por este extrator.
     if (pedido.tipo === 'PDF') {
-      return Promise.resolve(this.extrairEcg(pedido.conteudo));
+      return this.extrairEcg(await textoDoPdf(pedido.conteudo));
     }
 
     return Promise.reject(
@@ -186,9 +184,7 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
     };
   }
 
-  private extrairEcg(conteudo: Uint8Array): ResultadoDaExtracao {
-    const texto = new TextDecoder('utf-8').decode(conteudo);
-
+  private extrairEcg(texto: string): ResultadoDaExtracao {
     const bpm = capturar(texto, /Frequencia cardiaca:\s*(\d+(?:[.,]\d+)?)\s*BPM/i);
     const achado = capturar(texto, /Analise instantanea:\s*(.+)/i);
     const linhaTags = capturar(texto, /Tags:\s*(.+)/i);
@@ -278,6 +274,69 @@ const RECOMENDACAO_DO_APARELHO: Readonly<Record<string, string>> = {
   MUSCLE_CONTROL: 'deviceMuscleControlKg',
   RECOMMENDED_INTAKE: 'deviceRecommendedIntakeKcal',
 };
+
+/**
+ * A CAMADA DE TEXTO do PDF -- o passo que faltava (ADR-035 decisao 8).
+ *
+ * ---------------------------------------------------------------------------
+ * O QUE ESTAVA ERRADO.
+ * ---------------------------------------------------------------------------
+ *
+ * `extrairEcg` recebia os BYTES do PDF e fazia
+ * `new TextDecoder('utf-8').decode(...)` neles. Num PDF de verdade o texto
+ * vive comprimido em streams `FlateDecode`: decodificar os bytes crus como
+ * UTF-8 devolve lixo binario, nenhum regex casa, e o arquivo termina em
+ * `EXTRACTOR_NO_CONTENT`. Ou seja, o ECG NUNCA funcionou em producao -- e o
+ * comentario do `import.service.ts` ja tratava isso como fato consumado ("o
+ * ECG e um PDF de tracado, sem texto extraivel").
+ *
+ * O defeito sobreviveu porque o fixture de teste e um `.txt` com o texto ja
+ * extraido: ele E o resultado do passo que nao existia. A suite provava a
+ * metade que existia.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE `unpdf`, E NAO OCR.
+ * ---------------------------------------------------------------------------
+ *
+ * O ADR-035 e explicito: mandar para OCR um arquivo que JA TRAZ o texto e
+ * "pagar para introduzir erro". O Omron imprime frequencia, duracao e achado
+ * como texto de verdade; so o TRACADO e imagem, e o tracado nao vira medida.
+ *
+ * `unpdf` roda em Node puro, sem binario nativo e sem dependencia externa --
+ * ao contrario do `pdftotext`, que exigiria o poppler instalado no host e no
+ * container de CI.
+ *
+ * NORMALIZA ACENTO porque o laudo real e pt-BR ("Frequência cardíaca") e os
+ * padroes deste arquivo sao escritos sem acento. Sem isso o extrator leria o
+ * PDF corretamente e ainda assim nao casaria nada -- falha identica a de
+ * antes, com causa diferente.
+ */
+async function textoDoPdf(conteudo: Uint8Array): Promise<string> {
+  const { extractText, getDocumentProxy } = await import('unpdf');
+
+  let texto: string;
+
+  try {
+    const pdf = await getDocumentProxy(conteudo);
+    const extraido = await extractText(pdf, { mergePages: true });
+
+    texto = Array.isArray(extraido.text) ? extraido.text.join('\n') : extraido.text;
+  } catch (erro) {
+    // PDF corrompido ou protegido por senha nao e falha do sistema: e um
+    // arquivo que nao da para ler. `false` em `recuperavel` -- tentar de novo
+    // com o mesmo arquivo daria o mesmo resultado.
+    throw new ErroDeExtracao(
+      'EXTRACTOR_NO_CONTENT',
+      false,
+      `PDF ilegivel: ${erro instanceof Error ? erro.message : 'erro desconhecido'}`,
+    );
+  }
+
+  // `NFD` separa a letra do acento; a faixa combina os acentos soltos e some
+  // com eles. "Frequência" vira "Frequencia", que e como os padroes acima
+  // estao escritos.
+  return texto.normalize('NFD').replace(new RegExp('[\u0300-\u036f]', 'gu'), '');
+}
 
 function ehTipoDeMedida(valor: string): valor is TipoDeMedida {
   return (TIPOS_DE_MEDIDA as readonly string[]).includes(valor);

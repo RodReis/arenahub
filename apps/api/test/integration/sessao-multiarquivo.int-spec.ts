@@ -153,21 +153,19 @@ describe('F-multiarquivo -- sessao de revisao', () => {
   const UNIQUE_CSV = readFileSync(join(dirFixtures, 'laudo-unique-health-sintetico.csv'));
 
   /**
-   * O ECG real chega como PDF (OmronConnect); o fixture `.txt` e o texto JA
-   * EXTRAIDO da camada de texto (`pdftotext`, ADR-035 decisao 8) -- exatamente
-   * o que `laudo-bioimpedancia.extractor.spec.ts` usa chamando o extrator
-   * direto. Mas esta suite sobe pela HTTP de VERDADE, e `aceitarArquivo`
-   * confere a ASSINATURA nos primeiros bytes antes de qualquer coisa tocar o
-   * extrator -- um `.txt` puro declarado como `application/pdf` levaria
-   * `FILE_SIGNATURE_UNKNOWN`. O cabecalho `%PDF-1.7` prefixado aqui satisfaz
-   * SO a aceitacao; o extrator decodifica o buffer inteiro como UTF-8 e
-   * procura os marcadores por regex (`Frequencia cardiaca:`, `Analise
-   * instantanea:`), que continuam presentes depois do prefixo.
+   * PDF DE VERDADE, com camada de texto -- como o OmronConnect exporta.
+   *
+   * Era um `.txt` com o cabecalho `%PDF-1.7` colado na frente, so para
+   * satisfazer a checagem de assinatura de `aceitarArquivo`. Funcionava
+   * porque o extrator decodificava o buffer inteiro como UTF-8: um `.txt`
+   * disfarcado passava, e um PDF de verdade NAO -- que e exatamente o
+   * contrario do que a suite deveria provar, e o motivo de o ECG real falhar
+   * em producao com `EXTRACTOR_NO_CONTENT`.
+   *
+   * Com `unpdf` lendo a camada de texto, o fixture passa a ser o arquivo que
+   * o aparelho produz.
    */
-  const ECG_PDF = Buffer.concat([
-    Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]),
-    readFileSync(join(dirFixtures, 'ecg-omron-sintetico.txt')),
-  ]);
+  const ECG_PDF = readFileSync(join(dirFixtures, 'ecg-omron-sintetico.pdf'));
 
   const enviar = async (
     conta: (typeof contas)['a'],

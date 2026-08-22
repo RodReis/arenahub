@@ -29,6 +29,15 @@ interface Recomendacao {
   readonly chave: string;
   readonly rotulo: string;
   readonly unidade: 'kg' | 'kcal';
+  /**
+   * O valor é um AJUSTE (quanto mudar), não uma medida (quanto é).
+   *
+   * Ajuste mostra o sinal: "−10,1 kg" e "+2,0 kg" pedem ações opostas, e sem
+   * o sinal "10,1 kg de controle de peso" não diz qual delas. Medida não:
+   * "Peso padrão +82,1 kg" lê como se o aluno tivesse de GANHAR 82 kg,
+   * quando 82,1 kg é o peso que o aparelho calculou como referência.
+   */
+  readonly ehAjuste: boolean;
 }
 
 /**
@@ -37,11 +46,16 @@ interface Recomendacao {
  * ingestão por último (o meio).
  */
 const RECOMENDACOES: readonly Recomendacao[] = [
-  { chave: 'deviceStandardWeightKg', rotulo: 'Peso padrão', unidade: 'kg' },
-  { chave: 'deviceWeightControlKg', rotulo: 'Controle de peso', unidade: 'kg' },
-  { chave: 'deviceFatControlKg', rotulo: 'Controle de gordura', unidade: 'kg' },
-  { chave: 'deviceMuscleControlKg', rotulo: 'Controle muscular', unidade: 'kg' },
-  { chave: 'deviceRecommendedIntakeKcal', rotulo: 'Ingestão recomendada', unidade: 'kcal' },
+  { chave: 'deviceStandardWeightKg', rotulo: 'Peso padrão', unidade: 'kg', ehAjuste: false },
+  { chave: 'deviceWeightControlKg', rotulo: 'Controle de peso', unidade: 'kg', ehAjuste: true },
+  { chave: 'deviceFatControlKg', rotulo: 'Controle de gordura', unidade: 'kg', ehAjuste: true },
+  { chave: 'deviceMuscleControlKg', rotulo: 'Controle muscular', unidade: 'kg', ehAjuste: true },
+  {
+    chave: 'deviceRecommendedIntakeKcal',
+    rotulo: 'Ingestão recomendada',
+    unidade: 'kcal',
+    ehAjuste: false,
+  },
 ];
 
 /**
@@ -52,14 +66,17 @@ const RECOMENDACOES: readonly Recomendacao[] = [
  * (`−10,1 kg`): sem ele, "10,1 kg de controle de peso" não diz se é para
  * ganhar ou perder, que é justamente a informação.
  */
-function valorLegivel(valor: number, unidade: Recomendacao['unidade']): string {
+function valorLegivel(valor: number, item: Recomendacao): string {
+  const casas = item.unidade === 'kcal' ? 0 : 1;
   const numero = new Intl.NumberFormat('pt-BR', {
-    minimumFractionDigits: unidade === 'kcal' ? 0 : 1,
-    maximumFractionDigits: unidade === 'kcal' ? 0 : 1,
-    signDisplay: unidade === 'kcal' ? 'auto' : 'exceptZero',
+    minimumFractionDigits: casas,
+    maximumFractionDigits: casas,
+    // Sinal só no AJUSTE. Em medida, o `+` sugere "aumente isto" -- "Peso
+    // padrão +82,1 kg" lia como se o aluno tivesse de ganhar 82 kg.
+    signDisplay: item.ehAjuste ? 'exceptZero' : 'auto',
   }).format(valor);
 
-  return unidade === 'kcal' ? `${numero} kcal/dia` : `${numero} kg`;
+  return item.unidade === 'kcal' ? `${numero} kcal/dia` : `${numero} kg`;
 }
 
 interface Props {
@@ -94,7 +111,7 @@ export function MetasEControle({ deviceReport }: Props) {
               <dt>{item.rotulo}</dt>
               <dd data-testid={`recomendacao-${item.chave}`}>
                 {typeof valor === 'number' ? (
-                  valorLegivel(valor, item.unidade)
+                  valorLegivel(valor, item)
                 ) : (
                   <Ausente />
                 )}
