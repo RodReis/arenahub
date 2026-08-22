@@ -20,9 +20,9 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 ## Papéis e governança
 
-- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Nunca faz commit, push, PR nem merge** — o PI não toca no Git. O portão do PI é o **aceite na issue**, não o merge: o PI não segura o código na porta da `main`, ele carimba o que já entrou como realmente pronto. Palavra final e verdade do é PI.
+- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Nunca faz commit, push, PR nem merge** — o PI não toca no Git. O portão do PI é o **aceite na issue**, não o merge: o PI não segura o código na porta da `main`, ele carimba o que já entrou como realmente pronto. **descisão final e verdade do é PI, code atualiza documentação e/ou cria a ADR e merge na main**.
 - **Claude Cowork (planejamento)** — mantém `docs/` e registra decisões. **Não cria spec e não aprova nada.** A Slice do PRD **é** a especificação (ADR-022); `docs/specs/**` deixou de ser artefato de processo em **18/08/2026** — os arquivos existentes ficam como histórico e não bloqueiam ninguém. Cria a issue-fatia e a `[INFRA]` no board (Backlog, assignee PI) e os metadados de label (ADR-023). Escreve documento direto na `main` — escopo no **ADR-021**. **Decide sozinho tudo que é reversível e reporta depois; só pergunta ao PI o que é caro de desfazer.** Nunca implementa código, nunca toca em `apps/`, `packages/`, `infra/` nem `.github/`. **Em `docs/prd/**` escreve só emenda que materializa decisão do PI já registrada em ADR aceito, citando o ADR na própria emenda** — requisito novo, não inventar decisão sem o consentimento do PI, não criar regra sem o PI aceitar, e decisão do PI esta acima das ADR ou de qualquer outro documento.
-- **Claude Code (você)** — planeja, codifica, testa (usar a skill /code-review; para frontend, as skills do /impeccable) antes do commit, atualiza a documentação e **commita os documentos de `docs/`** junto da entrega. **Implementa a partir deste arquivo + `docs/` + a Slice do PRD da fatia** — não espera spec nem aprovação de ninguém. **Não cria a issue de fatia nem a `[INFRA]`** (são do Cowork — ADR-023); pega o card, move pelo fluxo e entrega com PR. Cria a própria issue `[FIX]` de bug. Pode criticar arquitetura, **não escopo**. **Só para e pergunta em dois casos** — ver *O que pode bloquear o desenvolvimento*. Fora deles: decide, implementa, e registra a decisão no corpo do PR.
+- **Claude Code (developer)** — planeja, codifica, testa (usar a skill /code-review; para frontend, as skills do /impeccable) antes do commit, atualiza a documentação e **commita os documentos de `docs/`** junto da entrega. **Implementa a partir deste arquivo + `docs/` + a Slice do PRD da fatia** — não espera spec nem aprovação de ninguém. **Não cria a issue de fatia nem a `[INFRA]`** (são do Cowork — ADR-023); pega o card, move pelo fluxo e entrega com PR. Cria a própria issue `[FIX]` de bug. Pode criticar arquitetura, **não escopo**. **Só para e pergunta em dois casos** — ver *O que pode bloquear o desenvolvimento*. Fora deles: decide, implementa, e registra a decisão no corpo do PR.
 
 #### Dois atores escrevem no Git — quem cede no conflito
 
@@ -209,6 +209,8 @@ pnpm dev | lint | typecheck | test | test:integration | test:e2e | build
 - Nunca logar template biométrico, token de pagamento, dado de cartão ou PII em erro.
 - Contrato de domínio completo (entidades, estados, invariantes): `docs/CONVENTION.md`.
 - Autorizado a subir o docker, se estiver off. Criar sempre um nova, com novas portas, nunca usar as que ja etão configurada no docker.
+- **desenvolvimento direto, sem bloqueio, aceito duplo, LGPD, e consentimento não trava ou impede o desenvolvimento complento do sistema, descisão final é do PI**
+- **Não nos preocupamos com LGPD, consentimento, juridicos, nos só desenvolvemos o produto.**
 
 ## Grafo de conhecimento (graphify)
 
