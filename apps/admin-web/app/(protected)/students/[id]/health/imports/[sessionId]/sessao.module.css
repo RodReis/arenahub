@@ -152,6 +152,41 @@
   }
 }
 
+/*
+ * A coluna da direita ACOMPANHA a rolagem.
+ *
+ * A esquerda tem 67 campos, dois painéis de segmento e o histórico -- muitos
+ * ecrãs de rolagem. A análise, o achado cardíaco e as metas são justamente o
+ * que se consulta ENQUANTO se confere linha por linha; presos no topo, some
+ * na primeira rolagem e obriga a subir de volta a cada dúvida.
+ *
+ * `max-height` + `overflow-y` porque a coluna pode ficar mais alta que a
+ * janela (análise longa + os três cards): sem isso, o `sticky` gruda o topo
+ * e o rodapé fica inalcançável para sempre.
+ *
+ * Só a partir de 1100px -- abaixo disso a grade vira uma coluna só, e grudar
+ * um bloco que ocupa a largura inteira taparia o conteúdo.
+ */
+@media (min-width: 1101px) {
+  .colunaLateral {
+    position: sticky;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 1100px) {
+  .colunaLateral {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+}
+
 /* Painéis de largura cheia abaixo da grade principal: segmentos e histórico. */
 /*
  * Os dois paineis de segmento -- EMPILHADOS, nao lado a lado.
@@ -302,6 +337,53 @@
   font-size: var(--ah-type-caption-size);
 }
 
+/*
+ * Lista rótulo/valor da coluna direita -- o `<dl>` do achado do ECG e o de
+ * "Metas e controle".
+ *
+ * `.listaDoAparelho` existia no TSX do ECG e NÃO existia aqui: o `<dl>` saía
+ * sem estilo nenhum, com o `<dd>` herdando a indentação nativa do navegador.
+ * Passou despercebido porque CSS Modules não acusa classe inexistente --
+ * `estilos['listaDoAparelho']` vira `undefined` e o `className` some calado.
+ *
+ * Valor à direita e `tabular-nums` porque a coluna é de números que se
+ * comparam na vertical: sem largura fixa de dígito, `82,1` e `-10,1`
+ * desalinham e a leitura vira soletração.
+ */
+.listaDoAparelho,
+.listaDeRecomendacoes {
+  margin: 0;
+  font-size: var(--ah-type-body-size);
+}
+
+.listaDoAparelho > div,
+.listaDeRecomendacoes > div {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.listaDoAparelho > div:last-child,
+.listaDeRecomendacoes > div:last-child {
+  border-bottom: none;
+}
+
+.listaDoAparelho dt,
+.listaDeRecomendacoes dt {
+  color: var(--ah-text-secondary);
+}
+
+.listaDoAparelho dd,
+.listaDeRecomendacoes dd {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 /* Segmentos: braço/tronco/perna, gordura e músculo. */
 /*
  * A tabela de segmentos rola DENTRO do painel quando nao cabe -- nunca
@@ -355,80 +437,10 @@
   text-align: right;
 }
 
-/*
- * Abas -- navegacao entre secoes da avaliacao.
- *
- * Sublinhado como marcador de aba ativa, e nao fundo preenchido: com o
- * painel de analise ao lado, um bloco colorido competiria com os badges de
- * leitura da tabela, que sao o que precisa saltar aos olhos.
- */
-.abas {
-  border-bottom: 1px solid var(--ah-border-subtle);
-}
-
-.abas ul {
-  display: flex;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  overflow-x: auto;
-}
-
-.abas a {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-bottom: 2px solid transparent;
-  color: var(--ah-text-secondary);
-  font-size: var(--ah-type-body-size);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: color 120ms ease-out, border-color 120ms ease-out;
-}
-
-.abas a:hover {
-  color: var(--ah-text-default);
-  border-bottom-color: var(--ah-border-default);
-}
-
-.abas a:focus-visible {
-  outline: 2px solid var(--ah-focus-ring);
-  outline-offset: -2px;
-}
-
-/*
- * A aba ativa carrega DOIS canais, nunca so a cor: peso da fonte e a linha
- * embaixo. Quem opera com brilho baixo ou nao distingue cor chega a mesma
- * leitura (`PRODUCT.md`, principio 3).
- */
-.abas a[aria-current='page'] {
-  color: var(--ah-text-strong);
-  font-weight: 600;
-  border-bottom-color: var(--ah-action-solid);
-}
-
-.contagemDaAba {
-  padding: 1px 6px;
-  border-radius: var(--ah-radius-badge);
-  background: var(--ah-surface-sunken);
-  color: var(--ah-text-secondary);
-  font-size: var(--ah-type-caption-size);
-  font-variant-numeric: tabular-nums;
-  font-weight: 400;
-}
-
 /* A coluna de conteudo das abas -- o painel de analise fica ao lado dela. */
 .conteudo {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .abas a {
-    transition: none;
-  }
 }

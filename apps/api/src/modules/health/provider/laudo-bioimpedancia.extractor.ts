@@ -107,6 +107,9 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
     }
 
     const campos: CampoProposto[] = [];
+    // Recomendacoes do aparelho (INV-151): guardadas como ATRIBUTO, nunca
+    // como medida. Ver `RECOMENDACAO_DO_APARELHO` para o porque.
+    const recomendacoes: Record<string, unknown> = {};
 
     for (const linha of linhas.slice(1)) {
       const celulas = linha.split(',').map((c) => c.trim());
@@ -118,6 +121,25 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
       // peso ideal) e IGNORADA, nao derruba o arquivo -- mesma regra do
       // `CsvDocumentExtractorAdapter`.
       if (!tipo || !bruto) continue;
+
+      // ANTES da guarda de `ehTipoDeMedida`: as recomendacoes NAO estao em
+      // `TIPOS_DE_MEDIDA` de proposito (INV-151), entao a guarda as
+      // descartaria. Aqui elas saem da linha do CSV para `atributos`, sem
+      // nunca virar `CampoProposto`.
+      const recomendacao = RECOMENDACAO_DO_APARELHO[tipo];
+
+      if (recomendacao !== undefined) {
+        const valor = Number(bruto);
+
+        // Valor ilegivel nao vira `0` (INV-104): a chave simplesmente nao
+        // entra, e a tela mostra ausencia em vez de um zero inventado.
+        if (Number.isFinite(valor)) {
+          recomendacoes[recomendacao] = valor;
+        }
+
+        continue;
+      }
+
       if (!ehTipoDeMedida(tipo)) continue;
 
       const valor = Number(bruto);
@@ -158,6 +180,9 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
       // `exactOptionalPropertyTypes`: so inclui a chave quando ha valor --
       // `sourceLabel: undefined` explicito nao e a mesma coisa que omitir.
       ...(sourceLabel !== undefined ? { sourceLabel } : {}),
+      // Laudo sem nenhuma recomendacao nao grava `atributos: {}` -- ausencia
+      // de recomendacao e diferente de recomendacao vazia.
+      ...(Object.keys(recomendacoes).length > 0 ? { atributos: recomendacoes } : {}),
     };
   }
 
@@ -222,6 +247,37 @@ export class LaudoBioimpedanciaExtractor implements DocumentExtractor {
     };
   }
 }
+
+/**
+ * As "Recomendacoes de condicao fisica" do laudo -> chave em `atributos`.
+ *
+ * ---------------------------------------------------------------------------
+ * ISTO NAO E MEDIDA, E POR ISSO NAO ESTA EM `TIPOS_DE_MEDIDA` (INV-151).
+ * ---------------------------------------------------------------------------
+ *
+ * Peso padrao, os tres "controles" e a ingestao recomendada sao FORMULA
+ * PROPRIETARIA do fabricante, nao grandeza medida. O criterio da INV-151:
+ * vira medida o que e medido e comparavel entre aparelhos; vira atributo o
+ * que e indice do fabricante, que muda num firmware novo e produziria
+ * tendencia falsa comparado mes a mes. ADR-038 diz o mesmo, e o proprio
+ * laudo carimba "nao e recomendado como base para dados medicos".
+ *
+ * Consequencia pratica: estes cinco valores sao EXIBIDOS (card "Metas e
+ * controle") e nada mais -- nao entram no grafico de evolucao, nao viram
+ * `BodyMeasurement`, e nenhuma linha do sistema decide nada em cima deles.
+ * Meta oficial de aluno e a da F20 (`HealthGoal`), que tem baseline, alvo e
+ * responsavel -- coisa diferente de sugestao de balanca.
+ *
+ * A chave carrega o prefixo `device` para deixar a origem obvia em
+ * `deviceReport`, onde convive com `ecgFinding` e afins.
+ */
+const RECOMENDACAO_DO_APARELHO: Readonly<Record<string, string>> = {
+  STANDARD_WEIGHT: 'deviceStandardWeightKg',
+  WEIGHT_CONTROL: 'deviceWeightControlKg',
+  FAT_CONTROL: 'deviceFatControlKg',
+  MUSCLE_CONTROL: 'deviceMuscleControlKg',
+  RECOMMENDED_INTAKE: 'deviceRecommendedIntakeKcal',
+};
 
 function ehTipoDeMedida(valor: string): valor is TipoDeMedida {
   return (TIPOS_DE_MEDIDA as readonly string[]).includes(valor);

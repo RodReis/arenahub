@@ -107,4 +107,58 @@ describe('extrator de laudo de bioimpedancia', () => {
     // formula proprietaria muda com firmware e produziria tendencia falsa.
     expect(r.campos.some((c) => String(c.type).includes('BODY_AGE'))).toBe(false);
   });
+
+  it('guarda as recomendacoes do aparelho como atributo, nunca como medida', async () => {
+    const r = await extrator.extrair({
+      tipo: 'CSV',
+      conteudo: lerFixture('laudo-unique-health-sintetico.csv'),
+    });
+
+    // INV-151: as cinco recomendacoes viram `deviceReport`, nao medida.
+    expect(r.atributos).toMatchObject({
+      deviceStandardWeightKg: 82.1,
+      deviceWeightControlKg: -10.1,
+      deviceFatControlKg: -10.1,
+      deviceMuscleControlKg: 0,
+      deviceRecommendedIntakeKcal: 2437,
+    });
+
+    // O OUTRO LADO DA MESMA REGRA -- o que o teste acima nao pega.
+    //
+    // Guardar como atributo so respeita a INV-151 se elas tambem NAO
+    // entrarem em `campos`: um tipo que caisse nos dois lugares apareceria
+    // no grafico de evolucao, que e exatamente o que a invariante impede.
+    const tiposMedidos = r.campos.map((c) => String(c.type));
+
+    for (const proibido of [
+      'STANDARD_WEIGHT',
+      'WEIGHT_CONTROL',
+      'FAT_CONTROL',
+      'MUSCLE_CONTROL',
+      'RECOMMENDED_INTAKE',
+    ]) {
+      expect(tiposMedidos).not.toContain(proibido);
+    }
+
+    // Indice puro (idade corporal, pontuacao) nao vira NEM medida nem
+    // atributo -- so as cinco recomendacoes que a tela exibe sao captadas.
+    expect(r.atributos?.['BODY_AGE']).toBeUndefined();
+    expect(r.atributos?.['HEALTH_SCORE']).toBeUndefined();
+
+    // E o laudo continua produzindo as medidas de verdade.
+    expect(tiposMedidos).toContain('WEIGHT');
+  });
+
+  it('nao inventa zero quando a recomendacao vem ilegivel (INV-104)', async () => {
+    const r = await extrator.extrair({
+      tipo: 'CSV',
+      conteudo: new TextEncoder().encode(
+        ['tipo,valor,unidade', 'WEIGHT,88.4,kg', 'STANDARD_WEIGHT,--,kg'].join('\n'),
+      ),
+    });
+
+    // Ausencia NAO E ZERO: a chave some, e a tela mostra "sem valor" em vez
+    // de um `0 kg` que o laudo nunca disse.
+    expect(r.atributos?.['deviceStandardWeightKg']).toBeUndefined();
+  });
 });

@@ -44,10 +44,69 @@
   border-bottom-color: var(--ah-border-strong);
 }
 
-.filtro a[aria-current='page'] {
+.filtro a[aria-current='page'],
+.seletorDeMedicao a[aria-current='page'] {
   color: var(--ah-text-strong);
   border-bottom-color: var(--ah-accent-600);
   font-weight: 600;
+}
+
+/*
+ * Seletor de medição -- qual avaliação a tela mostra.
+ *
+ * Herda a mecânica do `.filtro` acima (links em linha que quebram sozinhos,
+ * ativo com DOIS canais: peso e borda). A diferença é que ele carrega um
+ * rótulo: cinco períodos se explicam sozinhos, mas uma fila de datas soltas
+ * não diz se são medições, vencimentos ou faltas.
+ *
+ * `overflow-x` porque a lista cresce com o tempo -- um aluno de dois anos
+ * tem dezenas de medições, e a quebra em quatro linhas empurraria a
+ * avaliação para fora da primeira tela.
+ */
+.seletorDeMedicao {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.rotuloDoSeletor {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  white-space: nowrap;
+}
+
+.seletorDeMedicao ul {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+
+.seletorDeMedicao a {
+  display: inline-block;
+  padding: 6px 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--ah-text-secondary);
+  text-decoration: none;
+  font-size: var(--ah-type-body-size);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.seletorDeMedicao a:hover {
+  color: var(--ah-text-strong);
+  border-bottom-color: var(--ah-border-strong);
+}
+
+.seletorDeMedicao a:focus-visible {
+  outline: 2px solid var(--ah-focus-ring);
+  outline-offset: -2px;
 }
 
 /*

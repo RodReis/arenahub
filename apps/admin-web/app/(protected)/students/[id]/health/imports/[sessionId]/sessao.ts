@@ -52,6 +52,48 @@ export function atributosDoAparelho(
   return doEcg?.atributos ?? null;
 }
 
+/** As chaves que o extrator de bioimpedancia grava para o card "Metas e controle". */
+const CHAVES_DE_RECOMENDACAO = [
+  'deviceStandardWeightKg',
+  'deviceWeightControlKg',
+  'deviceFatControlKg',
+  'deviceMuscleControlKg',
+  'deviceRecommendedIntakeKcal',
+] as const;
+
+/**
+ * Recomendacoes do aparelho (INV-151) -- peso padrao, controles e ingestao.
+ *
+ * PROCURA POR CHAVE, nao pelo arquivo de bioimpedancia. Dois motivos:
+ *
+ *   1. Uma sessao tem DOIS laudos de bioimpedancia (balanca e analise), e
+ *      qual deles traz as recomendacoes depende do modelo do aparelho --
+ *      fixar "o primeiro BIOIMPEDANCE" acertaria hoje e erraria no proximo
+ *      laudo que imprimisse as recomendacoes no outro arquivo.
+ *   2. E o mesmo criterio de `atributosDoAparelho`, que acha o ECG pela
+ *      presenca de `ecgFinding` e nao pelo tipo declarado.
+ *
+ * Junta as chaves de TODOS os arquivos: se dois laudos trouxerem partes
+ * diferentes, a tela mostra a uniao em vez de escolher um e perder o resto.
+ * Colisao de chave e resolvida pelo ultimo arquivo, mesma regra do
+ * `deviceReport` no servidor (`import.service.ts`).
+ */
+export function recomendacoesDoAparelho(
+  sessao: SessaoDeRevisao,
+): Record<string, unknown> | null {
+  const encontradas: Record<string, unknown> = {};
+
+  for (const arquivo of sessao.arquivos) {
+    for (const chave of CHAVES_DE_RECOMENDACAO) {
+      const valor = arquivo.atributos?.[chave];
+
+      if (typeof valor === 'number') encontradas[chave] = valor;
+    }
+  }
+
+  return Object.keys(encontradas).length === 0 ? null : encontradas;
+}
+
 export interface CartaoDeArquivo {
   readonly importId: string;
   readonly sourceLabel: string;

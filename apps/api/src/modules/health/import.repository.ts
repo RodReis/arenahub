@@ -500,6 +500,57 @@ export class ImportRepository {
   }
 
   /**
+   * As sessoes de revisao de UM aluno, da mais recente para a mais antiga.
+   *
+   * Alimenta o seletor de medicao da tela de saude: e a lista de "quais
+   * avaliacoes existem", nao o conteudo de nenhuma delas.
+   *
+   * ---------------------------------------------------------------------------
+   * A DATA E `createdAt` DA PRIMEIRA IMPORTACAO, NAO DA SESSAO.
+   * ---------------------------------------------------------------------------
+   *
+   * Nao existe tabela de sessao -- ela e um agrupamento por
+   * `review_session_id` em `assessment_imports` (ADR-038). A data que
+   * representa a sessao e, portanto, a do arquivo mais antigo do grupo: e
+   * quando a medicao comecou a ser enviada. Usar `max` daria a data do
+   * ultimo upload, que muda se alguem anexa um laudo esquecido dias depois e
+   * faria a medicao pular de lugar na lista.
+   *
+   * Importacao sem `reviewSessionId` (upload avulso, anterior ao ADR-038)
+   * fica de fora: ela nao e uma sessao, e inventar uma para ela criaria
+   * entrada fantasma no seletor.
+   */
+  async listarSessoesDoAluno(
+    contexto: TenantContext,
+    studentId: string,
+  ): Promise<{ reviewSessionId: string; iniciadaEm: Date }[]> {
+    const grupos = await this.db.assessmentImport.groupBy({
+      by: ['reviewSessionId'],
+      where: {
+        tenantId: contexto.tenantId,
+        studentId,
+        reviewSessionId: { not: null },
+      },
+      _min: { createdAt: true },
+    });
+
+    return grupos
+      .filter(
+        (grupo): grupo is typeof grupo & { reviewSessionId: string; _min: { createdAt: Date } } =>
+          grupo.reviewSessionId !== null && grupo._min.createdAt !== null,
+      )
+      .map((grupo) => ({
+        reviewSessionId: grupo.reviewSessionId,
+        iniciadaEm: grupo._min.createdAt,
+      }))
+      // ORDENA AQUI, nao no `groupBy`: ordenar por agregado (`_min`) no
+      // Prisma exige o campo tambem em `by`, e ai o agrupamento deixaria de
+      // ser por sessao. A lista tem uma entrada por medicao (dezenas, nao
+      // milhares), entao ordenar em memoria custa nada.
+      .sort((a, b) => b.iniciadaEm.getTime() - a.iniciadaEm.getTime());
+  }
+
+  /**
    * Confirma TODOS os imports `EXTRACTED` de uma sessao, apontando para a
    * MESMA avaliacao (Task 5).
    *

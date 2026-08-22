@@ -391,6 +391,18 @@ export class ImportService {
     return this.importacoes.pendentesEFalhas(contexto);
   }
 
+  /**
+   * As medicoes de um aluno, da mais recente para a mais antiga.
+   *
+   * So a lista -- id e data de cada uma. O conteudo vem de `detalharSessao`,
+   * uma sessao por vez: carregar os 67 campos de todas as medicoes de um
+   * aluno para desenhar um seletor seria puxar o historico inteiro para
+   * mostrar oito datas.
+   */
+  async sessoesDoAluno(contexto: TenantContext, studentId: string) {
+    return this.importacoes.listarSessoesDoAluno(contexto, studentId);
+  }
+
   /** A importacao com os campos em ORDEM DE REVISAO -- menor confianca antes. */
   async detalhar(contexto: TenantContext, importId: string): Promise<ImportacaoComCampos> {
     const importacao = await this.importacoes.encontrar(contexto, importId);
