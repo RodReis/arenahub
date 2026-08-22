@@ -25,6 +25,14 @@ import estilos from './health.module.css';
 export interface MedicaoDisponivel {
   readonly sessionId: string;
   readonly assessedAt: string;
+  /**
+   * A sessão virou avaliação publicada.
+   *
+   * Quando `false`, `assessedAt` é a data do UPLOAD e não a da medição --
+   * a sessão ainda não tem `assessed_at` para exibir. O rótulo diz isso em
+   * vez de apresentar as duas datas como se fossem a mesma coisa.
+   */
+  readonly published: boolean;
 }
 
 interface Props {
@@ -40,6 +48,24 @@ export function SeletorDeMedicao({ studentId, medicoes, atual, timeZone }: Props
   // leva a lugar nenhum. A data continua visível no cabeçalho da avaliação.
   if (medicoes.length < 2) return null;
 
+  /*
+   * DATAS REPETIDAS PRECISAM DE DESEMPATE.
+   *
+   * Oito medições de meses diferentes importadas no mesmo dia, ou dois
+   * laudos do mesmo dia, produzem entradas com rótulo idêntico -- e aí
+   * escolher no seletor é chute. Observado ao vivo: quatro entradas
+   * "21/08/2026", indistinguíveis.
+   *
+   * Só as datas EMPATADAS ganham a hora; as demais ficam com a data limpa,
+   * que é o que se reconhece de relance.
+   */
+  const diaDe = (iso: string) => iso.slice(0, 10);
+  const repetidas = new Set(
+    medicoes
+      .map((m) => diaDe(m.assessedAt))
+      .filter((dia, i, todos) => todos.indexOf(dia) !== i),
+  );
+
   return (
     <nav className={estilos['seletorDeMedicao']} aria-label="Medições do aluno">
       <p className={estilos['rotuloDoSeletor']} id="rotulo-medicoes">
@@ -54,8 +80,33 @@ export function SeletorDeMedicao({ studentId, medicoes, atual, timeZone }: Props
               aria-current={medicao.sessionId === atual ? 'page' : undefined}
               data-testid={`medicao-${medicao.sessionId}`}
               scroll={false}
+              /*
+                A data sozinha não diz se é medição ou upload. O título
+                completa para quem passa o mouse ou usa leitor de tela, sem
+                poluir uma fila de oito datas com sufixo em cada uma.
+              */
+              title={
+                medicao.published
+                  ? 'Avaliação publicada'
+                  : 'Laudos enviados, avaliação ainda não publicada — esta é a data do envio'
+              }
             >
-              <TenantDateTime iso={medicao.assessedAt} timeZone={timeZone} format="date" />
+              <TenantDateTime
+                iso={medicao.assessedAt}
+                timeZone={timeZone}
+                format={repetidas.has(diaDe(medicao.assessedAt)) ? 'datetime' : 'date'}
+              />
+              {/*
+                Marca visível para a sessão não publicada: sem ela, uma data
+                de upload senta na fila ao lado de datas de medição fingindo
+                ser a mesma coisa.
+              */}
+              {medicao.published ? null : (
+                <span className={estilos['medicaoPendente']} aria-hidden="true">
+                  {' '}
+                  ·&nbsp;envio
+                </span>
+              )}
             </Link>
           </li>
         ))}

@@ -506,15 +506,24 @@ export class ImportRepository {
    * avaliacoes existem", nao o conteudo de nenhuma delas.
    *
    * ---------------------------------------------------------------------------
-   * A DATA E `createdAt` DA PRIMEIRA IMPORTACAO, NAO DA SESSAO.
+   * A DATA E A DA MEDICAO (`assessed_at`), NAO A DO UPLOAD.
    * ---------------------------------------------------------------------------
    *
+   * Sao coisas diferentes e o seletor precisa da primeira: o avaliador
+   * reconhece "a avaliacao de marco", nao "o arquivo que subi terca". A
+   * importacao da base historica torna isso obvio -- oito medicoes de meses
+   * distintos, todas enviadas no mesmo dia, apareceriam como oito entradas
+   * com a MESMA data, indistinguiveis no seletor. Observado ao vivo: quatro
+   * sessoes rotuladas "21/08/2026".
+   *
+   * `createdAt` continua sendo o desempate para sessao AINDA NAO PUBLICADA
+   * (`assessment_id` nulo enquanto os laudos nao viram avaliacao): ali nao ha
+   * `assessed_at` para usar, e a data do upload e a unica que existe.
+   *
    * Nao existe tabela de sessao -- ela e um agrupamento por
-   * `review_session_id` em `assessment_imports` (ADR-038). A data que
-   * representa a sessao e, portanto, a do arquivo mais antigo do grupo: e
-   * quando a medicao comecou a ser enviada. Usar `max` daria a data do
-   * ultimo upload, que muda se alguem anexa um laudo esquecido dias depois e
-   * faria a medicao pular de lugar na lista.
+   * `review_session_id` em `assessment_imports` (ADR-038), e por isso a
+   * consulta e SQL cru: o `groupBy` do Prisma nao agrega por coluna de uma
+   * tabela relacionada (`body_assessments.assessed_at`).
    *
    * Importacao sem `reviewSessionId` (upload avulso, anterior ao ADR-038)
    * fica de fora: ela nao e uma sessao, e inventar uma para ela criaria
@@ -523,31 +532,31 @@ export class ImportRepository {
   async listarSessoesDoAluno(
     contexto: TenantContext,
     studentId: string,
-  ): Promise<{ reviewSessionId: string; iniciadaEm: Date }[]> {
-    const grupos = await this.db.assessmentImport.groupBy({
-      by: ['reviewSessionId'],
-      where: {
-        tenantId: contexto.tenantId,
-        studentId,
-        reviewSessionId: { not: null },
-      },
-      _min: { createdAt: true },
-    });
+  ): Promise<{ reviewSessionId: string; iniciadaEm: Date; publicada: boolean }[]> {
+    // `tenant_id` e `student_id` sao PARAMETROS ($1/$2), nunca interpolados
+    // -- `$queryRaw` com template tagged parametriza de verdade (regra 2 de
+    // arquitetura: o tenant vem da identidade autenticada).
+    const linhas = await this.db.$queryRaw<
+      { review_session_id: string; iniciada_em: Date; publicada: boolean }[]
+    >`
+      SELECT
+        ai.review_session_id,
+        COALESCE(MIN(ba.assessed_at), MIN(ai.created_at)) AS iniciada_em,
+        bool_or(ai.assessment_id IS NOT NULL) AS publicada
+      FROM assessment_imports ai
+      LEFT JOIN body_assessments ba ON ba.id = ai.assessment_id
+      WHERE ai.tenant_id = ${contexto.tenantId}::uuid
+        AND ai.student_id = ${studentId}::uuid
+        AND ai.review_session_id IS NOT NULL
+      GROUP BY ai.review_session_id
+      ORDER BY iniciada_em DESC
+    `;
 
-    return grupos
-      .filter(
-        (grupo): grupo is typeof grupo & { reviewSessionId: string; _min: { createdAt: Date } } =>
-          grupo.reviewSessionId !== null && grupo._min.createdAt !== null,
-      )
-      .map((grupo) => ({
-        reviewSessionId: grupo.reviewSessionId,
-        iniciadaEm: grupo._min.createdAt,
-      }))
-      // ORDENA AQUI, nao no `groupBy`: ordenar por agregado (`_min`) no
-      // Prisma exige o campo tambem em `by`, e ai o agrupamento deixaria de
-      // ser por sessao. A lista tem uma entrada por medicao (dezenas, nao
-      // milhares), entao ordenar em memoria custa nada.
-      .sort((a, b) => b.iniciadaEm.getTime() - a.iniciadaEm.getTime());
+    return linhas.map((linha) => ({
+      reviewSessionId: linha.review_session_id,
+      iniciadaEm: linha.iniciada_em,
+      publicada: linha.publicada,
+    }));
   }
 
   /**

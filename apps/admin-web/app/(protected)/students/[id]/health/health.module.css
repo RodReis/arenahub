@@ -109,6 +109,12 @@
   outline-offset: -2px;
 }
 
+/* Sessão enviada mas ainda não publicada -- a data é a do envio. */
+.medicaoPendente {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
 /*
  * Envio dos laudos do mês.
  *

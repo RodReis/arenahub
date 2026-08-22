@@ -262,12 +262,16 @@ export class ImportController {
   @RequirePermissions('health.read')
   async sessoesDoAluno(
     @Param('studentId') studentId: string,
-  ): Promise<{ sessionId: string; assessedAt: string }[]> {
+  ): Promise<{ sessionId: string; assessedAt: string; published: boolean }[]> {
     const sessoes = await this.importacoes.sessoesDoAluno(this.contexto.require(), studentId);
 
     return sessoes.map((sessao) => ({
       sessionId: sessao.reviewSessionId,
       assessedAt: sessao.iniciadaEm.toISOString(),
+      // `assessedAt` de uma sessao NAO publicada e a data do upload, nao a da
+      // medicao. A tela precisa saber a diferenca para nao rotular as duas
+      // igual -- ver `SeletorDeMedicao`.
+      published: sessao.publicada,
     }));
   }
 
