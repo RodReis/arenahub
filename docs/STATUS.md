@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 23/08/2026 *(F53 e F54: pagamento nas três superfícies — recorte do PI)*
+**Última atualização:** 23/08/2026 *(F53, F54 e F55: pagamento nas três superfícies; `docs/specs/` reaberto)*
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -715,7 +715,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F52 | SPEC-052 | 3.5 | 3.5.4 | Área do aluno no totem: identificação, pagamento e evolução | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.6](prd/academia/MVP-04-app-totem.md) | [#153](https://github.com/RodReis/arenahub/issues/153) | aprovada-pi |
 | F53 | SPEC-053 | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [`SPEC-053-pagamentos-e-cobranca-no-balcao.md`](specs/SPEC-053-pagamentos-e-cobranca-no-balcao.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | em-revisao |
 | F54 | SPEC-054 | 3 | — | Painel financeiro gerencial (KPIs) | [`SPEC-054-painel-financeiro-gerencial.md`](specs/SPEC-054-painel-financeiro-gerencial.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | em-revisao |
-| F55 | SPEC-055 | 3 | — | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | [`SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md`](specs/SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md) | — | em-revisao |
+| F55 | SPEC-055 | 3 | — | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | [`SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md`](specs/SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md) | [#158](https://github.com/RodReis/arenahub/issues/158) | em-revisao |
 
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
