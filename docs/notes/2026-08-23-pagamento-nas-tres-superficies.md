@@ -169,3 +169,44 @@ começar sem ele.
    `[MVP3]` conforme a resposta; se ele quiser `[MVP2]`, é um rename de título.
 2. **Permissão do painel gerencial** — reusar `billing.manage` ou criar `billing.dashboard`.
 3. **Credenciais de Sicoob e Getnet** — §8.
+
+---
+
+## 10. Emenda de 23/08/2026 — segunda rodada com o PI
+
+O PI revisou o recorte no mesmo dia. **O que muda em relação às §4 a §7 acima:**
+
+| # | decisão | efeito |
+|---|---|---|
+| 1 | **No balcão o aluno escolhe: dinheiro, PIX ou cartão** | a §4 falava de PIX e baixa manual; cartão entra |
+| 2 | **Cartão no balcão é checkout hospedado da Getnet**, digitado no celular do aluno | nenhum campo de cartão no painel; INV-098 preservado sem esforço |
+| 3 | **Cartão no totem, por QR de checkout no celular do aluno** | **inverte** a decisão 3 da §2 (*"totem só PIX"*) |
+| 4 | **No totem não há baixa manual nem `wa.me`** — a baixa é automática por webhook | não há operador no totem; a §6 fica assim |
+| 5 | **Base de cálculo do painel gerencial: o plano em que o aluno está matriculado** | `PlanPrice` das assinaturas `ACTIVE`, não a soma das invoices |
+| 6 | **Permissão do painel gerencial: `admin`** | ver `SPEC-054` §4 — no ArenaHub permissão é capacidade nomeada, e a spec propõe `billing.dashboard` |
+| 7 | **Adapters reais de Sicoob e Getnet, e as chaves em `Configuração → Pagamento`** | vira a **F55**, separada da F53 |
+| 8 | **`docs/specs/` reaberto** | `SPEC-053`, `SPEC-054` e `SPEC-055` escritas; `CLAUDE.md` e `docs/specs/README.md` emendados |
+
+### 10.1 Duas coisas registradas contra o pedido
+
+**"Nada de fakePay" não é executável ao pé da letra.** O `FakePaymentProvider` é dublê de
+boundary exigido pelo **ADR-017** e pelo `TESTING.md` §3 — é ele que permite testar webhook
+duplicado, evento fora de ordem, falha do provedor e estorno assíncrono sem depender da rede de um
+banco. Apagá-lo derruba a suíte que protege o financeiro. **O que muda é a seleção:** o `useClass`
+fixo de `billing.module.ts` vira roteamento por `ProviderAccount.capability` (`PIX` → Sicoob,
+`CARD` → Getnet), e o fake fica em teste e em ambiente sem credencial. Detalhe na `SPEC-055` §2.
+
+**Cartão no totem amplia o `MVP-04` §7 Slice 4.6**, que prevê apenas PIX e QR. A emenda de PRD que
+isso exige **não é do Cowork**: o ADR-021 só autoriza materializar decisão já registrada em ADR
+aceito, e esta não está. Ou vira ADR, ou o texto do PRD é escrito pelo Code/PI. **Enquanto isso, a
+decisão vive aqui e no `STATUS.md`** — e a F52 não pode ser executada com duas versões da mesma
+Slice em circulação.
+
+### 10.2 O que a decisão 3 exige do totem, e que a `SPEC-052` vai ter de honrar
+
+- **Nenhum número de cartão é digitado na tela do totem.** O QR leva o aluno ao checkout
+  hospedado, no celular dele.
+- **Valor continua escondido até a ação deliberada** (`DS-TOTEM` §10 regra 1); na tela pública
+  (hero), pendência financeira não aparece de forma nenhuma (`M4-BR-007`).
+- **O totem acompanha a confirmação sem prolongar a sessão** — e a sessão encerra limpando tudo
+  (`DS-TOTEM` §11 regra 11).

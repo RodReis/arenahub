@@ -36,12 +36,13 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 - Cria spec e não aprova nada. 
 - Cria issue no git na Main.
 #regras
-**Escreve documento direto na `main` 
+**Escreve documento direto na `main`**
+**Nunca implementa código** 
 **Escreve documento sem bloqueio, aceito duplo, LGPD, amarra jurídica, consentimento e não criar ou inventa regra sempre pergunta o PI**
 **ADR e DESCISÕES não trava ou impede o desenvolvimento completo do sistema, decisão final é do PI.** 
 **Cowork não criar ou inventa regra, segui a que esta especificada, e a decisão final é o PI**
 **Cowork não preocupa e nem inventa regra de LGPD, consentimento, jurídicos, só especifica o produto.**. 
-**Nunca implementa código**
+**Não esta autorizado a criar regra, nem aceito duplo, nem LGPD, e nem consentimento, que não está especificado**
 **Requisito novo, não inventar decisão sem o consentimento do PI**
 **Se criar regra, perguntar ao PI** 
 **Decisão do PI esta acima das ADR ou de qualquer outro documento.** 
@@ -267,7 +268,7 @@ Use a que existir no ambiente; a ausência de uma skill não é desculpa para pu
 - `docs/prd/README.md` — **contrato de produto e engenharia** (documento master): arquitetura de referência, padrões transversais, comandos, estilo, testes, definição de pronto e rastreabilidade. Decisão que o contraria **emenda o parágrafo** com nota apontando o ADR.
 - `docs/prd/academia/MVP-*.md` (MVP-00 a MVP-06) — requisitos por MVP: FR/NFR/BR/AC, slices, gates de entrada e checklists de execução.
 - `docs/Especificação Completa — Plataforma Inteligente de Gestão para Academias.md` — visão ampla de origem. **Não é normativo**: onde conflitar com PRD, ADR ou `CONVENTION.md`, prevalece o documento mais específico.
-- `docs/specs/` — **histórico, não processo** (desde 18/08/2026). Eram ponteiros para a Slice do PRD (ADR-022); deixaram de ser artefato obrigatório e **não bloqueiam nem exigem aprovação**. O escopo mora no PRD. Não se criam novas.
+- `docs/specs/` — **reaberto em 23/08/2026, por decisão do PI.** Entre 18/08 e 23/08 valeu *"histórico, não processo — não se criam novas"*; o PI pediu spec para as fatias novas e a regra voltou **para fatia criada a partir de 23/08**: cada uma tem `SPEC-<nnn>` de mesmo número do `F<n>` (ADR-015). **F45–F48 seguem sem spec** e `SPEC-045`–`SPEC-048` seguem queimados. Onde a fatia nasce de uma Slice de PRD, a spec continua sendo **ponteiro fino** (ADR-022) e não copia requisito; onde não há Slice (F49–F55), o escopo mora na spec.
 - `docs/DEVELOPMENT.md` — **sua ordem de execução e status por item** (você é o dono; atualize a cada entrega junto com STATUS.md).
 - `docs/ARCHITECTURE.md` — desenho, módulos, dados, resiliência.
 - `docs/DECISIONS.md` — ADRs (ler antes de propor mudança estrutural). **ADR-021** define quem escreve o quê no Git.

@@ -11,6 +11,16 @@
 > **ADR-022 (14/08/2026): a `Slice N.M` do PRD É a spec.** Este arquivo é o ponteiro para ela.
 > As 41 existem desde 14/08/2026 — o que autoriza codificar é o **status**, não a existência.
 
+
+> ↩️ **23/08/2026 — reaberto por decisão do PI.** Em 18/08 o gate de spec morreu e este diretório
+> virou histórico; em 23/08 o PI pediu spec para as fatias novas de pagamento e a decisão dele
+> vence. **Vale para fatia criada a partir de 23/08** — `SPEC-053`, `SPEC-054` e `SPEC-055` são as
+> primeiras. **F45–F48 continuam sem spec**, e `SPEC-045` a `SPEC-048` continuam queimados.
+>
+> **O que mudou na forma:** para fatia que nasce de uma Slice de PRD, a spec continua sendo o
+> ponteiro fino descrito abaixo. Para fatia **sem** Slice (F49–F55, criadas por ADR ou por
+> recorte), **o escopo mora na spec** — não há PRD para apontar.
+
 ## 1. O que a spec é — e o que ela não é
 
 A spec deste projeto é **fina de propósito**.

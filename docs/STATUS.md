@@ -305,6 +305,27 @@ tudo roda contra o `FakePaymentProvider`, e a assinatura de webhook segue não c
 (registro de 19/08). F52, F53 e F54 podem ser construídas e testadas inteiras sem colocar um
 centavo na conta da Arena Positiva. **Credencial e sandbox são insumo do PI.**
 
+💳 **23/08/2026, segunda rodada — o cartão entra, o `FakePaymentProvider` NÃO sai, e as specs
+voltaram.** O PI revisou o recorte e decidiu seis coisas. **(1)** No balcão o aluno escolhe
+**dinheiro, PIX ou cartão**; cartão é **checkout hospedado da Getnet**, digitado **no celular do
+aluno** — nenhum número passa pelo painel nem pela recepcionista. **(2)** No totem entra cartão,
+mas por **QR de checkout que o aluno abre no próprio celular**: nada de 16 dígitos e CVV numa tela
+de 1080×1920 em área pública. **(3)** No totem **não há baixa manual nem `wa.me`** — não existe
+operador ali, e a baixa é automática por webhook. **(4)** Base de cálculo do painel gerencial vem
+do **plano em que o aluno está matriculado** (`PlanPrice` das assinaturas ativas), não da soma das
+invoices. **(5)** Credenciais e tokens dos provedores ganham tela: menu **Configuração → aba
+Pagamento**. **(6)** **`docs/specs/` foi reaberto** — `SPEC-053`, `SPEC-054` e `SPEC-055` existem;
+o `CLAUDE.md` §Mapa foi emendado.
+
+⚠️ **Duas coisas ficaram registradas contra o pedido, e valem a leitura.** A primeira: *"nada de
+fakePay"* **não pode ser cumprido ao pé da letra** — o `FakePaymentProvider` é dublê de boundary
+exigido pelo ADR-017 e pelo `TESTING.md` §3, e é ele que permite testar webhook duplicado, evento
+fora de ordem e estorno assíncrono sem depender da rede de um banco. O que muda é a **seleção**:
+`useClass` fixo vira roteamento por `ProviderAccount.capability`, e o fake fica só em teste. A
+segunda: **cartão no totem amplia o `MVP-04` §7 Slice 4.6**, que prevê apenas PIX — a emenda de
+PRD que isso exige **não é minha** (o ADR-021 só me autoriza a materializar decisão já registrada
+em ADR aceito), então ou vira ADR ou é o Code/PI quem escreve.
+
 ## 1. Onde estamos, em três frases
 
 O repositório tem PRDs aprovados para planejamento, planos de implementação por slice e, desde
@@ -692,9 +713,9 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | aprovada-pi |
 | F51 | SPEC-051 | 3.5 | 3.5.3 | Tela pública (hero): blocos, mídia e patrocínio | [ADR-042](DECISIONS.md#adr-042) | [#152](https://github.com/RodReis/arenahub/issues/152) | aprovada-pi |
 | F52 | SPEC-052 | 3.5 | 3.5.4 | Área do aluno no totem: identificação, pagamento e evolução | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.6](prd/academia/MVP-04-app-totem.md) | [#153](https://github.com/RodReis/arenahub/issues/153) | aprovada-pi |
-| F53 | — | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [recorte](notes/2026-08-23-pagamento-nas-tres-superficies.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | recorte de 23/08 — aguardando aceite do PI |
-| F54 | — | 3 | — | Painel financeiro gerencial (KPIs) | [recorte](notes/2026-08-23-pagamento-nas-tres-superficies.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | recorte de 23/08 — aguardando aceite do PI |
-
+| F53 | SPEC-053 | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [`SPEC-053-pagamentos-e-cobranca-no-balcao.md`](specs/SPEC-053-pagamentos-e-cobranca-no-balcao.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | em-revisao |
+| F54 | SPEC-054 | 3 | — | Painel financeiro gerencial (KPIs) | [`SPEC-054-painel-financeiro-gerencial.md`](specs/SPEC-054-painel-financeiro-gerencial.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | em-revisao |
+| F55 | SPEC-055 | 3 | — | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | [`SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md`](specs/SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md) | — | em-revisao |
 
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
@@ -732,13 +753,20 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 > vai de 48 para **52 fatias** — nenhum número reaproveitado, `SPEC-049` a `SPEC-052` alocados
 > aqui pela primeira vez.
 
-> **F53 e F54 criadas em 23/08/2026, por decisão do PI.** Escopo em
-> [`notes/2026-08-23-pagamento-nas-tres-superficies.md`](notes/2026-08-23-pagamento-nas-tres-superficies.md).
-> **Nascem sem `SPEC`**, pelo mesmo motivo de F45–F48: o gate de spec morreu em 18/08 e a fonte de
-> escopo é a nota, não um arquivo em `docs/specs/`. Pela regra do par igual (ADR-015),
-> **`SPEC-053` e `SPEC-054` ficam queimados e não são alocados a ninguém, nunca.** O conteúdo das
-> duas é Smart Billing (`MVP-02` §7); o token `[MVP3]` reflete a **posição na fila** que o PI
-> escolheu, não o PRD de origem. A contagem vai de 52 para **54 fatias**.
+> **F53, F54 e F55 criadas em 23/08/2026, por decisão do PI.** Escopo em
+> [`notes/2026-08-23-pagamento-nas-tres-superficies.md`](notes/2026-08-23-pagamento-nas-tres-superficies.md)
+> e nas specs `SPEC-053`, `SPEC-054` e `SPEC-055`.
+>
+> ↩️ **`docs/specs/` foi REABERTO na mesma conversa, por decisão do PI.** O `CLAUDE.md` dizia
+> *"não se criam novas"* desde 18/08; o PI pediu spec para estas fatias e a decisão dele vence.
+> As três **têm spec com número**, e o par `F<n>` = `SPEC-<nnn>` do ADR-015 volta a valer para
+> fatia nova. **F45–F48 continuam sem spec** — e `SPEC-045` a `SPEC-048` continuam queimados; o
+> que mudou vale daqui para a frente, não para trás.
+>
+> O conteúdo das três é Smart Billing (`MVP-02` §7); o token `[MVP3]` reflete a **posição na
+> fila** que o PI escolheu, não o PRD de origem. A **F55 nasce separada da F53 por proposta do
+> Cowork** — a F53 é construível hoje, a F55 espera credencial de banco —, e a separação está
+> registrada como pergunta aberta na própria `SPEC-055`. A contagem vai de 52 para **55 fatias**.
 
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento
