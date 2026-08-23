@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 19/08/2026 *(MVP 3: ADR-035, ADR-037; o ADR-008 fechou por inteiro)*
+**Última atualização:** 23/08/2026 *(F53 e F54: pagamento nas três superfícies — recorte do PI)*
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -285,6 +285,25 @@ de acesso** — quem decide onde o aluno entra continua sendo o plano, por `Plan
 verdade que a regra de arquitetura nº 1 proíbe. Migration em **dois passos** (coluna anulável →
 backfill para `MATRIZ` → `NOT NULL`), listagem passa a filtrar pela unidade do cabeçalho, e
 transferência entre unidades vira ação auditada — não edição de campo solta.
+
+💳 **23/08/2026 — pagamento do aluno nas três superfícies: o pedido virou duas fatias, não seis.**
+O PI pediu controle de pagamento no painel, no totem e no app. O recorte está em
+[`notes/2026-08-23-pagamento-nas-tres-superficies.md`](notes/2026-08-23-pagamento-nas-tres-superficies.md)
+e o resumo é que **três dos quatro itens pedidos não são frontend**: o painel gerencial precisa de
+endpoint de agregação que não existe, a lista transversal de invoices precisa do
+`GET /api/v1/invoices` que o `MVP-02` §13 prevê e ninguém implementou, e **notificação não tem
+módulo nenhum** na API. Decisões do PI no mesmo dia: dashboard é **KPI gerencial**, não esteira de
+cobrança (esteira é F38, MVP 6); **totem só PIX**, cartão fica no mobile — o que *confirma* o
+`MVP-04` §7 Slice 4.6 em vez de emendá-lo; e notificação é **aviso in-app + WhatsApp**, sem push
+nativo. Nascem **F53** (pagamentos e cobrança no balcão) e **F54** (painel gerencial). **O totem
+não ganha fatia nova** — pagamento lá já é a F52, e a ordem F49 → F50 → F51/F52 do ADR-042
+continua obrigatória. **Mobile fica fora:** `apps/mobile` está vazia, e cartão do aluno é a F25,
+que espera F23 e F24.
+
+⚠️ **O que trava dinheiro real, e não é código:** os adapters de **Sicoob e Getnet não existem** —
+tudo roda contra o `FakePaymentProvider`, e a assinatura de webhook segue não confirmada nos dois
+(registro de 19/08). F52, F53 e F54 podem ser construídas e testadas inteiras sem colocar um
+centavo na conta da Arena Positiva. **Credencial e sandbox são insumo do PI.**
 
 ## 1. Onde estamos, em três frases
 
@@ -673,6 +692,8 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | aprovada-pi |
 | F51 | SPEC-051 | 3.5 | 3.5.3 | Tela pública (hero): blocos, mídia e patrocínio | [ADR-042](DECISIONS.md#adr-042) | [#152](https://github.com/RodReis/arenahub/issues/152) | aprovada-pi |
 | F52 | SPEC-052 | 3.5 | 3.5.4 | Área do aluno no totem: identificação, pagamento e evolução | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.6](prd/academia/MVP-04-app-totem.md) | [#153](https://github.com/RodReis/arenahub/issues/153) | aprovada-pi |
+| F53 | — | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [recorte](notes/2026-08-23-pagamento-nas-tres-superficies.md) | — | recorte de 23/08 — aguardando aceite do PI |
+| F54 | — | 3 | — | Painel financeiro gerencial (KPIs) | [recorte](notes/2026-08-23-pagamento-nas-tres-superficies.md) | — | recorte de 23/08 — aguardando aceite do PI |
 
 
 
@@ -710,6 +731,14 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 > Decisão 5, módulo cuja fatia de origem não foi entregue **não aparece no painel**. A contagem
 > vai de 48 para **52 fatias** — nenhum número reaproveitado, `SPEC-049` a `SPEC-052` alocados
 > aqui pela primeira vez.
+
+> **F53 e F54 criadas em 23/08/2026, por decisão do PI.** Escopo em
+> [`notes/2026-08-23-pagamento-nas-tres-superficies.md`](notes/2026-08-23-pagamento-nas-tres-superficies.md).
+> **Nascem sem `SPEC`**, pelo mesmo motivo de F45–F48: o gate de spec morreu em 18/08 e a fonte de
+> escopo é a nota, não um arquivo em `docs/specs/`. Pela regra do par igual (ADR-015),
+> **`SPEC-053` e `SPEC-054` ficam queimados e não são alocados a ninguém, nunca.** O conteúdo das
+> duas é Smart Billing (`MVP-02` §7); o token `[MVP3]` reflete a **posição na fila** que o PI
+> escolheu, não o PRD de origem. A contagem vai de 52 para **54 fatias**.
 
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento

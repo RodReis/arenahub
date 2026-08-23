@@ -20,9 +20,48 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 ## Papéis e governança
 
-- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Nunca faz commit, push, PR nem merge** — o PI não toca no Git. O portão do PI é o **aceite na issue**, não o merge: o PI não segura o código na porta da `main`, ele carimba o que já entrou como realmente pronto. **descisão final e verdade do é PI, code atualiza documentação e/ou cria a ADR e merge na main**.
-- **Claude Cowork (planejamento)** — mantém `docs/` e registra decisões. **Não cria spec e não aprova nada.** A Slice do PRD **é** a especificação (ADR-022); `docs/specs/**` deixou de ser artefato de processo em **18/08/2026** — os arquivos existentes ficam como histórico e não bloqueiam ninguém. Cria a issue-fatia e a `[INFRA]` no board (Backlog, assignee PI) e os metadados de label (ADR-023). Escreve documento direto na `main` — escopo no **criar spec sem bloqueio, aceito duplo, LGPD, amarra juridica, consentimento e não criar ou inventa regra sempre pergunta o PI, isso não trava ou impede o desenvolvimento complento do sistema, descisão final é do PI. Não nos preocupamos com LGPD, consentimento, juridicos, nos só desenvolvemos o produto.**. Nunca implementa código, nunca toca em `apps/`, `packages/`, `infra/` nem `.github/`. **Em `docs/prd/**` escreve só emenda que materializa decisão do PI já registrada em ADR aceito, citando o ADR na própria emenda** — requisito novo, não inventar decisão sem o consentimento do PI, não criar regra sem o PI aceitar, e decisão do PI esta acima das ADR ou de qualquer outro documento. 
-- **Claude Code (developer)** — codifica, testa (usar a skill /code-review; e para frontend, as skills do /impeccable e /frontend-design:frontend-design) antes do commit, atualiza a documentação e **commita os documentos de `docs/`** junto da entrega. **Implementa a partir deste arquivo + `docs/` + a Slice do PRD da fatia** — não espera spec nem aprovação de ninguém. **Não cria a issue de fatia nem a `[INFRA]`** (são do Cowork — ADR-023); pega o card, move pelo fluxo e entrega com PR. Cria a própria issue `[FIX]` de bug. Pode criticar arquitetura, **não escopo**. **Só para e pergunta em dois casos** — ver *O que pode bloquear o desenvolvimento*. Fora deles: decide, implementa, e registra a decisão no corpo do PR. **Code não criar ou inventa regra, segui a que esta especificada, e a descisão final é o PI**
+**Rodrigo Reis (PI)** 
+— Decide escopo.
+- Prioridades e trade-offs; 
+- Aprova specs 
+- Aceita entregas. 
+#regras
+**Nunca faz commit, push, PR nem merge, o PI não toca no Git**
+**O portão do PI é o **aceite na issue**
+**O PI não segura o código na porta da `main`, ele carimba o que já entrou como realmente pronto.** 
+**Decisão final e verdade do é PI, code atualiza documentação e/ou cria a ADR e merge**.
+
+**Claude Cowork (plan)** 
+- mantém `docs/` e registra decisões. 
+- Cria spec e não aprova nada. 
+- Cria issue no git na Main.
+#regras
+**Escreve documento direto na `main` 
+**Escreve documento sem bloqueio, aceito duplo, LGPD, amarra jurídica, consentimento e não criar ou inventa regra sempre pergunta o PI**
+**ADR e DESCISÕES não trava ou impede o desenvolvimento completo do sistema, decisão final é do PI.** 
+**Cowork não criar ou inventa regra, segui a que esta especificada, e a decisão final é o PI**
+**Cowork não preocupa e nem inventa regra de LGPD, consentimento, jurídicos, só especifica o produto.**. 
+**Nunca implementa código**
+**Requisito novo, não inventar decisão sem o consentimento do PI**
+**Se criar regra, perguntar ao PI** 
+**Decisão do PI esta acima das ADR ou de qualquer outro documento.** 
+
+**Claude Code (developer)** 
+- codifica, testa e atualiza documentação.
+- Usar a skill code /superpowers developer; 
+- Usar a skill frontend /frontend-design e /impeccable antes do commit.
+- Usar a skill review /code-review
+#regra
+**Atualiza a documentação**
+**commita os documentos de `docs/`** junto da entrega.**
+**Implementa a partir deste arquivo + `docs/` + a Slice do PRD da fatia** 
+**Não cria a issue de fatia nem a `[INFRA]`** 
+**Pega o card, move pelo fluxo e entrega com PR.** 
+**Cria a própria issue `[FIX]` de bug.** 
+**Pode criticar arquitetura, **não escopo.** 
+**Só para e pergunta em dois casos** — ver *O que pode bloquear o desenvolvimento.** 
+**Decide, implementa, e registra a decisão no corpo do PR.** 
+**Code não criar ou inventa regra, segui a que esta especificada, e a decisão final é o PI**
 
 #### Dois atores escrevem no Git — quem cede no conflito
 
@@ -35,10 +74,6 @@ A divisão é **por arquivo** (ADR-021): documento de governança é do Cowork; 
 **Importante:** o push do Cowork na `main` é o único caminho do processo sem PR, CI ou aceite, e vale **só para documento**. **Todo código entra por PR com CI verde, sem exceção**, e o aceite continua sendo exclusivo do PI — essas duas garantias nunca se moveram.
 
 ### Ciclo de vida de uma fatia — três passos
-
-> **Simplificado em 18/08/2026 por decisão do PI.** O gate de spec `aprovada-pi` **morreu**: ele
-> exigia aprovar um arquivo-ponteiro cujo conteúdo real mora no PRD, e travava desenvolvimento sem
-> decidir nada. O que ficou é o que pegava erro de verdade: **CI verde** e **aceite do PI**.
 
 1. **Card existe** → o Cowork cria a issue no board (Backlog, `proplan:backlog`, assignee PI),
    título no *Padrão de título de issue*, corpo com link para a **Slice do PRD**.
@@ -84,18 +119,12 @@ O par MVP↔SPEC↔Fatia deriva do **Índice Fatia ↔ SPEC** do `docs/STATUS.md
 
 ### O que pode bloquear o desenvolvimento — a lista inteira
 
-**São dois casos. Não há terceiro.** Documento não bloqueia código; ADR não bloqueia código;
-"falta a spec" não bloqueia nada. Se você está parado por qualquer outro motivo, o motivo está
-errado — implemente e registre a decisão no PR.
-
-Tudo o mais — nome de campo, ordem de implementação, estrutura de pasta, dublê de teste, como
-testar, se cabe refactor junto — **é do Code, decide na hora**. Errou? É reversível: corrige no
-próximo PR.
-
-**ADR só para escolha cara de desfazer** — migração de dado histórico, contrato com terceiro,
-regime legal, decisão que outro sistema já consome. **Decisão sobre o próprio processo não vira
-ADR** (mudou em 18/08/2026: onze dos trinta primeiros ADRs eram sobre como trabalhar, e isso
-custava mais do que resolvia). Muda-se este arquivo e pronto.
+- Não criar aceite duplo;
+- Não criar consentimento;
+- Documento não bloqueia código; 
+- ADR não bloqueia código;
+- "falta a spec" não bloqueia nada. 
+Se você está parado por qualquer outro motivo, o motivo está errado — implemente e registre a decisão no PR.
 
 #### Correção de bug: o Code cria a própria issue
 
@@ -231,8 +260,6 @@ Use a que existir no ambiente; a ausência de uma skill não é desculpa para pu
 - `impeccable` — critique craft layout delight clarify polish optimize *(global)*
 - `context7` — documentação atualizada de biblioteca *(mcp)*
 - `expo` — implementação do mobile *(global)*
-- `gstack:design-review` — em todas as tarefas, não apenas em revisões.
-- `gstack:qa` — Test your app, find bugs, fix them with atomic commits, re-verify. Auto-generates regression tests for every fix.
 - `gstack` — is a process, not a collection of tools. The skills run in the order a sprint.
 
 ## Documentos-chave
