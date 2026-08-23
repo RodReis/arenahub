@@ -692,8 +692,8 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | aprovada-pi |
 | F51 | SPEC-051 | 3.5 | 3.5.3 | Tela pública (hero): blocos, mídia e patrocínio | [ADR-042](DECISIONS.md#adr-042) | [#152](https://github.com/RodReis/arenahub/issues/152) | aprovada-pi |
 | F52 | SPEC-052 | 3.5 | 3.5.4 | Área do aluno no totem: identificação, pagamento e evolução | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.6](prd/academia/MVP-04-app-totem.md) | [#153](https://github.com/RodReis/arenahub/issues/153) | aprovada-pi |
-| F53 | — | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [recorte](notes/2026-08-23-pagamento-nas-tres-superficies.md) | — | recorte de 23/08 — aguardando aceite do PI |
-| F54 | — | 3 | — | Painel financeiro gerencial (KPIs) | [recorte](notes/2026-08-23-pagamento-nas-tres-superficies.md) | — | recorte de 23/08 — aguardando aceite do PI |
+| F53 | — | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [recorte](notes/2026-08-23-pagamento-nas-tres-superficies.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | recorte de 23/08 — aguardando aceite do PI |
+| F54 | — | 3 | — | Painel financeiro gerencial (KPIs) | [recorte](notes/2026-08-23-pagamento-nas-tres-superficies.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | recorte de 23/08 — aguardando aceite do PI |
 
 
 
