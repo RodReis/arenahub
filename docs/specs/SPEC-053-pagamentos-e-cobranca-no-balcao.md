@@ -34,16 +34,21 @@ o nome antes de saber que existe fatura, e nenhuma tela responde *"o que vence e
 |---|---|---|
 | 1 | **O aluno escolhe a forma de pagamento no balcão:** dinheiro, PIX ou cartão | três caminhos na mesma tela, não três telas |
 | 2 | **Cartão é checkout hospedado da Getnet** | a recepcionista gera o checkout; **o aluno digita o cartão no próprio celular**. Nenhum número de cartão passa pelo painel, pela recepcionista ou pelo backend |
-| 3 | **Dinheiro é baixa manual** | `PaymentMethodKind.MANUAL`, com `recognizedByUserId`, teto de `manualPaymentLimitMinor` e auditoria (INV-072) |
+| 3 | **Dinheiro em espécie é baixa manual** | `PaymentMethodKind.MANUAL`, com `recognizedByUserId`, teto de `manualPaymentLimitMinor` e auditoria (INV-072) |
 | 4 | **PIX confirma sozinho** | cobrança PIX + webhook; a recepcionista **não dá baixa em PIX** |
 | 5 | **Recibo em toda confirmação** | `POST /payments/:id/receipt` e `GET /receipts/:id` já existem e nenhuma tela os chama |
 | 6 | **`wa.me` continua sendo do operador** | mesma decisão de 19/08: abre o WhatsApp da recepção, texto curto, **sem valor em reais** |
 
-**Decisão de modelagem que esta spec propõe e o PI precisa confirmar:** *dinheiro* usa
-`PaymentMethodKind.MANUAL` **sem campo novo**. Com o cartão indo para checkout hospedado
-(decisão 2), não existe mais "cartão na maquininha registrado à mão" — `MANUAL` volta a
-significar uma coisa só: dinheiro recebido na recepção. Criar um `CASH` separado só faria sentido
-se a maquininha física entrasse, e ela não entrou.
+**Decisão 7, do PI em 23/08/2026 — dinheiro é cédula, e não há maquininha.** *Dinheiro* usa
+`PaymentMethodKind.MANUAL` **sem campo novo**: com o cartão indo para checkout hospedado
+(decisão 2) e a maquininha física descartada, `MANUAL` volta a significar uma coisa só —
+**dinheiro em espécie recebido na recepção**. Nenhuma migration, nenhum enum novo.
+
+> ⚠️ **A consequência, registrada agora para não virar arqueologia depois:** no dia em que
+> entrar TED, transferência ou maquininha, `MANUAL` deixa de ser inequívoco — e os registros
+> criados até lá **não terão o qualificador** que a leitura futura vai querer. É o preço aceito
+> em troca de zero migration hoje; quem for acrescentar o qualificador precisa saber que o
+> histórico anterior é `MANUAL` = espécie por definição, não por dado.
 
 ---
 
@@ -136,7 +141,7 @@ O PI olha e diz "aceito" quando, com um aluno de demonstração:
 | # | pergunta | resposta | data |
 |---|---|---|---|
 | 1 | Como o cartão é passado no balcão? | **Checkout hospedado da Getnet** — o aluno paga no próprio celular | 23/08/2026 |
-| 2 | Dinheiro precisa de método próprio (`CASH`)? | **em aberto** — proposta: usar `MANUAL`, §2 | — |
+| 2 | Dinheiro precisa de método próprio (`CASH`)? | **Não.** Dinheiro é espécie, sem maquininha — usa `MANUAL` | 23/08/2026 |
 | 3 | Token de MVP: `[MVP3]` (fila) ou `[MVP2]` (conteúdo)? | `[MVP3]`, por posição na fila | 23/08/2026 |
 
 ---
@@ -145,4 +150,4 @@ O PI olha e diz "aceito" quando, com um aluno de demonstração:
 
 - [ ] O PI aceitou esta spec
 - [ ] A F55 está entregue **ou** está aceito que a fatia rode contra o `FakePaymentProvider`
-- [ ] A pergunta 2 da §7 está respondida
+- [x] A pergunta 2 da §7 está respondida — 23/08/2026, `MANUAL` para espécie
