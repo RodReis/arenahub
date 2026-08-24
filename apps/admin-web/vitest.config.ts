@@ -34,6 +34,20 @@ export default defineConfig({
     // cima do primeiro (foi assim que "Confirmar" virou multiplo botao).
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'app/**/*.test.tsx'],
+    /*
+     * `app/**` precisa de `.ts` E `.tsx`.
+     *
+     * So `.tsx` estava listado, e o primeiro teste de Server Action (que nao
+     * tem JSX, logo e `.ts`) foi coletado ZERO vezes -- `vitest run` saia
+     * verde com o arquivo inteiro ignorado, que e indistinguivel de um
+     * arquivo que passou. Foi assim que quase entregamos a troca de plano
+     * "testada" sem nenhum teste dela ter rodado.
+     */
+    include: [
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      'app/**/*.test.ts',
+      'app/**/*.test.tsx',
+    ],
   },
 });
