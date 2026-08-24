@@ -2583,6 +2583,11 @@ model PaymentAttempt {
   failureIsPermanent Boolean?             @map("failure_is_permanent")
   requestedAt        DateTime             @default(now()) @map("requested_at")
   settledAt          DateTime?            @map("settled_at")
+  /// Quando o checkout hospedado deixa de ser pagavel (F53). NULA para PIX e
+  /// para tentativas de cartao antigas -- so o checkout tem prazo fixo
+  /// conhecido na criacao. Sem ela, uma tentativa presa em `CREATED` nunca
+  /// sai do predicado do indice parcial abaixo e trava a fatura para sempre.
+  expiresAt          DateTime?            @map("expires_at")
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoice Invoice  @relation(fields: [invoiceId], references: [id])

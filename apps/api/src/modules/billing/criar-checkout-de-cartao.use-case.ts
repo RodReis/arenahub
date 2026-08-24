@@ -122,8 +122,15 @@ export class CriarCheckoutDeCartaoUseCase {
       include: {
         student: {
           include: {
-            addresses: true,
-            contacts: true,
+            /**
+             * `orderBy` explicito: sem ele, a ordem e a FISICA do Postgres,
+             * que muda apos qualquer `UPDATE` na tabela (`include-sem-orderby-embaralha`,
+             * licao ja paga em outro modulo). Aluno com dois enderecos
+             * mandaria ao antifraude o que o banco devolvesse primeiro
+             * naquele dia -- nao necessariamente o mais recente.
+             */
+            addresses: { orderBy: { createdAt: 'desc' } },
+            contacts: { orderBy: { isPrimary: 'desc' } },
           },
         },
       },
@@ -166,35 +173,14 @@ export class CriarCheckoutDeCartaoUseCase {
 
     const idempotencyKey = `${invoice.id}:checkout:${entrada.agora.toISOString()}`;
 
-    let tentativa: { id: string };
-
-    try {
-      tentativa = await this.db.paymentAttempt.create({
-        data: {
-          tenantId: contexto.tenantId,
-          invoiceId: invoice.id,
-          method: 'CARD',
-          status: 'CREATED',
-          idempotencyKey,
-          providerAccountId: conta.externalAccountId,
-        },
-        select: { id: true },
-      });
-    } catch (erro) {
-      /**
-       * P2002 = violacao de unicidade. O indice parcial
-       * `payment_attempts_um_checkout_em_voo` cobre `CREATED`,
-       * `REQUIRES_ACTION` e `PROCESSING`: outra requisicao ja colocou um
-       * checkout desta invoice em voo. NAO checamos `if (jaExiste)` antes --
-       * essa checagem perde a corrida por construcao, que e justamente o
-       * defeito que o indice existe para impedir.
-       */
-      if (erroDeUnicidade(erro)) {
-        throw new CheckoutJaEmAndamentoError();
-      }
-
-      throw erro;
-    }
+    const tentativa = await this.criarTentativa({
+      contexto,
+      invoiceId: invoice.id,
+      externalAccountId: conta.externalAccountId,
+      idempotencyKey,
+      expiresAt,
+      agora: entrada.agora,
+    });
 
     // Nao anulavel aqui: `faltaParaCartao` ja recusou quem nao tem endereco.
     const enderecoDeCobranca = invoice.student.addresses[0]!;
@@ -292,6 +278,96 @@ export class CriarCheckoutDeCartaoUseCase {
     }
 
     return { codigo: 'PROVIDER_UNAVAILABLE', recuperavel: true };
+  }
+
+  /**
+   * Grava a tentativa, respeitando o indice parcial `payment_attempts_um_checkout_em_voo`.
+   *
+   * DECISAO DO PI: a saida para uma tentativa presa e a EXPIRACAO, nao o
+   * reuso que o PIX faz. Devolver a MESMA cobranca serve para o PIX porque o
+   * QR continua valido -- mas devolver um link de checkout ja vencido e pior
+   * que gerar outro. Por isso, ao esbarrar no indice, o metodo busca a
+   * tentativa que esta bloqueando: se ela ja passou do proprio `expiresAt`,
+   * vira `FAILED` (terminal, fora do predicado do indice) e a criacao e
+   * refeita UMA vez; se nao, a recusa e genuina.
+   *
+   * SEM ISSO, uma tentativa presa em `CREATED` -- processo morto entre a
+   * resposta do provedor e o `update` que grava `externalPaymentId`, ou
+   * aluno que nunca abriu o link -- travaria a fatura contra cartao para
+   * sempre: nada tirava uma tentativa desse estado antes desta versao.
+   */
+  private async criarTentativa(entrada: {
+    contexto: TenantContext;
+    invoiceId: string;
+    externalAccountId: string;
+    idempotencyKey: string;
+    expiresAt: Date;
+    agora: Date;
+    /** Impede loop infinito: expira no maximo UMA tentativa por chamada. */
+    jaExpirouUmaVez?: boolean;
+  }): Promise<{ id: string }> {
+    try {
+      return await this.db.paymentAttempt.create({
+        data: {
+          tenantId: entrada.contexto.tenantId,
+          invoiceId: entrada.invoiceId,
+          method: 'CARD',
+          status: 'CREATED',
+          idempotencyKey: entrada.idempotencyKey,
+          providerAccountId: entrada.externalAccountId,
+          expiresAt: entrada.expiresAt,
+        },
+        select: { id: true },
+      });
+    } catch (erro) {
+      /**
+       * P2002 = violacao de unicidade. O indice parcial
+       * `payment_attempts_um_checkout_em_voo` cobre `CREATED`,
+       * `REQUIRES_ACTION` e `PROCESSING`: outra tentativa desta invoice ja
+       * esta em voo. NAO checamos `if (jaExiste)` antes de inserir -- essa
+       * checagem perde a corrida por construcao, que e justamente o defeito
+       * que o indice existe para impedir.
+       */
+      if (!erroDeUnicidade(erro)) {
+        throw erro;
+      }
+
+      if (entrada.jaExpirouUmaVez) {
+        throw new CheckoutJaEmAndamentoError();
+      }
+
+      const bloqueadora = await this.db.paymentAttempt.findFirst({
+        where: {
+          tenantId: entrada.contexto.tenantId,
+          invoiceId: entrada.invoiceId,
+          method: 'CARD',
+          status: { in: ['CREATED', 'REQUIRES_ACTION', 'PROCESSING'] },
+        },
+        select: { id: true, expiresAt: true },
+      });
+
+      /**
+       * `expiresAt` NULA e tratada como AINDA VALIDA, nao como expirada: e o
+       * caso de uma tentativa de PIX ou de uma tentativa de cartao anterior
+       * a esta coluna existir, e nenhuma das duas tem prazo conhecido para
+       * decidir por ela.
+       */
+      if (!bloqueadora?.expiresAt || bloqueadora.expiresAt > entrada.agora) {
+        throw new CheckoutJaEmAndamentoError();
+      }
+
+      await this.db.paymentAttempt.update({
+        where: { id: bloqueadora.id },
+        data: {
+          status: 'FAILED',
+          failureCode: 'CARD_CHECKOUT_EXPIRED',
+          failureIsPermanent: true,
+          settledAt: entrada.agora,
+        },
+      });
+
+      return this.criarTentativa({ ...entrada, jaExpirouUmaVez: true });
+    }
   }
 }
 

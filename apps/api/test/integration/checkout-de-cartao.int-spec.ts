@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
-import { CriarCheckoutDeCartaoUseCase } from '../../src/modules/billing/criar-checkout-de-cartao.use-case.js';
+import {
+  CheckoutJaEmAndamentoError,
+  CriarCheckoutDeCartaoUseCase,
+} from '../../src/modules/billing/criar-checkout-de-cartao.use-case.js';
 import { FakePaymentProvider } from '../../src/modules/billing/provider/fake-payment-provider.adapter.js';
 import { PAYMENT_PROVIDER } from '../../src/modules/billing/provider/payment-provider.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
@@ -187,6 +190,7 @@ describe('CriarCheckoutDeCartaoUseCase', () => {
 
   let planoId = '';
   let unidadeId = '';
+  let outroSubscriptionId = '';
   let numeroDaInvoice = 0;
 
   beforeAll(async () => {
@@ -303,8 +307,6 @@ describe('CriarCheckoutDeCartaoUseCase', () => {
   afterAll(async () => {
     await db.tenant.deleteMany({ where: { id: { in: [contexto.tenantId, outroContexto.tenantId] } } });
   });
-
-  let outroSubscriptionId = '';
 
   /** Cria um aluno com ou sem os dados que `faltaParaCartao` exige. */
   async function criarAluno(
@@ -487,13 +489,21 @@ describe('CriarCheckoutDeCartaoUseCase', () => {
   /*
    * CONCORRENCIA pelo caso de uso -- a sonda da Task 3 mediu o banco; esta
    * mede o caminho inteiro, que e o que a recepcao exercita com clique duplo.
+   *
+   * INSTANTES DISTINTOS de proposito (`AGORA` e `AGORA + 1ms`): a chave de
+   * idempotencia deriva de `agora.toISOString()`, entao chamar as duas com o
+   * MESMO instante monta a MESMA chave -- e quem rejeitaria a segunda seria
+   * o unique `(tenantId, idempotencyKey)`, nao o indice parcial que este
+   * teste existe para provar. Medido: com chave identica, o teste passava
+   * mesmo com o indice derrubado (achado da revisao, round 1).
    */
   it('duas requisicoes concorrentes produzem UM checkout', async () => {
     const invoice = await criarInvoiceAberta();
+    const AGORA_B = new Date(AGORA.getTime() + 1);
 
     const resultados = await Promise.allSettled([
       useCase.executar(contexto, { invoiceId: invoice.id, agora: AGORA }, 'corr-5a'),
-      useCase.executar(contexto, { invoiceId: invoice.id, agora: AGORA }, 'corr-5b'),
+      useCase.executar(contexto, { invoiceId: invoice.id, agora: AGORA_B }, 'corr-5b'),
     ]);
 
     const sucessos = resultados.filter((r) => r.status === 'fulfilled').length;
@@ -502,5 +512,125 @@ describe('CriarCheckoutDeCartaoUseCase', () => {
     });
 
     expect({ sucessos, tentativas }).toEqual({ sucessos: 1, tentativas: 1 });
+
+    /**
+     * O TIPO do erro da perdedora, nao so a contagem: `sucessos: 1` sozinho
+     * e satisfeito por QUALQUER falha na segunda chamada -- inclusive uma FK
+     * quebrada que nao tem nada a ver com o indice. Mesmo padrao da F14
+     * (`billing-cartao-e-recorrencia.int-spec.ts`).
+     */
+    const perdedora = resultados.find((r) => r.status === 'rejected');
+    expect(perdedora).toBeDefined();
+    if (perdedora?.status === 'rejected') {
+      expect(perdedora.reason).toBeInstanceOf(CheckoutJaEmAndamentoError);
+    }
+  });
+
+  /*
+   * EXPIRACAO: decisao do PI (round 1). Uma tentativa presa em `CREATED` --
+   * processo morto antes do `update` que grava `externalPaymentId`, ou aluno
+   * que nunca abriu o link -- nao pode travar a fatura contra cartao para
+   * sempre. A saida e a tentativa vencida virar terminal e sair do predicado
+   * do indice parcial, nao o reuso que o PIX faz (link vencido nao serve).
+   */
+  it('tentativa CREATED com expiresAt no passado NAO bloqueia checkout novo', async () => {
+    const invoice = await criarInvoiceAberta();
+
+    await db.paymentAttempt.create({
+      data: {
+        tenantId: contexto.tenantId,
+        invoiceId: invoice.id,
+        method: 'CARD',
+        status: 'CREATED',
+        idempotencyKey: `presa-vencida:${sufixo}:${randomUUID().slice(0, 6)}`,
+        expiresAt: new Date(AGORA.getTime() - 60 * 1000),
+      },
+    });
+
+    const checkout = await useCase.executar(
+      contexto,
+      { invoiceId: invoice.id, agora: AGORA },
+      'corr-expirada',
+    );
+
+    expect(checkout.checkoutUrl).toMatch(/^https:\/\//);
+
+    const tentativas = await db.paymentAttempt.findMany({
+      where: { tenantId: contexto.tenantId, invoiceId: invoice.id, method: 'CARD' },
+      select: { status: true, failureCode: true },
+    });
+
+    expect(tentativas).toHaveLength(2);
+    expect(tentativas).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: 'FAILED', failureCode: 'CARD_CHECKOUT_EXPIRED' }),
+        expect.objectContaining({ status: 'CREATED' }),
+      ]),
+    );
+  });
+
+  it('tentativa CREATED com expiresAt no futuro bloqueia checkout novo (409)', async () => {
+    const invoice = await criarInvoiceAberta();
+
+    await db.paymentAttempt.create({
+      data: {
+        tenantId: contexto.tenantId,
+        invoiceId: invoice.id,
+        method: 'CARD',
+        status: 'CREATED',
+        idempotencyKey: `presa-viva:${sufixo}:${randomUUID().slice(0, 6)}`,
+        expiresAt: new Date(AGORA.getTime() + 60 * 1000),
+      },
+    });
+
+    await expect(
+      useCase.executar(contexto, { invoiceId: invoice.id, agora: AGORA }, 'corr-viva'),
+    ).rejects.toMatchObject({ code: 'CARD_CHECKOUT_ALREADY_IN_FLIGHT', status: 409 });
+
+    const tentativas = await db.paymentAttempt.count({
+      where: { tenantId: contexto.tenantId, invoiceId: invoice.id, method: 'CARD' },
+    });
+    expect(tentativas).toBe(1);
+  });
+
+  /*
+   * ORDEM DETERMINISTICA: sem `orderBy` explicito, `addresses[0]` pega a
+   * ordem FISICA do Postgres, que muda apos qualquer `UPDATE` -- aluno com
+   * dois enderecos mandaria ao antifraude o que o banco devolvesse primeiro
+   * naquele dia. O caso de uso ordena por `createdAt desc`; este teste cria
+   * dois enderecos, em ordem, e prova -- pelo que realmente chega ao
+   * provedor -- que o mais recente e sempre o escolhido.
+   */
+  it('aluno com dois enderecos manda o mais recente ao provedor', async () => {
+    const invoice = await criarInvoiceAberta();
+    const { studentId } = await db.invoice.findUniqueOrThrow({
+      where: { id: invoice.id },
+      select: { studentId: true },
+    });
+
+    // `criarInvoiceAberta` ja deixou um endereco (Av. Paulista). Este e o
+    // segundo, criado DEPOIS -- o que `createdAt desc` deve escolher.
+    await db.studentAddress.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId,
+        postalCode: '04538-133',
+        street: 'Av. Brigadeiro Faria Lima',
+        number: '2000',
+        district: 'Itaim Bibi',
+        city: 'Sao Paulo',
+        state: 'SP',
+      },
+    });
+
+    const espiao = jest.spyOn(fake, 'createHostedCheckout');
+
+    await useCase.executar(contexto, { invoiceId: invoice.id, agora: AGORA }, 'corr-endereco');
+
+    expect(espiao.mock.calls[0]?.[0].customer.endereco.logradouro).toBe(
+      'Av. Brigadeiro Faria Lima',
+    );
+
+    espiao.mockRestore();
   });
 });
