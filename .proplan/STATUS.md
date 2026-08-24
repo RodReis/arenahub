@@ -46,8 +46,6 @@ _(vazio)_
 
 ### Sem épico
 
-- [MVP3][SPEC-053][FIX] plano criado pela interface nasce sem preco e nunca gera cobranca (#161)
-- [MVP3][SPEC-053][F53] Pagamentos e cobrança no balcão (admin-web) (#156)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 
@@ -60,6 +58,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-053][FIX] plano criado pela interface nasce sem preco e nunca gera cobranca (#161, finalizado em: 2026-08-24)
+- [MVP3][SPEC-053][F53] Pagamentos e cobrança no balcão (admin-web) (#156, finalizado em: 2026-08-24)
 - [MVP3][SPEC-053][FIX] tela do balcao ignora o receiptId e faz tres consultas a mais (#165, finalizado em: 2026-08-24)
 - [MVP3][SPEC-053][FIX] guarda de contrato OpenAPI nao pega mudanca de formato de resposta (#163, finalizado em: 2026-08-24)
 - [MVP3][SPEC-053][FIX] cobrar-assinatura-no-cartao grava UUID interno em providerAccountId (#164, finalizado em: 2026-08-24)
