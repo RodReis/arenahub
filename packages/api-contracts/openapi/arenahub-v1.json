@@ -670,7 +670,29 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "timezone",
+                    "invoices"
+                  ],
+                  "properties": {
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "invoices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [

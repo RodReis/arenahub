@@ -9,6 +9,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -670,7 +671,23 @@ export class BillingController {
     };
   }
 
+  /**
+   * SCHEMA DE RESPOSTA DECLARADO -- a primeira rota a sair da divida do FIX
+   * #163, e nao por acaso: foi ELA que mudou de array para objeto na F53 sem
+   * a guarda notar. `interface` do TypeScript nao chega ao OpenAPI (some na
+   * compilacao), entao a forma vai explicita.
+   */
   @Get('students/:id/invoices')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['timezone', 'invoices'],
+      properties: {
+        timezone: { type: 'string' },
+        invoices: { type: 'array', items: { type: 'object' } },
+      },
+    },
+  })
   @RequirePermissions('billing.read')
   async listarDoAluno(@Param('id') id: string): Promise<InvoicesDoAlunoDto> {
     const resposta = await this.billing.listarInvoicesDoAluno(this.contexto.require(), id);
