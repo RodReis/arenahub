@@ -7,6 +7,7 @@ import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
+import { BillingRepository } from '../../src/modules/billing/billing.repository.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { StudentRepository } from '../../src/modules/students/student.repository.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
@@ -168,7 +169,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
         ...dados,
       });
 
-  /** Plano de segunda a sexta, 06:00-22:00 (360 a 1320). */
+  /** Plano de segunda a sexta, 06:00-22:00 (360 a 1320), com preco de R$ 150,00. */
   const criarPlano = async (conta: (typeof contas)['a']): Promise<string> => {
     const resposta = await request(servidor())
       .post('/api/v1/plans')
@@ -182,6 +183,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
           startMinute: 360,
           endMinute: 1320,
         })),
+        amountMinor: 15000,
       });
 
     expect(resposta.status).toBe(201);
@@ -383,6 +385,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
               endMinute: 1320,
             },
           ],
+          amountMinor: 15000,
         });
 
       expect(resposta.status).toBe(422);
@@ -577,6 +580,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
             { gymUnitId: contas.a.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 720 },
             { gymUnitId: contas.a.unidadeId, dayOfWeek: 1, startMinute: 600, endMinute: 900 },
           ],
+          amountMinor: 15000,
         });
 
       expect(resposta.status).toBe(422);
@@ -603,9 +607,285 @@ describe('F7 -- aluno, plano e entitlement', () => {
           janelas: [
             { gymUnitId: outra.id, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
           ],
+          amountMinor: 15000,
         });
 
       expect(resposta.status).toBe(422);
+    });
+
+    it('recusa plano sem preco', async () => {
+      const resposta = await request(servidor())
+        .post('/api/v1/plans')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          name: `Sem Preco ${sufixo}`,
+          gymUnitIds: [contas.a.unidadeId],
+          janelas: [
+            { gymUnitId: contas.a.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
+          ],
+        });
+
+      expect(resposta.status).toBe(400);
+      expect((resposta.body as { code: string }).code).toBe('VALIDATION_FAILED');
+    });
+
+    it('recusa preco fracionario ou negativo', async () => {
+      const fracionario = await request(servidor())
+        .post('/api/v1/plans')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          name: `Preco Fracionario ${sufixo}`,
+          gymUnitIds: [contas.a.unidadeId],
+          janelas: [
+            { gymUnitId: contas.a.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
+          ],
+          amountMinor: 150.5,
+        });
+
+      expect(fracionario.status).toBe(400);
+
+      const negativo = await request(servidor())
+        .post('/api/v1/plans')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          name: `Preco Negativo ${sufixo}`,
+          gymUnitIds: [contas.a.unidadeId],
+          janelas: [
+            { gymUnitId: contas.a.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
+          ],
+          amountMinor: -100,
+        });
+
+      expect(negativo.status).toBe(400);
+    });
+
+    it('cria a primeira linha de preco na mesma transacao do plano', async () => {
+      const resposta = await request(servidor())
+        .post('/api/v1/plans')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          name: `Com Preco ${sufixo}`,
+          gymUnitIds: [contas.a.unidadeId],
+          janelas: [
+            { gymUnitId: contas.a.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
+          ],
+          amountMinor: 19900,
+        });
+
+      expect(resposta.status).toBe(201);
+
+      const planId = (resposta.body as { id: string }).id;
+      const precos = await db.planPrice.findMany({ where: { planId } });
+
+      expect(precos).toHaveLength(1);
+      expect(precos[0]!.amountMinor).toBe(19900);
+      expect(precos[0]!.currency).toBe('BRL');
+    });
+
+    it('devolve o preco vigente e o historico de vigencias em GET /plans/:id', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .get(`/api/v1/plans/${planId}`)
+        .set('Cookie', contas.a.cookie);
+
+      expect(resposta.status).toBe(200);
+
+      const corpo = resposta.body as {
+        currentPrice: { amountMinor: number; currency: string } | null;
+        prices: { amountMinor: number; validFrom: string }[];
+      };
+
+      expect(corpo.currentPrice).not.toBeNull();
+      expect(corpo.currentPrice!.amountMinor).toBe(15000);
+      expect(corpo.prices).toHaveLength(1);
+    });
+
+    it('devolve o preco vigente na listagem GET /plans', async () => {
+      await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .get('/api/v1/plans')
+        .set('Cookie', contas.a.cookie);
+
+      expect(resposta.status).toBe(200);
+
+      const corpo = resposta.body as { currentPrice: { amountMinor: number } | null }[];
+
+      expect(corpo.length).toBeGreaterThan(0);
+      expect(corpo.every((p) => p.currentPrice !== null)).toBe(true);
+    });
+  });
+
+  describe('reajuste de preco', () => {
+    /**
+     * O teste que fecha a lacuna da F53: plano criado pela API ja nasce
+     * cobravel, sem precisar de seed nem passo manual no banco.
+     */
+    it('plano criado pela API ja nasce cobravel -- a cobranca funciona', async () => {
+      await db.billingSettings.upsert({
+        where: { tenantId: contas.a.tenantId },
+        create: { tenantId: contas.a.tenantId, dueDay: 10, graceDays: 5 },
+        update: {},
+      });
+
+      const criado = await criarAluno(contas.a, { fullName: 'Cobravel De Cara' });
+      const alunoId = (criado.body as { id: string }).id;
+      const planId = await criarPlano(contas.a);
+
+      const assinatura = await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: alunoId,
+          planId,
+          startsAt: '2026-08-01T00:00:00.000Z',
+          endsAt: '2027-08-01T00:00:00.000Z',
+          reason: 'plano nasce cobravel',
+        });
+
+      expect(assinatura.status).toBe(201);
+
+      const billing = app.get(BillingRepository);
+      const invoice = await billing.abrirInvoiceDoPeriodo(
+        {
+          tenantId: contas.a.tenantId,
+          actorId: contas.a.userId,
+          sessionId: randomUUID(),
+          permissions: new Set(['subscription.manage']),
+          allowedUnitIds: 'ALL',
+        },
+        {
+          subscriptionId: (assinatura.body as { subscriptionId: string }).subscriptionId,
+          // Competencia FUTURA em relacao ao relogio real: o plano nasce com
+          // `validFrom = agora` (momento da criacao pela API), entao a
+          // competencia cobrada precisa ser posterior a isso.
+          emQue: new Date('2027-10-05T00:00:00.000Z'),
+        },
+      );
+
+      expect(invoice.status).toBe('OPEN');
+      expect(invoice.totalMinor).toBe(15000);
+    });
+
+    it('cria nova vigencia sem alterar invoice ja emitida (INV-068)', async () => {
+      await db.billingSettings.upsert({
+        where: { tenantId: contas.a.tenantId },
+        create: { tenantId: contas.a.tenantId, dueDay: 10, graceDays: 5 },
+        update: {},
+      });
+
+      const criado = await criarAluno(contas.a, { fullName: 'Reajuste Sem Efeito Retroativo' });
+      const alunoId = (criado.body as { id: string }).id;
+      const planId = await criarPlano(contas.a);
+
+      const assinatura = await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: alunoId,
+          planId,
+          startsAt: '2026-08-01T00:00:00.000Z',
+          endsAt: '2027-08-01T00:00:00.000Z',
+          reason: 'assinatura antes do reajuste',
+        });
+
+      const billing = app.get(BillingRepository);
+      const contexto = {
+        tenantId: contas.a.tenantId,
+        actorId: contas.a.userId,
+        sessionId: randomUUID(),
+        permissions: new Set(['subscription.manage']),
+        allowedUnitIds: 'ALL' as const,
+      };
+
+      // Competencias FUTURAS em relacao ao relogio real: o plano nasce com
+      // `validFrom = agora` (momento da criacao pela API).
+      const invoiceDeOutubro = await billing.abrirInvoiceDoPeriodo(contexto, {
+        subscriptionId: (assinatura.body as { subscriptionId: string }).subscriptionId,
+        emQue: new Date('2027-10-05T00:00:00.000Z'),
+      });
+
+      expect(invoiceDeOutubro.totalMinor).toBe(15000);
+
+      // Reajuste com vigencia em novembro -- nao pode tocar a invoice de
+      // outubro, ja aberta e com valor congelado.
+      const reajuste = await request(servidor())
+        .post(`/api/v1/plans/${planId}/prices`)
+        .set('Cookie', contas.a.cookie)
+        .send({ amountMinor: 18000, validFrom: '2027-11-01T00:00:00.000Z' });
+
+      expect(reajuste.status).toBe(201);
+
+      const invoiceDeOutubroDeNovo = await db.invoice.findUniqueOrThrow({
+        where: { id: invoiceDeOutubro.id },
+      });
+
+      expect(invoiceDeOutubroDeNovo.totalMinor).toBe(15000);
+
+      const invoiceDeNovembro = await billing.abrirInvoiceDoPeriodo(contexto, {
+        subscriptionId: (assinatura.body as { subscriptionId: string }).subscriptionId,
+        emQue: new Date('2027-11-05T00:00:00.000Z'),
+      });
+
+      expect(invoiceDeNovembro.totalMinor).toBe(18000);
+
+      const precos = await db.planPrice.findMany({
+        where: { planId },
+        orderBy: { validFrom: 'asc' },
+      });
+
+      expect(precos).toHaveLength(2);
+    });
+
+    it('validFrom duplicado responde 409 com codigo estavel, nao 500', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const primeiro = await request(servidor())
+        .post(`/api/v1/plans/${planId}/prices`)
+        .set('Cookie', contas.a.cookie)
+        .send({ amountMinor: 18000, validFrom: '2026-09-01T00:00:00.000Z' });
+
+      expect(primeiro.status).toBe(201);
+
+      const duplicado = await request(servidor())
+        .post(`/api/v1/plans/${planId}/prices`)
+        .set('Cookie', contas.a.cookie)
+        .send({ amountMinor: 20000, validFrom: '2026-09-01T00:00:00.000Z' });
+
+      expect(duplicado.status).toBe(409);
+      expect((duplicado.body as { code: string }).code).toBe('PLAN_PRICE_VALID_FROM_TAKEN');
+    });
+
+    /**
+     * Decisao registrada no relatorio da fatia: reajuste retroativo e
+     * RECUSADO. `validFrom` no passado mudaria o preco de competencias que
+     * ainda nao foram cobradas sem o operador escolher isso de proposito --
+     * o "agora" so entra por parametro no caso de uso, nunca dentro da
+     * regra, e e ele que decide o corte.
+     */
+    it('recusa reajuste com validFrom no passado', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/plans/${planId}/prices`)
+        .set('Cookie', contas.a.cookie)
+        .send({ amountMinor: 18000, validFrom: '2020-01-01T00:00:00.000Z' });
+
+      expect(resposta.status).toBe(422);
+      expect((resposta.body as { code: string }).code).toBe('PLAN_PRICE_RETROACTIVE');
+    });
+
+    it('plano de outro tenant responde 404 ao reajustar, exigindo o codigo', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/plans/${planId}/prices`)
+        .set('Cookie', contas.b.cookie)
+        .send({ amountMinor: 18000, validFrom: '2026-09-01T00:00:00.000Z' });
+
+      expect(resposta.status).toBe(404);
+      expect((resposta.body as { code: string }).code).toBe('PLAN_NOT_FOUND');
     });
   });
 

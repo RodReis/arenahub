@@ -78,6 +78,9 @@ describe('contrato OpenAPI', () => {
         '/api/v1/students/{id}/timeline',
         '/api/v1/plans',
         '/api/v1/plans/{id}',
+        // F53 -- backend de preco de plano: obrigatorio na criacao, mais
+        // reajuste que cria nova linha de vigencia sem tocar invoice emitida.
+        '/api/v1/plans/{id}/prices',
         '/api/v1/subscriptions',
         '/api/v1/subscriptions/{id}/actions',
         '/api/v1/entitlements/courtesy',

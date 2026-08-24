@@ -893,6 +893,29 @@
         ]
       }
     },
+    "/api/v1/plans/{id}/prices": {
+      "post": {
+        "operationId": "MembershipController_reajustarPreco",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Membership"
+        ]
+      }
+    },
     "/api/v1/plans/{id}": {
       "get": {
         "operationId": "MembershipController_detalharPlano",
