@@ -125,3 +125,78 @@ cumprido e o endpoint aceita evento forjado. **Nenhum tráfego de produção ant
 - [ ] O PI aceitou esta spec
 - [ ] Credenciais de sandbox dos dois provedores em mãos
 - [ ] A matriz do gate (`reports/MVP-02-matriz-de-homologacao-de-provedor.md`) foi atualizada com o que a sandbox confirmou
+
+---
+
+## 9. O que os documentos de `docs/integracao/` acrescentam — 23/08/2026
+
+O PI trouxe quatro documentos de integração Getnet. A análise completa está em
+[`notes/2026-08-23-analise-integracao-getnet.md`](../notes/2026-08-23-analise-integracao-getnet.md);
+aqui fica só o que **esta fatia** precisa honrar. Os documentos são **material de fornecedor**, no
+mesmo estatuto de `docs/vendor/topdata/` — não são spec, e onde conflitarem com PRD, ADR ou código
+entregue, perdem.
+
+### 9.1 Fase 0 — o bloqueio, agora com nome
+
+**Ter maquininha Getnet ativa não dá credencial de e-commerce.** Adquirência presencial (POS) e
+Plataforma Digital são **produtos contratuais distintos**: `client_id`, `client_secret` e
+`seller_id` saem do time de Integração da Getnet, mediante solicitação. É isto que a §1 desta spec
+chamava de "insumo do PI" — e é o primeiro item, bloqueante de todo o resto.
+
+Perguntas a fazer no mesmo contato, porque cada uma muda código:
+
+1. **Global API (`docs.globalgetnet.com`, sandbox `api-sbx.globalgetnet.com`) ou API Brasil legada
+   (`api.getnet.com.br`)?** Os conceitos são os mesmos; os *paths* não. Ficam em configuração.
+2. **Checkout hospedado / Iframe** — o produto que atende a decisão do PI de 23/08 e mantém o PAN
+   fora do nosso servidor.
+3. **Modo de autenticação do webhook** — HMAC ou mTLS antes de Basic (§9.4).
+4. **Ranges de IP do webhook**, para allowlist.
+5. **Script de fingerprint antifraude** e o que ele exige de `customer`.
+
+### 9.2 Contrato técnico que entra no adapter da Getnet
+
+- OAuth2 `client_credentials` → `access_token` Bearer, validade ~3600 s, **sem refresh token**:
+  cache com renovação antecipada, e `401` reautentica e repete **uma** vez.
+- Header `x-seller-id` **por `ProviderAccount`, nunca em variável de ambiente** — env única
+  quebraria multi-tenant e a INV-078.
+- `idempotency_key` por tentativa de cobrança; retry de rede reutiliza a chave, cobrança nova gera
+  outra. Casa com o índice parcial que a F14 já usa.
+- `soft_descriptor` (ex.: `ARENA*MENSALIDADE`) reduz contestação.
+- **Antifraude é obrigatório em produção**: `customer` completo (nome, e-mail, telefone, **CPF**,
+  endereço de cobrança) + `additional_data.device` (`ip_address`, `device_id`, `finger_print`).
+  Sem isso a transação é **bloqueada**, com mensagem genérica. Efeito colateral no cadastro em
+  §9.5.
+- **Monitorar o certificado TLS do nosso endpoint de webhook**: a Getnet para de entregar em
+  silêncio quando ele vence.
+
+### 9.3 PIX — conflito aberto com o ADR-032
+
+Os documentos assumem **PIX pela Getnet**; o **ADR-032 decidiu Sicoob**, porque o dinheiro cai
+direto na conta da academia. Getnet simplifica a construção (um adapter, um webhook, um extrato) e
+encarrega o adquirente do dinheiro; Sicoob é o inverso, e exige mTLS com certificado — **que não
+está estudado em lugar nenhum do repositório**.
+
+**Esta fatia não decide isso.** Se mudar, o ADR-032 é reaberto — ADR aceito não se contradiz por
+nota nem por spec.
+
+### 9.4 Webhook — Basic Auth não basta sozinho
+
+Os documentos escolhem `user_credentials` (Basic) "pela simplicidade". Basic autentica o
+**remetente**, não o **corpo**, e o `MVP-02` §15 exige proteção contra replay. Ordem de
+preferência: HMAC (que a coluna `signingSecretEncrypted` já espera) → mTLS → Basic. **Se Basic for
+o único modo oferecido**, a compensação é parte do aceite desta fatia: dedup por
+`(provider_account_id, external_event_id)` — já existe — **mais `getPaymentStatus` antes de
+aplicar qualquer efeito financeiro**.
+
+### 9.5 O que isto obriga fora desta fatia
+
+- **CPF e endereço de cobrança** viram condição para pagar com cartão em produção — e o ArenaHub
+  decidiu **CPF opcional** (INV-009/011, F45). A saída proposta é pedir na hora do pagamento, não
+  no cadastro: quem paga em espécie ou PIX nunca é incomodado. Detalhe na `SPEC-053` §9.
+- **Recorrência:** os documentos propõem o Subscriptions Engine da Getnet no lugar do ciclo que a
+  **F14 já entregou**. Custo admitido pelos próprios documentos: **preço de plano imutável**,
+  retry da Getnet no lugar do `[0,3,7]` do PI, e uma segunda fonte de verdade de assinatura.
+  Recomendação: manter o ciclo no ArenaHub e usar a Getnet como executor de cobrança tokenizada.
+  **Decisão do PI; se ele escolher o engine, a F14 é parcialmente refeita e isso exige ADR.**
+- **Get Smart / POS Android:** descartado com fundamento (deeplink só é invocável por app Android
+  dentro do terminal). Fica no Anexo A dos documentos como cenário futuro.

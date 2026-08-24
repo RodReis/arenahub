@@ -151,3 +151,41 @@ O PI olha e diz "aceito" quando, com um aluno de demonstração:
 - [ ] O PI aceitou esta spec
 - [ ] A F55 está entregue **ou** está aceito que a fatia rode contra o `FakePaymentProvider`
 - [x] A pergunta 2 da §7 está respondida — 23/08/2026, `MANUAL` para espécie
+
+---
+
+## 9. Antifraude da Getnet e o CPF opcional — 23/08/2026
+
+Achado dos documentos de `docs/integracao/`, analisados em
+[`notes/2026-08-23-analise-integracao-getnet.md`](../notes/2026-08-23-analise-integracao-getnet.md) §5.
+
+**Em produção, cartão sem `customer` completo é bloqueado pelo antifraude da Getnet** — nome,
+e-mail, telefone, **CPF** e endereço de cobrança. E o ArenaHub decidiu, de propósito, que **CPF é
+opcional** (INV-009/011, decisão do PI em 18/08 na F45).
+
+**Consequência direta nesta fatia:** aluno sem CPF **não paga com cartão**. Paga em espécie e por
+PIX normalmente, mas o cartão morre no antifraude com mensagem genérica — e a recepcionista vê
+*"não foi possível concluir"* sem entender por quê.
+
+**Proposta desta spec, que não desfaz decisão nenhuma:** o **fluxo de cartão** pede o que falta
+(CPF e endereço) **na hora do pagamento**, grava no cadastro e segue. O cadastro continua aceitando
+aluno sem CPF; quem paga em espécie ou PIX nunca é incomodado. **Confirmar com o PI.**
+
+### 9.1 Mensagens de erro — o que a recepção lê
+
+| situação | mensagem |
+|---|---|
+| recusa do emissor | "Pagamento recusado pelo emissor. Tente outro cartão." |
+| antifraude bloqueou | "Não foi possível concluir. Confirme os dados do aluno." — **a palavra "antifraude" não aparece** |
+| falta CPF/endereço | "Para pagar com cartão, precisamos do CPF e do endereço do aluno." |
+| QR PIX expirado | "QR expirado. Gere um novo código." |
+| API do provedor fora | banner de indisponibilidade, com a contingência combinada com a operação |
+
+O código técnico fica em tooltip ou detalhe para o suporte, nunca na frase principal.
+
+### 9.2 O que **não** vem dos documentos
+
+Eles descrevem, para o `admin-web`, um **formulário de cartão digitado pelo atendente** com
+PAN e CVV no browser do painel. **Isso está morto por duas razões:** a decisão do PI de 23/08
+(checkout hospedado, o aluno digita no próprio celular) e o `MVP-02` §15 + `M2-AC-011` + INV-098,
+que já proibiam PAN no nosso lado antes dessa conversa.

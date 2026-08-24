@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 23/08/2026 *(F53, F54 e F55: pagamento nas três superfícies; `docs/specs/` reaberto)*
+**Última atualização:** 23/08/2026 *(F53–F55; `docs/specs/` reaberto; análise dos documentos Getnet)*
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -325,6 +325,39 @@ fora de ordem e estorno assíncrono sem depender da rede de um banco. O que muda
 segunda: **cartão no totem amplia o `MVP-04` §7 Slice 4.6**, que prevê apenas PIX — a emenda de
 PRD que isso exige **não é minha** (o ADR-021 só me autoriza a materializar decisão já registrada
 em ADR aceito), então ou vira ADR ou é o Code/PI quem escreve.
+
+🏦 **23/08/2026, terceira rodada — chegaram quatro documentos de integração Getnet, e eles foram
+escritos como se o backend não existisse.** O PI trouxe `docs/integracao/` (um documento-mãe e um
+por canal). Análise inteira em
+[`notes/2026-08-23-analise-integracao-getnet.md`](notes/2026-08-23-analise-integracao-getnet.md).
+
+**O que eles trazem de valor, e é bastante:** a correção comercial de que **maquininha ativa não é
+credencial de e-commerce** (produtos contratuais distintos — é o bloqueio da F55, agora com nome e
+caminho); Global API × API Brasil legada, com a pergunta certa e os paths em configuração; a
+mecânica real do PIX (QR pagável depois de a tela morrer, webhook depois do `expired`); e o
+descarte fundamentado do Get Smart — os deeplinks `getnet://` só existem para app Android **dentro
+do POS**, e uma PWA em totem genérico nunca os invoca.
+
+**O erro-raiz:** o documento-mãe abre com *"Novo módulo `billing` em `apps/api`"* e propõe tabelas,
+estados e endpoints do zero. **O módulo existe e o MVP 2 está entregue** (F12–F16): onze tabelas,
+porta `PaymentProvider` com oito métodos, idempotência por índice parcial que já pegou cobrança em
+dobro medida, retry por tenant e conciliação com fila. Adotar o desenho como está criaria **uma
+segunda modelagem financeira dentro do mesmo módulo**. Os documentos entram como **material de
+fornecedor**, no estatuto de `docs/vendor/topdata/` — o que é da Getnet vai para a `SPEC-055`; o
+que é modelagem é substituído pelo schema que já está no banco.
+
+🔴 **Três conflitos que só o PI resolve, e um achado que ninguém tinha visto.**
+**(1) PIX:** os documentos assumem Getnet, o **ADR-032 decidiu Sicoob** — Getnet simplifica a
+construção (um adapter, um webhook, um extrato) e encarece a operação; Sicoob põe o dinheiro
+direto na conta e exige mTLS que ninguém estudou aqui. **(2) Recorrência:** eles propõem o
+Subscriptions Engine da Getnet no lugar do ciclo que a **F14 já entregou** — o custo, admitido
+pelos próprios documentos, é **preço de plano imutável**, retry da Getnet no lugar do `[0,3,7]` do
+PI e uma segunda fonte de verdade de assinatura. **(3) Webhook por Basic Auth** autentica o
+remetente, não o corpo; sem HMAC, a compensação (`getPaymentStatus` antes de qualquer efeito) vira
+parte do aceite. **E o achado:** o antifraude da Getnet **exige CPF e endereço** para cartão em
+produção, e o ArenaHub decidiu em 18/08 que **CPF é opcional** (INV-009/011) — aluno sem CPF paga
+em espécie e por PIX, mas **não paga com cartão**. A saída proposta pede o dado **no fluxo de
+pagamento**, não no cadastro: não desfaz decisão nenhuma e não incomoda quem paga de outro jeito.
 
 ## 1. Onde estamos, em três frases
 
