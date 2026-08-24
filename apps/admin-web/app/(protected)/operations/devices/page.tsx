@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import {
   Ausente,
+  Button,
   DataTable,
   EmptyState,
   EstadoSimples,
@@ -112,7 +113,22 @@ export default async function PaginaDeSincronizacao() {
 
   return (
     <section aria-labelledby="titulo-sync">
-      <PageHeader id="titulo-sync" title="Sincronização de dispositivos" />
+      <PageHeader
+        id="titulo-sync"
+        title="Sincronização de dispositivos"
+        breadcrumb={<span>Administração</span>}
+        actions={
+          /*
+            `POST /devices` existia na API -- com homologacao de hardware e
+            auditoria -- e nunca teve chamador. Nao ha seed de dispositivo e o
+            edge-agent nao se auto-registra: ate aqui, um leitor so entrava
+            por `curl`.
+          */
+          <Button href="/operations/devices/novo" data-testid="novo-dispositivo">
+            Novo dispositivo
+          </Button>
+        }
+      />
 
       {/*
         Região viva: quem usa leitor de tela é avisado da pendência sem
@@ -174,7 +190,23 @@ export default async function PaginaDeSincronizacao() {
             render: (d) => <TenantDateTime iso={d.lastSyncAt} timeZone={FUSO_PROVISORIO} />,
           },
         ]}
-        empty={<EmptyState testId="sem-dispositivo" title="Nenhum dispositivo cadastrado." />}
+        empty={
+          <EmptyState
+            testId="sem-dispositivo"
+            title="Nenhum dispositivo cadastrado."
+            hint="O leitor precisa estar cadastrado para receber os alunos e reconhecer rostos."
+            /*
+              O vazio nao tinha dica NEM acao -- beco puro, e a tela ficaria
+              assim para sempre, porque nada no sistema cria dispositivo
+              sozinho.
+            */
+            action={
+              <Button href="/operations/devices/novo" data-testid="novo-dispositivo-vazio">
+                Cadastrar dispositivo
+              </Button>
+            }
+          />
+        }
       />
 
       <h2>Fila de sincronização</h2>
