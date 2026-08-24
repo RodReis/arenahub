@@ -1,4 +1,14 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -36,6 +46,12 @@ const esquemaDePlano = z
     amountMinor: z.number().int().positive(),
   })
   .strict();
+
+/**
+ * Liga/desliga do plano. Um campo so, `.strict()`: mandar `name` ou `price`
+ * junto seria edicao de plano, que esta rota nao faz.
+ */
+const esquemaDeAtivacaoDePlano = z.object({ isActive: z.boolean() }).strict();
 
 const esquemaDeReajuste = z
   .object({
@@ -187,6 +203,42 @@ export class MembershipController {
     const planos = await this.membership.listarPlanos(this.contexto.require());
 
     return planos.map((p) => this.planoParaDto(p));
+  }
+
+  /**
+   * Liga e desliga o plano da lista de escolha.
+   *
+   * PATCH e nao DELETE: plano nao se apaga (decisao do PI, 24/08/2026).
+   * Apagar deixaria invoice e timeline antigas citando um plano inexistente,
+   * e o historico financeiro e auditado. `isActive` ja existia no schema e ja
+   * era exibido -- faltava quem o escrevesse.
+   */
+  @Patch('plans/:id/activation')
+  @RequirePermissions('plan.manage')
+  async alterarAtivacaoDePlano(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<PlanoDto> {
+    const dados = esquemaDeAtivacaoDePlano.parse(corpo);
+
+    await this.membership.alterarAtivacaoDePlano(
+      this.contexto.require(),
+      id,
+      dados.isActive,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    /*
+     * Relê o plano COMPLETO para devolver o mesmo DTO das outras rotas: o
+     * `update` volta só a linha de `Plan`, sem unidades, janelas nem preços,
+     * e uma resposta com forma diferente faria a tela achar que perdeu dado.
+     */
+    const plano = await this.membership.encontrarPlano(this.contexto.require(), id);
+
+    if (!plano) throw new NotFoundException({ code: 'PLAN_NOT_FOUND' });
+
+    return this.planoParaDto(plano);
   }
 
   @Get('plans/:id')

@@ -18,6 +18,7 @@ vi.mock('../../../lib/api/server-client', () => ({
 vi.mock('../../actions/membership', () => ({
   cadastrarPlano: vi.fn(),
   reajustarPreco: vi.fn(),
+  alterarAtivacaoDePlano: vi.fn(),
 }));
 
 import { chamarApi } from '../../../lib/api/server-client';

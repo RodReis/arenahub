@@ -717,6 +717,90 @@ describe('F7 -- aluno, plano e entitlement', () => {
     });
   });
 
+  describe('ativacao de plano', () => {
+    /**
+     * PLANO NAO SE APAGA, SE DESATIVA (decisao do PI, 24/08/2026): apagar
+     * deixaria invoice e timeline antigas citando um plano inexistente, e o
+     * historico financeiro e auditado.
+     */
+    it('desativa o plano que ninguem esta usando', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/plans/${planId}/activation`)
+        .set('Cookie', contas.a.cookie)
+        .send({ isActive: false });
+
+      expect(resposta.status).toBe(200);
+      expect((resposta.body as { isActive: boolean }).isActive).toBe(false);
+    });
+
+    /**
+     * A GUARDA QUE PROTEGE ACESSO: desativar plano com aluno usando o
+     * tiraria da lista de escolha enquanto alguem ainda depende dele -- e a
+     * recepcao descobriria na catraca, nao na tela.
+     */
+    it('recusa desativar plano com assinatura em vigor', async () => {
+      const planId = await criarPlano(contas.a);
+      const aluno = await criarAluno(contas.a, { fullName: 'Com Plano Ativo' });
+      const alunoId = (aluno.body as { id: string }).id;
+
+      await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: alunoId,
+          planId,
+          startsAt: '2026-01-01T06:00:00.000Z',
+          endsAt: '2027-01-01T22:00:00.000Z',
+          reason: 'matricula de bancada',
+        })
+        .expect(201);
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/plans/${planId}/activation`)
+        .set('Cookie', contas.a.cookie)
+        .send({ isActive: false });
+
+      expect(resposta.status).toBe(409);
+      expect((resposta.body as { code: string }).code).toBe('PLAN_IN_USE');
+    });
+
+    /**
+     * REATIVAR NUNCA E RECUSADO: devolver um plano a lista de escolha nao
+     * tira acesso de ninguem. So o desligamento tem guarda.
+     */
+    it('reativa sem exigir nada, mesmo com assinatura', async () => {
+      const planId = await criarPlano(contas.a);
+
+      await request(servidor())
+        .patch(`/api/v1/plans/${planId}/activation`)
+        .set('Cookie', contas.a.cookie)
+        .send({ isActive: false })
+        .expect(200);
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/plans/${planId}/activation`)
+        .set('Cookie', contas.a.cookie)
+        .send({ isActive: true });
+
+      expect(resposta.status).toBe(200);
+      expect((resposta.body as { isActive: boolean }).isActive).toBe(true);
+    });
+
+    it('plano de outro tenant responde 404, exigindo o codigo', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/plans/${planId}/activation`)
+        .set('Cookie', contas.b.cookie)
+        .send({ isActive: false });
+
+      expect(resposta.status).toBe(404);
+      expect((resposta.body as { code: string }).code).toBe('PLAN_NOT_FOUND');
+    });
+  });
+
   describe('reajuste de preco', () => {
     /**
      * O teste que fecha a lacuna da F53: plano criado pela API ja nasce

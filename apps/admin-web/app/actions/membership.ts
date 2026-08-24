@@ -86,6 +86,14 @@ const MENSAGEM: Record<string, string> = {
     'Alguém alterou esta assinatura enquanto você editava. Recarregue a ficha e tente de novo.',
   FORBIDDEN: 'Seu perfil não tem permissão para esta ação.',
   PLAN_PRICE_VALID_FROM_TAKEN: 'Já existe um preço cadastrado para esta data de início.',
+  /*
+   * A recusa que protege ACESSO: desativar plano com aluno usando o tiraria
+   * da lista enquanto alguem ainda depende dele, e a recepcao descobriria na
+   * catraca. A frase diz O QUE FAZER -- a API ja conta quantas assinaturas
+   * seguram o plano.
+   */
+  PLAN_IN_USE:
+    'Este plano tem assinatura em vigor. Encerre ou troque o plano dos alunos antes de desativá-lo.',
   PLAN_PRICE_RETROACTIVE:
     'A data de início não pode estar no passado — reajuste retroativo não é permitido.',
 };
@@ -432,3 +440,64 @@ export async function atribuirPlano(
  * `EntitlementDto` que a ficha recebe traz `subscriptionId` mas não a versão.
  * Construir a tela exige rota nova ou campo novo — decisão de escopo, do PI.
  */
+
+export interface EstadoDaAtivacaoDePlano {
+  erro?: string;
+  sucesso?: { planId: string; isActive: boolean };
+}
+
+const esquemaDeAtivacaoDePlano = z.object({
+  planId: z.string().uuid(),
+  /*
+   * Vem do formulário como string: `FormData` não tem booleano. A conversão
+   * é explícita porque `Boolean('false')` é `true` -- o erro clássico que
+   * faria "desativar" ativar.
+   */
+  isActive: z.enum(['true', 'false']).transform((valor) => valor === 'true'),
+});
+
+/**
+ * Liga e desliga o plano da lista de escolha.
+ *
+ * DESATIVA, NÃO APAGA (decisão do PI, 24/08/2026): apagar deixaria invoice e
+ * timeline antigas citando um plano inexistente, e o histórico financeiro é
+ * auditado.
+ *
+ * A recusa por plano em uso vem da API (`PLAN_IN_USE`) e não é replicada
+ * aqui: contar assinatura no cliente exigiria uma segunda chamada e ainda
+ * assim correria por fora — entre a contagem e o clique, alguém pode
+ * assinar. A guarda vive onde a decisão é atômica.
+ */
+export async function alterarAtivacaoDePlano(
+  _anterior: EstadoDaAtivacaoDePlano,
+  formulario: FormData,
+): Promise<EstadoDaAtivacaoDePlano> {
+  const validado = esquemaDeAtivacaoDePlano.safeParse({
+    planId: texto(formulario, 'planId'),
+    isActive: texto(formulario, 'isActive'),
+  });
+
+  if (!validado.success) {
+    return { erro: 'Não foi possível identificar o plano. Recarregue a página.' };
+  }
+
+  const resposta = await chamarApi<{ id: string; isActive: boolean }>(
+    `/api/v1/plans/${validado.data.planId}/activation`,
+    { metodo: 'PATCH', corpo: { isActive: validado.data.isActive } },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro: frase(
+        resposta.erro?.code ?? '',
+        validado.data.isActive
+          ? 'Não foi possível reativar o plano'
+          : 'Não foi possível desativar o plano',
+      ),
+    };
+  }
+
+  revalidatePath('/plans');
+
+  return { sucesso: { planId: resposta.dados.id, isActive: resposta.dados.isActive } };
+}
