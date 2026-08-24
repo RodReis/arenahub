@@ -102,16 +102,25 @@ const esquemaDeCriacao = z
     fullName: z.string().min(2).max(160),
     birthDate: dataSimples,
     /**
-     * Unidade de ORIGEM. Unico campo que a F45 tornou obrigatorio -- decisao
-     * do PI de 18/08/2026. Nome, nascimento e unidade sao os tres unicos
-     * obrigatorios do cadastro inteiro: quem chega sem documento, sem
-     * endereco e sem telefone e cadastrado do mesmo jeito.
+     * Unidade de ORIGEM. A F45 tornou obrigatorio -- decisao do PI de
+     * 18/08/2026. Nome, nascimento e unidade sao tres dos obrigatorios do
+     * cadastro; endereco e telefone continuam de fora.
      */
     gymUnitId: z.string().uuid(),
-    cpf: z
-      .string()
-      .optional()
-      .refine((valor) => valor === undefined || cpfEhValido(valor), 'CPF invalido'),
+    /**
+     * Obrigatorio desde o ADR-043 Decisao 3 (23/08/2026), que REVERTE a
+     * decisao do PI de 18/08 ("CPF continua opcional"). Motivo: o antifraude
+     * da Getnet bloqueia cobranca no cartao sem CPF no `customer`, e o PI
+     * decidiu exigi-lo no cadastro em vez de dentro do fluxo de pagamento.
+     *
+     * A OBRIGATORIEDADE E DE APLICACAO, NUNCA DE COLUNA -- `students.cpf`
+     * continua anulavel (`@db.Text?`). A base importada do Pacto tem pelo
+     * menos 308 alunos sem CPF (1.618 CPFs para 1.926 alunos, ADR-034); eles
+     * continuam existindo, treinando e passando na catraca. So nao podem
+     * pagar com cartao. Ver INV-009/INV-011: CPF nao vira matricula nem
+     * identificador de dispositivo so por ser obrigatorio agora.
+     */
+    cpf: z.string().refine((valor) => cpfEhValido(valor), 'CPF invalido'),
     /** Texto livre: RG nao tem formato nacional unico. */
     rg: z.string().min(1).max(40).optional(),
     registeredSex: sexoCadastral.optional(),
@@ -141,11 +150,14 @@ const esquemaDeEdicao = z
     fullName: z.string().min(2).max(160).optional(),
     birthDate: dataSimples.optional(),
     gymUnitId: z.string().uuid().optional(),
-    cpf: z
-      .string()
-      .nullable()
-      .optional()
-      .refine((valor) => valor === undefined || valor === null || cpfEhValido(valor), 'CPF invalido'),
+    /**
+     * SEM `.nullable()` -- unica excecao a distincao ausente/null do resto
+     * deste schema (ADR-043 Decisao 3). Ausente continua "nao mexer"; `null`
+     * aqui e RECUSADO em vez de "apagar", porque apagar um CPF ja gravado
+     * contraria a obrigatoriedade que este ADR introduziu. Os demais campos
+     * mantem `null` = apaga.
+     */
+    cpf: z.string().optional().refine((valor) => valor === undefined || cpfEhValido(valor), 'CPF invalido'),
     rg: z.string().min(1).max(40).nullable().optional(),
     registeredSex: sexoCadastral.nullable().optional(),
     leadSource: origemDoLead.nullable().optional(),

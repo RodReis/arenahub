@@ -131,6 +131,9 @@ describe('F8 -- consentimento biometrico', () => {
         fullName: 'Aluno De Teste',
         birthDate: nascimento,
         gymUnitId: conta.gymUnitId,
+        // Obrigatorio desde o ADR-043 Decisao 3; este arquivo nao testa CPF,
+        // entao um valor fixo e valido basta.
+        cpf: '52998224725',
         contacts: [],
       });
 

@@ -125,6 +125,29 @@ describe('F7 -- aluno, plano e entitlement', () => {
     conta.cookie = cookieDeAcesso(login);
   };
 
+  /*
+   * CPF valido e DIFERENTE a cada chamada (ADR-043 Decisao 3 tornou o campo
+   * obrigatorio no `POST /students`). Contador simples, nao aleatorio: teste
+   * tem de ser deterministico.
+   */
+  let proximoCpf = 1;
+  const gerarCpfValido = (): string => {
+    const base = String(100000000 + ((proximoCpf * 97) % 899999999)).padStart(9, '0');
+    proximoCpf += 1;
+
+    const digitos = base.split('').map(Number);
+    const verificador = (ate: number, seq: number[]): number => {
+      let soma = 0;
+      for (let i = 0; i < ate; i += 1) soma += seq[i]! * (ate + 1 - i);
+      const resto = (soma * 10) % 11;
+      return resto === 10 ? 0 : resto;
+    };
+    const d1 = verificador(9, digitos);
+    const d2 = verificador(10, [...digitos, d1]);
+
+    return `${base}${d1}${d2}`;
+  };
+
   const criarAluno = async (
     conta: (typeof contas)['a'],
     dados: Record<string, unknown> = {},
@@ -138,6 +161,9 @@ describe('F7 -- aluno, plano e entitlement', () => {
         // Obrigatorio desde a F45: unidade de ORIGEM, nunca controle de
         // acesso. Cada chamada pode sobrescrever pelo `...dados`.
         gymUnitId: conta.unidadeId,
+        // Obrigatorio desde o ADR-043 Decisao 3. Cada chamada pode
+        // sobrescrever pelo `...dados`.
+        cpf: gerarCpfValido(),
         contacts: [],
         ...dados,
       });

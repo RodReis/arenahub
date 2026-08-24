@@ -26,17 +26,17 @@ const esquemaDeCadastro = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe a data de nascimento'),
   /**
-   * Unidade de origem. Obrigatória desde a F45 — e é o único campo que a
-   * fatia acrescentou à lista de obrigatórios. Nome, nascimento e unidade
-   * são os três; todo o resto do formulário é opcional.
+   * Unidade de origem. Obrigatória desde a F45. Nome, nascimento, CPF e
+   * unidade são os obrigatórios; todo o resto do formulário é opcional.
    */
   gymUnitId: z.string().uuid('Selecione a unidade do aluno'),
-  // CPF é opcional por decisão de produto: a matrícula não depende dele
-  // (INV-009/011), e exigi-lo na recepção travaria o cadastro de menor de
-  // idade e de quem esqueceu o documento. O mockup marcava CPF, telefone e
-  // e-mail como obrigatórios — o PI decidiu em 18/08 que o mockup é que se
-  // corrige.
-  cpf: z.string().trim().optional(),
+  // Obrigatório desde o ADR-043 Decisão 3 (23/08), que REVERTE a decisão do
+  // PI de 18/08 ("CPF continua opcional"). O antifraude do checkout de
+  // cartão bloqueia cobrança sem CPF no `customer`; exigi-lo no cadastro
+  // evita pedir o documento dentro do fluxo de pagamento. A matrícula
+  // continua sem depender do CPF (INV-009/011) -- obrigatório na ENTRADA,
+  // nunca virou identificador.
+  cpf: z.string().trim().min(1, 'Informe o CPF do aluno'),
   rg: z.string().trim().max(40, 'RG longo demais').optional(),
   registeredSex: z.enum(['FEMALE', 'MALE', 'NOT_INFORMED']).optional(),
   leadSource: z
@@ -302,7 +302,7 @@ export async function cadastrarAluno(
       fullName: dados.fullName,
       birthDate: dados.birthDate,
       gymUnitId: dados.gymUnitId,
-      ...(dados.cpf ? { cpf: dados.cpf } : {}),
+      cpf: dados.cpf,
       ...(dados.rg ? { rg: dados.rg } : {}),
       ...(dados.registeredSex ? { registeredSex: dados.registeredSex } : {}),
       ...(dados.leadSource ? { leadSource: dados.leadSource } : {}),

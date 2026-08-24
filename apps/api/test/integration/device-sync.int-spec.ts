@@ -118,6 +118,9 @@ describe('F8 -- fila de sincronizacao', () => {
         fullName: 'Aluno Sync',
         birthDate: nascimento.toISOString().slice(0, 10),
         gymUnitId: conta.gymUnitId,
+        // Obrigatorio desde o ADR-043 Decisao 3; este arquivo nao testa CPF,
+        // entao um valor fixo e valido basta.
+        cpf: '52998224725',
         contacts: [],
       });
 

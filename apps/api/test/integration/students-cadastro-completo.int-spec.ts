@@ -14,12 +14,15 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
  *
  * O que este arquivo prova, item a item do criterio de aceite da issue #100:
  *
- *   - cadastro com nome, nascimento e unidade gera matricula;
+ *   - cadastro com nome, nascimento, unidade e CPF gera matricula (CPF
+ *     obrigatorio desde o ADR-043 Decisao 3, que reverte a decisao de 18/08);
  *   - endereco e contato de emergencia persistem e voltam no `GET`;
  *   - edicao respeita `version` (trava otimista);
  *   - unidade de outro tenant e recusada -- aluno nao muda de academia;
  *   - duplicata continua AVISANDO, nao bloqueando (INV-014);
- *   - CPF completo persiste e volta na resposta (ADR-034).
+ *   - CPF completo persiste e volta na resposta (ADR-034);
+ *   - aluno legado sem CPF (importado do Pacto, ADR-034) continua legivel e
+ *     editavel -- a obrigatoriedade e de aplicacao, nunca de coluna.
  *
  * A prova de que `gym_unit_id` NAO entra na decisao de acesso e estrutural e
  * mora em `src/modules/access/gym-unit-nao-decide-acesso.spec.ts`: teste de
@@ -173,6 +176,30 @@ describe('F45 -- cadastro completo de aluno', () => {
     conta.cookie = cookieDeAcesso(login);
   };
 
+  /*
+   * CPF valido e DIFERENTE a cada chamada (ADR-043 Decisao 3 tornou o campo
+   * obrigatorio). Um contador simples, nao aleatorio: teste tem de ser
+   * deterministico. `cpfEhValido` roda por cima para nunca produzir sequencia
+   * repetida (11111111111 etc), que o validador de dominio recusa.
+   */
+  let proximoCpf = 1;
+  const gerarCpfValido = (): string => {
+    const base = String(100000000 + ((proximoCpf * 97) % 899999999)).padStart(9, '0');
+    proximoCpf += 1;
+
+    const digitos = base.split('').map(Number);
+    const verificador = (ate: number, seq: number[]): number => {
+      let soma = 0;
+      for (let i = 0; i < ate; i += 1) soma += seq[i]! * (ate + 1 - i);
+      const resto = (soma * 10) % 11;
+      return resto === 10 ? 0 : resto;
+    };
+    const d1 = verificador(9, digitos);
+    const d2 = verificador(10, [...digitos, d1]);
+
+    return `${base}${d1}${d2}`;
+  };
+
   const criar = async (
     conta: (typeof contas)['a'],
     dados: Record<string, unknown> = {},
@@ -184,6 +211,7 @@ describe('F45 -- cadastro completo de aluno', () => {
         fullName: 'Aluno Completo',
         birthDate: '1990-05-10',
         gymUnitId: conta.unidadeId,
+        cpf: gerarCpfValido(),
         contacts: [],
         ...dados,
       });
@@ -205,17 +233,94 @@ describe('F45 -- cadastro completo de aluno', () => {
   });
 
   describe('cadastro minimo', () => {
-    it('nome, nascimento e unidade bastam -- e geram matricula', async () => {
-      // O CRITERIO CENTRAL DA FATIA: quem chega sem CPF, sem endereco e sem
-      // telefone e cadastrado do mesmo jeito (INV-009, INV-011). Se este
-      // teste passar a exigir mais um campo, a decisao do PI foi revertida
-      // sem ninguem ter escrito isso em lugar nenhum.
+    /*
+     * ESTE TESTE GUARDAVA A DECISAO DE 18/08 ("nome, nascimento e unidade
+     * bastam, CPF fica de fora"). O ADR-043 Decisao 3 (23/08/2026) reverteu
+     * isso: o antifraude da Getnet bloqueia cartao sem CPF, e o PI decidiu
+     * tornar o campo obrigatorio no cadastro em vez de pedi-lo dentro do
+     * fluxo de pagamento. O teste agora guarda a decisao NOVA -- nome,
+     * nascimento, unidade E CPF sao os obrigatorios -- e nao foi apagado
+     * porque a obrigatoriedade e de APLICACAO, nunca de coluna: o teste
+     * seguinte prova que o legado sem CPF continua vivo.
+     */
+    it('nome, nascimento, unidade e CPF sao os obrigatorios -- e geram matricula', async () => {
       const resposta = await criar(contas.a);
 
       expect(resposta.status).toBe(201);
       expect(corpo(resposta).membershipNumber).toMatch(/^AP-\d{4}-\d{8}$/);
       expect(corpo(resposta).gymUnitId).toBe(contas.a.unidadeId);
-      expect(corpo(resposta).cpf).toBeNull();
+      expect(corpo(resposta).cpf).not.toBeNull();
+    });
+
+    it('recusa cadastro sem CPF (ADR-043 Decisao 3)', async () => {
+      const resposta = await request(servidor())
+        .post('/api/v1/students')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          fullName: 'Sem CPF',
+          birthDate: '1990-05-10',
+          gymUnitId: contas.a.unidadeId,
+          contacts: [],
+        });
+
+      expect(resposta.status).toBe(400);
+    });
+
+    /*
+     * O LEGADO CONTINUA EXISTINDO. A obrigatoriedade e de aplicacao, nao de
+     * coluna: os 308 alunos do Pacto sem CPF (ADR-034) seguem no banco, seguem
+     * treinando e seguem passando na catraca. Criado DIRETO no banco porque a
+     * API agora recusa CPF ausente -- exatamente o caminho que o legado nunca
+     * passou. Se este teste falhar, a validacao virou constraint e quebrou a
+     * base importada em silencio.
+     */
+    it('aluno legado sem CPF continua legivel e editavel em outros campos', async () => {
+      const legado = await db.student.create({
+        data: {
+          tenantId: contas.a.tenantId,
+          gymUnitId: contas.a.unidadeId,
+          membershipNumber: `LEGADO-${sufixo}`,
+          fullName: 'Aluno Legado Sem CPF',
+          birthDate: new Date('1985-03-20T00:00:00.000Z'),
+          status: 'ACTIVE',
+        },
+      });
+
+      const lido = await request(servidor())
+        .get(`/api/v1/students/${legado.id}`)
+        .set('Cookie', contas.a.cookie);
+
+      expect(lido.status).toBe(200);
+      expect(ficha(lido).cpf).toBeNull();
+
+      const editado = await request(servidor())
+        .patch(`/api/v1/students/${legado.id}`)
+        .set('Cookie', contas.a.cookie)
+        .send({ version: legado.version, rg: '99.999.999-9' });
+
+      expect(editado.status).toBe(200);
+      expect(corpo(editado).rg).toBe('99.999.999-9');
+      // O CPF continua nulo -- editar OUTRO campo nao forcou o preenchimento.
+      expect(corpo(editado).cpf).toBeNull();
+    });
+
+    it('recusa apagar CPF existente com null explicito (ADR-043 Decisao 3)', async () => {
+      const cpf = gerarCpfValido();
+      const aluno = corpo(await criar(contas.a, { fullName: 'Com CPF Para Nao Apagar', cpf }));
+
+      const tentativa = await request(servidor())
+        .patch(`/api/v1/students/${aluno.id}`)
+        .set('Cookie', contas.a.cookie)
+        .send({ version: aluno.version, cpf: null });
+
+      expect(tentativa.status).toBe(400);
+
+      const fichaDoAluno = await request(servidor())
+        .get(`/api/v1/students/${aluno.id}`)
+        .set('Cookie', contas.a.cookie);
+
+      // O CPF sobrevive: a tentativa de apagar foi recusada, nao aplicada.
+      expect(ficha(fichaDoAluno).cpf).not.toBeNull();
     });
 
     it('recusa unidade de outro tenant, sem confirmar que ela existe', async () => {
