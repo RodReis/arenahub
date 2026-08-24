@@ -87,6 +87,25 @@ export default async function PaginaFinanceiroDoAluno({
   ]);
 
   if (!respostaDasInvoices.ok) {
+    /*
+      A MENSAGEM SEGUE O CODIGO DO ERRO, nao o contrario.
+
+      Ate a F53 esta tela dizia "Sem permissao" para QUALQUER falha -- um 500
+      do servidor e um aluno inexistente produziam a mesma frase. Passava
+      despercebido porque o unico erro provavel era mesmo permissao; a F53
+      tornou o 404 provavel ao fazer a rota exigir o aluno para resolver o
+      fuso da unidade.
+
+      Mandar a recepcao pedir permissao ao administrador quando o aluno foi
+      excluido faz duas pessoas perderem tempo com a pergunta errada.
+    */
+    const codigo = respostaDasInvoices.erro?.code ?? 'erro';
+
+    const titulo =
+      respostaDasInvoices.erro?.status === 404
+        ? `Aluno não encontrado (${codigo}).`
+        : `Sem permissão para consultar o financeiro (${codigo}).`;
+
     return (
       <section aria-labelledby="titulo-financeiro">
         <PageHeader id="titulo-financeiro" title="Financeiro" />
@@ -99,7 +118,7 @@ export default async function PaginaFinanceiroDoAluno({
               code: 'erro',
               correlationId: '',
             }),
-            title: `Sem permissão para consultar o financeiro (${respostaDasInvoices.erro?.code ?? 'erro'}).`,
+            title: titulo,
           }}
         />
       </section>
