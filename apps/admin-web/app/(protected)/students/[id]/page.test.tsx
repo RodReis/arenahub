@@ -93,6 +93,13 @@ async function renderizar() {
   return render(<ToastProvider>{elemento}</ToastProvider>);
 }
 
+/*
+ * `hidden: true` nas buscas de heading: desde 24/08/2026 a ficha divide o
+ * conteudo em abas (Informacao e Plano), e o painel inativo fica no DOM com
+ * `hidden` -- montado de proposito, porque input desmontado nao entra no
+ * `FormData`. O que estes testes verificam e o ROTULO certo ("Atribuir" vs
+ * "Alterar"), nao qual aba esta aberta.
+ */
 describe('ficha do aluno', () => {
   /**
    * As QUATRO PORTAS do sistema. Elas viraram cartao navegavel, e os
@@ -132,7 +139,7 @@ describe('ficha do aluno', () => {
 
     await renderizar();
 
-    expect(screen.getByRole('heading', { name: 'Atribuir plano' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Atribuir plano', hidden: true })).toBeInTheDocument();
   });
 
   /**
@@ -145,7 +152,7 @@ describe('ficha do aluno', () => {
 
     await renderizar();
 
-    expect(screen.getByRole('heading', { name: 'Alterar plano' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Alterar plano', hidden: true })).toBeInTheDocument();
     expect(screen.getByTestId('aviso-de-troca')).toBeInTheDocument();
   });
 
@@ -161,7 +168,35 @@ describe('ficha do aluno', () => {
 
     await renderizar();
 
-    expect(screen.getByRole('heading', { name: 'Atribuir plano' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Atribuir plano', hidden: true })).toBeInTheDocument();
     expect(screen.queryByTestId('aviso-de-troca')).not.toBeInTheDocument();
+  });
+  /**
+   * DUAS ABAS -- Informacao e Plano (decisao do PI, 24/08/2026). A ficha
+   * empilhava cinco secoes de peso identico, e a recepcao rolava a pagina
+   * inteira para chegar no plano.
+   */
+  it('divide o conteudo em duas abas', async () => {
+    responder([]);
+
+    await renderizar();
+
+    expect(screen.getByTestId('aba-informacao')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('aba-plano')).toHaveAttribute('aria-selected', 'false');
+  });
+
+  /**
+   * "ACESSO AGORA" SAIU DA FICHA: a pergunta "essa pessoa entra agora?" e
+   * feita olhando a LISTA, com o aluno parado na porta. As duas coisas que a
+   * secao fazia foram para a grid -- a situacao ja era coluna la, e a
+   * liberacao manual virou icone de linha.
+   */
+  it('nao mostra mais a secao "Acesso agora"', async () => {
+    responder([]);
+
+    await renderizar();
+
+    expect(screen.queryByTestId('acesso-sem-direito')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('link-liberacao-manual')).not.toBeInTheDocument();
   });
 });

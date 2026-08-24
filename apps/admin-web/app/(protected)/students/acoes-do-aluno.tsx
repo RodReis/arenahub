@@ -1,4 +1,4 @@
-import { FcBiotech, FcEditImage, FcMoneyTransfer, FcUnlock } from 'react-icons/fc';
+import { FcBiotech, FcEditImage, FcKey, FcMoneyTransfer, FcUnlock } from 'react-icons/fc';
 
 import { Button } from '@arenahub/ui';
 
@@ -29,13 +29,29 @@ const TAMANHO = 22;
 
 interface Props {
   readonly studentId: string;
-  /** A liberação de catraca só existe para quem está bloqueado. */
+  /** Para montar a query do override manual, que mostra o nome na tela. */
+  readonly nomeDoAluno: string;
+  /** A liberação FINANCEIRA só existe para quem está bloqueado. */
   readonly podeLiberar: boolean;
   /** O botão de liberação — ação de formulário, montada por quem chama. */
   readonly liberacao?: React.ReactNode;
+  /**
+   * `true` quando o aluno NÃO tem direito de acesso vigente.
+   *
+   * É o caso em que a recepção precisa abrir a catraca na mão -- e o único
+   * em que faz sentido oferecer o override. Para quem já entra, o atalho
+   * seria um convite a abrir a catraca sem motivo.
+   */
+  readonly semAcessoVigente: boolean;
 }
 
-export function AcoesDoAluno({ studentId, podeLiberar, liberacao }: Props) {
+export function AcoesDoAluno({
+  studentId,
+  nomeDoAluno,
+  podeLiberar,
+  liberacao,
+  semAcessoVigente,
+}: Props) {
   return (
     <div className={estilos['acoes']}>
       <Button
@@ -69,10 +85,35 @@ export function AcoesDoAluno({ studentId, podeLiberar, liberacao }: Props) {
       </Button>
 
       {/*
-        A liberação NÃO vira ícone fantasma quando não se aplica: um botão
-        desabilitado ali sugeriria que a recepção pode liberar qualquer
-        aluno, e ela só pode liberar quem o job de inadimplência bloqueou
-        (M2-BR-007). Ausência é a informação certa.
+        LIBERAR A CATRACA MANUALMENTE -- o override da F9, que ABRE a catraca
+        fisicamente. Saiu da ficha do aluno (decisão do PI, 24/08/2026) e
+        virou ícone de linha: a recepção decide isso olhando a LISTA, com a
+        pessoa parada na porta, não depois de abrir o cadastro.
+
+        Não confundir com o cadeado ao lado: aquele é liberação FINANCEIRA,
+        que dá prazo sem abrir nada. Chave e cadeado são desenhos diferentes
+        de propósito.
+
+        Só para quem NÃO tem acesso vigente -- para quem já entra, o atalho
+        seria convite a abrir a catraca sem motivo.
+      */}
+      {semAcessoVigente ? (
+        <Button
+          variant="icon"
+          href={`/access/override?aluno=${studentId}&nome=${encodeURIComponent(nomeDoAluno)}`}
+          aria-label="Liberar a catraca manualmente"
+          title="Liberar a catraca manualmente"
+          data-testid={`acao-liberacao-manual-${studentId}`}
+        >
+          <FcKey size={TAMANHO} aria-hidden />
+        </Button>
+      ) : null}
+
+      {/*
+        A liberação FINANCEIRA não vira ícone fantasma quando não se aplica:
+        um botão desabilitado ali sugeriria que a recepção pode liberar
+        qualquer aluno, e ela só pode liberar quem o job de inadimplência
+        bloqueou (M2-BR-007). Ausência é a informação certa.
       */}
       {podeLiberar ? (
         <span className={estilos['acaoDeFormulario']} title="Liberar catraca">

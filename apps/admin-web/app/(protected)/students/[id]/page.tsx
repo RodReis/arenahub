@@ -12,7 +12,6 @@ import {
   StateBadge,
   Telefone,
   TenantDateTime,
-  stateLabel,
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
@@ -32,6 +31,7 @@ import { FcClock, FcPortraitMode } from 'react-icons/fc';
 import estilos from './ficha.module.css';
 
 import { IconeBioimpedancia, IconePagamento } from '../acoes-do-aluno';
+import { AbasDaFicha } from './abas-da-ficha';
 import { AlterarSituacao } from './alterar-situacao';
 import { AtribuirPlano } from './atribuir-plano';
 import { EditarCadastro } from './editar-cadastro';
@@ -297,412 +297,387 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
         breadcrumb={<a href="/students">Voltar para a lista de alunos</a>}
       />
 
-      <dl className={estilos['dados']} data-testid="dados-do-aluno">
-        <dt>Matrícula</dt>
-        <dd data-testid="matricula">{aluno.membershipNumber}</dd>
 
-        <dt>Nascimento</dt>
-        <dd>
-          <TenantDateTime iso={aluno.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
-        </dd>
+      <AbasDaFicha
+        abas={[
+          {
+            id: 'informacao',
+            rotulo: 'Informação',
+            conteudo: (
+              <>
+            <dl className={estilos['dados']} data-testid="dados-do-aluno">
+              <dt>Matrícula</dt>
+              <dd data-testid="matricula">{aluno.membershipNumber}</dd>
 
-        <dt>CPF</dt>
-        {/*
-          "não informado" preservado byte a byte: aqui a ficha usa a frase, nao
-          o travessao do `Ausente`. Trocar mudaria texto de tela numa fatia que
-          muda aparencia.
-        */}
-        <dd>{aluno.cpf ? <Cpf value={aluno.cpf} /> : 'não informado'}</dd>
+              <dt>Nascimento</dt>
+              <dd>
+                <TenantDateTime iso={aluno.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
+              </dd>
 
-        <dt>Situação</dt>
-        {/*
-          O E2E le o `innerText` deste `<dd>` e o compara com as opcoes do
-          select de transicao. O `StateBadge` renderiza icone + rotulo, e o
-          `innerText` continua devolvendo so o rotulo -- a comparacao segue
-          valendo.
-        */}
-        <dd data-testid="situacao-do-aluno">
-          <StateBadge machine="student" state={aluno.status} />
-        </dd>
+              <dt>CPF</dt>
+              {/*
+                "não informado" preservado byte a byte: aqui a ficha usa a frase, nao
+                o travessao do `Ausente`. Trocar mudaria texto de tela numa fatia que
+                muda aparencia.
+              */}
+              <dd>{aluno.cpf ? <Cpf value={aluno.cpf} /> : 'não informado'}</dd>
 
-        {/*
-          CONTATO na ficha, e nao so na edicao: a recepcao liga para o aluno a
-          partir daqui. O telefone vivia so no formulario de cadastro e na
-          lista -- quem abria a ficha para resolver a excecao tinha que voltar
-          para a listagem para achar o numero.
-        */}
-        <dt>Telefone</dt>
-        {/* O proprio `Telefone` renderiza `Ausente` quando o numero e nulo. */}
-        <dd data-testid="telefone-do-aluno">
-          <Telefone numero={telefonePrincipal} testId="telefone-principal" />
-        </dd>
+              <dt>Situação</dt>
+              {/*
+                O E2E le o `innerText` deste `<dd>` e o compara com as opcoes do
+                select de transicao. O `StateBadge` renderiza icone + rotulo, e o
+                `innerText` continua devolvendo so o rotulo -- a comparacao segue
+                valendo.
+              */}
+              <dd data-testid="situacao-do-aluno">
+                <StateBadge machine="student" state={aluno.status} />
+              </dd>
 
-        <dt>E-mail</dt>
-        <dd data-testid="email-do-aluno">{email ? email : <Ausente />}</dd>
-      </dl>
+              {/*
+                CONTATO na ficha, e nao so na edicao: a recepcao liga para o aluno a
+                partir daqui. O telefone vivia so no formulario de cadastro e na
+                lista -- quem abria a ficha para resolver a excecao tinha que voltar
+                para a listagem para achar o numero.
+              */}
+              <dt>Telefone</dt>
+              {/* O proprio `Telefone` renderiza `Ausente` quando o numero e nulo. */}
+              <dd data-testid="telefone-do-aluno">
+                <Telefone numero={telefonePrincipal} testId="telefone-principal" />
+              </dd>
 
-      {/*
-        EDICAO em modal, ao lado dos dados que ela edita. Ver
-        `EditarCadastro`: a ficha e tela de consulta, e dezoito campos
-        abertos empurrariam "Acesso agora" para baixo da dobra em 1280px.
+              <dt>E-mail</dt>
+              <dd data-testid="email-do-aluno">{email ? email : <Ausente />}</dd>
+            </dl>
 
-        O `<div>` existe para o botao nao esticar na largura da pagina --
-        ver `.acoesDaIdentificacao`.
-      */}
-      <div className={estilos['acoesDaIdentificacao']}>
-        <EditarCadastro
-          studentId={aluno.id}
-          nomeDoAluno={aluno.fullName}
-          version={aluno.version}
-          fullName={aluno.fullName}
-          birthDate={aluno.birthDate}
-          cpf={aluno.cpf}
-          rg={aluno.rg}
-          registeredSex={aluno.registeredSex}
-          contacts={aluno.contacts ?? []}
-          address={aluno.address}
-        />
-      </div>
-
-      {/*
-        FAIXA DE VENCIMENTO -- F53 Task 12, spec SPEC-053 §3.4.
-
-        A CENA REAL: a recepcionista abre a ficha com a pessoa na frente e
-        precisa ver, sem clicar em nada, quem esta com mensalidade vencida ou
-        vencendo -- para cobrar na hora, e nao depois. `situacaoDeVencimento`
-        e derivada de `dueAt`/`blockAt`/`status`, que a resposta de
-        `/invoices` ja traz -- sem tabela nova, sem provedor, sem push.
-
-        EM_DIA nao mostra nada: e o caso comum (mensalidade paga ou nada em
-        aberto), e uma faixa que aparece sempre viraria ruido.
-      */}
-      {invoiceEmDestaque && situacaoDoVencimento !== 'EM_DIA' ? (
-        <p role="status" data-testid="faixa-de-vencimento" data-situacao={situacaoDoVencimento}>
-          Cobrança nº {invoiceEmDestaque.number} —{' '}
-          <Money cents={invoiceEmDestaque.totalMinor} currency={invoiceEmDestaque.currency} />
-          {', vencimento em '}
-          <TenantDateTime
-            iso={invoiceEmDestaque.dueAt}
-            timeZone={timezoneDaUnidade ?? FUSO_PROVISORIO}
-            format="date"
-          />
-          <Consequencia tom="danger">
-            {' — '}
-            {situacaoDoVencimento === 'VENCE_EM_BREVE'
-              ? 'vence hoje'
-              : situacaoDoVencimento === 'BLOQUEIO_PROXIMO'
-                ? 'vencida, bloqueio de acesso próximo'
-                : 'vencida'}
-          </Consequencia>
-        </p>
-      ) : null}
-
-      {/*
-        A pergunta mais urgente da recepção -- "essa pessoa entra agora?" --
-        respondida na primeira linha, em TEXTO. Uma tarja colorida sozinha
-        deixaria de fora quem não distingue as cores e quem está de relance.
-      */}
-      <section aria-labelledby="titulo-acesso" className={estilos['secao']}>
-        <h2 id="titulo-acesso">Acesso agora</h2>
-
-        {bloqueado ? (
-          <p role="alert" data-testid="acesso-impedido">
             {/*
-              `stateLabel` direto, nao `StateBadge`: aqui o rotulo entra NO MEIO
-              da frase, e um badge com icone e fundo quebraria a leitura. O
-              dicionario e o mesmo -- o que nao se repete e a fonte do texto.
+              EDICAO em modal, ao lado dos dados que ela edita. Ver
+              `EditarCadastro`: a ficha e tela de consulta, e dezoito campos
+              abertos empurrariam "Acesso agora" para baixo da dobra em 1280px.
+
+              O `<div>` existe para o botao nao esticar na largura da pagina --
+              ver `.acoesDaIdentificacao`.
             */}
-            A situação{' '}
-            <strong>{stateLabel('student', aluno.status)?.label ?? aluno.status}</strong> impede o
-            acesso. A catraca vai negar mesmo que exista plano vigente.
-          </p>
-        ) : vigentes.length > 0 ? (
-          <p role="status" data-testid="acesso-vigente">
-            Tem direito de acesso vigente. A catraca ainda confere unidade e horário no momento da
-            passagem.
-          </p>
-        ) : (
-          <p role="status" data-testid="acesso-sem-direito">
-            Sem direito de acesso vigente. Atribua um plano abaixo para liberar a catraca.
-          </p>
-        )}
+            <div className={estilos['acoesDaIdentificacao']}>
+              <EditarCadastro
+                studentId={aluno.id}
+                nomeDoAluno={aluno.fullName}
+                version={aluno.version}
+                fullName={aluno.fullName}
+                birthDate={aluno.birthDate}
+                cpf={aluno.cpf}
+                rg={aluno.rg}
+                registeredSex={aluno.registeredSex}
+                contacts={aluno.contacts ?? []}
+                address={aluno.address}
+              />
+            </div>
 
-        {/*
-          A saida imediata, e so quando o acesso FALHA -- issue #99.
+            {/*
+              FAIXA DE VENCIMENTO -- F53 Task 12, spec SPEC-053 §3.4.
 
-          Quem descobre aqui que a pessoa nao entra precisa agir agora, com ela
-          parada na catraca. Antes, o caminho era voltar a barra lateral,
-          escolher "Liberacao manual" e digitar o UUID num campo de texto livre
-          -- que esta ficha ja tinha em maos e usava em tres links, sem oferecer
-          este. A jornada principal do produto estava partida no meio.
+              A CENA REAL: a recepcionista abre a ficha com a pessoa na frente e
+              precisa ver, sem clicar em nada, quem esta com mensalidade vencida ou
+              vencendo -- para cobrar na hora, e nao depois. `situacaoDeVencimento`
+              e derivada de `dueAt`/`blockAt`/`status`, que a resposta de
+              `/invoices` ja traz -- sem tabela nova, sem provedor, sem push.
 
-          Nao aparece quando o acesso esta vigente: liberacao manual e ato
-          excepcional e auditado (`access.override` e permissao propria), e
-          oferece-la a quem ja pode passar convida ao uso banal.
+              EM_DIA nao mostra nada: e o caso comum (mensalidade paga ou nada em
+              aberto), e uma faixa que aparece sempre viraria ruido.
+            */}
+            {invoiceEmDestaque && situacaoDoVencimento !== 'EM_DIA' ? (
+              <p role="status" data-testid="faixa-de-vencimento" data-situacao={situacaoDoVencimento}>
+                Cobrança nº {invoiceEmDestaque.number} —{' '}
+                <Money cents={invoiceEmDestaque.totalMinor} currency={invoiceEmDestaque.currency} />
+                {', vencimento em '}
+                <TenantDateTime
+                  iso={invoiceEmDestaque.dueAt}
+                  timeZone={timezoneDaUnidade ?? FUSO_PROVISORIO}
+                  format="date"
+                />
+                <Consequencia tom="danger">
+                  {' — '}
+                  {situacaoDoVencimento === 'VENCE_EM_BREVE'
+                    ? 'vence hoje'
+                    : situacaoDoVencimento === 'BLOQUEIO_PROXIMO'
+                      ? 'vencida, bloqueio de acesso próximo'
+                      : 'vencida'}
+                </Consequencia>
+              </p>
+            ) : null}
 
-          `encodeURIComponent` no nome porque ele vem do cadastro e pode ter
-          acento, espaco ou `&`.
-        */}
-        {bloqueado || vigentes.length === 0 ? (
-          <p>
-            <a
-              href={`/access/override?aluno=${aluno.id}&nome=${encodeURIComponent(aluno.fullName)}`}
-              data-testid="link-liberacao-manual"
-            >
-              Liberar a catraca manualmente
-            </a>
-          </p>
-        ) : null}
-      </section>
+            <section aria-labelledby="titulo-mais" className={estilos['secao']}>
+              <h2 id="titulo-mais">Mais sobre este aluno</h2>
 
-      <section aria-labelledby="titulo-direitos" className={estilos['secao']}>
-        <h2 id="titulo-direitos">Direitos de acesso</h2>
+              <ul className={estilos['portas']}>
+                <li>
+                  <a
+                    className={estilos['porta']}
+                    href={`/students/${aluno.id}/timeline`}
+                    data-testid="link-timeline"
+                  >
+                    <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                      <FcClock size={22} aria-hidden />
+                    </span>
+                    <span className={estilos['rotuloDaPorta']}>Histórico administrativo</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    className={estilos['porta']}
+                    href={`/students/${aluno.id}/biometrics`}
+                    data-testid="link-biometria"
+                  >
+                    <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                      <FcPortraitMode size={22} aria-hidden />
+                    </span>
+                    <span className={estilos['rotuloDaPorta']}>Consentimento e biometria</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    className={estilos['porta']}
+                    href={`/students/${aluno.id}/billing`}
+                    data-testid="link-financeiro"
+                  >
+                    <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                      <IconePagamento />
+                    </span>
+                    <span className={estilos['rotuloDaPorta']}>Financeiro e cobranças</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    className={estilos['porta']}
+                    href={`/students/${aluno.id}/health`}
+                    data-testid="link-evolucao"
+                  >
+                    <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                      <IconeBioimpedancia />
+                    </span>
+                    <span className={estilos['rotuloDaPorta']}>Evolução corporal</span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+              </>
+            ),
+          },
+          {
+            id: 'plano',
+            rotulo: 'Plano',
+            conteudo: (
+              <>
+            {/*
+              "ACESSO AGORA" SAIU DAQUI -- decisão do PI em 24/08/2026.
 
-        {/*
-          Sem a lista de unidades, `nomeDaUnidade` cai para o UUID. Dizer isso
-          evita que a recepção leia um identificador técnico achando que é o
-          nome de uma unidade que ela não conhece.
-        */}
-        {unidadesIndisponiveis ? (
-          <ProblemDetail
-            testId="unidades-indisponiveis"
-            problem={{
-              ...(respostaDasUnidades.erro ?? {
-                type: 'about:blank',
-                status: 0,
-                code: 'erro',
-                correlationId: '',
-              }),
-              title:
-                'Não foi possível carregar os nomes das unidades. Onde deveria aparecer o nome, está o identificador interno.',
-            }}
-          />
-        ) : null}
+              A pergunta "essa pessoa entra agora?" é feita olhando a LISTA, com o
+              aluno parado na porta, e não depois de abrir o cadastro. As duas
+              coisas que a seção fazia foram para a grid: a situação já é coluna
+              lá, e "Liberar a catraca manualmente" virou ícone de linha (a chave,
+              em `AcoesDoAluno`).
 
-        <DataTable
-          testId="tabela-de-direitos"
-          rows={direitos}
-          rowKey={(direito) => direito.id}
-          rowTestId={(direito) => `direito-${direito.id}`}
-          caption="Direitos de acesso, do mais recente para o mais antigo"
-          columns={[
-            {
-              key: 'situacao',
-              header: 'Situação',
-              role: 'state',
-              render: (direito) => (
-                <>
-                  <StateBadge machine="entitlement" state={direito.status} />
-                  {vigenteAgora(direito, agora) ? (
+              O que ficou aqui é o DETALHE -- quais janelas, de qual unidade, com
+              qual vigência --, que é o que só faz sentido consultar na ficha.
+            */}
+            <section aria-labelledby="titulo-direitos" className={estilos['secao']}>
+              <h2 id="titulo-direitos">Direitos de acesso</h2>
+
+              {/*
+                Sem a lista de unidades, `nomeDaUnidade` cai para o UUID. Dizer isso
+                evita que a recepção leia um identificador técnico achando que é o
+                nome de uma unidade que ela não conhece.
+              */}
+              {unidadesIndisponiveis ? (
+                <ProblemDetail
+                  testId="unidades-indisponiveis"
+                  problem={{
+                    ...(respostaDasUnidades.erro ?? {
+                      type: 'about:blank',
+                      status: 0,
+                      code: 'erro',
+                      correlationId: '',
+                    }),
+                    title:
+                      'Não foi possível carregar os nomes das unidades. Onde deveria aparecer o nome, está o identificador interno.',
+                  }}
+                />
+              ) : null}
+
+              <DataTable
+                testId="tabela-de-direitos"
+                rows={direitos}
+                rowKey={(direito) => direito.id}
+                rowTestId={(direito) => `direito-${direito.id}`}
+                caption="Direitos de acesso, do mais recente para o mais antigo"
+                columns={[
+                  {
+                    key: 'situacao',
+                    header: 'Situação',
+                    role: 'state',
+                    render: (direito) => (
+                      <>
+                        <StateBadge machine="entitlement" state={direito.status} />
+                        {vigenteAgora(direito, agora) ? (
+                          /*
+                           * `Consequencia` e nao um `<span>` nu: e o mesmo padrao de
+                           * `/students` -- o estado ja foi dito pelo badge, e isto
+                           * responde a pergunta seguinte ("e dai?"). Era justamente
+                           * este o `<span>` sem tratamento nenhum que o componente
+                           * cita: gemeo visivel la, invisivel aqui.
+                           *
+                           * `tom="neutro"`: "vale agora" e a boa noticia. O `danger`
+                           * fica reservado a consequencia que BARRA o aluno.
+                           *
+                           * O testid e o TEXTO seguem byte a byte -- o E2E procura
+                           * `vigente-${id}`, e o espaco antes do travessao continua
+                           * onde estava.
+                           */
+                          <Consequencia testId={`vigente-${direito.id}`}> — vale agora</Consequencia>
+                        ) : null}
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'origem',
+                    header: 'Origem',
                     /*
-                     * `Consequencia` e nao um `<span>` nu: e o mesmo padrao de
-                     * `/students` -- o estado ja foi dito pelo badge, e isto
-                     * responde a pergunta seguinte ("e dai?"). Era justamente
-                     * este o `<span>` sem tratamento nenhum que o componente
-                     * cita: gemeo visivel la, invisivel aqui.
+                     * `code`: origem e um ENUM curto e fechado ("Assinatura",
+                     * "Cortesia") -- identifica a linha sem ser o que se procura.
+                     * Nao e `state`, porque nao e situacao: um direito cancelado
+                     * continua tendo vindo de uma assinatura.
                      *
-                     * `tom="neutro"`: "vale agora" e a boa noticia. O `danger`
-                     * fica reservado a consequencia que BARRA o aluno.
-                     *
-                     * O testid e o TEXTO seguem byte a byte -- o E2E procura
-                     * `vigente-${id}`, e o espaco antes do travessao continua
-                     * onde estava.
+                     * `ROTULO_DE_ORIGEM` FICA: origem do entitlement (ADR-009) e enum
+                     * extensivel, nao maquina de estado -- o §7 nao a cobre.
                      */
-                    <Consequencia testId={`vigente-${direito.id}`}> — vale agora</Consequencia>
-                  ) : null}
-                </>
-              ),
-            },
-            {
-              key: 'origem',
-              header: 'Origem',
-              /*
-               * `code`: origem e um ENUM curto e fechado ("Assinatura",
-               * "Cortesia") -- identifica a linha sem ser o que se procura.
-               * Nao e `state`, porque nao e situacao: um direito cancelado
-               * continua tendo vindo de uma assinatura.
-               *
-               * `ROTULO_DE_ORIGEM` FICA: origem do entitlement (ADR-009) e enum
-               * extensivel, nao maquina de estado -- o §7 nao a cobre.
-               */
-              role: 'code',
-              render: (d) => traduzir(ROTULO_DE_ORIGEM, d.source),
-            },
-            {
-              key: 'vigencia',
-              header: 'Vigência',
-              role: 'moment',
-              render: (d) => (
-                <>
-                  <TenantDateTime iso={d.startsAt} timeZone={FUSO_PROVISORIO} format="date" /> até{' '}
-                  <TenantDateTime iso={d.endsAt} timeZone={FUSO_PROVISORIO} format="date" />
-                </>
-              ),
-            },
-            {
-              key: 'onde',
-              header: 'Onde e quando vale',
-              /*
-               * `support`: uma lista de janelas por unidade e o texto mais longo
-               * da tabela, e e a coluna que deve ceder espaco -- com piso, para
-               * "Centro — seg a sex, 06:00 as 22:00" nao quebrar palavra a
-               * palavra.
-               */
-              role: 'support',
-              render: (direito) =>
-                direito.janelas.length === 0 ? (
-                  <Ausente />
-                ) : (
-                  <ul>
-                    {direito.janelas.map((janela, indice) => (
-                      <li
-                        key={`${janela.gymUnitId}-${janela.dayOfWeek}-${janela.startMinute}-${indice}`}
-                      >
-                        {nomeDaUnidade(janela.gymUnitId)} — {janelaLegivel(janela)}
-                      </li>
-                    ))}
-                  </ul>
-                ),
-            },
-            {
-              key: 'motivo',
-              header: 'Motivo',
-              /*
-               * SEM `role`, e nao `support`. O padrao caberia pelo tipo do dado
-               * (texto livre da API), mas `support` traz um PISO de 32ch, e
-               * "Onde e quando vale" ao lado ja o reivindica: duas colunas com
-               * 32ch de minimo somam 64ch numa tabela de cinco, e o piso que
-               * existe para impedir quebra em seis linhas passaria a EMPURRAR a
-               * vigencia e o estado para fora da primeira dobra.
-               *
-               * `reason` tambem e curto na pratica -- motivo de cortesia, nao
-               * frase operacional como `recommendedAction`. Sem role, a coluna
-               * cai no neutro de antes, que e o que ela precisa.
-               *
-               * Coluna de DADO, por isso `Ausente` e nao `AusenteDeAcao`: nao ha
-               * acao nenhuma nesta tabela.
-               */
-              render: (d) => d.reason ?? <Ausente />,
-            },
-          ]}
-          empty={
-            <EmptyState
-              testId="sem-direitos"
-              title="Nenhum direito de acesso registrado."
-              hint="Atribua um plano para criar o primeiro."
-            />
-          }
-        />
-      </section>
+                    role: 'code',
+                    render: (d) => traduzir(ROTULO_DE_ORIGEM, d.source),
+                  },
+                  {
+                    key: 'vigencia',
+                    header: 'Vigência',
+                    role: 'moment',
+                    render: (d) => (
+                      <>
+                        <TenantDateTime iso={d.startsAt} timeZone={FUSO_PROVISORIO} format="date" /> até{' '}
+                        <TenantDateTime iso={d.endsAt} timeZone={FUSO_PROVISORIO} format="date" />
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'onde',
+                    header: 'Onde e quando vale',
+                    /*
+                     * `support`: uma lista de janelas por unidade e o texto mais longo
+                     * da tabela, e e a coluna que deve ceder espaco -- com piso, para
+                     * "Centro — seg a sex, 06:00 as 22:00" nao quebrar palavra a
+                     * palavra.
+                     */
+                    role: 'support',
+                    render: (direito) =>
+                      direito.janelas.length === 0 ? (
+                        <Ausente />
+                      ) : (
+                        <ul>
+                          {direito.janelas.map((janela, indice) => (
+                            <li
+                              key={`${janela.gymUnitId}-${janela.dayOfWeek}-${janela.startMinute}-${indice}`}
+                            >
+                              {nomeDaUnidade(janela.gymUnitId)} — {janelaLegivel(janela)}
+                            </li>
+                          ))}
+                        </ul>
+                      ),
+                  },
+                  {
+                    key: 'motivo',
+                    header: 'Motivo',
+                    /*
+                     * SEM `role`, e nao `support`. O padrao caberia pelo tipo do dado
+                     * (texto livre da API), mas `support` traz um PISO de 32ch, e
+                     * "Onde e quando vale" ao lado ja o reivindica: duas colunas com
+                     * 32ch de minimo somam 64ch numa tabela de cinco, e o piso que
+                     * existe para impedir quebra em seis linhas passaria a EMPURRAR a
+                     * vigencia e o estado para fora da primeira dobra.
+                     *
+                     * `reason` tambem e curto na pratica -- motivo de cortesia, nao
+                     * frase operacional como `recommendedAction`. Sem role, a coluna
+                     * cai no neutro de antes, que e o que ela precisa.
+                     *
+                     * Coluna de DADO, por isso `Ausente` e nao `AusenteDeAcao`: nao ha
+                     * acao nenhuma nesta tabela.
+                     */
+                    render: (d) => d.reason ?? <Ausente />,
+                  },
+                ]}
+                empty={
+                  <EmptyState
+                    testId="sem-direitos"
+                    title="Nenhum direito de acesso registrado."
+                    hint="Atribua um plano para criar o primeiro."
+                  />
+                }
+              />
+            </section>
 
-      <section aria-labelledby="titulo-atribuir" className={estilos['secao']}>
-        {/*
-          O TÍTULO diz o que a ação faz de verdade. Aluno com plano vigente
-          não recebe um segundo plano: o atual é encerrado e o novo entra no
-          lugar -- ver `AtribuirPlano`.
-        */}
-        <h2 id="titulo-atribuir">{assinaturaVigente ? 'Alterar plano' : 'Atribuir plano'}</h2>
+            <section aria-labelledby="titulo-atribuir" className={estilos['secao']}>
+              {/*
+                O TÍTULO diz o que a ação faz de verdade. Aluno com plano vigente
+                não recebe um segundo plano: o atual é encerrado e o novo entra no
+                lugar -- ver `AtribuirPlano`.
+              */}
+              <h2 id="titulo-atribuir">{assinaturaVigente ? 'Alterar plano' : 'Atribuir plano'}</h2>
 
-        {/*
-          Lista de planos vazia por falha tem a mesma aparência de "nenhum
-          plano cadastrado" -- e as duas pedem ações opostas: uma manda
-          recarregar, a outra manda cadastrar plano.
-        */}
-        {planosIndisponiveis ? (
-          <ProblemDetail
-            testId="planos-indisponiveis"
-            problem={{
-              ...(respostaDosPlanos.erro ?? {
-                type: 'about:blank',
-                status: 0,
-                code: 'erro',
-                correlationId: '',
-              }),
-              title: `Não foi possível carregar a lista de planos (${respostaDosPlanos.erro?.code ?? 'erro'}). Recarregue a página para atribuir um plano.`,
-            }}
-          />
-        ) : (
-          <AtribuirPlano
-            studentId={aluno.id}
-            planos={planos}
-            impedido={bloqueado}
-            vigente={assinaturaVigente}
-          />
-        )}
-      </section>
+              {/*
+                Lista de planos vazia por falha tem a mesma aparência de "nenhum
+                plano cadastrado" -- e as duas pedem ações opostas: uma manda
+                recarregar, a outra manda cadastrar plano.
+              */}
+              {planosIndisponiveis ? (
+                <ProblemDetail
+                  testId="planos-indisponiveis"
+                  problem={{
+                    ...(respostaDosPlanos.erro ?? {
+                      type: 'about:blank',
+                      status: 0,
+                      code: 'erro',
+                      correlationId: '',
+                    }),
+                    title: `Não foi possível carregar a lista de planos (${respostaDosPlanos.erro?.code ?? 'erro'}). Recarregue a página para atribuir um plano.`,
+                  }}
+                />
+              ) : (
+                <AtribuirPlano
+                  studentId={aluno.id}
+                  planos={planos}
+                  impedido={bloqueado}
+                  vigente={assinaturaVigente}
+                />
+              )}
+            </section>
 
-      <section aria-labelledby="titulo-situacao" className={estilos['secao']}>
-        <h2 id="titulo-situacao">Situação do cadastro</h2>
-        <AlterarSituacao
-          studentId={aluno.id}
-          situacaoAtual={aluno.status}
-          version={aluno.version}
-        />
-      </section>
+            <section aria-labelledby="titulo-situacao" className={estilos['secao']}>
+              <h2 id="titulo-situacao">Situação do cadastro</h2>
+              <AlterarSituacao
+                studentId={aluno.id}
+                situacaoAtual={aluno.status}
+                version={aluno.version}
+              />
+            </section>
 
-      {/*
-        AS QUATRO PORTAS do aluno, como destino navegável e não como lista de
-        links de rodapé. Numa tela que é o hub da recepção, o lugar para onde
-        ela mais vai não pode ser o elemento menos visível da página.
+            {/*
+              AS QUATRO PORTAS do aluno, como destino navegável e não como lista de
+              links de rodapé. Numa tela que é o hub da recepção, o lugar para onde
+              ela mais vai não pode ser o elemento menos visível da página.
 
-        Cada uma leva o ícone que a MESMA ação já usa na listagem -- reuso,
-        não desenho novo: dois glifos para o mesmo destino ensinariam que são
-        destinos diferentes.
-      */}
-      <section aria-labelledby="titulo-mais" className={estilos['secao']}>
-        <h2 id="titulo-mais">Mais sobre este aluno</h2>
-
-        <ul className={estilos['portas']}>
-          <li>
-            <a
-              className={estilos['porta']}
-              href={`/students/${aluno.id}/timeline`}
-              data-testid="link-timeline"
-            >
-              <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                <FcClock size={22} aria-hidden />
-              </span>
-              <span className={estilos['rotuloDaPorta']}>Histórico administrativo</span>
-            </a>
-          </li>
-          <li>
-            <a
-              className={estilos['porta']}
-              href={`/students/${aluno.id}/biometrics`}
-              data-testid="link-biometria"
-            >
-              <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                <FcPortraitMode size={22} aria-hidden />
-              </span>
-              <span className={estilos['rotuloDaPorta']}>Consentimento e biometria</span>
-            </a>
-          </li>
-          <li>
-            <a
-              className={estilos['porta']}
-              href={`/students/${aluno.id}/billing`}
-              data-testid="link-financeiro"
-            >
-              <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                <IconePagamento />
-              </span>
-              <span className={estilos['rotuloDaPorta']}>Financeiro e cobranças</span>
-            </a>
-          </li>
-          <li>
-            <a
-              className={estilos['porta']}
-              href={`/students/${aluno.id}/health`}
-              data-testid="link-evolucao"
-            >
-              <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                <IconeBioimpedancia />
-              </span>
-              <span className={estilos['rotuloDaPorta']}>Evolução corporal</span>
-            </a>
-          </li>
-        </ul>
-      </section>
+              Cada uma leva o ícone que a MESMA ação já usa na listagem -- reuso,
+              não desenho novo: dois glifos para o mesmo destino ensinariam que são
+              destinos diferentes.
+            */}
+              </>
+            ),
+          },
+        ]}
+      />
     </section>
   );
 }
