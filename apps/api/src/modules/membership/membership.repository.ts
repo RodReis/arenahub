@@ -4,6 +4,7 @@ import type { Entitlement, Plan, PlanPrice, Prisma, Subscription } from '@arenah
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { competenciaDe } from '../billing/domain/ciclo-de-cobranca.js';
 import { validarValorMonetario } from '../billing/domain/dinheiro.js';
 import { alunoRecebeAcessoNormal, type StatusDeAluno } from '../students/domain/student.js';
 import { StudentRepository } from '../students/student.repository.js';
@@ -100,9 +101,21 @@ export class MembershipRepository {
    *
    * O preco entra aqui, e nao numa rota separada, para o plano nunca
    * existir sem preco -- nem por um instante (decisao do PI, 24/08/2026).
-   * `validFrom = agora`: a vigencia comeca no momento da criacao, e "agora"
-   * vem de `new Date()` no controller, nunca daqui dentro (regra de
-   * arquitetura: "agora" entra por parametro).
+   *
+   * `validFrom = competenciaDe(agora)`, NAO o instante exato da criacao.
+   * ACHADO [FIX] registrado no PR desta fatia: com `validFrom = agora`
+   * literal, um plano criado no dia 24 nascia com vigencia a partir do dia
+   * 24 -- mas `abrirInvoiceDoPeriodo` calcula a competencia como o
+   * PRIMEIRO DIA do mes corrente (`competenciaDe`), e `precoVigenteEm` exige
+   * `validFrom <= competencia`. Resultado: todo plano criado fora do dia 1
+   * nascia SEM conseguir cobrar a propria competencia do mes em que nasceu
+   * -- o oposto do que esta fatia promete ("plano criado pela API ja nasce
+   * cobravel"). Normalizar para o inicio da competencia fecha a lacuna sem
+   * tocar `precoVigenteEm`/`competenciaDe` (funcoes puras ja testadas por
+   * outros caminhos) e sem violar nenhuma invariante: a vigencia so recua
+   * dentro do MESMO mes em que o plano nasceu, nunca para tras dele.
+   * "Agora" ainda vem de `new Date()` no controller, nunca daqui dentro
+   * (regra de arquitetura: "agora" entra por parametro).
    *
    * As unidades sao conferidas contra o tenant ANTES de gravar: `PlanUnit`
    * nao tem FK para `GymUnit` (a relacao e por id solto), entao sem esta
@@ -154,7 +167,7 @@ export class MembershipRepository {
             create: {
               tenantId: contexto.tenantId,
               amountMinor: dados.amountMinor,
-              validFrom: agora,
+              validFrom: competenciaDe(agora),
             },
           },
         },

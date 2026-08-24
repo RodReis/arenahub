@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { cadastrarAluno } from './cadastro-de-aluno';
+import { criarPlano } from './cadastro-de-plano';
 
 /**
  * F53 Task 13 -- o aceite do PI, ponta a ponta.
@@ -13,6 +14,13 @@ import { cadastrarAluno } from './cadastro-de-aluno';
  * SO O CAMINHO DO DINHEIRO: PIX e cartao dependem de webhook do provedor, que
  * nao acontece num teste de navegador -- cobertura deles e de integracao no
  * backend (`billing-http.int-spec.ts`).
+ *
+ * O PLANO AGORA NASCE NA TELA, nao no seed -- essa e a lacuna que a fatia
+ * "preco de plano" fechou. Ate o commit f1a8b9b, plano criado pela interface
+ * nascia sem preco em `plan_prices` e a geracao de cobranca era recusada;
+ * este teste falhava exatamente aqui e usava o plano do seed como contorno.
+ * Com o campo de preco na tela (`criarPlano`), o caminho completo -- criar,
+ * atribuir, cobrar -- passa a ser possivel de ponta a ponta.
  */
 const DONO = { email: 'dono@arena-positiva.test', senha: 'senha-de-bancada-arenahub' };
 
@@ -62,21 +70,13 @@ test('a recepcao acha o aluno, cobra e emite recibo', async ({ page }) => {
   // assinatura/competencia).
   const nomeDoAluno = nomeUnico('Aluno Balcao');
 
-  /*
-   * PLANO DO SEED, e nao um criado pela tela -- e a diferenca importa.
-   *
-   * Cobranca nasce do par (assinatura, competencia) e precisa de PRECO
-   * VIGENTE; sem ele o servidor recusa com "o plano nao tem preco vigente
-   * para este periodo". Plano criado pela interface nasce SEM preco, porque
-   * `plan_prices` hoje so e escrito pelo seed -- nao existe rota, caso de uso
-   * nem campo de formulario que crie preco.
-   *
-   * Este teste ja falhou por isso: criava o plano na tela, atribuia, e a
-   * geracao da cobranca era recusada. O produto estava certo e a recusa foi
-   * explicita; o cenario do teste e que era impossivel. A lacuna esta
-   * registrada para o PI -- ver o corpo do PR da F53.
-   */
-  const nomeDoPlano = 'Programa Adultos e Idosos';
+  // PLANO CRIADO PELA TELA -- o aceite desta fatia. Preco obrigatorio no
+  // formulario (`criarPlano`) e o que torna este caminho possivel: cobranca
+  // nasce do par (assinatura, competencia) e precisa de PRECO VIGENTE, e ate
+  // a F53 "preco de plano" nao havia onde cadastra-lo pela interface.
+  const nomeDoPlano = nomeUnico('Programa Adultos e Idosos');
+
+  await criarPlano(page, nomeDoPlano);
 
   await cadastrarAluno(page, {
     nome: nomeDoAluno,

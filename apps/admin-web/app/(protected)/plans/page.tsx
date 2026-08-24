@@ -5,12 +5,14 @@ import {
   EmptyState,
   EstadoSimples,
   Identidade,
+  Money,
   PageHeader,
   ProblemDetail,
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { janelaLegivel } from '../../../src/students/formatar';
+import { AcaoDeReajuste } from './acao-de-reajuste';
 import { FormularioDePlano } from './formulario-de-plano';
 
 export const metadata: Metadata = {
@@ -26,6 +28,12 @@ interface Janela {
   endMinute: number;
 }
 
+interface Preco {
+  amountMinor: number;
+  currency: string;
+  validFrom: string;
+}
+
 interface Plano {
   id: string;
   name: string;
@@ -33,18 +41,26 @@ interface Plano {
   isActive: boolean;
   gymUnitIds: string[];
   janelas: Janela[];
+  /** Preco vigente hoje, ou nulo -- nao deveria acontecer para plano criado pela tela (F53). */
+  currentPrice: Preco | null;
+  /** Todas as vigencias, para o reajuste mostrar o historico. */
+  prices: Preco[];
 }
 
 interface Unidade {
   id: string;
   name: string;
+  timezone: string;
 }
 
 /**
- * Planos — Slice 1.2.
+ * Planos — Slice 1.2, com preço vigente desde a F53.
  *
- * O plano define ONDE e QUANDO o acesso vale. Preço não aparece aqui: o
- * modelo não tem campo monetário no MVP 1, e cobrança entra no MVP 2 (F12).
+ * O plano define ONDE, QUANDO e QUANTO o acesso vale. O preço vigente
+ * aparece na listagem porque quem reajusta ou confere um plano precisa ver
+ * o valor sem abrir a ficha -- e um plano criado por esta tela nunca deveria
+ * ter `currentPrice: null` (a API exige preço na criação desde o commit
+ * f1a8b9b).
  */
 export default async function PaginaDePlanos() {
   const [respostaDosPlanos, respostaDasUnidades] = await Promise.all([
@@ -160,6 +176,23 @@ export default async function PaginaDePlanos() {
               ),
           },
           {
+            key: 'preco',
+            header: 'Preço',
+            role: 'value',
+            /*
+             * `currentPrice` nulo nao deveria acontecer para plano criado
+             * por esta tela (a API exige preco na criacao), mas plano do
+             * seed ou de importacao futura pode nao ter vigencia -- o aviso
+             * evita que a coluna pareca vazia por engano.
+             */
+            render: (plano) =>
+              plano.currentPrice ? (
+                <Money cents={plano.currentPrice.amountMinor} currency={plano.currentPrice.currency} />
+              ) : (
+                <span>Sem preço vigente</span>
+              ),
+          },
+          {
             key: 'unidades',
             header: 'Unidades',
             /*
@@ -193,6 +226,26 @@ export default async function PaginaDePlanos() {
                   </li>
                 ))}
               </ul>
+            ),
+          },
+          {
+            key: 'reajuste',
+            header: 'Reajuste',
+            role: 'actions',
+            /*
+             * ponytail: fuso da PRIMEIRA unidade do plano, nao um por
+             * vigencia. Plano com unidades em fusos diferentes existe no
+             * dominio, mas `PlanPrice.validFrom` e um instante unico -- sem
+             * "fuso do preco" no contrato, mostrar o historico com N fusos
+             * simultaneos seria complexidade que nada pediu. Se isso incomodar
+             * na pratica, o upgrade e a API devolver o fuso junto do preco.
+             */
+            render: (plano) => (
+              <AcaoDeReajuste
+                planId={plano.id}
+                historico={plano.prices}
+                timeZone={unidades.find((u) => u.id === plano.gymUnitIds[0])?.timezone ?? 'UTC'}
+              />
             ),
           },
         ]}

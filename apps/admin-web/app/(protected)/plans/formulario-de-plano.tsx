@@ -8,6 +8,7 @@ import { Button, Field, TextareaField, useToastDeErro } from '@arenahub/ui';
 import estilos from './plans.module.css';
 
 import { cadastrarPlano, type EstadoDoPlano } from '../../actions/membership';
+import { paraCentavos } from '../../../src/billing/dinheiro';
 
 interface Unidade {
   id: string;
@@ -52,12 +53,13 @@ function BotaoDePlano() {
 }
 
 /**
- * Cadastro de plano — Slice 1.2.
+ * Cadastro de plano — Slice 1.2, com preço obrigatório desde a F53.
  *
- * O plano é ONDE e QUANDO o acesso vale: unidades e janelas de horário. Ele
- * **não tem preço** — `Plan` não carrega valor monetário no MVP 1, e dinheiro
- * entra só no MVP 2 (F12), com tipo inteiro em centavos. Um campo de preço
- * aqui seria promessa que o servidor não cumpre.
+ * O plano é ONDE e QUANDO o acesso vale: unidades e janelas de horário. O
+ * preço define QUANTO — a API exige `amountMinor` desde o commit f1a8b9b:
+ * plano sem preço não pode existir nem por um instante (decisão do PI,
+ * 24/08/2026), porque `plan_prices` sem linha vigente é o que barrava a
+ * cobrança do balcão.
  *
  * As janelas nascem como linhas de formulário repetidas: `getAll` preserva a
  * ordem, e é isso que amarra dia, início e fim da mesma linha.
@@ -69,6 +71,16 @@ export function FormularioDePlano({ unidades }: Props) {
   // tela nao regride com a saida do `<p role="alert">`.
   useToastDeErro(estado.erro, 'error', 'erro-do-plano');
 
+  /*
+   * Erro de preco fica LOCAL, nao viaja ate a Server Action.
+   *
+   * F53: plano sem preco nao pode existir. `required` nativo nao serve --
+   * este campo nao esta escondido, mas a conversao de reais para centavos
+   * (`paraCentavos`) so acontece aqui, e o formato invalido ("15,005") o
+   * navegador nao pega sozinho. Barrar em JS antes do envio evita o
+   * round-trip e diz exatamente qual foi o problema.
+   */
+  const [erroDoPreco, setErroDoPreco] = useState<string | null>(null);
 
   const [linhas, setLinhas] = useState<LinhaDeJanela[]>([
     {
@@ -106,6 +118,33 @@ export function FormularioDePlano({ unidades }: Props) {
     );
   };
 
+  /**
+   * Barra sem preco valido, ou envia -- nunca os dois.
+   *
+   * Mesmo formato de `formulario-de-cadastro.tsx`: a validacao ENVOLVE a
+   * action, porque `preventDefault` de `onSubmit` nao cancela o envio via
+   * `action` (sao caminhos alternativos, nao encadeados).
+   */
+  const enviar = (formulario: FormData): void => {
+    const valorDoCampo = formulario.get('amountMinor');
+    const digitado = (typeof valorDoCampo === 'string' ? valorDoCampo : '').trim();
+
+    if (digitado === '') {
+      setErroDoPreco('Informe o preço do plano.');
+      return;
+    }
+
+    const centavos = paraCentavos(digitado);
+
+    if (centavos === null || centavos <= 0) {
+      setErroDoPreco('Preço inválido — use até duas casas decimais, por exemplo 150,00.');
+      return;
+    }
+
+    setErroDoPreco(null);
+    acao(formulario);
+  };
+
   if (unidades.length === 0) {
     return (
       <p data-testid="sem-unidades">
@@ -129,7 +168,7 @@ export function FormularioDePlano({ unidades }: Props) {
   }
 
   return (
-    <form className={estilos['formulario']} action={acao}>
+    <form className={estilos['formulario']} action={enviar}>
       <Field
         id="nome-do-plano"
         name="name"
@@ -147,6 +186,24 @@ export function FormularioDePlano({ unidades }: Props) {
         defaultValue={estado.valores?.description ?? ''}
         rows={2}
         maxLength={500}
+      />
+
+      {/*
+        F53: plano sem preco nao pode existir -- a API recusa (`amountMinor`
+        obrigatorio desde o commit f1a8b9b). `aria-required`, nunca
+        `required` nativo: a validacao real mora na Server Action, em JS.
+      */}
+      <Field
+        id="preco-do-plano"
+        name="amountMinor"
+        label="Preço"
+        unit="R$"
+        defaultValue={estado.valores?.amountMinor ?? ''}
+        inputMode="decimal"
+        hint="Em reais, com até duas casas — por exemplo 150,00."
+        {...(erroDoPreco ? { error: erroDoPreco } : {})}
+        aria-required="true"
+        data-testid="campo-preco-do-plano"
       />
 
       <fieldset className={estilos['grupo']}>

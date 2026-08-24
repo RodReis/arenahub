@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { cadastrarAluno, preencherCadastro } from './cadastro-de-aluno';
+import { criarPlano } from './cadastro-de-plano';
 
 /**
  * Jornada de `M1-AC-002` e `M1-AC-003`: a recepção trabalha sem `curl`.
@@ -239,14 +240,10 @@ test.describe('busca de aluno', () => {
 test.describe('plano e direito de acesso', () => {
   test('a recepção cria um plano com janela de horário', async ({ page }) => {
     await entrar(page);
-    await page.goto('/plans');
 
     const nome = nomeUnico('Plano de Bancada');
 
-    await page.getByTestId('campo-nome-do-plano').fill(nome);
-    await page.getByTestId('confirmar-plano').click();
-
-    await expect(page.getByTestId('plano-criado')).toBeVisible();
+    await criarPlano(page, nome);
   });
 
   test('a ficha responde "entra agora?" antes de qualquer outra coisa', async ({ page }) => {
@@ -268,13 +265,9 @@ test.describe('plano e direito de acesso', () => {
     await entrar(page);
 
     // Plano com janela padrão (segunda, 06:00–22:00) na primeira unidade.
-    await page.goto('/plans');
-
     const nomeDoPlano = nomeUnico('Plano Atribuível');
 
-    await page.getByTestId('campo-nome-do-plano').fill(nomeDoPlano);
-    await page.getByTestId('confirmar-plano').click();
-    await expect(page.getByTestId('plano-criado')).toBeVisible();
+    await criarPlano(page, nomeDoPlano);
 
     await cadastrarAluno(page, { nome: nomeUnico('Aluno Com Plano'), nascimento: '1999-09-09' });
     await page.getByTestId('abrir-ficha').click();
@@ -303,13 +296,10 @@ test.describe('plano e direito de acesso', () => {
 
   test('a vigência precisa terminar depois de começar', async ({ page }) => {
     await entrar(page);
-    await page.goto('/plans');
 
     const nomeDoPlano = nomeUnico('Plano Para Erro');
 
-    await page.getByTestId('campo-nome-do-plano').fill(nomeDoPlano);
-    await page.getByTestId('confirmar-plano').click();
-    await expect(page.getByTestId('plano-criado')).toBeVisible();
+    await criarPlano(page, nomeDoPlano);
 
     await cadastrarAluno(page, { nome: nomeUnico('Vigência Invertida'), nascimento: '1997-02-02' });
     await page.getByTestId('abrir-ficha').click();
