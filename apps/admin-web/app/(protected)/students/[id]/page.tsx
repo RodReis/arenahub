@@ -6,6 +6,7 @@ import {
   Cpf,
   DataTable,
   EmptyState,
+  Icon,
   Money,
   PageHeader,
   ProblemDetail,
@@ -27,6 +28,9 @@ import {
 
 /** Fuso FIXO, preservado de `dataLegivel` -- mesma divida das outras telas. */
 const FUSO_PROVISORIO = 'America/Sao_Paulo';
+import estilos from './ficha.module.css';
+
+import { IconeBioimpedancia, IconePagamento } from '../acoes-do-aluno';
 import { AlterarSituacao } from './alterar-situacao';
 import { AtribuirPlano } from './atribuir-plano';
 import { EditarCadastro } from './editar-cadastro';
@@ -252,18 +256,17 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
    * formulario so sabe CRIAR, e atribuir um segundo plano deixa os dois
    * entitlements ativos -- a tela mostra o novo e a catraca honra o antigo.
    */
-  const direitoDeAssinatura = vigentes.find(
-    (direito) => direito.subscriptionId !== null && direito.subscriptionVersion !== null,
-  );
-
-  const assinaturaVigente =
-    direitoDeAssinatura && direitoDeAssinatura.subscriptionId !== null
-      ? {
-          subscriptionId: direitoDeAssinatura.subscriptionId,
-          version: direitoDeAssinatura.subscriptionVersion ?? 0,
-          planName: null,
-        }
-      : undefined;
+  const assinaturaVigente = vigentes
+    .map((direito) =>
+      direito.subscriptionId !== null && direito.subscriptionVersion !== null
+        ? {
+            subscriptionId: direito.subscriptionId,
+            version: direito.subscriptionVersion,
+            planName: null,
+          }
+        : undefined,
+    )
+    .find((assinatura) => assinatura !== undefined);
 
   /*
    * F53 Task 12 -- a invoice em aberto/vencida MAIS ANTIGA e o fuso da
@@ -293,7 +296,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
         breadcrumb={<a href="/students">Voltar para a lista de alunos</a>}
       />
 
-      <dl data-testid="dados-do-aluno">
+      <dl className={estilos['dados']} data-testid="dados-do-aluno">
         <dt>Matrícula</dt>
         <dd data-testid="matricula">{aluno.membershipNumber}</dd>
 
@@ -392,7 +395,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
         respondida na primeira linha, em TEXTO. Uma tarja colorida sozinha
         deixaria de fora quem não distingue as cores e quem está de relance.
       */}
-      <section aria-labelledby="titulo-acesso">
+      <section aria-labelledby="titulo-acesso" className={estilos['secao']}>
         <h2 id="titulo-acesso">Acesso agora</h2>
 
         {bloqueado ? (
@@ -445,7 +448,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
         ) : null}
       </section>
 
-      <section aria-labelledby="titulo-direitos">
+      <section aria-labelledby="titulo-direitos" className={estilos['secao']}>
         <h2 id="titulo-direitos">Direitos de acesso</h2>
 
         {/*
@@ -585,7 +588,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
         />
       </section>
 
-      <section aria-labelledby="titulo-atribuir">
+      <section aria-labelledby="titulo-atribuir" className={estilos['secao']}>
         {/*
           O TÍTULO diz o que a ação faz de verdade. Aluno com plano vigente
           não recebe um segundo plano: o atual é encerrado e o novo entra no
@@ -621,7 +624,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
         )}
       </section>
 
-      <section aria-labelledby="titulo-situacao">
+      <section aria-labelledby="titulo-situacao" className={estilos['secao']}>
         <h2 id="titulo-situacao">Situação do cadastro</h2>
         <AlterarSituacao
           studentId={aluno.id}
@@ -630,27 +633,65 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
         />
       </section>
 
-      <section aria-labelledby="titulo-mais">
+      {/*
+        AS QUATRO PORTAS do aluno, como destino navegável e não como lista de
+        links de rodapé. Numa tela que é o hub da recepção, o lugar para onde
+        ela mais vai não pode ser o elemento menos visível da página.
+
+        Cada uma leva o ícone que a MESMA ação já usa na listagem -- reuso,
+        não desenho novo: dois glifos para o mesmo destino ensinariam que são
+        destinos diferentes.
+      */}
+      <section aria-labelledby="titulo-mais" className={estilos['secao']}>
         <h2 id="titulo-mais">Mais sobre este aluno</h2>
-        <ul>
+
+        <ul className={estilos['portas']}>
           <li>
-            <a href={`/students/${aluno.id}/timeline`} data-testid="link-timeline">
-              Histórico administrativo
+            <a
+              className={estilos['porta']}
+              href={`/students/${aluno.id}/timeline`}
+              data-testid="link-timeline"
+            >
+              <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                <Icon name="clock" />
+              </span>
+              <span className={estilos['rotuloDaPorta']}>Histórico administrativo</span>
             </a>
           </li>
           <li>
-            <a href={`/students/${aluno.id}/biometrics`} data-testid="link-biometria">
-              Consentimento e biometria
+            <a
+              className={estilos['porta']}
+              href={`/students/${aluno.id}/biometrics`}
+              data-testid="link-biometria"
+            >
+              <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                <Icon name="scan-face" />
+              </span>
+              <span className={estilos['rotuloDaPorta']}>Consentimento e biometria</span>
             </a>
           </li>
           <li>
-            <a href={`/students/${aluno.id}/billing`} data-testid="link-financeiro">
-              Financeiro e cobranças
+            <a
+              className={estilos['porta']}
+              href={`/students/${aluno.id}/billing`}
+              data-testid="link-financeiro"
+            >
+              <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                <IconePagamento />
+              </span>
+              <span className={estilos['rotuloDaPorta']}>Financeiro e cobranças</span>
             </a>
           </li>
           <li>
-            <a href={`/students/${aluno.id}/health`} data-testid="link-evolucao">
-              Evolução corporal
+            <a
+              className={estilos['porta']}
+              href={`/students/${aluno.id}/health`}
+              data-testid="link-evolucao"
+            >
+              <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                <IconeBioimpedancia />
+              </span>
+              <span className={estilos['rotuloDaPorta']}>Evolução corporal</span>
             </a>
           </li>
         </ul>
