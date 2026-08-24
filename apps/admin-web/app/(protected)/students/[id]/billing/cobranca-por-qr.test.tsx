@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CobrancaPorQr } from './cobranca-por-qr';
 
+/** Espelha `INTERVALO_DE_POLLING_MS` da tela -- o laco roda a cada 3s. */
+const INTERVALO_DE_POLLING_MS = 3_000;
+
 /**
  * O laco de polling do balcao -- F53, Task 11.
  *
@@ -12,7 +15,6 @@ import { CobrancaPorQr } from './cobranca-por-qr';
  */
 const props = {
   paymentAttemptId: 'tentativa-1',
-  invoiceId: 'invoice-1',
   qrCodeDataUri: 'data:image/png;base64,fake',
   copiaECola: '00020126...copia-e-cola',
   checkoutUrl: null,
@@ -29,7 +31,9 @@ describe('CobrancaPorQr', () => {
    * pelo resto do expediente -- e a recepcao mantem a tela aberta o dia todo.
    */
   it('para de consultar quando a invoice fica paga', async () => {
-    const consultar = vi.fn().mockResolvedValue({ invoiceStatus: 'PAID', receiptId: 'rec-1' });
+    const consultar = vi
+      .fn()
+      .mockResolvedValue({ invoiceStatus: 'PAID', receiptId: 'rec-1', paymentId: 'pag-1' });
     render(<CobrancaPorQr {...props} consultar={consultar} />);
 
     await waitFor(() => expect(screen.getByTestId('pagamento-confirmado')).toBeInTheDocument());
@@ -44,7 +48,9 @@ describe('CobrancaPorQr', () => {
    * contra um QR que nenhum banco aceita mais.
    */
   it('para e oferece novo codigo quando o QR expira', async () => {
-    const consultar = vi.fn().mockResolvedValue({ invoiceStatus: 'OPEN', receiptId: null });
+    const consultar = vi
+      .fn()
+      .mockResolvedValue({ invoiceStatus: 'OPEN', receiptId: null, paymentId: null });
     render(
       <CobrancaPorQr
         {...props}
@@ -74,7 +80,9 @@ describe('CobrancaPorQr', () => {
   it('para de consultar quando o QR expira com o laco ja rodando', async () => {
     vi.useFakeTimers();
 
-    const consultar = vi.fn().mockResolvedValue({ invoiceStatus: 'OPEN', receiptId: null });
+    const consultar = vi
+      .fn()
+      .mockResolvedValue({ invoiceStatus: 'OPEN', receiptId: null, paymentId: null });
     const expiresAt = new Date(Date.now() + 4_000).toISOString();
 
     act(() => {
@@ -117,5 +125,107 @@ describe('CobrancaPorQr', () => {
       await vi.advanceTimersByTimeAsync(3_000);
     });
     expect(consultar.mock.calls.length).toBe(chamadasAoExpirar);
+  });
+  /*
+   * FIX #165: O RECIBO QUE JA VEIO NAO SE REDESCOBRE.
+   *
+   * `GET /payment-attempts/:id` -- a leitura barata do laco -- ja devolve
+   * `receiptId`. Ate este fix a tela ignorava o campo e refazia o caminho com
+   * tres viagens. Consultar e emitir sao rotas DIFERENTES, e o teste separa as
+   * duas: emitir um recibo que ja existe gastaria um POST a toa.
+   */
+  it('consulta o recibo que o polling ja trouxe, sem emitir de novo', async () => {
+    const consultar = vi
+      .fn()
+      .mockResolvedValue({ invoiceStatus: 'PAID', receiptId: 'rec-7', paymentId: 'pag-7' });
+    const consultarRecibo = vi
+      .fn()
+      .mockResolvedValue({ sucesso: { receiptId: 'rec-7', numero: 42, verificationHash: 'abc' } });
+    const emitirRecibo = vi.fn();
+
+    render(
+      <CobrancaPorQr
+        {...props}
+        consultar={consultar}
+        consultarRecibo={consultarRecibo}
+        emitirRecibo={emitirRecibo}
+      />,
+    );
+
+    await waitFor(() => expect(consultarRecibo).toHaveBeenCalledWith('rec-7'));
+    expect(emitirRecibo).not.toHaveBeenCalled();
+  });
+
+  /*
+   * O OUTRO RAMO: pago, mas o recibo ainda nao existe. Emite pelo `paymentId`
+   * que a MESMA leitura entrega -- nao pelo `invoiceId`, que exigia descobrir
+   * o pagamento com uma viagem extra e um palpite ("o ultimo CONFIRMED").
+   */
+  it('emite pelo paymentId do polling quando o recibo ainda nao existe', async () => {
+    const consultar = vi
+      .fn()
+      .mockResolvedValue({ invoiceStatus: 'PAID', receiptId: null, paymentId: 'pag-9' });
+    const emitirRecibo = vi
+      .fn()
+      .mockResolvedValue({ sucesso: { receiptId: 'rec-9', numero: 9, verificationHash: 'def' } });
+    const consultarRecibo = vi.fn();
+
+    render(
+      <CobrancaPorQr
+        {...props}
+        consultar={consultar}
+        consultarRecibo={consultarRecibo}
+        emitirRecibo={emitirRecibo}
+      />,
+    );
+
+    await waitFor(() => expect(emitirRecibo).toHaveBeenCalledWith('pag-9'));
+    expect(consultarRecibo).not.toHaveBeenCalled();
+  });
+
+  /*
+   * A JANELA TRANSITORIA: o webhook confirmou a invoice e o pagamento ainda
+   * nao apareceu nesta leitura. Emitir com `null` viraria `POST
+   * /payments/null/receipt`; travar de vez deixaria a recepcao sem recibo.
+   * O certo e nao pedir nada AINDA -- e pedir quando o dado chegar.
+   */
+  it('espera o paymentId aparecer em vez de emitir com nulo', async () => {
+    vi.useFakeTimers();
+
+    const consultar = vi
+      .fn()
+      .mockResolvedValueOnce({ invoiceStatus: 'PAID', receiptId: null, paymentId: null })
+      .mockResolvedValue({ invoiceStatus: 'PAID', receiptId: null, paymentId: 'pag-tardio' });
+    const emitirRecibo = vi
+      .fn()
+      .mockResolvedValue({ sucesso: { receiptId: 'r', numero: 1, verificationHash: 'h' } });
+
+    render(
+      <CobrancaPorQr
+        {...props}
+        expiresAt={new Date(Date.now() + 5 * 60 * 1000).toISOString()}
+        consultar={consultar}
+        emitirRecibo={emitirRecibo}
+      />,
+    );
+
+    // Primeira leitura: invoice paga, mas sem NADA com que emitir.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(consultar).toHaveBeenCalledTimes(1);
+    expect(emitirRecibo).not.toHaveBeenCalled();
+
+    /*
+     * O LACO NAO PODE TER MORRIDO AQUI. Antes do fix ele parava no PAID e a
+     * tela ficava sem recibo para sempre. O tick seguinte e o que prova que
+     * ainda ha quem pergunte -- e e nele que o `paymentId` aparece.
+     */
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(INTERVALO_DE_POLLING_MS);
+    });
+
+    expect(consultar.mock.calls.length).toBeGreaterThan(1);
+    expect(emitirRecibo).toHaveBeenCalledWith('pag-tardio');
   });
 });

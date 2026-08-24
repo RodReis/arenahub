@@ -16,6 +16,17 @@ export interface TentativaObservada {
   invoiceStatus: string;
   paidAt: Date | null;
   receiptId: string | null;
+  /**
+   * O pagamento que a tentativa gerou, ou `null` enquanto o webhook nao
+   * chegou. E o id que `POST /payments/:id/receipt` exige para EMITIR o
+   * recibo -- `receiptId` so responde pelo que ja foi emitido.
+   *
+   * Sai daqui de graca: o `include` ja carrega `payment` para alcancar o
+   * recibo. Sem ele a tela redescobria o pagamento com tres viagens
+   * (`GET /invoices/:id` -> `POST .../receipt` -> `GET /receipts/:id`),
+   * justamente o oposto da razao de esta rota ser barata.
+   */
+  paymentId: string | null;
 }
 
 /**
@@ -53,7 +64,7 @@ export class ConsultarTentativaUseCase {
       where: { id: paymentAttemptId, tenantId: contexto.tenantId },
       include: {
         invoice: { select: { status: true, paidAt: true } },
-        payment: { select: { receipt: { select: { id: true } } } },
+        payment: { select: { id: true, receipt: { select: { id: true } } } },
       },
     });
 
@@ -67,6 +78,7 @@ export class ConsultarTentativaUseCase {
       invoiceStatus: tentativa.invoice.status,
       paidAt: tentativa.invoice.paidAt,
       receiptId: tentativa.payment?.receipt?.id ?? null,
+      paymentId: tentativa.payment?.id ?? null,
     };
   }
 }

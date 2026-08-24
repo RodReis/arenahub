@@ -198,6 +198,7 @@ describe('GET /payment-attempts/:id', () => {
   async function criarTentativaPagaComRecibo(): Promise<{
     tentativaId: string;
     receiptId: string;
+    paymentId: string;
   }> {
     periodo += 1;
 
@@ -260,7 +261,7 @@ describe('GET /payment-attempts/:id', () => {
       select: { id: true },
     });
 
-    return { tentativaId: tentativa.id, receiptId: recibo.id };
+    return { tentativaId: tentativa.id, receiptId: recibo.id, paymentId: pagamento.id };
   }
 
   it('le do banco sem consultar o provedor', async () => {
@@ -280,6 +281,36 @@ describe('GET /payment-attempts/:id', () => {
 
     expect(observada.invoiceStatus).toBe('PAID');
     expect(observada.receiptId).toBe(receiptId);
+  });
+
+  /**
+   * FIX #165: o `paymentId` sai daqui para a tela EMITIR o recibo.
+   *
+   * `POST /payments/:id/receipt` exige o id do PAGAMENTO, e antes deste fix
+   * nenhuma rota do laco o devolvia -- a tela redescobria tudo com tres
+   * viagens a partir da invoice. Sai de graca: o `include` ja carregava
+   * `payment` para alcancar o recibo.
+   */
+  it('devolve o paymentId junto, para emitir quando o recibo ainda nao existe', async () => {
+    const { tentativaId, paymentId } = await criarTentativaPagaComRecibo();
+
+    const observada = await useCase.executar(contexto, tentativaId);
+
+    expect(observada.paymentId).toBe(paymentId);
+  });
+
+  /**
+   * A JANELA TRANSITORIA, do outro lado do contrato: tentativa em voo, sem
+   * pagamento ainda. `null` -- e nunca `undefined`, que sumiria do JSON e
+   * faria a tela ler `undefined` sem saber distinguir de campo ausente.
+   */
+  it('paymentId e nulo enquanto o pagamento nao nasceu', async () => {
+    const tentativa = await criarTentativaPix(contexto.tenantId);
+
+    const observada = await useCase.executar(contexto, tentativa.id);
+
+    expect(observada.paymentId).toBeNull();
+    expect(observada.receiptId).toBeNull();
   });
 
   it('tentativa de outro tenant e 404', async () => {

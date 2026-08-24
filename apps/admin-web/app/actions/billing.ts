@@ -277,6 +277,8 @@ export async function registrarPagamentoNoBalcao(
 export interface TentativaObservada {
   invoiceStatus: string;
   receiptId: string | null;
+  /** O pagamento gerado, para EMITIR o recibo quando ainda nao existe. */
+  paymentId: string | null;
 }
 
 export interface EstadoDaTentativa {
@@ -297,6 +299,7 @@ export async function consultarTentativa(paymentAttemptId: string): Promise<Esta
   const resposta = await chamarApi<{
     invoiceStatus: string;
     receiptId: string | null;
+    paymentId: string | null;
   }>(`/api/v1/payment-attempts/${paymentAttemptId}`);
 
   if (!resposta.ok || !resposta.dados) {
@@ -307,6 +310,7 @@ export async function consultarTentativa(paymentAttemptId: string): Promise<Esta
     dados: {
       invoiceStatus: resposta.dados.invoiceStatus,
       receiptId: resposta.dados.receiptId,
+      paymentId: resposta.dados.paymentId,
     },
   };
 }
@@ -348,28 +352,76 @@ export interface EstadoDoRecibo {
 }
 
 /**
- * Emite (ou devolve, se ja existe) o recibo da invoice paga e confirma a
- * emissao com `GET /receipts/:id`. F53, Task 11 -- SPEC-053 item 5: os dois
- * endpoints existem desde a F16 e nenhuma tela os chamava.
+ * Recupera o recibo JA EMITIDO, em uma viagem.
  *
- * `POST /payments/:id/receipt` exige o ID DO PAGAMENTO, que este arquivo nao
- * recebe em nenhum lugar (nem `payment-attempts/:id` nem `payments/:id/status`
- * o devolvem -- so o `payment-attempts/:id` da attempt). A invoice paga,
- * porem, ja e conhecida (`invoiceId` viaja com a cobranca desde a criacao):
- * `GET /invoices/:id` devolve os pagamentos da fatura, e o CONFIRMED e o
- * pagamento que acabou de fechar a cobranca -- reaproveita rota existente em
- * vez de pedir mudanca em `apps/api` fora do escopo desta task.
+ * O laco do balcao ja recebe `receiptId` de `GET /payment-attempts/:id`. Ate
+ * o FIX #165, a tela ignorava esse campo e redescobria o recibo com tres
+ * viagens (`GET /invoices/:id` -> `POST .../receipt` -> `GET /receipts/:id`)
+ * -- o oposto da razao de a rota do polling ser barata.
+ */
+export async function consultarReciboEmitido(receiptId: string): Promise<EstadoDoRecibo> {
+  const consulta = await chamarApi<{ receiptId: string; numero: number; verificationHash: string }>(
+    `/api/v1/receipts/${receiptId}`,
+  );
+
+  if (!consulta.ok || !consulta.dados) {
+    return { erro: mensagemDe(consulta.erro?.code, 'Nao foi possivel confirmar o recibo.') };
+  }
+
+  return {
+    sucesso: {
+      receiptId: consulta.dados.receiptId,
+      numero: consulta.dados.numero,
+      verificationHash: consulta.dados.verificationHash,
+    },
+  };
+}
+
+/**
+ * Emite o recibo de um pagamento e confirma a emissao com `GET /receipts/:id`.
+ *
+ * RECEBE O `paymentId`, nao o `invoiceId` (FIX #165). A leitura barata do
+ * polling passou a devolver `paymentId` junto do `receiptId` -- de graca, o
+ * `include` dela ja carregava `payment` para alcancar o recibo. Some com o
+ * `GET /invoices/:id` que existia so para redescobrir qual pagamento fechou a
+ * cobranca, e com o palpite embutido nele: "o ultimo CONFIRMED da lista" e
+ * heuristica, enquanto o `paymentId` da tentativa e o pagamento EXATO que
+ * aquela cobranca gerou.
  *
  * A CONSULTA APOS EMITIR nao e so para provar a rota GET: e o que confirma o
  * documento antes de mostra-lo na tela, com o `verificationHash` que a
  * recepcao pode conferir com o aluno.
+ */
+export async function emitirReciboDoPagamento(paymentId: string): Promise<EstadoDoRecibo> {
+  const emissao = await chamarApi<{ receiptId: string; numero: number }>(
+    `/api/v1/payments/${paymentId}/receipt`,
+    { metodo: 'POST' },
+  );
+
+  if (!emissao.ok || !emissao.dados) {
+    return { erro: mensagemDe(emissao.erro?.code, 'Nao foi possivel emitir o recibo.') };
+  }
+
+  return consultarReciboEmitido(emissao.dados.receiptId);
+}
+
+/**
+ * Emite o recibo a partir da INVOICE -- o caminho do DINHEIRO no balcao.
+ *
+ * Pagamento manual nao passa pelo laco de polling: nao existe tentativa, e
+ * por isso nao ha `paymentId` a consumir. Aqui a busca por invoice continua
+ * sendo o unico caminho, e nao vira as tres viagens do FIX #165 -- sao duas,
+ * e a primeira e a que descobre o pagamento que acabou de nascer.
+ *
+ * PIX e cartao NAO usam esta funcao: a tela do QR ja recebe `receiptId` e
+ * `paymentId` prontos do polling.
  */
 export async function emitirReciboDaInvoice(invoiceId: string): Promise<EstadoDoRecibo> {
   const respostaDaInvoice = await chamarApi<InvoiceRetornada>(`/api/v1/invoices/${invoiceId}`);
 
   if (!respostaDaInvoice.ok || !respostaDaInvoice.dados) {
     return {
-      erro: mensagemDe(respostaDaInvoice.erro?.code, 'Não foi possível localizar a cobrança.'),
+      erro: mensagemDe(respostaDaInvoice.erro?.code, 'Nao foi possivel localizar a cobranca.'),
     };
   }
 
@@ -380,31 +432,8 @@ export async function emitirReciboDaInvoice(invoiceId: string): Promise<EstadoDo
     .find((pagamento) => pagamento.status === 'CONFIRMED' || pagamento.status === 'REFUNDED');
 
   if (!pagamentoConfirmado) {
-    return { erro: 'Nenhum pagamento confirmado encontrado para esta cobrança.' };
+    return { erro: 'Nenhum pagamento confirmado encontrado para esta cobranca.' };
   }
 
-  const emissao = await chamarApi<{ receiptId: string; numero: number }>(
-    `/api/v1/payments/${pagamentoConfirmado.id}/receipt`,
-    { metodo: 'POST' },
-  );
-
-  if (!emissao.ok || !emissao.dados) {
-    return { erro: mensagemDe(emissao.erro?.code, 'Não foi possível emitir o recibo.') };
-  }
-
-  const consulta = await chamarApi<{ verificationHash: string }>(
-    `/api/v1/receipts/${emissao.dados.receiptId}`,
-  );
-
-  if (!consulta.ok || !consulta.dados) {
-    return { erro: mensagemDe(consulta.erro?.code, 'Não foi possível confirmar o recibo.') };
-  }
-
-  return {
-    sucesso: {
-      receiptId: emissao.dados.receiptId,
-      numero: emissao.dados.numero,
-      verificationHash: consulta.dados.verificationHash,
-    },
-  };
+  return emitirReciboDoPagamento(pagamentoConfirmado.id);
 }

@@ -247,7 +247,6 @@ export function PainelDeCobranca({
           <CobrancaPorQr
             key={cobrancaPorQr.sucesso.paymentAttemptId}
             paymentAttemptId={cobrancaPorQr.sucesso.paymentAttemptId}
-            invoiceId={cobrancaPorQr.sucesso.invoiceId}
             qrCodeDataUri={cobrancaPorQr.sucesso.qrCodeDataUri}
             copiaECola={cobrancaPorQr.sucesso.copiaECola}
             checkoutUrl={cobrancaPorQr.sucesso.checkoutUrl}

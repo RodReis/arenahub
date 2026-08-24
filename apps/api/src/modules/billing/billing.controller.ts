@@ -217,6 +217,8 @@ interface TentativaObservadaDto {
   invoiceStatus: string;
   paidAt: string | null;
   receiptId: string | null;
+  /** O pagamento gerado, para EMITIR o recibo quando `receiptId` e nulo. */
+  paymentId: string | null;
 }
 
 interface MetodoDePagamentoDto {
@@ -622,6 +624,7 @@ export class BillingController {
       invoiceStatus: observada.invoiceStatus,
       paidAt: observada.paidAt?.toISOString() ?? null,
       receiptId: observada.receiptId,
+      paymentId: observada.paymentId,
     };
   }
 

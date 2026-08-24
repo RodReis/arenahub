@@ -37,9 +37,14 @@ async function consultarStatusPadrao(paymentAttemptId: string): Promise<EstadoDo
   return consultarStatusAtivo(paymentAttemptId);
 }
 
-async function emitirReciboPadrao(invoiceId: string): Promise<EstadoDoRecibo> {
-  const { emitirReciboDaInvoice } = await import('../../../../actions/billing');
-  return emitirReciboDaInvoice(invoiceId);
+async function emitirReciboPadrao(paymentId: string): Promise<EstadoDoRecibo> {
+  const { emitirReciboDoPagamento } = await import('../../../../actions/billing');
+  return emitirReciboDoPagamento(paymentId);
+}
+
+async function consultarReciboPadrao(receiptId: string): Promise<EstadoDoRecibo> {
+  const { consultarReciboEmitido } = await import('../../../../actions/billing');
+  return consultarReciboEmitido(receiptId);
 }
 
 const INTERVALO_DE_POLLING_MS = 3_000;
@@ -49,7 +54,6 @@ const STATUS_TERMINAL = new Set(['PAID', 'CANCELLED', 'REFUNDED']);
 
 interface Props {
   readonly paymentAttemptId: string;
-  readonly invoiceId: string;
   readonly qrCodeDataUri: string | null;
   readonly copiaECola: string | null;
   readonly checkoutUrl: string | null;
@@ -63,7 +67,8 @@ interface Props {
    */
   readonly consultar?: (paymentAttemptId: string) => Promise<TentativaObservada | { erro: string }>;
   readonly consultarStatus?: (paymentAttemptId: string) => Promise<EstadoDoStatusAtivo>;
-  readonly emitirRecibo?: (invoiceId: string) => Promise<EstadoDoRecibo>;
+  readonly emitirRecibo?: (paymentId: string) => Promise<EstadoDoRecibo>;
+  readonly consultarRecibo?: (receiptId: string) => Promise<EstadoDoRecibo>;
 }
 
 /**
@@ -86,7 +91,6 @@ interface Props {
  */
 export function CobrancaPorQr({
   paymentAttemptId,
-  invoiceId,
   qrCodeDataUri,
   copiaECola,
   checkoutUrl,
@@ -96,6 +100,7 @@ export function CobrancaPorQr({
   consultar = consultarPadrao,
   consultarStatus = consultarStatusPadrao,
   emitirRecibo = emitirReciboPadrao,
+  consultarRecibo = consultarReciboPadrao,
 }: Props) {
   const jaExpirado = new Date(expiresAt).getTime() <= Date.now();
 
@@ -107,12 +112,44 @@ export function CobrancaPorQr({
   const [emitindoRecibo, setEmitindoRecibo] = useState(false);
   const [erroDoRecibo, setErroDoRecibo] = useState<string | null>(null);
   const reciboPedidoRef = useRef(false);
+  /**
+   * O laco ja consultou alguma vez? Guarda de REMONTAGEM.
+   *
+   * `pago` esta nas deps do efeito, entao vira-lo remonta o laco -- e
+   * remontagem dispara a consulta de abertura na hora, gastando uma chamada
+   * a mais por ciclo. Com a ref, so a PRIMEIRA montagem abre consultando; as
+   * seguintes esperam o proximo tick.
+   */
+  const jaConsultouRef = useRef(false);
 
   const pago = tentativa !== null && STATUS_TERMINAL.has(tentativa.invoiceStatus);
 
   useEffect(() => {
     // QR ja nasceu expirado -- nem comeca a consultar (2a condicao de parada).
-    if (jaExpirado || pago) return;
+    /**
+     * PARA NO TERMINAL -- MENOS ENQUANTO FALTA O RECIBO (FIX #165).
+     *
+     * `pago` NAO entra nesta condicao de guarda, so nas deps. Quem desliga o
+     * laco e o `return` de dentro de `consultarUmaVez`, e ele so desliga
+     * tendo COM QUE emitir (`receiptId` ou `paymentId`).
+     *
+     * A DIFERENCA IMPORTA: parar no instante em que a invoice vira PAID
+     * deixava a tela sem recibo para sempre quando aquela MESMA leitura vinha
+     * sem os dois campos -- webhook confirmou a invoice, pagamento ainda nao
+     * apareceu. Janela estreita, invisivel em dev.
+     */
+    if (jaExpirado) return;
+
+    /**
+     * JA TEM COM QUE EMITIR -- o laco cumpriu o papel e para aqui.
+     *
+     * Este `return` e o que substitui o antigo `pago` na guarda: para pelo
+     * DADO que chegou, nao pelo status sozinho. Ler `tentativa` sem lista-lo
+     * nas deps e deliberado: inclui-lo remontaria o efeito a cada leitura, e
+     * remontagem dispara `consultarUmaVez` na hora -- uma consulta extra por
+     * ciclo, que foi exatamente a regressao que o teste do QR expirado pegou.
+     */
+    if (pago && Boolean(tentativa?.receiptId ?? tentativa?.paymentId)) return;
 
     let cancelado = false;
 
@@ -131,14 +168,22 @@ export function CobrancaPorQr({
 
       setTentativa(resultado);
 
-      if (STATUS_TERMINAL.has(resultado.invoiceStatus)) return;
+      if (
+        STATUS_TERMINAL.has(resultado.invoiceStatus) &&
+        Boolean(resultado.receiptId ?? resultado.paymentId)
+      ) {
+        return;
+      }
 
       if (new Date(expiresAt).getTime() <= Date.now()) {
         setExpirado(true);
       }
     };
 
-    void consultarUmaVez();
+    if (!jaConsultouRef.current) {
+      jaConsultouRef.current = true;
+      void consultarUmaVez();
+    }
 
     const idDoIntervalo = setInterval(() => {
       if (new Date(expiresAt).getTime() <= Date.now()) {
@@ -158,15 +203,34 @@ export function CobrancaPorQr({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `consultar` e prop estavel na tela real; variar so no teste.
   }, [paymentAttemptId, expiresAt, jaExpirado, pago, expirado]);
 
-  // Recibo em toda confirmacao, nos tres caminhos -- SPEC-053 item 5. So
-  // pede uma vez por confirmacao (`reciboPedidoRef`).
+  /**
+   * Recibo em toda confirmacao, nos tres caminhos -- SPEC-053 item 5. So
+   * pede uma vez por confirmacao (`reciboPedidoRef`).
+   *
+   * CONSOME O QUE O POLLING JA TROUXE (FIX #165). A leitura barata devolve
+   * `receiptId` quando o recibo ja existe e `paymentId` quando ainda nao:
+   * recibo emitido vira UMA consulta, e a emissao usa o pagamento exato da
+   * tentativa. Antes, a tela ignorava os dois campos e redescobria tudo com
+   * tres viagens a partir do `invoiceId` -- justamente o oposto da razao de
+   * a rota do polling existir.
+   *
+   * `paymentId` nulo com a invoice ja paga e transitorio e possivel: o
+   * webhook confirmou a invoice e o pagamento ainda nao apareceu nesta
+   * leitura. O `reciboPedidoRef` so e marcado quando ha o que fazer, entao
+   * o proximo ciclo do laco tenta de novo em vez de travar sem recibo.
+   */
   useEffect(() => {
     if (!pago || reciboPedidoRef.current) return;
+
+    const receiptId = tentativa?.receiptId ?? null;
+    const paymentId = tentativa?.paymentId ?? null;
+
+    if (!receiptId && !paymentId) return;
 
     reciboPedidoRef.current = true;
     setEmitindoRecibo(true);
 
-    void emitirRecibo(invoiceId)
+    void (receiptId ? consultarRecibo(receiptId) : emitirRecibo(paymentId as string))
       .then((resultado) => {
         setEmitindoRecibo(false);
 
@@ -183,8 +247,8 @@ export function CobrancaPorQr({
         setEmitindoRecibo(false);
         setErroDoRecibo('Não foi possível emitir o recibo.');
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `emitirRecibo` e prop estavel na tela real; variar so no teste.
-  }, [pago, invoiceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `emitirRecibo`/`consultarRecibo` sao props estaveis na tela real; variar so no teste.
+  }, [pago, tentativa?.receiptId, tentativa?.paymentId]);
 
   const conferirComOBanco = (): void => {
     setConsultandoAgora(true);
