@@ -24,7 +24,16 @@
     a canvas do conteúdo. `--ah-text-secondary` aqui sairia ilegível.
   */
   color: var(--ah-text-on-chrome);
-  opacity: 0.6;
+  /*
+    SEM `opacity`, e isto não é preferência: com `opacity: .6` o axe mediu
+    3.70 contra o mínimo de 4.5 e **reprovou o E2E de acessibilidade em
+    TODAS as telas** -- o rótulo vive na sidebar, que aparece em todas.
+
+    A opacidade compõe a cor com o fundo antes de a régua medir: o token vale
+    #A6AEB9 (8.24 sobre o #121417 da sidebar), e a 60% ele degrada para
+    #6b7078. Quem precisa de menos peso usa tamanho e `letter-spacing`, que
+    não mexem no contraste.
+  */
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }

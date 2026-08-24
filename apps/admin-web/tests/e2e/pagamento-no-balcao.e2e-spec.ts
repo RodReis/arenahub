@@ -86,6 +86,13 @@ test('a recepcao acha o aluno, cobra e emite recibo', async ({ page }) => {
   await page.getByTestId('abrir-ficha').click();
   await expect(page).toHaveURL(/\/students\/[0-9a-f-]{36}/);
 
+  /*
+   * A ficha virou duas abas e o formulario de plano abre por botao
+   * (24/08/2026) -- ver `students.e2e-spec.ts` para o porque.
+   */
+  await page.getByTestId('aba-plano').click();
+  await page.getByRole('button', { name: /Atribuir plano|Alterar plano/ }).first().click();
+
   await page.getByLabel('Plano', { exact: true }).selectOption({ label: nomeDoPlano });
   await page.getByTestId('campo-inicio').fill('2026-01-01T06:00');
   await page.getByTestId('campo-fim').fill('2027-01-01T22:00');

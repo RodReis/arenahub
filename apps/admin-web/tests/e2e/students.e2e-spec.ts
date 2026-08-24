@@ -246,16 +246,23 @@ test.describe('plano e direito de acesso', () => {
     await criarPlano(page, nome);
   });
 
-  test('a ficha responde "entra agora?" antes de qualquer outra coisa', async ({ page }) => {
+  /**
+   * "ACESSO AGORA" SAIU DA FICHA em 24/08/2026, por decisao do PI: a
+   * pergunta "essa pessoa entra agora?" e feita olhando a LISTA, com o aluno
+   * parado na porta -- nao depois de abrir o cadastro. A situacao ja era
+   * coluna la, e a liberacao manual virou icone de linha.
+   *
+   * O que a ficha continua respondendo, e o que este teste passa a cobrir, e
+   * o DETALHE: quais direitos existem, com qual janela.
+   */
+  test('a ficha mostra que o aluno novo ainda nao tem direito de acesso', async ({ page }) => {
     await entrar(page);
     await cadastrarAluno(page, { nome: nomeUnico('Ficha Sem Plano'), nascimento: '1993-05-21' });
     await page.getByTestId('abrir-ficha').click();
 
-    await expect(page.getByRole('heading', { name: 'Acesso agora' })).toBeVisible();
+    // Os direitos vivem na aba Plano (24/08/2026).
+    await page.getByTestId('aba-plano').click();
 
-    // Aluno recém-cadastrado não tem direito de acesso -- e a tela precisa
-    // dizer isso com todas as letras, não deixar a área em branco.
-    await expect(page.getByTestId('acesso-sem-direito')).toContainText(/Sem direito de acesso/i);
     await expect(page.getByTestId('sem-direitos')).toBeVisible();
   });
 
@@ -271,6 +278,14 @@ test.describe('plano e direito de acesso', () => {
 
     await cadastrarAluno(page, { nome: nomeUnico('Aluno Com Plano'), nascimento: '1999-09-09' });
     await page.getByTestId('abrir-ficha').click();
+
+    /*
+     * A ficha virou duas abas e o formulario abre por botao (24/08/2026): a
+     * aba Plano existe para RESPONDER "qual acesso este aluno tem", e cinco
+     * campos ocupavam mais espaco que a resposta.
+     */
+    await page.getByTestId('aba-plano').click();
+    await page.getByRole('button', { name: /Atribuir plano|Alterar plano/ }).first().click();
 
     await page.getByLabel('Plano', { exact: true }).selectOption({ label: nomeDoPlano });
     await page.getByTestId('campo-inicio').fill('2026-01-01T06:00');
@@ -303,6 +318,14 @@ test.describe('plano e direito de acesso', () => {
 
     await cadastrarAluno(page, { nome: nomeUnico('Vigência Invertida'), nascimento: '1997-02-02' });
     await page.getByTestId('abrir-ficha').click();
+
+    /*
+     * A ficha virou duas abas e o formulario abre por botao (24/08/2026): a
+     * aba Plano existe para RESPONDER "qual acesso este aluno tem", e cinco
+     * campos ocupavam mais espaco que a resposta.
+     */
+    await page.getByTestId('aba-plano').click();
+    await page.getByRole('button', { name: /Atribuir plano|Alterar plano/ }).first().click();
 
     await page.getByLabel('Plano', { exact: true }).selectOption({ label: nomeDoPlano });
     await page.getByTestId('campo-inicio').fill('2027-01-01T06:00');

@@ -331,6 +331,21 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               */}
               <dd data-testid="situacao-do-aluno">
                 <StateBadge machine="student" state={aluno.status} />
+                {/*
+                  A CONSEQUÊNCIA, não só o rótulo. "Bloqueado" sozinho não
+                  avisa que a catraca nega MESMO com plano vigente -- e a
+                  recepção atribuiria um plano esperando resolver.
+
+                  Ficava na seção "Acesso agora", que saiu para a grid em
+                  24/08/2026. A situação foi junto; a consequência dela não
+                  tinha para onde ir e voltou para cá, ao lado do estado que
+                  a causa.
+                */}
+                {bloqueado ? (
+                  <Consequencia tom="danger" testId="acesso-impedido">
+                    impede o acesso, mesmo com plano vigente
+                  </Consequencia>
+                ) : null}
               </dd>
 
               {/*
