@@ -51,7 +51,17 @@ async function criarAlunoAtivoComPlano(page: Page): Promise<void> {
   await cadastrarAluno(page, { nome: `Aluna A11y ${sufixo}`, nascimento: '1994-05-20' });
   await page.getByTestId('abrir-ficha').click();
 
-  await page.getByLabel('Plano', { exact: true }).selectOption({ label: `Plano A11y ${sufixo}` });
+  /*
+   * A ficha virou duas abas e o formulario de plano abre por botao
+   * (24/08/2026) -- ver `students.e2e-spec.ts` para o porque.
+   */
+  await page.getByTestId('aba-plano').click();
+  await page
+    .getByRole('button', { name: /Atribuir plano|Alterar plano/ })
+    .first()
+    .click();
+
+  await page.getByTestId('campo-plano').selectOption({ label: `Plano A11y ${sufixo}` });
   await page.getByTestId('campo-inicio').fill('2026-01-01T06:00');
   await page.getByTestId('campo-fim').fill('2027-01-01T22:00');
   await page.getByTestId('campo-motivo-atribuicao').fill('cenario de varredura de acessibilidade');

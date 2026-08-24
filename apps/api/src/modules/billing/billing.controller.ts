@@ -659,7 +659,10 @@ export class BillingController {
         number: invoice.number,
         status: invoice.status,
         currency: invoice.currency,
-        billingPeriod: invoice.billingPeriod.toISOString(),
+        // COMPETENCIA e `@db.Date`: mes de referencia, sem hora e sem fuso.
+        // Serializada inteira, a tela a reinterpretava como instante e mostrava
+        // o dia anterior mais um "00:00" que nao existe no dado.
+        billingPeriod: invoice.billingPeriod.toISOString().slice(0, 10),
         totalMinor: invoice.totalMinor,
         dueAt: invoice.dueAt.toISOString(),
         paidAt: invoice.paidAt?.toISOString() ?? null,
@@ -717,7 +720,10 @@ export class BillingController {
       number: invoice.number,
       status: invoice.status,
       currency: invoice.currency,
-      billingPeriod: invoice.billingPeriod.toISOString(),
+      // COMPETENCIA e `@db.Date`: mes de referencia, sem hora e sem fuso.
+        // Serializada inteira, a tela a reinterpretava como instante e mostrava
+        // o dia anterior mais um "00:00" que nao existe no dado.
+        billingPeriod: invoice.billingPeriod.toISOString().slice(0, 10),
       subtotalMinor: invoice.subtotalMinor,
       discountMinor: invoice.discountMinor,
       totalMinor: invoice.totalMinor,

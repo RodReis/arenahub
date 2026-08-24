@@ -16,6 +16,7 @@ import {
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { situacaoDeVencimento } from '../../../src/billing/vencimento';
+import { impedeAcesso } from '../../../src/students/formatar';
 import { AcoesDoAluno } from './acoes-do-aluno';
 import { BotaoDeLiberacao } from './botao-de-liberacao';
 import { FiltroDeAlunos } from './filtro-de-alunos';
@@ -414,11 +415,34 @@ export default async function PaginaDeAlunos({
               financeira" para os 1.926 alunos importados (CANCELLED, sem
               cobrança real) nem para cancelamento por outro motivo.
             */
+            /*
+              `semAcessoVigente` sai de SITUAÇÃO e ASSINATURA, não de
+              entitlement -- e é uma aproximação declarada, não descuido.
+
+              A regra de arquitetura nº 1 é clara: entitlement controla
+              acesso, assinatura não. Mas `GET /students` não carrega
+              entitlements (`paraDtoDaLista` só traz a assinatura vigente),
+              então a lista não tem como saber quem entra AGORA.
+
+              O que a aproximação faz: oferece o atalho a quem está
+              bloqueado/cancelado/arquivado ou sem assinatura -- o conjunto
+              que contém todos os que precisam de override. Ela erra para o
+              lado seguro (pode oferecer a quem tem direito e não precisa),
+              nunca esconde de quem precisa. E o override não decide nada
+              sozinho: abre um formulário onde a recepção informa motivo.
+
+              Trazer o entitlement para a lista é mudança de API, registrada
+              na issue desta entrega.
+            */
             render: (aluno) => (
               <AcoesDoAluno
                 studentId={aluno.id}
+                nomeDoAluno={aluno.fullName}
                 podeLiberar={aluno.status === 'BLOCKED'}
                 liberacao={<BotaoDeLiberacao studentId={aluno.id} />}
+                semAcessoVigente={
+                  aluno.subscriptionStatus !== 'ACTIVE' || impedeAcesso(aluno.status)
+                }
               />
             ),
           },

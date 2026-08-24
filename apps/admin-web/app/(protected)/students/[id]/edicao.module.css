@@ -1,0 +1,200 @@
+/**
+ * Edição do cadastro — modal com abas.
+ *
+ * POR QUE MODAL, se o `PRODUCT.md` desaconselha modal como primeira opção:
+ * a alternativa inline foi tentada e reprovada pelo PI — dezoito campos
+ * empilhados na ficha empurravam "Acesso agora" e "Direitos de acesso" para
+ * baixo da dobra, e a ficha é tela de CONSULTA. Editar cadastro é tarefa
+ * pontual e fechada, com começo e fim, que é exatamente o caso em que modal
+ * é a resposta certa e não preguiça.
+ *
+ * `<dialog>` NATIVO, não uma div com z-index: ele traz foco preso, `Esc`
+ * para fechar, backdrop e top layer de graça. Reimplementar isso à mão é
+ * como se perde acessibilidade sem perceber.
+ */
+
+.dialogo {
+  /*
+    `min()` e não largura fixa: em 1280px (o monitor do balcão) dá 720px com
+    respiro; num notebook estreito acompanha a viewport sem estourar.
+  */
+  width: min(720px, calc(100vw - 48px));
+  max-height: min(680px, calc(100vh - 64px));
+  /*
+    `margin: auto` É O QUE CENTRALIZA um `<dialog>` nativo -- sem ele o
+    navegador aplica o próprio padrão e o modal encosta no canto superior
+    esquerdo. Não é `position: fixed` mais `transform`: o dialog aberto por
+    `showModal()` já vive na top layer, e `auto` nos quatro lados resolve os
+    dois eixos de uma vez.
+  */
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ah-border-default);
+  border-radius: 10px;
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-default);
+  box-shadow: var(--ah-elev-3);
+  overflow: hidden;
+}
+
+.dialogo::backdrop {
+  background: rgb(10 11 13 / 0.45);
+}
+
+/*
+  GRID de três faixas: cabeçalho e rodapé fixos, corpo rolando no meio.
+  Sem isto, o botão "Salvar" desce com o conteúdo e some da vista justo no
+  formulário mais longo -- que é quando ele mais importa.
+*/
+/*
+  ALTURA ACOMPANHA O CONTEUDO, com teto -- e não altura fixa.
+
+  Com `height` fixo, a aba "Identificação" (cinco campos) abria um vão morto
+  de uns 200px até o rodapé, e o modal parecia quebrado. `1fr` no corpo
+  continua fazendo a rolagem cair no meio quando a aba é longa; o que muda é
+  que uma aba curta encolhe o modal em vez de esticar o vazio.
+*/
+.moldura {
+  display: grid;
+  /*
+    `minmax(0, auto)` no corpo: `auto` deixa a aba curta encolher o modal, e
+    o `0` de mínimo é o que permite ao filho com `overflow-y: auto` rolar de
+    verdade. Só `auto` faria a faixa crescer com o conteúdo e empurrar o
+    rodapé para fora da tela na aba de Endereço, que é a mais longa.
+  */
+  grid-template-rows: auto auto minmax(0, auto) auto;
+  max-height: min(680px, calc(100vh - 64px));
+}
+
+.cabecalho {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+  color: var(--ah-text-strong);
+}
+
+/* O nome do aluno no cabeçalho: quem edita precisa ver DE QUEM é a ficha. */
+.subtitulo {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/**
+ * ABAS.
+ *
+ * `role="tablist"` de verdade, com setas do teclado: dezoito campos em três
+ * grupos só ajudam se der para circular entre eles sem o mouse -- a
+ * recepção opera com o teclado, de pé, com o aluno esperando.
+ */
+.abas {
+  display: flex;
+  gap: 4px;
+  padding: 8px 20px 0;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.aba {
+  appearance: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 8px 12px;
+  font: inherit;
+  color: var(--ah-text-secondary);
+  cursor: pointer;
+  /* Só cor e borda -- 120ms, o feedback de controle do DS-PAINEL §4. */
+  transition:
+    color 120ms cubic-bezier(0.2, 0, 0.2, 1),
+    border-color 120ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.aba:hover {
+  color: var(--ah-text-strong);
+}
+
+.aba:focus-visible {
+  outline: 2px solid var(--ah-action-text);
+  outline-offset: -2px;
+}
+
+/*
+  A aba ativa carrega DOIS canais: cor E a barra embaixo. Só a cor deixaria
+  de fora quem opera com brilho baixo -- a mesma razão que vale para estado
+  em badge (PRODUCT.md: cor nunca é canal único).
+*/
+.abaAtiva {
+  color: var(--ah-action-text);
+  border-bottom-color: var(--ah-action-text);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+.corpo {
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+/**
+ * DUAS COLUNAS onde os campos são curtos.
+ *
+ * `auto-fit` com piso de 240px: duas colunas no modal de 720px, uma só
+ * quando a viewport aperta. É o que torna o formulário COMPACTO -- dezoito
+ * campos em coluna única eram 18 linhas de rolagem.
+ */
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px 16px;
+}
+
+/* Campo que ocupa a linha inteira: nome completo, logradouro. */
+.largo {
+  grid-column: 1 / -1;
+}
+
+.rodape {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ah-border-subtle);
+  background: var(--ah-surface-raised);
+}
+
+/*
+  O aviso de rodapé fica à ESQUERDA, longe dos botões: mensagem colada no
+  "Salvar" vira parte do botão para quem lê de relance.
+*/
+.avisoDoRodape {
+  margin: 0;
+  margin-right: auto;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.nota {
+  margin: 0;
+  grid-column: 1 / -1;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aba {
+    transition: none;
+  }
+}

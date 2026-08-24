@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button, Field, SelectField, TextareaField, useToastDeErro } from '@arenahub/ui';
@@ -71,6 +71,19 @@ function BotaoDeAtribuicao({ troca }: { troca: boolean }) {
  * ser alimentada por invoice — mas a catraca continua lendo só o entitlement.
  */
 export function AtribuirPlano({ studentId, planos, impedido, vigente }: Props) {
+  /*
+   * FECHADO POR PADRÃO (decisão do PI, 24/08/2026).
+   *
+   * A aba Plano existe para RESPONDER "qual acesso este aluno tem" -- e o
+   * formulário de cinco campos ocupava mais espaço que a resposta, empurrando
+   * os direitos de acesso para cima da dobra. Trocar plano é ato pontual;
+   * consultar é o que se faz o tempo todo.
+   *
+   * Fica aberto quando há erro de validação: `estado.valores` só existe
+   * depois de uma tentativa, e fechar o formulário nesse caso esconderia da
+   * recepção o que ela acabou de digitar.
+   */
+  const [aberto, setAberto] = useState(false);
   const [estado, acao] = useActionState(atribuirPlano, ESTADO_INICIAL);
   // Erro vira TOAST -- CLAUDE.md: "sempre usar Toast para: Info, Warn e
   // error". O toast ja carrega `role="alert"`, entao o anuncio ao leitor de
@@ -103,6 +116,23 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente }: Props) {
           <a href={`/students/${studentId}`}>Atualizar a ficha</a>
         </p>
       </div>
+    );
+  }
+
+  /*
+   * O formulário só aparece quando pedido -- ou quando a tentativa falhou e
+   * há preenchimento a preservar (ver `aberto`, no topo).
+   */
+  if (!aberto && !estado.valores) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setAberto(true)}
+        data-testid={`abrir-plano-${studentId}`}
+      >
+        {troca ? 'Alterar plano' : 'Atribuir plano'}
+      </Button>
     );
   }
 
@@ -147,10 +177,17 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente }: Props) {
         </>
       ) : null}
 
+      {/*
+        `data-testid` PRÓPRIO porque "Plano" virou nome ambíguo: a aba da
+        ficha também se chama assim, e `getByLabel('Plano')` passou a casar
+        com os dois (o painel leva `aria-labelledby="aba-plano"`). Os dois
+        rótulos estão certos onde estão -- quem precisa desempatar é o teste.
+      */}
       <SelectField
         id="plano"
         name="planId"
         label="Plano"
+        data-testid="campo-plano"
         defaultValue={estado.valores?.planId ?? ''}
         required
       >
@@ -197,7 +234,12 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente }: Props) {
         hint="Registrado na auditoria. Ex.: “matrícula presencial, pagamento em dinheiro, recibo 481”."
       />
 
-      <BotaoDeAtribuicao troca={troca} />
+      <div className={estilos['acoes']}>
+        <BotaoDeAtribuicao troca={troca} />
+        <Button type="button" variant="ghost" onClick={() => setAberto(false)}>
+          Cancelar
+        </Button>
+      </div>
     </form>
   );
 }

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@arenahub/ui';
@@ -31,7 +32,8 @@ function aluno(sobrescritas: Record<string, unknown> = {}) {
     id: ALUNO_ID,
     membershipNumber: 'AP-2026-00003046',
     fullName: 'Paulo Victor Ribeiro de Barros',
-    birthDate: '1999-07-15T00:00:00.000Z',
+    // A API devolve data PURA (`@db.Date`, cortada no controller).
+    birthDate: '1999-07-16',
     cpf: '05047398161',
     status: 'ACTIVE',
     archivedAt: null,
@@ -92,6 +94,13 @@ async function renderizar() {
   return render(<ToastProvider>{elemento}</ToastProvider>);
 }
 
+/*
+ * `hidden: true` nas buscas de heading: desde 24/08/2026 a ficha divide o
+ * conteudo em abas (Informacao e Plano), e o painel inativo fica no DOM com
+ * `hidden` -- montado de proposito, porque input desmontado nao entra no
+ * `FormData`. O que estes testes verificam e o ROTULO certo ("Atribuir" vs
+ * "Alterar"), nao qual aba esta aberta.
+ */
 describe('ficha do aluno', () => {
   /**
    * As QUATRO PORTAS do sistema. Elas viraram cartao navegavel, e os
@@ -131,7 +140,7 @@ describe('ficha do aluno', () => {
 
     await renderizar();
 
-    expect(screen.getByRole('heading', { name: 'Atribuir plano' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Atribuir plano', hidden: true })).toBeInTheDocument();
   });
 
   /**
@@ -140,11 +149,22 @@ describe('ficha do aluno', () => {
    * somando um segundo plano ao primeiro.
    */
   it('diz "Alterar plano" e avisa do encerramento quando ha assinatura vigente', async () => {
+    const usuario = userEvent.setup();
+
     responder([entitlement()]);
 
     await renderizar();
 
-    expect(screen.getByRole('heading', { name: 'Alterar plano' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Alterar plano', hidden: true })).toBeInTheDocument();
+
+    /*
+     * O formulario fica FECHADO ate ser pedido (24/08/2026): a aba Plano
+     * existe para responder "qual acesso este aluno tem", e cinco campos
+     * empurravam os direitos de acesso para cima da dobra. O aviso de
+     * encerramento vive dentro dele.
+     */
+    await usuario.click(screen.getByTestId(`abrir-plano-${ALUNO_ID}`));
+
     expect(screen.getByTestId('aviso-de-troca')).toBeInTheDocument();
   });
 
@@ -160,7 +180,35 @@ describe('ficha do aluno', () => {
 
     await renderizar();
 
-    expect(screen.getByRole('heading', { name: 'Atribuir plano' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Atribuir plano', hidden: true })).toBeInTheDocument();
     expect(screen.queryByTestId('aviso-de-troca')).not.toBeInTheDocument();
+  });
+  /**
+   * DUAS ABAS -- Informacao e Plano (decisao do PI, 24/08/2026). A ficha
+   * empilhava cinco secoes de peso identico, e a recepcao rolava a pagina
+   * inteira para chegar no plano.
+   */
+  it('divide o conteudo em duas abas', async () => {
+    responder([]);
+
+    await renderizar();
+
+    expect(screen.getByTestId('aba-informacao')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('aba-plano')).toHaveAttribute('aria-selected', 'false');
+  });
+
+  /**
+   * "ACESSO AGORA" SAIU DA FICHA: a pergunta "essa pessoa entra agora?" e
+   * feita olhando a LISTA, com o aluno parado na porta. As duas coisas que a
+   * secao fazia foram para a grid -- a situacao ja era coluna la, e a
+   * liberacao manual virou icone de linha.
+   */
+  it('nao mostra mais a secao "Acesso agora"', async () => {
+    responder([]);
+
+    await renderizar();
+
+    expect(screen.queryByTestId('acesso-sem-direito')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('link-liberacao-manual')).not.toBeInTheDocument();
   });
 });

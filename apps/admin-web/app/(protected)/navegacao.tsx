@@ -2,6 +2,9 @@
 
 import { NavLink } from '@arenahub/ui';
 import { usePathname } from 'next/navigation';
+import { Fragment } from 'react';
+
+import estilos from './navegacao.module.css';
 
 /**
  * Navegação principal — F46, issue #99.
@@ -23,6 +26,16 @@ import { usePathname } from 'next/navigation';
 interface Item {
   readonly href: string;
   readonly label: string;
+  /**
+   * Rótulo do grupo que COMEÇA neste item.
+   *
+   * Modelado no item e não numa lista aninhada de propósito: `itemAtual`
+   * precisa comparar todos os hrefs entre si para escolher o mais
+   * específico, e uma estrutura em dois níveis o obrigaria a achatar a
+   * árvore antes de cada comparação -- trabalho novo para resolver um
+   * problema que a lista plana não tem.
+   */
+  readonly grupo?: string;
 }
 
 export function Navegacao({ itens }: { readonly itens: readonly Item[] }) {
@@ -32,12 +45,16 @@ export function Navegacao({ itens }: { readonly itens: readonly Item[] }) {
   return (
     <>
       {itens.map((item) => (
-        <NavLink
-          key={item.href}
-          href={item.href}
-          label={item.label}
-          current={item.href === atual}
-        />
+        <Fragment key={item.href}>
+          {/*
+            O rótulo de grupo é `<h2>`, não um `<span>` com aparência de
+            título: quem navega por cabeçalho no leitor de tela usa isso
+            para pular direto à Administração, e `role="navigation"` do
+            shell já dá o contexto em volta.
+          */}
+          {item.grupo ? <h2 className={estilos['grupo']}>{item.grupo}</h2> : null}
+          <NavLink href={item.href} label={item.label} current={item.href === atual} />
+        </Fragment>
       ))}
     </>
   );

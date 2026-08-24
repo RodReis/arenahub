@@ -1,0 +1,44 @@
+/**
+ * Rótulo de grupo da navegação — "Administração".
+ *
+ * O menu tinha nove itens de peso idêntico, e Dispositivos e Unidades — que
+ * a recepção abre uma vez por mês — disputavam o olho com Alunos, que ela
+ * abre a cada atendimento. Agrupar o que é configuração separa o uso diário
+ * do uso raro.
+ *
+ * Le so a camada semantica: `--ah-text-*`, nunca `--ah-carbon-*` cru.
+ */
+.grupo {
+  margin: 16px 0 4px;
+  padding: 0 12px;
+  /*
+    Caption e não body: é rótulo de seção, não item navegável. Se tivesse o
+    mesmo peso dos links, viraria mais um item na lista -- e um que não
+    clica, que é a pior espécie.
+  */
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+  /*
+    `--ah-text-on-chrome` porque a sidebar é superfície escura (chrome), não
+    a canvas do conteúdo. `--ah-text-secondary` aqui sairia ilegível.
+  */
+  color: var(--ah-text-on-chrome);
+  /*
+    SEM `opacity`, e isto não é preferência: com `opacity: .6` o axe mediu
+    3.70 contra o mínimo de 4.5 e **reprovou o E2E de acessibilidade em
+    TODAS as telas** -- o rótulo vive na sidebar, que aparece em todas.
+
+    A opacidade compõe a cor com o fundo antes de a régua medir: o token vale
+    #A6AEB9 (8.24 sobre o #121417 da sidebar), e a 60% ele degrada para
+    #6b7078. Quem precisa de menos peso usa tamanho e `letter-spacing`, que
+    não mexem no contraste.
+  */
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* O primeiro grupo não precisa do respiro de cima: já está colado ao topo. */
+.grupo:first-child {
+  margin-top: 0;
+}
