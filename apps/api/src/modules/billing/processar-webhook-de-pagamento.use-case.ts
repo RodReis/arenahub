@@ -307,7 +307,7 @@ export class ProcessarWebhookDePagamentoUseCase {
   ): Promise<{
     attemptId: string;
     invoiceId: string;
-    /** Metodo real da tentativa (PIX ou CARD) -- nunca fixo (F53/SPEC-055). */
+    /** Metodo real da tentativa (PIX, CARD ou MANUAL) -- nunca fixo (F53/SPEC-055). */
     method: 'PIX' | 'CARD' | 'MANUAL';
     estado: { status: StatusDoPagamento; ultimoEventoAplicadoEm: Date | null };
   } | null> {
@@ -459,11 +459,34 @@ export class ProcessarWebhookDePagamentoUseCase {
    * Segmento de canal da acao de auditoria, seguindo a convencao ja usada no
    * modulo (`grep 'billing.payment.' apps/api/src`): `pix.*` para PIX,
    * `card_checkout.*` para cartao -- mesmo prefixo de
-   * `criar-checkout-de-cartao.use-case.ts` (`card_checkout.created`). `MANUAL`
-   * nao chega aqui: pagamento manual nao tem tentativa nem webhook.
+   * `criar-checkout-de-cartao.use-case.ts` (`card_checkout.created`).
+   *
+   * `MANUAL` NAO tem mapa aqui -- e nao por esquecimento: pagamento manual
+   * ja tem a PROPRIA acao, plana e sem canal, `billing.payment.manual`
+   * (`billing.repository.ts`). Mapear `MANUAL` para `pix` silenciosamente
+   * reintroduziria a mesma mentira que esta funcao existe para eliminar, so
+   * que num quarto lugar. Falha alto: o `switch` exaustivo quebra a
+   * COMPILACAO se o enum ganhar um membro novo (`_exaustivo: never`), e o
+   * `default` cobre o caso hoje inalcancavel (`MANUAL` nao tem tentativa
+   * nem webhook) sem devolver um canal errado.
    */
   private canal(method: 'PIX' | 'CARD' | 'MANUAL'): 'pix' | 'card_checkout' {
-    return method === 'CARD' ? 'card_checkout' : 'pix';
+    switch (method) {
+      case 'PIX':
+        return 'pix';
+      case 'CARD':
+        return 'card_checkout';
+      case 'MANUAL':
+        throw new Error(
+          'Webhook de pagamento nao tem canal de auditoria para method MANUAL -- ' +
+            'pagamento manual usa billing.payment.manual, gravado em billing.repository.ts, ' +
+            'nunca pelo webhook',
+        );
+      default: {
+        const _exaustivo: never = method;
+        throw new Error(`Metodo de pagamento desconhecido: ${String(_exaustivo)}`);
+      }
+    }
   }
 
   /**

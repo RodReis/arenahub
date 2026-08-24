@@ -185,6 +185,8 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
     db = app.get(PrismaService);
     provedor = app.get<FakePaymentProvider>(PAYMENT_PROVIDER);
     provedor.registrarConta(CONTA_NO_PROVEDOR, SEGREDO);
+    // Mesmo segredo: o fake nao distingue por capacidade, so pela conta.
+    provedor.registrarConta(CONTA_CARD_NO_PROVEDOR, SEGREDO);
 
     const tenant = await db.tenant.create({
       data: {
@@ -520,7 +522,9 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
   describe('F53 -- webhook de cartao grava o metodo real, nao PIX fixo', () => {
     it('pagamento de cartao grava Payment.method = CARD, evento e auditoria corretos', async () => {
       const { invoiceId, externalPaymentId } = await criarCobrancaCartao();
-      const dados = webhook({ externalPaymentId });
+      // Webhook de cartao chega pela conta de CARD, nunca pela de PIX -- em
+      // producao cada capacidade tem sua propria conta no provedor.
+      const dados = webhook({ externalPaymentId, externalAccountId: CONTA_CARD_NO_PROVEDOR });
 
       const resposta = await enviarWebhook(dados);
 
