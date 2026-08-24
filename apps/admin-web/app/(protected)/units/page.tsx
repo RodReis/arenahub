@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import {
+  Button,
   DataTable,
   EmptyState,
   EstadoSimples,
@@ -35,7 +36,21 @@ export default async function PaginaDeUnidades() {
     // o operador sem saber se nao ha unidade ou se ele nao tem permissao.
     return (
       <section aria-labelledby="titulo-unidades">
-        <PageHeader id="titulo-unidades" title="Unidades" />
+        <PageHeader
+        id="titulo-unidades"
+        title="Unidades"
+        breadcrumb={<span>Administração</span>}
+        actions={
+          /*
+            `POST /units` existia na API desde sempre -- com validacao de fuso
+            IANA e auditoria -- e nunca teve um chamador no painel. A unica
+            unidade que existia veio do seed.
+          */
+          <Button href="/units/nova" data-testid="nova-unidade">
+            Nova unidade
+          </Button>
+        }
+      />
         {/*
           Mesma frase que ja estava na tela, agora acentuada (o plano autoriza
           so a acentuacao desta tela). O `title` do `problem+json` da API NAO
@@ -135,6 +150,15 @@ export default async function PaginaDeUnidades() {
             testId="lista-vazia"
             title="Nenhuma unidade cadastrada ainda."
             hint="Cadastre a primeira unidade para liberar o acesso da recepção."
+            /*
+              A dica MANDAVA cadastrar e nao oferecia caminho -- "vazio sem
+              saida e beco", como o proprio `EmptyState` documenta.
+            */
+            action={
+              <Button href="/units/nova" data-testid="nova-unidade-vazio">
+                Cadastrar unidade
+              </Button>
+            }
           />
         }
       />
