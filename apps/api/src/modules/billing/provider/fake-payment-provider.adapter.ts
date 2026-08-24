@@ -124,6 +124,15 @@ export class FakePaymentProvider implements PaymentProvider {
   chamadasDeCheckout = 0;
 
   /**
+   * Quantas vezes `getPaymentStatus` foi chamado, nesta instancia.
+   *
+   * Existe para o teste da leitura barata (F53/Task 5): provar que o laco de
+   * polling NAO bate no provedor -- o fake nao tem rate limit para avisar
+   * sozinho quando o desenho erra.
+   */
+  chamadasDeStatus = 0;
+
+  /**
    * O estorno confirma na hora, ou fica pendente?
    *
    * PADRAO SINCRONO por conveniencia dos testes que nao estao testando isso --
@@ -221,6 +230,8 @@ export class FakePaymentProvider implements PaymentProvider {
   }
 
   getPaymentStatus(externalPaymentId: string): Promise<ProviderPayment> {
+    this.chamadasDeStatus += 1;
+
     const cobranca = this.cobrancas.get(externalPaymentId);
 
     if (!cobranca) {

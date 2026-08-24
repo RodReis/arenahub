@@ -19,6 +19,7 @@ import {
   type InvoiceComTimeline,
 } from './billing.repository.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
+import { ConsultarTentativaUseCase } from './consultar-tentativa.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
@@ -151,6 +152,15 @@ interface StatusDePagamentoDto {
   occurredAt: string;
 }
 
+/** Leitura barata da tentativa, para o laco de polling do balcao. F53. */
+interface TentativaObservadaDto {
+  paymentAttemptId: string;
+  status: string;
+  invoiceStatus: string;
+  paidAt: string | null;
+  receiptId: string | null;
+}
+
 interface MetodoDePagamentoDto {
   id: string;
   provider: string;
@@ -213,6 +223,7 @@ export class BillingController {
     private readonly billing: BillingRepository,
     private readonly cobrancaPix: CriarCobrancaPixUseCase,
     private readonly statusDePagamento: ConsultarStatusDePagamentoUseCase,
+    private readonly tentativa: ConsultarTentativaUseCase,
     private readonly metodoDePagamento: RegistrarMetodoDePagamentoUseCase,
     private readonly cobrancaNoCartao: CobrarAssinaturaNoCartaoUseCase,
     private readonly cancelamentoDeRecorrencia: CancelarRecorrenciaUseCase,
@@ -473,6 +484,29 @@ export class BillingController {
       statusNoProvedor: status.statusNoProvedor,
       divergente: status.divergente,
       occurredAt: status.occurredAt.toISOString(),
+    };
+  }
+
+  /**
+   * Leitura barata para o laco da tela. `billing.read` e nao permissao nova:
+   * e a mesma que ja le invoice e status de pagamento nesta rota vizinha --
+   * quem pode ver a fatura pode ver se ela foi paga.
+   *
+   * SO O NOSSO BANCO. Ver docblock de `ConsultarTentativaUseCase` para o
+   * porque de nao reusar `GET /payments/:id/status` aqui: aquela bate no
+   * provedor a cada chamada, e o laco do balcao roda a cada 3s.
+   */
+  @Get('payment-attempts/:id')
+  @RequirePermissions('billing.read')
+  async observarTentativa(@Param('id') id: string): Promise<TentativaObservadaDto> {
+    const observada = await this.tentativa.executar(this.contexto.require(), id);
+
+    return {
+      paymentAttemptId: observada.paymentAttemptId,
+      status: observada.status,
+      invoiceStatus: observada.invoiceStatus,
+      paidAt: observada.paidAt?.toISOString() ?? null,
+      receiptId: observada.receiptId,
     };
   }
 

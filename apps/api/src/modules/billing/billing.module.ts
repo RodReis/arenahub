@@ -11,6 +11,7 @@ import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
 import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
+import { ConsultarTentativaUseCase } from './consultar-tentativa.use-case.js';
 import { ConciliarMovimentosUseCase } from './conciliar-movimentos.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { CriarCheckoutDeCartaoUseCase } from './criar-checkout-de-cartao.use-case.js';
@@ -64,6 +65,7 @@ import { WebhookController } from './webhook.controller.js';
     CriarCobrancaPixUseCase,
     CriarCheckoutDeCartaoUseCase,
     ConsultarStatusDePagamentoUseCase,
+    ConsultarTentativaUseCase,
     ProcessarWebhookDePagamentoUseCase,
     TenantContextService,
     ProviderAccountResolver,

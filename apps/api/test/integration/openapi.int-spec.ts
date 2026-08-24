@@ -124,6 +124,8 @@ describe('contrato OpenAPI', () => {
         '/api/v1/invoices/{id}/payments/pix',
         '/api/v1/payments/{id}/status',
         '/api/v1/students/{id}/invoices',
+        // F53 -- task 5: leitura barata para o laco de polling do balcao.
+        '/api/v1/payment-attempts/{id}',
         '/api/v1/webhooks/payments/{provider}',
         // F14 -- cartao e recorrencia.
         '/api/v1/payment-methods',

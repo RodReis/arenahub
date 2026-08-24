@@ -597,6 +597,29 @@
         ]
       }
     },
+    "/api/v1/payment-attempts/{id}": {
+      "get": {
+        "operationId": "BillingController_observarTentativa",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/students/{id}/invoices": {
       "get": {
         "operationId": "BillingController_listarDoAluno",
