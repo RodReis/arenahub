@@ -26,7 +26,6 @@ const NAVEGACAO = [
     caso diferente, ver `botao-de-liberacao.tsx`), só não tem mais item fixo
     no menu.
   */
-  { href: '/operations/devices', label: 'Dispositivos' },
   { href: '/students', label: 'Alunos' },
   { href: '/plans', label: 'Planos' },
   /*
@@ -41,6 +40,18 @@ const NAVEGACAO = [
     conferencia mensal atras de uma tela de uso diario.
   */
   { href: '/billing/reconciliation', label: 'Conciliação' },
+  /*
+    ADMINISTRAÇÃO -- decisão do PI em 24/08/2026.
+
+    Dispositivos e Unidades são CONFIGURAÇÃO: a recepção os abre uma vez por
+    mês, enquanto abre Alunos a cada atendimento. Com nove itens de peso
+    idêntico, os dois disputavam o olho com o que se usa o dia inteiro.
+
+    Dispositivos vinha logo depois de "Eventos de acesso" -- perto do que a
+    operação usa, longe do que ele é. Agrupar os dois no fim separa o uso
+    diário do uso raro sem esconder nenhum: continuam a um clique.
+  */
+  { href: '/operations/devices', label: 'Dispositivos', grupo: 'Administração' },
   { href: '/units', label: 'Unidades' },
 ] as const;
 

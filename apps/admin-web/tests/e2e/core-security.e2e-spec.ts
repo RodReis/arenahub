@@ -59,6 +59,12 @@ test.describe('acesso ao painel', () => {
     await page.getByLabel('Senha').fill(DONO.senha);
     await page.getByRole('button', { name: 'Entrar' }).click();
 
+    // O login passa a cair em OPERACAO (24/08/2026): quem abre o painel
+    // pergunta "a catraca esta de pe?", nao "quais unidades existem?".
+    await expect(page).toHaveURL(/\/operations/);
+
+    // As unidades continuam a um clique, agora sob "Administracao".
+    await page.getByRole('link', { name: 'Unidades' }).click();
     await expect(page).toHaveURL(/\/units/);
     await expect(page.getByRole('heading', { name: 'Unidades' })).toBeVisible();
     await expect(page.getByTestId('usuario-logado')).toHaveText(DONO.email);
@@ -70,7 +76,7 @@ test.describe('acesso ao painel', () => {
     await page.getByLabel('E-mail').fill(DONO.email);
     await page.getByLabel('Senha').fill(DONO.senha);
     await page.getByRole('button', { name: 'Entrar' }).click();
-    await expect(page).toHaveURL(/\/units/);
+    await expect(page).toHaveURL(/\/operations/);
 
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login/);
@@ -92,7 +98,7 @@ test.describe('acesso ao painel', () => {
     await page.keyboard.type(DONO.senha);
     await page.keyboard.press('Enter');
 
-    await expect(page).toHaveURL(/\/units/);
+    await expect(page).toHaveURL(/\/operations/);
   });
 
   test('o erro de login e anunciavel por leitor de tela', async ({ page }) => {
@@ -113,6 +119,9 @@ test.describe('acesso ao painel', () => {
     await page.getByLabel('E-mail').fill(DONO.email);
     await page.getByLabel('Senha').fill(DONO.senha);
     await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL(/\/operations/);
+
+    await page.getByRole('link', { name: 'Unidades' }).click();
     await expect(page).toHaveURL(/\/units/);
 
     // Tabela semantica: leitor de tela le "coluna Codigo, linha 2". Grid de

@@ -88,7 +88,15 @@ export async function entrar(
 
   await repassarCookies(resposta.cookiesDaApi);
 
-  redirect('/units');
+  /*
+   * ENTRA EM OPERAÇÃO, não em Unidades (decisão do PI, 24/08/2026).
+   *
+   * Quem abre o painel no começo do turno pergunta "a catraca está de pé?",
+   * não "quais unidades existem?" -- e Unidades virou tela de
+   * Administração, aberta uma vez por mês. Cair na configuração ao logar
+   * fazia a recepção navegar antes de começar a trabalhar.
+   */
+  redirect('/operations');
 }
 
 export async function sair(): Promise<void> {
