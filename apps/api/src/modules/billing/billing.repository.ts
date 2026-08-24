@@ -287,7 +287,26 @@ export class BillingRepository {
     const invoices = await this.db.invoice.findMany({
       where: { tenantId: contexto.tenantId, studentId },
       include: { items: true, payments: true },
-      orderBy: { billingPeriod: 'desc' },
+      /*
+       * `dueAt` PRIMEIRO, e `id` como desempate -- ordem TOTAL.
+       *
+       * Ate a F53 esta consulta ordenava por `billingPeriod desc`, sozinho, e
+       * a tela dizia no comentario que a ordem era por `dueAt`. Duas coisas
+       * quebravam:
+       *
+       *   1. A tela escolhe a fatura em aberto MAIS ANTIGA -- a que a
+       *      recepcao precisa resolver agora -- pegando a ultima da lista.
+       *      Ordenado por competencia, uma fatura reaberta de competencia
+       *      anterior com vencimento posterior aparecia como "a de agora".
+       *   2. Duas faturas da MESMA competencia (o que cancelar-e-reemitir
+       *      produz) empatavam, e o desempate caia na ordem FISICA do
+       *      Postgres, que muda depois de qualquer UPDATE.
+       *
+       * A listagem transversal (`listar-invoices.use-case.ts`) e a lista de
+       * alunos (`student.repository.ts`) ja ordenavam assim; esta era a que
+       * faltava.
+       */
+      orderBy: [{ dueAt: 'desc' }, { id: 'desc' }],
     });
 
     return { timezone: aluno.gymUnit.timezone, invoices };

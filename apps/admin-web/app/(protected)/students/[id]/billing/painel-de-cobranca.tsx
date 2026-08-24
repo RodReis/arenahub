@@ -104,12 +104,32 @@ export function PainelDeCobranca({
 
     invoiceDoReciboPedidoRef.current = invoiceId;
 
-    void emitirReciboDaInvoice(invoiceId).then((resultado) => {
-      if (resultado.sucesso) {
-        setReciboDoBalcao({ numero: resultado.sucesso.numero });
-      }
-    });
-  }, [estadoDoPagamento.sucesso]);
+    /*
+     * A FALHA DO RECIBO PRECISA APARECER.
+     *
+     * O dinheiro ja entrou quando chegamos aqui -- o pagamento foi registrado
+     * e a fatura esta paga. Se a emissao do recibo falhar em silencio, a
+     * recepcionista fica com o dinheiro na mao, sem recibo e sem nada na tela
+     * dizendo o que aconteceu; ela reemitiria clicando de novo, ou entregaria
+     * o troco sem comprovante.
+     *
+     * `catch` alem do `sucesso`: a action devolve erro de dominio no
+     * resultado, mas queda de rede rejeita a promessa, e sem tratar as duas
+     * sobra `unhandled rejection` no lugar de aviso.
+     */
+    void emitirReciboDaInvoice(invoiceId)
+      .then((resultado) => {
+        if (resultado.sucesso) {
+          setReciboDoBalcao({ numero: resultado.sucesso.numero });
+          return;
+        }
+
+        show('error', 'Pagamento registrado, mas o recibo nao foi emitido. Tente reemitir.');
+      })
+      .catch(() => {
+        show('error', 'Pagamento registrado, mas o recibo nao foi emitido. Tente reemitir.');
+      });
+  }, [estadoDoPagamento.sucesso, show]);
 
   const confirmarRecebimento = (motivo: string): void => {
     if (!cobrando) return;
@@ -165,7 +185,7 @@ export function PainelDeCobranca({
       ) : null}
 
       {reciboDoBalcao ? (
-        <p role="status" data-testid="recibo-emitido">
+        <p role="status" data-testid="recibo-emitido-em-especie">
           Recibo nº {reciboDoBalcao.numero} emitido.
         </p>
       ) : null}

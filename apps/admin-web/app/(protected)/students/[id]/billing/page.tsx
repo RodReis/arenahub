@@ -11,6 +11,7 @@ import {
   TenantDateTime,
 } from '@arenahub/ui';
 
+import { faturaEmDestaque } from '../../../../../src/billing/vencimento';
 import { chamarApi } from '../../../../../lib/api/server-client';
 import { PainelDeCobranca } from './painel-de-cobranca';
 import type { DadoFaltante } from './seletor-de-forma';
@@ -176,15 +177,15 @@ export default async function PaginaFinanceiroDoAluno({
     )?.subscriptionId ?? null;
 
   /*
-   * A invoice em aberto/vencida MAIS ANTIGA -- e a que a recepcao precisa
-   * resolver agora. `dueAt` ja vem ordenado do backend (mais recente
-   * primeiro, ver `listarDoAluno`), entao a mais antiga em aberto e a
-   * ULTIMA da lista filtrada.
+   * A fatura em destaque sai de `faturaEmDestaque`, e nao de um calculo local:
+   * a ficha do aluno mostra o aviso de vencimento sobre a MESMA fatura, e duas
+   * implementacoes divergiriam.
    */
   const invoicesEmAberto = invoices.filter(
     (invoice) => invoice.status === 'OPEN' || invoice.status === 'OVERDUE',
   );
-  const invoiceEmDestaque = invoicesEmAberto[invoicesEmAberto.length - 1] ?? null;
+
+  const invoiceEmDestaque = faturaEmDestaque(invoices);
 
   return (
     <section aria-labelledby="titulo-financeiro">

@@ -140,5 +140,11 @@ test('a recepcao acha o aluno, cobra e emite recibo', async ({ page }) => {
   await page.getByLabel(/motivo/i).fill('Pagamento em especie no balcao');
   await page.getByTestId('confirmar-acao-sensivel').click();
 
-  await expect(page.getByTestId('recibo-emitido')).toBeVisible();
+  /*
+   * `recibo-emitido-em-especie`, e nao `recibo-emitido` generico: os dois
+   * caminhos de recibo (especie e QR) podem estar visiveis ao mesmo tempo na
+   * mesma pagina, e um testid compartilhado faz o Playwright recusar em modo
+   * estrito. O nome diz QUAL recibo este teste espera.
+   */
+  await expect(page.getByTestId('recibo-emitido-em-especie')).toBeVisible();
 });

@@ -15,7 +15,7 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
-import { situacaoDeVencimento } from '../../../../src/billing/vencimento';
+import { faturaEmDestaque, situacaoDeVencimento } from '../../../../src/billing/vencimento';
 import { traduzir } from '../../../../src/operations/formatar';
 import {
   ROTULO_DE_ORIGEM,
@@ -207,10 +207,12 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
    */
   const invoices = respostaDasInvoices.dados?.invoices ?? [];
   const timezoneDaUnidade = respostaDasInvoices.dados?.timezone;
-  const invoicesEmAberto = invoices.filter(
-    (invoice) => invoice.status === 'OPEN' || invoice.status === 'OVERDUE',
-  );
-  const invoiceEmDestaque = invoicesEmAberto[invoicesEmAberto.length - 1] ?? null;
+  /*
+   * MESMA funcao que a tela de cobranca usa. A ficha avisa "vencida" sobre a
+   * fatura que a outra tela manda receber -- se cada uma escolhesse por conta
+   * propria, a recepcao leria aviso de uma fatura e cobraria outra.
+   */
+  const invoiceEmDestaque = faturaEmDestaque(invoices);
   const situacaoDoVencimento =
     invoiceEmDestaque && timezoneDaUnidade
       ? situacaoDeVencimento(invoiceEmDestaque, agora, timezoneDaUnidade)

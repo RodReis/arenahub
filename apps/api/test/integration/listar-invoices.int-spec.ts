@@ -163,14 +163,44 @@ describe('GET /invoices', () => {
     await db.user.deleteMany({ where: { id: { in: actorIdsCriados.splice(0) } } });
   });
 
-  it('lista as invoices do tenant, da mais recente para a mais antiga', async () => {
+  /**
+   * ORDEM TOTAL, e o teste afirma a ORDEM -- nao so a contagem.
+   *
+   * A versao anterior deste teste tinha este nome e conferia apenas
+   * `total === 3`: apagar o `orderBy` do caso de uso a deixava verde. Guarda
+   * que nao falha sem a coisa que guarda e decorativa.
+   *
+   * O empate de `dueAt` esta aqui de proposito, e e o caso que o `id` como
+   * segunda chave existe para resolver: numa lista PAGINADA, duas linhas que
+   * trocam de lugar entre dois carregamentos fazem uma aparecer duas vezes e
+   * a outra nunca.
+   */
+  it('ordena por vencimento decrescente, com o id desempatando', async () => {
     const { contexto, subscriptionId, studentId } = await semearTenant();
-    await criarInvoices(contexto.tenantId, subscriptionId, studentId, 3);
+
+    const meioId = await criarInvoice(contexto.tenantId, subscriptionId, studentId, {
+      dueAt: new Date('2026-08-10T00:00:00Z'),
+    });
+    const empatadaId = await criarInvoice(contexto.tenantId, subscriptionId, studentId, {
+      dueAt: new Date('2026-08-10T00:00:00Z'),
+    });
+    const maisNovaId = await criarInvoice(contexto.tenantId, subscriptionId, studentId, {
+      dueAt: new Date('2026-09-10T00:00:00Z'),
+    });
+    const maisVelhaId = await criarInvoice(contexto.tenantId, subscriptionId, studentId, {
+      dueAt: new Date('2026-07-10T00:00:00Z'),
+    });
 
     const pagina = await useCase.executar(contexto, { pagina: 1, tamanho: 20 });
 
-    expect(pagina.total).toBe(3);
-    expect(pagina.itens).toHaveLength(3);
+    expect(pagina.total).toBe(4);
+
+    const vencimentos = pagina.itens.map((i) => new Date(i.dueAt).getTime());
+    expect(vencimentos).toEqual([...vencimentos].sort((a, b) => b - a));
+
+    // As duas do mesmo vencimento saem por `id desc`, sempre na mesma ordem.
+    const [maiorId, menorId] = [meioId, empatadaId].sort().reverse();
+    expect(pagina.itens.map((i) => i.id)).toEqual([maisNovaId, maiorId, menorId, maisVelhaId]);
   });
 
   /*

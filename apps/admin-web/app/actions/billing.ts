@@ -150,15 +150,14 @@ interface CheckoutDeCartaoRetornado {
  * O cartao vai do celular do aluno direto para o provedor (INV-098,
  * ADR-032): esta tela nunca ve numero de cartao.
  *
- * ⚠️ BLOQUEIO CONHECIDO: o caso de uso `CriarCheckoutDeCartaoUseCase`
- * (Task 4) existe, mas nao ha rota HTTP exposta para ele em
- * `billing.controller.ts` -- a Task 4, como escrita no plano, criou so o
- * caso de uso e o registro em `billing.module.ts`, sem controller. Chamar
- * esta action hoje devolve 404 ate essa rota (`POST
- * /api/v1/invoices/:id/payments/card-checkout`, nome espelhando o PIX) ser
- * criada. Documentado no relatorio da Task 10 -- decisao tecnica registrada,
- * nao workaround silencioso: adicionar controller esta fora do escopo desta
- * task (arquivos de `apps/api` nao listados no brief).
+ * Chama `POST /api/v1/invoices/:id/payments/card-checkout`, que nao e a
+ * mesma rota do cartao ja tokenizado (`payments/card`, da F14): aquela cobra
+ * um metodo salvo, e no balcao o aluno ainda nao tem cartao nenhum guardado.
+ *
+ * Cadastro incompleto volta como 422 `STUDENT_BILLING_DATA_INCOMPLETE` --
+ * o servidor recusa ANTES de tocar o provedor, porque o antifraude
+ * bloquearia com uma recusa generica que a recepcao leria como "o cartao nao
+ * passou", quando o conserto e preencher o CPF.
  */
 export async function iniciarCheckoutDeCartao(
   invoiceId: string,

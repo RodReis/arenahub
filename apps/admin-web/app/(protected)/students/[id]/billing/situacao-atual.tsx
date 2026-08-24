@@ -1,5 +1,6 @@
 import { Money, StateBadge, TenantDateTime } from '@arenahub/ui';
 
+import { diasDeAtraso } from '../../../../../src/billing/vencimento';
 import estilos from './situacao-atual.module.css';
 
 interface InvoiceEmDestaque {
@@ -18,22 +19,6 @@ interface Props {
   readonly agora: Date;
 }
 
-/**
- * Dias corridos entre `dueAt` e `agora`, no calendario -- nao no instante.
- *
- * Comparar instante contra instante marcaria a fatura como vencida minutos
- * apos a meia-noite do proprio dia de vencimento, que ainda nao venceu. A
- * conta aqui e deliberadamente simples (diferenca de dias corridos, sem o
- * fuso da unidade): o calculo COM fuso -- `situacaoDeVencimento` -- e a
- * Task 12, fora do escopo desta tela.
- */
-function diasDeAtraso(dueAt: string, agora: Date): number {
-  const vencimento = new Date(dueAt);
-  const diferencaEmMs = agora.getTime() - vencimento.getTime();
-  const dias = Math.floor(diferencaEmMs / (1000 * 60 * 60 * 24));
-
-  return dias > 0 ? dias : 0;
-}
 
 /**
  * O que o aluno deve AGORA -- topo da pagina, F53 Task 10.
@@ -55,7 +40,13 @@ export function SituacaoAtual({ invoice, timezone, agora }: Props) {
     );
   }
 
-  const atraso = invoice.status === 'OVERDUE' ? diasDeAtraso(invoice.dueAt, agora) : 0;
+  /*
+   * `diasDeAtraso` do modulo de vencimento, e nao uma conta local: ele compara
+   * DIA CIVIL no fuso da unidade. Subtrair instantes -- o que esta tela fazia
+   * antes -- marca atraso de um dia as 00:01 do proprio vencimento, e faz o
+   * numero aqui discordar da faixa que a ficha do aluno mostra.
+   */
+  const atraso = invoice.status === 'OVERDUE' ? diasDeAtraso(invoice, agora, timezone) : 0;
 
   return (
     <section aria-labelledby="titulo-situacao" className={estilos['situacao']}>

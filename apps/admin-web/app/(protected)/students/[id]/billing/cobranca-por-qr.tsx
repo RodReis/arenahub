@@ -206,7 +206,7 @@ export function CobrancaPorQr({
         <p className={estilos['confirmado']}>Pagamento confirmado.</p>
         {emitindoRecibo ? <p role="status">Emitindo recibo…</p> : null}
         {recibo ? (
-          <p data-testid="recibo-emitido">
+          <p data-testid="recibo-emitido-por-qr">
             Recibo não fiscal nº {recibo.numero} emitido.{' '}
             <code>{recibo.verificationHash.slice(0, 12)}</code>
           </p>

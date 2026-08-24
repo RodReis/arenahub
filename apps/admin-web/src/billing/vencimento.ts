@@ -19,6 +19,71 @@ export interface InvoiceParaAviso {
   readonly blockAt: string | null;
 }
 
+/** Minimo para escolher a fatura em destaque: vencimento e um desempate estavel. */
+export interface InvoiceCandidata {
+  readonly id: string;
+  readonly status: string;
+  readonly dueAt: string;
+}
+
+/**
+ * A fatura em aberto que a recepcao precisa resolver AGORA -- a de vencimento
+ * mais antigo.
+ *
+ * ESCOLHE PELO CAMPO, nunca pela posicao na lista. Duas telas faziam
+ * `lista[lista.length - 1]`, o que amarra o resultado a ordem que o backend
+ * usa: enquanto ela foi `billingPeriod desc`, o calculo devolvia a fatura
+ * errada sempre que competencia e vencimento discordavam -- o caso da fatura
+ * reaberta.
+ *
+ * `id` desempata porque duas faturas do mesmo vencimento existem (cancelar e
+ * reemitir produz exatamente isso), e sem criterio estavel cada carregamento
+ * destacaria uma diferente.
+ *
+ * UMA COPIA SO, de proposito: a ficha do aluno e a tela de cobranca precisam
+ * apontar para a MESMA fatura. Duas implementacoes divergiriam, e o aviso de
+ * vencimento de uma nomearia fatura diferente da outra.
+ */
+export function faturaEmDestaque<T extends InvoiceCandidata>(
+  invoices: readonly T[],
+): T | null {
+  const emAberto = invoices.filter(
+    (invoice) => invoice.status === 'OPEN' || invoice.status === 'OVERDUE',
+  );
+
+  if (emAberto.length === 0) return null;
+
+  return emAberto.reduce((maisAntiga, candidata) => {
+    if (candidata.dueAt !== maisAntiga.dueAt) {
+      return candidata.dueAt < maisAntiga.dueAt ? candidata : maisAntiga;
+    }
+
+    return candidata.id < maisAntiga.id ? candidata : maisAntiga;
+  });
+}
+
+/**
+ * Dias de atraso, em dia CIVIL no fuso da unidade -- zero quando ainda nao
+ * venceu.
+ *
+ * MESMA conta de `situacaoDeVencimento`, exposta separada porque a tela
+ * precisa do NUMERO ("3 dias de atraso"), nao so da faixa. Antes da revisao
+ * final da F53 havia uma segunda implementacao em `situacao-atual.tsx` que
+ * subtraia INSTANTES e ignorava o fuso -- as duas conviviam na mesma tela,
+ * uma certa e uma errada, e perto da meia-noite discordavam.
+ */
+export function diasDeAtraso(
+  /* So `dueAt` -- pedir `InvoiceParaAviso` inteiro obrigaria quem tem apenas a
+     data a inventar `blockAt`, e o `blockAt` nao entra nesta conta. */
+  invoice: { readonly dueAt: string },
+  agora: Date,
+  timezone: string,
+): number {
+  const dias = diferencaEmDias(invoice.dueAt, agora, timezone);
+
+  return dias < 0 ? -dias : 0;
+}
+
 /**
  * A situacao de vencimento da invoice, para exibir sem clicar em nada.
  *
