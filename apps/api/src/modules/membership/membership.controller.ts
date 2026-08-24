@@ -9,6 +9,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -214,6 +215,31 @@ export class MembershipController {
    * era exibido -- faltava quem o escrevesse.
    */
   @Patch('plans/:id/activation')
+  /*
+   * SCHEMA DECLARADO, e nao um verbete novo na divida: a lista de
+   * `OPERACOES_SEM_SCHEMA_DE_RESPOSTA` so pode ENCOLHER, e o criterio
+   * escrito la e exigir schema das rotas NOVAS.
+   *
+   * A forma vai explicita porque `interface` do TypeScript some na
+   * compilacao e nao chega ao OpenAPI -- e este e o mesmo `PlanoDto` que
+   * `GET /plans` devolve, relido depois do update.
+   */
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['id', 'name', 'isActive', 'gymUnitIds', 'janelas', 'prices'],
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        description: { type: 'string', nullable: true },
+        isActive: { type: 'boolean' },
+        gymUnitIds: { type: 'array', items: { type: 'string' } },
+        janelas: { type: 'array', items: { type: 'object' } },
+        currentPrice: { type: 'object', nullable: true },
+        prices: { type: 'array', items: { type: 'object' } },
+      },
+    },
+  })
   @RequirePermissions('plan.manage')
   async alterarAtivacaoDePlano(
     @Param('id') id: string,
