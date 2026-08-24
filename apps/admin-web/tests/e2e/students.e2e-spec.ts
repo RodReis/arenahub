@@ -51,15 +51,27 @@ test.describe('cadastro de aluno', () => {
     await expect(page.getByTestId('matricula-gerada')).toContainText(/^AP-\d{4}-\d{8}$/);
   });
 
-  test('cadastra sem CPF -- documento não é requisito de matrícula', async ({ page }) => {
+  /*
+   * ESTE TESTE GUARDAVA A DECISAO DE 18/08 ("nome, nascimento e unidade são
+   * os ÚNICOS obrigatórios"). O ADR-043 Decisão 3 (23/08/2026) reverteu isso:
+   * o antifraude do checkout de cartão bloqueia cobrança sem CPF, e o PI
+   * decidiu exigi-lo no cadastro. O teste agora guarda a decisão NOVA -- não
+   * foi apagado porque o histórico de por que a regra mudou tem valor.
+   */
+  test('recusa cadastro sem CPF (ADR-043 Decisão 3)', async ({ page }) => {
     await entrar(page);
 
-    // CPF, telefone, e-mail e endereço em branco de propósito: é o caso de
-    // quem chega sem documento, e a F45 manteve a decisão de que nome,
-    // nascimento e unidade são os ÚNICOS obrigatórios do cadastro inteiro.
-    await cadastrarAluno(page, { nome: nomeUnico('Sem Documento'), nascimento: '2001-07-02' });
+    // CPF em branco de propósito (`cpf: ''`, não omitido -- omitido usaria o
+    // default gerado pelo helper) -- é exatamente o caso que a validação nova
+    // precisa barrar. `preencherCadastro`, não `cadastrarAluno`: este teste
+    // não espera sucesso.
+    await preencherCadastro(page, {
+      nome: nomeUnico('Sem Documento'),
+      nascimento: '2001-07-02',
+      cpf: '',
+    });
 
-    await expect(page.getByTestId('matricula-gerada')).toContainText(/^AP-/);
+    await expect(page.getByTestId('erro-do-cadastro')).toBeVisible();
   });
 
   test('nome curto demais é recusado sem perder o que foi digitado', async ({ page }) => {
@@ -106,6 +118,9 @@ test.describe('cadastro de aluno', () => {
 
     await page.getByTestId('campo-fullName').fill(nomeUnico('Sem Unidade'));
     await page.getByTestId('campo-birthDate').fill('1990-01-01');
+    // CPF obrigatório desde o ADR-043 Decisão 3 -- sem ele, o erro pararia
+    // no passo 1 e nunca chegaria à checagem de unidade que este teste prova.
+    await page.getByTestId('campo-cpf').fill('111.444.777-35');
 
     await page.getByTestId('ir-para-passo-4').click();
     await page.getByTestId('confirmar-cadastro').click();
@@ -148,6 +163,8 @@ test.describe('cadastro de aluno', () => {
 
     await page.getByTestId('campo-fullName').fill(nome);
     await page.getByTestId('campo-birthDate').fill('1991-04-12');
+    // CPF obrigatório desde o ADR-043 Decisão 3.
+    await page.getByTestId('campo-cpf').fill('111.444.777-35');
 
     await page.getByTestId('ir-para-passo-2').click();
     await page.getByTestId('campo-cep').fill('80010000');
