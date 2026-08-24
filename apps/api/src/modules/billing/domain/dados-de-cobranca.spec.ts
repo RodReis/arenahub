@@ -1,3 +1,5 @@
+import { describe, expect, it } from '@jest/globals';
+
 import { faltaParaCartao } from './dados-de-cobranca.js';
 
 describe('faltaParaCartao', () => {
