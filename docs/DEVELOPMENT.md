@@ -567,12 +567,6 @@ O delta do ADR-008 entrou no modelo e na regra: consentimento por responsável l
 comprovável e **revalidação na virada dos 18** (INV-143 — a prova continua válida, a autorização
 caduca), log de acesso a dado biométrico, e retenção como parâmetro do cliente (art. 39).
 
-**O que continua em aberto:** `M1-AC-004` e `M1-AC-007` **não estão atendidos fisicamente** —
-nada rodou em hardware homologado, porque o gate `M1-HW-01` não foi atravessado. O expurgo dos 30
-dias está modelado mas sem job agendado, e a lista de hardware homologado segue provisória no
-código até `supported-hardware.md` existir. **BullMQ e WebSocket não entraram**: a entrega durável
-não precisou deles, e `CLAUDE.md` manda usar fila só quando comprovadamente necessário.
-
 Evidência, limites e decisões técnicas em
 [`docs/operations/smart-access/biometric-consent-evidence.md`](operations/smart-access/biometric-consent-evidence.md).
 

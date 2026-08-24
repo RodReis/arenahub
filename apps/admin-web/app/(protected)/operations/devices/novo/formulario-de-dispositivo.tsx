@@ -165,12 +165,6 @@ export function FormularioDeDispositivo({ unidades }: Props) {
         data-testid="campo-firmware-do-dispositivo"
       />
 
-      {/*
-        A LISTA DE HOMOLOGAÇÃO É PROVISÓRIA e o código da API diz isso ao
-        lado dela: quando o gate `M1-HW-01` passar, ela sai do código e vem
-        do documento de homologação. Dizer aqui evita a recepção comprar um
-        equipamento supondo que o painel aceita qualquer um.
-      */}
       <p role="note" className={estilos['nota']}>
         Só os equipamentos homologados na bancada aparecem aqui — hoje, o leitor facial e a catraca
         Topdata Inner instalados na unidade. Outros modelos entram quando passarem pelo gate de
