@@ -1,0 +1,155 @@
+/**
+ * Ficha do aluno — a tela HUB do painel.
+ *
+ * Ela nasceu sem CSS nenhum: 551 linhas de `<dl>`, `<h2>` e `<ul>` no estilo
+ * default do navegador, enquanto lista, wizard, cobrança e saúde todos têm o
+ * seu. O resultado era uma pilha de seções de peso idêntico, com as quatro
+ * portas do sistema como a coisa MENOS visível da página.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`
+ * e `--ah-border-*`, nunca `--ah-carbon-*` cru.
+ *
+ * O que este arquivo NÃO faz: estilo de controle (é `Button`, `Field`), forma
+ * de formulário (é `formulario.module.css`) e tabela (é `DataTable`). Só o
+ * arranjo entre eles.
+ */
+
+/**
+ * IDENTIFICAÇÃO em grade de rótulo/valor.
+ *
+ * O `<dl>` nu empilha `<dt>` e `<dd>` em linhas alternadas com recuo do
+ * navegador -- oito linhas verticais para seis dados que a recepção lê de
+ * relance com o aluno na frente. Em duas colunas, o olho varre os rótulos de
+ * um lado e os valores do outro.
+ *
+ * `auto` na primeira coluna: os rótulos são curtos e conhecidos (Matrícula,
+ * Nascimento, CPF), então a coluna encolhe para o texto e o valor começa
+ * logo depois, em vez de a 200px de distância.
+ */
+.dados {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  align-items: baseline;
+  margin: 0 0 20px;
+}
+
+.dados dt {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-label);
+}
+
+.dados dd {
+  margin: 0;
+  color: var(--ah-text-default);
+}
+
+/**
+ * SEÇÃO — a unidade de leitura da ficha.
+ *
+ * Separador em vez de card: cinco cards empilhados numa tela de consulta
+ * viram moldura sobre moldura, e o `PRODUCT.md` é explícito -- card tem
+ * borda, não sombra, e superfície plana lê melhor em densidade alta. Aqui
+ * nem borda: uma linha de topo basta para dizer "outra coisa começa".
+ */
+.secao {
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.secao > h2 {
+  margin: 0 0 12px;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+  color: var(--ah-text-strong);
+}
+
+/**
+ * NAVEGAÇÃO para as outras telas do aluno.
+ *
+ * Eram quatro links de texto num `<ul>` no rodapé -- as quatro portas do
+ * sistema (histórico, biometria, financeiro, evolução) com menos presença
+ * que qualquer rótulo de campo acima delas. Numa tela que é o hub da
+ * recepção, o destino mais usado não pode ser o elemento menos visível.
+ *
+ * `auto-fit` com piso de 200px: quatro colunas no monitor do balcão, duas no
+ * estreito, sem media query. O piso é o que cabe "Consentimento e
+ * biometria" sem quebrar em três linhas.
+ */
+.portas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/**
+ * A PORTA é o link inteiro, não o texto dentro dele.
+ *
+ * Alvo grande é o que a mão acerta no balcão -- e um link de texto de 14px
+ * tem alvo de 14px. `display: flex` no `<a>` faz o cartão todo ser
+ * clicável.
+ */
+.porta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: 8px;
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-default);
+  text-decoration: none;
+  /*
+    120ms é o feedback de controle do DS-PAINEL §4. Cor e borda só --
+    `transform` aqui seria decoração, e a promessa da catraca é p95 < 300ms:
+    a interface não pode parecer mais lenta que o motor.
+  */
+  transition:
+    border-color 120ms cubic-bezier(0.2, 0, 0.2, 1),
+    background-color 120ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/*
+ * Hover traz DOIS canais -- borda E superfície. Realce só por cor desaparece
+ * para quem opera com brilho baixo, que é o caso do balcão sob luz
+ * fluorescente forte. Mesmo raciocínio do `Button` variante `icon`.
+ */
+.porta:hover {
+  border-color: var(--ah-border-hover);
+  background: var(--ah-surface-sunken);
+}
+
+.porta:focus-visible {
+  outline: 2px solid var(--ah-action-text);
+  outline-offset: 2px;
+}
+
+/*
+ * O ícone fica em CARBONO, não no accent.
+ *
+ * DS-PAINEL §2.3: accent é AÇÃO, carbono é estrutura. Estas quatro portas
+ * navegam -- não mudam estado, não abrem catraca, não cobram ninguém. Pintar
+ * de accent as colocaria no mesmo peso visual do botão que salva o cadastro.
+ */
+.iconeDaPorta {
+  flex: none;
+  display: inline-flex;
+  color: var(--ah-text-icon);
+}
+
+.rotuloDaPorta {
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .porta {
+    transition: none;
+  }
+}
