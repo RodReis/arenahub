@@ -1,0 +1,39 @@
+/**
+ * Seletor de forma de pagamento -- F53, Task 10.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-state-*`,
+ * `--ah-space-*`, nunca `--ah-carbon-*` cru nem hex literal.
+ */
+.seletor {
+  margin: 0 0 24px;
+  padding: 0;
+  border: none;
+}
+
+.legenda {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+/*
+ * As tres formas em linha, quebrando sozinhas -- e a pessoa esta no balcao,
+ * a tela pode estar num monitor estreito de caixa.
+ */
+.opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/*
+ * O motivo do cartao indisponivel usa o tom de atencao -- e informativo, nao
+ * um erro que a recepcao causou.
+ */
+.motivo {
+  margin: 8px 0 0;
+  color: var(--ah-state-warning);
+  font-size: var(--ah-type-body-size);
+}

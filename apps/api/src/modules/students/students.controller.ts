@@ -102,16 +102,25 @@ const esquemaDeCriacao = z
     fullName: z.string().min(2).max(160),
     birthDate: dataSimples,
     /**
-     * Unidade de ORIGEM. Unico campo que a F45 tornou obrigatorio -- decisao
-     * do PI de 18/08/2026. Nome, nascimento e unidade sao os tres unicos
-     * obrigatorios do cadastro inteiro: quem chega sem documento, sem
-     * endereco e sem telefone e cadastrado do mesmo jeito.
+     * Unidade de ORIGEM. A F45 tornou obrigatorio -- decisao do PI de
+     * 18/08/2026. Nome, nascimento e unidade sao tres dos obrigatorios do
+     * cadastro; endereco e telefone continuam de fora.
      */
     gymUnitId: z.string().uuid(),
-    cpf: z
-      .string()
-      .optional()
-      .refine((valor) => valor === undefined || cpfEhValido(valor), 'CPF invalido'),
+    /**
+     * Obrigatorio desde o ADR-043 Decisao 3 (23/08/2026), que REVERTE a
+     * decisao do PI de 18/08 ("CPF continua opcional"). Motivo: o antifraude
+     * da Getnet bloqueia cobranca no cartao sem CPF no `customer`, e o PI
+     * decidiu exigi-lo no cadastro em vez de dentro do fluxo de pagamento.
+     *
+     * A OBRIGATORIEDADE E DE APLICACAO, NUNCA DE COLUNA -- `students.cpf`
+     * continua anulavel (`@db.Text?`). A base importada do Pacto tem pelo
+     * menos 308 alunos sem CPF (1.618 CPFs para 1.926 alunos, ADR-034); eles
+     * continuam existindo, treinando e passando na catraca. So nao podem
+     * pagar com cartao. Ver INV-009/INV-011: CPF nao vira matricula nem
+     * identificador de dispositivo so por ser obrigatorio agora.
+     */
+    cpf: z.string().refine((valor) => cpfEhValido(valor), 'CPF invalido'),
     /** Texto livre: RG nao tem formato nacional unico. */
     rg: z.string().min(1).max(40).optional(),
     registeredSex: sexoCadastral.optional(),
@@ -141,11 +150,14 @@ const esquemaDeEdicao = z
     fullName: z.string().min(2).max(160).optional(),
     birthDate: dataSimples.optional(),
     gymUnitId: z.string().uuid().optional(),
-    cpf: z
-      .string()
-      .nullable()
-      .optional()
-      .refine((valor) => valor === undefined || valor === null || cpfEhValido(valor), 'CPF invalido'),
+    /**
+     * SEM `.nullable()` -- unica excecao a distincao ausente/null do resto
+     * deste schema (ADR-043 Decisao 3). Ausente continua "nao mexer"; `null`
+     * aqui e RECUSADO em vez de "apagar", porque apagar um CPF ja gravado
+     * contraria a obrigatoriedade que este ADR introduziu. Os demais campos
+     * mantem `null` = apaga.
+     */
+    cpf: z.string().optional().refine((valor) => valor === undefined || cpfEhValido(valor), 'CPF invalido'),
     rg: z.string().min(1).max(40).nullable().optional(),
     registeredSex: sexoCadastral.nullable().optional(),
     leadSource: origemDoLead.nullable().optional(),
@@ -215,6 +227,16 @@ interface AlunoDto {
    * Vazia na ficha, que nao carrega credenciais -- so a lista as busca.
    */
   deviceIds: string[];
+  /**
+   * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente -- F53
+   * Task 12, aviso de vencimento derivado (SPEC-053 §3.4). `null` quando
+   * nao ha assinatura, nao ha invoice em aberto, ou o fuso da unidade nao
+   * esta cadastrado -- os tres casos em que a lista nao tem base para
+   * avisar, e por isso nao avisa.
+   */
+  invoiceParaAviso: { status: string; dueAt: string; blockAt: string | null } | null;
+  /** Fuso da unidade de ORIGEM do aluno (INV-144/ADR-019), para o mesmo aviso. */
+  timezoneDaUnidade: string | null;
 }
 
 interface ContatoDto {
@@ -508,6 +530,11 @@ export class StudentsController {
       subscriptionStatus: null,
       phone: null,
       deviceIds: [],
+      // A ficha (`GET /students/:id`) busca o aviso de vencimento pela sua
+      // PROPRIA rota (`/students/:id/invoices`, ja existente) -- estes dois
+      // campos so a lista preenche, em `paraDtoDaLista`.
+      invoiceParaAviso: null,
+      timezoneDaUnidade: null,
     };
   }
 
@@ -521,6 +548,7 @@ export class StudentsController {
    */
   private paraDtoDaLista(aluno: AlunoComVinculos): AlunoDto {
     const assinatura = aluno.subscriptions?.[0];
+    const invoice = assinatura?.invoices?.[0];
 
     return {
       ...this.paraDto(aluno),
@@ -528,6 +556,14 @@ export class StudentsController {
       subscriptionStatus: assinatura?.status ?? null,
       phone: aluno.contacts?.[0]?.value ?? null,
       deviceIds: numerosDeEquipamento(aluno.credentials ?? []),
+      invoiceParaAviso: invoice
+        ? {
+            status: invoice.status,
+            dueAt: invoice.dueAt.toISOString(),
+            blockAt: invoice.blockAt?.toISOString() ?? null,
+          }
+        : null,
+      timezoneDaUnidade: aluno.gymUnit?.timezone ?? null,
     };
   }
 }
@@ -549,7 +585,12 @@ function numerosDeEquipamento(credenciais: readonly { externalId: string }[]): s
 
 /** O aluno como a busca o devolve: com a assinatura vigente e o telefone. */
 type AlunoComVinculos = Student & {
-  subscriptions?: { status: string; plan: { name: string } }[];
+  subscriptions?: {
+    status: string;
+    plan: { name: string };
+    invoices?: { status: string; dueAt: Date; blockAt: Date | null }[];
+  }[];
   contacts?: { value: string }[];
   credentials?: { externalId: string }[];
+  gymUnit?: { timezone: string } | null;
 };

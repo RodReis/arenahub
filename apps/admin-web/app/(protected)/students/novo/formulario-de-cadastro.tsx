@@ -82,6 +82,10 @@ const UFS = [
 const OBRIGATORIOS = [
   { campo: 'fullName', passo: 0, rotulo: 'o nome completo' },
   { campo: 'birthDate', passo: 0, rotulo: 'a data de nascimento' },
+  // CPF entrou na lista pelo ADR-043 Decisao 3: o antifraude do checkout de
+  // cartao bloqueia cobranca sem CPF, e o PI decidiu exigi-lo no cadastro em
+  // vez de dentro do fluxo de pagamento.
+  { campo: 'cpf', passo: 0, rotulo: 'o CPF' },
   { campo: 'gymUnitId', passo: 2, rotulo: 'a unidade' },
 ] as const;
 
@@ -150,10 +154,12 @@ function BotaoDeEnvio() {
 /**
  * Cadastro completo de aluno em quatro passos — F45.
  *
- * NOME, NASCIMENTO E UNIDADE SÃO OS ÚNICOS OBRIGATÓRIOS. O mockup marcava
- * CPF, telefone e e-mail também; o PI decidiu em 18/08 que o mockup é que se
- * corrige — a matrícula nunca depende do CPF (INV-009/011), e quem chega sem
- * documento é cadastrado do mesmo jeito.
+ * NOME, NASCIMENTO, CPF E UNIDADE SÃO OS OBRIGATÓRIOS. O PI decidiu em 18/08
+ * que o CPF ficava de fora; o ADR-043 Decisão 3 (23/08) REVERTE isso — o
+ * antifraude do checkout de cartão bloqueia cobrança sem CPF, e exigi-lo no
+ * cadastro evita pedir o documento dentro do fluxo de pagamento. A matrícula
+ * continua sem depender do CPF (INV-009/011): o campo é obrigatório na
+ * ENTRADA, nunca virou identificador. Telefone e e-mail continuam opcionais.
  *
  * UM FORMULÁRIO SÓ, QUATRO PASSOS VISÍVEIS. Os campos dos passos que não
  * estão na tela continuam montados, escondidos por `hidden` — e não
@@ -520,13 +526,14 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
             <Campo
               id="cpf"
               rotulo="CPF"
-              marca="opcional"
-              dica="A matrícula não depende do CPF: quem chega sem documento é cadastrado normalmente."
+              marca="obrigatório"
+              dica="Exigido pelo antifraude do pagamento com cartão (ADR-043). A matrícula não depende do CPF."
             >
               {entrada('cpf', {
                 mascara: mascararCpf,
                 placeholder: '000.000.000-00',
                 inputMode: 'numeric',
+                obrigatorio: true,
                 dica: true,
               })}
             </Campo>

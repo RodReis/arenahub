@@ -176,6 +176,63 @@ export interface ProviderEvent {
   payload: unknown;
 }
 
+/**
+ * Endereco de cobranca. Exigido pelo antifraude da Getnet (SPEC-053 9).
+ *
+ * A F45 ja entregou `student_addresses`; este tipo e a projecao do que o
+ * provedor pede, nao a entidade.
+ */
+export interface EnderecoDeCobranca {
+  logradouro: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  cep: string;
+}
+
+/**
+ * Dados do pagador que o antifraude exige.
+ *
+ * `cpf` e `endereco` NAO sao anulaveis aqui de proposito: quem nao os tem
+ * nao chega a este ponto -- o caso de uso recusa antes (Task 4), com
+ * `STUDENT_BILLING_DATA_INCOMPLETE`. Tipo anulavel aqui empurraria a decisao
+ * para dentro do adapter, que responderia com bloqueio do antifraude em vez
+ * de com uma frase que a recepcao entende.
+ */
+export interface CustomerParaAntifraude {
+  nome: string;
+  email: string | null;
+  telefone: string | null;
+  cpf: string;
+  endereco: EnderecoDeCobranca;
+}
+
+export interface HostedCheckoutInput {
+  externalAccountId: string;
+  amountMinor: number;
+  currency: string;
+  idempotencyKey: string;
+  expiresAt: Date;
+  /** Texto curto que o aluno ve no checkout. Sem PII. */
+  descricao: string;
+  customer: CustomerParaAntifraude;
+}
+
+/**
+ * MESMA FORMA de `PixCharge`, e nao por acaso: no balcao os dois viram QR na
+ * tela, e a diferenca e so o que o aluno faz depois de escanear.
+ *
+ * `checkoutUrl` existe alem do QR porque o aluno pode preferir o link por
+ * WhatsApp -- e porque QR nao e alcancavel por leitor de tela.
+ */
+export interface HostedCheckout {
+  externalPaymentId: string;
+  checkoutUrl: string;
+  qrCodeDataUri: string;
+  expiresAt: Date;
+}
+
 export interface PaymentProvider {
   createPix(input: CreatePixInput): Promise<PixCharge>;
   getPaymentStatus(externalPaymentId: string): Promise<ProviderPayment>;
@@ -218,6 +275,18 @@ export interface PaymentProvider {
    * ser tratado no fluxo normal, e a unica saida correta e parar.
    */
   verifyAndParseWebhook(input: RawWebhook): Promise<ProviderEvent>;
+  /**
+   * NONO METODO -- checkout HOSPEDADO, a primeira cobranca no cartao.
+   *
+   * NAO E `createTokenizedSubscription` (ADR-043, Decisao 5): aquele cobra um
+   * metodo JA TOKENIZADO, e no balcao o aluno ainda nao tem cartao salvo.
+   * Confundi-los mandaria o backend pedir token que nao existe.
+   *
+   * O aluno digita o cartao NO PROPRIO CELULAR, na pagina do provedor. E o
+   * que torna INV-098 verdadeiro no balcao: nao ha campo de cartao para
+   * proteger porque nao ha campo de cartao.
+   */
+  createHostedCheckout(input: HostedCheckoutInput): Promise<HostedCheckout>;
 }
 
 /** Token de injecao -- a porta e interface, e interface some no runtime. */

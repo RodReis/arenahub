@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
+import { paraCentavos } from '../../src/billing/dinheiro';
 
 /**
  * Plano, assinatura e direito de acesso — F7, Slice 1.2.
@@ -42,7 +43,13 @@ const esquemaDeAssinatura = z.object({
 export interface EstadoDoPlano {
   erro?: string;
   sucesso?: { planId: string; name: string };
-  valores?: { name?: string; description?: string };
+  valores?: { name?: string; description?: string; amountMinor?: string };
+}
+
+export interface EstadoDoReajuste {
+  erro?: string;
+  sucesso?: { amountMinor: number; validFrom: string };
+  valores?: { amountMinor?: string; validFrom?: string };
 }
 
 export interface EstadoDaAssinatura {
@@ -68,6 +75,9 @@ const MENSAGEM: Record<string, string> = {
   SUBSCRIPTION_VERSION_CONFLICT:
     'Alguém alterou esta assinatura enquanto você editava. Recarregue a ficha e tente de novo.',
   FORBIDDEN: 'Seu perfil não tem permissão para esta ação.',
+  PLAN_PRICE_VALID_FROM_TAKEN: 'Já existe um preço cadastrado para esta data de início.',
+  PLAN_PRICE_RETROACTIVE:
+    'A data de início não pode estar no passado — reajuste retroativo não é permitido.',
 };
 
 function texto(formulario: FormData, campo: string): string {
@@ -166,7 +176,12 @@ export async function cadastrarPlano(
     gymUnitIds: unidades,
   };
 
-  const valores = { name: bruto.name, description: bruto.description };
+  const amountMinorDigitado = texto(formulario, 'amountMinor');
+  const valores = {
+    name: bruto.name,
+    description: bruto.description,
+    amountMinor: amountMinorDigitado,
+  };
 
   const validado = esquemaDePlano.safeParse(bruto);
 
@@ -175,6 +190,19 @@ export async function cadastrarPlano(
       erro: validado.error.issues[0]?.message ?? 'Confira os dados informados.',
       valores,
     };
+  }
+
+  // F53: plano sem preco nao pode existir. A API recusa (`amountMinor`
+  // obrigatorio, > 0) -- barrar aqui evita o round-trip e da a frase certa,
+  // em vez de "confira os dados informados" sem dizer qual dado.
+  if (amountMinorDigitado.trim() === '') {
+    return { erro: 'Informe o preço do plano.', valores };
+  }
+
+  const amountMinor = paraCentavos(amountMinorDigitado);
+
+  if (amountMinor === null || amountMinor <= 0) {
+    return { erro: 'Preço inválido — use até duas casas decimais, por exemplo 150,00.', valores };
   }
 
   const janelas = janelasDoFormulario(formulario, unidades[0]!);
@@ -194,6 +222,7 @@ export async function cadastrarPlano(
       ...(bruto.description !== '' ? { description: bruto.description } : {}),
       gymUnitIds: validado.data.gymUnitIds,
       janelas,
+      amountMinor,
     },
   });
 
@@ -204,6 +233,54 @@ export async function cadastrarPlano(
   revalidatePath('/plans');
 
   return { sucesso: { planId: resposta.dados.id, name: resposta.dados.name } };
+}
+
+/**
+ * Reajuste — F53, item 6 do brief. Nova linha de vigência, sem tocar em
+ * invoice já emitida (INV-068). `validFrom` no passado é recusado pela API
+ * com 422 `PLAN_PRICE_RETROACTIVE` — a mensagem já sai em português claro,
+ * sem o código (ver `MENSAGEM`).
+ */
+export async function reajustarPreco(
+  _anterior: EstadoDoReajuste,
+  formulario: FormData,
+): Promise<EstadoDoReajuste> {
+  const planId = texto(formulario, 'planId');
+  const amountMinorDigitado = texto(formulario, 'amountMinor');
+  const validFromDigitado = texto(formulario, 'validFrom');
+
+  const valores = { amountMinor: amountMinorDigitado, validFrom: validFromDigitado };
+
+  if (amountMinorDigitado.trim() === '') {
+    return { erro: 'Informe o novo preço.', valores };
+  }
+
+  const amountMinor = paraCentavos(amountMinorDigitado);
+
+  if (amountMinor === null || amountMinor <= 0) {
+    return { erro: 'Preço inválido — use até duas casas decimais, por exemplo 150,00.', valores };
+  }
+
+  const validFrom = instanteIso(validFromDigitado);
+
+  if (validFrom === '') {
+    return { erro: 'Informe a data de início do reajuste.', valores };
+  }
+
+  const resposta = await chamarApi<{ amountMinor: number; currency: string; validFrom: string }>(
+    `/api/v1/plans/${planId}/prices`,
+    { metodo: 'POST', corpo: { amountMinor, validFrom } },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível reajustar o preço'), valores };
+  }
+
+  // So `/plans`: nao ha ficha de plano (`/plans/:id`) nesta fatia -- ver
+  // `AcaoDeReajuste`, que vive na propria listagem.
+  revalidatePath('/plans');
+
+  return { sucesso: { amountMinor: resposta.dados.amountMinor, validFrom: resposta.dados.validFrom } };
 }
 
 export async function atribuirPlano(

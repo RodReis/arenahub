@@ -11,26 +11,17 @@ import {
   TenantDateTime,
 } from '@arenahub/ui';
 
+import { faturaEmDestaque } from '../../../../../src/billing/vencimento';
 import { chamarApi } from '../../../../../lib/api/server-client';
 import { PainelDeCobranca } from './painel-de-cobranca';
+import type { DadoFaltante } from './seletor-de-forma';
+import { SituacaoAtual } from './situacao-atual';
 
 export const metadata: Metadata = {
   title: 'Financeiro do aluno — ArenaHub',
 };
 
 export const dynamic = 'force-dynamic';
-
-/**
- * Fuso FIXO -- mesma divida das outras telas do painel. A invoice traz
- * `tenant_id`, nao o fuso da unidade, e o financeiro nao e dado fisico
- * (nao tem `gym_unit_id`, por ADR-027).
- *
- * Aqui a divida DOI MAIS que nas outras telas: `INV-144` diz que o instante
- * de bloqueio por inadimplencia e no timezone da unidade, SEM fallback para
- * o tenant. Enquanto este valor for fixo, a data que a recepcao le pode
- * divergir da que o job de vencimento vai usar na F15.
- */
-const FUSO_PROVISORIO = 'America/Sao_Paulo';
 
 interface Pagamento {
   id: string;
@@ -66,6 +57,43 @@ interface Entitlement {
 interface Aluno {
   id: string;
   fullName: string;
+  /** Anulavel: 308 alunos do Pacto nao tem (ADR-034). */
+  cpf: string | null;
+  address: { postalCode: string } | null;
+}
+
+/** Resposta de `GET /students/:id/invoices` -- fuso da unidade do aluno (INV-144, ADR-019). F53. */
+interface InvoicesDoAluno {
+  timezone: string;
+  invoices: Invoice[];
+}
+
+/**
+ * O que falta no cadastro para pagar com CARTAO. F53, Task 10.
+ *
+ * REIMPLEMENTAR NAO -- espelha `faltaParaCartao` de
+ * `apps/api/src/modules/billing/domain/dados-de-cobranca.ts`, que e quem
+ * BLOQUEIA de verdade (o caso de uso do checkout recusa com 422
+ * `STUDENT_BILLING_DATA_INCOMPLETE` se o cadastro estiver incompleto,
+ * independente do que esta tela mostrar). Nao ha pacote compartilhado entre
+ * `apps/api` e `apps/admin-web` para importar a funcao original -- esta copia
+ * so decide COMO EXIBIR o aviso antes do clique; nunca decide se o pagamento
+ * e aceito.
+ */
+function faltandoParaCartao(aluno: Aluno | undefined): readonly DadoFaltante[] {
+  if (!aluno) return [];
+
+  const faltando: DadoFaltante[] = [];
+
+  if (aluno.cpf === null || aluno.cpf.trim() === '') {
+    faltando.push('CPF');
+  }
+
+  if (aluno.address === null) {
+    faltando.push('ENDERECO');
+  }
+
+  return faltando;
 }
 
 /**
@@ -88,11 +116,30 @@ export default async function PaginaFinanceiroDoAluno({
 
   const [respostaDoAluno, respostaDasInvoices, respostaDosDireitos] = await Promise.all([
     chamarApi<Aluno>(`/api/v1/students/${id}`),
-    chamarApi<Invoice[]>(`/api/v1/students/${id}/invoices`),
+    chamarApi<InvoicesDoAluno>(`/api/v1/students/${id}/invoices`),
     chamarApi<Entitlement[]>(`/api/v1/students/${id}/entitlements`),
   ]);
 
   if (!respostaDasInvoices.ok) {
+    /*
+      A MENSAGEM SEGUE O CODIGO DO ERRO, nao o contrario.
+
+      Ate a F53 esta tela dizia "Sem permissao" para QUALQUER falha -- um 500
+      do servidor e um aluno inexistente produziam a mesma frase. Passava
+      despercebido porque o unico erro provavel era mesmo permissao; a F53
+      tornou o 404 provavel ao fazer a rota exigir o aluno para resolver o
+      fuso da unidade.
+
+      Mandar a recepcao pedir permissao ao administrador quando o aluno foi
+      excluido faz duas pessoas perderem tempo com a pergunta errada.
+    */
+    const codigo = respostaDasInvoices.erro?.code ?? 'erro';
+
+    const titulo =
+      respostaDasInvoices.erro?.status === 404
+        ? `Aluno não encontrado (${codigo}).`
+        : `Sem permissão para consultar o financeiro (${codigo}).`;
+
     return (
       <section aria-labelledby="titulo-financeiro">
         <PageHeader id="titulo-financeiro" title="Financeiro" />
@@ -105,14 +152,17 @@ export default async function PaginaFinanceiroDoAluno({
               code: 'erro',
               correlationId: '',
             }),
-            title: `Sem permissão para consultar o financeiro (${respostaDasInvoices.erro?.code ?? 'erro'}).`,
+            title: titulo,
           }}
         />
       </section>
     );
   }
 
-  const invoices = respostaDasInvoices.dados ?? [];
+  const invoices = respostaDasInvoices.dados?.invoices ?? [];
+  // Fuso da unidade de origem do aluno (INV-144, ADR-019) -- sem fallback
+  // para America/Sao_Paulo: sem o dado, nao ha fuso confiavel para exibir.
+  const timezoneDaUnidade = respostaDasInvoices.dados?.timezone ?? 'UTC';
   const aluno = respostaDoAluno.dados;
 
   /*
@@ -126,12 +176,25 @@ export default async function PaginaFinanceiroDoAluno({
       (direito) => direito.status === 'ACTIVE' && direito.subscriptionId !== null,
     )?.subscriptionId ?? null;
 
+  /*
+   * A fatura em destaque sai de `faturaEmDestaque`, e nao de um calculo local:
+   * a ficha do aluno mostra o aviso de vencimento sobre a MESMA fatura, e duas
+   * implementacoes divergiriam.
+   */
+  const invoicesEmAberto = invoices.filter(
+    (invoice) => invoice.status === 'OPEN' || invoice.status === 'OVERDUE',
+  );
+
+  const invoiceEmDestaque = faturaEmDestaque(invoices);
+
   return (
     <section aria-labelledby="titulo-financeiro">
       <PageHeader
         id="titulo-financeiro"
         title={aluno ? `Financeiro — ${aluno.fullName}` : 'Financeiro'}
       />
+
+      <SituacaoAtual invoice={invoiceEmDestaque} timezone={timezoneDaUnidade} agora={new Date()} />
 
       <DataTable
         testId="tabela-de-cobrancas"
@@ -159,7 +222,7 @@ export default async function PaginaFinanceiroDoAluno({
             key: 'competencia',
             header: 'Competência',
             role: 'moment',
-            render: (invoice) => <TenantDateTime iso={invoice.billingPeriod} timeZone={FUSO_PROVISORIO} />,
+            render: (invoice) => <TenantDateTime iso={invoice.billingPeriod} timeZone={timezoneDaUnidade} />,
           },
           {
             key: 'situacao',
@@ -181,7 +244,7 @@ export default async function PaginaFinanceiroDoAluno({
             key: 'vencimento',
             header: 'Vence em',
             role: 'moment',
-            render: (invoice) => <TenantDateTime iso={invoice.dueAt} timeZone={FUSO_PROVISORIO} />,
+            render: (invoice) => <TenantDateTime iso={invoice.dueAt} timeZone={timezoneDaUnidade} />,
           },
           {
             key: 'recebimento',
@@ -213,7 +276,7 @@ export default async function PaginaFinanceiroDoAluno({
                       {pagamento.paidAt ? (
                         <>
                           {' — '}
-                          <TenantDateTime iso={pagamento.paidAt} timeZone={FUSO_PROVISORIO} format="datetime" />
+                          <TenantDateTime iso={pagamento.paidAt} timeZone={timezoneDaUnidade} format="datetime" />
                         </>
                       ) : null}
                     </li>
@@ -232,15 +295,15 @@ export default async function PaginaFinanceiroDoAluno({
       />
 
       <PainelDeCobranca
+        studentId={id}
         subscriptionId={assinaturaAtiva}
-        invoicesEmAberto={invoices
-          .filter((invoice) => invoice.status === 'OPEN' || invoice.status === 'OVERDUE')
-          .map((invoice) => ({
-            id: invoice.id,
-            number: invoice.number,
-            totalMinor: invoice.totalMinor,
-            currency: invoice.currency,
-          }))}
+        faltandoParaCartao={faltandoParaCartao(aluno)}
+        invoicesEmAberto={invoicesEmAberto.map((invoice) => ({
+          id: invoice.id,
+          number: invoice.number,
+          totalMinor: invoice.totalMinor,
+          currency: invoice.currency,
+        }))}
       />
     </section>
   );

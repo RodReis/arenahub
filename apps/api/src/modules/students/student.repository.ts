@@ -633,11 +633,47 @@ export class StudentRepository {
           select: {
             status: true,
             plan: { select: { name: true } },
+            /*
+             * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente --
+             * F53 Task 12, mesmo criterio de `listar-invoices.use-case.ts`
+             * (`dueAt asc` primeiro traz a mais antiga). SEM segunda consulta:
+             * nested include sob o `take: 1` de cima, mesma tecnica que ja
+             * evita o N+1 aqui.
+             */
+            invoices: {
+              where: { status: { in: ['OPEN', 'OVERDUE'] } },
+              orderBy: [{ dueAt: 'asc' }, { id: 'asc' }],
+              take: 1,
+              select: { status: true, dueAt: true, blockAt: true },
+            },
           },
         },
+        /*
+         * Fuso da unidade de ORIGEM do aluno (INV-144, ADR-019) -- sem ele
+         * `situacaoDeVencimento` nao tem como decidir o dia civil de `dueAt`.
+         * SEM FALLBACK: unidade sem fuso cadastrado nao aparece com aviso
+         * errado, aparece sem aviso (ver `paraDtoDaLista`).
+         */
+        gymUnit: { select: { timezone: true } },
         contacts: {
           where: { type: 'PHONE' },
-          orderBy: { isPrimary: 'desc' },
+          /*
+            DUAS chaves, nao uma. `isPrimary` e boolean, logo NAO e ordem
+            total: dois telefones com o mesmo valor de `isPrimary` empatam, e
+            o desempate cai na ordem FISICA do Postgres -- que muda depois de
+            qualquer UPDATE na tabela.
+
+            Com `take: 1` em cima, o empate nao embaralha a ordem: ele troca
+            QUAL telefone aparece. A recepcao ligaria para um numero num
+            carregamento e para outro no seguinte, sem nada ter mudado no
+            cadastro.
+
+            Corrigido junto da F53, que consertou o mesmo defeito no caminho
+            do checkout de cartao (o telefone que vai ao antifraude do
+            provedor). Sao os dois unicos pontos do `apps/api` com boolean
+            como criterio unico de ordenacao.
+          */
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
           take: 1,
           select: { value: true },
         },

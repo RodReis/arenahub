@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { cadastrarAluno } from './cadastro-de-aluno';
+import { criarPlano } from './cadastro-de-plano';
 
 /**
  * WCAG 2.2 AA nos fluxos essenciais -- DS-PAINEL.md §10.
@@ -42,10 +43,7 @@ const TELAS = ['/units', '/students', '/plans', '/operations', '/access-events']
 async function criarAlunoAtivoComPlano(page: Page): Promise<void> {
   const sufixo = String(Date.now());
 
-  await page.goto('/plans');
-  await page.getByTestId('campo-nome-do-plano').fill(`Plano A11y ${sufixo}`);
-  await page.getByTestId('confirmar-plano').click();
-  await expect(page.getByTestId('plano-criado')).toBeVisible();
+  await criarPlano(page, `Plano A11y ${sufixo}`);
 
   // O cadastro virou um wizard de quatro passos na F45; `cadastrarAluno`
   // guarda a navegação entre eles, para este teste continuar sendo sobre

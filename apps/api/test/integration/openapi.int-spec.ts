@@ -7,6 +7,39 @@ import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
 import { montarOpenApi } from '../../src/openapi.js';
+import { OPERACOES_SEM_SCHEMA_DE_RESPOSTA } from './openapi-divida-de-schema.js';
+
+const METODOS_HTTP = ['get', 'post', 'put', 'patch', 'delete'] as const;
+
+/** `POST /api/v1/invoices` -- a chave da allowlist e do relatorio de erro. */
+function operacoesSemSchemaDeResposta(paths: Record<string, unknown>): string[] {
+  const achadas: string[] = [];
+
+  for (const [caminho, item] of Object.entries(paths)) {
+    for (const metodo of METODOS_HTTP) {
+      const operacao = (item as Record<string, unknown>)[metodo] as
+        | { responses?: Record<string, { content?: Record<string, { schema?: unknown }> }> }
+        | undefined;
+
+      if (!operacao) continue;
+
+      /**
+       * BASTA UMA resposta com schema. `2xx` e o que interessa na pratica,
+       * mas exigir o codigo exato aqui obrigaria a saber, para cada rota, se
+       * ela devolve 200 ou 201 -- checagem que nao paga o que custa. O que
+       * esta guarda existe para pegar e a operacao que nao descreve corpo
+       * NENHUM, e essa passa igual pelos dois criterios.
+       */
+      const temSchema = Object.values(operacao.responses ?? {}).some((resposta) =>
+        Object.values(resposta?.content ?? {}).some((conteudo) => conteudo?.schema !== undefined),
+      );
+
+      if (!temSchema) achadas.push(`${metodo.toUpperCase()} ${caminho}`);
+    }
+  }
+
+  return achadas.sort();
+}
 
 const CAMINHO_DO_SNAPSHOT = join(
   process.cwd(),
@@ -78,6 +111,9 @@ describe('contrato OpenAPI', () => {
         '/api/v1/students/{id}/timeline',
         '/api/v1/plans',
         '/api/v1/plans/{id}',
+        // F53 -- backend de preco de plano: obrigatorio na criacao, mais
+        // reajuste que cria nova linha de vigencia sem tocar invoice emitida.
+        '/api/v1/plans/{id}/prices',
         '/api/v1/subscriptions',
         '/api/v1/subscriptions/{id}/actions',
         '/api/v1/entitlements/courtesy',
@@ -118,17 +154,24 @@ describe('contrato OpenAPI', () => {
         // NAO ESTAVAM AQUI: a lista parou na F11, e as duas fatias entregaram
         // rota sem declara-la. O snapshot pegava a mudanca, esta lista nao --
         // ela e a que diz, em prosa, o que a fatia PROMETEU publicar.
+        // F53 -- task 6: GET adicionado ao mesmo path para a lista
+        // transversal de faturas do tenant (POST ja existia, F12).
         '/api/v1/invoices',
         '/api/v1/invoices/{id}',
         '/api/v1/invoices/{id}/manual-payment',
         '/api/v1/invoices/{id}/payments/pix',
         '/api/v1/payments/{id}/status',
         '/api/v1/students/{id}/invoices',
+        // F53 -- task 5: leitura barata para o laco de polling do balcao.
+        '/api/v1/payment-attempts/{id}',
         '/api/v1/webhooks/payments/{provider}',
         // F14 -- cartao e recorrencia.
         '/api/v1/payment-methods',
         '/api/v1/invoices/{id}/payments/card',
         '/api/v1/subscriptions/{id}/recurrence/cancel',
+        // F53 -- task 16: checkout hospedado de cartao (primeira cobranca,
+        // sem token salvo). Coexiste com a rota tokenizada acima.
+        '/api/v1/invoices/{id}/payments/card-checkout',
         // F15 -- inadimplencia e acesso.
         '/api/v1/billing/delinquency',
         '/api/v1/billing/delinquency/apply',
@@ -152,6 +195,46 @@ describe('contrato OpenAPI', () => {
         '/api/v1/students/{id}/health-context/{factor}',
       ]),
     );
+  });
+
+  /**
+   * FIX #163: A GUARDA NAO ENXERGAVA O CORPO.
+   *
+   * O snapshot compara `paths` inteiro, entao pega rota que some, rota que
+   * nasce e parametro que muda. Nao pegava mudanca de FORMA da resposta --
+   * porque nenhuma operacao declarava schema (113 de 113), e comparar
+   * `{ "description": "" }` com outro `{ "description": "" }` sempre bate.
+   * Foi assim que `GET /students/:id/invoices` virou de array para objeto na
+   * F53 sem um aviso sequer.
+   *
+   * O CRITERIO (decisao do PI): exigir schema so das rotas NOVAS. As 113
+   * herdadas ficam na allowlist, que so pode encolher.
+   */
+  it('rota nova declara schema de resposta', () => {
+    const semSchema = operacoesSemSchemaDeResposta(documento.paths);
+    const perdoadas = new Set(OPERACOES_SEM_SCHEMA_DE_RESPOSTA);
+
+    const novas = semSchema.filter((operacao) => !perdoadas.has(operacao));
+
+    expect(novas).toEqual([]);
+  });
+
+  /**
+   * A ALLOWLIST NAO PODE MENTIR.
+   *
+   * Sem esta metade, uma rota que ganhou schema continuaria listada como
+   * devedora para sempre, e a lista deixaria de dizer qual e a divida real --
+   * viraria a documentacao que envelhece, o defeito que o snapshot existe
+   * para impedir. Falhar aqui e trivial de resolver: apagar a linha.
+   */
+  it('a divida de schema so encolhe', () => {
+    const semSchema = new Set(operacoesSemSchemaDeResposta(documento.paths));
+
+    const jaResolvidas = OPERACOES_SEM_SCHEMA_DE_RESPOSTA.filter(
+      (operacao) => !semSchema.has(operacao),
+    );
+
+    expect(jaResolvidas).toEqual([]);
   });
 
   it('nao expoe rota fora de /api/v1, health e version', () => {

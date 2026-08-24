@@ -1,0 +1,19 @@
+-- Quando o checkout de cartao deixa de ser pagavel.
+--
+-- SEM ISTO, uma tentativa presa em `CREATED` -- processo morto entre a
+-- resposta do provedor e o `update` que grava `externalPaymentId`, ou aluno
+-- que simplesmente nunca abriu o link -- trava a fatura contra cartao PARA
+-- SEMPRE: `CREATED` esta dentro do predicado do indice parcial
+-- `payment_attempts_um_checkout_em_voo`, e nada no sistema tirava uma
+-- tentativa desse estado. Todo checkout novo daquela invoice respondia 409
+-- indefinidamente.
+--
+-- `criar-checkout-de-cartao.use-case.ts` passa a checar esta coluna antes de
+-- recusar por "checkout em andamento": se a tentativa bloqueadora ja passou
+-- do proprio `expires_at`, ela vira `FAILED` (terminal, fora do predicado do
+-- indice) e uma nova tentativa e criada no lugar.
+--
+-- NULA para tentativas de PIX e para tentativas de cartao anteriores a esta
+-- migration: so o checkout hospedado tem prazo fixo conhecido no momento da
+-- criacao (`MINUTOS_DE_VALIDADE_DO_CHECKOUT`).
+ALTER TABLE "payment_attempts" ADD COLUMN "expires_at" TIMESTAMP(3);

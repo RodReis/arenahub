@@ -86,6 +86,9 @@ describe('F8 -- identidade biometrica e dispositivos', () => {
         fullName: 'Aluno Biometrico',
         birthDate: nascimento.toISOString().slice(0, 10),
         gymUnitId: conta.gymUnitId,
+        // Obrigatorio desde o ADR-043 Decisao 3; este arquivo nao testa CPF,
+        // entao um valor fixo e valido basta.
+        cpf: '52998224725',
         contacts: [],
       });
 

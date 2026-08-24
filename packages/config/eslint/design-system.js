@@ -37,6 +37,19 @@ const FORMATADORES_AUTORIZADOS = [
   '**/TenantDateTime.spec.tsx',
   '**/Money.tsx',
   '**/Money.spec.tsx',
+  /**
+   * F53 Task 12 -- `situacaoDeVencimento` compara o DIA da invoice contra o
+   * DIA de agora no fuso da unidade (nunca o instante, ver o cabecalho do
+   * proprio arquivo). Sem biblioteca de data nova permitida nesta fatia, a
+   * unica forma de obter o dia civil num fuso IANA em JS puro e
+   * `Intl.DateTimeFormat(...).formatToParts()` -- mesma tecnica que
+   * `apps/api/.../bloqueio-por-inadimplencia.ts` ja usa no backend para o
+   * mesmo problema (ADR-019). A funcao nunca formata texto para tela; so
+   * decide o enum que os componentes de UI (esses sim, `TenantDateTime`)
+   * depois exibem.
+   */
+  '**/vencimento.ts',
+  '**/vencimento.test.ts',
 ];
 
 /** Arquivos onde `--ah-action-*` e proibido -- regra 3. */

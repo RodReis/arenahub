@@ -401,6 +401,18 @@
         "tags": [
           "Billing"
         ]
+      },
+      "get": {
+        "operationId": "BillingController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
       }
     },
     "/api/v1/invoices/{id}/manual-payment": {
@@ -466,6 +478,29 @@
     "/api/v1/invoices/{id}/payments/card": {
       "post": {
         "operationId": "BillingController_cobrarNoCartao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/payments/card-checkout": {
+      "post": {
+        "operationId": "BillingController_criarCheckoutDeCartao",
         "parameters": [
           {
             "name": "id",
@@ -597,6 +632,29 @@
         ]
       }
     },
+    "/api/v1/payment-attempts/{id}": {
+      "get": {
+        "operationId": "BillingController_observarTentativa",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/students/{id}/invoices": {
       "get": {
         "operationId": "BillingController_listarDoAluno",
@@ -612,7 +670,29 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "timezone",
+                    "invoices"
+                  ],
+                  "properties": {
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "invoices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -827,6 +907,29 @@
         "parameters": [],
         "responses": {
           "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Membership"
+        ]
+      }
+    },
+    "/api/v1/plans/{id}/prices": {
+      "post": {
+        "operationId": "MembershipController_reajustarPreco",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
             "description": ""
           }
         },

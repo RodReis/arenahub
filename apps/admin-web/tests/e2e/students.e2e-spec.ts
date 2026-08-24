@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { cadastrarAluno, preencherCadastro } from './cadastro-de-aluno';
+import { criarPlano } from './cadastro-de-plano';
 
 /**
  * Jornada de `M1-AC-002` e `M1-AC-003`: a recepção trabalha sem `curl`.
@@ -51,15 +52,27 @@ test.describe('cadastro de aluno', () => {
     await expect(page.getByTestId('matricula-gerada')).toContainText(/^AP-\d{4}-\d{8}$/);
   });
 
-  test('cadastra sem CPF -- documento não é requisito de matrícula', async ({ page }) => {
+  /*
+   * ESTE TESTE GUARDAVA A DECISAO DE 18/08 ("nome, nascimento e unidade são
+   * os ÚNICOS obrigatórios"). O ADR-043 Decisão 3 (23/08/2026) reverteu isso:
+   * o antifraude do checkout de cartão bloqueia cobrança sem CPF, e o PI
+   * decidiu exigi-lo no cadastro. O teste agora guarda a decisão NOVA -- não
+   * foi apagado porque o histórico de por que a regra mudou tem valor.
+   */
+  test('recusa cadastro sem CPF (ADR-043 Decisão 3)', async ({ page }) => {
     await entrar(page);
 
-    // CPF, telefone, e-mail e endereço em branco de propósito: é o caso de
-    // quem chega sem documento, e a F45 manteve a decisão de que nome,
-    // nascimento e unidade são os ÚNICOS obrigatórios do cadastro inteiro.
-    await cadastrarAluno(page, { nome: nomeUnico('Sem Documento'), nascimento: '2001-07-02' });
+    // CPF em branco de propósito (`cpf: ''`, não omitido -- omitido usaria o
+    // default gerado pelo helper) -- é exatamente o caso que a validação nova
+    // precisa barrar. `preencherCadastro`, não `cadastrarAluno`: este teste
+    // não espera sucesso.
+    await preencherCadastro(page, {
+      nome: nomeUnico('Sem Documento'),
+      nascimento: '2001-07-02',
+      cpf: '',
+    });
 
-    await expect(page.getByTestId('matricula-gerada')).toContainText(/^AP-/);
+    await expect(page.getByTestId('erro-do-cadastro')).toBeVisible();
   });
 
   test('nome curto demais é recusado sem perder o que foi digitado', async ({ page }) => {
@@ -106,6 +119,9 @@ test.describe('cadastro de aluno', () => {
 
     await page.getByTestId('campo-fullName').fill(nomeUnico('Sem Unidade'));
     await page.getByTestId('campo-birthDate').fill('1990-01-01');
+    // CPF obrigatório desde o ADR-043 Decisão 3 -- sem ele, o erro pararia
+    // no passo 1 e nunca chegaria à checagem de unidade que este teste prova.
+    await page.getByTestId('campo-cpf').fill('111.444.777-35');
 
     await page.getByTestId('ir-para-passo-4').click();
     await page.getByTestId('confirmar-cadastro').click();
@@ -148,6 +164,8 @@ test.describe('cadastro de aluno', () => {
 
     await page.getByTestId('campo-fullName').fill(nome);
     await page.getByTestId('campo-birthDate').fill('1991-04-12');
+    // CPF obrigatório desde o ADR-043 Decisão 3.
+    await page.getByTestId('campo-cpf').fill('111.444.777-35');
 
     await page.getByTestId('ir-para-passo-2').click();
     await page.getByTestId('campo-cep').fill('80010000');
@@ -222,14 +240,10 @@ test.describe('busca de aluno', () => {
 test.describe('plano e direito de acesso', () => {
   test('a recepção cria um plano com janela de horário', async ({ page }) => {
     await entrar(page);
-    await page.goto('/plans');
 
     const nome = nomeUnico('Plano de Bancada');
 
-    await page.getByTestId('campo-nome-do-plano').fill(nome);
-    await page.getByTestId('confirmar-plano').click();
-
-    await expect(page.getByTestId('plano-criado')).toBeVisible();
+    await criarPlano(page, nome);
   });
 
   test('a ficha responde "entra agora?" antes de qualquer outra coisa', async ({ page }) => {
@@ -251,13 +265,9 @@ test.describe('plano e direito de acesso', () => {
     await entrar(page);
 
     // Plano com janela padrão (segunda, 06:00–22:00) na primeira unidade.
-    await page.goto('/plans');
-
     const nomeDoPlano = nomeUnico('Plano Atribuível');
 
-    await page.getByTestId('campo-nome-do-plano').fill(nomeDoPlano);
-    await page.getByTestId('confirmar-plano').click();
-    await expect(page.getByTestId('plano-criado')).toBeVisible();
+    await criarPlano(page, nomeDoPlano);
 
     await cadastrarAluno(page, { nome: nomeUnico('Aluno Com Plano'), nascimento: '1999-09-09' });
     await page.getByTestId('abrir-ficha').click();
@@ -286,13 +296,10 @@ test.describe('plano e direito de acesso', () => {
 
   test('a vigência precisa terminar depois de começar', async ({ page }) => {
     await entrar(page);
-    await page.goto('/plans');
 
     const nomeDoPlano = nomeUnico('Plano Para Erro');
 
-    await page.getByTestId('campo-nome-do-plano').fill(nomeDoPlano);
-    await page.getByTestId('confirmar-plano').click();
-    await expect(page.getByTestId('plano-criado')).toBeVisible();
+    await criarPlano(page, nomeDoPlano);
 
     await cadastrarAluno(page, { nome: nomeUnico('Vigência Invertida'), nascimento: '1997-02-02' });
     await page.getByTestId('abrir-ficha').click();

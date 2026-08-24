@@ -1,0 +1,36 @@
+/**
+ * Situacao atual -- F53, Task 10. So camada semantica (regra 2 de lint).
+ */
+.situacao {
+  margin-bottom: 24px;
+}
+
+.destaque {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--ah-surface-raised);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+}
+
+.destaque output {
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: var(--ah-type-heading-weight);
+}
+
+.vencimento {
+  color: var(--ah-text-secondary);
+}
+
+.atraso {
+  color: var(--ah-state-danger);
+  font-weight: 600;
+}
+
+.emDia {
+  color: var(--ah-text-secondary);
+}

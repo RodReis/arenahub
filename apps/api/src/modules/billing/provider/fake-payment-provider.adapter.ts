@@ -3,6 +3,8 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   ErroDoProvedor,
   type CreatePixInput,
+  type HostedCheckout,
+  type HostedCheckoutInput,
   type ListMovementsInput,
   type PaymentProvider,
   type PixCharge,
@@ -40,6 +42,12 @@ import {
 export const HEADER_DE_ASSINATURA = 'x-arenahub-fake-signature';
 
 export const PROVEDOR_FAKE = 'fake';
+
+/**
+ * QR fixo do checkout hospedado. `createPix` gera o dele a partir do id da
+ * cobranca e nao foi tocado aqui -- alteracao cirurgica, escopo desta task.
+ */
+const QR_FALSO = 'data:image/png;base64,ZmFrZS1xcg==';
 
 interface CobrancaEmMemoria {
   externalPaymentId: string;
@@ -102,6 +110,27 @@ export class FakePaymentProvider implements PaymentProvider {
 
   /** Estornos na ordem em que ocorreram, para o extrato. */
   private readonly estornos: EstornoEmMemoria[] = [];
+
+  /** Checkouts hospedados por chave de idempotencia -- o que torna o retry seguro. */
+  private readonly checkoutsPorChave = new Map<string, HostedCheckout>();
+
+  /**
+   * Quantas vezes `createHostedCheckout` foi chamado, nesta instancia.
+   *
+   * Existe para o teste de recusa por cadastro incompleto (F53/Task 4):
+   * provar que o caso de uso recusou ANTES de gastar requisicao com o
+   * provedor, e nao so que a resposta veio com o codigo certo.
+   */
+  chamadasDeCheckout = 0;
+
+  /**
+   * Quantas vezes `getPaymentStatus` foi chamado, nesta instancia.
+   *
+   * Existe para o teste da leitura barata (F53/Task 5): provar que o laco de
+   * polling NAO bate no provedor -- o fake nao tem rate limit para avisar
+   * sozinho quando o desenho erra.
+   */
+  chamadasDeStatus = 0;
 
   /**
    * O estorno confirma na hora, ou fica pendente?
@@ -201,6 +230,8 @@ export class FakePaymentProvider implements PaymentProvider {
   }
 
   getPaymentStatus(externalPaymentId: string): Promise<ProviderPayment> {
+    this.chamadasDeStatus += 1;
+
     const cobranca = this.cobrancas.get(externalPaymentId);
 
     if (!cobranca) {
@@ -569,5 +600,32 @@ export class FakePaymentProvider implements PaymentProvider {
     if (cobranca) {
       cobranca.status = 'PENDING';
     }
+  }
+
+  /**
+   * Checkout hospedado -- F53/Task 2 (SPEC-053). O aluno digita o cartao NO
+   * PROPRIO CELULAR, na pagina do provedor; o duble nao recebe, nao guarda e
+   * nao sabe inventar numero de cartao.
+   */
+  createHostedCheckout(input: HostedCheckoutInput): Promise<HostedCheckout> {
+    this.chamadasDeCheckout += 1;
+
+    /*
+     * Memoriza por chave de idempotencia, como o provedor real faz. Sortear
+     * um id novo a cada chamada faria o teste de idempotencia da Task 4
+     * medir o fake em vez da guarda.
+     */
+    const existente = this.checkoutsPorChave.get(input.idempotencyKey);
+    if (existente) return Promise.resolve(existente);
+
+    const checkout: HostedCheckout = {
+      externalPaymentId: `fake-checkout-${input.idempotencyKey}`,
+      checkoutUrl: `https://checkout.fake.test/${input.idempotencyKey}`,
+      qrCodeDataUri: QR_FALSO,
+      expiresAt: input.expiresAt,
+    };
+
+    this.checkoutsPorChave.set(input.idempotencyKey, checkout);
+    return Promise.resolve(checkout);
   }
 }

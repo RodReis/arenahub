@@ -18,7 +18,41 @@ export interface DadosDoAluno {
   nascimento: string;
   /** Só os dígitos; o campo aplica a máscara sozinho. */
   telefone?: string;
+  /**
+   * Ausente = usa um CPF válido gerado automaticamente (a maioria dos
+   * testes só precisa de "um aluno cadastrado", não de um caso de CPF).
+   * String vazia `''` = deixa o campo em branco de propósito, para quem
+   * testa a própria validação de CPF obrigatório (ADR-043 Decisão 3).
+   */
   cpf?: string;
+}
+
+/**
+ * CPF valido e UNICO por chamada -- mesma receita de
+ * `apps/api/test/integration/students-cadastro-completo.int-spec.ts`
+ * (`gerarCpfValido`) e de `pagamento-no-balcao.spec.ts`. Contador, nao
+ * aleatorio: teste tem de ser deterministico. CPF e obrigatorio desde o
+ * ADR-043 Decisao 3 -- sem um default aqui, os ~17 testes que so precisam de
+ * "um aluno cadastrado" (nao de um caso de CPF) teriam de repetir isto cada
+ * um.
+ */
+let proximoCpf = 1;
+
+function gerarCpfValido(): string {
+  const base = String(100000000 + ((proximoCpf * 97) % 899999999)).padStart(9, '0');
+  proximoCpf += 1;
+
+  const digitos = base.split('').map(Number);
+  const verificador = (ate: number, seq: number[]): number => {
+    let soma = 0;
+    for (let i = 0; i < ate; i += 1) soma += seq[i]! * (ate + 1 - i);
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+  const d1 = verificador(9, digitos);
+  const d2 = verificador(10, [...digitos, d1]);
+
+  return `${base}${d1}${d2}`;
 }
 
 /**
@@ -37,9 +71,10 @@ export async function preencherCadastro(page: Page, dados: DadosDoAluno): Promis
     await page.getByTestId('campo-telefone').fill(dados.telefone);
   }
 
-  if (dados.cpf) {
-    await page.getByTestId('campo-cpf').fill(dados.cpf);
-  }
+  // CPF obrigatorio desde o ADR-043 Decisao 3. `undefined` usa o default
+  // gerado aqui; `''` explicito deixa o campo em branco de proposito (quem
+  // testa a propria recusa por CPF ausente passa `cpf: ''`).
+  await page.getByTestId('campo-cpf').fill(dados.cpf === undefined ? gerarCpfValido() : dados.cpf);
 
   // Passo 3: a unidade é o único campo que a F45 tornou obrigatório, e ela
   // mora no passo administrativo.

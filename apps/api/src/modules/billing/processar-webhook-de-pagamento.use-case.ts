@@ -194,6 +194,7 @@ export class ProcessarWebhookDePagamentoUseCase {
         registroId: registro.id,
         attemptId: alvo.attemptId,
         invoiceId: alvo.invoiceId,
+        method: alvo.method,
         externalPaymentId: evento.externalPaymentId ?? '',
         providerAccountId: conta.externalAccountId,
         novoStatus: decisao.novoStatus,
@@ -280,6 +281,7 @@ export class ProcessarWebhookDePagamentoUseCase {
         registroId: registro.id,
         attemptId: alvo.attemptId,
         invoiceId: alvo.invoiceId,
+        method: alvo.method,
         externalPaymentId: registro.externalPaymentId ?? '',
         providerAccountId: registro.account.externalAccountId,
         novoStatus: decisao.novoStatus,
@@ -305,6 +307,8 @@ export class ProcessarWebhookDePagamentoUseCase {
   ): Promise<{
     attemptId: string;
     invoiceId: string;
+    /** Metodo real da tentativa (PIX, CARD ou MANUAL) -- nunca fixo (F53/SPEC-055). */
+    method: 'PIX' | 'CARD' | 'MANUAL';
     estado: { status: StatusDoPagamento; ultimoEventoAplicadoEm: Date | null };
   } | null> {
     const tentativa = await tx.paymentAttempt.findFirst({
@@ -328,6 +332,7 @@ export class ProcessarWebhookDePagamentoUseCase {
     return {
       attemptId: tentativa.id,
       invoiceId: tentativa.invoiceId,
+      method: tentativa.method,
       estado: {
         status: tentativa.payment?.status ?? 'PENDING',
         ultimoEventoAplicadoEm: ultimoAplicado?.occurredAt ?? null,
@@ -343,6 +348,8 @@ export class ProcessarWebhookDePagamentoUseCase {
       registroId: string;
       attemptId: string;
       invoiceId: string;
+      /** Metodo real da tentativa -- nunca fixo em PIX (F53/SPEC-055). */
+      method: 'PIX' | 'CARD' | 'MANUAL';
       externalPaymentId: string;
       providerAccountId: string;
       novoStatus: StatusDoPagamento;
@@ -395,7 +402,7 @@ export class ProcessarWebhookDePagamentoUseCase {
         invoiceId: invoice.id,
         amountMinor: invoice.totalMinor,
         currency: invoice.currency,
-        method: 'PIX',
+        method: dados.method,
         status: 'CONFIRMED',
         paidAt: dados.occurredAt,
         attemptId: dados.attemptId,
@@ -420,7 +427,7 @@ export class ProcessarWebhookDePagamentoUseCase {
         },
       });
 
-      await this.auditar(tx, dados, pagamento.id, 'billing.payment.pix.credited');
+      await this.auditar(tx, dados, pagamento.id, `billing.payment.${this.canal(dados.method)}.credited`);
       return;
     }
 
@@ -439,13 +446,47 @@ export class ProcessarWebhookDePagamentoUseCase {
         aggregateId: invoice.id,
         payload: {
           paymentId: pagamento.id,
-          method: 'PIX',
+          method: dados.method,
           externalPaymentId: dados.externalPaymentId,
         },
       },
     });
 
-    await this.auditar(tx, dados, pagamento.id, 'billing.payment.pix.confirmed');
+    await this.auditar(tx, dados, pagamento.id, `billing.payment.${this.canal(dados.method)}.confirmed`);
+  }
+
+  /**
+   * Segmento de canal da acao de auditoria, seguindo a convencao ja usada no
+   * modulo (`grep 'billing.payment.' apps/api/src`): `pix.*` para PIX,
+   * `card_checkout.*` para cartao -- mesmo prefixo de
+   * `criar-checkout-de-cartao.use-case.ts` (`card_checkout.created`).
+   *
+   * `MANUAL` NAO tem mapa aqui -- e nao por esquecimento: pagamento manual
+   * ja tem a PROPRIA acao, plana e sem canal, `billing.payment.manual`
+   * (`billing.repository.ts`). Mapear `MANUAL` para `pix` silenciosamente
+   * reintroduziria a mesma mentira que esta funcao existe para eliminar, so
+   * que num quarto lugar. Falha alto: o `switch` exaustivo quebra a
+   * COMPILACAO se o enum ganhar um membro novo (`_exaustivo: never`), e o
+   * `default` cobre o caso hoje inalcancavel (`MANUAL` nao tem tentativa
+   * nem webhook) sem devolver um canal errado.
+   */
+  private canal(method: 'PIX' | 'CARD' | 'MANUAL'): 'pix' | 'card_checkout' {
+    switch (method) {
+      case 'PIX':
+        return 'pix';
+      case 'CARD':
+        return 'card_checkout';
+      case 'MANUAL':
+        throw new Error(
+          'Webhook de pagamento nao tem canal de auditoria para method MANUAL -- ' +
+            'pagamento manual usa billing.payment.manual, gravado em billing.repository.ts, ' +
+            'nunca pelo webhook',
+        );
+      default: {
+        const _exaustivo: never = method;
+        throw new Error(`Metodo de pagamento desconhecido: ${String(_exaustivo)}`);
+      }
+    }
   }
 
   /**

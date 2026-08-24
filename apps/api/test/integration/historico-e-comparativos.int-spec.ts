@@ -145,6 +145,9 @@ describe('F18 -- historico e comparativos', () => {
         fullName: 'Aluno De Teste',
         birthDate: '1990-05-10',
         gymUnitId: conta.gymUnitId,
+        // Obrigatorio desde o ADR-043 Decisao 3; este arquivo nao testa CPF,
+        // entao um valor fixo e valido basta.
+        cpf: '52998224725',
         contacts: [],
       });
 

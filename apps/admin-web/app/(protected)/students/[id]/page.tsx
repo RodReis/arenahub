@@ -6,6 +6,7 @@ import {
   Cpf,
   DataTable,
   EmptyState,
+  Money,
   PageHeader,
   ProblemDetail,
   StateBadge,
@@ -14,6 +15,7 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
+import { faturaEmDestaque, situacaoDeVencimento } from '../../../../src/billing/vencimento';
 import { traduzir } from '../../../../src/operations/formatar';
 import {
   ROTULO_DE_ORIGEM,
@@ -73,6 +75,22 @@ interface Unidade {
   name: string;
 }
 
+interface Invoice {
+  id: string;
+  number: number;
+  status: string;
+  currency: string;
+  totalMinor: number;
+  dueAt: string;
+  blockAt: string | null;
+}
+
+/** Resposta de `GET /students/:id/invoices` -- fuso da unidade do aluno (INV-144, ADR-019). */
+interface InvoicesDoAluno {
+  timezone: string;
+  invoices: Invoice[];
+}
+
 /**
  * Ficha do aluno — `M1-AC-002` e `M1-AC-003`, Slice 1.2.
  *
@@ -84,14 +102,24 @@ interface Unidade {
 export default async function PaginaDaFicha({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  // Em série o operador esperaria quatro viagens; em paralelo, uma.
-  const [respostaDoAluno, respostaDosDireitos, respostaDosPlanos, respostaDasUnidades] =
-    await Promise.all([
-      chamarApi<Aluno>(`/api/v1/students/${id}`),
-      chamarApi<Entitlement[]>(`/api/v1/students/${id}/entitlements`),
-      chamarApi<Plano[]>('/api/v1/plans'),
-      chamarApi<Unidade[]>('/api/v1/units'),
-    ]);
+  // Em série o operador esperaria cinco viagens; em paralelo, uma.
+  const [
+    respostaDoAluno,
+    respostaDosDireitos,
+    respostaDosPlanos,
+    respostaDasUnidades,
+    respostaDasInvoices,
+  ] = await Promise.all([
+    chamarApi<Aluno>(`/api/v1/students/${id}`),
+    chamarApi<Entitlement[]>(`/api/v1/students/${id}/entitlements`),
+    chamarApi<Plano[]>('/api/v1/plans'),
+    chamarApi<Unidade[]>('/api/v1/units'),
+    // F53 Task 12 -- aviso de vencimento. Falha aqui NAO derruba a ficha: o
+    // aviso e um acrescimo a uma tela que ja respondia "quem e este aluno"
+    // sem ele. Ver `invoiceEmDestaque` abaixo, que trata ausencia como "nada
+    // a avisar", nao como aluno em dia.
+    chamarApi<InvoicesDoAluno>(`/api/v1/students/${id}/invoices`),
+  ]);
 
   if (!respostaDoAluno.ok || !respostaDoAluno.dados) {
     const codigo = respostaDoAluno.erro?.code ?? 'erro';
@@ -170,6 +198,26 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
   const vigentes = direitos.filter((direito) => vigenteAgora(direito, agora));
   const bloqueado = impedeAcesso(aluno.status);
 
+  /*
+   * F53 Task 12 -- a invoice em aberto/vencida MAIS ANTIGA e o fuso da
+   * unidade, no mesmo criterio de `students/[id]/billing/page.tsx`: sem
+   * fatura aberta, ou sem a consulta ter respondido, nao ha nada a avisar
+   * aqui -- e a mesma regra que faz invoice PAGA nunca aparecer como
+   * vencida (`situacaoDeVencimento`).
+   */
+  const invoices = respostaDasInvoices.dados?.invoices ?? [];
+  const timezoneDaUnidade = respostaDasInvoices.dados?.timezone;
+  /*
+   * MESMA funcao que a tela de cobranca usa. A ficha avisa "vencida" sobre a
+   * fatura que a outra tela manda receber -- se cada uma escolhesse por conta
+   * propria, a recepcao leria aviso de uma fatura e cobraria outra.
+   */
+  const invoiceEmDestaque = faturaEmDestaque(invoices);
+  const situacaoDoVencimento =
+    invoiceEmDestaque && timezoneDaUnidade
+      ? situacaoDeVencimento(invoiceEmDestaque, agora, timezoneDaUnidade)
+      : 'EM_DIA';
+
   return (
     <section aria-labelledby="titulo-ficha">
       <PageHeader
@@ -206,6 +254,39 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
           <StateBadge machine="student" state={aluno.status} />
         </dd>
       </dl>
+
+      {/*
+        FAIXA DE VENCIMENTO -- F53 Task 12, spec SPEC-053 §3.4.
+
+        A CENA REAL: a recepcionista abre a ficha com a pessoa na frente e
+        precisa ver, sem clicar em nada, quem esta com mensalidade vencida ou
+        vencendo -- para cobrar na hora, e nao depois. `situacaoDeVencimento`
+        e derivada de `dueAt`/`blockAt`/`status`, que a resposta de
+        `/invoices` ja traz -- sem tabela nova, sem provedor, sem push.
+
+        EM_DIA nao mostra nada: e o caso comum (mensalidade paga ou nada em
+        aberto), e uma faixa que aparece sempre viraria ruido.
+      */}
+      {invoiceEmDestaque && situacaoDoVencimento !== 'EM_DIA' ? (
+        <p role="status" data-testid="faixa-de-vencimento" data-situacao={situacaoDoVencimento}>
+          Cobrança nº {invoiceEmDestaque.number} —{' '}
+          <Money cents={invoiceEmDestaque.totalMinor} currency={invoiceEmDestaque.currency} />
+          {', vencimento em '}
+          <TenantDateTime
+            iso={invoiceEmDestaque.dueAt}
+            timeZone={timezoneDaUnidade ?? FUSO_PROVISORIO}
+            format="date"
+          />
+          <Consequencia tom="danger">
+            {' — '}
+            {situacaoDoVencimento === 'VENCE_EM_BREVE'
+              ? 'vence hoje'
+              : situacaoDoVencimento === 'BLOQUEIO_PROXIMO'
+                ? 'vencida, bloqueio de acesso próximo'
+                : 'vencida'}
+          </Consequencia>
+        </p>
+      ) : null}
 
       {/*
         A pergunta mais urgente da recepção -- "essa pessoa entra agora?" --

@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import { precoVigenteEm } from '../billing/domain/dinheiro.js';
 import { MINUTOS_POR_DIA } from './domain/plan.js';
 import {
   ConflitoDeVersaoError,
@@ -30,6 +31,16 @@ const esquemaDePlano = z
     janelas: z.array(janela).min(1).max(200),
     salesStartAt: z.iso.datetime().optional(),
     salesEndAt: z.iso.datetime().optional(),
+    // Centavos, INV-065. Obrigatorio: plano sem preco nao pode existir nem
+    // por um instante (decisao do PI, 24/08/2026).
+    amountMinor: z.number().int().positive(),
+  })
+  .strict();
+
+const esquemaDeReajuste = z
+  .object({
+    amountMinor: z.number().int().positive(),
+    validFrom: z.iso.datetime(),
   })
   .strict();
 
@@ -66,6 +77,12 @@ const esquemaDeCortesia = z
   })
   .strict();
 
+interface PrecoDto {
+  amountMinor: number;
+  currency: string;
+  validFrom: string;
+}
+
 interface PlanoDto {
   id: string;
   name: string;
@@ -73,6 +90,10 @@ interface PlanoDto {
   isActive: boolean;
   gymUnitIds: string[];
   janelas: { gymUnitId: string; dayOfWeek: number; startMinute: number; endMinute: number }[];
+  /** Preco vigente HOJE, ou nulo -- nao deveria acontecer para plano criado por esta rota. */
+  currentPrice: PrecoDto | null;
+  /** Todas as vigencias, para a tela mostrar o historico de reajuste. */
+  prices: PrecoDto[];
 }
 
 interface EntitlementDto {
@@ -107,13 +128,43 @@ export class MembershipController {
         janelas: dados.janelas,
         salesStartAt: dados.salesStartAt ? new Date(dados.salesStartAt) : undefined,
         salesEndAt: dados.salesEndAt ? new Date(dados.salesEndAt) : undefined,
+        amountMinor: dados.amountMinor,
       },
       requisicao.correlationId ?? 'sem-correlacao',
+      new Date(),
     );
 
     const completo = await this.membership.encontrarPlano(this.contexto.require(), plano.id);
 
     return this.planoParaDto(completo!);
+  }
+
+  /**
+   * Reajuste: nova linha de vigencia, sem tocar invoice ja emitida (INV-068).
+   * Mesma permissao da criacao -- ver brief da fatia.
+   */
+  @Post('plans/:id/prices')
+  @RequirePermissions('plan.manage')
+  async reajustarPreco(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<PrecoDto> {
+    const dados = esquemaDeReajuste.parse(corpo);
+
+    const preco = await this.membership.reajustarPreco(
+      this.contexto.require(),
+      id,
+      { amountMinor: dados.amountMinor, validFrom: new Date(dados.validFrom) },
+      requisicao.correlationId ?? 'sem-correlacao',
+      new Date(),
+    );
+
+    return {
+      amountMinor: preco.amountMinor,
+      currency: preco.currency,
+      validFrom: preco.validFrom.toISOString(),
+    };
   }
 
   @Get('plans')
@@ -297,6 +348,21 @@ export class MembershipController {
   }
 
   private planoParaDto(plano: PlanoComRegras): PlanoDto {
+    const precos: PrecoDto[] = plano.prices.map((p) => ({
+      amountMinor: p.amountMinor,
+      currency: p.currency,
+      validFrom: p.validFrom.toISOString(),
+    }));
+
+    const vigente = precoVigenteEm(
+      plano.prices.map((p) => ({
+        amountMinor: p.amountMinor,
+        currency: p.currency,
+        validFrom: p.validFrom,
+      })),
+      new Date(),
+    );
+
     return {
       id: plano.id,
       name: plano.name,
@@ -309,6 +375,10 @@ export class MembershipController {
         startMinute: j.startMinute,
         endMinute: j.endMinute,
       })),
+      currentPrice: vigente
+        ? { amountMinor: vigente.amountMinor, currency: vigente.currency, validFrom: vigente.validFrom.toISOString() }
+        : null,
+      prices: precos,
     };
   }
 

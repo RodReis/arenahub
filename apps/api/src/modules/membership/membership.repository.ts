@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { Entitlement, Plan, Prisma, Subscription } from '@arenahub/database';
+import type { Entitlement, Plan, PlanPrice, Prisma, Subscription } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { competenciaDe } from '../billing/domain/ciclo-de-cobranca.js';
+import { validarValorMonetario } from '../billing/domain/dinheiro.js';
 import { alunoRecebeAcessoNormal, type StatusDeAluno } from '../students/domain/student.js';
 import { StudentRepository } from '../students/student.repository.js';
 import { montarSnapshotDePolitica } from './domain/entitlement.js';
@@ -27,6 +29,40 @@ export class ConflitoDeVersaoError extends ErroDeDominio {
   }
 }
 
+/**
+ * `validFrom` de reajuste ja usado para este plano. `@@unique([planId,
+ * validFrom])` da a garantia; este erro traduz o `P2002` em 409 de dominio.
+ */
+export class PrecoDeVigenciaDuplicadaError extends ErroDeDominio {
+  constructor() {
+    super(
+      'PLAN_PRICE_VALID_FROM_TAKEN',
+      409,
+      'Ja existe um preco cadastrado para esta data de vigencia',
+    );
+  }
+}
+
+/**
+ * Reajuste com `validFrom` no passado.
+ *
+ * DECISAO DESTA FATIA (registrada no relatorio): recusar, nao aceitar com
+ * aviso. `validFrom` retroativo mudaria o preco de competencias que ainda
+ * nao foram cobradas sem o operador escolher isso deliberadamente -- e a
+ * tela ainda nao tem um passo de confirmacao para esse caso. Aceitar em
+ * silencio seria o comportamento acidental que o brief pede para nao
+ * deixar acontecer.
+ */
+export class ReajusteRetroativoError extends ErroDeDominio {
+  constructor() {
+    super(
+      'PLAN_PRICE_RETROACTIVE',
+      422,
+      'validFrom nao pode estar no passado; reajuste retroativo nao e permitido',
+    );
+  }
+}
+
 export interface DadosDeCriacaoDePlano {
   name: string;
   description?: string | undefined;
@@ -34,6 +70,13 @@ export interface DadosDeCriacaoDePlano {
   janelas: readonly JanelaDeAcesso[];
   salesStartAt?: Date | undefined;
   salesEndAt?: Date | undefined;
+  /** Centavos, INV-065. Preco vigente a partir de agora, na mesma transacao do plano. */
+  amountMinor: number;
+}
+
+export interface DadosDeReajuste {
+  amountMinor: number;
+  validFrom: Date;
 }
 
 @Injectable()
@@ -53,7 +96,26 @@ export class MembershipRepository {
   // -------------------------------------------------------------------------
 
   /**
-   * Cria plano, unidades e janelas numa transacao.
+   * Cria plano, unidades, janelas e a PRIMEIRA linha de preco numa unica
+   * transacao.
+   *
+   * O preco entra aqui, e nao numa rota separada, para o plano nunca
+   * existir sem preco -- nem por um instante (decisao do PI, 24/08/2026).
+   *
+   * `validFrom = competenciaDe(agora)`, NAO o instante exato da criacao.
+   * ACHADO [FIX] registrado no PR desta fatia: com `validFrom = agora`
+   * literal, um plano criado no dia 24 nascia com vigencia a partir do dia
+   * 24 -- mas `abrirInvoiceDoPeriodo` calcula a competencia como o
+   * PRIMEIRO DIA do mes corrente (`competenciaDe`), e `precoVigenteEm` exige
+   * `validFrom <= competencia`. Resultado: todo plano criado fora do dia 1
+   * nascia SEM conseguir cobrar a propria competencia do mes em que nasceu
+   * -- o oposto do que esta fatia promete ("plano criado pela API ja nasce
+   * cobravel"). Normalizar para o inicio da competencia fecha a lacuna sem
+   * tocar `precoVigenteEm`/`competenciaDe` (funcoes puras ja testadas por
+   * outros caminhos) e sem violar nenhuma invariante: a vigencia so recua
+   * dentro do MESMO mes em que o plano nasceu, nunca para tras dele.
+   * "Agora" ainda vem de `new Date()` no controller, nunca daqui dentro
+   * (regra de arquitetura: "agora" entra por parametro).
    *
    * As unidades sao conferidas contra o tenant ANTES de gravar: `PlanUnit`
    * nao tem FK para `GymUnit` (a relacao e por id solto), entao sem esta
@@ -63,8 +125,11 @@ export class MembershipRepository {
     contexto: TenantContext,
     dados: DadosDeCriacaoDePlano,
     correlationId: string,
+    agora: Date,
   ): Promise<Plan> {
     const janelas = validarJanelas(dados.janelas);
+
+    validarValorMonetario(dados.amountMinor);
 
     const unidades = await this.db.gymUnit.findMany({
       where: { id: { in: [...dados.gymUnitIds] }, tenantId: contexto.tenantId },
@@ -98,6 +163,13 @@ export class MembershipRepository {
           salesEndAt: dados.salesEndAt ?? null,
           units: { create: dados.gymUnitIds.map((gymUnitId) => ({ gymUnitId })) },
           accessWindows: { create: janelas.map((j) => ({ ...j })) },
+          prices: {
+            create: {
+              tenantId: contexto.tenantId,
+              amountMinor: dados.amountMinor,
+              validFrom: competenciaDe(agora),
+            },
+          },
         },
       });
 
@@ -110,7 +182,11 @@ export class MembershipRepository {
           target: 'plan',
           targetId: plano.id,
           correlationId,
-          metadata: { name: plano.name, unidades: dados.gymUnitIds.length },
+          metadata: {
+            name: plano.name,
+            unidades: dados.gymUnitIds.length,
+            amountMinor: dados.amountMinor,
+          },
         },
       });
 
@@ -131,7 +207,7 @@ export class MembershipRepository {
   async listarPlanos(contexto: TenantContext): Promise<PlanoComRegras[]> {
     return this.db.plan.findMany({
       where: { tenantId: contexto.tenantId },
-      include: { units: true, accessWindows: true },
+      include: { units: true, accessWindows: true, prices: true },
       orderBy: { name: 'asc' },
     });
   }
@@ -139,8 +215,81 @@ export class MembershipRepository {
   async encontrarPlano(contexto: TenantContext, id: string): Promise<PlanoComRegras | null> {
     return this.db.plan.findFirst({
       where: { id, tenantId: contexto.tenantId },
-      include: { units: true, accessWindows: true },
+      include: { units: true, accessWindows: true, prices: true },
     });
+  }
+
+  /**
+   * Reajuste: nova linha de vigencia, sem tocar nas invoices ja emitidas
+   * (INV-068). O valor antigo continua na tabela, e `precoVigenteEm` passa a
+   * escolher a linha nova a partir de `validFrom`.
+   *
+   * `validFrom` no passado e RECUSADO -- ver `ReajusteRetroativoError`.
+   * `agora` entra por parametro, nunca `new Date()` aqui dentro.
+   */
+  async reajustarPreco(
+    contexto: TenantContext,
+    planId: string,
+    dados: DadosDeReajuste,
+    correlationId: string,
+    agora: Date,
+  ): Promise<PlanPrice> {
+    validarValorMonetario(dados.amountMinor);
+
+    if (dados.validFrom.getTime() < agora.getTime()) {
+      throw new ReajusteRetroativoError();
+    }
+
+    const plano = await this.db.plan.findFirst({
+      where: { id: planId, tenantId: contexto.tenantId },
+      select: { id: true },
+    });
+
+    if (!plano) throw new PlanoNaoEncontradoError();
+
+    try {
+      return await this.db.$transaction(async (tx) => {
+        const preco = await tx.planPrice.create({
+          data: {
+            tenantId: contexto.tenantId,
+            planId,
+            amountMinor: dados.amountMinor,
+            validFrom: dados.validFrom,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            tenantId: contexto.tenantId,
+            actorType: 'USER',
+            actorId: contexto.actorId,
+            action: 'plan.price_adjusted',
+            target: 'plan',
+            targetId: planId,
+            correlationId,
+            metadata: { amountMinor: dados.amountMinor, validFrom: dados.validFrom.toISOString() },
+          },
+        });
+
+        await tx.outboxEvent.create({
+          data: {
+            tenantId: contexto.tenantId,
+            eventType: 'PlanPriceAdjusted',
+            aggregateType: 'Plan',
+            aggregateId: planId,
+            payload: { amountMinor: dados.amountMinor, validFrom: dados.validFrom.toISOString() },
+          },
+        });
+
+        return preco;
+      });
+    } catch (erro) {
+      if (violacaoDeUnicidade(erro)) {
+        throw new PrecoDeVigenciaDuplicadaError();
+      }
+
+      throw erro;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -625,7 +774,7 @@ export class MembershipRepository {
 }
 
 export type PlanoComRegras = Prisma.PlanGetPayload<{
-  include: { units: true; accessWindows: true };
+  include: { units: true; accessWindows: true; prices: true };
 }>;
 
 export type EntitlementComJanelas = Prisma.EntitlementGetPayload<{
@@ -633,3 +782,13 @@ export type EntitlementComJanelas = Prisma.EntitlementGetPayload<{
 }>;
 
 export type EventoDeTimeline = Prisma.StudentTimelineEventGetPayload<object>;
+
+/**
+ * Violacao de unicidade do Prisma (P2002).
+ *
+ * Aqui significa uma coisa so: `@@unique([planId, validFrom])` recusou uma
+ * segunda linha de preco na mesma data de vigencia.
+ */
+function violacaoDeUnicidade(erro: unknown): boolean {
+  return typeof erro === 'object' && erro !== null && 'code' in erro && erro.code === 'P2002';
+}

@@ -6,8 +6,10 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -19,12 +21,15 @@ import {
   type InvoiceComTimeline,
 } from './billing.repository.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
+import { ConsultarTentativaUseCase } from './consultar-tentativa.use-case.js';
+import { ListarInvoicesUseCase, TAMANHO_MAXIMO_DA_PAGINA } from './listar-invoices.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
 import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
 import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
+import { CriarCheckoutDeCartaoUseCase } from './criar-checkout-de-cartao.use-case.js';
 import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
 
 const esquemaDeAbertura = z
@@ -79,6 +84,30 @@ const esquemaDeLiberacao = z
   })
   .strict();
 
+/**
+ * Lista transversal de faturas do tenant. F53, task 6.
+ *
+ * `status` e `z.enum` com os seis valores REAIS de `InvoiceStatus`
+ * (`packages/database/prisma/schema.prisma`) -- nao string livre. Sem o
+ * enum, `?status=xyz` nao vira 400: a query roda, o Prisma nao acha nada, e
+ * o cliente le `total: 0` como "tenant sem fatura" quando a verdade e
+ * "status inexistente". Erro de digitacao virando resposta vazia em
+ * silencio e pior que o 400.
+ *
+ * `tamanho` tem teto (`TAMANHO_MAXIMO_DA_PAGINA`) no proprio schema: recusar
+ * no boundary evita que a validacao dependa do caso de uso lembrar de
+ * cortar.
+ */
+const esquemaDeListagem = z
+  .object({
+    status: z.enum(['DRAFT', 'OPEN', 'PAID', 'OVERDUE', 'CANCELLED', 'REFUNDED']).optional(),
+    vencendoDe: z.iso.datetime().optional(),
+    vencendoAte: z.iso.datetime().optional(),
+    pagina: z.coerce.number().int().min(1).default(1),
+    tamanho: z.coerce.number().int().min(1).max(TAMANHO_MAXIMO_DA_PAGINA).default(20),
+  })
+  .strict();
+
 const esquemaDePagamentoManual = z
   .object({
     /**
@@ -129,6 +158,37 @@ interface InvoiceDto {
   payments: PagamentoDto[];
 }
 
+/**
+ * Resposta de `GET /students/:id/invoices` -- fuso da UNIDADE DE ORIGEM do
+ * aluno (INV-144, ADR-019) junto das faturas. F53, task 7: sem o fuso aqui,
+ * a tela caia de volta num valor fixo em codigo, que diverge do fuso que o
+ * job de vencimento usa.
+ */
+interface InvoicesDoAlunoDto {
+  timezone: string;
+  invoices: InvoiceDto[];
+}
+
+/** Linha da lista transversal -- resumo, sem itens nem pagamentos. F53. */
+interface InvoiceDaListaDto {
+  id: string;
+  number: number;
+  status: string;
+  currency: string;
+  billingPeriod: string;
+  totalMinor: number;
+  dueAt: string;
+  paidAt: string | null;
+  studentId: string;
+}
+
+interface PaginaDeInvoicesDto {
+  itens: InvoiceDaListaDto[];
+  total: number;
+  pagina: number;
+  tamanho: number;
+}
+
 /** Cobranca PIX pronta para o aluno pagar. `MVP-02` 7, Slice 2.2. */
 interface CobrancaPixDto {
   paymentAttemptId: string;
@@ -151,6 +211,17 @@ interface StatusDePagamentoDto {
   occurredAt: string;
 }
 
+/** Leitura barata da tentativa, para o laco de polling do balcao. F53. */
+interface TentativaObservadaDto {
+  paymentAttemptId: string;
+  status: string;
+  invoiceStatus: string;
+  paidAt: string | null;
+  receiptId: string | null;
+  /** O pagamento gerado, para EMITIR o recibo quando `receiptId` e nulo. */
+  paymentId: string | null;
+}
+
 interface MetodoDePagamentoDto {
   id: string;
   provider: string;
@@ -162,6 +233,17 @@ interface MetodoDePagamentoDto {
 interface CobrancaNoCartaoDto {
   paymentAttemptId: string;
   externalSubscriptionId: string;
+  amountMinor: number;
+  currency: string;
+}
+
+/** Checkout hospedado de cartao pronto para o aluno pagar. F53, task 16. */
+interface CheckoutDeCartaoDto {
+  paymentAttemptId: string;
+  externalPaymentId: string;
+  checkoutUrl: string;
+  qrCodeDataUri: string;
+  expiresAt: string;
   amountMinor: number;
   currency: string;
 }
@@ -213,8 +295,11 @@ export class BillingController {
     private readonly billing: BillingRepository,
     private readonly cobrancaPix: CriarCobrancaPixUseCase,
     private readonly statusDePagamento: ConsultarStatusDePagamentoUseCase,
+    private readonly tentativa: ConsultarTentativaUseCase,
+    private readonly listagem: ListarInvoicesUseCase,
     private readonly metodoDePagamento: RegistrarMetodoDePagamentoUseCase,
     private readonly cobrancaNoCartao: CobrarAssinaturaNoCartaoUseCase,
+    private readonly checkoutDeCartao: CriarCheckoutDeCartaoUseCase,
     private readonly cancelamentoDeRecorrencia: CancelarRecorrenciaUseCase,
     private readonly inadimplencia: ConsultarInadimplenciaUseCase,
     private readonly aplicarInadimplencia: AplicarInadimplenciaUseCase,
@@ -358,6 +443,50 @@ export class BillingController {
   }
 
   /**
+   * Cria o checkout HOSPEDADO de cartao da invoice. F53, task 16 -- SPEC-053 9.
+   *
+   * DIFERENTE de `POST invoices/:id/payments/card`, acima: aquela cobra no
+   * cartao TOKENIZADO que o aluno ja salvou; esta e a PRIMEIRA cobranca,
+   * quando ainda nao ha token -- o aluno digita o cartao na pagina do
+   * provedor, no proprio celular (INV-098). As duas rotas coexistem.
+   *
+   * `billing.manage`, mesma permissao da rota irma e da cobranca PIX: gerar
+   * cobranca e ato comum do financeiro, nao excepcional.
+   *
+   * NAO CONFIRMA PAGAMENTO -- devolve link e QR. A confirmacao vem por
+   * webhook (INV-076) ou pela consulta ativa, como no PIX e no cartao
+   * tokenizado.
+   *
+   * Erros de dominio do caso de uso ja chegam com `status` certo
+   * (`ProblemDetailsFilter` traduz `ErroDeDominio`): 422 para cadastro
+   * incompleto (`STUDENT_BILLING_DATA_INCOMPLETE`), 409 para checkout ja em
+   * andamento (`CARD_CHECKOUT_ALREADY_IN_FLIGHT`), 404 para invoice de outro
+   * tenant ou inexistente -- por isso a rota so deixa o erro subir.
+   */
+  @Post('invoices/:id/payments/card-checkout')
+  @RequirePermissions('billing.manage')
+  async criarCheckoutDeCartao(
+    @Param('id') id: string,
+    @Req() requisicao: Request,
+  ): Promise<CheckoutDeCartaoDto> {
+    const checkout = await this.checkoutDeCartao.executar(
+      this.contexto.require(),
+      { invoiceId: id, agora: new Date() },
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    return {
+      paymentAttemptId: checkout.paymentAttemptId,
+      externalPaymentId: checkout.externalPaymentId,
+      checkoutUrl: checkout.checkoutUrl,
+      qrCodeDataUri: checkout.qrCodeDataUri,
+      expiresAt: checkout.expiresAt.toISOString(),
+      amountMinor: checkout.amountMinor,
+      currency: checkout.currency,
+    };
+  }
+
+  /**
    * Cancela a recorrencia de cartao da assinatura. Slice 2.3.
    *
    * CANCELAR A RECORRENCIA NAO CANCELA A ASSINATURA: o aluno que pagou ate o
@@ -476,12 +605,97 @@ export class BillingController {
     };
   }
 
-  @Get('students/:id/invoices')
+  /**
+   * Leitura barata para o laco da tela. `billing.read` e nao permissao nova:
+   * e a mesma que ja le invoice e status de pagamento nesta rota vizinha --
+   * quem pode ver a fatura pode ver se ela foi paga.
+   *
+   * SO O NOSSO BANCO. Ver docblock de `ConsultarTentativaUseCase` para o
+   * porque de nao reusar `GET /payments/:id/status` aqui: aquela bate no
+   * provedor a cada chamada, e o laco do balcao roda a cada 3s.
+   */
+  @Get('payment-attempts/:id')
   @RequirePermissions('billing.read')
-  async listarDoAluno(@Param('id') id: string): Promise<InvoiceDto[]> {
-    const invoices = await this.billing.listarInvoicesDoAluno(this.contexto.require(), id);
+  async observarTentativa(@Param('id') id: string): Promise<TentativaObservadaDto> {
+    const observada = await this.tentativa.executar(this.contexto.require(), id);
 
-    return invoices.map((invoice) => this.paraDto(invoice));
+    return {
+      paymentAttemptId: observada.paymentAttemptId,
+      status: observada.status,
+      invoiceStatus: observada.invoiceStatus,
+      paidAt: observada.paidAt?.toISOString() ?? null,
+      receiptId: observada.receiptId,
+      paymentId: observada.paymentId,
+    };
+  }
+
+  /**
+   * Lista transversal de faturas do tenant -- a visao de gestao. F53, task 6.
+   *
+   * Decisao 1 do PI em 23/08/2026: a spec propunha cortar esta rota, o PI
+   * mandou implementar. `billing.read` -- mesma permissao das outras
+   * leituras de invoice neste controller: quem ve a fatura do aluno pode ver
+   * o financeiro do tenant inteiro.
+   *
+   * NAO FILTRA POR ALUNO: e o que a distingue de `GET
+   * /students/:id/invoices`, logo abaixo.
+   */
+  @Get('invoices')
+  @RequirePermissions('billing.read')
+  async listar(@Query() consulta: unknown): Promise<PaginaDeInvoicesDto> {
+    const filtro = esquemaDeListagem.parse(consulta);
+
+    const pagina = await this.listagem.executar(this.contexto.require(), {
+      ...(filtro.status ? { status: filtro.status } : {}),
+      ...(filtro.vencendoDe ? { vencendoDe: new Date(filtro.vencendoDe) } : {}),
+      ...(filtro.vencendoAte ? { vencendoAte: new Date(filtro.vencendoAte) } : {}),
+      pagina: filtro.pagina,
+      tamanho: filtro.tamanho,
+    });
+
+    return {
+      itens: pagina.itens.map((invoice) => ({
+        id: invoice.id,
+        number: invoice.number,
+        status: invoice.status,
+        currency: invoice.currency,
+        billingPeriod: invoice.billingPeriod.toISOString(),
+        totalMinor: invoice.totalMinor,
+        dueAt: invoice.dueAt.toISOString(),
+        paidAt: invoice.paidAt?.toISOString() ?? null,
+        studentId: invoice.studentId,
+      })),
+      total: pagina.total,
+      pagina: pagina.pagina,
+      tamanho: pagina.tamanho,
+    };
+  }
+
+  /**
+   * SCHEMA DE RESPOSTA DECLARADO -- a primeira rota a sair da divida do FIX
+   * #163, e nao por acaso: foi ELA que mudou de array para objeto na F53 sem
+   * a guarda notar. `interface` do TypeScript nao chega ao OpenAPI (some na
+   * compilacao), entao a forma vai explicita.
+   */
+  @Get('students/:id/invoices')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['timezone', 'invoices'],
+      properties: {
+        timezone: { type: 'string' },
+        invoices: { type: 'array', items: { type: 'object' } },
+      },
+    },
+  })
+  @RequirePermissions('billing.read')
+  async listarDoAluno(@Param('id') id: string): Promise<InvoicesDoAlunoDto> {
+    const resposta = await this.billing.listarInvoicesDoAluno(this.contexto.require(), id);
+
+    return {
+      timezone: resposta.timezone,
+      invoices: resposta.invoices.map((invoice) => this.paraDto(invoice)),
+    };
   }
 
   /** Timeline financeira: o controle detectivo do ADR-027. */

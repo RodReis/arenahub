@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 23/08/2026 *(ADR-043; F53–F56; `docs/specs/` reaberto)*
+**Última atualização:** 24/08/2026 *(F53 entregue — pagamento no balcão)*
 
 🔑 **24/08/2026 — o Cowork passa a empurrar o próprio commit.** Até aqui o commit entrava na `main`
 local e ficava esperando alguém sincronizar: o `git push` pelo bridge falhava com
@@ -410,17 +410,17 @@ a cédula de **Cobrança**, com `aria-label`, `title` e alvo de 32 px, apontando
 balcão*. **Não há rota nem ícone novos:** o que falta é o que a página faz — escolher a forma
 (espécie, PIX, cartão), o QR na tela, o checkout hospedado e o recibo.
 
-**Isso encolhe a F53, e o corte está proposto na spec:** o `GET /api/v1/invoices` foi pensado para
-uma busca por *fatura*, e o fluxo real é a busca por *aluno*, que já existe. A visão "quem deve" é
-a `/billing/delinquency` da F15; a agregada é a F54. **A lista transversal sai do caminho crítico**
-e só volta se o PI a quiser como tela de gestão. Fica registrado que ela continua prevista no
-`MVP-02` §13 e nunca foi implementada.
+**O corte proposto na spec foi RECUSADO pelo PI em 23/08/2026.** O `GET /api/v1/invoices` foi
+pensado para uma busca por *fatura*, e o fluxo do balcão é a busca por *aluno* — mas o PI mandou
+implementá-lo mesmo assim, como visão de gestão. **Entregue na F53**, paginado e filtrável, sem
+nenhuma tela desta fatia consumindo-o: quem vai consumir é a **F54**.
 
-⚠️ **E a ampliação da tela esbarra numa dívida que já está lá:** `/students/[id]/billing` fixa
-`FUSO_PROVISORIO = 'America/Sao_Paulo'` em código, enquanto a **INV-144** manda o instante de
-bloqueio ser no fuso da unidade, **sem fallback para o tenant**. Enquanto o valor for fixo, a data
-que a recepção lê pode divergir da que o job de vencimento usa — e agora essa tela vai receber
-dinheiro.
+✅ **A dívida do fuso foi paga na F53 (24/08/2026).** `/students/[id]/billing` fixava
+`FUSO_PROVISORIO = 'America/Sao_Paulo'` em código, contra a **INV-144**. A rota
+`GET /students/:id/invoices` passou a devolver o fuso da **unidade de origem do aluno**, e a tela usa
+o que a API manda — sem fallback para o tenant, que é o que o invariante proíbe. **Sem migration:**
+`gym_units.timezone` existe desde o ADR-019. O teste usa `America/Manaus` de propósito — com o fuso
+da academia real, o valor certo e o fixo coincidem e o teste ficaria verde com a constante no lugar.
 
 
 ## 1. Onde estamos, em três frases
@@ -522,7 +522,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 |---|---|---|---|
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **29** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e [F17](https://github.com/RodReis/arenahub/issues/17) |
+| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e [F53](https://github.com/RodReis/arenahub/issues/156) |
 | Feito | `proplan:done` | PR mergeado com CI verde | **4** — [F14](https://github.com/RodReis/arenahub/issues/14), [F15](https://github.com/RodReis/arenahub/issues/15), [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **31** |
 
@@ -822,7 +822,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | aprovada-pi |
 | F51 | SPEC-051 | 3.5 | 3.5.3 | Tela pública (hero): blocos, mídia e patrocínio | [ADR-042](DECISIONS.md#adr-042) | [#152](https://github.com/RodReis/arenahub/issues/152) | aprovada-pi |
 | F52 | SPEC-052 | 3.5 | 3.5.4 | Área do aluno no totem: identificação, pagamento e evolução | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.6](prd/academia/MVP-04-app-totem.md) | [#153](https://github.com/RodReis/arenahub/issues/153) | aprovada-pi |
-| F53 | SPEC-053 | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [`SPEC-053-pagamentos-e-cobranca-no-balcao.md`](specs/SPEC-053-pagamentos-e-cobranca-no-balcao.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | em-revisao |
+| F53 | SPEC-053 | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [`SPEC-053-pagamentos-e-cobranca-no-balcao.md`](specs/SPEC-053-pagamentos-e-cobranca-no-balcao.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | entregue |
 | F54 | SPEC-054 | 3 | — | Painel financeiro gerencial (KPIs) | [`SPEC-054-painel-financeiro-gerencial.md`](specs/SPEC-054-painel-financeiro-gerencial.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | em-revisao |
 | F55 | SPEC-055 | 3 | — | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | [`SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md`](specs/SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md) | [#158](https://github.com/RodReis/arenahub/issues/158) | em-revisao |
 | F56 | SPEC-056 | 3 | — | Plano com assinatura mensal | [`SPEC-056-plano-com-assinatura-mensal.md`](specs/SPEC-056-plano-com-assinatura-mensal.md) | [#159](https://github.com/RodReis/arenahub/issues/159) | em-revisao |
