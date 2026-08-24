@@ -30,9 +30,22 @@ export interface ModeloHomologado {
 /**
  * Homologado pela bancada do MVP 0 (F1-F5): Topdata Inner Fit instalado na
  * unidade, leitor AYTI11108174.
+ *
+ * A CATRACA entrou em 24/08/2026, por decisao do PI. Ela nao veio de
+ * suposicao: o inventario foi lido no teclado/LCD do proprio equipamento
+ * pelo PI, no local, e esta registrado em
+ * `docs/field-notes/2026-08-15-hardware-arena-positiva.md` §2.1 --
+ * modelo **Topdata Inner**, serial **247000797**, firmware **7.05.00**,
+ * respondendo na porta 3570 do canal SDK (`EasyInner.dll`).
+ *
+ * E a MESMA catraca da bancada que homologou o leitor facial: os dois
+ * equipamentos sao do par instalado na unidade, e o ciclo facial ao vivo de
+ * 17/08 girou justamente esta catraca (30 comandos, 28 giros confirmados por
+ * sensor). O que faltava era o registro no codigo, nao a evidencia.
  */
 export const HARDWARE_HOMOLOGADO: readonly ModeloHomologado[] = [
   { kind: 'FACIAL_READER', model: 'Inner Fit', firmwares: [] },
+  { kind: 'TURNSTILE', model: 'Inner', firmwares: [] },
 ];
 
 export type ResultadoDeHomologacao =

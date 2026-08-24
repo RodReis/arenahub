@@ -106,4 +106,19 @@ describe('cadastrarDispositivo', () => {
     expect(estado.valores?.['model']).toBe('Inner Fit');
     expect(vi.mocked(chamarApi)).not.toHaveBeenCalled();
   });
+  /**
+   * A CATRACA entrou na homologacao em 24/08/2026 (decisao do PI, com o
+   * inventario do painel fisico em `field-notes/2026-08-15`). O par que
+   * viaja e `TURNSTILE` + `Inner` -- trocar o `kind` descreveria um
+   * equipamento que nao existe, e a API recusaria.
+   */
+  it('manda o par TURNSTILE + Inner ao cadastrar a catraca', async () => {
+    vi.mocked(chamarApi).mockResolvedValue(criado());
+
+    await cadastrarDispositivo({}, formulario({ kind: 'TURNSTILE', model: 'Inner', serial: '247000797' }));
+
+    const corpo = vi.mocked(chamarApi).mock.calls[0]?.[1]?.corpo as Record<string, unknown>;
+    expect(corpo['kind']).toBe('TURNSTILE');
+    expect(corpo['model']).toBe('Inner');
+  });
 });
