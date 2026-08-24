@@ -299,6 +299,14 @@ test.describe('plano e direito de acesso', () => {
 
     await page.getByRole('link', { name: 'Atualizar a ficha' }).click();
 
+    /*
+     * A ABA VOLTA PARA "Informação" ao recarregar -- a página é servidor, e
+     * qual aba estava aberta é estado de cliente, que não sobrevive à
+     * navegação. Reabrir aqui é o que a recepção faria; guardar a aba na URL
+     * é decisão de produto, não conserto de teste.
+     */
+    await page.getByTestId('aba-plano').click();
+
     // O ACEITE DA FATIA, literal: "visualiza exatamente quando e onde o
     // acesso é válido". Unidade pelo nome e janela em hora legível -- um
     // UUID e `startMinute: 360` responderiam a pergunta só no papel.
