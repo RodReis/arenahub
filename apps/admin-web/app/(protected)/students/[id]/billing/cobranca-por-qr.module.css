@@ -1,0 +1,50 @@
+/**
+ * QR, polling e recibo -- F53, Task 11.
+ *
+ * So camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-state-*`,
+ * `--ah-space-*`, `--ah-surface-*`, nunca `--ah-carbon-*` cru nem hex
+ * literal.
+ */
+.cobranca {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--ah-surface-raised);
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+}
+
+.qr {
+  width: 200px;
+  height: 200px;
+  align-self: flex-start;
+}
+
+.copiaECola {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copiaECola code {
+  flex: 1;
+  overflow-wrap: anywhere;
+  color: var(--ah-text-secondary);
+}
+
+.confirmado {
+  color: var(--ah-state-success);
+  font-weight: 600;
+}
+
+.expirado {
+  color: var(--ah-state-danger);
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

@@ -73,7 +73,7 @@ interface InvoiceRetornada {
   number: number;
   status: string;
   totalMinor: number;
-  payments: { amountMinor: number }[];
+  payments: { id: string; status: string; amountMinor: number }[];
 }
 
 /**
@@ -84,6 +84,7 @@ export interface EstadoDaCobrancaPorQr {
   erro?: string;
   sucesso?: {
     paymentAttemptId: string;
+    invoiceId: string;
     qrCodeDataUri: string | null;
     copiaECola: string | null;
     checkoutUrl: string | null;
@@ -122,6 +123,7 @@ export async function iniciarCobrancaPix(invoiceId: string): Promise<EstadoDaCob
   return {
     sucesso: {
       paymentAttemptId: resposta.dados.paymentAttemptId,
+      invoiceId,
       qrCodeDataUri: resposta.dados.qrCodeDataUri,
       copiaECola: resposta.dados.copiaECola,
       checkoutUrl: null,
@@ -173,6 +175,7 @@ export async function iniciarCheckoutDeCartao(
   return {
     sucesso: {
       paymentAttemptId: resposta.dados.paymentAttemptId,
+      invoiceId,
       qrCodeDataUri: resposta.dados.qrCodeDataUri,
       copiaECola: null,
       checkoutUrl: resposta.dados.checkoutUrl,
@@ -267,6 +270,142 @@ export async function registrarPagamentoNoBalcao(
       // Sobrepagamento vira crédito do aluno (ADR-027). A tela avisa, senão o
       // troco "some" da perspectiva de quem está no balcão.
       creditoGerado: pago > resposta.dados.totalMinor,
+    },
+  };
+}
+
+/** Leitura barata da tentativa -- o que o laco de polling da Task 11 consulta. */
+export interface TentativaObservada {
+  invoiceStatus: string;
+  receiptId: string | null;
+}
+
+export interface EstadoDaTentativa {
+  erro?: string;
+  dados?: TentativaObservada;
+}
+
+/**
+ * Consulta o NOSSO banco -- `GET /payment-attempts/:id`. F53, Task 11.
+ *
+ * DECISAO DE ARQUITETURA QUE NAO PODE SER INVERTIDA: esta e a rota do laco
+ * de polling porque so le o banco, onde o webhook ja escreveu. Ela NUNCA
+ * troca de lugar com `consultarStatusAtivo` -- aquela bate no provedor a
+ * cada chamada, e um laco de 3 em 3s custaria ~20 chamadas externas por
+ * minuto de QR aberto, por caixa (ver `ConsultarTentativaUseCase`).
+ */
+export async function consultarTentativa(paymentAttemptId: string): Promise<EstadoDaTentativa> {
+  const resposta = await chamarApi<{
+    invoiceStatus: string;
+    receiptId: string | null;
+  }>(`/api/v1/payment-attempts/${paymentAttemptId}`);
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: mensagemDe(resposta.erro?.code, 'Não foi possível consultar o pagamento.') };
+  }
+
+  return {
+    dados: {
+      invoiceStatus: resposta.dados.invoiceStatus,
+      receiptId: resposta.dados.receiptId,
+    },
+  };
+}
+
+export interface EstadoDoStatusAtivo {
+  erro?: string;
+  dados?: { statusLocal: string; statusNoProvedor: string; divergente: boolean };
+}
+
+/**
+ * Consulta ativa no provedor -- `GET /payments/:id/status`. F53, Task 11.
+ *
+ * O botao "Conferir com o banco": UMA chamada por clique, nunca em laco --
+ * e o caminho de quem nao pode esperar o polling do `payment-attempts/:id`.
+ */
+export async function consultarStatusAtivo(paymentAttemptId: string): Promise<EstadoDoStatusAtivo> {
+  const resposta = await chamarApi<{
+    statusLocal: string;
+    statusNoProvedor: string;
+    divergente: boolean;
+  }>(`/api/v1/payments/${paymentAttemptId}/status`);
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: mensagemDe(resposta.erro?.code, 'Não foi possível consultar o provedor.') };
+  }
+
+  return {
+    dados: {
+      statusLocal: resposta.dados.statusLocal,
+      statusNoProvedor: resposta.dados.statusNoProvedor,
+      divergente: resposta.dados.divergente,
+    },
+  };
+}
+
+export interface EstadoDoRecibo {
+  erro?: string;
+  sucesso?: { receiptId: string; numero: number; verificationHash: string };
+}
+
+/**
+ * Emite (ou devolve, se ja existe) o recibo da invoice paga e confirma a
+ * emissao com `GET /receipts/:id`. F53, Task 11 -- SPEC-053 item 5: os dois
+ * endpoints existem desde a F16 e nenhuma tela os chamava.
+ *
+ * `POST /payments/:id/receipt` exige o ID DO PAGAMENTO, que este arquivo nao
+ * recebe em nenhum lugar (nem `payment-attempts/:id` nem `payments/:id/status`
+ * o devolvem -- so o `payment-attempts/:id` da attempt). A invoice paga,
+ * porem, ja e conhecida (`invoiceId` viaja com a cobranca desde a criacao):
+ * `GET /invoices/:id` devolve os pagamentos da fatura, e o CONFIRMED e o
+ * pagamento que acabou de fechar a cobranca -- reaproveita rota existente em
+ * vez de pedir mudanca em `apps/api` fora do escopo desta task.
+ *
+ * A CONSULTA APOS EMITIR nao e so para provar a rota GET: e o que confirma o
+ * documento antes de mostra-lo na tela, com o `verificationHash` que a
+ * recepcao pode conferir com o aluno.
+ */
+export async function emitirReciboDaInvoice(invoiceId: string): Promise<EstadoDoRecibo> {
+  const respostaDaInvoice = await chamarApi<InvoiceRetornada>(`/api/v1/invoices/${invoiceId}`);
+
+  if (!respostaDaInvoice.ok || !respostaDaInvoice.dados) {
+    return {
+      erro: mensagemDe(respostaDaInvoice.erro?.code, 'Não foi possível localizar a cobrança.'),
+    };
+  }
+
+  // CONFIRMED ou REFUNDED emitem recibo (INV-069/INV-075) -- ver docblock de
+  // `EmitirReciboUseCase.executar`. O mais recente e o que fechou a cobranca.
+  const pagamentoConfirmado = [...respostaDaInvoice.dados.payments]
+    .reverse()
+    .find((pagamento) => pagamento.status === 'CONFIRMED' || pagamento.status === 'REFUNDED');
+
+  if (!pagamentoConfirmado) {
+    return { erro: 'Nenhum pagamento confirmado encontrado para esta cobrança.' };
+  }
+
+  const emissao = await chamarApi<{ receiptId: string; numero: number }>(
+    `/api/v1/payments/${pagamentoConfirmado.id}/receipt`,
+    { metodo: 'POST' },
+  );
+
+  if (!emissao.ok || !emissao.dados) {
+    return { erro: mensagemDe(emissao.erro?.code, 'Não foi possível emitir o recibo.') };
+  }
+
+  const consulta = await chamarApi<{ verificationHash: string }>(
+    `/api/v1/receipts/${emissao.dados.receiptId}`,
+  );
+
+  if (!consulta.ok || !consulta.dados) {
+    return { erro: mensagemDe(consulta.erro?.code, 'Não foi possível confirmar o recibo.') };
+  }
+
+  return {
+    sucesso: {
+      receiptId: emissao.dados.receiptId,
+      numero: emissao.dados.numero,
+      verificationHash: consulta.dados.verificationHash,
     },
   };
 }

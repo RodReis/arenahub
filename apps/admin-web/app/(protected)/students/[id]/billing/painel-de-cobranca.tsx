@@ -1,12 +1,13 @@
 'use client';
 
-import { useActionState, useId, useState } from 'react';
+import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { EmptyState, Field, Money, SensitiveAction, useToast, useToastDeErro } from '@arenahub/ui';
 
 import {
   abrirCobranca,
+  emitirReciboDaInvoice,
   iniciarCheckoutDeCartao,
   iniciarCobrancaPix,
   registrarPagamentoNoBalcao,
@@ -14,6 +15,7 @@ import {
   type EstadoDaInvoice,
   type EstadoDoPagamento,
 } from '../../../../actions/billing';
+import { CobrancaPorQr } from './cobranca-por-qr';
 import { SeletorDeForma, type DadoFaltante, type FormaDePagamento } from './seletor-de-forma';
 
 interface InvoiceEmAberto {
@@ -81,11 +83,33 @@ export function PainelDeCobranca({
   const [cobrancaPorQr, setCobrancaPorQr] = useState<EstadoDaCobrancaPorQr | null>(null);
   const [gerandoQr, setGerandoQr] = useState(false);
 
+  const [reciboDoBalcao, setReciboDoBalcao] = useState<{ numero: number } | null>(null);
+  const invoiceDoReciboPedidoRef = useRef<string | null>(null);
+
   // Os erros da tela viram toast -- CLAUDE.md: "sempre usar Toast para:
   // Info, Warn e error". Cada acao anuncia a propria falha.
   useToastDeErro(estadoDaInvoice.erro, 'error', 'erro-ao-gerar');
   useToastDeErro(estadoDoPagamento.erro, 'error', 'erro-ao-receber');
   useToastDeErro(cobrancaPorQr?.erro, 'error', 'erro-ao-gerar-qr');
+
+  /*
+   * Recibo em toda confirmacao, nos tres caminhos (SPEC-053 item 5) -- este
+   * efeito cobre o DINHEIRO. PIX e cartao emitem dentro de `CobrancaPorQr`,
+   * quando o proprio polling ve a invoice virar PAID.
+   */
+  useEffect(() => {
+    const invoiceId = estadoDoPagamento.sucesso?.invoiceId;
+
+    if (!invoiceId || invoiceDoReciboPedidoRef.current === invoiceId) return;
+
+    invoiceDoReciboPedidoRef.current = invoiceId;
+
+    void emitirReciboDaInvoice(invoiceId).then((resultado) => {
+      if (resultado.sucesso) {
+        setReciboDoBalcao({ numero: resultado.sucesso.numero });
+      }
+    });
+  }, [estadoDoPagamento.sucesso]);
 
   const confirmarRecebimento = (motivo: string): void => {
     if (!cobrando) return;
@@ -140,6 +164,12 @@ export function PainelDeCobranca({
         </p>
       ) : null}
 
+      {reciboDoBalcao ? (
+        <p role="status" data-testid="recibo-emitido">
+          Recibo nº {reciboDoBalcao.numero} emitido.
+        </p>
+      ) : null}
+
       {subscriptionId === null ? (
         <EmptyState
           testId="sem-assinatura-ativa"
@@ -186,28 +216,25 @@ export function PainelDeCobranca({
       ) : null}
 
       {/*
-        Handoff para a Task 11 (`CobrancaPorQr`): QR, copia-e-cola,
-        checkoutUrl e polling controlado ainda nao existem nesta task -- o
-        que ha aqui e o resultado cru da Server Action, para a proxima task
-        substituir por aquele componente sem mexer neste arquivo de novo.
+        QR, copia-e-cola, checkoutUrl e polling controlado -- Task 11.
+        `key={paymentAttemptId}` remonta o componente a cada nova cobranca,
+        para o laco de polling da tentativa anterior nao sobreviver a uma
+        cobranca gerada de novo (aluno cancelou e pediu outro QR).
       */}
       {cobrancaPorQr?.sucesso ? (
-        <section aria-labelledby="titulo-cobranca-por-qr" data-testid="cobranca-por-qr-pendente">
+        <section aria-labelledby="titulo-cobranca-por-qr">
           <h3 id="titulo-cobranca-por-qr">Aguardando pagamento</h3>
-          <Money
-            cents={cobrancaPorQr.sucesso.amountMinor}
+          <CobrancaPorQr
+            key={cobrancaPorQr.sucesso.paymentAttemptId}
+            paymentAttemptId={cobrancaPorQr.sucesso.paymentAttemptId}
+            invoiceId={cobrancaPorQr.sucesso.invoiceId}
+            qrCodeDataUri={cobrancaPorQr.sucesso.qrCodeDataUri}
+            copiaECola={cobrancaPorQr.sucesso.copiaECola}
+            checkoutUrl={cobrancaPorQr.sucesso.checkoutUrl}
+            expiresAt={cobrancaPorQr.sucesso.expiresAt}
+            amountMinor={cobrancaPorQr.sucesso.amountMinor}
             currency={cobrancaPorQr.sucesso.currency}
           />
-          {cobrancaPorQr.sucesso.checkoutUrl ? (
-            <p>
-              <a href={cobrancaPorQr.sucesso.checkoutUrl} target="_blank" rel="noopener noreferrer">
-                Abrir checkout do cartão
-              </a>
-            </p>
-          ) : null}
-          {cobrancaPorQr.sucesso.copiaECola ? (
-            <p data-testid="pix-copia-e-cola">{cobrancaPorQr.sucesso.copiaECola}</p>
-          ) : null}
         </section>
       ) : null}
 
