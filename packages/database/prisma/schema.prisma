@@ -2597,6 +2597,12 @@ model PaymentAttempt {
   /// aluno DUAS VEZES: a chave de idempotencia deriva da contagem de
   /// tentativas, e contagem muda entre a leitura e a escrita -- justamente a
   /// janela que a idempotencia existe para fechar.
+  ///
+  /// F53: o indice acima NAO cobre o checkout hospedado -- ele nasce em
+  /// `CREATED`, nao em `PROCESSING`. Segundo indice parcial (`method = 'CARD'
+  /// AND status IN ('CREATED', 'REQUIRES_ACTION', 'PROCESSING')`) fecha essa
+  /// segunda porta, medido em `checkout-de-cartao.int-spec.ts`. Os dois
+  /// convivem: nenhum dos dois substitui o outro.
   @@index([tenantId, invoiceId, status])
   @@map("payment_attempts")
 }
