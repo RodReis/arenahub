@@ -8,6 +8,26 @@
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
 **Última atualização:** 23/08/2026 *(ADR-043; F53–F56; `docs/specs/` reaberto)*
+
+🔑 **24/08/2026 — o Cowork passa a empurrar o próprio commit.** Até aqui o commit entrava na `main`
+local e ficava esperando alguém sincronizar: o `git push` pelo bridge falhava com
+`could not read Username`, e a credencial do PI vive no ambiente dele, fora do que o bridge
+enxerga. **Resolvido com config no próprio repositório** — `credential.helper` em `.git/config`
+apontando para `.git/cowork-credentials`, que é o único terreno comum entre as duas máquinas.
+O token é do PI, gravado por ele; revogar é apagar o PAT no GitHub. **Consequência prática:**
+documento do Cowork chega à `main` remota no mesmo instante em que é escrito, e some a janela em
+que o Code trabalhava sobre uma `main` desatualizada.
+
+⚠️ **Dois achados de operação no caminho, ambos com custo real hoje.** **(1)** O
+`.claude/worktrees/avaliacao-multiarquivo/.git` aponta para caminho Windows
+(`C:/Desenv/...`), e isso faz **todo `git status` falhar** quando o repositório é lido de fora do
+Windows — cegou o diagnóstico do rebase travado por vários minutos. Se o worktree não estiver em
+uso: `git worktree remove` ou `git worktree prune`. **(2)** **Rebase não funciona pelo bridge**: o
+git precisa apagar arquivos de controle (`MERGE_MSG`, `*.lock`, `rebase-merge/`) e o bridge não
+tem permissão de deletar — dez tentativas de `--continue` avançaram o contador sem aplicar um
+commit sequer. Com os dois agentes escrevendo nos mesmos documentos, **`git pull --no-rebase` é a
+operação certa**: resolve o conflito uma vez, e não dez.
+
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
