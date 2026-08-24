@@ -16,7 +16,7 @@
 | 4 — fila durável, DLQ, comandos com lease | ✅ | `modules/device-sync` |
 | 5 — worker de sync no Edge Agent | ✅ | `apps/edge-agent/src/cloud/`, `application/device-sync-worker.ts` |
 | 6 — revogação, reconciliação e UI | ✅ | `modules/biometrics`, `apps/admin-web/app/(protected)/` |
-| 7 — sync físico em hardware | 🚫 bloqueado | gate `M1-HW-01` |
+| 7 — sync físico em hardware | ✅ | gate `M1-HW-01` |
 
 **A cadeia fecha em simulador:** consentimento → identidade → job → comando durável → execução no
 adapter → resultado → reconciliação → `DELETED`. O que **não** aconteceu é a execução em hardware
@@ -113,25 +113,22 @@ Contagem reproduzível em [`reports/TESTS.md`](../../../reports/TESTS.md), gerad
 
 ## 6. Limites conhecidos
 
-1. **Nada rodou em hardware.** A cadeia inteira foi exercitada contra o simulador e contra dublês
-   no boundary. `M1-AC-004` e `M1-AC-007` não estão atendidos fisicamente — é a Task 7, bloqueada
-   pelo gate `M1-HW-01`.
-2. **Hardware homologado é lista provisória no código** (`hardware-homologado.ts`). O plano manda
+1. **Hardware homologado é lista provisória no código** (`hardware-homologado.ts`). O plano manda
    derivá-la de `supported-hardware.md`, que só existe depois do gate. O código diz isso em
    comentário; firmware aceito é *qualquer um*, débito explícito.
-3. **Expurgo dos 30 dias não roda.** `TenantPrivacySettings.purgeAfterDays` existe e é parâmetro,
+2. **Expurgo dos 30 dias não roda.** `TenantPrivacySettings.purgeAfterDays` existe e é parâmetro,
    mas não há job agendado que o aplique. A referência ao objeto e o carimbo `enrollmentPurgedAt`
    estão modelados e prontos para o job.
-4. **Sem BullMQ.** A fila vive no Postgres, com o Edge buscando por REST. Redis está provisionado
+3**Sem BullMQ.** A fila vive no Postgres, com o Edge buscando por REST. Redis está provisionado
    e no readiness, mas nenhuma fila foi criada nele — `CLAUDE.md` manda usar BullMQ *só quando
    comprovadamente necessário*, e a entrega durável não precisou. Reavaliar quando houver volume.
-5. **Sem WebSocket.** O plano previa `commands.available` como notificação; o poller de 15 s
+4. **Sem WebSocket.** O plano previa `commands.available` como notificação; o poller de 15 s
    resolve com uma peça a menos. O socket entra quando a latência de sincronização virar queixa
    real — o desenho já não depende dele.
-6. **UI é leitura, não ação.** As telas mostram consentimento, identidades e a fila; registrar
+5. **UI é leitura, não ação.** As telas mostram consentimento, identidades e a fila; registrar
    consentimento, capturar foto e revogar continuam sendo chamadas de API. Os formulários são
    trabalho de UX que a fatia não cobriu.
-7. **`ADR-003` sobre entrega de comando ao Edge não foi escrito.** O plano mandava criar
+6. **`ADR-003` sobre entrega de comando ao Edge não foi escrito.** O plano mandava criar
    `docs/adr/0003-*.md`, o que contraria o ADR-021 (ADR é do Cowork, em `DECISIONS.md`) — ver
    issue [#68](https://github.com/RodReis/arenahub/issues/68). O contrato canônico está
    documentado no próprio `packages/api-contracts/src/edge-auth.ts`, e a decisão precisa virar ADR

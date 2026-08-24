@@ -178,8 +178,4 @@ que mais aparecem no dia a dia:
 
 ## Estado
 
-**MVP 1 (Smart Access) em andamento.** F6 e F7 entregues; F8 (consentimento,
-biometria e sync) fechou as Tasks 1 a 6 em `SIMULATOR_READY` — nada rodou em
-hardware ainda, porque o gate `M1-HW-01` não foi atravessado.
-
 Progresso por fatia em [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
