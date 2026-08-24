@@ -209,7 +209,17 @@ export class CobrarAssinaturaNoCartaoUseCase {
           method: 'CARD',
           status: 'PROCESSING',
           idempotencyKey,
-          providerAccountId: conta.id,
+          /**
+           * O ID EXTERNO, nao `conta.id`. O nome da coluna sugere o interno e
+           * ja enganou aqui: ate a correcao deste FIX, esta era a UNICA
+           * escrita do repositorio que gravava o UUID interno.
+           *
+           * A coluna e `String?` sem `@db.Uuid` e sem FK justamente porque
+           * modela o id do PROVEDOR -- e o par `(providerAccountId,
+           * externalPaymentId)` que casa com o que ele manda de volta. A
+           * convencao esta escrita por extenso em `estornar-pagamento`.
+           */
+          providerAccountId: conta.externalAccountId,
         },
         select: { id: true },
       });
