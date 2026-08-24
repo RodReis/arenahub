@@ -405,6 +405,21 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               </p>
             ) : null}
 
+            {/*
+              SITUAÇÃO DO CADASTRO vive em INFORMAÇÃO, não em Plano (decisão
+              do PI, 24/08/2026): ela é atributo de QUEM a pessoa é -- ativo,
+              suspenso, cancelado --, e não do que ela contratou. Plano trata
+              de assinatura e direito de acesso.
+            */}
+            <section aria-labelledby="titulo-situacao" className={estilos['secao']}>
+              <h2 id="titulo-situacao">Situação do cadastro</h2>
+              <AlterarSituacao
+                studentId={aluno.id}
+                situacaoAtual={aluno.status}
+                version={aluno.version}
+              />
+            </section>
+
             <section aria-labelledby="titulo-mais" className={estilos['secao']}>
               <h2 id="titulo-mais">Mais sobre este aluno</h2>
 
@@ -653,15 +668,6 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                   vigente={assinaturaVigente}
                 />
               )}
-            </section>
-
-            <section aria-labelledby="titulo-situacao" className={estilos['secao']}>
-              <h2 id="titulo-situacao">Situação do cadastro</h2>
-              <AlterarSituacao
-                studentId={aluno.id}
-                situacaoAtual={aluno.status}
-                version={aluno.version}
-              />
             </section>
 
             {/*

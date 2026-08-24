@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@arenahub/ui';
@@ -148,11 +149,22 @@ describe('ficha do aluno', () => {
    * somando um segundo plano ao primeiro.
    */
   it('diz "Alterar plano" e avisa do encerramento quando ha assinatura vigente', async () => {
+    const usuario = userEvent.setup();
+
     responder([entitlement()]);
 
     await renderizar();
 
     expect(screen.getByRole('heading', { name: 'Alterar plano', hidden: true })).toBeInTheDocument();
+
+    /*
+     * O formulario fica FECHADO ate ser pedido (24/08/2026): a aba Plano
+     * existe para responder "qual acesso este aluno tem", e cinco campos
+     * empurravam os direitos de acesso para cima da dobra. O aviso de
+     * encerramento vive dentro dele.
+     */
+    await usuario.click(screen.getByTestId(`abrir-plano-${ALUNO_ID}`));
+
     expect(screen.getByTestId('aviso-de-troca')).toBeInTheDocument();
   });
 
