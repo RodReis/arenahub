@@ -332,11 +332,26 @@ describe('F45 -- cadastro completo de aluno', () => {
       expect(corpo(resposta).code).toBe('GYM_UNIT_NOT_FOUND');
     });
 
+    /**
+     * CPF PRESENTE DE PROPOSITO, e o campo que falta e SO a unidade.
+     *
+     * Ate o ADR-043 este envio nao tinha CPF -- e nao precisava, porque o
+     * unico campo ausente era `gymUnitId` e o 400 so podia vir dele. Com o
+     * CPF obrigatorio, um envio sem os dois recebe 400 pelos DOIS motivos, e
+     * o teste passaria a ficar verde mesmo se a unidade voltasse a ser
+     * opcional: status igual com causa diferente e a forma mais barata de um
+     * teste passar sem provar nada.
+     */
     it('recusa cadastro sem unidade', async () => {
       const resposta = await request(servidor())
         .post('/api/v1/students')
         .set('Cookie', contas.a.cookie)
-        .send({ fullName: 'Sem Unidade', birthDate: '1990-05-10', contacts: [] });
+        .send({
+          fullName: 'Sem Unidade',
+          birthDate: '1990-05-10',
+          cpf: gerarCpfValido(),
+          contacts: [],
+        });
 
       expect(resposta.status).toBe(400);
     });
