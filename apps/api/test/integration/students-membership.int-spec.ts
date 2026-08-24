@@ -876,6 +876,34 @@ describe('F7 -- aluno, plano e entitlement', () => {
       expect((resposta.body as { code: string }).code).toBe('PLAN_PRICE_RETROACTIVE');
     });
 
+    /**
+     * FRONTEIRA do retroativo: HOJE nao e passado.
+     *
+     * A comparacao era instante contra instante, e `validFrom` vem de um
+     * `<input type="date">` -- ou seja, meia-noite. Depois das 00:00:01 o
+     * proprio dia corrente caia como "retroativo", e a recepcao nao
+     * conseguia dar preco vigente hoje ao plano: so a partir de amanha.
+     *
+     * O teste acima nao pegava isso porque usa passado distante (2020) --
+     * qualquer uma das duas comparacoes o recusa. So a data de hoje separa
+     * a regra certa da errada.
+     */
+    it('aceita reajuste com validFrom hoje -- hoje nao e passado', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const hoje = new Date();
+      const meiaNoiteDeHoje = new Date(
+        Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()),
+      );
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/plans/${planId}/prices`)
+        .set('Cookie', contas.a.cookie)
+        .send({ amountMinor: 18000, validFrom: meiaNoiteDeHoje.toISOString() });
+
+      expect(resposta.status).toBe(201);
+    });
+
     it('plano de outro tenant responde 404 ao reajustar, exigindo o codigo', async () => {
       const planId = await criarPlano(contas.a);
 
