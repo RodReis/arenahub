@@ -76,7 +76,7 @@ export function SensitiveAction({ verb, summary, onConfirm, onCancel }: Props) {
         <Button variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button variant="destructive" onClick={confirmar}>
+        <Button variant="destructive" onClick={confirmar} data-testid="confirmar-acao-sensivel">
           {verb}
         </Button>
       </div>

@@ -90,6 +90,7 @@ export function FiltroDeAlunos({ unidades, termoInicial, situacaoInicial, unidad
           value={termo}
           onChange={(evento) => setTermo(evento.target.value)}
           placeholder="Ex.: Maria, AP-2026-00000001, (41) 99999-0000"
+          data-testid="busca-de-alunos"
         />
       </div>
 
