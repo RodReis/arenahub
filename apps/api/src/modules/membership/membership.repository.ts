@@ -236,7 +236,15 @@ export class MembershipRepository {
   ): Promise<PlanPrice> {
     validarValorMonetario(dados.amountMinor);
 
-    if (dados.validFrom.getTime() < agora.getTime()) {
+    // Compara DIA, nao instante: `validFrom` vem de um `<input type="date">` e
+    // chega como meia-noite UTC. Contra o instante corrente, o proprio dia de
+    // hoje era recusado a partir de 00:00:01 -- a recepcao nao conseguia dar
+    // preco vigente hoje ao plano, so a partir de amanha.
+    const inicioDeHoje = new Date(
+      Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()),
+    );
+
+    if (dados.validFrom.getTime() < inicioDeHoje.getTime()) {
       throw new ReajusteRetroativoError();
     }
 
