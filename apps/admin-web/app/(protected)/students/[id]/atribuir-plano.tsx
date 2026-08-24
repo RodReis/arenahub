@@ -177,10 +177,17 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente }: Props) {
         </>
       ) : null}
 
+      {/*
+        `data-testid` PRÓPRIO porque "Plano" virou nome ambíguo: a aba da
+        ficha também se chama assim, e `getByLabel('Plano')` passou a casar
+        com os dois (o painel leva `aria-labelledby="aba-plano"`). Os dois
+        rótulos estão certos onde estão -- quem precisa desempatar é o teste.
+      */}
       <SelectField
         id="plano"
         name="planId"
         label="Plano"
+        data-testid="campo-plano"
         defaultValue={estado.valores?.planId ?? ''}
         required
       >

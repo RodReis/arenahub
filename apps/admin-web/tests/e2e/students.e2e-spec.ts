@@ -287,7 +287,7 @@ test.describe('plano e direito de acesso', () => {
     await page.getByTestId('aba-plano').click();
     await page.getByRole('button', { name: /Atribuir plano|Alterar plano/ }).first().click();
 
-    await page.getByLabel('Plano', { exact: true }).selectOption({ label: nomeDoPlano });
+    await page.getByTestId('campo-plano').selectOption({ label: nomeDoPlano });
     await page.getByTestId('campo-inicio').fill('2026-01-01T06:00');
     await page.getByTestId('campo-fim').fill('2027-01-01T22:00');
     await page
@@ -327,7 +327,7 @@ test.describe('plano e direito de acesso', () => {
     await page.getByTestId('aba-plano').click();
     await page.getByRole('button', { name: /Atribuir plano|Alterar plano/ }).first().click();
 
-    await page.getByLabel('Plano', { exact: true }).selectOption({ label: nomeDoPlano });
+    await page.getByTestId('campo-plano').selectOption({ label: nomeDoPlano });
     await page.getByTestId('campo-inicio').fill('2027-01-01T06:00');
     await page.getByTestId('campo-fim').fill('2026-01-01T22:00');
     await page.getByTestId('campo-motivo-atribuicao').fill('teste de vigência invertida');
