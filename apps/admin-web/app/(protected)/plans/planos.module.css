@@ -54,6 +54,24 @@
   color: var(--ah-text-secondary);
 }
 
+/**
+ * A UNIDADE do plano, no cabeçalho do modal.
+ *
+ * Linha própria e com rótulo, não colada ao nome com um ponto separador:
+ * "Clinica de Musculacao · Matriz" lê como um nome composto, e o que ela
+ * responde é outra pergunta -- ONDE este plano vale.
+ */
+.unidadeDoPlano {
+  margin: 6px 0 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-default);
+}
+
+.rotuloDaUnidade {
+  color: var(--ah-text-label);
+}
+
 .corpo {
   display: flex;
   flex-direction: column;

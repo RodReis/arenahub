@@ -124,9 +124,26 @@ export function AcaoDeReajuste({
               isto quem abre a partir da quinta linha não tem como conferir
               que clicou na certa.
             */}
-            <p className={estilos['nomeDoPlano']}>
-              {nomeDoPlano}
-              {unidades.length > 0 ? ` · ${unidades.join(', ')}` : ''}
+            <p className={estilos['nomeDoPlano']}>{nomeDoPlano}</p>
+
+            {/*
+              A UNIDADE EM LINHA PRÓPRIA, com rótulo -- e "sem unidade" é dito
+              com todas as letras, não omitido.
+
+              Plano sem unidade não libera acesso em lugar nenhum: a janela de
+              horário é por unidade, e sem nenhuma o entitlement nasce sem
+              onde valer. Quem vai reajustar o preço precisa ver isso, e a
+              ausência silenciosa parecia "ainda não carregou".
+            */}
+            <p className={estilos['unidadeDoPlano']}>
+              <span className={estilos['rotuloDaUnidade']}>Unidade</span>{' '}
+              {unidades.length > 0 ? (
+                unidades.join(', ')
+              ) : (
+                <span data-testid={`plano-sem-unidade-${planId}`}>
+                  nenhuma — este plano não libera acesso
+                </span>
+              )}
             </p>
           </div>
 
