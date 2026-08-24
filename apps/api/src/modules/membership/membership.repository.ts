@@ -63,6 +63,28 @@ export class ReajusteRetroativoError extends ErroDeDominio {
   }
 }
 
+/**
+ * Desativacao de plano que ainda tem aluno vinculado.
+ *
+ * DECISAO DO PI (24/08/2026): plano nao se APAGA, se DESATIVA -- quem teve
+ * assinatura nele mantem o registro legivel e a auditoria nao fica com
+ * referencia quebrada. E a desativacao e recusada enquanto houver aluno
+ * USANDO: `PENDING`, `ACTIVE`, `PAST_DUE` e `PAUSED` ainda vinculam alguem.
+ *
+ * `CANCELLED` e `EXPIRED` NAO bloqueiam: sao historico, e exigir que nenhuma
+ * assinatura tenha existido tornaria indesativavel todo plano que ja rodou
+ * uma vez -- exatamente os que mais precisam sair da lista de escolha.
+ */
+export class PlanoEmUsoError extends ErroDeDominio {
+  constructor(assinaturas: number) {
+    super(
+      'PLAN_IN_USE',
+      409,
+      `Plano tem ${assinaturas} assinatura(s) em vigor; encerre-as antes de desativar`,
+    );
+  }
+}
+
 export interface DadosDeCriacaoDePlano {
   name: string;
   description?: string | undefined;
@@ -216,6 +238,73 @@ export class MembershipRepository {
     return this.db.plan.findFirst({
       where: { id, tenantId: contexto.tenantId },
       include: { units: true, accessWindows: true, prices: true },
+    });
+  }
+
+  /**
+   * Liga e desliga o plano da lista de escolha.
+   *
+   * DESATIVA, NAO APAGA (decisao do PI, 24/08/2026). Apagar deixaria invoice
+   * e timeline antigas citando um plano que nao existe mais -- e o historico
+   * financeiro e auditado. `isActive` ja existia no schema, era lido pelo
+   * DTO e exibido na tela; o que nunca existiu foi quem o escrevesse.
+   *
+   * DESATIVAR E RECUSADO com aluno em uso; REATIVAR nunca e, porque devolver
+   * um plano a lista de escolha nao tira acesso de ninguem.
+   *
+   * `agora` nao entra aqui: nao ha decisao temporal nesta operacao.
+   */
+  async alterarAtivacaoDePlano(
+    contexto: TenantContext,
+    id: string,
+    isActive: boolean,
+    correlationId: string,
+  ): Promise<Plan> {
+    const plano = await this.db.plan.findFirst({
+      where: { id, tenantId: contexto.tenantId },
+      select: { id: true, name: true },
+    });
+
+    if (!plano) throw new PlanoNaoEncontradoError();
+
+    if (!isActive) {
+      /*
+       * "EM USO" e o que ainda vincula aluno: PENDING, ACTIVE, PAST_DUE e
+       * PAUSED. CANCELLED e EXPIRED sao historico -- exigir que nenhuma
+       * assinatura tenha existido tornaria indesativavel todo plano que ja
+       * rodou, que sao justamente os que mais precisam sair da lista.
+       *
+       * PAUSED entra porque pausa e reversivel: o aluno volta a ter acesso
+       * ao retomar, e o plano precisa continuar de pe para isso.
+       */
+      const emUso = await this.db.subscription.count({
+        where: {
+          tenantId: contexto.tenantId,
+          planId: id,
+          status: { in: ['PENDING', 'ACTIVE', 'PAST_DUE', 'PAUSED'] },
+        },
+      });
+
+      if (emUso > 0) throw new PlanoEmUsoError(emUso);
+    }
+
+    return this.db.$transaction(async (tx) => {
+      const atualizado = await tx.plan.update({ where: { id }, data: { isActive } });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: isActive ? 'plan.activated' : 'plan.deactivated',
+          target: 'plan',
+          targetId: id,
+          correlationId,
+          metadata: { name: atualizado.name },
+        },
+      });
+
+      return atualizado;
     });
   }
 

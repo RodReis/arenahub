@@ -12,7 +12,9 @@ import {
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { janelaLegivel } from '../../../src/students/formatar';
+import { AcaoDeAtivacao } from './acao-de-ativacao';
 import { AcaoDeReajuste } from './acao-de-reajuste';
+import estilosDePlano from './planos.module.css';
 import { Abas } from '../../../src/components/abas';
 import { FormularioDePlano } from './formulario-de-plano';
 
@@ -250,8 +252,8 @@ export default async function PaginaDePlanos() {
                   ),
                 },
                 {
-                  key: 'reajuste',
-                  header: 'Reajuste',
+                  key: 'acoes',
+                  header: 'Ações',
                   role: 'actions',
                   /*
                    * ponytail: fuso da PRIMEIRA unidade do plano, nao um por
@@ -262,6 +264,7 @@ export default async function PaginaDePlanos() {
                    * na pratica, o upgrade e a API devolver o fuso junto do preco.
                    */
                   render: (plano) => (
+                    <div className={estilosDePlano['acoesDaLinha']}>
                     <AcaoDeReajuste
                       planId={plano.id}
                       nomeDoPlano={plano.name}
@@ -269,6 +272,17 @@ export default async function PaginaDePlanos() {
                       historico={plano.prices}
                       timeZone={unidades.find((u) => u.id === plano.gymUnitIds[0])?.timezone ?? 'UTC'}
                     />
+
+                      {/*
+                        DESATIVAR, nao excluir: plano apagado deixaria invoice
+                        e timeline citando algo que nao existe mais.
+                      */}
+                      <AcaoDeAtivacao
+                        planId={plano.id}
+                        nomeDoPlano={plano.name}
+                        isActive={plano.isActive}
+                      />
+                    </div>
                   ),
                 },
               ]}

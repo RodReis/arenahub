@@ -938,6 +938,81 @@
         ]
       }
     },
+    "/api/v1/plans/{id}/activation": {
+      "patch": {
+        "operationId": "MembershipController_alterarAtivacaoDePlano",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "isActive",
+                    "gymUnitIds",
+                    "janelas",
+                    "prices"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "gymUnitIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "janelas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "currentPrice": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "prices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Membership"
+        ]
+      }
+    },
     "/api/v1/plans/{id}": {
       "get": {
         "operationId": "MembershipController_detalharPlano",

@@ -113,3 +113,10 @@
   padding: 12px 20px;
   border-top: 1px solid var(--ah-border-subtle);
 }
+
+/** As duas ações de linha, lado a lado e encostadas à direita. */
+.acoesDaLinha {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
