@@ -9,7 +9,7 @@ vi.mock('next/cache', () => ({
 }));
 
 import { chamarApi } from '../../lib/api/server-client';
-import { cadastrarUnidade } from './units';
+import { cadastrarUnidade, editarUnidade } from './units';
 
 function formulario(extras: Record<string, string> = {}): FormData {
   const dados = new FormData();
@@ -82,6 +82,75 @@ describe('cadastrarUnidade', () => {
 
     expect(estado.sucesso).toBeUndefined();
     expect(estado.valores?.code).toBe('ZONA-SUL');
+    expect(vi.mocked(chamarApi)).not.toHaveBeenCalled();
+  });
+});
+describe('editarUnidade', () => {
+  const UNIDADE_ID = '11111111-1111-4111-8111-111111111111';
+
+  function formularioDeEdicao(extras: Record<string, string> = {}): FormData {
+    const dados = new FormData();
+
+    dados.set('unitId', UNIDADE_ID);
+    dados.set('name', 'Unidade Zona Sul Renomeada');
+    dados.set('timezone', 'America/Manaus');
+
+    for (const [chave, valor] of Object.entries(extras)) {
+      dados.set(chave, valor);
+    }
+
+    return dados;
+  }
+
+  beforeEach(() => {
+    vi.mocked(chamarApi).mockReset();
+  });
+
+  it('manda PATCH com nome e fuso', async () => {
+    vi.mocked(chamarApi).mockResolvedValue(criada());
+
+    const estado = await editarUnidade({}, formularioDeEdicao());
+
+    expect(estado.sucesso).toBeDefined();
+    expect(vi.mocked(chamarApi).mock.calls[0]?.[0]).toBe(`/api/v1/units/${UNIDADE_ID}`);
+    expect(vi.mocked(chamarApi).mock.calls[0]?.[1]?.metodo).toBe('PATCH');
+  });
+
+  /**
+   * `openingHours` NAO PODE VIAJAR na edicao.
+   *
+   * O schema o declara opcional: campo AUSENTE e "nao mexer", campo presente
+   * e vazio e "esvazie". Manda-lo `{}` aqui apagaria o horario de uma unidade
+   * que ja o tivesse -- e ninguem veria sumir, porque nenhuma tela mostra
+   * horario de funcionamento hoje.
+   */
+  it('nao manda openingHours, para nao apagar o horario existente', async () => {
+    vi.mocked(chamarApi).mockResolvedValue(criada());
+
+    await editarUnidade({}, formularioDeEdicao());
+
+    const corpo = vi.mocked(chamarApi).mock.calls[0]?.[1]?.corpo as Record<string, unknown>;
+    expect(corpo).not.toHaveProperty('openingHours');
+  });
+
+  /**
+   * `code` tambem fica de fora: `PATCH /units/:id` nao o aceita (`.strict()`),
+   * e manda-lo derrubaria a requisicao inteira com VALIDATION_FAILED.
+   */
+  it('nao manda o codigo, que a API nao aceita alterar', async () => {
+    vi.mocked(chamarApi).mockResolvedValue(criada());
+
+    await editarUnidade({}, formularioDeEdicao({ code: 'TENTATIVA' }));
+
+    const corpo = vi.mocked(chamarApi).mock.calls[0]?.[1]?.corpo as Record<string, unknown>;
+    expect(corpo).not.toHaveProperty('code');
+  });
+
+  it('preserva o preenchimento quando a validacao falha', async () => {
+    const estado = await editarUnidade({}, formularioDeEdicao({ name: '' }));
+
+    expect(estado.sucesso).toBeUndefined();
+    expect(estado.valores?.timezone).toBe('America/Manaus');
     expect(vi.mocked(chamarApi)).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,8 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
+import { EditarUnidade } from './editar-unidade';
+import estilos from './unidades.module.css';
 
 export const metadata: Metadata = {
   title: 'Unidades — ArenaHub',
@@ -36,21 +38,7 @@ export default async function PaginaDeUnidades() {
     // o operador sem saber se nao ha unidade ou se ele nao tem permissao.
     return (
       <section aria-labelledby="titulo-unidades">
-        <PageHeader
-        id="titulo-unidades"
-        title="Unidades"
-        breadcrumb={<span>Administração</span>}
-        actions={
-          /*
-            `POST /units` existia na API desde sempre -- com validacao de fuso
-            IANA e auditoria -- e nunca teve um chamador no painel. A unica
-            unidade que existia veio do seed.
-          */
-          <Button href="/units/nova" data-testid="nova-unidade">
-            Nova unidade
-          </Button>
-        }
-      />
+        <PageHeader id="titulo-unidades" title="Unidades" />
         {/*
           Mesma frase que ja estava na tela, agora acentuada (o plano autoriza
           so a acentuacao desta tela). O `title` do `problem+json` da API NAO
@@ -77,7 +65,21 @@ export default async function PaginaDeUnidades() {
 
   return (
     <section aria-labelledby="titulo-unidades">
-      <PageHeader id="titulo-unidades" title="Unidades" />
+      <PageHeader
+        id="titulo-unidades"
+        title="Unidades"
+        breadcrumb={<span>Administração</span>}
+        actions={
+          /*
+            `POST /units` existia na API desde sempre -- com validacao de fuso
+            IANA e auditoria -- e nunca teve um chamador no painel. A unica
+            unidade que existia veio do seed.
+          */
+          <Button href="/units/nova" data-testid="nova-unidade">
+            Nova unidade
+          </Button>
+        }
+      />
 
       <DataTable
         testId="tabela-de-unidades"
@@ -143,6 +145,26 @@ export default async function PaginaDeUnidades() {
               ) : (
                 <EstadoSimples label="Inativa" tom="neutro" />
               ),
+          },
+          {
+            key: 'acao',
+            header: 'Ação',
+            role: 'actions',
+            /*
+              `PATCH /units/:id` existia na API -- com a mesma validacao de
+              fuso do POST e auditoria propria -- e tambem nao tinha chamador.
+              Corrigir o nome de uma unidade exigia `curl`.
+            */
+            render: (u) => (
+              <div className={estilos['acaoDaLinha']}>
+                <EditarUnidade
+                  unitId={u.id}
+                  code={u.code}
+                  name={u.name}
+                  timezone={u.timezone}
+                />
+              </div>
+            ),
           },
         ]}
         empty={
