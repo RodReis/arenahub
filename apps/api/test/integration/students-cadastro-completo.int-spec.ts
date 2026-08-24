@@ -632,5 +632,79 @@ describe('F45 -- cadastro completo de aluno', () => {
       expect(ids).toContain(naFilial.id);
       expect(ids).not.toContain(naMatriz.id);
     });
+
+    /**
+     * O TELEFONE DA LISTA E DETERMINISTICO, mesmo com dois empatados.
+     *
+     * A listagem traz UM telefone por aluno (`take: 1`), escolhido por
+     * `isPrimary`. Mas `isPrimary` e boolean, e boolean NAO e ordem total:
+     * dois telefones com o mesmo valor empatam, e o desempate cai na ordem
+     * FISICA do Postgres -- que muda depois de qualquer UPDATE na tabela.
+     *
+     * Com `take: 1` em cima, o empate nao embaralha a lista: ele troca QUAL
+     * telefone aparece. A recepcao ligaria para um numero num carregamento e
+     * para outro no seguinte, sem ninguem ter mexido no cadastro.
+     *
+     * O campo `phone` nasceu na F50 sem nenhum teste de integracao que o
+     * lesse; este e o primeiro. Sem a segunda chave de ordenacao em
+     * `student.repository.ts`, ele falha.
+     */
+    it('escolhe sempre o mesmo telefone quando dois empatam em isPrimary', async () => {
+      const aluno = corpo(await criar(contas.a, { fullName: `Dois Telefones ${sufixo}` }));
+
+      const antigo = '11911110000';
+      const recente = '11922220000';
+
+      /*
+       * AMBOS `isPrimary: true` -- o empate que o defeito precisa. Criados em
+       * chamadas separadas para `createdAt` diferir de verdade; `createMany`
+       * numa transacao so daria o mesmo instante aos dois e o desempate ficaria
+       * indefinido tambem na versao corrigida.
+       */
+      await db.studentContact.create({
+        data: {
+          tenantId: contas.a.tenantId,
+          studentId: aluno.id,
+          type: 'PHONE',
+          value: antigo,
+          isPrimary: true,
+        },
+      });
+
+      await db.studentContact.create({
+        data: {
+          tenantId: contas.a.tenantId,
+          studentId: aluno.id,
+          type: 'PHONE',
+          value: recente,
+          isPrimary: true,
+        },
+      });
+
+      /*
+       * Um UPDATE entre as duas leituras e o gatilho real: ele muda a ordem
+       * fisica das linhas no Postgres. Sem desempate explicito, e aqui que as
+       * duas leituras passam a discordar.
+       */
+      const primeira = await request(servidor())
+        .get(`/api/v1/students?q=Dois Telefones ${sufixo}&limit=100`)
+        .set('Cookie', contas.a.cookie);
+
+      await db.studentContact.updateMany({
+        where: { studentId: aluno.id, value: antigo },
+        data: { label: 'remexido' },
+      });
+
+      const segunda = await request(servidor())
+        .get(`/api/v1/students?q=Dois Telefones ${sufixo}&limit=100`)
+        .set('Cookie', contas.a.cookie);
+
+      const telefoneNa = (resposta: request.Response): string | null =>
+        (lista(resposta).find((a) => a.id === aluno.id) as { phone?: string | null } | undefined)
+          ?.phone ?? null;
+
+      expect(telefoneNa(primeira)).toBe(recente);
+      expect(telefoneNa(segunda)).toBe(recente);
+    });
   });
 });
