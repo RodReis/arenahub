@@ -70,3 +70,19 @@
   flex: 1 1 200px;
   min-width: 0;
 }
+
+/**
+ * Nota que explica uma REGRA do formulario -- "endereco e tudo-ou-nada",
+ * "contato de emergencia nunca e primario".
+ *
+ * Peso de apoio, nao de paragrafo: ela explica um limite da ferramenta e nao
+ * pode competir com o rotulo do campo que vem logo acima. Mesmo tratamento
+ * do `.aviso` da lista de alunos, e por isso mora aqui e nao naquela tela --
+ * a segunda copia divergiria na primeira correcao de contraste.
+ */
+.nota {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
