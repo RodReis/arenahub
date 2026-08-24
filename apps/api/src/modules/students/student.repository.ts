@@ -633,8 +633,28 @@ export class StudentRepository {
           select: {
             status: true,
             plan: { select: { name: true } },
+            /*
+             * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente --
+             * F53 Task 12, mesmo criterio de `listar-invoices.use-case.ts`
+             * (`dueAt asc` primeiro traz a mais antiga). SEM segunda consulta:
+             * nested include sob o `take: 1` de cima, mesma tecnica que ja
+             * evita o N+1 aqui.
+             */
+            invoices: {
+              where: { status: { in: ['OPEN', 'OVERDUE'] } },
+              orderBy: [{ dueAt: 'asc' }, { id: 'asc' }],
+              take: 1,
+              select: { status: true, dueAt: true, blockAt: true },
+            },
           },
         },
+        /*
+         * Fuso da unidade de ORIGEM do aluno (INV-144, ADR-019) -- sem ele
+         * `situacaoDeVencimento` nao tem como decidir o dia civil de `dueAt`.
+         * SEM FALLBACK: unidade sem fuso cadastrado nao aparece com aviso
+         * errado, aparece sem aviso (ver `paraDtoDaLista`).
+         */
+        gymUnit: { select: { timezone: true } },
         contacts: {
           where: { type: 'PHONE' },
           /*

@@ -15,6 +15,7 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
+import { situacaoDeVencimento } from '../../../src/billing/vencimento';
 import { AcoesDoAluno } from './acoes-do-aluno';
 import { BotaoDeLiberacao } from './botao-de-liberacao';
 import { FiltroDeAlunos } from './filtro-de-alunos';
@@ -40,6 +41,10 @@ interface Aluno {
   status: string;
   archivedAt: string | null;
   version: number;
+  /** Invoice em aberto/vencida mais antiga -- F53 Task 12, aviso de vencimento. */
+  invoiceParaAviso: { status: string; dueAt: string; blockAt: string | null } | null;
+  /** Fuso da unidade de origem do aluno (INV-144/ADR-019), para o mesmo aviso. */
+  timezoneDaUnidade: string | null;
 }
 
 interface Unidade {
@@ -131,6 +136,11 @@ export default async function PaginaDeAlunos({
   }
 
   const alunos = resposta.dados ?? [];
+
+  // F53 Task 12 -- um "agora" so, para toda a pagina: evita que duas linhas
+  // avaliadas em milissegundos diferentes do mesmo carregamento decidam o
+  // aviso de vencimento com relogios ligeiramente diferentes.
+  const agora = new Date();
 
   /**
    * Próxima página pelo id do último aluno.
@@ -351,7 +361,40 @@ export default async function PaginaDeAlunos({
             key: 'situacao',
             header: 'Situação',
             role: 'state',
-            render: (aluno) => <StateBadge machine="student" state={aluno.status} />,
+            /*
+              MARCA DE VENCIMENTO -- F53 Task 12, spec SPEC-053 §3.4.
+
+              A CENA REAL: a recepcionista olha a LISTA de alunos, nao so a
+              ficha de um, e precisa ver quem esta vencido ou vencendo sem
+              abrir cada cadastro. `situacaoDeVencimento` e derivada de
+              `invoiceParaAviso`/`timezoneDaUnidade`, que a lista ja traz --
+              sem tabela nova, sem provedor, sem push.
+
+              Sem invoice em aberto OU sem o fuso da unidade cadastrado, nao
+              ha base para avisar -- a linha fica exatamente como antes desta
+              fatia.
+            */
+            render: (aluno) => {
+              const situacao =
+                aluno.invoiceParaAviso && aluno.timezoneDaUnidade
+                  ? situacaoDeVencimento(aluno.invoiceParaAviso, agora, aluno.timezoneDaUnidade)
+                  : 'EM_DIA';
+
+              return (
+                <>
+                  <StateBadge machine="student" state={aluno.status} />
+                  {situacao !== 'EM_DIA' ? (
+                    <Consequencia tom="danger" testId={`vencimento-${aluno.id}`}>
+                      {situacao === 'VENCE_EM_BREVE'
+                        ? ' — mensalidade vence hoje'
+                        : situacao === 'BLOQUEIO_PROXIMO'
+                          ? ' — mensalidade vencida, bloqueio próximo'
+                          : ' — mensalidade vencida'}
+                    </Consequencia>
+                  ) : null}
+                </>
+              );
+            },
           },
           {
             key: 'acao',

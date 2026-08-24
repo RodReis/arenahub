@@ -227,6 +227,16 @@ interface AlunoDto {
    * Vazia na ficha, que nao carrega credenciais -- so a lista as busca.
    */
   deviceIds: string[];
+  /**
+   * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente -- F53
+   * Task 12, aviso de vencimento derivado (SPEC-053 §3.4). `null` quando
+   * nao ha assinatura, nao ha invoice em aberto, ou o fuso da unidade nao
+   * esta cadastrado -- os tres casos em que a lista nao tem base para
+   * avisar, e por isso nao avisa.
+   */
+  invoiceParaAviso: { status: string; dueAt: string; blockAt: string | null } | null;
+  /** Fuso da unidade de ORIGEM do aluno (INV-144/ADR-019), para o mesmo aviso. */
+  timezoneDaUnidade: string | null;
 }
 
 interface ContatoDto {
@@ -520,6 +530,11 @@ export class StudentsController {
       subscriptionStatus: null,
       phone: null,
       deviceIds: [],
+      // A ficha (`GET /students/:id`) busca o aviso de vencimento pela sua
+      // PROPRIA rota (`/students/:id/invoices`, ja existente) -- estes dois
+      // campos so a lista preenche, em `paraDtoDaLista`.
+      invoiceParaAviso: null,
+      timezoneDaUnidade: null,
     };
   }
 
@@ -533,6 +548,7 @@ export class StudentsController {
    */
   private paraDtoDaLista(aluno: AlunoComVinculos): AlunoDto {
     const assinatura = aluno.subscriptions?.[0];
+    const invoice = assinatura?.invoices?.[0];
 
     return {
       ...this.paraDto(aluno),
@@ -540,6 +556,14 @@ export class StudentsController {
       subscriptionStatus: assinatura?.status ?? null,
       phone: aluno.contacts?.[0]?.value ?? null,
       deviceIds: numerosDeEquipamento(aluno.credentials ?? []),
+      invoiceParaAviso: invoice
+        ? {
+            status: invoice.status,
+            dueAt: invoice.dueAt.toISOString(),
+            blockAt: invoice.blockAt?.toISOString() ?? null,
+          }
+        : null,
+      timezoneDaUnidade: aluno.gymUnit?.timezone ?? null,
     };
   }
 }
@@ -561,7 +585,12 @@ function numerosDeEquipamento(credenciais: readonly { externalId: string }[]): s
 
 /** O aluno como a busca o devolve: com a assinatura vigente e o telefone. */
 type AlunoComVinculos = Student & {
-  subscriptions?: { status: string; plan: { name: string } }[];
+  subscriptions?: {
+    status: string;
+    plan: { name: string };
+    invoices?: { status: string; dueAt: Date; blockAt: Date | null }[];
+  }[];
   contacts?: { value: string }[];
   credentials?: { externalId: string }[];
+  gymUnit?: { timezone: string } | null;
 };
