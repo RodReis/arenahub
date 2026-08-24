@@ -20,18 +20,6 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Fuso FIXO -- mesma divida das outras telas do painel. A invoice traz
- * `tenant_id`, nao o fuso da unidade, e o financeiro nao e dado fisico
- * (nao tem `gym_unit_id`, por ADR-027).
- *
- * Aqui a divida DOI MAIS que nas outras telas: `INV-144` diz que o instante
- * de bloqueio por inadimplencia e no timezone da unidade, SEM fallback para
- * o tenant. Enquanto este valor for fixo, a data que a recepcao le pode
- * divergir da que o job de vencimento vai usar na F15.
- */
-const FUSO_PROVISORIO = 'America/Sao_Paulo';
-
 interface Pagamento {
   id: string;
   method: string;
@@ -68,6 +56,12 @@ interface Aluno {
   fullName: string;
 }
 
+/** Resposta de `GET /students/:id/invoices` -- fuso da unidade do aluno (INV-144, ADR-019). F53. */
+interface InvoicesDoAluno {
+  timezone: string;
+  invoices: Invoice[];
+}
+
 /**
  * Financeiro do aluno — F12, Slice 2.1.
  *
@@ -88,7 +82,7 @@ export default async function PaginaFinanceiroDoAluno({
 
   const [respostaDoAluno, respostaDasInvoices, respostaDosDireitos] = await Promise.all([
     chamarApi<Aluno>(`/api/v1/students/${id}`),
-    chamarApi<Invoice[]>(`/api/v1/students/${id}/invoices`),
+    chamarApi<InvoicesDoAluno>(`/api/v1/students/${id}/invoices`),
     chamarApi<Entitlement[]>(`/api/v1/students/${id}/entitlements`),
   ]);
 
@@ -112,7 +106,10 @@ export default async function PaginaFinanceiroDoAluno({
     );
   }
 
-  const invoices = respostaDasInvoices.dados ?? [];
+  const invoices = respostaDasInvoices.dados?.invoices ?? [];
+  // Fuso da unidade de origem do aluno (INV-144, ADR-019) -- sem fallback
+  // para America/Sao_Paulo: sem o dado, nao ha fuso confiavel para exibir.
+  const timezoneDaUnidade = respostaDasInvoices.dados?.timezone ?? 'UTC';
   const aluno = respostaDoAluno.dados;
 
   /*
@@ -159,7 +156,7 @@ export default async function PaginaFinanceiroDoAluno({
             key: 'competencia',
             header: 'Competência',
             role: 'moment',
-            render: (invoice) => <TenantDateTime iso={invoice.billingPeriod} timeZone={FUSO_PROVISORIO} />,
+            render: (invoice) => <TenantDateTime iso={invoice.billingPeriod} timeZone={timezoneDaUnidade} />,
           },
           {
             key: 'situacao',
@@ -181,7 +178,7 @@ export default async function PaginaFinanceiroDoAluno({
             key: 'vencimento',
             header: 'Vence em',
             role: 'moment',
-            render: (invoice) => <TenantDateTime iso={invoice.dueAt} timeZone={FUSO_PROVISORIO} />,
+            render: (invoice) => <TenantDateTime iso={invoice.dueAt} timeZone={timezoneDaUnidade} />,
           },
           {
             key: 'recebimento',
@@ -213,7 +210,7 @@ export default async function PaginaFinanceiroDoAluno({
                       {pagamento.paidAt ? (
                         <>
                           {' — '}
-                          <TenantDateTime iso={pagamento.paidAt} timeZone={FUSO_PROVISORIO} format="datetime" />
+                          <TenantDateTime iso={pagamento.paidAt} timeZone={timezoneDaUnidade} format="datetime" />
                         </>
                       ) : null}
                     </li>

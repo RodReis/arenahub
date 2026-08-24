@@ -156,6 +156,17 @@ interface InvoiceDto {
   payments: PagamentoDto[];
 }
 
+/**
+ * Resposta de `GET /students/:id/invoices` -- fuso da UNIDADE DE ORIGEM do
+ * aluno (INV-144, ADR-019) junto das faturas. F53, task 7: sem o fuso aqui,
+ * a tela caia de volta num valor fixo em codigo, que diverge do fuso que o
+ * job de vencimento usa.
+ */
+interface InvoicesDoAlunoDto {
+  timezone: string;
+  invoices: InvoiceDto[];
+}
+
 /** Linha da lista transversal -- resumo, sem itens nem pagamentos. F53. */
 interface InvoiceDaListaDto {
   id: string;
@@ -601,10 +612,13 @@ export class BillingController {
 
   @Get('students/:id/invoices')
   @RequirePermissions('billing.read')
-  async listarDoAluno(@Param('id') id: string): Promise<InvoiceDto[]> {
-    const invoices = await this.billing.listarInvoicesDoAluno(this.contexto.require(), id);
+  async listarDoAluno(@Param('id') id: string): Promise<InvoicesDoAlunoDto> {
+    const resposta = await this.billing.listarInvoicesDoAluno(this.contexto.require(), id);
 
-    return invoices.map((invoice) => this.paraDto(invoice));
+    return {
+      timezone: resposta.timezone,
+      invoices: resposta.invoices.map((invoice) => this.paraDto(invoice)),
+    };
   }
 
   /** Timeline financeira: o controle detectivo do ADR-027. */

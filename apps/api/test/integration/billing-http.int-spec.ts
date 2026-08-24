@@ -256,12 +256,15 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
     expect(corpo.payments[0]?.recognizedByUserId).not.toBeNull();
   });
 
-  it('lista as invoices do aluno', async () => {
+  it('lista as invoices do aluno, com o fuso da unidade de origem', async () => {
     const resposta = await request(servidor())
       .get(`/api/v1/students/${cenario.studentId}/invoices`)
       .set('Cookie', cenario.cookieGestor);
 
     expect(resposta.status).toBe(200);
-    expect(resposta.body).toHaveLength(1);
+    // F53, task 7: o corpo deixou de ser array e passou a { timezone, invoices }.
+    const corpo = resposta.body as { timezone: string; invoices: unknown[] };
+    expect(corpo.timezone).toBe('America/Sao_Paulo');
+    expect(corpo.invoices).toHaveLength(1);
   });
 });

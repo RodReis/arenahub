@@ -40,6 +40,12 @@ export class InvoiceNaoEncontradaError extends ErroDeDominio {
   }
 }
 
+export class AlunoNaoEncontradoError extends ErroDeDominio {
+  constructor() {
+    super('STUDENT_NOT_FOUND', 404, 'Aluno nao encontrado');
+  }
+}
+
 export class TransicaoDeInvoiceInvalidaError extends ErroDeDominio {
   constructor(de: string, para: string) {
     super('INVOICE_INVALID_TRANSITION', 409, `Invoice em ${de} nao vai para ${para}`);
@@ -252,20 +258,39 @@ export class BillingRepository {
   }
 
   /**
-   * Invoices do aluno, mais recente primeiro.
+   * Invoices do aluno, mais recente primeiro, com o fuso da unidade de
+   * origem do aluno.
    *
    * Escopo do tenant no `where`, sempre: regra de arquitetura no 2. Sem
    * ele, um id de outro tenant devolveria dado que nao e de quem pergunta.
+   *
+   * Fuso da UNIDADE DE ORIGEM do aluno (INV-144, ADR-019) -- sem fallback
+   * para o tenant, que e exatamente o que o invariante proibe.
+   *
+   * A invoice nao tem `gym_unit_id` (financeiro nao e dado fisico,
+   * ADR-027), entao o fuso vem pelo aluno. Nao ha aluno sem unidade: a F45
+   * tornou a coluna `NOT NULL`.
    */
   async listarInvoicesDoAluno(
     contexto: TenantContext,
     studentId: string,
-  ): Promise<InvoiceComItens[]> {
-    return this.db.invoice.findMany({
+  ): Promise<InvoicesDoAlunoComFuso> {
+    const aluno = await this.db.student.findFirst({
+      where: { id: studentId, tenantId: contexto.tenantId },
+      include: { gymUnit: { select: { timezone: true } } },
+    });
+
+    if (!aluno) {
+      throw new AlunoNaoEncontradoError();
+    }
+
+    const invoices = await this.db.invoice.findMany({
       where: { tenantId: contexto.tenantId, studentId },
       include: { items: true, payments: true },
       orderBy: { billingPeriod: 'desc' },
     });
+
+    return { timezone: aluno.gymUnit.timezone, invoices };
   }
 
   /**
@@ -355,3 +380,9 @@ export type InvoiceComItens = Prisma.InvoiceGetPayload<{
 export type InvoiceComTimeline = Prisma.InvoiceGetPayload<{
   include: { items: true; payments: true; attempts: true };
 }>;
+
+/** Resposta de `GET /students/:id/invoices` -- fuso da unidade do aluno junto das faturas. */
+export interface InvoicesDoAlunoComFuso {
+  timezone: string;
+  invoices: InvoiceComItens[];
+}

@@ -292,4 +292,41 @@ describe('F12 -- invoice e pagamento manual', () => {
       ),
     ).rejects.toThrow();
   });
+
+  /*
+   * FUSO DA UNIDADE, nunca do tenant e nunca fixo (INV-144, ADR-019).
+   *
+   * A unidade do teste NAO e America/Sao_Paulo de proposito: com o fuso da
+   * academia real, o valor certo e o valor fixo coincidem, e o teste
+   * passaria com o `FUSO_PROVISORIO` ainda no lugar -- verde provando nada.
+   */
+  it('devolve o timezone da unidade de origem do aluno', async () => {
+    const unidadeEmManaus = await db.gymUnit.create({
+      data: {
+        tenantId: a.tenantId,
+        code: `UNI-MANAUS-${sufixo}`,
+        name: 'Unidade Manaus',
+        timezone: 'America/Manaus',
+        openingHours: {},
+      },
+    });
+
+    const alunoDeManaus = await db.student.create({
+      data: {
+        tenantId: a.tenantId,
+        gymUnitId: unidadeEmManaus.id,
+        fullName: 'Aluno de Manaus',
+        membershipNumber: `manaus-${sufixo}`,
+        birthDate: new Date('1990-05-20T00:00:00Z'),
+        status: 'ACTIVE',
+      },
+    });
+
+    const resposta = await billing.listarInvoicesDoAluno(
+      contexto(a.tenantId, a.actorId),
+      alunoDeManaus.id,
+    );
+
+    expect(resposta.timezone).toBe('America/Manaus');
+  });
 });
