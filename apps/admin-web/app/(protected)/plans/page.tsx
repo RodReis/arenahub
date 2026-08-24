@@ -195,12 +195,23 @@ export default async function PaginaDePlanos() {
                    * seed ou de importacao futura pode nao ter vigencia -- o aviso
                    * evita que a coluna pareca vazia por engano.
                    */
-                  render: (plano) =>
-                    plano.currentPrice ? (
-                      <Money cents={plano.currentPrice.amountMinor} currency={plano.currentPrice.currency} />
-                    ) : (
-                      <span>Sem preço vigente</span>
-                    ),
+                  render: (plano) => (
+                    /*
+                      `data-testid` na CELULA: desde que o reajuste virou modal,
+                      o historico de vigencias fica montado no DOM e repete o
+                      mesmo valor -- buscar "R$ 150,00" solto acha dois.
+                    */
+                    <span data-testid={`preco-do-plano-${plano.id}`}>
+                      {plano.currentPrice ? (
+                        <Money
+                          cents={plano.currentPrice.amountMinor}
+                          currency={plano.currentPrice.currency}
+                        />
+                      ) : (
+                        'Sem preço vigente'
+                      )}
+                    </span>
+                  ),
                 },
                 {
                   key: 'unidades',
@@ -253,6 +264,8 @@ export default async function PaginaDePlanos() {
                   render: (plano) => (
                     <AcaoDeReajuste
                       planId={plano.id}
+                      nomeDoPlano={plano.name}
+                      unidades={plano.gymUnitIds.map(nomeDaUnidade)}
                       historico={plano.prices}
                       timeZone={unidades.find((u) => u.id === plano.gymUnitIds[0])?.timezone ?? 'UTC'}
                     />
