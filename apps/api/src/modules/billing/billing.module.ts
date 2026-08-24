@@ -13,6 +13,7 @@ import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamen
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { ConciliarMovimentosUseCase } from './conciliar-movimentos.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
+import { CriarCheckoutDeCartaoUseCase } from './criar-checkout-de-cartao.use-case.js';
 import { EmitirReciboUseCase } from './emitir-recibo.use-case.js';
 import { EstornarPagamentoUseCase } from './estornar-pagamento.use-case.js';
 import { EstornoConciliacaoController } from './estorno-conciliacao.controller.js';
@@ -61,6 +62,7 @@ import { WebhookController } from './webhook.controller.js';
   providers: [
     BillingRepository,
     CriarCobrancaPixUseCase,
+    CriarCheckoutDeCartaoUseCase,
     ConsultarStatusDePagamentoUseCase,
     ProcessarWebhookDePagamentoUseCase,
     TenantContextService,

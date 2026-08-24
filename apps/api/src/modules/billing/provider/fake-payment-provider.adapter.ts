@@ -115,6 +115,15 @@ export class FakePaymentProvider implements PaymentProvider {
   private readonly checkoutsPorChave = new Map<string, HostedCheckout>();
 
   /**
+   * Quantas vezes `createHostedCheckout` foi chamado, nesta instancia.
+   *
+   * Existe para o teste de recusa por cadastro incompleto (F53/Task 4):
+   * provar que o caso de uso recusou ANTES de gastar requisicao com o
+   * provedor, e nao so que a resposta veio com o codigo certo.
+   */
+  chamadasDeCheckout = 0;
+
+  /**
    * O estorno confirma na hora, ou fica pendente?
    *
    * PADRAO SINCRONO por conveniencia dos testes que nao estao testando isso --
@@ -587,14 +596,16 @@ export class FakePaymentProvider implements PaymentProvider {
    * PROPRIO CELULAR, na pagina do provedor; o duble nao recebe, nao guarda e
    * nao sabe inventar numero de cartao.
    */
-  async createHostedCheckout(input: HostedCheckoutInput): Promise<HostedCheckout> {
+  createHostedCheckout(input: HostedCheckoutInput): Promise<HostedCheckout> {
+    this.chamadasDeCheckout += 1;
+
     /*
      * Memoriza por chave de idempotencia, como o provedor real faz. Sortear
      * um id novo a cada chamada faria o teste de idempotencia da Task 4
      * medir o fake em vez da guarda.
      */
     const existente = this.checkoutsPorChave.get(input.idempotencyKey);
-    if (existente) return existente;
+    if (existente) return Promise.resolve(existente);
 
     const checkout: HostedCheckout = {
       externalPaymentId: `fake-checkout-${input.idempotencyKey}`,
@@ -604,6 +615,6 @@ export class FakePaymentProvider implements PaymentProvider {
     };
 
     this.checkoutsPorChave.set(input.idempotencyKey, checkout);
-    return checkout;
+    return Promise.resolve(checkout);
   }
 }
