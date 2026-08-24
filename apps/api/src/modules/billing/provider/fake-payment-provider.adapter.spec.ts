@@ -390,3 +390,50 @@ describe('FakePaymentProvider.cancelSubscription', () => {
     );
   });
 });
+
+describe('FakePaymentProvider.createHostedCheckout', () => {
+  const entrada = {
+    externalAccountId: 'conta-getnet',
+    amountMinor: 15000,
+    currency: 'BRL',
+    idempotencyKey: 'checkout:invoice-1',
+    expiresAt: new Date('2026-08-23T13:00:00Z'),
+    descricao: 'Mensalidade agosto',
+    customer: {
+      nome: 'Aluno de Teste',
+      email: 'aluno@exemplo.test',
+      telefone: '11999990000',
+      cpf: '12345678901',
+      endereco: {
+        logradouro: 'Rua Um',
+        numero: '10',
+        bairro: 'Centro',
+        cidade: 'Sao Paulo',
+        uf: 'SP',
+        cep: '01001000',
+      },
+    },
+  };
+
+  it('devolve link e QR do checkout hospedado', async () => {
+    const checkout = await new FakePaymentProvider().createHostedCheckout(entrada);
+
+    expect(checkout.externalPaymentId).toBeTruthy();
+    expect(checkout.checkoutUrl).toMatch(/^https:\/\//);
+    expect(checkout.qrCodeDataUri).toMatch(/^data:image\/png;base64,/);
+    expect(checkout.expiresAt).toEqual(entrada.expiresAt);
+  });
+
+  /*
+   * A MESMA chave devolve o MESMO externalPaymentId. O fake precisa honrar
+   * isso: se ele sortear um id novo a cada chamada, o teste de idempotencia
+   * da Task 4 passa por acidente -- ele estaria medindo o fake, nao a guarda.
+   */
+  it('a mesma chave de idempotencia devolve o mesmo pagamento', async () => {
+    const fake = new FakePaymentProvider();
+    const primeiro = await fake.createHostedCheckout(entrada);
+    const segundo = await fake.createHostedCheckout(entrada);
+
+    expect(segundo.externalPaymentId).toBe(primeiro.externalPaymentId);
+  });
+});

@@ -3,6 +3,8 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   ErroDoProvedor,
   type CreatePixInput,
+  type HostedCheckout,
+  type HostedCheckoutInput,
   type ListMovementsInput,
   type PaymentProvider,
   type PixCharge,
@@ -40,6 +42,12 @@ import {
 export const HEADER_DE_ASSINATURA = 'x-arenahub-fake-signature';
 
 export const PROVEDOR_FAKE = 'fake';
+
+/**
+ * QR fixo do checkout hospedado. `createPix` gera o dele a partir do id da
+ * cobranca e nao foi tocado aqui -- alteracao cirurgica, escopo desta task.
+ */
+const QR_FALSO = 'data:image/png;base64,ZmFrZS1xcg==';
 
 interface CobrancaEmMemoria {
   externalPaymentId: string;
@@ -102,6 +110,9 @@ export class FakePaymentProvider implements PaymentProvider {
 
   /** Estornos na ordem em que ocorreram, para o extrato. */
   private readonly estornos: EstornoEmMemoria[] = [];
+
+  /** Checkouts hospedados por chave de idempotencia -- o que torna o retry seguro. */
+  private readonly checkoutsPorChave = new Map<string, HostedCheckout>();
 
   /**
    * O estorno confirma na hora, ou fica pendente?
@@ -569,5 +580,30 @@ export class FakePaymentProvider implements PaymentProvider {
     if (cobranca) {
       cobranca.status = 'PENDING';
     }
+  }
+
+  /**
+   * Checkout hospedado -- F53/Task 2 (SPEC-053). O aluno digita o cartao NO
+   * PROPRIO CELULAR, na pagina do provedor; o duble nao recebe, nao guarda e
+   * nao sabe inventar numero de cartao.
+   */
+  async createHostedCheckout(input: HostedCheckoutInput): Promise<HostedCheckout> {
+    /*
+     * Memoriza por chave de idempotencia, como o provedor real faz. Sortear
+     * um id novo a cada chamada faria o teste de idempotencia da Task 4
+     * medir o fake em vez da guarda.
+     */
+    const existente = this.checkoutsPorChave.get(input.idempotencyKey);
+    if (existente) return existente;
+
+    const checkout: HostedCheckout = {
+      externalPaymentId: `fake-checkout-${input.idempotencyKey}`,
+      checkoutUrl: `https://checkout.fake.test/${input.idempotencyKey}`,
+      qrCodeDataUri: QR_FALSO,
+      expiresAt: input.expiresAt,
+    };
+
+    this.checkoutsPorChave.set(input.idempotencyKey, checkout);
+    return checkout;
   }
 }
