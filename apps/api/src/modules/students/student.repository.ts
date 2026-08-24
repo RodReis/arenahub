@@ -637,7 +637,23 @@ export class StudentRepository {
         },
         contacts: {
           where: { type: 'PHONE' },
-          orderBy: { isPrimary: 'desc' },
+          /*
+            DUAS chaves, nao uma. `isPrimary` e boolean, logo NAO e ordem
+            total: dois telefones com o mesmo valor de `isPrimary` empatam, e
+            o desempate cai na ordem FISICA do Postgres -- que muda depois de
+            qualquer UPDATE na tabela.
+
+            Com `take: 1` em cima, o empate nao embaralha a ordem: ele troca
+            QUAL telefone aparece. A recepcao ligaria para um numero num
+            carregamento e para outro no seguinte, sem nada ter mudado no
+            cadastro.
+
+            Corrigido junto da F53, que consertou o mesmo defeito no caminho
+            do checkout de cartao (o telefone que vai ao antifraude do
+            provedor). Sao os dois unicos pontos do `apps/api` com boolean
+            como criterio unico de ordenacao.
+          */
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
           take: 1,
           select: { value: true },
         },
