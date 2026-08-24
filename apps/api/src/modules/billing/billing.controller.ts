@@ -85,13 +85,20 @@ const esquemaDeLiberacao = z
 /**
  * Lista transversal de faturas do tenant. F53, task 6.
  *
+ * `status` e `z.enum` com os seis valores REAIS de `InvoiceStatus`
+ * (`packages/database/prisma/schema.prisma`) -- nao string livre. Sem o
+ * enum, `?status=xyz` nao vira 400: a query roda, o Prisma nao acha nada, e
+ * o cliente le `total: 0` como "tenant sem fatura" quando a verdade e
+ * "status inexistente". Erro de digitacao virando resposta vazia em
+ * silencio e pior que o 400.
+ *
  * `tamanho` tem teto (`TAMANHO_MAXIMO_DA_PAGINA`) no proprio schema: recusar
  * no boundary evita que a validacao dependa do caso de uso lembrar de
  * cortar.
  */
 const esquemaDeListagem = z
   .object({
-    status: z.string().min(1).max(20).optional(),
+    status: z.enum(['DRAFT', 'OPEN', 'PAID', 'OVERDUE', 'CANCELLED', 'REFUNDED']).optional(),
     vencendoDe: z.iso.datetime().optional(),
     vencendoAte: z.iso.datetime().optional(),
     pagina: z.coerce.number().int().min(1).default(1),

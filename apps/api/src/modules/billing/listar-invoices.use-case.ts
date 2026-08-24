@@ -6,8 +6,11 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 /** Teto do tamanho da pagina -- sem ele um cliente pede 100000 e a rota vira despejo do financeiro inteiro. */
 export const TAMANHO_MAXIMO_DA_PAGINA = 100;
 
+/** Os seis valores de `InvoiceStatus` (`packages/database/prisma/schema.prisma`). */
+export type StatusDeInvoice = 'DRAFT' | 'OPEN' | 'PAID' | 'OVERDUE' | 'CANCELLED' | 'REFUNDED';
+
 export interface FiltroDeInvoices {
-  status?: string;
+  status?: StatusDeInvoice;
   vencendoDe?: Date;
   vencendoAte?: Date;
   pagina: number;
@@ -61,7 +64,7 @@ export class ListarInvoicesUseCase {
 
     const where = {
       tenantId: contexto.tenantId,
-      ...(filtro.status ? { status: filtro.status as never } : {}),
+      ...(filtro.status ? { status: filtro.status } : {}),
       ...(filtro.vencendoDe || filtro.vencendoAte
         ? {
             dueAt: {
