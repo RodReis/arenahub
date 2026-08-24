@@ -382,6 +382,27 @@ atos** — cobrança pontual com token salvo contra recorrência instalada uma v
 que o dublê esconde defeito de dinheiro**; a primeira foi a chave de idempotência derivada de
 contagem, na própria F14, que cobrava em dobro.
 
+🔎 **23/08/2026, quinta rodada — o PI descreveu o caminho do atendimento, e metade dele já estava
+no ar.** *"Pesquisa do aluno → aluno localizado → na grid, coluna Ação → ícone do pagamento →
+página de pagar."* A grid de `/students` **já tem** a coluna Ação com quatro ícones, e o terceiro é
+a cédula de **Cobrança**, com `aria-label`, `title` e alvo de 32 px, apontando para
+`/students/[id]/billing` — que existe desde a F12, com *Gerar cobrança do mês* e *Receber no
+balcão*. **Não há rota nem ícone novos:** o que falta é o que a página faz — escolher a forma
+(espécie, PIX, cartão), o QR na tela, o checkout hospedado e o recibo.
+
+**Isso encolhe a F53, e o corte está proposto na spec:** o `GET /api/v1/invoices` foi pensado para
+uma busca por *fatura*, e o fluxo real é a busca por *aluno*, que já existe. A visão "quem deve" é
+a `/billing/delinquency` da F15; a agregada é a F54. **A lista transversal sai do caminho crítico**
+e só volta se o PI a quiser como tela de gestão. Fica registrado que ela continua prevista no
+`MVP-02` §13 e nunca foi implementada.
+
+⚠️ **E a ampliação da tela esbarra numa dívida que já está lá:** `/students/[id]/billing` fixa
+`FUSO_PROVISORIO = 'America/Sao_Paulo'` em código, enquanto a **INV-144** manda o instante de
+bloqueio ser no fuso da unidade, **sem fallback para o tenant**. Enquanto o valor for fixo, a data
+que a recepção lê pode divergir da que o job de vencimento usa — e agora essa tela vai receber
+dinheiro.
+
+
 ## 1. Onde estamos, em três frases
 
 O repositório tem PRDs aprovados para planejamento, planos de implementação por slice e, desde

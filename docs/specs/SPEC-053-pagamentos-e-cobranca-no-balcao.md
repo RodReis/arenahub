@@ -54,24 +54,58 @@ o nome antes de saber que existe fatura, e nenhuma tela responde *"o que vence e
 
 ## 3. Escopo
 
+### 3.0 Onde o fluxo começa — decisão do PI em 23/08/2026
+
+> *"Pesquisa do aluno → aluno localizado → na grid vai ter uma coluna ação: colocar o ícone do
+> pagamento, ir para página de pagar."*
+
+**Metade disso já está no ar, e a spec anterior errou o alvo por não ter olhado.** A grid de
+`/students` já tem a coluna **Ação** com quatro ícones (`acoes-do-aluno.tsx`), e o terceiro é
+**a cédula — "Cobrança do aluno"**, com `aria-label`, `title` e alvo de 32 px, apontando para
+**`/students/[id]/billing`**, que existe desde a F12.
+
+**Consequências, e elas encolhem a fatia:**
+
+1. **Não há rota nova.** A "página de pagar" **é** `/students/[id]/billing`. Criar
+   `/students/[id]/pagar` ao lado dela produziria **duas telas de dinheiro do mesmo aluno** — e a
+   segunda nasceria sem o histórico de invoices, pagamentos e entitlement que a primeira já
+   mostra.
+2. **Não há ícone novo.** O que muda é o que a página faz quando a recepcionista chega nela.
+3. **`GET /api/v1/invoices` sai do caminho crítico.** Ele foi proposto para uma busca por fatura
+   que **não é o fluxo**: quem chega ao balcão é o aluno, e a busca é a de alunos, que já existe.
+   Ver §3.1.
+
+**O que a página tem hoje** (F12/F13): lista de invoices com itens e pagamentos, entitlement,
+*Gerar cobrança do mês* (idempotente, INV-066) e *Receber no balcão* via `SensitiveAction` com
+motivo obrigatório.
+
+**O que falta, e é esta fatia:** escolher a **forma de pagamento**, o QR do PIX na tela, o QR/link
+do **checkout hospedado** de cartão, o acompanhamento da confirmação e o **recibo**.
+
 ### 3.1 Backend
 
-- **`GET /api/v1/invoices`** — lista do tenant, com filtro por `status`, período de vencimento,
-  unidade, aluno e método, ordenação e paginação. **O `MVP-02` §13 já prevê este endpoint e ele
-  nunca foi implementado**: existem só `GET /students/:id/invoices` e `GET /invoices/:id`.
-  Permissão `billing.read`.
-- **`POST /api/v1/invoices/:id/payments/card`** já existe (F14) e cobra **método tokenizado
-  existente**. O balcão precisa do caminho de **primeira** cobrança: gerar um **checkout hospedado**
-  da Getnet para uma invoice e devolver a URL — método novo na porta `PaymentProvider`
-  (`createHostedCheckout`), implementado pelo adapter da **F55** e pelo `FakePaymentProvider`.
-  A ampliação da porta segue o precedente da emenda de 19/08 (`listMovements`/`getRefundStatus`).
+- **`createHostedCheckout` na porta `PaymentProvider`** — a primeira cobrança no cartão. O
+  `POST /invoices/:id/payments/card` da F14 cobra **método já tokenizado**, e no balcão o aluno
+  ainda não tem cartão salvo. Implementado pelo adapter da **F55** e pelo `FakePaymentProvider`.
+  ⚠️ Ver ADR-043 Decisão 5: essa chamada **não** pode ser `createTokenizedSubscription`.
+- **`GET /api/v1/invoices` — proposta de CORTE desta fatia.** Ele está no `MVP-02` §13 e nunca foi
+  implementado, mas com a entrada pela grid de alunos ele deixa de servir ao balcão: a visão
+  "quem deve" já é `/billing/delinquency` (F15), e a visão agregada é a **F54**. Fica registrado
+  como pendência do PRD, para quem precisar de drill-down no dashboard. **Se o PI quiser a lista
+  transversal de faturas, ela volta — mas como tela de gestão, não como caminho do atendimento.**
 
-### 3.2 Tela `/billing/invoices`
+### 3.2 A página de pagamento — `/students/[id]/billing`
 
-- Lista com busca por aluno, filtros persistentes na URL, `StateBadge` pelo dicionário do
-  `DS-PAINEL` §7, valores em `tabular-nums` (§3 do mesmo documento).
-- Ações na linha: **receber** (abre o fluxo da §3.3), abrir recibo, `wa.me`, abrir a ficha.
-- `DataFreshness` em três estados, nunca colapsados (`DS-PAINEL` §8.2).
+- Abre com **o que este aluno deve agora** no topo: invoice em aberto ou vencida, valor,
+  vencimento e dias de atraso. Histórico continua embaixo.
+- `StateBadge` pelo dicionário do `DS-PAINEL` §7, valores em `tabular-nums`, `DataFreshness` em
+  três estados.
+- **Sem fatura em aberto**, a página não fica muda: mostra a situação e mantém *Gerar cobrança do
+  mês*, que já existe e é idempotente.
+- ⚠️ **`FUSO_PROVISORIO`**: a página fixa `America/Sao_Paulo` em código. A INV-144 manda o instante
+  de bloqueio ser no fuso da unidade, **sem fallback para o tenant** — enquanto esse valor for
+  fixo, a data que a recepção lê pode divergir da que o job de vencimento usa. Esta fatia **não
+  pode ampliar a tela sem tratar isso**.
 
 ### 3.3 Fluxo "receber" — uma pergunta por vez
 
@@ -102,6 +136,8 @@ já está na resposta**. Sem tabela nova, sem provedor, sem push.
 | Pagamento no totem | **F52** (MVP 3.5), depois de F49 e F50 |
 | Pagamento no app do aluno | **F25** (MVP 4), depois de F23 e F24 |
 | Régua de cobrança, histórico de contato, promessa de pagamento | **F38** (MVP 6) |
+| Lista transversal de faturas (`GET /api/v1/invoices`) | **cortada** — §3.1; volta como tela de gestão se o PI quiser |
+| Rota `/students/[id]/pagar` separada | **não existe** — a página de pagamento é a de cobrança do aluno, §3.0 |
 | API oficial de WhatsApp | fatia própria; o `wa.me` continua abrindo o app do operador |
 | Push nativo | não entra — decisão do PI em 23/08 |
 | Maquininha física / TEF | descartado pela decisão 2 |
@@ -127,7 +163,8 @@ já está na resposta**. Sem tabela nova, sem provedor, sem push.
 
 O PI olha e diz "aceito" quando, com um aluno de demonstração:
 
-1. a recepcionista **acha a fatura pela busca**, sem abrir a ficha do aluno;
+1. a recepcionista acha o aluno na **pesquisa de alunos**, clica no **ícone de cobrança da coluna
+   Ação** e cai na página de pagamento — o caminho que o PI descreveu, e que já existe;
 2. **dinheiro** → baixa manual registra ator e evidência, e o recibo abre;
 3. **PIX** → o QR aparece, o pagamento confirma **pelo webhook**, e a tela muda sozinha;
 4. **cartão** → o checkout abre no celular do aluno, e **nenhum campo de cartão existe no painel**;
@@ -143,6 +180,8 @@ O PI olha e diz "aceito" quando, com um aluno de demonstração:
 | 1 | Como o cartão é passado no balcão? | **Checkout hospedado da Getnet** — o aluno paga no próprio celular | 23/08/2026 |
 | 2 | Dinheiro precisa de método próprio (`CASH`)? | **Não.** Dinheiro é espécie, sem maquininha — usa `MANUAL` | 23/08/2026 |
 | 3 | Token de MVP: `[MVP3]` (fila) ou `[MVP2]` (conteúdo)? | `[MVP3]`, por posição na fila | 23/08/2026 |
+| 4 | Onde o atendimento começa? | **Pesquisa de aluno → ícone de cobrança na coluna Ação → página de pagamento** | 23/08/2026 |
+| 5 | A lista transversal de faturas ainda é necessária? | **em aberto** — proposta de corte em §3.1 | — |
 
 ---
 
@@ -151,6 +190,7 @@ O PI olha e diz "aceito" quando, com um aluno de demonstração:
 - [ ] O PI aceitou esta spec
 - [ ] A F55 está entregue **ou** está aceito que a fatia rode contra o `FakePaymentProvider`
 - [x] A pergunta 2 da §7 está respondida — 23/08/2026, `MANUAL` para espécie
+- [ ] A pergunta 5 da §7 está respondida (corte do `GET /api/v1/invoices`)
 
 ---
 
