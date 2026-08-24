@@ -6,7 +6,6 @@ import {
   Cpf,
   DataTable,
   EmptyState,
-  Icon,
   Money,
   PageHeader,
   ProblemDetail,
@@ -28,6 +27,8 @@ import {
 
 /** Fuso FIXO, preservado de `dataLegivel` -- mesma divida das outras telas. */
 const FUSO_PROVISORIO = 'America/Sao_Paulo';
+import { FcClock, FcPortraitMode } from 'react-icons/fc';
+
 import estilos from './ficha.module.css';
 
 import { IconeBioimpedancia, IconePagamento } from '../acoes-do-aluno';
@@ -341,22 +342,27 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
       </dl>
 
       {/*
-        EDICAO fechada por padrao, ao lado dos dados que ela edita.
-        Ver `EditarCadastro`: a ficha e tela de consulta, e dezoito campos
+        EDICAO em modal, ao lado dos dados que ela edita. Ver
+        `EditarCadastro`: a ficha e tela de consulta, e dezoito campos
         abertos empurrariam "Acesso agora" para baixo da dobra em 1280px.
+
+        O `<div>` existe para o botao nao esticar na largura da pagina --
+        ver `.acoesDaIdentificacao`.
       */}
-      <EditarCadastro
-        studentId={aluno.id}
-        nomeDoAluno={aluno.fullName}
-        version={aluno.version}
-        fullName={aluno.fullName}
-        birthDate={aluno.birthDate}
-        cpf={aluno.cpf}
-        rg={aluno.rg}
-        registeredSex={aluno.registeredSex}
-        contacts={aluno.contacts ?? []}
-        address={aluno.address}
-      />
+      <div className={estilos['acoesDaIdentificacao']}>
+        <EditarCadastro
+          studentId={aluno.id}
+          nomeDoAluno={aluno.fullName}
+          version={aluno.version}
+          fullName={aluno.fullName}
+          birthDate={aluno.birthDate}
+          cpf={aluno.cpf}
+          rg={aluno.rg}
+          registeredSex={aluno.registeredSex}
+          contacts={aluno.contacts ?? []}
+          address={aluno.address}
+        />
+      </div>
 
       {/*
         FAIXA DE VENCIMENTO -- F53 Task 12, spec SPEC-053 §3.4.
@@ -654,7 +660,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               data-testid="link-timeline"
             >
               <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                <Icon name="clock" />
+                <FcClock size={22} aria-hidden />
               </span>
               <span className={estilos['rotuloDaPorta']}>Histórico administrativo</span>
             </a>
@@ -666,7 +672,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               data-testid="link-biometria"
             >
               <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                <Icon name="scan-face" />
+                <FcPortraitMode size={22} aria-hidden />
               </span>
               <span className={estilos['rotuloDaPorta']}>Consentimento e biometria</span>
             </a>

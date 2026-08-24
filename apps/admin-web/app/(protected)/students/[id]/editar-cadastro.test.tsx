@@ -190,6 +190,32 @@ describe('EditarCadastro', () => {
   });
 
   /**
+   * SALVOU TEM DE AVISAR.
+   *
+   * O modal fecha sozinho no sucesso, e sem toast a recepcao ficava sem
+   * confirmacao nenhuma -- a tela voltava ao normal, indistinguivel de um
+   * "Cancelar". Reportado pelo PI em 24/08/2026: "fiz alteracao no aluno e
+   * nao teve toast de sucesso".
+   *
+   * O estado de sucesso chega pelo `useActionState`, entao o teste renderiza
+   * o componente com a action ja mockada devolvendo sucesso.
+   */
+  it('avisa por toast quando o cadastro e salvo', async () => {
+    const { editarAluno } = await import('../../../actions/students');
+    vi.mocked(editarAluno).mockResolvedValue({ sucesso: { version: 4 } });
+
+    const usuario = userEvent.setup();
+
+    renderizar();
+    await abrir(usuario);
+    await usuario.click(screen.getByTestId('confirmar-edicao'));
+
+    expect(await screen.findByTestId(`sucesso-da-edicao-${PADRAO.studentId}`)).toHaveTextContent(
+      'Cadastro atualizado.',
+    );
+  });
+
+  /**
    * `version` viaja no corpo e e o controle otimista. Se ela nao for para o
    * formulario, o PATCH vai sem versao e a API recusa tudo.
    */

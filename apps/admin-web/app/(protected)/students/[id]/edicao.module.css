@@ -20,6 +20,14 @@
   */
   width: min(720px, calc(100vw - 48px));
   max-height: min(680px, calc(100vh - 64px));
+  /*
+    `margin: auto` É O QUE CENTRALIZA um `<dialog>` nativo -- sem ele o
+    navegador aplica o próprio padrão e o modal encosta no canto superior
+    esquerdo. Não é `position: fixed` mais `transform`: o dialog aberto por
+    `showModal()` já vive na top layer, e `auto` nos quatro lados resolve os
+    dois eixos de uma vez.
+  */
+  margin: auto;
   padding: 0;
   border: 1px solid var(--ah-border-default);
   border-radius: 10px;
@@ -38,11 +46,24 @@
   Sem isto, o botão "Salvar" desce com o conteúdo e some da vista justo no
   formulário mais longo -- que é quando ele mais importa.
 */
+/*
+  ALTURA ACOMPANHA O CONTEUDO, com teto -- e não altura fixa.
+
+  Com `height` fixo, a aba "Identificação" (cinco campos) abria um vão morto
+  de uns 200px até o rodapé, e o modal parecia quebrado. `1fr` no corpo
+  continua fazendo a rolagem cair no meio quando a aba é longa; o que muda é
+  que uma aba curta encolhe o modal em vez de esticar o vazio.
+*/
 .moldura {
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
-  max-height: inherit;
-  height: min(680px, calc(100vh - 64px));
+  /*
+    `minmax(0, auto)` no corpo: `auto` deixa a aba curta encolher o modal, e
+    o `0` de mínimo é o que permite ao filho com `overflow-y: auto` rolar de
+    verdade. Só `auto` faria a faixa crescer com o conteúdo e empurrar o
+    rodapé para fora da tela na aba de Endereço, que é a mais longa.
+  */
+  grid-template-rows: auto auto minmax(0, auto) auto;
+  max-height: min(680px, calc(100vh - 64px));
 }
 
 .cabecalho {

@@ -129,6 +129,20 @@ export function EditarCadastro({
   const dialogo = useRef<HTMLDialogElement>(null);
 
   useToastDeErro(estado.erro, 'error', `erro-da-edicao-${studentId}`);
+  /*
+   * SUCESSO TAMBEM AVISA. O modal fecha sozinho ao salvar, e sem o toast a
+   * recepcao ficava sem nenhuma confirmacao -- a tela simplesmente voltava
+   * ao normal, indistinguivel de um "Cancelar". Mesmo par do botao de
+   * liberar catraca: `error` para a falha, `info` para o feito.
+   *
+   * `info` e nao `success` porque o Toast do painel tem tres canais --
+   * info, warn, error (CLAUDE.md, Convencoes de codigo). Nao ha um quarto.
+   */
+  useToastDeErro(
+    estado.sucesso ? 'Cadastro atualizado.' : undefined,
+    'info',
+    `sucesso-da-edicao-${studentId}`,
+  );
 
   /*
    * `showModal()` é o que traz foco preso e backdrop -- o atributo `open` no

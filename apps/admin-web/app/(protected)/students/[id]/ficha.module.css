@@ -46,6 +46,20 @@
 }
 
 /**
+ * A linha de ação da identificação -- hoje só "Editar cadastro".
+ *
+ * Existe porque o botão estava esticando na largura inteira da página e
+ * lendo como barra, não como botão: ele mora solto no fluxo, e sem um
+ * contêiner que o encolha o `inline-flex` não tem contra o que se medir.
+ * `flex-start` prende o botão ao seu próprio tamanho.
+ */
+.acoesDaIdentificacao {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 4px;
+}
+
+/**
  * SEÇÃO — a unidade de leitura da ficha.
  *
  * Separador em vez de card: cinco cards empilhados numa tela de consulta
