@@ -10,6 +10,7 @@ import {
   PageHeader,
   ProblemDetail,
   StateBadge,
+  Telefone,
   TenantDateTime,
   stateLabel,
 } from '@arenahub/ui';
@@ -28,12 +29,31 @@ import {
 const FUSO_PROVISORIO = 'America/Sao_Paulo';
 import { AlterarSituacao } from './alterar-situacao';
 import { AtribuirPlano } from './atribuir-plano';
+import { EditarCadastro } from './editar-cadastro';
 
 export const metadata: Metadata = {
   title: 'Ficha do aluno — ArenaHub',
 };
 
 export const dynamic = 'force-dynamic';
+
+interface Contato {
+  type: string;
+  value: string;
+  isPrimary: boolean;
+  label: string | null;
+  relationship: string | null;
+}
+
+interface Endereco {
+  postalCode: string;
+  street: string;
+  number: string | null;
+  complement: string | null;
+  district: string | null;
+  city: string;
+  state: string;
+}
 
 interface Aluno {
   id: string;
@@ -44,6 +64,16 @@ interface Aluno {
   status: string;
   archivedAt: string | null;
   version: number;
+  /*
+    `rg`, `registeredSex`, `contacts` e `address` a API SEMPRE devolveu em
+    `GET /students/:id` -- o DTO chama-se "o cadastro inteiro, para a ficha e
+    para a edicao". Esta interface é que os ignorava, e por isso a ficha
+    mostrava quatro campos de um cadastro de vinte e dois.
+  */
+  rg: string | null;
+  registeredSex: string | null;
+  contacts: Contato[];
+  address: Endereco | null;
 }
 
 interface Janela {
@@ -199,6 +229,20 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
   const bloqueado = impedeAcesso(aluno.status);
 
   /*
+   * Contato principal para a FICHA mostrar -- o telefone marcado como
+   * primario, ou o primeiro que existir. `contacts` pode vir indefinido em
+   * resposta antiga de cache, e `?? []` evita que a ficha inteira quebre por
+   * causa de um campo de apoio.
+   */
+  const contatos = aluno.contacts ?? [];
+  const telefonePrincipal =
+    contatos.find((contato) => contato.type === 'PHONE' && contato.isPrimary)?.value ??
+    contatos.find((contato) => contato.type === 'PHONE')?.value ??
+    contatos.find((contato) => contato.type === 'WHATSAPP')?.value ??
+    null;
+  const email = contatos.find((contato) => contato.type === 'EMAIL')?.value ?? null;
+
+  /*
    * F53 Task 12 -- a invoice em aberto/vencida MAIS ANTIGA e o fuso da
    * unidade, no mesmo criterio de `students/[id]/billing/page.tsx`: sem
    * fatura aberta, ou sem a consulta ter respondido, nao ha nada a avisar
@@ -253,7 +297,39 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
         <dd data-testid="situacao-do-aluno">
           <StateBadge machine="student" state={aluno.status} />
         </dd>
+
+        {/*
+          CONTATO na ficha, e nao so na edicao: a recepcao liga para o aluno a
+          partir daqui. O telefone vivia so no formulario de cadastro e na
+          lista -- quem abria a ficha para resolver a excecao tinha que voltar
+          para a listagem para achar o numero.
+        */}
+        <dt>Telefone</dt>
+        {/* O proprio `Telefone` renderiza `Ausente` quando o numero e nulo. */}
+        <dd data-testid="telefone-do-aluno">
+          <Telefone numero={telefonePrincipal} testId="telefone-principal" />
+        </dd>
+
+        <dt>E-mail</dt>
+        <dd data-testid="email-do-aluno">{email ? email : <Ausente />}</dd>
       </dl>
+
+      {/*
+        EDICAO fechada por padrao, ao lado dos dados que ela edita.
+        Ver `EditarCadastro`: a ficha e tela de consulta, e dezoito campos
+        abertos empurrariam "Acesso agora" para baixo da dobra em 1280px.
+      */}
+      <EditarCadastro
+        studentId={aluno.id}
+        version={aluno.version}
+        fullName={aluno.fullName}
+        birthDate={aluno.birthDate}
+        cpf={aluno.cpf}
+        rg={aluno.rg}
+        registeredSex={aluno.registeredSex}
+        contacts={aluno.contacts ?? []}
+        address={aluno.address}
+      />
 
       {/*
         FAIXA DE VENCIMENTO -- F53 Task 12, spec SPEC-053 §3.4.

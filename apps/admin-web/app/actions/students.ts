@@ -73,6 +73,47 @@ const esquemaDeSituacao = z.object({
   version: z.coerce.number().int().min(0),
 });
 
+/**
+ * Edição de dado cadastral — a metade que faltava da F45.
+ *
+ * A API tem `PATCH /students/:id` desde aquela fatia, com trava otimista,
+ * timeline e auditoria. O que nunca existiu foi quem a chamasse: o lápis da
+ * lista aponta para a ficha, que só LÊ. Cada erro de digitação virava
+ * cadastro descartado — exatamente o que o comentário do controller diz
+ * querer evitar.
+ *
+ * Espelha `esquemaDeCadastro` nos campos que a ficha edita, com uma
+ * diferença que vem do contrato da API, não de gosto: `cpf` é obrigatório na
+ * EDIÇÃO como é na criação (ADR-043 Decisão 3), e a API recusa `null` nesse
+ * campo em vez de aceitá-lo como "apagar".
+ */
+const esquemaDeEdicao = z.object({
+  studentId: z.string().uuid(),
+  version: z.coerce.number().int().min(0),
+  fullName: z
+    .string()
+    .trim()
+    .min(2, 'Informe o nome completo do aluno')
+    .max(160, 'Nome longo demais'),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe a data de nascimento'),
+  cpf: z.string().trim().min(1, 'Informe o CPF do aluno'),
+  rg: z.string().trim().max(40, 'RG longo demais').optional(),
+  registeredSex: z.enum(['FEMALE', 'MALE', 'NOT_INFORMED']).optional(),
+  telefone: z.string().trim().max(160).optional(),
+  whatsapp: z.string().trim().max(160).optional(),
+  email: z.string().trim().max(160).optional(),
+  cep: z.string().trim().optional(),
+  logradouro: z.string().trim().max(200).optional(),
+  numero: z.string().trim().max(20).optional(),
+  complemento: z.string().trim().max(120).optional(),
+  bairro: z.string().trim().max(120).optional(),
+  cidade: z.string().trim().max(120).optional(),
+  uf: z.string().trim().optional(),
+  emergenciaNome: z.string().trim().max(160).optional(),
+  emergenciaParentesco: z.string().trim().max(80).optional(),
+  emergenciaTelefone: z.string().trim().max(160).optional(),
+});
+
 export interface EstadoDoCadastro {
   erro?: string;
   sucesso?: {
@@ -109,6 +150,21 @@ export interface EstadoDaSituacao {
      */
     version: number;
   };
+}
+
+export interface EstadoDaEdicao {
+  erro?: string;
+  /** Versão nova, pela mesma razão de `EstadoDaSituacao.sucesso.version`. */
+  sucesso?: { version: number };
+  /**
+   * O que a recepção digitou, devolvido em erro.
+   *
+   * A ficha edita dezoito campos; perder o preenchimento por um CPF inválido
+   * é a recepção redigitando endereço inteiro com o aluno esperando. É a
+   * mesma razão de `EstadoDoCadastro.valores`, e a regra de acessibilidade
+   * do painel diz o mesmo: formulário nunca limpa dado em erro recuperável.
+   */
+  valores?: Record<string, string>;
 }
 
 /**
@@ -179,6 +235,31 @@ const CAMPOS_DO_CADASTRO = [
 
 type DadosDoCadastro = z.infer<typeof esquemaDeCadastro>;
 
+/**
+ * O que `montarContatos` e `montarEndereco` realmente leem.
+ *
+ * Tipado pelos CAMPOS e não por `DadosDoCadastro` inteiro porque a edição
+ * manda os mesmos contatos e o mesmo endereço sem mandar `gymUnitId`,
+ * `status` nem `leadSource`. Exigir o objeto de cadastro completo forçaria
+ * uma segunda cópia das duas funções — e duas cópias divergem na primeira
+ * correção, que é como o telefone de emergência viraria primário num dos
+ * lados e não no outro.
+ */
+type CamposDeContato = Pick<
+  DadosDoCadastro,
+  | 'telefone'
+  | 'whatsapp'
+  | 'email'
+  | 'emergenciaNome'
+  | 'emergenciaParentesco'
+  | 'emergenciaTelefone'
+>;
+
+type CamposDeEndereco = Pick<
+  DadosDoCadastro,
+  'cep' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf'
+>;
+
 interface ContatoDaApi {
   type: 'EMAIL' | 'PHONE' | 'WHATSAPP' | 'EMERGENCY';
   value: string;
@@ -194,7 +275,7 @@ interface ContatoDaApi {
  * pessoa e por isso nunca é primário: marcá-lo faria a academia ligar para a
  * mãe do aluno achando que ligava para ele.
  */
-function montarContatos(dados: DadosDoCadastro): ContatoDaApi[] {
+function montarContatos(dados: CamposDeContato): ContatoDaApi[] {
   const contatos: ContatoDaApi[] = [];
 
   if (dados.telefone) {
@@ -230,7 +311,7 @@ function montarContatos(dados: DadosDoCadastro): ContatoDaApi[] {
  * que diria "CEP inválido" para quem simplesmente não preencheu endereço
  * nenhum.
  */
-function montarEndereco(dados: DadosDoCadastro):
+function montarEndereco(dados: CamposDeEndereco):
   | {
       postalCode: string;
       street: string;
@@ -365,6 +446,106 @@ export async function alterarSituacao(
   return {
     sucesso: { status: resposta.dados.status, version: resposta.dados.version },
   };
+}
+
+/** Campos do formulário de edição, na ordem em que a ficha os mostra. */
+const CAMPOS_DA_EDICAO = [
+  'fullName',
+  'birthDate',
+  'cpf',
+  'rg',
+  'registeredSex',
+  'telefone',
+  'whatsapp',
+  'email',
+  'cep',
+  'logradouro',
+  'numero',
+  'complemento',
+  'bairro',
+  'cidade',
+  'uf',
+  'emergenciaNome',
+  'emergenciaParentesco',
+  'emergenciaTelefone',
+] as const;
+
+/**
+ * Edita o cadastro do aluno.
+ *
+ * DOIS PONTOS DO CONTRATO DA API que mudam como o corpo é montado, e que não
+ * são escolha desta função:
+ *
+ * 1. `contacts` SUBSTITUI a lista inteira, não faz merge. Por isso o
+ *    formulário carrega os quatro contatos preenchidos e reenvia todos —
+ *    mandar só o telefone alterado APAGARIA e-mail e emergência. O mesmo
+ *    vale para `address`.
+ *
+ * 2. O schema da API é `.strict()`: campo desconhecido no corpo derruba a
+ *    requisição inteira com `VALIDATION_FAILED`. Daí `CAMPOS_DA_EDICAO` ser
+ *    uma lista fechada, e não um `for` sobre o FormData.
+ *
+ * `version` volta na resposta e o formulário se remonta com ela — sem isso a
+ * segunda correção seguida falharia com `STUDENT_VERSION_CONFLICT` sem que
+ * ninguém mais tivesse tocado no aluno.
+ */
+export async function editarAluno(
+  _anterior: EstadoDaEdicao,
+  formulario: FormData,
+): Promise<EstadoDaEdicao> {
+  const valores = Object.fromEntries(
+    CAMPOS_DA_EDICAO.map((campo) => [campo, texto(formulario, campo)]),
+  );
+
+  const studentId = texto(formulario, 'studentId');
+
+  const validado = esquemaDeEdicao.safeParse({
+    studentId,
+    version: texto(formulario, 'version'),
+    ...valores,
+  });
+
+  if (!validado.success) {
+    const problema = validado.error.issues[0];
+
+    return {
+      erro: problema?.message ?? 'Confira os dados informados.',
+      valores,
+    };
+  }
+
+  const dados = validado.data;
+  const endereco = montarEndereco(dados);
+
+  const resposta = await chamarApi<{ version: number }>(`/api/v1/students/${studentId}`, {
+    metodo: 'PATCH',
+    corpo: {
+      version: dados.version,
+      fullName: dados.fullName,
+      birthDate: dados.birthDate,
+      cpf: dados.cpf,
+      // `null` APAGA o campo na API; ausente seria "não mexer". Aqui o
+      // formulário mostra todos os campos, então um campo esvaziado é uma
+      // decisão da recepção de apagar aquele dado -- e precisa chegar como
+      // `null`, não sumir do corpo.
+      rg: dados.rg ? dados.rg : null,
+      registeredSex: dados.registeredSex ?? null,
+      contacts: montarContatos(dados),
+      address: endereco ?? null,
+    },
+  });
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro: frase(resposta.erro?.code ?? '', 'Não foi possível salvar o cadastro'),
+      valores,
+    };
+  }
+
+  revalidatePath(`/students/${studentId}`);
+  revalidatePath('/students');
+
+  return { sucesso: { version: resposta.dados.version } };
 }
 
 /**
