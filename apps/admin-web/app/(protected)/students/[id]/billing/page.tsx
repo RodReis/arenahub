@@ -13,6 +13,8 @@ import {
 
 import { chamarApi } from '../../../../../lib/api/server-client';
 import { PainelDeCobranca } from './painel-de-cobranca';
+import type { DadoFaltante } from './seletor-de-forma';
+import { SituacaoAtual } from './situacao-atual';
 
 export const metadata: Metadata = {
   title: 'Financeiro do aluno — ArenaHub',
@@ -54,12 +56,43 @@ interface Entitlement {
 interface Aluno {
   id: string;
   fullName: string;
+  /** Anulavel: 308 alunos do Pacto nao tem (ADR-034). */
+  cpf: string | null;
+  address: { postalCode: string } | null;
 }
 
 /** Resposta de `GET /students/:id/invoices` -- fuso da unidade do aluno (INV-144, ADR-019). F53. */
 interface InvoicesDoAluno {
   timezone: string;
   invoices: Invoice[];
+}
+
+/**
+ * O que falta no cadastro para pagar com CARTAO. F53, Task 10.
+ *
+ * REIMPLEMENTAR NAO -- espelha `faltaParaCartao` de
+ * `apps/api/src/modules/billing/domain/dados-de-cobranca.ts`, que e quem
+ * BLOQUEIA de verdade (o caso de uso do checkout recusa com 422
+ * `STUDENT_BILLING_DATA_INCOMPLETE` se o cadastro estiver incompleto,
+ * independente do que esta tela mostrar). Nao ha pacote compartilhado entre
+ * `apps/api` e `apps/admin-web` para importar a funcao original -- esta copia
+ * so decide COMO EXIBIR o aviso antes do clique; nunca decide se o pagamento
+ * e aceito.
+ */
+function faltandoParaCartao(aluno: Aluno | undefined): readonly DadoFaltante[] {
+  if (!aluno) return [];
+
+  const faltando: DadoFaltante[] = [];
+
+  if (aluno.cpf === null || aluno.cpf.trim() === '') {
+    faltando.push('CPF');
+  }
+
+  if (aluno.address === null) {
+    faltando.push('ENDERECO');
+  }
+
+  return faltando;
 }
 
 /**
@@ -142,12 +175,25 @@ export default async function PaginaFinanceiroDoAluno({
       (direito) => direito.status === 'ACTIVE' && direito.subscriptionId !== null,
     )?.subscriptionId ?? null;
 
+  /*
+   * A invoice em aberto/vencida MAIS ANTIGA -- e a que a recepcao precisa
+   * resolver agora. `dueAt` ja vem ordenado do backend (mais recente
+   * primeiro, ver `listarDoAluno`), entao a mais antiga em aberto e a
+   * ULTIMA da lista filtrada.
+   */
+  const invoicesEmAberto = invoices.filter(
+    (invoice) => invoice.status === 'OPEN' || invoice.status === 'OVERDUE',
+  );
+  const invoiceEmDestaque = invoicesEmAberto[invoicesEmAberto.length - 1] ?? null;
+
   return (
     <section aria-labelledby="titulo-financeiro">
       <PageHeader
         id="titulo-financeiro"
         title={aluno ? `Financeiro — ${aluno.fullName}` : 'Financeiro'}
       />
+
+      <SituacaoAtual invoice={invoiceEmDestaque} timezone={timezoneDaUnidade} agora={new Date()} />
 
       <DataTable
         testId="tabela-de-cobrancas"
@@ -248,15 +294,15 @@ export default async function PaginaFinanceiroDoAluno({
       />
 
       <PainelDeCobranca
+        studentId={id}
         subscriptionId={assinaturaAtiva}
-        invoicesEmAberto={invoices
-          .filter((invoice) => invoice.status === 'OPEN' || invoice.status === 'OVERDUE')
-          .map((invoice) => ({
-            id: invoice.id,
-            number: invoice.number,
-            totalMinor: invoice.totalMinor,
-            currency: invoice.currency,
-          }))}
+        faltandoParaCartao={faltandoParaCartao(aluno)}
+        invoicesEmAberto={invoicesEmAberto.map((invoice) => ({
+          id: invoice.id,
+          number: invoice.number,
+          totalMinor: invoice.totalMinor,
+          currency: invoice.currency,
+        }))}
       />
     </section>
   );

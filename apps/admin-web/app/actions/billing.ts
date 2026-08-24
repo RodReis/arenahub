@@ -76,6 +76,113 @@ interface InvoiceRetornada {
   payments: { amountMinor: number }[];
 }
 
+/**
+ * Saida comum de PIX e cartao -- o que a Task 11 (`CobrancaPorQr`) consome
+ * para desenhar QR, copia-e-cola e link de checkout.
+ */
+export interface EstadoDaCobrancaPorQr {
+  erro?: string;
+  sucesso?: {
+    paymentAttemptId: string;
+    qrCodeDataUri: string | null;
+    copiaECola: string | null;
+    checkoutUrl: string | null;
+    expiresAt: string;
+    amountMinor: number;
+    currency: string;
+  };
+}
+
+interface CobrancaPixRetornada {
+  paymentAttemptId: string;
+  externalPaymentId: string;
+  copiaECola: string;
+  qrCodeDataUri: string;
+  expiresAt: string;
+  amountMinor: number;
+  currency: string;
+}
+
+/**
+ * Gera a cobranca PIX da invoice -- Task 10/11, F53.
+ *
+ * NAO CONFIRMA PAGAMENTO: devolve QR e copia-e-cola. A tela da Task 11
+ * consulta `payment-attempts/:id` (leitura barata) ate a invoice ficar paga.
+ */
+export async function iniciarCobrancaPix(invoiceId: string): Promise<EstadoDaCobrancaPorQr> {
+  const resposta = await chamarApi<CobrancaPixRetornada>(
+    `/api/v1/invoices/${invoiceId}/payments/pix`,
+    { metodo: 'POST' },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: mensagemDe(resposta.erro?.code, 'Não foi possível gerar o PIX.') };
+  }
+
+  return {
+    sucesso: {
+      paymentAttemptId: resposta.dados.paymentAttemptId,
+      qrCodeDataUri: resposta.dados.qrCodeDataUri,
+      copiaECola: resposta.dados.copiaECola,
+      checkoutUrl: null,
+      expiresAt: resposta.dados.expiresAt,
+      amountMinor: resposta.dados.amountMinor,
+      currency: resposta.dados.currency,
+    },
+  };
+}
+
+interface CheckoutDeCartaoRetornado {
+  paymentAttemptId: string;
+  externalPaymentId: string;
+  checkoutUrl: string;
+  qrCodeDataUri: string;
+  expiresAt: string;
+  amountMinor: number;
+  currency: string;
+}
+
+/**
+ * Gera o checkout hospedado de cartao da invoice -- Task 10/11, F53.
+ *
+ * O cartao vai do celular do aluno direto para o provedor (INV-098,
+ * ADR-032): esta tela nunca ve numero de cartao.
+ *
+ * ⚠️ BLOQUEIO CONHECIDO: o caso de uso `CriarCheckoutDeCartaoUseCase`
+ * (Task 4) existe, mas nao ha rota HTTP exposta para ele em
+ * `billing.controller.ts` -- a Task 4, como escrita no plano, criou so o
+ * caso de uso e o registro em `billing.module.ts`, sem controller. Chamar
+ * esta action hoje devolve 404 ate essa rota (`POST
+ * /api/v1/invoices/:id/payments/card-checkout`, nome espelhando o PIX) ser
+ * criada. Documentado no relatorio da Task 10 -- decisao tecnica registrada,
+ * nao workaround silencioso: adicionar controller esta fora do escopo desta
+ * task (arquivos de `apps/api` nao listados no brief).
+ */
+export async function iniciarCheckoutDeCartao(
+  invoiceId: string,
+): Promise<EstadoDaCobrancaPorQr> {
+  const resposta = await chamarApi<CheckoutDeCartaoRetornado>(
+    `/api/v1/invoices/${invoiceId}/payments/card-checkout`,
+    { metodo: 'POST' },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: mensagemDe(resposta.erro?.code, 'Não foi possível gerar o checkout do cartão.') };
+  }
+
+  return {
+    sucesso: {
+      paymentAttemptId: resposta.dados.paymentAttemptId,
+      qrCodeDataUri: resposta.dados.qrCodeDataUri,
+      copiaECola: null,
+      checkoutUrl: resposta.dados.checkoutUrl,
+      expiresAt: resposta.dados.expiresAt,
+      amountMinor: resposta.dados.amountMinor,
+      currency: resposta.dados.currency,
+    },
+  };
+}
+
 export async function abrirCobranca(
   _anterior: EstadoDaInvoice,
   formulario: FormData,

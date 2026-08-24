@@ -7,10 +7,14 @@ import { EmptyState, Field, Money, SensitiveAction, useToast, useToastDeErro } f
 
 import {
   abrirCobranca,
+  iniciarCheckoutDeCartao,
+  iniciarCobrancaPix,
   registrarPagamentoNoBalcao,
+  type EstadoDaCobrancaPorQr,
   type EstadoDaInvoice,
   type EstadoDoPagamento,
 } from '../../../../actions/billing';
+import { SeletorDeForma, type DadoFaltante, type FormaDePagamento } from './seletor-de-forma';
 
 interface InvoiceEmAberto {
   id: string;
@@ -20,8 +24,10 @@ interface InvoiceEmAberto {
 }
 
 interface Props {
+  readonly studentId: string;
   readonly subscriptionId: string | null;
   readonly invoicesEmAberto: readonly InvoiceEmAberto[];
+  readonly faltandoParaCartao: readonly DadoFaltante[];
 }
 
 const ESTADO_DA_INVOICE: EstadoDaInvoice = {};
@@ -38,20 +44,30 @@ function BotaoDeGerar() {
 }
 
 /**
- * Cobrança e recebimento no balcão — F12, Slice 2.1.
+ * Cobrança e recebimento no balcão — F12, Slice 2.1. Forma de pagamento
+ * antes do valor — F53, Task 10.
  *
- * Duas ações, deliberadamente separadas:
+ * A CENA REAL: a recepcionista tem a pessoa no balcão escolhendo como paga.
+ * Por isso o `SeletorDeForma` vem primeiro por cobrança em aberto, e só
+ * depois de escolhido é que o caminho específico aparece:
  *
- *   1. GERAR a cobrança do mês — idempotente no servidor (INV-066), então
- *      clique duplo não cobra duas vezes. Por isso o botão não precisa de
- *      confirmação: repetir é seguro.
- *   2. RECEBER dinheiro no balcão — passa por `SensitiveAction`, com motivo
- *      obrigatório. Não porque possa duplicar, mas porque reconhecer dinheiro
- *      sem provedor é o ato que a auditoria vai ler depois. Com a dupla
- *      permissão fora do MVP 2 (ADR-027), o motivo é parte do único controle
- *      que restou.
+ *   1. DINHEIRO — entra no fluxo que já existia (INTOCADO): valor →
+ *      `SensitiveAction` com motivo obrigatório. Não porque possa duplicar,
+ *      mas porque reconhecer dinheiro sem provedor é o ato que a auditoria
+ *      vai ler depois. Com a dupla permissão fora do MVP 2 (ADR-027), o
+ *      motivo é parte do único controle que restou.
+ *   2. PIX / CARTÃO — chamam as novas Server Actions e entregam QR/link ao
+ *      componente da Task 11 (`CobrancaPorQr`, ainda não criado nesta task).
+ *
+ * GERAR a cobrança do mês continua separada, idempotente no servidor
+ * (INV-066): clique duplo não cobra duas vezes, por isso sem confirmação.
  */
-export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
+export function PainelDeCobranca({
+  studentId,
+  subscriptionId,
+  invoicesEmAberto,
+  faltandoParaCartao,
+}: Props) {
   const [estadoDaInvoice, gerar] = useActionState(abrirCobranca, ESTADO_DA_INVOICE);
   const [estadoDoPagamento, receber] = useActionState(
     registrarPagamentoNoBalcao,
@@ -62,11 +78,14 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
   const idDoValor = useId();
   const { show } = useToast();
 
-  // Os dois erros da tela viram toast -- CLAUDE.md: "sempre usar Toast para:
-  // Info, Warn e error". Gerar cobranca e receber pagamento sao acoes
-  // distintas, e cada uma anuncia a propria falha.
+  const [cobrancaPorQr, setCobrancaPorQr] = useState<EstadoDaCobrancaPorQr | null>(null);
+  const [gerandoQr, setGerandoQr] = useState(false);
+
+  // Os erros da tela viram toast -- CLAUDE.md: "sempre usar Toast para:
+  // Info, Warn e error". Cada acao anuncia a propria falha.
   useToastDeErro(estadoDaInvoice.erro, 'error', 'erro-ao-gerar');
   useToastDeErro(estadoDoPagamento.erro, 'error', 'erro-ao-receber');
+  useToastDeErro(cobrancaPorQr?.erro, 'error', 'erro-ao-gerar-qr');
 
   const confirmarRecebimento = (motivo: string): void => {
     if (!cobrando) return;
@@ -79,6 +98,31 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
     receber(dados);
     setCobrando(null);
     setValor('');
+  };
+
+  const escolherForma = (invoice: InvoiceEmAberto, forma: FormaDePagamento): void => {
+    setCobrancaPorQr(null);
+
+    if (forma === 'DINHEIRO') {
+      setCobrando(invoice);
+      /*
+       * Pré-preenche com o valor integral: é o caso comum, e pagamento
+       * parcial é recusado pelo servidor de qualquer forma (ADR-027,
+       * resposta 1). Digitar do zero só criaria chance de errar centavo.
+       */
+      setValor((invoice.totalMinor / 100).toFixed(2).replace('.', ','));
+      return;
+    }
+
+    setCobrando(null);
+    setGerandoQr(true);
+
+    const gerar = forma === 'PIX' ? iniciarCobrancaPix : iniciarCheckoutDeCartao;
+
+    void gerar(invoice.id).then((resultado) => {
+      setGerandoQr(false);
+      setCobrancaPorQr(resultado);
+    });
   };
 
   return (
@@ -124,25 +168,46 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
               <li key={invoice.id}>
                 Cobrança nº {invoice.number} —{' '}
                 <Money cents={invoice.totalMinor} currency={invoice.currency} />
-                <button
-                  type="button"
-                  data-testid={`receber-${invoice.id}`}
-                  onClick={() => {
-                    setCobrando(invoice);
-                    /*
-                     * Pré-preenche com o valor integral: é o caso comum, e
-                     * pagamento parcial é recusado pelo servidor de qualquer
-                     * forma (ADR-027, resposta 1). Digitar do zero só criaria
-                     * chance de errar centavo.
-                     */
-                    setValor((invoice.totalMinor / 100).toFixed(2).replace('.', ','));
-                  }}
-                >
-                  Registrar recebimento
-                </button>
+                <SeletorDeForma
+                  studentId={studentId}
+                  faltandoParaCartao={faltandoParaCartao}
+                  onEscolher={(forma) => escolherForma(invoice, forma)}
+                />
               </li>
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {gerandoQr ? (
+        <p role="status" data-testid="gerando-qr">
+          Gerando cobrança…
+        </p>
+      ) : null}
+
+      {/*
+        Handoff para a Task 11 (`CobrancaPorQr`): QR, copia-e-cola,
+        checkoutUrl e polling controlado ainda nao existem nesta task -- o
+        que ha aqui e o resultado cru da Server Action, para a proxima task
+        substituir por aquele componente sem mexer neste arquivo de novo.
+      */}
+      {cobrancaPorQr?.sucesso ? (
+        <section aria-labelledby="titulo-cobranca-por-qr" data-testid="cobranca-por-qr-pendente">
+          <h3 id="titulo-cobranca-por-qr">Aguardando pagamento</h3>
+          <Money
+            cents={cobrancaPorQr.sucesso.amountMinor}
+            currency={cobrancaPorQr.sucesso.currency}
+          />
+          {cobrancaPorQr.sucesso.checkoutUrl ? (
+            <p>
+              <a href={cobrancaPorQr.sucesso.checkoutUrl} target="_blank" rel="noopener noreferrer">
+                Abrir checkout do cartão
+              </a>
+            </p>
+          ) : null}
+          {cobrancaPorQr.sucesso.copiaECola ? (
+            <p data-testid="pix-copia-e-cola">{cobrancaPorQr.sucesso.copiaECola}</p>
+          ) : null}
         </section>
       ) : null}
 
