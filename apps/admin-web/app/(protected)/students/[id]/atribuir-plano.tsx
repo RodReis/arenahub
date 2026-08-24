@@ -15,11 +15,29 @@ interface Plano {
   isActive: boolean;
 }
 
+/**
+ * A assinatura vigente do aluno, quando existe.
+ *
+ * `version` é o que torna a TROCA possível: `POST /subscriptions/:id/actions`
+ * exige a versão para cancelar, e sem ela o painel só sabia criar — nunca
+ * substituir.
+ */
+export interface AssinaturaVigente {
+  subscriptionId: string;
+  version: number;
+  planName: string | null;
+}
+
 interface Props {
   studentId: string;
   planos: Plano[];
   /** `true` quando a situação do aluno impede o acesso (INV-033). */
   impedido: boolean;
+  /**
+   * Assinatura a substituir. Ausente = o aluno não tem plano, e o formulário
+   * é o de atribuição de sempre.
+   */
+  vigente?: AssinaturaVigente | undefined;
 }
 
 const ESTADO_INICIAL: EstadoDaAssinatura = {};
@@ -33,12 +51,14 @@ const ESTADO_INICIAL: EstadoDaAssinatura = {};
  * mesmo aluno. Quando o `Idempotency-Key` transversal chegar (INV-087), a
  * garantia passa para o servidor, onde deveria estar.
  */
-function BotaoDeAtribuicao() {
+function BotaoDeAtribuicao({ troca }: { troca: boolean }) {
   const { pending } = useFormStatus();
+
+  const rotulo = troca ? 'Alterar plano' : 'Atribuir plano';
 
   return (
     <Button type="submit" disabled={pending} data-testid="confirmar-atribuicao">
-      {pending ? 'Atribuindo…' : 'Atribuir plano'}
+      {pending ? (troca ? 'Alterando…' : 'Atribuindo…') : rotulo}
     </Button>
   );
 }
@@ -50,7 +70,7 @@ function BotaoDeAtribuicao() {
  * humana registrada, e não de um pagamento. No MVP 2 a mesma cadeia passa a
  * ser alimentada por invoice — mas a catraca continua lendo só o entitlement.
  */
-export function AtribuirPlano({ studentId, planos, impedido }: Props) {
+export function AtribuirPlano({ studentId, planos, impedido, vigente }: Props) {
   const [estado, acao] = useActionState(atribuirPlano, ESTADO_INICIAL);
   // Erro vira TOAST -- CLAUDE.md: "sempre usar Toast para: Info, Warn e
   // error". O toast ja carrega `role="alert"`, entao o anuncio ao leitor de
@@ -69,12 +89,15 @@ export function AtribuirPlano({ studentId, planos, impedido }: Props) {
     );
   }
 
+  const troca = vigente !== undefined;
+
   if (estado.sucesso) {
     return (
       <div role="status" data-testid="plano-atribuido">
         <p>
-          Plano atribuído. O direito de acesso foi criado e já vale a partir do início da
-          vigência.
+          {troca
+            ? 'Plano alterado. O plano anterior foi encerrado e o novo direito de acesso já vale a partir do início da vigência.'
+            : 'Plano atribuído. O direito de acesso foi criado e já vale a partir do início da vigência.'}
         </p>
         <p>
           <a href={`/students/${studentId}`}>Atualizar a ficha</a>
@@ -98,7 +121,31 @@ export function AtribuirPlano({ studentId, planos, impedido }: Props) {
         </p>
       ) : null}
 
+      {/*
+        TROCA: a recepção precisa saber que o plano atual TERMINA, e não que
+        um segundo se soma ao primeiro. Sem esta frase, "alterar plano" e
+        "adicionar plano" são a mesma tela para quem opera.
+      */}
+      {troca ? (
+        <p role="note" className={estilos['nota']} data-testid="aviso-de-troca">
+          O plano{vigente.planName ? ` ${vigente.planName}` : ''} será encerrado e o direito de
+          acesso dele, revogado. O acesso passa a valer pelo plano novo.
+        </p>
+      ) : null}
+
       <input type="hidden" name="studentId" value={studentId} />
+
+      {/*
+        Id e versão da assinatura a cancelar. Vão JUNTOS -- a Server Action
+        recusa um sem o outro, porque cancelar sem versão não é possível e
+        seguir sem cancelar deixaria dois planos ativos.
+      */}
+      {troca ? (
+        <>
+          <input type="hidden" name="substituiSubscriptionId" value={vigente.subscriptionId} />
+          <input type="hidden" name="substituiVersion" value={vigente.version} />
+        </>
+      ) : null}
 
       <SelectField
         id="plano"
@@ -150,7 +197,7 @@ export function AtribuirPlano({ studentId, planos, impedido }: Props) {
         hint="Registrado na auditoria. Ex.: “matrícula presencial, pagamento em dinheiro, recibo 481”."
       />
 
-      <BotaoDeAtribuicao />
+      <BotaoDeAtribuicao troca={troca} />
     </form>
   );
 }

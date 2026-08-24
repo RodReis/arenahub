@@ -737,7 +737,7 @@ export class MembershipRepository {
   ): Promise<EntitlementComJanelas[]> {
     return this.db.entitlement.findMany({
       where: { tenantId: contexto.tenantId, studentId },
-      include: { unitWindows: true },
+      include: { unitWindows: true, subscription: { select: { version: true } } },
       orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
     });
   }
@@ -785,8 +785,17 @@ export type PlanoComRegras = Prisma.PlanGetPayload<{
   include: { units: true; accessWindows: true; prices: true };
 }>;
 
+/**
+ * `subscription` entra com UM campo so: a versao.
+ *
+ * Ela e o que `POST /subscriptions/:id/actions` exige para cancelar, e sem
+ * ela a ficha tinha o `subscriptionId` sem poder usa-lo -- "trocar de plano"
+ * virava atribuir um segundo por cima do primeiro. `select` em vez de
+ * `include` porque o resto da assinatura nao e assunto do entitlement, e
+ * carregar o registro inteiro so aumentaria a resposta.
+ */
 export type EntitlementComJanelas = Prisma.EntitlementGetPayload<{
-  include: { unitWindows: true };
+  include: { unitWindows: true; subscription: { select: { version: true } } };
 }>;
 
 export type EventoDeTimeline = Prisma.StudentTimelineEventGetPayload<object>;

@@ -104,6 +104,20 @@ interface EntitlementDto {
   endsAt: string;
   reason: string | null;
   subscriptionId: string | null;
+  /**
+   * Versao da assinatura de origem, para a tela poder CANCELAR sem uma
+   * segunda viagem.
+   *
+   * `POST /subscriptions/:id/actions` exige `version` -- e sem este campo a
+   * ficha tinha o `subscriptionId` e nao tinha como usa-lo. O resultado
+   * pratico era que "trocar de plano" no painel virava atribuir um segundo
+   * plano por cima: as duas assinaturas ficavam ACTIVE, os dois entitlements
+   * tambem, e a catraca seguia honrando o antigo pela uniao das janelas.
+   *
+   * `null` para entitlement de CORTESIA, que nao nasce de assinatura nenhuma
+   * -- o mesmo caso em que `subscriptionId` ja e nulo.
+   */
+  subscriptionVersion: number | null;
   janelas: { gymUnitId: string; dayOfWeek: number; startMinute: number; endMinute: number }[];
 }
 
@@ -391,6 +405,9 @@ export class MembershipController {
       endsAt: entitlement.endsAt.toISOString(),
       reason: entitlement.reason,
       subscriptionId: entitlement.subscriptionId,
+      // Cortesia nao nasce de assinatura: `subscription` e nulo junto com
+      // `subscriptionId`, e nao ha versao a devolver.
+      subscriptionVersion: entitlement.subscription?.version ?? null,
       janelas: entitlement.unitWindows.map((j) => ({
         gymUnitId: j.gymUnitId,
         dayOfWeek: j.dayOfWeek,

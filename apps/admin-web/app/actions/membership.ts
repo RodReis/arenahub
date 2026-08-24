@@ -38,6 +38,16 @@ const esquemaDeAssinatura = z.object({
     .trim()
     .min(3, 'Descreva o motivo — a auditoria depende disso')
     .max(300, 'Motivo longo demais'),
+  /**
+   * Assinatura vigente a SUBSTITUIR, quando existe.
+   *
+   * Presentes juntos ou ausentes juntos: cancelar exige id e versão, e ter
+   * um sem o outro é sempre erro de montagem da tela, nunca entrada da
+   * recepção. Ausentes = o aluno não tem plano, e isto é uma atribuição
+   * comum.
+   */
+  substituiSubscriptionId: z.string().uuid().optional(),
+  substituiVersion: z.coerce.number().int().min(0).optional(),
 });
 
 export interface EstadoDoPlano {
@@ -287,12 +297,17 @@ export async function atribuirPlano(
   _anterior: EstadoDaAssinatura,
   formulario: FormData,
 ): Promise<EstadoDaAssinatura> {
+  const substituiId = texto(formulario, 'substituiSubscriptionId');
+  const substituiVersao = texto(formulario, 'substituiVersion');
+
   const bruto = {
     studentId: texto(formulario, 'studentId'),
     planId: texto(formulario, 'planId'),
     startsAt: texto(formulario, 'startsAt'),
     endsAt: texto(formulario, 'endsAt'),
     reason: texto(formulario, 'reason'),
+    ...(substituiId ? { substituiSubscriptionId: substituiId } : {}),
+    ...(substituiVersao ? { substituiVersion: substituiVersao } : {}),
   };
 
   const valores = {
@@ -320,6 +335,55 @@ export async function atribuirPlano(
 
   if (new Date(fim).getTime() <= new Date(inicio).getTime()) {
     return { erro: 'O fim da vigência precisa ser depois do início.', valores };
+  }
+
+  /*
+   * TROCA DE PLANO: cancela a anterior ANTES de criar a nova.
+   *
+   * `POST /subscriptions` não substitui nada — cria. Atribuir um segundo
+   * plano sem cancelar o primeiro deixa DUAS assinaturas e DOIS entitlements
+   * ativos, e a catraca segue honrando o antigo pela união das janelas: a
+   * tela mostra o plano novo (a lista lê a assinatura mais recente) enquanto
+   * o acesso continua valendo pelo velho. Bug silencioso, no caminho da
+   * catraca.
+   *
+   * A ORDEM não é indiferente. Cancelar depois de criar deixaria os dois
+   * ativos se o cancelamento falhasse — exatamente o estado que este código
+   * existe para impedir. Cancelando antes, a falha inversa (cancelou e a
+   * criação falhou) deixa o aluno SEM plano: visível na hora, na própria
+   * ficha, e corrigível atribuindo de novo. Entre um erro que se vê e um que
+   * some, escolhe-se o que se vê.
+   *
+   * O `CANCEL` revoga o entitlement na mesma transação da API
+   * (`alterarAssinatura`), então não há janela em que a assinatura esteja
+   * cancelada e o direito de acesso continue de pé.
+   */
+  if (validado.data.substituiSubscriptionId !== undefined) {
+    if (validado.data.substituiVersion === undefined) {
+      return { erro: 'Não foi possível identificar a assinatura atual. Recarregue a ficha.', valores };
+    }
+
+    const cancelamento = await chamarApi<{ id: string; status: string }>(
+      `/api/v1/subscriptions/${validado.data.substituiSubscriptionId}/actions`,
+      {
+        metodo: 'POST',
+        corpo: {
+          action: 'CANCEL',
+          version: validado.data.substituiVersion,
+          reason: validado.data.reason,
+        },
+      },
+    );
+
+    if (!cancelamento.ok) {
+      return {
+        erro: frase(
+          cancelamento.erro?.code ?? '',
+          'Não foi possível encerrar o plano atual, e por isso o novo não foi atribuído',
+        ),
+        valores,
+      };
+    }
   }
 
   // ATENÇÃO: esta rota NÃO é idempotente — decisão registrada na issue #7,

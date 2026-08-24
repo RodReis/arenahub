@@ -91,6 +91,8 @@ interface Entitlement {
   endsAt: string;
   reason: string | null;
   subscriptionId: string | null;
+  /** Versão da assinatura de origem — o que a troca de plano precisa para cancelar. */
+  subscriptionVersion: number | null;
   janelas: Janela[];
 }
 
@@ -241,6 +243,27 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
     contatos.find((contato) => contato.type === 'WHATSAPP')?.value ??
     null;
   const email = contatos.find((contato) => contato.type === 'EMAIL')?.value ?? null;
+
+  /*
+   * ASSINATURA VIGENTE -- a que uma troca de plano precisa ENCERRAR.
+   *
+   * Vem do entitlement vigente que nasceu de assinatura: cortesia tem
+   * `subscriptionId` nulo e nao e plano que se substitui. Sem isto o
+   * formulario so sabe CRIAR, e atribuir um segundo plano deixa os dois
+   * entitlements ativos -- a tela mostra o novo e a catraca honra o antigo.
+   */
+  const direitoDeAssinatura = vigentes.find(
+    (direito) => direito.subscriptionId !== null && direito.subscriptionVersion !== null,
+  );
+
+  const assinaturaVigente =
+    direitoDeAssinatura && direitoDeAssinatura.subscriptionId !== null
+      ? {
+          subscriptionId: direitoDeAssinatura.subscriptionId,
+          version: direitoDeAssinatura.subscriptionVersion ?? 0,
+          planName: null,
+        }
+      : undefined;
 
   /*
    * F53 Task 12 -- a invoice em aberto/vencida MAIS ANTIGA e o fuso da
@@ -563,7 +586,12 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
       </section>
 
       <section aria-labelledby="titulo-atribuir">
-        <h2 id="titulo-atribuir">Atribuir plano</h2>
+        {/*
+          O TÍTULO diz o que a ação faz de verdade. Aluno com plano vigente
+          não recebe um segundo plano: o atual é encerrado e o novo entra no
+          lugar -- ver `AtribuirPlano`.
+        */}
+        <h2 id="titulo-atribuir">{assinaturaVigente ? 'Alterar plano' : 'Atribuir plano'}</h2>
 
         {/*
           Lista de planos vazia por falha tem a mesma aparência de "nenhum
@@ -584,7 +612,12 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             }}
           />
         ) : (
-          <AtribuirPlano studentId={aluno.id} planos={planos} impedido={bloqueado} />
+          <AtribuirPlano
+            studentId={aluno.id}
+            planos={planos}
+            impedido={bloqueado}
+            vigente={assinaturaVigente}
+          />
         )}
       </section>
 
