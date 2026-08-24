@@ -1,4 +1,4 @@
-import { Ausente, StateBadge } from '@arenahub/ui';
+import { Ausente, DataTable, EmptyState, StateBadge } from '@arenahub/ui';
 
 import {
   faixaLegivel,
@@ -89,89 +89,141 @@ function CelulaDeValor({ campo }: { readonly campo: CampoDaLinha }) {
 /**
  * O campo que virou a medida, segundo o servidor.
  *
- * `undefined` quando a divergência não se resolveu — a linha sai da tabela e
- * entra no aviso de conflito, porque exibir um dos lados sugeriria que ele
- * foi o publicado quando nada foi.
+ * `undefined` quando a divergência não se resolveu — a linha sai da tabela,
+ * porque exibir um dos lados sugeriria que ele foi o publicado quando nada
+ * foi.
  */
 export function campoPublicado(linha: LinhaDeRevisao): CampoDaLinha | undefined {
   return linha.campos.find((campo) => campo.id === linha.campoPublicadoId);
 }
 
-/** Linhas cuja divergência o servidor não conseguiu resolver. */
-export function linhasEmConflito(
-  linhas: readonly LinhaDeRevisao[],
-): readonly LinhaDeRevisao[] {
-  return linhas.filter((linha) => campoPublicado(linha) === undefined);
+/** Um campo tem leitura quando o laudo trouxe faixa para compará-lo. */
+function temFaixa(campo: CampoDaLinha): boolean {
+  return campo.referenceMin !== null || campo.referenceMax !== null;
 }
 
 export function ValoresDaAvaliacao({ linhas }: { readonly linhas: readonly LinhaDeRevisao[] }) {
   const publicadas = linhas.filter((linha) => campoPublicado(linha) !== undefined);
-  const conflitos = linhasEmConflito(linhas);
+
+  /*
+   * DUAS TABELAS, NÃO UMA COM METADE DAS CÉLULAS VAZIAS.
+   *
+   * Medida sem faixa de referência não tem leitura possível -- "Sem faixa
+   * publicada" repetido em dez linhas ocupava a coluna inteira sem informar
+   * nada, e ainda competia visualmente com os badges que importam (Acima,
+   * Abaixo). Quem varre a tabela procura o que saiu da faixa; o que nem tem
+   * faixa é ruído nessa varredura.
+   *
+   * Separadas: em cima o que se compara, embaixo o que só se registra.
+   */
+  const comFaixa = publicadas.filter((linha) => {
+    const campo = campoPublicado(linha);
+
+    return campo !== undefined && temFaixa(campo);
+  });
+  const semFaixa = publicadas.filter((linha) => {
+    const campo = campoPublicado(linha);
+
+    return campo !== undefined && !temFaixa(campo);
+  });
 
   return (
     <section aria-labelledby="titulo-valores" className={estilos['painel']}>
       <h2 id="titulo-valores">Valores da avaliação</h2>
 
-      {/*
-        Conflito não some em silêncio. Quando dois laudos do mesmo tipo
-        discordam, nenhum valor é publicado para aquele campo -- e o
-        avaliador precisa saber QUAIS campos ficaram de fora, ou vai
-        procurá-los no histórico achando que sumiram.
-      */}
-      {conflitos.length > 0 ? (
-        <p className={estilos['avisoDeConflito']} role="note" data-testid="aviso-de-conflito">
-          {conflitos.length === 1
-            ? 'Um campo não foi publicado porque os laudos discordam: '
-            : `${conflitos.length} campos não foram publicados porque os laudos discordam: `}
-          <strong>{conflitos.map((linha) => rotuloDeTipo(linha.type)).join(', ')}</strong>. Confira
-          os arquivos originais — divergência entre dois laudos do mesmo tipo costuma indicar
-          problema no aparelho.
-        </p>
-      ) : null}
-
-      <div className={estilos['rolagemDaTabela']}>
-        <table className={estilos['tabela']} data-testid="tabela-de-valores">
-          <caption className={estilos['legendaDaTabela']}>
-            Medidas extraídas dos laudos e já publicadas para o aluno.
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Campo</th>
-              <th scope="col" className={estilos['colunaNumerica']}>
-                Valor
-              </th>
-              <th scope="col" className={estilos['colunaNumerica']}>
-                Faixa de referência
-              </th>
-              <th scope="col">Leitura</th>
-            </tr>
-          </thead>
-          <tbody>
-            {publicadas.map((linha) => {
+      <DataTable
+        testId="tabela-de-valores"
+        rows={comFaixa}
+        rowKey={(linha) => linha.type}
+        rowTestId={(linha) => `linha-${linha.type}`}
+        caption="Medidas com faixa de referência do aparelho."
+        empty={
+          <EmptyState
+            testId="sem-medidas-com-faixa"
+            title="Nenhuma medida com faixa de referência neste laudo."
+            hint="O aparelho não publicou faixa para comparar — os valores lidos estão na tabela abaixo."
+          />
+        }
+        columns={[
+          {
+            key: 'campo',
+            header: 'Campo',
+            role: 'identity',
+            rowHeader: true,
+            render: (linha) => rotuloDeTipo(linha.type),
+          },
+          {
+            key: 'valor',
+            header: 'Valor',
+            role: 'value',
+            render: (linha) => <CelulaPublicada linha={linha} />,
+          },
+          {
+            key: 'faixa',
+            header: 'Faixa de referência',
+            role: 'value',
+            render: (linha) => {
               const campo = campoPublicado(linha);
 
-              if (campo === undefined) return null;
+              return campo === undefined
+                ? null
+                : faixaLegivel(campo.referenceMin, campo.referenceMax, campo.extractedUnit);
+            },
+          },
+          {
+            key: 'leitura',
+            header: 'Leitura',
+            role: 'state',
+            render: (linha) => {
+              const campo = campoPublicado(linha);
 
-              return (
-                <tr key={linha.type} data-testid={`linha-${linha.type}`}>
-                  <th scope="row" className={estilos['nomeDoCampo']}>
-                    {rotuloDeTipo(linha.type)}
-                  </th>
-                  <td className={estilos['colunaNumerica']}>
-                    <CelulaDeValor campo={campo} />
-                  </td>
-                  <td className={estilos['colunaNumerica']}>
-                    {faixaLegivel(campo.referenceMin, campo.referenceMax, campo.extractedUnit)}
-                  </td>
-                  <td>
-                    <StateBadge machine="leitura" state={campo.leitura} />
-                  </td>
-                </tr>
+              return campo === undefined ? null : (
+                <StateBadge machine="leitura" state={campo.leitura} />
               );
-            })}
-          </tbody>
-        </table>
-      </div>
+            },
+          },
+        ]}
+      />
+
+      {/*
+        A segunda tabela só existe quando há o que pôr nela -- `DataTable`
+        renderiza o `empty` quando a lista é vazia, e um "nenhuma outra
+        medida" aqui seria ruído: a ausência dela já não diz nada a ninguém.
+      */}
+      {semFaixa.length > 0 ? (
+        <div className={estilos['blocoSecundario']}>
+          <DataTable
+            testId="tabela-sem-faixa"
+            rows={semFaixa}
+            rowKey={(linha) => linha.type}
+            rowTestId={(linha) => `linha-${linha.type}`}
+            caption="Outras medidas registradas — o laudo não trouxe faixa para compará-las."
+            empty={null}
+            columns={[
+              {
+                key: 'campo',
+                header: 'Campo',
+                role: 'identity',
+                rowHeader: true,
+                render: (linha) => rotuloDeTipo(linha.type),
+              },
+              {
+                key: 'valor',
+                header: 'Valor',
+                role: 'value',
+                render: (linha) => <CelulaPublicada linha={linha} />,
+              },
+            ]}
+          />
+        </div>
+      ) : null}
     </section>
   );
+}
+
+/** O valor publicado da linha — `null` quando o conflito não se resolveu. */
+function CelulaPublicada({ linha }: { readonly linha: LinhaDeRevisao }) {
+  const campo = campoPublicado(linha);
+
+  return campo === undefined ? <Ausente /> : <CelulaDeValor campo={campo} />;
 }

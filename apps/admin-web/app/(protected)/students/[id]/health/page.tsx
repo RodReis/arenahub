@@ -20,6 +20,8 @@ import {
 } from '../../../../../src/health/formatar';
 import { EnvioDeLaudos } from './envio-de-laudos';
 import { FiltroDePeriodo } from './filtro-de-periodo';
+import { AvaliacaoCompleta } from './imports/[sessionId]/avaliacao-completa';
+import { SeletorDeMedicao, type MedicaoDisponivel } from './seletor-de-medicao';
 
 export const metadata: Metadata = {
   title: 'Evolução corporal — ArenaHub',
@@ -234,10 +236,10 @@ export default async function PaginaDaEvolucao({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; medicao?: string }>;
 }) {
   const { id } = await params;
-  const { period } = await searchParams;
+  const { period, medicao } = await searchParams;
 
   // Período inválido na URL cai no padrão da tela em vez de estourar: a query
   // é editável pelo usuário, e um 400 aqui seria uma página de erro por uma
@@ -245,9 +247,13 @@ export default async function PaginaDaEvolucao({
   // de apresentação escolhendo um padrão, não o servidor aceitando lixo.
   const periodo: Periodo = ehPeriodo(period) ? period : '90D';
 
-  const [respostaDoAluno, respostaDoHistorico] = await Promise.all([
+  const [respostaDoAluno, respostaDoHistorico, respostaDasMedicoes] = await Promise.all([
     chamarApi<Aluno>(`/api/v1/students/${id}`),
     chamarApi<Historico>(`/api/v1/students/${id}/health-progress?period=${periodo}`),
+    // As medições disponíveis, para o seletor e para saber qual mostrar.
+    // Falha aqui NÃO derruba a tela: sem a lista, a página cai no que era
+    // antes (envio + gráficos), que continua útil.
+    chamarApi<MedicaoDisponivel[]>(`/api/v1/students/${id}/assessment-sessions`),
   ]);
 
   if (!respostaDoAluno.ok || !respostaDoAluno.dados) {
@@ -311,16 +317,26 @@ export default async function PaginaDaEvolucao({
 
   const historico = respostaDoHistorico.dados;
 
-  return (
-    <section aria-labelledby="titulo-evolucao">
-      <PageHeader id="titulo-evolucao" title={`Evolução corporal — ${aluno.fullName}`} />
+  // As medições disponíveis. Falha na consulta vira lista vazia -- a tela
+  // degrada para envio + gráficos em vez de não abrir.
+  const medicoes = respostaDasMedicoes.ok ? (respostaDasMedicoes.dados ?? []) : [];
 
-      {/*
-        O envio vem ANTES do histórico de propósito: é o que a academia faz
-        todo mês ao abrir esta tela, e o gráfico é o que ela consulta depois.
-      */}
-      <EnvioDeLaudos studentId={id} />
+  /*
+   * QUAL medição a tela mostra.
+   *
+   * `?medicao=` na URL manda, mas só se ela EXISTIR na lista: um id chutado
+   * (ou o de outro aluno) cai na mais recente em vez de produzir "avaliação
+   * não encontrada". Mesmo tratamento que o período inválido acima -- a query
+   * é editável por quem usa, e a API continua sendo a guarda de verdade.
+   *
+   * Sem `?medicao=`, abre a mais recente: é a que alguém quer ver ao abrir a
+   * ficha de um aluno, e a lista já vem ordenada por isso.
+   */
+  const escolhida =
+    medicoes.find((m) => m.sessionId === medicao)?.sessionId ?? medicoes[0]?.sessionId ?? null;
 
+  const graficos = (
+    <>
       <FiltroDePeriodo
         studentId={id}
         periodoAtual={periodo}
@@ -342,12 +358,67 @@ export default async function PaginaDaEvolucao({
           />
         ))
       )}
+    </>
+  );
 
-      <p>
-        <a href={`/students/${id}`} data-testid="link-ficha">
-          Voltar para a ficha do aluno
-        </a>
-      </p>
-    </section>
+  const linkDaFicha = (
+    <p>
+      <a href={`/students/${id}`} data-testid="link-ficha">
+        Voltar para a ficha do aluno
+      </a>
+    </p>
+  );
+
+  /*
+   * ALUNO SEM NENHUMA MEDIÇÃO -- a tela que existia antes.
+   *
+   * Sem avaliação para mostrar, o que resta é o que sempre foi útil aqui:
+   * enviar o primeiro laudo. Renderizar a avaliação vazia produziria uma
+   * casca de painéis com traço em toda linha, que informa menos que o
+   * convite para enviar.
+   */
+  if (escolhida === null) {
+    return (
+      <section aria-labelledby="titulo-evolucao">
+        <PageHeader id="titulo-evolucao" title={`Evolução corporal — ${aluno.fullName}`} />
+        <EnvioDeLaudos studentId={id} />
+        {graficos}
+        {linkDaFicha}
+      </section>
+    );
+  }
+
+  /*
+   * A MESMA TELA DA AVALIAÇÃO, não uma parecida.
+   *
+   * `AvaliacaoCompleta` é o componente que a rota `imports/[sessionId]`
+   * também renderiza -- um ajuste nela aparece nos dois caminhos. O seletor
+   * de medição entra no slot do cabeçalho; os gráficos por período e o envio
+   * ficam abaixo, no rodapé.
+   *
+   * A ordem inverte o que era antes: a avaliação vem primeiro porque é o que
+   * se consulta ao abrir a ficha de um aluno; o envio, que era o topo, desce
+   * para junto dos gráficos -- ele é a tarefa mensal, não a leitura diária.
+   */
+  return (
+    <AvaliacaoCompleta
+      studentId={id}
+      sessionId={escolhida}
+      cabecalho={
+        <SeletorDeMedicao
+          studentId={id}
+          medicoes={medicoes}
+          atual={escolhida}
+          timeZone={historico.timezone}
+        />
+      }
+      rodape={
+        <>
+          <EnvioDeLaudos studentId={id} />
+          {graficos}
+          {linkDaFicha}
+        </>
+      }
+    />
   );
 }

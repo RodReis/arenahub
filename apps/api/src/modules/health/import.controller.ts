@@ -251,6 +251,31 @@ export class ImportController {
   }
 
   /**
+   * As medicoes de um aluno -- o seletor de data da tela de saude.
+   *
+   * Devolve so `sessionId` e a data de cada uma, da mais recente para a mais
+   * antiga. Lista VAZIA e resposta legitima (aluno sem nenhuma avaliacao
+   * ainda), nunca 404: a tela usa isso para decidir entre "escolha uma
+   * medicao" e "envie o primeiro laudo".
+   */
+  @Get('students/:studentId/assessment-sessions')
+  @RequirePermissions('health.read')
+  async sessoesDoAluno(
+    @Param('studentId') studentId: string,
+  ): Promise<{ sessionId: string; assessedAt: string; published: boolean }[]> {
+    const sessoes = await this.importacoes.sessoesDoAluno(this.contexto.require(), studentId);
+
+    return sessoes.map((sessao) => ({
+      sessionId: sessao.reviewSessionId,
+      assessedAt: sessao.iniciadaEm.toISOString(),
+      // `assessedAt` de uma sessao NAO publicada e a data do upload, nao a da
+      // medicao. A tela precisa saber a diferenca para nao rotular as duas
+      // igual -- ver `SeletorDeMedicao`.
+      published: sessao.publicada,
+    }));
+  }
+
+  /**
    * A sessao como a tela de revisao precisa dela (Task 5): arquivos, linhas
    * consolidadas entre eles e se pode confirmar.
    *

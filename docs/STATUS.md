@@ -506,6 +506,18 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | Feito | `proplan:done` | PR mergeado com CI verde | **4** — [F14](https://github.com/RodReis/arenahub/issues/14), [F15](https://github.com/RodReis/arenahub/issues/15), [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **31** |
 
+> 🩺 **22/08/2026 — a avaliação virou UMA tela, e três funcionalidades que pareciam prontas não
+> estavam.** As quatro abas saíram (não existem na referência de design e escondiam três quartos
+> do conteúdo); `/students/:id/health` e a rota da sessão passaram a renderizar o **mesmo**
+> componente, com seletor de medição. 🔴 **O que a entrega descobriu, e nenhum teste pegava:**
+> **nenhuma análise de IA jamais publicou** — o prompt pedia "o JSON do schema" sem mostrar o
+> schema, e `validarSaida` rejeitava tudo; **o ECG em PDF nunca foi lido** — a camada de texto do
+> ADR-035 §8 nunca foi implementada, e o extrator decodificava bytes comprimidos como UTF-8; e
+> **`consent_documents` estava vazia**, então nenhum aluno podia aceitar a análise. Os três tinham
+> o mesmo padrão: **o dublê de teste devolvia o formato certo por construção**, e a suíte provava
+> a metade que existia. Corrigidos e verificados com o laudo real do PI. Detalhe no
+> `DEVELOPMENT.md` §5 e na correção de 22/08 do ADR-041.
+>
 > 💳 **19/08/2026 — F14 entregue, e o MVP 2 voltou a andar.** Cartão tokenizado, recorrência,
 > política de retry (D+0/D+3/D+7 por decisão do PI) e cancelamento — PR
 > [#117](https://github.com/RodReis/arenahub/pull/117). 🔴 **A fatia produziu um defeito crítico
@@ -796,6 +808,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F56 | SPEC-056 | 3 | — | Plano com assinatura mensal | [`SPEC-056-plano-com-assinatura-mensal.md`](specs/SPEC-056-plano-com-assinatura-mensal.md) | [#159](https://github.com/RodReis/arenahub/issues/159) | em-revisao |
 
 
+
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
 > ADR**, não no PRD: o design system é trabalho de plataforma e não tem PRD que o descreva. O
 > ADR-015 foi emendado para admitir isso. A contagem sai de 41 para **44 fatias** — nenhum número
@@ -845,7 +858,6 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 > fila** que o PI escolheu, não o PRD de origem. A **F55 nasce separada da F53 por proposta do
 > Cowork** — a F53 é construível hoje, a F55 espera credencial de banco —, e a separação está
 > registrada como pergunta aberta na própria `SPEC-055`. A **F56** (plano com assinatura mensal) nasce em seguida, pelo **ADR-043**. A contagem vai de 52 para **56 fatias**.
-
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento
 (MVP 5), portões de retenção (MVP 6).

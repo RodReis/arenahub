@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-08-21
+updated: 2026-08-22
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,6 +9,10 @@ updated: 2026-08-21
 
 ### Sem épico
 
+- [MVP3.5][SPEC-049][F49] Kiosk seguro, provisionamento e sessão efêmera (#150)
+- [MVP3.5][SPEC-052][F52] Área do aluno no totem: identificação, pagamento e evolução (#153)
+- [MVP3.5][SPEC-051][F51] Tela pública (hero): blocos, mídia e patrocínio (#152)
+- [MVP3.5][SPEC-050][F50] Contrato de configuração, painel e publicação versionada (#151)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
@@ -51,6 +55,10 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-021][FIX] analise de IA e ECG em PDF nunca funcionaram; avaliacao e historico viram uma tela so (#154, finalizado em: 2026-08-22)
+- [MVP3][SPEC-021][FIX] aceite duplo autoriza analise mesmo com recusa — CI da main vermelho (#146, finalizado em: 2026-08-22)
+- [MVP3][SPEC-019][FIX] publicacao automatica trava com laudo ilegivel, valor implausivel e tipo de laudo indistinguivel (#147, finalizado em: 2026-08-22)
+- [MVP2.5][FIX] pnpm dev serve o dist velho de @arenahub/ui e o painel abre com layout de dias atras (#148, finalizado em: 2026-08-22)
 - [MVP1][FIX] eixo de dayOfWeek divergente entre gravacao e motor nega acesso aos domingos (#129, finalizado em: 2026-08-21)
 - [MVP3][SPEC-020][F20] Metas e frequência (#20, finalizado em: 2026-08-21)
 - [MVP3][SPEC-021][F21] Análise assistiva por IA (#21, finalizado em: 2026-08-21)

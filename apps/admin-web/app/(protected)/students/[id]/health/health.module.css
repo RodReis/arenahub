@@ -44,10 +44,101 @@
   border-bottom-color: var(--ah-border-strong);
 }
 
-.filtro a[aria-current='page'] {
+.filtro a[aria-current='page'],
+.seletorDeMedicao a[aria-current='page'] {
   color: var(--ah-text-strong);
   border-bottom-color: var(--ah-accent-600);
   font-weight: 600;
+}
+
+/*
+ * Seletor de medição -- qual avaliação a tela mostra.
+ *
+ * Herda a mecânica do `.filtro` acima (links em linha que quebram sozinhos,
+ * ativo com DOIS canais: peso e borda). A diferença é que ele carrega um
+ * rótulo: cinco períodos se explicam sozinhos, mas uma fila de datas soltas
+ * não diz se são medições, vencimentos ou faltas.
+ *
+ * `overflow-x` porque a lista cresce com o tempo -- um aluno de dois anos
+ * tem dezenas de medições, e a quebra em quatro linhas empurraria a
+ * avaliação para fora da primeira tela.
+ */
+.seletorDeMedicao {
+  display: flex;
+  /*
+   * `center` e nao `baseline`: o atalho e um `Button` de 36px de altura, e
+   * alinhar pela linha de base do texto dele o desencaixaria da fila de
+   * datas -- a base do rotulo dentro de um controle nao e a base do
+   * controle.
+   */
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+/*
+ * O atalho encosta a direita; a fila de datas fica com o resto da linha.
+ *
+ * Ancorado no `data-testid` e nao em `> a:last-child`: o seletor posicional
+ * pegaria QUALQUER ancora que viesse por ultimo, e a proxima pessoa que
+ * acrescentasse um link aqui empurraria o botao sem entender por que.
+ */
+.seletorDeMedicao [data-testid='ir-para-envio'] {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.rotuloDoSeletor {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  white-space: nowrap;
+}
+
+.seletorDeMedicao ul {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  /*
+   * A lista fica com o espaço que sobra e o atalho encosta à direita.
+   * `min-width: 0` é o que permite o `overflow-x` de fato rolar dentro de um
+   * flex item -- sem ele o conteúdo empurra o container e o atalho sai da
+   * tela na primeira ficha com muitas medições.
+   */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.seletorDeMedicao a {
+  display: inline-block;
+  padding: 6px 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--ah-text-secondary);
+  text-decoration: none;
+  font-size: var(--ah-type-body-size);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.seletorDeMedicao a:hover {
+  color: var(--ah-text-strong);
+  border-bottom-color: var(--ah-border-strong);
+}
+
+.seletorDeMedicao a:focus-visible {
+  outline: 2px solid var(--ah-focus-ring);
+  outline-offset: -2px;
+}
+
+/* Sessão enviada mas ainda não publicada -- a data é a do envio. */
+.medicaoPendente {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
 }
 
 /*

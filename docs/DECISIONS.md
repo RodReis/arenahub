@@ -2349,6 +2349,35 @@ caminho de erro que antes terminava em "o avaliador resolve na tela" passou a te
 publicado e ninguém avisado. O ADR-039 assumiu o risco do valor errado publicado; não tinha como
 prever o risco simétrico — **o valor certo não publicado, em silêncio**.
 
+### Correção de 22/08/2026 — o defeito 1 descrevia mal a causa; o ADR-035 §8 estava certo
+
+O item 1 acima afirma que "o ECG é PDF de traçado, **sem texto extraível**". **É falso, e o
+ADR-035 decisão 8 já dizia o contrário desde 20/08:** o PDF do OmronConnect *tem* camada de
+texto, e `pdftotext` lê `Paciente`, `Gravado`, `Frequência cardíaca`, `Duração`, `Tags` e
+`Análise instantânea` direto de lá.
+
+O que faltava era a **implementação** dessa leitura. `extrairEcg` recebia os bytes do PDF e fazia
+`TextDecoder('utf-8').decode(...)` neles; num PDF real o texto vive comprimido em streams
+`FlateDecode`, e decodificar os bytes crus devolve lixo binário. Nenhum regex casava, e o arquivo
+terminava em `EXTRACTOR_NO_CONTENT` — sintoma que este ADR leu como "o PDF não tem texto", quando
+a causa era "ninguém extraiu o texto".
+
+**O contorno do defeito 1 continua correto e necessário** — arquivo ilegível não pode segurar a
+medição, e traçado sem camada de texto continua existindo. O que muda é que o ECG do OmronConnect
+**deixou de ser esse caso**.
+
+Corrigido em 22/08/2026 com `unpdf` (Node puro, sem dependência externa) no lugar do `pdftotext`
+que o ADR-035 §8 nomeia: aquele exigiria o poppler instalado no host e no container de CI. A
+decisão de §8 — parser determinístico, nunca OCR — permanece intacta; só a ferramenta mudou.
+
+Duas coisas que o laudo real ensinou e o fixture escondia:
+
+- **O laudo é pt-BR com acento** ("Frequência cardíaca"), e os padrões do extrator são escritos
+  sem. O texto passa por `NFD` antes de casar — sem isso, o PDF seria lido corretamente e ainda
+  assim nenhum campo entraria.
+- **O fixture era um `.txt`** com o texto já extraído: ele *era* o resultado do passo que não
+  existia. A suíte provava a metade que existia. Substituído por um PDF de verdade.
+
 ---
 
 <a id="adr-042"></a>

@@ -107,8 +107,25 @@ export function EnvioDeLaudos({ studentId }: Props) {
     router.push(`/students/${studentId}/health/imports/${sessaoCriada}`);
   }, [sessaoCriada, studentId, router]);
 
+  /*
+   * `id="enviar-laudos"` ANCORA o botão "Nova avaliação" do topo da tela.
+   *
+   * O bloco de envio vive no rodapé, depois da avaliação e dos gráficos --
+   * quem abre a ficha de um aluno vem consultar, não anexar. Mas anexar é o
+   * que a academia faz toda medição, e um botão que exige rolar a página
+   * inteira é um botão que não existe: foi exatamente a pergunta do PI
+   * ("onde eu adiciono a avaliação?") olhando para esta tela.
+   *
+   * A âncora resolve sem duplicar o formulário: um `<a href="#...">` no
+   * topo, um formulário só, e o navegador leva até ele.
+   */
   return (
-    <form action={acao} data-testid="envio-de-laudos" className={estilos['envio']}>
+    <form
+      id="enviar-laudos"
+      action={acao}
+      data-testid="envio-de-laudos"
+      className={estilos['envio']}
+    >
       <input type="hidden" name="studentId" value={studentId} />
 
       <div className={estilos['cabecalhoDoEnvio']}>

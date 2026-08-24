@@ -97,6 +97,9 @@ health_report.export
 >    Exige teste que **falha** se campo de origem `ECG` vazar para o snapshot.
 > 2. **A extração do ECG não usa IA.** O PDF do OmronConnect tem camada de texto legível por
 >    `pdftotext`; parser determinístico, não adapter de OCR.
+>    *Implementado em 22/08/2026 com `unpdf` no lugar do `pdftotext` — Node puro, sem exigir
+>    poppler no host e no container de CI. A decisão (determinístico, nunca OCR) não mudou; só a
+>    ferramenta. Ver a correção de 22/08 no ADR-041.*
 > 3. **Achado aberto vira pendência visível** na lista de alunos, resolvida por
 >    `Registrar encaminhamento` (data + responsável), emitindo `HealthReferralRegistered`.
 > 4. O texto que o aluno lê sobre a pendência é **fixo, revisado por profissional de saúde e

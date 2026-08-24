@@ -1,13 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { AbasDaAvaliacao, ehAba } from './abas-da-avaliacao';
 import { AchadoDoEcg } from './achado-do-ecg';
 import { CartoesDeArquivo } from './cartoes-de-arquivo';
 import { ValoresDaAvaliacao, type LinhaDeRevisao } from './valores-da-avaliacao';
+import { MetasEControle } from './metas-e-controle';
 import {
   atributosDoAparelho,
   cartoesDeArquivo,
+  recomendacoesDoAparelho,
   type ArquivoDaSessao,
   type SessaoDeRevisao,
 } from './sessao';
@@ -163,27 +164,49 @@ describe('valores da avaliação publicada', () => {
   });
 
   /**
-   * Conflito não resolvido NÃO some em silêncio: o campo fica de fora da
-   * avaliação, e quem lê precisa saber quais campos ficaram -- senão vai
-   * procurá-los no histórico achando que se perderam.
+   * Campo em conflito continua FORA da tabela: exibir um dos lados sugeriria
+   * que ele foi o publicado quando nada foi. O aviso em texto saiu (pedido do
+   * PI), mas a linha nunca entrou -- e é isso que este teste protege.
    */
-  it('avisa quais campos ficaram de fora quando os laudos discordam', () => {
+  it('campo em conflito não entra na tabela', () => {
     render(<ValoresDaAvaliacao linhas={[linhaConcordante, linhaEmConflito]} />);
 
-    expect(screen.getByTestId('aviso-de-conflito')).toBeInTheDocument();
-    expect(screen.getAllByRole('row')).toHaveLength(2); // só a concordante
+    expect(screen.getAllByRole('row')).toHaveLength(2); // cabeçalho + a concordante
+    expect(screen.queryByTestId(`linha-${linhaEmConflito.type}`)).not.toBeInTheDocument();
   });
 
-  it('não mostra aviso de conflito quando tudo foi publicado', () => {
-    render(<ValoresDaAvaliacao linhas={[linhaConcordante, linhaDivergenteResolvida]} />);
+  /**
+   * MEDIDA SEM FAIXA VAI PARA A TABELA DE BAIXO.
+   *
+   * "Sem faixa publicada" repetido em dez linhas ocupava a coluna Leitura
+   * inteira sem informar nada, e competia com os badges que importam. Quem
+   * varre a tabela procura o que saiu da faixa.
+   */
+  it('separa em duas tabelas: com faixa e sem faixa', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante, linhaSemValor]} />);
 
-    expect(screen.queryByTestId('aviso-de-conflito')).not.toBeInTheDocument();
+    const comFaixa = screen.getByTestId('tabela-de-valores');
+    const semFaixa = screen.getByTestId('tabela-sem-faixa');
+
+    // `linhaConcordante` tem faixa (60,6–82); `linhaSemValor` não tem nenhuma.
+    expect(comFaixa).toHaveTextContent(/peso/i);
+    expect(semFaixa).toHaveTextContent(/gordura visceral/i);
+    expect(semFaixa).not.toHaveTextContent(/sem faixa publicada/i);
+    // A tabela de baixo não tem coluna de leitura -- ela não teria o que dizer.
+    expect(semFaixa.querySelectorAll('thead th')).toHaveLength(2);
+  });
+
+  /** Tabela sem nenhuma linha não é renderizada -- cabeçalho vazio não informa. */
+  it('não renderiza a tabela sem faixa quando todos os campos têm faixa', () => {
+    render(<ValoresDaAvaliacao linhas={[linhaConcordante]} />);
+
+    expect(screen.queryByTestId('tabela-sem-faixa')).not.toBeInTheDocument();
   });
 
   it('valor ausente é travessão, nunca zero (INV-104)', () => {
     render(<ValoresDaAvaliacao linhas={[linhaSemValor]} />);
 
-    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2); // valor E faixa
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
@@ -297,6 +320,26 @@ describe('informacoes do ECG', () => {
     expect(screen.getByTestId('achado-ecg')).toHaveTextContent('—');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
+
+  /**
+   * OBSERVAÇÕES é o campo que quem operou o aparelho digitou.
+   *
+   * Aparece VERBATIM e só quando existe: a maioria dos laudos vem sem, e uma
+   * linha "Observações —" em todo ECG ocuparia espaço para dizer que ninguém
+   * escreveu nada. As outras cinco são sempre esperadas, e por isso mostram
+   * o traço.
+   */
+  it('mostra as observações do operador, verbatim', () => {
+    render(<AchadoDoEcg atributos={{ ecgNotes: '9 okjgfs' }} />);
+
+    expect(screen.getByTestId('ecg-observacoes')).toHaveTextContent('9 okjgfs');
+  });
+
+  it('laudo sem observações não renderiza a linha', () => {
+    render(<AchadoDoEcg atributos={{ ecgFinding: 'Ritmo normal' }} />);
+
+    expect(screen.queryByTestId('ecg-observacoes')).not.toBeInTheDocument();
+  });
 });
 
 describe('atributosDoAparelho', () => {
@@ -351,102 +394,125 @@ describe('atributosDoAparelho', () => {
   });
 });
 
-describe('abas da avaliação', () => {
-  const caminho = '/students/aluno-1/health/imports/sessao-1';
+describe('metas e controle — recomendações do aparelho (INV-151)', () => {
+  /** Uma sessão com os atributos que o extrator grava, sem o resto do ruído. */
+  function sessaoCom(atributos: Record<string, unknown> | null): SessaoDeRevisao {
+    return {
+      sessionId: 'sessao-1',
+      linhas: [],
+      podeConfirmar: { pronta: true },
+      arquivos: [
+        {
+          importId: 'import-bio',
+          sourceLabel: 'CF610_G',
+          tipoDeLaudo: 'BIOIMPEDANCE',
+          atributos,
+        },
+      ],
+    };
+  }
 
-  it('marca a aba ativa com dois canais: peso e aria-current', () => {
-    render(<AbasDaAvaliacao caminho={caminho} ativa="segmentos" />);
-
-    const ativa = screen.getByTestId('aba-segmentos');
-    expect(ativa).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByTestId('aba-valores')).not.toHaveAttribute('aria-current');
-  });
-
-  /**
-   * A aba viaja na URL, não em estado de cliente: o link é compartilhável,
-   * o botão voltar funciona e a página continua Server Component. Se isto
-   * virar `<button>`, a tela passou a exigir JavaScript para trocar de aba.
-   */
-  it('as abas são links de verdade, com a aba na query', () => {
-    render(<AbasDaAvaliacao caminho={caminho} ativa="valores" />);
-
-    expect(screen.getByTestId('aba-historico')).toHaveAttribute(
-      'href',
-      `${caminho}?aba=historico`,
+  it('lê as cinco recomendações de qualquer arquivo da sessão', () => {
+    const recomendacoes = recomendacoesDoAparelho(
+      sessaoCom({
+        deviceStandardWeightKg: 82.1,
+        deviceWeightControlKg: -10.1,
+        deviceRecommendedIntakeKcal: 2437,
+      }),
     );
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+
+    expect(recomendacoes).toEqual({
+      deviceStandardWeightKg: 82.1,
+      deviceWeightControlKg: -10.1,
+      deviceRecommendedIntakeKcal: 2437,
+    });
   });
 
   /**
-   * A contagem existe para evitar o clique numa aba vazia. Zero é uma
-   * contagem legítima -- e é justamente a mais útil de saber antes.
+   * O achado do ECG mora no MESMO `atributos`. Se a leitura fosse por
+   * "pega tudo", o card de metas exibiria texto de ECG numa lista de kg.
    */
-  it('mostra a contagem quando ela existe, inclusive zero', () => {
+  it('ignora atributo que não é recomendação', () => {
+    expect(
+      recomendacoesDoAparelho(
+        sessaoCom({ ecgFinding: 'Possivel fibrilacao atrial', deviceStandardWeightKg: 82.1 }),
+      ),
+    ).toEqual({ deviceStandardWeightKg: 82.1 });
+  });
+
+  it('laudo sem recomendação nenhuma devolve null, não objeto vazio', () => {
+    expect(recomendacoesDoAparelho(sessaoCom({ ecgFinding: 'Ritmo nao classificado' }))).toBeNull();
+    expect(recomendacoesDoAparelho(sessaoCom(null))).toBeNull();
+  });
+
+  it('mostra o valor com unidade e preserva o sinal do controle', () => {
     render(
-      <AbasDaAvaliacao
-        caminho={caminho}
-        ativa="valores"
-        contagens={{ valores: 31, segmentos: 0 }}
+      <MetasEControle
+        deviceReport={{
+          deviceStandardWeightKg: 82.1,
+          deviceWeightControlKg: -10.1,
+          deviceMuscleControlKg: 0,
+          deviceRecommendedIntakeKcal: 2437,
+        }}
       />,
     );
 
-    expect(screen.getByTestId('aba-valores')).toHaveTextContent('31');
-    expect(screen.getByTestId('aba-segmentos')).toHaveTextContent('0');
-    // Sem contagem informada, nada de número inventado.
-    expect(screen.getByTestId('aba-ecg')).toHaveTextContent(/^ECG$/);
-  });
-
-  it('aba inválida na URL não é aba', () => {
-    expect(ehAba('valores')).toBe(true);
-    expect(ehAba('inexistente')).toBe(false);
-    expect(ehAba(undefined)).toBe(false);
-  });
-});
-
-/**
- * A aba do ECG precisa dizer POR QUE está vazia.
- *
- * Cinco traços sem explicação tratam três situações diferentes como uma: não
- * enviaram ECG, enviaram e o extrator não leu, enviaram e o aparelho não
- * reportou nada. Só a terceira é "não há o que mostrar".
- */
-describe('ECG — a ausência explicada', () => {
-  it('sem arquivo de ECG na sessão, diz que não foi enviado', () => {
-    render(<AchadoDoEcg />);
-
-    expect(screen.getByTestId('ecg-sem-arquivo')).toHaveTextContent(/nenhum arquivo de ecg/i);
-    expect(screen.queryByTestId('ecg-nao-lido')).not.toBeInTheDocument();
-  });
-
-  it('arquivo enviado que o extrator não leu explica isso, sem culpar quem enviou', () => {
-    render(
-      <AchadoDoEcg arquivo={{ estado: 'FAILED', motivoDaFalha: 'EXTRACTOR_NO_CONTENT' }} />,
+    expect(screen.getByTestId('recomendacao-deviceStandardWeightKg')).toHaveTextContent('82,1 kg');
+    // O SINAL é a informação: "10,1 kg" não diz se é para ganhar ou perder.
+    // O sinal vem do `Intl` (hífen-menos comum, não o − tipográfico): o teste
+    // afirma o que o navegador REALMENTE renderiza, e a regex ancora os dois
+    // lados para nao passar por acaso num "110,1".
+    expect(screen.getByTestId('recomendacao-deviceWeightControlKg')).toHaveTextContent(
+      /^-10,1 kg$/,
     );
-
-    const aviso = screen.getByTestId('ecg-nao-lido');
-    expect(aviso).toHaveTextContent(/não conseguiu lê-lo/i);
-    // O arquivo NÃO se perdeu -- dizer isso evita o reenvio desnecessário.
-    expect(aviso).toHaveTextContent(/continua guardado/i);
+    expect(screen.getByTestId('recomendacao-deviceRecommendedIntakeKcal')).toHaveTextContent(
+      '2.437 kcal/dia',
+    );
   });
 
   /**
-   * Arquivo lido com sucesso mas sem achado: aqui o vazio é a resposta
-   * correta, e um aviso a mais só faria ruído.
+   * Zero é um valor MEDIDO ("controle muscular: 0 kg" = não precisa mudar),
+   * não ausência. Tratá-lo como falta esconderia a recomendação de quem lê.
    */
-  it('arquivo lido sem achado não ganha aviso nenhum', () => {
-    render(<AchadoDoEcg arquivo={{ estado: 'EXTRACTED', motivoDaFalha: null }} />);
-
-    expect(screen.queryByTestId('ecg-sem-arquivo')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ecg-nao-lido')).not.toBeInTheDocument();
-    expect(screen.getByTestId('achado-ecg')).toHaveTextContent('—');
-  });
-
-  /** ADR-035 continua valendo: explicar a ausência não é interpretar o laudo. */
-  it('nenhum botão aparece, mesmo com o aviso de falha', () => {
+  /**
+   * SINAL SÓ NO AJUSTE.
+   *
+   * "Peso padrão +82,1 kg" lia como se o aluno tivesse de GANHAR 82 kg --
+   * 82,1 é o peso de referência que o aparelho calculou, não uma meta de
+   * ganho. Já "−10,1 kg" de controle é ajuste: sem o sinal, não se sabe se
+   * é para perder ou ganhar.
+   */
+  it('medida não leva sinal; ajuste leva', () => {
     render(
-      <AchadoDoEcg arquivo={{ estado: 'FAILED', motivoDaFalha: 'EXTRACTOR_NO_CONTENT' }} />,
+      <MetasEControle
+        deviceReport={{
+          deviceStandardWeightKg: 82.1,
+          deviceWeightControlKg: -10.1,
+          deviceRecommendedIntakeKcal: 2437,
+        }}
+      />,
     );
 
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('recomendacao-deviceStandardWeightKg')).toHaveTextContent(
+      /^82,1 kg$/,
+    );
+    expect(screen.getByTestId('recomendacao-deviceRecommendedIntakeKcal')).toHaveTextContent(
+      /^2\.437 kcal\/dia$/,
+    );
+    expect(screen.getByTestId('recomendacao-deviceWeightControlKg')).toHaveTextContent(
+      /^-10,1 kg$/,
+    );
+  });
+
+  it('zero é valor, não ausência', () => {
+    render(<MetasEControle deviceReport={{ deviceMuscleControlKg: 0 }} />);
+
+    expect(screen.getByTestId('recomendacao-deviceMuscleControlKg')).toHaveTextContent('0 kg');
+  });
+
+  it('não renderiza card nenhum quando o laudo não trouxe recomendação', () => {
+    const { container } = render(<MetasEControle deviceReport={null} />);
+
+    expect(container).toBeEmptyDOMElement();
   });
 });
