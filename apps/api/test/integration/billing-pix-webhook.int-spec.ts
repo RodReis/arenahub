@@ -54,6 +54,9 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
     outroTenantId: '',
   };
 
+  /** Conta do provedor com capacidade CARD, para os testes de webhook de cartao. */
+  const CONTA_CARD_NO_PROVEDOR = `acct_f53_card_${sufixo}`;
+
   const servidor = (): Parameters<typeof request>[0] =>
     app.getHttpServer() as Parameters<typeof request>[0];
 
@@ -137,6 +140,42 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
     };
   }
 
+  /**
+   * Abre invoice em competencia limpa e grava a tentativa de CARTAO direto no
+   * banco (`method: 'CARD'`) -- equivalente ao que
+   * `criar-checkout-de-cartao.use-case.ts` gravaria, sem montar o cadastro
+   * completo (CPF, endereco) que aquele endpoint exige. O que este teste
+   * cobre e o webhook, nao a criacao do checkout.
+   */
+  async function criarCobrancaCartao(): Promise<{ invoiceId: string; externalPaymentId: string }> {
+    mesDoCaso += 1;
+    const emQue = new Date(Date.UTC(2027, mesDoCaso, 15, 12, 0, 0)).toISOString();
+
+    const invoice = await request(servidor())
+      .post('/api/v1/invoices')
+      .set('Cookie', cenario.cookie)
+      .send({ subscriptionId: cenario.subscriptionId, emQue });
+
+    expect(invoice.status).toBe(201);
+
+    const invoiceId = corpoDeInvoice(invoice).id;
+    const externalPaymentId = `chk_${randomUUID()}`;
+
+    await db.paymentAttempt.create({
+      data: {
+        tenantId: cenario.tenantId,
+        invoiceId,
+        method: 'CARD',
+        status: 'PROCESSING',
+        idempotencyKey: `${invoiceId}:checkout:${emQue}`,
+        providerAccountId: CONTA_CARD_NO_PROVEDOR,
+        externalPaymentId,
+      },
+    });
+
+    return { invoiceId, externalPaymentId };
+  }
+
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
@@ -187,6 +226,18 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
         capability: 'PIX',
         externalAccountId: CONTA_NO_PROVEDOR,
         // Em producao vive cifrado; aqui o valor nao sai deste arquivo.
+        signingSecretEncrypted: SEGREDO,
+      },
+    });
+
+    // Segunda conta do mesmo tenant, capacidade CARD -- F53 (checkout de
+    // cartao). Mesma assinatura HMAC: o fake nao distingue por capacidade.
+    await db.providerAccount.create({
+      data: {
+        tenantId: tenant.id,
+        provider: PROVEDOR_FAKE,
+        capability: 'CARD',
+        externalAccountId: CONTA_CARD_NO_PROVEDOR,
         signingSecretEncrypted: SEGREDO,
       },
     });
@@ -463,6 +514,54 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
 
       const pagamentos = await db.payment.findMany({ where: { invoiceId } });
       expect(pagamentos).toHaveLength(1);
+    });
+  });
+
+  describe('F53 -- webhook de cartao grava o metodo real, nao PIX fixo', () => {
+    it('pagamento de cartao grava Payment.method = CARD, evento e auditoria corretos', async () => {
+      const { invoiceId, externalPaymentId } = await criarCobrancaCartao();
+      const dados = webhook({ externalPaymentId });
+
+      const resposta = await enviarWebhook(dados);
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body).toMatchObject({ received: true, applied: true });
+
+      const pagamento = await db.payment.findFirstOrThrow({ where: { invoiceId } });
+      expect(pagamento.method).toBe('CARD');
+
+      const evento = await db.outboxEvent.findFirstOrThrow({
+        where: { tenantId: cenario.tenantId, aggregateId: invoiceId, eventType: 'InvoicePaid' },
+      });
+      expect(evento.payload).toMatchObject({ method: 'CARD' });
+
+      const auditoria = await db.auditLog.findFirstOrThrow({
+        where: { tenantId: cenario.tenantId, targetId: pagamento.id },
+      });
+      expect(auditoria.action).toBe('billing.payment.card_checkout.confirmed');
+    });
+
+    it('pagamento PIX continua gravando method = PIX -- caminho existente intacto', async () => {
+      const { invoiceId, externalPaymentId } = await criarCobranca();
+      const dados = webhook({ externalPaymentId });
+
+      const resposta = await enviarWebhook(dados);
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body).toMatchObject({ received: true, applied: true });
+
+      const pagamento = await db.payment.findFirstOrThrow({ where: { invoiceId } });
+      expect(pagamento.method).toBe('PIX');
+
+      const evento = await db.outboxEvent.findFirstOrThrow({
+        where: { tenantId: cenario.tenantId, aggregateId: invoiceId, eventType: 'InvoicePaid' },
+      });
+      expect(evento.payload).toMatchObject({ method: 'PIX' });
+
+      const auditoria = await db.auditLog.findFirstOrThrow({
+        where: { tenantId: cenario.tenantId, targetId: pagamento.id },
+      });
+      expect(auditoria.action).toBe('billing.payment.pix.confirmed');
     });
   });
 
