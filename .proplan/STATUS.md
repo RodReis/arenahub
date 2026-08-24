@@ -9,6 +9,7 @@ updated: 2026-08-24
 
 ### Sem épico
 
+- [MVP3][FIX] chamarApi assere o tipo em vez de validar: divergencia de contrato vira crash de runtime (#167)
 - [MVP3][SPEC-056][F56] Plano com assinatura mensal (#159)
 - [MVP3][SPEC-054][F54] Painel financeiro gerencial (KPIs) (#157)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
@@ -58,6 +59,10 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-053][FIX] reajuste recusa a data de hoje: comparacao usa instante em vez de dia (#168, finalizado em: 2026-08-24)
+- [MVP1][SPEC-008][FIX] alterar plano do aluno troca de verdade, em vez de acumular assinatura (#172, finalizado em: 2026-08-24)
+- [MVP1][SPEC-045][FIX] editar cadastro do aluno: a API tem PATCH, o painel nao tem tela (#170, finalizado em: 2026-08-24)
+- [MVP1][FIX] ficha do aluno sem CSS: navegacao no rodape e glifo fraco no balcao (#174, finalizado em: 2026-08-24)
 - [MVP3][SPEC-053][FIX] plano criado pela interface nasce sem preco e nunca gera cobranca (#161, finalizado em: 2026-08-24)
 - [MVP3][SPEC-053][F53] Pagamentos e cobrança no balcão (admin-web) (#156, finalizado em: 2026-08-24)
 - [MVP3][SPEC-053][FIX] tela do balcao ignora o receiptId e faz tres consultas a mais (#165, finalizado em: 2026-08-24)
