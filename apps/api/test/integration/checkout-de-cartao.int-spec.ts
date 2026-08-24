@@ -204,10 +204,19 @@ describe('CriarCheckoutDeCartaoUseCase', () => {
      * no sucesso, e um ator inventado (`randomUUID()` sem linha correspondente)
      * quebra a escrita com violacao de chave estrangeira.
      */
+    /*
+     * `@arena.test`, NAO `@exemplo.test`: a guarda de vazamento
+     * (`vazamento.int-spec.ts`) varre os usuarios de `@exemplo.test` exigindo
+     * que todo `passwordHash` tenha a forma `scrypt$v=1$...`. Uma fixture com
+     * hash sintetico naquele dominio derruba a guarda -- e a guarda esta
+     * certa: e literalmente o trabalho dela achar senha que nao parece hash.
+     *
+     * O dominio alternativo e o mesmo que `billing.int-spec.ts` ja usa.
+     */
     const usuario = await db.user.create({
       data: {
-        email: `f53-uc-${sufixo}@exemplo.test`,
-        passwordHash: 'hash-nao-usado-neste-teste',
+        email: `f53-uc-${sufixo}@arena.test`,
+        passwordHash: 'x'.repeat(60),
       },
       select: { id: true },
     });
