@@ -2751,3 +2751,151 @@ O índice no topo deste arquivo **para no ADR-032**: os ADRs 033 a 041 não fora
 **ADR-036 é citado no `CLAUDE.md` e no `STATUS.md` sem existir neste arquivo**. Ambos são
 anteriores a este ADR e não são escopo dele — ficam apontados, não apagados, conforme a diretriz
 de alterações cirúrgicas do `CLAUDE.md`.
+
+---
+
+## ADR-043 — Pagamento: PIX segue no Sicoob, CPF vira obrigatório, o totem ganha dois QRs e a assinatura vira modalidade de plano
+
+**Data:** 23/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 23/08/2026**
+· **Confirma** o **ADR-032** (PIX no Sicoob) e o mantém, com contingência documentada
+· **Reverte** a decisão do PI de 18/08/2026 registrada no `STATUS.md` e em
+  [`notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md`](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) §1 (*"CPF continua opcional"*)
+· **Emenda** `docs/prd/academia/MVP-04-app-totem.md` §7 Slice 4.6 — o totem deixa de ser só PIX
+· **Alcança** `SPEC-053`, `SPEC-055`, `SPEC-052` e cria a **F56**
+· **NÃO alcança:** INV-009, INV-011 e INV-012 (matrícula não depende do CPF, CPF não é
+  identificador de dispositivo) — continuam valendo palavra por palavra; regra de arquitetura 1
+  (entitlement); ADR-027 (modelo de `Payment`); ADR-034 (CPF em claro)
+
+**Contexto.** Em 23/08/2026 o PI trouxe quatro documentos de integração Getnet
+(`docs/integracao/`), analisados em
+[`notes/2026-08-23-analise-integracao-getnet.md`](notes/2026-08-23-analise-integracao-getnet.md).
+Eles são bons sobre a Getnet e foram escritos como se o backend não existisse — o MVP 2 está
+entregue desde 19/08. Da análise saíram quatro perguntas que só o PI podia responder, e uma quinta
+coisa que ninguém tinha visto. Este ADR registra as cinco.
+
+---
+
+### Decisão 1 — PIX continua no Sicoob; a Getnet é plano B, escrito
+
+O **ADR-032 fica de pé**: PIX pelo Sicoob, porque o dinheiro cai direto na conta da academia. Os
+documentos assumiam PIX na Getnet, e isso **não** se torna decisão.
+
+**O plano B é registrado agora, e não é hipótese vaga.** Se a fase 0 mostrar que o PIX do Sicoob
+custa caro em integração — ele exige **mTLS com certificado**, e nada disso está estudado no
+repositório —, a troca para a Getnet é **uma linha de `provider_accounts`**, porque a tabela guarda
+*o que a conta sabe fazer, não quem ela é*, e o roteamento pergunta pela **capacidade**. O que a
+troca custa não é código: é o dinheiro passar a cair no adquirente, com prazo e taxa dele.
+
+**Gatilho para reabrir:** esforço de mTLS/certificado do Sicoob medido na fase 0 acima do custo de
+um segundo adapter. Quem constata é quem executa a F55; a decisão continua sendo do PI.
+
+---
+
+### Decisão 2 — A recorrência continua no ArenaHub, e "assinatura" vira **modalidade de plano**
+
+Os documentos propunham entregar a mensalidade ao **Subscriptions Engine da Getnet**. Recusado —
+e o motivo é que o custo aparece em regra comercial, não em código: o engine torna **o valor do
+plano imutável** (mudar preço = plano novo + migrar assinaturas), substitui o retry `[0,3,7]` que
+o PI escolheu em 19/08 pelo dele, e cria uma segunda fonte de verdade de assinatura ao lado da
+nossa. O ciclo do ArenaHub — invoice por período, `blockAnchor`, carência, `PlanPrice.validFrom` —
+**fica.**
+
+**O que o PI acrescentou, e é escopo novo:** *"quero ter a possibilidade de criar um plano com
+assinatura mensal"*. Isto é uma **modalidade de plano**, não uma troca de motor:
+
+| modalidade | quem cobra | como o aluno paga |
+|---|---|---|
+| **avulsa** (hoje) | o ArenaHub gera a invoice do período; alguém cobra | espécie, PIX ou cartão, a cada mês |
+| **assinatura** (nova) | o ArenaHub gera a invoice do período **e cobra sozinho** no cartão tokenizado do aluno, com o retry do tenant | o aluno adere uma vez, com cartão salvo |
+
+**A assinatura não terceiriza o ciclo.** O calendário, o valor, a carência e o bloqueio continuam
+nossos; o que muda é que existe um método salvo e uma autorização do aluno para cobrar sem ele
+agir. Vira a fatia **F56**.
+
+---
+
+### Decisão 3 — CPF passa a ser **obrigatório** no cadastro de aluno
+
+O antifraude da Getnet **bloqueia cartão** sem `customer` completo — nome, e-mail, telefone,
+**CPF** e endereço de cobrança. O PI decidiu tornar o CPF obrigatório em vez de pedi-lo dentro do
+fluxo de pagamento.
+
+**Isto reverte a decisão de 18/08** (*"CPF continua opcional — o mockup que o marcava obrigatório
+é que está errado"*). A reversão é explícita e datada; quem ler o documento de retrabalho da F45
+precisa chegar aqui.
+
+**O que NÃO muda, e é o que evita o erro previsível:** **INV-009 e INV-011 continuam inteiras** —
+*todo aluno tem matrícula, e a matrícula nunca depende do CPF*; *CPF ajuda a detectar duplicidade,
+mas não é matrícula*. Campo obrigatório no cadastro **não** é chave de identificação. Quem
+implementar não pode usar o CPF como matrícula, nem como identificador de dispositivo (INV-012).
+
+**Como a obrigatoriedade entra — e por que não é `NOT NULL`:**
+
+1. **Validação de aplicação**, na API e na tela, para **cadastro novo e edição**. A coluna
+   `students.cpf` **continua anulável**.
+2. **A base legada não pode ser reescrita:** a importação do Pacto trouxe **1.618 CPFs para 1.926
+   alunos** (ADR-034) — há pelo menos **308 alunos sem CPF**, e não existe de onde inventá-lo. Uma
+   migration `NOT NULL` **falharia**, e preencher com valor sintético produziria CPF inválido em
+   registro de gente real.
+3. Aluno sem CPF vira **pendência de cadastro visível**: a recepção completa quando ele aparecer.
+   Ele continua entrando na catraca — pendência cadastral **não** é razão de negativa de acesso
+   (ADR-024 é lista fechada, e nada aqui a altera).
+4. **`NOT NULL` só quando a pendência zerar**, e isso é decisão futura, não desta.
+
+---
+
+### Decisão 4 — O totem exibe **dois QRs**: PIX e checkout de cartão
+
+O `MVP-04` §7 Slice 4.6 previa apenas PIX, e o documento do totem concordava. O PI decidiu que o
+aluno escolhe **PIX ou cartão** no totem — e a forma escolhida mantém tudo o que a Slice protegia:
+
+> **O totem exibe um QR e não tem teclado de cartão.** No PIX, o QR é a cobrança; no cartão, o QR
+> é o **checkout hospedado**, que o aluno abre no **próprio celular**. Em nenhum dos dois o totem
+> vê PAN, CVV ou token — ele continua **fora do escopo PCI**, como o documento do totem exige.
+
+Continuam valendo, sem exceção: `M4-BR-007` e `DS-TOTEM` §11 — **a tela pública não mostra
+pendência nem valor**, e valor só aparece depois de ação deliberada do aluno; identificação **não**
+é por CPF (`M4-FR-016`); e a sessão encerra limpando tudo.
+
+**Este ADR emenda o `MVP-04` §7 Slice 4.6** — é o mecanismo do ADR-021: com a decisão registrada
+em ADR aceito, o Cowork materializa a emenda no PRD citando este número.
+
+---
+
+### Decisão 5 — Achado: `createTokenizedSubscription` está sendo usado para cobrar invoice avulsa
+
+**Não é decisão do PI; é defeito latente encontrado ao cruzar os documentos com o código, e ele
+precisa ser corrigido antes do adapter real.**
+
+A F14 cobra a invoice no cartão chamando `this.provedor.createTokenizedSubscription({...})` uma
+vez **por cobrança**, guardando o `externalSubscriptionId` como `externalPaymentId` da tentativa
+(`cobrar-assinatura-no-cartao.use-case.ts`). Contra o `FakePaymentProvider` isso passa: o dublê
+devolve um id e ninguém cobra nada.
+
+**Contra a Getnet real, isso cria uma assinatura mensal de verdade a cada invoice.** O
+`POST /rpy/be-subscription/v1/subscriptions` instala uma recorrência que **cobra sozinha todo
+ciclo**. Doze meses de mensalidade produziriam **doze assinaturas vivas** no provedor, cobrando o
+mesmo aluno em paralelo — e o ArenaHub não tem onde vê-las, porque não persiste
+`externalSubscriptionId` em `Subscription`.
+
+**Consequência normativa:** a porta `PaymentProvider` passa a distinguir os dois atos, e a F55 não
+entrega adapter real sem isso:
+
+- **`chargeTokenizedPayment`** — cobrança **pontual** com token salvo. É o que a F14 sempre quis
+  dizer, e é o que a cobrança de invoice deve chamar.
+- **`createTokenizedSubscription`** — recorrência de verdade, instalada **uma vez por assinatura
+  do aluno**, e usada só pela modalidade da Decisão 2 (**F56**).
+
+---
+
+### Consequências
+
+| # | consequência | onde |
+|---|---|---|
+| 1 | `SPEC-053` troca "pedir CPF no pagamento" por "CPF obrigatório no cadastro" | `SPEC-053` §9 |
+| 2 | `SPEC-055` fixa PIX no Sicoob, com o gatilho da Decisão 1 escrito | `SPEC-055` §9.3 |
+| 3 | `SPEC-055` ganha a separação `chargeTokenizedPayment` × `createTokenizedSubscription` | `SPEC-055` §3.1 |
+| 4 | Nasce a **F56** — plano com assinatura mensal | Índice do `STATUS.md` |
+| 5 | `MVP-04` §7 Slice 4.6 emendado — dois QRs no totem | PRD |
+| 6 | F45/F48 herdam a pendência de CPF da base legada | cadastro e ativação |
+| 7 | A F14 tem correção pendente que **só aparece com provedor real** | Decisão 5 |

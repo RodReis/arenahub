@@ -52,6 +52,13 @@ sabe fazer, não quem ela é*.
 - **Getnet — cartão:** `createTokenizedSubscription`, `cancelSubscription`, `refundPayment`,
   `getRefundStatus`, `listMovements`, `verifyAndParseWebhook`, **e o `createHostedCheckout` que a
   F53 precisa** para a primeira cobrança no balcão e que a F52 usa no QR do totem.
+- ⚠️ **`chargeTokenizedPayment` e `createTokenizedSubscription` são atos diferentes, e hoje o
+  código os confunde** — ADR-043, Decisão 5. A F14 chama `createTokenizedSubscription` **a cada
+  cobrança de invoice**; contra a Getnet real isso instalaria uma recorrência mensal viva por
+  invoice, cobrando o mesmo aluno em paralelo. **Esta fatia não entrega adapter real sem separar
+  os dois:** cobrança pontual com token salvo (`chargeTokenizedPayment`, que é o que a cobrança de
+  invoice deve chamar) e recorrência instalada uma vez por assinatura do aluno
+  (`createTokenizedSubscription`, usada só pela **F56**).
 - Erros do provedor traduzidos para códigos internos estáveis, classificados em **recuperável** ou
   **permanente** (`MVP-02` §12).
 - **Nenhum dos dois faz PIX e cartão** — é o ponto inteiro do ADR-032: o Sicoob é banco, não
@@ -169,15 +176,20 @@ Perguntas a fazer no mesmo contato, porque cada uma muda código:
 - **Monitorar o certificado TLS do nosso endpoint de webhook**: a Getnet para de entregar em
   silêncio quando ele vence.
 
-### 9.3 PIX — conflito aberto com o ADR-032
+### 9.3 PIX — decidido: continua no Sicoob (ADR-043, Decisão 1)
 
-Os documentos assumem **PIX pela Getnet**; o **ADR-032 decidiu Sicoob**, porque o dinheiro cai
-direto na conta da academia. Getnet simplifica a construção (um adapter, um webhook, um extrato) e
-encarrega o adquirente do dinheiro; Sicoob é o inverso, e exige mTLS com certificado — **que não
-está estudado em lugar nenhum do repositório**.
+Os documentos assumiam PIX pela Getnet. **O ADR-032 fica de pé:** PIX pelo Sicoob, porque o
+dinheiro cai direto na conta da academia.
 
-**Esta fatia não decide isso.** Se mudar, o ADR-032 é reaberto — ADR aceito não se contradiz por
-nota nem por spec.
+**A Getnet é plano B escrito, não hipótese.** Se a fase 0 mostrar que o PIX do Sicoob custa caro
+em integração — ele exige **mTLS com certificado**, e nada disso está estudado no repositório —,
+trocar é **uma linha em `provider_accounts`**: a tabela guarda *o que a conta sabe fazer*, e o
+roteamento pergunta pela capacidade. **Quem constata o custo é quem executa esta fatia; a decisão
+de trocar continua sendo do PI.**
+
+**O que isso obriga aqui:** o levantamento do mTLS do Sicoob — certificado, renovação, onde ele
+mora em produção — é **entregável desta fatia**, não descoberta de última hora. Certificado de
+mTLS vence, e vence em silêncio.
 
 ### 9.4 Webhook — Basic Auth não basta sozinho
 
@@ -190,13 +202,15 @@ aplicar qualquer efeito financeiro**.
 
 ### 9.5 O que isto obriga fora desta fatia
 
-- **CPF e endereço de cobrança** viram condição para pagar com cartão em produção — e o ArenaHub
-  decidiu **CPF opcional** (INV-009/011, F45). A saída proposta é pedir na hora do pagamento, não
-  no cadastro: quem paga em espécie ou PIX nunca é incomodado. Detalhe na `SPEC-053` §9.
-- **Recorrência:** os documentos propõem o Subscriptions Engine da Getnet no lugar do ciclo que a
-  **F14 já entregou**. Custo admitido pelos próprios documentos: **preço de plano imutável**,
-  retry da Getnet no lugar do `[0,3,7]` do PI, e uma segunda fonte de verdade de assinatura.
-  Recomendação: manter o ciclo no ArenaHub e usar a Getnet como executor de cobrança tokenizada.
-  **Decisão do PI; se ele escolher o engine, a F14 é parcialmente refeita e isso exige ADR.**
+- **CPF — decidido (ADR-043, Decisão 3):** passa a ser **obrigatório no cadastro**, revertendo a
+  decisão de 18/08. A obrigatoriedade é validação de aplicação; a coluna segue anulável, porque a
+  base legada tem pelo menos **308 alunos sem CPF** e não há de onde inventá-lo. Detalhe na
+  `SPEC-053` §9.
+- **Recorrência — decidido (ADR-043, Decisão 2):** o ciclo **continua no ArenaHub**. O
+  Subscriptions Engine da Getnet foi recusado porque o custo aparece em regra comercial: torna o
+  preço do plano imutável, substitui o retry `[0,3,7]` do PI pelo dele e cria uma segunda fonte de
+  verdade de assinatura. A Getnet fica como **executor de cobrança tokenizada**. Em paralelo nasce
+  a **F56**: "plano com assinatura mensal" como **modalidade de plano** — o aluno adere uma vez e
+  o ArenaHub cobra sozinho, com o calendário e a carência ainda nossos.
 - **Get Smart / POS Android:** descartado com fundamento (deeplink só é invocável por app Android
   dentro do terminal). Fica no Anexo A dos documentos como cenário futuro.

@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 23/08/2026 *(F53–F55; `docs/specs/` reaberto; análise dos documentos Getnet)*
+**Última atualização:** 23/08/2026 *(ADR-043; F53–F56; `docs/specs/` reaberto)*
 **Código:** bootstrap (#42–#47) + **F1, a primeira fatia**. A exceção de arranque morreu.
 
 🟢 **17/08/2026 — duas janelas físicas, e o MVP 0 saiu do simulador.** A catraca girou por comando
@@ -358,6 +358,29 @@ parte do aceite. **E o achado:** o antifraude da Getnet **exige CPF e endereço*
 produção, e o ArenaHub decidiu em 18/08 que **CPF é opcional** (INV-009/011) — aluno sem CPF paga
 em espécie e por PIX, mas **não paga com cartão**. A saída proposta pede o dado **no fluxo de
 pagamento**, não no cadastro: não desfaz decisão nenhuma e não incomoda quem paga de outro jeito.
+
+⚖️ **23/08/2026, quarta rodada — o PI decidiu, e virou o ADR-043.** Cinco pontos:
+**(1) PIX continua no Sicoob** — o ADR-032 fica de pé, e a Getnet vira **plano B escrito**, com
+gatilho de reabertura (o custo do mTLS do Sicoob, medido na fase 0). **(2) A recorrência continua
+no ArenaHub** — o Subscriptions Engine da Getnet foi recusado porque o custo dele aparece em regra
+comercial: preço de plano imutável, retry dele no lugar do `[0,3,7]`, e uma segunda fonte de
+verdade de assinatura. Em troca nasce a **F56**: *plano com assinatura mensal* como **modalidade
+de plano** — o aluno adere uma vez, o ArenaHub cobra sozinho, e o calendário continua nosso.
+**(3) CPF passa a ser obrigatório no cadastro**, revertendo a decisão de 18/08 — validação de
+aplicação, coluna anulável, porque a base do Pacto tem **pelo menos 308 alunos sem CPF** e não há
+de onde inventá-lo; INV-009, INV-011 e INV-012 continuam inteiras. **(4) O totem ganha dois QRs**
+— PIX e checkout de cartão no celular do aluno, sem teclado de cartão e fora do escopo PCI; o
+`MVP-04` §7 Slice 4.6 foi **emendado**, autorizado pelo próprio ADR.
+
+🐛 **(5) E a análise achou um defeito latente na F14, que nenhum teste podia pegar.** A cobrança de
+invoice no cartão chama `createTokenizedSubscription` **a cada cobrança**. Contra o
+`FakePaymentProvider` isso passa — o dublê devolve um id e ninguém cobra nada. **Contra a Getnet
+real, cada invoice instalaria uma recorrência mensal viva:** doze meses, doze assinaturas cobrando
+o mesmo aluno em paralelo, e o ArenaHub sem onde vê-las (o `externalSubscriptionId` é gravado em
+`payment_attempts`, não em `Subscription`). A **F55 não entrega adapter real sem separar os dois
+atos** — cobrança pontual com token salvo contra recorrência instalada uma vez. **É a segunda vez
+que o dublê esconde defeito de dinheiro**; a primeira foi a chave de idempotência derivada de
+contagem, na própria F14, que cobrava em dobro.
 
 ## 1. Onde estamos, em três frases
 
@@ -749,6 +772,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F53 | SPEC-053 | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [`SPEC-053-pagamentos-e-cobranca-no-balcao.md`](specs/SPEC-053-pagamentos-e-cobranca-no-balcao.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | em-revisao |
 | F54 | SPEC-054 | 3 | — | Painel financeiro gerencial (KPIs) | [`SPEC-054-painel-financeiro-gerencial.md`](specs/SPEC-054-painel-financeiro-gerencial.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | em-revisao |
 | F55 | SPEC-055 | 3 | — | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | [`SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md`](specs/SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md) | [#158](https://github.com/RodReis/arenahub/issues/158) | em-revisao |
+| F56 | SPEC-056 | 3 | — | Plano com assinatura mensal | [`SPEC-056-plano-com-assinatura-mensal.md`](specs/SPEC-056-plano-com-assinatura-mensal.md) | [#159](https://github.com/RodReis/arenahub/issues/159) | em-revisao |
 
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
@@ -799,7 +823,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 > O conteúdo das três é Smart Billing (`MVP-02` §7); o token `[MVP3]` reflete a **posição na
 > fila** que o PI escolheu, não o PRD de origem. A **F55 nasce separada da F53 por proposta do
 > Cowork** — a F53 é construível hoje, a F55 espera credencial de banco —, e a separação está
-> registrada como pergunta aberta na própria `SPEC-055`. A contagem vai de 52 para **55 fatias**.
+> registrada como pergunta aberta na própria `SPEC-055`. A **F56** (plano com assinatura mensal) nasce em seguida, pelo **ADR-043**. A contagem vai de 52 para **56 fatias**.
 
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento

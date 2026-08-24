@@ -228,3 +228,32 @@ schema do repositório para o que é nosso.
 **Uma pendência de higiene:** os quatro se referem a um documento-mãe chamado
 `integracao-getnet-spec.md`, que não existe com esse nome — o arquivo é
 `SPEC - Integracao getnet.md`. Quem for implementar vai procurar o nome errado.
+
+---
+
+## 8. Decisões do PI — 23/08/2026, registradas no **ADR-043**
+
+As quatro perguntas da §4 foram respondidas no mesmo dia. **O ADR-043 é a fonte**; esta seção só
+diz o que aconteceu com cada ponto desta análise.
+
+| § | pergunta | resposta do PI |
+|---|---|---|
+| 4.1 | PIX: Sicoob ou Getnet? | **Sicoob agora, Getnet como plano B escrito.** O ADR-032 fica de pé; o gatilho de reabertura é o custo do mTLS medido na fase 0 |
+| 4.2 | Recorrência: ArenaHub ou engine da Getnet? | **ArenaHub.** E entra escopo novo: *"quero a possibilidade de criar um plano com assinatura mensal"* → **modalidade de plano**, fatia **F56** |
+| 4.3 | PAN no backend ou checkout hospedado? | **Checkout hospedado** — já era o que o `MVP-02` §15 exigia |
+| 4.4 | Webhook por Basic Auth basta? | segue a ordem HMAC → mTLS → Basic, com compensação obrigatória se só houver Basic |
+| 5 | CPF opcional × antifraude | **CPF passa a ser obrigatório no cadastro** — reverte a decisão de 18/08. Validação de aplicação; a coluna segue anulável por causa dos **308 alunos legados sem CPF** |
+| 6.3 | totem: só PIX ou dois QRs? | **Dois QRs** — PIX e checkout de cartão. O `MVP-04` §7 Slice 4.6 foi emendado, autorizado pelo ADR-043 |
+
+### 8.1 O que a análise achou e ninguém tinha pedido
+
+Cruzar os documentos com o código revelou um **defeito latente na F14**, registrado como
+**Decisão 5 do ADR-043**: a cobrança de invoice no cartão chama `createTokenizedSubscription` —
+**uma vez por cobrança**. Contra o `FakePaymentProvider` isso passa; contra a Getnet real, cada
+invoice instalaria uma **recorrência mensal viva**, e doze meses produziriam doze assinaturas
+cobrando o mesmo aluno em paralelo. O ArenaHub sequer teria onde vê-las: o
+`externalSubscriptionId` é gravado em `payment_attempts`, não em `Subscription`.
+
+**A F55 não entrega adapter real sem separar os dois atos** — cobrança pontual com token salvo
+contra recorrência instalada uma vez. É o tipo de defeito que só aparece quando o dublê sai, e é
+exatamente por isso que ele estava invisível.

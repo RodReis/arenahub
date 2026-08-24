@@ -154,22 +154,29 @@ O PI olha e diz "aceito" quando, com um aluno de demonstração:
 
 ---
 
-## 9. Antifraude da Getnet e o CPF opcional — 23/08/2026
+## 9. Antifraude da Getnet e o CPF — 23/08/2026
 
 Achado dos documentos de `docs/integracao/`, analisados em
 [`notes/2026-08-23-analise-integracao-getnet.md`](../notes/2026-08-23-analise-integracao-getnet.md) §5.
 
 **Em produção, cartão sem `customer` completo é bloqueado pelo antifraude da Getnet** — nome,
-e-mail, telefone, **CPF** e endereço de cobrança. E o ArenaHub decidiu, de propósito, que **CPF é
-opcional** (INV-009/011, decisão do PI em 18/08 na F45).
+e-mail, telefone, **CPF** e endereço de cobrança.
 
-**Consequência direta nesta fatia:** aluno sem CPF **não paga com cartão**. Paga em espécie e por
-PIX normalmente, mas o cartão morre no antifraude com mensagem genérica — e a recepcionista vê
-*"não foi possível concluir"* sem entender por quê.
+**Decidido pelo PI em 23/08/2026, registrado no ADR-043 Decisão 3: o CPF passa a ser obrigatório
+no cadastro de aluno.** Isso **reverte** a decisão de 18/08 (*"CPF continua opcional"*) — e não
+toca INV-009, INV-011 nem INV-012: a matrícula continua não dependendo do CPF, e o CPF continua
+não sendo identificador de dispositivo.
 
-**Proposta desta spec, que não desfaz decisão nenhuma:** o **fluxo de cartão** pede o que falta
-(CPF e endereço) **na hora do pagamento**, grava no cadastro e segue. O cadastro continua aceitando
-aluno sem CPF; quem paga em espécie ou PIX nunca é incomodado. **Confirmar com o PI.**
+**O que esta fatia herda disso:**
+
+- A obrigatoriedade é **validação de aplicação** (API e tela), para cadastro novo e edição. A
+  coluna `students.cpf` **continua anulável** — a base legada do Pacto tem pelo menos **308 alunos
+  sem CPF** (1.618 CPFs para 1.926 alunos, ADR-034), e não há de onde inventá-lo.
+- **Aluno legado sem CPF não paga com cartão.** O fluxo de cartão precisa dizer isso com todas as
+  letras e oferecer o caminho: completar o cadastro ali mesmo, ou receber em espécie ou por PIX.
+- **Endereço de cobrança** também é exigido pelo antifraude. A F45 já entregou
+  `student_addresses`; o que falta é a tela conferir que ele existe antes de abrir o checkout.
+- Pendência de cadastro **não bloqueia catraca** — a razão de negativa é lista fechada (ADR-024).
 
 ### 9.1 Mensagens de erro — o que a recepção lê
 
@@ -177,7 +184,7 @@ aluno sem CPF; quem paga em espécie ou PIX nunca é incomodado. **Confirmar com
 |---|---|
 | recusa do emissor | "Pagamento recusado pelo emissor. Tente outro cartão." |
 | antifraude bloqueou | "Não foi possível concluir. Confirme os dados do aluno." — **a palavra "antifraude" não aparece** |
-| falta CPF/endereço | "Para pagar com cartão, precisamos do CPF e do endereço do aluno." |
+| aluno legado sem CPF | "Este aluno ainda não tem CPF no cadastro. Complete o cadastro para pagar com cartão, ou receba em espécie ou PIX." |
 | QR PIX expirado | "QR expirado. Gere um novo código." |
 | API do provedor fora | banner de indisponibilidade, com a contingência combinada com a operação |
 

@@ -149,6 +149,10 @@ Aceite: uma bateria automatizada e manual comprova que dados do usuário A não 
 
 - jornada pendência → pagamento → confirmação → entitlement;
 - mensagens privadas e discretas;
+- **o aluno escolhe PIX ou cartão, e as duas formas são um QR** *(emenda de 23/08/2026 — ADR-043,
+  Decisão 4)*: no PIX o QR é a cobrança; no cartão o QR abre o **checkout hospedado no celular do
+  aluno**. **O totem não tem teclado de cartão e não vê PAN, CVV ou token** — segue fora do escopo
+  PCI, e `M4-BR-007` e o `DS-TOTEM` §11 continuam valendo sem exceção;
 - fallback para QR PIX no celular;
 - acompanhamento sem manter sessão além do necessário.
 
