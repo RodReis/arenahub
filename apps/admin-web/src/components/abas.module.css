@@ -1,0 +1,64 @@
+/**
+ * Abas de tela — compartilhadas entre a ficha do aluno e a tela de planos.
+ *
+ * Nasceram na ficha em 24/08/2026 e vieram para cá quando a segunda tela
+ * precisou delas: duas cópias divergiriam na primeira correção de contraste
+ * ou de espaçamento, que é como o painel chegou a sete alturas de controle
+ * diferentes antes.
+ *
+ * Le so a camada semantica: `--ah-text-*`, `--ah-action-*` e `--ah-border-*`,
+ * nunca token primitivo.
+ */
+.abas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+  margin-bottom: 16px;
+}
+
+.aba {
+  appearance: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 10px 14px;
+  font: inherit;
+  color: var(--ah-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  /*
+    120ms -- feedback de controle. Só cor e borda: movimento decorativo faria
+    a interface parecer mais lenta que o motor da catraca, cuja promessa é
+    p95 < 300ms.
+  */
+  transition:
+    color 120ms cubic-bezier(0.2, 0, 0.2, 1),
+    border-color 120ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.aba:hover {
+  color: var(--ah-text-strong);
+}
+
+.aba:focus-visible {
+  outline: 2px solid var(--ah-action-text);
+  outline-offset: -2px;
+}
+
+/*
+  A aba ativa carrega DOIS canais: cor E a barra embaixo. Só a cor deixaria
+  de fora quem opera com brilho baixo, que é o caso do balcão sob luz
+  fluorescente forte.
+*/
+.abaAtiva {
+  color: var(--ah-action-text);
+  border-bottom-color: var(--ah-action-text);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aba {
+    transition: none;
+  }
+}

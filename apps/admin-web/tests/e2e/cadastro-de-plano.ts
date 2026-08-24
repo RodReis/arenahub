@@ -15,6 +15,14 @@ export async function criarPlano(
   precoEmReais = '150,00',
 ): Promise<void> {
   await page.goto('/plans');
+
+  /*
+   * A tela de planos virou duas abas em 24/08/2026 -- "Planos cadastrados" e
+   * "Criar plano" --, e a primeira e a que abre. Quem vem CONFERIR um plano
+   * nao deve rolar por cima de um formulario que nao vai usar.
+   */
+  await page.getByTestId('aba-novo-plano').click();
+
   await page.getByTestId('campo-nome-do-plano').fill(nome);
   await page.getByTestId('campo-preco-do-plano').fill(precoEmReais);
   await page.getByTestId('confirmar-plano').click();

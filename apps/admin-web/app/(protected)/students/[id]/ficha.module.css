@@ -60,64 +60,6 @@
 }
 
 /**
- * ABAS — Informação e Plano (decisão do PI, 24/08/2026).
- *
- * A ficha empilhava cinco seções de peso idêntico, e a recepção rolava a
- * página inteira para chegar no plano. Duas abas separam o que ela consulta
- * ("quem é este aluno") do que ela opera ("qual plano, qual situação").
- */
-.abas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  border-bottom: 1px solid var(--ah-border-subtle);
-  margin-bottom: 16px;
-}
-
-.aba {
-  appearance: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  padding: 10px 14px;
-  font: inherit;
-  color: var(--ah-text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  /* 120ms -- feedback de controle. Só cor e borda: movimento decorativo
-     faria a interface parecer mais lenta que o motor da catraca. */
-  transition:
-    color 120ms cubic-bezier(0.2, 0, 0.2, 1),
-    border-color 120ms cubic-bezier(0.2, 0, 0.2, 1);
-}
-
-.aba:hover {
-  color: var(--ah-text-strong);
-}
-
-.aba:focus-visible {
-  outline: 2px solid var(--ah-action-text);
-  outline-offset: -2px;
-}
-
-/*
-  A aba ativa carrega DOIS canais: cor E a barra embaixo. Só a cor deixaria
-  de fora quem opera com brilho baixo, que é o caso do balcão sob luz
-  fluorescente forte.
-*/
-.abaAtiva {
-  color: var(--ah-action-text);
-  border-bottom-color: var(--ah-action-text);
-  font-weight: var(--ah-type-body-strong-weight);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .aba {
-    transition: none;
-  }
-}
-
-/**
  * SEÇÃO — a unidade de leitura da ficha.
  *
  * Separador em vez de card: cinco cards empilhados numa tela de consulta

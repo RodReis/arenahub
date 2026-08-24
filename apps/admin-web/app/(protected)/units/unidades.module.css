@@ -1,0 +1,84 @@
+/**
+ * Edição de unidade — modal de dois campos.
+ *
+ * Menor que o da ficha do aluno de propósito: são nome e fuso, não dezoito
+ * campos em três abas. Um modal de 720px para dois campos deixaria metade da
+ * caixa vazia.
+ *
+ * Le so a camada semantica: `--ah-surface-*`, `--ah-border-*`, `--ah-text-*`.
+ */
+.dialogo {
+  width: min(480px, calc(100vw - 48px));
+  /*
+    `margin: auto` É O QUE CENTRALIZA um `<dialog>` nativo -- sem ele o
+    navegador aplica o próprio padrão e a caixa encosta no canto superior
+    esquerdo. Foi assim que o modal do aluno nasceu torto.
+  */
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ah-border-default);
+  border-radius: 10px;
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-default);
+  box-shadow: var(--ah-elev-3);
+  overflow: hidden;
+}
+
+.dialogo::backdrop {
+  background: rgb(10 11 13 / 0.45);
+}
+
+.formularioDoDialogo {
+  display: flex;
+  flex-direction: column;
+}
+
+.cabecalhoDoDialogo {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.tituloDoDialogo {
+  margin: 0;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+  color: var(--ah-text-strong);
+}
+
+/* O código em mono: é identificador que se compara caractere a caractere. */
+.codigoDoDialogo {
+  margin: 2px 0 0;
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.corpoDoDialogo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.notaDoDialogo {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.rodapeDoDialogo {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+/** Coluna de ação da tabela: encosta à direita e não cresce. */
+.acaoDaLinha {
+  display: flex;
+  justify-content: flex-end;
+}

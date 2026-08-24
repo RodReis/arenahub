@@ -55,6 +55,12 @@ const NAVEGACAO = [
   { href: '/units', label: 'Unidades' },
 ] as const;
 
+interface Unidade {
+  id: string;
+  name: string;
+  status: string;
+}
+
 /**
  * Portao da area autenticada.
  *
@@ -63,9 +69,44 @@ const NAVEGACAO = [
  * sessao valida, a pagina nem chega a renderizar.
  */
 export default async function LayoutProtegido({ children }: { children: ReactNode }) {
-  const resposta = await chamarApi<Perfil>('/api/v1/auth/me');
+  /*
+   * As duas consultas vao juntas: o perfil decide se a pessoa entra, e as
+   * unidades alimentam o indicador do topbar. Em serie, toda navegacao
+   * pagaria os dois tempos de rede.
+   *
+   * Falha ao buscar unidade NAO derruba o painel -- o indicador cai para o
+   * texto de ausencia e o resto da tela funciona.
+   */
+  const [resposta, respostaDeUnidades] = await Promise.all([
+    chamarApi<Perfil>('/api/v1/auth/me'),
+    chamarApi<Unidade[]>('/api/v1/units'),
+  ]);
 
   if (!resposta.ok || !resposta.dados) redirect('/login');
+
+  const unidades = (respostaDeUnidades.dados ?? []).filter(
+    (unidade) => unidade.status === 'ACTIVE',
+  );
+
+  /*
+   * O QUE O TOPBAR MOSTRA, e por que não é "Unidade não selecionada".
+   *
+   * Aquele texto vinha de quando o painel não consultava unidade nenhuma --
+   * e continuava aparecendo com a Matriz cadastrada, dizendo à recepção que
+   * faltava escolher algo que não havia onde escolher.
+   *
+   * Com UMA unidade ativa não há o que selecionar: ela É o contexto, e o
+   * honesto é nomeá-la. Com várias, o painel ainda não sabe qual está em uso
+   * -- a TROCA exige decisão de produto sobre persistência e escopo de
+   * sessão (DS-PAINEL §5), e até lá dizer "várias unidades" é mais verdadeiro
+   * que fingir uma escolha. Sem nenhuma, o texto vira convite a cadastrar.
+   */
+  const unidadeNoTopbar =
+    unidades.length === 1
+      ? (unidades[0]?.name ?? 'Unidade sem nome')
+      : unidades.length === 0
+        ? 'Nenhuma unidade cadastrada'
+        : `${unidades.length} unidades`;
 
   // O `ToastProvider` subiu para o layout raiz: a tela de login tambem
   // precisa dele, e ela fica fora de `(protected)`.
@@ -80,10 +121,11 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
       navLabel="Navegacao principal"
       /*
         Indicador de unidade, nao seletor. A TROCA exige decisao de produto
-        sobre persistencia e escopo de sessao (DS-PAINEL.md §5); enquanto ela
-        nao existe, a ausencia fica visivel em vez de silenciosa.
+        sobre persistencia e escopo de sessao (DS-PAINEL.md §5) -- o que
+        mudou e que o indicador agora DIZ QUAL unidade, em vez de repetir
+        "nao selecionada" com a Matriz cadastrada. Ver `unidadeNoTopbar`.
       */
-      unitSelector={<span data-testid="unidade-ativa">Unidade não selecionada</span>}
+      unitSelector={<span data-testid="unidade-ativa">{unidadeNoTopbar}</span>}
       user={
         <>
           <span data-testid="usuario-logado">{resposta.dados.email}</span>

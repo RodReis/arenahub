@@ -31,7 +31,7 @@ import { FcClock, FcPortraitMode } from 'react-icons/fc';
 import estilos from './ficha.module.css';
 
 import { IconeBioimpedancia, IconePagamento } from '../acoes-do-aluno';
-import { AbasDaFicha } from './abas-da-ficha';
+import { Abas } from '../../../../src/components/abas';
 import { AlterarSituacao } from './alterar-situacao';
 import { AtribuirPlano } from './atribuir-plano';
 import { EditarCadastro } from './editar-cadastro';
@@ -298,7 +298,8 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
       />
 
 
-      <AbasDaFicha
+      <Abas
+        rotulo="Seções da ficha"
         abas={[
           {
             id: 'informacao',

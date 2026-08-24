@@ -1,0 +1,115 @@
+/**
+ * Reajuste de preço — modal.
+ *
+ * ERA INLINE, dentro da célula da coluna "Reajuste" (`role: 'actions'`, que
+ * é estreita por definição): o formulário de dois campos mais o histórico de
+ * vigências espremia tudo numa coluna de botão, e o resultado ficava
+ * ilegível. Um formulário não cabe onde cabia o botão que o abre.
+ *
+ * Le so a camada semantica: `--ah-surface-*`, `--ah-border-*`, `--ah-text-*`.
+ */
+.dialogo {
+  width: min(460px, calc(100vw - 48px));
+  /*
+    `margin: auto` É O QUE CENTRALIZA um `<dialog>` nativo -- sem ele o
+    navegador aplica o próprio padrão e a caixa cola no canto superior
+    esquerdo.
+  */
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ah-border-default);
+  border-radius: 10px;
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-default);
+  box-shadow: var(--ah-elev-3);
+  overflow: hidden;
+}
+
+.dialogo::backdrop {
+  background: rgb(10 11 13 / 0.45);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+}
+
+.cabecalho {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+  color: var(--ah-text-strong);
+}
+
+.nomeDoPlano {
+  margin: 2px 0 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/**
+ * A UNIDADE do plano, no cabeçalho do modal.
+ *
+ * Linha própria e com rótulo, não colada ao nome com um ponto separador:
+ * "Clinica de Musculacao · Matriz" lê como um nome composto, e o que ela
+ * responde é outra pergunta -- ONDE este plano vale.
+ */
+.unidadeDoPlano {
+  margin: 6px 0 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-default);
+}
+
+.rotuloDaUnidade {
+  color: var(--ah-text-label);
+}
+
+.corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+/**
+ * HISTÓRICO DE VIGÊNCIAS à vista antes de reajustar.
+ *
+ * Quem muda o preço precisa ver o que já valeu, senão decide às cegas sobre
+ * o que virou vigência. Fica no topo do modal, não no rodapé: é insumo da
+ * decisão, não nota de rodapé dela.
+ */
+.historico {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: 6px;
+  background: var(--ah-surface-sunken);
+  list-style: none;
+}
+
+.historico li + li {
+  margin-top: 4px;
+}
+
+.tituloDoHistorico {
+  margin: 0 0 6px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-label);
+}
+
+.rodape {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ah-border-subtle);
+}

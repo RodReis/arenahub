@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 
-import estilos from './ficha.module.css';
+import estilos from './abas.module.css';
 
 export interface Aba {
   readonly id: string;
@@ -12,10 +12,12 @@ export interface Aba {
 
 interface Props {
   readonly abas: readonly Aba[];
+  /** Rótulo do `tablist` para leitor de tela. Ex.: "Seções da ficha". */
+  readonly rotulo: string;
 }
 
 /**
- * Abas da ficha do aluno — decisão do PI em 24/08/2026: Informação e Plano.
+ * Abas de tela — compartilhadas entre a ficha do aluno e a tela de planos.
  *
  * CLIENT porque troca de aba é estado; o conteúdo continua vindo pronto do
  * Server Component, passado por prop. Nada aqui busca dado.
@@ -29,12 +31,12 @@ interface Props {
  *      campos da aba escondida vazios -- e a API, que substitui o registro
  *      inteiro, os apagaria.
  */
-export function AbasDaFicha({ abas }: Props) {
+export function Abas({ abas, rotulo }: Props) {
   const [ativa, setAtiva] = useState(abas[0]?.id ?? '');
 
   return (
     <>
-      <div className={estilos['abas']} role="tablist" aria-label="Seções da ficha">
+      <div className={estilos['abas']} role="tablist" aria-label={rotulo}>
         {abas.map((aba) => (
           <button
             key={aba.id}

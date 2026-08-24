@@ -33,6 +33,20 @@ const esquemaDeUnidade = z.object({
   timezone: z.string().min(1, 'Selecione o fuso horário da unidade'),
 });
 
+/**
+ * Edição de unidade.
+ *
+ * `code` FICA DE FORA, e não por esquecimento: `PATCH /units/:id` não o
+ * aceita. Ele é o identificador estável que aparece em tela, relatório e
+ * conversa da operação — trocá-lo depois de a unidade existir quebraria a
+ * referência de quem já o decorou.
+ */
+const esquemaDeEdicaoDeUnidade = z.object({
+  unitId: z.string().uuid(),
+  name: z.string().trim().min(1, 'Informe o nome da unidade').max(120, 'Nome longo demais'),
+  timezone: z.string().min(1, 'Selecione o fuso horário da unidade'),
+});
+
 export interface EstadoDaUnidade {
   erro?: string;
   sucesso?: { id: string; name: string };
@@ -99,6 +113,46 @@ export async function cadastrarUnidade(
 
   if (!resposta.ok || !resposta.dados) {
     return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível cadastrar a unidade'), valores };
+  }
+
+  revalidatePath('/units');
+
+  return { sucesso: { id: resposta.dados.id, name: resposta.dados.name } };
+}
+
+export async function editarUnidade(
+  _anterior: EstadoDaUnidade,
+  formulario: FormData,
+): Promise<EstadoDaUnidade> {
+  const unitId = texto(formulario, 'unitId');
+
+  const valores = {
+    name: texto(formulario, 'name'),
+    timezone: texto(formulario, 'timezone'),
+  };
+
+  const validado = esquemaDeEdicaoDeUnidade.safeParse({ unitId, ...valores });
+
+  if (!validado.success) {
+    return {
+      erro: validado.error.issues[0]?.message ?? 'Confira os dados informados.',
+      valores,
+    };
+  }
+
+  const resposta = await chamarApi<{ id: string; name: string }>(`/api/v1/units/${unitId}`, {
+    metodo: 'PATCH',
+    /*
+     * SÓ nome e fuso. `openingHours` fica de fora de propósito: o schema o
+     * declara opcional, e mandá-lo vazio aqui APAGARIA o horário de uma
+     * unidade que já o tivesse — campo ausente é "não mexer", campo presente
+     * e vazio é "esvazie".
+     */
+    corpo: { name: validado.data.name, timezone: validado.data.timezone },
+  });
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível salvar a unidade'), valores };
   }
 
   revalidatePath('/units');

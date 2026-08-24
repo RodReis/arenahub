@@ -55,7 +55,13 @@ describe('pagina de planos -- preco vigente na listagem', () => {
     const elemento = await PaginaDePlanos();
     render(<ToastProvider>{elemento}</ToastProvider>);
 
-    expect(screen.getByText('R$ 150,00')).toBeInTheDocument();
+    /*
+     * DENTRO DA TABELA, e nao em qualquer lugar da tela: desde que o
+     * reajuste virou modal (24/08/2026), o historico de vigencias fica
+     * montado no DOM e repete o mesmo preco. `getByText` solto passou a
+     * achar dois -- e o que este teste garante e a COLUNA de preco.
+     */
+    expect(screen.getByTestId('preco-do-plano-plano-1')).toHaveTextContent('R$ 150,00');
   });
 
   it('mostra aviso quando o plano nao tem preco vigente', async () => {
@@ -74,5 +80,25 @@ describe('pagina de planos -- preco vigente na listagem', () => {
     render(<ToastProvider>{elemento}</ToastProvider>);
 
     expect(screen.getByTestId('plano-plano-1')).toHaveTextContent(/sem preço vigente/i);
+  });
+  /**
+   * DUAS ABAS na tela de planos (decisao do PI, 24/08/2026) -- mesmo motivo
+   * da ficha do aluno: a listagem e o formulario de criacao viviam
+   * empilhados, e quem vinha CONFERIR um plano rolava a pagina inteira por
+   * cima de um formulario que nao ia usar.
+   */
+  it('divide a tela em Planos cadastrados e Criar plano', async () => {
+    vi.mocked(chamarApi).mockImplementation((caminho: string) => {
+      if (caminho === '/api/v1/plans') {
+        return Promise.resolve({ ok: true, dados: [plano()], cookiesDaApi: [] });
+      }
+      return Promise.resolve({ ok: true, dados: [UNIDADE], cookiesDaApi: [] });
+    });
+
+    const elemento = await PaginaDePlanos();
+    render(<ToastProvider>{elemento}</ToastProvider>);
+
+    expect(screen.getByTestId('aba-lista-de-planos')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('aba-novo-plano')).toHaveAttribute('aria-selected', 'false');
   });
 });
