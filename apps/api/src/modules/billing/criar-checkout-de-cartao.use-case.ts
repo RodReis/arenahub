@@ -130,7 +130,15 @@ export class CriarCheckoutDeCartaoUseCase {
              * naquele dia -- nao necessariamente o mais recente.
              */
             addresses: { orderBy: { createdAt: 'desc' } },
-            contacts: { orderBy: { isPrimary: 'desc' } },
+            /**
+             * DUAS chaves, nao uma: `isPrimary` sozinho NAO e ordem total --
+             * e boolean, entao dois contatos do MESMO tipo com o MESMO
+             * `isPrimary` (dois EMAIL ambos `false`, por exemplo) empatam e
+             * caem de volta na ordem fisica (achado da revisao, round 2: o
+             * mesmo defeito do endereco, do lado do contato). `createdAt desc`
+             * desempata.
+             */
+            contacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }] },
           },
         },
       },
@@ -336,6 +344,13 @@ export class CriarCheckoutDeCartaoUseCase {
         throw new CheckoutJaEmAndamentoError();
       }
 
+      /**
+       * SEM `orderBy`: o proprio indice parcial `payment_attempts_um_checkout_em_voo`
+       * (tenantId, invoiceId, method='CARD', status IN CREATED/REQUIRES_ACTION/PROCESSING)
+       * e UNIQUE -- no maximo UMA linha satisfaz este `where`, entao nao ha
+       * ordem para desempatar. Determinismo vem da constraint, nao da
+       * consulta.
+       */
       const bloqueadora = await this.db.paymentAttempt.findFirst({
         where: {
           tenantId: entrada.contexto.tenantId,

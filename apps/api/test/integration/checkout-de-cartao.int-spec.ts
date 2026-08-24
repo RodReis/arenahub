@@ -633,4 +633,46 @@ describe('CriarCheckoutDeCartaoUseCase', () => {
 
     espiao.mockRestore();
   });
+
+  /*
+   * `isPrimary` sozinho NAO e ordem total -- e boolean, entao dois contatos
+   * do MESMO tipo com o MESMO `isPrimary` (dois EMAIL, ambos nao-primarios)
+   * empatam e caem de volta na ordem FISICA do Postgres (achado da revisao,
+   * round 2: o mesmo defeito do endereco, do lado do contato -- e o e-mail
+   * que sai daqui vai para o antifraude do provedor). `createdAt desc`
+   * desempata; este teste planta o empate e prova -- pelo que chega ao
+   * provedor -- que o mais recente vence sempre.
+   */
+  it('aluno com dois contatos empatados em isPrimary manda o mais recente ao provedor', async () => {
+    const invoice = await criarInvoiceAberta();
+    const { studentId } = await db.invoice.findUniqueOrThrow({
+      where: { id: invoice.id },
+      select: { studentId: true },
+    });
+
+    // `criarAluno` ja deixou um EMAIL `isPrimary: true` -- este segundo
+    // EMAIL, tambem `isPrimary: true` e criado DEPOIS, monta o empate real
+    // no topo do `orderBy`: os dois batem em `isPrimary`, e so `createdAt`
+    // pode decidir.
+    await db.studentContact.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId,
+        type: 'EMAIL',
+        value: 'mais-novo@example.test',
+        isPrimary: true,
+      },
+    });
+
+    const espiao = jest.spyOn(fake, 'createHostedCheckout');
+
+    await useCase.executar(contexto, { invoiceId: invoice.id, agora: AGORA }, 'corr-contato');
+
+    // Sem o desempate por `createdAt`, a escolha entre os dois `isPrimary:
+    // true` cairia na ordem fisica do Postgres -- o mais novo e o unico
+    // resultado que prova que `createdAt desc` decidiu.
+    expect(espiao.mock.calls[0]?.[0].customer.email).toBe('mais-novo@example.test');
+
+    espiao.mockRestore();
+  });
 });
