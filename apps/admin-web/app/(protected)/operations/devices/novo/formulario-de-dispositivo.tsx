@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button, Field, SelectField, useToastDeErro } from '@arenahub/ui';
@@ -21,14 +21,25 @@ interface Props {
 const ESTADO_INICIAL: EstadoDoDispositivo = {};
 
 /**
- * O único modelo homologado hoje.
+ * Os modelos homologados.
  *
- * Vem da bancada do MVP 0 (F1–F5): Topdata Inner Fit instalado na unidade.
- * A API recusa qualquer outro com `DEVICE_UNSUPPORTED_HARDWARE`, e oferecer
- * campo livre de modelo faria a recepção digitar a marca da catraca que
- * comprou para receber um erro depois de preencher tudo.
+ * Espelha `hardware-homologado.ts` na API, que é quem manda: cadastrar
+ * qualquer outro devolve `DEVICE_UNSUPPORTED_HARDWARE`. Lista em vez de
+ * campo livre porque digitar a marca errada só produziria esse erro depois
+ * de preencher a tela inteira.
+ *
+ * Os dois são o par instalado na unidade da bancada do MVP 0 — leitor facial
+ * `AYTI11108174` e catraca serial `247000797`, inventariados no local pelo
+ * PI (`docs/field-notes/2026-08-15-hardware-arena-positiva.md`).
  */
-const MODELOS = [{ kind: 'FACIAL_READER', model: 'Inner Fit', rotulo: 'Topdata Inner Fit — leitor facial' }] as const;
+const MODELOS = [
+  {
+    kind: 'FACIAL_READER',
+    model: 'Inner Fit',
+    rotulo: 'Topdata Inner Fit — leitor facial',
+  },
+  { kind: 'TURNSTILE', model: 'Inner', rotulo: 'Topdata Inner — catraca' },
+] as const;
 
 function BotaoDeCadastro() {
   const { pending } = useFormStatus();
@@ -49,6 +60,18 @@ function BotaoDeCadastro() {
  */
 export function FormularioDeDispositivo({ unidades }: Props) {
   const [estado, acao] = useActionState(cadastrarDispositivo, ESTADO_INICIAL);
+
+  /*
+   * O modelo é estado porque o `kind` deriva dele -- ver o campo oculto lá
+   * embaixo. `estado.valores` tem prioridade para não perder a escolha
+   * quando o cadastro falha.
+   */
+  const [modeloEscolhido, setModeloEscolhido] = useState(
+    estado.valores?.['model'] ?? MODELOS[0].model,
+  );
+
+  const kindDoModelo =
+    MODELOS.find((modelo) => modelo.model === modeloEscolhido)?.kind ?? MODELOS[0].kind;
 
   useToastDeErro(estado.erro, 'error', 'erro-do-dispositivo');
 
@@ -94,13 +117,16 @@ export function FormularioDeDispositivo({ unidades }: Props) {
       {/*
         MODELO E TIPO viajam juntos: a homologação da API valida o PAR
         (`kind` + `model`), não cada um sozinho. Dois selects separados
-        deixariam montar "TURNSTILE + Inner Fit", que é recusado.
+        deixariam montar "TURNSTILE + Inner Fit", que é recusado -- e pior,
+        deixariam a recepção escolher um par que não existe sem nada na tela
+        avisando.
       */}
       <SelectField
         id="modelo-do-dispositivo"
         name="model"
         label="Modelo"
-        defaultValue={estado.valores?.['model'] ?? MODELOS[0].model}
+        value={modeloEscolhido}
+        onChange={(evento) => setModeloEscolhido(evento.target.value)}
         required
         data-testid="campo-modelo-do-dispositivo"
       >
@@ -112,11 +138,11 @@ export function FormularioDeDispositivo({ unidades }: Props) {
       </SelectField>
 
       {/*
-        `kind` acompanha o modelo escolhido. Com um modelo só na lista, ele é
-        fixo -- quando a homologação crescer, isto vira um `onChange` que lê
-        o par do `MODELOS`.
+        `kind` DERIVA do modelo, e é por isso que o select é controlado: com
+        dois modelos na lista (leitor facial e catraca), um `kind` fixo
+        mandaria `FACIAL_READER` junto com a catraca e a API recusaria o par.
       */}
-      <input type="hidden" name="kind" value={MODELOS[0].kind} />
+      <input type="hidden" name="kind" value={kindDoModelo} />
 
       <Field
         id="serie-do-dispositivo"
@@ -140,13 +166,15 @@ export function FormularioDeDispositivo({ unidades }: Props) {
       />
 
       {/*
-        A LISTA DE HOMOLOGAÇÃO É PROVISÓRIA e depende do gate físico
-        `M1-HW-01`. Dizer isso aqui evita a recepção concluir que o sistema
-        não aceita a catraca que a academia comprou -- ele ainda não aceita.
+        A LISTA DE HOMOLOGAÇÃO É PROVISÓRIA e o código da API diz isso ao
+        lado dela: quando o gate `M1-HW-01` passar, ela sai do código e vem
+        do documento de homologação. Dizer aqui evita a recepção comprar um
+        equipamento supondo que o painel aceita qualquer um.
       */}
       <p role="note" className={estilos['nota']}>
-        Só o leitor facial Topdata Inner Fit está homologado até agora. Catraca e outros modelos
-        entram quando passarem pelo gate de hardware.
+        Só os equipamentos homologados na bancada aparecem aqui — hoje, o leitor facial e a catraca
+        Topdata Inner instalados na unidade. Outros modelos entram quando passarem pelo gate de
+        hardware.
       </p>
 
       <div className={estilos['acoes']}>

@@ -33,15 +33,15 @@ const MENSAGEM: Record<string, string> = {
   FORBIDDEN: 'Seu perfil não tem permissão para cadastrar dispositivos.',
   GYM_UNIT_NOT_FOUND: 'Unidade não encontrada nesta academia.',
   /*
-   * O ERRO MAIS PROVÁVEL desta tela, e por isso a frase diz o que fazer.
+   * A frase diz O QUE FAZER, e não só que deu errado.
    *
-   * A lista de homologação tem UM modelo hoje (Topdata Inner Fit, o da
-   * bancada do MVP 0). Toda catraca e todo leitor de outra marca são
-   * recusados — e "não foi possível cadastrar" mandaria a recepção conferir
-   * série e modelo à procura de um erro de digitação que não existe.
+   * A lista de homologação tem os dois equipamentos da bancada do MVP 0
+   * (leitor facial e catraca Topdata Inner). Qualquer outro é recusado — e
+   * "não foi possível cadastrar" mandaria a recepção conferir série e modelo
+   * à procura de um erro de digitação que não existe.
    */
   DEVICE_UNSUPPORTED_HARDWARE:
-    'Este modelo ainda não é homologado. Só o leitor facial Topdata Inner Fit está liberado — os demais dependem do gate de hardware.',
+    'Este modelo ainda não é homologado. Só os equipamentos testados na bancada são aceitos — os demais dependem do gate de hardware.',
   DEVICE_SERIAL_TAKEN: 'Já existe um dispositivo com este número de série.',
 };
 
