@@ -133,6 +133,9 @@ describe('contrato OpenAPI', () => {
         '/api/v1/payment-methods',
         '/api/v1/invoices/{id}/payments/card',
         '/api/v1/subscriptions/{id}/recurrence/cancel',
+        // F53 -- task 16: checkout hospedado de cartao (primeira cobranca,
+        // sem token salvo). Coexiste com a rota tokenizada acima.
+        '/api/v1/invoices/{id}/payments/card-checkout',
         // F15 -- inadimplencia e acesso.
         '/api/v1/billing/delinquency',
         '/api/v1/billing/delinquency/apply',

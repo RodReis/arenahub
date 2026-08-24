@@ -28,6 +28,7 @@ import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
 import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
 import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
+import { CriarCheckoutDeCartaoUseCase } from './criar-checkout-de-cartao.use-case.js';
 import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
 
 const esquemaDeAbertura = z
@@ -233,6 +234,17 @@ interface CobrancaNoCartaoDto {
   currency: string;
 }
 
+/** Checkout hospedado de cartao pronto para o aluno pagar. F53, task 16. */
+interface CheckoutDeCartaoDto {
+  paymentAttemptId: string;
+  externalPaymentId: string;
+  checkoutUrl: string;
+  qrCodeDataUri: string;
+  expiresAt: string;
+  amountMinor: number;
+  currency: string;
+}
+
 interface RecorrenciaCanceladaDto {
   subscriptionId: string;
   canceladasNoProvedor: number;
@@ -284,6 +296,7 @@ export class BillingController {
     private readonly listagem: ListarInvoicesUseCase,
     private readonly metodoDePagamento: RegistrarMetodoDePagamentoUseCase,
     private readonly cobrancaNoCartao: CobrarAssinaturaNoCartaoUseCase,
+    private readonly checkoutDeCartao: CriarCheckoutDeCartaoUseCase,
     private readonly cancelamentoDeRecorrencia: CancelarRecorrenciaUseCase,
     private readonly inadimplencia: ConsultarInadimplenciaUseCase,
     private readonly aplicarInadimplencia: AplicarInadimplenciaUseCase,
@@ -423,6 +436,50 @@ export class BillingController {
       externalSubscriptionId: cobranca.externalSubscriptionId,
       amountMinor: cobranca.amountMinor,
       currency: cobranca.currency,
+    };
+  }
+
+  /**
+   * Cria o checkout HOSPEDADO de cartao da invoice. F53, task 16 -- SPEC-053 9.
+   *
+   * DIFERENTE de `POST invoices/:id/payments/card`, acima: aquela cobra no
+   * cartao TOKENIZADO que o aluno ja salvou; esta e a PRIMEIRA cobranca,
+   * quando ainda nao ha token -- o aluno digita o cartao na pagina do
+   * provedor, no proprio celular (INV-098). As duas rotas coexistem.
+   *
+   * `billing.manage`, mesma permissao da rota irma e da cobranca PIX: gerar
+   * cobranca e ato comum do financeiro, nao excepcional.
+   *
+   * NAO CONFIRMA PAGAMENTO -- devolve link e QR. A confirmacao vem por
+   * webhook (INV-076) ou pela consulta ativa, como no PIX e no cartao
+   * tokenizado.
+   *
+   * Erros de dominio do caso de uso ja chegam com `status` certo
+   * (`ProblemDetailsFilter` traduz `ErroDeDominio`): 422 para cadastro
+   * incompleto (`STUDENT_BILLING_DATA_INCOMPLETE`), 409 para checkout ja em
+   * andamento (`CARD_CHECKOUT_ALREADY_IN_FLIGHT`), 404 para invoice de outro
+   * tenant ou inexistente -- por isso a rota so deixa o erro subir.
+   */
+  @Post('invoices/:id/payments/card-checkout')
+  @RequirePermissions('billing.manage')
+  async criarCheckoutDeCartao(
+    @Param('id') id: string,
+    @Req() requisicao: Request,
+  ): Promise<CheckoutDeCartaoDto> {
+    const checkout = await this.checkoutDeCartao.executar(
+      this.contexto.require(),
+      { invoiceId: id, agora: new Date() },
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    return {
+      paymentAttemptId: checkout.paymentAttemptId,
+      externalPaymentId: checkout.externalPaymentId,
+      checkoutUrl: checkout.checkoutUrl,
+      qrCodeDataUri: checkout.qrCodeDataUri,
+      expiresAt: checkout.expiresAt.toISOString(),
+      amountMinor: checkout.amountMinor,
+      currency: checkout.currency,
     };
   }
 

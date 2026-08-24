@@ -111,6 +111,19 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
     });
     cenario.tenantId = tenant.id;
 
+    // F53, task 16: checkout hospedado de cartao precisa de conta ativa de
+    // CARD (`ProviderAccountResolver`) -- sem ela, a rota devolve 409
+    // `PROVIDER_ACCOUNT_MISSING` em vez do fluxo que o teste quer provar.
+    await db.providerAccount.create({
+      data: {
+        tenantId: tenant.id,
+        provider: 'getnet',
+        capability: 'CARD',
+        externalAccountId: `ACC-CARD-${sufixo}`,
+        signingSecretEncrypted: 'nao-sai-deste-arquivo',
+      },
+    });
+
     // A F45 tornou `students.gym_unit_id` obrigatorio: todo aluno nasce numa
     // unidade de origem. Cobranca nao consulta unidade -- ela existe aqui so
     // para o aluno da fixture ser valido.
@@ -266,5 +279,177 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
     const corpo = resposta.body as { timezone: string; invoices: unknown[] };
     expect(corpo.timezone).toBe('America/Sao_Paulo');
     expect(corpo.invoices).toHaveLength(1);
+  });
+
+  /**
+   * F53, task 16 -- o buraco entre o caso de uso (task 9, ja testado em
+   * `checkout-de-cartao.int-spec.ts`) e a rota HTTP que o balcao chama.
+   * `checkout-de-cartao.int-spec.ts` cobre o caso de uso direto; aqui o foco
+   * e SO o que a porta HTTP acrescenta: autenticacao por cookie e a
+   * traducao do erro de dominio para status HTTP certo.
+   */
+  describe('checkout hospedado de cartao', () => {
+    /** Aluno com CPF e endereco -- passa pela recusa de cadastro incompleto. */
+    async function criarAlunoComCadastroCompleto(rotulo: string): Promise<{
+      subscriptionId: string;
+    }> {
+      const unidade = await db.gymUnit.create({
+        data: {
+          tenantId: cenario.tenantId,
+          code: `UNI-CC-${rotulo}`,
+          name: 'Unidade checkout',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+
+      const aluno = await db.student.create({
+        data: {
+          tenantId: cenario.tenantId,
+          gymUnitId: unidade.id,
+          fullName: `Aluno Checkout ${rotulo}`,
+          membershipNumber: `f12-cc-${rotulo}`,
+          birthDate: new Date('1990-05-20T00:00:00Z'),
+          status: 'ACTIVE',
+          cpf: '52998224725',
+        },
+      });
+
+      await db.studentContact.create({
+        data: {
+          tenantId: cenario.tenantId,
+          studentId: aluno.id,
+          type: 'EMAIL',
+          value: `checkout-${rotulo}@example.test`,
+          isPrimary: true,
+        },
+      });
+
+      await db.studentAddress.create({
+        data: {
+          tenantId: cenario.tenantId,
+          studentId: aluno.id,
+          postalCode: '01310-100',
+          street: 'Av. Paulista',
+          number: '1000',
+          district: 'Bela Vista',
+          city: 'Sao Paulo',
+          state: 'SP',
+        },
+      });
+
+      const { planId } = await db.subscription.findUniqueOrThrow({
+        where: { id: cenario.subscriptionId },
+        select: { planId: true },
+      });
+
+      const assinatura = await db.subscription.create({
+        data: {
+          tenantId: cenario.tenantId,
+          studentId: aluno.id,
+          planId,
+          status: 'ACTIVE',
+          startsAt: new Date('2026-08-01T00:00:00Z'),
+        },
+      });
+
+      return { subscriptionId: assinatura.id };
+    }
+
+    async function abrirInvoice(subscriptionId: string, emQue: string): Promise<string> {
+      const resposta = await request(servidor())
+        .post('/api/v1/invoices')
+        .set('Cookie', cenario.cookieGestor)
+        .send({ subscriptionId, emQue });
+
+      return (resposta.body as { id: string }).id;
+    }
+
+    it('cria o checkout pela porta da frente e devolve link e QR', async () => {
+      const { subscriptionId } = await criarAlunoComCadastroCompleto('ok');
+      const invoiceId = await abrirInvoice(subscriptionId, '2026-08-18T12:00:00.000Z');
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/invoices/${invoiceId}/payments/card-checkout`)
+        .set('Cookie', cenario.cookieGestor)
+        .send();
+
+      expect(resposta.status).toBe(201);
+      expect(resposta.body).toMatchObject({
+        checkoutUrl: expect.stringMatching(/^https:\/\//),
+        amountMinor: PRECO_MINOR,
+        currency: 'BRL',
+      });
+      const corpo = resposta.body as {
+        paymentAttemptId: string;
+        externalPaymentId: string;
+        qrCodeDataUri: string;
+        expiresAt: string;
+      };
+      expect(corpo.paymentAttemptId).toBeTruthy();
+      expect(corpo.externalPaymentId).toBeTruthy();
+      expect(corpo.qrCodeDataUri).toBeTruthy();
+      expect(corpo.expiresAt).toBeTruthy();
+    });
+
+    it('aluno sem CPF devolve 422 com o codigo de cadastro incompleto, nao 500', async () => {
+      const unidade = await db.gymUnit.create({
+        data: {
+          tenantId: cenario.tenantId,
+          code: 'UNI-CC-SEMCPF',
+          name: 'Unidade checkout sem cpf',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+
+      const { planId } = await db.subscription.findUniqueOrThrow({
+        where: { id: cenario.subscriptionId },
+        select: { planId: true },
+      });
+
+      const aluno = await db.student.create({
+        data: {
+          tenantId: cenario.tenantId,
+          gymUnitId: unidade.id,
+          fullName: 'Aluno Checkout Sem Cpf',
+          membershipNumber: 'f12-cc-semcpf',
+          birthDate: new Date('1990-05-20T00:00:00Z'),
+          status: 'ACTIVE',
+          cpf: null,
+        },
+      });
+
+      const assinatura = await db.subscription.create({
+        data: {
+          tenantId: cenario.tenantId,
+          studentId: aluno.id,
+          planId,
+          status: 'ACTIVE',
+          startsAt: new Date('2026-08-01T00:00:00Z'),
+        },
+      });
+
+      const invoiceId = await abrirInvoice(assinatura.id, '2026-08-19T12:00:00.000Z');
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/invoices/${invoiceId}/payments/card-checkout`)
+        .set('Cookie', cenario.cookieGestor)
+        .send();
+
+      expect(resposta.status).toBe(422);
+      expect(resposta.body).toMatchObject({ code: 'STUDENT_BILLING_DATA_INCOMPLETE' });
+    });
+
+    it('sem cookie de sessao e 401', async () => {
+      const { subscriptionId } = await criarAlunoComCadastroCompleto('semauth');
+      const invoiceId = await abrirInvoice(subscriptionId, '2026-08-20T12:00:00.000Z');
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/invoices/${invoiceId}/payments/card-checkout`)
+        .send();
+
+      expect(resposta.status).toBe(401);
+    });
   });
 });
