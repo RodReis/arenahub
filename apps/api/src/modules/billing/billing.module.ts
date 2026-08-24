@@ -12,6 +12,7 @@ import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.u
 import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { ConsultarTentativaUseCase } from './consultar-tentativa.use-case.js';
+import { ListarInvoicesUseCase } from './listar-invoices.use-case.js';
 import { ConciliarMovimentosUseCase } from './conciliar-movimentos.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { CriarCheckoutDeCartaoUseCase } from './criar-checkout-de-cartao.use-case.js';
@@ -66,6 +67,7 @@ import { WebhookController } from './webhook.controller.js';
     CriarCheckoutDeCartaoUseCase,
     ConsultarStatusDePagamentoUseCase,
     ConsultarTentativaUseCase,
+    ListarInvoicesUseCase,
     ProcessarWebhookDePagamentoUseCase,
     TenantContextService,
     ProviderAccountResolver,

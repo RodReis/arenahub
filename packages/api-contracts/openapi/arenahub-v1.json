@@ -401,6 +401,18 @@
         "tags": [
           "Billing"
         ]
+      },
+      "get": {
+        "operationId": "BillingController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
       }
     },
     "/api/v1/invoices/{id}/manual-payment": {

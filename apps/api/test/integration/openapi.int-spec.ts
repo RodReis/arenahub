@@ -118,6 +118,8 @@ describe('contrato OpenAPI', () => {
         // NAO ESTAVAM AQUI: a lista parou na F11, e as duas fatias entregaram
         // rota sem declara-la. O snapshot pegava a mudanca, esta lista nao --
         // ela e a que diz, em prosa, o que a fatia PROMETEU publicar.
+        // F53 -- task 6: GET adicionado ao mesmo path para a lista
+        // transversal de faturas do tenant (POST ja existia, F12).
         '/api/v1/invoices',
         '/api/v1/invoices/{id}',
         '/api/v1/invoices/{id}/manual-payment',

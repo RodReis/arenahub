@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -20,6 +21,7 @@ import {
 } from './billing.repository.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { ConsultarTentativaUseCase } from './consultar-tentativa.use-case.js';
+import { ListarInvoicesUseCase, TAMANHO_MAXIMO_DA_PAGINA } from './listar-invoices.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
@@ -80,6 +82,23 @@ const esquemaDeLiberacao = z
   })
   .strict();
 
+/**
+ * Lista transversal de faturas do tenant. F53, task 6.
+ *
+ * `tamanho` tem teto (`TAMANHO_MAXIMO_DA_PAGINA`) no proprio schema: recusar
+ * no boundary evita que a validacao dependa do caso de uso lembrar de
+ * cortar.
+ */
+const esquemaDeListagem = z
+  .object({
+    status: z.string().min(1).max(20).optional(),
+    vencendoDe: z.iso.datetime().optional(),
+    vencendoAte: z.iso.datetime().optional(),
+    pagina: z.coerce.number().int().min(1).default(1),
+    tamanho: z.coerce.number().int().min(1).max(TAMANHO_MAXIMO_DA_PAGINA).default(20),
+  })
+  .strict();
+
 const esquemaDePagamentoManual = z
   .object({
     /**
@@ -128,6 +147,26 @@ interface InvoiceDto {
   paidAt: string | null;
   items: InvoiceItemDto[];
   payments: PagamentoDto[];
+}
+
+/** Linha da lista transversal -- resumo, sem itens nem pagamentos. F53. */
+interface InvoiceDaListaDto {
+  id: string;
+  number: number;
+  status: string;
+  currency: string;
+  billingPeriod: string;
+  totalMinor: number;
+  dueAt: string;
+  paidAt: string | null;
+  studentId: string;
+}
+
+interface PaginaDeInvoicesDto {
+  itens: InvoiceDaListaDto[];
+  total: number;
+  pagina: number;
+  tamanho: number;
 }
 
 /** Cobranca PIX pronta para o aluno pagar. `MVP-02` 7, Slice 2.2. */
@@ -224,6 +263,7 @@ export class BillingController {
     private readonly cobrancaPix: CriarCobrancaPixUseCase,
     private readonly statusDePagamento: ConsultarStatusDePagamentoUseCase,
     private readonly tentativa: ConsultarTentativaUseCase,
+    private readonly listagem: ListarInvoicesUseCase,
     private readonly metodoDePagamento: RegistrarMetodoDePagamentoUseCase,
     private readonly cobrancaNoCartao: CobrarAssinaturaNoCartaoUseCase,
     private readonly cancelamentoDeRecorrencia: CancelarRecorrenciaUseCase,
@@ -507,6 +547,48 @@ export class BillingController {
       invoiceStatus: observada.invoiceStatus,
       paidAt: observada.paidAt?.toISOString() ?? null,
       receiptId: observada.receiptId,
+    };
+  }
+
+  /**
+   * Lista transversal de faturas do tenant -- a visao de gestao. F53, task 6.
+   *
+   * Decisao 1 do PI em 23/08/2026: a spec propunha cortar esta rota, o PI
+   * mandou implementar. `billing.read` -- mesma permissao das outras
+   * leituras de invoice neste controller: quem ve a fatura do aluno pode ver
+   * o financeiro do tenant inteiro.
+   *
+   * NAO FILTRA POR ALUNO: e o que a distingue de `GET
+   * /students/:id/invoices`, logo abaixo.
+   */
+  @Get('invoices')
+  @RequirePermissions('billing.read')
+  async listar(@Query() consulta: unknown): Promise<PaginaDeInvoicesDto> {
+    const filtro = esquemaDeListagem.parse(consulta);
+
+    const pagina = await this.listagem.executar(this.contexto.require(), {
+      ...(filtro.status ? { status: filtro.status } : {}),
+      ...(filtro.vencendoDe ? { vencendoDe: new Date(filtro.vencendoDe) } : {}),
+      ...(filtro.vencendoAte ? { vencendoAte: new Date(filtro.vencendoAte) } : {}),
+      pagina: filtro.pagina,
+      tamanho: filtro.tamanho,
+    });
+
+    return {
+      itens: pagina.itens.map((invoice) => ({
+        id: invoice.id,
+        number: invoice.number,
+        status: invoice.status,
+        currency: invoice.currency,
+        billingPeriod: invoice.billingPeriod.toISOString(),
+        totalMinor: invoice.totalMinor,
+        dueAt: invoice.dueAt.toISOString(),
+        paidAt: invoice.paidAt?.toISOString() ?? null,
+        studentId: invoice.studentId,
+      })),
+      total: pagina.total,
+      pagina: pagina.pagina,
+      tamanho: pagina.tamanho,
     };
   }
 
