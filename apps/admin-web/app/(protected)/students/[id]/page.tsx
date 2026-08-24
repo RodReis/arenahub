@@ -347,6 +347,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
       */}
       <EditarCadastro
         studentId={aluno.id}
+        nomeDoAluno={aluno.fullName}
         version={aluno.version}
         fullName={aluno.fullName}
         birthDate={aluno.birthDate}

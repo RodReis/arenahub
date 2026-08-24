@@ -1,17 +1,11 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button, Field, SelectField, useToastDeErro } from '@arenahub/ui';
 
-/*
-  Forma de formulário COMPARTILHADA do painel, não um arranjo local: o
-  arquivo existe justamente porque cada tela inventando o próprio
-  espaçamento foi como o painel chegou a sete alturas de controle
-  diferentes.
-*/
-import estilos from '../../../formulario.module.css';
+import estilos from './edicao.module.css';
 
 import { editarAluno, type EstadoDaEdicao } from '../../../actions/students';
 
@@ -36,6 +30,7 @@ interface Endereco {
 
 interface Props {
   readonly studentId: string;
+  readonly nomeDoAluno: string;
   readonly version: number;
   readonly fullName: string;
   readonly birthDate: string;
@@ -48,15 +43,20 @@ interface Props {
 
 const ESTADO_INICIAL: EstadoDaEdicao = {};
 
+const ABAS = [
+  { id: 'identificacao', rotulo: 'Identificação' },
+  { id: 'contato', rotulo: 'Contato' },
+  { id: 'endereco', rotulo: 'Endereço' },
+] as const;
+
+type IdDeAba = (typeof ABAS)[number]['id'];
+
 /**
  * Primeiro contato de um tipo, ou string vazia.
  *
- * A API guarda uma LISTA e a ficha edita um campo por tipo. Pegar o primeiro
- * é o que a tela consegue representar hoje; se um aluno tiver dois telefones,
- * o segundo não aparece aqui — e como `contacts` substitui a lista inteira no
- * PATCH, salvar pela ficha o descartaria. Por isso os campos de contato só
- * são reenviados quando o aluno não tem contato repetido do mesmo tipo (ver
- * `contatosSimplesDemais`).
+ * A API guarda uma LISTA e esta tela edita um campo por tipo. Ver
+ * `contatosSimplesDemais`: quando há repetido, a edição de contato sai de
+ * cena em vez de apagar o que não cabe.
  */
 function primeiroContato(contatos: readonly Contato[], tipo: string): string {
   return contatos.find((contato) => contato.type === tipo)?.value ?? '';
@@ -69,11 +69,9 @@ function contatoDeEmergencia(contatos: readonly Contato[]): Contato | undefined 
 /**
  * A ficha só pode reeditar contatos que ela consegue REPRESENTAR.
  *
- * `contacts` substitui a lista inteira. Um aluno com dois telefones tem o
- * segundo invisível nesta tela — e salvar o apagaria em silêncio, que é o
- * tipo de perda de dado que ninguém percebe até precisar ligar. Quando isso
- * acontece, a edição de contatos fica indisponível e a ficha diz por quê,
- * em vez de oferecer um formulário que destrói dado.
+ * `contacts` substitui a lista inteira no PATCH. Um aluno com dois telefones
+ * tem o segundo invisível aqui — e salvar o apagaria em silêncio, que é o
+ * tipo de perda que ninguém percebe até precisar ligar.
  */
 function contatosSimplesDemais(contatos: readonly Contato[]): boolean {
   const porTipo = new Map<string, number>();
@@ -96,20 +94,26 @@ function BotaoDeEdicao() {
 }
 
 /**
- * Edição do cadastro — a metade que faltava da F45.
+ * Edição do cadastro — modal com abas.
  *
- * A API tem `PATCH /students/:id` desde aquela fatia; nunca houve tela. O
- * lápis da lista aponta para esta ficha prometendo "Editar cadastro", e até
- * agora entregava só leitura.
+ * A primeira versão era um formulário inline de dezoito campos empilhados, e
+ * o PI reprovou: empurrava "Acesso agora" e "Direitos de acesso" para baixo
+ * da dobra numa tela que existe para CONSULTAR. Editar cadastro é tarefa
+ * pontual, com começo e fim — o caso em que modal é a resposta certa, e não
+ * preguiça de resolver o layout.
  *
- * FECHADO POR PADRÃO, e isso é a decisão central deste componente. A ficha é
- * o hub de consulta da recepção — ela abre para responder "essa pessoa
- * entra agora?", não para corrigir CPF. Dezoito campos abertos empurrariam
- * "Acesso agora" e "Direitos de acesso" para baixo da dobra num monitor de
- * 1280px, que é o que o PRODUCT.md chama de densidade sendo a funcionalidade.
+ * `<dialog>` NATIVO: foco preso, `Esc` para fechar, backdrop e top layer de
+ * graça. Reimplementar isso à mão é como se perde acessibilidade sem
+ * perceber.
+ *
+ * TODOS OS CAMPOS FICAM MONTADOS, sempre. As abas escondem por CSS, não
+ * desmontam — um `<input>` desmontado não entra no `FormData`, e salvar da
+ * aba "Contato" apagaria endereço e identificação. É o mesmo motivo pelo
+ * qual o wizard de cadastro não usa `required` nativo em passo escondido.
  */
 export function EditarCadastro({
   studentId,
+  nomeDoAluno,
   version,
   fullName,
   birthDate,
@@ -120,14 +124,45 @@ export function EditarCadastro({
   address,
 }: Props) {
   const [aberto, setAberto] = useState(false);
+  const [aba, setAba] = useState<IdDeAba>('identificacao');
   const [estado, acao] = useActionState(editarAluno, ESTADO_INICIAL);
+  const dialogo = useRef<HTMLDialogElement>(null);
+
   useToastDeErro(estado.erro, 'error', `erro-da-edicao-${studentId}`);
 
-  // Mesma razão de `AlterarSituacao`: depois de salvar, a verdade é a versão
-  // que a API devolveu. Sem isto, a segunda correção seguida levaria um
-  // conflito de versão sem ninguém mais ter tocado no aluno.
-  const versaoVigente = estado.sucesso?.version ?? version;
+  /*
+   * `showModal()` é o que traz foco preso e backdrop -- o atributo `open` no
+   * JSX abriria o dialog SEM nada disso, como um `<div>` qualquer.
+   */
+  useEffect(() => {
+    const elemento = dialogo.current;
+    if (!elemento) return;
 
+    if (aberto && !elemento.open) elemento.showModal();
+    if (!aberto && elemento.open) elemento.close();
+  }, [aberto]);
+
+  /*
+   * Fechou pelo `Esc` ou pelo backdrop: o navegador dispara `close` sem
+   * passar pelo nosso botão, e sem isto o estado ficaria dizendo "aberto"
+   * com o dialog fechado -- e o próximo clique no botão não abriria nada.
+   */
+  useEffect(() => {
+    const elemento = dialogo.current;
+    if (!elemento) return;
+
+    const aoFechar = (): void => setAberto(false);
+    elemento.addEventListener('close', aoFechar);
+
+    return () => elemento.removeEventListener('close', aoFechar);
+  }, []);
+
+  // Salvou: fecha sozinho. A ficha por trás já foi revalidada pela action.
+  useEffect(() => {
+    if (estado.sucesso) setAberto(false);
+  }, [estado.sucesso]);
+
+  const versaoVigente = estado.sucesso?.version ?? version;
   const podeEditarContatos = contatosSimplesDemais(contacts);
   const emergencia = contatoDeEmergencia(contacts);
 
@@ -139,8 +174,14 @@ export function EditarCadastro({
    */
   const valor = (campo: string, daApi: string): string => estado.valores?.[campo] ?? daApi;
 
-  if (!aberto) {
-    return (
+  const painel = (id: IdDeAba): { hidden: boolean; role: string; id: string } => ({
+    hidden: aba !== id,
+    role: 'tabpanel',
+    id: `painel-${id}-${studentId}`,
+  });
+
+  return (
+    <>
       <Button
         type="button"
         variant="outline"
@@ -149,229 +190,275 @@ export function EditarCadastro({
       >
         Editar cadastro
       </Button>
-    );
-  }
 
-  return (
-    <form className={estilos['formularioDeEdicao']} action={acao}>
-      <input type="hidden" name="studentId" value={studentId} />
-      <input type="hidden" name="version" value={versaoVigente} />
+      <dialog ref={dialogo} className={estilos['dialogo']} aria-labelledby={`titulo-edicao-${studentId}`}>
+        <form className={estilos['moldura']} action={acao}>
+          <input type="hidden" name="studentId" value={studentId} />
+          <input type="hidden" name="version" value={versaoVigente} />
 
-      {estado.sucesso ? (
-        <p role="status" data-testid="cadastro-salvo">
-          Cadastro atualizado.
-        </p>
-      ) : null}
+          <div className={estilos['cabecalho']}>
+            <div>
+              <h2 className={estilos['titulo']} id={`titulo-edicao-${studentId}`}>
+                Editar cadastro
+              </h2>
+              {/* De QUEM é a ficha: o modal cobre a tela que dizia isso. */}
+              <p className={estilos['subtitulo']}>{nomeDoAluno}</p>
+            </div>
+          </div>
 
-      <fieldset className={estilos['grupo']}>
-        <legend>Identificação</legend>
+          {/*
+            `role="tablist"` de verdade: dezoito campos em três grupos só
+            ajudam se der para circular sem o mouse -- a recepção opera de
+            pé, com o aluno esperando.
+          */}
+          <div className={estilos['abas']} role="tablist" aria-label="Seções do cadastro">
+            {ABAS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                id={`aba-${item.id}-${studentId}`}
+                aria-selected={aba === item.id}
+                aria-controls={`painel-${item.id}-${studentId}`}
+                className={`${estilos['aba']} ${aba === item.id ? estilos['abaAtiva'] : ''}`}
+                onClick={() => setAba(item.id)}
+                data-testid={`aba-${item.id}`}
+              >
+                {item.rotulo}
+              </button>
+            ))}
+          </div>
 
-        <Field
-          id={`edicao-nome-${studentId}`}
-          name="fullName"
-          label="Nome completo"
-          defaultValue={valor('fullName', fullName)}
-          maxLength={160}
-          required
-          data-testid="campo-edicao-nome"
-        />
+          <div className={estilos['corpo']}>
+            <div {...painel('identificacao')} aria-labelledby={`aba-identificacao-${studentId}`}>
+              <div className={estilos['grade']}>
+                <div className={estilos['largo']}>
+                  <Field
+                    id={`edicao-nome-${studentId}`}
+                    name="fullName"
+                    label="Nome completo"
+                    defaultValue={valor('fullName', fullName)}
+                    maxLength={160}
+                    required
+                    data-testid="campo-edicao-nome"
+                  />
+                </div>
 
-        <Field
-          id={`edicao-nascimento-${studentId}`}
-          name="birthDate"
-          type="date"
-          label="Data de nascimento"
-          // `birthDate` chega ISO completo da API; o input aceita só a data.
-          defaultValue={valor('birthDate', birthDate.slice(0, 10))}
-          required
-          data-testid="campo-edicao-nascimento"
-        />
+                <Field
+                  id={`edicao-nascimento-${studentId}`}
+                  name="birthDate"
+                  type="date"
+                  label="Data de nascimento"
+                  /*
+                    A API devolve `YYYY-MM-DD` puro -- `birthDate` é `@db.Date`
+                    e o controller já corta o instante. O `slice` fica como
+                    guarda de formato, não como conversão.
+                  */
+                  defaultValue={valor('birthDate', birthDate.slice(0, 10))}
+                  required
+                  data-testid="campo-edicao-nascimento"
+                />
 
-        <Field
-          id={`edicao-cpf-${studentId}`}
-          name="cpf"
-          label="CPF"
-          defaultValue={valor('cpf', cpf ?? '')}
-          hint="Obrigatório — o antifraude da cobrança por cartão recusa sem ele."
-          required
-          data-testid="campo-edicao-cpf"
-        />
+                <Field
+                  id={`edicao-cpf-${studentId}`}
+                  name="cpf"
+                  label="CPF"
+                  defaultValue={valor('cpf', cpf ?? '')}
+                  required
+                  data-testid="campo-edicao-cpf"
+                />
 
-        <Field
-          id={`edicao-rg-${studentId}`}
-          name="rg"
-          label="RG"
-          defaultValue={valor('rg', rg ?? '')}
-          maxLength={40}
-          data-testid="campo-edicao-rg"
-        />
+                <Field
+                  id={`edicao-rg-${studentId}`}
+                  name="rg"
+                  label="RG"
+                  defaultValue={valor('rg', rg ?? '')}
+                  maxLength={40}
+                  data-testid="campo-edicao-rg"
+                />
 
-        <SelectField
-          id={`edicao-sexo-${studentId}`}
-          name="registeredSex"
-          label="Sexo cadastral"
-          defaultValue={valor('registeredSex', registeredSex ?? '')}
-          data-testid="campo-edicao-sexo"
-        >
-          <option value="">Não informado</option>
-          <option value="FEMALE">Feminino</option>
-          <option value="MALE">Masculino</option>
-          <option value="NOT_INFORMED">Prefere não informar</option>
-        </SelectField>
-      </fieldset>
+                <SelectField
+                  id={`edicao-sexo-${studentId}`}
+                  name="registeredSex"
+                  label="Sexo cadastral"
+                  defaultValue={valor('registeredSex', registeredSex ?? '')}
+                  data-testid="campo-edicao-sexo"
+                >
+                  <option value="">Não informado</option>
+                  <option value="FEMALE">Feminino</option>
+                  <option value="MALE">Masculino</option>
+                  <option value="NOT_INFORMED">Prefere não informar</option>
+                </SelectField>
 
-      {podeEditarContatos ? (
-        <fieldset className={estilos['grupo']}>
-          <legend>Contato</legend>
+                <p className={estilos['nota']}>
+                  O CPF é obrigatório — o antifraude da cobrança por cartão recusa sem ele.
+                </p>
+              </div>
+            </div>
 
-          <Field
-            id={`edicao-telefone-${studentId}`}
-            name="telefone"
-            label="Telefone"
-            defaultValue={valor('telefone', primeiroContato(contacts, 'PHONE'))}
-            maxLength={160}
-            data-testid="campo-edicao-telefone"
-          />
+            <div {...painel('contato')} aria-labelledby={`aba-contato-${studentId}`}>
+              {podeEditarContatos ? (
+                <div className={estilos['grade']}>
+                  <Field
+                    id={`edicao-telefone-${studentId}`}
+                    name="telefone"
+                    label="Telefone"
+                    defaultValue={valor('telefone', primeiroContato(contacts, 'PHONE'))}
+                    maxLength={160}
+                    data-testid="campo-edicao-telefone"
+                  />
 
-          <Field
-            id={`edicao-whatsapp-${studentId}`}
-            name="whatsapp"
-            label="WhatsApp"
-            defaultValue={valor('whatsapp', primeiroContato(contacts, 'WHATSAPP'))}
-            maxLength={160}
-            data-testid="campo-edicao-whatsapp"
-          />
+                  <Field
+                    id={`edicao-whatsapp-${studentId}`}
+                    name="whatsapp"
+                    label="WhatsApp"
+                    defaultValue={valor('whatsapp', primeiroContato(contacts, 'WHATSAPP'))}
+                    maxLength={160}
+                    data-testid="campo-edicao-whatsapp"
+                  />
 
-          <Field
-            id={`edicao-email-${studentId}`}
-            name="email"
-            type="email"
-            label="E-mail"
-            defaultValue={valor('email', primeiroContato(contacts, 'EMAIL'))}
-            maxLength={160}
-            data-testid="campo-edicao-email"
-          />
+                  <div className={estilos['largo']}>
+                    <Field
+                      id={`edicao-email-${studentId}`}
+                      name="email"
+                      type="email"
+                      label="E-mail"
+                      defaultValue={valor('email', primeiroContato(contacts, 'EMAIL'))}
+                      maxLength={160}
+                      data-testid="campo-edicao-email"
+                    />
+                  </div>
 
-          <Field
-            id={`edicao-emergencia-nome-${studentId}`}
-            name="emergenciaNome"
-            label="Contato de emergência — nome"
-            defaultValue={valor('emergenciaNome', emergencia?.label ?? '')}
-            maxLength={160}
-            data-testid="campo-edicao-emergencia-nome"
-          />
+                  <Field
+                    id={`edicao-emergencia-nome-${studentId}`}
+                    name="emergenciaNome"
+                    label="Emergência — nome"
+                    defaultValue={valor('emergenciaNome', emergencia?.label ?? '')}
+                    maxLength={160}
+                    data-testid="campo-edicao-emergencia-nome"
+                  />
 
-          <Field
-            id={`edicao-emergencia-parentesco-${studentId}`}
-            name="emergenciaParentesco"
-            label="Parentesco"
-            defaultValue={valor('emergenciaParentesco', emergencia?.relationship ?? '')}
-            maxLength={80}
-            data-testid="campo-edicao-emergencia-parentesco"
-          />
+                  <Field
+                    id={`edicao-emergencia-parentesco-${studentId}`}
+                    name="emergenciaParentesco"
+                    label="Parentesco"
+                    defaultValue={valor('emergenciaParentesco', emergencia?.relationship ?? '')}
+                    maxLength={80}
+                    data-testid="campo-edicao-emergencia-parentesco"
+                  />
 
-          <Field
-            id={`edicao-emergencia-telefone-${studentId}`}
-            name="emergenciaTelefone"
-            label="Telefone de emergência"
-            defaultValue={valor('emergenciaTelefone', emergencia?.value ?? '')}
-            maxLength={160}
-            data-testid="campo-edicao-emergencia-telefone"
-          />
-        </fieldset>
-      ) : (
-        /*
-          Ausência é a informação certa, como no botão de liberar catraca:
-          um formulário que apagaria o segundo telefone é pior que nenhum.
-        */
-        <p role="note" data-testid="contatos-nao-editaveis">
-          Este aluno tem mais de um contato do mesmo tipo, e esta ficha edita um por tipo. Salvar
-          aqui apagaria os demais, então a edição de contatos está indisponível para ele.
-        </p>
-      )}
+                  <Field
+                    id={`edicao-emergencia-telefone-${studentId}`}
+                    name="emergenciaTelefone"
+                    label="Emergência — telefone"
+                    defaultValue={valor('emergenciaTelefone', emergencia?.value ?? '')}
+                    maxLength={160}
+                    data-testid="campo-edicao-emergencia-telefone"
+                  />
+                </div>
+              ) : (
+                /*
+                  Ausência é a informação certa, como no botão de liberar
+                  catraca: um formulário que apagaria o segundo telefone é
+                  pior que nenhum.
+                */
+                <p role="note" data-testid="contatos-nao-editaveis">
+                  Este aluno tem mais de um contato do mesmo tipo, e esta ficha edita um por tipo.
+                  Salvar aqui apagaria os demais, então a edição de contatos está indisponível para
+                  ele.
+                </p>
+              )}
+            </div>
 
-      <fieldset className={estilos['grupo']}>
-        <legend>Endereço</legend>
+            <div {...painel('endereco')} aria-labelledby={`aba-endereco-${studentId}`}>
+              <div className={estilos['grade']}>
+                <Field
+                  id={`edicao-cep-${studentId}`}
+                  name="cep"
+                  label="CEP"
+                  defaultValue={valor('cep', address?.postalCode ?? '')}
+                  data-testid="campo-edicao-cep"
+                />
 
-        <Field
-          id={`edicao-cep-${studentId}`}
-          name="cep"
-          label="CEP"
-          defaultValue={valor('cep', address?.postalCode ?? '')}
-          data-testid="campo-edicao-cep"
-        />
+                <Field
+                  id={`edicao-bairro-${studentId}`}
+                  name="bairro"
+                  label="Bairro"
+                  defaultValue={valor('bairro', address?.district ?? '')}
+                  maxLength={120}
+                  data-testid="campo-edicao-bairro"
+                />
 
-        <Field
-          id={`edicao-logradouro-${studentId}`}
-          name="logradouro"
-          label="Logradouro"
-          defaultValue={valor('logradouro', address?.street ?? '')}
-          maxLength={200}
-          data-testid="campo-edicao-logradouro"
-        />
+                <div className={estilos['largo']}>
+                  <Field
+                    id={`edicao-logradouro-${studentId}`}
+                    name="logradouro"
+                    label="Logradouro"
+                    defaultValue={valor('logradouro', address?.street ?? '')}
+                    maxLength={200}
+                    data-testid="campo-edicao-logradouro"
+                  />
+                </div>
 
-        <Field
-          id={`edicao-numero-${studentId}`}
-          name="numero"
-          label="Número"
-          defaultValue={valor('numero', address?.number ?? '')}
-          maxLength={20}
-          data-testid="campo-edicao-numero"
-        />
+                <Field
+                  id={`edicao-numero-${studentId}`}
+                  name="numero"
+                  label="Número"
+                  defaultValue={valor('numero', address?.number ?? '')}
+                  maxLength={20}
+                  data-testid="campo-edicao-numero"
+                />
 
-        <Field
-          id={`edicao-complemento-${studentId}`}
-          name="complemento"
-          label="Complemento"
-          defaultValue={valor('complemento', address?.complement ?? '')}
-          maxLength={120}
-          data-testid="campo-edicao-complemento"
-        />
+                <Field
+                  id={`edicao-complemento-${studentId}`}
+                  name="complemento"
+                  label="Complemento"
+                  defaultValue={valor('complemento', address?.complement ?? '')}
+                  maxLength={120}
+                  data-testid="campo-edicao-complemento"
+                />
 
-        <Field
-          id={`edicao-bairro-${studentId}`}
-          name="bairro"
-          label="Bairro"
-          defaultValue={valor('bairro', address?.district ?? '')}
-          maxLength={120}
-          data-testid="campo-edicao-bairro"
-        />
+                <Field
+                  id={`edicao-cidade-${studentId}`}
+                  name="cidade"
+                  label="Cidade"
+                  defaultValue={valor('cidade', address?.city ?? '')}
+                  maxLength={120}
+                  data-testid="campo-edicao-cidade"
+                />
 
-        <Field
-          id={`edicao-cidade-${studentId}`}
-          name="cidade"
-          label="Cidade"
-          defaultValue={valor('cidade', address?.city ?? '')}
-          maxLength={120}
-          data-testid="campo-edicao-cidade"
-        />
+                <Field
+                  id={`edicao-uf-${studentId}`}
+                  name="uf"
+                  label="UF"
+                  defaultValue={valor('uf', address?.state ?? '')}
+                  maxLength={2}
+                  data-testid="campo-edicao-uf"
+                />
 
-        <Field
-          id={`edicao-uf-${studentId}`}
-          name="uf"
-          label="UF"
-          defaultValue={valor('uf', address?.state ?? '')}
-          maxLength={2}
-          data-testid="campo-edicao-uf"
-        />
+                {/*
+                  O endereço é tudo-ou-nada na API: CEP, logradouro, cidade e
+                  UF viajam juntos ou não viajam. O aviso evita o 400 que
+                  diria "CEP inválido" para quem só preencheu a rua.
+                */}
+                <p className={estilos['nota']}>
+                  Para gravar o endereço, preencha ao menos CEP, logradouro, cidade e UF.
+                </p>
+              </div>
+            </div>
+          </div>
 
-        {/*
-          O endereço é tudo-ou-nada na API: CEP, logradouro, cidade e UF
-          viajam juntos ou não viajam. Endereço pela metade não localiza
-          ninguém, e o aviso aqui evita o 400 que diria "CEP inválido" para
-          quem só preencheu a rua.
-        */}
-        <p role="note" className={estilos['nota']}>
-          Para gravar o endereço, preencha ao menos CEP, logradouro, cidade e UF.
-        </p>
-      </fieldset>
-
-      <div className={estilos['acoes']}>
-        <BotaoDeEdicao />
-        <Button type="button" variant="ghost" onClick={() => setAberto(false)}>
-          Cancelar
-        </Button>
-      </div>
-    </form>
+          <div className={estilos['rodape']}>
+            <p className={estilos['avisoDoRodape']}>
+              Salvar grava as três seções, não só a aba aberta.
+            </p>
+            <Button type="button" variant="ghost" onClick={() => setAberto(false)}>
+              Cancelar
+            </Button>
+            <BotaoDeEdicao />
+          </div>
+        </form>
+      </dialog>
+    </>
   );
 }

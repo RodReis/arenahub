@@ -31,7 +31,8 @@ function aluno(sobrescritas: Record<string, unknown> = {}) {
     id: ALUNO_ID,
     membershipNumber: 'AP-2026-00003046',
     fullName: 'Paulo Victor Ribeiro de Barros',
-    birthDate: '1999-07-15T00:00:00.000Z',
+    // A API devolve data PURA (`@db.Date`, cortada no controller).
+    birthDate: '1999-07-16',
     cpf: '05047398161',
     status: 'ACTIVE',
     archivedAt: null,
