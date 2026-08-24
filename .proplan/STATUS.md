@@ -47,6 +47,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP1][FIX] data de nascimento anda um dia: data pura renderizada como instante (#176)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 
@@ -59,6 +60,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] nao ha como cadastrar unidade nem dispositivo: API pronta, painel sem tela (#178, finalizado em: 2026-08-24)
 - [MVP3][SPEC-053][FIX] reajuste recusa a data de hoje: comparacao usa instante em vez de dia (#168, finalizado em: 2026-08-24)
 - [MVP1][SPEC-008][FIX] alterar plano do aluno troca de verdade, em vez de acumular assinatura (#172, finalizado em: 2026-08-24)
 - [MVP1][SPEC-045][FIX] editar cadastro do aluno: a API tem PATCH, o painel nao tem tela (#170, finalizado em: 2026-08-24)
