@@ -202,10 +202,25 @@ describe('F14 -- cartao, recorrencia e politica de retry', () => {
 
     const tentativa = await db.paymentAttempt.findUnique({
       where: { id: cobranca.paymentAttemptId },
-      select: { status: true, method: true, externalPaymentId: true },
+      select: { status: true, method: true, externalPaymentId: true, providerAccountId: true },
     });
     expect(tentativa?.status).toBe('PROCESSING');
     expect(tentativa?.method).toBe('CARD');
+
+    /**
+     * O ID EXTERNO, nao o UUID interno da conta (FIX #164).
+     *
+     * Ate a correcao, esta escrita gravava `conta.id` -- e passava, porque
+     * NENHUM teste olhava a coluna. A assercao e pelo valor exato de
+     * proposito: `toBeDefined()` passaria com o UUID errado, que foi
+     * justamente como o defeito sobreviveu a F14 inteira.
+     */
+    const conta = await db.providerAccount.findFirstOrThrow({
+      where: { tenantId: contexto.tenantId, capability: 'CARD' },
+      select: { id: true, externalAccountId: true },
+    });
+    expect(tentativa?.providerAccountId).toBe(conta.externalAccountId);
+    expect(tentativa?.providerAccountId).not.toBe(conta.id);
 
     const invoice = await db.invoice.findUnique({
       where: { id: invoiceId },
