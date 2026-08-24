@@ -8,7 +8,7 @@
 | **Recorte** | [`notes/2026-08-23-pagamento-nas-tres-superficies.md`](../notes/2026-08-23-pagamento-nas-tres-superficies.md) §4 |
 | **Superfície** | `admin-web` · contrato de UI: `docs/design/DS-PAINEL.md` |
 | **Card** | [#156](https://github.com/RodReis/arenahub/issues/156) |
-| **Status** | `em-revisao` — escrita em 23/08/2026, aguardando o aceite do PI |
+| **Status** | `entregue` — escrita em 23/08/2026, decisões do PI no mesmo dia, implementada em 24/08/2026 |
 | **ADRs que alcança** | ADR-027 (modelo de `Payment`), ADR-032 (Sicoob PIX / Getnet cartão) |
 | **Depende de** | **F55** para operar com dinheiro real — sem os adapters, roda contra o `FakePaymentProvider` |
 
@@ -88,11 +88,14 @@ do **checkout hospedado** de cartão, o acompanhamento da confirmação e o **re
   `POST /invoices/:id/payments/card` da F14 cobra **método já tokenizado**, e no balcão o aluno
   ainda não tem cartão salvo. Implementado pelo adapter da **F55** e pelo `FakePaymentProvider`.
   ⚠️ Ver ADR-043 Decisão 5: essa chamada **não** pode ser `createTokenizedSubscription`.
-- **`GET /api/v1/invoices` — proposta de CORTE desta fatia.** Ele está no `MVP-02` §13 e nunca foi
-  implementado, mas com a entrada pela grid de alunos ele deixa de servir ao balcão: a visão
-  "quem deve" já é `/billing/delinquency` (F15), e a visão agregada é a **F54**. Fica registrado
-  como pendência do PRD, para quem precisar de drill-down no dashboard. **Se o PI quiser a lista
-  transversal de faturas, ela volta — mas como tela de gestão, não como caminho do atendimento.**
+- **`GET /api/v1/invoices` — IMPLEMENTADO nesta fatia.** A spec propunha cortá-lo; **o PI recusou o
+  corte em 23/08/2026** e mandou implementar. Lista transversal do tenant, paginada, com filtro por
+  status e por período de vencimento, permissão `billing.read`.
+  Ordenação **total** (`dueAt desc, id desc`): sem a segunda chave, duas faturas do mesmo vencimento
+  trocariam de lugar entre carregamentos e, numa lista paginada, uma apareceria duas vezes e outra
+  nunca. Teto de página imposto no servidor, para o pedido de 100 000 não virar despejo do
+  financeiro inteiro. **Nenhuma tela desta fatia o consome** — o balcão entra pelo aluno; ele existe
+  para a visão de gestão da **F54**.
 
 ### 3.2 A página de pagamento — `/students/[id]/billing`
 
@@ -102,10 +105,13 @@ do **checkout hospedado** de cartão, o acompanhamento da confirmação e o **re
   três estados.
 - **Sem fatura em aberto**, a página não fica muda: mostra a situação e mantém *Gerar cobrança do
   mês*, que já existe e é idempotente.
-- ⚠️ **`FUSO_PROVISORIO`**: a página fixa `America/Sao_Paulo` em código. A INV-144 manda o instante
-  de bloqueio ser no fuso da unidade, **sem fallback para o tenant** — enquanto esse valor for
-  fixo, a data que a recepção lê pode divergir da que o job de vencimento usa. Esta fatia **não
-  pode ampliar a tela sem tratar isso**.
+- ✅ **`FUSO_PROVISORIO` morreu nesta fatia.** A constante fixava `America/Sao_Paulo` em código,
+  contra a INV-144. `GET /students/:id/invoices` passou a devolver o **fuso da unidade de origem do
+  aluno** junto das faturas, e a tela usa o que a API manda — sem fallback para o tenant, que é
+  exatamente o que o invariante proíbe. **Sem migration:** `gym_units.timezone` existe desde o
+  ADR-019 e `students.gym_unit_id` é `NOT NULL` desde a F45.
+  O teste usa unidade em **`America/Manaus`**, deliberadamente: com o fuso da academia real o valor
+  certo e o valor fixo coincidem, e o teste ficaria verde com a constante ainda no lugar.
 
 ### 3.3 Fluxo "receber" — uma pergunta por vez
 
@@ -136,7 +142,7 @@ já está na resposta**. Sem tabela nova, sem provedor, sem push.
 | Pagamento no totem | **F52** (MVP 3.5), depois de F49 e F50 |
 | Pagamento no app do aluno | **F25** (MVP 4), depois de F23 e F24 |
 | Régua de cobrança, histórico de contato, promessa de pagamento | **F38** (MVP 6) |
-| Lista transversal de faturas (`GET /api/v1/invoices`) | **cortada** — §3.1; volta como tela de gestão se o PI quiser |
+| ~~Lista transversal de faturas (`GET /api/v1/invoices`)~~ | **saiu do escopo negativo** — o PI recusou o corte em 23/08 e ela foi implementada (§3.1) |
 | Rota `/students/[id]/pagar` separada | **não existe** — a página de pagamento é a de cobrança do aluno, §3.0 |
 | API oficial de WhatsApp | fatia própria; o `wa.me` continua abrindo o app do operador |
 | Push nativo | não entra — decisão do PI em 23/08 |
@@ -153,9 +159,8 @@ já está na resposta**. Sem tabela nova, sem provedor, sem push.
 - **INV-069** — estado terminal de pagamento não regride.
 - **INV-098** — nenhuma coluna, log ou teste com PAN, CVV ou trilha. **O checkout hospedado é o
   que torna isto verdadeiro no balcão.**
-- **INV-144** — instante de bloqueio no timezone da unidade. ⚠️ A tela do aluno usa
-  `FUSO_PROVISORIO = 'America/Sao_Paulo'` fixo hoje; a lista nova **não** pode repetir o valor
-  fixo sem registrar a dívida.
+- **INV-144** — instante de bloqueio no timezone da unidade. ✅ **Dívida paga nesta fatia:** o fuso
+  vem da unidade de origem do aluno, pela resposta da API. A constante fixa foi removida.
 
 ---
 
@@ -181,16 +186,19 @@ O PI olha e diz "aceito" quando, com um aluno de demonstração:
 | 2 | Dinheiro precisa de método próprio (`CASH`)? | **Não.** Dinheiro é espécie, sem maquininha — usa `MANUAL` | 23/08/2026 |
 | 3 | Token de MVP: `[MVP3]` (fila) ou `[MVP2]` (conteúdo)? | `[MVP3]`, por posição na fila | 23/08/2026 |
 | 4 | Onde o atendimento começa? | **Pesquisa de aluno → ícone de cobrança na coluna Ação → página de pagamento** | 23/08/2026 |
-| 5 | A lista transversal de faturas ainda é necessária? | **em aberto** — proposta de corte em §3.1 | — |
+| 5 | A lista transversal de faturas ainda é necessária? | **Sim — implementar.** O corte proposto na §3.1 foi recusado | 23/08/2026 |
+| 6 | O `FUSO_PROVISORIO` fixo na tela, o que fazer? | **Resolver pelo fuso da unidade do aluno** — sem migration, `gym_units.timezone` e `students.gym_unit_id` já existem | 23/08/2026 |
+| 7 | Como a tela descobre que o PIX/cartão confirmou? | **Polling de uma leitura barata** (`GET /payment-attempts/:id`), não WebSocket | 23/08/2026 |
+| 8 | O CPF obrigatório (ADR-043) entra nesta fatia? | **Sim**, não vira card próprio | 23/08/2026 |
 
 ---
 
 ## 8. Antes de codificar, confirme
 
-- [ ] O PI aceitou esta spec
-- [ ] A F55 está entregue **ou** está aceito que a fatia rode contra o `FakePaymentProvider`
+- [x] O PI aceitou esta spec
+- [x] A F55 está entregue **ou** está aceito que a fatia rode contra o `FakePaymentProvider` — aceito: a fatia roda contra o fake
 - [x] A pergunta 2 da §7 está respondida — 23/08/2026, `MANUAL` para espécie
-- [ ] A pergunta 5 da §7 está respondida (corte do `GET /api/v1/invoices`)
+- [x] A pergunta 5 da §7 está respondida — **implementar**, não cortar (23/08/2026)
 
 ---
 
