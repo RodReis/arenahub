@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { z } from 'zod';
 
 import {
   DataTable,
@@ -11,6 +12,7 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
+import { CODIGO_DE_CONTRATO } from '../../../src/api/validar-resposta';
 import { janelaLegivel } from '../../../src/students/formatar';
 import { AcaoDeAtivacao } from './acao-de-ativacao';
 import { EditarPlano } from './editar-plano';
@@ -25,37 +27,48 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-interface Janela {
-  gymUnitId: string;
-  dayOfWeek: number;
-  startMinute: number;
-  endMinute: number;
-}
+/*
+ * Schemas de RESPOSTA, nao so tipos.
+ *
+ * O generico de `chamarApi` e assercao: quando a API respondeu sem `prices`,
+ * o TS ficou calado e a tela quebrou com `Cannot read properties of
+ * undefined (reading length)` dentro do render (issue #167). Com o schema, a
+ * mesma divergencia vira `ProblemDetail` -- o caminho de erro que esta
+ * pagina ja tinha.
+ */
+const esquemaDeJanela = z.object({
+  gymUnitId: z.string(),
+  dayOfWeek: z.number(),
+  startMinute: z.number(),
+  endMinute: z.number(),
+});
 
-interface Preco {
-  amountMinor: number;
-  currency: string;
-  validFrom: string;
-}
+const esquemaDePreco = z.object({
+  amountMinor: z.number(),
+  currency: z.string(),
+  validFrom: z.string(),
+});
 
-interface Plano {
-  id: string;
-  name: string;
-  description: string | null;
-  isActive: boolean;
-  gymUnitIds: string[];
-  janelas: Janela[];
+
+const esquemaDePlano = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  isActive: z.boolean(),
+  gymUnitIds: z.array(z.string()),
+  janelas: z.array(esquemaDeJanela),
   /** Preco vigente hoje, ou nulo -- nao deveria acontecer para plano criado pela tela (F53). */
-  currentPrice: Preco | null;
+  currentPrice: esquemaDePreco.nullable(),
   /** Todas as vigencias, para o reajuste mostrar o historico. */
-  prices: Preco[];
-}
+  prices: z.array(esquemaDePreco),
+});
 
-interface Unidade {
-  id: string;
-  name: string;
-  timezone: string;
-}
+const esquemaDeUnidade = z.object({
+  id: z.string(),
+  name: z.string(),
+  timezone: z.string(),
+});
+
 
 /**
  * Planos — Slice 1.2, com preço vigente desde a F53.
@@ -68,8 +81,8 @@ interface Unidade {
  */
 export default async function PaginaDePlanos() {
   const [respostaDosPlanos, respostaDasUnidades] = await Promise.all([
-    chamarApi<Plano[]>('/api/v1/plans'),
-    chamarApi<Unidade[]>('/api/v1/units'),
+    chamarApi('/api/v1/plans', { esquema: z.array(esquemaDePlano) }),
+    chamarApi('/api/v1/units', { esquema: z.array(esquemaDeUnidade) }),
   ]);
 
   if (!respostaDosPlanos.ok) {
@@ -85,7 +98,15 @@ export default async function PaginaDePlanos() {
               code: 'erro',
               correlationId: '',
             }),
-            title: `Sem permissão para consultar planos (${respostaDosPlanos.erro?.code ?? 'erro'}).`,
+            /*
+             * Falha de contrato ja traz o campo que divergiu no titulo --
+             * sobrescrever com "sem permissao" jogaria fora a unica frase
+             * que encurta o diagnostico, e mentiria sobre a causa.
+             */
+            title:
+              respostaDosPlanos.erro?.code === CODIGO_DE_CONTRATO
+                ? respostaDosPlanos.erro.title
+                : `Sem permissão para consultar planos (${respostaDosPlanos.erro?.code ?? 'erro'}).`,
           }}
         />
       </section>
