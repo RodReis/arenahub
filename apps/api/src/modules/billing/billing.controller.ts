@@ -325,6 +325,7 @@ interface ResumoFinanceiroDto {
   ate: string;
   recebidoMinor: number;
   pagamentosConfirmados: number;
+  estornadoMinor: number;
   receitaEsperadaMinor: number;
   aReceberMinor: number;
   faturasAReceber: number;
@@ -613,6 +614,7 @@ export class BillingController {
         ate: { type: 'string', format: 'date-time' },
         recebidoMinor: { type: 'integer' },
         pagamentosConfirmados: { type: 'integer' },
+        estornadoMinor: { type: 'integer' },
         receitaEsperadaMinor: { type: 'integer' },
         aReceberMinor: { type: 'integer' },
         faturasAReceber: { type: 'integer' },

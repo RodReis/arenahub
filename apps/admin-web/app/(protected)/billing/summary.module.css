@@ -1,0 +1,249 @@
+/**
+ * Painel financeiro gerencial -- F54, `SPEC-054`.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`,
+ * `--ah-border-*` e `--ah-state-*`, nunca `--ah-carbon-*` cru.
+ *
+ * ## A tese do layout
+ *
+ * Uma audiencia so -- o dono --, e tres perguntas em ordem de peso: quanto
+ * ENTROU (a resposta), quanto FALTA entrar, quanto esta VENCIDO. A tela e um
+ * numero grande, dois de apoio e a composicao da divida.
+ *
+ * Nao repete o erro que a F15 corrigiu: tres cards de peso identico obrigam a
+ * ler os tres para descobrir qual importa. Aqui o recebido e maior que o
+ * resto porque e a pergunta que se abre a tela para responder.
+ */
+
+/* ─── Faixa do periodo ─────────────────────────────────────────────────── */
+
+/*
+ * A JANELA VAI VISIVEL, e nao e enfeite: o backend recusa periodo em curso e
+ * aplica o ultimo mes fechado por default. Sem dizer qual periodo somou, o
+ * gestor leria os numeros como "agora" -- e eles nao sao.
+ */
+.periodo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 20px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.periodoValor {
+  font-weight: 600;
+  color: var(--ah-text-default);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Bloco principal ──────────────────────────────────────────────────── */
+
+/*
+ * Dinheiro a esquerda, composicao da divida a direita -- mesma proporcao da
+ * tela de inadimplencia (`1fr 1.4fr`), pelo mesmo motivo: os rotulos das
+ * faixas precisam de largura, e o numero grande ocupa menos do que parece.
+ *
+ * Fundo afundado com cards claros por cima, e nao sombra: `DS-PAINEL` §4 --
+ * card tem borda, nao sombra; sombra so em camada que flutua.
+ */
+.visaoDoDono {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  align-items: stretch;
+  gap: 16px;
+  margin: 0 0 40px;
+  padding: 16px;
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-sunken);
+}
+
+@media (max-width: 900px) {
+  .visaoDoDono {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dinheiro,
+.composicao {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.composicao > :last-child {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+}
+
+.rotulo {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * O RECEBIDO E A RESPOSTA DA TELA. `clamp` pelo mesmo motivo da F15: 48px
+ * fixos estouram a coluna a 900px, 32px desperdicam a tela a 1440px.
+ */
+.valorGigante {
+  margin: 8px 0 0;
+  font-size: clamp(2rem, 1.2rem + 2.4vw, 3rem);
+  line-height: 1.05;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * Numeros de apoio: linha de dados, nao cards. Transforma-los em caixas daria
+ * a eles o mesmo peso do recebido.
+ */
+.secundarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin: 24px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.secundarios dt {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.secundarios dd {
+  margin: 2px 0 0;
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: 600;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.tituloDoBloco {
+  margin: 0 0 16px;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: 600;
+  color: var(--ah-text-default);
+}
+
+/* ─── Segunda faixa: expectativa e quebra por metodo ───────────────────── */
+
+.faixaSecundaria {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 0 0 40px;
+}
+
+@media (max-width: 900px) {
+  .faixaSecundaria {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*
+ * Estes SIM sao cards com borda -- estao sobre o fundo da pagina, nao sobre o
+ * fundo afundado do bloco principal. `DS-PAINEL` §4.
+ */
+.cartao {
+  padding: 20px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.valorMedio {
+  margin: 8px 0 0;
+  font-size: var(--ah-type-display-size, 1.75rem);
+  line-height: 1.1;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.apoio {
+  margin: 8px 0 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/* ─── Tabelas ──────────────────────────────────────────────────────────── */
+
+.tituloDaSecao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 12px;
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: 600;
+  color: var(--ah-text-strong);
+}
+
+.apoioDoTitulo {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 400;
+  color: var(--ah-text-secondary);
+}
+
+.secao {
+  margin: 0 0 40px;
+}
+
+/*
+ * A BASE DE CALCULO, declarada (`SPEC-054` §5.2).
+ *
+ * Nao e nota de rodape decorativa: os ~340 alunos ativados e os 1.926
+ * importados como `CANCELLED` (ADR-033) distorcem qualquer percentual, e uma
+ * taxa lida sem saber o denominador afirma sobre a academia o que e verdade
+ * sobre a importacao.
+ */
+.base {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-sunken);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.base dt {
+  display: inline;
+}
+
+.base dd {
+  display: inline;
+  margin: 0 0 0 6px;
+  font-weight: 600;
+  color: var(--ah-text-default);
+  font-variant-numeric: tabular-nums;
+}
+
+.base > div {
+  white-space: nowrap;
+}

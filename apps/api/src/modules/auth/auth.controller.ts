@@ -6,6 +6,7 @@ import { NaoAutenticadoError } from '../../common/http/erro-de-dominio.js';
 import { Public } from '../../common/security/public.decorator.js';
 import { COOKIE_DE_ACESSO, COOKIE_DE_REFRESH, lerCookie } from './cookies.js';
 import { AuthService, type ParDeTokens } from './auth.service.js';
+import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { TokenService } from './token.service.js';
 
 const ACESSO_VALIDO_POR_MS = 10 * 60 * 1000;
@@ -31,6 +32,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly tokens: TokenService,
+    private readonly contexto: TenantContextService,
   ) {}
 
   @Public()
@@ -80,7 +82,29 @@ export class AuthController {
     try {
       const claims = this.tokens.verificarAcesso(token);
 
-      return await this.auth.perfil(claims.sub);
+      /**
+       * AS PERMISSOES VAO JUNTO -- F54.
+       *
+       * O painel precisa esconder do menu o que a pessoa nao alcanca
+       * (`SPEC-054` §7), e ate aqui o front nao tinha como saber quem pode o
+       * que: escondia nada, e cada tela descobria a recusa ao abrir.
+       *
+       * NAO E CONTROLE DE ACESSO, e a distincao importa: quem digitar a URL
+       * chega igual, e quem barra continua sendo o `PermissionsGuard` no
+       * servidor. Esconder o item so evita oferecer a alguem uma tela que vai
+       * recusa-lo -- e o guard segue sendo a unica coisa entre a pessoa e o
+       * dado.
+       *
+       * SEM CONSULTA NOVA: o `AuthGuard` ja montou este conjunto a partir do
+       * BANCO para esta requisicao (nao do token, justamente para revogacao
+       * valer na hora). Aqui so se le o que ja esta em memoria.
+       */
+      const contexto = this.contexto.opcional();
+
+      return {
+        ...(await this.auth.perfil(claims.sub)),
+        permissions: contexto ? [...contexto.permissions].sort() : [],
+      };
     } catch {
       // Token invalido, expirado ou de outro tipo produzem a mesma
       // resposta: quem esta sondando nao aprende qual dos tres foi.

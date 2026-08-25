@@ -198,8 +198,8 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
       amountMinor?: number;
       method?: 'MANUAL' | 'PIX' | 'CARD';
     } = {},
-  ): Promise<void> {
-    await db.payment.create({
+  ): Promise<string> {
+    const pagamento = await db.payment.create({
       data: {
         tenantId: s.contexto.tenantId,
         invoiceId,
@@ -208,6 +208,31 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
         method: opts.method ?? 'MANUAL',
         status: opts.status ?? 'CONFIRMED',
         paidAt: opts.paidAt ?? new Date('2026-08-10T12:00:00Z'),
+      },
+      select: { id: true },
+    });
+
+    return pagamento.id;
+  }
+
+  async function criarEstorno(
+    s: Semente,
+    invoiceId: string,
+    paymentId: string,
+    opts: { amountMinor: number; settledAt?: Date; status?: 'CONFIRMED' | 'REQUESTED' | 'FAILED' },
+  ): Promise<void> {
+    await db.refund.create({
+      data: {
+        tenantId: s.contexto.tenantId,
+        invoiceId,
+        paymentId,
+        amountMinor: opts.amountMinor,
+        currency: 'BRL',
+        status: opts.status ?? 'CONFIRMED',
+        reason: 'teste de fixture',
+        requestedByUserId: s.contexto.actorId,
+        idempotencyKey: randomUUID(),
+        settledAt: opts.settledAt ?? new Date('2026-08-20T12:00:00Z'),
       },
     });
   }
@@ -314,6 +339,87 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
       // para a quebra somar 100%, e nao de duas com a terceira sumindo.
       { metodo: 'CARD', minorTotal: 0, quantidade: 0 },
     ]);
+  });
+
+  /**
+   * O DEFEITO QUE ESTE TESTE EXISTE PARA IMPEDIR, achado em revisao.
+   *
+   * ESTORNO PARCIAL NAO MEXE NO `Payment`: o `EstornarPagamentoUseCase` so
+   * move o pagamento para `REFUNDED` quando o estorno e TOTAL. Um pagamento
+   * de R$ 150 estornado em R$ 90 continua `CONFIRMED` com `amountMinor` 150 --
+   * e a primeira versao desta fatia somava exatamente isso.
+   *
+   * O dono leria que entraram R$ 150 quando entraram R$ 60. E o terceiro
+   * defeito de dinheiro do projeto com a mesma assinatura: o estado do
+   * registro nao conta a historia inteira.
+   */
+  it('desconta estorno parcial do recebido, com o pagamento ainda CONFIRMED', async () => {
+    const s = await semearTenant();
+    const invoice = await criarInvoice(s);
+    const pagamento = await criarPagamento(s, invoice, { amountMinor: 15_000 });
+
+    await criarEstorno(s, invoice, pagamento, { amountMinor: 9_000 });
+
+    const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    // O pagamento NAO mudou de estado -- e o que torna o defeito invisivel.
+    const depois = await db.payment.findUniqueOrThrow({
+      where: { id: pagamento },
+      select: { status: true, amountMinor: true },
+    });
+    expect(depois).toEqual({ status: 'CONFIRMED', amountMinor: 15_000 });
+
+    expect(resumo.recebidoMinor).toBe(6_000);
+    expect(resumo.estornadoMinor).toBe(9_000);
+  });
+
+  /** Estorno nao confirmado NAO abate: o dinheiro ainda nao saiu. */
+  it('ignora estorno que ainda nao foi confirmado', async () => {
+    const s = await semearTenant();
+    const invoice = await criarInvoice(s);
+    const pagamento = await criarPagamento(s, invoice, { amountMinor: 15_000 });
+
+    await criarEstorno(s, invoice, pagamento, { amountMinor: 9_000, status: 'REQUESTED' });
+    await criarEstorno(s, invoice, pagamento, { amountMinor: 5_000, status: 'FAILED' });
+
+    const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    expect(resumo.recebidoMinor).toBe(15_000);
+    expect(resumo.estornadoMinor).toBe(0);
+  });
+
+  /**
+   * O ESTORNO ABATE NO PERIODO EM QUE O DINHEIRO SAIU (`settledAt`), nao no do
+   * pagamento original -- senao um mes ja fechado mudaria de valor semanas
+   * depois, que e o que a janela fechada existe para impedir.
+   */
+  it('abate o estorno na janela em que foi liquidado, nao na do pagamento', async () => {
+    const s = await semearTenant();
+    const invoice = await criarInvoice(s);
+    const pagamento = await criarPagamento(s, invoice, {
+      paidAt: new Date('2026-08-10T12:00:00Z'),
+      amountMinor: 15_000,
+    });
+
+    // Liquidado em SETEMBRO: agosto nao pode encolher.
+    await criarEstorno(s, invoice, pagamento, {
+      amountMinor: 9_000,
+      settledAt: new Date('2026-09-05T12:00:00Z'),
+    });
+
+    const agosto = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+    expect(agosto.recebidoMinor).toBe(15_000);
+    expect(agosto.estornadoMinor).toBe(0);
+
+    const setembro = await useCase.executar(s.contexto, {
+      de: ATE,
+      ate: new Date('2026-10-01T00:00:00.000Z'),
+      agora: new Date('2026-10-02T00:00:00.000Z'),
+    });
+    // Sem entrada no mes, o liquido vai a ZERO e nao a negativo -- "recebi
+    // menos noventa reais" nao e leitura util. O estorno aparece ao lado.
+    expect(setembro.recebidoMinor).toBe(0);
+    expect(setembro.estornadoMinor).toBe(9_000);
   });
 
   /**

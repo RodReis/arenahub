@@ -139,6 +139,11 @@ export interface SerieDeCompetencia {
  * faturado faturou zero, e pular o mes faria a linha ligar julho a setembro
  * como se agosto nao tivesse existido. O preenchimento e do chamador, que
  * conhece a janela; esta funcao apenas nao inventa mes fora dela.
+ *
+ * A UNIAO DAS DUAS CHAVES, e nao as chaves do faturado: os dois lados vem de
+ * consultas INDEPENDENTES, e nada garante que toda competencia exista nos
+ * dois mapas. Iterar so um deles perderia, calada, a competencia que so o
+ * outro conhece.
  */
 export function montarSerie(
   faturadoPorCompetencia: ReadonlyMap<string, number>,

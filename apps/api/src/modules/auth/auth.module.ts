@@ -1,3 +1,4 @@
+import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { Module } from '@nestjs/common';
 
 import { carregarConfig, type ConfigDaApi } from '../../config/env.js';
@@ -18,6 +19,9 @@ const CONFIG_DA_API = Symbol('CONFIG_DA_API');
   controllers: [AuthController],
   providers: [
     AuthService,
+    // Escopo de REQUEST: o `/auth/me` le dele as permissoes ja montadas pelo
+    // guard. Sem registrar aqui, compila e quebra em runtime (F54).
+    TenantContextService,
     PasswordService,
     SessionRepository,
     TokenService,

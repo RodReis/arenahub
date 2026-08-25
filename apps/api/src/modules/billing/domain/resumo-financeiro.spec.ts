@@ -166,10 +166,12 @@ describe('montarSerie', () => {
   });
 
   /**
-   * Competencia que so tem recebimento existe: quem paga agosto atrasado em
-   * setembro nao cria competencia de setembro -- mas uma invoice cancelada
-   * cujo pagamento foi confirmado antes deixa a competencia so do lado do
-   * recebido. Ela nao pode sumir da serie.
+   * A serie itera a UNIAO das duas chaves, nao as do faturado.
+   *
+   * Os dois lados vem de consultas independentes, e nada garante que toda
+   * competencia exista nos dois mapas. Iterar so o faturado perderia, calada,
+   * a competencia que so o recebido conhece -- e o teste falha se alguem
+   * "simplificar" para um lado so.
    */
   it('inclui competencia presente so no recebido', () => {
     const serie = montarSerie(new Map(), new Map([['2026-08', 12_000]]));

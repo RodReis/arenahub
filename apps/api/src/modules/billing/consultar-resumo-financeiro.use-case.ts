@@ -57,9 +57,22 @@ export interface ResumoFinanceiro {
   readonly de: Date;
   readonly ate: Date;
 
-  /** Pagamentos `CONFIRMED` com `paidAt` na janela. */
+  /**
+   * Recebido LIQUIDO: pagamentos `CONFIRMED` na janela, menos os estornos
+   * confirmados nela. Ver `estornadoMinor`.
+   */
   readonly recebidoMinor: number;
   readonly pagamentosConfirmados: number;
+
+  /**
+   * Estornos confirmados na janela, ja descontados de `recebidoMinor`.
+   *
+   * VAI SEPARADO porque devolver dinheiro nao e o mesmo que nao te-lo
+   * recebido: um mes com R$ 5.000 de entrada e R$ 800 de estorno conta uma
+   * historia diferente de um mes com R$ 4.200 de entrada, e o painel existe
+   * para o dono ver a diferenca.
+   */
+  readonly estornadoMinor: number;
 
   /**
    * Soma do `PlanPrice` vigente das assinaturas ativas -- decisao 3 do PI.
@@ -145,8 +158,16 @@ export class ConsultarResumoFinanceiroUseCase {
      * Tudo em paralelo: sao consultas independentes, e serializa-las faria a
      * tela somar oito latencias de banco por carregamento.
      */
-    const [recebido, aReceber, vencidas, porMetodo, faturadoNaSerie, recebidoNaSerie, assinaturas] =
-      await Promise.all([
+    const [
+      recebido,
+      estornado,
+      aReceber,
+      vencidas,
+      porMetodo,
+      faturadoNaSerie,
+      recebidoNaSerie,
+      assinaturas,
+    ] = await Promise.all([
         // RECEBIDO: pagamento CONFIRMED com `paidAt` na janela.
         //
         // `paidAt` e nao `createdAt`: o pagamento manual da recepcao e
@@ -160,6 +181,31 @@ export class ConsultarResumoFinanceiroUseCase {
           },
           _sum: { amountMinor: true },
           _count: true,
+        }),
+
+        /**
+         * ESTORNOS CONFIRMADOS NA JANELA -- e o defeito que esta consulta
+         * existe para nao ter.
+         *
+         * ESTORNO PARCIAL NAO MEXE NO `Payment`: `EstornarPagamentoUseCase`
+         * so move o pagamento para `REFUNDED` quando o estorno e TOTAL --
+         * parcial deixa `CONFIRMED` com o `amountMinor` inteiro, de proposito
+         * (parte do dinheiro entrou mesmo). Somar `CONFIRMED` sem descontar
+         * faria um pagamento de R$ 150 estornado em R$ 90 continuar contando
+         * R$ 150 no painel: o dono leria que entraram 150 quando entraram 60.
+         *
+         * `settledAt` E NAO `paidAt` do pagamento original: o estorno abate no
+         * periodo em que o dinheiro SAIU. Atribui-lo ao periodo do pagamento
+         * faria um mes ja fechado mudar de valor semanas depois -- justamente
+         * o que a janela fechada existe para impedir.
+         */
+        this.db.refund.aggregate({
+          where: {
+            ...doTenant,
+            status: 'CONFIRMED',
+            settledAt: { gte: entrada.de, lt: entrada.ate },
+          },
+          _sum: { amountMinor: true },
         }),
 
         // A RECEBER: invoice OPEN vencendo na janela.
@@ -254,7 +300,18 @@ export class ConsultarResumoFinanceiroUseCase {
     const inadimplentes = new Set(vencidas.map((invoice) => invoice.studentId));
     const pagantes = new Set(assinaturas.map((assinatura) => assinatura.studentId));
 
-    const recebidoMinor = recebido._sum.amountMinor ?? 0;
+    const estornadoMinor = estornado._sum.amountMinor ?? 0;
+
+    /**
+     * LIQUIDO, e nunca negativo.
+     *
+     * O piso em zero cobre o caso real de estorno que atravessa a janela: um
+     * pagamento de julho estornado em agosto abate em agosto, e se agosto
+     * tiver recebido pouco o liquido daria negativo. "Recebi menos vinte
+     * reais" nao e leitura util para o dono -- o que ele precisa ver e a
+     * entrada em zero e o estorno declarado ao lado, que e o que a tela faz.
+     */
+    const recebidoMinor = Math.max((recebido._sum.amountMinor ?? 0) - estornadoMinor, 0);
 
     return {
       de: entrada.de,
@@ -262,6 +319,7 @@ export class ConsultarResumoFinanceiroUseCase {
 
       recebidoMinor,
       pagamentosConfirmados: recebido._count,
+      estornadoMinor,
 
       receitaEsperadaMinor: await this.receitaEsperada(contexto, assinaturas, entrada.agora),
 
