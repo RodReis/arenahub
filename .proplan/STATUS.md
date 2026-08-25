@@ -9,7 +9,6 @@ updated: 2026-08-25
 
 ### Sem épico
 
-- [MVP1][FIX] sessao expira em 10 min e o painel nao renova: toda Server Action falha calada (#187)
 - [MVP3][FIX] chamarApi assere o tipo em vez de validar: divergencia de contrato vira crash de runtime (#167)
 - [MVP3][SPEC-056][F56] Plano com assinatura mensal (#159)
 - [MVP3][SPEC-054][F54] Painel financeiro gerencial (KPIs) (#157)
@@ -60,6 +59,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] sessao expira em 10 min e o painel nao renova: toda Server Action falha calada (#187, finalizado em: 2026-08-25)
 - [MVP1][FIX] seed cria plano sem unidade nem janela: entitlement nasce ACTIVE e a catraca nega (#188, finalizado em: 2026-08-25)
 - [MVP2][SPEC-013][FIX] plano nao pode ser editado apos criado (#185, finalizado em: 2026-08-25)
 - [MVP1][FIX] data de nascimento anda um dia: data pura renderizada como instante (#176, finalizado em: 2026-08-25)
