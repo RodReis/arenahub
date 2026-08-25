@@ -13,6 +13,7 @@ import {
 import { chamarApi } from '../../../lib/api/server-client';
 import { janelaLegivel } from '../../../src/students/formatar';
 import { AcaoDeAtivacao } from './acao-de-ativacao';
+import { EditarPlano } from './editar-plano';
 import { AcaoDeReajuste } from './acao-de-reajuste';
 import estilosDePlano from './planos.module.css';
 import { Abas } from '../../../src/components/abas';
@@ -265,6 +266,20 @@ export default async function PaginaDePlanos() {
                    */
                   render: (plano) => (
                     <div className={estilosDePlano['acoesDaLinha']}>
+                      {/*
+                        EDITAR o plano -- nada dele era editavel ate
+                        24/08/2026: nome errado e, o pior, unidade faltando
+                        ficavam para sempre.
+                      */}
+                      <EditarPlano
+                        planId={plano.id}
+                        nome={plano.name}
+                        descricao={plano.description}
+                        unidadesDoPlano={plano.gymUnitIds}
+                        janelas={plano.janelas}
+                        unidades={unidades}
+                      />
+
                     <AcaoDeReajuste
                       planId={plano.id}
                       nomeDoPlano={plano.name}

@@ -96,6 +96,13 @@ export interface DadosDeCriacaoDePlano {
   amountMinor: number;
 }
 
+export interface DadosDeEdicaoDePlano {
+  name: string;
+  description?: string | undefined;
+  gymUnitIds: readonly string[];
+  janelas: readonly JanelaDeAcesso[];
+}
+
 export interface DadosDeReajuste {
   amountMinor: number;
   validFrom: Date;
@@ -254,6 +261,103 @@ export class MembershipRepository {
    *
    * `agora` nao entra aqui: nao ha decisao temporal nesta operacao.
    */
+  /**
+   * Edita nome, descricao, unidades e janelas do plano.
+   *
+   * PRECO FICA DE FORA: ele tem rota propria (`POST /plans/:id/prices`) e
+   * historico de vigencia -- trocar o valor por aqui apagaria a linha do
+   * tempo que INV-068 existe para preservar.
+   *
+   * UNIDADES E JANELAS ANDAM JUNTAS, e nao e escolha de conveniencia: a
+   * janela aponta para `gymUnitId`, entao trocar a unidade sem reescrever as
+   * janelas deixaria regra MORTA -- janela nunca avaliada, para uma unidade
+   * que saiu do plano. Substituir as duas na mesma transacao e o unico jeito
+   * de o plano nunca existir num estado incoerente.
+   *
+   * QUEM JA TEM ASSINATURA NAO E AFETADO: o entitlement guarda um SNAPSHOT
+   * da politica (`montarSnapshotDePolitica`), copiado quando nasce. A edicao
+   * vale para assinaturas NOVAS -- e isso protege quem esta dentro de perder
+   * acesso por uma correcao de cadastro.
+   */
+  async editarPlano(
+    contexto: TenantContext,
+    id: string,
+    dados: DadosDeEdicaoDePlano,
+    correlationId: string,
+  ): Promise<Plan> {
+    const janelas = validarJanelas(dados.janelas);
+
+    const existente = await this.db.plan.findFirst({
+      where: { id, tenantId: contexto.tenantId },
+      select: { id: true },
+    });
+
+    if (!existente) throw new PlanoNaoEncontradoError();
+
+    // MESMA checagem da criacao: `PlanUnit` nao tem FK para `GymUnit` (a
+    // relacao e por id solto), entao sem isto daria para mover o plano para
+    // a unidade de outra academia.
+    const unidades = await this.db.gymUnit.findMany({
+      where: { id: { in: [...dados.gymUnitIds] }, tenantId: contexto.tenantId },
+      select: { id: true },
+    });
+
+    if (unidades.length !== dados.gymUnitIds.length) {
+      throw new ErroDeDominio('PLAN_UNIT_NOT_FOUND', 422, 'Unidade inexistente neste tenant');
+    }
+
+    const permitidas = new Set(dados.gymUnitIds);
+    for (const janela of janelas) {
+      if (!permitidas.has(janela.gymUnitId)) {
+        throw new ErroDeDominio(
+          'PLAN_WINDOW_UNIT_NOT_IN_PLAN',
+          422,
+          'Janela aponta para unidade que nao esta no plano',
+        );
+      }
+    }
+
+    return this.db.$transaction(async (tx) => {
+      /*
+       * SUBSTITUI, nao faz merge: `deleteMany` seguido de `create`. Merge
+       * exigiria um identificador estavel de janela que nao existe -- e
+       * tentar casar por (dia, inicio, fim) confundiria "mudei o horario"
+       * com "criei outra faixa".
+       */
+      await tx.planUnit.deleteMany({ where: { planId: id } });
+      await tx.planAccessWindow.deleteMany({ where: { planId: id } });
+
+      const plano = await tx.plan.update({
+        where: { id },
+        data: {
+          name: dados.name,
+          description: dados.description ?? null,
+          units: { create: dados.gymUnitIds.map((gymUnitId) => ({ gymUnitId })) },
+          accessWindows: { create: janelas.map((j) => ({ ...j })) },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'plan.updated',
+          target: 'plan',
+          targetId: id,
+          correlationId,
+          metadata: {
+            name: plano.name,
+            unidades: dados.gymUnitIds.length,
+            janelas: janelas.length,
+          },
+        },
+      });
+
+      return plano;
+    });
+  }
+
   async alterarAtivacaoDePlano(
     contexto: TenantContext,
     id: string,
