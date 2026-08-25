@@ -150,6 +150,14 @@ const PERMISSOES = [
   // e ela nunca ve o percentual de gordura de ninguem. Mantem a separacao do
   // ADR-037 de pe com o fluxo automatico.
   'health.upload',
+  // F54: painel financeiro gerencial.
+  //
+  // Separada de `billing.read` pelo mesmo motivo de `biometric.*`: o que a
+  // RECEPCAO precisa e achar a fatura de UM aluno no balcao. O painel
+  // consolida o tenant inteiro -- faturamento, ticket medio e taxa de
+  // inadimplencia --, e quem atende na porta nao precisa disso para
+  // trabalhar. Decisao do PI em 25/08/2026 (`SPEC-054` §8, pergunta 3).
+  'billing.dashboard',
 ];
 
 

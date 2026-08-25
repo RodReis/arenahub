@@ -558,6 +558,92 @@
         ]
       }
     },
+    "/api/v1/billing/summary": {
+      "get": {
+        "operationId": "BillingController_consultarResumoFinanceiro",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "de",
+                    "ate",
+                    "recebidoMinor",
+                    "faixas",
+                    "serie",
+                    "base"
+                  ],
+                  "properties": {
+                    "de": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "ate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "recebidoMinor": {
+                      "type": "integer"
+                    },
+                    "pagamentosConfirmados": {
+                      "type": "integer"
+                    },
+                    "receitaEsperadaMinor": {
+                      "type": "integer"
+                    },
+                    "aReceberMinor": {
+                      "type": "integer"
+                    },
+                    "faturasAReceber": {
+                      "type": "integer"
+                    },
+                    "vencidoMinor": {
+                      "type": "integer"
+                    },
+                    "faturasVencidas": {
+                      "type": "integer"
+                    },
+                    "faixas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "ticketMedioMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "taxaDeInadimplencia": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "quebraPorMetodo": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "serie": {
+                      "type": "object"
+                    },
+                    "base": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/billing/delinquency/apply": {
       "post": {
         "operationId": "BillingController_aplicarInadimplenciaAgora",
