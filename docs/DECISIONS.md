@@ -2944,3 +2944,65 @@ maior que zero. Não se antecipou a coluna para não invadir escopo de outra fat
 | 5 | `MVP-04` §7 Slice 4.6 emendado — dois QRs no totem | PRD |
 | 6 | F45/F48 herdam a pendência de CPF da base legada | cadastro e ativação |
 | 7 | A F14 tem correção pendente que **só aparece com provedor real** | Decisão 5 |
+
+---
+
+## ADR-044 — Getnet: a integração é pela Global API, não pela API Brasil legada
+
+**Data:** 25/08/2026 · **Decisão do PI** · **Status:** aceito
+
+### Contexto
+
+A `SPEC-055` §9.1 listava cinco perguntas para a Fase 0 com a Getnet, e a primeira decidia os
+*paths* de toda a integração: **Global API** (`docs.globalgetnet.com`, sandbox
+`api-sbx.globalgetnet.com`) ou **API Brasil legada** (`api.getnet.com.br`)? Os conceitos são os
+mesmos; os caminhos, não. Enquanto a resposta não existisse, escrever adapter era apostar — e
+apostar errado significa reescrever o transporte inteiro.
+
+### Decisão
+
+**Global API.**
+
+Razão registrada pelo PI: é a interface moderna e unificada (*single entry point*) para pagamento
+digital e presencial; permite operar Brasil, Argentina, Chile e México por **uma única integração
+técnica**; e é o caminho indicado para projeto novo e para integração entre e-commerce e Smart
+POS.
+
+**Multi-país não é requisito do MVP 2** — o ArenaHub atende uma academia em Curitiba. O que pesa
+aqui é outra coisa: **escolher a interface que não está em fim de vida é barato agora e caro
+depois.** Migrar transporte de pagamento com dinheiro real correndo é exatamente a classe de
+mudança que este arquivo existe para evitar.
+
+### Por que é ADR e não nota de PR
+
+Contrato com terceiro, no critério do `CLAUDE.md`: outro sistema (o da Getnet) já consome a
+escolha, e desfazê-la depois de credencial emitida e tráfego rodando custa reemissão contratual,
+não refactor.
+
+### O que a documentação pública confirmou — 25/08/2026
+
+OAuth2 `client_credentials`; header **`x-seller-id`** (confirma que a conta vai por
+`ProviderAccount`, nunca em variável de ambiente — INV-078); *Single-Step Payments* (autoriza e
+captura numa chamada); tokenização para cobrança recorrente; assinatura como produto — **que a
+Decisão 2 do ADR-043 recusou usar**; webhook em tempo real; e **Web Checkout** em três formas
+(iFrame, lightbox, página hospedada).
+
+### O que continua em aberto, e o que ainda bloqueia
+
+A decisão **não desbloqueia a F55**. Seguem sendo insumo do PI: `client_id`, `client_secret` e
+`seller_id` (maquininha ativa não dá credencial de e-commerce — `SPEC-055` §9.1), e o certificado
+mTLS do Sicoob.
+
+E a documentação pública **não respondeu** hosts base, paths exatos, validade do `access_token`,
+formato da idempotência, nem — o mais caro — **como se verifica a autenticidade do webhook**. Essa
+última é o achado aberto desde 19/08 (`SPEC-055` §3.3) e continua sendo o que **impede tráfego de
+produção**: sem ela, `M2-FR-007` não é cumprido e o endpoint aceita evento forjado.
+
+### Consequências
+
+| # | consequência | onde |
+|---|---|---|
+| 1 | `SPEC-055` §9.1 pergunta 1 respondida; as outras quatro seguem abertas | `SPEC-055` §9.1, §10 |
+| 2 | Hosts entram em configuração por `ProviderAccount` (sandbox/produção), não em constante | `SPEC-055` §3.2 |
+| 3 | A suposição de `access_token` ~3600 s sem refresh continua **suposição**, não fato | `SPEC-055` §9.2, §10.2 |
+| 4 | Nenhum código muda hoje — sem credencial não há o que chamar | — |

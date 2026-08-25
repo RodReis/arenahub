@@ -127,6 +127,7 @@ cumprido e o endpoint aceita evento forjado. **Nenhum tráfego de produção ant
 | 1 | Fatia separada da F53? | **em aberto** — proposta e motivo na abertura desta spec | — |
 | 2 | Credenciais de sandbox e produção dos dois provedores | **em aberto — insumo do PI** | — |
 | 3 | CNPJ/conta recebedora e modelo de conta (`MVP-02` §5) já definidos? | **em aberto** | — |
+| 4 | Global API ou API Brasil legada? | **Global API** — §10 | 25/08/2026 |
 
 ---
 
@@ -155,13 +156,17 @@ chamava de "insumo do PI" — e é o primeiro item, bloqueante de todo o resto.
 
 Perguntas a fazer no mesmo contato, porque cada uma muda código:
 
-1. **Global API (`docs.globalgetnet.com`, sandbox `api-sbx.globalgetnet.com`) ou API Brasil legada
-   (`api.getnet.com.br`)?** Os conceitos são os mesmos; os *paths* não. Ficam em configuração.
+1. ~~**Global API ou API Brasil legada?**~~ **RESPONDIDA — decisão do PI em 25/08/2026: Global
+   API** (`docs.globalgetnet.com`, sandbox `api-sbx.globalgetnet.com`). Ver §9.6.
 2. **Checkout hospedado / Iframe** — o produto que atende a decisão do PI de 23/08 e mantém o PAN
-   fora do nosso servidor.
-3. **Modo de autenticação do webhook** — HMAC ou mTLS antes de Basic (§9.4).
-4. **Ranges de IP do webhook**, para allowlist.
-5. **Script de fingerprint antifraude** e o que ele exige de `customer`.
+   fora do nosso servidor. **Parcialmente respondida** pela §9.6: o produto se chama **Web
+   Checkout** e oferece três formas (iFrame, lightbox, página hospedada). *Qual das três* continua
+   aberto.
+3. **Modo de autenticação do webhook** — HMAC ou mTLS antes de Basic (§9.4). **EM ABERTO, e é a
+   mais cara:** a documentação pública confirma que há webhook, mas **não diz como a autenticidade
+   é verificada** — que é exatamente o achado aberto desde 19/08 e a §3.3 desta spec.
+4. **Ranges de IP do webhook**, para allowlist. **Em aberto.**
+5. **Script de fingerprint antifraude** e o que ele exige de `customer`. **Em aberto.**
 
 ### 9.2 Contrato técnico que entra no adapter da Getnet
 
@@ -217,3 +222,56 @@ aplicar qualquer efeito financeiro**.
   o ArenaHub cobra sozinho, com o calendário e a carência ainda nossos.
 - **Get Smart / POS Android:** descartado com fundamento (deeplink só é invocável por app Android
   dentro do terminal). Fica no Anexo A dos documentos como cenário futuro.
+
+---
+
+## 10. Decisão do PI — Global API, 25/08/2026
+
+**A integração da Getnet é pela Global API** (`docs.globalgetnet.com`, sandbox
+`api-sbx.globalgetnet.com`), **não** pela API Brasil legada (`api.getnet.com.br`). Responde a
+pergunta 1 da §9.1 — a que decidia os *paths* de toda a integração.
+
+**Razão registrada pelo PI:** é a interface moderna e unificada (*single entry point*) para
+pagamento digital e presencial; permite operar Brasil, Argentina, Chile e México por **uma única
+integração técnica**, e é o caminho indicado para projeto novo e para integração entre e-commerce
+e Smart POS. Nada disso é requisito do MVP 2 — o ArenaHub atende uma academia em Curitiba —, mas
+**escolher a interface que não está em fim de vida é barato agora e caro depois**, e a decisão é
+do PI.
+
+### 10.1 O que a documentação pública confirma
+
+Verificado em 25/08/2026 em `docs.globalgetnet.com/pt/products/online-payments/regional-api` e
+`.../web-checkout`:
+
+| item | confirmado |
+|---|---|
+| Autenticação | **OAuth2 `client_credentials`** — casa com o que a §9.2 já previa |
+| Header de conta | **`x-seller-id`** — confirma a §9.2: por `ProviderAccount`, nunca em env |
+| Cobrança com cartão | *Single-Step Payments*: **autoriza e captura numa chamada** |
+| Tokenização | existe, descrita como armazenamento seguro para **cobrança recorrente** |
+| Assinatura/recorrência | existe como produto — o que a **Decisão 2 do ADR-043 recusou usar** |
+| Webhook | existe, "notificação em tempo real" |
+| Checkout | **Web Checkout**, em três formas: **iFrame, lightbox ou página hospedada** |
+
+**O nome da rota na navegação é `regional-api`, não `global-api`.** Detalhe bobo que custa um 404
+a quem adivinhar o path — anotado aqui para o próximo não repetir.
+
+### 10.2 O que a documentação pública NÃO respondeu
+
+Nada abaixo é adivinhável: entra na Fase 0, com as credenciais.
+
+- **Hosts base** e **paths exatos** de cada operação.
+- **Validade do `access_token`** e se há refresh — a §9.2 assume ~3600 s sem refresh, e isso
+  **continua sendo suposição**, não fato verificado.
+- **Idempotência**: se é header ou campo de corpo, e qual o nome.
+- ⚠️ **Como a autenticidade do webhook é verificada.** A doc confirma que o webhook existe e
+  **não diz como se prova que ele veio da Getnet**. É o achado aberto desde 19/08, é a §3.3, e é
+  o que impede tráfego de produção. **A pergunta 3 da §9.1 segue sendo a mais cara da lista.**
+- **Qual das três formas de Web Checkout** atende o balcão (F53) e o totem (F52).
+
+### 10.3 Efeito nesta fatia
+
+Nenhum código muda hoje: sem `client_id`/`client_secret`/`seller_id`, não há o que chamar. O que a
+decisão faz é **fixar contra qual interface o adapter será escrito**, e portanto contra qual
+documentação a Fase 0 deve perguntar. Os hosts entram em configuração por `ProviderAccount`
+(sandbox/produção), como a §3.2 já previa — não em constante de código.

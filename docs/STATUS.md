@@ -401,6 +401,22 @@ o mesmo aluno em paralelo, e o ArenaHub sem onde vê-las (o `externalSubscriptio
 atos** — cobrança pontual com token salvo contra recorrência instalada uma vez. **É a segunda vez
 que o dublê esconde defeito de dinheiro**; a primeira foi a chave de idempotência derivada de
 contagem, na própria F14, que cobrava em dobro.
+✅ **Corrigido em 25/08/2026 (PR #193).** `chargeTokenizedPayment` nasceu na porta e a F14 passou a
+chamá-lo; o campo de retorno virou `externalPaymentId`. Achado durante a correção: **o
+cancelamento dependia do defeito** — `CancelarRecorrenciaUseCase` só funcionava porque a coluna
+guardava, por acidente, um id de assinatura. Decisão do PI: zero recorrências a cancelar é o
+estado verdadeiro, e a fonte correta (`Subscription.externalSubscriptionId`) nasce na F56.
+
+🌐 **25/08/2026 — o PI escolheu a Global API (ADR-044).** A pergunta que decidia os *paths* de toda
+a integração Getnet foi respondida: **Global API** (`api-sbx.globalgetnet.com`), não a API Brasil
+legada. Razão: interface unificada, não está em fim de vida, e cobre Brasil/Argentina/Chile/México
+por uma integração só — multi-país não é requisito do MVP 2, mas trocar transporte de pagamento
+com dinheiro correndo é caro. A doc pública confirmou OAuth2 `client_credentials`, header
+`x-seller-id`, captura em passo único, tokenização e **Web Checkout** em três formas. **Não
+respondeu** hosts, paths, validade do token, idempotência — nem **como se verifica a autenticidade
+do webhook**, que segue sendo o achado aberto desde 19/08 e o que **impede tráfego de produção**.
+**A F55 continua bloqueada**: `client_id`/`client_secret`/`seller_id` e o mTLS do Sicoob seguem
+sendo insumo do PI.
 
 🔎 **23/08/2026, quinta rodada — o PI descreveu o caminho do atendimento, e metade dele já estava
 no ar.** *"Pesquisa do aluno → aluno localizado → na grid, coluna Ação → ícone do pagamento →
