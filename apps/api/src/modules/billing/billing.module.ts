@@ -5,6 +5,7 @@ import { TenantContextService } from '../../common/tenant/tenant-context.service
 import { BillingController } from './billing.controller.js';
 import { BillingRepository } from './billing.repository.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
+import { ConsultarResumoFinanceiroUseCase } from './consultar-resumo-financeiro.use-case.js';
 import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
 import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
@@ -76,6 +77,7 @@ import { WebhookController } from './webhook.controller.js';
     CancelarRecorrenciaUseCase,
     AplicarInadimplenciaUseCase,
     ConsultarInadimplenciaUseCase,
+    ConsultarResumoFinanceiroUseCase,
     LiberacaoFinanceiraUseCase,
     EstornarPagamentoUseCase,
     ObservarEstornoUseCase,

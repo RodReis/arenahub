@@ -36,6 +36,14 @@ interface Item {
    * problema que a lista plana não tem.
    */
   readonly grupo?: string;
+  /**
+   * Capacidade que o usuario precisa ter para o item aparecer (F54).
+   *
+   * O FILTRO ACONTECE NO SERVIDOR, no layout -- este campo esta aqui so para
+   * o tipo bater. Filtrar no cliente mandaria o item para o navegador e o
+   * esconderia com CSS, o que nao esconde nada de quem abre o DevTools.
+   */
+  readonly exigePermissao?: string;
 }
 
 export function Navegacao({ itens }: { readonly itens: readonly Item[] }) {

@@ -9,6 +9,14 @@ import { Navegacao } from './navegacao';
 interface Perfil {
   id: string;
   email: string;
+  /**
+   * Capacidades do usuario nesta sessao -- F54.
+   *
+   * NAO E CONTROLE DE ACESSO: quem digitar a URL chega igual, e quem barra
+   * continua sendo o `PermissionsGuard` no servidor. Serve para nao OFERECER
+   * uma tela que vai recusar a pessoa.
+   */
+  permissions?: string[];
 }
 
 /**
@@ -40,6 +48,15 @@ const NAVEGACAO = [
     conferencia mensal atras de uma tela de uso diario.
   */
   { href: '/billing/reconciliation', label: 'Conciliação' },
+  /*
+    PAINEL FINANCEIRO -- F54, e o unico item do menu com permissao propria.
+
+    `billing.dashboard` e nova (decisao do PI, SPEC-054 §8): `billing.read` e
+    o que a recepcao usa para achar a fatura de um aluno, e o painel consolida
+    o tenant inteiro. Por isso este item some para quem so atende no balcao --
+    ver `exigePermissao`.
+  */
+  { href: '/billing', label: 'Painel financeiro', exigePermissao: 'billing.dashboard' },
   /*
     ADMINISTRAÇÃO -- decisão do PI em 24/08/2026.
 
@@ -108,6 +125,23 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
         ? 'Nenhuma unidade cadastrada'
         : `${unidades.length} unidades`;
 
+  /*
+   * O QUE O MENU MOSTRA -- F54.
+   *
+   * Item sem `exigePermissao` aparece para todo mundo, como sempre apareceu:
+   * a fatia nao esconde nada que ja estava visivel. So o painel financeiro
+   * declara capacidade, e some para quem nao a tem.
+   *
+   * `permissions` AUSENTE esconde o item protegido em vez de mostra-lo. Uma
+   * API antiga que ainda nao devolva o campo faria o link aparecer para todos
+   * -- e um link que leva a uma recusa e pior que link nenhum. Errar para o
+   * lado de esconder e o unico erro barato aqui.
+   */
+  const permissoes = new Set(resposta.dados.permissions ?? []);
+  const itensVisiveis = NAVEGACAO.filter(
+    (item) => !('exigePermissao' in item) || permissoes.has(item.exigePermissao),
+  );
+
   // O `ToastProvider` subiu para o layout raiz: a tela de login tambem
   // precisa dele, e ela fica fora de `(protected)`.
   return (
@@ -147,7 +181,7 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
           não re-renderiza na navegação, então uma rota passada daqui ficaria
           congelada na tela de entrada.
         */
-        <Navegacao itens={NAVEGACAO} />
+        <Navegacao itens={itensVisiveis} />
       }
     >
       {children}

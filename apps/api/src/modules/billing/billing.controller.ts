@@ -22,6 +22,8 @@ import {
 } from './billing.repository.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { ConsultarTentativaUseCase } from './consultar-tentativa.use-case.js';
+import { ConsultarResumoFinanceiroUseCase } from './consultar-resumo-financeiro.use-case.js';
+import { janelaPadrao } from './domain/resumo-financeiro.js';
 import { ListarInvoicesUseCase, TAMANHO_MAXIMO_DA_PAGINA } from './listar-invoices.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
@@ -105,6 +107,26 @@ const esquemaDeListagem = z
     vencendoAte: z.iso.datetime().optional(),
     pagina: z.coerce.number().int().min(1).default(1),
     tamanho: z.coerce.number().int().min(1).max(TAMANHO_MAXIMO_DA_PAGINA).default(20),
+  })
+  .strict();
+
+/**
+ * Janela do resumo financeiro. F54.
+ *
+ * `de` INCLUSIVO e `ate` EXCLUSIVO -- "agosto" e `[01/08, 01/09)`. Nomes em
+ * portugues como as demais rotas deste controller (`vencendoDe`/`vencendoAte`,
+ * `pagina`, `tamanho`); a `SPEC-054` escreveu `?from&to`, que quebraria a
+ * convencao de todo o resto da API por nada.
+ *
+ * AMBOS OPCIONAIS: sem janela, o default e o ultimo mes FECHADO -- ver
+ * `janelaPadrao()`. Exigir os dois faria a tela ter de escolher um periodo
+ * antes de mostrar qualquer numero, e o gestor que abre o painel quer ver o
+ * mes passado sem configurar nada.
+ */
+const esquemaDoResumo = z
+  .object({
+    de: z.iso.datetime().optional(),
+    ate: z.iso.datetime().optional(),
   })
   .strict();
 
@@ -291,6 +313,35 @@ interface ResultadoDaInadimplenciaDto {
   direitosSuspensos: number;
 }
 
+/**
+ * Resposta de `GET /billing/summary`. F54.
+ *
+ * Numeros que podem NAO EXISTIR sao `number | null`, nunca zero: ticket medio
+ * sem pagamento e taxa sem pagante nao valem zero, valem nada (`SPEC-054` §5,
+ * `DS-PAINEL` §7). A tela desenha `—`.
+ */
+interface ResumoFinanceiroDto {
+  de: string;
+  ate: string;
+  recebidoMinor: number;
+  pagamentosConfirmados: number;
+  estornadoMinor: number;
+  receitaEsperadaMinor: number;
+  aReceberMinor: number;
+  faturasAReceber: number;
+  vencidoMinor: number;
+  faturasVencidas: number;
+  faixas: { rotulo: string; minorTotal: number; quantidade: number }[];
+  ticketMedioMinor: number | null;
+  taxaDeInadimplencia: number | null;
+  quebraPorMetodo: { metodo: string; minorTotal: number; quantidade: number }[];
+  serie: {
+    pontos: { competencia: string; faturadoMinor: number; recebidoMinor: number }[];
+    suficienteParaLinha: boolean;
+  };
+  base: { alunosPagantes: number; alunosInadimplentes: number; assinaturasAtivas: number };
+}
+
 interface LiberacaoDto {
   id: string;
   studentId: string;
@@ -310,6 +361,7 @@ export class BillingController {
     private readonly checkoutDeCartao: CriarCheckoutDeCartaoUseCase,
     private readonly cancelamentoDeRecorrencia: CancelarRecorrenciaUseCase,
     private readonly inadimplencia: ConsultarInadimplenciaUseCase,
+    private readonly resumoFinanceiro: ConsultarResumoFinanceiroUseCase,
     private readonly aplicarInadimplencia: AplicarInadimplenciaUseCase,
     private readonly liberacao: LiberacaoFinanceiraUseCase,
     private readonly contexto: TenantContextService,
@@ -534,6 +586,68 @@ export class BillingController {
         dueAt: linha.dueAt.toISOString(),
         liberadoAte: linha.liberadoAte?.toISOString() ?? null,
       })),
+    };
+  }
+
+  /**
+   * O painel financeiro gerencial. F54, `SPEC-054`.
+   *
+   * PERMISSAO PROPRIA, e nao `billing.read`. A decisao e do PI (§8, pergunta
+   * 3) e a razao esta na §4 da spec: `billing.read` e o que a RECEPCIONISTA
+   * usa para achar a fatura de um aluno no balcao. Dar a ela este endpoint
+   * entregaria faturamento, ticket medio e inadimplencia do tenant inteiro a
+   * quem so precisava atender alguem na porta.
+   *
+   * E o mesmo criterio que ja separou `access.override`,
+   * `billing.payment.manual` e `billing.refund`: capacidade propria quando a
+   * EXPOSICAO e diferente, mesmo que hoje um unico papel agrupe todas.
+   *
+   * SO LE -- acao sobre invoice e a F53, regua de cobranca e a F38.
+   */
+  @Get('billing/summary')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['de', 'ate', 'recebidoMinor', 'faixas', 'serie', 'base'],
+      properties: {
+        de: { type: 'string', format: 'date-time' },
+        ate: { type: 'string', format: 'date-time' },
+        recebidoMinor: { type: 'integer' },
+        pagamentosConfirmados: { type: 'integer' },
+        estornadoMinor: { type: 'integer' },
+        receitaEsperadaMinor: { type: 'integer' },
+        aReceberMinor: { type: 'integer' },
+        faturasAReceber: { type: 'integer' },
+        vencidoMinor: { type: 'integer' },
+        faturasVencidas: { type: 'integer' },
+        faixas: { type: 'array', items: { type: 'object' } },
+        ticketMedioMinor: { type: 'integer', nullable: true },
+        taxaDeInadimplencia: { type: 'number', nullable: true },
+        quebraPorMetodo: { type: 'array', items: { type: 'object' } },
+        serie: { type: 'object' },
+        base: { type: 'object' },
+      },
+    },
+  })
+  @RequirePermissions('billing.dashboard')
+  async consultarResumoFinanceiro(@Query() consulta: unknown): Promise<ResumoFinanceiroDto> {
+    const filtro = esquemaDoResumo.parse(consulta);
+    const agora = new Date();
+    const padrao = janelaPadrao(agora);
+
+    const resumo = await this.resumoFinanceiro.executar(this.contexto.require(), {
+      de: filtro.de ? new Date(filtro.de) : padrao.de,
+      ate: filtro.ate ? new Date(filtro.ate) : padrao.ate,
+      agora,
+    });
+
+    return {
+      ...resumo,
+      de: resumo.de.toISOString(),
+      ate: resumo.ate.toISOString(),
+      faixas: [...resumo.faixas],
+      quebraPorMetodo: [...resumo.quebraPorMetodo],
+      serie: { pontos: [...resumo.serie.pontos], suficienteParaLinha: resumo.serie.suficienteParaLinha },
     };
   }
 

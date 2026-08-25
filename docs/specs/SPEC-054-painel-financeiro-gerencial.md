@@ -8,7 +8,7 @@
 | **Recorte** | [`notes/2026-08-23-pagamento-nas-tres-superficies.md`](../notes/2026-08-23-pagamento-nas-tres-superficies.md) §5 |
 | **Superfície** | `admin-web` · `docs/design/DS-PAINEL.md` |
 | **Card** | [#157](https://github.com/RodReis/arenahub/issues/157) |
-| **Status** | `em-revisao` — escrita em 23/08/2026, aguardando o aceite do PI |
+| **Status** | `implementada` — escrita em 23/08/2026; pergunta 3 da §8 respondida pelo PI em 25/08/2026 |
 | **Depende de** | nada além do que já está no banco. **Não depende da F55** |
 
 ---
@@ -116,11 +116,28 @@ declarada na tela. Um usuário sem a permissão da §4 **não vê o item no menu
 |---|---|---|---|
 | 1 | KPI gerencial ou esteira de cobrança? | **KPI gerencial** | 23/08/2026 |
 | 2 | Base de cálculo | **o plano em que o aluno está matriculado** | 23/08/2026 |
-| 3 | `billing.dashboard` nova ou reusar `billing.manage`? | **em aberto** — §4 | — |
+| 3 | `billing.dashboard` nova ou reusar `billing.manage`? | **`billing.dashboard` nova** — a proposta da §4 | 25/08/2026 |
 
 ---
 
 ## 9. Antes de codificar, confirme
 
-- [ ] O PI aceitou esta spec
-- [ ] A pergunta 3 da §8 está respondida
+- [x] O PI aceitou esta spec
+- [x] A pergunta 3 da §8 está respondida — `billing.dashboard`, 25/08/2026
+
+---
+
+## 10. Divergências da implementação, e por quê
+
+Registradas aqui porque a spec continua sendo o ponteiro da fatia.
+
+| o quê | a spec dizia | ficou | motivo |
+|---|---|---|---|
+| Nome dos parâmetros | `?from&to` | `?de&ate` | As rotas vizinhas do mesmo controller usam português (`vencendoDe`, `pagina`, `tamanho`). Quebrar a convenção da API inteira por dois nomes não paga o que custa. |
+| Faixas de atraso | herdadas da F15 | `Até 15 / 16–30 / 31–60 / Mais de 60` | A F15 separa **"em carência"**, que é sobre ACESSO — quem ainda entra na academia. Aqui a pergunta é sobre DINHEIRO, e dinheiro atrasado é atrasado independente de o aluno passar na catraca. Os cortes de 15 e 30 são os mesmos; 60 foi acrescentado porque sem teto a última faixa engoliria dívida de qualquer idade. |
+| Série por competência | não especificado o formato | tabela, não gráfico | Com menos de três pontos a série não vira linha (§5.1) — e a base real nasce com um mês. Tabela informa nos dois casos; gráfico só no terceiro mês. O `SerieDeMedidas` do DS plota **uma** medida, e esta série tem duas (faturado e recebido). |
+| `DS-PAINEL.md` | citado como contrato da superfície | **não existe** | `docs/design/` só contém PNGs. A implementação seguiu o padrão real da tela de inadimplência, que é código vivo. |
+
+**Acréscimo ao escopo da §3.1:** `estornadoMinor`. O recebido é **líquido** — estorno parcial
+deixa o `Payment` em `CONFIRMED` com o valor cheio (de propósito, porque parte do dinheiro
+entrou), e somar `CONFIRMED` sem descontar faria o painel afirmar uma entrada que foi devolvida.
