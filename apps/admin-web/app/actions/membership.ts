@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
 import { paraCentavos } from '../../src/billing/dinheiro';
+import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
  * Plano, assinatura e direito de acesso — F7, Slice 1.2.
@@ -69,6 +70,7 @@ export interface EstadoDaAssinatura {
 }
 
 const MENSAGEM: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
   VALIDATION_FAILED: 'Confira os dados informados.',
   PLAN_NOT_FOUND: 'Plano não encontrado nesta academia.',
   PLAN_UNIT_NOT_FOUND: 'Uma das unidades selecionadas não existe nesta academia.',

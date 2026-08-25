@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
+import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
  * Cadastro de dispositivo — a metade que faltava.
@@ -29,6 +30,7 @@ export interface EstadoDoDispositivo {
 }
 
 const MENSAGEM: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
   VALIDATION_FAILED: 'Confira os dados informados.',
   FORBIDDEN: 'Seu perfil não tem permissão para cadastrar dispositivos.',
   GYM_UNIT_NOT_FOUND: 'Unidade não encontrada nesta academia.',

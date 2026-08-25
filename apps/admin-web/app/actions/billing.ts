@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
 import { paraCentavos } from '../../src/billing/dinheiro';
+import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
  * Financeiro — F12, Slice 2.1.
@@ -49,6 +50,7 @@ export interface EstadoDoPagamento {
  * A recepção precisa saber O QUE FAZER, não qual invariante quebrou.
  */
 const MENSAGEM: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
   VALIDATION_FAILED: 'Confira os dados informados.',
   SUBSCRIPTION_NOT_FOUND: 'Assinatura não encontrada nesta academia.',
   BILLING_SETTINGS_MISSING:

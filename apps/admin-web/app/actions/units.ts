@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
+import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
  * Cadastro de unidade — a metade que faltava.
@@ -55,6 +56,7 @@ export interface EstadoDaUnidade {
 }
 
 const MENSAGEM: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
   VALIDATION_FAILED: 'Confira os dados informados.',
   FORBIDDEN: 'Seu perfil não tem permissão para cadastrar unidades.',
   /*

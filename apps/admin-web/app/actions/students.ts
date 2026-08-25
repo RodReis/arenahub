@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
+import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
  * Cadastro e ciclo de vida do aluno — F7, Slice 1.2.
@@ -175,6 +176,7 @@ export interface EstadoDaEdicao {
  * para descobrir o que fazer.
  */
 const MENSAGEM: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
   VALIDATION_FAILED: 'Confira os dados informados.',
   STUDENT_NOT_FOUND: 'Aluno não encontrado nesta academia.',
   STUDENT_INVALID_TRANSITION:
@@ -574,6 +576,7 @@ export interface EstadoDaLiberacaoFinanceira {
 }
 
 const MENSAGEM_DA_LIBERACAO: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
   STUDENT_NOT_FOUND: 'Aluno não encontrado nesta academia.',
   FORBIDDEN: 'Seu perfil não tem permissão para liberar financeiramente.',
 };
