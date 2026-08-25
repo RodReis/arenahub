@@ -3006,3 +3006,142 @@ produção**: sem ela, `M2-FR-007` não é cumprido e o endpoint aceita evento f
 | 2 | Hosts entram em configuração por `ProviderAccount` (sandbox/produção), não em constante | `SPEC-055` §3.2 |
 | 3 | A suposição de `access_token` ~3600 s sem refresh continua **suposição**, não fato | `SPEC-055` §9.2, §10.2 |
 | 4 | Nenhum código muda hoje — sem credencial não há o que chamar | — |
+
+---
+
+## ADR-045 — Regime de identificação do totem: CPF sozinho, sem segundo fator
+
+**Data:** 25/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 25/08/2026**
+· **Emenda** `docs/prd/academia/MVP-04-app-totem.md` — `M4-BR-004`
+· **Restringe** `docs/design/DS-TOTEM.md` §5.1 (três caminhos de identificação viram um)
+· **Alcança** a `SPEC-049` §0, §3.2, §3.3 e §9 — a fatia F49
+· **NÃO alcança:** a autenticação do **dispositivo** (HMAC, §3.1 da spec — outro mecanismo,
+  intocado); `M4-BR-002` e `M4-BR-003` (QR da carteirinha do app, MVP 4); `M4-BR-005` e
+  `M4-BR-006` (duração e não persistência da sessão, que continuam valendo inteiros);
+  ADR-042 Decisões 5 e 6; a Regra de arquitetura 1 (entitlement)
+
+### Contexto
+
+O `DS-TOTEM.md` §5.1 desenha **três caminhos** para o aluno se identificar no totem:
+reconhecimento facial, QR Code da carteirinha do app e digitação de CPF *"com confirmação por
+data de nascimento"*. A F49 é a fatia que constrói o totem seguro, e precisava saber quais
+desses três nascem com ela.
+
+Em 25/08/2026, durante o brainstorming da fatia, o PI decidiu **quatro** coisas. Elas restringem
+o desenho do DS, e uma delas **contraria um `BR` do PRD**. Ficam aqui, não no corpo de um PR,
+porque duas delas são risco aceito conscientemente — e risco aceito que mora em mensagem de
+commit some.
+
+### Decisão 1 — reconhecimento facial vai para o backlog
+
+Dos três caminhos do DS §5.1, **facial não entra na F49 nem tem fatia alocada**. Vai para o
+backlog, sem MVP de destino.
+
+O totem já convive com biometria facial na catraca (MVP 1); o que não existe é a jornada de
+*identificação por rosto no totem*, que é uma superfície diferente, com iluminação, distância e
+consentimento diferentes.
+
+### Decisão 2 — QR Code nesta superfície é PIX, não carteirinha
+
+O totem tem QR Code, mas ele é **de pagamento** (PIX, ADR-043), não de identificação. O QR da
+carteirinha do app que o DS §5.1 desenha **é MVP 4** — depende do app mobile existir, e o app
+mobile vem depois do totem (ADR-042, Decisão 1).
+
+Consequência prática: quem lê "QR no totem" em documento antigo não deve concluir que existe
+identificação por QR na F49. Não existe.
+
+### Decisão 3 — login é CPF sozinho, sem segundo fator
+
+O DS §5.1 pede *"digitar CPF com confirmação por data de nascimento"*. **O PI decidiu CPF puro.**
+
+Isto **contraria `M4-BR-004`** — *"CPF no totem é localizador, não autenticador suficiente"*. A
+regra dizia exatamente que o CPF sozinho não basta para abrir sessão; a decisão do PI diz que
+basta.
+
+**A consequência foi apresentada ao PI e reafirmada por ele:** quem sabe o CPF de um aluno vê,
+naquele totem, o **nome** dele, o **estado do plano** e o **valor da fatura em aberto**. Não é
+uma exposição hipotética — é a carga útil que `POST /api/v1/kiosk/sessions` devolve por desenho
+(`SPEC-049` §4). **Risco aceito.**
+
+O que **não** muda: a superfície continua mínima (`M4-FR-018`). CPF sozinho abre a sessão, mas a
+sessão não passa a expor endereço, contato, documento, avaliação nem biometria. O relaxamento é
+no *portão*, não no *conteúdo*.
+
+### Decisão 4 — mensagem única e neutra, sem limite de tentativas
+
+Toda falha de identificação — CPF inexistente, aluno cancelado, erro interno — devolve a **mesma
+frase**: *"Não foi possível entrar. Procure a recepção."* Mesma disciplina da frase pública única
+de `DENY` (ADR-024).
+
+E **sem limite de tentativas**: o totem não bloqueia, não conta, não impõe espera.
+
+**Consequência, apresentada e aceita pelo PI:** enumeração de CPF é barata. Um número por vez, o
+totem confirma quem é aluno daquela unidade — e, para quem é, quanto deve. A mensagem neutra não
+distingue *"não existe"* de *"existe e está cancelado"*, mas **distingue sucesso de falha**, e é
+isso que a enumeração precisa. **Risco aceito.**
+
+### O achado da implementação que agrava a Decisão 4
+
+A Decisão 4 foi aceita sobre uma premissa implícita: **enumerar exige estar fisicamente na frente
+do aparelho**, um CPF por vez, digitando num teclado de tela, à vista da recepção. Isso é o que
+torna o risco tolerável.
+
+A implementação da F49 quase quebrou essa premissa. A superfície `apps/kiosk` roda um servidor
+Node que assina as chamadas à API (o segredo HMAC do dispositivo **não pode** ir para o
+navegador). Na primeira versão esse servidor escutava em `0.0.0.0` — o padrão do Next. Como a
+rede da academia **não é isolada** (registro do MVP 0), qualquer host da LAN podia chamar
+`POST /api/kiosk/sessions` em laço, com CPF de terceiros, e receber nome, plano, pendência e um
+token de sessão válido — **sem tocar no totem**, e sem a mensagem neutra proteger nada, porque o
+status HTTP cru distingue 404 de 201. Isso é a base inteira do tenant, na velocidade de um
+script.
+
+**Foi corrigido:** a ponte liga apenas em loopback (`--hostname 127.0.0.1`, em `dev` e em
+`start`), e o motivo está escrito ao lado do script para que ninguém o "conserte".
+
+**O que fica registrado, e é o ponto deste bloco:** a Decisão 4 é aceitável **enquanto e somente
+enquanto** a ponte ficar em loopback. Expor a ponte à rede — por conveniência de diagnóstico, por
+container mal configurado, por *reverse proxy* — não é ajuste de infraestrutura: **é mudança do
+risco que o PI aceitou**, e reabre esta decisão.
+
+### Consequência para a F49 — a área interna nasce vazia, e isso é correto
+
+O PI havia decidido, na mesma conversa, restringir **dado de saúde** (avaliação, evolução 3D,
+histórico de avaliações) e o **ranking** a autenticação forte, deixando pagamento e histórico de
+pagamentos no nível fraco.
+
+**Com a Decisão 1, não existe autenticação forte nesta fatia.** Facial era o caminho forte; ele
+saiu. Logo, os quatro módulos ficam **inalcançáveis por qualquer caminho** até a F52 / MVP 4 —
+não porque foram desligados, mas porque a porta que os abriria não foi construída.
+
+Somando a isso a decisão de deixar **pagamento e histórico de pagamentos para a F52**, a área
+interna da F49 entrega **zero dos seis módulos** do `DS-TOTEM.md` §5.2.
+
+**Isso é correto e intencional.** O aceite da F49 é *isolamento de tenant e limpeza de sessão* —
+que dado do aluno A não chega ao aluno B, e que nada dele sobrevive ao encerramento. Uma fatia
+com módulos ligados provaria menos, não mais: entregaria funcionalidade antes de provar a
+fundação que a sustenta.
+
+Módulo sem fatia entregue **não aparece** — não aparece cinza, não aparece desabilitado
+(ADR-042, Decisão 5, trava 2).
+
+### Gatilho de revisão
+
+**A primeira fatia que trouxer reconhecimento facial ou QR Code da carteirinha do app ao totem
+reabre a questão do segundo fator** — e, com ela, as Decisões 3 e 4 inteiras.
+
+O motivo: hoje o CPF é o único portão, e um segundo fator custaria uma tela a mais numa jornada
+que não tem alternativa. Quando existir caminho forte, o CPF passa a ser o caminho *degradado*, e
+aí a pergunta muda de *"vale a pena o atrito?"* para *"o que o caminho fraco pode ver?"* — que é
+outra decisão, com outro custo.
+
+Reabre também, **antes disso**, qualquer proposta de tirar a ponte do loopback (bloco acima).
+
+### Consequências
+
+| # | consequência | onde |
+|---|---|---|
+| 1 | `M4-BR-004` fica **emendado**: CPF é autenticador suficiente no totem até nova decisão | `MVP-04` §9 |
+| 2 | O DS-TOTEM §5.1 fica restrito a um caminho na F49; os outros dois seguem desenhados, não implementados | `DS-TOTEM.md` §5.1 |
+| 3 | Enumeração de CPF é risco vivo e aceito, condicionado ao loopback da ponte | `SPEC-049` §9 |
+| 4 | A área interna da F49 entrega zero dos seis módulos do DS §5.2 — aceite é isolamento e limpeza | `SPEC-049` §0 |
+| 5 | Facial no totem sai do roadmap: backlog, sem MVP de destino | `docs/STATUS.md` |
