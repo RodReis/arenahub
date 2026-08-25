@@ -74,5 +74,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-25 | #167 | [#202](https://github.com/RodReis/arenahub/pull/202) | integração | 645 | 645 | 0 | 84.3 | [#202](https://github.com/RodReis/arenahub/pull/202) |
 | 2026-08-25 | #159 | F56 | unitário | 1652 | 1652 | 0 | 75.7 || [#203](https://github.com/RodReis/arenahub/pull/203) |
 | 2026-08-25 | #159 | F56 | integração | 729 | 729 | 0 | — || [#203](https://github.com/RodReis/arenahub/pull/203) |
-| 2026-08-25 | #204 | — | unitário | 1667 | 1667 | 0 | 75.8 | — |
-| 2026-08-25 | #204 | — | integração | 645 | 645 | 0 | 84.3 | — |
+| 2026-08-25 | #204 | — | unitário | 1667 | 1667 | 0 | 75.8 || [#205](https://github.com/RodReis/arenahub/pull/205) |
+| 2026-08-25 | #204 | — | integração | 645 | 645 | 0 | 84.3 || [#205](https://github.com/RodReis/arenahub/pull/205) |
