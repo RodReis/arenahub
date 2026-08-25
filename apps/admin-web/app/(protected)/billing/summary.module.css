@@ -4,195 +4,235 @@
  * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`,
  * `--ah-border-*` e `--ah-state-*`, nunca `--ah-carbon-*` cru.
  *
- * ## A tese do layout
+ * ## A tese do layout, reescrita em 25/08/2026
  *
- * Uma audiencia so -- o dono --, e tres perguntas em ordem de peso: quanto
- * ENTROU (a resposta), quanto FALTA entrar, quanto esta VENCIDO. A tela e um
- * numero grande, dois de apoio e a composicao da divida.
+ * A primeira versao era o que o `PRODUCT.md` lista como anti-referencia --
+ * *"sidebar + grid de cards uniformes + KPI gigante"* -- e media **2,1 telas de
+ * scroll a 1280px**, o monitor que o documento nomeia como o real. Com o aluno
+ * esperando no balcao, cada rolagem e uma pergunta nao respondida.
  *
- * Nao repete o erro que a F15 corrigiu: tres cards de peso identico obrigam a
- * ler os tres para descobrir qual importa. Aqui o recebido e maior que o
- * resto porque e a pergunta que se abre a tela para responder.
+ * O que mudou:
+ *
+ * 1. **Faixa unica de KPI** no lugar do numero de 3rem mais dois cards soltos.
+ *    Seis indicadores compactos custam menos altura que um gigante, e o gerente
+ *    compara valores lado a lado em vez de rolar entre eles.
+ * 2. **Duas colunas** onde havia empilhamento: a composicao da divida e a
+ *    quebra por metodo respondem perguntas irmas ("onde parou" / "por onde
+ *    entrou") e cabem lado a lado a 1280px.
+ * 3. **Tabela do grafico recolhida** num `<details>`. O `SerieFinanceira` ja
+ *    publica tabela invisivel para leitor de tela, entao a regra "todo grafico
+ *    tem tabela equivalente" (PRD) esta cumprida sem gastar ~300px repetindo
+ *    tres numeros que o grafico ja desenha.
+ * 4. **Filtro de mes em chips**, no topo -- antes so existia pela URL.
+ *
+ * ## Cor com conviccao -- decisao do PI em 25/08/2026
+ *
+ * O `PRODUCT.md` restringe cor a papel (accent=acao, carbono=estrutura,
+ * semantico=estado). O PI pediu a tela mais viva, e a saida foi usar o
+ * SEMANTICO com peso: superficie tingida por estado, que o proprio
+ * `semantic.json` ja previa (`bgAlpha: 0.10`, `borderAlpha: 0.32`) e o
+ * `StateBadge` ja aplica via `color-mix`. Nada de token novo.
+ *
+ * O que continua PROIBIDO, e nao por gosto: superficie tingida com o accent do
+ * TENANT -- num tenant de accent vermelho, "ativo" e "erro" viram a mesma cor
+ * (Principio 5) -- e cor como unico canal, que e proibicao de PRD. Todo bloco
+ * colorido aqui carrega rotulo textual.
  */
 
-/* ─── Faixa do periodo ─────────────────────────────────────────────────── */
+/* ─── Cabeçalho e filtro ───────────────────────────────────────────────── */
 
 /*
- * A JANELA VAI VISIVEL, e nao e enfeite: o backend recusa periodo em curso e
- * aplica o ultimo mes fechado por default. Sem dizer qual periodo somou, o
- * gestor leria os numeros como "agora" -- e eles nao sao.
+ * O FILTRO FICA ANTES DOS NUMEROS, porque ele os define. Abaixo deles a pessoa
+ * leria primeiro e descobriria o periodo depois -- que e como se confunde
+ * "recebido em julho" com "recebido agora".
  */
-.periodo {
+.barraDoPeriodo {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   margin: 0 0 20px;
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
-  color: var(--ah-text-secondary);
 }
 
-.periodoValor {
-  font-weight: 600;
-  color: var(--ah-text-default);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ─── Bloco principal ──────────────────────────────────────────────────── */
-
-/*
- * Dinheiro a esquerda, composicao da divida a direita -- mesma proporcao da
- * tela de inadimplencia (`1fr 1.4fr`), pelo mesmo motivo: os rotulos das
- * faixas precisam de largura, e o numero grande ocupa menos do que parece.
- *
- * Fundo afundado com cards claros por cima, e nao sombra: `DS-PAINEL` §4 --
- * card tem borda, nao sombra; sombra so em camada que flutua.
- */
-.visaoDoDono {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  align-items: stretch;
-  gap: 16px;
-  margin: 0 0 40px;
-  padding: 16px;
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
   border-radius: var(--ah-radius-card);
   background: var(--ah-surface-sunken);
 }
 
-@media (max-width: 900px) {
-  .visaoDoDono {
-    grid-template-columns: 1fr;
-  }
-}
-
-.dinheiro,
-.composicao {
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  border-radius: var(--ah-radius-card);
-  background: var(--ah-surface-raised);
-}
-
-.composicao > :last-child {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  flex: 1;
-}
-
-.rotulo {
-  margin: 0;
+/*
+ * Chip de periodo -- `<a>` e nao `<button>`: cada periodo E uma URL, e o
+ * gerente precisa poder mandar "olha julho" para o contador. Estado em memoria
+ * nao se compartilha nem sobrevive a um recarregamento.
+ */
+.chip {
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--ah-radius-card) - 2px);
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   font-weight: 500;
+  color: var(--ah-text-label);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 140ms ease-out,
+    color 140ms ease-out;
+}
+
+.chip:hover {
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-strong);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--ah-accent-600);
+  outline-offset: 2px;
+}
+
+/*
+ * O ATUAL USA ACCENT porque selecao E acao no vocabulario do DS -- e o unico
+ * lugar desta tela onde a cor do tenant aparece. `aria-current` acompanha:
+ * cor sozinha nunca e canal unico (PRD).
+ */
+.chip[aria-current='page'] {
+  background: var(--ah-accent-600);
+  border-color: var(--ah-accent-600);
+  color: var(--ah-accent-on);
+  font-weight: 600;
+}
+
+.periodoApurado {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.periodoApurado strong {
+  font-weight: 600;
+  color: var(--ah-text-default);
+}
+
+/* ─── Faixa de KPI ─────────────────────────────────────────────────────── */
+
+/*
+ * PISO DE 155px, e o numero foi MEDIDO, nao escolhido: a area de conteudo a
+ * 1280px tem 974px, e sao SEIS indicadores (sete quando ha estorno). Com o
+ * piso de 190px que esta faixa tinha, cabiam cinco -- e o sexto descia sozinho
+ * para uma segunda linha, deixando um vao cinza de quatro colunas ao lado.
+ *
+ * 974 / 6 = 162, entao 155 cabe com folga e ainda permite o setimo KPI quebrar
+ * em duas linhas CHEIAS em vez de uma linha e um orfao.
+ *
+ * `gap: 1px` sobre fundo de borda desenha os divisores SEM borda por celula:
+ * uma linha de 1px entre KPIs, nunca duas encostadas.
+ */
+.faixaDeKpi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 1px;
+  margin: 0 0 24px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-border-subtle);
+  overflow: hidden;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  background: var(--ah-surface-raised);
+}
+
+/*
+ * KPI COM ESTADO tinge a propria superficie -- `color-mix` com `currentColor`,
+ * mesmo mecanismo do `StateBadge`. E o que da vida a tela sem inventar token
+ * nem usar o accent do tenant como decoracao.
+ *
+ * 8% e nao os 10% do badge: aqui a area pintada e muito maior, e o mesmo alfa
+ * numa faixa inteira vira bloco de cor em vez de tinta.
+ */
+.kpi[data-tom] {
+  background: color-mix(in srgb, currentColor 8%, var(--ah-surface-raised));
+}
+
+.kpi[data-tom='success'] {
+  color: var(--ah-state-success);
+}
+.kpi[data-tom='warning'] {
+  color: var(--ah-state-warning);
+}
+.kpi[data-tom='risk'] {
+  color: var(--ah-state-risk);
+}
+.kpi[data-tom='danger'] {
+  color: var(--ah-state-danger);
+}
+.kpi[data-tom='info'] {
+  color: var(--ah-state-info);
+}
+
+.kpiRotulo {
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ah-text-secondary);
 }
 
-/*
- * O RECEBIDO E A RESPOSTA DA TELA. `clamp` pelo mesmo motivo da F15: 48px
- * fixos estouram a coluna a 900px, 32px desperdicam a tela a 1440px.
- */
-.valorGigante {
-  margin: 8px 0 0;
-  font-size: clamp(2rem, 1.2rem + 2.4vw, 3rem);
-  line-height: 1.05;
+.kpiValor {
+  margin: 0;
+  /*
+    20px e nao 22: `R$ 44.400,00` a 22px mede ~148px e estourava a coluna de
+    155. O `white-space: nowrap` abaixo impede a quebra, entao o valor
+    vazaria em vez de embrulhar -- pior dos dois.
+  */
+  font-size: 20px;
+  line-height: 26px;
   font-weight: 650;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   color: var(--ah-text-strong);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 /*
- * Numeros de apoio: linha de dados, nao cards. Transforma-los em caixas daria
- * a eles o mesmo peso do recebido.
+ * No KPI tingido o VALOR veste a cor do estado -- e o unico numero da faixa
+ * que muda de cor, e por isso o olho vai nele primeiro. O rotulo fica no cinza
+ * de sempre: colorir os dois dobraria a tinta sem dobrar a informacao.
  */
-.secundarios {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 28px;
-  margin: 24px 0 0;
-  padding: 16px 0 0;
-  border-top: 1px solid var(--ah-border-subtle);
+.kpi[data-tom] .kpiValor {
+  color: currentColor;
 }
 
-.secundarios dt {
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
+.kpiApoio {
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
   color: var(--ah-text-secondary);
 }
 
-.secundarios dd {
-  margin: 2px 0 0;
-  font-size: var(--ah-type-heading-size);
-  line-height: var(--ah-type-heading-lh);
-  font-weight: 600;
-  color: var(--ah-text-strong);
-  font-variant-numeric: tabular-nums;
+/* O sparkline mora dentro do KPI, sem margem propria. */
+.kpiTendencia {
+  margin-top: 2px;
 }
 
-.tituloDoBloco {
-  margin: 0 0 16px;
-  font-size: var(--ah-type-body-size);
-  line-height: var(--ah-type-body-lh);
-  font-weight: 600;
-  color: var(--ah-text-default);
-}
-
-/* ─── Segunda faixa: expectativa e quebra por metodo ───────────────────── */
-
-.faixaSecundaria {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin: 0 0 40px;
-}
-
-@media (max-width: 900px) {
-  .faixaSecundaria {
-    grid-template-columns: 1fr;
-  }
-}
-
-/*
- * Estes SIM sao cards com borda -- estao sobre o fundo da pagina, nao sobre o
- * fundo afundado do bloco principal. `DS-PAINEL` §4.
- */
-.cartao {
-  padding: 20px;
-  border: 1px solid var(--ah-border-subtle);
-  border-radius: var(--ah-radius-card);
-  background: var(--ah-surface-raised);
-}
-
-.valorMedio {
-  margin: 8px 0 0;
-  font-size: var(--ah-type-display-size, 1.75rem);
-  line-height: 1.1;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  color: var(--ah-text-strong);
-  font-variant-numeric: tabular-nums;
-}
-
-.apoio {
-  margin: 8px 0 0;
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
-  color: var(--ah-text-secondary);
-}
-
-/* ─── Tabelas ──────────────────────────────────────────────────────────── */
+/* ─── Blocos ───────────────────────────────────────────────────────────── */
 
 .tituloDaSecao {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
+  gap: 10px;
   margin: 0 0 12px;
   font-size: var(--ah-type-heading-size);
   line-height: var(--ah-type-heading-lh);
@@ -207,28 +247,169 @@
   color: var(--ah-text-secondary);
 }
 
+/*
+ * DUAS PERGUNTAS IRMAS LADO A LADO: "onde o dinheiro parou" e "por onde ele
+ * entrou". Empilhadas custavam ~380px e obrigavam a rolar entre duas metades
+ * da mesma leitura.
+ *
+ * A 1024px viram uma coluna -- e o breakpoint `degraded` do DS, abaixo do qual
+ * a densidade lado a lado deixa de caber.
+ */
+.duasColunas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 0 0 24px;
+}
+
+@media (max-width: 1024px) {
+  .duasColunas {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+/* O gráfico ocupa o espaço que sobra, centrado -- sem vão sob as barras. */
+.cartao > :last-child {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+}
+
+.tituloDoCartao {
+  margin: 0 0 12px;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: 600;
+  color: var(--ah-text-default);
+}
+
 .secao {
-  margin: 0 0 40px;
+  margin: 0 0 24px;
+}
+
+.grafico {
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
 }
 
 /*
- * A BASE DE CALCULO, declarada (`SPEC-054` §5.2).
+ * O aviso de serie curta fica ACIMA do grafico: quem le a curva precisa saber
+ * que ela e curta ANTES de tirar conclusao dela.
+ */
+.avisoDaSerie {
+  margin: 0 0 12px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.apoio {
+  margin: 8px 0 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/* ─── Tabela recolhida ─────────────────────────────────────────────────── */
+
+/*
+ * `<details>` NATIVO, e nao um acordeao de biblioteca: teclado, leitor de tela
+ * e a busca do navegador funcionam sem uma linha de JS, e o `PRODUCT.md`
+ * proibe reinventar afordancia padrao.
  *
- * Nao e nota de rodape decorativa: os ~340 alunos ativados e os 1.926
- * importados como `CANCELLED` (ADR-033) distorcem qualquer percentual, e uma
- * taxa lida sem saber o denominador afirma sobre a academia o que e verdade
- * sobre a importacao.
+ * FECHADO por padrao: o grafico responde a tendencia, que e a pergunta de quem
+ * abre a tela. Quem vai CONFERIR um numero abre -- e e a minoria dos acessos.
+ */
+.detalhe {
+  margin: 12px 0 0;
+  border-top: 1px solid var(--ah-border-subtle);
+  padding: 12px 0 0;
+}
+
+.detalheGatilho {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 500;
+  color: var(--ah-text-label);
+  cursor: pointer;
+  list-style: none;
+}
+
+/* Remove o triângulo do WebKit -- o `::before` abaixo desenha o nosso. */
+.detalheGatilho::-webkit-details-marker {
+  display: none;
+}
+
+.detalheGatilho::before {
+  content: '▸';
+  font-size: 10px;
+  transition: transform 140ms ease-out;
+}
+
+.detalhe[open] .detalheGatilho::before {
+  transform: rotate(90deg);
+}
+
+.detalheGatilho:hover {
+  color: var(--ah-text-strong);
+}
+
+/*
+ * Foco visivel: anel de 2px com offset de 2px, o padrao do DS. `summary` tem
+ * foco nativo, mas o outline default some contra a borda do cartao.
+ */
+.detalheGatilho:focus-visible {
+  outline: 2px solid var(--ah-accent-600);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.detalheConteudo {
+  margin: 12px 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .detalheGatilho::before {
+    transition: none;
+  }
+}
+
+/* ─── Base de cálculo ──────────────────────────────────────────────────── */
+
+/*
+ * A BASE SOBRE A QUAL A TELA CALCULA, declarada (`SPEC-054` §5.2).
+ *
+ * Nao e nota de rodape decorativa: os ~295 ativos e os 1.906 importados como
+ * `CANCELLED` (ADR-033) distorcem qualquer percentual, e uma taxa lida sem o
+ * denominador afirma sobre a ACADEMIA o que e verdade sobre a IMPORTACAO.
  */
 .base {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
   margin: 0;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-radius: var(--ah-radius-card);
   background: var(--ah-surface-sunken);
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
+  font-size: 11px;
+  line-height: 15px;
   color: var(--ah-text-secondary);
 }
 
