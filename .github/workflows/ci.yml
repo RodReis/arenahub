@@ -312,10 +312,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          # A suite do totem (F49) grava em apps/kiosk/, com `trace:
-          # 'retain-on-failure'` e `screenshot: 'only-on-failure'` e
-          # `retries: 1` -- sem o caminho aqui, o rastro que explicaria uma
-          # falha nela nunca sai do runner.
+          # As duas suites (admin-web e a do totem, F49) tem `trace:
+          # 'retain-on-failure'` e `screenshot: 'only-on-failure'`, mas isso
+          # so grava em test-results/ -- playwright-report/ so existe com o
+          # reporter `html`, ligado nos dois playwright.config.ts (guarda
+          # `reporter: [..., ['html', { outputFolder: 'playwright-report' }]]`
+          # quando `CI`). O html embute trace e screenshot no proprio
+          # relatorio; sem o reporter, este `path` apontaria para um
+          # diretorio que o CI nunca cria.
           path: |
             apps/admin-web/playwright-report/
             apps/kiosk/playwright-report/
