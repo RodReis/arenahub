@@ -244,6 +244,76 @@ describe('F49 -- heartbeat e config do totem', () => {
     await db.tenant.delete({ where: { id: totemOrdem.tenantId } });
   });
 
+  /**
+   * Achado da revisao final da F49: a unique constraint e
+   * [tenantId, gymUnitId, kioskDeviceId, version] -- cada camada tem o
+   * PROPRIO contador. Publicar a PRIMEIRA config de unidade em version:1
+   * enquanto o tenant ja esta em version:5 muda a tela (a unidade agora
+   * responde por `identificacao`), mas o `.at(-1)?.version` antigo (maior
+   * entre as tres camadas achatadas) continuava devolvendo 5 -- o totem
+   * nunca recarregava porque o numero que ele compara no boot nao mudou
+   * (ADR-042, Decisao 3).
+   */
+  it('configVersion muda quando a PRIMEIRA config de unidade e publicada sobre um tenant ja avancado', async () => {
+    const totemRevisor: Totem = {
+      tenantId: '',
+      gymUnitId: '',
+      kioskDeviceId: '',
+      keyId: '',
+      segredo: '',
+    };
+
+    await montarTotem(totemRevisor, `revisor-${randomUUID().slice(0, 8)}`);
+
+    await db.kioskConfiguration.create({
+      data: {
+        tenantId: totemRevisor.tenantId,
+        gymUnitId: null,
+        kioskDeviceId: null,
+        version: 5,
+        publishedAt: new Date(),
+        payload: { marca: { nomeDaAcademia: 'TENANT EM V5' } },
+      },
+    });
+
+    const respostaAntes = await request(servidor())
+      .get('/api/v1/kiosk/config')
+      .set(assinarPedido(totemRevisor, '', '/api/v1/kiosk/config', 'GET'))
+      .expect(200);
+
+    const versionAntes = (respostaAntes.body as RespostaConfig).version;
+
+    // Primeira config de UNIDADE -- camada propria, contador proprio.
+    await db.kioskConfiguration.create({
+      data: {
+        tenantId: totemRevisor.tenantId,
+        gymUnitId: totemRevisor.gymUnitId,
+        kioskDeviceId: null,
+        version: 1,
+        publishedAt: new Date(),
+        payload: { identificacao: { cpf: false, facial: false, qrCodeDoApp: true } },
+      },
+    });
+
+    const respostaDepois = await request(servidor())
+      .get('/api/v1/kiosk/config')
+      .set(assinarPedido(totemRevisor, '', '/api/v1/kiosk/config', 'GET'))
+      .expect(200);
+
+    const corpoDepois = respostaDepois.body as RespostaConfig;
+
+    // A tela mudou de fato (a unidade venceu em `identificacao`) -- se o
+    // numero nao mudasse junto, o totem nao recarregaria a tela nova.
+    expect(corpoDepois.config.identificacao).toEqual({
+      cpf: false,
+      facial: false,
+      qrCodeDoApp: true,
+    });
+    expect(corpoDepois.version).not.toBe(versionAntes);
+
+    await db.tenant.delete({ where: { id: totemRevisor.tenantId } });
+  });
+
   it('a configuracao do tenant B NAO vaza para o totem do tenant A', async () => {
     await db.kioskConfiguration.create({
       data: {

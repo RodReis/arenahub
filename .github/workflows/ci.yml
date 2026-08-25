@@ -312,5 +312,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: apps/admin-web/playwright-report/
+          # A suite do totem (F49) grava em apps/kiosk/, com `trace:
+          # 'retain-on-failure'` e `screenshot: 'only-on-failure'` e
+          # `retries: 1` -- sem o caminho aqui, o rastro que explicaria uma
+          # falha nela nunca sai do runner.
+          path: |
+            apps/admin-web/playwright-report/
+            apps/kiosk/playwright-report/
           retention-days: 7

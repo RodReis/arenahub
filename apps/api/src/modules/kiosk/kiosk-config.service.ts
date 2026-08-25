@@ -48,17 +48,36 @@ export class KioskConfigService {
       orderBy: [{ version: 'asc' }],
     });
 
-    const daCamada = (gymUnitId: string | null, kioskDeviceId: string | null): unknown =>
-      publicadas.filter((c) => c.gymUnitId === gymUnitId && c.kioskDeviceId === kioskDeviceId).at(-1)
-        ?.payload;
+    const daCamada = (
+      gymUnitId: string | null,
+      kioskDeviceId: string | null,
+    ): { version: number; payload: unknown } | undefined =>
+      publicadas.filter((c) => c.gymUnitId === gymUnitId && c.kioskDeviceId === kioskDeviceId).at(-1);
+
+    const camadaTenant = daCamada(null, null);
+    const camadaUnidade = daCamada(contexto.gymUnitId, null);
+    const camadaDispositivo = daCamada(contexto.gymUnitId, contexto.kioskDeviceId);
 
     const config = resolverConfig({
-      tenant: daCamada(null, null),
-      unidade: daCamada(contexto.gymUnitId, null),
-      dispositivo: daCamada(contexto.gymUnitId, contexto.kioskDeviceId),
+      tenant: camadaTenant?.payload,
+      unidade: camadaUnidade?.payload,
+      dispositivo: camadaDispositivo?.payload,
     });
 
-    const version = publicadas.at(-1)?.version ?? 0;
+    // A unique constraint e [tenantId, gymUnitId, kioskDeviceId, version]:
+    // cada camada tem o PROPRIO contador, independente das outras duas. Usar
+    // so o maior `version` entre as tres (`.at(-1)` na lista achatada) faz o
+    // numero estagnar quando uma camada NOVA e publicada com version baixa
+    // (tenant em v5, primeira config de unidade em v1 -- o merge muda, o
+    // numero nao) e RECUAR quando a camada mais alta e despublicada.
+    //
+    // A soma das versoes de cada camada resolve os dois: muda a config
+    // efetiva (qualquer camada avança) => a soma muda; nenhuma camada muda
+    // => a soma nao muda. So recua se uma camada for despublicada -- o que E
+    // uma mudanca real na config efetiva, entao o numero tinha que mudar
+    // mesmo.
+    const version =
+      (camadaTenant?.version ?? 0) + (camadaUnidade?.version ?? 0) + (camadaDispositivo?.version ?? 0);
 
     return { version, config };
   }
