@@ -1,0 +1,19 @@
+{
+  "$comment": "Camada 1 (primitivo) da superficie do totem (kiosk) -- F49/F44, DS-TOTEM.md §2.1. Mesma regra do primitive.json: NENHUM componente le esta camada direto (regra de lint 2), e os hex vivem AQUI e em nenhum outro lugar do repositorio (regra de lint 1). `contrastOnBase` mede contra `totem.bg.base` -- e o fundo real da tela, ao contrario do painel que mede contra branco.",
+
+  "totem": {
+    "bg": {
+      "base":    { "value": "#0A0B0D", "$role": "fundo de todas as telas" },
+      "surface": { "value": "#121417", "contrastOnBase": 1.07, "$role": "cards, botoes secundarios, listas" }
+    },
+    "border": {
+      "hairline": { "value": "#1A2032", "contrastOnBase": 1.22, "$role": "divisores internos, linhas de tabela" },
+      "default":  { "value": "#232A3D", "contrastOnBase": 1.38, "$role": "borda de card e de botao secundario (2px)" }
+    },
+    "text": {
+      "primary":   { "value": "#FFFFFF", "contrastOnBase": 19.69, "$role": "titulos, valores, rotulos de botao" },
+      "secondary": { "value": "#A6AEB9", "contrastOnBase": 8.79,  "$role": "descricoes, metadados, legendas" },
+      "tertiary":  { "value": "#565E69", "contrastOnBase": 3.0,   "$role": "cabecalho de tabela, comparativos 'vs anterior'", "$comment": "REPROVA no alvo AAA_TEXT (7) do totem -- 3.0 < 7. Existe para texto auxiliar de baixa prioridade, nao para conteudo de leitura obrigatoria a distancia (mesmo papel de carbon-400 no painel)." }
+    }
+  }
+}

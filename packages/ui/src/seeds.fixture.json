@@ -20,6 +20,12 @@
 
   "branco": "#FFFFFF",
 
+  "totem": {
+    "$comment": "Seeds e fundo de teste do totem (F49/F44) -- entrada do resolvedor, nao token do sistema. O fundo carbono real do totem vive em tokens/totem.json (bg.base); repetido aqui como dado de teste pela mesma razao dos seeds acima: regra de lint 1 vale para spec tambem.",
+    "bgBase": "#0A0B0D",
+    "seeds": ["#4D7CFF", "#3DDC84", "#F5A524", "#8B5CF6"]
+  },
+
   "$formasComentario": "Entradas do parser de hex -- validas e invalidas. Nao sao cores do sistema: sao o dado que prova que parseHex aceita a forma curta e RECUSA lixo em vez de devolver preto silenciosamente.",
   "formas": {
     "curtaValida": "#FFF",

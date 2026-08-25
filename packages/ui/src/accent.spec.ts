@@ -16,7 +16,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { accentCssVars, deriveRamp, RAMP_TONES, resolveAccent } from './accent.js';
-import { AA_TEXT, contrastRatio, meets, parseHex, ratio } from './contrast.js';
+import { AA_TEXT, AAA_TEXT, contrastRatio, meets, parseHex, ratio } from './contrast.js';
 import fixture from './seeds.fixture.json' with { type: 'json' };
 import { ACCENT_SEED_DEFAULT, CARBON, SEMANTIC_COLOR } from './tokens.generated.js';
 
@@ -186,6 +186,29 @@ describe('resolveAccent', () => {
   it('resolve contra superficie escura sem fork -- F43 e F44 vao precisar', () => {
     const resolved = resolveAccent(SEED, SUPERFICIE_ESCURA);
     expect(meets(resolved.text, SUPERFICIE_ESCURA, AA_TEXT)).toBe(true);
+  });
+});
+
+describe('accent do totem -- superficie escura, alvo 7:1', () => {
+  // Fundo carbono do totem -- DS-TOTEM.md §2.1 (bg/base). Vem do fixture, nao
+  // de literal aqui: regra de lint 1 tambem vale para spec (ver seeds.fixture.json).
+  const BG_BASE = fixture.totem.bgBase;
+
+  it('resolve o texto de acao com contraste >= 7 sobre o carbono', () => {
+    const resolvido = resolveAccent(fixture.totem.seeds[0] as string, BG_BASE);
+
+    expect(contrastRatio(resolvido.text, BG_BASE)).toBeGreaterThanOrEqual(AAA_TEXT);
+  });
+
+  it('vale para os quatro accents do totem, nao so para o azul', () => {
+    for (const seed of fixture.totem.seeds) {
+      const resolvido = resolveAccent(seed, BG_BASE);
+
+      expect(
+        contrastRatio(resolvido.text, BG_BASE),
+        `${seed}: texto de acao contra ${BG_BASE}`,
+      ).toBeGreaterThanOrEqual(AAA_TEXT);
+    }
   });
 });
 
