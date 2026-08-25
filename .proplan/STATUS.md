@@ -55,6 +55,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [INFRA] Menu: grupo Financeiro e rótulos de seção diferenciados (#204, finalizado em: 2026-08-25)
 - [MVP3][SPEC-056][F56] Plano com assinatura mensal (#159, finalizado em: 2026-08-25)
 - [MVP3][FIX] chamarApi assere o tipo em vez de validar: divergencia de contrato vira crash de runtime (#167, finalizado em: 2026-08-25)
 - [MVP3][SPEC-054][FIX] filtro de mês perde os outros meses ao apurar o mais antigo (#200, finalizado em: 2026-08-25)
