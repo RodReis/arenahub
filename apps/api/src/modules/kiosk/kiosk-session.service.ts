@@ -78,10 +78,11 @@ export class KioskSessionService {
   async estenderSessao(
     contexto: ContextoDoKiosk,
     sessionId: string,
+    token: string,
     agora: Date,
   ): Promise<{ expiraEm: string }> {
     const { config } = await this.config.resolverParaDispositivo(contexto);
-    const sessao = await this.viva(contexto, sessionId);
+    const sessao = await this.viva(contexto, sessionId, token, agora);
 
     const novo = estender(
       sessao.expiresAt,
@@ -101,10 +102,11 @@ export class KioskSessionService {
   async encerrar(
     contexto: ContextoDoKiosk,
     sessionId: string,
+    token: string,
     motivo: string,
     agora: Date,
   ): Promise<void> {
-    const sessao = await this.viva(contexto, sessionId);
+    const sessao = await this.viva(contexto, sessionId, token, agora);
 
     await this.db.kioskSession.update({
       where: { id: sessao.id },
@@ -113,20 +115,29 @@ export class KioskSessionService {
   }
 
   /**
-   * Sessao viva DESTE dispositivo. O `kioskDeviceId` no filtro nao e zelo:
-   * sem ele, um totem encerraria ou estenderia a sessao de outro.
+   * Sessao viva DESTE dispositivo, autorizada pelo TOKEN do aluno.
+   *
+   * Fecha o ciclo que faltava: sem isto, `tokenHash` era gravado e nunca
+   * lido -- expirar ou encerrar a sessao nao tinha efeito nenhum sobre o
+   * que o token autorizava, porque nada consumia o token. Token em maos
+   * so autoriza se (1) bater o hash, (2) `endedAt` for nulo, e (3)
+   * `expiresAt` ainda nao passou de `agora` -- as tres, sempre.
+   *
+   * `kioskDeviceId` no filtro nao e zelo: sem ele, um totem estenderia ou
+   * encerraria a sessao aberta em outro totem do MESMO tenant.
    */
-  private async viva(contexto: ContextoDoKiosk, sessionId: string) {
+  private async viva(contexto: ContextoDoKiosk, sessionId: string, token: string, agora: Date) {
     const sessao = await this.db.kioskSession.findFirst({
       where: {
         id: sessionId,
         tenantId: contexto.tenantId,
         kioskDeviceId: contexto.kioskDeviceId,
+        tokenHash: this.hash(token),
         endedAt: null,
       },
     });
 
-    if (!sessao) {
+    if (!sessao || sessao.expiresAt <= agora) {
       throw new NotFoundException({ code: 'KIOSK_SESSION_NOT_FOUND' });
     }
 

@@ -34,6 +34,11 @@ describe('F49 -- sessao do totem', () => {
 
   const totemA: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
   const totemB: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
+  // MESMO tenant do totemA -- caso real de uma academia com dois quiosques
+  // no saguao. Sem isto, "sessao de um totem nao pode ser encerrada por
+  // outro" media so o filtro de tenant (totemB esta noutro tenant) e nunca
+  // exercitava o filtro de `kioskDeviceId`.
+  const totemC: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
 
   const CPF_DO_ALUNO_A = '52998224725';
   const CPF_DO_ALUNO_B = '11144477735';
@@ -53,6 +58,7 @@ describe('F49 -- sessao do totem', () => {
     corpo: unknown,
     caminho: string,
     metodo: 'GET' | 'POST' | 'DELETE' = 'POST',
+    tokenDeSessao?: string,
   ): Record<string, string> => {
     // `corpo === ''` sinaliza requisicao sem corpo (GET, DELETE, ou POST de
     // acao sem payload como o /extend) -- o cru assinado tem que ser vazio
@@ -61,7 +67,7 @@ describe('F49 -- sessao do totem', () => {
     const timestamp = Math.floor(Date.now() / 1000);
     const nonce = randomUUID();
 
-    return {
+    const cabecalhos: Record<string, string> = {
       'x-kiosk-key-id': totem.keyId,
       'x-kiosk-timestamp': String(timestamp),
       'x-kiosk-nonce': nonce,
@@ -77,6 +83,14 @@ describe('F49 -- sessao do totem', () => {
         totem.segredo,
       ),
     };
+
+    // Credencial da SESSAO (do aluno), distinta da credencial HMAC do
+    // dispositivo -- fora da assinatura de proposito, o guard nunca a le.
+    if (tokenDeSessao !== undefined) {
+      cabecalhos['x-session-token'] = tokenDeSessao;
+    }
+
+    return cabecalhos;
   };
 
   /** Monta tenant + unidade + dispositivo + credencial de totem, isolados por rotulo. */
@@ -99,8 +113,19 @@ describe('F49 -- sessao do totem', () => {
       },
     });
 
+    await publicarConfig(tenant.id);
+    await montarDispositivoNoTenant(alvo, tenant.id, unidade.id, rotulo);
+  };
+
+  /** Monta so um dispositivo + credencial NUM TENANT JA EXISTENTE (segundo totem do mesmo tenant). */
+  const montarDispositivoNoTenant = async (
+    alvo: Totem,
+    tenantId: string,
+    gymUnitId: string,
+    rotulo: string,
+  ): Promise<void> => {
     const dispositivo = await db.kioskDevice.create({
-      data: { tenantId: tenant.id, gymUnitId: unidade.id, code: `TOTEM-SESS-${rotulo}-${sufixo}` },
+      data: { tenantId, gymUnitId, code: `TOTEM-SESS-${rotulo}-${sufixo}` },
     });
 
     const segredo = randomBytes(32).toString('hex');
@@ -108,7 +133,7 @@ describe('F49 -- sessao do totem', () => {
 
     await db.kioskCredential.create({
       data: {
-        tenantId: tenant.id,
+        tenantId,
         kioskDeviceId: dispositivo.id,
         keyId,
         encryptedSecret: app.get(KioskAuthService).cifrarSegredo(segredo),
@@ -117,24 +142,26 @@ describe('F49 -- sessao do totem', () => {
       },
     });
 
-    // Publica a config do tenant -- necessaria para abrir sessao (duracao).
+    Object.assign(alvo, {
+      tenantId,
+      gymUnitId,
+      kioskDeviceId: dispositivo.id,
+      keyId,
+      segredo,
+    });
+  };
+
+  /** Publica a config do tenant -- necessaria para abrir sessao (duracao). */
+  const publicarConfig = async (tenantId: string): Promise<void> => {
     await db.kioskConfiguration.create({
       data: {
-        tenantId: tenant.id,
+        tenantId,
         gymUnitId: null,
         kioskDeviceId: null,
         version: 1,
         publishedAt: new Date(),
         payload: { sessao: { duracaoSegundos: 60, incrementoSegundos: 30, tetoSegundos: 99 } },
       },
-    });
-
-    Object.assign(alvo, {
-      tenantId: tenant.id,
-      gymUnitId: unidade.id,
-      kioskDeviceId: dispositivo.id,
-      keyId,
-      segredo,
     });
   };
 
@@ -171,6 +198,8 @@ describe('F49 -- sessao do totem', () => {
 
     await montarTotem(totemA, 'a');
     await montarTotem(totemB, 'b');
+    // totemC: segundo dispositivo do MESMO tenant e MESMA unidade do totemA.
+    await montarDispositivoNoTenant(totemC, totemA.tenantId, totemA.gymUnitId, 'c');
 
     await criarAluno(totemA.tenantId, totemA.gymUnitId, CPF_DO_ALUNO_A, 'Aluno A');
     await criarAluno(totemB.tenantId, totemB.gymUnitId, CPF_DO_ALUNO_B, 'Aluno B');
@@ -212,14 +241,27 @@ describe('F49 -- sessao do totem', () => {
     expect(corpo).not.toContain('@');
   });
 
-  it('ACEITE DA FATIA -- o aluno do tenant B nao existe para o totem do tenant A', async () => {
-    const resposta = await request(servidor())
+  it('ACEITE DA FATIA -- o aluno do tenant B nao existe para o totem do tenant A, mas o do tenant A existe', async () => {
+    // Ponta positiva: com hash sem escopo de tenant (busca quebrada para
+    // todo mundo), o 404 abaixo tambem apareceria -- mas por ausencia de
+    // RESULTADO, nao por ISOLAMENTO. Sem esta metade, o teste nao distingue
+    // "nao vazou" de "nao funciona". As duas pontas amarradas e o aceite
+    // fica impossivel de passar por acidente.
+    const achaOProprio = await request(servidor())
+      .post('/api/v1/kiosk/sessions')
+      .set(assinarPedido(totemA, { cpf: CPF_DO_ALUNO_A }, '/api/v1/kiosk/sessions'))
+      .send({ cpf: CPF_DO_ALUNO_A })
+      .expect(201);
+
+    expect((achaOProprio.body as RespostaSessao).nome).toBe('Aluno A');
+
+    const naoAchaOOutro = await request(servidor())
       .post('/api/v1/kiosk/sessions')
       .set(assinarPedido(totemA, { cpf: CPF_DO_ALUNO_B }, '/api/v1/kiosk/sessions'))
       .send({ cpf: CPF_DO_ALUNO_B })
       .expect(404);
 
-    expect((resposta.body as { code: string }).code).toBe('KIOSK_IDENTIFICATION_FAILED');
+    expect((naoAchaOOutro.body as { code: string }).code).toBe('KIOSK_IDENTIFICATION_FAILED');
   });
 
   it('CPF inexistente e aluno de outro tenant devolvem a MESMA resposta', async () => {
@@ -255,31 +297,123 @@ describe('F49 -- sessao do totem', () => {
       .send({ cpf: CPF_DO_ALUNO_A })
       .expect(201);
 
-    const { sessionId } = aberta.body as RespostaSessao;
+    const { sessionId, token } = aberta.body as RespostaSessao;
 
     await request(servidor())
       .delete(`/api/v1/kiosk/sessions/${sessionId}`)
-      .set(assinarPedido(totemA, '', `/api/v1/kiosk/sessions/${sessionId}`, 'DELETE'))
+      .set(assinarPedido(totemA, '', `/api/v1/kiosk/sessions/${sessionId}`, 'DELETE', token))
       .expect(204);
 
     await request(servidor())
       .post(`/api/v1/kiosk/sessions/${sessionId}/extend`)
-      .set(assinarPedido(totemA, '', `/api/v1/kiosk/sessions/${sessionId}/extend`, 'POST'))
+      .set(
+        assinarPedido(totemA, '', `/api/v1/kiosk/sessions/${sessionId}/extend`, 'POST', token),
+      )
       .expect(404);
   });
 
-  it('sessao de um totem nao pode ser encerrada por outro', async () => {
+  /**
+   * CRITICAL do fix round 1: prova que o TOKEN em maos, e nao so o
+   * `sessionId` da URL, e o que autoriza. `estenderSessao` faz o SELECT por
+   * `tokenHash` -- sem ele o token era gravado e nunca lido, e a garantia de
+   * "encerrar invalida no ato" seria acidental (o teste acima passava so
+   * porque `viva()` olhava `endedAt`, nunca o token).
+   *
+   * Prova por mutacao: comentar a checagem `sessao.expiresAt <= agora` em
+   * `kiosk-session.service.ts` faz este teste ficar vermelho (a sessao
+   * expirada voltaria a autorizar `/extend`).
+   */
+  it('sessao expirada nao autoriza -- o token em maos nao basta', async () => {
     const aberta = await request(servidor())
       .post('/api/v1/kiosk/sessions')
       .set(assinarPedido(totemA, { cpf: CPF_DO_ALUNO_A }, '/api/v1/kiosk/sessions'))
       .send({ cpf: CPF_DO_ALUNO_A })
       .expect(201);
 
-    const rota = `/api/v1/kiosk/sessions/${(aberta.body as RespostaSessao).sessionId}`;
+    const { sessionId, token } = aberta.body as RespostaSessao;
+
+    // Forca a expiracao direto no banco -- sem esperar os 60s reais.
+    await db.kioskSession.update({
+      where: { id: sessionId },
+      data: { expiresAt: new Date(Date.now() - 1_000) },
+    });
+
+    await request(servidor())
+      .post(`/api/v1/kiosk/sessions/${sessionId}/extend`)
+      .set(
+        assinarPedido(totemA, '', `/api/v1/kiosk/sessions/${sessionId}/extend`, 'POST', token),
+      )
+      .expect(404);
+  });
+
+  /**
+   * CRITICAL do fix round 1, segunda ponta: sessao encerrada por DELETE nao
+   * volta a autorizar so porque o token continua em maos.
+   *
+   * Prova por mutacao: remover `endedAt: null` do `where` de `viva()` faz
+   * este teste ficar vermelho (o token encerrado voltaria a autorizar).
+   */
+  it('sessao encerrada por DELETE nao autoriza -- mesmo com o token em maos', async () => {
+    const aberta = await request(servidor())
+      .post('/api/v1/kiosk/sessions')
+      .set(assinarPedido(totemA, { cpf: CPF_DO_ALUNO_A }, '/api/v1/kiosk/sessions'))
+      .send({ cpf: CPF_DO_ALUNO_A })
+      .expect(201);
+
+    const { sessionId, token } = aberta.body as RespostaSessao;
+
+    await request(servidor())
+      .delete(`/api/v1/kiosk/sessions/${sessionId}`)
+      .set(assinarPedido(totemA, '', `/api/v1/kiosk/sessions/${sessionId}`, 'DELETE', token))
+      .expect(204);
+
+    await request(servidor())
+      .post(`/api/v1/kiosk/sessions/${sessionId}/extend`)
+      .set(
+        assinarPedido(totemA, '', `/api/v1/kiosk/sessions/${sessionId}/extend`, 'POST', token),
+      )
+      .expect(404);
+  });
+
+  it('sessao de um totem nao pode ser encerrada por outro (tenant diferente)', async () => {
+    const aberta = await request(servidor())
+      .post('/api/v1/kiosk/sessions')
+      .set(assinarPedido(totemA, { cpf: CPF_DO_ALUNO_A }, '/api/v1/kiosk/sessions'))
+      .send({ cpf: CPF_DO_ALUNO_A })
+      .expect(201);
+
+    const { sessionId, token } = aberta.body as RespostaSessao;
+    const rota = `/api/v1/kiosk/sessions/${sessionId}`;
 
     await request(servidor())
       .delete(rota)
-      .set(assinarPedido(totemB, '', rota, 'DELETE'))
+      .set(assinarPedido(totemB, '', rota, 'DELETE', token))
+      .expect(404);
+  });
+
+  /**
+   * IMPORTANT do fix round 1: o caso REAL -- dois totens do MESMO tenant,
+   * uma academia com dois quiosques no saguao. O teste acima (tenant
+   * diferente) media so o filtro de `tenantId`; este exercita o de
+   * `kioskDeviceId`.
+   *
+   * Prova por mutacao: remover `kioskDeviceId` do `where` de `viva()` faz
+   * este teste ficar vermelho (totemC passaria a encerrar a sessao aberta
+   * no totemA).
+   */
+  it('sessao de um totem nao pode ser encerrada por outro totem do MESMO tenant', async () => {
+    const aberta = await request(servidor())
+      .post('/api/v1/kiosk/sessions')
+      .set(assinarPedido(totemA, { cpf: CPF_DO_ALUNO_A }, '/api/v1/kiosk/sessions'))
+      .send({ cpf: CPF_DO_ALUNO_A })
+      .expect(201);
+
+    const { sessionId, token } = aberta.body as RespostaSessao;
+    const rota = `/api/v1/kiosk/sessions/${sessionId}`;
+
+    await request(servidor())
+      .delete(rota)
+      .set(assinarPedido(totemC, '', rota, 'DELETE', token))
       .expect(404);
   });
 });

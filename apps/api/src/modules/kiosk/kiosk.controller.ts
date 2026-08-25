@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  Param,
+  Post,
+  Req,
+} from '@nestjs/common';
 import { z } from 'zod';
 import type { Request } from 'express';
 
@@ -71,18 +82,36 @@ export class KioskController {
   async estenderSessao(
     @Req() requisicao: Request,
     @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
   ): Promise<{ expiraEm: string }> {
     const contexto = this.contexto(requisicao);
 
-    return this.sessions.estenderSessao(contexto, sessionId, new Date());
+    return this.sessions.estenderSessao(contexto, sessionId, this.token(token), new Date());
   }
 
   @Delete('sessions/:id')
   @HttpCode(204)
-  async encerrarSessao(@Req() requisicao: Request, @Param('id') sessionId: string): Promise<void> {
+  async encerrarSessao(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ): Promise<void> {
     const contexto = this.contexto(requisicao);
 
-    await this.sessions.encerrar(contexto, sessionId, 'MANUAL', new Date());
+    await this.sessions.encerrar(contexto, sessionId, this.token(token), 'MANUAL', new Date());
+  }
+
+  /**
+   * O token do ALUNO -- credencial da sessao, distinta da credencial HMAC do
+   * dispositivo. Sem ele, `sessionId` da URL sozinho autorizaria qualquer um
+   * que adivinhasse o UUID a estender ou encerrar a sessao de outro aluno.
+   */
+  private token(valor: string | undefined): string {
+    if (!valor) {
+      throw new BadRequestException({ code: 'KIOSK_SESSION_TOKEN_MISSING' });
+    }
+
+    return valor;
   }
 
   private contexto(requisicao: Request): ContextoDoKiosk {
