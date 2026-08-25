@@ -32,10 +32,14 @@ export function RodapeDeSessao({
   segundosRestantes,
   aoEstender,
   aoEncerrar,
+  altoContraste,
+  aoAlternarContraste,
 }: {
   readonly segundosRestantes: number;
   readonly aoEstender: () => void;
   readonly aoEncerrar: () => void;
+  readonly altoContraste: boolean;
+  readonly aoAlternarContraste: () => void;
 }) {
   return (
     <footer
@@ -59,6 +63,21 @@ export function RodapeDeSessao({
       >
         Sessão encerra em {segundosRestantes} s
       </span>
+      {/*
+        O interruptor tambem AQUI, e nao so na tela publica: quem precisa de
+        alto contraste descobre isso lendo a propria area, ja dentro da sessao
+        -- obriga-lo a encerrar e voltar ao atrator para ligar seria negar a
+        acessibilidade no momento em que ela faz falta.
+      */}
+      <button
+        type="button"
+        className="botaoDeContraste"
+        aria-pressed={altoContraste}
+        data-testid="alternar-contraste"
+        onClick={aoAlternarContraste}
+      >
+        Alto contraste
+      </button>
       <button
         type="button"
         className="botaoSecundario"

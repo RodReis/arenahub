@@ -4,6 +4,8 @@ import { randomBytes } from 'node:crypto';
 
 import { CABECALHOS_DO_KIOSK, assinar } from '@arenahub/api-contracts';
 
+import { resolverCaminhoDaPonte } from '../../../../lib/rotas-da-ponte';
+
 /**
  * Ponte assinada entre o navegador do totem e a API.
  *
@@ -51,13 +53,22 @@ function credencial(): { keyId: string; secret: string } {
 }
 
 async function repassar(requisicao: Request, metodo: Metodo): Promise<Response> {
-  const { keyId, secret } = credencial();
-
   const url = new URL(requisicao.url);
-  // O caminho do totem espelha o da API: `/api/kiosk/config` daqui vira
-  // `/api/v1/kiosk/config` la. A reescrita e literal, sem tabela de rotas --
-  // acrescentar endpoint na API nao pede mexer aqui.
-  const caminho = `/api/v1/kiosk/${url.pathname.replace(/^\/api\/kiosk\/?/, '')}`;
+
+  // ALLOWLIST antes de qualquer coisa -- inclusive antes de ler a credencial.
+  // Caminho fora da jornada nao chega a ser assinado: assinar primeiro e
+  // filtrar depois deixaria a credencial do dispositivo carimbar um pedido
+  // que so seria recusado do outro lado.
+  const caminho = resolverCaminhoDaPonte(url.pathname);
+
+  if (caminho === null) {
+    // Sem detalhe: 404 e o que um caminho inexistente devolveria de qualquer
+    // forma, e distinguir "nao existe" de "existe mas nao e permitido"
+    // mapearia a superficie da API para quem sondasse.
+    return new Response(null, { status: 404 });
+  }
+
+  const { keyId, secret } = credencial();
   const pathAndQuery = `${caminho}${url.search}`;
 
   // Le UMA VEZ e usa a MESMA string para assinar e enviar: reserializar

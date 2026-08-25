@@ -267,3 +267,72 @@ button {
   flex-shrink: 0;
   color: var(--ah-totem-state-danger);
 }
+
+/* ------------------------------------------------------- alto contraste */
+
+/**
+ * Alto contraste -- DS-TOTEM.md §1, §2.6, §4 e o checklist §8.
+ *
+ * O interruptor na tela e do ALUNO: vale so para a sessao dele e SEMPRE vence
+ * o `altoContrastePadrao` da unidade (ADR-042, Decisao 6 -- gerente nao
+ * desliga acessibilidade de quem esta usando). Encerrada a sessao, volta o
+ * padrao da unidade. Quem implementa essa precedencia e o `page.tsx`; aqui e
+ * so o efeito visual de `[data-contraste="alto"]` no <html>.
+ *
+ * O §4 lista o que ele remove: glow, gradiente de fundo, forma angular e
+ * ponto pulsante. E o §2.6 fecha: "alto contraste desliga todos os efeitos
+ * decorativos".
+ */
+[data-contraste='alto'] {
+  /* Texto secundario passa a BRANCO (§4) -- 19.69 contra o fundo, no lugar
+     dos 8.79 do cinza. O terciario acompanha: a 3.0 ele ja reprovava no alvo
+     de 7 do totem, e em alto contraste nao ha desculpa para mante-lo. */
+  --ah-totem-text-secondary: var(--ah-totem-text-primary);
+  --ah-totem-text-tertiary: var(--ah-totem-text-primary);
+  /* Borda sobe para o tom forte: divisor que some derrota a leitura em pe. */
+  --ah-totem-border-hairline: var(--ah-totem-border-default);
+}
+
+/* Gradiente de acao vira COR CHAPADA -- o degrade some, o alvo continua. */
+[data-contraste='alto'] .ctaPrimario {
+  background: var(--ah-totem-brand-600);
+  box-shadow: none;
+}
+
+/* O recorte de gradiente no hero vira texto solido: `background-clip: text`
+   com `color: transparent` e decoracao, e em alto contraste texto nao pode
+   depender de gradiente para existir. */
+[data-contraste='alto'] .heroDestaque {
+  background: none;
+  -webkit-text-fill-color: var(--ah-totem-brand-200);
+  color: var(--ah-totem-brand-200);
+}
+
+/* Forma angular, ponto pulsante e qualquer outro adorno saem de cena. */
+[data-contraste='alto'] [data-decorativo] {
+  display: none;
+}
+
+/* §2.6: "alto contraste desliga todos os efeitos decorativos". */
+[data-contraste='alto'] * {
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+/**
+ * Botao do interruptor -- 88 px como todo alvo desta superficie (§2.4).
+ * Mora no cabecalho da tela publica e no rodape da sessao.
+ */
+.botaoDeContraste {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tt-alvo-secundario);
+  padding: 0 30px;
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ah-totem-text-primary);
+  font-size: var(--tt-metadado);
+  font-weight: 600;
+}

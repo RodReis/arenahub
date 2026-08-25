@@ -43,7 +43,7 @@
       }
     },
     "brand": {
-      "$comment": "Marca e acao -- DS-TOTEM.md 2.1. `500` e a cor primaria (aneis, barras); `400`/`600` sao as pontas do gradiente de CTA; `300` e glifo de icone sobre fundo escuro; `200` e texto de apoio azul. Os hex sao os quatro accents que a Task 6 ja mediu contra `bg.base` -- AZUL e o `500` daqui.",
+      "$comment": "Marca e acao do accent AZUL -- DS-TOTEM.md 2.1. `500` e a cor primaria (aneis, barras); `400`/`600` sao as pontas do gradiente de CTA; `300` e glifo de icone sobre fundo escuro; `200` e texto de apoio. Estes hex sao os do DS, escritos a mao: AZUL e a identidade do cliente inaugural e nao se deriva. Os outros tres accents de `ACCENTS_DO_TOTEM` (VERDE, LARANJA, ROXO) sao DERIVADOS do seed por `deriveRamp` no build-tokens.mjs -- ver `accentsDerivados` abaixo.",
       "200": {
         "value": "#8FB0FF",
         "contrastOnBase": 9.21,
@@ -89,6 +89,78 @@
         "value": "#FF6B6B",
         "contrastOnBase": 7.09,
         "$role": "alerta clinico que exige atendimento humano"
+      }
+    },
+    "accentsDerivados": {
+      "$comment": "Os outros tres accents de `ACCENTS_DO_TOTEM` (packages/api-contracts), que o totem seleciona pela config (`aparencia.accent`). Mesmos cinco papeis do bloco `brand`, emitidos sob `[data-accent=\"<NOME>\"]`. PROCEDENCIA: nao foram escolhidos a olho -- saem de `deriveRamp(seed)` do proprio design system (packages/ui/src/accent.ts), o mesmo resolvedor OKLCH que o painel usa. Ficam MATERIALIZADOS aqui, e nao calculados no build-tokens.mjs, porque o pipeline e `.mjs` puro e roda ANTES do `tsc` que produziria o `accent.js` importavel -- importar dali seria depender do proprio build que este passo precede. Reproduzir: `deriveRamp('<seed>')` e ler os degraus 200-600. AZUL nao entra: e o bloco `brand`, com os hex EXATOS do DS-TOTEM.md 2.1 -- a identidade do cliente inaugural nao se deriva (a rampa OKLCH devolveria #5383FF no lugar de #4D7CFF). CONTRASTE: o papel `200` e o unico usado como TEXTO, e os tres passam folgado no alvo AAA_TEXT (7) do totem -- 13.57 / 12.44 / 11.40. `400`/`500`/`600` sao fundo de gradiente e preenchimento, como no bloco `brand`.",
+      "VERDE": {
+        "$seed": "#3DDC84",
+        "200": {
+          "value": "#7AEDA4",
+          "contrastOnBase": 13.57
+        },
+        "300": {
+          "value": "#56D689",
+          "contrastOnBase": 10.67
+        },
+        "400": {
+          "value": "#27C06F",
+          "contrastOnBase": 8.3
+        },
+        "500": {
+          "value": "#00AC57",
+          "contrastOnBase": 6.6
+        },
+        "600": {
+          "value": "#009144",
+          "contrastOnBase": 4.81
+        }
+      },
+      "LARANJA": {
+        "$seed": "#F5A524",
+        "200": {
+          "value": "#FFC36B",
+          "contrastOnBase": 12.44
+        },
+        "300": {
+          "value": "#F0A946",
+          "contrastOnBase": 9.82
+        },
+        "400": {
+          "value": "#DB9111",
+          "contrastOnBase": 7.57
+        },
+        "500": {
+          "value": "#C77A00",
+          "contrastOnBase": 5.82
+        },
+        "600": {
+          "value": "#A96400",
+          "contrastOnBase": 4.23
+        }
+      },
+      "ROXO": {
+        "$seed": "#8B5CF6",
+        "200": {
+          "value": "#D6B8FF",
+          "contrastOnBase": 11.4
+        },
+        "300": {
+          "value": "#BF9DFF",
+          "contrastOnBase": 8.89
+        },
+        "400": {
+          "value": "#AA83FF",
+          "contrastOnBase": 6.94
+        },
+        "500": {
+          "value": "#9669FF",
+          "contrastOnBase": 5.4
+        },
+        "600": {
+          "value": "#7E53E0",
+          "contrastOnBase": 3.94
+        }
       }
     }
   }

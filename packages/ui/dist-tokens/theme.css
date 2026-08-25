@@ -138,6 +138,30 @@
   --ah-totem-state-danger: #FF6B6B;
 }
 
+[data-surface="totem"][data-accent="VERDE"] {
+  --ah-totem-brand-200: #7AEDA4;
+  --ah-totem-brand-300: #56D689;
+  --ah-totem-brand-400: #27C06F;
+  --ah-totem-brand-500: #00AC57;
+  --ah-totem-brand-600: #009144;
+}
+
+[data-surface="totem"][data-accent="LARANJA"] {
+  --ah-totem-brand-200: #FFC36B;
+  --ah-totem-brand-300: #F0A946;
+  --ah-totem-brand-400: #DB9111;
+  --ah-totem-brand-500: #C77A00;
+  --ah-totem-brand-600: #A96400;
+}
+
+[data-surface="totem"][data-accent="ROXO"] {
+  --ah-totem-brand-200: #D6B8FF;
+  --ah-totem-brand-300: #BF9DFF;
+  --ah-totem-brand-400: #AA83FF;
+  --ah-totem-brand-500: #9669FF;
+  --ah-totem-brand-600: #7E53E0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 100ms !important;

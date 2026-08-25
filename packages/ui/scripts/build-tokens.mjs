@@ -395,6 +395,8 @@ push('');
 push('/* Superficie do totem: dark, leitura a 60-100 cm. DS-TOTEM.md 2.1. */');
 push('[data-surface="totem"] {');
 for (const [grupo, entradas] of Object.entries(totem.totem)) {
+  // `accentsDerivados` sai em blocos proprios logo abaixo, um por accent.
+  if (grupo === 'accentsDerivados') continue;
   for (const [nome, def] of Object.entries(entradas)) {
     if (nome.startsWith('$')) continue;
     push(`  --ah-totem-${grupo}-${nome}: ${def.value};`);
@@ -402,6 +404,26 @@ for (const [grupo, entradas] of Object.entries(totem.totem)) {
 }
 push('}');
 push('');
+
+/**
+ * Um bloco por accent NAO-AZUL -- ADR-042, Decisao 0: `aparencia.accent` e
+ * configuravel, entao as quatro variantes precisam EXISTIR. Emitir so a AZUL
+ * deixava o campo do contrato sem efeito nenhum na tela.
+ *
+ * `[data-surface="totem"][data-accent="X"]` redefine so os cinco papeis de
+ * `brand`; superficie, texto e semantica seguem do bloco acima. AZUL nao
+ * precisa de bloco: e o valor padrao ja emitido em `--ah-totem-brand-*`.
+ */
+for (const [accent, papeis] of Object.entries(totem.totem.accentsDerivados)) {
+  if (accent.startsWith('$')) continue;
+  push(`[data-surface="totem"][data-accent="${accent}"] {`);
+  for (const [nome, def] of Object.entries(papeis)) {
+    if (nome.startsWith('$')) continue;
+    push(`  --ah-totem-brand-${nome}: ${def.value};`);
+  }
+  push('}');
+  push('');
+}
 push('@media (prefers-reduced-motion: reduce) {');
 push('  *, *::before, *::after {');
 push(`    animation-duration: ${primitive.motion.reducedMotionMax}ms !important;`);

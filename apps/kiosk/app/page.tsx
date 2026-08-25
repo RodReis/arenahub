@@ -8,6 +8,7 @@ import { IdentificacaoCpf } from '../components/identificacao-cpf';
 import { MinhaArea } from '../components/minha-area';
 import { BarraDeSessao, RodapeDeSessao } from '../components/rodape-de-sessao';
 import { Toast } from '../components/toast';
+import { contrasteEfetivo } from '../lib/aparencia';
 import { abrirSessao, carregarConfig, type SessaoDoAluno } from '../lib/kiosk-client';
 import { limparEstadoDaSessao, useSessao } from '../lib/use-sessao';
 
@@ -33,6 +34,13 @@ export default function Totem() {
   const [sessao, setSessao] = useState<SessaoDoAluno | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // `null` = o aluno nao mexeu no interruptor; vale o padrao da unidade.
+  const [contrasteDoAluno, setContrasteDoAluno] = useState<boolean | null>(null);
+
+  const altoContraste = contrasteEfetivo(
+    contrasteDoAluno,
+    config.aparencia.altoContrastePadrao,
+  );
 
   // Marca, accent, duracao e modulos vem da config DESDE O PRIMEIRO COMMIT
   // (ADR-042, Decisao 0) -- mesmo que hoje so exista o padrao do seed.
@@ -42,10 +50,38 @@ export default function Totem() {
     });
   }, []);
 
+  /**
+   * Accent e contraste moram no <html>, nao num wrapper: `[data-surface]` ja
+   * esta la (posto pelo layout, no servidor), e os blocos de token do
+   * `theme.css` sao escritos como `[data-surface="totem"][data-accent="X"]`.
+   *
+   * Escrito por efeito, e nao no layout: `aparencia` vem da CONFIG, que so
+   * chega depois do primeiro fetch. O padrao AZUL ja e o `--ah-totem-brand-*`
+   * base, entao ate a config chegar a tela nunca fica sem cor.
+   */
+  useEffect(() => {
+    const raiz = document.documentElement;
+
+    raiz.dataset['accent'] = config.aparencia.accent;
+
+    if (altoContraste) {
+      raiz.dataset['contraste'] = 'alto';
+    } else {
+      delete raiz.dataset['contraste'];
+    }
+  }, [config.aparencia.accent, altoContraste]);
+
   const voltarAoInicio = useCallback(() => {
     setSessao(null);
     setEtapa('atrator');
+    // A escolha do aluno morre com a sessao dele: o proximo nao herda a
+    // preferencia do anterior, e o padrao da unidade volta a valer.
+    setContrasteDoAluno(null);
   }, []);
+
+  const alternarContraste = useCallback(() => {
+    setContrasteDoAluno((atual) => !(atual ?? config.aparencia.altoContrastePadrao));
+  }, [config.aparencia.altoContrastePadrao]);
 
   const confirmar = useCallback(async (cpf: string) => {
     setOcupado(true);
@@ -63,11 +99,34 @@ export default function Totem() {
     setSessao(aberta);
   }, []);
 
-  // Limpa tambem ao SAIR da pagina (recarregar, fechar, tela apagando): sem
-  // isto, o unico caminho de limpeza seria o encerramento voluntario.
+  /**
+   * Limpa tambem quando a pagina SAI -- recarregar, fechar a aba, o navegador
+   * sendo morto pelo modo quiosque.
+   *
+   * `pagehide`, e nao o cleanup do efeito: cleanup de efeito roda quando o
+   * COMPONENTE desmonta, o que nao acontece num F5 nem ao fechar a aba. Foi o
+   * que a revisao pegou -- o comentario anterior prometia cobrir esses casos e
+   * o codigo nao cobria.
+   *
+   * `pagehide` e nao `beforeunload`: o segundo nao dispara em navegador movel
+   * nem quando a aba e descartada por memoria, e ainda arrisca o dialogo de
+   * confirmacao. `pagehide` dispara nos dois, e tambem quando a pagina entra
+   * no cache de retorno (`persisted`) -- limpar la e o que se quer: a pagina
+   * pode voltar do cache com o dado do aluno anterior ainda em memoria.
+   *
+   * O cleanup do efeito fica junto porque desmontar tambem tem de limpar, e
+   * limpar duas vezes e inofensivo (a segunda ja encontra tudo vazio).
+   */
   useEffect(() => {
-    return () => {
+    const aoSair = (): void => {
       limparEstadoDaSessao();
+    };
+
+    window.addEventListener('pagehide', aoSair);
+
+    return () => {
+      window.removeEventListener('pagehide', aoSair);
+      aoSair();
     };
   }, []);
 
@@ -77,6 +136,8 @@ export default function Totem() {
         sessao={sessao}
         config={config}
         aoEncerrar={voltarAoInicio}
+        altoContraste={altoContraste}
+        aoAlternarContraste={alternarContraste}
       />
     );
   }
@@ -86,6 +147,8 @@ export default function Totem() {
       {etapa === 'atrator' ? (
         <Atrator
           config={config}
+          altoContraste={altoContraste}
+          aoAlternarContraste={alternarContraste}
           aoEntrar={() => {
             setEtapa('cpf');
           }}
@@ -119,10 +182,14 @@ function TelaDeSessao({
   sessao,
   config,
   aoEncerrar,
+  altoContraste,
+  aoAlternarContraste,
 }: {
   readonly sessao: SessaoDoAluno;
   readonly config: KioskConfig;
   readonly aoEncerrar: () => void;
+  readonly altoContraste: boolean;
+  readonly aoAlternarContraste: () => void;
 }) {
   const { segundosRestantes, fracaoRestante, estender, encerrar } = useSessao(
     sessao,
@@ -138,6 +205,8 @@ function TelaDeSessao({
         segundosRestantes={segundosRestantes}
         aoEstender={estender}
         aoEncerrar={encerrar}
+        altoContraste={altoContraste}
+        aoAlternarContraste={aoAlternarContraste}
       />
     </div>
   );
