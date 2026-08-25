@@ -343,6 +343,49 @@ describe('F56 -- plano com assinatura mensal', () => {
       });
       expect(assinatura.externalSubscriptionId).not.toBeNull();
     });
+    /*
+     * A JANELA ENTRE O PROVEDOR E O BANCO -- achado da revisao deste PR.
+     *
+     * A adesao chama o provedor ANTES de gravar (ordem oposta a da cobranca,
+     * onde gravar antes protege dinheiro que sai sem registro). Se o processo
+     * morrer no meio, fica uma recorrencia viva no provedor sem nada no
+     * ArenaHub apontando para ela: cobra o aluno todo mes e ninguem consegue
+     * cancelar -- o defeito da Decisao 5, por outra porta.
+     *
+     * O que fecha a janela e a chave `sub:<id>` ser derivada da ASSINATURA, e
+     * nao de contagem ou de relogio: a proxima tentativa reenvia a MESMA
+     * chave, o provedor devolve o MESMO id e a gravacao completa. Sem
+     * instalar a segunda recorrencia.
+     */
+    it('recupera a adesao interrompida entre o provedor e o banco', async () => {
+      const subscriptionId = await alunoPronto();
+      const antes = fake.recorrenciasInstaladas;
+
+      // Primeira adesao completa...
+      const primeira = await adesao(subscriptionId);
+
+      // ...e o banco perde a gravacao, simulando a morte do processo no meio.
+      await db.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          externalSubscriptionId: null,
+          recurrenceConsentAt: null,
+          recurrenceConsentActorId: null,
+        },
+      });
+
+      const segunda = await adesao(subscriptionId);
+
+      // MESMO id: nenhuma segunda recorrencia foi instalada no provedor.
+      expect(segunda.externalSubscriptionId).toBe(primeira.externalSubscriptionId);
+      expect(fake.recorrenciasInstaladas).toBe(antes + 1);
+
+      const assinatura = await db.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        select: { externalSubscriptionId: true },
+      });
+      expect(assinatura.externalSubscriptionId).toBe(primeira.externalSubscriptionId);
+    });
   });
 
   describe('cancelamento', () => {
