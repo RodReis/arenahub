@@ -3,7 +3,7 @@
     "testes": 779,
     "pass": 779,
     "falha": 0,
-    "coberturaPct": 66.11
+    "coberturaPct": 65.64
   },
   "apps/api#test:integration": {
     "testes": 557,

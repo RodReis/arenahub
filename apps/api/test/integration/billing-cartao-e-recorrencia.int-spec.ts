@@ -16,6 +16,8 @@ import {
   TOKEN_RECUSADO_TEMPORARIO,
 } from '../../src/modules/billing/provider/fake-payment-provider.adapter.js';
 import { RegistrarMetodoDePagamentoUseCase } from '../../src/modules/billing/registrar-metodo-de-pagamento.use-case.js';
+import { FakePaymentProvider } from '../../src/modules/billing/provider/fake-payment-provider.adapter.js';
+import { PAYMENT_PROVIDER } from '../../src/modules/billing/provider/payment-provider.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -38,6 +40,7 @@ describe('F14 -- cartao, recorrencia e politica de retry', () => {
   let registrarMetodo: RegistrarMetodoDePagamentoUseCase;
   let cobrar: CobrarAssinaturaNoCartaoUseCase;
   let cancelar: CancelarRecorrenciaUseCase;
+  let fake: FakePaymentProvider;
 
   const sufixo = randomUUID().slice(0, 8);
   const contexto: TenantContext = {
@@ -84,6 +87,7 @@ describe('F14 -- cartao, recorrencia e politica de retry', () => {
     registrarMetodo = moduleRef.get(RegistrarMetodoDePagamentoUseCase);
     cobrar = moduleRef.get(CobrarAssinaturaNoCartaoUseCase);
     cancelar = moduleRef.get(CancelarRecorrenciaUseCase);
+    fake = moduleRef.get(PAYMENT_PROVIDER);
 
     const tenant = await db.tenant.create({
       data: {
@@ -198,7 +202,18 @@ describe('F14 -- cartao, recorrencia e politica de retry', () => {
 
     const cobranca = await cobrar.executar(contexto, { invoiceId, agora: VENCIMENTO });
 
-    expect(cobranca.externalSubscriptionId).toMatch(/^fake_sub_/);
+    /**
+     * `fake_card_`, NAO `fake_sub_` (ADR-043, Decisao 5).
+     *
+     * O prefixo e a assercao inteira: ate 25/08/2026 este teste esperava
+     * `fake_sub_` e passava, porque a cobranca de invoice chamava
+     * `createTokenizedSubscription`. Contra a Getnet real aquilo instalaria
+     * uma recorrencia mensal viva POR INVOICE. Um `toBeDefined()` aqui teria
+     * sobrevivido aos dois mundos -- e foi por nao olhar o prefixo que o
+     * defeito atravessou a F14 inteira.
+     */
+    expect(cobranca.externalPaymentId).toMatch(/^fake_card_/);
+    expect(cobranca.externalPaymentId).not.toMatch(/^fake_sub_/);
 
     const tentativa = await db.paymentAttempt.findUnique({
       where: { id: cobranca.paymentAttemptId },
@@ -259,7 +274,7 @@ describe('F14 -- cartao, recorrencia e politica de retry', () => {
     });
 
     const segunda = await cobrar.executar(contexto, { invoiceId, agora: VENCIMENTO });
-    expect(segunda.externalSubscriptionId).toMatch(/^fake_sub_/);
+    expect(segunda.externalPaymentId).toMatch(/^fake_card_/);
   });
 
   it('recusa PERMANENTE para na hora, com tentativas ainda sobrando', async () => {
@@ -369,6 +384,38 @@ describe('F14 -- cartao, recorrencia e politica de retry', () => {
     }
   });
 
+  it('cobrar tres invoices NAO instala nenhuma recorrencia no provedor', async () => {
+    /**
+     * ADR-043, Decisao 5 -- o teste que fecha a porta.
+     *
+     * O bug que ele guarda: ate 25/08/2026 a cobranca de invoice chamava
+     * `createTokenizedSubscription`, e contra a Getnet real cada mensalidade
+     * instalaria um CALENDARIO. No segundo mes o aluno seria cobrado pela
+     * recorrencia de setembro E pela de outubro; no decimo segundo, doze
+     * vezes. A suite inteira passava, porque o duble devolve um id de
+     * qualquer jeito e ninguem olhava o que ficava instalado.
+     *
+     * A assercao e sobre o ESTADO NO PROVEDOR, nao sobre o retorno: o id
+     * devolvido diz o que voltou daquela chamada, e o que cobra o aluno no
+     * mes seguinte e o que ficou de pe. Sao perguntas diferentes, e so a
+     * segunda pega este defeito.
+     */
+    const antes = fake.recorrenciasInstaladas;
+
+    for (let i = 0; i < 3; i += 1) {
+      /**
+       * `periodo += 1` ANTES de abrir a invoice: o periodo entra na chave
+       * `(tenant_id, subscription_id, billing_period)`, e tres invoices no
+       * mesmo periodo colidem na constraint. Os outros casos abrem uma so, e
+       * por isso incrementam depois.
+       */
+      periodo += 1;
+      await cobrar.executar(contexto, { invoiceId: await novaInvoice(), agora: VENCIMENTO });
+    }
+
+    expect(fake.recorrenciasInstaladas).toBe(antes);
+  });
+
   it('cancelar a recorrencia NAO cancela a assinatura', async () => {
     /**
      * Sao coisas diferentes, e confundi-las tira o acesso de quem pagou: o
@@ -377,7 +424,19 @@ describe('F14 -- cartao, recorrencia e politica de retry', () => {
      */
     const resultado = await cancelar.executar(contexto, { subscriptionId });
 
-    expect(resultado.canceladasNoProvedor).toBeGreaterThan(0);
+    /**
+     * ZERO, e nao "mais que zero" (ADR-043, Decisao 5).
+     *
+     * Este numero era maior que zero por causa de um BUG: a cobranca de
+     * invoice instalava uma recorrencia por invoice, e o cancelamento
+     * encontrava aquele lixo para cancelar. Cobrar invoice nao instala
+     * calendario -- entao nao ha o que cancelar, e o proprio caso de uso
+     * declara que zero nao e erro.
+     *
+     * Recorrencia de verdade nasce na F56, e e la que este numero volta a
+     * ser maior que zero, lendo `Subscription.externalSubscriptionId`.
+     */
+    expect(resultado.canceladasNoProvedor).toBe(0);
 
     const assinatura = await db.subscription.findUnique({
       where: { id: subscriptionId },

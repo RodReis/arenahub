@@ -59,6 +59,9 @@ sabe fazer, não quem ela é*.
   os dois:** cobrança pontual com token salvo (`chargeTokenizedPayment`, que é o que a cobrança de
   invoice deve chamar) e recorrência instalada uma vez por assinatura do aluno
   (`createTokenizedSubscription`, usada só pela **F56**).
+  **Feito em 25/08/2026, antes e fora do resto desta fatia** — não dependia de credencial, e é a
+  única parte da F55 que era construível sem o insumo do PI. Detalhe e o achado do cancelamento
+  em **ADR-043, Decisão 5**.
 - Erros do provedor traduzidos para códigos internos estáveis, classificados em **recuperável** ou
   **permanente** (`MVP-02` §12).
 - **Nenhum dos dois faz PIX e cartão** — é o ponto inteiro do ADR-032: o Sicoob é banco, não

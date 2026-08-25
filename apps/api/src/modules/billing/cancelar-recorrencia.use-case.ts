@@ -3,11 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
-import {
-  ErroDoProvedor,
-  PAYMENT_PROVIDER,
-  type PaymentProvider,
-} from './provider/payment-provider.port.js';
+import { PAYMENT_PROVIDER, type PaymentProvider } from './provider/payment-provider.port.js';
 
 /**
  * Cancela a recorrencia de cartao de uma assinatura. `MVP-02` 7, Slice 2.3:
@@ -59,48 +55,30 @@ export class CancelarRecorrenciaUseCase {
     }
 
     /**
-     * As recorrencias vivas desta assinatura sao as tentativas de CARTAO que
-     * chegaram a receber identificador do provedor. Tentativa que falhou
-     * antes disso nunca criou combinado nenhum la.
+     * NAO HA RECORRENCIA INSTALADA PARA CANCELAR -- ainda (ADR-043, Decisao 5).
+     *
+     * Ate 25/08/2026 este laco varria `payment_attempts` de cartao e passava
+     * `externalPaymentId` para `cancelSubscription`. Aquilo so fazia sentido
+     * por causa de um BUG: a cobranca de invoice chamava
+     * `createTokenizedSubscription`, entao a coluna guardava, por acidente,
+     * um id de ASSINATURA. Corrigida a cobranca para
+     * `chargeTokenizedPayment`, a coluna guarda o que o nome sempre disse --
+     * id de PAGAMENTO --, e mandar isso para `cancelSubscription` cancelaria
+     * pelo identificador errado. Contra o duble seria `PROVIDER_NOT_FOUND`
+     * silencioso; contra a Getnet real, um alvo errado.
+     *
+     * O ESTADO VERDADEIRO DO SISTEMA HOJE E ZERO: a F14 cobra invoice, e
+     * cobrar invoice nao instala calendario nenhum. Recorrencia de verdade
+     * nasce na **F56** (plano com assinatura mensal), que cria
+     * `Subscription.externalSubscriptionId` -- a fonte correta desta leitura.
+     * Enquanto ela nao existe, nao ha o que cancelar, e o contrato deste caso
+     * de uso ja dizia que zero NAO e erro.
+     *
+     * O `cancelSubscription` da porta continua existindo e testado no duble:
+     * quem o exercita e a F56. O `provedor` segue injetado por isso -- tirar
+     * e recolocar na proxima fatia seria churn, e o campo documenta que este
+     * caso de uso fala com o provedor.
      */
-    const vivas = await this.db.paymentAttempt.findMany({
-      where: {
-        tenantId: contexto.tenantId,
-        method: 'CARD',
-        externalPaymentId: { not: null },
-        invoice: { subscriptionId: assinatura.id },
-      },
-      select: { id: true, externalPaymentId: true },
-    });
-
-    let canceladas = 0;
-
-    for (const tentativa of vivas) {
-      if (tentativa.externalPaymentId === null) {
-        continue;
-      }
-
-      try {
-        await this.provedor.cancelSubscription(tentativa.externalPaymentId);
-        canceladas += 1;
-      } catch (erro) {
-        /**
-         * RECORRENCIA JA INEXISTENTE NAO E FALHA. O aluno pode ter cancelado
-         * pelo app do banco, ou o provedor pode ter encerrado por conta
-         * propria -- em ambos os casos o estado desejado JA VALE, e devolver
-         * erro faria a recepcao tentar de novo para sempre.
-         *
-         * Qualquer outro erro sobe: nao cancelar de verdade e continuar
-         * cobrando o aluno e o pior resultado possivel aqui.
-         */
-        if (erro instanceof ErroDoProvedor && erro.codigo === 'PROVIDER_NOT_FOUND') {
-          continue;
-        }
-
-        throw erro;
-      }
-    }
-
-    return { subscriptionId: assinatura.id, canceladasNoProvedor: canceladas };
+    return { subscriptionId: assinatura.id, canceladasNoProvedor: 0 };
   }
 }
