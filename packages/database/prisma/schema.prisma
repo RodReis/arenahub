@@ -186,6 +186,24 @@ enum LeadSource {
 /// a assinatura para PAST_DUE. O valor entra agora porque o modelo e o mesmo
 /// que o MVP 2 vai usar -- criar a coluna depois custaria migration de enum
 /// em tabela ja populada. Nenhuma transicao desta fatia o alcanca.
+/// Modalidade de cobranca do plano -- ADR-043, Decisao 2.
+///
+/// A assinatura NAO terceiriza o ciclo: o calendario, o valor, a carencia e o
+/// bloqueio continuam do ArenaHub. O que muda e que existe um metodo salvo e
+/// uma autorizacao do aluno para cobrar sem ele agir. Era exatamente isso que
+/// o Subscriptions Engine da Getnet tiraria, e o motivo de a Decisao 2 te-lo
+/// recusado.
+enum PlanBillingMode {
+  /// O ArenaHub gera a invoice do periodo; ALGUEM cobra -- recepcao ou o
+  /// proprio aluno pelo totem.
+  AVULSO
+  /// O ArenaHub gera a invoice do periodo E cobra sozinho no cartao salvo,
+  /// com o retry do tenant.
+  ASSINATURA
+
+  @@map("plan_billing_mode")
+}
+
 enum SubscriptionStatus {
   PENDING
   ACTIVE
@@ -1086,17 +1104,25 @@ model StudentTimelineEvent {
 /// inclusas, convidados, fidelidade, multa) sao `[indefinido]` por INV-059 --
 /// NAO inventar campo para elas aqui.
 model Plan {
-  id           String    @id @default(uuid()) @db.Uuid
-  tenantId     String    @map("tenant_id") @db.Uuid
+  id           String          @id @default(uuid()) @db.Uuid
+  tenantId     String          @map("tenant_id") @db.Uuid
   name         String
   description  String?
-  isActive     Boolean   @default(true) @map("is_active")
+  isActive     Boolean         @default(true) @map("is_active")
   /// Validade de VENDA do plano (ate quando pode ser contratado), diferente
   /// da vigencia da assinatura de um aluno.
-  salesStartAt DateTime? @map("sales_start_at")
-  salesEndAt   DateTime? @map("sales_end_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  salesStartAt DateTime?       @map("sales_start_at")
+  salesEndAt   DateTime?       @map("sales_end_at")
+  /// Como o plano cobra (ADR-043, Decisao 2). `AVULSO` e o padrao porque e o
+  /// que todo plano existente E -- migration que mudasse o comportamento de
+  /// plano ja vendido cobraria aluno que nunca autorizou recorrencia.
+  ///
+  /// Plano `ASSINATURA` exige `PlanPrice` vigente: nao se assina o que nao tem
+  /// preco. A regra e de aplicacao, nao de coluna -- a vigencia e uma LINHA em
+  /// outra tabela, e nenhuma constraint de coluna alcanca isso.
+  billingMode  PlanBillingMode @default(AVULSO) @map("billing_mode")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
 
   tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   units         PlanUnit[]
@@ -1169,9 +1195,34 @@ model Subscription {
   /// cada comando -- e ficam aqui na ultima alteracao, alem da timeline.
   lastActorId String?            @map("last_actor_id") @db.Uuid
   lastReason  String?            @map("last_reason")
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
-  version     Int                @default(0)
+
+  /// Identificador da RECORRENCIA no provedor -- a fonte correta que o
+  /// `CancelarRecorrenciaUseCase` esperava (ADR-043, Decisao 5).
+  ///
+  /// Ate 25/08/2026 este id vivia, por acidente, em
+  /// `payment_attempts.external_payment_id`: a cobranca de invoice chamava
+  /// `createTokenizedSubscription` e a coluna guardava id de assinatura. Aqui
+  /// ele fica no lugar certo -- UMA recorrencia por assinatura do aluno,
+  /// instalada na adesao e cancelada no cancelamento.
+  ///
+  /// Nulo em toda assinatura de plano AVULSO, e em assinatura de plano
+  /// ASSINATURA que ainda nao aderiu: adesao e ato separado da criacao.
+  externalSubscriptionId String? @map("external_subscription_id")
+
+  /// Quando o aluno autorizou a cobranca recorrente. Nulo = nao autorizou.
+  ///
+  /// A adesao exige aceite EXPLICITO com valor, dia da cobranca e como
+  /// cancelar na tela (SPEC-056 2.2). Sem registro do instante, "ele
+  /// autorizou?" nao tem resposta -- e contestacao de debito recorrente e
+  /// exatamente a disputa em que essa pergunta e feita.
+  recurrenceConsentAt      DateTime? @map("recurrence_consent_at")
+  /// Quem operou a adesao (recepcao). Nulo quando o proprio aluno aderir --
+  /// caminho que nasce na F25/F52, nao aqui.
+  recurrenceConsentActorId String?   @map("recurrence_consent_actor_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -1181,6 +1232,11 @@ model Subscription {
   invoices     Invoice[]
 
   @@index([tenantId, studentId, status])
+  /// O JOB DE COBRANCA AUTOMATICA LE POR AQUI: assinaturas com recorrencia
+  /// instalada, por tenant. Sem o indice o job varre a tabela inteira a cada
+  /// execucao, e ele roda por agendador -- custo que so aparece com a base
+  /// crescida, quando ja e tarde.
+  @@index([tenantId, externalSubscriptionId])
   @@map("subscriptions")
 }
 
@@ -3477,7 +3533,6 @@ model HealthGoal {
   @@map("health_goals")
 }
 
-
 /// Sessao de frequencia: UM DIA em que o aluno entrou pelo menos uma vez
 /// (`M3-FR-013`, `M3-BR-008`, Slice 3.4).
 ///
@@ -3542,7 +3597,6 @@ model StudentAttendanceSession {
   @@map("student_attendance_sessions")
 }
 
-
 /// Desfecho de uma analise por IA.
 enum AiAnalysisStatus {
   /// Saida validada e gravada. E a unica que a tela mostra.
@@ -3562,18 +3616,18 @@ enum AiAnalysisStatus {
 /// de analises, e reproduzir uma analise de tres meses atras exige o TEXTO
 /// que a gerou -- nao o nome dele.
 model AiPromptVersion {
-  id        String @id @default(uuid()) @db.Uuid
+  id            String    @id @default(uuid()) @db.Uuid
   /// `analise-de-saude@3`. Unico globalmente: prompt e do produto, nao do
   /// tenant.
-  name      String @unique
-  content   String
+  name          String    @unique
+  content       String
   /// SHA-256 do `content`, em hex minusculo. E o que prova que o texto nao
   /// mudou por baixo de uma analise ja publicada.
-  contentSha256 String @map("content_sha256")
-  createdAt DateTime @default(now()) @map("created_at")
+  contentSha256 String    @map("content_sha256")
+  createdAt     DateTime  @default(now()) @map("created_at")
   /// Preenchido quando uma versao nova entra. Versao aposentada continua
   /// existindo: ha analise publicada apontando para ela.
-  retiredAt DateTime? @map("retired_at")
+  retiredAt     DateTime? @map("retired_at")
 
   analyses AiAnalysis[]
 
@@ -3623,10 +3677,10 @@ model AiAnalysis {
   /// Inteiro pela mesma regra de arquitetura no 6 que vale para dinheiro:
   /// `float` acumula erro, e o teto de gasto por tenant (`M3-NFR-005`) soma
   /// milhares destes valores.
-  costMicros    Int @map("cost_micros")
-  latencyMs     Int @map("latency_ms")
-  inputTokens   Int @map("input_tokens")
-  outputTokens  Int @map("output_tokens")
+  costMicros   Int @map("cost_micros")
+  latencyMs    Int @map("latency_ms")
+  inputTokens  Int @map("input_tokens")
+  outputTokens Int @map("output_tokens")
 
   /// Quem pediu a analise. E o profissional que endossou (F21).
   requestedByUserId String @map("requested_by_user_id") @db.Uuid
@@ -3642,7 +3696,6 @@ model AiAnalysis {
   @@index([tenantId, createdAt])
   @@map("ai_analyses")
 }
-
 
 /// Estado de uma importacao de arquivo (F19).
 enum AssessmentImportStatus {
@@ -3710,17 +3763,17 @@ model AssessmentImport {
   objectKey        String? @map("object_key")
 
   /// Veredito do antivirus. Nulo enquanto nao escaneou.
-  scanResult String? @map("scan_result")
+  scanResult    String? @map("scan_result")
   /// Qual implementacao extraiu (`csv@1`, `fake-ocr@1`). Auditoria.
-  extractor  String?
+  extractor     String?
   /// Por que falhou, quando `FAILED` ou `INFECTED`.
   failureReason String? @map("failure_reason")
 
   /// Quem enviou o arquivo.
-  uploadedByUserId String  @map("uploaded_by_user_id") @db.Uuid
+  uploadedByUserId String    @map("uploaded_by_user_id") @db.Uuid
   /// Quem confirmou a revisao. Nulo ate a confirmacao -- e o registro de que
   /// um HUMANO decidiu (INV-103).
-  reviewedByUserId String? @map("reviewed_by_user_id") @db.Uuid
+  reviewedByUserId String?   @map("reviewed_by_user_id") @db.Uuid
   reviewedAt       DateTime? @map("reviewed_at")
 
   /// A avaliacao que nasceu desta importacao. Nula ate a confirmacao.
@@ -3784,11 +3837,11 @@ model AssessmentImport {
 /// consegue, meses depois, descobrir que o OCR lia virgula errado num
 /// modelo especifico de laudo.
 model ImportedField {
-  id       String             @id @default(uuid()) @db.Uuid
-  tenantId String             @map("tenant_id") @db.Uuid
-  importId String             @map("import_id") @db.Uuid
+  id       String              @id @default(uuid()) @db.Uuid
+  tenantId String              @map("tenant_id") @db.Uuid
+  importId String              @map("import_id") @db.Uuid
   type     BodyMeasurementType
-  state    ImportedFieldState @default(PENDING)
+  state    ImportedFieldState  @default(PENDING)
 
   /// O que a maquina leu. Nulo quando o extrator marcou o campo como ilegivel.
   extractedValue Decimal?         @map("extracted_value") @db.Decimal(10, 4)
@@ -3816,8 +3869,8 @@ model ImportedField {
   /// Faixa de referencia VIGENTE no laudo, guardada junto da medida: ela e
   /// do fabricante e muda com firmware. Em tabela global, a leitura de
   /// agosto deixaria de fazer sentido em dezembro.
-  referenceMin Decimal? @map("reference_min") @db.Decimal(10, 4)
-  referenceMax Decimal? @map("reference_max") @db.Decimal(10, 4)
+  referenceMin    Decimal? @map("reference_min") @db.Decimal(10, 4)
+  referenceMax    Decimal? @map("reference_max") @db.Decimal(10, 4)
   /// Percentual do padrao que o aparelho reporta (233,3% no braco direito).
   standardPercent Decimal? @map("standard_percent") @db.Decimal(7, 2)
 

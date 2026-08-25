@@ -117,6 +117,11 @@ export interface DadosDeCriacaoDePlano {
   salesEndAt?: Date | undefined;
   /** Centavos, INV-065. Preco vigente a partir de agora, na mesma transacao do plano. */
   amountMinor: number;
+  /**
+   * Modalidade de cobranca (ADR-043, Decisao 2). Ausente = `AVULSO`, que e o
+   * default da coluna -- plano criado por chamador antigo continua avulso.
+   */
+  billingMode?: 'AVULSO' | 'ASSINATURA' | undefined;
 }
 
 export interface DadosDeEdicaoDePlano {
@@ -211,6 +216,7 @@ export class MembershipRepository {
           tenantId: contexto.tenantId,
           name: dados.name,
           description: dados.description ?? null,
+          ...(dados.billingMode === undefined ? {} : { billingMode: dados.billingMode }),
           salesStartAt: dados.salesStartAt ?? null,
           salesEndAt: dados.salesEndAt ?? null,
           units: { create: dados.gymUnitIds.map((gymUnitId) => ({ gymUnitId })) },
@@ -238,6 +244,7 @@ export class MembershipRepository {
             name: plano.name,
             unidades: dados.gymUnitIds.length,
             amountMinor: dados.amountMinor,
+            billingMode: plano.billingMode,
           },
         },
       });
@@ -957,7 +964,22 @@ export class MembershipRepository {
   ): Promise<EntitlementComJanelas[]> {
     return this.db.entitlement.findMany({
       where: { tenantId: contexto.tenantId, studentId },
-      include: { unitWindows: true, subscription: { select: { version: true } } },
+      include: {
+        unitWindows: true,
+        /*
+         * F56: a ficha precisa saber se JA EXISTE recorrencia (mostra
+         * "encerrar") ou nao (mostra "ativar"), e se o plano sequer aceita
+         * assinatura. Sem os tres campos a tela faria uma segunda viagem por
+         * assinatura listada.
+         */
+        subscription: {
+          select: {
+            version: true,
+            externalSubscriptionId: true,
+            plan: { select: { billingMode: true, name: true, prices: true } },
+          },
+        },
+      },
       orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
     });
   }
@@ -1014,8 +1036,23 @@ export type PlanoComRegras = Prisma.PlanGetPayload<{
  * `include` porque o resto da assinatura nao e assunto do entitlement, e
  * carregar o registro inteiro so aumentaria a resposta.
  */
+/**
+ * O `include` esta ESCRITO DUAS VEZES -- aqui e em
+ * `listarEntitlementsDoAluno`, e o Prisma nao liga as duas pontas sozinho.
+ * Divergir faz o compilador reclamar do CONSUMIDOR, longe da causa: foi o que
+ * aconteceu ao adicionar os campos da F56. Mexeu num, mexa no outro.
+ */
 export type EntitlementComJanelas = Prisma.EntitlementGetPayload<{
-  include: { unitWindows: true; subscription: { select: { version: true } } };
+  include: {
+    unitWindows: true;
+    subscription: {
+      select: {
+        version: true;
+        externalSubscriptionId: true;
+        plan: { select: { billingMode: true; name: true; prices: true } };
+      };
+    };
+  };
 }>;
 
 export type EventoDeTimeline = Prisma.StudentTimelineEventGetPayload<object>;

@@ -8,6 +8,8 @@ import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js
 import { ConsultarResumoFinanceiroUseCase } from './consultar-resumo-financeiro.use-case.js';
 import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
+import { AderirARecorrenciaUseCase } from './aderir-a-recorrencia.use-case.js';
+import { RodarCicloDeAssinaturasUseCase } from './rodar-ciclo-de-assinaturas.use-case.js';
 import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
 import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
@@ -75,6 +77,8 @@ import { WebhookController } from './webhook.controller.js';
     RegistrarMetodoDePagamentoUseCase,
     CobrarAssinaturaNoCartaoUseCase,
     CancelarRecorrenciaUseCase,
+    AderirARecorrenciaUseCase,
+    RodarCicloDeAssinaturasUseCase,
     AplicarInadimplenciaUseCase,
     ConsultarInadimplenciaUseCase,
     ConsultarResumoFinanceiroUseCase,

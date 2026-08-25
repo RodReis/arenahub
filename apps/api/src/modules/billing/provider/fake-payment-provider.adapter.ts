@@ -147,6 +147,22 @@ export class FakePaymentProvider implements PaymentProvider {
   recorrenciasInstaladas = 0;
 
   /**
+   * A recorrencia continua VIVA no provedor?
+   *
+   * Existe pela F56: `recorrenciasInstaladas` conta quantas nasceram e nunca
+   * decresce -- ele nao distingue "instalei e cancelei" de "instalei e
+   * continua cobrando". Recorrencia viva depois de um cancelamento e cobranca
+   * que ninguem autorizou, e o contador sozinho nao pega isso.
+   *
+   * METODO e nao o `Set` exposto: quem observa precisa PERGUNTAR, nao poder
+   * adicionar. Um teste que consegue plantar estado no duble deixa de medir o
+   * codigo de producao.
+   */
+  temRecorrenciaViva(externalSubscriptionId: string): boolean {
+    return this.assinaturasVivas.has(externalSubscriptionId);
+  }
+
+  /**
    * O estorno confirma na hora, ou fica pendente?
    *
    * PADRAO SINCRONO por conveniencia dos testes que nao estao testando isso --

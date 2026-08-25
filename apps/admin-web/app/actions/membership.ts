@@ -27,6 +27,7 @@ const esquemaDePlano = z.object({
   name: z.string().trim().min(1, 'Informe o nome do plano').max(120, 'Nome longo demais'),
   description: z.string().trim().max(500, 'Descrição longa demais').optional(),
   gymUnitIds: z.array(z.string().uuid()).min(1, 'Selecione ao menos uma unidade'),
+  billingMode: z.enum(['AVULSO', 'ASSINATURA']).catch('AVULSO'),
 });
 
 const esquemaDeAssinatura = z.object({
@@ -194,6 +195,10 @@ export async function cadastrarPlano(
     name: texto(formulario, 'name'),
     description: texto(formulario, 'description'),
     gymUnitIds: unidades,
+    // F56: ausente vira AVULSO no `.catch()` do esquema -- formulario antigo
+    // (ou requisicao sem o campo) continua criando plano avulso, e nenhum
+    // plano passa a cobrar sozinho por omissao.
+    billingMode: texto(formulario, 'billingMode'),
   };
 
   const amountMinorDigitado = texto(formulario, 'amountMinor');
@@ -243,6 +248,7 @@ export async function cadastrarPlano(
       gymUnitIds: validado.data.gymUnitIds,
       janelas,
       amountMinor,
+      billingMode: validado.data.billingMode,
     },
   });
 

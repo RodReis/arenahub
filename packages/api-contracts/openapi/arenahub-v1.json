@@ -521,6 +521,118 @@
         ]
       }
     },
+    "/api/v1/subscriptions/{id}/recurrence": {
+      "post": {
+        "operationId": "BillingController_aderirARecorrencia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "subscriptionId",
+                    "externalSubscriptionId",
+                    "amountMinor",
+                    "currency",
+                    "dueDay"
+                  ],
+                  "properties": {
+                    "subscriptionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "externalSubscriptionId": {
+                      "type": "string"
+                    },
+                    "amountMinor": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "dueDay": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/api/v1/billing/subscription-cycle/run": {
+      "post": {
+        "operationId": "BillingController_rodarCicloDeAssinaturas",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "assinaturasConsideradas",
+                    "invoicesGeradas",
+                    "cobrancasDisparadas",
+                    "puladas"
+                  ],
+                  "properties": {
+                    "assinaturasConsideradas": {
+                      "type": "integer"
+                    },
+                    "invoicesGeradas": {
+                      "type": "integer"
+                    },
+                    "cobrancasDisparadas": {
+                      "type": "integer"
+                    },
+                    "puladas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "subscriptionId",
+                          "motivo"
+                        ],
+                        "properties": {
+                          "subscriptionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "motivo": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/subscriptions/{id}/recurrence/cancel": {
       "post": {
         "operationId": "BillingController_cancelarRecorrencia",
