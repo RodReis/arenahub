@@ -115,6 +115,9 @@ export interface ResumoFinanceiro {
 
 const UM_DIA_EM_MS = 86_400_000;
 
+/** Quantos meses a serie por competencia olha para tras. Ver `inicioDaSerie`. */
+const MESES_DA_SERIE = 12;
+
 /**
  * As quatro idades da divida.
  *
@@ -153,6 +156,15 @@ export class ConsultarResumoFinanceiroUseCase {
     validarJanela(entrada.de, entrada.ate, entrada.agora);
 
     const doTenant = { tenantId: contexto.tenantId };
+
+    /**
+     * A serie olha para TRAS a partir do fim da janela -- ver o comentario da
+     * consulta de competencia. Doze meses porque e o ciclo que o dono compara
+     * ("como foi agosto do ano passado?"); mais que isso vira arquivo, nao
+     * painel.
+     */
+    const inicioDaSerie = new Date(entrada.ate);
+    inicioDaSerie.setUTCMonth(inicioDaSerie.getUTCMonth() - MESES_DA_SERIE);
 
     /**
      * Tudo em paralelo: sao consultas independentes, e serializa-las faria a
@@ -253,17 +265,30 @@ export class ConsultarResumoFinanceiroUseCase {
         /**
          * SERIE POR COMPETENCIA, nao por data de pagamento (`SPEC-054` §3.1).
          *
+         * A SERIE NAO E RECORTADA PELA JANELA -- e a segunda excecao
+         * deliberada, pelo mesmo motivo do vencido acima.
+         *
+         * A janela dos KPIs e de UM mes, e a serie existe para COMPARAR
+         * meses. Recortando-a pela janela ela teria sempre exatamente um
+         * ponto, e o aviso de "dado insuficiente para comparar periodos"
+         * ficaria permanente: um bloco que promete evolucao (`SPEC-054` §3.2)
+         * e e incapaz de mostra-la. Foi o que a primeira versao desta fatia
+         * fez, e so apareceu com dado real na tela.
+         *
+         * O RECORTE E RETROSPECTIVO: os 12 meses que terminam no fim da
+         * janela. Olhar para tras a partir do periodo apurado responde "como
+         * chegamos ate aqui"; incluir competencia POSTERIOR a janela
+         * misturaria faturamento que o periodo escolhido nao explica.
+         *
          * `billingPeriod` e `@db.Date` -- mes de referencia, sem hora e sem
-         * fuso. A janela recorta a competencia, e nao o instante: pedir
-         * agosto traz a competencia de agosto inteira, independente de quando
-         * cada invoice foi aberta.
+         * fuso.
          */
         this.db.invoice.groupBy({
           by: ['billingPeriod'],
           where: {
             ...doTenant,
             status: { notIn: ['DRAFT', 'CANCELLED'] },
-            billingPeriod: { gte: entrada.de, lt: entrada.ate },
+            billingPeriod: { gte: inicioDaSerie, lt: entrada.ate },
           },
           _sum: { totalMinor: true },
         }),
@@ -285,7 +310,7 @@ export class ConsultarResumoFinanceiroUseCase {
           where: {
             ...doTenant,
             status: 'CONFIRMED',
-            invoice: { billingPeriod: { gte: entrada.de, lt: entrada.ate } },
+            invoice: { billingPeriod: { gte: inicioDaSerie, lt: entrada.ate } },
           },
           select: { amountMinor: true, invoice: { select: { billingPeriod: true } } },
         }),
