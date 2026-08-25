@@ -339,6 +339,7 @@ interface ResumoFinanceiroDto {
     pontos: { competencia: string; faturadoMinor: number; recebidoMinor: number }[];
     suficienteParaLinha: boolean;
   };
+  competenciasDisponiveis: string[];
   base: { alunosPagantes: number; alunosInadimplentes: number; assinaturasAtivas: number };
 }
 
@@ -625,6 +626,7 @@ export class BillingController {
         taxaDeInadimplencia: { type: 'number', nullable: true },
         quebraPorMetodo: { type: 'array', items: { type: 'object' } },
         serie: { type: 'object' },
+        competenciasDisponiveis: { type: 'array', items: { type: 'string' } },
         base: { type: 'object' },
       },
     },
@@ -648,6 +650,7 @@ export class BillingController {
       faixas: [...resumo.faixas],
       quebraPorMetodo: [...resumo.quebraPorMetodo],
       serie: { pontos: [...resumo.serie.pontos], suficienteParaLinha: resumo.serie.suficienteParaLinha },
+      competenciasDisponiveis: [...resumo.competenciasDisponiveis],
     };
   }
 

@@ -599,6 +599,67 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
   });
 
   /**
+   * O BUG QUE ESTE TESTE IMPEDE, visto pelo PI na tela: clicar em "mai" e
+   * ficar preso la.
+   *
+   * O filtro de periodo derivava da SERIE, e a serie olha 12 meses PARA TRAS
+   * a partir do fim da janela -- o que esta certo para ela. Apurando maio, a
+   * serie devolvia so maio, o filtro ficava com um chip so, e nao havia
+   * caminho de volta para junho.
+   *
+   * As duas perguntas sao diferentes: a serie responde "como chegamos ate
+   * aqui", `competenciasDisponiveis` responde "que periodos existem para
+   * escolher" -- e a segunda NAO PODE depender de qual esta aberto.
+   */
+  it('lista todas as competencias mesmo apurando a mais antiga', async () => {
+    const s = await semearTenant();
+    const deJunho = await outraAssinaturaDoMesmoTenant(s);
+    const deJulho = await outraAssinaturaDoMesmoTenant(s);
+
+    await criarInvoice(s, { competencia: '2026-05', totalMinor: 10_000 });
+    await criarInvoice(deJunho, { competencia: '2026-06', totalMinor: 10_000 });
+    await criarInvoice(deJulho, { competencia: '2026-07', totalMinor: 10_000 });
+
+    // Janela de MAIO -- a mais antiga das tres.
+    const resumo = await useCase.executar(s.contexto, {
+      de: new Date('2026-05-01T00:00:00.000Z'),
+      ate: new Date('2026-06-01T00:00:00.000Z'),
+      agora: AGORA,
+    });
+
+    // A serie olha para tras: so maio. Correto, e nao muda.
+    expect(resumo.serie.pontos.map((p) => p.competencia)).toEqual(['2026-05']);
+
+    // O FILTRO ve as tres -- e o que devolve o caminho de volta.
+    expect(resumo.competenciasDisponiveis).toEqual(['2026-05', '2026-06', '2026-07']);
+  });
+
+  it('nao lista competencia de outro tenant no filtro', async () => {
+    const meu = await semearTenant();
+    const outro = await semearTenant();
+
+    await criarInvoice(meu, { competencia: '2026-05' });
+    await criarInvoice(outro, { competencia: '2026-11' });
+
+    const resumo = await useCase.executar(meu.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    expect(resumo.competenciasDisponiveis).toEqual(['2026-05']);
+  });
+
+  /** DRAFT nao foi emitida e CANCELLED deixou de valer -- nem uma nem outra e periodo escolhivel. */
+  it('nao oferece competencia que so tem invoice DRAFT ou CANCELLED', async () => {
+    const s = await semearTenant();
+    const emDraft = await outraAssinaturaDoMesmoTenant(s);
+
+    await criarInvoice(s, { competencia: '2026-05', status: 'OPEN' });
+    await criarInvoice(emDraft, { competencia: '2026-09', status: 'DRAFT' });
+
+    const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    expect(resumo.competenciasDisponiveis).toEqual(['2026-05']);
+  });
+
+  /**
    * A COMPETENCIA E `YYYY-MM` LIDA EM UTC, e o teste existe por causa do bug
    * de um dia que a F53 ja produziu: `billingPeriod` e `@db.Date` gravado a
    * meia-noite UTC, e `getMonth()` no fuso do servidor (America/Sao_Paulo,

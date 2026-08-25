@@ -633,6 +633,12 @@
                     "serie": {
                       "type": "object"
                     },
+                    "competenciasDisponiveis": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "base": {
                       "type": "object"
                     }
