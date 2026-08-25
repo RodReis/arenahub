@@ -18,6 +18,7 @@
     "seed:demo": "tsx prisma/seed-demo.ts",
     "seed:ativos": "tsx prisma/seed-ativos.ts",
     "import:pacto": "tsx prisma/import-pacto.ts",
+    "fix:188": "tsx prisma/fix-188-snapshot-vazio.ts",
     "studio": "prisma studio",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

@@ -283,7 +283,7 @@ async function semear(): Promise<void> {
       });
     }
 
-    await db.gymUnit.upsert({
+    const unidade = await db.gymUnit.upsert({
       where: { tenantId_code: { tenantId: tenant.id, code: UNIDADE.code } },
       create: { ...UNIDADE, tenantId: tenant.id, openingHours: {} },
       update: {},
@@ -300,6 +300,33 @@ async function semear(): Promise<void> {
         where: { tenantId_name: { tenantId: tenant.id, name: definicao.name } },
         create: { tenantId: tenant.id, name: definicao.name, description: definicao.description },
         update: { description: definicao.description },
+      });
+
+      /*
+       * UNIDADE E JANELA SAO PARTE DO PLANO, NAO ENFEITE (issue #188).
+       *
+       * Sem elas o snapshot de politica sai vazio: o entitlement nasce ATIVO,
+       * a ficha diz que o aluno tem acesso e a catraca nega. `POST /plans`
+       * exige as duas (`min(1)`), e o seed escrevia pelo client -- contornando
+       * a validacao e produzindo um estado que a API recusa criar.
+       *
+       * Apaga e reescreve, como os beneficios logo abaixo: nao ha chave
+       * natural, e reescrever mantem o seed idempotente sem inventar id.
+       */
+      await db.planUnit.deleteMany({ where: { planId: plano.id } });
+      await db.planUnit.create({ data: { planId: plano.id, gymUnitId: unidade.id } });
+
+      // Segunda a sexta, 06:00-22:00 (360 a 1320) -- o mesmo horario que a
+      // bancada ja usa nos planos criados pela tela.
+      await db.planAccessWindow.deleteMany({ where: { planId: plano.id } });
+      await db.planAccessWindow.createMany({
+        data: [1, 2, 3, 4, 5].map((dia) => ({
+          planId: plano.id,
+          gymUnitId: unidade.id,
+          dayOfWeek: dia,
+          startMinute: 360,
+          endMinute: 1320,
+        })),
       });
 
       await db.planPrice.upsert({

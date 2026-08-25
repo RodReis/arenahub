@@ -1,27 +1,27 @@
 {
   "apps/api#test": {
-    "testes": 771,
-    "pass": 771,
+    "testes": 779,
+    "pass": 779,
     "falha": 0,
-    "coberturaPct": 66.23
+    "coberturaPct": 66.11
   },
   "apps/api#test:integration": {
-    "testes": 532,
-    "pass": 532,
+    "testes": 557,
+    "pass": 557,
     "falha": 0,
-    "coberturaPct": 83.03
+    "coberturaPct": 83.63
   },
   "apps/admin-web#test": {
-    "testes": 195,
-    "pass": 195,
+    "testes": 252,
+    "pass": 252,
     "falha": 0,
-    "coberturaPct": 75.21
+    "coberturaPct": 74.49
   },
   "packages/ui#test": {
-    "testes": 175,
-    "pass": 175,
+    "testes": 178,
+    "pass": 178,
     "falha": 0,
-    "coberturaPct": 99.03
+    "coberturaPct": 99.04
   },
   "packages/database#test": {
     "testes": 44,

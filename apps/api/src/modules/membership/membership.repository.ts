@@ -85,6 +85,29 @@ export class PlanoEmUsoError extends ErroDeDominio {
   }
 }
 
+/**
+ * Plano sem janela de acesso nao gera direito nenhum.
+ *
+ * O snapshot de politica sairia vazio e o entitlement nasceria ATIVO sem
+ * liberar hora nenhuma: a ficha diz que o aluno tem acesso, a catraca nega,
+ * e a divergencia so aparece com o aluno parado no totem. Recusar aqui troca
+ * uma falha invisivel por um erro que a recepcao ve na hora, com o que fazer
+ * a respeito.
+ *
+ * `POST /plans` ja exige `janelas: min(1)`, entao este estado nao nasce pela
+ * API -- nasce de escrita direta no banco (era o caso do seed, issue #188).
+ * A guarda fica assim mesmo: quem cria o entitlement e quem responde por ele.
+ */
+export class PlanoSemJanelaError extends ErroDeDominio {
+  constructor() {
+    super(
+      'PLAN_HAS_NO_ACCESS_WINDOW',
+      422,
+      'Plano nao tem janela de acesso e por isso nao libera a catraca; cadastre o horario do plano',
+    );
+  }
+}
+
 export interface DadosDeCriacaoDePlano {
   name: string;
   description?: string | undefined;
@@ -578,6 +601,10 @@ export class MembershipRepository {
 
     const plano = await this.encontrarPlano(contexto, entrada.planId);
     if (!plano) throw new PlanoNaoEncontradoError();
+
+    // Sem janela o entitlement nasceria ATIVO sem liberar hora nenhuma --
+    // ver `PlanoSemJanelaError`. Antes da transacao: nao ha o que desfazer.
+    if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
 
     const janelas: JanelaDeAcesso[] = plano.accessWindows.map((j) => ({
       gymUnitId: j.gymUnitId,
