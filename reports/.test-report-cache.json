@@ -46,5 +46,17 @@
     "pass": 199,
     "falha": 0,
     "coberturaPct": 91.19
+  },
+  "apps/kiosk#test": {
+    "testes": 30,
+    "pass": 30,
+    "falha": 0,
+    "coberturaPct": 39.02
+  },
+  "packages/api-contracts#test": {
+    "testes": 31,
+    "pass": 31,
+    "falha": 0,
+    "coberturaPct": 97.22
   }
 }

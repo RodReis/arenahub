@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 
-import { acumularNoNivel, gerar, secaoEstadoAtual } from './test-report.core.mjs';
+import { ALVOS, acumularNoNivel, gerar, secaoEstadoAtual } from './test-report.core.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DESTINO = join(RAIZ, 'reports', 'TESTS.md');
@@ -52,16 +52,6 @@ const CACHE = join(RAIZ, 'reports', '.test-report-cache.json');
  * entre Jest e Vitest -- confirmado rodando os dois) e como pedir cobertura
  * (flag diferente por runner).
  */
-const ALVOS = [
-  { pacote: 'apps/api', nivel: 'unitário', script: 'test', runner: 'jest' },
-  { pacote: 'apps/api', nivel: 'integração', script: 'test:integration', runner: 'jest' },
-  { pacote: 'apps/admin-web', nivel: 'unitário', script: 'test', runner: 'vitest' },
-  { pacote: 'packages/ui', nivel: 'unitário', script: 'test', runner: 'vitest' },
-  { pacote: 'packages/database', nivel: 'unitário', script: 'test', runner: 'vitest' },
-  { pacote: 'packages/database', nivel: 'integração', script: 'test:integration', runner: 'vitest' },
-  { pacote: 'packages/access-policy', nivel: 'unitário', script: 'test', runner: 'jest' },
-  { pacote: 'apps/edge-agent', nivel: 'unitário', script: 'test', runner: 'jest' },
-];
 
 function argumento(nome) {
   const i = process.argv.indexOf(`--${nome}`);

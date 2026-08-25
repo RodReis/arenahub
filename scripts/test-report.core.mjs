@@ -12,6 +12,54 @@
  */
 export const NIVEIS = ['unitário', 'contrato', 'integração', 'e2e', 'hardware', 'segurança'];
 
+/**
+ * Pacotes cujos testes entram no relatorio. Mora aqui, e nao no
+ * `test-report.mjs`, para o self-check poder conferir a lista sem importar o
+ * lado que roda processo.
+ *
+ * ACRESCENTAR PACOTE NOVO AQUI E OBRIGATORIO. Pacote com script `test` fora
+ * desta lista fica INVISIVEL no relatorio -- ausencia da lista e
+ * indistinguivel de "nao tem teste", e a guarda fica verde por subcontagem.
+ * `alvosFaltando` existe exatamente para isso nao passar calado.
+ */
+export const ALVOS = [
+  { pacote: 'apps/api', nivel: 'unitário', script: 'test', runner: 'jest' },
+  { pacote: 'apps/api', nivel: 'integração', script: 'test:integration', runner: 'jest' },
+  { pacote: 'apps/admin-web', nivel: 'unitário', script: 'test', runner: 'vitest' },
+  { pacote: 'packages/ui', nivel: 'unitário', script: 'test', runner: 'vitest' },
+  { pacote: 'packages/database', nivel: 'unitário', script: 'test', runner: 'vitest' },
+  { pacote: 'packages/database', nivel: 'integração', script: 'test:integration', runner: 'vitest' },
+  { pacote: 'packages/access-policy', nivel: 'unitário', script: 'test', runner: 'jest' },
+  { pacote: 'apps/edge-agent', nivel: 'unitário', script: 'test', runner: 'jest' },
+  { pacote: 'apps/kiosk', nivel: 'unitário', script: 'test', runner: 'vitest' },
+  { pacote: 'packages/api-contracts', nivel: 'unitário', script: 'test', runner: 'jest' },
+];
+
+/**
+ * Devolve os pares `pacote#script` que existem no workspace e NAO estao em
+ * `alvos` -- ou seja, testes que rodam mas nao aparecem no relatorio.
+ *
+ * `workspaces`: [{ pacote, scripts: {nome: comando} }]. Recebe a lista pronta
+ * em vez de varrer o disco para continuar pura e testavel.
+ *
+ * So considera os scripts que o gerador sabe coletar (`test`,
+ * `test:integration`); `test:e2e` fica de fora de proposito -- o Playwright
+ * roda por `pnpm test:e2e`, fora deste gerador, e isso vale para todos os
+ * pacotes (registrado em `docs/TESTING.md` §5).
+ */
+export const SCRIPTS_COLETAVEIS = ['test', 'test:integration'];
+
+export function alvosFaltando(workspaces, alvos = ALVOS) {
+  const cobertos = new Set(alvos.map((a) => `${a.pacote}#${a.script}`));
+
+  return workspaces
+    .flatMap(({ pacote, scripts }) =>
+      SCRIPTS_COLETAVEIS.filter((s) => scripts?.[s]).map((script) => `${pacote}#${script}`),
+    )
+    .filter((chave) => !cobertos.has(chave))
+    .sort();
+}
+
 export function formatarPct(valor) {
   return valor === null || valor === undefined ? '—' : valor.toFixed(1);
 }
