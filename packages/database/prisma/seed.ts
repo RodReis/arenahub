@@ -19,6 +19,7 @@
 import { randomBytes, scrypt, type ScryptOptions } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
+import { CONFIG_PADRAO_DO_TOTEM } from '@arenahub/api-contracts';
 import { config as carregarEnv } from 'dotenv';
 
 // O `.env` vive na raiz do monorepo -- mesma fonte que o docker-compose e o
@@ -373,6 +374,7 @@ async function semear(): Promise<void> {
     console.info(`[seed] catalogo com ${String(CATALOGO.length)} planos e precos vigentes.`);
 
     await semearAceiteDaAnalise(db, tenant.id);
+    await semearTotem(db, tenant.id, unidade.id);
 
     console.info(`[seed] tenant "${TENANT.slug}" pronto, com dono ${DONO.email}.`);
   } finally {
@@ -464,6 +466,50 @@ async function semearAceiteDaAnalise(
     `[seed] aceite de analise por IA: ${String(novos.length)} novo(s), ` +
       `${String(ativos.length)} aluno(s) ativo(s) no total.`,
   );
+}
+
+/**
+ * Totem `TOTEM01` da unidade, com a configuracao de UNIDADE (versao 1) ja
+ * publicada -- o padrao que a F49 le enquanto a F50 nao existe para
+ * escrever (ADR-042, Decisao 0).
+ *
+ * `kioskConfiguration.upsert` com `kioskDeviceId: null` na chave composta
+ * NAO compila: o tipo gerado pelo Prisma para uma chave unica composta
+ * exige `string` em cada campo, mesmo quando a coluna e nullable no schema
+ * -- atrito conhecido do Prisma com `null` em `@@unique`. A saida e
+ * `findFirst` (que aceita `null` num filtro comum) seguido de `create`
+ * condicional; perde a atomicidade do upsert, mas o seed roda sempre
+ * sozinho e sequencial, entao a corrida entre leitura e escrita nao existe
+ * aqui.
+ */
+async function semearTotem(
+  db: Awaited<ReturnType<typeof criarPrismaClient>>,
+  tenantId: string,
+  gymUnitId: string,
+): Promise<void> {
+  await db.kioskDevice.upsert({
+    where: { tenantId_code: { tenantId, code: 'TOTEM01' } },
+    update: {},
+    create: { tenantId, gymUnitId, code: 'TOTEM01' },
+  });
+
+  const configuracaoExistente = await db.kioskConfiguration.findFirst({
+    where: { tenantId, gymUnitId, kioskDeviceId: null, version: 1 },
+  });
+
+  if (!configuracaoExistente) {
+    await db.kioskConfiguration.create({
+      data: {
+        tenantId,
+        gymUnitId,
+        version: 1,
+        publishedAt: new Date(),
+        payload: CONFIG_PADRAO_DO_TOTEM,
+      },
+    });
+  }
+
+  console.info('[seed] totem "TOTEM01" com configuracao de unidade v1 publicada.');
 }
 
 /** Idade em anos completos numa data de referencia. */

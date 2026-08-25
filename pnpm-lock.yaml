@@ -377,6 +377,9 @@ importers:
       '@arenahub/access-policy':
         specifier: workspace:*
         version: link:../access-policy
+      '@arenahub/api-contracts':
+        specifier: workspace:*
+        version: link:../api-contracts
       '@arenahub/config':
         specifier: workspace:*
         version: link:../config
