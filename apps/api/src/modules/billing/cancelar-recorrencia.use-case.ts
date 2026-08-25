@@ -47,7 +47,7 @@ export class CancelarRecorrenciaUseCase {
   ): Promise<RecorrenciaCancelada> {
     const assinatura = await this.db.subscription.findFirst({
       where: { id: entrada.subscriptionId, tenantId: contexto.tenantId },
-      select: { id: true },
+      select: { id: true, externalSubscriptionId: true },
     });
 
     if (!assinatura) {
@@ -55,30 +55,55 @@ export class CancelarRecorrenciaUseCase {
     }
 
     /**
-     * NAO HA RECORRENCIA INSTALADA PARA CANCELAR -- ainda (ADR-043, Decisao 5).
+     * A FONTE E `Subscription.externalSubscriptionId` -- ADR-043, Decisao 5.
      *
-     * Ate 25/08/2026 este laco varria `payment_attempts` de cartao e passava
-     * `externalPaymentId` para `cancelSubscription`. Aquilo so fazia sentido
-     * por causa de um BUG: a cobranca de invoice chamava
+     * Ate 25/08/2026 este caso de uso varria `payment_attempts` e passava
+     * `externalPaymentId` para `cancelSubscription`. Aquilo so funcionava por
+     * causa de um bug: a cobranca de invoice chamava
      * `createTokenizedSubscription`, entao a coluna guardava, por acidente,
-     * um id de ASSINATURA. Corrigida a cobranca para
-     * `chargeTokenizedPayment`, a coluna guarda o que o nome sempre disse --
-     * id de PAGAMENTO --, e mandar isso para `cancelSubscription` cancelaria
-     * pelo identificador errado. Contra o duble seria `PROVIDER_NOT_FOUND`
-     * silencioso; contra a Getnet real, um alvo errado.
+     * um id de assinatura. Corrigida a cobranca, o campo passou a guardar o
+     * que o nome sempre disse, e a fonte correta nasceu aqui, na F56.
      *
-     * O ESTADO VERDADEIRO DO SISTEMA HOJE E ZERO: a F14 cobra invoice, e
-     * cobrar invoice nao instala calendario nenhum. Recorrencia de verdade
-     * nasce na **F56** (plano com assinatura mensal), que cria
-     * `Subscription.externalSubscriptionId` -- a fonte correta desta leitura.
-     * Enquanto ela nao existe, nao ha o que cancelar, e o contrato deste caso
-     * de uso ja dizia que zero NAO e erro.
-     *
-     * O `cancelSubscription` da porta continua existindo e testado no duble:
-     * quem o exercita e a F56. O `provedor` segue injetado por isso -- tirar
-     * e recolocar na proxima fatia seria churn, e o campo documenta que este
-     * caso de uso fala com o provedor.
+     * ZERO CONTINUA NAO SENDO ERRO, e agora por dois motivos legitimos:
+     * assinatura de plano AVULSO nunca instalou recorrencia, e assinatura de
+     * plano ASSINATURA que ainda nao aderiu tambem nao. Em nenhum dos dois ha
+     * o que cancelar.
      */
-    return { subscriptionId: assinatura.id, canceladasNoProvedor: 0 };
+    if (assinatura.externalSubscriptionId === null) {
+      return { subscriptionId: assinatura.id, canceladasNoProvedor: 0 };
+    }
+
+    /*
+     * O PROVEDOR PRIMEIRO, o banco depois -- e a ordem oposta da cobranca,
+     * de proposito.
+     *
+     * Na cobranca, gravar antes protege contra dinheiro que sai sem registro.
+     * Aqui o risco e o inverso: limpar a coluna primeiro e falhar no provedor
+     * deixaria uma recorrencia VIVA cobrando o aluno todo mes, sem nada no
+     * ArenaHub apontando para ela -- invisivel ate a contestacao chegar.
+     * Falhar no provedor com a coluna intacta e recuperavel: basta chamar de
+     * novo.
+     */
+    await this.provedor.cancelSubscription(assinatura.externalSubscriptionId);
+
+    /*
+     * Condicionado ao id que acabamos de cancelar: se outra requisicao ja
+     * limpou (ou trocou) a coluna, esta escrita nao afeta linha nenhuma em
+     * vez de apagar o trabalho dela.
+     */
+    await this.db.subscription.updateMany({
+      where: {
+        id: assinatura.id,
+        tenantId: contexto.tenantId,
+        externalSubscriptionId: assinatura.externalSubscriptionId,
+      },
+      data: {
+        externalSubscriptionId: null,
+        recurrenceConsentAt: null,
+        recurrenceConsentActorId: null,
+      },
+    });
+
+    return { subscriptionId: assinatura.id, canceladasNoProvedor: 1 };
   }
 }

@@ -206,6 +206,38 @@ export function FormularioDePlano({ unidades }: Props) {
         data-testid="campo-preco-do-plano"
       />
 
+      {/*
+        F56: modalidade de cobrança (ADR-043, Decisão 2).
+
+        `radio` e não `select`: são duas opções que mudam quem cobra, e a
+        diferença precisa estar visível na tela — num `select` fechado o
+        operador leria só a escolhida e não saberia que a outra existe.
+        `Avulso` vem marcado porque é o comportamento de todo plano de hoje.
+      */}
+      <fieldset className={estilos['grupo']}>
+        <legend>Como o plano cobra</legend>
+
+        <label className={estilos['marcador']}>
+          <input type="radio" name="billingMode" value="AVULSO" defaultChecked />
+          Avulso — o sistema gera a fatura do mês e alguém cobra (recepção ou o próprio aluno)
+        </label>
+
+        <label className={estilos['marcador']}>
+          <input
+            type="radio"
+            name="billingMode"
+            value="ASSINATURA"
+            data-testid="modalidade-assinatura"
+          />
+          Assinatura — o sistema cobra sozinho no cartão salvo, depois que o aluno aderir
+        </label>
+
+        <p role="note">
+          Na assinatura, o aluno adere uma vez na ficha dele, com o cartão cadastrado e aceite
+          na tela. Criar o plano como assinatura não cobra ninguém.
+        </p>
+      </fieldset>
+
       <fieldset className={estilos['grupo']}>
         <legend>Unidades onde o plano vale</legend>
 

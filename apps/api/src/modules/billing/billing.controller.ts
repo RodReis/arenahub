@@ -28,6 +28,8 @@ import { ListarInvoicesUseCase, TAMANHO_MAXIMO_DA_PAGINA } from './listar-invoic
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
+import { AderirARecorrenciaUseCase } from './aderir-a-recorrencia.use-case.js';
+import { RodarCicloDeAssinaturasUseCase } from './rodar-ciclo-de-assinaturas.use-case.js';
 import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
 import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
@@ -78,6 +80,21 @@ const esquemaDeMetodoTokenizado = z
  * excepcional, e sem motivo a auditoria nao explica nada depois -- mesmo
  * criterio do pagamento manual (ADR-027).
  */
+/**
+ * Aceite da recorrencia. `.strict()` como todo esquema deste controller.
+ *
+ * `z.literal(true)` e nao `z.boolean()`: mandar `false` nao e um pedido
+ * valido de adesao -- e um pedido para NAO aderir, que nao tem rota. Recusar
+ * no boundary transforma o que seria um 409 do dominio numa mensagem de
+ * validacao, e mantem a regra tambem no caso de uso, onde ela vale para todo
+ * chamador (F25 e F52 vao entrar por ali).
+ */
+const esquemaDeAdesao = z
+  .object({
+    aceitouRecorrencia: z.literal(true),
+  })
+  .strict();
+
 const esquemaDeLiberacao = z
   .object({
     studentId: z.uuid(),
@@ -283,6 +300,24 @@ interface RecorrenciaCanceladaDto {
   canceladasNoProvedor: number;
 }
 
+interface RecorrenciaInstaladaDto {
+  subscriptionId: string;
+  externalSubscriptionId: string;
+  /** Quanto sera cobrado por ciclo, no preco vigente hoje. */
+  amountMinor: number;
+  currency: string;
+  /** Dia do mes do vencimento. */
+  dueDay: number;
+}
+
+interface ResultadoDoCicloDto {
+  assinaturasConsideradas: number;
+  invoicesGeradas: number;
+  cobrancasDisparadas: number;
+  /** O que ficou de fora, e por que. NUNCA omitido. */
+  puladas: { subscriptionId: string; motivo: string }[];
+}
+
 interface PainelDeInadimplenciaDto {
   resumo: {
     emAtrasoMinor: number;
@@ -361,6 +396,8 @@ export class BillingController {
     private readonly cobrancaNoCartao: CobrarAssinaturaNoCartaoUseCase,
     private readonly checkoutDeCartao: CriarCheckoutDeCartaoUseCase,
     private readonly cancelamentoDeRecorrencia: CancelarRecorrenciaUseCase,
+    private readonly adesaoARecorrencia: AderirARecorrenciaUseCase,
+    private readonly cicloDeAssinaturas: RodarCicloDeAssinaturasUseCase,
     private readonly inadimplencia: ConsultarInadimplenciaUseCase,
     private readonly resumoFinanceiro: ConsultarResumoFinanceiroUseCase,
     private readonly aplicarInadimplencia: AplicarInadimplenciaUseCase,
@@ -544,6 +581,102 @@ export class BillingController {
       expiresAt: checkout.expiresAt.toISOString(),
       amountMinor: checkout.amountMinor,
       currency: checkout.currency,
+    };
+  }
+
+  /**
+   * Adere a cobranca recorrente. `SPEC-056` 2.2; ADR-043, Decisao 2.
+   *
+   * O ACEITE VEM NO CORPO e e obrigatorio: sem ele e debito surpresa, que e o
+   * que gera contestacao. A tela mostra valor, dia da cobranca e como
+   * cancelar ANTES de mandar `aceitouRecorrencia: true` -- e o caso de uso
+   * recusa quando vem `false`, entao a garantia nao depende da tela.
+   */
+  @Post('subscriptions/:id/recurrence')
+  @RequirePermissions('billing.manage')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['subscriptionId', 'externalSubscriptionId', 'amountMinor', 'currency', 'dueDay'],
+      properties: {
+        subscriptionId: { type: 'string', format: 'uuid' },
+        externalSubscriptionId: { type: 'string' },
+        amountMinor: { type: 'integer' },
+        currency: { type: 'string' },
+        dueDay: { type: 'integer' },
+      },
+    },
+  })
+  async aderirARecorrencia(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+  ): Promise<RecorrenciaInstaladaDto> {
+    const dados = esquemaDeAdesao.parse(corpo);
+    const contexto = this.contexto.require();
+
+    const resultado = await this.adesaoARecorrencia.executar(contexto, {
+      subscriptionId: id,
+      aceitouRecorrencia: dados.aceitouRecorrencia,
+      actorId: contexto.actorId,
+      emQue: new Date(),
+    });
+
+    return {
+      subscriptionId: resultado.subscriptionId,
+      externalSubscriptionId: resultado.externalSubscriptionId,
+      amountMinor: resultado.amountMinor,
+      currency: resultado.currency,
+      dueDay: resultado.dueDay,
+    };
+  }
+
+  /**
+   * Roda o ciclo mensal sob demanda: gera a invoice do periodo e cobra.
+   * `SPEC-056` 5.3.
+   *
+   * EXISTE COMO ROTA pelo mesmo motivo do job de vencimento -- nao ha
+   * agendador no MVP 2, e fila entra "so quando comprovadamente necessario"
+   * (`CLAUDE.md`). Chamar duas vezes tem o efeito de chamar uma: a segunda
+   * geracao devolve a MESMA invoice (INV-066) e a segunda cobranca e recusada
+   * pelo indice parcial. Um cron do sistema resolve sem risco.
+   */
+  @Post('billing/subscription-cycle/run')
+  @RequirePermissions('billing.manage')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: [
+        'assinaturasConsideradas',
+        'invoicesGeradas',
+        'cobrancasDisparadas',
+        'puladas',
+      ],
+      properties: {
+        assinaturasConsideradas: { type: 'integer' },
+        invoicesGeradas: { type: 'integer' },
+        cobrancasDisparadas: { type: 'integer' },
+        puladas: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['subscriptionId', 'motivo'],
+            properties: {
+              subscriptionId: { type: 'string', format: 'uuid' },
+              motivo: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  })
+  async rodarCicloDeAssinaturas(): Promise<ResultadoDoCicloDto> {
+    const resultado = await this.cicloDeAssinaturas.executar(this.contexto.require(), new Date());
+
+    return {
+      assinaturasConsideradas: resultado.assinaturasConsideradas,
+      invoicesGeradas: resultado.invoicesGeradas,
+      cobrancasDisparadas: resultado.cobrancasDisparadas,
+      puladas: resultado.puladas.map((pulada) => ({ ...pulada })),
     };
   }
 

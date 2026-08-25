@@ -34,6 +34,7 @@ import { IconeBioimpedancia, IconePagamento } from '../acoes-do-aluno';
 import { Abas } from '../../../../src/components/abas';
 import { AlterarSituacao } from './alterar-situacao';
 import { AtribuirPlano } from './atribuir-plano';
+import { CobrancaRecorrente } from './cobranca-recorrente';
 import { EditarCadastro } from './editar-cadastro';
 
 export const metadata: Metadata = {
@@ -98,6 +99,12 @@ interface Entitlement {
   subscriptionId: string | null;
   /** Versão da assinatura de origem — o que a troca de plano precisa para cancelar. */
   subscriptionVersion: number | null;
+  /** F56: modalidade do plano da assinatura. Nulo em cortesia. */
+  planBillingMode: 'AVULSO' | 'ASSINATURA' | null;
+  /** F56: já existe recorrência instalada no provedor? */
+  recorrenciaAtiva: boolean;
+  /** F56: preço vigente do plano — o valor que o aceite autoriza. */
+  planCurrentPrice: { amountMinor: number; currency: string } | null;
   janelas: Janela[];
 }
 
@@ -264,6 +271,9 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             subscriptionId: direito.subscriptionId,
             version: direito.subscriptionVersion,
             planName: null,
+            billingMode: direito.planBillingMode ?? 'AVULSO',
+            recorrenciaAtiva: direito.recorrenciaAtiva,
+            planCurrentPrice: direito.planCurrentPrice,
           }
         : undefined,
     )
@@ -649,6 +659,28 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                 }
               />
             </section>
+
+            {/*
+              F56 -- cobranca recorrente, ao lado do plano e nao numa aba
+              propria: quem atribui o plano de assinatura e quem ativa a
+              cobranca, na mesma conversa com o aluno.
+
+              So aparece com assinatura vigente: sem plano nao ha o que cobrar.
+            */}
+            {assinaturaVigente ? (
+              <section aria-labelledby="titulo-recorrencia" className={estilos['secao']}>
+                <h2 id="titulo-recorrencia">Cobrança recorrente</h2>
+
+                <CobrancaRecorrente
+                  subscriptionId={assinaturaVigente.subscriptionId}
+                  billingMode={assinaturaVigente.billingMode}
+                  ativa={assinaturaVigente.recorrenciaAtiva}
+                  amountMinor={assinaturaVigente.planCurrentPrice?.amountMinor ?? null}
+                  currency={assinaturaVigente.planCurrentPrice?.currency ?? 'BRL'}
+                  dueDay={null}
+                />
+              </section>
+            ) : null}
 
             <section aria-labelledby="titulo-atribuir" className={estilos['secao']}>
               {/*

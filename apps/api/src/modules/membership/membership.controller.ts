@@ -45,6 +45,12 @@ const esquemaDePlano = z
     // Centavos, INV-065. Obrigatorio: plano sem preco nao pode existir nem
     // por um instante (decisao do PI, 24/08/2026).
     amountMinor: z.number().int().positive(),
+    /**
+     * Modalidade de cobranca (ADR-043, Decisao 2). OPCIONAL, com `AVULSO` no
+     * default da coluna: chamador que nao conhece o campo continua criando
+     * plano avulso, e nenhum plano passa a cobrar sozinho por omissao.
+     */
+    billingMode: z.enum(['AVULSO', 'ASSINATURA']).optional(),
   })
   .strict();
 
@@ -127,6 +133,8 @@ interface PlanoDto {
   currentPrice: PrecoDto | null;
   /** Todas as vigencias, para a tela mostrar o historico de reajuste. */
   prices: PrecoDto[];
+  /** Como o plano cobra (ADR-043, Decisao 2). */
+  billingMode: 'AVULSO' | 'ASSINATURA';
 }
 
 interface EntitlementDto {
@@ -151,6 +159,25 @@ interface EntitlementDto {
    * -- o mesmo caso em que `subscriptionId` ja e nulo.
    */
   subscriptionVersion: number | null;
+  /**
+   * Modalidade do plano da assinatura (ADR-043, Decisao 2). Nulo em cortesia,
+   * que nao nasce de assinatura.
+   */
+  planBillingMode: 'AVULSO' | 'ASSINATURA' | null;
+  /**
+   * Ja existe cobranca recorrente instalada? A tela escolhe entre "ativar" e
+   * "encerrar" por este campo -- e nao pela modalidade, que so diz o que o
+   * plano PERMITE, nunca o que o aluno autorizou.
+   */
+  recorrenciaAtiva: boolean;
+  /** Nome do plano da assinatura. Nulo em cortesia. */
+  planName: string | null;
+  /**
+   * Preco vigente HOJE do plano, para a tela mostrar QUANTO sera cobrado antes
+   * do aceite -- sem isso o aceite seria em branco (`SPEC-056` 2.2). Nulo
+   * quando o plano perdeu a vigencia, e a tela recusa a adesao com essa frase.
+   */
+  planCurrentPrice: PrecoDto | null;
   janelas: { gymUnitId: string; dayOfWeek: number; startMinute: number; endMinute: number }[];
 }
 
@@ -176,6 +203,7 @@ export class MembershipController {
         salesStartAt: dados.salesStartAt ? new Date(dados.salesStartAt) : undefined,
         salesEndAt: dados.salesEndAt ? new Date(dados.salesEndAt) : undefined,
         amountMinor: dados.amountMinor,
+        billingMode: dados.billingMode,
       },
       requisicao.correlationId ?? 'sem-correlacao',
       new Date(),
@@ -536,6 +564,7 @@ export class MembershipController {
         startMinute: j.startMinute,
         endMinute: j.endMinute,
       })),
+      billingMode: plano.billingMode,
       currentPrice: vigente
         ? { amountMinor: vigente.amountMinor, currency: vigente.currency, validFrom: vigente.validFrom.toISOString() }
         : null,
@@ -544,6 +573,23 @@ export class MembershipController {
   }
 
   private entitlementParaDto(entitlement: EntitlementComJanelas): EntitlementDto {
+    /** MESMA funcao do `planoParaDto` -- uma so definicao de "preco vigente". */
+    function precoVigenteDoPlano(
+      precos: { amountMinor: number; currency: string; validFrom: Date }[] | undefined,
+    ): PrecoDto | null {
+      if (!precos) return null;
+
+      const vigente = precoVigenteEm(precos, new Date());
+
+      return vigente
+        ? {
+            amountMinor: vigente.amountMinor,
+            currency: vigente.currency,
+            validFrom: vigente.validFrom.toISOString(),
+          }
+        : null;
+    }
+
     return {
       id: entitlement.id,
       source: entitlement.source,
@@ -555,6 +601,10 @@ export class MembershipController {
       // Cortesia nao nasce de assinatura: `subscription` e nulo junto com
       // `subscriptionId`, e nao ha versao a devolver.
       subscriptionVersion: entitlement.subscription?.version ?? null,
+      planBillingMode: entitlement.subscription?.plan.billingMode ?? null,
+      recorrenciaAtiva: entitlement.subscription?.externalSubscriptionId != null,
+      planName: entitlement.subscription?.plan.name ?? null,
+      planCurrentPrice: precoVigenteDoPlano(entitlement.subscription?.plan.prices),
       janelas: entitlement.unitWindows.map((j) => ({
         gymUnitId: j.gymUnitId,
         dayOfWeek: j.dayOfWeek,
