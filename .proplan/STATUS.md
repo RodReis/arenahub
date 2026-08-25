@@ -57,6 +57,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-054][FIX] painel financeiro: série nunca compara períodos e a URL não escolhe o período (#196, finalizado em: 2026-08-25)
 - [MVP3][SPEC-054][F54] Painel financeiro gerencial (KPIs) (#157, finalizado em: 2026-08-25)
 - [MVP1][FIX] coluna PLANO em branco para quem tem acesso por vinculo, nao por assinatura (#191, finalizado em: 2026-08-25)
 - [MVP1][FIX] sessao expira em 10 min e o painel nao renova: toda Server Action falha calada (#187, finalizado em: 2026-08-25)
