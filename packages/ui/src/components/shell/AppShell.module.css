@@ -91,26 +91,81 @@
 }
 
 .navlink {
+  position: relative;
   padding: 8px 12px;
   border-radius: var(--ah-radius-control);
   color: var(--ah-text-on-chrome);
   text-decoration: none;
+  /*
+    TRANSICAO DE ESTADO, nao decoracao: o painel promete p95 < 300 ms na
+    catraca e nao pode PARECER mais lento que o motor. `--ah-motion-control`
+    sao 120ms -- o suficiente para o realce nao piscar, curto o bastante para
+    quem varre a lista com o mouse nao ver rastro.
+
+    Nomeadas uma a uma em vez de `all`: `all` animaria tambem o que muda de
+    layout, e animar layout numa sidebar de 224px custa reflow a cada hover.
+  */
+  transition:
+    background var(--ah-motion-control) var(--ah-motion-easing),
+    color var(--ah-motion-control) var(--ah-motion-easing);
 }
 
 .navlink:hover {
   background: color-mix(in srgb, var(--ah-surface-raised) 8%, transparent);
+  /*
+    O hover tambem CLAREIA o texto, e nao so o fundo. Com fundo sozinho, quem
+    opera com brilho baixo no balcao ve o realce sumir -- e o alvo do mouse
+    passa a depender de um contraste de 8% sobre chrome.
+  */
+  color: var(--ah-carbon-100);
 }
 
 /**
- * Item ativo: fundo E peso, nao so cor. O `aria-current` carrega a mesma
- * informacao para quem nao ve a tela -- os dois canais saem do mesmo atributo,
- * entao nao podem divergir (§10 item 1).
+ * Item ativo: fundo, peso E marcador de posicao -- nao so cor. O
+ * `aria-current` carrega a mesma informacao para quem nao ve a tela: os dois
+ * canais saem do mesmo atributo, entao nao podem divergir (§10 item 1).
  */
 .navlink[aria-current='page'] {
   background: color-mix(in srgb, var(--ah-surface-raised) 14%, transparent);
   color: var(--ah-surface-raised);
   font-weight: 600;
 }
+
+/**
+ * O MARCADOR DE POSICAO do item atual.
+ *
+ * Fundo a 14% sobre chrome e uma diferenca sutil quando o monitor do balcao
+ * esta com brilho baixo e a luz fluorescente bate na tela. Uma barra de
+ * accent na calha esquerda responde "voce esta AQUI" antes de a pessoa ler o
+ * rotulo -- o mesmo canal que o rotulo de grupo usa, na mesma calha, o que
+ * torna a sidebar legivel como uma coluna so.
+ *
+ * NAO E `border-left`: a barra e um pseudo-elemento posicionado, com altura
+ * menor que a linha e cantos arredondados. `border-left` grosso como acento
+ * e proibido pela skill, e alem disso empurraria o texto 2px a cada
+ * navegacao.
+ */
+.navlink[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  /*
+    Recuado 6px em cima e embaixo: a barra marca o CENTRO da linha, nao a
+    caixa inteira. Colada nas bordas ela vira divisoria e briga com a regua
+    dos grupos.
+  */
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: var(--ah-radius-badge);
+  background: var(--ah-accent-400);
+}
+
+/*
+  `prefers-reduced-motion` ja e tratado no tema global (todas as transicoes
+  caem para 100ms), entao nao ha bloco proprio aqui -- duplicar a regra so
+  criaria dois lugares para divergir.
+*/
 
 .conteudo {
   padding: 24px;

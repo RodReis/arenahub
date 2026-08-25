@@ -49,25 +49,46 @@ interface Item {
 export function Navegacao({ itens }: { readonly itens: readonly Item[] }) {
   const rota = usePathname();
   const atual = itemAtual(rota, itens);
-
   return (
     <>
-      {itens.map((item) => (
-        <Fragment key={item.href}>
-          {/*
-            O rótulo de grupo é `<h2>`, não um `<span>` com aparência de
-            título: quem navega por cabeçalho no leitor de tela usa isso
-            para pular direto à Administração, e `role="navigation"` do
-            shell já dá o contexto em volta.
-          */}
-          {item.grupo ? <h2 className={estilos['grupo']}>{item.grupo}</h2> : null}
-          <NavLink href={item.href} label={item.label} current={item.href === atual} />
-        </Fragment>
-      ))}
+      {itens.map((item) => {
+        return (
+          <Fragment key={item.href}>
+            {/*
+              O rótulo de grupo é `<h2>`, não um `<span>` com aparência de
+              título: quem navega por cabeçalho no leitor de tela usa isso
+              para pular direto a uma seção, e `role="navigation"` do shell
+              já dá o contexto em volta.
+            */}
+            {item.grupo === undefined ? null : (
+              <h2 className={estilos['grupo']}>{item.grupo}</h2>
+            )}
+            <NavLink href={item.href} label={item.label} current={item.href === atual} />
+          </Fragment>
+        );
+      })}
     </>
   );
 }
 
+/**
+ * Em que posição cada rótulo de grupo aparece.
+ *
+ * O rótulo mora no item que abre o grupo (`Item.grupo`), e o layout FILTRA a
+ * lista por permissão antes de ela chegar aqui. Se o item que declara o grupo
+ * for o filtrado, o rótulo sumiria junto e os irmãos ficariam órfãos no meio
+ * da lista, sem cabeçalho.
+ *
+ * Quem resolve isso é o layout, que reancora o `grupo` no primeiro item
+ * SOBREVIVENTE antes de passar a lista (ver `reancorarGrupos`). Aqui a regra
+ * é simples de propósito: **o rótulo aparece onde o campo estiver**. Tentar
+ * consertar no cliente seria impossível — a informação do item removido já
+ * não chega.
+ *
+ * Um segundo `grupo` com o mesmo nome, se a reancoragem falhar, apareceria
+ * duas vezes; é ruído visível, não silêncio, e por isso o teste do layout
+ * cobre a reancoragem.
+ */
 /**
  * Qual item marcar como atual — **um só**.
  *
