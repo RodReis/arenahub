@@ -218,6 +218,62 @@ as flags, e revisão humana no PR continua sendo a rede de segurança para isso.
 que garante que ele conta o que existe. Gerador de relatório sem teste é a forma mais elegante
 de mentir com número.
 
+### O campo PR nasce `—`, e isso é a regra — não um esquecimento
+
+Quem entrega roda `test:report` **antes** do commit final, e nesse momento **o PR ainda não
+existe**: ele é aberto depois, a partir do commit que o comando acabou de produzir. Então a
+linha nasce com `—` no campo PR, e o número real entra num commit posterior, **depois do merge**.
+
+`--check` não valida esse campo (bloco acima), então nada quebra se ele ficar `—` — e é
+exatamente por isso que ele precisa estar escrito aqui. **Inventar o número é pior que deixar
+vazio:** um PR que ainda não existe pode nascer com outro número, e a linha passaria a apontar
+para trabalho de terceiros com aparência de evidência conferida. `—` é honesto; palpite não é.
+
+**Preencher depois do merge é passo do fluxo**, junto com `proplan:done` — ver `CLAUDE.md`,
+*Ciclo de vida de uma fatia*, passo 2.
+
+### Evidência da `SPEC-049` — F49, kiosk seguro
+
+Registrada em `reports/TESTS.md` por
+`pnpm test:report --issue 150 --spec SPEC-049`, em 25/08/2026. **PR: `—`** — preencher depois do
+merge, pela regra acima.
+
+O que a fatia cobre, por nível (detalhe em
+[`superpowers/specs/2026-08-25-f49-kiosk-seguro-design.md`](superpowers/specs/2026-08-25-f49-kiosk-seguro-design.md) §7):
+
+| nível | o que prova |
+|---|---|
+| unitário | expiração e extensão de sessão (funções puras, **"agora" entra por parâmetro**), máscara e validação de CPF, resolução das três camadas de configuração, accent com alvo 7:1 |
+| integração | HMAC do dispositivo nos seis casos (assinatura válida e inválida, relógio fora da janela, nonce repetido, credencial revogada, credencial vencida); **isolamento A/B**; sessão expirada não autoriza; sessão encerrada por `DELETE` não autoriza mesmo com token em mãos; módulo desligado devolve 404 |
+| e2e | jornada atrator → CPF → minha área → encerrar, com **asserção de limpeza**: `sessionStorage` e `localStorage` vazios e nenhum dado do aluno no DOM |
+
+**A guarda de regressão desta fatia tem nome, não é implícita:** *dado do aluno A não aparece
+para o aluno B*. É o aceite literal da Slice 4.5, e um teste nomeado é o que impede que ele seja
+"coberto" por acidente e perdido no refactor seguinte.
+
+🔴 **Os números acima não incluem `apps/kiosk` — e a lacuna não é do e2e só.**
+
+Verificado em 25/08/2026: a lista `ALVOS` de `scripts/test-report.mjs` tem **oito** entradas
+(`apps/api`, `apps/admin-web`, `packages/ui`, `packages/database`, `packages/access-policy`,
+`apps/edge-agent`) e **`apps/kiosk` não está em nenhuma delas**. A superfície nasceu nesta fatia;
+o gerador não sabe que ela existe.
+
+O efeito, medido:
+
+| suíte do kiosk | existe? | entra no `reports/TESTS.md`? |
+|---|---|---|
+| unitário (`apps/kiosk/lib/*.spec.ts`) | **sim — 6 arquivos, 30 testes, todos passando** | **não** |
+| e2e (`apps/kiosk/e2e/jornada-do-totem.spec.ts`) | sim, com `pretest:e2e` recriando o banco `_e2e` | não — Playwright roda por `pnpm test:e2e`, fora do gerador |
+
+**Isto é a falha que o §5 existe para impedir**, na sua forma mais silenciosa: pacote ausente da
+lista é indistinguível de pacote sem teste, e o relatório fica verde por subcontagem. Ninguém
+escreveu `0` — o `0` é o que sobra de não perguntar.
+
+**Correção fica para card `[INFRA]`, fora do escopo desta fatia** (que é documentação): incluir
+`apps/kiosk` em `ALVOS` — e, junto, fazer o `test:report:selfcheck` **falhar quando um workspace
+com script `test` não estiver na lista**, para que o próximo pacote novo não repita isto. Só
+acrescentar o kiosk conserta o caso, não a classe.
+
 ---
 
 ## 6. CI

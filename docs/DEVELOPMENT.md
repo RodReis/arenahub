@@ -735,15 +735,111 @@ assinatura profissional — **ainda não existe**). Pode andar em paralelo ao MV
 
 ---
 
+### Fatias fora da numeração de MVP · F42 a F48 e F53 a F56
+
+Nascidas depois do roadmap original, por ADR ou por decisão direta do PI. Não são um MVP: são
+fatias que se encaixam na fila do MVP indicado na coluna. Fonte da numeração: o **Índice
+Fatia ↔ SPEC** do `docs/STATUS.md`.
+
+| F | MVP | núcleo | estado |
+|---|---|---|---|
+| F42 | 2.5 | Design system da superfície `admin-web` — tokens, 15 componentes, `state-labels.ts` (ADR-025) | ✅ entregue |
+| F43 | 2.5 | Design system da superfície `mobile` | gate: MVP 4 |
+| F44 | 2.5 | Design system da superfície `kiosk` | **o gate mudou** — o totem vem no MVP 3.5, não no 4 (ADR-042); a F49 já traz os tokens do totem para `packages/ui` |
+| F45 | 1 | Cadastro completo de aluno — retrabalho da Slice 1.2 (a F7 entregou 4 dos 18 campos) | ✅ entregue |
+| F46 | 2.5 | Design system **aplicado** ao `admin-web` — execução do que a F42 contratou | ✅ entregue |
+| F47 | 1 | Importação da base legada Pacto: 1.926 alunos entram como `CANCELLED` (ADR-033) | ✅ entregue |
+| F48 | 1 | Ativação da base corrente do Pacto (~340 ativos) | ✅ entregue |
+| F53 | 3 | Pagamentos e cobrança no balcão (`admin-web`) | ✅ entregue |
+| F54 | 3 | Painel financeiro gerencial (KPIs) | ✅ entregue |
+| F55 | 3 | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | **bloqueada** — faltam `client_id`/`client_secret`/`seller_id` da Getnet e o mTLS do Sicoob; e a verificação de autenticidade do webhook segue sem resposta (ADR-044) |
+| F56 | 3 | Plano com assinatura mensal como modalidade de plano (ADR-043) | ✅ entregue |
+
+---
+
+### MVP 3.5 — Totem · F49 a F52
+
+**A fila mudou aqui.** O **ADR-042** criou o MVP 3.5 e o colocou **antes** do MVP 4, e atribui
+explicitamente **à F49** a tarefa de reordenar esta seção. A ordem canônica passa a ser:
+
+```
+MVP 1 → MVP 2 → MVP 3 → MVP 3.5 (totem, F49–F52) → MVP 4 (app mobile, F23–F29) → MVP 5 → MVP 6
+```
+
+**Por que o totem antes do app.** O MVP 4 amarrava app mobile *e* totem no mesmo gate. O totem
+não precisa do app: precisa de identidade, entitlement e PIX — que existem. Manter os dois
+juntos adiava a superfície que a academia usa o dia inteiro por causa de uma que o aluno usa no
+celular. Detalhe e razão completa: ADR-042, Decisão 1.
+
+Entrada: MVP 1 estável (identidade e decisão de acesso) + MVP 2 com PIX operando (F13 ✅).
+
+Ordem interna fixada pelo ADR-042: **F49 → F50 → F51/F52**. Quem carrega o peso da configuração
+é a F49 (que **lê** `KioskConfiguration`), não a F50 (que **escreve**) — inverter deixaria a F50
+sem aceite verificável.
+
+| F | slice | núcleo |
+|---|---|---|
+| F49 | 3.5.1 Kiosk seguro, provisionamento e sessão efêmera | ✅ **entregue** — ver abaixo |
+| F50 | 3.5.2 Contrato de configuração, painel e publicação versionada | painel *Personalização do totem* no `admin-web`, rascunho e publicação por versão; o totem compara `configVersion` no heartbeat que a F49 já entrega |
+| F51 | 3.5.3 Tela pública (hero): blocos, mídia e patrocínio | a tela pública **é o produto**, não a moldura — o totem passa a maior parte do dia sem ninguém na frente dele |
+| F52 | 3.5.4 Área do aluno: identificação, pagamento e evolução | é aqui que os módulos do `DS-TOTEM.md` §5.2 ligam; a F49 entrega a área interna **vazia** de propósito |
+
+**A Decisão 0 do ADR-042 vale para as quatro:** nenhuma tela do `kiosk` nasce com valor fixo
+naquilo que a Decisão 6 não trava — marca, accent, tempo de sessão, blocos, módulos e textos são
+**lidos da configuração desde o primeiro commit**, mesmo quando o único valor existente é o
+padrão do seed. Ler de um objeto de config custa quase nada enquanto a tela está sendo escrita;
+custa uma fatia inteira depois que ela existe (foi o que aconteceu com o `admin-web` — F42
+contratou, F46 reaplicou).
+
+#### F49 — o que a fatia cumpriu
+
+Slice 3.5.1 · `SPEC-049` · issue [#150](https://github.com/RodReis/arenahub/issues/150) ·
+spec de design [`2026-08-25-f49-kiosk-seguro-design.md`](superpowers/specs/2026-08-25-f49-kiosk-seguro-design.md)
+
+| passo | entrega |
+|---|---|
+| 1 | Quatro modelos Prisma: `KioskDevice`, `KioskCredential`, `KioskConfiguration`, `KioskSession`. Os dois primeiros são cópia estrutural de `EdgeNode`/`EdgeCredential` — não se inventa provisionamento novo. `KioskSession` guarda **`tokenHash`, não o token**: sessão de 60 s que precisa morrer na hora não combina com JWT auto-contido |
+| 2 | Contrato inteiro de `KioskConfiguration`, cobrindo o `DS-TOTEM.md` §7.2 — incluindo o que só a F50 vai escrever. Três camadas (tenant → unidade → dispositivo) resolvidas pela nulabilidade; a mais específica vence. `version` e `publishedAt` já nascem na tabela para a F50 não precisar migrar dado publicado |
+| 3 | Autenticação HMAC do **dispositivo**, idêntica ao `edge-auth`: janela de relógio, credencial ativa, assinatura, nonce por último dentro de transação. `tenantId` e `gymUnitId` saem **da credencial, nunca do corpo** (Regra de arquitetura 2) |
+| 4 | `POST /heartbeat` (já devolvendo `configVersion`, exigência da F50) e `GET /config` |
+| 5 | Sessão efêmera do aluno: `POST /sessions` por CPF, `extend` (+30 s, teto 99 s), `DELETE` que **mata a linha no servidor**. Módulo desligado responde **404 para aquele dispositivo** — desligar é no servidor, e nesta fatia todos estão desligados |
+| 6 | Tokens do totem em `packages/ui`, com o alvo de contraste **7:1** do `DS-TOTEM.md` §11.3 (o resolvedor mirava `AA_TEXT` 4.5, que serve o painel). Nenhum hex colado do `Totem.dc.html` — ADR-026 |
+| 7 | Superfície `apps/kiosk` (o diretório estava vazio): atrator, CPF e "Minha área", 1080×1920 retrato |
+| 8 | E2E Playwright provando o aceite: jornada completa e **asserção de limpeza** — `sessionStorage` e `localStorage` vazios e nenhum dado do aluno no DOM depois de encerrar |
+| 9 | **ADR-045** — regime de identificação: CPF sozinho sem segundo fator, mensagem neutra sem limite de tentativas, facial em backlog, QR desta superfície é PIX. Emenda `M4-BR-004` |
+| 10 | Esta reordenação, `STATUS.md` e a evidência da `SPEC-049` |
+
+**O que a F49 entrega de propósito vazio.** A área interna sai com **zero dos seis módulos** do
+`DS-TOTEM.md` §5.2, e isso é o desenho, não uma lacuna: o aceite da fatia é **isolamento de
+tenant e limpeza de sessão**, não funcionalidade. Sem facial (ADR-045, Decisão 1) não existe
+autenticação forte, então saúde e ranking ficam inalcançáveis; pagamento e histórico são a F52.
+
+**O isolamento sai por construção, não por checagem.** O lookup é
+`calcularHashDeCpf(tenantId, cpf)` com o `tenantId` vindo da credencial do dispositivo — o totem
+do tenant X não consegue nem *formular a pergunta* sobre o aluno do tenant Y.
+
+🔴 **O que a implementação descobriu.** A ponte Node que assina as chamadas (o segredo HMAC não
+pode ir ao navegador) escutava em `0.0.0.0`, o padrão do Next. Com a rede da academia **não
+isolada**, qualquer host da LAN enumerava a base inteira do tenant sem tocar no totem — e a
+mensagem neutra não protege nada, porque o status HTTP cru distingue 404 de 201. Corrigido:
+`--hostname 127.0.0.1` em `dev` e em `start`, com o motivo escrito ao lado do script. O ADR-045
+registra que a Decisão 4 do PI **só se sustenta enquanto a ponte ficar em loopback**.
+
+---
+
 ### MVP 4 a 6 · F23 a F41
 
-Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
+Vem **depois** do MVP 3.5 (ADR-042). Detalhamento quando o MVP anterior fechar. Pontos que já se
+sabe que vão doer:
 
+- **F27 e F28** são as Slices 4.5 e 4.6 do `MVP-04`, cuja **execução o MVP 3.5 antecipou** nas
+  F49–F52. Quando o MVP 4 for detalhado, verificar o que sobrou delas em vez de reimplementar.
 - **F28** (pagamento no totem) é o app do aluno inteiro, com dinheiro, numa tela pública — e
   depende de regra de proração que **não existe** para upgrade/downgrade.
 - **F29** depende de `M4-DIST-01` (política de publicação em lojas), indefinida.
 - **F33** carrega a contradição interna da Especificação sobre ranking de perda de peso
-  (INV-121).
+  (INV-121). É ela que destrava o módulo *Ranking* do totem — pela trava 2 da Decisão 5 do
+  ADR-042, módulo sem fatia entregue **não aparece**.
 - **F40** provavelmente **não acontece**: exige ≥ 200 churns positivos e ≥ 1.000 snapshots por
   tenant. Sem isso, o produto fica na baseline de regras — e tudo bem.
 
@@ -830,3 +926,4 @@ Detalhamento quando o MVP anterior fechar. Pontos que já se sabe que vão doer:
 | 25/08/2026 | — *(#167)* | — | [#202](https://github.com/RodReis/arenahub/pull/202) | `[FIX]`: **o boundary do painel assertava o tipo da resposta em vez de validar.** O genérico de `chamarApi` é asserção, não validação: divergência de contrato passava calada pelo compilador e explodia dentro da árvore de render — `prices` ausente virou `Cannot read properties of undefined (reading 'length')` em `/plans`. O padrão estava em **59 chamadas, 24 arquivos**. `validarResposta` (função pura em `src/api/`) recebe schema Zod e devolve `ProblemDetails` com código estável `RESPONSE_CONTRACT_MISMATCH`, com o **caminho do campo** que divergiu no título e **nunca o valor recebido** (pode ser PII). O parâmetro `esquema` é **opcional de propósito**: sem ele o comportamento é o de hoje, e a migração das telas é incremental — `/plans` migra aqui e serve de prova. A tela deixou de sobrescrever o título quando o código é de contrato: *"sem permissão"* mentia sobre a causa e jogava fora a frase útil. 🔴 **Duas armadilhas de verificação no caminho.** (1) O `include` do vitest **não coleta `lib/**`** — o teste natural, ao lado do `server-client`, sairia **verde ignorado**; por isso a lógica é função pura em `src/api/`. (2) O teste existente da página **mocka `chamarApi` inteiro**, então o schema nunca executa e ele **não distingue "validou" de "não valida nada"** — o teste novo roda `chamarApi` de verdade, com dublê só em `fetch` e `next/headers`. Provado por mutação: neutralizar o `safeParse` derruba 3 de 4 unitários, e remover o `esquema` da chamada **reproduz o TypeError exato da issue**. 📌 **Achado colateral:** o `Estado atual` do `TESTS.md` estava defasado em **77 testes unitários e 28 de integração** — as entregas #199 e #201 não regeraram o relatório. A baseline real da `main` hoje é 1621/645; esta entrega leva a 1627/645. |
 | 25/08/2026 | — *(#204)* | — | [#205](https://github.com/RodReis/arenahub/pull/205) | `[INFRA]`: **menu ganha o grupo Financeiro e rótulos de seção diferenciados.** Pedido do PI. Cobrança, Conciliação e Painel financeiro estavam soltos no meio da lista, e a leitura de relance não dizia que eram a mesma família. A ordem dentro do grupo segue a **frequência**, não o organograma: Cobrança é diária, Conciliação é mensal, Painel é gerencial. O rótulo se separou do link por **tracking** (0.04 → 0.08em), respiro (16 → 24px), marcador de accent de 2px na calha e régua de 1px fechando o grupo anterior — **sem `opacity`**, que já foi tentado e reprovou o axe em todas as telas (3.70 contra o mínimo de 4.5). O `NavLink` ganhou marcador de posição e transição de 120ms: fundo a 14% sobre chrome é sutil demais com brilho baixo no balcão. 🔴 **O defeito latente que apareceu ao escrever:** o rótulo mora no item que ABRE o grupo, e "Financeiro" **já contém** um item com `exigePermissao`. Bastava reordenar para o rótulo morar num item que some — e os irmãos ficariam órfãos **só para quem não tem a permissão**, invisível para quem revisa o PR. `reancorarGrupos` devolve o rótulo ao primeiro sobrevivente; mora no layout, não no `Navegacao`, porque só lá a lista completa existe. 📏 **Medido na tela, não estimado:** o marcador do rótulo preenchia 87% da sua caixa contra 67% do item ativo — o secundário gritava mais que o "você está aqui"; aos 4px de recuo cai para 50%. E o modo faixa (abaixo de 1280px) precisou de bloco próprio: a régua girada caía a 8px do marcador, dois traços colados dizendo coisas diferentes. ⚠️ **Pré-existente, medido na `main` e NÃO corrigido aqui:** no modo faixa "Eventos de acesso" quebra em três linhas e leva o link a 193px. Não é o agrupamento que causa. **Provado por mutação:** o teste exercita `reancorarGrupos` no arranjo perigoso (rótulo no item COM permissão) — pelo menu de hoje ele passaria verde com a função removida. 8/8 no E2E de axe, incluindo zoom 200%. |
 | 25/08/2026 | **F56** | SPEC-056 | [#203](https://github.com/RodReis/arenahub/pull/203) | **Plano com assinatura mensal.** Assinatura vira **modalidade de plano** (`Plan.billingMode`), não motor de cobrança terceirizado — ADR-043, Decisão 2. O calendário, o valor, a carência e o bloqueio continuam do ArenaHub; o que muda é existir método salvo e autorização para cobrar sem o aluno agir. **`Subscription.externalSubscriptionId` nasce aqui** — a fonte que o `CancelarRecorrenciaUseCase` esperava desde 25/08 (Decisão 5): ele deixa de devolver zero fixo e passa a cancelar de verdade, aqui e no provedor. A adesão é o **único** lugar que chama `createTokenizedSubscription`, e valida na ordem em que o operador consegue agir — modalidade, status, preço vigente, **CPF** (Decisão 3), cartão, aceite —, porque quem está no balcão age pela PRIMEIRA recusa. O ciclo (`RodarCicloDeAssinaturasUseCase`) gera a invoice do período e cobra sozinho, **sem calendário novo**: reusa `ciclo-de-cobranca`, `BillingRepository` e o retry da F14. 🔑 **Três decisões do PI em 25/08:** ciclo completo (gerar **e** cobrar, não só cobrar); avisos **visíveis no painel** em vez de canal externo — não existe infra de notificação no sistema, e criá-la é decisão própria; e construção contra o `FakePaymentProvider`, já que a F55 espera credencial (trocar é um `useClass`). 🔴 **O defeito que o compilador pegou e um `string` não pegaria:** `OVERDUE` é o nome do vencido no `InvoiceStatus` — **não** `PAST_DUE`, que é do lado da ASSINATURA. Os dois vocabulários convivem, e trocar um pelo outro pularia calada justamente a invoice vencida, que é a que mais precisa ser cobrada. 🔴 **O achado da revisão adversarial do próprio PR:** a adesão chama o provedor **antes** de gravar — ordem oposta à da cobrança —, e morrer no meio deixaria recorrência viva sem nada apontando para ela (a Decisão 5 por outra porta). O código já estava certo, mas **dizer não é provar**: o que fecha a janela é a chave `sub:<id>` derivar da assinatura, e agora há teste. **Provado por mutação, não por leitura:** filtrar o ciclo por MODALIDADE em vez de por CONSENTIMENTO passa em 4 dos 5 testes e falha exatamente no que importa — cobraria cartão de quem nunca autorizou; instabilizar a chave de idempotência derruba concorrência **e** recuperação. 📌 **Fora de escopo, dito:** canal de aviso de reajuste e de cartão vencendo. `cartaoVenceEm` responde a pergunta e a ficha mostra; quem avisa o aluno é a recepção. |
+| 25/08/2026 | **F49** | SPEC-049 | *(preencher após o merge)* | **Kiosk seguro, provisionamento e sessão efêmera.** A superfície `apps/kiosk` nasceu (o diretório estava vazio): quatro modelos Prisma, HMAC de dispositivo copiado do `edge-auth`, contrato inteiro de `KioskConfiguration` em três camadas, sessão efêmera de 60 s com `tokenHash` no banco, tokens do totem em 7:1, três telas e o E2E que prova a limpeza. **A área interna sai com zero dos seis módulos do DS §5.2, de propósito** — o aceite é isolamento e limpeza, não funcionalidade. **ADR-045** registra o regime de identificação (CPF sozinho, facial em backlog) e os dois riscos que o PI aceitou. 🔴 **Achado da implementação:** a ponte Node que assina as chamadas escutava em `0.0.0.0` e, com a rede da academia não isolada, permitia enumerar a base inteira do tenant sem tocar no totem — corrigido para loopback, e o ADR-045 condiciona a decisão do PI a ele. **Este é o primeiro PR a reordenar a fila do §4:** MVP 3.5 antes do MVP 4, tarefa que o ADR-042 atribui a esta fatia |

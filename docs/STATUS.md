@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 24/08/2026 *(F53 entregue — pagamento no balcão)*
+**Última atualização:** 25/08/2026 *(F49 entregue — kiosk seguro; quadro reconciliado com o board)*
 
 🔑 **24/08/2026 — o Cowork passa a empurrar o próprio commit.** Até aqui o commit entrava na `main`
 local e ficava esperando alguém sincronizar: o `git push` pelo bridge falhava com
@@ -536,11 +536,20 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **29** |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **27** |
 | A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **3** — [F2](https://github.com/RodReis/arenahub/issues/2), [F10](https://github.com/RodReis/arenahub/issues/10) e [F53](https://github.com/RodReis/arenahub/issues/156) |
-| Feito | `proplan:done` | PR mergeado com CI verde | **4** — [F14](https://github.com/RodReis/arenahub/issues/14), [F15](https://github.com/RodReis/arenahub/issues/15), [#111](https://github.com/RodReis/arenahub/issues/111) e [#112](https://github.com/RodReis/arenahub/issues/112), aguardando aceite do PI |
-| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **31** |
+| Em Andamento | `proplan:doing` | Code está implementando | **1** — [F49](https://github.com/RodReis/arenahub/issues/150) |
+| Feito | `proplan:done` | PR mergeado com CI verde | 0 |
+| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **77** |
+
+> 🧾 **25/08/2026 — o quadro foi reconciliado contra o board, não estimado.** A tabela acima
+> estava defasada: listava F2, F10 e F53 em *Em Andamento* e quatro cards em *Feito*, mas F2 e
+> F10 nunca saíram do backlog e o board não tem nenhum `proplan:done` vivo. **F53 (#156),
+> F54 (#157) e F56 (#159) estão fechadas e `proplan:finalizado`** — o PI aceitou as três. As
+> contagens vêm de `gh issue list --label proplan:<x> --state all`, conferidas uma a uma.
+>
+> **F49 (#150) está em `doing`** — é a fatia desta entrega. A única issue de fatia ainda aberta
+> fora do backlog.
 
 > 🩺 **22/08/2026 — a avaliação virou UMA tela, e três funcionalidades que pareciam prontas não
 > estavam.** As quatro abas saíram (não existem na referência de design e escondiam três quartos
@@ -751,7 +760,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **2** | Pagamento controla entitlement automaticamente | MVP 1 estável + **provedor homologado** | F12–F16 | **provedor decidido em 19/08 (ADR-032): Sicoob PIX + Getnet cartão** — F14 e F15 destravadas, F16 ainda espera as duas políticas do `M2-COMPLIANCE-01`. F12 e F13 já entregues |
 | **2.5** | Design system: tokens, `packages/ui` e as três superfícies | **F42 sem gate** (dívida ativa: `admin-web` está na `main` sem CSS) · **F43 e F44 têm gate:** o PI priorizar o MVP 4 | F42–F44 | criado por **ADR-025**. F42 pegável assim que o card `[INFRA]` do pipeline de tokens sair |
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis (o *protocolo clínico* como gate **caiu em 19/08** — decisão do PI, ADR-035) | F17–F22 | **bloqueado só por MVP 1.** ADR-008 e ADR-036 fechados; F17–F20 não chamam IA e são as primeiras pegáveis quando o MVP 1 estabilizar |
-| **3.5** | Totem: tela pública configurável + autosserviço do aluno | MVP 1 estável + PIX operando (F13 ✅) | F49–F52 | criado por **ADR-042** em 22/08/2026. **Antecipa a decisão, não a execução** — o kiosk nasce configurável em vez de ser retrabalhado depois. Antecipa a execução das Slices 4.5 e 4.6 |
+| **3.5** | Totem: tela pública configurável + autosserviço do aluno | MVP 1 estável + PIX operando (F13 ✅) | F49–F52 | criado por **ADR-042** em 22/08/2026. **Antecipa a decisão, não a execução** — o kiosk nasce configurável em vez de ser retrabalhado depois. Antecipa a execução das Slices 4.5 e 4.6. **Em execução: F49 entregue em 25/08/2026** — regime de identificação fixado pelo **ADR-045** (CPF sozinho; facial vai para o backlog) |
 | **4** | Autosserviço: **app do aluno** (o totem saiu para o MVP 3.5) | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado — e **vem depois do MVP 3.5**, decisão do PI em 22/08 (ADR-042). **Slices 4.5 e 4.6 são executadas no MVP 3.5**; o texto e o aceite continuam no PRD MVP-04 §7, sem cópia |
 | **5** | Engajamento opt-in mensurável | eventos confiáveis + app do MVP 4 | F30–F35 | bloqueado |
 | **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | bloqueado |
@@ -760,8 +769,9 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 **Ordem de execução (decisão do PI em 22/08/2026, ADR-042):**
 `MVP 1 → MVP 2 → MVP 3 → **MVP 3.5 (totem)** → MVP 4 (app mobile) → MVP 5 → MVP 6`.
 O totem vem **antes** do app: ele não depende do celular do aluno e alcança todo mundo que passa
-pela recepção. A fila de itens do `docs/DEVELOPMENT.md` precisa refletir isso — arquivo do Code,
-tarefa registrada na F49.
+pela recepção. ✅ **A fila do `docs/DEVELOPMENT.md` §4 foi reordenada na F49, em 25/08/2026** —
+era a tarefa que o ADR-042 registrava para esta fatia, e ela também acrescentou as F42–F48 e
+F53–F56, que faltavam naquele arquivo.
 
 **Observação sobre o MVP 3:** o índice do plano declara que **o MVP 2 não é dependência
 funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
@@ -834,14 +844,14 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **entregue** — PR [#107](https://github.com/RodReis/arenahub/pull/107), aguardando aceite |
 | F47 | — | 1 | — | Importação da base legada Pacto (1.926 alunos) | [ADR-033](DECISIONS.md#adr-033--importação-da-base-legada-do-pacto-1926-alunos-entram-como-cancelled) | [#118](https://github.com/RodReis/arenahub/issues/118) | planejada |
 | F48 | — | 1 | — | Ativação da base corrente do Pacto (~340 ativos) | [design](superpowers/specs/2026-08-20-ativacao-base-corrente-design.md) | — | **entregue** — aguardando aceite |
-| F49 | SPEC-049 | 3.5 | 3.5.1 | Kiosk seguro, provisionamento e sessão efêmera | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.5](prd/academia/MVP-04-app-totem.md) | [#150](https://github.com/RodReis/arenahub/issues/150) | aprovada-pi |
+| F49 | SPEC-049 | 3.5 | 3.5.1 | Kiosk seguro, provisionamento e sessão efêmera | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.5](prd/academia/MVP-04-app-totem.md) | [#150](https://github.com/RodReis/arenahub/issues/150) | ✅ **entregue** em 25/08/2026 — aguardando aceite |
 | F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | aprovada-pi |
 | F51 | SPEC-051 | 3.5 | 3.5.3 | Tela pública (hero): blocos, mídia e patrocínio | [ADR-042](DECISIONS.md#adr-042) | [#152](https://github.com/RodReis/arenahub/issues/152) | aprovada-pi |
 | F52 | SPEC-052 | 3.5 | 3.5.4 | Área do aluno no totem: identificação, pagamento e evolução | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.6](prd/academia/MVP-04-app-totem.md) | [#153](https://github.com/RodReis/arenahub/issues/153) | aprovada-pi |
-| F53 | SPEC-053 | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [`SPEC-053-pagamentos-e-cobranca-no-balcao.md`](specs/SPEC-053-pagamentos-e-cobranca-no-balcao.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | entregue |
-| F54 | SPEC-054 | 3 | — | Painel financeiro gerencial (KPIs) | [`SPEC-054-painel-financeiro-gerencial.md`](specs/SPEC-054-painel-financeiro-gerencial.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | em-revisao |
-| F55 | SPEC-055 | 3 | — | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | [`SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md`](specs/SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md) | [#158](https://github.com/RodReis/arenahub/issues/158) | em-revisao |
-| F56 | SPEC-056 | 3 | — | Plano com assinatura mensal | [`SPEC-056-plano-com-assinatura-mensal.md`](specs/SPEC-056-plano-com-assinatura-mensal.md) | [#159](https://github.com/RodReis/arenahub/issues/159) | em-revisao |
+| F53 | SPEC-053 | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [`SPEC-053-pagamentos-e-cobranca-no-balcao.md`](specs/SPEC-053-pagamentos-e-cobranca-no-balcao.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | ✅ **finalizado** — aceito pelo PI |
+| F54 | SPEC-054 | 3 | — | Painel financeiro gerencial (KPIs) | [`SPEC-054-painel-financeiro-gerencial.md`](specs/SPEC-054-painel-financeiro-gerencial.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | ✅ **finalizado** — aceito pelo PI |
+| F55 | SPEC-055 | 3 | — | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | [`SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md`](specs/SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md) | [#158](https://github.com/RodReis/arenahub/issues/158) | aprovada-pi — **bloqueada** (credenciais Getnet + mTLS Sicoob) |
+| F56 | SPEC-056 | 3 | — | Plano com assinatura mensal | [`SPEC-056-plano-com-assinatura-mensal.md`](specs/SPEC-056-plano-com-assinatura-mensal.md) | [#159](https://github.com/RodReis/arenahub/issues/159) | ✅ **finalizado** — aceito pelo PI |
 
 
 
@@ -894,6 +904,21 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 > fila** que o PI escolheu, não o PRD de origem. A **F55 nasce separada da F53 por proposta do
 > Cowork** — a F53 é construível hoje, a F55 espera credencial de banco —, e a separação está
 > registrada como pergunta aberta na própria `SPEC-055`. A **F56** (plano com assinatura mensal) nasce em seguida, pelo **ADR-043**. A contagem vai de 52 para **56 fatias**.
+> **F49 entregue em 25/08/2026 — e trouxe o ADR-045.** A fatia fixou o **regime de
+> identificação do totem**: reconhecimento facial vai para o **backlog** (sem MVP de destino), o
+> QR desta superfície é **PIX**, não carteirinha do app, e o login é **CPF sozinho, sem segundo
+> fator** — o que **emenda `M4-BR-004`**. O PI aceitou dois riscos por escrito: quem sabe o CPF
+> vê nome, plano e valor em aberto; e a enumeração de CPF é barata, porque a mensagem de falha é
+> única, neutra e sem limite de tentativas. **A área interna sai com zero dos seis módulos do
+> `DS-TOTEM.md` §5.2, de propósito** — o aceite da fatia é isolamento de tenant e limpeza de
+> sessão, não funcionalidade.
+>
+> ⚠️ **A segunda aceitação é condicional, e a condição é técnica.** A ponte Node do totem
+> escutava em `0.0.0.0`; com a rede da academia não isolada, isso permitia enumerar a base
+> inteira do tenant a partir de qualquer host da LAN, sem tocar no aparelho. Corrigido para
+> loopback. **Tirar a ponte do loopback reabre o ADR-045** — não é ajuste de infraestrutura, é
+> mudança do risco que o PI aceitou.
+
 **Cards `[GATE]` previstos** (não são fatias, não têm SPEC nem F): homologação de provedor de
 pagamento (MVP 2), portões clínicos (MVP 3), portões de canal (MVP 4), portões de engajamento
 (MVP 5), portões de retenção (MVP 6).
