@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
  * A suite navega o totem de verdade: a tela chama a ponte do proprio app, a
  * ponte assina com a credencial `dev-totem01` e a API responde contra o banco
  * de e2e. Nao ha duble em lugar nenhum -- um teste que mockasse a API
- * provaria que a tela funciona contra um dublê, e o aceite desta fatia e
+ * provaria que a tela funciona contra um duble, e o aceite desta fatia e
  * justamente que a cadeia inteira funciona.
  *
  * DADO DO SEED, nunca dado real: `packages/database/prisma/seed.ts` cria
@@ -86,7 +86,13 @@ async function abrirSessao(page: Page): Promise<void> {
   await expect(page.getByTestId('toast-de-erro')).toHaveCount(0);
 }
 
-/** Segundos restantes lidos do rodape ("Sessão encerra em N s"). */
+/**
+ * Segundos restantes lidos do rodape.
+ *
+ * O acento em "Sessão" e CITACAO do texto que a tela renderiza, nao prosa:
+ * tira-lo faria o comentario descrever uma string que nao existe. A regra de
+ * comentario sem acento vale para o que se escreve, nao para o que se cita.
+ */
 async function segundosRestantes(page: Page): Promise<number> {
   const texto = (await page.getByTestId('contador-de-sessao').textContent()) ?? '';
   const encontrado = /(\d+)/.exec(texto);

@@ -587,9 +587,16 @@ function hashDeCpf(tenantId: string, cpf: string): string {
  * Cifra o segredo do totem no MESMO envelope que a API decifra:
  * AES-256-GCM em `{ivBase64}:{tagBase64}:{ciphertextBase64}`.
  *
- * DUPLICADO de `CifradorDeSegredo` (`apps/api/.../auth/segredo-cifrado.ts`),
- * e nao importado: `packages/database` nao depende de `apps/api` e nao pode
- * passar a depender -- a seta aponta ao contrario. A alternativa seria mover
+ * Duas origens, e vale distinguir para quem for conferir: a PRIMITIVA
+ * AES-256-GCM e o `CifradorDeSegredo`
+ * (`apps/api/src/modules/auth/segredo-cifrado.ts`); o ENVELOPE de tres
+ * campos separados por `:` e montado e lido em
+ * `apps/api/src/modules/kiosk-auth/kiosk-auth.service.ts`
+ * (`cifrarSegredo` / `decifrarSegredo`). E o segundo que define o formato
+ * gravado na coluna, e portanto o que esta funcao precisa reproduzir.
+ *
+ * DUPLICADO, e nao importado: `packages/database` nao depende de `apps/api`
+ * e nao pode passar a depender -- a seta aponta ao contrario. A alternativa seria mover
  * o cifrador para um pacote compartilhado, o que arrastaria a API inteira
  * atras de 15 linhas de `node:crypto` que nao mudam ha meses.
  *
