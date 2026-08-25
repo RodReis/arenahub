@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { assinar } from '@arenahub/api-contracts';
@@ -14,15 +14,28 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
 /**
  * F49, Task 3 -- assinatura do totem.
  *
- * Cada teste e um ATAQUE. O caminho feliz e um; os outros seis sao o motivo
- * de o mecanismo existir.
+ * Cada teste e um ATAQUE. O caminho feliz e um; os outros sao o motivo de o
+ * mecanismo existir. Toda recusa asserta o `code` no corpo, nao so o status
+ * HTTP -- sem isso, trocar o motivo por outro (ou desligar uma checagem que
+ * ainda devolve 401 por acidente, como `activeFrom`/`expiresAt` caindo no
+ * `EDGE_KEY_UNKNOWN` generico) passa despercebido.
  */
 describe('F49 -- assinatura do totem', () => {
   let app: INestApplication;
   let db: PrismaService;
 
   const sufixo = randomUUID().slice(0, 8);
-  const totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
+
+  type Totem = {
+    tenantId: string;
+    gymUnitId: string;
+    kioskDeviceId: string;
+    keyId: string;
+    segredo: string;
+  };
+
+  const totemA: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
+  const totemB: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
 
   const servidor = (): Parameters<typeof request>[0] =>
     app.getHttpServer() as Parameters<typeof request>[0];
@@ -30,6 +43,7 @@ describe('F49 -- assinatura do totem', () => {
   const CORPO = { agentVersion: '0.1.0', localTimeMs: 0 };
 
   const assinarPedido = (
+    totem: Totem,
     corpo: unknown,
     ajuste: { timestamp?: number; nonce?: string } = {},
   ): Record<string, string> => {
@@ -55,20 +69,17 @@ describe('F49 -- assinatura do totem', () => {
     };
   };
 
-  beforeAll(async () => {
-    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
-
-    app = modulo.createNestApplication();
-    aplicarParserComCorpoCru(app);
-    await app.init();
-
-    db = app.get(PrismaService);
-
+  /** Monta tenant + unidade + dispositivo + credencial de totem, isolados por rotulo. */
+  const montarTotem = async (
+    alvo: Totem,
+    rotulo: string,
+    ajusteCredencial: { activeFrom?: Date; expiresAt?: Date } = {},
+  ): Promise<void> => {
     const tenant = await db.tenant.create({
       data: {
-        slug: `kiosk-${sufixo}`,
-        legalName: 'Kiosk LTDA',
-        displayName: 'Kiosk',
+        slug: `kiosk-${rotulo}-${sufixo}`,
+        legalName: `Kiosk ${rotulo} LTDA`,
+        displayName: `Kiosk ${rotulo}`,
       },
     });
 
@@ -83,11 +94,11 @@ describe('F49 -- assinatura do totem', () => {
     });
 
     const dispositivo = await db.kioskDevice.create({
-      data: { tenantId: tenant.id, gymUnitId: unidade.id, code: `TOTEM-${sufixo}` },
+      data: { tenantId: tenant.id, gymUnitId: unidade.id, code: `TOTEM-${rotulo}-${sufixo}` },
     });
 
     const segredo = randomBytes(32).toString('hex');
-    const keyId = `kiosk-${sufixo}`;
+    const keyId = `kiosk-${rotulo}-${sufixo}`;
 
     await db.kioskCredential.create({
       data: {
@@ -95,50 +106,69 @@ describe('F49 -- assinatura do totem', () => {
         kioskDeviceId: dispositivo.id,
         keyId,
         encryptedSecret: app.get(KioskAuthService).cifrarSegredo(segredo),
-        activeFrom: new Date(Date.now() - 60_000),
+        activeFrom: ajusteCredencial.activeFrom ?? new Date(Date.now() - 60_000),
+        expiresAt: ajusteCredencial.expiresAt ?? null,
       },
     });
 
-    Object.assign(totem, {
+    Object.assign(alvo, {
       tenantId: tenant.id,
       gymUnitId: unidade.id,
       kioskDeviceId: dispositivo.id,
       keyId,
       segredo,
     });
+  };
+
+  beforeAll(async () => {
+    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+
+    app = modulo.createNestApplication();
+    aplicarParserComCorpoCru(app);
+    await app.init();
+
+    db = app.get(PrismaService);
+
+    await montarTotem(totemA, 'a');
+    await montarTotem(totemB, 'b');
   });
 
   afterAll(async () => {
-    await db.tenant.delete({ where: { id: totem.tenantId } });
+    await db.tenant.delete({ where: { id: totemA.tenantId } });
+    await db.tenant.delete({ where: { id: totemB.tenantId } });
     await app.close();
   });
 
   it('aceita requisicao assinada corretamente', async () => {
     await request(servidor())
       .post('/api/v1/kiosk/heartbeat')
-      .set(assinarPedido(CORPO))
+      .set(assinarPedido(totemA, CORPO))
       .send(CORPO)
       .expect(200);
   });
 
   it('recusa corpo adulterado depois de assinado', async () => {
-    const cabecalhos = assinarPedido(CORPO);
+    const cabecalhos = assinarPedido(totemA, CORPO);
 
-    await request(servidor())
+    const resposta = await request(servidor())
       .post('/api/v1/kiosk/heartbeat')
       .set(cabecalhos)
       .send({ ...CORPO, agentVersion: '9.9.9' })
       .expect(401);
+
+    expect(resposta.body).toMatchObject({ code: 'EDGE_SIGNATURE_INVALID' });
   });
 
   it('recusa relogio fora da janela', async () => {
     const antigo = Math.floor(Date.now() / 1000) - 400;
 
-    await request(servidor())
+    const resposta = await request(servidor())
       .post('/api/v1/kiosk/heartbeat')
-      .set(assinarPedido(CORPO, { timestamp: antigo }))
+      .set(assinarPedido(totemA, CORPO, { timestamp: antigo }))
       .send(CORPO)
       .expect(401);
+
+    expect(resposta.body).toMatchObject({ code: 'EDGE_TIMESTAMP_OUT_OF_WINDOW' });
   });
 
   it('recusa nonce repetido', async () => {
@@ -146,47 +176,120 @@ describe('F49 -- assinatura do totem', () => {
 
     await request(servidor())
       .post('/api/v1/kiosk/heartbeat')
-      .set(assinarPedido(CORPO, { nonce }))
+      .set(assinarPedido(totemA, CORPO, { nonce }))
       .send(CORPO)
       .expect(200);
 
-    await request(servidor())
+    const resposta = await request(servidor())
       .post('/api/v1/kiosk/heartbeat')
-      .set(assinarPedido(CORPO, { nonce }))
+      .set(assinarPedido(totemA, CORPO, { nonce }))
       .send(CORPO)
       .expect(401);
+
+    expect(resposta.body).toMatchObject({ code: 'EDGE_REPLAY_DETECTED' });
   });
 
   it('recusa chave desconhecida', async () => {
-    await request(servidor())
+    const resposta = await request(servidor())
       .post('/api/v1/kiosk/heartbeat')
-      .set({ ...assinarPedido(CORPO), 'x-kiosk-key-id': 'nao-existe' })
+      .set({ ...assinarPedido(totemA, CORPO), 'x-kiosk-key-id': 'nao-existe' })
       .send(CORPO)
       .expect(401);
+
+    expect(resposta.body).toMatchObject({ code: 'EDGE_KEY_UNKNOWN' });
   });
 
   it('recusa credencial revogada', async () => {
     await db.kioskCredential.updateMany({
-      where: { keyId: totem.keyId },
+      where: { keyId: totemA.keyId },
       data: { revokedAt: new Date() },
     });
 
-    await request(servidor())
+    const resposta = await request(servidor())
       .post('/api/v1/kiosk/heartbeat')
-      .set(assinarPedido(CORPO))
+      .set(assinarPedido(totemA, CORPO))
       .send(CORPO)
       .expect(401);
 
+    expect(resposta.body).toMatchObject({ code: 'EDGE_KEY_REVOKED' });
+
     await db.kioskCredential.updateMany({
-      where: { keyId: totem.keyId },
+      where: { keyId: totemA.keyId },
       data: { revokedAt: null },
     });
   });
 
   it('recusa requisicao sem assinatura', async () => {
-    await request(servidor())
+    const resposta = await request(servidor())
       .post('/api/v1/kiosk/heartbeat')
       .send(CORPO)
       .expect(401);
+
+    expect(resposta.body).toMatchObject({ code: 'EDGE_SIGNATURE_MISSING' });
+  });
+
+  it('recusa credencial ainda nao vigente (activeFrom no futuro)', async () => {
+    const futuro: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
+
+    await montarTotem(futuro, `futuro-${randomUUID().slice(0, 8)}`, {
+      activeFrom: new Date(Date.now() + 3_600_000),
+    });
+
+    const resposta = await request(servidor())
+      .post('/api/v1/kiosk/heartbeat')
+      .set(assinarPedido(futuro, CORPO))
+      .send(CORPO)
+      .expect(401);
+
+    expect(resposta.body).toMatchObject({ code: 'EDGE_KEY_UNKNOWN' });
+
+    await db.tenant.delete({ where: { id: futuro.tenantId } });
+  });
+
+  it('recusa credencial vencida (expiresAt no passado)', async () => {
+    const vencido: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
+
+    await montarTotem(vencido, `vencido-${randomUUID().slice(0, 8)}`, {
+      expiresAt: new Date(Date.now() - 3_600_000),
+    });
+
+    const resposta = await request(servidor())
+      .post('/api/v1/kiosk/heartbeat')
+      .set(assinarPedido(vencido, CORPO))
+      .send(CORPO)
+      .expect(401);
+
+    expect(resposta.body).toMatchObject({ code: 'EDGE_KEY_REVOKED' });
+
+    await db.tenant.delete({ where: { id: vencido.tenantId } });
+  });
+
+  it('nao autentica como o tenant do totem B usando a credencial do totem A', async () => {
+    const resposta = await request(servidor())
+      .post('/api/v1/kiosk/heartbeat')
+      .set(assinarPedido(totemA, CORPO))
+      .send(CORPO)
+      .expect(200);
+
+    // O endpoint minimo desta task nao devolve o contexto -- a prova de
+    // isolamento real (tenantId/gymUnitId do contexto resolvido) fica para a
+    // Task 4, quando o heartbeat expõe algo alem de `{ ok: true }`. Aqui a
+    // rede de regressao e: a credencial do A nunca autentica pelo keyId do
+    // B, e vice-versa -- exatamente o que a proxima asserção prova.
+    expect(resposta.body).toMatchObject({ ok: true });
+
+    const cabecalhosDoA = assinarPedido(totemA, CORPO);
+
+    const cruzada = await request(servidor())
+      .post('/api/v1/kiosk/heartbeat')
+      .set({ ...cabecalhosDoA, 'x-kiosk-key-id': totemB.keyId })
+      .send(CORPO)
+      .expect(401);
+
+    // A assinatura foi calculada com o segredo do A, mas anunciada como se
+    // fosse a chave do B: a credencial do B tem segredo diferente, entao a
+    // assinatura nao confere -- isolamento entre tenants provado pelo
+    // proprio mecanismo de assinatura, sem precisar do contexto exposto.
+    expect(cruzada.body).toMatchObject({ code: 'EDGE_SIGNATURE_INVALID' });
   });
 });
