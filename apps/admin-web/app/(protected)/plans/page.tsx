@@ -11,7 +11,8 @@ import {
   ProblemDetail,
 } from '@arenahub/ui';
 
-import { CODIGO_DE_CONTRATO, chamarApi } from '../../../lib/api/server-client';
+import { chamarApi } from '../../../lib/api/server-client';
+import { CODIGO_DE_CONTRATO } from '../../../src/api/validar-resposta';
 import { janelaLegivel } from '../../../src/students/formatar';
 import { AcaoDeAtivacao } from './acao-de-ativacao';
 import { EditarPlano } from './editar-plano';

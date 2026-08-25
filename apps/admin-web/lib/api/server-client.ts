@@ -6,8 +6,18 @@ import type { ZodType } from 'zod';
 import { validarResposta } from '../../src/api/validar-resposta';
 import type { ProblemDetails } from '../../src/api/validar-resposta';
 
+/*
+ * `ProblemDetails` continua saindo daqui -- e o tipo que todo chamador ja
+ * importava, e tipo nao vai para o bundle.
+ *
+ * `CODIGO_DE_CONTRATO` NAO e reexportado de proposito: reexportar valor
+ * daria a um Client Component um motivo para importar deste arquivo, e o
+ * `server-only` do topo derrubaria o build -- ou pior, alguem removeria o
+ * `server-only` para "resolver", publicando `API_INTERNAL_URL` no
+ * navegador. Quem precisa da constante importa de `src/api/`, que e segura
+ * nos dois lados.
+ */
 export type { ProblemDetails } from '../../src/api/validar-resposta';
-export { CODIGO_DE_CONTRATO } from '../../src/api/validar-resposta';
 
 /**
  * Cliente da API, exclusivo do servidor.
