@@ -271,12 +271,12 @@ describe('F49 -- assinatura do totem', () => {
       .send(CORPO)
       .expect(200);
 
-    // O endpoint minimo desta task nao devolve o contexto -- a prova de
-    // isolamento real (tenantId/gymUnitId do contexto resolvido) fica para a
-    // Task 4, quando o heartbeat expõe algo alem de `{ ok: true }`. Aqui a
-    // rede de regressao e: a credencial do A nunca autentica pelo keyId do
-    // B, e vice-versa -- exatamente o que a proxima asserção prova.
-    expect(resposta.body).toMatchObject({ ok: true });
+    // Task 4: o heartbeat agora devolve configVersion/serverTime. A prova de
+    // isolamento real (tenantId/gymUnitId do contexto resolvido) vive em
+    // `kiosk-config.int-spec.ts`. Aqui a rede de regressao e: a credencial
+    // do A nunca autentica pelo keyId do B, e vice-versa -- exatamente o que
+    // a proxima asserção prova.
+    expect(typeof (resposta.body as { configVersion: number }).configVersion).toBe('number');
 
     const cabecalhosDoA = assinarPedido(totemA, CORPO);
 

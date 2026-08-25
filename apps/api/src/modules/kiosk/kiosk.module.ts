@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 
+import { PersistenceModule } from '../../persistence/persistence.module.js';
 import { KioskAuthModule } from '../kiosk-auth/kiosk-auth.module.js';
+import { KioskConfigService } from './kiosk-config.service.js';
 import { KioskController } from './kiosk.controller.js';
 
-/**
- * Endpoints do totem. Hoje so o heartbeat minimo (F49, Task 3); a Task 4
- * entrega o resto da superficie.
- */
+/** Endpoints do totem: heartbeat e configuracao resolvida (F49, Task 4). */
 @Module({
-  imports: [KioskAuthModule],
+  imports: [PersistenceModule, KioskAuthModule],
   controllers: [KioskController],
+  providers: [KioskConfigService],
 })
 export class KioskModule {}
