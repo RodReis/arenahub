@@ -59,6 +59,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][SPEC-013][FIX] plano nao pode ser editado apos criado (#185, finalizado em: 2026-08-25)
 - [MVP1][FIX] data de nascimento anda um dia: data pura renderizada como instante (#176, finalizado em: 2026-08-25)
 - [MVP1][FIX] catraca Topdata Inner nao podia ser cadastrada: evidencia de bancada existia, faltava no codigo (#180, finalizado em: 2026-08-25)
 - [MVP1][SPEC-008][FIX] nao havia como desativar plano: isActive existia sem quem o escrevesse (#183, finalizado em: 2026-08-25)
