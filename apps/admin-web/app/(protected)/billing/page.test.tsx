@@ -8,7 +8,7 @@ vi.mock('../../../lib/api/server-client', () => ({
 }));
 
 import { chamarApi } from '../../../lib/api/server-client';
-import PainelFinanceiroPage from './page';
+import PainelFinanceiroPage, { periodosDisponiveis } from './page';
 
 /**
  * Painel financeiro gerencial -- F54, `SPEC-054`.
@@ -78,12 +78,13 @@ describe('painel financeiro', () => {
    * O ESTORNO PRECISA ESTAR VISIVEL quando existe: o recebido ja vem liquido
    * do backend, e sem a linha o dono descobriria a devolucao so no extrato.
    */
-  it('mostra o estorno e marca o recebido como liquido quando houve devolucao', async () => {
+  it('mostra o estorno como indicador proprio, ja descontado do recebido', async () => {
     await renderizar({ ...RESUMO, recebidoMinor: 36_000, estornadoMinor: 9_000 });
 
     expect(screen.getByTestId('estornado')).toHaveTextContent('90,00');
     expect(screen.getByTestId('recebido-no-periodo')).toHaveTextContent('360,00');
-    expect(screen.getByText(/Recebido no período \(líquido\)/)).toBeInTheDocument();
+    // A frase importa: sem ela o gestor somaria o estorno ao recebido.
+    expect(screen.getByText(/já descontado do recebido/i)).toBeInTheDocument();
   });
 
   /** Sem devolucao, a linha nao existe -- "Estornado R$ 0,00" gastaria peso a toa. */
@@ -227,7 +228,121 @@ describe('painel financeiro', () => {
     const tabela = screen.getByTestId('quebra-por-metodo');
     expect(tabela).toHaveTextContent('PIX');
     expect(tabela).toHaveTextContent('Cartão');
-    expect(tabela).toHaveTextContent('Espécie ou transferência');
+    expect(tabela).toHaveTextContent('Espécie');
+  });
+
+  /**
+   * O PERCENTUAL E A RAZAO DA MUDANCA de tabela para barras: "o PIX e quanto
+   * do meu caixa?" e a pergunta do bloco, e ela se responde por proporcao.
+   *
+   * PIX: 40.000 de 45.000 recebidos = 88,9%. Espécie: 5.000 = 11,1%.
+   *
+   * O CARTAO SEM MOVIMENTO MOSTRA `0%`, e aqui zero e verdade: ha total do
+   * qual ser parte, e a fatia e mesmo nula. `—` seria pior -- afirmaria que a
+   * proporcao nao existe quando ela existe e vale zero.
+   */
+  it('mostra a proporcao de cada forma sobre o total recebido', async () => {
+    await renderizar();
+
+    const quebra = screen.getByTestId('quebra-por-metodo');
+    expect(quebra).toHaveTextContent('88,9%');
+    expect(quebra).toHaveTextContent('11,1%');
+    expect(quebra).toHaveTextContent('0%');
+  });
+
+  /**
+   * SEPARADOR DE MILHAR -- o bug que a versao anterior tinha.
+   *
+   * O rotulo saia como `R$ 12000,00` porque a tela formatava com
+   * `toFixed(2).replace('.', ',')` em vez do formatador do DS. Doze mil sem
+   * separador se confunde com mil e duzentos de relance, num grafico que
+   * existe justamente para comparar tamanhos.
+   */
+  it('formata o rotulo do grafico de dividas com separador de milhar', async () => {
+    await renderizar({
+      ...RESUMO,
+      vencidoMinor: 1_200_000,
+      faturasVencidas: 3,
+      faixas: [
+        { rotulo: 'Até 15 dias', minorTotal: 1_200_000, quantidade: 3 },
+        { rotulo: '16 a 30 dias', minorTotal: 0, quantidade: 0 },
+        { rotulo: '31 a 60 dias', minorTotal: 0, quantidade: 0 },
+        { rotulo: 'Mais de 60 dias', minorTotal: 0, quantidade: 0 },
+      ],
+    });
+
+    const grafico = screen.getByTestId('faixas-da-divida');
+    expect(grafico).toHaveTextContent('R$ 12.000,00');
+    expect(grafico).not.toHaveTextContent('R$ 12000,00');
+  });
+
+  /**
+   * A SERIE VIRA GRAFICO, e a tabela CONTINUA -- o grafico responde tendencia,
+   * a tabela responde valor. Quem vai conferir um numero precisa do numero.
+   */
+  it('mostra o grafico de competencia junto da tabela, nao no lugar dela', async () => {
+    await renderizar();
+
+    expect(screen.getByTestId('grafico-de-competencia')).toBeInTheDocument();
+    expect(screen.getByTestId('serie-por-competencia')).toBeInTheDocument();
+  });
+
+  /**
+   * A COLUNA QUE FALTAVA: o gestor vinha subtraindo faturado menos recebido a
+   * cada linha para achar o buraco do mes -- que e a pergunta do bloco.
+   */
+  it('mostra quanto nao entrou em cada competencia', async () => {
+    await renderizar();
+
+    // jun: 30.000 faturado, 30.000 recebido -> 0. jul: 40.000 - 20.000 = 20.000.
+    const tabela = screen.getByTestId('serie-por-competencia');
+    expect(tabela).toHaveTextContent('Não entrou');
+    expect(tabela).toHaveTextContent('R$ 200,00');
+  });
+
+  /**
+   * O SPARKLINE SO EXISTE PARA O RECEBIDO -- decisao do PI. "A receber" e
+   * "vencido" sao fotos do instante e nao tem historico no banco; fabricar a
+   * curva exigiria snapshot mensal, que e fatia nova.
+   */
+  it('mostra a tendencia do recebido quando ha serie', async () => {
+    await renderizar();
+
+    expect(screen.getByTestId('tendencia-do-recebido')).toBeInTheDocument();
+  });
+
+  /** Um ponto nao e tendencia: um traco reto afirmaria estabilidade nao medida. */
+  it('nao mostra tendencia com uma competencia so', async () => {
+    await renderizar({
+      ...RESUMO,
+      serie: {
+        pontos: [{ competencia: '2026-08', faturadoMinor: 50_000, recebidoMinor: 45_000 }],
+        suficienteParaLinha: false,
+      },
+    });
+
+    expect(screen.queryByTestId('tendencia-do-recebido')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Sem entrada no periodo nao ha proporcao a mostrar -- e dividir por zero
+   * produziria `NaN%` na tela.
+   */
+  it('mostra estado vazio na quebra quando nao houve pagamento', async () => {
+    await renderizar({
+      ...RESUMO,
+      recebidoMinor: 0,
+      pagamentosConfirmados: 0,
+      ticketMedioMinor: null,
+      quebraPorMetodo: [
+        { metodo: 'MANUAL', minorTotal: 0, quantidade: 0 },
+        { metodo: 'PIX', minorTotal: 0, quantidade: 0 },
+        { metodo: 'CARD', minorTotal: 0, quantidade: 0 },
+      ],
+    });
+
+    expect(screen.getByTestId('sem-pagamento')).toBeInTheDocument();
+    expect(screen.queryByTestId('quebra-por-metodo')).not.toBeInTheDocument();
   });
 
   it('mostra estado vazio quando nao ha divida em aberto', async () => {
@@ -246,6 +361,57 @@ describe('painel financeiro', () => {
    * A tela recusada mostra o problema, nao uma pagina em branco nem numeros
    * zerados -- que seriam indistinguiveis de uma academia sem movimento.
    */
+  /**
+   * O FILTRO DE MES -- ate aqui o periodo so existia pela URL, e digitar ISO
+   * 8601 na barra de endereco e o oposto do "sem tempo para procurar" que o
+   * PRODUCT.md descreve.
+   */
+  it('oferece um chip por competencia apurada', async () => {
+    await renderizar();
+
+    expect(screen.getByTestId('periodo-jun/2026')).toBeInTheDocument();
+    expect(screen.getByTestId('periodo-jul/2026')).toBeInTheDocument();
+    expect(screen.getByTestId('periodo-ago/2026')).toBeInTheDocument();
+  });
+
+  /**
+   * `aria-current` E NAO SO A COR: cor sozinha nunca e canal unico (PRD), e
+   * quem usa leitor de tela precisa saber qual periodo esta aberto.
+   */
+  it('marca o periodo aberto com aria-current, nao so com cor', async () => {
+    await renderizar({
+      ...RESUMO,
+      de: '2026-07-01T00:00:00.000Z',
+      ate: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(screen.getByTestId('periodo-jul/2026')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('periodo-jun/2026')).not.toHaveAttribute('aria-current');
+  });
+
+  /** Cada chip e uma URL -- estado em memoria nao se compartilha. */
+  it('aponta cada chip para a janela daquele mes', async () => {
+    await renderizar();
+
+    expect(screen.getByTestId('periodo-jun/2026').getAttribute('href')).toContain(
+      '2026-06-01T00%3A00%3A00.000Z',
+    );
+  });
+
+  /**
+   * A TABELA FICA RECOLHIDA e a acessibilidade nao depende dela: o
+   * `SerieFinanceira` publica tabela invisivel propria. O `<details>` fechado
+   * economiza ~300px sem esconder o numero de quem vai conferir.
+   */
+  it('recolhe a tabela de valores atras de um detalhe fechado', async () => {
+    const { container } = await renderizar();
+
+    const detalhe = container.querySelector('details');
+    expect(detalhe).not.toBeNull();
+    expect(detalhe).not.toHaveAttribute('open');
+    expect(screen.getByText('Ver valores exatos')).toBeInTheDocument();
+  });
+
   it('mostra o erro quando a API recusa a consulta', async () => {
     vi.mocked(chamarApi).mockResolvedValue({
       ok: false,
@@ -264,5 +430,61 @@ describe('painel financeiro', () => {
 
     expect(screen.getByTestId('erro-de-permissao')).toBeInTheDocument();
     expect(screen.queryByTestId('recebido-no-periodo')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Os meses que o filtro oferece.
+ *
+ * DERIVADOS DA SERIE que o backend ja devolve, e nao de um calendario
+ * inventado: oferecer um mes sem movimento levaria o gerente a uma tela vazia
+ * que parece defeito.
+ */
+describe('periodosDisponiveis', () => {
+  const JANELA = { de: '2026-07-01T00:00:00.000Z', ate: '2026-08-01T00:00:00.000Z' };
+
+  it('ordena do mais antigo para o mais recente', () => {
+    const periodos = periodosDisponiveis(['2026-08', '2026-06', '2026-07'], JANELA);
+
+    expect(periodos.map((p) => p.rotulo)).toEqual(['jun/2026', 'jul/2026', 'ago/2026']);
+  });
+
+  it('monta a janela do mes, com fim exclusivo', () => {
+    const [junho] = periodosDisponiveis(['2026-06'], JANELA);
+
+    expect(junho?.de).toBe('2026-06-01T00:00:00.000Z');
+    expect(junho?.ate).toBe('2026-07-01T00:00:00.000Z');
+  });
+
+  it('atravessa a virada de ano', () => {
+    const [dezembro] = periodosDisponiveis(['2025-12'], JANELA);
+
+    expect(dezembro?.ate).toBe('2026-01-01T00:00:00.000Z');
+  });
+
+  it('marca como atual o mes que bate com a janela aberta', () => {
+    const periodos = periodosDisponiveis(['2026-06', '2026-07'], JANELA);
+
+    expect(periodos.find((p) => p.rotulo === 'jul/2026')?.atual).toBe(true);
+    expect(periodos.find((p) => p.rotulo === 'jun/2026')?.atual).toBe(false);
+  });
+
+  /**
+   * MANTEM OS MAIS RECENTES quando ha mais que o limite: o backend devolve 12
+   * meses, e doze chips seriam uma segunda barra de navegacao. Cortar os
+   * antigos e o certo -- ninguem abre o painel para ver setembro do ano
+   * passado primeiro.
+   */
+  it('corta os mais antigos ao passar do limite', () => {
+    const doze = Array.from({ length: 12 }, (_, i) => `2026-${String(i + 1).padStart(2, '0')}`);
+    const periodos = periodosDisponiveis(doze, JANELA, 6);
+
+    expect(periodos).toHaveLength(6);
+    expect(periodos[0]?.rotulo).toBe('jul/2026');
+    expect(periodos[5]?.rotulo).toBe('dez/2026');
+  });
+
+  it('devolve lista vazia quando nao ha competencia', () => {
+    expect(periodosDisponiveis([], JANELA)).toEqual([]);
   });
 });

@@ -1,0 +1,16 @@
+/**
+ * Linha minima ao lado de um numero.
+ *
+ * Le so a camada semantica (regra 2 de lint).
+ */
+
+/*
+ * Largura contida: o sparkline acompanha o KPI, nao disputa espaco com ele.
+ * `currentColor` da linha herda daqui quando o token ainda nao resolveu.
+ */
+.sparkline {
+  width: 100%;
+  max-width: 160px;
+  margin: 8px 0 0;
+  color: var(--ah-text-secondary);
+}
