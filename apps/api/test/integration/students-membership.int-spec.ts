@@ -717,6 +717,130 @@ describe('F7 -- aluno, plano e entitlement', () => {
     });
   });
 
+  describe('edicao de plano', () => {
+    /**
+     * NADA DO PLANO ERA EDITAVEL ate 24/08/2026: nome errado, descricao
+     * desatualizada e -- o pior -- unidade faltando ficavam para sempre.
+     * Plano sem unidade nao libera acesso em lugar nenhum.
+     */
+    it('edita nome, descricao, unidades e janelas', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/plans/${planId}`)
+        .set('Cookie', contas.a.cookie)
+        .send({
+          name: 'Plano Renomeado',
+          description: 'descricao nova',
+          gymUnitIds: [contas.a.unidadeId],
+          janelas: [
+            { gymUnitId: contas.a.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
+          ],
+        });
+
+      expect(resposta.status).toBe(200);
+
+      const corpo = resposta.body as { name: string; description: string; janelas: unknown[] };
+      expect(corpo.name).toBe('Plano Renomeado');
+      expect(corpo.description).toBe('descricao nova');
+      expect(corpo.janelas).toHaveLength(1);
+    });
+
+    /**
+     * SUBSTITUI, NAO ACUMULA: o plano nasce com 5 janelas (segunda a sexta)
+     * e a edicao manda 1. Se o `deleteMany` sumisse, ficariam 6 -- e a
+     * catraca liberaria nos dias que a operadora acabou de tirar.
+     */
+    it('substitui as janelas em vez de acumular', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const antes = await request(servidor())
+        .get(`/api/v1/plans/${planId}`)
+        .set('Cookie', contas.a.cookie);
+
+      expect((antes.body as { janelas: unknown[] }).janelas.length).toBeGreaterThan(1);
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/plans/${planId}`)
+        .set('Cookie', contas.a.cookie)
+        .send({
+          name: 'Com Uma Janela',
+          gymUnitIds: [contas.a.unidadeId],
+          janelas: [
+            { gymUnitId: contas.a.unidadeId, dayOfWeek: 6, startMinute: 480, endMinute: 720 },
+          ],
+        });
+
+      expect((resposta.body as { janelas: unknown[] }).janelas).toHaveLength(1);
+    });
+
+    /**
+     * JANELA ORFA E RECUSADA: janela que aponta para unidade fora do plano
+     * nunca seria avaliada -- regra morta gravada como se valesse. Mesma
+     * checagem da criacao, e e por isso que unidades e janelas andam juntas
+     * nesta rota.
+     */
+    it('recusa janela que aponta para unidade fora do plano', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/plans/${planId}`)
+        .set('Cookie', contas.a.cookie)
+        .send({
+          name: 'Janela Orfa',
+          gymUnitIds: [contas.a.unidadeId],
+          janelas: [
+            // Unidade da OUTRA academia: nao esta no plano.
+            { gymUnitId: contas.b.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
+          ],
+        });
+
+      expect(resposta.status).toBe(422);
+      expect((resposta.body as { code: string }).code).toBe('PLAN_WINDOW_UNIT_NOT_IN_PLAN');
+    });
+
+    /**
+     * O PRECO NAO ENTRA: tem rota propria com historico de vigencia, e
+     * trocar o valor por aqui apagaria a linha do tempo do INV-068.
+     * `.strict()` recusa em vez de ignorar em silencio.
+     */
+    it('recusa amountMinor no corpo, que tem rota propria', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/plans/${planId}`)
+        .set('Cookie', contas.a.cookie)
+        .send({
+          name: 'Com Preco',
+          gymUnitIds: [contas.a.unidadeId],
+          janelas: [
+            { gymUnitId: contas.a.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
+          ],
+          amountMinor: 99900,
+        });
+
+      expect(resposta.status).toBe(400);
+    });
+
+    it('plano de outro tenant responde 404, exigindo o codigo', async () => {
+      const planId = await criarPlano(contas.a);
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/plans/${planId}`)
+        .set('Cookie', contas.b.cookie)
+        .send({
+          name: 'Invasao',
+          gymUnitIds: [contas.b.unidadeId],
+          janelas: [
+            { gymUnitId: contas.b.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
+          ],
+        });
+
+      expect(resposta.status).toBe(404);
+      expect((resposta.body as { code: string }).code).toBe('PLAN_NOT_FOUND');
+    });
+  });
+
   describe('ativacao de plano', () => {
     /**
      * PLANO NAO SE APAGA, SE DESATIVA (decisao do PI, 24/08/2026): apagar

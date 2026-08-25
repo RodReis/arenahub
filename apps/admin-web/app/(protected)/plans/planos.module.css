@@ -120,3 +120,81 @@
   justify-content: flex-end;
   gap: 6px;
 }
+
+/**
+ * Modal LARGO — a edição de plano tem tabela de janelas dentro.
+ *
+ * O de reajuste tem 460px porque são dois campos; aqui há nome, descrição,
+ * lista de unidades e uma tabela de cinco colunas. Reusar a largura menor
+ * espremeria a tabela, que é o defeito que o modal veio corrigir.
+ */
+.dialogoLargo {
+  width: min(720px, calc(100vw - 48px));
+  max-height: min(680px, calc(100vh - 64px));
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ah-border-default);
+  border-radius: 10px;
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-default);
+  box-shadow: var(--ah-elev-3);
+  overflow: hidden;
+}
+
+.dialogoLargo::backdrop {
+  background: rgb(10 11 13 / 0.45);
+}
+
+/*
+  O corpo rola; cabeçalho e rodapé ficam. Sem isto o botão "Salvar" desce com
+  o conteúdo e some justo no formulário mais longo.
+*/
+.dialogoLargo .corpo {
+  overflow-y: auto;
+  max-height: calc(min(680px, 100vh - 64px) - 130px);
+}
+
+/**
+ * `<fieldset>` agrupa SEM moldura: o entalhe do navegador dentro de um modal
+ * que já tem borda vira moldura sobre moldura.
+ */
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.grupo > legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+.marcador {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.janelas {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.janelas th {
+  text-align: left;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-label);
+  font-weight: normal;
+  padding-bottom: 4px;
+}
+
+.janelas td {
+  padding: 2px 4px 2px 0;
+}

@@ -49,6 +49,22 @@ const esquemaDePlano = z
   .strict();
 
 /**
+ * Edicao de plano: nome, descricao, unidades e janelas.
+ *
+ * SEM `amountMinor`: preco tem rota propria com historico de vigencia
+ * (`POST /plans/:id/prices`), e trocar o valor por aqui apagaria a linha do
+ * tempo que INV-068 preserva. `.strict()` recusa em vez de ignorar.
+ */
+const esquemaDeEdicaoDePlano = z
+  .object({
+    name: z.string().min(1).max(120),
+    description: z.string().max(500).optional(),
+    gymUnitIds: z.array(z.uuid()).min(1),
+    janelas: z.array(janela).min(1).max(200),
+  })
+  .strict();
+
+/**
  * Liga/desliga do plano. Um campo so, `.strict()`: mandar `name` ou `price`
  * junto seria edicao de plano, que esta rota nao faz.
  */
@@ -214,6 +230,59 @@ export class MembershipController {
    * e o historico financeiro e auditado. `isActive` ja existia no schema e ja
    * era exibido -- faltava quem o escrevesse.
    */
+  /**
+   * Edicao de plano -- nada disso era editavel ate 24/08/2026.
+   *
+   * O plano nascia e ficava: nome errado, descricao desatualizada e, o pior,
+   * unidade faltando. Plano sem unidade nao libera acesso em lugar nenhum,
+   * e a unica saida era criar outro plano e migrar os alunos.
+   */
+  @Patch('plans/:id')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['id', 'name', 'isActive', 'gymUnitIds', 'janelas', 'prices'],
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        description: { type: 'string', nullable: true },
+        isActive: { type: 'boolean' },
+        gymUnitIds: { type: 'array', items: { type: 'string' } },
+        janelas: { type: 'array', items: { type: 'object' } },
+        currentPrice: { type: 'object', nullable: true },
+        prices: { type: 'array', items: { type: 'object' } },
+      },
+    },
+  })
+  @RequirePermissions('plan.manage')
+  async editarPlano(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<PlanoDto> {
+    const dados = esquemaDeEdicaoDePlano.parse(corpo);
+
+    await this.membership.editarPlano(
+      this.contexto.require(),
+      id,
+      {
+        name: dados.name,
+        description: dados.description,
+        gymUnitIds: dados.gymUnitIds,
+        janelas: dados.janelas,
+      },
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    // Rele o plano COMPLETO: o `update` volta so a linha de `Plan`, sem
+    // unidades, janelas nem precos.
+    const plano = await this.membership.encontrarPlano(this.contexto.require(), id);
+
+    if (!plano) throw new NotFoundException({ code: 'PLAN_NOT_FOUND' });
+
+    return this.planoParaDto(plano);
+  }
+
   @Patch('plans/:id/activation')
   /*
    * SCHEMA DECLARADO, e nao um verbete novo na divida: a lista de

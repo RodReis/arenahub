@@ -501,3 +501,70 @@ export async function alterarAtivacaoDePlano(
 
   return { sucesso: { planId: resposta.dados.id, isActive: resposta.dados.isActive } };
 }
+
+export interface EstadoDaEdicaoDePlano {
+  erro?: string;
+  sucesso?: { planId: string; name: string };
+  valores?: { name?: string; description?: string };
+}
+
+/**
+ * Edita nome, descrição, unidades e janelas do plano.
+ *
+ * PREÇO NÃO ENTRA: tem rota própria com histórico de vigência
+ * (`reajustarPreco`), e trocar o valor por aqui apagaria a linha do tempo
+ * que o INV-068 preserva. A API é `.strict()` e recusa `amountMinor` no
+ * corpo — a omissão aqui não é esquecimento.
+ *
+ * UNIDADES E JANELAS VIAJAM JUNTAS porque a janela aponta para `gymUnitId`:
+ * mandar só as unidades deixaria janela para uma unidade que saiu do plano
+ * — regra nunca avaliada, gravada como se valesse.
+ */
+export async function editarPlano(
+  _anterior: EstadoDaEdicaoDePlano,
+  formulario: FormData,
+): Promise<EstadoDaEdicaoDePlano> {
+  const planId = texto(formulario, 'planId');
+
+  const unidades = formulario
+    .getAll('gymUnitIds')
+    .filter((valor): valor is string => typeof valor === 'string' && valor !== '');
+
+  const valores = {
+    name: texto(formulario, 'name'),
+    description: texto(formulario, 'description'),
+  };
+
+  const validado = esquemaDePlano.safeParse({ ...valores, gymUnitIds: unidades });
+
+  if (!validado.success) {
+    return {
+      erro: validado.error.issues[0]?.message ?? 'Confira os dados informados.',
+      valores,
+    };
+  }
+
+  const janelas = janelasDoFormulario(formulario, unidades[0]!);
+
+  if (janelas.length === 0) {
+    return { erro: 'Informe ao menos uma janela de horário.', valores };
+  }
+
+  const resposta = await chamarApi<{ id: string; name: string }>(`/api/v1/plans/${planId}`, {
+    metodo: 'PATCH',
+    corpo: {
+      name: validado.data.name,
+      ...(validado.data.description ? { description: validado.data.description } : {}),
+      gymUnitIds: validado.data.gymUnitIds,
+      janelas,
+    },
+  });
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível salvar o plano'), valores };
+  }
+
+  revalidatePath('/plans');
+
+  return { sucesso: { planId: resposta.dados.id, name: resposta.dados.name } };
+}
