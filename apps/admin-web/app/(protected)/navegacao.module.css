@@ -1,16 +1,28 @@
 /**
- * Rótulo de grupo da navegação — "Administração".
+ * Rótulo de grupo da navegação — "Financeiro", "Administração".
  *
- * O menu tinha nove itens de peso idêntico, e Dispositivos e Unidades — que
- * a recepção abre uma vez por mês — disputavam o olho com Alunos, que ela
- * abre a cada atendimento. Agrupar o que é configuração separa o uso diário
- * do uso raro.
+ * O menu tinha nove itens de peso idêntico, e a leitura de relance não dizia
+ * que Cobrança, Conciliação e Painel financeiro eram a mesma família: a
+ * recepção reconhecia rótulo por rótulo. Agrupar deixa o olho pousar numa
+ * REGIÃO e só então escolher a tela.
  *
  * Le so a camada semantica: `--ah-text-*`, nunca `--ah-carbon-*` cru.
  */
 .grupo {
-  margin: 16px 0 4px;
+  /*
+    O RESPIRO É O SEPARADOR PRINCIPAL, e vem antes de qualquer decoração.
+    24px acima e 6px abaixo amarram o rótulo ao grupo que ele abre em vez de
+    o deixar boiando entre dois — proximidade faz o trabalho que uma linha
+    faria, sem gastar um pixel de tinta.
+  */
+  margin: 24px 0 6px;
+  /*
+    12px de recuo alinha o texto do rótulo com o texto dos links (que têm
+    `padding: 8px 12px`). O marcador de accent ocupa a calha à esquerda, fora
+    da coluna de texto — ver `::before`.
+  */
   padding: 0 12px;
+  position: relative;
   /*
     Caption e não body: é rótulo de seção, não item navegável. Se tivesse o
     mesmo peso dos links, viraria mais um item na lista -- e um que não
@@ -35,10 +47,153 @@
     não mexem no contraste.
   */
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  /*
+    0.08em, e não os 0.04em de antes. Caixa alta em 12px pede mais tracking
+    para não empastar, e o espaçamento maior é justamente o que separa o
+    rótulo do link sem tocar na cor: à distância de balcão, "FINANCEIRO"
+    espaçado lê como *categoria*, e "Cobrança" lê como *destino*.
+  */
+  letter-spacing: 0.08em;
+}
+
+/**
+ * O MARCADOR DE ACCENT — a única cor da sidebar fora do item ativo.
+ *
+ * Regra 5 do PRODUCT.md: accent é ação, carbono é estrutura. Um traço de 2px
+ * na calha do rótulo é estrutura *desenhada com* accent, não ação — ele não
+ * clica, não recebe foco e não compete com o item selecionado, que carrega
+ * fundo, peso e `aria-current`. É o que dá ao grupo uma âncora visual sem
+ * introduzir um segundo elemento clicável.
+ *
+ * `aria-hidden` implícito: pseudo-elemento decorativo não entra na árvore de
+ * acessibilidade, e a informação real está no `<h2>` — cor nunca é canal
+ * único (regra 3).
+ */
+.grupo::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  /*
+    MAIS CURTO QUE O MARCADOR DO ITEM ATIVO, e isso foi medido, não estimado:
+    a 1280px o rótulo mede 16px de caixa e o link 36px. Com 1px de recuo o
+    marcador do rótulo preenchia 87% da sua caixa contra 67% do item ativo --
+    o rótulo, que é secundário, gritava mais que o "você está aqui", que é a
+    informação principal. Aos 4px ele cai para ~50% e a hierarquia inverte de
+    volta.
+
+    `top`/`bottom` e não `height` fixa: acompanha o `line-height` do caption
+    em qualquer zoom, enquanto uma altura em px descolaria a 200% (requisito
+    de zoom do PRODUCT.md).
+  */
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: var(--ah-radius-badge);
+  background: var(--ah-accent-400);
 }
 
 /* O primeiro grupo não precisa do respiro de cima: já está colado ao topo. */
 .grupo:first-child {
   margin-top: 0;
+}
+
+/**
+ * A RÉGUA que fecha o grupo anterior.
+ *
+ * Sem ela o respiro de 24px sozinho é ambíguo em densidade alta: a recepção
+ * lê um vão e não sabe se é fim de grupo ou só espaçamento. Uma linha de 1px
+ * a meia-tinta responde sem virar caixa — o PRODUCT.md proíbe card com sombra
+ * por padrão, e agrupar com borda de caixa dentro de uma sidebar de 240px
+ * gastaria largura que os rótulos usam.
+ *
+ * `:not(:first-child)` porque o primeiro grupo não fecha nada acima.
+ */
+.grupo:not(:first-child)::after {
+  content: '';
+  position: absolute;
+  /* Metade do respiro superior: a linha divide o vão, não encosta no rótulo. */
+  top: -12px;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  /*
+    `color-mix` sobre o token de borda em vez de um cinza literal: a sidebar é
+    escura e `--ah-border-subtle` cru (#E5E9EE) seria uma cicatriz clara. 14%
+    dá a separação e some no fundo — mesma técnica do hover do `NavLink`.
+  */
+  background: color-mix(in srgb, var(--ah-border-subtle) 14%, transparent);
+}
+
+/**
+ * MODO HORIZONTAL — abaixo de 1280px o `AppShell` vira a sidebar em faixa
+ * (`flex-direction: row`), e os grupos passam a viver lado a lado em vez de
+ * empilhados.
+ *
+ * Duas coisas quebram nesse eixo, e as duas foram vistas na tela a 640px (o
+ * equivalente a 1280 com zoom de 200%):
+ *
+ * 1. **O respiro vertical vira nada.** `margin-top: 24px` não separa itens que
+ *    estão lado a lado; quem separa é a margem horizontal.
+ * 2. **A régua vira uma barra vertical** à esquerda do rótulo. Ela foi
+ *    desenhada para fechar um grupo EMPILHADO -- na faixa ela é confundida
+ *    com o próprio marcador de accent, dois traços verticais colados dizendo
+ *    coisas diferentes.
+ *
+ * A separação passa a ser a que funciona no eixo certo: espaço à esquerda e
+ * um divisor vertical de verdade, no lugar do horizontal.
+ */
+@media (max-width: 1279px) {
+  .grupo {
+    /*
+      ALINHADO AO TOPO, não centrado.
+      
+      A faixa estica os links ao mais alto da linha -- "Eventos de acesso"
+      quebra em três linhas e leva o item a 193px, com a `<nav>` a 240px.
+      **Isso é pré-existente**, medido na `main` sem este grupo: não é o
+      agrupamento que causa, e consertar a quebra dos links é card próprio.
+
+      Com `center` o rótulo pousava no MEIO desses 240px, longe do texto dos
+      links que ele rotula -- boiando no vazio. `flex-start` o mantém na mesma
+      linha de leitura dos itens, que é onde o olho já está.
+    */
+    align-self: flex-start;
+    /* Sobe o rótulo à altura do texto do link, não da caixa esticada dele. */
+    margin-top: 8px;
+    white-space: nowrap;
+    /*
+      A margem muda de eixo: 16px à esquerda abrem o grupo, 0 nas verticais
+      porque não há o que empilhar.
+    */
+    margin-right: 0;
+    margin-bottom: 0;
+    margin-left: 16px;
+    /* O marcador de accent volta para a esquerda do texto, colado a ele. */
+    padding: 0 0 0 8px;
+  }
+
+  .grupo:first-child {
+    margin-left: 16px;
+  }
+
+  /*
+    O marcador acompanha a altura do TEXTO na faixa, e não a caixa do
+    rótulo -- na horizontal a caixa é curta e o traço de 8px ficaria um ponto.
+  */
+  .grupo::before {
+    top: 0;
+    bottom: 0;
+  }
+
+  /*
+    A RÉGUA SAI, e a decisão veio da tela: girada para vertical ela caía a 8px
+    do marcador de accent -- dois traços verticais quase colados, um dizendo
+    "aqui começa um grupo" e o outro "aqui termina o anterior". Medido a 640px.
+
+    Na faixa horizontal quem separa é a margem de 16px, que já é o dobro do
+    `gap: 8px` entre links. Duas marcas para o mesmo limite é ruído; uma
+    resolve.
+  */
+  .grupo:not(:first-child)::after {
+    content: none;
+  }
 }

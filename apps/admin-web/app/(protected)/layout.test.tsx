@@ -21,7 +21,7 @@ vi.mock('../actions/auth', () => ({
 }));
 
 import { chamarApi } from '../../lib/api/server-client';
-import LayoutProtegido from './layout';
+import LayoutProtegido, { reancorarGrupos } from './layout';
 
 const PERFIL = { id: 'u1', email: 'dono@arena-positiva.test' };
 
@@ -29,12 +29,16 @@ function unidade(nome: string, status = 'ACTIVE') {
   return { id: `id-${nome}`, name: nome, status };
 }
 
-function responder(unidades: unknown[]) {
+function responder(unidades: unknown[], permissions?: string[]) {
   vi.mocked(chamarApi).mockImplementation((caminho: string) => {
     if (caminho === '/api/v1/units') {
       return Promise.resolve({ ok: true, dados: unidades, cookiesDaApi: [] });
     }
-    return Promise.resolve({ ok: true, dados: PERFIL, cookiesDaApi: [] });
+    return Promise.resolve({
+      ok: true,
+      dados: permissions === undefined ? PERFIL : { ...PERFIL, permissions },
+      cookiesDaApi: [],
+    });
   });
 }
 
@@ -117,5 +121,114 @@ describe('indicador de unidade no topbar', () => {
 
     expect(screen.getByTestId('unidade-ativa')).toBeInTheDocument();
     expect(screen.getByText('conteúdo')).toBeInTheDocument();
+  });
+
+  describe('grupos do menu', () => {
+    /** Os rótulos de grupo, na ordem em que aparecem no DOM. */
+    function rotulos(): string[] {
+      return screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent ?? '');
+    }
+
+    it('agrupa as três telas de dinheiro sob Financeiro', async () => {
+      responder([unidade('Matriz')], ['billing.dashboard']);
+      await renderizar();
+
+      expect(rotulos()).toEqual(['Financeiro', 'Administração']);
+
+      for (const nome of ['Cobrança', 'Conciliação', 'Painel financeiro']) {
+        expect(screen.getByRole('link', { name: nome })).toBeInTheDocument();
+      }
+    });
+
+    /*
+     * O DEFEITO QUE `reancorarGrupos` EVITA, e a razão de ele existir.
+     *
+     * O rótulo mora no item que abre o grupo. Hoje "Financeiro" abre em
+     * Cobrança, que aparece para todo mundo -- mas o grupo JÁ contém um item
+     * com `exigePermissao`, e basta alguém reordenar para o rótulo passar a
+     * morar num item que some. Aí "Conciliação" e "Painel financeiro"
+     * ficariam órfãos no meio da lista, sem cabeçalho, **só para quem não tem
+     * a permissão**: quem revisa o PR vê a sidebar completa e não vê nada
+     * errado.
+     *
+     * O teste força exatamente esse arranjo tirando o primeiro item do grupo.
+     */
+    it('mantém o rótulo quando o primeiro item do grupo é filtrado', async () => {
+      /*
+       * Sem `billing.dashboard` o "Painel financeiro" some -- é o filtro real
+       * do layout. O que se verifica é que o grupo continua rotulado.
+       */
+      responder([unidade('Matriz')], []);
+      await renderizar();
+
+      expect(rotulos()).toEqual(['Financeiro', 'Administração']);
+      expect(screen.queryByRole('link', { name: 'Painel financeiro' })).toBeNull();
+      expect(screen.getByRole('link', { name: 'Cobrança' })).toBeInTheDocument();
+    });
+
+    /* O rótulo aparece UMA vez por grupo, não a cada item dele. */
+    it('não repete o rótulo nos demais itens do grupo', async () => {
+      responder([unidade('Matriz')], ['billing.dashboard']);
+      await renderizar();
+
+      expect(screen.getAllByRole('heading', { level: 2, name: 'Financeiro' })).toHaveLength(1);
+    });
+  });
+
+  /*
+   * A REANCORAGEM, TESTADA NO ARRANJO QUE A EXIGE.
+   *
+   * Pela ordem de HOJE o menu não exercita esta função: "Financeiro" abre em
+   * Cobrança, que aparece para todo mundo. O defeito nasce no dia em que
+   * alguém reordenar o grupo e o rótulo passar a morar num item com
+   * permissão -- e nasce **silencioso**, só para quem não tem a permissão.
+   *
+   * Por isso o teste monta esse arranjo em vez de esperar por ele. Testar
+   * pelo menu real passaria verde com a função removida, que é a definição
+   * de teste que não mede nada.
+   */
+  describe('reancorarGrupos', () => {
+    const COMPLETA = [
+      { href: '/a', label: 'A' },
+      // O rótulo mora no item COM permissão -- o arranjo perigoso.
+      { href: '/painel', label: 'Painel', grupo: 'Financeiro', exigePermissao: 'x' },
+      { href: '/cobranca', label: 'Cobrança' },
+      { href: '/conciliacao', label: 'Conciliação' },
+      { href: '/config', label: 'Config', grupo: 'Administração' },
+    ] as const;
+
+    function rotulosDe(itens: readonly { grupo?: string }[]): (string | undefined)[] {
+      return itens.map((item) => item.grupo).filter((g) => g !== undefined);
+    }
+
+    it('move o rótulo para o primeiro item que sobreviveu', () => {
+      const visiveis = COMPLETA.filter((item) => item.href !== '/painel');
+
+      const resultado = reancorarGrupos(COMPLETA, visiveis);
+
+      expect(rotulosDe(resultado)).toEqual(['Financeiro', 'Administração']);
+      // E o rótulo pousa em Cobrança, o primeiro que restou do grupo.
+      expect(resultado.find((item) => item.grupo === 'Financeiro')?.href).toBe('/cobranca');
+    });
+
+    it('deixa o rótulo onde está quando ninguém é filtrado', () => {
+      const resultado = reancorarGrupos(COMPLETA, COMPLETA);
+
+      expect(resultado.find((item) => item.grupo === 'Financeiro')?.href).toBe('/painel');
+    });
+
+    it('omite o rótulo quando o grupo inteiro some', () => {
+      const visiveis = COMPLETA.filter((item) => item.href === '/a' || item.href === '/config');
+
+      const resultado = reancorarGrupos(COMPLETA, visiveis);
+
+      expect(rotulosDe(resultado)).toEqual(['Administração']);
+    });
+
+    it('não repete o rótulo nos irmãos do grupo', () => {
+      const resultado = reancorarGrupos(COMPLETA, COMPLETA);
+
+      expect(rotulosDe(resultado).filter((g) => g === 'Financeiro')).toHaveLength(1);
+    });
   });
 });

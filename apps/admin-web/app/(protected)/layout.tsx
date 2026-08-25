@@ -19,11 +19,24 @@ interface Perfil {
   permissions?: string[];
 }
 
+interface ItemDeMenu {
+  readonly href: string;
+  readonly label: string;
+  /** Rotulo do grupo que COMECA neste item. */
+  readonly grupo?: string;
+  /** Capacidade exigida para o item aparecer (F54). */
+  readonly exigePermissao?: string;
+}
+
 /**
  * A ordem e a do turno: primeiro o que diz se a catraca esta de pe, depois a
  * investigacao, depois o cadastro.
+ *
+ * TIPADO como `ItemDeMenu[]` em vez de `as const` puro: com `as const` o TS
+ * infere uma UNIAO de literais onde `grupo` so existe nos itens que o
+ * declaram, e qualquer leitura generica do campo vira erro de compilacao.
  */
-const NAVEGACAO = [
+const NAVEGACAO: readonly ItemDeMenu[] = [
   { href: '/operations', label: 'Operação' },
   { href: '/access-events', label: 'Eventos de acesso' },
   /*
@@ -37,10 +50,23 @@ const NAVEGACAO = [
   { href: '/students', label: 'Alunos' },
   { href: '/plans', label: 'Planos' },
   /*
+    FINANCEIRO -- decisao do PI em 25/08/2026, mesmo criterio que criou
+    "Administração" no dia anterior.
+
+    As tres telas de dinheiro estavam soltas no meio da lista, e a leitura de
+    relance nao dizia que eram a mesma familia: a recepcao lia oito itens de
+    peso identico e tinha de reconhecer cada rotulo. Agrupadas, o olho pousa
+    numa regiao e so entao escolhe a tela.
+
+    A ORDEM DENTRO DO GRUPO segue a frequencia, nao o organograma: Cobranca e
+    diaria, Conciliacao e mensal, Painel e gerencial. Quem abre com o aluno
+    esperando encontra o item de uso diario primeiro.
+  */
+  /*
     Depois de Planos porque cobranca e consequencia da assinatura -- a recepcao
     chega aqui vinda de "quem esta devendo?", nao de "que planos existem?".
   */
-  { href: '/billing/delinquency', label: 'Cobrança' },
+  { href: '/billing/delinquency', label: 'Cobrança', grupo: 'Financeiro' },
   /*
     Depois de Cobranca, e nao dentro dela: sao publicos diferentes. Cobranca e
     a recepcao perguntando "quem esta devendo?"; Conciliacao e quem fecha o mes
@@ -55,6 +81,12 @@ const NAVEGACAO = [
     o que a recepcao usa para achar a fatura de um aluno, e o painel consolida
     o tenant inteiro. Por isso este item some para quem so atende no balcao --
     ver `exigePermissao`.
+
+    ⚠️ ELE E O ULTIMO DO GRUPO **e** o unico que some por permissao. Se um dia
+    o grupo passar a comecar por um item com `exigePermissao`, o rotulo
+    "Financeiro" sumiria junto com ele e os irmaos ficariam orfaos -- o
+    `Navegacao` resolve isso reancorando o rotulo no primeiro item VISIVEL,
+    nao no primeiro item declarado.
   */
   { href: '/billing', label: 'Painel financeiro', exigePermissao: 'billing.dashboard' },
   /*
@@ -70,12 +102,65 @@ const NAVEGACAO = [
   */
   { href: '/operations/devices', label: 'Dispositivos', grupo: 'Administração' },
   { href: '/units', label: 'Unidades' },
-] as const;
+];
 
 interface Unidade {
   id: string;
   name: string;
   status: string;
+}
+
+/**
+ * Devolve o rotulo de grupo ao primeiro item que SOBREVIVEU ao filtro.
+ *
+ * O rotulo mora no item que abre o grupo, e isso funciona enquanto esse item
+ * aparece para todo mundo. Deixa de funcionar no instante em que ele tiver
+ * `exigePermissao`: o filtro remove o item, o rotulo vai junto, e os irmaos
+ * ficam orfaos no meio da lista sem cabecalho.
+ *
+ * Nao e hipotese distante -- "Financeiro" ja contem um item com permissao
+ * (`billing.dashboard`), e basta alguem reordenar o grupo para o defeito
+ * nascer, silencioso, **so para quem NAO tem a permissao**. Quem revisa o PR
+ * ve a sidebar completa e nao ve nada errado.
+ *
+ * RECEBE AS DUAS LISTAS de proposito: a completa diz a que grupo cada href
+ * pertence (a informacao que o filtro destroi), a filtrada diz quem ficou.
+ * Ler `NAVEGACAO` direto do escopo funcionaria em producao e deixaria a
+ * funcao intestavel -- nao daria para montar o arranjo perigoso, que e
+ * justamente o que precisa de prova.
+ *
+ * Grupo cujos itens sumiram TODOS nao tem onde ancorar, e o rotulo
+ * corretamente nao aparece.
+ */
+export function reancorarGrupos(
+  completa: readonly ItemDeMenu[],
+  visiveis: readonly ItemDeMenu[],
+): readonly ItemDeMenu[] {
+  const grupoDeCadaHref = new Map<string, string>();
+  let atual: string | undefined;
+
+  for (const item of completa) {
+    if (item.grupo !== undefined) atual = item.grupo;
+    if (atual !== undefined) grupoDeCadaHref.set(item.href, atual);
+  }
+
+  let ultimoEmitido: string | undefined;
+
+  return visiveis.map((item) => {
+    const grupo = grupoDeCadaHref.get(item.href);
+
+    // Primeiro sobrevivente do grupo: e ele que carrega o rotulo agora.
+    if (grupo !== undefined && grupo !== ultimoEmitido) {
+      ultimoEmitido = grupo;
+
+      return { ...item, grupo };
+    }
+
+    // Os demais do mesmo grupo NAO repetem o rotulo.
+    const { grupo: _descartado, ...semGrupo } = item;
+
+    return semGrupo;
+  });
 }
 
 /**
@@ -138,8 +223,11 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
    * lado de esconder e o unico erro barato aqui.
    */
   const permissoes = new Set(resposta.dados.permissions ?? []);
-  const itensVisiveis = NAVEGACAO.filter(
-    (item) => !('exigePermissao' in item) || permissoes.has(item.exigePermissao),
+  const itensVisiveis = reancorarGrupos(
+    NAVEGACAO,
+    NAVEGACAO.filter(
+      (item) => item.exigePermissao === undefined || permissoes.has(item.exigePermissao),
+    ),
   );
 
   // O `ToastProvider` subiu para o layout raiz: a tela de login tambem
