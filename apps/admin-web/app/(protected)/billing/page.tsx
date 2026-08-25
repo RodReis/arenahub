@@ -120,8 +120,31 @@ function diaLegivel(iso: string): string {
   return `${dia}/${mes}/${ano}`;
 }
 
-export default async function PainelFinanceiroPage() {
-  const resposta = await chamarApi<Resumo>('/api/v1/billing/summary');
+/**
+ * A JANELA VEM DA URL -- `?de=&ate=`, ISO 8601.
+ *
+ * URL e nao estado de componente: periodo apurado e a primeira coisa que um
+ * gestor manda para o contador ou para o socio, e um painel que so existe na
+ * sessao de quem abriu nao pode ser compartilhado nem recarregado.
+ *
+ * SEM PARAMETRO, o backend aplica o ultimo mes fechado -- por isso os dois sao
+ * repassados so quando existem, em vez de a tela inventar um default proprio.
+ * Dois lugares decidindo a mesma janela e como elas divergem.
+ */
+export default async function PainelFinanceiroPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ de?: string; ate?: string }>;
+}) {
+  const { de, ate } = await searchParams;
+
+  const consulta = new URLSearchParams();
+  if (de) consulta.set('de', de);
+  if (ate) consulta.set('ate', ate);
+
+  const resposta = await chamarApi<Resumo>(
+    `/api/v1/billing/summary${consulta.size > 0 ? `?${consulta}` : ''}`,
+  );
 
   if (!resposta.ok || !resposta.dados) {
     return (
@@ -359,11 +382,11 @@ export default async function PainelFinanceiroPage() {
           <>
             {!resumo.serie.suficienteParaLinha ? (
               <p className={estilos['apoio']} data-testid="serie-insuficiente">
-                Dado insuficiente para comparar períodos: há{' '}
+                Dado insuficiente para comparar períodos:{' '}
                 {resumo.serie.pontos.length === 1
-                  ? 'uma competência'
-                  : `${resumo.serie.pontos.length} competências`}{' '}
-                apurada(s), e a comparação de tendência exige pelo menos três.
+                  ? 'há uma competência apurada'
+                  : `há ${resumo.serie.pontos.length} competências apuradas`}
+                , e a comparação de tendência exige pelo menos três.
               </p>
             ) : null}
 

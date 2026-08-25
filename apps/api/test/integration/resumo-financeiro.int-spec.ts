@@ -546,6 +546,59 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
   });
 
   /**
+   * A SERIE OLHA PARA TRAS, e nao e recortada pela janela de um mes.
+   *
+   * O DEFEITO QUE ESTE TESTE IMPEDE, visto com dado real na tela: recortando
+   * a serie pela janela dos KPIs ela teria SEMPRE um ponto -- a janela e de um
+   * mes --, e o aviso "dado insuficiente para comparar periodos" ficaria
+   * permanente. Um bloco que promete evolucao (§3.2) e nunca consegue
+   * mostra-la.
+   */
+  it('inclui competencias anteriores a janela na serie', async () => {
+    const s = await semearTenant();
+    const deJunho = await outraAssinaturaDoMesmoTenant(s);
+    const deMaio = await outraAssinaturaDoMesmoTenant(s);
+
+    await criarInvoice(s, { competencia: '2026-07', totalMinor: 10_000 });
+    await criarInvoice(deJunho, { competencia: '2026-06', totalMinor: 20_000 });
+    await criarInvoice(deMaio, { competencia: '2026-05', totalMinor: 30_000 });
+
+    // Janela de JULHO apenas -- mas a serie tem de trazer os tres meses.
+    const resumo = await useCase.executar(s.contexto, {
+      de: new Date('2026-07-01T00:00:00.000Z'),
+      ate: new Date('2026-08-01T00:00:00.000Z'),
+      agora: AGORA,
+    });
+
+    expect(resumo.serie.pontos.map((p) => p.competencia)).toEqual([
+      '2026-05',
+      '2026-06',
+      '2026-07',
+    ]);
+    expect(resumo.serie.suficienteParaLinha).toBe(true);
+  });
+
+  /**
+   * Competencia POSTERIOR a janela nao entra: incluir faturamento que o
+   * periodo escolhido nao explica misturaria as duas leituras.
+   */
+  it('nao inclui competencia posterior a janela', async () => {
+    const s = await semearTenant();
+    const deAgosto = await outraAssinaturaDoMesmoTenant(s);
+
+    await criarInvoice(s, { competencia: '2026-07', totalMinor: 10_000 });
+    await criarInvoice(deAgosto, { competencia: '2026-08', totalMinor: 99_000 });
+
+    const resumo = await useCase.executar(s.contexto, {
+      de: new Date('2026-07-01T00:00:00.000Z'),
+      ate: new Date('2026-08-01T00:00:00.000Z'),
+      agora: AGORA,
+    });
+
+    expect(resumo.serie.pontos.map((p) => p.competencia)).toEqual(['2026-07']);
+  });
+
+  /**
    * A COMPETENCIA E `YYYY-MM` LIDA EM UTC, e o teste existe por causa do bug
    * de um dia que a F53 ja produziu: `billingPeriod` e `@db.Date` gravado a
    * meia-noite UTC, e `getMonth()` no fuso do servidor (America/Sao_Paulo,

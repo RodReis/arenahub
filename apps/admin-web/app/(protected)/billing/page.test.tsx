@@ -54,10 +54,13 @@ const RESUMO = {
   base: { alunosPagantes: 3, alunosInadimplentes: 1, assinaturasAtivas: 2 },
 };
 
-async function renderizar(resumo: unknown = RESUMO) {
+async function renderizar(
+  resumo: unknown = RESUMO,
+  busca: { de?: string; ate?: string } = {},
+) {
   vi.mocked(chamarApi).mockResolvedValue({ ok: true, dados: resumo, cookiesDaApi: [] });
 
-  const elemento = await PainelFinanceiroPage();
+  const elemento = await PainelFinanceiroPage({ searchParams: Promise.resolve(busca) });
 
   return render(<ToastProvider>{elemento}</ToastProvider>);
 }
@@ -88,6 +91,28 @@ describe('painel financeiro', () => {
     await renderizar();
 
     expect(screen.queryByTestId('estornado')).not.toBeInTheDocument();
+  });
+
+  /**
+   * A JANELA VEM DA URL, e o teste existe porque a primeira versao desta tela
+   * NAO a lia: chamava a API sem parametro nenhum e ficava presa no mes
+   * passado para sempre. O backend aceitava `de`/`ate` desde o inicio e nada
+   * os fornecia -- lacuna invisivel para typecheck, lint e build, achada so
+   * abrindo a tela.
+   */
+  it('repassa o periodo da URL para a API', async () => {
+    await renderizar(RESUMO, { de: '2026-08-01T00:00:00.000Z', ate: '2026-08-25T00:00:00.000Z' });
+
+    expect(chamarApi).toHaveBeenCalledWith(
+      '/api/v1/billing/summary?de=2026-08-01T00%3A00%3A00.000Z&ate=2026-08-25T00%3A00%3A00.000Z',
+    );
+  });
+
+  /** Sem parametro, quem decide a janela e o backend -- nao a tela. */
+  it('nao inventa janela quando a URL nao traz periodo', async () => {
+    await renderizar();
+
+    expect(chamarApi).toHaveBeenCalledWith('/api/v1/billing/summary');
   });
 
   /**
@@ -234,7 +259,7 @@ describe('painel financeiro', () => {
       cookiesDaApi: [],
     });
 
-    const elemento = await PainelFinanceiroPage();
+    const elemento = await PainelFinanceiroPage({ searchParams: Promise.resolve({}) });
     render(<ToastProvider>{elemento}</ToastProvider>);
 
     expect(screen.getByTestId('erro-de-permissao')).toBeInTheDocument();
