@@ -51,6 +51,7 @@ const RESUMO = {
     ],
     suficienteParaLinha: true,
   },
+  competenciasDisponiveis: ['2026-06', '2026-07', '2026-08'],
   base: { alunosPagantes: 3, alunosInadimplentes: 1, assinaturasAtivas: 2 },
 };
 
@@ -387,6 +388,37 @@ describe('painel financeiro', () => {
 
     expect(screen.getByTestId('periodo-jul/2026')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('periodo-jun/2026')).not.toHaveAttribute('aria-current');
+  });
+
+  /**
+   * O BUG QUE O PI VIU NA TELA: clicar em "mai" e ficar preso la.
+   *
+   * O filtro derivava de `serie.pontos`, que olha 12 meses PARA TRAS a partir
+   * do fim da janela. Apurando a competencia mais ANTIGA, a serie devolvia so
+   * ela -- restava um chip, sem caminho de volta.
+   *
+   * Aqui a serie tem um ponto so (como o backend devolve ao apurar junho) e o
+   * filtro continua com os tres. Se alguem religar o filtro a serie, este
+   * teste cai.
+   */
+  it('mantem todos os chips ao apurar a competencia mais antiga', async () => {
+    await renderizar({
+      ...RESUMO,
+      de: '2026-06-01T00:00:00.000Z',
+      ate: '2026-07-01T00:00:00.000Z',
+      // A serie encolhe -- e correto, ela olha para tras.
+      serie: {
+        pontos: [{ competencia: '2026-06', faturadoMinor: 30_000, recebidoMinor: 30_000 }],
+        suficienteParaLinha: false,
+      },
+      // O filtro NAO encolhe.
+      competenciasDisponiveis: ['2026-06', '2026-07', '2026-08'],
+    });
+
+    expect(screen.getByTestId('periodo-jun/2026')).toHaveAttribute('aria-current', 'page');
+    // O caminho de volta existe.
+    expect(screen.getByTestId('periodo-jul/2026')).toBeInTheDocument();
+    expect(screen.getByTestId('periodo-ago/2026')).toBeInTheDocument();
   });
 
   /** Cada chip e uma URL -- estado em memoria nao se compartilha. */

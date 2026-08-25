@@ -57,6 +57,15 @@ interface Resumo {
   taxaDeInadimplencia: number | null;
   quebraPorMetodo: Metodo[];
   serie: { pontos: Ponto[]; suficienteParaLinha: boolean };
+  /**
+   * Todas as competencias com movimento, independente da janela apurada.
+   *
+   * SEPARADO DA SERIE, e o motivo e um bug que o PI viu na tela: o filtro
+   * derivava de `serie.pontos`, que olha 12 meses PARA TRAS a partir do fim da
+   * janela. Apurar maio devolvia so maio, o filtro ficava com um chip so, e
+   * nao havia caminho de volta para junho.
+   */
+  competenciasDisponiveis: string[];
   base: { alunosPagantes: number; alunosInadimplentes: number; assinaturasAtivas: number };
 }
 
@@ -236,10 +245,10 @@ export default async function PainelFinanceiroPage({
 
   const resumo = resposta.dados;
 
-  const periodos = periodosDisponiveis(
-    resumo.serie.pontos.map((ponto) => ponto.competencia),
-    { de: resumo.de, ate: resumo.ate },
-  );
+  const periodos = periodosDisponiveis(resumo.competenciasDisponiveis, {
+    de: resumo.de,
+    ate: resumo.ate,
+  });
 
   /*
     O "não entrou" da competência mais recente é o que dá o tom do KPI de

@@ -98,6 +98,22 @@ export interface ResumoFinanceiro {
   readonly serie: SerieDeCompetencia;
 
   /**
+   * Todas as competencias com movimento, `YYYY-MM`, da mais antiga para a mais
+   * recente. INDEPENDENTE DA JANELA.
+   *
+   * SEPARADO DA SERIE de proposito, e o defeito que essa separacao conserta e
+   * concreto: a serie olha 12 meses PARA TRAS a partir do fim da janela, o que
+   * esta certo para ela ("como chegamos ate aqui"). O filtro de periodo da tela
+   * derivava dessa mesma lista -- entao apurar maio devolvia so maio, o filtro
+   * ficava com um chip so, e nao havia caminho de volta para junho.
+   *
+   * As duas perguntas sao diferentes: a serie responde "como chegamos ate
+   * aqui", este campo responde "que periodos existem para escolher". A segunda
+   * nao pode depender de qual esta aberto.
+   */
+  readonly competenciasDisponiveis: readonly string[];
+
+  /**
    * A BASE SOBRE A QUAL A TELA CALCULA, declarada (`SPEC-054` §5.2).
    *
    * Os ~340 alunos ativados da base do Pacto e os 1.926 importados como
@@ -178,6 +194,7 @@ export class ConsultarResumoFinanceiroUseCase {
       porMetodo,
       faturadoNaSerie,
       recebidoNaSerie,
+      competencias,
       assinaturas,
     ] = await Promise.all([
         // RECEBIDO: pagamento CONFIRMED com `paidAt` na janela.
@@ -315,6 +332,19 @@ export class ConsultarResumoFinanceiroUseCase {
           select: { amountMinor: true, invoice: { select: { billingPeriod: true } } },
         }),
 
+        /*
+          AS COMPETENCIAS QUE EXISTEM, sem recorte de janela.
+
+          Alimenta o filtro de periodo da tela, que precisa oferecer TODOS os
+          meses independente de qual esta aberto. `groupBy` sem `where` de data
+          -- o conjunto e uma linha por mes de faturamento do tenant, algumas
+          dezenas na vida do produto, nao o historico de invoices.
+        */
+        this.db.invoice.groupBy({
+          by: ['billingPeriod'],
+          where: { ...doTenant, status: { notIn: ['DRAFT', 'CANCELLED'] } },
+        }),
+
         // Assinaturas que deveriam estar pagando, com o plano para o preco.
         this.db.subscription.findMany({
           where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] } },
@@ -382,6 +412,10 @@ export class ConsultarResumoFinanceiroUseCase {
           })),
         ),
       ),
+
+      competenciasDisponiveis: competencias
+        .map((linha) => linha.billingPeriod.toISOString().slice(0, 7))
+        .sort(),
 
       base: {
         alunosPagantes: pagantes.size,
