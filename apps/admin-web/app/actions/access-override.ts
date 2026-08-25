@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
+import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
  * Liberação manual da catraca — `M1-FR-023`, `M1-AC-008`.
@@ -47,6 +48,7 @@ export interface EstadoDoOverride {
  * chamado para descobrir o que fazer.
  */
 const MENSAGEM: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
   ACCESS_OVERRIDE_SUBJECT_REQUIRED:
     'Informe o aluno OU a descrição do visitante — um dos dois, não os dois.',
   DEVICE_NOT_FOUND: 'Esta catraca não pertence à unidade selecionada.',

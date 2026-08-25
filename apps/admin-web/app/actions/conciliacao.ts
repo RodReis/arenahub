@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
 import { janelaFechada } from '../../src/billing/conciliacao';
+import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
  * Conciliação e estorno — F16, Slice 2.5.
@@ -48,6 +49,7 @@ export interface EstadoDaConciliacao {
  * Quem concilia precisa saber O QUE FAZER — não qual invariante quebrou.
  */
 const MENSAGEM: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
   VALIDATION_FAILED: 'Confira os dados informados.',
   RECONCILIATION_ITEM_NOT_FOUND: 'Esta divergência não existe mais nesta academia.',
   RECONCILIATION_ITEM_ALREADY_RESOLVED:

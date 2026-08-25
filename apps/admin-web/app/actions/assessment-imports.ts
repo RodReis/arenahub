@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { chamarApi } from '../../lib/api/server-client';
+import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
  * Envio dos laudos da avaliacao (ADR-039).
@@ -13,6 +14,7 @@ import { chamarApi } from '../../lib/api/server-client';
  */
 
 const MENSAGEM: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
   VALIDATION_FAILED: 'Confira os dados informados.',
   IMPORT_NOT_FOUND: 'Importacao nao encontrada nesta academia.',
   SESSION_NOT_FOUND: 'Sessao de revisao nao encontrada.',
