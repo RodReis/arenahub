@@ -306,6 +306,9 @@ importers:
       '@arenahub/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@playwright/test':
+        specifier: 1.62.1
+        version: 1.62.1
       '@testing-library/jest-dom':
         specifier: 6.9.1
         version: 6.9.1

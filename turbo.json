@@ -13,7 +13,9 @@
     "JWT_PRIVATE_KEY",
     "JWT_PUBLIC_KEY",
     "MFA_ENCRYPTION_KEY",
-    "API_INTERNAL_URL"
+    "API_INTERNAL_URL",
+    "KIOSK_KEY_ID",
+    "KIOSK_SECRET"
   ],
   "tasks": {
     "build": {

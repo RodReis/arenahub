@@ -11,7 +11,10 @@
     "build": "next build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "//pretest:e2e": "Espelha o admin-web: recria o banco `_e2e` (DROP + migrate + seed) antes da suite. E o seed que cria o aluno com CPF e a credencial `dev-totem01` do totem -- sem os dois a jornada nao existe.",
+    "pretest:e2e": "node --env-file-if-exists=../../.env ../../scripts/preparar-banco-de-teste.mjs e2e"
   },
   "dependencies": {
     "@arenahub/api-contracts": "workspace:*",
@@ -24,6 +27,7 @@
   },
   "devDependencies": {
     "@arenahub/config": "workspace:*",
+    "@playwright/test": "1.62.1",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.0",
     "@testing-library/user-event": "14.6.1",

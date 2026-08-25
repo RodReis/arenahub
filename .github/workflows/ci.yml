@@ -223,6 +223,25 @@ jobs:
       # os pes da outra.
       INTEGRATION_DATABASE_URL: postgresql://arenahub:arenahub_ci@postgres:5432/arenahub_int?schema=public
 
+      # Chave de cifra dos segredos simetricos. FIXA no CI, e nao efemera,
+      # porque o E2E do totem exige que o SEED e a API usem a mesma: o seed
+      # grava a credencial `dev-totem01` cifrada com ela, e a API precisa
+      # decifrar. Com chave nova a cada arranque, o seed pularia a credencial
+      # e toda identificacao cairia na mensagem neutra -- a jornada nao
+      # aconteceria, e um E2E mal escrito ficaria verde mesmo assim.
+      #
+      # VALOR DESCARTAVEL de CI, gerado para este arquivo e para mais nada.
+      # Nao protege nada: o banco do job nasce e morre com ele.
+      # 32 bytes exatos em base64 (`ci-descartavel-nao-protege-nada!`) -- a
+      # API recusa qualquer outro tamanho no arranque.
+      MFA_ENCRYPTION_KEY: Y2ktZGVzY2FydGF2ZWwtbmFvLXByb3RlZ2UtbmFkYSE=
+
+      # Credencial do totem que o seed cria. Segredo PUBLICADO de propósito:
+      # e o mesmo do `.env.example`, para bancada e E2E. Producao usa secret
+      # manager, com credencial gerada pelo painel (F50).
+      KIOSK_KEY_ID: dev-totem01
+      KIOSK_SECRET: segredo-de-bancada-do-totem-nao-use-em-producao
+
     steps:
       - uses: actions/checkout@v7
 

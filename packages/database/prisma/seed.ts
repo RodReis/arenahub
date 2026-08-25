@@ -16,7 +16,13 @@
  * IDEMPOTENTE: roda quantas vezes for preciso sem duplicar. Seed que so
  * funciona em banco vazio obriga a derrubar tudo antes de cada execucao.
  */
-import { randomBytes, scrypt, type ScryptOptions } from 'node:crypto';
+import {
+  createCipheriv,
+  createHash,
+  randomBytes,
+  scrypt,
+  type ScryptOptions,
+} from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { CONFIG_PADRAO_DO_TOTEM } from '@arenahub/api-contracts';
@@ -50,6 +56,51 @@ function derivar(
 const TENANT = { slug: 'arena-positiva', legalName: 'Complexo Arena Positiva LTDA', displayName: 'Arena Positiva' };
 const DONO = { email: 'dono@arena-positiva.test', senha: 'senha-de-bancada-arenahub' };
 const UNIDADE = { code: 'MATRIZ', name: 'Unidade Matriz', timezone: 'America/Sao_Paulo' };
+
+/**
+ * Aluno que o totem identifica na bancada e no E2E da F49.
+ *
+ * FALSO POR CONSTRUCAO, como o resto deste arquivo: o CPF `000.000.001-91` e
+ * o menor numero cujos digitos verificadores fecham, e o nome nao pertence a
+ * ninguem. Nenhum dado real de aluno entra aqui -- nem em fixture, nem em
+ * golden file (CLAUDE.md).
+ *
+ * `ACTIVE` e sem invoice em aberto: a jornada de aceite quer a faixa "Plano
+ * ativo". Pendencia e o outro caminho da mesma tela e nao precisa de aluno
+ * proprio no seed base.
+ */
+const ALUNO_DO_TOTEM = {
+  // Matricula FORA da faixa que a API emite (`AP-{ano}-{8 digitos}`): o banco
+  // de desenvolvimento ja tinha um `AP-2026-00000001` cadastrado pela tela, e
+  // o upsert por chave natural teria sobrescrito o CPF e o status dele. Um
+  // prefixo proprio garante que este aluno nunca colide com um cadastrado de
+  // verdade -- e deixa obvio, na lista de alunos, de onde ele veio.
+  membershipNumber: 'SEED-TOTEM-0001',
+  fullName: 'Aluno de Bancada do Totem',
+  cpf: '00000000191',
+  birthDate: '1990-05-20',
+};
+
+/**
+ * Credencial HMAC do totem para DESENVOLVIMENTO LOCAL.
+ *
+ * ISTO NAO E SEGREDO DE PRODUCAO E NUNCA PODE VIRAR UM. Esta em texto claro
+ * num arquivo versionado, o que e a definicao de segredo publicado. Existe
+ * por um motivo so: sem credencial, a ponte do totem nao assina, TODA
+ * identificacao cai na mensagem neutra, e a jornada nao funciona nem por
+ * acidente -- entao nao havia como rodar o E2E da fatia.
+ *
+ * A F50 entrega o provisionamento pelo painel, com segredo gerado e exibido
+ * uma vez. Quando ela chegar, este bloco continua valendo so para a bancada.
+ *
+ * O prefixo `dev-` no `keyId` e proposital: uma credencial com esse nome num
+ * banco que nao seja de desenvolvimento e um achado de auditoria, nao uma
+ * duvida.
+ */
+const CREDENCIAL_DO_TOTEM = {
+  keyId: 'dev-totem01',
+  segredo: 'segredo-de-bancada-do-totem-nao-use-em-producao',
+};
 
 /**
  * Mesmo envelope do `PasswordService` da API.
@@ -373,8 +424,11 @@ async function semear(): Promise<void> {
 
     console.info(`[seed] catalogo com ${String(CATALOGO.length)} planos e precos vigentes.`);
 
-    await semearAceiteDaAnalise(db, tenant.id);
     await semearTotem(db, tenant.id, unidade.id);
+    // Depois do totem (precisa do dispositivo) e ANTES do aceite de IA, que
+    // varre os alunos ativos -- inclusive este.
+    await semearAlunoECredencialDoTotem(db, tenant.id, unidade.id);
+    await semearAceiteDaAnalise(db, tenant.id);
 
     console.info(`[seed] tenant "${TENANT.slug}" pronto, com dono ${DONO.email}.`);
   } finally {
@@ -510,6 +564,150 @@ async function semearTotem(
   }
 
   console.info('[seed] totem "TOTEM01" com configuracao de unidade v1 publicada.');
+}
+
+/**
+ * Hash do CPF, com pimenta por tenant.
+ *
+ * DUPLICADO de `apps/api/src/modules/students/domain/identificacao.ts`, pelo
+ * mesmo motivo que `gerarHash` acima duplica o `PasswordService`: este pacote
+ * NAO depende da API, e inverter a dependencia para reaproveitar uma linha
+ * custaria mais do que resolve. Se um terceiro lugar precisar, extrai para
+ * `packages/testing`.
+ *
+ * A formula tem de bater EXATAMENTE com a da API -- e ela que a busca do
+ * totem usa. Divergir aqui nao daria erro: daria "aluno nao encontrado", que
+ * a tela mostra como a mensagem neutra, indistinguivel de CPF errado.
+ */
+function hashDeCpf(tenantId: string, cpf: string): string {
+  return createHash('sha256').update(`${tenantId}:${cpf.replace(/\D/g, '')}`).digest('hex');
+}
+
+/**
+ * Cifra o segredo do totem no MESMO envelope que a API decifra:
+ * AES-256-GCM em `{ivBase64}:{tagBase64}:{ciphertextBase64}`.
+ *
+ * DUPLICADO de `CifradorDeSegredo` (`apps/api/.../auth/segredo-cifrado.ts`),
+ * e nao importado: `packages/database` nao depende de `apps/api` e nao pode
+ * passar a depender -- a seta aponta ao contrario. A alternativa seria mover
+ * o cifrador para um pacote compartilhado, o que arrastaria a API inteira
+ * atras de 15 linhas de `node:crypto` que nao mudam ha meses.
+ *
+ * IV novo a cada cifragem (nunca reutilizar em GCM) e tag junto, porque
+ * decifrar exige os tres.
+ */
+function cifrarSegredo(chave: Buffer, segredo: string): string {
+  const iv = randomBytes(12);
+  const cifra = createCipheriv('aes-256-gcm', chave, iv);
+  const ciphertext = Buffer.concat([cifra.update(segredo, 'utf8'), cifra.final()]);
+
+  return [
+    iv.toString('base64'),
+    cifra.getAuthTag().toString('base64'),
+    ciphertext.toString('base64'),
+  ].join(':');
+}
+
+/**
+ * Aluno e credencial que fazem a jornada do totem existir na bancada.
+ *
+ * A CREDENCIAL DEPENDE DE `MFA_ENCRYPTION_KEY`. Ela e a chave de segredo
+ * simetrico da aplicacao, e em desenvolvimento e EFEMERA por padrao -- a API
+ * gera uma nova a cada arranque. Ciphertext gravado sob uma chave que morreu
+ * no reinicio anterior nao decifra, e o sintoma seria 401 em toda chamada do
+ * totem, sem nada apontando para a causa.
+ *
+ * Por isso a credencial e PULADA quando a chave nao esta fixada, com um aviso
+ * que diz o que fazer -- em vez de gravar uma linha que nunca vai funcionar.
+ * O aluno e criado de qualquer forma: ele nao depende de chave nenhuma.
+ */
+async function semearAlunoECredencialDoTotem(
+  db: Awaited<ReturnType<typeof criarPrismaClient>>,
+  tenantId: string,
+  gymUnitId: string,
+): Promise<void> {
+  await db.student.upsert({
+    where: {
+      tenantId_membershipNumber: {
+        tenantId,
+        membershipNumber: ALUNO_DO_TOTEM.membershipNumber,
+      },
+    },
+    create: {
+      tenantId,
+      gymUnitId,
+      membershipNumber: ALUNO_DO_TOTEM.membershipNumber,
+      fullName: ALUNO_DO_TOTEM.fullName,
+      birthDate: new Date(ALUNO_DO_TOTEM.birthDate),
+      cpf: ALUNO_DO_TOTEM.cpf,
+      cpfHash: hashDeCpf(tenantId, ALUNO_DO_TOTEM.cpf),
+      status: 'ACTIVE',
+    },
+    // O `cpfHash` entra tambem no update: a pimenta e o `tenantId`, entao um
+    // banco recriado com tenant novo precisa do hash recalculado -- sem isso
+    // o aluno existiria com hash de um tenant que nao existe mais.
+    update: {
+      cpfHash: hashDeCpf(tenantId, ALUNO_DO_TOTEM.cpf),
+      status: 'ACTIVE',
+    },
+  });
+
+  // A MATRICULA no log, nunca o CPF. O numero aqui e falso, mas log que
+  // imprime CPF vira padrao copiado para onde o dado e real (CLAUDE.md:
+  // "nunca logar PII"). Quem precisa do CPF le a constante logo acima.
+  console.info(
+    `[seed] aluno do totem "${ALUNO_DO_TOTEM.membershipNumber}" (dado falso, de bancada).`,
+  );
+
+  const chaveBase64 = process.env['MFA_ENCRYPTION_KEY'];
+
+  if (!chaveBase64) {
+    console.warn(
+      '[seed] credencial do totem PULADA: MFA_ENCRYPTION_KEY nao esta fixada.\n' +
+        '       Sem ela a API gera chave nova a cada arranque e nao decifraria\n' +
+        '       o segredo gravado agora. Descomente a linha no seu `.env`\n' +
+        '       (veja `.env.example`) e rode o seed de novo.',
+    );
+    return;
+  }
+
+  const chave = Buffer.from(chaveBase64, 'base64');
+
+  if (chave.length !== 32) {
+    throw new Error(
+      `MFA_ENCRYPTION_KEY precisa de 32 bytes em base64; recebeu ${String(chave.length)}.`,
+    );
+  }
+
+  const dispositivo = await db.kioskDevice.findUniqueOrThrow({
+    where: { tenantId_code: { tenantId, code: 'TOTEM01' } },
+    select: { id: true },
+  });
+
+  // `activeFrom` no passado: a credencial precisa valer AGORA, e um valor
+  // exatamente igual a `new Date()` perde para o `>` da verificacao quando o
+  // relogio do banco esta alguns ms atras do da aplicacao.
+  const credencial = {
+    tenantId,
+    kioskDeviceId: dispositivo.id,
+    encryptedSecret: cifrarSegredo(chave, CREDENCIAL_DO_TOTEM.segredo),
+    activeFrom: new Date(Date.now() - 60_000),
+    expiresAt: null,
+    revokedAt: null,
+  };
+
+  // Re-cifra no update: a chave pode ter mudado desde a ultima execucao, e
+  // manter o ciphertext antigo daria 401 num seed que diz ter rodado bem.
+  await db.kioskCredential.upsert({
+    where: { keyId: CREDENCIAL_DO_TOTEM.keyId },
+    create: { ...credencial, keyId: CREDENCIAL_DO_TOTEM.keyId },
+    update: credencial,
+  });
+
+  console.info(
+    `[seed] credencial de totem "${CREDENCIAL_DO_TOTEM.keyId}" -- ` +
+      'DESENVOLVIMENTO, segredo publicado no repositorio.',
+  );
 }
 
 /** Idade em anos completos numa data de referencia. */
