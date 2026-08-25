@@ -213,6 +213,16 @@ interface AlunoDto {
    * — que é o caso normal de um interessado, não um erro.
    */
   planName: string | null;
+  /**
+   * Origem do direito de acesso vigente (`EntitlementSource`), quando ele NAO
+   * vem de assinatura -- cortesia, funcionário, personal trainer, dependente.
+   *
+   * SEPARADO de `planName` de propósito: aquele promete NOME DE PLANO, e
+   * devolver `COURTESY` ali obrigaria a tela a adivinhar se a string é o nome
+   * de um plano chamado assim ou um enum a traduzir. Vem `SUBSCRIPTION` junto
+   * do `planName` quando há assinatura, para a tela escolher o nome.
+   */
+  accessSource: string | null;
   /** Situação da assinatura, para a lista distinguir ativo de em atraso. */
   subscriptionStatus: string | null;
   /** Telefone principal, para o atalho de conversa na lista. */
@@ -527,6 +537,7 @@ export class StudentsController {
       archivedAt: aluno.archivedAt?.toISOString() ?? null,
       version: aluno.version,
       planName: null,
+      accessSource: null,
       subscriptionStatus: null,
       phone: null,
       deviceIds: [],
@@ -550,9 +561,18 @@ export class StudentsController {
     const assinatura = aluno.subscriptions?.[0];
     const invoice = assinatura?.invoices?.[0];
 
+    /*
+     * ASSINATURA PRIMEIRO: quem tem plano de verdade tem que ver o NOME dele
+     * ("Mensal Fit"), nao a palavra "Assinatura". A origem so responde quando
+     * o acesso vem de VINCULO -- e ai ela e a unica resposta que existe,
+     * porque nao ha plano nenhum por tras.
+     */
+    const vinculo = aluno.entitlements?.[0];
+
     return {
       ...this.paraDto(aluno),
       planName: assinatura?.plan.name ?? null,
+      accessSource: assinatura ? 'SUBSCRIPTION' : (vinculo?.source ?? null),
       subscriptionStatus: assinatura?.status ?? null,
       phone: aluno.contacts?.[0]?.value ?? null,
       deviceIds: numerosDeEquipamento(aluno.credentials ?? []),
@@ -590,6 +610,8 @@ type AlunoComVinculos = Student & {
     plan: { name: string };
     invoices?: { status: string; dueAt: Date; blockAt: Date | null }[];
   }[];
+  /** Direito vigente que NAO nasce de assinatura -- ver `accessSource`. */
+  entitlements?: { source: string }[];
   contacts?: { value: string }[];
   credentials?: { externalId: string }[];
   gymUnit?: { timezone: string } | null;

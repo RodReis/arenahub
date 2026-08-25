@@ -624,6 +624,133 @@ describe('F7 -- aluno, plano e entitlement', () => {
     });
   });
 
+  describe('coluna PLANO da listagem', () => {
+    /*
+     * O ALUNO TINHA ACESSO E A LISTA DIZIA QUE NAO.
+     *
+     * `planName` saia de `subscriptions[0].plan.name`, e direito que NAO
+     * nasce de assinatura -- cortesia, funcionario, personal trainer,
+     * dependente -- nao tem assinatura nenhuma. A ficha mostrava "Ativo,
+     * Personal trainer, vale agora" e a MESMA pessoa aparecia com "—" na
+     * coluna PLANO da lista.
+     *
+     * Nao era caso isolado: 33 alunos da bancada (24 funcionarios e 9
+     * personal trainers). A recepcao olha a lista para decidir se libera --
+     * "sem plano" ali e uma resposta errada com cara de definitiva.
+     */
+    it('mostra a origem do direito quando o acesso nao vem de assinatura', async () => {
+      const criado = await criarAluno(contas.a, { fullName: 'Cortesia Sem Assinatura' });
+      const id = (criado.body as { id: string }).id;
+
+      const cortesia = await request(servidor())
+        .post('/api/v1/entitlements/courtesy')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: id,
+          gymUnitIds: [contas.a.unidadeId],
+          janelas: [
+            { gymUnitId: contas.a.unidadeId, dayOfWeek: 1, startMinute: 360, endMinute: 1320 },
+          ],
+          startsAt: '2026-08-01T00:00:00.000Z',
+          endsAt: '2027-08-01T00:00:00.000Z',
+          reason: 'cortesia de bancada',
+        });
+
+      expect(cortesia.status).toBe(201);
+
+      const lista = await request(servidor())
+        .get('/api/v1/students')
+        .query({ q: 'Cortesia Sem Assinatura' })
+        .set('Cookie', contas.a.cookie);
+
+      expect(lista.status).toBe(200);
+
+      const alunos = lista.body as {
+        id: string;
+        planName: string | null;
+        accessSource: string | null;
+      }[];
+      const alvo = alunos.find((a) => a.id === id);
+
+      expect(alvo).toBeDefined();
+
+      /*
+       * CAMPO PROPRIO, e nao a origem enfiada em `planName`. Este promete
+       * NOME DE PLANO -- devolver 'COURTESY' ali obrigaria a tela a adivinhar
+       * se a string e o nome de um plano chamado assim ou um enum a traduzir,
+       * e as duas coisas se formatam diferente.
+       */
+      expect(alvo!.accessSource).toBe('COURTESY');
+      expect(alvo!.planName).toBeNull();
+    });
+
+    /*
+     * ASSINATURA CONTINUA VENCENDO. Quem tem plano de verdade tem que ver o
+     * NOME dele -- "Mensal Fit", nao "Assinatura". Sem esta trava, a correcao
+     * acima poderia trocar o nome do plano pela origem e piorar o caso comum
+     * para consertar o raro.
+     */
+    it('prefere o nome do plano quando ha assinatura', async () => {
+      const criado = await criarAluno(contas.a, { fullName: 'Com Assinatura De Verdade' });
+      const id = (criado.body as { id: string }).id;
+      const planId = await criarPlano(contas.a);
+
+      const assinatura = await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: id,
+          planId,
+          startsAt: '2026-08-01T00:00:00.000Z',
+          endsAt: '2027-08-01T00:00:00.000Z',
+          reason: 'assinatura comum',
+        });
+
+      expect(assinatura.status).toBe(201);
+
+      const lista = await request(servidor())
+        .get('/api/v1/students')
+        .query({ q: 'Com Assinatura De Verdade' })
+        .set('Cookie', contas.a.cookie);
+
+      const alunos = lista.body as {
+        id: string;
+        planName: string | null;
+        accessSource: string | null;
+      }[];
+      const alvo = alunos.find((a) => a.id === id);
+
+      expect(alvo?.planName).toMatch(/^Mensal /);
+      // A origem vem junto e diz SUBSCRIPTION -- a tela escolhe o nome.
+      expect(alvo?.accessSource).toBe('SUBSCRIPTION');
+    });
+
+    /*
+     * SEM DIREITO NENHUM CONTINUA SENDO "—". Interessado que ainda nao
+     * assinou nao pode ganhar rotulo de acesso -- a lista responderia que ele
+     * tem algo.
+     */
+    it('devolve null para aluno sem direito de acesso', async () => {
+      const criado = await criarAluno(contas.a, { fullName: 'Interessado Sem Nada' });
+      const id = (criado.body as { id: string }).id;
+
+      const lista = await request(servidor())
+        .get('/api/v1/students')
+        .query({ q: 'Interessado Sem Nada' })
+        .set('Cookie', contas.a.cookie);
+
+      const alunos = lista.body as {
+        id: string;
+        planName: string | null;
+        accessSource: string | null;
+      }[];
+      const alvo = alunos.find((a) => a.id === id);
+
+      expect(alvo?.planName).toBeNull();
+      expect(alvo?.accessSource).toBeNull();
+    });
+  });
+
   describe('plano', () => {
     it('recusa janelas sobrepostas', async () => {
       const resposta = await request(servidor())

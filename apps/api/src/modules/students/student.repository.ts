@@ -586,6 +586,12 @@ export class StudentRepository {
       ordem?: 'nome' | 'matricula' | 'nascimento' | undefined;
       direcao?: 'asc' | 'desc' | undefined;
     },
+    /**
+     * O "agora" ENTRA POR PARAMETRO (`CLAUDE.md`, Convencoes): so assim o
+     * teste consegue fixar o instante que decide se um direito vale hoje.
+     * Ausente, vale o relogio -- a rota nao precisa saber disso.
+     */
+    agora: Date = new Date(),
   ): Promise<Student[]> {
     const termo = filtro.termo?.trim();
 
@@ -647,6 +653,39 @@ export class StudentRepository {
               select: { status: true, dueAt: true, blockAt: true },
             },
           },
+        },
+        /*
+         * O DIREITO QUE NAO NASCE DE ASSINATURA -- cortesia, funcionario,
+         * personal trainer, dependente, convenio.
+         *
+         * Sem isto a coluna PLANO saia de `subscriptions[0]` e so ela: quem
+         * tem acesso por VINCULO nao tem assinatura nenhuma, entao a ficha
+         * mostrava "Ativo, Personal trainer, vale agora" e a lista mostrava
+         * "—" para a MESMA pessoa. Eram 33 alunos da bancada (24 funcionarios,
+         * 9 personal trainers), e a recepcao olha a lista para decidir se
+         * libera.
+         *
+         * `subscriptionId: null` FILTRA no banco, nao no DTO: o direito
+         * derivado de assinatura ja chega pelo include de cima, com o NOME do
+         * plano, que e melhor resposta que a origem.
+         *
+         * VIGENTE AGORA, nao qualquer um: `startsAt <= agora <= endsAt` com
+         * status ativo. Direito expirado ou agendado na coluna diria que o
+         * aluno tem acesso hoje.
+         *
+         * `take: 1` pelo mesmo motivo do bloco de cima -- consulta por aluno
+         * seria o N+1 que `docs/REVIEW.md` §3.4 barra.
+         */
+        entitlements: {
+          where: {
+            subscriptionId: null,
+            status: 'ACTIVE',
+            startsAt: { lte: agora },
+            endsAt: { gte: agora },
+          },
+          orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+          select: { source: true },
         },
         /*
          * Fuso da unidade de ORIGEM do aluno (INV-144, ADR-019) -- sem ele

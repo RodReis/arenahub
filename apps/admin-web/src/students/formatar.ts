@@ -88,6 +88,34 @@ export const ROTULO_DE_ORIGEM: Record<string, string> = {
 };
 
 /** Rótulos de situação da assinatura. */
+/**
+ * O que a coluna PLANO da listagem mostra.
+ *
+ * O ALUNO TINHA ACESSO E A LISTA DIZIA QUE NAO. `planName` vem da assinatura
+ * vigente, e direito que nasce de VINCULO -- cortesia, funcionario, personal
+ * trainer, dependente -- nao tem assinatura nenhuma: a ficha mostrava "Ativo,
+ * Personal trainer, vale agora" e a MESMA pessoa aparecia com "—" na lista.
+ * Eram 33 alunos da bancada, e a recepcao olha a lista para decidir se libera.
+ *
+ * ASSINATURA VENCE: quem tem plano de verdade ve o NOME dele ("Mensal Fit"),
+ * nao a palavra "Assinatura" -- trocar o nome pela origem pioraria o caso
+ * comum para consertar o raro.
+ *
+ * Devolve `null` quando nao ha acesso nenhum: interessado que ainda nao
+ * assinou nao pode ganhar rotulo, senao a lista responde que ele tem algo.
+ */
+export function planoDaListagem(
+  planName: string | null,
+  accessSource: string | null,
+): string | null {
+  if (planName !== null) return planName;
+  if (accessSource === null || accessSource === 'SUBSCRIPTION') return null;
+
+  // Origem desconhecida cai no proprio codigo, nunca em branco: enum novo na
+  // API apareceria como celula vazia, indistinguivel de "sem acesso".
+  return ROTULO_DE_ORIGEM[accessSource] ?? accessSource;
+}
+
 export const ROTULO_DE_ASSINATURA: Record<string, string> = {
   PENDING: 'Pendente',
   ACTIVE: 'Ativa',
