@@ -9,6 +9,7 @@ import {
   horaDoMinuto,
   impedeAcesso,
   janelaLegivel,
+  planoDaListagem,
   situacoesPossiveis,
   vigenteAgora,
 } from './formatar';
@@ -205,5 +206,48 @@ describe('dicionários', () => {
 
   it('cobre os vinte tipos de evento da timeline', () => {
     expect(Object.keys(ROTULO_DE_EVENTO)).toHaveLength(20);
+  });
+});
+
+/*
+ * A coluna PLANO mostrava "—" para quem TEM acesso: `planName` so existe com
+ * assinatura, e cortesia/funcionario/personal trainer nao tem nenhuma. A
+ * ficha do mesmo aluno mostrava o direito ativo -- duas telas, duas
+ * respostas.
+ */
+describe('planoDaListagem', () => {
+  it('mostra o nome do plano quando ha assinatura', () => {
+    expect(planoDaListagem('Mensal Fit', 'SUBSCRIPTION')).toBe('Mensal Fit');
+  });
+
+  it('traduz a origem quando o acesso vem de vinculo', () => {
+    expect(planoDaListagem(null, 'PERSONAL_TRAINER')).toBe('Personal trainer');
+    expect(planoDaListagem(null, 'EMPLOYEE')).toBe('Funcionário');
+    expect(planoDaListagem(null, 'COURTESY')).toBe('Cortesia');
+  });
+
+  it('devolve null quando o aluno nao tem acesso nenhum', () => {
+    expect(planoDaListagem(null, null)).toBeNull();
+  });
+
+  /*
+   * O caso que da nome ao bug: SUBSCRIPTION sem `planName` significa que a
+   * assinatura sumiu do include, nao que exista um plano chamado
+   * "Assinatura". Mostrar a palavra ali inventaria plano.
+   */
+  it('nao inventa rotulo para SUBSCRIPTION sem nome de plano', () => {
+    expect(planoDaListagem(null, 'SUBSCRIPTION')).toBeNull();
+  });
+
+  /*
+   * Enum novo na API nao pode virar celula vazia -- ela e indistinguivel de
+   * "sem acesso", que e a resposta oposta.
+   */
+  it('cai no proprio codigo quando a origem e desconhecida', () => {
+    expect(planoDaListagem(null, 'ORIGEM_QUE_AINDA_NAO_EXISTE')).toBe('ORIGEM_QUE_AINDA_NAO_EXISTE');
+  });
+
+  it('prefere a assinatura mesmo com origem preenchida', () => {
+    expect(planoDaListagem('Anual Black', 'EMPLOYEE')).toBe('Anual Black');
   });
 });

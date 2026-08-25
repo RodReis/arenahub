@@ -16,7 +16,7 @@ import {
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { situacaoDeVencimento } from '../../../src/billing/vencimento';
-import { impedeAcesso } from '../../../src/students/formatar';
+import { impedeAcesso, planoDaListagem } from '../../../src/students/formatar';
 import { AcoesDoAluno } from './acoes-do-aluno';
 import { BotaoDeLiberacao } from './botao-de-liberacao';
 import { FiltroDeAlunos } from './filtro-de-alunos';
@@ -37,6 +37,8 @@ interface Aluno {
   birthDate: string;
   cpf: string | null;
   planName: string | null;
+  /** Origem do direito vigente quando o acesso nao vem de assinatura. */
+  accessSource: string | null;
   subscriptionStatus: string | null;
   phone: string | null;
   status: string;
@@ -329,17 +331,26 @@ export default async function PaginaDeAlunos({
               caminho normal do funil, nao uma falha -- e `—` com rotulo diz
               "nao ha", enquanto "sem plano" soa como diagnostico.
             */
-            render: (aluno) =>
-              aluno.planName === null ? (
-                <Ausente />
-              ) : (
+            render: (aluno) => {
+              /*
+                NAO E SO `planName`: quem tem acesso por VINCULO (cortesia,
+                funcionario, personal trainer) nao tem assinatura, e a coluna
+                mostrava "—" para aluno cuja propria ficha exibia o direito
+                ativo. Ver `planoDaListagem`.
+              */
+              const rotulo = planoDaListagem(aluno.planName, aluno.accessSource);
+
+              if (rotulo === null) return <Ausente />;
+
+              return (
                 <span className={estilos['plano']}>
-                  <span className={estilos['nomeDoPlano']}>{aluno.planName}</span>
+                  <span className={estilos['nomeDoPlano']}>{rotulo}</span>
                   {aluno.subscriptionStatus === 'PAST_DUE' ? (
                     <Consequencia tom="danger">assinatura em atraso</Consequencia>
                   ) : null}
                 </span>
-              ),
+              );
+            },
           },
           {
             key: 'contato',
