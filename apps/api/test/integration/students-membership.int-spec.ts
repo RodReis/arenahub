@@ -542,6 +542,62 @@ describe('F7 -- aluno, plano e entitlement', () => {
       }
     });
 
+    /*
+     * PLANO SEM JANELA NAO GERA ACESSO -- e o entitlement mentia dizendo que
+     * sim (issue #188).
+     *
+     * O snapshot de politica nasce vazio, a ficha exibe o direito como ATIVO,
+     * e a catraca nega. A recepcao ve "tem plano" na tela e o aluno ve a porta
+     * fechada -- a divergencia so aparece no totem.
+     *
+     * O plano e criado DIRETO NO PRISMA de proposito: `POST /plans` exige
+     * `janelas: min(1)` e nao consegue produzir este estado. Quem produziu
+     * foi o seed, que escrevia pelo client e contornava a validacao.
+     */
+    it('recusa assinatura de plano sem janela de acesso', async () => {
+      const criado = await criarAluno(contas.a, { fullName: 'Sem Janela' });
+      const id = (criado.body as { id: string }).id;
+
+      const planoSemJanela = await db.plan.create({
+        data: {
+          tenantId: contas.a.tenantId,
+          name: `Sem Janela ${randomUUID().slice(0, 6)}`,
+          units: { create: [{ gymUnitId: contas.a.unidadeId }] },
+          // Preco entra porque o plano fica VISIVEL em `GET /plans`, e a
+          // listagem promete preco vigente para todo plano. So a janela deve
+          // faltar -- e ela que este teste exercita.
+          prices: {
+            create: {
+              tenantId: contas.a.tenantId,
+              amountMinor: 15000,
+              validFrom: new Date('2026-01-01T00:00:00.000Z'),
+            },
+          },
+        },
+      });
+
+      const resposta = await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: id,
+          planId: planoSemJanela.id,
+          startsAt: '2026-08-01T00:00:00.000Z',
+          endsAt: '2027-08-01T00:00:00.000Z',
+          reason: 'plano sem janela nao libera nada',
+        });
+
+      expect(resposta.status).toBe(422);
+      expect((resposta.body as { code: string }).code).toBe('PLAN_HAS_NO_ACCESS_WINDOW');
+
+      // A recusa e TOTAL: nenhuma assinatura, nenhum entitlement orfao.
+      const assinaturas = await db.subscription.count({ where: { studentId: id } });
+      const direitos = await db.entitlement.count({ where: { studentId: id } });
+
+      expect(assinaturas).toBe(0);
+      expect(direitos).toBe(0);
+    });
+
     it('recusa nova assinatura para aluno arquivado', async () => {
       const criado = await criarAluno(contas.a, { fullName: 'Arquivado Sem Assinatura' });
       const id = (criado.body as { id: string }).id;
