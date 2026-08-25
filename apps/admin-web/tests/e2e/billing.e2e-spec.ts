@@ -71,7 +71,19 @@ test.describe('financeiro do aluno', () => {
     await page.getByTestId('link-financeiro').click();
 
     await expect(page).toHaveURL(new RegExp(`/students/${id}/billing`));
-    await expect(page.getByRole('heading', { name: /Financeiro/ })).toBeVisible();
+    /*
+     * O TITULO DA PAGINA, ancorado no `id` -- nao `/Financeiro/` solto.
+     *
+     * Desde o agrupamento do menu (#204) existe um `<h2>` "Financeiro" na
+     * sidebar de TODA tela, e a regex casava com os dois (`strict mode
+     * violation`, nao falha de navegacao). Trocar por `level: 1` conserta o
+     * erro mas NAO conserta o teste: `#titulo-financeiro` e o unico elemento
+     * que so existe NESTA rota, e e ele que prova que a navegacao chegou.
+     *
+     * O nome do aluno no titulo confirma a segunda metade: a pagina carregou
+     * o aluno certo, nao so a rota certa.
+     */
+    await expect(page.locator('#titulo-financeiro')).toContainText(/^Financeiro —/);
   });
 
   test('cobrança ainda não gerada mostra estado vazio, não tabela em branco', async ({ page }) => {
