@@ -2915,6 +2915,22 @@ entrega adapter real sem isso:
 - **`createTokenizedSubscription`** — recorrência de verdade, instalada **uma vez por assinatura
   do aluno**, e usada só pela modalidade da Decisão 2 (**F56**).
 
+**Corrigido em 25/08/2026** (PR referenciando a issue #158): `chargeTokenizedPayment` nasceu na
+porta, a F14 passou a chamá-lo, e o campo de retorno virou `externalPaymentId` — o nome descrevia
+o defeito, não o dado. O teste que fecha a porta afirma o **estado no provedor** (nenhuma
+recorrência instalada depois de três invoices cobradas), e não o id devolvido: o id diz o que
+voltou daquela chamada, e o que cobra o aluno no mês seguinte é o que ficou de pé.
+
+**Achado durante a correção — o cancelamento dependia do defeito.**
+`CancelarRecorrenciaUseCase` varria `payment_attempts` e passava `externalPaymentId` para
+`cancelSubscription()`. Aquilo só funcionava porque a coluna guardava, por acidente, um id de
+assinatura. Corrigida a cobrança, a coluna guarda o que o nome sempre disse, e mandá-la para
+`cancelSubscription` cancelaria pelo identificador errado. **Decisão do PI em 25/08/2026:** o
+estado verdadeiro do sistema é **zero recorrências a cancelar** — cobrar invoice não instala
+calendário nenhum, e o contrato do caso de uso já dizia que zero não é erro. A fonte correta
+(`Subscription.externalSubscriptionId`) nasce na **F56**, e é lá que esse número volta a ser
+maior que zero. Não se antecipou a coluna para não invadir escopo de outra fatia.
+
 ---
 
 ### Consequências

@@ -232,7 +232,15 @@ interface MetodoDePagamentoDto {
 
 interface CobrancaNoCartaoDto {
   paymentAttemptId: string;
-  externalSubscriptionId: string;
+  /**
+   * Id do PAGAMENTO no provedor. Chamava-se `externalSubscriptionId` ate
+   * 25/08/2026, quando a cobranca de invoice instalava recorrencia por
+   * engano (ADR-043, Decisao 5) -- o campo descrevia o bug.
+   *
+   * Mesmo nome que `CheckoutDeCartaoDto` ja usava: as duas rotas de cartao
+   * devolvem a mesma coisa e vinham divergindo so no rotulo.
+   */
+  externalPaymentId: string;
   amountMinor: number;
   currency: string;
 }
@@ -436,7 +444,7 @@ export class BillingController {
 
     return {
       paymentAttemptId: cobranca.paymentAttemptId,
-      externalSubscriptionId: cobranca.externalSubscriptionId,
+      externalPaymentId: cobranca.externalPaymentId,
       amountMinor: cobranca.amountMinor,
       currency: cobranca.currency,
     };

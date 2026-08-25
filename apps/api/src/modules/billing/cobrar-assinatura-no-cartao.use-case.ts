@@ -86,7 +86,15 @@ export class CobrancaJaEmAndamentoError extends ErroDeDominio {
 
 export interface CobrancaNoCartaoCriada {
   readonly paymentAttemptId: string;
-  readonly externalSubscriptionId: string;
+  /**
+   * O id do PAGAMENTO no provedor -- o mesmo que o webhook e o
+   * `getPaymentStatus` usam.
+   *
+   * Chamava-se `externalSubscriptionId` ate 25/08/2026, e o nome nao era so
+   * feio: ele descrevia o que a chamada errada devolvia (ADR-043, Decisao 5).
+   * Assinatura tem id de assinatura, e ele vive na `Subscription`, nao aqui.
+   */
+  readonly externalPaymentId: string;
   readonly amountMinor: number;
   readonly currency: string;
 }
@@ -238,7 +246,16 @@ export class CobrarAssinaturaNoCartaoUseCase {
     }
 
     try {
-      const assinatura = await this.provedor.createTokenizedSubscription({
+      /**
+       * COBRANCA PONTUAL, nao instalacao de recorrencia (ADR-043, Decisao 5).
+       *
+       * Ate 25/08/2026 esta linha chamava `createTokenizedSubscription`, e o
+       * duble nao denunciava porque devolve um id de qualquer jeito. Contra a
+       * Getnet real, cada invoice instalaria uma RECORRENCIA MENSAL VIVA:
+       * doze mensalidades viravam doze calendarios cobrando o mesmo aluno em
+       * paralelo, e o segundo mes chegaria com doze debitos.
+       */
+      const cobranca = await this.provedor.chargeTokenizedPayment({
         externalAccountId: conta.externalAccountId,
         cardToken: metodo.externalTokenId,
         amountMinor: invoice.totalMinor,
@@ -248,12 +265,12 @@ export class CobrarAssinaturaNoCartaoUseCase {
 
       await this.db.paymentAttempt.update({
         where: { id: tentativa.id },
-        data: { externalPaymentId: assinatura.externalSubscriptionId },
+        data: { externalPaymentId: cobranca.externalPaymentId },
       });
 
       return {
         paymentAttemptId: tentativa.id,
-        externalSubscriptionId: assinatura.externalSubscriptionId,
+        externalPaymentId: cobranca.externalPaymentId,
         amountMinor: invoice.totalMinor,
         currency: invoice.currency,
       };

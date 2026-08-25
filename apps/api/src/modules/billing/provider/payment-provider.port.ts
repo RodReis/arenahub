@@ -84,6 +84,37 @@ export interface ProviderPayment {
   occurredAt: Date;
 }
 
+/**
+ * Cobranca PONTUAL num metodo ja tokenizado -- uma invoice, uma vez.
+ *
+ * MESMA FORMA de `SubscriptionInput`, e a semelhanca e exatamente o risco que
+ * o ADR-043, Decisao 5, mandou separar: os campos coincidem, entao trocar um
+ * pelo outro COMPILA. O que muda nao e o payload, e o efeito no provedor --
+ * aqui o dinheiro sai uma vez, la nasce um calendario.
+ */
+export interface TokenizedChargeInput {
+  externalAccountId: string;
+  /**
+   * Token da tokenizacao HOSPEDADA (INV-098). PAN e CVV nunca chegam aqui --
+   * se um dia chegarem, e bug de PCI, nao campo faltando.
+   */
+  cardToken: string;
+  amountMinor: number;
+  currency: string;
+  idempotencyKey: string;
+}
+
+/**
+ * O resultado de uma cobranca pontual e um PAGAMENTO, com o mesmo
+ * `externalPaymentId` que o webhook e o `getPaymentStatus` usam. Nao ha
+ * `externalSubscriptionId` aqui porque nao ha assinatura -- e era justamente
+ * ele que a F14 vinha guardando em `payment_attempts.externalPaymentId`.
+ */
+export interface ProviderCharge {
+  externalPaymentId: string;
+  status: StatusNoProvedor;
+}
+
 export interface SubscriptionInput {
   externalAccountId: string;
   /**
@@ -236,6 +267,31 @@ export interface HostedCheckout {
 export interface PaymentProvider {
   createPix(input: CreatePixInput): Promise<PixCharge>;
   getPaymentStatus(externalPaymentId: string): Promise<ProviderPayment>;
+  /**
+   * DECIMO METODO -- cobranca PONTUAL num cartao ja salvo. E o que a cobranca
+   * de invoice (F14) chama.
+   *
+   * NASCEU DE UM BUG REAL (ADR-043, Decisao 5): a F14 chamava
+   * `createTokenizedSubscription` A CADA INVOICE. Contra o duble isso passa,
+   * porque o fake so devolve um id; contra a Getnet real, cada invoice
+   * INSTALARIA UMA RECORRENCIA MENSAL VIVA, e doze meses de mensalidade
+   * viravam doze calendarios cobrando o mesmo aluno em paralelo.
+   *
+   * A REGRA, em uma linha: cobrar dinheiro AGORA e este metodo; instalar um
+   * calendario que cobra sozinho e `createTokenizedSubscription`, e so a F56
+   * o chama.
+   */
+  chargeTokenizedPayment(input: TokenizedChargeInput): Promise<ProviderCharge>;
+  /**
+   * Instala uma RECORRENCIA no provedor -- uma vez por assinatura do aluno.
+   *
+   * NAO E COBRANCA DE INVOICE (ADR-043, Decisao 5): quem cobra uma invoice e
+   * `chargeTokenizedPayment`. Chamado apenas pela **F56** (plano com
+   * assinatura mensal), onde o aluno adere UMA vez.
+   *
+   * O `externalSubscriptionId` que ele devolve pertence a `Subscription`, nao
+   * a `payment_attempts` -- a F56 move a coluna para o lugar certo.
+   */
   createTokenizedSubscription(input: SubscriptionInput): Promise<ProviderSubscription>;
   cancelSubscription(externalSubscriptionId: string): Promise<void>;
   refundPayment(input: RefundInput): Promise<ProviderRefund>;

@@ -8,6 +8,7 @@ import {
   type ListMovementsInput,
   type PaymentProvider,
   type PixCharge,
+  type ProviderCharge,
   type ProviderEvent,
   type ProviderMovement,
   type ProviderPayment,
@@ -17,6 +18,7 @@ import {
   type RefundInput,
   type StatusNoProvedor,
   type SubscriptionInput,
+  type TokenizedChargeInput,
 } from './payment-provider.port.js';
 
 /**
@@ -131,6 +133,18 @@ export class FakePaymentProvider implements PaymentProvider {
    * sozinho quando o desenho erra.
    */
   chamadasDeStatus = 0;
+
+  /**
+   * Quantas RECORRENCIAS foram instaladas nesta instancia
+   * (`createTokenizedSubscription`).
+   *
+   * Existe para o teste que fecha o ADR-043, Decisao 5: cobrar tres invoices
+   * tem de deixar este contador em ZERO. Sem ele a prova seria indireta --
+   * olhar o prefixo do id devolvido diz o que voltou, mas nao diz o que
+   * ficou instalado no provedor, e e o que fica instalado que cobra o aluno
+   * no mes seguinte.
+   */
+  recorrenciasInstaladas = 0;
 
   /**
    * O estorno confirma na hora, ou fica pendente?
@@ -360,7 +374,78 @@ export class FakePaymentProvider implements PaymentProvider {
    * faria um teste futuro passar por engano.
    */
   /**
-   * Assinatura tokenizada -- F14.
+   * Cobranca PONTUAL no cartao salvo -- o que a F14 chama por invoice.
+   *
+   * Recusa pelos MESMOS prefixos de token da assinatura: a politica de retry
+   * e a mesma, e duplicar convencao faria um dos dois caminhos envelhecer
+   * sozinho.
+   *
+   * REGISTRA EM `cobrancas`, junto com o PIX, e nao num deposito proprio de
+   * cartao. E o que faz `getPaymentStatus`, `listMovements` e o estorno
+   * enxergarem a cobranca de cartao: para todos eles, um pagamento
+   * confirmado e um pagamento confirmado, e a forma como o dinheiro entrou
+   * nao muda a conciliacao.
+   */
+  chargeTokenizedPayment(input: TokenizedChargeInput): Promise<ProviderCharge> {
+    if (input.amountMinor <= 0) {
+      throw new ErroDoProvedor(
+        'PROVIDER_INVALID_REQUEST',
+        false,
+        'cobranca no cartao exige valor positivo',
+      );
+    }
+
+    if (input.cardToken.startsWith(TOKEN_RECUSADO_DEFINITIVO)) {
+      throw new ErroDoProvedor('PROVIDER_REJECTED', false, 'cartao recusado em definitivo');
+    }
+
+    if (input.cardToken.startsWith(TOKEN_RECUSADO_TEMPORARIO)) {
+      throw new ErroDoProvedor('PROVIDER_REJECTED', true, 'saldo insuficiente');
+    }
+
+    /**
+     * Mesma chave devolve a MESMA cobranca -- sem isto, um retry de rede
+     * cobraria o aluno duas vezes pela mesma invoice.
+     */
+    const existente = this.cobrancas.get(input.idempotencyKey);
+    if (existente) {
+      return Promise.resolve({
+        externalPaymentId: existente.externalPaymentId,
+        status: existente.status,
+      });
+    }
+
+    /**
+     * Nasce `PENDING`, nao `CONFIRMED`: no cartao real a autorizacao e uma
+     * coisa e a confirmacao e outra, e quem confirma a invoice e o webhook
+     * (INV-076). Um duble que ja nascesse confirmado esconderia a fatia
+     * inteira do fluxo assincrono.
+     *
+     * `occurredAt` nasce na EPOCH e quem o move e `simularMudancaDeStatus`,
+     * igual ao PIX: o duble nao le relogio -- se lesse, o extrato ordenaria
+     * por um instante que o teste nao controla, e a conciliacao ficaria
+     * flaky sem ninguem entender por que.
+     */
+    const cobranca: CobrancaEmMemoria = {
+      externalPaymentId: `fake_card_${randomUUID()}`,
+      externalAccountId: input.externalAccountId,
+      status: 'PENDING',
+      amountMinor: input.amountMinor,
+      currency: input.currency,
+      occurredAt: new Date(0),
+    };
+
+    this.cobrancas.set(input.idempotencyKey, cobranca);
+    this.cobrancas.set(cobranca.externalPaymentId, cobranca);
+
+    return Promise.resolve({
+      externalPaymentId: cobranca.externalPaymentId,
+      status: cobranca.status,
+    });
+  }
+
+  /**
+   * Assinatura tokenizada -- F56, e SO ela (ADR-043, Decisao 5).
    *
    * O DUBLE NAO RECEBE, NAO GUARDA E NAO SABE INVENTAR numero de cartao: a
    * entrada e `cardToken`, que no mundo real vem do checkout hospedado do
@@ -403,6 +488,13 @@ export class FakePaymentProvider implements PaymentProvider {
     const externalSubscriptionId = `fake_sub_${randomUUID()}`;
     this.assinaturas.set(input.idempotencyKey, externalSubscriptionId);
     this.assinaturasVivas.add(externalSubscriptionId);
+
+    /**
+     * DEPOIS da idempotencia: retry de rede reusa a chave e NAO instala nada
+     * novo, entao contar antes inflaria o numero e o teste acusaria uma
+     * recorrencia que nao existe.
+     */
+    this.recorrenciasInstaladas += 1;
 
     return Promise.resolve({ externalSubscriptionId, status: 'ACTIVE' });
   }
