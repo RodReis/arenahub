@@ -1,19 +1,95 @@
 {
   "$comment": "Camada 1 (primitivo) da superficie do totem (kiosk) -- F49/F44, DS-TOTEM.md §2.1. Mesma regra do primitive.json: NENHUM componente le esta camada direto (regra de lint 2), e os hex vivem AQUI e em nenhum outro lugar do repositorio (regra de lint 1). `contrastOnBase` mede contra `totem.bg.base` -- e o fundo real da tela, ao contrario do painel que mede contra branco.",
-
   "totem": {
     "bg": {
-      "base":    { "value": "#0A0B0D", "$role": "fundo de todas as telas" },
-      "surface": { "value": "#121417", "contrastOnBase": 1.07, "$role": "cards, botoes secundarios, listas" }
+      "base": {
+        "value": "#0A0B0D",
+        "$role": "fundo de todas as telas"
+      },
+      "surface": {
+        "value": "#121417",
+        "contrastOnBase": 1.07,
+        "$role": "cards, botoes secundarios, listas"
+      }
     },
     "border": {
-      "hairline": { "value": "#1A2032", "contrastOnBase": 1.22, "$role": "divisores internos, linhas de tabela" },
-      "default":  { "value": "#232A3D", "contrastOnBase": 1.38, "$role": "borda de card e de botao secundario (2px)" }
+      "hairline": {
+        "value": "#1A2032",
+        "contrastOnBase": 1.22,
+        "$role": "divisores internos, linhas de tabela"
+      },
+      "default": {
+        "value": "#232A3D",
+        "contrastOnBase": 1.38,
+        "$role": "borda de card e de botao secundario (2px)"
+      }
     },
     "text": {
-      "primary":   { "value": "#FFFFFF", "contrastOnBase": 19.69, "$role": "titulos, valores, rotulos de botao" },
-      "secondary": { "value": "#A6AEB9", "contrastOnBase": 8.79,  "$role": "descricoes, metadados, legendas" },
-      "tertiary":  { "value": "#565E69", "contrastOnBase": 3.0,   "$role": "cabecalho de tabela, comparativos 'vs anterior'", "$comment": "REPROVA no alvo AAA_TEXT (7) do totem -- 3.0 < 7. Existe para texto auxiliar de baixa prioridade, nao para conteudo de leitura obrigatoria a distancia (mesmo papel de carbon-400 no painel)." }
+      "primary": {
+        "value": "#FFFFFF",
+        "contrastOnBase": 19.69,
+        "$role": "titulos, valores, rotulos de botao"
+      },
+      "secondary": {
+        "value": "#A6AEB9",
+        "contrastOnBase": 8.79,
+        "$role": "descricoes, metadados, legendas"
+      },
+      "tertiary": {
+        "value": "#565E69",
+        "contrastOnBase": 3.0,
+        "$role": "cabecalho de tabela, comparativos 'vs anterior'",
+        "$comment": "REPROVA no alvo AAA_TEXT (7) do totem -- 3.0 < 7. Existe para texto auxiliar de baixa prioridade, nao para conteudo de leitura obrigatoria a distancia (mesmo papel de carbon-400 no painel)."
+      }
+    },
+    "brand": {
+      "$comment": "Marca e acao -- DS-TOTEM.md 2.1. `500` e a cor primaria (aneis, barras); `400`/`600` sao as pontas do gradiente de CTA; `300` e glifo de icone sobre fundo escuro; `200` e texto de apoio azul. Os hex sao os quatro accents que a Task 6 ja mediu contra `bg.base` -- AZUL e o `500` daqui.",
+      "200": {
+        "value": "#8FB0FF",
+        "contrastOnBase": 9.21,
+        "$role": "texto de apoio em azul, rotulos de secao, links"
+      },
+      "300": {
+        "value": "#7DA2FF",
+        "contrastOnBase": 7.95,
+        "$role": "icones sobre fundo escuro"
+      },
+      "400": {
+        "value": "#5B86FF",
+        "contrastOnBase": 5.91,
+        "$role": "inicio do gradiente de CTA (fundo, nao texto)",
+        "$comment": "5.91 contra `bg.base` -- REPROVA no alvo AAA_TEXT (7). Legitimo: `400` e `600` sao FUNDO do gradiente de CTA, cujo texto e branco (19.69 contra o proprio gradiente). Nunca usar como cor de texto."
+      },
+      "500": {
+        "value": "#4D7CFF",
+        "contrastOnBase": 5.29,
+        "$role": "cor primaria: aneis, barras de progresso, indicadores",
+        "$comment": "5.29 contra `bg.base` -- REPROVA em AAA_TEXT (7). E cor de PREENCHIMENTO (anel, barra de progresso, trilho), nao de texto: componente grafico responde ao alvo de 3:1 do WCAG 1.4.11, nao ao de texto. Texto azul usa `200`."
+      },
+      "600": {
+        "value": "#3E63E8",
+        "contrastOnBase": 3.9,
+        "$role": "fim do gradiente de CTA (fundo, nao texto)",
+        "$comment": "3.9 contra `bg.base` -- fim do gradiente de CTA. Ver o comentario de `400`."
+      }
+    },
+    "state": {
+      "$comment": "Semantica -- DS-TOTEM.md 2.1. Cada estado usa a mesma receita: borda 2px em 40% da cor, fundo em 10%, icone e titulo na cor cheia, corpo em branco. Verde nunca e cor de botao; laranja e vermelho nunca decoram.",
+      "success": {
+        "value": "#3DDC84",
+        "contrastOnBase": 11.03,
+        "$role": "plano ativo, pagamento pago"
+      },
+      "warning": {
+        "value": "#F5A524",
+        "contrastOnBase": 9.65,
+        "$role": "pendencia financeira"
+      },
+      "danger": {
+        "value": "#FF6B6B",
+        "contrastOnBase": 7.09,
+        "$role": "alerta clinico que exige atendimento humano"
+      }
     }
   }
 }

@@ -119,6 +119,25 @@
   --ah-radius-modal: 10px;
 }
 
+/* Superficie do totem: dark, leitura a 60-100 cm. DS-TOTEM.md 2.1. */
+[data-surface="totem"] {
+  --ah-totem-bg-base: #0A0B0D;
+  --ah-totem-bg-surface: #121417;
+  --ah-totem-border-hairline: #1A2032;
+  --ah-totem-border-default: #232A3D;
+  --ah-totem-text-primary: #FFFFFF;
+  --ah-totem-text-secondary: #A6AEB9;
+  --ah-totem-text-tertiary: #565E69;
+  --ah-totem-brand-200: #8FB0FF;
+  --ah-totem-brand-300: #7DA2FF;
+  --ah-totem-brand-400: #5B86FF;
+  --ah-totem-brand-500: #4D7CFF;
+  --ah-totem-brand-600: #3E63E8;
+  --ah-totem-state-success: #3DDC84;
+  --ah-totem-state-warning: #F5A524;
+  --ah-totem-state-danger: #FF6B6B;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 100ms !important;

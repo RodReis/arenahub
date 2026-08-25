@@ -5,6 +5,7 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { CABECALHOS_DO_KIOSK } from '@arenahub/api-contracts';
 import type { Request } from 'express';
 
 import { KioskAuthService, type ContextoDoKiosk } from './kiosk-auth.service.js';
@@ -12,12 +13,13 @@ import { KioskAuthService, type ContextoDoKiosk } from './kiosk-auth.service.js'
 /** Marca a rota como autenticada por assinatura de totem. */
 export const ROTA_DE_KIOSK = 'rota-de-kiosk';
 
-export const CABECALHOS_DO_KIOSK = {
-  keyId: 'x-kiosk-key-id',
-  timestamp: 'x-kiosk-timestamp',
-  nonce: 'x-kiosk-nonce',
-  signature: 'x-kiosk-signature',
-} as const;
+/**
+ * Reexportado, nao redefinido: os nomes moram em `@arenahub/api-contracts`,
+ * ao lado do `assinar` que os acompanha, para que o totem (que assina) e a
+ * API (que verifica) leiam a MESMA lista. O reexport mantem os imports que
+ * ja apontavam para ca.
+ */
+export { CABECALHOS_DO_KIOSK };
 
 declare module 'express' {
   interface Request {

@@ -34,6 +34,7 @@ const readJson = (name) => JSON.parse(readFileSync(join(TOKENS, name), 'utf8'));
 const primitive = readJson('primitive.json');
 const semantic = readJson('semantic.json');
 const expression = readJson('expression.json');
+const totem = readJson('totem.json');
 
 const errors = [];
 
@@ -379,6 +380,26 @@ push(`  --ah-radius-control: ${panel.radius.control}px;`);
 push(`  --ah-radius-card: ${panel.radius.card}px;`);
 push(`  --ah-radius-badge: ${panel.radius.badge}px;`);
 push(`  --ah-radius-modal: ${panel.radius.modal}px;`);
+push('}');
+push('');
+
+/**
+ * Superficie do TOTEM -- DS-TOTEM.md 2.1.
+ *
+ * Emitida daqui, e nao escrita a mao no app, pela mesma razao das outras: o
+ * hex vive em `tokens/` e em nenhum outro lugar (regra de lint 1). O totem e
+ * dark e nao compartilha papel com o painel; por isso ganha prefixo proprio
+ * (`--ah-totem-*`) em vez de redefinir `--ah-text-*`, que confundiria um
+ * componente do painel renderizado por engano nesta superficie.
+ */
+push('/* Superficie do totem: dark, leitura a 60-100 cm. DS-TOTEM.md 2.1. */');
+push('[data-surface="totem"] {');
+for (const [grupo, entradas] of Object.entries(totem.totem)) {
+  for (const [nome, def] of Object.entries(entradas)) {
+    if (nome.startsWith('$')) continue;
+    push(`  --ah-totem-${grupo}-${nome}: ${def.value};`);
+  }
+}
 push('}');
 push('');
 push('@media (prefers-reduced-motion: reduce) {');

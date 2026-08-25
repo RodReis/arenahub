@@ -13,6 +13,7 @@ export {
   normalizarCaminhoEQuery,
   timestampEstaNaJanela,
   CABECALHOS,
+  CABECALHOS_DO_KIOSK,
   JANELA_DE_RELOGIO_EM_SEGUNDOS,
   PREFIXO_CANONICO,
   type MotivoDeRecusa,
