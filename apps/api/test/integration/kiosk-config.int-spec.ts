@@ -185,6 +185,65 @@ describe('F49 -- heartbeat e config do totem', () => {
     });
   });
 
+  /**
+   * Prova que o `orderBy` do servico e OBRIGATORIO, nao decorativo.
+   *
+   * As demais linhas deste arquivo inserem as configuracoes ja em ordem
+   * crescente de `version`, entao a ordem fisica de insercao no Postgres
+   * coincide com a ordenada -- a ausencia de `orderBy` nunca seria exercida.
+   * Aqui a versao 3 e publicada ANTES da versao 2, na mesma camada (tenant
+   * inteiro). Sem `orderBy: [{ version: 'asc' }]`, o `.at(-1)` do servico
+   * pegaria "a ultima que o banco decidiu devolver" -- que, dependendo do
+   * plano de execucao, pode ser a 2 (inserida por ultimo). Com o `orderBy`,
+   * so a MAIOR version pode vencer, nunca a inserida por ultimo.
+   */
+  it('config resolve pela MAIOR version publicada, nao pela ordem de insercao', async () => {
+    const totemOrdem: Totem = {
+      tenantId: '',
+      gymUnitId: '',
+      kioskDeviceId: '',
+      keyId: '',
+      segredo: '',
+    };
+
+    await montarTotem(totemOrdem, `ordem-${randomUUID().slice(0, 8)}`);
+
+    // version 3 primeiro, version 2 depois -- fora de ordem de insercao.
+    await db.kioskConfiguration.create({
+      data: {
+        tenantId: totemOrdem.tenantId,
+        gymUnitId: null,
+        kioskDeviceId: null,
+        version: 3,
+        publishedAt: new Date(),
+        payload: { marca: { nomeDaAcademia: 'VERSAO TRES' } },
+      },
+    });
+
+    await db.kioskConfiguration.create({
+      data: {
+        tenantId: totemOrdem.tenantId,
+        gymUnitId: null,
+        kioskDeviceId: null,
+        version: 2,
+        publishedAt: new Date(),
+        payload: { marca: { nomeDaAcademia: 'VERSAO DOIS' } },
+      },
+    });
+
+    const resposta = await request(servidor())
+      .get('/api/v1/kiosk/config')
+      .set(assinarPedido(totemOrdem, '', '/api/v1/kiosk/config', 'GET'))
+      .expect(200);
+
+    const corpo = resposta.body as RespostaConfig & { config: { marca: { nomeDaAcademia: string } } };
+
+    expect(corpo.version).toBe(3);
+    expect(corpo.config.marca.nomeDaAcademia).toBe('VERSAO TRES');
+
+    await db.tenant.delete({ where: { id: totemOrdem.tenantId } });
+  });
+
   it('a configuracao do tenant B NAO vaza para o totem do tenant A', async () => {
     await db.kioskConfiguration.create({
       data: {

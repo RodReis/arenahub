@@ -40,8 +40,11 @@ export class KioskConfigService {
           { gymUnitId: contexto.gymUnitId, kioskDeviceId: contexto.kioskDeviceId },
         ],
       },
-      // Ordem EXPLICITA: sem `orderBy`, a ordem fisica do Postgres muda apos
-      // UPDATE e a ultima versao viraria loteria.
+      // Ordem EXPLICITA: `KioskConfiguration` e append-only (sem updatedAt, a
+      // unique constraint [tenantId, gymUnitId, kioskDeviceId, version] so
+      // permite INSERT) -- mas o motor NAO garante ordem de retorno sem
+      // `ORDER BY`, mesmo so com INSERT. Depender da ordem de insercao para
+      // achar "a ultima versao" e sorte, nao contrato.
       orderBy: [{ version: 'asc' }],
     });
 
