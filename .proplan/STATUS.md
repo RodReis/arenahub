@@ -9,10 +9,11 @@ updated: 2026-08-25
 
 ### Sem épico
 
+- [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
+- [MVP1.5][SPEC-010][F10] Operação offline (#10)
+- [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 - [MVP3][FIX] chamarApi assere o tipo em vez de validar: divergencia de contrato vira crash de runtime (#167)
 - [MVP3][SPEC-056][F56] Plano com assinatura mensal (#159)
-- [MVP3][SPEC-054][F54] Painel financeiro gerencial (KPIs) (#157)
-- [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
 - [MVP3.5][SPEC-049][F49] Kiosk seguro, provisionamento e sessão efêmera (#150)
 - [MVP3.5][SPEC-052][F52] Área do aluno no totem: identificação, pagamento e evolução (#153)
 - [MVP3.5][SPEC-051][F51] Tela pública (hero): blocos, mídia e patrocínio (#152)
@@ -45,10 +46,7 @@ _(vazio)_
 
 ## Em Andamento
 
-### Sem épico
-
-- [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
-- [MVP1.5][SPEC-010][F10] Operação offline (#10)
+_(vazio)_
 
 ## Feito
 
@@ -59,6 +57,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-054][F54] Painel financeiro gerencial (KPIs) (#157, finalizado em: 2026-08-25)
 - [MVP1][FIX] coluna PLANO em branco para quem tem acesso por vinculo, nao por assinatura (#191, finalizado em: 2026-08-25)
 - [MVP1][FIX] sessao expira em 10 min e o painel nao renova: toda Server Action falha calada (#187, finalizado em: 2026-08-25)
 - [MVP1][FIX] seed cria plano sem unidade nem janela: entitlement nasce ACTIVE e a catraca nega (#188, finalizado em: 2026-08-25)
