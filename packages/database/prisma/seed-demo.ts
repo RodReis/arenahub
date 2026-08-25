@@ -8,6 +8,13 @@
  * a tela nao tem como saber a diferenca, e tela vazia nao deixa avaliar
  * decisao de layout, hierarquia ou estado.
  *
+ * O QUE ELE CRIA: alunos, dispositivos e eventos de acesso (o que motivou o
+ * arquivo, em 2026-08) e, desde 25/08/2026, o FATURAMENTO de tres
+ * competencias -- invoices, itens e pagamentos confirmados. O painel
+ * financeiro da F54 abria zerado pelo mesmo motivo que a tela de operacao
+ * abria, e o bloco de evolucao por competencia so se consegue julgar com tres
+ * pontos. Ver `COMPETENCIAS_FATURADAS`.
+ *
  * SEPARADO do `seed.ts` de proposito, por decisao do PI. O seed base roda
  * tambem no `pretest:e2e` e no `pretest:integration`; se ele passasse a criar
  * aluno e evento, as suites herdariam dado que nao criaram -- e as que
@@ -118,6 +125,63 @@ const UM_DIA = 24 * 60 * 60 * 1000;
  * resolver.
  */
 const DIAS_DE_EVENTO = 7;
+
+/**
+ * Quantas competencias fechadas o faturamento de demonstracao cria.
+ *
+ * TRES, e o numero nao e arbitrario: o painel financeiro (F54) so desenha
+ * comparacao de tendencia com tres pontos ou mais -- abaixo disso ele mostra
+ * "dado insuficiente", que e o estado correto mas nao deixa avaliar o bloco.
+ * Duas competencias produziriam justamente a tela que nao se consegue julgar.
+ */
+const COMPETENCIAS_FATURADAS = 3;
+
+/**
+ * Proporcao de faturas PAGAS por competencia, da mais antiga para a mais
+ * recente.
+ *
+ * DECRESCENTE de proposito. Mes que fechou ha mais tempo teve mais chance de
+ * ser quitado; o mes corrente ainda tem gente que vai pagar. Proporcao
+ * constante faria as tres barras iguais e a serie viraria uma reta -- que e
+ * exatamente o que o bloco de evolucao existe para NAO mostrar quando a
+ * realidade e outra.
+ */
+const PAGAS_POR_COMPETENCIA = [92, 88, 74] as const;
+
+/**
+ * Mix de forma de pagamento, em faixas cumulativas de 0..99.
+ *
+ * PIX domina porque a academia ja recebe por la (ADR-032), cartao vem depois e
+ * especie e a minoria do balcao. Um metodo so faria a quebra por forma de
+ * pagamento do painel nao dizer nada.
+ */
+const FAIXA_PIX = 58;
+const FAIXA_CARTAO = 87;
+
+const UMA_HORA = 60 * 60 * 1000;
+
+/**
+ * Desfecho DETERMINISTICO a partir de um texto.
+ *
+ * Nao usa `Math.random()`: semente que muda a cada execucao faz a tela mudar
+ * embaixo de quem esta avaliando layout, e dois desenvolvedores olhando "o
+ * mesmo" banco veriam numeros diferentes. Hash simples (djb2) basta -- a
+ * exigencia aqui e reprodutibilidade, nao qualidade criptografica.
+ */
+function sorteioEstavel(semente: string): number {
+  let hash = 5381;
+
+  for (let i = 0; i < semente.length; i += 1) {
+    hash = ((hash << 5) + hash + semente.charCodeAt(i)) | 0;
+  }
+
+  return Math.abs(hash) % 100;
+}
+
+/** Primeiro dia da competencia, `N` meses antes do mes corrente, em UTC. */
+function competenciaAtras(agora: Date, mesesAtras: number): Date {
+  return new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth() - mesesAtras, 1));
+}
 
 async function semearDemonstracao(): Promise<void> {
   const db = criarPrismaClient();
@@ -401,8 +465,160 @@ async function semearDemonstracao(): Promise<void> {
       }
     }
 
+    /*
+      FATURAMENTO DE DEMONSTRACAO -- o painel financeiro (F54) abria vazio.
+
+      Mesmo motivo do resto deste arquivo: banco vazio nao e bug, mas quem
+      olha a tela nao tem como saber a diferenca, e painel zerado nao deixa
+      avaliar hierarquia, faixa de atraso nem quebra por forma de pagamento.
+
+      COBRE TODAS AS ASSINATURAS ATIVAS DO TENANT, nao so os alunos `DEMO-`:
+      os ~286 ativados da base do Pacto sao o volume real que o painel vai
+      somar, e faturar so os doze de demonstracao produziria uma tela que nao
+      se parece com a que o dono vai ver.
+    */
+    const assinaturasAtivas = await db.subscription.findMany({
+      where: { tenantId: tenant.id, status: 'ACTIVE' },
+      select: { id: true, studentId: true, planId: true },
+    });
+
+    /*
+      Preco vigente por plano, carregado UMA vez. Uma consulta por assinatura
+      seria N+1 num laco de quase trezentas.
+    */
+    const precos = await db.planPrice.findMany({
+      where: { tenantId: tenant.id, validFrom: { lte: agora } },
+      select: { planId: true, amountMinor: true },
+      orderBy: { validFrom: 'desc' },
+    });
+
+    const precoDoPlano = new Map<string, number>();
+    for (const preco of precos) {
+      // `orderBy` decrescente: o primeiro que chega e o mais recente vigente.
+      if (!precoDoPlano.has(preco.planId)) {
+        precoDoPlano.set(preco.planId, preco.amountMinor);
+      }
+    }
+
+    /*
+      `number` e unico por tenant e nunca reaproveitado -- comeca depois do
+      maior que ja existe, para conviver com invoice criada pela API.
+    */
+    const maiorNumero = await db.invoice.aggregate({
+      where: { tenantId: tenant.id },
+      _max: { number: true },
+    });
+
+    let proximoNumero = (maiorNumero._max.number ?? 0) + 1;
+    let invoicesCriadas = 0;
+    let pagamentosCriados = 0;
+
+    for (let atras = COMPETENCIAS_FATURADAS; atras >= 1; atras -= 1) {
+      const competencia = competenciaAtras(agora, atras);
+      const venceEm = new Date(competencia);
+      venceEm.setUTCDate(10);
+
+      const percentualPago = PAGAS_POR_COMPETENCIA[COMPETENCIAS_FATURADAS - atras] ?? 85;
+
+      for (const assinatura of assinaturasAtivas) {
+        const valorMinor = precoDoPlano.get(assinatura.planId);
+
+        // Plano sem preco vigente nao gera fatura -- e o caso do preco
+        // agendado so para o mes que vem. Inventar valor aqui produziria
+        // receita que o painel nao consegue explicar.
+        if (valorMinor === undefined) continue;
+
+        /*
+          IDEMPOTENTE pela unique `(tenant, subscription, billing_period)` --
+          INV-066, a regra que impede cobrar o aluno duas vezes pelo mesmo
+          mes. Consultar antes de criar evita queimar numero de invoice a cada
+          reexecucao.
+        */
+        const jaExiste = await db.invoice.findFirst({
+          where: {
+            tenantId: tenant.id,
+            subscriptionId: assinatura.id,
+            billingPeriod: competencia,
+          },
+          select: { id: true },
+        });
+
+        if (jaExiste) continue;
+
+        const sorte = sorteioEstavel(`${assinatura.id}:${competencia.toISOString()}`);
+        const pagou = sorte < percentualPago;
+
+        /*
+          Dia do pagamento espalhado ao longo da competencia: todo mundo
+          pagando no mesmo dia faria a serie parecer lote automatico, e o
+          recorte por janela do painel nao teria o que exercitar.
+        */
+        const pagoEm = pagou
+          ? new Date(competencia.getTime() + (sorte % 26) * UM_DIA + 14 * UMA_HORA)
+          : null;
+
+        // A competencia mais recente ainda corre: o que nao foi pago esta
+        // `OPEN`, nao `OVERDUE`. As anteriores ja venceram.
+        const emAberto = atras === 1 ? 'OPEN' : 'OVERDUE';
+        const mes = String(competencia.getUTCMonth() + 1).padStart(2, '0');
+        const ano = String(competencia.getUTCFullYear());
+
+        const invoice = await db.invoice.create({
+          data: {
+            tenantId: tenant.id,
+            subscriptionId: assinatura.id,
+            studentId: assinatura.studentId,
+            billingPeriod: competencia,
+            status: pagou ? 'PAID' : emAberto,
+            number: proximoNumero,
+            currency: 'BRL',
+            subtotalMinor: valorMinor,
+            totalMinor: valorMinor,
+            dueAt: venceEm,
+            paidAt: pagoEm,
+            items: {
+              create: {
+                tenantId: tenant.id,
+                description: `Mensalidade ${mes}/${ano}`,
+                quantity: 1,
+                unitAmountMinor: valorMinor,
+                totalMinor: valorMinor,
+              },
+            },
+          },
+          select: { id: true },
+        });
+
+        proximoNumero += 1;
+        invoicesCriadas += 1;
+
+        if (pagou && pagoEm) {
+          const metodoSorte = sorteioEstavel(`metodo:${invoice.id}`);
+          const metodo =
+            metodoSorte < FAIXA_PIX ? 'PIX' : metodoSorte < FAIXA_CARTAO ? 'CARD' : 'MANUAL';
+
+          await db.payment.create({
+            data: {
+              tenantId: tenant.id,
+              invoiceId: invoice.id,
+              amountMinor: valorMinor,
+              currency: 'BRL',
+              method: metodo,
+              status: 'CONFIRMED',
+              paidAt: pagoEm,
+            },
+          });
+
+          pagamentosCriados += 1;
+        }
+      }
+    }
+
     console.info(
       `[demo] ${String(ALUNOS.length)} alunos, 1 leitor + 1 catraca, ${String(eventos)} eventos de acesso.`,
+    );
+    console.info(
+      `[demo] faturamento: ${String(invoicesCriadas)} invoice(s) em ${String(COMPETENCIAS_FATURADAS)} competencias, ${String(pagamentosCriados)} pagamento(s) confirmado(s).`,
     );
     console.info('[demo] nenhum dado real -- nomes inventados, sem CPF.');
   } finally {
