@@ -43,6 +43,22 @@ export class KioskSessionService {
         // ARCHIVED e LEAD caem na mensagem neutra unica abaixo.
         status: { in: ['ACTIVE', 'TRIAL', 'SUSPENDED'] },
       },
+      /*
+       * ORDEM EXPLICITA, e nao zelo: `cpfHash` NAO e unico, e a base real
+       * tem CPF repetido -- dois irmaos com o mesmo numero, erro de
+       * digitacao na importacao. Sem `orderBy`, um `findFirst` devolve o
+       * que o Postgres entregar primeiro, e essa ordem MUDA depois de
+       * qualquer UPDATE na tabela: o mesmo CPF abriria a sessao ora de um
+       * aluno, ora de outro, e cada um veria a fatura e a avaliacao do
+       * outro.
+       *
+       * `createdAt asc` com `id` de desempate: o cadastro mais antigo
+       * ganha, sempre o mesmo, e o desfecho para de depender do dia.
+       *
+       * Isto NAO conserta o dado duplicado -- so o torna deterministico.
+       * Corrigir o cadastro e da recepcao.
+       */
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: { id: true, fullName: true },
     });
 
@@ -126,6 +142,29 @@ export class KioskSessionService {
    * `kioskDeviceId` no filtro nao e zelo: sem ele, um totem estenderia ou
    * encerraria a sessao aberta em outro totem do MESMO tenant.
    */
+  /**
+   * O PORTAO DE TODO DADO DE ALUNO NO TOTEM (F52).
+   *
+   * Devolve o `studentId` DA SESSAO -- e e por isso que ela existe. Todo
+   * endpoint de dado de aluno resolve o aluno POR AQUI, nunca por um id
+   * vindo da URL ou do corpo: com id na URL, quem tem uma sessao valida lê a
+   * avaliacao e a fatura de QUALQUER aluno do tenant trocando um UUID, e o
+   * isolamento que a F49 provou vira decoracao.
+   *
+   * As tres condicoes de `viva()` continuam valendo inteiras: hash do token,
+   * `endedAt` nulo e `expiresAt` no futuro.
+   */
+  async exigirSessaoViva(
+    contexto: ContextoDoKiosk,
+    sessionId: string,
+    token: string,
+    agora: Date,
+  ): Promise<{ id: string; studentId: string }> {
+    const sessao = await this.viva(contexto, sessionId, token, agora);
+
+    return { id: sessao.id, studentId: sessao.studentId };
+  }
+
   private async viva(contexto: ContextoDoKiosk, sessionId: string, token: string, agora: Date) {
     const sessao = await this.db.kioskSession.findFirst({
       where: {

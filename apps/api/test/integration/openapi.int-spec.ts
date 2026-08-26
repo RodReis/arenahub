@@ -200,6 +200,15 @@ describe('contrato OpenAPI', () => {
         '/api/v1/admin/kiosk-devices/{id}/config/draft',
         // F51 -- upload da midia da tela publica (MP4, ADR-042 Decisao 7).
         '/api/v1/admin/kiosk-devices/{id}/media',
+        // F52 -- area do aluno no totem. NENHUMA recebe id de aluno nem de
+        // fatura: o aluno sai da sessao, e essa ausencia e o desenho.
+        '/api/v1/kiosk/sessions/{id}/payments',
+        '/api/v1/kiosk/sessions/{id}/payments/pix',
+        '/api/v1/kiosk/sessions/{id}/payments/card-checkout',
+        '/api/v1/kiosk/sessions/{id}/payments/{attemptId}',
+        '/api/v1/kiosk/sessions/{id}/assessment',
+        '/api/v1/kiosk/sessions/{id}/assessments',
+        '/api/v1/kiosk/sessions/{id}/evolution',
       ]),
     );
   });

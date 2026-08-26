@@ -497,3 +497,200 @@ button {
   max-width: 140px;
   object-fit: contain;
 }
+
+/* ---------------------------------------------- area do aluno (F52) ---- */
+
+/**
+ * Moldura das telas internas -- mesmo respiro da `MinhaArea`.
+ *
+ * `overflow-y: auto` porque avaliacao e historico passam da altura do
+ * totem; o resto da superficie nunca rola (a tela publica e a identificacao
+ * cabem inteiras, de proposito).
+ */
+.telaInterna {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tt-gap-bloco);
+  padding: var(--tt-padding-interno) var(--tt-padding-interno) 24px;
+}
+
+.escolhaDeForma {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tt-gap-grade);
+}
+
+.blocoDoQr,
+.blocoConfirmado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tt-gap-grade);
+  text-align: center;
+}
+
+/**
+ * O QR SEMPRE SOBRE BRANCO -- DS-TOTEM.md §5.6.
+ *
+ * Nao e escolha estetica: sobre o carbono do totem, a maioria dos leitores
+ * de celular nao encontra o padrao. Branco literal e correto aqui, e a
+ * excecao esta dita.
+ */
+.cartaoDoQr {
+  background: #fff;
+  padding: 36px;
+  border-radius: var(--tt-raio-card);
+}
+
+.cartaoDoQr img {
+  display: block;
+  width: 320px;
+  height: 320px;
+}
+
+.valorDaCobranca {
+  margin: 0;
+  font-size: 56px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Aviso de saude -- regra de arquitetura no 8.
+ *
+ * SEM BOTAO DE FECHAR, em lugar nenhum: um aviso que o operador fecha e um
+ * aviso que nao existe a partir do segundo uso.
+ */
+.avisoDeSaude {
+  margin: 0;
+  padding: 20px 24px;
+  border-radius: var(--tt-raio-card);
+  border: var(--tt-borda) solid color-mix(in srgb, var(--ah-totem-state-warning) 40%, transparent);
+  background: color-mix(in srgb, var(--ah-totem-state-warning) 10%, var(--ah-totem-bg-base));
+  font-size: var(--tt-metadado);
+  line-height: 30px;
+}
+
+/**
+ * Bloco de composicao corporal -- DS-TOTEM.md §5.3.
+ *
+ * A moldura e o selo existem; a IMAGEM nao. O asset de composicao corporal
+ * nao existe no repositorio (nem imagem, nem gerador, nem dependencia 3D),
+ * e desenhar um corpo generico seria pior que o vazio: o aluno leria como
+ * sendo o corpo DELE, medido. `min-height` menor que os 520 px do DS
+ * justamente porque nao ha imagem para preencher.
+ */
+.blocoDeComposicao {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 200px;
+  padding: 28px 32px;
+  border-radius: var(--tt-raio-card);
+  border: var(--tt-borda) dashed var(--ah-totem-border-default);
+  background: var(--ah-totem-bg-surface);
+}
+
+.seloDoMes {
+  padding: 0 24px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--tt-raio-pill);
+  background: color-mix(in srgb, var(--ah-totem-brand-500) 18%, var(--ah-totem-bg-base));
+  font-size: var(--tt-metadado);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.relatorioDoAparelho {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 28px 32px;
+  border-radius: var(--tt-raio-card);
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  background: var(--ah-totem-bg-surface);
+}
+
+.pontuacaoDoAparelho {
+  margin: 0;
+  font-size: var(--tt-valor);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.gradeDeMetricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--tt-gap-grade);
+}
+
+.cardDeMetrica {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px 28px;
+  border-radius: var(--tt-raio-card);
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  background: var(--ah-totem-bg-surface);
+}
+
+.valorDaMetrica {
+  font-size: var(--tt-valor);
+  font-weight: 800;
+  /* Tabular para a coluna nao dancar entre uma medicao e outra. */
+  font-variant-numeric: tabular-nums;
+}
+
+.listaDeSegmentos,
+.listaDePagamentos,
+.listaDeAvaliacoes,
+.listaDeMeses {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.segmento,
+.pagamento,
+.pagamentoEmAberto,
+.linhaDeAvaliacao,
+.mesDaEvolucao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 16px;
+  padding: 24px 28px;
+  border-radius: var(--tt-raio-card);
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  background: var(--ah-totem-bg-surface);
+}
+
+/* Fatura em aberto: a linha que o aluno veio resolver. */
+.pagamentoEmAberto {
+  border-color: color-mix(in srgb, var(--ah-totem-state-warning) 60%, transparent);
+  background: color-mix(in srgb, var(--ah-totem-state-warning) 10%, var(--ah-totem-bg-base));
+}
+
+.valorDoPagamento {
+  margin-left: auto;
+  font-size: var(--tt-card-titulo);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.analiseAssistiva {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px 32px;
+  border-radius: var(--tt-raio-card);
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  background: var(--ah-totem-bg-surface);
+}

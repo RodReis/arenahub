@@ -17,8 +17,11 @@ import type { IndicadoresDaUnidade } from '@arenahub/api-contracts';
 
 import { KioskRoute } from '../kiosk-auth/kiosk-route.decorator.js';
 import type { ContextoDoKiosk } from '../kiosk-auth/kiosk-auth.service.js';
+import { KioskAreaDoAlunoService } from './kiosk-area-do-aluno.service.js';
 import { KioskConfigService, type ConfiguracaoResolvida } from './kiosk-config.service.js';
 import { KioskMediaLinkService } from './kiosk-media-link.service.js';
+import { KioskPagamentoService, type CobrancaDoTotem } from './kiosk-pagamento.service.js';
+import { KioskSaudeService } from './kiosk-saude.service.js';
 import { KioskSessionService, type SessaoAberta } from './kiosk-session.service.js';
 
 const heartbeatSchema = z.object({
@@ -43,6 +46,9 @@ export class KioskController {
     private readonly config: KioskConfigService,
     private readonly midia: KioskMediaLinkService,
     private readonly sessions: KioskSessionService,
+    private readonly area: KioskAreaDoAlunoService,
+    private readonly pagamento: KioskPagamentoService,
+    private readonly saude: KioskSaudeService,
   ) {}
 
   @Post('heartbeat')
@@ -190,6 +196,312 @@ export class KioskController {
     const contexto = this.contexto(requisicao);
 
     await this.sessions.encerrar(contexto, sessionId, this.token(token), 'MANUAL', new Date());
+  }
+
+  /*
+   * ---------------------------------------------------------------------
+   * AREA DO ALUNO (F52) -- `DS-TOTEM.md` §5.2 a §5.7.
+   *
+   * Todos passam por `area.resolver(...)`, que faz as tres checagens numa
+   * chamada: modulo ligado (404 se nao), sessao viva, e o `studentId` DA
+   * SESSAO. Nenhum destes endpoints aceita id de aluno nem de fatura -- e a
+   * ausencia desses parametros que impede uma sessao valida de ler o dado de
+   * outro aluno trocando um UUID.
+   * ---------------------------------------------------------------------
+   */
+
+  @Post('sessions/:id/payments/pix')
+  @HttpCode(201)
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['paymentAttemptId', 'forma', 'qrCodeDataUri', 'expiraEm', 'valorEmCentavos', 'moeda'],
+      properties: {
+        paymentAttemptId: { type: 'string', format: 'uuid' },
+        forma: { type: 'string', enum: ['PIX', 'CARD'] },
+        qrCodeDataUri: { type: 'string' },
+        copiaECola: { type: 'string', nullable: true, description: 'EMV do PIX; nulo no cartão.' },
+        checkoutUrl: { type: 'string', nullable: true, description: 'Checkout hospedado; nulo no PIX.' },
+        expiraEm: { type: 'string', format: 'date-time' },
+        valorEmCentavos: { type: 'integer' },
+        moeda: { type: 'string' },
+      },
+    },
+  })
+  async cobrarPorPix(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ): Promise<CobrancaDoTotem> {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'pagamento',
+      agora,
+    );
+
+    return this.pagamento.cobrarPorPix(
+      aluno,
+      agora,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+  }
+
+  @Post('sessions/:id/payments/card-checkout')
+  @HttpCode(201)
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['paymentAttemptId', 'forma', 'qrCodeDataUri', 'expiraEm', 'valorEmCentavos', 'moeda'],
+      properties: {
+        paymentAttemptId: { type: 'string', format: 'uuid' },
+        forma: { type: 'string', enum: ['PIX', 'CARD'] },
+        qrCodeDataUri: { type: 'string' },
+        copiaECola: { type: 'string', nullable: true, description: 'EMV do PIX; nulo no cartão.' },
+        checkoutUrl: { type: 'string', nullable: true, description: 'Checkout hospedado; nulo no PIX.' },
+        expiraEm: { type: 'string', format: 'date-time' },
+        valorEmCentavos: { type: 'integer' },
+        moeda: { type: 'string' },
+      },
+    },
+  })
+  async cobrarPorCartao(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ): Promise<CobrancaDoTotem> {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'pagamento',
+      agora,
+    );
+
+    return this.pagamento.cobrarPorCartao(
+      aluno,
+      agora,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+  }
+
+  /**
+   * O LACO da tela enquanto o QR esta aberto.
+   *
+   * `M4-BR-001`: isto NAO confirma pagamento -- le o que o webhook ja
+   * confirmou. A cadeia que restaura o entitlement e a do MVP 2, sem bypass
+   * local nenhum (regra de arquitetura no 1).
+   */
+  @Get('sessions/:id/payments/:attemptId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['status', 'statusDaFatura', 'pagoEm'],
+      properties: {
+        status: { type: 'string' },
+        statusDaFatura: { type: 'string' },
+        pagoEm: { type: 'string', format: 'date-time', nullable: true },
+      },
+    },
+  })
+  async observarPagamento(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Param('attemptId') attemptId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ) {
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'pagamento',
+      new Date(),
+    );
+
+    return this.pagamento.observar(aluno, attemptId);
+  }
+
+  @Get('sessions/:id/payments')
+  @ApiOkResponse({
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['invoiceId', 'status', 'vencimentoEm', 'valorEmCentavos', 'moeda', 'emAberto'],
+        properties: {
+          invoiceId: { type: 'string', format: 'uuid' },
+          status: { type: 'string' },
+          vencimentoEm: { type: 'string', format: 'date-time' },
+          pagoEm: { type: 'string', format: 'date-time', nullable: true },
+          valorEmCentavos: { type: 'integer' },
+          moeda: { type: 'string' },
+          emAberto: { type: 'boolean' },
+        },
+      },
+    },
+  })
+  async historicoDePagamentos(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'historicoDePagamentos',
+      agora,
+    );
+
+    return this.pagamento.historico(aluno, agora);
+  }
+
+  @Get('sessions/:id/assessment')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      nullable: true,
+      required: ['medidaEm', 'aparelho', 'metricas', 'segmentos', 'relatorioDoAparelho'],
+      properties: {
+        medidaEm: { type: 'string', format: 'date-time', nullable: true },
+        aparelho: { type: 'string', nullable: true },
+        metricas: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['tipo', 'valor', 'unidade', 'deltaAbsoluto', 'razaoDaAusencia'],
+              properties: {
+                tipo: { type: 'string' },
+                valor: { type: 'number', nullable: true },
+                unidade: { type: 'string', nullable: true },
+                deltaAbsoluto: { type: 'number', nullable: true },
+                razaoDaAusencia: { type: 'string', nullable: true },
+              },
+            },
+          },
+        segmentos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['segmento', 'gorduraKg', 'musculoKg'],
+            properties: {
+              segmento: { type: 'string', enum: ['ARMS', 'TRUNK', 'LEGS'] },
+              gorduraKg: { type: 'number', nullable: true },
+              musculoKg: { type: 'number', nullable: true },
+            },
+          },
+        },
+        relatorioDoAparelho: {
+          type: 'object',
+          nullable: true,
+          additionalProperties: true,
+          description: 'Índice e achado como o aparelho os escreveu. Opaco: nunca interpretado.',
+        },
+      },
+    },
+    description: 'Nulo quando o aluno ainda não tem avaliação publicada.',
+  })
+  async avaliacaoDoMes(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'avaliacao',
+      agora,
+    );
+
+    return this.saude.avaliacaoDoMes(aluno, agora);
+  }
+
+  @Get('sessions/:id/evolution')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['months', 'latestAnalysis'],
+      properties: {
+        months: { type: 'array', items: { type: 'object', additionalProperties: true } },
+        latestAnalysis: {
+          type: 'object',
+          nullable: true,
+          required: ['positivePoints', 'attentionPoints', 'disclaimerCode'],
+          properties: {
+            positivePoints: { type: 'array', items: { type: 'string' } },
+            attentionPoints: { type: 'array', items: { type: 'string' } },
+            disclaimerCode: { type: 'string', enum: ['NOT_MEDICAL_DIAGNOSIS'] },
+          },
+        },
+      },
+    },
+  })
+  async evolucao(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'evolucao',
+      agora,
+    );
+
+    return this.saude.evolucao(aluno, agora);
+  }
+
+  @Get('sessions/:id/assessments')
+  @ApiOkResponse({
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['assessmentId', 'medidaEm', 'metricas'],
+        properties: {
+          assessmentId: { type: 'string', format: 'uuid' },
+          medidaEm: { type: 'string', format: 'date-time' },
+          metricas: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['tipo', 'valor', 'unidade', 'deltaAbsoluto', 'razaoDaAusencia'],
+              properties: {
+                tipo: { type: 'string' },
+                valor: { type: 'number', nullable: true },
+                unidade: { type: 'string', nullable: true },
+                deltaAbsoluto: { type: 'number', nullable: true },
+                razaoDaAusencia: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  async historicoDeAvaliacoes(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'historicoDeAvaliacoes',
+      agora,
+    );
+
+    return this.saude.historicoDeAvaliacoes(aluno, agora);
   }
 
   /**

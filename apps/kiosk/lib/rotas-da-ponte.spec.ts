@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { resolverCaminhoDaPonte } from './rotas-da-ponte.js';
 
+const TENTATIVA = 'c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f';
 const SESSAO = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
 
 describe('allowlist da ponte assinada', () => {
@@ -33,6 +34,33 @@ describe('allowlist da ponte assinada', () => {
     ['id de sessao que nao e UUID', '/api/kiosk/sessions/../extend'],
     ['fora do prefixo da ponte', '/api/v1/admin/tenants'],
     ['raiz da ponte', '/api/kiosk/'],
+  ])('recusa %s', (_caso, caminho) => {
+    expect(resolverCaminhoDaPonte(caminho)).toBeNull();
+  });
+
+  /** Area do aluno (F52) -- um padrao por endpoint, nunca um curinga. */
+  it.each([
+    ['historico de pagamentos', `sessions/${SESSAO}/payments`],
+    ['cobranca PIX', `sessions/${SESSAO}/payments/pix`],
+    ['checkout de cartao', `sessions/${SESSAO}/payments/card-checkout`],
+    ['observar tentativa', `sessions/${SESSAO}/payments/${TENTATIVA}`],
+    ['avaliacao do mes', `sessions/${SESSAO}/assessment`],
+    ['historico de avaliacoes', `sessions/${SESSAO}/assessments`],
+    ['evolucao', `sessions/${SESSAO}/evolution`],
+  ])('aceita %s', (_caso, resto) => {
+    expect(resolverCaminhoDaPonte(`/api/kiosk/${resto}`)).toBe(`/api/v1/kiosk/${resto}`);
+  });
+
+  /**
+   * A lista e por ENDPOINT, e nao `sessions/<id>/.*` -- um curinga passaria
+   * sub-caminho futuro sem ninguem reler a allowlist.
+   */
+  it.each([
+    ['sub-caminho inventado', `/api/kiosk/sessions/${SESSAO}/payments/pix/confirm`],
+    ['attemptId que nao e UUID', `/api/kiosk/sessions/${SESSAO}/payments/abc`],
+    ['avaliacao com id colado', `/api/kiosk/sessions/${SESSAO}/assessment/${TENTATIVA}`],
+    ['travessia depois do id', `/api/kiosk/sessions/${SESSAO}/../../admin`],
+    ['modulo inventado', `/api/kiosk/sessions/${SESSAO}/ranking`],
   ])('recusa %s', (_caso, caminho) => {
     expect(resolverCaminhoDaPonte(caminho)).toBeNull();
   });

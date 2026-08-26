@@ -7,6 +7,7 @@ import { Button, Field, SelectField, useToast, useToastDeErro } from '@arenahub/
 
 import { Abas } from '../../../../../src/components/abas';
 import { AbaDeBlocos } from './aba-de-blocos';
+import { AbaDeModulos } from './aba-de-modulos';
 import {
   descartarAction,
   publicarAction,
@@ -49,7 +50,7 @@ function configInicial(estado: EstadoDaConfiguracao): KioskConfig {
 /**
  * Personalizacao do totem -- F50, painel do gerente.
  *
- * TRES ABAS reaproveitando `Abas` (ficha do aluno / planos): todas ficam
+ * CINCO ABAS reaproveitando `Abas` (ficha do aluno / planos): todas ficam
  * montadas, so trocam de `hidden` -- sem isso, campo de uma aba escondida
  * some do estado ao trocar de aba, porque o rascunho e um so objeto
  * controlado por este componente, nao por `FormData` nativo.
@@ -108,6 +109,10 @@ export function FormularioDeConfiguracao({ estado, kioskDeviceId }: Props) {
 
   const atualizarPatrocinio = (patrocinio: KioskConfig['patrocinio']) => {
     setRascunho((atual) => ({ ...atual, patrocinio }));
+  };
+
+  const atualizarModulos = (modulos: KioskConfig['modulos']) => {
+    setRascunho((atual) => ({ ...atual, modulos }));
   };
 
   const salvar = async () => {
@@ -299,6 +304,11 @@ export function FormularioDeConfiguracao({ estado, kioskDeviceId }: Props) {
                 aoFalhar={setErro}
               />
             ),
+          },
+          {
+            id: 'modulos',
+            rotulo: 'Módulos',
+            conteudo: <AbaDeModulos rascunho={rascunho} aoMudarModulos={atualizarModulos} />,
           },
           {
             id: 'sessao',

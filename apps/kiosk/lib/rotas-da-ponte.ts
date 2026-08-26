@@ -27,6 +27,18 @@ const PERMITIDOS: readonly RegExp[] = [
   /^sessions$/,
   new RegExp(`^sessions/${ID_DE_SESSAO}/extend$`),
   new RegExp(`^sessions/${ID_DE_SESSAO}$`),
+  /*
+   * AREA DO ALUNO (F52). Um padrao por endpoint, com o id da sessao
+   * ancorado no mesmo formato -- e nao um `sessions/<id>/.*` que passaria
+   * qualquer sub-caminho futuro sem ninguem reler esta lista.
+   */
+  new RegExp(`^sessions/${ID_DE_SESSAO}/payments$`),
+  new RegExp(`^sessions/${ID_DE_SESSAO}/payments/pix$`),
+  new RegExp(`^sessions/${ID_DE_SESSAO}/payments/card-checkout$`),
+  new RegExp(`^sessions/${ID_DE_SESSAO}/payments/${ID_DE_SESSAO}$`),
+  new RegExp(`^sessions/${ID_DE_SESSAO}/assessment$`),
+  new RegExp(`^sessions/${ID_DE_SESSAO}/assessments$`),
+  new RegExp(`^sessions/${ID_DE_SESSAO}/evolution$`),
 ];
 
 /**

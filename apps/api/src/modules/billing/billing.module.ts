@@ -99,6 +99,25 @@ import { WebhookController } from './webhook.controller.js';
    * virar por unidade, ganhar aprovacao em dois niveis --, quem se ajusta e
    * este modulo, e o de acesso nem fica sabendo.
    */
-  exports: [BillingRepository, PAYMENT_PROVIDER, LiberacaoFinanceiraUseCase],
+  exports: [
+    BillingRepository,
+    PAYMENT_PROVIDER,
+    LiberacaoFinanceiraUseCase,
+    /*
+     * Exportados para o TOTEM (F52), pela mesma razao da liberacao acima: o
+     * kiosk cobra chamando o CASO DE USO, nunca escrevendo em `invoices` ou
+     * `payment_attempts` (regra de arquitetura no 9). Se a forma da cobranca
+     * mudar -- ganhar antifraude, mudar de provedor, exigir passo novo --,
+     * quem se ajusta e este modulo, e o totem nem fica sabendo.
+     *
+     * `ConsultarTentativaUseCase` e a consulta BARATA (so o nosso banco), e
+     * e deliberadamente a unica exportada das duas: exportar tambem a que
+     * bate no provedor convidaria alguem a usa-la no laco de polling do
+     * totem, que e o erro que o proprio arquivo dela documenta.
+     */
+    CriarCobrancaPixUseCase,
+    CriarCheckoutDeCartaoUseCase,
+    ConsultarTentativaUseCase,
+  ],
 })
 export class BillingModule {}
