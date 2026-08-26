@@ -335,12 +335,13 @@ imutabilidade do passo 2 (publicar sempre insere linha nova) — os dois describ
 
 ### Evidência da `SPEC-051` — F51, tela pública do totem
 
-Gerada em 26/08/2026 a partir do gate local. **PR: `—`** — preencher depois do merge, pela regra acima.
+Gerada em 26/08/2026 a partir do gate local, e confirmada pelo CI no merge.
+**PR: [#208](https://github.com/RodReis/arenahub/pull/208)**
 
 ```
-| 2026-08-26 | #152 | SPEC-051 | unitário   | 1860 | 1860 | 0 |    — | — |
-| 2026-08-26 | #152 | SPEC-051 | integração |  649 |  649 | 0 |    — | — |
-| 2026-08-26 | #152 | SPEC-051 | e2e        |   61 |   61 | 0 |    — | — |
+| 2026-08-26 | #152 | SPEC-051 | unitário   | 1860 | 1860 | 0 | #208 | — |
+| 2026-08-26 | #152 | SPEC-051 | integração |  649 |  649 | 0 | #208 | — |
+| 2026-08-26 | #152 | SPEC-051 | e2e        |   61 |   61 | 0 | #208 | — |
 ```
 
 **A linha `e2e` é preenchida à mão**, pelo motivo já registrado acima: o gerador coleta `test` e
