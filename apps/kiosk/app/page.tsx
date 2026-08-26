@@ -1,6 +1,10 @@
 'use client';
 
-import { CONFIG_PADRAO_DO_TOTEM, type KioskConfig } from '@arenahub/api-contracts';
+import {
+  CONFIG_PADRAO_DO_TOTEM,
+  type IndicadoresDaUnidade,
+  type KioskConfig,
+} from '@arenahub/api-contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Atrator } from '../components/atrator';
@@ -43,6 +47,18 @@ export default function Totem() {
   // `null` ate a primeira config carregar -- `decidirReinicio` fica inerte
   // ate la (ver reinicio.ts: sem boot conhecido, nao ha o que comparar).
   const [versaoDoBoot, setVersaoDoBoot] = useState<number | null>(null);
+  /**
+   * Ultimo valor conhecido dos indicadores da unidade (F51).
+   *
+   * ESTE ESTADO E O CACHE, e e o que sustenta `M3.5-FR-005` para o bloco de
+   * informacoes: quando o heartbeat falha, `heartbeat()` devolve `null` e
+   * este valor NAO e tocado -- a tela publica segue exibindo o ultimo numero
+   * que chegou, em vez de piscar para vazio a cada queda de link.
+   *
+   * `null` so ate o PRIMEIRO heartbeat responder. Ai o bloco mostra o titulo
+   * sem numero, que e diferente de mostrar zero.
+   */
+  const [indicadores, setIndicadores] = useState<IndicadoresDaUnidade | null>(null);
   // Marcado quando `decidirReinicio` manda 'aguardar': a troca so acontece
   // quando esta sessao terminar, nunca no meio dela.
   const reinicioPendenteRef = useRef(false);
@@ -80,9 +96,15 @@ export default function Totem() {
    * acima, nunca pela closure do momento em que foi agendado.
    */
   useEffect(() => {
-    const intervalo = setInterval(() => {
+    const bater = (): void => {
       void heartbeat().then((resposta) => {
         if (resposta === null) return;
+
+        // So sobrescreve quando o numero VEIO: uma API antiga (sem o campo)
+        // nao pode apagar o ultimo valor conhecido.
+        if (resposta.indicadores !== undefined) {
+          setIndicadores(resposta.indicadores);
+        }
 
         const decisao = decidirReinicio({
           versaoDoBoot: versaoDoBootRef.current,
@@ -96,7 +118,15 @@ export default function Totem() {
           reinicioPendenteRef.current = true;
         }
       });
-    }, INTERVALO_DE_HEARTBEAT_MS);
+    };
+
+    // UM AGORA, e nao so daqui a 30 segundos: os indicadores da tela publica
+    // (F51) chegam por aqui, e esperar o primeiro intervalo deixaria o bloco
+    // de informacoes sem numero durante meio minuto a cada boot -- que e
+    // justamente quando alguem esta olhando o totem recem-ligado.
+    bater();
+
+    const intervalo = setInterval(bater, INTERVALO_DE_HEARTBEAT_MS);
 
     return () => {
       clearInterval(intervalo);
@@ -206,6 +236,7 @@ export default function Totem() {
       {etapa === 'atrator' ? (
         <Atrator
           config={config}
+          indicadores={indicadores}
           altoContraste={altoContraste}
           aoAlternarContraste={alternarContraste}
           aoEntrar={() => {

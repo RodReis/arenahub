@@ -6,6 +6,7 @@ import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware
 import { ProblemDetailsFilter } from './common/http/problem-details.filter.js';
 import { AuthGuard } from './common/security/auth.guard.js';
 import { PermissionsGuard } from './common/security/permissions.guard.js';
+import { AntivirusModule } from './common/antivirus/antivirus.module.js';
 import { StorageModule } from './common/storage/storage.module.js';
 import { HealthController } from './health/health.controller.js';
 import { VerificadorDeBanco } from './health/verificador-de-banco.js';
@@ -43,6 +44,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     // mesmo `@Interval`.
     ScheduleModule.forRoot(),
     PersistenceModule,
+    AntivirusModule,
     StorageModule,
     AuthModule,
     IamModule,

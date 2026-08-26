@@ -12,10 +12,10 @@ import { PasswordService } from '../../src/modules/auth/password.service.js';
 import type { BodyMeasurementType, MeasurementUnit } from '@arenahub/database';
 
 import { ImportService } from '../../src/modules/health/import.service.js';
-import { FakeMalwareScannerAdapter } from '../../src/modules/health/provider/fake-malware-scanner.adapter.js';
+import { FakeMalwareScannerAdapter } from '../../src/common/antivirus/fake-malware-scanner.adapter.js';
 import { FakeOcrExtractorAdapter } from '../../src/modules/health/provider/fake-ocr-extractor.adapter.js';
 import { DOCUMENT_EXTRACTOR, ErroDeExtracao } from '../../src/modules/health/provider/document-extractor.port.js';
-import { ErroDoScanner } from '../../src/modules/health/provider/malware-scanner.port.js';
+import { ErroDoScanner } from '../../src/common/antivirus/malware-scanner.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**

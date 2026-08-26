@@ -1,6 +1,16 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { CONFIG_PADRAO_DO_TOTEM, resolverConfig } from './kiosk-config.js';
+import {
+  CONFIG_PADRAO_DO_TOTEM,
+  MAXIMO_DE_PATROCINADORES,
+  ROTULO_PADRAO_DE_PATROCINIO,
+  blocoDaTelaPublicaSchema,
+  blocosEmRodizio,
+  indicadoresDaUnidadeSchema,
+  kioskConfigSchema,
+  resolverConfig,
+  rotuloDePatrocinio,
+} from './kiosk-config.js';
 
 describe('resolverConfig -- tres camadas, a mais especifica vence', () => {
   it('devolve o padrao quando nenhuma camada existe', () => {
@@ -63,5 +73,163 @@ describe('resolverConfig -- tres camadas, a mais especifica vence', () => {
       facial: false,
       qrCodeDoApp: false,
     });
+  });
+});
+
+describe('blocos da tela publica (F51)', () => {
+  const blocoVideo = {
+    id: 'b1',
+    habilitado: true,
+    tipo: 'VIDEO' as const,
+    titulo: 'Quem forma a nossa equipe',
+    legenda: 'Conheca os professores.',
+    midiaKey: 'tenants/t/kiosk-media/u/abc.mp4',
+    linkExterno: null,
+  };
+
+  const blocoEventos = {
+    id: 'b2',
+    habilitado: false,
+    tipo: 'EVENTOS' as const,
+    titulo: 'Proximos eventos',
+    itens: [{ data: '2026-08-30', titulo: 'Aulao de Spinning', informacao: '19h' }],
+  };
+
+  it('nenhum bloco vem habilitado no padrao -- a tela nasce so com hero e CTA', () => {
+    expect(CONFIG_PADRAO_DO_TOTEM.blocos.itens).toEqual([]);
+    expect(blocosEmRodizio(CONFIG_PADRAO_DO_TOTEM)).toEqual([]);
+  });
+
+  it('o rodizio leva SO os habilitados, na ordem do array', () => {
+    const config = {
+      ...CONFIG_PADRAO_DO_TOTEM,
+      blocos: {
+        tempoPorBlocoSegundos: 12 as const,
+        itens: [blocoEventos, blocoVideo],
+      },
+    };
+
+    expect(blocosEmRodizio(config).map((b) => b.id)).toEqual(['b1']);
+  });
+
+  it('a ORDEM do array e a ordem do rodizio -- inverter o array inverte a tela', () => {
+    const dois = [blocoVideo, { ...blocoEventos, habilitado: true }];
+
+    const emOrdem = blocosEmRodizio({
+      ...CONFIG_PADRAO_DO_TOTEM,
+      blocos: { tempoPorBlocoSegundos: 12, itens: dois },
+    });
+    const invertido = blocosEmRodizio({
+      ...CONFIG_PADRAO_DO_TOTEM,
+      blocos: { tempoPorBlocoSegundos: 12, itens: [...dois].reverse() },
+    });
+
+    expect(emOrdem.map((b) => b.id)).toEqual(['b1', 'b2']);
+    expect(invertido.map((b) => b.id)).toEqual(['b2', 'b1']);
+  });
+
+  it('camada de dispositivo SUBSTITUI a lista de blocos, nunca concatena', () => {
+    const resultado = resolverConfig({
+      unidade: { blocos: { tempoPorBlocoSegundos: 8, itens: [blocoVideo] } },
+      dispositivo: { blocos: { itens: [blocoEventos] } },
+    });
+
+    // Concatenar produziria ordem de rodizio que ninguem definiu.
+    expect(resultado.blocos.itens.map((b) => b.id)).toEqual(['b2']);
+    // ...e o tempo da unidade sobrevive: o dispositivo so falou de `itens`.
+    expect(resultado.blocos.tempoPorBlocoSegundos).toBe(8);
+  });
+
+  it('bloco de tipo desconhecido invalida a camada, que e ignorada', () => {
+    const resultado = resolverConfig({
+      unidade: {
+        blocos: { itens: [{ id: 'x', habilitado: true, tipo: 'RANKING' }] },
+      },
+    });
+
+    expect(resultado.blocos.itens).toEqual([]);
+  });
+
+  it('video exige legenda -- DS-TOTEM §4 pede video sem som E com legenda', () => {
+    const semLegenda = { ...blocoVideo, legenda: '' };
+
+    expect(blocoDaTelaPublicaSchema.safeParse(semLegenda).success).toBe(false);
+  });
+});
+
+describe('faixa de patrocinadores (ADR-042, Decisao 4)', () => {
+  it('rotulo vazio cai no padrao, nunca em nada', () => {
+    expect(rotuloDePatrocinio('')).toBe(ROTULO_PADRAO_DE_PATROCINIO);
+    expect(rotuloDePatrocinio('   ')).toBe(ROTULO_PADRAO_DE_PATROCINIO);
+  });
+
+  it('rotulo configurado vence o padrao', () => {
+    expect(rotuloDePatrocinio(' Apoio ')).toBe('Apoio');
+  });
+
+  it('aceita ate 6 marcas e recusa a setima', () => {
+    const marca = { nome: 'Marca', logotipoUrl: null };
+    const comSeis = Array.from({ length: MAXIMO_DE_PATROCINADORES }, () => marca);
+
+    const seis = kioskConfigSchema.shape.patrocinio.safeParse({
+      habilitado: true,
+      rotulo: '',
+      marcas: comSeis,
+    });
+    const sete = kioskConfigSchema.shape.patrocinio.safeParse({
+      habilitado: true,
+      rotulo: '',
+      marcas: [...comSeis, marca],
+    });
+
+    expect(seis.success).toBe(true);
+    expect(sete.success).toBe(false);
+  });
+
+  it('NAO existe campo de contagem, clique ou periodo no contrato', () => {
+    // A ausencia deles E a trava: o `parse` DESCARTA campo estranho, entao
+    // um contador enviado pelo painel nao chega ao banco (`M3.5-BR-006`).
+    const parsed = kioskConfigSchema.shape.patrocinio.parse({
+      habilitado: true,
+      rotulo: 'Apoio',
+      marcas: [{ nome: 'Marca', logotipoUrl: null }],
+      impressoes: 42,
+      urlDeDestino: 'https://exemplo.com',
+      veiculaAte: '2026-12-31',
+    });
+
+    expect(parsed).not.toHaveProperty('impressoes');
+    expect(parsed).not.toHaveProperty('urlDeDestino');
+    expect(parsed).not.toHaveProperty('veiculaAte');
+  });
+});
+
+describe('indicadores da unidade -- M3.5-BR-001', () => {
+  it('aceita dois inteiros nao negativos', () => {
+    const parsed = indicadoresDaUnidadeSchema.parse({
+      checkinsDeHoje: 312,
+      treinandoAgora: 47,
+    });
+
+    expect(parsed).toEqual({ checkinsDeHoje: 312, treinandoAgora: 47 });
+  });
+
+  it('DESCARTA qualquer dado de aluno que venha junto', () => {
+    const parsed = indicadoresDaUnidadeSchema.parse({
+      checkinsDeHoje: 1,
+      treinandoAgora: 1,
+      alunos: [{ nome: 'Fulano de Tal', studentId: 'uuid' }],
+    });
+
+    expect(parsed).not.toHaveProperty('alunos');
+  });
+
+  it('recusa contagem negativa e fracionaria', () => {
+    expect(
+      indicadoresDaUnidadeSchema.safeParse({ checkinsDeHoje: -1, treinandoAgora: 0 }).success,
+    ).toBe(false);
+    expect(
+      indicadoresDaUnidadeSchema.safeParse({ checkinsDeHoje: 1.5, treinandoAgora: 0 }).success,
+    ).toBe(false);
   });
 });

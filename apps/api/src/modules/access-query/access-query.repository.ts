@@ -254,6 +254,38 @@ export class AccessQueryRepository {
     });
   }
 
+  /**
+   * Quantas entradas AUTORIZADAS a unidade teve no periodo (F51).
+   *
+   * CASO DE USO PUBLICO deste modulo, e por isso existe aqui em vez de o
+   * `kiosk` consultar `access_events` direto: modulo nao le tabela privada
+   * de outro (regra de arquitetura no 9).
+   *
+   * Escopo por `gymUnitId` EXPLICITO, e nao por `TenantContext`: quem chama
+   * e o totem, cuja credencial e de dispositivo e ja carrega a unidade --
+   * nao ha papel nem `allowedUnitIds` no caminho. Reusar `contar` obrigaria
+   * a fabricar um `TenantContext` falso, e contexto fabricado e como
+   * isolamento de tenant vira decoracao.
+   *
+   * Devolve INTEIRO. Nao ha `select` de aluno, de nome nem de id nesta
+   * consulta -- `M3.5-BR-001` e cumprido por o dado nunca sair do banco.
+   */
+  async contarEntradasDaUnidade(entrada: {
+    readonly tenantId: string;
+    readonly gymUnitId: string;
+    readonly de: Date;
+    readonly ate: Date;
+  }): Promise<number> {
+    return this.db.accessEvent.count({
+      where: {
+        tenantId: entrada.tenantId,
+        gymUnitId: entrada.gymUnitId,
+        outcome: 'ALLOW',
+        occurredAt: { gte: entrada.de, lte: entrada.ate },
+      },
+    });
+  }
+
   private montarWhere(
     contexto: TenantContext,
     filtro: FiltroDeEventos,

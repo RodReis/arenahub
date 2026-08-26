@@ -13,10 +13,12 @@ import {
 import { ApiNoContentResponse, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { z } from 'zod';
 import type { Request } from 'express';
+import type { IndicadoresDaUnidade } from '@arenahub/api-contracts';
 
 import { KioskRoute } from '../kiosk-auth/kiosk-route.decorator.js';
 import type { ContextoDoKiosk } from '../kiosk-auth/kiosk-auth.service.js';
 import { KioskConfigService, type ConfiguracaoResolvida } from './kiosk-config.service.js';
+import { KioskMediaLinkService } from './kiosk-media-link.service.js';
 import { KioskSessionService, type SessaoAberta } from './kiosk-session.service.js';
 
 const heartbeatSchema = z.object({
@@ -39,6 +41,7 @@ const abrirSessaoSchema = z.object({
 export class KioskController {
   constructor(
     private readonly config: KioskConfigService,
+    private readonly midia: KioskMediaLinkService,
     private readonly sessions: KioskSessionService,
   ) {}
 
@@ -47,17 +50,29 @@ export class KioskController {
   @ApiOkResponse({
     schema: {
       type: 'object',
-      required: ['configVersion', 'serverTime'],
+      required: ['configVersion', 'serverTime', 'indicadores'],
       properties: {
         configVersion: { type: 'integer' },
         serverTime: { type: 'string', format: 'date-time' },
+        indicadores: {
+          type: 'object',
+          required: ['checkinsDeHoje', 'treinandoAgora'],
+          properties: {
+            checkinsDeHoje: { type: 'integer' },
+            treinandoAgora: { type: 'integer' },
+          },
+        },
       },
     },
   })
   async heartbeat(
     @Req() requisicao: Request,
     @Body() corpo: unknown,
-  ): Promise<{ configVersion: number; serverTime: string }> {
+  ): Promise<{
+    configVersion: number;
+    serverTime: string;
+    indicadores: IndicadoresDaUnidade;
+  }> {
     const contexto = this.contexto(requisicao);
     const dados = heartbeatSchema.parse(corpo);
     const agora = new Date();
@@ -66,9 +81,14 @@ export class KioskController {
 
     await this.config.registrarHeartbeat(contexto, dados, agora);
 
+    // Os indicadores da tela publica (F51) pegam CARONA aqui, e nao numa rota
+    // propria: `M3.5-FR-005` proibe a tela publica depender da rede, e uma
+    // requisicao a mais so para o contador seria essa dependencia.
+    const indicadores = await this.config.contarIndicadores(contexto, agora);
+
     // `configVersion` nasce AQUI, na F49: a F50 declara este endpoint como
     // pre-existente e compara este numero com o do boot (ADR-042, Decisao 3).
-    return { configVersion: version, serverTime: agora.toISOString() };
+    return { configVersion: version, serverTime: agora.toISOString(), indicadores };
   }
 
   @Get('config')
@@ -93,7 +113,13 @@ export class KioskController {
     },
   })
   async obterConfig(@Req() requisicao: Request): Promise<ConfiguracaoResolvida> {
-    return this.config.resolverParaDispositivo(this.contexto(requisicao));
+    const contexto = this.contexto(requisicao);
+    const resolvida = await this.config.resolverParaDispositivo(contexto);
+
+    // As URLs de midia sao assinadas AQUI, no boot -- nunca pela tela. E o
+    // que sustenta `M3.5-FR-005`: o totem recebe endereco pronto, baixa uma
+    // vez e serve do cache; a tela publica em si nunca fala com a rede.
+    return this.midia.resolverMidias(contexto, resolvida);
   }
 
   @Post('sessions')

@@ -22,7 +22,21 @@ export {
 export {
   ACCENTS_DO_TOTEM,
   CONFIG_PADRAO_DO_TOTEM,
+  MAXIMO_DE_PATROCINADORES,
+  ROTULO_PADRAO_DE_PATROCINIO,
+  TEMPOS_POR_BLOCO,
+  TIPOS_DE_BLOCO,
+  blocoDaTelaPublicaSchema,
+  blocosEmRodizio,
+  indicadoresDaUnidadeSchema,
   kioskConfigSchema,
   resolverConfig,
+  rotuloDePatrocinio,
 } from './kiosk-config.js';
-export type { KioskConfig, KioskConfigLayers } from './kiosk-config.js';
+export type {
+  BlocoDaTelaPublica,
+  IndicadoresDaUnidade,
+  KioskConfig,
+  KioskConfigLayers,
+  TipoDeBloco,
+} from './kiosk-config.js';

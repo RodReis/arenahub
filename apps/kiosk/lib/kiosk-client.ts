@@ -1,4 +1,8 @@
-import { type KioskConfig, CONFIG_PADRAO_DO_TOTEM } from '@arenahub/api-contracts';
+import {
+  type IndicadoresDaUnidade,
+  type KioskConfig,
+  CONFIG_PADRAO_DO_TOTEM,
+} from '@arenahub/api-contracts';
 
 /**
  * Cliente do totem, do lado do NAVEGADOR.
@@ -51,6 +55,15 @@ export async function carregarConfig(): Promise<ConfigDoTotem> {
 export interface RespostaDeHeartbeat {
   readonly configVersion: number;
   readonly serverTime: string;
+  /**
+   * Os dois numeros da tela publica (F51).
+   *
+   * OPCIONAL no tipo do cliente, embora a API sempre os mande: um totem que
+   * ainda nao atualizou fala com uma API que ja atualizou (e vice-versa), e
+   * um campo obrigatorio aqui faria o `undefined` virar `NaN` na tela em vez
+   * de "sem numero ainda".
+   */
+  readonly indicadores?: IndicadoresDaUnidade;
 }
 
 /**

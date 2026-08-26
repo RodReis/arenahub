@@ -336,3 +336,164 @@ button {
   font-size: var(--tt-metadado);
   font-weight: 600;
 }
+
+/* --------------------------------------- blocos publicos (F51, §4) */
+
+/**
+ * O cartao do rodizio. UM POR VEZ -- o §4 exige "no maximo um bloco de midia
+ * visivel por vez", e o rodizio garante isso por construcao.
+ *
+ * `flex-shrink: 0` e altura maxima: a tela e 1080x1920 FIXOS e nao rola
+ * (checklist §8: `scrollHeight === clientHeight`). Um bloco com texto longo
+ * demais precisa ser cortado pelo `overflow`, nunca empurrar o CTA para fora.
+ */
+.blocoPublico {
+  /*
+   * Cresce ate o teto e nunca encolhe abaixo do conteudo: o cartao e o que
+   * ocupa o vao entre hero e CTA. Com `flex-shrink: 0` sozinho ele ficava
+   * pequeno no meio de muito ar -- foi o que a tela real mostrou.
+   */
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 620px;
+  overflow: hidden;
+  padding: 28px;
+  border: var(--tt-borda) solid var(--ah-totem-border);
+  border-radius: var(--tt-raio-card);
+  background: var(--ah-totem-bg-surface);
+}
+
+.tituloDoBloco {
+  font-size: var(--tt-card-titulo);
+  font-weight: 800;
+  margin: 0;
+}
+
+/**
+ * `object-fit: cover` com altura fixa: video vertical e 16:9 convivem no
+ * mesmo cartao sem que um deles estique o layout (DS-TOTEM §4 aceita os dois).
+ */
+.videoDoBloco {
+  width: 100%;
+  height: 360px;
+  object-fit: cover;
+  border-radius: var(--tt-raio-icone);
+  background: var(--ah-totem-bg-base);
+}
+
+.listaDeEventos {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evento {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.dataDoEvento {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: var(--tt-raio-pill);
+  background: var(--ah-totem-bg-base);
+  color: var(--ah-totem-brand-200);
+  font-size: var(--tt-metadado);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tituloDoEvento {
+  flex: 1;
+  font-size: var(--tt-corpo);
+  font-weight: 700;
+}
+
+.indicadores {
+  display: flex;
+  gap: 40px;
+}
+
+.indicador {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.valorDoIndicador {
+  font-size: var(--tt-valor);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-totem-brand-200);
+}
+
+/** Pontos do rodizio -- indicam quantos blocos giram e qual esta em cena. */
+.progressoDoRodizio {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.pontoDoRodizio {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--tt-raio-pill);
+  background: var(--ah-totem-border);
+}
+
+.pontoDoRodizio[data-ativo='true'] {
+  width: 36px;
+  background: var(--ah-totem-brand-300);
+}
+
+/**
+ * Faixa de patrocinadores -- ADR-042, Decisao 4.
+ *
+ * FIXA no rodape, fora do rodizio. O rotulo NAO pode sumir: publicidade
+ * identificada como tal (CDC art. 36), ao lado de conteudo informativo da
+ * propria academia.
+ */
+.faixaDePatrocinio {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 20px;
+  border-top: var(--tt-borda) solid var(--ah-totem-border);
+}
+
+.rotuloDoPatrocinio {
+  flex-shrink: 0;
+  font-size: var(--tt-minimo);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ah-totem-text-secondary);
+}
+
+.marcas {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-around;
+  gap: 16px;
+}
+
+.marca {
+  font-size: var(--tt-metadado);
+  font-weight: 700;
+  color: var(--ah-totem-text-secondary);
+}
+
+.logotipoDoPatrocinador {
+  max-height: 48px;
+  max-width: 140px;
+  object-fit: contain;
+}

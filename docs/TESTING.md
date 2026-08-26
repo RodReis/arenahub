@@ -302,12 +302,11 @@ Playwright ao relatório é trabalho de `[INFRA]`, fora do escopo desta fatia.
 
 ### Evidência da `SPEC-050` — F50, configuração do totem
 
-Gerada por `pnpm test:report --issue 151 --spec SPEC-050`, em 26/08/2026. **PR: `—`** — preencher
-depois do merge, pela regra acima.
+Gerada por `pnpm test:report --issue 151 --spec SPEC-050`, em 26/08/2026. **PR: [#207](https://github.com/RodReis/arenahub/pull/207)** — preenchido pela F51, que encontrou o campo em `—`.
 
 ```
-| 2026-08-26 | #151 | SPEC-050 | unitário   | 1757 | 1757 | 0 |    — | — |
-| 2026-08-26 | #151 | SPEC-050 | integração |  640 |  640 | 0 |    — | — |
+| 2026-08-26 | #151 | SPEC-050 | unitário   | 1757 | 1757 | 0 | #207 | — |
+| 2026-08-26 | #151 | SPEC-050 | integração |  640 |  640 | 0 | #207 | — |
 ```
 
 **Cobertura % não capturada nesta linha.** `pnpm test:report` trava na saída do processo Jest
@@ -333,6 +332,36 @@ O que a fatia cobre, por nível (detalhe em
 nunca reescreve versão publicada*. É o índice parcial do passo 1 (isolamento por chave) mais a
 imutabilidade do passo 2 (publicar sempre insere linha nova) — os dois described em
 `docs/DEVELOPMENT.md` §"F50 — o que a fatia cumpriu".
+
+### Evidência da `SPEC-051` — F51, tela pública do totem
+
+Gerada em 26/08/2026 a partir do gate local. **PR: `—`** — preencher depois do merge, pela regra acima.
+
+```
+| 2026-08-26 | #152 | SPEC-051 | unitário   | 1860 | 1860 | 0 |    — | — |
+| 2026-08-26 | #152 | SPEC-051 | integração |  649 |  649 | 0 |    — | — |
+```
+
+**Cobertura % não capturada, pelo mesmo motivo já registrado na `SPEC-050`:** `pnpm test:report`
+trava na saída do Jest neste ambiente Windows. Os números acima são os que o gate local produziu —
+unitário 1860/1860 (12 pacotes), integração 649/649 (43 suítes), zero falhas. **Escopo é a suíte
+inteira do monorepo**, não um subconjunto da F51, porque o gerador nunca soube separar por fatia.
+
+O que a fatia cobre, por nível (detalhe em
+[`superpowers/specs/2026-08-26-f51-tela-publica-do-totem-design.md`](superpowers/specs/2026-08-26-f51-tela-publica-do-totem-design.md)):
+
+| nível | o que prova |
+|---|---|
+| unitário | `blocosVisiveis` (vídeo sem mídia resolvida **sai** do rodízio, em vez de virar 12 s de tela preta), `proximoIndice`/`indiceSeguro` (lista vazia devolve 0, nunca `NaN`; lista que encolheu volta ao início), `mover` (subir a primeira e descer a última **não** embaralham), `aceitarMidia` e `pareceMp4` (a assinatura ISO-BMFF mora no **offset 4**, não no 0), `rotuloDePatrocinio` (rótulo vazio cai no padrão, nunca em nada), `formatarData` (a data digitada não anda um dia para trás), `inicioDoDiaLocal` (22h locais ainda são o mesmo dia, embora já seja o dia seguinte em UTC) |
+| integração | `POST /admin/kiosk-devices/:id/media` — MP4 aceito devolve chave escopada por tenant **e** unidade; PNG renomeado é recusado **sem sequer chamar o antivírus**; EICAR responde 422 e **não** chega ao storage; totem de outro tenant responde 404, nunca 403. `GET /kiosk/config` — os blocos publicados chegam ao totem na ordem e no tempo configurados; **mídia apontando para outra unidade não vira URL assinada**, mesmo gravada no payload. `POST /kiosk/heartbeat` — os indicadores contam `access_events` reais e contam **só os da unidade daquele totem**; `DENY` não conta como check-in |
+| componente | a faixa de patrocinadores **não tem `<a>` nem `<button>`** (vitrine, não mídia — ADR-042, Decisão 4); o bloco de informações mostra o título e **não um zero** enquanto nenhum número chegou; o campo de link do Instagram aparece **desabilitado com o motivo em tela** |
+
+**A guarda de regressão desta fatia tem nome:** *nenhuma configuração publica dado de aluno na tela
+pública, e a faixa de patrocínio nunca conta exibição*. A primeira metade é estrutural — o
+componente da hero recebe `config` e dois inteiros, e `SessaoDoAluno` não é importado no arquivo; o
+endpoint que produz os números devolve **dois inteiros**, sem lista, sem nome, sem id
+(`M3.5-BR-001`). A segunda também: não há campo de contagem, clique, campanha ou período **no
+contrato**, e o `parse` do Zod descarta o que vier a mais (`M3.5-BR-006`).
 
 ---
 

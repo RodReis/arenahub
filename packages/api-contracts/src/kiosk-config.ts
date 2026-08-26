@@ -16,6 +16,134 @@ import { z } from 'zod';
 /** Escolha entre quatro, nunca hex livre (ADR-042, Decisao 6). */
 export const ACCENTS_DO_TOTEM = ['AZUL', 'VERDE', 'LARANJA', 'ROXO'] as const;
 
+/** Os cinco tipos de bloco da tela publica (F51, issue #152). */
+export const TIPOS_DE_BLOCO = [
+  'VIDEO',
+  'EVENTOS',
+  'MATERIAL',
+  'INSTAGRAM',
+  'INFORMACOES',
+] as const;
+
+export type TipoDeBloco = (typeof TIPOS_DE_BLOCO)[number];
+
+/** Tempo por bloco no rodizio -- lista fechada (`M3.5-FR-004`). */
+export const TEMPOS_POR_BLOCO = [8, 12, 20, 30] as const;
+
+/** Ate 6 marcas por unidade (ADR-042, Decisao 4). */
+export const MAXIMO_DE_PATROCINADORES = 6;
+
+/** Rotulo obrigatorio da faixa -- vazio cai neste padrao, nunca em nada. */
+export const ROTULO_PADRAO_DE_PATROCINIO = 'Espaço patrocinado';
+
+const blocoBaseSchema = z.object({
+  /** Estavel entre publicacoes: e a chave de React e o alvo do reordenar. */
+  id: z.string().min(1),
+  habilitado: z.boolean(),
+});
+
+/**
+ * Video da tela publica.
+ *
+ * `midiaKey` e `linkExterno` sao ORIGENS ALTERNATIVAS, nao um par: a chave
+ * aponta para o MP4 ja no object storage; o link e o reel do Instagram, que
+ * na F51 nao tem adapter (decisao 1 do PI de 26/08/2026) e fica gravado
+ * esperando a fatia INFRA. O contrato ja o aceita para que a chegada do
+ * adapter nao mexa em tabela, contrato nem tela (ADR-042, Decisao 0).
+ *
+ * `legenda` nao e opcional por acidente: `DS-TOTEM.md` §4 exige video SEM SOM
+ * e COM LEGENDA -- a recepcao nao tem audio confiavel. Campo opcional
+ * produziria video mudo e sem texto, que nao comunica nada.
+ */
+const blocoVideoSchema = blocoBaseSchema.extend({
+  tipo: z.literal('VIDEO'),
+  titulo: z.string().min(1),
+  legenda: z.string().min(1),
+  midiaKey: z.string().nullable(),
+  linkExterno: z.string().url().nullable(),
+  /**
+   * URL assinada, preenchida pela API no BOOT e nunca gravada.
+   *
+   * Campo separado de `midiaKey` -- e nao a chave sobrescrita com a URL --
+   * porque os dois tem donos opostos: a CHAVE e escrita pelo painel e vive
+   * na versao publicada; a URL e derivada, expira em uma hora e nao pertence
+   * a configuracao. Sobrescrever a chave faria o proximo `PUT` do painel
+   * gravar uma URL expirada onde deveria haver chave, e o video sumiria da
+   * tela sem que ninguem tivesse mexido nele.
+   *
+   * Opcional no schema porque o PAINEL nunca o envia: so a resposta do
+   * `GET /api/v1/kiosk/config` o traz.
+   */
+  midiaUrl: z.string().nullable().optional(),
+});
+
+const blocoEventosSchema = blocoBaseSchema.extend({
+  tipo: z.literal('EVENTOS'),
+  titulo: z.string().min(1),
+  itens: z
+    .array(
+      z.object({
+        /** Data em ISO `YYYY-MM-DD`: o totem so a formata, nunca a calcula. */
+        data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        titulo: z.string().min(1),
+        informacao: z.string(),
+      }),
+    )
+    .max(4),
+});
+
+const blocoMaterialSchema = blocoBaseSchema.extend({
+  tipo: z.literal('MATERIAL'),
+  titulo: z.string().min(1),
+  resumo: z.string(),
+  /** Vira QR na tela -- quem le, le no proprio celular. */
+  urlDoQr: z.string().url(),
+});
+
+const blocoInstagramSchema = blocoBaseSchema.extend({
+  tipo: z.literal('INSTAGRAM'),
+  perfil: z.string().min(1),
+  chamada: z.string(),
+});
+
+/**
+ * Indicadores da unidade.
+ *
+ * NAO carrega valor: o numero vem do heartbeat (`IndicadoresDaUnidade`) e
+ * expira com ele. Guardar numero na config publicada congelaria um valor de
+ * ontem numa versao imutavel -- e o gerente teria de republicar para o
+ * contador andar.
+ */
+const blocoInformacoesSchema = blocoBaseSchema.extend({
+  tipo: z.literal('INFORMACOES'),
+  titulo: z.string().min(1),
+  mostrarCheckinsDeHoje: z.boolean(),
+  mostrarTreinandoAgora: z.boolean(),
+});
+
+export const blocoDaTelaPublicaSchema = z.discriminatedUnion('tipo', [
+  blocoVideoSchema,
+  blocoEventosSchema,
+  blocoMaterialSchema,
+  blocoInstagramSchema,
+  blocoInformacoesSchema,
+]);
+
+export type BlocoDaTelaPublica = z.infer<typeof blocoDaTelaPublicaSchema>;
+
+/**
+ * Indicadores da unidade, servidos pelo heartbeat -- nunca gravados na
+ * config. DOIS INTEIROS, e nada mais: `M3.5-BR-001` proibe dado de aluno na
+ * tela publica, e o jeito de garantir isso e o servidor nao ter o que
+ * vazar. Sem lista, sem nome, sem id.
+ */
+export const indicadoresDaUnidadeSchema = z.object({
+  checkinsDeHoje: z.number().int().nonnegative(),
+  treinandoAgora: z.number().int().nonnegative(),
+});
+
+export type IndicadoresDaUnidade = z.infer<typeof indicadoresDaUnidadeSchema>;
+
 export const kioskConfigSchema = z.object({
   marca: z.object({
     nomeDaAcademia: z.string().min(1),
@@ -52,9 +180,70 @@ export const kioskConfigSchema = z.object({
     historicoDeAvaliacoes: z.boolean(),
     ranking: z.boolean(),
   }),
+  /**
+   * Tela publica (F51). A ORDEM DO ARRAY E A ORDEM DO RODIZIO -- nao ha
+   * campo `ordem` a manter em sincronia, e reordenar e mover no array.
+   * Campo `ordem` separado permitiria dois blocos com o mesmo numero, e o
+   * desempate cairia na ordem fisica -- que e exatamente o defeito que
+   * `include-sem-orderby-embaralha` documenta.
+   */
+  blocos: z.object({
+    tempoPorBlocoSegundos: z.union([
+      z.literal(8),
+      z.literal(12),
+      z.literal(20),
+      z.literal(30),
+    ]),
+    itens: z.array(blocoDaTelaPublicaSchema).max(TIPOS_DE_BLOCO.length),
+  }),
+  /**
+   * Faixa de patrocinadores (ADR-042, Decisao 4).
+   *
+   * VITRINE, NAO MIDIA: nao ha campo de periodo, de campanha, de contador
+   * nem de destino de clique -- e a ausencia deles no CONTRATO que impede o
+   * contador de aparecer "em silencio" depois. Acrescentar qualquer um
+   * exige ADR proprio, que e o gatilho que a Decisao 4 escreveu.
+   */
+  patrocinio: z.object({
+    habilitado: z.boolean(),
+    /** Vazio nao apaga o rotulo: cai em `ROTULO_PADRAO_DE_PATROCINIO`. */
+    rotulo: z.string(),
+    marcas: z
+      .array(
+        z.object({
+          nome: z.string().min(1),
+          logotipoUrl: z.string().url().nullable(),
+        }),
+      )
+      .max(MAXIMO_DE_PATROCINADORES),
+  }),
 });
 
 export type KioskConfig = z.infer<typeof kioskConfigSchema>;
+
+/**
+ * O rotulo que a faixa exibe -- `M3.5-BR-006` e CDC art. 36.
+ *
+ * PURA e exportada porque a REGRA e uma so e os dois lados a aplicam: o
+ * painel para pre-visualizar, o totem para exibir. Duas implementacoes de
+ * "vazio cai no padrao" divergiriam no primeiro `trim()` esquecido.
+ */
+export function rotuloDePatrocinio(configurado: string): string {
+  const limpo = configurado.trim();
+
+  return limpo === '' ? ROTULO_PADRAO_DE_PATROCINIO : limpo;
+}
+
+/**
+ * Os blocos que entram no rodizio, na ordem publicada.
+ *
+ * PURA: entra config, sai lista. Desabilitado nao entra; a ordem e a do
+ * array. Existe como funcao — e nao como filtro inline na tela — porque o
+ * painel pre-visualiza a MESMA sequencia que o totem roda.
+ */
+export function blocosEmRodizio(config: KioskConfig): readonly BlocoDaTelaPublica[] {
+  return config.blocos.itens.filter((bloco) => bloco.habilitado);
+}
 
 /**
  * O padrao que a F49 entrega enquanto a F50 nao existe para escrever.
@@ -94,6 +283,21 @@ export const CONFIG_PADRAO_DO_TOTEM: KioskConfig = {
     historicoDeAvaliacoes: false,
     ranking: false,
   },
+  /**
+   * Nenhum bloco por padrao. O `DS-TOTEM.md` §4 ja cobre este estado -- "se
+   * todos os blocos opcionais estiverem desligados, hero e CTA se distribuem
+   * com o espaco restante". Um bloco de exemplo no padrao apareceria na tela
+   * de quem nunca configurou nada, com texto que a academia nao escreveu.
+   */
+  blocos: {
+    tempoPorBlocoSegundos: 12,
+    itens: [],
+  },
+  patrocinio: {
+    habilitado: false,
+    rotulo: '',
+    marcas: [],
+  },
 };
 
 export interface KioskConfigLayers {
@@ -107,12 +311,20 @@ export interface KioskConfigLayers {
 // tem aninhamento alem de 1 nivel, um partial RASO em cada secao equivale
 // a um deep partial aqui: cada secao vira opcional, e por dentro dela cada
 // campo tambem vira opcional.
+//
+// `blocos` e `patrocinio` seguem a MESMA regra rasa, e a consequencia esta
+// nos ARRAYS: camada que define `itens` SUBSTITUI a lista inteira da camada
+// de baixo -- nao concatena. E o que se quer: a unidade que monta a propria
+// tela publica nao herda metade dos blocos do tenant intercalados com os
+// seus. Concatenar produziria ordem de rodizio que ninguem definiu.
 const kioskConfigSchemaParcial = z.object({
   marca: kioskConfigSchema.shape.marca.partial().optional(),
   aparencia: kioskConfigSchema.shape.aparencia.partial().optional(),
   sessao: kioskConfigSchema.shape.sessao.partial().optional(),
   identificacao: kioskConfigSchema.shape.identificacao.partial().optional(),
   modulos: kioskConfigSchema.shape.modulos.partial().optional(),
+  blocos: kioskConfigSchema.shape.blocos.partial().optional(),
+  patrocinio: kioskConfigSchema.shape.patrocinio.partial().optional(),
 });
 
 /**
@@ -157,6 +369,8 @@ function mesclar(base: KioskConfig, camada: unknown): KioskConfig {
     sessao: sobrepor(base.sessao, dados.sessao),
     identificacao: sobrepor(base.identificacao, dados.identificacao),
     modulos: sobrepor(base.modulos, dados.modulos),
+    blocos: sobrepor(base.blocos, dados.blocos),
+    patrocinio: sobrepor(base.patrocinio, dados.patrocinio),
   };
 }
 
