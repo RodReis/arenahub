@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   resolverConfig,
   type IndicadoresDaUnidade,
@@ -92,6 +92,33 @@ export class KioskConfigService {
       (camadaTenant?.version ?? 0) + (camadaUnidade?.version ?? 0) + (camadaDispositivo?.version ?? 0);
 
     return { version, config };
+  }
+
+  /**
+   * TRAVA 1 do ADR-042, Decisao 5: desligar modulo e no SERVIDOR, nunca no
+   * cliente. Endpoint de modulo desligado responde 404 para AQUELE
+   * dispositivo -- um kiosk com devtools aberto nao reabilita nada
+   * (`M3.5-FR-007`, `M4-FR-018`).
+   *
+   * 404 e nao 403 de proposito: a mesma disciplina da mensagem neutra de
+   * identificacao (ADR-045, Decisao 4). "Existe mas voce nao pode" e uma
+   * informacao a mais do que a superficie do totem precisa dar.
+   *
+   * Vive AQUI, e nao em cada handler, porque a config e a mesma resolucao de
+   * tres camadas que o `GET /config` ja faz: duas leituras diferentes do que
+   * "esta ligado" divergiriam no primeiro modulo acrescentado.
+   */
+  async exigirModulo(
+    contexto: ContextoDoKiosk,
+    modulo: keyof KioskConfig['modulos'],
+  ): Promise<KioskConfig> {
+    const { config } = await this.resolverParaDispositivo(contexto);
+
+    if (!config.modulos[modulo]) {
+      throw new NotFoundException({ code: 'KIOSK_MODULE_DISABLED' });
+    }
+
+    return config;
   }
 
   /**

@@ -241,3 +241,24 @@
   flex-direction: column;
   gap: 12px;
 }
+
+/* ---- Modulos (F52) ------------------------------------------------------ */
+
+.listaDeModulos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.modulo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-control-radius);
+  background: var(--ah-surface-raised);
+}
