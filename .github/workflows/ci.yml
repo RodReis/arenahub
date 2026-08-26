@@ -258,6 +258,15 @@ jobs:
       - name: gerar client do Prisma
         run: pnpm --filter @arenahub/database generate
 
+      # A F49 fez o seed importar `@arenahub/api-contracts` (CONFIG_PADRAO_DO_TOTEM).
+      # `tsx` resolve o pacote pelo `exports` real do `package.json`, que aponta
+      # para `dist/index.js` -- e o `pnpm build` completo só roda depois do
+      # `test:integration` (passo 7 de 8). Sem isto, o `pretest:integration`
+      # (que roda o seed) falha com ERR_MODULE_NOT_FOUND antes de qualquer teste
+      # começar. Builda só o pacote que o seed precisa, não o monorepo inteiro.
+      - name: build do api-contracts (dependencia do seed)
+        run: pnpm --filter @arenahub/api-contracts build
+
       # --- 5 de 8 ---------------------------------------------------------
       # Promovido na F6, quando `apps/api` e `packages/database` nasceram e
       # passaram a declarar a task -- exatamente o que o passo de pendentes
