@@ -909,7 +909,8 @@ isso, em vez de prometer uma proteção que a suíte não sustenta.
 
 #### F52 — o que a fatia cumpriu
 
-Slice 3.5.4 · `SPEC-052` · issue [#153](https://github.com/RodReis/arenahub/issues/153)
+Slice 3.5.4 · `SPEC-052` · issue [#153](https://github.com/RodReis/arenahub/issues/153) ·
+PR [#209](https://github.com/RodReis/arenahub/pull/209) (mergeado em 26/08/2026, CI verde)
 
 | passo | entrega |
 |---|---|

@@ -414,12 +414,12 @@ contrato**, e o `parse` do Zod descarta o que vier a mais (`M3.5-BR-006`).
 
 ### Evidência da `SPEC-052` — F52, área do aluno no totem
 
-Gerada em 26/08/2026 a partir do gate local.
-**PR: —**
+Gerada em 26/08/2026 a partir do gate local, e confirmada pelo CI no merge.
+**PR: [#209](https://github.com/RodReis/arenahub/pull/209)**
 
 ```
-| 2026-08-26 | #153 | SPEC-052 | unitário   | 1965 | 1965 | 0 | — | — |
-| 2026-08-26 | #153 | SPEC-052 | integração |  661 |  661 | 0 | — | — |
+| 2026-08-26 | #153 | SPEC-052 | unitário   | 1965 | 1965 | 0 | #209 | — |
+| 2026-08-26 | #153 | SPEC-052 | integração |  661 |  661 | 0 | #209 | — |
 ```
 
 **Sem linha `e2e` nesta fatia**, e é escolha, não esquecimento: o aceite da F52 é *isolamento entre
