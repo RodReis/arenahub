@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -12,7 +12,6 @@ updated: 2026-08-25
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
-- [MVP3.5][SPEC-049][F49] Kiosk seguro, provisionamento e sessão efêmera (#150)
 - [MVP3.5][SPEC-052][F52] Área do aluno no totem: identificação, pagamento e evolução (#153)
 - [MVP3.5][SPEC-051][F51] Tela pública (hero): blocos, mídia e patrocínio (#152)
 - [MVP3.5][SPEC-050][F50] Contrato de configuração, painel e publicação versionada (#151)
@@ -55,6 +54,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3.5][SPEC-049][F49] Kiosk seguro, provisionamento e sessão efêmera (#150, finalizado em: 2026-08-26)
 - [INFRA] Menu: grupo Financeiro e rótulos de seção diferenciados (#204, finalizado em: 2026-08-25)
 - [MVP3][SPEC-056][F56] Plano com assinatura mensal (#159, finalizado em: 2026-08-25)
 - [MVP3][FIX] chamarApi assere o tipo em vez de validar: divergencia de contrato vira crash de runtime (#167, finalizado em: 2026-08-25)
