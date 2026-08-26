@@ -431,6 +431,16 @@ Lista de 5 posições: medalhão de 64 px, nome, métrica. A posição do aluno 
 - Ativar o render 3D e a tela de evolução
 - Texto do aviso clínico e do rodapé de responsabilidade
 
+### Publicar cria versão nova e reinicia a superfície
+
+Configuração publicada **não é aplicada em runtime**: `publish` cria uma versão nova e imutável, o
+heartbeat devolve `configVersion`, e o totem que detecta divergência **reinicia** — fora de sessão,
+ou logo que a sessão em curso encerra. É o que mantém verdadeiro o princípio de resolver accent e
+moldura uma vez, no boot ([ADR-042](../DECISIONS.md#adr-042), Decisão 3).
+
+Custo aceito: a mudança não é instantânea. Com aluno usando o totem, o painel mostra *"aguardando o
+totem ficar livre"* — estado de publicação, não erro.
+
 ### 7.3 Assets
 
 | Arquivo | Uso | Especificação |

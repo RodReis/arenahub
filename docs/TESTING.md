@@ -300,6 +300,40 @@ específico do kiosk** — vale igual para o `admin-web`, e é pré-existente. `
 ignora `test:e2e` deliberadamente, para não cobrar o que o gerador não sabe coletar. Ligar o
 Playwright ao relatório é trabalho de `[INFRA]`, fora do escopo desta fatia.
 
+### Evidência da `SPEC-050` — F50, configuração do totem
+
+Gerada por `pnpm test:report --issue 151 --spec SPEC-050`, em 26/08/2026. **PR: `—`** — preencher
+depois do merge, pela regra acima.
+
+```
+| 2026-08-26 | #151 | SPEC-050 | unitário   | 1757 | 1757 | 0 |    — | — |
+| 2026-08-26 | #151 | SPEC-050 | integração |  640 |  640 | 0 |    — | — |
+```
+
+**Cobertura % não capturada nesta linha.** `pnpm test:report` trava na saída do processo Jest
+neste ambiente Windows — o runner termina os testes e fecha um handle aberto de um jeito que
+nunca devolve controle ao processo pai (comportamento pré-existente, distinto do crash por
+violação de acesso já registrado; aqui não há saída nenhuma, só travamento). Os números de
+`testes`/`pass`/`falha` acima são os que o gate local realmente produziu: unitário 1757/1757,
+integração 640/640 (42 suítes), ambos 0 falhas — **escopo é a suíte inteira do monorepo**, não
+um subconjunto isolado da F50, porque o gerador nunca soube separar por fatia (mesma limitação já
+registrada para `SPEC-049` acima). Preencher a cobertura % é trabalho de rodar `test:report` fora
+deste ambiente (CI, ou terminal do PI) uma vez que o handle pendurado for investigado.
+
+O que a fatia cobre, por nível (detalhe em
+[`superpowers/specs/2026-08-26-f50-configuracao-do-totem-design.md`](superpowers/specs/2026-08-26-f50-configuracao-do-totem-design.md)):
+
+| nível | o que prova |
+|---|---|
+| unitário | `proximaVersao` (incremento de versão na publicação), `totemOcupado` (totem em sessão bloqueia reinício imediato), `decidirReinicio` (comparação de `configVersion` que decide se o totem reinicia) |
+| integração | as cinco rotas de `kiosk-admin`; **isolamento A/B** — totem do tenant X não acessa nem lista o do tenant Y, 404 e não 403; publicar **nunca** reescreve a versão publicada anterior (linha antiga permanece imutável); descartar rascunho restaura a configuração publicada, não um estado intermediário; `GET /kiosk/config` (rota do totem, F49) **nunca** serve rascunho — só a versão com `publishedAt` preenchido |
+| e2e | aceite via painel `/operations/kiosks`: edita marca/cor/sessão → salva rascunho → publica → barra de estado volta a "sem alterações"; descartar rascunho restaura o valor publicado (não o valor descartado) |
+
+**A guarda de regressão desta fatia tem nome:** *rascunho de um tenant nunca vaza para outro; publicar
+nunca reescreve versão publicada*. É o índice parcial do passo 1 (isolamento por chave) mais a
+imutabilidade do passo 2 (publicar sempre insere linha nova) — os dois described em
+`docs/DEVELOPMENT.md` §"F50 — o que a fatia cumpriu".
+
 ---
 
 ## 6. CI
