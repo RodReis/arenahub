@@ -99,7 +99,12 @@ test.describe('F51 -- tela pública do totem', () => {
 
     await page.getByTestId('campo-patrocinioHabilitado').check();
     await page.getByTestId('acrescentar-patrocinador').click();
-    await page.getByLabel('Nome').first().fill('Suplementos XYZ');
+
+    // Pelo ID do campo, e nao por `getByLabel('Nome').first()`: TODAS as abas
+    // ficam montadas (so trocam de `hidden`), entao "Nome" tambem casa com
+    // "Nome da academia" da aba Marca -- escondida, e o `fill` estoura em
+    // timeout de 30 s esperando ela ficar visivel.
+    await page.locator('#patrocinador-nome-0').fill('Suplementos XYZ');
 
     // Rotulo EM BRANCO: a tela tem de dizer qual padrao o totem exibira --
     // publicidade identificada como tal (CDC art. 36).

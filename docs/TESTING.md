@@ -340,7 +340,12 @@ Gerada em 26/08/2026 a partir do gate local. **PR: `—`** — preencher depois 
 ```
 | 2026-08-26 | #152 | SPEC-051 | unitário   | 1860 | 1860 | 0 |    — | — |
 | 2026-08-26 | #152 | SPEC-051 | integração |  649 |  649 | 0 |    — | — |
+| 2026-08-26 | #152 | SPEC-051 | e2e        |   61 |   61 | 0 |    — | — |
 ```
+
+**A linha `e2e` é preenchida à mão**, pelo motivo já registrado acima: o gerador coleta `test` e
+`test:integration`, e o Playwright roda por `pnpm test:e2e`, fora dele. Os 61 incluem os 3 do
+aceite da F51 e os 58 pré-existentes, todos verdes na mesma execução.
 
 **Cobertura % não capturada, pelo mesmo motivo já registrado na `SPEC-050`:** `pnpm test:report`
 trava na saída do Jest neste ambiente Windows. Os números acima são os que o gate local produziu —
