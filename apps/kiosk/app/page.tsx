@@ -62,22 +62,32 @@ export default function Totem() {
   }, []);
 
   /**
+   * Snapshot lido no MOMENTO em que o heartbeat responde, nao no momento em
+   * que o `setInterval` foi agendado -- mesmo padrao de `use-sessao.ts`
+   * (`aoEncerrarRef`). Sem isto, uma sessao que ABRE enquanto um heartbeat
+   * esta em voo fica invisivel para aquele callback: ele ainda calcularia
+   * 'reiniciar' com a closure antiga e interromperia o aluno.
+   */
+  const sessaoRef = useRef(sessao);
+  sessaoRef.current = sessao;
+  const versaoDoBootRef = useRef(versaoDoBoot);
+  versaoDoBootRef.current = versaoDoBoot;
+
+  /**
    * Heartbeat periodico: pergunta a versao publicada atual e decide se a
-   * superficie deve reiniciar (ADR-042, Decisao 3). `sessao` entra no
-   * array de dependencia para que a decisao mais recente sempre veja se ha
-   * aluno na frente do totem -- reiniciar NUNCA pode interromper a sessao.
+   * superficie deve reiniciar (ADR-042, Decisao 3). Sem dependencias -- o
+   * intervalo nasce uma vez e le sempre o estado mais recente pelos refs
+   * acima, nunca pela closure do momento em que foi agendado.
    */
   useEffect(() => {
-    const emSessao = sessao !== null;
-
     const intervalo = setInterval(() => {
       void heartbeat().then((resposta) => {
         if (resposta === null) return;
 
         const decisao = decidirReinicio({
-          versaoDoBoot,
+          versaoDoBoot: versaoDoBootRef.current,
           versaoAtual: resposta.configVersion,
-          emSessao,
+          emSessao: sessaoRef.current !== null,
         });
 
         if (decisao === 'reiniciar') {
@@ -91,7 +101,7 @@ export default function Totem() {
     return () => {
       clearInterval(intervalo);
     };
-  }, [versaoDoBoot, sessao]);
+  }, []);
 
   /**
    * Accent e contraste moram no <html>, nao num wrapper: `[data-surface]` ja
