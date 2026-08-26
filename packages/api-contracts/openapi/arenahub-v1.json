@@ -1937,6 +1937,550 @@
         ]
       }
     },
+    "/api/v1/kiosk/sessions/{id}/payments/pix": {
+      "post": {
+        "operationId": "KioskController_cobrarPorPix",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "paymentAttemptId",
+                    "forma",
+                    "qrCodeDataUri",
+                    "expiraEm",
+                    "valorEmCentavos",
+                    "moeda"
+                  ],
+                  "properties": {
+                    "paymentAttemptId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "forma": {
+                      "type": "string",
+                      "enum": [
+                        "PIX",
+                        "CARD"
+                      ]
+                    },
+                    "qrCodeDataUri": {
+                      "type": "string"
+                    },
+                    "copiaECola": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "EMV do PIX; nulo no cartão."
+                    },
+                    "checkoutUrl": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Checkout hospedado; nulo no PIX."
+                    },
+                    "expiraEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "valorEmCentavos": {
+                      "type": "integer"
+                    },
+                    "moeda": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/payments/card-checkout": {
+      "post": {
+        "operationId": "KioskController_cobrarPorCartao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "paymentAttemptId",
+                    "forma",
+                    "qrCodeDataUri",
+                    "expiraEm",
+                    "valorEmCentavos",
+                    "moeda"
+                  ],
+                  "properties": {
+                    "paymentAttemptId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "forma": {
+                      "type": "string",
+                      "enum": [
+                        "PIX",
+                        "CARD"
+                      ]
+                    },
+                    "qrCodeDataUri": {
+                      "type": "string"
+                    },
+                    "copiaECola": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "EMV do PIX; nulo no cartão."
+                    },
+                    "checkoutUrl": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Checkout hospedado; nulo no PIX."
+                    },
+                    "expiraEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "valorEmCentavos": {
+                      "type": "integer"
+                    },
+                    "moeda": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/payments/{attemptId}": {
+      "get": {
+        "operationId": "KioskController_observarPagamento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "statusDaFatura",
+                    "pagoEm"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "statusDaFatura": {
+                      "type": "string"
+                    },
+                    "pagoEm": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/payments": {
+      "get": {
+        "operationId": "KioskController_historicoDePagamentos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "invoiceId",
+                      "status",
+                      "vencimentoEm",
+                      "valorEmCentavos",
+                      "moeda",
+                      "emAberto"
+                    ],
+                    "properties": {
+                      "invoiceId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "vencimentoEm": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "pagoEm": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      },
+                      "valorEmCentavos": {
+                        "type": "integer"
+                      },
+                      "moeda": {
+                        "type": "string"
+                      },
+                      "emAberto": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/assessment": {
+      "get": {
+        "operationId": "KioskController_avaliacaoDoMes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nulo quando o aluno ainda não tem avaliação publicada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "required": [
+                    "medidaEm",
+                    "aparelho",
+                    "metricas",
+                    "segmentos",
+                    "relatorioDoAparelho"
+                  ],
+                  "properties": {
+                    "medidaEm": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "aparelho": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "metricas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "tipo",
+                          "valor",
+                          "unidade",
+                          "deltaAbsoluto",
+                          "razaoDaAusencia"
+                        ],
+                        "properties": {
+                          "tipo": {
+                            "type": "string"
+                          },
+                          "valor": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "unidade": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "deltaAbsoluto": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "razaoDaAusencia": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    },
+                    "segmentos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "segmento",
+                          "gorduraKg",
+                          "musculoKg"
+                        ],
+                        "properties": {
+                          "segmento": {
+                            "type": "string",
+                            "enum": [
+                              "ARMS",
+                              "TRUNK",
+                              "LEGS"
+                            ]
+                          },
+                          "gorduraKg": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "musculoKg": {
+                            "type": "number",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    },
+                    "relatorioDoAparelho": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": true,
+                      "description": "Índice e achado como o aparelho os escreveu. Opaco: nunca interpretado."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/evolution": {
+      "get": {
+        "operationId": "KioskController_evolucao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "months",
+                    "latestAnalysis"
+                  ],
+                  "properties": {
+                    "months": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    },
+                    "latestAnalysis": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "positivePoints",
+                        "attentionPoints",
+                        "disclaimerCode"
+                      ],
+                      "properties": {
+                        "positivePoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "attentionPoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "disclaimerCode": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_MEDICAL_DIAGNOSIS"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/assessments": {
+      "get": {
+        "operationId": "KioskController_historicoDeAvaliacoes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "assessmentId",
+                      "medidaEm",
+                      "metricas"
+                    ],
+                    "properties": {
+                      "assessmentId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "medidaEm": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "metricas": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "tipo",
+                            "valor",
+                            "unidade",
+                            "deltaAbsoluto",
+                            "razaoDaAusencia"
+                          ],
+                          "properties": {
+                            "tipo": {
+                              "type": "string"
+                            },
+                            "valor": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "unidade": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "deltaAbsoluto": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "razaoDaAusencia": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
     "/api/v1/access-events": {
       "get": {
         "operationId": "AccessQueryController_listar",
@@ -1971,532 +2515,6 @@
         },
         "tags": [
           "AccessQuery"
-        ]
-      }
-    },
-    "/api/v1/admin/kiosk-devices": {
-      "get": {
-        "operationId": "KioskAdminController_listar",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "KioskAdmin"
-        ]
-      }
-    },
-    "/api/v1/admin/kiosk-devices/{id}/config": {
-      "get": {
-        "operationId": "KioskAdminController_obter",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "publicada",
-                    "rascunho",
-                    "efetiva",
-                    "configVersion",
-                    "totemEmSessao"
-                  ],
-                  "properties": {
-                    "publicada": {
-                      "type": "object",
-                      "nullable": true
-                    },
-                    "rascunho": {
-                      "type": "object",
-                      "nullable": true
-                    },
-                    "efetiva": {
-                      "type": "object"
-                    },
-                    "configVersion": {
-                      "type": "integer"
-                    },
-                    "totemEmSessao": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "KioskAdmin"
-        ]
-      },
-      "put": {
-        "operationId": "KioskAdminController_salvar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "nullable": true,
-                  "description": "Sem corpo."
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "KioskAdmin"
-        ]
-      }
-    },
-    "/api/v1/admin/kiosk-devices/{id}/config/publish": {
-      "post": {
-        "operationId": "KioskAdminController_publicar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "version"
-                  ],
-                  "properties": {
-                    "version": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "KioskAdmin"
-        ]
-      }
-    },
-    "/api/v1/admin/kiosk-devices/{id}/media": {
-      "post": {
-        "operationId": "KioskAdminController_enviarMidia",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "midiaKey"
-                  ],
-                  "properties": {
-                    "midiaKey": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "KioskAdmin"
-        ]
-      }
-    },
-    "/api/v1/admin/kiosk-devices/{id}/config/draft": {
-      "delete": {
-        "operationId": "KioskAdminController_descartar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "nullable": true,
-                  "description": "Sem corpo."
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "KioskAdmin"
-        ]
-      }
-    },
-    "/api/v1/device-sync-jobs": {
-      "get": {
-        "operationId": "DeviceSyncController_listar",
-        "parameters": [
-          {
-            "name": "deviceId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "identityId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "state",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "DeviceSync"
-        ]
-      }
-    },
-    "/api/v1/edge/commands": {
-      "get": {
-        "operationId": "EdgeCommandsController_listar",
-        "parameters": [
-          {
-            "name": "after",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "EdgeCommands"
-        ]
-      }
-    },
-    "/api/v1/edge/commands/{id}/lease": {
-      "post": {
-        "operationId": "EdgeCommandsController_arrendar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "EdgeCommands"
-        ]
-      }
-    },
-    "/api/v1/edge/sync-results/batch": {
-      "post": {
-        "operationId": "EdgeCommandsController_receberResultados",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "EdgeCommands"
-        ]
-      }
-    },
-    "/api/v1/edge/access-decisions": {
-      "post": {
-        "operationId": "EdgeAccessController_decidirAcesso",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "EdgeAccess"
-        ]
-      }
-    },
-    "/api/v1/edge/access-events/{id}/passage": {
-      "post": {
-        "operationId": "EdgeAccessController_registrarPassagem",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "EdgeAccess"
-        ]
-      }
-    },
-    "/api/v1/access/manual-overrides": {
-      "post": {
-        "operationId": "ManualOverrideController_criar",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "ManualOverride"
-        ]
-      }
-    },
-    "/api/v1/access-events/exports": {
-      "post": {
-        "operationId": "ExportsController_solicitar",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Exports"
-        ]
-      }
-    },
-    "/api/v1/exports/{id}": {
-      "get": {
-        "operationId": "ExportsController_consultar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Exports"
-        ]
-      }
-    },
-    "/api/v1/exports/{id}/cancel": {
-      "post": {
-        "operationId": "ExportsController_cancelar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Exports"
-        ]
-      }
-    },
-    "/api/v1/exports/{id}/download": {
-      "post": {
-        "operationId": "ExportsController_baixar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Exports"
-        ]
-      }
-    },
-    "/api/v1/operations/overview": {
-      "get": {
-        "operationId": "OperationsController_panorama",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Operations"
-        ]
-      }
-    },
-    "/api/v1/operations/alerts": {
-      "get": {
-        "operationId": "OperationsController_listarAlertas",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Operations"
-        ]
-      }
-    },
-    "/api/v1/operations/alerts/{id}/acknowledge": {
-      "post": {
-        "operationId": "OperationsController_reconhecer",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Operations"
         ]
       }
     },
@@ -3220,6 +3238,532 @@
         },
         "tags": [
           "Import"
+        ]
+      }
+    },
+    "/api/v1/admin/kiosk-devices": {
+      "get": {
+        "operationId": "KioskAdminController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
+    "/api/v1/admin/kiosk-devices/{id}/config": {
+      "get": {
+        "operationId": "KioskAdminController_obter",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "publicada",
+                    "rascunho",
+                    "efetiva",
+                    "configVersion",
+                    "totemEmSessao"
+                  ],
+                  "properties": {
+                    "publicada": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "rascunho": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "efetiva": {
+                      "type": "object"
+                    },
+                    "configVersion": {
+                      "type": "integer"
+                    },
+                    "totemEmSessao": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      },
+      "put": {
+        "operationId": "KioskAdminController_salvar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "description": "Sem corpo."
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
+    "/api/v1/admin/kiosk-devices/{id}/config/publish": {
+      "post": {
+        "operationId": "KioskAdminController_publicar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "version"
+                  ],
+                  "properties": {
+                    "version": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
+    "/api/v1/admin/kiosk-devices/{id}/media": {
+      "post": {
+        "operationId": "KioskAdminController_enviarMidia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "midiaKey"
+                  ],
+                  "properties": {
+                    "midiaKey": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
+    "/api/v1/admin/kiosk-devices/{id}/config/draft": {
+      "delete": {
+        "operationId": "KioskAdminController_descartar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "description": "Sem corpo."
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
+    "/api/v1/device-sync-jobs": {
+      "get": {
+        "operationId": "DeviceSyncController_listar",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DeviceSync"
+        ]
+      }
+    },
+    "/api/v1/edge/commands": {
+      "get": {
+        "operationId": "EdgeCommandsController_listar",
+        "parameters": [
+          {
+            "name": "after",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeCommands"
+        ]
+      }
+    },
+    "/api/v1/edge/commands/{id}/lease": {
+      "post": {
+        "operationId": "EdgeCommandsController_arrendar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeCommands"
+        ]
+      }
+    },
+    "/api/v1/edge/sync-results/batch": {
+      "post": {
+        "operationId": "EdgeCommandsController_receberResultados",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeCommands"
+        ]
+      }
+    },
+    "/api/v1/edge/access-decisions": {
+      "post": {
+        "operationId": "EdgeAccessController_decidirAcesso",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeAccess"
+        ]
+      }
+    },
+    "/api/v1/edge/access-events/{id}/passage": {
+      "post": {
+        "operationId": "EdgeAccessController_registrarPassagem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EdgeAccess"
+        ]
+      }
+    },
+    "/api/v1/access/manual-overrides": {
+      "post": {
+        "operationId": "ManualOverrideController_criar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ManualOverride"
+        ]
+      }
+    },
+    "/api/v1/access-events/exports": {
+      "post": {
+        "operationId": "ExportsController_solicitar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exports"
+        ]
+      }
+    },
+    "/api/v1/exports/{id}": {
+      "get": {
+        "operationId": "ExportsController_consultar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exports"
+        ]
+      }
+    },
+    "/api/v1/exports/{id}/cancel": {
+      "post": {
+        "operationId": "ExportsController_cancelar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exports"
+        ]
+      }
+    },
+    "/api/v1/exports/{id}/download": {
+      "post": {
+        "operationId": "ExportsController_baixar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exports"
+        ]
+      }
+    },
+    "/api/v1/operations/overview": {
+      "get": {
+        "operationId": "OperationsController_panorama",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Operations"
+        ]
+      }
+    },
+    "/api/v1/operations/alerts": {
+      "get": {
+        "operationId": "OperationsController_listarAlertas",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Operations"
+        ]
+      }
+    },
+    "/api/v1/operations/alerts/{id}/acknowledge": {
+      "post": {
+        "operationId": "OperationsController_reconhecer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Operations"
         ]
       }
     }

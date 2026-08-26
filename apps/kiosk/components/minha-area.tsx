@@ -1,10 +1,15 @@
 'use client';
 
+import { useState } from 'react';
+
 import type { KioskConfig } from '@arenahub/api-contracts';
 
 import type { SessaoDoAluno } from '../lib/kiosk-client';
 import { modulosVisiveis, type CardDeModulo } from '../lib/modulos';
+import { HistoricoDePagamentos } from './historico-de-pagamentos';
 import { IconeAtencao, IconeConfirmado } from './icones';
+import { Pagamento } from './pagamento';
+import { AvaliacaoDoMes, Evolucao, HistoricoDeAvaliacoes } from './saude';
 
 /**
  * Area interna -- DS-TOTEM.md §5.2.
@@ -41,6 +46,33 @@ export function MinhaArea({
    */
   const cards = modulosVisiveis(config);
   const modulosLigados = cards.length > 0;
+
+  /*
+   * NAVEGACAO POR ESTADO, NAO POR ROTA. O totem roda em quiosque e o
+   * historico do navegador sobrevive ao encerramento da sessao: com rota,
+   * o botao "voltar" reabriria a tela do aluno ANTERIOR. O mesmo motivo
+   * que `page.tsx` ja documenta para a maquina de etapas de la.
+   */
+  const [aberto, setAberto] = useState<CardDeModulo['campo'] | null>(null);
+  const voltar = () => setAberto(null);
+
+  if (aberto === 'pagamento') return <Pagamento sessao={sessao} aoVoltar={voltar} />;
+  if (aberto === 'avaliacao') return <AvaliacaoDoMes sessao={sessao} aoVoltar={voltar} />;
+  if (aberto === 'evolucao') return <Evolucao sessao={sessao} aoVoltar={voltar} />;
+  if (aberto === 'historicoDeAvaliacoes')
+    return <HistoricoDeAvaliacoes sessao={sessao} aoVoltar={voltar} />;
+
+  if (aberto === 'historicoDePagamentos')
+    return (
+      <HistoricoDePagamentos
+        sessao={sessao}
+        // O CTA de pagar so existe se o modulo de pagamento estiver ligado:
+        // oferecer um caminho que o servidor recusaria com 404 seria pior
+        // que nao oferece-lo.
+        aoPagar={config.modulos.pagamento ? () => setAberto('pagamento') : undefined}
+        aoVoltar={voltar}
+      />
+    );
 
   return (
     <div
@@ -89,7 +121,7 @@ export function MinhaArea({
       )}
 
       {modulosLigados ? (
-        <GradeDeModulos cards={cards} />
+        <GradeDeModulos cards={cards} aoAbrir={setAberto} />
       ) : (
         /*
           Nenhum modulo ligado: a grade do §5.2 nao existe -- nao ha grade

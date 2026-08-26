@@ -127,6 +127,20 @@ const ANTHROPIC_CLIENT = Symbol('ANTHROPIC_CLIENT');
     HealthExportService,
     TenantContextService,
   ],
-  exports: [AssessmentRepository],
+  exports: [
+    AssessmentRepository,
+    /*
+     * Exportados para o TOTEM (F52). `BodyEvolutionService` ja foi ESCRITO
+     * para esta superficie -- o cabecalho dele diz que a serie que o celular
+     * e o totem consomem sai dali -- e ate a F52 nao tinha consumidor.
+     *
+     * A LEITURA (a cor de cada faixa) e resolvida no servidor de proposito:
+     * se cada superficie calculasse a propria, o aluno veria o braco verde no
+     * celular e amarelo no totem. Exportar o servico, e nao o repositorio,
+     * e o que mantem essa garantia (regra de arquitetura no 9).
+     */
+    BodyEvolutionService,
+    HealthProgressService,
+  ],
 })
 export class HealthModule {}

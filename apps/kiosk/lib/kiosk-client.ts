@@ -159,3 +159,167 @@ export async function encerrarSessao(sessionId: string, token: string): Promise<
     // Ver acima: a limpeza local acontece de qualquer forma.
   }
 }
+
+/* ---------------------------------------------------------------------
+ * AREA DO ALUNO (F52).
+ *
+ * Todas exigem `x-session-token`: o `sessionId` da URL sozinho nao
+ * autoriza nada -- e a API confere as duas coisas.
+ *
+ * DEGRADAM PARA `null`, nunca lancam. Um erro nao capturado aqui deixaria
+ * o totem numa tela quebrada com o nome do aluno na frente da recepcao; a
+ * tela mostra "nao foi possivel carregar" e o rodape de sessao continua
+ * contando. Modulo desligado responde 404 e cai no mesmo `null` -- e
+ * correto: para o aluno, funcao desligada e funcao que nao existe.
+ * --------------------------------------------------------------------- */
+
+export interface CobrancaDoTotem {
+  readonly paymentAttemptId: string;
+  readonly forma: 'PIX' | 'CARD';
+  readonly qrCodeDataUri: string;
+  readonly copiaECola: string | null;
+  readonly checkoutUrl: string | null;
+  readonly expiraEm: string;
+  readonly valorEmCentavos: number;
+  readonly moeda: string;
+}
+
+export interface EstadoDaCobranca {
+  readonly status: string;
+  readonly statusDaFatura: string;
+  readonly pagoEm: string | null;
+}
+
+export interface LinhaDePagamento {
+  readonly invoiceId: string;
+  readonly status: string;
+  readonly vencimentoEm: string;
+  readonly pagoEm: string | null;
+  readonly valorEmCentavos: number;
+  readonly moeda: string;
+  readonly emAberto: boolean;
+}
+
+export interface MetricaDoTotem {
+  readonly tipo: string;
+  readonly valor: number | null;
+  readonly unidade: string | null;
+  readonly deltaAbsoluto: number | null;
+  readonly razaoDaAusencia: string | null;
+}
+
+export interface SegmentoDoTotem {
+  readonly segmento: 'ARMS' | 'TRUNK' | 'LEGS';
+  readonly gorduraKg: number | null;
+  readonly musculoKg: number | null;
+}
+
+export interface AvaliacaoDoTotem {
+  readonly medidaEm: string | null;
+  readonly aparelho: string | null;
+  readonly metricas: readonly MetricaDoTotem[];
+  readonly segmentos: readonly SegmentoDoTotem[];
+  readonly relatorioDoAparelho: Record<string, unknown> | null;
+}
+
+export interface LinhaDeAvaliacao {
+  readonly assessmentId: string;
+  readonly medidaEm: string;
+  readonly metricas: readonly MetricaDoTotem[];
+}
+
+export interface AnaliseDaEvolucao {
+  readonly positivePoints: readonly string[];
+  readonly attentionPoints: readonly string[];
+  readonly disclaimerCode: 'NOT_MEDICAL_DIAGNOSIS';
+}
+
+export interface EvolucaoDoTotem {
+  readonly months: readonly {
+    readonly assessedAtLocal: string;
+    readonly metrics: readonly { type: string; value: number; unit: string | null }[];
+  }[];
+  readonly latestAnalysis: AnaliseDaEvolucao | null;
+}
+
+async function daSessao<T>(
+  caminho: string,
+  token: string,
+  init?: { method: 'POST' },
+): Promise<T | null> {
+  try {
+    const resposta = await fetch(`/api/kiosk/${caminho}`, {
+      method: init?.method ?? 'GET',
+      headers: { 'x-session-token': token },
+      cache: 'no-store',
+    });
+
+    if (!resposta.ok) return null;
+
+    return (await resposta.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+const daSessaoId = (sessionId: string) => `sessions/${encodeURIComponent(sessionId)}`;
+
+export function cobrarPorPix(sessionId: string, token: string) {
+  return daSessao<CobrancaDoTotem>(`${daSessaoId(sessionId)}/payments/pix`, token, {
+    method: 'POST',
+  });
+}
+
+export function cobrarPorCartao(sessionId: string, token: string) {
+  return daSessao<CobrancaDoTotem>(`${daSessaoId(sessionId)}/payments/card-checkout`, token, {
+    method: 'POST',
+  });
+}
+
+export function observarCobranca(sessionId: string, token: string, attemptId: string) {
+  return daSessao<EstadoDaCobranca>(
+    `${daSessaoId(sessionId)}/payments/${encodeURIComponent(attemptId)}`,
+    token,
+  );
+}
+
+export function carregarPagamentos(sessionId: string, token: string) {
+  return daSessao<readonly LinhaDePagamento[]>(`${daSessaoId(sessionId)}/payments`, token);
+}
+
+/**
+ * A avaliacao do aluno, ou `'sem-avaliacao'`, ou `null` se nao deu.
+ *
+ * TRES ESTADOS, e nao dois. O endpoint devolve corpo `null` quando o aluno
+ * ainda nao tem avaliacao publicada -- que e diferente de a chamada ter
+ * falhado. Colapsar os dois em `null` faria a tela dizer "voce ainda nao
+ * tem avaliacao" para um aluno que TEM, toda vez que a rede da academia
+ * oscilasse; e "procure a recepcao" resolve um caso e nao o outro.
+ */
+export async function carregarAvaliacao(
+  sessionId: string,
+  token: string,
+): Promise<AvaliacaoDoTotem | 'sem-avaliacao' | null> {
+  try {
+    const resposta = await fetch(`/api/kiosk/${daSessaoId(sessionId)}/assessment`, {
+      headers: { 'x-session-token': token },
+      cache: 'no-store',
+    });
+
+    if (!resposta.ok) return null;
+
+    const corpo = (await resposta.json()) as AvaliacaoDoTotem | null;
+
+    return corpo ?? 'sem-avaliacao';
+  } catch {
+    return null;
+  }
+}
+
+export function carregarAvaliacoes(sessionId: string, token: string) {
+  return daSessao<readonly LinhaDeAvaliacao[]>(`${daSessaoId(sessionId)}/assessments`, token);
+}
+
+export function carregarEvolucao(sessionId: string, token: string) {
+  return daSessao<EvolucaoDoTotem>(`${daSessaoId(sessionId)}/evolution`, token);
+}

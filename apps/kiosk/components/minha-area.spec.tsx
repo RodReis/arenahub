@@ -1,9 +1,25 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { CONFIG_PADRAO_DO_TOTEM, type KioskConfig } from '@arenahub/api-contracts';
 
 import type { SessaoDoAluno } from '../lib/kiosk-client.js';
+
 import { MinhaArea } from './minha-area.js';
+
+/*
+ * As telas internas buscam dado ao montar. Aqui so importa a NAVEGACAO --
+ * o conteudo delas tem suite propria -- entao os carregadores devolvem
+ * nulo e a tela cai no estado de falha, que ja e um estado valido.
+ */
+vi.mock('../lib/kiosk-client', async (original) => ({
+  ...(await original<typeof import('../lib/kiosk-client')>()),
+  carregarAvaliacao: vi.fn().mockResolvedValue(null),
+  carregarAvaliacoes: vi.fn().mockResolvedValue(null),
+  carregarEvolucao: vi.fn().mockResolvedValue(null),
+  carregarPagamentos: vi.fn().mockResolvedValue(null),
+}));
+
 
 function sessao(pendenciaEmCentavos: number | null): SessaoDoAluno {
   return {
@@ -86,5 +102,37 @@ describe('MinhaArea', () => {
     render(<MinhaArea sessao={sessao(null)} config={config({ pagamento: true })} />);
 
     expect(screen.getByTestId('modulo-pagamento').tagName).toBe('BUTTON');
+  });
+
+  it('abre a tela do módulo ao tocar no card', async () => {
+    const usuario = userEvent.setup();
+
+    render(<MinhaArea sessao={sessao(null)} config={config({ avaliacao: true })} />);
+    await usuario.click(screen.getByTestId('modulo-avaliacao'));
+
+    expect(await screen.findByRole('heading', { name: 'Avaliação do mês' })).toBeInTheDocument();
+  });
+
+  it('volta para a grade sem deixar rastro da tela anterior', async () => {
+    const usuario = userEvent.setup();
+
+    render(<MinhaArea sessao={sessao(null)} config={config({ avaliacao: true })} />);
+    await usuario.click(screen.getByTestId('modulo-avaliacao'));
+    await usuario.click(await screen.findByRole('button', { name: 'Voltar' }));
+
+    expect(screen.getByTestId('grade-de-modulos')).toBeInTheDocument();
+  });
+
+  it('navega por estado, não por rota — o histórico do quiosque vazaria o aluno anterior', async () => {
+    // Com rota, o botao "voltar" do navegador reabriria a tela do aluno da
+    // sessao ANTERIOR: o historico sobrevive ao encerramento da sessao.
+    const usuario = userEvent.setup();
+    const antes = window.location.href;
+
+    render(<MinhaArea sessao={sessao(null)} config={config({ avaliacao: true })} />);
+    await usuario.click(screen.getByTestId('modulo-avaliacao'));
+    await screen.findByRole('heading', { name: 'Avaliação do mês' });
+
+    expect(window.location.href).toBe(antes);
   });
 });
