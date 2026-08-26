@@ -1,7 +1,7 @@
 'use client';
 
 import { CONFIG_PADRAO_DO_TOTEM, type KioskConfig } from '@arenahub/api-contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Atrator } from '../components/atrator';
 import { IdentificacaoCpf } from '../components/identificacao-cpf';
@@ -9,8 +9,12 @@ import { MinhaArea } from '../components/minha-area';
 import { BarraDeSessao, RodapeDeSessao } from '../components/rodape-de-sessao';
 import { Toast } from '../components/toast';
 import { contrasteEfetivo } from '../lib/aparencia';
-import { abrirSessao, carregarConfig, type SessaoDoAluno } from '../lib/kiosk-client';
+import { abrirSessao, carregarConfig, heartbeat, type SessaoDoAluno } from '../lib/kiosk-client';
+import { decidirReinicio } from '../lib/reinicio';
 import { limparEstadoDaSessao, useSessao } from '../lib/use-sessao';
+
+/** ADR-042, Decisao 3: intervalo do heartbeat que decide o reinicio da superficie. */
+const INTERVALO_DE_HEARTBEAT_MS = 30_000;
 
 /**
  * O totem inteiro -- tres estados numa rota so.
@@ -36,6 +40,12 @@ export default function Totem() {
   const [erro, setErro] = useState<string | null>(null);
   // `null` = o aluno nao mexeu no interruptor; vale o padrao da unidade.
   const [contrasteDoAluno, setContrasteDoAluno] = useState<boolean | null>(null);
+  // `null` ate a primeira config carregar -- `decidirReinicio` fica inerte
+  // ate la (ver reinicio.ts: sem boot conhecido, nao ha o que comparar).
+  const [versaoDoBoot, setVersaoDoBoot] = useState<number | null>(null);
+  // Marcado quando `decidirReinicio` manda 'aguardar': a troca so acontece
+  // quando esta sessao terminar, nunca no meio dela.
+  const reinicioPendenteRef = useRef(false);
 
   const altoContraste = contrasteEfetivo(
     contrasteDoAluno,
@@ -45,10 +55,43 @@ export default function Totem() {
   // Marca, accent, duracao e modulos vem da config DESDE O PRIMEIRO COMMIT
   // (ADR-042, Decisao 0) -- mesmo que hoje so exista o padrao do seed.
   useEffect(() => {
-    void carregarConfig().then(({ config: carregada }) => {
+    void carregarConfig().then(({ version, config: carregada }) => {
       setConfig(carregada);
+      setVersaoDoBoot(version);
     });
   }, []);
+
+  /**
+   * Heartbeat periodico: pergunta a versao publicada atual e decide se a
+   * superficie deve reiniciar (ADR-042, Decisao 3). `sessao` entra no
+   * array de dependencia para que a decisao mais recente sempre veja se ha
+   * aluno na frente do totem -- reiniciar NUNCA pode interromper a sessao.
+   */
+  useEffect(() => {
+    const emSessao = sessao !== null;
+
+    const intervalo = setInterval(() => {
+      void heartbeat().then((resposta) => {
+        if (resposta === null) return;
+
+        const decisao = decidirReinicio({
+          versaoDoBoot,
+          versaoAtual: resposta.configVersion,
+          emSessao,
+        });
+
+        if (decisao === 'reiniciar') {
+          window.location.reload();
+        } else if (decisao === 'aguardar') {
+          reinicioPendenteRef.current = true;
+        }
+      });
+    }, INTERVALO_DE_HEARTBEAT_MS);
+
+    return () => {
+      clearInterval(intervalo);
+    };
+  }, [versaoDoBoot, sessao]);
 
   /**
    * Accent e contraste moram no <html>, nao num wrapper: `[data-surface]` ja
@@ -77,6 +120,12 @@ export default function Totem() {
     // A escolha do aluno morre com a sessao dele: o proximo nao herda a
     // preferencia do anterior, e o padrao da unidade volta a valer.
     setContrasteDoAluno(null);
+
+    // A sessao que acabou de encerrar era a que segurava o reinicio
+    // pendente (ADR-042, Decisao 3) -- agora pode acontecer.
+    if (reinicioPendenteRef.current) {
+      window.location.reload();
+    }
   }, []);
 
   const alternarContraste = useCallback(() => {
