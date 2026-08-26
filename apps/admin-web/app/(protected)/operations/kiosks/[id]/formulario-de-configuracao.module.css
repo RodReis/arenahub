@@ -141,3 +141,103 @@
   gap: 10px;
   padding-top: 8px;
 }
+
+/* ---- Blocos publicos (F51) --------------------------------------------- */
+
+.listaDeBlocos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: bloco;
+}
+
+/**
+ * O NUMERO DA ORDEM vem de contador CSS, nao do indice do array: reordenar
+ * renumera sozinho, e nao ha segundo lugar onde a ordem possa divergir da
+ * lista publicada.
+ */
+.bloco {
+  counter-increment: bloco;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-control-radius);
+  background: var(--ah-surface-raised);
+}
+
+.cabecalhoDoBloco {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ligaBloco {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ligaBloco::before {
+  content: counter(bloco);
+  min-width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ah-control-radius);
+  background: var(--ah-surface-sunken);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.ordem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.acrescentar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.linhaDeEvento {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.campoDeArquivo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--ah-type-caption-size);
+  color: var(--ah-text-label);
+}
+
+/**
+ * A faixa de patrocinadores e um ASSUNTO SEPARADO dos blocos: ela nao gira,
+ * nao reordena e nao entra na lista. Sem esta separacao ela encostava nos
+ * botoes de acrescentar bloco e parecia mais um item do rodizio -- foi o que
+ * a tela real mostrou.
+ */
+.blocoDePatrocinio {
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-control-radius);
+  background: var(--ah-surface-raised);
+  padding: 14px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

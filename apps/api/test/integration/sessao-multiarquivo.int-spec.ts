@@ -16,7 +16,7 @@ import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js'
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { AssessmentRepository } from '../../src/modules/health/assessment.repository.js';
 import { AvaliacaoJaExisteParaOrigemError } from '../../src/modules/health/domain/avaliacao.js';
-import { FakeMalwareScannerAdapter } from '../../src/modules/health/provider/fake-malware-scanner.adapter.js';
+import { FakeMalwareScannerAdapter } from '../../src/common/antivirus/fake-malware-scanner.adapter.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**

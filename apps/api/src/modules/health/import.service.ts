@@ -58,7 +58,7 @@ import {
   MALWARE_SCANNER,
   ErroDoScanner,
   type MalwareScanner,
-} from './provider/malware-scanner.port.js';
+} from '../../common/antivirus/malware-scanner.port.js';
 
 /**
  * Upload, extracao e revisao de arquivo (F19, Slice 3.3).

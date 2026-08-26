@@ -6,6 +6,7 @@ import { ACCENTS_DO_TOTEM, type KioskConfig } from '@arenahub/api-contracts';
 import { Button, Field, SelectField, useToast, useToastDeErro } from '@arenahub/ui';
 
 import { Abas } from '../../../../../src/components/abas';
+import { AbaDeBlocos } from './aba-de-blocos';
 import {
   descartarAction,
   publicarAction,
@@ -96,6 +97,17 @@ export function FormularioDeConfiguracao({ estado, kioskDeviceId }: Props) {
     valor: KioskConfig['sessao'][K],
   ) => {
     setRascunho((atual) => ({ ...atual, sessao: { ...atual.sessao, [campo]: valor } }));
+  };
+
+  // Secoes INTEIRAS, e nao campo a campo: `blocos` e `patrocinio` carregam
+  // lista ordenada, e um setter por campo obrigaria a aba a remontar o
+  // objeto de qualquer jeito.
+  const atualizarBlocos = (blocos: KioskConfig['blocos']) => {
+    setRascunho((atual) => ({ ...atual, blocos }));
+  };
+
+  const atualizarPatrocinio = (patrocinio: KioskConfig['patrocinio']) => {
+    setRascunho((atual) => ({ ...atual, patrocinio }));
   };
 
   const salvar = async () => {
@@ -273,6 +285,19 @@ export function FormularioDeConfiguracao({ estado, kioskDeviceId }: Props) {
                   próprio aluno sempre vence — prevalece sobre este padrão da unidade.
                 </p>
               </div>
+            ),
+          },
+          {
+            id: 'blocos',
+            rotulo: 'Blocos públicos',
+            conteudo: (
+              <AbaDeBlocos
+                rascunho={rascunho}
+                kioskDeviceId={kioskDeviceId}
+                aoMudarBlocos={atualizarBlocos}
+                aoMudarPatrocinio={atualizarPatrocinio}
+                aoFalhar={setErro}
+              />
             ),
           },
           {

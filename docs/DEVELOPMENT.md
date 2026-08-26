@@ -781,7 +781,7 @@ sem aceite verificável.
 |---|---|---|
 | F49 | 3.5.1 Kiosk seguro, provisionamento e sessão efêmera | ✅ **entregue** — ver abaixo |
 | F50 | 3.5.2 Contrato de configuração, painel e publicação versionada | ✅ **entregue** — ver abaixo |
-| F51 | 3.5.3 Tela pública (hero): blocos, mídia e patrocínio | a tela pública **é o produto**, não a moldura — o totem passa a maior parte do dia sem ninguém na frente dele |
+| F51 | 3.5.3 Tela pública (hero): blocos, mídia e patrocínio | ✅ **entregue** — ver abaixo |
 | F52 | 3.5.4 Área do aluno: identificação, pagamento e evolução | é aqui que os módulos do `DS-TOTEM.md` §5.2 ligam; a F49 entrega a área interna **vazia** de propósito |
 
 **A Decisão 0 do ADR-042 vale para as quatro:** nenhuma tela do `kiosk` nasce com valor fixo
@@ -849,6 +849,62 @@ passo 1 é schema novo.
 `DS-TOTEM.md` que o arquivo não tem (§9.1, §11.x, §12) — decisão do PI foi registrar a mecânica da
 Decisão 3 em **§7.2**, a seção real de configuração, e não inventar as seções que o ADR cita. Nota
 completa em `docs/STATUS.md`.
+
+
+#### F51 — o que a fatia cumpriu
+
+Slice 3.5.3 · `SPEC-051` · issue [#152](https://github.com/RodReis/arenahub/issues/152) ·
+spec de design [`2026-08-26-f51-tela-publica-do-totem-design.md`](superpowers/specs/2026-08-26-f51-tela-publica-do-totem-design.md)
+
+| passo | entrega |
+|---|---|
+| 1 | `KioskConfig` ganha `blocos` (cinco tipos, ordem, tempo por bloco) e `patrocinio`. **A ordem do array É a ordem do rodízio** — sem campo `ordem` separado, que permitiria dois blocos com o mesmo número e desempate pela ordem física |
+| 2 | Upload de MP4 até 40 MB em `POST /admin/kiosk-devices/:id/media`, com a ordem de defesa da F19: **formato → antivírus → storage**. Chave gerada pelo servidor, escopada por tenant **e** unidade |
+| 3 | A porta do antivírus saiu de `modules/health/provider/` para `common/antivirus/` como `@Global` — o totem também envia arquivo, e `kiosk-admin` importar de dentro de `health` seria módulo alcançando o interior de outro (regra de arquitetura nº 9). **Mudança de lugar, não de comportamento** |
+| 4 | Indicadores da unidade (check-ins de hoje, treinando agora) no heartbeat que já existia — não em rota nova. Vêm de `AccessQueryRepository.contarEntradasDaUnidade`, **caso de uso público**, nunca leitura direta de `access_events` |
+| 5 | Aba **Blocos públicos** no painel: acrescentar (um de cada tipo), ligar, reordenar, editar os cinco tipos, enviar MP4 e configurar a faixa de patrocinadores |
+| 6 | Rodízio na hero do `apps/kiosk`: um bloco por vez, na ordem publicada, no tempo configurado; faixa de patrocinadores fixa no rodapé, fora do rodízio |
+| 7 | E2E do aceite (`tela-publica-do-totem.e2e-spec.ts`), esta seção, a linha da F51 no `STATUS.md` e a evidência da `SPEC-051` no `TESTING.md` |
+
+**Nenhuma tabela nova.** Blocos e patrocínio entram no `payload` de `kiosk_configurations`, que já é
+`Json`. O design da F50 previu `kiosk_config_blocks`, `kiosk_sponsors` e `kiosk_media_assets` para
+cá; **nenhuma das três se justifica** depois de olhar o que armazenariam — uma lista ordenada com no
+máximo 5 itens e outra com no máximo 6. Bloco em tabela relacional separada tornaria "publicar a
+versão 7" um problema de cópia de N linhas e "voltar para a 6" um problema de restauração; no
+`payload`, ambos são a linha versionada que já existe.
+
+**Duas decisões do PI em 26/08/2026 mudaram o escopo da issue:**
+
+1. **O Instagram entra como porta, não como adapter.** A Decisão 7 do ADR-042 manda extrair reel com
+   `yt-dlp`, binário que não existe na imagem da API nem no CI. O campo `linkExterno` existe no
+   contrato **desde este commit** e o painel o mostra **desabilitado com o motivo em tela** — quando
+   o adapter chegar, nenhuma tabela, nenhum contrato e nenhuma tela mudam. Vira fatia `[INFRA]`.
+2. **Os indicadores ao vivo entram com número real, e isso pede leitura do `M3.5-FR-005`.** O
+   requisito diz *"servir toda **mídia** do cache local, sem rede"* — e continua literal: vídeo,
+   logotipo e imagem nunca são buscados em runtime. O que se acrescenta é **um número de texto**,
+   que pega carona no heartbeat de 30 s e fica **em cache na memória**: sem rede, a tela mostra o
+   último valor conhecido em vez de piscar para vazio. A tela pública nunca depende da rede para
+   renderizar, que é a garantia que o requisito protege.
+
+**"Treinando agora" é estimativa, e a tela diz isso.** A catraca do MVP 0/1 registra entrada e não
+saída; o número é "quem entrou nas últimas 3 horas". Prometer contagem exata na recepção, ao lado de
+patrocinador, seria prometer o que o dado não sustenta.
+
+**Três defeitos que a tela real pegou e o CI não pegaria:** a faixa de patrocinadores encostava nos
+botões de acrescentar bloco e parecia mais um item do rodízio (ganhou cartão próprio); o cartão do
+bloco flutuava solto no meio de muito ar, porque os dois `flex` do atrator continuavam empurrando
+mesmo com bloco na tela (o vão de baixo agora cede); e o cartão sem `flex: 1 1 auto` ficava pequeno
+demais para o vão disponível.
+
+**Uma correção que a revisão obrigou a descrever com honestidade.** O `try` do antivírus envolvia
+também a decisão sobre o veredito, e o código foi reescrito para envolver só a chamada. **Medido por
+mutação em 26/08/2026: as duas formas são observacionalmente idênticas hoje** — com o `throw` de
+"infectado" dentro do `try`, ele cai no próprio `catch`, não é `ErroDoScanner`, e sai relançado
+intacto; **nenhum teste da suíte distingue as duas**, e plantar a mutação deixa os 7 testes verdes.
+O que a separação compra é o *próximo* `catch`: no dia em que o bloco tratar mais um tipo de erro,
+"infectado" (422) passaria a responder como "scanner fora do ar" (503). É disciplina contra o
+futuro, **não correção de defeito presente** — e o comentário no código foi reescrito para dizer
+isso, em vez de prometer uma proteção que a suíte não sustenta.
 
 ---
 

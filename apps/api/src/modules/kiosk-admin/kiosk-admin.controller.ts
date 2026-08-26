@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Put,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiNoContentResponse, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { kioskConfigSchema } from '@arenahub/api-contracts';
 
@@ -8,7 +21,20 @@ import {
   KioskAdminConfigService,
   type EstadoDaConfiguracao,
 } from './kiosk-admin-config.service.js';
+import { KioskMediaService } from './kiosk-media.service.js';
+import { TAMANHO_MAXIMO_DE_MIDIA_BYTES } from './domain/midia-do-totem.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+
+/**
+ * O arquivo como o `FileInterceptor` o entrega -- mesma declaracao local do
+ * `import.controller.ts` (F19), e pela mesma razao: sao tres campos, e
+ * `@types/multer` traria uma dependencia inteira para descrever seis linhas.
+ */
+interface ArquivoRecebido {
+  readonly originalname: string;
+  readonly mimetype: string;
+  readonly buffer: Buffer;
+}
 
 interface TotemDto {
   id: string;
@@ -33,6 +59,7 @@ interface TotemDto {
 export class KioskAdminController {
   constructor(
     private readonly config: KioskAdminConfigService,
+    private readonly midia: KioskMediaService,
     private readonly contexto: TenantContextService,
     private readonly db: PrismaService,
   ) {}
@@ -110,6 +137,46 @@ export class KioskAdminController {
   })
   async publicar(@Param('id') id: string): Promise<{ version: number }> {
     return this.config.publicar(this.contexto.require(), id, new Date());
+  }
+
+  /**
+   * Recebe o MP4 da tela publica (F51, ADR-042 Decisao 7).
+   *
+   * Devolve so a CHAVE: quem a coloca em `blocos.itens[].midiaKey` e o
+   * painel, no rascunho, e o rascunho so vira tela publicada em `publish`.
+   * Um upload nao muda o que o totem exibe -- e o que mantem a publicacao
+   * versionada como o unico caminho ate a superficie.
+   *
+   * `limits.fileSize` no interceptor E o teto do dominio ao mesmo tempo: o
+   * primeiro corta antes de o buffer inteiro subir a memoria, o segundo diz
+   * qual codigo de erro o gerente ve.
+   */
+  @Post(':id/media')
+  @HttpCode(201)
+  @RequirePermissions('device.manage')
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['midiaKey'],
+      properties: { midiaKey: { type: 'string' } },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: TAMANHO_MAXIMO_DE_MIDIA_BYTES } }),
+  )
+  async enviarMidia(
+    @Param('id') id: string,
+    @UploadedFile() arquivo: ArquivoRecebido | undefined,
+  ): Promise<{ midiaKey: string }> {
+    if (!arquivo) {
+      throw new BadRequestException({ code: 'FILE_REQUIRED' });
+    }
+
+    return this.midia.enviar(this.contexto.require(), id, {
+      originalFilename: arquivo.originalname,
+      contentType: arquivo.mimetype,
+      conteudo: new Uint8Array(arquivo.buffer),
+    });
   }
 
   @Delete(':id/config/draft')

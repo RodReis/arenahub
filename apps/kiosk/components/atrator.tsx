@@ -1,38 +1,45 @@
 'use client';
 
-import type { KioskConfig } from '@arenahub/api-contracts';
+import type { IndicadoresDaUnidade, KioskConfig } from '@arenahub/api-contracts';
 
+import { blocosVisiveis } from '../lib/rodizio';
+import { BlocosPublicos } from './blocos-publicos';
 import { IconeEntrar, IconeMarca } from './icones';
 
 /**
  * Tela publica -- DS-TOTEM.md §4.
  *
  * REGRA QUE NAO SE NEGOCIA: nenhum dado de aluno aparece aqui. Nem nome, nem
- * foto, nem ranking. Esta tela e vista por quem passa na recepcao, e o
- * componente inteiro so recebe `config` -- nao ha prop por onde um dado de
- * aluno entrasse mesmo que alguem quisesse.
+ * foto, nem ranking. Esta tela e vista por quem passa na recepcao, e as unicas
+ * props sao `config` e dois INTEIROS agregados da unidade -- nao ha prop por
+ * onde um nome, um valor de pendencia ou um id entrasse (`M3.5-BR-001`).
  *
- * Nasce SEM os quatro blocos opcionais (reel, eventos, informacoes ao vivo,
- * patrocinio): eles sao a F51. O §4 ja cobre este estado -- "se todos os
- * blocos opcionais estiverem desligados, hero e CTA se distribuem com o
- * espaco restante". O `flex: 1` entre hero e CTA e essa distribuicao.
+ * Os blocos opcionais e a faixa de patrocinadores chegaram na F51 e vivem em
+ * `BlocosPublicos`. O §4 continua valendo quando nao ha nenhum ligado -- "se
+ * todos os blocos opcionais estiverem desligados, hero e CTA se distribuem
+ * com o espaco restante": os dois `flex` abaixo sao essa distribuicao, e o
+ * componente nao renderiza nada quando a lista esta vazia.
  *
  * A tela INTEIRA e tocavel e leva a identificacao (§4), nao so o botao: a
  * 80 cm, mirar um retangulo especifico e trabalho desnecessario.
  */
 export function Atrator({
   config,
+  indicadores,
   aoEntrar,
   altoContraste,
   aoAlternarContraste,
 }: {
   readonly config: KioskConfig;
+  /** Dois inteiros da unidade. `null` ate o primeiro heartbeat responder. */
+  readonly indicadores: IndicadoresDaUnidade | null;
   readonly aoEntrar: () => void;
   readonly altoContraste: boolean;
   readonly aoAlternarContraste: () => void;
 }) {
   const { marca } = config;
   const { kicker, headline } = partirSlogan(marca.slogan, marca.nomeDaAcademia);
+  const temBloco = blocosVisiveis(config).length > 0;
 
   return (
     <div
@@ -98,14 +105,12 @@ export function Atrator({
       </header>
 
       {/*
-        A DISTRIBUICAO do §4: sem os quatro blocos opcionais (F51), o espaco
-        sobra. Ele e repartido em DOIS -- um antes do hero, um depois -- e nao
-        empilhado inteiro embaixo dele: com um `flex: 1` so, o hero fica
-        grudado no cabecalho e a tela parece truncada no meio. Com dois, o
-        hero flutua no terco superior e o CTA no inferior, que e a leitura que
-        o §4 descreve ("hero e CTA se distribuem com o espaco restante").
-        Quando a F51 ligar os blocos, eles entram entre estes dois vaos e o
-        `flex: 1` some sozinho -- sem mexer neste arquivo.
+        A DISTRIBUICAO do §4: sem bloco opcional nenhum, o espaco sobra. Ele e
+        repartido em DOIS -- um antes do hero, um depois -- e nao empilhado
+        inteiro embaixo dele: com um `flex: 1` so, o hero fica grudado no
+        cabecalho e a tela parece truncada no meio. Com dois, o hero flutua no
+        terco superior e o CTA no inferior, que e a leitura que o §4 descreve.
+        Com blocos ligados, eles ocupam o vao de baixo e os `flex` cedem.
       */}
       <span style={{ flex: 1 }} />
 
@@ -143,7 +148,15 @@ export function Atrator({
         </h1>
       </div>
 
-      <span style={{ flex: 1.4 }} />
+      {/*
+        O vao de baixo SO existe quando nao ha bloco: com um cartao na tela,
+        os dois `flex` continuavam empurrando e o bloco flutuava solto no meio
+        de muito ar -- foi o que a tela real mostrou. Com bloco, o espaco e
+        dele.
+      */}
+      {temBloco ? null : <span style={{ flex: 1.4 }} />}
+
+      <BlocosPublicos config={config} indicadores={indicadores} />
 
       <div
         style={{

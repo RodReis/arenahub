@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 26/08/2026 *(F50 entregue — configuração do totem; quadro reconciliado com o board)*
+**Última atualização:** 26/08/2026 *(F51 entregue — tela pública do totem)*
 
 🔑 **24/08/2026 — o Cowork passa a empurrar o próprio commit.** Até aqui o commit entrava na `main`
 local e ficava esperando alguém sincronizar: o `git push` pelo bridge falhava com
@@ -345,6 +345,19 @@ fora de ordem e estorno assíncrono sem depender da rede de um banco. O que muda
 segunda: **cartão no totem amplia o `MVP-04` §7 Slice 4.6**, que prevê apenas PIX — a emenda de
 PRD que isso exige **não é minha** (o ADR-021 só me autoriza a materializar decisão já registrada
 em ADR aceito), então ou vira ADR ou é o Code/PI quem escreve.
+
+📺 **26/08/2026 — a F51 entregou a tela pública, e duas decisões do PI mudaram o escopo da
+issue.** A primeira: **o Instagram entra como porta, não como adapter** — a Decisão 7 do ADR-042
+manda extrair reel com `yt-dlp`, binário que não existe na imagem da API nem no CI, então o campo
+`linkExterno` já está no contrato e o painel o mostra **desabilitado com o motivo em tela**; o
+adapter real vira fatia `[INFRA]`. A segunda pede **leitura explícita do `M3.5-FR-005`**: o bloco
+de informações da unidade exibe número **real**, buscado no heartbeat de 30 s que já existia e
+guardado em cache de memória. O requisito diz *"servir toda **mídia** do cache local, sem rede"* e
+**continua literal** — vídeo, logotipo e imagem nunca são buscados em runtime; o que se acrescenta
+é texto, e sem rede a tela mostra o último valor conhecido em vez de piscar para vazio. **A tela
+pública nunca depende da rede para renderizar**, que é a garantia que o requisito protege.
+**"Treinando agora" é estimativa e a tela diz isso** — a catraca registra entrada e não saída.
+Nenhuma tabela nova: blocos e patrocínio vivem no `payload` versionado que a F49 já criou.
 
 🏦 **23/08/2026, terceira rodada — chegaram quatro documentos de integração Getnet, e eles foram
 escritos como se o backend não existisse.** O PI trouxe `docs/integracao/` (um documento-mãe e um
@@ -852,7 +865,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F48 | — | 1 | — | Ativação da base corrente do Pacto (~340 ativos) | [design](superpowers/specs/2026-08-20-ativacao-base-corrente-design.md) | — | **entregue** — aguardando aceite |
 | F49 | SPEC-049 | 3.5 | 3.5.1 | Kiosk seguro, provisionamento e sessão efêmera | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.5](prd/academia/MVP-04-app-totem.md) | [#150](https://github.com/RodReis/arenahub/issues/150) | ✅ **entregue** em 25/08/2026 — aguardando aceite |
 | F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | ✅ **entregue** em 26/08/2026 — aguardando aceite |
-| F51 | SPEC-051 | 3.5 | 3.5.3 | Tela pública (hero): blocos, mídia e patrocínio | [ADR-042](DECISIONS.md#adr-042) | [#152](https://github.com/RodReis/arenahub/issues/152) | aprovada-pi |
+| F51 | SPEC-051 | 3.5 | 3.5.3 | Tela pública (hero): blocos, mídia e patrocínio | [ADR-042](DECISIONS.md#adr-042) | [#152](https://github.com/RodReis/arenahub/issues/152) | ✅ **entregue** em 26/08/2026 — aguardando aceite |
 | F52 | SPEC-052 | 3.5 | 3.5.4 | Área do aluno no totem: identificação, pagamento e evolução | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.6](prd/academia/MVP-04-app-totem.md) | [#153](https://github.com/RodReis/arenahub/issues/153) | aprovada-pi |
 | F53 | SPEC-053 | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [`SPEC-053-pagamentos-e-cobranca-no-balcao.md`](specs/SPEC-053-pagamentos-e-cobranca-no-balcao.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | ✅ **finalizado** — aceito pelo PI |
 | F54 | SPEC-054 | 3 | — | Painel financeiro gerencial (KPIs) | [`SPEC-054-painel-financeiro-gerencial.md`](specs/SPEC-054-painel-financeiro-gerencial.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | ✅ **finalizado** — aceito pelo PI |

@@ -103,3 +103,46 @@ export const OBJECT_STORAGE = Symbol('ObjectStoragePort');
 export function montarChaveDeCadastro(tenantId: string, identityId: string): string {
   return `tenants/${tenantId}/biometrics/${identityId}/enrollment`;
 }
+
+/**
+ * Monta a chave do objeto de midia.
+ *
+ * Formato: `tenants/{tenantId}/kiosk-media/{gymUnitId}/{id}.mp4`.
+ *
+ * SERVIDOR GERA, cliente nunca escolhe prefixo -- mesma disciplina de
+ * `montarChaveDeCadastro`. Aceitar `key` do corpo deixaria o tenant A
+ * escrever em `tenants/{B}/...`, que e a regra de arquitetura no 2 furada
+ * pela porta dos fundos.
+ */
+export function montarChaveDeMidia(
+  tenantId: string,
+  gymUnitId: string,
+  id: string,
+): string {
+  return `${prefixoDeMidia(tenantId, gymUnitId)}${id}.mp4`;
+}
+
+/**
+ * O diretorio em que a midia daquela unidade pode morar.
+ *
+ * Existe separado porque a LEITURA precisa conferir o que a ESCRITA montou:
+ * `midiaKey` vem do payload da configuracao, que e dado de banco, e assinar
+ * leitura de uma chave sem conferir o prefixo entregaria objeto de outro
+ * tenant a quem editasse o payload.
+ *
+ * `startsWith` sobre este prefixo basta porque ele termina em `/` -- sem a
+ * barra, `tenants/t1/kiosk-media/u1` casaria com `.../u10`, dando ao totem
+ * da unidade 1 a midia da unidade 10.
+ */
+export function prefixoDeMidia(tenantId: string, gymUnitId: string): string {
+  return `tenants/${tenantId}/kiosk-media/${gymUnitId}/`;
+}
+
+/** A chave pertence a esta unidade deste tenant? */
+export function chaveDeMidiaPertenceA(
+  midiaKey: string,
+  tenantId: string,
+  gymUnitId: string,
+): boolean {
+  return midiaKey.startsWith(prefixoDeMidia(tenantId, gymUnitId));
+}

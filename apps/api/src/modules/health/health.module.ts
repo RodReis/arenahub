@@ -23,8 +23,6 @@ import { DocumentExtractorRouterAdapter } from './provider/document-extractor-ro
 import { DOCUMENT_EXTRACTOR, type DocumentExtractor } from './provider/document-extractor.port.js';
 import { FakeOcrExtractorAdapter } from './provider/fake-ocr-extractor.adapter.js';
 import { LaudoBioimpedanciaExtractor } from './provider/laudo-bioimpedancia.extractor.js';
-import { MALWARE_SCANNER } from './provider/malware-scanner.port.js';
-import { FakeMalwareScannerAdapter } from './provider/fake-malware-scanner.adapter.js';
 import { AiAnalysisRepository } from './ai-analysis.repository.js';
 import { AiAnalysisService } from './ai-analysis.service.js';
 import { AI_PROVIDER, type AiProvider } from './provider/ai-provider.port.js';
@@ -86,8 +84,6 @@ const ANTHROPIC_CLIENT = Symbol('ANTHROPIC_CLIENT');
     LaudoBioimpedanciaExtractor,
     DocumentExtractorRouterAdapter,
     { provide: DOCUMENT_EXTRACTOR, useExisting: DocumentExtractorRouterAdapter },
-    FakeMalwareScannerAdapter,
-    { provide: MALWARE_SCANNER, useExisting: FakeMalwareScannerAdapter },
     FakeAiProviderAdapter,
     /**
      * Cliente Anthropic unico do modulo, `null` sem `ANTHROPIC_API_KEY` --

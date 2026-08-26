@@ -1713,7 +1713,8 @@
                   "type": "object",
                   "required": [
                     "configVersion",
-                    "serverTime"
+                    "serverTime",
+                    "indicadores"
                   ],
                   "properties": {
                     "configVersion": {
@@ -1722,6 +1723,21 @@
                     "serverTime": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "indicadores": {
+                      "type": "object",
+                      "required": [
+                        "checkinsDeHoje",
+                        "treinandoAgora"
+                      ],
+                      "properties": {
+                        "checkinsDeHoje": {
+                          "type": "integer"
+                        },
+                        "treinandoAgora": {
+                          "type": "integer"
+                        }
+                      }
                     }
                   }
                 }
@@ -1921,6 +1937,43 @@
         ]
       }
     },
+    "/api/v1/access-events": {
+      "get": {
+        "operationId": "AccessQueryController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AccessQuery"
+        ]
+      }
+    },
+    "/api/v1/access-events/{id}": {
+      "get": {
+        "operationId": "AccessQueryController_detalhar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AccessQuery"
+        ]
+      }
+    },
     "/api/v1/admin/kiosk-devices": {
       "get": {
         "operationId": "KioskAdminController_listar",
@@ -2057,6 +2110,44 @@
                   "properties": {
                     "version": {
                       "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
+    "/api/v1/admin/kiosk-devices/{id}/media": {
+      "post": {
+        "operationId": "KioskAdminController_enviarMidia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "midiaKey"
+                  ],
+                  "properties": {
+                    "midiaKey": {
+                      "type": "string"
                     }
                   }
                 }
@@ -2272,43 +2363,6 @@
         },
         "tags": [
           "ManualOverride"
-        ]
-      }
-    },
-    "/api/v1/access-events": {
-      "get": {
-        "operationId": "AccessQueryController_listar",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "AccessQuery"
-        ]
-      }
-    },
-    "/api/v1/access-events/{id}": {
-      "get": {
-        "operationId": "AccessQueryController_detalhar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "AccessQuery"
         ]
       }
     },

@@ -302,12 +302,11 @@ Playwright ao relatório é trabalho de `[INFRA]`, fora do escopo desta fatia.
 
 ### Evidência da `SPEC-050` — F50, configuração do totem
 
-Gerada por `pnpm test:report --issue 151 --spec SPEC-050`, em 26/08/2026. **PR: `—`** — preencher
-depois do merge, pela regra acima.
+Gerada por `pnpm test:report --issue 151 --spec SPEC-050`, em 26/08/2026. **PR: [#207](https://github.com/RodReis/arenahub/pull/207)** — preenchido pela F51, que encontrou o campo em `—`.
 
 ```
-| 2026-08-26 | #151 | SPEC-050 | unitário   | 1757 | 1757 | 0 |    — | — |
-| 2026-08-26 | #151 | SPEC-050 | integração |  640 |  640 | 0 |    — | — |
+| 2026-08-26 | #151 | SPEC-050 | unitário   | 1757 | 1757 | 0 | #207 | — |
+| 2026-08-26 | #151 | SPEC-050 | integração |  640 |  640 | 0 | #207 | — |
 ```
 
 **Cobertura % não capturada nesta linha.** `pnpm test:report` trava na saída do processo Jest
@@ -333,6 +332,83 @@ O que a fatia cobre, por nível (detalhe em
 nunca reescreve versão publicada*. É o índice parcial do passo 1 (isolamento por chave) mais a
 imutabilidade do passo 2 (publicar sempre insere linha nova) — os dois described em
 `docs/DEVELOPMENT.md` §"F50 — o que a fatia cumpriu".
+
+### Evidência da `SPEC-051` — F51, tela pública do totem
+
+Gerada em 26/08/2026 a partir do gate local. **PR: `—`** — preencher depois do merge, pela regra acima.
+
+```
+| 2026-08-26 | #152 | SPEC-051 | unitário   | 1860 | 1860 | 0 |    — | — |
+| 2026-08-26 | #152 | SPEC-051 | integração |  649 |  649 | 0 |    — | — |
+| 2026-08-26 | #152 | SPEC-051 | e2e        |   61 |   61 | 0 |    — | — |
+```
+
+**A linha `e2e` é preenchida à mão**, pelo motivo já registrado acima: o gerador coleta `test` e
+`test:integration`, e o Playwright roda por `pnpm test:e2e`, fora dele. Os 61 incluem os 3 do
+aceite da F51 e os 58 pré-existentes, todos verdes na mesma execução.
+
+**Cobertura % não capturada, pelo mesmo motivo já registrado na `SPEC-050`:** `pnpm test:report`
+trava na saída do Jest neste ambiente Windows. Os números acima são os que o gate local produziu —
+unitário 1860/1860 (12 pacotes), integração 649/649 (43 suítes), zero falhas. **Escopo é a suíte
+inteira do monorepo**, não um subconjunto da F51, porque o gerador nunca soube separar por fatia.
+
+O que a fatia cobre, por nível (detalhe em
+[`superpowers/specs/2026-08-26-f51-tela-publica-do-totem-design.md`](superpowers/specs/2026-08-26-f51-tela-publica-do-totem-design.md)):
+
+| nível | o que prova |
+|---|---|
+| unitário | `blocosVisiveis` (vídeo sem mídia resolvida **sai** do rodízio, em vez de virar 12 s de tela preta), `proximoIndice`/`indiceSeguro` (lista vazia devolve 0, nunca `NaN`; lista que encolheu volta ao início), `mover` (subir a primeira e descer a última **não** embaralham), `aceitarMidia` e `pareceMp4` (a assinatura ISO-BMFF mora no **offset 4**, não no 0), `rotuloDePatrocinio` (rótulo vazio cai no padrão, nunca em nada), `formatarData` (a data digitada não anda um dia para trás), `inicioDoDiaLocal` (22h locais ainda são o mesmo dia, embora já seja o dia seguinte em UTC) |
+| integração | `POST /admin/kiosk-devices/:id/media` — MP4 aceito devolve chave escopada por tenant **e** unidade; PNG renomeado é recusado **sem sequer chamar o antivírus**; EICAR responde 422 e **não** chega ao storage; totem de outro tenant responde 404, nunca 403. `GET /kiosk/config` — os blocos publicados chegam ao totem na ordem e no tempo configurados; **mídia apontando para outra unidade não vira URL assinada**, mesmo gravada no payload. `POST /kiosk/heartbeat` — os indicadores contam `access_events` reais e contam **só os da unidade daquele totem**; `DENY` não conta como check-in |
+| componente | a faixa de patrocinadores **não tem `<a>` nem `<button>`** (vitrine, não mídia — ADR-042, Decisão 4); o bloco de informações mostra o título e **não um zero** enquanto nenhum número chegou; o campo de link do Instagram aparece **desabilitado com o motivo em tela** |
+
+🔴 **`test:integration` roda com `--runInBand` e vaza memória — a F51 cruzou o limiar.** As suítes
+compartilham **um processo**, e cada uma monta um `AppModule` Nest próprio; **a maioria não chama
+`app.close()` no `afterAll`**, então os módulos ficam vivos até o fim da execução. Na F50 eram 42
+suítes e 640 testes e passava; a **43ª** estourou o heap padrão do runner com `FATAL ERROR: Reached
+heap limit` e `exit 134` — que **parece crash de teste e não é**: nenhum teste falhou, e o resumo
+do Jest nem chegou a ser impresso.
+
+O teto foi elevado (`NODE_OPTIONS=--max-old-space-size=6144` no workflow **e** no `globalEnv` do
+`turbo.json`, senão o Turbo descarta a variável sem erro). **É a correção proporcional, não a de
+raiz:** fechar a app em ~40 suítes alheias é refatoração que nenhuma fatia pediu. O conserto de
+verdade — `afterAll` fechando a app em toda suíte, ou abandonar o `--runInBand` — é card `[INFRA]`
+próprio, e **a próxima fatia que acrescentar suíte de integração pode reencontrar o teto**.
+
+🔴 **O CI sobe SÓ Postgres — nem MinIO, nem Redis.** Descoberto pela F51, que foi a **primeira
+suíte de integração a gravar objeto de verdade** no object storage e derrubou o pipeline com
+`ECONNREFUSED 127.0.0.1:9000`. Toda suíte de integração desta casa dubla o storage com
+`.overrideProvider(OBJECT_STORAGE)` (`access-query-export`, `biometric-identity`, `device-sync`,
+`health`, `historico-e-comparativos`, `upload-e-revisao`) — o padrão existia, e a F51 era a única
+que não o seguia. **Quem escrever a próxima fatia que toque o storage precisa saber disto antes de
+abrir o PR:** localmente o MinIO do `docker-compose` responde e o teste passa; no CI, não.
+
+O dublê **guarda o que foi gravado** e **registra o que foi assinado**, para não cair na armadilha
+do dublê que esconde o ato errado: um serviço que devolvesse a chave sem gravar nada passaria verde
+com um dublê que só responde `Promise.resolve()`. Provado por mutação — remover o `putPrivateObject`
+do serviço deixa o teste vermelho.
+
+**Provado por mutação em 26/08/2026**, e não por leitura — cada guarda foi quebrada de propósito
+para ver a suíte ficar vermelha:
+
+| mutação plantada | resultado |
+|---|---|
+| Gravar no storage **antes** de escanear | 2 testes vermelhos (`ESCANEIA ANTES de gravar`, `scanner FORA DO AR ... NAO entra no storage`) |
+| Tirar a barra final do prefixo de mídia (`u1` passaria a alcançar `u10`) | 4 testes vermelhos, em unidade **e** integração |
+| Vídeo sem `midiaUrl` **voltar** ao rodízio (12 s de tela preta) | 2 testes vermelhos, no domínio puro e no componente |
+| Marca do patrocinador virar `<a href>` | 1 teste vermelho (`NAO ha link nem area clicavel na faixa`) |
+
+⚠️ **Uma guarda que a mutação mostrou ser retórica, e está registrada como tal.** Mover o `throw`
+de "arquivo infectado" para dentro do `try` do antivírus **não quebra teste nenhum** — os 7 seguem
+verdes, porque o erro cai no próprio `catch`, não é `ErroDoScanner` e sai relançado intacto. As
+duas formas são observacionalmente idênticas hoje. O comentário no código foi reescrito para dizer
+isso: a separação é disciplina contra o *próximo* `catch`, não correção de defeito presente.
+
+**A guarda de regressão desta fatia tem nome:** *nenhuma configuração publica dado de aluno na tela
+pública, e a faixa de patrocínio nunca conta exibição*. A primeira metade é estrutural — o
+componente da hero recebe `config` e dois inteiros, e `SessaoDoAluno` não é importado no arquivo; o
+endpoint que produz os números devolve **dois inteiros**, sem lista, sem nome, sem id
+(`M3.5-BR-001`). A segunda também: não há campo de contagem, clique, campanha ou período **no
+contrato**, e o `parse` do Zod descarta o que vier a mais (`M3.5-BR-006`).
 
 ---
 

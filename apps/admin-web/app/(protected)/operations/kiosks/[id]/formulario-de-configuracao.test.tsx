@@ -17,6 +17,12 @@ vi.mock('../../../../actions/kiosk-config', () => ({
   descartarAction: vi.fn(),
 }));
 
+// A aba Blocos publicos (F51) traz o upload de midia junto. Sem este mock,
+// `server-only` derruba a arvore INTEIRA -- e o erro sai longe da causa.
+vi.mock('../../../../actions/kiosk-midia', () => ({
+  enviarMidiaAction: vi.fn(),
+}));
+
 const estado = {
   publicada: { version: 2, config: CONFIG_PADRAO_DO_TOTEM },
   rascunho: null,
@@ -53,8 +59,11 @@ describe('FormularioDeConfiguracao', () => {
 
     await usuario.click(screen.getByRole('tab', { name: /sessão/i }));
 
-    expect(screen.getByText(/30 s/)).toBeInTheDocument();
-    expect(screen.getByText(/99 s/)).toBeInTheDocument();
+    // Pelo TESTID, e nao por texto solto: "30 s" tambem e uma das opcoes de
+    // tempo por bloco da aba Blocos publicos (F51), que fica montada ao lado.
+    // A busca por texto casava com as duas e quebrou quando a aba entrou.
+    expect(screen.getByTestId('incremento-fixo')).toHaveTextContent('30 s');
+    expect(screen.getByTestId('teto-fixo')).toHaveTextContent('99 s');
     expect(screen.queryByRole('spinbutton', { name: /incremento|teto/i })).not.toBeInTheDocument();
   });
 

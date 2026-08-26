@@ -198,6 +198,8 @@ describe('contrato OpenAPI', () => {
         '/api/v1/admin/kiosk-devices/{id}/config',
         '/api/v1/admin/kiosk-devices/{id}/config/publish',
         '/api/v1/admin/kiosk-devices/{id}/config/draft',
+        // F51 -- upload da midia da tela publica (MP4, ADR-042 Decisao 7).
+        '/api/v1/admin/kiosk-devices/{id}/media',
       ]),
     );
   });

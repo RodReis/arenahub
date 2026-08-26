@@ -1,8 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { resolverConfig, type KioskConfig } from '@arenahub/api-contracts';
+import {
+  resolverConfig,
+  type IndicadoresDaUnidade,
+  type KioskConfig,
+} from '@arenahub/api-contracts';
 
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { AccessQueryRepository } from '../access-query/access-query.repository.js';
 import type { ContextoDoKiosk } from '../kiosk-auth/kiosk-auth.service.js';
+import {
+  inicioDaJanelaDeTreino,
+  inicioDoDiaLocal,
+} from './domain/indicadores-da-unidade.js';
 
 export interface ConfiguracaoResolvida {
   readonly version: number;
@@ -18,7 +27,10 @@ export interface DadosDoHeartbeat {
 
 @Injectable()
 export class KioskConfigService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly eventos: AccessQueryRepository,
+  ) {}
 
   /**
    * Resolve as tres camadas (ADR-042, Decisao 8) para ESTE dispositivo.
@@ -100,5 +112,40 @@ export class KioskConfigService {
         clockOffsetMs: dados.localTimeMs === 0 ? null : dados.localTimeMs - agora.getTime(),
       },
     });
+  }
+
+  /**
+   * Os dois numeros do bloco de informacoes da tela publica (F51).
+   *
+   * VAO NO HEARTBEAT que a F49 ja dispara a cada 30 s, e nao numa rota
+   * propria: `M3.5-FR-005` proibe a tela publica depender da rede, e uma
+   * requisicao a mais so para o contador seria exatamente essa dependencia.
+   * Pegando carona no heartbeat, a tela renderiza com o ultimo valor que
+   * chegou -- e continua renderizando quando nenhum chega.
+   *
+   * As duas contagens vao em paralelo: sao consultas independentes sobre o
+   * mesmo indice (`[tenantId, gymUnitId, occurredAt]`), e serializa-las
+   * dobraria a latencia de um heartbeat que roda a cada 30 segundos.
+   */
+  async contarIndicadores(
+    contexto: ContextoDoKiosk,
+    agora: Date,
+  ): Promise<IndicadoresDaUnidade> {
+    const escopo = { tenantId: contexto.tenantId, gymUnitId: contexto.gymUnitId };
+
+    const [checkinsDeHoje, treinandoAgora] = await Promise.all([
+      this.eventos.contarEntradasDaUnidade({
+        ...escopo,
+        de: inicioDoDiaLocal(agora),
+        ate: agora,
+      }),
+      this.eventos.contarEntradasDaUnidade({
+        ...escopo,
+        de: inicioDaJanelaDeTreino(agora),
+        ate: agora,
+      }),
+    ]);
+
+    return { checkinsDeHoje, treinandoAgora };
   }
 }

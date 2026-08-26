@@ -10,6 +10,7 @@ import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.j
 import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.service.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import type { EstadoDaConfiguracao } from '../../src/modules/kiosk-admin/kiosk-admin-config.service.js';
+import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 describe('F50 -- rascunho unico por camada', () => {
@@ -128,6 +129,41 @@ describe('F50 -- rotas administrativas de configuracao', () => {
     return lista.find((c) => c.startsWith('arenahub_access=')) ?? '';
   };
 
+  /**
+   * Storage DUBLADO, como em toda suite de integracao desta casa
+   * (`access-query-export`, `biometric-identity`, `device-sync`, ...): o CI
+   * sobe **so Postgres** -- nao ha MinIO nem Redis. O upload da F51 foi o
+   * primeiro teste de integracao a gravar objeto de verdade, e derrubou o
+   * pipeline com `ECONNREFUSED 127.0.0.1:9000`.
+   *
+   * O dublê GUARDA o que foi gravado: o teste continua provando que o
+   * arquivo chegou ao storage com a chave certa, e nao apenas que a rota
+   * respondeu 201.
+   */
+  const gravados = new Map<string, Buffer>();
+
+  const storageFalso = {
+    createPrivateUpload: () =>
+      Promise.resolve({ uploadUrl: 'https://storage.test/x', expiresAt: '' }),
+    headPrivateObject: () => Promise.resolve({ size: 1, contentType: 'video/mp4' }),
+    deletePrivateObject: (key: string) => {
+      gravados.delete(key);
+
+      return Promise.resolve();
+    },
+    putPrivateObject: (entrada: { key: string; body: Buffer }) => {
+      gravados.set(entrada.key, entrada.body);
+
+      return Promise.resolve();
+    },
+    createPrivateDownload: (entrada: { key: string }) =>
+      Promise.resolve({
+        downloadUrl: `https://storage.test/${entrada.key}?assinada=1`,
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      }),
+    verificar: () => Promise.resolve(true),
+  };
+
   type Tenant = { id: string; gymUnitId: string; deviceId: string; cookieGestor: string };
 
   const tenantA: Tenant = { id: '', gymUnitId: '', deviceId: '', cookieGestor: '' };
@@ -194,7 +230,11 @@ describe('F50 -- rotas administrativas de configuracao', () => {
   };
 
   beforeAll(async () => {
-    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const modulo = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(OBJECT_STORAGE)
+      .useValue(storageFalso)
+      .compile();
+
     app = modulo.createNestApplication();
     aplicarParserComCorpoCru(app);
     await app.init();
@@ -359,5 +399,83 @@ describe('F50 -- rotas administrativas de configuracao', () => {
     const corpo = resposta.body as { config: { marca: { slogan: string } } };
 
     expect(corpo.config.marca.slogan).not.toBe('so rascunho');
+  });
+  /**
+   * F51 -- upload da midia da tela publica.
+   *
+   * O QUE ESTES TESTES PROVAM, e o unitario nao: a rota REAL recebe
+   * `multipart/form-data`, exige `device.manage`, e a ordem de defesa
+   * (formato -> antivirus -> storage) vale de ponta a ponta.
+   */
+  const cabecalhoMp4 = (): Buffer =>
+    Buffer.concat([
+      Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]),
+      Buffer.alloc(64),
+    ]);
+
+  it('POST media aceita MP4 e devolve a chave escopada por tenant e unidade', async () => {
+    const resposta = await request(servidor())
+      .post(`/api/v1/admin/kiosk-devices/${tenantA.deviceId}/media`)
+      .set('Cookie', tenantA.cookieGestor)
+      .attach('file', cabecalhoMp4(), { filename: 'video.mp4', contentType: 'video/mp4' })
+      .expect(201);
+
+    const { midiaKey } = resposta.body as { midiaKey: string };
+
+    expect(midiaKey.startsWith(`tenants/${tenantA.id}/kiosk-media/${tenantA.gymUnitId}/`)).toBe(
+      true,
+    );
+    // O ARQUIVO CHEGOU, e nao so a rota respondeu 201: sem esta asserção,
+    // um servico que devolvesse a chave sem gravar nada passaria verde.
+    expect(gravados.get(midiaKey)).toBeDefined();
+  });
+
+  it('POST media recusa PNG disfarcado de MP4 -- a assinatura decide, nao o nome', async () => {
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(64),
+    ]);
+
+    const resposta = await request(servidor())
+      .post(`/api/v1/admin/kiosk-devices/${tenantA.deviceId}/media`)
+      .set('Cookie', tenantA.cookieGestor)
+      .attach('file', png, { filename: 'video.mp4', contentType: 'video/mp4' })
+      .expect(400);
+
+    expect((resposta.body as { code: string }).code).toBe('FILE_SIGNATURE_MISMATCH');
+  });
+
+  it('POST media recusa arquivo INFECTADO -- antivirus antes do storage', async () => {
+    // EICAR montado em pedacos: escrito inteiro, o antivirus da maquina de
+    // quem clona o repositorio poria este arquivo em quarentena.
+    const eicar = Buffer.from(
+      ['X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR', '-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'].join(''),
+      'latin1',
+    );
+
+    // O EICAR fica DENTRO dos primeiros 1024 bytes: o dublê so decodifica
+    // essa janela (ver `fake-malware-scanner.adapter.ts` -- antivirus real
+    // varre o arquivo inteiro). Enterra-lo depois do cabecalho de 76 bytes
+    // faria o teste passar por engano, provando que nada foi escaneado.
+    const infectado = Buffer.concat([cabecalhoMp4(), eicar, Buffer.alloc(2048)]);
+
+    const resposta = await request(servidor())
+      .post(`/api/v1/admin/kiosk-devices/${tenantA.deviceId}/media`)
+      .set('Cookie', tenantA.cookieGestor)
+      .attach('file', infectado, {
+        filename: 'video.mp4',
+        contentType: 'video/mp4',
+      })
+      .expect(422);
+
+    expect((resposta.body as { code: string }).code).toBe('FILE_INFECTED');
+  });
+
+  it('POST media em totem de OUTRO tenant responde 404, nunca 403', async () => {
+    await request(servidor())
+      .post(`/api/v1/admin/kiosk-devices/${tenantB.deviceId}/media`)
+      .set('Cookie', tenantA.cookieGestor)
+      .attach('file', cabecalhoMp4(), { filename: 'video.mp4', contentType: 'video/mp4' })
+      .expect(404);
   });
 });
