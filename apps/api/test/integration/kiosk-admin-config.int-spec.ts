@@ -13,6 +13,7 @@ import type { EstadoDaConfiguracao } from '../../src/modules/kiosk-admin/kiosk-a
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 describe('F50 -- rascunho unico por camada', () => {
+  let app: INestApplication;
   let db: PrismaService;
   let tenantId = '';
   let gymUnitId = '';
@@ -21,7 +22,7 @@ describe('F50 -- rascunho unico por camada', () => {
 
   beforeAll(async () => {
     const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    const app = modulo.createNestApplication();
+    app = modulo.createNestApplication();
     await app.init();
     db = app.get(PrismaService);
 
@@ -55,6 +56,7 @@ describe('F50 -- rascunho unico por camada', () => {
 
   afterAll(async () => {
     await db.tenant.delete({ where: { id: tenantId } });
+    await app.close();
   });
 
   const rascunho = (deviceId: string | null, version: number) =>
