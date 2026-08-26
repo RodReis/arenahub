@@ -12,6 +12,7 @@ import {
   type MetricaDoTotem,
   type SessaoDoAluno,
 } from '../lib/kiosk-client';
+import { fracaoDaPontuacao, tracadoDoArco } from '../lib/pontuacao';
 import {
   deltaLegivel,
   mesDaMedicao,
@@ -193,11 +194,7 @@ function RelatorioDoAparelho({ relatorio }: { readonly relatorio: Record<string,
 
   return (
     <div className="relatorioDoAparelho" data-testid="relatorio-do-aparelho">
-      {pontuacao !== null && (
-        <p className="pontuacaoDoAparelho" data-testid="pontuacao">
-          {pontuacao} pontos
-        </p>
-      )}
+      {pontuacao !== null && <AnelDePontuacao bruto={pontuacao} />}
 
       {condicao !== null && <p className="corpo">{condicao}</p>}
 
@@ -381,5 +378,59 @@ export function HistoricoDeAvaliacoes({
         </>
       )}
     </Moldura>
+  );
+}
+
+/**
+ * Anel de pontuacao -- DS-TOTEM.md §3.12.
+ *
+ * DEGRADA PARA TEXTO quando o aparelho reporta algo que nao e numero na escala
+ * (ver `lib/pontuacao.ts`): o campo e texto livre, e desenhar arco a partir de
+ * "Condicao boa" seria inventar leitura sobre dado de saude. O `<p>` que estava
+ * aqui antes continua sendo o caminho nesse caso -- nada regride.
+ */
+function AnelDePontuacao({ bruto }: { readonly bruto: string }) {
+  const fracao = fracaoDaPontuacao(bruto);
+
+  if (fracao === null) {
+    return (
+      <p className="pontuacaoDoAparelho" data-testid="pontuacao">
+        {bruto} pontos
+      </p>
+    );
+  }
+
+  return (
+    <div className="anelDePontuacao" data-testid="anel-de-pontuacao">
+      {/*
+        `aria-hidden`: o valor ja esta no texto ao lado, e um leitor de tela
+        anunciando dois circulos SVG antes do numero atrapalha em vez de
+        informar. O desenho e reforco visual do dado, nao o dado.
+      */}
+      <svg width="140" height="140" viewBox="0 0 140 140" aria-hidden="true">
+        <circle
+          cx="70"
+          cy="70"
+          r="58"
+          fill="none"
+          stroke="var(--ah-totem-border-hairline)"
+          strokeWidth="14"
+        />
+        <circle
+          cx="70"
+          cy="70"
+          r="58"
+          fill="none"
+          stroke="var(--ah-totem-brand-500)"
+          strokeWidth="14"
+          strokeLinecap="round"
+          strokeDasharray={tracadoDoArco(fracao)}
+          transform="rotate(-90 70 70)"
+        />
+      </svg>
+      <p className="pontuacaoDoAparelho" data-testid="pontuacao">
+        {bruto} pontos
+      </p>
+    </div>
   );
 }

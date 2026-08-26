@@ -135,6 +135,95 @@ button {
   background: var(--ah-totem-bg-base);
 }
 
+/**
+ * Moldura do totem -- DS-TOTEM.md §3.1.
+ *
+ * O corpo pinta a borda metalica e o glow; `.tela` continua sendo a superficie
+ * util. Sao dois elementos porque o gradiente da borda nao pode participar do
+ * `overflow: hidden` que recorta o conteudo.
+ *
+ * `1080x1920` e o alvo (§1), mas em monitor de desenvolvimento a moldura
+ * encolhe junto: `max-width` em vez de `width` fixo. No totem real, onde a
+ * viewport JA e 1080x1920, os dois valores coincidem e a moldura encosta na
+ * borda fisica -- que e o que o §3.1 descreve.
+ */
+.moldura {
+  display: contents;
+}
+
+/**
+ * A moldura so aparece em tela MAIOR que o totem -- isto e, em monitor de
+ * desenvolvimento e na pre-visualizacao do painel.
+ *
+ * No equipamento real a viewport JA e 1080x1920: ali a moldura roubaria 2px
+ * uteis e arredondaria o canto do conteudo contra a moldura FISICA do
+ * gabinete, que ja existe em metal. O §3.1 descreve a borda do aparelho; em
+ * cima do aparelho ela e redundante, fora dele e o que da a leitura de "isto
+ * e um totem".
+ */
+@media (min-width: 1081px) {
+  .moldura {
+    display: block;
+
+    /* O gradiente metalico do §3.1 pinta o FUNDO, e o padding de 2px o revela
+       como se fosse borda. `border-image` nao aceita raio, e uma borda solida
+       nao aceita gradiente -- este e o unico caminho que da os dois. */
+    background: linear-gradient(145deg, #d8dee5, #8d97a3 45%, #e9edf1);
+    /* 3px, e nao os 2 do §3.1: o §3.1 descreve a borda em cima de uma tela de
+       1080px reais. Na pre-visualizacao a moldura e desenhada menor, e 2px de
+       metal contra o preto do fundo somem -- a borda parecia um contorno cinza
+       fino, nao metal. 3px preserva a leitura sem virar quadro. */
+    padding: 3px;
+    border-radius: 48px;
+    box-shadow:
+      0 0 64px rgb(77 124 255 / 14%),
+      0 24px 64px rgb(10 11 13 / 40%);
+    width: 1080px;
+    margin-inline: auto;
+    overflow: hidden;
+  }
+
+  /* 46px = 48 externo - 2 de padding: raios concentricos (§3.1). */
+  .moldura > .tela {
+    border-radius: 46px;
+    /* A altura util desconta o padding da moldura, senao a tela de 100dvh
+       empurra 4px para fora e o glow fica cortado embaixo. */
+    height: calc(100dvh - 6px);
+  }
+}
+
+/**
+ * Alto contraste remove o glow E o metal -- §2.6 manda desligar efeito
+ * decorativo, e uma borda em gradiente e decoracao. Vira linha chapada, que
+ * ainda delimita a superficie sem depender de degrade.
+ */
+[data-contraste='alto'] .moldura {
+  background: var(--ah-totem-border-default);
+  box-shadow: none;
+}
+
+/* ------------------------------------------------------------- movimento */
+
+/**
+ * §2.6. As duas unicas animacoes da superficie. Ambas morrem em alto
+ * contraste pela regra `animation: none !important` mais abaixo.
+ */
+@keyframes ah-pulse {
+  from {
+    opacity: 0.7;
+  }
+
+  to {
+    opacity: 0.15;
+  }
+}
+
+@keyframes ah-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ----------------------------------------------------------- tipografia */
 
 .hero {
@@ -157,6 +246,86 @@ button {
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
+}
+
+/**
+ * Forma angular diagonal atras do hero -- DS-TOTEM.md §3.3, "o unico elemento
+ * decorativo permitido na tela publica".
+ *
+ * `data-decorativo` NAO e enfeite de nome: a regra de alto contraste mais
+ * abaixo (`[data-contraste='alto'] [data-decorativo]`) ja existia esperando
+ * por este elemento desde a F51 -- o hook estava escrito e nada o emitia.
+ *
+ * `pointer-events: none` porque a tela publica inteira e tocavel (§4): a forma
+ * nao pode interceptar o toque que abre a identificacao.
+ */
+.heroContainer {
+  position: relative;
+}
+
+.formaAngular {
+  position: absolute;
+  /*
+   * NAO `inset: 0`. A caixa do hero e BAIXA e larga (so o texto), e um
+   * `clip-path` diagonal dentro dela vira uma TARJA horizontal atravessando a
+   * headline -- foi o que a primeira versao desta regra produziu, e nenhum
+   * teste pegou porque a tarja e visualmente errada, nao funcionalmente.
+   *
+   * A forma precisa ser mais ALTA que o texto para que a diagonal se leia como
+   * diagonal. Ela extravasa em cima e embaixo e e recortada pelo
+   * `overflow: hidden` da `.tela`.
+   */
+  /*
+   * ALTA e ESTREITA. Duas versoes anteriores erraram aqui e as duas so
+   * apareceram no screenshot:
+   *   1. `inset: 0` -> a caixa do hero e baixa e larga, e a diagonal virou uma
+   *      TARJA horizontal cortando a headline.
+   *   2. caixa larga com -20%/-10% -> paralelogramo quase horizontal, lido
+   *      como bloco retangular flutuando, e vazando sobre o card de baixo.
+   * Uma diagonal so se le como diagonal quando a caixa e mais ALTA que larga.
+   * `bottom: 0` porque ela nao pode descer sobre o conteudo seguinte.
+   */
+  top: -140%;
+  bottom: 0;
+  left: 52%;
+  right: -6%;
+  z-index: 0;
+  clip-path: polygon(38% 0, 100% 0, 62% 100%, 0 100%);
+  background: linear-gradient(
+    140deg,
+    var(--ah-totem-brand-600),
+    var(--ah-totem-brand-300)
+  );
+  /* .34 do §3.3 era sobre a arte de referencia, onde a forma ocupa o fundo
+     INTEIRO da tela. Concentrada ao lado do hero ela fica pesada nesse valor:
+     .16 mantem a presenca sem competir com a headline, que e o conteudo. */
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+/* O texto fica ACIMA da forma. Sem isto o gradiente recortado do
+   `.heroDestaque` competiria com o fundo e ambos sumiriam. */
+.heroContainer > *:not(.formaAngular) {
+  position: relative;
+  z-index: 1;
+}
+
+/**
+ * Ponto de acento pulsante (§2.6, `ah-pulse`). 5 s, alternado, para subir e
+ * descer em vez de saltar de .15 para .7 a cada volta.
+ */
+.pontoDeAcento {
+  position: absolute;
+  /* Junto ao kicker, DENTRO da area visivel: a primeira versao usava
+     `top:-6 left:-6` e o ponto caia fora do recorte da tela. */
+  top: 4px;
+  left: -22px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ah-totem-brand-500);
+  animation: ah-pulse 5s ease-in-out infinite alternate;
+  pointer-events: none;
 }
 
 .kicker {
@@ -616,6 +785,17 @@ button {
   border-radius: var(--tt-raio-card);
   border: var(--tt-borda) solid var(--ah-totem-border-default);
   background: var(--ah-totem-bg-surface);
+}
+
+/**
+ * Anel de pontuacao -- §3.12. Numero e anel lado a lado; o `<p>` interno
+ * mantem a classe antiga porque o caminho degradado (texto puro, sem anel)
+ * usa exatamente o mesmo estilo.
+ */
+.anelDePontuacao {
+  display: flex;
+  align-items: center;
+  gap: 24px;
 }
 
 .pontuacaoDoAparelho {

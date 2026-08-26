@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 26/08/2026 *(F51 entregue — tela pública do totem)*
+**Última atualização:** 26/08/2026 *(F44 entregue — design system do totem)*
 
 🔑 **24/08/2026 — o Cowork passa a empurrar o próprio commit.** Até aqui o commit entrava na `main`
 local e ficava esperando alguém sincronizar: o `git push` pelo bridge falhava com
@@ -346,6 +346,21 @@ segunda: **cartão no totem amplia o `MVP-04` §7 Slice 4.6**, que prevê apenas
 PRD que isso exige **não é minha** (o ADR-021 só me autoriza a materializar decisão já registrada
 em ADR aceito), então ou vira ADR ou é o Code/PI quem escreve.
 
+🔇 **26/08/2026 — a F44 achou uma flag que não fazia nada, e inverteu a própria premissa.** O
+ADR-025 criou a fatia com gate (*"o PI priorizar o MVP 4"*) e o risco escrito de *"componente sem
+consumidor erra em silêncio"*. O ADR-042 antecipou o totem e as **F49–F52 construíram
+`apps/kiosk` inteiro antes** — o risco não se materializou, porque veio consumidor primeiro e o
+design system nasceu destilado das telas. Sobrou o que ficou de fora. 🔴 **O achado:**
+`avisoSonoroNaRecusa` existia no contrato desde a F50 **ligada por padrão**, com checkbox no
+painel, e **nenhuma linha do kiosk lia o campo** — a academia marcava a caixa e o totem seguia
+mudo. Mesmo padrão da análise de IA e do OCR de ECG na F51. ⚠️ **E dois defeitos que só a tela
+revelou, com 155 testes verdes:** a forma angular saiu como tarja cortando a headline, depois como
+bloco invadindo o card. **Defeito visual é invisível para teste de comportamento.** A `SPEC-044`
+foi reescrita: ela apontava para seções (`§8` catraca, `§9`, `§11`, `§12`) que a **v2.0 do
+`DS-TOTEM.md` apagou** na F50. Duas perguntas ao PI ficaram: a **escala da pontuação** (o DS mostra
+`80 PONTOS` e nunca diz de quanto — assumido 100) e o destino da **tela pública da catraca**, sem
+contrato de design vigente.
+
 📺 **26/08/2026 — a F51 entregou a tela pública, e duas decisões do PI mudaram o escopo da
 issue.** A primeira: **o Instagram entra como porta, não como adapter** — a Decisão 7 do ADR-042
 manda extrair reel com `yt-dlp`, binário que não existe na imagem da API nem no CI, então o campo
@@ -549,11 +564,11 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
-| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **27** |
-| A Fazer | `proplan:todo` | Code pegou | 0 |
-| Em Andamento | `proplan:doing` | Code está implementando | **1** — [F49](https://github.com/RodReis/arenahub/issues/150) |
+| Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **23** |
+| A Fazer | `proplan:todo` | Code pegou | **1** — [F44](https://github.com/RodReis/arenahub/issues/83) |
+| Em Andamento | `proplan:doing` | Code está implementando | 0 |
 | Feito | `proplan:done` | PR mergeado com CI verde | 0 |
-| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **77** |
+| Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **81** |
 
 > 🧾 **25/08/2026 — o quadro foi reconciliado contra o board, não estimado.** A tabela acima
 > estava defasada: listava F2, F10 e F53 em *Em Andamento* e quatro cards em *Feito*, mas F2 e
@@ -858,7 +873,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | [`SPEC-041-producao-controlada-e-monitoramento.md`](specs/SPEC-041-producao-controlada-e-monitoramento.md) | [#41](https://github.com/RodReis/arenahub/issues/41) | planejada |
 | F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | [#81](https://github.com/RodReis/arenahub/issues/81) | aprovada-pi |
 | F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | [#82](https://github.com/RodReis/arenahub/issues/82) | aprovada-pi *(gate: MVP 4)* |
-| F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | aprovada-pi *(gate: MVP 4)* |
+| F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | ✅ **entregue** em 26/08/2026 — aguardando aceite |
 | F45 | — | 1 | — | Cadastro completo de aluno (retrabalho da Slice 1.2) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#100](https://github.com/RodReis/arenahub/issues/100) | **entregue** — aguardando aceite |
 | F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **entregue** — PR [#107](https://github.com/RodReis/arenahub/pull/107), aguardando aceite |
 | F47 | — | 1 | — | Importação da base legada Pacto (1.926 alunos) | [ADR-033](DECISIONS.md#adr-033--importação-da-base-legada-do-pacto-1926-alunos-entram-como-cancelled) | [#118](https://github.com/RodReis/arenahub/issues/118) | planejada |

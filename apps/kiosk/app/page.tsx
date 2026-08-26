@@ -13,6 +13,7 @@ import { MinhaArea } from '../components/minha-area';
 import { BarraDeSessao, RodapeDeSessao } from '../components/rodape-de-sessao';
 import { Toast } from '../components/toast';
 import { contrasteEfetivo } from '../lib/aparencia';
+import { tocarAvisoDeRecusa } from '../lib/aviso-sonoro';
 import { abrirSessao, carregarConfig, heartbeat, type SessaoDoAluno } from '../lib/kiosk-client';
 import { decidirReinicio } from '../lib/reinicio';
 import { limparEstadoDaSessao, useSessao } from '../lib/use-sessao';
@@ -62,6 +63,17 @@ export default function Totem() {
   // Marcado quando `decidirReinicio` manda 'aguardar': a troca so acontece
   // quando esta sessao terminar, nunca no meio dela.
   const reinicioPendenteRef = useRef(false);
+  /**
+   * REF, e nao leitura direta de `config`: `confirmar` e um `useCallback` com
+   * deps `[]` -- estavel de proposito, porque ele desce como prop para a tela
+   * de CPF e recria-lo a cada config nova remontaria o teclado numerico no meio
+   * da digitacao. Ler `config.sessao` la dentro capturaria o valor do PRIMEIRO
+   * render, e o totem carrega a config real DEPOIS de montar: a caixa marcada
+   * no painel nunca chegaria ao som. O ref atravessa a closure sem recria-la.
+   */
+  const avisoSonoroRef = useRef(CONFIG_PADRAO_DO_TOTEM.sessao.avisoSonoroNaRecusa);
+
+  avisoSonoroRef.current = config.sessao.avisoSonoroNaRecusa;
 
   const altoContraste = contrasteEfetivo(
     contrasteDoAluno,
@@ -182,6 +194,10 @@ export default function Totem() {
 
     if (aberta === null) {
       setErro(FALHA_DE_IDENTIFICACAO);
+      // Reforco sonoro do MESMO evento que o Toast anuncia, quando a unidade
+      // pediu (`sessao.avisoSonoroNaRecusa`). Aqui, e nao dentro do Toast: o
+      // Toast e generico, e so ESTA recusa tem aviso configurado.
+      tocarAvisoDeRecusa(avisoSonoroRef.current);
       return;
     }
 

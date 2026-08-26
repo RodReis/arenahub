@@ -47,7 +47,15 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { readonly children: ReactNode }) {
   return (
     <html lang="pt-BR" data-surface="totem" className={`${inter.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        {/*
+          Moldura do totem -- §3.1. `display: contents` por padrao: no
+          equipamento real (viewport 1080x1920) ela NAO existe no layout, e so
+          se materializa acima de 1080px, onde a tela e um monitor e a moldura
+          e o que da a leitura de totem. Ver `globals.css`.
+        */}
+        <div className="moldura">{children}</div>
+      </body>
     </html>
   );
 }

@@ -114,7 +114,15 @@ export function Atrator({
       */}
       <span style={{ flex: 1 }} />
 
-      <div style={{ flexShrink: 0 }}>
+      <div className="heroContainer" style={{ flexShrink: 0 }}>
+        {/*
+          Forma angular e ponto pulsante -- §3.3, "o unico elemento decorativo
+          permitido na tela publica". Os dois carregam `data-decorativo`, que e
+          o seletor que o alto contraste ja usava para esconde-los desde a F51
+          -- a regra existia sem nada que a acionasse.
+        */}
+        <span className="formaAngular" data-decorativo aria-hidden="true" />
+        <span className="pontoDeAcento" data-decorativo aria-hidden="true" />
         {/*
           O HERO VEM DA CONFIG (ADR-042, Decisao 0).
           Ate o fix da revisao, o kicker e a headline traziam a copy do cliente
