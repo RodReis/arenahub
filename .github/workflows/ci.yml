@@ -223,6 +223,25 @@ jobs:
       # os pes da outra.
       INTEGRATION_DATABASE_URL: postgresql://arenahub:arenahub_ci@postgres:5432/arenahub_int?schema=public
 
+      # Chave de cifra dos segredos simetricos. FIXA no CI, e nao efemera,
+      # porque o E2E do totem exige que o SEED e a API usem a mesma: o seed
+      # grava a credencial `dev-totem01` cifrada com ela, e a API precisa
+      # decifrar. Com chave nova a cada arranque, o seed pularia a credencial
+      # e toda identificacao cairia na mensagem neutra -- a jornada nao
+      # aconteceria, e um E2E mal escrito ficaria verde mesmo assim.
+      #
+      # VALOR DESCARTAVEL de CI, gerado para este arquivo e para mais nada.
+      # Nao protege nada: o banco do job nasce e morre com ele.
+      # 32 bytes exatos em base64 (`ci-descartavel-nao-protege-nada!`) -- a
+      # API recusa qualquer outro tamanho no arranque.
+      MFA_ENCRYPTION_KEY: Y2ktZGVzY2FydGF2ZWwtbmFvLXByb3RlZ2UtbmFkYSE=
+
+      # Credencial do totem que o seed cria. Segredo PUBLICADO de proposito:
+      # e o mesmo do `.env.example`, para bancada e E2E. Producao usa secret
+      # manager, com credencial gerada pelo painel (F50).
+      KIOSK_KEY_ID: dev-totem01
+      KIOSK_SECRET: segredo-de-bancada-do-totem-nao-use-em-producao
+
     steps:
       - uses: actions/checkout@v7
 
@@ -238,6 +257,15 @@ jobs:
 
       - name: gerar client do Prisma
         run: pnpm --filter @arenahub/database generate
+
+      # A F49 fez o seed importar `@arenahub/api-contracts` (CONFIG_PADRAO_DO_TOTEM).
+      # `tsx` resolve o pacote pelo `exports` real do `package.json`, que aponta
+      # para `dist/index.js` -- e o `pnpm build` completo só roda depois do
+      # `test:integration` (passo 7 de 8). Sem isto, o `pretest:integration`
+      # (que roda o seed) falha com ERR_MODULE_NOT_FOUND antes de qualquer teste
+      # começar. Builda só o pacote que o seed precisa, não o monorepo inteiro.
+      - name: build do api-contracts (dependencia do seed)
+        run: pnpm --filter @arenahub/api-contracts build
 
       # --- 5 de 8 ---------------------------------------------------------
       # Promovido na F6, quando `apps/api` e `packages/database` nasceram e
@@ -293,5 +321,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: apps/admin-web/playwright-report/
+          # As duas suites (admin-web e a do totem, F49) tem `trace:
+          # 'retain-on-failure'` e `screenshot: 'only-on-failure'`, mas isso
+          # so grava em test-results/ -- playwright-report/ so existe com o
+          # reporter `html`, ligado nos dois playwright.config.ts (guarda
+          # `reporter: [..., ['html', { outputFolder: 'playwright-report' }]]`
+          # quando `CI`). O html embute trace e screenshot no proprio
+          # relatorio; sem o reporter, este `path` apontaria para um
+          # diretorio que o CI nunca cria.
+          path: |
+            apps/admin-web/playwright-report/
+            apps/kiosk/playwright-report/
           retention-days: 7

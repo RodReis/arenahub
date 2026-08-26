@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "//": "Turborepo 2 SANITIZA o ambiente: variavel nao declarada aqui nao chega a task. Sem esta lista, `test:integration` passa na maquina de quem tem `.env` (o dotenv injeta) e falha no CI, onde a variavel vem do ambiente do job -- verde local, vermelho remoto, o pior tipo de divergencia. | A task `dev` declara `dependsOn: [^build]` porque `@arenahub/ui` e consumido pelo `exports.import` do pacote, que aponta para `dist/` -- gitignorado e escrito so pelo `build`. Sem isso, `pnpm dev` sobe o `next dev` sobre o `dist` da ULTIMA vez que alguem buildou NAQUELA arvore: o painel abre com o layout de dias atras, sem erro nenhum, e duas arvores do mesmo commit servem telas diferentes. O `transpilePackages` do next.config nao salva -- ele compila o que o resolver entregou, e o resolver entregou o `dist` velho. | `build:tokens` gera theme.css e tokens.generated.ts a partir de packages/ui/tokens/*.json, e precede `lint` e `typecheck` porque tokens.generated.ts e FONTE DE TIPO: sem ele o typecheck falha por arquivo inexistente, apontando para o sintoma em vez da causa. O comentario mora aqui, e nao dentro da task, porque o Turbo so aceita a chave `//` exata e no topo.",
+  "//": "Turborepo 2 SANITIZA o ambiente: variavel nao declarada aqui nao chega a task. Sem esta lista, `test:integration` passa na maquina de quem tem `.env` (o dotenv injeta) e falha no CI, onde a variavel vem do ambiente do job -- verde local, vermelho remoto, o pior tipo de divergencia. | A task `dev` declara `dependsOn: [^build]` porque `@arenahub/ui` e consumido pelo `exports.import` do pacote, que aponta para `dist/` -- gitignorado e escrito so pelo `build`. Sem isso, `pnpm dev` sobe o `next dev` sobre o `dist` da ULTIMA vez que alguem buildou NAQUELA arvore: o painel abre com o layout de dias atras, sem erro nenhum, e duas arvores do mesmo commit servem telas diferentes. O `transpilePackages` do next.config nao salva -- ele compila o que o resolver entregou, e o resolver entregou o `dist` velho. | `@arenahub/kiosk#test:e2e` DEPENDE de `@arenahub/admin-web#test:e2e`, e a aresta e load-bearing: sem ela o Turbo roda as duas suites E2E em paralelo (nao ha interdependencia natural entre elas) e elas colidem em DOIS recursos unicos. PORTA: as duas sobem `pnpm --filter @arenahub/api start` na 3344 com `reuseExistingServer: false`, e a segunda morre com \"port already used\". BANCO, que e pior: as duas apontam para o MESMO `E2E_DATABASE_URL` e o `pretest:e2e` DROPA esse banco -- em paralelo, o drop de uma cai enquanto a outra ainda le. O sintoma nao e erro estavel: e a ordem de execucao decidindo se o CI passa. Preferida a `--concurrency=1` porque aquela serializa o grafo INTEIRO (inclusive 3 pares de build que hoje paralelizam sem conflito); esta serializa so as duas que disputam. Se as suites ganharem banco e porta proprios, a aresta pode sair. | `build:tokens` gera theme.css e tokens.generated.ts a partir de packages/ui/tokens/*.json, e precede `lint` e `typecheck` porque tokens.generated.ts e FONTE DE TIPO: sem ele o typecheck falha por arquivo inexistente, apontando para o sintoma em vez da causa. O comentario mora aqui, e nao dentro da task, porque o Turbo so aceita a chave `//` exata e no topo.",
   "globalEnv": [
     "CI",
     "DATABASE_URL",
@@ -13,7 +13,9 @@
     "JWT_PRIVATE_KEY",
     "JWT_PUBLIC_KEY",
     "MFA_ENCRYPTION_KEY",
-    "API_INTERNAL_URL"
+    "API_INTERNAL_URL",
+    "KIOSK_KEY_ID",
+    "KIOSK_SECRET"
   ],
   "tasks": {
     "build": {
@@ -73,6 +75,13 @@
     "test:e2e": {
       "dependsOn": [
         "^build"
+      ],
+      "cache": false
+    },
+    "@arenahub/kiosk#test:e2e": {
+      "dependsOn": [
+        "^build",
+        "@arenahub/admin-web#test:e2e"
       ],
       "cache": false
     },

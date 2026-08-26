@@ -16,7 +16,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { accentCssVars, deriveRamp, RAMP_TONES, resolveAccent } from './accent.js';
-import { AA_TEXT, contrastRatio, meets, parseHex, ratio } from './contrast.js';
+import { AA_TEXT, AAA_TEXT, contrastRatio, meets, parseHex, ratio } from './contrast.js';
 import fixture from './seeds.fixture.json' with { type: 'json' };
 import { ACCENT_SEED_DEFAULT, CARBON, SEMANTIC_COLOR } from './tokens.generated.js';
 
@@ -186,6 +186,95 @@ describe('resolveAccent', () => {
   it('resolve contra superficie escura sem fork -- F43 e F44 vao precisar', () => {
     const resolved = resolveAccent(SEED, SUPERFICIE_ESCURA);
     expect(meets(resolved.text, SUPERFICIE_ESCURA, AA_TEXT)).toBe(true);
+  });
+});
+
+describe('accent do totem -- superficie escura, alvo 7:1', () => {
+  // Fundo carbono do totem -- DS-TOTEM.md §2.1 (bg/base). Vem do fixture, nao
+  // de literal aqui: regra de lint 1 tambem vale para spec (ver seeds.fixture.json).
+  const BG_BASE = fixture.totem.bgBase;
+
+  /**
+   * Confere o TOM escolhido, nao so o contraste resultante.
+   *
+   * Um teste que so confere `contrastRatio(...) >= 7` passa mesmo se o alvo de
+   * 7 nunca for de fato aplicado na resolucao -- foi exatamente o bug: os
+   * quatro seeds do totem resolvem tao claros que ate o alvo AA (4.5) ja
+   * produz contraste > 16:1 contra o carbono, entao a asserção de contraste
+   * sozinha nunca reprova quando alguem esquece de passar `alvoTexto`.
+   * Assertar o tom prova que `resolveAccent(seed, BG_BASE, AAA_TEXT)` de fato
+   * recebeu o alvo -- ver a prova por mutacao no comentario abaixo.
+   */
+  it.each(fixture.totem.seeds.map((seed: string) => [seed] as const))(
+    'resolve o tom que a rampa realmente atinge >= 7:1 para %s',
+    (seed) => {
+      const resolvido = resolveAccent(seed, BG_BASE, AAA_TEXT);
+      const ramp = deriveRamp(seed);
+      const tomEscolhido = RAMP_TONES.find((tone) => ramp[tone] === resolvido.text);
+
+      // Os quatro seeds do totem sao claros o bastante para o TOM MAIS CLARO
+      // da rampa (50) ja passar de 7:1 contra o carbono -- nao ha seed do
+      // totem que force um tom mais escuro que 50 neste conjunto. Registrado
+      // no relatorio da task: nenhum seed caiu no fallback (tom 900).
+      expect(tomEscolhido, `${seed}: tom nao encontrado na rampa`).toBe(50);
+      expect(
+        contrastRatio(resolvido.text, BG_BASE),
+        `${seed}: texto de acao contra ${BG_BASE}`,
+      ).toBeGreaterThanOrEqual(AAA_TEXT);
+    },
+  );
+
+});
+
+describe('resolveAccent -- alvo de contraste e parametro, nao constante fixa', () => {
+  /**
+   * Prova de que `alvoTexto` de fato influencia `minToneWithContrast`, nao so
+   * o limiar do `expect`.
+   *
+   * Os quatro seeds do totem (bloco acima) tem tom 50 tao claro contra o
+   * carbono `#0A0B0D` que ele satisfaz 4.5 E 7 ao mesmo tempo -- comparar
+   * AA vs AAA NELES sempre da o mesmo tom, com ou sem o bug original (que
+   * ignorava o terceiro argumento). Nao e o caso certo para provar
+   * parametrizacao.
+   *
+   * O par SEED (Ciano Arena, `#00A9B8`) x `WHITE` -- o par PADRAO do painel,
+   * ja usado no resto deste arquivo -- diverge de verdade: accent-700 passa
+   * em 4.5 mas nao em 7; accent-800 e o primeiro a passar em 7. Se alguem
+   * reverter `alvoTexto` para uma constante fixa (o bug original), este teste
+   * fica vermelho porque os dois lados colapsam no mesmo tom.
+   */
+  it('AAA_TEXT escolhe tom mais escuro que AA_TEXT quando os alvos realmente divergem', () => {
+    const comAA = resolveAccent(SEED, WHITE, AA_TEXT);
+    const comAAA = resolveAccent(SEED, WHITE, AAA_TEXT);
+
+    const ramp = deriveRamp(SEED);
+    const indiceAA = RAMP_TONES.indexOf(
+      RAMP_TONES.find((t) => ramp[t] === comAA.text) as (typeof RAMP_TONES)[number],
+    );
+    const indiceAAA = RAMP_TONES.indexOf(
+      RAMP_TONES.find((t) => ramp[t] === comAAA.text) as (typeof RAMP_TONES)[number],
+    );
+
+    expect(comAAA.text, 'AAA deveria escolher um tom diferente de AA neste par').not.toBe(
+      comAA.text,
+    );
+    expect(indiceAAA, 'AAA deveria escolher tom mais escuro (indice maior) que AA').toBeGreaterThan(
+      indiceAA,
+    );
+    expect(meets(comAAA.text, WHITE, AAA_TEXT)).toBe(true);
+    expect(meets(comAA.text, WHITE, AAA_TEXT), 'o tom de AA nao deveria bastar para AAA').toBe(
+      false,
+    );
+  });
+
+  it('surface default continua AA_TEXT -- retrocompatibilidade do painel', () => {
+    // `resolveAccent(seed)` sem terceiro argumento tem de continuar
+    // resolvendo exatamente como antes desta mudanca: admin-web nao muda.
+    const semAlvoExplicito = resolveAccent(SEED);
+    const comAlvoExplicitoAA = resolveAccent(SEED, WHITE, AA_TEXT);
+
+    expect(semAlvoExplicito.text).toBe(comAlvoExplicitoAA.text);
+    expect(semAlvoExplicito.solid).toBe(comAlvoExplicitoAA.solid);
   });
 });
 

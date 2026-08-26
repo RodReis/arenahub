@@ -1700,6 +1700,227 @@
         ]
       }
     },
+    "/api/v1/kiosk/heartbeat": {
+      "post": {
+        "operationId": "KioskController_heartbeat",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "configVersion",
+                    "serverTime"
+                  ],
+                  "properties": {
+                    "configVersion": {
+                      "type": "integer"
+                    },
+                    "serverTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/config": {
+      "get": {
+        "operationId": "KioskController_obterConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "version",
+                    "config"
+                  ],
+                  "properties": {
+                    "version": {
+                      "type": "integer"
+                    },
+                    "config": {
+                      "type": "object",
+                      "required": [
+                        "marca",
+                        "aparencia",
+                        "sessao",
+                        "identificacao",
+                        "modulos"
+                      ],
+                      "properties": {
+                        "marca": {
+                          "type": "object"
+                        },
+                        "aparencia": {
+                          "type": "object"
+                        },
+                        "sessao": {
+                          "type": "object"
+                        },
+                        "identificacao": {
+                          "type": "object"
+                        },
+                        "modulos": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions": {
+      "post": {
+        "operationId": "KioskController_abrirSessao",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "sessionId",
+                    "token",
+                    "nome",
+                    "plano",
+                    "expiraEm"
+                  ],
+                  "properties": {
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "nome": {
+                      "type": "string"
+                    },
+                    "plano": {
+                      "type": "object",
+                      "required": [
+                        "ativo",
+                        "pendenciaEmCentavos"
+                      ],
+                      "properties": {
+                        "ativo": {
+                          "type": "boolean"
+                        },
+                        "pendenciaEmCentavos": {
+                          "type": "integer",
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "expiraEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/extend": {
+      "post": {
+        "operationId": "KioskController_estenderSessao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "expiraEm"
+                  ],
+                  "properties": {
+                    "expiraEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}": {
+      "delete": {
+        "operationId": "KioskController_encerrarSessao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "description": "Sem corpo."
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
     "/api/v1/device-sync-jobs": {
       "get": {
         "operationId": "DeviceSyncController_listar",

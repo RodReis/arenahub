@@ -207,6 +207,12 @@ Aceite: piloto atende métricas e possui rollback de app/API e restauração do 
 - `M4-BR-002`: QR da carteirinha expira rapidamente e contém token opaco, não PII.
 - `M4-BR-003`: screenshot do QR pode funcionar apenas dentro da janela curta; replay posterior falha.
 - `M4-BR-004`: CPF no totem é localizador, não autenticador suficiente.
+  > **Emendado pelo [ADR-045](../../DECISIONS.md#adr-045) em 25/08/2026 — decisão do PI.** No totem,
+  > o CPF **é** autenticador suficiente: login é CPF sozinho, sem data de nascimento e sem segundo
+  > fator. O PI aceitou a consequência registrada no ADR (quem sabe o CPF vê nome, estado do plano e
+  > valor da fatura em aberto) e a enumeração barata que a mensagem neutra sem limite de tentativas
+  > permite. A regra original fica aqui como o requisito que o ADR emenda; ela volta a valer se a
+  > primeira fatia com facial ou QR do app reabrir a questão (gatilho de revisão do ADR-045).
 - `M4-BR-005`: sessão kiosk expira após inatividade e sempre antes de sessão mobile comum.
 - `M4-BR-006`: totem não persiste PII em storage durável ou autofill.
 - `M4-BR-007`: tela pública usa descrição discreta de pendência, sem valor quando a privacidade exigir.

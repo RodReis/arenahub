@@ -13,8 +13,28 @@
  * certa, dado um resultado ja extraido.
  */
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { acumularNoNivel, formatarPct, gerar, historicoExistente, linhaDeNivel, NIVEIS, secaoEstadoAtual } from './test-report.core.mjs';
+import { ALVOS, acumularNoNivel, alvosFaltando, formatarPct, gerar, historicoExistente, linhaDeNivel, NIVEIS, secaoEstadoAtual } from './test-report.core.mjs';
+
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** Le os workspaces reais do disco: `apps/*` e `packages/*` com package.json. */
+function workspacesDoDisco(raiz = RAIZ) {
+  return ['apps', 'packages'].flatMap((grupo) => {
+    const base = join(raiz, grupo);
+    if (!existsSync(base)) return [];
+
+    return readdirSync(base, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && existsSync(join(base, e.name, 'package.json')))
+      .map((e) => ({
+        pacote: `${grupo}/${e.name}`,
+        scripts: JSON.parse(readFileSync(join(base, e.name, 'package.json'), 'utf8')).scripts ?? {},
+      }));
+  });
+}
 
 const casos = [];
 
@@ -174,6 +194,67 @@ casos.push([
     const adulterado = original.replace('| 5 | 5 | 0 |', '| 999 | 999 | 0 |');
 
     assert.notEqual(secaoEstadoAtual(original), secaoEstadoAtual(adulterado));
+  },
+]);
+
+casos.push([
+  'alvosFaltando acusa pacote com script test que nao esta em ALVOS',
+  () => {
+    const alvos = [{ pacote: 'apps/api', nivel: 'unitário', script: 'test', runner: 'jest' }];
+    const workspaces = [
+      { pacote: 'apps/api', scripts: { test: 'jest' } },
+      { pacote: 'apps/kiosk', scripts: { test: 'vitest run' } },
+    ];
+
+    assert.deepEqual(alvosFaltando(workspaces, alvos), ['apps/kiosk#test']);
+  },
+]);
+
+casos.push([
+  'alvosFaltando acusa script:integration ausente mesmo com o unitario ja coberto',
+  () => {
+    // O bug real e' mais sutil que "pacote inteiro esquecido": o pacote esta
+    // na lista pelo unitario e o test:integration dele nunca roda.
+    const alvos = [{ pacote: 'packages/database', nivel: 'unitário', script: 'test', runner: 'vitest' }];
+    const workspaces = [{ pacote: 'packages/database', scripts: { test: 'vitest', 'test:integration': 'vitest' } }];
+
+    assert.deepEqual(alvosFaltando(workspaces, alvos), ['packages/database#test:integration']);
+  },
+]);
+
+casos.push([
+  'alvosFaltando ignora test:e2e -- Playwright roda fora do gerador (TESTING.md §5)',
+  () => {
+    const workspaces = [{ pacote: 'apps/kiosk', scripts: { test: 'vitest', 'test:e2e': 'playwright test' } }];
+    const alvos = [{ pacote: 'apps/kiosk', nivel: 'unitário', script: 'test', runner: 'vitest' }];
+
+    assert.deepEqual(alvosFaltando(workspaces, alvos), [], 'test:e2e nao deve ser cobrado');
+  },
+]);
+
+casos.push([
+  'alvosFaltando nao acusa pacote sem script de teste (packages/config)',
+  () => {
+    const workspaces = [{ pacote: 'packages/config', scripts: { lint: 'eslint .' } }];
+    assert.deepEqual(alvosFaltando(workspaces, []), []);
+  },
+]);
+
+casos.push([
+  'ESTE REPOSITORIO: nenhum workspace com teste esta fora de ALVOS',
+  () => {
+    // A guarda contra subcontagem, rodando contra o disco de verdade. Pacote
+    // novo com script `test` derruba este caso ate entrar em ALVOS -- que e' o
+    // ponto: ausencia da lista deixa de ser indistinguivel de "nao tem teste".
+    const faltando = alvosFaltando(workspacesDoDisco(), ALVOS);
+
+    assert.deepEqual(
+      faltando,
+      [],
+      `workspace com teste fora de ALVOS (invisivel no reports/TESTS.md): ${faltando.join(', ')}
+` +
+        `          Acrescente em scripts/test-report.core.mjs -> ALVOS.`,
+    );
   },
 ]);
 

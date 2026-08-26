@@ -1,0 +1,338 @@
+/**
+ * Folha de base do TOTEM -- contrato em docs/design/DS-TOTEM.md.
+ *
+ * Importa os tokens gerados por `@arenahub/ui` (o bloco
+ * `[data-surface="totem"]` de theme.css) e define, aqui, so o que e escala
+ * desta superficie: tipografia de 19 px para cima, alvos de 88 px para cima,
+ * bordas de 2 px. Nenhum hex literal -- regra de lint 1.
+ *
+ * Sem Tailwind de proposito: o totem tem UMA tela, tres estados e nenhum
+ * componente compartilhado com o painel. Uma folha de 200 linhas com nomes
+ * de papel e menor e mais legivel que a mesma coisa em classe utilitaria.
+ */
+
+@import '@arenahub/ui/theme.css';
+
+/* -------------------------------------------------------------- escala */
+
+:root {
+  /* Tipografia -- DS-TOTEM.md §2.2. Minimo absoluto 19 px. */
+  --tt-hero: 72px;
+  --tt-hero-lh: 78px;
+  --tt-titulo: 64px;
+  --tt-titulo-lh: 68px;
+  --tt-kicker: 22px;
+  --tt-valor: 44px;
+  --tt-card-titulo: 28px;
+  --tt-botao: 30px;
+  --tt-corpo: 24px;
+  --tt-corpo-lh: 34px;
+  --tt-metadado: 21px;
+  --tt-minimo: 19px;
+
+  /* Espaco -- DS-TOTEM.md §2.3, escala base 4, multiplos de 8. */
+  --tt-gap-bloco: 36px;
+  --tt-gap-grade: 24px;
+  --tt-padding-publico: 44px 52px 36px;
+  --tt-padding-interno: 64px;
+
+  /* Raios -- DS-TOTEM.md §2.3. */
+  --tt-raio-card: 28px;
+  --tt-raio-botao: 24px;
+  --tt-raio-icone: 20px;
+  --tt-raio-pill: 999px;
+
+  /* Alvos de toque -- DS-TOTEM.md §2.4. Nada tocavel abaixo de 88 px. */
+  --tt-alvo-cta: 116px;
+  --tt-alvo-secundario: 88px;
+  --tt-alvo-tecla: 132px;
+
+  /* Bordas SEMPRE 2 px -- a 1 px desaparece a distancia de leitura. */
+  --tt-borda: 2px;
+
+  --tt-fonte: var(--tt-fonte-carregada), 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --tt-fonte-mono: var(--tt-fonte-mono-carregada), 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--ah-totem-bg-base);
+  color: var(--ah-totem-text-primary);
+  font-family: var(--tt-fonte);
+  font-size: var(--tt-corpo);
+  line-height: var(--tt-corpo-lh);
+  -webkit-font-smoothing: antialiased;
+  /* Quiosque: sem selecao de texto nem menu de contexto por toque longo. */
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+/**
+ * Numeral tabular em TODA metrica -- DS-TOTEM.md §2.2 e checklist §8.
+ *
+ * Obrigatorio, nao preferencia: numeral proporcional faz o contador de
+ * sessao mudar de largura a cada segundo, e o rodape inteiro dança.
+ */
+[data-numerico],
+time {
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+
+p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/**
+ * Foco visivel -- o totem e tocavel, mas o teclado fisico e o caminho de
+ * manutencao e de leitor de tela. Anel grosso porque a 80 cm o de 2 px do
+ * painel some.
+ */
+:focus-visible {
+  outline: 4px solid var(--ah-totem-brand-300);
+  outline-offset: 3px;
+}
+
+/* --------------------------------------------------- superficie e moldura */
+
+/**
+ * A tela do totem e 1080x1920 fixos (DS-TOTEM.md §1). Em monitor de
+ * desenvolvimento ela encolhe proporcionalmente em vez de rolar: rolagem num
+ * quiosque e um estado sem saida -- ninguem procura barra de rolagem em pe,
+ * a 80 cm, e o checklist §8 exige `scrollHeight === clientHeight`.
+ */
+.tela {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--ah-totem-bg-base);
+}
+
+/* ----------------------------------------------------------- tipografia */
+
+.hero {
+  font-size: var(--tt-hero);
+  line-height: var(--tt-hero-lh);
+  font-weight: 900;
+  letter-spacing: -0.025em;
+}
+
+/**
+ * Segunda linha do hero em gradiente recortado no texto -- DS-TOTEM.md §3.3.
+ * Unico lugar fora do CTA onde o gradiente azul aparece.
+ */
+.heroDestaque {
+  background: linear-gradient(
+    100deg,
+    var(--ah-totem-brand-300),
+    var(--ah-totem-brand-600)
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.kicker {
+  font-size: var(--tt-kicker);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--ah-totem-brand-200);
+}
+
+.tituloDeTela {
+  font-size: var(--tt-titulo);
+  line-height: var(--tt-titulo-lh);
+  font-weight: 800;
+}
+
+.corpo {
+  font-size: var(--tt-corpo);
+  line-height: var(--tt-corpo-lh);
+  color: var(--ah-totem-text-secondary);
+}
+
+.metadado {
+  font-size: var(--tt-metadado);
+  color: var(--ah-totem-text-secondary);
+}
+
+/* -------------------------------------------------------------- botoes */
+
+/**
+ * CTA primario -- DS-TOTEM.md §3.8. UM por tela.
+ *
+ * `min-height` e nao `height`: o rotulo e configuravel (vem da marca), e um
+ * texto mais longo que quebre em duas linhas nao pode vazar do botao.
+ */
+.ctaPrimario {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  width: 100%;
+  min-height: var(--tt-alvo-cta);
+  padding: 0 40px;
+  border: none;
+  border-radius: var(--tt-raio-botao);
+  background: linear-gradient(
+    100deg,
+    var(--ah-totem-brand-400),
+    var(--ah-totem-brand-600)
+  );
+  color: var(--ah-totem-text-primary);
+  font-size: var(--tt-botao);
+  font-weight: 700;
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--ah-totem-brand-500) 25%, transparent);
+}
+
+.ctaPrimario:disabled {
+  background: var(--ah-totem-border-hairline);
+  color: var(--ah-totem-text-tertiary);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.botaoSecundario {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tt-alvo-secundario);
+  padding: 0 40px;
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  border-radius: 20px;
+  background: var(--ah-totem-bg-surface);
+  color: var(--ah-totem-text-primary);
+  font-size: var(--tt-corpo);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- toast */
+
+/**
+ * Toast do totem -- CLAUDE.md: "Nao usar Alert para msg, sempre usar Toast".
+ *
+ * Proprio, e nao o `Toast` de `@arenahub/ui`: aquele le a camada semantica
+ * do PAINEL (`--ah-surface-raised`, tema claro) e seu botao de dispensar tem
+ * alvo de 24 px -- abaixo do piso de 88 px desta superficie (§2.4). Reusar
+ * daria um retangulo branco ilegivel com um alvo que ninguem acerta em pe.
+ */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 56px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 880px;
+  padding: 28px 36px;
+  border: var(--tt-borda) solid
+    color-mix(in srgb, var(--ah-totem-state-danger) 40%, transparent);
+  border-radius: var(--tt-raio-card);
+  background: color-mix(in srgb, var(--ah-totem-state-danger) 10%, var(--ah-totem-bg-base));
+  color: var(--ah-totem-text-primary);
+  font-size: var(--tt-corpo);
+  line-height: var(--tt-corpo-lh);
+}
+
+.toastIcone {
+  flex-shrink: 0;
+  color: var(--ah-totem-state-danger);
+}
+
+/* ------------------------------------------------------- alto contraste */
+
+/**
+ * Alto contraste -- DS-TOTEM.md §1, §2.6, §4 e o checklist §8.
+ *
+ * O interruptor na tela e do ALUNO: vale so para a sessao dele e SEMPRE vence
+ * o `altoContrastePadrao` da unidade (ADR-042, Decisao 6 -- gerente nao
+ * desliga acessibilidade de quem esta usando). Encerrada a sessao, volta o
+ * padrao da unidade. Quem implementa essa precedencia e o `page.tsx`; aqui e
+ * so o efeito visual de `[data-contraste="alto"]` no <html>.
+ *
+ * O §4 lista o que ele remove: glow, gradiente de fundo, forma angular e
+ * ponto pulsante. E o §2.6 fecha: "alto contraste desliga todos os efeitos
+ * decorativos".
+ */
+[data-contraste='alto'] {
+  /* Texto secundario passa a BRANCO (§4) -- 19.69 contra o fundo, no lugar
+     dos 8.79 do cinza. O terciario acompanha: a 3.0 ele ja reprovava no alvo
+     de 7 do totem, e em alto contraste nao ha desculpa para mante-lo. */
+  --ah-totem-text-secondary: var(--ah-totem-text-primary);
+  --ah-totem-text-tertiary: var(--ah-totem-text-primary);
+  /* Borda sobe para o tom forte: divisor que some derrota a leitura em pe. */
+  --ah-totem-border-hairline: var(--ah-totem-border-default);
+}
+
+/* Gradiente de acao vira COR CHAPADA -- o degrade some, o alvo continua. */
+[data-contraste='alto'] .ctaPrimario {
+  background: var(--ah-totem-brand-600);
+  box-shadow: none;
+}
+
+/* O recorte de gradiente no hero vira texto solido: `background-clip: text`
+   com `color: transparent` e decoracao, e em alto contraste texto nao pode
+   depender de gradiente para existir. */
+[data-contraste='alto'] .heroDestaque {
+  background: none;
+  -webkit-text-fill-color: var(--ah-totem-brand-200);
+  color: var(--ah-totem-brand-200);
+}
+
+/* Forma angular, ponto pulsante e qualquer outro adorno saem de cena. */
+[data-contraste='alto'] [data-decorativo] {
+  display: none;
+}
+
+/* §2.6: "alto contraste desliga todos os efeitos decorativos". */
+[data-contraste='alto'] * {
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+/**
+ * Botao do interruptor -- 88 px como todo alvo desta superficie (§2.4).
+ * Mora no cabecalho da tela publica e no rodape da sessao.
+ */
+.botaoDeContraste {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tt-alvo-secundario);
+  padding: 0 30px;
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ah-totem-text-primary);
+  font-size: var(--tt-metadado);
+  font-weight: 600;
+}

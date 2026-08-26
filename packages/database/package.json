@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@arenahub/access-policy": "workspace:*",
+    "@arenahub/api-contracts": "workspace:*",
     "@arenahub/config": "workspace:*",
     "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "4.1.10",

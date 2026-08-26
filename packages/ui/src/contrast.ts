@@ -14,6 +14,14 @@ export const AA_TEXT = 4.5;
 /** Alvo AA para texto grande (>=18.66px bold ou >=24px) e componentes. */
 export const AA_LARGE = 3;
 
+/**
+ * Alvo do TOTEM (DS-TOTEM.md §1 "Contexto fisico" + §2.1): 7:1.
+ *
+ * Mais alto que o `AA_TEXT` (4.5) do painel porque a tela fica em ambiente de
+ * academia -- luz alta e reflexo -- e e lida a 60-100 cm, em pe.
+ */
+export const AAA_TEXT = 7;
+
 export interface Rgb {
   readonly r: number;
   readonly g: number;

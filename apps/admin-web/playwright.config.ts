@@ -69,7 +69,15 @@ export default defineConfig({
   // teste so, com o verde parecendo igual.
   forbidOnly: Boolean(process.env['CI']),
   retries: process.env['CI'] ? 1 : 0,
-  reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
+  // `html` grava em playwright-report/ -- e o caminho que o passo "guardar
+  // rastro do Playwright quando falha" do ci.yml sobe como artefato. Sem
+  // este reporter o diretorio nunca existe: trace e screenshot ficam presos
+  // em test-results/ (outputDir padrao), fora do que o upload le. Lacuna
+  // pre-existente (o passo ja apontava para admin-web antes da F49),
+  // corrigida junto por estar no mesmo passo do ci.yml.
+  reporter: process.env['CI']
+    ? [['github'], ['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]]
+    : [['list']],
 
   use: {
     baseURL: `http://localhost:${PORTA_DA_WEB}`,

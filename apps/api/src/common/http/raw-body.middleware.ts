@@ -18,12 +18,12 @@ declare module 'express' {
 /**
  * Prefixos das rotas que precisam do corpo cru.
  *
- * Edge (F9) e webhook de pagamento (F13) verificam assinatura sobre os bytes
- * exatos -- pelo mesmo motivo, e com o mesmo custo se faltar: a assinatura
- * deixa de bater e a rota recusa tudo em runtime, com codigo que parece
- * correto.
+ * Edge (F9), webhook de pagamento (F13) e totem (F49) verificam assinatura
+ * sobre os bytes exatos -- pelo mesmo motivo, e com o mesmo custo se
+ * faltar: a assinatura deixa de bater e a rota recusa tudo em runtime, com
+ * codigo que parece correto.
  */
-const PREFIXOS_COM_CORPO_CRU = ['/api/v1/edge', '/api/v1/webhooks/'] as const;
+const PREFIXOS_COM_CORPO_CRU = ['/api/v1/edge', '/api/v1/kiosk', '/api/v1/webhooks/'] as const;
 
 /**
  * `verify` do body-parser: guarda o corpo cru das rotas de Edge.

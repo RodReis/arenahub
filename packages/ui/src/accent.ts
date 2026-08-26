@@ -181,12 +181,29 @@ const WHITE = '#FFFFFF';
  * `surface` e o fundo sobre o qual o texto de acao aparece -- branco no card
  * do painel. Fica como parametro porque o app e o totem sao dark, e o mesmo
  * resolvedor vai servir F43 e F44 sem fork.
+ *
+ * `alvoTexto` e o contraste minimo exigido para `text`/`focusRing` contra
+ * `surface`. Default `AA_TEXT` (4.5) preserva o painel sem mudanca -- quem
+ * chama para o totem passa `AAA_TEXT` (7), porque a tela fica em ambiente de
+ * academia com luz alta (DS-TOTEM.md). Sem este parametro, `AAA_TEXT` existia
+ * so como limiar de assercao no teste -- nunca influenciava qual tom o
+ * resolvedor de fato escolhia.
+ *
+ * `solid` continua fixo em `AA_TEXT` contra `WHITE`: e o par acao-solida +
+ * texto-branco do botao, que nao muda com a superficie da pagina -- o botao
+ * carrega o proprio contraste interno independente de onde e colocado. Nao ha
+ * hoje um caso de uso que precise de um `solid` mais estrito; se aparecer,
+ * decidir na hora com o mesmo raciocinio.
  */
-export function resolveAccent(seedHex: string, surface: string = WHITE): ResolvedAccent {
+export function resolveAccent(
+  seedHex: string,
+  surface: string = WHITE,
+  alvoTexto: number = AA_TEXT,
+): ResolvedAccent {
   const ramp = deriveRamp(seedHex);
 
   const solid = minToneWithContrast(ramp, WHITE, AA_TEXT);
-  const text = minToneWithContrast(ramp, surface, AA_TEXT);
+  const text = minToneWithContrast(ramp, surface, alvoTexto);
   const hover = nextDarkerTone(ramp, solid);
 
   return {

@@ -1,0 +1,45 @@
+{
+  "name": "@arenahub/kiosk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Totem de autoatendimento do ArenaHub: Next.js PWA em modo quiosque",
+  "//scripts": "LOOPBACK NAO E OPCIONAL. O Next liga em 0.0.0.0 por padrao, e a rede da academia NAO e isolada. Sem `--hostname 127.0.0.1`, qualquer host da LAN chama POST /api/kiosk/sessions com um CPF de terceiro e recebe nome, plano, pendencia e um token de sessao valido -- sem tocar no totem. A mensagem neutra da tela nao protege nada: o status HTTP cru distingue 404 de 201. Isso e enumeracao da base inteira do tenant. A ponte so precisa atender o navegador do PROPRIO totem; nao \"conserte\" isto achando que e limitacao.",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "start": "next start --hostname 127.0.0.1",
+    "build": "next build",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "//pretest:e2e": "Espelha o admin-web: recria o banco `_e2e` (DROP + migrate + seed) antes da suite. E o seed que cria o aluno com CPF e a credencial `dev-totem01` do totem -- sem os dois a jornada nao existe.",
+    "pretest:e2e": "node --env-file-if-exists=../../.env ../../scripts/preparar-banco-de-teste.mjs e2e"
+  },
+  "dependencies": {
+    "@arenahub/api-contracts": "workspace:*",
+    "@arenahub/ui": "workspace:*",
+    "next": "16.3.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "0.0.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@arenahub/config": "workspace:*",
+    "@playwright/test": "1.62.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.0",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.4",
+    "eslint": "9.39.5",
+    "jsdom": "27.0.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  },
+  "engines": {
+    "node": ">=22.5.0 <23.0.0"
+  }
+}

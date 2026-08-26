@@ -1,0 +1,167 @@
+{
+  "$comment": "Camada 1 (primitivo) da superficie do totem (kiosk) -- F49/F44, DS-TOTEM.md §2.1. Mesma regra do primitive.json: NENHUM componente le esta camada direto (regra de lint 2), e os hex vivem AQUI e em nenhum outro lugar do repositorio (regra de lint 1). `contrastOnBase` mede contra `totem.bg.base` -- e o fundo real da tela, ao contrario do painel que mede contra branco.",
+  "totem": {
+    "bg": {
+      "base": {
+        "value": "#0A0B0D",
+        "$role": "fundo de todas as telas"
+      },
+      "surface": {
+        "value": "#121417",
+        "contrastOnBase": 1.07,
+        "$role": "cards, botoes secundarios, listas"
+      }
+    },
+    "border": {
+      "hairline": {
+        "value": "#1A2032",
+        "contrastOnBase": 1.22,
+        "$role": "divisores internos, linhas de tabela"
+      },
+      "default": {
+        "value": "#232A3D",
+        "contrastOnBase": 1.38,
+        "$role": "borda de card e de botao secundario (2px)"
+      }
+    },
+    "text": {
+      "primary": {
+        "value": "#FFFFFF",
+        "contrastOnBase": 19.69,
+        "$role": "titulos, valores, rotulos de botao"
+      },
+      "secondary": {
+        "value": "#A6AEB9",
+        "contrastOnBase": 8.79,
+        "$role": "descricoes, metadados, legendas"
+      },
+      "tertiary": {
+        "value": "#565E69",
+        "contrastOnBase": 3.0,
+        "$role": "cabecalho de tabela, comparativos 'vs anterior'",
+        "$comment": "REPROVA no alvo AAA_TEXT (7) do totem -- 3.0 < 7. Existe para texto auxiliar de baixa prioridade, nao para conteudo de leitura obrigatoria a distancia (mesmo papel de carbon-400 no painel)."
+      }
+    },
+    "brand": {
+      "$comment": "Marca e acao do accent AZUL -- DS-TOTEM.md 2.1. `500` e a cor primaria (aneis, barras); `400`/`600` sao as pontas do gradiente de CTA; `300` e glifo de icone sobre fundo escuro; `200` e texto de apoio. Estes hex sao os do DS, escritos a mao: AZUL e a identidade do cliente inaugural e nao se deriva. Os outros tres accents de `ACCENTS_DO_TOTEM` (VERDE, LARANJA, ROXO) sao DERIVADOS do seed por `deriveRamp` no build-tokens.mjs -- ver `accentsDerivados` abaixo.",
+      "200": {
+        "value": "#8FB0FF",
+        "contrastOnBase": 9.21,
+        "$role": "texto de apoio em azul, rotulos de secao, links"
+      },
+      "300": {
+        "value": "#7DA2FF",
+        "contrastOnBase": 7.95,
+        "$role": "icones sobre fundo escuro"
+      },
+      "400": {
+        "value": "#5B86FF",
+        "contrastOnBase": 5.91,
+        "$role": "inicio do gradiente de CTA (fundo, nao texto)",
+        "$comment": "5.91 contra `bg.base` -- REPROVA no alvo AAA_TEXT (7). Legitimo: `400` e `600` sao FUNDO do gradiente de CTA, cujo texto e branco (19.69 contra o proprio gradiente). Nunca usar como cor de texto."
+      },
+      "500": {
+        "value": "#4D7CFF",
+        "contrastOnBase": 5.29,
+        "$role": "cor primaria: aneis, barras de progresso, indicadores",
+        "$comment": "5.29 contra `bg.base` -- REPROVA em AAA_TEXT (7). E cor de PREENCHIMENTO (anel, barra de progresso, trilho), nao de texto: componente grafico responde ao alvo de 3:1 do WCAG 1.4.11, nao ao de texto. Texto azul usa `200`."
+      },
+      "600": {
+        "value": "#3E63E8",
+        "contrastOnBase": 3.9,
+        "$role": "fim do gradiente de CTA (fundo, nao texto)",
+        "$comment": "3.9 contra `bg.base` -- fim do gradiente de CTA. Ver o comentario de `400`."
+      }
+    },
+    "state": {
+      "$comment": "Semantica -- DS-TOTEM.md 2.1. Cada estado usa a mesma receita: borda 2px em 40% da cor, fundo em 10%, icone e titulo na cor cheia, corpo em branco. Verde nunca e cor de botao; laranja e vermelho nunca decoram.",
+      "success": {
+        "value": "#3DDC84",
+        "contrastOnBase": 11.03,
+        "$role": "plano ativo, pagamento pago"
+      },
+      "warning": {
+        "value": "#F5A524",
+        "contrastOnBase": 9.65,
+        "$role": "pendencia financeira"
+      },
+      "danger": {
+        "value": "#FF6B6B",
+        "contrastOnBase": 7.09,
+        "$role": "alerta clinico que exige atendimento humano"
+      }
+    },
+    "accentsDerivados": {
+      "$comment": "Os outros tres accents de `ACCENTS_DO_TOTEM` (packages/api-contracts), que o totem seleciona pela config (`aparencia.accent`). Mesmos cinco papeis do bloco `brand`, emitidos sob `[data-accent=\"<NOME>\"]`. PROCEDENCIA: nao foram escolhidos a olho -- saem de `deriveRamp(seed)` do proprio design system (packages/ui/src/accent.ts), o mesmo resolvedor OKLCH que o painel usa. Ficam MATERIALIZADOS aqui, e nao calculados no build-tokens.mjs, porque o pipeline e `.mjs` puro e roda ANTES do `tsc` que produziria o `accent.js` importavel -- importar dali seria depender do proprio build que este passo precede. Reproduzir: `deriveRamp('<seed>')` e ler os degraus 200-600. AZUL nao entra: e o bloco `brand`, com os hex EXATOS do DS-TOTEM.md 2.1 -- a identidade do cliente inaugural nao se deriva (a rampa OKLCH devolveria #5383FF no lugar de #4D7CFF). CONTRASTE: o papel `200` e o unico usado como TEXTO, e os tres passam folgado no alvo AAA_TEXT (7) do totem -- 13.57 / 12.44 / 11.40. `400`/`500`/`600` sao fundo de gradiente e preenchimento, como no bloco `brand`.",
+      "VERDE": {
+        "$seed": "#3DDC84",
+        "200": {
+          "value": "#7AEDA4",
+          "contrastOnBase": 13.57
+        },
+        "300": {
+          "value": "#56D689",
+          "contrastOnBase": 10.67
+        },
+        "400": {
+          "value": "#27C06F",
+          "contrastOnBase": 8.3
+        },
+        "500": {
+          "value": "#00AC57",
+          "contrastOnBase": 6.6
+        },
+        "600": {
+          "value": "#009144",
+          "contrastOnBase": 4.81
+        }
+      },
+      "LARANJA": {
+        "$seed": "#F5A524",
+        "200": {
+          "value": "#FFC36B",
+          "contrastOnBase": 12.44
+        },
+        "300": {
+          "value": "#F0A946",
+          "contrastOnBase": 9.82
+        },
+        "400": {
+          "value": "#DB9111",
+          "contrastOnBase": 7.57
+        },
+        "500": {
+          "value": "#C77A00",
+          "contrastOnBase": 5.82
+        },
+        "600": {
+          "value": "#A96400",
+          "contrastOnBase": 4.23
+        }
+      },
+      "ROXO": {
+        "$seed": "#8B5CF6",
+        "200": {
+          "value": "#D6B8FF",
+          "contrastOnBase": 11.4
+        },
+        "300": {
+          "value": "#BF9DFF",
+          "contrastOnBase": 8.89
+        },
+        "400": {
+          "value": "#AA83FF",
+          "contrastOnBase": 6.94
+        },
+        "500": {
+          "value": "#9669FF",
+          "contrastOnBase": 5.4
+        },
+        "600": {
+          "value": "#7E53E0",
+          "contrastOnBase": 3.94
+        }
+      }
+    }
+  }
+}

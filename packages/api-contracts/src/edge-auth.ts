@@ -33,6 +33,23 @@ export const CABECALHOS = {
 } as const;
 
 /**
+ * Os MESMOS quatro campos, com nomes proprios do totem.
+ *
+ * Cabecalho separado porque totem e Edge tem ciclo de vida e revogacao
+ * independentes (tabela de credencial propria). O ALGORITMO e identico --
+ * mesmo `assinar`, mesmo texto canonico -- e por isso os nomes moram aqui, ao
+ * lado dele: quem assina no totem e quem verifica na API tem de ler a mesma
+ * lista, e uma segunda copia em cada lado e a divergencia que este pacote
+ * existe para impedir.
+ */
+export const CABECALHOS_DO_KIOSK = {
+  keyId: 'x-kiosk-key-id',
+  timestamp: 'x-kiosk-timestamp',
+  nonce: 'x-kiosk-nonce',
+  signature: 'x-kiosk-signature',
+} as const;
+
+/**
  * Tolerancia de relogio, em segundos.
  *
  * PC de academia raramente tem NTP. 300 s (5 min) e largo o bastante para

@@ -218,6 +218,88 @@ as flags, e revisão humana no PR continua sendo a rede de segurança para isso.
 que garante que ele conta o que existe. Gerador de relatório sem teste é a forma mais elegante
 de mentir com número.
 
+### O campo PR nasce `—`, e isso é a regra — não um esquecimento
+
+Quem entrega roda `test:report` **antes** do commit final, e nesse momento **o PR ainda não
+existe**: ele é aberto depois, a partir do commit que o comando acabou de produzir. Então a
+linha nasce com `—` no campo PR, e o número real entra num commit posterior, **depois do merge**.
+
+`--check` não valida esse campo (bloco acima), então nada quebra se ele ficar `—` — e é
+exatamente por isso que ele precisa estar escrito aqui. **Inventar o número é pior que deixar
+vazio:** um PR que ainda não existe pode nascer com outro número, e a linha passaria a apontar
+para trabalho de terceiros com aparência de evidência conferida. `—` é honesto; palpite não é.
+
+**Preencher depois do merge é passo do fluxo**, junto com `proplan:done` — ver `CLAUDE.md`,
+*Ciclo de vida de uma fatia*, passo 2.
+
+### Evidência da `SPEC-049` — F49, kiosk seguro
+
+Registrada em `reports/TESTS.md` por
+`pnpm test:report --issue 150 --spec SPEC-049`, em 25/08/2026. **PR: `—`** — preencher depois do
+merge, pela regra acima.
+
+```
+| 2026-08-25 | #150 | SPEC-049 | unitário   | 1738 | 1738 | 0 | 75.6 | — |
+| 2026-08-25 | #150 | SPEC-049 | integração |  645 |  645 | 0 | 84.3 | — |
+```
+
+Os números **já incluem** `apps/kiosk` e `packages/api-contracts` — ver o bloco de correção
+abaixo. A primeira geração desta linha saiu com `1677` e foi descartada: contava a fatia do
+totem sem contar o totem.
+
+O que a fatia cobre, por nível (detalhe em
+[`superpowers/specs/2026-08-25-f49-kiosk-seguro-design.md`](superpowers/specs/2026-08-25-f49-kiosk-seguro-design.md) §7):
+
+| nível | o que prova |
+|---|---|
+| unitário | expiração e extensão de sessão (funções puras, **"agora" entra por parâmetro**), máscara e validação de CPF, resolução das três camadas de configuração, accent com alvo 7:1 |
+| integração | HMAC do dispositivo nos seis casos (assinatura válida e inválida, relógio fora da janela, nonce repetido, credencial revogada, credencial vencida); **isolamento A/B**; sessão expirada não autoriza; sessão encerrada por `DELETE` não autoriza mesmo com token em mãos; módulo desligado devolve 404 |
+| e2e | jornada atrator → CPF → minha área → encerrar, com **asserção de limpeza**: `sessionStorage` e `localStorage` vazios e nenhum dado do aluno no DOM |
+
+**A guarda de regressão desta fatia tem nome, não é implícita:** *dado do aluno A não aparece
+para o aluno B*. É o aceite literal da Slice 4.5, e um teste nomeado é o que impede que ele seja
+"coberto" por acidente e perdido no refactor seguinte.
+
+✅ **Corrigido em 25/08/2026, nesta fatia — e a lacuna era maior que o kiosk.**
+
+Ao registrar a evidência da `SPEC-049` descobriu-se que a lista `ALVOS` do gerador **não tinha
+`apps/kiosk`** — a superfície nasceu nesta fatia e o gerador não sabia que ela existia. Ao
+escrever a guarda que impede isso, ela acusou **um segundo pacote invisível que ninguém
+procurava**: `packages/api-contracts`, com 31 testes rodando desde sempre e nunca contados.
+
+| pacote | testes que estavam invisíveis |
+|---|---:|
+| `apps/kiosk` | 30 |
+| `packages/api-contracts` | 31 |
+| **total** | **61** |
+
+O nível `unitário` do relatório foi de **1677 para 1738** — a diferença não é teste novo, é
+teste que já passava e não aparecia. **Este é o formato exato da mentira que o §5 existe para
+impedir:** ninguém escreveu um número errado, e mesmo assim o relatório afirmava menos do que a
+suíte provava. Pacote fora da lista é indistinguível de pacote sem teste.
+
+**A correção tem duas camadas, e a segunda é a que importa:**
+
+1. `apps/kiosk` e `packages/api-contracts` entraram em `ALVOS` — conserta **o caso**.
+2. `alvosFaltando()` (em `scripts/test-report.core.mjs`) compara os workspaces do disco contra
+   `ALVOS`, e o `test:report:selfcheck` **falha** quando existe pacote com script `test` ou
+   `test:integration` fora da lista — conserta **a classe**. O próximo app não nasce invisível:
+   o selfcheck fica vermelho nomeando o pacote e apontando onde acrescentá-lo.
+
+A guarda foi provada nas duas direções, não só na verde: com um workspace-canário plantado o
+selfcheck sai **1 e nomeia o pacote**; removido o canário, volta a 0. *Guarda que não fica
+vermelha quando deveria é pior que guarda nenhuma* — provar só o verde não distingue "regra
+satisfeita" de "regra ausente".
+
+**`ALVOS` mora em `test-report.core.mjs`**, não no `test-report.mjs`, justamente para o
+selfcheck poder conferi-la sem importar o lado que roda processo.
+
+⚠️ **O que continua em aberto, de propósito: o nível `e2e` segue em `0`.** O gerador coleta
+`test` e `test:integration`; o Playwright roda por `pnpm test:e2e`, fora dele. Isso **não é
+específico do kiosk** — vale igual para o `admin-web`, e é pré-existente. `alvosFaltando()`
+ignora `test:e2e` deliberadamente, para não cobrar o que o gerador não sabe coletar. Ligar o
+Playwright ao relatório é trabalho de `[INFRA]`, fora do escopo desta fatia.
+
 ---
 
 ## 6. CI

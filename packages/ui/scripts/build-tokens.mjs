@@ -34,6 +34,7 @@ const readJson = (name) => JSON.parse(readFileSync(join(TOKENS, name), 'utf8'));
 const primitive = readJson('primitive.json');
 const semantic = readJson('semantic.json');
 const expression = readJson('expression.json');
+const totem = readJson('totem.json');
 
 const errors = [];
 
@@ -381,6 +382,48 @@ push(`  --ah-radius-badge: ${panel.radius.badge}px;`);
 push(`  --ah-radius-modal: ${panel.radius.modal}px;`);
 push('}');
 push('');
+
+/**
+ * Superficie do TOTEM -- DS-TOTEM.md 2.1.
+ *
+ * Emitida daqui, e nao escrita a mao no app, pela mesma razao das outras: o
+ * hex vive em `tokens/` e em nenhum outro lugar (regra de lint 1). O totem e
+ * dark e nao compartilha papel com o painel; por isso ganha prefixo proprio
+ * (`--ah-totem-*`) em vez de redefinir `--ah-text-*`, que confundiria um
+ * componente do painel renderizado por engano nesta superficie.
+ */
+push('/* Superficie do totem: dark, leitura a 60-100 cm. DS-TOTEM.md 2.1. */');
+push('[data-surface="totem"] {');
+for (const [grupo, entradas] of Object.entries(totem.totem)) {
+  // `accentsDerivados` sai em blocos proprios logo abaixo, um por accent.
+  if (grupo === 'accentsDerivados') continue;
+  for (const [nome, def] of Object.entries(entradas)) {
+    if (nome.startsWith('$')) continue;
+    push(`  --ah-totem-${grupo}-${nome}: ${def.value};`);
+  }
+}
+push('}');
+push('');
+
+/**
+ * Um bloco por accent NAO-AZUL -- ADR-042, Decisao 0: `aparencia.accent` e
+ * configuravel, entao as quatro variantes precisam EXISTIR. Emitir so a AZUL
+ * deixava o campo do contrato sem efeito nenhum na tela.
+ *
+ * `[data-surface="totem"][data-accent="X"]` redefine so os cinco papeis de
+ * `brand`; superficie, texto e semantica seguem do bloco acima. AZUL nao
+ * precisa de bloco: e o valor padrao ja emitido em `--ah-totem-brand-*`.
+ */
+for (const [accent, papeis] of Object.entries(totem.totem.accentsDerivados)) {
+  if (accent.startsWith('$')) continue;
+  push(`[data-surface="totem"][data-accent="${accent}"] {`);
+  for (const [nome, def] of Object.entries(papeis)) {
+    if (nome.startsWith('$')) continue;
+    push(`  --ah-totem-brand-${nome}: ${def.value};`);
+  }
+  push('}');
+  push('');
+}
 push('@media (prefers-reduced-motion: reduce) {');
 push('  *, *::before, *::after {');
 push(`    animation-duration: ${primitive.motion.reducedMotionMax}ms !important;`);

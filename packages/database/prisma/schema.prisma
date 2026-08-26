@@ -548,6 +548,11 @@ model Tenant {
   deviceSyncJobs      DeviceSyncJob[]
   deviceCommands      DeviceCommand[]
 
+  kioskDevices        KioskDevice[]
+  kioskCredentials    KioskCredential[]
+  kioskConfigurations KioskConfiguration[]
+  kioskSessions       KioskSession[]
+
   accessPolicies         AccessPolicy[]
   operationalAlerts      OperationalAlert[]
   dataExportJobs         DataExportJob[]
@@ -955,6 +960,7 @@ model Student {
   biometricIdentities BiometricIdentity[]
   deviceUsers         DeviceUser[]
   credentials         StudentCredential[]
+  kioskSessions       KioskSession[]
 
   administrativeBlocks  AdministrativeBlock[]
   accessEvents          AccessEvent[]
@@ -1612,6 +1618,131 @@ model ReplayNonce {
   @@unique([edgeNodeId, keyId, nonceHash])
   @@index([expiresAt])
   @@map("replay_nonces")
+}
+
+// ---------------------------------------------------------------------------
+// Kiosk / totem de autoatendimento (F49)
+// ---------------------------------------------------------------------------
+
+enum KioskDeviceStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+/// Totem de autoatendimento na recepcao. Dado fisico: exige `gym_unit_id`
+/// (regra de arquitetura no 2).
+model KioskDevice {
+  id                String            @id @default(uuid()) @db.Uuid
+  tenantId          String            @map("tenant_id") @db.Uuid
+  gymUnitId         String            @map("gym_unit_id") @db.Uuid
+  /// Identificador estavel escolhido na instalacao. Aparece no painel.
+  code              String
+  status            KioskDeviceStatus @default(ACTIVE)
+  agentVersion      String?           @map("agent_version")
+  lastHeartbeat     DateTime?         @map("last_heartbeat")
+  /// Diferenca entre o relogio do totem e o da nuvem, em ms. Mesma razao do
+  /// `EdgeNode`: relogio torto e causa comum de 401 em campo.
+  clockOffsetMs     Int?              @map("clock_offset_ms")
+  /// Versao de configuracao carregada no boot. O heartbeat compara com a
+  /// publicada para decidir reinicio (ADR-042, Decisao 3 -- usado pela F50).
+  bootConfigVersion Int?              @map("boot_config_version")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  credentials KioskCredential[]
+  sessions    KioskSession[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, gymUnitId])
+  @@map("kiosk_devices")
+}
+
+/// Credencial HMAC do totem. Espelha `EdgeCredential` -- mesmo mecanismo,
+/// tabela propria: totem e Edge tem ciclo de vida e revogacao independentes.
+model KioskCredential {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  kioskDeviceId   String    @map("kiosk_device_id") @db.Uuid
+  /// Vai no header `X-Kiosk-Key-Id`. Publico: identifica, nao autentica.
+  keyId           String    @unique @map("key_id")
+  /// Segredo cifrado. NUNCA em log, nem mascarado.
+  encryptedSecret String    @map("encrypted_secret")
+  activeFrom      DateTime  @map("active_from")
+  expiresAt       DateTime? @map("expires_at")
+  /// Revogacao e IMEDIATA: preenchido, a credencial para de valer no ato.
+  revokedAt       DateTime? @map("revoked_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kioskDevice KioskDevice @relation(fields: [kioskDeviceId], references: [id], onDelete: Cascade)
+
+  @@index([kioskDeviceId])
+  @@map("kiosk_credentials")
+}
+
+/// Configuracao do totem em tres camadas (ADR-042, Decisao 8): a mais
+/// especifica vence. A nulabilidade E a camada -- linha de tenant tem os dois
+/// ids nulos; de unidade, so `kiosk_device_id` nulo; de dispositivo, ambos.
+///
+/// `version` e `published_at` nascem AQUI mesmo sem a F49 escrever: rascunho
+/// e a versao sem `published_at`, e acrescentar coluna depois obrigaria
+/// migracao de dado ja publicado.
+model KioskConfiguration {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  gymUnitId     String?   @map("gym_unit_id") @db.Uuid
+  kioskDeviceId String?   @map("kiosk_device_id") @db.Uuid
+  version       Int
+  publishedAt   DateTime? @map("published_at")
+  payload       Json
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, gymUnitId, kioskDeviceId, version])
+  @@index([tenantId, publishedAt])
+  @@map("kiosk_configurations")
+}
+
+/// Nonce de replay do totem. Tabela propria: `ReplayNonce` prende
+/// `edge_node_id` com FK obrigatoria, e totem nao e Edge.
+model KioskReplayNonce {
+  id        String   @id @default(uuid()) @db.Uuid
+  keyId     String   @map("key_id")
+  /// SHA-256 do nonce recebido. O valor bruto nao precisa ser guardado.
+  nonceHash String   @map("nonce_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([keyId, nonceHash])
+  @@index([expiresAt])
+  @@map("kiosk_replay_nonces")
+}
+
+/// Sessao efemera do aluno no totem.
+///
+/// Guarda o HASH do token, nao o token: sessao de 60 s que precisa morrer no
+/// ato do "Encerrar" nao combina com JWT auto-contido, que seguiria valido
+/// ate expirar mesmo depois de encerrada.
+model KioskSession {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  kioskDeviceId String    @map("kiosk_device_id") @db.Uuid
+  studentId     String    @map("student_id") @db.Uuid
+  tokenHash     String    @unique @map("token_hash")
+  expiresAt     DateTime  @map("expires_at")
+  endedAt       DateTime? @map("ended_at")
+  /// `MANUAL`, `TIMEOUT`, `ERROR` ou `FOCUS_LOST` (`M4-FR-019`).
+  endedReason   String?   @map("ended_reason")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kioskDevice KioskDevice @relation(fields: [kioskDeviceId], references: [id], onDelete: Cascade)
+  student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([kioskDeviceId, endedAt])
+  @@map("kiosk_sessions")
 }
 
 /// Dispositivo fisico homologado (leitor facial, catraca).
