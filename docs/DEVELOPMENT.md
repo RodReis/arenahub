@@ -794,6 +794,7 @@ contratou, F46 reaplicou).
 #### F49 — o que a fatia cumpriu
 
 Slice 3.5.1 · `SPEC-049` · issue [#150](https://github.com/RodReis/arenahub/issues/150) ·
+PR [#206](https://github.com/RodReis/arenahub/pull/206) (mergeado em 26/08/2026, CI verde) ·
 spec de design [`2026-08-25-f49-kiosk-seguro-design.md`](superpowers/specs/2026-08-25-f49-kiosk-seguro-design.md)
 
 | passo | entrega |
