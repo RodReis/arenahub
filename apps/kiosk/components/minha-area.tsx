@@ -136,6 +136,7 @@ export function MinhaArea({
         </p>
       )}
 
+      {/* A sobra fica embaixo do conteudo, nunca no meio dele. */}
       <span style={{ flex: 1 }} />
     </div>
   );
@@ -162,18 +163,39 @@ function GradeDeModulos({
     <div
       data-testid="grade-de-modulos"
       style={{
+        /*
+         * A GRADE FICA LOGO ABAIXO DA FAIXA, e a sobra vai para o fim.
+         *
+         * Duas tentativas erradas antes desta, e as duas vistas na tela do
+         * totem, nao deduzidas: `gridAutoRows: 1fr` esticou os cartoes para
+         * 419 px com o titulo boiando no meio; `alignContent: center` abriu
+         * um vao de 470 px ENTRE a faixa e a grade, e a tela passou a ler
+         * como se o miolo tivesse sumido.
+         *
+         * Altura natural, encostada no conteudo de cima: sobra embaixo de
+         * uma tela curta e o lugar normal de sobra.
+         */
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
         gap: 20,
       }}
     >
-      {cards.map((card) => (
+      {cards.map((card, indice) => (
         <button
           key={card.campo}
           type="button"
           data-testid={`modulo-${card.campo}`}
           onClick={() => aoAbrir?.(card.campo)}
           style={{
+            /*
+             * O ULTIMO CARD DE CONTAGEM IMPAR ATRAVESSA a linha inteira. Com
+             * cinco modulos em duas colunas ele ficava sozinho na terceira
+             * fileira, com um buraco do tamanho de um card ao lado -- lido
+             * como card que faltou carregar, nao como fim da lista.
+             */
+            ...(indice === cards.length - 1 && cards.length % 2 === 1
+              ? { gridColumn: '1 / -1' }
+              : {}),
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'flex-start',
