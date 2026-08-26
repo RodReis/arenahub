@@ -203,6 +203,26 @@ jobs:
       # NOS DOIS lugares -- aqui e no `turbo.json`.
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
+      # Heap maior para `test:integration`, que roda com `--runInBand`: as 43
+      # suites compartilham UM processo, e cada uma monta um `AppModule` Nest
+      # proprio. A maioria delas nao chama `app.close()` no `afterAll`, entao
+      # os modulos ficam vivos ate o fim da execucao e o heap so cresce.
+      #
+      # NAO E DEFEITO DA FATIA QUE ESTOUROU: na F50 eram 42 suites e 640
+      # testes, e passava; a 43a cruzou o limiar do heap padrao do runner e o
+      # job morreu com `FATAL ERROR: Reached heap limit` (exit 134), que
+      # parece crash de teste e nao e -- nenhum teste falhou.
+      #
+      # Elevar o teto e a correcao PROPORCIONAL: fechar a app em ~40 suites
+      # alheias e refatoracao que nenhuma fatia pediu. O conserto de raiz
+      # (`afterAll` fechando a app em toda suite, ou tirar o `--runInBand`)
+      # vira card [INFRA] proprio.
+      #
+      # Declarado AQUI e no `globalEnv` do `turbo.json`: o Turbo sanitiza o
+      # ambiente e descarta variavel que nao esteja na lista -- ela sumiria
+      # sem erro nenhum que apontasse a causa.
+      NODE_OPTIONS: --max-old-space-size=6144
+
       # `postgres`, e NÃO `localhost`: com o job dentro de um container, o
       # runner liga os dois por uma rede Docker e o serviço passa a atender
       # pelo LABEL dele. Em `localhost` mora o próprio job.

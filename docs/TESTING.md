@@ -361,6 +361,19 @@ O que a fatia cobre, por nível (detalhe em
 | integração | `POST /admin/kiosk-devices/:id/media` — MP4 aceito devolve chave escopada por tenant **e** unidade; PNG renomeado é recusado **sem sequer chamar o antivírus**; EICAR responde 422 e **não** chega ao storage; totem de outro tenant responde 404, nunca 403. `GET /kiosk/config` — os blocos publicados chegam ao totem na ordem e no tempo configurados; **mídia apontando para outra unidade não vira URL assinada**, mesmo gravada no payload. `POST /kiosk/heartbeat` — os indicadores contam `access_events` reais e contam **só os da unidade daquele totem**; `DENY` não conta como check-in |
 | componente | a faixa de patrocinadores **não tem `<a>` nem `<button>`** (vitrine, não mídia — ADR-042, Decisão 4); o bloco de informações mostra o título e **não um zero** enquanto nenhum número chegou; o campo de link do Instagram aparece **desabilitado com o motivo em tela** |
 
+🔴 **`test:integration` roda com `--runInBand` e vaza memória — a F51 cruzou o limiar.** As suítes
+compartilham **um processo**, e cada uma monta um `AppModule` Nest próprio; **a maioria não chama
+`app.close()` no `afterAll`**, então os módulos ficam vivos até o fim da execução. Na F50 eram 42
+suítes e 640 testes e passava; a **43ª** estourou o heap padrão do runner com `FATAL ERROR: Reached
+heap limit` e `exit 134` — que **parece crash de teste e não é**: nenhum teste falhou, e o resumo
+do Jest nem chegou a ser impresso.
+
+O teto foi elevado (`NODE_OPTIONS=--max-old-space-size=6144` no workflow **e** no `globalEnv` do
+`turbo.json`, senão o Turbo descarta a variável sem erro). **É a correção proporcional, não a de
+raiz:** fechar a app em ~40 suítes alheias é refatoração que nenhuma fatia pediu. O conserto de
+verdade — `afterAll` fechando a app em toda suíte, ou abandonar o `--runInBand` — é card `[INFRA]`
+próprio, e **a próxima fatia que acrescentar suíte de integração pode reencontrar o teto**.
+
 🔴 **O CI sobe SÓ Postgres — nem MinIO, nem Redis.** Descoberto pela F51, que foi a **primeira
 suíte de integração a gravar objeto de verdade** no object storage e derrubou o pipeline com
 `ECONNREFUSED 127.0.0.1:9000`. Toda suíte de integração desta casa dubla o storage com
