@@ -896,10 +896,15 @@ bloco flutuava solto no meio de muito ar, porque os dois `flex` do atrator conti
 mesmo com bloco na tela (o vão de baixo agora cede); e o cartão sem `flex: 1 1 auto` ficava pequeno
 demais para o vão disponível.
 
-**Um defeito de código, corrigido na raiz:** o `try` do antivírus envolvia também a decisão sobre o
-veredito — o `throw` de "infectado" caía no próprio `catch` e sobrevivia por **não** ser
-`ErroDoScanner`. Funcionava por acidente: mover uma linha ali dentro transformaria 422 (infectado)
-em 503 (scanner fora do ar), que são ações opostas. O `try` agora envolve só a chamada.
+**Uma correção que a revisão obrigou a descrever com honestidade.** O `try` do antivírus envolvia
+também a decisão sobre o veredito, e o código foi reescrito para envolver só a chamada. **Medido por
+mutação em 26/08/2026: as duas formas são observacionalmente idênticas hoje** — com o `throw` de
+"infectado" dentro do `try`, ele cai no próprio `catch`, não é `ErroDoScanner`, e sai relançado
+intacto; **nenhum teste da suíte distingue as duas**, e plantar a mutação deixa os 7 testes verdes.
+O que a separação compra é o *próximo* `catch`: no dia em que o bloco tratar mais um tipo de erro,
+"infectado" (422) passaria a responder como "scanner fora do ar" (503). É disciplina contra o
+futuro, **não correção de defeito presente** — e o comentário no código foi reescrito para dizer
+isso, em vez de prometer uma proteção que a suíte não sustenta.
 
 ---
 

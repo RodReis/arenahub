@@ -356,6 +356,22 @@ O que a fatia cobre, por nível (detalhe em
 | integração | `POST /admin/kiosk-devices/:id/media` — MP4 aceito devolve chave escopada por tenant **e** unidade; PNG renomeado é recusado **sem sequer chamar o antivírus**; EICAR responde 422 e **não** chega ao storage; totem de outro tenant responde 404, nunca 403. `GET /kiosk/config` — os blocos publicados chegam ao totem na ordem e no tempo configurados; **mídia apontando para outra unidade não vira URL assinada**, mesmo gravada no payload. `POST /kiosk/heartbeat` — os indicadores contam `access_events` reais e contam **só os da unidade daquele totem**; `DENY` não conta como check-in |
 | componente | a faixa de patrocinadores **não tem `<a>` nem `<button>`** (vitrine, não mídia — ADR-042, Decisão 4); o bloco de informações mostra o título e **não um zero** enquanto nenhum número chegou; o campo de link do Instagram aparece **desabilitado com o motivo em tela** |
 
+**Provado por mutação em 26/08/2026**, e não por leitura — cada guarda foi quebrada de propósito
+para ver a suíte ficar vermelha:
+
+| mutação plantada | resultado |
+|---|---|
+| Gravar no storage **antes** de escanear | 2 testes vermelhos (`ESCANEIA ANTES de gravar`, `scanner FORA DO AR ... NAO entra no storage`) |
+| Tirar a barra final do prefixo de mídia (`u1` passaria a alcançar `u10`) | 4 testes vermelhos, em unidade **e** integração |
+| Vídeo sem `midiaUrl` **voltar** ao rodízio (12 s de tela preta) | 2 testes vermelhos, no domínio puro e no componente |
+| Marca do patrocinador virar `<a href>` | 1 teste vermelho (`NAO ha link nem area clicavel na faixa`) |
+
+⚠️ **Uma guarda que a mutação mostrou ser retórica, e está registrada como tal.** Mover o `throw`
+de "arquivo infectado" para dentro do `try` do antivírus **não quebra teste nenhum** — os 7 seguem
+verdes, porque o erro cai no próprio `catch`, não é `ErroDoScanner` e sai relançado intacto. As
+duas formas são observacionalmente idênticas hoje. O comentário no código foi reescrito para dizer
+isso: a separação é disciplina contra o *próximo* `catch`, não correção de defeito presente.
+
 **A guarda de regressão desta fatia tem nome:** *nenhuma configuração publica dado de aluno na tela
 pública, e a faixa de patrocínio nunca conta exibição*. A primeira metade é estrutural — o
 componente da hero recebe `config` e dois inteiros, e `SessaoDoAluno` não é importado no arquivo; o

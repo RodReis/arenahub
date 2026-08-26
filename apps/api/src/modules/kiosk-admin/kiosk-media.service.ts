@@ -78,11 +78,19 @@ export class KioskMediaService {
 
     // --- 2. ANTIVIRUS, ANTES DE TOCAR O STORAGE --------------------------
     //
-    // O `try` envolve SO a chamada, e nao a decisao sobre o veredito: com o
-    // `throw` do infectado dentro do bloco, ele cairia no proprio `catch` e
-    // sobreviveria por nao ser `ErroDoScanner` -- funcionando por acidente.
-    // Mover uma linha ali dentro depois transformaria "infectado" em
-    // "scanner fora do ar", que sao 422 e 503, acoes opostas.
+    // O `try` envolve SO a chamada, e nao a decisao sobre o veredito.
+    //
+    // HONESTIDADE SOBRE O QUE ISTO GARANTE, medida por mutacao em
+    // 26/08/2026: pôr o `throw` do infectado DENTRO do `try` NAO muda o
+    // comportamento hoje -- ele cai no proprio `catch`, nao e
+    // `ErroDoScanner`, e sai relancado intacto. Nenhum teste distingue as
+    // duas formas, porque nao ha entrada que as separe.
+    //
+    // O que a separacao compra e o PROXIMO `catch`: no dia em que este
+    // bloco tratar mais um tipo de erro -- ou o `if (erro instanceof ...)`
+    // virar um `else` generico --, "infectado" (422) passaria a ser
+    // respondido como "scanner fora do ar" (503), que sao acoes opostas.
+    // E disciplina contra o futuro, nao correcao de defeito presente.
     let veredito;
 
     try {
