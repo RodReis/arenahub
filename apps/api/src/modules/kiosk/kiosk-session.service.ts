@@ -126,6 +126,29 @@ export class KioskSessionService {
    * `kioskDeviceId` no filtro nao e zelo: sem ele, um totem estenderia ou
    * encerraria a sessao aberta em outro totem do MESMO tenant.
    */
+  /**
+   * O PORTAO DE TODO DADO DE ALUNO NO TOTEM (F52).
+   *
+   * Devolve o `studentId` DA SESSAO -- e e por isso que ela existe. Todo
+   * endpoint de dado de aluno resolve o aluno POR AQUI, nunca por um id
+   * vindo da URL ou do corpo: com id na URL, quem tem uma sessao valida lê a
+   * avaliacao e a fatura de QUALQUER aluno do tenant trocando um UUID, e o
+   * isolamento que a F49 provou vira decoracao.
+   *
+   * As tres condicoes de `viva()` continuam valendo inteiras: hash do token,
+   * `endedAt` nulo e `expiresAt` no futuro.
+   */
+  async exigirSessaoViva(
+    contexto: ContextoDoKiosk,
+    sessionId: string,
+    token: string,
+    agora: Date,
+  ): Promise<{ id: string; studentId: string }> {
+    const sessao = await this.viva(contexto, sessionId, token, agora);
+
+    return { id: sessao.id, studentId: sessao.studentId };
+  }
+
   private async viva(contexto: ContextoDoKiosk, sessionId: string, token: string, agora: Date) {
     const sessao = await this.db.kioskSession.findFirst({
       where: {

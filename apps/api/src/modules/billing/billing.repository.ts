@@ -335,6 +335,33 @@ export class BillingRepository {
   }
 
   /**
+   * A tentativa E do aluno? Confere pela INVOICE, nao pelo pagamento.
+   *
+   * Existe para o totem (F52): la quem consulta e o proprio aluno numa
+   * sessao efemera, e `ConsultarTentativaUseCase` escopa so por tenant --
+   * correto no balcao, onde o operador e autorizado sobre qualquer aluno.
+   * Sem este filtro, uma sessao valida no totem observaria a tentativa de
+   * qualquer aluno do tenant chutando UUID.
+   *
+   * Pela invoice porque `Payment` so nasce quando o webhook confirma: amarrar
+   * no pagamento deixaria justamente a janela do QR aberto sem checagem.
+   */
+  async buscarTentativaDoAluno(
+    contexto: TenantContext,
+    studentId: string,
+    paymentAttemptId: string,
+  ): Promise<{ id: string } | null> {
+    return this.db.paymentAttempt.findFirst({
+      where: {
+        id: paymentAttemptId,
+        tenantId: contexto.tenantId,
+        invoice: { studentId, tenantId: contexto.tenantId },
+      },
+      select: { id: true },
+    });
+  }
+
+  /**
    * Proximo numero de invoice do tenant.
    *
    * Mesmo padrao de `StudentRepository.proximaMatricula`, e pelas mesmas
