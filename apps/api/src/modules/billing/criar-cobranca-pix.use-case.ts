@@ -136,9 +136,44 @@ export class CriarCobrancaPixUseCase {
     });
 
     if (pendente?.externalPaymentId) {
-      const noProvedor = await this.provedor.getPaymentStatus(pendente.externalPaymentId);
+      /*
+       * COBRANCA QUE O PROVEDOR NAO CONHECE NAO DERRUBA O PEDIDO.
+       *
+       * Esta consulta e OTIMIZACAO -- reaproveitar um QR que ainda vale. A
+       * tentativa vive no NOSSO banco e a cobranca vive no provedor, e os
+       * dois podem divergir: cobranca expurgada por retencao, ambiente
+       * recriado, id de um provedor anterior. Quando isso acontecia, o
+       * `PROVIDER_NOT_FOUND` subia sem tratamento e a criacao inteira
+       * falhava -- e a invoice ficava PERMANENTEMENTE sem poder gerar PIX
+       * novo, porque a linha `PROCESSING` que causa a consulta nunca sai do
+       * banco sozinha.
+       *
+       * Achado na bancada do totem (F52): reiniciar a API apagava as
+       * cobrancas do `FakePaymentProvider`, que guarda em memoria, e
+       * NENHUM aluno conseguia mais pagar aquela fatura.
+       *
+       * Nao encontrada => segue para o caminho normal e cria uma nova. So
+       * `PROVIDER_NOT_FOUND` e engolido: indisponibilidade e recusa
+       * continuam subindo, porque ai o provedor esta falando conosco e a
+       * resposta dele importa.
+       *
+       * `try/catch` e NAO `.catch()`: a porta devolve `Promise`, mas nada
+       * obriga a implementacao a ser `async` -- o proprio duble lanca de
+       * forma SINCRONA, antes de haver promise, e um `.catch()` encadeado
+       * nunca seria alcancado. Custou uma rodada de teste vermelho para
+       * aparecer.
+       */
+      let noProvedor: Awaited<ReturnType<PaymentProvider['getPaymentStatus']>> | null = null;
 
-      if (noProvedor.status === 'PENDING' && noProvedor.occurredAt > entrada.agora) {
+      try {
+        noProvedor = await this.provedor.getPaymentStatus(pendente.externalPaymentId);
+      } catch (erro: unknown) {
+        if (!(erro instanceof ErroDoProvedor) || erro.codigo !== 'PROVIDER_NOT_FOUND') {
+          throw erro;
+        }
+      }
+
+      if (noProvedor && noProvedor.status === 'PENDING' && noProvedor.occurredAt > entrada.agora) {
         const recriada = await this.provedor.createPix({
           externalAccountId: conta.externalAccountId,
           amountMinor: invoice.totalMinor,

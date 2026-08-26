@@ -383,6 +383,37 @@ describe('F13 -- PIX, webhook idempotente e ativacao do acesso', () => {
 
       expect(corpoDePix(segunda).externalPaymentId).toBe(externalPaymentId);
     });
+
+    it('cobranca que o provedor NAO conhece nao trava a invoice para sempre', async () => {
+      /*
+       * A tentativa vive no NOSSO banco e a cobranca vive no provedor, e os
+       * dois divergem: cobranca expurgada por retencao, ambiente recriado,
+       * id de um provedor anterior.
+       *
+       * O DEFEITO QUE ESTE TESTE FECHA: o `PROVIDER_NOT_FOUND` da consulta
+       * de reuso subia sem tratamento e derrubava a criacao inteira -- e a
+       * linha `PROCESSING` que dispara essa consulta nao sai do banco
+       * sozinha, entao a invoice ficava PERMANENTEMENTE sem poder gerar PIX
+       * novo. Achado na bancada do totem (F52), com a API reiniciada no meio
+       * de um pagamento.
+       *
+       * A consulta e OTIMIZACAO (reaproveitar um QR que ainda vale): nao
+       * encontrada, o certo e criar uma nova.
+       */
+      const { invoiceId, externalPaymentId } = await criarCobranca();
+
+      provedor.esquecerCobranca(externalPaymentId);
+
+      const depois = await request(servidor())
+        .post(`/api/v1/invoices/${invoiceId}/payments/pix`)
+        .set('Cookie', cenario.cookie)
+        .expect(201);
+
+      const corpo = corpoDePix(depois);
+
+      expect(corpo.externalPaymentId).not.toBe(externalPaymentId);
+      expect(corpo.qrCodeDataUri).toContain('data:image/png;base64,');
+    });
   });
 
   describe('INV-077 -- assinatura verificada antes de tudo', () => {

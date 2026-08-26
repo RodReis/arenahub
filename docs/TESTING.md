@@ -419,7 +419,7 @@ Gerada em 26/08/2026 a partir do gate local.
 
 ```
 | 2026-08-26 | #153 | SPEC-052 | unitário   | 1965 | 1965 | 0 | — | — |
-| 2026-08-26 | #153 | SPEC-052 | integração |  659 |  659 | 0 | — | — |
+| 2026-08-26 | #153 | SPEC-052 | integração |  661 |  661 | 0 | — | — |
 ```
 
 **Sem linha `e2e` nesta fatia**, e é escolha, não esquecimento: o aceite da F52 é *isolamento entre
@@ -427,6 +427,28 @@ alunos sobre dado de saúde e financeiro*, e isso se mede no **servidor**, não 
 que abre a sessão de um aluno e clica nos cards provaria a navegação — que já tem teste de
 componente — e **não** provaria que o aluno A não alcança a fatura de B, que é o que importa aqui.
 Os 61 do Playwright continuam verdes, sem caso novo.
+
+**Dois defeitos de produção achados na bancada entraram nesta fatia**, e os dois só apareceram
+com a tela aberta: o `actorId` do totem violando a chave estrangeira de `audit_logs` (o totem não
+tem usuário, e `KioskDevice` não é `User`), e a cobrança PIX que **travava a invoice para sempre**
+quando o provedor não conhecia a tentativa pendente. O segundo é o mais caro: a linha `PROCESSING`
+não sai do banco sozinha, então nenhum aluno voltava a gerar PIX para aquela fatura.
+
+**Dois defeitos de produção achados na bancada entraram nesta fatia**, e nenhum dos dois apareceria
+sem abrir a tela:
+
+1. **O `actorId` do totem violava a chave estrangeira de `audit_logs`.** Montei o `TenantContext`
+   com `kioskDeviceId` -- é UUID, compila, passa no typecheck -- mas a coluna referencia `users`, e
+   um `KioskDevice` não é um `User`. O INSERT de auditoria derrubava a **transação inteira** da
+   cobrança: ninguém pagava pelo totem.
+2. **A cobrança PIX travava a invoice para sempre.** O reuso de tentativa pendente consulta o
+   provedor, e `PROVIDER_NOT_FOUND` subia sem tratamento. Como a linha `PROCESSING` não sai do banco
+   sozinha, a invoice ficava **permanentemente** sem poder gerar PIX novo. Vale para provedor real
+   (cobrança expurgada por retenção, id de provedor anterior), não só para o dublê em memória.
+
+O segundo custou uma rodada de teste vermelho para ficar certo: a primeira correção usou `.catch()`,
+e o dublê lança de forma **síncrona** -- a porta devolve `Promise`, mas nada obriga a implementação a
+ser `async`, e o `.catch()` encadeado nunca era alcançado.
 
 **A contagem de integração foi somada em dois blocos**, porque `test:integration` completo **trava
 na saída do Jest neste ambiente Windows** — o processo morre no encerramento, depois de todas as
@@ -451,6 +473,8 @@ vermelha:
 | Anular a amarra da tentativa ao aluno (`if (false && !daSessao)`) | 1 teste vermelho |
 | Tirar `tokenHash` do `where` da sessão (o UUID da URL autorizaria sozinho) | 1 teste vermelho |
 | Acrescentar `ranking` à grade do painel (trava 2) | 1 teste vermelho, no `admin-web` |
+| Tirar o `orderBy` da busca por CPF (CPF repetido voltaria a depender da ordem física) | 1 teste vermelho |
+| Devolver `PROVIDER_NOT_FOUND` sem tratamento no reuso da cobrança PIX | 1 teste vermelho, em `billing-pix-webhook` |
 
 🔴 **A primeira rodada de mutação achou um buraco real, e ele foi fechado antes do PR.** A trava 1
 **não tinha teste de integração nenhum**: plantar a mutação deixava as 45 suítes verdes. A suíte

@@ -7,6 +7,16 @@ import { KioskConfigService } from './kiosk-config.service.js';
 import { KioskSessionService } from './kiosk-session.service.js';
 
 /**
+ * Nao ha usuario do painel agindo -- quem age e o aluno, numa sessao
+ * efemera. `audit_logs.actor_id` e anulavel exatamente para isto.
+ *
+ * A conversao mora AQUI, num lugar so e com nome, em vez de um
+ * `as unknown as string` solto no meio do objeto: a divergencia entre o
+ * tipo (`string`) e a coluna (`uuid NULL`) fica visivel para quem ler.
+ */
+const SEM_USUARIO = null as unknown as string;
+
+/**
  * O aluno resolvido a partir da SESSAO, nunca da URL.
  *
  * `contexto` e o `TenantContext` que os casos de uso de billing e health
@@ -85,7 +95,31 @@ export class KioskAreaDoAlunoService {
   private tenantContext(contexto: ContextoDoKiosk, sessionId: string): TenantContext {
     return {
       tenantId: contexto.tenantId,
-      actorId: contexto.kioskDeviceId,
+      /*
+       * `actorId` VAZIO, e isto foi um defeito real: pus aqui o
+       * `kioskDeviceId`, que e UUID e compila, mas `audit_logs.actor_id` tem
+       * CHAVE ESTRANGEIRA PARA `users` -- e um `KioskDevice` nao e um
+       * `User`. O INSERT de auditoria violava a FK e derrubava a transacao
+       * INTEIRA da cobranca: o aluno via "nao foi possivel gerar a cobranca"
+       * e ninguem conseguia pagar pelo totem.
+       *
+       * A coluna e anulavel de proposito, e vazio e a resposta honesta: nao
+       * ha usuario agindo. Quem age e o proprio aluno, numa sessao efemera,
+       * e `KioskSession` ja guarda o dispositivo e o aluno. O
+       * `correlationId` amarra a linha de auditoria a requisicao.
+       *
+       * O TIPO diz `string` e o BANCO aceita nulo -- e a divergencia e real:
+       * `TenantContext.actorId` alimenta `recognizedByUserId`,
+       * `evaluatorUserId` e uma duzia de outros campos que sao mesmo de
+       * usuario, em doze arquivos. Afrouxar o tipo para `string | null`
+       * espalharia ajuste por todos eles, o que atravessa modulo e nao e
+       * ajuste de fatia.
+       *
+       * Preencher isto direito pede `ActorType.DEVICE`, que o enum nao tem.
+       * Fica apontado, nao remendado -- e o `null` explicito abaixo e o
+       * unico ponto onde a divergencia aparece.
+       */
+      actorId: SEM_USUARIO,
       sessionId,
       permissions: new Set<string>(),
       allowedUnitIds: new Set([contexto.gymUnitId]),

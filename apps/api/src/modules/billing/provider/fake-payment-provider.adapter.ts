@@ -711,6 +711,24 @@ export class FakePaymentProvider implements PaymentProvider {
   }
 
   /**
+   * O provedor deixa de conhecer a cobranca -- ela some de la, nao daqui.
+   *
+   * EXISTE PARA UM CENARIO SO, e ele nao e hipotetico: a tentativa vive no
+   * NOSSO banco e a cobranca vive no provedor, e os dois divergem quando a
+   * cobranca e expurgada por retencao, quando o ambiente e recriado, ou
+   * quando o id veio de um provedor anterior.
+   *
+   * Achado na bancada do totem (F52): reiniciar a API apagava a memoria
+   * deste duble, a linha `PROCESSING` continuava no banco, e a invoice
+   * ficava PERMANENTEMENTE sem poder gerar PIX novo. Sem este metodo, a
+   * divergencia so aparece quando alguem reinicia o processo no meio de um
+   * pagamento -- que e exatamente o teste que ninguem escreve.
+   */
+  esquecerCobranca(externalPaymentId: string): void {
+    this.cobrancas.delete(externalPaymentId);
+  }
+
+  /**
    * Checkout hospedado -- F53/Task 2 (SPEC-053). O aluno digita o cartao NO
    * PROPRIO CELULAR, na pagina do provedor; o duble nao recebe, nao guarda e
    * nao sabe inventar numero de cartao.
