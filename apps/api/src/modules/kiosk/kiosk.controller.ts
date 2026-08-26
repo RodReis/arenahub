@@ -10,6 +10,7 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
+import { ApiNoContentResponse, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { z } from 'zod';
 import type { Request } from 'express';
 
@@ -43,6 +44,16 @@ export class KioskController {
 
   @Post('heartbeat')
   @HttpCode(200)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['configVersion', 'serverTime'],
+      properties: {
+        configVersion: { type: 'integer' },
+        serverTime: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
   async heartbeat(
     @Req() requisicao: Request,
     @Body() corpo: unknown,
@@ -61,12 +72,52 @@ export class KioskController {
   }
 
   @Get('config')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['version', 'config'],
+      properties: {
+        version: { type: 'integer' },
+        config: {
+          type: 'object',
+          required: ['marca', 'aparencia', 'sessao', 'identificacao', 'modulos'],
+          properties: {
+            marca: { type: 'object' },
+            aparencia: { type: 'object' },
+            sessao: { type: 'object' },
+            identificacao: { type: 'object' },
+            modulos: { type: 'object' },
+          },
+        },
+      },
+    },
+  })
   async obterConfig(@Req() requisicao: Request): Promise<ConfiguracaoResolvida> {
     return this.config.resolverParaDispositivo(this.contexto(requisicao));
   }
 
   @Post('sessions')
   @HttpCode(201)
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['sessionId', 'token', 'nome', 'plano', 'expiraEm'],
+      properties: {
+        sessionId: { type: 'string' },
+        token: { type: 'string' },
+        nome: { type: 'string' },
+        plano: {
+          type: 'object',
+          required: ['ativo', 'pendenciaEmCentavos'],
+          properties: {
+            ativo: { type: 'boolean' },
+            pendenciaEmCentavos: { type: 'integer', nullable: true },
+          },
+        },
+        expiraEm: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
   async abrirSessao(
     @Req() requisicao: Request,
     @Body() corpo: unknown,
@@ -79,6 +130,13 @@ export class KioskController {
 
   @Post('sessions/:id/extend')
   @HttpCode(200)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['expiraEm'],
+      properties: { expiraEm: { type: 'string', format: 'date-time' } },
+    },
+  })
   async estenderSessao(
     @Req() requisicao: Request,
     @Param('id') sessionId: string,
@@ -91,6 +149,13 @@ export class KioskController {
 
   @Delete('sessions/:id')
   @HttpCode(204)
+  // 204 nao tem corpo -- e a resposta certa para encerrar. O schema vazio
+  // declara isso EXPLICITAMENTE: a guarda de contrato (FIX #163) existe para
+  // pegar rota que nao descreve corpo nenhum por esquecimento, e "sem corpo,
+  // de proposito" precisa ser dito, nao omitido.
+  @ApiNoContentResponse({
+    schema: { type: 'object', nullable: true, description: 'Sem corpo.' },
+  })
   async encerrarSessao(
     @Req() requisicao: Request,
     @Param('id') sessionId: string,
