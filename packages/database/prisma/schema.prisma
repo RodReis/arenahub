@@ -1700,6 +1700,9 @@ model KioskConfiguration {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  /// Rascunho unico por camada vive em INDICE PARCIAL com COALESCE
+  /// (`kiosk_configurations_rascunho_unico`), escrito a mao na migracao:
+  /// Prisma nao expressa `WHERE` nem `COALESCE` em @@unique.
   @@unique([tenantId, gymUnitId, kioskDeviceId, version])
   @@index([tenantId, publishedAt])
   @@map("kiosk_configurations")
