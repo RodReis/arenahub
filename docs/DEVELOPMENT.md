@@ -981,6 +981,89 @@ aberto, por caixa —, que é o erro que o próprio arquivo dela documenta.
 
 ---
 
+#### F44 — o que a fatia cumpriu
+
+Slice 2.5.3 · `SPEC-044` · issue [#83](https://github.com/RodReis/arenahub/issues/83) ·
+PR *(preencher após o merge)*
+
+**Esta fatia inverteu a própria premissa, e o registro importa.** O ADR-025 criou a F44 com um
+gate — *"o PI priorizar o MVP 4"* — e um risco escrito: *"componente sem consumidor erra em
+silêncio"*. O **ADR-042** antecipou o totem e as **F49–F52 construíram `apps/kiosk` inteiro**
+antes desta fatia rodar. O risco **não se materializou**: veio consumidor primeiro, e o design
+system nasceu destilado das telas que o usam. Sobrou para a F44 **o que ficou de fora**.
+
+| passo | entrega |
+|---|---|
+| 1 | **`avisoSonoroNaRecusa` ganha consumidor.** A flag existia no contrato desde a F50 com default `true`, o painel tinha o checkbox, e **nenhuma linha do `apps/kiosk` lia o campo** |
+| 2 | Moldura do totem (`DS-TOTEM.md` §3.1) — borda metálica, raios concêntricos 48/46, glow azul |
+| 3 | Forma angular diagonal e ponto pulsante no hero (§3.3), os únicos elementos decorativos que o §4 permite na tela pública |
+| 4 | Anel de pontuação SVG (§3.12), com degradação para texto |
+| 5 | `@keyframes ah-pulse` e `ah-spin` (§2.6) — as duas animações que o DS define e que **não existiam** |
+| 6 | `SPEC-044` reescrita contra o `DS-TOTEM.md` **v2.0**; esta seção, a linha da F44 no `STATUS.md` e a evidência da `SPEC-044` no `TESTING.md` |
+
+🔴 **O defeito que motiva a fatia: uma flag que não fazia nada.** `sessao.avisoSonoroNaRecusa`
+nasceu na F50 **ligada por padrão**, com checkbox no painel — e o totem seguia mudo. A academia
+marcava a caixa e acreditava que o equipamento avisava. É o **mesmo padrão** que a F51 encontrou
+na análise de IA e no OCR de ECG: contrato e tela existem, e o recurso nunca executou. Aqui o
+custo era menor, mas a forma é idêntica — e é por isso que fica registrado.
+
+**Som sintetizado, sem asset.** `AudioContext` com dois tons descendentes (440 → 330 Hz) a volume
+0.08. Um `<audio src>` exigiria arquivo (mais um 404 possível no modo quiosque) e esbarraria na
+política de autoplay — a recusa nasce de uma **resposta de rede**, não de um gesto. O volume e a
+queda grave são operação, não estética: o totem fica na recepção **com fila atrás**, e um bipe
+agudo anunciaria a recusa para a fila. **Nunca lança** — aparelho sem saída de áudio degrada para
+recusa muda, e o Toast continua sendo o canal de verdade (o §3.4 já fixa que esta superfície nunca
+*depende* de áudio).
+
+🔴 **O defeito que a sondagem pegou antes do commit, e que a revisão considerou aceitável.**
+`fracaoDaPontuacao` usava `Number()`, que entende **notação de literal de JavaScript**: `"0x10"`
+virava 16 e desenhava um anel de 16% **sobre dado de saúde**; `"0b11"` virava 3; `"1e3"` saturava
+o anel no cheio. O campo é **texto livre reportado pelo aparelho**, não código. A revisão
+adversarial julgou improvável no formato real do equipamento e não bloqueou; a guarda entrou assim
+mesmo — custou uma regex, e a regra de arquitetura 8 existe justamente para o caso em que o
+aparelho manda o que não esperávamos. **Provado por canário:** removida a guarda, 6 testes caem.
+
+**O anel recusa desenhar o que não sabe ler.** O §3.12 pede arco *"proporcional"* e o DS desenha
+`80 PONTOS` **sem nunca dizer 80 de quanto**. Escala assumida: **100**, isolada em
+`ESCALA_DA_PONTUACAO` para que trocar seja uma linha. Quando o texto não for número dentro dela,
+**não há anel** — a tela cai no número em texto, que já funcionava. ⚠️ **Pergunta 5 da spec: a
+escala real é decisão do PI.**
+
+**A moldura só existe onde o equipamento não está.** Acima de 1080 px de viewport ela aparece;
+na tela real do totem (1080 × 1920) vira `display: contents` e some do layout. No equipamento a
+moldura roubaria 2 px úteis e arredondaria o canto do conteúdo contra a moldura **física** do
+gabinete, que já existe em metal. Verificado no navegador: a 1080 px a `.tela` mede **1080 px
+inteiros**.
+
+⚠️ **Dois defeitos que só a tela revelou — suíte verde não os pegaria.** A forma angular saiu
+errada **duas vezes**, e as duas versões passavam em 155 testes:
+
+1. Com `inset: 0`, a caixa do hero é **baixa e larga**, e a diagonal virou uma **tarja horizontal
+   cortando a headline** — parecia corrupção de render.
+2. Alargada, virou um **bloco retangular** flutuando ao lado do texto e **invadindo o card** de
+   baixo.
+
+Só na terceira, alta e estreita, a diagonal se lê como diagonal. O registro é a lição: **defeito
+visual é invisível para teste de comportamento**, e o jeito de pegá-lo é abrir a tela.
+
+**`data-decorativo` já esperava por esta fatia.** A regra
+`[data-contraste='alto'] [data-decorativo] { display: none }` foi escrita na F51 e **nenhum
+elemento a acionava** — hook pronto, implementação ausente. Verificado no navegador com o alto
+contraste ligado: forma, ponto, animação, glow e gradiente metálico todos em `none`, cumprindo o
+§2.6.
+
+**Duas correções de vocabulário na spec.** O mínimo tipográfico é **19 px** (DS §2.2 e checklist
+§8, e é o que `--tt-minimo` implementa) — a spec dizia 20. E **`carbon-950` não existe**: o token
+é `totem.bg.base` (`#0A0B0D`). A spec anterior descrevia um vocabulário que o repositório não usa.
+
+**O que ficou fora, e por quê.** A **tela pública da catraca** era `DS-TOTEM.md §8` na spec
+original; a **v2.0 apagou essa seção** (o §8 atual é o *Checklist de revisão*). Sem contrato de
+design vigente, escrevê-la é decisão de produto — pergunta 1 da spec. Também ficaram fora o
+**render 3D** (§5.3/§5.4) e os **assets** do §7.3, que não existem no repositório, e o **ranking**
+(§5.8), que depende da F33.
+
+---
+
 ### MVP 4 a 6 · F23 a F41
 
 Vem **depois** do MVP 3.5 (ADR-042). Detalhamento quando o MVP anterior fechar. Pontos que já se
@@ -1081,3 +1164,4 @@ sabe que vão doer:
 | 25/08/2026 | — *(#204)* | — | [#205](https://github.com/RodReis/arenahub/pull/205) | `[INFRA]`: **menu ganha o grupo Financeiro e rótulos de seção diferenciados.** Pedido do PI. Cobrança, Conciliação e Painel financeiro estavam soltos no meio da lista, e a leitura de relance não dizia que eram a mesma família. A ordem dentro do grupo segue a **frequência**, não o organograma: Cobrança é diária, Conciliação é mensal, Painel é gerencial. O rótulo se separou do link por **tracking** (0.04 → 0.08em), respiro (16 → 24px), marcador de accent de 2px na calha e régua de 1px fechando o grupo anterior — **sem `opacity`**, que já foi tentado e reprovou o axe em todas as telas (3.70 contra o mínimo de 4.5). O `NavLink` ganhou marcador de posição e transição de 120ms: fundo a 14% sobre chrome é sutil demais com brilho baixo no balcão. 🔴 **O defeito latente que apareceu ao escrever:** o rótulo mora no item que ABRE o grupo, e "Financeiro" **já contém** um item com `exigePermissao`. Bastava reordenar para o rótulo morar num item que some — e os irmãos ficariam órfãos **só para quem não tem a permissão**, invisível para quem revisa o PR. `reancorarGrupos` devolve o rótulo ao primeiro sobrevivente; mora no layout, não no `Navegacao`, porque só lá a lista completa existe. 📏 **Medido na tela, não estimado:** o marcador do rótulo preenchia 87% da sua caixa contra 67% do item ativo — o secundário gritava mais que o "você está aqui"; aos 4px de recuo cai para 50%. E o modo faixa (abaixo de 1280px) precisou de bloco próprio: a régua girada caía a 8px do marcador, dois traços colados dizendo coisas diferentes. ⚠️ **Pré-existente, medido na `main` e NÃO corrigido aqui:** no modo faixa "Eventos de acesso" quebra em três linhas e leva o link a 193px. Não é o agrupamento que causa. **Provado por mutação:** o teste exercita `reancorarGrupos` no arranjo perigoso (rótulo no item COM permissão) — pelo menu de hoje ele passaria verde com a função removida. 8/8 no E2E de axe, incluindo zoom 200%. |
 | 25/08/2026 | **F56** | SPEC-056 | [#203](https://github.com/RodReis/arenahub/pull/203) | **Plano com assinatura mensal.** Assinatura vira **modalidade de plano** (`Plan.billingMode`), não motor de cobrança terceirizado — ADR-043, Decisão 2. O calendário, o valor, a carência e o bloqueio continuam do ArenaHub; o que muda é existir método salvo e autorização para cobrar sem o aluno agir. **`Subscription.externalSubscriptionId` nasce aqui** — a fonte que o `CancelarRecorrenciaUseCase` esperava desde 25/08 (Decisão 5): ele deixa de devolver zero fixo e passa a cancelar de verdade, aqui e no provedor. A adesão é o **único** lugar que chama `createTokenizedSubscription`, e valida na ordem em que o operador consegue agir — modalidade, status, preço vigente, **CPF** (Decisão 3), cartão, aceite —, porque quem está no balcão age pela PRIMEIRA recusa. O ciclo (`RodarCicloDeAssinaturasUseCase`) gera a invoice do período e cobra sozinho, **sem calendário novo**: reusa `ciclo-de-cobranca`, `BillingRepository` e o retry da F14. 🔑 **Três decisões do PI em 25/08:** ciclo completo (gerar **e** cobrar, não só cobrar); avisos **visíveis no painel** em vez de canal externo — não existe infra de notificação no sistema, e criá-la é decisão própria; e construção contra o `FakePaymentProvider`, já que a F55 espera credencial (trocar é um `useClass`). 🔴 **O defeito que o compilador pegou e um `string` não pegaria:** `OVERDUE` é o nome do vencido no `InvoiceStatus` — **não** `PAST_DUE`, que é do lado da ASSINATURA. Os dois vocabulários convivem, e trocar um pelo outro pularia calada justamente a invoice vencida, que é a que mais precisa ser cobrada. 🔴 **O achado da revisão adversarial do próprio PR:** a adesão chama o provedor **antes** de gravar — ordem oposta à da cobrança —, e morrer no meio deixaria recorrência viva sem nada apontando para ela (a Decisão 5 por outra porta). O código já estava certo, mas **dizer não é provar**: o que fecha a janela é a chave `sub:<id>` derivar da assinatura, e agora há teste. **Provado por mutação, não por leitura:** filtrar o ciclo por MODALIDADE em vez de por CONSENTIMENTO passa em 4 dos 5 testes e falha exatamente no que importa — cobraria cartão de quem nunca autorizou; instabilizar a chave de idempotência derruba concorrência **e** recuperação. 📌 **Fora de escopo, dito:** canal de aviso de reajuste e de cartão vencendo. `cartaoVenceEm` responde a pergunta e a ficha mostra; quem avisa o aluno é a recepção. |
 | 25/08/2026 | **F49** | SPEC-049 | *(preencher após o merge)* | **Kiosk seguro, provisionamento e sessão efêmera.** A superfície `apps/kiosk` nasceu (o diretório estava vazio): quatro modelos Prisma, HMAC de dispositivo copiado do `edge-auth`, contrato inteiro de `KioskConfiguration` em três camadas, sessão efêmera de 60 s com `tokenHash` no banco, tokens do totem em 7:1, três telas e o E2E que prova a limpeza. **A área interna sai com zero dos seis módulos do DS §5.2, de propósito** — o aceite é isolamento e limpeza, não funcionalidade. **ADR-045** registra o regime de identificação (CPF sozinho, facial em backlog) e os dois riscos que o PI aceitou. 🔴 **Achado da implementação:** a ponte Node que assina as chamadas escutava em `0.0.0.0` e, com a rede da academia não isolada, permitia enumerar a base inteira do tenant sem tocar no totem — corrigido para loopback, e o ADR-045 condiciona a decisão do PI a ele. **Este é o primeiro PR a reordenar a fila do §4:** MVP 3.5 antes do MVP 4, tarefa que o ADR-042 atribui a esta fatia |
+| 26/08/2026 | **F44** | SPEC-044 | *(preencher após o merge)* | **Design system da superfície `kiosk`.** A fatia **inverteu a própria premissa**: o ADR-025 a criou com gate (*"o PI priorizar o MVP 4"*) e o risco escrito de *"componente sem consumidor"*, mas o ADR-042 antecipou o totem e as **F49–F52 construíram `apps/kiosk` inteiro antes**. O DS nasceu destilado das telas; sobrou para a F44 **o que ficou de fora**. 🔴 **O defeito que motiva a fatia:** `avisoSonoroNaRecusa` existia no contrato desde a F50 **ligada por padrão**, com checkbox no painel, e **nenhuma linha do kiosk lia o campo** — a academia marcava a caixa e o totem seguia mudo. Mesmo padrão da análise de IA e do OCR de ECG na F51: contrato e tela existem, recurso nunca executou. Som **sintetizado** (`AudioContext`, 440→330 Hz, volume 0.08), sem asset: `<audio src>` exigiria arquivo e esbarraria no autoplay, porque a recusa nasce de **resposta de rede**, não de gesto; grave e baixo porque a recepção tem **fila atrás**. 🔴 **Defeito pego na sondagem, que a revisão não bloqueou:** `Number()` entende notação de literal JS — `"0x10"` desenhava anel de **16% sobre dado de saúde**, `"1e3"` saturava no cheio. O campo é texto livre do **aparelho**, não código; guarda por regex entrou assim mesmo (regra de arquitetura 8), **provada por canário** — sem ela, 6 testes caem. ⚠️ **Dois defeitos que só a tela revelou, com 155 testes verdes:** a forma angular §3.3 saiu como **tarja cortando a headline** (`inset: 0` numa caixa baixa e larga) e depois como **bloco invadindo o card** — só alta e estreita a diagonal se lê como diagonal. **Defeito visual é invisível para teste de comportamento.** A **moldura §3.1 só existe onde o equipamento não está**: acima de 1080px aparece, na tela real vira `display: contents` — no gabinete ela roubaria 2px úteis e duplicaria a moldura **física** de metal; verificado no navegador (a 1080px a `.tela` mede 1080 inteiros). O anel §3.12 **recusa desenhar o que não sabe ler**: o DS mostra `80 PONTOS` e **nunca diz de quanto** — escala 100 assumida em `ESCALA_DA_PONTUACAO`, degradando para texto. `data-decorativo` **já esperava**: a regra de alto contraste foi escrita na F51 sem nenhum elemento que a acionasse. 📌 **Fora, e dito:** tela pública da catraca — era o `§8` na spec antiga e a **v2.0 apagou a seção**; sem contrato vigente, é decisão de produto |
