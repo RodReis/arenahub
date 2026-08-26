@@ -1921,6 +1921,186 @@
         ]
       }
     },
+    "/api/v1/admin/kiosk-devices": {
+      "get": {
+        "operationId": "KioskAdminController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
+    "/api/v1/admin/kiosk-devices/{id}/config": {
+      "get": {
+        "operationId": "KioskAdminController_obter",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "publicada",
+                    "rascunho",
+                    "efetiva",
+                    "configVersion",
+                    "totemEmSessao"
+                  ],
+                  "properties": {
+                    "publicada": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "rascunho": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "efetiva": {
+                      "type": "object"
+                    },
+                    "configVersion": {
+                      "type": "integer"
+                    },
+                    "totemEmSessao": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      },
+      "put": {
+        "operationId": "KioskAdminController_salvar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "description": "Sem corpo."
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
+    "/api/v1/admin/kiosk-devices/{id}/config/publish": {
+      "post": {
+        "operationId": "KioskAdminController_publicar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "version"
+                  ],
+                  "properties": {
+                    "version": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
+    "/api/v1/admin/kiosk-devices/{id}/config/draft": {
+      "delete": {
+        "operationId": "KioskAdminController_descartar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "description": "Sem corpo."
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
     "/api/v1/device-sync-jobs": {
       "get": {
         "operationId": "DeviceSyncController_listar",

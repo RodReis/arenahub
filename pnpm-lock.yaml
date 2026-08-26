@@ -14,6 +14,9 @@ importers:
 
   apps/admin-web:
     dependencies:
+      '@arenahub/api-contracts':
+        specifier: workspace:*
+        version: link:../../packages/api-contracts
       '@arenahub/ui':
         specifier: workspace:*
         version: link:../../packages/ui

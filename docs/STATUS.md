@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 25/08/2026 *(F49 entregue — kiosk seguro; quadro reconciliado com o board)*
+**Última atualização:** 26/08/2026 *(F50 entregue — configuração do totem; quadro reconciliado com o board)*
 
 🔑 **24/08/2026 — o Cowork passa a empurrar o próprio commit.** Até aqui o commit entrava na `main`
 local e ficava esperando alguém sincronizar: o `git push` pelo bridge falhava com
@@ -776,6 +776,12 @@ F53–F56, que faltavam naquele arquivo.
 **Observação sobre o MVP 3:** o índice do plano declara que **o MVP 2 não é dependência
 funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 
+⚠️ **O ADR-042 referencia seções que o `DS-TOTEM.md` não tem.** O ADR declara *"Alcança
+`docs/design/DS-TOTEM.md` §11 regra 9 e §12 pendências 1 e 4"* e cita ainda §9.1, §11.2, §11.3,
+§11.5 a §11.8 e §11.10 — mas o arquivo vai de §1 a §8. Na F50 (26/08/2026) o PI decidiu **registrar
+e não editar**: a mecânica da Decisão 3 entrou em **§7.2**, que é a seção real de configuração, e
+nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
+
 ---
 
 ## 5. Índice Fatia ↔ SPEC
@@ -845,7 +851,7 @@ funcional** — MVP 3 pode andar em paralelo se o PI priorizar assim.
 | F47 | — | 1 | — | Importação da base legada Pacto (1.926 alunos) | [ADR-033](DECISIONS.md#adr-033--importação-da-base-legada-do-pacto-1926-alunos-entram-como-cancelled) | [#118](https://github.com/RodReis/arenahub/issues/118) | planejada |
 | F48 | — | 1 | — | Ativação da base corrente do Pacto (~340 ativos) | [design](superpowers/specs/2026-08-20-ativacao-base-corrente-design.md) | — | **entregue** — aguardando aceite |
 | F49 | SPEC-049 | 3.5 | 3.5.1 | Kiosk seguro, provisionamento e sessão efêmera | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.5](prd/academia/MVP-04-app-totem.md) | [#150](https://github.com/RodReis/arenahub/issues/150) | ✅ **entregue** em 25/08/2026 — aguardando aceite |
-| F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | aprovada-pi |
+| F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | ✅ **entregue** em 26/08/2026 — aguardando aceite |
 | F51 | SPEC-051 | 3.5 | 3.5.3 | Tela pública (hero): blocos, mídia e patrocínio | [ADR-042](DECISIONS.md#adr-042) | [#152](https://github.com/RodReis/arenahub/issues/152) | aprovada-pi |
 | F52 | SPEC-052 | 3.5 | 3.5.4 | Área do aluno no totem: identificação, pagamento e evolução | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.6](prd/academia/MVP-04-app-totem.md) | [#153](https://github.com/RodReis/arenahub/issues/153) | aprovada-pi |
 | F53 | SPEC-053 | 3 | — | Pagamentos e cobrança no balcão (`admin-web`) | [`SPEC-053-pagamentos-e-cobranca-no-balcao.md`](specs/SPEC-053-pagamentos-e-cobranca-no-balcao.md) | [#156](https://github.com/RodReis/arenahub/issues/156) | ✅ **finalizado** — aceito pelo PI |

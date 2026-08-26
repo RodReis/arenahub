@@ -1,0 +1,143 @@
+/**
+ * Personalizacao do totem -- F50. DS-PAINEL.md, nunca DS-TOTEM: 7:1 e alvo
+ * de 88 px sao do `apps/kiosk`, nao deste painel.
+ *
+ * So token semantico `--ah-*` -- cor fora do token nao acompanha o tema
+ * (ADR-026, e a lint proibe hex literal).
+ */
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/** Barra de estado fixa: os tres estados que a operacao precisa distinguir de relance. */
+.barraDeEstado {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-control-radius);
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+}
+
+.secao {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 32rem;
+  padding-top: 16px;
+}
+
+.dica {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+.grupoDeAccent {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rotuloDoGrupo {
+  padding: 0;
+  font-size: var(--ah-type-caption-size);
+  font-weight: 600;
+  color: var(--ah-text-label);
+}
+
+.amostras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.amostra {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-control-radius);
+  cursor: pointer;
+  color: var(--ah-text-secondary);
+  transition:
+    border-color var(--ah-motion-control) var(--ah-motion-easing),
+    color var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.amostra:has(input:checked) {
+  border-color: var(--ah-action-solid);
+  color: var(--ah-text-strong);
+  font-weight: 600;
+}
+
+.amostra:has(input:focus-visible) {
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+/* O input nativo continua no DOM (teclado, leitor de tela) mas some visualmente. */
+.amostra input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.pastilha {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--ah-border-strong);
+}
+
+.pastilha[data-accent='AZUL'] {
+  background: var(--ah-accent-600);
+}
+
+.pastilha[data-accent='VERDE'] {
+  background: var(--ah-state-success);
+}
+
+.pastilha[data-accent='LARANJA'] {
+  background: var(--ah-warning);
+}
+
+.pastilha[data-accent='ROXO'] {
+  background: var(--ah-state-info);
+}
+
+.campoBooleano {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-size);
+}
+
+.valorFixo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ah-border-subtle);
+  color: var(--ah-text-strong);
+}
+
+.rotuloFixo {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+}
+
+.acoes {
+  display: flex;
+  gap: 10px;
+  padding-top: 8px;
+}

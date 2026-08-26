@@ -780,7 +780,7 @@ sem aceite verificável.
 | F | slice | núcleo |
 |---|---|---|
 | F49 | 3.5.1 Kiosk seguro, provisionamento e sessão efêmera | ✅ **entregue** — ver abaixo |
-| F50 | 3.5.2 Contrato de configuração, painel e publicação versionada | painel *Personalização do totem* no `admin-web`, rascunho e publicação por versão; o totem compara `configVersion` no heartbeat que a F49 já entrega |
+| F50 | 3.5.2 Contrato de configuração, painel e publicação versionada | ✅ **entregue** — ver abaixo |
 | F51 | 3.5.3 Tela pública (hero): blocos, mídia e patrocínio | a tela pública **é o produto**, não a moldura — o totem passa a maior parte do dia sem ninguém na frente dele |
 | F52 | 3.5.4 Área do aluno: identificação, pagamento e evolução | é aqui que os módulos do `DS-TOTEM.md` §5.2 ligam; a F49 entrega a área interna **vazia** de propósito |
 
@@ -825,6 +825,30 @@ isolada**, qualquer host da LAN enumerava a base inteira do tenant sem tocar no 
 mensagem neutra não protege nada, porque o status HTTP cru distingue 404 de 201. Corrigido:
 `--hostname 127.0.0.1` em `dev` e em `start`, com o motivo escrito ao lado do script. O ADR-045
 registra que a Decisão 4 do PI **só se sustenta enquanto a ponte ficar em loopback**.
+
+#### F50 — o que a fatia cumpriu
+
+Slice 3.5.2 · `SPEC-050` · issue [#151](https://github.com/RodReis/arenahub/issues/151) ·
+spec de design [`2026-08-26-f50-configuracao-do-totem-design.md`](superpowers/specs/2026-08-26-f50-configuracao-do-totem-design.md)
+
+| passo | entrega |
+|---|---|
+| 1 | Índice parcial garantindo **rascunho único por camada** (tenant, unidade ou dispositivo) — não é possível existir duas linhas de `KioskConfiguration` com `publishedAt IS NULL` para a mesma chave, então "salvar rascunho" nunca duplica |
+| 2 | Serviço de promoção rascunho → versão publicada **imutável**: publicar cria uma linha nova com `version` incrementada e `publishedAt` preenchido; a versão anterior nunca é reescrita |
+| 3 | Cinco rotas administrativas (`GET /admin/kiosk-devices`, `GET`/`PUT /:id/config`, `POST /:id/config/publish`, `DELETE /:id/config/draft`) num módulo **`kiosk-admin` separado** do `kiosk-auth` da F49 — sessão de gerente (cookie + permissão), nunca HMAC de dispositivo |
+| 4 | Totem reinicia **fora de sessão** comparando `configVersion` do heartbeat contra a versão carregada no boot — é a mecânica registrada em `DS-TOTEM.md` §7.2 |
+| 5 | Painel `/operations/kiosks` no `admin-web`: lista de totens e formulário de configuração em três abas (Marca, Aparência, Sessão), com barra de estado e os três botões Salvar rascunho / Publicar / Descartar rascunho |
+| 6 | E2E do aceite (`personalizacao-do-totem.e2e-spec.ts`): altera marca/cor/sessão → salva rascunho → publica → estado volta a "sem alterações"; e descartar restaura o valor publicado, não o descartado |
+| 7 | Esta seção do `DEVELOPMENT.md`, a linha da F50 no `STATUS.md` e a evidência da `SPEC-050` no `TESTING.md` |
+
+**Nenhuma migração de tabela nova.** A F49 já criou `KioskConfiguration` com `version` e
+`publishedAt` justamente para a F50 não precisar migrar dado publicado — só o índice parcial do
+passo 1 é schema novo.
+
+**Discrepância registrada, não corrigida.** O `docs/DECISIONS.md` (ADR-042) referencia seções do
+`DS-TOTEM.md` que o arquivo não tem (§9.1, §11.x, §12) — decisão do PI foi registrar a mecânica da
+Decisão 3 em **§7.2**, a seção real de configuração, e não inventar as seções que o ADR cita. Nota
+completa em `docs/STATUS.md`.
 
 ---
 

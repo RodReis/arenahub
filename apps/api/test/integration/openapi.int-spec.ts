@@ -193,6 +193,11 @@ describe('contrato OpenAPI', () => {
         '/api/v1/assessments/{id}/corrections',
         '/api/v1/students/{id}/health-context',
         '/api/v1/students/{id}/health-context/{factor}',
+        // F50 -- configuracao do totem (painel, sessao de gerente).
+        '/api/v1/admin/kiosk-devices',
+        '/api/v1/admin/kiosk-devices/{id}/config',
+        '/api/v1/admin/kiosk-devices/{id}/config/publish',
+        '/api/v1/admin/kiosk-devices/{id}/config/draft',
       ]),
     );
   });

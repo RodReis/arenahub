@@ -48,6 +48,37 @@ export async function carregarConfig(): Promise<ConfigDoTotem> {
   }
 }
 
+export interface RespostaDeHeartbeat {
+  readonly configVersion: number;
+  readonly serverTime: string;
+}
+
+/**
+ * Ping periodico do totem: leva a versao do agente e o relogio local, traz a
+ * versao ATUAL da config publicada (F49). E o sinal que `decidirReinicio`
+ * consome para saber se a config do boot ainda vale.
+ *
+ * API fora do ar nao pode travar o totem: como `carregarConfig`, degrada
+ * devolvendo `null` em vez de lancar -- o chamador simplesmente pula aquele
+ * ciclo e tenta de novo no proximo heartbeat.
+ */
+export async function heartbeat(): Promise<RespostaDeHeartbeat | null> {
+  try {
+    const resposta = await fetch('/api/kiosk/heartbeat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ agentVersion: '0.1.0', localTimeMs: Date.now() }),
+      cache: 'no-store',
+    });
+
+    if (!resposta.ok) return null;
+
+    return (await resposta.json()) as RespostaDeHeartbeat;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Abre a sessao pelo CPF. `null` significa "nao foi possivel entrar".
  *
