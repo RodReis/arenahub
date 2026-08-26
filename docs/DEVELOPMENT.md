@@ -782,7 +782,7 @@ sem aceite verificável.
 | F49 | 3.5.1 Kiosk seguro, provisionamento e sessão efêmera | ✅ **entregue** — ver abaixo |
 | F50 | 3.5.2 Contrato de configuração, painel e publicação versionada | ✅ **entregue** — ver abaixo |
 | F51 | 3.5.3 Tela pública (hero): blocos, mídia e patrocínio | ✅ **entregue** — ver abaixo |
-| F52 | 3.5.4 Área do aluno: identificação, pagamento e evolução | é aqui que os módulos do `DS-TOTEM.md` §5.2 ligam; a F49 entrega a área interna **vazia** de propósito |
+| F52 | 3.5.4 Área do aluno: identificação, pagamento e evolução | ✅ **entregue** — ver abaixo |
 
 **A Decisão 0 do ADR-042 vale para as quatro:** nenhuma tela do `kiosk` nasce com valor fixo
 naquilo que a Decisão 6 não trava — marca, accent, tempo de sessão, blocos, módulos e textos são
@@ -905,6 +905,78 @@ O que a separação compra é o *próximo* `catch`: no dia em que o bloco tratar
 "infectado" (422) passaria a responder como "scanner fora do ar" (503). É disciplina contra o
 futuro, **não correção de defeito presente** — e o comentário no código foi reescrito para dizer
 isso, em vez de prometer uma proteção que a suíte não sustenta.
+
+
+#### F52 — o que a fatia cumpriu
+
+Slice 3.5.4 · `SPEC-052` · issue [#153](https://github.com/RodReis/arenahub/issues/153)
+
+| passo | entrega |
+|---|---|
+| 1 | Aba **Módulos** no painel (quinta aba), com os cinco módulos de fatia entregue. `ranking` fica **fora**: a F33 (MVP 5) não entregou, e módulo sem fatia **não aparece** — nem cinza, nem desabilitado (ADR-042, Decisão 5, trava 2) |
+| 2 | `KioskConfigService.exigirModulo()` — endpoint de módulo desligado responde **404** para aquele dispositivo (trava 1, `M3.5-FR-007`). Um kiosk com devtools aberto não reabilita nada |
+| 3 | Grade de card-módulo na área interna (`DS-TOTEM.md` §3.10/§5.2), que a F49 entregou vazia de propósito. A ordem vive em lista própria, **não** derivada das chaves do schema Zod |
+| 4 | Sete endpoints sob `/api/v1/kiosk/sessions/:id/*`, todos atrás de `KioskAreaDoAlunoService.resolver()` |
+| 5 | Pagamento com **dois QRs** (ADR-043, Decisão 4): PIX e checkout hospedado de cartão, reusando `CriarCobrancaPixUseCase` e `CriarCheckoutDeCartaoUseCase` |
+| 6 | Histórico de pagamentos (§5.7) e as três telas de saúde (§5.3–§5.5), reusando `BodyEvolutionService` — que foi escrito para o totem e até aqui **não tinha consumidor** |
+| 7 | Sete padrões novos na allowlist da ponte, um por endpoint; esta seção, a linha da F52 no `STATUS.md` e a evidência da `SPEC-052` no `TESTING.md` |
+
+**As três decisões de segurança que sustentam a fatia.** Elas ficam registradas porque são o
+aceite: *"dado do aluno A não aparece para o aluno B"* passou a valer sobre **dado de saúde e
+financeiro**, não só sobre a saudação.
+
+1. **`resolver()` faz numa chamada o que nenhum handler pode esquecer** — módulo ligado, sessão
+   viva, e o `studentId` **da sessão**. Três checagens espalhadas por sete handlers seriam sete
+   chances de esquecer uma; aqui quem esquecer não tem `studentId` para prosseguir.
+2. **Nenhum endpoint aceita id de aluno nem de fatura.** O aluno sai de `KioskSession`; a fatura a
+   cobrar é a **mais antiga em aberto dele**. Com id na URL, uma sessão válida leria a fatura de
+   qualquer aluno do tenant trocando um UUID — e o pagador seria o errado.
+3. **O módulo é checado ANTES da sessão**, para que desligado e sessão inválida devolvam o **mesmo
+   404**. Fosse a sessão primeiro, o par de status (401 vs 404) diria a quem sonda de fora qual dos
+   dois falhou.
+
+**Um vazamento achado ao cruzar o balcão com o totem.** `ConsultarTentativaUseCase` escopa por
+tenant e **não** por aluno — correto no balcão, onde o operador é autorizado sobre qualquer aluno.
+No totem seria vazamento: uma sessão válida saberia se a fatura de **qualquer** aluno foi paga, e
+quando, chutando UUID. Nasceu `BillingRepository.buscarTentativaDoAluno`, e a amarra é **pela
+invoice, não pelo pagamento**: `Payment` só existe depois que o webhook confirma, e amarrar nele
+deixaria sem checagem justamente a janela em que o QR está aberto.
+
+**Quatro decisões do PI em 26/08/2026:**
+
+1. **As três telas de saúde do DS**, e não o *"resumo apenas"* que o ADR-042 e a issue pediam.
+2. **O bloco de composição corporal fica como moldura e selo, sem imagem.** O asset não existe no
+   repositório — nem imagem, nem gerador, nem dependência 3D — e a tela diz que virá. Desenhar um
+   corpo genérico seria pior que o vazio: o aluno leria como sendo o corpo **dele**, medido.
+3. **Pontuação e achado de ECG saem crus, atribuídos ao aparelho.** A RDC 657/2022 da ANVISA isenta
+   software que só exibe; classificar, colorir por gravidade ou recomendar conduta enquadra como
+   dispositivo médico (ADR-035). Mesmo precedente de `achado-do-ecg.tsx` no painel.
+4. **Cartão entra agora, contra o `FakePaymentProvider`.** Trocar pelo adapter real da F55 é um
+   `useClass` no módulo, não reescrita de tela.
+
+**`ranking` continua no contrato, e some só da UI.** A trava 2 diz *"não existe"*; removê-lo do
+schema Zod invalidaria toda configuração já publicada em `KioskConfiguration.payload`. A trava é
+sobre o que o gerente **vê**, não sobre o shape persistido — e o teste que prova a ausência foi
+verificado com **canário plantado**: acrescentar a linha do ranking deixa o teste vermelho.
+
+**Navegação por estado, nunca por rota.** O totem roda em quiosque e o histórico do navegador
+sobrevive ao encerramento da sessão: com rota, o botão *"voltar"* reabriria a tela do aluno
+**anterior**. Mesmo motivo que a máquina de etapas de `page.tsx` já documentava.
+
+**Dois defeitos que os testes pegaram, e o CI sozinho não pegaria:**
+
+1. **A faixa de pendência exibia o valor da fatura** logo depois do login — `DS-TOTEM.md` §9.1 e a
+   issue exigem que valor e detalhe só apareçam na etapa de pagamento, depois de ação deliberada. A
+   recepção tem fila atrás, e quem está na fila lê a tela de quem está na frente.
+2. **"O aluno não tem avaliação" e "a rede caiu" chegavam ambos como `null`**, e a tela dizia a
+   mensagem errada num dos dois casos. Um aluno que **tem** avaliação leria *"você ainda não tem
+   avaliação registrada"* toda vez que a rede da academia oscilasse. Agora são três estados.
+
+**O wiring só apareceu na integração.** `BillingModule` e `HealthModule` não exportavam os casos de
+uso que o totem consome, e **typecheck e unitários passam verdes** porque não montam o container de
+DI do Nest. `ConsultarStatusDePagamentoUseCase` ficou de fora dos exports de propósito: exportá-la
+convidaria alguém a usá-la no laço de polling do totem — ~20 chamadas externas por minuto de QR
+aberto, por caixa —, que é o erro que o próprio arquivo dela documenta.
 
 ---
 

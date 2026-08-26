@@ -411,6 +411,57 @@ endpoint que produz os números devolve **dois inteiros**, sem lista, sem nome, 
 (`M3.5-BR-001`). A segunda também: não há campo de contagem, clique, campanha ou período **no
 contrato**, e o `parse` do Zod descarta o que vier a mais (`M3.5-BR-006`).
 
+
+### Evidência da `SPEC-052` — F52, área do aluno no totem
+
+Gerada em 26/08/2026 a partir do gate local.
+**PR: —**
+
+```
+| 2026-08-26 | #153 | SPEC-052 | unitário   | 1965 | 1965 | 0 | — | — |
+| 2026-08-26 | #153 | SPEC-052 | integração |  659 |  659 | 0 | — | — |
+```
+
+**Sem linha `e2e` nesta fatia**, e é escolha, não esquecimento: o aceite da F52 é *isolamento entre
+alunos sobre dado de saúde e financeiro*, e isso se mede no **servidor**, não no navegador. Um E2E
+que abre a sessão de um aluno e clica nos cards provaria a navegação — que já tem teste de
+componente — e **não** provaria que o aluno A não alcança a fatura de B, que é o que importa aqui.
+Os 61 do Playwright continuam verdes, sem caso novo.
+
+**A contagem de integração foi somada em dois blocos**, porque `test:integration` completo **trava
+na saída do Jest neste ambiente Windows** — o processo morre no encerramento, depois de todas as
+suítes passarem, e nem o resumo nem o `--outputFile` chegam a ser escritos. É o mesmo defeito de
+ambiente já registrado nas `SPEC-050` e `SPEC-051`, e **não é regressão desta fatia**: 43 suítes /
+649 testes passavam antes com `exit 0`, e a F52 acrescenta 1 suíte / 10 testes.
+
+O que a fatia cobre, por nível:
+
+| nível | o que prova |
+|---|---|
+| unitário | `recortarHistorico` (fatura em aberto **não** é cortada por idade — cortá-la sumiria com a dívida em vez de errá-la, e o totem passaria a afirmar por omissão que não há o que pagar; desempate por `id` para a linha não pular de lugar entre dois carregamentos); `resumirMetricas` (tipo não medido **não some** da grade, e "primeira medição" nunca vira zero — INV-104); `agruparSegmentos` (braço esquerdo + direito viram uma linha; ausência **não** vira zero, que leria como "não há gordura ali"); `modulosVisiveis` (`ranking: true` não produz card); `deltaLegivel` (sinal explícito, e "sem mudança" ≠ "primeira medição") |
+| integração | módulo desligado responde **404 com sessão válida**, e o **mesmo** 404 de uma sessão inexistente — quem sonda de fora não distingue os dois; `sessionId` de um aluno com token de outro responde 404; o aluno sem fatura recebe `KIOSK_NO_OPEN_INVOICE` em vez de alcançar a fatura alheia; a tentativa de pagamento de outro aluno responde 404, **nunca o estado**; o histórico de um aluno não traz a fatura do outro, **e o do outro traz a dele** (sem esse par, um endpoint que devolvesse sempre lista vazia passaria os dois) |
+| componente | o QR **não tem botão de "já paguei"** (`M4-BR-001` — o backend confirma); `CANCELLED` é terminal mas **não** exibe "confirmado"; o laço para ao desmontar, para não confirmar para o próximo aluno; o aviso de não-diagnóstico **não tem botão de fechar**; a faixa de pendência **não mostra o valor** antes da etapa de pagamento |
+
+**Provado por mutação em 26/08/2026** — cada trava foi quebrada de propósito para ver a suíte ficar
+vermelha:
+
+| mutação plantada | resultado |
+|---|---|
+| Trocar `exigirModulo` por `resolverParaDispositivo` (módulo desligado passaria a responder) | 1 teste vermelho |
+| Anular a amarra da tentativa ao aluno (`if (false && !daSessao)`) | 1 teste vermelho |
+| Tirar `tokenHash` do `where` da sessão (o UUID da URL autorizaria sozinho) | 1 teste vermelho |
+| Acrescentar `ranking` à grade do painel (trava 2) | 1 teste vermelho, no `admin-web` |
+
+🔴 **A primeira rodada de mutação achou um buraco real, e ele foi fechado antes do PR.** A trava 1
+**não tinha teste de integração nenhum**: plantar a mutação deixava as 45 suítes verdes. A suíte
+`kiosk-area-do-aluno.int-spec.ts` nasceu daí — antes dela, a trava existia no código e não existia
+na prova, que é o mesmo que a guarda de lint sem canário já ensinou nesta casa.
+
+**A guarda de regressão desta fatia tem nome:** *nenhum endpoint da área do aluno aceita id de aluno
+ou de fatura*. É estrutural e verificável por leitura — os sete handlers recebem `sessionId` e
+`x-session-token`, e o `studentId` sai de `KioskSession`. No dia em que alguém acrescentar um
+parâmetro de aluno, a regressão não é sutil: é a assinatura do método mudando.
+
 ---
 
 ## 6. CI
