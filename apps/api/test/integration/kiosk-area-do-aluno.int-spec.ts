@@ -375,4 +375,53 @@ describe('F52 -- area do aluno no totem', () => {
         .expect(400);
     });
   });
+
+  describe('CPF repetido na base — o desfecho não pode depender do dia', () => {
+    it('abre a sessão do cadastro MAIS ANTIGO, não do que o banco devolver', async () => {
+      /*
+       * `cpfHash` NAO e unico, e a base real tem CPF repetido -- dois irmaos
+       * com o mesmo numero, erro de digitacao na importacao. Sem `orderBy`,
+       * `findFirst` devolve o que o Postgres entregar primeiro, e essa ordem
+       * muda depois de qualquer UPDATE na tabela: o mesmo CPF abriria a
+       * sessao ora de um aluno, ora de outro, e cada um veria a fatura e a
+       * avaliacao do outro.
+       *
+       * O TESTE NAO TENTA PROVOCAR A CORRIDA -- provocar ordem fisica e
+       * pouco confiavel, e um teste que "as vezes" pega a mutacao nao e
+       * guarda. Ele assere QUAL aluno ganha: o irmao entra com `createdAt`
+       * ANTERIOR ao cadastro original, entao a regra manda ele ganhar, e a
+       * ordem de insercao manda o contrario. As duas respostas sao
+       * distinguiveis, e so a regra produz a esperada.
+       */
+      const CPF = '11144477735';
+
+      const irmao = await db.student.create({
+        data: {
+          tenantId: totem.tenantId,
+          gymUnitId: totem.gymUnitId,
+          membershipNumber: `AP-2026-${randomUUID().replace(/\D/g, '').slice(0, 8)}`,
+          fullName: 'Irmao Com Mesmo CPF',
+          birthDate: new Date('2001-01-01'),
+          cpf: CPF,
+          cpfHash: calcularHashDeCpf(totem.tenantId, CPF),
+          status: 'ACTIVE',
+          // ANTERIOR ao aluno B, que o `beforeAll` criou agora.
+          createdAt: new Date('2020-01-01T00:00:00.000Z'),
+        },
+      });
+
+      const sessao = await abrirSessao(CPF);
+
+      const dona = await db.kioskSession.findUnique({
+        where: { id: sessao.sessionId },
+        select: { studentId: true },
+      });
+
+      expect(dona?.studentId).toBe(irmao.id);
+      expect(dona?.studentId).not.toBe(alunoB);
+
+      await db.kioskSession.deleteMany({ where: { studentId: irmao.id } });
+      await db.student.delete({ where: { id: irmao.id } });
+    });
+  });
 });

@@ -43,6 +43,22 @@ export class KioskSessionService {
         // ARCHIVED e LEAD caem na mensagem neutra unica abaixo.
         status: { in: ['ACTIVE', 'TRIAL', 'SUSPENDED'] },
       },
+      /*
+       * ORDEM EXPLICITA, e nao zelo: `cpfHash` NAO e unico, e a base real
+       * tem CPF repetido -- dois irmaos com o mesmo numero, erro de
+       * digitacao na importacao. Sem `orderBy`, um `findFirst` devolve o
+       * que o Postgres entregar primeiro, e essa ordem MUDA depois de
+       * qualquer UPDATE na tabela: o mesmo CPF abriria a sessao ora de um
+       * aluno, ora de outro, e cada um veria a fatura e a avaliacao do
+       * outro.
+       *
+       * `createdAt asc` com `id` de desempate: o cadastro mais antigo
+       * ganha, sempre o mesmo, e o desfecho para de depender do dia.
+       *
+       * Isto NAO conserta o dado duplicado -- so o torna deterministico.
+       * Corrigir o cadastro e da recepcao.
+       */
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: { id: true, fullName: true },
     });
 
