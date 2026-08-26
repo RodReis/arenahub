@@ -565,9 +565,9 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | coluna | label | o que significa | quantas |
 |---|---|---|---|
 | Backlog | `proplan:backlog` | card criado; **estacionamento visível** — nem tudo aqui é pegável | **23** |
-| A Fazer | `proplan:todo` | Code pegou | **1** — [F44](https://github.com/RodReis/arenahub/issues/83) |
+| A Fazer | `proplan:todo` | Code pegou | 0 |
 | Em Andamento | `proplan:doing` | Code está implementando | 0 |
-| Feito | `proplan:done` | PR mergeado com CI verde | 0 |
+| Feito | `proplan:done` | PR mergeado com CI verde | **1** — [F44](https://github.com/RodReis/arenahub/issues/83) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **81** |
 
 > 🧾 **25/08/2026 — o quadro foi reconciliado contra o board, não estimado.** A tabela acima
@@ -873,7 +873,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | [`SPEC-041-producao-controlada-e-monitoramento.md`](specs/SPEC-041-producao-controlada-e-monitoramento.md) | [#41](https://github.com/RodReis/arenahub/issues/41) | planejada |
 | F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | [#81](https://github.com/RodReis/arenahub/issues/81) | aprovada-pi |
 | F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | [#82](https://github.com/RodReis/arenahub/issues/82) | aprovada-pi *(gate: MVP 4)* |
-| F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | ✅ **entregue** em 26/08/2026 — aguardando aceite |
+| F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | ✅ **entregue** em 26/08/2026 ([#210](https://github.com/RodReis/arenahub/pull/210)) — aguardando aceite |
 | F45 | — | 1 | — | Cadastro completo de aluno (retrabalho da Slice 1.2) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#100](https://github.com/RodReis/arenahub/issues/100) | **entregue** — aguardando aceite |
 | F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **entregue** — PR [#107](https://github.com/RodReis/arenahub/pull/107), aguardando aceite |
 | F47 | — | 1 | — | Importação da base legada Pacto (1.926 alunos) | [ADR-033](DECISIONS.md#adr-033--importação-da-base-legada-do-pacto-1926-alunos-entram-como-cancelled) | [#118](https://github.com/RodReis/arenahub/issues/118) | planejada |
