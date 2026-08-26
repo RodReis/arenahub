@@ -9,6 +9,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
 import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.service.js';
+import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -45,6 +46,31 @@ describe('F51 -- tela publica do totem', () => {
     app.getHttpServer() as Parameters<typeof request>[0];
 
   const CORPO = { agentVersion: '0.1.0', localTimeMs: 0 };
+
+  /**
+   * Storage DUBLADO -- o CI sobe **so Postgres**, sem MinIO. Aqui o dublê
+   * REGISTRA as chaves que chegaram a ser assinadas: e o que prova que a
+   * chave de outra unidade nao chegou ao storage, em vez de so conferir que
+   * a resposta trouxe `midiaUrl: null`.
+   */
+  const assinadas: string[] = [];
+
+  const storageFalso = {
+    createPrivateUpload: () =>
+      Promise.resolve({ uploadUrl: 'https://storage.test/x', expiresAt: '' }),
+    headPrivateObject: () => Promise.resolve({ size: 1, contentType: 'video/mp4' }),
+    deletePrivateObject: () => Promise.resolve(),
+    putPrivateObject: () => Promise.resolve(),
+    createPrivateDownload: (entrada: { key: string }) => {
+      assinadas.push(entrada.key);
+
+      return Promise.resolve({
+        downloadUrl: `https://storage.test/${entrada.key}?assinada=1`,
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    },
+    verificar: () => Promise.resolve(true),
+  };
 
   const assinarPedido = (
     corpo: unknown,
@@ -100,7 +126,10 @@ describe('F51 -- tela publica do totem', () => {
   };
 
   beforeAll(async () => {
-    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const modulo = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(OBJECT_STORAGE)
+      .useValue(storageFalso)
+      .compile();
 
     app = modulo.createNestApplication();
     aplicarParserComCorpoCru(app);
@@ -230,6 +259,10 @@ describe('F51 -- tela publica do totem', () => {
 
     expect(video?.tipo).toBe('VIDEO');
     expect(video).toMatchObject({ midiaUrl: null });
+    // A recusa acontece ANTES do storage: a chave alheia nunca chegou a ser
+    // assinada. Sem esta asserção, um servico que assinasse e depois
+    // descartasse a URL passaria verde.
+    expect(assinadas).toEqual([]);
   });
 
   it('o heartbeat conta as entradas da unidade DESTE totem, e so dela', async () => {

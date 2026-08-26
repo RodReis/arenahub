@@ -10,6 +10,7 @@ import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.j
 import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.service.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import type { EstadoDaConfiguracao } from '../../src/modules/kiosk-admin/kiosk-admin-config.service.js';
+import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 describe('F50 -- rascunho unico por camada', () => {
@@ -128,6 +129,41 @@ describe('F50 -- rotas administrativas de configuracao', () => {
     return lista.find((c) => c.startsWith('arenahub_access=')) ?? '';
   };
 
+  /**
+   * Storage DUBLADO, como em toda suite de integracao desta casa
+   * (`access-query-export`, `biometric-identity`, `device-sync`, ...): o CI
+   * sobe **so Postgres** -- nao ha MinIO nem Redis. O upload da F51 foi o
+   * primeiro teste de integracao a gravar objeto de verdade, e derrubou o
+   * pipeline com `ECONNREFUSED 127.0.0.1:9000`.
+   *
+   * O dublê GUARDA o que foi gravado: o teste continua provando que o
+   * arquivo chegou ao storage com a chave certa, e nao apenas que a rota
+   * respondeu 201.
+   */
+  const gravados = new Map<string, Buffer>();
+
+  const storageFalso = {
+    createPrivateUpload: () =>
+      Promise.resolve({ uploadUrl: 'https://storage.test/x', expiresAt: '' }),
+    headPrivateObject: () => Promise.resolve({ size: 1, contentType: 'video/mp4' }),
+    deletePrivateObject: (key: string) => {
+      gravados.delete(key);
+
+      return Promise.resolve();
+    },
+    putPrivateObject: (entrada: { key: string; body: Buffer }) => {
+      gravados.set(entrada.key, entrada.body);
+
+      return Promise.resolve();
+    },
+    createPrivateDownload: (entrada: { key: string }) =>
+      Promise.resolve({
+        downloadUrl: `https://storage.test/${entrada.key}?assinada=1`,
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      }),
+    verificar: () => Promise.resolve(true),
+  };
+
   type Tenant = { id: string; gymUnitId: string; deviceId: string; cookieGestor: string };
 
   const tenantA: Tenant = { id: '', gymUnitId: '', deviceId: '', cookieGestor: '' };
@@ -194,7 +230,11 @@ describe('F50 -- rotas administrativas de configuracao', () => {
   };
 
   beforeAll(async () => {
-    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const modulo = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(OBJECT_STORAGE)
+      .useValue(storageFalso)
+      .compile();
+
     app = modulo.createNestApplication();
     aplicarParserComCorpoCru(app);
     await app.init();
@@ -385,6 +425,9 @@ describe('F50 -- rotas administrativas de configuracao', () => {
     expect(midiaKey.startsWith(`tenants/${tenantA.id}/kiosk-media/${tenantA.gymUnitId}/`)).toBe(
       true,
     );
+    // O ARQUIVO CHEGOU, e nao so a rota respondeu 201: sem esta asserção,
+    // um servico que devolvesse a chave sem gravar nada passaria verde.
+    expect(gravados.get(midiaKey)).toBeDefined();
   });
 
   it('POST media recusa PNG disfarcado de MP4 -- a assinatura decide, nao o nome', async () => {

@@ -356,6 +356,19 @@ O que a fatia cobre, por nível (detalhe em
 | integração | `POST /admin/kiosk-devices/:id/media` — MP4 aceito devolve chave escopada por tenant **e** unidade; PNG renomeado é recusado **sem sequer chamar o antivírus**; EICAR responde 422 e **não** chega ao storage; totem de outro tenant responde 404, nunca 403. `GET /kiosk/config` — os blocos publicados chegam ao totem na ordem e no tempo configurados; **mídia apontando para outra unidade não vira URL assinada**, mesmo gravada no payload. `POST /kiosk/heartbeat` — os indicadores contam `access_events` reais e contam **só os da unidade daquele totem**; `DENY` não conta como check-in |
 | componente | a faixa de patrocinadores **não tem `<a>` nem `<button>`** (vitrine, não mídia — ADR-042, Decisão 4); o bloco de informações mostra o título e **não um zero** enquanto nenhum número chegou; o campo de link do Instagram aparece **desabilitado com o motivo em tela** |
 
+🔴 **O CI sobe SÓ Postgres — nem MinIO, nem Redis.** Descoberto pela F51, que foi a **primeira
+suíte de integração a gravar objeto de verdade** no object storage e derrubou o pipeline com
+`ECONNREFUSED 127.0.0.1:9000`. Toda suíte de integração desta casa dubla o storage com
+`.overrideProvider(OBJECT_STORAGE)` (`access-query-export`, `biometric-identity`, `device-sync`,
+`health`, `historico-e-comparativos`, `upload-e-revisao`) — o padrão existia, e a F51 era a única
+que não o seguia. **Quem escrever a próxima fatia que toque o storage precisa saber disto antes de
+abrir o PR:** localmente o MinIO do `docker-compose` responde e o teste passa; no CI, não.
+
+O dublê **guarda o que foi gravado** e **registra o que foi assinado**, para não cair na armadilha
+do dublê que esconde o ato errado: um serviço que devolvesse a chave sem gravar nada passaria verde
+com um dublê que só responde `Promise.resolve()`. Provado por mutação — remover o `putPrivateObject`
+do serviço deixa o teste vermelho.
+
 **Provado por mutação em 26/08/2026**, e não por leitura — cada guarda foi quebrada de propósito
 para ver a suíte ficar vermelha:
 
