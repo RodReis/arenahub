@@ -101,6 +101,12 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     diário do uso raro sem esconder nenhum: continuam a um clique.
   */
   { href: '/operations/devices', label: 'Dispositivos', grupo: 'Administração' },
+  /*
+    TOTENS -- F50. Mesmo grupo de Dispositivos, mesmo motivo: personalizar o
+    totem (marca, aparencia, sessao) e configuracao de uso raro, nao a
+    ferramenta do atendimento diario.
+  */
+  { href: '/operations/kiosks', label: 'Totens', exigePermissao: 'device.read' },
   { href: '/units', label: 'Unidades' },
 ];
 

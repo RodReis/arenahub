@@ -15,6 +15,7 @@
     "pretest:e2e": "node --env-file-if-exists=../../.env ../../scripts/preparar-banco-de-teste.mjs e2e"
   },
   "dependencies": {
+    "@arenahub/api-contracts": "workspace:*",
     "@arenahub/ui": "workspace:*",
     "@base-ui/react": "^1.7.0",
     "class-variance-authority": "^0.7.1",
