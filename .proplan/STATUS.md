@@ -24,7 +24,6 @@ updated: 2026-08-27
 - [MVP5][SPEC-033][F33] Rankings privados por padrão (#33)
 - [MVP5][SPEC-032][F32] Consistência e streak (#32)
 - [MVP5][SPEC-031][F31] XP e conquistas (#31)
-- [MVP5][SPEC-030][F30] Preferências e identidade pública (#30)
 - [MVP4][SPEC-029][F29] Piloto e distribuição (#29)
 - [MVP4][SPEC-028][F28] Pagamento e desbloqueio no totem (#28)
 - [MVP4][SPEC-027][F27] Kiosk seguro (#27)
@@ -50,6 +49,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP5][SPEC-030][F30] Preferências e identidade pública (#30, finalizado em: 2026-08-27)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83, finalizado em: 2026-08-27)
 - [MVP3.5][SPEC-052][F52] Área do aluno no totem: identificação, pagamento e evolução (#153, finalizado em: 2026-08-26)
 - [MVP3.5][SPEC-051][F51] Tela pública (hero): blocos, mídia e patrocínio (#152, finalizado em: 2026-08-26)
