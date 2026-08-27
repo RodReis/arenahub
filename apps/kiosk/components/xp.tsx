@@ -127,7 +127,7 @@ function Movimentos({ movimentos }: { readonly movimentos: readonly MovimentoDeX
         >
           <span className="corpo">{movimento.regra}</span>
           <span className="metadado">{mesDaMedicao(movimento.quando) ?? '—'}</span>
-          <span className="valorDoPagamento">+{movimento.pontos}</span>
+          <span className="pontosDoMovimento">+{movimento.pontos}</span>
         </div>
       ))}
     </div>
@@ -149,7 +149,7 @@ function Conquistas({ conquistas }: { readonly conquistas: readonly ConquistaDoT
       {conquistas.map((conquista) => (
         <div
           key={`${conquista.titulo}-${conquista.desbloqueadaEm}`}
-          className={conquista.revertida ? 'pagamentoEmAberto' : 'segmento'}
+          className={conquista.revertida ? 'conquistaRevertida' : 'segmento'}
           data-testid="conquista"
         >
           <span className="corpo">{conquista.titulo}</span>

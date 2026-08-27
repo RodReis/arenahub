@@ -841,7 +841,8 @@ button {
 .pagamento,
 .pagamentoEmAberto,
 .linhaDeAvaliacao,
-.mesDaEvolucao {
+.mesDaEvolucao,
+.conquistaRevertida {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -859,6 +860,25 @@ button {
 }
 
 .valorDoPagamento {
+  margin-left: auto;
+  font-size: var(--tt-card-titulo);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Conquista revertida: evento informativo, ja resolvido -- NAO pendencia
+ * financeira nem alerta clinico (DS-TOTEM.md §2.1 reserva laranja/vermelho
+ * para os dois). Caixa neutra igual ao `.segmento` (ver grupo acima); so o
+ * rotulo "Revertida" usa `brand/200` para sinalizar "isto mudou de estado"
+ * sem tom de alarme.
+ */
+.conquistaRevertida .metadado[data-testid='conquista-revertida'] {
+  color: var(--ah-totem-brand-200);
+}
+
+/* Pontuacao de um movimento de XP -- rotulo neutro, sem conotacao de dinheiro (M5-BR-010). */
+.pontosDoMovimento {
   margin-left: auto;
   font-size: var(--tt-card-titulo);
   font-weight: 700;
