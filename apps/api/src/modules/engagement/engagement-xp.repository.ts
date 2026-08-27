@@ -111,6 +111,20 @@ export interface PortaDeXp {
   movimentosDoExtrato(contexto: TenantContext, studentId: string): Promise<MovimentoDoExtratoDeXp[]>;
   /** Conquistas do aluno na forma exibivel, incluindo as REVERTIDAS. */
   conquistasDoExtrato(contexto: TenantContext, studentId: string): Promise<ConquistaDoExtratoDeXp[]>;
+  /**
+   * Fuso da UNIDADE de matricula do aluno -- o que `ajustar()` (Task 11)
+   * precisa para calcular `localMonth` do movimento manual. `null` se o
+   * aluno nao existe no tenant (o controller devolve 404 nesse caso).
+   */
+  fusoDoAluno(contexto: TenantContext, studentId: string): Promise<string | null>;
+  /**
+   * Uma versao de regra QUALQUER do tenant -- so para satisfazer a FK
+   * obrigatoria de `XpLedgerEntry.ruleVersionId` num `ADJUSTMENT` manual, que
+   * nao tem gatilho proprio no catalogo v1 (`XpTrigger` so tem
+   * `SESSAO_CONFIRMADA`). O sentido do ajuste vive em `reason`, nunca nesta
+   * referencia. `null` se o tenant ainda nao tem regra nenhuma semeada.
+   */
+  qualquerVersaoDeRegra(contexto: TenantContext): Promise<{ id: string } | null>;
 }
 
 @Injectable()
@@ -377,5 +391,21 @@ export class EngagementXpRepository implements PortaDeXp {
       revertida: conquista.status === 'REVERSED',
       motivo: conquista.reversedReason,
     }));
+  }
+
+  async fusoDoAluno(contexto: TenantContext, studentId: string): Promise<string | null> {
+    const aluno = await this.db.student.findFirst({
+      where: { tenantId: contexto.tenantId, id: studentId },
+      select: { gymUnit: { select: { timezone: true } } },
+    });
+
+    return aluno?.gymUnit.timezone ?? null;
+  }
+
+  async qualquerVersaoDeRegra(contexto: TenantContext): Promise<{ id: string } | null> {
+    return this.db.xpRuleVersion.findFirst({
+      where: { tenantId: contexto.tenantId },
+      select: { id: true },
+    });
   }
 }

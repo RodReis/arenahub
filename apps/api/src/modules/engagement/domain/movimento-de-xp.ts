@@ -113,6 +113,51 @@ export function reverter(
   };
 }
 
+/** O que `ajustar` precisa para montar o movimento manual. */
+export interface EntradaDeAjuste {
+  pontos: number;
+  motivo: string;
+  /** Chave de idempotencia do painel -- vira o `sourceId` (Task 11). */
+  idempotencyKey: string;
+  /**
+   * FK obrigatoria de `XpLedgerEntry.ruleVersionId` -- o catalogo v1 nao tem
+   * gatilho MANUAL, entao o ajuste referencia uma versao de regra qualquer
+   * do tenant so para satisfazer a coluna. O motivo do movimento (o PORQUE)
+   * vive em `reason`, nunca nesta referencia.
+   */
+  ruleVersionId: string;
+  agora: Date;
+  fusoDaUnidade: string;
+}
+
+/**
+ * Movimento manual (painel) -- ajuste de XP fora do catalogo automatico,
+ * `M5-FR-007`/`M5-AC-010`.
+ *
+ * NAO EXISTE "editar": isto e sempre um INSERT novo. `idempotencyKey` e o
+ * `sourceId` -- a chave unica do ledger (`tenantId, studentId, sourceKind,
+ * sourceId, ruleVersionId, type`) e quem impede duplicar o mesmo ajuste, nao
+ * uma checagem previa em memoria.
+ */
+export function ajustar(entrada: EntradaDeAjuste): MovimentoDeXp {
+  const motivo = entrada.motivo.trim();
+  if (motivo.length === 0) {
+    throw new Error('XP_MOTIVO_OBRIGATORIO');
+  }
+
+  return {
+    type: 'ADJUSTMENT',
+    points: entrada.pontos,
+    ruleVersionId: entrada.ruleVersionId,
+    sourceKind: 'MANUAL_ADJUSTMENT',
+    sourceId: entrada.idempotencyKey,
+    reversesEntryId: null,
+    occurredAt: entrada.agora,
+    localMonth: mesLocal(entrada.agora, entrada.fusoDaUnidade),
+    reason: motivo,
+  };
+}
+
 /** O saldo E a soma do ledger. Nao ha outra definicao. */
 export function somarSaldo(movimentos: readonly { points: number }[]): number {
   return movimentos.reduce((total, movimento) => total + movimento.points, 0);

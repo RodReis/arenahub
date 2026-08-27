@@ -1,8 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { resolverRegraVigente } from './domain/regra-de-xp.js';
-import { concederPorSessao, mesLocal } from './domain/movimento-de-xp.js';
+import { ajustar, concederPorSessao, mesLocal } from './domain/movimento-de-xp.js';
 import { avaliarConquistas } from './domain/conquista.js';
 import {
   PORTA_DE_XP,
@@ -157,6 +157,58 @@ export class EngagementXpService {
    * isso (Task 6); expor aqui evita que o teste precise conhecer a porta.
    */
   async reconstruirProjecao(contexto: TenantContext, studentId: string): Promise<void> {
+    await this.porta.recalcularSaldo(contexto, studentId);
+  }
+
+  /**
+   * Ajuste manual de XP pelo painel (F31, Task 11) -- `M5-FR-007`/`M5-AC-010`.
+   *
+   * NAO HA EDICAO: isto sempre GRAVA um movimento `ADJUSTMENT` novo, nunca
+   * altera um existente (o ledger e append-only por trigger no banco).
+   *
+   * `idempotencyKey` vira o `sourceId` do movimento -- a chave unica do
+   * ledger e quem impede duplicar, entao P2002 aqui e SUCESSO idempotente,
+   * no mesmo padrao de `sincronizarXp`: reenviar o mesmo ajuste (rede
+   * instavel, duplo clique) devolve o resultado ja gravado, nao um erro.
+   */
+  async ajustarXp(
+    contexto: TenantContext,
+    studentId: string,
+    entrada: { pontos: number; motivo: string; idempotencyKey: string },
+    agora: Date,
+  ): Promise<void> {
+    const fusoDaUnidade = await this.porta.fusoDoAluno(contexto, studentId);
+    if (fusoDaUnidade === null) {
+      throw new NotFoundException({ code: 'ALUNO_NAO_ENCONTRADO', message: 'Aluno nao encontrado' });
+    }
+
+    const regra = await this.porta.qualquerVersaoDeRegra(contexto);
+    if (regra === null) {
+      throw new NotFoundException({
+        code: 'CATALOGO_DE_XP_VAZIO',
+        message: 'Tenant sem nenhuma versao de regra de XP semeada',
+      });
+    }
+
+    const movimento = ajustar({
+      pontos: entrada.pontos,
+      motivo: entrada.motivo,
+      idempotencyKey: entrada.idempotencyKey,
+      ruleVersionId: regra.id,
+      agora,
+      fusoDaUnidade,
+    });
+
+    try {
+      await this.porta.gravarConcessao(contexto, {
+        studentId,
+        movimento,
+        evento: { eventType: 'XPAdjusted', aggregateType: 'XpLedgerEntry' },
+      });
+    } catch (erro) {
+      if (!ehColisaoDeUnicidade(erro)) throw erro;
+    }
+
     await this.porta.recalcularSaldo(contexto, studentId);
   }
 

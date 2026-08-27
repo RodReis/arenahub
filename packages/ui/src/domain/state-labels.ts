@@ -49,7 +49,14 @@ export type StateMachine =
    * `campo.state` de cada campo do arquivo (`cartoesDeArquivo`, `sessao.ts`)
    * -- nao e maquina de estado persistida, so um resumo por arquivo.
    */
-  | 'fileReviewState';
+  | 'fileReviewState'
+  /**
+   * F31, Task 11 -- `RankingSnapshotStatus` do placar mensal (painel). Tom
+   * NEUTRO em `WITHHELD` de proposito -- `M5-BR-007` diz que a coorte abaixo
+   * do minimo NAO E ERRO, e sim a politica funcionando; `danger`/`warning`
+   * pintaria como falha o que e comportamento esperado.
+   */
+  | 'rankingSnapshot';
 
 type Dictionary = Readonly<Record<StateMachine, Readonly<Record<string, StateLabel>>>>;
 
@@ -316,6 +323,13 @@ export const STATE_LABELS: Dictionary = {
     // ARQUIVO, não que o sistema quebrou -- um PDF de traçado de ECG é
     // ilegível para o extrator e isso é normal, não defeito.
     FAILED: { label: 'Não foi possível ler', tone: 'danger', icon: 'x-circle' },
+  },
+
+  rankingSnapshot: {
+    DRAFT: { label: 'Rascunho', tone: 'info', icon: 'clock' },
+    PUBLISHED: { label: 'Publicado', tone: 'success', icon: 'check-circle' },
+    // NEUTRO, nao danger/warning -- ver o comentario do StateMachine acima.
+    WITHHELD: { label: 'Retido — coorte abaixo do mínimo', tone: 'neutral', icon: 'minus' },
   },
 };
 

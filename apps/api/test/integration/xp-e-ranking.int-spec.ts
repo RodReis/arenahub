@@ -13,6 +13,7 @@ import { AttendanceService } from '../../src/modules/health/attendance.service.j
 import { EngagementXpService } from '../../src/modules/engagement/engagement-xp.service.js';
 import { EngagementRankingService } from '../../src/modules/engagement/engagement-ranking.service.js';
 import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.service.js';
+import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { calcularHashDeCpf } from '../../src/modules/students/domain/identificacao.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
@@ -179,6 +180,54 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
     });
 
     return aluno.id;
+  };
+
+  const cookieDeAcesso = (resposta: request.Response): string => {
+    const cabecalho: unknown = resposta.headers['set-cookie'];
+    const lista: string[] = Array.isArray(cabecalho) ? (cabecalho as string[]) : [];
+
+    return lista.find((c) => c.startsWith('arenahub_access=')) ?? '';
+  };
+
+  /**
+   * Usuario de PAINEL com exatamente as permissoes pedidas -- mesmo padrao
+   * de `billing-http.int-spec.ts`. Task 11: as rotas de placar/XP do painel
+   * sao autenticadas por sessao (cookie), nao pelo HMAC do totem.
+   */
+  const criarUsuarioCom = async (
+    rotulo: string,
+    codigos: readonly string[],
+  ): Promise<string> => {
+    const usuario = await db.user.create({
+      data: {
+        email: `f31-${rotulo}-${sufixo}@exemplo.test`,
+        passwordHash: await app.get(PasswordService).gerarHash('senha-de-teste-f31'),
+      },
+    });
+
+    await db.tenantMembership.create({ data: { tenantId, userId: usuario.id } });
+
+    const papel = await db.role.create({
+      data: { tenantId, name: `PAPEL_${rotulo}_${sufixo}`, isSystem: false },
+    });
+
+    for (const code of codigos) {
+      const permissao = await db.permission.upsert({
+        where: { code },
+        create: { code },
+        update: {},
+      });
+
+      await db.rolePermission.create({ data: { roleId: papel.id, permissionId: permissao.id } });
+    }
+
+    await db.userRole.create({ data: { tenantId, userId: usuario.id, roleId: papel.id } });
+
+    const login = await request(servidor())
+      .post('/api/v1/auth/login')
+      .send({ email: usuario.email, password: 'senha-de-teste-f31' });
+
+    return cookieDeAcesso(login);
   };
 
   beforeAll(async () => {
@@ -650,6 +699,152 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       expect(serializado).not.toContain('studentId');
       // As demais permanecem -- opt-out de um nao esvazia o placar inteiro.
       expect(serializado).toContain('Ana');
+    });
+  });
+
+  /**
+   * Fatia F31, Task 11 -- painel: publicar placar e ajustar XP.
+   *
+   * NAO HA ROTA DE EDICAO: o teste central desta secao prova que o ajuste
+   * GRAVA um movimento novo sem apagar o original (`M5-FR-007`), e que o
+   * mesmo `idempotencyKey` repetido nao duplica (a chave unica do ledger
+   * quem garante, nao um `if` no controller).
+   */
+  describe('painel -- publicar placar e ajustar XP', () => {
+    let cookieModerador: string;
+    let cookieSemPermissao: string;
+
+    beforeAll(async () => {
+      cookieModerador = await criarUsuarioCom('moderador-t11', ['engagement.moderate']);
+      cookieSemPermissao = await criarUsuarioCom('sem-permissao-t11', []);
+    });
+
+    it('sem permissao, 403 ao publicar', async () => {
+      // Mes PROPRIO desta suite (nao '2026-08'): a suite de heartbeat acima
+      // ja publica um snapshot de '2026-08' para este `gymUnitId`, e a chave
+      // unica `(tenantId, gymUnitId, localMonth)` colidiria.
+      const aluno = await criarAluno();
+      await db.studentXpBalance.create({
+        data: {
+          tenantId,
+          studentId: aluno,
+          localMonth: '2026-10',
+          points: 10,
+          entryCount: 1,
+          lastEntryAt: AGORA,
+        },
+      });
+
+      const gerado = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${gymUnitId}/2026-10/gerar`)
+        .set('Cookie', cookieModerador)
+        .expect(201);
+
+      const snapshotId = (gerado.body as { id: string }).id;
+
+      await request(servidor())
+        .post(`/api/v1/engagement/rankings/${snapshotId}/publicar`)
+        .set('Cookie', cookieSemPermissao)
+        .expect(403);
+    });
+
+    it('ajuste exige motivo', async () => {
+      const aluno = await criarAluno();
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/engagement/xp/${aluno}/ajustar`)
+        .set('Cookie', cookieModerador)
+        .send({ pontos: -10, motivo: '', idempotencyKey: randomUUID() })
+        .expect(400);
+
+      expect((resposta.body as { code: string }).code).toBe('VALIDATION_FAILED');
+    });
+
+    /*
+     * `M5-FR-007` e `M5-AC-010`: correcao e movimento compensatorio. Nao ha
+     * rota de edicao, e o movimento original continua no ledger.
+     */
+    it('ajuste grava movimento compensatorio sem apagar o original', async () => {
+      const aluno = await criarAluno();
+
+      await request(servidor())
+        .post(`/api/v1/engagement/xp/${aluno}/ajustar`)
+        .set('Cookie', cookieModerador)
+        .send({ pontos: 30, motivo: 'bonus de evento', idempotencyKey: randomUUID() })
+        .expect(201);
+
+      const original = await db.xpLedgerEntry.findFirstOrThrow({
+        where: { tenantId, studentId: aluno },
+      });
+
+      await request(servidor())
+        .post(`/api/v1/engagement/xp/${aluno}/ajustar`)
+        .set('Cookie', cookieModerador)
+        .send({ pontos: -10, motivo: 'passagem corrigida', idempotencyKey: randomUUID() })
+        .expect(201);
+
+      const movimentos = await db.xpLedgerEntry.findMany({
+        where: { tenantId, studentId: aluno },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      expect(movimentos).toHaveLength(2);
+      expect(movimentos[0]?.id).toBe(original.id);
+      expect(movimentos[1]).toMatchObject({ type: 'ADJUSTMENT', points: -10, reason: 'passagem corrigida' });
+    });
+
+    it('mesmo idempotencyKey nao ajusta duas vezes', async () => {
+      const aluno = await criarAluno();
+      const chave = randomUUID();
+
+      const ajustar = () =>
+        request(servidor())
+          .post(`/api/v1/engagement/xp/${aluno}/ajustar`)
+          .set('Cookie', cookieModerador)
+          .send({ pontos: -10, motivo: 'passagem corrigida', idempotencyKey: chave });
+
+      await ajustar().expect(201);
+      await ajustar().expect(201);
+
+      const total = await db.xpLedgerEntry.count({
+        where: { tenantId, studentId: aluno, type: 'ADJUSTMENT' },
+      });
+
+      expect(total).toBe(1);
+    });
+
+    /* `M5-AC-007`: republicar e recusado -- 409, nao 500. */
+    it('republicar um snapshot ja publicado e 409', async () => {
+      const aluno = await criarAluno();
+      await db.studentXpBalance.create({
+        data: {
+          tenantId,
+          studentId: aluno,
+          localMonth: '2026-09',
+          points: 10,
+          entryCount: 1,
+          lastEntryAt: AGORA,
+        },
+      });
+
+      const gerado = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${gymUnitId}/2026-09/gerar`)
+        .set('Cookie', cookieModerador)
+        .expect(201);
+
+      const snapshotId = (gerado.body as { id: string }).id;
+
+      await request(servidor())
+        .post(`/api/v1/engagement/rankings/${snapshotId}/publicar`)
+        .set('Cookie', cookieModerador)
+        .expect(201);
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${snapshotId}/publicar`)
+        .set('Cookie', cookieModerador)
+        .expect(409);
+
+      expect((resposta.body as { code: string }).code).toBe('RANKING_SNAPSHOT_IMUTAVEL');
     });
   });
 });

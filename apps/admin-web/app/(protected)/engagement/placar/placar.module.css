@@ -1,0 +1,30 @@
+/*
+ * Placar mensal e ajuste de XP -- F31, Task 11.
+ *
+ * Cor, tipografia e raio saem de token `--ah-*` (DS-PAINEL.md): hex literal
+ * é proibido pela lint. Sem tokens de espaçamento no design system ainda
+ * (mesma observação de `reconciliation.module.css`) -- px direto aqui.
+ */
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+.bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-md, 8px);
+  background: var(--ah-surface-raised);
+}
+
+.resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

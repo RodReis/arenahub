@@ -73,8 +73,15 @@ export class FakePortaDeXp implements PortaDeXp {
   private readonly conquistasDesbloqueadas = new Set<string>();
   private readonly conquistasPorAluno: ConquistaDesbloqueada[] = [];
   private readonly optOuts = new Set<string>();
+  /** studentId -> fuso da unidade -- `undefined` = aluno inexistente no dublê. */
+  private readonly fusoPorAluno = new Map<string, string>();
   private colidirNaEscrita = false;
   private proximoId = 1;
+
+  /** So do dublê: registra o fuso da unidade do aluno -- Task 11 (ajuste manual). */
+  comAluno(studentId: string, fusoDaUnidade = 'America/Sao_Paulo'): void {
+    this.fusoPorAluno.set(studentId, fusoDaUnidade);
+  }
 
   comRegra(entrada: RegraDeTeste): void {
     this.regras.push({
@@ -170,6 +177,28 @@ export class FakePortaDeXp implements PortaDeXp {
     }
 
     const movimento = entrada.movimento;
+
+    /*
+     * Mesma chave unica do banco real (`@@unique([tenantId, studentId,
+     * sourceKind, sourceId, ruleVersionId, type])`) -- sem isto o dublê
+     * deixaria passar um segundo `ADJUSTMENT` com o mesmo `idempotencyKey`
+     * (Task 11), e o teste de idempotencia passaria por acidente em vez de
+     * provar a garantia real.
+     */
+    const duplicata = this.ledger.some(
+      (linha) =>
+        linha.studentId === entrada.studentId &&
+        linha.sourceKind === movimento.sourceKind &&
+        linha.sourceId === movimento.sourceId &&
+        linha.ruleVersionId === movimento.ruleVersionId &&
+        linha.type === movimento.type,
+    );
+
+    if (duplicata) {
+      const erroColisao = new Error('Unique constraint failed') as Error & { code: string };
+      erroColisao.code = 'P2002';
+      return Promise.reject(erroColisao);
+    }
     this.ledger.push({
       id: `mov-${this.proximoId++}`,
       studentId: entrada.studentId,
@@ -266,5 +295,14 @@ export class FakePortaDeXp implements PortaDeXp {
           motivo: conquista.motivo,
         })),
     );
+  }
+
+  fusoDoAluno(_contexto: TenantContext, studentId: string): Promise<string | null> {
+    return Promise.resolve(this.fusoPorAluno.get(studentId) ?? null);
+  }
+
+  qualquerVersaoDeRegra(_contexto: TenantContext): Promise<{ id: string } | null> {
+    const regra = this.regras[0];
+    return Promise.resolve(regra ? { id: regra.id } : null);
   }
 }

@@ -117,6 +117,16 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     critério de `device.read` acima.
   */
   { href: '/engagement/aliases', label: 'Moderação de apelido', exigePermissao: 'engagement.read' },
+  /*
+    PLACAR MENSAL E AJUSTE DE XP -- F31, Task 11.
+
+    Mesmo grupo das duas entradas acima: gerar/publicar o placar e ajustar
+    XP e uso esporadico (uma vez por mes, ou quando uma correcao pontual
+    aparece), nao ferramenta de atendimento diario. `engagement.moderate`
+    porque as tres rotas do painel (gerar, publicar, ajustar) exigem essa
+    permissao -- sem ela nao ha nada que a tela deixe fazer.
+  */
+  { href: '/engagement/placar', label: 'Placar e XP', exigePermissao: 'engagement.moderate' },
   { href: '/units', label: 'Unidades' },
 ];
 

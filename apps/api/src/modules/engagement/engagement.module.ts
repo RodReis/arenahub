@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { PersistenceModule } from '../../persistence/persistence.module.js';
 import { EngagementController } from './engagement.controller.js';
+import { EngagementXpController } from './engagement-xp.controller.js';
 import { EngagementRepository, PORTA_DE_ENGAJAMENTO } from './engagement.repository.js';
 import { EngagementService } from './engagement.service.js';
 import { EngagementXpRepository, PORTA_DE_XP } from './engagement-xp.repository.js';
@@ -22,7 +23,7 @@ import { EngagementRankingService } from './engagement-ranking.service.js';
  */
 @Module({
   imports: [PersistenceModule],
-  controllers: [EngagementController],
+  controllers: [EngagementController, EngagementXpController],
   providers: [
     EngagementService,
     EngagementXpService,
