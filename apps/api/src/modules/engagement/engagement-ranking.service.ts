@@ -6,9 +6,30 @@ import { classificar, type SaldoParaClassificar } from './domain/classificacao.j
 import { resolverExposicao } from './domain/exposicao.js';
 import {
   PORTA_DE_RANKING,
+  type ExposicaoDoAluno,
   type PortaDeRanking,
   type SnapshotDeRanking,
 } from './engagement-ranking.repository.js';
+
+/**
+ * TTL do cache do placar AO VIVO -- Emenda de 27/08/2026 (ADR-047).
+ *
+ * 60 s, e o motivo NAO e performance: e o `M5-NFR-003` (opt-out reflete em
+ * ate 15 minutos). O placar nao muda de um jeito perceptivel num minuto, e
+ * 60 s fica bem dentro da janela que o opt-out exige. O ganho de performance
+ * (`M5-NFR-004`, p95 < 500 ms) e consequencia, nao motivo -- o heartbeat do
+ * totem bate a cada 30 s (`INTERVALO_DE_HEARTBEAT_MS`), 2.880 vezes/dia por
+ * totem, e sem cache cada batida varreria `StudentXpBalance` da unidade e
+ * resolveria exposicao de todos os alunos.
+ */
+const TTL_DO_CACHE_AO_VIVO_MS = 60_000;
+
+/** Uma entrada do cache do placar ao vivo -- por processo (memoria
+ * `duble-com-estado-vaza-entre-testes`: instancia nova por teste). */
+interface EntradaDeCache {
+  calculadoEm: number;
+  placar: readonly EntradaPublicaDoPlacar[];
+}
 
 /**
  * O placar como o publico o ve -- SEM `studentId` (M5-AC-001).
@@ -28,6 +49,9 @@ export type { EntradaPublicaDoPlacar };
  */
 @Injectable()
 export class EngagementRankingService {
+  /** Cache em memoria do placar ao vivo, por `(tenantId, gymUnitId, localMonth)`. */
+  private readonly cacheAoVivo = new Map<string, EntradaDeCache>();
+
   constructor(@Inject(PORTA_DE_RANKING) private readonly porta: PortaDeRanking) {}
 
   /**
@@ -113,6 +137,13 @@ export class EngagementRankingService {
    *
    * A posicao NAO e recalculada apos a remocao: quem era 3o continua 3o, e o
    * 2o simplesmente nao aparece. Renumerar exporia por deducao quem saiu.
+   *
+   * NOME ABREVIADO no caminho de primeiro nome (`entrada.nomeAbreviado`,
+   * ja calculado pela porta com `abreviarNome()`) -- `DS-TOTEM.md` §3.4c e
+   * §5.8 exigem nome abreviado em toda tela publica e na area interna do
+   * totem. Apelido APROVADO e o `NOME_ANONIMO` continuam INTEIROS: o aluno
+   * escolheu aquele apelido para aparecer exatamente assim, e ja passou por
+   * moderacao.
    */
   async lerPlacarPublicado(
     contexto: TenantContext,
@@ -129,12 +160,97 @@ export class EngagementRankingService {
       const exposicao = resolverExposicao({
         decisao: entrada.decisao,
         perfil: entrada.perfil,
-        primeiroNome: entrada.primeiroNome,
+        primeiroNome: entrada.nomeAbreviado,
         statusDoAluno: entrada.statusDoAluno,
       });
 
       return exposicao.exibe
         ? [{ position: entrada.position, nomeExibido: exposicao.nome, points: entrada.points }]
+        : [];
+    });
+  }
+
+  /**
+   * O placar do MES CORRENTE, lido ao vivo -- sem gravar snapshot nenhum.
+   * Emenda de 27/08/2026 (ADR-047): publicar o parcial todo dia colidiria
+   * com `M5-AC-007` (snapshot publicado e imutavel), porque o placar do mes
+   * corrente muda a cada treino. Ler ao vivo elimina a colisao em vez de
+   * contornar.
+   *
+   * Faz o que `gerarSnapshot` + `lerPlacarPublicado` fariam juntos, SEM
+   * gravar nada: le os saldos, filtra por `resolverExposicao()`, aplica a
+   * coorte minima e classifica -- na hora, a cada chamada (respeitado o
+   * cache abaixo).
+   *
+   * POSICAO SEM BURACO -- diferente do placar publicado. Ali a posicao vem
+   * CONGELADA do snapshot, e quem sai deixa buraco (1, 3, 4): renumerar
+   * exporia por deducao quem pediu opt-out entre duas leituras. Aqui nao ha
+   * posicao congelada nenhuma de onde deduzir ausencia -- quem esta fora
+   * NUNCA entrou no calculo, e a lista classificada ja nasce sem ele. Os
+   * dois comportamentos sao diferentes DE PROPOSITO; nao "uniformizar".
+   */
+  async placarAoVivo(
+    contexto: TenantContext,
+    gymUnitId: string,
+    localMonth: string,
+    agora: Date,
+  ): Promise<readonly EntradaPublicaDoPlacar[]> {
+    const chave = `${contexto.tenantId}::${gymUnitId}::${localMonth}`;
+    const emCache = this.cacheAoVivo.get(chave);
+
+    if (emCache && agora.getTime() - emCache.calculadoEm < TTL_DO_CACHE_AO_VIVO_MS) {
+      return emCache.placar;
+    }
+
+    const [minimumCohort, saldos] = await Promise.all([
+      this.porta.coorteMinima(contexto),
+      this.porta.saldosDaUnidade(contexto, gymUnitId, localMonth),
+    ]);
+
+    const elegiveis = await this.filtrarElegiveis(contexto, saldos);
+
+    const placar =
+      elegiveis.length < minimumCohort
+        ? []
+        : await this.exposicaoDosClassificados(contexto, elegiveis);
+
+    this.cacheAoVivo.set(chave, { calculadoEm: agora.getTime(), placar });
+
+    return placar;
+  }
+
+  /** Classifica os saldos elegiveis e resolve o nome exibido de cada um --
+   * compartilhado por `placarAoVivo`. Os alunos ja passaram por
+   * `filtrarElegiveis`, entao `resolverExposicao` aqui sempre resulta em
+   * `exibe: true`; ele roda de novo so para obter o NOME (apelido x primeiro
+   * nome x anonimo), que `filtrarElegiveis` descarta de proposito. */
+  private async exposicaoDosClassificados(
+    contexto: TenantContext,
+    elegiveis: readonly SaldoParaClassificar[],
+  ): Promise<readonly EntradaPublicaDoPlacar[]> {
+    const posicoes = classificar(elegiveis);
+
+    const exposicoes = await this.porta.exposicaoDosAlunos(
+      contexto,
+      posicoes.map((posicao) => posicao.studentId),
+    );
+    const exposicaoPorAluno = new Map<string, ExposicaoDoAluno>(
+      exposicoes.map((exposicao) => [exposicao.studentId, exposicao]),
+    );
+
+    return posicoes.flatMap((posicao) => {
+      const dados = exposicaoPorAluno.get(posicao.studentId);
+      if (!dados) return [];
+
+      const exposicao = resolverExposicao({
+        decisao: dados.decisao,
+        perfil: dados.perfil,
+        primeiroNome: dados.nomeAbreviado,
+        statusDoAluno: dados.statusDoAluno,
+      });
+
+      return exposicao.exibe
+        ? [{ position: posicao.position, nomeExibido: exposicao.nome, points: posicao.points }]
         : [];
     });
   }
@@ -155,6 +271,55 @@ export class EngagementRankingService {
 
     const placar = await this.lerPlacarPublicado(contexto, gymUnitId, localMonth);
     return placar.find((item) => item.position === entrada.position) ?? null;
+  }
+
+  /**
+   * Posicao de UM aluno no placar AO VIVO do mes corrente -- a area interna
+   * do totem ("Meu XP", `DS-TOTEM.md` §5.8) usa isto, nao `posicaoDoAluno`:
+   * o mes corrente nunca tem snapshot publicado (Emenda de 27/08/2026), e
+   * `posicaoDoAluno` so enxerga snapshot.
+   *
+   * NAO usa o cache de `placarAoVivo` -- essa chamada e por SESSAO de aluno
+   * na area interna do totem (rara: uma pessoa entrando na propria area),
+   * bem diferente do heartbeat de 30 s que justifica o cache. Ler
+   * `saldosDaUnidade` direto aqui mantem o metodo simples sem espalhar o
+   * cache do hero publico para um caminho com padrao de chamada diferente.
+   *
+   * `null` se o proprio aluno esta em opt-out, inativo, ou a coorte nao
+   * alcanca o minimo -- SEM excecao para o titular: `resolverExposicao`
+   * roda para ele igual roda para qualquer outro (mesma regra de
+   * `posicaoDoAluno`).
+   */
+  async posicaoAoVivoDoAluno(
+    contexto: TenantContext,
+    gymUnitId: string,
+    localMonth: string,
+    studentId: string,
+  ): Promise<EntradaPublicaDoPlacar | null> {
+    const [minimumCohort, saldos, [exposicao]] = await Promise.all([
+      this.porta.coorteMinima(contexto),
+      this.porta.saldosDaUnidade(contexto, gymUnitId, localMonth),
+      this.porta.exposicaoDosAlunos(contexto, [studentId]),
+    ]);
+
+    if (!exposicao) return null;
+
+    const elegiveis = await this.filtrarElegiveis(contexto, saldos);
+    if (elegiveis.length < minimumCohort) return null;
+
+    const minha = classificar(elegiveis).find((posicao) => posicao.studentId === studentId);
+    if (!minha) return null;
+
+    const resultado = resolverExposicao({
+      decisao: exposicao.decisao,
+      perfil: exposicao.perfil,
+      primeiroNome: exposicao.nomeAbreviado,
+      statusDoAluno: exposicao.statusDoAluno,
+    });
+
+    return resultado.exibe
+      ? { position: minha.position, nomeExibido: resultado.nome, points: minha.points }
+      : null;
   }
 
   /**

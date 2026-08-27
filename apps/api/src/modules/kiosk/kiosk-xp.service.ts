@@ -55,7 +55,9 @@ export class KioskXpService {
 
     const [extrato, entradaDoPlacar] = await Promise.all([
       this.xp.obterExtratoCompleto(aluno.contexto, aluno.studentId, mes),
-      this.ranking.posicaoDoAluno(aluno.contexto, gymUnitIdDoAluno(aluno), mes, aluno.studentId),
+      // AO VIVO, nao publicado -- Emenda de 27/08/2026 (ADR-047): o mes
+      // corrente nunca tem snapshot, so o job mensal fecha o mes anterior.
+      this.ranking.posicaoAoVivoDoAluno(aluno.contexto, gymUnitIdDoAluno(aluno), mes, aluno.studentId),
     ]);
 
     return { ...extrato, posicao: entradaDoPlacar?.position ?? null };

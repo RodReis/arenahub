@@ -176,10 +176,15 @@ export class KioskConfigService {
    * dobraria a latencia de um heartbeat que roda a cada 30 segundos.
    *
    * O PLACAR chega AQUI, ja com os nomes resolvidos no servidor por
-   * `EngagementRankingService.lerPlacarPublicado` -- nunca `studentId`
+   * `EngagementRankingService.placarAoVivo` -- nunca `studentId`
    * (`blocos-publicos.tsx`, F51, trava estrutural). Modulo `xp` desligado ou
-   * placar retido/nao publicado devolve lista vazia, nunca ausente: o bloco
+   * coorte abaixo do minimo devolve lista vazia, nunca ausente: o bloco
    * some do rodizio, nao aparece cinza nem vazio.
+   *
+   * AO VIVO, nao snapshot publicado -- Emenda de 27/08/2026 (ADR-047): o
+   * hero mostra o MES CORRENTE, sempre atualizado, e nao republica nada.
+   * `placarAoVivo` tem cache proprio de 60 s; nada aqui precisa se preocupar
+   * com o heartbeat de 30 s bater rapido demais.
    */
   async contarIndicadores(
     contexto: ContextoDoKiosk,
@@ -214,13 +219,14 @@ export class KioskConfigService {
       allowedUnitIds: new Set([contexto.gymUnitId]),
     };
 
-    const placar = await this.ranking.lerPlacarPublicado(
+    const placar = await this.ranking.placarAoVivo(
       tenantContext,
       contexto.gymUnitId,
       mesLocal(agora, FUSO_DA_ACADEMIA),
+      agora,
     );
 
-    // `lerPlacarPublicado` devolve `readonly [...]`; `IndicadoresDaUnidade`
+    // `placarAoVivo` devolve `readonly [...]`; `IndicadoresDaUnidade`
     // (Zod) infere array mutavel -- copia rasa so para casar o tipo, sem
     // mudar o conteudo.
     return [...placar];

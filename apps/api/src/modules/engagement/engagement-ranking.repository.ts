@@ -5,7 +5,7 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import type { SaldoParaClassificar } from './domain/classificacao.js';
 import type { DecisaoDeEngajamento } from './domain/participacao.js';
-import type { IdentidadeEscolhida, StatusDoPerfilPublico } from './domain/exposicao.js';
+import { abreviarNome, type IdentidadeEscolhida, type StatusDoPerfilPublico } from './domain/exposicao.js';
 
 /** Token de injecao da porta -- o modulo Nest liga isto ao repositorio Prisma. */
 export const PORTA_DE_RANKING = Symbol('PortaDeRanking');
@@ -33,7 +33,9 @@ export interface EntradaComExposicao {
   points: number;
   decisao: DecisaoDeEngajamento | null;
   perfil: PerfilPublicoParaExposicao | null;
-  primeiroNome: string;
+  /** JA abreviado ("Ana S.") -- `DS-TOTEM.md` §3.4c/§5.8, nomes sempre
+   * abreviados em tela publica e na area interna do totem. */
+  nomeAbreviado: string;
   statusDoAluno: StudentStatus;
 }
 
@@ -53,6 +55,28 @@ export interface ElegibilidadeDoAluno {
   statusDoAluno: StudentStatus;
 }
 
+/** Exposicao completa de um aluno especifico -- usado pelo placar AO VIVO
+ * (`placarAoVivo`), que nao tem snapshot de onde tirar nome/perfil como
+ * `entradasComExposicao` tira. Mesmos campos, so que indexado por
+ * `studentId` em vez de vir amarrado a uma linha de snapshot. */
+export interface ExposicaoDoAluno {
+  studentId: string;
+  decisao: DecisaoDeEngajamento | null;
+  perfil: PerfilPublicoParaExposicao | null;
+  /** JA abreviado ("Ana S.") -- mesma razao de `EntradaComExposicao.nomeAbreviado`. */
+  nomeAbreviado: string;
+  statusDoAluno: StudentStatus;
+}
+
+/** Uma unidade ativa e o fuso dela -- o que o job de fechamento mensal
+ * (`EngagementRankingSchedulerService`) precisa para varrer todo tenant/
+ * unidade e decidir, por unidade, qual e o `localMonth` anterior. */
+export interface UnidadeParaFechamento {
+  tenantId: string;
+  gymUnitId: string;
+  timezone: string;
+}
+
 /**
  * Gera, retem, publica e le o placar mensal.
  *
@@ -60,6 +84,11 @@ export interface ElegibilidadeDoAluno {
  * arquitetura no 2) -- inclusive nos metodos so-leitura. Porta PROPRIA,
  * separada de `PortaDeXp`: o placar precisa dos saldos de TODOS os alunos da
  * unidade num mes, e `PortaDeXp.saldoDoAluno` devolve um so aluno por vez.
+ *
+ * EXCECAO: `unidadesAtivasComTimezone` NAO recebe `TenantContext` -- e uma
+ * varredura entre TODOS os tenants, o mesmo padrao de
+ * `OperationsRepository.listarTenantsAtivos` (F11): quem chama e um JOB de
+ * sistema, sem ator autenticado de tenant nenhum.
  */
 export interface PortaDeRanking {
   coorteMinima(contexto: TenantContext): Promise<number>;
@@ -91,6 +120,11 @@ export interface PortaDeRanking {
     contexto: TenantContext,
     snapshotId: string,
   ): Promise<readonly EntradaComExposicao[]>;
+  exposicaoDosAlunos(
+    contexto: TenantContext,
+    studentIds: readonly string[],
+  ): Promise<readonly ExposicaoDoAluno[]>;
+  unidadesAtivasComTimezone(): Promise<readonly UnidadeParaFechamento[]>;
 }
 
 /** O que `salvarSnapshot` grava -- posicoes ja classificadas por `classificar()`. */
@@ -359,15 +393,66 @@ export class EngagementRankingRepository implements PortaDeRanking {
             identidade: entrada.student.publicProfile.identityChoice,
           }
         : null,
-      primeiroNome: primeiroNomeDe(entrada.student.fullName),
+      nomeAbreviado: abreviarNome(entrada.student.fullName),
       statusDoAluno: entrada.student.status,
     }));
   }
-}
 
-/** Primeiro nome, a partir do nome completo -- mesma extracao de `engagement.service.ts`. */
-function primeiroNomeDe(fullName: string): string {
-  return fullName.trim().split(/\s+/u)[0] ?? fullName;
+  /**
+   * Exposicao completa (nome, perfil, decisao, status) dos `studentIds`
+   * dados -- SEM snapshot, para o placar AO VIVO (`EngagementRankingService.
+   * placarAoVivo`, Emenda de 27/08/2026). Mesma forma de `entradasComExposicao`,
+   * so que a fonte da lista de alunos e o array dado, nao as linhas de um
+   * snapshot ja gravado.
+   */
+  async exposicaoDosAlunos(
+    contexto: TenantContext,
+    studentIds: readonly string[],
+  ): Promise<readonly ExposicaoDoAluno[]> {
+    if (studentIds.length === 0) return [];
+
+    const [alunos, decisaoPorAluno] = await Promise.all([
+      this.db.student.findMany({
+        where: { tenantId: contexto.tenantId, id: { in: [...studentIds] } },
+        select: { id: true, fullName: true, status: true, publicProfile: true },
+      }),
+      this.decisaoDeRankingPorAluno(contexto, studentIds),
+    ]);
+
+    return alunos.map((aluno) => ({
+      studentId: aluno.id,
+      decisao: decisaoPorAluno.get(aluno.id) ?? null,
+      perfil: aluno.publicProfile
+        ? {
+            alias: aluno.publicProfile.alias,
+            status: aluno.publicProfile.status,
+            identidade: aluno.publicProfile.identityChoice,
+          }
+        : null,
+      nomeAbreviado: abreviarNome(aluno.fullName),
+      statusDoAluno: aluno.status,
+    }));
+  }
+
+  /**
+   * Todas as unidades de tenant ATIVO, com o fuso de cada uma -- o job de
+   * fechamento mensal (`EngagementRankingSchedulerService`) usa isto para
+   * varrer e decidir, por unidade, qual e o `localMonth` ANTERIOR no fuso
+   * DELA. Mesmo padrao de `OperationsRepository.listarTenantsAtivos` (F11):
+   * sem `TenantContext`, e uma varredura de sistema.
+   */
+  async unidadesAtivasComTimezone(): Promise<readonly UnidadeParaFechamento[]> {
+    const unidades = await this.db.gymUnit.findMany({
+      where: { tenant: { status: 'ACTIVE' } },
+      select: { tenantId: true, id: true, timezone: true },
+    });
+
+    return unidades.map((unidade) => ({
+      tenantId: unidade.tenantId,
+      gymUnitId: unidade.id,
+      timezone: unidade.timezone,
+    }));
+  }
 }
 
 /** Converte a linha do Prisma (com `entries` incluidas) para `SnapshotDeRanking`. */

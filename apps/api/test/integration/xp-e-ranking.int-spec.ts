@@ -11,7 +11,6 @@ import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.j
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { AttendanceService } from '../../src/modules/health/attendance.service.js';
 import { EngagementXpService } from '../../src/modules/engagement/engagement-xp.service.js';
-import { EngagementRankingService } from '../../src/modules/engagement/engagement-ranking.service.js';
 import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.service.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { calcularHashDeCpf } from '../../src/modules/students/domain/identificacao.js';
@@ -66,8 +65,6 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
 
     return aluno.id;
   };
-
-  let ranking: EngagementRankingService;
 
   type Totem = {
     tenantId: string;
@@ -240,7 +237,6 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
     db = app.get(PrismaService);
     servico = app.get(EngagementXpService);
     frequencia = app.get(AttendanceService);
-    ranking = app.get(EngagementRankingService);
 
     const tenant = await db.tenant.create({
       data: {
@@ -618,8 +614,27 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
   });
 
   describe('POST heartbeat -- placar publico', () => {
-    /** Publica um placar PUBLICADO com os cinco alunos dados, com nome civil distinguivel. */
-    const placarPublicadoCom = async (
+    /**
+     * O heartbeat le o placar AO VIVO (Emenda de 27/08/2026, ADR-047) com o
+     * `agora` REAL do controller (`new Date()`), nao o `AGORA` fixo desta
+     * suite -- entao o saldo tem de cair no mes CORRENTE de verdade, e nao
+     * num snapshot publicado (que so existe para mes FECHADO agora).
+     */
+    const mesCorrente = (): string => {
+      const formatador = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+
+      return formatador.format(new Date()).slice(0, 7);
+    };
+
+    /** Grava saldo de XP direto (sem snapshot) para os alunos dados, com nome
+     * civil distinguivel -- o placar AO VIVO le `StudentXpBalance`, nunca
+     * snapshot, para o mes corrente. */
+    const placarAoVivoCom = async (
       nomes: readonly string[],
     ): Promise<Record<string, string>> => {
       const idPorNome: Record<string, string> = {};
@@ -637,29 +652,13 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
           data: {
             tenantId: totem.tenantId,
             studentId: aluno,
-            localMonth: '2026-08',
+            localMonth: mesCorrente(),
             points: pontos,
             entryCount: 1,
-            lastEntryAt: new Date('2026-08-20T12:00:00.000Z'),
+            lastEntryAt: new Date(),
           },
         });
       }
-
-      const contextoDoTotem: TenantContext = {
-        tenantId: totem.tenantId,
-        actorId: 'system-f31-task9',
-        sessionId: randomUUID(),
-        permissions: new Set(),
-        allowedUnitIds: 'ALL',
-      };
-
-      const snapshot = await ranking.gerarSnapshot(
-        contextoDoTotem,
-        totem.gymUnitId,
-        '2026-08',
-        new Date('2026-08-20T12:00:00.000Z'),
-      );
-      await ranking.publicar(contextoDoTotem, snapshot.id, new Date('2026-08-20T12:00:00.000Z'));
 
       return idPorNome;
     };
@@ -687,7 +686,7 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
     };
 
     it('entrega o placar ja sem quem pediu opt-out, e sem studentId', async () => {
-      const idPorNome = await placarPublicadoCom(['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa']);
+      const idPorNome = await placarAoVivoCom(['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa']);
       await optOut(idPorNome['Bruno']!);
 
       const resposta = await heartbeat().expect(200);

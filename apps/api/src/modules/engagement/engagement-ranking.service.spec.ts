@@ -185,7 +185,8 @@ describe('EngagementRankingService.lerPlacarPublicado', () => {
     const nome = placar[0]?.nomeExibido;
 
     expect(nome).not.toBe('ApelidoNaoAprovado');
-    expect(nome).toBe('Ana');
+    // Nome civil "Ana Sobrenome Teste" abreviado -- DS-TOTEM.md §3.4c.
+    expect(nome).toBe('Ana S.');
   });
 
   /*
@@ -256,7 +257,8 @@ describe('EngagementRankingService.posicaoDoAluno', () => {
 
     const posicao = await servico.posicaoDoAluno(CTX, 'unidade-1', MES, 'bruno');
 
-    expect(posicao).toEqual({ position: 2, nomeExibido: 'Bruno', points: 20 });
+    // Nome civil "Bruno Sobrenome Teste" abreviado -- DS-TOTEM.md §3.4c/§5.8.
+    expect(posicao).toEqual({ position: 2, nomeExibido: 'Bruno S.', points: 20 });
   });
 
   /*
@@ -268,6 +270,229 @@ describe('EngagementRankingService.posicaoDoAluno', () => {
     fake.comOptOut('bruno');
 
     const posicao = await servico.posicaoDoAluno(CTX, 'unidade-1', MES, 'bruno');
+
+    expect(posicao).toBeNull();
+  });
+});
+
+/**
+ * `placarAoVivo` -- Emenda de 27/08/2026 (ADR-047). Mesmas garantias de
+ * `lerPlacarPublicado` (coorte, opt-out, inatividade, apelido, sem
+ * `studentId`), so que SEM snapshot -- e com um cache que o teste tem que
+ * provar contando chamadas ao repositorio, nao so observando o resultado.
+ */
+describe('EngagementRankingService.placarAoVivo', () => {
+  let fake: FakePortaDeRanking;
+  let servico: EngagementRankingService;
+
+  beforeEach(() => {
+    fake = new FakePortaDeRanking();
+    servico = new EngagementRankingService(fake);
+  });
+
+  /** Popula `quantidade` alunos com nome civil `Nome N Sobrenome Teste`,
+   * cada um com o proprio saldo -- suficiente para as asserções de
+   * ordem/coorte, sem precisar de apelido nem opt-out. */
+  function comAlunos(quantidade: number): void {
+    const saldos = saldosDeAlunos(quantidade);
+    fake.comSaldos('unidade-1', MES, saldos);
+    for (const saldo of saldos) {
+      fake.comAluno(saldo.studentId, `${capitalizar(saldo.studentId)} Sobrenome Teste`);
+    }
+  }
+
+  function capitalizar(texto: string): string {
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+
+  it('coorte abaixo do minimo devolve lista vazia', async () => {
+    fake.comCoorteMinima(5);
+    comAlunos(4);
+
+    const placar = await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+
+    expect(placar).toEqual([]);
+  });
+
+  it('aluno em opt-out nao aparece E nao conta na coorte', async () => {
+    fake.comCoorteMinima(5);
+    comAlunos(5);
+    fake.comOptOut('aluno-1');
+
+    // So 4 elegiveis restam depois do opt-out -- abaixo do minimo de 5.
+    const placar = await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+
+    expect(placar).toEqual([]);
+  });
+
+  it('aluno inativo nao aparece', async () => {
+    fake.comCoorteMinima(1);
+    comAlunos(2);
+    fake.comAlunoInativo('aluno-1');
+
+    const placar = await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+
+    expect(placar.map((e) => e.nomeExibido)).not.toContain('Aluno-1 S.');
+    expect(placar).toHaveLength(1);
+  });
+
+  it('apelido pendente nao vaza -- so APPROVED vira nome', async () => {
+    fake.comCoorteMinima(1);
+    comAlunos(1);
+    fake.comApelidoPendente('aluno-1', 'ApelidoNaoAprovado');
+
+    const placar = await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+
+    // Nome civil "Aluno-1 Sobrenome Teste" abreviado -- DS-TOTEM.md §3.4c.
+    expect(placar[0]?.nomeExibido).toBe('Aluno-1 S.');
+  });
+
+  it('apelido aprovado aparece inteiro, sem abreviar', async () => {
+    fake.comCoorteMinima(1);
+    comAlunos(1);
+    fake.comApelidoAprovado('aluno-1', 'Aninha');
+
+    const placar = await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+
+    expect(placar[0]?.nomeExibido).toBe('Aninha');
+  });
+
+  it('o DTO nao contem studentId', async () => {
+    fake.comCoorteMinima(1);
+    comAlunos(1);
+
+    const serializado = JSON.stringify(await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA));
+
+    expect(serializado).not.toContain('studentId');
+    expect(serializado).not.toContain('Sobrenome Teste');
+  });
+
+  it('ordem deterministica com entrada embaralhada', async () => {
+    fake.comCoorteMinima(1);
+    const saldos = [
+      { studentId: 'aluno-3', points: 10, lastEntryAt: AGORA },
+      { studentId: 'aluno-1', points: 30, lastEntryAt: AGORA },
+      { studentId: 'aluno-2', points: 20, lastEntryAt: AGORA },
+    ];
+    fake.comSaldos('unidade-1', MES, saldos);
+
+    const placar = await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+
+    expect(placar.map((e) => e.points)).toEqual([30, 20, 10]);
+    expect(placar.map((e) => e.position)).toEqual([1, 2, 3]);
+  });
+
+  /*
+   * POSICAO SEM BURACO -- ao contrario do placar PUBLICADO. Aqui quem esta
+   * em opt-out nunca entra no calculo, entao a lista classificada ja nasce
+   * sem buraco: 1, 2, 3, nao 1, 3, 4.
+   */
+  it('posicao sem buraco quando alguem esta em opt-out', async () => {
+    fake.comCoorteMinima(1);
+    comAlunos(3);
+    fake.comOptOut('aluno-2');
+
+    const placar = await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+
+    expect(placar.map((e) => e.position)).toEqual([1, 2]);
+  });
+
+  /*
+   * O CASO DO CACHE. Duas chamadas dentro do TTL (60 s) fazem UMA leitura no
+   * repositorio; depois do TTL, a proxima chamada le de novo. `agora` entra
+   * por parametro -- o teste nao espera um minuto real.
+   */
+  describe('cache', () => {
+    it('duas chamadas dentro do TTL leem o repositorio uma vez so', async () => {
+      fake.comCoorteMinima(1);
+      comAlunos(1);
+
+      await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+      await servico.placarAoVivo(CTX, 'unidade-1', MES, new Date(AGORA.getTime() + 30_000));
+
+      expect(fake.chamadasASaldosDaUnidade).toBe(1);
+    });
+
+    it('depois do TTL, a proxima chamada le o repositorio de novo', async () => {
+      fake.comCoorteMinima(1);
+      comAlunos(1);
+
+      await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+      await servico.placarAoVivo(CTX, 'unidade-1', MES, new Date(AGORA.getTime() + 60_000));
+
+      expect(fake.chamadasASaldosDaUnidade).toBe(2);
+    });
+
+    it('TTL e por (tenant, unidade, mes) -- outra unidade nao reaproveita o cache', async () => {
+      fake.comCoorteMinima(1);
+      comAlunos(1);
+      fake.comSaldos('unidade-2', MES, saldosDeAlunos(1));
+
+      await servico.placarAoVivo(CTX, 'unidade-1', MES, AGORA);
+      await servico.placarAoVivo(CTX, 'unidade-2', MES, AGORA);
+
+      expect(fake.chamadasASaldosDaUnidade).toBe(2);
+    });
+  });
+});
+
+/**
+ * `posicaoAoVivoDoAluno` -- a area interna do totem (`DS-TOTEM.md` §5.8)
+ * consulta a PROPRIA posicao no mes corrente, que nunca tem snapshot
+ * publicado desde a Emenda de 27/08/2026.
+ */
+describe('EngagementRankingService.posicaoAoVivoDoAluno', () => {
+  let fake: FakePortaDeRanking;
+  let servico: EngagementRankingService;
+
+  beforeEach(() => {
+    fake = new FakePortaDeRanking();
+    servico = new EngagementRankingService(fake);
+    fake.comCoorteMinima(1);
+  });
+
+  function comAlunos(quantidade: number): void {
+    const saldos = saldosDeAlunos(quantidade);
+    fake.comSaldos('unidade-1', MES, saldos);
+    for (const saldo of saldos) {
+      fake.comAluno(saldo.studentId, `${capitalizar(saldo.studentId)} Sobrenome Teste`);
+    }
+  }
+
+  function capitalizar(texto: string): string {
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+
+  it('devolve a propria posicao, com o nome abreviado', async () => {
+    comAlunos(3);
+
+    const posicao = await servico.posicaoAoVivoDoAluno(CTX, 'unidade-1', MES, 'aluno-2');
+
+    expect(posicao).toEqual({ position: 2, nomeExibido: 'Aluno-2 S.', points: 20 });
+  });
+
+  it('devolve null quando o proprio aluno esta em opt-out', async () => {
+    comAlunos(3);
+    fake.comOptOut('aluno-2');
+
+    const posicao = await servico.posicaoAoVivoDoAluno(CTX, 'unidade-1', MES, 'aluno-2');
+
+    expect(posicao).toBeNull();
+  });
+
+  it('devolve null quando a coorte nao alcanca o minimo', async () => {
+    fake.comCoorteMinima(5);
+    comAlunos(2);
+
+    const posicao = await servico.posicaoAoVivoDoAluno(CTX, 'unidade-1', MES, 'aluno-1');
+
+    expect(posicao).toBeNull();
+  });
+
+  it('devolve null para aluno sem saldo no mes', async () => {
+    comAlunos(3);
+
+    const posicao = await servico.posicaoAoVivoDoAluno(CTX, 'unidade-1', MES, 'aluno-inexistente');
 
     expect(posicao).toBeNull();
   });
