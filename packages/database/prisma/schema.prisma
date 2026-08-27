@@ -270,12 +270,32 @@ enum StudentTimelineEventType {
   @@map("student_timeline_event_type")
 }
 
+/// Finalidade do documento de consentimento.
+///
+/// ATENCAO AO REGIME: `BIOMETRIC`, `HEALTH` e `AI_ANALYSIS` sao OPT-IN --
+/// sem linha aceita, nao autoriza. As quatro finalidades de ENGAJAMENTO sao
+/// OPT-OUT: sem linha, o aluno PARTICIPA (ADR-046, decisao do PI em
+/// 26/08/2026). A mesma tabela guarda os dois regimes, e o predicado de
+/// cada um vive separado -- `modules/privacy` para o primeiro,
+/// `modules/engagement/domain/participacao.ts` para o segundo.
 enum ConsentDocumentType {
   BIOMETRIC
 
   HEALTH
 
   AI_ANALYSIS
+
+  /// Aparecer em ranking. OPT-OUT.
+  RANKING
+
+  /// Participar de desafio. OPT-OUT. DORMENTE ate a F34.
+  CHALLENGE
+
+  /// Receber notificacao de engajamento. OPT-OUT. DORMENTE: nao ha app.
+  ENGAGEMENT_PUSH
+
+  /// Aparecer em ranking de evolucao fisica. OPT-OUT. DORMENTE ate a F33.
+  PHYSICAL_EVOLUTION_RANKING
 
   @@map("consent_document_type")
 }
@@ -592,6 +612,8 @@ model Tenant {
   assessmentImports    AssessmentImport[]
   importedFields       ImportedField[]
 
+  publicProfiles PublicProfile[]
+
   @@map("tenants")
 }
 
@@ -669,6 +691,7 @@ model User {
   requestedAiAnalyses   AiAnalysis[]           @relation("AiAnalysisRequester")
   uploadedImports       AssessmentImport[]     @relation("ImportUploader")
   reviewedImports       AssessmentImport[]     @relation("ImportReviewer")
+  moderatedProfiles     PublicProfile[]
 
   @@map("users")
 }
@@ -968,6 +991,7 @@ model Student {
   familyMemberships     FamilyMember[]
   invoices              Invoice[]
   accountCredits        AccountCredit[]
+  publicProfile         PublicProfile?
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -4017,4 +4041,81 @@ model ImportedField {
   @@index([importId, state])
   @@index([importId, agreesWithFieldId])
   @@map("imported_fields")
+}
+
+/// Estado de moderacao do apelido publico.
+enum PublicProfileStatus {
+  /// Aguardando moderacao. Enquanto isso, o aluno aparece pelo primeiro nome.
+  PENDING
+  APPROVED
+  REJECTED
+  /// Ocultado depois de aprovado -- denuncia, revisao, mudanca de politica.
+  HIDDEN
+
+  @@map("public_profile_status")
+}
+
+/// Como o aluno escolheu aparecer.
+enum PublicIdentityChoice {
+  PRIMEIRO_NOME
+  APELIDO
+  ANONIMO
+
+  @@map("public_identity_choice")
+}
+
+/// Razao CATEGORIZADA de recusa. Enum, nunca texto livre: texto livre vira
+/// PII e vira inconsistencia entre moderadores.
+enum AliasRejectionReason {
+  OFENSIVO
+  CONTEM_PII
+  IMPERSONACAO
+  SPAM_OU_PROPAGANDA
+  ILEGIVEL
+
+  @@map("alias_rejection_reason")
+}
+
+/// Identidade publica do aluno no engajamento.
+///
+/// SEPARADA do cadastro civil de proposito: `Student.name` e nome legal e
+/// nunca vira apelido publico por acidente. Uma linha por aluno por tenant;
+/// a ausencia dela significa "aparece pelo primeiro nome".
+model PublicProfile {
+  id              String                @id @default(uuid()) @db.Uuid
+  tenantId        String                @map("tenant_id") @db.Uuid
+  /// `@unique` sozinho (alem do composto `[tenantId, studentId]` abaixo):
+  /// exigencia do Prisma para relacao um-para-um com `Student.publicProfile`.
+  /// Nao muda o dado -- aluno pertence a um so tenant, entao unico em
+  /// `studentId` e unico em `[tenantId, studentId]` colapsam na mesma regra.
+  studentId       String                @unique @map("student_id") @db.Uuid
+  identityChoice  PublicIdentityChoice  @default(PRIMEIRO_NOME) @map("identity_choice")
+  /// Como o aluno digitou. Exibido so quando `status = APPROVED`.
+  alias           String?
+  /// Forma canonica (NFKC, minuscula, sem invisivel) -- alimenta o indice
+  /// parcial de unicidade. Ver `triagem-de-alias.ts`.
+  aliasNormalized String?               @map("alias_normalized")
+  status          PublicProfileStatus   @default(PENDING)
+  /// Codigos de sinal da triagem, para o moderador priorizar. Array de
+  /// `SinalDeAlias`. NUNCA guarda o motivo em texto livre.
+  screeningSignals String[]             @default([]) @map("screening_signals")
+  rejectionReason AliasRejectionReason? @map("rejection_reason")
+  moderatedBy     String?               @map("moderated_by") @db.Uuid
+  moderatedAt     DateTime?             @map("moderated_at")
+  /// Compare-and-swap: o cliente manda a versao que leu, e a escrita falha
+  /// se outra edicao passou no meio.
+  version         Int                   @default(1)
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  moderator User?   @relation(fields: [moderatedBy], references: [id])
+
+  /// Unicidade do alias vive em INDICE PARCIAL sobre `APPROVED`, escrito a
+  /// mao na migracao: Prisma nao expressa `WHERE` em @@unique. Indice total
+  /// recusaria o segundo PENDING legitimo antes de um moderador olhar.
+  @@unique([tenantId, studentId])
+  @@index([tenantId, status, createdAt])
+  @@map("public_profiles")
 }
