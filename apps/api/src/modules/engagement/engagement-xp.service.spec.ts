@@ -80,4 +80,42 @@ describe('EngagementXpService.sincronizarXp', () => {
 
     expect((await servico.sincronizarXp(contexto, 'aluno-1', AGORA)).saldoDoMes).toBe(10);
   });
+
+  /*
+   * `M5-FR-006`: conquista sai de fato VERIFICADO. A GRANT original de uma
+   * sessao estornada permanece no ledger (append-only), mas o REVERSAL que
+   * a anula tem de contar contra o marco -- senao a contagem fica presa no
+   * numero antigo mesmo apos a correcao.
+   */
+  it('sessao revertida nao conta para o marco', async () => {
+    const sessaoEm = (indice: number) => ({
+      id: `s${indice}`,
+      occurredAt: new Date(`2026-08-${String(indice).padStart(2, '0')}T12:00:00Z`),
+      fusoDaUnidade: 'America/Sao_Paulo',
+    });
+    const dezSessoes = Array.from({ length: 10 }, (_valor, indice) => sessaoEm(indice + 1));
+
+    fake.comRegra({ points: 10 });
+    fake.comDefinicoes([
+      { id: 'd1', code: 'dez-treinos', version: 1, title: '10 treinos', criterionKind: 'SESSOES_ACUMULADAS', threshold: 10 },
+    ]);
+    // So 9 das 10 sessoes na primeira rodada -- o marco de 10 NAO desbloqueia
+    // ainda. Se as 10 entrassem de uma vez, o desbloqueio aconteceria ANTES
+    // da reversao, e "revogar conquista ja desbloqueada" e escopo da Task 11
+    // (`reverse-achievement`), fora desta correcao.
+    fake.comSessoes(dezSessoes.slice(0, 9));
+    await servico.sincronizarXp(contexto, 'aluno-1', AGORA);
+    expect(await fake.conquistasDoAluno(contexto, 'aluno-1')).not.toContain('d1');
+
+    // Estorna uma das 9 e adiciona uma decima nova: bruto chegaria a "10
+    // GRANT historicas", liquido continua em 9 validas.
+    fake.reverterSessao('s1');
+    fake.comSessoes([sessaoEm(10)]);
+
+    await servico.sincronizarXp(contexto, 'aluno-1', AGORA);
+
+    // Com 9 sessoes validas (10 GRANT - 1 revertida), o marco de 10 continua
+    // fechado.
+    expect(await fake.conquistasDoAluno(contexto, 'aluno-1')).not.toContain('d1');
+  });
 });

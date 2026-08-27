@@ -32,13 +32,24 @@ export interface ConquistaParaGravar {
   evidenceEntryId: string;
 }
 
-/** Movimento do ledger, na forma minima que `somarSaldo`/`avaliarConquistas` consomem. */
+/**
+ * Movimento do ledger, na forma minima que `somarSaldo`/`avaliarConquistas`
+ * consomem.
+ *
+ * `sourceId` e `reversesEntryId` existem para a contagem LIQUIDA de sessao:
+ * um `REVERSAL` nao apaga a `GRANT` original (ledger append-only), entao
+ * quem conta evidencia de conquista precisa casar o `REVERSAL` com o `id` da
+ * `GRANT` que ele anula (via `reversesEntryId`) para descontar aquele
+ * `sourceId` da contagem.
+ */
 export interface MovimentoDoLedger {
   id: string;
   points: number;
   localMonth: string;
   type: 'GRANT' | 'ADJUSTMENT' | 'REVERSAL';
   sourceKind: 'ATTENDANCE_SESSION' | 'MANUAL_ADJUSTMENT';
+  sourceId: string;
+  reversesEntryId: string | null;
 }
 
 /** Politica de agrupamento de sessao vigente -- ver `StudentAttendanceSession.policyVersion`. */
@@ -78,12 +89,18 @@ export class EngagementXpRepository implements PortaDeXp {
   }
 
   /**
-   * As sessoes que ainda nao geraram movimento -- LEFT JOIN, nao duas
-   * consultas.
+   * As sessoes que ainda nao geraram movimento -- DUAS consultas pequenas e
+   * indexadas, nao um `findMany` que carrega a vida inteira do aluno.
    *
-   * Carregar todas as sessoes e filtrar em memoria contra os movimentos
-   * carregados funciona ate o aluno ter dois anos de historico; a partir dai
-   * cada abertura da tela puxa a vida inteira dele para a memoria do Node.
+   * Nao ha `include`/`none` de relacao aqui: `XpLedgerEntry.sourceId` aponta
+   * para a sessao SEM foreign key (o ledger aceita origens de dominios
+   * diferentes), entao o Prisma nao tem um `NOT EXISTS` relacional para
+   * gerar. A alternativa seria uma subquery SQL crua; em vez disso, as duas
+   * consultas abaixo -- sessoes do aluno e `sourceId`s ja pontuados do aluno
+   * -- sao cada uma filtrada por `tenantId + studentId` (indexado) e batem
+   * na casa de dezenas/poucas centenas de linhas por aluno, entao a uniao em
+   * memoria via `Set` e barata: o que se queria evitar era carregar TODO o
+   * ledger do tenant, nao duas consultas escopadas a um aluno so.
    */
   async sessoesSemMovimento(
     contexto: TenantContext,
@@ -94,12 +111,6 @@ export class EngagementXpRepository implements PortaDeXp {
         tenantId: contexto.tenantId,
         studentId,
         policyVersion: POLITICA_DE_SESSAO,
-        /*
-         * `none` traduz para NOT EXISTS. A relacao nao existe no schema --
-         * `sourceId` aponta para a sessao sem foreign key, porque o ledger
-         * aceita origens de dominios diferentes. Entao a exclusao vem de uma
-         * subconsulta explicita.
-         */
       },
       select: {
         id: true,
@@ -270,7 +281,15 @@ export class EngagementXpRepository implements PortaDeXp {
     return this.db.xpLedgerEntry.findMany({
       where: { tenantId: contexto.tenantId, studentId },
       orderBy: { occurredAt: 'asc' },
-      select: { id: true, points: true, localMonth: true, type: true, sourceKind: true },
+      select: {
+        id: true,
+        points: true,
+        localMonth: true,
+        type: true,
+        sourceKind: true,
+        sourceId: true,
+        reversesEntryId: true,
+      },
     });
   }
 }

@@ -122,21 +122,43 @@ export class EngagementXpService {
       this.porta.movimentosDoAluno(contexto, studentId),
     ]);
 
-    // Evidencia = movimentos de GRANT por sessao de treino -- ADJUSTMENT e
-    // REVERSAL nao contam como sessao, e misturar os tres infla a contagem
-    // que a conquista `SESSOES_ACUMULADAS` promete.
-    const movimentosDeSessao = movimentos.filter(
+    // Evidencia = GRANT por sessao de treino -- ADJUSTMENT nao conta como
+    // sessao, e misturar os dois infla a contagem que a conquista
+    // `SESSOES_ACUMULADAS` promete.
+    const grantsDeSessao = movimentos.filter(
       (movimento) => movimento.type === 'GRANT' && movimento.sourceKind === 'ATTENDANCE_SESSION',
     );
 
-    if (movimentosDeSessao.length === 0) return [];
+    /*
+     * O ledger e APPEND-ONLY: estornar uma sessao GRAVA um REVERSAL, nao
+     * apaga a GRANT original. Contar toda GRANT historica (bruta) manteria
+     * uma sessao corrigida valendo para sempre -- `M5-FR-006` exige
+     * conquista a partir de fato VERIFICADO, e o fato deixou de valer no
+     * instante em que o REVERSAL foi gravado. A contagem LIQUIDA e por isso
+     * "GRANT cujo sourceId nao tem REVERSAL apontando de volta para ela via
+     * reversesEntryId" -- nunca "todo GRANT que ja existiu".
+     */
+    const sourceIdsRevertidos = new Set(
+      movimentos
+        .filter((movimento) => movimento.type === 'REVERSAL' && movimento.reversesEntryId !== null)
+        .map((movimento) => {
+          const grantOriginal = grantsDeSessao.find((grant) => grant.id === movimento.reversesEntryId);
+          return grantOriginal?.sourceId;
+        }),
+    );
 
-    const ultimoMovimentoId = movimentosDeSessao[movimentosDeSessao.length - 1]?.id;
+    const sessoesValidas = grantsDeSessao.filter(
+      (grant) => !sourceIdsRevertidos.has(grant.sourceId),
+    );
+
+    if (sessoesValidas.length === 0) return [];
+
+    const ultimoMovimentoId = sessoesValidas[sessoesValidas.length - 1]?.id;
     if (!ultimoMovimentoId) return [];
 
     const aDesbloquear = avaliarConquistas(
       definicoes,
-      { sessoesAcumuladas: movimentosDeSessao.length, ultimoMovimentoId },
+      { sessoesAcumuladas: sessoesValidas.length, ultimoMovimentoId },
       jaDesbloqueadas,
     );
 

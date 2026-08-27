@@ -36,6 +36,7 @@ interface LinhaDoLedger {
   type: 'GRANT' | 'ADJUSTMENT' | 'REVERSAL';
   sourceKind: 'ATTENDANCE_SESSION' | 'MANUAL_ADJUSTMENT';
   sourceId: string;
+  reversesEntryId: string | null;
   ruleVersionId: string;
   occurredAt: Date;
 }
@@ -92,6 +93,35 @@ export class FakePortaDeXp implements PortaDeXp {
     this.colidirNaEscrita = true;
   }
 
+  /**
+   * So do dublê: estorna a `GRANT` da sessao `sourceId`, gravando um
+   * `REVERSAL` que aponta para ela via `reversesEntryId` -- a `GRANT`
+   * original PERMANECE no ledger (append-only), e e o `REVERSAL` que a
+   * anula na contagem liquida.
+   */
+  reverterSessao(sourceId: string): void {
+    const original = this.ledger.find(
+      (linha) =>
+        linha.sourceId === sourceId &&
+        linha.sourceKind === 'ATTENDANCE_SESSION' &&
+        linha.type === 'GRANT',
+    );
+    if (!original) throw new Error(`Nenhuma GRANT encontrada para a sessao ${sourceId}`);
+
+    this.ledger.push({
+      id: `mov-${this.proximoId++}`,
+      studentId: original.studentId,
+      points: -original.points,
+      localMonth: original.localMonth,
+      type: 'REVERSAL',
+      sourceKind: original.sourceKind,
+      sourceId: original.sourceId,
+      reversesEntryId: original.id,
+      ruleVersionId: original.ruleVersionId,
+      occurredAt: original.occurredAt,
+    });
+  }
+
   regrasDoTenant(_contexto: TenantContext, gatilho: GatilhoDeXp): Promise<VersaoDeRegra[]> {
     return Promise.resolve(this.regras.filter((regra) => regra.trigger === gatilho));
   }
@@ -123,6 +153,7 @@ export class FakePortaDeXp implements PortaDeXp {
       type: movimento.type,
       sourceKind: movimento.sourceKind,
       sourceId: movimento.sourceId,
+      reversesEntryId: movimento.reversesEntryId,
       ruleVersionId: movimento.ruleVersionId,
       occurredAt: movimento.occurredAt,
     });
@@ -170,6 +201,8 @@ export class FakePortaDeXp implements PortaDeXp {
           localMonth: linha.localMonth,
           type: linha.type,
           sourceKind: linha.sourceKind,
+          sourceId: linha.sourceId,
+          reversesEntryId: linha.reversesEntryId,
         })),
     );
   }
