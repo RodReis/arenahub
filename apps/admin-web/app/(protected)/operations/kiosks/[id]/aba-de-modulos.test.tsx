@@ -28,14 +28,16 @@ describe('AbaDeModulos', () => {
     expect(screen.getByTestId('campo-modulo-historicoDeAvaliacoes')).toBeInTheDocument();
   });
 
-  it('não mostra ranking — nem ligado, nem cinza, nem desabilitado', () => {
-    // Trava 2 do ADR-042, Decisao 5: a F33 (MVP 5) nao foi entregue. O
-    // `queryBy*` e proposital -- `getBy*` lancaria, e o que este teste prova
-    // e a AUSENCIA. Ligar o campo na config nao o faz aparecer.
+  it('mostra ranking — a F30 entregou a fatia que alimenta o modulo', () => {
+    // Ate a F30 este teste provava a AUSENCIA: trava 2 do ADR-042, Decisao 5,
+    // com a F33 apontada como dona. A F30 (ADR-046) entregou a tela de
+    // preferencia de exposicao, entao o modulo passa a ser configuravel --
+    // a trava continua valendo, o que mudou e existir fatia.
     renderizar({ ranking: true });
 
-    expect(screen.queryByTestId('campo-modulo-ranking')).not.toBeInTheDocument();
-    expect(screen.queryByText(/ranking/i)).not.toBeInTheDocument();
+    const campo = screen.getByTestId('campo-modulo-ranking');
+    expect(campo).toBeInTheDocument();
+    expect(campo).toBeChecked();
   });
 
   it('avisa que desligar remove a etapa, não só o botão', () => {
