@@ -16,9 +16,9 @@ describe('triarAlias -- normalizacao', () => {
   });
 
   it('remove caractere invisivel e SINALIZA', () => {
-    // U+200B (zero-width space) faz 'tigre' e 'ti​gre' passarem por
+    // U+200B (zero-width space) no meio da palavra faz duas strings
     // alias diferentes no banco e identicos na tela.
-    const resultado = triarAlias('ti​gre', SEM_BLOQUEIO);
+    const resultado = triarAlias('ti\u200bgre', SEM_BLOQUEIO);
     expect(resultado.normalizado).toBe('tigre');
     expect(resultado.sinais).toContain('CARACTERE_INVISIVEL');
   });

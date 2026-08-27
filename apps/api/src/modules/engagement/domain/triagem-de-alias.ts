@@ -29,8 +29,15 @@ export interface ResultadoDaTriagem {
   sinais: readonly SinalDeAlias[];
 }
 
-/** Zero-width space, ZWNJ, ZWJ, BOM e afins -- invisiveis que duplicam alias. */
-const INVISIVEIS = /[­​-‏‪-‮⁠-⁤﻿]/gu;
+/**
+ * Zero-width space, ZWNJ, ZWJ, BOM e afins -- invisiveis que duplicam alias.
+ *
+ * Escritos como ESCAPE, nao como o caractere literal: literal aqui e um byte
+ * que ninguem enxerga na revisao, e a lint `no-irregular-whitespace` recusa
+ * com razao. O escape diz a mesma coisa e da para conferir a olho.
+ */
+const INVISIVEIS =
+  /[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/gu;
 
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/u;
 /** 10 ou 11 digitos seguidos, com ou sem separador -- telefone brasileiro. */
