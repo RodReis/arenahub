@@ -1094,7 +1094,7 @@ reservava `modulos.ranking` no contrato de `KioskConfiguration`, desligado por p
 | F | slice | núcleo |
 |---|---|---|
 | F30 | 5.1 Preferências e identidade pública | ✅ **entregue** — ver abaixo |
-| F31 | 5.2 XP e conquistas + 5.4 ranking | ✅ **entregue** em 27/08/2026 — ADR-047 destravou a fatia (totem como superfície) e absorveu a F33 |
+| F31 | 5.2 XP e conquistas + 5.4 ranking | ✅ **entregue** em 27/08/2026 ([#213](https://github.com/RodReis/arenahub/pull/213)) — ADR-047 destravou a fatia (totem como superfície) e absorveu a F33 |
 | F32 | 5.3 Consistência e streak | bloqueada — gate do MVP 5 original |
 | ~~F33~~ | 5.4 Rankings privados por padrão | **absorvida pela F31** (ADR-047, Decisão 2) — número queimado. INV-121 passou para a F31 |
 | F34 | 5.5 Desafios e notificações | bloqueada — gate do MVP 5 original |

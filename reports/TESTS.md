@@ -82,5 +82,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-26 | #83 | SPEC-044 | integração | 645 | 645 | 0 | 84.3 | [#210](https://github.com/RodReis/arenahub/pull/210) |
 | 2026-08-27 | #30 | SPEC-030 | unitário | 2064 | 2064 | 0 | 75.7 | #211 |
 | 2026-08-27 | #30 | SPEC-030 | integração | 673 | 673 | 0 | 84.3 | #211 |
-| 2026-08-27 | #31 | SPEC-031 | unitário | 2195 | 2195 | 0 | 76.3 | — |
-| 2026-08-27 | #31 | SPEC-031 | integração | 753 | 753 | 0 | 83.9 | — |
+| 2026-08-27 | #31 | SPEC-031 | unitário | 2195 | 2195 | 0 | 76.3 | [#213](https://github.com/RodReis/arenahub/pull/213) |
+| 2026-08-27 | #31 | SPEC-031 | integração | 753 | 753 | 0 | 83.9 | [#213](https://github.com/RodReis/arenahub/pull/213) |
