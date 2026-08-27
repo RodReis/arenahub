@@ -2,23 +2,25 @@
 
 import type { IndicadoresDaUnidade, KioskConfig } from '@arenahub/api-contracts';
 
-import { blocosVisiveis } from '../lib/rodizio';
-import { BlocosPublicos } from './blocos-publicos';
+import { BlocosPublicos, haAlgoNaGradePublica } from './blocos-publicos';
 import { IconeEntrar, IconeMarca } from './icones';
 
 /**
- * Tela publica -- DS-TOTEM.md §4.
+ * Tela publica -- DS-TOTEM.md §4 v2.1 (grade densa, ADR-047 Emenda de
+ * 27/08/2026 (2)).
  *
- * REGRA QUE NAO SE NEGOCIA: nenhum dado de aluno aparece aqui. Nem nome, nem
- * foto, nem ranking. Esta tela e vista por quem passa na recepcao, e as unicas
- * props sao `config` e dois INTEIROS agregados da unidade -- nao ha prop por
- * onde um nome, um valor de pendencia ou um id entrasse (`M3.5-BR-001`).
+ * REGRA QUE NAO SE NEGOCIA: nenhum dado IDENTIFICAVEL de aluno aparece
+ * aqui. Nem nome civil, nem foto, nem id. O bloco de ranking (F31) e a
+ * excecao desenhada: mostra posicao, nome JA ABREVIADO e pontos, porque
+ * `resolverExposicao()` roda no SERVIDOR antes do heartbeat chegar --
+ * `Atrator` continua recebendo so `config` e dois INTEIROS agregados mais o
+ * placar ja resolvido, nunca um `studentId` (`M3.5-BR-001`).
  *
- * Os blocos opcionais e a faixa de patrocinadores chegaram na F51 e vivem em
+ * Os blocos opcionais, o ranking e a faixa de patrocinadores vivem em
  * `BlocosPublicos`. O §4 continua valendo quando nao ha nenhum ligado -- "se
  * todos os blocos opcionais estiverem desligados, hero e CTA se distribuem
- * com o espaco restante": os dois `flex` abaixo sao essa distribuicao, e o
- * componente nao renderiza nada quando a lista esta vazia.
+ * com o espaco restante": os dois `flex` abaixo sao essa distribuicao, e
+ * `haAlgoNaGradePublica` decide quando a grade nao renderiza nada.
  *
  * A tela INTEIRA e tocavel e leva a identificacao (§4), nao so o botao: a
  * 80 cm, mirar um retangulo especifico e trabalho desnecessario.
@@ -39,7 +41,7 @@ export function Atrator({
 }) {
   const { marca } = config;
   const { kicker, headline } = partirSlogan(marca.slogan, marca.nomeDaAcademia);
-  const temBloco = blocosVisiveis(config).length > 0;
+  const temBloco = haAlgoNaGradePublica(config, indicadores);
 
   return (
     <div
