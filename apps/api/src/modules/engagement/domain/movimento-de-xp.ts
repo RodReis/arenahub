@@ -95,13 +95,10 @@ export function concederPorSessao(entrada: EntradaDeConcessao): MovimentoDeXp {
 export function reverter(
   original: MovimentoOriginal,
   motivo: string,
-  agora: Date,
 ): MovimentoDeXp {
   if (motivo.trim().length === 0) {
     throw new Error('XP_MOTIVO_OBRIGATORIO');
   }
-
-  void agora;
 
   return {
     type: 'REVERSAL',

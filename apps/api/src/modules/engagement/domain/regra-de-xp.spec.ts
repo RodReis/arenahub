@@ -41,6 +41,16 @@ describe('resolverRegraVigente', () => {
   });
 
   /*
+   * O LIMITE INFERIOR e INCLUSIVO, e este teste e o unico que prende isso:
+   * trocar `<=` por `<` na comparacao de `effectiveFrom` nao quebra nenhum
+   * outro caso, porque o teste da virada e satisfeito pelo `effectiveTo`
+   * exclusivo da versao anterior.
+   */
+  it('vale ja no primeiro instante da vigencia', () => {
+    expect(resolverRegraVigente([v1, v2], 'SESSAO_CONFIRMADA', v1.effectiveFrom)?.id).toBe('r1');
+  });
+
+  /*
    * `effectiveTo` e EXCLUSIVO. As duas versoes se encostam em
    * 2026-06-01T00:00:00Z: se o limite fosse inclusivo, esse instante
    * pertenceria as duas, e a escolha viraria a ordem do array -- que e a

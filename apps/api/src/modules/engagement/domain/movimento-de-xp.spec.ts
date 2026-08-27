@@ -57,7 +57,7 @@ describe('reverter', () => {
       localMonth: '2026-08',
     };
 
-    expect(reverter(original, 'passagem corrigida', new Date('2026-08-20T09:00:00Z'))).toMatchObject({
+    expect(reverter(original, 'passagem corrigida')).toMatchObject({
       type: 'REVERSAL',
       points: -10,
       reversesEntryId: 'e1',
@@ -79,7 +79,7 @@ describe('reverter', () => {
       localMonth: '2026-08',
     };
 
-    expect(() => reverter(original, '  ', new Date())).toThrow('XP_MOTIVO_OBRIGATORIO');
+    expect(() => reverter(original, '  ')).toThrow('XP_MOTIVO_OBRIGATORIO');
   });
 });
 
