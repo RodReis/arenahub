@@ -1080,6 +1080,62 @@ sabe que vão doer:
 - **F40** provavelmente **não acontece**: exige ≥ 200 churns positivos e ≥ 1.000 snapshots por
   tenant. Sem isso, o produto fica na baseline de regras — e tudo bem.
 
+### MVP 5 — Engajamento opt-out · F30 a F35
+
+**O gate mudou para a F30.** O `docs/STATUS.md` §4 lista *"eventos confiáveis + app do MVP 4"*
+como gate de entrada do MVP 5 inteiro — mas o **ADR-046** (26/08/2026) emenda o `MVP-05` §1 para
+que esse gate **não alcance a F30**: ela não lê evento de domínio nem depende do app, que segue
+com `apps/mobile/.gitkeep`. F31–F35 continuam atrás do gate original.
+
+**A superfície também mudou.** A Slice 5.1 previa "app"; o canal que existe é o `apps/kiosk`
+(ADR-046, Decisão 1) — o mesmo totem que a F49/F50 (ADR-042, ADR-045) já identifica por CPF e já
+reservava `modulos.ranking` no contrato de `KioskConfiguration`, desligado por padrão desde a F50.
+
+| F | slice | núcleo |
+|---|---|---|
+| F30 | 5.1 Preferências e identidade pública | ✅ **entregue** — ver abaixo |
+| F31 | 5.2 XP e conquistas | bloqueada — gate do MVP 5 original |
+| F32 | 5.3 Consistência e streak | bloqueada — gate do MVP 5 original |
+| F33 | 5.4 Rankings privados por padrão | bloqueada — gate do MVP 5 original; carrega INV-121 |
+| F34 | 5.5 Desafios e notificações | bloqueada — gate do MVP 5 original |
+| F35 | 5.6 Operação, moderação e experimento | bloqueada — gate do MVP 5 original; traz o canal de denúncia que grava `PublicProfileStatus.HIDDEN` |
+
+#### F30 — o que a fatia cumpriu
+
+Slice 5.1 · `SPEC-030` · issue [#30](https://github.com/RodReis/arenahub/issues/30) ·
+PR `—` (preencher após o merge) ·
+spec de design [`2026-08-26-f30-preferencias-e-identidade-publica-design.md`](superpowers/specs/2026-08-26-f30-preferencias-e-identidade-publica-design.md)
+
+| passo | entrega |
+|---|---|
+| 1 | `ConsentDocumentType` ganha `RANKING`, `CHALLENGE`, `ENGAGEMENT_PUSH` e `PHYSICAL_EVOLUTION_RANKING` — as três últimas dormentes, sem documento publicado e sem consumidor. Sem tabela paralela: a preferência do aluno **é** um `ConsentRecord`, reusando o append-only que já existe em `modules/privacy` |
+| 2 | `participaDoRanking()` (`modules/engagement/domain/participacao.ts`) — o predicado do regime opt-out, deliberadamente **separado** de `avaliarConsentimento()` (biometria), com o aviso do ADR-046 escrito no próprio código |
+| 3 | `resolverExposicao()` (`modules/engagement/domain/exposicao.ts`) — o **ponto único** que decide se um aluno aparece publicamente e com que nome: `ALUNO_INATIVO` vence `OPT_OUT`, que vence a escolha de identidade |
+| 4 | `triarAlias()` (`modules/engagement/domain/triagem-de-alias.ts`) — normalização NFKC, corte de invisível/controle, sinalização de PII; classifica, não pune — tudo vira `PENDING` |
+| 5 | Tabela `PublicProfile` (uma linha por `(tenantId, studentId)`), com unicidade de `aliasNormalized` em **índice parcial sobre `status = APPROVED`** — dois `PENDING` com o mesmo alias coexistem |
+| 6 | Casos de uso (`ObterPreferencias`, `AtualizarPreferencia`, `DefinirAliasPublico`, `ModerarAlias`) com idempotência por `Idempotency-Key` em `AtualizarPreferencia` |
+| 7 | Três rotas no totem (`apps/kiosk`, sob `KioskAreaDoAlunoService.resolver()`) e duas no painel (`apps/admin-web`, `engagement.read`/`engagement.moderate`) — fila de moderação de alias |
+| 8 | Duas telas no totem — *Minhas preferências* (interruptor ligado por padrão, a inversão visível ao aluno) e *Meu nome no ranking* — e a fila de moderação no painel |
+| 9 | ADR-046, esta seção, a linha da F30 no `STATUS.md`, a evidência da `SPEC-030` no `TESTING.md` e os §2–§5 da própria `SPEC-030` |
+
+**O documento de engajamento vem do seed, com `tenantId` real e hash calculado** — sem ele a API
+responde `DOCUMENTO_DE_ENGAJAMENTO_AUSENTE`; nenhum dado inventado no caminho de produção.
+
+**Dois cortes deliberados, registrados no design (`SPEC-030` §3):** `HIDDEN` nasce **sem caminho
+de escrita** — o estado existe no enum e no filtro de listagem, mas nenhuma rota grava; ele é
+para denúncia, que só chega na F35. E **sem outbox nem cache de exposição**: nenhum consumidor
+existe hoje — a F33 é quem vai pedir os dois, quando existir.
+
+🔴 **Achado que fica registrado para quem for mergear esta fatia:** `EngagementModule` não
+declara `TenantContextService` nos próprios `providers` (as demais rotas que dependem dele —
+`PrivacyModule`, `KioskAdminModule` — declaram). `TenantContextService` acaba resolvido no grafo
+de outro jeito para o app subir em produção, mas o `TestingModule` de integração **não** tem essa
+rede de segurança: `Test.createTestingModule({ imports: [AppModule] })` falha ao instanciar
+`EngagementController`, e **toda a suíte de integração da API (46 suítes) quebra no boot**, não
+só os testes do módulo novo. Unitário passa limpo (2060/2060) porque não sobe o Nest inteiro. Isto
+bloqueia o gate de CI verde do `CLAUDE.md` e precisa de correção de código antes do merge — fora
+do escopo desta task de documentação.
+
 ---
 
 ## 5. Registro de entregas
@@ -1165,3 +1221,4 @@ sabe que vão doer:
 | 25/08/2026 | **F56** | SPEC-056 | [#203](https://github.com/RodReis/arenahub/pull/203) | **Plano com assinatura mensal.** Assinatura vira **modalidade de plano** (`Plan.billingMode`), não motor de cobrança terceirizado — ADR-043, Decisão 2. O calendário, o valor, a carência e o bloqueio continuam do ArenaHub; o que muda é existir método salvo e autorização para cobrar sem o aluno agir. **`Subscription.externalSubscriptionId` nasce aqui** — a fonte que o `CancelarRecorrenciaUseCase` esperava desde 25/08 (Decisão 5): ele deixa de devolver zero fixo e passa a cancelar de verdade, aqui e no provedor. A adesão é o **único** lugar que chama `createTokenizedSubscription`, e valida na ordem em que o operador consegue agir — modalidade, status, preço vigente, **CPF** (Decisão 3), cartão, aceite —, porque quem está no balcão age pela PRIMEIRA recusa. O ciclo (`RodarCicloDeAssinaturasUseCase`) gera a invoice do período e cobra sozinho, **sem calendário novo**: reusa `ciclo-de-cobranca`, `BillingRepository` e o retry da F14. 🔑 **Três decisões do PI em 25/08:** ciclo completo (gerar **e** cobrar, não só cobrar); avisos **visíveis no painel** em vez de canal externo — não existe infra de notificação no sistema, e criá-la é decisão própria; e construção contra o `FakePaymentProvider`, já que a F55 espera credencial (trocar é um `useClass`). 🔴 **O defeito que o compilador pegou e um `string` não pegaria:** `OVERDUE` é o nome do vencido no `InvoiceStatus` — **não** `PAST_DUE`, que é do lado da ASSINATURA. Os dois vocabulários convivem, e trocar um pelo outro pularia calada justamente a invoice vencida, que é a que mais precisa ser cobrada. 🔴 **O achado da revisão adversarial do próprio PR:** a adesão chama o provedor **antes** de gravar — ordem oposta à da cobrança —, e morrer no meio deixaria recorrência viva sem nada apontando para ela (a Decisão 5 por outra porta). O código já estava certo, mas **dizer não é provar**: o que fecha a janela é a chave `sub:<id>` derivar da assinatura, e agora há teste. **Provado por mutação, não por leitura:** filtrar o ciclo por MODALIDADE em vez de por CONSENTIMENTO passa em 4 dos 5 testes e falha exatamente no que importa — cobraria cartão de quem nunca autorizou; instabilizar a chave de idempotência derruba concorrência **e** recuperação. 📌 **Fora de escopo, dito:** canal de aviso de reajuste e de cartão vencendo. `cartaoVenceEm` responde a pergunta e a ficha mostra; quem avisa o aluno é a recepção. |
 | 25/08/2026 | **F49** | SPEC-049 | *(preencher após o merge)* | **Kiosk seguro, provisionamento e sessão efêmera.** A superfície `apps/kiosk` nasceu (o diretório estava vazio): quatro modelos Prisma, HMAC de dispositivo copiado do `edge-auth`, contrato inteiro de `KioskConfiguration` em três camadas, sessão efêmera de 60 s com `tokenHash` no banco, tokens do totem em 7:1, três telas e o E2E que prova a limpeza. **A área interna sai com zero dos seis módulos do DS §5.2, de propósito** — o aceite é isolamento e limpeza, não funcionalidade. **ADR-045** registra o regime de identificação (CPF sozinho, facial em backlog) e os dois riscos que o PI aceitou. 🔴 **Achado da implementação:** a ponte Node que assina as chamadas escutava em `0.0.0.0` e, com a rede da academia não isolada, permitia enumerar a base inteira do tenant sem tocar no totem — corrigido para loopback, e o ADR-045 condiciona a decisão do PI a ele. **Este é o primeiro PR a reordenar a fila do §4:** MVP 3.5 antes do MVP 4, tarefa que o ADR-042 atribui a esta fatia |
 | 26/08/2026 | **F44** | SPEC-044 | [#210](https://github.com/RodReis/arenahub/pull/210) | **Design system da superfície `kiosk`.** A fatia **inverteu a própria premissa**: o ADR-025 a criou com gate (*"o PI priorizar o MVP 4"*) e o risco escrito de *"componente sem consumidor"*, mas o ADR-042 antecipou o totem e as **F49–F52 construíram `apps/kiosk` inteiro antes**. O DS nasceu destilado das telas; sobrou para a F44 **o que ficou de fora**. 🔴 **O defeito que motiva a fatia:** `avisoSonoroNaRecusa` existia no contrato desde a F50 **ligada por padrão**, com checkbox no painel, e **nenhuma linha do kiosk lia o campo** — a academia marcava a caixa e o totem seguia mudo. Mesmo padrão da análise de IA e do OCR de ECG na F51: contrato e tela existem, recurso nunca executou. Som **sintetizado** (`AudioContext`, 440→330 Hz, volume 0.08), sem asset: `<audio src>` exigiria arquivo e esbarraria no autoplay, porque a recusa nasce de **resposta de rede**, não de gesto; grave e baixo porque a recepção tem **fila atrás**. 🔴 **Defeito pego na sondagem, que a revisão não bloqueou:** `Number()` entende notação de literal JS — `"0x10"` desenhava anel de **16% sobre dado de saúde**, `"1e3"` saturava no cheio. O campo é texto livre do **aparelho**, não código; guarda por regex entrou assim mesmo (regra de arquitetura 8), **provada por canário** — sem ela, 6 testes caem. ⚠️ **Dois defeitos que só a tela revelou, com 155 testes verdes:** a forma angular §3.3 saiu como **tarja cortando a headline** (`inset: 0` numa caixa baixa e larga) e depois como **bloco invadindo o card** — só alta e estreita a diagonal se lê como diagonal. **Defeito visual é invisível para teste de comportamento.** A **moldura §3.1 só existe onde o equipamento não está**: acima de 1080px aparece, na tela real vira `display: contents` — no gabinete ela roubaria 2px úteis e duplicaria a moldura **física** de metal; verificado no navegador (a 1080px a `.tela` mede 1080 inteiros). O anel §3.12 **recusa desenhar o que não sabe ler**: o DS mostra `80 PONTOS` e **nunca diz de quanto** — escala 100 assumida em `ESCALA_DA_PONTUACAO`, degradando para texto. `data-decorativo` **já esperava**: a regra de alto contraste foi escrita na F51 sem nenhum elemento que a acionasse. 📌 **Fora, e dito:** tela pública da catraca — era o `§8` na spec antiga e a **v2.0 apagou a seção**; sem contrato vigente, é decisão de produto |
+| 27/08/2026 | **F30** | SPEC-030 | `—` *(preencher após o merge)* | **Preferências e identidade pública, no totem — ADR-046.** A Slice 5.1 previa "app" e o gate do MVP 5 exigia *"eventos confiáveis + app do MVP 4"*; nenhum dos dois existe. Três decisões do PI em 26/08: a superfície é o `apps/kiosk`, o gate do MVP 5 **não alcança** esta fatia (F31–F35 continuam atrás dele) e o consentimento de ranking vira **opt-out** — alunos já aceitos e autorizados participam por padrão, quem não quiser pede para sair. **O ponto perigoso da fatia:** a mesma tabela `ConsentRecord` passa a guardar dois regimes opostos de ausência de linha — biometria/saúde/IA continuam **não autorizado**, engajamento vira **participa** — e os predicados vivem separados de propósito (`participacao.ts` × `consentimento.ts`) para que unificá-los não inverta um dos dois em silêncio. `resolverExposicao()` é o ponto único que decide quem aparece e com que nome: aluno inativo vence opt-out, que vence a escolha de identidade, e apelido fora de `APPROVED` nunca vaza (INV-153 a INV-155). Unicidade de apelido em **índice parcial sobre `APPROVED`** — dois `PENDING` com o mesmo alias coexistem, só um chega a aparecer. **Dois cortes deliberados:** `HIDDEN` nasce sem caminho de escrita (espera a F35, canal de denúncia) e não há outbox nem cache de exposição (espera a F33, primeiro consumidor). 🔴 **Achado que bloqueia o merge, fora do escopo desta task de documentação:** `EngagementModule` não declara `TenantContextService` nos próprios `providers`; `Test.createTestingModule({ imports: [AppModule] })` falha ao montar `EngagementController` e derruba as 46 suítes de integração da API no boot (671 de 673 testes falhando), não só o módulo novo — unitário passa limpo (2060/2060) porque não sobe o Nest inteiro. Precisa de correção de código (acrescentar `TenantContextService` aos `providers` de `EngagementModule`, no padrão de `PrivacyModule`/`KioskAdminModule`) antes de qualquer PR poder fechar com CI verde |

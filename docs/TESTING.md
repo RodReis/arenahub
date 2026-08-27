@@ -486,6 +486,48 @@ ou de fatura*. É estrutural e verificável por leitura — os sete handlers rec
 `x-session-token`, e o `studentId` sai de `KioskSession`. No dia em que alguém acrescentar um
 parâmetro de aluno, a regressão não é sutil: é a assinatura do método mudando.
 
+### Evidência da `SPEC-030` — F30, preferências e identidade pública
+
+**PR: `—`** — preencher depois do merge, pela regra do topo desta seção.
+
+`pnpm test:report --issue 30 --spec SPEC-030`, rodado em 27/08/2026, confirma o **unitário**:
+
+```
+| 2026-08-27 | #30 | SPEC-030 | unitário   | 2060 | 2060 | 0 | 75.5 | — |
+```
+
+**A linha não foi commitada em `reports/TESTS.md`** — o gerador manteve, para `integração`, o
+número da última execução bem-sucedida (645/645, herdado da `SPEC-044`) em vez de refletir a
+execução real desta fatia, e commitar essa linha registraria uma prova de integração que não
+existe. Rodar `pnpm test:report --issue 30 --spec SPEC-030` de novo depois da correção abaixo, e
+só então commitar `reports/TESTS.md`, é passo do fechamento desta fatia.
+
+**Sem linha `integração` confiável nesta entrega**, e não é omissão silenciosa: `EngagementModule`
+não declara `TenantContextService` nos próprios `providers` (`PrivacyModule` e `KioskAdminModule`
+declaram; `EngagementModule` não). Rodar `pnpm --filter @arenahub/api test:integration` direto
+mostra a causa exata — `Test.createTestingModule({ imports: [AppModule] })` falha ao montar
+`EngagementController` por dependência não resolvida, e isso derruba **as 46 suítes de
+integração da API no boot**, não só as do módulo novo: **671 de 673 testes falhando**, 46 de 46
+suítes. `pnpm test:report` manteve o número da última execução bem-sucedida (645/645) em vez de
+reportar a queda — o script está descrito para isso no §5 acima, e é exatamente o comportamento
+que torna a linha da tabela **não confiável como prova de integração desta fatia**: os 645 são
+herança da `SPEC-044`, não evidência do que a F30 tocou.
+
+**Isto é um defeito de código, fora do escopo desta task de documentação** (Task 11 do brief da
+F30, documentação apenas) — registrado aqui porque `TESTING.md` teria mentido se dissesse
+"integração verde" sem rodar. A correção é de uma linha: acrescentar `TenantContextService` aos
+`providers` de `apps/api/src/modules/engagement/engagement.module.ts`, no padrão que
+`PrivacyModule` e `KioskAdminModule` já seguem. **Bloqueia o portão de CI verde do `CLAUDE.md`** e
+precisa ser resolvido antes de qualquer PR desta fatia poder fechar.
+
+O unitário (2060/2060, cobrindo os 48 testes próprios do módulo — `participacao.spec.ts`,
+`exposicao.spec.ts`, `triagem-de-alias.spec.ts`, `engagement.service.spec.ts`,
+`engagement.controller.spec.ts`) roda limpo porque não sobe o `AppModule` inteiro, e prova o
+domínio puro e o service com dublê de repositório. O que ele **não** prova — os dois regimes
+convivendo na mesma tabela real, o índice parcial recusando o segundo `APPROVED`, o isolamento de
+tenant e sessão — está escrito em `apps/api/test/integration/engagement.int-spec.ts`, mas não
+roda enquanto o módulo não sobe.
+
 ---
 
 ## 6. CI

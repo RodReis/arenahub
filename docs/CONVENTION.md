@@ -70,8 +70,18 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 | `Student` | nome, CPF, RG, data de nascimento, sexo cadastral, telefone, WhatsApp, e-mail, foto, endereço, CEP, cidade, estado, matrícula, unidade, data de cadastro, origem do lead, consultor, status | ~ **(obrigatório — matrícula é única por tenant)** | Especificação §11 |
 | `StudentContact` | nome, parentesco, telefone | ~ | Especificação §11 |
 | `StudentAddress` | **`[indefinido]`** — endereço aparece embutido em `Student` | ~ | `M1` §11 |
-| `Consent` | `student_id`, `type`, `document_version`, `accepted_at`, `revoked_at`, `ip`, `device`. Tipos: `TERMS`, `PRIVACY`, `BIOMETRIC`, `HEALTH_DATA`, `MARKETING`, `RANKING`. **ADR-008 acrescenta consentimento por responsável legal** para menor de 18 — modelagem é escopo obrigatório de F8 | ~ | Especificação §75 + **ADR-008** |
+| `Consent` | `student_id`, `type`, `document_version`, `accepted_at`, `revoked_at`, `ip`, `device`. Tipos vigentes em `ConsentDocumentType`: `BIOMETRIC`, `HEALTH`, `AI_ANALYSIS` — regime **opt-in**, ausência de linha = **não autorizado** — e, desde a F30, `RANKING`, `CHALLENGE`, `ENGAGEMENT_PUSH`, `PHYSICAL_EVOLUTION_RANKING` — regime **opt-out**, ausência de linha = **participa** (ver tabela de regimes abaixo). As três últimas nascem **dormentes**, sem documento publicado e sem consumidor. **ADR-008 acrescenta consentimento por responsável legal** para menor de 18 — modelagem é escopo obrigatório de F8 | ~ | Especificação §75 + **ADR-008** + **ADR-046** |
 | `BiometricIdentity` | `id`, `tenant_id`, `student_id`, `type` (`FACE`\|`FINGERPRINT`\|`OTHER`), `status`, `external_enroll_id`, `consent_status`, `consent_version`, `consented_at`, `revoked_at` | ✔ | Especificação §13 |
+
+**A mesma tabela `Consent` guarda dois regimes opostos** (ADR-046, decisão do PI em 26/08/2026):
+
+| regime | finalidades | ausência de `ConsentRecord` significa | predicado |
+|---|---|---|---|
+| biometria, saúde, IA | `BIOMETRIC`, `HEALTH`, `AI_ANALYSIS` | **não autorizado** | `avaliarConsentimento()` — `modules/privacy/domain/consentimento.ts` |
+| engajamento | `RANKING`, `CHALLENGE`, `ENGAGEMENT_PUSH`, `PHYSICAL_EVOLUTION_RANKING` | **participa** | `participaDoRanking()` — `modules/engagement/domain/participacao.ts` |
+
+Os dois predicados vivem **separados de propósito** — unificá-los inverteria um dos dois regimes
+em silêncio. Não reusar um pelo outro.
 
 > **Conflito conhecido.** `BiometricIdentity.external_enroll_id` é único e **não tem
 > `device_id`** — mas o `enrollid` do Topdata é **por dispositivo** (Especificação §14/§16). Dois
@@ -150,8 +160,19 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 
 ### 2.6 Engajamento e retenção
 
-Definidas nos PRDs dos MVPs 4 a 6, **não** na Especificação (que só dá exemplos de valores).
-Não são contrato vigente até a fatia correspondente: `xp_rules`, `xp_ledger`,
+| entidade | campos declarados | `tenant_id` | origem |
+|---|---|---|---|
+| `PublicProfile` | `id`, `tenant_id`, `student_id` (`@unique`), `identity_choice` (`PRIMEIRO_NOME`\|`APELIDO`\|`ANONIMO`), `alias`, `alias_normalized`, `status` (`PENDING`\|`APPROVED`\|`REJECTED`\|`HIDDEN`), `screening_signals[]`, `rejection_reason` (enum categorizado, nunca texto livre), `moderated_by`, `moderated_at`, `version` (compare-and-swap) | ✔ | `SPEC-030` (F30) + **ADR-046** |
+
+**Separada do cadastro civil de propósito** — `Student.name` é nome legal e nunca vira apelido
+público por acidente. Uma linha por `(tenant_id, student_id)`; sua ausência significa "aparece
+pelo primeiro nome". **Unicidade de `alias_normalized` é índice único parcial sobre
+`status = APPROVED`** — dois alunos podem ter o mesmo apelido `PENDING`; só um chega a aparecer
+(INV-153).
+
+O restante das tabelas de engajamento é definido nos PRDs dos MVPs 4 a 6, **não** na
+Especificação (que só dá exemplos de valores), e **não** é contrato vigente até a fatia
+correspondente: `xp_rules`, `xp_ledger`,
 `streak_policies`, `student_streaks`, `achievement_definitions`, `student_achievements`,
 `challenge_templates`, `challenges`, `challenge_participants`, `ranking_definitions`,
 `ranking_snapshots`, `ranking_entries`, `notification_preferences`, `notifications`,
@@ -450,7 +471,7 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 
 ### 4.15 Ranking, privacidade e telas públicas (INV-120 a INV-125)
 
-- **INV-120** Ranking é **opt-in**; o aluno escolhe participar, como o nome aparece e se oculta o valor absoluto.
+- **INV-120** *(emendado por ADR-046, 26/08/2026)* Ranking é **opt-out**: o aluno participa por padrão e escolhe como o nome aparece; quem não quiser aparecer pede para sair, e a saída vale a partir da próxima projeção. Redação original ("ranking é opt-in") valia antes da decisão do PI que criou a F30 — ver INV-153 a INV-155.
 - **INV-121** Não criar "quem perdeu mais peso" como ranking principal. *(A Especificação §57 abre com "maior redução percentual de gordura" — contradiz a própria §60. Resolver na spec de F33.)*
 - **INV-122** Evitar streak que premie treino excessivo diário.
 - **INV-123** **A tela pública da catraca não exibe dívida, valor, CPF ou dado sensível.** Bloqueio mostra "Plano pendente. Procure a recepção."
@@ -498,6 +519,21 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 - **INV-150** **Campo concordante entre arquivos deduplica; campo divergente nunca funde automaticamente — exige escolha humana explícita, sem pré-seleção.** A sessão não pode ser confirmada enquanto **qualquer** campo divergente estiver com pelo menos um lado `PENDING`. A tolerância de equivalência deriva da precisão impressa no laudo (não de estimativa) e é assimétrica de propósito: mostrar divergência que era só arredondamento custa um clique ao avaliador; fundir valores que realmente divergem grava um número errado como confirmado por duas fontes.
 - **INV-151** **Índice, classificação e sugestão proprietários do fabricante nunca viram medida.** Idade corporal, pontuação de saúde, tipo de corpo, peso ideal sugerido e classificações do aparelho vão para `BodyAssessment.deviceReport` (JSON opaco), fora do gráfico de evolução. Critério: vira medida o que é medido e comparável entre aparelhos; vira atributo o que é índice ou fórmula proprietária do fabricante, que pode mudar num firmware novo e produziria tendência falsa se comparado mês a mês.
 - **INV-152** **O ECG nunca é interpretado, mesmo dentro da avaliação multiarquivo (ADR-035, sem exceção).** `HEART_RATE` é medida oficial; achado do aparelho, tags e observações do ECG são texto atribuído ao aparelho em `deviceReport`, e nenhuma regra lê esse texto para decidir, alertar, bloquear ou encaminhar.
+
+### 4.20 Preferências e identidade pública (INV-153 a INV-155) — *(ADR-046, F30, 26/08/2026)*
+
+- **INV-153** **Apelido não aprovado nunca é exibido.** `resolverExposicao()` só mostra o `alias`
+  quando `PublicProfile.status = APPROVED`; qualquer outro estado (`PENDING`, `REJECTED`,
+  `HIDDEN`) cai no primeiro nome. Provado por `apps/api/src/modules/engagement/domain/exposicao.spec.ts`
+  e pelo teste de índice parcial em `apps/api/test/integration/engagement.int-spec.ts` (dois
+  `PENDING` com o mesmo `aliasNormalized` coexistem; o segundo `APPROVED` é recusado).
+- **INV-154** **Ausência de `ConsentRecord` de engajamento significa que o aluno participa** — o
+  oposto do regime de biometria/saúde/IA (INV-017, INV-021). Provado por
+  `apps/api/src/modules/engagement/domain/participacao.spec.ts`, com teste dedicado que falha se
+  o default for invertido para `false`.
+- **INV-155** **Aluno com `Student.status` diferente de `ACTIVE` nunca aparece em exposição
+  pública**, mesmo participando e com apelido aprovado — vazamento de aluno cancelado no telão do
+  saguão é vazamento com outro nome. Provado por `exposicao.spec.ts` (`motivo: 'ALUNO_INATIVO'`).
 
 ---
 
