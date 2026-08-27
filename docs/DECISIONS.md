@@ -3396,3 +3396,43 @@ perceba, e o `M5-NFR-004` (p95 < 500 ms, sem cálculo síncrono pesado) continua
 
 A coorte mínima de 5 e `resolverExposicao()` valem igual na leitura ao vivo: abaixo do mínimo, o
 placar vem vazio e o bloco sai do rodízio do hero.
+
+### Emenda de 27/08/2026 (2) — a tela pública passa para a grade densa do DS v2.1
+
+Decidido pelo PI em 27/08/2026, depois de uma auditoria de design que comparou o código do totem
+com o `docs/design/DS-TOTEM.md` v2.1.
+
+**O que a auditoria encontrou.** `apps/kiosk/components/blocos-publicos.tsx` implementa um
+**rodízio** — um bloco de mídia por vez, girando — e justifica assim, no próprio código:
+
+> *"O §4 exige 'no máximo um bloco de mídia visível por vez', e o rodízio garante isso por
+> construção."*
+
+**Essa frase não existe na v2.1.** Ela vem da versão anterior do documento; a v2.1 a substituiu
+pela **grade densa** ("home pública em grade densa", no cabeçalho de versão): reel à esquerda em
+altura total, carrossel e ranking empilhados à direita.
+
+O código está correto para o DS de ontem e divergente do DS de hoje. Como o documento de design é
+**contrato de implementação** (ADR-026), quem se ajusta é o código — a F51 ficou defasada em
+relação ao documento, e a F31 herdou a defasagem ao acrescentar o bloco de ranking ao rodízio.
+
+**A consequência que motivou a decisão:** o §4 define três regras de recomposição — *"se um bloco
+da coluna direita for desligado, o outro ocupa a coluna inteira; se a coluna toda for desligada, o
+reel ocupa a largura total"*. Num rodízio elas não existem, porque nunca há dois blocos na tela ao
+mesmo tempo. Essa é a responsividade real desta superfície: o totem é 1080×1920 fixo, mas **a
+composição muda por configuração**, e todo bloco pode ser desligado no painel.
+
+**Decisão:** a tela pública é reescrita na grade v2.1, com as quatro composições possíveis
+cobertas por teste. O escopo alcança código da F51 — registrado aqui para que a mudança não pareça
+refactor oportunista dentro de uma fatia de engajamento.
+
+**Também alinhado ao §3.4c nesta emenda:** o bloco de ranking ganha medalhão por posição (1º em
+`brand/500`, 2º–3º em `brand/tint`, demais em `border/hairline`), chip de período
+("AGOSTO · TREINOS"), rodapé "Participação opcional · nomes abreviados" e classes próprias — hoje
+ele reusa as do bloco de eventos.
+
+**E o nome abreviado.** O §3.4c exige *"nomes sempre abreviados em tela pública"* — `"Ana S."`, não
+`"Ana"`. `resolverExposicao()` (F30) devolvia o primeiro nome inteiro. A abreviação passa a viver
+no domínio, com as partículas de ligação tratadas (`"Ana de Souza"` → `"Ana S."`, nunca `"Ana d."`),
+e incide sobre o caminho do primeiro nome — **apelido aprovado continua inteiro** (o aluno o
+escolheu para aparecer assim, e ele passou por moderação) e **`ANONIMO` continua "Participante"**.
