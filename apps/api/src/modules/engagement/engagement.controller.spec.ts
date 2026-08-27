@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { CanActivate, ExecutionContext, INestApplication } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import type { Request } from 'express';
 import request from 'supertest';
 
+import { ProblemDetailsFilter } from '../../common/http/problem-details.filter.js';
 import { PermissionsGuard } from '../../common/security/permissions.guard.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -91,6 +92,9 @@ describe('EngagementController -- fila de moderacao', () => {
         // escopo desta suite unitaria.
         { provide: APP_GUARD, useClass: AuthGuardFalso },
         { provide: APP_GUARD, useClass: PermissionsGuard },
+        // Sem o filtro global, o corpo do erro seria o padrao do Nest
+        // (sem `code`) -- o teste de baixo so tem sentido com ele aqui.
+        { provide: APP_FILTER, useClass: ProblemDetailsFilter },
       ],
     }).compile();
 
@@ -142,11 +146,17 @@ describe('EngagementController -- fila de moderacao', () => {
       new Date(),
     );
 
-    await request(servidor())
+    const resposta = await request(servidor())
       .patch(`/api/v1/engagement/aliases/${perfil.id}`)
       .set('Authorization', 'Bearer token-moderador')
       .send({ decisao: 'REJECTED' })
       .expect(400);
+
+    // So o status nao distingue RAZAO_DE_RECUSA_OBRIGATORIA de
+    // VALIDATION_FAILED (erro de Zod na mesma rota) -- o `code` e o que prova
+    // qual dos dois o painel recebeu.
+    const corpo = resposta.body as { code: string };
+    expect(corpo.code).toBe('RAZAO_DE_RECUSA_OBRIGATORIA');
   });
 
   it('moderar perfil de outro tenant e 404', async () => {

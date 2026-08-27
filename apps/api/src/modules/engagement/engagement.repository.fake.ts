@@ -176,7 +176,10 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
 
     if (entrada.version !== null) {
       if (!existente || existente.version !== entrada.version) {
-        throw new ConflictException('Perfil publico foi alterado por outra edicao');
+        throw new ConflictException({
+          code: 'PERFIL_PUBLICO_VERSAO_CONFLITANTE',
+          message: 'Perfil publico foi alterado por outra edicao',
+        });
       }
     }
 
@@ -203,7 +206,10 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
   moderarPerfil(entrada: EntradaDeModeracaoNoBanco, _agora: Date): Promise<PerfilPublicoDoAluno> {
     const perfil = this.perfis.get(entrada.perfilId);
     if (!perfil || perfil.tenantId !== entrada.tenantId) {
-      throw new NotFoundException('Perfil publico nao encontrado');
+      throw new NotFoundException({
+        code: 'PERFIL_PUBLICO_NAO_ENCONTRADO',
+        message: 'Perfil publico nao encontrado',
+      });
     }
 
     if (entrada.status === 'APPROVED') {

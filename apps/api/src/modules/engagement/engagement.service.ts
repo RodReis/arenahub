@@ -91,7 +91,9 @@ export class EngagementService {
 
   async obterPreferencias(ctx: TenantContext, studentId: string): Promise<PreferenciasDoAluno> {
     const aluno = await this.repo.buscarAluno(ctx.tenantId, studentId);
-    if (!aluno) throw new NotFoundException('Aluno nao encontrado');
+    if (!aluno) {
+      throw new NotFoundException({ code: 'ALUNO_NAO_ENCONTRADO', message: 'Aluno nao encontrado' });
+    }
 
     const decisoes = await Promise.all(
       FINALIDADES.map((finalidade) => this.repo.decisaoVigente(ctx.tenantId, studentId, finalidade)),
@@ -130,7 +132,9 @@ export class EngagementService {
     agora: Date,
   ): Promise<PreferenciasDoAluno> {
     const aluno = await this.repo.buscarAluno(ctx.tenantId, entrada.studentId);
-    if (!aluno) throw new NotFoundException('Aluno nao encontrado');
+    if (!aluno) {
+      throw new NotFoundException({ code: 'ALUNO_NAO_ENCONTRADO', message: 'Aluno nao encontrado' });
+    }
 
     await this.repo.registrarDecisao(
       {
@@ -154,7 +158,9 @@ export class EngagementService {
     agora: Date,
   ): Promise<PerfilPublicoDoAluno> {
     const aluno = await this.repo.buscarAluno(ctx.tenantId, entrada.studentId);
-    if (!aluno) throw new NotFoundException('Aluno nao encontrado');
+    if (!aluno) {
+      throw new NotFoundException({ code: 'ALUNO_NAO_ENCONTRADO', message: 'Aluno nao encontrado' });
+    }
 
     if (entrada.identityChoice !== 'APELIDO' || entrada.alias === null) {
       return this.repo.salvarPerfil(
@@ -203,11 +209,17 @@ export class EngagementService {
   ): Promise<PerfilPublicoDoAluno> {
     if (entrada.decisao === 'REJECTED') {
       if (!entrada.rejectionReason) {
-        throw new BadRequestException('rejectionReason e obrigatorio ao rejeitar');
+        throw new BadRequestException({
+          code: 'RAZAO_DE_RECUSA_OBRIGATORIA',
+          message: 'rejectionReason e obrigatorio ao rejeitar',
+        });
       }
 
       if (!RAZOES_DE_REJEICAO.includes(entrada.rejectionReason)) {
-        throw new BadRequestException('rejectionReason nao pertence ao enum AliasRejectionReason');
+        throw new BadRequestException({
+          code: 'RAZAO_DE_RECUSA_INVALIDA',
+          message: 'rejectionReason nao pertence ao enum AliasRejectionReason',
+        });
       }
     }
 

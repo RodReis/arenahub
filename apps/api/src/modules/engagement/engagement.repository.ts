@@ -270,7 +270,10 @@ export class EngagementRepository implements PortaDeEngajamento {
       });
 
       if (resultado.count === 0) {
-        throw new ConflictException('Perfil publico foi alterado por outra edicao');
+        throw new ConflictException({
+          code: 'PERFIL_PUBLICO_VERSAO_CONFLITANTE',
+          message: 'Perfil publico foi alterado por outra edicao',
+        });
       }
 
       const atualizado = await this.db.publicProfile.findFirst({
@@ -278,7 +281,10 @@ export class EngagementRepository implements PortaDeEngajamento {
       });
 
       if (!atualizado) {
-        throw new NotFoundException('Perfil publico nao encontrado');
+        throw new NotFoundException({
+          code: 'PERFIL_PUBLICO_NAO_ENCONTRADO',
+          message: 'Perfil publico nao encontrado',
+        });
       }
 
       return paraPerfilPublico(atualizado);
@@ -305,7 +311,10 @@ export class EngagementRepository implements PortaDeEngajamento {
       });
 
       if (resultado.count === 0) {
-        throw new NotFoundException('Perfil publico nao encontrado');
+        throw new NotFoundException({
+          code: 'PERFIL_PUBLICO_NAO_ENCONTRADO',
+          message: 'Perfil publico nao encontrado',
+        });
       }
 
       const atualizado = await this.db.publicProfile.findFirst({
@@ -313,7 +322,10 @@ export class EngagementRepository implements PortaDeEngajamento {
       });
 
       if (!atualizado) {
-        throw new NotFoundException('Perfil publico nao encontrado');
+        throw new NotFoundException({
+          code: 'PERFIL_PUBLICO_NAO_ENCONTRADO',
+          message: 'Perfil publico nao encontrado',
+        });
       }
 
       return paraPerfilPublico(atualizado);
