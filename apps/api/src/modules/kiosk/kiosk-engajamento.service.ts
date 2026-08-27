@@ -23,6 +23,7 @@ export class KioskEngajamentoService {
   async atualizarPreferencia(
     aluno: AlunoDaSessao,
     participa: boolean,
+    idempotencyKey: string,
     agora: Date,
   ): Promise<PreferenciasDoAluno> {
     return this.engajamento.atualizarPreferencia(
@@ -33,6 +34,7 @@ export class KioskEngajamentoService {
         // outra finalidade antes do controller montar esta chamada.
         finalidade: 'RANKING',
         participa,
+        idempotencyKey,
       },
       agora,
     );

@@ -53,7 +53,6 @@ describe('F30 -- preferencia de engajamento no totem', () => {
     caminho: string,
     metodo: 'GET' | 'POST' | 'PATCH' = 'POST',
     tokenDeSessao?: string,
-    idempotencyKey?: string,
   ): Record<string, string> => {
     const body = metodo === 'GET' || corpo === '' ? '' : JSON.stringify(corpo);
     const timestamp = Math.floor(Date.now() / 1000);
@@ -70,7 +69,6 @@ describe('F30 -- preferencia de engajamento no totem', () => {
     };
 
     if (tokenDeSessao !== undefined) cabecalhos['x-session-token'] = tokenDeSessao;
-    if (idempotencyKey !== undefined) cabecalhos['idempotency-key'] = idempotencyKey;
 
     return cabecalhos;
   };
@@ -143,15 +141,10 @@ describe('F30 -- preferencia de engajamento no totem', () => {
   const buscar = (caminho: string, token: string) =>
     request(servidor()).get(caminho).set(assinarPedido('', caminho, 'GET', token));
 
-  const atualizar = (
-    caminho: string,
-    token: string,
-    corpo: Record<string, unknown>,
-    idempotencyKey: string,
-  ) =>
+  const atualizar = (caminho: string, token: string, corpo: Record<string, unknown>) =>
     request(servidor())
       .patch(caminho)
-      .set(assinarPedido(corpo, caminho, 'PATCH', token, idempotencyKey))
+      .set(assinarPedido(corpo, caminho, 'PATCH', token))
       .send(corpo);
 
   beforeAll(async () => {
@@ -240,15 +233,36 @@ describe('F30 -- preferencia de engajamento no totem', () => {
     const { sessionId, token } = await abrirSessao(CPF_DO_ALUNO);
     const caminho = `/api/v1/kiosk/sessions/${sessionId}/engajamento/preferencias`;
 
-    const resposta = await atualizar(
-      caminho,
-      token,
-      { finalidade: 'RANKING', participa: false },
-      `k1-${sufixo}`,
-    ).expect(200);
+    const resposta = await atualizar(caminho, token, {
+      finalidade: 'RANKING',
+      participa: false,
+      idempotencyKey: `k1-${sufixo}`,
+    }).expect(200);
 
     const corpo = resposta.body as { finalidades: Record<string, boolean> };
     expect(corpo.finalidades['RANKING']).toBe(false);
+  });
+
+  it('toque duplo com a mesma idempotencyKey nao grava decisao nova', async () => {
+    const { sessionId, token } = await abrirSessao(CPF_DO_ALUNO);
+    const caminho = `/api/v1/kiosk/sessions/${sessionId}/engajamento/preferencias`;
+    const chave = `dedupe-${sufixo}`;
+    const corpo = { finalidade: 'RANKING' as const, participa: false, idempotencyKey: chave };
+
+    await atualizar(caminho, token, corpo).expect(200);
+    await atualizar(caminho, token, corpo).expect(200);
+
+    // Consulta o banco: so a contagem de linhas distingue dedupe (uma
+    // linha) de regravação silenciosa (duas linhas com o mesmo resultado
+    // aparente na resposta HTTP).
+    const decisoes = await db.consentRecord.findMany({
+      where: {
+        tenantId: totem.tenantId,
+        evidence: { path: ['idempotencyKey'], equals: chave },
+      },
+    });
+
+    expect(decisoes).toHaveLength(1);
   });
 
   it('finalidade dormente e recusada pelo contrato', async () => {
@@ -258,24 +272,22 @@ describe('F30 -- preferencia de engajamento no totem', () => {
     const { sessionId, token } = await abrirSessao(CPF_DO_ALUNO);
     const caminho = `/api/v1/kiosk/sessions/${sessionId}/engajamento/preferencias`;
 
-    await atualizar(
-      caminho,
-      token,
-      { finalidade: 'CHALLENGE', participa: false },
-      `k2-${sufixo}`,
-    ).expect(400);
+    await atualizar(caminho, token, {
+      finalidade: 'CHALLENGE',
+      participa: false,
+      idempotencyKey: `k2-${sufixo}`,
+    }).expect(400);
   });
 
   it('define o alias publico e le de volta', async () => {
     const { sessionId, token } = await abrirSessao(CPF_DO_ALUNO);
     const caminho = `/api/v1/kiosk/sessions/${sessionId}/engajamento/perfil-publico`;
 
-    const resposta = await atualizar(
-      caminho,
-      token,
-      { identityChoice: 'APELIDO', alias: 'Furacao', version: null },
-      `k3-${sufixo}`,
-    ).expect(200);
+    const resposta = await atualizar(caminho, token, {
+      identityChoice: 'APELIDO',
+      alias: 'Furacao',
+      version: null,
+    }).expect(200);
 
     const corpo = resposta.body as { identityChoice: string; alias: string | null };
     expect(corpo.identityChoice).toBe('APELIDO');

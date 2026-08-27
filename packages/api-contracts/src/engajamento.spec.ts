@@ -4,9 +4,29 @@ import { aliasPublicoSchema, preferenciasSchema } from './engajamento.js';
 
 describe('preferenciasSchema', () => {
   it('aceita RANKING', () => {
-    const resultado = preferenciasSchema.safeParse({ finalidade: 'RANKING', participa: true });
+    const resultado = preferenciasSchema.safeParse({
+      finalidade: 'RANKING',
+      participa: true,
+      idempotencyKey: 'chave-de-teste-1',
+    });
 
     expect(resultado.success).toBe(true);
+  });
+
+  it('recusa sem idempotencyKey', () => {
+    const resultado = preferenciasSchema.safeParse({ finalidade: 'RANKING', participa: true });
+
+    expect(resultado.success).toBe(false);
+  });
+
+  it('recusa idempotencyKey com menos de 8 caracteres', () => {
+    const resultado = preferenciasSchema.safeParse({
+      finalidade: 'RANKING',
+      participa: true,
+      idempotencyKey: 'curta',
+    });
+
+    expect(resultado.success).toBe(false);
   });
 
   const finalidadesDormentes: readonly string[] = [
@@ -18,7 +38,11 @@ describe('preferenciasSchema', () => {
   it.each(finalidadesDormentes)(
     'recusa %s -- dormente no banco, ausente do contrato desta fatia',
     (finalidade) => {
-      const resultado = preferenciasSchema.safeParse({ finalidade, participa: true });
+      const resultado = preferenciasSchema.safeParse({
+        finalidade,
+        participa: true,
+        idempotencyKey: 'chave-de-teste-1',
+      });
 
       expect(resultado.success).toBe(false);
     },

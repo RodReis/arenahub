@@ -570,7 +570,7 @@ export class KioskController {
 
     const dados = preferenciasSchema.parse(corpo);
 
-    return this.engajamento.atualizarPreferencia(aluno, dados.participa, agora);
+    return this.engajamento.atualizarPreferencia(aluno, dados.participa, dados.idempotencyKey, agora);
   }
 
   @Patch('sessions/:id/engajamento/perfil-publico')

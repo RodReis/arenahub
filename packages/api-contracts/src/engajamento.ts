@@ -13,6 +13,9 @@ export const finalidadeExpostaSchema = z.literal('RANKING');
 export const preferenciasSchema = z.object({
   finalidade: finalidadeExpostaSchema,
   participa: z.boolean(),
+  /** Obrigatoria, como na F11: toque duplo no totem devolve o mesmo
+   * resultado em vez de gravar decisao nova. */
+  idempotencyKey: z.string().min(8).max(120),
 });
 
 export type PreferenciasDoTotem = z.infer<typeof preferenciasSchema>;
