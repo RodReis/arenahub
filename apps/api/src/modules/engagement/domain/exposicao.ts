@@ -1,4 +1,4 @@
-import type { StudentStatus } from '@prisma/client';
+import type { StudentStatus } from '@arenahub/database';
 
 import { type DecisaoDeEngajamento, participaDoRanking } from './participacao.js';
 
