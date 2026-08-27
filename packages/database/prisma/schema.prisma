@@ -614,6 +614,18 @@ model Tenant {
 
   publicProfiles PublicProfile[]
 
+  xpRuleVersions         XpRuleVersion[]
+  xpLedgerEntries        XpLedgerEntry[]
+  xpBalances             StudentXpBalance[]
+  achievementDefinitions AchievementDefinitionVersion[]
+  achievements           StudentAchievement[]
+  rankingSnapshots       RankingSnapshot[]
+
+  /// Minimo de participantes para publicar um placar (`M5-BR-007`).
+  /// ADR-047: 5. Configuravel por tenant -- academia pequena e academia
+  /// grande nao tem a mesma nocao de "poucos".
+  rankingMinimumCohort Int @default(5) @map("ranking_minimum_cohort")
+
   @@map("tenants")
 }
 
@@ -644,6 +656,8 @@ model GymUnit {
   manualAccessOverrides ManualAccessOverride[]
   operationalAlerts     OperationalAlert[]
   attendanceSessions    StudentAttendanceSession[]
+
+  rankingSnapshots RankingSnapshot[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -992,6 +1006,11 @@ model Student {
   invoices              Invoice[]
   accountCredits        AccountCredit[]
   publicProfile         PublicProfile?
+
+  xpLedgerEntries XpLedgerEntry[]
+  xpBalances      StudentXpBalance[]
+  achievements    StudentAchievement[]
+  rankingEntries  RankingEntry[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -4118,4 +4137,286 @@ model PublicProfile {
   @@unique([tenantId, studentId])
   @@index([tenantId, status, createdAt])
   @@map("public_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// F31 -- XP, conquistas e ranking
+// ---------------------------------------------------------------------------
+
+enum XpTrigger {
+  /// Uma sessao de treino confirmada no dia local da unidade. A unica do
+  /// catalogo v1. Enum e nao string livre: e o que impede regra nova de
+  /// chegar como expressao executavel (`M5-RULES-01`, item 4).
+  SESSAO_CONFIRMADA
+
+  @@map("xp_trigger")
+}
+
+enum XpEntryType {
+  GRANT
+  ADJUSTMENT
+  REVERSAL
+
+  @@map("xp_entry_type")
+}
+
+enum XpRuleStatus {
+  DRAFT
+  APPROVED
+
+  @@map("xp_rule_status")
+}
+
+/// Uma versao do catalogo de XP.
+///
+/// Regra alterada e LINHA NOVA (`M5-BR-009`). A resolucao usa `occurredAt`
+/// do FATO, nunca o relogio do processo: evento atrasado e pontuado pela
+/// regra que valia quando o aluno treinou.
+model XpRuleVersion {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @map("tenant_id") @db.Uuid
+  /// Identificador estavel da regra atraves das versoes (`treino-diario`).
+  code          String
+  version       Int
+  trigger       XpTrigger
+  /// INTEIRO. XP nao e dinheiro, mas a mesma razao vale: fracao acumulada
+  /// diverge entre a soma e a projecao.
+  points        Int
+  status        XpRuleStatus @default(APPROVED)
+  effectiveFrom DateTime     @map("effective_from")
+  /// `null` = vigente. Fechar uma versao e preencher isto, nunca apagar.
+  effectiveTo   DateTime?    @map("effective_to")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entries XpLedgerEntry[]
+
+  @@unique([tenantId, code, version])
+  @@index([tenantId, trigger, effectiveFrom])
+  @@map("xp_rule_versions")
+}
+
+/// Origem de um movimento de XP.
+enum XpSourceKind {
+  /// `StudentAttendanceSession.id` -- a projecao da F24, que ja deduplica
+  /// sessao por dia local da unidade.
+  ATTENDANCE_SESSION
+  /// Ajuste manual do operador. `sourceId` e a chave de idempotencia que o
+  /// painel envia.
+  MANUAL_ADJUSTMENT
+
+  @@map("xp_source_kind")
+}
+
+/// Movimento de XP -- APPEND-ONLY.
+///
+/// Nunca `UPDATE`, nunca `DELETE`. Correcao e movimento COMPENSATORIO
+/// vinculado por `reversesEntryId`, como `AccessEventCorrection` ja faz no
+/// MVP 1 (`M1-BR-009`, `M5-FR-007`).
+model XpLedgerEntry {
+  id              String       @id @default(uuid()) @db.Uuid
+  tenantId        String       @map("tenant_id") @db.Uuid
+  studentId       String       @map("student_id") @db.Uuid
+  type            XpEntryType
+  /// Positivo concede, negativo estorna. A soma do ledger E o saldo.
+  points          Int
+  ruleVersionId   String       @map("rule_version_id") @db.Uuid
+  sourceKind      XpSourceKind @map("source_kind")
+  /// Id do fato que originou o movimento, no dominio de `sourceKind`.
+  ///
+  /// STRING, NAO `@db.Uuid`: `MANUAL_ADJUSTMENT` usa a `idempotencyKey` que
+  /// o painel envia -- string livre, no mesmo padrao de `DeviceSyncJob`,
+  /// `DeviceCommand` e `AccessEvent` nesta base. `@db.Uuid` recusaria essa
+  /// chave em runtime.
+  sourceId        String       @map("source_id")
+  /// Preenchido so em `REVERSAL`: o movimento que este compensa.
+  reversesEntryId String?      @map("reverses_entry_id") @db.Uuid
+  /// Data do FATO, nao da gravacao. E o que a resolucao de regra le.
+  occurredAt      DateTime     @map("occurred_at")
+  /// `AAAA-MM` do dia local DA UNIDADE, materializado na escrita.
+  ///
+  /// Materializado e nao derivado na leitura pelo mesmo motivo que a F24
+  /// guarda `sessionDate` como `@db.Date`: reconverter fuso na leitura
+  /// aplica o fuso duas vezes, e o placar de agosto ganharia treino de
+  /// julho na virada.
+  localMonth      String       @map("local_month")
+  /// Motivo do ajuste ou da reversao. Obrigatorio para os dois; `null` em
+  /// `GRANT`, que tem a regra como justificativa.
+  reason          String?
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student     Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  ruleVersion XpRuleVersion  @relation(fields: [ruleVersionId], references: [id])
+  reverses    XpLedgerEntry? @relation("ReversaoDeXp", fields: [reversesEntryId], references: [id])
+  revertidoPor XpLedgerEntry[] @relation("ReversaoDeXp")
+  achievements StudentAchievement[]
+
+  /// A CHAVE QUE GARANTE `M5-AC-002`.
+  ///
+  /// Cem replays do mesmo fato colidem nesta linha. A violacao e tratada
+  /// como SUCESSO IDEMPOTENTE no service, nao como erro que alimenta
+  /// retry infinito. Idempotencia em INDICE e nao em `if`: guarda que le
+  /// antes de escrever perde a corrida por construcao -- foi o que a F14,
+  /// a F17 e a F18 ja custaram nesta base.
+  ///
+  /// `type` entra na chave para que a REVERSAL do mesmo fato possa
+  /// coexistir com a GRANT que ela compensa.
+  @@unique([tenantId, studentId, sourceKind, sourceId, ruleVersionId, type])
+  @@index([tenantId, studentId, localMonth])
+  @@index([tenantId, localMonth])
+  @@map("xp_ledger_entries")
+}
+
+/// Saldo do aluno no mes -- PROJECAO, reconstruivel.
+///
+/// Apagar esta tabela inteira e recalcular do ledger tem de produzir os
+/// mesmos numeros (`M5-NFR-002`). Isso e teste, nao promessa.
+model StudentXpBalance {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  studentId  String   @map("student_id") @db.Uuid
+  localMonth String   @map("local_month")
+  points     Int
+  entryCount Int      @map("entry_count")
+  /// Instante do ultimo movimento somado. E o criterio 2 do desempate.
+  lastEntryAt DateTime @map("last_entry_at")
+  rebuiltAt  DateTime @default(now()) @map("rebuilt_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, studentId, localMonth])
+  @@index([tenantId, localMonth, points])
+  @@map("student_xp_balances")
+}
+
+enum AchievementCriterionKind {
+  /// Numero de sessoes de treino acumuladas, de todos os tempos.
+  SESSOES_ACUMULADAS
+
+  @@map("achievement_criterion_kind")
+}
+
+enum AchievementStatus {
+  UNLOCKED
+  /// Revertida. A linha NAO some -- o desbloqueio original continua
+  /// visivel com o motivo anexado (`M5-FR-007`).
+  REVERSED
+
+  @@map("achievement_status")
+}
+
+/// Uma versao da definicao de conquista.
+model AchievementDefinitionVersion {
+  id            String                   @id @default(uuid()) @db.Uuid
+  tenantId      String                   @map("tenant_id") @db.Uuid
+  code          String
+  version       Int
+  /// Texto exibido ao aluno, em pt-BR.
+  title         String
+  criterionKind AchievementCriterionKind @map("criterion_kind")
+  /// Limiar do criterio (10 sessoes, 50 sessoes...).
+  threshold     Int
+  effectiveFrom DateTime                 @map("effective_from")
+  effectiveTo   DateTime?                @map("effective_to")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unlocked StudentAchievement[]
+
+  @@unique([tenantId, code, version])
+  @@map("achievement_definition_versions")
+}
+
+/// Conquista desbloqueada por um aluno.
+model StudentAchievement {
+  id                  String            @id @default(uuid()) @db.Uuid
+  tenantId            String            @map("tenant_id") @db.Uuid
+  studentId           String            @map("student_id") @db.Uuid
+  definitionVersionId String            @map("definition_version_id") @db.Uuid
+  status              AchievementStatus @default(UNLOCKED)
+  unlockedAt          DateTime          @map("unlocked_at")
+  /// O MOVIMENTO DO LEDGER que provou o criterio.
+  ///
+  /// `M5-FR-006`: conquista sai de evidencia verificada, nunca de
+  /// alegacao do cliente. Sem esta coluna, "desbloqueei" seria uma
+  /// afirmacao sem lastro.
+  evidenceEntryId     String            @map("evidence_entry_id") @db.Uuid
+  reversedAt          DateTime?         @map("reversed_at")
+  reversedReason      String?           @map("reversed_reason")
+
+  tenant     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student                      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  definition AchievementDefinitionVersion @relation(fields: [definitionVersionId], references: [id])
+  evidence   XpLedgerEntry                @relation(fields: [evidenceEntryId], references: [id])
+
+  @@unique([tenantId, studentId, definitionVersionId])
+  @@index([tenantId, studentId, status])
+  @@map("student_achievements")
+}
+
+enum RankingSnapshotStatus {
+  DRAFT
+  PUBLISHED
+  /// Retido: coorte abaixo do minimo (`M5-BR-007`). Nao e erro, e a
+  /// politica funcionando.
+  WITHHELD
+
+  @@map("ranking_snapshot_status")
+}
+
+/// Placar mensal de uma unidade -- IMUTAVEL depois de publicado.
+///
+/// `M5-AC-007`: regra alterada nao muda snapshot historico. O que este
+/// snapshot congela e PONTUACAO E POSICAO; QUEM APARECE e decidido em toda
+/// leitura por `resolverExposicao()`.
+///
+/// Se o nome publico fosse gravado aqui, um aluno que pedisse opt-out
+/// depois da publicacao continuaria estampado num artefato imutavel -- e a
+/// unica saida seria mutar o que o `M5-AC-007` proibe mutar.
+model RankingSnapshot {
+  id             String                @id @default(uuid()) @db.Uuid
+  tenantId       String                @map("tenant_id") @db.Uuid
+  gymUnitId      String                @map("gym_unit_id") @db.Uuid
+  localMonth     String                @map("local_month")
+  status         RankingSnapshotStatus  @default(DRAFT)
+  /// Copiado da configuracao NO MOMENTO da geracao. Mudar a politica
+  /// depois nao reescreve o que este snapshot decidiu.
+  minimumCohort  Int                   @map("minimum_cohort")
+  eligibleCount  Int                   @map("eligible_count")
+  generatedAt    DateTime              @map("generated_at")
+  publishedAt    DateTime?             @map("published_at")
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gymUnit GymUnit       @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+  entries RankingEntry[]
+
+  /// UM snapshot por unidade e mes. Regerar e substituir o DRAFT; o
+  /// PUBLISHED nao se regera.
+  @@unique([tenantId, gymUnitId, localMonth])
+  @@map("ranking_snapshots")
+}
+
+/// Uma posicao no placar.
+///
+/// Guarda `studentId` para AUDITORIA. O DTO publico NUNCA o devolve, e o
+/// nome nao mora aqui -- ver o comentario de `RankingSnapshot`.
+model RankingEntry {
+  id         String @id @default(uuid()) @db.Uuid
+  snapshotId String @map("snapshot_id") @db.Uuid
+  position   Int
+  studentId  String @map("student_id") @db.Uuid
+  points     Int
+  /// Instante do ultimo movimento do aluno no mes -- criterio 2 do
+  /// desempate, congelado junto com a posicao.
+  lastEntryAt DateTime @map("last_entry_at")
+
+  snapshot RankingSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  student  Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, studentId])
+  @@unique([snapshotId, position])
+  @@index([snapshotId, position])
+  @@map("ranking_entries")
 }

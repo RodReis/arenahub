@@ -435,6 +435,7 @@ async function semear(): Promise<void> {
     await semearAlunoECredencialDoTotem(db, tenant.id, unidade.id);
     await semearAceiteDaAnalise(db, tenant.id);
     await semearDocumentosDeEngajamento(db, tenant.id);
+    await semearCatalogoDeXpEConquistas(db, tenant.id);
 
     console.info(`[seed] tenant "${TENANT.slug}" pronto, com dono ${DONO.email}.`);
   } finally {
@@ -601,6 +602,59 @@ async function semearDocumentosDeEngajamento(
   }
 
   console.info(`[seed] documentos de engajamento: ${String(FINALIDADES.length)} finalidade(s).`);
+}
+
+/**
+ * Catalogo v1 de XP e conquistas (F31, ADR-047 Decisao 3).
+ *
+ * Numeros propostos pelo Code; o PI revisa depois, e revisar e CRIAR VERSAO
+ * NOVA -- nunca editar esta (`M5-BR-009`). Idempotente pela chave natural
+ * (`tenantId`, `code`, `version`), como o resto do arquivo.
+ */
+async function semearCatalogoDeXpEConquistas(
+  db: Awaited<ReturnType<typeof criarPrismaClient>>,
+  tenantId: string,
+): Promise<void> {
+  const VIGENCIA_INICIAL = new Date('2026-01-01T00:00:00.000Z');
+
+  await db.xpRuleVersion.upsert({
+    where: { tenantId_code_version: { tenantId, code: 'treino-diario', version: 1 } },
+    update: {},
+    create: {
+      tenantId,
+      code: 'treino-diario',
+      version: 1,
+      trigger: 'SESSAO_CONFIRMADA',
+      points: 10,
+      status: 'APPROVED',
+      effectiveFrom: VIGENCIA_INICIAL,
+    },
+  });
+
+  const MARCOS = [
+    { code: 'primeiro-treino', titulo: 'Primeiro treino', limiar: 1 },
+    { code: 'dez-treinos', titulo: '10 treinos', limiar: 10 },
+    { code: 'cinquenta-treinos', titulo: '50 treinos', limiar: 50 },
+    { code: 'cem-treinos', titulo: '100 treinos', limiar: 100 },
+  ];
+
+  for (const marco of MARCOS) {
+    await db.achievementDefinitionVersion.upsert({
+      where: { tenantId_code_version: { tenantId, code: marco.code, version: 1 } },
+      update: {},
+      create: {
+        tenantId,
+        code: marco.code,
+        version: 1,
+        title: marco.titulo,
+        criterionKind: 'SESSOES_ACUMULADAS',
+        threshold: marco.limiar,
+        effectiveFrom: VIGENCIA_INICIAL,
+      },
+    });
+  }
+
+  console.info(`[seed] catalogo de XP: 1 regra e ${String(MARCOS.length)} conquista(s).`);
 }
 
 /**
