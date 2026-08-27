@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { RankingSnapshotStatus, StudentStatus } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -266,7 +266,30 @@ export class EngagementRankingRepository implements PortaDeRanking {
     });
 
     if (resultado.count === 0) {
-      throw new Error('RANKING_SNAPSHOT_IMUTAVEL');
+      /*
+       * O CAS pode ter falhado por dois motivos bem diferentes: o snapshot
+       * nao existe neste tenant (404), ou existe e ja esta PUBLISHED
+       * (`M5-AC-007`, 409 -- republicar e recusado, nao erro do cliente).
+       * Antes disto os dois casos viravam `Error` crua, que o
+       * `ProblemDetailsFilter` so sabe traduzir como 500 -- a politica de
+       * imutabilidade "recusava" derrubando a requisicao com erro interno.
+       */
+      const existente = await this.db.rankingSnapshot.findFirst({
+        where: { id: snapshotId, tenantId: contexto.tenantId },
+        select: { id: true },
+      });
+
+      if (!existente) {
+        throw new NotFoundException({
+          code: 'RANKING_SNAPSHOT_NAO_ENCONTRADO',
+          message: 'RANKING_SNAPSHOT_NAO_ENCONTRADO',
+        });
+      }
+
+      throw new ConflictException({
+        code: 'RANKING_SNAPSHOT_IMUTAVEL',
+        message: 'RANKING_SNAPSHOT_IMUTAVEL',
+      });
     }
 
     const publicado = await this.db.rankingSnapshot.findFirst({
@@ -275,7 +298,10 @@ export class EngagementRankingRepository implements PortaDeRanking {
     });
 
     if (!publicado) {
-      throw new Error('RANKING_SNAPSHOT_NAO_ENCONTRADO');
+      throw new NotFoundException({
+        code: 'RANKING_SNAPSHOT_NAO_ENCONTRADO',
+        message: 'RANKING_SNAPSHOT_NAO_ENCONTRADO',
+      });
     }
 
     return paraSnapshot(publicado);

@@ -1,3 +1,4 @@
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { RankingSnapshotStatus, StudentStatus } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -184,11 +185,21 @@ export class FakePortaDeRanking implements PortaDeRanking {
   ): Promise<SnapshotDeRanking> {
     const snapshot = this.snapshots.get(snapshotId);
     if (!snapshot || snapshot.tenantId !== contexto.tenantId) {
-      return Promise.reject(new Error('RANKING_SNAPSHOT_NAO_ENCONTRADO'));
+      return Promise.reject(
+        new NotFoundException({
+          code: 'RANKING_SNAPSHOT_NAO_ENCONTRADO',
+          message: 'RANKING_SNAPSHOT_NAO_ENCONTRADO',
+        }),
+      );
     }
 
     if (snapshot.status === 'PUBLISHED') {
-      return Promise.reject(new Error('RANKING_SNAPSHOT_IMUTAVEL'));
+      return Promise.reject(
+        new ConflictException({
+          code: 'RANKING_SNAPSHOT_IMUTAVEL',
+          message: 'RANKING_SNAPSHOT_IMUTAVEL',
+        }),
+      );
     }
 
     snapshot.status = 'PUBLISHED';
