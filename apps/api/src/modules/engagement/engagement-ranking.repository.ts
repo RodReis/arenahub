@@ -13,6 +13,7 @@ export const PORTA_DE_RANKING = Symbol('PortaDeRanking');
 /** Um snapshot de placar, na forma minima que o service consome. */
 export interface SnapshotDeRanking {
   id: string;
+  gymUnitId: string;
   status: RankingSnapshotStatus;
   publishedAt: Date | null;
   entries: readonly EntradaDeSnapshot[];
@@ -458,12 +459,14 @@ export class EngagementRankingRepository implements PortaDeRanking {
 /** Converte a linha do Prisma (com `entries` incluidas) para `SnapshotDeRanking`. */
 function paraSnapshot(linha: {
   id: string;
+  gymUnitId: string;
   status: RankingSnapshotStatus;
   publishedAt: Date | null;
   entries: { studentId: string; position: number; points: number }[];
 }): SnapshotDeRanking {
   return {
     id: linha.id,
+    gymUnitId: linha.gymUnitId,
     status: linha.status,
     publishedAt: linha.publishedAt,
     entries: linha.entries.map((entrada) => ({

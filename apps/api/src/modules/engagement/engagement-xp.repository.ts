@@ -112,11 +112,17 @@ export interface PortaDeXp {
   /** Conquistas do aluno na forma exibivel, incluindo as REVERTIDAS. */
   conquistasDoExtrato(contexto: TenantContext, studentId: string): Promise<ConquistaDoExtratoDeXp[]>;
   /**
-   * Fuso da UNIDADE de matricula do aluno -- o que `ajustar()` (Task 11)
-   * precisa para calcular `localMonth` do movimento manual. `null` se o
-   * aluno nao existe no tenant (o controller devolve 404 nesse caso).
+   * Unidade de matricula do aluno (id + fuso) -- o que `ajustarXp()`
+   * (Task 11) precisa para (a) calcular `localMonth` do movimento manual e
+   * (b) checar escopo de unidade do ator (`allowedUnitIds`) ANTES de gravar
+   * o ajuste -- um gerente restrito a unidade A nao pode ajustar XP de aluno
+   * da unidade B. `null` se o aluno nao existe no tenant (o service devolve
+   * 404 nesse caso).
    */
-  fusoDoAluno(contexto: TenantContext, studentId: string): Promise<string | null>;
+  unidadeDoAluno(
+    contexto: TenantContext,
+    studentId: string,
+  ): Promise<{ gymUnitId: string; timezone: string } | null>;
   /**
    * Uma versao de regra QUALQUER do tenant -- so para satisfazer a FK
    * obrigatoria de `XpLedgerEntry.ruleVersionId` num `ADJUSTMENT` manual, que
@@ -393,13 +399,16 @@ export class EngagementXpRepository implements PortaDeXp {
     }));
   }
 
-  async fusoDoAluno(contexto: TenantContext, studentId: string): Promise<string | null> {
+  async unidadeDoAluno(
+    contexto: TenantContext,
+    studentId: string,
+  ): Promise<{ gymUnitId: string; timezone: string } | null> {
     const aluno = await this.db.student.findFirst({
       where: { tenantId: contexto.tenantId, id: studentId },
-      select: { gymUnit: { select: { timezone: true } } },
+      select: { gymUnitId: true, gymUnit: { select: { timezone: true } } },
     });
 
-    return aluno?.gymUnit.timezone ?? null;
+    return aluno ? { gymUnitId: aluno.gymUnitId, timezone: aluno.gymUnit.timezone } : null;
   }
 
   async qualquerVersaoDeRegra(contexto: TenantContext): Promise<{ id: string } | null> {

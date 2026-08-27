@@ -44,9 +44,26 @@ describe('EngagementXpController -- painel de placar e XP', () => {
     allowedUnitIds: 'ALL',
   };
 
+  /** Unidades usadas so pelos testes de escopo (Task 11, correcao critica):
+   * um gerente restrito a `UNIDADE_A` nunca pode agir sobre `UNIDADE_B`. */
+  const UNIDADE_A = '33333333-3333-4333-8333-333333333333';
+  const UNIDADE_B = '44444444-4444-4444-8444-444444444444';
+
+  /** Moderador RESTRITO a `UNIDADE_A` -- `allowedUnitIds` e um conjunto, nao
+   * `'ALL'`. E o ator que a correcao critica da F31/Task 11 precisa barrar
+   * fora da propria unidade. */
+  const CTX_MODERADOR_UNIDADE_A: TenantContext = {
+    tenantId: 't1',
+    actorId: 'moderador-restrito-1',
+    sessionId: 's3',
+    permissions: new Set(['engagement.moderate']),
+    allowedUnitIds: new Set([UNIDADE_A]),
+  };
+
   const CONTEXTOS: Record<string, TenantContext> = {
     'token-moderador': CTX_MODERADOR,
     'token-sem-permissao': CTX_SEM_PERMISSAO,
+    'token-moderador-unidade-a': CTX_MODERADOR_UNIDADE_A,
   };
 
   class AuthGuardFalso implements CanActivate {
@@ -108,6 +125,110 @@ describe('EngagementXpController -- painel de placar e XP', () => {
         .post(`/api/v1/engagement/rankings/${snapshotId}/publicar`)
         .set('Authorization', 'Bearer token-sem-permissao')
         .expect(403);
+    });
+
+    /*
+     * Correcao critica (F31, Task 11): um gerente restrito a `UNIDADE_A`
+     * gerava e publicava DEFINITIVAMENTE o placar de `UNIDADE_B` so por
+     * saber o UUID dela na URL -- `M5-AC-007` torna a publicacao
+     * irreversivel, entao vazar isto e o pior caso possivel.
+     *
+     * PROVA DO CANARIO: com `exigirEscopoDaUnidade` removido do controller,
+     * este teste fica VERMELHO (a chamada devolve 201 em vez de 404) --
+     * confirmado manualmente, guarda restaurada em seguida.
+     */
+    it('moderador restrito a UNIDADE_A nao gera placar de UNIDADE_B', async () => {
+      fakeRanking.comCoorteMinima(1);
+      fakeRanking.comSaldos(UNIDADE_B, '2026-08', [
+        { studentId: 'aluno-1', points: 10, lastEntryAt: new Date() },
+      ]);
+
+      await request(servidor())
+        .post(`/api/v1/engagement/rankings/${UNIDADE_B}/2026-08/gerar`)
+        .set('Authorization', 'Bearer token-moderador-unidade-a')
+        .expect(404);
+    });
+
+    /* Caso positivo: sem ele, uma guarda que recusa tudo passaria igual. */
+    it('moderador restrito a UNIDADE_A gera placar da propria unidade', async () => {
+      fakeRanking.comCoorteMinima(1);
+      fakeRanking.comSaldos(UNIDADE_A, '2026-08', [
+        { studentId: 'aluno-1', points: 10, lastEntryAt: new Date() },
+      ]);
+
+      const gerado = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${UNIDADE_A}/2026-08/gerar`)
+        .set('Authorization', 'Bearer token-moderador-unidade-a')
+        .expect(201);
+
+      expect(gerado.body).toMatchObject({ status: 'DRAFT' });
+    });
+
+    /*
+     * O snapshot de `UNIDADE_B` foi gerado por um moderador `ALL` -- o
+     * restrito a `UNIDADE_A` so tenta publicar. `publicar` nao recebe
+     * `gymUnitId` na URL, so o `snapshotId`: a correcao tem de carregar o
+     * snapshot e checar a unidade DELE, nao a da requisicao.
+     *
+     * PROVA DO CANARIO: com a checagem de escopo removida de `publicar`,
+     * este teste fica VERMELHO (201 em vez de 404) -- confirmado
+     * manualmente, guarda restaurada em seguida.
+     */
+    it('moderador restrito a UNIDADE_A nao publica snapshot de UNIDADE_B', async () => {
+      fakeRanking.comCoorteMinima(1);
+      fakeRanking.comSaldos(UNIDADE_B, '2026-08', [
+        { studentId: 'aluno-1', points: 10, lastEntryAt: new Date() },
+      ]);
+
+      const gerado = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${UNIDADE_B}/2026-08/gerar`)
+        .set('Authorization', 'Bearer token-moderador')
+        .expect(201);
+
+      const snapshotId = (gerado.body as { id: string }).id;
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${snapshotId}/publicar`)
+        .set('Authorization', 'Bearer token-moderador-unidade-a')
+        .expect(404);
+
+      expect((resposta.body as { code: string }).code).toBe('RANKING_SNAPSHOT_NAO_ENCONTRADO');
+    });
+
+    /* Caso positivo: moderador restrito publicando o proprio snapshot. */
+    it('moderador restrito a UNIDADE_A publica snapshot da propria unidade', async () => {
+      fakeRanking.comCoorteMinima(1);
+      fakeRanking.comSaldos(UNIDADE_A, '2026-08', [
+        { studentId: 'aluno-1', points: 10, lastEntryAt: new Date() },
+      ]);
+
+      const gerado = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${UNIDADE_A}/2026-08/gerar`)
+        .set('Authorization', 'Bearer token-moderador-unidade-a')
+        .expect(201);
+
+      const snapshotId = (gerado.body as { id: string }).id;
+
+      const publicado = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${snapshotId}/publicar`)
+        .set('Authorization', 'Bearer token-moderador-unidade-a')
+        .expect(201);
+
+      expect(publicado.body).toMatchObject({ status: 'PUBLISHED' });
+    });
+
+    /*
+     * O mesmo snapshot inexistente devolve o MESMO codigo para os dois
+     * motivos ("nao existe" e "existe, mas e de outra unidade") -- provando
+     * que a resposta nao denuncia qual dos dois aconteceu.
+     */
+    it('snapshot inexistente e o mesmo 404 de snapshot fora de escopo', async () => {
+      const resposta = await request(servidor())
+        .post('/api/v1/engagement/rankings/snapshot-que-nao-existe/publicar')
+        .set('Authorization', 'Bearer token-moderador-unidade-a')
+        .expect(404);
+
+      expect((resposta.body as { code: string }).code).toBe('RANKING_SNAPSHOT_NAO_ENCONTRADO');
     });
 
     it('gera e publica um snapshot', async () => {
@@ -246,6 +367,42 @@ describe('EngagementXpController -- painel de placar e XP', () => {
         .set('Authorization', 'Bearer token-moderador')
         .send({ pontos: -10, motivo: 'correcao', idempotencyKey: 'k1' })
         .expect(404);
+    });
+
+    /*
+     * Correcao critica (F31, Task 11): `ajustar` recebe `studentId`, e um
+     * aluno pertence a uma unidade (`Student.gymUnitId`). Um gerente
+     * restrito a `UNIDADE_A` nao pode ajustar XP de aluno matriculado em
+     * `UNIDADE_B` -- mesmo 404 de "aluno inexistente", para nao denunciar
+     * que o aluno existe em outra unidade.
+     *
+     * PROVA DO CANARIO: com a checagem de escopo removida de `ajustarXp`,
+     * este teste fica VERMELHO (201 em vez de 404) -- confirmado
+     * manualmente, guarda restaurada em seguida.
+     */
+    it('moderador restrito a UNIDADE_A nao ajusta XP de aluno de UNIDADE_B', async () => {
+      const alunoDeUnidadeB = '55555555-5555-4555-8555-555555555555';
+      fakeXp.comAluno(alunoDeUnidadeB, 'America/Sao_Paulo', UNIDADE_B);
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/engagement/xp/${alunoDeUnidadeB}/ajustar`)
+        .set('Authorization', 'Bearer token-moderador-unidade-a')
+        .send({ pontos: -10, motivo: 'correcao', idempotencyKey: 'k1' })
+        .expect(404);
+
+      expect((resposta.body as { code: string }).code).toBe('ALUNO_NAO_ENCONTRADO');
+    });
+
+    /* Caso positivo: moderador restrito ajustando aluno da propria unidade. */
+    it('moderador restrito a UNIDADE_A ajusta XP de aluno da propria unidade', async () => {
+      const alunoDeUnidadeA = '66666666-6666-4666-8666-666666666666';
+      fakeXp.comAluno(alunoDeUnidadeA, 'America/Sao_Paulo', UNIDADE_A);
+
+      await request(servidor())
+        .post(`/api/v1/engagement/xp/${alunoDeUnidadeA}/ajustar`)
+        .set('Authorization', 'Bearer token-moderador-unidade-a')
+        .send({ pontos: -10, motivo: 'correcao', idempotencyKey: 'k1' })
+        .expect(201);
     });
   });
 });

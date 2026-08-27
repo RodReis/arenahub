@@ -49,13 +49,16 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
 
   let contexto: TenantContext;
 
-  const criarAluno = async (): Promise<string> => {
+  /** `gymUnitIdDoAluno` OMITIDO (padrao) = a unidade principal da suite --
+   * os testes de escopo (Task 11, correcao critica) passam a segunda
+   * unidade explicitamente. */
+  const criarAluno = async (gymUnitIdDoAluno?: string): Promise<string> => {
     contadorDeMatricula += 1;
 
     const aluno = await db.student.create({
       data: {
         tenantId,
-        gymUnitId,
+        gymUnitId: gymUnitIdDoAluno ?? gymUnitId,
         membershipNumber: `F31-${sufixo}-${String(contadorDeMatricula).padStart(4, '0')}`,
         fullName: 'Aluno De Teste Do F31',
         birthDate: new Date('1995-06-15T00:00:00.000Z'),
@@ -191,9 +194,17 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
    * de `billing-http.int-spec.ts`. Task 11: as rotas de placar/XP do painel
    * sao autenticadas por sessao (cookie), nao pelo HMAC do totem.
    */
+  /**
+   * `gymUnitIdDoPapel` OMITIDO (padrao) = papel vale no tenant inteiro
+   * (`allowedUnitIds: 'ALL'`, ver `AuthGuard.montarContexto`). Passar um
+   * `gymUnitId` cria um ator RESTRITO aquela unidade -- e o que os testes
+   * de escopo (Task 11, correcao critica) precisam para provar que um
+   * gerente de uma unidade nao age sobre outra.
+   */
   const criarUsuarioCom = async (
     rotulo: string,
     codigos: readonly string[],
+    gymUnitIdDoPapel?: string,
   ): Promise<string> => {
     const usuario = await db.user.create({
       data: {
@@ -218,7 +229,9 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       await db.rolePermission.create({ data: { roleId: papel.id, permissionId: permissao.id } });
     }
 
-    await db.userRole.create({ data: { tenantId, userId: usuario.id, roleId: papel.id } });
+    await db.userRole.create({
+      data: { tenantId, userId: usuario.id, roleId: papel.id, gymUnitId: gymUnitIdDoPapel ?? null },
+    });
 
     const login = await request(servidor())
       .post('/api/v1/auth/login')
@@ -712,10 +725,32 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
   describe('painel -- publicar placar e ajustar XP', () => {
     let cookieModerador: string;
     let cookieSemPermissao: string;
+    /** Moderador RESTRITO a `gymUnitId` -- o escopo do proprio `beforeAll`,
+     * usado como "UNIDADE_A" nos testes de escopo abaixo. */
+    let cookieModeradorRestrito: string;
+    /** Segunda unidade -- "UNIDADE_B" nos testes de escopo: o gerente
+     * restrito a `gymUnitId` nunca pode agir sobre ela. */
+    let outraUnidadeId: string;
 
     beforeAll(async () => {
       cookieModerador = await criarUsuarioCom('moderador-t11', ['engagement.moderate']);
       cookieSemPermissao = await criarUsuarioCom('sem-permissao-t11', []);
+      cookieModeradorRestrito = await criarUsuarioCom(
+        'moderador-restrito-t11',
+        ['engagement.moderate'],
+        gymUnitId,
+      );
+
+      const outraUnidade = await db.gymUnit.create({
+        data: {
+          tenantId,
+          code: 'OUTRA-T11',
+          name: `Outra Unidade T11 ${sufixo}`,
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+      outraUnidadeId = outraUnidade.id;
     });
 
     it('sem permissao, 403 ao publicar', async () => {
@@ -745,6 +780,151 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
         .post(`/api/v1/engagement/rankings/${snapshotId}/publicar`)
         .set('Cookie', cookieSemPermissao)
         .expect(403);
+    });
+
+    /*
+     * Correcao critica (F31, Task 11): um gerente restrito a `gymUnitId`
+     * gerava e publicava DEFINITIVAMENTE o placar de `outraUnidadeId` so
+     * por saber o UUID dela na URL -- `M5-AC-007` torna a publicacao
+     * irreversivel, e o `SnapshotDto` devolve `entries[].studentId`, entao
+     * o gerente ainda receberia a lista de alunos da unidade alheia.
+     */
+    it('moderador restrito nao gera placar de outra unidade', async () => {
+      const aluno = await criarAluno(outraUnidadeId);
+      await db.studentXpBalance.create({
+        data: {
+          tenantId,
+          studentId: aluno,
+          localMonth: '2026-11',
+          points: 10,
+          entryCount: 1,
+          lastEntryAt: AGORA,
+        },
+      });
+
+      await request(servidor())
+        .post(`/api/v1/engagement/rankings/${outraUnidadeId}/2026-11/gerar`)
+        .set('Cookie', cookieModeradorRestrito)
+        .expect(404);
+    });
+
+    /*
+     * Caso positivo: sem a guarda de escopo, um teste que so recusa tudo
+     * passaria igual. O 201 sozinho ja prova que a PROPRIA unidade nao e
+     * barrada -- o `status` pode ser WITHHELD (coorte de 1 aluno fica abaixo
+     * do minimo do tenant) sem que isso seja falha de escopo nenhuma.
+     */
+    it('moderador restrito gera placar da propria unidade', async () => {
+      const aluno = await criarAluno();
+      await db.studentXpBalance.create({
+        data: {
+          tenantId,
+          studentId: aluno,
+          localMonth: '2026-11',
+          points: 10,
+          entryCount: 1,
+          lastEntryAt: AGORA,
+        },
+      });
+
+      await request(servidor())
+        .post(`/api/v1/engagement/rankings/${gymUnitId}/2026-11/gerar`)
+        .set('Cookie', cookieModeradorRestrito)
+        .expect(201);
+    });
+
+    /*
+     * `publicar` nao recebe `gymUnitId` na URL, so `snapshotId` -- a
+     * correcao tem de carregar o snapshot e checar a unidade DELE. O
+     * snapshot de `outraUnidadeId` foi gerado por um moderador `ALL`.
+     */
+    it('moderador restrito nao publica snapshot de outra unidade', async () => {
+      const aluno = await criarAluno(outraUnidadeId);
+      await db.studentXpBalance.create({
+        data: {
+          tenantId,
+          studentId: aluno,
+          localMonth: '2026-12',
+          points: 10,
+          entryCount: 1,
+          lastEntryAt: AGORA,
+        },
+      });
+
+      const gerado = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${outraUnidadeId}/2026-12/gerar`)
+        .set('Cookie', cookieModerador)
+        .expect(201);
+
+      const snapshotId = (gerado.body as { id: string }).id;
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${snapshotId}/publicar`)
+        .set('Cookie', cookieModeradorRestrito)
+        .expect(404);
+
+      expect((resposta.body as { code: string }).code).toBe('RANKING_SNAPSHOT_NAO_ENCONTRADO');
+    });
+
+    /* Caso positivo: moderador restrito publicando o proprio snapshot. */
+    it('moderador restrito publica snapshot da propria unidade', async () => {
+      // Coorte de 5 -- o minimo padrao do tenant (`rankingMinimumCohort`).
+      // Precisa fechar DRAFT (nao WITHHELD) para haver algo publicavel.
+      for (let indice = 0; indice < 5; indice += 1) {
+        const aluno = await criarAluno();
+        await db.studentXpBalance.create({
+          data: {
+            tenantId,
+            studentId: aluno,
+            localMonth: '2027-01',
+            points: 10,
+            entryCount: 1,
+            lastEntryAt: AGORA,
+          },
+        });
+      }
+
+      const gerado = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${gymUnitId}/2027-01/gerar`)
+        .set('Cookie', cookieModeradorRestrito)
+        .expect(201);
+
+      const snapshotId = (gerado.body as { id: string }).id;
+
+      const publicado = await request(servidor())
+        .post(`/api/v1/engagement/rankings/${snapshotId}/publicar`)
+        .set('Cookie', cookieModeradorRestrito)
+        .expect(201);
+
+      expect(publicado.body).toMatchObject({ status: 'PUBLISHED' });
+    });
+
+    /*
+     * `ajustar` recebe `studentId`, e um aluno pertence a uma unidade
+     * (`Student.gymUnitId`). Mesmo 404 de "aluno inexistente" -- nao pode
+     * denunciar que o aluno existe em outra unidade.
+     */
+    it('moderador restrito nao ajusta XP de aluno de outra unidade', async () => {
+      const alunoDeOutraUnidade = await criarAluno(outraUnidadeId);
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/engagement/xp/${alunoDeOutraUnidade}/ajustar`)
+        .set('Cookie', cookieModeradorRestrito)
+        .send({ pontos: -10, motivo: 'correcao', idempotencyKey: randomUUID() })
+        .expect(404);
+
+      expect((resposta.body as { code: string }).code).toBe('ALUNO_NAO_ENCONTRADO');
+    });
+
+    /* Caso positivo: moderador restrito ajustando aluno da propria unidade. */
+    it('moderador restrito ajusta XP de aluno da propria unidade', async () => {
+      const alunoDaUnidade = await criarAluno();
+
+      await request(servidor())
+        .post(`/api/v1/engagement/xp/${alunoDaUnidade}/ajustar`)
+        .set('Cookie', cookieModeradorRestrito)
+        .send({ pontos: -10, motivo: 'correcao', idempotencyKey: randomUUID() })
+        .expect(201);
     });
 
     it('ajuste exige motivo', async () => {

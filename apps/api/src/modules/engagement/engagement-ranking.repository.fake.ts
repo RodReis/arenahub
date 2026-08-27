@@ -317,6 +317,7 @@ function capitalizar(texto: string): string {
 function paraSnapshot(snapshot: SnapshotEmMemoria): SnapshotDeRanking {
   return {
     id: snapshot.id,
+    gymUnitId: snapshot.gymUnitId,
     status: snapshot.status,
     publishedAt: snapshot.publishedAt,
     entries: snapshot.entries.map((entrada) => ({ ...entrada })),

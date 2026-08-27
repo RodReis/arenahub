@@ -1,9 +1,10 @@
-import { BadRequestException, Body, Controller, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, NotFoundException, Param, Post } from '@nestjs/common';
 import { ApiOkResponse } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { EngagementRankingService } from './engagement-ranking.service.js';
 import { EngagementXpService } from './engagement-xp.service.js';
 import type { SnapshotDeRanking } from './engagement-ranking.repository.js';
@@ -85,13 +86,14 @@ export class EngagementXpController {
   @ApiOkResponse({ schema: ESQUEMA_DE_RESPOSTA_DO_SNAPSHOT })
   async gerar(@Param() parametros: unknown): Promise<SnapshotDto> {
     const { gymUnitId, mes } = esquemaDoMes.parse(parametros);
+    const contexto = this.contexto.require();
 
-    const snapshot = await this.ranking.gerarSnapshot(
-      this.contexto.require(),
-      gymUnitId,
-      mes,
-      new Date(),
-    );
+    // Escopo de unidade (mesmo padrao de `ManualOverrideUseCase`): um
+    // gerente restrito a unidade A nao gera placar da unidade B so por
+    // saber o UUID dela na URL.
+    this.exigirEscopoDaUnidade(contexto, gymUnitId);
+
+    const snapshot = await this.ranking.gerarSnapshot(contexto, gymUnitId, mes, new Date());
 
     return this.paraDto(snapshot);
   }
@@ -101,10 +103,28 @@ export class EngagementXpController {
   @ApiOkResponse({ schema: ESQUEMA_DE_RESPOSTA_DO_SNAPSHOT })
   async publicar(@Param() parametros: unknown): Promise<SnapshotDto> {
     const { snapshotId } = esquemaDoSnapshot.parse(parametros);
+    const contexto = this.contexto.require();
 
-    const snapshot = await this.ranking.publicar(this.contexto.require(), snapshotId, new Date());
+    /*
+     * `publicar` nao recebe `gymUnitId` na requisicao -- so no proprio
+     * snapshot -- entao o escopo so pode ser checado DEPOIS de carrega-lo.
+     * Carregar primeiro e ja tenant-escopado (`snapshotPorId`); se nao
+     * existir OU for de outra unidade, o erro tem de ser IDENTICO
+     * (`RANKING_SNAPSHOT_NAO_ENCONTRADO`) -- senao a diferenca entre as
+     * duas respostas denunciaria a existencia do snapshot alheio.
+     */
+    const snapshot = await this.ranking.snapshotPorId(contexto, snapshotId);
 
-    return this.paraDto(snapshot);
+    if (!snapshot || !this.dentroDoEscopo(contexto, snapshot.gymUnitId)) {
+      throw new NotFoundException({
+        code: 'RANKING_SNAPSHOT_NAO_ENCONTRADO',
+        message: 'RANKING_SNAPSHOT_NAO_ENCONTRADO',
+      });
+    }
+
+    const publicado = await this.ranking.publicar(contexto, snapshotId, new Date());
+
+    return this.paraDto(publicado);
   }
 
   @Post('xp/:studentId/ajustar')
@@ -147,5 +167,20 @@ export class EngagementXpController {
         points: entrada.points,
       })),
     };
+  }
+
+  /** `true` se o ator pode agir sobre `gymUnitId` -- `allowedUnitIds` e
+   * `'ALL'` (papel de tenant inteiro) ou contem a unidade. */
+  private dentroDoEscopo(contexto: TenantContext, gymUnitId: string): boolean {
+    return contexto.allowedUnitIds === 'ALL' || contexto.allowedUnitIds.has(gymUnitId);
+  }
+
+  /** Recusa com `NotFoundException` (nao `Forbidden`) quando a unidade esta
+   * fora do escopo do ator -- mesmo padrao de `ManualOverrideUseCase`:
+   * nao revelar que a unidade existe e deliberado. */
+  private exigirEscopoDaUnidade(contexto: TenantContext, gymUnitId: string): void {
+    if (!this.dentroDoEscopo(contexto, gymUnitId)) {
+      throw new NotFoundException({ code: 'GYM_UNIT_NOT_FOUND' });
+    }
   }
 }

@@ -111,6 +111,16 @@ export class EngagementRankingService {
   }
 
   /**
+   * Um snapshot pelo id, ja escopado por tenant -- exposto para o controller
+   * checar `allowedUnitIds` ANTES de publicar (Task 11, correcao critica):
+   * `publicar()` nao recebe `gymUnitId` na requisicao, so no proprio
+   * snapshot, entao o escopo so pode ser verificado depois de carrega-lo.
+   */
+  async snapshotPorId(contexto: TenantContext, snapshotId: string): Promise<SnapshotDeRanking | null> {
+    return this.porta.snapshotPorId(contexto, snapshotId);
+  }
+
+  /**
    * Publica um snapshot DRAFT. `M5-AC-007`: o snapshot e imutavel depois de
    * publicado -- republicar e recusado, nunca sobrescrito.
    */

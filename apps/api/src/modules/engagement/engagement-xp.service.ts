@@ -177,10 +177,20 @@ export class EngagementXpService {
     entrada: { pontos: number; motivo: string; idempotencyKey: string },
     agora: Date,
   ): Promise<void> {
-    const fusoDaUnidade = await this.porta.fusoDoAluno(contexto, studentId);
-    if (fusoDaUnidade === null) {
+    const unidade = await this.porta.unidadeDoAluno(contexto, studentId);
+
+    // Mesmo erro para "nao existe" e "existe, mas e de outra unidade"
+    // (padrao de `ManualOverrideUseCase`/`GYM_UNIT_NOT_FOUND`): um gerente
+    // restrito a unidade A nao pode ajustar XP de aluno da unidade B, e a
+    // resposta nao pode denunciar QUAL dos dois motivos foi.
+    if (
+      unidade === null ||
+      (contexto.allowedUnitIds !== 'ALL' && !contexto.allowedUnitIds.has(unidade.gymUnitId))
+    ) {
       throw new NotFoundException({ code: 'ALUNO_NAO_ENCONTRADO', message: 'Aluno nao encontrado' });
     }
+
+    const fusoDaUnidade = unidade.timezone;
 
     const regra = await this.porta.qualquerVersaoDeRegra(contexto);
     if (regra === null) {

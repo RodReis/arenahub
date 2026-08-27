@@ -73,14 +73,19 @@ export class FakePortaDeXp implements PortaDeXp {
   private readonly conquistasDesbloqueadas = new Set<string>();
   private readonly conquistasPorAluno: ConquistaDesbloqueada[] = [];
   private readonly optOuts = new Set<string>();
-  /** studentId -> fuso da unidade -- `undefined` = aluno inexistente no dublê. */
-  private readonly fusoPorAluno = new Map<string, string>();
+  /** studentId -> unidade + fuso -- `undefined` = aluno inexistente no dublê. */
+  private readonly unidadePorAluno = new Map<string, { gymUnitId: string; timezone: string }>();
   private colidirNaEscrita = false;
   private proximoId = 1;
 
-  /** So do dublê: registra o fuso da unidade do aluno -- Task 11 (ajuste manual). */
-  comAluno(studentId: string, fusoDaUnidade = 'America/Sao_Paulo'): void {
-    this.fusoPorAluno.set(studentId, fusoDaUnidade);
+  /** So do dublê: registra a unidade + fuso do aluno -- Task 11 (ajuste
+   * manual e checagem de escopo de unidade). */
+  comAluno(
+    studentId: string,
+    fusoDaUnidade = 'America/Sao_Paulo',
+    gymUnitId = 'unidade-1',
+  ): void {
+    this.unidadePorAluno.set(studentId, { gymUnitId, timezone: fusoDaUnidade });
   }
 
   comRegra(entrada: RegraDeTeste): void {
@@ -297,8 +302,11 @@ export class FakePortaDeXp implements PortaDeXp {
     );
   }
 
-  fusoDoAluno(_contexto: TenantContext, studentId: string): Promise<string | null> {
-    return Promise.resolve(this.fusoPorAluno.get(studentId) ?? null);
+  unidadeDoAluno(
+    _contexto: TenantContext,
+    studentId: string,
+  ): Promise<{ gymUnitId: string; timezone: string } | null> {
+    return Promise.resolve(this.unidadePorAluno.get(studentId) ?? null);
   }
 
   qualquerVersaoDeRegra(_contexto: TenantContext): Promise<{ id: string } | null> {
