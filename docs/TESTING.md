@@ -496,37 +496,56 @@ parâmetro de aluno, a regressão não é sutil: é a assinatura do método muda
 | 2026-08-27 | #30 | SPEC-030 | unitário   | 2060 | 2060 | 0 | 75.5 | — |
 ```
 
-**A linha não foi commitada em `reports/TESTS.md`** — o gerador manteve, para `integração`, o
-número da última execução bem-sucedida (645/645, herdado da `SPEC-044`) em vez de refletir a
-execução real desta fatia, e commitar essa linha registraria uma prova de integração que não
-existe. Rodar `pnpm test:report --issue 30 --spec SPEC-030` de novo depois da correção abaixo, e
-só então commitar `reports/TESTS.md`, é passo do fechamento desta fatia.
+**A linha não foi commitada em `reports/TESTS.md` na primeira tentativa**, e a razão virou achado:
+o gerador manteve, para `integração`, o número da última execução bem-sucedida (645/645, herdado
+da `SPEC-044`) em vez de refletir a execução real, que estava falhando. Commitar aquela linha
+registraria prova que não existia. **Regerar e commitar `reports/TESTS.md` é passo do fechamento
+desta fatia.**
 
-**Sem linha `integração` confiável nesta entrega**, e não é omissão silenciosa: `EngagementModule`
-não declara `TenantContextService` nos próprios `providers` (`PrivacyModule` e `KioskAdminModule`
-declaram; `EngagementModule` não). Rodar `pnpm --filter @arenahub/api test:integration` direto
-mostra a causa exata — `Test.createTestingModule({ imports: [AppModule] })` falha ao montar
-`EngagementController` por dependência não resolvida, e isso derruba **as 46 suítes de
-integração da API no boot**, não só as do módulo novo: **671 de 673 testes falhando**, 46 de 46
-suítes. `pnpm test:report` manteve o número da última execução bem-sucedida (645/645) em vez de
-reportar a queda — o script está descrito para isso no §5 acima, e é exatamente o comportamento
-que torna a linha da tabela **não confiável como prova de integração desta fatia**: os 645 são
-herança da `SPEC-044`, não evidência do que a F30 tocou.
+⚠️ **O gerador de relatório herda o número anterior quando a suíte falha.** Isso não é bug desta
+fatia — está descrito no §5 acima — mas é a armadilha que quase transformou 46 suítes quebradas em
+uma linha verde no documento de evidência. Quem fechar fatia daqui em diante: confira o número
+contra a execução, não contra o arquivo.
 
-**Isto é um defeito de código, fora do escopo desta task de documentação** (Task 11 do brief da
-F30, documentação apenas) — registrado aqui porque `TESTING.md` teria mentido se dissesse
-"integração verde" sem rodar. A correção é de uma linha: acrescentar `TenantContextService` aos
-`providers` de `apps/api/src/modules/engagement/engagement.module.ts`, no padrão que
-`PrivacyModule` e `KioskAdminModule` já seguem. **Bloqueia o portão de CI verde do `CLAUDE.md`** e
-precisa ser resolvido antes de qualquer PR desta fatia poder fechar.
+#### O defeito que a geração de evidência encontrou — e como escapou de seis revisões
+
+Ao gerar a evidência acima, a integração **não subia**: `EngagementModule` não declarava
+`TenantContextService` nos próprios `providers`, embora o `EngagementController` o injete.
+`Test.createTestingModule({ imports: [AppModule] })` falhava ao montar o controller, e isso
+derrubava **as 46 suítes de integração da API no boot** — 671 de 673 testes —, inclusive suítes
+sem relação nenhuma com engajamento (`listar-invoices` entre elas).
+
+**Corrigido em `dd43ce0`**, com uma linha e o import, no padrão que `PrivacyModule` e
+`KioskAdminModule` já seguem. Verificado depois: `listar-invoices` 8/8, `engagement` 5/5,
+unitário 943/943 no pacote, lint verde.
+
+**Por que passou por seis revisões de código.** O teste unitário do controller declara
+`TenantContextService` na mão dentro do `Test.createTestingModule` — passava verde enquanto o
+`AppModule` real quebrava. É a mesma classe de defeito que já custou uma rodada nesta fatia (o
+`EngagementModule` esquecido no `AppModule`, achado pela F30 na task de integração): **revisão de
+diff não enxerga o que não está lá.** Só boot real enxerga.
+
+A lição para o `docs/REVIEW.md`: quando uma fatia cria módulo Nest novo, a checagem de fiação
+(`AppModule` o registra? o módulo declara tudo que seus controllers injetam?) não pode depender de
+alguém reparar na ausência — precisa de teste que suba o `AppModule` de verdade.
 
 O unitário (2060/2060, cobrindo os 48 testes próprios do módulo — `participacao.spec.ts`,
 `exposicao.spec.ts`, `triagem-de-alias.spec.ts`, `engagement.service.spec.ts`,
-`engagement.controller.spec.ts`) roda limpo porque não sobe o `AppModule` inteiro, e prova o
-domínio puro e o service com dublê de repositório. O que ele **não** prova — os dois regimes
-convivendo na mesma tabela real, o índice parcial recusando o segundo `APPROVED`, o isolamento de
-tenant e sessão — está escrito em `apps/api/test/integration/engagement.int-spec.ts`, mas não
-roda enquanto o módulo não sobe.
+`engagement.controller.spec.ts`) prova o domínio puro e o service com dublê de repositório.
+
+O que ele **não** prova, e por isso existe `apps/api/test/integration/engagement.int-spec.ts`
+(5 casos, verdes):
+
+| o que o caso prova | por que só integração prova |
+|---|---|
+| os dois regimes na mesma tabela sem contaminação | exige `ConsentRecord` real com linhas de biometria e de engajamento lado a lado |
+| dois alunos com o mesmo alias `PENDING` convivem | o índice é **parcial**; dublê não tem índice |
+| o segundo `APPROVED` com o mesmo alias é recusado | a recusa vem do Postgres, não do código |
+| o mesmo alias aprovado em outro tenant é permitido | prova que a chave inclui `tenant_id` |
+| decisão vigente com `occurredAt` empatado | prova que o `orderBy` decide, não a ordem física |
+
+Mais 7 casos em `kiosk-engajamento.int-spec.ts`, incluindo a dedupe por `idempotencyKey` contada
+no banco — asserção só na resposta HTTP não distinguiria dedupe de regravação.
 
 ---
 

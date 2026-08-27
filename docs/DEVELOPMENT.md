@@ -1126,15 +1126,22 @@ de escrita** — o estado existe no enum e no filtro de listagem, mas nenhuma ro
 para denúncia, que só chega na F35. E **sem outbox nem cache de exposição**: nenhum consumidor
 existe hoje — a F33 é quem vai pedir os dois, quando existir.
 
-🔴 **Achado que fica registrado para quem for mergear esta fatia:** `EngagementModule` não
-declara `TenantContextService` nos próprios `providers` (as demais rotas que dependem dele —
-`PrivacyModule`, `KioskAdminModule` — declaram). `TenantContextService` acaba resolvido no grafo
-de outro jeito para o app subir em produção, mas o `TestingModule` de integração **não** tem essa
-rede de segurança: `Test.createTestingModule({ imports: [AppModule] })` falha ao instanciar
-`EngagementController`, e **toda a suíte de integração da API (46 suítes) quebra no boot**, não
-só os testes do módulo novo. Unitário passa limpo (2060/2060) porque não sobe o Nest inteiro. Isto
-bloqueia o gate de CI verde do `CLAUDE.md` e precisa de correção de código antes do merge — fora
-do escopo desta task de documentação.
+🔴 **O defeito que a geração de evidência pegou, e que seis revisões de código não pegaram.**
+`EngagementModule` não declarava `TenantContextService` nos próprios `providers`, embora o
+`EngagementController` o injete. O Nest não resolvia o controller e **derrubava o boot da
+aplicação inteira**: 46 suítes de integração, 671 de 673 testes, incluindo suítes sem relação
+nenhuma com engajamento — `listar-invoices` entre elas.
+
+**Corrigido em `dd43ce0`** (uma linha e o import, no padrão de `PrivacyModule` e
+`KioskAdminModule`). Verificado depois: `listar-invoices` 8/8, `engagement` 5/5, unitário 943/943
+no pacote, lint verde.
+
+**Por que escapou.** O teste unitário do controller declara `TenantContextService` na mão dentro
+do `Test.createTestingModule` — verde no teste, quebrado no `AppModule` real. É a **segunda** vez
+nesta fatia que fiação ausente atravessa a revisão: a primeira foi o próprio `EngagementModule`
+esquecido no `AppModule`, achado quando a F30 escreveu o teste de integração. As duas têm a mesma
+forma — **revisão de diff não enxerga o que não está lá.** Quem criar módulo Nest novo daqui em
+diante: a fiação só se prova subindo o `AppModule` de verdade.
 
 ---
 
