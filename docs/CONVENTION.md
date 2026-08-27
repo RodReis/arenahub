@@ -472,7 +472,7 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 ### 4.15 Ranking, privacidade e telas públicas (INV-120 a INV-125)
 
 - **INV-120** *(emendado por ADR-046, 26/08/2026)* Ranking é **opt-out**: o aluno participa por padrão e escolhe como o nome aparece; quem não quiser aparecer pede para sair, e a saída vale a partir da próxima projeção. Redação original ("ranking é opt-in") valia antes da decisão do PI que criou a F30 — ver INV-153 a INV-155.
-- **INV-121** Não criar "quem perdeu mais peso" como ranking principal. *(A Especificação §57 abre com "maior redução percentual de gordura" — contradiz a própria §60. Resolver na spec de F33.)*
+- **INV-121** Não criar "quem perdeu mais peso" como ranking principal. *(A Especificação §57 abre com "maior redução percentual de gordura" — contradiz a própria §60.)* **Respeitado por construção na F31** (ADR-047): o único placar que existe ranqueia **XP de frequência**, e o ranking de evolução física relativa ficou fora de escopo — ele exige o consentimento `PHYSICAL_EVOLUTION_RANKING`, dormente desde a F30, e volta na fatia que o acender.
 - **INV-122** Evitar streak que premie treino excessivo diário.
 - **INV-123** **A tela pública da catraca não exibe dívida, valor, CPF ou dado sensível.** Bloqueio mostra "Plano pendente. Procure a recepção."
 - **INV-124** Status é apresentado como resultado + razão, nunca inferido só por cor.
