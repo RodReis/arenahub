@@ -207,4 +207,68 @@ describe('EngagementRankingService.lerPlacarPublicado', () => {
 
     expect(await servico.lerPlacarPublicado(CTX, 'unidade-1', MES)).toEqual([]);
   });
+
+  /*
+   * A POSICAO NAO E RENUMERADA quando alguem sai. Quem era 3o continua 3o, e
+   * o 2o simplesmente nao aparece.
+   *
+   * Renumerar produziria 1, 2, 3 sem buraco -- e comparar duas leituras
+   * revelaria por deducao quem pediu para sair. O buraco e a privacidade.
+   */
+  it('nao renumera a posicao de quem ficou', async () => {
+    await publicadoCom(['ana', 'bruno', 'carla', 'diego', 'elisa']);
+
+    fake.comOptOut('bruno');
+
+    const placar = await servico.lerPlacarPublicado(CTX, 'unidade-1', MES);
+
+    expect(placar.map((e) => e.position)).toEqual([1, 3, 4, 5]);
+  });
+});
+
+describe('EngagementRankingService.posicaoDoAluno', () => {
+  let fake: FakePortaDeRanking;
+  let servico: EngagementRankingService;
+
+  beforeEach(() => {
+    fake = new FakePortaDeRanking();
+    servico = new EngagementRankingService(fake);
+    fake.comCoorteMinima(1);
+  });
+
+  async function publicadoCom(studentIds: readonly string[]): Promise<void> {
+    const saldos = studentIds.map((id, indice) => ({
+      studentId: id,
+      points: (studentIds.length - indice) * 10,
+      lastEntryAt: AGORA,
+    }));
+    fake.comSaldos('unidade-1', MES, saldos);
+    for (const id of studentIds) {
+      fake.comAluno(id, `${id.charAt(0).toUpperCase()}${id.slice(1)} Sobrenome Teste`);
+    }
+
+    const snapshot = await servico.gerarSnapshot(CTX, 'unidade-1', MES, AGORA);
+    await servico.publicar(CTX, snapshot.id, AGORA);
+  }
+
+  it('devolve a posicao correta do aluno consultado', async () => {
+    await publicadoCom(['ana', 'bruno', 'carla']);
+
+    const posicao = await servico.posicaoDoAluno(CTX, 'unidade-1', MES, 'bruno');
+
+    expect(posicao).toEqual({ position: 2, nomeExibido: 'Bruno', points: 20 });
+  });
+
+  /*
+   * O caso interessante: quem saiu do placar nao tem posicao, nem para SI
+   * MESMO -- `resolverExposicao` nao abre excecao para o proprio titular.
+   */
+  it('devolve null quando o proprio aluno consultado esta em opt-out', async () => {
+    await publicadoCom(['ana', 'bruno', 'carla']);
+    fake.comOptOut('bruno');
+
+    const posicao = await servico.posicaoDoAluno(CTX, 'unidade-1', MES, 'bruno');
+
+    expect(posicao).toBeNull();
+  });
 });
