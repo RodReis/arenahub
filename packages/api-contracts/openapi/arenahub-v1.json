@@ -1686,6 +1686,188 @@
         ]
       }
     },
+    "/api/v1/engagement/aliases": {
+      "get": {
+        "operationId": "EngagementController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "itens"
+                  ],
+                  "properties": {
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "identityChoice",
+                          "alias",
+                          "status",
+                          "version",
+                          "alunoNome"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "identityChoice": {
+                            "type": "string",
+                            "enum": [
+                              "PRIMEIRO_NOME",
+                              "APELIDO",
+                              "ANONIMO"
+                            ]
+                          },
+                          "alias": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "aliasNormalized": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "PENDING",
+                              "APPROVED",
+                              "REJECTED",
+                              "HIDDEN"
+                            ]
+                          },
+                          "screeningSignals": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "rejectionReason": {
+                            "type": "string",
+                            "enum": [
+                              "OFENSIVO",
+                              "CONTEM_PII",
+                              "IMPERSONACAO",
+                              "SPAM_OU_PROPAGANDA",
+                              "ILEGIVEL"
+                            ],
+                            "nullable": true
+                          },
+                          "version": {
+                            "type": "integer"
+                          },
+                          "alunoNome": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Engagement"
+        ]
+      }
+    },
+    "/api/v1/engagement/aliases/{id}": {
+      "patch": {
+        "operationId": "EngagementController_moderar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "identityChoice",
+                    "alias",
+                    "status",
+                    "version"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "identityChoice": {
+                      "type": "string",
+                      "enum": [
+                        "PRIMEIRO_NOME",
+                        "APELIDO",
+                        "ANONIMO"
+                      ]
+                    },
+                    "alias": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "aliasNormalized": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING",
+                        "APPROVED",
+                        "REJECTED",
+                        "HIDDEN"
+                      ]
+                    },
+                    "screeningSignals": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "rejectionReason": {
+                      "type": "string",
+                      "enum": [
+                        "OFENSIVO",
+                        "CONTEM_PII",
+                        "IMPERSONACAO",
+                        "SPAM_OU_PROPAGANDA",
+                        "ILEGIVEL"
+                      ],
+                      "nullable": true
+                    },
+                    "version": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Engagement"
+        ]
+      }
+    },
     "/api/v1/edge/heartbeat": {
       "post": {
         "operationId": "EdgeController_heartbeat",
@@ -2469,6 +2651,167 @@
                           }
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/engajamento/preferencias": {
+      "get": {
+        "operationId": "KioskController_obterPreferenciasDeEngajamento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "finalidades",
+                    "perfil",
+                    "nomeExibido"
+                  ],
+                  "properties": {
+                    "finalidades": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "perfil": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": true
+                    },
+                    "nomeExibido": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      },
+      "patch": {
+        "operationId": "KioskController_atualizarPreferenciaDeEngajamento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "finalidades",
+                    "perfil",
+                    "nomeExibido"
+                  ],
+                  "properties": {
+                    "finalidades": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "perfil": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": true
+                    },
+                    "nomeExibido": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/engajamento/perfil-publico": {
+      "patch": {
+        "operationId": "KioskController_definirPerfilPublico",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "identityChoice",
+                    "alias",
+                    "status",
+                    "version"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "identityChoice": {
+                      "type": "string",
+                      "enum": [
+                        "PRIMEIRO_NOME",
+                        "APELIDO",
+                        "ANONIMO"
+                      ]
+                    },
+                    "alias": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer"
                     }
                   }
                 }

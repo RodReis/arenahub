@@ -507,6 +507,36 @@ fatia — está descrito no §5 acima — mas é a armadilha que quase transform
 uma linha verde no documento de evidência. Quem fechar fatia daqui em diante: confira o número
 contra a execução, não contra o arquivo.
 
+#### Percurso na tela — 27/08/2026, ambiente local completo
+
+O plano da F30 exigia percorrer o fluxo com o servidor de pé, e a revisão final foi enfática:
+*"não fechar sem ele"*. Feito com Playwright, API em `3344`, totem em `3000`, painel em `3010`.
+
+| passo | resultado |
+|---|---|
+| Ligar o módulo `ranking` na configuração do totem, publicar | versão 3 publicada com `ranking: true` |
+| Abrir a área do aluno por CPF | teclado na tela, campo `readonly` — só o teclado do totem digita |
+| Ver o interruptor de ranking | **nasce `[checked]`** — o regime opt-out visível ao aluno |
+| Conferir finalidades dormentes | `CHALLENGE` e `ENGAGEMENT_PUSH` **não aparecem** |
+| Desligar o ranking | `PATCH … 200` na ponte; `ConsentRecord` `REFUSED` gravado |
+| Reabrir a sessão | `RANKING: false` persistiu |
+| Pedir apelido "Tigre" | gravado `PENDING`, `nomeExibido` **não vaza** o apelido pendente |
+| Abrir a fila de moderação | o apelido aparece com o **nome completo do aluno**, vindo da API |
+| Aprovar | `APPROVED`, `alias_normalized: tigre`, moderador registrado, fila esvazia |
+| Voltar ao ranking | `nomeExibido` vira **"Tigre"** — o ciclo fecha |
+| Repetir o `PATCH` com a mesma `idempotencyKey` | **uma única linha** em `consent_records` |
+
+**O percurso achou a quinta falha de fiação da fatia** — e é a razão de ele existir. A aba de
+módulos do painel **não listava `ranking`**: o módulo só podia ser ligado por SQL. O comentário
+da F50 apontava a F33 como dona (*"quando a F33 entregar, ela acrescenta a linha aqui"*), e a
+F30 chegou antes. Corrigido em `cffba6e`, com o teste que provava a ausência invertido.
+
+**Nenhuma das cinco falhas de fiação desta fatia foi achada por revisão de diff.** Duas vieram
+de teste de integração, uma da geração de evidência, e duas — `PATCH` ausente na ponte e o
+campo que a API não enviava — só apareceriam abrindo a tela. Elas atravessam **processo**
+(navegador → Next → Nest, e Nest → Next SSR), onde `fetch` e `chamarApi<T>` são casts não
+verificados que nenhum compilador confere.
+
 #### O defeito que a geração de evidência encontrou — e como escapou de seis revisões
 
 Ao gerar a evidência acima, a integração **não subia**: `EngagementModule` não declarava

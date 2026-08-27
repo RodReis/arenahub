@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
@@ -14,9 +15,13 @@ const RAZOES_DE_REJEICAO = [
   'ILEGIVEL',
 ] as const;
 
+/** Espelham `PublicProfileStatus` e `PublicIdentityChoice` do schema. */
+const ESTADOS_DO_PERFIL = ['PENDING', 'APPROVED', 'REJECTED', 'HIDDEN'] as const;
+const IDENTIDADES = ['PRIMEIRO_NOME', 'APELIDO', 'ANONIMO'] as const;
+
 const esquemaDeListagem = z
   .object({
-    status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'HIDDEN']),
+    status: z.enum(ESTADOS_DO_PERFIL),
   })
   .strict();
 
@@ -67,6 +72,33 @@ export class EngagementController {
 
   @Get()
   @RequirePermissions('engagement.read')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['itens'],
+      properties: {
+        itens: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['id', 'identityChoice', 'alias', 'status', 'version', 'alunoNome'],
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              identityChoice: { type: 'string', enum: [...IDENTIDADES] },
+              alias: { type: 'string', nullable: true },
+              aliasNormalized: { type: 'string', nullable: true },
+              status: { type: 'string', enum: [...ESTADOS_DO_PERFIL] },
+              screeningSignals: { type: 'array', items: { type: 'string' } },
+              rejectionReason: { type: 'string', enum: [...RAZOES_DE_REJEICAO], nullable: true },
+              version: { type: 'integer' },
+              /** Nome COMPLETO: quem modera precisa distinguir homonimos. */
+              alunoNome: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  })
   async listar(@Query() consulta: unknown): Promise<{ itens: ItemDaFilaDto[] }> {
     const filtro = esquemaDeListagem.parse(consulta);
 
@@ -79,6 +111,22 @@ export class EngagementController {
 
   @Patch(':id')
   @RequirePermissions('engagement.moderate')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['id', 'identityChoice', 'alias', 'status', 'version'],
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        identityChoice: { type: 'string', enum: [...IDENTIDADES] },
+        alias: { type: 'string', nullable: true },
+        aliasNormalized: { type: 'string', nullable: true },
+        status: { type: 'string', enum: [...ESTADOS_DO_PERFIL] },
+        screeningSignals: { type: 'array', items: { type: 'string' } },
+        rejectionReason: { type: 'string', enum: [...RAZOES_DE_REJEICAO], nullable: true },
+        version: { type: 'integer' },
+      },
+    },
+  })
   async moderar(@Param('id') id: string, @Body() corpo: unknown): Promise<PerfilDto> {
     const entrada = esquemaDeModeracao.parse(corpo);
 
