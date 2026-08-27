@@ -365,6 +365,14 @@ describe('triarAlias -- sinais', () => {
     expect(triarAlias(bruto, SEM_BLOQUEIO).sinais).toContain(sinal);
   });
 
+  it('onze digitos nus levam OS DOIS sinais -- a triagem nao escolhe por ordem de if', () => {
+    // CPF sem pontuacao e telefone sem pontuacao sao a mesma string. Quem
+    // decide e o moderador, com as duas hipoteses na frente.
+    const sinais = triarAlias('52998224725', SEM_BLOQUEIO).sinais;
+    expect(sinais).toContain('PARECE_CPF');
+    expect(sinais).toContain('PARECE_TELEFONE');
+  });
+
   it('sinaliza palavra bloqueada do tenant', () => {
     expect(triarAlias('Tigre Palavrao', ['palavrao']).sinais).toContain('PALAVRA_BLOQUEADA');
   });
@@ -466,8 +474,18 @@ export function triarAlias(
   if (!TEM_ALFANUMERICO.test(normalizado)) sinais.add('SO_SIMBOLOS');
 
   if (EMAIL.test(normalizado)) sinais.add('PARECE_EMAIL');
+
+  /*
+   * OS DOIS SINAIS ACUMULAM, de proposito -- nada de `else if` aqui.
+   *
+   * Onze digitos nus (`52998224725`) sao um CPF valido E um telefone
+   * plausivel. Escolher um por ordem de `if` faz a ordem decidir: CPF
+   * primeiro rotula todo celular como documento; telefone primeiro esconde
+   * o CPF atras do sinal mais barato. A triagem CLASSIFICA e o humano
+   * decide -- entrada ambigua vai para a fila com as DUAS hipoteses.
+   */
   if (CPF.test(normalizado)) sinais.add('PARECE_CPF');
-  else if (TELEFONE.test(normalizado)) sinais.add('PARECE_TELEFONE');
+  if (TELEFONE.test(normalizado)) sinais.add('PARECE_TELEFONE');
 
   const comparavel = semAcento(normalizado);
   const bloqueada = palavrasBloqueadas.some((palavra) =>
