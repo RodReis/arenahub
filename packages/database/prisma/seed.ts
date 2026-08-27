@@ -150,6 +150,11 @@ const PERMISSOES = [
   'biometric.revoke',
   'device.manage',
   'device.read',
+  // F30: moderacao de apelido publico. Trabalho de recepcao/operacao, nao de
+  // financeiro -- por isso entra na mesma vizinhanca de `student.read` e
+  // `consent.manage`, nao junto de `billing.*`.
+  'engagement.read',
+  'engagement.moderate',
   // F9: decisao de acesso e liberacao manual.
   //
   // `access.override` e separado de tudo: quem opera a recepcao no dia a dia
