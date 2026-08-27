@@ -54,4 +54,21 @@ describe('triarAlias -- sinais', () => {
   it('alias limpo nao gera sinal nenhum', () => {
     expect(triarAlias('Tigre', SEM_BLOQUEIO).sinais).toEqual([]);
   });
+
+  it('11 digitos nus gera ambiguo: TELEFONE e CPF', () => {
+    const resultado = triarAlias('52998224725', SEM_BLOQUEIO);
+    expect(resultado.sinais).toContain('PARECE_TELEFONE');
+    expect(resultado.sinais).toContain('PARECE_CPF');
+  });
+
+  it('CPF formatado (com ponto e hifen) gera so CPF', () => {
+    const resultado = triarAlias('529.982.247-25', SEM_BLOQUEIO);
+    expect(resultado.sinais).toContain('PARECE_CPF');
+  });
+
+  it('telefone sem ponto (com parentese e hifen) gera so TELEFONE', () => {
+    const resultado = triarAlias('(41) 99999-8888', SEM_BLOQUEIO);
+    expect(resultado.sinais).toContain('PARECE_TELEFONE');
+    expect(resultado.sinais).not.toContain('PARECE_CPF');
+  });
 });

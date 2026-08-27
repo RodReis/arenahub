@@ -34,9 +34,9 @@ const INVISIVEIS = /[­​-‏‪-‮⁠-⁤﻿]/gu;
 
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/u;
 /** 10 ou 11 digitos seguidos, com ou sem separador -- telefone brasileiro. */
-const TELEFONE = /(?:\d[\s()-]*){10,11}/u;
-/** 11 digitos com a pontuacao classica de CPF -- deve ter separadores. */
-const CPF = /\d{3}[.]\d{3}[.]\d{3}[-]\d{2}|\d{3}\s\d{3}\s\d{3}[-\s]\d{2}/u;
+const TELEFONE = /(?:\d[\s().-]*){10,11}/u;
+/** 11 digitos com a pontuacao classica de CPF. */
+const CPF = /\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2}/u;
 /** Pelo menos uma letra ou digito -- senao e so simbolo. */
 const TEM_ALFANUMERICO = /[\p{L}\p{N}]/u;
 
@@ -73,8 +73,10 @@ export function triarAlias(
   if (!TEM_ALFANUMERICO.test(normalizado)) sinais.add('SO_SIMBOLOS');
 
   if (EMAIL.test(normalizado)) sinais.add('PARECE_EMAIL');
+  // Entrada pode ser ambigua: ambos os sinais sao anexados para que o moderador
+  // veja as duas hipoteses em vez de uma escolhida por ordem de if.
   if (TELEFONE.test(normalizado)) sinais.add('PARECE_TELEFONE');
-  else if (CPF.test(normalizado)) sinais.add('PARECE_CPF');
+  if (CPF.test(normalizado)) sinais.add('PARECE_CPF');
 
   const comparavel = semAcento(normalizado);
   const bloqueada = palavrasBloqueadas.some((palavra) =>
