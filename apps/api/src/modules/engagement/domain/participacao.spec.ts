@@ -1,3 +1,5 @@
+import { describe, expect, it } from '@jest/globals';
+
 import { participaDoRanking } from './participacao.js';
 
 describe('participaDoRanking -- regime de OPT-OUT', () => {

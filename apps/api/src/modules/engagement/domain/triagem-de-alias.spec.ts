@@ -1,4 +1,6 @@
-import { triarAlias } from './triagem-de-alias.js';
+import { describe, expect, it } from '@jest/globals';
+
+import { triarAlias, type SinalDeAlias } from './triagem-de-alias.js';
 
 const SEM_BLOQUEIO: readonly string[] = [];
 
@@ -31,11 +33,13 @@ describe('triarAlias -- sinais', () => {
     expect(triarAlias('a'.repeat(25), SEM_BLOQUEIO).sinais).toContain('LONGO_DEMAIS');
   });
 
-  it.each([
+  // Sem `as const`: `it.each` recusa tupla readonly, e o tipo do elemento
+  // ja vem estreito o bastante do proprio literal.
+  it.each<[string, SinalDeAlias]>([
     ['ana@exemplo.com', 'PARECE_EMAIL'],
     ['41999998888', 'PARECE_TELEFONE'],
     ['529.982.247-25', 'PARECE_CPF'],
-  ] as const)('sinaliza PII: %s', (bruto, sinal) => {
+  ])('sinaliza PII: %s', (bruto, sinal) => {
     expect(triarAlias(bruto, SEM_BLOQUEIO).sinais).toContain(sinal);
   });
 

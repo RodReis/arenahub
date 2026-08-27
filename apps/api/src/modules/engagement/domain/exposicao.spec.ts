@@ -1,3 +1,5 @@
+import { describe, expect, it } from '@jest/globals';
+
 import { NOME_ANONIMO, resolverExposicao } from './exposicao.js';
 
 const base = {

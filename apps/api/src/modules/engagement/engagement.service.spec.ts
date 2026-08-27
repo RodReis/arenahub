@@ -1,3 +1,5 @@
+import { beforeEach, describe, expect, it } from '@jest/globals';
+
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 import { EngagementService } from './engagement.service.js';
@@ -48,8 +50,16 @@ describe('EngagementService -- preferencias', () => {
 
     expect((await service.obterPreferencias(CTX, 'a1')).finalidades.RANKING).toBe(true);
     // INV-021: a decisao anterior continua existindo, marcada como substituida.
-    expect(repo.decisoesDe('a1', 'RANKING')).toHaveLength(2);
-    expect(repo.decisoesDe('a1', 'RANKING')[0].supersededAt).toEqual(AGORA);
+    const decisoes = repo.decisoesDe('a1', 'RANKING');
+    expect(decisoes).toHaveLength(2);
+
+    // `toHaveLength` acima ja garante o elemento; o `if` existe para o
+    // compilador, e lanca em vez de virar `?.` -- um encadeamento opcional
+    // aqui faria a asserção sumir calada se a lista viesse vazia.
+    const anterior = decisoes[0];
+    if (!anterior) throw new Error('esperava a decisao anterior na posicao 0');
+
+    expect(anterior.supersededAt).toEqual(AGORA);
   });
 
   it('mesma Idempotency-Key nao cria segunda linha', async () => {
