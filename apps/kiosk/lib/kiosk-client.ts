@@ -323,3 +323,78 @@ export function carregarAvaliacoes(sessionId: string, token: string) {
 export function carregarEvolucao(sessionId: string, token: string) {
   return daSessao<EvolucaoDoTotem>(`${daSessaoId(sessionId)}/evolution`, token);
 }
+
+/* ---------------------------------------------------------------------
+ * PREFERENCIA DE ENGAJAMENTO E IDENTIDADE PUBLICA (F30, Task 8).
+ *
+ * `finalidades` traz as QUATRO chaves do dominio (RANKING, CHALLENGE,
+ * ENGAGEMENT_PUSH, PHYSICAL_EVOLUTION_RANKING), mas so `RANKING` tem
+ * consumidor nesta fatia -- as outras existem no banco sem tela. A tela le
+ * so `finalidades.RANKING` e ignora o resto, de proposito.
+ * --------------------------------------------------------------------- */
+
+export interface PerfilPublicoDoTotem {
+  readonly id: string;
+  readonly identityChoice: 'PRIMEIRO_NOME' | 'APELIDO' | 'ANONIMO';
+  readonly alias: string | null;
+  readonly status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HIDDEN';
+  readonly version: number;
+}
+
+export interface PreferenciasDoTotem {
+  readonly finalidades: Record<string, boolean>;
+  readonly perfil: PerfilPublicoDoTotem | null;
+  readonly nomeExibido: string;
+}
+
+export function carregarPreferencias(sessionId: string, token: string) {
+  return daSessao<PreferenciasDoTotem>(`${daSessaoId(sessionId)}/engajamento/preferencias`, token);
+}
+
+/**
+ * PATCH exige `idempotencyKey` no corpo -- toque duplo no totem devolve o
+ * mesmo resultado em vez de gravar decisao nova. Gerada por chamada, nunca
+ * fixa: `crypto.randomUUID()` e suportado em todo navegador do totem.
+ */
+async function patchDaSessao<T>(
+  caminho: string,
+  token: string,
+  corpo: Record<string, unknown>,
+): Promise<T | null> {
+  try {
+    const resposta = await fetch(`/api/kiosk/${caminho}`, {
+      method: 'PATCH',
+      headers: { 'x-session-token': token, 'content-type': 'application/json' },
+      body: JSON.stringify(corpo),
+      cache: 'no-store',
+    });
+
+    if (!resposta.ok) return null;
+
+    return (await resposta.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+export function atualizarPreferenciaDeRanking(sessionId: string, token: string, participa: boolean) {
+  return patchDaSessao<PreferenciasDoTotem>(
+    `${daSessaoId(sessionId)}/engajamento/preferencias`,
+    token,
+    { finalidade: 'RANKING', participa, idempotencyKey: crypto.randomUUID() },
+  );
+}
+
+export function atualizarPerfilPublico(
+  sessionId: string,
+  token: string,
+  identityChoice: 'PRIMEIRO_NOME' | 'APELIDO' | 'ANONIMO',
+  alias: string | null,
+  version: number | null,
+) {
+  return patchDaSessao<PerfilPublicoDoTotem>(
+    `${daSessaoId(sessionId)}/engajamento/perfil-publico`,
+    token,
+    { identityChoice, alias, version },
+  );
+}

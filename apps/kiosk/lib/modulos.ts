@@ -17,10 +17,11 @@ export interface CardDeModulo {
  * um objeto e da declaracao do schema Zod, e mover um campo la reordenaria a
  * tela do totem sem ninguem pedir.
  *
- * `ranking` esta FORA: a F33 (MVP 5) e a fatia que o alimenta e nao foi
- * entregue -- modulo sem fatia entregue nao aparece (ADR-042, Decisao 5,
- * trava 2). O campo segue no contrato, e a ausencia aqui e o que o mantem
- * invisivel.
+ * `ranking` ENTRA aqui na F30: esta fatia e a que entrega a tela de
+ * preferencia de exposicao (`<Preferencias />`) -- modulo sem fatia entregue
+ * nao aparece (ADR-042, Decisao 5, trava 2), e agora ha fatia. O ranking
+ * PUBLICO em si (mostrar posicao, nomes) continua sendo a F33 -- este card
+ * so leva a tela de CONSENTIMENTO, nao a um placar.
  */
 const GRADE: readonly CardDeModulo[] = [
   {
@@ -51,6 +52,12 @@ const GRADE: readonly CardDeModulo[] = [
     campo: 'historicoDePagamentos',
     titulo: 'Histórico de pagamentos',
     destino: 'Faturas e comprovantes',
+    natureza: 'leitura',
+  },
+  {
+    campo: 'ranking',
+    titulo: 'Minhas preferências',
+    destino: 'Ranking e nome exibido',
     natureza: 'leitura',
   },
 ];

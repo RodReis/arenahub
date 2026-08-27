@@ -47,7 +47,9 @@ describe('allowlist da ponte assinada', () => {
     ['avaliacao do mes', `sessions/${SESSAO}/assessment`],
     ['historico de avaliacoes', `sessions/${SESSAO}/assessments`],
     ['evolucao', `sessions/${SESSAO}/evolution`],
-  ])('aceita %s', (_caso, resto) => {
+    ['preferencia de engajamento', `sessions/${SESSAO}/engajamento/preferencias`],
+    ['perfil publico', `sessions/${SESSAO}/engajamento/perfil-publico`],
+  ] as const)('aceita %s', (_caso, resto) => {
     expect(resolverCaminhoDaPonte(`/api/kiosk/${resto}`)).toBe(`/api/v1/kiosk/${resto}`);
   });
 

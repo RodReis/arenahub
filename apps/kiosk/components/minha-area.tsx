@@ -9,6 +9,7 @@ import { modulosVisiveis, type CardDeModulo } from '../lib/modulos';
 import { HistoricoDePagamentos } from './historico-de-pagamentos';
 import { IconeAtencao, IconeConfirmado } from './icones';
 import { Pagamento } from './pagamento';
+import { Preferencias } from './preferencias';
 import { AvaliacaoDoMes, Evolucao, HistoricoDeAvaliacoes } from './saude';
 
 /**
@@ -61,6 +62,8 @@ export function MinhaArea({
   if (aberto === 'evolucao') return <Evolucao sessao={sessao} aoVoltar={voltar} />;
   if (aberto === 'historicoDeAvaliacoes')
     return <HistoricoDeAvaliacoes sessao={sessao} aoVoltar={voltar} />;
+
+  if (aberto === 'ranking') return <Preferencias sessao={sessao} aoVoltar={voltar} />;
 
   if (aberto === 'historicoDePagamentos')
     return (

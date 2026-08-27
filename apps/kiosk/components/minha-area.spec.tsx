@@ -88,14 +88,14 @@ describe('MinhaArea', () => {
     expect(screen.queryByTestId('modulo-evolucao')).not.toBeInTheDocument();
   });
 
-  it('não acende a grade só porque ranking está ligado', () => {
-    // `ranking: true` numa config publicada nao pode produzir grade VAZIA:
-    // a F33 nao entregou, entao nao ha card -- e sem card a tela volta a
-    // dizer "procure a recepcao", que e a verdade.
+  it('acende a grade quando ranking está ligado -- F30 entregou o card', () => {
+    // Ate a F30, `ranking: true` numa config publicada produzia grade VAZIA
+    // porque a F33 nao tinha entregado o consumidor. A F30 entrega a tela de
+    // preferencia de exposicao (`<Preferencias />`), entao o card existe.
     render(<MinhaArea sessao={sessao(null)} config={config({ ranking: true })} />);
 
-    expect(screen.queryByTestId('grade-de-modulos')).not.toBeInTheDocument();
-    expect(screen.getByText(/procure a recepção/i)).toBeInTheDocument();
+    expect(screen.getByTestId('grade-de-modulos')).toBeInTheDocument();
+    expect(screen.getByTestId('modulo-ranking')).toBeInTheDocument();
   });
 
   it('usa botão nativo nos cards — teclado e leitor de tela sem reimplementação', () => {
