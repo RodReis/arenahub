@@ -111,6 +111,15 @@ export class EngagementXpService {
     return { localMonth: mes, saldo };
   }
 
+  /**
+   * `M5-NFR-002`: a projecao e reconstruivel a partir do ledger, sem tocar
+   * nele. So repassa para a porta -- `recalcularSaldo` ja faz exatamente
+   * isso (Task 6); expor aqui evita que o teste precise conhecer a porta.
+   */
+  async reconstruirProjecao(contexto: TenantContext, studentId: string): Promise<void> {
+    await this.porta.recalcularSaldo(contexto, studentId);
+  }
+
   /** Avalia conquistas contra a evidencia do ledger e grava as novas. */
   private async avaliarEGravarConquistas(
     contexto: TenantContext,
