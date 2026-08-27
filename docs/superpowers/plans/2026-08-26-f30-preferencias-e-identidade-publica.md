@@ -24,6 +24,7 @@
 - **Dinheiro não aparece nesta fatia.** Se aparecer, é sinal de escopo vazando.
 - **Toda tela lê tokens** — nunca hex literal (a lint proíbe). `DS-TOTEM.md` para o totem, `DS-PAINEL.md` para o painel.
 - **Toast, nunca `alert`**, para info/aviso/erro.
+- **`idempotencyKey` vai no CORPO, validado por Zod (`z.string().min(8).max(120)`), nunca em header.** É o padrão do repositório — `health-progress.controller.ts:80` e `manual-override.controller.ts:30`. Onde os blocos abaixo mostram `Idempotency-Key` como header, está errado: header que ninguém lê deixa a idempotência inerte e o teste finge cobri-la.
 - **Migration é SQL escrito à mão** em `packages/database/prisma/migrations/<timestamp>_<nome>/migration.sql`, com comentário explicando o porquê. Timestamp desta fatia: `20260827000000_f30_engajamento`.
 - **Piso de verde:** `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:integration`, `pnpm build`. Antes do commit final, `pnpm test:report` (o `pnpm test` **não** roda integração).
 - **PR usa `refs #30`**, nunca `closes #30` — só o PI fecha a issue.
