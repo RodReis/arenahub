@@ -3351,3 +3351,48 @@ servidor**. A tela não ganha `fetch`, não importa `SessaoDoAluno`, e nunca rec
 | 6 | `M5-RULES-01` não bloqueia; catálogo v1 proposto pelo Code | `SPEC-031` §6 |
 | 7 | Snapshot congela pontuação; exposição é reavaliada em toda leitura | `SPEC-031` §4.5 |
 | 8 | Sem BullMQ, worker ou despachante de outbox — projeção sob demanda, como a F24 | `SPEC-031` §2.4 |
+
+### Emenda de 27/08/2026 — o placar público é lido ao vivo; o snapshot guarda o mês fechado
+
+Decidido pelo PI em 27/08/2026, durante a execução da fatia. **Emenda as Decisões 2 e 3 acima**
+e o desenho da `SPEC-031` §7 e §8.1.
+
+**O que motivou:** o PI perguntou se gerar e publicar o placar não deveria ser automático. O
+levantamento mostrou que `@nestjs/schedule` **já existe e já está ligado** (`ScheduleModule.forRoot()`
+no `app.module.ts`), com precedente maduro em `operations/alert-scheduler.service.ts` (F11) —
+`@Interval`, trava de reentrada, `agora` injetado para teste, falha de um tenant não derrubando os
+outros, idempotência no banco em vez de fila. O plano da fatia afirmava que não havia infra de
+agendamento; **estava errado**.
+
+**Decisão 1 — o hero mostra o parcial do mês corrente.** É o que engaja: o aluno vê que pode subir
+treinando hoje. Placar só do mês fechado não reflete o esforço em curso.
+
+**Decisão 2 — o hero lê ao vivo, sem snapshot e sem publicação.**
+
+Publicar o parcial todo dia colidiria de frente com o `M5-AC-007` (*"snapshot publicado é
+imutável"*): o placar do mês corrente muda a cada treino, e republicá-lo exigiria reescrever o que
+o critério de aceite proíbe reescrever.
+
+A saída não foi afrouxar a imutabilidade — foi ver o que ela protege. O `M5-AC-007` existe para que
+**regra alterada não mude placar histórico**. O placar de agosto *depois* que agosto acabou é
+histórico; *enquanto* agosto corre, é estado corrente. Ler ao vivo elimina a colisão em vez de
+contorná-la.
+
+**Decisão 3 — o snapshot fica, para o mês fechado.** Um job mensal, no dia 1º, gera e publica o
+snapshot do mês que acabou — o registro imutável e auditável que o `M5-FR-010` pede. O painel
+continua podendo gerar e publicar manualmente.
+
+| superfície | fonte | quando |
+|---|---|---|
+| hero público | leitura ao vivo, com cache curto | mês corrente, sempre atualizado |
+| snapshot | job mensal no dia 1º | mês fechado, imutável |
+| painel | geração e publicação manuais | a qualquer momento |
+
+**A consequência técnica registrada:** o heartbeat do totem bate a cada 30 s (2.880 vezes por dia,
+por totem). Calcular o placar em cada batida varreria `StudentXpBalance` da unidade e resolveria
+exposição de todos os alunos, toda vez. O placar ao vivo é servido de **cache em memória por
+`(tenant, unidade, mês)`, com TTL curto** — o placar não muda em um minuto de forma que alguém
+perceba, e o `M5-NFR-004` (p95 < 500 ms, sem cálculo síncrono pesado) continua atendido.
+
+A coorte mínima de 5 e `resolverExposicao()` valem igual na leitura ao vivo: abaixo do mínimo, o
+placar vem vazio e o bloco sai do rodízio do hero.
