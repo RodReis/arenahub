@@ -6,6 +6,7 @@ import { type FinalidadeDeEngajamento, participaDoRanking } from './domain/parti
 import { type IdentidadeEscolhida, resolverExposicao } from './domain/exposicao.js';
 import { triarAlias } from './domain/triagem-de-alias.js';
 import {
+  type PerfilParaModeracao,
   type PerfilPublicoDoAluno,
   PORTA_DE_ENGAJAMENTO,
   type PortaDeEngajamento,
@@ -198,7 +199,7 @@ export class EngagementService {
   async listarParaModeracao(
     ctx: TenantContext,
     filtro: FiltroDeModeracao,
-  ): Promise<PerfilPublicoDoAluno[]> {
+  ): Promise<PerfilParaModeracao[]> {
     return this.repo.listarPorStatus(ctx.tenantId, filtro.status, 100);
   }
 

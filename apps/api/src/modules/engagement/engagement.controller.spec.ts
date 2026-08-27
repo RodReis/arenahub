@@ -109,7 +109,7 @@ describe('EngagementController -- fila de moderacao', () => {
       .expect(403);
   });
 
-  it('lista os pendentes com os sinais da triagem', async () => {
+  it('lista os pendentes com os sinais da triagem e o nome do aluno', async () => {
     await repo.salvarPerfil(
       {
         tenantId: 't1',
@@ -128,8 +128,41 @@ describe('EngagementController -- fila de moderacao', () => {
       .set('Authorization', 'Bearer token-moderador')
       .expect(200);
 
-    const corpo = resposta.body as { itens: { status: string }[] };
-    expect(corpo.itens[0]).toMatchObject({ status: 'PENDING' });
+    const corpo = resposta.body as {
+      itens: {
+        id: string;
+        identityChoice: string;
+        alias: string | null;
+        status: string;
+        screeningSignals: string[];
+        rejectionReason: string | null;
+        version: number;
+        alunoNome: string;
+      }[];
+    };
+
+    const item = corpo.itens[0];
+    if (!item) throw new Error('esperava um item na fila');
+
+    expect(item.status).toBe('PENDING');
+    // O aluno Ana Souza (a1) cadastrado no beforeEach -- prova que o nome
+    // atravessa o join real, nao um campo vazio ou hardcoded.
+    expect(item.alunoNome).toBe('Ana Souza');
+
+    // `toMatchObject` e subset-match: nao acusaria `alunoNome` ausente se o
+    // DTO tivesse regredido. Comparar o CONJUNTO de chaves detecta campo
+    // que sumiu ou sobrou -- e o que pegou o Critical 2 desta revisao.
+    const chavesEsperadas = [
+      'id',
+      'identityChoice',
+      'alias',
+      'status',
+      'screeningSignals',
+      'rejectionReason',
+      'version',
+      'alunoNome',
+    ].sort();
+    expect(Object.keys(item).sort()).toEqual(chavesEsperadas);
   });
 
   it('rejeitar sem razao categorizada e 400', async () => {

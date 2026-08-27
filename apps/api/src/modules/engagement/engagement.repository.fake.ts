@@ -8,6 +8,7 @@ import type {
   EntradaDeModeracaoNoBanco,
   EntradaDeRegistro,
   EntradaDeSalvamento,
+  PerfilParaModeracao,
   PerfilPublicoDoAluno,
   PortaDeEngajamento,
 } from './engagement.repository.js';
@@ -42,7 +43,10 @@ interface DecisaoGuardada {
 export class RepositorioEmMemoria implements PortaDeEngajamento {
   private readonly alunos = new Map<string, AlunoDeTeste>();
   private readonly decisoes: DecisaoGuardada[] = [];
-  private readonly perfis = new Map<string, PerfilPublicoDoAluno & { tenantId: string; studentId: string }>();
+  private readonly perfis = new Map<
+    string,
+    PerfilPublicoDoAluno & { tenantId: string; studentId: string; aliasNormalized: string | null }
+  >();
   /** Documentos "publicados" -- espelha o que o seed grava no banco real. */
   private readonly documentosPublicados = new Set<string>();
   private proximoId = 1;
@@ -166,7 +170,9 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
   }
 
   salvarPerfil(entrada: EntradaDeSalvamento, _agora: Date): Promise<PerfilPublicoDoAluno> {
-    let existente: (PerfilPublicoDoAluno & { tenantId: string; studentId: string }) | undefined;
+    let existente:
+      | (PerfilPublicoDoAluno & { tenantId: string; studentId: string; aliasNormalized: string | null })
+      | undefined;
     for (const perfil of this.perfis.values()) {
       if (perfil.tenantId === entrada.tenantId && perfil.studentId === entrada.studentId) {
         existente = perfil;
@@ -186,12 +192,17 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
     const id = existente?.id ?? `perfil-${this.proximoId++}`;
     const novaVersao = existente ? existente.version + 1 : 1;
 
-    const salvo: PerfilPublicoDoAluno & { tenantId: string; studentId: string } = {
+    const salvo: PerfilPublicoDoAluno & {
+      tenantId: string;
+      studentId: string;
+      aliasNormalized: string | null;
+    } = {
       id,
       tenantId: entrada.tenantId,
       studentId: entrada.studentId,
       identityChoice: entrada.identityChoice,
       alias: entrada.alias,
+      aliasNormalized: entrada.aliasNormalized,
       status: 'PENDING',
       screeningSignals: [...entrada.screeningSignals],
       rejectionReason: null,
@@ -213,7 +224,7 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
     }
 
     if (entrada.status === 'APPROVED') {
-      this.verificarColisaoDeAliasAprovado(entrada.tenantId, perfil.id, perfil.alias);
+      this.verificarColisaoDeAliasAprovado(entrada.tenantId, perfil.id, perfil.aliasNormalized);
     }
 
     const atualizado = { ...perfil, status: entrada.status, rejectionReason: entrada.rejectionReason };
@@ -226,28 +237,42 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
     tenantId: string,
     status: StatusDoPerfilPublico,
     limite: number,
-  ): Promise<PerfilPublicoDoAluno[]> {
+  ): Promise<PerfilParaModeracao[]> {
+    // Espelha o `include: { student: { select: { fullName } } }` do
+    // repositorio real -- mesma junção, feita a mao contra o Map de alunos.
     const resultado = [...this.perfis.values()]
       .filter((p) => p.tenantId === tenantId && p.status === status)
       .slice(0, limite)
-      .map(semTenantEAluno);
+      .map((perfil) => ({
+        ...semTenantEAluno(perfil),
+        alunoNome: this.alunos.get(perfil.studentId)?.name ?? '',
+      }));
 
     return Promise.resolve(resultado);
   }
 
-  /** Espelha o indice parcial: alias unico so entre APPROVED, ao aprovar. */
+  /**
+   * Espelha o indice parcial: alias unico so entre APPROVED, ao aprovar.
+   *
+   * Compara `aliasNormalized`, nao o `alias` cru -- o indice real
+   * (`public_profiles_alias_aprovado_unico`) e sobre `alias_normalized`
+   * (NFKC + minuscula + espaco colapsado, saida de `triarAlias`). Comparar o
+   * texto cru deixava "Tigre" e "TIGRE" coexistirem aqui e colidirem so no
+   * Postgres -- um dublê mais permissivo que o indice que ele deveria
+   * espelhar.
+   */
   private verificarColisaoDeAliasAprovado(
     tenantId: string,
     ignorarId: string,
-    alias: string | null,
+    aliasNormalized: string | null,
   ): void {
-    if (!alias) return;
+    if (!aliasNormalized) return;
 
     for (const perfil of this.perfis.values()) {
       if (perfil.id === ignorarId) continue;
       if (perfil.tenantId !== tenantId) continue;
       if (perfil.status !== 'APPROVED') continue;
-      if (perfil.alias === alias) {
+      if (perfil.aliasNormalized === aliasNormalized) {
         throw new ConflictException({
           code: 'ALIAS_JA_APROVADO_PARA_OUTRO_ALUNO',
           message: 'Este apelido ja foi aprovado para outro aluno',

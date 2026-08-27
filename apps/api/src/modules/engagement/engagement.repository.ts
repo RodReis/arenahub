@@ -31,6 +31,22 @@ export interface PerfilPublicoDoAluno {
   version: number;
 }
 
+/**
+ * Perfil publico com o nome do aluno anexado -- so para a fila de moderacao.
+ *
+ * NAO e o formato de `perfilDoAluno`/`salvarPerfil`: aquele alimenta
+ * `obterPreferencias`, que o TOTEM consome (`PreferenciasDoAluno.perfil`), e
+ * o totem fala com o proprio aluno -- nao precisa do nome dele de volta.
+ * Vazar `alunoNome` ali inchava um tipo compartilhado por um consumidor que
+ * nao pediu. O moderador, ao contrario, julga um perfil de outra pessoa e
+ * precisa do NOME COMPLETO para distinguir alunos com o mesmo primeiro nome
+ * -- diferente da tela do totem, que mostra so o primeiro nome para o
+ * proprio aluno.
+ */
+export interface PerfilParaModeracao extends PerfilPublicoDoAluno {
+  alunoNome: string;
+}
+
 export interface EntradaDeRegistro {
   tenantId: string;
   actorId: string;
@@ -83,7 +99,7 @@ export interface PortaDeEngajamento {
     tenantId: string,
     status: StatusDoPerfilPublico,
     limite: number,
-  ): Promise<PerfilPublicoDoAluno[]>;
+  ): Promise<PerfilParaModeracao[]>;
 }
 
 /** Converte a linha do Prisma para a forma que o service consome. */
@@ -338,14 +354,18 @@ export class EngagementRepository implements PortaDeEngajamento {
     tenantId: string,
     status: StatusDoPerfilPublico,
     limite: number,
-  ): Promise<PerfilPublicoDoAluno[]> {
+  ): Promise<PerfilParaModeracao[]> {
     const perfis = await this.db.publicProfile.findMany({
       where: { tenantId, status },
       orderBy: [{ createdAt: 'asc' }],
       take: limite,
+      include: { student: { select: { fullName: true } } },
     });
 
-    return perfis.map(paraPerfilPublico);
+    return perfis.map((perfil) => ({
+      ...paraPerfilPublico(perfil),
+      alunoNome: perfil.student.fullName,
+    }));
   }
 }
 

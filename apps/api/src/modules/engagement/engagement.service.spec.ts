@@ -220,4 +220,67 @@ describe('EngagementService -- alias publico', () => {
       ),
     ).rejects.toThrow(BadRequestException);
   });
+
+  it('aprovar alias que so difere em caixa do ja aprovado colide -- ConflictException', async () => {
+    repo.cadastrarAluno({ id: 'a2', tenantId: 't1', name: 'Bruno Lima', status: 'ACTIVE' });
+
+    const primeiro = await service.definirAliasPublico(
+      CTX,
+      { studentId: 'a1', identityChoice: 'APELIDO', alias: 'Tigre', version: null },
+      AGORA,
+    );
+    await service.moderarAlias(
+      CTX,
+      { perfilId: primeiro.id, decisao: 'APPROVED', rejectionReason: null },
+      AGORA,
+    );
+
+    const segundo = await service.definirAliasPublico(
+      CTX,
+      { studentId: 'a2', identityChoice: 'APELIDO', alias: 'TIGRE', version: null },
+      AGORA,
+    );
+
+    // O indice real e sobre `alias_normalized` (NFKC + minuscula): "Tigre" e
+    // "TIGRE" normalizam para o mesmo valor e devem colidir aqui tambem --
+    // um dublê que comparasse o texto cru deixaria os dois coexistirem.
+    await expect(
+      service.moderarAlias(
+        CTX,
+        { perfilId: segundo.id, decisao: 'APPROVED', rejectionReason: null },
+        AGORA,
+      ),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('aprovar alias que so difere em espaco do ja aprovado colide -- ConflictException', async () => {
+    repo.cadastrarAluno({ id: 'a3', tenantId: 't1', name: 'Carla Dias', status: 'ACTIVE' });
+
+    const primeiro = await service.definirAliasPublico(
+      CTX,
+      { studentId: 'a1', identityChoice: 'APELIDO', alias: 'Leao', version: null },
+      AGORA,
+    );
+    await service.moderarAlias(
+      CTX,
+      { perfilId: primeiro.id, decisao: 'APPROVED', rejectionReason: null },
+      AGORA,
+    );
+
+    const segundo = await service.definirAliasPublico(
+      CTX,
+      { studentId: 'a3', identityChoice: 'APELIDO', alias: '  Leao  ', version: null },
+      AGORA,
+    );
+
+    // `triarAlias` colapsa espaco nas pontas e no meio -- "Leao" e "  Leao  "
+    // normalizam igual e devem colidir na aprovacao.
+    await expect(
+      service.moderarAlias(
+        CTX,
+        { perfilId: segundo.id, decisao: 'APPROVED', rejectionReason: null },
+        AGORA,
+      ),
+    ).rejects.toThrow(ConflictException);
+  });
 });

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
-import type { PerfilPublicoDoAluno } from './engagement.repository.js';
+import type { PerfilParaModeracao, PerfilPublicoDoAluno } from './engagement.repository.js';
 import { EngagementService } from './engagement.service.js';
 
 const RAZOES_DE_REJEICAO = [
@@ -38,6 +38,19 @@ interface PerfilDto {
 }
 
 /**
+ * Item da fila de moderacao -- `PerfilDto` mais o nome do aluno.
+ *
+ * Tipo PROPRIO, nao extensao do `PerfilDto` usado por `moderar`: aquele e a
+ * forma que tambem alimenta `obterPreferencias` (consumida pelo totem), e o
+ * totem nao deve ganhar um campo que so a tela de moderacao precisa. Nome
+ * COMPLETO (nao primeiro nome): o moderador julga o perfil de outra pessoa e
+ * precisa distinguir alunos que compartilham o primeiro nome.
+ */
+interface ItemDaFilaDto extends PerfilDto {
+  alunoNome: string;
+}
+
+/**
  * Fila de moderacao de apelido no painel -- Task 7 da F30.
  *
  * O moderador so julga o que o aluno escreveu (`APPROVED`/`REJECTED`); nao
@@ -54,14 +67,14 @@ export class EngagementController {
 
   @Get()
   @RequirePermissions('engagement.read')
-  async listar(@Query() consulta: unknown): Promise<{ itens: PerfilDto[] }> {
+  async listar(@Query() consulta: unknown): Promise<{ itens: ItemDaFilaDto[] }> {
     const filtro = esquemaDeListagem.parse(consulta);
 
     const perfis = await this.engajamento.listarParaModeracao(this.contexto.require(), {
       status: filtro.status,
     });
 
-    return { itens: perfis.map((p) => this.paraDto(p)) };
+    return { itens: perfis.map((p) => this.paraItemDaFila(p)) };
   }
 
   @Patch(':id')
@@ -92,5 +105,9 @@ export class EngagementController {
       rejectionReason: perfil.rejectionReason,
       version: perfil.version,
     };
+  }
+
+  private paraItemDaFila(perfil: PerfilParaModeracao): ItemDaFilaDto {
+    return { ...this.paraDto(perfil), alunoNome: perfil.alunoNome };
   }
 }

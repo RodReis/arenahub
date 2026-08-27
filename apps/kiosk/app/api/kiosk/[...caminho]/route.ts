@@ -27,10 +27,10 @@ const URL_INTERNA = process.env['API_INTERNAL_URL'] ?? 'http://localhost:3344';
  * Metodos repassados. Lista fechada: um handler que aceitasse qualquer verbo
  * viraria proxy generico para a API inteira -- assinado com a credencial do
  * totem, que e exatamente o que nao se quer dar de graca a quem alcance a
- * porta local do quiosque. O Next so exporta os tres abaixo; qualquer outro
+ * porta local do quiosque. O Next so exporta os quatro abaixo; qualquer outro
  * verbo recebe 405 sem passar por aqui.
  */
-type Metodo = 'GET' | 'POST' | 'DELETE';
+type Metodo = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 /**
  * Credencial do dispositivo, lida do ambiente.
@@ -124,6 +124,10 @@ export async function GET(requisicao: Request): Promise<Response> {
 
 export async function POST(requisicao: Request): Promise<Response> {
   return repassar(requisicao, 'POST');
+}
+
+export async function PATCH(requisicao: Request): Promise<Response> {
+  return repassar(requisicao, 'PATCH');
 }
 
 export async function DELETE(requisicao: Request): Promise<Response> {
