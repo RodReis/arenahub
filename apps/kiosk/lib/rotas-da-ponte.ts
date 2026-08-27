@@ -42,6 +42,8 @@ const PERMITIDOS: readonly RegExp[] = [
   /* PREFERENCIA DE ENGAJAMENTO E IDENTIDADE PUBLICA (F30, Task 8). */
   new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/preferencias$`),
   new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/perfil-publico$`),
+  /* XP E CONQUISTAS DO ALUNO (F31, Task 9). */
+  new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/xp$`),
 ];
 
 /**

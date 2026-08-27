@@ -132,14 +132,33 @@ export const blocoDaTelaPublicaSchema = z.discriminatedUnion('tipo', [
 export type BlocoDaTelaPublica = z.infer<typeof blocoDaTelaPublicaSchema>;
 
 /**
+ * Uma linha do placar publico -- SEM `studentId` (M5-AC-001).
+ *
+ * Fonte unica do formato: `EngagementRankingService` (apps/api) importa e
+ * reexporta este mesmo tipo, em vez de declarar uma copia estrutural. O
+ * placar e dado publico que atravessa o heartbeat ate a tela do totem
+ * (F51), e duas definicoes do mesmo formato divergem na primeira mudanca.
+ */
+export const entradaPublicaDoPlacarSchema = z.object({
+  position: z.number().int().positive(),
+  nomeExibido: z.string().min(1),
+  points: z.number().int(),
+});
+
+export type EntradaPublicaDoPlacar = z.infer<typeof entradaPublicaDoPlacarSchema>;
+
+/**
  * Indicadores da unidade, servidos pelo heartbeat -- nunca gravados na
- * config. DOIS INTEIROS, e nada mais: `M3.5-BR-001` proibe dado de aluno na
- * tela publica, e o jeito de garantir isso e o servidor nao ter o que
- * vazar. Sem lista, sem nome, sem id.
+ * config. `M3.5-BR-001` proibe dado de aluno na tela publica: os dois
+ * inteiros nao carregam identidade nenhuma, e `placar` so carrega o que
+ * `resolverExposicao()` ja filtrou e resolveu no SERVIDOR -- nome exibido,
+ * nunca `studentId`. Modulo `xp` desligado ou placar retido chega como
+ * lista vazia, nunca ausente.
  */
 export const indicadoresDaUnidadeSchema = z.object({
   checkinsDeHoje: z.number().int().nonnegative(),
   treinandoAgora: z.number().int().nonnegative(),
+  placar: z.array(entradaPublicaDoPlacarSchema),
 });
 
 export type IndicadoresDaUnidade = z.infer<typeof indicadoresDaUnidadeSchema>;
@@ -179,6 +198,7 @@ export const kioskConfigSchema = z.object({
     evolucao: z.boolean(),
     historicoDeAvaliacoes: z.boolean(),
     ranking: z.boolean(),
+    xp: z.boolean(),
   }),
   /**
    * Tela publica (F51). A ORDEM DO ARRAY E A ORDEM DO RODIZIO -- nao ha
@@ -282,6 +302,7 @@ export const CONFIG_PADRAO_DO_TOTEM: KioskConfig = {
     evolucao: false,
     historicoDeAvaliacoes: false,
     ranking: false,
+    xp: false,
   },
   /**
    * Nenhum bloco por padrao. O `DS-TOTEM.md` §4 ja cobre este estado -- "se

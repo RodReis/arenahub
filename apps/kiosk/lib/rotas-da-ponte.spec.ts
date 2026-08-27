@@ -49,6 +49,7 @@ describe('allowlist da ponte assinada', () => {
     ['evolucao', `sessions/${SESSAO}/evolution`],
     ['preferencia de engajamento', `sessions/${SESSAO}/engajamento/preferencias`],
     ['perfil publico', `sessions/${SESSAO}/engajamento/perfil-publico`],
+    ['extrato de xp', `sessions/${SESSAO}/engajamento/xp`],
   ] as const)('aceita %s', (_caso, resto) => {
     expect(resolverCaminhoDaPonte(`/api/kiosk/${resto}`)).toBe(`/api/v1/kiosk/${resto}`);
   });
@@ -63,6 +64,7 @@ describe('allowlist da ponte assinada', () => {
     ['avaliacao com id colado', `/api/kiosk/sessions/${SESSAO}/assessment/${TENTATIVA}`],
     ['travessia depois do id', `/api/kiosk/sessions/${SESSAO}/../../admin`],
     ['modulo inventado', `/api/kiosk/sessions/${SESSAO}/ranking`],
+    ['travessia depois do extrato de xp', `/api/kiosk/sessions/${SESSAO}/engajamento/xp/../../admin`],
   ])('recusa %s', (_caso, caminho) => {
     expect(resolverCaminhoDaPonte(caminho)).toBeNull();
   });

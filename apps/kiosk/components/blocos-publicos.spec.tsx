@@ -143,7 +143,7 @@ describe('BlocosPublicos -- indicadores (M3.5-BR-001)', () => {
     render(
       <BlocosPublicos
         config={config([informacoes])}
-        indicadores={{ checkinsDeHoje: 312, treinandoAgora: 47 }}
+        indicadores={{ checkinsDeHoje: 312, treinandoAgora: 47, placar: [] }}
       />,
     );
 
@@ -155,7 +155,7 @@ describe('BlocosPublicos -- indicadores (M3.5-BR-001)', () => {
     render(
       <BlocosPublicos
         config={config([{ ...informacoes, mostrarTreinandoAgora: false }])}
-        indicadores={{ checkinsDeHoje: 312, treinandoAgora: 47 }}
+        indicadores={{ checkinsDeHoje: 312, treinandoAgora: 47, placar: [] }}
       />,
     );
 

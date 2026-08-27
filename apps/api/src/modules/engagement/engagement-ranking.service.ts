@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { EntradaPublicaDoPlacar } from '@arenahub/api-contracts';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { classificar, type SaldoParaClassificar } from './domain/classificacao.js';
@@ -9,12 +10,14 @@ import {
   type SnapshotDeRanking,
 } from './engagement-ranking.repository.js';
 
-/** O placar como o publico o ve -- SEM `studentId` (M5-AC-001). */
-export interface EntradaPublicaDoPlacar {
-  position: number;
-  nomeExibido: string;
-  points: number;
-}
+/**
+ * O placar como o publico o ve -- SEM `studentId` (M5-AC-001).
+ *
+ * REEXPORTADO de `@arenahub/api-contracts`, nunca redeclarado: e o mesmo
+ * formato que atravessa o heartbeat ate o totem (F31, Task 9), e duas
+ * definicoes do mesmo formato divergem na primeira mudanca.
+ */
+export type { EntradaPublicaDoPlacar };
 
 /**
  * Gera, retem, publica e le o placar mensal de uma unidade.

@@ -13,6 +13,7 @@ import { KioskSaudeService } from './kiosk-saude.service.js';
 import { KioskConfigService } from './kiosk-config.service.js';
 import { KioskMediaLinkService } from './kiosk-media-link.service.js';
 import { KioskSessionService } from './kiosk-session.service.js';
+import { KioskXpService } from './kiosk-xp.service.js';
 import { KioskController } from './kiosk.controller.js';
 
 /**
@@ -31,6 +32,9 @@ import { KioskController } from './kiosk.controller.js';
  * `EngagementModule` entra pela F30, Task 6, pela MESMA razao: o totem le e
  * atualiza a preferencia de ranking e o alias publico chamando
  * `EngagementService` -- nunca `ConsentRecord` nem `PublicProfile` direto.
+ * A F31, Task 9 usa a MESMA importacao para XP e placar: `KioskXpService`
+ * chama `EngagementXpService`/`EngagementRankingService`, nunca
+ * `XpLedgerEntry`/`RankingSnapshot` direto.
  */
 @Module({
   imports: [
@@ -50,6 +54,7 @@ import { KioskController } from './kiosk.controller.js';
     KioskPagamentoService,
     KioskSaudeService,
     KioskEngajamentoService,
+    KioskXpService,
   ],
 })
 export class KioskModule {}

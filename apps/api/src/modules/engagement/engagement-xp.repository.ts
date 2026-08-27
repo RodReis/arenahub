@@ -52,6 +52,27 @@ export interface MovimentoDoLedger {
   reversesEntryId: string | null;
 }
 
+/**
+ * Um movimento do ledger, na forma que o EXTRATO do totem mostra
+ * (`M5-FR-004`, §13 do PRD: sempre mostrar POR QUE o aluno recebeu).
+ *
+ * `regra` e o `code` de `XpRuleVersion` para GRANT; para ADJUSTMENT/REVERSAL
+ * (que nao tem regra, so motivo) cai no `reason` gravado no proprio
+ * movimento -- `XpLedgerEntry.reason` e obrigatorio para os dois.
+ */
+export interface MovimentoDoExtratoDeXp {
+  pontos: number;
+  regra: string;
+  quando: Date;
+}
+
+/** Uma conquista do aluno, incluindo a REVERTIDA -- o extrato nao esconde estorno. */
+export interface ConquistaDoExtratoDeXp {
+  titulo: string;
+  desbloqueadaEm: Date;
+  revertida: boolean;
+}
+
 /** Politica de agrupamento de sessao vigente -- ver `StudentAttendanceSession.policyVersion`. */
 const POLITICA_DE_SESSAO = 'dia-civil-local@1';
 
@@ -76,6 +97,10 @@ export interface PortaDeXp {
   gravarConquistas(contexto: TenantContext, conquistas: readonly ConquistaParaGravar[]): Promise<void>;
   saldoDoAluno(contexto: TenantContext, studentId: string, localMonth: string): Promise<number>;
   movimentosDoAluno(contexto: TenantContext, studentId: string): Promise<MovimentoDoLedger[]>;
+  /** Movimentos na forma exibivel do extrato -- com a REGRA/motivo por extenso. */
+  movimentosDoExtrato(contexto: TenantContext, studentId: string): Promise<MovimentoDoExtratoDeXp[]>;
+  /** Conquistas do aluno na forma exibivel, incluindo as REVERTIDAS. */
+  conquistasDoExtrato(contexto: TenantContext, studentId: string): Promise<ConquistaDoExtratoDeXp[]>;
 }
 
 @Injectable()
@@ -291,5 +316,54 @@ export class EngagementXpRepository implements PortaDeXp {
         reversesEntryId: true,
       },
     });
+  }
+
+  /**
+   * `regra` e o CODE da versao de regra para GRANT; ADJUSTMENT/REVERSAL nao
+   * tem regra, so `reason` -- os dois sao obrigatorios no schema para os
+   * tipos que os usam (`XpLedgerEntry.reason`, `packages/database`).
+   */
+  async movimentosDoExtrato(
+    contexto: TenantContext,
+    studentId: string,
+  ): Promise<MovimentoDoExtratoDeXp[]> {
+    const movimentos = await this.db.xpLedgerEntry.findMany({
+      where: { tenantId: contexto.tenantId, studentId },
+      orderBy: { occurredAt: 'asc' },
+      select: {
+        points: true,
+        occurredAt: true,
+        reason: true,
+        ruleVersion: { select: { code: true } },
+      },
+    });
+
+    return movimentos.map((movimento) => ({
+      pontos: movimento.points,
+      regra: movimento.reason ?? movimento.ruleVersion.code,
+      quando: movimento.occurredAt,
+    }));
+  }
+
+  /** `M5-FR-007`: revertida NAO some -- continua visivel, com o motivo anexado. */
+  async conquistasDoExtrato(
+    contexto: TenantContext,
+    studentId: string,
+  ): Promise<ConquistaDoExtratoDeXp[]> {
+    const conquistas = await this.db.studentAchievement.findMany({
+      where: { tenantId: contexto.tenantId, studentId },
+      orderBy: { unlockedAt: 'asc' },
+      select: {
+        status: true,
+        unlockedAt: true,
+        definition: { select: { title: true } },
+      },
+    });
+
+    return conquistas.map((conquista) => ({
+      titulo: conquista.definition.title,
+      desbloqueadaEm: conquista.unlockedAt,
+      revertida: conquista.status === 'REVERSED',
+    }));
   }
 }

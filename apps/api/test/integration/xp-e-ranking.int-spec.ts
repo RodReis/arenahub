@@ -1,13 +1,19 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { assinar } from '@arenahub/api-contracts';
+import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
+import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { AttendanceService } from '../../src/modules/health/attendance.service.js';
 import { EngagementXpService } from '../../src/modules/engagement/engagement-xp.service.js';
+import { EngagementRankingService } from '../../src/modules/engagement/engagement-ranking.service.js';
+import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.service.js';
+import { calcularHashDeCpf } from '../../src/modules/students/domain/identificacao.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -60,15 +66,132 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
     return aluno.id;
   };
 
+  let ranking: EngagementRankingService;
+
+  type Totem = {
+    tenantId: string;
+    gymUnitId: string;
+    kioskDeviceId: string;
+    keyId: string;
+    segredo: string;
+  };
+
+  const totem: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
+
+  const servidor = (): Parameters<typeof request>[0] =>
+    app.getHttpServer() as Parameters<typeof request>[0];
+
+  /** Mesmo padrao HMAC de `kiosk-engajamento.int-spec.ts`. */
+  const assinarPedido = (
+    corpo: unknown,
+    caminho: string,
+    metodo: 'GET' | 'POST' = 'POST',
+    tokenDeSessao?: string,
+  ): Record<string, string> => {
+    const body = metodo === 'GET' || corpo === '' ? '' : JSON.stringify(corpo);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const nonce = randomUUID();
+
+    const cabecalhos: Record<string, string> = {
+      'x-kiosk-key-id': totem.keyId,
+      'x-kiosk-timestamp': String(timestamp),
+      'x-kiosk-nonce': nonce,
+      'x-kiosk-signature': assinar(
+        { keyId: totem.keyId, timestamp, nonce, method: metodo, pathAndQuery: caminho, body },
+        totem.segredo,
+      ),
+    };
+
+    if (tokenDeSessao !== undefined) cabecalhos['x-session-token'] = tokenDeSessao;
+
+    return cabecalhos;
+  };
+
+  /** Publica a config do tenant com os modulos que o caso pede. */
+  const publicarConfig = async (modulos: Record<string, boolean>, versao: number): Promise<void> => {
+    await db.kioskConfiguration.create({
+      data: {
+        tenantId: totem.tenantId,
+        gymUnitId: null,
+        kioskDeviceId: null,
+        version: versao,
+        publishedAt: new Date(),
+        payload: {
+          sessao: { duracaoSegundos: 60, incrementoSegundos: 30, tetoSegundos: 99 },
+          modulos,
+        },
+      },
+    });
+  };
+
+  /** Documento de consentimento vigente do tenant -- sem ele, `atualizarPreferencia` recusa. */
+  const publicarDocumentoDeRanking = async (): Promise<void> => {
+    const conteudo = `Termo de teste RANKING -- ${sufixo}. `.repeat(3);
+    const sha = createHash('sha256').update(conteudo, 'utf8').digest('hex');
+
+    await db.consentDocument.create({
+      data: {
+        tenantId: totem.tenantId,
+        type: 'RANKING',
+        version: 1,
+        purpose: 'Finalidade de teste RANKING',
+        content: conteudo,
+        contentSha256: sha,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    });
+  };
+
+  const abrirSessao = async (cpf: string): Promise<{ sessionId: string; token: string }> => {
+    const resposta = await request(servidor())
+      .post('/api/v1/kiosk/sessions')
+      .set(assinarPedido({ cpf }, '/api/v1/kiosk/sessions'))
+      .send({ cpf })
+      .expect(201);
+
+    const corpo = resposta.body as { sessionId: string; token: string };
+
+    return { sessionId: corpo.sessionId, token: corpo.token };
+  };
+
+  const buscar = (caminho: string, token: string) =>
+    request(servidor()).get(caminho).set(assinarPedido('', caminho, 'GET', token));
+
+  const heartbeat = () =>
+    request(servidor())
+      .post('/api/v1/kiosk/heartbeat')
+      .set(assinarPedido({ agentVersion: '1.0.0', localTimeMs: 0 }, '/api/v1/kiosk/heartbeat'))
+      .send({ agentVersion: '1.0.0', localTimeMs: 0 });
+
+  /** Aluno de teste com CPF, para abrir sessao de totem. */
+  const criarAlunoComCpf = async (cpf: string, nome: string): Promise<string> => {
+    const aluno = await db.student.create({
+      data: {
+        tenantId,
+        gymUnitId,
+        membershipNumber: `F31-CPF-${sufixo}-${String(contadorDeMatricula++).padStart(4, '0')}`,
+        fullName: nome,
+        birthDate: new Date('2000-01-01'),
+        cpf,
+        cpfHash: calcularHashDeCpf(tenantId, cpf),
+        status: 'ACTIVE',
+      },
+    });
+
+    return aluno.id;
+  };
+
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
     app = moduleRef.createNestApplication();
+    aplicarParserComCorpoCru(app);
     await app.init();
 
     db = app.get(PrismaService);
     servico = app.get(EngagementXpService);
     frequencia = app.get(AttendanceService);
+    ranking = app.get(EngagementRankingService);
 
     const tenant = await db.tenant.create({
       data: {
@@ -112,6 +235,36 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       permissions: new Set(),
       allowedUnitIds: 'ALL',
     };
+
+    // Totem HTTP para os testes de HEARTBEAT/ENDPOINT (Task 9).
+    const dispositivo = await db.kioskDevice.create({
+      data: { tenantId, gymUnitId, code: `TOTEM-F31-${sufixo}` },
+    });
+
+    const segredo = randomBytes(32).toString('hex');
+    const keyId = `kiosk-f31-${sufixo}`;
+
+    await db.kioskCredential.create({
+      data: {
+        tenantId,
+        kioskDeviceId: dispositivo.id,
+        keyId,
+        encryptedSecret: app.get(KioskAuthService).cifrarSegredo(segredo),
+        activeFrom: new Date(Date.now() - 60_000),
+        expiresAt: null,
+      },
+    });
+
+    Object.assign(totem, {
+      tenantId,
+      gymUnitId,
+      kioskDeviceId: dispositivo.id,
+      keyId,
+      segredo,
+    });
+
+    await publicarDocumentoDeRanking();
+    await publicarConfig({ xp: true }, 1);
   });
 
   afterAll(async () => {
@@ -306,5 +459,142 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
 
     expect(depois.points).toBe(antes.points);
     expect(depois.entryCount).toBe(antes.entryCount);
+  });
+
+  /*
+   * ---------------------------------------------------------------------
+   * F31, TASK 9 -- ponte do totem: `GET .../engajamento/xp` e o placar no
+   * heartbeat. Contra HTTP real (supertest), com a mesma credencial HMAC
+   * dos demais endpoints do totem.
+   * ---------------------------------------------------------------------
+   */
+  describe('GET sessions/:id/engajamento/xp', () => {
+    /** Aluno com uma sessao confirmada, XP sincronizado e sessao de totem aberta. */
+    const sessaoDoAlunoComXp = async (): Promise<{ sessionId: string; token: string; studentId: string }> => {
+      const cpf = String(10_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
+      const aluno = await criarAlunoComCpf(cpf, 'Aluno Com XP');
+
+      await gravarPassagemConfirmada(aluno, '2026-08-17T12:00:00.000Z');
+      await projetarFrequencia(aluno);
+
+      const { sessionId, token } = await abrirSessao(cpf);
+
+      return { sessionId, token, studentId: aluno };
+    };
+
+    it('devolve saldo, movimentos explicaveis e posicao', async () => {
+      const { sessionId, token } = await sessaoDoAlunoComXp();
+
+      const resposta = await buscar(`/api/v1/kiosk/sessions/${sessionId}/engajamento/xp`, token).expect(
+        200,
+      );
+
+      expect(resposta.body).toMatchObject({ saldoDoMes: 10, mes: '2026-08' });
+      // `M5-FR-004` e §13 do PRD: sempre mostrar POR QUE o aluno recebeu.
+      const corpo = resposta.body as { movimentos: { pontos: number; regra: string }[] };
+      expect(corpo.movimentos[0]).toMatchObject({ pontos: 10, regra: expect.any(String) });
+    });
+
+    /*
+     * Cada endpoint da area do aluno so serve O ALUNO DAQUELA SESSAO. A
+     * memoria `vazamento` e o `tenant-isolation.int-spec.ts` existem porque
+     * este e o erro que mais custa caro.
+     */
+    it('nao devolve XP de aluno de outra sessao', async () => {
+      const meu = await sessaoDoAlunoComXp();
+      const outro = await sessaoDoAlunoComXp();
+
+      const resposta = await buscar(
+        `/api/v1/kiosk/sessions/${meu.sessionId}/engajamento/xp`,
+        meu.token,
+      ).expect(200);
+
+      expect(JSON.stringify(resposta.body)).not.toContain(outro.studentId);
+    });
+  });
+
+  describe('POST heartbeat -- placar publico', () => {
+    /** Publica um placar PUBLICADO com os cinco alunos dados, com nome civil distinguivel. */
+    const placarPublicadoCom = async (
+      nomes: readonly string[],
+    ): Promise<Record<string, string>> => {
+      const idPorNome: Record<string, string> = {};
+
+      for (const [indice, nome] of nomes.entries()) {
+        const aluno = await criarAluno();
+        idPorNome[nome] = aluno;
+
+        await db.student.update({ where: { id: aluno }, data: { fullName: nome } });
+
+        // Pontuacao decrescente: `ana` fica em 1o, e assim por diante --
+        // so para o placar ter uma ordem estavel e previsivel no teste.
+        const pontos = (nomes.length - indice) * 10;
+        await db.studentXpBalance.create({
+          data: {
+            tenantId: totem.tenantId,
+            studentId: aluno,
+            localMonth: '2026-08',
+            points: pontos,
+            entryCount: 1,
+            lastEntryAt: new Date('2026-08-20T12:00:00.000Z'),
+          },
+        });
+      }
+
+      const contextoDoTotem: TenantContext = {
+        tenantId: totem.tenantId,
+        actorId: 'system-f31-task9',
+        sessionId: randomUUID(),
+        permissions: new Set(),
+        allowedUnitIds: 'ALL',
+      };
+
+      const snapshot = await ranking.gerarSnapshot(
+        contextoDoTotem,
+        totem.gymUnitId,
+        '2026-08',
+        new Date('2026-08-20T12:00:00.000Z'),
+      );
+      await ranking.publicar(contextoDoTotem, snapshot.id, new Date('2026-08-20T12:00:00.000Z'));
+
+      return idPorNome;
+    };
+
+    /** Opt-out de RANKING para o aluno de nome dado, via `ConsentRecord` direto --
+     * mais simples que abrir sessao so para isto, e o que o snapshot LE na leitura
+     * (`resolverExposicao`) e a decisao vigente, nao a origem HTTP dela. */
+    const optOut = async (studentId: string): Promise<void> => {
+      const documento = await db.consentDocument.findFirstOrThrow({
+        where: { tenantId: totem.tenantId, type: 'RANKING' },
+      });
+
+      await db.consentRecord.create({
+        data: {
+          tenantId: totem.tenantId,
+          studentId,
+          documentId: documento.id,
+          decision: 'REFUSED',
+          subjectKind: 'STUDENT',
+          subjectAgeYears: 26,
+          occurredAt: new Date('2026-08-21T00:00:00.000Z'),
+          evidence: {},
+        },
+      });
+    };
+
+    it('entrega o placar ja sem quem pediu opt-out, e sem studentId', async () => {
+      const idPorNome = await placarPublicadoCom(['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa']);
+      await optOut(idPorNome['Bruno']!);
+
+      const resposta = await heartbeat().expect(200);
+
+      const corpo = resposta.body as { indicadores: { placar: unknown[] } };
+      const serializado = JSON.stringify(corpo.indicadores.placar);
+
+      expect(serializado).not.toContain('Bruno');
+      expect(serializado).not.toContain('studentId');
+      // As demais permanecem -- opt-out de um nao esvazia o placar inteiro.
+      expect(serializado).toContain('Ana');
+    });
   });
 });

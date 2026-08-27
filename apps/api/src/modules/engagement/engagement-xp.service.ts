@@ -4,7 +4,12 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { resolverRegraVigente } from './domain/regra-de-xp.js';
 import { concederPorSessao, mesLocal } from './domain/movimento-de-xp.js';
 import { avaliarConquistas } from './domain/conquista.js';
-import { PORTA_DE_XP, type PortaDeXp } from './engagement-xp.repository.js';
+import {
+  PORTA_DE_XP,
+  type ConquistaDoExtratoDeXp,
+  type MovimentoDoExtratoDeXp,
+  type PortaDeXp,
+} from './engagement-xp.repository.js';
 
 /** O que `sincronizarXp` devolve -- consumido pela Task 9 (kiosk) direto. */
 export interface ResumoDeXp {
@@ -17,6 +22,18 @@ export interface ResumoDeXp {
 export interface ExtratoDeXp {
   localMonth: string;
   saldo: number;
+}
+
+/**
+ * Extrato COMPLETO do aluno (F31, Task 9) -- saldo do mes, movimentos
+ * explicaveis (`M5-FR-004`, §13 do PRD) e conquistas, incluindo as
+ * revertidas (`M5-FR-007`).
+ */
+export interface ExtratoCompletoDeXp {
+  saldoDoMes: number;
+  mes: string;
+  movimentos: readonly MovimentoDoExtratoDeXp[];
+  conquistas: readonly ConquistaDoExtratoDeXp[];
 }
 
 /** Gatilho unico do catalogo v1 -- ver `domain/regra-de-xp.ts`. */
@@ -109,6 +126,29 @@ export class EngagementXpService {
   async obterExtrato(contexto: TenantContext, studentId: string, mes: string): Promise<ExtratoDeXp> {
     const saldo = await this.porta.saldoDoAluno(contexto, studentId, mes);
     return { localMonth: mes, saldo };
+  }
+
+  /**
+   * O extrato COMPLETO que o totem mostra (Task 9): saldo, movimentos
+   * explicaveis e conquistas -- incluindo a REVERTIDA, que `M5-FR-007`
+   * exige continuar visivel, com o motivo anexado.
+   *
+   * Nao sincroniza XP antes de ler -- quem decide QUANDO sincronizar e o
+   * chamador (`KioskXpService`), porque sincronizar e uma escrita e este
+   * metodo e leitura pura.
+   */
+  async obterExtratoCompleto(
+    contexto: TenantContext,
+    studentId: string,
+    mes: string,
+  ): Promise<ExtratoCompletoDeXp> {
+    const [saldoDoMes, movimentos, conquistas] = await Promise.all([
+      this.porta.saldoDoAluno(contexto, studentId, mes),
+      this.porta.movimentosDoExtrato(contexto, studentId),
+      this.porta.conquistasDoExtrato(contexto, studentId),
+    ]);
+
+    return { saldoDoMes, mes, movimentos, conquistas };
   }
 
   /**

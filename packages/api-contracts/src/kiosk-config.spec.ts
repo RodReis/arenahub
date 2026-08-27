@@ -64,6 +64,7 @@ describe('resolverConfig -- tres camadas, a mais especifica vence', () => {
       evolucao: false,
       historicoDeAvaliacoes: false,
       ranking: false,
+      xp: false,
     });
   });
 
@@ -205,31 +206,59 @@ describe('faixa de patrocinadores (ADR-042, Decisao 4)', () => {
 });
 
 describe('indicadores da unidade -- M3.5-BR-001', () => {
-  it('aceita dois inteiros nao negativos', () => {
+  it('aceita dois inteiros nao negativos e o placar', () => {
     const parsed = indicadoresDaUnidadeSchema.parse({
       checkinsDeHoje: 312,
       treinandoAgora: 47,
+      placar: [{ position: 1, nomeExibido: 'Ana', points: 50 }],
     });
 
-    expect(parsed).toEqual({ checkinsDeHoje: 312, treinandoAgora: 47 });
+    expect(parsed).toEqual({
+      checkinsDeHoje: 312,
+      treinandoAgora: 47,
+      placar: [{ position: 1, nomeExibido: 'Ana', points: 50 }],
+    });
+  });
+
+  it('placar vazio e aceito -- modulo desligado ou placar retido', () => {
+    const parsed = indicadoresDaUnidadeSchema.parse({
+      checkinsDeHoje: 0,
+      treinandoAgora: 0,
+      placar: [],
+    });
+
+    expect(parsed.placar).toEqual([]);
   });
 
   it('DESCARTA qualquer dado de aluno que venha junto', () => {
     const parsed = indicadoresDaUnidadeSchema.parse({
       checkinsDeHoje: 1,
       treinandoAgora: 1,
+      placar: [],
       alunos: [{ nome: 'Fulano de Tal', studentId: 'uuid' }],
     });
 
     expect(parsed).not.toHaveProperty('alunos');
   });
 
+  it('DESCARTA studentId dentro de uma entrada do placar', () => {
+    const parsed = indicadoresDaUnidadeSchema.parse({
+      checkinsDeHoje: 1,
+      treinandoAgora: 1,
+      placar: [{ position: 1, nomeExibido: 'Ana', points: 50, studentId: 'uuid-vazado' }],
+    });
+
+    expect(parsed.placar[0]).not.toHaveProperty('studentId');
+  });
+
   it('recusa contagem negativa e fracionaria', () => {
     expect(
-      indicadoresDaUnidadeSchema.safeParse({ checkinsDeHoje: -1, treinandoAgora: 0 }).success,
+      indicadoresDaUnidadeSchema.safeParse({ checkinsDeHoje: -1, treinandoAgora: 0, placar: [] })
+        .success,
     ).toBe(false);
     expect(
-      indicadoresDaUnidadeSchema.safeParse({ checkinsDeHoje: 1.5, treinandoAgora: 0 }).success,
+      indicadoresDaUnidadeSchema.safeParse({ checkinsDeHoje: 1.5, treinandoAgora: 0, placar: [] })
+        .success,
     ).toBe(false);
   });
 });

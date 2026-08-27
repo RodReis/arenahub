@@ -3,8 +3,10 @@ import type { GatilhoDeXp, VersaoDeRegra } from './domain/regra-de-xp.js';
 import { somarSaldo } from './domain/movimento-de-xp.js';
 import type { DefinicaoDeConquista } from './domain/conquista.js';
 import type {
+  ConquistaDoExtratoDeXp,
   ConquistaParaGravar,
   EntradaDeGravacao,
+  MovimentoDoExtratoDeXp,
   MovimentoDoLedger,
   PortaDeXp,
   SessaoPontuavel,
@@ -39,6 +41,15 @@ interface LinhaDoLedger {
   reversesEntryId: string | null;
   ruleVersionId: string;
   occurredAt: Date;
+  reason: string | null;
+}
+
+/** Conquista desbloqueada, guardada em memoria -- para o EXTRATO (Task 9). */
+interface ConquistaDesbloqueada {
+  studentId: string;
+  definitionVersionId: string;
+  unlockedAt: Date;
+  revertida: boolean;
 }
 
 /**
@@ -59,6 +70,7 @@ export class FakePortaDeXp implements PortaDeXp {
   private readonly definicoes: DefinicaoDeConquista[] = [];
   private readonly ledger: LinhaDoLedger[] = [];
   private readonly conquistasDesbloqueadas = new Set<string>();
+  private readonly conquistasPorAluno: ConquistaDesbloqueada[] = [];
   private readonly optOuts = new Set<string>();
   private colidirNaEscrita = false;
   private proximoId = 1;
@@ -119,7 +131,18 @@ export class FakePortaDeXp implements PortaDeXp {
       reversesEntryId: original.id,
       ruleVersionId: original.ruleVersionId,
       occurredAt: original.occurredAt,
+      reason: 'sessao estornada',
     });
+  }
+
+  /** So do dublê: marca a conquista `definitionVersionId` do aluno como REVERTIDA. */
+  reverterConquista(studentId: string, definitionVersionId: string): void {
+    const conquista = this.conquistasPorAluno.find(
+      (item) => item.studentId === studentId && item.definitionVersionId === definitionVersionId,
+    );
+    if (!conquista) throw new Error(`Conquista ${definitionVersionId} nao desbloqueada para ${studentId}`);
+
+    conquista.revertida = true;
   }
 
   regrasDoTenant(_contexto: TenantContext, gatilho: GatilhoDeXp): Promise<VersaoDeRegra[]> {
@@ -156,6 +179,7 @@ export class FakePortaDeXp implements PortaDeXp {
       reversesEntryId: movimento.reversesEntryId,
       ruleVersionId: movimento.ruleVersionId,
       occurredAt: movimento.occurredAt,
+      reason: movimento.reason,
     });
 
     return Promise.resolve();
@@ -178,6 +202,12 @@ export class FakePortaDeXp implements PortaDeXp {
   gravarConquistas(_contexto: TenantContext, conquistas: readonly ConquistaParaGravar[]): Promise<void> {
     for (const conquista of conquistas) {
       this.conquistasDesbloqueadas.add(conquista.definitionVersionId);
+      this.conquistasPorAluno.push({
+        studentId: conquista.studentId,
+        definitionVersionId: conquista.definitionVersionId,
+        unlockedAt: conquista.unlockedAt,
+        revertida: false,
+      });
     }
 
     return Promise.resolve();
@@ -203,6 +233,33 @@ export class FakePortaDeXp implements PortaDeXp {
           sourceKind: linha.sourceKind,
           sourceId: linha.sourceId,
           reversesEntryId: linha.reversesEntryId,
+        })),
+    );
+  }
+
+  /** `regra` = code da versao de regra para GRANT; `reason` para ADJUSTMENT/REVERSAL. */
+  movimentosDoExtrato(_contexto: TenantContext, studentId: string): Promise<MovimentoDoExtratoDeXp[]> {
+    return Promise.resolve(
+      this.ledger
+        .filter((linha) => linha.studentId === studentId)
+        .map((linha) => ({
+          pontos: linha.points,
+          regra: linha.reason ?? this.regras.find((r) => r.id === linha.ruleVersionId)?.code ?? '',
+          quando: linha.occurredAt,
+        })),
+    );
+  }
+
+  conquistasDoExtrato(_contexto: TenantContext, studentId: string): Promise<ConquistaDoExtratoDeXp[]> {
+    const definicaoPorId = new Map(this.definicoes.map((definicao) => [definicao.id, definicao]));
+
+    return Promise.resolve(
+      this.conquistasPorAluno
+        .filter((conquista) => conquista.studentId === studentId)
+        .map((conquista) => ({
+          titulo: definicaoPorId.get(conquista.definitionVersionId)?.title ?? '',
+          desbloqueadaEm: conquista.unlockedAt,
+          revertida: conquista.revertida,
         })),
     );
   }

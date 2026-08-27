@@ -7,11 +7,17 @@ import {
 
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { AccessQueryRepository } from '../access-query/access-query.repository.js';
+import { EngagementRankingService } from '../engagement/engagement-ranking.service.js';
+import { mesLocal } from '../engagement/domain/movimento-de-xp.js';
 import type { ContextoDoKiosk } from '../kiosk-auth/kiosk-auth.service.js';
+import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import {
   inicioDaJanelaDeTreino,
   inicioDoDiaLocal,
 } from './domain/indicadores-da-unidade.js';
+
+/** Mesmo fuso fixo que `domain/indicadores-da-unidade.ts` assume para a academia. */
+const FUSO_DA_ACADEMIA = 'America/Sao_Paulo';
 
 export interface ConfiguracaoResolvida {
   readonly version: number;
@@ -30,6 +36,7 @@ export class KioskConfigService {
   constructor(
     private readonly db: PrismaService,
     private readonly eventos: AccessQueryRepository,
+    private readonly ranking: EngagementRankingService,
   ) {}
 
   /**
@@ -142,7 +149,8 @@ export class KioskConfigService {
   }
 
   /**
-   * Os dois numeros do bloco de informacoes da tela publica (F51).
+   * Os numeros do bloco de informacoes da tela publica (F51) + o placar
+   * publico (F31, Task 9).
    *
    * VAO NO HEARTBEAT que a F49 ja dispara a cada 30 s, e nao numa rota
    * propria: `M3.5-FR-005` proibe a tela publica depender da rede, e uma
@@ -153,14 +161,21 @@ export class KioskConfigService {
    * As duas contagens vao em paralelo: sao consultas independentes sobre o
    * mesmo indice (`[tenantId, gymUnitId, occurredAt]`), e serializa-las
    * dobraria a latencia de um heartbeat que roda a cada 30 segundos.
+   *
+   * O PLACAR chega AQUI, ja com os nomes resolvidos no servidor por
+   * `EngagementRankingService.lerPlacarPublicado` -- nunca `studentId`
+   * (`blocos-publicos.tsx`, F51, trava estrutural). Modulo `xp` desligado ou
+   * placar retido/nao publicado devolve lista vazia, nunca ausente: o bloco
+   * some do rodizio, nao aparece cinza nem vazio.
    */
   async contarIndicadores(
     contexto: ContextoDoKiosk,
+    config: KioskConfig,
     agora: Date,
   ): Promise<IndicadoresDaUnidade> {
     const escopo = { tenantId: contexto.tenantId, gymUnitId: contexto.gymUnitId };
 
-    const [checkinsDeHoje, treinandoAgora] = await Promise.all([
+    const [checkinsDeHoje, treinandoAgora, placar] = await Promise.all([
       this.eventos.contarEntradasDaUnidade({
         ...escopo,
         de: inicioDoDiaLocal(agora),
@@ -171,8 +186,30 @@ export class KioskConfigService {
         de: inicioDaJanelaDeTreino(agora),
         ate: agora,
       }),
+      config.modulos.xp ? this.placarPublico(contexto, agora) : Promise.resolve([]),
     ]);
 
-    return { checkinsDeHoje, treinandoAgora };
+    return { checkinsDeHoje, treinandoAgora, placar };
+  }
+
+  private async placarPublico(contexto: ContextoDoKiosk, agora: Date) {
+    const tenantContext: TenantContext = {
+      tenantId: contexto.tenantId,
+      actorId: null as unknown as string,
+      sessionId: contexto.kioskDeviceId,
+      permissions: new Set<string>(),
+      allowedUnitIds: new Set([contexto.gymUnitId]),
+    };
+
+    const placar = await this.ranking.lerPlacarPublicado(
+      tenantContext,
+      contexto.gymUnitId,
+      mesLocal(agora, FUSO_DA_ACADEMIA),
+    );
+
+    // `lerPlacarPublicado` devolve `readonly [...]`; `IndicadoresDaUnidade`
+    // (Zod) infere array mutavel -- copia rasa so para casar o tipo, sem
+    // mudar o conteudo.
+    return [...placar];
   }
 }
