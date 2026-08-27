@@ -3238,3 +3238,116 @@ os dois inverteria um dos dois regimes em silêncio, e é exatamente por isso qu
 | 4 | `ConsentRecord` guarda dois regimes opostos de ausência de linha, com predicados separados | `SPEC-030` §2, §4 |
 | 5 | `PublicProfile` (tabela nova) guarda o apelido público e sua moderação, com unicidade em índice parcial sobre `APPROVED` | `SPEC-030` §2 |
 | 6 | `HIDDEN` nasce sem caminho de escrita nesta fatia — é para denúncia, e não há canal de denúncia até a F35 | `SPEC-030` §3 |
+
+---
+
+## ADR-047 — F31 roda antes do gate do MVP 5, absorve a F33 e nasce com catálogo de XP proposto pelo Code
+
+**Data:** 27/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 27/08/2026**
+· **Emenda** `docs/prd/academia/MVP-05-engagement.md` §1 (gate de entrada) e §7 Slice 5.2
+  (superfície)
+· **Alcança** a `SPEC-031` e a fatia F31; **absorve** a `SPEC-033` e a fatia F33
+· **NÃO alcança:** F32, F34 e F35, que seguem atrás do gate do MVP 5 tal como estava; a Regra de
+  arquitetura 9; a Regra de arquitetura 5 (evento na mesma transação da mudança de estado);
+  o regime opt-out do ADR-046
+
+### Contexto
+
+O ADR-046 liberou a F30 e escreveu, com todas as letras, que **F31–F35 continuam atrás do gate
+original** e que *"se uma fatia futura quiser rodar antes do gate, precisa do próprio ADR, com o
+próprio argumento"*. Este é esse ADR, e este é o argumento.
+
+O gate do MVP 5 pede duas coisas: *"eventos confiáveis + app do MVP 4"*. Em 27/08/2026 elas estão
+em estados opostos, e é isso que muda a conta desde 26/08.
+
+**O app não existe e não vai existir tão cedo.** `apps/mobile/` tem um `.gitkeep`; F23–F29 estão
+todas `planejada`; a ordem de execução do ADR-042 coloca o MVP 4 depois do MVP 3.5.
+
+**Os eventos confiáveis existem.** A F24 entregou `StudentAttendanceSession`: dia local **da
+unidade**, política versionada (`dia-civil-local@1`), e uma sessão por
+`(tenant, aluno, dia, unidade, política)` garantida por chave única no banco. A F49–F52 entregou
+o totem com área do aluno identificada por CPF. Nenhuma das duas existia quando o gate foi
+escrito.
+
+### Decisão 1 — a fatia roda, com o totem como superfície
+
+Mesmo movimento do ADR-046, Decisão 1: onde a Slice diz "app", leia-se **totem**. O `apps/kiosk`
+ganha a tela *Meu XP* na área do aluno e um bloco de ranking no rodízio da tela pública.
+
+**Isso libera só a F31 (com o escopo da F33 dentro).** F32, F34 e F35 continuam atrás do gate —
+streak, desafios, notificações e moderação não ganham argumento por tabela.
+
+### Decisão 2 — F31 absorve a F33; a numeração F33/SPEC-033 fica queimada
+
+Palavras do PI: *"o ranking vai aparecer na área pública do totem (ranking da academia — geral) e
+na conta individual do aluno, mostrando onde ele está"*.
+
+XP privado sem placar não entrega o que a academia quer ver. Partir em duas fatias adiaria metade
+do valor sem reduzir risco: o placar ordena exatamente o saldo que a F31 já produz, e o portão de
+exposição já existe desde a F30 (`resolverExposicao()`).
+
+`F33` e `SPEC-033` **não são reaproveitadas** — número alocado não volta à fila (regra do
+`STATUS.md`). O arquivo `docs/specs/SPEC-033-rankings-privados-por-padrao.md` fica como histórico
+e aponta para cá.
+
+**Três parâmetros do ranking, decididos pelo PI nesta data:**
+
+| parâmetro | decisão | consequência |
+|---|---|---|
+| identidade no placar público | **conforme a F30** — `resolverExposicao()` decide | apelido aprovado, ou primeiro nome, ou "Participante"; nome civil completo nunca vai ao hero |
+| coorte mínima (`M5-BR-007`) | **5 participantes** | abaixo disso o snapshot é `WITHHELD` e o hero não mostra placar; a conta individual continua mostrando o XP |
+| período | **mês corrente** | zera no dia 1º; o ledger guarda tudo, o mês é só o recorte |
+
+### Decisão 3 — `M5-RULES-01` não bloqueia; o Code propõe o catálogo v1
+
+`M5-RULES-01` pede *"catálogo de XP e streak assinado por profissional"*. Ele **nasceu no plano de
+apoio, não no PRD**, e o precedente é o `M3-CLINICAL-01` — mesmo formato, mesma exigência de
+assinatura profissional, derrubado como gate em 19/08 pelo ADR-035, decisão do PI.
+
+Dos quatro itens do `M5-RULES-01`, dois são **código e são entregues de qualquer forma**:
+
+- *"nenhuma regra premia passagens repetidas no mesmo dia local"* — garantido por
+  `StudentAttendanceSession`, no banco, não por contagem no código;
+- *"interpretador declarativo não aceita JavaScript, SQL ou expressão arbitrária"* — a regra é
+  dado (`{ gatilho, pontos }`) com allowlist de gatilhos; não há caminho para expressão.
+
+Os outros dois são **conteúdo**: quanto vale um treino, quais conquistas existem. O Code propõe o
+v1 (10 XP por sessão confirmada; conquistas em 1, 10, 50 e 100 sessões) e o PI revisa os números
+quando quiser. **Trocar valor é versão nova de regra, não migration** — é para isso que
+`XpRuleVersion` é versionada.
+
+### A consequência que precisa ficar escrita — snapshot congela pontuação, não exposição
+
+`RankingSnapshot` publicado é **imutável** (`M5-AC-007`): regra alterada depois não reescreve
+placar passado. Mas `M5-FR-003` e `M5-NFR-003` exigem que o aluno que pede opt-out suma da
+próxima leitura em até 15 minutos.
+
+As duas exigências colidiriam se o nome fosse gravado na entrada do snapshot. Por isso
+**`RankingEntry` guarda `studentId` para auditoria e o nome sai de `resolverExposicao()` em toda
+leitura** — o snapshot congela **pontuação e posição**; quem aparece é decidido **agora**.
+
+Gravar o nome público na materialização pareceria uma otimização óbvia e seria o defeito: um
+aluno que pediu para sair continuaria estampado num artefato imutável, e a única saída seria
+mutar o que o `M5-AC-007` proíbe mutar.
+
+### A trava da F51 que esta fatia não pode quebrar
+
+`apps/kiosk/components/blocos-publicos.tsx` declara, no próprio código, que **nenhum dado de aluno
+chega até ele** (`M3.5-BR-001`) e que **a tela pública não fala com a rede**. Um bloco de ranking
+com nomes é, por definição, dado de aluno na tela pública.
+
+A trava fica de pé assim: o placar chega **pelo heartbeat**, com os nomes **já resolvidos no
+servidor**. A tela não ganha `fetch`, não importa `SessaoDoAluno`, e nunca recebe `studentId`.
+
+### Decisões e onde elas aterrissam
+
+| # | decisão | aterrissa em |
+|---|---|---|
+| 1 | F31 roda antes do gate do MVP 5, com o totem como superfície | `MVP-05` §1, §7 Slice 5.2 |
+| 2 | F31 absorve a F33; `F33`/`SPEC-033` ficam queimadas | `STATUS.md` Índice Fatia ↔ SPEC, `SPEC-033` |
+| 3 | Identidade no placar segue `resolverExposicao()` (F30) | `SPEC-031` §8 |
+| 4 | Coorte mínima do ranking: **5**, configurável por tenant | `SPEC-031` §4.6 |
+| 5 | Período do placar público: **mês corrente** | `SPEC-031` §7 |
+| 6 | `M5-RULES-01` não bloqueia; catálogo v1 proposto pelo Code | `SPEC-031` §6 |
+| 7 | Snapshot congela pontuação; exposição é reavaliada em toda leitura | `SPEC-031` §4.5 |
+| 8 | Sem BullMQ, worker ou despachante de outbox — projeção sob demanda, como a F24 | `SPEC-031` §2.4 |
