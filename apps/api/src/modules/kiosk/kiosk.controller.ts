@@ -7,18 +7,20 @@ import {
   Headers,
   HttpCode,
   Param,
+  Patch,
   Post,
   Req,
 } from '@nestjs/common';
 import { ApiNoContentResponse, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { z } from 'zod';
 import type { Request } from 'express';
-import type { IndicadoresDaUnidade } from '@arenahub/api-contracts';
+import { aliasPublicoSchema, preferenciasSchema, type IndicadoresDaUnidade } from '@arenahub/api-contracts';
 
 import { KioskRoute } from '../kiosk-auth/kiosk-route.decorator.js';
 import type { ContextoDoKiosk } from '../kiosk-auth/kiosk-auth.service.js';
 import { KioskAreaDoAlunoService } from './kiosk-area-do-aluno.service.js';
 import { KioskConfigService, type ConfiguracaoResolvida } from './kiosk-config.service.js';
+import { KioskEngajamentoService } from './kiosk-engajamento.service.js';
 import { KioskMediaLinkService } from './kiosk-media-link.service.js';
 import { KioskPagamentoService, type CobrancaDoTotem } from './kiosk-pagamento.service.js';
 import { KioskSaudeService } from './kiosk-saude.service.js';
@@ -49,6 +51,7 @@ export class KioskController {
     private readonly area: KioskAreaDoAlunoService,
     private readonly pagamento: KioskPagamentoService,
     private readonly saude: KioskSaudeService,
+    private readonly engajamento: KioskEngajamentoService,
   ) {}
 
   @Post('heartbeat')
@@ -502,6 +505,112 @@ export class KioskController {
     );
 
     return this.saude.historicoDeAvaliacoes(aluno, agora);
+  }
+
+  /**
+   * §5.8 -- preferencia de engajamento (F30).
+   *
+   * So `RANKING` existe nesta fatia -- `preferenciasSchema` recusa qualquer
+   * outra finalidade antes de chegar aqui (400, boundary Zod).
+   */
+  @Get('sessions/:id/engajamento/preferencias')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['finalidades', 'perfil', 'nomeExibido'],
+      properties: {
+        finalidades: { type: 'object', additionalProperties: { type: 'boolean' } },
+        perfil: { type: 'object', nullable: true, additionalProperties: true },
+        nomeExibido: { type: 'string' },
+      },
+    },
+  })
+  async obterPreferenciasDeEngajamento(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ) {
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'ranking',
+      new Date(),
+    );
+
+    return this.engajamento.obterPreferencias(aluno);
+  }
+
+  @Patch('sessions/:id/engajamento/preferencias')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['finalidades', 'perfil', 'nomeExibido'],
+      properties: {
+        finalidades: { type: 'object', additionalProperties: { type: 'boolean' } },
+        perfil: { type: 'object', nullable: true, additionalProperties: true },
+        nomeExibido: { type: 'string' },
+      },
+    },
+  })
+  async atualizarPreferenciaDeEngajamento(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+    @Body() corpo: unknown,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'ranking',
+      agora,
+    );
+
+    const dados = preferenciasSchema.parse(corpo);
+
+    return this.engajamento.atualizarPreferencia(aluno, dados.participa, agora);
+  }
+
+  @Patch('sessions/:id/engajamento/perfil-publico')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['id', 'identityChoice', 'alias', 'status', 'version'],
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        identityChoice: { type: 'string', enum: ['PRIMEIRO_NOME', 'APELIDO', 'ANONIMO'] },
+        alias: { type: 'string', nullable: true },
+        status: { type: 'string' },
+        version: { type: 'integer' },
+      },
+    },
+  })
+  async definirPerfilPublico(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+    @Body() corpo: unknown,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'ranking',
+      agora,
+    );
+
+    const dados = aliasPublicoSchema.parse(corpo);
+
+    return this.engajamento.definirAliasPublico(
+      aluno,
+      dados.identityChoice,
+      dados.alias,
+      dados.version,
+      agora,
+    );
   }
 
   /**
