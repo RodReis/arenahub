@@ -337,18 +337,29 @@ export class EngagementRepository implements PortaDeEngajamento {
   }
 }
 
+/** Campos do indice parcial, na forma como `updateMany` relata a colisao
+ * (entre crases, separados por virgula) -- ver comentario abaixo. */
+const CAMPOS_DO_INDICE_ALIAS_APROVADO = '`tenant_id`, `alias_normalized`';
+
 /**
  * Colisao de alias aprovado dispara erro do Postgres no indice parcial.
  *
  * Prisma 7 + adapter-pg NAO popula `error.meta.target` (memoria
  * prisma7-adapter-pg-sem-meta-target): o nome do constraint so vem em
  * texto livre na mensagem. Casar pelo nome do indice, nao por `meta`.
+ *
+ * `create`/`upsert` citam o NOME do indice na mensagem; `updateMany` (usado
+ * em `moderarPerfil`) cita os CAMPOS em vez do nome -- testado contra
+ * Postgres real, nao documentado. Casar os dois formatos.
  */
 function traduzirErroDeColisao(erro: unknown): unknown {
   if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002') {
     const mensagem = String(erro.message ?? '');
 
-    if (mensagem.includes(INDICE_ALIAS_APROVADO_UNICO)) {
+    if (
+      mensagem.includes(INDICE_ALIAS_APROVADO_UNICO) ||
+      mensagem.includes(CAMPOS_DO_INDICE_ALIAS_APROVADO)
+    ) {
       return new ConflictException({
         code: 'ALIAS_JA_APROVADO_PARA_OUTRO_ALUNO',
         message: 'Este apelido ja foi aprovado para outro aluno',
