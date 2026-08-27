@@ -535,6 +535,41 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
   pública**, mesmo participando e com apelido aprovado — vazamento de aluno cancelado no telão do
   saguão é vazamento com outro nome. Provado por `exposicao.spec.ts` (`motivo: 'ALUNO_INATIVO'`).
 
+### 4.21 XP, conquistas e ranking (INV-156 a INV-161) — *(ADR-047, F31, 27/08/2026)*
+
+- **INV-156** **O ledger de XP é append-only, garantido no banco.** `xp_ledger_entries` tem trigger
+  que recusa `UPDATE` e `DELETE` levantando `XP_LEDGER_APPEND_ONLY`; correção é movimento
+  compensatório vinculado por `reversesEntryId`, nunca reescrita. Append-only por disciplina é uma
+  promessa que a primeira correção apressada quebra. Provado por
+  `apps/api/test/integration/xp-e-ranking.int-spec.ts` (`recusa UPDATE e DELETE no ledger`).
+- **INV-157** **O mesmo fato nunca concede XP duas vezes.** A chave única
+  `(tenantId, studentId, sourceKind, sourceId, ruleVersionId, type)` é a garantia — não um `if` que
+  lê antes de escrever, que perde a corrida por construção. A colisão `P2002` é tratada como
+  sucesso idempotente. Provado por `xp-e-ranking.int-spec.ts` (cem sincronizações concorrentes
+  contra Postgres real produzem um movimento e saldo de 10).
+- **INV-158** **Regra de XP é resolvida pela data do fato, não pelo relógio do processo.** Evento
+  atrasado é pontuado pela `XpRuleVersion` vigente em `occurredAt`; regra alterada é versão nova e
+  não reescreve concessão passada. Provado por
+  `apps/api/src/modules/engagement/domain/regra-de-xp.spec.ts`, incluindo o limite inferior
+  inclusivo da vigência (mutante `<=` → `<` deixa o teste vermelho).
+- **INV-159** **Conquista sai de evidência verificada, e sessão revertida não conta.** Cada
+  `StudentAchievement` guarda o `evidenceEntryId` do movimento que a provou, e a contagem de
+  `SESSOES_ACUMULADAS` é **líquida**: a `GRANT` permanece no ledger de propósito, e é o `REVERSAL`
+  que a anula. Provado por `engagement-xp.service.spec.ts`
+  (`sessao revertida nao conta para o marco`).
+- **INV-160** **Snapshot de ranking publicado nunca é reescrito.** Republicar é recusado com
+  `409 RANKING_SNAPSHOT_IMUTAVEL`; regra alterada depois não muda placar histórico. Provado por
+  `engagement-ranking.service.spec.ts` e por `xp-e-ranking.int-spec.ts`.
+- **INV-161** **Quem aparece no placar é decidido na leitura, nunca congelado no snapshot.**
+  `RankingEntry` guarda `studentId` para auditoria e **não** guarda nome; `resolverExposicao()` roda
+  a cada leitura, e o nome sai abreviado (`DS-TOTEM.md` §3.4c). Um aluno que pede opt-out depois da
+  publicação some da próxima leitura sem que ninguém toque no artefato imutável — gravar o nome na
+  materialização faria privacidade e imutabilidade colidirem, e a que perderia seria a
+  privacidade. A posição **não é renumerada** quando alguém é omitido: renumerar exporia por
+  dedução quem saiu. Provado por `engagement-ranking.service.spec.ts`
+  (`omite quem pediu opt-out DEPOIS da publicacao, sem tocar no snapshot` e
+  `nao renumera a posicao de quem ficou`).
+
 ---
 
 ## 5. Buracos conhecidos do modelo
