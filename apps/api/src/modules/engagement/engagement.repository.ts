@@ -337,24 +337,47 @@ export class EngagementRepository implements PortaDeEngajamento {
   }
 }
 
-/** Campos do indice parcial, na forma como `updateMany` relata a colisao
- * (entre crases, separados por virgula) -- ver comentario abaixo. */
+/**
+ * O nome do indice esta em `erro.meta.driverAdapterError.cause.originalMessage`
+ * (texto livre do Postgres), confirmado contra Postgres real -- mesmo
+ * caminho documentado em `assessment.repository.ts` (`violaIndiceDeOrigem`).
+ * `erro.message` (o texto formatado pelo Prisma) e fallback: `create`/`upsert`
+ * citam o NOME do indice ali, mas `updateMany` (usado em `moderarPerfil`)
+ * cita os CAMPOS em vez do nome -- o wording muda conforme a operacao, entao
+ * o fallback casa os dois formatos.
+ */
+function mensagemOriginalDoDriver(erro: Prisma.PrismaClientKnownRequestError): string | null {
+  const meta: unknown = erro.meta;
+  if (meta === null || typeof meta !== 'object') return null;
+
+  const driverError: unknown = (meta as Record<string, unknown>)['driverAdapterError'];
+  if (driverError === null || typeof driverError !== 'object') return null;
+
+  const cause: unknown = (driverError as Record<string, unknown>)['cause'];
+  if (cause === null || typeof cause !== 'object') return null;
+
+  const mensagem: unknown = (cause as Record<string, unknown>)['originalMessage'];
+  return typeof mensagem === 'string' ? mensagem : null;
+}
+
+/** Campos do indice parcial, na forma como `updateMany` relata a colisao no
+ * `erro.message` formatado (entre crases, separados por virgula) -- so usado
+ * no fallback, quando `meta` estruturado nao trouxer o nome do indice. */
 const CAMPOS_DO_INDICE_ALIAS_APROVADO = '`tenant_id`, `alias_normalized`';
 
 /**
  * Colisao de alias aprovado dispara erro do Postgres no indice parcial.
  *
- * Prisma 7 + adapter-pg NAO popula `error.meta.target` (memoria
- * prisma7-adapter-pg-sem-meta-target): o nome do constraint so vem em
- * texto livre na mensagem. Casar pelo nome do indice, nao por `meta`.
- *
- * `create`/`upsert` citam o NOME do indice na mensagem; `updateMany` (usado
- * em `moderarPerfil`) cita os CAMPOS em vez do nome -- testado contra
- * Postgres real, nao documentado. Casar os dois formatos.
+ * Prisma 7 + adapter-pg NAO popula `error.meta.target` como versoes
+ * anteriores documentavam (memoria prisma7-adapter-pg-sem-meta-target) --
+ * mas populam `error.meta.driverAdapterError.cause.originalMessage`, que
+ * carrega o nome do indice em texto livre. Tenta esse caminho primeiro;
+ * so cai para casar `erro.message` se `meta` nao trouxer nada usavel.
  */
 function traduzirErroDeColisao(erro: unknown): unknown {
   if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002') {
-    const mensagem = String(erro.message ?? '');
+    const doMeta = mensagemOriginalDoDriver(erro);
+    const mensagem = doMeta ?? String(erro.message ?? '');
 
     if (
       mensagem.includes(INDICE_ALIAS_APROVADO_UNICO) ||

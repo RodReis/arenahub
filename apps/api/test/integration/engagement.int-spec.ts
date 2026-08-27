@@ -315,17 +315,20 @@ describe('F30 -- engajamento e identidade publica (integracao)', () => {
   it('decisao vigente e a mais recente mesmo com occurredAt empatado', async () => {
     // Empate de timestamp nao pode deixar a ordem fisica do banco decidir.
     // O caso de uso nao produz esse empate sozinho (cada chamada carimba o
-    // proprio `agora`), entao o arranjo escreve as duas linhas direto pelo
-    // Prisma, no MESMO instante -- e verifica que a REFUSED gravada por
-    // ultimo e a que vale, nao a que o Postgres devolveria primeiro por
-    // ordem fisica.
+    // proprio `agora`, e `registrarDecisao` supera a linha anterior antes de
+    // criar a nova, entao nunca ha duas linhas VIVAS no fluxo normal). O
+    // arranjo escreve as duas linhas direto pelo Prisma: mesmo `occurredAt`,
+    // as DUAS com `supersededAt: null` (nada supera nada -- e o estado que
+    // o `where: { supersededAt: null }` de `decisaoVigente` permite passar
+    // adiante, ainda que o caminho de escrita normal nao o produza), e
+    // `createdAt` diferente. So o `orderBy` por `createdAt` desempata.
     const alunoId = await criarAluno(tenantA.id, tenantA.gymUnitId);
     const documento = await db.consentDocument.findFirstOrThrow({
       where: { tenantId: tenantA.id, type: 'RANKING', retiredAt: null },
     });
     const instanteEmpatado = new Date('2026-08-20T10:00:00.000Z');
 
-    const aceite = await db.consentRecord.create({
+    await db.consentRecord.create({
       data: {
         tenantId: tenantA.id,
         studentId: alunoId,
@@ -334,6 +337,7 @@ describe('F30 -- engajamento e identidade publica (integracao)', () => {
         subjectKind: 'STUDENT',
         subjectAgeYears: 30,
         occurredAt: instanteEmpatado,
+        createdAt: new Date('2026-08-20T10:00:00.001Z'),
       },
     });
 
@@ -346,15 +350,12 @@ describe('F30 -- engajamento e identidade publica (integracao)', () => {
         subjectKind: 'STUDENT',
         subjectAgeYears: 30,
         occurredAt: instanteEmpatado,
+        createdAt: new Date('2026-08-20T10:00:00.002Z'),
       },
     });
 
-    await db.consentRecord.update({
-      where: { id: aceite.id },
-      data: { supersededAt: instanteEmpatado },
-    });
-
     const preferencias = await service.obterPreferencias(ctxDe(tenantA), alunoId);
+    // A REFUSED tem createdAt maior -- e a que deve vencer o desempate.
     expect(preferencias.finalidades.RANKING).toBe(false);
   });
 });
