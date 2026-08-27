@@ -520,7 +520,7 @@ Todo render 3D recebe gradiente de legibilidade e selo identificando o período.
 - [ ] Laranja e vermelho apenas como estado
 
 **Conteúdo e privacidade**
-- [ ] Tela pública sem qualquer dado de aluno
+- [ ] Tela pública sem qualquer dado identificável de aluno — nunca nome civil, nunca foto, nunca id (o ranking do §3.4c é a exceção desenhada: nome já abreviado, não identifica)
 - [ ] Vídeo sem som e com legenda
 - [ ] Toda tela de avaliação marcada como somente leitura
 - [ ] Rodapé de "não é diagnóstico médico" presente em avaliação e evolução
