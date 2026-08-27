@@ -511,6 +511,61 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
 
       expect(JSON.stringify(resposta.body)).not.toContain(outro.studentId);
     });
+
+    /*
+     * `M5-FR-007` e §13 do PRD: revogacao e movimento compensatorio
+     * auditado, NAO exclusao -- a conquista revertida continua visivel, MAS
+     * so mostrar "Revertida" sem dizer por que levanta a pergunta sem
+     * responder, o que e pior do que nao mostrar nada. `motivo` prende essa
+     * garantia direto no corpo HTTP que o totem consome -- e o unico teste
+     * que passaria mesmo com `conquistasDoExtrato` esquecendo de selecionar
+     * `reversedReason`.
+     */
+    it('devolve o motivo de uma conquista revertida', async () => {
+      const { sessionId, token, studentId: aluno } = await sessaoDoAlunoComXp();
+
+      await servico.sincronizarXp(contexto, aluno, AGORA);
+      const evidencia = await db.xpLedgerEntry.findFirstOrThrow({
+        where: { tenantId, studentId: aluno },
+      });
+
+      const definicao = await db.achievementDefinitionVersion.create({
+        data: {
+          tenantId,
+          code: `motivo-revertido-${sufixo}`,
+          version: 1,
+          title: 'Primeira semana completa',
+          criterionKind: 'SESSOES_ACUMULADAS',
+          threshold: 1,
+          effectiveFrom: new Date('2000-01-01T00:00:00.000Z'),
+        },
+      });
+
+      const motivoEsperado = 'presenca lancada por engano na catraca';
+      await db.studentAchievement.create({
+        data: {
+          tenantId,
+          studentId: aluno,
+          definitionVersionId: definicao.id,
+          unlockedAt: AGORA,
+          evidenceEntryId: evidencia.id,
+          status: 'REVERSED',
+          reversedAt: AGORA,
+          reversedReason: motivoEsperado,
+        },
+      });
+
+      const resposta = await buscar(`/api/v1/kiosk/sessions/${sessionId}/engajamento/xp`, token).expect(
+        200,
+      );
+
+      const corpo = resposta.body as {
+        conquistas: { titulo: string; revertida: boolean; motivo: string | null }[];
+      };
+      const conquistaRevertida = corpo.conquistas.find((c) => c.titulo === 'Primeira semana completa');
+
+      expect(conquistaRevertida).toMatchObject({ revertida: true, motivo: motivoEsperado });
+    });
   });
 
   describe('POST heartbeat -- placar publico', () => {

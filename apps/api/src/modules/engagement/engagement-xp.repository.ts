@@ -66,11 +66,21 @@ export interface MovimentoDoExtratoDeXp {
   quando: Date;
 }
 
-/** Uma conquista do aluno, incluindo a REVERTIDA -- o extrato nao esconde estorno. */
+/**
+ * Uma conquista do aluno, incluindo a REVERTIDA -- o extrato nao esconde
+ * estorno.
+ *
+ * `motivo` e obrigatorio na LEITURA (nao opcional) porque uma conquista que
+ * perde o desbloqueio sem dizer por que levanta a pergunta sem responder --
+ * pior do que nao mostrar nada (§13 do PRD, `M5-FR-007`). E `null` quando a
+ * conquista nunca foi revertida; `StudentAchievement.reversedReason` so
+ * existe preenchido no caminho de estorno.
+ */
 export interface ConquistaDoExtratoDeXp {
   titulo: string;
   desbloqueadaEm: Date;
   revertida: boolean;
+  motivo: string | null;
 }
 
 /** Politica de agrupamento de sessao vigente -- ver `StudentAttendanceSession.policyVersion`. */
@@ -356,6 +366,7 @@ export class EngagementXpRepository implements PortaDeXp {
       select: {
         status: true,
         unlockedAt: true,
+        reversedReason: true,
         definition: { select: { title: true } },
       },
     });
@@ -364,6 +375,7 @@ export class EngagementXpRepository implements PortaDeXp {
       titulo: conquista.definition.title,
       desbloqueadaEm: conquista.unlockedAt,
       revertida: conquista.status === 'REVERSED',
+      motivo: conquista.reversedReason,
     }));
   }
 }

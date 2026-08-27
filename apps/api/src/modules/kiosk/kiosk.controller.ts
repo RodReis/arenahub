@@ -663,11 +663,12 @@ export class KioskController {
           type: 'array',
           items: {
             type: 'object',
-            required: ['titulo', 'desbloqueadaEm', 'revertida'],
+            required: ['titulo', 'desbloqueadaEm', 'revertida', 'motivo'],
             properties: {
               titulo: { type: 'string' },
               desbloqueadaEm: { type: 'string', format: 'date-time' },
               revertida: { type: 'boolean' },
+              motivo: { type: 'string', nullable: true },
             },
           },
         },

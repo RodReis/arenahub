@@ -2913,7 +2913,8 @@
                         "required": [
                           "titulo",
                           "desbloqueadaEm",
-                          "revertida"
+                          "revertida",
+                          "motivo"
                         ],
                         "properties": {
                           "titulo": {
@@ -2925,6 +2926,10 @@
                           },
                           "revertida": {
                             "type": "boolean"
+                          },
+                          "motivo": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }

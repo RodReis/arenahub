@@ -50,6 +50,7 @@ interface ConquistaDesbloqueada {
   definitionVersionId: string;
   unlockedAt: Date;
   revertida: boolean;
+  motivo: string | null;
 }
 
 /**
@@ -135,14 +136,15 @@ export class FakePortaDeXp implements PortaDeXp {
     });
   }
 
-  /** So do dublê: marca a conquista `definitionVersionId` do aluno como REVERTIDA. */
-  reverterConquista(studentId: string, definitionVersionId: string): void {
+  /** So do dublê: marca a conquista `definitionVersionId` do aluno como REVERTIDA, com motivo. */
+  reverterConquista(studentId: string, definitionVersionId: string, motivo = 'estorno de teste'): void {
     const conquista = this.conquistasPorAluno.find(
       (item) => item.studentId === studentId && item.definitionVersionId === definitionVersionId,
     );
     if (!conquista) throw new Error(`Conquista ${definitionVersionId} nao desbloqueada para ${studentId}`);
 
     conquista.revertida = true;
+    conquista.motivo = motivo;
   }
 
   regrasDoTenant(_contexto: TenantContext, gatilho: GatilhoDeXp): Promise<VersaoDeRegra[]> {
@@ -207,6 +209,7 @@ export class FakePortaDeXp implements PortaDeXp {
         definitionVersionId: conquista.definitionVersionId,
         unlockedAt: conquista.unlockedAt,
         revertida: false,
+        motivo: null,
       });
     }
 
@@ -260,6 +263,7 @@ export class FakePortaDeXp implements PortaDeXp {
           titulo: definicaoPorId.get(conquista.definitionVersionId)?.title ?? '',
           desbloqueadaEm: conquista.unlockedAt,
           revertida: conquista.revertida,
+          motivo: conquista.motivo,
         })),
     );
   }
