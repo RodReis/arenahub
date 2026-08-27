@@ -13,6 +13,9 @@
 ## Global Constraints
 
 - **Idioma:** domínio e identificadores em inglês; comentário, documento e texto de interface em **pt-BR**. Comentário de código **sem acento** (o repositório inteiro segue isso).
+- **Todo spec do `apps/api` importa os globais do Jest explicitamente** — `import { describe, expect, it } from '@jest/globals';` (mais `beforeEach` quando usar). `@types/jest` **não** está instalado no monorepo, e o `tsconfig` da api compila os specs: sem o import, `pnpm typecheck` quebra com `Cannot find name 'describe'`. Os 64 specs pré-existentes do pacote já fazem isso. Nos blocos de teste abaixo o import foi omitido por brevidade — acrescente-o sempre.
+- **`it.each` não aceita `as const`** neste tsconfig (tupla readonly contra assinatura mutável). Tipe o array — `it.each<[string, TipoDoSinal]>([...])` — em vez de usar `as const`.
+- **Acesso a índice de array em teste (`lista[0]`) precisa de guarda que lança**, nunca `?.`. Encadeamento opcional faz a asserção sumir calada quando a lista vem vazia — o teste passa provando nada.
 - **A inversão de regime:** ausência de `ConsentRecord` significa **participa** no engajamento — o oposto da biometria. Nunca reusar `avaliarConsentimento()` de `modules/privacy` para engajamento.
 - **`tenant_id` em toda entidade de negócio**, vindo da identidade autenticada — nunca do corpo da requisição (Regra de arquitetura 2).
 - **Módulo não lê tabela privada de outro módulo** (Regra 9): o totem chama caso de uso público, nunca `consent_records` direto.
