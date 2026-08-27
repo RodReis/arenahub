@@ -107,6 +107,16 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     ferramenta do atendimento diario.
   */
   { href: '/operations/kiosks', label: 'Totens', exigePermissao: 'device.read' },
+  /*
+    MODERAÇÃO DE APELIDO -- F30, Task 9.
+
+    Mesmo grupo de Dispositivos e Totens: moderar apelido público é uso
+    esporádico (a fila enche conforme alunos escolhem apelido), não algo que
+    a recepção abre todo atendimento. `engagement.read` porque a tela lista
+    perfis de engajamento; sem a capacidade, o link nem aparece -- o mesmo
+    critério de `device.read` acima.
+  */
+  { href: '/engagement/aliases', label: 'Moderação de apelido', exigePermissao: 'engagement.read' },
   { href: '/units', label: 'Unidades' },
 ];
 
