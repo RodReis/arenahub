@@ -28,6 +28,7 @@ export {
   TIPOS_DE_BLOCO,
   blocoDaTelaPublicaSchema,
   blocosEmRodizio,
+  entradaPublicaDoPlacarSchema,
   indicadoresDaUnidadeSchema,
   kioskConfigSchema,
   resolverConfig,
@@ -35,6 +36,7 @@ export {
 } from './kiosk-config.js';
 export type {
   BlocoDaTelaPublica,
+  EntradaPublicaDoPlacar,
   IndicadoresDaUnidade,
   KioskConfig,
   KioskConfigLayers,

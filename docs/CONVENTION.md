@@ -472,7 +472,7 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 ### 4.15 Ranking, privacidade e telas públicas (INV-120 a INV-125)
 
 - **INV-120** *(emendado por ADR-046, 26/08/2026)* Ranking é **opt-out**: o aluno participa por padrão e escolhe como o nome aparece; quem não quiser aparecer pede para sair, e a saída vale a partir da próxima projeção. Redação original ("ranking é opt-in") valia antes da decisão do PI que criou a F30 — ver INV-153 a INV-155.
-- **INV-121** Não criar "quem perdeu mais peso" como ranking principal. *(A Especificação §57 abre com "maior redução percentual de gordura" — contradiz a própria §60. Resolver na spec de F33.)*
+- **INV-121** Não criar "quem perdeu mais peso" como ranking principal. *(A Especificação §57 abre com "maior redução percentual de gordura" — contradiz a própria §60.)* **Respeitado por construção na F31** (ADR-047): o único placar que existe ranqueia **XP de frequência**, e o ranking de evolução física relativa ficou fora de escopo — ele exige o consentimento `PHYSICAL_EVOLUTION_RANKING`, dormente desde a F30, e volta na fatia que o acender.
 - **INV-122** Evitar streak que premie treino excessivo diário.
 - **INV-123** **A tela pública da catraca não exibe dívida, valor, CPF ou dado sensível.** Bloqueio mostra "Plano pendente. Procure a recepção."
 - **INV-124** Status é apresentado como resultado + razão, nunca inferido só por cor.
@@ -534,6 +534,41 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 - **INV-155** **Aluno com `Student.status` diferente de `ACTIVE` nunca aparece em exposição
   pública**, mesmo participando e com apelido aprovado — vazamento de aluno cancelado no telão do
   saguão é vazamento com outro nome. Provado por `exposicao.spec.ts` (`motivo: 'ALUNO_INATIVO'`).
+
+### 4.21 XP, conquistas e ranking (INV-156 a INV-161) — *(ADR-047, F31, 27/08/2026)*
+
+- **INV-156** **O ledger de XP é append-only, garantido no banco.** `xp_ledger_entries` tem trigger
+  que recusa `UPDATE` e `DELETE` levantando `XP_LEDGER_APPEND_ONLY`; correção é movimento
+  compensatório vinculado por `reversesEntryId`, nunca reescrita. Append-only por disciplina é uma
+  promessa que a primeira correção apressada quebra. Provado por
+  `apps/api/test/integration/xp-e-ranking.int-spec.ts` (`recusa UPDATE e DELETE no ledger`).
+- **INV-157** **O mesmo fato nunca concede XP duas vezes.** A chave única
+  `(tenantId, studentId, sourceKind, sourceId, ruleVersionId, type)` é a garantia — não um `if` que
+  lê antes de escrever, que perde a corrida por construção. A colisão `P2002` é tratada como
+  sucesso idempotente. Provado por `xp-e-ranking.int-spec.ts` (cem sincronizações concorrentes
+  contra Postgres real produzem um movimento e saldo de 10).
+- **INV-158** **Regra de XP é resolvida pela data do fato, não pelo relógio do processo.** Evento
+  atrasado é pontuado pela `XpRuleVersion` vigente em `occurredAt`; regra alterada é versão nova e
+  não reescreve concessão passada. Provado por
+  `apps/api/src/modules/engagement/domain/regra-de-xp.spec.ts`, incluindo o limite inferior
+  inclusivo da vigência (mutante `<=` → `<` deixa o teste vermelho).
+- **INV-159** **Conquista sai de evidência verificada, e sessão revertida não conta.** Cada
+  `StudentAchievement` guarda o `evidenceEntryId` do movimento que a provou, e a contagem de
+  `SESSOES_ACUMULADAS` é **líquida**: a `GRANT` permanece no ledger de propósito, e é o `REVERSAL`
+  que a anula. Provado por `engagement-xp.service.spec.ts`
+  (`sessao revertida nao conta para o marco`).
+- **INV-160** **Snapshot de ranking publicado nunca é reescrito.** Republicar é recusado com
+  `409 RANKING_SNAPSHOT_IMUTAVEL`; regra alterada depois não muda placar histórico. Provado por
+  `engagement-ranking.service.spec.ts` e por `xp-e-ranking.int-spec.ts`.
+- **INV-161** **Quem aparece no placar é decidido na leitura, nunca congelado no snapshot.**
+  `RankingEntry` guarda `studentId` para auditoria e **não** guarda nome; `resolverExposicao()` roda
+  a cada leitura, e o nome sai abreviado (`DS-TOTEM.md` §3.4c). Um aluno que pede opt-out depois da
+  publicação some da próxima leitura sem que ninguém toque no artefato imutável — gravar o nome na
+  materialização faria privacidade e imutabilidade colidirem, e a que perderia seria a
+  privacidade. A posição **não é renumerada** quando alguém é omitido: renumerar exporia por
+  dedução quem saiu. Provado por `engagement-ranking.service.spec.ts`
+  (`omite quem pediu opt-out DEPOIS da publicacao, sem tocar no snapshot` e
+  `nao renumera a posicao de quem ficou`).
 
 ---
 

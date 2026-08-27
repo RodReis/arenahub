@@ -25,6 +25,7 @@ import { KioskMediaLinkService } from './kiosk-media-link.service.js';
 import { KioskPagamentoService, type CobrancaDoTotem } from './kiosk-pagamento.service.js';
 import { KioskSaudeService } from './kiosk-saude.service.js';
 import { KioskSessionService, type SessaoAberta } from './kiosk-session.service.js';
+import { KioskXpService } from './kiosk-xp.service.js';
 
 const heartbeatSchema = z.object({
   agentVersion: z.string().min(1),
@@ -52,6 +53,7 @@ export class KioskController {
     private readonly pagamento: KioskPagamentoService,
     private readonly saude: KioskSaudeService,
     private readonly engajamento: KioskEngajamentoService,
+    private readonly xp: KioskXpService,
   ) {}
 
   @Post('heartbeat')
@@ -65,10 +67,23 @@ export class KioskController {
         serverTime: { type: 'string', format: 'date-time' },
         indicadores: {
           type: 'object',
-          required: ['checkinsDeHoje', 'treinandoAgora'],
+          required: ['checkinsDeHoje', 'treinandoAgora', 'placar'],
           properties: {
             checkinsDeHoje: { type: 'integer' },
             treinandoAgora: { type: 'integer' },
+            placar: {
+              type: 'array',
+              description: 'Vazio quando o modulo xp esta desligado ou o placar esta retido/nao publicado.',
+              items: {
+                type: 'object',
+                required: ['position', 'nomeExibido', 'points'],
+                properties: {
+                  position: { type: 'integer' },
+                  nomeExibido: { type: 'string' },
+                  points: { type: 'integer' },
+                },
+              },
+            },
           },
         },
       },
@@ -86,14 +101,15 @@ export class KioskController {
     const dados = heartbeatSchema.parse(corpo);
     const agora = new Date();
 
-    const { version } = await this.config.resolverParaDispositivo(contexto);
+    const { version, config } = await this.config.resolverParaDispositivo(contexto);
 
     await this.config.registrarHeartbeat(contexto, dados, agora);
 
-    // Os indicadores da tela publica (F51) pegam CARONA aqui, e nao numa rota
-    // propria: `M3.5-FR-005` proibe a tela publica depender da rede, e uma
-    // requisicao a mais so para o contador seria essa dependencia.
-    const indicadores = await this.config.contarIndicadores(contexto, agora);
+    // Os indicadores da tela publica (F51) e o placar de XP (F31, Task 9)
+    // pegam CARONA aqui, e nao numa rota propria: `M3.5-FR-005` proibe a
+    // tela publica depender da rede, e uma requisicao a mais so para o
+    // contador seria essa dependencia.
+    const indicadores = await this.config.contarIndicadores(contexto, config, agora);
 
     // `configVersion` nasce AQUI, na F49: a F50 declara este endpoint como
     // pre-existente e compara este numero com o do boot (ADR-042, Decisao 3).
@@ -611,6 +627,70 @@ export class KioskController {
       dados.version,
       agora,
     );
+  }
+
+  /**
+   * XP, movimentos explicaveis, conquistas (incluindo revertidas) e posicao
+   * no placar -- SO do aluno daquela sessao (F31, Task 9).
+   *
+   * `movimentos[].regra` e o `code` da regra para GRANT, ou o motivo
+   * gravado para ADJUSTMENT/REVERSAL (`M5-FR-004`, §13 do PRD: sempre
+   * mostrar POR QUE o aluno recebeu). `posicao` e `null` quando o aluno nao
+   * aparece no placar publicado (nao publicado, retido, opt-out ou
+   * inativo).
+   */
+  @Get('sessions/:id/engajamento/xp')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['saldoDoMes', 'mes', 'movimentos', 'conquistas', 'posicao'],
+      properties: {
+        saldoDoMes: { type: 'integer' },
+        mes: { type: 'string', pattern: '^\\d{4}-\\d{2}$' },
+        movimentos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['pontos', 'regra', 'quando'],
+            properties: {
+              pontos: { type: 'integer' },
+              regra: { type: 'string' },
+              quando: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+        conquistas: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['titulo', 'desbloqueadaEm', 'revertida', 'motivo'],
+            properties: {
+              titulo: { type: 'string' },
+              desbloqueadaEm: { type: 'string', format: 'date-time' },
+              revertida: { type: 'boolean' },
+              motivo: { type: 'string', nullable: true },
+            },
+          },
+        },
+        posicao: { type: 'integer', nullable: true },
+      },
+    },
+  })
+  async obterExtratoDeXp(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'xp',
+      agora,
+    );
+
+    return this.xp.obterExtrato(aluno, agora);
   }
 
   /**

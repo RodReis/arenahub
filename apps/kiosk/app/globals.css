@@ -506,30 +506,94 @@ button {
   font-weight: 600;
 }
 
-/* --------------------------------------- blocos publicos (F51, §4) */
+/* --------------------------------------- blocos publicos (F51, §4 v2.1) */
 
 /**
- * O cartao do rodizio. UM POR VEZ -- o §4 exige "no maximo um bloco de midia
- * visivel por vez", e o rodizio garante isso por construcao.
+ * A grade densa da tela publica -- `DS-TOTEM.md` §4 v2.1 (ADR-047, Emenda de
+ * 27/08/2026 (2)). Substitui o rodizio de bloco unico: reel a esquerda em
+ * altura total, carrossel e ranking empilhados a direita.
  *
- * `flex-shrink: 0` e altura maxima: a tela e 1080x1920 FIXOS e nao rola
- * (checklist §8: `scrollHeight === clientHeight`). Um bloco com texto longo
- * demais precisa ser cortado pelo `overflow`, nunca empurrar o CTA para fora.
+ * `grid-template-areas` por CLASSE, e nao um `if` de inline style por
+ * combinacao: sao seis composicoes fechadas (`classeDaComposicao` em
+ * `blocos-publicos.tsx`), e a tabela abaixo e a mesma tabela do brief da
+ * task 14, so que em CSS.
+ *
+ *   .gradeCompleta     "reel carrossel" / "reel ranking"     (reel+carrossel+ranking)
+ *   .gradeSemRanking   "reel carrossel" / "reel carrossel"   (reel+carrossel, sem ranking)
+ *   .gradeSemCarrossel "reel ranking"   / "reel ranking"     (reel+ranking, sem carrossel)
+ *   .gradeSoReel       "reel"                                (so reel -- uma coluna)
+ *   .gradeSemReel      (nem grid)                            (reel desligado -- direita ocupa tudo)
+ *
+ * `.gradeSemReel` NAO usa `grid-template-areas`: sem o reel, a coluna direita
+ * deixa de ser "coluna direita" -- vira a grade inteira, e o container troca
+ * para `display: flex; flex-direction: column`. Carrossel e ranking dentro
+ * dela empilham na ordem do DOM (ver `.slotCarrossel`/`.placarPublico`, que
+ * ja sao flex-column e nao dependem de `grid-area` para se posicionar).
+ *
+ * `flex: 1 1 auto` e altura maxima no proprio container (nao aqui): a tela e
+ * 1080x1920 FIXOS e nao rola (checklist §8: `scrollHeight === clientHeight`).
  */
-.blocoPublico {
-  /*
-   * Cresce ate o teto e nunca encolhe abaixo do conteudo: o cartao e o que
-   * ocupa o vao entre hero e CTA. Com `flex-shrink: 0` sozinho ele ficava
-   * pequeno no meio de muito ar -- foi o que a tela real mostrou.
-   */
+.gradeDaTelaPublica {
   flex: 1 1 auto;
+  display: grid;
+  gap: var(--tt-gap-grade);
+  min-height: 0;
+  max-height: 780px;
+  overflow: hidden;
+}
+
+.gradeCompleta {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas: 'reel carrossel' 'reel ranking';
+}
+
+.gradeSemRanking {
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: 'reel carrossel';
+}
+
+.gradeSemCarrossel {
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: 'reel ranking';
+}
+
+.gradeSoReel {
+  grid-template-columns: 1fr;
+  grid-template-areas: 'reel';
+}
+
+.slotReel {
+  grid-area: reel;
+  min-height: 0;
+}
+
+.slotCarrossel {
+  grid-area: carrossel;
+  min-height: 0;
+}
+
+/*
+ * Sem reel, "coluna direita" deixa de existir como conceito de grid -- vira
+ * flex-column, e carrossel/ranking empilham na ordem do DOM. Por isso
+ * `.gradeSemReel` e so isto (nao tem `grid-template-areas`/`grid-area`
+ * proprios): um `display: grid` aqui seria letra morta, ja que a proxima
+ * regra troca para flex antes de qualquer pintura.
+ */
+.gradeSemReel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tt-gap-grade);
+}
+
+.slotReel,
+.slotCarrossel {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-height: 620px;
   overflow: hidden;
   padding: 28px;
-  border: var(--tt-borda) solid var(--ah-totem-border);
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
   border-radius: var(--tt-raio-card);
   background: var(--ah-totem-bg-surface);
 }
@@ -620,6 +684,115 @@ button {
 .pontoDoRodizio[data-ativo='true'] {
   width: 36px;
   background: var(--ah-totem-brand-300);
+}
+
+/**
+ * Bloco de ranking publico -- `DS-TOTEM.md` §3.4c. Classes proprias: o card
+ * de evento (`.listaDeEventos`/`.evento`) tem layout diferente (data + titulo
+ * + info numa linha), e o ranking precisa de medalhao, chip de periodo e
+ * rodape que o evento nao tem.
+ */
+.placarPublico {
+  grid-area: ranking;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 28px;
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  border-radius: var(--tt-raio-card);
+  background: var(--ah-totem-bg-surface);
+}
+
+.cabecalhoDoPlacar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/** Chip "AGOSTO · TREINOS" -- pill 999px, mesma receita dos demais chips. */
+.chipDoPlacar {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border-radius: var(--tt-raio-pill);
+  background: var(--ah-totem-bg-base);
+  color: var(--ah-totem-brand-200);
+  font-size: var(--tt-metadado);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.listaDoPlacar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+
+.linhaDoPlacar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/**
+ * Medalhao de 52 px -- `DS-TOTEM.md` §3.4c: 1o em `brand/500` com texto
+ * branco; 2o-3o em `brand/tint` com texto `brand/200`; 4o-5o em
+ * `border/hairline`. `data-posicao` (ouro/prata/bronze) vem de
+ * `faixaDoMedalhao()` -- sempre token, nunca hex (regra 1 do DS §11).
+ */
+.medalhao {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  font-size: var(--tt-metadado);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.medalhao[data-posicao='ouro'] {
+  background: var(--ah-totem-brand-500);
+  color: var(--ah-totem-text-primary);
+}
+
+.medalhao[data-posicao='prata'] {
+  background: var(--ah-totem-brand-tint);
+  color: var(--ah-totem-brand-200);
+}
+
+.medalhao[data-posicao='bronze'] {
+  background: var(--ah-totem-border-hairline);
+  color: var(--ah-totem-text-secondary);
+}
+
+.nomeDoPlacar {
+  flex: 1;
+  font-size: var(--tt-card-titulo);
+  font-weight: 700;
+}
+
+.pontosDoPlacar {
+  flex-shrink: 0;
+  font-size: var(--tt-metadado);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-totem-text-secondary);
+}
+
+.rodapeDoPlacar {
+  margin: auto 0 0;
+  font-size: var(--tt-minimo);
+  color: var(--ah-totem-text-secondary);
 }
 
 /**
@@ -841,7 +1014,8 @@ button {
 .pagamento,
 .pagamentoEmAberto,
 .linhaDeAvaliacao,
-.mesDaEvolucao {
+.mesDaEvolucao,
+.conquistaRevertida {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -859,6 +1033,25 @@ button {
 }
 
 .valorDoPagamento {
+  margin-left: auto;
+  font-size: var(--tt-card-titulo);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Conquista revertida: evento informativo, ja resolvido -- NAO pendencia
+ * financeira nem alerta clinico (DS-TOTEM.md §2.1 reserva laranja/vermelho
+ * para os dois). Caixa neutra igual ao `.segmento` (ver grupo acima); so o
+ * rotulo "Revertida" usa `brand/200` para sinalizar "isto mudou de estado"
+ * sem tom de alarme.
+ */
+.conquistaRevertida .metadado[data-testid='conquista-revertida'] {
+  color: var(--ah-totem-brand-200);
+}
+
+/* Pontuacao de um movimento de XP -- rotulo neutro, sem conotacao de dinheiro (M5-BR-010). */
+.pontosDoMovimento {
   margin-left: auto;
   font-size: var(--tt-card-titulo);
   font-weight: 700;

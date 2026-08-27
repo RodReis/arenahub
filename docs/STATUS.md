@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 27/08/2026 *(F30 entregue — preferências e identidade pública)*
+**Última atualização:** 27/08/2026 *(F31 entregue — XP, conquistas e ranking mensal)*
 
 🔑 **27/08/2026 — F30 entregue, e o gate do MVP 5 se parte em dois.** O **ADR-046** registra três
 decisões do PI de 26/08: a superfície é o `apps/kiosk`, não o app do MVP 4 (que segue com
@@ -799,7 +799,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis (o *protocolo clínico* como gate **caiu em 19/08** — decisão do PI, ADR-035) | F17–F22 | **bloqueado só por MVP 1.** ADR-008 e ADR-036 fechados; F17–F20 não chamam IA e são as primeiras pegáveis quando o MVP 1 estabilizar |
 | **3.5** | Totem: tela pública configurável + autosserviço do aluno | MVP 1 estável + PIX operando (F13 ✅) | F49–F52 | criado por **ADR-042** em 22/08/2026. **Antecipa a decisão, não a execução** — o kiosk nasce configurável em vez de ser retrabalhado depois. Antecipa a execução das Slices 4.5 e 4.6. **Em execução: F49 entregue em 25/08/2026** — regime de identificação fixado pelo **ADR-045** (CPF sozinho; facial vai para o backlog) |
 | **4** | Autosserviço: **app do aluno** (o totem saiu para o MVP 3.5) | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado — e **vem depois do MVP 3.5**, decisão do PI em 22/08 (ADR-042). **Slices 4.5 e 4.6 são executadas no MVP 3.5**; o texto e o aceite continuam no PRD MVP-04 §7, sem cópia |
-| **5** | Engajamento opt-out mensurável | eventos confiáveis + app do MVP 4 — **não alcança a F30** (ADR-046) | F30–F35 | **F30 entregue em 27/08/2026** — superfície no totem, gate original segue valendo para F31–F35 |
+| **5** | Engajamento opt-out mensurável | eventos confiáveis + app do MVP 4 — **não alcança F30 nem F31** (ADR-046, ADR-047) | F30–F35 | **F30 e F31 entregues em 27/08/2026** — superfície no totem. A F31 absorveu a F33 (ADR-047). Gate original segue valendo para F32, F34 e F35 |
 | **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | bloqueado |
 
 
@@ -869,9 +869,9 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F28 | SPEC-028 | 4 | 4.6 | Pagamento e desbloqueio no totem | [`SPEC-028-pagamento-e-desbloqueio-no-totem.md`](specs/SPEC-028-pagamento-e-desbloqueio-no-totem.md) | [#28](https://github.com/RodReis/arenahub/issues/28) | planejada |
 | F29 | SPEC-029 | 4 | 4.7 | Piloto e distribuição | [`SPEC-029-piloto-e-distribuicao.md`](specs/SPEC-029-piloto-e-distribuicao.md) | [#29](https://github.com/RodReis/arenahub/issues/29) | planejada |
 | F30 | SPEC-030 | 5 | 5.1 | Preferências e identidade pública | [`SPEC-030-preferencias-e-identidade-publica.md`](specs/SPEC-030-preferencias-e-identidade-publica.md) | [#30](https://github.com/RodReis/arenahub/issues/30) | ✅ **entregue** em 27/08/2026 ([#211](https://github.com/RodReis/arenahub/pull/211)) |
-| F31 | SPEC-031 | 5 | 5.2 | XP e conquistas | [`SPEC-031-xp-e-conquistas.md`](specs/SPEC-031-xp-e-conquistas.md) | [#31](https://github.com/RodReis/arenahub/issues/31) | planejada |
+| F31 | SPEC-031 | 5 | 5.2 + 5.4 | XP, conquistas e ranking mensal | [`SPEC-031-xp-e-conquistas.md`](specs/SPEC-031-xp-e-conquistas.md) · [ADR-047](DECISIONS.md#adr-047) | [#31](https://github.com/RodReis/arenahub/issues/31) | ✅ **entregue** em 27/08/2026 (—) |
 | F32 | SPEC-032 | 5 | 5.3 | Consistência e streak | [`SPEC-032-consistencia-e-streak.md`](specs/SPEC-032-consistencia-e-streak.md) | [#32](https://github.com/RodReis/arenahub/issues/32) | planejada |
-| F33 | SPEC-033 | 5 | 5.4 | Rankings privados por padrão | [`SPEC-033-rankings-privados-por-padrao.md`](specs/SPEC-033-rankings-privados-por-padrao.md) | [#33](https://github.com/RodReis/arenahub/issues/33) | planejada |
+| ~~F33~~ | ~~SPEC-033~~ | 5 | 5.4 | ~~Rankings privados por padrão~~ | **absorvida pela F31** — [ADR-047](DECISIONS.md#adr-047), Decisão 2 | [#33](https://github.com/RodReis/arenahub/issues/33) | 🔒 **número queimado**, não reaproveitar |
 | F34 | SPEC-034 | 5 | 5.5 | Desafios e notificações | [`SPEC-034-desafios-e-notificacoes.md`](specs/SPEC-034-desafios-e-notificacoes.md) | [#34](https://github.com/RodReis/arenahub/issues/34) | planejada |
 | F35 | SPEC-035 | 5 | 5.6 | Operação, moderação e experimento | [`SPEC-035-operacao-moderacao-e-experimento.md`](specs/SPEC-035-operacao-moderacao-e-experimento.md) | [#35](https://github.com/RodReis/arenahub/issues/35) | planejada |
 | F36 | SPEC-036 | 6 | 6.1 | Contrato de dados e baseline analítica | [`SPEC-036-contrato-de-dados-e-baseline-analitica.md`](specs/SPEC-036-contrato-de-dados-e-baseline-analitica.md) | [#36](https://github.com/RodReis/arenahub/issues/36) | planejada |

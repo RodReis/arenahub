@@ -7,11 +7,30 @@ import {
 
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { AccessQueryRepository } from '../access-query/access-query.repository.js';
+import { EngagementRankingService } from '../engagement/engagement-ranking.service.js';
+import { mesLocal } from '../engagement/domain/movimento-de-xp.js';
 import type { ContextoDoKiosk } from '../kiosk-auth/kiosk-auth.service.js';
+import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import {
   inicioDaJanelaDeTreino,
   inicioDoDiaLocal,
 } from './domain/indicadores-da-unidade.js';
+
+/** Mesmo fuso fixo que `domain/indicadores-da-unidade.ts` assume para a academia. */
+const FUSO_DA_ACADEMIA = 'America/Sao_Paulo';
+
+/**
+ * Nao ha usuario do painel agindo -- quem "age" aqui e o heartbeat do
+ * dispositivo, sem sessao de aluno. `audit_logs.actor_id` e anulavel
+ * exatamente para isto.
+ *
+ * A conversao mora AQUI, num lugar so e com nome, em vez de um
+ * `as unknown as string` solto no meio do objeto: a divergencia entre o
+ * tipo (`string`) e a coluna (`uuid NULL`) fica visivel para quem ler. Mesmo
+ * padrao de `kiosk-area-do-aluno.service.ts` -- nao reexportado de la porque
+ * e um detalhe interno de cada servico, nao um valor compartilhado.
+ */
+const SEM_USUARIO = null as unknown as string;
 
 export interface ConfiguracaoResolvida {
   readonly version: number;
@@ -30,6 +49,7 @@ export class KioskConfigService {
   constructor(
     private readonly db: PrismaService,
     private readonly eventos: AccessQueryRepository,
+    private readonly ranking: EngagementRankingService,
   ) {}
 
   /**
@@ -142,7 +162,8 @@ export class KioskConfigService {
   }
 
   /**
-   * Os dois numeros do bloco de informacoes da tela publica (F51).
+   * Os numeros do bloco de informacoes da tela publica (F51) + o placar
+   * publico (F31, Task 9).
    *
    * VAO NO HEARTBEAT que a F49 ja dispara a cada 30 s, e nao numa rota
    * propria: `M3.5-FR-005` proibe a tela publica depender da rede, e uma
@@ -153,14 +174,26 @@ export class KioskConfigService {
    * As duas contagens vao em paralelo: sao consultas independentes sobre o
    * mesmo indice (`[tenantId, gymUnitId, occurredAt]`), e serializa-las
    * dobraria a latencia de um heartbeat que roda a cada 30 segundos.
+   *
+   * O PLACAR chega AQUI, ja com os nomes resolvidos no servidor por
+   * `EngagementRankingService.placarAoVivo` -- nunca `studentId`
+   * (`blocos-publicos.tsx`, F51, trava estrutural). Modulo `xp` desligado ou
+   * coorte abaixo do minimo devolve lista vazia, nunca ausente: o bloco
+   * some do rodizio, nao aparece cinza nem vazio.
+   *
+   * AO VIVO, nao snapshot publicado -- Emenda de 27/08/2026 (ADR-047): o
+   * hero mostra o MES CORRENTE, sempre atualizado, e nao republica nada.
+   * `placarAoVivo` tem cache proprio de 60 s; nada aqui precisa se preocupar
+   * com o heartbeat de 30 s bater rapido demais.
    */
   async contarIndicadores(
     contexto: ContextoDoKiosk,
+    config: KioskConfig,
     agora: Date,
   ): Promise<IndicadoresDaUnidade> {
     const escopo = { tenantId: contexto.tenantId, gymUnitId: contexto.gymUnitId };
 
-    const [checkinsDeHoje, treinandoAgora] = await Promise.all([
+    const [checkinsDeHoje, treinandoAgora, placar] = await Promise.all([
       this.eventos.contarEntradasDaUnidade({
         ...escopo,
         de: inicioDoDiaLocal(agora),
@@ -171,8 +204,31 @@ export class KioskConfigService {
         de: inicioDaJanelaDeTreino(agora),
         ate: agora,
       }),
+      config.modulos.xp ? this.placarPublico(contexto, agora) : Promise.resolve([]),
     ]);
 
-    return { checkinsDeHoje, treinandoAgora };
+    return { checkinsDeHoje, treinandoAgora, placar };
+  }
+
+  private async placarPublico(contexto: ContextoDoKiosk, agora: Date) {
+    const tenantContext: TenantContext = {
+      tenantId: contexto.tenantId,
+      actorId: SEM_USUARIO,
+      sessionId: contexto.kioskDeviceId,
+      permissions: new Set<string>(),
+      allowedUnitIds: new Set([contexto.gymUnitId]),
+    };
+
+    const placar = await this.ranking.placarAoVivo(
+      tenantContext,
+      contexto.gymUnitId,
+      mesLocal(agora, FUSO_DA_ACADEMIA),
+      agora,
+    );
+
+    // `placarAoVivo` devolve `readonly [...]`; `IndicadoresDaUnidade`
+    // (Zod) infere array mutavel -- copia rasa so para casar o tipo, sem
+    // mudar o conteudo.
+    return [...placar];
   }
 }

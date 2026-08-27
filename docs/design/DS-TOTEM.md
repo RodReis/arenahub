@@ -2,7 +2,7 @@
 
 Clínica de Musculação · plataforma ArenaHub
 Arquivo de referência: `Totem.dc.html`
-Versão 2.0 — rebrand azul, totem somente leitura, evolução 3D
+Versão 2.1 — home pública em grade densa (F31 Task 14, ADR-047 Emenda de 27/08/2026 (2))
 
 ---
 
@@ -51,7 +51,7 @@ A paleta parte da identidade da Clínica de Musculação: azul royal metálico s
 | `brand/600` | `#3E63E8` | Fim do gradiente de CTA |
 | `brand/300` | `#7DA2FF` | Ícones sobre fundo escuro |
 | `brand/200` | `#8FB0FF` | Texto de apoio em azul, rótulos de seção, links |
-| `brand/tint` | `rgba(77,124,255,.14)` | Fundo de ícone tonal, linha destacada de tabela |
+| `brand/tint` | `rgba(77,124,255,.14)` | Fundo de ícone tonal, linha destacada de tabela, medalhão do 2º/3º lugar (§3.4c) |
 
 **Gradiente de ação** — usado somente em CTA primário:
 `linear-gradient(100deg, #5B86FF, #3E63E8)` · texto `#FFFFFF` · sombra `0 8px 32px rgba(77,124,255,.25)`
@@ -177,6 +177,22 @@ Card de raio 28 px, altura de mídia 420 px, imagem em `object-fit: cover`. Sobr
 
 Reprodução: **sempre sem som, sempre com legenda**. Nunca depende de áudio.
 
+### 3.4c Ranking público (placar do mês)
+
+Card de mesmo raio e superfície dos demais blocos da grade densa (§4). Cabeçalho com título "Ranking do mês" (26 px/800) e, à direita, um **chip de período/métrica** em pill (ex.: "AGOSTO · TREINOS") — fundo `bg/base`, texto `brand/200`.
+
+Até **cinco linhas**, cada uma com:
+
+- **medalhão de 52 px**, circular: 1º lugar em `brand/500` com texto branco; 2º e 3º em `brand/tint` com texto `brand/200`; 4º e 5º em `border/hairline` com texto `text/secondary`;
+- **nome** 24 px/700 — sempre abreviado em tela pública (`"Ana S."`, nunca `"Ana de Souza"`; apelido aprovado pelo aluno aparece inteiro);
+- **métrica** 22 px, tabular, `text/secondary`.
+
+Rodapé fixo: "Participação opcional · nomes abreviados" (19 px, `text/secondary`).
+
+Este bloco não é um item de `config.blocos.itens` — nasce do placar público do heartbeat
+(`indicadores.placar`) e só aparece quando há ao menos uma entrada. Nunca reusa as classes do card
+de evento (§3.5): os dois layouts divergem e vão continuar divergindo.
+
 ### 3.5 Card de evento
 
 Linha horizontal com bloco de data (64 px, `brand/tint`, dia em 24 px/800 + mês em 15 px/700 tracking .08em) seguido de título 24 px/700 e info 19 px.
@@ -246,54 +262,85 @@ Grade 3×4, teclas de 132 px, dígitos em 40 px/700 branco, "Limpar" e "⌫" em 
 
 ## 4. Área externa — tela pública
 
-Ordem vertical fixa. Cada bloco pode ser ligado, desligado e reordenado no painel administrativo. A tela inteira é tocável e leva à identificação.
+Cabeçalho, hero, hint de entrada e patrocínio são **fixos** e não removíveis. Entre o hero e o hint,
+a partir da v2.1, vive uma **grade densa de duas colunas** — não mais o rodízio de bloco único da
+v2.0. A tela inteira é tocável e leva à identificação.
 
 ```
-┌─────────────────────────────────────────┐
-│ [logo] Clínica de Musculação   [contraste] │  cabeçalho — fixo
-│        DISCIPLINA HOJE, RESULTADOS SEMPRE │
-├─────────────────────────────────────────┤
-│ MUSCULAÇÃO · SAÚDE · PERFORMANCE          │  hero — fixo
-│ Disciplina hoje.                          │
-│ Resultados sempre.            ◣ azul      │
-├─────────────────────────────────────────┤
-│ ┌───────────────────────────────────────┐ │  bloco 1 · reel
-│ │  imagem 420px      ▶                  │ │  blocoReel
-│ │  reel · @clinicadamusculacao           │ │
-│ ├───────────────────────────────────────┤ │
-│ │ Quem forma a nossa equipe?    ▬ ● ● ● │ │
-│ └───────────────────────────────────────┘ │
-├─────────────────────────────────────────┤
-│ [30 AGO] Aulão de Spinning │ [05 SET] …  │  bloco 2 · eventos
-├─────────────────────────────────────────┤
-│ Treinando agora 47 │ Check-ins 312 │ …   │  bloco 3 · informações
-├─────────────────────────────────────────┤
-│      ▸ Entrar na minha área              │  CTA — fixo
-│  Consulte seu plano, pague e acompanhe   │
-├─────────────────────────────────────────┤
-│ ESPAÇO PATROCINADO      tecnologia …     │  bloco 4 · patrocínio
-│ [ ][ ][ ][ ][ ]                          │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│ [logo] Clínica de Musculação [contraste][Entrar] │  cabeçalho · fixo
+│        DISCIPLINA HOJE, RESULTADOS SEMPRE        │
+├──────────────────────────────────────────┤
+│ MUSCULAÇÃO · SAÚDE · PERFORMANCE                 │  hero · fixo
+│ Disciplina hoje. Resultados sempre.    ● azul    │
+├──────────────────────────────────────────┤
+│ ┌────────────────┐ ││ ┌────────────────┐ │
+│ │ reel · @clinica  │ ││ │ eventos/material │ │  carrossel · gira sozinho
+│ │       ▶          │ ││ │ ou instagram     │ │
+│ │                  │ ││ └────────────────┘ │
+│ │ Acompanhe a      │ ││ ┌────────────────┐ │
+│ │ Clínica no IG    │ ││ │ Ranking do mês   │ │  ranking público (§3.4c)
+│ └────────────────┘ ││ │ top 5 abreviado  │ │
+│   coluna esquerda    ││ └────────────────┘ │
+├──────────────────────┴┴────────────────────┤
+│  Toque na tela para entrar na sua área           │  hint · fixo
+├──────────────────────────────────────────┤
+│ ESPAÇO PATROCINADO          tecnologia arenahub  │  patrocínio · fixo
+└──────────────────────────────────────────┘
 ```
+
+**Coluna esquerda ("reel"):** o primeiro bloco configurável visível, em altura total. Qualquer um
+dos cinco tipos pode ocupar essa posição — é o primeiro item da lista publicada, não um tipo fixo.
+
+**Coluna direita, linha de cima ("carrossel"):** os demais blocos configuráveis visíveis, girando
+entre si no mesmo intervalo (`blocos.tempoPorBlocoSegundos`) que a v2.0 já usava. O rodízio **entre
+tipos diferentes não existe mais** — sobrevive só entre os itens que disputam esta única posição.
+
+**Coluna direita, linha de baixo ("ranking"):** o bloco de placar público (§3.4c), quando há pelo
+menos uma entrada. Não é um item de `config.blocos.itens` — é derivado do heartbeat, e por isso não
+compete pela posição de reel nem de carrossel.
 
 ### Blocos configuráveis
 
-| Bloco | Prop | Conteúdo esperado |
+| Bloco | Tipo (`config.blocos.itens[].tipo`) | Conteúdo esperado |
 |---|---|---|
-| Reel / vídeo | `blocoReel` | Mídia vertical ou 16:9, título, origem, carrossel de até 5 itens |
-| Eventos | `blocoEventos` | Data, título, informação curta — até 2 por linha |
-| Informações ao vivo | `blocoInfo` | 3 indicadores: rótulo, valor, delta |
-| Patrocínio | `blocoPatrocinio` | Até 5 marcas, nome ou logotipo |
+| Vídeo / reel | `VIDEO` | Mídia vertical ou 16:9, título, legenda, sem som |
+| Eventos | `EVENTOS` | Data, título, informação curta — até 4 itens |
+| Material | `MATERIAL` | Título, resumo, endereço para QR |
+| Instagram | `INSTAGRAM` | Perfil, chamada |
+| Informações ao vivo | `INFORMACOES` | Indicadores: check-ins hoje, treinando agora |
 
-Fixos e não removíveis: cabeçalho de marca, hero e CTA de entrada. O totem precisa sempre dizer onde está e como entrar.
+Fixos e não removíveis: cabeçalho de marca, hero, hint de entrada e faixa de patrocínio. O totem
+precisa sempre dizer onde está e como entrar.
+
+### As seis composições da grade
+
+Cada bloco configurável pode ser ligado ou desligado no painel; o ranking depende só de o placar ter
+alguma entrada. A grade se recompõe pela combinação dos três — nunca sobra card vazio, nunca sobra
+buraco:
+
+| reel | carrossel | ranking | layout |
+|---|---|---|---|
+| ligado | ligado | ligado | duas colunas; direita dividida em duas linhas |
+| ligado | ligado | desligado | duas colunas; carrossel ocupa a direita inteira |
+| ligado | desligado | ligado | duas colunas; ranking ocupa a direita inteira |
+| ligado | desligado | desligado | uma coluna; reel em largura total |
+| desligado | qualquer | qualquer | a coluna direita ocupa a largura total |
+| todos desligados | | | só cabeçalho, hero, hint e patrocínio |
+
+"Reel desligado" significa **zero blocos configuráveis visíveis** — com um só, ele já é o reel por
+definição (é o primeiro item da lista), e "carrossel" só existe a partir do segundo.
 
 ### Regras da tela pública
 
-- Nenhum dado de aluno. Nunca. Nem nome, nem foto, nem ranking com nome completo.
+- Nenhum dado identificável de aluno. Nunca nome civil, nunca foto, nunca id. O ranking (§3.4c) é a
+  exceção desenhada: mostra posição, nome **já abreviado** pelo servidor e pontos — nunca o nome
+  civil completo, nunca o identificador do aluno.
 - Vídeo sempre sem som e com legenda.
-- No máximo um bloco de mídia visível por vez.
-- Se todos os blocos opcionais estiverem desligados, hero e CTA se distribuem com o espaço restante — a tela não fica vazia nem quebra.
-- Alto contraste: remove glow, gradiente de fundo, forma angular e ponto pulsante; texto secundário passa a branco.
+- Se todos os blocos opcionais estiverem desligados, hero e CTA se distribuem com o espaço
+  restante — a tela não fica vazia nem quebra.
+- Alto contraste: remove glow, gradiente de fundo, forma angular e ponto pulsante; texto secundário
+  passa a branco.
 
 ---
 
@@ -473,7 +520,7 @@ Todo render 3D recebe gradiente de legibilidade e selo identificando o período.
 - [ ] Laranja e vermelho apenas como estado
 
 **Conteúdo e privacidade**
-- [ ] Tela pública sem qualquer dado de aluno
+- [ ] Tela pública sem qualquer dado identificável de aluno — nunca nome civil, nunca foto, nunca id (o ranking do §3.4c é a exceção desenhada: nome já abreviado, não identifica)
 - [ ] Vídeo sem som e com legenda
 - [ ] Toda tela de avaliação marcada como somente leitura
 - [ ] Rodapé de "não é diagnóstico médico" presente em avaliação e evolução

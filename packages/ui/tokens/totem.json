@@ -71,6 +71,11 @@
         "contrastOnBase": 3.9,
         "$role": "fim do gradiente de CTA (fundo, nao texto)",
         "$comment": "3.9 contra `bg.base` -- fim do gradiente de CTA. Ver o comentario de `400`."
+      },
+      "tint": {
+        "value": "rgba(77,124,255,.14)",
+        "$role": "fundo de icone tonal, linha destacada de tabela, medalhao do 2o/3o lugar do ranking (DS-TOTEM.md 3.4c)",
+        "$comment": "Sem `contrastOnBase`: e um FUNDO translucido (14% de opacidade), nao um par texto/superficie solido -- o gate de contraste do pipeline mede cor cheia contra fundo, e uma rgba com alpha nao tem luminancia fixa para medir. O par que importa e `brand.200` (texto) sobre este tint, e o `$role` documenta o uso em vez do numero."
       }
     },
     "state": {

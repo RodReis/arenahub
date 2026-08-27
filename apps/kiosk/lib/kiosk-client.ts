@@ -325,6 +325,44 @@ export function carregarEvolucao(sessionId: string, token: string) {
 }
 
 /* ---------------------------------------------------------------------
+ * XP, CONQUISTAS E POSICAO NO PLACAR (F31, Task 9/10).
+ * --------------------------------------------------------------------- */
+
+export interface MovimentoDeXp {
+  readonly pontos: number;
+  readonly regra: string;
+  readonly quando: string;
+}
+
+export interface ConquistaDoTotem {
+  readonly titulo: string;
+  readonly desbloqueadaEm: string;
+  readonly revertida: boolean;
+  /**
+   * O motivo da reversao, quando o servidor o envia.
+   *
+   * OPCIONAL: o endpoint da Task 9 (`GET .../engajamento/xp`) ainda nao
+   * devolve este campo -- `ConquistaDoExtratoDeXp` na API so tem
+   * `titulo`/`desbloqueadaEm`/`revertida`. Campo aqui, e a tela pronta para
+   * exibi-lo, evita reabrir `xp.tsx` quando a API o acrescentar; ausente,
+   * a tela mostra so "Revertida", sem inventar motivo que nao veio.
+   */
+  readonly motivo?: string | null;
+}
+
+export interface ExtratoDeXp {
+  readonly saldoDoMes: number;
+  readonly mes: string;
+  readonly movimentos: readonly MovimentoDeXp[];
+  readonly conquistas: readonly ConquistaDoTotem[];
+  readonly posicao: number | null;
+}
+
+export function carregarXp(sessionId: string, token: string) {
+  return daSessao<ExtratoDeXp>(`${daSessaoId(sessionId)}/engajamento/xp`, token);
+}
+
+/* ---------------------------------------------------------------------
  * PREFERENCIA DE ENGAJAMENTO E IDENTIDADE PUBLICA (F30, Task 8).
  *
  * `finalidades` traz as QUATRO chaves do dominio (RANKING, CHALLENGE,
