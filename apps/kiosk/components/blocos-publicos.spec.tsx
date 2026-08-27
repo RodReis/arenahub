@@ -358,6 +358,23 @@ describe('BlocosPublicos -- placar publico (§3.4c)', () => {
     expect(medalhaoQuarto).toHaveAttribute('data-posicao', 'bronze');
   });
 
+  it('as tres faixas do medalhao sao distintas -- 1o, 2o/3o e 4o/5o (§3.4c)', () => {
+    // O §3.4c exige TRES tratamentos visuais, nao dois: fundir 1o com
+    // 2o/3o (ou 2o/3o com 4o/5o) passaria despercebido se o teste so
+    // comparasse duas posicoes -- e foi exatamente o que a revisao provou
+    // mutando `position <= 3` para devolver 'ouro'.
+    render(<BlocosPublicos config={config([])} indicadores={indicadoresComPlacar} />);
+
+    const linhas = screen.getAllByRole('listitem');
+    const medalhao = (indice: number) => linhas[indice]?.querySelector('.medalhao');
+
+    expect(medalhao(0)).toHaveAttribute('data-posicao', 'ouro');
+    expect(medalhao(1)).toHaveAttribute('data-posicao', 'prata');
+    expect(medalhao(2)).toHaveAttribute('data-posicao', 'prata');
+    expect(medalhao(3)).toHaveAttribute('data-posicao', 'bronze');
+    expect(medalhao(4)).toHaveAttribute('data-posicao', 'bronze');
+  });
+
   it('chip de periodo e rodape de participacao aparecem', () => {
     render(<BlocosPublicos config={config([])} indicadores={indicadoresComPlacar} />);
 

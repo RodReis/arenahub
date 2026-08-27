@@ -522,13 +522,13 @@ button {
  *   .gradeSemRanking   "reel carrossel" / "reel carrossel"   (reel+carrossel, sem ranking)
  *   .gradeSemCarrossel "reel ranking"   / "reel ranking"     (reel+ranking, sem carrossel)
  *   .gradeSoReel       "reel"                                (so reel -- uma coluna)
- *   .gradeSemReel      "direita"                             (reel desligado -- direita ocupa tudo)
+ *   .gradeSemReel      (nem grid)                            (reel desligado -- direita ocupa tudo)
  *
- * `.gradeSemReel` usa uma UNICA area (`direita`) porque sem o reel a coluna
- * direita nao e mais "coluna direita" -- e a grade inteira, e carrossel e
- * ranking dentro dela empilham verticalmente com `display: flex` (ver
- * `.slotCarrossel`/`.placarPublico`, que ja sao flex-column e nao dependem
- * da grade externa para se posicionar).
+ * `.gradeSemReel` NAO usa `grid-template-areas`: sem o reel, a coluna direita
+ * deixa de ser "coluna direita" -- vira a grade inteira, e o container troca
+ * para `display: flex; flex-direction: column`. Carrossel e ranking dentro
+ * dela empilham na ordem do DOM (ver `.slotCarrossel`/`.placarPublico`, que
+ * ja sao flex-column e nao dependem de `grid-area` para se posicionar).
  *
  * `flex: 1 1 auto` e altura maxima no proprio container (nao aqui): a tela e
  * 1080x1920 FIXOS e nao rola (checklist §8: `scrollHeight === clientHeight`).
@@ -563,11 +563,6 @@ button {
   grid-template-areas: 'reel';
 }
 
-.gradeSemReel {
-  grid-template-columns: 1fr;
-  grid-template-areas: 'direita';
-}
-
 .slotReel {
   grid-area: reel;
   min-height: 0;
@@ -578,12 +573,13 @@ button {
   min-height: 0;
 }
 
-/* Sem reel, carrossel e ranking dividem a unica area `direita` em pilha. */
-.gradeSemReel .slotCarrossel,
-.gradeSemReel .placarPublico {
-  grid-area: direita;
-}
-
+/*
+ * Sem reel, "coluna direita" deixa de existir como conceito de grid -- vira
+ * flex-column, e carrossel/ranking empilham na ordem do DOM. Por isso
+ * `.gradeSemReel` e so isto (nao tem `grid-template-areas`/`grid-area`
+ * proprios): um `display: grid` aqui seria letra morta, ja que a proxima
+ * regra troca para flex antes de qualquer pintura.
+ */
 .gradeSemReel {
   display: flex;
   flex-direction: column;
