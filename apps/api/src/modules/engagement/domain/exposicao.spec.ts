@@ -57,4 +57,11 @@ describe('resolverExposicao', () => {
       motivo: 'OPT_OUT',
     });
   });
+
+  it('aluno inativo E fora do ranking reporta ALUNO_INATIVO -- a ordem dos dois if importa', () => {
+    // test exists to trap if someone inverts the status check after opt-out check.
+    // status priority must stay first: inactive students never appear, regardless of engagement decision.
+    const cancelado = { ...base, statusDoAluno: 'CANCELLED' as const, decisao: { decision: 'REFUSED' as const, supersededAt: null } };
+    expect(resolverExposicao(cancelado)).toEqual({ exibe: false, motivo: 'ALUNO_INATIVO' });
+  });
 });
