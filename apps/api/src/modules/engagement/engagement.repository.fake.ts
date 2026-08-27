@@ -43,10 +43,19 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
   private readonly alunos = new Map<string, AlunoDeTeste>();
   private readonly decisoes: DecisaoGuardada[] = [];
   private readonly perfis = new Map<string, PerfilPublicoDoAluno & { tenantId: string; studentId: string }>();
+  /** Documentos "publicados" -- espelha o que o seed grava no banco real. */
+  private readonly documentosPublicados = new Set<string>();
   private proximoId = 1;
 
   cadastrarAluno(aluno: AlunoDeTeste): void {
     this.alunos.set(aluno.id, aluno);
+  }
+
+  /** So do dublê: registra o documento de uma finalidade como publicado
+   * para o tenant, espelhando o seed real -- sem isso `registrarDecisao`
+   * recusa com `NotFoundException`. */
+  publicarDocumento(tenantId: string, finalidade: FinalidadeDeEngajamento): void {
+    this.documentosPublicados.add(`${tenantId}:${finalidade}`);
   }
 
   /** So do dublê: historico ordenado por occurredAt crescente, em copia. */
@@ -93,6 +102,13 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
   }
 
   registrarDecisao(entrada: EntradaDeRegistro, agora: Date): Promise<void> {
+    if (!this.documentosPublicados.has(`${entrada.tenantId}:${entrada.finalidade}`)) {
+      throw new NotFoundException({
+        code: 'DOCUMENTO_DE_ENGAJAMENTO_AUSENTE',
+        message: `Nenhum documento de consentimento publicado para ${entrada.finalidade}`,
+      });
+    }
+
     if (entrada.idempotencyKey) {
       const desde = agora.getTime() - 24 * 60 * 60 * 1000;
       const existente = this.decisoes.find(

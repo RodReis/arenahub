@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 import { EngagementService } from './engagement.service.js';
 import { RepositorioEmMemoria } from './engagement.repository.fake.js';
@@ -21,6 +21,7 @@ describe('EngagementService -- preferencias', () => {
     repo = new RepositorioEmMemoria();
     service = new EngagementService(repo);
     repo.cadastrarAluno({ id: 'a1', tenantId: 't1', name: 'Ana Souza', status: 'ACTIVE' });
+    repo.publicarDocumento('t1', 'RANKING');
   });
 
   it('aluno sem manifestacao aparece participando de todas as finalidades', async () => {
@@ -66,6 +67,17 @@ describe('EngagementService -- preferencias', () => {
   it('nao le nem escreve preferencia de aluno de outro tenant', async () => {
     repo.cadastrarAluno({ id: 'a9', tenantId: 't2', name: 'Bruno Lima', status: 'ACTIVE' });
     await expect(service.obterPreferencias(CTX, 'a9')).rejects.toThrow(NotFoundException);
+  });
+
+  it('registrar decisao sem documento publicado falha com codigo estavel', async () => {
+    // CHALLENGE nao foi publicado no beforeEach -- so RANKING foi.
+    await expect(
+      service.atualizarPreferencia(
+        CTX,
+        { studentId: 'a1', finalidade: 'CHALLENGE', participa: false, idempotencyKey: 'k1' },
+        AGORA,
+      ),
+    ).rejects.toThrow(NotFoundException);
   });
 });
 
@@ -176,5 +188,26 @@ describe('EngagementService -- alias publico', () => {
         AGORA,
       ),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejeitar com razao fora do enum falha com BadRequestException', async () => {
+    const perfil = await service.definirAliasPublico(
+      CTX,
+      { studentId: 'a1', identityChoice: 'APELIDO', alias: 'Tigre', version: null },
+      AGORA,
+    );
+    await expect(
+      service.moderarAlias(
+        CTX,
+        {
+          perfilId: perfil.id,
+          decisao: 'REJECTED',
+          // Fora do enum AliasRejectionReason -- string arbitraria vinda de
+          // um chamador que nao validou antes.
+          rejectionReason: 'MOTIVO_INVENTADO' as never,
+        },
+        AGORA,
+      ),
+    ).rejects.toThrow(BadRequestException);
   });
 });

@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, type StudentStatus } from '@arenahub/database';
+import { Prisma, type AliasRejectionReason, type StudentStatus } from '@arenahub/database';
 
 import { PrismaService } from '../../persistence/prisma.service.js';
 import type { DecisaoDeEngajamento, FinalidadeDeEngajamento } from './domain/participacao.js';
@@ -27,7 +27,7 @@ export interface PerfilPublicoDoAluno {
   alias: string | null;
   status: StatusDoPerfilPublico;
   screeningSignals: readonly string[];
-  rejectionReason: string | null;
+  rejectionReason: AliasRejectionReason | null;
   version: number;
 }
 
@@ -57,7 +57,7 @@ export interface EntradaDeModeracaoNoBanco {
   actorId: string;
   perfilId: string;
   status: 'APPROVED' | 'REJECTED';
-  rejectionReason: string | null;
+  rejectionReason: AliasRejectionReason | null;
 }
 
 /**
@@ -93,7 +93,7 @@ function paraPerfilPublico(linha: {
   alias: string | null;
   status: string;
   screeningSignals: string[];
-  rejectionReason: string | null;
+  rejectionReason: AliasRejectionReason | null;
   version: number;
 }): PerfilPublicoDoAluno {
   return {
@@ -161,11 +161,21 @@ export class EngagementRepository implements PortaDeEngajamento {
       if (existente) return;
     }
 
-    const documento = await this.encontrarOuCriarDocumentoVigente(
-      entrada.tenantId,
-      entrada.finalidade,
-      agora,
-    );
+    // Documento vigente do TENANT (nunca global/null): so o seed publica
+    // estes quatro, um por tenant -- ver `packages/database/prisma/seed.ts`.
+    // orderBy obrigatorio pelo mesmo motivo de `decisaoVigente`.
+    const documento = await this.db.consentDocument.findFirst({
+      where: { tenantId: entrada.tenantId, type: entrada.finalidade, retiredAt: null },
+      orderBy: [{ version: 'desc' }],
+      select: { id: true },
+    });
+
+    if (!documento) {
+      throw new NotFoundException({
+        code: 'DOCUMENTO_DE_ENGAJAMENTO_AUSENTE',
+        message: `Nenhum documento de consentimento publicado para ${entrada.finalidade}`,
+      });
+    }
 
     await this.db.$transaction(async (tx) => {
       await tx.consentRecord.updateMany({
@@ -193,39 +203,6 @@ export class EngagementRepository implements PortaDeEngajamento {
           occurredAt: agora,
         },
       });
-    });
-  }
-
-  /**
-   * Documento de engajamento nao tem tela de publicacao nesta fatia -- as
-   * quatro finalidades usam um documento GLOBAL implicito, criado sob
-   * demanda na primeira decisao. `purpose`/`content` sao placeholders: nao
-   * ha termo juridico para OPT-OUT de ranking, so o registro da decisao.
-   */
-  private async encontrarOuCriarDocumentoVigente(
-    tenantId: string,
-    finalidade: FinalidadeDeEngajamento,
-    agora: Date,
-  ): Promise<{ id: string }> {
-    const existente = await this.db.consentDocument.findFirst({
-      where: { tenantId: null, type: finalidade, retiredAt: null },
-      orderBy: [{ version: 'desc' }],
-      select: { id: true },
-    });
-
-    if (existente) return existente;
-
-    return this.db.consentDocument.create({
-      data: {
-        tenantId: null,
-        type: finalidade,
-        version: 1,
-        purpose: `Participacao em ${finalidade}`,
-        content: `Documento de preferencia de engajamento (${finalidade})`,
-        contentSha256: '0'.repeat(64),
-        effectiveFrom: agora,
-      },
-      select: { id: true },
     });
   }
 
@@ -321,7 +298,7 @@ export class EngagementRepository implements PortaDeEngajamento {
         where: { id: entrada.perfilId, tenantId: entrada.tenantId },
         data: {
           status: entrada.status,
-          rejectionReason: entrada.rejectionReason as never,
+          rejectionReason: entrada.rejectionReason,
           moderatedBy: entrada.actorId,
           moderatedAt: agora,
         },

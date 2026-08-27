@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { AliasRejectionReason } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { type FinalidadeDeEngajamento, participaDoRanking } from './domain/participacao.js';
@@ -43,10 +44,20 @@ export interface FiltroDeModeracao {
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HIDDEN';
 }
 
+/** Espelha o enum Prisma `AliasRejectionReason` -- checagem de pertinencia
+ * em runtime, ja que o tipo gerado some na compilacao. */
+const RAZOES_DE_REJEICAO: readonly AliasRejectionReason[] = [
+  'OFENSIVO',
+  'CONTEM_PII',
+  'IMPERSONACAO',
+  'SPAM_OU_PROPAGANDA',
+  'ILEGIVEL',
+];
+
 export interface EntradaDeModeracao {
   perfilId: string;
   decisao: 'APPROVED' | 'REJECTED';
-  rejectionReason: string | null;
+  rejectionReason: AliasRejectionReason | null;
 }
 
 /** Idade em anos completos, calculada a partir da data de nascimento. */
@@ -190,8 +201,14 @@ export class EngagementService {
     entrada: EntradaDeModeracao,
     agora: Date,
   ): Promise<PerfilPublicoDoAluno> {
-    if (entrada.decisao === 'REJECTED' && !entrada.rejectionReason) {
-      throw new BadRequestException('rejectionReason e obrigatorio ao rejeitar');
+    if (entrada.decisao === 'REJECTED') {
+      if (!entrada.rejectionReason) {
+        throw new BadRequestException('rejectionReason e obrigatorio ao rejeitar');
+      }
+
+      if (!RAZOES_DE_REJEICAO.includes(entrada.rejectionReason)) {
+        throw new BadRequestException('rejectionReason nao pertence ao enum AliasRejectionReason');
+      }
     }
 
     return this.repo.moderarPerfil(
