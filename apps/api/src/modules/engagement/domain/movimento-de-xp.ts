@@ -69,6 +69,29 @@ export function mesLocal(quando: Date, fusoDaUnidade: string): string {
   return formatador.format(quando).slice(0, 7);
 }
 
+/**
+ * O `AAAA-MM` imediatamente ANTERIOR a `mes` -- usado pelo job de fechamento
+ * mensal do ranking (Emenda de 27/08/2026, ADR-047) para achar o mes que
+ * acabou de fechar.
+ *
+ * Aritmetica de STRING, nao `Date`: `new Date('2026-09-01')` e interpretado
+ * em UTC, e decrementar o mes por `setMonth` exigiria escolher um fuso so
+ * para o calculo -- exatamente o problema que `mesLocal` ja resolve
+ * corretamente lendo o fuso da UNIDADE. Aqui so falta subtrair 1 mes de um
+ * `AAAA-MM` que ja veio local; nao ha fuso novo a decidir.
+ */
+export function mesAnterior(mes: string): string {
+  const [anoTexto, mesTexto] = mes.split('-');
+  const ano = Number(anoTexto);
+  const numeroDoMes = Number(mesTexto);
+
+  const dezembroDoAnoAnterior = numeroDoMes === 1;
+  const anoResultado = dezembroDoAnoAnterior ? ano - 1 : ano;
+  const mesResultado = dezembroDoAnoAnterior ? 12 : numeroDoMes - 1;
+
+  return `${anoResultado}-${String(mesResultado).padStart(2, '0')}`;
+}
+
 /** Concessao por sessao de treino confirmada. */
 export function concederPorSessao(entrada: EntradaDeConcessao): MovimentoDeXp {
   return {

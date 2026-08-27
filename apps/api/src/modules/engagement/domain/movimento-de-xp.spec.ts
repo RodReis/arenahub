@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { concederPorSessao, mesLocal, reverter, somarSaldo } from './movimento-de-xp.js';
+import { concederPorSessao, mesAnterior, mesLocal, reverter, somarSaldo } from './movimento-de-xp.js';
 import type { VersaoDeRegra } from './regra-de-xp.js';
 
 const regra: VersaoDeRegra = {
@@ -21,6 +21,16 @@ describe('mesLocal', () => {
 
   it('vira o mes quando o fuso local ja virou', () => {
     expect(mesLocal(new Date('2026-09-01T04:00:00Z'), 'America/Sao_Paulo')).toBe('2026-09');
+  });
+});
+
+describe('mesAnterior', () => {
+  it('subtrai um mes dentro do mesmo ano', () => {
+    expect(mesAnterior('2026-09')).toBe('2026-08');
+  });
+
+  it('vira o ano em janeiro', () => {
+    expect(mesAnterior('2026-01')).toBe('2025-12');
   });
 });
 

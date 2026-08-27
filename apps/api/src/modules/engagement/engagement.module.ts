@@ -10,16 +10,22 @@ import { EngagementXpRepository, PORTA_DE_XP } from './engagement-xp.repository.
 import { EngagementXpService } from './engagement-xp.service.js';
 import { EngagementRankingRepository, PORTA_DE_RANKING } from './engagement-ranking.repository.js';
 import { EngagementRankingService } from './engagement-ranking.service.js';
+import { EngagementRankingSchedulerService } from './engagement-ranking-scheduler.service.js';
 
 /**
  * Preferencia de engajamento e identidade publica (F30, ADR-046) + XP e
- * conquistas (F31) + placar mensal (F31, Task 8).
+ * conquistas (F31) + placar mensal (F31, Task 8) + fechamento mensal
+ * automatico do placar (F31, Task 13, Emenda de 27/08/2026).
  *
  * Exporta `EngagementService`, `EngagementXpService` e
  * `EngagementRankingService` -- o KioskModule vai consumir os tres como caso
  * de uso publico (regra de arquitetura no 9), nunca lendo
  * `PublicProfile`/`XpLedgerEntry`/`RankingEntry` direto. `EngagementController`
  * (Task 7) e a fila de moderacao do painel.
+ *
+ * `EngagementRankingSchedulerService` e SO provider -- nao ha rota nem
+ * export: `@Cron` (ja ligado por `ScheduleModule.forRoot()` no
+ * `app.module.ts`) e quem dispara, ninguem de fora chama isto direto.
  */
 @Module({
   imports: [PersistenceModule],
@@ -28,6 +34,7 @@ import { EngagementRankingService } from './engagement-ranking.service.js';
     EngagementService,
     EngagementXpService,
     EngagementRankingService,
+    EngagementRankingSchedulerService,
     // `TenantContextService` e injetado pelo `EngagementController` e precisa
     // ser declarado AQUI, como `PrivacyModule` e `KioskAdminModule` fazem.
     // Sem esta linha o Nest nao resolve o controller e derruba o boot da
