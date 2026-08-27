@@ -19,6 +19,19 @@ import {
 /** Mesmo fuso fixo que `domain/indicadores-da-unidade.ts` assume para a academia. */
 const FUSO_DA_ACADEMIA = 'America/Sao_Paulo';
 
+/**
+ * Nao ha usuario do painel agindo -- quem "age" aqui e o heartbeat do
+ * dispositivo, sem sessao de aluno. `audit_logs.actor_id` e anulavel
+ * exatamente para isto.
+ *
+ * A conversao mora AQUI, num lugar so e com nome, em vez de um
+ * `as unknown as string` solto no meio do objeto: a divergencia entre o
+ * tipo (`string`) e a coluna (`uuid NULL`) fica visivel para quem ler. Mesmo
+ * padrao de `kiosk-area-do-aluno.service.ts` -- nao reexportado de la porque
+ * e um detalhe interno de cada servico, nao um valor compartilhado.
+ */
+const SEM_USUARIO = null as unknown as string;
+
 export interface ConfiguracaoResolvida {
   readonly version: number;
   readonly config: KioskConfig;
@@ -195,7 +208,7 @@ export class KioskConfigService {
   private async placarPublico(contexto: ContextoDoKiosk, agora: Date) {
     const tenantContext: TenantContext = {
       tenantId: contexto.tenantId,
-      actorId: null as unknown as string,
+      actorId: SEM_USUARIO,
       sessionId: contexto.kioskDeviceId,
       permissions: new Set<string>(),
       allowedUnitIds: new Set([contexto.gymUnitId]),
