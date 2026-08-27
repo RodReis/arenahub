@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { NOME_ANONIMO, resolverExposicao } from './exposicao.js';
+import { NOME_ANONIMO, abreviarNome, resolverExposicao } from './exposicao.js';
 
 const base = {
   decisao: null,
@@ -65,5 +65,50 @@ describe('resolverExposicao', () => {
     // status priority must stay first: inactive students never appear, regardless of engagement decision.
     const cancelado = { ...base, statusDoAluno: 'CANCELLED' as const, decisao: { decision: 'REFUSED' as const, supersededAt: null } };
     expect(resolverExposicao(cancelado)).toEqual({ exibe: false, motivo: 'ALUNO_INATIVO' });
+  });
+});
+
+/**
+ * `DS-TOTEM.md` §3.4c/§5.8: "nomes sempre abreviados em tela publica" e na
+ * area interna do totem. Nome de pessoa real e bagunçado -- particula de
+ * ligacao, termo unico, espaco sobrando -- e cada caso abaixo e um jeito
+ * real de a regra ingenua ("segundo termo, ponto final") dar errado.
+ */
+describe('abreviarNome', () => {
+  it('primeiro nome + inicial do sobrenome', () => {
+    expect(abreviarNome('Ana Souza Lima')).toBe('Ana S.');
+  });
+
+  it('nome com um so termo nao ganha ponto solto', () => {
+    expect(abreviarNome('Madonna')).toBe('Madonna');
+  });
+
+  it('ignora particula de ligacao ao escolher o sobrenome', () => {
+    expect(abreviarNome('Ana de Souza')).toBe('Ana S.');
+  });
+
+  it('nome que e so particula depois do primeiro termo devolve so o primeiro termo', () => {
+    expect(abreviarNome('Ana de')).toBe('Ana');
+  });
+
+  it('tolera espacos multiplos e nas pontas', () => {
+    expect(abreviarNome('  Ana   Souza  ')).toBe('Ana S.');
+  });
+
+  /*
+   * Decisao registrada no relatorio da task: PRESERVA a caixa original do
+   * cadastro, nao normaliza. O cadastro e quem decide "ANGELA" vs "Angela";
+   * abreviar nao e o lugar de corrigir digitacao.
+   */
+  it('preserva a caixa original -- nao normaliza maiuscula/minuscula', () => {
+    expect(abreviarNome('ÂNGELA ROCHA')).toBe('ÂNGELA R.');
+  });
+
+  it('string vazia devolve vazio, sem estourar', () => {
+    expect(abreviarNome('')).toBe('');
+  });
+
+  it('string so com espaco devolve vazio, sem estourar', () => {
+    expect(abreviarNome('   ')).toBe('');
   });
 });
