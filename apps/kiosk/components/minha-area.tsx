@@ -11,6 +11,7 @@ import { IconeAtencao, IconeConfirmado } from './icones';
 import { Pagamento } from './pagamento';
 import { Preferencias } from './preferencias';
 import { AvaliacaoDoMes, Evolucao, HistoricoDeAvaliacoes } from './saude';
+import { Xp } from './xp';
 
 /**
  * Area interna -- DS-TOTEM.md §5.2.
@@ -68,6 +69,7 @@ export function MinhaArea({
     return <HistoricoDeAvaliacoes sessao={sessao} aoVoltar={voltar} />;
 
   if (aberto === 'ranking') return <Preferencias sessao={sessao} aoVoltar={voltar} />;
+  if (aberto === 'xp') return <Xp sessao={sessao} aoVoltar={voltar} />;
 
   if (aberto === 'historicoDePagamentos')
     return (

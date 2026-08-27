@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   rotuloDePatrocinio,
   type BlocoDaTelaPublica,
+  type EntradaPublicaDoPlacar,
   type IndicadoresDaUnidade,
   type KioskConfig,
 } from '@arenahub/api-contracts';
@@ -30,7 +31,31 @@ import { blocosVisiveis, indiceSeguro, proximoIndice } from '../lib/rodizio';
  * resolve em `GET /kiosk/config`) e o navegador a baixa uma vez; os numeros
  * chegam pelo heartbeat que ja existia e sao mantidos em memoria pelo pai.
  * Sem rede, o ultimo numero conhecido continua na tela.
+ *
+ * ---------------------------------------------------------------------------
+ * F31 (Task 10) ACRESCENTA O BLOCO RANKING -- AS DUAS GARANTIAS CONTINUAM DE PE.
+ * ---------------------------------------------------------------------------
+ *
+ * O placar chega DENTRO de `indicadores` (`indicadores.placar`), a mesma
+ * prop que ja existia -- nao um terceiro parametro, nao um `fetch` novo.
+ * `resolverExposicao()` roda no SERVIDOR antes de o heartbeat sair da API:
+ * o array so tem `position`/`nomeExibido`/`points`, nunca `studentId`
+ * (`EntradaPublicaDoPlacar` em `@arenahub/api-contracts`). Placar vazio (o
+ * modulo `xp` desligado, ou nenhum snapshot publicado) tira o bloco do
+ * rodizio -- ele nunca aparece cinza ou vazio.
  */
+/**
+ * O bloco de placar publico -- F31, Task 10.
+ *
+ * NAO E um dos `TIPOS_DE_BLOCO` de `config.blocos.itens`: o placar nao e
+ * midia que o gerente cadastra, e o conteudo dele (`indicadores.placar`) so
+ * existe em runtime, vindo do heartbeat. Por isso e um tipo LOCAL, que so
+ * entra na rotacao quando ha o que mostrar -- nunca um item configuravel
+ * que o painel liga/desliga.
+ */
+type BlocoDeRanking = { readonly tipo: 'RANKING' };
+type BlocoEmRotacao = BlocoDaTelaPublica | BlocoDeRanking;
+
 export function BlocosPublicos({
   config,
   indicadores,
@@ -38,7 +63,15 @@ export function BlocosPublicos({
   readonly config: KioskConfig;
   readonly indicadores: IndicadoresDaUnidade | null;
 }) {
-  const visiveis = blocosVisiveis(config);
+  const placar = indicadores?.placar ?? [];
+
+  /*
+   * Placar vazio (retido, ou modulo `xp` desligado -- API sempre manda `[]`
+   * nesses casos, nunca omite o campo) TIRA o bloco do rodizio -- nao entra
+   * cinza, nao entra vazio (mesma regra do §4 para os blocos configuraveis).
+   */
+  const visiveis: readonly BlocoEmRotacao[] =
+    placar.length > 0 ? [...blocosVisiveis(config), { tipo: 'RANKING' } as const] : blocosVisiveis(config);
   const [indice, setIndice] = useState(0);
 
   const total = visiveis.length;
@@ -100,7 +133,10 @@ export function BlocosPublicos({
             <div className="progressoDoRodizio" aria-hidden="true">
               {visiveis.map((bloco, posicao) => (
                 <span
-                  key={bloco.id}
+                  // O bloco de RANKING nao tem `id` (nao vem de
+                  // `config.blocos.itens`) -- o tipo so se repete uma vez na
+                  // lista, entao ele mesmo serve de chave.
+                  key={bloco.tipo === 'RANKING' ? 'RANKING' : bloco.id}
                   className="pontoDoRodizio"
                   data-ativo={posicao === indiceSeguro(indice, total)}
                 />
@@ -119,10 +155,15 @@ function ConteudoDoBloco({
   bloco,
   indicadores,
 }: {
-  readonly bloco: BlocoDaTelaPublica;
+  readonly bloco: BlocoEmRotacao;
   readonly indicadores: IndicadoresDaUnidade | null;
 }) {
   switch (bloco.tipo) {
+    case 'RANKING':
+      // Placar vazio ja tira o bloco da rotacao (ver `visiveis` acima) --
+      // aqui `indicadores` nunca e nulo com pelo menos uma entrada.
+      return <BlocoDePlacar placar={indicadores?.placar ?? []} />;
+
     case 'VIDEO':
       return (
         <>
@@ -219,6 +260,32 @@ function Indicador({ rotulo, valor }: { readonly rotulo: string; readonly valor:
       <span className="valorDoIndicador">{valor}</span>
       <span className="metadado">{rotulo}</span>
     </div>
+  );
+}
+
+/**
+ * Bloco de placar na tela publica -- F31, Task 10.
+ *
+ * `placar` chega PRONTO do servidor (`resolverExposicao()` ja filtrou
+ * opt-out e inatividade antes de o heartbeat sair da API): so
+ * `position`/`nomeExibido`/`points`, nunca `studentId` -- a trava do
+ * `M3.5-BR-001` continua de pe porque o TIPO em si (`EntradaPublicaDoPlacar`)
+ * nao tem por onde um id entrar.
+ */
+function BlocoDePlacar({ placar }: { readonly placar: readonly EntradaPublicaDoPlacar[] }) {
+  return (
+    <>
+      <h2 className="tituloDoBloco">Ranking do mês</h2>
+      <ul className="listaDeEventos" data-testid="lista-de-placar">
+        {placar.map((entrada) => (
+          <li key={entrada.position} className="evento">
+            <span className="dataDoEvento">{entrada.position}º</span>
+            <span className="tituloDoEvento">{entrada.nomeExibido}</span>
+            <span className="metadado">{entrada.points} pts</span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

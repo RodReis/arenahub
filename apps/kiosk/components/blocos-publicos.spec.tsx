@@ -230,6 +230,59 @@ describe('BlocosPublicos -- faixa de patrocinadores (ADR-042, Decisao 4)', () =>
   });
 });
 
+describe('BlocosPublicos -- placar (F31, Task 10)', () => {
+  const indicadoresComPlacar = {
+    checkinsDeHoje: 0,
+    treinandoAgora: 0,
+    placar: [
+      { position: 1, nomeExibido: 'Aninha', points: 50 },
+      { position: 2, nomeExibido: 'Bia', points: 40 },
+    ],
+  };
+
+  it('mostra os nomes que o heartbeat entregou', () => {
+    render(<BlocosPublicos config={config([])} indicadores={indicadoresComPlacar} />);
+
+    expect(screen.getByText('Aninha')).toBeInTheDocument();
+  });
+
+  it('placar vazio tira o bloco do rodizio', () => {
+    render(
+      <BlocosPublicos
+        config={config([])}
+        indicadores={{ ...indicadoresComPlacar, placar: [] }}
+      />,
+    );
+
+    expect(screen.queryByText(/ranking|placar/iu)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bloco-em-exibicao')).toBeNull();
+  });
+
+  it('sem heartbeat ainda (indicadores nulo), o bloco tambem nao aparece', () => {
+    render(<BlocosPublicos config={config([])} indicadores={null} />);
+
+    expect(screen.queryByTestId('lista-de-placar')).toBeNull();
+  });
+
+  it('entra no rodizio junto com os blocos configuraveis', () => {
+    vi.useFakeTimers();
+
+    render(
+      <BlocosPublicos config={config([instagram])} indicadores={indicadoresComPlacar} />,
+    );
+
+    expect(screen.getByTestId('bloco-em-exibicao')).toHaveAttribute('data-tipo', 'INSTAGRAM');
+
+    act(() => {
+      vi.advanceTimersByTime(12_000);
+    });
+
+    expect(screen.getByTestId('bloco-em-exibicao')).toHaveAttribute('data-tipo', 'RANKING');
+
+    vi.useRealTimers();
+  });
+});
+
 describe('formatarData', () => {
   it('a data digitada nao anda um dia para tras', () => {
     // `new Date('2026-08-30')` seria UTC: num fuso negativo, dia 30 vira 29.

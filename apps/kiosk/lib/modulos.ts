@@ -22,6 +22,11 @@ export interface CardDeModulo {
  * nao aparece (ADR-042, Decisao 5, trava 2), e agora ha fatia. O ranking
  * PUBLICO em si (mostrar posicao, nomes) continua sendo a F33 -- este card
  * so leva a tela de CONSENTIMENTO, nao a um placar.
+ *
+ * `xp` ENTRA na F31 (Task 10): `DS-TOTEM.md` §5.2 nao previa este modulo (e
+ * anterior a F31) -- posicionado logo depois de `ranking` por serem os dois
+ * cards de engajamento, decisao registrada no relatorio da Task 10, nao no
+ * documento de design.
  */
 const GRADE: readonly CardDeModulo[] = [
   {
@@ -58,6 +63,12 @@ const GRADE: readonly CardDeModulo[] = [
     campo: 'ranking',
     titulo: 'Minhas preferências',
     destino: 'Ranking e nome exibido',
+    natureza: 'leitura',
+  },
+  {
+    campo: 'xp',
+    titulo: 'Meus pontos',
+    destino: 'XP, conquistas e posição',
     natureza: 'leitura',
   },
 ];

@@ -21,6 +21,7 @@ describe('modulosVisiveis', () => {
         evolucao: false,
         historicoDeAvaliacoes: false,
         ranking: false,
+        xp: false,
       }),
     );
 
@@ -41,6 +42,12 @@ describe('modulosVisiveis', () => {
     const cards = modulosVisiveis(comModulos({ ranking: true }));
 
     expect(cards.map((c) => c.campo)).toEqual(['ranking']);
+  });
+
+  it('devolve o card de xp quando ligado, depois de ranking — a F31 entregou a tela de pontos', () => {
+    const cards = modulosVisiveis(comModulos({ ranking: true, xp: true }));
+
+    expect(cards.map((c) => c.campo)).toEqual(['ranking', 'xp']);
   });
 
   it('mantém a ordem do DS-TOTEM §5.2, não a ordem das chaves do contrato', () => {
