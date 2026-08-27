@@ -1,0 +1,78 @@
+import { describe, expect, it } from '@jest/globals';
+
+import { triarAlias, type SinalDeAlias } from './triagem-de-alias.js';
+
+const SEM_BLOQUEIO: readonly string[] = [];
+
+describe('triarAlias -- normalizacao', () => {
+  it('normaliza para NFKC e minusculas', () => {
+    // 'Ｔｉｇｒｅ' em largura total vira 'tigre' -- senao dois alunos ficam
+    // com aliases visualmente iguais e o indice unico nao percebe.
+    expect(triarAlias('Ｔｉｇｒｅ', SEM_BLOQUEIO).normalizado).toBe('tigre');
+  });
+
+  it('colapsa espaco repetido e apara as pontas', () => {
+    expect(triarAlias('  Tigre   de   Aco  ', SEM_BLOQUEIO).normalizado).toBe('tigre de aco');
+  });
+
+  it('remove caractere invisivel e SINALIZA', () => {
+    // U+200B (zero-width space) no meio da palavra faz duas strings
+    // alias diferentes no banco e identicos na tela.
+    const resultado = triarAlias('ti\u200bgre', SEM_BLOQUEIO);
+    expect(resultado.normalizado).toBe('tigre');
+    expect(resultado.sinais).toContain('CARACTERE_INVISIVEL');
+  });
+});
+
+describe('triarAlias -- sinais', () => {
+  it('sinaliza alias curto demais', () => {
+    expect(triarAlias('a', SEM_BLOQUEIO).sinais).toContain('CURTO_DEMAIS');
+  });
+
+  it('sinaliza alias longo demais', () => {
+    expect(triarAlias('a'.repeat(25), SEM_BLOQUEIO).sinais).toContain('LONGO_DEMAIS');
+  });
+
+  // Sem `as const`: `it.each` recusa tupla readonly, e o tipo do elemento
+  // ja vem estreito o bastante do proprio literal.
+  it.each<[string, SinalDeAlias]>([
+    ['ana@exemplo.com', 'PARECE_EMAIL'],
+    ['41999998888', 'PARECE_TELEFONE'],
+    ['529.982.247-25', 'PARECE_CPF'],
+  ])('sinaliza PII: %s', (bruto, sinal) => {
+    expect(triarAlias(bruto, SEM_BLOQUEIO).sinais).toContain(sinal);
+  });
+
+  it('sinaliza palavra bloqueada do tenant', () => {
+    expect(triarAlias('Tigre Palavrao', ['palavrao']).sinais).toContain('PALAVRA_BLOQUEADA');
+  });
+
+  it('pega palavra bloqueada com acento e caixa diferentes', () => {
+    expect(triarAlias('ARROMBÁDO', ['arrombado']).sinais).toContain('PALAVRA_BLOQUEADA');
+  });
+
+  it('sinaliza alias so de simbolos', () => {
+    expect(triarAlias('!!!###', SEM_BLOQUEIO).sinais).toContain('SO_SIMBOLOS');
+  });
+
+  it('alias limpo nao gera sinal nenhum', () => {
+    expect(triarAlias('Tigre', SEM_BLOQUEIO).sinais).toEqual([]);
+  });
+
+  it('11 digitos nus gera ambiguo: TELEFONE e CPF', () => {
+    const resultado = triarAlias('52998224725', SEM_BLOQUEIO);
+    expect(resultado.sinais).toContain('PARECE_TELEFONE');
+    expect(resultado.sinais).toContain('PARECE_CPF');
+  });
+
+  it('CPF formatado (com ponto e hifen) gera so CPF', () => {
+    const resultado = triarAlias('529.982.247-25', SEM_BLOQUEIO);
+    expect(resultado.sinais).toContain('PARECE_CPF');
+  });
+
+  it('telefone sem ponto (com parentese e hifen) gera so TELEFONE', () => {
+    const resultado = triarAlias('(41) 99999-8888', SEM_BLOQUEIO);
+    expect(resultado.sinais).toContain('PARECE_TELEFONE');
+    expect(resultado.sinais).not.toContain('PARECE_CPF');
+  });
+});

@@ -9,14 +9,14 @@ import estilos from './formulario-de-configuracao.module.css';
  *
  * TRAVA 2 do ADR-042, Decisao 5: modulo cuja fatia de origem nao foi
  * entregue NAO APARECE -- nao aparece cinza, nao aparece desabilitado: nao
- * existe. Por isso `ranking` (F33, MVP 5) esta FORA desta lista, e nao
- * listado com um `disabled`.
+ * existe.
  *
- * O CAMPO segue no contrato (`kioskConfigSchema.modulos.ranking`), porque
- * removê-lo invalidaria toda configuracao ja publicada em
- * `KioskConfiguration.payload` -- a trava e sobre o que o gerente VE, nao
- * sobre o shape persistido. Quando a F33 entregar, ela acrescenta a linha
- * aqui e o modulo nasce configuravel sem migracao nenhuma.
+ * `ranking` ENTRA na F30 (ADR-046). Ate 26/08/2026 este comentario dizia
+ * que a dona seria a F33 e que ela acrescentaria a linha; a F30 chegou
+ * antes e e quem alimenta o modulo -- ela entrega a tela de PREFERENCIA de
+ * exposicao (aparecer ou nao no ranking, e com que nome). O placar em si
+ * continua sendo F33, e nao muda nada aqui quando chegar: o modulo ja
+ * estara ligavel.
  */
 const MODULOS_DISPONIVEIS = [
   {
@@ -43,6 +43,11 @@ const MODULOS_DISPONIVEIS = [
     campo: 'historicoDeAvaliacoes',
     rotulo: 'Histórico de avaliações',
     descricao: 'Uma linha por mês medido, somente leitura.',
+  },
+  {
+    campo: 'ranking',
+    rotulo: 'Minhas preferências',
+    descricao: 'Aparecer ou não no ranking, e com que nome. O placar em si vem depois.',
   },
 ] as const satisfies readonly {
   campo: keyof KioskConfig['modulos'];

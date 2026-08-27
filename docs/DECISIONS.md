@@ -3145,3 +3145,96 @@ Reabre também, **antes disso**, qualquer proposta de tirar a ponte do loopback 
 | 3 | Enumeração de CPF é risco vivo e aceito, condicionado ao loopback da ponte | `SPEC-049` §9 |
 | 4 | A área interna da F49 entrega zero dos seis módulos do DS §5.2 — aceite é isolamento e limpeza | `SPEC-049` §0 |
 | 5 | Facial no totem sai do roadmap: backlog, sem MVP de destino | `docs/STATUS.md` |
+
+---
+
+## ADR-046 — Engajamento no totem, não no app; o gate do MVP 5 não alcança a F30; ranking vira opt-out
+
+**Data:** 26/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 26/08/2026**
+· **Emenda** `docs/prd/academia/MVP-05-engagement.md` §1 (gate de entrada) e §7 Slice 5.1
+  (superfície e critério de aceite)
+· **Alcança** a `SPEC-030` e a fatia F30
+· **NÃO alcança:** F31–F35, que seguem atrás do gate do MVP 5 tal como estava; a Regra de
+  arquitetura 9 (módulo não lê tabela privada de outro módulo); INV-021 (consentimento
+  versionado e revogável)
+
+### Contexto
+
+A Slice 5.1 do `MVP-05` foi escrita presumindo o **app** do MVP 4 como canal do aluno e um gate
+de entrada que exige *"eventos confiáveis + app do MVP 4"*. Nenhuma das duas premissas resistiu
+ao estado real do repositório em 26/08/2026: `apps/mobile/` tem só um `.gitkeep`, e o canal do
+aluno que existe de fato é o `apps/kiosk` — que desde a F49/F50 (ADR-042, ADR-045) já identifica
+o aluno por CPF e já trazia `modulos.ranking` no contrato de `KioskConfiguration`, desligado por
+padrão desde a F50. O lugar estava reservado; a Slice 5.1 não sabia disso.
+
+Durante o brainstorming da F30, em 26/08/2026, o PI tomou três decisões que redesenham a fatia. A
+terceira é a mais delicada: ela esvazia um critério de aceite já escrito no PRD.
+
+### Decisão 1 — a superfície é o totem, não o app
+
+**"App" na Slice 5.1 vira "totem".** O `apps/kiosk` ganha duas telas na área do aluno (atrás de
+`KioskAreaDoAlunoService.resolver()`, mesma amarra de sessão que paga e evolução física já usam):
+*Minhas preferências* (interruptor de participação no ranking) e *Meu nome no ranking* (primeiro
+nome · apelido · anônimo).
+
+Motivo: o totem alcança **todo aluno que passa pela recepção**, hoje, sem depender de o aluno ter
+instalado um aplicativo que ainda não existe. Esperar o MVP 4 para começar o MVP 5 empurraria
+engajamento para depois de uma dependência que a F30 não precisa.
+
+### Decisão 2 — o gate do MVP 5 não se aplica a esta fatia
+
+O gate dizia *"eventos confiáveis + app do MVP 4"*. Os dois requisitos descrevem o que **F31 em
+diante** vai precisar — XP e streak leem evento de frequência/pagamento; desafio e push mobile
+leem o app. A F30 não lê nenhum evento e não abre tela em `apps/mobile`: ela é o alicerce de
+privacidade e identidade pública sobre o qual as fatias seguintes vão se apoiar, não o primeiro
+consumidor delas.
+
+**Isso libera só a F30.** F31–F35 continuam atrás do gate original — a Decisão 1 não antecipa o
+MVP 4 nem promete eventos que não existem. Se uma fatia futura quiser rodar antes do gate, precisa
+do próprio ADR, com o próprio argumento.
+
+### Decisão 3 — consentimento de ranking vira opt-out
+
+A Slice 5.1 previa, como critério de aceite, *"aluno não consentido nunca aparece em API, cache,
+exportação ou tela pública"* — um regime **opt-in**. Palavras do PI: os alunos **já estão
+aceitos e autorizados**; não faz sentido pedir consentimento explícito para um ranking interno de
+academia com o mesmo rigor que se pede para biometria ou dado de saúde.
+
+O critério de aceite muda para: **"aluno que pediu para sair nunca aparece, a partir da próxima
+projeção"**. Não existe mais "aluno não consentido" — existe aluno que participa (o padrão) e
+aluno que registrou saída.
+
+### A consequência que precisa ficar escrita — dois regimes na mesma tabela
+
+`ConsentRecord` continua sendo a fonte única de consentimento (mesmo modelo append-only, mesma
+revogação por linha nova com `supersededAt`, mesmo ator/IP/dispositivo). `ConsentDocumentType`
+ganha quatro finalidades novas: `RANKING`, `CHALLENGE`, `ENGAGEMENT_PUSH` e
+`PHYSICAL_EVOLUTION_RANKING` — as três últimas **dormentes**, sem documento publicado e sem
+consumidor nesta fatia, modeladas só para que F31–F35 não precisem de migration.
+
+O ponto perigoso: a mesma tabela passa a sustentar **dois regimes opostos**.
+
+| regime | finalidades | ausência de `ConsentRecord` significa |
+|---|---|---|
+| biometria, saúde, IA | `BIOMETRIC`, `HEALTH`, `AI_ANALYSIS` | **NÃO autorizado** |
+| engajamento (esta fatia) | `RANKING`, `CHALLENGE`, `ENGAGEMENT_PUSH`, `PHYSICAL_EVOLUTION_RANKING` | **participa** |
+
+Os predicados que leem essa tabela vivem **separados de propósito**:
+`avaliarConsentimento()` em `apps/api/src/modules/privacy/domain/consentimento.ts` para o
+primeiro regime, `participaDoRanking()` em
+`apps/api/src/modules/engagement/domain/participacao.ts` para o segundo. Um predicado servindo
+aos dois regimes passaria verde enquanto nenhum teste misturasse os dois casos na mesma linha — o
+defeito que a memória `comentario-avisa-e-codigo-repete` já registrou uma vez nesta base. Unificar
+os dois inverteria um dos dois regimes em silêncio, e é exatamente por isso que
+`participacao.ts` carrega o aviso no próprio código, não só neste ADR.
+
+### Consequências
+
+| # | consequência | onde |
+|---|---|---|
+| 1 | `MVP-05` §7 Slice 5.1 fica **emendada**: superfície é o totem; critério de aceite passa a opt-out | `MVP-05` §7 |
+| 2 | `MVP-05` §1 fica **emendado**: gate não alcança a F30, continua valendo para F31–F35 | `MVP-05` §1 |
+| 3 | `ConsentDocumentType` ganha quatro finalidades, três dormentes | `packages/database/prisma/schema.prisma` |
+| 4 | `ConsentRecord` guarda dois regimes opostos de ausência de linha, com predicados separados | `SPEC-030` §2, §4 |
+| 5 | `PublicProfile` (tabela nova) guarda o apelido público e sua moderação, com unicidade em índice parcial sobre `APPROVED` | `SPEC-030` §2 |
+| 6 | `HIDDEN` nasce sem caminho de escrita nesta fatia — é para denúncia, e não há canal de denúncia até a F35 | `SPEC-030` §3 |

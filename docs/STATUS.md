@@ -7,7 +7,16 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 26/08/2026 *(F44 entregue — design system do totem)*
+**Última atualização:** 27/08/2026 *(F30 entregue — preferências e identidade pública)*
+
+🔑 **27/08/2026 — F30 entregue, e o gate do MVP 5 se parte em dois.** O **ADR-046** registra três
+decisões do PI de 26/08: a superfície é o `apps/kiosk`, não o app do MVP 4 (que segue com
+`apps/mobile/.gitkeep`); o gate original do MVP 5 (*"eventos confiáveis + app do MVP 4"*) **não
+alcança a F30** — só F31–F35 continuam atrás dele; e o consentimento de ranking vira **opt-out**
+— alunos já aceitos e autorizados participam por padrão. A mesma tabela `ConsentRecord` passa a
+guardar dois regimes opostos de ausência de linha (biometria/saúde/IA = não autorizado;
+engajamento = participa), com predicados separados de propósito. Detalhe em `docs/DEVELOPMENT.md`
+§ MVP 5.
 
 🔑 **24/08/2026 — o Cowork passa a empurrar o próprio commit.** Até aqui o commit entrava na `main`
 local e ficava esperando alguém sincronizar: o `git push` pelo bridge falhava com
@@ -790,7 +799,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis (o *protocolo clínico* como gate **caiu em 19/08** — decisão do PI, ADR-035) | F17–F22 | **bloqueado só por MVP 1.** ADR-008 e ADR-036 fechados; F17–F20 não chamam IA e são as primeiras pegáveis quando o MVP 1 estabilizar |
 | **3.5** | Totem: tela pública configurável + autosserviço do aluno | MVP 1 estável + PIX operando (F13 ✅) | F49–F52 | criado por **ADR-042** em 22/08/2026. **Antecipa a decisão, não a execução** — o kiosk nasce configurável em vez de ser retrabalhado depois. Antecipa a execução das Slices 4.5 e 4.6. **Em execução: F49 entregue em 25/08/2026** — regime de identificação fixado pelo **ADR-045** (CPF sozinho; facial vai para o backlog) |
 | **4** | Autosserviço: **app do aluno** (o totem saiu para o MVP 3.5) | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado — e **vem depois do MVP 3.5**, decisão do PI em 22/08 (ADR-042). **Slices 4.5 e 4.6 são executadas no MVP 3.5**; o texto e o aceite continuam no PRD MVP-04 §7, sem cópia |
-| **5** | Engajamento opt-in mensurável | eventos confiáveis + app do MVP 4 | F30–F35 | bloqueado |
+| **5** | Engajamento opt-out mensurável | eventos confiáveis + app do MVP 4 — **não alcança a F30** (ADR-046) | F30–F35 | **F30 entregue em 27/08/2026** — superfície no totem, gate original segue valendo para F31–F35 |
 | **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | bloqueado |
 
 
@@ -859,7 +868,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F27 | SPEC-027 | 4 | 4.5 | Kiosk seguro | [`SPEC-027-kiosk-seguro.md`](specs/SPEC-027-kiosk-seguro.md) | [#27](https://github.com/RodReis/arenahub/issues/27) | planejada |
 | F28 | SPEC-028 | 4 | 4.6 | Pagamento e desbloqueio no totem | [`SPEC-028-pagamento-e-desbloqueio-no-totem.md`](specs/SPEC-028-pagamento-e-desbloqueio-no-totem.md) | [#28](https://github.com/RodReis/arenahub/issues/28) | planejada |
 | F29 | SPEC-029 | 4 | 4.7 | Piloto e distribuição | [`SPEC-029-piloto-e-distribuicao.md`](specs/SPEC-029-piloto-e-distribuicao.md) | [#29](https://github.com/RodReis/arenahub/issues/29) | planejada |
-| F30 | SPEC-030 | 5 | 5.1 | Preferências e identidade pública | [`SPEC-030-preferencias-e-identidade-publica.md`](specs/SPEC-030-preferencias-e-identidade-publica.md) | [#30](https://github.com/RodReis/arenahub/issues/30) | planejada |
+| F30 | SPEC-030 | 5 | 5.1 | Preferências e identidade pública | [`SPEC-030-preferencias-e-identidade-publica.md`](specs/SPEC-030-preferencias-e-identidade-publica.md) | [#30](https://github.com/RodReis/arenahub/issues/30) | ✅ **entregue** em 27/08/2026 — PR `—` |
 | F31 | SPEC-031 | 5 | 5.2 | XP e conquistas | [`SPEC-031-xp-e-conquistas.md`](specs/SPEC-031-xp-e-conquistas.md) | [#31](https://github.com/RodReis/arenahub/issues/31) | planejada |
 | F32 | SPEC-032 | 5 | 5.3 | Consistência e streak | [`SPEC-032-consistencia-e-streak.md`](specs/SPEC-032-consistencia-e-streak.md) | [#32](https://github.com/RodReis/arenahub/issues/32) | planejada |
 | F33 | SPEC-033 | 5 | 5.4 | Rankings privados por padrão | [`SPEC-033-rankings-privados-por-padrao.md`](specs/SPEC-033-rankings-privados-por-padrao.md) | [#33](https://github.com/RodReis/arenahub/issues/33) | planejada |

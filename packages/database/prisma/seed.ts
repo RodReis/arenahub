@@ -150,6 +150,11 @@ const PERMISSOES = [
   'biometric.revoke',
   'device.manage',
   'device.read',
+  // F30: moderacao de apelido publico. Trabalho de recepcao/operacao, nao de
+  // financeiro -- por isso entra na mesma vizinhanca de `student.read` e
+  // `consent.manage`, nao junto de `billing.*`.
+  'engagement.read',
+  'engagement.moderate',
   // F9: decisao de acesso e liberacao manual.
   //
   // `access.override` e separado de tudo: quem opera a recepcao no dia a dia
@@ -429,6 +434,7 @@ async function semear(): Promise<void> {
     // varre os alunos ativos -- inclusive este.
     await semearAlunoECredencialDoTotem(db, tenant.id, unidade.id);
     await semearAceiteDaAnalise(db, tenant.id);
+    await semearDocumentosDeEngajamento(db, tenant.id);
 
     console.info(`[seed] tenant "${TENANT.slug}" pronto, com dono ${DONO.email}.`);
   } finally {
@@ -520,6 +526,81 @@ async function semearAceiteDaAnalise(
     `[seed] aceite de analise por IA: ${String(novos.length)} novo(s), ` +
       `${String(ativos.length)} aluno(s) ativo(s) no total.`,
   );
+}
+
+/**
+ * Documento de consentimento das quatro finalidades de ENGAJAMENTO
+ * (ADR-046), um por tenant -- `tenantId` REAL, nunca `null`.
+ *
+ * F30 tentou criar este documento sob demanda dentro de `registrarDecisao`
+ * (`findFirst` + `create`): corrida real, porque `@@unique([tenantId, type,
+ * version])` nao protege quando `tenantId` e `null` -- em Postgres, `NULL`
+ * nao colide com `NULL` em indice unico comum, entao duas decisoes
+ * concorrentes da mesma finalidade criavam duas linhas `version: 1` e o
+ * `orderBy: version desc` escolhia uma indeterminadamente. O documento saiu
+ * do caminho de escrita: sem linha aqui, `registrarDecisao` recusa com
+ * `NotFoundException` (`DOCUMENTO_DE_ENGAJAMENTO_AUSENTE`) em vez de criar
+ * silenciosamente.
+ *
+ * Nao e termo juridico -- e so o registro do que o aluno esta decidindo.
+ * `purpose`/`content` curtos e honestos, em pt-BR.
+ */
+async function semearDocumentosDeEngajamento(
+  db: Awaited<ReturnType<typeof criarPrismaClient>>,
+  tenantId: string,
+): Promise<void> {
+  const { createHash } = await import('node:crypto');
+
+  const FINALIDADES = [
+    {
+      type: 'RANKING' as const,
+      purpose: 'Participacao no ranking publico da academia',
+      content:
+        'Seu nome (ou apelido aprovado) pode aparecer no ranking publico ' +
+        'exibido na academia e no totem. Voce pode sair a qualquer momento.',
+    },
+    {
+      type: 'CHALLENGE' as const,
+      purpose: 'Participacao em desafios de engajamento',
+      content:
+        'Seus resultados em desafios da academia podem ser exibidos ' +
+        'publicamente para outros alunos. Voce pode sair a qualquer momento.',
+    },
+    {
+      type: 'ENGAGEMENT_PUSH' as const,
+      purpose: 'Recebimento de notificacoes de engajamento',
+      content:
+        'A academia pode enviar notificacoes sobre metas, sequencias e ' +
+        'conquistas. Voce pode sair a qualquer momento.',
+    },
+    {
+      type: 'PHYSICAL_EVOLUTION_RANKING' as const,
+      purpose: 'Participacao no ranking de evolucao fisica',
+      content:
+        'Sua evolucao fisica (comparativo de avaliacoes) pode aparecer num ' +
+        'ranking publico de progresso. Voce pode sair a qualquer momento.',
+    },
+  ];
+
+  for (const finalidade of FINALIDADES) {
+    const sha = createHash('sha256').update(finalidade.content, 'utf8').digest('hex');
+
+    await db.consentDocument.upsert({
+      where: { tenantId_type_version: { tenantId, type: finalidade.type, version: 1 } },
+      create: {
+        tenantId,
+        type: finalidade.type,
+        version: 1,
+        purpose: finalidade.purpose,
+        content: finalidade.content,
+        contentSha256: sha,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      update: {},
+    });
+  }
+
+  console.info(`[seed] documentos de engajamento: ${String(FINALIDADES.length)} finalidade(s).`);
 }
 
 /**

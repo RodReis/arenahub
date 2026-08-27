@@ -486,6 +486,97 @@ ou de fatura*. É estrutural e verificável por leitura — os sete handlers rec
 `x-session-token`, e o `studentId` sai de `KioskSession`. No dia em que alguém acrescentar um
 parâmetro de aluno, a regressão não é sutil: é a assinatura do método mudando.
 
+### Evidência da `SPEC-030` — F30, preferências e identidade pública
+
+**PR: `—`** — preencher depois do merge, pela regra do topo desta seção.
+
+`pnpm test:report --issue 30 --spec SPEC-030`, rodado em 27/08/2026, confirma o **unitário**:
+
+```
+| 2026-08-27 | #30 | SPEC-030 | unitário   | 2060 | 2060 | 0 | 75.5 | — |
+```
+
+**A linha não foi commitada em `reports/TESTS.md` na primeira tentativa**, e a razão virou achado:
+o gerador manteve, para `integração`, o número da última execução bem-sucedida (645/645, herdado
+da `SPEC-044`) em vez de refletir a execução real, que estava falhando. Commitar aquela linha
+registraria prova que não existia. **Regerar e commitar `reports/TESTS.md` é passo do fechamento
+desta fatia.**
+
+⚠️ **O gerador de relatório herda o número anterior quando a suíte falha.** Isso não é bug desta
+fatia — está descrito no §5 acima — mas é a armadilha que quase transformou 46 suítes quebradas em
+uma linha verde no documento de evidência. Quem fechar fatia daqui em diante: confira o número
+contra a execução, não contra o arquivo.
+
+#### Percurso na tela — 27/08/2026, ambiente local completo
+
+O plano da F30 exigia percorrer o fluxo com o servidor de pé, e a revisão final foi enfática:
+*"não fechar sem ele"*. Feito com Playwright, API em `3344`, totem em `3000`, painel em `3010`.
+
+| passo | resultado |
+|---|---|
+| Ligar o módulo `ranking` na configuração do totem, publicar | versão 3 publicada com `ranking: true` |
+| Abrir a área do aluno por CPF | teclado na tela, campo `readonly` — só o teclado do totem digita |
+| Ver o interruptor de ranking | **nasce `[checked]`** — o regime opt-out visível ao aluno |
+| Conferir finalidades dormentes | `CHALLENGE` e `ENGAGEMENT_PUSH` **não aparecem** |
+| Desligar o ranking | `PATCH … 200` na ponte; `ConsentRecord` `REFUSED` gravado |
+| Reabrir a sessão | `RANKING: false` persistiu |
+| Pedir apelido "Tigre" | gravado `PENDING`, `nomeExibido` **não vaza** o apelido pendente |
+| Abrir a fila de moderação | o apelido aparece com o **nome completo do aluno**, vindo da API |
+| Aprovar | `APPROVED`, `alias_normalized: tigre`, moderador registrado, fila esvazia |
+| Voltar ao ranking | `nomeExibido` vira **"Tigre"** — o ciclo fecha |
+| Repetir o `PATCH` com a mesma `idempotencyKey` | **uma única linha** em `consent_records` |
+
+**O percurso achou a quinta falha de fiação da fatia** — e é a razão de ele existir. A aba de
+módulos do painel **não listava `ranking`**: o módulo só podia ser ligado por SQL. O comentário
+da F50 apontava a F33 como dona (*"quando a F33 entregar, ela acrescenta a linha aqui"*), e a
+F30 chegou antes. Corrigido em `cffba6e`, com o teste que provava a ausência invertido.
+
+**Nenhuma das cinco falhas de fiação desta fatia foi achada por revisão de diff.** Duas vieram
+de teste de integração, uma da geração de evidência, e duas — `PATCH` ausente na ponte e o
+campo que a API não enviava — só apareceriam abrindo a tela. Elas atravessam **processo**
+(navegador → Next → Nest, e Nest → Next SSR), onde `fetch` e `chamarApi<T>` são casts não
+verificados que nenhum compilador confere.
+
+#### O defeito que a geração de evidência encontrou — e como escapou de seis revisões
+
+Ao gerar a evidência acima, a integração **não subia**: `EngagementModule` não declarava
+`TenantContextService` nos próprios `providers`, embora o `EngagementController` o injete.
+`Test.createTestingModule({ imports: [AppModule] })` falhava ao montar o controller, e isso
+derrubava **as 46 suítes de integração da API no boot** — 671 de 673 testes —, inclusive suítes
+sem relação nenhuma com engajamento (`listar-invoices` entre elas).
+
+**Corrigido em `dd43ce0`**, com uma linha e o import, no padrão que `PrivacyModule` e
+`KioskAdminModule` já seguem. Verificado depois: `listar-invoices` 8/8, `engagement` 5/5,
+unitário 943/943 no pacote, lint verde.
+
+**Por que passou por seis revisões de código.** O teste unitário do controller declara
+`TenantContextService` na mão dentro do `Test.createTestingModule` — passava verde enquanto o
+`AppModule` real quebrava. É a mesma classe de defeito que já custou uma rodada nesta fatia (o
+`EngagementModule` esquecido no `AppModule`, achado pela F30 na task de integração): **revisão de
+diff não enxerga o que não está lá.** Só boot real enxerga.
+
+A lição para o `docs/REVIEW.md`: quando uma fatia cria módulo Nest novo, a checagem de fiação
+(`AppModule` o registra? o módulo declara tudo que seus controllers injetam?) não pode depender de
+alguém reparar na ausência — precisa de teste que suba o `AppModule` de verdade.
+
+O unitário (2060/2060, cobrindo os 48 testes próprios do módulo — `participacao.spec.ts`,
+`exposicao.spec.ts`, `triagem-de-alias.spec.ts`, `engagement.service.spec.ts`,
+`engagement.controller.spec.ts`) prova o domínio puro e o service com dublê de repositório.
+
+O que ele **não** prova, e por isso existe `apps/api/test/integration/engagement.int-spec.ts`
+(5 casos, verdes):
+
+| o que o caso prova | por que só integração prova |
+|---|---|
+| os dois regimes na mesma tabela sem contaminação | exige `ConsentRecord` real com linhas de biometria e de engajamento lado a lado |
+| dois alunos com o mesmo alias `PENDING` convivem | o índice é **parcial**; dublê não tem índice |
+| o segundo `APPROVED` com o mesmo alias é recusado | a recusa vem do Postgres, não do código |
+| o mesmo alias aprovado em outro tenant é permitido | prova que a chave inclui `tenant_id` |
+| decisão vigente com `occurredAt` empatado | prova que o `orderBy` decide, não a ordem física |
+
+Mais 7 casos em `kiosk-engajamento.int-spec.ts`, incluindo a dedupe por `idempotencyKey` contada
+no banco — asserção só na resposta HTTP não distinguiria dedupe de regravação.
+
 ---
 
 ## 6. CI

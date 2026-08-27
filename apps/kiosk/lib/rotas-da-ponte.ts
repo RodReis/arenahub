@@ -39,6 +39,9 @@ const PERMITIDOS: readonly RegExp[] = [
   new RegExp(`^sessions/${ID_DE_SESSAO}/assessment$`),
   new RegExp(`^sessions/${ID_DE_SESSAO}/assessments$`),
   new RegExp(`^sessions/${ID_DE_SESSAO}/evolution$`),
+  /* PREFERENCIA DE ENGAJAMENTO E IDENTIDADE PUBLICA (F30, Task 8). */
+  new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/preferencias$`),
+  new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/perfil-publico$`),
 ];
 
 /**

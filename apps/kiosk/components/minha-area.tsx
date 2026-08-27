@@ -9,6 +9,7 @@ import { modulosVisiveis, type CardDeModulo } from '../lib/modulos';
 import { HistoricoDePagamentos } from './historico-de-pagamentos';
 import { IconeAtencao, IconeConfirmado } from './icones';
 import { Pagamento } from './pagamento';
+import { Preferencias } from './preferencias';
 import { AvaliacaoDoMes, Evolucao, HistoricoDeAvaliacoes } from './saude';
 
 /**
@@ -40,9 +41,13 @@ export function MinhaArea({
   const pendencia = sessao.plano.pendenciaEmCentavos;
 
   /*
-   * Deriva dos cards VISIVEIS, nunca de `Object.values(config.modulos)`:
-   * `ranking: true` numa config publicada acenderia a grade e ela viria
-   * vazia, porque `ranking` nao tem card ate a F33.
+   * Deriva dos cards VISIVEIS, nunca de `Object.values(config.modulos)`.
+   *
+   * A razao original era `ranking` ligado sem card -- a grade acendia vazia.
+   * A F30 entregou o card, entao esse caso especifico morreu; a derivacao
+   * continua porque a assimetria pode voltar: todo modulo novo nasce no
+   * contrato (`KioskConfig`) antes de ter tela, e contar flag em vez de card
+   * acenderia a grade cedo demais outra vez.
    */
   const cards = modulosVisiveis(config);
   const modulosLigados = cards.length > 0;
@@ -61,6 +66,8 @@ export function MinhaArea({
   if (aberto === 'evolucao') return <Evolucao sessao={sessao} aoVoltar={voltar} />;
   if (aberto === 'historicoDeAvaliacoes')
     return <HistoricoDeAvaliacoes sessao={sessao} aoVoltar={voltar} />;
+
+  if (aberto === 'ranking') return <Preferencias sessao={sessao} aoVoltar={voltar} />;
 
   if (aberto === 'historicoDePagamentos')
     return (

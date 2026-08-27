@@ -102,6 +102,7 @@ export type {
   AccessMode,
   AccessOutcome,
   AccessReason,
+  AliasRejectionReason,
   AssessmentStatus,
   BiometricAccessKind,
   BiometricAccessPurpose,

@@ -1,0 +1,40 @@
+/*
+ * Fila de moderação de apelido -- F30, Task 9.
+ *
+ * Cor, tipografia e raio saem de token `--ah-*` (DS-PAINEL.md): hex literal
+ * é proibido pela lint. Tela de trabalho em lote: densidade legível e ação
+ * rápida vencem ornamento.
+ */
+
+.sinais {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sinal {
+  padding: 2px 8px;
+  border-radius: var(--ah-radius-pill, 999px);
+  border: 1px solid var(--ah-border-subtle);
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  white-space: nowrap;
+}
+
+.semSinal {
+  color: var(--ah-text-secondary);
+  font-style: italic;
+}
+
+.acoes {
+  display: flex;
+  gap: 8px;
+}
+
+.formularioDeRejeicao {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}

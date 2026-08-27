@@ -3,9 +3,11 @@ import { Module } from '@nestjs/common';
 import { PersistenceModule } from '../../persistence/persistence.module.js';
 import { AccessQueryModule } from '../access-query/access-query.module.js';
 import { BillingModule } from '../billing/billing.module.js';
+import { EngagementModule } from '../engagement/engagement.module.js';
 import { HealthModule } from '../health/health.module.js';
 import { KioskAuthModule } from '../kiosk-auth/kiosk-auth.module.js';
 import { KioskAreaDoAlunoService } from './kiosk-area-do-aluno.service.js';
+import { KioskEngajamentoService } from './kiosk-engajamento.service.js';
 import { KioskPagamentoService } from './kiosk-pagamento.service.js';
 import { KioskSaudeService } from './kiosk-saude.service.js';
 import { KioskConfigService } from './kiosk-config.service.js';
@@ -25,9 +27,20 @@ import { KioskController } from './kiosk.controller.js';
  * `AccessQueryModule` entra pelo CASO DE USO PUBLICO dele
  * (`contarEntradasDaUnidade`), nunca por leitura direta de `access_events`:
  * modulo nao le tabela privada de outro (regra de arquitetura no 9).
+ *
+ * `EngagementModule` entra pela F30, Task 6, pela MESMA razao: o totem le e
+ * atualiza a preferencia de ranking e o alias publico chamando
+ * `EngagementService` -- nunca `ConsentRecord` nem `PublicProfile` direto.
  */
 @Module({
-  imports: [PersistenceModule, KioskAuthModule, AccessQueryModule, BillingModule, HealthModule],
+  imports: [
+    PersistenceModule,
+    KioskAuthModule,
+    AccessQueryModule,
+    BillingModule,
+    HealthModule,
+    EngagementModule,
+  ],
   controllers: [KioskController],
   providers: [
     KioskConfigService,
@@ -36,6 +49,7 @@ import { KioskController } from './kiosk.controller.js';
     KioskAreaDoAlunoService,
     KioskPagamentoService,
     KioskSaudeService,
+    KioskEngajamentoService,
   ],
 })
 export class KioskModule {}

@@ -33,13 +33,14 @@ describe('modulosVisiveis', () => {
     expect(cards.map((c) => c.campo)).toEqual(['avaliacao', 'pagamento']);
   });
 
-  it('não devolve card para ranking mesmo ligado — a F33 não foi entregue', () => {
-    // Trava 2 do ADR-042, Decisao 5. O campo existe no contrato desde a F50;
-    // o que o mantem invisivel e a ausencia na grade, e este teste e a guarda
-    // contra alguem "consertar" isso acrescentando a linha antes da F33.
+  it('devolve o card de ranking quando ligado — a F30 entregou a tela de preferência', () => {
+    // Trava 2 do ADR-042, Decisao 5: modulo sem fatia entregue nao aparece.
+    // Ate a F30 isso mantinha `ranking` fora da grade (a F33 nao tinha
+    // entregado); a F30 entrega `<Preferencias />`, o consumidor deste
+    // card, entao ele passa a aparecer como qualquer outro modulo ligado.
     const cards = modulosVisiveis(comModulos({ ranking: true }));
 
-    expect(cards).toEqual([]);
+    expect(cards.map((c) => c.campo)).toEqual(['ranking']);
   });
 
   it('mantém a ordem do DS-TOTEM §5.2, não a ordem das chaves do contrato', () => {
