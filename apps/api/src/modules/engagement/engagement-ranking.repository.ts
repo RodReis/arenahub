@@ -1,11 +1,12 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import type { RankingSnapshotStatus, StudentStatus } from '@arenahub/database';
+import type { RankingCategory, RankingSnapshotStatus, StudentStatus } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import type { SaldoParaClassificar } from './domain/classificacao.js';
 import type { DecisaoDeEngajamento } from './domain/participacao.js';
 import { abreviarNome, type IdentidadeEscolhida, type StatusDoPerfilPublico } from './domain/exposicao.js';
+import { inicioDaSemanaLocal } from './domain/semana-de-consistencia.js';
 
 /** Token de injecao da porta -- o modulo Nest liga isto ao repositorio Prisma. */
 export const PORTA_DE_RANKING = Symbol('PortaDeRanking');
@@ -14,6 +15,7 @@ export const PORTA_DE_RANKING = Symbol('PortaDeRanking');
 export interface SnapshotDeRanking {
   id: string;
   gymUnitId: string;
+  category: RankingCategory;
   status: RankingSnapshotStatus;
   publishedAt: Date | null;
   entries: readonly EntradaDeSnapshot[];
@@ -97,6 +99,7 @@ export interface PortaDeRanking {
     contexto: TenantContext,
     gymUnitId: string,
     localMonth: string,
+    category: RankingCategory,
   ): Promise<SaldoParaClassificar[]>;
   elegibilidadeDosAlunos(
     contexto: TenantContext,
@@ -116,6 +119,7 @@ export interface PortaDeRanking {
     contexto: TenantContext,
     gymUnitId: string,
     localMonth: string,
+    category: RankingCategory,
   ): Promise<SnapshotDeRanking | null>;
   entradasComExposicao(
     contexto: TenantContext,
@@ -132,6 +136,7 @@ export interface PortaDeRanking {
 export interface EntradaParaSalvarSnapshot {
   gymUnitId: string;
   localMonth: string;
+  category: RankingCategory;
   status: RankingSnapshotStatus;
   minimumCohort: number;
   eligibleCount: number;
@@ -153,29 +158,52 @@ export class EngagementRankingRepository implements PortaDeRanking {
   }
 
   /**
-   * Saldos de todos os alunos da unidade no mes -- associacao aluno/unidade
-   * via `Student.gymUnitId` (unidade de MATRICULA), nao via unidade das
-   * sessoes que geraram o movimento. Ver decisao registrada no relatorio da
-   * Task 8: o placar e uma feature social por unidade, e a unidade de
-   * matricula e o dado estavel; a unidade da sessao exigiria decidir
-   * "unidade dominante do mes" para aluno que treina em mais de uma, sem
-   * ganho que justifique a complexidade nesta fatia.
+   * O que classificar, na categoria pedida (F35, ADR-049 Decisao 4).
+   *
+   * Associacao aluno/unidade via `Student.gymUnitId` (unidade de MATRICULA),
+   * nao via unidade das sessoes: o placar e uma feature social por unidade, e
+   * a unidade de matricula e o dado estavel; a unidade da sessao exigiria
+   * decidir "unidade dominante do mes" para quem treina em mais de uma.
+   *
+   * A CATEGORIA SO MUDA A FONTE DOS PONTOS. `classificar()` continua a mesma
+   * funcao pura da F31: ela ordena `points` e desempata por `lastEntryAt` e
+   * `studentId`, sem saber o que o numero significa. Foi por isso que a
+   * categoria coube sem reescrever a classificacao.
    */
   async saldosDaUnidade(
     contexto: TenantContext,
     gymUnitId: string,
     localMonth: string,
+    category: RankingCategory = 'XP_DO_MES',
   ): Promise<SaldoParaClassificar[]> {
-    const saldos = await this.db.studentXpBalance.findMany({
+    if (category === 'XP_DO_MES') {
+      return this.db.studentXpBalance.findMany({
+        where: { tenantId: contexto.tenantId, localMonth, student: { gymUnitId } },
+        select: { studentId: true, points: true, lastEntryAt: true },
+      });
+    }
+
+    // FREQUENCIA e CONSISTENCIA saem da MESMA projecao: as sessoes da F24,
+    // ja deduplicadas por `(tenant, aluno, dia local, unidade, politica)` no
+    // indice unico. Contar sessao aqui e contar o que a catraca confirmou --
+    // nao ha segunda contagem de presenca no sistema, e criar uma seria criar
+    // uma verdade paralela capaz de divergir.
+    const sessoes = await this.db.studentAttendanceSession.findMany({
       where: {
         tenantId: contexto.tenantId,
-        localMonth,
-        student: { gymUnitId },
+        gymUnitId,
+        // `sessionDate` e `@db.Date` no fuso local da unidade -- comparar por
+        // prefixo AAAA-MM aqui repetiria a conversao que a F24 ja fez.
+        // Por isso a janela vem em Date, montada a partir do mes local.
+        sessionDate: janelaDoMes(localMonth),
       },
-      select: { studentId: true, points: true, lastEntryAt: true },
+      select: { studentId: true, sessionDate: true },
+      orderBy: { sessionDate: 'asc' },
     });
 
-    return saldos;
+    return category === 'FREQUENCIA'
+      ? contarSessoes(sessoes)
+      : contarSemanasDistintas(sessoes);
   }
 
   /**
@@ -241,15 +269,21 @@ export class EngagementRankingRepository implements PortaDeRanking {
     contexto: TenantContext,
     entrada: EntradaParaSalvarSnapshot,
   ): Promise<SnapshotDeRanking> {
-    // Regera o DRAFT/WITHHELD existente: `@@unique([tenantId, gymUnitId,
-    // localMonth])` permite so um snapshot por unidade e mes. O PUBLISHED
-    // nao chega aqui de novo -- quem barra republicar e `publicarSnapshot`.
+    // Regera o DRAFT/WITHHELD existente da mesma CATEGORIA:
+    // `@@unique([tenantId, gymUnitId, localMonth, category])` permite um
+    // snapshot por unidade, mes e categoria. O PUBLISHED nao chega aqui de
+    // novo -- quem barra republicar e `publicarSnapshot`.
+    //
+    // A categoria no `where` NAO e detalhe: sem ela, gerar o placar de
+    // frequencia de agosto apagaria o rascunho de XP de agosto, e o operador
+    // so descobriria ao tentar publicar e nao achar.
     const criado = await this.db.$transaction(async (tx) => {
       await tx.rankingSnapshot.deleteMany({
         where: {
           tenantId: contexto.tenantId,
           gymUnitId: entrada.gymUnitId,
           localMonth: entrada.localMonth,
+          category: entrada.category,
           status: { in: ['DRAFT', 'WITHHELD'] },
         },
       });
@@ -259,6 +293,7 @@ export class EngagementRankingRepository implements PortaDeRanking {
           tenantId: contexto.tenantId,
           gymUnitId: entrada.gymUnitId,
           localMonth: entrada.localMonth,
+          category: entrada.category,
           status: entrada.status,
           minimumCohort: entrada.minimumCohort,
           eligibleCount: entrada.eligibleCount,
@@ -346,9 +381,10 @@ export class EngagementRankingRepository implements PortaDeRanking {
     contexto: TenantContext,
     gymUnitId: string,
     localMonth: string,
+    category: RankingCategory = 'XP_DO_MES',
   ): Promise<SnapshotDeRanking | null> {
     const snapshot = await this.db.rankingSnapshot.findFirst({
-      where: { tenantId: contexto.tenantId, gymUnitId, localMonth, status: 'PUBLISHED' },
+      where: { tenantId: contexto.tenantId, gymUnitId, localMonth, category, status: 'PUBLISHED' },
       include: { entries: true },
     });
 
@@ -460,6 +496,7 @@ export class EngagementRankingRepository implements PortaDeRanking {
 function paraSnapshot(linha: {
   id: string;
   gymUnitId: string;
+  category: RankingCategory;
   status: RankingSnapshotStatus;
   publishedAt: Date | null;
   entries: { studentId: string; position: number; points: number }[];
@@ -467,6 +504,7 @@ function paraSnapshot(linha: {
   return {
     id: linha.id,
     gymUnitId: linha.gymUnitId,
+    category: linha.category,
     status: linha.status,
     publishedAt: linha.publishedAt,
     entries: linha.entries.map((entrada) => ({
@@ -475,4 +513,82 @@ function paraSnapshot(linha: {
       points: entrada.points,
     })),
   };
+}
+
+/**
+ * Janela `[primeiro dia, primeiro dia do mes seguinte)` do mes local.
+ *
+ * Meia-aberta de proposito: `lte` no ultimo dia depende de o `@db.Date` nao
+ * carregar hora, e basta um registro com hora para o ultimo dia do mes sumir
+ * do placar. `lt` no primeiro dia do mes seguinte nao tem essa aresta.
+ */
+function janelaDoMes(localMonth: string): { gte: Date; lt: Date } {
+  const [ano, mes] = localMonth.split('-').map(Number) as [number, number];
+
+  return {
+    gte: new Date(Date.UTC(ano, mes - 1, 1)),
+    lt: new Date(Date.UTC(ano, mes, 1)),
+  };
+}
+
+/** `AAAA-MM-DD` do `@db.Date`, sem reconverter fuso -- a F24 ja gravou local. */
+function diaLocal(sessionDate: Date): string {
+  return sessionDate.toISOString().slice(0, 10);
+}
+
+interface SessaoParaContagem {
+  studentId: string;
+  sessionDate: Date;
+}
+
+/** Quantas sessoes confirmadas o aluno teve no mes -- categoria FREQUENCIA. */
+function contarSessoes(sessoes: readonly SessaoParaContagem[]): SaldoParaClassificar[] {
+  const porAluno = new Map<string, { points: number; lastEntryAt: Date }>();
+
+  for (const sessao of sessoes) {
+    const atual = porAluno.get(sessao.studentId);
+    // `lastEntryAt` e o desempate 2 de `classificar()`: quem chegou ao numero
+    // PRIMEIRO ganha, entao guarda-se a sessao mais RECENTE de cada aluno --
+    // e ela que diz quando ele fechou a contagem do mes.
+    porAluno.set(sessao.studentId, {
+      points: (atual?.points ?? 0) + 1,
+      lastEntryAt:
+        atual && atual.lastEntryAt > sessao.sessionDate ? atual.lastEntryAt : sessao.sessionDate,
+    });
+  }
+
+  return [...porAluno].map(([studentId, dado]) => ({ studentId, ...dado }));
+}
+
+/**
+ * Em quantas SEMANAS DISTINTAS o aluno treinou no mes -- categoria
+ * CONSISTENCIA.
+ *
+ * Premia regularidade, nao volume: quem treina 3x por semana toda semana
+ * ganha de quem treina 15x numa semana so e some. Reusa
+ * `inicioDaSemanaLocal()` da F32 em vez de recalcular semana aqui -- duas
+ * definicoes de "que semana e esta" divergiriam na virada de ano.
+ */
+function contarSemanasDistintas(
+  sessoes: readonly SessaoParaContagem[],
+): SaldoParaClassificar[] {
+  const porAluno = new Map<string, { semanas: Set<string>; lastEntryAt: Date }>();
+
+  for (const sessao of sessoes) {
+    const atual = porAluno.get(sessao.studentId) ?? {
+      semanas: new Set<string>(),
+      lastEntryAt: sessao.sessionDate,
+    };
+
+    atual.semanas.add(inicioDaSemanaLocal(diaLocal(sessao.sessionDate)));
+    if (sessao.sessionDate > atual.lastEntryAt) atual.lastEntryAt = sessao.sessionDate;
+
+    porAluno.set(sessao.studentId, atual);
+  }
+
+  return [...porAluno].map(([studentId, dado]) => ({
+    studentId,
+    points: dado.semanas.size,
+    lastEntryAt: dado.lastEntryAt,
+  }));
 }

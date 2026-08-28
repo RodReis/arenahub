@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { EntradaPublicaDoPlacar } from '@arenahub/api-contracts';
+import type { RankingCategory } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { classificar, type SaldoParaClassificar } from './domain/classificacao.js';
@@ -71,10 +72,11 @@ export class EngagementRankingService {
     gymUnitId: string,
     localMonth: string,
     agora: Date,
+    category: RankingCategory = 'XP_DO_MES',
   ): Promise<SnapshotDeRanking> {
     const [minimumCohort, saldos] = await Promise.all([
       this.porta.coorteMinima(contexto),
-      this.porta.saldosDaUnidade(contexto, gymUnitId, localMonth),
+      this.porta.saldosDaUnidade(contexto, gymUnitId, localMonth, category),
     ]);
 
     const elegiveis = await this.filtrarElegiveis(contexto, saldos);
@@ -84,6 +86,7 @@ export class EngagementRankingService {
       return this.porta.salvarSnapshot(contexto, {
         gymUnitId,
         localMonth,
+        category,
         status: 'WITHHELD',
         minimumCohort,
         eligibleCount,
@@ -97,6 +100,7 @@ export class EngagementRankingService {
     return this.porta.salvarSnapshot(contexto, {
       gymUnitId,
       localMonth,
+      category,
       status: 'DRAFT',
       minimumCohort,
       eligibleCount,
@@ -159,8 +163,9 @@ export class EngagementRankingService {
     contexto: TenantContext,
     gymUnitId: string,
     localMonth: string,
+    category: RankingCategory = 'XP_DO_MES',
   ): Promise<readonly EntradaPublicaDoPlacar[]> {
-    const snapshot = await this.porta.snapshotPublicado(contexto, gymUnitId, localMonth);
+    const snapshot = await this.porta.snapshotPublicado(contexto, gymUnitId, localMonth, category);
 
     if (!snapshot) return [];
 
@@ -214,7 +219,7 @@ export class EngagementRankingService {
 
     const [minimumCohort, saldos] = await Promise.all([
       this.porta.coorteMinima(contexto),
-      this.porta.saldosDaUnidade(contexto, gymUnitId, localMonth),
+      this.porta.saldosDaUnidade(contexto, gymUnitId, localMonth, 'XP_DO_MES'),
     ]);
 
     const elegiveis = await this.filtrarElegiveis(contexto, saldos);
@@ -273,7 +278,7 @@ export class EngagementRankingService {
     localMonth: string,
     studentId: string,
   ): Promise<EntradaPublicaDoPlacar | null> {
-    const snapshot = await this.porta.snapshotPublicado(contexto, gymUnitId, localMonth);
+    const snapshot = await this.porta.snapshotPublicado(contexto, gymUnitId, localMonth, 'XP_DO_MES');
     if (!snapshot) return null;
 
     const entrada = snapshot.entries.find((item) => item.studentId === studentId);
@@ -308,7 +313,7 @@ export class EngagementRankingService {
   ): Promise<EntradaPublicaDoPlacar | null> {
     const [minimumCohort, saldos, [exposicao]] = await Promise.all([
       this.porta.coorteMinima(contexto),
-      this.porta.saldosDaUnidade(contexto, gymUnitId, localMonth),
+      this.porta.saldosDaUnidade(contexto, gymUnitId, localMonth, 'XP_DO_MES'),
       this.porta.exposicaoDosAlunos(contexto, [studentId]),
     ]);
 
