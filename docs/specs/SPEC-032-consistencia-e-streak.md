@@ -6,7 +6,7 @@
 | **MVP** | 5 |
 | **Slice do PRD** | **5.3** — `docs/prd/academia/MVP-05-engagement.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-05-03-consistency-streak.md` |
-| **Status** | `entregue` — 28/08/2026 |
+| **Status** | `entregue` — 28/08/2026, PR [#214](https://github.com/RodReis/arenahub/pull/214) |
 | **ADRs que bloqueiam** | nenhum |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M5-FR/BR/NFR/AC`) e os
