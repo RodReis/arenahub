@@ -17,6 +17,20 @@ import estilos from './formulario-de-configuracao.module.css';
  * exposicao (aparecer ou nao no ranking, e com que nome). O placar em si
  * continua sendo F33, e nao muda nada aqui quando chegar: o modulo ja
  * estara ligavel.
+ *
+ * `desafios` ENTRA na F34 (ADR-048): a fatia entrega a tela do aluno no
+ * totem, entao o modulo passa a existir aqui.
+ *
+ * `xp` ENTRA aqui em 28/08/2026, corrigindo uma falta da F31: a fatia
+ * entregou a tela `Meus pontos` no totem E o placar publico no hero, mas
+ * ninguem acrescentou o modulo a esta lista -- entao ele so podia ser ligado
+ * por escrita direta no banco.
+ *
+ * ⚠️ E o modulo que MAIS custa esquecer: `kiosk-config.service.ts` so calcula
+ * o placar publico quando `modulos.xp` esta ligado. Com ele desligado o
+ * heartbeat devolve `placar: []`, o hero tira o bloco de ranking do rodizio,
+ * e a tela publica fica sem placar sem nenhum erro em lugar nenhum. Foi
+ * exatamente o que o PI relatou em 28/08/2026 ("nem o ranque").
  */
 const MODULOS_DISPONIVEIS = [
   {
@@ -48,6 +62,16 @@ const MODULOS_DISPONIVEIS = [
     campo: 'ranking',
     rotulo: 'Minhas preferências',
     descricao: 'Aparecer ou não no ranking, e com que nome. O placar em si vem depois.',
+  },
+  {
+    campo: 'xp',
+    rotulo: 'Meus pontos',
+    descricao: 'XP e conquistas do aluno — e o placar do mês na tela pública.',
+  },
+  {
+    campo: 'desafios',
+    rotulo: 'Desafios',
+    descricao: 'Participar de desafios abertos e acompanhar o próprio progresso.',
   },
 ] as const satisfies readonly {
   campo: keyof KioskConfig['modulos'];

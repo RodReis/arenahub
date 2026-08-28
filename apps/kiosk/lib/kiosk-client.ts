@@ -462,3 +462,99 @@ export function atualizarPerfilPublico(
     { identityChoice, alias, version },
   );
 }
+
+/* ---------------------------------------------------------------------
+ * DESAFIOS (F34, Slice 5.5, ADR-048).
+ *
+ * OPT-IN: `inscrito: false` e o padrao. Ausencia de adesao significa NAO
+ * INSCRITO -- o oposto do ranking, onde ausencia de decisao significa
+ * PARTICIPA. As duas telas vivem lado a lado nesta area, entao a diferenca
+ * importa aqui tambem.
+ *
+ * `avisos` NAO e notificacao enviada: nao ha canal externo nesta fatia
+ * (ADR-048, Decisao 3). E o que o aluno ve quando chega ao totem.
+ * --------------------------------------------------------------------- */
+
+export interface DesafioDoTotem {
+  readonly id: string;
+  readonly title: string;
+  readonly meta: number;
+  readonly progresso: number;
+  readonly inscrito: boolean;
+  readonly startsOn: string;
+  readonly endsOn: string;
+}
+
+export interface AvisoDeDesafio {
+  readonly id: string;
+  readonly challengeTitle: string;
+  readonly kind: 'DISPONIVEL' | 'CONCLUIDO' | 'ENCERRADO_SEM_META';
+  readonly lido: boolean;
+}
+
+export interface DesafiosDoTotem {
+  readonly desafios: readonly DesafioDoTotem[];
+  readonly avisos: readonly AvisoDeDesafio[];
+}
+
+export function carregarDesafios(sessionId: string, token: string) {
+  return daSessao<DesafiosDoTotem>(`${daSessaoId(sessionId)}/engajamento/desafios`, token);
+}
+
+export function entrarNoDesafio(sessionId: string, token: string, challengeId: string) {
+  return daSessao<{ ok: boolean }>(
+    `${daSessaoId(sessionId)}/engajamento/desafios/${encodeURIComponent(challengeId)}/join`,
+    token,
+    { method: 'POST' },
+  );
+}
+
+/**
+ * Sair do desafio. A adesao vira `LEFT` -- a linha NAO e apagada
+ * (`M5-FR-014`), e o aluno pode voltar depois.
+ */
+export async function sairDoDesafio(sessionId: string, token: string, challengeId: string) {
+  try {
+    const resposta = await fetch(
+      `/api/kiosk/${daSessaoId(sessionId)}/engajamento/desafios/${encodeURIComponent(challengeId)}/join`,
+      {
+        method: 'DELETE',
+        headers: { 'x-session-token': token },
+        cache: 'no-store',
+      },
+    );
+
+    return resposta.ok ? ((await resposta.json()) as { ok: boolean }) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Marca avisos como lidos -- chamado DEPOIS de exibir, nunca junto da
+ * leitura da lista: marcar no carregamento faria o aviso sumir de quem so
+ * passou pela tela sem ler.
+ */
+export async function marcarAvisosComoLidos(
+  sessionId: string,
+  token: string,
+  ids: readonly string[],
+) {
+  if (ids.length === 0) return null;
+
+  try {
+    const resposta = await fetch(
+      `/api/kiosk/${daSessaoId(sessionId)}/engajamento/desafios/avisos/lidos`,
+      {
+        method: 'POST',
+        headers: { 'x-session-token': token, 'content-type': 'application/json' },
+        body: JSON.stringify({ ids }),
+        cache: 'no-store',
+      },
+    );
+
+    return resposta.ok ? ((await resposta.json()) as { ok: boolean }) : null;
+  } catch {
+    return null;
+  }
+}

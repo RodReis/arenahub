@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BlocoDaTelaPublica } from '@arenahub/api-contracts';
+import { TIPOS_DE_BLOCO, type BlocoDaTelaPublica } from '@arenahub/api-contracts';
 
 import { blocoNovo, mover, remover, substituir, tiposDisponiveis } from './blocos';
 
@@ -79,10 +79,15 @@ describe('remover', () => {
 
 describe('tiposDisponiveis', () => {
   it('esconde os tipos ja usados -- um de cada', () => {
-    expect(tiposDisponiveis(tres())).toEqual(['MATERIAL', 'INFORMACOES']);
+    expect(tiposDisponiveis(tres())).toEqual(['MATERIAL', 'INFORMACOES', 'DESAFIO']);
   });
 
-  it('lista vazia oferece os cinco', () => {
-    expect(tiposDisponiveis([])).toHaveLength(5);
+  /*
+   * DERIVADO DE `TIPOS_DE_BLOCO`, nao um numero cravado: a versao anterior
+   * dizia "os cinco" e quebrou quando a F34 acrescentou o sexto tipo. O que
+   * o teste quer afirmar e "lista vazia oferece TODOS", nao "oferece 5".
+   */
+  it('lista vazia oferece todos os tipos do contrato', () => {
+    expect(tiposDisponiveis([])).toHaveLength(TIPOS_DE_BLOCO.length);
   });
 });

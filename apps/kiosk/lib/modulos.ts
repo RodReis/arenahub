@@ -27,6 +27,11 @@ export interface CardDeModulo {
  * anterior a F31) -- posicionado logo depois de `ranking` por serem os dois
  * cards de engajamento, decisao registrada no relatorio da Task 10, nao no
  * documento de design.
+ *
+ * `desafios` ENTRA na F34 (ADR-048), no fim do bloco de engajamento pela
+ * mesma razao. E o UNICO card de engajamento com natureza `transacao`:
+ * inscrever-se MUDA ESTADO (cria adesao), diferente de ranking e XP, que so
+ * leem. `DS-TOTEM.md` §5.2 e anterior a esta fatia e nao a previa.
  */
 const GRADE: readonly CardDeModulo[] = [
   {
@@ -70,6 +75,12 @@ const GRADE: readonly CardDeModulo[] = [
     titulo: 'Meus pontos',
     destino: 'XP, conquistas e posição',
     natureza: 'leitura',
+  },
+  {
+    campo: 'desafios',
+    titulo: 'Desafios',
+    destino: 'Participe e acompanhe',
+    natureza: 'transacao',
   },
 ];
 

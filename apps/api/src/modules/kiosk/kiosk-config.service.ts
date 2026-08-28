@@ -7,6 +7,7 @@ import {
 
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { AccessQueryRepository } from '../access-query/access-query.repository.js';
+import { EngagementChallengesService } from '../engagement/engagement-challenges.service.js';
 import { EngagementRankingService } from '../engagement/engagement-ranking.service.js';
 import { mesLocal } from '../engagement/domain/movimento-de-xp.js';
 import type { ContextoDoKiosk } from '../kiosk-auth/kiosk-auth.service.js';
@@ -44,12 +45,30 @@ export interface DadosDoHeartbeat {
   readonly localTimeMs: number;
 }
 
+/**
+ * `AAAA-MM-DD` no fuso da academia -- o formato que o dominio de desafios
+ * consome (texto entra, texto sai; nunca `Date`).
+ *
+ * `en-CA` porque o formato dele JA e `AAAA-MM-DD`: montar na mao a partir de
+ * `getFullYear`/`getMonth` usaria o fuso do PROCESSO, e a virada do dia
+ * aconteceria na hora errada.
+ */
+function diaLocalDaUnidade(agora: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: FUSO_DA_ACADEMIA,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(agora);
+}
+
 @Injectable()
 export class KioskConfigService {
   constructor(
     private readonly db: PrismaService,
     private readonly eventos: AccessQueryRepository,
     private readonly ranking: EngagementRankingService,
+    private readonly desafios: EngagementChallengesService,
   ) {}
 
   /**
@@ -193,7 +212,7 @@ export class KioskConfigService {
   ): Promise<IndicadoresDaUnidade> {
     const escopo = { tenantId: contexto.tenantId, gymUnitId: contexto.gymUnitId };
 
-    const [checkinsDeHoje, treinandoAgora, placar] = await Promise.all([
+    const [checkinsDeHoje, treinandoAgora, placar, desafio] = await Promise.all([
       this.eventos.contarEntradasDaUnidade({
         ...escopo,
         de: inicioDoDiaLocal(agora),
@@ -205,19 +224,43 @@ export class KioskConfigService {
         ate: agora,
       }),
       config.modulos.xp ? this.placarPublico(contexto, agora) : Promise.resolve([]),
+      /*
+       * Gateado por `modulos.desafios`, como o placar por `modulos.xp`:
+       * modulo desligado devolve `null` e o bloco sai do carrossel, sem a
+       * tela publica precisar saber por que.
+       */
+      config.modulos.desafios
+        ? this.desafios.paraVitrine(
+            this.tenantContext(contexto),
+            contexto.gymUnitId,
+            diaLocalDaUnidade(agora),
+          )
+        : Promise.resolve(null),
     ]);
 
-    return { checkinsDeHoje, treinandoAgora, placar };
+    return { checkinsDeHoje, treinandoAgora, placar, desafio };
   }
 
-  private async placarPublico(contexto: ContextoDoKiosk, agora: Date) {
-    const tenantContext: TenantContext = {
+  /**
+   * `ContextoDoKiosk` -> `TenantContext`, para chamar caso de uso publico de
+   * outro modulo (regra de arquitetura 9).
+   *
+   * Extraido do corpo de `placarPublico`, que ja o montava inline, quando a
+   * vitrine de desafios passou a precisar do mesmo objeto -- duas copias
+   * divergiriam na primeira mudanca.
+   */
+  private tenantContext(contexto: ContextoDoKiosk): TenantContext {
+    return {
       tenantId: contexto.tenantId,
       actorId: SEM_USUARIO,
       sessionId: contexto.kioskDeviceId,
       permissions: new Set<string>(),
       allowedUnitIds: new Set([contexto.gymUnitId]),
     };
+  }
+
+  private async placarPublico(contexto: ContextoDoKiosk, agora: Date) {
+    const tenantContext = this.tenantContext(contexto);
 
     const placar = await this.ranking.placarAoVivo(
       tenantContext,

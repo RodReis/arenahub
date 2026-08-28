@@ -26,6 +26,13 @@ export interface AlunoDaSessao {
   readonly contexto: TenantContext;
   readonly studentId: string;
   readonly config: KioskConfig;
+  /**
+   * Unidade do TOTEM (F34). Ja vive em `contexto.allowedUnitIds`, mas exposta
+   * aqui porque quem consome precisa do valor, nao do conjunto -- e
+   * `[...allowedUnitIds][0]` em cada chamador seria a mesma extracao repetida,
+   * com a ordem de um `Set` decidindo qual unidade sai.
+   */
+  readonly gymUnitId: string;
 }
 
 /**
@@ -74,6 +81,7 @@ export class KioskAreaDoAlunoService {
       contexto: this.tenantContext(contexto, sessao.id),
       studentId: sessao.studentId,
       config,
+      gymUnitId: contexto.gymUnitId,
     };
   }
 

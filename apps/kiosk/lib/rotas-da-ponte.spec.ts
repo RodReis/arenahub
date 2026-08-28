@@ -69,3 +69,42 @@ describe('allowlist da ponte assinada', () => {
     expect(resolverCaminhoDaPonte(caminho)).toBeNull();
   });
 });
+
+describe('desafios (F34)', () => {
+  const SESSAO = '11111111-1111-4111-8111-111111111111';
+  const DESAFIO = '22222222-2222-4222-8222-222222222222';
+
+  it('permite listar desafios da sessao', () => {
+    expect(resolverCaminhoDaPonte(`/api/kiosk/sessions/${SESSAO}/engajamento/desafios`)).toBe(
+      `/api/v1/kiosk/sessions/${SESSAO}/engajamento/desafios`,
+    );
+  });
+
+  it('permite entrar e sair de um desafio', () => {
+    expect(
+      resolverCaminhoDaPonte(`/api/kiosk/sessions/${SESSAO}/engajamento/desafios/${DESAFIO}/join`),
+    ).toBe(`/api/v1/kiosk/sessions/${SESSAO}/engajamento/desafios/${DESAFIO}/join`);
+  });
+
+  it('permite marcar avisos como lidos', () => {
+    expect(
+      resolverCaminhoDaPonte(`/api/kiosk/sessions/${SESSAO}/engajamento/desafios/avisos/lidos`),
+    ).toBe(`/api/v1/kiosk/sessions/${SESSAO}/engajamento/desafios/avisos/lidos`);
+  });
+
+  /**
+   * O `challengeId` e ancorado como UUID de proposito: `[^/]+` deixaria
+   * passar caminho arbitrario depois de `desafios/`.
+   */
+  it('recusa challengeId que nao e UUID', () => {
+    expect(
+      resolverCaminhoDaPonte(`/api/kiosk/sessions/${SESSAO}/engajamento/desafios/../../admin/join`),
+    ).toBeNull();
+  });
+
+  it('recusa sub-caminho de desafios fora da lista', () => {
+    expect(
+      resolverCaminhoDaPonte(`/api/kiosk/sessions/${SESSAO}/engajamento/desafios/${DESAFIO}/apagar`),
+    ).toBeNull();
+  });
+});

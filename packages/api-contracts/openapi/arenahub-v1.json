@@ -2044,6 +2044,327 @@
         ]
       }
     },
+    "/api/v1/engagement/challenges/templates": {
+      "get": {
+        "operationId": "EngagementChallengesController_templates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "itens"
+                  ],
+                  "properties": {
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "code",
+                          "version",
+                          "name",
+                          "maxSessoesPorSemana",
+                          "maxJanelaEmDias"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "maxSessoesPorSemana": {
+                            "type": "integer"
+                          },
+                          "maxJanelaEmDias": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementChallenges"
+        ]
+      }
+    },
+    "/api/v1/engagement/challenges": {
+      "get": {
+        "operationId": "EngagementChallengesController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "itens"
+                  ],
+                  "properties": {
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "title",
+                          "status",
+                          "targetValue",
+                          "startsOn",
+                          "endsOn",
+                          "templateName",
+                          "participantes"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "DRAFT",
+                              "ACTIVE",
+                              "CLOSED",
+                              "CANCELLED"
+                            ]
+                          },
+                          "targetValue": {
+                            "type": "integer"
+                          },
+                          "startsOn": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                          },
+                          "endsOn": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                          },
+                          "templateName": {
+                            "type": "string"
+                          },
+                          "participantes": {
+                            "type": "integer"
+                          },
+                          "gymUnitId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementChallenges"
+        ]
+      },
+      "post": {
+        "operationId": "EngagementChallengesController_criar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementChallenges"
+        ]
+      }
+    },
+    "/api/v1/engagement/challenges/{id}": {
+      "patch": {
+        "operationId": "EngagementChallengesController_editar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementChallenges"
+        ]
+      },
+      "delete": {
+        "operationId": "EngagementChallengesController_excluir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementChallenges"
+        ]
+      }
+    },
+    "/api/v1/engagement/challenges/{id}/cancel": {
+      "post": {
+        "operationId": "EngagementChallengesController_cancelar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementChallenges"
+        ]
+      }
+    },
+    "/api/v1/engagement/challenges/{id}/activate": {
+      "post": {
+        "operationId": "EngagementChallengesController_ativar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementChallenges"
+        ]
+      }
+    },
     "/api/v1/edge/heartbeat": {
       "post": {
         "operationId": "EdgeController_heartbeat",
@@ -3171,6 +3492,243 @@
                           }
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/engajamento/desafios": {
+      "get": {
+        "operationId": "KioskController_listarDesafios",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "desafios",
+                    "avisos"
+                  ],
+                  "properties": {
+                    "desafios": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "title",
+                          "meta",
+                          "progresso",
+                          "inscrito",
+                          "startsOn",
+                          "endsOn"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "meta": {
+                            "type": "integer"
+                          },
+                          "progresso": {
+                            "type": "integer"
+                          },
+                          "inscrito": {
+                            "type": "boolean"
+                          },
+                          "startsOn": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                          },
+                          "endsOn": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                          }
+                        }
+                      }
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "challengeTitle",
+                          "kind",
+                          "lido"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "challengeTitle": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "DISPONIVEL",
+                              "CONCLUIDO",
+                              "ENCERRADO_SEM_META"
+                            ]
+                          },
+                          "lido": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/engajamento/desafios/{challengeId}/join": {
+      "post": {
+        "operationId": "KioskController_entrarNoDesafio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      },
+      "delete": {
+        "operationId": "KioskController_sairDoDesafio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/engajamento/desafios/avisos/lidos": {
+      "post": {
+        "operationId": "KioskController_marcarAvisosComoLidos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
                     }
                   }
                 }

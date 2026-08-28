@@ -23,6 +23,7 @@ export const TIPOS_DE_BLOCO = [
   'MATERIAL',
   'INSTAGRAM',
   'INFORMACOES',
+  'DESAFIO',
 ] as const;
 
 export type TipoDeBloco = (typeof TIPOS_DE_BLOCO)[number];
@@ -121,12 +122,29 @@ const blocoInformacoesSchema = blocoBaseSchema.extend({
   mostrarTreinandoAgora: z.boolean(),
 });
 
+/**
+ * Desafio em campanha -- F34, emenda (2) do ADR-048.
+ *
+ * NAO CARREGA O DESAFIO: nem titulo, nem meta, nem prazo. Igual ao bloco de
+ * INFORMACOES e pelo mesmo motivo -- o desafio muda de dia (um termina,
+ * outro abre) e congelar o titulo numa versao publicada obrigaria o gerente
+ * a republicar a config toda vez. O conteudo vem do heartbeat, em
+ * `IndicadoresDaUnidade.desafio`, e expira com ele.
+ *
+ * O bloco so diz QUE a academia quer mostrar desafio na parede.
+ */
+const blocoDesafioSchema = blocoBaseSchema.extend({
+  tipo: z.literal('DESAFIO'),
+  titulo: z.string().min(1),
+});
+
 export const blocoDaTelaPublicaSchema = z.discriminatedUnion('tipo', [
   blocoVideoSchema,
   blocoEventosSchema,
   blocoMaterialSchema,
   blocoInstagramSchema,
   blocoInformacoesSchema,
+  blocoDesafioSchema,
 ]);
 
 export type BlocoDaTelaPublica = z.infer<typeof blocoDaTelaPublicaSchema>;
@@ -155,10 +173,35 @@ export type EntradaPublicaDoPlacar = z.infer<typeof entradaPublicaDoPlacarSchema
  * nunca `studentId`. Modulo `xp` desligado ou placar retido chega como
  * lista vazia, nunca ausente.
  */
+/**
+ * O desafio que a tela publica anuncia -- o que TERMINA PRIMEIRO entre os
+ * abertos hoje.
+ *
+ * SEM NOME DE ALUNO e SEM CONTAGEM DE INSCRITOS (ADR-048, emenda 2):
+ * `M3.5-BR-001` proibe dado de aluno na tela publica, e com a inscricao
+ * automatica o numero de inscritos e a base inteira da academia -- dizer
+ * "293 participando" na parede nao informa nada e sugere um engajamento que
+ * ninguem escolheu.
+ *
+ * `null` = nenhum desafio aberto, e ai o bloco SAI do carrossel. Bloco vazio
+ * na parede e pior que bloco ausente -- mesma regra do placar abaixo da
+ * coorte minima.
+ */
+export const desafioPublicoSchema = z.object({
+  titulo: z.string(),
+  meta: z.number().int().positive(),
+  /** Dias ate o fim, ja calculado no SERVIDOR no fuso da unidade. */
+  diasRestantes: z.number().int().nonnegative(),
+});
+
+export type DesafioPublico = z.infer<typeof desafioPublicoSchema>;
+
 export const indicadoresDaUnidadeSchema = z.object({
   checkinsDeHoje: z.number().int().nonnegative(),
   treinandoAgora: z.number().int().nonnegative(),
   placar: z.array(entradaPublicaDoPlacarSchema),
+  /** `null` quando nao ha desafio aberto -- o bloco sai do carrossel. */
+  desafio: desafioPublicoSchema.nullable(),
 });
 
 export type IndicadoresDaUnidade = z.infer<typeof indicadoresDaUnidadeSchema>;
@@ -199,6 +242,15 @@ export const kioskConfigSchema = z.object({
     historicoDeAvaliacoes: z.boolean(),
     ranking: z.boolean(),
     xp: z.boolean(),
+    /**
+     * Desafios na area do aluno (F34, Slice 5.5, ADR-048).
+     *
+     * Config ja publicada NAO tem esta chave, e nao precisa ter: `sobrepor`
+     * mescla a camada sobre o padrao, e ausente herda `false`. Nenhuma
+     * republicacao e exigida de quem ja configurou o totem -- o modulo nasce
+     * desligado, como todos os outros (`M5-BR-001`).
+     */
+    desafios: z.boolean(),
   }),
   /**
    * Tela publica (F51). A ORDEM DO ARRAY E A ORDEM DO RODIZIO -- nao ha
@@ -303,6 +355,7 @@ export const CONFIG_PADRAO_DO_TOTEM: KioskConfig = {
     historicoDeAvaliacoes: false,
     ranking: false,
     xp: false,
+    desafios: false,
   },
   /**
    * Nenhum bloco por padrao. O `DS-TOTEM.md` §4 ja cobre este estado -- "se

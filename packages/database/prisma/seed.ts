@@ -436,6 +436,7 @@ async function semear(): Promise<void> {
     await semearAceiteDaAnalise(db, tenant.id);
     await semearDocumentosDeEngajamento(db, tenant.id);
     await semearCatalogoDeXpEConquistas(db, tenant.id);
+    await semearTemplatesDeDesafio(db, tenant.id);
 
     console.info(`[seed] tenant "${TENANT.slug}" pronto, com dono ${DONO.email}.`);
   } finally {
@@ -658,6 +659,75 @@ async function semearCatalogoDeXpEConquistas(
 }
 
 /**
+ * Catalogo v1 de templates de desafio (F34, Slice 5.5, ADR-048).
+ *
+ * O TEMPLATE E O LIMITE DE SEGURANCA (`M5-BR-011`): a secretaria escolhe
+ * template, janela e meta, e o teto de frequencia vem daqui -- ela nao
+ * escreve regra. Sem template no banco nao ha desafio a criar, entao este
+ * seed nao e conveniencia de demonstracao: e o catalogo minimo do produto.
+ *
+ * Numeros propostos pelo Code, mesma nota do catalogo de XP: o PI revisa
+ * depois, e revisar e CRIAR VERSAO NOVA -- nunca editar esta (`M5-BR-009`),
+ * porque desafio em curso aponta para a VERSAO e nao para o codigo.
+ *
+ * Idempotente pela chave natural (`tenantId`, `code`, `version`).
+ */
+async function semearTemplatesDeDesafio(
+  db: Awaited<ReturnType<typeof criarPrismaClient>>,
+  tenantId: string,
+): Promise<void> {
+  const VIGENCIA_INICIAL = new Date('2026-01-01T00:00:00.000Z');
+
+  /*
+   * Os tres tetos sao deliberadamente diferentes, e a diferenca e o ponto:
+   * um teto unico para todos os templates tornaria o campo decorativo.
+   *
+   * `maxSessoesPorSemana` 3/4/5 cobre iniciante, intermediario e avancado --
+   * 6 ou 7 seria treino sem dia de descanso, que e exatamente o que o
+   * `M5-BR-011` existe para impedir.
+   */
+  const TEMPLATES = [
+    {
+      code: 'constancia-iniciante',
+      name: 'Constancia iniciante',
+      maxSessionsPerWeek: 3,
+      maxWindowDays: 30,
+    },
+    {
+      code: 'assiduidade-semanal',
+      name: 'Assiduidade semanal',
+      maxSessionsPerWeek: 4,
+      maxWindowDays: 60,
+    },
+    {
+      code: 'ritmo-avancado',
+      name: 'Ritmo avancado',
+      maxSessionsPerWeek: 5,
+      maxWindowDays: 90,
+    },
+  ];
+
+  for (const template of TEMPLATES) {
+    await db.challengeTemplateVersion.upsert({
+      where: { tenantId_code_version: { tenantId, code: template.code, version: 1 } },
+      update: {},
+      create: {
+        tenantId,
+        code: template.code,
+        version: 1,
+        name: template.name,
+        metric: 'SESSOES_NA_JANELA',
+        maxSessionsPerWeek: template.maxSessionsPerWeek,
+        maxWindowDays: template.maxWindowDays,
+        effectiveFrom: VIGENCIA_INICIAL,
+      },
+    });
+  }
+
+  console.info(`[seed] templates de desafio: ${String(TEMPLATES.length)}.`);
+}
+
+/**
  * Totem `TOTEM01` da unidade, com a configuracao de UNIDADE (versao 1) ja
  * publicada -- o padrao que a F49 le enquanto a F50 nao existe para
  * escrever (ADR-042, Decisao 0).
@@ -723,6 +793,25 @@ async function semearTotem(
                 habilitado: true,
                 perfil: '@clinicadamusculacao',
                 chamada: 'Siga e acompanhe os treinos da unidade.',
+              },
+              /*
+               * DESAFIO EM CARTAZ -- F34 (ADR-048, emenda 2).
+               *
+               * O bloco so diz QUE a academia quer mostrar desafio na parede;
+               * o conteudo (titulo, meta, prazo) vem do heartbeat e muda
+               * sozinho conforme a campanha. Mesmo desenho do bloco de
+               * INFORMACOES: congelar o titulo aqui obrigaria a republicar a
+               * config a cada desafio novo.
+               *
+               * `habilitado: true` e seguro: sem desafio aberto o bloco SAI
+               * do carrossel (`blocosVisiveis`), entao ele nao ocupa espaco
+               * na tela de quem ainda nao criou campanha nenhuma.
+               */
+              {
+                id: 'desafio-em-cartaz',
+                tipo: 'DESAFIO',
+                habilitado: true,
+                titulo: 'Desafio do mês',
               },
             ],
           },

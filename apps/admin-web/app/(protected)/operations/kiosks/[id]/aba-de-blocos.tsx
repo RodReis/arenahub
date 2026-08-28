@@ -229,6 +229,15 @@ function EditorDoBloco({
         </>
       );
 
+    case 'DESAFIO':
+      /*
+       * SO O TITULO E EDITAVEL -- o desafio em si (campanha, meta, prazo) vem
+       * do heartbeat e muda sozinho conforme a secretaria abre e encerra
+       * campanhas em Engajamento. Um campo de "qual desafio" aqui congelaria
+       * a escolha numa versao publicada e obrigaria a republicar a config a
+       * cada campanha nova (ADR-048, emenda 2).
+       */
+      return <EditorDeDesafio bloco={bloco} aoMudar={aoMudar} />;
     case 'INSTAGRAM':
       return (
         <>
@@ -462,6 +471,31 @@ function EditorDeVideo({
               : 'Copiar vídeo do Instagram'}
         </Button>
       </div>
+    </>
+  );
+}
+
+function EditorDeDesafio({
+  bloco,
+  aoMudar,
+}: {
+  readonly bloco: Extract<BlocoDaTelaPublica, { tipo: 'DESAFIO' }>;
+  readonly aoMudar: (bloco: BlocoDaTelaPublica) => void;
+}) {
+  return (
+    <>
+      <Field
+        id={`titulo-${bloco.id}`}
+        label="Título do bloco"
+        value={bloco.titulo}
+        maxLength={60}
+        onChange={(evento) => aoMudar({ ...bloco, titulo: evento.target.value })}
+      />
+
+      <p className={estilos['dica']}>
+        O desafio exibido é o que termina primeiro entre os abertos. Sem desafio aberto, o bloco
+        sai do rodízio — nada aparece com o título sozinho.
+      </p>
     </>
   );
 }

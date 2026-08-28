@@ -78,7 +78,10 @@ export function haAlgoNaGradePublica(
   config: KioskConfig,
   indicadores: IndicadoresDaUnidade | null,
 ): boolean {
-  return blocosVisiveis(config).length > 0 || (indicadores?.placar.length ?? 0) > 0;
+  return (
+    blocosVisiveis(config, indicadores?.desafio ?? null).length > 0 ||
+    (indicadores?.placar.length ?? 0) > 0
+  );
 }
 
 export function BlocosPublicos({
@@ -102,7 +105,7 @@ export function BlocosPublicos({
    * Decisao registrada no relatorio da task 14: nao ha campo no schema que
    * marque um bloco como "e o reel".
    */
-  const visiveis = blocosVisiveis(config);
+  const visiveis = blocosVisiveis(config, indicadores?.desafio ?? null);
   const reel = visiveis[0];
   const blocosDoCarrossel = visiveis.slice(1);
   const temRanking = placar.length > 0;
@@ -306,6 +309,49 @@ function ConteudoDoBloco({
           <p className="corpo">{bloco.chamada}</p>
         </>
       );
+
+    case 'DESAFIO':
+      /*
+       * SEM O DESAFIO, NAO RENDERIZA NADA -- `blocosVisiveis` ja tirou este
+       * bloco da lista quando `desafio` e nulo, entao este `null` e a rede
+       * de seguranca, nao o caminho normal. Um titulo sozinho na parede
+       * anunciaria uma campanha que nao existe.
+       *
+       * Sem contagem de inscritos e sem nome de aluno: `M3.5-BR-001` proibe
+       * dado de aluno na tela publica, e com a inscricao automatica o numero
+       * de inscritos e a base inteira da academia (ADR-048, emenda 2).
+       */
+      return indicadores?.desafio ? (
+        <div className="blocoDeDesafio" data-testid="bloco-de-desafio">
+          <p className="metadado">{bloco.titulo}</p>
+          <h2 className="nomeDoDesafio">{indicadores.desafio.titulo}</h2>
+
+          {/*
+            A META E O NUMERO GRANDE, nao o titulo: quem passa a 3 m de
+            distancia le "6 treinos" e entende o que a academia esta pedindo.
+            O nome da campanha e contexto; a meta e a informacao.
+          */}
+          <p className="metaDoDesafio">
+            <span className="valorDaMetrica">{indicadores.desafio.meta}</span>
+            <span className="corpo"> treinos</span>
+          </p>
+
+          {/*
+            O PRAZO FECHA O BLOCO, alinhado embaixo -- e o que cria urgencia,
+            e no ultimo dia ganha destaque de estado em vez de virar
+            "faltam 0 dias".
+          */}
+          <p
+            className={
+              indicadores.desafio.diasRestantes === 0 ? 'prazoDoDesafioUltimoDia' : 'metadado'
+            }
+          >
+            {indicadores.desafio.diasRestantes === 0
+              ? 'Último dia'
+              : `Faltam ${String(indicadores.desafio.diasRestantes)} dias`}
+          </p>
+        </div>
+      ) : null;
 
     case 'INFORMACOES':
       return (

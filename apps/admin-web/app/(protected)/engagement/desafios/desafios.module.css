@@ -1,0 +1,130 @@
+/*
+ * Desafios -- F34, Slice 5.5, ADR-048.
+ *
+ * Cor, tipografia e raio saem de token `--ah-*` (DS-PAINEL.md): hex literal
+ * é proibido pela lint. Sem tokens de espaçamento no design system ainda
+ * (mesma observação de `placar.module.css`) -- px direto aqui.
+ */
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+.bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-md, 8px);
+  background: var(--ah-surface-raised);
+}
+
+/*
+ * Início e fim lado a lado: são uma decisão só (o período), e separá-los em
+ * duas linhas faria a secretaria ler dois campos independentes.
+ */
+.periodo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+/*
+ * Aviso informativo, não erro: o teto da janela orienta antes de enviar, mas
+ * quem recusa é o servidor. Cor secundária, não a de erro -- pintar de
+ * vermelho o que não falhou treinaria a secretaria a ignorar vermelho.
+ */
+.aviso {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: 0.875rem;
+}
+
+.resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Lista de desafios criados -- sem marcador: cada item ja tem seu selo. */
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-md, 8px);
+}
+
+.itemTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.itemAcao {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/*
+ * Formulário de edição — largura total do item, abaixo dos botões. Inline
+ * em vez de modal: a secretaria compara com os outros desafios da lista
+ * enquanto edita, e um modal esconderia justamente essa comparação.
+ */
+.edicao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding-top: 12px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+/*
+ * Confirmação de ação destrutiva, na própria linha do desafio.
+ *
+ * Borda em `--ah-state-danger` e não fundo tingido: o item continua legível
+ * enquanto se decide, e a cor sinaliza sem virar alerta gritando. Sombra
+ * porque é camada que interrompe — a única exceção ao "card tem borda" do
+ * PRODUCT.md.
+ */
+.confirmacao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--ah-state-danger);
+  border-radius: var(--ah-radius-md, 8px);
+}
+
+.confirmacaoResumo {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.confirmacaoAcoes {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
