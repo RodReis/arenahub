@@ -9,6 +9,7 @@ updated: 2026-08-28
 
 ### Sem épico
 
+- [MVP5][SPEC-033][F33] Rankings privados por padrão (#33)
 - [INFRA][FIX] totem em dev nao carrega o .env da raiz e colide na porta 3000 com o painel (#212)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
@@ -22,8 +23,6 @@ updated: 2026-08-28
 - [MVP6][SPEC-036][F36] Contrato de dados e baseline analítica (#36)
 - [MVP5][SPEC-035][F35] Operação, moderação e experimento (#35)
 - [MVP5][SPEC-034][F34] Desafios e notificações (#34)
-- [MVP5][SPEC-033][F33] Rankings privados por padrão (#33)
-- [MVP5][SPEC-032][F32] Consistência e streak (#32)
 - [MVP4][SPEC-029][F29] Piloto e distribuição (#29)
 - [MVP4][SPEC-028][F28] Pagamento e desbloqueio no totem (#28)
 - [MVP4][SPEC-027][F27] Kiosk seguro (#27)
@@ -49,6 +48,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP5][SPEC-032][F32] Consistência e streak (#32, finalizado em: 2026-08-28)
 - [MVP5][SPEC-031][F31] XP e conquistas (#31, finalizado em: 2026-08-28)
 - [MVP5][SPEC-030][F30] Preferências e identidade pública (#30, finalizado em: 2026-08-27)
 - [MVP2.5][SPEC-044][F44] Design system da superfície kiosk (#83, finalizado em: 2026-08-27)
