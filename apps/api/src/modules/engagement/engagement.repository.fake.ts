@@ -7,6 +7,7 @@ import type { StatusDaContestacao } from './domain/contestacao.js';
 import type {
   AlunoParaExposicao,
   ConfiguracaoDeEngajamento,
+  IndicadoresDeEngajamento,
   ContestacaoGravada,
   ContestacaoParaFila,
   EntradaDeContestacao,
@@ -343,6 +344,37 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .map((c) => ({ ...c })),
     );
+  }
+
+  indicadores(tenantId: string): Promise<IndicadoresDeEngajamento> {
+    const ativos = [...this.alunos.values()].filter(
+      (a) => a.tenantId === tenantId && a.status === 'ACTIVE',
+    );
+    const idsAtivos = new Set(ativos.map((a) => a.id));
+
+    // Espelha o repositorio real: opt-out VIGENTE de quem esta ATIVO, e
+    // participando e a SUBTRACAO -- ausencia de linha significa participa.
+    const optOut = this.decisoes.filter(
+      (d) =>
+        d.tenantId === tenantId &&
+        d.finalidade === 'RANKING' &&
+        d.decision === 'REFUSED' &&
+        d.supersededAt === null &&
+        idsAtivos.has(d.studentId),
+    ).length;
+
+    const perfis = [...this.perfis.values()].filter((p) => p.tenantId === tenantId);
+
+    return Promise.resolve({
+      alunosAtivos: ativos.length,
+      participandoDoRanking: ativos.length - optOut,
+      optOut,
+      apelidosPendentes: perfis.filter((p) => p.status === 'PENDING').length,
+      apelidosOcultos: perfis.filter((p) => p.status === 'HIDDEN').length,
+      contestacoesAbertas: this.contestacoes.filter(
+        (c) => c.tenantId === tenantId && c.status === 'ABERTA',
+      ).length,
+    });
   }
 
   // --- F35: configuracao de engajamento do tenant --------------------------

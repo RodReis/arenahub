@@ -48,3 +48,28 @@
   font-size: var(--ah-type-caption-size);
   margin: 0;
 }
+
+.numeros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 0;
+}
+
+.numeros > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.numeros dt {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.numeros dd {
+  margin: 0;
+  font-size: var(--ah-type-title-size, 1.5rem);
+  font-variant-numeric: tabular-nums;
+}

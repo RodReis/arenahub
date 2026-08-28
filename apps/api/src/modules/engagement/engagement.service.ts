@@ -20,6 +20,7 @@ import {
 } from './domain/contestacao.js';
 import {
   type ConfiguracaoDeEngajamento,
+  type IndicadoresDeEngajamento,
   type ContestacaoGravada,
   type ContestacaoParaFila,
   type PerfilParaModeracao,
@@ -384,6 +385,17 @@ export class EngagementService {
   }
 
   // --- F35: configuracao de engajamento do tenant --------------------------
+
+  /**
+   * Indicadores do painel de operacao (`M5-FR-018`).
+   *
+   * Leitura pura e derivada, sem tabela de metrica: o volume e de uma
+   * academia, e materializar criaria projecao com rebuild proprio capaz de
+   * divergir do que as telas mostram.
+   */
+  async indicadores(tenantId: string): Promise<IndicadoresDeEngajamento> {
+    return this.repo.indicadores(tenantId);
+  }
 
   /** Flags e teto do tenant. Tenant sem configuracao vem com tudo ligado. */
   async obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento> {

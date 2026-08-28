@@ -2124,6 +2124,55 @@
         ]
       }
     },
+    "/api/v1/engagement/configuracao/indicadores": {
+      "get": {
+        "operationId": "EngagementConfiguracaoController_indicadores",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "alunosAtivos",
+                    "participandoDoRanking",
+                    "optOut",
+                    "apelidosPendentes",
+                    "apelidosOcultos",
+                    "contestacoesAbertas"
+                  ],
+                  "properties": {
+                    "alunosAtivos": {
+                      "type": "integer"
+                    },
+                    "participandoDoRanking": {
+                      "type": "integer"
+                    },
+                    "optOut": {
+                      "type": "integer"
+                    },
+                    "apelidosPendentes": {
+                      "type": "integer"
+                    },
+                    "apelidosOcultos": {
+                      "type": "integer"
+                    },
+                    "contestacoesAbertas": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementConfiguracao"
+        ]
+      }
+    },
     "/api/v1/engagement/rankings/{gymUnitId}/{mes}/gerar": {
       "post": {
         "operationId": "EngagementXpController_gerar",

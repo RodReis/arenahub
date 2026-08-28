@@ -22,6 +22,21 @@ interface Unidade {
   readonly timezone: string;
 }
 
+/**
+ * As três categorias de placar -- F35, ADR-049 Decisão 4.
+ *
+ * O rótulo diz o que o número MEDE, não o nome do enum: quem opera a recepção
+ * precisa saber que "consistência" premia regularidade e não volume, senão
+ * publica o placar errado para a parede.
+ */
+const CATEGORIAS = [
+  { valor: 'XP_DO_MES', rotulo: 'Pontos do mês' },
+  { valor: 'FREQUENCIA', rotulo: 'Frequência — total de treinos no mês' },
+  { valor: 'CONSISTENCIA', rotulo: 'Consistência — semanas em que treinou' },
+] as const;
+
+type CategoriaDePlacar = (typeof CATEGORIAS)[number]['valor'];
+
 const ESTADO_DO_GERAR: EstadoDoGerar = {};
 const ESTADO_DO_PUBLICAR: EstadoDoPublicar = {};
 const ESTADO_DO_AJUSTE: EstadoDoAjuste = {};
@@ -51,6 +66,7 @@ function BlocoDeGeracao({ unidades }: { readonly unidades: readonly Unidade[] })
 
   const [unidadeId, setUnidadeId] = useState(unidades[0]?.id ?? '');
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
+  const [categoria, setCategoria] = useState<CategoriaDePlacar>('XP_DO_MES');
   // Fuso da unidade ESCOLHIDA -- nunca um default fixo (ver o comentario de
   // `TenantDateTime`: "sem default, quem chama e obrigado a dizer de onde
   // tirou o fuso"). `undefined` só quando não há nenhuma unidade na lista.
@@ -79,6 +95,7 @@ function BlocoDeGeracao({ unidades }: { readonly unidades: readonly Unidade[] })
     const formulario = new FormData();
     formulario.set('gymUnitId', unidadeId);
     formulario.set('mes', mes);
+    formulario.set('category', categoria);
     iniciarEnvio(() => acaoGerar(formulario));
   }
 
@@ -117,6 +134,26 @@ function BlocoDeGeracao({ unidades }: { readonly unidades: readonly Unidade[] })
         data-testid="mes-do-placar"
       />
 
+      {/*
+        CATEGORIA -- F35, ADR-049 Decisão 4. Cada uma é um placar próprio do
+        mesmo mês e unidade: gerar frequência não substitui o rascunho de XP,
+        e publicar uma não publica as outras.
+      */}
+      <SelectField
+        id="categoria-do-placar"
+        label="O que o placar mede"
+        value={categoria}
+        disabled={enviando}
+        onChange={(evento) => setCategoria(evento.target.value as CategoriaDePlacar)}
+        data-testid="categoria-do-placar"
+      >
+        {CATEGORIAS.map((opcao) => (
+          <option key={opcao.valor} value={opcao.valor}>
+            {opcao.rotulo}
+          </option>
+        ))}
+      </SelectField>
+
       <Button
         type="button"
         disabled={unidadeId === '' || mes === '' || enviando}
@@ -129,6 +166,14 @@ function BlocoDeGeracao({ unidades }: { readonly unidades: readonly Unidade[] })
       {snapshot ? (
         <div className={estilos['resultado']} data-testid="snapshot-gerado">
           <StateBadge machine="rankingSnapshot" state={snapshot.status} />
+
+          {/*
+            QUAL placar e este. Sem isto, tres rascunhos do mesmo mes ficam
+            indistinguiveis na tela, e publicar vira aposta.
+          */}
+          <p data-testid="categoria-do-snapshot">
+            {CATEGORIAS.find((c) => c.valor === snapshot.category)?.rotulo ?? snapshot.category}
+          </p>
 
           {snapshot.status === 'WITHHELD' ? (
             <p data-testid="aviso-withheld">

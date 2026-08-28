@@ -23,6 +23,32 @@ const esquemaDaConfiguracao = z
   })
   .strict();
 
+interface IndicadoresDto {
+  alunosAtivos: number;
+  participandoDoRanking: number;
+  optOut: number;
+  apelidosPendentes: number;
+  apelidosOcultos: number;
+  contestacoesAbertas: number;
+}
+
+const CAMPOS_DOS_INDICADORES = [
+  'alunosAtivos',
+  'participandoDoRanking',
+  'optOut',
+  'apelidosPendentes',
+  'apelidosOcultos',
+  'contestacoesAbertas',
+] as const;
+
+const ESQUEMA_DOS_INDICADORES = {
+  type: 'object',
+  required: [...CAMPOS_DOS_INDICADORES],
+  properties: Object.fromEntries(
+    CAMPOS_DOS_INDICADORES.map((campo) => [campo, { type: 'integer' }]),
+  ),
+};
+
 interface ConfiguracaoDto {
   rankingEnabled: boolean;
   challengesEnabled: boolean;
@@ -63,6 +89,17 @@ export class EngagementConfiguracaoController {
   @ApiOkResponse({ schema: ESQUEMA_DA_CONFIGURACAO })
   async obter(): Promise<ConfiguracaoDto> {
     return this.engajamento.obterConfiguracao(this.contexto.require().tenantId);
+  }
+
+  /*
+   * INDICADORES (`M5-FR-018`) -- o que a operacao precisa olhar e o que ainda
+   * precisa fazer, num numero cada. Leitura pura: `engagement.read` basta.
+   */
+  @Get('indicadores')
+  @RequirePermissions('engagement.read')
+  @ApiOkResponse({ schema: ESQUEMA_DOS_INDICADORES })
+  async indicadores(): Promise<IndicadoresDto> {
+    return this.engajamento.indicadores(this.contexto.require().tenantId);
   }
 
   /*

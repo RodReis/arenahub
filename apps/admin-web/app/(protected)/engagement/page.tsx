@@ -7,11 +7,13 @@ import { chamarApi } from '../../../lib/api/server-client';
 import type {
   ConfiguracaoDeEngajamento,
   DesafioDaListagemDto,
+  IndicadoresDeEngajamento,
   TemplateDeDesafioDto,
 } from '../../actions/engagement';
 import { PainelDeDesafios } from './desafios/painel-de-desafios';
 import { PainelDoPlacar } from './placar/painel-do-placar';
 import { PainelDeConfiguracao } from './configuracao/painel-de-configuracao';
+import { Indicadores } from './configuracao/indicadores';
 
 export const metadata: Metadata = {
   title: 'Engajamento — ArenaHub',
@@ -61,11 +63,12 @@ interface Unidade {
  * (ver o comentário do componente).
  */
 export default async function PaginaDeEngajamento() {
-  const [modelos, unidades, existentes, configuracao] = await Promise.all([
+  const [modelos, unidades, existentes, configuracao, indicadores] = await Promise.all([
     chamarApi<{ itens: TemplateDeDesafioDto[] }>('/api/v1/engagement/challenges/templates'),
     chamarApi<Unidade[]>('/api/v1/units'),
     chamarApi<{ itens: DesafioDaListagemDto[] }>('/api/v1/engagement/challenges'),
     chamarApi<ConfiguracaoDeEngajamento>('/api/v1/engagement/configuracao'),
+    chamarApi<IndicadoresDeEngajamento>('/api/v1/engagement/configuracao/indicadores'),
   ]);
 
   const listaDeUnidades = unidades.ok && unidades.dados ? unidades.dados : [];
@@ -130,7 +133,16 @@ export default async function PaginaDeEngajamento() {
             id: 'configuracao',
             rotulo: 'Configuração',
             conteudo: configuracao.ok && configuracao.dados ? (
-              <PainelDeConfiguracao inicial={configuracao.dados} />
+              <>
+                {/*
+                  Os números primeiro: quem abre a aba quer saber o estado
+                  antes de mexer nos interruptores que o mudam.
+                */}
+                {indicadores.ok && indicadores.dados ? (
+                  <Indicadores dados={indicadores.dados} />
+                ) : null}
+                <PainelDeConfiguracao inicial={configuracao.dados} />
+              </>
             ) : (
               <ProblemDetail
                 testId="erro-da-configuracao"

@@ -42,6 +42,7 @@ describe('PainelDoPlacar', () => {
     vi.mocked(gerarPlacar).mockResolvedValue({
       snapshot: {
         id: 'snap-1',
+        category: 'XP_DO_MES',
         status: 'DRAFT',
         publishedAt: null,
         entries: [{ studentId: 'a1', position: 1, points: 30 }],
@@ -63,7 +64,7 @@ describe('PainelDoPlacar', () => {
    */
   it('WITHHELD explica que a coorte ficou abaixo do minimo, sem botao de publicar', async () => {
     vi.mocked(gerarPlacar).mockResolvedValue({
-      snapshot: { id: 'snap-2', status: 'WITHHELD', publishedAt: null, entries: [] },
+      snapshot: { id: 'snap-2', category: 'XP_DO_MES', status: 'WITHHELD', publishedAt: null, entries: [] },
     });
 
     const usuario = userEvent.setup();
@@ -77,11 +78,12 @@ describe('PainelDoPlacar', () => {
 
   it('publicar mostra a data e nao oferece publicar de novo', async () => {
     vi.mocked(gerarPlacar).mockResolvedValue({
-      snapshot: { id: 'snap-3', status: 'DRAFT', publishedAt: null, entries: [] },
+      snapshot: { id: 'snap-3', category: 'XP_DO_MES', status: 'DRAFT', publishedAt: null, entries: [] },
     });
     vi.mocked(publicarPlacar).mockResolvedValue({
       snapshot: {
         id: 'snap-3',
+        category: 'XP_DO_MES',
         status: 'PUBLISHED',
         publishedAt: '2026-08-27T12:00:00.000Z',
         entries: [],
@@ -156,5 +158,53 @@ describe('PainelDoPlacar', () => {
     await usuario.click(screen.getByTestId('confirmar-ajuste'));
 
     expect(await screen.findByText('Aluno não encontrado.')).toBeInTheDocument();
+  });
+
+  /* --- Categoria de placar (F35, ADR-049 Decisão 4) --------------------- */
+
+  it('gera com a categoria escolhida, nao sempre XP', async () => {
+    // O canário: se a tela não mandasse a categoria, o seletor seria
+    // decorativo e toda geração viraria XP no servidor pelo default.
+    vi.mocked(gerarPlacar).mockResolvedValue({
+      snapshot: { id: 'snap-f', category: 'FREQUENCIA', status: 'DRAFT', publishedAt: null, entries: [] },
+    });
+
+    const usuario = userEvent.setup();
+    renderizar();
+
+    await usuario.selectOptions(screen.getByTestId('categoria-do-placar'), 'FREQUENCIA');
+    await usuario.click(screen.getByTestId('gerar-placar'));
+
+    // A ULTIMA chamada, nao a primeira: nao ha `mockReset` entre os testes
+    // deste arquivo, entao `calls[0]` seria o envio de um teste anterior --
+    // e o teste passaria ou falharia pela ordem de execucao, nao pelo codigo.
+    const chamadas = vi.mocked(gerarPlacar).mock.calls;
+    const formulario = chamadas[chamadas.length - 1]?.[1] as FormData;
+    expect(formulario.get('category')).toBe('FREQUENCIA');
+  });
+
+  it('o snapshot na tela diz QUAL placar e', async () => {
+    // Três rascunhos do mesmo mês são indistinguíveis sem isto, e publicar
+    // vira aposta.
+    vi.mocked(gerarPlacar).mockResolvedValue({
+      snapshot: { id: 'snap-c', category: 'CONSISTENCIA', status: 'DRAFT', publishedAt: null, entries: [] },
+    });
+
+    const usuario = userEvent.setup();
+    renderizar();
+
+    await usuario.click(screen.getByTestId('gerar-placar'));
+
+    expect(await screen.findByTestId('categoria-do-snapshot')).toHaveTextContent(/consist/i);
+  });
+
+  it('o rotulo diz o que a categoria MEDE, nao o nome do enum', () => {
+    // "CONSISTENCIA" não avisa que premia regularidade e não volume -- e
+    // quem opera a recepção publicaria o placar errado para a parede.
+    renderizar();
+
+    const seletor = screen.getByTestId('categoria-do-placar');
+    expect(seletor).toHaveTextContent(/semanas em que treinou/i);
+    expect(seletor).toHaveTextContent(/total de treinos/i);
   });
 });

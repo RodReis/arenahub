@@ -118,11 +118,29 @@ export interface PortaDeEngajamento {
   contestacoesDoAluno(tenantId: string, studentId: string): Promise<ContestacaoGravada[]>;
 
   // --- F35: configuracao de engajamento do tenant ------------------------
+  indicadores(tenantId: string): Promise<IndicadoresDeEngajamento>;
   obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento>;
   salvarConfiguracao(
     tenantId: string,
     entrada: Partial<ConfiguracaoDeEngajamento>,
   ): Promise<ConfiguracaoDeEngajamento>;
+}
+
+/**
+ * O que o painel de operacao mostra (`M5-FR-018`, F35).
+ *
+ * Numeros DERIVADOS na leitura, sem tabela de metrica: o volume e de uma
+ * academia, nao de um data warehouse, e materializar criaria uma projecao com
+ * rebuild proprio capaz de divergir do que as telas mostram -- exatamente o
+ * que a F32 evitou ao derivar o streak.
+ */
+export interface IndicadoresDeEngajamento {
+  alunosAtivos: number;
+  participandoDoRanking: number;
+  optOut: number;
+  apelidosPendentes: number;
+  apelidosOcultos: number;
+  contestacoesAbertas: number;
 }
 
 /**
@@ -538,6 +556,46 @@ export class EngagementRepository implements PortaDeEngajamento {
   }
 
   // --- F35: configuracao de engajamento do tenant --------------------------
+
+
+  /**
+   * Indicadores do painel (`M5-FR-018`).
+   *
+   * `participandoDoRanking` e uma SUBTRACAO, nao uma contagem de linhas
+   * ACCEPTED: no engajamento a ausencia de `ConsentRecord` significa que o
+   * aluno PARTICIPA (INV-154, regime opt-out do ADR-046). Contar linhas
+   * daria quase zero numa academia inteira -- o oposto da verdade.
+   */
+  async indicadores(tenantId: string): Promise<IndicadoresDeEngajamento> {
+    const [alunosAtivos, optOut, apelidosPendentes, apelidosOcultos, contestacoesAbertas] =
+      await Promise.all([
+        this.db.student.count({ where: { tenantId, status: 'ACTIVE' } }),
+        // So conta o opt-out de quem esta ATIVO: aluno inativo ja nao aparece
+        // em exposicao nenhuma (INV-155), e conta-lo aqui faria a soma de
+        // participantes + opt-out passar do total de ativos.
+        this.db.consentRecord.count({
+          where: {
+            tenantId,
+            document: { type: 'RANKING' },
+            decision: 'REFUSED',
+            supersededAt: null,
+            student: { status: 'ACTIVE' },
+          },
+        }),
+        this.db.publicProfile.count({ where: { tenantId, status: 'PENDING' } }),
+        this.db.publicProfile.count({ where: { tenantId, status: 'HIDDEN' } }),
+        this.db.engagementDispute.count({ where: { tenantId, status: 'ABERTA' } }),
+      ]);
+
+    return {
+      alunosAtivos,
+      participandoDoRanking: alunosAtivos - optOut,
+      optOut,
+      apelidosPendentes,
+      apelidosOcultos,
+      contestacoesAbertas,
+    };
+  }
 
   async obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento> {
     const tenant = await this.db.tenant.findUniqueOrThrow({

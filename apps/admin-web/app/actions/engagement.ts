@@ -53,6 +53,7 @@ function mensagemDe(code: string | undefined, padrao: string): string {
 /** Espelha `SnapshotDto` de `engagement-xp.controller.ts`. */
 export interface SnapshotDto {
   id: string;
+  category: 'XP_DO_MES' | 'FREQUENCIA' | 'CONSISTENCIA';
   status: 'DRAFT' | 'PUBLISHED' | 'WITHHELD';
   publishedAt: string | null;
   entries: { studentId: string; position: number; points: number }[];
@@ -88,6 +89,9 @@ export interface EstadoDoGerar {
 const esquemaDeGerar = z.object({
   gymUnitId: z.string().uuid(),
   mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u),
+  // Opcional com default: a API também tem default, mas mandar explícito
+  // deixa claro na requisição qual placar está sendo gerado.
+  category: z.enum(['XP_DO_MES', 'FREQUENCIA', 'CONSISTENCIA']).default('XP_DO_MES'),
 });
 
 export async function gerarPlacar(
@@ -97,6 +101,9 @@ export async function gerarPlacar(
   const analisado = esquemaDeGerar.safeParse({
     gymUnitId: formulario.get('gymUnitId'),
     mes: formulario.get('mes'),
+    ...(formulario.get('category') !== null
+      ? { category: formulario.get('category') }
+      : {}),
   });
 
   if (!analisado.success) {
@@ -105,7 +112,7 @@ export async function gerarPlacar(
 
   const resposta = await chamarApi<SnapshotDto>(
     `/api/v1/engagement/rankings/${analisado.data.gymUnitId}/${analisado.data.mes}/gerar`,
-    { metodo: 'POST' },
+    { metodo: 'POST', corpo: { category: analisado.data.category } },
   );
 
   if (!resposta.ok || !resposta.dados) {
@@ -556,6 +563,16 @@ export async function resolverContestacao(
 /* -------------------------------------------------------------------------
  * Configuração do engajamento -- F35, ADR-049 Decisão 3.
  * ------------------------------------------------------------------------- */
+
+/** O que o painel de operação mostra -- `M5-FR-018`, F35. */
+export interface IndicadoresDeEngajamento {
+  readonly alunosAtivos: number;
+  readonly participandoDoRanking: number;
+  readonly optOut: number;
+  readonly apelidosPendentes: number;
+  readonly apelidosOcultos: number;
+  readonly contestacoesAbertas: number;
+}
 
 export interface ConfiguracaoDeEngajamento {
   readonly rankingEnabled: boolean;
