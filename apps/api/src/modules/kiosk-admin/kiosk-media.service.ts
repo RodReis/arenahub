@@ -22,6 +22,10 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { CONTENT_TYPE_DE_MIDIA, TAMANHO_MAXIMO_DE_MIDIA_BYTES, aceitarMidia } from './domain/midia-do-totem.js';
 import { aceitarLinkDeReel } from './domain/link-de-reel.js';
+import {
+  BYTES_DO_CABECALHO_DE_LOGOTIPO,
+  aceitarLogotipo,
+} from './domain/logotipo-do-patrocinador.js';
 
 /** Quantos bytes do inicio bastam para reconhecer o container ISO-BMFF. */
 const BYTES_DO_CABECALHO = 16;
@@ -216,6 +220,81 @@ export class KioskMediaService {
       key: midiaKey,
       body: Buffer.from(midia.conteudo),
       contentType: CONTENT_TYPE_DE_MIDIA,
+    });
+
+    return { midiaKey };
+  }
+
+  /**
+   * Upload do logotipo de um patrocinador (28/08/2026, decisao do PI).
+   *
+   * MESMA ORDEM DE `enviar`, e nao um caminho paralelo: formato -> antivirus
+   * -> storage. O que muda e SO a regra de formato (imagem em vez de MP4,
+   * ver `domain/logotipo-do-patrocinador.ts`); as duas outras travas sao
+   * literalmente as mesmas chamadas.
+   *
+   * A chave sai do MESMO `montarChaveDeMidia`: o logotipo vive sob o prefixo
+   * do tenant e da unidade, que e o que `chaveDeMidiaPertenceA` confere
+   * antes de assinar no boot do totem. Um prefixo proprio exigiria uma
+   * segunda funcao de pertencimento -- e a primeira que divergisse viraria o
+   * buraco.
+   */
+  async enviarLogotipo(
+    contexto: TenantContext,
+    kioskDeviceId: string,
+    logotipo: MidiaRecebida,
+  ): Promise<MidiaEnviada> {
+    const device = await this.exigirDevice(contexto, kioskDeviceId);
+
+    // --- 1. FORMATO ------------------------------------------------------
+    const aceitacao = aceitarLogotipo({
+      tamanhoBytes: logotipo.conteudo.byteLength,
+      contentType: logotipo.contentType,
+      cabecalho: logotipo.conteudo.subarray(0, BYTES_DO_CABECALHO_DE_LOGOTIPO),
+    });
+
+    if (!aceitacao.aceito) {
+      throw new ErroDeDominio(
+        aceitacao.motivo,
+        400,
+        'Logotipo recusado. Envie PNG, JPEG ou WebP de até 2 MB.',
+      );
+    }
+
+    // --- 2. ANTIVIRUS, ANTES DE TOCAR O STORAGE --------------------------
+    let veredito;
+
+    try {
+      veredito = await this.antivirus.escanear(logotipo.conteudo);
+    } catch (erro) {
+      if (erro instanceof ErroDoScanner) {
+        throw new ErroDeDominio(erro.codigo, 503, 'Antivírus indisponível. Tente de novo.');
+      }
+
+      throw erro;
+    }
+
+    if (!veredito.limpo) {
+      throw new ErroDeDominio('FILE_INFECTED', 422, 'Logotipo recusado pelo antivírus.');
+    }
+
+    // --- 3. STORAGE, so depois de limpo -----------------------------------
+    //
+    // O `contentType` entra na CHAVE tambem, nao so no objeto: sem ele a
+    // chave sairia com `.mp4` fixo e o bucket guardaria PNG sob nome de
+    // video. Funcionava, mas mentia -- e o tipo aqui e confiavel porque
+    // `aceitarLogotipo` ja o conferiu contra a assinatura dos bytes.
+    const midiaKey = montarChaveDeMidia(
+      contexto.tenantId,
+      device.gymUnitId,
+      randomUUID(),
+      logotipo.contentType,
+    );
+
+    await this.storage.putPrivateObject({
+      key: midiaKey,
+      body: Buffer.from(logotipo.conteudo),
+      contentType: logotipo.contentType,
     });
 
     return { midiaKey };

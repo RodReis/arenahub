@@ -245,7 +245,7 @@ describe('BlocosPublicos -- faixa de patrocinadores (ADR-042, Decisao 4)', () =>
   const patrocinio = {
     habilitado: true,
     rotulo: '',
-    marcas: [{ nome: 'Suplementos XYZ', logotipoUrl: null }],
+    marcas: [{ nome: 'Suplementos XYZ', logotipoKey: null }],
   };
 
   it('fica FORA da grade -- continua na tela mesmo com o carrossel girando', () => {

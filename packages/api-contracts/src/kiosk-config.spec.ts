@@ -171,7 +171,7 @@ describe('faixa de patrocinadores (ADR-042, Decisao 4)', () => {
   });
 
   it('aceita ate 6 marcas e recusa a setima', () => {
-    const marca = { nome: 'Marca', logotipoUrl: null };
+    const marca = { nome: 'Marca', logotipoKey: null };
     const comSeis = Array.from({ length: MAXIMO_DE_PATROCINADORES }, () => marca);
 
     const seis = kioskConfigSchema.shape.patrocinio.safeParse({
@@ -195,7 +195,7 @@ describe('faixa de patrocinadores (ADR-042, Decisao 4)', () => {
     const parsed = kioskConfigSchema.shape.patrocinio.parse({
       habilitado: true,
       rotulo: 'Apoio',
-      marcas: [{ nome: 'Marca', logotipoUrl: null }],
+      marcas: [{ nome: 'Marca', logotipoKey: null }],
       impressoes: 42,
       urlDeDestino: 'https://exemplo.com',
       veiculaAte: '2026-12-31',
@@ -327,5 +327,58 @@ describe('desafio na tela publica -- M3.5-BR-001 (F34, ADR-048 emenda 2)', () =>
     });
 
     expect(r.success).toBe(false);
+  });
+});
+
+/**
+ * O LOGOTIPO DO PATROCINADOR VIRA UPLOAD (28/08/2026, decisao do PI).
+ *
+ * Ate aqui o campo era `logotipoUrl: z.string().url().nullable()` -- endereco
+ * de imagem hospedada por terceiro. Duas consequencias que o PI decidiu
+ * encerrar: a academia dependia de um host que nao controla (link morre, a
+ * faixa fica sem logo), e colar URL exigia que a marca ja estivesse na web.
+ *
+ * O campo agora e `logotipoKey`: a CHAVE do objeto no nosso storage, gravada
+ * pelo servidor no upload. Mesma forma do `midiaKey` do bloco de video --
+ * o totem nunca recebe a chave crua, e sim a URL assinada no boot.
+ *
+ * A URL EXTERNA FOI APOSENTADA, nao mantida em paralelo: dois campos com a
+ * mesma funcao viram a pergunta "qual vence?" em toda leitura.
+ */
+describe('logotipo do patrocinador e chave de storage, nao URL', () => {
+  it('aceita a chave do storage', () => {
+    const parsed = kioskConfigSchema.shape.patrocinio.safeParse({
+      habilitado: true,
+      rotulo: '',
+      marcas: [{ nome: 'Marca', logotipoKey: 'tenants/t1/kiosk-media/u1/abc.png' }],
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('aceita marca sem logotipo -- a faixa mostra o nome', () => {
+    const parsed = kioskConfigSchema.shape.patrocinio.safeParse({
+      habilitado: true,
+      rotulo: '',
+      marcas: [{ nome: 'Marca', logotipoKey: null }],
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  /*
+   * O canario da APOSENTADORIA: enquanto `logotipoUrl` existir no schema,
+   * este teste passa por acidente -- o campo seria aceito. Com ele fora, o
+   * `parse` DESCARTA a chave estranha, que e a mesma trava do teste de
+   * contador/clique logo acima.
+   */
+  it('descarta logotipoUrl -- o campo nao existe mais', () => {
+    const parsed = kioskConfigSchema.shape.patrocinio.parse({
+      habilitado: true,
+      rotulo: '',
+      marcas: [{ nome: 'Marca', logotipoKey: null, logotipoUrl: 'https://exemplo.com/l.png' }],
+    });
+
+    expect(parsed.marcas[0]).not.toHaveProperty('logotipoUrl');
   });
 });

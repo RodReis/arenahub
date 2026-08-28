@@ -284,7 +284,42 @@ export const kioskConfigSchema = z.object({
       .array(
         z.object({
           nome: z.string().min(1),
-          logotipoUrl: z.string().url().nullable(),
+          /**
+           * A CHAVE do logotipo no nosso storage -- nunca URL externa.
+           *
+           * Trocado em 28/08/2026 por decisao do PI: era
+           * `logotipoUrl: z.string().url()`, endereco de imagem hospedada por
+           * terceiro. Dois problemas que a troca encerra -- a faixa dependia
+           * de um host que a academia nao controla (link morre, logo some da
+           * parede), e so entrava marca que ja estivesse na web.
+           *
+           * A URL externa foi APOSENTADA, nao mantida em paralelo: dois
+           * campos com a mesma funcao viram "qual vence?" em toda leitura.
+           *
+           * Mesma forma do `midiaKey` do bloco de VIDEO, e pelo mesmo motivo:
+           * a chave e gravada pelo SERVIDOR no upload e vira URL assinada no
+           * boot do totem (`kiosk-media-link.service.ts`). O totem nunca
+           * recebe chave crua, e a assinatura e conferida contra o prefixo do
+           * tenant antes de sair -- assinar sem conferir entregaria objeto
+           * alheio a quem editasse o payload.
+           *
+           * `null` = marca sem logotipo: a faixa mostra o nome, que e o
+           * comportamento que ja existia para quem nao tinha imagem.
+           */
+          logotipoKey: z.string().min(1).nullable(),
+          /**
+           * URL assinada, preenchida pela API no BOOT e nunca gravada.
+           *
+           * Campo separado de `logotipoKey` pela mesma razao que separa
+           * `midiaUrl` de `midiaKey` (ver o bloco de VIDEO acima): a CHAVE e
+           * escrita pelo painel e vive na versao publicada; a URL e derivada
+           * e expira. Sobrescrever a chave faria o proximo `PUT` do painel
+           * gravar URL expirada onde deveria haver chave, e o logotipo
+           * sumiria da faixa sem ninguem ter mexido nele.
+           *
+           * Opcional porque o PAINEL nunca a envia.
+           */
+          logotipoUrlAssinada: z.string().nullable().optional(),
         }),
       )
       .max(MAXIMO_DE_PATROCINADORES),

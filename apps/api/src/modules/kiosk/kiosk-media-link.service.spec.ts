@@ -137,3 +137,108 @@ describe('KioskMediaLinkService.resolverMidias', () => {
     expect(version).toBe(entrada.version);
   });
 });
+
+/**
+ * LOGOTIPO DE PATROCINADOR SEGUE O MESMO CAMINHO DO VIDEO (28/08/2026).
+ *
+ * O campo era `logotipoUrl` -- endereco externo que o totem punha direto no
+ * `<img src>`. Virou `logotipoKey` por decisao do PI, e chave de storage nao
+ * carrega em `<img>`: precisa da mesma assinatura no boot que o video ja
+ * tinha.
+ *
+ * As tres garantias sao as MESMAS, e nao por simetria estetica: sao os tres
+ * modos de falha que ja custaram caro neste servico -- chave de outro
+ * tenant, storage fora do ar, e chave preservada na resposta.
+ */
+describe('logotipo do patrocinador vira URL assinada', () => {
+  const marca = (logotipoKey: string | null) => ({ nome: 'Suplementos', logotipoKey });
+
+  function comPatrocinio(marcas: readonly { nome: string; logotipoKey: string | null }[]) {
+    return {
+      version: 3,
+      config: {
+        ...CONFIG_PADRAO_DO_TOTEM,
+        patrocinio: { habilitado: true, rotulo: '', marcas: [...marcas] },
+      },
+    };
+  }
+
+  it('assina a chave que pertence ao tenant e a unidade', async () => {
+    const { servico } = montar();
+    const chave = `tenants/${TENANT}/kiosk-media/${UNIDADE}/logo.png`;
+
+    const saida = await servico.resolverMidias(contexto, comPatrocinio([marca(chave)]));
+
+    expect(saida.config.patrocinio.marcas[0]?.logotipoUrlAssinada).toContain('assinado');
+  });
+
+  /*
+   * A CHAVE SOBREVIVE na resposta -- so a URL e derivada. Zera-la faria uma
+   * falha temporaria do storage virar perda permanente do logotipo na
+   * proxima gravacao do rascunho pelo painel.
+   */
+  it('preserva a chave ao lado da URL', async () => {
+    const { servico } = montar();
+    const chave = `tenants/${TENANT}/kiosk-media/${UNIDADE}/logo.png`;
+
+    const saida = await servico.resolverMidias(contexto, comPatrocinio([marca(chave)]));
+
+    expect(saida.config.patrocinio.marcas[0]?.logotipoKey).toBe(chave);
+  });
+
+  it('recusa chave de OUTRO tenant sem assinar', async () => {
+    const { servico, assinadas } = montar();
+    const alheia = `tenants/OUTRO/kiosk-media/${UNIDADE}/logo.png`;
+
+    const saida = await servico.resolverMidias(contexto, comPatrocinio([marca(alheia)]));
+
+    expect(saida.config.patrocinio.marcas[0]?.logotipoUrlAssinada).toBeNull();
+    expect(assinadas).not.toContain(alheia);
+  });
+
+  /** Storage fora do ar cai no nome, nao derruba a faixa nem a tela. */
+  it('devolve null quando o storage falha', async () => {
+    const { servico } = montar({ falha: true });
+    const chave = `tenants/${TENANT}/kiosk-media/${UNIDADE}/logo.png`;
+
+    const saida = await servico.resolverMidias(contexto, comPatrocinio([marca(chave)]));
+
+    expect(saida.config.patrocinio.marcas[0]?.logotipoUrlAssinada).toBeNull();
+  });
+
+  /*
+   * O que importa e NAO ASSINAR -- nao a forma do campo vazio.
+   *
+   * Sem nenhuma chave (e sem video), `resolverMidias` devolve a config
+   * ORIGINAL pelo atalho, entao `logotipoUrlAssinada` fica `undefined` e nao
+   * `null`. Os dois sao ausencia, e o totem trata os dois igual (`!= null`
+   * na faixa). Exigir `null` aqui obrigaria a copiar toda a config no caso
+   * mais comum da tela publica -- custo real para uniformizar o que ninguem
+   * distingue.
+   */
+  it('nao chama o storage para marca sem logotipo', async () => {
+    const { servico, assinadas } = montar();
+
+    const saida = await servico.resolverMidias(contexto, comPatrocinio([marca(null)]));
+
+    expect(assinadas).toHaveLength(0);
+    expect(saida.config.patrocinio.marcas[0]?.logotipoUrlAssinada ?? null).toBeNull();
+  });
+
+  /*
+   * A marca SEM logotipo, ao lado de uma COM, passa pelo caminho longo -- e
+   * ai `null` explicito e obrigatorio, senao o campo viria undefined de um
+   * objeto que o servico de fato reescreveu.
+   */
+  it('zera a marca sem logotipo quando outra tem', async () => {
+    const { servico } = montar();
+    const chave = `tenants/${TENANT}/kiosk-media/${UNIDADE}/logo.png`;
+
+    const saida = await servico.resolverMidias(
+      contexto,
+      comPatrocinio([marca(chave), marca(null)]),
+    );
+
+    expect(saida.config.patrocinio.marcas[1]?.logotipoUrlAssinada).toBeNull();
+  });
+});

@@ -107,14 +107,20 @@ export function Atrator({
       </header>
 
       {/*
-        A DISTRIBUICAO do §4: sem bloco opcional nenhum, o espaco sobra. Ele e
-        repartido em DOIS -- um antes do hero, um depois -- e nao empilhado
-        inteiro embaixo dele: com um `flex: 1` so, o hero fica grudado no
-        cabecalho e a tela parece truncada no meio. Com dois, o hero flutua no
-        terco superior e o CTA no inferior, que e a leitura que o §4 descreve.
-        Com blocos ligados, eles ocupam o vao de baixo e os `flex` cedem.
+        A DISTRIBUICAO do §4 vale SO quando nao ha bloco: "se todos os blocos
+        opcionais estiverem desligados, hero e CTA se distribuem com o espaco
+        restante". Sem bloco, o espaco e repartido em DOIS -- um vao antes do
+        hero, um depois -- e nao empilhado inteiro embaixo dele: com um so, o
+        hero grudaria no cabecalho numa tela vazia.
+
+        COM bloco, os dois vaos somem. Ate 28/08/2026 este de cima rodava
+        SEMPRE, e empurrava o hero 500px para baixo numa tela de 1920 --
+        medido no totem real: cabecalho terminava em 132, o hero comecava em
+        720. O espaco morto saia da grade, que e onde o protótipo (`Totem.dc.html`)
+        poe o conteudo. O vao de baixo ja era condicional desde a F31; este
+        ficou para tras.
       */}
-      <span style={{ flex: 1 }} />
+      {temBloco ? null : <span style={{ flex: 1 }} />}
 
       <div className="heroContainer" style={{ flexShrink: 0 }}>
         {/*

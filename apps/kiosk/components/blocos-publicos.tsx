@@ -503,14 +503,26 @@ function FaixaDePatrocinio({
       <div className="marcas">
         {patrocinio.marcas.map((marca) => (
           <span key={marca.nome} className="marca">
-            {marca.logotipoUrl !== null ? (
-              /*
-               * `<img>` e nao `next/image`: o logotipo vem de URL que o
-               * gerente configura, e `next/image` exige dominio declarado em
-               * BUILD -- o dominio muda por academia, entao a otimizacao
-               * quebraria o totem do proximo cliente.
-               */
-              <img src={marca.logotipoUrl} alt={marca.nome} className="logotipoDoPatrocinador" />
+            {/*
+              A URL ASSINADA, nunca a chave: `logotipoKey` e identificador de
+              objeto no storage e nao carrega em `<img src>`. Quem a resolve e
+              a API no boot (`kiosk-media-link.service.ts`), do mesmo modo que
+              ja resolvia `midiaKey` -> `midiaUrl` do bloco de video.
+
+              Chave que nao pertence ao tenant, ou storage fora do ar, chegam
+              aqui como `null` e a faixa cai no NOME -- que e o mesmo destino
+              da marca que nunca teve logotipo. Uma imagem quebrada na parede
+              e pior do que o nome escrito.
+
+              `<img>` e nao `next/image`: a URL e assinada e expira em uma
+              hora, entao o otimizador de build nao tem o que pre-processar.
+            */}
+            {marca.logotipoUrlAssinada != null ? (
+              <img
+                src={marca.logotipoUrlAssinada}
+                alt={marca.nome}
+                className="logotipoDoPatrocinador"
+              />
             ) : (
               marca.nome
             )}

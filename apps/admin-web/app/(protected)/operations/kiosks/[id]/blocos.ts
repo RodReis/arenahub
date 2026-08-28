@@ -1,6 +1,7 @@
 import {
   TIPOS_DE_BLOCO,
   type BlocoDaTelaPublica,
+  type KioskConfig,
   type TipoDeBloco,
 } from '@arenahub/api-contracts';
 
@@ -117,4 +118,38 @@ export function tiposDisponiveis(
   const usados = new Set(itens.map((bloco) => bloco.tipo));
 
   return TIPOS_DE_BLOCO.filter((tipo) => !usados.has(tipo));
+}
+
+/**
+ * O que impede este rascunho de ser salvo, em portugues acionavel.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE VALIDAR AQUI SE O SERVIDOR JA VALIDA.
+ * ---------------------------------------------------------------------------
+ *
+ * O servidor CONTINUA sendo a autoridade -- nada aqui o substitui, e o
+ * `kioskConfigSchema` segue recusando o mesmo rascunho se alguem chamar a
+ * action por fora da tela. O que esta funcao acrescenta e a MENSAGEM.
+ *
+ * Relatado pelo PI em 28/08/2026: o painel devolvia
+ * "Nao foi possivel salvar o rascunho (VALIDATION_FAILED)" -- verdadeiro,
+ * inutil. A causa era uma linha de patrocinador em branco: o botao
+ * "+ Patrocinador" cria `{ nome: '', logotipoKey: null }` e o contrato exige
+ * `nome.min(1)`, entao a linha que o proprio painel acabara de criar
+ * bloqueava o salvamento sem dizer qual era.
+ *
+ * PURA: entra rascunho, sai lista de frases. Sem React, sem rede -- o que a
+ * torna testavel sem montar o formulario.
+ *
+ * A numeracao e 1-based DE PROPOSITO: o gerente conta "primeiro
+ * patrocinador, segundo patrocinador" na tela, nao indices de array.
+ */
+export function problemasDoRascunho(rascunho: {
+  readonly patrocinio: Pick<KioskConfig['patrocinio'], 'marcas'>;
+}): readonly string[] {
+  return rascunho.patrocinio.marcas.flatMap((marca, indice) =>
+    marca.nome.trim() === ''
+      ? [`Patrocinador ${indice + 1}: preencha o nome, ou remova a linha.`]
+      : [],
+  );
 }

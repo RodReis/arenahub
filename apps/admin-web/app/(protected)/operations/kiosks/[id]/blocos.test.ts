@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { TIPOS_DE_BLOCO, type BlocoDaTelaPublica } from '@arenahub/api-contracts';
 
-import { blocoNovo, mover, remover, substituir, tiposDisponiveis } from './blocos';
+import {
+  blocoNovo,
+  mover,
+  problemasDoRascunho,
+  remover,
+  substituir,
+  tiposDisponiveis,
+} from './blocos';
 
 function tres(): readonly BlocoDaTelaPublica[] {
   return [blocoNovo('VIDEO', 'a'), blocoNovo('EVENTOS', 'b'), blocoNovo('INSTAGRAM', 'c')];
@@ -89,5 +96,75 @@ describe('tiposDisponiveis', () => {
    */
   it('lista vazia oferece todos os tipos do contrato', () => {
     expect(tiposDisponiveis([])).toHaveLength(TIPOS_DE_BLOCO.length);
+  });
+});
+
+/**
+ * O RASCUNHO E RECUSADO ANTES DE SAIR DO NAVEGADOR.
+ *
+ * Relatado pelo PI em 28/08/2026: salvar devolvia dois toasts
+ * "Nao foi possivel salvar o rascunho (VALIDATION_FAILED)" sem dizer o que
+ * corrigir. A causa era uma linha de patrocinador em branco -- o botao
+ * "+ Patrocinador" cria `{ nome: '', logotipoKey: null }` e o contrato exige
+ * `nome.min(1)`, entao QUALQUER linha nao preenchida bloqueava o salvamento
+ * inteiro.
+ *
+ * O servidor continua validando (ele e a autoridade). O que muda e que o
+ * painel para antes e diz QUAL linha e O QUE fazer.
+ */
+describe('problemasDoRascunho', () => {
+  const semMarcas = { habilitado: false, rotulo: '', marcas: [] };
+
+  it('nao reclama de rascunho sem patrocinador nenhum', () => {
+    expect(problemasDoRascunho({ patrocinio: semMarcas })).toEqual([]);
+  });
+
+  it('aponta a linha do patrocinador sem nome, com o numero que a tela mostra', () => {
+    const problemas = problemasDoRascunho({
+      patrocinio: {
+        ...semMarcas,
+        marcas: [
+          { nome: 'EPG', logotipoKey: null },
+          { nome: '', logotipoKey: null },
+        ],
+      },
+    });
+
+    expect(problemas).toHaveLength(1);
+    // "2" e nao "1": o indice do array e interno, o gerente conta a partir de 1.
+    expect(problemas[0]).toMatch(/patrocinador 2/i);
+    expect(problemas[0]).toMatch(/nome/i);
+  });
+
+  /** Espaco em branco nao e nome -- o contrato usa `min(1)` apos o trim da UI. */
+  it('trata nome so com espacos como vazio', () => {
+    expect(
+      problemasDoRascunho({
+        patrocinio: { ...semMarcas, marcas: [{ nome: '   ', logotipoKey: null }] },
+      }),
+    ).toHaveLength(1);
+  });
+
+  it('aceita a linha preenchida', () => {
+    expect(
+      problemasDoRascunho({
+        patrocinio: { ...semMarcas, marcas: [{ nome: 'EPG', logotipoKey: null }] },
+      }),
+    ).toEqual([]);
+  });
+
+  /** Uma mensagem POR linha: duas em branco sao dois problemas a corrigir. */
+  it('lista uma mensagem por linha em branco', () => {
+    expect(
+      problemasDoRascunho({
+        patrocinio: {
+          ...semMarcas,
+          marcas: [
+            { nome: '', logotipoKey: null },
+            { nome: '', logotipoKey: null },
+          ],
+        },
+      }),
+    ).toHaveLength(2);
   });
 });

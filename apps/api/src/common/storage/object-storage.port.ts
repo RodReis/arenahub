@@ -105,21 +105,51 @@ export function montarChaveDeCadastro(tenantId: string, identityId: string): str
 }
 
 /**
+ * A extensao de cada `content-type` que pode entrar na midia do totem.
+ *
+ * Existe porque a chave nasceu com `.mp4` FIXO, quando video era a unica
+ * midia. Com o upload de logotipo (28/08/2026) isso passou a gravar PNG sob
+ * nome `.mp4`: funcionava -- o `content-type` do storage e quem manda na
+ * hora de servir --, mas mentia sobre o conteudo para qualquer um que
+ * abrisse o bucket, e transformava "que arquivo e este?" numa investigacao.
+ */
+const EXTENSAO_POR_TIPO: Readonly<Record<string, string>> = {
+  'video/mp4': 'mp4',
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+};
+
+/**
  * Monta a chave do objeto de midia.
  *
- * Formato: `tenants/{tenantId}/kiosk-media/{gymUnitId}/{id}.mp4`.
+ * Formato: `tenants/{tenantId}/kiosk-media/{gymUnitId}/{id}.{ext}`.
  *
  * SERVIDOR GERA, cliente nunca escolhe prefixo -- mesma disciplina de
  * `montarChaveDeCadastro`. Aceitar `key` do corpo deixaria o tenant A
  * escrever em `tenants/{B}/...`, que e a regra de arquitetura no 2 furada
  * pela porta dos fundos.
+ *
+ * O `contentType` e OPCIONAL e cai em `mp4`: as chamadas que ja existiam
+ * (upload de video, ingestao de reel) nao mudam de comportamento nem de
+ * assinatura. A extensao NAO participa da checagem de pertencimento --
+ * `prefixoDeMidia` olha so o comeco da chave --, entao chave antiga com
+ * `.mp4` continua valendo sem migracao.
+ *
+ * Tipo desconhecido tambem cai em `mp4` em vez de lancar: quem decide o que
+ * entra sao os dominios de aceitacao (`midia-do-totem.ts`,
+ * `logotipo-do-patrocinador.ts`), e duplicar a lista aqui criaria duas
+ * fontes da verdade que divergem no primeiro formato novo.
  */
 export function montarChaveDeMidia(
   tenantId: string,
   gymUnitId: string,
   id: string,
+  contentType = 'video/mp4',
 ): string {
-  return `${prefixoDeMidia(tenantId, gymUnitId)}${id}.mp4`;
+  const extensao = EXTENSAO_POR_TIPO[contentType.toLowerCase()] ?? 'mp4';
+
+  return `${prefixoDeMidia(tenantId, gymUnitId)}${id}.${extensao}`;
 }
 
 /**

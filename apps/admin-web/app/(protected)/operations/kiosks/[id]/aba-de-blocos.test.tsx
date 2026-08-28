@@ -188,7 +188,7 @@ describe('AbaDeBlocos -- faixa de patrocinadores (ADR-042, Decisao 4)', () => {
   it('para de oferecer patrocinador ao chegar no limite', () => {
     const marcas = Array.from({ length: MAXIMO_DE_PATROCINADORES }, (_, i) => ({
       nome: `Marca ${i}`,
-      logotipoUrl: null,
+      logotipoKey: null,
     }));
 
     renderizar(comBlocos([], { marcas }));
@@ -198,7 +198,7 @@ describe('AbaDeBlocos -- faixa de patrocinadores (ADR-042, Decisao 4)', () => {
   });
 
   it('NAO oferece campo de contagem, clique, campanha nem periodo', () => {
-    renderizar(comBlocos([], { marcas: [{ nome: 'Marca', logotipoUrl: null }] }));
+    renderizar(comBlocos([], { marcas: [{ nome: 'Marca', logotipoKey: null }] }));
 
     // A ausencia E a decisao: contador na faixa produziria o numero em que
     // um contrato de patrocinio se apoia (ADR-042, Decisao 4).

@@ -23,6 +23,7 @@ import {
 } from './kiosk-admin-config.service.js';
 import { KioskMediaService } from './kiosk-media.service.js';
 import { TAMANHO_MAXIMO_DE_MIDIA_BYTES } from './domain/midia-do-totem.js';
+import { TAMANHO_MAXIMO_DE_LOGOTIPO_BYTES } from './domain/logotipo-do-patrocinador.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { z } from 'zod';
 
@@ -184,6 +185,47 @@ export class KioskAdminController {
     }
 
     return this.midia.enviar(this.contexto.require(), id, {
+      originalFilename: arquivo.originalname,
+      contentType: arquivo.mimetype,
+      conteudo: new Uint8Array(arquivo.buffer),
+    });
+  }
+
+  /**
+   * Upload do logotipo de um patrocinador (28/08/2026, decisao do PI).
+   *
+   * ROTA PROPRIA, e nao um parametro de `:id/media`: os dois tetos sao
+   * diferentes (2 MB contra 40 MB) e `limits.fileSize` do interceptor e
+   * fixado aqui, antes de o corpo subir a memoria. Uma rota so obrigaria a
+   * usar o MAIOR teto para os dois, e um PNG de 39 MB chegaria inteiro na
+   * memoria antes de o dominio o recusar.
+   *
+   * Devolve so a CHAVE: quem a coloca em `patrocinio.marcas[].logotipoKey`
+   * e o painel, na proxima gravacao do rascunho -- mesma divisao do upload
+   * de video.
+   */
+  @Post(':id/sponsor-logo')
+  @HttpCode(201)
+  @RequirePermissions('device.manage')
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['midiaKey'],
+      properties: { midiaKey: { type: 'string' } },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: TAMANHO_MAXIMO_DE_LOGOTIPO_BYTES } }),
+  )
+  async enviarLogotipo(
+    @Param('id') id: string,
+    @UploadedFile() arquivo: ArquivoRecebido | undefined,
+  ): Promise<{ midiaKey: string }> {
+    if (!arquivo) {
+      throw new BadRequestException({ code: 'FILE_REQUIRED' });
+    }
+
+    return this.midia.enviarLogotipo(this.contexto.require(), id, {
       originalFilename: arquivo.originalname,
       contentType: arquivo.mimetype,
       conteudo: new Uint8Array(arquivo.buffer),

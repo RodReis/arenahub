@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { BlocoDaTelaPublica } from '@arenahub/api-contracts';
+import type { BlocoDaTelaPublica, KioskConfig } from '@arenahub/api-contracts';
 
 import {
   OBJECT_STORAGE,
@@ -54,22 +54,69 @@ export class KioskMediaLinkService {
     resolvida: ConfiguracaoResolvida,
   ): Promise<ConfiguracaoResolvida> {
     const { itens } = resolvida.config.blocos;
+    const { marcas } = resolvida.config.patrocinio;
 
-    if (!itens.some((bloco) => bloco.tipo === 'VIDEO' && bloco.midiaKey !== null)) {
-      return resolvida;
-    }
+    const temVideo = itens.some((bloco) => bloco.tipo === 'VIDEO' && bloco.midiaKey !== null);
+    const temLogotipo = marcas.some((marca) => marca.logotipoKey !== null);
 
-    const resolvidos = await Promise.all(
-      itens.map(async (bloco) => this.resolverBloco(bloco, contexto)),
-    );
+    // Nada a assinar: devolve o objeto ORIGINAL, sem copia. Vale a pena
+    // porque a tela publica sem video nem logotipo e o caso comum.
+    if (!temVideo && !temLogotipo) return resolvida;
+
+    const [resolvidos, marcasResolvidas] = await Promise.all([
+      temVideo
+        ? Promise.all(itens.map(async (bloco) => this.resolverBloco(bloco, contexto)))
+        : Promise.resolve(itens),
+      temLogotipo
+        ? Promise.all(marcas.map(async (marca) => this.resolverLogotipo(marca, contexto)))
+        : Promise.resolve(marcas),
+    ]);
 
     return {
       version: resolvida.version,
       config: {
         ...resolvida.config,
         blocos: { ...resolvida.config.blocos, itens: resolvidos },
+        patrocinio: { ...resolvida.config.patrocinio, marcas: marcasResolvidas },
       },
     };
+  }
+
+  /**
+   * Chave do logotipo -> URL assinada, com as MESMAS tres travas do video.
+   *
+   * Nao e simetria estetica: sao os tres modos de falha que este servico ja
+   * aprendeu a tratar -- chave de tenant alheio (nunca assinada), storage
+   * fora do ar (cai em `null`, a faixa mostra o nome) e a CHAVE preservada
+   * na resposta, para que falha temporaria nao vire perda permanente na
+   * proxima gravacao do rascunho.
+   */
+  private async resolverLogotipo(
+    marca: KioskConfig['patrocinio']['marcas'][number],
+    contexto: ContextoDoKiosk,
+  ): Promise<KioskConfig['patrocinio']['marcas'][number]> {
+    if (marca.logotipoKey === null) return { ...marca, logotipoUrlAssinada: null };
+
+    if (!chaveDeMidiaPertenceA(marca.logotipoKey, contexto.tenantId, contexto.gymUnitId)) {
+      return { ...marca, logotipoUrlAssinada: null };
+    }
+
+    try {
+      const { downloadUrl } = await this.storage.createPrivateDownload({
+        key: marca.logotipoKey,
+        expiresInSeconds: VALIDADE_SEGUNDOS,
+        // COM a extensao da chave: `fileName` vira
+        // `content-disposition: attachment; filename="..."`, e um nome sem
+        // extensao daria "logotipo" solto a quem salvasse o arquivo. A
+        // chave ja carrega a extensao certa desde que `montarChaveDeMidia`
+        // passou a derivá-la do `content-type`.
+        fileName: `logotipo.${marca.logotipoKey.split('.').pop() ?? 'png'}`,
+      });
+
+      return { ...marca, logotipoUrlAssinada: downloadUrl };
+    } catch {
+      return { ...marca, logotipoUrlAssinada: null };
+    }
   }
 
   private async resolverBloco(

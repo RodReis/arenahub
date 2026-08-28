@@ -10,7 +10,11 @@ import {
 } from '@arenahub/api-contracts';
 import { Button, Field, SelectField, TextareaField } from '@arenahub/ui';
 
-import { enviarMidiaAction, ingerirMidiaDeLinkAction } from '../../../../actions/kiosk-midia';
+import {
+  enviarLogotipoAction,
+  enviarMidiaAction,
+  ingerirMidiaDeLinkAction,
+} from '../../../../actions/kiosk-midia';
 import { ROTULO_DO_TIPO, blocoNovo, mover, remover, substituir, tiposDisponiveis } from './blocos';
 import estilos from './formulario-de-configuracao.module.css';
 
@@ -166,7 +170,12 @@ export function AbaDeBlocos({
         </div>
       ) : null}
 
-      <FaixaDePatrocinio patrocinio={patrocinio} aoMudar={aoMudarPatrocinio} />
+      <FaixaDePatrocinio
+        patrocinio={patrocinio}
+        aoMudar={aoMudarPatrocinio}
+        kioskDeviceId={kioskDeviceId}
+        aoFalhar={aoFalhar}
+      />
     </div>
   );
 }
@@ -605,9 +614,13 @@ function EditorDeEventos({
 function FaixaDePatrocinio({
   patrocinio,
   aoMudar,
+  kioskDeviceId,
+  aoFalhar,
 }: {
   readonly patrocinio: KioskConfig['patrocinio'];
   readonly aoMudar: (patrocinio: KioskConfig['patrocinio']) => void;
+  readonly kioskDeviceId: string;
+  readonly aoFalhar: (mensagem: string) => void;
 }) {
   const cheia = patrocinio.marcas.length >= MAXIMO_DE_PATROCINADORES;
 
@@ -661,16 +674,16 @@ function FaixaDePatrocinio({
             }}
           />
 
-          <Field
-            id={`patrocinador-logo-${indice}`}
-            label="URL do logotipo"
-            type="url"
-            value={marca.logotipoUrl ?? ''}
-            onChange={(e) => {
+          <LogotipoDoPatrocinador
+            indice={indice}
+            logotipoKey={marca.logotipoKey}
+            kioskDeviceId={kioskDeviceId}
+            aoFalhar={aoFalhar}
+            aoMudarChave={(logotipoKey) => {
               aoMudar({
                 ...patrocinio,
                 marcas: patrocinio.marcas.map((atual, i) =>
-                  i === indice ? { ...atual, logotipoUrl: e.target.value || null } : atual,
+                  i === indice ? { ...atual, logotipoKey } : atual,
                 ),
               });
             }}
@@ -701,7 +714,7 @@ function FaixaDePatrocinio({
           onClick={() => {
             aoMudar({
               ...patrocinio,
-              marcas: [...patrocinio.marcas, { nome: '', logotipoUrl: null }],
+              marcas: [...patrocinio.marcas, { nome: '', logotipoKey: null }],
             });
           }}
           data-testid="acrescentar-patrocinador"
@@ -710,5 +723,81 @@ function FaixaDePatrocinio({
         </Button>
       )}
     </fieldset>
+  );
+}
+
+/**
+ * Upload do logotipo de um patrocinador (28/08/2026, decisao do PI).
+ *
+ * SUBSTITUI o campo "URL do logotipo". Ate aqui o gerente colava o endereco
+ * de uma imagem hospedada por terceiro; agora envia o arquivo, e a chave
+ * volta do servidor. Os dois motivos da troca estao no contrato
+ * (`kiosk-config.ts`): a faixa dependia de um host que a academia nao
+ * controla, e so entrava marca que ja estivesse na web.
+ *
+ * MESMO DESENHO do upload de video logo acima -- envia ao soltar o arquivo,
+ * limpa o campo na recusa, e o pai decide o que fazer com o erro. A chave
+ * entra no rascunho em MEMORIA: quem grava e "Salvar rascunho".
+ */
+function LogotipoDoPatrocinador({
+  indice,
+  logotipoKey,
+  kioskDeviceId,
+  aoMudarChave,
+  aoFalhar,
+}: {
+  readonly indice: number;
+  readonly logotipoKey: string | null;
+  readonly kioskDeviceId: string;
+  readonly aoMudarChave: (logotipoKey: string | null) => void;
+  readonly aoFalhar: (mensagem: string) => void;
+}) {
+  const [enviando, setEnviando] = useState(false);
+  const campo = useRef<HTMLInputElement>(null);
+
+  const enviar = async (arquivo: File) => {
+    setEnviando(true);
+
+    const dados = new FormData();
+
+    dados.set('file', arquivo);
+
+    const resultado = await enviarLogotipoAction(kioskDeviceId, dados);
+
+    setEnviando(false);
+
+    if (resultado.erro !== undefined) {
+      aoFalhar(resultado.erro);
+
+      // Limpa o campo: deixar o nome do arquivo recusado ali sugere que ele
+      // foi aceito, e o gerente sai da tela achando que publicou o logotipo.
+      if (campo.current) campo.current.value = '';
+
+      return;
+    }
+
+    aoMudarChave(resultado.logotipoKey ?? null);
+  };
+
+  return (
+    <div className={estilos['campoDeArquivo']}>
+      <label htmlFor={`patrocinador-logo-${indice}`}>Logotipo (PNG, JPEG ou WebP, até 2 MB)</label>
+      <input
+        ref={campo}
+        id={`patrocinador-logo-${indice}`}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        disabled={enviando}
+        onChange={(e) => {
+          const arquivo = e.target.files?.[0];
+
+          if (arquivo) void enviar(arquivo);
+        }}
+        data-testid={`patrocinador-logo-${indice}`}
+      />
+      <span className={estilos['dica']} data-testid={`estado-logo-${indice}`}>
+        {enviando ? 'Enviando…' : logotipoKey ? 'Logotipo enviado.' : 'Sem logotipo — a faixa mostra o nome.'}
+      </span>
+    </div>
   );
 }

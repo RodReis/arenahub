@@ -8,6 +8,7 @@ import { Button, Field, SelectField, useToast, useToastDeErro } from '@arenahub/
 import { Abas } from '../../../../../src/components/abas';
 import { AbaDeBlocos } from './aba-de-blocos';
 import { AbaDeModulos } from './aba-de-modulos';
+import { problemasDoRascunho } from './blocos';
 import {
   descartarAction,
   publicarAction,
@@ -115,7 +116,32 @@ export function FormularioDeConfiguracao({ estado, kioskDeviceId }: Props) {
     setRascunho((atual) => ({ ...atual, modulos }));
   };
 
+  /**
+   * Recusa o envio quando o proprio painel sabe o motivo.
+   *
+   * O servidor continua validando -- isto nao o substitui. O que muda e a
+   * MENSAGEM: ate 28/08/2026 uma linha de patrocinador em branco (criada
+   * pelo botao "+ Patrocinador", que nasce com `nome: ''`) voltava do
+   * servidor como "VALIDATION_FAILED", sem dizer qual campo nem o que
+   * fazer. Relatado pelo PI com dois toasts identicos na tela.
+   *
+   * Devolve `true` quando barrou, para o chamador sair sem enviar.
+   */
+  const barrouPorProblema = (): boolean => {
+    const problemas = problemasDoRascunho(rascunho);
+
+    if (problemas.length === 0) return false;
+
+    // Uma frase por linha com defeito, todas visiveis: mostrar so a
+    // primeira faria o gerente corrigir, salvar e reencontrar a proxima.
+    show('error', problemas.join(' '), 'rascunho-invalido');
+
+    return true;
+  };
+
   const salvar = async () => {
+    if (barrouPorProblema()) return;
+
     setSalvando(true);
     setErro(null);
 
@@ -133,6 +159,10 @@ export function FormularioDeConfiguracao({ estado, kioskDeviceId }: Props) {
   };
 
   const publicar = async () => {
+    // Publicar promove o RASCUNHO: o mesmo defeito que barra o salvamento
+    // barraria a publicacao, e no servidor -- com a mesma mensagem opaca.
+    if (barrouPorProblema()) return;
+
     setPublicando(true);
     setErro(null);
 

@@ -4687,6 +4687,44 @@
         ]
       }
     },
+    "/api/v1/admin/kiosk-devices/{id}/sponsor-logo": {
+      "post": {
+        "operationId": "KioskAdminController_enviarLogotipo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "midiaKey"
+                  ],
+                  "properties": {
+                    "midiaKey": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "KioskAdmin"
+        ]
+      }
+    },
     "/api/v1/admin/kiosk-devices/{id}/media/from-link": {
       "post": {
         "operationId": "KioskAdminController_ingerirMidiaDeLink",
