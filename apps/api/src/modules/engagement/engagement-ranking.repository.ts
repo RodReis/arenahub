@@ -277,6 +277,32 @@ export class EngagementRankingRepository implements PortaDeRanking {
     // A categoria no `where` NAO e detalhe: sem ela, gerar o placar de
     // frequencia de agosto apagaria o rascunho de XP de agosto, e o operador
     // so descobriria ao tentar publicar e nao achar.
+    /*
+     * O `deleteMany` abaixo apaga so DRAFT e WITHHELD -- o PUBLISHED e
+     * imutavel (`M5-AC-007`) e continua ocupando a chave unica
+     * `(tenant, unidade, mes, categoria)`. Regerar um mes ja publicado colide
+     * no `create`, e sem esta traducao a colisao subia como 500 generico:
+     * o operador via "erro interno" quando o que aconteceu foi a REGRA
+     * funcionando. Achado abrindo a tela, nao pelo CI.
+     */
+    try {
+      return await this.criarSnapshot(entrada, contexto);
+    } catch (erro) {
+      if (ehColisaoDeUnicidade(erro)) {
+        throw new ConflictException({
+          code: 'RANKING_SNAPSHOT_IMUTAVEL',
+          message: 'RANKING_SNAPSHOT_IMUTAVEL',
+        });
+      }
+
+      throw erro;
+    }
+  }
+
+  private async criarSnapshot(
+    entrada: EntradaParaSalvarSnapshot,
+    contexto: TenantContext,
+  ): Promise<SnapshotDeRanking> {
     const criado = await this.db.$transaction(async (tx) => {
       await tx.rankingSnapshot.deleteMany({
         where: {
@@ -591,4 +617,12 @@ function contarSemanasDistintas(
     points: dado.semanas.size,
     lastEntryAt: dado.lastEntryAt,
   }));
+}
+
+/*
+ * Duck-typed, nao `instanceof Prisma.PrismaClientKnownRequestError`: mesmo
+ * padrao ja usado em `engagement-xp.service.ts` e nos casos de uso de billing.
+ */
+function ehColisaoDeUnicidade(erro: unknown): boolean {
+  return typeof erro === 'object' && erro !== null && 'code' in erro && erro.code === 'P2002';
 }
