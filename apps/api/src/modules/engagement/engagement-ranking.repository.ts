@@ -6,7 +6,10 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 import type { SaldoParaClassificar } from './domain/classificacao.js';
 import type { DecisaoDeEngajamento } from './domain/participacao.js';
 import { abreviarNome, type IdentidadeEscolhida, type StatusDoPerfilPublico } from './domain/exposicao.js';
-import { inicioDaSemanaLocal } from './domain/semana-de-consistencia.js';
+import {
+  POLITICA_DE_STREAK,
+  inicioDaSemanaLocal,
+} from './domain/semana-de-consistencia.js';
 
 /** Token de injecao da porta -- o modulo Nest liga isto ao repositorio Prisma. */
 export const PORTA_DE_RANKING = Symbol('PortaDeRanking');
@@ -203,7 +206,7 @@ export class EngagementRankingRepository implements PortaDeRanking {
 
     return category === 'FREQUENCIA'
       ? contarSessoes(sessoes)
-      : contarSemanasDistintas(sessoes);
+      : contarSemanasQualificadas(sessoes);
   }
 
   /**
@@ -568,7 +571,7 @@ interface SessaoParaContagem {
 }
 
 /** Quantas sessoes confirmadas o aluno teve no mes -- categoria FREQUENCIA. */
-function contarSessoes(sessoes: readonly SessaoParaContagem[]): SaldoParaClassificar[] {
+export function contarSessoes(sessoes: readonly SessaoParaContagem[]): SaldoParaClassificar[] {
   const porAluno = new Map<string, { points: number; lastEntryAt: Date }>();
 
   for (const sessao of sessoes) {
@@ -587,36 +590,67 @@ function contarSessoes(sessoes: readonly SessaoParaContagem[]): SaldoParaClassif
 }
 
 /**
- * Em quantas SEMANAS DISTINTAS o aluno treinou no mes -- categoria
- * CONSISTENCIA.
+ * Em quantas semanas o aluno ATINGIU A META no mes -- categoria CONSISTENCIA.
  *
- * Premia regularidade, nao volume: quem treina 3x por semana toda semana
- * ganha de quem treina 15x numa semana so e some. Reusa
- * `inicioDaSemanaLocal()` da F32 em vez de recalcular semana aqui -- duas
+ * A meta vem de `POLITICA_DE_STREAK.diasPorSemana`, a MESMA politica que o
+ * streak do aluno usa (F32) -- e nao um numero fixo aqui. Duas definicoes de
+ * "semana boa" divergiriam no dia em que a academia mudasse a meta, e o
+ * aluno veria um numero no streak e outro no placar.
+ *
+ * CONTA SEMANA QUALIFICADA, NAO SEMANA TOCADA. A primeira versao contava
+ * qualquer semana com pelo menos uma sessao, e isso fazia quem aparece 1x por
+ * semana empatar com quem bate a meta toda semana -- apagando exatamente a
+ * distincao que a categoria existe para medir. O comentario ja prometia
+ * "regularidade, nao volume"; o codigo nao cumpria.
+ *
+ * Reusa `inicioDaSemanaLocal()` da F32 em vez de recalcular semana aqui: duas
  * definicoes de "que semana e esta" divergiriam na virada de ano.
  */
-function contarSemanasDistintas(
+export function contarSemanasQualificadas(
   sessoes: readonly SessaoParaContagem[],
 ): SaldoParaClassificar[] {
-  const porAluno = new Map<string, { semanas: Set<string>; lastEntryAt: Date }>();
+  const porAluno = new Map<string, Map<string, Date[]>>();
 
   for (const sessao of sessoes) {
-    const atual = porAluno.get(sessao.studentId) ?? {
-      semanas: new Set<string>(),
-      lastEntryAt: sessao.sessionDate,
-    };
+    const semana = inicioDaSemanaLocal(diaLocal(sessao.sessionDate));
+    const semanas = porAluno.get(sessao.studentId) ?? new Map<string, Date[]>();
+    const dias = semanas.get(semana) ?? [];
 
-    atual.semanas.add(inicioDaSemanaLocal(diaLocal(sessao.sessionDate)));
-    if (sessao.sessionDate > atual.lastEntryAt) atual.lastEntryAt = sessao.sessionDate;
-
-    porAluno.set(sessao.studentId, atual);
+    dias.push(sessao.sessionDate);
+    semanas.set(semana, dias);
+    porAluno.set(sessao.studentId, semanas);
   }
 
-  return [...porAluno].map(([studentId, dado]) => ({
-    studentId,
-    points: dado.semanas.size,
-    lastEntryAt: dado.lastEntryAt,
-  }));
+  const resultado: SaldoParaClassificar[] = [];
+
+  for (const [studentId, semanas] of porAluno) {
+    let qualificadas = 0;
+    let lastEntryAt: Date | null = null;
+
+    for (const dias of semanas.values()) {
+      // Dias DISTINTOS: a F24 ja deduplica por dia local no indice unico, mas
+      // contar as linhas cruas aqui deixaria a regra depender daquele indice
+      // continuar existindo -- e ele nao e desta fatia.
+      const diasDistintos = new Set(dias.map(diaLocal)).size;
+      if (diasDistintos < POLITICA_DE_STREAK.diasPorSemana) continue;
+
+      qualificadas += 1;
+
+      // `lastEntryAt` sai das semanas QUE CONTARAM: vindo de uma semana nao
+      // qualificada, o desempate usaria um dia que nao gerou ponto nenhum.
+      for (const dia of dias) {
+        if (lastEntryAt === null || dia > lastEntryAt) lastEntryAt = dia;
+      }
+    }
+
+    // Aluno sem nenhuma semana qualificada nao entra no placar -- zero aqui
+    // nao e "ultimo lugar", e nao ter atingido a meta em mes nenhum.
+    if (qualificadas > 0 && lastEntryAt !== null) {
+      resultado.push({ studentId, points: qualificadas, lastEntryAt });
+    }
+  }
+
+  return resultado;
 }
 
 /*

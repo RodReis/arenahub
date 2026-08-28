@@ -108,12 +108,18 @@ export interface PortaDeEngajamento {
 
   // --- F35: contestacoes -------------------------------------------------
   criarContestacao(entrada: EntradaDeContestacao, agora: Date): Promise<ContestacaoGravada>;
-  contestacaoPorId(tenantId: string, id: string): Promise<ContestacaoGravada | null>;
+  contestacaoPorId(
+    tenantId: string,
+    id: string,
+    escopo: EscopoDeUnidade,
+  ): Promise<ContestacaoGravada | null>;
   gravarResolucao(entrada: EntradaDeResolucaoNoBanco, agora: Date): Promise<ContestacaoGravada>;
   listarContestacoes(
     tenantId: string,
     status: StatusDaContestacao,
     limite: number,
+    /** Unidades que o ator pode ver. `'ALL'` = tenant inteiro. */
+    escopo: EscopoDeUnidade,
   ): Promise<ContestacaoParaFila[]>;
   contestacoesDoAluno(tenantId: string, studentId: string): Promise<ContestacaoGravada[]>;
 
@@ -156,6 +162,15 @@ export interface ConfiguracaoDeEngajamento {
   /** Teto da correcao manual em pontos absolutos. `null` = sem teto. */
   correctionLimitPoints: number | null;
 }
+
+/**
+ * Unidades sobre as quais o ator pode agir -- espelha `TenantContext.allowedUnitIds`.
+ *
+ * A contestacao NAO tem `gymUnitId` proprio: a unidade e a do ALUNO, entao o
+ * filtro atravessa a relacao. Mesmo padrao de `ajustarXp` (F31), que barra
+ * gerente restrito a uma unidade de mexer em aluno de outra.
+ */
+export type EscopoDeUnidade = 'ALL' | ReadonlySet<string>;
 
 /** O que o service pede para abrir uma contestacao. */
 export interface EntradaDeContestacao {
@@ -480,8 +495,14 @@ export class EngagementRepository implements PortaDeEngajamento {
     return paraContestacao(criada);
   }
 
-  async contestacaoPorId(tenantId: string, id: string): Promise<ContestacaoGravada | null> {
-    const linha = await this.db.engagementDispute.findFirst({ where: { id, tenantId } });
+  async contestacaoPorId(
+    tenantId: string,
+    id: string,
+    escopo: EscopoDeUnidade,
+  ): Promise<ContestacaoGravada | null> {
+    const linha = await this.db.engagementDispute.findFirst({
+      where: { id, tenantId, ...filtroDeUnidade(escopo) },
+    });
     return linha ? paraContestacao(linha) : null;
   }
 
@@ -532,9 +553,10 @@ export class EngagementRepository implements PortaDeEngajamento {
     tenantId: string,
     status: StatusDaContestacao,
     limite: number,
+    escopo: EscopoDeUnidade,
   ): Promise<ContestacaoParaFila[]> {
     const linhas = await this.db.engagementDispute.findMany({
-      where: { tenantId, status },
+      where: { tenantId, status, ...filtroDeUnidade(escopo) },
       orderBy: [{ createdAt: 'asc' }],
       take: limite,
       include: { student: { select: { fullName: true } } },
@@ -728,4 +750,17 @@ function traduzirErroDeColisao(erro: unknown): unknown {
   }
 
   return erro;
+}
+
+/**
+ * Filtro de unidade, atravessando a relacao com o aluno.
+ *
+ * `'ALL'` devolve objeto vazio -- espalhar `{}` num `where` do Prisma nao
+ * acrescenta condicao, entao quem tem o tenant inteiro ve tudo sem ramo
+ * especial no chamador.
+ */
+function filtroDeUnidade(escopo: EscopoDeUnidade) {
+  if (escopo === 'ALL') return {};
+
+  return { student: { gymUnitId: { in: [...escopo] } } };
 }

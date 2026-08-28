@@ -7,6 +7,7 @@ import type { StatusDaContestacao } from './domain/contestacao.js';
 import type {
   AlunoParaExposicao,
   ConfiguracaoDeEngajamento,
+  EscopoDeUnidade,
   IndicadoresDeEngajamento,
   ContestacaoGravada,
   ContestacaoParaFila,
@@ -34,6 +35,8 @@ export interface AlunoDeTeste {
   tenantId: string;
   name: string;
   status: StudentStatus;
+  /** Unidade de matricula -- o que o filtro de escopo atravessa (F35). */
+  gymUnitId?: string;
 }
 
 /** Linha de decisao guardada em memoria, no formato de ConsentRecord. */
@@ -290,9 +293,23 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
     return Promise.resolve({ ...criada });
   }
 
-  contestacaoPorId(tenantId: string, id: string): Promise<ContestacaoGravada | null> {
-    const achada = this.contestacoes.find((c) => c.id === id && c.tenantId === tenantId);
+  contestacaoPorId(
+    tenantId: string,
+    id: string,
+    escopo: EscopoDeUnidade = 'ALL',
+  ): Promise<ContestacaoGravada | null> {
+    const achada = this.contestacoes.find(
+      (c) => c.id === id && c.tenantId === tenantId && this.dentroDoEscopo(c.studentId, escopo),
+    );
     return Promise.resolve(achada ? { ...achada } : null);
+  }
+
+  /** Espelha `filtroDeUnidade` do repositorio real: a unidade e a do ALUNO. */
+  private dentroDoEscopo(studentId: string, escopo: EscopoDeUnidade): boolean {
+    if (escopo === 'ALL') return true;
+
+    const unidade = this.alunos.get(studentId)?.gymUnitId;
+    return unidade !== undefined && escopo.has(unidade);
   }
 
   gravarResolucao(entrada: EntradaDeResolucaoNoBanco, agora: Date): Promise<ContestacaoGravada> {
@@ -323,9 +340,15 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
     tenantId: string,
     status: StatusDaContestacao,
     limite: number,
+    escopo: EscopoDeUnidade = 'ALL',
   ): Promise<ContestacaoParaFila[]> {
     const filtradas = this.contestacoes
-      .filter((c) => c.tenantId === tenantId && c.status === status)
+      .filter(
+        (c) =>
+          c.tenantId === tenantId &&
+          c.status === status &&
+          this.dentroDoEscopo(c.studentId, escopo),
+      )
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       .slice(0, limite);
 

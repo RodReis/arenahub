@@ -20,6 +20,7 @@ import {
 } from './domain/contestacao.js';
 import {
   type ConfiguracaoDeEngajamento,
+  type EscopoDeUnidade,
   type IndicadoresDeEngajamento,
   type ContestacaoGravada,
   type ContestacaoParaFila,
@@ -318,8 +319,14 @@ export class EngagementService {
   async listarContestacoes(
     tenantId: string,
     status: StatusDaContestacao,
+    escopo: EscopoDeUnidade = 'ALL',
   ): Promise<readonly ContestacaoParaFila[]> {
-    return this.repo.listarContestacoes(tenantId, status, EngagementService.LIMITE_DA_FILA);
+    return this.repo.listarContestacoes(
+      tenantId,
+      status,
+      EngagementService.LIMITE_DA_FILA,
+      escopo,
+    );
   }
 
   /** As contestacoes do proprio aluno -- o que o totem mostra. */
@@ -346,8 +353,14 @@ export class EngagementService {
     actorId: string,
     agora: Date,
     correctionEntryId: string | null = null,
+    escopo: EscopoDeUnidade = 'ALL',
   ): Promise<ContestacaoGravada> {
-    const atual = await this.repo.contestacaoPorId(tenantId, id);
+    /*
+     * O escopo entra na LEITURA, e por isso contestacao de outra unidade cai
+     * no mesmo 404 de "nao existe" -- distinguir as duas respostas denunciaria
+     * a existencia da contestacao alheia. Mesmo padrao de `ajustarXp`.
+     */
+    const atual = await this.repo.contestacaoPorId(tenantId, id, escopo);
 
     if (!atual) {
       throw new NotFoundException({

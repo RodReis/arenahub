@@ -86,7 +86,17 @@ export class EngagementContestacoesController {
     const { status } = esquemaDeListagem.parse(consulta);
     const contexto = this.contexto.require();
 
-    const itens = await this.engajamento.listarContestacoes(contexto.tenantId, status);
+    /*
+     * ESCOPO DE UNIDADE: um gerente restrito a unidade A nao ve contestacao de
+     * aluno da unidade B. Mesmo padrao de `ajustarXp` (F31) -- resolver com
+     * desfecho CORRIGIDA admite que houve correcao de saldo, e e o mesmo ato
+     * visto do outro lado.
+     */
+    const itens = await this.engajamento.listarContestacoes(
+      contexto.tenantId,
+      status,
+      contexto.allowedUnitIds,
+    );
 
     return { itens: itens.map((item) => this.paraItemDaFila(item)) };
   }
@@ -109,6 +119,8 @@ export class EngagementContestacoesController {
       entrada,
       contexto.actorId,
       new Date(),
+      null,
+      contexto.allowedUnitIds,
     );
 
     return this.paraDto(resolvida);
