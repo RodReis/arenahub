@@ -90,5 +90,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-28 | #215 | INFRA-215 | integração | 753 | 753 | 0 | 83.9 | [#216](https://github.com/RodReis/arenahub/pull/216) |
 | 2026-08-28 | #34 | SPEC-034 | unitário | 2409 | 2409 | 0 | 76.6 | [#219](https://github.com/RodReis/arenahub/pull/219) |
 | 2026-08-28 | #34 | SPEC-034 | integração | 764 | 764 | 0 | 83.9 | [#219](https://github.com/RodReis/arenahub/pull/219) |
-| 2026-08-28 | #220 | — | unitário | 2447 | 2447 | 0 | 76.6 | — |
-| 2026-08-28 | #220 | — | integração | 764 | 764 | 0 | 83.9 | — |
+| 2026-08-28 | #220 | — | unitário | 2447 | 2447 | 0 | 76.6 | [#221](https://github.com/RodReis/arenahub/pull/221) |
+| 2026-08-28 | #220 | — | integração | 764 | 764 | 0 | 83.9 | [#221](https://github.com/RodReis/arenahub/pull/221) |
