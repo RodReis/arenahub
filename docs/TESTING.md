@@ -581,7 +581,7 @@ no banco — asserção só na resposta HTTP não distinguiria dedupe de regrava
 
 ### Evidência da `SPEC-035` — F35, operação, moderação e experimento
 
-**PR: `—`** — preencher depois do merge, pela regra do topo desta seção.
+**PR: [#222](https://github.com/RodReis/arenahub/pull/222)** — preenchido depois do merge, pela regra do topo desta seção.
 
 `pnpm test:report --issue 35 --spec SPEC-035`, rodado em 28/08/2026, confirma o **unitário**:
 

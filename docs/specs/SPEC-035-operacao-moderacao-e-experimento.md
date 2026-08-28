@@ -6,7 +6,7 @@
 | **MVP** | 5 |
 | **Slice do PRD** | **5.6** — `docs/prd/academia/MVP-05-engagement.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-05-06-operations-experiment.md` |
-| **Status** | ✅ **entregue** em 28/08/2026 |
+| **Status** | ✅ **entregue** em 28/08/2026 — [PR #222](https://github.com/RodReis/arenahub/pull/222) |
 | **ADRs que bloqueiam** | nenhum — **ADR-049** autoriza a fatia antes do gate do MVP 5 |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo e os requisitos (`M5-FR/BR/NFR/AC`) moram no
