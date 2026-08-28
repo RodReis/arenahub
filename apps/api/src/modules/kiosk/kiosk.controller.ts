@@ -26,6 +26,18 @@ import { KioskPagamentoService, type CobrancaDoTotem } from './kiosk-pagamento.s
 import { KioskSaudeService } from './kiosk-saude.service.js';
 import { KioskSessionService, type SessaoAberta } from './kiosk-session.service.js';
 import { KioskXpService } from './kiosk-xp.service.js';
+import { KioskDesafiosService } from './kiosk-desafios.service.js';
+
+/**
+ * Avisos que o totem acabou de exibir (F34).
+ *
+ * `.strict()` e lista NAO vazia: chamada com `ids: []` seria trabalho a toa,
+ * e o `updateMany` do repositorio ja curto-circuita nesse caso -- exigir aqui
+ * torna o contrato explicito em vez de silenciosamente inerte.
+ */
+const avisosLidosSchema = z
+  .object({ ids: z.array(z.string().trim().min(1)).min(1) })
+  .strict();
 
 const heartbeatSchema = z.object({
   agentVersion: z.string().min(1),
@@ -54,6 +66,7 @@ export class KioskController {
     private readonly saude: KioskSaudeService,
     private readonly engajamento: KioskEngajamentoService,
     private readonly xp: KioskXpService,
+    private readonly desafios: KioskDesafiosService,
   ) {}
 
   @Post('heartbeat')
@@ -740,5 +753,165 @@ export class KioskController {
     }
 
     return contexto;
+  }
+
+  /**
+   * Desafios do aluno (F34, Slice 5.5, ADR-048).
+   *
+   * `'desafios'` e o modulo: desligado responde 404 sem consultar a sessao,
+   * como todo endpoint desta area (`KioskAreaDoAlunoService.resolver`).
+   *
+   * A lista APURA antes de ler -- desafio cuja janela fechou e encerrado na
+   * hora. Nao ha agendador nesta fatia: sem canal externo nao existe "enviar
+   * num horario", e o `CLAUDE.md` so admite fila quando comprovadamente
+   * necessario.
+   */
+  @Get('sessions/:id/engajamento/desafios')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['desafios', 'avisos'],
+      properties: {
+        desafios: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['id', 'title', 'meta', 'progresso', 'inscrito', 'startsOn', 'endsOn'],
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              title: { type: 'string' },
+              meta: { type: 'integer' },
+              progresso: { type: 'integer' },
+              inscrito: { type: 'boolean' },
+              startsOn: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+              endsOn: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+            },
+          },
+        },
+        avisos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['id', 'challengeTitle', 'kind', 'lido'],
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              challengeTitle: { type: 'string' },
+              kind: {
+                type: 'string',
+                enum: ['DISPONIVEL', 'CONCLUIDO', 'ENCERRADO_SEM_META'],
+              },
+              lido: { type: 'boolean' },
+            },
+          },
+        },
+      },
+    },
+  })
+  async listarDesafios(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'desafios',
+      agora,
+    );
+
+    return this.desafios.listar(aluno, agora);
+  }
+
+  /** Adesao -- OPT-IN (`M5-BR-001`): so entra quem pede para entrar. */
+  @Post('sessions/:id/engajamento/desafios/:challengeId/join')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['ok'],
+      properties: { ok: { type: 'boolean' } },
+    },
+  })
+  async entrarNoDesafio(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Param('challengeId') challengeId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ): Promise<{ ok: true }> {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'desafios',
+      agora,
+    );
+
+    await this.desafios.inscrever(aluno, challengeId, agora);
+
+    return { ok: true };
+  }
+
+  /** Saida (`M5-FR-014`) -- a linha vira `LEFT`, o historico fica. */
+  @Delete('sessions/:id/engajamento/desafios/:challengeId/join')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['ok'],
+      properties: { ok: { type: 'boolean' } },
+    },
+  })
+  async sairDoDesafio(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Param('challengeId') challengeId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ): Promise<{ ok: true }> {
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'desafios',
+      new Date(),
+    );
+
+    await this.desafios.sair(aluno, challengeId);
+
+    return { ok: true };
+  }
+
+  /**
+   * Marca avisos como lidos.
+   *
+   * O totem chama isto DEPOIS de exibir: marcar na leitura da lista faria o
+   * aviso sumir de um aluno que apenas passou pela aba sem ler nada.
+   */
+  @Post('sessions/:id/engajamento/desafios/avisos/lidos')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['ok'],
+      properties: { ok: { type: 'boolean' } },
+    },
+  })
+  async marcarAvisosComoLidos(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+    @Body() corpo: unknown,
+  ): Promise<{ ok: true }> {
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'desafios',
+      new Date(),
+    );
+
+    const dados = avisosLidosSchema.parse(corpo);
+    await this.desafios.marcarAvisosComoLidos(aluno, dados.ids);
+
+    return { ok: true };
   }
 }

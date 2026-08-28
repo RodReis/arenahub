@@ -199,6 +199,15 @@ export const kioskConfigSchema = z.object({
     historicoDeAvaliacoes: z.boolean(),
     ranking: z.boolean(),
     xp: z.boolean(),
+    /**
+     * Desafios na area do aluno (F34, Slice 5.5, ADR-048).
+     *
+     * Config ja publicada NAO tem esta chave, e nao precisa ter: `sobrepor`
+     * mescla a camada sobre o padrao, e ausente herda `false`. Nenhuma
+     * republicacao e exigida de quem ja configurou o totem -- o modulo nasce
+     * desligado, como todos os outros (`M5-BR-001`).
+     */
+    desafios: z.boolean(),
   }),
   /**
    * Tela publica (F51). A ORDEM DO ARRAY E A ORDEM DO RODIZIO -- nao ha
@@ -303,6 +312,7 @@ export const CONFIG_PADRAO_DO_TOTEM: KioskConfig = {
     historicoDeAvaliacoes: false,
     ranking: false,
     xp: false,
+    desafios: false,
   },
   /**
    * Nenhum bloco por padrao. O `DS-TOTEM.md` §4 ja cobre este estado -- "se

@@ -182,6 +182,23 @@ export class FakePortaDeDesafios implements PortaDeDesafios {
     );
   }
 
+  desafiosVencidosDoAluno(
+    _ctx: TenantContext,
+    studentId: string,
+    hoje: string,
+  ): Promise<{ id: string }[]> {
+    return Promise.resolve(
+      [...this.desafios.values()]
+        .filter(
+          (d) =>
+            d.status === 'ACTIVE' &&
+            d.endsOn < hoje &&
+            this.participacoes.get(`${d.id}:${studentId}`)?.status === 'JOINED',
+        )
+        .map((d) => ({ id: d.id })),
+    );
+  }
+
   concluirParticipacao(
     _ctx: TenantContext,
     participantId: string,

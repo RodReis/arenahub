@@ -11,6 +11,12 @@ import { EngagementXpService } from './engagement-xp.service.js';
 import { EngagementRankingRepository, PORTA_DE_RANKING } from './engagement-ranking.repository.js';
 import { EngagementRankingService } from './engagement-ranking.service.js';
 import { EngagementRankingSchedulerService } from './engagement-ranking-scheduler.service.js';
+import { EngagementChallengesController } from './engagement-challenges.controller.js';
+import {
+  EngagementChallengesRepository,
+  PORTA_DE_DESAFIOS,
+} from './engagement-challenges.repository.js';
+import { EngagementChallengesService } from './engagement-challenges.service.js';
 
 /**
  * Preferencia de engajamento e identidade publica (F30, ADR-046) + XP e
@@ -29,12 +35,13 @@ import { EngagementRankingSchedulerService } from './engagement-ranking-schedule
  */
 @Module({
   imports: [PersistenceModule],
-  controllers: [EngagementController, EngagementXpController],
+  controllers: [EngagementController, EngagementXpController, EngagementChallengesController],
   providers: [
     EngagementService,
     EngagementXpService,
     EngagementRankingService,
     EngagementRankingSchedulerService,
+    EngagementChallengesService,
     // `TenantContextService` e injetado pelo `EngagementController` e precisa
     // ser declarado AQUI, como `PrivacyModule` e `KioskAdminModule` fazem.
     // Sem esta linha o Nest nao resolve o controller e derruba o boot da
@@ -46,7 +53,15 @@ import { EngagementRankingSchedulerService } from './engagement-ranking-schedule
     { provide: PORTA_DE_ENGAJAMENTO, useClass: EngagementRepository },
     { provide: PORTA_DE_XP, useClass: EngagementXpRepository },
     { provide: PORTA_DE_RANKING, useClass: EngagementRankingRepository },
+    { provide: PORTA_DE_DESAFIOS, useClass: EngagementChallengesRepository },
   ],
-  exports: [EngagementService, EngagementXpService, EngagementRankingService],
+  exports: [
+    EngagementService,
+    EngagementXpService,
+    EngagementRankingService,
+    // O KioskModule consome os desafios como caso de uso publico (regra de
+    // arquitetura 9) -- nunca lendo `Challenge`/`ChallengeParticipant` direto.
+    EngagementChallengesService,
+  ],
 })
 export class EngagementModule {}

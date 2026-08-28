@@ -65,6 +65,8 @@ describe('resolverConfig -- tres camadas, a mais especifica vence', () => {
       historicoDeAvaliacoes: false,
       ranking: false,
       xp: false,
+      // F34: nasce desligado como todos os outros (`M5-BR-001`).
+      desafios: false,
     });
   });
 

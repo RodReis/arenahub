@@ -111,6 +111,19 @@ export interface PortaDeDesafios {
     challengeId: string,
   ): Promise<{ studentId: string; participantId: string }[]>;
 
+  /**
+   * Desafios AINDA `ACTIVE` cuja janela ja fechou e em que ESTE aluno segue
+   * `JOINED` -- o que a apuracao sob demanda do totem precisa encerrar.
+   *
+   * Filtra pelo aluno de proposito: varrer o tenant inteiro a cada abertura
+   * de totem faria o custo crescer com o numero de desafios da academia.
+   */
+  desafiosVencidosDoAluno(
+    ctx: TenantContext,
+    studentId: string,
+    hoje: string,
+  ): Promise<{ id: string }[]>;
+
   concluirParticipacao(ctx: TenantContext, participantId: string, quando: Date): Promise<void>;
   reprovarParticipacao(ctx: TenantContext, participantId: string): Promise<void>;
   fecharDesafio(ctx: TenantContext, challengeId: string, quando: Date): Promise<void>;
@@ -296,6 +309,24 @@ export class EngagementChallengesRepository implements PortaDeDesafios {
     });
 
     return linhas.map((l) => ({ studentId: l.studentId, participantId: l.id }));
+  }
+
+  async desafiosVencidosDoAluno(
+    ctx: TenantContext,
+    studentId: string,
+    hoje: string,
+  ): Promise<{ id: string }[]> {
+    const linhas = await this.prisma.challenge.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        status: 'ACTIVE',
+        endsOn: { lt: paraDataDoBanco(hoje) },
+        participants: { some: { studentId, status: 'JOINED' } },
+      },
+      select: { id: true },
+    });
+
+    return linhas;
   }
 
   async concluirParticipacao(

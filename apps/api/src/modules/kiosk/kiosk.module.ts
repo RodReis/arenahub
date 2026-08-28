@@ -14,6 +14,7 @@ import { KioskConfigService } from './kiosk-config.service.js';
 import { KioskMediaLinkService } from './kiosk-media-link.service.js';
 import { KioskSessionService } from './kiosk-session.service.js';
 import { KioskXpService } from './kiosk-xp.service.js';
+import { KioskDesafiosService } from './kiosk-desafios.service.js';
 import { KioskController } from './kiosk.controller.js';
 
 /**
@@ -55,6 +56,7 @@ import { KioskController } from './kiosk.controller.js';
     KioskSaudeService,
     KioskEngajamentoService,
     KioskXpService,
+    KioskDesafiosService,
   ],
 })
 export class KioskModule {}

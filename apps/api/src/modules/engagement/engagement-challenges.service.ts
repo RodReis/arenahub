@@ -171,6 +171,27 @@ export class EngagementChallengesService {
     );
   }
 
+  /**
+   * Desafios em que ESTE aluno esta inscrito e cuja janela ja fechou.
+   *
+   * Alimenta a apuracao sob demanda do totem (ADR-048, Decisao 3): sem canal
+   * externo nao ha o que "enviar" num horario, entao nao ha agendador -- quem
+   * dispara a apuracao e o proprio aluno ao abrir a aba.
+   *
+   * A varredura e do ALUNO, nao do tenant: um `encerrar()` de todos os
+   * desafios vencidos a cada abertura de totem faria o custo crescer com o
+   * numero de desafios da academia, nao com o do aluno na frente da tela.
+   */
+  async pendentesDeApuracao(
+    ctx: TenantContext,
+    studentId: string,
+    hoje: string,
+  ): Promise<{ id: string }[]> {
+    const vencidos = await this.porta.desafiosVencidosDoAluno(ctx, studentId, hoje);
+
+    return vencidos.map((d) => ({ id: d.id }));
+  }
+
   async inscrever(
     ctx: TenantContext,
     challengeId: string,
