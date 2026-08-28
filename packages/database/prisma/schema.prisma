@@ -620,6 +620,10 @@ model Tenant {
   achievementDefinitions AchievementDefinitionVersion[]
   achievements           StudentAchievement[]
   rankingSnapshots       RankingSnapshot[]
+  challengeTemplates     ChallengeTemplateVersion[]
+  challenges             Challenge[]
+  challengeParticipants  ChallengeParticipant[]
+  challengeNotices       ChallengeNotice[]
 
   /// Minimo de participantes para publicar um placar (`M5-BR-007`).
   /// ADR-047: 5. Configuravel por tenant -- academia pequena e academia
@@ -658,6 +662,7 @@ model GymUnit {
   attendanceSessions    StudentAttendanceSession[]
 
   rankingSnapshots RankingSnapshot[]
+  challenges       Challenge[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1011,6 +1016,8 @@ model Student {
   xpBalances      StudentXpBalance[]
   achievements    StudentAchievement[]
   rankingEntries  RankingEntry[]
+  challengeParticipations ChallengeParticipant[]
+  challengeNotices        ChallengeNotice[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -4419,4 +4426,217 @@ model RankingEntry {
   @@unique([snapshotId, position])
   @@index([snapshotId, position])
   @@map("ranking_entries")
+}
+
+// ---------------------------------------------------------------------------
+// F34 -- Desafios e avisos (Slice 5.5, ADR-048)
+// ---------------------------------------------------------------------------
+
+/// O que um desafio mede. Enum e nao expressao, pela MESMA razao de
+/// `XpTrigger` (`M5-RULES-01`): metrica em string livre e regra executavel
+/// chegando por dado, e ai o limite profissional do `M5-BR-011` vira
+/// decoracao -- nao ha como validar teto de algo que voce nao sabe o que e.
+enum ChallengeMetric {
+  /// Numero de sessoes confirmadas na janela. Le
+  /// `StudentAttendanceSession` (F24), a mesma projecao que o XP usa.
+  SESSOES_NA_JANELA
+
+  @@map("challenge_metric")
+}
+
+enum ChallengeStatus {
+  /// Criado, ainda nao aberto a inscricao.
+  DRAFT
+  /// Aceitando inscricao e medindo progresso.
+  ACTIVE
+  /// Janela terminou. Resultado congelado.
+  CLOSED
+  /// Encerrado antes da hora pelo operador. Nao produz resultado.
+  CANCELLED
+
+  @@map("challenge_status")
+}
+
+enum ChallengeParticipantStatus {
+  /// Inscrito e em curso.
+  JOINED
+  /// Saiu por vontade propria. Historico preservado (`M5-FR-014`).
+  LEFT
+  /// Bateu a meta antes do fim da janela.
+  COMPLETED
+  /// Janela fechou sem bater a meta.
+  FAILED
+
+  @@map("challenge_participant_status")
+}
+
+enum ChallengeNoticeKind {
+  /// Desafio novo aberto a inscricao na unidade do aluno.
+  DISPONIVEL
+  /// O aluno bateu a meta.
+  CONCLUIDO
+  /// A janela fechou sem a meta ser batida.
+  ENCERRADO_SEM_META
+
+  @@map("challenge_notice_kind")
+}
+
+/// Template de desafio -- VERSIONADO, e a unica origem de desafio
+/// (`M5-FR-013`).
+///
+/// O teto de frequencia mora AQUI, nao no desafio: e o que faz o
+/// `M5-BR-011` ser verificavel. Operador escolhe template e janela; nao
+/// escreve regra.
+///
+/// Mesma forma de `XpRuleVersion`: `code` estavel atraves das versoes,
+/// `effectiveTo` nulo = vigente, fechar versao e preencher a data -- nunca
+/// apagar.
+model ChallengeTemplateVersion {
+  id       String          @id @default(uuid()) @db.Uuid
+  tenantId String          @map("tenant_id") @db.Uuid
+  /// Identificador estavel atraves das versoes (`assiduidade-semanal`).
+  code     String
+  version  Int
+  name     String
+  metric   ChallengeMetric
+
+  /// Teto de sessoes por SEMANA que um desafio deste template pode exigir
+  /// (`M5-BR-011`). Validado na criacao do desafio, contra a janela real.
+  ///
+  /// INTEIRO e por semana, nao por janela: janela de 30 dias com meta 30
+  /// passaria num teto "por janela" generoso e ainda assim exigiria treino
+  /// diario sem descanso.
+  maxSessionsPerWeek Int @map("max_sessions_per_week")
+
+  /// Duracao maxima da janela, em dias. Impede desafio perpetuo, que na
+  /// pratica e meta sem encerramento e nunca produz resultado.
+  maxWindowDays Int @map("max_window_days")
+
+  effectiveFrom DateTime  @map("effective_from")
+  /// `null` = vigente.
+  effectiveTo   DateTime? @map("effective_to")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  challenges Challenge[]
+
+  @@unique([tenantId, code, version])
+  @@index([tenantId, effectiveFrom])
+  @@map("challenge_template_versions")
+}
+
+/// Um desafio concreto: template + janela + meta.
+///
+/// COPIA a versao do template ao nascer (`templateVersionId` aponta para a
+/// versao, nao para o codigo). Editar o template depois NAO altera desafio
+/// em curso -- mesmo principio do `policySnapshot` do entitlement e do
+/// snapshot de ranking (`M5-BR-009`): regra que muda nao reescreve o
+/// passado.
+model Challenge {
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  templateVersionId String          @map("template_version_id") @db.Uuid
+  /// `null` = vale para o tenant inteiro. Preenchido restringe a unidade.
+  gymUnitId         String?         @map("gym_unit_id") @db.Uuid
+  title             String
+  status            ChallengeStatus @default(DRAFT)
+
+  /// Meta a bater na janela, na unidade da metrica do template.
+  targetValue Int @map("target_value")
+
+  /// Janela, em dia local DA UNIDADE -- `@db.Date`, nao `DateTime`.
+  ///
+  /// Mesma razao de `StudentAttendanceSession.sessionDate` (F24): guardar
+  /// instante obriga a reconverter fuso na leitura, e fuso aplicado duas
+  /// vezes joga o treino da virada para o dia errado. Aqui o efeito seria
+  /// contar sessao fora da janela do desafio.
+  startsOn DateTime @map("starts_on") @db.Date
+  endsOn   DateTime @map("ends_on") @db.Date
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  closedAt  DateTime? @map("closed_at")
+
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  templateVersion ChallengeTemplateVersion @relation(fields: [templateVersionId], references: [id])
+  gymUnit         GymUnit?                 @relation(fields: [gymUnitId], references: [id])
+  participants    ChallengeParticipant[]
+  notices         ChallengeNotice[]
+
+  @@index([tenantId, status, startsOn])
+  @@index([tenantId, gymUnitId, status])
+  @@map("challenges")
+}
+
+/// Adesao do aluno a um desafio -- OPT-IN (`M5-BR-001`, ADR-048 Decisao 2).
+///
+/// ATENCAO: a AUSENCIA desta linha significa NAO INSCRITO. E o oposto de
+/// `participaDoRanking()` (F30), onde ausencia significa PARTICIPA.
+///
+/// NAO unifique os dois predicados. A diferenca e de REGIME: ranking e
+/// exposicao de algo que ja acontece (opt-out); desafio e compromisso que o
+/// aluno assume (opt-in). Um predicado servindo aos dois passa verde
+/// enquanto nenhum teste misturar os casos -- e ai ou o aluno vira
+/// participante de um desafio que nunca aceitou, ou some do ranking.
+model ChallengeParticipant {
+  id          String                     @id @default(uuid()) @db.Uuid
+  tenantId    String                     @map("tenant_id") @db.Uuid
+  challengeId String                     @map("challenge_id") @db.Uuid
+  studentId   String                     @map("student_id") @db.Uuid
+  status      ChallengeParticipantStatus @default(JOINED)
+
+  joinedAt    DateTime  @default(now()) @map("joined_at")
+  /// Preenchido em `LEFT`. A linha NAO e apagada: `M5-FR-014` manda manter
+  /// o historico, e apagar tambem perderia a prova de que houve adesao.
+  leftAt      DateTime? @map("left_at")
+  completedAt DateTime? @map("completed_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Uma adesao por aluno por desafio.
+  ///
+  /// Em INDICE e nao em `if`: guarda que le antes de escrever perde a
+  /// corrida por construcao -- custo ja pago pela F14, F17, F18 e F31 nesta
+  /// base. Reinscricao depois de sair reusa esta linha (volta a `JOINED`),
+  /// nao cria a segunda.
+  @@unique([challengeId, studentId])
+  @@index([tenantId, studentId, status])
+  @@map("challenge_participants")
+}
+
+/// Aviso de desafio -- exibido na area do aluno no totem.
+///
+/// NAO E ENVIO. Nao ha canal externo nesta fatia (ADR-048, Decisao 3): sem
+/// envio nao ha quiet hours, nao ha orcamento de contato e nao ha fronteira
+/// transacional x marketing -- essas perguntas so se colocam quando existir
+/// canal, e `ENGAGEMENT_PUSH` segue dormente ate la.
+///
+/// O aviso e ESCRITO quando o fato acontece e LIDO quando o aluno se
+/// identifica. Materializar em vez de derivar na leitura porque o aviso
+/// precisa sobreviver ao fato: quem completou o desafio em marco tem de ver
+/// o aviso na proxima vez que aparecer, mesmo que a janela ja tenha
+/// fechado.
+model ChallengeNotice {
+  id          String              @id @default(uuid()) @db.Uuid
+  tenantId    String              @map("tenant_id") @db.Uuid
+  challengeId String              @map("challenge_id") @db.Uuid
+  studentId   String              @map("student_id") @db.Uuid
+  kind        ChallengeNoticeKind
+  createdAt   DateTime            @default(now()) @map("created_at")
+  /// `null` = nao lido. Preenchido quando o aluno ve o aviso no totem.
+  readAt      DateTime?           @map("read_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Um aviso de cada tipo por aluno por desafio.
+  ///
+  /// Sem isto, reprocessar o encerramento gera um aviso novo a cada
+  /// execucao e o aluno abre o totem com a mesma mensagem repetida N vezes.
+  /// Idempotencia em INDICE, como no ledger de XP.
+  @@unique([challengeId, studentId, kind])
+  @@index([tenantId, studentId, readAt])
+  @@map("challenge_notices")
 }

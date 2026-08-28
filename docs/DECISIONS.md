@@ -3436,3 +3436,102 @@ ele reusa as do bloco de eventos.
 no domínio, com as partículas de ligação tratadas (`"Ana de Souza"` → `"Ana S."`, nunca `"Ana d."`),
 e incide sobre o caminho do primeiro nome — **apelido aprovado continua inteiro** (o aluno o
 escolheu para aparecer assim, e ele passou por moderação) e **`ANONIMO` continua "Participante"**.
+
+---
+
+## ADR-048 — F34 roda antes do gate do MVP 5; desafio é opt-in e o aviso vive no totem, sem canal externo
+
+**Data:** 28/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 28/08/2026**
+· **Emenda** `docs/prd/academia/MVP-05-engagement.md` §1 (gate de entrada) e §7 Slice 5.5
+  (superfície e canal de notificação)
+· **Alcança** a `SPEC-034` e a fatia F34
+· **NÃO alcança:** a F35, que segue atrás do gate do MVP 5 tal como estava; o regime opt-out do
+  ADR-046 (ver Decisão 2, que **não o revoga** — convive com ele); a Regra de arquitetura 9
+
+### Contexto
+
+O ADR-046 escreveu que **F31–F35 continuam atrás do gate original** e que *"se uma fatia futura
+quiser rodar antes do gate, precisa do próprio ADR, com o próprio argumento"*. O ADR-047 fez isso
+pela F31 e o PI liberou a F32 por decisão direta em 28/08/2026. Este é o ADR da F34.
+
+O gate pede *"eventos confiáveis + app do MVP 4"*. O argumento é o mesmo do ADR-047, e ficou mais
+forte: **o app continua não existindo** (`apps/mobile/` tem um `.gitkeep`), e os **eventos
+confiáveis existem** — `StudentAttendanceSession` (F24), o ledger de XP (F31) e o streak derivado
+(F32), todos com política versionada.
+
+A F30 já deixou a fatia preparada: `CHALLENGE` e `ENGAGEMENT_PUSH` **já existem** em
+`ConsentDocumentType`, marcadas dormentes, e o comentário do schema diz textualmente *"DORMENTE
+ate a F34"*. Acordar `CHALLENGE` não exige migration.
+
+### Decisão 1 — a fatia roda, com o totem como superfície
+
+Mesmo movimento do ADR-046 e do ADR-047: onde a Slice 5.5 diz "app", leia-se **totem**. A área do
+aluno do `apps/kiosk` ganha os desafios; a tela pública não muda.
+
+**Isso libera só a F34.** A F35 (operação, moderação e experimento) continua atrás do gate.
+
+### Decisão 2 — desafio é OPT-IN, e isso não contradiz o ADR-046
+
+A Slice 5.5 diz *"inscrição opt-in"* e o `M5-BR-001` diz *"nenhuma participação é habilitada por
+padrão"*. O ADR-046 tornou o **ranking** opt-out. As duas coisas convivem, e a diferença não é
+inconsistência:
+
+| | ranking (ADR-046) | desafio (esta fatia) |
+|---|---|---|
+| o que é | **exposição** de algo que já acontece | **compromisso** que o aluno assume |
+| padrão | participa (opt-out) | não participa (opt-in) |
+| por quê | o aluno já treina; o placar só mostra | inscrever alguém sem pedir cria meta que ele não escolheu |
+
+⚠️ **Não unifique os dois predicados.** `participaDoRanking()` trata ausência de decisão como
+*participa*; a inscrição em desafio é uma **linha que existe ou não existe** — sem linha, não está
+inscrito. Um predicado servindo aos dois regimes passa verde enquanto nenhum teste misturar os
+casos, e aí ou o aluno vira participante de um desafio que nunca aceitou, ou some do ranking.
+
+A finalidade `CHALLENGE` do `ConsentDocumentType` **continua dormente**: ela é um regime de
+consentimento opt-out, e a inscrição em desafio não é consentimento — é adesão, e mora na própria
+tabela de participação.
+
+### Decisão 3 — a notificação é aviso no totem; não há canal externo, e `ENGAGEMENT_PUSH` segue dormente
+
+O `M5-FR-015` pede *"notificação somente por canal consentido e dentro de quiet hours"*. O plano
+de apoio (`2026-08-14-mvp-05-05-challenges-notifications.md`) desenha um módulo
+`student-notifications` dono de inbox e entrega, BullMQ e um push processor.
+
+**Nada disso existe, e dois deles não têm para onde ir.** Em 28/08/2026 o repositório não tem
+tabela de notificação, não tem módulo de notificação e **não tem nenhuma dependência de e-mail,
+push, SMS ou WhatsApp**. Push exigiria o app, que é justamente o que o gate não tem.
+
+O `CLAUDE.md` resolve o conflito: plano é material de apoio e, onde divergir do PRD, o PRD vence;
+e Redis/BullMQ entra *"só quando comprovadamente necessário, não por padrão"*.
+
+**Decisão do PI:** a notificação desta fatia é o **aviso exibido na área do aluno quando ele se
+identifica no totem**. Não há envio, logo:
+
+- **não há quiet hours** — não existe "hora errada" quando é o aluno que chega;
+- **não há orçamento de contato** — o aviso não persegue ninguém;
+- **não há distinção transacional × marketing** — nada sai da academia, e a pergunta que a issue
+  #34 levantava (*"a distinção entre as duas é decisão de produto"*) **não se coloca** enquanto
+  não houver canal;
+- **`ENGAGEMENT_PUSH` continua dormente**, e acorda na fatia que trouxer um canal de verdade.
+
+**Escopo negativo explícito, para a F35 e para quem vier depois:** quiet hours, orçamento de
+contato, a fronteira transacional × marketing e qualquer canal externo **não foram implementados
+nem decididos** — não foram esquecidos, foram adiados até existir um canal que os torne uma
+pergunta real.
+
+### Decisão 4 — templates seguros são limite de frequência, não catálogo de conteúdo
+
+O `M5-BR-011` diz que *"desafio não pode exigir frequência acima do limite profissional aprovado"*
+e o aceite da Slice 5.5 diz que *"desafio não permite regra fora dos limites de segurança"*.
+
+O limite mora no **template**, versionado, e o desafio **copia a versão** ao nascer — editar o
+template depois não altera desafio em curso. Mesmo princípio do `policySnapshot` do entitlement
+(Regra de arquitetura 1) e do snapshot de ranking (`M5-BR-009`): regra que muda não reescreve o
+passado.
+
+### Consequências
+
+- A F34 entrega desafios ponta a ponta no totem, com aviso na própria tela.
+- A F35 continua atrás do gate e **herda** o escopo negativo da Decisão 3.
+- `ENGAGEMENT_PUSH` segue dormente; a primeira fatia com canal externo precisa decidir a fronteira
+  transacional × marketing, e não pode presumir que esta fatia a decidiu.
