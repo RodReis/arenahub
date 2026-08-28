@@ -132,3 +132,20 @@ Três achados que o CI não pegaria:
 
 Um defeito de UI que **não** era meu: o círculo preto sobre o menu no screenshot é o badge do
 Next.js dev, não a tela.
+
+E dois que a **revisão adversarial** achou depois, ambos corrigidos antes do PR:
+
+4. **A categoria CONSISTÊNCIA media a coisa errada.** Contava qualquer semana com ao menos uma
+   sessão, ignorando `POLITICA_DE_STREAK.diasPorSemana` — então quem aparece 1x por semana
+   empatava com quem bate a meta todas as semanas, apagando a distinção que a categoria existe
+   para medir. Divergia do próprio comentário da função **e** do ADR-049, Decisão 4, que declara a
+   fonte como as semanas elegíveis da F32. O teste não pegava porque injetava `points` já
+   calculados pelo dublê, sem exercitar a contagem real; agora as funções são exportadas e
+   testadas contra sessões brutas.
+5. **As contestações ignoravam `allowedUnitIds`.** Um gerente restrito à unidade A via e resolvia
+   contestação de aluno da unidade B — inclusive com desfecho `CORRIGIDA`, que admite correção de
+   saldo. É o mesmo ato de `ajustarXp` visto do outro lado, e `ajustarXp` já barrava isso desde a
+   F31. O escopo entra na **leitura**, então contestação de outra unidade cai no mesmo 404 de "não
+   existe" — distinguir as duas respostas denunciaria a existência da contestação alheia.
+   **A configuração do tenant não mudou:** ela é global por desenho, então ausência de escopo ali
+   não é furo.

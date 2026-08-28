@@ -586,7 +586,7 @@ no banco — asserção só na resposta HTTP não distinguiria dedupe de regrava
 `pnpm test:report --issue 35 --spec SPEC-035`, rodado em 28/08/2026, confirma o **unitário**:
 
 ```
-| 2026-08-28 | #35 | SPEC-035 | unitário | 2540 | 2540 | 0 | 76.6 | — |
+| 2026-08-28 | #35 | SPEC-035 | unitário | 2557 | 2557 | 0 | 76.8 | — |
 ```
 
 ⚠️ **A linha de integração que o gerador escreveu não é desta execução.** O crash do Jest no
@@ -601,17 +601,23 @@ para este alvo.
 ```
 
 Isso já enganou uma vez, na F32. A integração desta fatia foi medida **suíte a suíte**, com as 48
-suítes rodadas uma a uma — **732 testes, 0 falhas** —, e a linha do relatório foi corrigida à mão
+suítes rodadas uma a uma — **734 testes, 0 falhas** —, e a linha do relatório foi corrigida à mão
 para esse número (a guarda `--check` segue verde, porque ela confere o cache, não a origem). O 764
 que o gerador escrevera era do `#220`.
 
 ```
-| 2026-08-28 | #35 | SPEC-035 | integração | 732 | 732 | 0 | 83.9 | — |
+| 2026-08-28 | #35 | SPEC-035 | integração | 734 | 734 | 0 | 83.9 | — |
 ```
+
+⚠️ **E o próprio script de medição suíte a suíte tem uma aresta:** numa das execuções ele capturou
+saída vazia para `billing-pix-webhook` e somou 716 em vez de 734. Rodada isolada, a suíte dá
+18/18 — era captura vazia, não regressão. **A aritmética é a defesa:** 732 da medição anterior + 2
+do teste de escopo novo = 734, e 716 + 18 = 734. Contagem que cai sem explicação é para investigar,
+nunca para anotar.
 
 #### O que os testes desta fatia provam, e o que cai se a regra sumir
 
-Dez canários. Cada um foi executado com a regra removida, para provar que o teste falha:
+Doze canários. Cada um foi executado com a regra removida, para provar que o teste falha:
 
 | canário | o que cai sem a regra |
 |---|---|
@@ -625,6 +631,8 @@ Dez canários. Cada um foi executado com a regra removida, para provar que o tes
 | linha removida da allowlist da ponte | 1 — a rota do totem daria 404 antes de assinar |
 | permissão devolvida para `engagement.moderate` | 1 — quem só modera apelido voltaria a corrigir saldo de XP |
 | `P2002` sem tradução em `salvarSnapshot` | 1 — regerar mês publicado voltaria a 500 genérico |
+| meta da política fora de `contarSemanasQualificadas` | 4 — a categoria CONSISTÊNCIA voltaria a contar semana "tocada", empatando presença esporádica com regularidade real |
+| `allowedUnitIds` fora do controller de contestações | 2 (integração) — gerente restrito voltaria a resolver contestação de outra unidade |
 
 #### Verificação na API rodando e na tela
 
