@@ -177,3 +177,23 @@ describe('Desafios no totem', () => {
     expect(marcarAvisosComoLidos).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * A CLASSE DO BOTAO E CONTRATO COM O CSS DO TOTEM.
+ *
+ * A primeira versao usava `botaoPrimario`, que NAO EXISTE em `globals.css`:
+ * o botao renderizava sem estilo nenhum, parecendo um campo de texto. Nada
+ * quebra -- classe inexistente e valida em HTML --, e nenhum teste de
+ * comportamento pega. Este pega.
+ */
+describe('estilo do botao de acao', () => {
+  it('usa ctaPrimario para participar e botaoSecundario para sair', async () => {
+    comDados({
+      desafios: [DESAFIO, { ...DESAFIO, id: 'c-2', inscrito: true, progresso: 2 }],
+    });
+    renderizar();
+
+    expect(await screen.findByTestId('alternar-c-1')).toHaveClass('ctaPrimario');
+    expect(screen.getByTestId('alternar-c-2')).toHaveClass('botaoSecundario');
+  });
+});

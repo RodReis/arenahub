@@ -186,7 +186,7 @@ function CardDeDesafio({
 
       <button
         type="button"
-        className={desafio.inscrito ? 'botaoSecundario' : 'botaoPrimario'}
+        className={desafio.inscrito ? 'botaoSecundario' : 'ctaPrimario'}
         disabled={ocupado}
         onClick={aoAlternar}
         data-testid={`alternar-${desafio.id}`}

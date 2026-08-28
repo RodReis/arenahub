@@ -44,6 +44,21 @@ const PERMITIDOS: readonly RegExp[] = [
   new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/perfil-publico$`),
   /* XP E CONQUISTAS DO ALUNO (F31, Task 9). */
   new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/xp$`),
+  /*
+   * DESAFIOS (F34, Slice 5.5).
+   *
+   * Um padrao por endpoint, como manda o comentario do topo -- e o
+   * `challengeId` e ancorado no MESMO formato de UUID: `[^/]+` deixaria
+   * passar `..%2f` e qualquer caminho que a API venha a expor depois.
+   *
+   * ⚠️ ESTA LISTA E O QUE FEZ A TELA DE DESAFIOS DAR 404 EM 28/08/2026: a
+   * rota existia na API, o modulo estava ligado, a tela renderizava -- e a
+   * ponte recusava antes de assinar. Endpoint novo no totem SEMPRE precisa
+   * de uma linha aqui, e nenhum teste da API pega a falta dela.
+   */
+  new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/desafios$`),
+  new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/desafios/${ID_DE_SESSAO}/join$`),
+  new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/desafios/avisos/lidos$`),
 ];
 
 /**
