@@ -1026,4 +1026,186 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       expect((resposta.body as { code: string }).code).toBe('RANKING_SNAPSHOT_IMUTAVEL');
     });
   });
+  /*
+   * ---------------------------------------------------------------------
+   * F32 -- CONSISTENCIA SEMANAL E STREAK (Slice 5.3).
+   *
+   * Contra HTTP real: a F30 e a F31 mostraram que as falhas desta ponte NAO
+   * aparecem em teste de unidade -- rota nao exportada, campo que a API nao
+   * envia, modulo fora do `AppModule`. Todas atravessam processo, onde
+   * `fetch` e cast e nenhum compilador confere.
+   * ---------------------------------------------------------------------
+   */
+  describe('GET sessions/:id/engajamento/xp -- consistencia (F32)', () => {
+    /*
+     * `projetarFrequencia` (o helper da F31) projeta ate `AGORA` (20/08), e a
+     * F32 precisa de semanas JA FECHADAS -- passagem de 21/08 ficaria fora da
+     * janela e a semana nunca qualificaria. Este helper projeta com um teto
+     * posterior; o `periodo: 'ALL'` ja cobre o inicio.
+     */
+    const projetarAte = async (aluno: string, ate: Date): Promise<void> => {
+      await frequencia.frequenciaDoAluno(contexto, aluno, 'ALL', 'SEMANAL', ate);
+    };
+
+    /** Uma semana qualificada: tres dias distintos na semana de 17/08 (seg a dom). */
+    const treinarSemanaDe17 = async (aluno: string): Promise<void> => {
+      for (const dia of ['17', '19', '21']) {
+        await gravarPassagemConfirmada(aluno, `2026-08-${dia}T12:00:00.000Z`);
+      }
+      await projetarAte(aluno, new Date('2026-08-24T12:00:00.000Z'));
+    };
+
+    it('devolve a consistencia junto do extrato, no MESMO endpoint', async () => {
+      const cpf = String(20_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
+      const aluno = await criarAlunoComCpf(cpf, 'Aluno Consistente');
+      await treinarSemanaDe17(aluno);
+
+      const { sessionId, token } = await abrirSessao(cpf);
+
+      const resposta = await buscar(
+        `/api/v1/kiosk/sessions/${sessionId}/engajamento/xp`,
+        token,
+      ).expect(200);
+
+      // A F30 quebrou porque a ponte nao exportava o verbo; a F31, porque a
+      // fila lia campo que a API nao mandava. Assertar a FORMA inteira aqui
+      // e o que pega os dois.
+      expect(resposta.body).toMatchObject({
+        consistencia: {
+          atual: 1,
+          diasPorSemana: 3,
+          politica: 'semana-civil-local@1',
+        },
+      });
+    });
+
+    it('nao qualifica a semana abaixo da meta', async () => {
+      const cpf = String(21_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
+      const aluno = await criarAlunoComCpf(cpf, 'Aluno De Dois Dias');
+
+      await gravarPassagemConfirmada(aluno, '2026-08-17T12:00:00.000Z');
+      await gravarPassagemConfirmada(aluno, '2026-08-19T12:00:00.000Z');
+      await projetarAte(aluno, new Date('2026-08-24T12:00:00.000Z'));
+
+      const { sessionId, token } = await abrirSessao(cpf);
+
+      const resposta = await buscar(
+        `/api/v1/kiosk/sessions/${sessionId}/engajamento/xp`,
+        token,
+      ).expect(200);
+
+      expect(resposta.body).toMatchObject({ consistencia: { atual: 0 } });
+    });
+
+    /*
+     * A "prevencao de multipla pontuacao diaria" da Slice 5.3 e o indice
+     * unico da F24, no banco -- nao um `if` no dominio. Este teste passa por
+     * ele: seis passagens em tres dias viram tres sessoes, e a semana
+     * qualifica por DIAS, nao por passagens.
+     */
+    it('conta DIAS, nao passagens -- duas entradas no mesmo dia sao um dia so', async () => {
+      const cpf = String(22_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
+      const aluno = await criarAlunoComCpf(cpf, 'Aluno Que Volta A Tarde');
+
+      for (const dia of ['17', '19']) {
+        await gravarPassagemConfirmada(aluno, `2026-08-${dia}T09:00:00.000Z`);
+        await gravarPassagemConfirmada(aluno, `2026-08-${dia}T21:00:00.000Z`);
+      }
+      await projetarAte(aluno, new Date('2026-08-24T12:00:00.000Z'));
+
+      const { sessionId, token } = await abrirSessao(cpf);
+
+      const resposta = await buscar(
+        `/api/v1/kiosk/sessions/${sessionId}/engajamento/xp`,
+        token,
+      ).expect(200);
+
+      const corpo = resposta.body as {
+        consistencia: { atual: number; semanas: { inicio: string; diasTreinados: number }[] };
+      };
+
+      const semanaDe17 = corpo.consistencia.semanas.find((semana) => semana.inicio === '2026-08-17');
+
+      // Quatro passagens, DOIS dias -- abaixo da meta de tres.
+      expect(semanaDe17?.diasTreinados).toBe(2);
+      expect(corpo.consistencia.atual).toBe(0);
+    });
+
+    /*
+     * `M5-FR-009` ATRAVESSANDO MODULO: a pausa e reconstruida da timeline de
+     * `membership`, nao de `Subscription.status`. O status diz o estado de
+     * HOJE; se o streak lesse dele, a pausa de agosto sumiria no dia em que o
+     * aluno retomasse -- e o teste unitario, que injeta a pausa pronta no
+     * dublê, nunca veria isso.
+     */
+    it('le a pausa da TIMELINE, e ela nao rompe o streak', async () => {
+      const cpf = String(23_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
+      const aluno = await criarAlunoComCpf(cpf, 'Aluno Que Pausou');
+
+      await treinarSemanaDe17(aluno);
+
+      // Pausa que cobre a semana de 24/08 inteira, JA RETOMADA -- a
+      // assinatura de hoje esta ativa, e so a timeline guarda o intervalo.
+      await db.studentTimelineEvent.create({
+        data: {
+          tenantId,
+          studentId: aluno,
+          type: 'SUBSCRIPTION_PAUSED',
+          actorType: 'USER',
+          correlationId: randomUUID(),
+          occurredAt: new Date('2026-08-24T09:00:00.000Z'),
+        },
+      });
+      await db.studentTimelineEvent.create({
+        data: {
+          tenantId,
+          studentId: aluno,
+          type: 'SUBSCRIPTION_RESUMED',
+          actorType: 'USER',
+          correlationId: randomUUID(),
+          occurredAt: new Date('2026-08-31T09:00:00.000Z'),
+        },
+      });
+
+      const { sessionId, token } = await abrirSessao(cpf);
+
+      const resposta = await buscar(
+        `/api/v1/kiosk/sessions/${sessionId}/engajamento/xp`,
+        token,
+      ).expect(200);
+
+      const corpo = resposta.body as {
+        consistencia: { semanas: { inicio: string; status: string }[] };
+      };
+
+      const semanaPausada = corpo.consistencia.semanas.find(
+        (semana) => semana.inicio === '2026-08-24',
+      );
+
+      expect(semanaPausada?.status).toBe('PAUSADA');
+    });
+
+    /** Consistencia tambem e dado de aluno: nunca a de outra sessao. */
+    it('nao devolve a consistencia de aluno de outra sessao', async () => {
+      const cpfMeu = String(24_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
+      const meu = await criarAlunoComCpf(cpfMeu, 'Aluno Sem Treino');
+
+      const cpfOutro = String(25_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
+      const outro = await criarAlunoComCpf(cpfOutro, 'Aluno Com Streak');
+      await treinarSemanaDe17(outro);
+
+      void meu;
+      void outro;
+
+      const { sessionId, token } = await abrirSessao(cpfMeu);
+
+      const resposta = await buscar(
+        `/api/v1/kiosk/sessions/${sessionId}/engajamento/xp`,
+        token,
+      ).expect(200);
+
+      // O streak do OUTRO aluno e 1; a sessao e do meu, que nao treinou.
+      expect(resposta.body).toMatchObject({ consistencia: { atual: 0 } });
+    });
+  });
 });

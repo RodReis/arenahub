@@ -119,3 +119,142 @@ describe('EngagementXpService.sincronizarXp', () => {
     expect(await fake.conquistasDoAluno(contexto, 'aluno-1')).not.toContain('d1');
   });
 });
+
+describe('EngagementXpService.obterConsistencia', () => {
+  let fake: FakePortaDeXp;
+  let servico: EngagementXpService;
+
+  /** Uma sessao no dia local `AAAA-MM-DD`, meio-dia -- longe da virada. */
+  function sessaoNoDia(dataLocal: string, id = dataLocal) {
+    return { id, occurredAt: new Date(`${dataLocal}T15:00:00Z`), fusoDaUnidade: FUSO };
+  }
+
+  const FUSO = 'America/Sao_Paulo';
+
+  beforeEach(() => {
+    fake = new FakePortaDeXp();
+    servico = new EngagementXpService(fake);
+    fake.comAluno('aluno-1', FUSO);
+  });
+
+  it('devolve zero para aluno sem nenhuma sessao', async () => {
+    const consistencia = await servico.obterConsistencia(contexto, 'aluno-1', '2026-08-27', FUSO);
+
+    expect(consistencia).toMatchObject({ atual: 0, recorde: 0, diasPorSemana: 3 });
+  });
+
+  it('conta a semana que bateu a meta', async () => {
+    fake.comSessoes([
+      sessaoNoDia('2026-08-17'),
+      sessaoNoDia('2026-08-19'),
+      sessaoNoDia('2026-08-21'),
+    ]);
+
+    const consistencia = await servico.obterConsistencia(contexto, 'aluno-1', '2026-08-27', FUSO);
+
+    expect(consistencia.atual).toBe(1);
+  });
+
+  it('nao paga a mais por treinar todo dia -- `M5-BR-005`', async () => {
+    fake.comSessoes(
+      ['2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20', '2026-08-21', '2026-08-22'].map(
+        (dia) => sessaoNoDia(dia),
+      ),
+    );
+
+    const consistencia = await servico.obterConsistencia(contexto, 'aluno-1', '2026-08-27', FUSO);
+
+    // Seis dias numa semana continuam valendo UMA semana de streak.
+    expect(consistencia.atual).toBe(1);
+  });
+
+  it('pausa aprovada nao rompe o streak -- `M5-FR-009`', async () => {
+    fake.comSessoes([
+      sessaoNoDia('2026-08-17'),
+      sessaoNoDia('2026-08-19'),
+      sessaoNoDia('2026-08-21'),
+      sessaoNoDia('2026-09-07'),
+      sessaoNoDia('2026-09-09'),
+      sessaoNoDia('2026-09-11'),
+    ]);
+    fake.comPausa('aluno-1', { inicio: '2026-08-24', fim: '2026-09-06' });
+
+    const consistencia = await servico.obterConsistencia(contexto, 'aluno-1', '2026-09-13', FUSO);
+
+    expect(consistencia.atual).toBe(2);
+  });
+
+  it('SEM a pausa, o mesmo historico rompe o streak', async () => {
+    // O par do teste acima: prova que foi a PAUSA que preservou o streak, e
+    // nao um preenchimento de semana que nunca acontece.
+    fake.comSessoes([
+      sessaoNoDia('2026-08-17'),
+      sessaoNoDia('2026-08-19'),
+      sessaoNoDia('2026-08-21'),
+      sessaoNoDia('2026-09-07'),
+      sessaoNoDia('2026-09-09'),
+      sessaoNoDia('2026-09-11'),
+    ]);
+
+    const consistencia = await servico.obterConsistencia(contexto, 'aluno-1', '2026-09-13', FUSO);
+
+    expect(consistencia).toMatchObject({ atual: 1, recorde: 1 });
+  });
+
+  it('nao conta o mesmo dia duas vezes quando o aluno treina em duas unidades', async () => {
+    // Duas sessoes no MESMO dia local, unidades diferentes: e um dia treinado.
+    fake.comSessoes([
+      { id: 'a', occurredAt: new Date('2026-08-17T12:00:00Z'), fusoDaUnidade: FUSO },
+      { id: 'b', occurredAt: new Date('2026-08-17T22:00:00Z'), fusoDaUnidade: FUSO },
+      sessaoNoDia('2026-08-19'),
+    ]);
+
+    const consistencia = await servico.obterConsistencia(contexto, 'aluno-1', '2026-08-27', FUSO);
+
+    // Dois dias distintos, meta de tres -- nao qualifica.
+    expect(consistencia.atual).toBe(0);
+  });
+
+  it('limita as semanas EXIBIDAS sem truncar o streak calculado', async () => {
+    // 15 semanas seguidas qualificadas: a tela recebe 12, mas `atual` conta
+    // as 15. Truncar antes de resumir romperia o streak de quem tem historico
+    // mais longo que a janela.
+    const dias: string[] = [];
+    for (let semana = 0; semana < 15; semana += 1) {
+      const segunda = new Date(Date.UTC(2026, 4, 4) + semana * 7 * 86_400_000);
+      for (const offset of [0, 2, 4]) {
+        dias.push(new Date(segunda.getTime() + offset * 86_400_000).toISOString().slice(0, 10));
+      }
+    }
+
+    fake.comSessoes(dias.map((dia) => sessaoNoDia(dia)));
+
+    const ultimaSegunda = dias[dias.length - 3]!;
+    const consistencia = await servico.obterConsistencia(contexto, 'aluno-1', ultimaSegunda, FUSO);
+
+    expect(consistencia.semanas).toHaveLength(12);
+    expect(consistencia.atual).toBe(15);
+  });
+
+  it('devolve as semanas da mais recente para a mais antiga', async () => {
+    fake.comSessoes([
+      sessaoNoDia('2026-08-17'),
+      sessaoNoDia('2026-08-19'),
+      sessaoNoDia('2026-08-21'),
+      sessaoNoDia('2026-08-24'),
+    ]);
+
+    const consistencia = await servico.obterConsistencia(contexto, 'aluno-1', '2026-08-27', FUSO);
+
+    expect(consistencia.semanas.map((semana) => semana.inicio)).toEqual([
+      '2026-08-24',
+      '2026-08-17',
+    ]);
+  });
+
+  it('carrega a politica vigente na resposta -- a tela nunca repete a meta', async () => {
+    const consistencia = await servico.obterConsistencia(contexto, 'aluno-1', '2026-08-27', FUSO);
+
+    expect(consistencia.politica).toBe('semana-civil-local@1');
+  });
+});

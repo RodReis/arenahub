@@ -1082,10 +1082,12 @@ sabe que vão doer:
 
 ### MVP 5 — Engajamento opt-out · F30 a F35
 
-**O gate mudou para a F30.** O `docs/STATUS.md` §4 lista *"eventos confiáveis + app do MVP 4"*
+**O gate mudou para a F30, e de novo para a F32.** O `docs/STATUS.md` §4 lista *"eventos confiáveis + app do MVP 4"*
 como gate de entrada do MVP 5 inteiro — mas o **ADR-046** (26/08/2026) emenda o `MVP-05` §1 para
 que esse gate **não alcance a F30**: ela não lê evento de domínio nem depende do app, que segue
-com `apps/mobile/.gitkeep`. F31–F35 continuam atrás do gate original.
+com `apps/mobile/.gitkeep`. A **F32** foi destravada em 28/08 pela mesma razão, em decisão direta
+do PI (sem ADR: repete a exceção já registrada em ADR-046 e ADR-047, não cria regime novo).
+**F34 e F35 continuam atrás do gate original.**
 
 **A superfície também mudou.** A Slice 5.1 previa "app"; o canal que existe é o `apps/kiosk`
 (ADR-046, Decisão 1) — o mesmo totem que a F49/F50 (ADR-042, ADR-045) já identifica por CPF e já
@@ -1095,10 +1097,75 @@ reservava `modulos.ranking` no contrato de `KioskConfiguration`, desligado por p
 |---|---|---|
 | F30 | 5.1 Preferências e identidade pública | ✅ **entregue** — ver abaixo |
 | F31 | 5.2 XP e conquistas + 5.4 ranking | ✅ **entregue** em 27/08/2026 ([#213](https://github.com/RodReis/arenahub/pull/213)) — ADR-047 destravou a fatia (totem como superfície) e absorveu a F33 |
-| F32 | 5.3 Consistência e streak | bloqueada — gate do MVP 5 original |
+| F32 | 5.3 Consistência e streak | ✅ **entregue** em 28/08/2026 — destravada por decisão do PI, superfície no totem |
 | ~~F33~~ | 5.4 Rankings privados por padrão | **absorvida pela F31** (ADR-047, Decisão 2) — número queimado. INV-121 passou para a F31 |
 | F34 | 5.5 Desafios e notificações | bloqueada — gate do MVP 5 original |
 | F35 | 5.6 Operação, moderação e experimento | bloqueada — gate do MVP 5 original; traz o canal de denúncia que grava `PublicProfileStatus.HIDDEN` |
+
+#### F32 — o que a fatia cumpriu
+
+Slice 5.3 · `SPEC-032` · issue [#32](https://github.com/RodReis/arenahub/issues/32) · PR `—`
+
+**A fatia inteira cabe em uma função pura e dois métodos de repositório.** Não há tabela nova,
+migration nem módulo Nest — o plano de apoio previa cinco tabelas (`StreakPolicy`,
+`StreakPolicyVersion`, `StudentStreak`, `StudentStreakWeek`, `StreakProjectionVersion`) e nenhuma
+foi criada.
+
+| passo | o que entrou |
+|---|---|
+| 1 | `domain/semana-de-consistencia.ts` — puro: `inicioDaSemanaLocal`, `avaliarSemanas`, `resumirStreak`, `POLITICA_DE_STREAK` |
+| 2 | `PortaDeXp.diasTreinados` e `PortaDeXp.pausasAprovadas` — Prisma + dublê |
+| 3 | `EngagementXpService.obterConsistencia` — leitura pura, derivada |
+| 4 | `KioskXpService` devolve `consistencia` no extrato que a tela já buscava |
+| 5 | Bloco de consistência em `apps/kiosk/components/xp.tsx` + CSS |
+| 6 | Snapshot OpenAPI regenerado — a guarda de contrato pegou a mudança |
+
+**Por que derivar em vez de materializar.** `StudentAttendanceSession` (F24) já é a projeção de
+dias treinados, deduplicada por `(tenant, aluno, dia local, unidade, política)` num índice único.
+Uma segunda tabela seria fonte de verdade paralela com rebuild próprio, capaz de divergir da
+primeira — e a F31 já resolvera o mesmo problema derivando (`posicaoAoVivoDoAluno`). Consequência
+que vale registrar: a *"prevenção de múltipla pontuação diária"* da Slice 5.3 **não virou código
+nesta fatia**; ela é o índice único da F24, no banco, onde guarda que lê antes de escrever não
+perde corrida.
+
+**As três decisões de regra, e por que a ordem importa.**
+
+1. **A meta vence a pausa.** Quem bateu os 3 dias durante a pausa ganha a semana — pausar não
+   proíbe treinar. Invertida, a cadeia esconderia a semana qualificada de quem treinou pausado,
+   punindo o comportamento que a fatia quer premiar.
+2. **A pausa isenta a semana inteira ou nada.** Pausa parcial deixa dias treináveis de fora;
+   isentar a semana toda daria isenção de graça a quem pausou um dia.
+3. **A semana corrente nunca é "perdida".** Ela é `EM_ANDAMENTO` e o resumo a pula: sem isso, toda
+   segunda-feira de manhã zeraria o streak de todo mundo por algumas horas.
+
+**A pausa vem da timeline, não de `Subscription.status`.** O status guarda o estado de hoje;
+`M5-FR-009` precisa saber que houve pausa em agosto mesmo com a assinatura ativa agora. O
+repositório reconstrói os intervalos de `StudentTimelineEvent`
+(`SUBSCRIPTION_PAUSED` / `SUBSCRIPTION_RESUMED`), que `membership.repository.ts` já grava, e ignora
+um segundo `PAUSED` enquanto há intervalo aberto — retry de rede não fabrica isenção extra.
+
+🔧 **Duas armadilhas do ambiente, ambas já registradas e ambas repetidas.**
+
+A primeira: o **servidor da API servia build de 25/08**, três dias defasado, sem a F31 nem a F32.
+`/health` respondia 404 e a tela teria mentido sobre a fatia. Conferir a data do `dist/`, não a do
+processo.
+
+A segunda: **a guarda de evidência herdou o número da execução anterior.** `pnpm test:report`
+avisa e mantém o último valor bom quando `apps/api#test:integration` morre com o crash conhecido do
+Jest no Windows (`3221226505`). A integração foi então medida **suíte a suíte** — 698/698 em
+`apps/api`, 60/60 em `packages/database`, zero falhas. Sem essa medição manual, a linha do relatório
+seria prova que ninguém produziu.
+
+⚠️ **A única falha real da entrega só apareceu na suíte completa.** Rodando `xp-e-ranking`
+isolada, 25/25 passavam; a suíte inteira acusou o snapshot OpenAPI desatualizado — mudança
+legítima, regenerada com `ATUALIZAR_OPENAPI=1` (a variável **não** está no `globalEnv` do Turbo,
+então precisa ir direto ao Jest, senão some calada).
+
+**Percurso na tela, 28/08/2026, ambiente local completo.** Aluno real do seed, com 3 sessões em 3
+semanas distintas: a tela mostrou streak **0** — nenhuma semana bate a meta de 3 —, a semana
+corrente como *"Semana em andamento"* e as fechadas como *"Abaixo da meta"*, sem palavra de culpa.
+Injetando `SUBSCRIPTION_PAUSED`/`RESUMED` reais na timeline, a semana de 17–23/08 virou
+*"Assinatura pausada · não conta contra você"*. Dado de teste removido do banco depois.
 
 #### F30 — o que a fatia cumpriu
 
@@ -1229,3 +1296,4 @@ diante: a fiação só se prova subindo o `AppModule` de verdade.
 | 25/08/2026 | **F49** | SPEC-049 | *(preencher após o merge)* | **Kiosk seguro, provisionamento e sessão efêmera.** A superfície `apps/kiosk` nasceu (o diretório estava vazio): quatro modelos Prisma, HMAC de dispositivo copiado do `edge-auth`, contrato inteiro de `KioskConfiguration` em três camadas, sessão efêmera de 60 s com `tokenHash` no banco, tokens do totem em 7:1, três telas e o E2E que prova a limpeza. **A área interna sai com zero dos seis módulos do DS §5.2, de propósito** — o aceite é isolamento e limpeza, não funcionalidade. **ADR-045** registra o regime de identificação (CPF sozinho, facial em backlog) e os dois riscos que o PI aceitou. 🔴 **Achado da implementação:** a ponte Node que assina as chamadas escutava em `0.0.0.0` e, com a rede da academia não isolada, permitia enumerar a base inteira do tenant sem tocar no totem — corrigido para loopback, e o ADR-045 condiciona a decisão do PI a ele. **Este é o primeiro PR a reordenar a fila do §4:** MVP 3.5 antes do MVP 4, tarefa que o ADR-042 atribui a esta fatia |
 | 26/08/2026 | **F44** | SPEC-044 | [#210](https://github.com/RodReis/arenahub/pull/210) | **Design system da superfície `kiosk`.** A fatia **inverteu a própria premissa**: o ADR-025 a criou com gate (*"o PI priorizar o MVP 4"*) e o risco escrito de *"componente sem consumidor"*, mas o ADR-042 antecipou o totem e as **F49–F52 construíram `apps/kiosk` inteiro antes**. O DS nasceu destilado das telas; sobrou para a F44 **o que ficou de fora**. 🔴 **O defeito que motiva a fatia:** `avisoSonoroNaRecusa` existia no contrato desde a F50 **ligada por padrão**, com checkbox no painel, e **nenhuma linha do kiosk lia o campo** — a academia marcava a caixa e o totem seguia mudo. Mesmo padrão da análise de IA e do OCR de ECG na F51: contrato e tela existem, recurso nunca executou. Som **sintetizado** (`AudioContext`, 440→330 Hz, volume 0.08), sem asset: `<audio src>` exigiria arquivo e esbarraria no autoplay, porque a recusa nasce de **resposta de rede**, não de gesto; grave e baixo porque a recepção tem **fila atrás**. 🔴 **Defeito pego na sondagem, que a revisão não bloqueou:** `Number()` entende notação de literal JS — `"0x10"` desenhava anel de **16% sobre dado de saúde**, `"1e3"` saturava no cheio. O campo é texto livre do **aparelho**, não código; guarda por regex entrou assim mesmo (regra de arquitetura 8), **provada por canário** — sem ela, 6 testes caem. ⚠️ **Dois defeitos que só a tela revelou, com 155 testes verdes:** a forma angular §3.3 saiu como **tarja cortando a headline** (`inset: 0` numa caixa baixa e larga) e depois como **bloco invadindo o card** — só alta e estreita a diagonal se lê como diagonal. **Defeito visual é invisível para teste de comportamento.** A **moldura §3.1 só existe onde o equipamento não está**: acima de 1080px aparece, na tela real vira `display: contents` — no gabinete ela roubaria 2px úteis e duplicaria a moldura **física** de metal; verificado no navegador (a 1080px a `.tela` mede 1080 inteiros). O anel §3.12 **recusa desenhar o que não sabe ler**: o DS mostra `80 PONTOS` e **nunca diz de quanto** — escala 100 assumida em `ESCALA_DA_PONTUACAO`, degradando para texto. `data-decorativo` **já esperava**: a regra de alto contraste foi escrita na F51 sem nenhum elemento que a acionasse. 📌 **Fora, e dito:** tela pública da catraca — era o `§8` na spec antiga e a **v2.0 apagou a seção**; sem contrato vigente, é decisão de produto |
 | 27/08/2026 | **F30** | SPEC-030 | [#211](https://github.com/RodReis/arenahub/pull/211) | **Preferências e identidade pública, no totem — ADR-046.** A Slice 5.1 previa "app" e o gate do MVP 5 exigia *"eventos confiáveis + app do MVP 4"*; nenhum dos dois existe. Três decisões do PI em 26/08: a superfície é o `apps/kiosk`, o gate do MVP 5 **não alcança** esta fatia (F31–F35 continuam atrás dele) e o consentimento de ranking vira **opt-out** — alunos já aceitos e autorizados participam por padrão, quem não quiser pede para sair. **O ponto perigoso da fatia:** a mesma tabela `ConsentRecord` passa a guardar dois regimes opostos de ausência de linha — biometria/saúde/IA continuam **não autorizado**, engajamento vira **participa** — e os predicados vivem separados de propósito (`participacao.ts` × `consentimento.ts`) para que unificá-los não inverta um dos dois em silêncio. `resolverExposicao()` é o ponto único que decide quem aparece e com que nome: aluno inativo vence opt-out, que vence a escolha de identidade, e apelido fora de `APPROVED` nunca vaza (INV-153 a INV-155). Unicidade de apelido em **índice parcial sobre `APPROVED`** — dois `PENDING` com o mesmo alias coexistem, só um chega a aparecer. **Dois cortes deliberados:** `HIDDEN` nasce sem caminho de escrita (espera a F35, canal de denúncia) e não há outbox nem cache de exposição (espera a F33, primeiro consumidor). 🔧 **Cinco falhas de fiação, e nenhuma achada por revisão de diff.** `EngagementModule` fora do `AppModule` e sem declarar `TenantContextService` (esta derrubava as 46 suítes de integração no boot); a ponte do totem sem exportar `PATCH` — **o opt-out não funcionava**; a fila lendo campo que a API não enviava (TypeError no SSR); e o painel sem listar `ranking`, que só ligava por SQL. Todas corrigidas antes do merge. Duas vieram de teste de integração, uma da geração de evidência e duas só apareceram **abrindo a tela** — atravessam processo (navegador → Next → Nest, e Nest → Next SSR), onde `fetch` e `chamarApi<T>` são casts que nenhum compilador confere |
+| 28/08/2026 | **F32** | SPEC-032 | `—` | **Consistência e streak, derivados — nenhuma tabela nova.** O plano previa cinco tabelas de projeção; nenhuma foi criada. `StudentAttendanceSession` (F24) **já é** a projeção de dias treinados, deduplicada por `(tenant, aluno, dia local, unidade, política)` num índice único, e o streak é função dela — materializar criaria fonte de verdade paralela com rebuild próprio, capaz de divergir, exatamente o que a F31 evitou derivando o placar ao vivo. Consequência: a *"prevenção de múltipla pontuação diária"* da Slice 5.3 **não virou código** aqui — é o índice da F24, no banco. **Três decisões de regra, e a ordem é o desenho:** a meta vence a pausa (quem treinou pausado ganha a semana — a ordem inversa puniria quem a fatia quer premiar); a pausa isenta a semana inteira ou nada (parcial daria isenção de graça); e a semana corrente é `EM_ANDAMENTO`, nunca perdida — senão toda segunda de manhã zeraria o streak de todo mundo. A pausa vem da **timeline**, não de `Subscription.status`: o status é o estado de hoje, e `M5-FR-009` precisa da pausa de agosto com a assinatura ativa agora. 🔧 **Duas armadilhas do ambiente, ambas já registradas e ambas repetidas:** a API servia **build de 25/08** (`/health` em 404, a tela teria mentido sobre a fatia); e o gerador de evidência **herdou o número anterior** quando o crash do Jest no Windows matou a saída — a integração foi medida suíte a suíte (698/698 + 60/60). ⚠️ **A única falha real só apareceu na suíte completa:** isolada, `xp-e-ranking` dava 25/25; a suíte inteira acusou o snapshot OpenAPI desatualizado. `ATUALIZAR_OPENAPI=1` **não** está no `globalEnv` do Turbo — tem de ir direto ao Jest, senão some calada |

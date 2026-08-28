@@ -5,6 +5,12 @@ import { resolverRegraVigente } from './domain/regra-de-xp.js';
 import { ajustar, concederPorSessao, mesLocal } from './domain/movimento-de-xp.js';
 import { avaliarConquistas } from './domain/conquista.js';
 import {
+  POLITICA_DE_STREAK,
+  avaliarSemanas,
+  resumirStreak,
+  type SemanaAvaliada,
+} from './domain/semana-de-consistencia.js';
+import {
   PORTA_DE_XP,
   type ConquistaDoExtratoDeXp,
   type MovimentoDoExtratoDeXp,
@@ -36,8 +42,32 @@ export interface ExtratoCompletoDeXp {
   conquistas: readonly ConquistaDoExtratoDeXp[];
 }
 
+/**
+ * Consistencia semanal do aluno (F32) -- o que a tela do totem mostra.
+ *
+ * `semanas` vem da mais recente para a mais antiga: a tela le de cima para
+ * baixo e a semana corrente e a que importa primeiro.
+ */
+export interface Consistencia {
+  readonly atual: number;
+  readonly recorde: number;
+  /** A meta da politica vigente -- a tela nunca a repete por conta propria. */
+  readonly diasPorSemana: number;
+  readonly politica: string;
+  readonly semanas: readonly SemanaAvaliada[];
+}
+
 /** Gatilho unico do catalogo v1 -- ver `domain/regra-de-xp.ts`. */
 const GATILHO_DE_SESSAO = 'SESSAO_CONFIRMADA';
+
+/**
+ * Quantas semanas a tela recebe -- tres meses.
+ *
+ * Corta a EXIBICAO, nunca o calculo: `atual` e `recorde` saem da serie
+ * inteira, antes deste corte. Cortar a serie antes de resumir romperia o
+ * streak de quem tem historico mais longo que a janela.
+ */
+const SEMANAS_EXIBIDAS = 12;
 
 /*
  * Checagem duck-typed, nao `instanceof Prisma.PrismaClientKnownRequestError`:
@@ -149,6 +179,48 @@ export class EngagementXpService {
     ]);
 
     return { saldoDoMes, mes, movimentos, conquistas };
+  }
+
+  /**
+   * Consistencia semanal do aluno (F32, Slice 5.3).
+   *
+   * LEITURA PURA, derivada -- nao ha tabela de streak. `StudentAttendanceSession`
+   * (F24) ja e a projecao de dias treinados deduplicada por dia local, e o
+   * streak e uma funcao dela: materializar numa segunda tabela criaria uma
+   * fonte de verdade paralela que pode divergir, do mesmo jeito que a F31
+   * resolveu o placar do mes corrente ao vivo em vez de snapshot.
+   *
+   * Devolve as semanas mais recentes primeiro para a tela, e o resumo
+   * (`atual`/`recorde`) calculado sobre a serie INTEIRA -- cortar a serie
+   * antes de resumir romperia o streak de quem tem historico mais longo que a
+   * janela exibida (memoria corte-de-periodo-parte-cadeia).
+   */
+  async obterConsistencia(
+    contexto: TenantContext,
+    studentId: string,
+    hojeLocal: string,
+    fusoDaUnidade: string,
+  ): Promise<Consistencia> {
+    const [dias, pausas] = await Promise.all([
+      this.porta.diasTreinados(contexto, studentId),
+      this.porta.pausasAprovadas(contexto, studentId, fusoDaUnidade),
+    ]);
+
+    const semanas = avaliarSemanas(
+      dias.map((dataLocal) => ({ dataLocal })),
+      pausas,
+      POLITICA_DE_STREAK,
+      hojeLocal,
+    );
+
+    const resumo = resumirStreak(semanas);
+
+    return {
+      ...resumo,
+      diasPorSemana: POLITICA_DE_STREAK.diasPorSemana,
+      politica: POLITICA_DE_STREAK.versao,
+      semanas: [...semanas].reverse().slice(0, SEMANAS_EXIBIDAS),
+    };
   }
 
   /**

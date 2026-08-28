@@ -1050,6 +1050,57 @@ button {
   color: var(--ah-totem-brand-200);
 }
 
+/*
+ * Consistencia semanal (F32).
+ *
+ * Lista mais densa que `.listaDeSegmentos`: sao ate 12 linhas curtas DENTRO
+ * de um card, nao cards soltos na tela. Paddings de `.segmento` empilhariam
+ * doze caixas de 24px e empurrariam os movimentos de XP para fora da dobra.
+ */
+.listaDeSemanas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.semana {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--tt-raio-card);
+  /*
+   * Fundo `bg-base` sobre o card (`bg-surface`): a linha se distingue do card
+   * sem ganhar borda propria -- doze bordas dentro de um card viram grade.
+   */
+  background: var(--ah-totem-bg-base);
+}
+
+/*
+ * A SEMANA QUE BATEU A META e a unica com destaque de cor.
+ *
+ * `DS-TOTEM.md` §2.1 reserva laranja e vermelho para pendencia financeira e
+ * alerta clinico -- nao ha cor de alarme aqui: semana abaixo da meta fica
+ * NEUTRA, de proposito. Pintar de vermelho o que o §13 do PRD manda nao
+ * culpabilizar contradiria o texto com a cor.
+ */
+.semana[data-status='QUALIFICADA'] {
+  background: color-mix(in srgb, var(--ah-totem-brand-200) 14%, var(--ah-totem-bg-base));
+}
+
+/* Semana corrente: contorno leve, so para dizer "e esta que corre agora". */
+.semana[data-status='EM_ANDAMENTO'] {
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+}
+
+.diasDaSemana {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Pontuacao de um movimento de XP -- rotulo neutro, sem conotacao de dinheiro (M5-BR-010). */
 .pontosDoMovimento {
   margin-left: auto;

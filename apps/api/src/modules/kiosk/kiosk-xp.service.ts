@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
-import { EngagementXpService, type ExtratoCompletoDeXp } from '../engagement/engagement-xp.service.js';
+import {
+  EngagementXpService,
+  type Consistencia,
+  type ExtratoCompletoDeXp,
+} from '../engagement/engagement-xp.service.js';
 import { EngagementRankingService } from '../engagement/engagement-ranking.service.js';
 import { mesLocal } from '../engagement/domain/movimento-de-xp.js';
 import type { AlunoDaSessao } from './kiosk-area-do-aluno.service.js';
@@ -8,6 +12,8 @@ import type { AlunoDaSessao } from './kiosk-area-do-aluno.service.js';
 /** O extrato de XP como o totem o mostra -- so o aluno daquela sessao. */
 export interface ExtratoDeXpDoTotem extends ExtratoCompletoDeXp {
   posicao: number | null;
+  /** Consistencia semanal (F32) -- streak, recorde e as ultimas semanas. */
+  consistencia: Consistencia;
 }
 
 /**
@@ -53,15 +59,41 @@ export class KioskXpService {
 
     await this.xp.sincronizarXp(aluno.contexto, aluno.studentId, agora);
 
-    const [extrato, entradaDoPlacar] = await Promise.all([
+    const [extrato, entradaDoPlacar, consistencia] = await Promise.all([
       this.xp.obterExtratoCompleto(aluno.contexto, aluno.studentId, mes),
       // AO VIVO, nao publicado -- Emenda de 27/08/2026 (ADR-047): o mes
       // corrente nunca tem snapshot, so o job mensal fecha o mes anterior.
       this.ranking.posicaoAoVivoDoAluno(aluno.contexto, gymUnitIdDoAluno(aluno), mes, aluno.studentId),
+      // Consistencia semanal (F32) -- derivada das sessoes da F24, sem tabela
+      // propria. `diaLocal` e nao `mes`: a semana atravessa a virada de mes, e
+      // recortar por mes partiria o streak de quem treina na ultima semana de
+      // agosto e na primeira de setembro.
+      this.xp.obterConsistencia(
+        aluno.contexto,
+        aluno.studentId,
+        diaLocal(agora, FUSO_PADRAO_DO_MES),
+        FUSO_PADRAO_DO_MES,
+      ),
     ]);
 
-    return { ...extrato, posicao: entradaDoPlacar?.position ?? null };
+    return { ...extrato, posicao: entradaDoPlacar?.position ?? null, consistencia };
   }
+}
+
+/**
+ * `AAAA-MM-DD` de um instante, no fuso da unidade.
+ *
+ * `en-CA` ja formata nessa ordem -- mesmo motivo de `mesLocal`: remontar a
+ * string a partir de `getMonth() + 1` exigiria preencher zero a mao e erraria
+ * na virada do ano se alguem trocasse a ordem dos campos.
+ */
+function diaLocal(instante: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(instante);
 }
 
 /**

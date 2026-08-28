@@ -1,9 +1,9 @@
 {
   "apps/api#test": {
-    "testes": 1038,
-    "pass": 1038,
+    "testes": 1072,
+    "pass": 1072,
     "falha": 0,
-    "coberturaPct": 68.71
+    "coberturaPct": 68.96
   },
   "apps/api#test:integration": {
     "testes": 693,
@@ -48,10 +48,10 @@
     "coberturaPct": 91.19
   },
   "apps/kiosk#test": {
-    "testes": 198,
-    "pass": 198,
+    "testes": 209,
+    "pass": 209,
     "falha": 0,
-    "coberturaPct": 78.24
+    "coberturaPct": 78.66
   },
   "packages/api-contracts#test": {
     "testes": 59,
