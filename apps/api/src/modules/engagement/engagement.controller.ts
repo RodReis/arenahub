@@ -27,7 +27,7 @@ const esquemaDeListagem = z
 
 const esquemaDeModeracao = z
   .object({
-    decisao: z.enum(['APPROVED', 'REJECTED']),
+    decisao: z.enum(['APPROVED', 'REJECTED', 'HIDDEN']),
     rejectionReason: z.enum(RAZOES_DE_REJEICAO).nullish(),
   })
   .strict();

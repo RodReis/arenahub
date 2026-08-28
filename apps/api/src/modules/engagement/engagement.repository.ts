@@ -77,7 +77,7 @@ export interface EntradaDeModeracaoNoBanco {
   tenantId: string;
   actorId: string;
   perfilId: string;
-  status: 'APPROVED' | 'REJECTED';
+  status: 'APPROVED' | 'REJECTED' | 'HIDDEN';
   rejectionReason: AliasRejectionReason | null;
 }
 

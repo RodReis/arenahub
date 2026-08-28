@@ -733,11 +733,16 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
     let outraUnidadeId: string;
 
     beforeAll(async () => {
-      cookieModerador = await criarUsuarioCom('moderador-t11', ['engagement.moderate']);
+      // As DUAS permissoes: gerar/publicar placar exige `engagement.moderate`,
+      // corrigir XP exige `engagement.correct` (F35, ADR-049 Decisao 2).
+      cookieModerador = await criarUsuarioCom('moderador-t11', [
+        'engagement.moderate',
+        'engagement.correct',
+      ]);
       cookieSemPermissao = await criarUsuarioCom('sem-permissao-t11', []);
       cookieModeradorRestrito = await criarUsuarioCom(
         'moderador-restrito-t11',
-        ['engagement.moderate'],
+        ['engagement.moderate', 'engagement.correct'],
         gymUnitId,
       );
 

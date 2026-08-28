@@ -1868,6 +1868,180 @@
         ]
       }
     },
+    "/api/v1/engagement/contestacoes": {
+      "get": {
+        "operationId": "EngagementContestacoesController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "itens"
+                  ],
+                  "properties": {
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "studentId",
+                          "subject",
+                          "descricao",
+                          "status",
+                          "resolucao",
+                          "resolvedAt",
+                          "createdAt",
+                          "alunoNome"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "studentId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "subject": {
+                            "type": "string",
+                            "enum": [
+                              "XP",
+                              "CONQUISTA",
+                              "CONSISTENCIA",
+                              "RANKING",
+                              "DESAFIO"
+                            ]
+                          },
+                          "descricao": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "ABERTA",
+                              "CORRIGIDA",
+                              "IMPROCEDENTE"
+                            ]
+                          },
+                          "resolucao": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "resolvedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "alunoNome": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementContestacoes"
+        ]
+      }
+    },
+    "/api/v1/engagement/contestacoes/{id}/resolver": {
+      "post": {
+        "operationId": "EngagementContestacoesController_resolver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "studentId",
+                    "subject",
+                    "descricao",
+                    "status",
+                    "resolucao",
+                    "resolvedAt",
+                    "createdAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "studentId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "subject": {
+                      "type": "string",
+                      "enum": [
+                        "XP",
+                        "CONQUISTA",
+                        "CONSISTENCIA",
+                        "RANKING",
+                        "DESAFIO"
+                      ]
+                    },
+                    "descricao": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ABERTA",
+                        "CORRIGIDA",
+                        "IMPROCEDENTE"
+                      ]
+                    },
+                    "resolucao": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "resolvedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementContestacoes"
+        ]
+      }
+    },
     "/api/v1/engagement/rankings/{gymUnitId}/{mes}/gerar": {
       "post": {
         "operationId": "EngagementXpController_gerar",
@@ -1881,6 +2055,7 @@
                   "type": "object",
                   "required": [
                     "id",
+                    "category",
                     "status",
                     "publishedAt",
                     "entries"
@@ -1889,6 +2064,14 @@
                     "id": {
                       "type": "string",
                       "format": "uuid"
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "XP_DO_MES",
+                        "FREQUENCIA",
+                        "CONSISTENCIA"
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -1950,6 +2133,7 @@
                   "type": "object",
                   "required": [
                     "id",
+                    "category",
                     "status",
                     "publishedAt",
                     "entries"
@@ -1958,6 +2142,14 @@
                     "id": {
                       "type": "string",
                       "format": "uuid"
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "XP_DO_MES",
+                        "FREQUENCIA",
+                        "CONSISTENCIA"
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -3333,6 +3525,147 @@
                     },
                     "version": {
                       "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/sessions/{id}/engajamento/contestacoes": {
+      "post": {
+        "operationId": "KioskController_abrirContestacao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "subject",
+                    "descricao",
+                    "status",
+                    "createdAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "subject": {
+                      "type": "string",
+                      "enum": [
+                        "XP",
+                        "CONQUISTA",
+                        "CONSISTENCIA",
+                        "RANKING",
+                        "DESAFIO"
+                      ]
+                    },
+                    "descricao": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ABERTA",
+                        "CORRIGIDA",
+                        "IMPROCEDENTE"
+                      ]
+                    },
+                    "resolucao": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Kiosk"
+        ]
+      },
+      "get": {
+        "operationId": "KioskController_minhasContestacoes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "itens"
+                  ],
+                  "properties": {
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "subject",
+                          "descricao",
+                          "status",
+                          "createdAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "subject": {
+                            "type": "string"
+                          },
+                          "descricao": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "resolucao": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
                     }
                   }
                 }

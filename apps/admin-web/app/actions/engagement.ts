@@ -7,15 +7,19 @@ import { chamarApi } from '../../lib/api/server-client';
 import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
- * Moderação de apelido público -- F30, Task 9.
+ * Moderação de apelido público -- F30, Task 9; `HIDDEN` na F35.
  *
- * O moderador so ESCOLHE entre `APPROVED` e `REJECTED`; a API da Task 7 nao
- * aceita outra coisa no PATCH (`engagement.controller.ts`, `esquemaDeModeracao`)
- * -- `HIDDEN` existe no enum de estado mas nao e uma decisao deste formulario.
+ * `HIDDEN` era estado sem NENHUM caminho de escrita desde a F30, esperando o
+ * canal de denúncia (ADR-046, Decisão 6). A F35 decidiu que o canal não é do
+ * aluno: a secretaria oculta quando alguém reclama na recepção (ADR-049,
+ * Decisão 5).
+ *
+ * Rejeitar e ocultar são atos diferentes: rejeitar recusa um apelido que
+ * nunca apareceu; ocultar retira um que já estava em circulação.
  */
 const esquemaDeModeracao = z.object({
   perfilId: z.string().uuid(),
-  decisao: z.enum(['APPROVED', 'REJECTED']),
+  decisao: z.enum(['APPROVED', 'REJECTED', 'HIDDEN']),
   rejectionReason: z
     .enum(['OFENSIVO', 'CONTEM_PII', 'IMPERSONACAO', 'SPAM_OU_PROPAGANDA', 'ILEGIVEL'])
     .nullish(),
@@ -36,7 +40,7 @@ export interface EstadoDaModeracao {
  */
 const MENSAGEM: Record<string, string> = {
   ...MENSAGEM_DE_SESSAO,
-  RAZAO_DE_RECUSA_OBRIGATORIA: 'Escolha um motivo para rejeitar o apelido.',
+  RAZAO_DE_RECUSA_OBRIGATORIA: 'Escolha um motivo antes de rejeitar ou ocultar o apelido.',
   RAZAO_DE_RECUSA_INVALIDA: 'Motivo de rejeição inválido.',
   ALIAS_JA_APROVADO_PARA_OUTRO_ALUNO:
     'Outro aluno já tem este apelido aprovado. Rejeite ou peça para este aluno escolher outro.',
@@ -467,4 +471,84 @@ export async function cancelarDesafio(
   revalidatePath('/engagement/desafios');
 
   return { sucesso: { id: analisado.data.challengeId, titulo: '' } };
+}
+
+/* -------------------------------------------------------------------------
+ * Contestações -- F35, Slice 5.6, ADR-049.
+ * ------------------------------------------------------------------------- */
+
+/** Espelha o item de `GET /engagement/contestacoes`. */
+export interface ContestacaoDaFila {
+  readonly id: string;
+  readonly studentId: string;
+  readonly alunoNome: string;
+  readonly subject: string;
+  readonly descricao: string;
+  readonly status: string;
+  readonly resolucao: string | null;
+  readonly resolvedAt: string | null;
+  readonly createdAt: string;
+}
+
+export interface EstadoDaResolucao {
+  erro?: string;
+  sucesso?: { id: string };
+}
+
+const esquemaDeResolucao = z.object({
+  id: z.string().uuid(),
+  desfecho: z.enum(['CORRIGIDA', 'IMPROCEDENTE']),
+  resolucao: z.string().trim().min(1),
+});
+
+const MENSAGEM_DA_RESOLUCAO: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
+  CONTESTACAO_NAO_ENCONTRADA: 'Contestação não encontrada.',
+  CONTESTACAO_JA_RESOLVIDA:
+    'Esta contestação já foi resolvida por outra pessoa. Recarregue a fila para ver o desfecho.',
+  CONTESTACAO_RESOLUCAO_OBRIGATORIA: 'Escreva a resposta que o aluno vai ler.',
+};
+
+/**
+ * Registra o desfecho de uma contestação.
+ *
+ * A resposta é obrigatória nos DOIS desfechos: improcedente sem explicação é
+ * silêncio com carimbo, e o aluno que não sabe por que perdeu reclama de novo.
+ */
+export async function resolverContestacao(
+  _anterior: EstadoDaResolucao,
+  formulario: FormData,
+): Promise<EstadoDaResolucao> {
+  const analisado = esquemaDeResolucao.safeParse({
+    id: formulario.get('id'),
+    desfecho: formulario.get('desfecho'),
+    resolucao: formulario.get('resolucao'),
+  });
+
+  if (!analisado.success) {
+    return { erro: 'Escreva a resposta que o aluno vai ler antes de concluir.' };
+  }
+
+  const resposta = await chamarApi<{ id: string }>(
+    `/api/v1/engagement/contestacoes/${analisado.data.id}/resolver`,
+    {
+      metodo: 'POST',
+      corpo: {
+        desfecho: analisado.data.desfecho,
+        resolucao: analisado.data.resolucao,
+      },
+    },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro:
+        MENSAGEM_DA_RESOLUCAO[resposta.erro?.code ?? ''] ??
+        'Não foi possível registrar o desfecho.',
+    };
+  }
+
+  revalidatePath('/engagement/contestacoes');
+
+  return { sucesso: { id: resposta.dados.id } };
 }

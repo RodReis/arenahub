@@ -72,7 +72,15 @@ const RAZOES_DE_REJEICAO: readonly AliasRejectionReason[] = [
 
 export interface EntradaDeModeracao {
   perfilId: string;
-  decisao: 'APPROVED' | 'REJECTED';
+  /**
+   * `HIDDEN` entra na F35 (ADR-049, Decisao 5).
+   *
+   * A F30 criou o estado sem NENHUM caminho de escrita, esperando o canal de
+   * denuncia. O canal nao e do aluno: a secretaria oculta quando alguem
+   * reclama na recepcao -- botao de denuncia numa tela de academia e
+   * ferramenta de briga entre alunos antes de ser ferramenta de seguranca.
+   */
+  decisao: 'APPROVED' | 'REJECTED' | 'HIDDEN';
   rejectionReason: AliasRejectionReason | null;
 }
 
@@ -223,7 +231,9 @@ export class EngagementService {
     entrada: EntradaDeModeracao,
     agora: Date,
   ): Promise<PerfilPublicoDoAluno> {
-    if (entrada.decisao === 'REJECTED') {
+    // OCULTAR exige razao como REJEITAR: os dois retiram o apelido de
+    // circulacao, e ato de moderacao sem motivo registrado e ato sem trilha.
+    if (entrada.decisao === 'REJECTED' || entrada.decisao === 'HIDDEN') {
       if (!entrada.rejectionReason) {
         throw new BadRequestException({
           code: 'RAZAO_DE_RECUSA_OBRIGATORIA',

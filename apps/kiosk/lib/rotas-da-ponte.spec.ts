@@ -108,3 +108,26 @@ describe('desafios (F34)', () => {
     ).toBeNull();
   });
 });
+
+describe('contestacoes (F35)', () => {
+  const SESSAO = '11111111-1111-4111-8111-111111111111';
+
+  /**
+   * A linha na allowlist e o que faz a tela funcionar.
+   *
+   * Sem ela a rota existe na API, o modulo esta ligado, a tela renderiza --
+   * e a ponte devolve 404 generico antes de assinar. Foi assim que a tela de
+   * desafios quebrou em 28/08/2026, e nenhum teste da API pega.
+   */
+  it('permite abrir e acompanhar contestacoes da sessao', () => {
+    expect(resolverCaminhoDaPonte(`/api/kiosk/sessions/${SESSAO}/engajamento/contestacoes`)).toBe(
+      `/api/v1/kiosk/sessions/${SESSAO}/engajamento/contestacoes`,
+    );
+  });
+
+  it('recusa sub-caminho de contestacoes fora da lista', () => {
+    expect(
+      resolverCaminhoDaPonte(`/api/kiosk/sessions/${SESSAO}/engajamento/contestacoes/todas`),
+    ).toBeNull();
+  });
+});
