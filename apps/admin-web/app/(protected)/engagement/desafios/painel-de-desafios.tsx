@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useMemo, useState, useTransition } from 'react';
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 
 import { Button, Field, SelectField, StateBadge, useToastDeErro } from '@arenahub/ui';
 
@@ -78,6 +78,20 @@ export function PainelDeDesafios({
 
   /** Qual desafio esta com o formulario de edicao aberto. */
   const [editando, setEditando] = useState<string | null>(null);
+
+  /**
+   * Qual acao destrutiva espera confirmacao, e em qual desafio.
+   *
+   * INLINE, nao `window.confirm`: o dialogo nativo nao e testavel em
+   * componente (jsdom nao o tem sem duble) e nao carrega o nome do desafio
+   * nem o verbo real -- `DS-PAINEL.md` §6 exige os dois. A confirmacao mora
+   * na propria linha, entao quem confirma esta olhando para o item que vai
+   * sumir.
+   */
+  const [confirmando, setConfirmando] = useState<{
+    id: string;
+    acao: 'excluir' | 'cancelar';
+  } | null>(null);
   const [enviando, iniciarEnvio] = useTransition();
 
   const [modeloId, setModeloId] = useState(modelos[0]?.id ?? '');
@@ -287,46 +301,46 @@ export function PainelDeDesafios({
                         {editando === desafio.id ? 'Cancelar edição' : 'Editar'}
                       </Button>
 
-                      <form
-                        action={(dados) => {
-                          iniciarEnvio(() => {
-                            acaoExcluir(dados);
-                          });
-                        }}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={enviando}
+                        onClick={() => setConfirmando({ id: desafio.id, acao: 'excluir' })}
+                        data-testid={`excluir-${desafio.id}`}
                       >
-                        <input type="hidden" name="challengeId" value={desafio.id} />
-                        <Button
-                          type="submit"
-                          variant="destructive"
-                          disabled={enviando}
-                          data-testid={`excluir-${desafio.id}`}
-                        >
-                          Excluir
-                        </Button>
-                      </form>
+                        Excluir
+                      </Button>
                     </>
                   ) : null}
 
                   {podeCancelarNaTela(desafio) ? (
-                    <form
-                      action={(dados) => {
-                        iniciarEnvio(() => {
-                          acaoCancelar(dados);
-                        });
-                      }}
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      disabled={enviando}
+                      onClick={() => setConfirmando({ id: desafio.id, acao: 'cancelar' })}
+                      data-testid={`cancelar-${desafio.id}`}
                     >
-                      <input type="hidden" name="challengeId" value={desafio.id} />
-                      <Button
-                        type="submit"
-                        variant="destructive"
-                        disabled={enviando}
-                        data-testid={`cancelar-${desafio.id}`}
-                      >
-                        Cancelar desafio
-                      </Button>
-                    </form>
+                      Cancelar desafio
+                    </Button>
                   ) : null}
                 </div>
+
+                {confirmando?.id === desafio.id ? (
+                  <ConfirmacaoDeAcao
+                    desafio={desafio}
+                    acao={confirmando.acao}
+                    enviando={enviando}
+                    aoDesistir={() => setConfirmando(null)}
+                    aoConfirmar={(dados) => {
+                      iniciarEnvio(() => {
+                        if (confirmando.acao === 'excluir') acaoExcluir(dados);
+                        else acaoCancelar(dados);
+                        setConfirmando(null);
+                      });
+                    }}
+                  />
+                ) : null}
 
                 {editando === desafio.id ? (
                   <form
@@ -400,5 +414,93 @@ export function PainelDeDesafios({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Confirmacao de acao destrutiva, na propria linha do desafio.
+ *
+ * `DS-PAINEL.md` §6: botao destrutivo usa o VERBO REAL, nunca "OK". E o
+ * resumo diz o efeito por extenso, na linguagem de quem opera -- a diferenca
+ * entre excluir e cancelar (apagar x preservar o historico) e exatamente o
+ * que a secretaria precisa entender antes de confirmar.
+ *
+ * `role="alertdialog"`: e uma interrupcao que exige decisao, nao um aviso
+ * passivo. O foco vai para o botao de DESISTIR, nao para o destrutivo --
+ * quem chegou aqui por engano sai apertando Enter.
+ */
+function ConfirmacaoDeAcao({
+  desafio,
+  acao,
+  enviando,
+  aoConfirmar,
+  aoDesistir,
+}: {
+  readonly desafio: DesafioDaListagemDto;
+  readonly acao: 'excluir' | 'cancelar';
+  readonly enviando: boolean;
+  readonly aoConfirmar: (dados: FormData) => void;
+  readonly aoDesistir: () => void;
+}) {
+  const caixa = useRef<HTMLFormElement>(null);
+
+  /*
+   * Foco no botao de DESISTIR, nao no destrutivo: quem chegou aqui por
+   * engano sai apertando Enter.
+   *
+   * Pelo DOM e nao por `ref` no `Button`: o componente do design system nao
+   * expoe `ref`, e afrouxar o tipo dele por causa de uma tela seria mexer no
+   * contrato de todo mundo.
+   */
+  useEffect(() => {
+    caixa.current?.querySelector<HTMLButtonElement>('button[type="button"]')?.focus();
+  }, []);
+
+  const excluindo = acao === 'excluir';
+
+  return (
+    <form
+      ref={caixa}
+      className={estilos['confirmacao']}
+      role="alertdialog"
+      aria-label={excluindo ? 'Excluir desafio' : 'Cancelar desafio'}
+      data-testid={`confirmar-${acao}-${desafio.id}`}
+      action={aoConfirmar}
+      onKeyDown={(evento) => {
+        // Esc desiste -- a saida que todo dialogo precisa ter.
+        if (evento.key === 'Escape') aoDesistir();
+      }}
+    >
+      <input type="hidden" name="challengeId" value={desafio.id} />
+
+      <p className={estilos['confirmacaoResumo']}>
+        {excluindo ? (
+          <>
+            <strong>{desafio.title}</strong> será apagado e não poderá ser recuperado.
+          </>
+        ) : (
+          <>
+            <strong>{desafio.title}</strong> deixa de aceitar inscrição e não será mais apurado. O
+            histórico de quem participou é preservado.
+          </>
+        )}
+      </p>
+
+      <div className={estilos['confirmacaoAcoes']}>
+        <Button type="button" variant="outline" onClick={aoDesistir}>
+          Voltar
+        </Button>
+
+        {/* VERBO REAL, nunca "OK" nem "Confirmar" (DS-PAINEL.md §6). */}
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={enviando}
+          data-testid={`confirmado-${acao}-${desafio.id}`}
+        >
+          {excluindo ? 'Excluir desafio' : 'Cancelar desafio'}
+        </Button>
+      </div>
+    </form>
   );
 }

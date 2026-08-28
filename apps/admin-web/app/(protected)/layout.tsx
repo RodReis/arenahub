@@ -106,37 +106,45 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     totem (marca, aparencia, sessao) e configuracao de uso raro, nao a
     ferramenta do atendimento diario.
   */
-  { href: '/operations/kiosks', label: 'Totens', exigePermissao: 'device.read' },
+  { href: '/units', label: 'Unidades' },
   /*
-    MODERAÇÃO DE APELIDO -- F30, Task 9.
+    TOTEM -- grupo criado por decisao do PI em 28/08/2026: *"vamos colocar o
+    que for do totem no Menu Totem"*.
 
-    Mesmo grupo de Dispositivos e Totens: moderar apelido público é uso
-    esporádico (a fila enche conforme alunos escolhem apelido), não algo que
-    a recepção abre todo atendimento. `engagement.read` porque a tela lista
-    perfis de engajamento; sem a capacidade, o link nem aparece -- o mesmo
-    critério de `device.read` acima.
+    As tres entradas configuram a MESMA superficie -- o que o aluno ve no
+    totem --, e ficavam soltas em Administracao entre Dispositivos e
+    Unidades, onde nada dizia que eram a mesma familia. Agrupadas, a leitura
+    de relance responde "onde mexo no totem" numa parada so.
+
+    A ORDEM E A DA DEPENDENCIA, nao a alfabetica: sem personalizar o totem
+    (ligar modulo, publicar) nada do resto aparece para o aluno, entao
+    Personalizacao vem primeiro. Engajamento (placar, XP, desafios) e o
+    conteudo que roda dentro dela; moderar apelido e a fila que nasce dele.
+
+    `Placar e XP` e `Desafios` VIRARAM ABAS de `/engagement` -- eram dois
+    itens para um trabalho so. As rotas antigas continuam existindo e
+    funcionando; so sairam do menu.
+  */
+  {
+    href: '/operations/kiosks',
+    label: 'Personalização',
+    grupo: 'Totem',
+    exigePermissao: 'device.read',
+  },
+  /*
+    ENGAJAMENTO -- F31 (placar e XP) + F34 (desafios), numa tela de abas.
+
+    `engagement.moderate` e nao `engagement.read`: as duas abas so oferecem
+    ACAO (gerar/publicar placar, ajustar XP, criar/abrir desafio), e sem a
+    capacidade nao ha nada que a tela deixe fazer.
+  */
+  { href: '/engagement', label: 'Engajamento', exigePermissao: 'engagement.moderate' },
+  /*
+    MODERAÇÃO DE APELIDO -- F30, Task 9. Fila que nasce do engajamento: o
+    aluno escolhe apelido no totem, alguem aprova aqui. `engagement.read`
+    porque a tela LISTA perfis; sem a capacidade, o link nem aparece.
   */
   { href: '/engagement/aliases', label: 'Moderação de apelido', exigePermissao: 'engagement.read' },
-  /*
-    PLACAR MENSAL E AJUSTE DE XP -- F31, Task 11.
-
-    Mesmo grupo das duas entradas acima: gerar/publicar o placar e ajustar
-    XP e uso esporadico (uma vez por mes, ou quando uma correcao pontual
-    aparece), nao ferramenta de atendimento diario. `engagement.moderate`
-    porque as tres rotas do painel (gerar, publicar, ajustar) exigem essa
-    permissao -- sem ela nao ha nada que a tela deixe fazer.
-  */
-  { href: '/engagement/placar', label: 'Placar e XP', exigePermissao: 'engagement.moderate' },
-  /*
-    DESAFIOS -- F34, Slice 5.5.
-
-    Mesmo grupo das tres entradas acima, e pelo mesmo motivo: criar desafio e
-    ato esporadico (uma campanha por mes, quando ha), nao ferramenta de
-    atendimento diario. `engagement.moderate` porque criar e abrir exigem
-    essa permissao -- sem ela nao ha nada que a tela deixe fazer.
-  */
-  { href: '/engagement/desafios', label: 'Desafios', exigePermissao: 'engagement.moderate' },
-  { href: '/units', label: 'Unidades' },
 ];
 
 interface Unidade {

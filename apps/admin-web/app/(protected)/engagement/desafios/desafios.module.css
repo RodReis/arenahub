@@ -97,3 +97,34 @@
   padding-top: 12px;
   border-top: 1px solid var(--ah-border-subtle);
 }
+
+/*
+ * Confirmação de ação destrutiva, na própria linha do desafio.
+ *
+ * Borda em `--ah-state-danger` e não fundo tingido: o item continua legível
+ * enquanto se decide, e a cor sinaliza sem virar alerta gritando. Sombra
+ * porque é camada que interrompe — a única exceção ao "card tem borda" do
+ * PRODUCT.md.
+ */
+.confirmacao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--ah-state-danger);
+  border-radius: var(--ah-radius-md, 8px);
+}
+
+.confirmacaoResumo {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.confirmacaoAcoes {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}

@@ -17,6 +17,7 @@ vi.mock('../../../actions/engagement', () => ({
   cancelarDesafio: vi.fn(),
 }));
 
+import { cancelarDesafio, excluirDesafio } from '../../../actions/engagement';
 import { PainelDeDesafios } from './painel-de-desafios';
 import type {
   DesafioDaListagemDto,
@@ -277,5 +278,91 @@ describe('editar, excluir e cancelar', () => {
 
     expect(screen.queryByTestId('form-edicao-c-1')).not.toBeInTheDocument();
     expect(screen.getByTestId('form-edicao-c-2')).toBeInTheDocument();
+  });
+});
+
+/**
+ * EXCLUIR E CANCELAR PEDEM CONFIRMACAO.
+ *
+ * Relatado pelo PI em 28/08/2026: "Excluir esta excluindo direto sem msg de
+ * confirmacao, nao pode". Acao destrutiva sem desfazer nao pode acontecer
+ * num clique.
+ */
+describe('confirmacao de acao destrutiva', () => {
+  it('excluir nao apaga no primeiro clique -- abre a confirmacao', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE]);
+
+    await usuario.click(screen.getByTestId('excluir-c-1'));
+
+    expect(await screen.findByTestId('confirmar-excluir-c-1')).toBeInTheDocument();
+    expect(excluirDesafio).not.toHaveBeenCalled();
+  });
+
+  it('a confirmacao diz o nome do desafio e o efeito', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE]);
+
+    await usuario.click(screen.getByTestId('excluir-c-1'));
+    const caixa = await screen.findByTestId('confirmar-excluir-c-1');
+
+    expect(caixa).toHaveTextContent('Setembro em dia');
+    expect(caixa).toHaveTextContent(/não poderá ser recuperado/i);
+  });
+
+  /** `DS-PAINEL.md` §6: verbo real, nunca "OK" nem "Confirmar". */
+  it('o botao de confirmar usa o verbo real', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE]);
+
+    await usuario.click(screen.getByTestId('excluir-c-1'));
+    const confirmar = await screen.findByTestId('confirmado-excluir-c-1');
+
+    expect(confirmar).toHaveTextContent('Excluir desafio');
+    expect(confirmar).not.toHaveTextContent(/^(OK|Confirmar|Sim)$/i);
+  });
+
+  it('voltar desiste sem excluir', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE]);
+
+    await usuario.click(screen.getByTestId('excluir-c-1'));
+    await usuario.click(await screen.findByRole('button', { name: /voltar/i }));
+
+    expect(screen.queryByTestId('confirmar-excluir-c-1')).not.toBeInTheDocument();
+    expect(excluirDesafio).not.toHaveBeenCalled();
+  });
+
+  /** O foco vai para DESISTIR: quem chegou por engano sai apertando Enter. */
+  it('o foco inicial e o botao de desistir, nunca o destrutivo', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE]);
+
+    await usuario.click(screen.getByTestId('excluir-c-1'));
+    await screen.findByTestId('confirmar-excluir-c-1');
+
+    expect(screen.getByRole('button', { name: /voltar/i })).toHaveFocus();
+  });
+
+  it('cancelar tambem pede confirmacao, e explica que preserva o historico', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [{ ...EXISTENTE, status: 'ACTIVE', participantes: 3 }]);
+
+    await usuario.click(screen.getByTestId('cancelar-c-1'));
+    const caixa = await screen.findByTestId('confirmar-cancelar-c-1');
+
+    expect(caixa).toHaveTextContent(/histórico de quem participou é preservado/i);
+    expect(cancelarDesafio).not.toHaveBeenCalled();
+  });
+
+  it('uma confirmacao por vez', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE, { ...EXISTENTE, id: 'c-2', title: 'Outro' }]);
+
+    await usuario.click(screen.getByTestId('excluir-c-1'));
+    await usuario.click(screen.getByTestId('excluir-c-2'));
+
+    expect(screen.queryByTestId('confirmar-excluir-c-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('confirmar-excluir-c-2')).toBeInTheDocument();
   });
 });
