@@ -48,6 +48,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3.5][INFRA] Ingestão de reel do Instagram para a tela pública do totem (#215, finalizado em: 2026-08-28)
 - [MVP5][SPEC-032][F32] Consistência e streak (#32, finalizado em: 2026-08-28)
 - [MVP5][SPEC-031][F31] XP e conquistas (#31, finalizado em: 2026-08-28)
 - [MVP5][SPEC-030][F30] Preferências e identidade pública (#30, finalizado em: 2026-08-27)
