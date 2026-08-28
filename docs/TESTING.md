@@ -579,6 +579,75 @@ no banco — asserção só na resposta HTTP não distinguiria dedupe de regrava
 
 ---
 
+### Evidência da `SPEC-035` — F35, operação, moderação e experimento
+
+**PR: `—`** — preencher depois do merge, pela regra do topo desta seção.
+
+`pnpm test:report --issue 35 --spec SPEC-035`, rodado em 28/08/2026, confirma o **unitário**:
+
+```
+| 2026-08-28 | #35 | SPEC-035 | unitário | 2540 | 2540 | 0 | 76.6 | — |
+```
+
+⚠️ **A linha de integração que o gerador escreveu não é desta execução.** O crash do Jest no
+Windows (exit `3221226505`, pré-existente e registrado desde a F32) matou a saída antes do
+resultado, e o gerador **herdou o número da última execução bem-sucedida** — exatamente o que ele
+avisa em stderr:
+
+```
+[test:report] AVISO: apps/api (test:integration) nao produziu saida -- processo terminou com
+status 3221226505 sem escrever o resultado. Mantendo o numero da ultima execucao bem-sucedida
+para este alvo.
+```
+
+Isso já enganou uma vez, na F32. A integração desta fatia foi medida **suíte a suíte**, com as 48
+suítes rodadas uma a uma — **732 testes, 0 falhas** —, e a linha do relatório foi corrigida à mão
+para esse número (a guarda `--check` segue verde, porque ela confere o cache, não a origem). O 764
+que o gerador escrevera era do `#220`.
+
+```
+| 2026-08-28 | #35 | SPEC-035 | integração | 732 | 732 | 0 | 83.9 | — |
+```
+
+#### O que os testes desta fatia provam, e o que cai se a regra sumir
+
+Dez canários. Cada um foi executado com a regra removida, para provar que o teste falha:
+
+| canário | o que cai sem a regra |
+|---|---|
+| `Math.abs` fora do teto de correção | 3 testes — toda correção **negativa** passaria por qualquer teto (`-5000 > 100` é falso) |
+| categoria fora do `where` da regeneração | 1 — gerar frequência apagaria o rascunho de XP do mesmo mês |
+| `tenantId` fora do escopo da contestação | 1 — moderador do tenant A fecharia contestação do tenant B, com 200 |
+| contar linhas `ACCEPTED` em vez de subtrair | 2 — o painel mostraria quase zero participando numa academia inteira |
+| `??` no lugar de `!== undefined` no teto | 1 — `null` (sem teto) viraria "não veio", e o campo vazio não limparia o limite |
+| seletor de categoria sem enviar a escolha | 1 — o seletor viraria decoração e tudo cairia em XP pelo default |
+| `trim()` fora do mínimo da contestação | 2 — oito espaços com duas letras no meio passariam como texto válido |
+| linha removida da allowlist da ponte | 1 — a rota do totem daria 404 antes de assinar |
+| permissão devolvida para `engagement.moderate` | 1 — quem só modera apelido voltaria a corrigir saldo de XP |
+| `P2002` sem tradução em `salvarSnapshot` | 1 — regerar mês publicado voltaria a 500 genérico |
+
+#### Verificação na API rodando e na tela
+
+O CI não prova a tela, e esta fatia tem dois achados que só a execução real revelou (ver
+`DEVELOPMENT.md`). O que foi exercido contra a API de verdade, com o build do dia:
+
+| o quê | resultado |
+|---|---|
+| Teto de correção com limite 100 | `-500` recusado (`CORRECAO_ACIMA_DO_TETO`), `-50` aceito |
+| Contestação | aberta → aparece na fila com o nome do aluno → resolvida → **409 na segunda tentativa** |
+| Ocultar apelido | `HIDDEN` gravado; sem razão, **400** `RAZAO_DE_RECUSA_OBRIGATORIA` |
+| Placar por categoria | as três geram snapshots **independentes** no mesmo mês/unidade |
+| Regerar mês publicado | **409** `RANKING_SNAPSHOT_IMUTAVEL` (era 500 antes da correção) |
+| Indicadores | 341 ativos, 341 no placar — o regime opt-out do ADR-046 medido ao vivo |
+
+📌 **Duas armadilhas de ambiente, não do código.** A API servia **build de 25/08**, três dias
+defasado — `/api/v1/health-goals` respondia, as rotas da F35 não existiam; e o `tsc` incremental
+regenerou só os `.d.ts` até o `tsconfig.build.tsbuildinfo` ser removido. E `engagement.correct`
+**não existe em banco já semeado**: deu 403 até o seed (idempotente) ser rodado — o mesmo valerá
+em produção.
+
+---
+
 ## 6. CI
 
 Pipeline mínimo, em ordem de custo crescente (falhe cedo, falhe barato):
