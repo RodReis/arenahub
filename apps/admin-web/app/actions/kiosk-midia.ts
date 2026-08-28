@@ -35,7 +35,68 @@ const MENSAGEM: Record<string, string> = {
   FILE_INFECTED: 'O antivírus recusou este arquivo.',
   SCANNER_UNAVAILABLE: 'O antivírus está indisponível. Tente de novo em instantes.',
   SCANNER_TIMEOUT: 'O antivírus demorou a responder. Tente de novo em instantes.',
+
+  /*
+   * INGESTAO DE REEL (ADR-042, Decisao 7).
+   *
+   * As duas familias abaixo dizem coisas OPOSTAS ao gerente, e por isso nao
+   * compartilham frase:
+   *
+   *   - `LINK_*` e `MIDIA_*` -> o problema esta no que ele colou. Ele
+   *     resolve trocando o link.
+   *   - `EXTRATOR_*` -> a ferramenta falhou. Ele NAO resolve pela tela, e a
+   *     saida e o upload de MP4.
+   *
+   * Misturar as duas faria o gerente caçar um link bom atras de um defeito
+   * que nao e dele -- exatamente o que o ADR mandou evitar.
+   */
+  LINK_NAO_E_DO_INSTAGRAM: 'Cole um endereço do Instagram (instagram.com).',
+  LINK_NAO_APONTA_PARA_POST:
+    'Esse endereço não aponta para um post. Use o link de um reel, post ou IGTV.',
+  MIDIA_INDISPONIVEL:
+    'Não foi possível abrir esse post. Confira se ele é público e ainda existe.',
+  MIDIA_SEM_VIDEO: 'Esse post não tem vídeo.',
+  MIDIA_GRANDE_DEMAIS: 'O vídeo do Instagram passa de 40 MB. Envie um MP4 reduzido.',
+  EXTRATOR_INDISPONIVEL:
+    'A cópia do Instagram está indisponível nesta instalação. Envie um MP4.',
+  EXTRATOR_TIMEOUT: 'O Instagram demorou a responder. Tente de novo ou envie um MP4.',
+  EXTRATOR_FALHOU:
+    'Não foi possível copiar do Instagram agora — o problema não é o seu link. Envie um MP4 ou tente mais tarde.',
 };
+
+export interface EstadoDaIngestaoDeLink {
+  erro?: string;
+  midiaKey?: string;
+  /** A URL CANONICA -- e ela que o bloco guarda, nao a que o gerente colou. */
+  linkExterno?: string;
+}
+
+/**
+ * Copia um reel do Instagram para a midia do bloco (ADR-042, Decisao 7).
+ *
+ * Mesma disciplina de `enviarMidiaAction`: NAO revalida caminho nenhum --
+ * devolve chave e link, e quem grava e o `salvarRascunhoAction`. Um
+ * `revalidatePath` aqui apagaria o rascunho que o gerente ainda edita.
+ */
+export async function ingerirMidiaDeLinkAction(
+  kioskDeviceId: string,
+  link: string,
+): Promise<EstadoDaIngestaoDeLink> {
+  const resposta = await chamarApi<{ midiaKey: string; linkExterno: string }>(
+    `/api/v1/admin/kiosk-devices/${kioskDeviceId}/media/from-link`,
+    { metodo: 'POST', corpo: { link } },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    const codigo = resposta.erro?.code ?? '';
+
+    return {
+      erro: MENSAGEM[codigo] ?? `Não foi possível copiar o vídeo (${codigo || 'erro'}).`,
+    };
+  }
+
+  return { midiaKey: resposta.dados.midiaKey, linkExterno: resposta.dados.linkExterno };
+}
 
 export async function enviarMidiaAction(
   kioskDeviceId: string,

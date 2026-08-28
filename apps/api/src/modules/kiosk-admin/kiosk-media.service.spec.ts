@@ -6,6 +6,11 @@ import {
   type VereditoDoScanner,
 } from '../../common/antivirus/malware-scanner.port.js';
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
+import {
+  ErroDoExtrator,
+  type MediaFetcher,
+  type ResultadoDaExtracao,
+} from '../../common/media-fetcher/media-fetcher.port.js';
 import type { ObjectStoragePort } from '../../common/storage/object-storage.port.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import type { PrismaService } from '../../persistence/prisma.service.js';
@@ -34,9 +39,12 @@ function montar(opcoes: {
   readonly veredito?: VereditoDoScanner;
   readonly erroDoScanner?: ErroDoScanner;
   readonly deviceExiste?: boolean;
+  readonly extracao?: ResultadoDaExtracao;
+  readonly erroDoExtrator?: ErroDoExtrator;
 }) {
   const gravados: { key: string; contentType: string }[] = [];
   const escaneados: Uint8Array[] = [];
+  const baixados: string[] = [];
 
   const db = {
     kioskDevice: {
@@ -70,10 +78,23 @@ function montar(opcoes: {
       }),
   } as unknown as ObjectStoragePort;
 
+  const extrator: MediaFetcher = {
+    baixar: (url) => {
+      baixados.push(url);
+
+      if (opcoes.erroDoExtrator) return Promise.reject(opcoes.erroDoExtrator);
+
+      return Promise.resolve(
+        opcoes.extracao ?? { extraido: true, conteudo: mp4(2048), contentType: 'video/mp4' },
+      );
+    },
+  };
+
   return {
-    servico: new KioskMediaService(db, antivirus, storage),
+    servico: new KioskMediaService(db, antivirus, storage, extrator),
     gravados,
     escaneados,
+    baixados,
   };
 }
 
@@ -178,5 +199,166 @@ describe('KioskMediaService.enviar', () => {
     await expect(servico.enviar(contexto, DEVICE, midia(mp4()))).rejects.toMatchObject({
       status: 404,
     });
+  });
+});
+
+/*
+ * ---------------------------------------------------------------------
+ * INGESTAO DE REEL DO INSTAGRAM -- ADR-042, Decisao 7.
+ *
+ * O ponto de cada teste aqui e provar que o link NAO tem caminho proprio:
+ * ele desagua no mesmo fluxo do upload de MP4 (formato -> antivirus ->
+ * storage). Um caminho paralelo teria de repetir as tres travas, e a
+ * primeira que alguem esquecesse viraria o buraco.
+ * ---------------------------------------------------------------------
+ */
+describe('KioskMediaService.ingerirDeLink', () => {
+  const REEL = 'https://www.instagram.com/reel/DbtoWkFR6l6/';
+
+  it('baixa o reel e devolve a chave, como o upload faria', async () => {
+    const { servico, gravados, baixados } = montar({});
+
+    const resultado = await servico.ingerirDeLink(contexto, DEVICE, REEL);
+
+    expect(baixados).toEqual([REEL]);
+    expect(gravados).toHaveLength(1);
+    expect(resultado.midiaKey).toBe(gravados[0]!.key);
+  });
+
+  it('NORMALIZA o link antes de baixar -- query de rastreamento nao chega ao extrator', async () => {
+    const { servico, baixados } = montar({});
+
+    await servico.ingerirDeLink(
+      contexto,
+      DEVICE,
+      'https://www.instagram.com/reel/DbtoWkFR6l6/?utm_source=ig_web_copy_link',
+    );
+
+    expect(baixados).toEqual([REEL]);
+  });
+
+  it('devolve a URL canonica junto da chave -- e ela que o bloco guarda', async () => {
+    const { servico } = montar({});
+
+    const resultado = await servico.ingerirDeLink(
+      contexto,
+      DEVICE,
+      '  https://instagram.com/reel/DbtoWkFR6l6?utm_source=x  ',
+    );
+
+    expect(resultado.linkExterno).toBe(REEL);
+  });
+
+  it('ESCANEIA o que baixou -- reel nao pula o antivirus', async () => {
+    // A trava que mais importa: mídia de terceiro entrando no bucket sem
+    // passar pelo scanner seria pior que o upload, nao melhor.
+    const { servico, escaneados } = montar({});
+
+    await servico.ingerirDeLink(contexto, DEVICE, REEL);
+
+    expect(escaneados).toHaveLength(1);
+  });
+
+  it('NAO grava no storage quando o antivirus recusa o que veio do Instagram', async () => {
+    const { servico, gravados } = montar({
+      veredito: { limpo: false, ameaca: 'EICAR-Test-File' },
+    });
+
+    const erro = await erroLancadoPor(servico.ingerirDeLink(contexto, DEVICE, REEL));
+
+    expect(erro.code).toBe('FILE_INFECTED');
+    expect(gravados).toHaveLength(0);
+  });
+
+  it('recusa link que nao e do Instagram SEM chamar o extrator', async () => {
+    // SSRF: se a URL chegasse ao extrator, o servidor buscaria o que ela
+    // apontasse. A recusa tem de acontecer ANTES do processo externo.
+    const { servico, baixados } = montar({});
+
+    const erro = await erroLancadoPor(
+      servico.ingerirDeLink(contexto, DEVICE, 'https://exemplo.com/reel/DbtoWkFR6l6/'),
+    );
+
+    expect(erro.code).toBe('LINK_NAO_E_DO_INSTAGRAM');
+    expect(baixados).toEqual([]);
+  });
+
+  it('recusa host que apenas TERMINA em instagram.com, sem chamar o extrator', async () => {
+    const { servico, baixados } = montar({});
+
+    await erroLancadoPor(
+      servico.ingerirDeLink(contexto, DEVICE, 'https://evil-instagram.com/reel/DbtoWkFR6l6/'),
+    );
+
+    expect(baixados).toEqual([]);
+  });
+
+  it('traduz reel indisponivel em 422 -- e o gerente troca o link', async () => {
+    const { servico } = montar({
+      extracao: { extraido: false, motivo: 'MIDIA_INDISPONIVEL' },
+    });
+
+    const erro = await erroLancadoPor(servico.ingerirDeLink(contexto, DEVICE, REEL));
+
+    expect(erro).toMatchObject({ code: 'MIDIA_INDISPONIVEL', status: 422 });
+  });
+
+  it('traduz extrator quebrado em 503 -- e NAO em erro do link', async () => {
+    // A distincao que o ADR exige: no dia em que a Meta mudar e a extracao
+    // parar para TODO reel, o painel precisa dizer "a ferramenta falhou".
+    // Dizer "seu link esta errado" faria o gerente trocar de link para
+    // sempre atras de um defeito que nao e dele.
+    const { servico } = montar({
+      erroDoExtrator: new ErroDoExtrator('EXTRATOR_FALHOU', 'quebrou'),
+    });
+
+    const erro = await erroLancadoPor(servico.ingerirDeLink(contexto, DEVICE, REEL));
+
+    expect(erro.status).toBe(503);
+    expect(erro.code).toBe('EXTRATOR_FALHOU');
+  });
+
+  it('traduz extrator ausente em 503', async () => {
+    const { servico } = montar({
+      erroDoExtrator: new ErroDoExtrator('EXTRATOR_INDISPONIVEL', 'sem binario'),
+    });
+
+    expect((await erroLancadoPor(servico.ingerirDeLink(contexto, DEVICE, REEL))).status).toBe(503);
+  });
+
+  it('recusa midia grande demais sem gravar', async () => {
+    const { servico, gravados } = montar({
+      extracao: { extraido: false, motivo: 'MIDIA_GRANDE_DEMAIS' },
+    });
+
+    const erro = await erroLancadoPor(servico.ingerirDeLink(contexto, DEVICE, REEL));
+
+    expect(erro.code).toBe('MIDIA_GRANDE_DEMAIS');
+    expect(gravados).toHaveLength(0);
+  });
+
+  it('aplica a MESMA validacao de formato do upload', async () => {
+    // O extrator promete MP4, mas quem prova o formato sao os bytes. Se um
+    // dia ele devolver outra coisa, a assinatura de arquivo recusa -- a
+    // mesma trava que o upload tem.
+    const naoEhMp4 = new Uint8Array(1024);
+    naoEhMp4.set([0x25, 0x50, 0x44, 0x46], 0); // %PDF
+
+    const { servico, gravados } = montar({
+      extracao: { extraido: true, conteudo: naoEhMp4, contentType: 'video/mp4' },
+    });
+
+    await erroLancadoPor(servico.ingerirDeLink(contexto, DEVICE, REEL));
+
+    expect(gravados).toHaveLength(0);
+  });
+
+  it('device de outro tenant responde 404 antes de baixar qualquer coisa', async () => {
+    const { servico, baixados } = montar({ deviceExiste: false });
+
+    await expect(servico.ingerirDeLink(contexto, DEVICE, REEL)).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(baixados).toEqual([]);
   });
 });

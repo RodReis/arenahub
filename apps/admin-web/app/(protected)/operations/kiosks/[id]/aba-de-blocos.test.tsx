@@ -19,7 +19,10 @@ import { blocoNovo } from './blocos';
  */
 vi.mock('../../../../actions/kiosk-midia', () => ({
   enviarMidiaAction: vi.fn(),
+  ingerirMidiaDeLinkAction: vi.fn(),
 }));
+
+const { ingerirMidiaDeLinkAction } = await import('../../../../actions/kiosk-midia');
 
 function comBlocos(
   itens: KioskConfig['blocos']['itens'],
@@ -92,13 +95,71 @@ describe('AbaDeBlocos -- ordem do rodizio', () => {
 });
 
 describe('AbaDeBlocos -- video e a origem do Instagram', () => {
-  it('o campo de link existe e esta DESABILITADO, com o motivo em tela', () => {
+  it('o campo de link e EDITAVEL -- a segunda origem da Decisao 7 existe', () => {
     renderizar(comBlocos([blocoNovo('VIDEO', 'a')]));
 
-    const campo = screen.getByTestId('link-a');
+    expect(screen.getByTestId('link-a')).not.toBeDisabled();
+  });
 
-    expect(campo).toBeDisabled();
-    expect(screen.getByText(/Indisponível nesta versão/i)).toBeInTheDocument();
+  it('o botao de copiar nasce DESABILITADO enquanto nao ha link', () => {
+    // Clicar sem link dispararia uma chamada que so pode falhar.
+    renderizar(comBlocos([blocoNovo('VIDEO', 'a')]));
+
+    expect(screen.getByTestId('copiar-link-a')).toBeDisabled();
+  });
+
+  it('copiar grava a chave E a URL CANONICA que o servidor devolveu', async () => {
+    // O gerente cola o link com query de rastreamento; o que o bloco guarda
+    // e a forma normalizada -- senao o mesmo reel vira dois links no banco.
+    vi.mocked(ingerirMidiaDeLinkAction).mockResolvedValue({
+      midiaKey: 'tenant/unidade/abc.mp4',
+      linkExterno: 'https://www.instagram.com/reel/DbtoWkFR6l6/',
+    });
+
+    const usuario = userEvent.setup();
+    const bloco = {
+      ...blocoNovo('VIDEO', 'a'),
+      linkExterno: 'https://www.instagram.com/reel/DbtoWkFR6l6/?utm_source=ig_web_copy_link',
+    } as KioskConfig['blocos']['itens'][number];
+
+    const { aoMudarBlocos } = renderizar(comBlocos([bloco]));
+
+    await usuario.click(screen.getByTestId('copiar-link-a'));
+
+    const item = aoMudarBlocos.mock.calls[0]?.[0].itens[0];
+
+    expect(item).toMatchObject({
+      midiaKey: 'tenant/unidade/abc.mp4',
+      linkExterno: 'https://www.instagram.com/reel/DbtoWkFR6l6/',
+    });
+  });
+
+  it('falha na copia NAO altera o bloco -- o video que estava no ar continua', async () => {
+    vi.mocked(ingerirMidiaDeLinkAction).mockResolvedValue({ erro: 'Não foi possível copiar.' });
+
+    const usuario = userEvent.setup();
+    const bloco = {
+      ...blocoNovo('VIDEO', 'a'),
+      linkExterno: 'https://www.instagram.com/reel/DbtoWkFR6l6/',
+    } as KioskConfig['blocos']['itens'][number];
+
+    const { aoMudarBlocos } = renderizar(comBlocos([bloco]));
+
+    await usuario.click(screen.getByTestId('copiar-link-a'));
+
+    expect(aoMudarBlocos).not.toHaveBeenCalled();
+  });
+
+  it('o botao diz ATUALIZAR quando ja ha video -- substituir e outro ato', () => {
+    const bloco = {
+      ...blocoNovo('VIDEO', 'a'),
+      midiaKey: 'tenant/unidade/antigo.mp4',
+      linkExterno: 'https://www.instagram.com/reel/DbtoWkFR6l6/',
+    } as KioskConfig['blocos']['itens'][number];
+
+    renderizar(comBlocos([bloco]));
+
+    expect(screen.getByTestId('copiar-link-a')).toHaveTextContent(/Atualizar/i);
   });
 
   it('avisa que a midia e copiada no salvamento -- a Meta nao garante o resto', () => {

@@ -693,7 +693,40 @@ async function semearTotem(
         gymUnitId,
         version: 1,
         publishedAt: new Date(),
-        payload: CONFIG_PADRAO_DO_TOTEM,
+        payload: {
+          ...CONFIG_PADRAO_DO_TOTEM,
+          blocos: {
+            ...CONFIG_PADRAO_DO_TOTEM.blocos,
+            itens: [
+              /*
+               * Reel REAL da Clinica da Musculacao, para o totem local abrir
+               * com conteudo de verdade (ADR-042, Decisao 7).
+               *
+               * `midiaKey: null` de proposito: o seed NAO baixa o video --
+               * download e ato do painel, com o gerente olhando (trava 1 do
+               * ADR), e um seed que fosse a rede falharia em maquina offline
+               * e em CI. O bloco nasce com o LINK preenchido e o gerente
+               * clica em "Copiar video do Instagram" para trazer a midia.
+               */
+              {
+                id: 'video-instagram',
+                tipo: 'VIDEO',
+                habilitado: true,
+                titulo: 'Acompanhe a Clínica no Instagram',
+                legenda: 'Reel da semana — reproduz sem som, com legenda.',
+                midiaKey: null,
+                linkExterno: 'https://www.instagram.com/reel/DbtoWkFR6l6/',
+              },
+              {
+                id: 'perfil-instagram',
+                tipo: 'INSTAGRAM',
+                habilitado: true,
+                perfil: '@clinicadamusculacao',
+                chamada: 'Siga e acompanhe os treinos da unidade.',
+              },
+            ],
+          },
+        },
       },
     });
   }

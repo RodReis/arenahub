@@ -9,13 +9,19 @@ import {
 } from '../../common/antivirus/malware-scanner.port.js';
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import {
+  MEDIA_FETCHER,
+  ErroDoExtrator,
+  type MediaFetcher,
+} from '../../common/media-fetcher/media-fetcher.port.js';
+import {
   OBJECT_STORAGE,
   montarChaveDeMidia,
   type ObjectStoragePort,
 } from '../../common/storage/object-storage.port.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
-import { CONTENT_TYPE_DE_MIDIA, aceitarMidia } from './domain/midia-do-totem.js';
+import { CONTENT_TYPE_DE_MIDIA, TAMANHO_MAXIMO_DE_MIDIA_BYTES, aceitarMidia } from './domain/midia-do-totem.js';
+import { aceitarLinkDeReel } from './domain/link-de-reel.js';
 
 /** Quantos bytes do inicio bastam para reconhecer o container ISO-BMFF. */
 const BYTES_DO_CABECALHO = 16;
@@ -29,6 +35,17 @@ export interface MidiaRecebida {
 export interface MidiaEnviada {
   /** O que vai para `blocos.itens[].midiaKey` no rascunho da configuracao. */
   readonly midiaKey: string;
+}
+
+export interface MidiaIngerida extends MidiaEnviada {
+  /**
+   * A URL CANONICA do reel -- o que o bloco guarda em `linkExterno`.
+   *
+   * Devolvida junto da chave porque o painel precisa gravar a forma
+   * normalizada, nao a que o gerente colou: senao o mesmo reel copiado de
+   * dois lugares vira dois links no banco.
+   */
+  readonly linkExterno: string;
 }
 
 /**
@@ -56,7 +73,87 @@ export class KioskMediaService {
     private readonly db: PrismaService,
     @Inject(MALWARE_SCANNER) private readonly antivirus: MalwareScanner,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
+    @Inject(MEDIA_FETCHER) private readonly extrator: MediaFetcher,
   ) {}
+
+  /**
+   * Baixa um reel do Instagram e o guarda como midia da tela publica
+   * (ADR-042, Decisao 7).
+   *
+   * DESAGUA EM `enviar`, e essa e a decisao inteira: formato, antivirus e
+   * storage acontecem UMA vez, no mesmo lugar do upload de MP4. Um caminho
+   * proprio para o link teria de repetir as tres travas, e a primeira que
+   * alguem esquecesse viraria o buraco -- midia de TERCEIRO entrando no
+   * bucket sem escaneamento e pior que arquivo que o gerente escolheu.
+   *
+   * A validacao do LINK acontece antes de tudo, inclusive antes de tocar o
+   * banco: a URL vira argumento de um processo que baixa o que ela apontar,
+   * e host livre e SSRF (ver `domain/link-de-reel.ts`).
+   *
+   * Trava 1 do ADR: isto roda no ato de salvar o bloco, no PAINEL, com o
+   * gerente olhando. Nenhum caminho do totem chega aqui.
+   */
+  async ingerirDeLink(
+    contexto: TenantContext,
+    kioskDeviceId: string,
+    link: string,
+  ): Promise<MidiaIngerida> {
+    const aceitacao = aceitarLinkDeReel(link);
+
+    if (!aceitacao.aceito) {
+      throw new ErroDeDominio(
+        aceitacao.motivo,
+        400,
+        'Link inválido. Cole o endereço de um reel ou post do Instagram.',
+      );
+    }
+
+    // O device ANTES do download: baixar 25 MB para descobrir que o totem e
+    // de outro tenant gastaria rede e tempo do gerente por nada.
+    await this.exigirDevice(contexto, kioskDeviceId);
+
+    let extracao;
+
+    try {
+      extracao = await this.extrator.baixar(aceitacao.url, TAMANHO_MAXIMO_DE_MIDIA_BYTES);
+    } catch (erro) {
+      /*
+       * FERRAMENTA QUEBRADA E 503, NUNCA ERRO DO LINK.
+       *
+       * E a distincao que o ADR exige por escrito: no dia em que a Meta
+       * mudar e a extracao parar para TODO reel, o painel tem de dizer "a
+       * ferramenta falhou". Dizer "seu link esta errado" faria o gerente
+       * trocar de link para sempre, atras de um defeito que nao e dele.
+       */
+      if (erro instanceof ErroDoExtrator) {
+        throw new ErroDeDominio(
+          erro.codigo,
+          503,
+          'Não foi possível copiar o vídeo do Instagram agora. Envie um MP4 ou tente mais tarde.',
+        );
+      }
+
+      throw erro;
+    }
+
+    if (!extracao.extraido) {
+      // 422 e nao 400: o link esta bem formado, o conteudo e que nao veio.
+      // A acao do gerente e outra -- trocar o reel, nao corrigir a URL.
+      throw new ErroDeDominio(
+        extracao.motivo,
+        422,
+        'Não foi possível copiar esse vídeo. Confira se o post é público e tem vídeo.',
+      );
+    }
+
+    const { midiaKey } = await this.enviar(contexto, kioskDeviceId, {
+      originalFilename: `${aceitacao.codigo}.mp4`,
+      contentType: extracao.contentType,
+      conteudo: extracao.conteudo,
+    });
+
+    return { midiaKey, linkExterno: aceitacao.url };
+  }
 
   async enviar(
     contexto: TenantContext,

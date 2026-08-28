@@ -301,6 +301,16 @@ jobs:
 
       - name: 'test:integration'
         run: pnpm test:integration
+        env:
+          # O EXTRATOR DE MIDIA E O DUBLÊ NO CI, e isso e deliberado.
+          #
+          # O adapter real chama `yt-dlp` e fala com o Instagram. Instala-lo
+          # aqui traria de volta o `apt-get` que a #105 tirou do caminho
+          # critico -- e, pior, faria uma mudanca da Meta pintar o CI de
+          # vermelho sem defeito nosso. A extracao real e testada a mao (o
+          # ADR registra o risco); o que o CI prova e a FIACAO: validacao de
+          # link, antivirus, storage e as traducoes de erro.
+          MEDIA_FETCHER_FAKE: '1'
 
       # --- 7 de 8 ---------------------------------------------------------
       # Promovido na F6 (Task 6), quando o Playwright nasceu no admin-web.

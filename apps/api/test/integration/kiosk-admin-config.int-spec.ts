@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -11,6 +11,8 @@ import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.servic
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import type { EstadoDaConfiguracao } from '../../src/modules/kiosk-admin/kiosk-admin-config.service.js';
 import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
+import { FakeMediaFetcherAdapter } from '../../src/common/media-fetcher/fake-media-fetcher.adapter.js';
+import { ErroDoExtrator, MEDIA_FETCHER } from '../../src/common/media-fetcher/media-fetcher.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 describe('F50 -- rascunho unico por camada', () => {
@@ -229,10 +231,27 @@ describe('F50 -- rotas administrativas de configuracao', () => {
     alvo.cookieGestor = await criarGestor(tenant.id, rotulo);
   };
 
+  /**
+   * Instancia NOVA por suite -- dublê com estado compartilhado vaza modo
+   * ligado de um teste para o seguinte.
+   */
+  const extrator = new FakeMediaFetcherAdapter();
+
   beforeAll(async () => {
     const modulo = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(OBJECT_STORAGE)
       .useValue(storageFalso)
+      /*
+       * O EXTRATOR E O DUBLÊ AQUI, sempre -- e nao so quando
+       * `MEDIA_FETCHER_FAKE` estiver ligado no ambiente. O adapter real
+       * chamaria `yt-dlp` e a rede: a suite passaria a depender da Meta, e
+       * uma mudanca deles pintaria o CI de vermelho sem defeito nosso.
+       *
+       * O que estes testes provam e a FIACAO -- validacao de link,
+       * antivirus, storage e traducao de erro --, nao a extracao.
+       */
+      .overrideProvider(MEDIA_FETCHER)
+      .useValue(extrator)
       .compile();
 
     app = modulo.createNestApplication();
@@ -428,6 +447,93 @@ describe('F50 -- rotas administrativas de configuracao', () => {
     // O ARQUIVO CHEGOU, e nao so a rota respondeu 201: sem esta asserção,
     // um servico que devolvesse a chave sem gravar nada passaria verde.
     expect(gravados.get(midiaKey)).toBeDefined();
+  });
+
+  /*
+   * -------------------------------------------------------------------
+   * INGESTAO DE REEL -- `POST :id/media/from-link` (ADR-042, Decisao 7).
+   *
+   * Contra HTTP real, porque as falhas desta ponte nao aparecem em teste de
+   * unidade: rota nao registrada, guard de permissao faltando, schema que
+   * recusa o corpo. A F30 e a F31 perderam cinco fiacoes desse tipo.
+   * -------------------------------------------------------------------
+   */
+  describe('POST media/from-link', () => {
+    const REEL = 'https://www.instagram.com/reel/DbtoWkFR6l6/';
+
+    afterEach(() => {
+      extrator.resetar();
+    });
+
+    it('copia o reel e devolve chave escopada + URL canonica', async () => {
+      const resposta = await request(servidor())
+        .post(`/api/v1/admin/kiosk-devices/${tenantA.deviceId}/media/from-link`)
+        .set('Cookie', tenantA.cookieGestor)
+        .send({ link: `${REEL}?utm_source=ig_web_copy_link` })
+        .expect(201);
+
+      const corpo = resposta.body as { midiaKey: string; linkExterno: string };
+
+      expect(
+        corpo.midiaKey.startsWith(`tenants/${tenantA.id}/kiosk-media/${tenantA.gymUnitId}/`),
+      ).toBe(true);
+      // A query de rastreamento NAO sobrevive: o bloco guarda a forma
+      // canonica, senao o mesmo reel vira dois links no banco.
+      expect(corpo.linkExterno).toBe(REEL);
+      // O ARQUIVO CHEGOU ao storage -- nao basta a rota responder 201.
+      expect(gravados.get(corpo.midiaKey)).toBeDefined();
+    });
+
+    it('recusa host que nao e do Instagram -- 400, sem baixar nada', async () => {
+      const resposta = await request(servidor())
+        .post(`/api/v1/admin/kiosk-devices/${tenantA.deviceId}/media/from-link`)
+        .set('Cookie', tenantA.cookieGestor)
+        .send({ link: 'https://evil-instagram.com/reel/DbtoWkFR6l6/' })
+        .expect(400);
+
+      expect((resposta.body as { code: string }).code).toBe('LINK_NAO_E_DO_INSTAGRAM');
+    });
+
+    it('reel indisponivel responde 422 -- o gerente troca o link', async () => {
+      extrator.programarFalha('MIDIA_INDISPONIVEL');
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/admin/kiosk-devices/${tenantA.deviceId}/media/from-link`)
+        .set('Cookie', tenantA.cookieGestor)
+        .send({ link: REEL })
+        .expect(422);
+
+      expect((resposta.body as { code: string }).code).toBe('MIDIA_INDISPONIVEL');
+    });
+
+    it('extrator quebrado responde 503, NAO erro de link', async () => {
+      // A distincao que o ADR exige: quando a Meta mudar e a extracao parar
+      // para todo reel, o gerente precisa saber que o problema nao e dele.
+      extrator.programarErro(new ErroDoExtrator('EXTRATOR_FALHOU', 'quebrou'));
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/admin/kiosk-devices/${tenantA.deviceId}/media/from-link`)
+        .set('Cookie', tenantA.cookieGestor)
+        .send({ link: REEL })
+        .expect(503);
+
+      expect((resposta.body as { code: string }).code).toBe('EXTRATOR_FALHOU');
+    });
+
+    it('device de OUTRO tenant responde 404 -- nunca 403', async () => {
+      await request(servidor())
+        .post(`/api/v1/admin/kiosk-devices/${tenantB.deviceId}/media/from-link`)
+        .set('Cookie', tenantA.cookieGestor)
+        .send({ link: REEL })
+        .expect(404);
+    });
+
+    it('exige sessao -- rota de painel nao serve anonimo', async () => {
+      await request(servidor())
+        .post(`/api/v1/admin/kiosk-devices/${tenantA.deviceId}/media/from-link`)
+        .send({ link: REEL })
+        .expect(401);
+    });
   });
 
   it('POST media recusa PNG disfarcado de MP4 -- a assinatura decide, nao o nome', async () => {
