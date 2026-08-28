@@ -1131,7 +1131,7 @@ sobre o que já existe — não de cálculo novo.
 #### `[INFRA]` — ingestão de reel do Instagram (28/08/2026)
 
 Issue [#215](https://github.com/RodReis/arenahub/issues/215) · fecha a ponta aberta pelo
-**ADR-042, Decisão 7** · PR `—`
+**ADR-042, Decisão 7** · PR [#216](https://github.com/RodReis/arenahub/pull/216) (mergeado em 28/08/2026, CI verde)
 
 O painel já gravava `linkExterno` desde a F51, mas nada trazia a mídia para o object storage — e o
 totem só sabe servir `midiaKey`. O gerente colava o link, salvava, e a tela pública mostrava um
