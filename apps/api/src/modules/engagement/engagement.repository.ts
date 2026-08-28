@@ -4,6 +4,11 @@ import { Prisma, type AliasRejectionReason, type StudentStatus } from '@arenahub
 import { PrismaService } from '../../persistence/prisma.service.js';
 import type { DecisaoDeEngajamento, FinalidadeDeEngajamento } from './domain/participacao.js';
 import type { IdentidadeEscolhida, StatusDoPerfilPublico } from './domain/exposicao.js';
+import type {
+  AssuntoDaContestacao,
+  DesfechoDaContestacao,
+  StatusDaContestacao,
+} from './domain/contestacao.js';
 
 /** Nome do indice parcial que garante alias unico entre os aprovados. */
 const INDICE_ALIAS_APROVADO_UNICO = 'public_profiles_alias_aprovado_unico';
@@ -100,6 +105,54 @@ export interface PortaDeEngajamento {
     status: StatusDoPerfilPublico,
     limite: number,
   ): Promise<PerfilParaModeracao[]>;
+
+  // --- F35: contestacoes -------------------------------------------------
+  criarContestacao(entrada: EntradaDeContestacao, agora: Date): Promise<ContestacaoGravada>;
+  contestacaoPorId(tenantId: string, id: string): Promise<ContestacaoGravada | null>;
+  gravarResolucao(entrada: EntradaDeResolucaoNoBanco, agora: Date): Promise<ContestacaoGravada>;
+  listarContestacoes(
+    tenantId: string,
+    status: StatusDaContestacao,
+    limite: number,
+  ): Promise<ContestacaoParaFila[]>;
+  contestacoesDoAluno(tenantId: string, studentId: string): Promise<ContestacaoGravada[]>;
+}
+
+/** O que o service pede para abrir uma contestacao. */
+export interface EntradaDeContestacao {
+  tenantId: string;
+  studentId: string;
+  subject: AssuntoDaContestacao;
+  descricao: string;
+}
+
+/** O que o service pede para resolver -- ator e instante entram aqui. */
+export interface EntradaDeResolucaoNoBanco {
+  tenantId: string;
+  id: string;
+  status: DesfechoDaContestacao;
+  resolucao: string;
+  resolvedBy: string;
+  /** O movimento de XP que corrigiu, quando houve. Aponta, nao copia. */
+  correctionEntryId: string | null;
+}
+
+/** Uma contestacao como o service a consome. */
+export interface ContestacaoGravada {
+  id: string;
+  studentId: string;
+  subject: AssuntoDaContestacao;
+  descricao: string;
+  status: StatusDaContestacao;
+  resolucao: string | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+}
+
+/** A linha da fila do painel -- a contestacao mais o nome do aluno. */
+export interface ContestacaoParaFila extends ContestacaoGravada {
+  /** Nome COMPLETO: quem modera precisa saber de quem e, e a fila e interna. */
+  alunoNome: string;
 }
 
 /** Converte a linha do Prisma para a forma que o service consome. */
@@ -367,6 +420,124 @@ export class EngagementRepository implements PortaDeEngajamento {
       alunoNome: perfil.student.fullName,
     }));
   }
+
+  // --- F35: contestacoes ---------------------------------------------------
+
+  async criarContestacao(
+    entrada: EntradaDeContestacao,
+    agora: Date,
+  ): Promise<ContestacaoGravada> {
+    const criada = await this.db.engagementDispute.create({
+      data: {
+        tenantId: entrada.tenantId,
+        studentId: entrada.studentId,
+        subject: entrada.subject,
+        descricao: entrada.descricao,
+        status: 'ABERTA',
+        createdAt: agora,
+      },
+    });
+
+    return paraContestacao(criada);
+  }
+
+  async contestacaoPorId(tenantId: string, id: string): Promise<ContestacaoGravada | null> {
+    const linha = await this.db.engagementDispute.findFirst({ where: { id, tenantId } });
+    return linha ? paraContestacao(linha) : null;
+  }
+
+  /**
+   * Grava o desfecho.
+   *
+   * `status: 'ABERTA'` NO WHERE, e nao so o id: duas abas do painel abertas na
+   * mesma contestacao resolveriam as duas, e a segunda sobrescreveria ator e
+   * instante da primeira. A checagem de estado no dominio nao basta -- ela le
+   * antes de escrever, e quem le antes de escrever perde a corrida.
+   *
+   * O `tenantId` no where e o que separa as academias: sem ele um moderador
+   * do tenant A fecharia contestacao de aluno do tenant B, com resposta 200.
+   */
+  async gravarResolucao(
+    entrada: EntradaDeResolucaoNoBanco,
+    agora: Date,
+  ): Promise<ContestacaoGravada> {
+    const resultado = await this.db.engagementDispute.updateMany({
+      where: { id: entrada.id, tenantId: entrada.tenantId, status: 'ABERTA' },
+      data: {
+        status: entrada.status,
+        resolucao: entrada.resolucao,
+        resolvedBy: entrada.resolvedBy,
+        resolvedAt: agora,
+        correctionEntryId: entrada.correctionEntryId,
+      },
+    });
+
+    if (resultado.count === 0) {
+      // Nao existe, e de outro tenant, ou ja foi resolvida. O service ja
+      // distinguiu os dois primeiros casos lendo antes; aqui so resta a
+      // corrida perdida.
+      throw new ConflictException({
+        code: 'CONTESTACAO_JA_RESOLVIDA',
+        message: 'CONTESTACAO_JA_RESOLVIDA',
+      });
+    }
+
+    const atualizada = await this.db.engagementDispute.findFirstOrThrow({
+      where: { id: entrada.id, tenantId: entrada.tenantId },
+    });
+
+    return paraContestacao(atualizada);
+  }
+
+  async listarContestacoes(
+    tenantId: string,
+    status: StatusDaContestacao,
+    limite: number,
+  ): Promise<ContestacaoParaFila[]> {
+    const linhas = await this.db.engagementDispute.findMany({
+      where: { tenantId, status },
+      orderBy: [{ createdAt: 'asc' }],
+      take: limite,
+      include: { student: { select: { fullName: true } } },
+    });
+
+    return linhas.map((linha) => ({
+      ...paraContestacao(linha),
+      alunoNome: linha.student.fullName,
+    }));
+  }
+
+  async contestacoesDoAluno(tenantId: string, studentId: string): Promise<ContestacaoGravada[]> {
+    const linhas = await this.db.engagementDispute.findMany({
+      where: { tenantId, studentId },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+
+    return linhas.map(paraContestacao);
+  }
+}
+
+/** Converte a linha do Prisma para a forma que o service consome. */
+function paraContestacao(linha: {
+  id: string;
+  studentId: string;
+  subject: string;
+  descricao: string;
+  status: string;
+  resolucao: string | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+}): ContestacaoGravada {
+  return {
+    id: linha.id,
+    studentId: linha.studentId,
+    subject: linha.subject as AssuntoDaContestacao,
+    descricao: linha.descricao,
+    status: linha.status as StatusDaContestacao,
+    resolucao: linha.resolucao,
+    resolvedAt: linha.resolvedAt,
+    createdAt: linha.createdAt,
+  };
 }
 
 /**

@@ -1,4 +1,10 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { AliasRejectionReason } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -6,6 +12,15 @@ import { type FinalidadeDeEngajamento, participaDoRanking } from './domain/parti
 import { type IdentidadeEscolhida, resolverExposicao } from './domain/exposicao.js';
 import { triarAlias } from './domain/triagem-de-alias.js';
 import {
+  abrirContestacao,
+  resolverContestacao,
+  type AssuntoDaContestacao,
+  type DesfechoDaContestacao,
+  type StatusDaContestacao,
+} from './domain/contestacao.js';
+import {
+  type ContestacaoGravada,
+  type ContestacaoParaFila,
   type PerfilParaModeracao,
   type PerfilPublicoDoAluno,
   PORTA_DE_ENGAJAMENTO,
@@ -231,6 +246,127 @@ export class EngagementService {
         perfilId: entrada.perfilId,
         status: entrada.decisao,
         rejectionReason: entrada.rejectionReason,
+      },
+      agora,
+    );
+  }
+
+  // --- F35: contestacoes ---------------------------------------------------
+
+  /**
+   * Limite da fila de contestacoes.
+   *
+   * Mesmo numero da fila de apelidos: a tela nao pagina, e uma fila que cresce
+   * sem teto vira uma pagina que nao carrega. Se a academia acumular mais de
+   * 100 contestacoes abertas, o problema nao e a paginacao.
+   */
+  private static readonly LIMITE_DA_FILA = 100;
+
+  /**
+   * O aluno abre uma contestacao (`M5-FR-016`), pelo totem.
+   *
+   * A validacao roda ANTES da escrita, no dominio puro: uma linha invalida
+   * gravada e uma linha na fila que ninguem sabe resolver.
+   */
+  async abrirContestacao(
+    tenantId: string,
+    studentId: string,
+    entrada: { subject: AssuntoDaContestacao; descricao: string },
+  ): Promise<ContestacaoGravada> {
+    const aluno = await this.repo.buscarAluno(tenantId, studentId);
+    if (!aluno) {
+      throw new NotFoundException({
+        code: 'ALUNO_NAO_ENCONTRADO',
+        message: 'Aluno nao encontrado',
+      });
+    }
+
+    let nova;
+    try {
+      nova = abrirContestacao(entrada);
+    } catch (erro) {
+      throw new BadRequestException({
+        code: erro instanceof Error ? erro.message : 'CONTESTACAO_INVALIDA',
+        message: 'Contestacao recusada',
+      });
+    }
+
+    return this.repo.criarContestacao(
+      {
+        tenantId,
+        studentId,
+        subject: nova.subject,
+        descricao: nova.descricao,
+      },
+      new Date(),
+    );
+  }
+
+  /** A fila do painel, por status. */
+  async listarContestacoes(
+    tenantId: string,
+    status: StatusDaContestacao,
+  ): Promise<readonly ContestacaoParaFila[]> {
+    return this.repo.listarContestacoes(tenantId, status, EngagementService.LIMITE_DA_FILA);
+  }
+
+  /** As contestacoes do proprio aluno -- o que o totem mostra. */
+  async contestacoesDoAluno(
+    tenantId: string,
+    studentId: string,
+  ): Promise<readonly ContestacaoGravada[]> {
+    return this.repo.contestacoesDoAluno(tenantId, studentId);
+  }
+
+  /**
+   * A secretaria resolve.
+   *
+   * Le antes de escrever para distinguir "nao existe / e de outro tenant" de
+   * "ja foi resolvida" -- duas causas com mensagens diferentes para quem opera.
+   * Mas quem GARANTE a exclusao mutua e o `where` da escrita, que exige
+   * `status: ABERTA`: duas abas do painel resolveriam as duas, e a segunda
+   * sobrescreveria ator e instante da primeira.
+   */
+  async resolverContestacao(
+    tenantId: string,
+    id: string,
+    entrada: { desfecho: DesfechoDaContestacao; resolucao: string },
+    actorId: string,
+    agora: Date,
+    correctionEntryId: string | null = null,
+  ): Promise<ContestacaoGravada> {
+    const atual = await this.repo.contestacaoPorId(tenantId, id);
+
+    if (!atual) {
+      throw new NotFoundException({
+        code: 'CONTESTACAO_NAO_ENCONTRADA',
+        message: 'Contestacao nao encontrada',
+      });
+    }
+
+    let desfecho;
+    try {
+      desfecho = resolverContestacao(atual, entrada);
+    } catch (erro) {
+      const codigo = erro instanceof Error ? erro.message : 'CONTESTACAO_INVALIDA';
+
+      // `CONTESTACAO_JA_RESOLVIDA` e conflito de estado (409), nao entrada
+      // malformada (400): o cliente mandou algo valido sobre algo que mudou.
+      if (codigo === 'CONTESTACAO_JA_RESOLVIDA') {
+        throw new ConflictException({ code: codigo, message: 'Contestacao ja resolvida' });
+      }
+
+      throw new BadRequestException({ code: codigo, message: 'Resolucao recusada' });
+    }
+
+    return this.repo.gravarResolucao(
+      {
+        tenantId,
+        id,
+        status: desfecho.status,
+        resolucao: desfecho.resolucao,
+        resolvedBy: actorId,
+        correctionEntryId,
       },
       agora,
     );

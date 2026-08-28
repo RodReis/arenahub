@@ -17,6 +17,18 @@ const esquemaDoMes = z.object({
   mes: z.string().regex(REGEX_DO_MES),
 });
 
+/** As tres categorias de placar (F35, ADR-049 Decisao 4). */
+const CATEGORIAS = ['XP_DO_MES', 'FREQUENCIA', 'CONSISTENCIA'] as const;
+
+/*
+ * Categoria e OPCIONAL com default `XP_DO_MES`: a tela antiga do painel nao
+ * a envia, e sem o default toda geracao existente viraria 400 -- quebrar a
+ * F31 para acrescentar a F35 nao e acrescentar, e substituir.
+ */
+const esquemaDaCategoria = z
+  .object({ category: z.enum(CATEGORIAS).optional() })
+  .strict();
+
 /*
  * SEM `.uuid()`: diferente de `gymUnitId` (entrada do usuario no formulario
  * de geracao), `snapshotId` so circula entre telas do proprio painel --
@@ -38,6 +50,7 @@ const esquemaDoAjuste = z
 
 interface SnapshotDto {
   id: string;
+  category: string;
   status: string;
   publishedAt: string | null;
   entries: { studentId: string; position: number; points: number }[];
@@ -45,9 +58,10 @@ interface SnapshotDto {
 
 const ESQUEMA_DE_RESPOSTA_DO_SNAPSHOT = {
   type: 'object',
-  required: ['id', 'status', 'publishedAt', 'entries'],
+  required: ['id', 'category', 'status', 'publishedAt', 'entries'],
   properties: {
     id: { type: 'string', format: 'uuid' },
+    category: { type: 'string', enum: ['XP_DO_MES', 'FREQUENCIA', 'CONSISTENCIA'] },
     status: { type: 'string', enum: ['DRAFT', 'PUBLISHED', 'WITHHELD'] },
     publishedAt: { type: 'string', format: 'date-time', nullable: true },
     entries: {
@@ -84,8 +98,9 @@ export class EngagementXpController {
   @Post('rankings/:gymUnitId/:mes/gerar')
   @RequirePermissions('engagement.moderate')
   @ApiOkResponse({ schema: ESQUEMA_DE_RESPOSTA_DO_SNAPSHOT })
-  async gerar(@Param() parametros: unknown): Promise<SnapshotDto> {
+  async gerar(@Param() parametros: unknown, @Body() corpo: unknown): Promise<SnapshotDto> {
     const { gymUnitId, mes } = esquemaDoMes.parse(parametros);
+    const { category } = esquemaDaCategoria.parse(corpo ?? {});
     const contexto = this.contexto.require();
 
     // Escopo de unidade (mesmo padrao de `ManualOverrideUseCase`): um
@@ -93,7 +108,13 @@ export class EngagementXpController {
     // saber o UUID dela na URL.
     this.exigirEscopoDaUnidade(contexto, gymUnitId);
 
-    const snapshot = await this.ranking.gerarSnapshot(contexto, gymUnitId, mes, new Date());
+    const snapshot = await this.ranking.gerarSnapshot(
+      contexto,
+      gymUnitId,
+      mes,
+      new Date(),
+      category ?? 'XP_DO_MES',
+    );
 
     return this.paraDto(snapshot);
   }
@@ -127,8 +148,15 @@ export class EngagementXpController {
     return this.paraDto(publicado);
   }
 
+  /*
+   * `engagement.correct`, NAO `engagement.moderate` (F35, ADR-049 Decisao 2).
+   * Quem julga apelido nao e necessariamente quem mexe no saldo de XP de um
+   * aluno -- mesma separacao de `reconciliation.resolve` e
+   * `reconciliation.read`. Nao ha segundo ator: o controle e permissao
+   * propria + teto por operacao, que RECUSA acima do limite.
+   */
   @Post('xp/:studentId/ajustar')
-  @RequirePermissions('engagement.moderate')
+  @RequirePermissions('engagement.correct')
   @ApiOkResponse({
     schema: {
       type: 'object',
@@ -159,6 +187,7 @@ export class EngagementXpController {
   private paraDto(snapshot: SnapshotDeRanking): SnapshotDto {
     return {
       id: snapshot.id,
+      category: snapshot.category,
       status: snapshot.status,
       publishedAt: snapshot.publishedAt ? snapshot.publishedAt.toISOString() : null,
       entries: snapshot.entries.map((entrada) => ({

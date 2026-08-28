@@ -132,6 +132,8 @@ export interface PortaDeXp {
    * referencia. `null` se o tenant ainda nao tem regra nenhuma semeada.
    */
   qualquerVersaoDeRegra(contexto: TenantContext): Promise<{ id: string } | null>;
+  /** Teto da correcao manual, em pontos absolutos. `null` = sem teto (F35). */
+  tetoDeCorrecao(contexto: TenantContext): Promise<number | null>;
   /**
    * Os dias LOCAIS em que o aluno treinou (F32) -- `AAAA-MM-DD`, ordenados.
    *
@@ -433,6 +435,15 @@ export class EngagementXpRepository implements PortaDeXp {
     });
 
     return aluno ? { gymUnitId: aluno.gymUnitId, timezone: aluno.gymUnit.timezone } : null;
+  }
+
+  async tetoDeCorrecao(contexto: TenantContext): Promise<number | null> {
+    const tenant = await this.db.tenant.findUniqueOrThrow({
+      where: { id: contexto.tenantId },
+      select: { engagementCorrectionLimitPoints: true },
+    });
+
+    return tenant.engagementCorrectionLimitPoints;
   }
 
   async qualquerVersaoDeRegra(contexto: TenantContext): Promise<{ id: string } | null> {

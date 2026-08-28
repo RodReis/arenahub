@@ -3,9 +3,14 @@ import type { StudentStatus } from '@arenahub/database';
 
 import type { DecisaoDeEngajamento, FinalidadeDeEngajamento } from './domain/participacao.js';
 import type { StatusDoPerfilPublico } from './domain/exposicao.js';
+import type { StatusDaContestacao } from './domain/contestacao.js';
 import type {
   AlunoParaExposicao,
+  ContestacaoGravada,
+  ContestacaoParaFila,
+  EntradaDeContestacao,
   EntradaDeModeracaoNoBanco,
+  EntradaDeResolucaoNoBanco,
   EntradaDeRegistro,
   EntradaDeSalvamento,
   PerfilParaModeracao,
@@ -49,7 +54,10 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
   >();
   /** Documentos "publicados" -- espelha o que o seed grava no banco real. */
   private readonly documentosPublicados = new Set<string>();
+  /** Contestacoes da F35, com o tenant junto para o filtro de escopo. */
+  private readonly contestacoes: (ContestacaoGravada & { tenantId: string })[] = [];
   private proximoId = 1;
+  private proximaContestacao = 1;
 
   cadastrarAluno(aluno: AlunoDeTeste): void {
     this.alunos.set(aluno.id, aluno);
@@ -249,6 +257,81 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
       }));
 
     return Promise.resolve(resultado);
+  }
+
+  // --- F35: contestacoes ---------------------------------------------------
+
+  criarContestacao(entrada: EntradaDeContestacao, agora: Date): Promise<ContestacaoGravada> {
+    const criada: ContestacaoGravada & { tenantId: string } = {
+      id: `contestacao-${this.proximaContestacao++}`,
+      tenantId: entrada.tenantId,
+      studentId: entrada.studentId,
+      subject: entrada.subject,
+      descricao: entrada.descricao,
+      status: 'ABERTA',
+      resolucao: null,
+      resolvedAt: null,
+      createdAt: agora,
+    };
+
+    this.contestacoes.push(criada);
+    return Promise.resolve({ ...criada });
+  }
+
+  contestacaoPorId(tenantId: string, id: string): Promise<ContestacaoGravada | null> {
+    const achada = this.contestacoes.find((c) => c.id === id && c.tenantId === tenantId);
+    return Promise.resolve(achada ? { ...achada } : null);
+  }
+
+  gravarResolucao(entrada: EntradaDeResolucaoNoBanco, agora: Date): Promise<ContestacaoGravada> {
+    // Espelha o `where` do repositorio real: id + tenant + status ABERTA. A
+    // corrida so e recusada porque o ESTADO entra no criterio da escrita --
+    // guarda que le antes de escrever perde a corrida por construcao.
+    const alvo = this.contestacoes.find(
+      (c) => c.id === entrada.id && c.tenantId === entrada.tenantId && c.status === 'ABERTA',
+    );
+
+    if (!alvo) {
+      return Promise.reject(
+        new ConflictException({
+          code: 'CONTESTACAO_JA_RESOLVIDA',
+          message: 'CONTESTACAO_JA_RESOLVIDA',
+        }),
+      );
+    }
+
+    alvo.status = entrada.status;
+    alvo.resolucao = entrada.resolucao;
+    alvo.resolvedAt = agora;
+
+    return Promise.resolve({ ...alvo });
+  }
+
+  listarContestacoes(
+    tenantId: string,
+    status: StatusDaContestacao,
+    limite: number,
+  ): Promise<ContestacaoParaFila[]> {
+    const filtradas = this.contestacoes
+      .filter((c) => c.tenantId === tenantId && c.status === status)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(0, limite);
+
+    return Promise.resolve(
+      filtradas.map((c) => ({
+        ...c,
+        alunoNome: this.alunos.get(c.studentId)?.name ?? '',
+      })),
+    );
+  }
+
+  contestacoesDoAluno(tenantId: string, studentId: string): Promise<ContestacaoGravada[]> {
+    return Promise.resolve(
+      this.contestacoes
+        .filter((c) => c.tenantId === tenantId && c.studentId === studentId)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .map((c) => ({ ...c })),
+    );
   }
 
   /**

@@ -32,7 +32,9 @@ describe('EngagementXpController -- painel de placar e XP', () => {
     tenantId: 't1',
     actorId: 'moderador-1',
     sessionId: 's1',
-    permissions: new Set(['engagement.moderate']),
+    // As DUAS permissoes: gerar/publicar placar exige `engagement.moderate`,
+    // corrigir XP exige `engagement.correct` (F35, ADR-049 Decisao 2).
+    permissions: new Set(['engagement.moderate', 'engagement.correct']),
     allowedUnitIds: 'ALL',
   };
 
@@ -56,14 +58,30 @@ describe('EngagementXpController -- painel de placar e XP', () => {
     tenantId: 't1',
     actorId: 'moderador-restrito-1',
     sessionId: 's3',
-    permissions: new Set(['engagement.moderate']),
+    permissions: new Set(['engagement.moderate', 'engagement.correct']),
     allowedUnitIds: new Set([UNIDADE_A]),
+  };
+
+  /**
+   * So modera, NAO corrige (F35).
+   *
+   * Existe para provar que `engagement.correct` e uma permissao de verdade e
+   * nao decoracao: com as duas sempre juntas, separa-las nao mudaria nada e
+   * ninguem notaria se o decorator voltasse para `engagement.moderate`.
+   */
+  const CTX_SO_MODERADOR: TenantContext = {
+    tenantId: 't1',
+    actorId: 'so-moderador-1',
+    sessionId: 's4',
+    permissions: new Set(['engagement.moderate']),
+    allowedUnitIds: 'ALL',
   };
 
   const CONTEXTOS: Record<string, TenantContext> = {
     'token-moderador': CTX_MODERADOR,
     'token-sem-permissao': CTX_SEM_PERMISSAO,
     'token-moderador-unidade-a': CTX_MODERADOR_UNIDADE_A,
+    'token-so-moderador': CTX_SO_MODERADOR,
   };
 
   class AuthGuardFalso implements CanActivate {
@@ -303,6 +321,26 @@ describe('EngagementXpController -- painel de placar e XP', () => {
         .set('Authorization', 'Bearer token-sem-permissao')
         .send({ pontos: -10, motivo: 'correcao', idempotencyKey: 'k1' })
         .expect(403);
+    });
+
+    it('quem so MODERA nao corrige XP -- `engagement.correct` e propria (F35)', async () => {
+      // Quem julga apelido nao mexe no saldo de ninguem por tabela.
+      // Se o decorator voltasse para `engagement.moderate`, este teste cai.
+      await request(servidor())
+        .post(`/api/v1/engagement/xp/${STUDENT_ID}/ajustar`)
+        .set('Authorization', 'Bearer token-so-moderador')
+        .send({ pontos: -10, motivo: 'correcao', idempotencyKey: 'k-perm' })
+        .expect(403);
+    });
+
+    it('quem so MODERA ainda gera placar -- a separacao nao tirou nada', async () => {
+      // O outro lado: separar a permissao nao pode ter quebrado o que a F31
+      // ja fazia com `engagement.moderate`.
+      await request(servidor())
+        .post(`/api/v1/engagement/rankings/${UNIDADE_A}/2026-08/gerar`)
+        .set('Authorization', 'Bearer token-so-moderador')
+        .send({})
+        .expect(201);
     });
 
     it('ajuste exige motivo', async () => {
