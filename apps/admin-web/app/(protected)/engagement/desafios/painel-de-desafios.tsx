@@ -6,7 +6,10 @@ import { Button, Field, SelectField, StateBadge, useToastDeErro } from '@arenahu
 
 import {
   ativarDesafio,
+  cancelarDesafio,
   criarDesafio,
+  editarDesafio,
+  excluirDesafio,
   type DesafioDaListagemDto,
   type EstadoDoDesafio,
   type TemplateDeDesafioDto,
@@ -19,6 +22,23 @@ interface Unidade {
 }
 
 const ESTADO_INICIAL: EstadoDoDesafio = {};
+
+/**
+ * Espelham `podeEditar`/`podeExcluir` e `podeCancelar` do dominio da API.
+ *
+ * A GUARDA DE VERDADE E O SERVIDOR -- isto so evita mostrar botao que sempre
+ * falharia. Divergir daquelas funcoes faz a tela prometer o que a API
+ * recusa, entao qualquer mudanca la precisa vir aqui junto.
+ */
+function podeMexer(desafio: DesafioDaListagemDto): boolean {
+  return (
+    (desafio.status === 'DRAFT' || desafio.status === 'ACTIVE') && desafio.participantes === 0
+  );
+}
+
+function podeCancelarNaTela(desafio: DesafioDaListagemDto): boolean {
+  return desafio.status === 'DRAFT' || desafio.status === 'ACTIVE';
+}
 
 
 
@@ -52,6 +72,12 @@ export function PainelDeDesafios({
 }) {
   const [estadoCriar, acaoCriar] = useActionState(criarDesafio, ESTADO_INICIAL);
   const [estadoAtivar, acaoAtivar] = useActionState(ativarDesafio, ESTADO_INICIAL);
+  const [estadoEditar, acaoEditar] = useActionState(editarDesafio, ESTADO_INICIAL);
+  const [estadoExcluir, acaoExcluir] = useActionState(excluirDesafio, ESTADO_INICIAL);
+  const [estadoCancelar, acaoCancelar] = useActionState(cancelarDesafio, ESTADO_INICIAL);
+
+  /** Qual desafio esta com o formulario de edicao aberto. */
+  const [editando, setEditando] = useState<string | null>(null);
   const [enviando, iniciarEnvio] = useTransition();
 
   const [modeloId, setModeloId] = useState(modelos[0]?.id ?? '');
@@ -63,6 +89,9 @@ export function PainelDeDesafios({
 
   useToastDeErro(estadoCriar.erro, 'error', 'erro-ao-criar-desafio');
   useToastDeErro(estadoAtivar.erro, 'error', 'erro-ao-abrir-desafio');
+  useToastDeErro(estadoEditar.erro, 'error', 'erro-ao-editar-desafio');
+  useToastDeErro(estadoExcluir.erro, 'error', 'erro-ao-excluir-desafio');
+  useToastDeErro(estadoCancelar.erro, 'error', 'erro-ao-cancelar-desafio');
 
   const modelo = modelos.find((m) => m.id === modeloId);
 
@@ -224,11 +253,6 @@ export function PainelDeDesafios({
                 <div className={estilos['itemAcao']}>
                   <StateBadge machine="challenge" state={desafio.status} />
 
-                  {/*
-                    So RASCUNHO tem acao. Desafio ja aberto, encerrado ou
-                    cancelado nao volta atras nesta fatia -- cancelar e
-                    reabrir sao operacao da Slice 5.6.
-                  */}
                   {desafio.status === 'DRAFT' ? (
                     <form
                       action={(dados) => {
@@ -243,7 +267,133 @@ export function PainelDeDesafios({
                       </Button>
                     </form>
                   ) : null}
+
+                  {/*
+                    EDITAR e EXCLUIR so aparecem enquanto sao possiveis: com
+                    aluno inscrito, a API recusa os dois (mudar a meta
+                    alteraria o combinado; excluir apagaria o historico
+                    dele). Mostrar botao que sempre falha treina a secretaria
+                    a ignorar erro -- some, e sobra CANCELAR, que preserva.
+                  */}
+                  {podeMexer(desafio) ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={enviando}
+                        onClick={() => setEditando(editando === desafio.id ? null : desafio.id)}
+                        data-testid={`editar-${desafio.id}`}
+                      >
+                        {editando === desafio.id ? 'Cancelar edição' : 'Editar'}
+                      </Button>
+
+                      <form
+                        action={(dados) => {
+                          iniciarEnvio(() => {
+                            acaoExcluir(dados);
+                          });
+                        }}
+                      >
+                        <input type="hidden" name="challengeId" value={desafio.id} />
+                        <Button
+                          type="submit"
+                          variant="destructive"
+                          disabled={enviando}
+                          data-testid={`excluir-${desafio.id}`}
+                        >
+                          Excluir
+                        </Button>
+                      </form>
+                    </>
+                  ) : null}
+
+                  {podeCancelarNaTela(desafio) ? (
+                    <form
+                      action={(dados) => {
+                        iniciarEnvio(() => {
+                          acaoCancelar(dados);
+                        });
+                      }}
+                    >
+                      <input type="hidden" name="challengeId" value={desafio.id} />
+                      <Button
+                        type="submit"
+                        variant="destructive"
+                        disabled={enviando}
+                        data-testid={`cancelar-${desafio.id}`}
+                      >
+                        Cancelar desafio
+                      </Button>
+                    </form>
+                  ) : null}
                 </div>
+
+                {editando === desafio.id ? (
+                  <form
+                    className={estilos['edicao']}
+                    data-testid={`form-edicao-${desafio.id}`}
+                    action={(dados) => {
+                      iniciarEnvio(() => {
+                        acaoEditar(dados);
+                        setEditando(null);
+                      });
+                    }}
+                  >
+                    <input type="hidden" name="challengeId" value={desafio.id} />
+
+                    <Field
+                      id={`titulo-${desafio.id}`}
+                      name="title"
+                      label="Título"
+                      defaultValue={desafio.title}
+                      maxLength={120}
+                      disabled={enviando}
+                    />
+
+                    <div className={estilos['periodo']}>
+                      <Field
+                        id={`inicio-${desafio.id}`}
+                        name="startsOn"
+                        label="Início"
+                        type="date"
+                        defaultValue={desafio.startsOn}
+                        disabled={enviando}
+                      />
+                      <Field
+                        id={`fim-${desafio.id}`}
+                        name="endsOn"
+                        label="Fim"
+                        type="date"
+                        defaultValue={desafio.endsOn}
+                        disabled={enviando}
+                      />
+                    </div>
+
+                    <Field
+                      id={`meta-${desafio.id}`}
+                      name="targetValue"
+                      label="Meta (treinos no período)"
+                      type="number"
+                      min={1}
+                      defaultValue={String(desafio.targetValue)}
+                      disabled={enviando}
+                    />
+
+                    {/*
+                      O MODELO NAO E EDITAVEL: troca-lo trocaria o teto de
+                      seguranca por baixo de um desafio ja criado, e o limite
+                      foi validado contra o modelo original. Trocar de modelo
+                      e criar outro desafio.
+                    */}
+                    <p className={estilos['aviso']}>
+                      Modelo: {desafio.templateName} — para trocar de modelo, crie outro desafio.
+                    </p>
+
+                    <Button type="submit" disabled={enviando}>
+                      Salvar
+                    </Button>
+                  </form>
+                ) : null}
               </li>
             ))}
           </ul>

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Inject, Param, Patch, Post } from '@nestjs/common';
 import { ApiOkResponse } from '@nestjs/swagger';
 import { z } from 'zod';
 
@@ -13,6 +13,15 @@ import {
 
 /** `AAAA-MM-DD` -- dia local da unidade, o mesmo formato do dominio. */
 const REGEX_DO_DIA = /^\d{4}-\d{2}-\d{2}$/u;
+
+const esquemaDeEdicao = z
+  .object({
+    title: z.string().trim().min(1).max(120),
+    targetValue: z.number().int().positive(),
+    startsOn: z.string().regex(REGEX_DO_DIA),
+    endsOn: z.string().regex(REGEX_DO_DIA),
+  })
+  .strict();
 
 const esquemaDeCriacao = z
   .object({
@@ -157,6 +166,60 @@ export class EngagementChallengesController {
     const entrada = esquemaDeCriacao.parse(corpo);
 
     return this.desafios.criar(this.contexto.require(), entrada);
+  }
+
+  /**
+   * Edita titulo, meta e janela.
+   *
+   * `templateVersionId` NAO entra no corpo (`.strict()` recusa): trocar o
+   * modelo trocaria o teto de seguranca por baixo do desafio, e o
+   * `M5-BR-011` foi validado contra o modelo original.
+   */
+  @Patch(':id')
+  @RequirePermissions('engagement.moderate')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['ok'],
+      properties: { ok: { type: 'boolean' } },
+    },
+  })
+  async editar(@Param('id') id: string, @Body() corpo: unknown): Promise<{ ok: true }> {
+    await this.desafios.editar(this.contexto.require(), id, esquemaDeEdicao.parse(corpo));
+
+    return { ok: true };
+  }
+
+  /** Exclui de vez -- so o que ninguem aderiu. Com gente dentro, cancele. */
+  @Delete(':id')
+  @RequirePermissions('engagement.moderate')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['ok'],
+      properties: { ok: { type: 'boolean' } },
+    },
+  })
+  async excluir(@Param('id') id: string): Promise<{ ok: true }> {
+    await this.desafios.excluir(this.contexto.require(), id);
+
+    return { ok: true };
+  }
+
+  /** Fecha a porta SEM apagar: adesao, progresso e avisos continuam. */
+  @Post(':id/cancel')
+  @RequirePermissions('engagement.moderate')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['ok'],
+      properties: { ok: { type: 'boolean' } },
+    },
+  })
+  async cancelar(@Param('id') id: string): Promise<{ ok: true }> {
+    await this.desafios.cancelar(this.contexto.require(), id, new Date());
+
+    return { ok: true };
   }
 
   @Post(':id/activate')

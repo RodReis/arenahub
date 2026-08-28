@@ -10,6 +10,9 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import {
   avaliarLimiteDoTemplate,
   desfechoDaParticipacao,
+  podeCancelar,
+  podeEditar,
+  podeExcluir,
   podeInscrever,
   progressoNoDesafio,
 } from './domain/desafio.js';
@@ -133,6 +136,93 @@ export class EngagementChallengesService {
     }
 
     await this.porta.ativarDesafio(ctx, challengeId);
+
+    /*
+     * INSCRICAO AUTOMATICA -- emenda do ADR-048 (28/08/2026).
+     *
+     * Ao abrir, todo aluno ativo e em dia entra. O opt-in original deixava o
+     * desafio nascer vazio: a academia abre a campanha para os alunos que ja
+     * tem, nao para quem for ao totem descobrir que ela existe.
+     *
+     * Depois de `ativarDesafio`, nao antes: se a abertura falhar, ninguem
+     * fica inscrito num desafio que continua fechado.
+     */
+    const elegiveis = await this.porta.alunosElegiveis(ctx, desafio.gymUnitId);
+    const inscritos = await this.porta.inscreverEmLote(ctx, challengeId, elegiveis);
+
+    // O aviso vai so para quem ENTROU agora -- quem ja estava dentro nao
+    // precisa ser avisado de novo, e quem saiu nao foi reinscrito.
+    await this.porta.gravarAvisos(
+      ctx,
+      inscritos.map((studentId) => ({ challengeId, studentId, kind: 'DISPONIVEL' as const })),
+    );
+  }
+
+  /**
+   * Edita titulo, meta e janela.
+   *
+   * O teto do `M5-BR-011` e revalidado contra o MESMO modelo do desafio --
+   * editar nao pode ser um caminho lateral para uma meta que a criacao
+   * recusaria. O modelo em si nao muda: trocar de modelo trocaria o teto por
+   * baixo, e isso e criar outro desafio.
+   */
+  async editar(
+    ctx: TenantContext,
+    challengeId: string,
+    entrada: { title: string; targetValue: number; startsOn: string; endsOn: string },
+  ): Promise<void> {
+    const desafio = await this.exigirDesafio(ctx, challengeId);
+    const participantes = await this.porta.participantesAtivos(ctx, challengeId);
+
+    this.exigirMudancaPermitida(podeEditar({ status: desafio.status, participantes }), 'editar');
+
+    const template = await this.porta.templateVigentePorId(ctx, desafio.templateVersionId);
+
+    if (template) {
+      const avaliacao = avaliarLimiteDoTemplate(template.limite, {
+        inicio: entrada.startsOn,
+        fim: entrada.endsOn,
+        meta: entrada.targetValue,
+      });
+
+      if (!avaliacao.permitido) {
+        throw new BadRequestException({
+          code: `CHALLENGE_${avaliacao.motivo}`,
+          message: this.mensagemDaRecusa(avaliacao.motivo, template.limite.maxSessoesPorSemana),
+        });
+      }
+    }
+
+    await this.porta.atualizarDesafio(ctx, challengeId, entrada);
+  }
+
+  /**
+   * Exclui de vez.
+   *
+   * So o que ninguem aderiu: as FKs sao `onDelete: Cascade`, entao excluir
+   * com participante apagaria a adesao e o aviso do aluno junto, contra o
+   * `M5-FR-014`. Para esse caso ha `cancelar`.
+   */
+  async excluir(ctx: TenantContext, challengeId: string): Promise<void> {
+    const desafio = await this.exigirDesafio(ctx, challengeId);
+    const participantes = await this.porta.participantesAtivos(ctx, challengeId);
+
+    this.exigirMudancaPermitida(podeExcluir({ status: desafio.status, participantes }), 'excluir');
+
+    await this.porta.excluirDesafio(ctx, challengeId);
+  }
+
+  /** Fecha a porta SEM apagar: adesao, progresso e avisos continuam. */
+  async cancelar(ctx: TenantContext, challengeId: string, agora: Date): Promise<void> {
+    const desafio = await this.exigirDesafio(ctx, challengeId);
+    const participantes = await this.porta.participantesAtivos(ctx, challengeId);
+
+    this.exigirMudancaPermitida(
+      podeCancelar({ status: desafio.status, participantes }),
+      'cancelar',
+    );
+
+    await this.porta.cancelarDesafio(ctx, challengeId, agora);
   }
 
   /**
@@ -328,6 +418,31 @@ export class EngagementChallengesService {
 
   async marcarComoLidos(ctx: TenantContext, studentId: string, ids: string[]): Promise<void> {
     await this.porta.marcarAvisosComoLidos(ctx, studentId, ids);
+  }
+
+  private async exigirDesafio(ctx: TenantContext, challengeId: string) {
+    const desafio = await this.porta.desafioPorId(ctx, challengeId);
+
+    if (!desafio) throw this.desafioNaoEncontrado();
+
+    return desafio;
+  }
+
+  private exigirMudancaPermitida(
+    avaliacao: { permitido: boolean; motivo?: string },
+    acao: 'editar' | 'excluir' | 'cancelar',
+  ): void {
+    if (avaliacao.permitido) return;
+
+    throw new ConflictException({
+      code: `CHALLENGE_${avaliacao.motivo ?? 'MUDANCA_RECUSADA'}`,
+      message:
+        avaliacao.motivo === 'TEM_PARTICIPANTE'
+          ? acao === 'excluir'
+            ? 'Alunos já se inscreveram. Cancele o desafio em vez de excluir — assim o histórico deles é preservado.'
+            : 'Alunos já se inscreveram. Mudar a meta agora alteraria o combinado depois que eles aceitaram.'
+          : 'Este desafio já terminou.',
+    });
   }
 
   private desafioNaoEncontrado(): NotFoundException {

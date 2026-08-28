@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -12,6 +12,9 @@ import { ToastProvider } from '@arenahub/ui';
 vi.mock('../../../actions/engagement', () => ({
   criarDesafio: vi.fn(),
   ativarDesafio: vi.fn(),
+  editarDesafio: vi.fn(),
+  excluirDesafio: vi.fn(),
+  cancelarDesafio: vi.fn(),
 }));
 
 import { PainelDeDesafios } from './painel-de-desafios';
@@ -189,5 +192,90 @@ describe('PainelDeDesafios', () => {
     // sai, em vez de ficar de pe com um select vazio.
     expect(screen.getByTestId('sem-modelos')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /criar desafio/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('editar, excluir e cancelar', () => {
+  it('oferece editar e excluir enquanto ninguem se inscreveu', () => {
+    renderizar([MODELO], [EXISTENTE]);
+
+    expect(screen.getByTestId('editar-c-1')).toBeInTheDocument();
+    expect(screen.getByTestId('excluir-c-1')).toBeInTheDocument();
+  });
+
+  /**
+   * COM ALUNO INSCRITO, editar e excluir SOMEM -- sobra cancelar.
+   *
+   * A API recusa os dois nesse estado (mudar a meta alteraria o combinado;
+   * excluir apagaria o historico). Mostrar botao que sempre falha treina a
+   * secretaria a ignorar erro.
+   */
+  it('esconde editar e excluir quando ja ha inscrito, mantendo cancelar', () => {
+    renderizar([MODELO], [{ ...EXISTENTE, status: 'ACTIVE', participantes: 3 }]);
+
+    expect(screen.queryByTestId('editar-c-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('excluir-c-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('cancelar-c-1')).toBeInTheDocument();
+  });
+
+  it('nao oferece acao nenhuma em desafio encerrado', () => {
+    renderizar([MODELO], [{ ...EXISTENTE, status: 'CLOSED', participantes: 2 }]);
+
+    expect(screen.queryByTestId('editar-c-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('excluir-c-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('cancelar-c-1')).not.toBeInTheDocument();
+  });
+
+  it('abre o formulario de edicao com os valores atuais', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE]);
+
+    await usuario.click(screen.getByTestId('editar-c-1'));
+
+    const form = await screen.findByTestId('form-edicao-c-1');
+    expect(form).toBeInTheDocument();
+
+    // `within`: a tela tem DOIS campos "Título" -- o de criar e o de editar.
+    // Buscar solto pegaria o de criar, vazio, e o teste passaria pelo motivo
+    // errado no dia em que a edicao parasse de preencher.
+    expect(within(form).getByLabelText(/título/i)).toHaveValue('Setembro em dia');
+    expect(within(form).getByLabelText(/meta/i)).toHaveValue(8);
+  });
+
+  /**
+   * O MODELO NAO E EDITAVEL: troca-lo trocaria o teto de seguranca por baixo
+   * de um desafio ja criado.
+   */
+  it('a edicao nao oferece troca de modelo', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE]);
+
+    await usuario.click(screen.getByTestId('editar-c-1'));
+    const form = await screen.findByTestId('form-edicao-c-1');
+
+    expect(form.querySelector('select')).toBeNull();
+    expect(form).toHaveTextContent(/para trocar de modelo, crie outro desafio/i);
+  });
+
+  it('fecha o formulario ao clicar de novo em editar', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE]);
+
+    await usuario.click(screen.getByTestId('editar-c-1'));
+    expect(await screen.findByTestId('form-edicao-c-1')).toBeInTheDocument();
+
+    await usuario.click(screen.getByTestId('editar-c-1'));
+    expect(screen.queryByTestId('form-edicao-c-1')).not.toBeInTheDocument();
+  });
+
+  it('abre a edicao de um desafio por vez', async () => {
+    const usuario = userEvent.setup();
+    renderizar([MODELO], [EXISTENTE, { ...EXISTENTE, id: 'c-2', title: 'Outro' }]);
+
+    await usuario.click(screen.getByTestId('editar-c-1'));
+    await usuario.click(screen.getByTestId('editar-c-2'));
+
+    expect(screen.queryByTestId('form-edicao-c-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('form-edicao-c-2')).toBeInTheDocument();
   });
 });

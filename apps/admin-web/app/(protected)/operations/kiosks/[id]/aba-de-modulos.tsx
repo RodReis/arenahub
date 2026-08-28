@@ -17,6 +17,15 @@ import estilos from './formulario-de-configuracao.module.css';
  * exposicao (aparecer ou nao no ranking, e com que nome). O placar em si
  * continua sendo F33, e nao muda nada aqui quando chegar: o modulo ja
  * estara ligavel.
+ *
+ * `desafios` ENTRA na F34 (ADR-048): a fatia entrega a tela do aluno no
+ * totem, entao o modulo passa a existir aqui.
+ *
+ * ⚠️ `xp` ESTA FALTANDO, e nao e decisao: a F31 entregou a tela `Meus
+ * pontos` no totem (`lib/modulos.ts` ja tem o card) e o modulo existe no
+ * contrato, mas ninguem o acrescentou a esta lista -- entao ele so pode ser
+ * ligado por escrita direta no banco. Apontado pela F34 em 28/08/2026;
+ * corrigir e escopo da propria F31 ou de um `[FIX]`, nao desta fatia.
  */
 const MODULOS_DISPONIVEIS = [
   {
@@ -48,6 +57,11 @@ const MODULOS_DISPONIVEIS = [
     campo: 'ranking',
     rotulo: 'Minhas preferências',
     descricao: 'Aparecer ou não no ranking, e com que nome. O placar em si vem depois.',
+  },
+  {
+    campo: 'desafios',
+    rotulo: 'Desafios',
+    descricao: 'Participar de desafios abertos e acompanhar o próprio progresso.',
   },
 ] as const satisfies readonly {
   campo: keyof KioskConfig['modulos'];

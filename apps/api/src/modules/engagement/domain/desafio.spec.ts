@@ -4,6 +4,9 @@ import {
   avaliarLimiteDoTemplate,
   progressoNoDesafio,
   podeInscrever,
+  podeEditar,
+  podeExcluir,
+  podeCancelar,
   desfechoDaParticipacao,
   type LimiteDoTemplate,
   type JanelaDoDesafio,
@@ -278,5 +281,94 @@ describe('desfechoDaParticipacao', () => {
     expect(desfechoDaParticipacao({ progresso: 10, meta: 10, janelaFechada: true })).toBe(
       'COMPLETED',
     );
+  });
+});
+
+describe('podeEditar', () => {
+  it('permite editar desafio fechado sem participante', () => {
+    expect(podeEditar({ status: 'DRAFT', participantes: 0 })).toEqual({ permitido: true });
+  });
+
+  /**
+   * Desafio ABERTO com participante nao se edita.
+   *
+   * Mudar a meta de quem ja aderiu altera o compromisso DEPOIS do aceite --
+   * o aluno entrou para bater 8 e acordaria tendo de bater 20. Mesmo
+   * principio de `M5-BR-009`: regra que muda nao reescreve o passado.
+   */
+  it('recusa editar desafio com participante inscrito', () => {
+    expect(podeEditar({ status: 'ACTIVE', participantes: 1 })).toEqual({
+      permitido: false,
+      motivo: 'TEM_PARTICIPANTE',
+    });
+  });
+
+  /**
+   * Aberto e VAZIO ainda se edita: ninguem assumiu compromisso nenhum, e
+   * corrigir uma data errada e melhor do que obrigar a recriar.
+   */
+  it('permite editar desafio aberto que ninguem aderiu', () => {
+    expect(podeEditar({ status: 'ACTIVE', participantes: 0 })).toEqual({ permitido: true });
+  });
+
+  it('recusa editar desafio encerrado ou cancelado, mesmo vazio', () => {
+    for (const status of ['CLOSED', 'CANCELLED'] as const) {
+      expect(podeEditar({ status, participantes: 0 })).toEqual({
+        permitido: false,
+        motivo: 'DESAFIO_ENCERRADO',
+      });
+    }
+  });
+});
+
+describe('podeExcluir', () => {
+  it('permite excluir desafio fechado sem participante', () => {
+    expect(podeExcluir({ status: 'DRAFT', participantes: 0 })).toEqual({ permitido: true });
+  });
+
+  /**
+   * EXCLUIR APAGA. Desafio com participante NAO se exclui: apagaria a adesao
+   * e o aviso do aluno junto (`onDelete: Cascade`), e `M5-FR-014` manda
+   * manter o historico. Para esse caso existe CANCELAR, que preserva tudo.
+   */
+  it('recusa excluir desafio com participante, mesmo em rascunho', () => {
+    expect(podeExcluir({ status: 'DRAFT', participantes: 1 })).toEqual({
+      permitido: false,
+      motivo: 'TEM_PARTICIPANTE',
+    });
+  });
+
+  it('recusa excluir desafio encerrado -- e historico', () => {
+    expect(podeExcluir({ status: 'CLOSED', participantes: 0 })).toEqual({
+      permitido: false,
+      motivo: 'DESAFIO_ENCERRADO',
+    });
+  });
+
+  it('permite excluir desafio aberto e vazio', () => {
+    expect(podeExcluir({ status: 'ACTIVE', participantes: 0 })).toEqual({ permitido: true });
+  });
+});
+
+describe('podeCancelar', () => {
+  /**
+   * CANCELAR e a saida para desafio COM participante: preserva a adesao, o
+   * progresso e o aviso; so fecha a porta. E o oposto de excluir.
+   */
+  it('permite cancelar desafio aberto com participante', () => {
+    expect(podeCancelar({ status: 'ACTIVE', participantes: 3 })).toEqual({ permitido: true });
+  });
+
+  it('permite cancelar rascunho', () => {
+    expect(podeCancelar({ status: 'DRAFT', participantes: 0 })).toEqual({ permitido: true });
+  });
+
+  it('recusa cancelar o que ja terminou', () => {
+    for (const status of ['CLOSED', 'CANCELLED'] as const) {
+      expect(podeCancelar({ status, participantes: 0 })).toEqual({
+        permitido: false,
+        motivo: 'DESAFIO_ENCERRADO',
+      });
+    }
   });
 });

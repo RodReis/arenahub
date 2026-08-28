@@ -193,3 +193,82 @@ export function desfechoDaParticipacao(estado: {
 
   return estado.janelaFechada ? 'FAILED' : 'JOINED';
 }
+
+export type MotivoDeRecusaDeMudanca = 'TEM_PARTICIPANTE' | 'DESAFIO_ENCERRADO';
+
+export type AvaliacaoDeMudanca =
+  | { readonly permitido: true }
+  | { readonly permitido: false; readonly motivo: MotivoDeRecusaDeMudanca };
+
+/** O que as tres guardas abaixo precisam saber do desafio. */
+export interface SituacaoDoDesafio {
+  readonly status: StatusDoDesafio;
+  /** Quantos aderiram e NAO sairam. Quem saiu nao trava mudanca nenhuma. */
+  readonly participantes: number;
+}
+
+/**
+ * Editar meta, janela ou titulo.
+ *
+ * ---------------------------------------------------------------------------
+ * PARTICIPANTE TRAVA A EDICAO, E ESSA E A REGRA.
+ * ---------------------------------------------------------------------------
+ *
+ * Mudar a meta de quem ja aderiu altera o compromisso DEPOIS do aceite: o
+ * aluno entrou para bater 8 e acordaria tendo de bater 20, sem ter escolhido
+ * isso. Mesmo principio de `M5-BR-009` -- regra que muda nao reescreve o
+ * passado -- e do `policySnapshot` do entitlement.
+ *
+ * Aberto e VAZIO ainda se edita: ninguem assumiu nada, e corrigir uma data
+ * errada e melhor do que obrigar a recriar e reabrir.
+ *
+ * Encerrado ou cancelado nunca: e historico.
+ */
+export function podeEditar(desafio: SituacaoDoDesafio): AvaliacaoDeMudanca {
+  if (desafio.status === 'CLOSED' || desafio.status === 'CANCELLED') {
+    return { permitido: false, motivo: 'DESAFIO_ENCERRADO' };
+  }
+
+  if (desafio.participantes > 0) {
+    return { permitido: false, motivo: 'TEM_PARTICIPANTE' };
+  }
+
+  return { permitido: true };
+}
+
+/**
+ * Excluir de vez.
+ *
+ * EXCLUIR APAGA -- as FKs de `ChallengeParticipant` e `ChallengeNotice` sao
+ * `onDelete: Cascade`, entao a adesao e o aviso do aluno somem junto. Por
+ * isso desafio COM participante nao se exclui: `M5-FR-014` manda manter o
+ * historico de quem participou.
+ *
+ * Para esse caso existe `podeCancelar`, que fecha a porta preservando tudo.
+ */
+export function podeExcluir(desafio: SituacaoDoDesafio): AvaliacaoDeMudanca {
+  if (desafio.status === 'CLOSED' || desafio.status === 'CANCELLED') {
+    return { permitido: false, motivo: 'DESAFIO_ENCERRADO' };
+  }
+
+  if (desafio.participantes > 0) {
+    return { permitido: false, motivo: 'TEM_PARTICIPANTE' };
+  }
+
+  return { permitido: true };
+}
+
+/**
+ * Cancelar: fecha a porta sem apagar nada.
+ *
+ * E a saida para desafio que JA TEM gente -- a adesao, o progresso e os
+ * avisos continuam existindo, e o desafio so deixa de aceitar inscricao e de
+ * ser apurado. Diferente de excluir, que apaga.
+ */
+export function podeCancelar(desafio: SituacaoDoDesafio): AvaliacaoDeMudanca {
+  if (desafio.status === 'CLOSED' || desafio.status === 'CANCELLED') {
+    return { permitido: false, motivo: 'DESAFIO_ENCERRADO' };
+  }
+
+  return { permitido: true };
+}

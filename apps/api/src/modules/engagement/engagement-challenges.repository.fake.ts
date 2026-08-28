@@ -24,6 +24,7 @@ export class FakePortaDeDesafios implements PortaDeDesafios {
   private readonly participacoes = new Map<string, ParticipacaoPersistida & { studentId: string; challengeId: string }>();
   private readonly avisos: (AvisoDoAluno & { studentId: string })[] = [];
   private readonly diasPorAluno = new Map<string, string[]>();
+  private elegiveis: string[] = [];
 
   private sequencia = 0;
 
@@ -47,6 +48,12 @@ export class FakePortaDeDesafios implements PortaDeDesafios {
       studentId,
       challengeId,
     });
+    return this;
+  }
+
+  /** Alunos ativos e em dia -- os que a abertura inscreve sozinha. */
+  comAlunosElegiveis(ids: string[]): this {
+    this.elegiveis = ids;
     return this;
   }
 
@@ -93,6 +100,7 @@ export class FakePortaDeDesafios implements PortaDeDesafios {
       targetValue: dados.targetValue,
       title: dados.title,
       gymUnitId: dados.gymUnitId,
+      templateVersionId: dados.templateVersionId,
     };
 
     this.desafios.set(id, desafio);
@@ -213,6 +221,85 @@ export class FakePortaDeDesafios implements PortaDeDesafios {
         )
         .map((d) => ({ id: d.id })),
     );
+  }
+
+  alunosElegiveis(_ctx: TenantContext, _gymUnitId: string | null): Promise<string[]> {
+    return Promise.resolve([...this.elegiveis]);
+  }
+
+  inscreverEmLote(
+    _ctx: TenantContext,
+    challengeId: string,
+    studentIds: readonly string[],
+  ): Promise<string[]> {
+    const novos: string[] = [];
+
+    for (const studentId of studentIds) {
+      const chave = `${challengeId}:${studentId}`;
+
+      // Pula quem ja tem linha -- inclusive `LEFT`, como a producao faz.
+      if (this.participacoes.has(chave)) continue;
+
+      this.participacoes.set(chave, {
+        id: `p-${String(++this.sequencia)}`,
+        status: 'JOINED',
+        studentId,
+        challengeId,
+      });
+      novos.push(studentId);
+    }
+
+    return Promise.resolve(novos);
+  }
+
+  participantesAtivos(_ctx: TenantContext, challengeId: string): Promise<number> {
+    return Promise.resolve(
+      [...this.participacoes.values()].filter(
+        (p) => p.challengeId === challengeId && p.status !== 'LEFT',
+      ).length,
+    );
+  }
+
+  atualizarDesafio(
+    _ctx: TenantContext,
+    challengeId: string,
+    dados: { title: string; targetValue: number; startsOn: string; endsOn: string },
+  ): Promise<void> {
+    const desafio = this.desafios.get(challengeId);
+
+    if (desafio) {
+      this.desafios.set(challengeId, {
+        ...desafio,
+        title: dados.title,
+        targetValue: dados.targetValue,
+        startsOn: dados.startsOn,
+        endsOn: dados.endsOn,
+      });
+    }
+
+    return Promise.resolve();
+  }
+
+  excluirDesafio(_ctx: TenantContext, challengeId: string): Promise<void> {
+    this.desafios.delete(challengeId);
+
+    // O banco apaga em cascata (`onDelete: Cascade`); o fake precisa fazer o
+    // mesmo, senao um teste passaria com adesao orfa que a producao nao tem.
+    for (const [chave, p] of this.participacoes) {
+      if (p.challengeId === challengeId) this.participacoes.delete(chave);
+    }
+
+    return Promise.resolve();
+  }
+
+  cancelarDesafio(_ctx: TenantContext, challengeId: string, _quando: Date): Promise<void> {
+    const desafio = this.desafios.get(challengeId);
+
+    if (desafio?.status === 'DRAFT' || desafio?.status === 'ACTIVE') {
+      this.desafios.set(challengeId, { ...desafio, status: 'CANCELLED' });
+    }
+
+    return Promise.resolve();
   }
 
   concluirParticipacao(

@@ -83,3 +83,17 @@
   align-items: center;
   gap: 12px;
 }
+
+/*
+ * Formulário de edição — largura total do item, abaixo dos botões. Inline
+ * em vez de modal: a secretaria compara com os outros desafios da lista
+ * enquanto edita, e um modal esconderia justamente essa comparação.
+ */
+.edicao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding-top: 12px;
+  border-top: 1px solid var(--ah-border-subtle);
+}

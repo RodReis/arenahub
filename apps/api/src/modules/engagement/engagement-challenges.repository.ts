@@ -27,6 +27,12 @@ export interface DesafioPersistido {
   targetValue: number;
   title: string;
   gymUnitId: string | null;
+  /**
+   * A VERSAO do template, nao o codigo -- e o que faz `M5-BR-009` valer:
+   * editar o template depois nao mexe em desafio em curso. A edicao
+   * revalida o teto contra ESTA versao.
+   */
+  templateVersionId: string;
 }
 
 /** Um desafio na tela da secretaria: o desafio + quantos aderiram. */
@@ -139,6 +145,44 @@ export interface PortaDeDesafios {
     studentId: string,
     hoje: string,
   ): Promise<{ id: string }[]>;
+
+  /**
+   * Quantos aderiram e NAO sairam -- o numero que as guardas de editar,
+   * excluir e cancelar consultam. Quem saiu (`LEFT`) nao trava mudanca.
+   */
+  participantesAtivos(ctx: TenantContext, challengeId: string): Promise<number>;
+
+  /**
+   * Alunos que entram AUTOMATICAMENTE ao abrir a inscricao (emenda do
+   * ADR-048, 28/08/2026): aluno `ACTIVE` com entitlement `ACTIVE`.
+   *
+   * E a MESMA cadeia que a catraca usa (Regra de arquitetura 1) -- nao se
+   * inventa um segundo conceito de "aluno em dia" que possa divergir dela.
+   */
+  alunosElegiveis(ctx: TenantContext, gymUnitId: string | null): Promise<string[]>;
+
+  /**
+   * Inscreve varios de uma vez, PULANDO quem ja tem linha.
+   *
+   * `skipDuplicates` na unique `(challenge, student)`: quem ja esta dentro
+   * nao e duplicado, e quem SAIU (`LEFT`) nao e reinscrito -- reinscrever
+   * quem pediu para sair ignoraria o pedido dele. Devolve quem de fato
+   * entrou, para o aviso ir so a esses.
+   */
+  inscreverEmLote(
+    ctx: TenantContext,
+    challengeId: string,
+    studentIds: readonly string[],
+  ): Promise<string[]>;
+
+  atualizarDesafio(
+    ctx: TenantContext,
+    challengeId: string,
+    dados: { title: string; targetValue: number; startsOn: string; endsOn: string },
+  ): Promise<void>;
+
+  excluirDesafio(ctx: TenantContext, challengeId: string): Promise<void>;
+  cancelarDesafio(ctx: TenantContext, challengeId: string, quando: Date): Promise<void>;
 
   concluirParticipacao(ctx: TenantContext, participantId: string, quando: Date): Promise<void>;
   reprovarParticipacao(ctx: TenantContext, participantId: string): Promise<void>;
@@ -368,6 +412,116 @@ export class EngagementChallengesRepository implements PortaDeDesafios {
     return linhas;
   }
 
+  async participantesAtivos(ctx: TenantContext, challengeId: string): Promise<number> {
+    return this.prisma.challengeParticipant.count({
+      where: { tenantId: ctx.tenantId, challengeId, status: { not: 'LEFT' } },
+    });
+  }
+
+  async alunosElegiveis(ctx: TenantContext, gymUnitId: string | null): Promise<string[]> {
+    const agora = new Date();
+
+    const linhas = await this.prisma.student.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        status: 'ACTIVE',
+        ...(gymUnitId ? { gymUnitId } : {}),
+        entitlements: {
+          some: {
+            status: 'ACTIVE',
+            // Vigente AGORA: `endsAt` nao e anulavel neste schema, entao a
+            // janela e sempre fechada dos dois lados.
+            startsAt: { lte: agora },
+            endsAt: { gte: agora },
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    return linhas.map((l) => l.id);
+  }
+
+  async inscreverEmLote(
+    ctx: TenantContext,
+    challengeId: string,
+    studentIds: readonly string[],
+  ): Promise<string[]> {
+    if (studentIds.length === 0) return [];
+
+    /*
+     * Le quem JA tem linha antes de inserir -- inclusive `LEFT`. Nao e a
+     * guarda (a unique e), e sim como se descobre QUEM entrou de fato: o
+     * `createMany` devolve contagem, nao os ids, e o aviso precisa ir so
+     * para quem realmente foi inscrito.
+     */
+    const existentes = await this.prisma.challengeParticipant.findMany({
+      where: { tenantId: ctx.tenantId, challengeId, studentId: { in: [...studentIds] } },
+      select: { studentId: true },
+    });
+
+    const jaTem = new Set(existentes.map((e) => e.studentId));
+    const novos = studentIds.filter((id) => !jaTem.has(id));
+
+    if (novos.length === 0) return [];
+
+    await this.prisma.challengeParticipant.createMany({
+      data: novos.map((studentId) => ({
+        tenantId: ctx.tenantId,
+        challengeId,
+        studentId,
+        status: 'JOINED' as const,
+      })),
+      // A unique e quem garante: se alguem se inscreveu entre a leitura e a
+      // escrita, colide aqui e e ignorado em vez de derrubar a abertura.
+      skipDuplicates: true,
+    });
+
+    return novos;
+  }
+
+  async atualizarDesafio(
+    ctx: TenantContext,
+    challengeId: string,
+    dados: { title: string; targetValue: number; startsOn: string; endsOn: string },
+  ): Promise<void> {
+    /*
+     * `templateVersionId` NAO entra: trocar o modelo trocaria o teto de
+     * seguranca por baixo de um desafio ja criado, e a validacao do
+     * `M5-BR-011` foi feita contra o modelo original. Trocar de modelo e
+     * criar outro desafio.
+     */
+    await this.prisma.challenge.updateMany({
+      where: { id: challengeId, tenantId: ctx.tenantId },
+      data: {
+        title: dados.title,
+        targetValue: dados.targetValue,
+        startsOn: paraDataDoBanco(dados.startsOn),
+        endsOn: paraDataDoBanco(dados.endsOn),
+      },
+    });
+  }
+
+  async excluirDesafio(ctx: TenantContext, challengeId: string): Promise<void> {
+    // `deleteMany` e nao `delete`: o filtro por tenant vive no WHERE, e
+    // `delete` por id sozinho apagaria desafio de outro tenant se o id
+    // vazasse. Regra de arquitetura 2.
+    await this.prisma.challenge.deleteMany({
+      where: { id: challengeId, tenantId: ctx.tenantId },
+    });
+  }
+
+  async cancelarDesafio(
+    ctx: TenantContext,
+    challengeId: string,
+    quando: Date,
+  ): Promise<void> {
+    await this.prisma.challenge.updateMany({
+      where: { id: challengeId, tenantId: ctx.tenantId, status: { in: ['DRAFT', 'ACTIVE'] } },
+      data: { status: 'CANCELLED', closedAt: quando },
+    });
+  }
+
   async concluirParticipacao(
     ctx: TenantContext,
     participantId: string,
@@ -452,6 +606,7 @@ export class EngagementChallengesRepository implements PortaDeDesafios {
     targetValue: number;
     title: string;
     gymUnitId: string | null;
+    templateVersionId: string;
   }): DesafioPersistido {
     return {
       id: linha.id,
@@ -461,6 +616,7 @@ export class EngagementChallengesRepository implements PortaDeDesafios {
       targetValue: linha.targetValue,
       title: linha.title,
       gymUnitId: linha.gymUnitId,
+      templateVersionId: linha.templateVersionId,
     };
   }
 }

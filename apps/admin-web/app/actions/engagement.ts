@@ -296,6 +296,9 @@ const MENSAGEM_DE_DESAFIO: Record<string, string> = {
   CHALLENGE_META_INVALIDA: 'A meta precisa ser um número inteiro maior que zero.',
   CHALLENGE_NAO_ENCONTRADO: 'Desafio não encontrado.',
   CHALLENGE_JA_ATIVADO: 'Este desafio já foi aberto.',
+  CHALLENGE_TEM_PARTICIPANTE:
+    'Alunos já se inscreveram. Cancele o desafio — assim o histórico deles é preservado.',
+  CHALLENGE_DESAFIO_ENCERRADO: 'Este desafio já terminou e não pode mais ser alterado.',
 };
 
 function mensagemDeDesafio(code: string | undefined, padrao: string): string {
@@ -365,6 +368,100 @@ export async function ativarDesafio(
 
   if (!resposta.ok) {
     return { erro: mensagemDeDesafio(resposta.erro?.code, 'Não foi possível abrir o desafio.') };
+  }
+
+  revalidatePath('/engagement/desafios');
+
+  return { sucesso: { id: analisado.data.challengeId, titulo: '' } };
+}
+
+const esquemaDeEdicaoDeDesafio = z.object({
+  challengeId: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(120),
+  targetValue: z.coerce.number().int().positive(),
+  startsOn: z.string().regex(REGEX_DO_DIA),
+  endsOn: z.string().regex(REGEX_DO_DIA),
+});
+
+/**
+ * Edita titulo, meta e janela.
+ *
+ * O modelo NAO e editavel: trocar o modelo trocaria o teto de seguranca por
+ * baixo do desafio, e o limite foi validado contra o modelo original.
+ */
+export async function editarDesafio(
+  _anterior: EstadoDoDesafio,
+  formulario: FormData,
+): Promise<EstadoDoDesafio> {
+  const analisado = esquemaDeEdicaoDeDesafio.safeParse({
+    challengeId: formulario.get('challengeId'),
+    title: formulario.get('title'),
+    targetValue: formulario.get('targetValue'),
+    startsOn: formulario.get('startsOn'),
+    endsOn: formulario.get('endsOn'),
+  });
+
+  if (!analisado.success) {
+    return { erro: 'Preencha título, meta e o período do desafio.' };
+  }
+
+  const { challengeId, ...dados } = analisado.data;
+
+  const resposta = await chamarApi<{ ok: boolean }>(
+    `/api/v1/engagement/challenges/${challengeId}`,
+    { metodo: 'PATCH', corpo: dados },
+  );
+
+  if (!resposta.ok) {
+    return { erro: mensagemDeDesafio(resposta.erro?.code, 'Não foi possível salvar o desafio.') };
+  }
+
+  revalidatePath('/engagement/desafios');
+
+  return { sucesso: { id: challengeId, titulo: dados.title } };
+}
+
+const esquemaPorId = z.object({ challengeId: z.string().trim().min(1) });
+
+/** Exclui de vez -- a API recusa se alguém já se inscreveu. */
+export async function excluirDesafio(
+  _anterior: EstadoDoDesafio,
+  formulario: FormData,
+): Promise<EstadoDoDesafio> {
+  const analisado = esquemaPorId.safeParse({ challengeId: formulario.get('challengeId') });
+
+  if (!analisado.success) return { erro: 'Desafio inválido.' };
+
+  const resposta = await chamarApi<{ ok: boolean }>(
+    `/api/v1/engagement/challenges/${analisado.data.challengeId}`,
+    { metodo: 'DELETE' },
+  );
+
+  if (!resposta.ok) {
+    return { erro: mensagemDeDesafio(resposta.erro?.code, 'Não foi possível excluir o desafio.') };
+  }
+
+  revalidatePath('/engagement/desafios');
+
+  return { sucesso: { id: analisado.data.challengeId, titulo: '' } };
+}
+
+/** Fecha a porta SEM apagar: a adesão e o histórico do aluno continuam. */
+export async function cancelarDesafio(
+  _anterior: EstadoDoDesafio,
+  formulario: FormData,
+): Promise<EstadoDoDesafio> {
+  const analisado = esquemaPorId.safeParse({ challengeId: formulario.get('challengeId') });
+
+  if (!analisado.success) return { erro: 'Desafio inválido.' };
+
+  const resposta = await chamarApi<{ ok: boolean }>(
+    `/api/v1/engagement/challenges/${analisado.data.challengeId}/cancel`,
+    { metodo: 'POST' },
+  );
+
+  if (!resposta.ok) {
+    return { erro: mensagemDeDesafio(resposta.erro?.code, 'Não foi possível cancelar o desafio.') };
   }
 
   revalidatePath('/engagement/desafios');

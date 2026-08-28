@@ -3535,3 +3535,41 @@ passado.
 - A F35 continua atrás do gate e **herda** o escopo negativo da Decisão 3.
 - `ENGAGEMENT_PUSH` segue dormente; a primeira fatia com canal externo precisa decidir a fronteira
   transacional × marketing, e não pode presumir que esta fatia a decidiu.
+
+### Emenda de 28/08/2026 — inscrição automática substitui o opt-in da Decisão 2
+
+**Decidida pelo PI em 28/08/2026**, ao ver a tela com `0 inscrito(s)` num desafio recém-aberto.
+
+**Emenda** `docs/prd/academia/MVP-05-engagement.md` §7 Slice 5.5 (*"inscrição opt-in"*) e
+`M5-BR-001` (*"nenhuma participação é habilitada por padrão"*), **para desafio**. As demais
+finalidades de engajamento não mudam: `RANKING` segue o regime opt-out do ADR-046, e
+`CHALLENGE`/`ENGAGEMENT_PUSH` seguem dormentes.
+
+#### O que muda
+
+A Decisão 2 deste ADR fixou desafio como **opt-in**, com o argumento de que inscrever alguém sem
+pedir cria meta que ele não escolheu. O PI decidiu o contrário, e o motivo é de produto: um
+desafio que ninguém vê nascer vazio não engaja ninguém — a academia abre a campanha para os
+alunos que ela já tem, não para os que forem ao totem descobrir que ela existe.
+
+**Regra nova:** ao abrir a inscrição, todo aluno **`ACTIVE` com entitlement `ACTIVE`** na
+unidade do desafio (ou no tenant inteiro, quando `gymUnitId` é nulo) é inscrito automaticamente.
+
+#### Três decisões do PI que fecham as pontas
+
+| pergunta | decisão | consequência |
+|---|---|---|
+| quem entra | aluno `ACTIVE` **e** entitlement `ACTIVE` | é a mesma cadeia que a catraca usa (Regra de arquitetura 1) — não se inventa um segundo conceito de "aluno em dia" |
+| e se ficar inadimplente no meio | **continua no desafio** | desafio é engajamento, não cobrança; tirar quem atrasou uma fatura puniria duas vezes, e a apuração não precisa recalcular elegibilidade a cada passada |
+| pode sair | **sim, pelo totem** | `M5-FR-014` continua valendo: entra sozinho, mas ninguém é obrigado a participar. Quem sai **não é reinscrito** por uma reabertura |
+
+#### O que NÃO muda
+
+- **A adesão continua sendo uma linha em `ChallengeParticipant`** — não há "participante
+  implícito". Sem linha, não está no desafio. Isso é o que permite sair, e o que faz a contagem
+  de inscritos ser um `count` e não uma regra espalhada.
+- **`podeInscrever` continua existindo** e continua recusando inscrição repetida: a inscrição
+  automática usa o mesmo caminho, e a unique `(challenge, student)` continua sendo quem garante
+  uma adesão por aluno.
+- **Quem saiu não volta.** A inscrição automática pula quem já tem linha — inclusive `LEFT`.
+  Reinscrever quem pediu para sair seria ignorar o pedido dele.

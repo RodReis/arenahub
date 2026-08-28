@@ -32,6 +32,7 @@ const DESAFIO_ATIVO: DesafioPersistido = {
   targetValue: 8,
   title: 'Setembro em dia',
   gymUnitId: UNIDADE,
+  templateVersionId: 't-1',
 };
 
 /**
@@ -413,5 +414,248 @@ describe('avisos', () => {
     await service.encerrar(CTX, 'c-ativo', new Date(), '2026-09-15');
 
     expect(await service.avisos(CTX, OUTRO_ALUNO)).toEqual([]);
+  });
+});
+
+describe('editar, excluir e cancelar', () => {
+  it('edita titulo, meta e janela de desafio sem participante', async () => {
+    const { service, fake } = montar((f) =>
+      f.comTemplate(TEMPLATE).comDesafio(DESAFIO_ATIVO),
+    );
+
+    await service.editar(CTX, 'c-ativo', {
+      title: 'Setembro forte',
+      targetValue: 6,
+      startsOn: '2026-09-01',
+      endsOn: '2026-09-14',
+    });
+
+    expect(fake.desafioDe('c-ativo')).toMatchObject({
+      title: 'Setembro forte',
+      targetValue: 6,
+    });
+  });
+
+  /**
+   * O TETO E REVALIDADO NA EDICAO.
+   *
+   * Sem isto, editar seria caminho lateral para uma meta que a criacao
+   * recusa -- cria com 8, edita para 30, e o `M5-BR-011` vira decoracao.
+   */
+  it('recusa edicao com meta acima do teto do modelo', async () => {
+    const { service } = montar((f) => f.comTemplate(TEMPLATE).comDesafio(DESAFIO_ATIVO));
+
+    await expect(
+      service.editar(CTX, 'c-ativo', {
+        title: 'Todo dia',
+        targetValue: 30,
+        startsOn: '2026-09-01',
+        endsOn: '2026-09-14',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  /**
+   * PARTICIPANTE TRAVA A EDICAO (ADR-048).
+   *
+   * Mudar a meta depois que o aluno aceitou altera o combinado -- ele entrou
+   * para bater 8 e acordaria tendo de bater outro numero.
+   */
+  it('recusa editar desafio em que alguem ja se inscreveu', async () => {
+    const { service, fake } = montar((f) =>
+      f
+        .comTemplate(TEMPLATE)
+        .comDesafio(DESAFIO_ATIVO)
+        .comParticipacao('c-ativo', ALUNO, 'JOINED'),
+    );
+
+    await expect(
+      service.editar(CTX, 'c-ativo', {
+        title: 'Outro',
+        targetValue: 4,
+        startsOn: '2026-09-01',
+        endsOn: '2026-09-14',
+      }),
+    ).rejects.toThrow(ConflictException);
+
+    // E nada mudou.
+    expect(fake.desafioDe('c-ativo')).toMatchObject({ title: 'Setembro em dia', targetValue: 8 });
+  });
+
+  /** Quem SAIU nao trava: nao ha compromisso a preservar. */
+  it('permite editar quando o unico inscrito saiu', async () => {
+    const { service, fake } = montar((f) =>
+      f
+        .comTemplate(TEMPLATE)
+        .comDesafio(DESAFIO_ATIVO)
+        .comParticipacao('c-ativo', ALUNO, 'LEFT'),
+    );
+
+    await service.editar(CTX, 'c-ativo', {
+      title: 'Corrigido',
+      targetValue: 5,
+      startsOn: '2026-09-01',
+      endsOn: '2026-09-14',
+    });
+
+    expect(fake.desafioDe('c-ativo')?.title).toBe('Corrigido');
+  });
+
+  it('exclui desafio sem participante', async () => {
+    const { service, fake } = montar((f) => f.comDesafio(DESAFIO_ATIVO));
+
+    await service.excluir(CTX, 'c-ativo');
+
+    expect(fake.desafioDe('c-ativo')).toBeUndefined();
+  });
+
+  /**
+   * EXCLUIR APAGA EM CASCATA -- por isso participante trava.
+   *
+   * `M5-FR-014` manda manter o historico de quem participou; excluir levaria
+   * a adesao e o aviso junto. Para esse caso existe cancelar.
+   */
+  it('recusa excluir desafio com participante e preserva a adesao', async () => {
+    const { service, fake } = montar((f) =>
+      f.comDesafio(DESAFIO_ATIVO).comParticipacao('c-ativo', ALUNO, 'JOINED'),
+    );
+
+    await expect(service.excluir(CTX, 'c-ativo')).rejects.toThrow(ConflictException);
+
+    expect(fake.desafioDe('c-ativo')).toBeDefined();
+    expect(fake.participacaoDe('c-ativo', ALUNO)?.status).toBe('JOINED');
+  });
+
+  it('cancela desafio COM participante, preservando a adesao', async () => {
+    const { service, fake } = montar((f) =>
+      f.comDesafio(DESAFIO_ATIVO).comParticipacao('c-ativo', ALUNO, 'JOINED'),
+    );
+
+    await service.cancelar(CTX, 'c-ativo', new Date());
+
+    expect(fake.desafioDe('c-ativo')?.status).toBe('CANCELLED');
+    // A adesao CONTINUA -- e a diferenca entre cancelar e excluir.
+    expect(fake.participacaoDe('c-ativo', ALUNO)?.status).toBe('JOINED');
+  });
+
+  it('desafio cancelado some da lista do aluno', async () => {
+    const { service } = montar((f) => f.comDesafio(DESAFIO_ATIVO));
+
+    await service.cancelar(CTX, 'c-ativo', new Date());
+
+    expect(await service.paraOAluno(CTX, ALUNO, UNIDADE, '2026-09-05')).toEqual([]);
+  });
+
+  it('recusa cancelar o que ja foi cancelado', async () => {
+    const { service } = montar((f) =>
+      f.comDesafio({ ...DESAFIO_ATIVO, status: 'CANCELLED' }),
+    );
+
+    await expect(service.cancelar(CTX, 'c-ativo', new Date())).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it('recusa editar ou excluir desafio inexistente', async () => {
+    const { service } = montar();
+
+    await expect(
+      service.editar(CTX, 'nao-existe', {
+        title: 'x',
+        targetValue: 1,
+        startsOn: '2026-09-01',
+        endsOn: '2026-09-02',
+      }),
+    ).rejects.toThrow(NotFoundException);
+
+    await expect(service.excluir(CTX, 'nao-existe')).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('inscricao automatica ao abrir (emenda do ADR-048, 28/08/2026)', () => {
+  it('inscreve todo aluno ativo e em dia ao abrir a inscricao', async () => {
+    const { service, fake } = montar((f) =>
+      f
+        .comDesafio({ ...DESAFIO_ATIVO, status: 'DRAFT' })
+        .comAlunosElegiveis([ALUNO, OUTRO_ALUNO]),
+    );
+
+    await service.ativar(CTX, 'c-ativo');
+
+    expect(fake.participacaoDe('c-ativo', ALUNO)?.status).toBe('JOINED');
+    expect(fake.participacaoDe('c-ativo', OUTRO_ALUNO)?.status).toBe('JOINED');
+  });
+
+  it('o desafio nasce com os inscritos ja contados', async () => {
+    const { service } = montar((f) =>
+      f
+        .comDesafio({ ...DESAFIO_ATIVO, status: 'DRAFT' })
+        .comAlunosElegiveis([ALUNO, OUTRO_ALUNO]),
+    );
+
+    await service.ativar(CTX, 'c-ativo');
+    const [item] = await service.listar(CTX);
+
+    expect(item?.participantes).toBe(2);
+  });
+
+  /**
+   * QUEM SAIU NAO VOLTA.
+   *
+   * Reinscrever quem pediu para sair seria ignorar o pedido dele --
+   * `M5-FR-014`. A linha `LEFT` existe justamente para isso.
+   */
+  it('nao reinscreve quem ja tinha saido', async () => {
+    const { service, fake } = montar((f) =>
+      f
+        .comDesafio({ ...DESAFIO_ATIVO, status: 'DRAFT' })
+        .comParticipacao('c-ativo', ALUNO, 'LEFT')
+        .comAlunosElegiveis([ALUNO, OUTRO_ALUNO]),
+    );
+
+    await service.ativar(CTX, 'c-ativo');
+
+    expect(fake.participacaoDe('c-ativo', ALUNO)?.status).toBe('LEFT');
+    expect(fake.participacaoDe('c-ativo', OUTRO_ALUNO)?.status).toBe('JOINED');
+  });
+
+  it('abre normalmente quando nao ha aluno elegivel', async () => {
+    const { service, fake } = montar((f) =>
+      f.comDesafio({ ...DESAFIO_ATIVO, status: 'DRAFT' }),
+    );
+
+    await service.ativar(CTX, 'c-ativo');
+
+    expect(fake.desafioDe('c-ativo')?.status).toBe('ACTIVE');
+    expect(fake.avisosGravados()).toEqual([]);
+  });
+
+  /**
+   * O aluno inscrito automaticamente PODE SAIR (decisao do PI).
+   *
+   * Entrar sem pedir e uma coisa; ficar preso e outra.
+   */
+  it('o aluno inscrito automaticamente consegue sair', async () => {
+    const { service, fake } = montar((f) =>
+      f.comDesafio({ ...DESAFIO_ATIVO, status: 'DRAFT' }).comAlunosElegiveis([ALUNO]),
+    );
+
+    await service.ativar(CTX, 'c-ativo');
+    await service.sair(CTX, 'c-ativo', ALUNO);
+
+    expect(fake.participacaoDe('c-ativo', ALUNO)?.status).toBe('LEFT');
+  });
+
+  /** Avisa cada inscrito de que o desafio comecou. */
+  it('grava aviso DISPONIVEL para quem foi inscrito', async () => {
+    const { service, fake } = montar((f) =>
+      f.comDesafio({ ...DESAFIO_ATIVO, status: 'DRAFT' }).comAlunosElegiveis([ALUNO]),
+    );
+
+    await service.ativar(CTX, 'c-ativo');
+
+    expect(fake.avisosGravados()).toEqual([
+      { studentId: ALUNO, kind: 'DISPONIVEL', challengeId: 'c-ativo' },
+    ]);
   });
 });
