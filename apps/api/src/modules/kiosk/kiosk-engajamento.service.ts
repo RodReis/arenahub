@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
 import { EngagementService, type PreferenciasDoAluno } from '../engagement/engagement.service.js';
-import type { PerfilPublicoDoAluno } from '../engagement/engagement.repository.js';
+import type {
+  ContestacaoGravada,
+  PerfilPublicoDoAluno,
+} from '../engagement/engagement.repository.js';
+import type { AssuntoDaContestacao } from '../engagement/domain/contestacao.js';
 import type { AlunoDaSessao } from './kiosk-area-do-aluno.service.js';
 
 /**
@@ -52,5 +56,28 @@ export class KioskEngajamentoService {
       { studentId: aluno.studentId, identityChoice, alias, version },
       agora,
     );
+  }
+
+  /**
+   * O aluno abre uma contestacao pelo totem (`M5-FR-016`, F35).
+   *
+   * O `studentId` vem da SESSAO, nunca do corpo: quem esta logado no totem e
+   * quem contesta. Aceitar o id do corpo deixaria qualquer aluno abrir
+   * contestacao em nome de outro.
+   */
+  async abrirContestacao(
+    aluno: AlunoDaSessao,
+    subject: AssuntoDaContestacao,
+    descricao: string,
+  ): Promise<ContestacaoGravada> {
+    return this.engajamento.abrirContestacao(aluno.contexto.tenantId, aluno.studentId, {
+      subject,
+      descricao,
+    });
+  }
+
+  /** As contestacoes do proprio aluno -- acompanhamento, nao fila. */
+  async minhasContestacoes(aluno: AlunoDaSessao): Promise<readonly ContestacaoGravada[]> {
+    return this.engajamento.contestacoesDoAluno(aluno.contexto.tenantId, aluno.studentId);
   }
 }

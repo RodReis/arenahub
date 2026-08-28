@@ -624,11 +624,41 @@ model Tenant {
   challenges             Challenge[]
   challengeParticipants  ChallengeParticipant[]
   challengeNotices       ChallengeNotice[]
+  engagementDisputes     EngagementDispute[]
 
   /// Minimo de participantes para publicar um placar (`M5-BR-007`).
   /// ADR-047: 5. Configuravel por tenant -- academia pequena e academia
   /// grande nao tem a mesma nocao de "poucos".
   rankingMinimumCohort Int @default(5) @map("ranking_minimum_cohort")
+
+  // --- F35: flags e teto de correcao (ADR-049, Decisoes 2 e 3) ------------
+  //
+  // Flag e COLUNA, nao servico de flags e nao `if` no codigo -- mesmo
+  // precedente de `BillingSettings.blockAnchor`: "regra que vive dentro de um
+  // `if` e regra que ninguem encontra depois". Moram aqui, ao lado de
+  // `rankingMinimumCohort`, porque ja existe config de engajamento por tenant
+  // e uma tabela nova so para tres booleanos seria tabela para achar depois.
+  //
+  // Desligar NAO apaga nada: o ledger continua, o snapshot continua, o aluno
+  // so para de ver. Religar devolve tudo, porque nada foi destruido.
+
+  /// Placar publico e area de XP do totem. Desligado, o bloco sai do
+  /// carrossel -- mesmo comportamento de coorte insuficiente.
+  engagementRankingEnabled      Boolean @default(true) @map("engagement_ranking_enabled")
+  /// Desafios (F34). Desligado, nenhum desafio novo abre e os abertos param
+  /// de aparecer; participante e progresso ficam intactos.
+  engagementChallengesEnabled   Boolean @default(true) @map("engagement_challenges_enabled")
+  /// Conquistas (F31). Desligado, para de avaliar e de exibir; o ja
+  /// desbloqueado nao e revogado.
+  engagementAchievementsEnabled Boolean @default(true) @map("engagement_achievements_enabled")
+
+  /// Teto da correcao manual de XP, em pontos absolutos, por operacao.
+  /// Nulo = sem teto.
+  ///
+  /// RECUSA, NAO APROVA (ADR-049, Decisao 2): acima do teto a operacao e
+  /// barrada com erro de dominio. Nao existe papel de aprovador, e uma fila
+  /// que exige dois operadores numa academia que tem um nunca anda.
+  engagementCorrectionLimitPoints Int? @map("engagement_correction_limit_points")
 
   @@map("tenants")
 }
@@ -711,6 +741,7 @@ model User {
   uploadedImports       AssessmentImport[]     @relation("ImportUploader")
   reviewedImports       AssessmentImport[]     @relation("ImportReviewer")
   moderatedProfiles     PublicProfile[]
+  resolvedDisputes      EngagementDispute[]
 
   @@map("users")
 }
@@ -1018,6 +1049,7 @@ model Student {
   rankingEntries  RankingEntry[]
   challengeParticipations ChallengeParticipant[]
   challengeNotices        ChallengeNotice[]
+  engagementDisputes      EngagementDispute[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -4258,6 +4290,7 @@ model XpLedgerEntry {
   reverses    XpLedgerEntry? @relation("ReversaoDeXp", fields: [reversesEntryId], references: [id])
   revertidoPor XpLedgerEntry[] @relation("ReversaoDeXp")
   achievements StudentAchievement[]
+  disputasCorrigidas EngagementDispute[]
 
   /// A CHAVE QUE GARANTE `M5-AC-002`.
   ///
@@ -4363,6 +4396,29 @@ model StudentAchievement {
   @@map("student_achievements")
 }
 
+/// O que um placar mede. F35, ADR-049 Decisao 4.
+///
+/// Enum e nao expressao, pela mesma razao de `XpTrigger` e `ChallengeMetric`:
+/// criterio de classificacao em string livre e regra executavel chegando por
+/// dado, e ai `M5-BR-006` (baseline comparavel) vira decoracao.
+///
+/// EVOLUCAO RELATIVA NAO ESTA AQUI, de proposito. Exige baseline corporal
+/// comparavel, que e entrega do MVP 3 e nao existe -- publicar variacao sem
+/// baseline e publicar numero que nao significa o que diz. Entra com a
+/// fatia que trouxer o baseline, nao antes.
+enum RankingCategory {
+  /// XP acumulado no mes (F31). O placar que sempre existiu.
+  XP_DO_MES
+  /// Sessoes confirmadas no mes -- le `StudentAttendanceSession` (F24), a
+  /// mesma projecao que o XP le.
+  FREQUENCIA
+  /// Semanas elegiveis no mes (F32). Premia regularidade, nao volume: quem
+  /// treina 3x por semana toda semana ganha de quem treina 15x numa so.
+  CONSISTENCIA
+
+  @@map("ranking_category")
+}
+
 enum RankingSnapshotStatus {
   DRAFT
   PUBLISHED
@@ -4387,6 +4443,13 @@ model RankingSnapshot {
   tenantId       String                @map("tenant_id") @db.Uuid
   gymUnitId      String                @map("gym_unit_id") @db.Uuid
   localMonth     String                @map("local_month")
+  /// O que este placar mede (F35, ADR-049 Decisao 4). Entra na chave unica:
+  /// sem ela, so cabia UM placar por unidade e mes, e a categoria nova
+  /// colidiria com o XP em vez de conviver.
+  ///
+  /// Snapshot gerado antes da F35 recebeu `XP_DO_MES` na migration -- e o
+  /// que ele sempre mediu, so nao tinha nome.
+  category       RankingCategory       @default(XP_DO_MES)
   status         RankingSnapshotStatus  @default(DRAFT)
   /// Copiado da configuracao NO MOMENTO da geracao. Mudar a politica
   /// depois nao reescreve o que este snapshot decidiu.
@@ -4399,9 +4462,9 @@ model RankingSnapshot {
   gymUnit GymUnit       @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
   entries RankingEntry[]
 
-  /// UM snapshot por unidade e mes. Regerar e substituir o DRAFT; o
-  /// PUBLISHED nao se regera.
-  @@unique([tenantId, gymUnitId, localMonth])
+  /// UM snapshot por unidade, mes E CATEGORIA. Regerar e substituir o
+  /// DRAFT; o PUBLISHED nao se regera.
+  @@unique([tenantId, gymUnitId, localMonth, category])
   @@map("ranking_snapshots")
 }
 
@@ -4640,3 +4703,87 @@ model ChallengeNotice {
   @@index([tenantId, studentId, readAt])
   @@map("challenge_notices")
 }
+
+// ---------------------------------------------------------------------------
+// F35 -- Operacao, moderacao e experimento (Slice 5.6, ADR-049)
+//
+// A fatia nao cria mecanismo de engajamento novo: da a secretaria o poder de
+// CORRIGIR os que ja existem sem abrir o banco. O aceite e literal --
+// "equipe corrige pontuacao e remove exposicao sem editar banco diretamente".
+//
+// Nao ha segundo ator (ADR-049, Decisao 2). Correcao acima do teto RECUSA,
+// nunca enfileira -- mesmo precedente de `BillingSettings.refundLimitMinor`.
+// ---------------------------------------------------------------------------
+
+/// Sobre o que o aluno esta reclamando.
+///
+/// Enum, nao texto livre: a resolucao precisa saber qual mecanismo revisar, e
+/// "categoria" derivada de string do aluno e triagem por adivinhacao.
+enum EngagementDisputeSubject {
+  /// Pontos que nao apareceram, ou apareceram errados.
+  XP
+  /// Conquista que o aluno acha que desbloqueou e nao veio.
+  CONQUISTA
+  /// Semana que deveria contar para o streak e nao contou.
+  CONSISTENCIA
+  /// Posicao no placar.
+  RANKING
+  /// Progresso ou resultado de desafio.
+  DESAFIO
+
+  @@map("engagement_dispute_subject")
+}
+
+enum EngagementDisputeStatus {
+  /// Aberta pelo aluno, ninguem olhou.
+  ABERTA
+  /// Resolvida com correcao aplicada no ledger.
+  CORRIGIDA
+  /// Analisada e o sistema estava certo. Nao e derrota do aluno: e resposta.
+  IMPROCEDENTE
+
+  @@map("engagement_dispute_status")
+}
+
+/// Contestacao de engajamento -- `M5-FR-016`.
+///
+/// O aluno abre no totem; a secretaria resolve no painel. A linha NUNCA e
+/// apagada nem reaberta: resolver grava desfecho, ator e instante, e a
+/// contestacao vira historico. Reabrir seria apagar a trilha de quem decidiu.
+///
+/// A correcao que resolve a contestacao mora no LEDGER, nao aqui -- este
+/// modelo aponta para ela (`correctionEntryId`) em vez de duplicar o valor.
+/// Duplicar produziria duas verdades sobre quantos pontos foram devolvidos.
+model EngagementDispute {
+  id        String                   @id @default(uuid()) @db.Uuid
+  tenantId  String                   @map("tenant_id") @db.Uuid
+  studentId String                   @map("student_id") @db.Uuid
+  subject   EngagementDisputeSubject
+  /// O que o aluno escreveu. Sem PII de saude: e campo de reclamacao sobre
+  /// pontuacao, nao prontuario.
+  descricao String
+  status    EngagementDisputeStatus  @default(ABERTA)
+
+  /// Quem resolveu, quando e por que. Nulos enquanto `ABERTA`.
+  resolvedBy       String?   @map("resolved_by") @db.Uuid
+  resolvedAt       DateTime? @map("resolved_at")
+  /// Resposta da secretaria -- obrigatoria ao resolver, nos DOIS desfechos.
+  /// Improcedente sem explicacao e silencio com carimbo.
+  resolucao        String?
+  /// O movimento de XP que corrigiu, quando houve correcao. Aponta, nao copia.
+  correctionEntryId String?  @map("correction_entry_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /// Sem cascade: preserva QUEM resolveu mesmo se o usuario sair da academia.
+  resolver   User?          @relation(fields: [resolvedBy], references: [id])
+  correction XpLedgerEntry? @relation(fields: [correctionEntryId], references: [id])
+
+  /// A fila do painel le por aqui: abertas primeiro, mais antigas no topo.
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, studentId, createdAt])
+  @@map("engagement_disputes")
+}
+

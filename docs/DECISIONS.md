@@ -3650,3 +3650,136 @@ O **que termina primeiro** entre os abertos hoje, um só. Rodiziar entre desafio
 que já rodizia seria rodízio dentro de rodízio, e ninguém acompanha. Sem desafio aberto, o bloco
 **sai do carrossel** — mesmo comportamento do ranking abaixo da coorte mínima, e a razão é a mesma:
 bloco vazio na parede é pior que bloco ausente.
+
+---
+
+## ADR-049 — F35 roda antes do gate do MVP 5; correção recusa por teto, não por segundo ator; flag é coluna de tenant, sem experimento
+
+**Data:** 28/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 28/08/2026**
+· **Emenda** `docs/prd/academia/MVP-05-engagement.md` §1 (gate de entrada) e §7 Slice 5.6
+  (superfície, segregação de função e escopo de experimento)
+· **Alcança** a `SPEC-035` e a fatia F35; a ponta aberta da F33 (rankings por categoria)
+· **NÃO alcança:** o regime opt-out do ADR-046; a inscrição automática do ADR-048; a Regra de
+  arquitetura 9; o `M5-BR-006` (evolução relativa continua fora — ver Decisão 4)
+
+### Contexto
+
+O ADR-046 escreveu que **F31–F35 continuam atrás do gate original** e que *"se uma fatia futura
+quiser rodar antes do gate, precisa do próprio ADR, com o próprio argumento"*. O ADR-047 fez isso
+pela F31, o PI liberou a F32 por decisão direta e o ADR-048 fez pela F34. **Este é o ADR da F35, a
+última fatia do MVP 5** — depois dele o gate original não guarda mais nenhuma fatia.
+
+O gate pede *"eventos confiáveis + app do MVP 4"*. O argumento é o mesmo das três vezes anteriores,
+e nesta é o mais forte de todos: **o app continua não existindo** (`apps/mobile/` tem um
+`.gitkeep`), e os eventos confiáveis não só existem como já foram consumidos por quatro fatias —
+`StudentAttendanceSession` (F24), o ledger de XP (F31), o streak derivado (F32) e o progresso de
+desafio (F34).
+
+Esta fatia é diferente das anteriores num ponto: ela **não cria** um mecanismo de engajamento novo,
+ela dá à secretaria o poder de **corrigir** os que já existem sem abrir o banco. O aceite da Slice
+5.6 é literal: *"equipe corrige pontuação e remove exposição sem editar banco diretamente"*.
+
+### Decisão 1 — a fatia roda, com painel e totem como superfícies
+
+Mesmo movimento do ADR-046, do ADR-047 e do ADR-048: onde a Slice 5.6 diz "app", leia-se **painel**
+para o que a secretaria opera, e **totem** para o que o aluno faz.
+
+A divisão não é arbitrária: contestar é ato do aluno (totem, área interna autenticada); resolver,
+corrigir, ocultar, recalcular e medir são atos da operação (painel).
+
+**Isso encerra o gate do MVP 5.** Nenhuma fatia do MVP 5 continua atrás dele.
+
+### Decisão 2 — correção RECUSA por teto; não existe segundo ator
+
+O plano de apoio (`2026-08-14-mvp-05-06-operations-experiment.md`, Task 1 Step 1 e Task 3 Step 3)
+pedia segregação de função em três pontos: `SEGREGATION_OF_DUTIES_REQUIRED` ao autorizar correção,
+e *"aprovação requer ator diferente"* ao publicar recálculo.
+
+**O repositório já decidiu o contrário, e a decisão está escrita no schema** —
+`packages/database/prisma/schema.prisma`, campo `BillingSettings.refundLimitMinor`:
+
+> *"RECUSA, NÃO APROVA: acima do teto a operação é barrada com erro de domínio. **Não existe papel
+> de aprovador no MVP 2**, e inventar uma fila de aprovação que ninguém opera produziria estorno
+> travado para sempre."*
+
+O argumento vale inteiro aqui, e o contexto o reforça: **o cliente inaugural tem uma secretaria**.
+Uma fila que exige dois operadores distintos, numa academia com um, é uma fila que nunca anda — e o
+efeito prático de uma correção travada para sempre é pior que o de uma correção errada, porque a
+errada é visível no extrato e reversível pelo próprio mecanismo desta fatia.
+
+O que o produto usa no lugar do segundo ator, seguindo o precedente do MVP 2:
+
+| mecanismo | como aparece na F35 |
+|---|---|
+| **permissão própria** | `engagement.correct`, separada de `engagement.moderate` — como `reconciliation.resolve` é separada de `reconciliation.read`, pela mesma razão: *"quem confere nem sempre é quem decide"* |
+| **teto por operação** | correção acima do teto do tenant é **recusada** com erro de domínio, nunca enfileirada |
+| **motivo obrigatório** | já é invariante do ledger (`XP_MOTIVO_OBRIGATORIO`), a fatia não afrouxa |
+| **trilha** | ator e instante em toda decisão; o ledger é append-only por trigger |
+
+### Decisão 3 — flag é coluna de settings do tenant; experimento fica fora
+
+A Slice 5.6 pede *"feature flags e experimento com grupo controle"*. São duas coisas, e o PI separou.
+
+**Flags entram**, porque o aceite depende delas: desligar uma capacidade é o rollback que a operação
+precisa ter. Entram no formato que o repositório já usa — **coluna em tabela de settings do tenant**,
+pela razão registrada em `BillingSettings.blockAnchor`: *"não é constante, é CONFIGURAÇÃO… regra
+comercial que vive dentro de um `if` é regra que ninguém encontra depois"*. Não entra serviço de
+flags, nem arquivo de toggle, nem variável de ambiente.
+
+**Experimento com grupo controle fica fora.** Não há experimento pedido: nem hipótese, nem métrica
+de decisão, nem quem leia o resultado. Atribuição estável por hash, eventos de exposição e worker de
+guardrail nasceriam sem consumidor — e código sem consumidor não é preparação, é dívida que ninguém
+sabe se funciona porque nada exerce. Quando houver a primeira pergunta que só um experimento
+responde, ela traz o próprio ADR e a própria fatia.
+
+**Escopo negativo explícito, herdado e ampliado:** a F35 herda o escopo negativo do ADR-048 Decisão 3
+(quiet hours, orçamento de contato, canal externo) e acrescenta: sem atribuição de grupo, sem
+guardrail automático de parada, sem despachante de outbox.
+
+### Decisão 4 — ranking ganha categoria; evolução relativa continua fora
+
+Fecha a ponta que o PI deixou aberta em 28/08/2026 ao fechar a #33: *"rankings por categoria
+(frequência, consistência, evolução relativa — PRD §7) ficam para F34/F35"*. A F34 não pegou; é aqui.
+
+Entram **três** categorias, e o critério é ter dado confiável hoje:
+
+| categoria | fonte | existe? |
+|---|---|---|
+| XP do mês | `XpLedgerEntry` (F31) | sim — é o ranking atual |
+| Frequência | `StudentAttendanceSession` (F24) | sim — mesma projeção que o XP lê |
+| Consistência | semanas elegíveis (F32) | sim — `avaliarSemanas`/`resumirStreak` |
+
+**Evolução relativa fica fora.** O `M5-BR-006` exige *"variação relativa e baseline comparável"*, e
+baseline corporal comparável é entrega do MVP 3 que não existe. Publicar ranking de evolução sem
+baseline comparável é publicar número que não significa o que diz — e o `M5-FR-012` ainda proíbe
+expor valor absoluto quando oculto, o que exige desenho próprio. Vira ponta registrada, não código
+apressado.
+
+**Consequência estrutural:** a chave única `[tenantId, gymUnitId, localMonth]` de `RankingSnapshot`
+**impede** dois snapshots do mesmo mês e unidade. A categoria entra na chave. Migration obrigatória.
+
+### Decisão 5 — quem oculta é a secretaria; não há canal de denúncia do aluno
+
+A F30 deixou `PublicProfileStatus.HIDDEN` **sem nenhum caminho de escrita** — estado alcançável por
+nada, esperando *"o canal de denúncia da F35"* (ADR-046, Decisão 6).
+
+O PI decidiu que o canal **não é do aluno**: a fila de moderação ganha a ação **Ocultar**, e a
+secretaria a usa quando alguém reclama na recepção. Razão: um botão de denúncia numa tela de
+academia é ferramenta de briga entre alunos antes de ser ferramenta de segurança, e a reclamação
+real chega na recepção, que é onde a pessoa que pode agir já está.
+
+`HIDDEN` deixa de ser órfão. `resolverExposicao()` não muda — ela já trata qualquer status
+diferente de `APPROVED` caindo no primeiro nome, e há teste da F30 provando (`exposicao.spec.ts`).
+
+### Consequências
+
+| # | consequência | onde |
+|---|---|---|
+| 1 | `MVP-05` §1 fica **emendado**: o gate não alcança a F35 — e não guarda mais nenhuma fatia | `MVP-05` §1 |
+| 2 | Slice 5.6 fica **emendada**: sem segregação de função, sem experimento com grupo controle | `MVP-05` §7 |
+| 3 | Correção acima do teto **recusa**; não existe fila de aprovação | `SPEC-035` §2 |
+| 4 | Permissão nova `engagement.correct` entra no catálogo | `seed.ts` |
+| 5 | `RankingSnapshot` ganha categoria na chave única — **migration** | `schema.prisma` |
+| 6 | Evolução relativa continua fora, com razão registrada — ponta aberta | `SPEC-035` §3 |
+| 7 | `HIDDEN` ganha caminho de escrita pela fila de moderação | `SPEC-035` §1 |
+| 8 | Flag de engajamento é coluna de settings do tenant, nunca `if` no código | `schema.prisma` |

@@ -80,6 +80,9 @@ export class FakePortaDeXp implements PortaDeXp {
   private colidirNaEscrita = false;
   private proximoId = 1;
 
+  /** Teto de correcao do tenant. `null` = sem teto, que e o padrao real. */
+  private tetoDeCorrecao_: number | null = null;
+
   /** So do dublê: registra a unidade + fuso do aluno -- Task 11 (ajuste
    * manual e checagem de escopo de unidade). */
   comAluno(
@@ -320,6 +323,15 @@ export class FakePortaDeXp implements PortaDeXp {
     studentId: string,
   ): Promise<{ gymUnitId: string; timezone: string } | null> {
     return Promise.resolve(this.unidadePorAluno.get(studentId) ?? null);
+  }
+
+  /** So do duble: teto da correcao manual do tenant. `null` = sem teto. */
+  comTetoDeCorrecao(teto: number | null): void {
+    this.tetoDeCorrecao_ = teto;
+  }
+
+  tetoDeCorrecao(_contexto: TenantContext): Promise<number | null> {
+    return Promise.resolve(this.tetoDeCorrecao_);
   }
 
   qualquerVersaoDeRegra(_contexto: TenantContext): Promise<{ id: string } | null> {

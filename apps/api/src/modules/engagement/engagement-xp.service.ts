@@ -1,9 +1,10 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { resolverRegraVigente } from './domain/regra-de-xp.js';
 import { ajustar, concederPorSessao, mesLocal } from './domain/movimento-de-xp.js';
 import { avaliarConquistas } from './domain/conquista.js';
+import { autorizarCorrecao } from './domain/correcao.js';
 import {
   POLITICA_DE_STREAK,
   avaliarSemanas,
@@ -263,6 +264,22 @@ export class EngagementXpService {
     }
 
     const fusoDaUnidade = unidade.timezone;
+
+    // TETO ANTES DA ESCRITA (F35, ADR-049 Decisao 2). O ledger e append-only
+    // por trigger no banco: uma linha gravada antes da checagem nunca sairia
+    // de la, e "corrigir a correcao" exigiria uma segunda linha compensando a
+    // primeira. Barrar aqui e a unica ordem que nao suja o historico.
+    //
+    // RECUSA, NAO ENFILEIRA: nao existe papel de aprovador nesta base.
+    const teto = await this.porta.tetoDeCorrecao(contexto);
+    try {
+      autorizarCorrecao({ pontos: entrada.pontos, teto });
+    } catch (erro) {
+      throw new BadRequestException({
+        code: erro instanceof Error ? erro.message : 'CORRECAO_INVALIDA',
+        message: 'Correcao recusada',
+      });
+    }
 
     const regra = await this.porta.qualquerVersaoDeRegra(contexto);
     if (regra === null) {

@@ -1,5 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import type { RankingSnapshotStatus, StudentStatus } from '@arenahub/database';
+import type { RankingCategory, RankingSnapshotStatus, StudentStatus } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import type { SaldoParaClassificar } from './domain/classificacao.js';
@@ -21,6 +21,7 @@ interface SnapshotEmMemoria {
   tenantId: string;
   gymUnitId: string;
   localMonth: string;
+  category: RankingCategory;
   status: RankingSnapshotStatus;
   publishedAt: Date | null;
   entries: { studentId: string; position: number; points: number }[];
@@ -68,11 +69,38 @@ export class FakePortaDeRanking implements PortaDeRanking {
 
   /** So do dublê: popula os saldos de XP dos alunos de uma unidade/mes. */
   comSaldos(gymUnitId: string, localMonth: string, saldos: readonly SaldoParaClassificar[]): void {
-    this.saldos.set(chave(gymUnitId, localMonth), [...saldos]);
+    this.popular('XP_DO_MES', gymUnitId, localMonth, saldos);
+  }
+
+  /** So do dublê: popula as sessoes do mes (categoria FREQUENCIA, F35). */
+  comFrequencia(
+    gymUnitId: string,
+    localMonth: string,
+    valores: readonly SaldoParaClassificar[],
+  ): void {
+    this.popular('FREQUENCIA', gymUnitId, localMonth, valores);
+  }
+
+  /** So do dublê: popula as semanas elegiveis (categoria CONSISTENCIA, F35). */
+  comConsistencia(
+    gymUnitId: string,
+    localMonth: string,
+    valores: readonly SaldoParaClassificar[],
+  ): void {
+    this.popular('CONSISTENCIA', gymUnitId, localMonth, valores);
+  }
+
+  private popular(
+    category: RankingCategory,
+    gymUnitId: string,
+    localMonth: string,
+    valores: readonly SaldoParaClassificar[],
+  ): void {
+    this.saldos.set(chave(gymUnitId, localMonth, category), [...valores]);
 
     // Aluno default ACTIVE com nome derivado do id, so para os testes que
     // nao chamam `comAluno` explicitamente (ex.: geracao de coorte).
-    for (const saldo of saldos) {
+    for (const saldo of valores) {
       if (!this.alunos.has(saldo.studentId)) {
         this.alunos.set(saldo.studentId, {
           fullName: `${capitalizar(saldo.studentId)} Teste`,
@@ -132,9 +160,10 @@ export class FakePortaDeRanking implements PortaDeRanking {
     _contexto: TenantContext,
     gymUnitId: string,
     localMonth: string,
+    category: RankingCategory = 'XP_DO_MES',
   ): Promise<SaldoParaClassificar[]> {
     this.chamadasASaldosDaUnidade += 1;
-    return Promise.resolve([...(this.saldos.get(chave(gymUnitId, localMonth)) ?? [])]);
+    return Promise.resolve([...(this.saldos.get(chave(gymUnitId, localMonth, category)) ?? [])]);
   }
 
   elegibilidadeDosAlunos(
@@ -157,14 +186,16 @@ export class FakePortaDeRanking implements PortaDeRanking {
     contexto: TenantContext,
     entrada: EntradaParaSalvarSnapshot,
   ): Promise<SnapshotDeRanking> {
-    // Regera o DRAFT/WITHHELD existente da mesma unidade/mes -- mesmo
-    // comportamento do repositorio real (so um snapshot nao-publicado por
-    // unidade/mes).
+    // Regera o DRAFT/WITHHELD existente da mesma unidade/mes E CATEGORIA --
+    // mesmo comportamento do repositorio real. A categoria no criterio nao e
+    // detalhe: sem ela, gerar o placar de frequencia de agosto APAGARIA o
+    // rascunho de XP de agosto, e o operador so descobriria ao publicar.
     for (const [id, existente] of this.snapshots) {
       if (
         existente.tenantId === contexto.tenantId &&
         existente.gymUnitId === entrada.gymUnitId &&
         existente.localMonth === entrada.localMonth &&
+        existente.category === entrada.category &&
         existente.status !== 'PUBLISHED'
       ) {
         this.snapshots.delete(id);
@@ -177,6 +208,7 @@ export class FakePortaDeRanking implements PortaDeRanking {
       tenantId: contexto.tenantId,
       gymUnitId: entrada.gymUnitId,
       localMonth: entrada.localMonth,
+      category: entrada.category,
       status: entrada.status,
       publishedAt: null,
       entries: entrada.posicoes.map((posicao) => ({
@@ -230,12 +262,14 @@ export class FakePortaDeRanking implements PortaDeRanking {
     contexto: TenantContext,
     gymUnitId: string,
     localMonth: string,
+    category: RankingCategory = 'XP_DO_MES',
   ): Promise<SnapshotDeRanking | null> {
     for (const snapshot of this.snapshots.values()) {
       if (
         snapshot.tenantId === contexto.tenantId &&
         snapshot.gymUnitId === gymUnitId &&
         snapshot.localMonth === localMonth &&
+        snapshot.category === category &&
         snapshot.status === 'PUBLISHED'
       ) {
         return Promise.resolve(paraSnapshot(snapshot));
@@ -306,8 +340,8 @@ export class FakePortaDeRanking implements PortaDeRanking {
   }
 }
 
-function chave(gymUnitId: string, localMonth: string): string {
-  return `${gymUnitId}::${localMonth}`;
+function chave(gymUnitId: string, localMonth: string, category: RankingCategory): string {
+  return `${gymUnitId}::${localMonth}::${category}`;
 }
 
 function capitalizar(texto: string): string {
@@ -318,6 +352,7 @@ function paraSnapshot(snapshot: SnapshotEmMemoria): SnapshotDeRanking {
   return {
     id: snapshot.id,
     gymUnitId: snapshot.gymUnitId,
+    category: snapshot.category,
     status: snapshot.status,
     publishedAt: snapshot.publishedAt,
     entries: snapshot.entries.map((entrada) => ({ ...entrada })),

@@ -1,0 +1,75 @@
+/*
+ * Configuração do engajamento -- F35, Slice 5.6.
+ *
+ * Cor e tipografia saem de token `--ah-*`: hex literal é proibido pela lint.
+ * Tela de decisão rara e consequente (desligar o placar de toda a academia):
+ * ao contrário das filas, aqui o texto que explica o efeito vale mais que a
+ * densidade.
+ */
+
+.painel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 640px;
+}
+
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-md, 8px);
+  padding: 16px;
+}
+
+.capacidade {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.efeito {
+  display: block;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.aviso {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  margin: 0;
+}
+
+.salvo {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  margin: 0;
+}
+
+.numeros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 0;
+}
+
+.numeros > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.numeros dt {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.numeros dd {
+  margin: 0;
+  font-size: var(--ah-type-title-size, 1.5rem);
+  font-variant-numeric: tabular-nums;
+}

@@ -145,6 +145,13 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     porque a tela LISTA perfis; sem a capacidade, o link nem aparece.
   */
   { href: '/engagement/aliases', label: 'Moderação de apelido', exigePermissao: 'engagement.read' },
+  /*
+    CONTESTAÇÕES -- F35, Slice 5.6. A outra fila que nasce do engajamento: o
+    aluno discorda do que a tela mostrou e abre pelo totem, alguém resolve
+    aqui. `engagement.read` pela mesma razão da fila de apelido -- a tela
+    LISTA; resolver exige `engagement.correct`, que a rota cobra por conta.
+  */
+  { href: '/engagement/contestacoes', label: 'Contestações', exigePermissao: 'engagement.read' },
 ];
 
 interface Unidade {

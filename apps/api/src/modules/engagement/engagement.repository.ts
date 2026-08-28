@@ -4,6 +4,11 @@ import { Prisma, type AliasRejectionReason, type StudentStatus } from '@arenahub
 import { PrismaService } from '../../persistence/prisma.service.js';
 import type { DecisaoDeEngajamento, FinalidadeDeEngajamento } from './domain/participacao.js';
 import type { IdentidadeEscolhida, StatusDoPerfilPublico } from './domain/exposicao.js';
+import type {
+  AssuntoDaContestacao,
+  DesfechoDaContestacao,
+  StatusDaContestacao,
+} from './domain/contestacao.js';
 
 /** Nome do indice parcial que garante alias unico entre os aprovados. */
 const INDICE_ALIAS_APROVADO_UNICO = 'public_profiles_alias_aprovado_unico';
@@ -72,7 +77,7 @@ export interface EntradaDeModeracaoNoBanco {
   tenantId: string;
   actorId: string;
   perfilId: string;
-  status: 'APPROVED' | 'REJECTED';
+  status: 'APPROVED' | 'REJECTED' | 'HIDDEN';
   rejectionReason: AliasRejectionReason | null;
 }
 
@@ -100,6 +105,108 @@ export interface PortaDeEngajamento {
     status: StatusDoPerfilPublico,
     limite: number,
   ): Promise<PerfilParaModeracao[]>;
+
+  // --- F35: contestacoes -------------------------------------------------
+  criarContestacao(entrada: EntradaDeContestacao, agora: Date): Promise<ContestacaoGravada>;
+  contestacaoPorId(
+    tenantId: string,
+    id: string,
+    escopo: EscopoDeUnidade,
+  ): Promise<ContestacaoGravada | null>;
+  gravarResolucao(entrada: EntradaDeResolucaoNoBanco, agora: Date): Promise<ContestacaoGravada>;
+  listarContestacoes(
+    tenantId: string,
+    status: StatusDaContestacao,
+    limite: number,
+    /** Unidades que o ator pode ver. `'ALL'` = tenant inteiro. */
+    escopo: EscopoDeUnidade,
+  ): Promise<ContestacaoParaFila[]>;
+  contestacoesDoAluno(tenantId: string, studentId: string): Promise<ContestacaoGravada[]>;
+
+  // --- F35: configuracao de engajamento do tenant ------------------------
+  indicadores(tenantId: string): Promise<IndicadoresDeEngajamento>;
+  obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento>;
+  salvarConfiguracao(
+    tenantId: string,
+    entrada: Partial<ConfiguracaoDeEngajamento>,
+  ): Promise<ConfiguracaoDeEngajamento>;
+}
+
+/**
+ * O que o painel de operacao mostra (`M5-FR-018`, F35).
+ *
+ * Numeros DERIVADOS na leitura, sem tabela de metrica: o volume e de uma
+ * academia, nao de um data warehouse, e materializar criaria uma projecao com
+ * rebuild proprio capaz de divergir do que as telas mostram -- exatamente o
+ * que a F32 evitou ao derivar o streak.
+ */
+export interface IndicadoresDeEngajamento {
+  alunosAtivos: number;
+  participandoDoRanking: number;
+  optOut: number;
+  apelidosPendentes: number;
+  apelidosOcultos: number;
+  contestacoesAbertas: number;
+}
+
+/**
+ * Flags e teto por tenant (ADR-049, Decisoes 2 e 3).
+ *
+ * Desligar NAO apaga nada: o ledger continua, o snapshot continua, o aluno so
+ * para de ver. Religar devolve tudo, porque nada foi destruido.
+ */
+export interface ConfiguracaoDeEngajamento {
+  rankingEnabled: boolean;
+  challengesEnabled: boolean;
+  achievementsEnabled: boolean;
+  /** Teto da correcao manual em pontos absolutos. `null` = sem teto. */
+  correctionLimitPoints: number | null;
+}
+
+/**
+ * Unidades sobre as quais o ator pode agir -- espelha `TenantContext.allowedUnitIds`.
+ *
+ * A contestacao NAO tem `gymUnitId` proprio: a unidade e a do ALUNO, entao o
+ * filtro atravessa a relacao. Mesmo padrao de `ajustarXp` (F31), que barra
+ * gerente restrito a uma unidade de mexer em aluno de outra.
+ */
+export type EscopoDeUnidade = 'ALL' | ReadonlySet<string>;
+
+/** O que o service pede para abrir uma contestacao. */
+export interface EntradaDeContestacao {
+  tenantId: string;
+  studentId: string;
+  subject: AssuntoDaContestacao;
+  descricao: string;
+}
+
+/** O que o service pede para resolver -- ator e instante entram aqui. */
+export interface EntradaDeResolucaoNoBanco {
+  tenantId: string;
+  id: string;
+  status: DesfechoDaContestacao;
+  resolucao: string;
+  resolvedBy: string;
+  /** O movimento de XP que corrigiu, quando houve. Aponta, nao copia. */
+  correctionEntryId: string | null;
+}
+
+/** Uma contestacao como o service a consome. */
+export interface ContestacaoGravada {
+  id: string;
+  studentId: string;
+  subject: AssuntoDaContestacao;
+  descricao: string;
+  status: StatusDaContestacao;
+  resolucao: string | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+}
+
+/** A linha da fila do painel -- a contestacao mais o nome do aluno. */
+export interface ContestacaoParaFila extends ContestacaoGravada {
+  /** Nome COMPLETO: quem modera precisa saber de quem e, e a fila e interna. */
+  alunoNome: string;
 }
 
 /** Converte a linha do Prisma para a forma que o service consome. */
@@ -367,6 +474,226 @@ export class EngagementRepository implements PortaDeEngajamento {
       alunoNome: perfil.student.fullName,
     }));
   }
+
+  // --- F35: contestacoes ---------------------------------------------------
+
+  async criarContestacao(
+    entrada: EntradaDeContestacao,
+    agora: Date,
+  ): Promise<ContestacaoGravada> {
+    const criada = await this.db.engagementDispute.create({
+      data: {
+        tenantId: entrada.tenantId,
+        studentId: entrada.studentId,
+        subject: entrada.subject,
+        descricao: entrada.descricao,
+        status: 'ABERTA',
+        createdAt: agora,
+      },
+    });
+
+    return paraContestacao(criada);
+  }
+
+  async contestacaoPorId(
+    tenantId: string,
+    id: string,
+    escopo: EscopoDeUnidade,
+  ): Promise<ContestacaoGravada | null> {
+    const linha = await this.db.engagementDispute.findFirst({
+      where: { id, tenantId, ...filtroDeUnidade(escopo) },
+    });
+    return linha ? paraContestacao(linha) : null;
+  }
+
+  /**
+   * Grava o desfecho.
+   *
+   * `status: 'ABERTA'` NO WHERE, e nao so o id: duas abas do painel abertas na
+   * mesma contestacao resolveriam as duas, e a segunda sobrescreveria ator e
+   * instante da primeira. A checagem de estado no dominio nao basta -- ela le
+   * antes de escrever, e quem le antes de escrever perde a corrida.
+   *
+   * O `tenantId` no where e o que separa as academias: sem ele um moderador
+   * do tenant A fecharia contestacao de aluno do tenant B, com resposta 200.
+   */
+  async gravarResolucao(
+    entrada: EntradaDeResolucaoNoBanco,
+    agora: Date,
+  ): Promise<ContestacaoGravada> {
+    const resultado = await this.db.engagementDispute.updateMany({
+      where: { id: entrada.id, tenantId: entrada.tenantId, status: 'ABERTA' },
+      data: {
+        status: entrada.status,
+        resolucao: entrada.resolucao,
+        resolvedBy: entrada.resolvedBy,
+        resolvedAt: agora,
+        correctionEntryId: entrada.correctionEntryId,
+      },
+    });
+
+    if (resultado.count === 0) {
+      // Nao existe, e de outro tenant, ou ja foi resolvida. O service ja
+      // distinguiu os dois primeiros casos lendo antes; aqui so resta a
+      // corrida perdida.
+      throw new ConflictException({
+        code: 'CONTESTACAO_JA_RESOLVIDA',
+        message: 'CONTESTACAO_JA_RESOLVIDA',
+      });
+    }
+
+    const atualizada = await this.db.engagementDispute.findFirstOrThrow({
+      where: { id: entrada.id, tenantId: entrada.tenantId },
+    });
+
+    return paraContestacao(atualizada);
+  }
+
+  async listarContestacoes(
+    tenantId: string,
+    status: StatusDaContestacao,
+    limite: number,
+    escopo: EscopoDeUnidade,
+  ): Promise<ContestacaoParaFila[]> {
+    const linhas = await this.db.engagementDispute.findMany({
+      where: { tenantId, status, ...filtroDeUnidade(escopo) },
+      orderBy: [{ createdAt: 'asc' }],
+      take: limite,
+      include: { student: { select: { fullName: true } } },
+    });
+
+    return linhas.map((linha) => ({
+      ...paraContestacao(linha),
+      alunoNome: linha.student.fullName,
+    }));
+  }
+
+  async contestacoesDoAluno(tenantId: string, studentId: string): Promise<ContestacaoGravada[]> {
+    const linhas = await this.db.engagementDispute.findMany({
+      where: { tenantId, studentId },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+
+    return linhas.map(paraContestacao);
+  }
+
+  // --- F35: configuracao de engajamento do tenant --------------------------
+
+
+  /**
+   * Indicadores do painel (`M5-FR-018`).
+   *
+   * `participandoDoRanking` e uma SUBTRACAO, nao uma contagem de linhas
+   * ACCEPTED: no engajamento a ausencia de `ConsentRecord` significa que o
+   * aluno PARTICIPA (INV-154, regime opt-out do ADR-046). Contar linhas
+   * daria quase zero numa academia inteira -- o oposto da verdade.
+   */
+  async indicadores(tenantId: string): Promise<IndicadoresDeEngajamento> {
+    const [alunosAtivos, optOut, apelidosPendentes, apelidosOcultos, contestacoesAbertas] =
+      await Promise.all([
+        this.db.student.count({ where: { tenantId, status: 'ACTIVE' } }),
+        // So conta o opt-out de quem esta ATIVO: aluno inativo ja nao aparece
+        // em exposicao nenhuma (INV-155), e conta-lo aqui faria a soma de
+        // participantes + opt-out passar do total de ativos.
+        this.db.consentRecord.count({
+          where: {
+            tenantId,
+            document: { type: 'RANKING' },
+            decision: 'REFUSED',
+            supersededAt: null,
+            student: { status: 'ACTIVE' },
+          },
+        }),
+        this.db.publicProfile.count({ where: { tenantId, status: 'PENDING' } }),
+        this.db.publicProfile.count({ where: { tenantId, status: 'HIDDEN' } }),
+        this.db.engagementDispute.count({ where: { tenantId, status: 'ABERTA' } }),
+      ]);
+
+    return {
+      alunosAtivos,
+      participandoDoRanking: alunosAtivos - optOut,
+      optOut,
+      apelidosPendentes,
+      apelidosOcultos,
+      contestacoesAbertas,
+    };
+  }
+
+  async obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento> {
+    const tenant = await this.db.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: {
+        engagementRankingEnabled: true,
+        engagementChallengesEnabled: true,
+        engagementAchievementsEnabled: true,
+        engagementCorrectionLimitPoints: true,
+      },
+    });
+
+    return {
+      rankingEnabled: tenant.engagementRankingEnabled,
+      challengesEnabled: tenant.engagementChallengesEnabled,
+      achievementsEnabled: tenant.engagementAchievementsEnabled,
+      correctionLimitPoints: tenant.engagementCorrectionLimitPoints,
+    };
+  }
+
+  /**
+   * Grava so o que veio.
+   *
+   * Parcial de proposito: a tela envia a flag que o operador mexeu, e mandar
+   * o objeto inteiro faria duas abas abertas sobrescreverem uma a decisao da
+   * outra em campos que nenhuma das duas tocou.
+   */
+  async salvarConfiguracao(
+    tenantId: string,
+    entrada: Partial<ConfiguracaoDeEngajamento>,
+  ): Promise<ConfiguracaoDeEngajamento> {
+    await this.db.tenant.update({
+      where: { id: tenantId },
+      data: {
+        ...(entrada.rankingEnabled !== undefined
+          ? { engagementRankingEnabled: entrada.rankingEnabled }
+          : {}),
+        ...(entrada.challengesEnabled !== undefined
+          ? { engagementChallengesEnabled: entrada.challengesEnabled }
+          : {}),
+        ...(entrada.achievementsEnabled !== undefined
+          ? { engagementAchievementsEnabled: entrada.achievementsEnabled }
+          : {}),
+        // `!== undefined` e nao truthy: `null` (sem teto) e `0` (ninguem
+        // corrige) sao valores legitimos e distintos entre si.
+        ...(entrada.correctionLimitPoints !== undefined
+          ? { engagementCorrectionLimitPoints: entrada.correctionLimitPoints }
+          : {}),
+      },
+    });
+
+    return this.obterConfiguracao(tenantId);
+  }
+}
+
+/** Converte a linha do Prisma para a forma que o service consome. */
+function paraContestacao(linha: {
+  id: string;
+  studentId: string;
+  subject: string;
+  descricao: string;
+  status: string;
+  resolucao: string | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+}): ContestacaoGravada {
+  return {
+    id: linha.id,
+    studentId: linha.studentId,
+    subject: linha.subject as AssuntoDaContestacao,
+    descricao: linha.descricao,
+    status: linha.status as StatusDaContestacao,
+    resolucao: linha.resolucao,
+    resolvedAt: linha.resolvedAt,
+    createdAt: linha.createdAt,
+  };
 }
 
 /**
@@ -423,4 +750,17 @@ function traduzirErroDeColisao(erro: unknown): unknown {
   }
 
   return erro;
+}
+
+/**
+ * Filtro de unidade, atravessando a relacao com o aluno.
+ *
+ * `'ALL'` devolve objeto vazio -- espalhar `{}` num `where` do Prisma nao
+ * acrescenta condicao, entao quem tem o tenant inteiro ve tudo sem ramo
+ * especial no chamador.
+ */
+function filtroDeUnidade(escopo: EscopoDeUnidade) {
+  if (escopo === 'ALL') return {};
+
+  return { student: { gymUnitId: { in: [...escopo] } } };
 }

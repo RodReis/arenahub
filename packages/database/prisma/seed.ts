@@ -155,6 +155,17 @@ const PERMISSOES = [
   // `consent.manage`, nao junto de `billing.*`.
   'engagement.read',
   'engagement.moderate',
+  // F35: corrigir pontuacao e resolver contestacao.
+  //
+  // Separada de `engagement.moderate` pela mesma razao que
+  // `reconciliation.resolve` e separada de `reconciliation.read`: quem julga
+  // apelido nao e necessariamente quem mexe no saldo de XP de um aluno.
+  //
+  // NAO existe segundo ator (ADR-049, Decisao 2). O controle e permissao
+  // propria + teto por operacao (`Tenant.engagementCorrectionLimitPoints`),
+  // que RECUSA acima do limite em vez de enfileirar para aprovacao -- mesmo
+  // precedente de `BillingSettings.refundLimitMinor`.
+  'engagement.correct',
   // F9: decisao de acesso e liberacao manual.
   //
   // `access.override` e separado de tudo: quem opera a recepcao no dia a dia

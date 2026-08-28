@@ -1,4 +1,10 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { AliasRejectionReason } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -6,6 +12,18 @@ import { type FinalidadeDeEngajamento, participaDoRanking } from './domain/parti
 import { type IdentidadeEscolhida, resolverExposicao } from './domain/exposicao.js';
 import { triarAlias } from './domain/triagem-de-alias.js';
 import {
+  abrirContestacao,
+  resolverContestacao,
+  type AssuntoDaContestacao,
+  type DesfechoDaContestacao,
+  type StatusDaContestacao,
+} from './domain/contestacao.js';
+import {
+  type ConfiguracaoDeEngajamento,
+  type EscopoDeUnidade,
+  type IndicadoresDeEngajamento,
+  type ContestacaoGravada,
+  type ContestacaoParaFila,
   type PerfilParaModeracao,
   type PerfilPublicoDoAluno,
   PORTA_DE_ENGAJAMENTO,
@@ -57,7 +75,15 @@ const RAZOES_DE_REJEICAO: readonly AliasRejectionReason[] = [
 
 export interface EntradaDeModeracao {
   perfilId: string;
-  decisao: 'APPROVED' | 'REJECTED';
+  /**
+   * `HIDDEN` entra na F35 (ADR-049, Decisao 5).
+   *
+   * A F30 criou o estado sem NENHUM caminho de escrita, esperando o canal de
+   * denuncia. O canal nao e do aluno: a secretaria oculta quando alguem
+   * reclama na recepcao -- botao de denuncia numa tela de academia e
+   * ferramenta de briga entre alunos antes de ser ferramenta de seguranca.
+   */
+  decisao: 'APPROVED' | 'REJECTED' | 'HIDDEN';
   rejectionReason: AliasRejectionReason | null;
 }
 
@@ -208,7 +234,9 @@ export class EngagementService {
     entrada: EntradaDeModeracao,
     agora: Date,
   ): Promise<PerfilPublicoDoAluno> {
-    if (entrada.decisao === 'REJECTED') {
+    // OCULTAR exige razao como REJEITAR: os dois retiram o apelido de
+    // circulacao, e ato de moderacao sem motivo registrado e ato sem trilha.
+    if (entrada.decisao === 'REJECTED' || entrada.decisao === 'HIDDEN') {
       if (!entrada.rejectionReason) {
         throw new BadRequestException({
           code: 'RAZAO_DE_RECUSA_OBRIGATORIA',
@@ -234,5 +262,179 @@ export class EngagementService {
       },
       agora,
     );
+  }
+
+  // --- F35: contestacoes ---------------------------------------------------
+
+  /**
+   * Limite da fila de contestacoes.
+   *
+   * Mesmo numero da fila de apelidos: a tela nao pagina, e uma fila que cresce
+   * sem teto vira uma pagina que nao carrega. Se a academia acumular mais de
+   * 100 contestacoes abertas, o problema nao e a paginacao.
+   */
+  private static readonly LIMITE_DA_FILA = 100;
+
+  /**
+   * O aluno abre uma contestacao (`M5-FR-016`), pelo totem.
+   *
+   * A validacao roda ANTES da escrita, no dominio puro: uma linha invalida
+   * gravada e uma linha na fila que ninguem sabe resolver.
+   */
+  async abrirContestacao(
+    tenantId: string,
+    studentId: string,
+    entrada: { subject: AssuntoDaContestacao; descricao: string },
+  ): Promise<ContestacaoGravada> {
+    const aluno = await this.repo.buscarAluno(tenantId, studentId);
+    if (!aluno) {
+      throw new NotFoundException({
+        code: 'ALUNO_NAO_ENCONTRADO',
+        message: 'Aluno nao encontrado',
+      });
+    }
+
+    let nova;
+    try {
+      nova = abrirContestacao(entrada);
+    } catch (erro) {
+      throw new BadRequestException({
+        code: erro instanceof Error ? erro.message : 'CONTESTACAO_INVALIDA',
+        message: 'Contestacao recusada',
+      });
+    }
+
+    return this.repo.criarContestacao(
+      {
+        tenantId,
+        studentId,
+        subject: nova.subject,
+        descricao: nova.descricao,
+      },
+      new Date(),
+    );
+  }
+
+  /** A fila do painel, por status. */
+  async listarContestacoes(
+    tenantId: string,
+    status: StatusDaContestacao,
+    escopo: EscopoDeUnidade = 'ALL',
+  ): Promise<readonly ContestacaoParaFila[]> {
+    return this.repo.listarContestacoes(
+      tenantId,
+      status,
+      EngagementService.LIMITE_DA_FILA,
+      escopo,
+    );
+  }
+
+  /** As contestacoes do proprio aluno -- o que o totem mostra. */
+  async contestacoesDoAluno(
+    tenantId: string,
+    studentId: string,
+  ): Promise<readonly ContestacaoGravada[]> {
+    return this.repo.contestacoesDoAluno(tenantId, studentId);
+  }
+
+  /**
+   * A secretaria resolve.
+   *
+   * Le antes de escrever para distinguir "nao existe / e de outro tenant" de
+   * "ja foi resolvida" -- duas causas com mensagens diferentes para quem opera.
+   * Mas quem GARANTE a exclusao mutua e o `where` da escrita, que exige
+   * `status: ABERTA`: duas abas do painel resolveriam as duas, e a segunda
+   * sobrescreveria ator e instante da primeira.
+   */
+  async resolverContestacao(
+    tenantId: string,
+    id: string,
+    entrada: { desfecho: DesfechoDaContestacao; resolucao: string },
+    actorId: string,
+    agora: Date,
+    correctionEntryId: string | null = null,
+    escopo: EscopoDeUnidade = 'ALL',
+  ): Promise<ContestacaoGravada> {
+    /*
+     * O escopo entra na LEITURA, e por isso contestacao de outra unidade cai
+     * no mesmo 404 de "nao existe" -- distinguir as duas respostas denunciaria
+     * a existencia da contestacao alheia. Mesmo padrao de `ajustarXp`.
+     */
+    const atual = await this.repo.contestacaoPorId(tenantId, id, escopo);
+
+    if (!atual) {
+      throw new NotFoundException({
+        code: 'CONTESTACAO_NAO_ENCONTRADA',
+        message: 'Contestacao nao encontrada',
+      });
+    }
+
+    let desfecho;
+    try {
+      desfecho = resolverContestacao(atual, entrada);
+    } catch (erro) {
+      const codigo = erro instanceof Error ? erro.message : 'CONTESTACAO_INVALIDA';
+
+      // `CONTESTACAO_JA_RESOLVIDA` e conflito de estado (409), nao entrada
+      // malformada (400): o cliente mandou algo valido sobre algo que mudou.
+      if (codigo === 'CONTESTACAO_JA_RESOLVIDA') {
+        throw new ConflictException({ code: codigo, message: 'Contestacao ja resolvida' });
+      }
+
+      throw new BadRequestException({ code: codigo, message: 'Resolucao recusada' });
+    }
+
+    return this.repo.gravarResolucao(
+      {
+        tenantId,
+        id,
+        status: desfecho.status,
+        resolucao: desfecho.resolucao,
+        resolvedBy: actorId,
+        correctionEntryId,
+      },
+      agora,
+    );
+  }
+
+  // --- F35: configuracao de engajamento do tenant --------------------------
+
+  /**
+   * Indicadores do painel de operacao (`M5-FR-018`).
+   *
+   * Leitura pura e derivada, sem tabela de metrica: o volume e de uma
+   * academia, e materializar criaria projecao com rebuild proprio capaz de
+   * divergir do que as telas mostram.
+   */
+  async indicadores(tenantId: string): Promise<IndicadoresDeEngajamento> {
+    return this.repo.indicadores(tenantId);
+  }
+
+  /** Flags e teto do tenant. Tenant sem configuracao vem com tudo ligado. */
+  async obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento> {
+    return this.repo.obterConfiguracao(tenantId);
+  }
+
+  /**
+   * Grava so o que veio.
+   *
+   * O teto e o unico campo com validacao: negativo nao e teto, e um teto
+   * negativo barraria TODA correcao (nenhum valor absoluto e menor que -1),
+   * o que e desligar a correcao por acidente em vez de por decisao.
+   */
+  async salvarConfiguracao(
+    tenantId: string,
+    entrada: Partial<ConfiguracaoDeEngajamento>,
+  ): Promise<ConfiguracaoDeEngajamento> {
+    const teto = entrada.correctionLimitPoints;
+
+    if (teto !== undefined && teto !== null && (!Number.isInteger(teto) || teto < 0)) {
+      throw new BadRequestException({
+        code: 'TETO_INVALIDO',
+        message: 'O teto de correcao precisa ser um inteiro nao negativo, ou vazio para sem teto',
+      });
+    }
+
+    return this.repo.salvarConfiguracao(tenantId, entrada);
   }
 }

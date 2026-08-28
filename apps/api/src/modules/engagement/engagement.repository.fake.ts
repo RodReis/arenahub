@@ -3,9 +3,17 @@ import type { StudentStatus } from '@arenahub/database';
 
 import type { DecisaoDeEngajamento, FinalidadeDeEngajamento } from './domain/participacao.js';
 import type { StatusDoPerfilPublico } from './domain/exposicao.js';
+import type { StatusDaContestacao } from './domain/contestacao.js';
 import type {
   AlunoParaExposicao,
+  ConfiguracaoDeEngajamento,
+  EscopoDeUnidade,
+  IndicadoresDeEngajamento,
+  ContestacaoGravada,
+  ContestacaoParaFila,
+  EntradaDeContestacao,
   EntradaDeModeracaoNoBanco,
+  EntradaDeResolucaoNoBanco,
   EntradaDeRegistro,
   EntradaDeSalvamento,
   PerfilParaModeracao,
@@ -13,12 +21,22 @@ import type {
   PortaDeEngajamento,
 } from './engagement.repository.js';
 
+/** Os defaults do schema: tudo LIGADO, sem teto. */
+const PADRAO_DA_CONFIGURACAO: ConfiguracaoDeEngajamento = {
+  rankingEnabled: true,
+  challengesEnabled: true,
+  achievementsEnabled: true,
+  correctionLimitPoints: null,
+};
+
 /** Aluno como o dublê aceita cadastrar -- so o que os testes precisam. */
 export interface AlunoDeTeste {
   id: string;
   tenantId: string;
   name: string;
   status: StudentStatus;
+  /** Unidade de matricula -- o que o filtro de escopo atravessa (F35). */
+  gymUnitId?: string;
 }
 
 /** Linha de decisao guardada em memoria, no formato de ConsentRecord. */
@@ -49,7 +67,12 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
   >();
   /** Documentos "publicados" -- espelha o que o seed grava no banco real. */
   private readonly documentosPublicados = new Set<string>();
+  /** Contestacoes da F35, com o tenant junto para o filtro de escopo. */
+  private readonly contestacoes: (ContestacaoGravada & { tenantId: string })[] = [];
+  /** Configuracao por tenant. Ausencia = os defaults do schema. */
+  private readonly configuracoes = new Map<string, ConfiguracaoDeEngajamento>();
   private proximoId = 1;
+  private proximaContestacao = 1;
 
   cadastrarAluno(aluno: AlunoDeTeste): void {
     this.alunos.set(aluno.id, aluno);
@@ -249,6 +272,161 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
       }));
 
     return Promise.resolve(resultado);
+  }
+
+  // --- F35: contestacoes ---------------------------------------------------
+
+  criarContestacao(entrada: EntradaDeContestacao, agora: Date): Promise<ContestacaoGravada> {
+    const criada: ContestacaoGravada & { tenantId: string } = {
+      id: `contestacao-${this.proximaContestacao++}`,
+      tenantId: entrada.tenantId,
+      studentId: entrada.studentId,
+      subject: entrada.subject,
+      descricao: entrada.descricao,
+      status: 'ABERTA',
+      resolucao: null,
+      resolvedAt: null,
+      createdAt: agora,
+    };
+
+    this.contestacoes.push(criada);
+    return Promise.resolve({ ...criada });
+  }
+
+  contestacaoPorId(
+    tenantId: string,
+    id: string,
+    escopo: EscopoDeUnidade = 'ALL',
+  ): Promise<ContestacaoGravada | null> {
+    const achada = this.contestacoes.find(
+      (c) => c.id === id && c.tenantId === tenantId && this.dentroDoEscopo(c.studentId, escopo),
+    );
+    return Promise.resolve(achada ? { ...achada } : null);
+  }
+
+  /** Espelha `filtroDeUnidade` do repositorio real: a unidade e a do ALUNO. */
+  private dentroDoEscopo(studentId: string, escopo: EscopoDeUnidade): boolean {
+    if (escopo === 'ALL') return true;
+
+    const unidade = this.alunos.get(studentId)?.gymUnitId;
+    return unidade !== undefined && escopo.has(unidade);
+  }
+
+  gravarResolucao(entrada: EntradaDeResolucaoNoBanco, agora: Date): Promise<ContestacaoGravada> {
+    // Espelha o `where` do repositorio real: id + tenant + status ABERTA. A
+    // corrida so e recusada porque o ESTADO entra no criterio da escrita --
+    // guarda que le antes de escrever perde a corrida por construcao.
+    const alvo = this.contestacoes.find(
+      (c) => c.id === entrada.id && c.tenantId === entrada.tenantId && c.status === 'ABERTA',
+    );
+
+    if (!alvo) {
+      return Promise.reject(
+        new ConflictException({
+          code: 'CONTESTACAO_JA_RESOLVIDA',
+          message: 'CONTESTACAO_JA_RESOLVIDA',
+        }),
+      );
+    }
+
+    alvo.status = entrada.status;
+    alvo.resolucao = entrada.resolucao;
+    alvo.resolvedAt = agora;
+
+    return Promise.resolve({ ...alvo });
+  }
+
+  listarContestacoes(
+    tenantId: string,
+    status: StatusDaContestacao,
+    limite: number,
+    escopo: EscopoDeUnidade = 'ALL',
+  ): Promise<ContestacaoParaFila[]> {
+    const filtradas = this.contestacoes
+      .filter(
+        (c) =>
+          c.tenantId === tenantId &&
+          c.status === status &&
+          this.dentroDoEscopo(c.studentId, escopo),
+      )
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(0, limite);
+
+    return Promise.resolve(
+      filtradas.map((c) => ({
+        ...c,
+        alunoNome: this.alunos.get(c.studentId)?.name ?? '',
+      })),
+    );
+  }
+
+  contestacoesDoAluno(tenantId: string, studentId: string): Promise<ContestacaoGravada[]> {
+    return Promise.resolve(
+      this.contestacoes
+        .filter((c) => c.tenantId === tenantId && c.studentId === studentId)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .map((c) => ({ ...c })),
+    );
+  }
+
+  indicadores(tenantId: string): Promise<IndicadoresDeEngajamento> {
+    const ativos = [...this.alunos.values()].filter(
+      (a) => a.tenantId === tenantId && a.status === 'ACTIVE',
+    );
+    const idsAtivos = new Set(ativos.map((a) => a.id));
+
+    // Espelha o repositorio real: opt-out VIGENTE de quem esta ATIVO, e
+    // participando e a SUBTRACAO -- ausencia de linha significa participa.
+    const optOut = this.decisoes.filter(
+      (d) =>
+        d.tenantId === tenantId &&
+        d.finalidade === 'RANKING' &&
+        d.decision === 'REFUSED' &&
+        d.supersededAt === null &&
+        idsAtivos.has(d.studentId),
+    ).length;
+
+    const perfis = [...this.perfis.values()].filter((p) => p.tenantId === tenantId);
+
+    return Promise.resolve({
+      alunosAtivos: ativos.length,
+      participandoDoRanking: ativos.length - optOut,
+      optOut,
+      apelidosPendentes: perfis.filter((p) => p.status === 'PENDING').length,
+      apelidosOcultos: perfis.filter((p) => p.status === 'HIDDEN').length,
+      contestacoesAbertas: this.contestacoes.filter(
+        (c) => c.tenantId === tenantId && c.status === 'ABERTA',
+      ).length,
+    });
+  }
+
+  // --- F35: configuracao de engajamento do tenant --------------------------
+
+  obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento> {
+    // Ausencia de linha = os defaults do schema, tudo LIGADO e sem teto.
+    return Promise.resolve({ ...PADRAO_DA_CONFIGURACAO, ...this.configuracoes.get(tenantId) });
+  }
+
+  salvarConfiguracao(
+    tenantId: string,
+    entrada: Partial<ConfiguracaoDeEngajamento>,
+  ): Promise<ConfiguracaoDeEngajamento> {
+    const atual = { ...PADRAO_DA_CONFIGURACAO, ...this.configuracoes.get(tenantId) };
+
+    // Espelha o `!== undefined` do repositorio real: `null` e `0` sao valores
+    // legitimos e nao podem ser tratados como "nao veio".
+    const nova: ConfiguracaoDeEngajamento = {
+      rankingEnabled: entrada.rankingEnabled ?? atual.rankingEnabled,
+      challengesEnabled: entrada.challengesEnabled ?? atual.challengesEnabled,
+      achievementsEnabled: entrada.achievementsEnabled ?? atual.achievementsEnabled,
+      correctionLimitPoints:
+        entrada.correctionLimitPoints !== undefined
+          ? entrada.correctionLimitPoints
+          : atual.correctionLimitPoints,
+    };
+
+    this.configuracoes.set(tenantId, nova);
+    return Promise.resolve({ ...nova });
   }
 
   /**

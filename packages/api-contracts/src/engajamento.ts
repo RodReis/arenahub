@@ -33,3 +33,23 @@ export const aliasPublicoSchema = z
   });
 
 export type PerfilPublicoDoTotem = z.infer<typeof aliasPublicoSchema>;
+
+/**
+ * Contestacao aberta pelo aluno no totem (`M5-FR-016`, F35).
+ *
+ * O `studentId` NAO esta aqui de proposito: quem contesta e quem esta logado
+ * na sessao do totem, e o servidor o tira dali. Aceita-lo no corpo deixaria um
+ * aluno abrir contestacao em nome de outro.
+ *
+ * Os limites espelham `DESCRICAO_MIN`/`DESCRICAO_MAX` do dominio -- a
+ * validacao do servidor continua sendo a autoridade; esta aqui existe para a
+ * tela avisar antes de mandar, nao para substitui-la.
+ */
+export const contestacaoSchema = z
+  .object({
+    subject: z.enum(['XP', 'CONQUISTA', 'CONSISTENCIA', 'RANKING', 'DESAFIO']),
+    descricao: z.string().trim().min(5).max(500),
+  })
+  .strict();
+
+export type ContestacaoDoTotem = z.infer<typeof contestacaoSchema>;

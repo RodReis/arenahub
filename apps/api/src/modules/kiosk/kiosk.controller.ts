@@ -14,7 +14,12 @@ import {
 import { ApiNoContentResponse, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { z } from 'zod';
 import type { Request } from 'express';
-import { aliasPublicoSchema, preferenciasSchema, type IndicadoresDaUnidade } from '@arenahub/api-contracts';
+import {
+  aliasPublicoSchema,
+  contestacaoSchema,
+  preferenciasSchema,
+  type IndicadoresDaUnidade,
+} from '@arenahub/api-contracts';
 
 import { KioskRoute } from '../kiosk-auth/kiosk-route.decorator.js';
 import type { ContextoDoKiosk } from '../kiosk-auth/kiosk-auth.service.js';
@@ -640,6 +645,91 @@ export class KioskController {
       dados.version,
       agora,
     );
+  }
+
+  /**
+   * O aluno abre uma contestacao de engajamento (`M5-FR-016`, F35).
+   *
+   * `'ranking'` como capacidade da area: e o mesmo modulo que expoe XP,
+   * placar e consistencia -- contestar o que a tela mostra so faz sentido
+   * onde a tela existe. Academia com o modulo desligado nao tem o que
+   * contestar.
+   */
+  @Post('sessions/:id/engajamento/contestacoes')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['id', 'subject', 'descricao', 'status', 'createdAt'],
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        subject: { type: 'string', enum: ['XP', 'CONQUISTA', 'CONSISTENCIA', 'RANKING', 'DESAFIO'] },
+        descricao: { type: 'string' },
+        status: { type: 'string', enum: ['ABERTA', 'CORRIGIDA', 'IMPROCEDENTE'] },
+        resolucao: { type: 'string', nullable: true },
+        createdAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  async abrirContestacao(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+    @Body() corpo: unknown,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'ranking',
+      agora,
+    );
+
+    const dados = contestacaoSchema.parse(corpo);
+
+    return this.engajamento.abrirContestacao(aluno, dados.subject, dados.descricao);
+  }
+
+  /** As contestacoes do proprio aluno -- acompanhamento no totem. */
+  @Get('sessions/:id/engajamento/contestacoes')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['itens'],
+      properties: {
+        itens: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['id', 'subject', 'descricao', 'status', 'createdAt'],
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              subject: { type: 'string' },
+              descricao: { type: 'string' },
+              status: { type: 'string' },
+              resolucao: { type: 'string', nullable: true },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+      },
+    },
+  })
+  async minhasContestacoes(
+    @Req() requisicao: Request,
+    @Param('id') sessionId: string,
+    @Headers('x-session-token') token: string | undefined,
+  ) {
+    const agora = new Date();
+    const aluno = await this.area.resolver(
+      this.contexto(requisicao),
+      sessionId,
+      this.token(token),
+      'ranking',
+      agora,
+    );
+
+    return { itens: await this.engajamento.minhasContestacoes(aluno) };
   }
 
   /**

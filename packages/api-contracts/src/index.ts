@@ -44,5 +44,14 @@ export type {
   KioskConfigLayers,
   TipoDeBloco,
 } from './kiosk-config.js';
-export { aliasPublicoSchema, finalidadeExpostaSchema, preferenciasSchema } from './engajamento.js';
-export type { PerfilPublicoDoTotem, PreferenciasDoTotem } from './engajamento.js';
+export {
+  aliasPublicoSchema,
+  contestacaoSchema,
+  finalidadeExpostaSchema,
+  preferenciasSchema,
+} from './engajamento.js';
+export type {
+  ContestacaoDoTotem,
+  PerfilPublicoDoTotem,
+  PreferenciasDoTotem,
+} from './engajamento.js';

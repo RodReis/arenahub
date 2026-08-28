@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
+import type { RankingCategory } from '@arenahub/database';
+
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { mesAnterior, mesLocal } from './domain/movimento-de-xp.js';
 import { EngagementRankingService } from './engagement-ranking.service.js';
@@ -10,6 +12,13 @@ import { PORTA_DE_RANKING, type PortaDeRanking } from './engagement-ranking.repo
  * de `KioskConfigService.SEM_USUARIO`: `audit_logs.actor_id` e anulavel
  * exatamente para isto. */
 const SEM_USUARIO = null as unknown as string;
+
+/** As tres categorias que o fechamento mensal publica (F35, ADR-049). */
+const CATEGORIAS_DE_FECHAMENTO: readonly RankingCategory[] = [
+  'XP_DO_MES',
+  'FREQUENCIA',
+  'CONSISTENCIA',
+];
 
 /**
  * Fechamento mensal do placar -- Emenda de 27/08/2026 (ADR-047).
@@ -99,9 +108,15 @@ export class EngagementRankingSchedulerService {
     return { unidades: unidades.length, fechadas, falhas };
   }
 
-  /** Fecha UMA unidade -- `true` se publicou um snapshot novo, `false` se
-   * ja existia (idempotencia) ou a coorte ficou WITHHELD. Um WITHHELD NAO e
-   * falha -- e a politica funcionando -- entao nunca vira log de erro. */
+  /** Fecha UMA unidade -- `true` se publicou ao menos um snapshot novo.
+   *
+   * Fecha as TRES categorias (F35): deixar frequencia e consistencia de fora
+   * as tornaria placares que so existem se alguem lembrar de gerar a mao, e
+   * mes fechado nao se regera depois -- a janela passa.
+   *
+   * Cada categoria e independente: uma WITHHELD (coorte insuficiente) nao
+   * impede as outras de publicar. WITHHELD NAO e falha -- e a politica
+   * funcionando -- entao nunca vira log de erro. */
   private async fecharUnidade(
     unidade: { tenantId: string; gymUnitId: string; timezone: string },
     agora: Date,
@@ -116,15 +131,31 @@ export class EngagementRankingSchedulerService {
       allowedUnitIds: new Set([unidade.gymUnitId]),
     };
 
-    const jaPublicado = await this.porta.snapshotPublicado(contexto, unidade.gymUnitId, mesFechado);
-    if (jaPublicado) return false;
+    let publicouAlguma = false;
 
-    const snapshot = await this.ranking.gerarSnapshot(contexto, unidade.gymUnitId, mesFechado, agora);
+    for (const category of CATEGORIAS_DE_FECHAMENTO) {
+      const jaPublicado = await this.porta.snapshotPublicado(
+        contexto,
+        unidade.gymUnitId,
+        mesFechado,
+        category,
+      );
+      if (jaPublicado) continue;
 
-    if (snapshot.status === 'WITHHELD') return false;
+      const snapshot = await this.ranking.gerarSnapshot(
+        contexto,
+        unidade.gymUnitId,
+        mesFechado,
+        agora,
+        category,
+      );
 
-    await this.ranking.publicar(contexto, snapshot.id, agora);
+      if (snapshot.status === 'WITHHELD') continue;
 
-    return true;
+      await this.ranking.publicar(contexto, snapshot.id, agora);
+      publicouAlguma = true;
+    }
+
+    return publicouAlguma;
   }
 }

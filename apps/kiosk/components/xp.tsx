@@ -12,6 +12,7 @@ import {
   type SessaoDoAluno,
 } from '../lib/kiosk-client';
 import { mesDaMedicao } from '../lib/saude';
+import { Contestacao } from './contestacao';
 
 /**
  * Tela de XP, conquistas e posicao no placar -- F31, Task 10.
@@ -75,6 +76,15 @@ export function Xp({
           <Consistencia consistencia={carga.dados.consistencia} />
           <Movimentos movimentos={carga.dados.movimentos} />
           <Conquistas conquistas={carga.dados.conquistas} />
+          {/*
+            CONTESTAR VIVE AQUI, e nao numa area propria: o aluno discorda do
+            numero olhando para ele. Uma tela separada obrigaria a lembrar o
+            que viu e sair para procurar.
+
+            So aparece com os dados na tela -- contestar um extrato que nao
+            carregou seria contestar o que ninguem viu.
+          */}
+          <Contestacao sessao={sessao} />
         </>
       )}
 

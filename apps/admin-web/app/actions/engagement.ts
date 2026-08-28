@@ -7,15 +7,19 @@ import { chamarApi } from '../../lib/api/server-client';
 import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
- * Moderação de apelido público -- F30, Task 9.
+ * Moderação de apelido público -- F30, Task 9; `HIDDEN` na F35.
  *
- * O moderador so ESCOLHE entre `APPROVED` e `REJECTED`; a API da Task 7 nao
- * aceita outra coisa no PATCH (`engagement.controller.ts`, `esquemaDeModeracao`)
- * -- `HIDDEN` existe no enum de estado mas nao e uma decisao deste formulario.
+ * `HIDDEN` era estado sem NENHUM caminho de escrita desde a F30, esperando o
+ * canal de denúncia (ADR-046, Decisão 6). A F35 decidiu que o canal não é do
+ * aluno: a secretaria oculta quando alguém reclama na recepção (ADR-049,
+ * Decisão 5).
+ *
+ * Rejeitar e ocultar são atos diferentes: rejeitar recusa um apelido que
+ * nunca apareceu; ocultar retira um que já estava em circulação.
  */
 const esquemaDeModeracao = z.object({
   perfilId: z.string().uuid(),
-  decisao: z.enum(['APPROVED', 'REJECTED']),
+  decisao: z.enum(['APPROVED', 'REJECTED', 'HIDDEN']),
   rejectionReason: z
     .enum(['OFENSIVO', 'CONTEM_PII', 'IMPERSONACAO', 'SPAM_OU_PROPAGANDA', 'ILEGIVEL'])
     .nullish(),
@@ -36,7 +40,7 @@ export interface EstadoDaModeracao {
  */
 const MENSAGEM: Record<string, string> = {
   ...MENSAGEM_DE_SESSAO,
-  RAZAO_DE_RECUSA_OBRIGATORIA: 'Escolha um motivo para rejeitar o apelido.',
+  RAZAO_DE_RECUSA_OBRIGATORIA: 'Escolha um motivo antes de rejeitar ou ocultar o apelido.',
   RAZAO_DE_RECUSA_INVALIDA: 'Motivo de rejeição inválido.',
   ALIAS_JA_APROVADO_PARA_OUTRO_ALUNO:
     'Outro aluno já tem este apelido aprovado. Rejeite ou peça para este aluno escolher outro.',
@@ -49,6 +53,7 @@ function mensagemDe(code: string | undefined, padrao: string): string {
 /** Espelha `SnapshotDto` de `engagement-xp.controller.ts`. */
 export interface SnapshotDto {
   id: string;
+  category: 'XP_DO_MES' | 'FREQUENCIA' | 'CONSISTENCIA';
   status: 'DRAFT' | 'PUBLISHED' | 'WITHHELD';
   publishedAt: string | null;
   entries: { studentId: string; position: number; points: number }[];
@@ -84,6 +89,9 @@ export interface EstadoDoGerar {
 const esquemaDeGerar = z.object({
   gymUnitId: z.string().uuid(),
   mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u),
+  // Opcional com default: a API também tem default, mas mandar explícito
+  // deixa claro na requisição qual placar está sendo gerado.
+  category: z.enum(['XP_DO_MES', 'FREQUENCIA', 'CONSISTENCIA']).default('XP_DO_MES'),
 });
 
 export async function gerarPlacar(
@@ -93,6 +101,9 @@ export async function gerarPlacar(
   const analisado = esquemaDeGerar.safeParse({
     gymUnitId: formulario.get('gymUnitId'),
     mes: formulario.get('mes'),
+    ...(formulario.get('category') !== null
+      ? { category: formulario.get('category') }
+      : {}),
   });
 
   if (!analisado.success) {
@@ -101,7 +112,7 @@ export async function gerarPlacar(
 
   const resposta = await chamarApi<SnapshotDto>(
     `/api/v1/engagement/rankings/${analisado.data.gymUnitId}/${analisado.data.mes}/gerar`,
-    { metodo: 'POST' },
+    { metodo: 'POST', corpo: { category: analisado.data.category } },
   );
 
   if (!resposta.ok || !resposta.dados) {
@@ -467,4 +478,168 @@ export async function cancelarDesafio(
   revalidatePath('/engagement/desafios');
 
   return { sucesso: { id: analisado.data.challengeId, titulo: '' } };
+}
+
+/* -------------------------------------------------------------------------
+ * Contestações -- F35, Slice 5.6, ADR-049.
+ * ------------------------------------------------------------------------- */
+
+/** Espelha o item de `GET /engagement/contestacoes`. */
+export interface ContestacaoDaFila {
+  readonly id: string;
+  readonly studentId: string;
+  readonly alunoNome: string;
+  readonly subject: string;
+  readonly descricao: string;
+  readonly status: string;
+  readonly resolucao: string | null;
+  readonly resolvedAt: string | null;
+  readonly createdAt: string;
+}
+
+export interface EstadoDaResolucao {
+  erro?: string;
+  sucesso?: { id: string };
+}
+
+const esquemaDeResolucao = z.object({
+  id: z.string().uuid(),
+  desfecho: z.enum(['CORRIGIDA', 'IMPROCEDENTE']),
+  resolucao: z.string().trim().min(1),
+});
+
+const MENSAGEM_DA_RESOLUCAO: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
+  CONTESTACAO_NAO_ENCONTRADA: 'Contestação não encontrada.',
+  CONTESTACAO_JA_RESOLVIDA:
+    'Esta contestação já foi resolvida por outra pessoa. Recarregue a fila para ver o desfecho.',
+  CONTESTACAO_RESOLUCAO_OBRIGATORIA: 'Escreva a resposta que o aluno vai ler.',
+};
+
+/**
+ * Registra o desfecho de uma contestação.
+ *
+ * A resposta é obrigatória nos DOIS desfechos: improcedente sem explicação é
+ * silêncio com carimbo, e o aluno que não sabe por que perdeu reclama de novo.
+ */
+export async function resolverContestacao(
+  _anterior: EstadoDaResolucao,
+  formulario: FormData,
+): Promise<EstadoDaResolucao> {
+  const analisado = esquemaDeResolucao.safeParse({
+    id: formulario.get('id'),
+    desfecho: formulario.get('desfecho'),
+    resolucao: formulario.get('resolucao'),
+  });
+
+  if (!analisado.success) {
+    return { erro: 'Escreva a resposta que o aluno vai ler antes de concluir.' };
+  }
+
+  const resposta = await chamarApi<{ id: string }>(
+    `/api/v1/engagement/contestacoes/${analisado.data.id}/resolver`,
+    {
+      metodo: 'POST',
+      corpo: {
+        desfecho: analisado.data.desfecho,
+        resolucao: analisado.data.resolucao,
+      },
+    },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro:
+        MENSAGEM_DA_RESOLUCAO[resposta.erro?.code ?? ''] ??
+        'Não foi possível registrar o desfecho.',
+    };
+  }
+
+  revalidatePath('/engagement/contestacoes');
+
+  return { sucesso: { id: resposta.dados.id } };
+}
+
+/* -------------------------------------------------------------------------
+ * Configuração do engajamento -- F35, ADR-049 Decisão 3.
+ * ------------------------------------------------------------------------- */
+
+/** O que o painel de operação mostra -- `M5-FR-018`, F35. */
+export interface IndicadoresDeEngajamento {
+  readonly alunosAtivos: number;
+  readonly participandoDoRanking: number;
+  readonly optOut: number;
+  readonly apelidosPendentes: number;
+  readonly apelidosOcultos: number;
+  readonly contestacoesAbertas: number;
+}
+
+export interface ConfiguracaoDeEngajamento {
+  readonly rankingEnabled: boolean;
+  readonly challengesEnabled: boolean;
+  readonly achievementsEnabled: boolean;
+  readonly correctionLimitPoints: number | null;
+}
+
+export interface EstadoDaConfiguracao {
+  erro?: string;
+  sucesso?: true;
+}
+
+const MENSAGEM_DA_CONFIGURACAO: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
+  TETO_INVALIDO: 'O limite precisa ser um número inteiro a partir de zero, ou vazio para sem limite.',
+};
+
+/**
+ * Grava só o campo que o operador mexeu.
+ *
+ * `correctionLimitPoints` distingue TRÊS estados que a tela poderia colapsar:
+ * ausente (não mexeu), vazio (sem teto) e zero (ninguém corrige). Tratar vazio
+ * como zero desligaria a correção de uma academia que só queria tirar o limite.
+ */
+export async function salvarConfiguracaoDeEngajamento(
+  _anterior: EstadoDaConfiguracao,
+  formulario: FormData,
+): Promise<EstadoDaConfiguracao> {
+  const corpo: Record<string, unknown> = {};
+
+  for (const campo of ['rankingEnabled', 'challengesEnabled', 'achievementsEnabled'] as const) {
+    const valor = formulario.get(campo);
+    if (valor !== null) corpo[campo] = valor === 'true';
+  }
+
+  const teto = formulario.get('correctionLimitPoints');
+  // `FormData.get` devolve `File | string | null`; sem estreitar para string,
+  // um `File` viraria "[object Object]" e passaria a validacao numerica.
+  if (typeof teto === 'string') {
+    const texto = teto.trim();
+
+    if (texto === '') {
+      corpo['correctionLimitPoints'] = null;
+    } else {
+      const numero = Number(texto);
+      if (!Number.isInteger(numero) || numero < 0) {
+        return { erro: MENSAGEM_DA_CONFIGURACAO['TETO_INVALIDO'] as string };
+      }
+      corpo['correctionLimitPoints'] = numero;
+    }
+  }
+
+  const resposta = await chamarApi<ConfiguracaoDeEngajamento>(
+    '/api/v1/engagement/configuracao',
+    { metodo: 'POST', corpo },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro:
+        MENSAGEM_DA_CONFIGURACAO[resposta.erro?.code ?? ''] ??
+        'Não foi possível salvar a configuração.',
+    };
+  }
+
+  revalidatePath('/engagement');
+
+  return { sucesso: true };
 }

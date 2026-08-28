@@ -420,14 +420,15 @@ export function carregarPreferencias(sessionId: string, token: string) {
  * mesmo resultado em vez de gravar decisao nova. Gerada por chamada, nunca
  * fixa: `crypto.randomUUID()` e suportado em todo navegador do totem.
  */
-async function patchDaSessao<T>(
+async function comCorpoDaSessao<T>(
   caminho: string,
   token: string,
   corpo: Record<string, unknown>,
+  method: 'PATCH' | 'POST' = 'PATCH',
 ): Promise<T | null> {
   try {
     const resposta = await fetch(`/api/kiosk/${caminho}`, {
-      method: 'PATCH',
+      method,
       headers: { 'x-session-token': token, 'content-type': 'application/json' },
       body: JSON.stringify(corpo),
       cache: 'no-store',
@@ -442,7 +443,7 @@ async function patchDaSessao<T>(
 }
 
 export function atualizarPreferenciaDeRanking(sessionId: string, token: string, participa: boolean) {
-  return patchDaSessao<PreferenciasDoTotem>(
+  return comCorpoDaSessao<PreferenciasDoTotem>(
     `${daSessaoId(sessionId)}/engajamento/preferencias`,
     token,
     { finalidade: 'RANKING', participa, idempotencyKey: crypto.randomUUID() },
@@ -456,7 +457,7 @@ export function atualizarPerfilPublico(
   alias: string | null,
   version: number | null,
 ) {
-  return patchDaSessao<PerfilPublicoDoTotem>(
+  return comCorpoDaSessao<PerfilPublicoDoTotem>(
     `${daSessaoId(sessionId)}/engajamento/perfil-publico`,
     token,
     { identityChoice, alias, version },
@@ -557,4 +558,44 @@ export async function marcarAvisosComoLidos(
   } catch {
     return null;
   }
+}
+
+/* ---------------------------------------------------------------------
+ * CONTESTACOES (F35, Slice 5.6).
+ *
+ * O aluno discorda do que a tela mostrou e escreve. NAO ha `studentId` no
+ * corpo: quem contesta e quem esta logado na sessao, e o servidor o tira
+ * dali -- aceita-lo aqui deixaria um aluno contestar em nome de outro.
+ * --------------------------------------------------------------------- */
+
+export type AssuntoDaContestacao = 'XP' | 'CONQUISTA' | 'CONSISTENCIA' | 'RANKING' | 'DESAFIO';
+
+export interface ContestacaoDoAluno {
+  readonly id: string;
+  readonly subject: AssuntoDaContestacao;
+  readonly descricao: string;
+  readonly status: 'ABERTA' | 'CORRIGIDA' | 'IMPROCEDENTE';
+  readonly resolucao: string | null;
+  readonly createdAt: string;
+}
+
+export function abrirContestacao(
+  sessionId: string,
+  token: string,
+  subject: AssuntoDaContestacao,
+  descricao: string,
+) {
+  return comCorpoDaSessao<ContestacaoDoAluno>(
+    `${daSessaoId(sessionId)}/engajamento/contestacoes`,
+    token,
+    { subject, descricao },
+    'POST',
+  );
+}
+
+export function carregarContestacoes(sessionId: string, token: string) {
+  return daSessao<{ itens: readonly ContestacaoDoAluno[] }>(
+    `${daSessaoId(sessionId)}/engajamento/contestacoes`,
+    token,
+  );
 }

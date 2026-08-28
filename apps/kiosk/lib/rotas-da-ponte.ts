@@ -59,6 +59,8 @@ const PERMITIDOS: readonly RegExp[] = [
   new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/desafios$`),
   new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/desafios/${ID_DE_SESSAO}/join$`),
   new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/desafios/avisos/lidos$`),
+  /* CONTESTACOES (F35, Slice 5.6) -- abrir (POST) e acompanhar (GET). */
+  new RegExp(`^sessions/${ID_DE_SESSAO}/engajamento/contestacoes$`),
 ];
 
 /**
