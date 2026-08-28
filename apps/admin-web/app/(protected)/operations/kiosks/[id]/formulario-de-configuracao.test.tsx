@@ -119,3 +119,40 @@ describe('FormularioDeConfiguracao', () => {
     expect(screen.getByText(/herdado/i)).toBeInTheDocument();
   });
 });
+
+/**
+ * Relatado pelo PI em 28/08/2026: clicar em "Salvar rascunho" com uma linha
+ * de patrocinador em branco devolvia
+ * "Nao foi possivel salvar o rascunho (VALIDATION_FAILED)" -- duas vezes, e
+ * sem dizer o que corrigir. A linha vinha do proprio botao "+ Patrocinador",
+ * que cria `{ nome: '', logotipoKey: null }`.
+ *
+ * O canario: sem a guarda `barrouPorProblema`, a action E chamada e a
+ * mensagem util nao aparece.
+ */
+describe('rascunho invalido nao chega ao servidor', () => {
+  it('nomeia a linha em branco e nao envia', async () => {
+    const { salvarRascunhoAction } = await import('../../../../actions/kiosk-config');
+    const usuario = userEvent.setup();
+
+    renderizar({
+      estado: {
+        ...estado,
+        efetiva: {
+          ...CONFIG_PADRAO_DO_TOTEM,
+          patrocinio: {
+            habilitado: true,
+            rotulo: '',
+            marcas: [{ nome: '', logotipoKey: null }],
+          },
+        },
+      },
+      kioskDeviceId: 'k1',
+    });
+
+    await usuario.click(screen.getByRole('button', { name: /salvar rascunho/i }));
+
+    expect(await screen.findByText(/patrocinador 1/i)).toBeInTheDocument();
+    expect(salvarRascunhoAction).not.toHaveBeenCalled();
+  });
+});

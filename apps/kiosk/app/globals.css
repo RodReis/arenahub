@@ -533,12 +533,32 @@ button {
  * `flex: 1 1 auto` e altura maxima no proprio container (nao aqui): a tela e
  * 1080x1920 FIXOS e nao rola (checklist §8: `scrollHeight === clientHeight`).
  */
+/*
+ * O TETO SUBIU DE 780px PARA 1332px (28/08/2026).
+ *
+ * O valor antigo foi calibrado quando o atrator mantinha um espacador
+ * `flex: 1` INCONDICIONAL acima do hero. Os dois disputavam a mesma coluna:
+ * o espacador empurrava o hero para y=720 numa tela de 1920, e o teto
+ * impedia que a grade, comecando ja tao baixo, jogasse o CTA para fora.
+ *
+ * Com o espacador agora condicional a `temBloco` (`atrator.tsx`), o hero
+ * subiu para y=168 -- como no protipo (`Totem.dc.html`) -- e o teto antigo
+ * virou o defeito: os mesmos ~500px reapareceram como vao morto ABAIXO do
+ * rodape.
+ *
+ * 1332px e a MEDIDA, nao um chute: e o que sobra entre o fim do hero (246) e
+ * o topo do CTA (1650) menos os dois `gap` de bloco, verificado no totem em
+ * 1080x1920. Com ele o ranking mostra as 5 posicoes do protipo em vez de 3.
+ *
+ * A tela segue sem rolar (checklist §8: `scrollHeight === clientHeight`) --
+ * garantido por `overflow: hidden` e `min-height: 0`, nao pelo teto.
+ */
 .gradeDaTelaPublica {
   flex: 1 1 auto;
   display: grid;
   gap: var(--tt-gap-grade);
   min-height: 0;
-  max-height: 780px;
+  max-height: 1332px;
   overflow: hidden;
 }
 

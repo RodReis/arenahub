@@ -117,3 +117,64 @@ export async function enviarMidiaAction(
 
   return { midiaKey: resposta.dados.midiaKey };
 }
+
+/**
+ * MENSAGENS PROPRIAS PARA O LOGOTIPO, e nao o mapa acima reaproveitado.
+ *
+ * Os CODIGOS sao os mesmos (`FILE_TOO_LARGE`, `FILE_TYPE_NOT_ALLOWED`...),
+ * mas a acao que o gerente precisa tomar e outra: "passa de 40 MB, reduza a
+ * duracao" nao ajuda quem enviou um PNG de 3 MB, e "so entram arquivos MP4"
+ * seria simplesmente falso na tela de patrocinador.
+ *
+ * Reusar `MENSAGEM` daria mensagem tecnicamente presente e praticamente
+ * enganosa -- o modo de falha que este arquivo ja evita entre `LINK_*` e
+ * `EXTRATOR_*`.
+ */
+const MENSAGEM_DE_LOGOTIPO: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
+  KIOSK_DEVICE_NOT_FOUND: 'Totem não encontrado nesta academia.',
+  FILE_REQUIRED: 'Escolha uma imagem.',
+  FILE_TOO_LARGE: 'A imagem passa de 2 MB. Reduza o tamanho e envie de novo.',
+  FILE_EMPTY: 'O arquivo está vazio.',
+  FILE_TYPE_NOT_ALLOWED: 'Só entram PNG, JPEG ou WebP. SVG não é aceito.',
+  FILE_SIGNATURE_MISMATCH: 'O arquivo não é uma imagem válida, mesmo com esse nome.',
+  FILE_INFECTED: 'O antivírus recusou esta imagem.',
+  SCANNER_UNAVAILABLE: 'O antivírus está indisponível. Tente de novo em instantes.',
+  SCANNER_TIMEOUT: 'O antivírus demorou a responder. Tente de novo em instantes.',
+};
+
+export interface EstadoDoUploadDeLogotipo {
+  erro?: string;
+  logotipoKey?: string;
+}
+
+/**
+ * Upload do logotipo de um patrocinador (28/08/2026, decisao do PI).
+ *
+ * Mesma disciplina das duas acoes acima: NAO revalida caminho nenhum --
+ * devolve a chave, e quem grava e `salvarRascunhoAction`. Um
+ * `revalidatePath` aqui apagaria o rascunho que o gerente ainda edita.
+ */
+export async function enviarLogotipoAction(
+  kioskDeviceId: string,
+  formulario: FormData,
+): Promise<EstadoDoUploadDeLogotipo> {
+  const resposta = await chamarApi<{ midiaKey: string }>(
+    `/api/v1/admin/kiosk-devices/${kioskDeviceId}/sponsor-logo`,
+    { metodo: 'POST', formulario },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    const codigo = resposta.erro?.code ?? '';
+
+    return {
+      erro:
+        MENSAGEM_DE_LOGOTIPO[codigo] ?? `Não foi possível enviar a imagem (${codigo || 'erro'}).`,
+    };
+  }
+
+  // A API devolve `midiaKey` (nome da rota de storage); o painel a guarda em
+  // `logotipoKey`. O rename acontece AQUI, no boundary, para o componente
+  // nao ter de saber o vocabulario da rota.
+  return { logotipoKey: resposta.dados.midiaKey };
+}

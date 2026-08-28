@@ -2583,7 +2583,7 @@ do ArenaHub.
 | entra | não entra |
 |---|---|
 | Nome do patrocinador em texto | Contagem de impressão ou de exibição |
-| Logotipo em SVG, até 6 por unidade | Clique, QR ou qualquer chamada para ação |
+| Logotipo enviado à plataforma, até 6 por unidade (ver emenda de 28/08/2026) | Clique, QR ou qualquer chamada para ação |
 | Rótulo configurável da faixa (padrão: *"Espaço patrocinado"*) | Período de veiculação, campanha, agendamento |
 | Posição fixa no rodapé, sempre visível, fora do rodízio | Relatório de veiculação para a academia |
 
@@ -2599,6 +2599,35 @@ sem rótulo, os dois se confundem. Se o campo vier vazio, vale o padrão.
 
 **Gatilho de revisão:** o primeiro pedido de "quantas vezes meu logo apareceu" abre fatia
 própria e ADR próprio. Não se resolve com um contador acrescentado em silêncio.
+
+#### Emenda de 28/08/2026 — o logotipo é upload nosso, em raster, não SVG por URL
+
+A tabela acima dizia *"Logotipo em SVG"*, e o contrato implementava
+`logotipoUrl: z.string().url()` — endereço de imagem hospedada por terceiro. **Decisão do PI:
+os dois pontos mudam.**
+
+**A URL externa foi aposentada.** A faixa dependia de um host que a academia não controla: link
+que morre é logo que some da parede, e ninguém percebe até alguém olhar o totem. Além disso, só
+entrava marca que já estivesse na web — um patrocinador de bairro com a arte num arquivo ficava
+de fora. O campo virou `logotipoKey`: a chave do objeto no **nosso** storage, gravada pelo
+servidor no upload e resolvida em URL assinada no boot do totem, exatamente como `midiaKey` →
+`midiaUrl` do bloco de vídeo já fazia (mesma checagem de prefixo de tenant antes de assinar).
+
+Não se manteve URL e chave em paralelo: dois campos com a mesma função viram a pergunta "qual
+vence?" em toda leitura.
+
+**SVG saiu; entram PNG, JPEG e WebP, até 2 MB.** SVG é o formato natural de logotipo e por isso
+estava na tabela — mas é XML, e carrega `<script>`, `<foreignObject>` e handlers `on*`. Aceitá-lo
+exigiria sanitizar XML **além** do antivírus, que não detecta script em SVG, numa tela que fica
+ligada o dia inteiro na recepção. Os três formatos raster não têm superfície de script, e PNG com
+fundo transparente cobre o caso da faixa.
+
+O upload reusa o pipeline da Decisão 7 sem exceção: formato → antivírus → storage, com a chave
+gerada pelo servidor. A regra de formato é própria (`domain/logotipo-do-patrocinador.ts`), e não
+uma extensão da de vídeo — juntá-las produziria uma lista onde logotipo aceitaria MP4 de 40 MB.
+
+**Nada do que a Decisão 4 recusa voltou:** segue sem contador, sem clique, sem período, sem
+relatório. O que mudou é de onde vem a imagem, não o que a faixa faz.
 
 ---
 
