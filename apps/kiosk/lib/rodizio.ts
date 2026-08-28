@@ -1,4 +1,4 @@
-import type { BlocoDaTelaPublica, KioskConfig } from '@arenahub/api-contracts';
+import type { BlocoDaTelaPublica, DesafioPublico, KioskConfig } from '@arenahub/api-contracts';
 
 /**
  * O rodizio da tela publica -- F51, `M3.5-FR-004`.
@@ -20,11 +20,25 @@ import type { BlocoDaTelaPublica, KioskConfig } from '@arenahub/api-contracts';
  * A checagem e por `midiaUrl`, e nao por `midiaKey`: a CHAVE continua
  * gravada mesmo quando a URL falhou -- e ela que o painel edita.
  */
-export function blocosVisiveis(config: KioskConfig): readonly BlocoDaTelaPublica[] {
+export function blocosVisiveis(
+  config: KioskConfig,
+  /**
+   * O desafio em cartaz -- `null` quando nao ha nenhum aberto, ou quando o
+   * modulo `desafios` esta desligado (o servidor ja decide isso).
+   */
+  desafio: DesafioPublico | null = null,
+): readonly BlocoDaTelaPublica[] {
   return config.blocos.itens.filter((bloco) => {
     if (!bloco.habilitado) return false;
 
     if (bloco.tipo === 'VIDEO') return typeof bloco.midiaUrl === 'string' && bloco.midiaUrl !== '';
+
+    /*
+     * Sem desafio em cartaz o bloco SAI da lista -- mesma regra do video sem
+     * midia, logo acima. Bloco de campanha vazio na parede e pior que bloco
+     * ausente: o carrossel pararia num quadro que so tem titulo.
+     */
+    if (bloco.tipo === 'DESAFIO') return desafio !== null;
 
     return true;
   });

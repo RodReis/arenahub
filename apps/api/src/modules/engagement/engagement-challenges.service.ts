@@ -7,8 +7,10 @@ import {
 } from '@nestjs/common';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
+import type { DesafioNaVitrine } from './domain/desafio.js';
 import {
   avaliarLimiteDoTemplate,
+  desafioParaVitrine,
   desfechoDaParticipacao,
   podeCancelar,
   podeEditar,
@@ -292,6 +294,26 @@ export class EngagementChallengesService {
     const vencidos = await this.porta.desafiosVencidosDoAluno(ctx, studentId, hoje);
 
     return vencidos.map((d) => ({ id: d.id }));
+  }
+
+  /**
+   * O desafio que a TELA PUBLICA anuncia (ADR-048, emenda 2).
+   *
+   * Le os desafios abertos da unidade e escolhe UM -- o que termina primeiro.
+   * Sem nome de aluno e sem contagem de inscritos: `M3.5-BR-001` proibe dado
+   * de aluno na parede.
+   */
+  async paraVitrine(
+    ctx: TenantContext,
+    gymUnitId: string | null,
+    hoje: string,
+  ): Promise<DesafioNaVitrine | null> {
+    const abertos = await this.porta.desafiosAbertos(ctx, gymUnitId, hoje);
+
+    return desafioParaVitrine(
+      abertos.map((d) => ({ titulo: d.title, meta: d.targetValue, fim: d.endsOn })),
+      hoje,
+    );
   }
 
   async inscrever(

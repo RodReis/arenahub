@@ -66,7 +66,7 @@ const indicadoresComPlacar = {
     { position: 3, nomeExibido: 'Caio', points: 35 },
     { position: 4, nomeExibido: 'Duda', points: 30 },
     { position: 5, nomeExibido: 'Eva', points: 25 },
-  ],
+  ], desafio: null,
 };
 
 /**
@@ -220,7 +220,7 @@ describe('BlocosPublicos -- indicadores (M3.5-BR-001)', () => {
     render(
       <BlocosPublicos
         config={config([informacoes])}
-        indicadores={{ checkinsDeHoje: 312, treinandoAgora: 47, placar: [] }}
+        indicadores={{ checkinsDeHoje: 312, treinandoAgora: 47, placar: [], desafio: null }}
       />,
     );
 
@@ -232,7 +232,7 @@ describe('BlocosPublicos -- indicadores (M3.5-BR-001)', () => {
     render(
       <BlocosPublicos
         config={config([{ ...informacoes, mostrarTreinandoAgora: false }])}
-        indicadores={{ checkinsDeHoje: 312, treinandoAgora: 47, placar: [] }}
+        indicadores={{ checkinsDeHoje: 312, treinandoAgora: 47, placar: [], desafio: null }}
       />,
     );
 
@@ -318,7 +318,7 @@ describe('BlocosPublicos -- placar publico (§3.4c)', () => {
     render(
       <BlocosPublicos
         config={config([video])}
-        indicadores={{ ...indicadoresComPlacar, placar: [] }}
+        indicadores={{ ...indicadoresComPlacar, placar: [], desafio: null }}
       />,
     );
 
@@ -338,7 +338,7 @@ describe('BlocosPublicos -- placar publico (§3.4c)', () => {
       placar: [
         ...indicadoresComPlacar.placar,
         { position: 6, nomeExibido: 'Fabio', points: 20 },
-      ],
+      ], desafio: null,
     };
 
     render(<BlocosPublicos config={config([])} indicadores={seisEntradas} />);
@@ -449,5 +449,82 @@ describe('formatarData', () => {
   it('string fora do formato volta como veio, sem quebrar a tela', () => {
     expect(formatarData('')).toBe('');
     expect(formatarData('30/08/2026')).toBe('30/08/2026');
+  });
+});
+
+describe('bloco de DESAFIO na tela publica (F34, ADR-048 emenda 2)', () => {
+  const blocoDeDesafio = {
+    id: 'd1',
+    habilitado: true,
+    tipo: 'DESAFIO' as const,
+    titulo: 'Desafio do mês',
+  };
+
+  const emCartaz = { titulo: 'Setembro Ativo', meta: 8, diasRestantes: 5 };
+
+  it('mostra o desafio em cartaz com meta e prazo', () => {
+    render(
+      <BlocosPublicos
+        config={config([blocoDeDesafio])}
+        indicadores={{ checkinsDeHoje: 0, treinandoAgora: 0, placar: [], desafio: emCartaz }}
+      />,
+    );
+
+    const bloco = screen.getByTestId('bloco-de-desafio');
+
+    expect(bloco).toBeInTheDocument();
+    expect(screen.getByText('Setembro Ativo')).toBeInTheDocument();
+    // A meta e o numero grande: `8` e `treinos` sao elementos distintos.
+    expect(bloco).toHaveTextContent(/8\s*treinos/);
+    expect(screen.getByText(/Faltam 5 dias/)).toBeInTheDocument();
+  });
+
+  it('diz "Último dia" em vez de "faltam 0 dias"', () => {
+    render(
+      <BlocosPublicos
+        config={config([blocoDeDesafio])}
+        indicadores={{
+          checkinsDeHoje: 0,
+          treinandoAgora: 0,
+          placar: [],
+          desafio: { ...emCartaz, diasRestantes: 0 },
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Último dia')).toBeInTheDocument();
+    expect(screen.queryByText(/Faltam 0/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * `M3.5-BR-001` -- dado de aluno nao vai para a parede. E com a inscricao
+   * automatica o numero de inscritos e a base inteira da academia, entao
+   * exibi-lo sugeriria um engajamento que ninguem escolheu.
+   */
+  it('nao mostra nome de aluno nem contagem de inscritos', () => {
+    render(
+      <BlocosPublicos
+        config={config([blocoDeDesafio])}
+        indicadores={{ checkinsDeHoje: 0, treinandoAgora: 0, placar: [], desafio: emCartaz }}
+      />,
+    );
+
+    const bloco = screen.getByTestId('bloco-de-desafio');
+
+    expect(bloco).not.toHaveTextContent(/inscrito/i);
+    expect(bloco).not.toHaveTextContent(/participante/i);
+  });
+
+  /** Sem campanha o bloco SAI -- titulo sozinho anunciaria o que nao existe. */
+  it('some da tela quando nao ha desafio em cartaz', () => {
+    render(
+      <BlocosPublicos
+        config={config([blocoDeDesafio])}
+        indicadores={{ checkinsDeHoje: 0, treinandoAgora: 0, placar: [], desafio: null }}
+      />,
+    );
+
+    expect(screen.queryByTestId('bloco-de-desafio')).not.toBeInTheDocument();
+    expect(screen.queryByText('Desafio do mês')).not.toBeInTheDocument();
   });
 });

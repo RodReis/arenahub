@@ -93,3 +93,46 @@ describe('indiceSeguro', () => {
     expect(indiceSeguro(3, 0)).toBe(0);
   });
 });
+
+describe('bloco de DESAFIO (F34, ADR-048 emenda 2)', () => {
+  const base = { id: 'b1', habilitado: true } as const;
+
+  /**
+   * Sem desafio aberto o bloco SAI da lista -- mesma regra do VIDEO sem
+   * midia. Bloco de campanha vazio na parede e pior que bloco ausente: o
+   * carrossel pararia num quadro que so tem titulo.
+   */
+  it('sai da lista quando nao ha desafio em cartaz', () => {
+    const config = comBlocos([{ ...base, tipo: 'DESAFIO', titulo: 'Desafio do mês' }]);
+
+    expect(blocosVisiveis(config, null)).toEqual([]);
+  });
+
+  it('entra quando ha desafio em cartaz', () => {
+    const config = comBlocos([{ ...base, tipo: 'DESAFIO', titulo: 'Desafio do mês' }]);
+
+    const visiveis = blocosVisiveis(config, {
+      titulo: 'Setembro Ativo',
+      meta: 8,
+      diasRestantes: 5,
+    });
+
+    expect(visiveis).toHaveLength(1);
+  });
+
+  it('bloco desabilitado nao entra, mesmo com desafio em cartaz', () => {
+    const config = comBlocos([
+      { ...base, habilitado: false, tipo: 'DESAFIO', titulo: 'Desafio do mês' },
+    ]);
+
+    expect(
+      blocosVisiveis(config, { titulo: 'Setembro Ativo', meta: 8, diasRestantes: 5 }),
+    ).toEqual([]);
+  });
+
+  it('os outros tipos nao dependem do desafio', () => {
+    const config = comBlocos([{ ...base, tipo: 'INSTAGRAM', perfil: '@x', chamada: 'siga' }]);
+
+    expect(blocosVisiveis(config, null)).toHaveLength(1);
+  });
+});

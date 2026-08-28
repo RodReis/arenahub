@@ -213,12 +213,14 @@ describe('indicadores da unidade -- M3.5-BR-001', () => {
       checkinsDeHoje: 312,
       treinandoAgora: 47,
       placar: [{ position: 1, nomeExibido: 'Ana', points: 50 }],
+      desafio: null,
     });
 
     expect(parsed).toEqual({
       checkinsDeHoje: 312,
       treinandoAgora: 47,
       placar: [{ position: 1, nomeExibido: 'Ana', points: 50 }],
+      desafio: null,
     });
   });
 
@@ -227,6 +229,7 @@ describe('indicadores da unidade -- M3.5-BR-001', () => {
       checkinsDeHoje: 0,
       treinandoAgora: 0,
       placar: [],
+      desafio: null,
     });
 
     expect(parsed.placar).toEqual([]);
@@ -237,6 +240,7 @@ describe('indicadores da unidade -- M3.5-BR-001', () => {
       checkinsDeHoje: 1,
       treinandoAgora: 1,
       placar: [],
+      desafio: null,
       alunos: [{ nome: 'Fulano de Tal', studentId: 'uuid' }],
     });
 
@@ -248,6 +252,7 @@ describe('indicadores da unidade -- M3.5-BR-001', () => {
       checkinsDeHoje: 1,
       treinandoAgora: 1,
       placar: [{ position: 1, nomeExibido: 'Ana', points: 50, studentId: 'uuid-vazado' }],
+      desafio: null,
     });
 
     expect(parsed.placar[0]).not.toHaveProperty('studentId');
@@ -255,12 +260,72 @@ describe('indicadores da unidade -- M3.5-BR-001', () => {
 
   it('recusa contagem negativa e fracionaria', () => {
     expect(
-      indicadoresDaUnidadeSchema.safeParse({ checkinsDeHoje: -1, treinandoAgora: 0, placar: [] })
+      indicadoresDaUnidadeSchema.safeParse({ checkinsDeHoje: -1, treinandoAgora: 0, placar: [], desafio: null })
         .success,
     ).toBe(false);
     expect(
       indicadoresDaUnidadeSchema.safeParse({ checkinsDeHoje: 1.5, treinandoAgora: 0, placar: [] })
         .success,
     ).toBe(false);
+  });
+});
+
+describe('desafio na tela publica -- M3.5-BR-001 (F34, ADR-048 emenda 2)', () => {
+  it('aceita o desafio em cartaz', () => {
+    const r = indicadoresDaUnidadeSchema.safeParse({
+      checkinsDeHoje: 0,
+      treinandoAgora: 0,
+      placar: [],
+      desafio: { titulo: 'Setembro Ativo', meta: 8, diasRestantes: 5 },
+    });
+
+    expect(r.success).toBe(true);
+  });
+
+  it('aceita `null` -- nenhum desafio aberto, e o bloco sai do carrossel', () => {
+    const r = indicadoresDaUnidadeSchema.safeParse({
+      checkinsDeHoje: 0,
+      treinandoAgora: 0,
+      placar: [],
+      desafio: null,
+    });
+
+    expect(r.success).toBe(true);
+  });
+
+  /**
+   * DADO DE ALUNO NAO VAI PARA A PAREDE.
+   *
+   * O schema e `.strict()`-equivalente por construcao: campo extra e
+   * DESCARTADO, nunca repassado. Este teste prova que um `studentId` que
+   * escape do servidor nao chega a tela -- mesma guarda que
+   * `entradaPublicaDoPlacarSchema` ja tem.
+   */
+  it('descarta campo estranho no desafio, inclusive identificador de aluno', () => {
+    const r = indicadoresDaUnidadeSchema.parse({
+      checkinsDeHoje: 0,
+      treinandoAgora: 0,
+      placar: [],
+      desafio: {
+        titulo: 'Setembro Ativo',
+        meta: 8,
+        diasRestantes: 5,
+        studentId: 'uuid-vazado',
+        inscritos: 293,
+      },
+    });
+
+    expect(r.desafio).toEqual({ titulo: 'Setembro Ativo', meta: 8, diasRestantes: 5 });
+  });
+
+  it('recusa dias restantes negativo -- desafio vencido nao vai para a parede', () => {
+    const r = indicadoresDaUnidadeSchema.safeParse({
+      checkinsDeHoje: 0,
+      treinandoAgora: 0,
+      placar: [],
+      desafio: { titulo: 'Vencido', meta: 8, diasRestantes: -1 },
+    });
+
+    expect(r.success).toBe(false);
   });
 });

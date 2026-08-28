@@ -18,6 +18,7 @@ export const ROTULO_DO_TIPO: Readonly<Record<TipoDeBloco, string>> = {
   MATERIAL: 'Material informativo',
   INSTAGRAM: 'Instagram',
   INFORMACOES: 'Informações da unidade',
+  DESAFIO: 'Desafio em cartaz',
 };
 
 /**
@@ -42,6 +43,13 @@ export function blocoNovo(tipo: TipoDeBloco, id: string): BlocoDaTelaPublica {
       return { ...base, tipo, titulo: 'Material informativo', resumo: '', urlDoQr: 'https://' };
     case 'INSTAGRAM':
       return { ...base, tipo, perfil: '@', chamada: 'Siga a gente' };
+    case 'DESAFIO':
+      /*
+       * So o TITULO -- o conteudo (campanha, meta, prazo) vem do heartbeat
+       * e muda sozinho. Congelar o nome do desafio aqui obrigaria a
+       * republicar a config a cada campanha nova (ADR-048, emenda 2).
+       */
+      return { ...base, tipo, titulo: 'Desafio do mês' };
     case 'INFORMACOES':
       return {
         ...base,

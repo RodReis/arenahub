@@ -3573,3 +3573,51 @@ unidade do desafio (ou no tenant inteiro, quando `gymUnitId` é nulo) é inscrit
   uma adesão por aluno.
 - **Quem saiu não volta.** A inscrição automática pula quem já tem linha — inclusive `LEFT`.
   Reinscrever quem pediu para sair seria ignorar o pedido dele.
+
+### Emenda de 28/08/2026 (2) — o desafio na tela pública é um bloco do carrossel, não um slot novo
+
+**Decidida pelo PI em 28/08/2026**, ao relatar que *"o desafio não está mostrando na área pública
+do totem"*.
+
+#### O que se descobriu antes de decidir
+
+Duas coisas, e só uma era defeito:
+
+- **O ranking JÁ estava no hero** desde a F31 — `blocos-publicos.tsx` tem `temRanking`, a grade tem
+  composição própria, e o heartbeat já devolve `placar` com o nome de exibição resolvido no
+  servidor. Ele não aparecia porque o módulo `xp` estava **desligado**, e `xp` não estava na lista
+  de módulos configuráveis do painel (falta da própria F31). Corrigido como `[FIX]`, não como
+  fatia.
+- **O desafio nunca existiu na tela pública.** Os cinco tipos de bloco são `VIDEO`, `EVENTOS`,
+  `MATERIAL`, `INSTAGRAM` e `INFORMACOES`.
+
+#### Decisão — sexto tipo de bloco, não sétimo slot
+
+O desafio entra como **`DESAFIO`, um tipo de bloco do carrossel**, e não como uma área própria na
+grade do hero.
+
+O motivo é estrutural: a grade tem hoje `reel` à esquerda em altura total, com `carrossel` e
+`ranking` empilhados à direita — **seis composições fechadas** enumeradas em `classeDaComposicao` e
+espelhadas em CSS. Um sétimo slot dobraria a tabela para doze, numa tela de **1080×1920 fixos que
+não rola** (`M3.5-NFR`: `scrollHeight === clientHeight`). O carrossel já é o lugar onde blocos
+rodiziam entre si; o desafio é conteúdo de campanha, exatamente como eventos e material.
+
+#### O que o bloco mostra, e o que ele NÃO mostra
+
+**Mostra:** título do desafio, a meta e quantos dias faltam. É chamada, não placar.
+
+**Não mostra nome de aluno nenhum** — nem quem está participando, nem quem está na frente.
+`M3.5-BR-001` proíbe dado de aluno na tela pública, e o ranking só passa porque
+`resolverExposicao()` já resolveu o nome de exibição no servidor (F30). Um "ranking do desafio" no
+hero exigiria o mesmo tratamento e **não está nesta emenda**.
+
+**Sem contagem de inscritos.** Com a inscrição automática (emenda anterior), o número é a base
+inteira da academia — dizer "293 participando" na parede não informa nada e, pior, sugere um
+engajamento que ninguém escolheu.
+
+#### Qual desafio aparece
+
+O **que termina primeiro** entre os abertos hoje, um só. Rodiziar entre desafios dentro de um slot
+que já rodizia seria rodízio dentro de rodízio, e ninguém acompanha. Sem desafio aberto, o bloco
+**sai do carrossel** — mesmo comportamento do ranking abaixo da coorte mínima, e a razão é a mesma:
+bloco vazio na parede é pior que bloco ausente.

@@ -8,6 +8,7 @@ import {
   podeExcluir,
   podeCancelar,
   desfechoDaParticipacao,
+  desafioParaVitrine,
   type LimiteDoTemplate,
   type JanelaDoDesafio,
 } from './desafio.js';
@@ -370,5 +371,60 @@ describe('podeCancelar', () => {
         motivo: 'DESAFIO_ENCERRADO',
       });
     }
+  });
+});
+
+describe('desafioParaVitrine', () => {
+  const HOJE = '2026-09-05';
+
+  it('escolhe o que termina primeiro', () => {
+    const r = desafioParaVitrine(
+      [
+        { titulo: 'Longo', meta: 20, fim: '2026-09-30' },
+        { titulo: 'Curto', meta: 8, fim: '2026-09-10' },
+        { titulo: 'Medio', meta: 12, fim: '2026-09-20' },
+      ],
+      HOJE,
+    );
+
+    expect(r).toEqual({ titulo: 'Curto', meta: 8, diasRestantes: 5 });
+  });
+
+  it('devolve null sem desafio aberto', () => {
+    expect(desafioParaVitrine([], HOJE)).toBeNull();
+  });
+
+  /**
+   * Desafio que acaba HOJE ainda vale: `diasRestantes: 0` e "ultimo dia",
+   * nao "acabou". Excluir aqui tiraria o bloco da parede justamente no dia
+   * em que ele mais importa.
+   */
+  it('mantem o desafio que termina hoje, com zero dias restantes', () => {
+    const r = desafioParaVitrine([{ titulo: 'Hoje', meta: 5, fim: HOJE }], HOJE);
+
+    expect(r).toEqual({ titulo: 'Hoje', meta: 5, diasRestantes: 0 });
+  });
+
+  it('ignora desafio cuja janela ja passou', () => {
+    expect(
+      desafioParaVitrine([{ titulo: 'Ontem', meta: 5, fim: '2026-09-04' }], HOJE),
+    ).toBeNull();
+  });
+
+  /**
+   * Empate no fim resolvido pelo TITULO, nao pela ordem de chegada: sem
+   * desempate estavel, dois desafios que acabam no mesmo dia alternariam na
+   * parede a cada heartbeat, conforme a ordem fisica do banco.
+   */
+  it('desempata pelo titulo quando dois terminam no mesmo dia', () => {
+    const r = desafioParaVitrine(
+      [
+        { titulo: 'Zulu', meta: 8, fim: '2026-09-10' },
+        { titulo: 'Alfa', meta: 6, fim: '2026-09-10' },
+      ],
+      HOJE,
+    );
+
+    expect(r?.titulo).toBe('Alfa');
   });
 });

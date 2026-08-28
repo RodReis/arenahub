@@ -272,3 +272,59 @@ export function podeCancelar(desafio: SituacaoDoDesafio): AvaliacaoDeMudanca {
 
   return { permitido: true };
 }
+
+/** Um desafio aberto, na forma minima que a vitrine precisa. */
+export interface DesafioAberto {
+  readonly titulo: string;
+  readonly meta: number;
+  /** `AAAA-MM-DD` no fuso da unidade. */
+  readonly fim: string;
+}
+
+export interface DesafioNaVitrine {
+  readonly titulo: string;
+  readonly meta: number;
+  readonly diasRestantes: number;
+}
+
+/**
+ * O desafio que a TELA PUBLICA anuncia (ADR-048, emenda 2).
+ *
+ * UM SO, o que termina primeiro: o bloco vive dentro do carrossel, que ja
+ * rodizia entre blocos. Rodiziar entre desafios ali dentro seria rodizio
+ * dentro de rodizio, e ninguem acompanha.
+ *
+ * SEM NOME DE ALUNO e SEM CONTAGEM DE INSCRITOS -- `M3.5-BR-001` proibe dado
+ * de aluno na parede, e com a inscricao automatica o numero de inscritos e a
+ * base inteira da academia.
+ *
+ * `null` = nada aberto, e o bloco SAI do carrossel. Bloco vazio na parede e
+ * pior que bloco ausente.
+ */
+export function desafioParaVitrine(
+  abertos: readonly DesafioAberto[],
+  hoje: string,
+): DesafioNaVitrine | null {
+  const vigentes = abertos.filter((d) => d.fim >= hoje);
+
+  if (vigentes.length === 0) return null;
+
+  /*
+   * Desempate pelo TITULO, nao pela ordem de chegada: sem ele, dois desafios
+   * que terminam no mesmo dia alternariam na parede a cada heartbeat,
+   * conforme a ordem fisica do banco. Mesma armadilha do `include` sem
+   * `orderBy` que ja custou tempo nesta base.
+   */
+  const escolhido = [...vigentes].sort(
+    (a, b) => a.fim.localeCompare(b.fim) || a.titulo.localeCompare(b.titulo),
+  )[0];
+
+  if (!escolhido) return null;
+
+  return {
+    titulo: escolhido.titulo,
+    meta: escolhido.meta,
+    // Termina hoje = "ultimo dia", nao "acabou".
+    diasRestantes: (paraEpoch(escolhido.fim) - paraEpoch(hoje)) / MS_POR_DIA,
+  };
+}

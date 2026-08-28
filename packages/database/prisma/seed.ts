@@ -794,6 +794,25 @@ async function semearTotem(
                 perfil: '@clinicadamusculacao',
                 chamada: 'Siga e acompanhe os treinos da unidade.',
               },
+              /*
+               * DESAFIO EM CARTAZ -- F34 (ADR-048, emenda 2).
+               *
+               * O bloco so diz QUE a academia quer mostrar desafio na parede;
+               * o conteudo (titulo, meta, prazo) vem do heartbeat e muda
+               * sozinho conforme a campanha. Mesmo desenho do bloco de
+               * INFORMACOES: congelar o titulo aqui obrigaria a republicar a
+               * config a cada desafio novo.
+               *
+               * `habilitado: true` e seguro: sem desafio aberto o bloco SAI
+               * do carrossel (`blocosVisiveis`), entao ele nao ocupa espaco
+               * na tela de quem ainda nao criou campanha nenhuma.
+               */
+              {
+                id: 'desafio-em-cartaz',
+                tipo: 'DESAFIO',
+                habilitado: true,
+                titulo: 'Desafio do mês',
+              },
             ],
           },
         },
