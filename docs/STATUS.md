@@ -7,7 +7,31 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 27/08/2026 *(F31 entregue — XP, conquistas e ranking mensal)*
+**Última atualização:** 28/08/2026 *(F34 entregue — desafios, com inscrição automática)*
+
+🎯 **28/08/2026 — F34 entregue, e o opt-in do PRD virou inscrição automática.** O **ADR-048**
+autoriza a fatia antes do gate do MVP 5 (mesmo argumento do ADR-047: o app não existe, os eventos
+confiáveis existem) e registra quatro decisões; **duas emendas do mesmo dia mudaram o desenho**.
+
+**A emenda 1 inverteu a Slice 5.5.** O PI viu a tela com `0 inscrito(s)` num desafio recém-aberto e
+decidiu o contrário do que o PRD pede: ao abrir a inscrição, **todo aluno `ACTIVE` com entitlement
+`ACTIVE` entra automaticamente** — 293 na bancada, batendo com a contagem independente. Isso emenda
+a Slice 5.5 (*"inscrição opt-in"*) e o `M5-BR-001` **só para desafio**; `RANKING` segue opt-out
+(ADR-046). Três pontas fechadas pelo PI: quem fica inadimplente **continua**, o aluno **pode sair**
+pelo totem, e **quem saiu não é reinscrito**.
+
+**A emenda 2 levou o desafio para a tela pública** como *sexto tipo de bloco do carrossel*, não como
+slot novo — a grade do hero tem seis composições fechadas numa tela de 1080×1920 que não rola. O
+bloco mostra campanha, meta e prazo; **sem nome de aluno e sem contagem de inscritos** (`M3.5-BR-001`,
+e com inscrição automática o número é a base inteira da academia).
+
+⚠️ **Três defeitos de configuração achados no caminho, todos de fatias anteriores.** O módulo `xp`
+(F31) **nunca entrou na lista de módulos configuráveis do painel** — a tela *Meus pontos* e o
+**placar público no hero** existiam desde a F31 e só podiam ser ligados por escrita direta no
+banco; era esta a causa de *"o ranque não aparece"*, não uma tela faltando. A **allowlist da ponte
+do totem** (`rotas-da-ponte.ts`) recusava as rotas novas antes de assinar, e nenhum teste da API
+pega a falta de uma linha ali. E a tela de desafios **listava só o criado na sessão**, então um
+refresh o fazia sumir e o rascunho ficava inalcançável — o dado sempre esteve no banco.
 
 🔑 **27/08/2026 — F30 entregue, e o gate do MVP 5 se parte em dois.** O **ADR-046** registra três
 decisões do PI de 26/08: a superfície é o `apps/kiosk`, não o app do MVP 4 (que segue com
@@ -799,7 +823,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **3** | Evolução física rastreável + IA assistiva | identidade e frequência estáveis (o *protocolo clínico* como gate **caiu em 19/08** — decisão do PI, ADR-035) | F17–F22 | **bloqueado só por MVP 1.** ADR-008 e ADR-036 fechados; F17–F20 não chamam IA e são as primeiras pegáveis quando o MVP 1 estabilizar |
 | **3.5** | Totem: tela pública configurável + autosserviço do aluno | MVP 1 estável + PIX operando (F13 ✅) | F49–F52 | criado por **ADR-042** em 22/08/2026. **Antecipa a decisão, não a execução** — o kiosk nasce configurável em vez de ser retrabalhado depois. Antecipa a execução das Slices 4.5 e 4.6. **Em execução: F49 entregue em 25/08/2026** — regime de identificação fixado pelo **ADR-045** (CPF sozinho; facial vai para o backlog) |
 | **4** | Autosserviço: **app do aluno** (o totem saiu para o MVP 3.5) | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado — e **vem depois do MVP 3.5**, decisão do PI em 22/08 (ADR-042). **Slices 4.5 e 4.6 são executadas no MVP 3.5**; o texto e o aceite continuam no PRD MVP-04 §7, sem cópia |
-| **5** | Engajamento opt-out mensurável | eventos confiáveis + app do MVP 4 — **não alcança F30, F31 nem F32** (ADR-046, ADR-047 e decisão do PI de 28/08) | F30–F35 | **F30, F31 e F32 entregues** (27–28/08/2026) — superfície no totem. A F31 absorveu a F33 (ADR-047). Gate original segue valendo para F34 e F35 |
+| **5** | Engajamento opt-out mensurável | eventos confiáveis + app do MVP 4 — **não alcança F30, F31, F32 nem F34** (ADR-046, ADR-047, ADR-048 e decisão do PI de 28/08) | F30–F35 | **F30, F31, F32 e F34 entregues** (27–28/08/2026) — superfície no totem. A F31 absorveu a F33 (ADR-047). **A F34 inverteu o opt-in para inscrição automática** (ADR-048, emenda 1) e trouxe o desafio para a tela pública (emenda 2). Gate original segue valendo para **F35** |
 | **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | bloqueado |
 
 
@@ -872,7 +896,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F31 | SPEC-031 | 5 | 5.2 + 5.4 | XP, conquistas e ranking mensal | [`SPEC-031-xp-e-conquistas.md`](specs/SPEC-031-xp-e-conquistas.md) · [ADR-047](DECISIONS.md#adr-047) | [#31](https://github.com/RodReis/arenahub/issues/31) | ✅ **entregue** em 27/08/2026 ([#213](https://github.com/RodReis/arenahub/pull/213)) |
 | F32 | SPEC-032 | 5 | 5.3 | Consistência e streak | [`SPEC-032-consistencia-e-streak.md`](specs/SPEC-032-consistencia-e-streak.md) | [#32](https://github.com/RodReis/arenahub/issues/32) | ✅ **entregue** em 28/08/2026 ([#214](https://github.com/RodReis/arenahub/pull/214)) |
 | ~~F33~~ | ~~SPEC-033~~ | 5 | 5.4 | ~~Rankings privados por padrão~~ | **absorvida pela F31** — [ADR-047](DECISIONS.md#adr-047), Decisão 2 | [#33](https://github.com/RodReis/arenahub/issues/33) | 🔒 **número queimado**. Card fechado em 28/08/2026 com **uma ponta registrada**: rankings **por categoria** (frequência, consistência, evolução relativa — PRD §7) ficam para **F34/F35** |
-| F34 | SPEC-034 | 5 | 5.5 | Desafios e notificações | [`SPEC-034-desafios-e-notificacoes.md`](specs/SPEC-034-desafios-e-notificacoes.md) | [#34](https://github.com/RodReis/arenahub/issues/34) | planejada |
+| F34 | SPEC-034 | 5 | 5.5 | Desafios e notificações | [`SPEC-034-desafios-e-notificacoes.md`](specs/SPEC-034-desafios-e-notificacoes.md) | [#34](https://github.com/RodReis/arenahub/issues/34) | ✅ **entregue** em 28/08/2026 — aguardando aceite |
 | F35 | SPEC-035 | 5 | 5.6 | Operação, moderação e experimento | [`SPEC-035-operacao-moderacao-e-experimento.md`](specs/SPEC-035-operacao-moderacao-e-experimento.md) | [#35](https://github.com/RodReis/arenahub/issues/35) | planejada |
 | F36 | SPEC-036 | 6 | 6.1 | Contrato de dados e baseline analítica | [`SPEC-036-contrato-de-dados-e-baseline-analitica.md`](specs/SPEC-036-contrato-de-dados-e-baseline-analitica.md) | [#36](https://github.com/RodReis/arenahub/issues/36) | planejada |
 | F37 | SPEC-037 | 6 | 6.2 | Regras explicáveis e score | [`SPEC-037-regras-explicaveis-e-score.md`](specs/SPEC-037-regras-explicaveis-e-score.md) | [#37](https://github.com/RodReis/arenahub/issues/37) | planejada |
