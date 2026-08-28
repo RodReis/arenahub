@@ -7,6 +7,7 @@ import { TenantContextService } from '../../common/tenant/tenant-context.service
 import { EngagementChallengesService } from './engagement-challenges.service.js';
 import {
   PORTA_DE_DESAFIOS,
+  type DesafioDaListagem,
   type PortaDeDesafios,
 } from './engagement-challenges.repository.js';
 
@@ -93,6 +94,48 @@ export class EngagementChallengesController {
         maxJanelaEmDias: t.limite.maxJanelaEmDias,
       })),
     };
+  }
+
+  /** Os desafios do tenant -- inclusive RASCUNHO, que e o que se abre. */
+  @Get()
+  @RequirePermissions('engagement.read')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['itens'],
+      properties: {
+        itens: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: [
+              'id',
+              'title',
+              'status',
+              'targetValue',
+              'startsOn',
+              'endsOn',
+              'templateName',
+              'participantes',
+            ],
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              title: { type: 'string' },
+              status: { type: 'string', enum: ['DRAFT', 'ACTIVE', 'CLOSED', 'CANCELLED'] },
+              targetValue: { type: 'integer' },
+              startsOn: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+              endsOn: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+              templateName: { type: 'string' },
+              participantes: { type: 'integer' },
+              gymUnitId: { type: 'string', format: 'uuid', nullable: true },
+            },
+          },
+        },
+      },
+    },
+  })
+  async listar(): Promise<{ itens: DesafioDaListagem[] }> {
+    return { itens: await this.desafios.listar(this.contexto.require()) };
   }
 
   /**

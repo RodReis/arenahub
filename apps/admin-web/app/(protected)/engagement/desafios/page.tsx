@@ -3,7 +3,10 @@ import type { Metadata } from 'next';
 import { ProblemDetail } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
-import type { TemplateDeDesafioDto } from '../../../actions/engagement';
+import type {
+  DesafioDaListagemDto,
+  TemplateDeDesafioDto,
+} from '../../../actions/engagement';
 import { PainelDeDesafios } from './painel-de-desafios';
 
 export const metadata: Metadata = {
@@ -24,16 +27,20 @@ interface Unidade {
  * Server Component: busca os modelos vigentes e as unidades. Criar e abrir
  * sao Server Actions disparadas do lado cliente.
  *
- * NAO HA LISTAGEM DE DESAFIOS CRIADOS nesta fatia, e a ausencia e
- * deliberada: a Slice 5.5 pede criacao a partir de template, inscricao,
- * progresso e encerramento -- o painel de OPERACAO (listar, cancelar,
- * contestar) e a Slice 5.6, que segue atras do gate do MVP 5. A tela mostra
- * o desafio recem-criado da propria sessao, com o botao de abrir ao lado.
+ * A LISTAGEM EXISTE, e a primeira versao desta tela nao a tinha -- defeito
+ * relatado pelo PI em 28/08/2026. Sem ela, o desafio criado sumia no refresh
+ * (o estado vivia so na sessao do React) e ficava INALCANCAVEL para abrir: o
+ * dado estava no banco, mas nao havia caminho ate ele. Uma tela que perde o
+ * que acabou de criar parece que nao salvou.
+ *
+ * Segue fora de escopo o painel de OPERACAO da Slice 5.6 -- cancelar,
+ * contestar, recalcular -- que continua atras do gate do MVP 5.
  */
 export default async function PaginaDeDesafios() {
-  const [modelos, unidades] = await Promise.all([
+  const [modelos, unidades, existentes] = await Promise.all([
     chamarApi<{ itens: TemplateDeDesafioDto[] }>('/api/v1/engagement/challenges/templates'),
     chamarApi<Unidade[]>('/api/v1/units'),
+    chamarApi<{ itens: DesafioDaListagemDto[] }>('/api/v1/engagement/challenges'),
   ]);
 
   if (!modelos.ok || !modelos.dados) {
@@ -70,6 +77,7 @@ export default async function PaginaDeDesafios() {
       <PainelDeDesafios
         modelos={modelos.dados.itens}
         unidades={unidades.ok && unidades.dados ? unidades.dados : []}
+        existentes={existentes.ok && existentes.dados ? existentes.dados.itens : []}
       />
     </section>
   );

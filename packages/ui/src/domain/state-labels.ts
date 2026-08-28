@@ -35,6 +35,8 @@ export type StateMachine =
   | 'delinquencyAccess'
   | 'payment'
   | 'reconciliation'
+  /** F34 -- estado do DESAFIO na tela da secretaria (ADR-048). */
+  | 'challenge'
   | 'riskBand'
   /**
    * F-multiarquivo -- leitura de um valor extraido contra a faixa do
@@ -283,6 +285,21 @@ export const STATE_LABELS: Dictionary = {
     REFUND_PENDING: { label: 'Estorno em andamento', tone: 'warning', icon: 'refresh-cw' },
     REFUNDED: { label: 'Estornado', tone: 'neutral', icon: 'refresh-cw' },
     REQUIRES_ACTION: { label: 'Ação necessária', tone: 'warning', icon: 'alert-circle' },
+  },
+
+  /*
+   * F34 -- desafios (ADR-048).
+   *
+   * `DRAFT` e rotulado "Fechado", nao "Rascunho": para a secretaria o que
+   * importa e que o aluno ainda NAO ve o desafio, nao o nome interno do
+   * estado. Mesma razao pela qual `ACTIVE` vira "Aberto" -- ela pensa em
+   * inscricao aberta, nao em registro ativo.
+   */
+  challenge: {
+    DRAFT: { label: 'Fechado', tone: 'neutral', icon: 'lock' },
+    ACTIVE: { label: 'Aberto', tone: 'success', icon: 'check-circle' },
+    CLOSED: { label: 'Encerrado', tone: 'neutral', icon: 'check-circle' },
+    CANCELLED: { label: 'Cancelado', tone: 'neutral', icon: 'minus' },
   },
 
   reconciliation: {

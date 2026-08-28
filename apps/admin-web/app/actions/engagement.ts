@@ -247,6 +247,19 @@ export interface TemplateDeDesafioDto {
   maxJanelaEmDias: number;
 }
 
+/** Espelha o item de `GET /engagement/challenges`. */
+export interface DesafioDaListagemDto {
+  id: string;
+  title: string;
+  status: 'DRAFT' | 'ACTIVE' | 'CLOSED' | 'CANCELLED';
+  targetValue: number;
+  startsOn: string;
+  endsOn: string;
+  templateName: string;
+  participantes: number;
+  gymUnitId: string | null;
+}
+
 export interface EstadoDoDesafio {
   erro?: string;
   sucesso?: { id: string; titulo: string };

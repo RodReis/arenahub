@@ -2,11 +2,12 @@
 
 import { useActionState, useMemo, useState, useTransition } from 'react';
 
-import { Button, Field, SelectField, useToastDeErro } from '@arenahub/ui';
+import { Button, Field, SelectField, StateBadge, useToastDeErro } from '@arenahub/ui';
 
 import {
   ativarDesafio,
   criarDesafio,
+  type DesafioDaListagemDto,
   type EstadoDoDesafio,
   type TemplateDeDesafioDto,
 } from '../../../actions/engagement';
@@ -18,6 +19,8 @@ interface Unidade {
 }
 
 const ESTADO_INICIAL: EstadoDoDesafio = {};
+
+
 
 /** Dias entre duas datas locais, inclusivo -- o mesmo calculo do dominio. */
 function diasEntre(inicio: string, fim: string): number {
@@ -41,9 +44,11 @@ function diasEntre(inicio: string, fim: string): number {
 export function PainelDeDesafios({
   modelos,
   unidades,
+  existentes,
 }: {
   readonly modelos: readonly TemplateDeDesafioDto[];
   readonly unidades: readonly Unidade[];
+  readonly existentes: readonly DesafioDaListagemDto[];
 }) {
   const [estadoCriar, acaoCriar] = useActionState(criarDesafio, ESTADO_INICIAL);
   const [estadoAtivar, acaoAtivar] = useActionState(ativarDesafio, ESTADO_INICIAL);
@@ -80,8 +85,6 @@ export function PainelDeDesafios({
     modelo !== undefined && inicio !== '' && fim !== '' && fim >= inicio
       ? diasEntre(inicio, fim) > modelo.maxJanelaEmDias
       : false;
-
-  const criado = estadoCriar.sucesso;
 
   if (modelos.length === 0) {
     return (
@@ -196,39 +199,54 @@ export function PainelDeDesafios({
       </form>
 
       <div className={estilos['bloco']}>
-        <h2>Abrir inscrição</h2>
+        <h2>Desafios criados</h2>
 
-        {criado ? (
-          <form
-            className={estilos['resultado']}
-            action={(dados) => {
-              iniciarEnvio(() => {
-                acaoAtivar(dados);
-              });
-            }}
-          >
-            <p data-testid="desafio-criado">
-              <strong>{criado.titulo}</strong> foi criado e está fechado. Confira o período e a
-              meta antes de abrir — depois de aberto, os alunos já podem se inscrever pelo totem.
-            </p>
-
-            <input type="hidden" name="challengeId" value={criado.id} />
-
-            <Button type="submit" disabled={enviando}>
-              Abrir inscrição
-            </Button>
-
-            {estadoAtivar.sucesso ? (
-              <p data-testid="desafio-aberto">
-                Inscrição aberta. O desafio já aparece no totem para os alunos da unidade
-                escolhida.
-              </p>
-            ) : null}
-          </form>
-        ) : (
+        {existentes.length === 0 ? (
           <p data-testid="sem-desafio-criado">
-            Crie um desafio ao lado para abrir a inscrição.
+            Nenhum desafio ainda. Crie um ao lado — ele nasce fechado, e você abre a inscrição
+            quando estiver conferido.
           </p>
+        ) : (
+          <ul className={estilos['lista']} data-testid="lista-de-desafios">
+            {existentes.map((desafio) => (
+              <li key={desafio.id} className={estilos['item']} data-testid={`desafio-${desafio.id}`}>
+                <div className={estilos['itemTexto']}>
+                  <strong>{desafio.title}</strong>
+                  <span className={estilos['aviso']}>
+                    {desafio.templateName} · meta {desafio.targetValue} · {desafio.startsOn} a{' '}
+                    {desafio.endsOn}
+                    {desafio.status === 'ACTIVE' || desafio.status === 'CLOSED'
+                      ? ` · ${String(desafio.participantes)} inscrito(s)`
+                      : ''}
+                  </span>
+                </div>
+
+                <div className={estilos['itemAcao']}>
+                  <StateBadge machine="challenge" state={desafio.status} />
+
+                  {/*
+                    So RASCUNHO tem acao. Desafio ja aberto, encerrado ou
+                    cancelado nao volta atras nesta fatia -- cancelar e
+                    reabrir sao operacao da Slice 5.6.
+                  */}
+                  {desafio.status === 'DRAFT' ? (
+                    <form
+                      action={(dados) => {
+                        iniciarEnvio(() => {
+                          acaoAtivar(dados);
+                        });
+                      }}
+                    >
+                      <input type="hidden" name="challengeId" value={desafio.id} />
+                      <Button type="submit" disabled={enviando}>
+                        Abrir inscrição
+                      </Button>
+                    </form>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

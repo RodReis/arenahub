@@ -2,6 +2,7 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import type { StatusDaParticipacao } from './domain/desafio.js';
 import type {
   AvisoDoAluno,
+  DesafioDaListagem,
   AvisoParaGravar,
   DesafioParaCriar,
   DesafioPersistido,
@@ -121,6 +122,21 @@ export class FakePortaDeDesafios implements PortaDeDesafios {
           d.endsOn >= hoje &&
           (d.gymUnitId === null || d.gymUnitId === gymUnitId),
       ),
+    );
+  }
+
+  listarDoTenant(_ctx: TenantContext, limite: number): Promise<DesafioDaListagem[]> {
+    return Promise.resolve(
+      [...this.desafios.values()]
+        .reverse()
+        .slice(0, limite)
+        .map((d) => ({
+          ...d,
+          templateName: 'Modelo de teste',
+          participantes: [...this.participacoes.values()].filter(
+            (p) => p.challengeId === d.id && p.status !== 'LEFT',
+          ).length,
+        })),
     );
   }
 

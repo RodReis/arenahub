@@ -16,6 +16,7 @@ import {
 import {
   PORTA_DE_DESAFIOS,
   type AvisoParaGravar,
+  type DesafioDaListagem,
   type PortaDeDesafios,
 } from './engagement-challenges.repository.js';
 
@@ -106,6 +107,17 @@ export class EngagementChallengesService {
     });
 
     return { id: desafio.id };
+  }
+
+  /**
+   * Os desafios do tenant, para a tela da secretaria.
+   *
+   * Inclui RASCUNHO: e o estado que ela precisa encontrar para abrir. Sem
+   * isto, o desafio criado sumia da tela no refresh e ficava inalcancavel --
+   * o dado estava no banco, mas nao havia caminho ate ele.
+   */
+  async listar(ctx: TenantContext, limite = 50): Promise<DesafioDaListagem[]> {
+    return this.porta.listarDoTenant(ctx, limite);
   }
 
   async ativar(ctx: TenantContext, challengeId: string): Promise<void> {

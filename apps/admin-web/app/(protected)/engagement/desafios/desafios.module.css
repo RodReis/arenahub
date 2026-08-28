@@ -49,3 +49,37 @@
   flex-direction: column;
   gap: 12px;
 }
+
+/* Lista de desafios criados -- sem marcador: cada item ja tem seu selo. */
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-md, 8px);
+}
+
+.itemTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.itemAcao {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

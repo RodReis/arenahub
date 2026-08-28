@@ -15,7 +15,23 @@ vi.mock('../../../actions/engagement', () => ({
 }));
 
 import { PainelDeDesafios } from './painel-de-desafios';
-import type { TemplateDeDesafioDto } from '../../../actions/engagement';
+import type {
+  DesafioDaListagemDto,
+  TemplateDeDesafioDto,
+} from '../../../actions/engagement';
+
+/** Um desafio ja criado, como a listagem do servidor o devolve. */
+const EXISTENTE: DesafioDaListagemDto = {
+  id: 'c-1',
+  title: 'Setembro em dia',
+  status: 'DRAFT',
+  targetValue: 8,
+  startsOn: '2026-09-01',
+  endsOn: '2026-09-14',
+  templateName: 'Assiduidade semanal',
+  participantes: 0,
+  gymUnitId: null,
+};
 
 const MODELO: TemplateDeDesafioDto = {
   id: 't-1',
@@ -28,10 +44,13 @@ const MODELO: TemplateDeDesafioDto = {
 
 const UNIDADE = { id: '11111111-1111-4111-8111-111111111111', name: 'Centro' };
 
-function renderizar(modelos: TemplateDeDesafioDto[] = [MODELO]) {
+function renderizar(
+  modelos: TemplateDeDesafioDto[] = [MODELO],
+  existentes: DesafioDaListagemDto[] = [],
+) {
   return render(
     <ToastProvider>
-      <PainelDeDesafios modelos={modelos} unidades={[UNIDADE]} />
+      <PainelDeDesafios modelos={modelos} unidades={[UNIDADE]} existentes={existentes} />
     </ToastProvider>,
   );
 }
@@ -111,11 +130,56 @@ describe('PainelDeDesafios', () => {
    * O desafio nasce fechado; sem criar nada, nao ha o que abrir. Um botao de
    * abrir sempre visivel sugeriria que existe desafio esperando.
    */
-  it('nao oferece abrir inscricao antes de criar', () => {
+  it('nao oferece abrir inscricao quando nao ha desafio', () => {
     renderizar();
 
     expect(screen.getByTestId('sem-desafio-criado')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /abrir inscrição/i })).not.toBeInTheDocument();
+  });
+
+  /**
+   * A LISTAGEM VEM DO SERVIDOR, nao do estado da sessao.
+   *
+   * A primeira versao desta tela so mostrava o desafio recem-criado, guardado
+   * em `useActionState` -- e um refresh o fazia sumir, deixando-o
+   * inalcancavel para abrir. O defeito foi relatado pelo PI em 28/08/2026: a
+   * tela parecia nao ter salvado, com o dado intacto no banco.
+   */
+  it('lista desafios que ja existiam, sem depender de criar nesta sessao', () => {
+    renderizar([MODELO], [EXISTENTE]);
+
+    expect(screen.getByTestId('lista-de-desafios')).toBeInTheDocument();
+    expect(screen.getByTestId('desafio-c-1')).toHaveTextContent('Setembro em dia');
+    expect(screen.queryByTestId('sem-desafio-criado')).not.toBeInTheDocument();
+  });
+
+  it('oferece abrir inscricao apenas para desafio fechado', () => {
+    renderizar([MODELO], [
+      EXISTENTE,
+      { ...EXISTENTE, id: 'c-2', title: 'Ja aberto', status: 'ACTIVE', participantes: 4 },
+    ]);
+
+    // Um botao so -- o desafio ja aberto nao volta atras nesta fatia.
+    expect(screen.getAllByRole('button', { name: /abrir inscrição/i })).toHaveLength(1);
+  });
+
+  it('mostra o estado em pt-BR, nunca o enum cru', () => {
+    renderizar([MODELO], [EXISTENTE]);
+
+    expect(screen.getByTestId('desafio-c-1')).toHaveTextContent('Fechado');
+    expect(screen.getByTestId('desafio-c-1')).not.toHaveTextContent('DRAFT');
+  });
+
+  it('mostra inscritos so depois de aberto', () => {
+    renderizar([MODELO], [
+      EXISTENTE,
+      { ...EXISTENTE, id: 'c-2', title: 'Ja aberto', status: 'ACTIVE', participantes: 4 },
+    ]);
+
+    // Rascunho nao pode ter inscrito: exibir "0 inscrito(s)" ali sugeriria
+    // que ninguem quis entrar, quando na verdade nem foi aberto.
+    expect(screen.getByTestId('desafio-c-2')).toHaveTextContent('4 inscrito(s)');
+    expect(screen.getByTestId('desafio-c-1')).not.toHaveTextContent('inscrito');
   });
 
   it('avisa quando nao ha modelo cadastrado', () => {

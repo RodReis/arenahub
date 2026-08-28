@@ -29,6 +29,12 @@ export interface DesafioPersistido {
   gymUnitId: string | null;
 }
 
+/** Um desafio na tela da secretaria: o desafio + quantos aderiram. */
+export interface DesafioDaListagem extends DesafioPersistido {
+  templateName: string;
+  participantes: number;
+}
+
 export interface ParticipacaoPersistida {
   id: string;
   status: StatusDaParticipacao;
@@ -79,6 +85,16 @@ export interface PortaDeDesafios {
     gymUnitId: string | null,
     hoje: string,
   ): Promise<DesafioPersistido[]>;
+
+  /**
+   * Todos os desafios do tenant, do mais recente para o mais antigo.
+   *
+   * Alimenta a tela da secretaria. SEM filtro de status: um desafio em
+   * rascunho e justamente o que ela precisa achar para abrir -- esconde-lo
+   * deixaria o desafio criado inalcancavel depois de um refresh, que foi o
+   * defeito relatado pelo PI em 28/08/2026.
+   */
+  listarDoTenant(ctx: TenantContext, limite: number): Promise<DesafioDaListagem[]>;
 
   participacao(
     ctx: TenantContext,
@@ -242,6 +258,29 @@ export class EngagementChallengesRepository implements PortaDeDesafios {
     });
 
     return linhas.map((l) => this.paraDesafio(l));
+  }
+
+  async listarDoTenant(ctx: TenantContext, limite: number): Promise<DesafioDaListagem[]> {
+    const linhas = await this.prisma.challenge.findMany({
+      where: { tenantId: ctx.tenantId },
+      include: {
+        templateVersion: { select: { name: true } },
+        // Conta so quem esta DENTRO: quem saiu (`LEFT`) nao e participante
+        // atual, e conta-lo inflaria o numero que a secretaria usa para
+        // decidir se o desafio pegou.
+        _count: { select: { participants: { where: { status: { not: 'LEFT' } } } } },
+      },
+      // `id` desempata: dois desafios criados no mesmo instante teriam ordem
+      // fisica decidindo, e a lista embaralharia entre dois carregamentos.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limite,
+    });
+
+    return linhas.map((l) => ({
+      ...this.paraDesafio(l),
+      templateName: l.templateVersion.name,
+      participantes: l._count.participants,
+    }));
   }
 
   async participacao(
