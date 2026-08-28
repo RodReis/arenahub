@@ -19,6 +19,7 @@ import {
   type StatusDaContestacao,
 } from './domain/contestacao.js';
 import {
+  type ConfiguracaoDeEngajamento,
   type ContestacaoGravada,
   type ContestacaoParaFila,
   type PerfilParaModeracao,
@@ -380,5 +381,35 @@ export class EngagementService {
       },
       agora,
     );
+  }
+
+  // --- F35: configuracao de engajamento do tenant --------------------------
+
+  /** Flags e teto do tenant. Tenant sem configuracao vem com tudo ligado. */
+  async obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento> {
+    return this.repo.obterConfiguracao(tenantId);
+  }
+
+  /**
+   * Grava so o que veio.
+   *
+   * O teto e o unico campo com validacao: negativo nao e teto, e um teto
+   * negativo barraria TODA correcao (nenhum valor absoluto e menor que -1),
+   * o que e desligar a correcao por acidente em vez de por decisao.
+   */
+  async salvarConfiguracao(
+    tenantId: string,
+    entrada: Partial<ConfiguracaoDeEngajamento>,
+  ): Promise<ConfiguracaoDeEngajamento> {
+    const teto = entrada.correctionLimitPoints;
+
+    if (teto !== undefined && teto !== null && (!Number.isInteger(teto) || teto < 0)) {
+      throw new BadRequestException({
+        code: 'TETO_INVALIDO',
+        message: 'O teto de correcao precisa ser um inteiro nao negativo, ou vazio para sem teto',
+      });
+    }
+
+    return this.repo.salvarConfiguracao(tenantId, entrada);
   }
 }

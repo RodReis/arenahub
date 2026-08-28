@@ -4,6 +4,7 @@ import { TenantContextService } from '../../common/tenant/tenant-context.service
 import { PersistenceModule } from '../../persistence/persistence.module.js';
 import { EngagementController } from './engagement.controller.js';
 import { EngagementContestacoesController } from './engagement-contestacoes.controller.js';
+import { EngagementConfiguracaoController } from './engagement-configuracao.controller.js';
 import { EngagementXpController } from './engagement-xp.controller.js';
 import { EngagementRepository, PORTA_DE_ENGAJAMENTO } from './engagement.repository.js';
 import { EngagementService } from './engagement.service.js';
@@ -39,6 +40,7 @@ import { EngagementChallengesService } from './engagement-challenges.service.js'
   controllers: [
     EngagementController,
     EngagementContestacoesController,
+    EngagementConfiguracaoController,
     EngagementXpController,
     EngagementChallengesController,
   ],

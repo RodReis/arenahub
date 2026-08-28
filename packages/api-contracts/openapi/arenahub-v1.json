@@ -2042,6 +2042,88 @@
         ]
       }
     },
+    "/api/v1/engagement/configuracao": {
+      "get": {
+        "operationId": "EngagementConfiguracaoController_obter",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "rankingEnabled",
+                    "challengesEnabled",
+                    "achievementsEnabled",
+                    "correctionLimitPoints"
+                  ],
+                  "properties": {
+                    "rankingEnabled": {
+                      "type": "boolean"
+                    },
+                    "challengesEnabled": {
+                      "type": "boolean"
+                    },
+                    "achievementsEnabled": {
+                      "type": "boolean"
+                    },
+                    "correctionLimitPoints": {
+                      "type": "integer",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementConfiguracao"
+        ]
+      },
+      "post": {
+        "operationId": "EngagementConfiguracaoController_salvar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "rankingEnabled",
+                    "challengesEnabled",
+                    "achievementsEnabled",
+                    "correctionLimitPoints"
+                  ],
+                  "properties": {
+                    "rankingEnabled": {
+                      "type": "boolean"
+                    },
+                    "challengesEnabled": {
+                      "type": "boolean"
+                    },
+                    "achievementsEnabled": {
+                      "type": "boolean"
+                    },
+                    "correctionLimitPoints": {
+                      "type": "integer",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EngagementConfiguracao"
+        ]
+      }
+    },
     "/api/v1/engagement/rankings/{gymUnitId}/{mes}/gerar": {
       "post": {
         "operationId": "EngagementXpController_gerar",

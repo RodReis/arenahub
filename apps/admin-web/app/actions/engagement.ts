@@ -552,3 +552,77 @@ export async function resolverContestacao(
 
   return { sucesso: { id: resposta.dados.id } };
 }
+
+/* -------------------------------------------------------------------------
+ * Configuração do engajamento -- F35, ADR-049 Decisão 3.
+ * ------------------------------------------------------------------------- */
+
+export interface ConfiguracaoDeEngajamento {
+  readonly rankingEnabled: boolean;
+  readonly challengesEnabled: boolean;
+  readonly achievementsEnabled: boolean;
+  readonly correctionLimitPoints: number | null;
+}
+
+export interface EstadoDaConfiguracao {
+  erro?: string;
+  sucesso?: true;
+}
+
+const MENSAGEM_DA_CONFIGURACAO: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
+  TETO_INVALIDO: 'O limite precisa ser um número inteiro a partir de zero, ou vazio para sem limite.',
+};
+
+/**
+ * Grava só o campo que o operador mexeu.
+ *
+ * `correctionLimitPoints` distingue TRÊS estados que a tela poderia colapsar:
+ * ausente (não mexeu), vazio (sem teto) e zero (ninguém corrige). Tratar vazio
+ * como zero desligaria a correção de uma academia que só queria tirar o limite.
+ */
+export async function salvarConfiguracaoDeEngajamento(
+  _anterior: EstadoDaConfiguracao,
+  formulario: FormData,
+): Promise<EstadoDaConfiguracao> {
+  const corpo: Record<string, unknown> = {};
+
+  for (const campo of ['rankingEnabled', 'challengesEnabled', 'achievementsEnabled'] as const) {
+    const valor = formulario.get(campo);
+    if (valor !== null) corpo[campo] = valor === 'true';
+  }
+
+  const teto = formulario.get('correctionLimitPoints');
+  // `FormData.get` devolve `File | string | null`; sem estreitar para string,
+  // um `File` viraria "[object Object]" e passaria a validacao numerica.
+  if (typeof teto === 'string') {
+    const texto = teto.trim();
+
+    if (texto === '') {
+      corpo['correctionLimitPoints'] = null;
+    } else {
+      const numero = Number(texto);
+      if (!Number.isInteger(numero) || numero < 0) {
+        return { erro: MENSAGEM_DA_CONFIGURACAO['TETO_INVALIDO'] as string };
+      }
+      corpo['correctionLimitPoints'] = numero;
+    }
+  }
+
+  const resposta = await chamarApi<ConfiguracaoDeEngajamento>(
+    '/api/v1/engagement/configuracao',
+    { metodo: 'POST', corpo },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro:
+        MENSAGEM_DA_CONFIGURACAO[resposta.erro?.code ?? ''] ??
+        'Não foi possível salvar a configuração.',
+    };
+  }
+
+  revalidatePath('/engagement');
+
+  return { sucesso: true };
+}

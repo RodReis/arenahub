@@ -6,6 +6,7 @@ import type { StatusDoPerfilPublico } from './domain/exposicao.js';
 import type { StatusDaContestacao } from './domain/contestacao.js';
 import type {
   AlunoParaExposicao,
+  ConfiguracaoDeEngajamento,
   ContestacaoGravada,
   ContestacaoParaFila,
   EntradaDeContestacao,
@@ -17,6 +18,14 @@ import type {
   PerfilPublicoDoAluno,
   PortaDeEngajamento,
 } from './engagement.repository.js';
+
+/** Os defaults do schema: tudo LIGADO, sem teto. */
+const PADRAO_DA_CONFIGURACAO: ConfiguracaoDeEngajamento = {
+  rankingEnabled: true,
+  challengesEnabled: true,
+  achievementsEnabled: true,
+  correctionLimitPoints: null,
+};
 
 /** Aluno como o dublê aceita cadastrar -- so o que os testes precisam. */
 export interface AlunoDeTeste {
@@ -56,6 +65,8 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
   private readonly documentosPublicados = new Set<string>();
   /** Contestacoes da F35, com o tenant junto para o filtro de escopo. */
   private readonly contestacoes: (ContestacaoGravada & { tenantId: string })[] = [];
+  /** Configuracao por tenant. Ausencia = os defaults do schema. */
+  private readonly configuracoes = new Map<string, ConfiguracaoDeEngajamento>();
   private proximoId = 1;
   private proximaContestacao = 1;
 
@@ -332,6 +343,35 @@ export class RepositorioEmMemoria implements PortaDeEngajamento {
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .map((c) => ({ ...c })),
     );
+  }
+
+  // --- F35: configuracao de engajamento do tenant --------------------------
+
+  obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento> {
+    // Ausencia de linha = os defaults do schema, tudo LIGADO e sem teto.
+    return Promise.resolve({ ...PADRAO_DA_CONFIGURACAO, ...this.configuracoes.get(tenantId) });
+  }
+
+  salvarConfiguracao(
+    tenantId: string,
+    entrada: Partial<ConfiguracaoDeEngajamento>,
+  ): Promise<ConfiguracaoDeEngajamento> {
+    const atual = { ...PADRAO_DA_CONFIGURACAO, ...this.configuracoes.get(tenantId) };
+
+    // Espelha o `!== undefined` do repositorio real: `null` e `0` sao valores
+    // legitimos e nao podem ser tratados como "nao veio".
+    const nova: ConfiguracaoDeEngajamento = {
+      rankingEnabled: entrada.rankingEnabled ?? atual.rankingEnabled,
+      challengesEnabled: entrada.challengesEnabled ?? atual.challengesEnabled,
+      achievementsEnabled: entrada.achievementsEnabled ?? atual.achievementsEnabled,
+      correctionLimitPoints:
+        entrada.correctionLimitPoints !== undefined
+          ? entrada.correctionLimitPoints
+          : atual.correctionLimitPoints,
+    };
+
+    this.configuracoes.set(tenantId, nova);
+    return Promise.resolve({ ...nova });
   }
 
   /**

@@ -5,11 +5,13 @@ import { ProblemDetail } from '@arenahub/ui';
 import { Abas } from '../../../src/components/abas';
 import { chamarApi } from '../../../lib/api/server-client';
 import type {
+  ConfiguracaoDeEngajamento,
   DesafioDaListagemDto,
   TemplateDeDesafioDto,
 } from '../../actions/engagement';
 import { PainelDeDesafios } from './desafios/painel-de-desafios';
 import { PainelDoPlacar } from './placar/painel-do-placar';
+import { PainelDeConfiguracao } from './configuracao/painel-de-configuracao';
 
 export const metadata: Metadata = {
   title: 'Engajamento — ArenaHub',
@@ -59,10 +61,11 @@ interface Unidade {
  * (ver o comentário do componente).
  */
 export default async function PaginaDeEngajamento() {
-  const [modelos, unidades, existentes] = await Promise.all([
+  const [modelos, unidades, existentes, configuracao] = await Promise.all([
     chamarApi<{ itens: TemplateDeDesafioDto[] }>('/api/v1/engagement/challenges/templates'),
     chamarApi<Unidade[]>('/api/v1/units'),
     chamarApi<{ itens: DesafioDaListagemDto[] }>('/api/v1/engagement/challenges'),
+    chamarApi<ConfiguracaoDeEngajamento>('/api/v1/engagement/configuracao'),
   ]);
 
   const listaDeUnidades = unidades.ok && unidades.dados ? unidades.dados : [];
@@ -119,6 +122,26 @@ export default async function PaginaDeEngajamento() {
                     correlationId: '',
                   }),
                   title: `Sem permissão para consultar as unidades (${unidades.erro?.code ?? 'erro'}).`,
+                }}
+              />
+            ),
+          },
+          {
+            id: 'configuracao',
+            rotulo: 'Configuração',
+            conteudo: configuracao.ok && configuracao.dados ? (
+              <PainelDeConfiguracao inicial={configuracao.dados} />
+            ) : (
+              <ProblemDetail
+                testId="erro-da-configuracao"
+                problem={{
+                  ...(configuracao.erro ?? {
+                    type: 'about:blank',
+                    status: 0,
+                    code: 'erro',
+                    correlationId: '',
+                  }),
+                  title: `Não foi possível carregar a configuração (${configuracao.erro?.code ?? 'erro'}).`,
                 }}
               />
             ),

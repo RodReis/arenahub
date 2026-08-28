@@ -116,6 +116,27 @@ export interface PortaDeEngajamento {
     limite: number,
   ): Promise<ContestacaoParaFila[]>;
   contestacoesDoAluno(tenantId: string, studentId: string): Promise<ContestacaoGravada[]>;
+
+  // --- F35: configuracao de engajamento do tenant ------------------------
+  obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento>;
+  salvarConfiguracao(
+    tenantId: string,
+    entrada: Partial<ConfiguracaoDeEngajamento>,
+  ): Promise<ConfiguracaoDeEngajamento>;
+}
+
+/**
+ * Flags e teto por tenant (ADR-049, Decisoes 2 e 3).
+ *
+ * Desligar NAO apaga nada: o ledger continua, o snapshot continua, o aluno so
+ * para de ver. Religar devolve tudo, porque nada foi destruido.
+ */
+export interface ConfiguracaoDeEngajamento {
+  rankingEnabled: boolean;
+  challengesEnabled: boolean;
+  achievementsEnabled: boolean;
+  /** Teto da correcao manual em pontos absolutos. `null` = sem teto. */
+  correctionLimitPoints: number | null;
 }
 
 /** O que o service pede para abrir uma contestacao. */
@@ -514,6 +535,61 @@ export class EngagementRepository implements PortaDeEngajamento {
     });
 
     return linhas.map(paraContestacao);
+  }
+
+  // --- F35: configuracao de engajamento do tenant --------------------------
+
+  async obterConfiguracao(tenantId: string): Promise<ConfiguracaoDeEngajamento> {
+    const tenant = await this.db.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: {
+        engagementRankingEnabled: true,
+        engagementChallengesEnabled: true,
+        engagementAchievementsEnabled: true,
+        engagementCorrectionLimitPoints: true,
+      },
+    });
+
+    return {
+      rankingEnabled: tenant.engagementRankingEnabled,
+      challengesEnabled: tenant.engagementChallengesEnabled,
+      achievementsEnabled: tenant.engagementAchievementsEnabled,
+      correctionLimitPoints: tenant.engagementCorrectionLimitPoints,
+    };
+  }
+
+  /**
+   * Grava so o que veio.
+   *
+   * Parcial de proposito: a tela envia a flag que o operador mexeu, e mandar
+   * o objeto inteiro faria duas abas abertas sobrescreverem uma a decisao da
+   * outra em campos que nenhuma das duas tocou.
+   */
+  async salvarConfiguracao(
+    tenantId: string,
+    entrada: Partial<ConfiguracaoDeEngajamento>,
+  ): Promise<ConfiguracaoDeEngajamento> {
+    await this.db.tenant.update({
+      where: { id: tenantId },
+      data: {
+        ...(entrada.rankingEnabled !== undefined
+          ? { engagementRankingEnabled: entrada.rankingEnabled }
+          : {}),
+        ...(entrada.challengesEnabled !== undefined
+          ? { engagementChallengesEnabled: entrada.challengesEnabled }
+          : {}),
+        ...(entrada.achievementsEnabled !== undefined
+          ? { engagementAchievementsEnabled: entrada.achievementsEnabled }
+          : {}),
+        // `!== undefined` e nao truthy: `null` (sem teto) e `0` (ninguem
+        // corrige) sao valores legitimos e distintos entre si.
+        ...(entrada.correctionLimitPoints !== undefined
+          ? { engagementCorrectionLimitPoints: entrada.correctionLimitPoints }
+          : {}),
+      },
+    });
+
+    return this.obterConfiguracao(tenantId);
   }
 }
 
