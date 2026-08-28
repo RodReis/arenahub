@@ -46,6 +46,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3.5][FIX] Tela pública do totem: vão do hero, erro opaco ao salvar e upload de logotipo (#220, finalizado em: 2026-08-28)
 - [INFRA][FIX] totem em dev nao carrega o .env da raiz e colide na porta 3000 com o painel (#212, finalizado em: 2026-08-28)
 - [MVP5][SPEC-034][F34] Desafios e notificações (#34, finalizado em: 2026-08-28)
 - [MVP3.5][INFRA] Ingestão de reel do Instagram para a tela pública do totem (#215, finalizado em: 2026-08-28)
