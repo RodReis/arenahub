@@ -109,7 +109,7 @@ primeiro caso da tabela acima.
 - **Idioma**: documentação, specs, commits e comunicação sempre em português (PT-BR); código e identificadores em inglês.
 - **Sem hardcode e sem dado inventado no caminho de produção.** Dado local de desenvolvimento entra por seed, criado na primeira fatia que precisar. Seed em `packages/database/prisma/seed.ts` (ADR-020). **Dublê de teste é obrigatório, não proibido** — simulador de leitor Topdata, `FakePaymentProvider`, fake de OCR/IA e de antivírus existem por exigência dos PRDs e vivem no boundary, nunca dentro da regra de domínio. A fronteira está em `docs/TESTING.md`.
 - **Desenvolvimento é local** (docker-compose: Postgres + Redis + MinIO).
-- **Portas**: API `3344` (fixa — se ocupada, falha em vez de trocar); Expo dev server na padrão (`8081`); demais apps na porta padrão do framework. Colisão vira decisão registrada, nunca troca silenciosa.
+- **Portas**: API `3344` (fixa — se ocupada, falha em vez de trocar); `admin-web` `3000`; `kiosk` `3210` (a mesma do E2E — o totem tem uma porta só); Expo dev server na padrão (`8081`). **Cada superfície web fixa a própria porta com `-p`**: enquanto as duas caíram no padrão do Next, a segunda a subir ia para `3001` calada e a ponte assinada do totem passava a apontar para o lugar errado (issue #212). Colisão vira decisão registrada, nunca troca silenciosa.
 - **Nada de dado real de aluno no repositório** — nem em fixture, nem em golden file, nem em log de erro.
 - **Nunca afirmar estado de CI, PR ou job sem verificar no momento da fala.** Se o PI diz que
   terminou, a resposta é `gh pr checks <n>` — nunca contradizer sem checar. Silêncio de

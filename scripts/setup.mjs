@@ -137,7 +137,7 @@ function main() {
       '',
       'Ambiente pronto.',
       '',
-      '  pnpm dev                    sobe API (3344) e admin-web (3000)',
+      '  pnpm dev                    sobe API (3344), admin-web (3000) e totem (3210)',
       '  pnpm test                   testes de unidade',
       '  pnpm test:integration       testes que usam Postgres',
       '',

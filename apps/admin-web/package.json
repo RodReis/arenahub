@@ -5,8 +5,9 @@
   "type": "module",
   "description": "Painel administrativo do ArenaHub: Next.js App Router",
   "scripts": {
-    "dev": "next dev",
-    "start": "next start",
+    "//dev": "PORTA 3000 EXPLICITA, nao default acidental. A `playwright.config.ts` daqui ja assume 3000, e o `scripts/setup.mjs` a anuncia -- mas nenhum dos dois FIXAVA nada: os dois apps web caiam no padrao do Next e o segundo a subir ia para 3001 calado (issue #212). O CLAUDE.md manda registrar a colisao, nunca trocar em silencio. O totem fica na 3210.",
+    "dev": "next dev -p 3000",
+    "start": "next start -p 3000",
     "build": "next build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
