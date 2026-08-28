@@ -350,12 +350,38 @@ export interface ConquistaDoTotem {
   readonly motivo?: string | null;
 }
 
+/** Uma semana avaliada pela politica de consistencia (F32). */
+export interface SemanaDeConsistencia {
+  /** Segunda-feira da semana, `AAAA-MM-DD`. */
+  readonly inicio: string;
+  /** Domingo da semana, `AAAA-MM-DD`. */
+  readonly fim: string;
+  readonly diasTreinados: number;
+  readonly status: 'QUALIFICADA' | 'PERDIDA' | 'PAUSADA' | 'EM_ANDAMENTO';
+}
+
+/**
+ * Consistencia semanal do aluno (F32).
+ *
+ * `diasPorSemana` vem do SERVIDOR e nao e constante da tela: a meta mora na
+ * politica versionada, e um numero fixo aqui mentiria no dia em que a
+ * academia mudasse a meta.
+ */
+export interface ConsistenciaDoTotem {
+  readonly atual: number;
+  readonly recorde: number;
+  readonly diasPorSemana: number;
+  readonly politica: string;
+  readonly semanas: readonly SemanaDeConsistencia[];
+}
+
 export interface ExtratoDeXp {
   readonly saldoDoMes: number;
   readonly mes: string;
   readonly movimentos: readonly MovimentoDeXp[];
   readonly conquistas: readonly ConquistaDoTotem[];
   readonly posicao: number | null;
+  readonly consistencia: ConsistenciaDoTotem;
 }
 
 export function carregarXp(sessionId: string, token: string) {

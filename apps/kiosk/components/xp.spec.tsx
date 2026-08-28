@@ -1,7 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ExtratoDeXp, SessaoDoAluno } from '../lib/kiosk-client.js';
+import type {
+  ConsistenciaDoTotem,
+  ExtratoDeXp,
+  SemanaDeConsistencia,
+  SessaoDoAluno,
+} from '../lib/kiosk-client.js';
 import { Xp } from './xp.js';
 
 vi.mock('../lib/kiosk-client', async (original) => ({
@@ -19,6 +24,15 @@ const SESSAO: SessaoDoAluno = {
   expiraEm: '2026-08-27T12:01:00.000Z',
 };
 
+/** Consistencia neutra -- o teste que se importa com ela sobrescreve. */
+const SEM_CONSISTENCIA: ConsistenciaDoTotem = {
+  atual: 0,
+  recorde: 0,
+  diasPorSemana: 3,
+  politica: 'semana-civil-local@1',
+  semanas: [],
+};
+
 function dadosComSaldo(saldoDoMes: number): ExtratoDeXp {
   return {
     saldoDoMes,
@@ -26,7 +40,24 @@ function dadosComSaldo(saldoDoMes: number): ExtratoDeXp {
     movimentos: [],
     conquistas: [],
     posicao: null,
+    consistencia: SEM_CONSISTENCIA,
   };
+}
+
+function dadosComConsistencia(consistencia: Partial<ConsistenciaDoTotem>): ExtratoDeXp {
+  return {
+    ...dadosComSaldo(0),
+    consistencia: { ...SEM_CONSISTENCIA, ...consistencia },
+  };
+}
+
+function semana(
+  inicio: string,
+  fim: string,
+  diasTreinados: number,
+  status: SemanaDeConsistencia['status'],
+): SemanaDeConsistencia {
+  return { inicio, fim, diasTreinados, status };
 }
 
 function dadosCom(
@@ -119,5 +150,138 @@ describe('<Xp />', () => {
     render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
 
     expect(await screen.findByTestId('xp-falhou')).toBeInTheDocument();
+  });
+});
+
+describe('Xp -- consistencia semanal (F32)', () => {
+  beforeEach(() => {
+    vi.mocked(carregarXp).mockReset();
+  });
+
+  it('mostra o streak atual e a meta da politica', async () => {
+    vi.mocked(carregarXp).mockResolvedValue(
+      dadosComConsistencia({ atual: 4, recorde: 4, diasPorSemana: 3 }),
+    );
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    expect(await screen.findByTestId('streak-atual')).toHaveTextContent('4');
+    expect(screen.getByTestId('consistencia')).toHaveTextContent(/3 dias por semana/u);
+  });
+
+  it('le a meta do SERVIDOR, nao de uma constante da tela', async () => {
+    // A politica e versionada: se a academia mudar a meta para 4, a tela tem
+    // de acompanhar sem deploy. Um numero fixo aqui mentiria nesse dia.
+    vi.mocked(carregarXp).mockResolvedValue(dadosComConsistencia({ diasPorSemana: 4 }));
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    expect(await screen.findByTestId('consistencia')).toHaveTextContent(/4 dias por semana/u);
+  });
+
+  it('esconde o recorde quando ele e igual ao atual', async () => {
+    vi.mocked(carregarXp).mockResolvedValue(dadosComConsistencia({ atual: 3, recorde: 3 }));
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    await screen.findByTestId('consistencia');
+
+    expect(screen.queryByTestId('streak-recorde')).not.toBeInTheDocument();
+  });
+
+  it('mostra o recorde quando ele supera o atual', async () => {
+    vi.mocked(carregarXp).mockResolvedValue(dadosComConsistencia({ atual: 1, recorde: 6 }));
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    expect(await screen.findByTestId('streak-recorde')).toHaveTextContent('6');
+  });
+
+  it('lista as semanas com o intervalo em dia/mes', async () => {
+    vi.mocked(carregarXp).mockResolvedValue(
+      dadosComConsistencia({
+        semanas: [semana('2026-08-24', '2026-08-30', 3, 'QUALIFICADA')],
+      }),
+    );
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    expect(await screen.findByTestId('semana')).toHaveTextContent('24/08 a 30/08');
+  });
+
+  it('nao desloca a data por fuso do navegador', async () => {
+    // O intervalo e recorte de texto, nao `new Date()`. Se passasse por Date,
+    // um navegador a oeste de UTC mostraria 23/08 no lugar de 24/08 -- o
+    // mesmo erro de fuso duplo que o backend evita nao aceitando `Date`.
+    vi.mocked(carregarXp).mockResolvedValue(
+      dadosComConsistencia({ semanas: [semana('2026-01-01', '2026-01-04', 1, 'PERDIDA')] }),
+    );
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    expect(await screen.findByTestId('semana')).toHaveTextContent('01/01 a 04/01');
+  });
+
+  it('diz que a semana pausada NAO conta contra o aluno -- `M5-FR-009`', async () => {
+    vi.mocked(carregarXp).mockResolvedValue(
+      dadosComConsistencia({ semanas: [semana('2026-08-24', '2026-08-30', 0, 'PAUSADA')] }),
+    );
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    expect(await screen.findByTestId('semana')).toHaveTextContent(/não conta contra você/u);
+  });
+
+  it('NAO usa linguagem de culpa na semana abaixo da meta -- §13 do PRD', async () => {
+    vi.mocked(carregarXp).mockResolvedValue(
+      dadosComConsistencia({ semanas: [semana('2026-08-24', '2026-08-30', 1, 'PERDIDA')] }),
+    );
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    const linha = await screen.findByTestId('semana');
+
+    expect(linha).toHaveTextContent(/Abaixo da meta/u);
+    expect(linha.textContent ?? '').not.toMatch(/perdeu|falhou|você não|quebrou/iu);
+  });
+
+  it('NAO fala em dias seguidos -- a unidade e a semana (`M5-BR-005`)', async () => {
+    // Exibir "dias seguidos" ensinaria a meta errada mesmo com o backend
+    // contando semanas: o aluno passaria a treinar todo dia por medo de
+    // romper, que e exatamente o que a Slice 5.3 quer evitar.
+    vi.mocked(carregarXp).mockResolvedValue(dadosComConsistencia({ atual: 5, recorde: 5 }));
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    const card = await screen.findByTestId('consistencia');
+
+    expect(card.textContent ?? '').not.toMatch(/dias seguidos|dias consecutivos/iu);
+    expect(card).toHaveTextContent(/Semanas seguidas/u);
+  });
+
+  it('convida quem ainda nao treinou, em vez de mostrar lista vazia', async () => {
+    vi.mocked(carregarXp).mockResolvedValue(dadosComConsistencia({ semanas: [] }));
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    expect(await screen.findByTestId('sem-semanas')).toBeInTheDocument();
+  });
+
+  it('marca cada semana com o proprio status, para o CSS distinguir', async () => {
+    vi.mocked(carregarXp).mockResolvedValue(
+      dadosComConsistencia({
+        semanas: [
+          semana('2026-08-24', '2026-08-30', 2, 'EM_ANDAMENTO'),
+          semana('2026-08-17', '2026-08-23', 3, 'QUALIFICADA'),
+        ],
+      }),
+    );
+
+    render(<Xp sessao={SESSAO} aoVoltar={vi.fn()} />);
+
+    const linhas = await screen.findAllByTestId('semana');
+
+    expect(linhas[0]).toHaveAttribute('data-status', 'EM_ANDAMENTO');
+    expect(linhas[1]).toHaveAttribute('data-status', 'QUALIFICADA');
   });
 });

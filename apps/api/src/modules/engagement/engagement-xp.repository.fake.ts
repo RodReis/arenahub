@@ -11,6 +11,7 @@ import type {
   PortaDeXp,
   SessaoPontuavel,
 } from './engagement-xp.repository.js';
+import type { PausaAprovada } from './domain/semana-de-consistencia.js';
 
 /** Entrada de configuracao de `comRegra` -- so os campos que o teste varia. */
 export interface RegraDeTeste {
@@ -75,6 +76,7 @@ export class FakePortaDeXp implements PortaDeXp {
   private readonly optOuts = new Set<string>();
   /** studentId -> unidade + fuso -- `undefined` = aluno inexistente no dublê. */
   private readonly unidadePorAluno = new Map<string, { gymUnitId: string; timezone: string }>();
+  private readonly pausasPorAluno = new Map<string, PausaAprovada[]>();
   private colidirNaEscrita = false;
   private proximoId = 1;
 
@@ -106,6 +108,17 @@ export class FakePortaDeXp implements PortaDeXp {
 
   comDefinicoes(definicoes: readonly DefinicaoDeTeste[]): void {
     this.definicoes.push(...definicoes);
+  }
+
+  /** So do dublê: uma pausa de assinatura aprovada, em dias locais (F32). */
+  comPausa(studentId: string, pausa: PausaAprovada): void {
+    const atuais = this.pausasPorAluno.get(studentId);
+
+    if (atuais) {
+      atuais.push(pausa);
+    } else {
+      this.pausasPorAluno.set(studentId, [pausa]);
+    }
   }
 
   /** So do dublê: marca o aluno como opt-out de ranking -- ver o comentario da classe. */
@@ -312,5 +325,41 @@ export class FakePortaDeXp implements PortaDeXp {
   qualquerVersaoDeRegra(_contexto: TenantContext): Promise<{ id: string } | null> {
     const regra = this.regras[0];
     return Promise.resolve(regra ? { id: regra.id } : null);
+  }
+
+  /**
+   * Dias treinados do aluno (F32).
+   *
+   * DERIVADO de `this.sessoes`, e nao de uma lista propria que o teste
+   * configuraria a parte: o dublê que aceita "sessoes" e "dias treinados"
+   * como dois estados independentes deixa o teste montar um mundo impossivel
+   * -- streak sem sessao -- e passa por um motivo que a producao nao tem
+   * (memoria duble-esconde-ato-errado).
+   *
+   * O fuso vem de cada sessao, como no Prisma; e `Set` deduplica quem treinou
+   * em duas unidades no mesmo dia.
+   */
+  diasTreinados(_contexto: TenantContext, _studentId: string): Promise<string[]> {
+    const dias = new Set(
+      this.sessoes.map((sessao) =>
+        new Intl.DateTimeFormat('en-CA', {
+          timeZone: sessao.fusoDaUnidade,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(sessao.occurredAt),
+      ),
+    );
+
+    return Promise.resolve([...dias].sort());
+  }
+
+  /** Pausas configuradas pelo teste -- ver `comPausa`. */
+  pausasAprovadas(
+    _contexto: TenantContext,
+    studentId: string,
+    _fusoDaUnidade: string,
+  ): Promise<PausaAprovada[]> {
+    return Promise.resolve(this.pausasPorAluno.get(studentId) ?? []);
   }
 }
