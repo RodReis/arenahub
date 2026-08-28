@@ -7,7 +7,7 @@
   "//scripts": "LOOPBACK NAO E OPCIONAL. O Next liga em 0.0.0.0 por padrao, e a rede da academia NAO e isolada. Sem `--hostname 127.0.0.1`, qualquer host da LAN chama POST /api/kiosk/sessions com um CPF de terceiro e recebe nome, plano, pendencia e um token de sessao valido -- sem tocar no totem. A mensagem neutra da tela nao protege nada: o status HTTP cru distingue 404 de 201. Isso e enumeracao da base inteira do tenant. A ponte so precisa atender o navegador do PROPRIO totem; nao \"conserte\" isto achando que e limitacao.",
   "scripts": {
     "//dev": "PORTA 3210, a MESMA do E2E (playwright.config.ts): o totem tem uma porta so. A padrao do Next (3000) e do admin-web -- sem -p os dois brigam e o segundo cai em 3001 calado, e a ponte assinada passa a apontar para o lugar errado (issue #212). As KIOSK_* NAO entram aqui: elas vem do .env da RAIZ, carregado pelo next.config.ts -- veja o comentario la.",
-    "dev": "next dev --hostname 127.0.0.1 -p 3210",
+    "dev": "node ../../scripts/check-port.mjs 3210 totem && next dev --hostname 127.0.0.1 -p 3210",
     "start": "next start --hostname 127.0.0.1",
     "build": "next build",
     "lint": "eslint .",
