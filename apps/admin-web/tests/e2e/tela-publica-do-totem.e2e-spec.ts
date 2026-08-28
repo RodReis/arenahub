@@ -128,13 +128,27 @@ test.describe('F51 -- tela pública do totem', () => {
 
     await page.getByTestId('acrescentar-VIDEO').click();
 
-    // O campo EXISTE (ADR-042, Decisao 7 pediu as duas origens) e esta
-    // desabilitado porque o extrator e fatia [INFRA] -- esconde-lo faria o
-    // gerente concluir que a origem nunca existiu.
+    // O campo EXISTE e agora e EDITAVEL -- a fatia [INFRA] entregou o
+    // extrator (ADR-042, Decisao 7).
     const link = page.getByLabel('Link de reel do Instagram');
 
     await expect(link).toBeVisible();
-    await expect(link).toBeDisabled();
-    await expect(page.getByText(/Indisponível nesta versão/i)).toBeVisible();
+    await expect(link).toBeEnabled();
+
+    // O aviso do ADR continua obrigatorio: o campo nao pode prometer o que
+    // a Meta nao garante.
+    await expect(
+      page.getByText(/mudanças posteriores no Instagram não se refletem no totem/i),
+    ).toBeVisible();
+
+    // O botao existe e so libera com link -- clicar vazio dispararia uma
+    // chamada que so pode falhar.
+    const copiar = page.getByTestId(/^copiar-link-/);
+
+    await expect(copiar).toBeDisabled();
+
+    await link.fill('https://www.instagram.com/reel/DbtoWkFR6l6/');
+
+    await expect(copiar).toBeEnabled();
   });
 });

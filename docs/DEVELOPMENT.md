@@ -1128,6 +1128,69 @@ Vale notar que a **F32 tornou uma das três viável**: `avaliarSemanas`/`resumir
 métrica de consistência por aluno. Um ranking de consistência precisaria só de snapshot e ordenação
 sobre o que já existe — não de cálculo novo.
 
+#### `[INFRA]` — ingestão de reel do Instagram (28/08/2026)
+
+Issue [#215](https://github.com/RodReis/arenahub/issues/215) · fecha a ponta aberta pelo
+**ADR-042, Decisão 7** · PR `—`
+
+O painel já gravava `linkExterno` desde a F51, mas nada trazia a mídia para o object storage — e o
+totem só sabe servir `midiaKey`. O gerente colava o link, salvava, e a tela pública mostrava um
+`<video>` vazio. Pedido do PI: *"cadastrar vários vídeos que já estão no Insta e tocar no totem
+automático"*.
+
+**Viabilidade testada ANTES de abrir o card**, não depois: `yt-dlp` extraiu o reel real de
+`@clinicadamusculacao` (`DbtoWkFR6l6`) sem autenticação — MP4 de 24,6 MB, dentro do teto de 40 MB
+que `TAMANHO_MAXIMO_DE_MIDIA_BYTES` já impunha.
+
+| peça | onde |
+|---|---|
+| `MediaFetcher` (porta) + `ErroDoExtrator` | `common/media-fetcher/media-fetcher.port.ts` |
+| `YtDlpMediaFetcherAdapter` (real) e `FakeMediaFetcherAdapter` (dublê) | mesmo diretório |
+| `aceitarLinkDeReel` — fronteira de segurança, pura | `kiosk-admin/domain/link-de-reel.ts` |
+| `ingerirDeLink`, desaguando em `enviar` | `kiosk-admin/kiosk-media.service.ts` |
+| `POST :id/media/from-link` | `kiosk-admin/kiosk-admin.controller.ts` |
+| Campo habilitado + botão *Copiar/Atualizar vídeo* | `operations/kiosks/[id]/aba-de-blocos.tsx` |
+
+**A ingestão desagua no `KioskMediaService`, e essa é a decisão inteira.** Formato, antivírus e
+storage acontecem uma vez, no mesmo lugar do upload de MP4. Um caminho paralelo teria de repetir as
+três travas, e a primeira esquecida viraria o buraco — mídia de **terceiro** entrando no bucket sem
+escaneamento é pior que arquivo que o gerente escolheu.
+
+**`aceitarLinkDeReel` é fronteira de segurança, não validação de formulário.** O que ela aprova
+vira argumento de um processo que baixa o que a URL apontar: host livre é **SSRF** (rede interna,
+metadados de nuvem, `file://`). Por isso o host é comparado **inteiro** contra lista fechada —
+`includes`/`endsWith` aceitariam `evil-instagram.com` — e o shortcode é restrito a
+`[A-Za-z0-9_-]`. `execFile` (nunca `exec`) é a segunda camada, independente da primeira.
+
+**Vários reels sem contrato novo:** decisão do PI — N blocos `VIDEO` no rodízio que já existe
+(`kiosk/lib/rodizio.ts`), em vez de lista dentro de um bloco. Zero mudança de schema, de tabela e
+de tela.
+
+🔧 **Três defeitos, e nenhum apareceu em teste de unidade.**
+
+1. **`Nest can't resolve dependencies (String at index [0])`** — o construtor de
+   `YtDlpMediaFetcherAdapter` recebe o nome do binário com valor padrão, e registrar a **classe**
+   como provider fez o Nest tentar injetar esse primitivo. Derrubou a suíte **inteira** de
+   integração. `useFactory` resolveu.
+2. **`variant="secondary"` não existe** no design system (`solid | outline | ghost | destructive`),
+   e antes disso o botão apontava para classes CSS inexistentes. Typecheck passava nos dois casos.
+3. ⚠️ **A tradução de erro estava errada, com os testes verdes.** Um reel inexistente respondia
+   **503 "a ferramenta falhou"** em vez de **422 "confira se o post é público"** — a lista tinha
+   oito frases plausíveis do `yt-dlp` e **nenhuma era a real** (`empty media response`). O dublê
+   escolhia a mensagem, então o teste concordava consigo mesmo. Só a chamada contra o Instagram de
+   verdade mostrou. Isso importa porque o ADR exige a distinção por escrito: *"a ferramenta
+   quebrou"* o gerente não resolve pela tela; *"troque o link"*, sim.
+
+**O CI usa o dublê (`MEDIA_FETCHER_FAKE=1`), deliberadamente.** Instalar `yt-dlp` traria de volta o
+`apt-get` que a #105 tirou do caminho crítico e faria uma mudança da Meta pintar o CI de vermelho
+sem defeito nosso. O CI prova a **fiação**; a extração é verificada à mão.
+
+**Percurso real, 28/08/2026.** Pela API, com o extrator de verdade: o reel baixou em **4,2s**,
+passou pelo antivírus, foi para o MinIO, e a resposta trouxe a URL canônica (query de rastreamento
+removida). Publicada a configuração, o totem tocou o vídeo — `paused: false`, 112,1s, 720×1280, com
+`src` apontando para o **object storage**, nunca para o Instagram (trava 2 do ADR). Os dois
+caminhos de erro conferidos ao vivo: host falso → 400, reel inexistente → 422.
+
 #### F32 — o que a fatia cumpriu
 
 Slice 5.3 · `SPEC-032` · issue [#32](https://github.com/RodReis/arenahub/issues/32) · PR [#214](https://github.com/RodReis/arenahub/pull/214) (mergeado em 28/08/2026, CI verde)

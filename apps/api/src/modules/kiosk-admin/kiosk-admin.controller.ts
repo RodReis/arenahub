@@ -24,6 +24,17 @@ import {
 import { KioskMediaService } from './kiosk-media.service.js';
 import { TAMANHO_MAXIMO_DE_MIDIA_BYTES } from './domain/midia-do-totem.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { z } from 'zod';
+
+/**
+ * Corpo de `POST :id/media/from-link`.
+ *
+ * SO checa que ha texto -- quem decide se a URL e aceitavel e
+ * `aceitarLinkDeReel`, no dominio. Repetir a regra aqui criaria duas
+ * definicoes de "link valido" que divergem na primeira mudanca, e a do
+ * boundary venceria por acidente de ordem.
+ */
+const esquemaDeLinkDeMidia = z.object({ link: z.string().trim().min(1) }).strict();
 
 /**
  * O arquivo como o `FileInterceptor` o entrega -- mesma declaracao local do
@@ -177,6 +188,42 @@ export class KioskAdminController {
       contentType: arquivo.mimetype,
       conteudo: new Uint8Array(arquivo.buffer),
     });
+  }
+
+  /**
+   * Copia um reel do Instagram para a midia da tela publica (ADR-042,
+   * Decisao 7).
+   *
+   * MESMO CONTRATO DO UPLOAD -- devolve a chave, e o painel a coloca no
+   * rascunho. Adiciona `linkExterno` porque o bloco guarda a URL CANONICA,
+   * nao a que o gerente colou: o botao "copiar link" do app traz query de
+   * rastreamento, e o mesmo reel copiado de dois lugares viraria dois links.
+   *
+   * `POST` e nao `PUT` mesmo sendo repetivel: cada chamada BAIXA de novo e
+   * gera chave nova (o `randomUUID` de `montarChaveDeMidia`). E o que faz o
+   * botao "atualizar midia" do painel funcionar -- rechamar traz a versao
+   * atual do reel.
+   *
+   * O download acontece AQUI, no painel, com o gerente olhando (trava 1 do
+   * ADR). Nenhuma rota do totem extrai coisa nenhuma.
+   */
+  @Post(':id/media/from-link')
+  @HttpCode(201)
+  @RequirePermissions('device.manage')
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['midiaKey', 'linkExterno'],
+      properties: { midiaKey: { type: 'string' }, linkExterno: { type: 'string' } },
+    },
+  })
+  async ingerirMidiaDeLink(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+  ): Promise<{ midiaKey: string; linkExterno: string }> {
+    const { link } = esquemaDeLinkDeMidia.parse(corpo);
+
+    return this.midia.ingerirDeLink(this.contexto.require(), id, link);
   }
 
   @Delete(':id/config/draft')

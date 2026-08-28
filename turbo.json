@@ -16,7 +16,9 @@
     "MFA_ENCRYPTION_KEY",
     "API_INTERNAL_URL",
     "KIOSK_KEY_ID",
-    "KIOSK_SECRET"
+    "KIOSK_SECRET",
+    "MEDIA_FETCHER_FAKE",
+    "YTDLP_BIN"
   ],
   "tasks": {
     "build": {

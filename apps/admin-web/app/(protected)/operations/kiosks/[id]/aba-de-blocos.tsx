@@ -10,7 +10,7 @@ import {
 } from '@arenahub/api-contracts';
 import { Button, Field, SelectField, TextareaField } from '@arenahub/ui';
 
-import { enviarMidiaAction } from '../../../../actions/kiosk-midia';
+import { enviarMidiaAction, ingerirMidiaDeLinkAction } from '../../../../actions/kiosk-midia';
 import { ROTULO_DO_TIPO, blocoNovo, mover, remover, substituir, tiposDisponiveis } from './blocos';
 import estilos from './formulario-de-configuracao.module.css';
 
@@ -315,7 +315,44 @@ function EditorDeVideo({
   readonly aoFalhar: (mensagem: string) => void;
 }) {
   const [enviando, setEnviando] = useState(false);
+  const [copiando, setCopiando] = useState(false);
   const campoDeArquivo = useRef<HTMLInputElement>(null);
+
+  /**
+   * Copia o reel do Instagram para o storage (ADR-042, Decisao 7).
+   *
+   * Grava `midiaKey` E `linkExterno` na MESMA atualizacao: o servidor
+   * devolve a URL canonica (sem query de rastreamento), e guardar a que o
+   * gerente colou faria o mesmo reel virar dois links conforme de onde foi
+   * copiado.
+   *
+   * Em caso de falha o bloco NAO muda -- nem a chave, nem o link. Um video
+   * que ja estava no ar continua no ar; a copia falhada nao derruba o que
+   * funcionava.
+   */
+  const copiarDoInstagram = async () => {
+    const link = bloco.linkExterno;
+
+    if (!link) return;
+
+    setCopiando(true);
+
+    const resultado = await ingerirMidiaDeLinkAction(kioskDeviceId, link);
+
+    setCopiando(false);
+
+    if (resultado.erro !== undefined) {
+      aoFalhar(resultado.erro);
+
+      return;
+    }
+
+    aoMudar({
+      ...bloco,
+      midiaKey: resultado.midiaKey ?? null,
+      linkExterno: resultado.linkExterno ?? link,
+    });
+  };
 
   const enviar = async (arquivo: File) => {
     setEnviando(true);
@@ -387,23 +424,44 @@ function EditorDeVideo({
       </div>
 
       {/*
-        O CAMPO DE LINK EXISTE E ESTA DESABILITADO, com o motivo em tela.
-        Esconde-lo faria o gerente concluir que a origem nunca existiu; a
-        Decisao 7 do ADR-042 pediu as duas origens, e o que falta e o
-        extrator, nao a decisao.
+        LINK DO INSTAGRAM -- a segunda origem da Decisao 7 do ADR-042.
+
+        O botao e SEPARADO do campo de propósito: a copia e um ATO caro
+        (baixa dezenas de MB, escaneia, grava) e demorado. Disparar a cada
+        tecla digitada faria N downloads enquanto o gerente cola a URL.
       */}
       <Field
         id={`linkExterno-${bloco.id}`}
         label="Link de reel do Instagram"
         type="url"
         value={bloco.linkExterno ?? ''}
-        disabled
+        disabled={copiando}
         onChange={(e) => {
           aoMudar({ ...bloco, linkExterno: e.target.value || null });
         }}
-        hint="Indisponível nesta versão. Quando estiver, a mídia será copiada no momento de salvar — mudanças posteriores no Instagram não se refletem no totem."
+        hint="A mídia é copiada AGORA, ao clicar em copiar — mudanças posteriores no Instagram não se refletem no totem."
         data-testid={`link-${bloco.id}`}
       />
+
+      <div className={estilos['campoDeArquivo']}>
+        <Button
+          variant="outline"
+          disabled={copiando || !bloco.linkExterno}
+          onClick={() => void copiarDoInstagram()}
+          data-testid={`copiar-link-${bloco.id}`}
+        >
+          {/*
+            O rotulo MUDA quando ja ha video: "copiar" e "atualizar" sao
+            atos diferentes para o gerente -- o segundo substitui o que ja
+            esta no ar, e o botao precisa dizer isso antes do clique.
+          */}
+          {copiando
+            ? 'Copiando…'
+            : bloco.midiaKey
+              ? 'Atualizar vídeo do Instagram'
+              : 'Copiar vídeo do Instagram'}
+        </Button>
+      </div>
     </>
   );
 }
