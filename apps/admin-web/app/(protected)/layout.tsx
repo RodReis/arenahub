@@ -127,6 +127,15 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     permissao -- sem ela nao ha nada que a tela deixe fazer.
   */
   { href: '/engagement/placar', label: 'Placar e XP', exigePermissao: 'engagement.moderate' },
+  /*
+    DESAFIOS -- F34, Slice 5.5.
+
+    Mesmo grupo das tres entradas acima, e pelo mesmo motivo: criar desafio e
+    ato esporadico (uma campanha por mes, quando ha), nao ferramenta de
+    atendimento diario. `engagement.moderate` porque criar e abrir exigem
+    essa permissao -- sem ela nao ha nada que a tela deixe fazer.
+  */
+  { href: '/engagement/desafios', label: 'Desafios', exigePermissao: 'engagement.moderate' },
   { href: '/units', label: 'Unidades' },
 ];
 

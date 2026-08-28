@@ -232,3 +232,129 @@ export async function moderarAlias(
 
   return { sucesso: { perfilId: resposta.dados.id } };
 }
+
+/* -------------------------------------------------------------------------
+ * Desafios -- F34, Slice 5.5, ADR-048.
+ * ------------------------------------------------------------------------- */
+
+/** Espelha o item de `GET /engagement/challenges/templates`. */
+export interface TemplateDeDesafioDto {
+  id: string;
+  code: string;
+  version: number;
+  name: string;
+  maxSessoesPorSemana: number;
+  maxJanelaEmDias: number;
+}
+
+export interface EstadoDoDesafio {
+  erro?: string;
+  sucesso?: { id: string; titulo: string };
+}
+
+/** `AAAA-MM-DD` -- o mesmo formato que a API exige (dia local da unidade). */
+const REGEX_DO_DIA = /^\d{4}-\d{2}-\d{2}$/u;
+
+const esquemaDeCriacaoDeDesafio = z.object({
+  templateVersionId: z.string().trim().min(1),
+  /** Vazio no formulario = tenant inteiro. */
+  gymUnitId: z.string().uuid().nullable(),
+  title: z.string().trim().min(1).max(120),
+  targetValue: z.coerce.number().int().positive(),
+  startsOn: z.string().regex(REGEX_DO_DIA),
+  endsOn: z.string().regex(REGEX_DO_DIA),
+});
+
+/**
+ * Mensagem por codigo estavel -- nunca a mensagem crua do servidor.
+ *
+ * `CHALLENGE_FREQUENCIA_ACIMA_DO_LIMITE` e o erro que a secretaria encontra
+ * de verdade: a meta que ela digitou exige mais treino por semana do que o
+ * template permite (`M5-BR-011`). A frase diz o que fazer -- baixar a meta ou
+ * alongar a janela -- em vez de repetir o codigo.
+ */
+const MENSAGEM_DE_DESAFIO: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
+  CHALLENGE_TEMPLATE_NAO_ENCONTRADO: 'Escolha um modelo de desafio válido.',
+  CHALLENGE_FREQUENCIA_ACIMA_DO_LIMITE:
+    'A meta exige mais treinos por semana do que este modelo permite. Reduza a meta ou alongue o período.',
+  CHALLENGE_JANELA_LONGA_DEMAIS: 'O período é mais longo do que este modelo permite.',
+  CHALLENGE_JANELA_INVALIDA: 'A data final precisa ser igual ou posterior à inicial.',
+  CHALLENGE_META_INVALIDA: 'A meta precisa ser um número inteiro maior que zero.',
+  CHALLENGE_NAO_ENCONTRADO: 'Desafio não encontrado.',
+  CHALLENGE_JA_ATIVADO: 'Este desafio já foi aberto.',
+};
+
+function mensagemDeDesafio(code: string | undefined, padrao: string): string {
+  return (code ? MENSAGEM_DE_DESAFIO[code] : undefined) ?? padrao;
+}
+
+/**
+ * Cria o desafio em RASCUNHO.
+ *
+ * Nao abre a inscricao: `ativarDesafio` e um segundo ato deliberado, para que
+ * um erro de digitacao na meta nao esteja recebendo aluno antes de alguem
+ * reler.
+ */
+export async function criarDesafio(
+  _anterior: EstadoDoDesafio,
+  formulario: FormData,
+): Promise<EstadoDoDesafio> {
+  const unidade = formulario.get('gymUnitId');
+
+  const analisado = esquemaDeCriacaoDeDesafio.safeParse({
+    templateVersionId: formulario.get('templateVersionId'),
+    // Campo vazio significa "todas as unidades", nao string vazia.
+    gymUnitId: typeof unidade === 'string' && unidade.length > 0 ? unidade : null,
+    title: formulario.get('title'),
+    targetValue: formulario.get('targetValue'),
+    startsOn: formulario.get('startsOn'),
+    endsOn: formulario.get('endsOn'),
+  });
+
+  if (!analisado.success) {
+    return { erro: 'Preencha modelo, título, meta e o período do desafio.' };
+  }
+
+  const resposta = await chamarApi<{ id: string }>('/api/v1/engagement/challenges', {
+    metodo: 'POST',
+    corpo: analisado.data,
+  });
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: mensagemDeDesafio(resposta.erro?.code, 'Não foi possível criar o desafio.') };
+  }
+
+  revalidatePath('/engagement/desafios');
+
+  return { sucesso: { id: resposta.dados.id, titulo: analisado.data.title } };
+}
+
+const esquemaDeAtivacao = z.object({ challengeId: z.string().trim().min(1) });
+
+/** Abre a inscricao. A partir daqui o aluno ve o desafio no totem. */
+export async function ativarDesafio(
+  _anterior: EstadoDoDesafio,
+  formulario: FormData,
+): Promise<EstadoDoDesafio> {
+  const analisado = esquemaDeAtivacao.safeParse({
+    challengeId: formulario.get('challengeId'),
+  });
+
+  if (!analisado.success) {
+    return { erro: 'Desafio inválido.' };
+  }
+
+  const resposta = await chamarApi<{ ok: boolean }>(
+    `/api/v1/engagement/challenges/${analisado.data.challengeId}/activate`,
+    { metodo: 'POST' },
+  );
+
+  if (!resposta.ok) {
+    return { erro: mensagemDeDesafio(resposta.erro?.code, 'Não foi possível abrir o desafio.') };
+  }
+
+  revalidatePath('/engagement/desafios');
+
+  return { sucesso: { id: analisado.data.challengeId, titulo: '' } };
+}

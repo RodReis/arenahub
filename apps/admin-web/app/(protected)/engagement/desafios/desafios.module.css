@@ -1,0 +1,51 @@
+/*
+ * Desafios -- F34, Slice 5.5, ADR-048.
+ *
+ * Cor, tipografia e raio saem de token `--ah-*` (DS-PAINEL.md): hex literal
+ * é proibido pela lint. Sem tokens de espaçamento no design system ainda
+ * (mesma observação de `placar.module.css`) -- px direto aqui.
+ */
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+.bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-md, 8px);
+  background: var(--ah-surface-raised);
+}
+
+/*
+ * Início e fim lado a lado: são uma decisão só (o período), e separá-los em
+ * duas linhas faria a secretaria ler dois campos independentes.
+ */
+.periodo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+/*
+ * Aviso informativo, não erro: o teto da janela orienta antes de enviar, mas
+ * quem recusa é o servidor. Cor secundária, não a de erro -- pintar de
+ * vermelho o que não falhou treinaria a secretaria a ignorar vermelho.
+ */
+.aviso {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: 0.875rem;
+}
+
+.resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
