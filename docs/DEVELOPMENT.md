@@ -1098,9 +1098,35 @@ reservava `modulos.ranking` no contrato de `KioskConfiguration`, desligado por p
 | F30 | 5.1 Preferências e identidade pública | ✅ **entregue** — ver abaixo |
 | F31 | 5.2 XP e conquistas + 5.4 ranking | ✅ **entregue** em 27/08/2026 ([#213](https://github.com/RodReis/arenahub/pull/213)) — ADR-047 destravou a fatia (totem como superfície) e absorveu a F33 |
 | F32 | 5.3 Consistência e streak | ✅ **entregue** em 28/08/2026 — destravada por decisão do PI, superfície no totem |
-| ~~F33~~ | 5.4 Rankings privados por padrão | **absorvida pela F31** (ADR-047, Decisão 2) — número queimado. INV-121 passou para a F31 |
+| ~~F33~~ | 5.4 Rankings privados por padrão | **absorvida pela F31** (ADR-047, Decisão 2) — número queimado. INV-121 passou para a F31. Card fechado em 28/08/2026 — ver a ponta solta abaixo |
 | F34 | 5.5 Desafios e notificações | bloqueada — gate do MVP 5 original |
 | F35 | 5.6 Operação, moderação e experimento | bloqueada — gate do MVP 5 original; traz o canal de denúncia que grava `PublicProfileStatus.HIDDEN` |
+
+#### A ponta solta da Slice 5.4 — rankings por categoria
+
+Ao fechar a issue [#33](https://github.com/RodReis/arenahub/issues/33) em 28/08/2026, a conferência
+item a item da Slice 5.4 contra o que a F31 entregou mostrou **cinco dos seis itens cumpridos**:
+
+| item da Slice 5.4 | onde ficou |
+|---|---|
+| snapshots por **período** | `RankingSnapshot.localMonth`, `@@unique([tenantId, gymUnitId, localMonth])` |
+| snapshots por **categoria** | ❌ **não entregue** — ver abaixo |
+| métricas relativas e critérios de elegibilidade | coorte mínima 5 → `WITHHELD` (`M5-BR-007`) |
+| desempate determinístico | `classificacao.ts`: pontos → `lastEntryAt` → `studentId` |
+| identidade pública conforme preferência | `resolverExposicao()` da F30 |
+| publicação e retirada | `DRAFT`/`PUBLISHED`/`WITHHELD`, imutável após publicar (`M5-AC-007`) |
+
+**O que falta:** o PRD §7 pede *"rankings por frequência, consistência e evolução relativa"*. A F31
+entregou **um** placar — XP por mês —, e o ADR-047 **não declarou as demais categorias como escopo
+negativo**. A lacuna não estava registrada em documento nenhum até esta data.
+
+**Decisão do PI em 28/08/2026:** as categorias ficam para **F34/F35**, dentro do MVP 5. A #33 é
+fechada (o número segue queimado, não se reaproveita) e a ponta passa a viver aqui e no
+`STATUS.md`, em vez de sumir junto com o card.
+
+Vale notar que a **F32 tornou uma das três viável**: `avaliarSemanas`/`resumirStreak` já produzem a
+métrica de consistência por aluno. Um ranking de consistência precisaria só de snapshot e ordenação
+sobre o que já existe — não de cálculo novo.
 
 #### F32 — o que a fatia cumpriu
 
