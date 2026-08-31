@@ -832,13 +832,13 @@ trata `P2002` — ler-antes-de-escrever perde a corrida por construção.
 
 ### Evidência da `SPEC-038` — F38, CRM de retenção
 
-**PR: —** *(preencher depois do merge, pela regra do topo desta seção)*
+**PR: [#226](https://github.com/RodReis/arenahub/pull/226)** — preenchido depois do merge, pela regra do topo desta seção.
 
 `pnpm test:report --issue 38 --spec SPEC-038`, rodado em 31/08/2026:
 
 ```
-| 2026-08-31 | #38 | SPEC-038 | unitário   | 2768 | 2768 | 0 | 76.3 | — |
-| 2026-08-31 | #38 | SPEC-038 | integração |  765 |  765 | 0 | 83.9 | medido suíte a suíte |
+| 2026-08-31 | #38 | SPEC-038 | unitário   | 2768 | 2768 | 0 | 76.3 | [#226](https://github.com/RodReis/arenahub/pull/226) |
+| 2026-08-31 | #38 | SPEC-038 | integração |  765 |  765 | 0 | 83.9 | [#226](https://github.com/RodReis/arenahub/pull/226) — suíte a suíte |
 ```
 
 Unitário: **2768** (era 2707 na F37 — os **61** novos são desta fatia). Integração: **765** em

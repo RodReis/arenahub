@@ -100,5 +100,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-31 | #36 | SPEC-036 | integração | 856 | 856 | 0 | 83.9 | medido suíte a suíte (o Jest crasha no fim no Windows) |
 | 2026-08-31 | #37 | SPEC-037 | unitário | 2707 | 2707 | 0 | 76.4 | [#225](https://github.com/RodReis/arenahub/pull/225) |
 | 2026-08-31 | #37 | SPEC-037 | integração | 753 | 753 | 0 | 83.9 | [#225](https://github.com/RodReis/arenahub/pull/225) — medido suíte a suíte (o Jest crasha no fim no Windows) |
-| 2026-08-31 | #38 | SPEC-038 | unitário | 2768 | 2768 | 0 | 76.3 | — |
-| 2026-08-31 | #38 | SPEC-038 | integração | 765 | 765 | 0 | 83.9 | medido suíte a suíte (o Jest crasha no fim no Windows) |
+| 2026-08-31 | #38 | SPEC-038 | unitário | 2768 | 2768 | 0 | 76.3 | [#226](https://github.com/RodReis/arenahub/pull/226) |
+| 2026-08-31 | #38 | SPEC-038 | integração | 765 | 765 | 0 | 83.9 | [#226](https://github.com/RodReis/arenahub/pull/226) — medido suíte a suíte (o Jest crasha no fim no Windows) |
