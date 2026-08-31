@@ -6,7 +6,7 @@
 | **MVP** | 6 |
 | **Slice do PRD** | **6.5** — `docs/prd/academia/MVP-06-retention-ai.md` §8 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-06-05-supervised-ml-optional.md` |
-| **Status** | **`não executada`** — gate `M6-ML-01` não atingido (ADR-050) |
+| **Status** | **`não executada`** — gate `M6-ML-01` não atingido (ADR-050). PR [#228](https://github.com/RodReis/arenahub/pull/228), mergeado em 31/08/2026 |
 | **ADRs** | **ADR-050** decide a não-execução |
 
 > **Esta fatia não foi implementada, e isso é um resultado — não uma pendência.** A issue
