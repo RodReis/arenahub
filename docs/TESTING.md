@@ -658,8 +658,8 @@ em produção.
 
 ### Evidência da `SPEC-036` — F36, contrato de dados e baseline analítica
 
-**PR: —** (preencher depois do merge, pela regra do topo desta seção — falhei nisso no #127 e no
-#128, e a guarda `--check` **não** valida este campo).
+**PR: [#224](https://github.com/RodReis/arenahub/pull/224)** — preenchido depois do merge, pela regra
+do topo desta seção.
 
 `pnpm test:report --issue 36 --spec SPEC-036`, rodado em 31/08/2026:
 
