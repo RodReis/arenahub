@@ -1080,6 +1080,66 @@ sabe que vão doer:
 - **F40** provavelmente **não acontece**: exige ≥ 200 churns positivos e ≥ 1.000 snapshots por
   tenant. Sem isso, o produto fica na baseline de regras — e tudo bem.
 
+#### MVP 6 — F36 entregue em 31/08/2026 (contrato de dados)
+
+**O gate de ≥6 meses não alcançou a F36** — decisão do PI em 31/08. O gate existe para o *score*
+(F37+); o contrato de dados é justamente o que **faz os seis meses começarem a contar**, porque
+antes dele não há snapshot reconstruível para acumular.
+
+| F | slice | núcleo |
+|---|---|---|
+| F36 | 6.1 Contrato de dados e baseline analítica | ✅ **entregue** em 31/08/2026 — snapshot point-in-time, 13 features, checksum determinístico |
+| F37 | 6.2 Regras explicáveis e score | atrás do gate — precisa de snapshot acumulado |
+| F38–F41 | 6.3 a 6.6 | atrás da F37 |
+
+**O que a F36 descobriu, e vale para quem pegar a F37.**
+
+**1. O schema guarda mais história do que parece.** A leitura superficial diz que `Invoice.status`
+e `Subscription.status` são mutáveis e portanto o passado se perdeu. É falso: `dueAt`, `paidAt`,
+`createdAt`, `startsAt` e `publishedAt` **nunca mudam**, e `StudentTimelineEvent` é append-only.
+"A invoice estava vencida em D" é aritmética sobre datas imutáveis, não consulta de status —
+`estavaVencidaEm()` em [features.ts](../apps/api/src/modules/retention/domain/features.ts).
+**Doze das treze features saem as-of de verdade.**
+
+**2. A décima terceira é `payment_failure_count_90d`.** `PaymentAttempt.status` transita
+(`PROCESSING` → `FAILED`) depois do fato e não há trilha da transição. Ela sai marcada
+`ESTADO_CORRENTE` na coluna `provenance` — a F40 a exclui do treino com um filtro em vez de
+refazer esta fatia.
+
+**3. Dois instantes por fato, e o segundo é o que ninguém lembra.** `ocorreuEm` (quando aconteceu)
+e `conhecidoEm` (quando o sistema soube) divergem o tempo todo: catraca offline sincroniza 12h
+depois, webhook do PIX chega minutos depois. Filtrar só por `ocorreuEm` faz o fato de terça
+conhecido na quinta entrar num snapshot de quarta *reconstruído hoje* — e não entrar no de quarta
+*gerado na quarta*. **O defeito não tem sintoma:** o código roda, os testes passam, os números
+parecem certos, e o modelo aprende a enxergar o futuro. Canário: remover a condição de
+conhecimento derruba 3 testes.
+
+**4. "Ausente" e "zero" decidem quem recebe ligação.** Aluno com `attendance_days_30d = 0` faltou
+o mês; aluno com a mesma feature **ausente** entrou ontem. Colapsar os dois põe o recém-matriculado
+na fila de retenção. O tipo impede: `valor` é `null` quando ausente e `razao` é obrigatória, então
+nenhum `?? 0` apaga a distinção sem o compilador reclamar. Canário: 7 testes.
+
+**5. O checksum é a prova do aceite, não auditoria.** "Um snapshot passado pode ser reproduzido" é
+afirmação **verificável**: recalcular o mesmo recorte tem de dar o mesmo hash. Divergiu, alguma
+feature leu estado corrente — e a gravação lança `SNAPSHOT_NAO_DETERMINISTICO` em vez de
+sobrescrever, porque sobrescrever apagaria justamente a evidência de que o pipeline quebrou.
+
+🔎 **A revisão adversarial achou dois defeitos reais, e um era grave.** `gravarSnapshot` fazia
+`findUnique`-depois-`create`: dois workers passam os dois pelo `findUnique` antes de qualquer
+commit, e o segundo derrubava o job com **P2002 cru** — na reexecução que o próprio comentário do
+método prometia ser inofensiva. Ler-antes-de-escrever perde a corrida por construção; quem decide
+é a chave única. Canário com `Promise.all` de 3 gravações: sem o tratamento, o teste cai. O
+segundo: `subscription.findFirst` com `orderBy: { startsAt: 'desc' }` **sem desempate** — duas
+assinaturas com o mesmo `startsAt` (troca de plano no mesmo evento) deixariam a ordem física do
+Postgres escolher, e ela muda depois de um `UPDATE`. Já aconteceu neste repo duas vezes.
+
+⚠️ **A migration não pôde ser aplicada por `prisma migrate dev`:** a migration da F21 foi alterada
+depois de aplicada (pré-existente, commit `ca8535e`), e o Prisma exige **reset do banco** — que
+apagaria os dados locais. O SQL foi gerado por `prisma migrate diff --from-schema/--to-schema`,
+aplicado por `psql` e registrado em `_prisma_migrations`. **É aditiva:** só `CREATE TYPE` e
+`CREATE TABLE`, nenhum `DROP`/`ALTER` de coluna existente. Quem pegar a F37 vai esbarrar no mesmo
+bloqueio.
+
 ### MVP 5 — Engajamento opt-out · F30 a F35
 
 **O gate mudou para a F30, e de novo para a F32.** O `docs/STATUS.md` §4 lista *"eventos confiáveis + app do MVP 4"*

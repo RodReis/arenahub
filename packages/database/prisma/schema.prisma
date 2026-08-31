@@ -625,6 +625,9 @@ model Tenant {
   challengeParticipants  ChallengeParticipant[]
   challengeNotices       ChallengeNotice[]
   engagementDisputes     EngagementDispute[]
+  retentionTargetVersions     RetentionTargetVersion[]
+  retentionFeatureSetVersions RetentionFeatureSetVersion[]
+  studentFeatureSnapshots     StudentFeatureSnapshot[]
 
   /// Minimo de participantes para publicar um placar (`M5-BR-007`).
   /// ADR-047: 5. Configuravel por tenant -- academia pequena e academia
@@ -1050,6 +1053,7 @@ model Student {
   challengeParticipations ChallengeParticipant[]
   challengeNotices        ChallengeNotice[]
   engagementDisputes      EngagementDispute[]
+  featureSnapshots        StudentFeatureSnapshot[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -4787,3 +4791,168 @@ model EngagementDispute {
   @@map("engagement_disputes")
 }
 
+
+// ===========================================================================
+// RETENCAO -- contrato de dados e baseline analitica (F36, SPEC-036, Slice 6.1)
+// ===========================================================================
+
+/// Por que uma feature nao tem valor. AUSENTE NAO E ZERO -- `M6-BR-002` e o
+/// PRD §9. Sem este enum, `0` teria de servir para "faltou o mes inteiro" e
+/// para "entrou ontem", e a fila de retencao ligaria para o recem-matriculado.
+enum RetentionMissingReason {
+  /// Nao ha fato suficiente na janela. Caso comum e benigno: aluno novo.
+  NO_HISTORY
+  /// A fonte nao respondeu na materializacao. Degrada a completude.
+  SOURCE_UNAVAILABLE
+  /// Nao se aplica a este aluno (ex.: plano sem termino previsto).
+  NOT_APPLICABLE
+  /// Opt-out ou supressao vigente proibe usar o dado -- `M6-FR-006`.
+  SUPPRESSED
+
+  @@map("retention_missing_reason")
+}
+
+/// De onde veio o valor de uma feature.
+///
+/// A marca que a decisao do PI de 31/08/2026 exige. O PI decidiu executar a
+/// F36 com "aceite relaxado"; esta coluna e o que impede a decisao de
+/// contaminar em silencio o modelo da F40: `CURRENT_STATE` pode violar
+/// `M6-FR-003` (informacao futura) sem que nenhum teste perceba -- a feature
+/// acerta no backtest justamente porque enxergou o futuro. Marcada, a F40 a
+/// exclui do treino com um filtro; nao marcada, seria preciso refazer esta
+/// fatia para descobrir em quais features confiar.
+enum RetentionFeatureProvenance {
+  /// So fatos datados e imutaveis. Recalcular amanha da o mesmo numero.
+  AS_OF
+  /// Depende de campo mutavel sem trilha. Reproduzivel apenas por acaso.
+  CURRENT_STATE
+
+  @@map("retention_feature_provenance")
+}
+
+/// Versao do alvo: populacao, janelas e horizonte (`M6-FR-001`).
+///
+/// Versionar e o que impede comparacao invalida: o PRD §3 diz que "mudanca
+/// nessa definicao cria nova versao de target e invalida comparacao direta".
+/// Sem esta tabela, trocar a janela de 90 para 60 dias mudaria em silencio o
+/// significado de todo snapshot ja gravado.
+model RetentionTargetVersion {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  /// Identificador legivel, ex.: `alvo@1`. E o que aparece no snapshot.
+  label String
+
+  /// Janela de features, em dias (PRD §3: 90).
+  featureWindowDays Int @map("feature_window_days")
+  /// Horizonte de previsao, em dias (PRD §3: 30).
+  predictionDays    Int @map("prediction_days")
+  /// Dias sem reativacao que confirmam o churn (PRD §3: 30).
+  confirmationDays  Int @map("confirmation_days")
+
+  /// Congelada: versao em uso nao muda mais, cria-se outra.
+  frozenAt  DateTime? @map("frozen_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant    Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  snapshots StudentFeatureSnapshot[]
+
+  @@unique([tenantId, label])
+  @@map("retention_target_versions")
+}
+
+/// Versao do catalogo de features (`M6-FR-001`).
+///
+/// Separada do alvo de proposito: acrescentar uma feature nao muda a definicao
+/// de churn, e forcar as duas a andarem juntas invalidaria historico sem
+/// motivo.
+model RetentionFeatureSetVersion {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  /// Identificador legivel, ex.: `features@1`.
+  label String
+
+  /// Os nomes das features desta versao, na ordem do PRD §9.
+  featureNames String[] @map("feature_names")
+
+  frozenAt  DateTime? @map("frozen_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant    Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  snapshots StudentFeatureSnapshot[]
+
+  @@unique([tenantId, label])
+  @@map("retention_feature_set_versions")
+}
+
+/// O snapshot diario de features de um aluno (`M6-FR-002`).
+///
+/// IMUTAVEL por (tenant, aluno, observacao, alvo, catalogo, revisao). Correcao
+/// autorizada cria REVISAO nova; ninguem sobrescreve uma linha -- sobrescrever
+/// apagaria a evidencia de que o pipeline nao era reproduzivel, que e
+/// exatamente o que se quer descobrir.
+model StudentFeatureSnapshot {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  studentId          String @map("student_id") @db.Uuid
+  targetVersionId    String @map("target_version_id") @db.Uuid
+  featureSetVersionId String @map("feature_set_version_id") @db.Uuid
+
+  /// O dia que o snapshot descreve.
+  observedAt         DateTime @map("observed_at")
+  /// Ate quando o sistema podia SABER. Separado de `observedAt` para que a
+  /// reconstrucao auditada possa refazer "a quarta como ela era na quarta".
+  knowledgeCutoffAt  DateTime @map("knowledge_cutoff_at")
+  /// Correcao autorizada incrementa; a revisao 1 nunca e sobrescrita.
+  revision           Int      @default(1)
+
+  /// Fracao de features observadas, em `[0, 1]`. E CONFIANCA, nao risco --
+  /// `M6-BR-002`: ausencia reduz completude, nunca aumenta risco.
+  completeness Decimal @db.Decimal(5, 4)
+
+  /// Hash do texto canonico. Reconstruir o mesmo recorte tem de bater; a
+  /// divergencia vira `SNAPSHOT_NAO_DETERMINISTICO`, nunca sobrescrita.
+  checksum String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant            Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student           Student                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  targetVersion     RetentionTargetVersion     @relation(fields: [targetVersionId], references: [id])
+  featureSetVersion RetentionFeatureSetVersion @relation(fields: [featureSetVersionId], references: [id])
+  values            StudentFeatureValue[]
+
+  @@unique([tenantId, studentId, observedAt, targetVersionId, featureSetVersionId, revision])
+  @@index([tenantId, observedAt])
+  @@index([tenantId, studentId, observedAt])
+  @@map("student_feature_snapshots")
+}
+
+/// O valor de uma feature dentro do snapshot.
+///
+/// Linha por feature, e nao um JSON: o dashboard de cobertura agrega POR
+/// feature ("quantos alunos tem `days_past_due` ausente?"), e isso e um
+/// `GROUP BY` numa tabela contra varredura de JSON em toda linha. `value` e
+/// nulo sempre que `missingReason` esta preenchida -- a distincao de
+/// `M6-BR-002` chega ate o banco.
+model StudentFeatureValue {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  snapshotId String @map("snapshot_id") @db.Uuid
+
+  name String
+
+  /// `null` quando ausente. NUNCA zero por omissao.
+  value         Decimal?                @db.Decimal(18, 6)
+  missingReason RetentionMissingReason? @map("missing_reason")
+  provenance    RetentionFeatureProvenance @default(AS_OF)
+
+  snapshot StudentFeatureSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, name])
+  /// O dashboard de qualidade le por aqui.
+  @@index([tenantId, name, missingReason])
+  @@map("student_feature_values")
+}

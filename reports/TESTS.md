@@ -15,7 +15,7 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 2557 | 2557 | 0 | 76.8 |
+| unitário | 2624 | 2624 | 0 | 76.5 |
 | contrato | 0 | 0 | 0 | — |
 | integração | 764 | 764 | 0 | 83.9 |
 | e2e | 0 | 0 | 0 | — |
@@ -96,3 +96,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-28 | #35 | SPEC-035 | integração | 732 | 732 | 0 | 83.9 | — |
 | 2026-08-28 | #35 | SPEC-035 | unitário | 2557 | 2557 | 0 | 76.8 | [#222](https://github.com/RodReis/arenahub/pull/222) |
 | 2026-08-28 | #35 | SPEC-035 | integração | 734 | 734 | 0 | 83.9 | [#222](https://github.com/RodReis/arenahub/pull/222) |
+| 2026-08-31 | #36 | SPEC-036 | unitário | 2624 | 2624 | 0 | 76.5 | — |
+| 2026-08-31 | #36 | SPEC-036 | integração | 855 | 854 | 1 | 83.9 | falha pré-existente da F32 — issue #223 |

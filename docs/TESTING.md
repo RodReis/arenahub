@@ -656,6 +656,70 @@ em produção.
 
 ---
 
+### Evidência da `SPEC-036` — F36, contrato de dados e baseline analítica
+
+**PR: —** (preencher depois do merge, pela regra do topo desta seção — falhei nisso no #127 e no
+#128, e a guarda `--check` **não** valida este campo).
+
+`pnpm test:report --issue 36 --spec SPEC-036`, rodado em 31/08/2026:
+
+```
+| 2026-08-31 | #36 | SPEC-036 | unitário | 2624 | 2624 | 0 | 76.5 | — |
+```
+
+Unitário por pacote: **1348 API** (era 1282 na F35 — os 66 novos são desta fatia) + 443 painel +
+247 totem + 204 ui + 199 edge + 72 access-policy + 66 api-contracts + 44 database.
+
+⚠️ **A linha de integração do gerador é herdada, de novo.** Mesmo crash do Jest no Windows (exit
+`3221226505`, pré-existente desde a F32) — o gerador avisou em stderr e manteve o número anterior
+(764, do `#35`). **Medi suíte a suíte**, as 50 rodadas uma a uma, sem nenhuma captura vazia:
+
+```
+50 suítes · 855 testes · 1 falha
+```
+
+📌 **A falha não é desta fatia, e a aritmética não fecha com a F35 — as duas coisas têm explicação.**
+
+**A falha** é `xp-e-ranking` → *"devolve a consistencia junto do extrato"*, da F32: o teste treina
+em datas fixas (semana de 17–23/08) e compara contra o **relógio real**, então a partir de 24/08 o
+streak legitimamente cai para 0 e a asserção `atual: 1` envelhece. Verificado com `git stash` das
+alterações da F36: **falha igual sem o código novo**. Issue
+[#223](https://github.com/RodReis/arenahub/issues/223) aberta, sem correção aqui — é da F32.
+
+**A contagem** saltou de 734 (F35) para 855, e só 7 são meus. A medição da F35 cobriu **48**
+suítes; o próprio commit `ed0395e` acrescentou arquivos depois disso, e hoje o diretório tem **50**.
+Os outros ~114 testes vieram junto da F35, não desta fatia — contagem que sobe sem explicação é
+para investigar, e esta tem.
+
+📌 **A migration não passou por `prisma migrate dev`.** A migration da F21 foi alterada depois de
+aplicada (pré-existente, `ca8535e`), e o Prisma exige **reset do banco** — que apagaria os dados de
+desenvolvimento. O SQL saiu de `prisma migrate diff --from-schema/--to-schema`, foi aplicado por
+`psql` nos dois bancos (`arenahub` e `arenahub_int`) e registrado em `_prisma_migrations`. É
+**aditiva**: só `CREATE TYPE`/`CREATE TABLE`, nenhum `DROP`. Quem pegar a F37 esbarra no mesmo
+bloqueio.
+
+🔬 **Canários (4).** Cada guarda desta fatia foi provada removendo-a e vendo o teste cair:
+
+| guarda removida | testes que caem |
+|---|---|
+| condição de corte de conhecimento em `dentroDaJanela` | **3** |
+| `ausente()` devolvendo `0` em vez de `null` | **7** |
+| ordenação canônica do checksum | **2** |
+| tratamento de `P2002` em `gravarSnapshot` | **1** (o de concorrência) |
+
+O último merece nota: o teste de corrida usa **`Promise.all` de 3 gravações**, não chamadas em
+fila. Sequencial não exercita a corrida — passa com o código quebrado, que é como o defeito
+sobreviveria a uma revisão de diff.
+
+🔎 **A revisão adversarial achou os dois defeitos que a suíte não pegava**, ambos no repositório
+(o domínio puro passou limpo): o `P2002` acima, e `subscription.findFirst` **sem desempate** —
+duas assinaturas com o mesmo `startsAt` deixariam a ordem física do Postgres escolher qual é a
+corrente, e ela muda depois de um `UPDATE`. O efeito seria `SNAPSHOT_NAO_DETERMINISTICO`
+disparando por ordenação e escondendo o alarme que existe para pegar leitura de estado mutável.
+Terceira vez que este padrão aparece no repo.
+
+---
+
 ## 6. CI
 
 Pipeline mínimo, em ordem de custo crescente (falhe cedo, falhe barato):
