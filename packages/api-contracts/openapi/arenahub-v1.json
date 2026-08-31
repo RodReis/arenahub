@@ -3228,6 +3228,106 @@
         ]
       }
     },
+    "/api/v1/retention/health": {
+      "get": {
+        "operationId": "RetentionMonitoringController_painel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pipeline": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "SAUDAVEL",
+                            "ATRASADO",
+                            "DESLIGADO",
+                            "NUNCA_RODOU"
+                          ]
+                        },
+                        "hoursSinceLastRun": {
+                          "type": "integer",
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "drift": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "feature": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "AUSENCIA",
+                              "MEDIA"
+                            ]
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "ATENCAO",
+                              "CRITICO"
+                            ]
+                          },
+                          "change": {
+                            "type": "number"
+                          },
+                          "before": {
+                            "type": "number"
+                          },
+                          "after": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    },
+                    "needsAttention": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionMonitoring"
+        ]
+      }
+    },
+    "/api/v1/retention/scoring/kill-switch": {
+      "post": {
+        "operationId": "RetentionMonitoringController_definir",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionMonitoring"
+        ]
+      }
+    },
     "/api/v1/edge/heartbeat": {
       "post": {
         "operationId": "EdgeController_heartbeat",

@@ -673,6 +673,23 @@ model Tenant {
   /// que exige dois operadores numa academia que tem um nunca anda.
   engagementCorrectionLimitPoints Int? @map("engagement_correction_limit_points")
 
+  /// KILL SWITCH do scoring de retencao (F41, `M6-FR-017`).
+  ///
+  /// COLUNA, e nao servico de flags: mesmo precedente das tres flags de
+  /// engajamento acima. "Sem deploy" e o requisito (`M6-NFR-006`: efeito em
+  /// ate cinco minutos), e um `UPDATE` numa coluna e o caminho mais curto
+  /// entre a decisao e o efeito.
+  ///
+  /// DESLIGA SO O CALCULO NOVO -- decisao do PI em 31/08/2026. Para de
+  /// pontuar e de gerar fila; scores ja gravados continuam legiveis com marca
+  /// de idade (F37) e **tarefas abertas seguem trataveis ate o fim**. E o que
+  /// `M6-NFR-009` exige: "tarefas e interacoes permanecem disponiveis se o
+  /// scoring estiver indisponivel".
+  ///
+  /// Desligar nao apaga nada. Religar devolve o pipeline, porque nada foi
+  /// destruido -- mesma propriedade das flags de engajamento.
+  retentionScoringEnabled Boolean @default(true) @map("retention_scoring_enabled")
+
   @@map("tenants")
 }
 

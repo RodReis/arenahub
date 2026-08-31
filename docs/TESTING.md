@@ -980,6 +980,70 @@ por `psql` nos dois bancos, pelo bloqueio que a F36 documentou.
 
 ---
 
+### Evidência da `SPEC-041` — F41, produção controlada e monitoramento
+
+**PR: —** *(preencher depois do merge, pela regra do topo desta seção)*
+
+`pnpm test:report --issue 41 --spec SPEC-041`, rodado em 31/08/2026:
+
+```
+| 2026-08-31 | #41 | SPEC-041 | unitário   | 2843 | 2843 | 0 | 76.0 | — |
+| 2026-08-31 | #41 | SPEC-041 | integração |  791 |  791 | 0 | 83.9 | medido suíte a suíte |
+```
+
+Unitário: **2843** (era 2808 na F39 — os **35** novos são desta fatia). Integração: **791** em
+**54 suítes**, sendo **12** da suíte nova `retencao-monitoramento.int-spec.ts`:
+
+```
+779 (base da F39) + 12 (suíte nova) = 791
+```
+
+Medição suíte a suíte por `basename`. Uma captura veio vazia (`retencao-crm-tarefas`) e foi
+remedida: **12 testes, 0 falhas** — vazia não é zero.
+
+🔬 **Canários (3).** Cada guarda foi provada removendo-a:
+
+| guarda removida | testes que caem |
+|---|---|
+| kill switch em `pontuarDia` | **1** unitário + **3** integração |
+| `estado.ligado &&` em `precisaDeAtencao` | **1** unitário + **1** integração |
+| `createdAt` → `observedAt` na saúde do pipeline | **1** integração |
+
+🔴 **Dois dos três canários acharam buraco na suíte — e o terceiro não era pego por nada.**
+
+**Canário 2** derrubava só o unitário. O teste de integração *"o painel acusa DESLIGADO"* não tinha
+drift crítico junto, então `precisaDeAtencao: false` sairia mesmo **sem** a guarda de
+`estado.ligado`. Teste novo: mesmo tenant, drift crítico presente, medido **ligado** (alarma) e
+**desligado** (não alarma).
+
+**Canário 3 não derrubava nada.** Trocar `createdAt` por `observedAt` na leitura da saúde passava
+verde em toda a suíte. A consequência é real: numa **reconstrução histórica** — operação legítima
+que a F36 desenhou o corte de conhecimento para permitir — o pipeline grava `observedAt` antigo com
+`createdAt` de hoje. Lendo `observedAt`, um pipeline que rodou há 5 horas apareceria como parado há
+meses, e o alarme dispararia toda vez que alguém reconstruísse histórico. Teste novo: snapshot com
+`observedAt` em março e `createdAt` hoje deve sair **SAUDAVEL**.
+
+**Quarta fatia seguida com o mesmo padrão**, e desta vez em duas variantes novas:
+
+| fatia | por que o canário não alcançava |
+|---|---|
+| F37 | completude recusava antes da regra |
+| F38 | duas chaves únicas recusavam antes do cooldown |
+| F39 | faltava a segunda dimensão (só uma semente) |
+| **F41** | cenário sem o segundo fator (drift + desligado juntos) **e** distinção de campo nunca exercitada |
+
+📌 **Um teste meu estava errado, e o código certo.** A primeira versão do teste de drift punha os
+dois snapshots (01/09 e 05/09) na **mesma janela de 7 dias** — não havia o que comparar, e o teste
+falhou. A janela é intencional (7 dias contra 7 anteriores, para não confundir segunda com domingo);
+o conserto foi empurrar o snapshot base para 25/08, dentro do período ANTERIOR. Vale registrar
+porque o sintoma (drift não detectado) apontava para o código.
+
+📌 **A migration é a menor do MVP 6**: uma coluna booleana com `DEFAULT true`. Tenants existentes
+nascem ligados — kill switch é **opt-in**, e um default `false` desligaria o scoring de todo mundo
+no deploy. `migrate deploy` num banco recém-criado aplicou as **54 migrations**.
+
+---
+
 ## 6. CI
 
 Pipeline mínimo, em ordem de custo crescente (falhe cedo, falhe barato):
