@@ -906,6 +906,53 @@ O que a separação compra é o *próximo* `catch`: no dia em que o bloco tratar
 futuro, **não correção de defeito presente** — e o comentário no código foi reescrito para dizer
 isso, em vez de prometer uma proteção que a suíte não sustenta.
 
+##### Refino visual de 31/08/2026 — a partir da imagem de referência do PI
+
+A F51 entregou a tela **funcionando**; o refino veio depois, da imagem de referência de 28/08 e do
+diagrama do `DS-TOTEM.md` §4 v2.1. **Não é fatia nova** — nenhum requisito mudou, e o contrato de
+`KioskConfig` ficou intacto.
+
+**A tela inteira virou alvo de toque.** O §4 pede que qualquer toque leve à identificação, não só o
+botão. O caminho de teclado e leitor de tela continua sendo o próprio botão — por isso o container
+**não** ganhou `role` nem `tabindex`: dois alvos idênticos anunciados em sequência confundem mais do
+que ajudam.
+
+🔴 **E isso criou um defeito de acessibilidade que não existia antes.** Com `onClick` no container,
+todo botão de dentro passa a **borbulhar**. Para "Entrar" é inofensivo (os dois fazem a mesma
+coisa); para **"Alto contraste"** é grave: quem toca nele quer enxergar melhor a tela em que está, e
+sairia dela para a identificação. **A pessoa que mais precisa do recurso seria expulsa da tela ao
+usá-lo.** `stopPropagation` resolve, e o `atrator-toque.spec.tsx` é o canário — sem ele, 1 teste cai.
+
+**O CTA gigante de rodapé saiu; "Entrar" foi para o cabeçalho** (`[contraste][Entrar]`), reusando
+`.ctaPrimario` — alto contraste, reduced-motion e o retorno de toque vêm de graça, e `.ctaDoCabecalho`
+só encolhe o tamanho. O §3.8 (um CTA primário por tela) segue valendo: a tela inteira já é o alvo.
+
+**A faixa de patrocínio saiu de dentro de `BlocosPublicos`** para ficar abaixo do CTA, como no
+protótipo. Antes era filha da grade e por isso aparecia **antes** do botão. As garantias dela
+(rótulo obrigatório, nada clicável) continuam testadas — os testes passaram a montar
+`FaixaDePatrocinio` direto, porque são dela, não da grade.
+
+**VIDEO virou mídia-primeiro.** O vídeo ocupa o cartão inteiro e o texto vem sobreposto na base,
+sobre o véu de legibilidade do §3.4. Antes a mídia era uma tira com título embaixo, e **um reel 9/16
+num cartão alto deixava metade do card em texto vazio**. `object-fit: cover` é o que serve o 9/16:
+preenche recortando as bordas, nunca esticando nem letterbox.
+
+📌 **O aviso "reproduz sem som" some quando a própria legenda do gerente já avisa.** O §3.4 o torna
+obrigatório, mas repetir a frase uma linha abaixo do que o gerente escreveu lê como **defeito**, não
+como aviso.
+
+**INSTAGRAM ganhou ícone e centralização.** Sem mídia no contrato (perfil + chamada, nada mais), o
+cartão vivia como duas linhas soltas num mar de superfície vazia — o mesmo dado, centralizado e com
+o disco do ícone, lê-se de longe.
+
+**No painel:** o nome do arquivo enviado voltou à legenda (vídeo e logotipo). O CSS silencia o texto
+nativo do `input[type=file]` porque a frase padrão ("Nenhum arquivo escolhido") **contradizia** a
+nossa legenda ao lado; silenciado o nativo, o nome precisava voltar por outro caminho, senão o
+gerente envia o logotipo e não vê **qual** arquivo subiu.
+
+Kiosk **251 testes** (era 247), painel 443. Nenhum hex literal no CSS — a lint proíbe, e colar o
+`.dc.html` produziria exatamente isso — e `prefers-reduced-motion` em cada bloco animado.
+
 
 #### F52 — o que a fatia cumpriu
 
