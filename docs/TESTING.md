@@ -921,13 +921,13 @@ job.
 
 ### Evidência da `SPEC-039` — F39, experimento operacional
 
-**PR: —** *(preencher depois do merge, pela regra do topo desta seção)*
+**PR: [#227](https://github.com/RodReis/arenahub/pull/227)** — preenchido depois do merge, pela regra do topo desta seção.
 
 `pnpm test:report --issue 39 --spec SPEC-039`, rodado em 31/08/2026:
 
 ```
-| 2026-08-31 | #39 | SPEC-039 | unitário   | 2808 | 2808 | 0 | 76.1 | — |
-| 2026-08-31 | #39 | SPEC-039 | integração |  779 |  779 | 0 | 83.9 | medido suíte a suíte |
+| 2026-08-31 | #39 | SPEC-039 | unitário   | 2808 | 2808 | 0 | 76.1 | [#227](https://github.com/RodReis/arenahub/pull/227) |
+| 2026-08-31 | #39 | SPEC-039 | integração |  779 |  779 | 0 | 83.9 | [#227](https://github.com/RodReis/arenahub/pull/227) — suíte a suíte |
 ```
 
 Unitário: **2808** (era 2768 na F38 — os **40** novos são desta fatia). Integração: **779** em
