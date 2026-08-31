@@ -750,13 +750,13 @@ Terceira vez que este padrão aparece no repo.
 
 ### Evidência da `SPEC-037` — F37, regras explicáveis e score
 
-**PR: —** *(preencher depois do merge, pela regra do topo desta seção)*
+**PR: [#225](https://github.com/RodReis/arenahub/pull/225)** — preenchido depois do merge, pela regra do topo desta seção.
 
 `pnpm test:report --issue 37 --spec SPEC-037`, rodado em 31/08/2026:
 
 ```
-| 2026-08-31 | #37 | SPEC-037 | unitário   | 2707 | 2707 | 0 | 76.4 | — |
-| 2026-08-31 | #37 | SPEC-037 | integração |  753 |  753 | 0 | 83.9 | medido suíte a suíte |
+| 2026-08-31 | #37 | SPEC-037 | unitário   | 2707 | 2707 | 0 | 76.4 | [#225](https://github.com/RodReis/arenahub/pull/225) |
+| 2026-08-31 | #37 | SPEC-037 | integração |  753 |  753 | 0 | 83.9 | [#225](https://github.com/RodReis/arenahub/pull/225) — suíte a suíte |
 ```
 
 Unitário: **2707** (era 2624 na F36 — os **83** novos são desta fatia). Integração: **753** em
