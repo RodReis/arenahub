@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-08-28
+updated: 2026-08-31
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -18,7 +18,6 @@ updated: 2026-08-28
 - [MVP6][SPEC-039][F39] Experimento operacional (#39)
 - [MVP6][SPEC-038][F38] CRM de retenção (#38)
 - [MVP6][SPEC-037][F37] Regras explicáveis e score (#37)
-- [MVP6][SPEC-036][F36] Contrato de dados e baseline analítica (#36)
 - [MVP4][SPEC-029][F29] Piloto e distribuição (#29)
 - [MVP4][SPEC-028][F28] Pagamento e desbloqueio no totem (#28)
 - [MVP4][SPEC-027][F27] Kiosk seguro (#27)
@@ -44,6 +43,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP6][SPEC-036][F36] Contrato de dados e baseline analítica (#36, finalizado em: 2026-08-31)
+- [MVP5][SPEC-032][FIX] teste de consistência da F32 quebra com a passagem do tempo (#223, finalizado em: 2026-08-31)
 - [MVP5][SPEC-033][F33] Rankings privados por padrão (#33, finalizado em: 2026-08-28)
 - [MVP5][SPEC-035][F35] Operação, moderação e experimento (#35, finalizado em: 2026-08-28)
 - [MVP3.5][FIX] Tela pública do totem: vão do hero, erro opaco ao salvar e upload de logotipo (#220, finalizado em: 2026-08-28)
