@@ -6,7 +6,7 @@
 | **MVP** | 6 |
 | **Slice do PRD** | **6.6** — `docs/prd/academia/MVP-06-retention-ai.md` §8 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-06-06-production-monitoring.md` *(pressupõe modelo — ver §2)* |
-| **Status** | `entregue` — **escopo reduzido por ausência de modelo** |
+| **Status** | `entregue` — **escopo reduzido por ausência de modelo**. PR [#229](https://github.com/RodReis/arenahub/pull/229), mergeado em 31/08/2026 |
 | **ADRs** | **ADR-050** (F40 não executada) determina o escopo desta fatia |
 
 > **Esta spec é um ponteiro (ADR-022).** Escopo, requisitos e critérios de aceite moram no PRD.

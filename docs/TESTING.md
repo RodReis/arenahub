@@ -982,13 +982,13 @@ por `psql` nos dois bancos, pelo bloqueio que a F36 documentou.
 
 ### Evidência da `SPEC-041` — F41, produção controlada e monitoramento
 
-**PR: —** *(preencher depois do merge, pela regra do topo desta seção)*
+**PR: [#229](https://github.com/RodReis/arenahub/pull/229)** — preenchido depois do merge, pela regra do topo desta seção.
 
 `pnpm test:report --issue 41 --spec SPEC-041`, rodado em 31/08/2026:
 
 ```
-| 2026-08-31 | #41 | SPEC-041 | unitário   | 2843 | 2843 | 0 | 76.0 | — |
-| 2026-08-31 | #41 | SPEC-041 | integração |  791 |  791 | 0 | 83.9 | medido suíte a suíte |
+| 2026-08-31 | #41 | SPEC-041 | unitário   | 2843 | 2843 | 0 | 76.0 | [#229](https://github.com/RodReis/arenahub/pull/229) |
+| 2026-08-31 | #41 | SPEC-041 | integração |  791 |  791 | 0 | 83.9 | [#229](https://github.com/RodReis/arenahub/pull/229) — suíte a suíte |
 ```
 
 Unitário: **2843** (era 2808 na F39 — os **35** novos são desta fatia). Integração: **791** em
