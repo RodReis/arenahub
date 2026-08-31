@@ -628,6 +628,10 @@ model Tenant {
   retentionTargetVersions     RetentionTargetVersion[]
   retentionFeatureSetVersions RetentionFeatureSetVersion[]
   studentFeatureSnapshots     StudentFeatureSnapshot[]
+  retentionRuleVersions       RetentionRuleVersion[]
+  retentionScores             RetentionScore[]
+  retentionScoreSkips         RetentionScoreSkip[]
+  retentionSuppressions       RetentionSuppression[]
 
   /// Minimo de participantes para publicar um placar (`M5-BR-007`).
   /// ADR-047: 5. Configuravel por tenant -- academia pequena e academia
@@ -1054,6 +1058,9 @@ model Student {
   challengeNotices        ChallengeNotice[]
   engagementDisputes      EngagementDispute[]
   featureSnapshots        StudentFeatureSnapshot[]
+  retentionScores         RetentionScore[]
+  retentionScoreSkips     RetentionScoreSkip[]
+  retentionSuppressions   RetentionSuppression[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -4923,6 +4930,8 @@ model StudentFeatureSnapshot {
   targetVersion     RetentionTargetVersion     @relation(fields: [targetVersionId], references: [id])
   featureSetVersion RetentionFeatureSetVersion @relation(fields: [featureSetVersionId], references: [id])
   values            StudentFeatureValue[]
+  retentionScores   RetentionScore[]
+  retentionSkip     RetentionScoreSkip?
 
   @@unique([tenantId, studentId, observedAt, targetVersionId, featureSetVersionId, revision])
   @@index([tenantId, observedAt])
@@ -4955,4 +4964,268 @@ model StudentFeatureValue {
   /// O dashboard de qualidade le por aqui.
   @@index([tenantId, name, missingReason])
   @@map("student_feature_values")
+}
+
+// ---------------------------------------------------------------------------
+// F37 -- Regras explicaveis e score (Slice 6.2)
+// ---------------------------------------------------------------------------
+
+/// Para que lado uma regra empurra o risco.
+///
+/// `DECREASE` existe porque o PRD §7 pede "fatores positivos/negativos": sem
+/// ele a tela lista so motivos de alarme, e a recepcao nunca ve que o aluno
+/// treinou vinte dias no mes.
+enum RetentionRuleDirection {
+  INCREASE
+  DECREASE
+
+  @@map("retention_rule_direction")
+}
+
+/// Os operadores que uma regra pode usar. ALLOWLIST FECHADA.
+///
+/// Enum de banco, e nao texto livre, porque regra vinda do banco e DADO -- dado
+/// que vira expressao executavel e execucao remota, e expressao arbitraria
+/// quebra `M6-AC-002` (o mesmo snapshot deixaria de dar o mesmo score).
+enum RetentionRuleOperator {
+  GREATER_THAN
+  GREATER_THAN_OR_EQUAL
+  LESS_THAN
+  LESS_THAN_OR_EQUAL
+  /// Para a feature de variacao, que ja chega como razao (`-1` parou).
+  PERCENT_DROP_AT_LEAST
+
+  @@map("retention_rule_operator")
+}
+
+/// As quatro faixas do PRD §16.
+enum RetentionRiskBand {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+
+  @@map("retention_risk_band")
+}
+
+/// Quem calculou o score.
+///
+/// A baseline e o unico provider desta fatia. A coluna existe desde ja para que
+/// a F40 grave ao lado sem migrar de novo, e para que a comparacao
+/// champion/challenger/baseline (`M6-FR-016`) seja um `GROUP BY`.
+enum RetentionScoreProvider {
+  RULE_BASELINE
+  SUPERVISED_MODEL
+
+  @@map("retention_score_provider")
+}
+
+/// Por que um aluno nao foi pontuado (`M6-FR-006`).
+enum RetentionIneligibilityReason {
+  CANCELLED
+  SUPPRESSED
+  INSUFFICIENT_HISTORY
+
+  @@map("retention_ineligibility_reason")
+}
+
+/// Por que um aluno esta fora do scoring, por decisao e nao por estado.
+enum RetentionSuppressionReason {
+  OPT_OUT
+  DELETION_PENDING
+  /// `M6-BR-007` nao aceita supressao manual sem motivo -- o texto e obrigatorio.
+  MANUAL_WITH_REASON
+
+  @@map("retention_suppression_reason")
+}
+
+/// Uma versao CONGELADA do catalogo de regras (`M6-FR-001`, `M6-FR-004`).
+///
+/// Mesma forma das versoes da F36 (`label` + `frozenAt` + unique por tenant), e
+/// pelo mesmo motivo: mudar um peso muda o significado de todo score ja gravado.
+/// Editar regra de versao congelada nao e permitido -- cria-se outra versao, e o
+/// score antigo continua explicavel pelas regras que o produziram.
+model RetentionRuleVersion {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  /// Identificador legivel, ex.: `regras@1`.
+  label String
+
+  /// Os pisos das faixas, do maior para o menor. Versionados JUNTO das regras:
+  /// mover o corte de ALTO muda quem entra na fila sem mudar nenhum peso.
+  criticalFloor Int @default(75) @map("critical_floor")
+  highFloor     Int @default(50) @map("high_floor")
+  mediumFloor   Int @default(25) @map("medium_floor")
+
+  /// Abaixo disto o snapshot sabe pouco demais para ordenar uma fila.
+  /// E limiar de CONFIANCA, nao de risco -- `M6-BR-002`.
+  minimumCompleteness Decimal @default(0.3) @map("minimum_completeness") @db.Decimal(5, 4)
+
+  frozenAt  DateTime? @map("frozen_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rules  RetentionRule[]
+  scores RetentionScore[]
+
+  @@unique([tenantId, label])
+  @@map("retention_rule_versions")
+}
+
+/// Uma regra do catalogo. Tupla fechada, nunca expressao.
+model RetentionRule {
+  id            String @id @default(uuid()) @db.Uuid
+  tenantId      String @map("tenant_id") @db.Uuid
+  ruleVersionId String @map("rule_version_id") @db.Uuid
+
+  /// A feature do snapshot que esta regra observa. Uma das 13 do PRD §9.
+  featureName String                @map("feature_name")
+  operator    RetentionRuleOperator
+  threshold   Decimal               @db.Decimal(18, 6)
+
+  /// Quanto soma ao score quando dispara. Positivo; a direcao da o sinal.
+  weight    Int
+  direction RetentionRuleDirection
+
+  /// O texto que a recepcao le. Versionado junto: mudar a redacao de uma regra
+  /// ja usada reescreveria a explicacao de score passado.
+  label String
+
+  ruleVersion RetentionRuleVersion @relation(fields: [ruleVersionId], references: [id], onDelete: Cascade)
+
+  /// Uma regra por (versao, feature, operador, limite): duplicata silenciosa
+  /// contaria o mesmo motivo duas vezes no score.
+  @@unique([ruleVersionId, featureName, operator, threshold])
+  @@index([tenantId, ruleVersionId])
+  @@map("retention_rules")
+}
+
+/// O score de um aluno num snapshot (`M6-FR-005`).
+///
+/// APPEND-ONLY, como o snapshot da F36. Recalcular com regra nova nao reescreve
+/// o score antigo: a evolucao do risco (PRD §16) e a serie desses registros, e
+/// sobrescrever apagaria justamente a linha do tempo que a tela mostra.
+model RetentionScore {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  studentId     String @map("student_id") @db.Uuid
+  snapshotId    String @map("snapshot_id") @db.Uuid
+  ruleVersionId String @map("rule_version_id") @db.Uuid
+
+  provider RetentionScoreProvider @default(RULE_BASELINE)
+
+  /// Inteiro em `[0, 100]`. ORDENACAO, nao probabilidade.
+  value Int
+  band  RetentionRiskBand
+
+  /// Fracao de features observadas no snapshot pontuado. CONFIANCA, nao risco.
+  completeness Decimal @db.Decimal(5, 4)
+
+  /// `null` na baseline, sempre. PRD §16: "nao mostrar probabilidades com falsa
+  /// precisao quando nao calibradas". A coluna existe nula para a F40 preencher
+  /// sem migrar, e para a tela ja saber esconder o numero quando falta.
+  calibratedProbability Decimal? @map("calibrated_probability") @db.Decimal(5, 4)
+
+  /// O dia que o snapshot descreve. Copiado do snapshot para que a fila ordene
+  /// e pagine sem juntar tabela -- `M6-NFR-004` pede p95 < 1s.
+  observedAt   DateTime @map("observed_at")
+  calculatedAt DateTime @default(now()) @map("calculated_at")
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student      Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  snapshot     StudentFeatureSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  ruleVersion  RetentionRuleVersion   @relation(fields: [ruleVersionId], references: [id])
+  factors      RetentionScoreFactor[]
+
+  /// A chave de idempotencia de `M6-NFR-002`. Reexecutar a mesma versao sobre o
+  /// mesmo snapshot nao duplica -- e quem garante e o indice, nao um `if` no
+  /// codigo: dois workers passam juntos por qualquer leitura antes do commit.
+  @@unique([snapshotId, provider, ruleVersionId])
+  /// A fila le por aqui: risco alto primeiro, dentro do dia.
+  @@index([tenantId, observedAt, value])
+  @@index([tenantId, studentId, calculatedAt])
+  @@map("retention_scores")
+}
+
+/// Um fator da explicacao: a regra que disparou e o valor que a fez disparar.
+///
+/// O valor observado e gravado JUNTO. Sem ele a explicacao diz "cobranca
+/// vencida" e a recepcao nao pode contestar; com ele diz "vencida ha 41 dias", e
+/// contestar vira conferir um numero.
+model RetentionScoreFactor {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  scoreId  String @map("score_id") @db.Uuid
+
+  /// O que a regra observou. Guardado porque a regra pode ser de outra versao
+  /// que o leitor nao tem em maos.
+  ruleId        String                 @map("rule_id") @db.Uuid
+  featureName   String                 @map("feature_name")
+  observedValue Decimal                @map("observed_value") @db.Decimal(18, 6)
+  contribution  Int
+  direction     RetentionRuleDirection
+  label         String
+
+  /// Ordem de exibicao, 1 a 5. Persistida para a tela nao reordenar sozinha.
+  position Int
+
+  score RetentionScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  @@unique([scoreId, position])
+  @@index([tenantId, featureName])
+  @@map("retention_score_factors")
+}
+
+/// A decisao de nao pontuar, registrada (`M6-FR-006`).
+///
+/// Existe como LINHA, e nao como ausencia de score, porque "nao pontuado" e
+/// indistinguivel de "o job nao rodou" quando nao ha registro -- e as duas
+/// exigem acoes opostas da operacao.
+model RetentionScoreSkip {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  studentId  String @map("student_id") @db.Uuid
+  snapshotId String @map("snapshot_id") @db.Uuid
+
+  reason RetentionIneligibilityReason
+
+  observedAt DateTime @map("observed_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student  Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  snapshot StudentFeatureSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId])
+  @@index([tenantId, observedAt, reason])
+  @@map("retention_score_skips")
+}
+
+/// Supressao vigente: o aluno esta fora do scoring por decisao.
+model RetentionSuppression {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  reason RetentionSuppressionReason
+
+  /// Obrigatorio quando `MANUAL_WITH_REASON` -- `M6-BR-007`. O CHECK esta na
+  /// migration: o Prisma nao expressa condicional entre colunas.
+  note String?
+
+  startsAt DateTime  @default(now()) @map("starts_at")
+  /// `null` = sem prazo. Supressao expirada deixa de valer sem apagar a linha.
+  endsAt   DateTime? @map("ends_at")
+
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, endsAt])
+  @@map("retention_suppressions")
 }

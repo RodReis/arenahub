@@ -226,6 +226,18 @@ const PERMISSOES = [
   // inadimplencia --, e quem atende na porta nao precisa disso para
   // trabalhar. Decisao do PI em 25/08/2026 (`SPEC-054` §8, pergunta 3).
   'billing.dashboard',
+  // F37: fila de risco de churn explicavel.
+  //
+  // Separada de `student.read` pelo mesmo motivo de `billing.dashboard`: ler a
+  // ficha de UM aluno no balcao e trabalho de recepcao; ver a academia inteira
+  // ordenada por risco de sair e uma leitura gerencial sobre a base toda.
+  //
+  // `retention.suppress` e separada de `retention.read` pela logica dos atos
+  // excepcionais (`access.override`, `billing.refund`): tirar um aluno da fila
+  // e decisao com nome e motivo gravados, e `M6-BR-007` exige o motivo por
+  // escrito.
+  'retention.read',
+  'retention.suppress',
 ];
 
 
