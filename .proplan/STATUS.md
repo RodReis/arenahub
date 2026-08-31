@@ -13,7 +13,6 @@ updated: 2026-08-31
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
-- [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
 - [MVP4][SPEC-029][F29] Piloto e distribuição (#29)
 - [MVP4][SPEC-028][F28] Pagamento e desbloqueio no totem (#28)
 - [MVP4][SPEC-027][F27] Kiosk seguro (#27)
@@ -39,6 +38,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41, finalizado em: 2026-08-31)
 - [MVP6][SPEC-037][F37] Regras explicáveis e score (#37, finalizado em: 2026-08-31)
 - [MVP6][SPEC-038][F38] CRM de retenção (#38, finalizado em: 2026-08-31)
 - [MVP6][SPEC-039][F39] Experimento operacional (#39, finalizado em: 2026-08-31)
