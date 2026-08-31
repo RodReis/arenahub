@@ -17,8 +17,16 @@
 
 :root {
   /* Tipografia -- DS-TOTEM.md §2.2. Minimo absoluto 19 px. */
-  --tt-hero: 72px;
-  --tt-hero-lh: 78px;
+  /*
+   * 56px, nao os 72 do §2.2 v2.0: a imagem de referencia do PI (28/08/2026)
+   * poe o slogan de duas frases numa LINHA SO, com a grade densa dominando a
+   * tela. 56 e MEDIDO no navegador (28/08/2026): e o maior tamanho em que
+   * "Disciplina hoje. Resultados sempre." cabe nos 976px uteis sem quebrar;
+   * a 72px roubava ~90px de altura da grade. Slogan mais longo quebra
+   * naturalmente -- nunca estoura.
+   */
+  --tt-hero: 56px;
+  --tt-hero-lh: 64px;
   --tt-titulo: 64px;
   --tt-titulo-lh: 68px;
   --tt-kicker: 22px;
@@ -381,11 +389,70 @@ button {
   box-shadow: 0 8px 32px color-mix(in srgb, var(--ah-totem-brand-500) 25%, transparent);
 }
 
+/**
+ * RETORNO DE TOQUE -- o CTA e o unico alvo que todo aluno toca, e ate aqui
+ * nao respondia ao dedo: o protótipo e uma imagem estatica e nao desenha
+ * estado, mas botao sem `:active` num totem deixa a pessoa em duvida se
+ * pegou, e ela toca de novo.
+ *
+ * `transform` e `box-shadow` (nao `height` nem `padding`): sao as duas
+ * propriedades que o compositor anima sem re-layout -- o cartao de cima nao
+ * se mexe quando o botao afunda.
+ */
+.ctaPrimario {
+  transition:
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ctaPrimario:active:not(:disabled) {
+  transform: scale(0.985);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--ah-totem-brand-500) 30%, transparent);
+}
+
+/* §2.6: movimento e decoracao, e decoracao morre em alto contraste. */
+@media (prefers-reduced-motion: reduce) {
+  .ctaPrimario {
+    transition: none;
+  }
+
+  .ctaPrimario:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 .ctaPrimario:disabled {
   background: var(--ah-totem-border-hairline);
   color: var(--ah-totem-text-tertiary);
   cursor: not-allowed;
   box-shadow: none;
+}
+
+/**
+ * O CTA no CABECALHO (imagem de referencia de 28/08/2026 + diagrama do §4
+ * v2.1: `[contraste][Entrar]`). Herda tudo de `.ctaPrimario` -- gradiente,
+ * alto contraste, :active -- e so encolhe para o tamanho de cabecalho.
+ * 88px e o piso de alvo do §2.4; o alvo REAL de entrada e a tela inteira.
+ */
+.ctaDoCabecalho {
+  width: auto;
+  flex-shrink: 0;
+  min-height: var(--tt-alvo-secundario);
+  padding: 0 34px;
+  gap: 12px;
+  border-radius: 16px;
+  font-size: var(--tt-corpo);
+}
+
+/**
+ * O hint fixo do §4 fecha a tela no lugar do CTA gigante: instrucao curta,
+ * centrada, com a promessa do que ha do outro lado do toque.
+ */
+.dicaDeEntrada {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: var(--tt-metadado);
+  color: var(--ah-totem-text-secondary);
 }
 
 .botaoSecundario {
@@ -562,6 +629,34 @@ button {
   overflow: hidden;
 }
 
+/*
+ * ENTRADA DA GRADE no boot: os tres cartoes surgem em escada curta
+ * (0/90/180ms), uma vez so -- movimento que apresenta a composicao sem
+ * competir com ela (§2.6). Alto contraste ja mata via `animation: none
+ * !important`; reduced-motion desliga logo abaixo.
+ */
+.slotReel,
+.slotCarrossel,
+.placarPublico {
+  animation: tt-quadro-entra 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.slotCarrossel {
+  animation-delay: 90ms;
+}
+
+.placarPublico {
+  animation-delay: 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slotReel,
+  .slotCarrossel,
+  .placarPublico {
+    animation: none;
+  }
+}
+
 .gradeCompleta {
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
@@ -608,6 +703,7 @@ button {
 
 .slotReel,
 .slotCarrossel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -616,6 +712,62 @@ button {
   border: var(--tt-borda) solid var(--ah-totem-border-default);
   border-radius: var(--tt-raio-card);
   background: var(--ah-totem-bg-surface);
+}
+
+/*
+ * Cartao de VIDEO e MIDIA-PRIMEIRO (imagem de referencia de 28/08/2026): o
+ * padding some e o video encosta na borda do cartao -- o texto vem sobreposto
+ * na base, dentro de `.legendaDaMidia`. O raio quem corta e o proprio cartao
+ * (`overflow: hidden`).
+ */
+.slotReel[data-tipo='VIDEO'],
+.slotCarrossel[data-tipo='VIDEO'] {
+  padding: 0;
+  gap: 0;
+}
+
+/*
+ * No carrossel de video os pontos do rodizio flutuam SOBRE a midia -- sem
+ * padding no cartao, o `margin-top: auto` os deixaria colados na borda.
+ */
+.slotCarrossel[data-tipo='VIDEO'] .progressoDoRodizio {
+  position: absolute;
+  right: 28px;
+  bottom: 24px;
+  z-index: 1;
+  margin: 0;
+}
+
+/**
+ * QUADRO DO RODIZIO -- remontado a cada volta (key no React), o que dispara
+ * o crossfade. E o unico movimento do carrossel: troca seca de conteudo numa
+ * parede e um "pisca" que chama atencao pelo motivo errado (§2.6).
+ */
+.quadroDoRodizio {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  animation: tt-quadro-entra 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes tt-quadro-entra {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quadroDoRodizio {
+    animation: none;
+  }
 }
 
 .tituloDoBloco {
@@ -628,12 +780,115 @@ button {
  * `object-fit: cover` com altura fixa: video vertical e 16:9 convivem no
  * mesmo cartao sem que um deles estique o layout (DS-TOTEM §4 aceita os dois).
  */
+/**
+ * O VIDEO CRESCE COM O CARTAO, em vez de ter altura fixa.
+ *
+ * Eram 360px cravados. Quando o reel ocupa as duas linhas da grade
+ * (`gradeCompleta`), o cartao tem 1230px de altura -- e sobravam 672px de
+ * vazio embaixo da legenda, medidos na tela real. O protótipo nao tem esse
+ * buraco: a midia ocupa o cartao e o texto fica abaixo dela.
+ *
+ * `flex: 1` da ao video o espaco que sobra depois de titulo e legenda;
+ * `min-height: 0` e o que permite ele ENCOLHER num cartao baixo -- sem isso
+ * o item flex nunca fica menor que o conteudo e o cartao estoura. Os 360px
+ * viram piso, para o video nao virar uma tira fina quando o cartao e curto.
+ */
+/**
+ * A FIGURA DA MIDIA preenche o cartao inteiro; video, veu e legenda se
+ * empilham dentro dela. `object-fit: cover` e o que serve o reel 9/16: num
+ * cartao mais alto que a midia ele recorta as bordas em vez de esticar ou
+ * deixar tarja preta -- e um 16:9 no mesmo cartao convive pela mesma regra.
+ */
+.midiaDoBloco {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
 .videoDoBloco {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 360px;
+  height: 100%;
   object-fit: cover;
-  border-radius: var(--tt-raio-icone);
   background: var(--ah-totem-bg-base);
+}
+
+/**
+ * Veu de legibilidade do §3.4 -- topo leve, base forte. NAO e decoracao: e o
+ * que garante contraste do texto sobreposto em qualquer quadro do video, e
+ * por isso sobrevive ao alto contraste.
+ */
+.veuDaMidia {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ah-totem-bg-base) 45%, transparent),
+    transparent 32%,
+    color-mix(in srgb, var(--ah-totem-bg-base) 88%, transparent)
+  );
+}
+
+/* Titulo + legenda + aviso, ancorados na base da midia, sobre o veu. */
+.legendaDaMidia {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.corpoDaMidia {
+  font-size: var(--tt-metadado);
+  line-height: 1.4;
+  color: var(--ah-totem-text-secondary);
+}
+
+/* O aviso do §3.4 ("reproduz sem som, com legenda") fecha a legenda. */
+.avisoDaMidia {
+  font-size: var(--tt-minimo);
+  color: var(--ah-totem-text-secondary);
+}
+
+/**
+ * Bloco de Instagram -- centrado no cartao: perfil e chamada sao o dado
+ * inteiro do contrato, e duas linhas encostadas no topo liam como cartao
+ * quebrado. O disco com o icone da o reconhecimento a distancia.
+ */
+.blocoDeInstagram {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.discoDeInstagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  background: var(--ah-totem-brand-tint);
+  color: var(--ah-totem-brand-300);
+}
+
+.perfilDeInstagram {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
 }
 
 .listaDeEventos {
@@ -698,7 +953,13 @@ button {
   width: 12px;
   height: 12px;
   border-radius: var(--tt-raio-pill);
-  background: var(--ah-totem-border);
+  /*
+   * `--ah-totem-border` NAO EXISTE (so -default e -hairline) -- com a
+   * variavel indefinida o background era descartado e os pontos INATIVOS
+   * sumiam: o rodizio parecia ter um item so. Mesma armadilha ja documentada
+   * na borda da faixa de patrocinio.
+   */
+  background: var(--ah-totem-border-default);
 }
 
 .pontoDoRodizio[data-ativo='true'] {
@@ -745,9 +1006,16 @@ button {
   white-space: nowrap;
 }
 
+/*
+ * `flex: 1` + `space-evenly`: as cinco linhas se distribuem pela altura do
+ * cartao (imagem de referencia), em vez de amontoar no topo e deixar um vao
+ * antes do rodape. O `gap` vira piso para cartao baixo.
+ */
 .listaDoPlacar {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  justify-content: space-evenly;
   gap: 14px;
   margin: 0;
   padding: 0;
@@ -822,13 +1090,36 @@ button {
  * identificada como tal (CDC art. 36), ao lado de conteudo informativo da
  * propria academia.
  */
+/**
+ * FAIXA DE PATROCINADORES -- fiel ao `Totem.dc.html` (28/08/2026).
+ *
+ * Empilha em DUAS linhas, como o protótipo: rotulo + assinatura numa, as
+ * marcas na outra. Antes era uma linha so, com o rotulo a esquerda e as
+ * marcas espalhadas por `space-around` -- e o `space-around` era o que fazia
+ * duas marcas ficarem com larguras diferentes (120px e 107px, medidos na
+ * tela real), cada logotipo ocupando o tanto que a imagem pedia.
+ *
+ * BORDA: apontava para `--ah-totem-border`, token que NAO EXISTE -- so
+ * `--ah-totem-border-default` e `--ah-totem-border-hairline` estao definidos
+ * em `theme.css`. Variavel indefinida em `border-top` nao avisa: a regra
+ * inteira e descartada e a linha some. Era por isso que a divisoria do
+ * protótipo nao aparecia acima dos patrocinadores.
+ */
 .faixaDePatrocinio {
   flex-shrink: 0;
   display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 22px;
+  border-top: var(--tt-borda) solid var(--ah-totem-border-hairline);
+}
+
+/* Rotulo e assinatura dividem a linha, cada um numa ponta (protótipo §rodape). */
+.cabecalhoDoPatrocinio {
+  display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 14px 20px;
-  border-top: var(--tt-borda) solid var(--ah-totem-border);
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .rotuloDoPatrocinio {
@@ -840,23 +1131,64 @@ button {
   color: var(--ah-totem-text-secondary);
 }
 
-.marcas {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: space-around;
-  gap: 16px;
-}
-
-.marca {
-  font-size: var(--tt-metadado);
-  font-weight: 700;
+/* Sem faixa, a assinatura obrigatoria (§11.10) volta a ser uma linha centrada. */
+.assinaturaSolta {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: var(--tt-minimo);
   color: var(--ah-totem-text-secondary);
 }
 
+/* A assinatura ArenaHub (DS-TOTEM.md §11.10) mora na faixa, como no protótipo. */
+.assinaturaDoPatrocinio {
+  flex-shrink: 0;
+  font-size: var(--tt-minimo);
+  color: var(--ah-totem-text-secondary);
+}
+
+.marcas {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+}
+
+/**
+ * Cada marca e uma PASTILHA de mesma largura (`flex: 1`), nao um logotipo
+ * solto. E o que o protótipo desenha, e resolve o problema que a tela real
+ * mostrava: com a imagem mandando na largura, um patrocinador com logotipo
+ * largo ficava visualmente maior que o vizinho -- diferenca que num espaco
+ * pago se le como tratamento diferente entre quem pagou o mesmo.
+ */
+.marca {
+  flex: 1;
+  min-width: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  border-radius: 14px;
+  background: var(--ah-totem-bg-surface);
+  font-size: var(--tt-minimo);
+  font-weight: 600;
+  color: var(--ah-totem-text-secondary);
+  text-align: center;
+  /* Nome comprido encurta com reticencia em vez de estourar a pastilha. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/*
+ * O logotipo cabe DENTRO da pastilha: `max-width: 100%` e o que impede a
+ * imagem de voltar a mandar na largura. `max-height` deixa a folga de 8px
+ * em cima e embaixo para o logotipo nao encostar na borda.
+ */
 .logotipoDoPatrocinador {
   max-height: 48px;
-  max-width: 140px;
+  max-width: 100%;
   object-fit: contain;
 }
 

@@ -226,6 +226,123 @@
 }
 
 /**
+ * O CONTROLE NATIVO DE ARQUIVO, vestido de botao do design system.
+ *
+ * Ate aqui o `input[type=file]` entrava sem estilo nenhum: o Chrome pintava
+ * "Escolher arquivo | Nenhum arquivo escolhido" com a fonte e a cor DELE, no
+ * meio de um painel que usa `--ah-*` em todo o resto. Era o unico controle da
+ * tela que nao parecia do produto.
+ *
+ * Pior que o desalinho: o texto nativo dizia "Nenhum arquivo escolhido" ao
+ * lado da nossa legenda "Logotipo enviado." -- duas frases opostas sobre o
+ * mesmo campo, e a nativa e a que o gerente le primeiro, porque esta dentro
+ * do controle. `color: transparent` cala o texto nativo e deixa a legenda,
+ * que e a nossa e sabe o estado real, ser a unica voz.
+ *
+ * O nome do arquivo escolhido volta pela legenda (ver `aba-de-blocos.tsx`):
+ * o dado nunca sumiu do DOM -- so nao tinha onde aparecer com a cor certa.
+ */
+.campoDeArquivo input[type='file'] {
+  color: transparent;
+  font-size: var(--ah-type-caption-size);
+  max-width: 100%;
+}
+
+/* O nome do arquivo e a legenda vivem no `<span>`; aqui so o botao fala. */
+.campoDeArquivo input[type='file']::file-selector-button {
+  height: var(--ah-control-height);
+  margin-right: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-control-radius);
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-label);
+  font-family: inherit;
+  font-size: var(--ah-type-body-size);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--ah-motion-control) var(--ah-motion-easing),
+    border-color var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.campoDeArquivo input[type='file']:hover:not(:disabled)::file-selector-button {
+  border-color: var(--ah-border-strong);
+  background: var(--ah-surface-sunken);
+}
+
+/*
+ * O foco vai no BOTAO, nao no `input`: e o botao que o Tab alcanca e o que o
+ * gerente ve. Anel no input desenharia o contorno em volta de uma caixa
+ * invisivel, ao lado do controle que realmente esta focado.
+ */
+.campoDeArquivo input[type='file']:focus-visible {
+  outline: none;
+}
+
+.campoDeArquivo input[type='file']:focus-visible::file-selector-button {
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+/* Enviando: o campo fica `disabled`, e o cursor precisa dizer isso. */
+.campoDeArquivo input[type='file']:disabled::file-selector-button {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campoDeArquivo input[type='file']::file-selector-button {
+    transition: none;
+  }
+}
+
+/**
+ * UMA LINHA DE PATROCINADOR: nome, logotipo e remover.
+ *
+ * Antes reusava `.linhaDeEvento`, que e de OUTRO assunto (o par data/hora do
+ * bloco de evento) e alinha por `flex-end`. Com dois campos de alturas
+ * diferentes -- um `Field` com rotulo em cima, um campo de arquivo com rotulo
+ * E legenda -- o `flex-end` empurrava o "Logotipo" para o alto e o "Nome"
+ * para baixo, e os dois rotulos nunca ficavam na mesma linha. Era o desalinho
+ * que a tela mostrava.
+ *
+ * Aqui o alinhamento e `start`: os dois rotulos comecam na mesma altura, que
+ * e o que faz a linha ser lida como UM patrocinador em vez de dois campos
+ * soltos. O "Remover" e o unico que desce, porque e acao, nao campo.
+ */
+.linhaDePatrocinador {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.linhaDePatrocinador:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* O campo de arquivo ocupa o espaco que sobra, sem espremer o nome. */
+.linhaDePatrocinador .campoDeArquivo {
+  flex: 1 1 16rem;
+}
+
+/*
+ * O "Remover" desce ate a altura do CONTROLE, nao do rotulo -- alinhado ao
+ * topo ele flutuaria na linha do texto "Nome", longe do campo que apaga.
+ *
+ * O deslocamento e a altura do rotulo (uma linha de caption) mais o gap de
+ * 6px que o  usa entre rotulo e controle. Derivado dos tokens, e nao
+ * um numero escolhido a olho: mudou a tipografia, o botao acompanha.
+ */
+.linhaDePatrocinador > button {
+  margin-top: calc(var(--ah-type-caption-size) * var(--ah-type-body-lh) + 6px);
+}
+
+/**
  * A faixa de patrocinadores e um ASSUNTO SEPARADO dos blocos: ela nao gira,
  * nao reordena e nao entra na lista. Sem esta separacao ela encostava nos
  * botoes de acrescentar bloco e parecia mais um item do rodizio -- foi o que

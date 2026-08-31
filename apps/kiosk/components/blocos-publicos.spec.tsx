@@ -7,7 +7,14 @@ import {
   type KioskConfig,
 } from '@arenahub/api-contracts';
 
-import { BlocosPublicos, formatarData, haAlgoNaGradePublica, rotuloDoPeriodo } from './blocos-publicos.js';
+import {
+  AssinaturaSolta,
+  BlocosPublicos,
+  FaixaDePatrocinio,
+  formatarData,
+  haAlgoNaGradePublica,
+  rotuloDoPeriodo,
+} from './blocos-publicos.js';
 
 const video: BlocoDaTelaPublica = {
   id: 'v',
@@ -241,41 +248,31 @@ describe('BlocosPublicos -- indicadores (M3.5-BR-001)', () => {
   });
 });
 
-describe('BlocosPublicos -- faixa de patrocinadores (ADR-042, Decisao 4)', () => {
+/*
+ * A FAIXA SAIU DE DENTRO DE `BlocosPublicos` em 28/08/2026 para ficar ABAIXO
+ * do CTA, como no protótipo -- antes ela era filha da grade e por isso
+ * aparecia antes do botao. Os testes montam `FaixaDePatrocinio` direto: as
+ * garantias (rotulo obrigatorio, nada clicavel) sao dela, nao da grade.
+ *
+ * O que ela NAO gira junto com o carrossel continua coberto: o teste do
+ * rodizio vive nos casos de `BlocosPublicos` acima, e a faixa nao esta mais
+ * la para girar.
+ */
+describe('FaixaDePatrocinio -- faixa de patrocinadores (ADR-042, Decisao 4)', () => {
   const patrocinio = {
     habilitado: true,
     rotulo: '',
     marcas: [{ nome: 'Suplementos XYZ', logotipoKey: null }],
   };
 
-  it('fica FORA da grade -- continua na tela mesmo com o carrossel girando', () => {
-    vi.useFakeTimers();
-
-    render(
-      <BlocosPublicos config={config([video, instagram], { patrocinio })} indicadores={null} />,
-    );
-
-    expect(screen.getByTestId('faixa-de-patrocinio')).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(12_000);
-    });
-
-    expect(screen.getByTestId('faixa-de-patrocinio')).toBeInTheDocument();
-
-    vi.useRealTimers();
-  });
-
   it('rotulo vazio cai no padrao -- nunca faixa sem rotulo (CDC art. 36)', () => {
-    render(<BlocosPublicos config={config([], { patrocinio })} indicadores={null} />);
+    render(<FaixaDePatrocinio patrocinio={patrocinio} />);
 
     expect(screen.getByText(ROTULO_PADRAO_DE_PATROCINIO)).toBeInTheDocument();
   });
 
   it('NAO ha link nem area clicavel na faixa -- vitrine, nao midia', () => {
-    const { container } = render(
-      <BlocosPublicos config={config([], { patrocinio })} indicadores={null} />,
-    );
+    const { container } = render(<FaixaDePatrocinio patrocinio={patrocinio} />);
 
     const faixa = screen.getByTestId('faixa-de-patrocinio');
 
@@ -285,25 +282,36 @@ describe('BlocosPublicos -- faixa de patrocinadores (ADR-042, Decisao 4)', () =>
   });
 
   it('desligada, nao aparece', () => {
-    render(
-      <BlocosPublicos
-        config={config([], { patrocinio: { ...patrocinio, habilitado: false } })}
-        indicadores={null}
-      />,
-    );
+    render(<FaixaDePatrocinio patrocinio={{ ...patrocinio, habilitado: false }} />);
 
     expect(screen.queryByTestId('faixa-de-patrocinio')).toBeNull();
   });
 
   it('ligada sem marca nenhuma nao deixa faixa vazia na tela', () => {
-    render(
-      <BlocosPublicos
-        config={config([], { patrocinio: { ...patrocinio, marcas: [] } })}
-        indicadores={null}
-      />,
-    );
+    render(<FaixaDePatrocinio patrocinio={{ ...patrocinio, marcas: [] }} />);
 
     expect(screen.queryByTestId('faixa-de-patrocinio')).toBeNull();
+  });
+
+  /*
+   * A ASSINATURA (§11.10) e obrigatoria SEMPRE. Com faixa ela mora dentro
+   * dela; sem faixa, `AssinaturaSolta` a devolve. Este par de casos e o que
+   * impede a assinatura de sumir quando a academia desliga o patrocinio --
+   * que foi exatamente o risco de mover a assinatura para dentro da faixa.
+   */
+  it('a assinatura ArenaHub vive DENTRO da faixa quando ela existe', () => {
+    render(<FaixaDePatrocinio patrocinio={patrocinio} />);
+
+    const faixa = screen.getByTestId('faixa-de-patrocinio');
+
+    expect(faixa.textContent).toContain('arenahub');
+    expect(screen.queryByTestId('assinatura-arenahub')).toBeNull();
+  });
+
+  it('sem faixa, a assinatura continua na tela -- §11.10 nao e opcional', () => {
+    render(<AssinaturaSolta patrocinio={{ ...patrocinio, habilitado: false }} />);
+
+    expect(screen.getByTestId('assinatura-arenahub')).toBeInTheDocument();
   });
 });
 

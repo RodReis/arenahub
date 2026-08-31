@@ -2,7 +2,12 @@
 
 import type { IndicadoresDaUnidade, KioskConfig } from '@arenahub/api-contracts';
 
-import { BlocosPublicos, haAlgoNaGradePublica } from './blocos-publicos';
+import {
+  AssinaturaSolta,
+  BlocosPublicos,
+  FaixaDePatrocinio,
+  haAlgoNaGradePublica,
+} from './blocos-publicos';
 import { IconeEntrar, IconeMarca } from './icones';
 
 /**
@@ -44,8 +49,16 @@ export function Atrator({
   const temBloco = haAlgoNaGradePublica(config, indicadores);
 
   return (
+    /*
+      A TELA INTEIRA E TOCAVEL (§4): o clique no fundo leva a identificacao,
+      nao so o botao do cabecalho. O caminho de teclado/leitor de tela e o
+      proprio botao "Entrar" -- por isso o div nao carrega role nem tabindex:
+      dois alvos identicos anunciados em sequencia so confundem.
+    */
     <div
       className="tela"
+      data-testid="tela-atratora"
+      onClick={aoEntrar}
       style={{ padding: 'var(--tt-padding-publico)', gap: 'var(--tt-gap-bloco)' }}
     >
       <header style={{ display: 'flex', alignItems: 'center', gap: 24, flexShrink: 0 }}>
@@ -100,9 +113,41 @@ export function Atrator({
           className="botaoDeContraste"
           aria-pressed={altoContraste}
           data-testid="alternar-contraste"
-          onClick={aoAlternarContraste}
+          onClick={(evento) => {
+            /*
+              A tela inteira e tocavel (onClick no container): sem o
+              stopPropagation, alternar o contraste tambem ABRIRIA a
+              identificacao -- o toque de acessibilidade nao pode navegar.
+            */
+            evento.stopPropagation();
+            aoAlternarContraste();
+          }}
         >
           Alto contraste
+        </button>
+
+        {/*
+          O BOTAO ENTRAR MOROU AQUI a partir da imagem de referencia do PI
+          (28/08/2026) e do diagrama do §4 v2.1 -- `[contraste][Entrar]` no
+          cabecalho, hint fixo no rodape. O CTA gigante de rodape saiu: a tela
+          inteira ja e o alvo de toque, e o §3.8 segue valendo (um unico CTA
+          primario por tela -- este).
+
+          Reusa `.ctaPrimario` de proposito: alto contraste, reduced-motion e
+          o retorno de toque (:active) vem de graca; `.ctaDoCabecalho` so
+          encolhe o tamanho para o cabecalho.
+        */}
+        <button
+          type="button"
+          className="ctaPrimario ctaDoCabecalho"
+          data-testid="entrar-cabecalho"
+          onClick={(evento) => {
+            evento.stopPropagation();
+            aoEntrar();
+          }}
+        >
+          <IconeEntrar tamanho={26} />
+          Entrar
         </button>
       </header>
 
@@ -150,10 +195,16 @@ export function Atrator({
             {kicker}
           </div>
         )}
+        {/*
+          As frases correm NA MESMA LINHA (imagem de referencia de
+          28/08/2026), quebrando naturalmente quando nao couberem -- o `<br>`
+          forcado de antes fazia todo slogan de duas frases ocupar duas
+          linhas e roubava altura da grade.
+        */}
         <h1 className="hero">
           {headline.map((frase, indice) => (
             <span key={frase}>
-              {indice > 0 && <br />}
+              {indice > 0 && ' '}
               {indice === headline.length - 1 ? (
                 <span className="heroDestaque">{frase}</span>
               ) : (
@@ -174,35 +225,30 @@ export function Atrator({
 
       <BlocosPublicos config={config} indicadores={indicadores} />
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 14,
-          flexShrink: 0,
-        }}
-      >
-        <button type="button" className="ctaPrimario" onClick={aoEntrar}>
-          <IconeEntrar tamanho={34} />
-          Entrar na minha área
-        </button>
-        <p className="metadado" style={{ color: 'var(--ah-totem-brand-200)' }}>
-          Consulte seu plano e acompanhe sua evolução
-        </p>
-      </div>
-
-      {/* Assinatura ArenaHub -- DS-TOTEM.md §11.10. Nao configuravel. */}
-      <p
-        style={{
-          flexShrink: 0,
-          textAlign: 'center',
-          fontSize: 'var(--tt-minimo)',
-          color: 'var(--ah-totem-text-secondary)',
-        }}
-      >
-        tecnologia <strong>arenahub</strong>
+      {/*
+        O HINT FIXO DO §4 no lugar do CTA gigante: com o botao Entrar no
+        cabecalho e a tela inteira tocavel, o rodape vira a instrucao -- e a
+        promessa do que ha do outro lado. "pagamentos" so entra quando o
+        modulo esta LIGADO: prometer pagamento numa unidade que o desligou
+        manda o aluno procurar o que nao existe (§11).
+      */}
+      <p className="dicaDeEntrada" data-testid="dica-de-entrada">
+        Toque na tela para entrar na sua área
+        {config.modulos.pagamento ? ' — plano, avaliação e pagamentos' : ' — plano e avaliação'}
       </p>
+
+      {/*
+        A FAIXA FECHA A TELA, depois do CTA -- e a ordem do protótipo
+        (`Totem.dc.html`). Ate 28/08/2026 ela saia de dentro de
+        `BlocosPublicos`, o que a prendia ACIMA do botao: patrocinador
+        aparecia antes da acao principal, invertendo a hierarquia da tela.
+
+        A ASSINATURA ArenaHub (§11.10) mora dentro da faixa, dividindo a linha
+        com "ESPACO PATROCINADO". Sem faixa, `AssinaturaSolta` a devolve
+        sozinha -- as duas nunca aparecem juntas nem somem juntas.
+      */}
+      <FaixaDePatrocinio patrocinio={config.patrocinio} />
+      <AssinaturaSolta patrocinio={config.patrocinio} />
     </div>
   );
 }
