@@ -1,9 +1,9 @@
 {
   "apps/api#test": {
-    "testes": 1529,
-    "pass": 1529,
+    "testes": 1564,
+    "pass": 1564,
     "falha": 0,
-    "coberturaPct": 70.36
+    "coberturaPct": 70.28
   },
   "apps/api#test:integration": {
     "testes": 704,

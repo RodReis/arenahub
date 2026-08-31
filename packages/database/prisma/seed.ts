@@ -247,6 +247,13 @@ const PERMISSOES = [
   // afirma que alguém falou com o aluno. Quem consulta o painel não
   // necessariamente responde pela conversa.
   'retention.task.manage',
+  // F41: parar o scoring da academia inteira sem deploy.
+  //
+  // Separada de `retention.read` pelo precedente dos atos excepcionais
+  // (`access.override`, `billing.refund`): acompanhar o painel de saude e
+  // trabalho de rotina; DESLIGAR o pipeline afeta todo mundo e e decisao de
+  // operacao, nao de consulta.
+  'retention.kill_switch',
 ];
 
 

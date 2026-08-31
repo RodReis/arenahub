@@ -7,7 +7,25 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 31/08/2026 *(F40 não executada — o gate de ML não fecha, e a medição diz por quê)*
+**Última atualização:** 31/08/2026 *(F41 entregue — o MVP 6 fecha com escopo reduzido)*
+
+🏁 **31/08/2026 — F41 entregue, e o MVP 6 fecha.** Última fatia do roadmap documentado. A Slice 6.6
+foi escrita para monitorar um **modelo**, e sem a F40 metade dela não tem objeto — score de regra
+não é probabilidade e não calibra. Você decidiu entregar o que sobrevive:
+
+- **kill switch** do scoring — coluna de tenant, efeito imediato, sem deploy;
+- **drift das 13 features** — a entrada de tudo, hoje da baseline e amanhã do modelo;
+- **saúde do pipeline** — o job que parou não tem sintoma, porque fila vazia lê-se como boa notícia.
+
+**Desligar não quebra o que já estava na mão da recepção.** Scores gravados seguem legíveis com
+marca de idade, e a tarefa aberta continua tratável até ser concluída — `M6-NFR-009` testado de
+ponta a ponta. Desligar no meio do dia não pode deixar uma fila que ninguém consegue fechar.
+
+⚠️ **Um canário não era pego por nada, e a consequência era real.** A saúde do pipeline lê
+`createdAt` (quando rodou), não `observedAt` (que dia descreve). Numa reconstrução histórica —
+operação legítima que a F36 desenhou o corte de conhecimento para permitir — um pipeline saudável
+apareceria como parado há meses. Quarta fatia seguida com buraco de canário, em variante nova:
+**distinção de campo que nenhum teste exercitava.**
 
 ⛔ **31/08/2026 — a F40 não foi executada, e isso é o resultado, não uma pendência.** A issue #40 já
 avisava: *"fatia condicional, pode não acontecer, e isso é resultado válido"*. Em vez de supor, o
@@ -998,7 +1016,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F38 | SPEC-038 | 6 | 6.3 | CRM de retenção | [`SPEC-038-crm-de-retencao.md`](specs/SPEC-038-crm-de-retencao.md) | [#38](https://github.com/RodReis/arenahub/issues/38) | ✅ **entregue** em 31/08/2026 ([#226](https://github.com/RodReis/arenahub/pull/226)) — aguardando aceite — a seta do MVP 6 fechada: score vira tarefa. Fila top-K por capacidade (20/dia por unidade), cooldown de 14 dias, SLA de 3 dias úteis e canal WhatsApp — os quatro por **decisão do PI de 31/08** (`M6-OPS-01`). Nenhuma rota envia mensagem: o sistema **registra** o contato que a pessoa fez |
 | F39 | SPEC-039 | 6 | 6.4 | Experimento operacional | [`SPEC-039-experimento-operacional.md`](specs/SPEC-039-experimento-operacional.md) | [#39](https://github.com/RodReis/arenahub/issues/39) | ✅ **entregue** em 31/08/2026 ([#227](https://github.com/RodReis/arenahub/pull/227)) — aguardando aceite — randomização por hash verificável, braço de controle que nunca vira tarefa e análise por intenção de tratar. Parâmetros por **decisão do PI de 31/08** (`M6-EXPERIMENT-01`): 20% controle, permanência em 30 dias, quatro efeitos adversos. Imutabilidade da alocação garantida por **trigger no banco**, não por guarda no serviço |
 | F40 | SPEC-040 | 6 | 6.5 | Modelo supervisionado (condicionado a M6-ML-01) | [`SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md`](specs/SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md) | [#40](https://github.com/RodReis/arenahub/issues/40) | ⛔ **não executada** — decisão do PI em 31/08/2026 (**ADR-050**, [#228](https://github.com/RodReis/arenahub/pull/228)). O gate `M6-ML-01` foi **medido** e não fecha: **0 snapshots** (o pipeline nunca rodou), **1 churn datado** contra 200 exigidos, **3 dias** de histórico contra 6 meses. Nenhum código de ML entra no repositório; a baseline da F37 **é** o produto de scoring. Reabre com ≥1.000 snapshots e ≥200 churns datados |
-| F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | [`SPEC-041-producao-controlada-e-monitoramento.md`](specs/SPEC-041-producao-controlada-e-monitoramento.md) | [#41](https://github.com/RodReis/arenahub/issues/41) | planejada |
+| F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | [`SPEC-041-producao-controlada-e-monitoramento.md`](specs/SPEC-041-producao-controlada-e-monitoramento.md) | [#41](https://github.com/RodReis/arenahub/issues/41) | ✅ **entregue** em 31/08/2026 — aguardando aceite — **escopo reduzido por decisão do PI**: sem modelo (ADR-050), champion/challenger e calibração perdem o objeto. Entregues o **kill switch** do scoring (coluna de tenant, sem deploy), **drift das 13 features** e **saúde do pipeline**. Desligar preserva scores gravados e tarefas abertas (`M6-NFR-009`) |
 | F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | [#81](https://github.com/RodReis/arenahub/issues/81) | aprovada-pi |
 | F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | [#82](https://github.com/RodReis/arenahub/issues/82) | aprovada-pi *(gate: MVP 4)* |
 | F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | ✅ **entregue** em 26/08/2026 ([#210](https://github.com/RodReis/arenahub/pull/210)) — aguardando aceite |

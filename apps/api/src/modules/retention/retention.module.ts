@@ -9,6 +9,12 @@ import {
   PORTA_DE_EXPERIMENTOS,
   RetentionExperimentsRepository,
 } from './retention-experiments.repository.js';
+import { RetentionMonitoringController } from './retention-monitoring.controller.js';
+import {
+  PORTA_DE_MONITORAMENTO,
+  RetentionMonitoringRepository,
+} from './retention-monitoring.repository.js';
+import { RetentionMonitoringService } from './retention-monitoring.service.js';
 import { RetentionExperimentsService } from './retention-experiments.service.js';
 import { RetentionTasksController } from './retention-tasks.controller.js';
 import { RetentionTasksQueryRepository } from './retention-tasks-query.repository.js';
@@ -44,6 +50,11 @@ import { RetentionSnapshotsService } from './retention-snapshots.service.js';
  * um braco de controle que nunca recebe tarefa. Sem esse braco nao ha como
  * separar "a ligacao reteve o aluno" de "o aluno ia ficar de qualquer jeito".
  *
+ * A F41 fecha o MVP com o que a Slice 6.6 pede E existe sem modelo (a F40 nao
+ * foi executada, ADR-050): kill switch do scoring, drift das features e saude
+ * do pipeline. Champion/challenger e calibracao ficam fora -- score de regra
+ * nao calibra, e nao ha duas versoes competindo.
+ *
  * A F37 abriu a PRIMEIRA rota HTTP de retencao. A F36 deixou o modulo interno de
  * proposito -- expor score antes da baseline seria mostrar um numero que ainda
  * nao significava nada. Agora significa: cada ponto tem regra, valor observado
@@ -51,7 +62,11 @@ import { RetentionSnapshotsService } from './retention-snapshots.service.js';
  */
 @Module({
   imports: [PersistenceModule],
-  controllers: [RetentionScoresController, RetentionTasksController],
+  controllers: [
+    RetentionScoresController,
+    RetentionTasksController,
+    RetentionMonitoringController,
+  ],
   providers: [
     TenantContextService,
     RetentionSnapshotsService,
@@ -66,12 +81,15 @@ import { RetentionSnapshotsService } from './retention-snapshots.service.js';
     { provide: PORTA_DE_CONSULTA_DE_TAREFAS, useClass: RetentionTasksQueryRepository },
     RetentionExperimentsService,
     { provide: PORTA_DE_EXPERIMENTOS, useClass: RetentionExperimentsRepository },
+    RetentionMonitoringService,
+    { provide: PORTA_DE_MONITORAMENTO, useClass: RetentionMonitoringRepository },
   ],
   exports: [
     RetentionSnapshotsService,
     RetentionScoresService,
     RetentionTasksService,
     RetentionExperimentsService,
+    RetentionMonitoringService,
   ],
 })
 export class RetentionModule {}

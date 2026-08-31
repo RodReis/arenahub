@@ -1140,7 +1140,33 @@ antes dele não há snapshot reconstruível para acumular.
 | F38 | 6.3 CRM de retenção | ✅ **entregue** em 31/08/2026 — fila top-K por capacidade, cooldown, SLA, máquina de estados e registro de contato |
 | F39 | 6.4 Experimento operacional | ✅ **entregue** em 31/08/2026 — randomização por hash, braço de controle fora da fila, análise ITT |
 | F40 | 6.5 Modelo supervisionado | ⛔ **não executada** — gate `M6-ML-01` medido e não atingido (ADR-050) |
-| F41 | 6.6 Produção e monitoramento | escopo a reavaliar — sem modelo, drift e kill switch perdem o objeto |
+| F41 | 6.6 Produção e monitoramento | ✅ **entregue** em 31/08/2026 — escopo reduzido: kill switch, drift de feature e saúde do pipeline |
+
+**A F41 fecha o MVP 6 com escopo reduzido, por decisão do PI.**
+
+A Slice 6.6 foi escrita para monitorar um **modelo**. Sem F40 (ADR-050), champion/challenger e
+calibração perdem o objeto — score de regra não é probabilidade e não calibra. Ficou o que tem valor
+próprio: **kill switch**, **drift das 13 features** e **saúde do pipeline**.
+
+**1. O kill switch desliga só o cálculo novo.** Scores gravados seguem legíveis com marca de idade
+(F37), tarefas abertas seguem tratáveis até o fim — `M6-NFR-009` literal, testado de ponta a ponta.
+Desligar no meio do dia não pode deixar a recepção com uma fila que ela não consegue fechar.
+
+**2. Flag é COLUNA de tenant**, mesmo precedente das três de engajamento. "Sem deploy" é o
+requisito, e um `UPDATE` é o caminho mais curto entre a decisão e o efeito.
+
+**3. Desligado NÃO alarma**, nem com drift crítico visível. Alarme que dispara por situação criada
+de propósito treina a operação a ignorar alarme.
+
+**4. A saúde lê `createdAt`, não `observedAt`.** A pergunta é *quando o pipeline rodou*, não *que dia
+ele descreveu*. Reconstrução histórica grava `observedAt` antigo com `createdAt` de hoje — lendo
+`observedAt`, um pipeline saudável apareceria parado há meses. **Nenhum teste pegava isso.**
+
+**5. Drift de AUSÊNCIA suprime o de MÉDIA no mesmo período.** Quando a fonte cai, a média dos poucos
+observados também muda; reportar as duas esconderia a causa no meio do efeito.
+
+⚠️ **A lacuna do agendamento continua aberta** — agora com um sintoma visível: o painel acusa
+`NUNCA_RODOU`, que é exatamente o estado do banco de desenvolvimento.
 
 **A F40 não foi executada, e a medição é o entregável.**
 

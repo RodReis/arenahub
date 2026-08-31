@@ -55,6 +55,15 @@ const snapshot = (parcial: Partial<SnapshotParaPontuar> = {}): SnapshotParaPontu
   ...parcial,
 });
 
+/** Dublê do kill switch (F41). Ligado é o padrão do produto. */
+class MonitoramentoFake {
+  ligado = true;
+
+  scoringLigado(): Promise<boolean> {
+    return Promise.resolve(this.ligado);
+  }
+}
+
 class PortaFake implements PortaDeScores {
   catalogoAtual = catalogo();
   snapshots: SnapshotParaPontuar[] = [snapshot()];
@@ -93,11 +102,13 @@ class PortaFake implements PortaDeScores {
 
 describe('RetentionScoresService', () => {
   let porta: PortaFake;
+  let monitoramento: MonitoramentoFake;
   let service: RetentionScoresService;
 
   beforeEach(() => {
     porta = new PortaFake();
-    service = new RetentionScoresService(porta);
+    monitoramento = new MonitoramentoFake();
+    service = new RetentionScoresService(porta, monitoramento as never);
   });
 
   it('pontua aluno elegivel e grava fatores ordenados', async () => {
@@ -131,6 +142,38 @@ describe('RetentionScoresService', () => {
       [1, 'r2'],
       [2, 'r1'],
     ]);
+  });
+
+  it('nao pontua ninguem com o kill switch acionado -- M6-FR-017', async () => {
+    monitoramento.ligado = false;
+
+    const resumo = await service.pontuarDia(contexto, new Date('2026-09-01T00:00:00.000Z'));
+
+    expect(resumo).toEqual({ pontuados: 0, pulados: 0 });
+    expect(porta.gravados).toEqual([]);
+  });
+
+  it('kill switch nao registra pulo -- desligado nao e inelegibilidade', async () => {
+    // A linha de pulo existe para dizer POR QUE um aluno não foi pontuado
+    // (cancelado, suprimido, sem histórico). Scoring desligado não é uma
+    // propriedade do aluno, e gravar uma linha por aluno a cada rodada
+    // encheria a tabela de ruído que some quando alguém religa.
+    monitoramento.ligado = false;
+
+    await service.pontuarDia(contexto, new Date('2026-09-01T00:00:00.000Z'));
+
+    expect(porta.pulados).toEqual([]);
+  });
+
+  it('volta a pontuar quando o scoring e religado', async () => {
+    monitoramento.ligado = false;
+    await service.pontuarDia(contexto, new Date('2026-09-01T00:00:00.000Z'));
+
+    monitoramento.ligado = true;
+    const resumo = await service.pontuarDia(contexto, new Date('2026-09-01T00:00:00.000Z'));
+
+    // Religar devolve o pipeline: nada foi destruído enquanto esteve desligado.
+    expect(resumo.pontuados).toBe(1);
   });
 
   it('grava o valor observado em cada fator, para a explicacao ser contestavel', async () => {
