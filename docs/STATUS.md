@@ -7,7 +7,31 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 31/08/2026 *(F37 entregue — regras explicáveis e score)*
+**Última atualização:** 31/08/2026 *(F38 entregue — CRM de retenção)*
+
+🎯 **31/08/2026 — F38 entregue, e a seta do MVP 6 fecha.** A entrega do MVP inteiro é *"risco de
+churn explicável → tarefa operacional"*; a F37 deu o lado esquerdo, e sem esta fatia o score seria
+relatório, não ação. Agora a fila liga os quatro que o aceite exige: **score, ação, responsável e
+resultado**.
+
+**Os quatro números da operação são decisão do PI** (`M6-OPS-01`): capacidade **20/dia por
+unidade**, cooldown **14 dias**, SLA **3 dias úteis**, canal **WhatsApp único**. Vivem no banco,
+configuráveis sem deploy. Capacidade é por unidade porque a matriz e a do bairro não têm a mesma
+recepção — e unidade sem política **não gera fila**, em vez de herdar um padrão mudo que ninguém
+descobriria estar errado.
+
+**Nenhuma rota envia mensagem.** O `POST .../interactions` **registra** o que a atendente fez pelo
+WhatsApp dela. É o que separa CRM de retenção de plataforma de marketing, e o `prd/README.md` §3
+diz que o ArenaHub não é a segunda.
+
+⚠️ **Um canário achou defeito real no código, e a lição se repetiu pela segunda fatia seguida.**
+O cooldown não segurava nada: `criadaEm` vinha do relógio do Postgres (`@default(now())`) e era
+comparado com o `agora` da aplicação — dois relógios na mesma conta. Mas o teste **passava**, e por
+três motivos errados em sequência: primeiro a chave de score recusava, depois o índice parcial
+recusava, e só com os dois fora do caminho a falha apareceu. **Guarda verde não prova nada quando
+outra guarda recusa o caso antes dela** — na F37 foi a completude recusando antes da regra; aqui,
+duas chaves únicas antes do cooldown.
+
 
 🎯 **31/08/2026 — F37 entregue, e o score de churn nasce contestável.** O PI liberou a fatia do
 gate de ≥6 meses no mesmo dia da F36, com o argumento simétrico: **regra explicável não aprende de
@@ -851,7 +875,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **3.5** | Totem: tela pública configurável + autosserviço do aluno | MVP 1 estável + PIX operando (F13 ✅) | F49–F52 | criado por **ADR-042** em 22/08/2026. **Antecipa a decisão, não a execução** — o kiosk nasce configurável em vez de ser retrabalhado depois. Antecipa a execução das Slices 4.5 e 4.6. **Em execução: F49 entregue em 25/08/2026** — regime de identificação fixado pelo **ADR-045** (CPF sozinho; facial vai para o backlog) |
 | **4** | Autosserviço: **app do aluno** (o totem saiu para o MVP 3.5) | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado — e **vem depois do MVP 3.5**, decisão do PI em 22/08 (ADR-042). **Slices 4.5 e 4.6 são executadas no MVP 3.5**; o texto e o aceite continuam no PRD MVP-04 §7, sem cópia |
 | **5** | Engajamento opt-out mensurável | eventos confiáveis + app do MVP 4 — **não alcança nenhuma fatia do MVP 5** (ADR-046, ADR-047, ADR-048, ADR-049 e decisão do PI de 28/08 sobre a F32) | F30–F35 | **F30 a F35 entregues** (27–28/08/2026) — superfície no totem e no painel. A F31 absorveu a F33 (ADR-047). **A F34 inverteu o opt-in para inscrição automática** (ADR-048, emenda 1) e trouxe o desafio para a tela pública (emenda 2). **A F35 fechou o MVP 5 em 28/08** (ADR-049) — o gate original **não guarda mais nenhuma fatia** |
-| **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | **o gate não alcança a F36 nem a F37** — duas decisões do PI em 31/08/2026. O gate existe para o **modelo supervisionado** (Slice 6.5 / F40), que aprende de histórico: sem snapshot as-of os 6 meses nunca começam a contar (F36), e regra explicável não aprende — aplica limite que uma pessoa escreveu (F37). **F38–F41 continuam atrás dele** |
+| **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | **o gate não alcança a F36, a F37 nem a F38** — três decisões do PI em 31/08/2026. O gate existe para o **modelo supervisionado** (Slice 6.5 / F40), que aprende de histórico: sem snapshot as-of os 6 meses nunca começam a contar (F36), regra explicável não aprende — aplica limite que uma pessoa escreveu (F37) —, e fila de tarefa é código determinístico sobre o score que já existe (F38). **F39–F41 continuam atrás dele** |
 
 
 **Ordem de execução (decisão do PI em 22/08/2026, ADR-042):**
@@ -927,7 +951,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F35 | SPEC-035 | 5 | 5.6 | Operação, moderação e experimento | [`SPEC-035-operacao-moderacao-e-experimento.md`](specs/SPEC-035-operacao-moderacao-e-experimento.md) | [#35](https://github.com/RodReis/arenahub/issues/35) | ✅ **entregue** em 28/08/2026 ([#222](https://github.com/RodReis/arenahub/pull/222)) — aguardando aceite |
 | F36 | SPEC-036 | 6 | 6.1 | Contrato de dados e baseline analítica | [`SPEC-036-contrato-de-dados-e-baseline-analitica.md`](specs/SPEC-036-contrato-de-dados-e-baseline-analitica.md) | [#36](https://github.com/RodReis/arenahub/issues/36) | ✅ **entregue** em 31/08/2026 ([#224](https://github.com/RodReis/arenahub/pull/224)) — aguardando aceite — snapshot point-in-time entregue por **decisão do PI de 31/08** (aceite relaxado: o gate de ≥6 meses **não** guarda esta fatia). As 13 features do PRD §9 saem as-of; só `payment_failure_count_90d` é marcada `ESTADO_CORRENTE` |
 | F37 | SPEC-037 | 6 | 6.2 | Regras explicáveis e score | [`SPEC-037-regras-explicaveis-e-score.md`](specs/SPEC-037-regras-explicaveis-e-score.md) | [#37](https://github.com/RodReis/arenahub/issues/37) | ✅ **entregue** em 31/08/2026 ([#225](https://github.com/RodReis/arenahub/pull/225)) — aguardando aceite — baseline explicável entregue por **decisão do PI de 31/08** (o gate de ≥6 meses **não** guarda esta fatia: ele existe para o modelo supervisionado da F40, que aprende de histórico; regra declarativa não aprende). Score `[0,100]` com faixas versionadas, até 5 fatores com o valor observado, e recusa registrada com motivo em vez de score zero |
-| F38 | SPEC-038 | 6 | 6.3 | CRM de retenção | [`SPEC-038-crm-de-retencao.md`](specs/SPEC-038-crm-de-retencao.md) | [#38](https://github.com/RodReis/arenahub/issues/38) | planejada |
+| F38 | SPEC-038 | 6 | 6.3 | CRM de retenção | [`SPEC-038-crm-de-retencao.md`](specs/SPEC-038-crm-de-retencao.md) | [#38](https://github.com/RodReis/arenahub/issues/38) | ✅ **entregue** em 31/08/2026 — aguardando aceite — a seta do MVP 6 fechada: score vira tarefa. Fila top-K por capacidade (20/dia por unidade), cooldown de 14 dias, SLA de 3 dias úteis e canal WhatsApp — os quatro por **decisão do PI de 31/08** (`M6-OPS-01`). Nenhuma rota envia mensagem: o sistema **registra** o contato que a pessoa fez |
 | F39 | SPEC-039 | 6 | 6.4 | Experimento operacional | [`SPEC-039-experimento-operacional.md`](specs/SPEC-039-experimento-operacional.md) | [#39](https://github.com/RodReis/arenahub/issues/39) | planejada |
 | F40 | SPEC-040 | 6 | 6.5 | Modelo supervisionado (condicionado a M6-ML-01) | [`SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md`](specs/SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md) | [#40](https://github.com/RodReis/arenahub/issues/40) | planejada |
 | F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | [`SPEC-041-producao-controlada-e-monitoramento.md`](specs/SPEC-041-producao-controlada-e-monitoramento.md) | [#41](https://github.com/RodReis/arenahub/issues/41) | planejada |

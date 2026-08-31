@@ -238,6 +238,15 @@ const PERMISSOES = [
   // escrito.
   'retention.read',
   'retention.suppress',
+  // F38: tratar a tarefa da fila -- atribuir, iniciar, registrar contato,
+  // concluir e dispensar.
+  //
+  // Separada de `retention.read` pelo precedente dos atos excepcionais
+  // (`access.override`, `billing.refund`): olhar a fila de risco é leitura
+  // gerencial; DISPENSAR uma tarefa é decisão com motivo gravado, e concluir
+  // afirma que alguém falou com o aluno. Quem consulta o painel não
+  // necessariamente responde pela conversa.
+  'retention.task.manage',
 ];
 
 

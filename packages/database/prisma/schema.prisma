@@ -632,6 +632,9 @@ model Tenant {
   retentionScores             RetentionScore[]
   retentionScoreSkips         RetentionScoreSkip[]
   retentionSuppressions       RetentionSuppression[]
+  retentionCapacityPolicies   RetentionCapacityPolicy[]
+  retentionTasks              RetentionTask[]
+  retentionInteractions       RetentionInteraction[]
 
   /// Minimo de participantes para publicar um placar (`M5-BR-007`).
   /// ADR-047: 5. Configuravel por tenant -- academia pequena e academia
@@ -700,6 +703,9 @@ model GymUnit {
 
   rankingSnapshots RankingSnapshot[]
   challenges       Challenge[]
+
+  retentionCapacityPolicy RetentionCapacityPolicy?
+  retentionTasks          RetentionTask[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1061,6 +1067,7 @@ model Student {
   retentionScores         RetentionScore[]
   retentionScoreSkips     RetentionScoreSkip[]
   retentionSuppressions   RetentionSuppression[]
+  retentionTasks          RetentionTask[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -5138,6 +5145,7 @@ model RetentionScore {
   snapshot     StudentFeatureSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
   ruleVersion  RetentionRuleVersion   @relation(fields: [ruleVersionId], references: [id])
   factors      RetentionScoreFactor[]
+  task         RetentionTask?
 
   /// A chave de idempotencia de `M6-NFR-002`. Reexecutar a mesma versao sobre o
   /// mesmo snapshot nao duplica -- e quem garante e o indice, nao um `if` no
@@ -5228,4 +5236,174 @@ model RetentionSuppression {
 
   @@index([tenantId, studentId, endsAt])
   @@map("retention_suppressions")
+}
+
+// ---------------------------------------------------------------------------
+// F38 -- CRM de retencao (Slice 6.3)
+// ---------------------------------------------------------------------------
+
+/// Em que ponto a tarefa esta.
+///
+/// As tres terminais sao distintas de proposito: `COMPLETED` teve contato,
+/// `DISMISSED` foi descartada por uma pessoa com motivo, `EXPIRED` estourou o
+/// SLA sem ninguem tocar. Colapsa-las esconderia a metrica que diz se a fila
+/// esta grande demais para a equipe.
+enum RetentionTaskStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  DISMISSED
+  EXPIRED
+
+  @@map("retention_task_status")
+}
+
+/// O que aconteceu quando alguem tratou a tarefa (`M6-FR-010`).
+///
+/// `CHANNEL_UNAVAILABLE` nao e detalhe: com WhatsApp como canal unico (decisao
+/// do PI em 31/08/2026), aluno sem numero cadastrado e caso real e frequente, e
+/// precisa ser distinguivel de `NO_ANSWER` -- um diz "tente outro caminho", o
+/// outro "tente de novo mais tarde".
+///
+/// `RESOLVED_OTHER` cobre o aluno que voltou a treinar sozinho antes da
+/// ligacao: resultado bom que NAO veio da intervencao, e conta-lo como
+/// `CONTACTED` inflaria o efeito medido do CRM na Slice 6.4.
+enum RetentionTaskResult {
+  CONTACTED
+  NO_ANSWER
+  CHANNEL_UNAVAILABLE
+  DECLINED
+  FOLLOW_UP
+  RESOLVED_OTHER
+
+  @@map("retention_task_result")
+}
+
+/// Por onde o contato foi feito.
+///
+/// O ArenaHub **nao envia nada** -- `M6-BR-007` e `M6-AC-010`. Este enum
+/// registra o que a pessoa fez por fora, e por isso e um campo de REGISTRO, nao
+/// de integracao. O PI fixou WhatsApp como canal unico em 31/08/2026; os outros
+/// entram quando a operacao pedir.
+enum RetentionContactChannel {
+  WHATSAPP
+
+  @@map("retention_contact_channel")
+}
+
+/// Quanto a equipe de uma unidade consegue tratar por dia (`M6-BR-005`).
+///
+/// Por UNIDADE, e nao por tenant: a academia da matriz e a do bairro nao tem a
+/// mesma recepcao, e um numero unico condenaria uma das duas -- ou fila que
+/// ninguem alcanca, ou fila menor do que a equipe daria conta.
+model RetentionCapacityPolicy {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  /// `@unique` na coluna, e nao composto com o tenant: a unidade ja pertence a
+  /// um tenant so, entao unicidade por unidade E unicidade por (tenant,
+  /// unidade) -- e a forma simples e a que o Prisma aceita no lado 1-1.
+  gymUnitId String @unique @map("gym_unit_id") @db.Uuid
+
+  /// Tarefas por dia. Decisao do PI em 31/08/2026: 20.
+  dailyCapacity Int @default(20) @map("daily_capacity")
+  /// Dias ate o mesmo aluno poder gerar nova tarefa. Decisao do PI: 14.
+  cooldownDays  Int @default(14) @map("cooldown_days")
+  /// Dias UTEIS ate a tarefa vencer. Decisao do PI: 3.
+  slaBusinessDays Int @default(3) @map("sla_business_days")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gymUnit GymUnit @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("retention_capacity_policies")
+}
+
+/// A tarefa humana que nasce de um score (`M6-FR-007`).
+///
+/// LIGA OS QUATRO que o aceite da Slice 6.3 exige: o score que a originou, a
+/// estrategia (a acao sugerida), o responsavel e o resultado. Sem o vinculo com
+/// `scoreId` a tarefa vira um lembrete solto -- e a pergunta "a retencao
+/// funcionou?" deixa de ter resposta, porque nao ha como ligar a intervencao ao
+/// risco que a motivou.
+model RetentionTask {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  gymUnitId String @map("gym_unit_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  /// O score que originou a tarefa. `Restrict`: apagar o score deixaria a
+  /// tarefa sem a explicacao que a justifica.
+  scoreId String @map("score_id") @db.Uuid
+
+  /// Qual roteiro de retencao. Uma estrategia por motivo dominante; o cooldown
+  /// e por (aluno, estrategia), entao o aluno pode receber contato por queda de
+  /// frequencia e, semanas depois, por cobranca vencida.
+  strategy String
+
+  status RetentionTaskStatus @default(OPEN)
+
+  /// Quem esta com a tarefa. `null` enquanto `OPEN`.
+  assigneeId String? @map("assignee_id") @db.Uuid
+
+  /// Preenchido ao concluir -- obrigatorio pela maquina de estados.
+  result RetentionTaskResult?
+  /// Preenchido ao dispensar. O CHECK na migration exige o texto.
+  dismissReason String? @map("dismiss_reason")
+
+  /// Prazo em dias UTEIS a partir da criacao. Vencido, o expirador libera a
+  /// vaga de capacidade em vez de segurar o slot indefinidamente.
+  dueAt       DateTime  @map("due_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gymUnit      GymUnit                @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+  student      Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  score        RetentionScore         @relation(fields: [scoreId], references: [id])
+  interactions RetentionInteraction[]
+
+  /// Um score gera no maximo uma tarefa. E a idempotencia de `M6-AC-004`:
+  /// reprocessar o dia reencontra a chave em vez de duplicar.
+  @@unique([scoreId])
+  /// A fila le por aqui.
+  @@index([tenantId, gymUnitId, status, dueAt])
+  @@index([tenantId, studentId, createdAt])
+  @@map("retention_tasks")
+}
+
+/// Cada tentativa de contato (`M6-FR-010`, `M6-AC-006`).
+///
+/// APPEND-ONLY, e uma tarefa tem VARIAS: ligar tres vezes ate a pessoa atender
+/// sao tres interacoes e uma tarefa. Colapsar em um campo da tarefa perderia o
+/// historico de tentativa, que e o que distingue "ninguem tentou" de "tentou
+/// tres vezes e nao atenderam" -- diagnosticos opostos para a mesma fila parada.
+model RetentionInteraction {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  taskId   String @map("task_id") @db.Uuid
+
+  /// Quem falou. `Restrict` no usuario: apagar quem registrou apagaria a
+  /// responsabilidade que `M6-AC-006` exige.
+  actorId String @map("actor_id") @db.Uuid
+
+  channel RetentionContactChannel
+  result  RetentionTaskResult
+
+  /// O que foi conversado e o que fica combinado. Texto livre porque roteiro
+  /// nao cabe em enum -- e o proximo passo e do proximo humano, nao do sistema.
+  notes    String?
+  nextStep String? @map("next_step")
+
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  task   RetentionTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, taskId, occurredAt])
+  @@index([tenantId, occurredAt])
+  @@map("retention_interactions")
 }
