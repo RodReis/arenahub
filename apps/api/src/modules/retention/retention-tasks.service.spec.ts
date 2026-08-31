@@ -48,6 +48,20 @@ const gravada = (parcial: Partial<TarefaGravada> = {}): TarefaGravada => ({
   ...parcial,
 });
 
+/**
+ * Dublê do experimento (F39). `null` = sem experimento ativo, que é o estado
+ * normal do produto: a fila funciona sem experimento nenhum.
+ */
+class ExperimentoFake {
+  grupos = new Map<string, 'CONTROLE' | 'TRATAMENTO'>();
+  ativo = false;
+
+  grupoDoAluno(_contexto: TenantContext, studentId: string): Promise<'CONTROLE' | 'TRATAMENTO' | null> {
+    if (!this.ativo) return Promise.resolve(null);
+    return Promise.resolve(this.grupos.get(studentId) ?? null);
+  }
+}
+
 class PortaFake implements PortaDeTarefas {
   politicas: PoliticaDeCapacidade[] = [politica()];
   candidatos: CandidatoDoDia[] = [candidato()];
@@ -98,11 +112,13 @@ class PortaFake implements PortaDeTarefas {
 
 describe('RetentionTasksService — gerarFila', () => {
   let porta: PortaFake;
+  let experimento: ExperimentoFake;
   let service: RetentionTasksService;
 
   beforeEach(() => {
     porta = new PortaFake();
-    service = new RetentionTasksService(porta);
+    experimento = new ExperimentoFake();
+    service = new RetentionTasksService(porta, experimento as never);
   });
 
   it('cria tarefa para o candidato e devolve o resumo', async () => {
@@ -195,6 +211,78 @@ describe('RetentionTasksService — gerarFila', () => {
     expect(await service.gerarFila(contexto, agora)).toEqual({ criadas: 0, suprimidas: 1 });
   });
 
+  it('nao cria tarefa para quem esta no CONTROLE -- M6-FR-011', async () => {
+    // O coração do experimento: o controle nunca aparece para a equipe. Sem
+    // isso não há comparação -- todo mundo receberia ligação e a pergunta "a
+    // ligação adiantou?" ficaria sem grupo contra o qual medir.
+    experimento.ativo = true;
+    experimento.grupos.set('e1', 'CONTROLE');
+
+    const resumo = await service.gerarFila(contexto, agora);
+
+    expect(resumo).toEqual({ criadas: 0, suprimidas: 1 });
+    expect(porta.criadas).toEqual([]);
+  });
+
+  it('cria tarefa normalmente para quem esta no TRATAMENTO', async () => {
+    experimento.ativo = true;
+    experimento.grupos.set('e1', 'TRATAMENTO');
+
+    expect(await service.gerarFila(contexto, agora)).toEqual({ criadas: 1, suprimidas: 0 });
+  });
+
+  it('cria tarefa para quem nao esta no experimento', async () => {
+    // Aluno fora do experimento (entrou depois da alocação, por exemplo) segue
+    // o fluxo normal: excluí-lo seria punir quem não participa.
+    experimento.ativo = true;
+
+    expect(await service.gerarFila(contexto, agora)).toEqual({ criadas: 1, suprimidas: 0 });
+  });
+
+  it('ignora o experimento quando nao ha nenhum ativo', async () => {
+    experimento.ativo = false;
+    experimento.grupos.set('e1', 'CONTROLE');
+
+    // Sem experimento ativo o grupo não vale -- todo elegível entra na fila.
+    expect(await service.gerarFila(contexto, agora)).toEqual({ criadas: 1, suprimidas: 0 });
+  });
+
+  it('conta o controle como suprimido, nao como falha', async () => {
+    experimento.ativo = true;
+    experimento.grupos.set('a', 'CONTROLE');
+    experimento.grupos.set('b', 'TRATAMENTO');
+    porta.candidatos = [
+      candidato({ studentId: 'a', scoreId: 's-a', valor: 90 }),
+      candidato({ studentId: 'b', scoreId: 's-b', valor: 80 }),
+    ];
+
+    const resumo = await service.gerarFila(contexto, agora);
+
+    expect(resumo).toEqual({ criadas: 1, suprimidas: 1 });
+    expect(porta.criadas.map((c) => c.studentId)).toEqual(['b']);
+  });
+
+  it('o controle nao consome vaga de capacidade', async () => {
+    // Se o controle consumisse vaga, o experimento reduziria em 20% o trabalho
+    // real da recepção -- e o braço de tratamento ficaria menor do que a
+    // capacidade permite, enviesando o resultado contra a intervenção.
+    experimento.ativo = true;
+    experimento.grupos.set('a', 'CONTROLE');
+    experimento.grupos.set('b', 'TRATAMENTO');
+    experimento.grupos.set('c', 'TRATAMENTO');
+    porta.politicas = [politica({ capacidadeDiaria: 2 })];
+    porta.candidatos = [
+      candidato({ studentId: 'a', scoreId: 's-a', valor: 90 }),
+      candidato({ studentId: 'b', scoreId: 's-b', valor: 80 }),
+      candidato({ studentId: 'c', scoreId: 's-c', valor: 70 }),
+    ];
+
+    const resumo = await service.gerarFila(contexto, agora);
+
+    expect(resumo.criadas).toBe(2);
+    expect(porta.criadas.map((c) => c.studentId)).toEqual(['b', 'c']);
+  });
+
   it('e deterministico -- reexecutar o dia da o mesmo resultado', async () => {
     const primeira = await service.gerarFila(contexto, agora);
     porta.criadas = [];
@@ -206,11 +294,13 @@ describe('RetentionTasksService — gerarFila', () => {
 
 describe('RetentionTasksService — transicoes', () => {
   let porta: PortaFake;
+  let experimento: ExperimentoFake;
   let service: RetentionTasksService;
 
   beforeEach(() => {
     porta = new PortaFake();
-    service = new RetentionTasksService(porta);
+    experimento = new ExperimentoFake();
+    service = new RetentionTasksService(porta, experimento as never);
   });
 
   it('atribui uma tarefa', async () => {

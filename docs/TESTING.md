@@ -919,6 +919,67 @@ job.
 
 ---
 
+### Evidência da `SPEC-039` — F39, experimento operacional
+
+**PR: —** *(preencher depois do merge, pela regra do topo desta seção)*
+
+`pnpm test:report --issue 39 --spec SPEC-039`, rodado em 31/08/2026:
+
+```
+| 2026-08-31 | #39 | SPEC-039 | unitário   | 2808 | 2808 | 0 | 76.1 | — |
+| 2026-08-31 | #39 | SPEC-039 | integração |  779 |  779 | 0 | 83.9 | medido suíte a suíte |
+```
+
+Unitário: **2808** (era 2768 na F38 — os **40** novos são desta fatia). Integração: **779** em
+**53 suítes**, sendo **14** da suíte nova `retencao-experimento.int-spec.ts`. A aritmética fecha:
+
+```
+765 (base da F38) + 14 (suíte nova) = 779
+```
+
+Medição suíte a suíte por `basename`, as 53 uma a uma — zero falhas, **nenhuma captura vazia** nesta
+rodada. Mesmo crash do Jest no fim no Windows (exit `3221226505`, pré-existente desde a F32).
+
+🔬 **Canários (3).** Cada guarda foi provada removendo-a:
+
+| guarda removida | testes que caem |
+|---|---|
+| semente no hash de randomização | **1** unitário + **1** integração |
+| filtro do braço `CONTROLE` na fila | **3** unitários |
+| filtro de controle ANTES do corte de capacidade | **1** unitário |
+
+🔴 **O primeiro canário achou um buraco na suíte — terceira fatia seguida com o mesmo padrão.**
+Remover a semente do hash (`sha256(studentId)` em vez de `sha256(semente ␟ studentId)`) derrubava
+**só o unitário**; a integração inteira passava verde. Nenhum teste de integração usava duas
+sementes, então a consequência real — *o mesmo aluno preso no controle em todos os experimentos,
+acumulando nas mesmas pessoas o custo de nunca receber intervenção* — nunca era exercitada.
+
+Teste novo: dois experimentos com sementes diferentes sobre os **mesmos 40 alunos**, exigindo que as
+divisões divirjam. Com a semente ignorada seriam 40 coincidências de 40; com ela, fica perto de 20.
+
+**A lição já é regra:** guarda verde não prova nada quando o cenário não **alcança** a guarda. Na
+F37 era a completude recusando antes da regra de ausência; na F38, duas chaves únicas antes do
+cooldown; aqui, a ausência de um segundo experimento.
+
+📌 **O terceiro canário cobre um defeito de ORDEM, não de lógica.** Mover o filtro de controle para
+depois do corte de capacidade não quebra nada visivelmente: a fila continua saindo, o controle
+continua sem tarefa. Mas o controle passa a **consumir vaga** — a recepção trata 16 numa capacidade
+de 20, o braço de tratamento fica menor do que a operação aguenta, e o experimento mede uma
+intervenção mais fraca do que a real. É o tipo de viés que só aparece no resultado final, meses
+depois, sem sintoma no caminho.
+
+📌 **A imutabilidade mora em TRIGGER, e os testes batem no banco.** Cinco testes de integração
+tentam a escrita proibida direto pelo Prisma: mudar o grupo de uma alocação, mexer em `seed` e em
+`control_fraction` depois de `RUNNING`, alocar o mesmo aluno duas vezes, gravar o mesmo efeito
+adverso duas vezes. Todos são recusados **pelo Postgres**, não por um `if` no serviço — guarda em
+serviço é uma porta, e correção manual ou script de migração passam por fora dela.
+
+📌 **A migration inclui `CREATE FUNCTION` e `CREATE TRIGGER`**, e `migrate deploy` num banco
+recém-criado aplicou as **53 migrations** sem erro — é o que o job de integração do CI faz. Aplicada
+por `psql` nos dois bancos, pelo bloqueio que a F36 documentou.
+
+---
+
 ## 6. CI
 
 Pipeline mínimo, em ordem de custo crescente (falhe cedo, falhe barato):

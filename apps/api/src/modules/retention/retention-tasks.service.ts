@@ -8,6 +8,7 @@ import {
   type ComandoDeTarefa,
   type ResultadoDeTarefa,
 } from './domain/tarefa-de-retencao.js';
+import { RetentionExperimentsService } from './retention-experiments.service.js';
 import {
   PORTA_DE_TAREFAS,
   type CanalDeContato,
@@ -70,7 +71,10 @@ export class TarefaNaoEstaAtivaError extends Error {
  */
 @Injectable()
 export class RetentionTasksService {
-  constructor(@Inject(PORTA_DE_TAREFAS) private readonly porta: PortaDeTarefas) {}
+  constructor(
+    @Inject(PORTA_DE_TAREFAS) private readonly porta: PortaDeTarefas,
+    private readonly experimentos: RetentionExperimentsService,
+  ) {}
 
   /**
    * Gera a fila do dia, unidade por unidade.
@@ -80,12 +84,28 @@ export class RetentionTasksService {
    */
   async gerarFila(contexto: TenantContext, agora: Date): Promise<ResumoDaFila> {
     const politicas = await this.porta.politicasDoTenant(contexto);
-    const candidatos = await this.porta.candidatosDoDia(contexto, agora);
+    const brutos = await this.porta.candidatosDoDia(contexto, agora);
 
     const porUnidade = new Map(politicas.map((politica) => [politica.gymUnitId, politica]));
 
     let criadas = 0;
     let suprimidas = 0;
+
+    // O CONTROLE sai ANTES do corte de capacidade (F39, `M6-FR-011`).
+    //
+    // A ordem importa e é fácil de errar: filtrar depois faria o controle
+    // consumir vaga, e a recepção trataria 16 alunos numa capacidade de 20 --
+    // o braço de tratamento ficaria menor do que a operação aguenta, e o
+    // experimento mediria uma intervenção mais fraca do que a real.
+    const candidatos: CandidatoDoDia[] = [];
+    for (const candidato of brutos) {
+      const grupo = await this.experimentos.grupoDoAluno(contexto, candidato.studentId);
+      if (grupo === 'CONTROLE') {
+        suprimidas += 1;
+        continue;
+      }
+      candidatos.push(candidato);
+    }
 
     // Agrupa por unidade: a capacidade e de cada recepcao, e um corte global
     // deixaria a unidade grande consumir a vaga da pequena.
