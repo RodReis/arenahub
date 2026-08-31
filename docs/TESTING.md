@@ -893,6 +893,30 @@ receberia uma ligação por dia pelo mesmo motivo. O teste irmão prova que o í
 `migrate deploy` num banco recém-criado aplicou as **52 migrations** — é o que o job de integração
 do CI faz.
 
+🔴 **O CI reprovou por um teste que esta fatia não tocou, e a correção entrou aqui.**
+`painel-do-placar.test.tsx` (F35, `admin-web`) falhou com
+`expect(element).toHaveValue(null) / Received: -10` no job de unitários — num PR cujo diff **não
+inclui uma linha de `admin-web`**.
+
+**Era corrida, não regressão.** A limpeza do formulário mora num `useEffect` que roda **depois** do
+render que mostra `ajuste-registrado`; o teste esperava o segundo e assertava o primeiro. Passa na
+máquina rápida, falha na lenta — e o runner do GitHub é a lenta.
+
+**Provado, não suposto.** Local o teste passava 5 vezes seguidas nos dois formatos, então plantei um
+canário no componente (`setTimeout` de 30ms na limpeza) para simular a máquina lenta:
+
+| versão do teste | com a limpeza atrasada |
+|---|---|
+| asserção direta (como estava na `main`) | ❌ **falha**, com o erro exato do CI |
+| `waitFor` (como ficou) | ✅ passa |
+
+O canário foi removido; só o teste mudou. **O código estava certo** — `useEffect` para limpar após
+sucesso é o padrão, e o defeito era a expectativa do teste sobre *quando* isso acontece.
+
+⚠️ **`gh pr checks --watch` saiu com 0 mesmo com o job vermelho**, de novo (já registrado na
+memória do repo). A conferência que vale é `gh pr checks <n>` sem `--watch`, ou `gh run view` job a
+job.
+
 ---
 
 ## 6. CI

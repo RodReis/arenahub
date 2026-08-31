@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -142,8 +142,15 @@ describe('PainelDoPlacar', () => {
     await usuario.click(screen.getByTestId('confirmar-ajuste'));
 
     expect(await screen.findByTestId('ajuste-registrado')).toBeInTheDocument();
-    expect(screen.getByTestId('pontos-do-ajuste')).toHaveValue(null);
-    expect(screen.getByTestId('motivo-do-ajuste')).toHaveValue('');
+
+    // `waitFor`, e nao asserção direta: a limpeza mora num `useEffect` que roda
+    // DEPOIS do render que mostra `ajuste-registrado`. Assertar entre os dois
+    // passa na máquina rápida e falha na lenta -- foi o que aconteceu no CI em
+    // 31/08/2026, num PR que não tocou em `admin-web`.
+    await waitFor(() => {
+      expect(screen.getByTestId('pontos-do-ajuste')).toHaveValue(null);
+      expect(screen.getByTestId('motivo-do-ajuste')).toHaveValue('');
+    });
   });
 
   it('erro no ajuste aparece como toast', async () => {
