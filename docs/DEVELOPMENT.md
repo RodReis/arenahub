@@ -1138,7 +1138,47 @@ antes dele não há snapshot reconstruível para acumular.
 | F36 | 6.1 Contrato de dados e baseline analítica | ✅ **entregue** em 31/08/2026 — snapshot point-in-time, 13 features, checksum determinístico |
 | F37 | 6.2 Regras explicáveis e score | ✅ **entregue** em 31/08/2026 — regra declarativa versionada, score `[0,100]`, até 5 fatores, elegibilidade e supressão |
 | F38 | 6.3 CRM de retenção | ✅ **entregue** em 31/08/2026 — fila top-K por capacidade, cooldown, SLA, máquina de estados e registro de contato |
-| F39–F41 | 6.4 a 6.6 | atrás da F38 |
+| F39 | 6.4 Experimento operacional | ✅ **entregue** em 31/08/2026 — randomização por hash, braço de controle fora da fila, análise ITT |
+| F40–F41 | 6.5 e 6.6 | F40 atrás do gate de ≥6 meses; F41 atrás da F40 |
+
+**O que a F39 entrega, e o que quem pegar a F40 precisa saber.**
+
+**1. Os parâmetros do experimento são decisão do PI (31/08/2026):** 20% controle / 80% tratamento,
+métrica primária **permanência em 30 dias**, quatro efeitos adversos (opt-out, cancelamento, recusa,
+supressão). Ficam congelados na linha do experimento — trigger recusa mudar depois de `RUNNING`.
+
+**2. Randomização por hash, não por sorteio guardado.** O grupo é
+`sha256(semente ␟ studentId)` normalizado. `Math.random()` + gravar funcionaria até a pergunta
+*"como sabemos que ninguém mexeu na alocação depois de ver o resultado?"* — cuja resposta seria
+"confie na tabela". Com hash qualquer pessoa recalcula e confere, e há teste de integração que faz
+isso. **A semente é por experimento**: fixa, deixaria o mesmo aluno no controle para sempre.
+
+**3. Aloca com hash, LÊ do banco.** Recalcular na leitura faria uma correção de semente mover
+alunos **retroativamente**, e tarefas já criadas passariam a pertencer a um braço em que a pessoa
+nunca esteve. A gravação prova *quando* entrou; o hash prova que o grupo não foi escolhido a dedo.
+
+**4. O controle sai ANTES do corte de capacidade.** Ordem fácil de errar: filtrar depois faria o
+controle consumir vaga, a recepção trataria 16 numa capacidade de 20, e o experimento mediria uma
+intervenção mais fraca do que a real. Defeito sem sintoma — só aparece no resultado final. Canário
+dedicado.
+
+**5. Imutabilidade em TRIGGER, não no serviço.** Dois: um recusa mudar `seed`/`control_fraction`/
+`window_days` depois de `DRAFT`, outro recusa mudar o grupo de uma alocação. Guarda em serviço é
+uma porta — correção manual e script de migração passam por fora. Cinco testes de integração batem
+no banco direto.
+
+**6. ITT conta todo alocado, inclusive quem nunca foi contatado.** Analisar só os contatados é o
+viés clássico: quem atende o telefone é mais engajado. A taxa de contato é **reportada ao lado** —
+efeito nulo com 10% de contato e com 90% são conclusões opostas.
+
+**7. Janela por ALUNO, e quem está dentro dela não entra na análise.** Contar do início do
+experimento mediria janelas diferentes; incluir quem ainda está dentro infla a permanência dos dois
+braços.
+
+⚠️ **Terceira fatia seguida em que um canário verde escondia buraco na suíte.** Remover a semente
+do hash derrubava só o unitário — nenhum teste de integração usava duas sementes. Padrão já
+conhecido: na F37 a completude recusava antes da regra; na F38, duas chaves únicas antes do
+cooldown. **Montar o cenário que alcança a guarda é parte do canário.**
 
 **O gate de ≥6 meses também não alcançou a F37** — decisão do PI em 31/08, com o mesmo argumento
 que soltou a F36: **regra explicável não aprende de histórico, aplica limites que uma pessoa

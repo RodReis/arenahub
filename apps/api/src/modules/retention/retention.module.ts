@@ -5,6 +5,11 @@ import { PersistenceModule } from '../../persistence/persistence.module.js';
 import { RetentionScoresController } from './retention-scores.controller.js';
 import { PORTA_DE_SCORES, RetentionScoresRepository } from './retention-scores.repository.js';
 import { RetentionScoresService } from './retention-scores.service.js';
+import {
+  PORTA_DE_EXPERIMENTOS,
+  RetentionExperimentsRepository,
+} from './retention-experiments.repository.js';
+import { RetentionExperimentsService } from './retention-experiments.service.js';
 import { RetentionTasksController } from './retention-tasks.controller.js';
 import { RetentionTasksQueryRepository } from './retention-tasks-query.repository.js';
 import {
@@ -34,6 +39,11 @@ import { RetentionSnapshotsService } from './retention-snapshots.service.js';
  * A F38 acrescenta a fila de tarefas: a seta do MVP 6 vai de "risco explicavel"
  * a "tarefa operacional", e sem ela o score da F37 seria relatorio, nao acao.
  *
+ * A F39 mede se a seta funciona. O experimento e uma camada OPCIONAL sobre o
+ * CRM -- sem experimento ativo a fila roda igual --, e o que ele acrescenta e
+ * um braco de controle que nunca recebe tarefa. Sem esse braco nao ha como
+ * separar "a ligacao reteve o aluno" de "o aluno ia ficar de qualquer jeito".
+ *
  * A F37 abriu a PRIMEIRA rota HTTP de retencao. A F36 deixou o modulo interno de
  * proposito -- expor score antes da baseline seria mostrar um numero que ainda
  * nao significava nada. Agora significa: cada ponto tem regra, valor observado
@@ -54,7 +64,14 @@ import { RetentionSnapshotsService } from './retention-snapshots.service.js';
     RetentionTasksQueryService,
     { provide: PORTA_DE_TAREFAS, useClass: RetentionTasksRepository },
     { provide: PORTA_DE_CONSULTA_DE_TAREFAS, useClass: RetentionTasksQueryRepository },
+    RetentionExperimentsService,
+    { provide: PORTA_DE_EXPERIMENTOS, useClass: RetentionExperimentsRepository },
   ],
-  exports: [RetentionSnapshotsService, RetentionScoresService, RetentionTasksService],
+  exports: [
+    RetentionSnapshotsService,
+    RetentionScoresService,
+    RetentionTasksService,
+    RetentionExperimentsService,
+  ],
 })
 export class RetentionModule {}

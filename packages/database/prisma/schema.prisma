@@ -635,6 +635,9 @@ model Tenant {
   retentionCapacityPolicies   RetentionCapacityPolicy[]
   retentionTasks              RetentionTask[]
   retentionInteractions       RetentionInteraction[]
+  retentionExperiments        RetentionExperiment[]
+  retentionExperimentAssignments RetentionExperimentAssignment[]
+  retentionExperimentAdverseEvents RetentionExperimentAdverseEvent[]
 
   /// Minimo de participantes para publicar um placar (`M5-BR-007`).
   /// ADR-047: 5. Configuravel por tenant -- academia pequena e academia
@@ -1068,6 +1071,8 @@ model Student {
   retentionScoreSkips     RetentionScoreSkip[]
   retentionSuppressions   RetentionSuppression[]
   retentionTasks          RetentionTask[]
+  retentionExperimentAssignments   RetentionExperimentAssignment[]
+  retentionExperimentAdverseEvents RetentionExperimentAdverseEvent[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -5406,4 +5411,139 @@ model RetentionInteraction {
   @@index([tenantId, taskId, occurredAt])
   @@index([tenantId, occurredAt])
   @@map("retention_interactions")
+}
+
+// ---------------------------------------------------------------------------
+// F39 -- Experimento operacional (Slice 6.4)
+// ---------------------------------------------------------------------------
+
+/// Em que ponto o experimento esta.
+///
+/// `DRAFT` e o unico estado em que o desenho pode mudar. Depois de `RUNNING`,
+/// mexer em semente, fracao ou metrica moveria alunos de grupo -- que e o que
+/// `M6-FR-012` proibe.
+enum RetentionExperimentStatus {
+  DRAFT
+  RUNNING
+  CLOSED
+
+  @@map("retention_experiment_status")
+}
+
+/// Os dois bracos.
+///
+/// `CONTROL` NUNCA gera tarefa: a fila da F38 pergunta o grupo antes de
+/// selecionar. E o custo do experimento -- alunos em risco que ninguem liga, de
+/// proposito, para saber se ligar muda alguma coisa.
+enum RetentionExperimentGroup {
+  CONTROL
+  TREATMENT
+
+  @@map("retention_experiment_group")
+}
+
+/// O que pode ter dado errado (`M6-AC-011`).
+enum RetentionAdverseEffect {
+  OPT_OUT
+  CANCELLED
+  DECLINED
+  SUPPRESSION_REQUESTED
+
+  @@map("retention_adverse_effect")
+}
+
+/// O experimento, com o desenho CONGELADO ao iniciar (`M6-EXPERIMENT-01`).
+///
+/// Semente, fracao e janela vivem aqui e nao mudam depois de `RUNNING`. O CHECK
+/// da migration recusa a alteracao no proprio banco -- guarda no servico e uma
+/// porta, e outro caminho de escrita passaria por fora dela.
+model RetentionExperiment {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  /// Identificador legivel, ex.: `piloto-retencao@1`.
+  label String
+
+  status RetentionExperimentStatus @default(DRAFT)
+
+  /// A semente da randomizacao. POR EXPERIMENTO, e nao global: semente fixa
+  /// deixaria o mesmo aluno no controle para sempre, acumulando nas mesmas
+  /// pessoas o custo de nunca receber intervencao.
+  seed String
+
+  /// Fracao alocada ao controle, em `[0, 1]`. Decisao do PI: 0.2.
+  controlFraction Decimal @default(0.2) @map("control_fraction") @db.Decimal(5, 4)
+
+  /// Dias ate medir a metrica primaria. Decisao do PI: 30 (permanencia).
+  /// Casa com `predictionDays` do alvo -- medir antes do horizonte de churn
+  /// leria ruido como efeito.
+  windowDays Int @default(30) @map("window_days")
+
+  startedAt DateTime? @map("started_at")
+  closedAt  DateTime? @map("closed_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant      Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignments RetentionExperimentAssignment[]
+
+  @@unique([tenantId, label])
+  @@index([tenantId, status])
+  @@map("retention_experiments")
+}
+
+/// A alocacao de um aluno. APPEND-ONLY e IMUTAVEL (`M6-FR-012`).
+///
+/// O grupo e VERIFICAVEL: recalcular `sortearGrupo(seed, studentId, fraction)`
+/// tem de bater com o que esta gravado. Trocar um aluno de grupo para melhorar
+/// o resultado final deixa de ser invisivel -- e isso que o aceite da Slice 6.4
+/// ("sem cherry-picking") exige.
+///
+/// A linha existe para provar QUANDO o aluno entrou, nao para ser a unica fonte
+/// da verdade sobre QUAL grupo ele pegou.
+model RetentionExperimentAssignment {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  experimentId String @map("experiment_id") @db.Uuid
+  studentId    String @map("student_id") @db.Uuid
+
+  assignedGroup RetentionExperimentGroup @map("assigned_group")
+
+  /// Quando entrou. A janela de medicao conta a partir daqui, por aluno --
+  /// contar do inicio do experimento mediria janelas diferentes para quem
+  /// entrou no primeiro dia e para quem entrou no vigesimo.
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  experiment RetentionExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Um aluno entra UMA VEZ por experimento. Reprocessar o dia reencontra a
+  /// chave em vez de re-sortear -- e re-sortear seria mudanca de grupo.
+  @@unique([experimentId, studentId])
+  @@index([tenantId, experimentId, assignedGroup])
+  @@map("retention_experiment_assignments")
+}
+
+/// Um efeito adverso observado na janela (`M6-AC-011`).
+///
+/// Medido nos DOIS grupos: cancelamento so no tratamento nao diz nada -- aluno
+/// em risco cancela de qualquer jeito. O que interessa e a diferenca.
+model RetentionExperimentAdverseEvent {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  experimentId String @map("experiment_id") @db.Uuid
+  studentId    String @map("student_id") @db.Uuid
+
+  effect RetentionAdverseEffect
+
+  observedAt DateTime @default(now()) @map("observed_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Um efeito por aluno por experimento: o mesmo opt-out registrado duas vezes
+  /// e uma pessoa, nao duas, e contar repetido inflaria o dano medido.
+  @@unique([experimentId, studentId, effect])
+  @@index([tenantId, experimentId, effect])
+  @@map("retention_experiment_adverse_events")
 }
