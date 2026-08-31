@@ -53,7 +53,14 @@ const TETO_EXIBIDO = TETO_SEGUNDOS + 1;
 async function abrirSessao(page: Page): Promise<void> {
   await page.goto('/');
 
-  const entrar = page.getByRole('button', { name: /entrar na minha área/i });
+  /*
+   * `data-testid`, e nao o texto: o rotulo mudou de "Entrar na minha area"
+   * (CTA de rodape) para "Entrar" quando o botao subiu para o cabecalho, no
+   * refino de 31/08/2026 -- `DS-TOTEM.md` §4 v2.1 especifica
+   * `[contraste][Entrar]`. O seletor por texto quebrou o E2E sem que nada de
+   * comportamento tivesse mudado.
+   */
+  const entrar = page.getByTestId('entrar-cabecalho');
 
   await expect(entrar).toBeVisible();
   await entrar.click();
@@ -119,7 +126,7 @@ test('atrator -> CPF -> minha area -> encerrar, sem deixar rastro', async ({ pag
   await page.getByTestId('encerrar-sessao').click();
 
   // Voltou ao atrator.
-  await expect(page.getByRole('button', { name: /entrar na minha área/i })).toBeVisible();
+  await expect(page.getByTestId('entrar-cabecalho')).toBeVisible();
 
   // ACEITE DA FATIA: nada do aluno permanece.
   const residuo = await page.evaluate(() => ({
