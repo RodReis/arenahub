@@ -334,6 +334,8 @@ function EditorDeVideo({
 }) {
   const [enviando, setEnviando] = useState(false);
   const [copiando, setCopiando] = useState(false);
+  /* Mesmo motivo do logotipo: o CSS cala o texto nativo, a legenda devolve. */
+  const [nomeDoArquivo, setNomeDoArquivo] = useState<string | null>(null);
   const campoDeArquivo = useRef<HTMLInputElement>(null);
 
   /**
@@ -389,10 +391,12 @@ function EditorDeVideo({
       // Limpa o campo: deixar o nome do arquivo recusado ali sugere que ele
       // foi aceito, e o gerente sai da tela achando que publicou video.
       if (campoDeArquivo.current) campoDeArquivo.current.value = '';
+      setNomeDoArquivo(null);
 
       return;
     }
 
+    setNomeDoArquivo(arquivo.name);
     aoMudar({ ...bloco, midiaKey: resultado.midiaKey ?? null });
   };
 
@@ -436,7 +440,9 @@ function EditorDeVideo({
           {enviando
             ? 'Enviando…'
             : bloco.midiaKey
-              ? 'Vídeo enviado.'
+              ? nomeDoArquivo
+                ? `Vídeo enviado: ${nomeDoArquivo}`
+                : 'Vídeo enviado.'
               : 'Nenhum vídeo enviado ainda.'}
         </span>
       </div>
@@ -659,7 +665,7 @@ function FaixaDePatrocinio({
       />
 
       {patrocinio.marcas.map((marca, indice) => (
-        <div key={indice} className={estilos['linhaDeEvento']}>
+        <div key={indice} className={estilos['linhaDePatrocinador']}>
           <Field
             id={`patrocinador-nome-${indice}`}
             label="Nome"
@@ -753,6 +759,14 @@ function LogotipoDoPatrocinador({
   readonly aoFalhar: (mensagem: string) => void;
 }) {
   const [enviando, setEnviando] = useState(false);
+  /*
+   * O NOME DO ARQUIVO ACEITO. O controle nativo mostra o nome sozinho, mas o
+   * CSS silencia o texto dele -- ver `.campoDeArquivo` no modulo -- porque a
+   * frase nativa ("Nenhum arquivo escolhido") contradizia a nossa legenda
+   * logo ao lado. Silenciado o nativo, o nome precisa voltar por aqui, senao
+   * o gerente envia o logotipo e nao ve QUAL arquivo subiu.
+   */
+  const [nomeDoArquivo, setNomeDoArquivo] = useState<string | null>(null);
   const campo = useRef<HTMLInputElement>(null);
 
   const enviar = async (arquivo: File) => {
@@ -772,10 +786,12 @@ function LogotipoDoPatrocinador({
       // Limpa o campo: deixar o nome do arquivo recusado ali sugere que ele
       // foi aceito, e o gerente sai da tela achando que publicou o logotipo.
       if (campo.current) campo.current.value = '';
+      setNomeDoArquivo(null);
 
       return;
     }
 
+    setNomeDoArquivo(arquivo.name);
     aoMudarChave(resultado.logotipoKey ?? null);
   };
 
@@ -796,7 +812,13 @@ function LogotipoDoPatrocinador({
         data-testid={`patrocinador-logo-${indice}`}
       />
       <span className={estilos['dica']} data-testid={`estado-logo-${indice}`}>
-        {enviando ? 'Enviando…' : logotipoKey ? 'Logotipo enviado.' : 'Sem logotipo — a faixa mostra o nome.'}
+        {enviando
+          ? 'Enviando…'
+          : logotipoKey
+            ? nomeDoArquivo
+              ? `Logotipo enviado: ${nomeDoArquivo}`
+              : 'Logotipo enviado.'
+            : 'Sem logotipo — a faixa mostra o nome.'}
       </span>
     </div>
   );

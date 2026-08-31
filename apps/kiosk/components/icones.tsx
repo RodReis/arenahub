@@ -75,3 +75,12 @@ export function IconeConfirmado(props: PropsDeIcone) {
     </Base>
   );
 }
+
+/** Camera do Instagram -- bloco INSTAGRAM da tela publica (§4). */
+export function IconeInstagram(props: PropsDeIcone) {
+  return (
+    <Base {...props} tracado={props.tracado ?? 2}>
+      <path d="M3 8a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5V8z M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z M17.2 6.8v.01" />
+    </Base>
+  );
+}

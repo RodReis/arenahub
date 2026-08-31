@@ -22,6 +22,7 @@ import { DeviceSyncModule } from './modules/device-sync/device-sync.module.js';
 import { DevicesModule } from './modules/devices/devices.module.js';
 import { EdgeAuthModule } from './modules/edge-auth/edge-auth.module.js';
 import { EngagementModule } from './modules/engagement/engagement.module.js';
+import { RetentionModule } from './modules/retention/retention.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { BillingModule } from './modules/billing/billing.module.js';
 import { KioskModule } from './modules/kiosk/kiosk.module.js';
@@ -59,6 +60,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     DevicesModule,
     BiometricsModule,
     EngagementModule,
+    RetentionModule,
     EdgeAuthModule,
     KioskAuthModule,
     KioskModule,

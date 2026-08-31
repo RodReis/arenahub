@@ -906,6 +906,53 @@ O que a separação compra é o *próximo* `catch`: no dia em que o bloco tratar
 futuro, **não correção de defeito presente** — e o comentário no código foi reescrito para dizer
 isso, em vez de prometer uma proteção que a suíte não sustenta.
 
+##### Refino visual de 31/08/2026 — a partir da imagem de referência do PI
+
+A F51 entregou a tela **funcionando**; o refino veio depois, da imagem de referência de 28/08 e do
+diagrama do `DS-TOTEM.md` §4 v2.1. **Não é fatia nova** — nenhum requisito mudou, e o contrato de
+`KioskConfig` ficou intacto.
+
+**A tela inteira virou alvo de toque.** O §4 pede que qualquer toque leve à identificação, não só o
+botão. O caminho de teclado e leitor de tela continua sendo o próprio botão — por isso o container
+**não** ganhou `role` nem `tabindex`: dois alvos idênticos anunciados em sequência confundem mais do
+que ajudam.
+
+🔴 **E isso criou um defeito de acessibilidade que não existia antes.** Com `onClick` no container,
+todo botão de dentro passa a **borbulhar**. Para "Entrar" é inofensivo (os dois fazem a mesma
+coisa); para **"Alto contraste"** é grave: quem toca nele quer enxergar melhor a tela em que está, e
+sairia dela para a identificação. **A pessoa que mais precisa do recurso seria expulsa da tela ao
+usá-lo.** `stopPropagation` resolve, e o `atrator-toque.spec.tsx` é o canário — sem ele, 1 teste cai.
+
+**O CTA gigante de rodapé saiu; "Entrar" foi para o cabeçalho** (`[contraste][Entrar]`), reusando
+`.ctaPrimario` — alto contraste, reduced-motion e o retorno de toque vêm de graça, e `.ctaDoCabecalho`
+só encolhe o tamanho. O §3.8 (um CTA primário por tela) segue valendo: a tela inteira já é o alvo.
+
+**A faixa de patrocínio saiu de dentro de `BlocosPublicos`** para ficar abaixo do CTA, como no
+protótipo. Antes era filha da grade e por isso aparecia **antes** do botão. As garantias dela
+(rótulo obrigatório, nada clicável) continuam testadas — os testes passaram a montar
+`FaixaDePatrocinio` direto, porque são dela, não da grade.
+
+**VIDEO virou mídia-primeiro.** O vídeo ocupa o cartão inteiro e o texto vem sobreposto na base,
+sobre o véu de legibilidade do §3.4. Antes a mídia era uma tira com título embaixo, e **um reel 9/16
+num cartão alto deixava metade do card em texto vazio**. `object-fit: cover` é o que serve o 9/16:
+preenche recortando as bordas, nunca esticando nem letterbox.
+
+📌 **O aviso "reproduz sem som" some quando a própria legenda do gerente já avisa.** O §3.4 o torna
+obrigatório, mas repetir a frase uma linha abaixo do que o gerente escreveu lê como **defeito**, não
+como aviso.
+
+**INSTAGRAM ganhou ícone e centralização.** Sem mídia no contrato (perfil + chamada, nada mais), o
+cartão vivia como duas linhas soltas num mar de superfície vazia — o mesmo dado, centralizado e com
+o disco do ícone, lê-se de longe.
+
+**No painel:** o nome do arquivo enviado voltou à legenda (vídeo e logotipo). O CSS silencia o texto
+nativo do `input[type=file]` porque a frase padrão ("Nenhum arquivo escolhido") **contradizia** a
+nossa legenda ao lado; silenciado o nativo, o nome precisava voltar por outro caminho, senão o
+gerente envia o logotipo e não vê **qual** arquivo subiu.
+
+Kiosk **251 testes** (era 247), painel 443. Nenhum hex literal no CSS — a lint proíbe, e colar o
+`.dc.html` produziria exatamente isso — e `prefers-reduced-motion` em cada bloco animado.
+
 
 #### F52 — o que a fatia cumpriu
 
@@ -1079,6 +1126,66 @@ sabe que vão doer:
   ADR-042, módulo sem fatia entregue **não aparece**.
 - **F40** provavelmente **não acontece**: exige ≥ 200 churns positivos e ≥ 1.000 snapshots por
   tenant. Sem isso, o produto fica na baseline de regras — e tudo bem.
+
+#### MVP 6 — F36 entregue em 31/08/2026 (contrato de dados)
+
+**O gate de ≥6 meses não alcançou a F36** — decisão do PI em 31/08. O gate existe para o *score*
+(F37+); o contrato de dados é justamente o que **faz os seis meses começarem a contar**, porque
+antes dele não há snapshot reconstruível para acumular.
+
+| F | slice | núcleo |
+|---|---|---|
+| F36 | 6.1 Contrato de dados e baseline analítica | ✅ **entregue** em 31/08/2026 — snapshot point-in-time, 13 features, checksum determinístico |
+| F37 | 6.2 Regras explicáveis e score | atrás do gate — precisa de snapshot acumulado |
+| F38–F41 | 6.3 a 6.6 | atrás da F37 |
+
+**O que a F36 descobriu, e vale para quem pegar a F37.**
+
+**1. O schema guarda mais história do que parece.** A leitura superficial diz que `Invoice.status`
+e `Subscription.status` são mutáveis e portanto o passado se perdeu. É falso: `dueAt`, `paidAt`,
+`createdAt`, `startsAt` e `publishedAt` **nunca mudam**, e `StudentTimelineEvent` é append-only.
+"A invoice estava vencida em D" é aritmética sobre datas imutáveis, não consulta de status —
+`estavaVencidaEm()` em [features.ts](../apps/api/src/modules/retention/domain/features.ts).
+**Doze das treze features saem as-of de verdade.**
+
+**2. A décima terceira é `payment_failure_count_90d`.** `PaymentAttempt.status` transita
+(`PROCESSING` → `FAILED`) depois do fato e não há trilha da transição. Ela sai marcada
+`ESTADO_CORRENTE` na coluna `provenance` — a F40 a exclui do treino com um filtro em vez de
+refazer esta fatia.
+
+**3. Dois instantes por fato, e o segundo é o que ninguém lembra.** `ocorreuEm` (quando aconteceu)
+e `conhecidoEm` (quando o sistema soube) divergem o tempo todo: catraca offline sincroniza 12h
+depois, webhook do PIX chega minutos depois. Filtrar só por `ocorreuEm` faz o fato de terça
+conhecido na quinta entrar num snapshot de quarta *reconstruído hoje* — e não entrar no de quarta
+*gerado na quarta*. **O defeito não tem sintoma:** o código roda, os testes passam, os números
+parecem certos, e o modelo aprende a enxergar o futuro. Canário: remover a condição de
+conhecimento derruba 3 testes.
+
+**4. "Ausente" e "zero" decidem quem recebe ligação.** Aluno com `attendance_days_30d = 0` faltou
+o mês; aluno com a mesma feature **ausente** entrou ontem. Colapsar os dois põe o recém-matriculado
+na fila de retenção. O tipo impede: `valor` é `null` quando ausente e `razao` é obrigatória, então
+nenhum `?? 0` apaga a distinção sem o compilador reclamar. Canário: 7 testes.
+
+**5. O checksum é a prova do aceite, não auditoria.** "Um snapshot passado pode ser reproduzido" é
+afirmação **verificável**: recalcular o mesmo recorte tem de dar o mesmo hash. Divergiu, alguma
+feature leu estado corrente — e a gravação lança `SNAPSHOT_NAO_DETERMINISTICO` em vez de
+sobrescrever, porque sobrescrever apagaria justamente a evidência de que o pipeline quebrou.
+
+🔎 **A revisão adversarial achou dois defeitos reais, e um era grave.** `gravarSnapshot` fazia
+`findUnique`-depois-`create`: dois workers passam os dois pelo `findUnique` antes de qualquer
+commit, e o segundo derrubava o job com **P2002 cru** — na reexecução que o próprio comentário do
+método prometia ser inofensiva. Ler-antes-de-escrever perde a corrida por construção; quem decide
+é a chave única. Canário com `Promise.all` de 3 gravações: sem o tratamento, o teste cai. O
+segundo: `subscription.findFirst` com `orderBy: { startsAt: 'desc' }` **sem desempate** — duas
+assinaturas com o mesmo `startsAt` (troca de plano no mesmo evento) deixariam a ordem física do
+Postgres escolher, e ela muda depois de um `UPDATE`. Já aconteceu neste repo duas vezes.
+
+⚠️ **A migration não pôde ser aplicada por `prisma migrate dev`:** a migration da F21 foi alterada
+depois de aplicada (pré-existente, commit `ca8535e`), e o Prisma exige **reset do banco** — que
+apagaria os dados locais. O SQL foi gerado por `prisma migrate diff --from-schema/--to-schema`,
+aplicado por `psql` e registrado em `_prisma_migrations`. **É aditiva:** só `CREATE TYPE` e
+`CREATE TABLE`, nenhum `DROP`/`ALTER` de coluna existente. Quem pegar a F37 vai esbarrar no mesmo
+bloqueio.
 
 ### MVP 5 — Engajamento opt-out · F30 a F35
 

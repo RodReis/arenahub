@@ -10,6 +10,7 @@ import {
 } from '@arenahub/api-contracts';
 
 import { blocosVisiveis, indiceSeguro, proximoIndice } from '../lib/rodizio';
+import { IconeInstagram } from './icones';
 
 /**
  * Grade densa da tela publica -- F51, `M3.5-FR-004`/`M3.5-FR-005`, reescrita
@@ -139,8 +140,6 @@ export function BlocosPublicos({
           {temRanking && <BlocoDePlacar placar={placar} />}
         </div>
       )}
-
-      <FaixaDePatrocinio patrocinio={config.patrocinio} />
     </>
   );
 }
@@ -221,7 +220,16 @@ function BlocoDeCarrossel({
       // de anunciar cada volta por cima do que a pessoa faz.
       aria-live="off"
     >
-      <ConteudoDoBloco bloco={atual} indicadores={indicadores} />
+      {/*
+        `key={atual.id}` REMONTA o quadro a cada volta do rodizio, e a
+        montagem dispara o crossfade de `.quadroDoRodizio` -- a troca seca de
+        antes fazia o cartao "piscar" de um conteudo para outro sem
+        transicao. Reduced-motion e alto contraste desligam a animacao no
+        CSS, nunca aqui.
+      */}
+      <div key={atual.id} className="quadroDoRodizio">
+        <ConteudoDoBloco bloco={atual} indicadores={indicadores} />
+      </div>
 
       {total > 1 && (
         <div className="progressoDoRodizio" aria-hidden="true">
@@ -247,8 +255,19 @@ function ConteudoDoBloco({
 }) {
   switch (bloco.tipo) {
     case 'VIDEO':
+      /*
+       * MIDIA-PRIMEIRO (imagem de referencia de 28/08/2026): o video ocupa o
+       * cartao INTEIRO (o CSS zera o padding via `[data-tipo='VIDEO']`) e o
+       * texto vem SOBREPOSTO na base, sobre o veu de legibilidade do §3.4 --
+       * antes a midia era uma tira com titulo embaixo, e um reel 9/16 num
+       * cartao alto deixava metade do card em texto vazio.
+       *
+       * `object-fit: cover` e o que serve o 9/16: o cartao do reel e mais
+       * alto que 16/9 e o video preenche recortando as bordas, nunca
+       * esticando nem letterbox.
+       */
       return (
-        <>
+        <figure className="midiaDoBloco">
           {/*
             SEM SOM E COM LEGENDA -- DS-TOTEM.md §4: a recepcao nao tem audio
             confiavel. `muted` e `playsInline` tambem sao o que faz o
@@ -264,9 +283,20 @@ function ConteudoDoBloco({
             playsInline
             data-testid="video-do-bloco"
           />
-          <h2 className="tituloDoBloco">{bloco.titulo}</h2>
-          <p className="corpo">{bloco.legenda}</p>
-        </>
+          <span className="veuDaMidia" aria-hidden="true" />
+          <figcaption className="legendaDaMidia">
+            <h2 className="tituloDoBloco">{bloco.titulo}</h2>
+            <p className="corpoDaMidia">{bloco.legenda}</p>
+            {/*
+              O aviso do §3.4 e obrigatorio -- mas quando a PROPRIA legenda
+              do gerente ja avisa ("sem som"), repetir a frase uma linha
+              abaixo le como defeito, nao como aviso.
+            */}
+            {!/sem som/i.test(bloco.legenda) && (
+              <p className="avisoDaMidia">reproduz sem som, com legenda</p>
+            )}
+          </figcaption>
+        </figure>
       );
 
     case 'EVENTOS':
@@ -303,11 +333,20 @@ function ConteudoDoBloco({
       );
 
     case 'INSTAGRAM':
+      /*
+       * SEM MIDIA NO CONTRATO (perfil + chamada, nada mais), o cartao vivia
+       * como duas linhas soltas num mar de superficie vazia. Centralizar e
+       * dar o icone transforma o mesmo dado em convite: quem passa le o
+       * @perfil de longe.
+       */
       return (
-        <>
-          <h2 className="tituloDoBloco">{bloco.perfil}</h2>
-          <p className="corpo">{bloco.chamada}</p>
-        </>
+        <div className="blocoDeInstagram" data-testid="bloco-de-instagram">
+          <span className="discoDeInstagram" aria-hidden="true">
+            <IconeInstagram tamanho={40} />
+          </span>
+          <h2 className="perfilDeInstagram">{bloco.perfil}</h2>
+          {bloco.chamada !== '' && <p className="corpo">{bloco.chamada}</p>}
+        </div>
       );
 
     case 'DESAFIO':
@@ -420,8 +459,10 @@ function BlocoDePlacar({ placar }: { readonly placar: readonly EntradaPublicaDoP
       <ul className="listaDoPlacar" data-testid="lista-de-placar">
         {linhas.map((entrada) => (
           <li key={entrada.position} className="linhaDoPlacar">
+            {/* Numero seco no medalhao (imagem de referencia): o circulo ja
+                diz "posicao"; o "º" so espremia o numeral no disco de 52px. */}
             <span className="medalhao" data-posicao={faixaDoMedalhao(entrada.position)}>
-              {entrada.position}º
+              {entrada.position}
             </span>
             <span className="nomeDoPlacar">{entrada.nomeExibido}</span>
             <span className="pontosDoPlacar">{entrada.points} pts</span>
@@ -479,6 +520,31 @@ export function rotuloDoPeriodo(agora: Date = new Date()): string {
 }
 
 /**
+ * A assinatura ArenaHub quando NAO ha faixa -- DS-TOTEM.md §11.10.
+ *
+ * O §11.10 nao e opcional: a assinatura aparece na tela publica sempre. Com a
+ * faixa ligada ela vive DENTRO dela, dividindo a linha com o rotulo, como no
+ * protótipo. Desligada a faixa, a linha inteira some -- e a assinatura junto,
+ * se nao houvesse este caminho.
+ *
+ * Mesma condicao de `FaixaDePatrocinio`, invertida: as duas nunca aparecem
+ * juntas, e nunca somem juntas.
+ */
+export function AssinaturaSolta({
+  patrocinio,
+}: {
+  readonly patrocinio: KioskConfig['patrocinio'];
+}) {
+  if (patrocinio.habilitado && patrocinio.marcas.length > 0) return null;
+
+  return (
+    <p className="assinaturaSolta" data-testid="assinatura-arenahub">
+      tecnologia <strong>arenahub</strong>
+    </p>
+  );
+}
+
+/**
  * Faixa de patrocinadores -- ADR-042, Decisao 4.
  *
  * FIXA, FORA DA GRADE, e com rotulo que nao pode ser esvaziado (CDC art.
@@ -489,7 +555,7 @@ export function rotuloDoPeriodo(agora: Date = new Date()): string {
  * `<a>`. No momento em que o ArenaHub conta exibicao, ele produz o numero em
  * que um contrato de patrocinio se apoia -- e passa a responder por ele.
  */
-function FaixaDePatrocinio({
+export function FaixaDePatrocinio({
   patrocinio,
 }: {
   readonly patrocinio: KioskConfig['patrocinio'];
@@ -498,7 +564,19 @@ function FaixaDePatrocinio({
 
   return (
     <section className="faixaDePatrocinio" data-testid="faixa-de-patrocinio">
-      <span className="rotuloDoPatrocinio">{rotuloDePatrocinio(patrocinio.rotulo)}</span>
+      {/*
+        DUAS LINHAS, como o protótipo: rotulo e assinatura dividem a de cima,
+        as pastilhas ficam com a de baixo inteira. Numa linha so -- como era
+        ate 28/08/2026 -- o rotulo comia largura das marcas, e com cinco
+        patrocinadores (o maximo) cada pastilha ficava estreita demais para o
+        nome caber.
+      */}
+      <div className="cabecalhoDoPatrocinio">
+        <span className="rotuloDoPatrocinio">{rotuloDePatrocinio(patrocinio.rotulo)}</span>
+        <span className="assinaturaDoPatrocinio">
+          tecnologia <strong>arenahub</strong>
+        </span>
+      </div>
 
       <div className="marcas">
         {patrocinio.marcas.map((marca) => (
