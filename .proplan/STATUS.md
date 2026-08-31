@@ -14,10 +14,6 @@ updated: 2026-08-31
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41)
-- [MVP6][SPEC-040][F40] Modelo supervisionado (condicionado a M6-ML-01) (#40)
-- [MVP6][SPEC-039][F39] Experimento operacional (#39)
-- [MVP6][SPEC-038][F38] CRM de retenção (#38)
-- [MVP6][SPEC-037][F37] Regras explicáveis e score (#37)
 - [MVP4][SPEC-029][F29] Piloto e distribuição (#29)
 - [MVP4][SPEC-028][F28] Pagamento e desbloqueio no totem (#28)
 - [MVP4][SPEC-027][F27] Kiosk seguro (#27)
@@ -36,13 +32,18 @@ _(vazio)_
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [MVP6][SPEC-038][F38] CRM de retenção (#38)
+- [MVP6][SPEC-037][F37] Regras explicáveis e score (#37)
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP6][SPEC-039][F39] Experimento operacional (#39, finalizado em: 2026-08-31)
+- [MVP6][SPEC-040][F40] Modelo supervisionado (condicionado a M6-ML-01) (#40, finalizado em: 2026-08-31)
 - [MVP6][SPEC-036][F36] Contrato de dados e baseline analítica (#36, finalizado em: 2026-08-31)
 - [MVP5][SPEC-032][FIX] teste de consistência da F32 quebra com a passagem do tempo (#223, finalizado em: 2026-08-31)
 - [MVP5][SPEC-033][F33] Rankings privados por padrão (#33, finalizado em: 2026-08-28)
