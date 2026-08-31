@@ -748,6 +748,88 @@ Terceira vez que este padrão aparece no repo.
 
 ---
 
+### Evidência da `SPEC-037` — F37, regras explicáveis e score
+
+**PR: —** *(preencher depois do merge, pela regra do topo desta seção)*
+
+`pnpm test:report --issue 37 --spec SPEC-037`, rodado em 31/08/2026:
+
+```
+| 2026-08-31 | #37 | SPEC-037 | unitário   | 2707 | 2707 | 0 | 76.4 | — |
+| 2026-08-31 | #37 | SPEC-037 | integração |  753 |  753 | 0 | 83.9 | medido suíte a suíte |
+```
+
+Unitário: **2707** (era 2624 na F36 — os **83** novos são desta fatia). Integração: **753** em
+**51 suítes**, sendo **12** da suíte nova `retencao-score-explicavel.int-spec.ts`.
+
+⚠️ **A linha de integração do gerador continua herdada** — mesmo crash do Jest no Windows
+(exit `3221226505`, pré-existente desde a F32). O gerador avisa em stderr e mantém o número
+anterior, então a medição foi **suíte a suíte**, as 51 uma a uma.
+
+🔴 **A contagem de integração da F36 estava inflada, e a correção é aqui.** A F36 registrou
+**856**; medindo a `main` (`48bdfaa`, sem esta fatia) suíte a suíte, o número real é **741**. A
+aritmética desta fatia fecha exata:
+
+```
+741 (base da main) + 12 (suíte nova da F37) = 753
+```
+
+O erro **não é de código**: nenhum teste sumiu, e a contagem de suítes (50 → 51) bate com o
+único arquivo acrescentado. É de **medição** — a F36 mediu 856 onde a mesma árvore rende 741 hoje.
+**Não reproduzi a rodada dela, então não afirmo a causa.** Uma armadilha plausível está no
+mecanismo: o filtro por nome do Jest casa por substring, e `-- retencao` roda **2 suítes**, não 1
+(`retencao-snapshot` e `retencao-score-explicavel`); um laço que filtre por prefixo em vez de
+basename soma a mesma suíte várias vezes. Vale a lição já registrada — *contagem que sobe sem
+explicação é para investigar* —, e desta vez a investigação encontrou o erro no número anterior,
+não no atual.
+
+📌 **Uma suíte veio vazia numa das passagens** (`sessao-multiarquivo`, captura sem saída) e foi
+remedida sozinha: **14 testes, 0 falhas**. Captura vazia não é falha, mas **também não é zero** —
+somá-la como zero teria produzido 739 e escondido a diferença.
+
+📌 **A migration não passou por `prisma migrate dev`, pelo mesmo bloqueio que a F36 documentou.**
+A migration da F21 foi alterada depois de aplicada (`ca8535e`), e o Prisma exige reset. O SQL saiu
+de `prisma migrate diff --from-schema/--to-schema --output`, foi aplicado por `psql` nos dois
+bancos (`arenahub` e `arenahub_int`) e registrado em `_prisma_migrations`. É **aditiva**: só
+`CREATE TYPE`, `CREATE TABLE` e `ADD CONSTRAINT`, nenhum `DROP`.
+
+**Provado que o CI aplica do zero:** `prisma migrate deploy` num banco recém-criado aplicou as
+**51 migrations** sem erro. É o que o job de integração faz, e verificar localmente o caminho do
+`psql` não provaria nada sobre ele.
+
+⚠️ **`--output` é obrigatório no `migrate diff`.** Redirecionar o stdout (`> arquivo`) grava o
+banner do `dotenv` dentro do SQL, e o `psql` morre com `invalid command \..` — a mensagem não
+aponta para a causa. O `2>/dev/null` não resolve: o banner sai em **stdout**.
+
+🔬 **Canários (3).** Cada guarda foi provada removendo-a e vendo o teste cair:
+
+| guarda removida | testes que caem |
+|---|---|
+| `valor.valor` → `valor.valor ?? 0` em `avaliarRegra` | **2** unitários + **1** integração |
+| `tenantId` no `where` da fila de risco | **2** integração |
+| índice único `(snapshot, provider, versão)` | **2** integração (reexecução **e** corrida) |
+
+🔴 **O primeiro canário achou um buraco real na suíte, e o conserto está nesta fatia.** Na
+primeira tentativa, `?? 0` — o defeito exato que `M6-BR-002` existe para impedir — **passou verde
+em toda a integração**. O motivo: o único teste com feature ausente usava um aluno novo, com
+quase tudo ausente, que é **recusado por completude antes de qualquer regra ser avaliada**. A
+ausência nunca chegava ao motor.
+
+Dois testes novos fecham o buraco, e o segundo é o que mata o canário:
+
+- *"feature ausente não pontua, mesmo com completude suficiente"* — completude `0.75` (passa o
+  mínimo de `0.3`) com `days_past_due` ausente;
+- *"zero observado pontua, ausente não"* — **dois alunos com o mesmo vetor**, um com
+  `attendance_days_30d = 0` (faltou o mês) e outro com a mesma feature **ausente** (entrou
+  ontem). Colapsados, entrariam na fila com o mesmo número, e a recepção ligaria para quem acabou
+  de se matricular.
+
+📌 **O canário da corrida usa `Promise.all` de 3 rodadas**, pela razão que a F36 registrou:
+sequencial não exercita a corrida e passa com o código quebrado. A gravação tenta escrever e
+trata `P2002` — ler-antes-de-escrever perde a corrida por construção.
+
+---
+
 ## 6. CI
 
 Pipeline mínimo, em ordem de custo crescente (falhe cedo, falhe barato):

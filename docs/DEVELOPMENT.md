@@ -1136,8 +1136,58 @@ antes dele não há snapshot reconstruível para acumular.
 | F | slice | núcleo |
 |---|---|---|
 | F36 | 6.1 Contrato de dados e baseline analítica | ✅ **entregue** em 31/08/2026 — snapshot point-in-time, 13 features, checksum determinístico |
-| F37 | 6.2 Regras explicáveis e score | atrás do gate — precisa de snapshot acumulado |
+| F37 | 6.2 Regras explicáveis e score | ✅ **entregue** em 31/08/2026 — regra declarativa versionada, score `[0,100]`, até 5 fatores, elegibilidade e supressão |
 | F38–F41 | 6.3 a 6.6 | atrás da F37 |
+
+**O gate de ≥6 meses também não alcançou a F37** — decisão do PI em 31/08, com o mesmo argumento
+que soltou a F36: **regra explicável não aprende de histórico, aplica limites que uma pessoa
+escreveu.** O gate guarda o *modelo supervisionado* (Slice 6.5 / F40), que aprende de dado
+passado e sem seis meses aprenderia ruído. A baseline, sem histórico, apenas pontua pouca
+gente — nunca fica *errada* por falta de dado, porque ausência não pontua.
+
+**O que a F37 entrega, e o que quem pegar a F38 precisa saber.**
+
+**1. Regra é tupla fechada, nunca expressão.** Feature + operador de uma allowlist de cinco +
+limite + peso + direção, em `retention_rules`. A tentação óbvia — guardar `"attendance_days_30d
+<= 4"` como texto e interpretar — quebraria a fatia por dois lados: expressão arbitrária pode ler
+relógio e deixar de ser reprodutível (`M6-AC-002`), e regra vinda do banco é **dado**, então dado
+que vira código é execução remota. A allowlist tem teste que compara a lista inteira.
+
+**2. Ausência não pontua, e o buraco estava no teste, não no código.** O motor sempre devolveu
+`null` para feature ausente. Mas o canário `?? 0` **passou verde na integração inteira** na
+primeira tentativa: o único teste com ausência usava aluno novo, recusado por *completude* antes
+de qualquer regra ser avaliada. Dois testes novos fecham — um com completude suficiente, e o par
+*"zero observado pontua, ausente não"* com dois alunos de vetor idêntico. Sem eles, a fila
+mandaria a recepção ligar para quem se matriculou ontem.
+
+**3. Inelegível gera linha, não score zero.** `retention_score_skips` grava o motivo
+(`CANCELLED`, `SUPPRESSED`, `INSUFFICIENT_HISTORY`). Score `0` poria o suprimido no mesmo balde
+do aluno saudável; e **sem** a linha, "não pontuado" seria indistinguível de "o job não rodou" —
+duas situações que exigem ações opostas da operação.
+
+**4. Faixas e completude mínima moram na versão de regras, não no código.** Mover o corte de
+`ALTO` muda quem entra na fila sem mudar nenhum peso. Só versão **congelada** pontua: catálogo em
+edição faria dois alunos do mesmo dia saírem com regras diferentes.
+
+**5. O score não é probabilidade.** `calibratedProbability` é sempre `null` na baseline (PRD §16).
+A coluna existe nula para a F40 preencher sem migrar, e para a tela já saber esconder o número.
+No repositório de leitura, `Number(null)` daria `0` — e `0` leria como "0% de chance", o oposto
+de "não há probabilidade calibrada".
+
+**6. A F37 abre a primeira rota HTTP de retenção** (`GET /api/v1/retention/scores` e
+`.../students/:id/history`), com `retention.read` e `retention.suppress` novas no seed. O DTO
+**não carrega o vetor de features** — PRD §17 —, só os até cinco fatores, cada um com o valor
+observado que o fez disparar. É isso que torna o score contestável.
+
+⚠️ **Duas armadilhas de ferramenta, ambas com custo real.** (1) `prisma migrate diff` **exige
+`--output`**: redirecionar stdout grava o banner do `dotenv` dentro do SQL e o `psql` morre com
+`invalid command \..`, mensagem que não aponta para a causa (e `2>/dev/null` não resolve — o
+banner sai em stdout). (2) A migration precisa ser aplicada **nos dois bancos**, `arenahub` e
+`arenahub_int`: a suíte de integração usa `INTEGRATION_DATABASE_URL`, e sem isso os 12 testes
+falham com *"table does not exist"*.
+
+📌 **A contagem de integração da F36 estava inflada** — registrou 856; a mesma árvore, medida
+suíte a suíte, rende **741**. Detalhe e aritmética em `docs/TESTING.md`.
 
 **O que a F36 descobriu, e vale para quem pegar a F37.**
 

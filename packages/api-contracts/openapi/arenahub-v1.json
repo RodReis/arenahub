@@ -2688,6 +2688,251 @@
         ]
       }
     },
+    "/api/v1/retention/scores": {
+      "get": {
+        "operationId": "RetentionScoresController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scoreId": {
+                            "type": "string"
+                          },
+                          "studentId": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "band": {
+                            "type": "string",
+                            "enum": [
+                              "BAIXO",
+                              "MEDIO",
+                              "ALTO",
+                              "CRITICO"
+                            ]
+                          },
+                          "completeness": {
+                            "type": "number"
+                          },
+                          "calibratedProbability": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "ruleVersion": {
+                            "type": "string"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "calculatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "freshness": {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "ATUAL",
+                                  "DESATUALIZADO",
+                                  "EXPIRADO"
+                                ]
+                              },
+                              "ageInDays": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "notice": {
+                            "type": "string"
+                          },
+                          "factors": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "position": {
+                                  "type": "integer"
+                                },
+                                "feature": {
+                                  "type": "string"
+                                },
+                                "observedValue": {
+                                  "type": "number"
+                                },
+                                "contribution": {
+                                  "type": "integer"
+                                },
+                                "direction": {
+                                  "type": "string",
+                                  "enum": [
+                                    "AUMENTA",
+                                    "REDUZ"
+                                  ]
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionScores"
+        ]
+      }
+    },
+    "/api/v1/retention/students/{studentId}/history": {
+      "get": {
+        "operationId": "RetentionScoresController_historico",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scoreId": {
+                            "type": "string"
+                          },
+                          "studentId": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "band": {
+                            "type": "string",
+                            "enum": [
+                              "BAIXO",
+                              "MEDIO",
+                              "ALTO",
+                              "CRITICO"
+                            ]
+                          },
+                          "completeness": {
+                            "type": "number"
+                          },
+                          "calibratedProbability": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "ruleVersion": {
+                            "type": "string"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "calculatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "freshness": {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "ATUAL",
+                                  "DESATUALIZADO",
+                                  "EXPIRADO"
+                                ]
+                              },
+                              "ageInDays": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "notice": {
+                            "type": "string"
+                          },
+                          "factors": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "position": {
+                                  "type": "integer"
+                                },
+                                "feature": {
+                                  "type": "string"
+                                },
+                                "observedValue": {
+                                  "type": "number"
+                                },
+                                "contribution": {
+                                  "type": "integer"
+                                },
+                                "direction": {
+                                  "type": "string",
+                                  "enum": [
+                                    "AUMENTA",
+                                    "REDUZ"
+                                  ]
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionScores"
+        ]
+      }
+    },
     "/api/v1/edge/heartbeat": {
       "post": {
         "operationId": "EdgeController_heartbeat",
