@@ -7,7 +7,30 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 31/08/2026 *(F39 entregue — experimento operacional)*
+**Última atualização:** 31/08/2026 *(F40 não executada — o gate de ML não fecha, e a medição diz por quê)*
+
+⛔ **31/08/2026 — a F40 não foi executada, e isso é o resultado, não uma pendência.** A issue #40 já
+avisava: *"fatia condicional, pode não acontecer, e isso é resultado válido"*. Em vez de supor, o
+gate `M6-ML-01` foi **medido** contra o banco — e ele não fecha por margem larga:
+
+| exigência | mínimo | medido |
+|---|---|---|
+| snapshots elegíveis | 1.000 | **0** |
+| churns positivos | 200 | **1** |
+| histórico confiável | 6 meses | **3 dias** |
+
+**Os 1.907 `CANCELLED` não são 1.907 churns.** São o *status atual* de alunos importados em bloco
+entre 19 e 26/08 — status corrente não tem data de transição, e sem saber **quando** o aluno saiu
+não há label temporal. É a mesma armadilha que a F36 documentou ao construir as features as-of.
+
+**Nenhum código de ML entrou.** Modelo treinado em 3 dias de dado aprenderia a data de importação, e
+seria pior que inútil: um número sem explicação substituindo regras que a recepção entende —
+invertendo a ordem que o MVP escolheu de propósito. A **baseline da F37 é o produto**, não um degrau
+provisório. Detalhe em **ADR-050** e `SPEC-040`.
+
+⚠️ **A medição expôs uma lacuna que não tem card: nada agenda o pipeline diário.** As quatro fatias
+entregues (F36–F39) expõem o método e são testadas, mas **nenhuma tem job**. Sem execução recorrente
+os seis meses nunca começam a contar — é a dependência dura para qualquer reavaliação da F40.
 
 🎯 **31/08/2026 — F39 entregue, e a retenção passa a ser medida, não alegada.** Sem braço de
 controle não há como separar *"a ligação segurou o aluno"* de *"o aluno ia ficar de qualquer
@@ -896,7 +919,7 @@ entre elas a lista canônica de razões de `DENY`, que F9 precisa.
 | **3.5** | Totem: tela pública configurável + autosserviço do aluno | MVP 1 estável + PIX operando (F13 ✅) | F49–F52 | criado por **ADR-042** em 22/08/2026. **Antecipa a decisão, não a execução** — o kiosk nasce configurável em vez de ser retrabalhado depois. Antecipa a execução das Slices 4.5 e 4.6. **Em execução: F49 entregue em 25/08/2026** — regime de identificação fixado pelo **ADR-045** (CPF sozinho; facial vai para o backlog) |
 | **4** | Autosserviço: **app do aluno** (o totem saiu para o MVP 3.5) | APIs estáveis dos MVPs 1, 2 e 3 | F23–F29 | bloqueado — e **vem depois do MVP 3.5**, decisão do PI em 22/08 (ADR-042). **Slices 4.5 e 4.6 são executadas no MVP 3.5**; o texto e o aceite continuam no PRD MVP-04 §7, sem cópia |
 | **5** | Engajamento opt-out mensurável | eventos confiáveis + app do MVP 4 — **não alcança nenhuma fatia do MVP 5** (ADR-046, ADR-047, ADR-048, ADR-049 e decisão do PI de 28/08 sobre a F32) | F30–F35 | **F30 a F35 entregues** (27–28/08/2026) — superfície no totem e no painel. A F31 absorveu a F33 (ADR-047). **A F34 inverteu o opt-in para inscrição automática** (ADR-048, emenda 1) e trouxe o desafio para a tela pública (emenda 2). **A F35 fechou o MVP 5 em 28/08** (ADR-049) — o gate original **não guarda mais nenhuma fatia** |
-| **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | **o gate não alcança a F36, F37, F38 nem F39** — quatro decisões do PI em 31/08/2026. O gate existe para o **modelo supervisionado** (Slice 6.5 / F40), que aprende de histórico: sem snapshot as-of os 6 meses nunca começam a contar (F36), regra explicável não aprende (F37), fila de tarefa é código determinístico sobre o score (F38), e randomização/ITT são aritmética sobre a fila (F39). **F40 e F41 continuam atrás dele** |
+| **6** | Risco de churn explicável → tarefa operacional | ≥ 6 meses de histórico confiável | F36–F41 | **o gate não alcança a F36, F37, F38 nem F39** — quatro decisões do PI em 31/08/2026. O gate existe para o **modelo supervisionado** (Slice 6.5 / F40), que aprende de histórico: sem snapshot as-of os 6 meses nunca começam a contar (F36), regra explicável não aprende (F37), fila de tarefa é código determinístico sobre o score (F38), e randomização/ITT são aritmética sobre a fila (F39). **A F40 foi MEDIDA contra o gate em 31/08 e não passa** (0 snapshots, 1 churn datado, 3 dias de histórico) — fica **não executada** por ADR-050, e a baseline da F37 é o produto. **A F41 perde o objeto principal** (drift e kill switch *de modelo*) e precisa ter o escopo reavaliado |
 
 
 **Ordem de execução (decisão do PI em 22/08/2026, ADR-042):**
@@ -974,7 +997,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F37 | SPEC-037 | 6 | 6.2 | Regras explicáveis e score | [`SPEC-037-regras-explicaveis-e-score.md`](specs/SPEC-037-regras-explicaveis-e-score.md) | [#37](https://github.com/RodReis/arenahub/issues/37) | ✅ **entregue** em 31/08/2026 ([#225](https://github.com/RodReis/arenahub/pull/225)) — aguardando aceite — baseline explicável entregue por **decisão do PI de 31/08** (o gate de ≥6 meses **não** guarda esta fatia: ele existe para o modelo supervisionado da F40, que aprende de histórico; regra declarativa não aprende). Score `[0,100]` com faixas versionadas, até 5 fatores com o valor observado, e recusa registrada com motivo em vez de score zero |
 | F38 | SPEC-038 | 6 | 6.3 | CRM de retenção | [`SPEC-038-crm-de-retencao.md`](specs/SPEC-038-crm-de-retencao.md) | [#38](https://github.com/RodReis/arenahub/issues/38) | ✅ **entregue** em 31/08/2026 ([#226](https://github.com/RodReis/arenahub/pull/226)) — aguardando aceite — a seta do MVP 6 fechada: score vira tarefa. Fila top-K por capacidade (20/dia por unidade), cooldown de 14 dias, SLA de 3 dias úteis e canal WhatsApp — os quatro por **decisão do PI de 31/08** (`M6-OPS-01`). Nenhuma rota envia mensagem: o sistema **registra** o contato que a pessoa fez |
 | F39 | SPEC-039 | 6 | 6.4 | Experimento operacional | [`SPEC-039-experimento-operacional.md`](specs/SPEC-039-experimento-operacional.md) | [#39](https://github.com/RodReis/arenahub/issues/39) | ✅ **entregue** em 31/08/2026 ([#227](https://github.com/RodReis/arenahub/pull/227)) — aguardando aceite — randomização por hash verificável, braço de controle que nunca vira tarefa e análise por intenção de tratar. Parâmetros por **decisão do PI de 31/08** (`M6-EXPERIMENT-01`): 20% controle, permanência em 30 dias, quatro efeitos adversos. Imutabilidade da alocação garantida por **trigger no banco**, não por guarda no serviço |
-| F40 | SPEC-040 | 6 | 6.5 | Modelo supervisionado (condicionado a M6-ML-01) | [`SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md`](specs/SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md) | [#40](https://github.com/RodReis/arenahub/issues/40) | planejada |
+| F40 | SPEC-040 | 6 | 6.5 | Modelo supervisionado (condicionado a M6-ML-01) | [`SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md`](specs/SPEC-040-modelo-supervisionado-condicionado-a-m6-ml-01.md) | [#40](https://github.com/RodReis/arenahub/issues/40) | ⛔ **não executada** — decisão do PI em 31/08/2026 (**ADR-050**). O gate `M6-ML-01` foi **medido** e não fecha: **0 snapshots** (o pipeline nunca rodou), **1 churn datado** contra 200 exigidos, **3 dias** de histórico contra 6 meses. Nenhum código de ML entra no repositório; a baseline da F37 **é** o produto de scoring. Reabre com ≥1.000 snapshots e ≥200 churns datados |
 | F41 | SPEC-041 | 6 | 6.6 | Produção controlada e monitoramento | [`SPEC-041-producao-controlada-e-monitoramento.md`](specs/SPEC-041-producao-controlada-e-monitoramento.md) | [#41](https://github.com/RodReis/arenahub/issues/41) | planejada |
 | F42 | SPEC-042 | 2.5 | 2.5.1 | Design system da superfície `admin-web` | [`SPEC-042-design-system-do-painel.md`](specs/SPEC-042-design-system-do-painel.md) | [#81](https://github.com/RodReis/arenahub/issues/81) | aprovada-pi |
 | F43 | SPEC-043 | 2.5 | 2.5.2 | Design system da superfície `mobile` | [`SPEC-043-design-system-do-app.md`](specs/SPEC-043-design-system-do-app.md) | [#82](https://github.com/RodReis/arenahub/issues/82) | aprovada-pi *(gate: MVP 4)* |
