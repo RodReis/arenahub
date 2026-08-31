@@ -830,6 +830,95 @@ trata `P2002` — ler-antes-de-escrever perde a corrida por construção.
 
 ---
 
+### Evidência da `SPEC-038` — F38, CRM de retenção
+
+**PR: —** *(preencher depois do merge, pela regra do topo desta seção)*
+
+`pnpm test:report --issue 38 --spec SPEC-038`, rodado em 31/08/2026:
+
+```
+| 2026-08-31 | #38 | SPEC-038 | unitário   | 2768 | 2768 | 0 | 76.3 | — |
+| 2026-08-31 | #38 | SPEC-038 | integração |  765 |  765 | 0 | 83.9 | medido suíte a suíte |
+```
+
+Unitário: **2768** (era 2707 na F37 — os **61** novos são desta fatia). Integração: **765** em
+**52 suítes**, sendo **12** da suíte nova `retencao-crm-tarefas.int-spec.ts`. A aritmética fecha:
+
+```
+753 (base da F37) + 12 (suíte nova) = 765
+```
+
+⚠️ **A linha de integração do gerador continua herdada** — mesmo crash do Jest no Windows
+(exit `3221226505`, pré-existente desde a F32). Medição suíte a suíte, as 52 uma a uma, **por
+`basename`** — filtrar por prefixo é a armadilha que a F37 registrou, porque o filtro do Jest casa
+por substring e soma a mesma suíte várias vezes.
+
+📌 **Uma suíte veio vazia** (`auth`, captura sem saída) e foi remedida: **42 testes, 0 falhas**.
+Somá-la como zero teria produzido 723 e escondido a diferença.
+
+🔬 **Canários (3).** Cada guarda foi provada removendo-a:
+
+| guarda removida | testes que caem |
+|---|---|
+| índice parcial `(tenant, aluno, estratégia) WHERE ativo` | **1** integração |
+| comparação de cooldown em `selecionarFila` | **2** unitários + **1** integração |
+| `criadaEm` explícito (volta a `@default(now())`) | **1** unitário |
+
+🔴 **O canário do cooldown achou um DEFEITO REAL no código, não só no teste.** Este é o segundo
+achado da mesma família da F37, e vale registrar em detalhe porque a primeira versão do teste
+passava por **três** motivos errados em sequência:
+
+1. **Passava pelo `@@unique(score_id)`.** O teste reusava o mesmo `scoreId` para tentar a segunda
+   tarefa. A criação era recusada — mas pela chave de score, não pelo cooldown. Corrigido criando
+   um score novo de outro dia, que é o que o pipeline produz amanhã.
+2. **Passava pelo índice parcial.** Com a tarefa ainda ativa, o índice já bloqueava. Corrigido
+   dispensando a tarefa antes (terminal libera o índice parcial, que é *parcial* por isso).
+3. **Com 1 e 2 fora do caminho, o teste falhou — e a falha era do código.** `criadaEm` vinha do
+   `@default(now())` do Postgres, enquanto o cooldown comparava contra o `agora` da aplicação. Com
+   datas de teste no futuro (2026), a subtração dava negativo e o cooldown nunca segurava nada. A
+   correção passa a criação por parâmetro, como o "agora" — a mesma disciplina que o `CLAUDE.md`
+   exige das funções de cálculo.
+
+**A lição, que generaliza:** um canário verde não prova a guarda quando **outra** guarda recusa o
+caso antes dela. Na F37 foi a completude recusando antes da regra; aqui foram duas chaves únicas
+recusando antes do cooldown. Montar o cenário que **alcança** a guarda testada é parte do canário,
+não um detalhe.
+
+📌 **O índice parcial é a garantia que o `@@unique(score_id)` não dá**, e o teste que o prova usa
+score de **outro dia** — o caso normal, porque o pipeline roda diariamente. Sem ele, o mesmo aluno
+receberia uma ligação por dia pelo mesmo motivo. O teste irmão prova que o índice é mesmo
+*parcial*: tarefa terminal libera o aluno para uma nova.
+
+📌 **A migration passou por `psql` nos dois bancos**, pelo bloqueio que a F36 documentou, e
+`migrate deploy` num banco recém-criado aplicou as **52 migrations** — é o que o job de integração
+do CI faz.
+
+🔴 **O CI reprovou por um teste que esta fatia não tocou, e a correção entrou aqui.**
+`painel-do-placar.test.tsx` (F35, `admin-web`) falhou com
+`expect(element).toHaveValue(null) / Received: -10` no job de unitários — num PR cujo diff **não
+inclui uma linha de `admin-web`**.
+
+**Era corrida, não regressão.** A limpeza do formulário mora num `useEffect` que roda **depois** do
+render que mostra `ajuste-registrado`; o teste esperava o segundo e assertava o primeiro. Passa na
+máquina rápida, falha na lenta — e o runner do GitHub é a lenta.
+
+**Provado, não suposto.** Local o teste passava 5 vezes seguidas nos dois formatos, então plantei um
+canário no componente (`setTimeout` de 30ms na limpeza) para simular a máquina lenta:
+
+| versão do teste | com a limpeza atrasada |
+|---|---|
+| asserção direta (como estava na `main`) | ❌ **falha**, com o erro exato do CI |
+| `waitFor` (como ficou) | ✅ passa |
+
+O canário foi removido; só o teste mudou. **O código estava certo** — `useEffect` para limpar após
+sucesso é o padrão, e o defeito era a expectativa do teste sobre *quando* isso acontece.
+
+⚠️ **`gh pr checks --watch` saiu com 0 mesmo com o job vermelho**, de novo (já registrado na
+memória do repo). A conferência que vale é `gh pr checks <n>` sem `--watch`, ou `gh run view` job a
+job.
+
+---
+
 ## 6. CI
 
 Pipeline mínimo, em ordem de custo crescente (falhe cedo, falhe barato):

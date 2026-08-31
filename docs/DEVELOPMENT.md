@@ -1137,7 +1137,8 @@ antes dele não há snapshot reconstruível para acumular.
 |---|---|---|
 | F36 | 6.1 Contrato de dados e baseline analítica | ✅ **entregue** em 31/08/2026 — snapshot point-in-time, 13 features, checksum determinístico |
 | F37 | 6.2 Regras explicáveis e score | ✅ **entregue** em 31/08/2026 — regra declarativa versionada, score `[0,100]`, até 5 fatores, elegibilidade e supressão |
-| F38–F41 | 6.3 a 6.6 | atrás da F37 |
+| F38 | 6.3 CRM de retenção | ✅ **entregue** em 31/08/2026 — fila top-K por capacidade, cooldown, SLA, máquina de estados e registro de contato |
+| F39–F41 | 6.4 a 6.6 | atrás da F38 |
 
 **O gate de ≥6 meses também não alcançou a F37** — decisão do PI em 31/08, com o mesmo argumento
 que soltou a F36: **regra explicável não aprende de histórico, aplica limites que uma pessoa
@@ -1188,6 +1189,47 @@ falham com *"table does not exist"*.
 
 📌 **A contagem de integração da F36 estava inflada** — registrou 856; a mesma árvore, medida
 suíte a suíte, rende **741**. Detalhe e aritmética em `docs/TESTING.md`.
+
+**O que a F38 entrega, e o que quem pegar a F39 precisa saber.**
+
+**1. Os quatro parâmetros de operação são decisão do PI (31/08/2026), não constantes.** Capacidade
+**20/dia por unidade**, cooldown **14 dias**, SLA **3 dias úteis**, canal **WhatsApp único**. Vivem
+em `retention_capacity_policies`, configuráveis sem deploy. Candidato de unidade **sem política é
+ignorado**, nunca pontuado com um padrão mudo — o padrão silencioso pareceria funcionar, e ninguém
+descobriria que a unidade nova nunca foi configurada.
+
+**2. Duas chaves, cobrindo coisas diferentes — e a segunda é a que importa.**
+`@@unique(score_id)` impede que um score gere duas tarefas. O **índice parcial**
+`(tenant, aluno, estratégia) WHERE status ativo` impede que dois scores de **dias diferentes**
+gerem duas tarefas ativas pelo mesmo motivo — e esse é o caso **normal**, porque o pipeline roda
+todo dia. Sem ele, o aluno recebe uma ligação por dia. O predicado repete `ESTADOS_ATIVOS` do
+domínio, e há teste comparando a lista com `estaAtiva` justamente porque divergirem em silêncio é
+como o defeito voltaria.
+
+**3. `criadaEm` é explícito, e isso foi um defeito real achado por canário.** O cooldown compara
+`agora − criadaEm`; com `criadaEm` vindo do `@default(now())` do Postgres e `agora` da aplicação, a
+conta mistura dois relógios — e reprocessar um dia passado mediria contra o instante da
+reexecução. Mesma disciplina que o `CLAUDE.md` exige das funções de cálculo, agora também na
+escrita.
+
+**4. Registrar contato NÃO conclui a tarefa.** Ligar três vezes até atenderem são três interações e
+uma tarefa. Fechar na primeira tentativa sem resposta mostraria *"tratado"* para quem ninguém falou
+e apagaria o histórico de tentativa — que é o que distingue *"ninguém tentou"* de *"tentou três
+vezes"*, diagnósticos opostos para a mesma fila parada.
+
+**5. Nenhuma rota envia nada.** `M6-BR-007` e `M6-AC-010`: o `POST .../interactions` **registra** o
+que a pessoa fez pelo WhatsApp dela. É o que separa CRM de retenção de plataforma de marketing.
+
+**6. A estratégia é derivada do fator dominante**, não de uma tabela de templates (que o plano de
+apoio previa e ninguém preencheria). Vem do fator em `position: 1` que a F37 já grava, então a
+atendente lê o mesmo texto que decidiu a fila — e o cooldown por `(aluno, estratégia)` deixa o
+mesmo aluno ser contatado por queda de frequência e, semanas depois, por cobrança vencida.
+
+⚠️ **Um canário verde não prova a guarda quando outra guarda recusa o caso antes dela.** Segundo
+achado da mesma família em duas fatias: na F37 a completude recusava antes da regra de ausência;
+aqui **duas** chaves únicas recusavam antes do cooldown, e só depois de tirar as duas do caminho o
+teste falhou — apontando um defeito real no código. Montar o cenário que **alcança** a guarda é
+parte do canário.
 
 **O que a F36 descobriu, e vale para quem pegar a F37.**
 

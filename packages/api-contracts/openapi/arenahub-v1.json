@@ -2933,6 +2933,301 @@
         ]
       }
     },
+    "/api/v1/retention/tasks": {
+      "get": {
+        "operationId": "RetentionTasksController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "taskId": {
+                            "type": "string"
+                          },
+                          "studentId": {
+                            "type": "string"
+                          },
+                          "gymUnitId": {
+                            "type": "string"
+                          },
+                          "strategy": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "ABERTA",
+                              "ATRIBUIDA",
+                              "EM_ATENDIMENTO",
+                              "CONCLUIDA",
+                              "DISPENSADA",
+                              "EXPIRADA"
+                            ]
+                          },
+                          "assigneeId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "result": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "dismissReason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "dueAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "overdue": {
+                            "type": "boolean"
+                          },
+                          "score": {
+                            "type": "object",
+                            "properties": {
+                              "scoreId": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              },
+                              "band": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "factors": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "position": {
+                                  "type": "integer"
+                                },
+                                "feature": {
+                                  "type": "string"
+                                },
+                                "observedValue": {
+                                  "type": "number"
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "interactions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "channel": {
+                                  "type": "string"
+                                },
+                                "result": {
+                                  "type": "string"
+                                },
+                                "actorId": {
+                                  "type": "string"
+                                },
+                                "occurredAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "nextStep": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionTasks"
+        ]
+      }
+    },
+    "/api/v1/retention/tasks/{id}/assign": {
+      "post": {
+        "operationId": "RetentionTasksController_atribuir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionTasks"
+        ]
+      }
+    },
+    "/api/v1/retention/tasks/{id}/start": {
+      "post": {
+        "operationId": "RetentionTasksController_iniciar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionTasks"
+        ]
+      }
+    },
+    "/api/v1/retention/tasks/{id}/interactions": {
+      "post": {
+        "operationId": "RetentionTasksController_registrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionTasks"
+        ]
+      }
+    },
+    "/api/v1/retention/tasks/{id}/complete": {
+      "post": {
+        "operationId": "RetentionTasksController_concluir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionTasks"
+        ]
+      }
+    },
+    "/api/v1/retention/tasks/{id}/dismiss": {
+      "post": {
+        "operationId": "RetentionTasksController_dispensar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionTasks"
+        ]
+      }
+    },
     "/api/v1/edge/heartbeat": {
       "post": {
         "operationId": "EdgeController_heartbeat",
