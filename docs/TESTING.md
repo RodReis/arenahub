@@ -675,21 +675,49 @@ Unitário por pacote: **1348 API** (era 1282 na F35 — os 66 novos são desta f
 (764, do `#35`). **Medi suíte a suíte**, as 50 rodadas uma a uma, sem nenhuma captura vazia:
 
 ```
-50 suítes · 855 testes · 1 falha
+50 suítes · 856 testes · 0 falhas
 ```
 
-📌 **A falha não é desta fatia, e a aritmética não fecha com a F35 — as duas coisas têm explicação.**
+📌 **A contagem saltou de 734 (F35) para 856, e só 7 são meus** — contagem que sobe sem explicação
+é para investigar, e esta tem: a medição da F35 cobriu **48** suítes, o próprio commit `ed0395e`
+acrescentou arquivos depois disso, e hoje o diretório tem **50**. Os outros ~114 testes vieram
+junto da F35.
 
-**A falha** é `xp-e-ranking` → *"devolve a consistencia junto do extrato"*, da F32: o teste treina
-em datas fixas (semana de 17–23/08) e compara contra o **relógio real**, então a partir de 24/08 o
-streak legitimamente cai para 0 e a asserção `atual: 1` envelhece. Verificado com `git stash` das
-alterações da F36: **falha igual sem o código novo**. Issue
-[#223](https://github.com/RodReis/arenahub/issues/223) aberta, sem correção aqui — é da F32.
+🔴 **A suíte estava vermelha na `main` quando esta fatia começou, e o motivo era o calendário.**
 
-**A contagem** saltou de 734 (F35) para 855, e só 7 são meus. A medição da F35 cobriu **48**
-suítes; o próprio commit `ed0395e` acrescentou arquivos depois disso, e hoje o diretório tem **50**.
-Os outros ~114 testes vieram junto da F35, não desta fatia — contagem que sobe sem explicação é
-para investigar, e esta tem.
+`xp-e-ranking` → *"devolve a consistencia junto do extrato"* (F32) treinava em **datas fixas**
+(semana de 17–23/08/2026) e esperava `streak.atual === 1`, mas comparava contra o **relógio real**.
+`resumirStreak` conta de trás para frente e **para na primeira semana `PERDIDA`** — quando a semana
+de 24/08 fechou, o streak virou `0` e a asserção envelheceu. **Ninguém mudou uma linha de código:**
+o último run verde da `main` é de 28/08, e o CI passou a falhar sozinho em 31/08.
+
+Diagnosticado durante a F36 ao medir a integração, registrado na issue
+[#223](https://github.com/RodReis/arenahub/issues/223) e **corrigido aqui** — a falha bloqueava a
+`main` de qualquer PR, não só desta fatia.
+
+**A correção é no teste, não no código.** O domínio já está certo: `avaliarSemanas` e
+`resumirStreak` recebem `hojeLocal` por parâmetro e têm 25 testes unitários com datas injetadas.
+Quem lê o relógio é o controller do totem (`new Date()`), e injetar um relógio só para teste seria
+abstração de uso único. O bloco de integração passou a **ancorar na semana corrente** e derivar as
+demais por posição relativa:
+
+| antes | depois |
+|---|---|
+| `treinarSemanaDe17` (17, 19, 21/08) | `treinarSemanaQualificada` — seg/qua/sex da semana **anterior à corrente** |
+| `projetarAte(new Date('2026-08-24'))` | `projetarAteHoje` |
+| `semana.inicio === '2026-08-17'` | `semana.inicio === inicioDaSemanaTreinada()` |
+| pausa em 24/08 → 31/08 | `naSemanaCorrente(-1)` → `naSemanaCorrente(7)` |
+
+A semana treinada é a **anterior à corrente** por duas razões que o teste precisa das duas: já está
+**fechada** (a corrente é `EM_ANDAMENTO` e nunca qualifica) e é **adjacente** (não há semana perdida
+entre ela e hoje para romper o streak).
+
+⚠️ **A primeira tentativa de correção quebrou dois vizinhos** — o bloco inteiro depende de semanas
+correlacionadas (a treinada, a da pausa e "hoje"), e mover só uma âncora desalinha as outras.
+Corrigir de verdade exigiu reescrever o bloco todo, incluindo as asserções que comparavam
+`semana.inicio` com string literal. O resto da suíte **continua com data fixa de propósito**: ela
+depende de `localMonth` (`'2026-08'`), que o `AGORA` fixo do topo do arquivo já resolve — só o
+streak compara com o relógio real.
 
 📌 **A migration não passou por `prisma migrate dev`.** A migration da F21 foi alterada depois de
 aplicada (pré-existente, `ca8535e`), e o Prisma exige **reset do banco** — que apagaria os dados de

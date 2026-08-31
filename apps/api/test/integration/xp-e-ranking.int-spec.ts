@@ -14,6 +14,7 @@ import { EngagementXpService } from '../../src/modules/engagement/engagement-xp.
 import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.service.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { calcularHashDeCpf } from '../../src/modules/students/domain/identificacao.js';
+import { inicioDaSemanaLocal } from '../../src/modules/engagement/domain/semana-de-consistencia.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -1043,27 +1044,80 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
    */
   describe('GET sessions/:id/engajamento/xp -- consistencia (F32)', () => {
     /*
-     * `projetarFrequencia` (o helper da F31) projeta ate `AGORA` (20/08), e a
-     * F32 precisa de semanas JA FECHADAS -- passagem de 21/08 ficaria fora da
-     * janela e a semana nunca qualificaria. Este helper projeta com um teto
-     * posterior; o `periodo: 'ALL'` ja cobre o inicio.
+     * -------------------------------------------------------------------
+     * DATAS ANCORADAS NO RELOGIO, NAO FIXAS. Issue #223.
+     * -------------------------------------------------------------------
+     *
+     * A versao anterior treinava na semana de 17/08/2026 e esperava streak
+     * 1. Era verdade ate 23/08 e virou 0 no dia 24: `resumirStreak` conta de
+     * tras para frente e PARA na primeira semana PERDIDA, entao toda semana
+     * vazia posterior derruba a contagem. O CI da `main` ficou vermelho em
+     * 31/08 sem ninguem ter mudado uma linha de codigo.
+     *
+     * O resto da suite continua com data fixa porque depende de `localMonth`
+     * ('2026-08'), que o `AGORA` fixo resolve. O STREAK e o unico que compara
+     * com o relogio REAL -- o endpoint do totem chama `new Date()` no
+     * controller, e injetar um relogio so para teste seria abstracao de uso
+     * unico.
+     *
+     * A ancora e a SEMANA CORRENTE, porque o que estes testes precisam e da
+     * posicao RELATIVA entre as semanas, nao das datas absolutas:
+     *
+     *   semana treinada = a ANTERIOR a corrente -- ja FECHADA (a corrente
+     *     ainda corre e nunca qualifica, e `EM_ANDAMENTO` nao soma) e
+     *     ADJACENTE (sem semana perdida entre ela e hoje para romper o
+     *     streak).
+     */
+    const segundaDaSemanaCorrente = (): string =>
+      inicioDaSemanaLocal(new Date().toISOString().slice(0, 10));
+
+    /** Segunda-feira da semana treinada (a anterior a corrente), `AAAA-MM-DD`. */
+    const inicioDaSemanaTreinada = (): string => {
+      const corrente = new Date(`${segundaDaSemanaCorrente()}T00:00:00.000Z`);
+
+      return new Date(corrente.getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+    };
+
+    /** Um instante dentro da semana treinada: `offset` dias apos a segunda. */
+    const naSemanaTreinada = (offsetEmDias: number, hora = '12:00:00'): string => {
+      const inicio = new Date(`${inicioDaSemanaTreinada()}T00:00:00.000Z`);
+      const dia = new Date(inicio.getTime() + offsetEmDias * 86_400_000);
+
+      return `${dia.toISOString().slice(0, 10)}T${hora}.000Z`;
+    };
+
+    /** Um instante relativo a segunda da semana CORRENTE (offset pode ser negativo). */
+    const naSemanaCorrente = (offsetEmDias: number): Date => {
+      const inicio = new Date(`${segundaDaSemanaCorrente()}T09:00:00.000Z`);
+
+      return new Date(inicio.getTime() + offsetEmDias * 86_400_000);
+    };
+
+    /*
+     * `projetarFrequencia` (o helper da F31) projeta ate `AGORA`, e a F32
+     * precisa das sessoes projetadas ate HOJE -- passagem posterior ao teto
+     * ficaria fora da janela e a semana nunca qualificaria. Este helper
+     * projeta com teto proprio; o `periodo: 'ALL'` ja cobre o inicio.
      */
     const projetarAte = async (aluno: string, ate: Date): Promise<void> => {
       await frequencia.frequenciaDoAluno(contexto, aluno, 'ALL', 'SEMANAL', ate);
     };
 
-    /** Uma semana qualificada: tres dias distintos na semana de 17/08 (seg a dom). */
-    const treinarSemanaDe17 = async (aluno: string): Promise<void> => {
-      for (const dia of ['17', '19', '21']) {
-        await gravarPassagemConfirmada(aluno, `2026-08-${dia}T12:00:00.000Z`);
+    /** Projeta ate agora -- a semana treinada ja fechou, a corrente ainda corre. */
+    const projetarAteHoje = (aluno: string): Promise<void> => projetarAte(aluno, new Date());
+
+    /** Uma semana qualificada: tres dias distintos na semana treinada (seg, qua, sex). */
+    const treinarSemanaQualificada = async (aluno: string): Promise<void> => {
+      for (const offset of [0, 2, 4]) {
+        await gravarPassagemConfirmada(aluno, naSemanaTreinada(offset));
       }
-      await projetarAte(aluno, new Date('2026-08-24T12:00:00.000Z'));
+      await projetarAteHoje(aluno);
     };
 
     it('devolve a consistencia junto do extrato, no MESMO endpoint', async () => {
       const cpf = String(20_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
       const aluno = await criarAlunoComCpf(cpf, 'Aluno Consistente');
-      await treinarSemanaDe17(aluno);
+      await treinarSemanaQualificada(aluno);
 
       const { sessionId, token } = await abrirSessao(cpf);
 
@@ -1088,9 +1142,10 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       const cpf = String(21_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
       const aluno = await criarAlunoComCpf(cpf, 'Aluno De Dois Dias');
 
-      await gravarPassagemConfirmada(aluno, '2026-08-17T12:00:00.000Z');
-      await gravarPassagemConfirmada(aluno, '2026-08-19T12:00:00.000Z');
-      await projetarAte(aluno, new Date('2026-08-24T12:00:00.000Z'));
+      // Dois dias so -- abaixo da meta de tres.
+      await gravarPassagemConfirmada(aluno, naSemanaTreinada(0));
+      await gravarPassagemConfirmada(aluno, naSemanaTreinada(2));
+      await projetarAteHoje(aluno);
 
       const { sessionId, token } = await abrirSessao(cpf);
 
@@ -1112,11 +1167,11 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       const cpf = String(22_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
       const aluno = await criarAlunoComCpf(cpf, 'Aluno Que Volta A Tarde');
 
-      for (const dia of ['17', '19']) {
-        await gravarPassagemConfirmada(aluno, `2026-08-${dia}T09:00:00.000Z`);
-        await gravarPassagemConfirmada(aluno, `2026-08-${dia}T21:00:00.000Z`);
+      for (const offset of [0, 2]) {
+        await gravarPassagemConfirmada(aluno, naSemanaTreinada(offset, '09:00:00'));
+        await gravarPassagemConfirmada(aluno, naSemanaTreinada(offset, '21:00:00'));
       }
-      await projetarAte(aluno, new Date('2026-08-24T12:00:00.000Z'));
+      await projetarAteHoje(aluno);
 
       const { sessionId, token } = await abrirSessao(cpf);
 
@@ -1129,10 +1184,12 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
         consistencia: { atual: number; semanas: { inicio: string; diasTreinados: number }[] };
       };
 
-      const semanaDe17 = corpo.consistencia.semanas.find((semana) => semana.inicio === '2026-08-17');
+      const semanaTreinada = corpo.consistencia.semanas.find(
+        (semana) => semana.inicio === inicioDaSemanaTreinada(),
+      );
 
       // Quatro passagens, DOIS dias -- abaixo da meta de tres.
-      expect(semanaDe17?.diasTreinados).toBe(2);
+      expect(semanaTreinada?.diasTreinados).toBe(2);
       expect(corpo.consistencia.atual).toBe(0);
     });
 
@@ -1147,10 +1204,17 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       const cpf = String(23_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
       const aluno = await criarAlunoComCpf(cpf, 'Aluno Que Pausou');
 
-      await treinarSemanaDe17(aluno);
+      await treinarSemanaQualificada(aluno);
 
-      // Pausa que cobre a semana de 24/08 inteira, JA RETOMADA -- a
-      // assinatura de hoje esta ativa, e so a timeline guarda o intervalo.
+      /*
+       * Pausa que cobre a semana CORRENTE inteira, JA RETOMADA -- a
+       * assinatura de hoje esta ativa, e so a timeline guarda o intervalo.
+       *
+       * Comeca no DOMINGO anterior e termina no domingo seguinte para que a
+       * semana corrente caia inteira dentro do intervalo:
+       * `semanaInteiraPausada` exige `pausa.inicio <= inicio && fim <=
+       * pausa.fim`, entao pausa que comeca na propria segunda nao a cobre.
+       */
       await db.studentTimelineEvent.create({
         data: {
           tenantId,
@@ -1158,7 +1222,7 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
           type: 'SUBSCRIPTION_PAUSED',
           actorType: 'USER',
           correlationId: randomUUID(),
-          occurredAt: new Date('2026-08-24T09:00:00.000Z'),
+          occurredAt: naSemanaCorrente(-1),
         },
       });
       await db.studentTimelineEvent.create({
@@ -1168,7 +1232,7 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
           type: 'SUBSCRIPTION_RESUMED',
           actorType: 'USER',
           correlationId: randomUUID(),
-          occurredAt: new Date('2026-08-31T09:00:00.000Z'),
+          occurredAt: naSemanaCorrente(7),
         },
       });
 
@@ -1184,7 +1248,7 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       };
 
       const semanaPausada = corpo.consistencia.semanas.find(
-        (semana) => semana.inicio === '2026-08-24',
+        (semana) => semana.inicio === segundaDaSemanaCorrente(),
       );
 
       expect(semanaPausada?.status).toBe('PAUSADA');
@@ -1197,7 +1261,7 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
 
       const cpfOutro = String(25_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
       const outro = await criarAlunoComCpf(cpfOutro, 'Aluno Com Streak');
-      await treinarSemanaDe17(outro);
+      await treinarSemanaQualificada(outro);
 
       void meu;
       void outro;
