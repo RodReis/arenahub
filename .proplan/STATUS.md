@@ -32,16 +32,15 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [MVP6][SPEC-038][F38] CRM de retenção (#38)
-- [MVP6][SPEC-037][F37] Regras explicáveis e score (#37)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP6][SPEC-037][F37] Regras explicáveis e score (#37, finalizado em: 2026-08-31)
+- [MVP6][SPEC-038][F38] CRM de retenção (#38, finalizado em: 2026-08-31)
 - [MVP6][SPEC-039][F39] Experimento operacional (#39, finalizado em: 2026-08-31)
 - [MVP6][SPEC-040][F40] Modelo supervisionado (condicionado a M6-ML-01) (#40, finalizado em: 2026-08-31)
 - [MVP6][SPEC-036][F36] Contrato de dados e baseline analítica (#36, finalizado em: 2026-08-31)
