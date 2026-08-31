@@ -3783,3 +3783,100 @@ diferente de `APPROVED` caindo no primeiro nome, e há teste da F30 provando (`e
 | 6 | Evolução relativa continua fora, com razão registrada — ponta aberta | `SPEC-035` §3 |
 | 7 | `HIDDEN` ganha caminho de escrita pela fila de moderação | `SPEC-035` §1 |
 | 8 | Flag de engajamento é coluna de settings do tenant, nunca `if` no código | `schema.prisma` |
+
+---
+
+## ADR-050 — A F40 não é executada: o gate `M6-ML-01` não é atingível, e a medição diz por quê
+
+**Data:** 31/08/2026
+**Status:** aceito
+**Decisor:** Rodrigo Reis (PI)
+**Contexto:** Slice 6.5 do MVP 6 (`docs/prd/academia/MVP-06-retention-ai.md` §8), issue
+[#40](https://github.com/RodReis/arenahub/issues/40)
+
+### O problema
+
+A Slice 6.5 entrega um **modelo supervisionado de churn**, e o próprio título a condiciona ao gate
+`M6-ML-01`. A issue #40 é explícita sobre o que isso significa:
+
+> ⚠️ **Fatia condicional — pode não acontecer, e isso é resultado válido.** Se as regras
+> explicáveis de F37 já resolverem o problema com dado suficiente, **modelo supervisionado é custo
+> sem ganho**. A condicionalidade está no próprio título da Slice; não a trate como formalidade.
+
+O gate tem números verificáveis, e a pergunta certa não era *"queremos ML?"* — era **"o dado
+existe?"**. Isso se mede.
+
+### A medição, em 31/08/2026
+
+Contra o banco de desenvolvimento (`arenahub`, tenant `arena-positiva`, o único que existe):
+
+| exigência do `M6-ML-01` | mínimo | medido | razão |
+|---|---|---|---|
+| snapshots elegíveis por tenant | 1.000 | **0** | o pipeline da F36 **nunca rodou** — nenhuma fatia do MVP 6 tem job |
+| churns positivos por tenant | 200 | **1** | `student_timeline_events` tem **um** `SUBSCRIPTION_CANCELLED` |
+| histórico confiável | ≥ 6 meses | **3 dias** | sessões de treino existem só em 27/08; invoices, de 25 a 27/08 |
+
+**Os 1.907 `Subscription.status = CANCELLED` não são 1.907 churns.** São o *status atual* de linhas
+importadas em bloco entre 19 e 26/08/2026 — todos os 1.967 alunos entraram numa carga única. Status
+corrente não tem data de transição, e a F36 documentou exatamente essa armadilha: *"a invoice estava
+vencida em D" é aritmética sobre datas imutáveis, não consulta de status*. Sem a data em que o
+aluno saiu, não há label temporal — e sem label temporal não há treino supervisionado, só
+memorização do presente.
+
+### A decisão
+
+**A F40 não é executada.** Nenhum código de ML entra no repositório: sem pipeline de treino, sem
+runner Python, sem shadow mode, sem `model_versions`.
+
+Não é adiamento por falta de tempo. É o **resultado que o PRD prevê** para o caso em que o gate não
+fecha, e a última linha do `M6-ML-01` já dizia o que fazer: *"ausência do gate mantém baseline
+funcional e ML fechado"*. A baseline da F37 está entregue, funcional e explicável; ela é o produto
+enquanto não houver dado que justifique outra coisa.
+
+### Por que não construir "já que é barato"
+
+Três razões, em ordem de peso:
+
+**1. O modelo não poderia ser promovido.** O aceite da Slice 6.5 exige superar a baseline num teste
+temporal congelado. Com 1 churn datado não há conjunto de teste — o pipeline nasceria com o kill
+switch permanentemente acionado, e código que nunca executa em produção apodrece sem ninguém notar.
+
+**2. Custo de manutenção real, benefício zero.** Cada fatia seguinte carregaria a compatibilidade de
+um trilho de ML que ninguém usa: migrations, `providers` no módulo, testes que rodam no CI a cada
+push, dependências Python. A F37 já deixou a porta aberta com `RetentionScoreProvider` e a coluna
+`calibratedProbability` nula — a F40 encaixa quando fizer sentido, **sem refazer nada**.
+
+**3. Modelo ruim é pior que regra clara.** Treinado em 3 dias de dado, ele aprenderia a data de
+importação, não o comportamento do aluno. E o resultado seria pior do que inútil: um número sem
+explicação que a recepção não pode contestar, substituindo regras que ela entende. O MVP inteiro foi
+desenhado na ordem oposta — *"explicável vem antes de modelo, e a ordem é deliberada"* (issue #37).
+
+### O que precisa acontecer para reavaliar
+
+Em ordem de dependência. Nenhum destes é trabalho da F40:
+
+1. **O pipeline precisa rodar diariamente.** Snapshot → score → fila → alocação existem e são
+   testados, mas **nenhuma das quatro fatias tem job**. Sem execução recorrente, `student_feature_
+   snapshots` continua vazia e os seis meses nunca começam a contar. É a única dependência dura, e
+   hoje ela não tem card.
+2. **Churn precisa virar evento datado.** `SUBSCRIPTION_CANCELLED` em `StudentTimelineEvent` já é
+   append-only e tem `occurredAt` — o caminho existe, falta o cancelamento real passar por ele em
+   volume.
+3. **Seis meses de operação real.** Com o pipeline rodando desde D, o gate é reavaliável em D+180.
+4. **Só então:** medir de novo o `M6-ML-01` e, se fechar, reabrir a decisão.
+
+**Critério de reabertura:** ≥ 1.000 snapshots e ≥ 200 churns datados no mesmo tenant. Enquanto não
+houver, esta decisão não precisa ser revisitada — e a medição pode ser refeita a qualquer momento
+com as consultas registradas em `SPEC-040`.
+
+### Consequências
+
+| # | consequência | onde |
+|---|---|---|
+| 1 | A F40 é fechada como **não executada**, não como pendente | `docs/STATUS.md`, `SPEC-040` |
+| 2 | Nenhum código, migration ou dependência de ML entra no repositório | — |
+| 3 | A baseline de regras (F37) **é** o produto de scoring, não um degrau provisório | `SPEC-037` |
+| 4 | `calibratedProbability` segue nula e `RetentionScoreProvider` segue com um provider | `schema.prisma` |
+| 5 | **Fica exposta uma lacuna que não tem card: nada agenda o pipeline diário** | ver §4 acima |
+| 6 | A F41 (Slice 6.6) perde o objeto principal — drift e kill switch **de modelo** | reavaliar escopo |
+| 7 | A medição é reproduzível e datada; refazê-la é o gatilho de reabertura | `SPEC-040` §2 |

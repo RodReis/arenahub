@@ -1139,7 +1139,29 @@ antes dele não há snapshot reconstruível para acumular.
 | F37 | 6.2 Regras explicáveis e score | ✅ **entregue** em 31/08/2026 — regra declarativa versionada, score `[0,100]`, até 5 fatores, elegibilidade e supressão |
 | F38 | 6.3 CRM de retenção | ✅ **entregue** em 31/08/2026 — fila top-K por capacidade, cooldown, SLA, máquina de estados e registro de contato |
 | F39 | 6.4 Experimento operacional | ✅ **entregue** em 31/08/2026 — randomização por hash, braço de controle fora da fila, análise ITT |
-| F40–F41 | 6.5 e 6.6 | F40 atrás do gate de ≥6 meses; F41 atrás da F40 |
+| F40 | 6.5 Modelo supervisionado | ⛔ **não executada** — gate `M6-ML-01` medido e não atingido (ADR-050) |
+| F41 | 6.6 Produção e monitoramento | escopo a reavaliar — sem modelo, drift e kill switch perdem o objeto |
+
+**A F40 não foi executada, e a medição é o entregável.**
+
+O gate `M6-ML-01` tem números verificáveis, então a pergunta não era *"queremos ML?"* — era **"o
+dado existe?"**. Medido em 31/08/2026 contra o banco: **0 snapshots** (o pipeline nunca rodou),
+**1 churn datado** contra 200 exigidos, **3 dias** de histórico real contra 6 meses.
+
+**A armadilha que quase passa:** `Subscription.status = CANCELLED` aparece 1.907 vezes, e parece
+amostra farta. Não é — é o *status atual* de alunos importados em bloco entre 19 e 26/08. Status
+corrente não tem data de transição, e sem saber **quando** o aluno saiu não há label temporal. É
+exatamente o que a F36 documentou ao construir features as-of: *"a invoice estava vencida em D" é
+aritmética sobre datas imutáveis, não consulta de status*.
+
+**Nada de ML entrou no repositório** — nem migration, nem dependência, nem código morto. A porta
+segue aberta sem custo: a F37 já deixou `RetentionScoreProvider` como ponto de extensão e
+`calibratedProbability` como coluna nula.
+
+⚠️ **A medição expôs uma lacuna sem card: nada agenda o pipeline diário.** As F36–F39 expõem o
+método e são testadas, mas nenhuma tem job. Sem execução recorrente `student_feature_snapshots`
+continua vazia e os seis meses nunca começam a contar. É a dependência dura para reabrir a F40 —
+critério objetivo: ≥1.000 snapshots e ≥200 churns datados no mesmo tenant.
 
 **O que a F39 entrega, e o que quem pegar a F40 precisa saber.**
 
