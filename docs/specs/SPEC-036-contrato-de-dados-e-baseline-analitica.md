@@ -6,7 +6,7 @@
 | **MVP** | 6 |
 | **Slice do PRD** | **6.1** — `docs/prd/academia/MVP-06-retention-ai.md` §7 |
 | **Plano de apoio** | `docs/superpowers/plans/2026-08-14-mvp-06-*` (índice + planos por slice) |
-| **Status** | `em execução` (31/08/2026) |
+| **Status** | `entregue` em 31/08/2026 ([#224](https://github.com/RodReis/arenahub/pull/224)) — aguardando aceite do PI |
 | **ADRs que bloqueiam** | nenhum |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo, os requisitos (`M6-FR/BR/NFR/AC`) e os
