@@ -305,6 +305,115 @@
   line-height: 1.5;
 }
 
+/* ------------------------------------------------------------- controles
+ *
+ * MOLDURA, CONTROLE E SETA -- os mesmos papeis do `Field.module.css` de
+ * `@arenahub/ui`, com os mesmos tokens.
+ *
+ * Ate a issue #231 esta tela vestia os controles com as classes Tailwind do
+ * shadcn (`h-(--ah-control-height) rounded-lg border-input ...`), unica do
+ * painel a fazer isso. Ao migrar para `<input>` e `<select>` nativos, o
+ * estilo precisou vir para ca.
+ *
+ * NAO reusa o `Field.module.css` direto: CSS Module e escopado por arquivo,
+ * e a classe gerada nao e publica. O que se compartilha entre as duas folhas
+ * sao os TOKENS -- que e o contrato de verdade (ADR-026). Enquanto a tela
+ * mantiver o proprio `Campo` (que tem `marca` e a grade de duas colunas do
+ * mockup, coisas que o `Field` nao modela), a duplicacao e do seletor, nunca
+ * do valor.
+ */
+
+.moldura {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--ah-control-height);
+  /* Respiro maior a DIREITA: visto na tela, a seta encostava na borda com os
+     10px simetricos do campo de texto. O texto do <select> nao chega ate la
+     porque a seta ocupa a ponta. */
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-control);
+  background: var(--ah-surface-raised);
+}
+
+/* O anel acompanha a MOLDURA: em volta do texto ele deixaria a seta do
+   `<select>` visualmente fora do campo focado. */
+.moldura:focus-within {
+  border-color: var(--ah-focus-ring);
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+/*
+ * O `<input>` solto tambem desenha a propria caixa -- ele nao tem moldura em
+ * volta, ao contrario do `<select>`. Um seletor, dois contextos: dentro da
+ * moldura ele fica transparente (regra abaixo), fora dela ele E a caixa.
+ */
+.controle {
+  width: 100%;
+  min-width: 0;
+  height: var(--ah-control-height);
+  padding: 0 10px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-control);
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-default);
+  font-family: inherit;
+  font-size: var(--ah-type-body-size);
+}
+
+.controle:focus-visible {
+  border-color: var(--ah-focus-ring);
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+.controle:disabled {
+  background: var(--ah-surface-canvas);
+  border-color: var(--ah-border-subtle);
+  /*
+     `--ah-text-secondary`, e nao um cinza mais claro: campo desabilitado ainda
+     PRECISA SER LIDO -- a matricula avisa que sera gerada no servidor, e essa
+     frase e a resposta a "cade o numero?". Controle inativo e isento de 1.4.3,
+     mas isencao nao e motivo para apagar texto que a recepcao usa.
+  */
+  color: var(--ah-text-secondary);
+  cursor: not-allowed;
+}
+
+/* Dentro da moldura o controle e so o texto: a caixa ja foi desenhada. */
+.moldura .controle {
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+/* O anel vive na moldura -- dois aneis concentricos seriam ruido. */
+.moldura .controle:focus-visible {
+  outline: none;
+}
+
+/*
+ * `<select>` perde a aparencia nativa dentro da moldura, senao o navegador
+ * desenha a propria borda e a propria seta dentro da nossa.
+ */
+.moldura select.controle {
+  appearance: none;
+}
+
+/* Seta decorativa, desenhada em CSS -- mesma forma do `Field` do DS. */
+.seta {
+  width: 0;
+  height: 0;
+  flex: none;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--ah-text-secondary);
+}
+
 .secao {
   margin: 0;
   padding: 0;

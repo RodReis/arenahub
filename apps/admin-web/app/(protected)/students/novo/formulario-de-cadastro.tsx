@@ -3,17 +3,8 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { useToastDeErro } from '@arenahub/ui';
+import { Button, useToastDeErro } from '@arenahub/ui';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { mascararCep, mascararCpf, mascararTelefone } from '@/lib/mascaras';
 
 import { estadoDoPasso as calcularEstadoDoPasso } from '../../../../src/students/trilha';
@@ -220,7 +211,8 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
       dica?: boolean;
     } = {},
   ) => (
-    <Input
+    <input
+      className={estilos['controle']}
       id={campo}
       name={campo}
       type={extras.tipo ?? 'text'}
@@ -248,61 +240,60 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
   );
 
   /**
-   * Select do shadcn não envia valor sozinho: ele é um botão com menu, não um
-   * `<select>`. O `<input type="hidden">` é o que faz o valor chegar ao
-   * FormData da server action.
+   * `<select>` NATIVO -- a mesma escolha que `SelectField` de `@arenahub/ui`
+   * defende, e que esta tela era a unica do painel a nao seguir.
+   *
+   * O combobox de `<div>` que morava aqui custava tres remendos, todos
+   * documentados em comentario e todos desnecessarios agora:
+   *
+   *   1. `<input type="hidden">` espelhando o valor, porque o componente NAO
+   *      envia nada ao `FormData` -- ele e um botao com menu.
+   *   2. `items={...}` mapeando valor -> rotulo, senao o gatilho exibia
+   *      "FEMALE" e o UUID cru da unidade.
+   *   3. `value=''` em vez de `undefined`, para o Base UI nao nascer
+   *      nao-controlado e virar controlado na primeira selecao.
+   *
+   * O nativo dispensa os tres: ele envia sozinho, mostra o texto da `<option>`
+   * e aceita `value=''` sem ambiguidade. Alem disso, o teclado, o leitor de
+   * tela e o toque ja funcionam sem ninguem os reimplementar -- e o E2E volta
+   * a poder usar `selectOption`, que o combobox quebrava (issue #231).
+   *
+   * A `<option>` vazia carrega o placeholder: `<select>` nativo nao tem
+   * atributo proprio para isso, e sem ela o primeiro item apareceria como se
+   * ja estivesse escolhido.
    */
   const selecao = (
     campo: string,
     opcoes: readonly (readonly [string, string])[],
     placeholder: string,
   ) => (
-    <>
-      <Select
-        /*
-         * `items` E O QUE FAZ O GATILHO MOSTRAR O ROTULO, e nao o valor cru.
-         *
-         * Sem ele, `Select.Value` do Base UI renderiza o proprio `value`: a
-         * combo de sexo exibia "FEMALE" e a de unidade, o UUID
-         * `c89a3ee6-f2e5-...`. Visto na tela, nao deduzido. O `items` da ao
-         * componente o mapa valor -> rotulo, que e o mecanismo oficial da
-         * biblioteca para isso (docs do Select, "Formatting the value").
-         *
-         * A lista sai das MESMAS `opcoes` que montam o menu: um so lugar
-         * define rotulo, entao gatilho e menu nao podem divergir.
-         */
-        items={opcoes.map(([chave, texto]) => ({ value: chave, label: texto }))}
-        // `''` e nao `undefined`: o Base UI decide no PRIMEIRO render se o
-        // componente e controlado, e `undefined` o faz nascer
-        // nao-controlado e virar controlado na primeira selecao -- duas
-        // fontes de verdade para o mesmo valor.
+    <div className={estilos['moldura']}>
+      <select
+        className={estilos['controle']}
+        id={campo}
+        name={campo}
         value={valor(campo)}
-        // O Base UI entrega `null` quando a seleção é limpa; o rascunho
-        // guarda string, e `''` é o que representa "campo não informado" no
-        // resto do formulário.
-        onValueChange={(novo) => anotar(campo, novo ?? '')}
+        onChange={(evento) => {
+          anotar(campo, evento.target.value);
+        }}
+        data-testid={`campo-${campo}`}
       >
-        <SelectTrigger id={campo} className="w-full" data-testid={`campo-${campo}`}>
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
+        <option value="">{placeholder}</option>
 
-        <SelectContent>
-          {opcoes.map(([chave, texto]) => (
-            <SelectItem key={chave} value={chave}>
-              {texto}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        {opcoes.map(([chave, texto]) => (
+          <option key={chave} value={chave}>
+            {texto}
+          </option>
+        ))}
+      </select>
 
       {/*
-        SEM `required`: o atributo e invalido num `<input type="hidden">` por
-        especificacao, e nao validava nada mesmo -- campo dentro de contêiner
-        `hidden` fica fora da validacao nativa. Quem barra o envio e
-        `faltaObrigatorio`, que ainda leva a pessoa ao passo certo.
+        Seta DECORATIVA, desenhada em CSS -- mesma solucao do `SelectField` do
+        DS. `aria-hidden` porque quem usa leitor de tela ouve o proprio
+        `<select>` se anunciar como combobox; a seta repetiria isso em ruido.
       */}
-      <input type="hidden" name={campo} value={valor(campo)} />
-    </>
+      <span className={estilos['seta']} aria-hidden="true" />
+    </div>
   );
 
   if (estado.sucesso) {
@@ -350,35 +341,22 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
 
         <div className={estilos['acoes']}>
           {/*
-            `render` e não `asChild`: o shadcn deste projeto é construído
-            sobre Base UI, não Radix. O elemento renderizado é um `<a>` de
-            verdade — botão que navega tem de ser link, senão perde abrir em
-            nova aba, copiar endereço e o anúncio de "link" do leitor de tela.
-          */}
-          {/*
-            O TEXTO VAI DENTRO DO `render`, e não como filho do `Button`:
-            com um elemento vazio no `render`, o Base UI monta o `<a>` sem os
-            filhos e o botão sai como um retângulo colorido sem texto nenhum.
-            Visto na tela, não deduzido.
+            `href` no proprio `Button` -- o componente do DS renderiza um `<a>`
+            de verdade quando recebe a prop, e botao que navega TEM de ser
+            link: um `<button onClick>` perde abrir em nova aba, copiar
+            endereco e o anuncio de "link" do leitor de tela.
 
-            `nativeButton={false}` porque o elemento renderizado é um `<a>`:
-            sem isso o Base UI avisa que a semântica nativa se perde — e o
-            aviso está certo, quem navega tem de ser link.
+            Substitui o `render={<a>}` + `nativeButton={false}` que o Base UI
+            exigia. A regra e a mesma; o DS so a expoe por uma prop em vez de
+            por composicao.
           */}
-          <Button
-            render={
-              <a href={`/students/${estado.sucesso.studentId}`} data-testid="abrir-ficha">
-                Abrir a ficha e atribuir um plano
-              </a>
-            }
-            nativeButton={false}
-          />
+          <Button href={`/students/${estado.sucesso.studentId}`} data-testid="abrir-ficha">
+            Abrir a ficha e atribuir um plano
+          </Button>
 
-          <Button
-            render={<a href="/students/novo">Cadastrar outro aluno</a>}
-            nativeButton={false}
-            variant="outline"
-          />
+          <Button href="/students/novo" variant="outline">
+            Cadastrar outro aluno
+          </Button>
         </div>
       </div>
     );
@@ -670,7 +648,8 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
                 é imutável (INV-010). Enviá-la faria a API recusar o corpo
                 inteiro — o schema é `.strict()`.
               */}
-              <Input
+              <input
+                className={estilos['controle']}
                 id="matricula-preview"
                 value="Gerada ao concluir o cadastro"
                 readOnly
@@ -723,11 +702,9 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
         </div>
 
         <div className={estilos['acoes']}>
-          <Button
-            render={<a href="/students">Cancelar</a>}
-            nativeButton={false}
-            variant="ghost"
-          />
+          <Button href="/students" variant="ghost">
+            Cancelar
+          </Button>
 
           {passo > 0 ? (
             <Button

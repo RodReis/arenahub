@@ -79,8 +79,21 @@ export async function preencherCadastro(page: Page, dados: DadosDoAluno): Promis
   // Passo 3: a unidade é o único campo que a F45 tornou obrigatório, e ela
   // mora no passo administrativo.
   await page.getByTestId('ir-para-passo-3').click();
-  await page.getByTestId('campo-gymUnitId').click();
-  await page.getByRole('option').first().click();
+
+  /*
+   * `selectOption` num `<select>` NATIVO -- um gesto, não dois.
+   *
+   * Enquanto a tela usava o combobox de `<div>` do Base UI (issue #231), este
+   * trecho precisava de `.click()` para abrir o menu e de
+   * `getByRole('option').first().click()` para escolher: o Playwright não tem
+   * como falar com um combobox que não é `<select>`, e a API dedicada ficava
+   * fora de alcance.
+   *
+   * `index: 1` e não `0` porque a primeira `<option>` é o placeholder
+   * ("Selecione a unidade"), que existe porque `<select>` nativo não tem
+   * atributo de placeholder -- sem ela o primeiro item pareceria já escolhido.
+   */
+  await page.getByTestId('campo-gymUnitId').selectOption({ index: 1 });
 
   // O envio vive no último passo — é lá que o formulário termina.
   await page.getByTestId('ir-para-passo-4').click();
