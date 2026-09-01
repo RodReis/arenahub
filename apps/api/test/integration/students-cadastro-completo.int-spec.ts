@@ -711,6 +711,83 @@ describe('F45 -- cadastro completo de aluno', () => {
       expect(lista(todos).map((a) => a.id)).toEqual(expect.arrayContaining([ativo.id, interessado.id]));
     });
 
+    /*
+     * O TOTAL do "20 de N" -- cabecalho `X-Total-Count`.
+     *
+     * Vai no CABECALHO e nao no corpo porque e metadado de paginacao, e
+     * trocar o array por envelope quebraria o contrato de todo consumidor por
+     * um numero que nao e dado do aluno.
+     */
+    it('informa quantos alunos o filtro alcanca, no cabecalho', async () => {
+      await criar(contas.a, { fullName: `Contagem ${sufixo}`, status: 'ACTIVE' });
+
+      const resposta = await request(servidor())
+        .get('/api/v1/students?limit=1')
+        .set('Cookie', contas.a.cookie)
+        .expect(200);
+
+      const total = Number(resposta.headers['x-total-count']);
+
+      // A pagina traz UM aluno; o total conta a base inteira do tenant.
+      expect(lista(resposta)).toHaveLength(1);
+      expect(total).toBeGreaterThan(1);
+    });
+
+    /*
+     * O TOTAL ACOMPANHA O FILTRO, e essa e a razao de ele existir.
+     *
+     * Um total fixo mentiria assim que alguem filtrasse: a tela diria "20 de
+     * 1.968" enquanto pagina 341 ativos. O denominador tem de descrever a
+     * lista que esta sendo paginada.
+     */
+    it('o total muda com o filtro, e nunca e maior que o sem filtro', async () => {
+      await criar(contas.a, { fullName: `Ativo total ${sufixo}`, status: 'ACTIVE' });
+      await criar(contas.a, { fullName: `Lead total ${sufixo}`, status: 'LEAD' });
+
+      const contarCom = async (consulta: string): Promise<number> => {
+        const resposta = await request(servidor())
+          .get(`/api/v1/students?limit=1${consulta}`)
+          .set('Cookie', contas.a.cookie)
+          .expect(200);
+
+        return Number(resposta.headers['x-total-count']);
+      };
+
+      const todos = await contarCom('');
+      const ativos = await contarCom('&status=ACTIVE');
+      const buscados = await contarCom(`&q=${encodeURIComponent(`Ativo total ${sufixo}`)}`);
+
+      expect(ativos).toBeGreaterThan(0);
+      expect(ativos).toBeLessThan(todos);
+      // A busca por nome exato alcanca UM aluno -- o total nao pode dizer 341.
+      expect(buscados).toBe(1);
+    });
+
+    /*
+     * O total e do TENANT de quem pergunta. Contar a base alheia vazaria o
+     * tamanho da academia vizinha por um numero no rodape.
+     */
+    it('o total NAO conta aluno de outro tenant', async () => {
+      const daAcademiaA = await request(servidor())
+        .get('/api/v1/students?limit=1')
+        .set('Cookie', contas.a.cookie)
+        .expect(200);
+
+      const daAcademiaB = await request(servidor())
+        .get('/api/v1/students?limit=1')
+        .set('Cookie', contas.b.cookie)
+        .expect(200);
+
+      const totalA = Number(daAcademiaA.headers['x-total-count']);
+      const totalB = Number(daAcademiaB.headers['x-total-count']);
+
+      const alunosDeA = await db.student.count({ where: { tenantId: contas.a.tenantId } });
+      const alunosDeB = await db.student.count({ where: { tenantId: contas.b.tenantId } });
+
+      expect(totalA).toBe(alunosDeA);
+      expect(totalB).toBe(alunosDeB);
+    });
+
     /**
      * SITUACAO INVALIDA NAO DERRUBA A TELA.
      *

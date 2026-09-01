@@ -220,6 +220,47 @@ test.describe('busca de aluno', () => {
     await expect(page.getByTestId('matricula')).toContainText(/^AP-/);
   });
 
+  /*
+   * O TOTAL do "20 de N" -- o denominador acompanha o FILTRO.
+   *
+   * Só E2E prova isto ponta a ponta: o número sai da API num cabeçalho
+   * (`X-Total-Count`), atravessa o `chamarApi` e chega ao rodapé do
+   * `DataTable`. Teste de componente cobre a formatação; teste de integração
+   * cobre a contagem; nenhum dos dois cobre a travessia.
+   */
+  test('o rodapé diz de quantos alunos a página é uma fatia', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/students');
+
+    const rodape = page.getByRole('navigation', { name: 'Paginação' });
+
+    // "20 de 1.968" -- e nunca o texto antigo, que não dava noção de escala.
+    await expect(rodape).toContainText(/\d+ de [\d.]+/);
+    await expect(rodape).not.toContainText('itens carregados');
+  });
+
+  /*
+   * O denominador muda com o filtro, e é essa a razão de ele existir: um
+   * total fixo mentiria assim que alguém filtrasse.
+   */
+  test('o total encolhe quando o filtro encolhe a lista', async ({ page }) => {
+    await entrar(page);
+
+    const totalDe = async (url: string): Promise<number> => {
+      await page.goto(url);
+      const texto = await page.getByRole('navigation', { name: 'Paginação' }).innerText();
+      const achado = /de ([\d.]+)/.exec(texto);
+
+      return Number((achado?.[1] ?? '0').replace(/\./g, ''));
+    };
+
+    const todos = await totalDe('/students');
+    const ativos = await totalDe('/students?status=ACTIVE');
+
+    expect(ativos).toBeGreaterThan(0);
+    expect(ativos).toBeLessThan(todos);
+  });
+
   test('busca sem resultado explica o próximo passo', async ({ page }) => {
     await entrar(page);
     await page.goto('/students?q=nome-que-nao-existe-em-lugar-nenhum');

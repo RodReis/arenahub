@@ -35,6 +35,16 @@ export interface RespostaDaApi<T> {
   erro?: ProblemDetails;
   /** Cookies que a API mandou gravar, para a Server Action repassar. */
   cookiesDaApi: string[];
+  /**
+   * `X-Total-Count`, quando a rota o manda — quantos itens o filtro alcança,
+   * não quantos vieram nesta página.
+   *
+   * Ausente na maioria das rotas, e por isso é opcional: só as listagens
+   * paginadas o declaram. `undefined` significa "a rota não informa", que é
+   * diferente de zero — e a tela precisa distinguir os dois para não anunciar
+   * "0 alunos" numa base cheia.
+   */
+  total?: number;
 }
 
 /**
@@ -119,7 +129,7 @@ export async function chamarApi<T>(
   const esquema = opcoes.esquema;
 
   if (esquema === undefined) {
-    return { ok: true, dados: corpoDaResposta as T, cookiesDaApi };
+    return { ok: true, dados: corpoDaResposta as T, cookiesDaApi, ...totalDaResposta(resposta) };
   }
 
   const validado = validarResposta(esquema, corpoDaResposta, {
@@ -131,5 +141,25 @@ export async function chamarApi<T>(
     return { ok: false, erro: validado.erro, cookiesDaApi };
   }
 
-  return { ok: true, dados: validado.dados, cookiesDaApi };
+  return { ok: true, dados: validado.dados, cookiesDaApi, ...totalDaResposta(resposta) };
+}
+
+/**
+ * Lê `X-Total-Count` da resposta, quando existe.
+ *
+ * Devolve objeto para ser espalhado: com `exactOptionalPropertyTypes`,
+ * atribuir `total: undefined` é diferente de omitir a chave, e só a omissão
+ * satisfaz `total?: number`.
+ *
+ * Valor não numérico é IGNORADO em vez de virar `NaN`: um cabeçalho corrompido
+ * mostraria "20 de NaN" na tela, que é pior que não mostrar total nenhum.
+ */
+function totalDaResposta(resposta: Response): { total?: number } {
+  const bruto = resposta.headers.get('x-total-count');
+
+  if (bruto === null) return {};
+
+  const total = Number(bruto);
+
+  return Number.isFinite(total) && total >= 0 ? { total } : {};
 }

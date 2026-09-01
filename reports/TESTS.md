@@ -15,7 +15,7 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 2893 | 2893 | 0 | 75.7 |
+| unitário | 2904 | 2904 | 0 | 75.5 |
 | contrato | 0 | 0 | 0 | — |
 | integração | 810 | 810 | 0 | 83.9 |
 | e2e | 0 | 0 | 0 | — |
@@ -112,3 +112,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-01 | #241 | — | integração | 810 | 810 | 0 | 83.9 | [#245](https://github.com/RodReis/arenahub/pull/245) — medido suíte a suíte (o Jest crasha no fim no Windows) |
 | 2026-09-01 | #242 | SPEC-057 | unitário | 2897 | 2897 | 0 | 75.7 | [#247](https://github.com/RodReis/arenahub/pull/247) |
 | 2026-09-01 | #242 | SPEC-057 | integração | 796 | 796 | 0 | 83.9 | [#247](https://github.com/RodReis/arenahub/pull/247) — medido suíte a suíte, 56 suítes (o Jest crasha no fim no Windows e o gerador manteve o 810 da entrega anterior); 796 conferido por contagem independente dos `it`/`test` declarados |
+| 2026-09-01 | #248 | — | unitário | 2904 | 2904 | 0 | 75.5 | — |
+| 2026-09-01 | #248 | — | integração | 799 | 799 | 0 | 83.9 | — medido suíte a suíte, 56 suítes (o Jest crasha no fim no Windows e o gerador manteve o 810 da entrega anterior); 799 conferido por contagem independente dos `it`/`test` declarados |
