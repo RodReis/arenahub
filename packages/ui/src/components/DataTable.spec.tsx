@@ -95,6 +95,69 @@ describe('DataTable', () => {
   });
 
   /**
+   * O TOTAL do filtro atual, quando a rota o informa -- "20 de 341".
+   *
+   * Sem ele a paginacao por cursor nao da nocao de escala: "20 itens
+   * carregados" nao distingue uma base de 25 alunos de uma de 2.000.
+   */
+  it('mostra "N de TOTAL" quando o total e informado', () => {
+    render(tabela({ nextHref: '/students?cursor=zzz', total: 341 }));
+
+    expect(screen.getByText(/2 de 341/)).toBeInTheDocument();
+    expect(screen.queryByText(/itens carregados/)).not.toBeInTheDocument();
+  });
+
+  /** Separador de milhar em pt-BR: "1.968", nunca "1,968" nem "1968". */
+  it('formata o total com separador de milhar', () => {
+    render(tabela({ nextHref: '/students?cursor=zzz', total: 1968 }));
+
+    expect(screen.getByText(/2 de 1\.968/)).toBeInTheDocument();
+  });
+
+  /*
+   * `undefined` e "a rota nao informa", que NAO e zero. Voltar ao texto
+   * antigo e o comportamento certo: anunciar "de 0" numa base cheia seria
+   * dizer que a academia nao tem aluno.
+   */
+  it('sem total informado, mantem o texto de itens carregados', () => {
+    render(tabela({ nextHref: '/students?cursor=zzz' }));
+
+    expect(screen.getByText(/2 itens carregados/)).toBeInTheDocument();
+  });
+
+  /*
+   * O RODAPE APARECE SEM PAGINACAO quando ha total -- achado no E2E.
+   *
+   * O banco de teste tem 18 alunos, cabe numa pagina, e nao havia
+   * "Proximos": o rodape inteiro nao renderizava e a contagem sumia
+   * justamente na base pequena, que e onde a pessoa mais consegue conferir o
+   * numero de cabeca.
+   */
+  it('mostra o total mesmo sem link de pagina nenhum', () => {
+    render(tabela({ total: 18 }));
+
+    expect(screen.getByText(/2 de 18/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Próximos' })).not.toBeInTheDocument();
+  });
+
+  /** Sem total E sem paginacao, o rodape nao existe -- nada a dizer. */
+  it('sem total e sem paginação, não há rodapé', () => {
+    render(tabela({}));
+
+    expect(screen.queryByRole('navigation', { name: 'Paginação' })).not.toBeInTheDocument();
+  });
+
+  /*
+   * Zero e um total LEGITIMO -- busca que nao achou ninguem. Tratar como
+   * ausente aqui esconderia justamente a informacao que explica a tela vazia.
+   */
+  it('total zero e mostrado, nao tratado como ausente', () => {
+    render(tabela({ nextHref: '/students?cursor=zzz', total: 0 }));
+
+    expect(screen.getByText(/2 de 0/)).toBeInTheDocument();
+  });
+
+  /**
    * REGRESSAO: as 12 tabelas que este componente substitui carregam
    * `data-testid` que os 39 E2E ja procuram (`tabela-de-alunos`,
    * `tabela-de-unidades`, `tabela-de-direitos`). Sem repassar, a migracao

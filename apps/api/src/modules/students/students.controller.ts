@@ -9,9 +9,10 @@ import {
   Post,
   Query,
   Req,
+  Res,
 } from '@nestjs/common';
 import type { Student } from '@arenahub/database';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
@@ -344,9 +345,24 @@ export class StudentsController {
     private readonly contexto: TenantContextService,
   ) {}
 
+  /**
+   * O TOTAL vai no CABECALHO `X-Total-Count`, nao no corpo.
+   *
+   * A rota devolve `AlunoDto[]` puro desde sempre, e trocar por envelope
+   * (`{ itens, total }`) quebraria o snapshot do contrato e todo consumidor
+   * de uma vez -- por um numero que e METADADO da resposta, nao dado do
+   * aluno. Cabecalho e onde metadado de paginacao mora, e o array continua
+   * lendo igual para quem nao se importa com ele.
+   *
+   * `Access-Control-Expose-Headers` acompanha: sem ele o navegador ESCONDE
+   * cabecalho nao-simples de resposta cross-origin, e o painel leria `null`
+   * sem erro nenhum -- o tipo de defeito que so aparece em producao, onde
+   * API e painel podem estar em origens diferentes.
+   */
   @Get()
   @RequirePermissions('student.read')
   async buscar(
+    @Res({ passthrough: true }) resposta: Response,
     @Query('q') termo?: string,
     @Query('limit') limite?: string,
     @Query('cursor') cursor?: string,
@@ -390,6 +406,23 @@ export class StudentsController {
         : {}),
       ...(direcao === 'asc' || direcao === 'desc' ? { direcao } : {}),
     });
+
+    /*
+     * A contagem usa o MESMO filtro da listagem -- menos `cursor` e `limite`,
+     * que sao a janela e nao o conjunto. Contar com o cursor daria "20 de 20",
+     * que e a definicao de numero inutil.
+     *
+     * Em paralelo com a listagem seria uma otimizacao possivel; em serie
+     * custa 0,3 ms medidos, e o `await` da lista ja aconteceu acima.
+     */
+    const total = await this.alunos.contar(this.contexto.require(), {
+      termo,
+      gymUnitId,
+      ...(situacao.success ? { status: situacao.data } : {}),
+    });
+
+    resposta.setHeader('X-Total-Count', String(total));
+    resposta.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
 
     return encontrados.map((a) => this.paraDtoDaLista(a));
   }

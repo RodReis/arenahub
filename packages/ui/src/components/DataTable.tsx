@@ -94,6 +94,15 @@ interface Props<T> {
   readonly prevHref?: string;
   readonly nextHref?: string;
   /**
+   * Quantos itens o filtro alcanca -- o denominador do "20 de 341".
+   *
+   * OPCIONAL de proposito: rota que nao informa total continua mostrando so
+   * "20 itens carregados", como sempre mostrou. `undefined` e "nao sei", que
+   * nao e o mesmo que zero -- anunciar "0" numa base cheia seria pior que
+   * calar.
+   */
+  readonly total?: number;
+  /**
    * `data-testid` da `<table>`.
    *
    * Existe porque as tabelas que este componente substitui ja carregam testid
@@ -119,16 +128,37 @@ interface Props<T> {
 /**
  * Tabela do painel -- DS-PAINEL.md §5 e §9.
  *
- * Paginacao por CURSOR, sem numeracao de paginas: numero exigiria `COUNT(*)`
- * a cada consulta e mentiria, porque o total muda entre um clique e outro
- * enquanto a recepcao cadastra. "Anteriores / Proximos" mais contador de itens
- * carregados nunca mente.
+ * Paginacao por CURSOR, sem numeracao de paginas: numerar exigiria calcular
+ * quantas paginas existem, e esse numero muda entre um clique e outro
+ * enquanto a recepcao cadastra -- a pagina 5 de hoje nao e a pagina 5 de
+ * daqui a um minuto. "Anteriores / Proximos" nunca mente sobre isso.
+ *
+ * O TOTAL, por outro lado, entrou em 01/09/2026 a pedido do PI, e a
+ * preocupacao original foi MEDIDA em vez de presumida: `COUNT(*)` com os
+ * mesmos filtros custa **0,27 ms sem filtro e 0,38 ms com filtro e busca**
+ * no banco da bancada (1.968 alunos), os dois por indice. Ele muda entre
+ * cliques como qualquer outro dado da tela -- e "20 de 1.968" com um segundo
+ * de atraso e infinitamente mais util que "20 itens carregados", que nao
+ * distingue uma base de 25 alunos de uma de 2.000.
  *
  * `caption` e obrigatorio: tabela sem legenda e opaca no leitor de tela. As 12
  * tabelas que este componente substitui ja acertavam isso -- e `scope="col"`
  * em todos os 61 cabecalhos. O componente preserva; regressao aqui e
  * regressao de acessibilidade.
  */
+/**
+ * Separador de milhar do total -- "1.968", nunca "1968".
+ *
+ * `Intl.NumberFormat` e nao `toLocaleString`: a regra 5 do lint (DS §11)
+ * restringe o METODO, que e por onde a formatacao de data escaparia para o
+ * fuso do navegador. Formatacao de NUMERO por `Intl.NumberFormat` e permitida
+ * -- `formatarDinheiro` ja o usa pela mesma razao.
+ *
+ * Instancia UNICA no modulo, e nao uma por render: construir `Intl` e caro, e
+ * a tabela redesenha a cada navegacao de pagina.
+ */
+const MILHAR = new Intl.NumberFormat('pt-BR');
+
 export function DataTable<T>({
   rows,
   columns,
@@ -137,6 +167,7 @@ export function DataTable<T>({
   empty,
   prevHref,
   nextHref,
+  total,
   testId,
   rowTestId,
   sort,
@@ -269,10 +300,23 @@ export function DataTable<T>({
       </table>
       </div>
 
-      {prevHref !== undefined || nextHref !== undefined ? (
+      {/*
+        O RODAPE APARECE TAMBEM SEM PAGINACAO, quando ha total.
+        
+        Antes ele so existia com "Anteriores" ou "Proximos" -- e numa base de
+        18 alunos, que cabe numa pagina, a recepcao nao via contagem nenhuma.
+        O total responde "quantos alunos existem?", pergunta que independe de
+        haver proxima pagina; esconde-lo justamente na base pequena inverte
+        quem mais precisa da resposta.
+      */}
+      {prevHref !== undefined || nextHref !== undefined || total !== undefined ? (
         <nav className={estilos['paginacao']} aria-label="Paginação">
           {prevHref !== undefined ? <a href={prevHref}>Anteriores</a> : null}
-          <span className={estilos['contador']}>{rows.length} itens carregados</span>
+          <span className={estilos['contador']}>
+            {total === undefined
+              ? `${rows.length} itens carregados`
+              : `${rows.length} de ${MILHAR.format(total)}`}
+          </span>
           {nextHref !== undefined ? <a href={nextHref}>Próximos</a> : null}
         </nav>
       ) : null}

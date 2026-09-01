@@ -213,6 +213,16 @@ export default async function PaginaDeAlunos({
       <DataTable
         testId="tabela-de-alunos"
         rows={alunos}
+        /*
+          O TOTAL do filtro atual, não da base inteira: com "Ativo" marcado o
+          rodapé diz "20 de 341"; sem filtro, "20 de 1.968". O denominador
+          descreve sempre a lista que está sendo paginada — um número fixo
+          mentiria assim que alguém filtrasse.
+
+          `resposta.total` é `undefined` quando a API não informa, e aí o
+          rodapé volta ao texto de sempre em vez de anunciar zero.
+        */
+        {...(resposta.total === undefined ? {} : { total: resposta.total })}
         rowKey={(aluno) => aluno.id}
         rowTestId={(aluno) => `aluno-${aluno.id}`}
         /*
