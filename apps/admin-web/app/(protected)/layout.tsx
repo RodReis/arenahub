@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { chamarApi } from '../../lib/api/server-client';
 import { sair } from '../actions/auth';
 import { Navegacao } from './navegacao';
+import { SeletorDeUnidade } from './seletor-de-unidade';
 
 interface Perfil {
   id: string;
@@ -37,6 +38,13 @@ interface ItemDeMenu {
  * declaram, e qualquer leitura generica do campo vira erro de compilacao.
  */
 const NAVEGACAO: readonly ItemDeMenu[] = [
+  { href: '/dashboard', label: 'Dashboard' },
+  /*
+    `Operação` CONTINUA no menu -- decisão 3 da `SPEC-057`. O dashboard é o
+    resumo; esta é a tela de investigação, com os alertas detalhados, a fila
+    de sincronização e o detalhe de dispositivo. Resumo e detalhe são telas
+    diferentes, e o dashboard não substitui nenhuma delas.
+  */
   { href: '/operations', label: 'Operação' },
   { href: '/access-events', label: 'Eventos de acesso' },
   /*
@@ -241,24 +249,16 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
   );
 
   /*
-   * O QUE O TOPBAR MOSTRA, e por que não é "Unidade não selecionada".
+   * O QUE O TOPBAR MOSTRA -- e ele passou a SELECIONAR em 01/09/2026 (F57).
    *
-   * Aquele texto vinha de quando o painel não consultava unidade nenhuma --
-   * e continuava aparecendo com a Matriz cadastrada, dizendo à recepção que
-   * faltava escolher algo que não havia onde escolher.
+   * Era indicador estático: com uma unidade dizia o nome, com várias dizia
+   * "2 unidades", porque a TROCA dependia de decisão de produto sobre
+   * persistência e escopo de sessão. O dashboard forçou a decisão -- sem
+   * unidade escolhida não existe "hoje", e "hoje" é o bloco 2 da fatia.
    *
-   * Com UMA unidade ativa não há o que selecionar: ela É o contexto, e o
-   * honesto é nomeá-la. Com várias, o painel ainda não sabe qual está em uso
-   * -- a TROCA exige decisão de produto sobre persistência e escopo de
-   * sessão (DS-PAINEL §5), e até lá dizer "várias unidades" é mais verdadeiro
-   * que fingir uma escolha. Sem nenhuma, o texto vira convite a cadastrar.
+   * Com UMA unidade continua sendo rótulo: ela É o contexto, e um `<select>`
+   * de uma opção só é um botão que não faz nada. Ver `SeletorDeUnidade`.
    */
-  const unidadeNoTopbar =
-    unidades.length === 1
-      ? (unidades[0]?.name ?? 'Unidade sem nome')
-      : unidades.length === 0
-        ? 'Nenhuma unidade cadastrada'
-        : `${unidades.length} unidades`;
 
   /*
    * O QUE O MENU MOSTRA -- F54.
@@ -292,12 +292,13 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
       */
       navLabel="Navegacao principal"
       /*
-        Indicador de unidade, nao seletor. A TROCA exige decisao de produto
-        sobre persistencia e escopo de sessao (DS-PAINEL.md §5) -- o que
-        mudou e que o indicador agora DIZ QUAL unidade, em vez de repetir
-        "nao selecionada" com a Matriz cadastrada. Ver `unidadeNoTopbar`.
+        SELETOR de unidade desde 01/09/2026 (F57) -- era indicador estático.
+        A escolha vive na URL: compartilhável por link, sobrevive a
+        recarregamento e o servidor a lê antes de renderizar.
       */
-      unitSelector={<span data-testid="unidade-ativa">{unidadeNoTopbar}</span>}
+      unitSelector={
+        <SeletorDeUnidade unidades={unidades} vazio="Nenhuma unidade cadastrada" />
+      }
       user={
         <>
           <span data-testid="usuario-logado">{resposta.dados.email}</span>

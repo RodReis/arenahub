@@ -165,6 +165,31 @@ Sidebar 204 px · painel de login 42% (mín. 360 px) · card de login 340 px · 
 
 Praticamente nenhum. `@keyframes ah-pulse` (opacidade 1 → .3) marca indicador ao vivo. Switch move o knob por `transform: translateX(16px)`. Toast entra e sai em 160 ms. Nada mais anima.
 
+**Exceção do dashboard — emenda de 01/09/2026 (F57, decisão do PI).** A tela de dashboard
+operacional acrescenta duas animações, e só ela:
+
+| o que | duração | o que comunica |
+|---|---|---|
+| `ah-halo` — anel que expande e some sob o ponto "ao vivo" | 2 s, contínuo | o feed está recarregando **agora**; para junto com a recarga quando a aba fica oculta |
+| `ah-entra` — linha nova do feed desliza 6 px e aparece | 220 ms, `cubic-bezier(0.16, 1, 0.3, 1)` | alguém acabou de passar na catraca |
+
+As duas passam em `transform` e `opacity` (compositor, sem recálculo de layout) e **desligam em
+`prefers-reduced-motion: reduce`**, onde o estado continua legível por cor, ícone e texto. Nenhuma
+delas é transição entre telas, que continua proibida.
+
+### 2.10 Superfície tingida por estado — dashboard
+
+**Emenda de 01/09/2026 (F57, decisão do PI).** A célula de KPI do dashboard pinta o próprio fundo
+com `color-mix(in srgb, currentColor 7%, var(--ah-surface-raised))` e ganha aresta superior de
+3 px na cor cheia do tom.
+
+- **7% e não os 10% do `StateBadge`**: a área pintada é uma célula inteira, e o mesmo alfa numa
+  faixa de quatro vira bloco de cor em vez de tinta.
+- **Sem estado, sem tinta.** Célula neutra fica branca — a faixa nunca tem quatro cores.
+- **Contraste medido**, não estimado: valor entre 5,13 e 5,77 e rótulo entre 5,88 e 5,95 nos quatro
+  tons, contra os 3,0 (texto grande) e 4,5 (texto normal) exigidos.
+- **Não vale para as demais telas.** Grid, cobrança e operação seguem a §4.6.
+
 ---
 
 ## 3. Grids e layout

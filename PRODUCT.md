@@ -86,6 +86,35 @@ não de imitação.
 - **Cor como único canal.** Ponto colorido sem texto, badge sem ícone, gráfico sem tabela
   equivalente. É proibição de PRD, não escolha estética.
 
+### Emenda de 01/09/2026 — o dashboard tem licença para ser mais expressivo
+
+**Decisão do PI, na F57.** Ao ver a primeira versão do dashboard operacional, o PI pediu uma tela
+mais colorida, com efeito e com mais presença visual — e, informado de que isso contrariava as duas
+anti-referências acima, decidiu emendá-las em vez de recuar.
+
+O que a emenda **abre**, e só na tela de dashboard:
+
+- **Superfície tingida pelo estado.** A célula de KPI pinta o próprio fundo com o tom semântico a
+  7% e ganha uma aresta superior de 3 px na cor cheia. Não é decoração: a cor é a do estado que o
+  número descreve, e some quando não há estado.
+- **Movimento que comunica estado.** O pulso do indicador "ao vivo" e a entrada da linha nova do
+  feed (220 ms). Os dois dizem *"isto está acontecendo agora"* — sem eles a lista troca de conteúdo
+  em silêncio e quem olhava não percebe que alguém passou na catraca.
+
+O que a emenda **não toca**, porque não é estética e sim contrato:
+
+- **Contraste WCAG AA** (`M1-NFR-008`), verificado por teste que falha o build. Medido nos quatro
+  tons: valor entre 5,13 e 5,77; rótulo entre 5,88 e 5,95 — contra os 3,0 e 4,5 exigidos.
+- **Cor nunca é canal único.** Todo KPI colorido carrega ícone e texto; o "ao vivo" diz "pausado"
+  por escrito quando para.
+- **`prefers-reduced-motion: reduce`** desliga tudo o que se move, e o estado continua legível.
+- **Accent é ação, carbono é estrutura, semântico é estado** (Princípio 5). A cor que entrou é
+  semântica. Gradiente, sombra decorativa e accent como enfeite continuam fora.
+
+**Isto não se estende às demais telas por tabela.** Grid de alunos, cobrança e operação continuam
+sob a regra original: elas são superfícies de trabalho, e o dashboard é a de resumo — a única que
+alguém olha de longe, entre atendimentos.
+
 ## Design Principles
 
 1. **A exceção é o caso principal.** A recepção abre o painel quando algo deu errado. O caminho

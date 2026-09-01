@@ -59,9 +59,10 @@ test.describe('acesso ao painel', () => {
     await page.getByLabel('Senha').fill(DONO.senha);
     await page.getByRole('button', { name: 'Entrar' }).click();
 
-    // O login passa a cair em OPERACAO (24/08/2026): quem abre o painel
-    // pergunta "a catraca esta de pe?", nao "quais unidades existem?".
-    await expect(page).toHaveURL(/\/operations/);
+    // O login passa a cair no DASHBOARD (01/09/2026, `SPEC-057` decisao 2):
+    // quem abre o painel pergunta "a academia esta de pe?" e quer o RESUMO.
+    // `Operacao` continua no menu, como tela de investigacao.
+    await expect(page).toHaveURL(/\/dashboard/);
 
     // As unidades continuam a um clique, agora sob "Administracao".
     await page.getByRole('link', { name: 'Unidades' }).click();
@@ -76,7 +77,7 @@ test.describe('acesso ao painel', () => {
     await page.getByLabel('E-mail').fill(DONO.email);
     await page.getByLabel('Senha').fill(DONO.senha);
     await page.getByRole('button', { name: 'Entrar' }).click();
-    await expect(page).toHaveURL(/\/operations/);
+    await expect(page).toHaveURL(/\/dashboard/);
 
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login/);
@@ -98,7 +99,7 @@ test.describe('acesso ao painel', () => {
     await page.keyboard.type(DONO.senha);
     await page.keyboard.press('Enter');
 
-    await expect(page).toHaveURL(/\/operations/);
+    await expect(page).toHaveURL(/\/dashboard/);
   });
 
   test('o erro de login e anunciavel por leitor de tela', async ({ page }) => {
@@ -119,7 +120,7 @@ test.describe('acesso ao painel', () => {
     await page.getByLabel('E-mail').fill(DONO.email);
     await page.getByLabel('Senha').fill(DONO.senha);
     await page.getByRole('button', { name: 'Entrar' }).click();
-    await expect(page).toHaveURL(/\/operations/);
+    await expect(page).toHaveURL(/\/dashboard/);
 
     await page.getByRole('link', { name: 'Unidades' }).click();
     await expect(page).toHaveURL(/\/units/);

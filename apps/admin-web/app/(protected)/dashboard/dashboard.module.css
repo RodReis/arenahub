@@ -1,0 +1,506 @@
+/**
+ * Dashboard operacional -- F57, `SPEC-057`.
+ *
+ * Lê só a camada semântica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`,
+ * `--ah-border-*`, `--ah-state-*` e `--ah-accent-*`, nunca `--ah-carbon-*` cru.
+ *
+ * ## Por que esta tela é mais viva que o resto do painel — decisão do PI, 01/09/2026
+ *
+ * O `PRODUCT.md` descreve o painel como instrumento denso e sóbrio, e lista
+ * "cheio de animação" e "card com sombra por padrão" como anti-referências. O
+ * PI pediu explicitamente uma tela mais colorida, com efeito e com mais
+ * presença visual, aceitando emendar o documento — a emenda está no
+ * `PRODUCT.md` e no `DS-PAINEL.md`.
+ *
+ * O que a decisão **não** revogou, porque não é estética e sim contrato:
+ *
+ * - **Contraste WCAG AA** (`M1-NFR-008`), verificado por teste que falha o build.
+ * - **Cor nunca é canal único**: todo estado colorido carrega ícone e texto.
+ * - **`prefers-reduced-motion`** desliga tudo o que se move.
+ * - **Accent é ação, carbono é estrutura, semântico é estado** (Princípio 5).
+ *   A cor que entra aqui é SEMÂNTICA — a superfície tingida pelo estado que o
+ *   número descreve. Nenhum gradiente decorativo, nenhum accent como enfeite:
+ *   num tenant de accent vermelho, "ativo" e "erro" viram a mesma cor.
+ *
+ * ## A tese do layout
+ *
+ * A pergunta é "a academia está de pé?", e tem de ser respondida SEM ROLAR.
+ * A faixa de KPI vem primeiro; abaixo, o feed ao vivo — o único bloco que se
+ * move — ocupa a coluna larga, e o contexto do mês fica na estreita.
+ */
+
+/* ─── Faixa de KPI ─────────────────────────────────────────────────────── */
+
+/*
+ * A faixa é DENSA e SEM VÃO: `gap: 1px` sobre fundo de borda desenha os
+ * divisores sem borda por célula. Mesmo mecanismo já medido no financeiro.
+ */
+.faixaDeKpi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  margin: 0 0 18px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-border-subtle);
+  overflow: hidden;
+}
+
+/*
+ * O KPI tem uma FAIXA DE ESTADO no topo — 3px de cor cheia, largura total.
+ *
+ * Não é `border-left` (banido: listra lateral decorativa). É a aresta superior
+ * da célula, e ela carrega significado: a cor diz o estado, o ícone e o texto
+ * dentro dizem o mesmo em outros dois canais. Com estado neutro a faixa some,
+ * em vez de virar uma linha cinza decorativa em toda célula.
+ */
+.kpi {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 15px 16px 14px;
+  background: var(--ah-surface-raised);
+  overflow: hidden;
+}
+
+.kpi[data-tom]::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: currentColor;
+}
+
+/*
+ * SUPERFÍCIE TINGIDA pelo próprio estado — `color-mix` com `currentColor`, o
+ * mesmo mecanismo do `StateBadge`, sem token novo.
+ *
+ * 7% e não os 10% do badge: a área pintada aqui é uma célula inteira, e o
+ * mesmo alfa numa faixa de quatro vira bloco de cor em vez de tinta. Medido
+ * contra o texto: `--ah-text-strong` sobre a superfície tingida a 7% continua
+ * acima de 4.5:1 nos quatro tons.
+ */
+.kpi[data-tom] {
+  background: color-mix(in srgb, currentColor 7%, var(--ah-surface-raised));
+}
+
+.kpi[data-tom='success'] {
+  color: var(--ah-state-success);
+}
+.kpi[data-tom='warning'] {
+  color: var(--ah-state-warning);
+}
+.kpi[data-tom='danger'] {
+  color: var(--ah-state-danger);
+}
+.kpi[data-tom='info'] {
+  color: var(--ah-state-info);
+}
+
+.kpiRotulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * O VALOR é o elemento dominante da faixa: 30px contra 11px do rótulo é
+ * contraste de escala ~2.7×, o que dá à faixa um foco claro em vez de quatro
+ * elementos de peso médio.
+ *
+ * `tabular-nums` porque o número muda a cada recarga, e sem largura fixa de
+ * dígito ele treme na horizontal — movimento que ninguém pediu.
+ */
+.kpiValor {
+  margin: 0;
+  font-size: 30px;
+  line-height: 34px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * No KPI com estado o VALOR veste a cor — é o único número da faixa que muda
+ * de cor, e por isso o olho vai nele primeiro. O rótulo fica no cinza de
+ * sempre: colorir os dois dobraria a tinta sem dobrar a informação.
+ */
+.kpi[data-tom] .kpiValor {
+  color: currentColor;
+}
+
+.kpiUnidade {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ah-text-secondary);
+}
+
+.kpiApoio {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ah-text-secondary);
+}
+
+/* ─── Corpo em duas colunas ────────────────────────────────────────────── */
+
+/*
+ * O FEED fica na coluna larga porque é o único bloco que muda sozinho: é para
+ * ele que o olho volta. Os outros respondem "como está o mês", e cabem na
+ * estreita sem competir com o movimento.
+ *
+ * A 1024px vira coluna única — o breakpoint `degraded` do DS.
+ */
+.corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .corpo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+/*
+ * O cabeçalho do cartão tem fundo REBAIXADO, não a mesma superfície do corpo:
+ * separa título de conteúdo por material em vez de por uma linha só, o que dá
+ * profundidade sem sombra nenhuma.
+ */
+.cabecalhoDoCartao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card) var(--ah-radius-card) 0 0;
+  background: var(--ah-surface-sunken);
+}
+
+.tituloDoCartao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: 600;
+  color: var(--ah-text-strong);
+}
+
+.conteudoDoCartao {
+  padding: 12px 16px 14px;
+  min-width: 0;
+}
+
+/* ─── Feed ao vivo ─────────────────────────────────────────────────────── */
+
+/*
+ * O indicador PULSA só quando está recarregando de fato. Parado com a aba
+ * oculta ele para de pulsar e diz "pausado" — um ponto piscando numa tela que
+ * não atualiza há dez minutos é mentira visual.
+ *
+ * TRÊS CANAIS, como todo estado do painel: cor (verde/cinza), movimento
+ * (pulsa/parado) e TEXTO ("ao vivo"/"pausado").
+ */
+.aoVivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-success) 32%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ah-state-success) 10%, transparent);
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  color: var(--ah-state-success);
+}
+
+.aoVivo[data-pausado='true'] {
+  border-color: var(--ah-border-default);
+  background: transparent;
+  color: var(--ah-text-secondary);
+}
+
+.pulso {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/*
+ * O halo é um pseudo-elemento que expande e some — `transform` e `opacity`,
+ * as duas propriedades que o compositor anima sem recalcular layout.
+ */
+.aoVivo:not([data-pausado='true']) .pulso::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: ah-halo 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@keyframes ah-halo {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.6);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/*
+ * A LINHA NOVA do feed entra deslizando de cima — a única animação de entrada
+ * da tela, e ela comunica estado: "isto acabou de acontecer". Sem ela, a
+ * lista troca de conteúdo em silêncio e quem estava olhando não percebe que
+ * alguém passou na catraca.
+ *
+ * 220 ms com ease-out-expo: rápido o bastante para não atrasar a leitura.
+ */
+.linhaDoFeed {
+  animation: ah-entra 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ah-entra {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.horaDoFeed {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ah-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.nomeDoFeed {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-default);
+}
+
+/* ─── Listas ───────────────────────────────────────────────────────────── */
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * Linhas separadas por divisor INTERNO (`:not(:last-child)`), não por gap: em
+ * densidade alta o divisor lê como tabela, e o gap lê como cartões soltos.
+ */
+.linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.linha:not(:last-child) {
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.linhaTexto {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-default);
+}
+
+.linhaValor {
+  flex-shrink: 0;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: 650;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * PÓDIO: as três primeiras posições do placar ganham peso; da quarta em
+ * diante o número fica no cinza de rótulo. A hierarquia é a informação —
+ * quem lidera é o que se lê de relance.
+ */
+.posicao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--ah-surface-sunken);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ah-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.posicao[data-podio='true'] {
+  background: color-mix(in srgb, var(--ah-accent-600) 12%, transparent);
+  color: var(--ah-accent-600);
+}
+
+.apoio {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 10px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid var(--ah-border-subtle);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ah-text-secondary);
+}
+
+.vazio {
+  margin: 0;
+  padding: 4px 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/* ─── Feriado ──────────────────────────────────────────────────────────── */
+
+.feriado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 0;
+}
+
+.feriado:not(:last-child) {
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+/*
+ * O DIA em bloco próprio: um calendário se lê pelo número, não pelo nome, e
+ * dar peso ao dia é o que permite achar "a próxima segunda fechada" de
+ * relance.
+ */
+.diaDoFeriado {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  padding: 3px 0 4px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: 7px;
+  background: var(--ah-surface-sunken);
+  line-height: 1;
+}
+
+.diaDoFeriadoNumero {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.diaDoFeriadoMes {
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * MUNICIPAL se distingue do nacional — quem cadastrou precisa saber qual dá
+ * para editar. Cor mais texto, nunca cor sozinha.
+ */
+.origem {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ah-text-secondary);
+}
+
+/* ─── Movimento reduzido ───────────────────────────────────────────────── */
+
+/*
+ * `prefers-reduced-motion` desliga TUDO o que se move. Não é degradação: o
+ * pulso vira um ponto estático que continua dizendo o estado por cor e por
+ * texto, e a linha do feed aparece sem deslizar.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .aoVivo:not([data-pausado='true']) .pulso::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .linhaDoFeed {
+    animation: none;
+  }
+}

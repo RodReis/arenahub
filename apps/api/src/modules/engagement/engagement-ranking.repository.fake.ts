@@ -8,6 +8,7 @@ import { abreviarNome, type IdentidadeEscolhida, type StatusDoPerfilPublico } fr
 import type {
   ElegibilidadeDoAluno,
   EntradaComExposicao,
+  EntradaInternaDoPlacar,
   EntradaParaSalvarSnapshot,
   ExposicaoDoAluno,
   PortaDeRanking,
@@ -303,6 +304,30 @@ export class FakePortaDeRanking implements PortaDeRanking {
           statusDoAluno: aluno?.status ?? 'ACTIVE',
         };
       }),
+    );
+  }
+
+  /**
+   * Espelha `entradasInternas`: nome REAL, sem alias e sem abreviacao.
+   *
+   * O dublê nao pode abreviar aqui -- se abreviasse, o teste que prova
+   * "o painel mostra nome inteiro" passaria com o fake e falharia contra o
+   * banco, que e o pior tipo de verde.
+   */
+  entradasInternas(
+    contexto: TenantContext,
+    snapshotId: string,
+  ): Promise<readonly EntradaInternaDoPlacar[]> {
+    const snapshot = this.snapshots.get(snapshotId);
+    if (!snapshot || snapshot.tenantId !== contexto.tenantId) return Promise.resolve([]);
+
+    return Promise.resolve(
+      snapshot.entries.map((entrada) => ({
+        position: entrada.position,
+        points: entrada.points,
+        studentId: entrada.studentId,
+        fullName: this.alunos.get(entrada.studentId)?.fullName ?? entrada.studentId,
+      })),
     );
   }
 

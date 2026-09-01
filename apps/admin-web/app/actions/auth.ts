@@ -96,7 +96,7 @@ export async function entrar(
    * Administração, aberta uma vez por mês. Cair na configuração ao logar
    * fazia a recepção navegar antes de começar a trabalhar.
    */
-  redirect('/operations');
+  redirect('/dashboard');
 }
 
 export async function sair(): Promise<void> {

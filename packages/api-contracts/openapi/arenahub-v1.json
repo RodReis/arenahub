@@ -6210,6 +6210,404 @@
           "Operations"
         ]
       }
+    },
+    "/api/v1/dashboard": {
+      "get": {
+        "operationId": "DashboardController_panorama",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "unidade",
+                    "unidades",
+                    "geradoEm",
+                    "dispositivos",
+                    "situacoes",
+                    "feriados"
+                  ],
+                  "properties": {
+                    "unidade": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name",
+                        "timezone"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "timezone": {
+                          "type": "string"
+                        }
+                      },
+                      "nullable": true
+                    },
+                    "unidades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "timezone"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "timezone": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "geradoEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "dispositivos": {
+                      "type": "object",
+                      "required": [
+                        "online",
+                        "total",
+                        "degradados"
+                      ],
+                      "properties": {
+                        "online": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "degradados": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "acessosDeHoje": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "desde",
+                        "allow",
+                        "deny",
+                        "override"
+                      ],
+                      "properties": {
+                        "desde": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "allow": {
+                          "type": "integer"
+                        },
+                        "deny": {
+                          "type": "integer"
+                        },
+                        "override": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "situacoes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "status",
+                          "motivo",
+                          "quantidade"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "SUSPENDED",
+                              "BLOCKED"
+                            ]
+                          },
+                          "motivo": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "DELINQUENCY",
+                              "STUDENT_REQUEST",
+                              "MEDICAL",
+                              "CONDUCT"
+                            ]
+                          },
+                          "quantidade": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "placar": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "mes",
+                        "publicadoEm",
+                        "entradas"
+                      ],
+                      "properties": {
+                        "mes": {
+                          "type": "string"
+                        },
+                        "publicadoEm": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "entradas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "position",
+                              "points",
+                              "nome"
+                            ],
+                            "properties": {
+                              "position": {
+                                "type": "integer"
+                              },
+                              "points": {
+                                "type": "integer"
+                              },
+                              "nome": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "desafiosAtivos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "title",
+                          "endsOn",
+                          "participantes"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "endsOn": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "participantes": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "feriados": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "data",
+                          "nome",
+                          "origem"
+                        ],
+                        "properties": {
+                          "data": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "nome": {
+                            "type": "string"
+                          },
+                          "origem": {
+                            "type": "string",
+                            "enum": [
+                              "NACIONAL",
+                              "MUNICIPAL"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/units/{gymUnitId}/holidays": {
+      "get": {
+        "operationId": "DashboardController_listarFeriados",
+        "parameters": [
+          {
+            "name": "gymUnitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "data",
+                      "nome"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "data": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "nome": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      },
+      "post": {
+        "operationId": "DashboardController_cadastrarFeriado",
+        "parameters": [
+          {
+            "name": "gymUnitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "nome",
+                    "origem"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "nome": {
+                      "type": "string"
+                    },
+                    "origem": {
+                      "type": "string",
+                      "enum": [
+                        "NACIONAL",
+                        "MUNICIPAL"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/units/{gymUnitId}/holidays/{id}": {
+      "delete": {
+        "operationId": "DashboardController_removerFeriado",
+        "parameters": [
+          {
+            "name": "gymUnitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
     }
   },
   "info": {

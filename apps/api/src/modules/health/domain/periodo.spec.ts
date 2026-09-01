@@ -1,6 +1,12 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { PERIODOS, dataLocalIso, inicioDoPeriodo, type Periodo } from './periodo.js';
+import {
+  PERIODOS,
+  dataLocalIso,
+  inicioDoDiaLocal,
+  inicioDoPeriodo,
+  type Periodo,
+} from './periodo.js';
 
 /**
  * F18 -- filtro de periodo do grafico (`M3-FR-008`: 30D, 90D, 6M, 1A e todo
@@ -139,5 +145,62 @@ describe('inicioDoPeriodo', () => {
       expect(inicio).not.toBeNull();
       expect(inicio!.getTime()).toBeLessThan(AGORA.getTime());
     }
+  });
+});
+
+/**
+ * F57 -- o corte de "hoje" do dashboard operacional.
+ *
+ * O que estes testes defendem e que o dia da academia comeca a meia-noite
+ * LOCAL. Contar em UTC faz o contador zerar as 21h de Brasilia, na frente do
+ * operador e no pico do movimento; contar as ultimas 24 h corridas faz o
+ * numero das 9h da manha incluir metade do movimento de ontem.
+ */
+describe('inicioDoDiaLocal', () => {
+  it('devolve a meia-noite local, que em Sao Paulo e 03:00 UTC', () => {
+    const inicio = inicioDoDiaLocal(new Date('2026-08-20T15:00:00.000Z'), SP);
+
+    expect(inicio.toISOString()).toBe('2026-08-20T03:00:00.000Z');
+  });
+
+  /*
+   * O defeito que motivou a mudanca: as 21h de Brasilia ja e dia 21 em UTC.
+   * Com corte UTC o contador do dia zeraria aqui -- tres horas antes do fim
+   * do expediente.
+   */
+  it('as 21h de Brasilia ainda e o dia 20, embora em UTC ja seja 21', () => {
+    const vinteEUmaEmSP = new Date('2026-08-21T00:30:00.000Z');
+
+    expect(vinteEUmaEmSP.toISOString().slice(0, 10)).toBe('2026-08-21');
+    expect(inicioDoDiaLocal(vinteEUmaEmSP, SP).toISOString()).toBe('2026-08-20T03:00:00.000Z');
+  });
+
+  it('logo depois da meia-noite local, o dia ja virou', () => {
+    const inicio = inicioDoDiaLocal(new Date('2026-08-20T03:01:00.000Z'), SP);
+
+    expect(inicio.toISOString()).toBe('2026-08-20T03:00:00.000Z');
+  });
+
+  it('o corte nunca esta no futuro, em nenhuma hora do dia', () => {
+    for (let hora = 0; hora < 24; hora += 1) {
+      const agora = new Date(Date.UTC(2026, 7, 20, hora, 0, 0));
+
+      expect(inicioDoDiaLocal(agora, SP).getTime()).toBeLessThanOrEqual(agora.getTime());
+    }
+  });
+
+  /*
+   * Offset diferente do de Brasilia: aritmetica de offset fixo (-3h chumbado)
+   * acertaria Sao Paulo e erraria aqui, e o erro so apareceria no dia em que
+   * abrisse unidade fora do fuso.
+   */
+  it('respeita fuso com outro offset -- Fernando de Noronha e UTC-2', () => {
+    const inicio = inicioDoDiaLocal(new Date('2026-08-20T15:00:00.000Z'), 'America/Noronha');
+
+    expect(inicio.toISOString()).toBe('2026-08-20T02:00:00.000Z');
+  });
+
+  it('recusa fuso invalido em vez de cair em UTC (ADR-019)', () => {
+    expect(() => inicioDoDiaLocal(AGORA, 'Fuso/Inventado')).toThrow();
   });
 });
