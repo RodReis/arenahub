@@ -13,6 +13,7 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
+import { AcoesDoDispositivo } from './acoes-do-dispositivo';
 
 export const metadata: Metadata = {
   title: 'Sincronização de dispositivos — ArenaHub',
@@ -36,6 +37,8 @@ interface Dispositivo {
   model: string;
   serial: string;
   status: string;
+  /** Versão instalada, editável pela ação de linha. `null` antes da primeira. */
+  firmware: string | null;
   lastHeartbeat: string | null;
   lastSyncAt: string | null;
 }
@@ -154,7 +157,7 @@ export default async function PaginaDeSincronizacao() {
             key: 'situacao',
             header: 'Situação',
             /*
-             * Ternario preservado, NAO `StateBadge machine="device"`.
+             * `EstadoSimples`, NAO `StateBadge machine="device"`.
              *
              * O dicionario canonico tem `device` com 5 estados
              * (PROVISIONING/ONLINE/DEGRADED/OFFLINE/RETIRED), mas esta rota
@@ -162,20 +165,33 @@ export default async function PaginaDeSincronizacao() {
              * recepcao perderia a informacao. Alinhar os dois e mudanca de
              * contrato de API, nao de aparencia.
              *
-             * O que MUDOU foi a forma: `EstadoSimples` da a esta celula a
-             * mesma altura, gap e icone do badge -- antes ela era texto cru ao
-             * lado de colunas com badge, e a tabela parecia ter duas
-             * linguagens visuais. Sem borda, porque a moldura e o sinal
-             * honesto de que o estado e rastreado por uma maquina; este e
-             * derivado.
+             * Sem borda, porque a moldura e o sinal honesto de que o estado e
+             * rastreado por uma maquina; este e derivado.
+             *
+             * TRES SITUACOES, TRES RESPOSTAS (issue #241). O ternario anterior
+             * dizia "Fora de operacao" para MAINTENANCE e RETIRED igualmente.
+             * Enquanto ninguem podia escolher a situacao pela tela isso nao
+             * aparecia; com a edicao, quem marca "Em manutencao" recarregaria
+             * e leria "Fora de operacao" -- concluindo que nao salvou.
              */
             role: 'state',
-            render: (d) =>
-              d.status === 'ACTIVE' ? (
-                <EstadoSimples label="Ativo" tom="positivo" />
-              ) : (
-                <EstadoSimples label="Fora de operação" tom="negativo" />
-              ),
+            render: (d) => {
+              const testId = `situacao-do-dispositivo-${d.id}`;
+
+              if (d.status === 'ACTIVE') {
+                return <EstadoSimples label="Ativo" tom="positivo" testId={testId} />;
+              }
+
+              if (d.status === 'MAINTENANCE') {
+                return <EstadoSimples label="Em manutenção" tom="atencao" testId={testId} />;
+              }
+
+              if (d.status === 'RETIRED') {
+                return <EstadoSimples label="Aposentado" tom="neutro" testId={testId} />;
+              }
+
+              return <EstadoSimples label="Fora de operação" tom="negativo" testId={testId} />;
+            },
           },
           {
             key: 'contato',
@@ -188,6 +204,29 @@ export default async function PaginaDeSincronizacao() {
             role: 'moment',
             header: 'Última sincronização',
             render: (d) => <TenantDateTime iso={d.lastSyncAt} timeZone={FUSO_PROVISORIO} />,
+          },
+          {
+            key: 'acao',
+            header: 'Ação',
+            role: 'actions',
+            /*
+              A TABELA NAO TINHA ACAO NENHUMA ate a issue #241, e `PATCH
+              /api/v1/devices/:id` existia desde sempre -- mesmo defeito da
+              issue #178 ("API pronta, painel sem tela") em outra tela.
+
+              Equipamento aposentado nao mostra acao: o componente devolve
+              `null`. Oferecer "Aposentar" a quem ja esta aposentado seria
+              clique sem efeito, e reativar e caminho que ninguem pediu.
+            */
+            render: (d) => (
+              <AcoesDoDispositivo
+                deviceId={d.id}
+                serial={d.serial}
+                model={d.model}
+                status={d.status}
+                firmware={d.firmware}
+              />
+            ),
           },
         ]}
         empty={

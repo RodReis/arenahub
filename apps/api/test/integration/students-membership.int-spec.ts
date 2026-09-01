@@ -445,11 +445,18 @@ describe('F7 -- aluno, plano e entitlement', () => {
 
       expect(primeira.status).toBe(200);
 
-      // Mesma versao de novo: o estado ja mudou.
+      /*
+       * Mesma versao de novo: o estado ja mudou.
+       *
+       * O pedido vai COMPLETO -- com `reason`, exigido desde a issue #241
+       * para SUSPENDED. Mandando incompleto, a recusa viria da falta do
+       * motivo (400) e este teste passaria a provar outra coisa, deixando o
+       * conflito de versao sem cobertura nenhuma.
+       */
       const segunda = await request(servidor())
         .patch(`/api/v1/students/${id}/status`)
         .set('Cookie', contas.a.cookie)
-        .send({ status: 'SUSPENDED', version: 0 });
+        .send({ status: 'SUSPENDED', version: 0, reason: 'STUDENT_REQUEST' });
 
       expect(segunda.status).toBe(404);
     });

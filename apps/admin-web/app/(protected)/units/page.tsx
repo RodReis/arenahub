@@ -12,7 +12,8 @@ import {
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { EditarUnidade } from './editar-unidade';
-import estilos from './unidades.module.css';
+import { SituacaoDaUnidade } from './situacao-da-unidade';
+import estilos from '../dialogo.module.css';
 
 export const metadata: Metadata = {
   title: 'Unidades — ArenaHub',
@@ -162,6 +163,19 @@ export default async function PaginaDeUnidades() {
                   code={u.code}
                   name={u.name}
                   timezone={u.timezone}
+                />
+                {/*
+                  INATIVAR, e nao excluir (issue #241): dez tabelas
+                  referenciam `GymUnit` com `onDelete: Cascade`, e apagar
+                  levaria junto dispositivo, evento de acesso e avaliacao
+                  fisica. Nao ha `DELETE /units/:id` na API, e esta tela nao
+                  promete um.
+                */}
+                <SituacaoDaUnidade
+                  unitId={u.id}
+                  code={u.code}
+                  name={u.name}
+                  status={u.status}
                 />
               </div>
             ),

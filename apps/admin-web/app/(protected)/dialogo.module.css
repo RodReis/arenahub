@@ -1,0 +1,118 @@
+/**
+ * Modal de ação de linha — DS-PAINEL.md §4.15.
+ *
+ * Extraído de `units/unidades.module.css` na issue #241, quando dispositivos
+ * ganharam o segundo modal com a mesma forma. Duas cópias do mesmo CSS de
+ * modal divergem na primeira vez que alguém ajusta o padding de um lado só,
+ * e aí as duas telas passam a ensinar formas diferentes para a mesma ação.
+ *
+ * Le so a camada semantica: `--ah-surface-*`, `--ah-border-*`, `--ah-text-*`.
+ * Valor literal aqui e recusado pela guarda `check-css-tokens`.
+ */
+.dialogo {
+  /*
+    460 px é a medida do sistema (DS-PAINEL.md §2.8, "modal 460 px"). O
+    valor herdado de `units/` era 480 -- divergência de 20 px que ninguém
+    tinha motivo para escolher e que agora vale para os três modais.
+    Não virou token porque não existe escala de largura em
+    `packages/ui/tokens`: criar uma para um valor só seria inventar sistema.
+  */
+  width: min(460px, calc(100vw - 48px));
+  /*
+    HERANÇA DA CÉLULA DE AÇÕES -- as duas linhas abaixo existem por isso.
+    ---------------------------------------------------------------------
+    Este `<dialog>` é renderizado DENTRO da célula de ações da tabela, e
+    `DataTable.module.css` põe `white-space: nowrap` nessa célula -- certo
+    para ela, porque botão de linha não pode quebrar no meio da palavra.
+
+    O modal herda. Sem esta linha, TODO texto dele vira uma linha só e sai
+    pela borda: a frase que explica que os eventos de acesso NÃO são
+    apagados terminava cortada em "já regi…", justamente a parte que
+    responde ao medo de quem clica em "Aposentar". `overflow-wrap` não
+    salva -- ele decide ONDE quebrar, não SE quebra; contra `nowrap`, não
+    quebra nunca.
+
+    `text-align: right` chega pela mesma porta: a célula encosta os botões
+    à direita, e o modal inteiro -- título, série, dica do campo -- vinha
+    alinhado à direita junto. Corrigir cada filho seria tratar sintoma; a
+    herança é uma só e para aqui.
+
+    Visto na tela, não em teste: `getByText` acha o nó inteiro mesmo com o
+    texto vazando ou torto, e os quatro testes desta tela passavam.
+  */
+  white-space: normal;
+  text-align: left;
+  /*
+    `margin: auto` É O QUE CENTRALIZA um `<dialog>` nativo -- sem ele o
+    navegador aplica o próprio padrão e a caixa encosta no canto superior
+    esquerdo. Foi assim que o modal do aluno nasceu torto.
+  */
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ah-border-default);
+  border-radius: 10px;
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-default);
+  box-shadow: var(--ah-elev-3);
+  overflow: hidden;
+}
+
+.dialogo::backdrop {
+  background: var(--ah-scrim);
+}
+
+.formularioDoDialogo {
+  display: flex;
+  flex-direction: column;
+}
+
+.cabecalhoDoDialogo {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.tituloDoDialogo {
+  margin: 0;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+  color: var(--ah-text-strong);
+}
+
+/* O código em mono: é identificador que se compara caractere a caractere. */
+.codigoDoDialogo {
+  margin: 2px 0 0;
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.corpoDoDialogo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.notaDoDialogo {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.rodapeDoDialogo {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+/** Coluna de ação da tabela: encosta à direita e não cresce. */
+.acaoDaLinha {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

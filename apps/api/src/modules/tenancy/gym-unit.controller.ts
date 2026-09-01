@@ -50,8 +50,37 @@ const esquemaDeAtualizacao = z
     name: z.string().min(1).max(120).optional(),
     timezone: timezoneValido.optional(),
     openingHours: esquemaDeHorario.optional(),
+    /*
+     * INATIVAR, NUNCA APAGAR -- e por isso nao existe `DELETE /units/:id`.
+     *
+     * Dez tabelas referenciam `GymUnit` com `onDelete: Cascade`: apagar uma
+     * unidade levaria junto dispositivo, evento de acesso e avaliacao fisica
+     * -- o historico de quem passou na catraca. `Student.gymUnit` e
+     * `Restrict` e ja registrava a intencao do desenho.
+     *
+     * A coluna e o enum existiam desde o inicio e o DTO de saida sempre
+     * devolveu `status`; o que faltava era o caminho de ESCRITA. Ate aqui
+     * nenhuma unidade podia ser inativada senao por UPDATE direto no banco
+     * (issue #241).
+     */
+    status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+    /*
+     * Motivo do ATO, nao da unidade: vai para o `metadata` do `AuditLog` e
+     * nao vira coluna. Minimo de 10 caracteres pelo mesmo motivo que
+     * `ManualAccessOverride.reason` -- "ok" nao e motivo.
+     */
+    reason: z.string().trim().min(10).max(500).optional(),
   })
-  .strict();
+  .strict()
+  /*
+   * INATIVAR EXIGE MOTIVO (DS-PAINEL.md §5.1). Reativar e renomear nao: a
+   * exigencia existe para a acao que tira a unidade de operacao, e pedir
+   * justificativa para trocar um nome so ensinaria a digitar "." no campo.
+   */
+  .refine((dados) => dados.status !== 'INACTIVE' || dados.reason !== undefined, {
+    message: 'Inativar uma unidade exige motivo',
+    path: ['reason'],
+  });
 
 /** DTO de saida. Nao e a entidade -- `CLAUDE.md`, Convencoes de codigo. */
 interface UnidadeDto {
@@ -110,13 +139,14 @@ export class GymUnitController {
     @Body() corpo: unknown,
     @Req() requisicao: Request,
   ): Promise<UnidadeDto> {
-    const dados = esquemaDeAtualizacao.parse(corpo);
+    const { reason, ...dados } = esquemaDeAtualizacao.parse(corpo);
 
     const unidade = await this.unidades.atualizar(
       this.contexto.require(),
       id,
       dados,
       requisicao.correlationId ?? 'sem-correlacao',
+      reason,
     );
 
     if (!unidade) throw new NotFoundException({ code: 'UNIT_NOT_FOUND' });

@@ -18,6 +18,7 @@ import { chamarApi } from '../../../../lib/api/server-client';
 import { faturaEmDestaque, situacaoDeVencimento } from '../../../../src/billing/vencimento';
 import { traduzir } from '../../../../src/operations/formatar';
 import {
+  MOTIVO_DA_SITUACAO,
   ROTULO_DE_ORIGEM,
   impedeAcesso,
   janelaLegivel,
@@ -68,6 +69,10 @@ interface Aluno {
   birthDate: string;
   cpf: string | null;
   status: string;
+  /** Por que está suspenso ou bloqueado. `null` em toda outra situação. */
+  statusReason: string | null;
+  /** O caso concreto, ao lado da razão fechada. Lido por extenso AQUI. */
+  statusReasonNote: string | null;
   archivedAt: string | null;
   version: number;
   /*
@@ -358,6 +363,32 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                   </Consequencia>
                 ) : null}
               </dd>
+
+              {/*
+                MOTIVO EM LINHA PRÓPRIA, e não colado na situação (issue #241).
+
+                Dois motivos. O primeiro é o E2E: `students.e2e-spec.ts` lê o
+                `innerText` do `<dd>` acima e o compara com as opções do select
+                de transição -- acrescentar texto ali arriscaria a comparação.
+
+                O segundo é a observação: ela vai até 500 caracteres, e é AQUI
+                que ela é lida por extenso. Na grid só cabe a razão fechada,
+                com a observação no `title` -- quem não tem mouse chega a este
+                lugar.
+
+                A linha só existe quando há motivo: o `CHECK` do banco garante
+                que ele seja nulo fora de SUSPENDED/BLOCKED, então não há
+                travessão a mostrar no caso normal.
+              */}
+              {aluno.statusReason ? (
+                <>
+                  <dt>Motivo</dt>
+                  <dd data-testid="motivo-da-situacao">
+                    {MOTIVO_DA_SITUACAO[aluno.statusReason] ?? aluno.statusReason}
+                    {aluno.statusReasonNote ? ` — ${aluno.statusReasonNote}` : null}
+                  </dd>
+                </>
+              ) : null}
 
               {/*
                 CONTATO na ficha, e nao so na edicao: a recepcao liga para o aluno a

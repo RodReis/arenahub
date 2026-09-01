@@ -752,6 +752,19 @@ export class StudentRepository {
     novoStatus: StudentStatus,
     correlationId: string,
     agora: Date,
+    /*
+     * SEMPRE GRAVADO, inclusive como par de nulos -- e por isso nao e
+     * opcional. O chamador ja decidiu, a partir do status de DESTINO, se ha
+     * motivo; aqui so se escreve o que ele decidiu.
+     *
+     * Se este parametro fosse opcional e o campo pudesse ficar de fora do
+     * `data`, sair de `BLOCKED` para `ACTIVE` preservaria o motivo antigo --
+     * e o `CHECK` do banco derrubaria a transacao.
+     */
+    motivo: {
+      reason: 'DELINQUENCY' | 'STUDENT_REQUEST' | 'MEDICAL' | 'CONDUCT' | null;
+      reasonNote: string | null;
+    },
   ): Promise<Student | null> {
     const arquivando = novoStatus === 'ARCHIVED';
 
@@ -760,6 +773,8 @@ export class StudentRepository {
         where: { id, tenantId: contexto.tenantId, version: versaoEsperada },
         data: {
           status: novoStatus,
+          statusReason: motivo.reason,
+          statusReasonNote: motivo.reasonNote,
           version: { increment: 1 },
           ...(arquivando ? { archivedAt: agora } : {}),
         },
@@ -786,7 +801,19 @@ export class StudentRepository {
           actorType: 'USER',
           actorId: contexto.actorId,
           correlationId,
-          payload: { status: novoStatus },
+          /*
+           * O MOTIVO ENTRA NO PAYLOAD, e e aqui que ele vira historico.
+           *
+           * A coluna do aluno guarda o motivo VIGENTE e e limpa na volta
+           * para `ACTIVE` -- de proposito. Quem precisa da sequencia ("foi
+           * suspenso por atestado em agosto e bloqueado por conduta em
+           * outubro") le esta timeline, que nao e reescrita.
+           */
+          payload: {
+            status: novoStatus,
+            reason: motivo.reason,
+            reasonNote: motivo.reasonNote,
+          },
         },
       });
 

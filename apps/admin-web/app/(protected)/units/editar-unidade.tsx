@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom';
 
 import { Button, Field, SelectField, useToastDeErro } from '@arenahub/ui';
 
-import estilos from './unidades.module.css';
+import estilos from '../dialogo.module.css';
 
 import { editarUnidade, type EstadoDaUnidade } from '../../actions/units';
 import { FUSOS } from './fusos';

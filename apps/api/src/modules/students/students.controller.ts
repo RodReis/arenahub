@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -181,12 +182,40 @@ const situacaoDoAluno = z.enum([
   'ARCHIVED',
 ]);
 
+/**
+ * Por que o aluno foi suspenso ou bloqueado (issue #241).
+ *
+ * Lista FECHADA por decisao do PI em 01/09/2026: o dashboard conta por razao,
+ * e texto livre nao se agrupa. A observacao concreta vai em `reasonNote`, ao
+ * lado -- as duas coisas sao diferentes e nenhuma substitui a outra.
+ */
+const motivoDaSituacao = z.enum(['DELINQUENCY', 'STUDENT_REQUEST', 'MEDICAL', 'CONDUCT']);
+
+/** As duas situacoes que PEDEM motivo. Uma lista, usada pelas duas regras. */
+const SITUACAO_COM_MOTIVO = new Set(['SUSPENDED', 'BLOCKED']);
+
 const esquemaDeStatus = z
   .object({
     status: situacaoDoAluno,
     version: z.number().int().min(0),
+    reason: motivoDaSituacao.optional(),
+    reasonNote: z.string().trim().min(1).max(500).optional(),
   })
-  .strict();
+  .strict()
+  /*
+   * Observacao sem razao e orfa: ela DETALHA a razao fechada, nao a
+   * substitui. Sozinha, viraria o texto livre que a lista fechada existe
+   * para evitar.
+   *
+   * ESTA REGRA FICA NO SCHEMA porque e coerencia interna do CORPO -- nao
+   * depende de para onde o aluno vai. As outras duas (exigir motivo, recusar
+   * motivo indevido) dependem do DESTINO e por isso moram no caso de uso,
+   * DEPOIS da maquina de transicao. Ver `alterarStatus`.
+   */
+  .refine((dados) => dados.reasonNote === undefined || dados.reason !== undefined, {
+    message: 'A observação acompanha o motivo, não o substitui',
+    path: ['reasonNote'],
+  });
 
 /** Colunas por onde a listagem aceita ordenar. Lista branca. */
 const ordemDeListagem = z.enum(['nome', 'matricula', 'nascimento']);
@@ -206,6 +235,17 @@ interface AlunoDto {
   gymUnitId: string;
   advisorUserId: string | null;
   status: string;
+  /**
+   * POR QUE o aluno está suspenso ou bloqueado (issue #241). `null` em toda
+   * outra situação -- e o `CHECK` do banco garante que seja assim.
+   *
+   * Vai na LISTA, e não só na ficha: a grid mostra "Bloqueado" e a próxima
+   * pergunta de quem lê é sempre "por quê". Fazer a recepção abrir cada ficha
+   * para descobrir seria o mesmo que não gravar.
+   */
+  statusReason: string | null;
+  /** O caso concreto, ao lado da razão fechada. */
+  statusReasonNote: string | null;
   archivedAt: string | null;
   version: number;
   /**
@@ -397,6 +437,52 @@ export class StudentsController {
 
     const novoStatus = transicionarAluno(atual.status, dados.status);
 
+    /*
+     * MOTIVO SE VALIDA AQUI, e nao no schema Zod -- a ORDEM e o ponto.
+     *
+     * Estas duas regras dependem do DESTINO, e o destino so existe depois de
+     * `transicionarAluno`. Postas no schema, elas rodavam ANTES da maquina de
+     * transicao e devolviam "falta o motivo" (400) para um pedido cuja
+     * transicao sequer e permitida -- `LEAD -> SUSPENDED` respondia sobre o
+     * campo que falta em vez de dizer que o caminho nao existe. O erro mais
+     * FUNDAMENTAL tem de vencer: dois testes de integracao da F7 pegaram
+     * exatamente isso (`recusa transicao invalida`, `recusa comando com
+     * versao desatualizada`).
+     *
+     * A terceira regra -- observacao sem razao -- continua no schema, porque
+     * e coerencia interna do corpo e nao depende de destino nenhum.
+     */
+    if (SITUACAO_COM_MOTIVO.has(novoStatus) && dados.reason === undefined) {
+      throw new BadRequestException({ code: 'STUDENT_STATUS_REASON_REQUIRED' });
+    }
+
+    /*
+     * O CONTRARIO TAMBEM: motivo em transicao que nao o comporta e RECUSADO,
+     * nao ignorado em silencio.
+     *
+     * Aceitar e descartar deixaria o chamador convicto de ter gravado uma
+     * razao que nao existe em lugar nenhum. E gravar seria pior: o `CHECK` do
+     * banco (`students_motivo_so_com_situacao_que_o_pede`) derrubaria a
+     * transacao com erro de constraint, que nao diz a ninguem o que fazer.
+     */
+    if (!SITUACAO_COM_MOTIVO.has(novoStatus) && dados.reason !== undefined) {
+      throw new BadRequestException({ code: 'STUDENT_STATUS_REASON_NOT_APPLICABLE' });
+    }
+
+    /*
+     * O MOTIVO E DO STATUS VIGENTE, e some junto com ele.
+     *
+     * `transicionarAluno` ja recusou a transicao invalida acima, entao aqui
+     * `novoStatus` e o estado real de destino -- e e ELE, nao o que o
+     * chamador pediu, que decide se ha motivo a gravar. Sair de `BLOCKED`
+     * para `ACTIVE` sem limpar deixaria o aluno voltando a treinar com
+     * "inadimplencia" no cadastro; o `CHECK` do banco derrubaria a
+     * transacao, mas com erro de constraint em vez de comportamento.
+     */
+    const motivo = SITUACAO_COM_MOTIVO.has(novoStatus)
+      ? { reason: dados.reason ?? null, reasonNote: dados.reasonNote ?? null }
+      : { reason: null, reasonNote: null };
+
     const aluno = await this.alunos.alterarStatus(
       contexto,
       id,
@@ -404,6 +490,7 @@ export class StudentsController {
       novoStatus,
       requisicao.correlationId ?? 'sem-correlacao',
       new Date(),
+      motivo,
     );
 
     // `null` aqui e conflito de versao, nao ausencia: o aluno existe (foi
@@ -534,6 +621,8 @@ export class StudentsController {
       gymUnitId: aluno.gymUnitId,
       advisorUserId: aluno.advisorUserId,
       status: aluno.status,
+      statusReason: aluno.statusReason,
+      statusReasonNote: aluno.statusReasonNote,
       archivedAt: aluno.archivedAt?.toISOString() ?? null,
       version: aluno.version,
       planName: null,

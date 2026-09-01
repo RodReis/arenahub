@@ -23,6 +23,21 @@ const esquemaDeDispositivo = z.object({
   firmware: z.string().trim().max(40, 'Firmware longo demais').optional(),
 });
 
+/**
+ * Edição de dispositivo.
+ *
+ * SÓ situação e firmware, porque é só isso que `PATCH /api/v1/devices/:id`
+ * aceita — e o recorte é do domínio, não da tela: unidade, tipo, modelo e
+ * série identificam o equipamento FÍSICO que está parafusado na parede.
+ * Trocá-los no cadastro faria o histórico de acesso apontar para um
+ * equipamento que nunca leu aquele rosto.
+ */
+const esquemaDeEdicaoDeDispositivo = z.object({
+  deviceId: z.string().uuid(),
+  status: z.enum(['ACTIVE', 'MAINTENANCE', 'RETIRED']),
+  firmware: z.string().trim().max(40, 'Firmware longo demais').optional(),
+});
+
 export interface EstadoDoDispositivo {
   erro?: string;
   sucesso?: { id: string; serial: string };
@@ -100,6 +115,104 @@ export async function cadastrarDispositivo(
       erro: frase(resposta.erro?.code ?? '', 'Não foi possível cadastrar o dispositivo'),
       valores,
     };
+  }
+
+  revalidatePath('/operations/devices');
+
+  return { sucesso: { id: resposta.dados.id, serial: resposta.dados.serial } };
+}
+
+/**
+ * Edição de dispositivo — situação e firmware.
+ *
+ * `PATCH /api/v1/devices/:id` existe desde sempre e nunca teve chamador: a
+ * tabela de equipamentos não tinha ação de linha nenhuma, e um leitor só
+ * mudava de situação por `curl` (issue #241, mesmo defeito da #178).
+ */
+export async function editarDispositivo(
+  _anterior: EstadoDoDispositivo,
+  formulario: FormData,
+): Promise<EstadoDoDispositivo> {
+  const valores = {
+    deviceId: texto(formulario, 'deviceId'),
+    status: texto(formulario, 'status'),
+    firmware: texto(formulario, 'firmware'),
+  };
+
+  const validado = esquemaDeEdicaoDeDispositivo.safeParse(valores);
+
+  if (!validado.success) {
+    return { erro: validado.error.issues[0]?.message ?? 'Confira os dados informados.', valores };
+  }
+
+  /*
+   * APOSENTAR NÃO PASSA POR AQUI. O formulário de edição não oferece
+   * `RETIRED` na lista, e esta guarda existe para o caso de o valor chegar
+   * por outro caminho: aposentar é ação sensível (DS-PAINEL.md §5.1) e exige
+   * motivo, que este formulário não coleta. Sem ela, a API recusaria com
+   * `VALIDATION_FAILED` -- correto, mas mudo sobre o que fazer.
+   */
+  if (validado.data.status === 'RETIRED') {
+    return { erro: 'Para aposentar um dispositivo, use a ação "Aposentar".', valores };
+  }
+
+  const resposta = await chamarApi<{ id: string; serial: string }>(
+    `/api/v1/devices/${validado.data.deviceId}`,
+    {
+      metodo: 'PATCH',
+      corpo: {
+        status: validado.data.status,
+        /*
+         * Firmware vazio SOME do corpo, como no cadastro: `.strict()` na API
+         * recusaria a chave desconhecida, e `''` passaria como valor
+         * informado -- apagando o firmware de quem tinha um.
+         */
+        ...(validado.data.firmware ? { firmware: validado.data.firmware } : {}),
+      },
+    },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro: frase(resposta.erro?.code ?? '', 'Não foi possível salvar o dispositivo'),
+      valores,
+    };
+  }
+
+  revalidatePath('/operations/devices');
+
+  return { sucesso: { id: resposta.dados.id, serial: resposta.dados.serial } };
+}
+
+/**
+ * Aposentadoria de dispositivo — o mais perto de "excluir" que existe.
+ *
+ * NÃO HÁ `DELETE /devices/:id`, e não deve haver: `AccessEvent` referencia o
+ * dispositivo, e apagá-lo levaria junto o registro de quem passou na catraca.
+ * `status: RETIRED` tira o equipamento de operação e preserva o histórico.
+ *
+ * Ação sensível (DS-PAINEL.md §5.1): motivo obrigatório, e o motivo é
+ * gravado -- vai para o `metadata` do `AuditLog`. Coletar e descartar seria
+ * teatro de auditoria.
+ */
+export async function aposentarDispositivo(
+  _anterior: EstadoDoDispositivo,
+  formulario: FormData,
+): Promise<EstadoDoDispositivo> {
+  const deviceId = texto(formulario, 'deviceId');
+  const motivo = texto(formulario, 'reason').trim();
+
+  if (motivo.length < 10) {
+    return { erro: 'Escreva o motivo da aposentadoria (ao menos 10 caracteres).' };
+  }
+
+  const resposta = await chamarApi<{ id: string; serial: string }>(
+    `/api/v1/devices/${deviceId}`,
+    { metodo: 'PATCH', corpo: { status: 'RETIRED', reason: motivo } },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível aposentar o dispositivo') };
   }
 
   revalidatePath('/operations/devices');

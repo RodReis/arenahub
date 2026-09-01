@@ -103,8 +103,16 @@ export class GymUnitRepository {
       name?: string | undefined;
       timezone?: string | undefined;
       openingHours?: Prisma.InputJsonValue | undefined;
+      status?: 'ACTIVE' | 'INACTIVE' | undefined;
     },
     correlationId: string,
+    /*
+     * MOTIVO E DO ATO, NAO DA UNIDADE -- por isso vem separado de `dados` e
+     * nao vira coluna. Inativar unidade e acao sensivel (DS-PAINEL.md §5.1):
+     * exige motivo, e motivo que nao e gravado em lugar nenhum e teatro de
+     * auditoria. Ele mora no `metadata` do `AuditLog`, que ja e `Json?`.
+     */
+    motivo?: string,
   ): Promise<GymUnit | null> {
     // Campo ausente no PATCH chega como `undefined`, e o tipo do Prisma nao
     // o aceita sob `exactOptionalPropertyTypes`. Remover a chave e mais
@@ -132,7 +140,10 @@ export class GymUnitRepository {
           target: 'gym_unit',
           targetId: id,
           correlationId,
-          metadata: { campos: Object.keys(dados) },
+          metadata: {
+            campos: Object.keys(dados),
+            ...(motivo === undefined ? {} : { motivo }),
+          },
         },
       });
 
