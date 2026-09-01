@@ -8,7 +8,7 @@
 | **Mockup** | [`docs/design/Dasboard.png`](../design/Dasboard.png) — **referência de estilo, não de layout** (decisão do PI, 01/09/2026) |
 | **Superfície** | `admin-web` · `docs/design/DS-PAINEL.md` |
 | **Card** | [#242](https://github.com/RodReis/arenahub/issues/242) |
-| **Status** | `rascunho` — escrita em 01/09/2026 |
+| **Status** | `aprovada-pi` — escrita e **aprovada pelo PI em 01/09/2026** |
 | **Depende de** | **[#241](https://github.com/RodReis/arenahub/issues/241) item 6** (motivo de bloqueio/suspensão) para o bloco 4 |
 
 ---
@@ -32,6 +32,9 @@ resumo que decide se vale investigar.
 | 4 | **Motivo de bloqueio/suspensão: lista fechada de quatro** | inadimplência, pedido do aluno, atestado médico, conduta — com observação livre opcional. **Inadimplência se carimba sozinha** pelo fluxo de cobrança que já é automático; as outras três são escolha de quem bloqueia. **Nasce na [#241](https://github.com/RodReis/arenahub/issues/241), não aqui** |
 | 5 | **Feriados: biblioteca para nacionais + cadastro dos municipais** | ver §5 — é o item mais caro da fatia, e o único que cria entidade nova |
 | 6 | **Placar/XP: criar a rota de leitura** | só existe `POST .../gerar` e `POST .../publicar`. Ver §4 |
+| 7 | **Feriados fica dentro da F57** | recusada a proposta de F58 própria. A fatia entrega os sete blocos num aceite só — ver §5 e o risco em §8.1 |
+| 8 | **Placar mostra nome real** | o painel é tela interna; o alias do ADR-046 continua sendo do que é público (totem e app) |
+| 9 | **Feriado municipal: saída A** | cadastro por unidade, lista livre. `GymUnit` não é alterada |
 
 ---
 
@@ -92,17 +95,24 @@ Duas coisas que o desenho do banco já decide, e que a tela não pode contrariar
 - **`DRAFT` não vaza para o dashboard.** Snapshot gerado e não publicado é rascunho de
   moderação; mostrá-lo no resumo tornaria a publicação decorativa.
 
-> ⚠️ **Pergunta aberta — nome ou alias?** O consentimento `RANKING` é **opt-out** (ADR-046) e
-> existe alias público justamente para o totem e o app. O painel é tela interna e o mockup já
-> mostra nome real no feed de acessos. **Proposta:** painel mostra nome real; alias continua
-> sendo do que é público. Precisa do seu "sim" antes de virar código.
+> ✅ **Nome real — decisão do PI, 01/09/2026.** O consentimento `RANKING` é opt-out (ADR-046) e
+> o alias existe para o que é **público**: totem e app. O painel é tela interna, e o feed de
+> acessos já mostra nome real — usar alias aqui daria à recepção um apelido que ela não consegue
+> ligar à ficha do aluno. **O alias não deixa de existir; ele só não governa tela interna.**
 
 ---
 
 ## 5. Feriados — o bloco que não é um bloco
 
 Este é o item que muda o tamanho da fatia. Os outros seis leem dado que já existe; este **cria
-entidade nova, e ela tem dois consumidores esperando há semanas**:
+entidade nova, e ela tem dois consumidores esperando há semanas**.
+
+> **Fica dentro da F57 — decisão do PI, 01/09/2026.** O Cowork propôs separar em F58; o PI
+> recusou. Consequência registrada: o aceite da fatia vira **tudo ou nada** — um problema no
+> calendário segura os seis blocos que já estariam prontos. Mitigação na §8.1, e ela não depende
+> de fatia nova: PRs sequenciais dentro da mesma fatia.
+
+Os dois consumidores:
 
 - `retention/domain/selecao-de-fila.ts:104` — o SLA de **3 dias úteis** da fila de retenção
   (`M6-OPS-01`, F38) diz literalmente: *"Feriado não entra: exigiria calendário por unidade"*.
@@ -129,15 +139,17 @@ depender da rede de um serviço externo para desenhar um bloco, e a API roda em 
 `status` — nada de município nem de código IBGE. Feriado municipal é **por cidade**, e a unidade
 não sabe em qual está.
 
-Duas saídas, e é decisão sua:
+✅ **Saída A — decisão do PI, 01/09/2026.** O cadastro municipal é **por unidade**, lista livre
+de datas. `GymUnit` **não é alterada** e não ganha município nem código IBGE.
 
-| saída | custo | efeito |
-|---|---|---|
-| **A** — cadastro municipal é **por unidade**, lista livre de datas | migração mínima, nenhuma mudança em `GymUnit` | duas unidades na mesma cidade cadastram o mesmo feriado duas vezes, e podem divergir |
-| **B** — `GymUnit` ganha município (código IBGE), calendário é **por município** | migração em `GymUnit` + preencher as unidades existentes | uma cidade, um calendário. É o desenho correto, e é mais caro |
+O que isso aceita de propósito: duas unidades na mesma cidade cadastram o mesmo feriado duas
+vezes, e podem divergir. É barato enquanto houver **uma unidade por cidade**.
 
-**Recomendo A** enquanto houver uma unidade por cidade. B vira necessário no dia em que a Arena
-Positiva abrir a segunda unidade no mesmo município — e aí é migração, não redesenho.
+**O gatilho de revisão é concreto** — a segunda unidade da Arena Positiva no mesmo município. No
+dia em que ela abrir, o desenho correto passa a ser o calendário por município (`GymUnit` com
+código IBGE), e a mudança é **migração de dado, não redesenho**: as datas já cadastradas sobem
+para o município. Registrar o gatilho é o que impede a divergência silenciosa de virar
+descoberta.
 
 ---
 
@@ -176,7 +188,17 @@ Positiva abrir a segunda unidade no mesmo município — e aí é migração, n�
 - [ ] AC-6 — desafios `ACTIVE` aparecem; `DRAFT`, `CLOSED` e `CANCELLED` não
 - [ ] AC-7 — feriados do mês aparecem; nacional sem cadastro manual, municipal cadastrável
 - [ ] AC-8 — gerente restrito à unidade A não lê número nenhum da unidade B
-- [ ] AC-9 — `pnpm lint`, `typecheck`, `test`, `test:integration`, `test:e2e` e `build` verdes
+- [ ] AC-9 — o placar mostra **nome real**, e o feriado municipal é cadastrado **por unidade**
+- [ ] AC-10 — `pnpm lint`, `typecheck`, `test`, `test:integration`, `test:e2e` e `build` verdes
+
+### 8.1 Riscos
+
+| risco | sinal de que aconteceu | o que fazer |
+|---|---|---|
+| **Aceite tudo-ou-nada** (decisão 7): o calendário segura os seis blocos prontos | a fatia passa de uma semana e o PR ainda não abriu | PRs **sequenciais dentro da mesma fatia** — seis blocos primeiro, feriados depois. Não vira fatia nova sem decisão do PI |
+| Biblioteca de feriados resolve por rede | o bloco fica vazio ou lento quando a academia perde link | biblioteca offline, em processo. §5.1 |
+| Segunda unidade no mesmo município | duas listas de feriado municipal divergem | migrar para calendário por município. §5.2 |
+| Recarga de 5 s sem pausa | pico de requisições fora do horário de movimento | `visibilitychange`. §3.2, AC-3 |
 
 ---
 
@@ -184,9 +206,11 @@ Positiva abrir a segunda unidade no mesmo município — e aí é migração, n�
 
 | # | pergunta | resposta | data |
 |---|---|---|---|
-| 1 | Placar mostra nome real ou alias? (§4) | | |
-| 2 | Feriado municipal: saída A (por unidade) ou B (município em `GymUnit`)? (§5.2) | | |
-| 3 | Feriados é fatia própria (F58) ou fica aqui dentro? | | |
+| 1 | Placar mostra nome real ou alias? (§4) | **Nome real.** O painel é tela interna; o alias segue sendo do que é público | 01/09/2026 |
+| 2 | Feriado municipal: saída A (por unidade) ou B (município em `GymUnit`)? (§5.2) | **Saída A.** `GymUnit` não é alterada | 01/09/2026 |
+| 3 | Feriados é fatia própria (F58) ou fica aqui dentro? | **Fica dentro da F57.** F58 recusada | 01/09/2026 |
+
+**Nenhuma linha em branco — a spec está `aprovada-pi`.**
 
 ---
 
@@ -196,5 +220,8 @@ Positiva abrir a segunda unidade no mesmo município — e aí é migração, n�
   PNG entra como direção visual: densidade, cartão de KPI, escala tipográfica, o seletor de
   unidade no topo, o "Atualizado às HH:MM".
 - **Não somos plataforma de alerta.** O dashboard resume; quem investiga vai para `/operations`.
-- **Nenhum bloco escreve.** Sete leituras e nada mais — a tela que todo mundo deixa aberta é a
-  pior lugar para pôr um botão que muda estado.
+- **Nenhum bloco do dashboard escreve.** Sete leituras e nada mais — a tela que todo mundo deixa
+  aberta é o pior lugar para um botão que muda estado. O **cadastro** de feriado municipal é a
+  exceção aparente, e não é: ele mora na tela de configuração, não no dashboard.
+- **F58 não foi queimada.** A proposta de separar Feriados foi recusada **antes** de virar card,
+  então `F58` e `SPEC-058` seguem livres para a próxima fatia.
