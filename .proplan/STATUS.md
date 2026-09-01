@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -27,7 +27,9 @@ _(vazio)_
 
 ## Em Andamento
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][FIX] design system paralelo em src/components/ui: uma tela usa outro vocabulario, e o select quebra o E2E (#231)
 
 ## Feito
 
@@ -38,6 +40,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] dois testes de reajuste de preco quebram todo dia 1 do mes: cenario colide com o preco de nascimento do plano (#233, finalizado em: 2026-09-01)
+- [INFRA] gate de contraste do build de tokens nao cobre o totem (#230, finalizado em: 2026-09-01)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41, finalizado em: 2026-08-31)
 - [MVP6][SPEC-037][F37] Regras explicáveis e score (#37, finalizado em: 2026-08-31)
 - [MVP6][SPEC-038][F38] CRM de retenção (#38, finalizado em: 2026-08-31)
