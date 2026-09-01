@@ -170,5 +170,103 @@ export const CONTRAST_REPORT = [
     "bg": "#eeeff0",
     "value": 5.7,
     "exempt": null
+  },
+  {
+    "role": "totem.text.primary",
+    "fg": "#FFFFFF",
+    "bg": "bg.surface",
+    "value": 18.45,
+    "exempt": null
+  },
+  {
+    "role": "totem.text.secondary",
+    "fg": "#A6AEB9",
+    "bg": "bg.surface",
+    "value": 8.24,
+    "exempt": null
+  },
+  {
+    "role": "totem.text.tertiary",
+    "fg": "#747F8D",
+    "bg": "bg.surface",
+    "value": 4.54,
+    "exempt": null
+  },
+  {
+    "role": "totem.border.default",
+    "fg": "#51618C",
+    "bg": "bg.surface",
+    "value": 3.02,
+    "exempt": null
+  },
+  {
+    "role": "totem.border.hairline",
+    "fg": "#1A2032",
+    "bg": "bg.surface",
+    "value": 1.14,
+    "exempt": "Divisor interno e linha de tabela -- decoracao, nao affordance. A WCAG 1.4.11 cobre o que o usuario precisa PERCEBER para operar, e o alvo tocavel e delimitado por `border.default`, que passa. Um hairline a 3:1 viraria grade, nao divisor."
+  },
+  {
+    "role": "totem.brand.200",
+    "fg": "#8FB0FF",
+    "bg": "bg.surface",
+    "value": 8.63,
+    "exempt": null
+  },
+  {
+    "role": "totem.brand.300",
+    "fg": "#7DA2FF",
+    "bg": "bg.surface",
+    "value": 7.45,
+    "exempt": null
+  },
+  {
+    "role": "totem.state.success",
+    "fg": "#3DDC84",
+    "bg": "#0f2019",
+    "value": 9.48,
+    "exempt": null
+  },
+  {
+    "role": "totem.state.warning",
+    "fg": "#F5A524",
+    "bg": "#221a0f",
+    "value": 8.42,
+    "exempt": null
+  },
+  {
+    "role": "totem.state.danger",
+    "fg": "#FF6B6B",
+    "bg": "#231516",
+    "value": 6.36,
+    "exempt": null
+  },
+  {
+    "role": "totem.cta.AZUL",
+    "fg": "#FFFFFF",
+    "bg": "#5B86FF",
+    "value": 3.33,
+    "exempt": null
+  },
+  {
+    "role": "totem.cta.VERDE",
+    "fg": "#FFFFFF",
+    "bg": "#27C06F",
+    "value": 2.37,
+    "exempt": "#230 -- rampa derivada do seed; corrigir muda a identidade do tenant"
+  },
+  {
+    "role": "totem.cta.LARANJA",
+    "fg": "#FFFFFF",
+    "bg": "#DB9111",
+    "value": 2.6,
+    "exempt": "#230 -- idem"
+  },
+  {
+    "role": "totem.cta.ROXO",
+    "fg": "#FFFFFF",
+    "bg": "#AA83FF",
+    "value": 2.84,
+    "exempt": "#230 -- idem"
   }
 ] as const;
