@@ -87,9 +87,30 @@ describe('seletor de unidade no topbar', () => {
     const seletor = screen.getByTestId('unidade-ativa');
 
     expect(seletor.tagName).toBe('SELECT');
+    // A primeira é a opção vazia -- ver "sem padrão silencioso", abaixo.
     expect(
       screen.getAllByRole('option').map((opcao) => opcao.textContent),
-    ).toEqual(['Matriz', 'Zona Sul']);
+    ).toEqual(['Selecione a unidade', 'Matriz', 'Zona Sul']);
+  });
+
+  /*
+   * SEM PADRÃO SILENCIOSO — o defeito que a revisão do próprio código achou.
+   *
+   * Cair na primeira unidade faria o seletor exibi-la como escolhida enquanto
+   * o dashboard diz "escolha uma unidade": dois estados contraditórios na
+   * mesma tela. E escolher justamente aquela NÃO dispararia `onChange` (o
+   * valor não muda), deixando a pessoa presa, clicando na opção certa sem
+   * efeito nenhum.
+   */
+  it('sem unidade na URL, o seletor NÃO finge que uma já foi escolhida', async () => {
+    responder([unidade('Matriz'), unidade('Zona Sul')]);
+
+    await renderizar();
+
+    const seletor = screen.getByTestId('unidade-ativa') as HTMLSelectElement;
+
+    expect(seletor.value).toBe('');
+    expect(screen.getByRole('option', { name: 'Selecione a unidade' })).toBeDisabled();
   });
 
   /** Rótulo acessível: sem ele o leitor de tela anuncia "combo box" e nada mais. */

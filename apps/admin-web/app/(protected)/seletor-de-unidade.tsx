@@ -61,7 +61,18 @@ export function SeletorDeUnidade({ unidades, vazio }: Props) {
     );
   }
 
-  const atual = parametros.get('unidade') ?? unidades[0]?.id ?? '';
+  /*
+   * SEM PADRÃO SILENCIOSO. Com duas unidades e nenhuma na URL, cair na
+   * primeira faria o seletor exibi-la como escolhida enquanto o dashboard diz
+   * "escolha uma unidade" — dois estados contraditórios na mesma tela. Pior:
+   * escolher justamente aquela não dispararia `onChange` (o valor não muda) e
+   * a pessoa ficaria presa, clicando na opção certa sem efeito.
+   *
+   * A opção vazia é a saída: ela EXISTE enquanto ninguém escolheu, e some
+   * assim que alguém escolhe — um placeholder permanente na lista seria um
+   * item que não leva a lugar nenhum.
+   */
+  const atual = parametros.get('unidade') ?? '';
 
   const trocar = (proximaUnidade: string) => {
     const proximos = new URLSearchParams(parametros.toString());
@@ -96,6 +107,11 @@ export function SeletorDeUnidade({ unidades, vazio }: Props) {
         onChange={(evento) => trocar(evento.target.value)}
         value={atual}
       >
+        {atual === '' ? (
+          <option disabled value="">
+            Selecione a unidade
+          </option>
+        ) : null}
         {unidades.map((unidade) => (
           <option key={unidade.id} value={unidade.id}>
             {unidade.name}
