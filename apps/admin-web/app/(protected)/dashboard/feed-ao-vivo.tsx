@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { StateBadge, TenantDateTime } from '@arenahub/ui';
+import { Icon, StateBadge, TenantDateTime } from '@arenahub/ui';
 
 import { lerFeedDeAcessos, type EventoDoFeed } from '../../actions/dashboard';
+import { doisNomes } from './dois-nomes';
 import estilos from './dashboard.module.css';
 
 /** Decisão do PI: cinco segundos. */
@@ -116,7 +117,17 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial }: Props) {
 
       <div className={estilos['conteudoDoCartao']}>
         {eventos.length === 0 ? (
-          <p className={estilos['vazio']}>Nenhum acesso registrado ainda hoje.</p>
+          <div className={estilos['vazio']}>
+            <span className={estilos['iconeDoVazio']}>
+              <Icon name="clock" />
+            </span>
+            <span className={estilos['textoDoVazio']}>
+              Nenhum acesso ainda hoje.
+              <span className={estilos['saidaDoVazio']}>
+                A lista se preenche sozinha quando alguém passar na catraca.
+              </span>
+            </span>
+          </div>
         ) : (
           <ul className={estilos['lista']} data-testid="feed-de-acessos">
             {eventos.map((evento) => (
@@ -131,8 +142,15 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial }: Props) {
                   <span className={estilos['horaDoFeed']}>
                     <TenantDateTime iso={evento.occurredAt} timeZone={timeZone} format="time" />
                   </span>
+                  {/*
+                    DOIS NOMES, não o inteiro: a linha divide espaço com a
+                    hora e o badge, e "Bruna Barbara Militao Vi…" truncado
+                    esconde justamente o que diferencia duas Brunas.
+                  */}
                   <span className={estilos['nomeDoFeed']}>
-                    {evento.student?.fullName ?? evento.externalUserId ?? 'Não identificado'}
+                    {evento.student
+                      ? doisNomes(evento.student.fullName)
+                      : (evento.externalUserId ?? 'Não identificado')}
                   </span>
                 </span>
                 {/*

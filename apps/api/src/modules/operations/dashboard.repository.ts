@@ -61,7 +61,24 @@ export interface ContagemDeSituacao {
   /** `null` para quem foi bloqueado antes de o motivo existir (#241). */
   motivo: string | null;
   quantidade: number;
+  /**
+   * QUEM sao -- ate cinco nomes, para a recepcao reconhecer sem abrir a grid.
+   *
+   * "2 bloqueados" nao ajuda quem esta no balcao: a pergunta e "quem?". Cinco
+   * cabem na linha sem quebrar o cartao; acima disso a lista vira parede de
+   * texto e a contagem ao lado passa a ser a informacao util.
+   */
+  alunos: readonly string[];
 }
+
+/**
+ * Quantos nomes cada situacao mostra.
+ *
+ * Cinco cabem na linha sem quebrar o cartao. Acima disso a lista vira parede
+ * de texto e a contagem ao lado passa a ser a informacao util -- quem quer
+ * ver todos abre a grid de alunos filtrada.
+ */
+const NOMES_POR_SITUACAO = 5;
 
 @Injectable()
 export class DashboardRepository {
@@ -127,21 +144,45 @@ export class DashboardRepository {
     contexto: TenantContext,
     gymUnitId: string,
   ): Promise<readonly ContagemDeSituacao[]> {
-    const grupos = await this.db.student.groupBy({
-      by: ['status', 'statusReason'],
+    /*
+     * UMA consulta, nao duas: `groupBy` daria a contagem e um `findMany` por
+     * grupo daria os nomes -- o N+1 que `docs/REVIEW.md` §3.4 barra. Como a
+     * lista e pequena por construcao (suspensos e bloqueados de UMA unidade),
+     * ler as linhas e agrupar em memoria custa menos que a ida extra ao banco.
+     */
+    const alunos = await this.db.student.findMany({
       where: {
         tenantId: contexto.tenantId,
         gymUnitId,
         status: { in: ['SUSPENDED', 'BLOCKED'] },
       },
-      _count: true,
+      select: { fullName: true, status: true, statusReason: true },
+      // Ordem ESTAVEL na lista de nomes tambem: sem isto os cinco exibidos
+      // trocariam entre dois carregamentos, e a recepcao leria nomes
+      // diferentes para a mesma situacao.
+      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
     });
 
-    return grupos
+    const porGrupo = new Map<string, { status: string; motivo: string | null; nomes: string[] }>();
+
+    for (const aluno of alunos) {
+      const chave = `${aluno.status}::${aluno.statusReason ?? ''}`;
+      const grupo = porGrupo.get(chave) ?? {
+        status: aluno.status,
+        motivo: aluno.statusReason,
+        nomes: [],
+      };
+
+      grupo.nomes.push(aluno.fullName);
+      porGrupo.set(chave, grupo);
+    }
+
+    return [...porGrupo.values()]
       .map((g) => ({
         status: g.status,
-        motivo: g.statusReason,
-        quantidade: g._count,
+        motivo: g.motivo,
+        quantidade: g.nomes.length,
+        alunos: g.nomes.slice(0, NOMES_POR_SITUACAO),
       }))
       .sort(compararSituacoes);
   }

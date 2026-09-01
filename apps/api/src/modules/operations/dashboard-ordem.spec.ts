@@ -27,6 +27,9 @@ describe('compararSituacoes — ordem estável do bloco de restrições', () => 
     status,
     motivo,
     quantidade,
+    // Os nomes não participam da ordenação -- só a quantidade, o status e o
+    // motivo desempatam. Lista vazia mantém o teste sobre o que ele prova.
+    alunos: [],
   });
 
   it('maior quantidade primeiro', () => {

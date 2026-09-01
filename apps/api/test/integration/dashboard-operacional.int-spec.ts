@@ -257,14 +257,23 @@ describe('F57 -- dashboard operacional', () => {
       .set('Cookie', cookieAdmin)
       .expect(200);
 
-    const situacoes = (resposta.body as { situacoes: { status: string; motivo: string | null }[] })
-      .situacoes;
+    const situacoes = (
+      resposta.body as {
+        situacoes: { status: string; motivo: string | null; quantidade: number; alunos: string[] }[];
+      }
+    ).situacoes;
 
-    expect(situacoes).toContainEqual({ status: 'SUSPENDED', motivo: 'MEDICAL', quantidade: 1 });
+    expect(situacoes).toContainEqual({
+      status: 'SUSPENDED',
+      motivo: 'MEDICAL',
+      quantidade: 1,
+      alunos: ['Suspenso da Matriz'],
+    });
     expect(situacoes).toContainEqual({
       status: 'BLOCKED',
       motivo: 'DELINQUENCY',
       quantidade: 1,
+      alunos: ['Bloqueado da Matriz'],
     });
 
     // O bloqueado da FILIAL nao entra na contagem da matriz.
@@ -284,6 +293,54 @@ describe('F57 -- dashboard operacional', () => {
    * comparacao alimentada com as entradas na ordem errada de proposito. La o
    * canario funciona.
    */
+
+  /*
+   * BLOCO 4 -- teto de cinco nomes por situacao.
+   *
+   * Cinco cabem na linha sem quebrar o cartao; o sexto e os seguintes viram
+   * "e mais N" (`NOMES_POR_SITUACAO` no repositorio). Setup PROPRIO -- sete
+   * bloqueados so para este teste -- para nao inflar o cenario compartilhado
+   * do `beforeAll` de cima, que os outros testes tambem leem.
+   */
+  it('AC-4 -- mostra ate cinco nomes por situacao, e conta o resto', async () => {
+    const unidadeC = await db.gymUnit.create({
+      data: {
+        tenantId: ids.tenantId,
+        code: `C-${sufixo}`,
+        name: `Teto ${sufixo}`,
+        timezone: FUSO,
+        openingHours: {},
+      },
+    });
+
+    await Promise.all(
+      Array.from({ length: 7 }, (_, i) =>
+        db.student.create({
+          data: {
+            tenantId: ids.tenantId,
+            gymUnitId: unidadeC.id,
+            fullName: `Bloqueado Teto ${i}`,
+            membershipNumber: `${sufixo}-teto-${i}`,
+            birthDate: new Date('1995-01-01T00:00:00.000Z'),
+            status: 'BLOCKED',
+            statusReason: 'CONDUCT',
+          },
+        }),
+      ),
+    );
+
+    const resposta = await request(servidor())
+      .get(`/api/v1/dashboard?gymUnitId=${unidadeC.id}`)
+      .set('Cookie', cookieAdmin)
+      .expect(200);
+
+    const situacao = (
+      resposta.body as { situacoes: { quantidade: number; alunos: string[] }[] }
+    ).situacoes[0];
+
+    expect(situacao?.quantidade).toBe(7);
+    expect(situacao?.alunos).toHaveLength(5);
+  });
 
   /*
    * AC-5 e AC-9 -- placar publicado, com nome real; `DRAFT` invisivel.

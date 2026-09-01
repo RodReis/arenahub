@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 
 import {
   DataFreshness,
   EmptyState,
   Icon,
+  type IconName,
   PageHeader,
   ProblemDetail,
   TenantDateTime,
@@ -12,7 +14,9 @@ import {
 import { lerFeedDeAcessos } from '../../actions/dashboard';
 import { chamarApi } from '../../../lib/api/server-client';
 import estilos from './dashboard.module.css';
+import { doisNomes } from './dois-nomes';
 import { FeedAoVivo } from './feed-ao-vivo';
+import { NumeroQueConta } from './numero-que-conta';
 
 export const metadata: Metadata = {
   title: 'Dashboard operacional — ArenaHub',
@@ -36,7 +40,12 @@ interface Dashboard {
   geradoEm: string;
   dispositivos: { online: number; total: number; degradados: number };
   acessosDeHoje: { desde: string; allow: number; deny: number; override: number } | null;
-  situacoes: { status: string; motivo: string | null; quantidade: number }[];
+  situacoes: {
+    status: string;
+    motivo: string | null;
+    quantidade: number;
+    alunos: string[];
+  }[];
   placar: {
     mes: string;
     publicadoEm: string | null;
@@ -73,6 +82,39 @@ const MES_ABREVIADO = [
   'nov',
   'dez',
 ];
+
+/**
+ * Vazio com ÍCONE e próximo passo — `DS-PAINEL.md` §9.
+ *
+ * A primeira versão desta tela tinha cinco frases soltas que constatavam
+ * ausência ("Nenhum placar publicado neste mês") sem dizer se aquilo era bom,
+ * ruim ou esperado. `tom="success"` marca o vazio que é BOA notícia: ninguém
+ * bloqueado é a academia funcionando, e pintá-lo do mesmo cinza de "nenhum
+ * desafio criado" manda procurar problema onde não há.
+ */
+function Vazio({
+  icone,
+  children,
+  saida,
+  tom,
+}: {
+  icone: IconName;
+  children: ReactNode;
+  saida?: ReactNode;
+  tom?: 'success';
+}) {
+  return (
+    <div className={estilos['vazio']}>
+      <span className={estilos['iconeDoVazio']} {...(tom ? { 'data-tom': tom } : {})}>
+        <Icon name={icone} />
+      </span>
+      <span className={estilos['textoDoVazio']}>
+        {children}
+        {saida ? <span className={estilos['saidaDoVazio']}>{saida}</span> : null}
+      </span>
+    </div>
+  );
+}
 
 function traduzir(mapa: Record<string, string>, chave: string | null): string {
   /*
@@ -157,6 +199,9 @@ export default async function PaginaDoDashboard({
   const fuso = unidade?.timezone ?? 'UTC';
 
   const totalDeRestricoes = dados.situacoes.reduce((soma, s) => soma + s.quantidade, 0);
+  // Passagens do dia -- zero significa "ninguém passou", não "não sei".
+  const movimentoDoDia =
+    (dados.acessosDeHoje?.allow ?? 0) + (dados.acessosDeHoje?.deny ?? 0);
   const tudoOnline =
     dados.dispositivos.total > 0 && dados.dispositivos.online === dados.dispositivos.total;
 
@@ -201,8 +246,9 @@ export default async function PaginaDoDashboard({
             Dispositivos
           </p>
           <p className={estilos['kpiValor']} data-testid="kpi-dispositivos">
-            {dados.dispositivos.online}
-            <span className={estilos['kpiUnidade']}>/{dados.dispositivos.total} online</span>
+            <NumeroQueConta valor={dados.dispositivos.online}>
+              <span className={estilos['kpiUnidade']}>/{dados.dispositivos.total} online</span>
+            </NumeroQueConta>
           </p>
           {dados.dispositivos.degradados > 0 ? (
             <p className={estilos['kpiApoio']}>
@@ -212,7 +258,13 @@ export default async function PaginaDoDashboard({
           ) : null}
         </div>
 
-        <div className={estilos['kpi']}>
+        {/*
+          CATEGORIA e não estado: a cor diz o que a célula MEDE. Antes, numa
+          academia parada, três dos quatro KPIs ficavam brancos -- a faixa
+          perdia identidade justamente no estado mais comum, o de tudo em
+          ordem. O tom de alerta continua mais forte e salta por cima.
+        */}
+        <div className={estilos['kpi']} data-categoria="acesso">
           <p className={estilos['kpiRotulo']}>
             <Icon name="user-check" />
             Acessos hoje
@@ -221,8 +273,16 @@ export default async function PaginaDoDashboard({
             Dado ausente é `—`, nunca `0` (Princípio 4): zero é uma afirmação
             sobre o mundo, ausência é a confissão de que não sabemos.
           */}
+          {/*
+            `—` quando a rota não informa (Princípio 4: ausência não é zero) --
+            e nesse caso não há o que contar.
+          */}
           <p className={estilos['kpiValor']} data-testid="kpi-acessos">
-            {dados.acessosDeHoje?.allow ?? '—'}
+            {dados.acessosDeHoje ? (
+              <NumeroQueConta valor={dados.acessosDeHoje.allow} />
+            ) : (
+              '—'
+            )}
           </p>
           {/*
             O "desde" fica DECLARADO: sem ele o número não diz de que janela
@@ -236,10 +296,39 @@ export default async function PaginaDoDashboard({
               <TenantDateTime iso={dados.acessosDeHoje.desde} timeZone={fuso} format="time" />
             </p>
           ) : null}
+          {/*
+            A PROPORÇÃO do dia, liberados contra recusados. Dois números lado
+            a lado exigem conta de cabeça para saber se 9 recusas é muito; a
+            barra responde antes da conta. Os números continuam escritos nos
+            KPIs, e o `title` diz a proporção por extenso — cor não é canal
+            único.
+          */}
+          {dados.acessosDeHoje ? (
+            <div
+              className={estilos['proporcao']}
+              data-vazio={movimentoDoDia === 0}
+              role="img"
+              aria-label={
+                movimentoDoDia === 0
+                  ? 'Nenhuma passagem hoje'
+                  : `${dados.acessosDeHoje.allow} liberadas e ${dados.acessosDeHoje.deny} recusadas hoje`
+              }
+            >
+              <span
+                className={estilos['proporcaoLiberado']}
+                style={{ flexGrow: dados.acessosDeHoje.allow }}
+              />
+              <span
+                className={estilos['proporcaoNegado']}
+                style={{ flexGrow: dados.acessosDeHoje.deny }}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div
           className={estilos['kpi']}
+          data-categoria="recusa"
           data-tom={(dados.acessosDeHoje?.deny ?? 0) > 0 ? 'danger' : undefined}
         >
           <p className={estilos['kpiRotulo']}>
@@ -247,7 +336,7 @@ export default async function PaginaDoDashboard({
             Recusas hoje
           </p>
           <p className={estilos['kpiValor']} data-testid="kpi-recusas">
-            {dados.acessosDeHoje?.deny ?? '—'}
+            {dados.acessosDeHoje ? <NumeroQueConta valor={dados.acessosDeHoje.deny} /> : '—'}
           </p>
           {(dados.acessosDeHoje?.override ?? 0) > 0 ? (
             <p className={estilos['kpiApoio']}>
@@ -263,13 +352,13 @@ export default async function PaginaDoDashboard({
           azul faria a faixa ter três cores competindo sem que a terceira
           signifique nada. Cor aqui é ESTADO, não decoração (Princípio 5).
         */}
-        <div className={estilos['kpi']}>
+        <div className={estilos['kpi']} data-categoria="restricao">
           <p className={estilos['kpiRotulo']}>
             <Icon name="user-x" />
             Restrições
           </p>
           <p className={estilos['kpiValor']} data-testid="kpi-restricoes">
-            {unidade === null ? '—' : totalDeRestricoes}
+            {unidade === null ? '—' : <NumeroQueConta valor={totalDeRestricoes} />}
           </p>
           <p className={estilos['kpiApoio']}>suspensos e bloqueados</p>
         </div>
@@ -290,17 +379,38 @@ export default async function PaginaDoDashboard({
             </header>
             <div className={estilos['conteudoDoCartao']}>
               {dados.situacoes.length === 0 ? (
-                <p className={estilos['vazio']}>Ninguém bloqueado ou suspenso nesta unidade.</p>
+                <Vazio icone="check-circle" tom="success">
+                  Ninguém bloqueado ou suspenso — todo mundo com acesso liberado.
+                </Vazio>
               ) : (
                 <ul className={estilos['lista']} data-testid="lista-de-situacoes">
                   {dados.situacoes.map((situacao) => (
-                    <li className={estilos['linha']} key={`${situacao.status}-${situacao.motivo}`}>
-                      <span className={estilos['linhaTexto']}>
-                        <Icon name={situacao.status === 'BLOCKED' ? 'ban' : 'user-minus'} />
-                        {traduzir(ROTULO_DE_SITUACAO, situacao.status)} ·{' '}
-                        {traduzir(ROTULO_DE_MOTIVO, situacao.motivo)}
+                    <li
+                      className={estilos['linhaDeSituacao']}
+                      key={`${situacao.status}-${situacao.motivo}`}
+                    >
+                      <span className={estilos['linha']}>
+                        <span className={estilos['linhaTexto']}>
+                          <Icon name={situacao.status === 'BLOCKED' ? 'ban' : 'user-minus'} />
+                          {traduzir(ROTULO_DE_SITUACAO, situacao.status)} ·{' '}
+                          {traduzir(ROTULO_DE_MOTIVO, situacao.motivo)}
+                        </span>
+                        <span className={estilos['linhaValor']}>{situacao.quantidade}</span>
                       </span>
-                      <span className={estilos['linhaValor']}>{situacao.quantidade}</span>
+                      {/*
+                        QUEM são, não só quantos. "2 bloqueados" não ajuda quem
+                        está no balcão com o aluno na frente — a pergunta é
+                        "quem?". Cinco nomes cabem; acima disso a contagem ao
+                        lado volta a ser a informação útil.
+                      */}
+                      {situacao.alunos.length > 0 ? (
+                        <span className={estilos['nomesDaSituacao']}>
+                          {situacao.alunos.map(doisNomes).join(' · ')}
+                          {situacao.quantidade > situacao.alunos.length
+                            ? ` e mais ${situacao.quantidade - situacao.alunos.length}`
+                            : ''}
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -329,7 +439,12 @@ export default async function PaginaDoDashboard({
             </header>
             <div className={estilos['conteudoDoCartao']}>
               {dados.placar === null || dados.placar.entradas.length === 0 ? (
-                <p className={estilos['vazio']}>Nenhum placar publicado neste mês.</p>
+                <Vazio
+                  icone="hourglass"
+                  saida={<>O placar do mês fecha automaticamente, ou pode ser publicado em Engajamento.</>}
+                >
+                  Nenhum placar publicado neste mês.
+                </Vazio>
               ) : (
                 <>
                   <ul className={estilos['lista']} data-testid="placar-do-mes">
@@ -371,7 +486,9 @@ export default async function PaginaDoDashboard({
             </header>
             <div className={estilos['conteudoDoCartao']}>
               {dados.desafiosAtivos.length === 0 ? (
-                <p className={estilos['vazio']}>Nenhum desafio em andamento.</p>
+                <Vazio icone="dumbbell" saida={<>Crie e ative um em Engajamento → Desafios.</>}>
+                  Nenhum desafio em andamento.
+                </Vazio>
               ) : (
                 <ul className={estilos['lista']} data-testid="desafios-ativos">
                   {dados.desafiosAtivos.map((desafio) => (
@@ -394,7 +511,9 @@ export default async function PaginaDoDashboard({
             </header>
             <div className={estilos['conteudoDoCartao']}>
               {dados.feriados.length === 0 ? (
-                <p className={estilos['vazio']}>Nenhum feriado neste mês.</p>
+                <Vazio icone="check-circle" tom="success">
+                  Nenhum feriado neste mês — mês cheio de expediente.
+                </Vazio>
               ) : (
                 <ul className={estilos['lista']} data-testid="feriados-do-mes">
                   {dados.feriados.map((feriado) => {
