@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 31/08/2026 *(F41 entregue — o MVP 6 fecha com escopo reduzido)*
+**Última atualização:** 01/09/2026 *(F57 criada — dashboard operacional vira a porta de entrada do painel)*
 
 🏁 **31/08/2026 — F41 entregue, e o MVP 6 fecha.** Última fatia do roadmap documentado. A Slice 6.6
 foi escrita para monitorar um **modelo**, e sem a F40 metade dela não tem objeto — score de regra
@@ -1032,6 +1032,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F54 | SPEC-054 | 3 | — | Painel financeiro gerencial (KPIs) | [`SPEC-054-painel-financeiro-gerencial.md`](specs/SPEC-054-painel-financeiro-gerencial.md) | [#157](https://github.com/RodReis/arenahub/issues/157) | ✅ **finalizado** — aceito pelo PI |
 | F55 | SPEC-055 | 3 | — | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | [`SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md`](specs/SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md) | [#158](https://github.com/RodReis/arenahub/issues/158) | aprovada-pi — **bloqueada** (credenciais Getnet + mTLS Sicoob) |
 | F56 | SPEC-056 | 3 | — | Plano com assinatura mensal | [`SPEC-056-plano-com-assinatura-mensal.md`](specs/SPEC-056-plano-com-assinatura-mensal.md) | [#159](https://github.com/RodReis/arenahub/issues/159) | ✅ **finalizado** — aceito pelo PI |
+| F57 | SPEC-057 | 1 | — | Dashboard operacional (nova porta de entrada do painel) | [`SPEC-057-dashboard-operacional.md`](specs/SPEC-057-dashboard-operacional.md) | [#242](https://github.com/RodReis/arenahub/issues/242) | criada em 01/09/2026 — **depende de [#241](https://github.com/RodReis/arenahub/issues/241) item 6** (motivo de bloqueio/suspensão) |
 
 
 
