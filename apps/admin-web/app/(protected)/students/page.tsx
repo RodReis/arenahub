@@ -363,34 +363,6 @@ export default async function PaginaDeAlunos({
               return (
                 <>
                   <StateBadge machine="student" state={aluno.status} />
-                  {/*
-                    O MOTIVO ANDA COLADO NA SITUAÇÃO (issue #241).
-
-                    A grid dizia "Bloqueado" e parava aí -- a próxima pergunta
-                    de quem lê é sempre "por quê", e a resposta exigia abrir a
-                    ficha, uma por uma. `statusReason` é nulo fora de
-                    `SUSPENDED`/`BLOCKED`, garantido pelo `CHECK` do banco, e
-                    por isso não há travessão a mostrar no caso normal.
-
-                    A OBSERVAÇÃO fica no `title` de um `<span>` em volta, e
-                    não na linha: ela é texto livre de até 500 caracteres e
-                    esticaria a altura da linha de quem a escreveu por
-                    extenso. A razão fechada é curta e já responde a pergunta;
-                    a observação detalha para quem parar o mouse ali. O texto
-                    completo continua na ficha do aluno, para quem não tem
-                    mouse.
-                  */}
-                  {aluno.statusReason ? (
-                    <span
-                      {...(aluno.statusReasonNote
-                        ? { title: aluno.statusReasonNote }
-                        : {})}
-                    >
-                      <Consequencia testId={`motivo-${aluno.id}`}>
-                        {` — ${MOTIVO_DA_SITUACAO[aluno.statusReason] ?? aluno.statusReason}`}
-                      </Consequencia>
-                    </span>
-                  ) : null}
                   {situacao !== 'EM_DIA' ? (
                     <Consequencia tom="danger" testId={`vencimento-${aluno.id}`}>
                       {situacao === 'VENCE_EM_BREVE'
@@ -403,6 +375,45 @@ export default async function PaginaDeAlunos({
                 </>
               );
             },
+          },
+          {
+            key: 'motivo',
+            header: 'Motivo',
+            /*
+              `label`, como PLANO e CONTATO: rótulo curto e fechado, de uma
+              lista de quatro. Sem `role` a coluna nasce neutra e toma
+              largura livre -- foi o que espremeu os nomes na coluna ALUNO
+              assim que esta entrou (visto na tela, não no teste).
+            */
+            role: 'label',
+            /*
+              COLUNA PRÓPRIA, e não texto colado no badge de situação
+              (decisão do PI, 01/09/2026). Em coluna, os motivos se leem na
+              VERTICAL: quem varre a lista atrás de "quantos estão parados
+              por inadimplência" responde de relance, o que não dá para fazer
+              com a razão embutida na célula ao lado.
+
+              `statusReason` é nulo fora de SUSPENDED/BLOCKED -- o `CHECK` do
+              banco garante --, e a maioria das linhas fica com `Ausente`.
+              Isso é a informação certa: ausência de motivo em aluno ativo
+              não é dado faltando, é a resposta.
+
+              A OBSERVAÇÃO vai no `title`, não na célula: ela é texto livre de
+              até 500 caracteres e esticaria a altura da linha de quem a
+              escreveu por extenso. Quem não tem mouse lê o texto completo na
+              ficha do aluno.
+            */
+            render: (aluno) =>
+              aluno.statusReason ? (
+                <span
+                  data-testid={`motivo-${aluno.id}`}
+                  {...(aluno.statusReasonNote ? { title: aluno.statusReasonNote } : {})}
+                >
+                  {MOTIVO_DA_SITUACAO[aluno.statusReason] ?? aluno.statusReason}
+                </span>
+              ) : (
+                <Ausente />
+              ),
           },
           {
             key: 'acao',

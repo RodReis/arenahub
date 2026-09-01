@@ -119,9 +119,30 @@ const esquemaDeEdicao = z.object({
     .min(2, 'Informe o nome completo do aluno')
     .max(160, 'Nome longo demais'),
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe a data de nascimento'),
-  cpf: z.string().trim().min(1, 'Informe o CPF do aluno'),
+  /*
+   * OPCIONAL NA EDIÇÃO, obrigatório no CADASTRO (o schema acima).
+   *
+   * Exigi-lo aqui travava a edição inteira dos 322 alunos sem CPF -- os do
+   * seed e os importados do Pacto. A API já se comporta assim: `PATCH /:id`
+   * aceita o campo ausente e RECUSA `null`, então quem tem CPF continua sem
+   * poder apagá-lo (ADR-043 Decisão 3).
+   */
+  cpf: z.string().trim().optional(),
   rg: z.string().trim().max(40, 'RG longo demais').optional(),
-  registeredSex: z.enum(['FEMALE', 'MALE', 'NOT_INFORMED']).optional(),
+  /*
+   * `''` VIRA AUSENTE, e o vazio não é hipótese: o `<option value="">Não
+   * informado</option>` da tela manda exatamente isso, e `.optional()`
+   * sozinho NÃO o cobre -- ele admite a chave ausente, não a string vazia.
+   * O resultado era um toast com a mensagem crua do Zod ("Invalid option:
+   * expected one of FEMALE|MALE|NOT_INFORMED") e nada salvo, para qualquer
+   * aluno sem sexo cadastral informado.
+   */
+  registeredSex: z
+    .union([z.enum(['FEMALE', 'MALE', 'NOT_INFORMED']), z.literal('')], {
+      error: 'Selecione o sexo cadastral na lista.',
+    })
+    .optional()
+    .transform((valor) => (valor === '' ? undefined : valor)),
   telefone: z.string().trim().max(160).optional(),
   whatsapp: z.string().trim().max(160).optional(),
   email: z.string().trim().max(160).optional(),
@@ -135,6 +156,32 @@ const esquemaDeEdicao = z.object({
   emergenciaNome: z.string().trim().max(160).optional(),
   emergenciaParentesco: z.string().trim().max(80).optional(),
   emergenciaTelefone: z.string().trim().max(160).optional(),
+  /*
+   * Motivo da situação vigente -- corrigível sem trocar de estado (issue
+   * #241). Só chega preenchido quando o aluno ESTÁ suspenso ou bloqueado: o
+   * formulário nem mostra os campos fora disso, e a API os recusa.
+   */
+  /*
+   * `''` VIRA AUSENTE -- e o vazio é o caso COMUM, não a exceção.
+   *
+   * `CAMPOS_DA_EDICAO` lê a lista fechada do FormData, e `texto()` devolve
+   * string vazia para campo que não existe no DOM. Os campos de motivo só
+   * existem quando o aluno está suspenso ou bloqueado: para TODO aluno
+   * ativo, `statusReason` chega como `''`.
+   *
+   * `z.enum().optional()` NÃO cobre isso -- ele admite a chave ausente, não
+   * a string vazia. Sem o `union`, editar o telefone de qualquer aluno ativo
+   * passaria a falhar com "Selecione o motivo na lista", num campo que a
+   * tela nem mostra. Mesma armadilha do `registeredSex` logo acima.
+   */
+  statusReason: z
+    .union(
+      [z.enum(['DELINQUENCY', 'STUDENT_REQUEST', 'MEDICAL', 'CONDUCT']), z.literal('')],
+      { error: 'Selecione o motivo na lista.' },
+    )
+    .optional()
+    .transform((valor) => (valor === '' ? undefined : valor)),
+  statusReasonNote: z.string().trim().max(500).optional(),
 });
 
 export interface EstadoDoCadastro {
@@ -523,6 +570,9 @@ const CAMPOS_DA_EDICAO = [
   'emergenciaNome',
   'emergenciaParentesco',
   'emergenciaTelefone',
+  // Motivo da situação -- corrigível sem trocar de estado (issue #241).
+  'statusReason',
+  'statusReasonNote',
 ] as const;
 
 /**
@@ -554,6 +604,7 @@ export async function editarAluno(
 
   const studentId = texto(formulario, 'studentId');
 
+
   const validado = esquemaDeEdicao.safeParse({
     studentId,
     version: texto(formulario, 'version'),
@@ -561,10 +612,24 @@ export async function editarAluno(
   });
 
   if (!validado.success) {
-    const problema = validado.error.issues[0];
+    /*
+     * A MENSAGEM DO ZOD SÓ CHEGA À TELA SE FOR NOSSA.
+     *
+     * `issue.message` traz o texto PADRÃO do Zod, em inglês, quando o campo
+     * não declara o seu -- e foi assim que a recepção viu
+     * `Invalid option: expected one of "FEMALE"|"MALE"|"NOT_INFORMED"` num
+     * toast. O CLAUDE.md é explícito: erro traz ação possível, nunca detalhe
+     * técnico.
+     *
+     * A heurística é grosseira de propósito -- toda mensagem nossa é escrita
+     * em português e nenhuma delas cabe neste padrão. Campo novo sem
+     * mensagem cai no genérico, que é feio mas legível; vazar inglês, não.
+     */
+    const problema = validado.error.issues[0]?.message;
+    const nossa = problema !== undefined && !/^(Invalid|Expected|Required|Too )/i.test(problema);
 
     return {
-      erro: problema?.message ?? 'Confira os dados informados.',
+      erro: nossa ? problema : 'Confira os dados informados.',
       valores,
     };
   }
@@ -572,13 +637,23 @@ export async function editarAluno(
   const dados = validado.data;
   const endereco = montarEndereco(dados);
 
+
   const resposta = await chamarApi<{ version: number }>(`/api/v1/students/${studentId}`, {
     metodo: 'PATCH',
     corpo: {
       version: dados.version,
       fullName: dados.fullName,
       birthDate: dados.birthDate,
-      cpf: dados.cpf,
+      /*
+       * CPF VAZIO SOME DO CORPO -- e é diferente dos campos abaixo.
+       *
+       * Os outros usam `null` para APAGAR, porque esvaziá-los é decisão da
+       * recepção. O CPF não: a API recusa `null` de propósito (ADR-043
+       * Decisão 3) e `''` cairia na validação de CPF inválido. Ausente é a
+       * única forma correta de dizer "não mexer" -- e é o que os 322 alunos
+       * sem CPF mandam a cada edição.
+       */
+      ...(dados.cpf ? { cpf: dados.cpf } : {}),
       // `null` APAGA o campo na API; ausente seria "não mexer". Aqui o
       // formulário mostra todos os campos, então um campo esvaziado é uma
       // decisão da recepção de apagar aquele dado -- e precisa chegar como
@@ -587,6 +662,21 @@ export async function editarAluno(
       registeredSex: dados.registeredSex ?? null,
       contacts: montarContatos(dados),
       address: endereco ?? null,
+      /*
+       * MOTIVO SÓ QUANDO O FORMULÁRIO O MOSTROU.
+       *
+       * Os campos só existem no DOM quando o aluno está suspenso ou
+       * bloqueado. Ausentes, ficam fora do corpo -- e ausente é "não mexer",
+       * que é o certo: mandar `null` aqui APAGARIA o motivo de quem tem um,
+       * a cada vez que alguém corrigisse um telefone.
+       *
+       * Presentes e vazios (a recepção limpou de propósito) viram `null`,
+       * que é como este schema apaga campo -- mesma regra do `rg` acima.
+       */
+      ...(dados.statusReason ? { statusReason: dados.statusReason } : {}),
+      ...(dados.statusReason
+        ? { statusReasonNote: dados.statusReasonNote ? dados.statusReasonNote : null }
+        : {}),
     },
   });
 

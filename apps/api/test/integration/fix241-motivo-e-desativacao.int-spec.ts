@@ -367,5 +367,127 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
       expect(gravado.statusReason).toBeNull();
       expect(gravado.statusReasonNote).toBeNull();
     });
+    /*
+     * O CAMINHO PARA QUEM JA ESTA SUSPENSO OU BLOQUEADO (decisao do PI,
+     * 01/09/2026).
+     *
+     * `PATCH /:id/status` exige MUDANCA de situacao para aceitar motivo --
+     * entao quem ja estava bloqueado antes do campo existir (o seed, os
+     * importados do Pacto) ficava sem caminho: a unica saida era reativar e
+     * bloquear de novo, gravando na timeline uma reativacao que nunca
+     * aconteceu. O motivo passa a ser corrigivel pelo PATCH de CADASTRO.
+     */
+    describe('corrigir o motivo sem mudar de situacao', () => {
+      let bloqueado = '';
+      let versaoDoBloqueado = 0;
+
+      beforeAll(async () => {
+        const aluno = await db.student.create({
+          data: {
+            tenantId,
+            gymUnitId,
+            membershipNumber: `AP-2026-${randomUUID().slice(0, 8)}`,
+            fullName: 'Bloqueado Sem Motivo',
+            birthDate: new Date('1990-01-01'),
+            // Nasce BLOCKED e SEM motivo -- exatamente o estado em que os
+            // alunos do seed ficaram.
+            status: 'BLOCKED',
+          },
+        });
+        bloqueado = aluno.id;
+        versaoDoBloqueado = aluno.version;
+      });
+
+      const editar = (corpo: Record<string, unknown>) =>
+        request(servidor())
+          .patch(`/api/v1/students/${bloqueado}`)
+          .set('cookie', cookie)
+          .send({ version: versaoDoBloqueado, ...corpo });
+
+      it('grava o motivo em quem ja estava bloqueado', async () => {
+        const resposta = await editar({
+          statusReason: 'CONDUCT',
+          statusReasonNote: 'emprestou a credencial para terceiro',
+        });
+
+        expect(resposta.status).toBe(200);
+        expect((resposta.body as { statusReason: string }).statusReason).toBe('CONDUCT');
+        expect((resposta.body as { statusReasonNote: string }).statusReasonNote).toBe(
+          'emprestou a credencial para terceiro',
+        );
+
+        // A SITUACAO NAO MUDOU -- e o ponto do caminho novo.
+        expect((resposta.body as { status: string }).status).toBe('BLOCKED');
+
+        versaoDoBloqueado = (resposta.body as { version: number }).version;
+      });
+
+      it('nao inventa transicao na timeline', async () => {
+        /*
+         * Corrigir motivo NAO e mudanca de estado. Se aparecesse um
+         * `STUDENT_STATUS_CHANGED` aqui, o historico passaria a afirmar uma
+         * transicao que nunca houve -- que e justamente o defeito do caminho
+         * antigo (reativar so para rebloquear).
+         */
+        const eventos = await db.studentTimelineEvent.count({
+          where: { tenantId, studentId: bloqueado, type: 'STUDENT_STATUS_CHANGED' },
+        });
+
+        expect(eventos).toBe(0);
+      });
+
+      it('recusa motivo em aluno que nao esta suspenso nem bloqueado', async () => {
+        const ativo = await db.student.create({
+          data: {
+            tenantId,
+            gymUnitId,
+            membershipNumber: `AP-2026-${randomUUID().slice(0, 8)}`,
+            fullName: 'Aluno Ativo',
+            birthDate: new Date('1990-01-01'),
+            status: 'ACTIVE',
+          },
+        });
+
+        const resposta = await request(servidor())
+          .patch(`/api/v1/students/${ativo.id}`)
+          .set('cookie', cookie)
+          .send({ version: ativo.version, statusReason: 'MEDICAL' });
+
+        expect(resposta.status).toBe(400);
+        expect((resposta.body as { code: string }).code).toBe(
+          'STUDENT_STATUS_REASON_NOT_APPLICABLE',
+        );
+      });
+
+      it('recusa observacao sem razao, tambem por aqui', async () => {
+        const semRazao = await db.student.create({
+          data: {
+            tenantId,
+            gymUnitId,
+            membershipNumber: `AP-2026-${randomUUID().slice(0, 8)}`,
+            fullName: 'Suspenso Sem Motivo',
+            birthDate: new Date('1990-01-01'),
+            status: 'SUSPENDED',
+          },
+        });
+
+        const resposta = await request(servidor())
+          .patch(`/api/v1/students/${semRazao.id}`)
+          .set('cookie', cookie)
+          .send({ version: semRazao.version, statusReasonNote: 'so a observacao' });
+
+        expect(resposta.status).toBe(400);
+        expect((resposta.body as { code: string }).code).toBe('STUDENT_STATUS_REASON_REQUIRED');
+      });
+
+      it('LIMPA o motivo quando a razao vem nula', async () => {
+        const resposta = await editar({ statusReason: null, statusReasonNote: null });
+
+        expect(resposta.status).toBe(200);
+        expect((resposta.body as { statusReason: string | null }).statusReason).toBeNull();
+
+        versaoDoBloqueado = (resposta.body as { version: number }).version;
+      });
+    });
   });
 });

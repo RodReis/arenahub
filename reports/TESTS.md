@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 2859 | 2859 | 0 | 75.5 |
+| unitário | 2868 | 2868 | 0 | 75.7 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 805 | 805 | 0 | 83.9 |
+| integração | 810 | 810 | 0 | 83.9 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -108,3 +108,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-31 | #41 | SPEC-041 | integração | 791 | 791 | 0 | 83.9 | [#229](https://github.com/RodReis/arenahub/pull/229) — medido suíte a suíte (o Jest crasha no fim no Windows) |
 | 2026-09-01 | #241 | — | unitário | 2859 | 2859 | 0 | 75.5 | [#243](https://github.com/RodReis/arenahub/pull/243) |
 | 2026-09-01 | #241 | — | integração | 805 | 805 | 0 | 83.9 | [#243](https://github.com/RodReis/arenahub/pull/243) — medido suíte a suíte (o Jest crasha no fim no Windows) |
+| 2026-09-01 | #241 | — | unitário | 2868 | 2868 | 0 | 75.7 | — |
+| 2026-09-01 | #241 | — | integração | 810 | 810 | 0 | 83.9 | — medido suíte a suíte (o Jest crasha no fim no Windows) |

@@ -77,6 +77,18 @@ export interface DadosDeEdicaoDeAluno {
   advisorUserId?: string | null | undefined;
   contacts?: readonly ContatoDeEntrada[] | undefined;
   address?: EnderecoDeEntrada | null | undefined;
+  /*
+   * Motivo da situacao VIGENTE -- corrigivel sem trocar de estado (issue
+   * #241). Quem ja estava suspenso ou bloqueado antes do campo existir nao
+   * tinha por onde preenche-lo: `PATCH /:id/status` exige mudanca de estado,
+   * e reativar so para rebloquear grava na timeline uma reativacao que nunca
+   * aconteceu.
+   *
+   * `null` limpa, como nos demais campos deste tipo. Quem valida contra a
+   * situacao vigente e o controller, que a conhece.
+   */
+  statusReason?: 'DELINQUENCY' | 'STUDENT_REQUEST' | 'MEDICAL' | 'CONDUCT' | null | undefined;
+  statusReasonNote?: string | null | undefined;
 }
 
 /** Aluno com endereco e contatos, para o `GET /students/:id`. */
@@ -435,6 +447,10 @@ export class StudentRepository {
           ...(dados.registeredSex !== undefined ? { registeredSex: dados.registeredSex } : {}),
           ...(dados.leadSource !== undefined ? { leadSource: dados.leadSource } : {}),
           ...(dados.advisorUserId !== undefined ? { advisorUserId: dados.advisorUserId } : {}),
+          ...(dados.statusReason !== undefined ? { statusReason: dados.statusReason } : {}),
+          ...(dados.statusReasonNote !== undefined
+            ? { statusReasonNote: dados.statusReasonNote }
+            : {}),
           // `cpf` e `cpfHash` andam JUNTOS: hash sem o campo em claro esconde
           // o aluno da recepcao, e o campo em claro sem hash o esconde da
           // deteccao de duplicata.

@@ -338,57 +338,6 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               */}
               <dd>{aluno.cpf ? <Cpf value={aluno.cpf} /> : 'não informado'}</dd>
 
-              <dt>Situação</dt>
-              {/*
-                O E2E le o `innerText` deste `<dd>` e o compara com as opcoes do
-                select de transicao. O `StateBadge` renderiza icone + rotulo, e o
-                `innerText` continua devolvendo so o rotulo -- a comparacao segue
-                valendo.
-              */}
-              <dd data-testid="situacao-do-aluno">
-                <StateBadge machine="student" state={aluno.status} />
-                {/*
-                  A CONSEQUÊNCIA, não só o rótulo. "Bloqueado" sozinho não
-                  avisa que a catraca nega MESMO com plano vigente -- e a
-                  recepção atribuiria um plano esperando resolver.
-
-                  Ficava na seção "Acesso agora", que saiu para a grid em
-                  24/08/2026. A situação foi junto; a consequência dela não
-                  tinha para onde ir e voltou para cá, ao lado do estado que
-                  a causa.
-                */}
-                {bloqueado ? (
-                  <Consequencia tom="danger" testId="acesso-impedido">
-                    impede o acesso, mesmo com plano vigente
-                  </Consequencia>
-                ) : null}
-              </dd>
-
-              {/*
-                MOTIVO EM LINHA PRÓPRIA, e não colado na situação (issue #241).
-
-                Dois motivos. O primeiro é o E2E: `students.e2e-spec.ts` lê o
-                `innerText` do `<dd>` acima e o compara com as opções do select
-                de transição -- acrescentar texto ali arriscaria a comparação.
-
-                O segundo é a observação: ela vai até 500 caracteres, e é AQUI
-                que ela é lida por extenso. Na grid só cabe a razão fechada,
-                com a observação no `title` -- quem não tem mouse chega a este
-                lugar.
-
-                A linha só existe quando há motivo: o `CHECK` do banco garante
-                que ele seja nulo fora de SUSPENDED/BLOCKED, então não há
-                travessão a mostrar no caso normal.
-              */}
-              {aluno.statusReason ? (
-                <>
-                  <dt>Motivo</dt>
-                  <dd data-testid="motivo-da-situacao">
-                    {MOTIVO_DA_SITUACAO[aluno.statusReason] ?? aluno.statusReason}
-                    {aluno.statusReasonNote ? ` — ${aluno.statusReasonNote}` : null}
-                  </dd>
-                </>
-              ) : null}
 
               {/*
                 CONTATO na ficha, e nao so na edicao: a recepcao liga para o aluno a
@@ -418,6 +367,9 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               <EditarCadastro
                 studentId={aluno.id}
                 nomeDoAluno={aluno.fullName}
+                status={aluno.status}
+                statusReason={aluno.statusReason}
+                statusReasonNote={aluno.statusReasonNote}
                 version={aluno.version}
                 fullName={aluno.fullName}
                 birthDate={aluno.birthDate}
@@ -470,6 +422,46 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             */}
             <section aria-labelledby="titulo-situacao" className={estilos['secao']}>
               <h2 id="titulo-situacao">Situação do cadastro</h2>
+
+              {/*
+                A SITUAÇÃO VIGENTE MORA AQUI, junto do que a altera -- decisão
+                do PI em 01/09/2026.
+
+                Ela ficava também na lista de leitura do topo, ao lado de
+                matrícula e nascimento, e a ficha dizia a mesma coisa duas
+                vezes na mesma tela. Um lugar só: quem lê a situação está a
+                um clique de mudá-la, e não precisa procurar onde.
+
+                Os três andam juntos porque respondem a mesma pergunta em
+                sequência -- QUAL estado, o que ele CAUSA, e POR QUÊ.
+              */}
+              <p data-testid="situacao-do-aluno" className={estilos['situacaoVigente']}>
+                <StateBadge machine="student" state={aluno.status} />
+                {/*
+                  A CONSEQUÊNCIA, não só o rótulo. "Bloqueado" sozinho não
+                  avisa que a catraca nega MESMO com plano vigente -- e a
+                  recepção atribuiria um plano esperando resolver.
+                */}
+                {bloqueado ? (
+                  <Consequencia tom="danger" testId="acesso-impedido">
+                    impede o acesso, mesmo com plano vigente
+                  </Consequencia>
+                ) : null}
+              </p>
+
+              {/*
+                O motivo só existe em SUSPENDED/BLOCKED -- o `CHECK` do banco
+                garante -- então não há travessão a mostrar no caso normal. É
+                aqui que a observação é lida por extenso: na grid cabe só a
+                razão fechada, com o texto no `title`.
+              */}
+              {aluno.statusReason ? (
+                <p data-testid="motivo-da-situacao" className={estilos['motivoVigente']}>
+                  {MOTIVO_DA_SITUACAO[aluno.statusReason] ?? aluno.statusReason}
+                  {aluno.statusReasonNote ? ` — ${aluno.statusReasonNote}` : null}
+                </p>
+              ) : null}
+
               <AlterarSituacao
                 studentId={aluno.id}
                 situacaoAtual={aluno.status}
