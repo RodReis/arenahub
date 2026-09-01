@@ -1082,6 +1082,44 @@ Duas consequências da divisão, ambas deliberadas:
 
 Nenhuma verificação foi removida ou afrouxada: **os dois jobs são obrigatórios** para o merge.
 
+### A regra 1 do DS no CSS — `scripts/check-css-tokens.mjs`
+
+Roda dentro de `pnpm test:guardas`, antes das guardas de `run-task` e de porta. Não é passo novo do
+pipeline: é um furo tapado num passo que já existia.
+
+As seis regras do design system (`packages/config/eslint/design-system.js`) são **seletores de AST
+de JavaScript** — `Literal`, `TemplateElement`. Nenhum deles enxerga um `.css`. A regra 1 diz "hex
+literal fora de `packages/ui/tokens` é erro", e até 31/08/2026 ela valia **apenas** para cor escrita
+dentro de TSX.
+
+O custo foi medido, não suposto: **32 valores `oklch()`** do `shadcn add` moraram em
+`apps/admin-web/app/globals.css` com o lint verde o tempo todo — num arquivo cujo próprio
+comentário mandava "NAO reintroduza valor literal aqui". Nenhum era consumido, e nenhum tinha
+contraste verificado.
+
+A guarda pega hex, `rgb()`, `hsl()` e `oklch()`/`lab()`/`lch()` cru em `.css`. Ignora três coisas de
+propósito, e cada uma tem razão:
+
+- `packages/ui/tokens/**` e `dist-tokens/**` — a fonte legítima de hex, que é o que a regra 1
+  protege.
+- `color-mix(… var(--ah-*) …)` — composição sobre token continua sendo token.
+- **Cor citada em comentário.** Este repositório documenta decisão de contraste citando o hex
+  medido (`#A6AEB9` vale 8.24 sobre a sidebar) e cita issue por número (`#229`). Sem essa exclusão a
+  guarda reprovaria a própria prosa que explica por que a regra existe.
+
+Exceção é **nominal, por arquivo e com motivo escrito**, no mesmo molde do `eslint/design-system.js`
+— duas hoje, ambas do totem: o `#fff` do cartão de QR (§5.6: sobre o carbono, o leitor de celular
+não acha o padrão) e o gradiente metálico da moldura (§3.1 o especifica em hex).
+
+**Provada com canário, nas duas direções.** Plantei `#BADA55` e `oklch(0.205 0 0)` — os dois
+reprovaram com exit 1; o segundo é literalmente o caso que passou batido. *Guarda verde sem canário
+não prova nada: regra ausente é indistinguível de regra satisfeita* — a mesma lição que a §5 desta
+casa já registra.
+
+E ela achou defeito no primeiro `run`: o glow da moldura do totem estava em
+`rgb(77 124 255 / 14%)` — o `brand-500` **azul** escrito à mão. O halo continuava azul quando o
+tenant escolhia VERDE, LARANJA ou ROXO, discordando da marca que o boot acabara de resolver.
+
 **Não rodam em CI:** teste de hardware real (só na bancada, no gate) e teste de carga (sob
 demanda).
 
