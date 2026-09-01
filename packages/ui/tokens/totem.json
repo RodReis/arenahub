@@ -19,9 +19,10 @@
         "$role": "divisores internos, linhas de tabela"
       },
       "default": {
-        "value": "#232A3D",
-        "contrastOnBase": 1.38,
-        "$role": "borda de card e de botao secundario (2px)"
+        "value": "#51618C",
+        "contrastOnBase": 3.22,
+        "$role": "borda de card e de botao secundario (2px)",
+        "$comment": "Era #232A3D (1.38 sobre base, 1.29 sobre surface) -- REPROVAVA o alvo de 3.0 do WCAG 1.4.11 para componente de UI. Isto nao e detalhe estetico: esta borda e o que DELIMITA o alvo tocavel do botao secundario, e o §1 do DS descreve a tela sob luz de academia com reflexo. Um contorno a 1.38 desaparece exatamente na condicao para a qual a superficie foi desenhada. O novo valor mantem o matiz azulado e passa nos DOIS fundos: 3.22 sobre bg.base e 3.02 sobre bg.surface -- a borda aparece nos dois (botao sobre base, card sobre surface), entao o menor dos dois e que manda."
       }
     },
     "text": {
@@ -36,10 +37,10 @@
         "$role": "descricoes, metadados, legendas"
       },
       "tertiary": {
-        "value": "#565E69",
-        "contrastOnBase": 3.0,
+        "value": "#747F8D",
+        "contrastOnBase": 4.84,
         "$role": "cabecalho de tabela, comparativos 'vs anterior'",
-        "$comment": "REPROVA no alvo AAA_TEXT (7) do totem -- 3.0 < 7. Existe para texto auxiliar de baixa prioridade, nao para conteudo de leitura obrigatoria a distancia (mesmo papel de carbon-400 no painel)."
+        "$comment": "Era #565E69: 3.0 sobre bg.base e 2.81 sobre bg.surface -- este segundo REPROVAVA ate o piso de 3.0 de texto grande, e o token e generico demais para depender do tamanho de quem o usa. O uso que doia era o placeholder do CPF (`identificacao-cpf.tsx`), a primeira tela do aluno. O novo valor da 4.84 sobre base e 4.54 sobre surface: passa em texto NORMAL nos dois fundos, entao o proximo uso nao volta a reprovar. Segue abaixo do alvo AAA_TEXT (7) do totem de proposito -- e texto auxiliar de baixa prioridade, mesmo papel de carbon-400 no painel. O CTA desabilitado usa este token sobre border.hairline (2.47) e continua ISENTO por WCAG 1.4.3, que dispensa componente inativo -- mesma excecao nomeada que o painel ja carrega."
       }
     },
     "brand": {
