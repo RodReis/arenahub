@@ -304,10 +304,17 @@ export function CobrancaPorQr({
         um extra.
       */}
       {qrCodeDataUri ? (
+        // `width`/`height` batendo com os 200px do `.qr`: o CSS ja reserva o
+        // espaco, mas so depois que a folha aplica -- os atributos dao a
+        // proporcao ao parser antes disso, e o copia-e-cola abaixo para de
+        // saltar quando o QR entra. Mesmo par que o `pagamento.tsx` do totem
+        // ja usa no mesmo caso.
         <img
           className={estilos['qr']}
           src={qrCodeDataUri}
           alt="Código QR para pagamento. Use o copia-e-cola ou o link abaixo se não conseguir escanear."
+          width={200}
+          height={200}
         />
       ) : null}
 

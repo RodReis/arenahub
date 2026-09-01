@@ -183,9 +183,16 @@ button {
        fino, nao metal. 3px preserva a leitura sem virar quadro. */
     padding: 3px;
     border-radius: 48px;
+    /*
+       `color-mix` sobre os tokens, e nao `rgb()` cru: `77 124 255` era o
+       `brand-500` AZUL escrito a mao, entao o halo continuava azul quando o
+       tenant escolhia VERDE, LARANJA ou ROXO -- a moldura discordava da marca
+       que o boot acabara de resolver. Mesma tecnica que o resto do arquivo ja
+       usa.
+    */
     box-shadow:
-      0 0 64px rgb(77 124 255 / 14%),
-      0 24px 64px rgb(10 11 13 / 40%);
+      0 0 64px color-mix(in srgb, var(--ah-totem-brand-500) 14%, transparent),
+      0 24px 64px color-mix(in srgb, var(--ah-totem-bg-base) 40%, transparent);
     width: 1080px;
     margin-inline: auto;
     overflow: hidden;
@@ -416,8 +423,25 @@ button {
     transition: none;
   }
 
-  .ctaPrimario:active:not(:disabled) {
+  .ctaPrimario:active:not(:disabled),
+  .botaoSecundario:active:not(:disabled),
+  .botaoDeContraste:active:not(:disabled) {
     transform: none;
+  }
+
+  /*
+    O PONTO PULSANTE PARA DE VEZ, e nao so acelera.
+
+    O tema global (`dist-tokens/theme.css`) reduz toda duracao a 100ms sob
+    esta preferencia -- o que resolve transicao, mas PIORA laco infinito: o
+    ponto passaria a piscar dez vezes por segundo em vez de respirar em 5s.
+    `animation: none` e o unico desfecho correto para `infinite`.
+
+    Fica em `opacity` cheia: parado e visivel, nao parado e invisivel.
+  */
+  .pontoDeAcento {
+    animation: none;
+    opacity: 0.7;
   }
 }
 
@@ -467,6 +491,32 @@ button {
   color: var(--ah-totem-text-primary);
   font-size: var(--tt-corpo);
   font-weight: 600;
+}
+
+/**
+ * ESTADOS DO SECUNDARIO -- a mesma tese do `.ctaPrimario` acima (§2.6).
+ *
+ * Esta e a classe do "Voltar" de TODA tela interna, e ela nao tinha `:active`
+ * nem `:disabled`. Num totem o toque nao tem cursor nem hover: sem afundar, a
+ * pessoa nao sabe se pegou, e toca de novo -- que e o defeito que o comentario
+ * do `.ctaPrimario` descreve e que aqui ficou de fora.
+ *
+ * `contestacao.tsx` e `desafios.tsx` ja passam `disabled={enviando}` a esta
+ * classe: sem regra, o botao ficava IDENTICO e inerte durante o envio.
+ */
+.botaoSecundario:active:not(:disabled),
+.botaoDeContraste:active:not(:disabled) {
+  transform: scale(0.985);
+  border-color: var(--ah-totem-brand-500);
+}
+
+.botaoSecundario:disabled,
+.botaoDeContraste:disabled {
+  /* Sem `opacity` no conjunto: ela compoe a cor com o fundo antes de a regua
+     de contraste medir, e o rotulo cairia abaixo do minimo. Borda apagada e
+     texto terciario dizem "inativo" sem mexer no par medido. */
+  border-color: var(--ah-totem-border-hairline);
+  color: var(--ah-totem-text-secondary);
 }
 
 /* ---------------------------------------------------------------- toast */
@@ -1346,6 +1396,59 @@ button {
   background: var(--ah-totem-bg-surface);
 }
 
+/**
+ * CAMPO DE FORMULARIO -- o unico lugar do totem que digita texto.
+ *
+ * `select` e `textarea` sem regra caem no default do NAVEGADOR: ~13px de
+ * fonte e ~21px de altura no Chrome. Contra o piso de 19px do §2.2 e os 88px
+ * de alvo do §2.4, isso e falha dupla -- e cai justo na contestacao, a tela
+ * de quem ja viu um numero errado e esta em pe, a 60cm, irritado.
+ *
+ * Nao existia regra nenhuma para eles no arquivo: o totem so tinha botao e
+ * tecla ate a contestacao chegar, e o CSS nao acompanhou.
+ */
+.cardDeMetrica select,
+.cardDeMetrica textarea {
+  font-family: var(--tt-fonte);
+  font-size: var(--tt-corpo);
+  line-height: var(--tt-corpo-lh);
+  color: var(--ah-totem-text-primary);
+  background: var(--ah-totem-bg-base);
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  border-radius: var(--tt-raio-botao);
+  padding: 20px 24px;
+  width: 100%;
+}
+
+/* Alvo tocavel: o `select` e um controle de UMA linha, entao a altura minima
+   e quem garante os 88px do §2.4. O `textarea` ja passa pelas 3 linhas. */
+.cardDeMetrica select {
+  min-height: var(--tt-alvo-secundario);
+  /* A seta nativa some no fundo escuro em alguns navegadores; o padding a
+     direita reserva o espaco dela sem cobrir o texto da opcao longa. */
+  padding-right: 56px;
+}
+
+.cardDeMetrica textarea {
+  /* `resize` desligado: nao ha mouse no totem para arrastar a alca. As 3
+     linhas ja cabem os 500 caracteres do `maxLength`, com rolagem. */
+  resize: none;
+  /*
+     `user-select` volta a `text` aqui: o `body` desliga selecao na superficie
+     inteira (topo do arquivo) para o toque nao pintar texto ao arrastar, mas
+     dentro do campo isso atrapalha o cursor de quem digita.
+  */
+  user-select: text;
+}
+
+.cardDeMetrica select:disabled,
+.cardDeMetrica textarea:disabled {
+  /* Envio em curso -- o campo continua LEGIVEL, so nao aceita mudanca. Texto
+     apagado aqui esconderia o que a pessoa acabou de escrever. */
+  border-color: var(--ah-totem-border-hairline);
+  opacity: 0.7;
+}
+
 .valorDaMetrica {
   font-size: var(--tt-valor);
   font-weight: 800;
@@ -1509,12 +1612,23 @@ button {
 /*
  * Ultimo dia usa a cor de estado, nao a de texto secundario: e o unico dia
  * em que o prazo muda o que o aluno faz.
+ *
+ * `--ah-totem-state-warning`, e nao `--ah-totem-accent`: este ultimo NUNCA
+ * EXISTIU no tema. O `dist-tokens/theme.css` publica `--ah-totem-brand-200`
+ * ate `-600`; `--ah-accent-*` sem o `totem` e do PAINEL, outra superficie.
+ * Variavel indefinida em `color` faz a declaracao inteira ser descartada, e
+ * o aviso herdava o texto de cima em silencio -- justo na unica linha da
+ * tela publica que muda o comportamento do aluno. E a armadilha que este
+ * arquivo ja documenta duas vezes e que mesmo assim reincidiu.
+ *
+ * Estado usa tom SEMANTICO fixo, nunca o accent do tenant (regra 3 do DS
+ * §11): prazo acabando le igual em toda academia.
  */
 .prazoDoDesafioUltimoDia {
   margin: auto 0 0;
   font-size: var(--tt-metadado);
   font-weight: 700;
-  color: var(--ah-totem-accent);
+  color: var(--ah-totem-state-warning);
 }
 
 .blocoDeDesafio > .metadado:last-child {

@@ -38,7 +38,7 @@
 }
 
 .dialogo::backdrop {
-  background: rgb(10 11 13 / 0.45);
+  background: var(--ah-scrim);
 }
 
 /*

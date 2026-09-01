@@ -386,11 +386,25 @@ function TecladoDeApelido({
             }}
             aria-label={tecla === 'apagar' ? 'Apagar último caractere' : tecla}
             style={{
-              minHeight: 56,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              /*
+                88px -- o piso de alvo do §2.4, o mesmo de todo botao desta
+                superficie. Estava em 56, o unico alvo do totem abaixo do
+                piso: com 10px de gap dava 66px de passo vertical, e o dedo
+                que erra pega a fileira de baixo. Nao vai aos 132 da tecla de
+                CPF (`--tt-alvo-tecla`) porque sao 27 teclas em 7 colunas,
+                nao 12 em 3 -- a grade nao cabe na altura da tela.
+              */
+              minHeight: 'var(--tt-alvo-secundario)',
               border: 'var(--tt-borda) solid var(--ah-totem-border-default)',
-              borderRadius: 14,
-              background: 'var(--ah-totem-bg-base)',
-              fontSize: 22,
+              borderRadius: 'var(--tt-raio-icone)',
+              background: 'var(--ah-totem-bg-surface)',
+              // Alinhado ao corpo da superficie; 22px era menor que o minimo
+              // de 19px por pouco, e destoava dos 40px do teclado irmao.
+              fontSize: 'var(--tt-corpo)',
+              color: 'var(--ah-totem-text-primary)',
               fontWeight: 700,
               textTransform: 'uppercase',
             }}

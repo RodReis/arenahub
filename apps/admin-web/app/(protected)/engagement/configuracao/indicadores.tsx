@@ -10,6 +10,11 @@ import estilos from './configuracao.module.css';
  * embaixo, o que ainda depende de alguém. Misturar as duas faria a secretaria
  * procurar a fila no meio de estatística — e a fila é o que ela abre a tela
  * para ver.
+ *
+ * `<h2>`, e não `<h3>`: o único heading acima destes é o `<h1>` da página
+ * (`engagement/page.tsx`), e não há `<h2>` nenhum na aba — `PainelDeConfiguracao`
+ * usa `<legend>`. Com `<h3>` o nível 2 ficava vago, e quem navega por heading
+ * em leitor de tela ouve um degrau que não existe (WCAG 1.3.1).
  */
 export function Indicadores({ dados }: { readonly dados: IndicadoresDeEngajamento }) {
   // Participação sobre a base ATIVA, que é o único denominador honesto: aluno
@@ -22,7 +27,7 @@ export function Indicadores({ dados }: { readonly dados: IndicadoresDeEngajament
   return (
     <div data-testid="indicadores-de-engajamento">
       <section aria-labelledby="titulo-participacao" className={estilos['grupo']}>
-        <h3 id="titulo-participacao">Participação</h3>
+        <h2 id="titulo-participacao">Participação</h2>
 
         <dl className={estilos['numeros']}>
           <div>
@@ -48,7 +53,7 @@ export function Indicadores({ dados }: { readonly dados: IndicadoresDeEngajament
       </section>
 
       <section aria-labelledby="titulo-pendencias" className={estilos['grupo']}>
-        <h3 id="titulo-pendencias">Esperando alguém</h3>
+        <h2 id="titulo-pendencias">Esperando alguém</h2>
 
         <dl className={estilos['numeros']}>
           <div>

@@ -246,6 +246,45 @@ function BlocoDeCarrossel({
   );
 }
 
+/**
+ * A preferencia de movimento do SISTEMA, lida em JS.
+ *
+ * O CSS ja desliga animacao em `prefers-reduced-motion` (globals.css), mas
+ * `<video autoPlay loop>` nao e animacao de CSS: nenhuma media query o
+ * alcanca. Quem decide se ele roda e o atributo, entao a preferencia precisa
+ * chegar ate aqui.
+ *
+ * Comeca em `false` de proposito: no servidor nao existe `matchMedia`, e um
+ * default `true` faria o video nascer parado e so comecar depois da
+ * hidratacao -- pior que o contrario.
+ */
+function useMenosMovimento(): boolean {
+  const [menos, setMenos] = useState(false);
+
+  useEffect(() => {
+    /*
+      `matchMedia` conferido antes de chamar: jsdom nao o implementa, e o
+      navegador do totem, sim. Sem a guarda o efeito lanca no primeiro render
+      da suite e derruba a arvore inteira -- o video seguiria tocando, mas o
+      cartao ao redor nunca chegaria a tela.
+    */
+    if (typeof window.matchMedia !== 'function') return;
+
+    const consulta = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setMenos(consulta.matches);
+
+    const aoMudar = (evento: MediaQueryListEvent) => {
+      setMenos(evento.matches);
+    };
+    consulta.addEventListener('change', aoMudar);
+    return () => {
+      consulta.removeEventListener('change', aoMudar);
+    };
+  }, []);
+
+  return menos;
+}
+
 function ConteudoDoBloco({
   bloco,
   indicadores,
@@ -253,6 +292,12 @@ function ConteudoDoBloco({
   readonly bloco: BlocoDaTelaPublica;
   readonly indicadores: IndicadoresDaUnidade | null;
 }) {
+  /*
+    ANTES do `switch`: hook nao pode viver dentro de `case`, e o de VIDEO e o
+    unico que o consome. Custo de um `matchMedia` por bloco renderizado.
+  */
+  const menosMovimento = useMenosMovimento();
+
   switch (bloco.tipo) {
     case 'VIDEO':
       /*
@@ -274,12 +319,20 @@ function ConteudoDoBloco({
             navegador aceitar `autoPlay` sem gesto do usuario; sem eles o
             video ficaria parado no primeiro quadro.
           */}
+          {/*
+            `autoPlay` e `loop` so quando ninguem pediu menos movimento. Video
+            que roda sozinho, em laco, sem parada e por mais de 5s e o que a
+            WCAG 2.2.2 (nivel A) proibe -- e num totem sem cursor um botao de
+            pausa nao tem quem o alcance: a preferencia do sistema E o
+            controle. Desligado, o quadro fica no primeiro frame, que continua
+            sendo a midia da academia, so que quieta.
+          */}
           <video
             className="videoDoBloco"
             src={bloco.midiaUrl ?? undefined}
-            autoPlay
+            autoPlay={!menosMovimento}
             muted
-            loop
+            loop={!menosMovimento}
             playsInline
             data-testid="video-do-bloco"
           />
@@ -300,6 +353,23 @@ function ConteudoDoBloco({
       );
 
     case 'EVENTOS':
+      /*
+        LISTA VAZIA NAO E LISTA -- mesma tese de `Movimentos` em `xp.tsx`.
+        Um titulo "Agenda" com nada embaixo, na parede da recepcao, le como
+        carregamento que falhou; a frase diz que nao ha evento, que e outra
+        coisa. O titulo do gerente continua aparecendo: ele nomeia o espaco.
+      */
+      if (bloco.itens.length === 0) {
+        return (
+          <>
+            <h2 className="tituloDoBloco">{bloco.titulo}</h2>
+            <p className="corpo" data-testid="sem-eventos">
+              Nenhum evento marcado por enquanto.
+            </p>
+          </>
+        );
+      }
+
       return (
         <>
           <h2 className="tituloDoBloco">{bloco.titulo}</h2>
@@ -455,6 +525,19 @@ function BlocoDePlacar({ placar }: { readonly placar: readonly EntradaPublicaDoP
           {rotuloDoPeriodo()}
         </span>
       </header>
+
+      {/*
+        Placar vazio e um estado NORMAL, nao uma falha: mes recem-virado, ou
+        ninguem optou por aparecer (a participacao e opcional, e o rodape
+        abaixo diz isso). Sem esta frase, o cartao mostrava cabecalho, chip de
+        periodo e uma lista vazia -- que na parede da recepcao le como sistema
+        quebrado.
+      */}
+      {linhas.length === 0 ? (
+        <p className="corpo" data-testid="sem-placar">
+          Ainda não há ranking neste mês.
+        </p>
+      ) : null}
 
       <ul className="listaDoPlacar" data-testid="lista-de-placar">
         {linhas.map((entrada) => (
