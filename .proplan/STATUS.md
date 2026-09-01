@@ -36,6 +36,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] lista de alunos não diz de quantos a página é uma fatia (#248, finalizado em: 2026-09-01)
 - [MVP1][SPEC-057][F57] Dashboard operacional — nova porta de entrada do painel (#242, finalizado em: 2026-09-01)
 - [MVP1][FIX] painel sem editar/aposentar dispositivo, sem inativar unidade, e situacao de aluno sem motivo (#241, finalizado em: 2026-09-01)
 - [MVP4][SPEC-028][F28] Pagamento e desbloqueio no totem (#28, finalizado em: 2026-09-01)
