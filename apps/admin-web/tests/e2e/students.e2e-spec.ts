@@ -172,16 +172,18 @@ test.describe('cadastro de aluno', () => {
     await page.getByTestId('campo-logradouro').fill('Rua das Flores');
     await page.getByTestId('campo-numero').fill('123');
     await page.getByTestId('campo-cidade').fill('Curitiba');
-    await page.getByTestId('campo-uf').click();
-    await page.getByRole('option', { name: 'PR', exact: true }).click();
+    // `<select>` nativo desde a issue #231: um `selectOption` no lugar do par
+    // abrir-menu + clicar-na-opcao que o combobox de `<div>` exigia.
+    await page.getByTestId('campo-uf').selectOption('PR');
 
     await page.getByTestId('campo-emergenciaNome').fill('Maria Silva');
     await page.getByTestId('campo-emergenciaParentesco').fill('mae');
     await page.getByTestId('campo-emergenciaTelefone').fill('41988881111');
 
     await page.getByTestId('ir-para-passo-3').click();
-    await page.getByTestId('campo-gymUnitId').click();
-    await page.getByRole('option').first().click();
+    // `index: 1` porque a `<option>` de indice 0 e o placeholder ("Selecione a
+    // unidade") -- `<select>` nativo nao tem atributo proprio para isso.
+    await page.getByTestId('campo-gymUnitId').selectOption({ index: 1 });
 
     await page.getByTestId('ir-para-passo-4').click();
     await page.getByTestId('confirmar-cadastro').click();
