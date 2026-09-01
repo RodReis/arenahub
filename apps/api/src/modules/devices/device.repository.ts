@@ -104,6 +104,13 @@ export class DeviceRepository {
       firmware?: string | undefined;
     },
     correlationId: string,
+    /*
+     * MOTIVO E DO ATO, NAO DO DISPOSITIVO -- separado de `dados` e sem
+     * coluna. Aposentar e acao sensivel (DS-PAINEL.md §5.1): exige motivo, e
+     * motivo que nao e gravado em lugar nenhum e teatro de auditoria. Mora
+     * no `metadata` do `AuditLog`, que ja e `Json?`.
+     */
+    motivo?: string,
   ): Promise<Device | null> {
     return this.db.$transaction(async (tx) => {
       const alterados = await tx.device.updateMany({
@@ -125,7 +132,10 @@ export class DeviceRepository {
           target: 'device',
           targetId: id,
           correlationId,
-          metadata: { status: dados.status ?? null },
+          metadata: {
+            status: dados.status ?? null,
+            ...(motivo === undefined ? {} : { motivo }),
+          },
         },
       });
 

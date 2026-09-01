@@ -161,3 +161,55 @@ export async function editarUnidade(
 
   return { sucesso: { id: resposta.dados.id, name: resposta.dados.name } };
 }
+
+/**
+ * Inativação e reativação de unidade — o mais perto de "excluir" que existe.
+ *
+ * NÃO HÁ `DELETE /units/:id`, e não deve haver: dez tabelas referenciam
+ * `GymUnit` com `onDelete: Cascade`, e apagar levaria junto dispositivo,
+ * evento de acesso e avaliação física — o histórico da operação inteira.
+ * `Student.gymUnit` é `Restrict` e já registrava a intenção do desenho.
+ *
+ * Inativar é ação sensível (DS-PAINEL.md §5.1): motivo obrigatório, e o
+ * motivo é GRAVADO — vai para o `metadata` do `AuditLog`. Reativar não exige,
+ * pelo mesmo critério: a exigência protege a ação que tira de operação.
+ */
+export async function alternarSituacaoDaUnidade(
+  _anterior: EstadoDaUnidade,
+  formulario: FormData,
+): Promise<EstadoDaUnidade> {
+  const unitId = texto(formulario, 'unitId');
+  const inativando = texto(formulario, 'situacao') === 'INACTIVE';
+  const motivo = texto(formulario, 'reason').trim();
+
+  if (inativando && motivo.length < 10) {
+    return { erro: 'Escreva o motivo da inativação (ao menos 10 caracteres).' };
+  }
+
+  const resposta = await chamarApi<{ id: string; name: string }>(`/api/v1/units/${unitId}`, {
+    metodo: 'PATCH',
+    corpo: {
+      status: inativando ? 'INACTIVE' : 'ACTIVE',
+      /*
+       * Motivo SÓ quando inativa. A API o recusaria? Não — ele é opcional
+       * lá. Mas mandar um motivo vazio na reativação gravaria uma string em
+       * branco na auditoria, que é pior que campo ausente: parece que alguém
+       * respondeu e não respondeu nada.
+       */
+      ...(inativando ? { reason: motivo } : {}),
+    },
+  });
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro: frase(
+        resposta.erro?.code ?? '',
+        inativando ? 'Não foi possível inativar a unidade' : 'Não foi possível reativar a unidade',
+      ),
+    };
+  }
+
+  revalidatePath('/units');
+
+  return { sucesso: { id: resposta.dados.id, name: resposta.dados.name } };
+}

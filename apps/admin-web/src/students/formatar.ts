@@ -25,6 +25,31 @@ export const ROTULO_DE_SITUACAO: Record<string, string> = {
 };
 
 /**
+ * POR QUE o aluno está suspenso ou bloqueado (issue #241).
+ *
+ * Lista FECHADA, decidida pelo PI em 01/09/2026, e espelho de
+ * `StudentStatusReason` no schema. Texto livre não se agrupa — "inadimplente",
+ * "não pagou" e "atraso" virariam três razões para o mesmo fato, e o
+ * dashboard não teria como contar por motivo.
+ *
+ * O caso concreto continua cabendo, em texto livre, na observação ao lado.
+ */
+export const MOTIVO_DA_SITUACAO: Record<string, string> = {
+  DELINQUENCY: 'Inadimplência',
+  STUDENT_REQUEST: 'Pedido do aluno',
+  MEDICAL: 'Atestado médico',
+  CONDUCT: 'Conduta',
+};
+
+/**
+ * As duas situações que PEDEM motivo.
+ *
+ * Espelha a regra da API (`students.controller.ts`), que recusa suspensão ou
+ * bloqueio sem razão — e recusa razão em transição que não a comporta.
+ */
+export const SITUACOES_COM_MOTIVO = new Set(['SUSPENDED', 'BLOCKED']);
+
+/**
  * Situações que impedem o acesso — `domain/student.ts`, INV-033.
  *
  * Espelha a regra do servidor para a tela poder avisar antes de a recepção

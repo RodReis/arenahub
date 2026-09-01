@@ -83,4 +83,41 @@ describe('pagina de unidades', () => {
 
     expect(screen.getByTestId('nova-unidade-vazio')).toHaveAttribute('href', '/units/nova');
   });
+  /**
+   * NAO HAVIA COMO TIRAR UMA UNIDADE DE OPERACAO (issue #241).
+   *
+   * `GymUnitStatus` tem `ACTIVE | INACTIVE` desde o inicio e o DTO sempre
+   * devolveu `status` -- mas o `PATCH /units/:id` e `.strict()` e NAO aceitava
+   * o campo: mandar `{"status":"INACTIVE"}` dava 400. Inativar uma unidade so
+   * era possivel por `UPDATE` direto no banco.
+   *
+   * E nao existe `DELETE`: dez tabelas referenciam `GymUnit` com
+   * `onDelete: Cascade`, e apagar levaria junto dispositivo, evento de acesso
+   * e avaliacao fisica.
+   */
+  it('oferece inativar a unidade ativa', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({ ok: true, dados: [UNIDADE], cookiesDaApi: [] });
+
+    await renderizar();
+
+    expect(screen.getByTestId(`inativar-unidade-${UNIDADE.id}`)).toBeInTheDocument();
+  });
+
+  /**
+   * UNIDADE JA INATIVA NAO SE INATIVA DE NOVO -- seria clique sem efeito. E a
+   * REATIVACAO tem caminho proprio, com verbo proprio: as duas acoes ocupam o
+   * mesmo lugar da linha porque sao a mesma decisao em sentidos opostos.
+   */
+  it('oferece reativar, e nao inativar, quando a unidade ja esta inativa', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({
+      ok: true,
+      dados: [{ ...UNIDADE, status: 'INACTIVE' }],
+      cookiesDaApi: [],
+    });
+
+    await renderizar();
+
+    expect(screen.getByTestId(`reativar-unidade-${UNIDADE.id}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`inativar-unidade-${UNIDADE.id}`)).not.toBeInTheDocument();
+  });
 });

@@ -1,14 +1,34 @@
 /**
- * Edição de unidade — modal de dois campos.
+ * Modal de ação de linha — DS-PAINEL.md §4.15.
  *
- * Menor que o da ficha do aluno de propósito: são nome e fuso, não dezoito
- * campos em três abas. Um modal de 720px para dois campos deixaria metade da
- * caixa vazia.
+ * Extraído de `units/unidades.module.css` na issue #241, quando dispositivos
+ * ganharam o segundo modal com a mesma forma. Duas cópias do mesmo CSS de
+ * modal divergem na primeira vez que alguém ajusta o padding de um lado só,
+ * e aí as duas telas passam a ensinar formas diferentes para a mesma ação.
  *
  * Le so a camada semantica: `--ah-surface-*`, `--ah-border-*`, `--ah-text-*`.
+ * Valor literal aqui e recusado pela guarda `check-css-tokens`.
  */
 .dialogo {
   width: min(480px, calc(100vw - 48px));
+  /*
+    `white-space: normal` NÃO É REDUNDANTE, e a herança é o motivo.
+    ---------------------------------------------------------------------
+    Este `<dialog>` é renderizado DENTRO da célula de ações da tabela, e
+    `DataTable.module.css` põe `white-space: nowrap` nessa célula -- certo
+    para ela, porque botão de linha não pode quebrar no meio da palavra.
+
+    O modal herda. Sem esta linha, TODO texto dele vira uma linha só e sai
+    pela borda: a frase que explica que os eventos de acesso NÃO são
+    apagados terminava cortada em "já regi…", justamente a parte que
+    responde ao medo de quem clica em "Aposentar". `overflow-wrap` não
+    salva -- ele decide ONDE quebrar, não SE quebra; contra `nowrap`, não
+    quebra nunca.
+
+    Visto na tela, não em teste: `getByText` acha o nó inteiro mesmo com o
+    texto vazando, e os quatro testes desta tela passavam.
+  */
+  white-space: normal;
   /*
     `margin: auto` É O QUE CENTRALIZA um `<dialog>` nativo -- sem ele o
     navegador aplica o próprio padrão e a caixa encosta no canto superior
@@ -67,6 +87,13 @@
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
+  /*
+    `text-align: left` pelo mesmo motivo do `white-space` lá em cima: a
+    célula de ações da tabela alinha à direita, e o modal herdava. A quebra
+    de linha em si é resolvida no `.dialogo` -- aqui não cabe
+    `overflow-wrap: anywhere`, que partiria palavra no meio.
+  */
+  text-align: left;
 }
 
 .rodapeDoDialogo {
@@ -81,4 +108,5 @@
 .acaoDaLinha {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }

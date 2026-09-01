@@ -108,6 +108,34 @@ enum StudentStatus {
   @@map("student_status")
 }
 
+/// Por que o aluno foi suspenso ou bloqueado (issue #241).
+///
+/// LISTA FECHADA, e nao texto livre, por decisao do PI em 01/09/2026: o
+/// dashboard precisa contar por razao ("principal motivo: inadimplencia"), e
+/// texto livre nao se agrupa -- "inadimplente", "nao pagou" e "atraso" viram
+/// tres razoes distintas para o mesmo fato. A observacao livre continua
+/// existindo ao lado, em `statusReasonNote`, para o caso concreto.
+///
+/// NAO E CAUSA DE DECISAO DE ACESSO. Quem decide entrada e o entitlement
+/// (regra de arquitetura no 1) -- este campo explica um status que ja foi
+/// decidido, nunca o produz.
+enum StudentStatusReason {
+  /// Mensalidade em atraso. O job de inadimplencia NAO grava este valor
+  /// sozinho: ele age no entitlement, nao no status do aluno. Quem bloqueia
+  /// pelo painel e que escolhe a razao.
+  DELINQUENCY
+  /// Pausa combinada: viagem, mudanca de cidade, questao pessoal.
+  STUDENT_REQUEST
+  /// Atestado ou recomendacao medica. Guarda a RAZAO ADMINISTRATIVA da
+  /// suspensao, nunca o quadro clinico -- diagnostico nao entra aqui.
+  MEDICAL
+  /// Quebra de regra da academia: conduta, dano a equipamento, emprestimo de
+  /// credencial.
+  CONDUCT
+
+  @@map("student_status_reason")
+}
+
 enum StudentContactType {
   EMAIL
   PHONE
@@ -1030,6 +1058,19 @@ model Student {
   /// sobrevive a saida do funcionario.
   advisorUserId    String?               @map("advisor_user_id") @db.Uuid
   status           StudentStatus         @default(LEAD)
+  /// POR QUE o aluno esta suspenso ou bloqueado (issue #241).
+  ///
+  /// Anulavel e LIMPO na volta para `ACTIVE`: motivo e do status VIGENTE,
+  /// nao historico. Quem quer a sequencia le `StudentTimelineEvent`, que
+  /// guarda cada transicao com o seu motivo e nao e reescrito.
+  ///
+  /// Mora na tabela, e nao so na auditoria, porque a GRID o exibe: pintar a
+  /// lista de alunos a partir do `AuditLog` seria varrer o log a cada
+  /// carregamento para responder algo que e estado corrente.
+  statusReason     StudentStatusReason?  @map("status_reason")
+  /// O caso concreto, em texto livre, ao lado da razao fechada. Opcional: a
+  /// razao ja responde "por que"; isto responde "o que exatamente".
+  statusReasonNote String?               @map("status_reason_note")
   /// Papel da pessoa (F48). Default `STUDENT` porque e o caso comum e
   /// porque as 1.926 linhas ja existentes precisam de um valor.
   profile          StudentProfile        @default(STUDENT)

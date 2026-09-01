@@ -36,8 +36,27 @@ const esquemaDeAtualizacao = z
   .object({
     status: z.enum(['ACTIVE', 'MAINTENANCE', 'RETIRED']).optional(),
     firmware: z.string().max(40).optional(),
+    /*
+     * Motivo do ATO, nao do dispositivo: vai para o `metadata` do
+     * `AuditLog`, nao vira coluna. Minimo de 10 caracteres pelo mesmo
+     * criterio de `ManualAccessOverride.reason` -- "ok" nao e motivo.
+     */
+    reason: z.string().trim().min(10).max(500).optional(),
   })
-  .strict();
+  .strict()
+  /*
+   * APOSENTAR EXIGE MOTIVO (DS-PAINEL.md §5.1) -- e aposentar e o mais perto
+   * de excluir que este dispositivo chega: nao existe `DELETE /devices/:id`
+   * porque `AccessEvent` o referencia, e apagar levaria junto o registro de
+   * quem passou na catraca.
+   *
+   * Manutencao e reativacao nao exigem: sao movimento rotineiro da operacao,
+   * e pedir justificativa em cada um ensinaria a digitar "." no campo.
+   */
+  .refine((dados) => dados.status !== 'RETIRED' || dados.reason !== undefined, {
+    message: 'Aposentar um dispositivo exige motivo',
+    path: ['reason'],
+  });
 
 interface DispositivoDto {
   id: string;
@@ -119,13 +138,14 @@ export class DevicesController {
     @Body() corpo: unknown,
     @Req() requisicao: Request,
   ): Promise<DispositivoDto> {
-    const dados = esquemaDeAtualizacao.parse(corpo);
+    const { reason, ...dados } = esquemaDeAtualizacao.parse(corpo);
 
     const dispositivo = await this.dispositivos.atualizar(
       this.contexto.require(),
       id,
       dados,
       requisicao.correlationId ?? 'sem-correlacao',
+      reason,
     );
 
     if (!dispositivo) throw new NotFoundException({ code: 'DEVICE_NOT_FOUND' });

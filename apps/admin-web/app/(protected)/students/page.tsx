@@ -6,7 +6,6 @@ import {
   EmptyState,
   Ausente,
   Consequencia,
-  Cpf,
   Identidade,
   Telefone,
   PageHeader,
@@ -16,7 +15,7 @@ import {
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { situacaoDeVencimento } from '../../../src/billing/vencimento';
-import { impedeAcesso, planoDaListagem } from '../../../src/students/formatar';
+import { MOTIVO_DA_SITUACAO, planoDaListagem } from '../../../src/students/formatar';
 import { AcoesDoAluno } from './acoes-do-aluno';
 import { BotaoDeLiberacao } from './botao-de-liberacao';
 import { FiltroDeAlunos } from './filtro-de-alunos';
@@ -35,13 +34,16 @@ interface Aluno {
   deviceIds: string[];
   fullName: string;
   birthDate: string;
-  cpf: string | null;
   planName: string | null;
   /** Origem do direito vigente quando o acesso nao vem de assinatura. */
   accessSource: string | null;
   subscriptionStatus: string | null;
   phone: string | null;
   status: string;
+  /** Por que está suspenso ou bloqueado. `null` em toda outra situação. */
+  statusReason: string | null;
+  /** O caso concreto, ao lado da razão fechada. */
+  statusReasonNote: string | null;
   archivedAt: string | null;
   version: number;
   /** Invoice em aberto/vencida mais antiga -- F53 Task 12, aviso de vencimento. */
@@ -208,15 +210,6 @@ export default async function PaginaDeAlunos({
         unidadeInicial={unidade ?? ''}
       />
 
-      {/*
-        A busca não cobre CPF -- o documento é guardado só como hash, e
-        procurar por ele exigiria rota nova. Dizer isso aqui evita a recepção
-        digitar o CPF, não achar ninguém e concluir que o aluno não existe.
-      */}
-      <p className={estilos['aviso']} role="note" data-testid="aviso-de-busca">
-        A busca não encontra por CPF. Use nome, número de matrícula ou telefone.
-      </p>
-
       <DataTable
         testId="tabela-de-alunos"
         rows={alunos}
@@ -253,23 +246,10 @@ export default async function PaginaDeAlunos({
             sortKey: 'nome',
             header: 'Aluno',
             /*
-             * NOME E CPF NA MESMA CELULA, empilhados -- como no mockup.
-             *
-             * Sao a mesma pergunta ("e esta pessoa?"), e quem confere
-             * documento no balcao le os dois juntos. Em colunas separadas, o
-             * olho atravessa a linha inteira entre uma metade e outra da
-             * resposta.
-             *
-             * `Cpf` recebe o documento completo, formatado pela API
-             * (ADR-034).
-             *
-             * SEM CPF, A LINHA NAO GANHA UM `—`. Cadastrar sem documento e o
-             * caminho normal (INV-009/011), e nesta base 13 de 16 alunos nao
-             * tem CPF: um travessao por linha viraria uma coluna de ausencia
-             * sob os nomes, chamando atencao para o que NAO e problema. A
-             * marca de ausencia continua existindo onde ela responde a uma
-             * pergunta -- na ficha do aluno, onde a pessoa foi procurar o
-             * documento.
+             * SÓ O NOME. O CPF saiu da grid por decisão do PI (01/09/2026,
+             * issue #241) -- tanto a coluna própria quanto qualquer eco sob
+             * o nome. O documento continua na ficha do aluno, que é onde
+             * alguém vai procurá-lo.
              */
             role: 'identity',
             render: (aluno) => <Identidade nome={aluno.fullName} href={`/students/${aluno.id}`} />,
@@ -299,18 +279,6 @@ export default async function PaginaDeAlunos({
             */
             render: (aluno) =>
               aluno.deviceIds.length === 0 ? <Ausente /> : aluno.deviceIds.join(', '),
-          },
-          {
-            key: 'cpf',
-            header: 'CPF',
-            role: 'code',
-            /*
-              Coluna propria, e nao linha de apoio sob o nome: empilhados, os
-              dois criavam uma segunda linha em apenas 3 de 16 alunos --
-              buracos irregulares sob os nomes. Em coluna, a ausencia e uma
-              celula vazia como qualquer outra.
-            */
-            render: (aluno) => (aluno.cpf === null ? <Ausente /> : <Cpf value={aluno.cpf} />),
           },
           {
             key: 'plano',
@@ -395,6 +363,34 @@ export default async function PaginaDeAlunos({
               return (
                 <>
                   <StateBadge machine="student" state={aluno.status} />
+                  {/*
+                    O MOTIVO ANDA COLADO NA SITUAÇÃO (issue #241).
+
+                    A grid dizia "Bloqueado" e parava aí -- a próxima pergunta
+                    de quem lê é sempre "por quê", e a resposta exigia abrir a
+                    ficha, uma por uma. `statusReason` é nulo fora de
+                    `SUSPENDED`/`BLOCKED`, garantido pelo `CHECK` do banco, e
+                    por isso não há travessão a mostrar no caso normal.
+
+                    A OBSERVAÇÃO fica no `title` de um `<span>` em volta, e
+                    não na linha: ela é texto livre de até 500 caracteres e
+                    esticaria a altura da linha de quem a escreveu por
+                    extenso. A razão fechada é curta e já responde a pergunta;
+                    a observação detalha para quem parar o mouse ali. O texto
+                    completo continua na ficha do aluno, para quem não tem
+                    mouse.
+                  */}
+                  {aluno.statusReason ? (
+                    <span
+                      {...(aluno.statusReasonNote
+                        ? { title: aluno.statusReasonNote }
+                        : {})}
+                    >
+                      <Consequencia testId={`motivo-${aluno.id}`}>
+                        {` — ${MOTIVO_DA_SITUACAO[aluno.statusReason] ?? aluno.statusReason}`}
+                      </Consequencia>
+                    </span>
+                  ) : null}
                   {situacao !== 'EM_DIA' ? (
                     <Consequencia tom="danger" testId={`vencimento-${aluno.id}`}>
                       {situacao === 'VENCE_EM_BREVE'
@@ -413,10 +409,10 @@ export default async function PaginaDeAlunos({
             header: 'Ação',
             role: 'actions',
             /*
-              Quatro ações como ÍCONE, não como botão de texto: com quatro
-              rótulos por linha a coluna comia mais largura que o nome do
-              aluno, e a tabela passava a rolar horizontalmente num monitor
-              de 1280 -- que é o monitor da recepção (`PRODUCT.md`).
+              Ações como ÍCONE, não como botão de texto: com um rótulo por
+              ação a coluna comia mais largura que o nome do aluno, e a
+              tabela passava a rolar horizontalmente num monitor de 1280 --
+              que é o monitor da recepção (`PRODUCT.md`).
 
               Cada ícone carrega `aria-label` e `title`: forma sozinha é
               canal único, e isso o PRODUCT.md proíbe. Ver `acoes-do-aluno`.
@@ -427,33 +423,17 @@ export default async function PaginaDeAlunos({
               cobrança real) nem para cancelamento por outro motivo.
             */
             /*
-              `semAcessoVigente` sai de SITUAÇÃO e ASSINATURA, não de
-              entitlement -- e é uma aproximação declarada, não descuido.
-
-              A regra de arquitetura nº 1 é clara: entitlement controla
-              acesso, assinatura não. Mas `GET /students` não carrega
-              entitlements (`paraDtoDaLista` só traz a assinatura vigente),
-              então a lista não tem como saber quem entra AGORA.
-
-              O que a aproximação faz: oferece o atalho a quem está
-              bloqueado/cancelado/arquivado ou sem assinatura -- o conjunto
-              que contém todos os que precisam de override. Ela erra para o
-              lado seguro (pode oferecer a quem tem direito e não precisa),
-              nunca esconde de quem precisa. E o override não decide nada
-              sozinho: abre um formulário onde a recepção informa motivo.
-
-              Trazer o entitlement para a lista é mudança de API, registrada
-              na issue desta entrega.
+              O ATALHO DE OVERRIDE MANUAL SAIU DAQUI (decisão do PI,
+              01/09/2026, issue #241). A chave que levava a
+              `/access/override` deixou a grid; a rota continua existindo e
+              é alcançada pelo menu. O cadeado ao lado é outra coisa --
+              liberação FINANCEIRA -- e permanece.
             */
             render: (aluno) => (
               <AcoesDoAluno
                 studentId={aluno.id}
-                nomeDoAluno={aluno.fullName}
                 podeLiberar={aluno.status === 'BLOCKED'}
                 liberacao={<BotaoDeLiberacao studentId={aluno.id} />}
-                semAcessoVigente={
-                  aluno.subscriptionStatus !== 'ACTIVE' || impedeAcesso(aluno.status)
-                }
               />
             ),
           },

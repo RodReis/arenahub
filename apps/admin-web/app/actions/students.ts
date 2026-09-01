@@ -5,6 +5,13 @@ import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
 import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
+/*
+ * A lista vem de `formatar`, e NAO e reexportada daqui: arquivo `'use server'`
+ * so pode exportar funcao async -- exportar o `Set` derrubava a ficha do aluno
+ * com 500 ("A 'use server' file can only export async functions, found
+ * object"). Nenhum teste pegou; a tela pegou.
+ */
+import { SITUACOES_COM_MOTIVO } from '../../src/students/formatar';
 
 /**
  * Cadastro e ciclo de vida do aluno — F7, Slice 1.2.
@@ -61,18 +68,33 @@ const esquemaDeCadastro = z.object({
   emergenciaTelefone: z.string().trim().max(160).optional(),
 });
 
-const esquemaDeSituacao = z.object({
-  status: z.enum([
-    'LEAD',
-    'TRIAL',
-    'ACTIVE',
-    'SUSPENDED',
-    'BLOCKED',
-    'CANCELLED',
-    'ARCHIVED',
-  ]),
-  version: z.coerce.number().int().min(0),
-});
+/** Lista FECHADA, decidida pelo PI em 01/09/2026. Ver `MOTIVO_DA_SITUACAO`. */
+const motivoDaSituacao = z.enum(['DELINQUENCY', 'STUDENT_REQUEST', 'MEDICAL', 'CONDUCT']);
+
+const esquemaDeSituacao = z
+  .object({
+    status: z.enum([
+      'LEAD',
+      'TRIAL',
+      'ACTIVE',
+      'SUSPENDED',
+      'BLOCKED',
+      'CANCELLED',
+      'ARCHIVED',
+    ]),
+    version: z.coerce.number().int().min(0),
+    reason: motivoDaSituacao.optional(),
+    reasonNote: z.string().trim().max(500).optional(),
+  })
+  /*
+   * A MESMA REGRA DA API, e não em lugar dela: `PATCH /students/:id/status`
+   * recusa suspensão sem motivo. Validar aqui é para a recepção ver a frase
+   * certa sem perder o que digitou -- a API valida de novo, e é ela que manda.
+   */
+  .refine((dados) => !SITUACOES_COM_MOTIVO.has(dados.status) || dados.reason !== undefined, {
+    message: 'Escolha o motivo da suspensão ou do bloqueio.',
+    path: ['reason'],
+  });
 
 /**
  * Edição de dado cadastral — a metade que faltava da F45.
@@ -181,6 +203,11 @@ const MENSAGEM: Record<string, string> = {
   STUDENT_NOT_FOUND: 'Aluno não encontrado nesta academia.',
   STUDENT_INVALID_TRANSITION:
     'Esta mudança de situação não é permitida a partir da situação atual.',
+  // Issue #241. Sem tradução, a recepção leria o código cru — e estes dois
+  // são justamente os que ela consegue resolver sozinha na tela.
+  STUDENT_STATUS_REASON_REQUIRED: 'Escolha o motivo da suspensão ou do bloqueio.',
+  STUDENT_STATUS_REASON_NOT_APPLICABLE:
+    'O motivo só se aplica a suspensão ou bloqueio. Ao reativar, ele é removido automaticamente.',
   // A API responde 404 neste caso, não 409 — por isso a tradução é por
   // CÓDIGO, nunca por status HTTP.
   STUDENT_VERSION_CONFLICT:
@@ -422,20 +449,46 @@ export async function alterarSituacao(
 ): Promise<EstadoDaSituacao> {
   const studentId = texto(formulario, 'studentId');
 
+  const motivo = texto(formulario, 'reason');
+  const observacao = texto(formulario, 'reasonNote').trim();
+
   const validado = esquemaDeSituacao.safeParse({
     status: texto(formulario, 'status'),
     version: texto(formulario, 'version'),
+    ...(motivo ? { reason: motivo } : {}),
+    ...(observacao ? { reasonNote: observacao } : {}),
   });
 
   if (!validado.success) {
-    return { erro: 'Selecione uma situação válida.' };
+    return {
+      erro: validado.error.issues[0]?.message ?? 'Selecione uma situação válida.',
+    };
   }
+
+  const pedeMotivo = SITUACOES_COM_MOTIVO.has(validado.data.status);
 
   const resposta = await chamarApi<{ status: string; version: number }>(
     `/api/v1/students/${studentId}/status`,
     {
       metodo: 'PATCH',
-      corpo: { status: validado.data.status, version: validado.data.version },
+      corpo: {
+        status: validado.data.status,
+        version: validado.data.version,
+        /*
+         * MOTIVO SÓ NA SITUAÇÃO QUE O PEDE. A API é `.strict()` e RECUSA
+         * motivo em transição que não o comporta -- de propósito: aceitar e
+         * descartar deixaria o painel convicto de ter gravado uma razão que
+         * não existe em lugar nenhum.
+         *
+         * Voltar para ATIVO manda os campos ausentes, e é assim que o motivo
+         * antigo é limpo: quem volta a treinar não carrega "inadimplência" no
+         * cadastro.
+         */
+        ...(pedeMotivo && validado.data.reason ? { reason: validado.data.reason } : {}),
+        ...(pedeMotivo && validado.data.reasonNote
+          ? { reasonNote: validado.data.reasonNote }
+          : {}),
+      },
     },
   );
 

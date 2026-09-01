@@ -1,14 +1,19 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, SelectField, useToastDeErro } from '@arenahub/ui';
+import { Button, Field, SelectField, useToastDeErro } from '@arenahub/ui';
 
 import estilos from '../../../formulario.module.css';
 
 import { alterarSituacao, type EstadoDaSituacao } from '../../../actions/students';
-import { ROTULO_DE_SITUACAO, situacoesPossiveis } from '../../../../src/students/formatar';
+import {
+  MOTIVO_DA_SITUACAO,
+  ROTULO_DE_SITUACAO,
+  SITUACOES_COM_MOTIVO,
+  situacoesPossiveis,
+} from '../../../../src/students/formatar';
 
 interface Props {
   studentId: string;
@@ -55,7 +60,33 @@ export function AlterarSituacao({ studentId, situacaoAtual, version }: Props) {
   const situacaoVigente = estado.sucesso?.status ?? situacaoAtual;
   const versaoVigente = estado.sucesso?.version ?? version;
 
+  /*
+   * O DESTINO ESCOLHIDO precisa ser estado, e nao so valor do `<select>`: e
+   * ele que decide se o campo de motivo aparece. Suspender e bloquear exigem
+   * razao (DS-PAINEL.md §5.1); cancelar e arquivar nao, e a API RECUSA razao
+   * neles -- entao o campo nao pode nem existir ali.
+   */
+  const [destinoEscolhido, setDestinoEscolhido] = useState('');
+
+  /*
+   * O DESTINO SE ZERA JUNTO COM O SELECT, e não sozinho.
+   *
+   * O `key={situacaoVigente}` lá embaixo remonta o `<select>` quando a
+   * situação muda -- ele volta para "Selecione…". Mas este estado é do
+   * COMPONENTE, não do select: sem esta linha ele guardava o último destino
+   * escolhido, e depois de suspender alguém o campo de motivo continuava na
+   * tela com o select já vazio. Visto na tela; nenhum teste montava o
+   * componente duas vezes seguidas.
+   */
+  const [ancora, setAncora] = useState(situacaoVigente);
+
+  if (ancora !== situacaoVigente) {
+    setAncora(situacaoVigente);
+    setDestinoEscolhido('');
+  }
+
   const destinos = situacoesPossiveis(situacaoVigente);
+  const pedeMotivo = SITUACOES_COM_MOTIVO.has(destinoEscolhido);
 
   if (destinos.length === 0) {
     return (
@@ -90,6 +121,7 @@ export function AlterarSituacao({ studentId, situacaoAtual, version }: Props) {
         label="Nova situação"
         defaultValue=""
         required
+        onChange={(evento) => setDestinoEscolhido(evento.target.value)}
         data-testid="campo-situacao"
       >
         <option value="">Selecione…</option>
@@ -99,6 +131,45 @@ export function AlterarSituacao({ studentId, situacaoAtual, version }: Props) {
           </option>
         ))}
       </SelectField>
+
+      {/*
+        MONTADO E DESMONTADO, nunca escondido com `hidden`: campo `required`
+        dentro de bloco escondido é validado pelo navegador do mesmo jeito, e
+        o formulário trava sem dizer por quê -- o usuário clica em "Alterar" e
+        nada acontece. Ausente do DOM, o campo não valida nada.
+      */}
+      {pedeMotivo ? (
+        <>
+          <SelectField
+            id="motivo-da-situacao"
+            name="reason"
+            label="Motivo"
+            defaultValue=""
+            required
+            data-testid="campo-motivo-da-situacao"
+          >
+            <option value="">Selecione…</option>
+            {Object.entries(MOTIVO_DA_SITUACAO).map(([valor, rotulo]) => (
+              <option key={valor} value={valor}>
+                {rotulo}
+              </option>
+            ))}
+          </SelectField>
+
+          {/*
+            A OBSERVAÇÃO É OPCIONAL e acompanha a razão, não a substitui. A
+            razão fechada responde "por quê" e permite contar; a observação
+            responde "o que exatamente" no caso concreto.
+          */}
+          <Field
+            id="observacao-da-situacao"
+            name="reasonNote"
+            label="Observação (opcional)"
+            maxLength={500}
+            data-testid="campo-observacao-da-situacao"
+          />
+        </>
+      ) : null}
 
       <BotaoDeAlteracao />
     </form>
