@@ -9,6 +9,10 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
 import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.service.js';
+// A MESMA funcao que o codigo de producao usa para cortar o dia -- importar em
+// vez de reimplementar o offset aqui e o que impede o teste e a regra de
+// divergirem na proxima mudanca de fuso.
+import { inicioDoDiaLocal } from '../../src/modules/kiosk/domain/indicadores-da-unidade.js';
 import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
@@ -265,14 +269,34 @@ describe('F51 -- tela publica do totem', () => {
     expect(assinadas).toEqual([]);
   });
 
-  it('o heartbeat conta as entradas da unidade DESTE totem, e so dela', async () => {
+  /**
+   * Um instante que cai DENTRO do dia local da academia e dentro da janela de
+   * treino -- as duas condicoes que `checkinsDeHoje` e `treinandoAgora` medem.
+   *
+   * `agora - 1h` cego NAO serve, e a falha foi observada: entre 00:00 e 01:00
+   * no fuso da academia, "uma hora atras" e ONTEM, `inicioDoDiaLocal` corta a
+   * entrada e os dois indicadores voltam 0. O CI caiu as 03:12 UTC de
+   * 01/09/2026 -- 00:12 em Sao Paulo (issue #237). Todo dia tem essa janela;
+   * o mes virando so tornou o defeito visivel.
+   *
+   * O maior entre "1 hora atras" e "logo depois da meia-noite local" satisfaz
+   * as duas janelas em qualquer horario do dia.
+   */
+  const dentroDoDiaLocal = (): Date => {
     const agora = new Date();
     const haUmaHora = new Date(agora.getTime() - 60 * 60 * 1000);
+    const logoAposMeiaNoite = new Date(inicioDoDiaLocal(agora).getTime() + 60 * 1000);
 
-    await registrarEntrada(totem.gymUnitId, haUmaHora);
-    await registrarEntrada(totem.gymUnitId, haUmaHora);
+    return haUmaHora > logoAposMeiaNoite ? haUmaHora : logoAposMeiaNoite;
+  };
+
+  it('o heartbeat conta as entradas da unidade DESTE totem, e so dela', async () => {
+    const quandoEntrou = dentroDoDiaLocal();
+
+    await registrarEntrada(totem.gymUnitId, quandoEntrou);
+    await registrarEntrada(totem.gymUnitId, quandoEntrou);
     // A vizinha teve movimento tambem -- e ele NAO pode aparecer aqui.
-    await registrarEntrada(unidadeVizinha, haUmaHora);
+    await registrarEntrada(unidadeVizinha, quandoEntrou);
 
     const resposta = await request(servidor())
       .post('/api/v1/kiosk/heartbeat')

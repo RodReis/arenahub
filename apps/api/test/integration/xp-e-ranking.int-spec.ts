@@ -46,7 +46,25 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
   // `agora` fixo: as sessoes de fixture caem todas em agosto/2026, e o
   // `localMonth` esperado nas asserções ('2026-08') depende de uma data de
   // referencia estavel, nao do relogio real da maquina que roda o teste.
+  //
+  // VALE SO PARA O QUE RECEBE `AGORA` POR PARAMETRO. Os casos de uso que leem
+  // o relogio de dentro (`new Date()` no controller) NAO enxergam este valor;
+  // para eles a fixture tem de nascer do relogio real, senao a suite passa
+  // enquanto o mes real coincide com agosto e quebra na virada -- foi o que
+  // aconteceu em 01/09/2026 (issue #237).
   const AGORA = new Date('2026-08-20T12:00:00.000Z');
+
+  /**
+   * O dia civil de HOJE no fuso da academia, como o codigo de producao o
+   * calcula. Serve as fixtures lidas por caso de uso que usa o relogio real.
+   */
+  const hojeLocal = (): string =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
 
   let contexto: TenantContext;
 
@@ -360,8 +378,8 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
   };
 
   /** Forca a projecao de `StudentAttendanceSession` a partir das passagens gravadas. */
-  const projetarFrequencia = async (aluno: string): Promise<void> => {
-    await frequencia.frequenciaDoAluno(contexto, aluno, 'ALL', 'SEMANAL', AGORA);
+  const projetarFrequencia = async (aluno: string, agora: Date = AGORA): Promise<void> => {
+    await frequencia.frequenciaDoAluno(contexto, aluno, 'ALL', 'SEMANAL', agora);
   };
 
   /** Aluno com uma unica sessao ja projetada e pronta para receber XP. */
@@ -533,8 +551,34 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       const cpf = String(10_000_000_000n + BigInt(contadorDeMatricula) * 111n).padStart(11, '0');
       const aluno = await criarAlunoComCpf(cpf, 'Aluno Com XP');
 
-      await gravarPassagemConfirmada(aluno, '2026-08-17T12:00:00.000Z');
-      await projetarFrequencia(aluno);
+      /*
+       * Passagem em HOJE, nao em agosto literal: o endpoint de XP da area do
+       * aluno le o relogio REAL (`new Date()` no controller), nao o `AGORA`
+       * desta suite. Com a passagem em agosto, o saldo caia num mes que o
+       * endpoint nao consultava, e a resposta vinha vazia -- invisivel
+       * enquanto o mes real era agosto.
+       */
+      const agoraReal = new Date();
+      /*
+       * DENTRO DO DIA LOCAL E JA NO PASSADO -- as duas condicoes, e nenhuma
+       * das duas e obvia:
+       *
+       *   `T12:00Z` fixo esta no FUTURO quando a suite roda de madrugada, e
+       *   passagem futura nao vira sessao -- o saldo voltava 0.
+       *
+       *   `agora - 1h` cego cai em ONTEM entre 00:00 e 01:00 no fuso da
+       *   academia, e ai a sessao nasce fora do mes/dia que o endpoint
+       *   consulta.
+       *
+       * O maior entre os dois satisfaz as duas em qualquer horario.
+       */
+      const umaHoraAtras = new Date(agoraReal.getTime() - 60 * 60 * 1000);
+      const logoAposMeiaNoiteLocal = new Date(`${hojeLocal()}T00:05:00.000-03:00`);
+      const quandoPassou =
+        umaHoraAtras > logoAposMeiaNoiteLocal ? umaHoraAtras : logoAposMeiaNoiteLocal;
+
+      await gravarPassagemConfirmada(aluno, quandoPassou.toISOString());
+      await projetarFrequencia(aluno, agoraReal);
 
       const { sessionId, token } = await abrirSessao(cpf);
 
@@ -548,7 +592,9 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
         200,
       );
 
-      expect(resposta.body).toMatchObject({ saldoDoMes: 10, mes: '2026-08' });
+      // `mes` derivado do relogio, nao '2026-08' literal: o endpoint responde o
+      // mes CORRENTE, e a assercao tem de acompanhar (issue #237).
+      expect(resposta.body).toMatchObject({ saldoDoMes: 10, mes: hojeLocal().slice(0, 7) });
       // `M5-FR-004` e §13 do PRD: sempre mostrar POR QUE o aluno recebeu.
       const corpo = resposta.body as { movimentos: { pontos: number; regra: string }[] };
       expect(corpo.movimentos[0]).toMatchObject({ pontos: 10, regra: expect.any(String) });
