@@ -10,10 +10,16 @@ vi.mock('../../lib/api/server-client', () => ({
 /*
  * `usePathname` entra junto: o layout renderiza `Navegacao`, que o usa para
  * marcar o item atual. Sem ele o mock derruba a árvore inteira.
+ *
+ * `useRouter` e `useSearchParams` entraram com o SELETOR de unidade (F57):
+ * ele lê a escolha da URL e navega ao trocar. Mock incompleto aqui derruba
+ * as oito asserções deste arquivo com um erro que não aponta para o seletor.
  */
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
   usePathname: () => '/students',
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('../actions/auth', () => ({
@@ -52,8 +58,12 @@ async function renderizar() {
  * O TOPBAR dizia "Unidade não selecionada" mesmo com a Matriz cadastrada --
  * mandava a recepção escolher algo que não havia onde escolher. O texto vinha
  * de quando o painel não consultava unidade nenhuma.
+ *
+ * Desde 01/09/2026 (F57) ele SELECIONA quando há mais de uma: o dashboard
+ * forçou a decisão que estava adiada -- sem unidade escolhida não existe
+ * "hoje". Com uma só, continua sendo rótulo.
  */
-describe('indicador de unidade no topbar', () => {
+describe('seletor de unidade no topbar', () => {
   it('com UMA unidade ativa, mostra o nome dela', async () => {
     responder([unidade('Unidade Matriz')]);
 
@@ -63,16 +73,64 @@ describe('indicador de unidade no topbar', () => {
   });
 
   /**
-   * Com VÁRIAS o painel ainda não sabe qual está em uso: a troca exige
-   * decisão de produto sobre persistência e escopo de sessão (DS-PAINEL §5).
-   * Dizer quantas é mais verdadeiro que fingir uma escolha.
+   * Com VÁRIAS agora se ESCOLHE -- era "2 unidades", um rótulo que dizia à
+   * recepção quantas portas existiam sem deixar abrir nenhuma.
+   *
+   * O teste afirma as OPÇÕES, não o texto: `toHaveTextContent` num `<select>`
+   * concatena todas elas, e passaria mesmo que o controle não fosse operável.
    */
-  it('com mais de uma, diz quantas em vez de fingir uma escolha', async () => {
+  it('com mais de uma, vira um seletor com uma opção por unidade', async () => {
     responder([unidade('Matriz'), unidade('Zona Sul')]);
 
     await renderizar();
 
-    expect(screen.getByTestId('unidade-ativa')).toHaveTextContent('2 unidades');
+    const seletor = screen.getByTestId('unidade-ativa');
+
+    expect(seletor.tagName).toBe('SELECT');
+    // A primeira é a opção vazia -- ver "sem padrão silencioso", abaixo.
+    expect(
+      screen.getAllByRole('option').map((opcao) => opcao.textContent),
+    ).toEqual(['Selecione a unidade', 'Matriz', 'Zona Sul']);
+  });
+
+  /*
+   * SEM PADRÃO SILENCIOSO — o defeito que a revisão do próprio código achou.
+   *
+   * Cair na primeira unidade faria o seletor exibi-la como escolhida enquanto
+   * o dashboard diz "escolha uma unidade": dois estados contraditórios na
+   * mesma tela. E escolher justamente aquela NÃO dispararia `onChange` (o
+   * valor não muda), deixando a pessoa presa, clicando na opção certa sem
+   * efeito nenhum.
+   */
+  it('sem unidade na URL, o seletor NÃO finge que uma já foi escolhida', async () => {
+    responder([unidade('Matriz'), unidade('Zona Sul')]);
+
+    await renderizar();
+
+    // `getByLabelText` devolve o elemento JÁ tipado como `<select>`; o cast
+    // que estava aqui era redundante e o lint o recusa.
+    const seletor = screen.getByLabelText('Unidade');
+
+    expect(seletor).toHaveValue('');
+    expect(screen.getByRole('option', { name: 'Selecione a unidade' })).toBeDisabled();
+  });
+
+  /** Rótulo acessível: sem ele o leitor de tela anuncia "combo box" e nada mais. */
+  it('o seletor tem rótulo acessível', async () => {
+    responder([unidade('Matriz'), unidade('Zona Sul')]);
+
+    await renderizar();
+
+    expect(screen.getByLabelText('Unidade')).toBe(screen.getByTestId('unidade-ativa'));
+  });
+
+  /** Com UMA não há o que selecionar: `<select>` de uma opção é botão morto. */
+  it('com uma só, continua rótulo e NÃO vira seletor', async () => {
+    responder([unidade('Unidade Matriz')]);
+
+    await renderizar();
+
+    expect(screen.getByTestId('unidade-ativa').tagName).not.toBe('SELECT');
   });
 
   it('sem nenhuma, o texto convida a cadastrar', async () => {

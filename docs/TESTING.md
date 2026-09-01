@@ -1044,6 +1044,100 @@ no deploy. `migrate deploy` num banco recém-criado aplicou as **54 migrations**
 
 ---
 
+### Evidência da `SPEC-057` — F57, dashboard operacional
+
+**PR: [#247](https://github.com/RodReis/arenahub/pull/247)** — preenchido depois do merge, pela regra do topo desta seção.
+
+`pnpm test:report --issue 242 --spec SPEC-057`, rodado em 01/09/2026:
+
+```
+| 2026-09-01 | #242 | SPEC-057 | unitário   | 2897 | 2897 | 0 | 75.7 | — |
+| 2026-09-01 | #242 | SPEC-057 | integração |  796 |  796 | 0 | 83.9 | — suíte a suíte |
+```
+
+Unitário: **2897** (era 2868 na #245 — os **29** novos são desta fatia: 13 de `feriados`, 7 de
+`inicioDoDiaLocal`, 4 de `compararSituacoes`, 6 do feed e 4 do seletor). Integração: **796** em
+**56 suítes**, sendo **13** da suíte nova `dashboard-operacional.int-spec.ts`.
+
+⚠️ **O `test:report` gravou 810, e o número está errado — corrigido à mão.** O Jest crasha no fim
+no Windows (comportamento conhecido desde a F38), e o gerador, sem saída para ler, **manteve o
+número da última execução bem-sucedida** — o 810 da #245. Ele avisa quando faz isso, em vez de
+inventar, e o aviso é que denuncia:
+
+```
+[test:report] AVISO: apps/api (test:integration) nao produziu saida --
+processo terminou com status 3221226505 sem escrever o resultado.
+Mantendo o numero da ultima execucao bem-sucedida para este alvo.
+```
+
+**796 foi conferido por duas medições independentes**, porque manter um número herdado é
+exatamente a forma de o relatório mentir com aparência de evidência:
+
+```
+medição 1 — execução suíte a suíte:  ok=796  falha=0  (56 suítes)
+medição 2 — contagem estática dos `it`/`test` declarados:  796
+```
+
+🔬 **Canários (2).**
+
+| guarda removida | testes que caem |
+|---|---|
+| `parar()` no ramo `oculta` de `visibilitychange` | **2** unitários (`PARA de recarregar`, `volta a recarregar`) |
+| desempate de `compararSituacoes` (só `quantidade`) | **3** unitários |
+
+O primeiro importa porque o comportamento é **ausência de requisição**, e ausência é o que mais
+facilmente passa despercebido: sem ele, um teste que só afirmasse o rótulo "pausado" continuaria
+verde com o ciclo rodando por baixo.
+
+🔴 **O segundo canário REPROVOU o teste que eu tinha escrito, e essa é a lição da fatia.** A ordem
+estável do bloco 4 nasceu testada por **integração**: ler duas vezes pela rota, escrever no aluno
+entre as leituras e exigir a mesma ordem. Passava verde — **e continuou verde com o desempate
+removido**. A ordem física do Postgres não é reproduzível sob demanda: um `UPDATE` numa tabela
+pequena não move a tupla o bastante, e o teste passava pelo motivo errado.
+
+**O defeito é real, e foi medido no banco antes de decidir o que fazer:**
+
+```
+ status    | status_reason | count
+-----------+---------------+-------
+ SUSPENDED | MEDICAL       |     5
+ BLOCKED   | DELINQUENCY   |     5
+ BLOCKED   | CONDUCT       |     5
+```
+
+Três grupos com contagem **idêntica**, já devolvidos numa ordem que não é a de inserção. O teste de
+integração saiu (teste decorativo é pior que teste nenhum — afirma cobertura que não tem, e o
+arquivo agora explica por que ele não está lá), a comparação virou função pura exportada
+(`compararSituacoes`) e o teste unitário a alimenta com as entradas **na ordem errada de
+propósito**, incluindo as seis permutações. Aí o canário derruba **3**.
+
+📌 **A guarda do contrato OpenAPI pegou o que nenhuma outra camada pega.** Rota nova sem
+`@ApiOkResponse` reprova em `openapi.int-spec.ts` — e **typecheck, lint e `pnpm build` passam
+todos**. As quatro rotas da fatia ganharam schema declarado à mão: o Nest só infere schema de
+**classe** decorada, e o painel consome `interface`.
+
+📌 **Um teste de contraste que não é teste automatizado, e por isso está escrito aqui.** O passe
+visual do PI tinge a superfície do KPI com o tom semântico. Os quatro tons foram **medidos**, não
+estimados, contra os limites de WCAG AA (`M1-NFR-008`):
+
+| tom | valor (30 px, precisa ≥3,0) | rótulo (11 px, precisa ≥4,5) |
+|---|---|---|
+| `success` | 5,17 | 5,95 |
+| `warning` | 5,77 | 5,93 |
+| `danger` | 5,13 | 5,88 |
+| `info` | 5,27 | 5,94 |
+
+A primeira medição usou um cinza **chutado** (`#6b7280`) e deu 4,38 — reprovando. O valor real do
+token, lido do navegador, é `rgb(86,94,105)`, e dá 5,95. Registrar isso importa: **o palpite
+reprovava e o dado aprovava**, e agir sobre o palpite teria mudado um token por um defeito
+inexistente.
+
+📌 **A migration cria uma tabela e não altera nenhuma.** `local_holidays` com `@@unique(gymUnitId,
+date)` — sem ele, dois cliques no botão deixam o mesmo feriado duas vezes na lista, e o teste de
+integração prova que o segundo cadastro **atualiza o nome** em vez de duplicar a linha.
+
+---
+
 ## 6. CI
 
 Pipeline mínimo, em ordem de custo crescente (falhe cedo, falhe barato):

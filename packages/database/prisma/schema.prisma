@@ -603,6 +603,7 @@ model Tenant {
 
   accessPolicies         AccessPolicy[]
   operationalAlerts      OperationalAlert[]
+  localHolidays          LocalHoliday[]
   dataExportJobs         DataExportJob[]
   administrativeBlocks   AdministrativeBlock[]
   accessEvents           AccessEvent[]
@@ -642,29 +643,29 @@ model Tenant {
 
   publicProfiles PublicProfile[]
 
-  xpRuleVersions         XpRuleVersion[]
-  xpLedgerEntries        XpLedgerEntry[]
-  xpBalances             StudentXpBalance[]
-  achievementDefinitions AchievementDefinitionVersion[]
-  achievements           StudentAchievement[]
-  rankingSnapshots       RankingSnapshot[]
-  challengeTemplates     ChallengeTemplateVersion[]
-  challenges             Challenge[]
-  challengeParticipants  ChallengeParticipant[]
-  challengeNotices       ChallengeNotice[]
-  engagementDisputes     EngagementDispute[]
-  retentionTargetVersions     RetentionTargetVersion[]
-  retentionFeatureSetVersions RetentionFeatureSetVersion[]
-  studentFeatureSnapshots     StudentFeatureSnapshot[]
-  retentionRuleVersions       RetentionRuleVersion[]
-  retentionScores             RetentionScore[]
-  retentionScoreSkips         RetentionScoreSkip[]
-  retentionSuppressions       RetentionSuppression[]
-  retentionCapacityPolicies   RetentionCapacityPolicy[]
-  retentionTasks              RetentionTask[]
-  retentionInteractions       RetentionInteraction[]
-  retentionExperiments        RetentionExperiment[]
-  retentionExperimentAssignments RetentionExperimentAssignment[]
+  xpRuleVersions                   XpRuleVersion[]
+  xpLedgerEntries                  XpLedgerEntry[]
+  xpBalances                       StudentXpBalance[]
+  achievementDefinitions           AchievementDefinitionVersion[]
+  achievements                     StudentAchievement[]
+  rankingSnapshots                 RankingSnapshot[]
+  challengeTemplates               ChallengeTemplateVersion[]
+  challenges                       Challenge[]
+  challengeParticipants            ChallengeParticipant[]
+  challengeNotices                 ChallengeNotice[]
+  engagementDisputes               EngagementDispute[]
+  retentionTargetVersions          RetentionTargetVersion[]
+  retentionFeatureSetVersions      RetentionFeatureSetVersion[]
+  studentFeatureSnapshots          StudentFeatureSnapshot[]
+  retentionRuleVersions            RetentionRuleVersion[]
+  retentionScores                  RetentionScore[]
+  retentionScoreSkips              RetentionScoreSkip[]
+  retentionSuppressions            RetentionSuppression[]
+  retentionCapacityPolicies        RetentionCapacityPolicy[]
+  retentionTasks                   RetentionTask[]
+  retentionInteractions            RetentionInteraction[]
+  retentionExperiments             RetentionExperiment[]
+  retentionExperimentAssignments   RetentionExperimentAssignment[]
   retentionExperimentAdverseEvents RetentionExperimentAdverseEvent[]
 
   /// Minimo de participantes para publicar um placar (`M5-BR-007`).
@@ -754,10 +755,52 @@ model GymUnit {
 
   retentionCapacityPolicy RetentionCapacityPolicy?
   retentionTasks          RetentionTask[]
+  localHolidays           LocalHoliday[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
   @@map("gym_units")
+}
+
+/// Feriado MUNICIPAL da unidade -- F57, `SPEC-057` §5.2.
+///
+/// Os NACIONAIS nao moram aqui: sao calculados em processo (`date-holidays`),
+/// e gravar 12 linhas por ano por unidade seria copiar uma lista que nao
+/// muda -- com o custo de alguem lembrar de rodar o seed todo dezembro.
+///
+/// A ancora e a UNIDADE, nao o municipio (saida A, decisao do PI em
+/// 01/09/2026): `GymUnit` nao tem cidade nem codigo IBGE, e acrescentar um
+/// so para isto seria migracao maior que a fatia. O que isso aceita de
+/// proposito: duas unidades na mesma cidade cadastram a mesma data duas
+/// vezes, e podem divergir. Barato enquanto houver uma unidade por cidade --
+/// o gatilho de revisao e a SEGUNDA unidade no mesmo municipio, e a mudanca
+/// e migracao de dado (as datas sobem para o municipio), nao redesenho.
+///
+/// SO DE LEITURA nesta fatia: o calendario nao adia vencimento de fatura nem
+/// pausa SLA da fila de retencao. Os dois consumidores existem e tem linha
+/// (`billing/domain/ciclo-de-cobranca.ts`, `retention/domain/selecao-de-fila.ts`),
+/// e ligar qualquer um deles e caro de desfazer -- pede ADR, nao PR.
+model LocalHoliday {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  gymUnitId String   @map("gym_unit_id") @db.Uuid
+  /// A DATA local do feriado, sem hora. `@db.Date` e nao `DateTime`: feriado
+  /// e um dia do calendario, e guardar instante reintroduziria o fuso que a
+  /// unidade ja resolveu -- 25/12 as 00:00 de Brasilia e 24/12 em UTC.
+  date      DateTime @db.Date
+  /// Como aparece na tela ("Aniversario da cidade").
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gymUnit GymUnit @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+
+  /// Uma data so pode ser cadastrada uma vez por unidade: sem isto, dois
+  /// cliques no botao deixam o mesmo feriado duas vezes na lista.
+  @@unique([gymUnitId, date])
+  @@index([tenantId, gymUnitId, date])
+  @@map("local_holidays")
 }
 
 // ---------------------------------------------------------------------------
@@ -1117,18 +1160,18 @@ model Student {
   accountCredits        AccountCredit[]
   publicProfile         PublicProfile?
 
-  xpLedgerEntries XpLedgerEntry[]
-  xpBalances      StudentXpBalance[]
-  achievements    StudentAchievement[]
-  rankingEntries  RankingEntry[]
-  challengeParticipations ChallengeParticipant[]
-  challengeNotices        ChallengeNotice[]
-  engagementDisputes      EngagementDispute[]
-  featureSnapshots        StudentFeatureSnapshot[]
-  retentionScores         RetentionScore[]
-  retentionScoreSkips     RetentionScoreSkip[]
-  retentionSuppressions   RetentionSuppression[]
-  retentionTasks          RetentionTask[]
+  xpLedgerEntries                  XpLedgerEntry[]
+  xpBalances                       StudentXpBalance[]
+  achievements                     StudentAchievement[]
+  rankingEntries                   RankingEntry[]
+  challengeParticipations          ChallengeParticipant[]
+  challengeNotices                 ChallengeNotice[]
+  engagementDisputes               EngagementDispute[]
+  featureSnapshots                 StudentFeatureSnapshot[]
+  retentionScores                  RetentionScore[]
+  retentionScoreSkips              RetentionScoreSkip[]
+  retentionSuppressions            RetentionSuppression[]
+  retentionTasks                   RetentionTask[]
   retentionExperimentAssignments   RetentionExperimentAssignment[]
   retentionExperimentAdverseEvents RetentionExperimentAdverseEvent[]
 
@@ -4221,31 +4264,31 @@ enum AliasRejectionReason {
 /// nunca vira apelido publico por acidente. Uma linha por aluno por tenant;
 /// a ausencia dela significa "aparece pelo primeiro nome".
 model PublicProfile {
-  id              String                @id @default(uuid()) @db.Uuid
-  tenantId        String                @map("tenant_id") @db.Uuid
+  id               String                @id @default(uuid()) @db.Uuid
+  tenantId         String                @map("tenant_id") @db.Uuid
   /// `@unique` sozinho (alem do composto `[tenantId, studentId]` abaixo):
   /// exigencia do Prisma para relacao um-para-um com `Student.publicProfile`.
   /// Nao muda o dado -- aluno pertence a um so tenant, entao unico em
   /// `studentId` e unico em `[tenantId, studentId]` colapsam na mesma regra.
-  studentId       String                @unique @map("student_id") @db.Uuid
-  identityChoice  PublicIdentityChoice  @default(PRIMEIRO_NOME) @map("identity_choice")
+  studentId        String                @unique @map("student_id") @db.Uuid
+  identityChoice   PublicIdentityChoice  @default(PRIMEIRO_NOME) @map("identity_choice")
   /// Como o aluno digitou. Exibido so quando `status = APPROVED`.
-  alias           String?
+  alias            String?
   /// Forma canonica (NFKC, minuscula, sem invisivel) -- alimenta o indice
   /// parcial de unicidade. Ver `triagem-de-alias.ts`.
-  aliasNormalized String?               @map("alias_normalized")
-  status          PublicProfileStatus   @default(PENDING)
+  aliasNormalized  String?               @map("alias_normalized")
+  status           PublicProfileStatus   @default(PENDING)
   /// Codigos de sinal da triagem, para o moderador priorizar. Array de
   /// `SinalDeAlias`. NUNCA guarda o motivo em texto livre.
-  screeningSignals String[]             @default([]) @map("screening_signals")
-  rejectionReason AliasRejectionReason? @map("rejection_reason")
-  moderatedBy     String?               @map("moderated_by") @db.Uuid
-  moderatedAt     DateTime?             @map("moderated_at")
+  screeningSignals String[]              @default([]) @map("screening_signals")
+  rejectionReason  AliasRejectionReason? @map("rejection_reason")
+  moderatedBy      String?               @map("moderated_by") @db.Uuid
+  moderatedAt      DateTime?             @map("moderated_at")
   /// Compare-and-swap: o cliente manda a versao que leu, e a escrita falha
   /// se outra edicao passou no meio.
-  version         Int                   @default(1)
-  createdAt       DateTime              @default(now()) @map("created_at")
-  updatedAt       DateTime              @updatedAt @map("updated_at")
+  version          Int                   @default(1)
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
 
   tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -4365,12 +4408,12 @@ model XpLedgerEntry {
   reason          String?
   createdAt       DateTime     @default(now()) @map("created_at")
 
-  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student     Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  ruleVersion XpRuleVersion  @relation(fields: [ruleVersionId], references: [id])
-  reverses    XpLedgerEntry? @relation("ReversaoDeXp", fields: [reversesEntryId], references: [id])
-  revertidoPor XpLedgerEntry[] @relation("ReversaoDeXp")
-  achievements StudentAchievement[]
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student            Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  ruleVersion        XpRuleVersion        @relation(fields: [ruleVersionId], references: [id])
+  reverses           XpLedgerEntry?       @relation("ReversaoDeXp", fields: [reversesEntryId], references: [id])
+  revertidoPor       XpLedgerEntry[]      @relation("ReversaoDeXp")
+  achievements       StudentAchievement[]
   disputasCorrigidas EngagementDispute[]
 
   /// A CHAVE QUE GARANTE `M5-AC-002`.
@@ -4394,15 +4437,15 @@ model XpLedgerEntry {
 /// Apagar esta tabela inteira e recalcular do ledger tem de produzir os
 /// mesmos numeros (`M5-NFR-002`). Isso e teste, nao promessa.
 model StudentXpBalance {
-  id         String   @id @default(uuid()) @db.Uuid
-  tenantId   String   @map("tenant_id") @db.Uuid
-  studentId  String   @map("student_id") @db.Uuid
-  localMonth String   @map("local_month")
-  points     Int
-  entryCount Int      @map("entry_count")
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  studentId   String   @map("student_id") @db.Uuid
+  localMonth  String   @map("local_month")
+  points      Int
+  entryCount  Int      @map("entry_count")
   /// Instante do ultimo movimento somado. E o criterio 2 do desempate.
   lastEntryAt DateTime @map("last_entry_at")
-  rebuiltAt  DateTime @default(now()) @map("rebuilt_at")
+  rebuiltAt   DateTime @default(now()) @map("rebuilt_at")
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -4520,27 +4563,27 @@ enum RankingSnapshotStatus {
 /// depois da publicacao continuaria estampado num artefato imutavel -- e a
 /// unica saida seria mutar o que o `M5-AC-007` proibe mutar.
 model RankingSnapshot {
-  id             String                @id @default(uuid()) @db.Uuid
-  tenantId       String                @map("tenant_id") @db.Uuid
-  gymUnitId      String                @map("gym_unit_id") @db.Uuid
-  localMonth     String                @map("local_month")
+  id            String                @id @default(uuid()) @db.Uuid
+  tenantId      String                @map("tenant_id") @db.Uuid
+  gymUnitId     String                @map("gym_unit_id") @db.Uuid
+  localMonth    String                @map("local_month")
   /// O que este placar mede (F35, ADR-049 Decisao 4). Entra na chave unica:
   /// sem ela, so cabia UM placar por unidade e mes, e a categoria nova
   /// colidiria com o XP em vez de conviver.
   ///
   /// Snapshot gerado antes da F35 recebeu `XP_DO_MES` na migration -- e o
   /// que ele sempre mediu, so nao tinha nome.
-  category       RankingCategory       @default(XP_DO_MES)
-  status         RankingSnapshotStatus  @default(DRAFT)
+  category      RankingCategory       @default(XP_DO_MES)
+  status        RankingSnapshotStatus @default(DRAFT)
   /// Copiado da configuracao NO MOMENTO da geracao. Mudar a politica
   /// depois nao reescreve o que este snapshot decidiu.
-  minimumCohort  Int                   @map("minimum_cohort")
-  eligibleCount  Int                   @map("eligible_count")
-  generatedAt    DateTime              @map("generated_at")
-  publishedAt    DateTime?             @map("published_at")
+  minimumCohort Int                   @map("minimum_cohort")
+  eligibleCount Int                   @map("eligible_count")
+  generatedAt   DateTime              @map("generated_at")
+  publishedAt   DateTime?             @map("published_at")
 
-  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  gymUnit GymUnit       @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gymUnit GymUnit        @relation(fields: [gymUnitId], references: [id], onDelete: Cascade)
   entries RankingEntry[]
 
   /// UM snapshot por unidade, mes E CATEGORIA. Regerar e substituir o
@@ -4554,11 +4597,11 @@ model RankingSnapshot {
 /// Guarda `studentId` para AUDITORIA. O DTO publico NUNCA o devolve, e o
 /// nome nao mora aqui -- ver o comentario de `RankingSnapshot`.
 model RankingEntry {
-  id         String @id @default(uuid()) @db.Uuid
-  snapshotId String @map("snapshot_id") @db.Uuid
-  position   Int
-  studentId  String @map("student_id") @db.Uuid
-  points     Int
+  id          String   @id @default(uuid()) @db.Uuid
+  snapshotId  String   @map("snapshot_id") @db.Uuid
+  position    Int
+  studentId   String   @map("student_id") @db.Uuid
+  points      Int
   /// Instante do ultimo movimento do aluno no mes -- criterio 2 do
   /// desempate, congelado junto com a posicao.
   lastEntryAt DateTime @map("last_entry_at")
@@ -4846,13 +4889,13 @@ model EngagementDispute {
   status    EngagementDisputeStatus  @default(ABERTA)
 
   /// Quem resolveu, quando e por que. Nulos enquanto `ABERTA`.
-  resolvedBy       String?   @map("resolved_by") @db.Uuid
-  resolvedAt       DateTime? @map("resolved_at")
+  resolvedBy        String?   @map("resolved_by") @db.Uuid
+  resolvedAt        DateTime? @map("resolved_at")
   /// Resposta da secretaria -- obrigatoria ao resolver, nos DOIS desfechos.
   /// Improcedente sem explicacao e silencio com carimbo.
-  resolucao        String?
+  resolucao         String?
   /// O movimento de XP que corrigiu, quando houve correcao. Aponta, nao copia.
-  correctionEntryId String?  @map("correction_entry_id") @db.Uuid
+  correctionEntryId String?   @map("correction_entry_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -4867,7 +4910,6 @@ model EngagementDispute {
   @@index([tenantId, studentId, createdAt])
   @@map("engagement_disputes")
 }
-
 
 // ===========================================================================
 // RETENCAO -- contrato de dados e baseline analitica (F36, SPEC-036, Slice 6.1)
@@ -4931,7 +4973,7 @@ model RetentionTargetVersion {
   frozenAt  DateTime? @map("frozen_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
-  tenant    Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   snapshots StudentFeatureSnapshot[]
 
   @@unique([tenantId, label])
@@ -4973,17 +5015,17 @@ model StudentFeatureSnapshot {
   id       String @id @default(uuid()) @db.Uuid
   tenantId String @map("tenant_id") @db.Uuid
 
-  studentId          String @map("student_id") @db.Uuid
-  targetVersionId    String @map("target_version_id") @db.Uuid
+  studentId           String @map("student_id") @db.Uuid
+  targetVersionId     String @map("target_version_id") @db.Uuid
   featureSetVersionId String @map("feature_set_version_id") @db.Uuid
 
   /// O dia que o snapshot descreve.
-  observedAt         DateTime @map("observed_at")
+  observedAt        DateTime @map("observed_at")
   /// Ate quando o sistema podia SABER. Separado de `observedAt` para que a
   /// reconstrucao auditada possa refazer "a quarta como ela era na quarta".
-  knowledgeCutoffAt  DateTime @map("knowledge_cutoff_at")
+  knowledgeCutoffAt DateTime @map("knowledge_cutoff_at")
   /// Correcao autorizada incrementa; a revisao 1 nunca e sobrescrita.
-  revision           Int      @default(1)
+  revision          Int      @default(1)
 
   /// Fracao de features observadas, em `[0, 1]`. E CONFIANCA, nao risco --
   /// `M6-BR-002`: ausencia reduz completude, nunca aumenta risco.
@@ -5024,8 +5066,8 @@ model StudentFeatureValue {
   name String
 
   /// `null` quando ausente. NUNCA zero por omissao.
-  value         Decimal?                @db.Decimal(18, 6)
-  missingReason RetentionMissingReason? @map("missing_reason")
+  value         Decimal?                   @db.Decimal(18, 6)
+  missingReason RetentionMissingReason?    @map("missing_reason")
   provenance    RetentionFeatureProvenance @default(AS_OF)
 
   snapshot StudentFeatureSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
@@ -5203,12 +5245,12 @@ model RetentionScore {
   observedAt   DateTime @map("observed_at")
   calculatedAt DateTime @default(now()) @map("calculated_at")
 
-  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student      Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  snapshot     StudentFeatureSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-  ruleVersion  RetentionRuleVersion   @relation(fields: [ruleVersionId], references: [id])
-  factors      RetentionScoreFactor[]
-  task         RetentionTask?
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student     Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  snapshot    StudentFeatureSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  ruleVersion RetentionRuleVersion   @relation(fields: [ruleVersionId], references: [id])
+  factors     RetentionScoreFactor[]
+  task        RetentionTask?
 
   /// A chave de idempotencia de `M6-NFR-002`. Reexecutar a mesma versao sobre o
   /// mesmo snapshot nao duplica -- e quem garante e o indice, nao um `if` no
@@ -5369,9 +5411,9 @@ model RetentionCapacityPolicy {
   gymUnitId String @unique @map("gym_unit_id") @db.Uuid
 
   /// Tarefas por dia. Decisao do PI em 31/08/2026: 20.
-  dailyCapacity Int @default(20) @map("daily_capacity")
+  dailyCapacity   Int @default(20) @map("daily_capacity")
   /// Dias ate o mesmo aluno poder gerar nova tarefa. Decisao do PI: 14.
-  cooldownDays  Int @default(14) @map("cooldown_days")
+  cooldownDays    Int @default(14) @map("cooldown_days")
   /// Dias UTEIS ate a tarefa vencer. Decisao do PI: 3.
   slaBusinessDays Int @default(3) @map("sla_business_days")
 
@@ -5413,9 +5455,9 @@ model RetentionTask {
   assigneeId String? @map("assignee_id") @db.Uuid
 
   /// Preenchido ao concluir -- obrigatorio pela maquina de estados.
-  result RetentionTaskResult?
+  result        RetentionTaskResult?
   /// Preenchido ao dispensar. O CHECK na migration exige o texto.
-  dismissReason String? @map("dismiss_reason")
+  dismissReason String?              @map("dismiss_reason")
 
   /// Prazo em dias UTEIS a partir da criacao. Vencido, o expirador libera a
   /// vaga de capacidade em vez de segurar o slot indefinidamente.

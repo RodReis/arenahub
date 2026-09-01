@@ -186,6 +186,41 @@ export class EngagementRankingService {
   }
 
   /**
+   * O placar publicado do mes, com NOME REAL -- para o painel (F57).
+   *
+   * Devolve tambem `publishedAt`: entre uma publicacao e outra o numero NAO
+   * anda, e um placar parado sem marca de idade e indistinguivel de um job
+   * que morreu. A tela diz de quando e (`DS-PAINEL` §4.4).
+   *
+   * `DRAFT` nao vaza: `snapshotPublicado` so acha publicado, e mostrar
+   * rascunho de moderacao no resumo tornaria a publicacao decorativa.
+   */
+  async lerPlacarInterno(
+    contexto: TenantContext,
+    gymUnitId: string,
+    localMonth: string,
+    category: RankingCategory = 'XP_DO_MES',
+  ): Promise<{
+    publicadoEm: string | null;
+    entradas: readonly { position: number; points: number; nome: string }[];
+  }> {
+    const snapshot = await this.porta.snapshotPublicado(contexto, gymUnitId, localMonth, category);
+
+    if (!snapshot) return { publicadoEm: null, entradas: [] };
+
+    const entradas = await this.porta.entradasInternas(contexto, snapshot.id);
+
+    return {
+      publicadoEm: snapshot.publishedAt?.toISOString() ?? null,
+      entradas: entradas.map((e) => ({
+        position: e.position,
+        points: e.points,
+        nome: e.fullName,
+      })),
+    };
+  }
+
+  /**
    * O placar do MES CORRENTE, lido ao vivo -- sem gravar snapshot nenhum.
    * Emenda de 27/08/2026 (ADR-047): publicar o parcial todo dia colidiria
    * com `M5-AC-007` (snapshot publicado e imutavel), porque o placar do mes

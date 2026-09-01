@@ -1,0 +1,117 @@
+/**
+ * Seletor de unidade da topbar — F57.
+ *
+ * Vive sobre `--ah-surface-chrome`, o carbono da topbar. Lê só a camada
+ * semântica (regra 2 de lint): `--ah-text-on-chrome`, nunca `--ah-carbon-*`.
+ */
+
+/* Indicador estático — uma unidade só, ou nenhuma. Não é controle. */
+.rotulo {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 500;
+  color: var(--ah-text-on-chrome);
+}
+
+.caixa {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/*
+ * O `<select>` nativo estilizado com `appearance: none` + seta própria.
+ *
+ * Estilizar o controle nativo é diferente de reinventá-lo: o menu que abre
+ * continua sendo o do sistema operacional, com teclado, busca por digitação e
+ * leitor de tela funcionando de graça. O que muda é só a casca fechada.
+ */
+.select {
+  appearance: none;
+  height: 30px;
+  padding: 0 30px 0 12px;
+  border: 1px solid color-mix(in srgb, var(--ah-text-on-chrome) 22%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ah-text-on-chrome) 8%, transparent);
+  color: var(--ah-text-on-chrome);
+  font-family: inherit;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out;
+}
+
+.select:hover {
+  background: color-mix(in srgb, var(--ah-text-on-chrome) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ah-text-on-chrome) 36%, transparent);
+}
+
+/*
+ * Foco visível de 2 px com offset de 2 px — o padrão do DS, e requisito de
+ * WCAG. Sobre o carbono o anel é claro; o accent do tenant sumiria contra
+ * fundos escuros de alguns tenants.
+ */
+.select:focus-visible {
+  outline: 2px solid var(--ah-text-on-chrome);
+  outline-offset: 2px;
+}
+
+/*
+ * As `<option>` herdam o fundo do sistema, não o da topbar: em alguns
+ * navegadores o menu aberto usa o `color` do `<select>`, e texto claro sobre
+ * menu branco fica ilegível. Declarar os dois resolve nos dois lados.
+ */
+.select option {
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-default);
+}
+
+/* A seta. `pointer-events: none` para o clique atravessar até o select. */
+.caixa::after {
+  content: '';
+  position: absolute;
+  right: 11px;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--ah-text-on-chrome);
+  transform: translateY(-2px) rotate(45deg);
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/*
+ * Durante a navegação o controle esmaece: a troca de unidade recarrega a tela
+ * inteira no servidor, e sem sinal nenhum a pessoa clica de novo achando que
+ * não funcionou.
+ */
+.caixa[data-navegando='true'] .select {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .select {
+    transition: none;
+  }
+}
+
+/*
+ * Escondido visualmente, presente para leitor de tela. O padrão do DS —
+ * `display: none` e `visibility: hidden` removem do acessível também.
+ */
+.acessivel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

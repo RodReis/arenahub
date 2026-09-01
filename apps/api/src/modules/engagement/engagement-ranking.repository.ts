@@ -34,6 +34,23 @@ export interface EntradaDeSnapshot {
 /** O que `entradasComExposicao` devolve: a entrada congelada + os dados de
  * exposicao ATUAIS do aluno (perfil, decisao, status) -- nunca gravados no
  * snapshot, porque mudam depois da publicacao (ver `EngagementRankingService`). */
+/**
+ * Entrada do placar para TELA INTERNA -- nome real, sem alias e sem
+ * abreviacao.
+ *
+ * Existe separada de `EntradaComExposicao` de proposito. O alias do ADR-046
+ * governa o que e PUBLICO (totem e app); o painel e tela interna, e o feed de
+ * acessos ao lado ja mostra nome inteiro -- dar apelido aqui entregaria a
+ * recepcao um nome que ela nao consegue ligar a ficha do aluno (decisao do
+ * PI, 01/09/2026). O alias NAO deixa de existir; ele so nao governa aqui.
+ */
+export interface EntradaInternaDoPlacar {
+  position: number;
+  points: number;
+  studentId: string;
+  fullName: string;
+}
+
 export interface EntradaComExposicao {
   position: number;
   points: number;
@@ -128,6 +145,10 @@ export interface PortaDeRanking {
     contexto: TenantContext,
     snapshotId: string,
   ): Promise<readonly EntradaComExposicao[]>;
+  entradasInternas(
+    contexto: TenantContext,
+    snapshotId: string,
+  ): Promise<readonly EntradaInternaDoPlacar[]>;
   exposicaoDosAlunos(
     contexto: TenantContext,
     studentIds: readonly string[],
@@ -461,6 +482,33 @@ export class EngagementRankingRepository implements PortaDeRanking {
         : null,
       nomeAbreviado: abreviarNome(entrada.student.fullName),
       statusDoAluno: entrada.student.status,
+    }));
+  }
+
+  /**
+   * Entradas do snapshot com NOME REAL, para tela interna -- F57.
+   *
+   * Nao passa por `resolverExposicao()`: quem chama e o painel, e a decisao
+   * do PI de 01/09/2026 e que o alias governa o publico, nao a recepcao. Por
+   * isso e metodo PROPRIO em vez de parametro em `entradasComExposicao` --
+   * um booleano `mostrarNomeReal` num caminho que hoje protege identidade
+   * publica seria uma chave de contorno esperando alguem liga-la por engano.
+   */
+  async entradasInternas(
+    contexto: TenantContext,
+    snapshotId: string,
+  ): Promise<readonly EntradaInternaDoPlacar[]> {
+    const entradas = await this.db.rankingEntry.findMany({
+      where: { snapshotId, snapshot: { tenantId: contexto.tenantId } },
+      orderBy: { position: 'asc' },
+      include: { student: { select: { fullName: true } } },
+    });
+
+    return entradas.map((entrada) => ({
+      position: entrada.position,
+      points: entrada.points,
+      studentId: entrada.studentId,
+      fullName: entrada.student.fullName,
     }));
   }
 

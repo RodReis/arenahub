@@ -113,6 +113,28 @@ function meiaNoiteLocalEmUtc(ano: number, mes: number, dia: number, fuso: string
 }
 
 /**
+ * O instante UTC em que o dia local da unidade COMECOU.
+ *
+ * Vive aqui, e nao no modulo que chama, porque este arquivo ja e o unico que
+ * sabe converter fuso em meia-noite (`meiaNoiteLocalEmUtc`, com a base IANA
+ * do runtime). A terceira copia dessa aritmetica seria a primeira a errar no
+ * horario de verao.
+ *
+ * Recusa fuso invalido pela mesma razao que `inicioDoPeriodo`: sem fuso nao
+ * ha meia-noite definida, e cair em UTC produz um corte errado e silencioso
+ * (ADR-019, fuso da unidade SEM fallback).
+ */
+export function inicioDoDiaLocal(agora: Date, fuso: string): Date {
+  if (!Intl.supportedValuesOf('timeZone').includes(fuso)) {
+    throw new RangeError(`fuso horario desconhecido: ${fuso}`);
+  }
+
+  const hoje = dataLocal(agora, fuso);
+
+  return meiaNoiteLocalEmUtc(hoje.ano, hoje.mes, hoje.dia, fuso);
+}
+
+/**
  * Instante a partir do qual as avaliacoes entram no grafico.
  *
  * `ALL` devolve `null` -- ausencia de corte, nao `new Date(0)`: uma data de
