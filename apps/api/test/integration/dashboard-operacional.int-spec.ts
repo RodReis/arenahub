@@ -272,6 +272,20 @@ describe('F57 -- dashboard operacional', () => {
   });
 
   /*
+   * A ORDEM ESTAVEL do bloco 4 NAO e testada aqui, e a ausencia e deliberada.
+   *
+   * A primeira versao deste arquivo tinha um teste que lia duas vezes e
+   * exigia a mesma ordem. **O canario reprovou o teste**: removendo o
+   * desempate do repositorio, ele continuou VERDE -- a ordem fisica do
+   * Postgres nao e reproduzivel sob demanda, e um UPDATE numa tabela pequena
+   * nao move a tupla o bastante.
+   *
+   * A prova real vive em `dashboard-ordem.spec.ts`, sobre a funcao de
+   * comparacao alimentada com as entradas na ordem errada de proposito. La o
+   * canario funciona.
+   */
+
+  /*
    * AC-5 e AC-9 -- placar publicado, com nome real; `DRAFT` invisivel.
    */
   describe('AC-5 e AC-9 -- placar', () => {

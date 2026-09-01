@@ -6,6 +6,35 @@ import { inicioDoDiaLocal } from '../health/domain/periodo.js';
 import { feriadosDoMes, type FeriadoDoCalendario } from './domain/feriados.js';
 
 /**
+ * Ordem de exibicao das contagens por situacao -- funcao PURA, exportada
+ * para ter teste proprio.
+ *
+ * `groupBy` sem `orderBy` devolve na ordem FISICA do Postgres, que muda a
+ * cada UPDATE nas linhas. Ordenar so por quantidade deixa os empates -- que
+ * sao a maioria numa academia com dois ou tres bloqueados -- trocando de
+ * lugar entre dois carregamentos, sem nada ter mudado. Uma lista que se
+ * reordena sozinha faz a recepcao reler a tela para conferir se leu certo.
+ *
+ * Vive aqui, e nao inline no `.sort()`, porque a ordem fisica do Postgres
+ * NAO e reproduzivel sob demanda: teste de integracao que tenta forcar o
+ * embaralhamento passa verde mesmo sem o desempate (medido). O que da para
+ * provar de verdade e a funcao de comparacao, com as entradas na ordem
+ * errada de proposito.
+ */
+export function compararSituacoes(
+  a: ContagemDeSituacao,
+  b: ContagemDeSituacao,
+): number {
+  return (
+    b.quantidade - a.quantidade ||
+    a.status.localeCompare(b.status) ||
+    // `null` por ULTIMO: "motivo nao informado" e o caso a resolver, nao o
+    // cabecalho da lista. `￿` e o maior ponto de codigo utilizavel.
+    (a.motivo ?? '￿').localeCompare(b.motivo ?? '￿')
+  );
+}
+
+/**
  * Leitura agregada do dashboard operacional -- F57, `SPEC-057`.
  *
  * SO LE. Nenhum bloco do dashboard escreve: a tela que todo mundo deixa
@@ -114,7 +143,7 @@ export class DashboardRepository {
         motivo: g.statusReason,
         quantidade: g._count,
       }))
-      .sort((a, b) => b.quantidade - a.quantidade);
+      .sort(compararSituacoes);
   }
 
   /**

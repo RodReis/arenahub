@@ -1051,14 +1051,13 @@ no deploy. `migrate deploy` num banco recém-criado aplicou as **54 migrations**
 `pnpm test:report --issue 242 --spec SPEC-057`, rodado em 01/09/2026:
 
 ```
-| 2026-09-01 | #242 | SPEC-057 | unitário   | 2893 | 2893 | 0 | 75.7 | — |
+| 2026-09-01 | #242 | SPEC-057 | unitário   | 2897 | 2897 | 0 | 75.7 | — |
 | 2026-09-01 | #242 | SPEC-057 | integração |  796 |  796 | 0 | 83.9 | — suíte a suíte |
 ```
 
-Unitário: **2893** (era 2868 na #245 — os **25** novos são desta fatia: 13 de `feriados`, 7 de
-`inicioDoDiaLocal`, 6 do feed e 3 do seletor, menos os 4 do layout que mudaram de asserção em vez de
-somar). Integração: **796** em **56 suítes**, sendo **13** da suíte nova
-`dashboard-operacional.int-spec.ts`.
+Unitário: **2897** (era 2868 na #245 — os **29** novos são desta fatia: 13 de `feriados`, 7 de
+`inicioDoDiaLocal`, 4 de `compararSituacoes`, 6 do feed e 4 do seletor). Integração: **796** em
+**56 suítes**, sendo **13** da suíte nova `dashboard-operacional.int-spec.ts`.
 
 ⚠️ **O `test:report` gravou 810, e o número está errado — corrigido à mão.** O Jest crasha no fim
 no Windows (comportamento conhecido desde a F38), e o gerador, sem saída para ler, **manteve o
@@ -1079,15 +1078,38 @@ medição 1 — execução suíte a suíte:  ok=796  falha=0  (56 suítes)
 medição 2 — contagem estática dos `it`/`test` declarados:  796
 ```
 
-🔬 **Canário (1).** A pausa do feed foi provada removendo-a:
+🔬 **Canários (2).**
 
 | guarda removida | testes que caem |
 |---|---|
 | `parar()` no ramo `oculta` de `visibilitychange` | **2** unitários (`PARA de recarregar`, `volta a recarregar`) |
+| desempate de `compararSituacoes` (só `quantidade`) | **3** unitários |
 
-O canário importa aqui porque o comportamento é **ausência de requisição**, e ausência é o que mais
+O primeiro importa porque o comportamento é **ausência de requisição**, e ausência é o que mais
 facilmente passa despercebido: sem ele, um teste que só afirmasse o rótulo "pausado" continuaria
 verde com o ciclo rodando por baixo.
+
+🔴 **O segundo canário REPROVOU o teste que eu tinha escrito, e essa é a lição da fatia.** A ordem
+estável do bloco 4 nasceu testada por **integração**: ler duas vezes pela rota, escrever no aluno
+entre as leituras e exigir a mesma ordem. Passava verde — **e continuou verde com o desempate
+removido**. A ordem física do Postgres não é reproduzível sob demanda: um `UPDATE` numa tabela
+pequena não move a tupla o bastante, e o teste passava pelo motivo errado.
+
+**O defeito é real, e foi medido no banco antes de decidir o que fazer:**
+
+```
+ status    | status_reason | count
+-----------+---------------+-------
+ SUSPENDED | MEDICAL       |     5
+ BLOCKED   | DELINQUENCY   |     5
+ BLOCKED   | CONDUCT       |     5
+```
+
+Três grupos com contagem **idêntica**, já devolvidos numa ordem que não é a de inserção. O teste de
+integração saiu (teste decorativo é pior que teste nenhum — afirma cobertura que não tem, e o
+arquivo agora explica por que ele não está lá), a comparação virou função pura exportada
+(`compararSituacoes`) e o teste unitário a alimenta com as entradas **na ordem errada de
+propósito**, incluindo as seis permutações. Aí o canário derruba **3**.
 
 📌 **A guarda do contrato OpenAPI pegou o que nenhuma outra camada pega.** Rota nova sem
 `@ApiOkResponse` reprova em `openapi.int-spec.ts` — e **typecheck, lint e `pnpm build` passam

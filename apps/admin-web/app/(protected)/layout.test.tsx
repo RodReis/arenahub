@@ -107,9 +107,11 @@ describe('seletor de unidade no topbar', () => {
 
     await renderizar();
 
-    const seletor = screen.getByTestId('unidade-ativa') as HTMLSelectElement;
+    // `getByLabelText` devolve o elemento JÁ tipado como `<select>`; o cast
+    // que estava aqui era redundante e o lint o recusa.
+    const seletor = screen.getByLabelText('Unidade');
 
-    expect(seletor.value).toBe('');
+    expect(seletor).toHaveValue('');
     expect(screen.getByRole('option', { name: 'Selecione a unidade' })).toBeDisabled();
   });
 
