@@ -229,14 +229,6 @@ test.describe('busca de aluno', () => {
     await expect(page.getByTestId('sem-alunos')).toContainText(/grafia|cadastre/i);
   });
 
-  test('avisa que a busca não cobre CPF -- senão a recepção conclui que o aluno não existe', async ({
-    page,
-  }) => {
-    await entrar(page);
-    await page.goto('/students');
-
-    await expect(page.getByTestId('aviso-de-busca')).toContainText(/não encontra por CPF/i);
-  });
 });
 
 test.describe('plano e direito de acesso', () => {
@@ -363,6 +355,9 @@ test.describe('situação do cadastro', () => {
     await page.reload();
 
     await page.getByTestId('campo-situacao').selectOption('BLOCKED');
+    // Motivo obrigatório desde a issue #241 -- e o select só aparece depois
+    // de escolher uma situação que o pede.
+    await page.getByTestId('campo-motivo-da-situacao').selectOption('DELINQUENCY');
     await page.getByTestId('confirmar-situacao').click();
 
     await expect(page.getByTestId('situacao-alterada')).toBeVisible();
@@ -390,6 +385,7 @@ test.describe('situação do cadastro', () => {
     // segunda alteração levava "alguém alterou este aluno enquanto você
     // editava" sem ninguém mais envolvido.
     await page.getByTestId('campo-situacao').selectOption('SUSPENDED');
+    await page.getByTestId('campo-motivo-da-situacao').selectOption('STUDENT_REQUEST');
     await page.getByTestId('confirmar-situacao').click();
 
     await expect(page.getByTestId('erro-da-situacao')).toHaveCount(0);

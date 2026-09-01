@@ -42,12 +42,13 @@ const APOSENTADO = {
 
 /** A tela faz duas chamadas em paralelo: fila de sync e dispositivos. */
 function responder(dispositivos: unknown[]) {
-  vi.mocked(chamarApi).mockImplementation(((caminho: string) =>
+  vi.mocked(chamarApi).mockImplementation((caminho: string) =>
     Promise.resolve(
       caminho.startsWith('/api/v1/devices')
         ? { ok: true, dados: dispositivos, cookiesDaApi: [] }
         : { ok: true, dados: [], cookiesDaApi: [] },
-    )) as unknown as typeof chamarApi);
+    ),
+  );
 }
 
 async function renderizar() {

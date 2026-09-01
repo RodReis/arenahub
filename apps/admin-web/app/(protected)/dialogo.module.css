@@ -10,9 +10,16 @@
  * Valor literal aqui e recusado pela guarda `check-css-tokens`.
  */
 .dialogo {
-  width: min(480px, calc(100vw - 48px));
   /*
-    `white-space: normal` NÃO É REDUNDANTE, e a herança é o motivo.
+    460 px é a medida do sistema (DS-PAINEL.md §2.8, "modal 460 px"). O
+    valor herdado de `units/` era 480 -- divergência de 20 px que ninguém
+    tinha motivo para escolher e que agora vale para os três modais.
+    Não virou token porque não existe escala de largura em
+    `packages/ui/tokens`: criar uma para um valor só seria inventar sistema.
+  */
+  width: min(460px, calc(100vw - 48px));
+  /*
+    HERANÇA DA CÉLULA DE AÇÕES -- as duas linhas abaixo existem por isso.
     ---------------------------------------------------------------------
     Este `<dialog>` é renderizado DENTRO da célula de ações da tabela, e
     `DataTable.module.css` põe `white-space: nowrap` nessa célula -- certo
@@ -25,10 +32,16 @@
     salva -- ele decide ONDE quebrar, não SE quebra; contra `nowrap`, não
     quebra nunca.
 
+    `text-align: right` chega pela mesma porta: a célula encosta os botões
+    à direita, e o modal inteiro -- título, série, dica do campo -- vinha
+    alinhado à direita junto. Corrigir cada filho seria tratar sintoma; a
+    herança é uma só e para aqui.
+
     Visto na tela, não em teste: `getByText` acha o nó inteiro mesmo com o
-    texto vazando, e os quatro testes desta tela passavam.
+    texto vazando ou torto, e os quatro testes desta tela passavam.
   */
   white-space: normal;
+  text-align: left;
   /*
     `margin: auto` É O QUE CENTRALIZA um `<dialog>` nativo -- sem ele o
     navegador aplica o próprio padrão e a caixa encosta no canto superior
@@ -87,13 +100,6 @@
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
-  /*
-    `text-align: left` pelo mesmo motivo do `white-space` lá em cima: a
-    célula de ações da tabela alinha à direita, e o modal herdava. A quebra
-    de linha em si é resolvida no `.dialogo` -- aqui não cabe
-    `overflow-wrap: anywhere`, que partiria palavra no meio.
-  */
-  text-align: left;
 }
 
 .rodapeDoDialogo {

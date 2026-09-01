@@ -141,19 +141,17 @@ export function SituacaoDaUnidade({ unitId, code, name, status }: Props) {
                   <strong>continuam existindo</strong> — nada é apagado.
                 </p>
 
+                {/* `hint` amarra a frase ao campo por `aria-describedby`. */}
                 <Field
                   id={`situacao-motivo-unidade-${unitId}`}
                   name="reason"
                   label="Motivo (obrigatório)"
+                  hint="Fica registrado com o seu nome e a data."
                   maxLength={500}
                   minLength={10}
                   required
                   data-testid={`campo-motivo-da-situacao-${unitId}`}
                 />
-
-                <p role="note" className={estilos['notaDoDialogo']}>
-                  O motivo fica registrado com o seu nome e a data.
-                </p>
               </>
             ) : (
               <p role="note" className={estilos['notaDoDialogo']}>

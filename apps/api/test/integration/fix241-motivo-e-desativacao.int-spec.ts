@@ -34,6 +34,10 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
   let gymUnitId = '';
   let cookie = '';
 
+  /** `getHttpServer()` devolve `any`; o helper prende o tipo num lugar so. */
+  const servidor = (): Parameters<typeof request>[0] =>
+    app.getHttpServer() as Parameters<typeof request>[0];
+
   beforeAll(async () => {
     const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = modulo.createNestApplication();
@@ -96,7 +100,7 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
 
     await db.userRole.create({ data: { tenantId, userId: usuario.id, roleId: papel.id } });
 
-    const login = await request(app.getHttpServer())
+    const login = await request(servidor())
       .post('/api/v1/auth/login')
       .send({ email, password: SENHA });
 
@@ -113,13 +117,13 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
 
   describe('unidade', () => {
     it('inativa a unidade e guarda o motivo na auditoria', async () => {
-      const resposta = await request(app.getHttpServer())
+      const resposta = await request(servidor())
         .patch(`/api/v1/units/${gymUnitId}`)
         .set('cookie', cookie)
         .send({ status: 'INACTIVE', reason: 'unidade fechada para reforma estrutural' });
 
       expect(resposta.status).toBe(200);
-      expect(resposta.body.status).toBe('INACTIVE');
+      expect((resposta.body as { status: string }).status).toBe('INACTIVE');
 
       const auditoria = await db.auditLog.findFirst({
         where: { tenantId, target: 'gym_unit', targetId: gymUnitId },
@@ -134,7 +138,7 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
     });
 
     it('recusa inativar sem motivo', async () => {
-      const resposta = await request(app.getHttpServer())
+      const resposta = await request(servidor())
         .patch(`/api/v1/units/${gymUnitId}`)
         .set('cookie', cookie)
         .send({ status: 'INACTIVE' });
@@ -143,17 +147,17 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
     });
 
     it('reativa sem exigir motivo', async () => {
-      const resposta = await request(app.getHttpServer())
+      const resposta = await request(servidor())
         .patch(`/api/v1/units/${gymUnitId}`)
         .set('cookie', cookie)
         .send({ status: 'ACTIVE' });
 
       expect(resposta.status).toBe(200);
-      expect(resposta.body.status).toBe('ACTIVE');
+      expect((resposta.body as { status: string }).status).toBe('ACTIVE');
     });
 
     it('recusa status fora do enum', async () => {
-      const resposta = await request(app.getHttpServer())
+      const resposta = await request(servidor())
         .patch(`/api/v1/units/${gymUnitId}`)
         .set('cookie', cookie)
         .send({ status: 'DELETED', reason: 'tentativa de excluir de verdade' });
@@ -180,7 +184,7 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
     });
 
     it('recusa aposentar sem motivo', async () => {
-      const resposta = await request(app.getHttpServer())
+      const resposta = await request(servidor())
         .patch(`/api/v1/devices/${deviceId}`)
         .set('cookie', cookie)
         .send({ status: 'RETIRED' });
@@ -189,23 +193,23 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
     });
 
     it('aceita manutencao sem motivo -- e movimento rotineiro', async () => {
-      const resposta = await request(app.getHttpServer())
+      const resposta = await request(servidor())
         .patch(`/api/v1/devices/${deviceId}`)
         .set('cookie', cookie)
         .send({ status: 'MAINTENANCE' });
 
       expect(resposta.status).toBe(200);
-      expect(resposta.body.status).toBe('MAINTENANCE');
+      expect((resposta.body as { status: string }).status).toBe('MAINTENANCE');
     });
 
     it('aposenta com motivo e o grava na auditoria', async () => {
-      const resposta = await request(app.getHttpServer())
+      const resposta = await request(servidor())
         .patch(`/api/v1/devices/${deviceId}`)
         .set('cookie', cookie)
         .send({ status: 'RETIRED', reason: 'leitor queimado apos descarga eletrica' });
 
       expect(resposta.status).toBe(200);
-      expect(resposta.body.status).toBe('RETIRED');
+      expect((resposta.body as { status: string }).status).toBe('RETIRED');
 
       const auditoria = await db.auditLog.findFirst({
         where: { tenantId, target: 'device', targetId: deviceId },
@@ -238,7 +242,7 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
     });
 
     const alterar = (corpo: Record<string, unknown>) =>
-      request(app.getHttpServer())
+      request(servidor())
         .patch(`/api/v1/students/${studentId}/status`)
         .set('cookie', cookie)
         .send(corpo);
@@ -249,7 +253,7 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
       expect(resposta.status).toBe(400);
       // CODIGO, nao so status: `400` sozinho nao distingue "falta o motivo"
       // de qualquer outra recusa de schema, e a tela traduz por codigo.
-      expect(resposta.body.code).toBe('STUDENT_STATUS_REASON_REQUIRED');
+      expect((resposta.body as { code: string }).code).toBe('STUDENT_STATUS_REASON_REQUIRED');
     });
 
     /*
@@ -277,13 +281,13 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
       });
 
       // LEAD -> SUSPENDED nao esta na tabela de transicoes, E vai sem motivo.
-      const resposta = await request(app.getHttpServer())
+      const resposta = await request(servidor())
         .patch(`/api/v1/students/${novo.id}/status`)
         .set('cookie', cookie)
         .send({ status: 'SUSPENDED', version: novo.version });
 
       expect(resposta.status).toBe(409);
-      expect(resposta.body.code).toBe('STUDENT_INVALID_TRANSITION');
+      expect((resposta.body as { code: string }).code).toBe('STUDENT_INVALID_TRANSITION');
     });
 
     it('recusa observacao sem motivo -- ela detalha a razao, nao a substitui', async () => {
@@ -305,11 +309,13 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
       });
 
       expect(resposta.status).toBe(200);
-      expect(resposta.body.status).toBe('BLOCKED');
-      expect(resposta.body.statusReason).toBe('DELINQUENCY');
-      expect(resposta.body.statusReasonNote).toBe('tres mensalidades em aberto');
+      expect((resposta.body as { status: string }).status).toBe('BLOCKED');
+      expect((resposta.body as { statusReason: string }).statusReason).toBe('DELINQUENCY');
+      expect((resposta.body as { statusReasonNote: string }).statusReasonNote).toBe(
+        'tres mensalidades em aberto',
+      );
 
-      versao = resposta.body.version;
+      versao = (resposta.body as { version: number }).version;
     });
 
     it('guarda o motivo na timeline, que nao e reescrita', async () => {
@@ -338,14 +344,14 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
       });
 
       expect(resposta.status).toBe(400);
-      expect(resposta.body.code).toBe('STUDENT_STATUS_REASON_NOT_APPLICABLE');
+      expect((resposta.body as { code: string }).code).toBe('STUDENT_STATUS_REASON_NOT_APPLICABLE');
     });
 
     it('LIMPA o motivo ao voltar para ativo', async () => {
       const resposta = await alterar({ status: 'ACTIVE', version: versao });
 
       expect(resposta.status).toBe(200);
-      expect(resposta.body.status).toBe('ACTIVE');
+      expect((resposta.body as { status: string }).status).toBe('ACTIVE');
 
       /*
        * O CASO QUE O `CHECK` DO BANCO PEGA, e que a aplicacao tem de evitar
@@ -353,8 +359,8 @@ describe('#241 -- motivo de situacao e desativacao por status', () => {
        * no cadastro -- e a proxima pessoa que abrir a ficha le um motivo que
        * nao vale mais.
        */
-      expect(resposta.body.statusReason).toBeNull();
-      expect(resposta.body.statusReasonNote).toBeNull();
+      expect((resposta.body as { statusReason: string | null }).statusReason).toBeNull();
+      expect((resposta.body as { statusReasonNote: string | null }).statusReasonNote).toBeNull();
 
       const gravado = await db.student.findFirstOrThrow({ where: { id: studentId } });
 

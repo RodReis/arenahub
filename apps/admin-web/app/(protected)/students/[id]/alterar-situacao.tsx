@@ -160,11 +160,16 @@ export function AlterarSituacao({ studentId, situacaoAtual, version }: Props) {
             A OBSERVAÇÃO É OPCIONAL e acompanha a razão, não a substitui. A
             razão fechada responde "por quê" e permite contar; a observação
             responde "o que exatamente" no caso concreto.
+
+            O `hint` diz isso onde a pessoa decide se escreve ou não -- e,
+            por vir do `Field`, é lido junto do campo por quem usa leitor de
+            tela, não como parágrafo à parte.
           */}
           <Field
             id="observacao-da-situacao"
             name="reasonNote"
             label="Observação (opcional)"
+            hint="O caso concreto: prazo, número do atestado, o que combinaram."
             maxLength={500}
             data-testid="campo-observacao-da-situacao"
           />

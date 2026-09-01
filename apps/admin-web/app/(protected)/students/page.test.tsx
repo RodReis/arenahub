@@ -61,12 +61,13 @@ const SUSPENSO = {
 };
 
 function responder(alunos: unknown[]) {
-  vi.mocked(chamarApi).mockImplementation(((caminho: string) =>
+  vi.mocked(chamarApi).mockImplementation((caminho: string) =>
     Promise.resolve(
       caminho.startsWith('/api/v1/students')
         ? { ok: true, dados: alunos, cookiesDaApi: [] }
         : { ok: true, dados: [], cookiesDaApi: [] },
-    )) as unknown as typeof chamarApi);
+    ),
+  );
 }
 
 async function renderizar(alunos: unknown[]) {

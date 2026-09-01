@@ -263,19 +263,22 @@ export function AcoesDoDispositivo({ deviceId, serial, model, status, firmware }
               registrados por ele <strong>continuam no histórico</strong> — nada é apagado.
             </p>
 
+            {/*
+              `hint` do `Field`, e não um `<p>` solto ao lado: o componente o
+              amarra ao campo por `aria-describedby`, então quem usa leitor de
+              tela ouve "o motivo fica registrado..." AO CHEGAR no campo, e
+              não como um parágrafo órfão depois dele.
+            */}
             <Field
               id={`baixa-motivo-dispositivo-${deviceId}`}
               name="reason"
               label="Motivo (obrigatório)"
+              hint="Fica registrado com o seu nome e a data."
               maxLength={500}
               required
               minLength={10}
               data-testid={`campo-motivo-da-baixa-${deviceId}`}
             />
-
-            <p role="note" className={estilos['notaDoDialogo']}>
-              O motivo fica registrado com o seu nome e a data.
-            </p>
           </div>
 
           <div className={estilos['rodapeDoDialogo']}>
