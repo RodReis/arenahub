@@ -27,9 +27,7 @@ _(vazio)_
 
 ## Em Andamento
 
-### Sem épico
-
-- [MVP1][FIX] design system paralelo em src/components/ui: uma tela usa outro vocabulario, e o select quebra o E2E (#231)
+_(vazio)_
 
 ## Feito
 
@@ -40,6 +38,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] design system paralelo em src/components/ui: uma tela usa outro vocabulario, e o select quebra o E2E (#231, finalizado em: 2026-09-01)
+- [MVP5][FIX] cinco testes de integração quebram na virada do mês: fixture em agosto, código lendo o relógio real (#237, finalizado em: 2026-09-01)
 - [MVP1][FIX] dois testes de reajuste de preco quebram todo dia 1 do mes: cenario colide com o preco de nascimento do plano (#233, finalizado em: 2026-09-01)
 - [INFRA] gate de contraste do build de tokens nao cobre o totem (#230, finalizado em: 2026-09-01)
 - [MVP6][SPEC-041][F41] Produção controlada e monitoramento (#41, finalizado em: 2026-08-31)
