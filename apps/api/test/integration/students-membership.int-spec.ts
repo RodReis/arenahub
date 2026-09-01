@@ -1229,20 +1229,41 @@ describe('F7 -- aluno, plano e entitlement', () => {
       expect(precos).toHaveLength(2);
     });
 
+    /**
+     * DATA RELATIVA, nunca literal -- o teste envelhecia com o calendario.
+     *
+     * A versao anterior gravava `'2026-09-01T00:00:00.000Z'` fixo. Enquanto
+     * essa data foi futuro, o cenario funcionou; em 01/09/2026 ela virou HOJE
+     * e os dois `POST` passaram a colidir com o preco de NASCIMENTO do plano
+     * -- `criarPlano` cria o plano ja com preco, e o repositorio grava essa
+     * primeira linha em `competenciaDe(agora)`, o dia 1 do mes corrente
+     * (`membership.repository.ts`). O primeiro `POST` recebia 409 em vez de
+     * 201 e a suite caia. Falharia de novo todo dia 1, em qualquer mes.
+     *
+     * O que este teste prova -- "gravar duas vezes o mesmo `validFrom` da 409
+     * com codigo estavel" -- nao depende de QUAL data seja, so de ela estar
+     * livre. O primeiro dia do proximo mes e sempre livre: o preco de
+     * nascimento mora no mes corrente.
+     */
     it('validFrom duplicado responde 409 com codigo estavel, nao 500', async () => {
       const planId = await criarPlano(contas.a);
+
+      const agora = new Date();
+      const proximaCompetencia = new Date(
+        Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth() + 1, 1),
+      ).toISOString();
 
       const primeiro = await request(servidor())
         .post(`/api/v1/plans/${planId}/prices`)
         .set('Cookie', contas.a.cookie)
-        .send({ amountMinor: 18000, validFrom: '2026-09-01T00:00:00.000Z' });
+        .send({ amountMinor: 18000, validFrom: proximaCompetencia });
 
       expect(primeiro.status).toBe(201);
 
       const duplicado = await request(servidor())
         .post(`/api/v1/plans/${planId}/prices`)
         .set('Cookie', contas.a.cookie)
-        .send({ amountMinor: 20000, validFrom: '2026-09-01T00:00:00.000Z' });
+        .send({ amountMinor: 20000, validFrom: proximaCompetencia });
 
       expect(duplicado.status).toBe(409);
       expect((duplicado.body as { code: string }).code).toBe('PLAN_PRICE_VALID_FROM_TAKEN');
@@ -1292,7 +1313,30 @@ describe('F7 -- aluno, plano e entitlement', () => {
         .set('Cookie', contas.a.cookie)
         .send({ amountMinor: 18000, validFrom: meiaNoiteDeHoje.toISOString() });
 
-      expect(resposta.status).toBe(201);
+      /*
+       * A ASSERCAO E SOBRE O 422, nao sobre o 201 -- e a data TEM de ser hoje.
+       *
+       * Este teste existe para uma fronteira: `validFrom` no dia corrente nao
+       * pode cair como retroativo. Trocar a data por outra qualquer mataria o
+       * que ele prova, entao o cenario e que precisa ceder.
+       *
+       * E ele cede num dia por mes: `criarPlano` cria o plano JA com preco, e
+       * o repositorio grava essa primeira linha em `competenciaDe(agora)` --
+       * o dia 1. Todo dia 1, "hoje" e a competencia corrente sao a MESMA data,
+       * o `@@unique([planId, validFrom])` acusa e a resposta legitima passa a
+       * ser 409. Assertar `201` cru fazia a suite cair no dia 1 de cada mes.
+       *
+       * 201 e 409 dizem os dois que a regra do retroativo deixou passar: um
+       * gravou, o outro esbarrou na linha que ja existia PARA HOJE. Quem
+       * reprova a fronteira e o 422 -- e e so ele que este teste precisa ver
+       * ausente.
+       */
+      expect(resposta.status).not.toBe(422);
+      expect([201, 409]).toContain(resposta.status);
+
+      if (resposta.status === 409) {
+        expect((resposta.body as { code: string }).code).toBe('PLAN_PRICE_VALID_FROM_TAKEN');
+      }
     });
 
     it('plano de outro tenant responde 404 ao reajustar, exigindo o codigo', async () => {
