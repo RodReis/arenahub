@@ -1046,13 +1046,13 @@ no deploy. `migrate deploy` num banco recém-criado aplicou as **54 migrations**
 
 ### Evidência da `SPEC-057` — F57, dashboard operacional
 
-**PR: [#247](https://github.com/RodReis/arenahub/pull/247)** — preenchido depois do merge, pela regra do topo desta seção.
+**PR: [#247](https://github.com/RodReis/arenahub/pull/247)** — mergeado em 01/09/2026, CI verde nos dois jobs.
 
 `pnpm test:report --issue 242 --spec SPEC-057`, rodado em 01/09/2026:
 
 ```
-| 2026-09-01 | #242 | SPEC-057 | unitário   | 2897 | 2897 | 0 | 75.7 | — |
-| 2026-09-01 | #242 | SPEC-057 | integração |  796 |  796 | 0 | 83.9 | — suíte a suíte |
+| 2026-09-01 | #242 | SPEC-057 | unitário   | 2897 | 2897 | 0 | 75.7 | [#247](https://github.com/RodReis/arenahub/pull/247) |
+| 2026-09-01 | #242 | SPEC-057 | integração |  796 |  796 | 0 | 83.9 | [#247](https://github.com/RodReis/arenahub/pull/247) — suíte a suíte |
 ```
 
 Unitário: **2897** (era 2868 na #245 — os **29** novos são desta fatia: 13 de `feriados`, 7 de
