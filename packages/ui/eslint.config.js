@@ -20,4 +20,21 @@ export default [
       'no-restricted-syntax': 'off',
     },
   },
+  {
+    /*
+     * O CANARIO DO GATE DE CONTRASTE PRECISA DO HEX QUE A REGRA 1 PROIBE.
+     *
+     * Ele planta cor reprovada no `totem.json`, roda o build e exige que
+     * falhe -- e a unica forma de provar que a guarda reprova de verdade, em
+     * vez de estar apenas ausente. Sem esta excecao a regra 1 barraria o
+     * proprio teste que existe para provar a regra 4.
+     *
+     * Um arquivo, nominal, como as duas acima. O hex aqui nunca chega a
+     * componente nem a tela: e entrada de teste, restaurada no `afterEach`.
+     */
+    files: ['src/gate-de-contraste-do-totem.spec.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
+    },
+  },
 ];

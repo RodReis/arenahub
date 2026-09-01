@@ -236,6 +236,243 @@ for (const [name, def] of Object.entries(semantic.state ?? {})) {
   }
 }
 
+/* ------------------------------------------------- contraste do TOTEM (#230) */
+
+/**
+ * O MESMO GATE, na superficie que nao o tinha.
+ *
+ * Ate 01/09/2026 o pipeline VERIFICAVA o painel e apenas EMITIA o totem: a
+ * saida dizia "13 pares verificados" e nenhum era desta superficie. Os campos
+ * `contrastOnBase` do totem.json eram numero escrito a mao que ninguem
+ * conferia -- e varios `$comment` argumentam "reprova no alvo X, e legitimo
+ * porque ..." apoiados nesse numero.
+ *
+ * Nao era hipotese. Dois tokens estavam abaixo do minimo da WCAG com o build
+ * verde (corrigidos no PR #232):
+ *
+ *   border.default  1.38 sobre base -- reprovava 1.4.11 (piso 3.0)
+ *   text.tertiary   2.81 sobre SURFACE -- o JSON anotava 3.00 medindo contra
+ *                   `bg.base`, e o uso real e sobre `bg.surface`
+ *
+ * O segundo e a licao inteira: nao basta medir, tem de medir contra o fundo
+ * CERTO. O gate do painel ja aprendeu isso com o badge de estado em 18/08;
+ * aqui a mesma armadilha seguia aberta.
+ *
+ * TRES ALVOS, por papel -- um numero unico reprova ou o texto ou a borda:
+ *
+ *   texto normal ....... 4.5  (WCAG 1.4.3)
+ *   texto grande ....... 3.0  (>= 18.66px bold ou >= 24px)
+ *   componente/borda ... 3.0  (WCAG 1.4.11)
+ *
+ * O alvo de 7 que o totem.json cita e AAA. Fica como meta no proprio JSON,
+ * nunca como reprovacao: quebrar o build por algo que o contrato nao exige
+ * ensina a desligar a guarda.
+ */
+
+const ALVO_TOTEM = { texto: 4.5, textoGrande: 3.0, componente: 3.0 };
+
+/**
+ * O fundo em que cada token REALMENTE aparece, e o piso que o papel dele pede.
+ *
+ * `fundos` e lista porque varios pintam nos dois: `border.default` contorna
+ * card (sobre `bg.surface`) E botao secundario (sobre `bg.base`). O MENOR dos
+ * dois manda -- passar num e reprovar no outro e reprovar.
+ */
+const PAPEIS_DO_TOTEM = [
+  { token: 'text.primary', alvo: 'texto', fundos: ['bg.base', 'bg.surface'] },
+  { token: 'text.secondary', alvo: 'texto', fundos: ['bg.base', 'bg.surface'] },
+  { token: 'text.tertiary', alvo: 'texto', fundos: ['bg.base', 'bg.surface'] },
+  { token: 'border.default', alvo: 'componente', fundos: ['bg.base', 'bg.surface'] },
+  { token: 'border.hairline', alvo: 'componente', fundos: ['bg.base', 'bg.surface'] },
+  { token: 'brand.200', alvo: 'texto', fundos: ['bg.base', 'bg.surface'] },
+  { token: 'brand.300', alvo: 'componente', fundos: ['bg.base', 'bg.surface'] },
+];
+
+/**
+ * Excecao NOMINAL, com a clausula que isenta -- nunca um "por enquanto".
+ *
+ * Mesmo molde do `$exempt` do painel e da lista do eslint/design-system.js:
+ * curta, por token, com o motivo escrito. Regra sem excecao nomeada vira
+ * `eslint-disable` solto; excecao sem motivo vira lixo que ninguem ousa
+ * remover.
+ */
+const ISENTOS_DO_TOTEM = {
+  'border.hairline': {
+    why:
+      'Divisor interno e linha de tabela -- decoracao, nao affordance. A WCAG ' +
+      '1.4.11 cobre o que o usuario precisa PERCEBER para operar, e o alvo ' +
+      'tocavel e delimitado por `border.default`, que passa. Um hairline a 3:1 ' +
+      'viraria grade, nao divisor.',
+  },
+};
+
+/**
+ * A rampa de `brand` nao entra em `PAPEIS_DO_TOTEM` com alvo de texto.
+ *
+ * `400`, `500` e `600` sao FUNDO -- pontas do gradiente de CTA e preenchimento
+ * de anel e barra. Medi-los como texto reprovaria cor que nunca vira letra. O
+ * par que importa e o BRANCO sobre eles, no bloco mais abaixo.
+ */
+const ACCENTS_DO_TOTEM = ['AZUL', 'VERDE', 'LARANJA', 'ROXO'];
+
+const valorDoTotem = (caminho) => {
+  const [grupo, nome] = caminho.split('.');
+  return totem.totem?.[grupo]?.[nome]?.value ?? null;
+};
+
+for (const papel of PAPEIS_DO_TOTEM) {
+  const fg = valorDoTotem(papel.token);
+  if (!fg) {
+    errors.push(`totem: token inexistente em PAPEIS_DO_TOTEM: "${papel.token}"`);
+    continue;
+  }
+
+  const alvo = ALVO_TOTEM[papel.alvo];
+  const isento = ISENTOS_DO_TOTEM[papel.token];
+
+  let pior = null;
+  for (const chave of papel.fundos) {
+    const bg = valorDoTotem(chave);
+    if (!bg) {
+      errors.push(`totem: fundo inexistente: "${chave}"`);
+      continue;
+    }
+    const value = round2(contrast(fg, bg));
+    if (pior === null || value < pior.value) pior = { value, bg: chave, hex: bg };
+  }
+  if (pior === null) continue;
+
+  contrastReport.push({
+    role: `totem.${papel.token}`,
+    fg,
+    bg: pior.bg,
+    value: pior.value,
+    exempt: isento ? isento.why : null,
+  });
+
+  if (pior.value < alvo && !isento) {
+    errors.push(
+      `contraste reprovado: totem.${papel.token} (${fg}) sobre ${pior.bg} ` +
+        `(${pior.hex}) = ${pior.value}, alvo ${alvo} (${papel.alvo}). ` +
+        `Use um tom mais claro OU declare a isencao em ISENTOS_DO_TOTEM com a ` +
+        `clausula WCAG que a justifica.`,
+    );
+  }
+}
+
+/**
+ * Estado do totem sobre O FUNDO QUE ELE PINTA -- nao sobre `bg.base` puro.
+ *
+ * A receita do §2.1 e a mesma do badge do painel: fundo em 10% da cor, texto e
+ * icone na cor cheia. Medir contra `bg.base` puro e OTIMISTA -- o tint clareia
+ * o fundo e derruba o contraste real em ~1.3 ponto. Foi esse par errado que
+ * deixou `state.success` do painel passar com 5.08 e entregar 4.44 na tela.
+ */
+for (const [name, def] of Object.entries(totem.totem.state ?? {})) {
+  if (name.startsWith('$')) continue;
+  const fg = def.value;
+  if (!fg) continue;
+
+  const fundo = mix(fg, valorDoTotem('bg.base'), TINT_DO_BADGE);
+  const value = round2(contrast(fg, fundo));
+
+  contrastReport.push({ role: `totem.state.${name}`, fg, bg: fundo, value, exempt: null });
+
+  if (value < ALVO_TOTEM.texto) {
+    errors.push(
+      `contraste reprovado: totem.state.${name} (${fg}) sobre o proprio tint ` +
+        `de 10% (${fundo}) = ${value}, alvo ${ALVO_TOTEM.texto}.`,
+    );
+  }
+}
+
+/**
+ * BRANCO sobre o CTA, nos QUATRO accents -- o par que mais aperta.
+ *
+ * O rotulo do CTA e 30px/700 e o do cabecalho 24px/700: os dois contam como
+ * TEXTO GRANDE (>= 18.66px bold), piso 3.0. O gradiente vai de `400` a `600`,
+ * e o inicio e sempre o pior lado.
+ *
+ * TRES DOS QUATRO REPROVAM HOJE -- VERDE 2.37, LARANJA 2.60, ROXO 2.84. Nao
+ * quebram o build de proposito: mexer na rampa muda a identidade configuravel
+ * do tenant, que e decisao de PRODUTO e nao de guarda. Ficam REPORTADOS, com o
+ * card que os carrega. O gate existe para tornar o problema visivel, nao para
+ * decidir no lugar do PI.
+ */
+const CTA_CONHECIDO = {
+  VERDE: '#230 -- rampa derivada do seed; corrigir muda a identidade do tenant',
+  LARANJA: '#230 -- idem',
+  ROXO: '#230 -- idem',
+};
+
+for (const accent of ACCENTS_DO_TOTEM) {
+  const rampa =
+    accent === 'AZUL' ? totem.totem.brand : totem.totem.accentsDerivados?.[accent];
+  const inicio = rampa?.['400']?.value;
+  if (!inicio) {
+    errors.push(`totem: accent "${accent}" sem tom 400 -- o inicio do gradiente de CTA.`);
+    continue;
+  }
+
+  const value = round2(contrast(WHITE, inicio));
+  const conhecido = CTA_CONHECIDO[accent];
+
+  contrastReport.push({
+    role: `totem.cta.${accent}`,
+    fg: WHITE,
+    bg: inicio,
+    value,
+    exempt: conhecido ?? null,
+  });
+
+  if (value < ALVO_TOTEM.textoGrande && !conhecido) {
+    errors.push(
+      `contraste reprovado: branco sobre o inicio do gradiente de CTA do accent ` +
+        `${accent} (${inicio}) = ${value}, alvo ${ALVO_TOTEM.textoGrande} ` +
+        `(texto grande). O rotulo do CTA e 30px/700.`,
+    );
+  }
+}
+
+/**
+ * `contrastOnBase` do JSON tem de BATER com o medido.
+ *
+ * Sem isto o campo continua sendo prosa: alguem troca o hex, esquece o numero,
+ * e o arquivo passa a mentir com o build verde -- que e como `text.tertiary`
+ * anotava 3.00 enquanto entregava 2.81 no uso real.
+ *
+ * Tolerancia de 0.01 para arredondamento. `bg.base` nao se mede contra si
+ * mesmo e `brand.tint` e rgba sem luminancia fixa: os dois ficam de fora por
+ * nao declararem `contrastOnBase` no JSON.
+ */
+const conferirAnotacao = (rotulo, def) => {
+  if (def.contrastOnBase === undefined) return;
+  const medido = round2(contrast(def.value, valorDoTotem('bg.base')));
+  if (Math.abs(medido - def.contrastOnBase) > 0.01) {
+    errors.push(
+      `${rotulo}: "contrastOnBase" diz ${def.contrastOnBase} mas o medido contra ` +
+        `bg.base e ${medido}. O campo nao pode divergir do calculo -- numero que ` +
+        `so um humano mantem volta a mentir.`,
+    );
+  }
+};
+
+for (const [grupo, entradas] of Object.entries(totem.totem)) {
+  if (grupo === 'accentsDerivados' || grupo.startsWith('$')) continue;
+  for (const [nome, def] of Object.entries(entradas)) {
+    if (nome.startsWith('$') || typeof def !== 'object') continue;
+    conferirAnotacao(`totem.${grupo}.${nome}`, def);
+  }
+}
+
+for (const [accent, papeis] of Object.entries(totem.totem.accentsDerivados ?? {})) {
+  if (accent.startsWith('$')) continue;
+  for (const [tom, def] of Object.entries(papeis)) {
+    if (tom.startsWith('$') || typeof def !== 'object') continue;
+    conferirAnotacao(`totem.accentsDerivados.${accent}.${tom}`, def);
+  }
+}
+
 /* ------------------------------------------------------------------ saida */
 
 const cssLines = [];
