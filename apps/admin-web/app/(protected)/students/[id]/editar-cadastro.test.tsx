@@ -48,6 +48,11 @@ const PADRAO = {
   registeredSex: null,
   contacts: [],
   address: null,
+  // ATIVO no padrao: os campos de motivo so existem em SUSPENDED/BLOCKED, e
+  // o teste que os exercita passa `status` proprio.
+  status: 'ACTIVE',
+  statusReason: null,
+  statusReasonNote: null,
 };
 
 function renderizar(props: Partial<Parameters<typeof EditarCadastro>[0]> = {}) {
@@ -226,5 +231,50 @@ describe('EditarCadastro', () => {
     await abrir(usuario);
 
     expect(container.querySelector('input[name="version"]')).toHaveValue('7');
+  });
+  /**
+   * O BURACO QUE ESTES TRES TESTES FECHAM (issue #241).
+   *
+   * `PATCH /:id/status` so aceita motivo junto de uma MUDANCA de situacao.
+   * Quem ja estava suspenso ou bloqueado antes do campo existir -- os alunos
+   * do seed, os importados do Pacto -- ficava sem caminho nenhum: a unica
+   * saida era reativar e bloquear de novo, o que grava na timeline uma
+   * reativacao que nunca aconteceu.
+   */
+  it('oferece motivo e observacao quando o aluno esta bloqueado', async () => {
+    const usuario = userEvent.setup();
+
+    renderizar({ status: 'BLOCKED', statusReason: 'DELINQUENCY', statusReasonNote: 'desde junho' });
+    await abrir(usuario);
+
+    expect(screen.getByTestId('campo-edicao-motivo')).toHaveValue('DELINQUENCY');
+    expect(screen.getByTestId('campo-edicao-observacao')).toHaveValue('desde junho');
+  });
+
+  it('oferece motivo tambem no suspenso', async () => {
+    const usuario = userEvent.setup();
+
+    renderizar({ status: 'SUSPENDED', statusReason: null, statusReasonNote: null });
+    await abrir(usuario);
+
+    // Vazio, e nao ausente: e exatamente o aluno que precisa do preenchimento.
+    expect(screen.getByTestId('campo-edicao-motivo')).toHaveValue('');
+  });
+
+  /**
+   * FORA DE SUSPENDED/BLOCKED OS CAMPOS NEM EXISTEM.
+   *
+   * O `CHECK` do banco (`students_motivo_so_com_situacao_que_o_pede`) proibe
+   * motivo em aluno ativo, e a API recusa. Mostrar o campo -- mesmo
+   * desabilitado -- sugeriria um caminho que nao ha.
+   */
+  it('nao oferece motivo para aluno ativo', async () => {
+    const usuario = userEvent.setup();
+
+    renderizar();
+    await abrir(usuario);
+
+    expect(screen.queryByTestId('campo-edicao-motivo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('campo-edicao-observacao')).not.toBeInTheDocument();
   });
 });

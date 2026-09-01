@@ -167,3 +167,30 @@
     transition: none;
   }
 }
+
+/**
+ * A situação vigente e o motivo dela, no topo da seção que os altera.
+ *
+ * Vieram da lista de leitura do topo da ficha (decisão do PI, 01/09/2026):
+ * a tela dizia a mesma coisa duas vezes, e a segunda ficava longe do
+ * formulário que a muda. Aqui, quem lê está a um clique de agir.
+ */
+.situacaoVigente {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  flex-wrap: wrap;
+}
+
+/**
+ * O motivo é APOIO da situação, não par dela: entra menor e mais discreto,
+ * abaixo do badge. Ler "Bloqueado" e depois "por quê" é a ordem em que a
+ * recepção pergunta.
+ */
+.motivoVigente {
+  margin: 0 0 12px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}

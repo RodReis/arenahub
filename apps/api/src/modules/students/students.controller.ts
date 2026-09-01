@@ -145,6 +145,18 @@ const esquemaDeCriacao = z
  * valida a transicao. Duplicar aqui seria um segundo caminho para mudar
  * situacao, sem as regras do primeiro.
  */
+/**
+ * Por que o aluno foi suspenso ou bloqueado (issue #241).
+ *
+ * Lista FECHADA por decisao do PI em 01/09/2026: o dashboard conta por razao,
+ * e texto livre nao se agrupa. A observacao concreta vai em `reasonNote`, ao
+ * lado -- as duas coisas sao diferentes e nenhuma substitui a outra.
+ */
+const motivoDaSituacao = z.enum(['DELINQUENCY', 'STUDENT_REQUEST', 'MEDICAL', 'CONDUCT']);
+
+/** As duas situacoes que PEDEM motivo. Uma lista, usada pelas duas regras. */
+const SITUACAO_COM_MOTIVO = new Set(['SUSPENDED', 'BLOCKED']);
+
 const esquemaDeEdicao = z
   .object({
     version: z.number().int().min(0),
@@ -165,6 +177,20 @@ const esquemaDeEdicao = z
     advisorUserId: z.string().uuid().nullable().optional(),
     contacts: z.array(contato).max(10).optional(),
     address: endereco.nullable().optional(),
+    /*
+     * MOTIVO TAMBEM SE CORRIGE AQUI, e nao so ao TROCAR de situacao.
+     *
+     * `PATCH /:id/status` exige mudanca de estado para aceitar motivo. Quem
+     * JA estava suspenso ou bloqueado -- os alunos que vieram do seed, os
+     * importados, quem foi bloqueado antes do campo existir -- ficava sem
+     * caminho: a unica saida era reativar e bloquear de novo, o que grava na
+     * timeline uma reativacao que nunca aconteceu.
+     *
+     * `null` LIMPA, como nos demais campos deste schema. A validacao contra
+     * a situacao VIGENTE mora no caso de uso, que e quem a conhece.
+     */
+    statusReason: motivoDaSituacao.nullable().optional(),
+    statusReasonNote: z.string().trim().min(1).max(500).nullable().optional(),
   })
   .strict();
 
@@ -181,18 +207,6 @@ const situacaoDoAluno = z.enum([
   'CANCELLED',
   'ARCHIVED',
 ]);
-
-/**
- * Por que o aluno foi suspenso ou bloqueado (issue #241).
- *
- * Lista FECHADA por decisao do PI em 01/09/2026: o dashboard conta por razao,
- * e texto livre nao se agrupa. A observacao concreta vai em `reasonNote`, ao
- * lado -- as duas coisas sao diferentes e nenhuma substitui a outra.
- */
-const motivoDaSituacao = z.enum(['DELINQUENCY', 'STUDENT_REQUEST', 'MEDICAL', 'CONDUCT']);
-
-/** As duas situacoes que PEDEM motivo. Uma lista, usada pelas duas regras. */
-const SITUACAO_COM_MOTIVO = new Set(['SUSPENDED', 'BLOCKED']);
 
 const esquemaDeStatus = z
   .object({
@@ -529,6 +543,27 @@ export class StudentsController {
     // `null` limpa o consultor e nao precisa de checagem -- so um valor novo.
     if (dados.advisorUserId) {
       await this.exigirConsultorDoTenant(dados.advisorUserId);
+    }
+
+    /*
+     * A INVARIANTE E A MESMA do `PATCH /:id/status`, medida contra a situacao
+     * VIGENTE: motivo so existe em SUSPENDED/BLOCKED. Aqui a situacao nao
+     * muda, entao quem manda e `atual.status`.
+     *
+     * Sem esta checagem o `CHECK` do banco derrubaria a transacao com erro de
+     * constraint -- correto, e mudo sobre o que fazer.
+     */
+    if (dados.statusReason != null && !SITUACAO_COM_MOTIVO.has(atual.status)) {
+      throw new BadRequestException({ code: 'STUDENT_STATUS_REASON_NOT_APPLICABLE' });
+    }
+
+    /*
+     * Observacao sem razao e orfa -- a mesma regra do outro endpoint. Vale
+     * tambem quando a razao JA esta gravada e so a observacao vem no corpo:
+     * `?? atual.statusReason` cobre esse caso.
+     */
+    if (dados.statusReasonNote != null && (dados.statusReason ?? atual.statusReason) == null) {
+      throw new BadRequestException({ code: 'STUDENT_STATUS_REASON_REQUIRED' });
     }
 
     const aluno = await this.alunos.atualizar(

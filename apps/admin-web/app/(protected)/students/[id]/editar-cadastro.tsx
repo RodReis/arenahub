@@ -8,6 +8,11 @@ import { Button, Field, SelectField, useToastDeErro } from '@arenahub/ui';
 import estilos from './edicao.module.css';
 
 import { editarAluno, type EstadoDaEdicao } from '../../../actions/students';
+import {
+  MOTIVO_DA_SITUACAO,
+  ROTULO_DE_SITUACAO,
+  SITUACOES_COM_MOTIVO,
+} from '../../../../src/students/formatar';
 
 /** Contato como a API o devolve. */
 interface Contato {
@@ -39,6 +44,10 @@ interface Props {
   readonly registeredSex: string | null;
   readonly contacts: readonly Contato[];
   readonly address: Endereco | null;
+  /** Situação vigente -- decide se os campos de motivo existem. */
+  readonly status: string;
+  readonly statusReason: string | null;
+  readonly statusReasonNote: string | null;
 }
 
 const ESTADO_INICIAL: EstadoDaEdicao = {};
@@ -122,6 +131,9 @@ export function EditarCadastro({
   registeredSex,
   contacts,
   address,
+  status,
+  statusReason,
+  statusReasonNote,
 }: Props) {
   const [aberto, setAberto] = useState(false);
   const [aba, setAba] = useState<IdDeAba>('identificacao');
@@ -273,12 +285,28 @@ export function EditarCadastro({
                   data-testid="campo-edicao-nascimento"
                 />
 
+                {/*
+                  `required` SÓ PARA QUEM JÁ TEM CPF -- decisão do PI em
+                  01/09/2026.
+
+                  Obrigatório para todos, o campo travava a edição INTEIRA de
+                  quem nunca teve CPF: 322 alunos hoje (os do seed e os
+                  importados do Pacto, ADR-033). Não dava para corrigir
+                  telefone, endereço nem o motivo da situação -- o formulário
+                  simplesmente não submetia, e a validação nativa aponta um
+                  campo que a recepção muitas vezes não tem como preencher.
+
+                  Quem TEM continua sem poder apagar: é a mesma regra do
+                  `PATCH /:id` na API, que recusa `null` e aceita ausente
+                  (ADR-043 Decisão 3). O que muda é só o piso de entrada.
+                */}
                 <Field
                   id={`edicao-cpf-${studentId}`}
                   name="cpf"
                   label="CPF"
                   defaultValue={valor('cpf', cpf ?? '')}
-                  required
+                  {...(cpf ? { required: true } : {})}
+                  {...(cpf ? {} : { hint: 'Sem CPF no cadastro. Informe quando tiver.' })}
                   data-testid="campo-edicao-cpf"
                 />
 
@@ -307,6 +335,54 @@ export function EditarCadastro({
                 <p className={estilos['nota']}>
                   O CPF é obrigatório — o antifraude da cobrança por cartão recusa sem ele.
                 </p>
+
+                {/*
+                  MOTIVO DA SITUAÇÃO, para quem JÁ está suspenso ou bloqueado
+                  (issue #241, decisão do PI em 01/09/2026).
+
+                  `PATCH /:id/status` só aceita motivo junto de uma MUDANÇA de
+                  situação -- então quem já estava bloqueado antes do campo
+                  existir (os alunos do seed, os importados) ficava sem
+                  caminho: a única saída era reativar e bloquear de novo, o
+                  que grava na timeline uma reativação que nunca aconteceu.
+
+                  Fora de SUSPENDED/BLOCKED os campos NEM EXISTEM: o `CHECK`
+                  do banco proíbe motivo ali, e a API recusa. Mostrá-los
+                  desabilitados sugeriria um caminho que não há.
+
+                  Opcionais, sem `required`: este formulário mantém todos os
+                  campos montados e esconde as abas por CSS -- `required` em
+                  campo escondido trava o envio sem dizer por quê, como o
+                  comentário no topo deste arquivo já registra.
+                */}
+                {SITUACOES_COM_MOTIVO.has(status) ? (
+                  <>
+                    <SelectField
+                      id={`edicao-motivo-${studentId}`}
+                      name="statusReason"
+                      label={`Motivo da situação (${ROTULO_DE_SITUACAO[status] ?? status})`}
+                      defaultValue={valor('statusReason', statusReason ?? '')}
+                      data-testid="campo-edicao-motivo"
+                    >
+                      <option value="">Selecione…</option>
+                      {Object.entries(MOTIVO_DA_SITUACAO).map(([chave, rotulo]) => (
+                        <option key={chave} value={chave}>
+                          {rotulo}
+                        </option>
+                      ))}
+                    </SelectField>
+
+                    <Field
+                      id={`edicao-observacao-${studentId}`}
+                      name="statusReasonNote"
+                      label="Observação do motivo"
+                      hint="O caso concreto: prazo, número do atestado, o que combinaram."
+                      defaultValue={valor('statusReasonNote', statusReasonNote ?? '')}
+                      maxLength={500}
+                      data-testid="campo-edicao-observacao"
+                    />
+                  </>
+                ) : null}
               </div>
             </div>
 
