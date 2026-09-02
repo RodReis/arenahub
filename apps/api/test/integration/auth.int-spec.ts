@@ -163,6 +163,27 @@ describe('autenticacao', () => {
 
       expect(resposta.status).toBe(400);
     });
+
+    it('bloqueia com 429 apos dez tentativas em sequencia (SPEC-058 AC-7)', async () => {
+      // E-mail exclusivo deste teste: o rate limit e por IP, e o supertest
+      // reusa o mesmo socket -- compartilhar EMAIL com o resto da suite
+      // faria os outros testes de login contarem para este limite.
+      const emailDoTeste = `rate-limit-${sufixo}@exemplo.test`;
+
+      const tentar = (): Promise<request.Response> =>
+        request(servidor())
+          .post('/api/v1/auth/login')
+          .send({ email: emailDoTeste, password: 'senha-nunca-certa' });
+
+      for (let i = 0; i < 10; i += 1) {
+        const resposta = await tentar();
+        expect(resposta.status).toBe(401);
+      }
+
+      const decimaPrimeira = await tentar();
+
+      expect(decimaPrimeira.status).toBe(429);
+    });
   });
 
   describe('POST /api/v1/auth/refresh', () => {

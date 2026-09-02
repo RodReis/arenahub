@@ -1,5 +1,6 @@
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { Module } from '@nestjs/common';
+import { ThrottlerModule, minutes } from '@nestjs/throttler';
 
 import { carregarConfig, type ConfigDaApi } from '../../config/env.js';
 import { PersistenceModule } from '../../persistence/persistence.module.js';
@@ -15,7 +16,15 @@ import { TotpService } from './totp.service.js';
 const CONFIG_DA_API = Symbol('CONFIG_DA_API');
 
 @Module({
-  imports: [PersistenceModule],
+  imports: [
+    PersistenceModule,
+    // So fornece o `ThrottlerStorage` que o `AuthService.login` usa para
+    // contar tentativa errada (SPEC-058 AC-7). Sem `ThrottlerGuard`: o
+    // guard decide ANTES do handler rodar e nao sabe se a senha bateu --
+    // so o service, depois de conferir a senha, sabe se a tentativa foi
+    // errada.
+    ThrottlerModule.forRoot([{ ttl: minutes(1), limit: 10 }]),
+  ],
   controllers: [AuthController],
   providers: [
     AuthService,
