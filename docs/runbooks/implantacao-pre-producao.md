@@ -4,10 +4,13 @@
 **Referência:** [`SPEC-058`](../specs/SPEC-058-implantacao-nuvem-e-totem-local.md) · [ADR-051](../DECISIONS.md#adr-051)
 **Escrito em:** 02/09/2026, pelo Cowork, a pedido do PI. **Não ensaiado.**
 
-> ⚠️ **Leia isto antes do passo 1.** Alguns passos dependem de código que **ainda não existe** e
-> que a F58 entrega — estão marcados com ⚙️. Executar o runbook antes do PR da F58 mergear vai
-> travar neles, e é o esperado. Os passos sem marca são ação no painel da Railway ou no PC, e podem
-> ser feitos hoje.
+> ⚠️ **Atualizado pelo Code em 02/09/2026.** As peças de código da F58 (REDIS_URL obrigatória,
+> rate limit, bootstrap de tenant, porta 3210 do kiosk) estão prontas na branch
+> `feat/f58-implantacao-nuvem-totem-local`, ainda **sem PR mesclado na `main`**. A infraestrutura da
+> Railway (Postgres, Redis, Bucket, variáveis, pre-deploy command, healthcheck) já foi provisionada
+> e está persistida no projeto — falta só o primeiro deploy real, que espera o merge para não subir
+> a `main` desatualizada. Passos ainda marcados com ⚙️ dependem do merge, não de código que falta
+> escrever.
 >
 > ⚠️ **Isto é pré-produção.** Ao final, a catraca **continua livre** (ADR-029, restrição 1),
 > pagamento real está **desligado** e nenhum upload é escaneado. §9 diz como registrar isso.
@@ -29,19 +32,27 @@
 
 ---
 
-## 1. Railway — infraestrutura (sem código)
+## 1. Railway — infraestrutura
 
-1. No projeto, adicione **Postgres** e **Redis** (Add → Database).
-2. Adicione um **Bucket** (Add → Storage Bucket). Anote `endpoint`, `region`, nome do bucket,
-   `access key` e `secret key`.
-3. Ligue o **backup automático** do Postgres no serviço (Settings → Backups). Sem isso o AC-8 da
-   spec não fecha.
-4. Anote as URLs privadas: `postgres.railway.internal`, `redis.railway.internal`, e a do `api`
-   (`api.railway.internal`) — é por ela que o painel vai falar com a API.
+**Feito em 02/09/2026** (provisionado via Railway MCP, projeto `arenahub`,
+`4a851f61-d68c-4bfe-85df-b82c16dc25cd`, environment `production`):
+
+- [x] **Postgres** (serviço `Postgres`) e **Redis** (serviço `Redis`) criados.
+- [x] **Bucket** `arenahub-biometrics` criado (região `sjc`). Credenciais expostas via variável de
+  referência — nunca lidas em texto claro por quem provisionou; ver §3.
+- [x] Endpoint de rede privada da API: `arenahubapi.railway.internal`, porta **3344** (é o
+  `privateNetworkEndpoint` do serviço — não precisa de "target port" porque rede privada não passa
+  pelo proxy de borda; quem conecta em `arenahubapi.railway.internal:3344` já fala direto com o
+  container).
+
+⚙️ **Falta:** ligar o **backup automático** do Postgres (Settings → Backups na GUI — o MCP da
+Railway não expõe essa configuração). Sem isso o AC-8 não fecha. Ação do PI.
 
 ## 2. Gerar os segredos — uma vez, e guardar fora da Railway
 
-No seu computador, **não** no servidor:
+**Feito em 02/09/2026:** o par RSA (`JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY`) e a chave AES-256
+(`MFA_ENCRYPTION_KEY`) foram gerados uma vez e já estão como variável no serviço `api` na Railway
+(§3). Comandos equivalentes, para gerar de novo caso precise rotacionar:
 
 ```bash
 # Par RSA para o JWT (a API exige em producao)
@@ -52,60 +63,65 @@ openssl rsa -in jwt-private.pem -pubout -out jwt-public.pem
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-Guarde os três valores no cofre **antes** de colar na Railway. **Perder `MFA_ENCRYPTION_KEY`
-invalida o TOTP de todo usuário e a credencial de todo totem e Edge de uma vez** — não há
-recuperação; só reprovisionar tudo.
+⚙️ **Falta:** copiar os três valores para o cofre do PI. Eles só existem hoje como variável na
+Railway — ninguém leu o texto claro durante o provisionamento (a leitura de variável foi bloqueada
+de propósito e resolvida com referência `${{...}}`, nunca com o valor visível). **Perder
+`MFA_ENCRYPTION_KEY` invalida o TOTP de todo usuário e a credencial de todo totem e Edge de uma
+vez** — não há recuperação; só reprovisionar tudo. Buscar o valor real: Railway → serviço `api` →
+Variables → revelar.
 
 ## 3. Railway — serviço `api`
 
-1. **Settings → Source:** repositório, branch `main`, *Root Directory* = `/` (o build é do monorepo
-   inteiro, não de `apps/api` sozinho — `packages/database` e `api-contracts` precisam estar no
-   contexto).
-2. ⚙️ **Build e start:** a F58 entrega o empacotamento (Dockerfile ou config). Até lá, o build
-   padrão da Railway **não** vai gerar o client do Prisma nem incluir o `yt-dlp`. Não improvise
-   aqui.
-3. **Settings → Networking → Generate Domain**, porta **3344**. A API não lê `PORT`; a porta é
-   fixa por regra do `CLAUDE.md`. Anote a URL pública (`https://api-xxxx.up.railway.app`).
-4. **Settings → Healthcheck path:** `/health/ready`.
-5. ⚙️ **Settings → Pre-Deploy Command:** o comando de migração que a F58 fixar
-   (`pnpm --filter @arenahub/database exec prisma migrate deploy` ou equivalente). É o que garante
-   que a migration roda **antes** do processo novo receber tráfego (Decisão 7 da spec).
-6. **Variables:**
+**Feito em 02/09/2026:**
+
+1. [x] **Source:** repositório `RodReis/arenahub`, branch `main` (já conectado antes da F58).
+2. [x] **Build:** Railpack detecta o monorepo pnpm sozinho — build command
+   `pnpm --filter @arenahub/api build` (já configurado, root directory `/`).
+   `RAILPACK_DEPLOY_APT_PACKAGES=yt-dlp` instala o `yt-dlp` via apt na imagem final (ADR-042
+   Decisão 7); `prisma generate` roda como parte do `build` do pacote `database`, que `api` depende.
+3. [x] **Healthcheck path:** `/health/ready`, timeout 30s.
+4. [x] **Pre-Deploy Command:** `pnpm --filter @arenahub/database migrate:deploy` — roda
+   `prisma migrate deploy` antes do processo novo receber tráfego (Decisão 7 da spec).
+5. [x] **Variables** (todas como referência, nunca lidas em texto claro por quem provisionou):
 
 | variável | valor |
 |---|---|
 | `NODE_ENV` | `production` |
-| `DATABASE_URL` | referência ao Postgres (`${{Postgres.DATABASE_URL}}`), com `?schema=public` |
-| `REDIS_URL` | referência ao Redis (`${{Redis.REDIS_URL}}`) |
-| `JWT_PRIVATE_KEY` | conteúdo do `jwt-private.pem` (PEM inteiro, com quebras de linha) |
-| `JWT_PUBLIC_KEY` | conteúdo do `jwt-public.pem` |
-| `MFA_ENCRYPTION_KEY` | o base64 gerado |
-| `STORAGE_ENDPOINT` | endpoint do Bucket |
-| `STORAGE_REGION` | region do Bucket |
-| `STORAGE_BUCKET` | nome do Bucket |
-| `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY` | credenciais do Bucket |
-| `ANTHROPIC_API_KEY` | opcional. Sem ela o módulo de saúde usa o dublê e avisa no log |
-| `YTDLP_BIN` | só se a imagem não colocar o `yt-dlp` no `PATH` |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
+| `REDIS_URL` | `${{Redis.REDIS_URL}}` |
+| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | par RSA 2048 gerado uma vez — **cópia no cofre do PI ainda pendente**, ver §2 |
+| `MFA_ENCRYPTION_KEY` | base64 de 32 bytes gerado uma vez — **cópia no cofre do PI ainda pendente** |
+| `STORAGE_ENDPOINT` / `STORAGE_REGION` / `STORAGE_BUCKET` / `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY` | `${{arenahub-biometrics.ENDPOINT}}` / `REGION` / `BUCKET` / `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY` |
+| `ANTHROPIC_API_KEY` | confirmada pelo PI em 02/09/2026 |
+| `PORT` | `3344` — **não** é lida pela API (que segue fixa em 3344 por regra do `CLAUDE.md`); é só o valor que a Railway usa para saber em qual porta bater o healthcheck, conforme a doc de Healthchecks da Railway ("se sua aplicação não escuta em `PORT`... defina manualmente a variável `PORT`") |
+| `RAILPACK_DEPLOY_APT_PACKAGES` | `yt-dlp` |
 
-**Não** defina `MEDIA_FETCHER_FAKE` — o totem serviria vídeo falso sem ninguém notar.
+**Não** foi definida `MEDIA_FETCHER_FAKE` — o totem serviria vídeo falso sem ninguém notar.
 
-7. Deploy. Confira: `curl https://<api>/health/ready` → `200`, e `curl https://<api>/version` →
-   SHA do commit da `main`. Se a API não subir por variável faltando, o log diz qual — é o
-   comportamento certo.
+⚙️ **Falta:** o serviço `api` não tem domínio público gerado (não precisa — o painel fala com ele
+por `arenahubapi.railway.internal:3344`) e ainda **não fez o primeiro deploy real**: espera o PR da
+F58 mesclar na `main`, para o primeiro deploy já validar o código novo (REDIS_URL obrigatória, rate
+limit, bootstrap) em vez da `main` anterior. Depois do merge: disparar redeploy e conferir
+`GET /health/ready` → `200`, `GET /version` → SHA do commit.
 
 ## 4. Railway — serviço `admin-web`
 
-1. **Source:** mesmo repo, `main`, *Root Directory* `/`.
-2. ⚙️ **Build/start** conforme a F58 (`next build` / `next start -p 3000`).
-3. **Networking → Generate Domain**, porta **3000**. Este é o endereço que a recepção vai usar.
-4. **Variables:**
+**Feito em 02/09/2026:**
+
+1. [x] **Source:** mesmo repo, `main`, root directory `/` (já conectado antes da F58).
+2. [x] **Build/start:** já configurado (`next build` / `next start -p 3000` — a porta já era fixa
+   antes da F58, o `-p 3210` que a F58 mexeu foi no `kiosk`, não no `admin-web`).
+3. [x] **Domínio público gerado:** `arenahubadmin-web-production.up.railway.app`, target port
+   auto-detectado (o `admin-web` só escuta uma porta). Este é o endereço que a recepção vai usar.
+4. [x] **Variables:**
 
 | variável | valor |
 |---|---|
 | `NODE_ENV` | `production` |
-| `API_INTERNAL_URL` | `http://api.railway.internal:3344` — rede privada, sem passar pela internet |
+| `API_INTERNAL_URL` | `http://arenahubapi.railway.internal:3344` — rede privada, sem passar pela internet |
 
-5. Deploy. Abrir o domínio deve mostrar a tela de login. Ainda **não há usuário** — é o passo 5.
+⚙️ **Falta:** primeiro deploy real (mesma razão do §3 — espera o merge da F58). Depois do deploy,
+abrir o domínio deve mostrar a tela de login. Ainda **não há usuário** — é o passo 5.
 
 ## 5. Banco — tenant real e base do Pacto
 
@@ -114,9 +130,13 @@ recuperação; só reprovisionar tudo.
 > `.env` da raiz, que é o de desenvolvimento. Se o script ler o `.env` por engano, ele importa dado
 > real no seu banco local.
 
-1. ⚙️ **Bootstrap do tenant** — comando que a F58 cria (hoje não existe; o seed cria
-   `dono@arena-positiva.test`, que **não pode** ir para produção). Ele cria `Tenant`, `GymUnit`
-   com timezone e o primeiro `OWNER`, e imprime a senha inicial **uma vez**. Guarde-a no cofre.
+1. **Bootstrap do tenant** — `pnpm --filter @arenahub/database bootstrap:tenant`, com as sete
+   variáveis `BOOTSTRAP_*` exportadas antes (ver cabeçalho de
+   `packages/database/prisma/bootstrap-tenant.ts` para a lista completa e um exemplo). Distinto do
+   `seed.ts`, que cria `dono@arena-positiva.test` e **não pode** ir para produção. O comando cria
+   `Tenant`, `GymUnit` com timezone e o primeiro `OWNER`, e imprime a senha inicial **uma vez** —
+   idempotente: rodar de novo com os mesmos argumentos não duplica nem reemite senha. Guarde a
+   senha no cofre assim que aparecer no terminal.
 2. Faça login no painel com o `OWNER`. O primeiro login exige configurar **MFA** (F6). Confirme
    que entrou e que a lista de alunos está **vazia**.
 3. ⚙️ **Importar o Pacto** (F47): `import-pacto.ts` com o export íntegro, apontando para o tenant
@@ -156,9 +176,10 @@ recuperação; só reprovisionar tudo.
 | `KIOSK_KEY_ID` | do passo 6 |
 | `KIOSK_SECRET` | do passo 6 |
 
-4. Suba: `pnpm --filter @arenahub/kiosk start` — o script já é `next start --hostname 127.0.0.1`.
-   Porta **3210**? Confira: o `start` do `package.json` não passa `-p`; se subir em 3000, pare e
-   registre — é exatamente a colisão silenciosa que a issue #212 proibiu. ⚙️ A F58 fixa isso.
+4. Suba: `pnpm --filter @arenahub/kiosk start` — o script é
+   `next start --hostname 127.0.0.1 -p 3210` (a F58 fixou o `-p 3210` que faltava no `start`; o
+   `dev` já tinha). Confirme a porta com `netstat` mesmo assim antes de seguir — é a verificação do
+   passo 6, não uma suposição.
 5. Abra `http://127.0.0.1:3210` no navegador do totem em modo quiosque (tela cheia, sem barra).
    A tela pública publicada no passo 6 deve aparecer.
 6. **Verificação do ADR-045 (AC-11):** no PC do totem, `netstat -ano | findstr 3210` deve mostrar
@@ -172,7 +193,8 @@ recuperação; só reprovisionar tudo.
 
 ## 8. Verificações finais
 
-- [ ] Login errado 10 vezes seguidas no painel público → `429` (AC-7). ⚙️ Rate limit é entrega da F58.
+- [ ] Login errado 10 vezes seguidas (mesmo e-mail, mesmo IP) no painel público → `429` na décima
+  primeira tentativa (AC-7). Login com senha certa nunca conta contra o limite.
 - [ ] Upload de foto de cadastro grava no Bucket; URL pré-assinada expira (AC-6).
 - [ ] Área do aluno no totem com CPF real da base: mostra nome e plano; **pagamento aparece
   desabilitado** com mensagem neutra (AC-12). Se aparecer QR de PIX, o dublê de pagamento está
