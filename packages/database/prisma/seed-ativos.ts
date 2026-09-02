@@ -40,6 +40,23 @@ const TENANT_SLUG = 'arena-positiva';
 const NOME_DO_PLANO = 'Programa Adultos e Idosos';
 
 /**
+ * Periodo do plano para quem o arquivo nao data -- decisao do PI, 02/09/2026.
+ *
+ * O export atual NAO TRAZ `Data Inicio` nem `Data Fim`. Sem periodo,
+ * `gravarPessoa` devolve `aluno sem periodo de plano` e o aluno fica `ACTIVE`
+ * SEM direito -- ou seja, a catraca fechada para a base inteira. O PI decidiu
+ * que todo aluno ativo do arquivo ganha acesso a partir de 01/09/2026.
+ *
+ * O FIM E 12 MESES DEPOIS, mesma janela que `MESES_DE_VINCULO` ja aplica a
+ * quem entra por vinculo. Direito sem fim nao existe neste sistema: ele
+ * expiraria so por alguem lembrar de revogar, e ninguem lembra.
+ *
+ * So vale como PADRAO: linha que trouxer as datas usa as dela.
+ */
+const INICIO_PADRAO = '20260901';
+const FIM_PADRAO = '20270901';
+
+/**
  * Nomes das colunas COMO O PACTO AS ESCREVE -- com acento, espaco e caixa
  * originais. Mapear aqui, num lugar so, evita espalhar `registro['Data
  * Nascimento']` pelo codigo de gravacao, que trabalha em ingles.
@@ -54,9 +71,22 @@ const COLUNAS = {
   bairro: 'Bairro',
   cep: 'Cep',
   municipio: 'Municipio',
-  telefone: 'Telefone',
-  celular: 'Celular',
+  uf: 'Uf',
+  /*
+   * TELEFONE E CELULAR SAO A MESMA COLUNA no export atual (confirmado pelo
+   * PI, 02/09/2026): o Pacto passou a exportar `Telefone/Celular` unico. Os
+   * dois campos apontam para ela de proposito -- `gravarContato` grava
+   * `PHONE` e `WHATSAPP` com o mesmo numero, que e o que a recepcao precisa
+   * (ela liga e manda mensagem para o mesmo aparelho).
+   *
+   * Nao e duplicacao acidental: apontar so um deixaria o outro canal vazio,
+   * e o painel oferece os dois.
+   */
+  telefone: 'Telefone/Celular',
+  celular: 'Telefone/Celular',
   cpf: 'Cpf',
+  // AUSENTES do export atual -- caem em `INICIO_PADRAO`/`FIM_PADRAO`. Ficam
+  // mapeadas para a linha que um dia as traga voltar a mandar sozinha.
   dataInicio: 'Data Inicio',
   dataFim: 'Data Fim',
   email: 'Email',
@@ -80,7 +110,46 @@ function lerTexto(linha: Record<string, unknown>, coluna: string): string {
 }
 
 /**
- * `unknown` antes de validar dado externo (`CLAUDE.md`). O JSON vem de um
+ * CSV do Pacto em linhas-objeto, com o cabecalho como chave.
+ *
+ * SEPARADOR `;` e SEM ASPAS -- e o que o Pacto exporta, conferido no arquivo
+ * real (348 linhas, 15 campos em todas, zero aspas). Por isso `split`, e nao
+ * uma biblioteca: campo com virgula, aspas ou quebra de linha embutida nao
+ * existe aqui, e uma dependencia nova para 15 linhas de codigo seria peso
+ * sem contrapartida.
+ *
+ * SE O FORMATO MUDAR (ganhar aspas ou campo com `;` dentro), este parser
+ * passa a errar CALADO -- a contagem de campos por linha e a defesa: linha
+ * com numero de campos diferente do cabecalho vira erro, nao registro torto.
+ */
+function lerCsv(conteudo: string): Record<string, unknown>[] {
+  const linhas = conteudo
+    .split(/\r?\n/)
+    .map((linha) => linha.trim())
+    .filter((linha) => linha !== '');
+
+  const cabecalho = linhas.shift();
+
+  if (cabecalho === undefined) throw new Error('CSV vazio.');
+
+  const colunas = cabecalho.split(';').map((coluna) => coluna.trim());
+
+  return linhas.map((linha, indice) => {
+    const campos = linha.split(';');
+
+    if (campos.length !== colunas.length) {
+      throw new Error(
+        `Linha ${String(indice + 2)} do CSV tem ${String(campos.length)} campos, ` +
+          `e o cabecalho tem ${String(colunas.length)}.`,
+      );
+    }
+
+    return Object.fromEntries(colunas.map((coluna, i) => [coluna, campos[i]?.trim() ?? '']));
+  });
+}
+
+/**
+ * `unknown` antes de validar dado externo (`CLAUDE.md`). O arquivo vem de um
  * extrator de terceiro: confiar na forma dele aqui seria confiar num arquivo
  * que ninguem versiona.
  */
@@ -106,11 +175,15 @@ function converter(bruto: unknown): RegistroDePessoaAtiva[] {
       bairro: lerTexto(registro, COLUNAS.bairro),
       cep: lerTexto(registro, COLUNAS.cep),
       municipio: lerTexto(registro, COLUNAS.municipio),
+      uf: lerTexto(registro, COLUNAS.uf),
       telefone: lerTexto(registro, COLUNAS.telefone),
       celular: lerTexto(registro, COLUNAS.celular),
       cpf: lerTexto(registro, COLUNAS.cpf),
-      dataInicio: lerTexto(registro, COLUNAS.dataInicio),
-      dataFim: lerTexto(registro, COLUNAS.dataFim),
+      // O PADRAO SO ENTRA QUANDO O ARQUIVO NAO TRAZ (`||`, sobre string
+      // vazia). Linha datada usa a data dela -- o padrao existe para o
+      // export atual, que nao traz nenhuma, e nao para sobrescrever quem tem.
+      dataInicio: lerTexto(registro, COLUNAS.dataInicio) || INICIO_PADRAO,
+      dataFim: lerTexto(registro, COLUNAS.dataFim) || FIM_PADRAO,
       email: lerTexto(registro, COLUNAS.email),
     };
   });
@@ -144,6 +217,7 @@ function relatorioDoArquivo(
     { campo: 'endereco', preenchidos: contar((r) => r.endereco), total },
     { campo: 'cep', preenchidos: contar((r) => r.cep), total },
     { campo: 'municipio', preenchidos: contar((r) => r.municipio), total },
+    { campo: 'uf', preenchidos: contar((r) => r.uf), total },
   ];
 }
 
@@ -161,9 +235,13 @@ async function ativar(): Promise<void> {
   }
 
   const conteudo = await readFile(caminho, 'utf8');
-  // `unknown` antes de validar dado externo (`CLAUDE.md`): o JSON vem de um
+  // CSV OU JSON, decidido pela EXTENSAO e nao pelo conteudo: adivinhar pelo
+  // primeiro caractere faria um JSON malformado ser lido como CSV e produzir
+  // 300 registros vazios em vez de um erro de parse.
+  const ehCsv = caminho.toLowerCase().endsWith('.csv');
+  // `unknown` antes de validar dado externo (`CLAUDE.md`): o arquivo vem de um
   // extrator de terceiro que ninguem versiona.
-  const bruto: unknown = JSON.parse(conteudo);
+  const bruto: unknown = ehCsv ? lerCsv(conteudo) : JSON.parse(conteudo);
   const registros = converter(bruto);
 
   console.info(`[seed-ativos] ${String(registros.length)} registros lidos de ${caminho}`);

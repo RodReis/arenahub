@@ -45,6 +45,15 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     ursula: '31350038415',
     vera: '36829112192',
     xenia: '61885159200',
+    // UM CPF POR TESTE, sem reuso: o tenant e o mesmo para a suite inteira e
+    // nao ha limpeza entre casos, entao repetir um CPF faz o teste seguinte
+    // CASAR com a pessoa do anterior em vez de criar a sua -- e passar pelo
+    // motivo errado. Estes cinco entraram com os testes de UF e endereco.
+    wagner: '60020666241',
+    yara: '34862268862',
+    zilda: '82606204050',
+    heitor: '52622602685',
+    ines: '04004288061',
   } as const;
 
   beforeAll(async () => {
@@ -173,6 +182,9 @@ describe('importacao da base ativa do Pacto (F48)', () => {
       bairro: '',
       cep: '',
       municipio: '',
+      // Vazia por padrao: e o caso comum do arquivo, e exercita a queda em
+      // `UF_PADRAO`. O teste de UF sobrescreve com a sigla que quer provar.
+      uf: '',
       telefone: '',
       celular: '',
       cpf: aluno?.cpf ?? '',
@@ -965,6 +977,116 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(endereco.postalCode).toBe('75380000');
     expect(endereco.city).toBe('Trindade');
     expect(endereco.state).toBe('GO');
+  });
+
+  it('a UF vem do ARQUIVO, e nao do padrao fixo', async () => {
+    await importar([
+      registroDe(null, {
+        nome: 'WAGNER DE OUTRO ESTADO',
+        cpf: CPF.wagner,
+        endereco: 'RUA DE SAO PAULO 10',
+        cep: '01000000',
+        municipio: 'Sao Paulo',
+        uf: 'sp',
+      }),
+    ]);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'WAGNER DE OUTRO ESTADO' },
+    });
+    const endereco = await db.studentAddress.findFirstOrThrow({
+      where: { studentId: criada.id },
+    });
+
+    // CAIXA ALTA, vindo de `sp` minusculo: o Pacto escreve a sigla de tres
+    // jeitos, e quem filtra por `SP` tem de achar todo mundo que mora la.
+    expect(endereco.state).toBe('SP');
+  });
+
+  it('UF invalida no arquivo cai no padrao, em vez de gravar sujeira', async () => {
+    await importar([
+      registroDe(null, {
+        nome: 'YARA COM UF TORTA',
+        cpf: CPF.yara,
+        endereco: 'RUA QUALQUER 1',
+        municipio: 'Trindade',
+        // `goias` por extenso: o campo existe, mas nao e sigla. Gravar como
+        // veio deixaria a coluna com duas grafias para o mesmo estado.
+        uf: 'goias',
+      }),
+    ]);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'YARA COM UF TORTA' },
+    });
+    const endereco = await db.studentAddress.findFirstOrThrow({
+      where: { studentId: criada.id },
+    });
+
+    expect(endereco.state).toBe('GO');
+  });
+
+  it('endereco SEM CEP e gravado -- a rua sozinha ja localiza', async () => {
+    await importar([
+      registroDe(null, {
+        nome: 'ZILDA SEM CEP',
+        cpf: CPF.zilda,
+        endereco: 'RUA SEM CEP 77',
+        bairro: 'SANTUARIO',
+        municipio: 'Trindade',
+      }),
+    ]);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'ZILDA SEM CEP' },
+    });
+    const endereco = await db.studentAddress.findFirstOrThrow({
+      where: { studentId: criada.id },
+    });
+
+    // O REGIME ANTIGO DESCARTAVA ESTA LINHA INTEIRA. Sao 275 enderecos do
+    // export real contra 69 CEPs: exigir os dois perdia a rua de quase toda
+    // a base para preservar um CEP que o Pacto nao preenche.
+    expect(endereco.street).toBe('RUA SEM CEP 77');
+    expect(endereco.postalCode).toBe('');
+  });
+
+  it('endereco que mudou no arquivo ATUALIZA o que ja estava no banco', async () => {
+    const aluno = await criarAlunoCancelado({ nome: 'HEITOR QUE MUDOU DE CASA', cpf: CPF.heitor });
+
+    await importar([
+      registroDe(aluno, { endereco: 'RUA ANTIGA 1', cep: '75380000', municipio: 'Trindade' }),
+    ]);
+    await importar([
+      registroDe(aluno, { endereco: 'RUA NOVA 2', cep: '75381111', municipio: 'Trindade' }),
+    ]);
+
+    const enderecos = await db.studentAddress.findMany({ where: { studentId: aluno.id } });
+
+    // UM endereco, o novo. O regime antigo (`if (!jaTem)`) deixava a rua
+    // antiga para sempre e ainda contava a pessoa como "endereco gravado" --
+    // rerodar o import nao corrigia, e o relatorio dizia que estava tudo bem.
+    expect(enderecos).toHaveLength(1);
+    expect(enderecos[0]?.street).toBe('RUA NOVA 2');
+    expect(enderecos[0]?.postalCode).toBe('75381111');
+  });
+
+  it('CEP ausente na segunda rodada NAO apaga o que ja estava gravado', async () => {
+    const aluno = await criarAlunoCancelado({ nome: 'INES QUE PERDEU O CEP', cpf: CPF.ines });
+
+    await importar([
+      registroDe(aluno, { endereco: 'RUA ANTIGA 1', cep: '75380000', municipio: 'Trindade' }),
+    ]);
+    // Mesma pessoa, arquivo novo sem o CEP -- o caso do export atual, que
+    // traz 275 ruas e so 69 CEPs.
+    await importar([registroDe(aluno, { endereco: 'RUA NOVA 2', municipio: 'Trindade' })]);
+
+    const endereco = await db.studentAddress.findFirstOrThrow({ where: { studentId: aluno.id } });
+
+    expect(endereco.street).toBe('RUA NOVA 2');
+    // Campo vazio no arquivo NAO apaga dado do banco -- regra do topo de
+    // `importar.ts`. A rua atualiza; o CEP que ninguem trouxe permanece.
+    expect(endereco.postalCode).toBe('75380000');
   });
 
   it('credencial que ja pertence a outro aluno vira pendencia, nao muda de dono', async () => {

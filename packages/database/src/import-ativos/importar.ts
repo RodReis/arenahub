@@ -67,10 +67,29 @@ import {
 export const MESES_DE_VINCULO = 12;
 
 /**
- * UF fixa. O relatorio do Pacto nao traz UF confiavel -- vem `g`, `Go`,
- * vazio. A academia e de Goias (mesma decisao da F47/ADR-033).
+ * UF quando o arquivo nao traz nenhuma. A academia e de Goias (F47/ADR-033).
+ *
+ * DEIXOU DE SER FIXA em 02/09/2026, por decisao do PI: o export atual traz a
+ * coluna `Uf` preenchida, e ignora-la gravava `GO` em quem mora em outro
+ * estado. `normalizarUf` cuida do lixo historico (`g`, `Go`, vazio) que
+ * motivou o valor fixo original -- o que nao vier como sigla de duas letras
+ * cai neste padrao, em vez de gravar sujeira.
  */
 const UF_PADRAO = 'GO';
+
+/**
+ * Sigla de UF em caixa alta, ou `null` quando o arquivo nao traz uma valida.
+ *
+ * DUAS LETRAS, e nada mais: o Pacto guarda `g`, `Go`, `goias` e vazio no
+ * mesmo campo. Gravar qualquer um deles como veio produziria uma coluna de
+ * estado com quatro grafias para o mesmo lugar -- e quem filtrasse por `GO`
+ * perderia parte da base sem ver que perdeu.
+ */
+function normalizarUf(valor: string): string | null {
+  const sigla = valor.trim().toUpperCase();
+
+  return /^[A-Z]{2}$/.test(sigla) ? sigla : null;
+}
 
 /** Municipio assumido quando o arquivo nao traz -- a unidade fica em Trindade. */
 const MUNICIPIO_PADRAO = 'Trindade';
@@ -133,6 +152,8 @@ export interface RegistroDePessoaAtiva {
   readonly bairro: string;
   readonly cep: string;
   readonly municipio: string;
+  /** Sigla do estado. Vazia ou invalida cai em `UF_PADRAO` -- ver `normalizarUf`. */
+  readonly uf: string;
   readonly telefone: string;
   readonly celular: string;
   readonly cpf: string;
@@ -649,29 +670,55 @@ async function gravarPessoa(
   const celular = await gravarContato(db, alvo.tenantId, studentId, 'WHATSAPP', registro.celular);
   const email = await gravarContato(db, alvo.tenantId, studentId, 'EMAIL', registro.email);
 
-  // Endereco so com logradouro E CEP: pela metade nao entrega carta nem
-  // localiza ninguem, e ocuparia o lugar do endereco bom que a recepcao
-  // digitaria depois. Nunca sobrescreve endereco existente.
+  /*
+   * Endereco: LOGRADOURO basta, e o import ATUALIZA o que ja existe.
+   *
+   * As duas regras mudaram em 02/09/2026, por decisao do PI, e cada uma
+   * escondia dado que o arquivo trazia:
+   *
+   *   - CEP DEIXOU DE SER OBRIGATORIO. Exigir logradouro E CEP descartava
+   *     275 enderecos do export atual, que so tem 69 CEPs -- a recepcao
+   *     ficava sem a rua de quase toda a base para preservar um CEP que o
+   *     Pacto nunca preencheu. Rua sem CEP localiza; rua nenhuma nao.
+   *
+   *   - PASSA A ATUALIZAR. O `if (!jaTem)` nunca sobrescrevia, entao quem
+   *     mudou de casa depois da primeira rodada ficava com o endereco
+   *     antigo para sempre, e rerodar o import nao corrigia -- o contador
+   *     ainda somava a pessoa como "endereco gravado", que era a leitura
+   *     mais enganosa possivel.
+   *
+   * Campo VAZIO no arquivo continua nao apagando o que esta no banco (regra
+   * do topo): `??` so troca o que veio preenchido.
+   */
   const street = registro.endereco.trim();
   const postalCode = registro.cep.trim();
   let endereco = false;
 
-  if (street !== '' && postalCode !== '') {
+  if (street !== '') {
+    const municipio = registro.municipio.trim();
     const jaTem = await db.studentAddress.findFirst({ where: { studentId }, select: { id: true } });
 
-    if (!jaTem) {
-      const municipio = registro.municipio.trim();
+    const dados = {
+      street,
+      district: registro.bairro.trim() || null,
+      city: municipio === '' ? MUNICIPIO_PADRAO : municipio,
+      state: normalizarUf(registro.uf) ?? UF_PADRAO,
+    };
 
+    if (jaTem) {
+      await db.studentAddress.update({
+        where: { id: jaTem.id },
+        // CEP vazio NAO apaga o que ja esta gravado -- e o unico campo aqui
+        // que o arquivo costuma nao trazer, e o do banco pode ser melhor.
+        data: { ...dados, ...(postalCode === '' ? {} : { postalCode }) },
+      });
+    } else {
+      // `postalCode` e NOT NULL sem default no schema, entao "nao sabemos" so
+      // pode ser string vazia -- nao ha NULL disponivel. E o primeiro caso do
+      // banco com CEP vazio (antes desta mudanca a regra o tornava impossivel),
+      // e e deliberado: a alternativa era continuar descartando a rua inteira.
       await db.studentAddress.create({
-        data: {
-          tenantId: alvo.tenantId,
-          studentId,
-          street,
-          district: registro.bairro.trim() || null,
-          city: municipio === '' ? MUNICIPIO_PADRAO : municipio,
-          state: UF_PADRAO,
-          postalCode,
-        },
+        data: { tenantId: alvo.tenantId, studentId, ...dados, postalCode },
       });
     }
 
