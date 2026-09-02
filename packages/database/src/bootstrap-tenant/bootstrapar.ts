@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import type { PrismaClientArenaHub } from '../client.js';
+import { PERMISSOES_DO_OWNER } from '../permissoes.js';
 import { gerarHash } from '../senha.js';
 
 export interface ArgumentosDeBootstrap {
@@ -26,17 +27,6 @@ export interface ResultadoDoBootstrap {
    */
   senhaGerada: string | null;
 }
-
-const PERMISSOES_DO_OWNER = [
-  'tenant.read',
-  'tenant.update',
-  'unit.create',
-  'unit.read',
-  'unit.update',
-  'user.manage',
-  'role.assign',
-];
-
 /**
  * Bootstrap de tenant real -- SPEC-058 §6.
  *

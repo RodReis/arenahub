@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { criarPrismaClient, type PrismaClientArenaHub } from '../src/index.js';
 import { bootstrapar } from '../src/bootstrap-tenant/bootstrapar.js';
+import { PERMISSOES_DO_OWNER } from '../src/permissoes.js';
 
 /**
  * Prova SPEC-058 §6: comando idempotente que cria Tenant, GymUnit e o
@@ -114,4 +115,25 @@ describe('bootstrap de tenant real (SPEC-058)', () => {
     expect(segunda.senhaGerada).toBeNull();
     expect(primeira.senhaGerada).toBeTruthy();
   });
+
+  it('da ao OWNER todas as permissoes do papel, nao um subconjunto', async () => {
+    const args = argumentos(`${sufixo}-e`);
+
+    const { tenantId } = await bootstrapar(db, args);
+
+    const papel = await db.role.findUniqueOrThrow({
+      where: { tenantId_name: { tenantId, name: 'OWNER' } },
+      include: { permissions: { include: { permission: true } } },
+    });
+
+    const concedidas = papel.permissions.map((p) => p.permission.code).sort();
+
+    // O bootstrap da F58 nasceu com uma COPIA de sete permissoes enquanto o
+    // seed concedia 42: o OWNER criado em producao logava e levava FORBIDDEN
+    // no proprio dashboard (`access.read`). Comparar com a fonte -- e nao com
+    // uma lista escrita aqui -- e o que faz permissao nova chegar aos dois
+    // caminhos sem ninguem lembrar.
+    expect(concedidas).toEqual([...PERMISSOES_DO_OWNER].sort());
+  });
+
 });
