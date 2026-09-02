@@ -16,13 +16,7 @@
  * IDEMPOTENTE: roda quantas vezes for preciso sem duplicar. Seed que so
  * funciona em banco vazio obriga a derrubar tudo antes de cada execucao.
  */
-import {
-  createCipheriv,
-  createHash,
-  randomBytes,
-  scrypt,
-  type ScryptOptions,
-} from 'node:crypto';
+import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { CONFIG_PADRAO_DO_TOTEM } from '@arenahub/api-contracts';
@@ -35,23 +29,7 @@ import { config as carregarEnv } from 'dotenv';
 carregarEnv({ path: fileURLToPath(new URL('../../../.env', import.meta.url)) });
 
 import { criarPrismaClient } from '../src/client.js';
-
-// `promisify(scrypt)` perde a sobrecarga que aceita `ScryptOptions`. O
-// wrapper manual preserva os quatro argumentos com tipo -- mesmo motivo do
-// `PasswordService` da API.
-function derivar(
-  senha: string,
-  sal: Buffer,
-  tamanho: number,
-  opcoes: ScryptOptions,
-): Promise<Buffer> {
-  return new Promise((resolver, rejeitar) => {
-    scrypt(senha, sal, tamanho, opcoes, (erro, chave) => {
-      if (erro) rejeitar(erro);
-      else resolver(chave);
-    });
-  });
-}
+import { gerarHash } from '../src/senha.js';
 
 const TENANT = { slug: 'arena-positiva', legalName: 'Complexo Arena Positiva LTDA', displayName: 'Arena Positiva' };
 const DONO = { email: 'dono@arena-positiva.test', senha: 'senha-de-bancada-arenahub' };
@@ -101,26 +79,6 @@ const CREDENCIAL_DO_TOTEM = {
   keyId: 'dev-totem01',
   segredo: 'segredo-de-bancada-do-totem-nao-use-em-producao',
 };
-
-/**
- * Mesmo envelope do `PasswordService` da API.
- *
- * Duplicado de proposito: o pacote de banco nao depende da API, e inverter
- * essa dependencia para reaproveitar uma funcao de 15 linhas custaria mais
- * do que resolve. Se um terceiro lugar precisar, extrai para
- * `packages/testing`.
- */
-async function gerarHash(senha: string): Promise<string> {
-  const sal = randomBytes(16);
-  const hash = await derivar(senha, sal, 64, {
-    N: 16_384,
-    r: 8,
-    p: 1,
-    maxmem: 64 * 1024 * 1024,
-  });
-
-  return `scrypt$v=1$N=16384$r=8$p=1$${sal.toString('base64url')}$${hash.toString('base64url')}`;
-}
 
 const PERMISSOES = [
   'tenant.read',
