@@ -44,6 +44,14 @@
   `privateNetworkEndpoint` do serviço — não precisa de "target port" porque rede privada não passa
   pelo proxy de borda; quem conecta em `arenahubapi.railway.internal:3344` já fala direto com o
   container).
+- [x] Postgres com **volume** `postgres-data` em `/var/lib/postgresql/data` e `POSTGRES_PASSWORD`
+  definida. A imagem `postgres` crua recusa iniciar sem essa variável, e sem volume os dados
+  sumiriam a cada deploy — nenhuma das duas coisas vem pronta quando o serviço nasce de imagem em
+  vez de template.
+- [x] **`watchPatterns` removido dos dois serviços de app.** Estavam limitados a `/apps/api/**` e
+  `/apps/admin-web/**`, o que é errado num monorepo: mudança em `packages/ui`, `api-contracts`,
+  `database` ou `access-policy` nunca dispararia deploy de quem depende dela, e o serviço ficaria
+  servindo código velho sem nenhum sinal. Agora todo push na `main` reconstrói os dois.
 
 ⚙️ **Falta:** ligar o **backup automático** do Postgres (Settings → Backups na GUI — o MCP da
 Railway não expõe essa configuração). Sem isso o AC-8 não fecha. Ação do PI.
@@ -75,10 +83,17 @@ Variables → revelar.
 **Feito em 02/09/2026:**
 
 1. [x] **Source:** repositório `RodReis/arenahub`, branch `main` (já conectado antes da F58).
-2. [x] **Build:** Railpack detecta o monorepo pnpm sozinho — build command
-   `pnpm --filter @arenahub/api build` (já configurado, root directory `/`).
+2. [x] **Build:** `pnpm exec turbo run build --filter=@arenahub/api`, root directory `/`.
+
+   **O `--filter` do pnpm sozinho não serve** — foi o que derrubou as três primeiras tentativas de
+   deploy da F58. `pnpm --filter @arenahub/api build` roda **só** o script daquele pacote, sem
+   construir `@arenahub/database`, `access-policy` e `api-contracts`, que a API importa por
+   `dist/`. O build passava e o processo morria no arranque com `ERR_MODULE_NOT_FOUND`, um pacote
+   por vez. O turbo é quem conhece o grafo (`dependsOn: ["^build"]`) e constrói tudo na ordem —
+   inclusive `@arenahub/database#generate`, declarado no `turbo.json` desde a F58.
+
    `RAILPACK_DEPLOY_APT_PACKAGES=yt-dlp` instala o `yt-dlp` via apt na imagem final (ADR-042
-   Decisão 7); `prisma generate` roda como parte do `build` do pacote `database`, que `api` depende.
+   Decisão 7).
 3. [x] **Healthcheck path:** `/health/ready`, timeout 30s.
 4. [x] **Pre-Deploy Command:** `pnpm --filter @arenahub/database migrate:deploy` — roda
    `prisma migrate deploy` antes do processo novo receber tráfego (Decisão 7 da spec).
@@ -109,8 +124,10 @@ limit, bootstrap) em vez da `main` anterior. Depois do merge: disparar redeploy 
 **Feito em 02/09/2026:**
 
 1. [x] **Source:** mesmo repo, `main`, root directory `/` (já conectado antes da F58).
-2. [x] **Build/start:** já configurado (`next build` / `next start -p 3000` — a porta já era fixa
-   antes da F58, o `-p 3210` que a F58 mexeu foi no `kiosk`, não no `admin-web`).
+2. [x] **Build:** `pnpm exec turbo run build --filter=@arenahub/admin-web` (mesma razão do §3 — o
+   painel importa `@arenahub/ui` e `@arenahub/api-contracts`, e com `pnpm --filter` sozinho o
+   Next falhava com 75 erros de `Module not found`). **Start:** `next start -p 3000`, porta já fixa
+   antes da F58 — o `-p 3210` que a F58 mexeu foi no `kiosk`, não aqui.
 3. [x] **Domínio público gerado:** `arenahubadmin-web-production.up.railway.app`, target port
    auto-detectado (o `admin-web` só escuta uma porta). Este é o endereço que a recepção vai usar.
 4. [x] **Variables:**
