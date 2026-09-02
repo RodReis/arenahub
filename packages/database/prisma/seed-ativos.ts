@@ -37,7 +37,21 @@ import {
 } from '../src/import-ativos/importar.js';
 
 const TENANT_SLUG = 'arena-positiva';
-const NOME_DO_PLANO = 'Programa Adultos e Idosos';
+
+/**
+ * Plano que recebe as assinaturas da importacao.
+ *
+ * PARAMETRIZADO em 02/09/2026: o nome do plano NAO E O MESMO em todo
+ * ambiente. Em producao a academia cadastrou `Plano Individuais - protocolos
+ * e acompanhamento`; o padrao abaixo e o nome usado na bancada. Com o nome
+ * fixo, rodar em producao falhava alto -- correto, mas exigia editar codigo
+ * para uma diferenca que e de DADO, nao de logica.
+ *
+ * `ARENAHUB_PLANO` sobrescreve. Continua sem inventar plano: o que nao existe
+ * no tenant falha alto, porque importar todo mundo como pendencia silenciosa
+ * so apareceria na fila da catraca.
+ */
+const NOME_DO_PLANO = process.env['ARENAHUB_PLANO'] ?? 'Programa Adultos e Idosos';
 
 /**
  * Periodo do plano para quem o arquivo nao data -- decisao do PI, 02/09/2026.
