@@ -1,7 +1,16 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src"
+    "rootDir": "src",
+    // INCREMENTAL DESLIGADO AQUI, e so aqui. O `tsc` incremental confia no
+    // `.tsbuildinfo` e NAO verifica se o output existe no disco: com o
+    // buildinfo de uma execucao anterior presente e as fontes inalteradas,
+    // ele sai 0 sem emitir `dist/` nenhum. Em build de deploy isso vira uma
+    // imagem sem `dist/main.js` que so falha no arranque -- foi o que
+    // aconteceu na primeira implantacao da F58, com o Railpack reaproveitando
+    // a camada que continha o buildinfo. Cache entre deploys nao vale nada
+    // aqui; o `tsconfig.json` de desenvolvimento segue incremental.
+    "incremental": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "src/**/*.spec.ts", "test/**/*.ts"]
