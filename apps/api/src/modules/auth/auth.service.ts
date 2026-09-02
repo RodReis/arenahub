@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { InjectThrottlerStorage, minutes, seconds, type ThrottlerStorage } from '@nestjs/throttler';
 
 import {
   CredencialInvalidaError,
+  LoginBloqueadoPorTentativasError,
   NaoAutenticadoError,
   RefreshReutilizadoError,
 } from '../../common/http/erro-de-dominio.js';
@@ -11,6 +13,20 @@ import { SessionRepository } from './session.repository.js';
 import { TokenService } from './token.service.js';
 
 const REFRESH_VALIDO_POR_DIAS = 14;
+
+/**
+ * SPEC-058 AC-7: dez tentativas ERRADAS em sequencia recebem 429 antes da
+ * decima primeira.
+ *
+ * "Erradas" e literal -- login bem sucedido nunca soma aqui, entao ninguem
+ * legitimo e barrado por logar de novo varias vezes (troca de aba, sessao
+ * expirada, etc.). A chave e (IP + e-mail tentado): so IP puniria toda a
+ * rede de uma academia pelo erro de uma pessoa; so e-mail deixaria um
+ * atacante trocar de IP e continuar.
+ */
+const JANELA_DE_FORCA_BRUTA_MS = minutes(1);
+const LIMITE_DE_TENTATIVAS_ERRADAS = 10;
+const BLOQUEIO_APOS_LIMITE_MS = seconds(60);
 
 export interface ParDeTokens {
   accessToken: string;
@@ -36,10 +52,12 @@ export class AuthService {
     private readonly senhas: PasswordService,
     private readonly tokens: TokenService,
     private readonly sessoes: SessionRepository,
+    @InjectThrottlerStorage() private readonly forcaBruta: ThrottlerStorage,
   ) {}
 
-  async login(email: string, senha: string): Promise<ParDeTokens> {
+  async login(email: string, senha: string, ip: string): Promise<ParDeTokens> {
     const normalizado = email.trim().toLowerCase();
+    const chaveDeForcaBruta = `${ip}:${normalizado}`;
 
     const usuario = await this.db.user.findUnique({
       where: { email: normalizado },
@@ -50,13 +68,24 @@ export class AuthService {
     // ENVELOPE_FALSO acima.
     const confere = await this.senhas.conferir(senha, usuario?.passwordHash ?? ENVELOPE_FALSO);
 
-    if (!usuario || !confere || usuario.status !== 'ACTIVE') {
+    const vinculo = usuario?.memberships[0];
+
+    if (!usuario || !confere || usuario.status !== 'ACTIVE' || !vinculo) {
+      // So a tentativa ERRADA soma contra o limite (AC-7). Login valido
+      // nunca chama `increment`: sessao repetida (troca de aba, sessao
+      // expirada) nao e o que este limite existe para conter.
+      const registro = await this.forcaBruta.increment(
+        chaveDeForcaBruta,
+        JANELA_DE_FORCA_BRUTA_MS,
+        LIMITE_DE_TENTATIVAS_ERRADAS,
+        BLOQUEIO_APOS_LIMITE_MS,
+        'login-bruteforce',
+      );
+
+      if (registro.isBlocked) throw new LoginBloqueadoPorTentativasError();
+
       throw new CredencialInvalidaError();
     }
-
-    const vinculo = usuario.memberships[0];
-
-    if (!vinculo) throw new CredencialInvalidaError();
 
     return this.emitirPar({ userId: usuario.id, tenantId: vinculo.tenantId });
   }

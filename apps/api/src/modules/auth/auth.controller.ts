@@ -38,12 +38,19 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
-  async login(@Body() corpo: unknown, @Res({ passthrough: true }) resposta: Response) {
+  async login(
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+    @Res({ passthrough: true }) resposta: Response,
+  ) {
     // `unknown` antes de validar (`CLAUDE.md`, Convencoes). O DTO tipado
     // so existe depois que o Zod confirmou a forma.
     const dados = esquemaDeLogin.parse(corpo);
 
-    this.gravarCookies(resposta, await this.auth.login(dados.email, dados.password));
+    this.gravarCookies(
+      resposta,
+      await this.auth.login(dados.email, dados.password, requisicao.ip ?? 'sem-ip'),
+    );
 
     // Corpo vazio de proposito: token vive em cookie HttpOnly. Devolve-lo
     // no JSON o levaria para `localStorage`, legivel por qualquer script.

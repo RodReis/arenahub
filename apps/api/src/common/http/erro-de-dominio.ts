@@ -48,3 +48,13 @@ export class NaoAutenticadoError extends ErroDeDominio {
     super('AUTH_REQUIRED', 401, 'Autenticacao obrigatoria');
   }
 }
+
+/**
+ * Dez tentativas erradas de login em sequencia, do mesmo IP contra o mesmo
+ * e-mail (SPEC-058 AC-7).
+ */
+export class LoginBloqueadoPorTentativasError extends ErroDeDominio {
+  constructor() {
+    super('AUTH_LOGIN_RATE_LIMITED', 429, 'Muitas tentativas. Tente novamente em instantes');
+  }
+}
