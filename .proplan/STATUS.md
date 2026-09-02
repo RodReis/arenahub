@@ -10,7 +10,6 @@ updated: 2026-09-02
 ### Sem épico
 
 - [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254)
-- [MVP1][SPEC-058][F58] Implantação: API e painel na Railway, totem local, pré-produção (#253)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
@@ -38,6 +37,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][SPEC-058][F58] Implantação: API e painel na Railway, totem local, pré-produção (#253, finalizado em: 2026-09-02)
 - [MVP1][FIX] dashboard operacional sem cor nos KPIs e sem nome de quem está bloqueado (#250, finalizado em: 2026-09-02)
 - [MVP1][FIX] reajuste de preço com data fixa vira retroativo no dia seguinte (#252, finalizado em: 2026-09-02)
 - [MVP1][FIX] lista de alunos não diz de quantos a página é uma fatia (#248, finalizado em: 2026-09-01)
