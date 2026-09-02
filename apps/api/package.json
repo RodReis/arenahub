@@ -8,8 +8,6 @@
     "//dev": "tsc --watch, e NAO tsx: o esbuild do tsx nao emite design:paramtypes, e sem esse metadado o Nest nao resolve dependencia por tipo -- a API morria no arranque com UndefinedDependencyException no MfaService. Ver apps/api/README-dev.md.",
     "dev": "node ../../scripts/check-port.mjs 3344 && node ../../scripts/dev-api.mjs",
     "start": "node dist/main.js",
-    "//prebuild": "Railway (Railpack) roda so `pnpm --filter @arenahub/api build` no deploy -- sem passar pelo turbo, que e quem normalmente garante `^build` (client do Prisma gerado E @arenahub/database compilado para dist/, que e o entry point real do pacote) antes. O hook `pre<script>` do pnpm cobre o caso sem depender do orquestrador do build remoto. Cada peca so roda se o alvo ainda nao existe: o CI ja gera o client num passo proprio (com um DATABASE_URL de mentira que so vive naquele passo -- gerar de novo aqui sem essa variavel quebraria o CI com PrismaConfigEnvError) e builda todo pacote via `pnpm build` (turbo) antes deste `build` isolado.",
-    "prebuild": "(test -e ../../packages/database/src/generated/client.ts || pnpm --filter @arenahub/database generate) && (test -e ../../packages/database/dist/index.js || pnpm --filter @arenahub/database build)",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

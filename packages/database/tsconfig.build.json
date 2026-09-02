@@ -4,7 +4,11 @@
     "noEmit": false,
     "rootDir": "src",
     "outDir": "dist",
-    "declaration": true
+    "declaration": true,
+    // Mesmo motivo do `apps/api/tsconfig.build.json`: incremental confia no
+    // `.tsbuildinfo` e nao olha o disco, entao um buildinfo sobrevivente
+    // produz build "verde" com `dist/` vazio.
+    "incremental": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test", "prisma"]

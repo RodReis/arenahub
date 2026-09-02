@@ -32,6 +32,20 @@
         "!.next/cache/**"
       ]
     },
+    "@arenahub/database#build": {
+      "dependsOn": [
+        "^build",
+        "@arenahub/database#generate"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
+    },
+    "@arenahub/database#generate": {
+      "outputs": [
+        "src/generated/**"
+      ]
+    },
     "build:tokens": {
       "inputs": [
         "tokens/**",
