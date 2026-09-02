@@ -145,25 +145,40 @@ limit, bootstrap) em vez da `main` anterior. Depois do merge: disparar redeploy 
 | `NODE_ENV` | `production` |
 | `API_INTERNAL_URL` | `http://arenahubapi.railway.internal:3344` — rede privada, sem passar pela internet |
 
-⚙️ **Falta:** primeiro deploy real (mesma razão do §3 — espera o merge da F58). Depois do deploy,
-abrir o domínio deve mostrar a tela de login. Ainda **não há usuário** — é o passo 5.
-
 ## 5. Banco — tenant real e base do Pacto
 
 > Rode estes comandos **contra o Postgres da Railway**, a partir da sua máquina, com a
 > `DATABASE_URL` pública do Postgres **passada por ambiente na linha de comando** — nunca colada no
 > `.env` da raiz, que é o de desenvolvimento. Se o script ler o `.env` por engano, ele importa dado
 > real no seu banco local.
+>
+> **O host interno não serve aqui.** `postgres.railway.internal` só resolve dentro da rede da
+> Railway; da sua máquina não há rota. Para rodar de fora é preciso um **TCP proxy** no serviço
+> Postgres (Settings → Networking → TCP Proxy, porta 5432), que devolve um endereço público do
+> tipo `sakura.proxy.rlwy.net:37662`. Isso **expõe o banco na internet**, protegido só pela senha:
+> crie quando for usar e **remova quando terminar** os passos que precisam de acesso externo.
 
-1. **Bootstrap do tenant** — `pnpm --filter @arenahub/database bootstrap:tenant`, com as sete
+1. [x] **Bootstrap do tenant** — `pnpm --filter @arenahub/database bootstrap:tenant`, com as sete
    variáveis `BOOTSTRAP_*` exportadas antes (ver cabeçalho de
    `packages/database/prisma/bootstrap-tenant.ts` para a lista completa e um exemplo). Distinto do
    `seed.ts`, que cria `dono@arena-positiva.test` e **não pode** ir para produção. O comando cria
    `Tenant`, `GymUnit` com timezone e o primeiro `OWNER`, e imprime a senha inicial **uma vez** —
    idempotente: rodar de novo com os mesmos argumentos não duplica nem reemite senha. Guarde a
    senha no cofre assim que aparecer no terminal.
-2. Faça login no painel com o `OWNER`. O primeiro login exige configurar **MFA** (F6). Confirme
-   que entrou e que a lista de alunos está **vazia**.
+
+   **Feito em 02/09/2026:** tenant `arena-positiva`, unidade `MATRIZ`
+   (`America/Sao_Paulo`), `OWNER` com e-mail real do PI. Conferido no banco: nenhum usuário
+   `.test` existe em produção (AC-4).
+
+   ⚠️ **O comando concedia 7 das 42 permissões** e foi corrigido no mesmo dia
+   ([#259](https://github.com/RodReis/arenahub/pull/259)). O `OWNER` logava, configurava MFA e
+   levava `FORBIDDEN` no próprio dashboard (`access.read`). Se o dono de um tenant novo não
+   enxergar alguma tela, **é aqui que se olha primeiro**: as permissões saíram para
+   `packages/database/src/permissoes.ts`, fonte única do seed e do bootstrap, e reexecutar o
+   comando reconcilia sem tocar na senha.
+2. [x] Faça login no painel com o `OWNER`. O primeiro login exige configurar **MFA** (F6). Confirme
+   que entrou e que a lista de alunos está **vazia**. — feito em 02/09/2026, com o dashboard
+   abrindo depois da correção de permissões acima.
 3. ⚙️ **Importar o Pacto** (F47): `import-pacto.ts` com o export íntegro, apontando para o tenant
    criado. Anote a contagem de `CANCELLED` que o script imprime.
 4. ⚙️ **Ativar a base corrente** (F48): `seed-ativos.ts` com o `Pessoas1.csv`. Anote a contagem de
