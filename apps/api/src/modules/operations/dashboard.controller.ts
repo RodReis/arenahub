@@ -109,7 +109,7 @@ const ESQUEMA_DO_DASHBOARD = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['status', 'motivo', 'quantidade'],
+        required: ['status', 'motivo', 'quantidade', 'alunos'],
         properties: {
           status: { type: 'string', enum: ['SUSPENDED', 'BLOCKED'] },
           motivo: {
@@ -118,6 +118,7 @@ const ESQUEMA_DO_DASHBOARD = {
             enum: ['DELINQUENCY', 'STUDENT_REQUEST', 'MEDICAL', 'CONDUCT'],
           },
           quantidade: { type: 'integer' },
+          alunos: { type: 'array', items: { type: 'string' } },
         },
       },
     },

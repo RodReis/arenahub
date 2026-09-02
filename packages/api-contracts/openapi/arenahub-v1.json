@@ -6330,7 +6330,8 @@
                         "required": [
                           "status",
                           "motivo",
-                          "quantidade"
+                          "quantidade",
+                          "alunos"
                         ],
                         "properties": {
                           "status": {
@@ -6352,6 +6353,12 @@
                           },
                           "quantidade": {
                             "type": "integer"
+                          },
+                          "alunos": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         }
                       }

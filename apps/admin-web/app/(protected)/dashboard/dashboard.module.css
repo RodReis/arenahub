@@ -60,8 +60,31 @@
   flex-direction: column;
   gap: 3px;
   padding: 15px 16px 14px;
-  background: var(--ah-surface-raised);
+  /*
+   * GRADIENTE SUTIL, não decoração: a luz vem de cima, como numa superfície
+   * física iluminada pelo ambiente. É o que separa "cartão" de "retângulo
+   * branco" sem precisar de borda extra.
+   */
+  background: linear-gradient(180deg, var(--ah-surface-raised) 0%, var(--ah-surface-canvas) 100%);
   overflow: hidden;
+  transition:
+    background 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * O KPI RESPONDE AO MOUSE -- levanta pela sombra, não por `translate`.
+ *
+ * `transform` moveria a célula e abriria uma fresta de 1 px contra as
+ * vizinhas (a faixa é `gap: 1px` sobre fundo de borda, e o vão é o divisor).
+ * A sombra dá a mesma leitura de "isto está à frente" sem mexer no layout.
+ */
+.kpi:hover {
+  background: var(--ah-surface-raised);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, currentColor 14%, transparent),
+    0 2px 12px -4px color-mix(in srgb, var(--ah-text-strong) 22%, transparent);
+  z-index: 1;
 }
 
 .kpi[data-tom]::before {
@@ -81,21 +104,154 @@
  * contra o texto: `--ah-text-strong` sobre a superfície tingida a 7% continua
  * acima de 4.5:1 nos quatro tons.
  */
+/*
+ * O KPI COM ESTADO tinge com GRADIENTE da própria cor -- mais forte no topo,
+ * onde a aresta de 3 px já marca, dissolvendo até quase nada embaixo. O
+ * resultado lê como luz caindo sobre a cor, não como bloco chapado.
+ *
+ * Os dois extremos foram medidos: 10% no topo e 4% embaixo mantêm o texto
+ * acima de 4,5:1 nos quatro tons (o pior caso é o topo, mais escuro).
+ */
 .kpi[data-tom] {
-  background: color-mix(in srgb, currentColor 7%, var(--ah-surface-raised));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, currentColor 10%, var(--ah-surface-raised)) 0%,
+    color-mix(in srgb, currentColor 4%, var(--ah-surface-raised)) 100%
+  );
+}
+
+.kpi[data-tom]:hover {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, currentColor 14%, var(--ah-surface-raised)) 0%,
+    color-mix(in srgb, currentColor 6%, var(--ah-surface-raised)) 100%
+  );
+}
+
+/*
+ * O KPI PISCA quando o número muda -- o feed trouxe acesso novo e o contador
+ * subiu. Liga o que se move (o feed) ao que se lê (o número), que hoje são
+ * dois blocos sem relação visual.
+ *
+ * Uma vez, 900 ms, e acabou: brilho que repete vira alarme.
+ */
+.kpi[data-mudou='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--ah-state-success);
+  opacity: 0;
+  pointer-events: none;
+  animation: ah-brilho 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ah-brilho {
+  0% {
+    opacity: 0.22;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .kpi[data-tom='success'] {
-  color: var(--ah-state-success);
+  --tom-do-alerta: var(--ah-state-success);
+  color: var(--tom-do-alerta);
 }
 .kpi[data-tom='warning'] {
-  color: var(--ah-state-warning);
+  --tom-do-alerta: var(--ah-state-warning);
+  color: var(--tom-do-alerta);
 }
 .kpi[data-tom='danger'] {
-  color: var(--ah-state-danger);
+  --tom-do-alerta: var(--ah-state-danger);
+  color: var(--tom-do-alerta);
 }
 .kpi[data-tom='info'] {
-  color: var(--ah-state-info);
+  --tom-do-alerta: var(--ah-state-info);
+  color: var(--tom-do-alerta);
+}
+
+/*
+ * TOM DE CATEGORIA -- o que a célula MEDE, não o estado em que ela está.
+ *
+ * Antes só existia tom de ALERTA (recusa > 0, dispositivo degradado), e numa
+ * academia parada três dos quatro KPIs ficavam brancos: a faixa perdia
+ * identidade justamente no estado mais comum, o de tudo em ordem.
+ *
+ * A cor de categoria é mais fraca que a de alerta de propósito -- 5% contra
+ * 10% no topo. Ela dá identidade sem competir: quando uma recusa aparece, o
+ * vermelho tem de saltar acima dela, senão o alerta vira mais um cartão
+ * colorido.
+ *
+ * `accent` para acessos porque acesso liberado É o produto -- a cor da marca
+ * mede o que a academia existe para fazer.
+ */
+.kpi[data-categoria] {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, currentColor 5%, var(--ah-surface-raised)) 0%,
+    var(--ah-surface-raised) 100%
+  );
+}
+
+.kpi[data-categoria]:hover {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, currentColor 9%, var(--ah-surface-raised)) 0%,
+    var(--ah-surface-raised) 100%
+  );
+}
+
+/*
+ * A cor vai numa VARIÁVEL, não só em `color`.
+ *
+ * `currentColor` dentro do rótulo já é o cinza do próprio rótulo -- ele
+ * redefine `color`, e o `svg` herda dele, não da célula. Foi o que fez a
+ * primeira versão desta regra não pintar ícone nenhum. A variável atravessa a
+ * redefinição.
+ */
+.kpi[data-categoria='acesso'] {
+  --tom-da-categoria: var(--ah-accent-700);
+  color: var(--tom-da-categoria);
+}
+.kpi[data-categoria='recusa'] {
+  --tom-da-categoria: var(--ah-state-danger);
+  color: var(--tom-da-categoria);
+}
+.kpi[data-categoria='restricao'] {
+  --tom-da-categoria: var(--ah-state-warning);
+  color: var(--tom-da-categoria);
+}
+
+/*
+ * A ARESTA DE CATEGORIA é fina e translúcida -- 2 px a 45%, contra os 3 px
+ * chapados do alerta. A diferença de espessura é o segundo canal: quem não
+ * distingue as cores ainda vê qual faixa é mais grossa.
+ */
+.kpi[data-categoria]:not([data-tom])::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+/*
+ * O ÍCONE do rótulo veste a cor da categoria. É o que faz a faixa ser lida
+ * como quatro medidas distintas em vez de quatro caixas iguais -- e funciona
+ * mesmo onde o fundo tingido é fraco demais para registrar.
+ */
+.kpi[data-categoria] .kpiRotulo svg {
+  color: var(--tom-da-categoria);
+}
+
+/*
+ * O ícone do KPI em ALERTA veste o tom do alerta, que vence a categoria --
+ * `--tom-do-alerta` é definido junto de cada `data-tom` e cai para a
+ * categoria quando não há alerta.
+ */
+.kpi[data-tom] .kpiRotulo svg {
+  color: var(--tom-do-alerta, var(--tom-da-categoria));
 }
 
 .kpiRotulo {
@@ -156,6 +312,70 @@
   color: var(--ah-text-secondary);
 }
 
+/*
+ * A BARRA DE PROPORÇÃO do movimento do dia -- liberados contra recusados.
+ *
+ * Dois números lado a lado ("312" e "9") exigem que a recepção faça a conta
+ * de cabeça para saber se 9 recusas é muito. A barra responde antes da conta:
+ * uma faixa quase toda verde é um dia normal, e uma com vermelho visível é um
+ * dia para investigar.
+ *
+ * NÃO É GRÁFICO DECORATIVO: os dois números continuam escritos nos KPIs ao
+ * lado, e o `<title>` do SVG diz a proporção por extenso. Cor nunca é canal
+ * único (proibição de PRD).
+ */
+.proporcao {
+  display: flex;
+  height: 4px;
+  margin-top: 7px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--ah-surface-sunken);
+}
+
+/*
+ * A BARRA CRESCE da esquerda ao carregar -- `transform: scaleX`, que o
+ * compositor anima sem recalcular layout (animar `width` obrigaria o
+ * navegador a refazer o layout 60 vezes por segundo).
+ *
+ * `transform-origin: left` porque a leitura é da esquerda para a direita: uma
+ * barra que cresce do centro não corresponde a nada.
+ */
+.proporcaoLiberado,
+.proporcaoNegado {
+  transform-origin: left;
+  animation: ah-cresce 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.proporcaoLiberado {
+  background: var(--ah-state-success);
+}
+
+.proporcaoNegado {
+  background: var(--ah-state-danger);
+  /* A parcela vermelha entra DEPOIS da verde -- o olho lê "de tudo isso,
+     isto foi recusado", que é a ordem da informação. */
+  animation-delay: 120ms;
+}
+
+@keyframes ah-cresce {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/*
+ * DIA SEM MOVIMENTO NENHUM: a barra vira um traço neutro em vez de sumir.
+ * Bloco que desaparece faz a faixa "pular" de altura entre um carregamento e
+ * outro, e movimento que não significa nada é ruído no balcão.
+ */
+.proporcao[data-vazio='true'] {
+  background: var(--ah-border-subtle);
+}
+
 /* ─── Corpo em duas colunas ────────────────────────────────────────────── */
 
 /*
@@ -185,6 +405,14 @@
   min-width: 0;
 }
 
+/*
+ * O CARTÃO TEM PROFUNDIDADE -- sombra difusa e baixa, do tipo que separa a
+ * superfície do fundo sem anunciar que existe.
+ *
+ * Duas camadas: um halo largo e fraco (a sombra de ambiente) e uma linha
+ * curta e mais escura logo abaixo da borda (o contato). Uma sombra só, com
+ * blur grande, borra; duas leem como objeto pousado.
+ */
 .cartao {
   display: flex;
   flex-direction: column;
@@ -192,6 +420,26 @@
   border: 1px solid var(--ah-border-subtle);
   border-radius: var(--ah-radius-card);
   background: var(--ah-surface-raised);
+  box-shadow:
+    0 1px 2px -1px color-mix(in srgb, var(--ah-text-strong) 10%, transparent),
+    0 6px 20px -12px color-mix(in srgb, var(--ah-text-strong) 20%, transparent);
+  transition:
+    box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * HOVER: o cartão sobe 1 px e a sombra se aprofunda. Um pixel é pouco de
+ * propósito -- o suficiente para o olho registrar resposta, pouco para não
+ * empurrar o texto e obrigar a reler.
+ */
+.cartao:hover {
+  transform: translateY(-1px);
+  border-color: var(--ah-border-default);
+  box-shadow:
+    0 2px 4px -2px color-mix(in srgb, var(--ah-text-strong) 12%, transparent),
+    0 12px 28px -14px color-mix(in srgb, var(--ah-text-strong) 30%, transparent);
 }
 
 /*
@@ -207,7 +455,17 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--ah-border-subtle);
   border-radius: var(--ah-radius-card) var(--ah-radius-card) 0 0;
-  background: var(--ah-surface-sunken);
+  /* Mesma luz-de-cima dos KPIs, para o material ler igual na tela toda. */
+  background: linear-gradient(180deg, var(--ah-surface-canvas) 0%, var(--ah-surface-sunken) 100%);
+}
+
+/*
+ * O ÍCONE do título ganha a cor de ação -- é o único ponto de accent do
+ * cartão, e o que distingue "Placar do mês" de "Feriados do mês" antes de a
+ * pessoa ler as duas palavras.
+ */
+.tituloDoCartao svg {
+  color: var(--ah-action-text);
 }
 
 .tituloDoCartao {
@@ -357,6 +615,38 @@
   border-bottom: 1px solid var(--ah-border-subtle);
 }
 
+/*
+ * A linha de situação tem DUAS alturas: o cabeçalho (situação · motivo, com a
+ * contagem à direita) e os nomes embaixo. O divisor vai no item, não na linha
+ * de cima, senão cortaria entre o motivo e as pessoas a que ele se refere.
+ */
+.linhaDeSituacao {
+  padding: 9px 0;
+}
+
+.linhaDeSituacao:not(:last-child) {
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.linhaDeSituacao .linha {
+  padding: 0;
+  border-bottom: 0;
+}
+
+/*
+ * OS NOMES são apoio, não título: 12 px no cinza secundário. Quebram em duas
+ * linhas quando precisam -- truncar com reticências esconderia justamente o
+ * sobrenome que distingue duas pessoas de mesmo primeiro nome.
+ */
+.nomesDaSituacao {
+  display: block;
+  margin-top: 3px;
+  padding-left: 21px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--ah-text-secondary);
+}
+
 .linhaTexto {
   display: flex;
   align-items: center;
@@ -416,12 +706,77 @@
   color: var(--ah-text-secondary);
 }
 
+/* ─── Estado vazio ─────────────────────────────────────────────────────── */
+
+/*
+ * VAZIO NÃO É BECO -- `DS-PAINEL.md` §9 exige ação de saída, e a primeira
+ * versão desta tela tinha CINCO becos: "Nenhum placar publicado", "Nenhum
+ * desafio", "Nenhum acesso registrado". Cinco frases que constatam ausência e
+ * não dizem se aquilo é bom, ruim ou esperado.
+ *
+ * O vazio agora tem ÍCONE, frase e -- onde existe -- o próximo passo. O ícone
+ * carrega o tom: verde quando o vazio é BOA notícia (ninguém bloqueado),
+ * neutro quando é só ausência (nenhum desafio ainda).
+ */
 .vazio {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
   margin: 0;
-  padding: 4px 0;
+  padding: 10px 0 6px;
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
+}
+
+/*
+ * O ÍCONE do vazio ganha superfície própria -- um disco de 26 px com a cor do
+ * tom. Sem ele o bloco vazio é um parágrafo cinza solto, indistinguível de
+ * texto de apoio; com ele o olho reconhece "aqui não há nada" sem ler.
+ */
+.iconeDoVazio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ah-surface-sunken);
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * VAZIO QUE É BOA NOTÍCIA veste verde. "Ninguém bloqueado nesta unidade" não
+ * é a mesma informação que "nenhum desafio criado" -- a primeira é a academia
+ * funcionando, e pintá-la de cinza faz a recepção procurar problema onde não
+ * há.
+ */
+.iconeDoVazio[data-tom='success'] {
+  background: color-mix(in srgb, var(--ah-state-success) 12%, transparent);
+  color: var(--ah-state-success);
+}
+
+.textoDoVazio {
+  margin: 0;
+}
+
+/*
+ * O PRÓXIMO PASSO, quando existe. Fica na linha de baixo e em 11 px: é
+ * orientação, não o conteúdo do bloco.
+ */
+.saidaDoVazio {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ah-text-secondary);
+}
+
+.saidaDoVazio a {
+  color: var(--ah-action-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* ─── Feriado ──────────────────────────────────────────────────────────── */
@@ -500,7 +855,29 @@
     opacity: 0;
   }
 
-  .linhaDoFeed {
+  .linhaDoFeed,
+  .proporcaoLiberado,
+  .proporcaoNegado,
+  .kpi[data-mudou='true']::after {
     animation: none;
+  }
+
+  /*
+   * A barra precisa TERMINAR visível, não sumir: sem a animação, `both`
+   * deixaria o `scaleX(0)` do primeiro quadro congelado, e a proporção
+   * desapareceria justamente para quem pediu menos movimento.
+   */
+  .proporcaoLiberado,
+  .proporcaoNegado {
+    transform: scaleX(1);
+  }
+
+  .cartao,
+  .kpi {
+    transition: none;
+  }
+
+  .cartao:hover {
+    transform: none;
   }
 }

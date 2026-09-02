@@ -1346,13 +1346,28 @@ describe('F7 -- aluno, plano e entitlement', () => {
       }
     });
 
+    /*
+     * DATA-LIMITE PRE-EXISTENTE, corrigida por ser pre-requisito deste PR
+     * (CLAUDE.md -- bug de comportamento ja documentado, o Code cria a
+     * propria issue e corrige sem esperar). `validFrom` fixo em
+     * '2026-09-01' virou passado no dia seguinte e o handler recusa
+     * retroativo ANTES de checar o tenant (`reajustarPreco` no
+     * repositorio): a resposta virava 422 `PLAN_PRICE_RETROACTIVE`, nunca
+     * chegando ao 404 que este teste prova. Mesmo padrao do teste de
+     * fronteira logo acima -- `validFrom` de HOJE, calculado em runtime.
+     */
     it('plano de outro tenant responde 404 ao reajustar, exigindo o codigo', async () => {
       const planId = await criarPlano(contas.a);
+
+      const hoje = new Date();
+      const meiaNoiteDeHoje = new Date(
+        Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()),
+      );
 
       const resposta = await request(servidor())
         .post(`/api/v1/plans/${planId}/prices`)
         .set('Cookie', contas.b.cookie)
-        .send({ amountMinor: 18000, validFrom: '2026-09-01T00:00:00.000Z' });
+        .send({ amountMinor: 18000, validFrom: meiaNoiteDeHoje.toISOString() });
 
       expect(resposta.status).toBe(404);
       expect((resposta.body as { code: string }).code).toBe('PLAN_NOT_FOUND');
