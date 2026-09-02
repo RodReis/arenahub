@@ -8,7 +8,7 @@
   "scripts": {
     "//dev": "PORTA 3210, a MESMA do E2E (playwright.config.ts): o totem tem uma porta so. A padrao do Next (3000) e do admin-web -- sem -p os dois brigam e o segundo cai em 3001 calado, e a ponte assinada passa a apontar para o lugar errado (issue #212). As KIOSK_* NAO entram aqui: elas vem do .env da RAIZ, carregado pelo next.config.ts -- veja o comentario la.",
     "dev": "node ../../scripts/check-port.mjs 3210 totem && next dev --hostname 127.0.0.1 -p 3210",
-    "start": "next start --hostname 127.0.0.1",
+    "start": "next start --hostname 127.0.0.1 -p 3210",
     "build": "next build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

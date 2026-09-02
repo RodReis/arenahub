@@ -18,7 +18,7 @@ const esquema = z.object({
   /** 32 bytes em base64, para AES-256-GCM do segredo TOTP. */
   MFA_ENCRYPTION_KEY: z.string().optional(),
 
-  REDIS_URL: z.string().default('redis://127.0.0.1:6379'),
+  REDIS_URL: z.string().optional(),
 
   STORAGE_ENDPOINT: z.string().default('http://127.0.0.1:9000'),
   STORAGE_REGION: z.string().default('us-east-1'),
@@ -92,10 +92,32 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaAp
       audiencia: bruto.JWT_AUDIENCE,
     },
     mfa: { chave: resolverChaveDeMfa(bruto) },
-    redis: { url: bruto.REDIS_URL },
+    redis: { url: resolverRedisUrl(bruto) },
     storage: resolverStorage(bruto),
     anthropicApiKey: bruto.ANTHROPIC_API_KEY ?? null,
   };
+}
+
+/**
+ * Mesma regra das demais credenciais: obrigatoria em producao, padrao local
+ * fora dela.
+ *
+ * O padrao `127.0.0.1` nunca aponta para um Redis de producao -- deixa-lo
+ * passar em silencio faz o processo subir "com sucesso" contra um Redis que
+ * nao existe (SPEC-058 AC-2).
+ */
+function resolverRedisUrl(bruto: z.infer<typeof esquema>): string {
+  if (bruto.REDIS_URL) {
+    return bruto.REDIS_URL;
+  }
+
+  if (bruto.NODE_ENV === 'production') {
+    throw new Error(
+      'REDIS_URL e obrigatoria em producao. O padrao 127.0.0.1 so vale em desenvolvimento.',
+    );
+  }
+
+  return 'redis://127.0.0.1:6379';
 }
 
 /**
