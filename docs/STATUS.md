@@ -7,7 +7,33 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 01/09/2026 *(F57 entregue — dashboard operacional, seletor de unidade e emenda visual)*
+**Última atualização:** 02/09/2026 *(F58 e F59 criadas — implantação em pré-produção e composição do edge-agent; ADR-051)*
+
+🚀 **02/09/2026 — todas as issues de `admin-web` e `kiosk` fechadas; nasce a implantação.** O PI
+pediu a spec de implantação e, na mesma conversa, tomou seis decisões que viraram o **ADR-051**:
+nuvem inteira na **Railway** (API, painel, Postgres, Redis, Bucket); **totem LOCAL** no PC da
+recepção, porque a ponte HMAC em loopback é a condição do risco aceito no ADR-045 — publicar o
+kiosk na nuvem o reabriria; `edge-agent` **não é serviço de nuvem** (Windows x86 + LAN da catraca);
+antivírus **sobe com o dublê**, risco registrado; banco nasce com a **base do Pacto** (F47 + F48).
+Os serviços `kiosk` e `edge-agent` que o PI havia criado na Railway foram apagados.
+
+**Duas fatias, porque os aceites são diferentes:** a **F58** (`SPEC-058`, [#253](https://github.com/RodReis/arenahub/issues/253))
+é a implantação — fecha de longe, com backup restaurado e `netstat` do totem só em `127.0.0.1` como
+evidência. A **F59** (`SPEC-059`, [#254](https://github.com/RodReis/arenahub/issues/254)) é a
+**composição de produção do edge-agent** — a pendência da §1 linha 8, sem dono desde 15/08, que
+ganhou número: o `main.ts` hoje só emite heartbeat no log, e a composição real vive no `lab:run`.
+Só fecha na academia.
+
+⚠️ **Implantado ≠ produção.** A restrição 1 do ADR-029 continua em vigor: a catraca segue em
+`acionamento1: 8` até o ADR-028 fechar. A `SPEC-058` §7.3 exige que o aceite diga isso em texto,
+junto com *pagamento real desligado até a F55* e *nenhum upload escaneado*.
+
+📋 **Passo a passo em [`docs/runbooks/implantacao-pre-producao.md`](runbooks/implantacao-pre-producao.md)**
+— os passos que dependem de código da F58 estão marcados ⚙️; os demais são ação na Railway ou no PC
+e podem ser feitos hoje.
+
+📌 **Correção de índice:** a F47 ([#118](https://github.com/RodReis/arenahub/issues/118)) está
+`proplan:finalizado` desde 20/08/2026 e o Índice a listava como `planejada`. Corrigido abaixo.
 
 🏁 **31/08/2026 — F41 entregue, e o MVP 6 fecha.** Última fatia do roadmap documentado. A Slice 6.6
 foi escrita para monitorar um **modelo**, e sem a F40 metade dela não tem objeto — score de regra
@@ -692,7 +718,7 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | 5 | ✅ ~~**cutover: apontar a catraca para o `edge-agent`**~~ — **feito e devolvido** em 17/08 (`.106` → `.190` → `.106`, legado religado). O mesmo vale para o leitor facial, pelo menu físico, **sem depender da senha de admin** | — |
 | 6 | ✅ ~~**ligar os adapters ao `main.ts`** — fatia nova~~ — **a fatia nova morreu em 17/08, por decisão do PI**: o `lab:run` foi construído dentro da janela e absorvido por **F2/F5**, sem número novo. ⚠️ **Consequência aberta na linha 8** | — |
 | 7 | 🟡 **catraca em `acionamento1: 8` — livre por decisão operacional.** A academia opera destravada **enquanto cadastra os alunos** (esclarecido pelo PI em 18/08); trava quando o cadastro fechar. **Não é defeito** — é fase. ⚠️ **O risco é a troca não segurar:** o `EasyInnerBridge.cs` manda `ConfigurarAcionamento1(1, 5)` em toda conexão e a config do SDK sobrescreve a do equipamento; se `Funcao = 1` não for o modo travado, o ArenaHub destrava de volta a cada reconexão. Falta ler a tabela do enum no manual que o PI já tem (ADR-028) | **restrição 2 do ADR-029** — condição de saída do MVP 1 |
-| 8 | 🟠 **composição de PRODUÇÃO do `edge-agent` ficou sem dono.** Ordem de inicialização, o que o agente faz ao subir, o que acontece quando um dispositivo não responde — falha alto ou degrada. O `lab:run` é **bancada**; nada disso está decidido. **Precisa de número antes de F9 ir a piloto** — decisão do PI, insumo pronto em [`docs/notes/composicao-do-edge-agent.md`](notes/composicao-do-edge-agent.md) | **MVP 1** |
+| 8 | ✅ ~~🟠 **composição de PRODUÇÃO do `edge-agent` ficou sem dono.**~~ **Ganhou número em 02/09/2026: F59 / `SPEC-059`, [#254](https://github.com/RodReis/arenahub/issues/254)** (ADR-051). O texto original fica como histórico: Ordem de inicialização, o que o agente faz ao subir, o que acontece quando um dispositivo não responde — falha alto ou degrada. O `lab:run` é **bancada**; nada disso está decidido. **Precisa de número antes de F9 ir a piloto** — decisão do PI, insumo pronto em [`docs/notes/composicao-do-edge-agent.md`](notes/composicao-do-edge-agent.md) | **MVP 1** |
 | 9 | 🟠 **relógio do leitor facial.** O `ocorridoEm` veio congelado em `15:47:28` em todos os reconhecimentos de 17/08 — timestamp fixo embaralha a ordem de eventos (`M0-FR-004`). Decisão do PI em 17/08: **acertar o relógio *e* o Edge carimbar `recebidoEm` como critério de ordenação quando o `ocorridoEm` for implausível**, preservando o original (`M0-BR-004`) | **F2** |
 | 10 | 🟠 **consumir o `senduser` para detectar órfãos** entre leitor e nuvem — leitura de reconciliação que vira **alerta**, nunca cadastro. Decisão do PI em 17/08; **fora de F2**, fatia futura do MVP 1 **ainda sem número** | **MVP 1** |
 
@@ -1022,7 +1048,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F44 | SPEC-044 | 2.5 | 2.5.3 | Design system da superfície `kiosk` | [`SPEC-044-design-system-do-totem.md`](specs/SPEC-044-design-system-do-totem.md) | [#83](https://github.com/RodReis/arenahub/issues/83) | ✅ **entregue** em 26/08/2026 ([#210](https://github.com/RodReis/arenahub/pull/210)) — aguardando aceite |
 | F45 | — | 1 | — | Cadastro completo de aluno (retrabalho da Slice 1.2) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#100](https://github.com/RodReis/arenahub/issues/100) | **entregue** — aguardando aceite |
 | F46 | — | 2.5 | — | Design system aplicado ao `admin-web` (execução da F42) | [retrabalho](notes/2026-08-18-retrabalho-cadastro-completo-de-aluno.md) | [#99](https://github.com/RodReis/arenahub/issues/99) | **entregue** — PR [#107](https://github.com/RodReis/arenahub/pull/107), aguardando aceite |
-| F47 | — | 1 | — | Importação da base legada Pacto (1.926 alunos) | [ADR-033](DECISIONS.md#adr-033--importação-da-base-legada-do-pacto-1926-alunos-entram-como-cancelled) | [#118](https://github.com/RodReis/arenahub/issues/118) | planejada |
+| F47 | — | 1 | — | Importação da base legada Pacto (1.926 alunos) | [ADR-033](DECISIONS.md#adr-033--importação-da-base-legada-do-pacto-1926-alunos-entram-como-cancelled) | [#118](https://github.com/RodReis/arenahub/issues/118) | ✅ **finalizado** — aceito pelo PI em 20/08/2026 (o Índice dizia `planejada` até 02/09) |
 | F48 | — | 1 | — | Ativação da base corrente do Pacto (~340 ativos) | [design](superpowers/specs/2026-08-20-ativacao-base-corrente-design.md) | — | **entregue** — aguardando aceite |
 | F49 | SPEC-049 | 3.5 | 3.5.1 | Kiosk seguro, provisionamento e sessão efêmera | [ADR-042](DECISIONS.md#adr-042) · [`MVP-04` §7 Slice 4.5](prd/academia/MVP-04-app-totem.md) | [#150](https://github.com/RodReis/arenahub/issues/150) | ✅ **entregue** em 25/08/2026 — aguardando aceite |
 | F50 | SPEC-050 | 3.5 | 3.5.2 | Contrato de configuração, painel e publicação versionada | [ADR-042](DECISIONS.md#adr-042) | [#151](https://github.com/RodReis/arenahub/issues/151) | ✅ **entregue** em 26/08/2026 — aguardando aceite |
@@ -1033,8 +1059,15 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F55 | SPEC-055 | 3 | — | Adapters reais (Sicoob e Getnet) e Configuração → Pagamento | [`SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md`](specs/SPEC-055-adapters-sicoob-getnet-e-configuracao-de-pagamento.md) | [#158](https://github.com/RodReis/arenahub/issues/158) | aprovada-pi — **bloqueada** (credenciais Getnet + mTLS Sicoob) |
 | F56 | SPEC-056 | 3 | — | Plano com assinatura mensal | [`SPEC-056-plano-com-assinatura-mensal.md`](specs/SPEC-056-plano-com-assinatura-mensal.md) | [#159](https://github.com/RodReis/arenahub/issues/159) | ✅ **finalizado** — aceito pelo PI |
 | F57 | SPEC-057 | 1 | — | Dashboard operacional (nova porta de entrada do painel) | [`SPEC-057-dashboard-operacional.md`](specs/SPEC-057-dashboard-operacional.md) | [#242](https://github.com/RodReis/arenahub/issues/242) | ✅ **entregue** em 01/09/2026 ([#247](https://github.com/RodReis/arenahub/pull/247)) — aguardando aceite. Os sete blocos num aceite só, com feriados dentro (F58 recusada pelo PI, número livre). Dois pedidos do PI entraram junto: **seletor de unidade** no topo (a troca estava adiada desde a F45, e sem ela não existe "hoje") e um **passe visual mais expressivo**, que emendou o `PRODUCT.md` e o `DS-PAINEL.md` §2.9/§2.10 |
+| F58 | SPEC-058 | 1 | — | Implantação: API e painel na Railway, totem local, pré-produção | [`SPEC-058-implantacao-nuvem-e-totem-local.md`](specs/SPEC-058-implantacao-nuvem-e-totem-local.md) · [ADR-051](DECISIONS.md#adr-051) | [#253](https://github.com/RodReis/arenahub/issues/253) | aprovada-pi — escrita e aprovada em 02/09/2026. **Não é produção**: restrição 1 do ADR-029 segue em vigor |
+| F59 | SPEC-059 | 1 | — | Composição de produção do edge-agent (main.ts, serviço Windows, pareamento) | [`SPEC-059-composicao-de-producao-do-edge-agent.md`](specs/SPEC-059-composicao-de-producao-do-edge-agent.md) · [insumo](notes/composicao-do-edge-agent.md) | [#254](https://github.com/RodReis/arenahub/issues/254) | aprovada-pi — escrita e aprovada em 02/09/2026. AC-1–5 fecham em simulador; AC-6–9 só na academia |
 
 
+
+> **F58 e F59 criadas em 02/09/2026 por ADR-051.** O número **F58** tinha sido proposto para os
+> feriados e **recusado pelo PI em 01/09** (ficaram dentro da F57) — nunca entrou neste Índice, logo
+> alocá-lo agora não é reaproveitamento. `SPEC-058` e `SPEC-059` alocadas aqui pela primeira vez. A
+> contagem vai de 57 para **59 fatias**.
 
 > **F42–F44 criadas em 16/08/2026 por ADR-025.** As Slices 2.5.1–2.5.3 são definidas **no próprio
 > ADR**, não no PRD: o design system é trabalho de plataforma e não tem PRD que o descreva. O
