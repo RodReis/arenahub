@@ -128,8 +128,16 @@ limit, bootstrap) em vez da `main` anterior. Depois do merge: disparar redeploy 
    painel importa `@arenahub/ui` e `@arenahub/api-contracts`, e com `pnpm --filter` sozinho o
    Next falhava com 75 erros de `Module not found`). **Start:** `next start -p 3000`, porta já fixa
    antes da F58 — o `-p 3210` que a F58 mexeu foi no `kiosk`, não aqui.
-3. [x] **Domínio público gerado:** `arenahubadmin-web-production.up.railway.app`, target port
-   auto-detectado (o `admin-web` só escuta uma porta). Este é o endereço que a recepção vai usar.
+3. [x] **Domínio público gerado:** `arenahubadmin-web-production.up.railway.app`. Este é o endereço
+   que a recepção vai usar.
+
+   ⚙️ **Falta:** o domínio nasceu com **target port vazio** e a auto-detecção não pegou os 3000 —
+   o serviço sobe ("Ready", `next start -p 3000`), o deploy fica `SUCCESS` e mesmo assim a borda
+   responde **404** / `Application failed to respond`, porque não sabe para qual porta encaminhar.
+   Definir **3000** em Settings → Networking → Public Networking. O MCP da Railway não edita a
+   porta de um domínio já criado, e a variável `PORT` **não** resolve este caso (diferente do
+   healthcheck da API, §3) — o `next start` já recebe `-p 3000` explícito, então `PORT` não muda
+   onde ele escuta nem o que a borda faz. Ação do PI.
 4. [x] **Variables:**
 
 | variável | valor |
