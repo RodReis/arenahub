@@ -167,12 +167,65 @@ export default async function PaginaDeAlunos({
     if (termo) proxima.set('q', termo);
     if (situacao) proxima.set('status', situacao);
     if (unidade) proxima.set('gymUnitId', unidade);
+
+    /*
+     * A ORDEM VAI JUNTO -- issue #263. Sem isto, ordenar por nome e clicar em
+     * "Próximos" devolvia a página 2 da ordem PADRÃO (cadastro mais recente),
+     * com um cursor calculado na ordem por nome: a lista trocava de critério
+     * no meio da navegação e podia pular ou repetir gente, porque o cursor
+     * aponta para uma posição que só existe na ordem em que foi emitido.
+     */
+    if (ordem) {
+      proxima.set('ordem', ordem);
+      proxima.set('direcao', direcao);
+    }
+
     proxima.set('cursor', ultimo.id);
 
     return `/students?${proxima.toString()}`;
   };
 
   const proxima = proximaUrl();
+
+  /**
+   * Volta para a PRIMEIRA página — issue #263.
+   *
+   * A paginação era só de ida: quem clicava em "Próximos" ficava sem caminho
+   * de volta na tela, e o único recurso era o botão do navegador.
+   *
+   * NÃO É "página anterior", é "primeira página", e a diferença é honesta: a
+   * paginação por cursor só sabe andar para frente — o cursor aponta para
+   * onde a página ATUAL começou, e reconstruir o cursor da anterior exigiria
+   * guardar a pilha de cursores visitados na URL. Para uma lista que a
+   * recepção usa para achar uma pessoa (e que tem busca por nome logo acima),
+   * voltar ao começo resolve; empilhar cursor seria complexidade para um
+   * caminho que quase ninguém percorre.
+   *
+   * Só aparece quando há `cursor` — na primeira página não há para onde
+   * voltar, e um link inerte só ocuparia espaço.
+   */
+  const primeiraUrl = (): string => {
+    if (!cursor) return '';
+
+    const inicio = new URLSearchParams();
+
+    // Os filtros VÃO JUNTO, pela mesma razão de "Próximos": voltar ao começo
+    // não pode significar perder o filtro que a pessoa escolheu.
+    if (termo) inicio.set('q', termo);
+    if (situacao) inicio.set('status', situacao);
+    if (unidade) inicio.set('gymUnitId', unidade);
+
+    if (ordem) {
+      inicio.set('ordem', ordem);
+      inicio.set('direcao', direcao);
+    }
+
+    const consulta = inicio.toString();
+
+    return consulta ? `/students?${consulta}` : '/students';
+  };
+
+  const primeira = primeiraUrl();
 
   return (
     <section aria-labelledby="titulo-alunos">
@@ -459,6 +512,7 @@ export default async function PaginaDeAlunos({
             ),
           },
         ]}
+        {...(primeira ? { prevHref: primeira, prevLabel: 'Primeira página' } : {})}
         {...(proxima ? { nextHref: proxima } : {})}
         empty={
           <EmptyState

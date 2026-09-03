@@ -48,6 +48,29 @@ export function FiltroDeAlunos({ unidades, termoInicial, situacaoInicial, unidad
   const [termo, setTermo] = useState(termoInicial);
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  /**
+   * O ultimo termo que a pessoa REALMENTE buscou -- issue #263.
+   *
+   * `useEffect` roda na MONTAGEM, e nao so quando `termo` muda. Sem esta
+   * comparacao, chegar na pagina 2 pelo link "Proximos" montava o
+   * componente, disparava `navegar` 300 ms depois e `url.delete('cursor')`
+   * devolvia a pessoa para a PAGINA 1 -- sozinho, sem ninguem tocar em nada.
+   * A recepcao via a lista "voltar" enquanto lia, e paginar era impossivel.
+   *
+   * GUARDA O VALOR, e nao um booleano "ja montou". A diferenca nao e estilo:
+   * `reactStrictMode` esta ligado (`next.config.ts`) e monta cada componente
+   * DUAS vezes em desenvolvimento, entao um sinalizador de primeira execucao
+   * e derrubado pela segunda montagem -- e foi exatamente assim que a
+   * primeira versao desta correcao passou no teste de unidade (onde `render`
+   * nao simula Strict Mode) e continuou falhando no navegador, pego pelo
+   * E2E. Comparar valores e idempotente: montar dez vezes com o mesmo texto
+   * nao dispara busca nenhuma.
+   *
+   * `useRef` e nao `useState`: mudar isto nao pode causar renderizacao, e o
+   * valor tem de sobreviver entre renderizacoes sem participar de nenhuma.
+   */
+  const ultimoBuscado = useRef(termoInicial);
+
   const navegar = (proximoTermo: string, proximaSituacao: string, proximaUnidade: string): void => {
     const url = new URLSearchParams(searchParams.toString());
 
@@ -68,10 +91,25 @@ export function FiltroDeAlunos({ unidades, termoInicial, situacaoInicial, unidad
   // Busca automática: só dispara com 3+ caracteres, ou quando o campo volta
   // a ficar vazio (para limpar o filtro sem digitar nada de novo).
   useEffect(() => {
+    /*
+     * TEXTO IGUAL AO ÚLTIMO BUSCADO NÃO É BUSCA (issue #263). A pessoa não
+     * digitou nada -- ela apenas abriu a tela, possivelmente numa página 2
+     * cujo `cursor` `navegar` apagaria, devolvendo-a à primeira.
+     *
+     * Compara VALOR, e não "é a primeira execução": o Strict Mode monta duas
+     * vezes, e um sinalizador de montagem é derrubado pela segunda. Ver a
+     * nota em `ultimoBuscado`.
+     */
+    if (termo === ultimoBuscado.current) return;
+
     if (termo.length > 0 && termo.length < MINIMO_DE_CARACTERES) return;
 
     clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
+      // Só depois de disparar de fato: marcar antes faria um texto abandonado
+      // no meio da digitação (que nunca chegou a buscar) bloquear a busca
+      // real quando a pessoa voltasse a ele.
+      ultimoBuscado.current = termo;
       navegar(termo, situacaoInicial, unidadeInicial);
     }, ATRASO_MS);
 

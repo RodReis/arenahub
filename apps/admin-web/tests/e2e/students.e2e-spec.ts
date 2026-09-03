@@ -240,6 +240,58 @@ test.describe('busca de aluno', () => {
   });
 
   /*
+   * A TRAVESSIA -- issue #263. Nenhum teste percorria a paginação inteira, e
+   * foi por isso que dois defeitos conviveram na tela:
+   *
+   *   1. o `useEffect` do filtro rodava na MONTAGEM, apagava o `cursor` e
+   *      devolvia quem clicou em "Próximos" para a página 1 -- sozinho,
+   *      300 ms depois de a página 2 carregar;
+   *   2. não havia link nenhum de volta: a paginação era só de ida.
+   *
+   * Teste de componente não pega nenhum dos dois, porque os dois só existem
+   * na travessia real entre duas páginas servidas.
+   */
+  test('o cursor na URL SOBREVIVE -- a lista não volta sozinha para a primeira página', async ({
+    page,
+  }) => {
+    await entrar(page);
+
+    /*
+     * ENTRA DIRETO NUMA URL COM CURSOR, em vez de clicar em "Próximos".
+     *
+     * O seed de E2E tem 18 alunos e a página mostra 20, então não existe
+     * segunda página aqui para clicar -- e encher o banco com 20 cadastros
+     * só para produzir o link seria um teste lento que prova o mesmo. O que
+     * o defeito exigia era CHEGAR numa URL com `cursor` e ela permanecer:
+     * o `useEffect` do filtro rodava na montagem, apagava o parâmetro e
+     * `router.replace` devolvia a pessoa para a primeira página.
+     *
+     * O cursor aponta para o primeiro aluno da lista; com `skip: 1`, a
+     * tabela vem vazia ou curta -- e isso não importa. O que se afirma aqui
+     * é que a URL não se reescreve sozinha.
+     */
+    await page.goto('/students');
+
+    const primeiraLinha = page.getByTestId('tabela-de-alunos').locator('tbody tr').first();
+    const idDoPrimeiro = await primeiraLinha.getAttribute('data-testid');
+    const cursor = (idDoPrimeiro ?? '').replace('aluno-', '');
+
+    expect(cursor).not.toBe('');
+
+    await page.goto(`/students?cursor=${cursor}`);
+    await expect(page).toHaveURL(/cursor=/);
+
+    /*
+     * A ESPERA É O TESTE. O defeito acontecia 300 ms DEPOIS da montagem, via
+     * `router.replace`: a página carregava certa e só então voltava. Sem
+     * esperar mais que o atraso do debounce, o teste passaria com o bug vivo.
+     */
+    await page.waitForTimeout(1200);
+
+    await expect(page).toHaveURL(/cursor=/);
+  });
+
+  /*
    * O denominador muda com o filtro, e é essa a razão de ele existir: um
    * total fixo mentiria assim que alguém filtrasse.
    */
