@@ -92,6 +92,16 @@ interface Props<T> {
   readonly rowKey: (row: T) => string;
   readonly empty: ReactNode;
   readonly prevHref?: string;
+  /**
+   * Rótulo do link de volta. Padrão: `Anteriores`.
+   *
+   * EXISTE PORQUE NEM TODA VOLTA É "a anterior". A paginação por cursor só
+   * anda para frente — o cursor aponta para onde a página atual começou, e
+   * reconstruir o da anterior exigiria empilhar os cursores visitados. Uma
+   * lista que oferece apenas o retorno ao começo precisa dizer isso, senão
+   * promete uma navegação que não entrega.
+   */
+  readonly prevLabel?: string;
   readonly nextHref?: string;
   /**
    * Quantos itens o filtro alcanca -- o denominador do "20 de 341".
@@ -166,6 +176,7 @@ export function DataTable<T>({
   rowKey,
   empty,
   prevHref,
+  prevLabel = 'Anteriores',
   nextHref,
   total,
   testId,
@@ -311,7 +322,7 @@ export function DataTable<T>({
       */}
       {prevHref !== undefined || nextHref !== undefined || total !== undefined ? (
         <nav className={estilos['paginacao']} aria-label="Paginação">
-          {prevHref !== undefined ? <a href={prevHref}>Anteriores</a> : null}
+          {prevHref !== undefined ? <a href={prevHref}>{prevLabel}</a> : null}
           <span className={estilos['contador']}>
             {total === undefined
               ? `${rows.length} itens carregados`
