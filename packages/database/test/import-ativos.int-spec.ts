@@ -54,6 +54,9 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     zilda: '82606204050',
     heitor: '52622602685',
     ines: '04004288061',
+    yago: '11122233043',
+    zara: '22233344073',
+    wesley: '33344455001',
   } as const;
 
   beforeAll(async () => {
@@ -836,7 +839,13 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(await db.subscription.count({ where: { studentId: criada.id } })).toBe(0);
   });
 
-  it('aluno criado SEM periodo e ativado, mas NAO ganha entitlement nenhum', async () => {
+  it('aluno CRIADO sem periodo no arquivo ainda assim ganha direito -- comeca em 01/09/2026', async () => {
+    // Decisao do PI, 04/09/2026: quem esta importacao CRIA nunca fica "sem
+    // periodo de plano" -- comeca a contar do dia da migracao, mesmo que o
+    // CSV nao traga `Data Inicio`/`Data Fim` nenhuma. A REGRA No 1 (so
+    // `Entitlement` decide acesso) continua intacta: e o proprio direito que
+    // nasce aqui, com startsAt/endsAt CONGELADOS pela migracao, e nao um
+    // caminho que a ignora.
     const resultado = await importar([
       registroDe(null, {
         nome: 'PEDRO CRIADO SEM PERIODO',
@@ -848,21 +857,114 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     ]);
 
     expect(resultado.criados).toBe(1);
+    expect(resultado.direitosPorPlano).toBe(1);
 
     const criada = await db.student.findFirstOrThrow({
       where: { tenantId: alvo.tenantId, fullName: 'PEDRO CRIADO SEM PERIODO' },
     });
 
     expect(criada.status).toBe('ACTIVE');
-    // A REGRA No 1 APLICADA A QUEM NASCEU AGORA: cadastrar e ativar nao e dar
-    // acesso. So `Entitlement` decide, e sem periodo nao ha o que congelar.
-    expect(await db.entitlement.count({ where: { studentId: criada.id } })).toBe(0);
-    expect(await db.subscription.count({ where: { studentId: criada.id } })).toBe(0);
-    expect(resultado.pendencias).toContainEqual({
+
+    const direito = await db.entitlement.findFirstOrThrow({ where: { studentId: criada.id } });
+    const assinatura = await db.subscription.findFirstOrThrow({ where: { studentId: criada.id } });
+
+    expect(direito.startsAt.toISOString()).toBe('2026-09-01T00:00:00.000Z');
+    expect(direito.endsAt.toISOString()).toBe('2027-09-01T00:00:00.000Z');
+    expect(assinatura.startsAt.toISOString()).toBe('2026-09-01T00:00:00.000Z');
+    expect(resultado.pendencias).not.toContainEqual({
       nome: 'PEDRO CRIADO SEM PERIODO',
       motivo: 'aluno sem periodo de plano',
     });
   });
+
+  it('quem foi CRIADO com data forcada nao duplica assinatura/direito quando o CSV muda de data', async () => {
+    // O CASO QUE QUEBROU A IDEMPOTENCIA na primeira versao desta mudanca: a
+    // segunda execucao encontra a mesma pessoa por CPF (casamento, nao mais
+    // criacao) e calcularia `inicio` a partir do CSV -- que aqui e OUTRO
+    // valor de proposito, simulando uma exportacao seguinte do Pacto com a
+    // `Data Inicio` historica de novo preenchida. Sem o marcador de criacao,
+    // isso duplicaria assinatura e direito a cada rodada.
+    const primeira = await importar([
+      registroDe(null, {
+        nome: 'YAGO CRIADO COM DATA FORCADA',
+        cpf: CPF.yago,
+        dataInicio: '20200101',
+        dataFim: '20200201',
+      }),
+    ]);
+
+    expect(primeira.criados).toBe(1);
+
+    const criada = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'YAGO CRIADO COM DATA FORCADA' },
+    });
+
+    // Segunda execucao: MESMA pessoa (casa por CPF), CSV com data diferente.
+    const segunda = await importar([
+      registroDe(null, {
+        nome: 'YAGO CRIADO COM DATA FORCADA',
+        cpf: CPF.yago,
+        dataInicio: '20200101',
+        dataFim: '20200201',
+      }),
+    ]);
+
+    expect(segunda.criados).toBe(0);
+    expect(segunda.casadosPorCpf).toBe(1);
+    expect(segunda.direitosPorPlano).toBe(0);
+
+    const direitos = await db.entitlement.findMany({ where: { studentId: criada.id } });
+    const assinaturas = await db.subscription.findMany({ where: { studentId: criada.id } });
+
+    // UMA assinatura, UM direito -- nao dois. E a data continua sendo a
+    // FORCADA da primeira execucao, nao a do CSV (que a segunda rodada
+    // ignora exatamente porque a pessoa ja tem o marcador de criacao).
+    expect(assinaturas).toHaveLength(1);
+    expect(direitos).toHaveLength(1);
+    expect(assinaturas[0]!.startsAt.toISOString()).toBe('2026-09-01T00:00:00.000Z');
+    expect(direitos[0]!.startsAt.toISOString()).toBe('2026-09-01T00:00:00.000Z');
+  });
+
+  it('CASA POR NOME sem CPF no cadastro: o CPF do arquivo passa a ser gravado', async () => {
+    // Gap que a F48/F49 deixavam: `gravarPessoa` atualizava tudo MENOS o
+    // CPF, entao quem casava por nome (porque nunca tinha CPF no banco)
+    // ficava PARA SEMPRE sem documento, mesmo trazendo o CPF certo em toda
+    // importacao seguinte. Pedido do PI, 04/09/2026: "atualizar o cpf, quem
+    // nao tiver pelo nome".
+    const aluno = await criarAlunoCancelado({ nome: 'ZARA SEM CPF NO CADASTRO', cpf: null });
+
+    const resultado = await importar([
+      registroDe(null, { nome: 'ZARA SEM CPF NO CADASTRO', cpf: CPF.zara }),
+    ]);
+
+    expect(resultado.casadosPorNome).toBe(1);
+
+    const atualizado = await db.student.findUniqueOrThrow({ where: { id: aluno.id } });
+
+    expect(atualizado.cpf).toBe(CPF.zara);
+    expect(atualizado.cpfHash).toBe(
+      createHash('sha256').update(`${alvo.tenantId}:${CPF.zara}`).digest('hex'),
+    );
+  });
+
+  it('CPF existente e valido NAO e apagado quando o arquivo vem sem CPF', async () => {
+    // O reverso do teste acima: campo vazio no arquivo nao apaga dado bom
+    // (regra do topo de `importar.ts`) -- vale para CPF tambem.
+    const aluno = await criarAlunoCancelado({ nome: 'WESLEY COM CPF PRESERVADO', cpf: CPF.wesley });
+
+    await importar([registroDe(aluno, { cpf: '' })]);
+
+    const atualizado = await db.student.findUniqueOrThrow({ where: { id: aluno.id } });
+
+    expect(atualizado.cpf).toBe(CPF.wesley);
+  });
+
+  // O contraste -- aluno CASADO (ja existia) sem periodo no arquivo continua
+  // SEM direito, porque so quem esta importacao CRIA e "novo" no sentido do
+  // pedido do PI -- ja esta coberto acima em
+  // "aluno sem periodo e ativado, mas NAO ganha direito de acesso"
+  // (`EVA SEM PERIODO`), que usa `criarAlunoCancelado` e continua valendo
+  // sem alteracao.
 
   it('duas linhas do arquivo para a mesma pessoa criam UMA -- a segunda vira pendencia', async () => {
     const antes = await db.student.count({ where: { tenantId: alvo.tenantId } });
