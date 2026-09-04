@@ -67,6 +67,31 @@ import {
 export const MESES_DE_VINCULO = 12;
 
 /**
+ * Data de inicio forcada para quem esta fatia CRIA (nao casa com ninguem).
+ *
+ * Decisao do PI, 04/09/2026: o Pacto antigo trazia `Data Inicio` de quando a
+ * pessoa comecou LA -- por vezes anos atras. Quem nunca existiu no ArenaHub
+ * comeca a contar o plano a partir de HOJE da migracao, nao da data historica
+ * do sistema antigo. So se aplica a CRIADOS: quem ja tem cadastro (casou)
+ * mantem a data que a `gravarPessoa` ja gravava, do arquivo.
+ */
+const INICIO_PARA_CRIADOS = new Date(Date.UTC(2026, 8, 1));
+
+/**
+ * Texto gravado em `Subscription.lastReason` / `Entitlement.reason` de quem
+ * foi CRIADO por esta importacao (nao casou).
+ *
+ * NECESSARIO PARA A IDEMPOTENCIA: a segunda execucao encontra a mesma
+ * pessoa por CPF/nome (casamento, nao criacao), e o `inicio` recalculado a
+ * partir do CSV e OUTRO valor -- diferente do `INICIO_PARA_CRIADOS` gravado
+ * na primeira execucao. Sem este marcador, a busca por `startsAt` exato
+ * erraria e uma SEGUNDA assinatura/direito nasceria para a mesma pessoa a
+ * cada execucao. Motivo por que nao e so um texto livre feito na hora: tem
+ * de ser byte a byte igual em toda execucao para a busca reconhecer.
+ */
+const MARCADOR_CRIADO = 'Importacao da base ativa do Pacto (F48) -- cadastro novo';
+
+/**
  * UF quando o arquivo nao traz nenhuma. A academia e de Goias (F47/ADR-033).
  *
  * DEIXOU DE SER FIXA em 02/09/2026, por decisao do PI: o export atual traz a
@@ -634,12 +659,26 @@ async function gravarPessoa(
   db: Escritor,
   alvo: AlvoDaAtivacao,
   registro: RegistroDePessoaAtiva,
-  contexto: { studentId: string; perfil: PerfilImportado; agora: Date },
+  contexto: {
+    studentId: string;
+    perfil: PerfilImportado;
+    agora: Date;
+    /** `true` para quem ESTA EXECUCAO criou -- ver `INICIO_PARA_CRIADOS`. */
+    criadoNestaExecucao: boolean;
+  },
 ): Promise<EfeitoDaPessoa> {
-  const { studentId, perfil, agora } = contexto;
+  const { studentId, perfil, agora, criadoNestaExecucao } = contexto;
 
   const nascimento = parsearDataDoPacto(registro.dataNascimento);
   const nascimentoBom = nascimento !== null && nascimentoEhPlausivel(nascimento, agora);
+
+  // CPF: grava/atualiza quando o CSV traz um valido E o banco nao tem o
+  // MESMO ja gravado. Cobre quem CASOU POR NOME sem CPF no cadastro (o caso
+  // que a F48/F49 nunca preenchiam) -- sem isso a base ficava sem documento
+  // para sempre, mesmo trazendo o CPF certo em toda importacao seguinte.
+  // Nao apaga CPF existente: `cpfBom` decide gravar, nunca `null`.
+  const cpfDoArquivo = normalizarCpf(registro.cpf);
+  const cpfBom = cpfDoArquivo !== '' && cpfEhValido(cpfDoArquivo);
 
   await db.student.update({
     where: { id: studentId },
@@ -648,6 +687,10 @@ async function gravarPessoa(
       status: 'ACTIVE',
       // Ausente ou implausivel NAO apaga o que ja esta no banco.
       ...(nascimentoBom ? { birthDate: nascimento } : {}),
+      // `cpf` e `cpfHash` andam JUNTOS -- ver a nota em `criarPessoa`.
+      ...(cpfBom
+        ? { cpf: cpfDoArquivo, cpfHash: calcularHashDeCpf(alvo.tenantId, cpfDoArquivo) }
+        : {}),
     },
   });
 
@@ -742,8 +785,18 @@ async function gravarPessoa(
   const source = origemDoDireito(perfil);
 
   if (perfil === 'STUDENT') {
-    const inicio = parsearDataDoPacto(registro.dataInicio);
-    const fim = parsearDataDoPacto(registro.dataFim);
+    // QUEM ESTA IMPORTACAO CRIOU (nao existia no ArenaHub) comeca a contar
+    // de HOJE da migracao, nao da `Data Inicio` historica do Pacto --
+    // decisao do PI, 04/09/2026 (ver `INICIO_PARA_CRIADOS`). So "criado"
+    // ativa a data forcada -- alguem que JA EXISTIA no ArenaHub (mesmo sem
+    // assinatura, ex.: um `CANCELLED` reativando com plano) nao e "novo" no
+    // sentido do pedido, e mantem a data do arquivo.
+    const fimParaCriados = new Date(INICIO_PARA_CRIADOS);
+
+    fimParaCriados.setUTCMonth(fimParaCriados.getUTCMonth() + MESES_DE_VINCULO);
+
+    const inicio = criadoNestaExecucao ? INICIO_PARA_CRIADOS : parsearDataDoPacto(registro.dataInicio);
+    const fim = criadoNestaExecucao ? fimParaCriados : parsearDataDoPacto(registro.dataFim);
 
     if (inicio === null || fim === null) {
       // ATIVAR CADASTRO NAO E DAR ACESSO (regra de arquitetura no 1). Sem
@@ -754,12 +807,34 @@ async function gravarPessoa(
     }
 
     // Idempotencia por chave natural `(tenantId, studentId, planId,
-    // startsAt)`: mesma pessoa, mesmo plano, mesma data de inicio e a mesma
-    // assinatura -- nao uma segunda a cada execucao.
-    const assinatura = await db.subscription.findFirst({
+    // startsAt)` -- comportamento original desde a F48, que cobre CASADO
+    // (mesma pessoa, mesma data do CSV em toda execucao) e RENOVACAO (mesmo
+    // plano, novo ciclo, `startsAt` diferente cria uma segunda assinatura).
+    //
+    // CRIADO E DIFERENTE: a primeira execucao grava `INICIO_PARA_CRIADOS`; a
+    // segunda encontra a MESMA pessoa por CPF/nome (casamento) e calcula
+    // `inicio` a partir do CSV -- OUTRO valor -- entao a busca por
+    // `startsAt` exato erra e recriaria a assinatura. `MARCADOR_CRIADO` e o
+    // texto que reconhece essa assinatura em qualquer execucao seguinte,
+    // sem precisar de um campo novo no schema so para isto.
+    const porStartsAt = await db.subscription.findFirst({
       where: { tenantId: alvo.tenantId, studentId, planId: alvo.planId, startsAt: inicio },
       select: { id: true },
     });
+
+    const porMarcadorDeCriacao = criadoNestaExecucao
+      ? null
+      : await db.subscription.findFirst({
+          where: {
+            tenantId: alvo.tenantId,
+            studentId,
+            planId: alvo.planId,
+            lastReason: MARCADOR_CRIADO,
+          },
+          select: { id: true },
+        });
+
+    const assinatura = porStartsAt ?? porMarcadorDeCriacao;
 
     const subscriptionId =
       assinatura?.id ??
@@ -774,18 +849,31 @@ async function gravarPessoa(
             endsAt: fim,
             // SEM Invoice: vincular plano nao e cobrar. Essas pessoas ja
             // pagaram no sistema antigo.
-            lastReason: 'Importacao da base ativa do Pacto (F48)',
+            lastReason: criadoNestaExecucao
+              ? MARCADOR_CRIADO
+              : 'Importacao da base ativa do Pacto (F48)',
           },
           select: { id: true },
         })
       ).id;
 
-    const jaTemDireito = await db.entitlement.findFirst({
+    // Mesmo raciocinio da assinatura: o direito de quem foi CRIADO precisa
+    // ser reconhecido pelo marcador tambem, senao a segunda execucao
+    // calcula `startsAt` do CSV e cria um SEGUNDO direito para a mesma
+    // pessoa.
+    const direitoPorStartsAt = await db.entitlement.findFirst({
       where: { tenantId: alvo.tenantId, studentId, source, startsAt: inicio },
       select: { id: true },
     });
 
-    if (jaTemDireito) return efeito;
+    const direitoPorMarcadorDeCriacao = criadoNestaExecucao
+      ? null
+      : await db.entitlement.findFirst({
+          where: { tenantId: alvo.tenantId, studentId, source, reason: MARCADOR_CRIADO },
+          select: { id: true },
+        });
+
+    if (direitoPorStartsAt ?? direitoPorMarcadorDeCriacao) return efeito;
 
     await criarDireito(db, {
       tenantId: alvo.tenantId,
@@ -794,7 +882,7 @@ async function gravarPessoa(
       subscriptionId,
       startsAt: inicio,
       endsAt: fim,
-      reason: 'Importacao da base ativa do Pacto (F48)',
+      reason: criadoNestaExecucao ? MARCADOR_CRIADO : 'Importacao da base ativa do Pacto (F48)',
       snapshot: montarSnapshot({ id: alvo.planId, name: alvo.planName }, perfil, alvo.gymUnitIds),
     });
 
@@ -1015,6 +1103,7 @@ export async function importarPessoasAtivas(
               studentId: existente,
               perfil,
               agora,
+              criadoNestaExecucao: false,
             }),
           };
         }
@@ -1028,6 +1117,7 @@ export async function importarPessoasAtivas(
             studentId: criada.studentId,
             perfil,
             agora,
+            criadoNestaExecucao: true,
           }),
         };
       });

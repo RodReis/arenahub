@@ -79,7 +79,12 @@ const COLUNAS = {
   nome: 'Nome',
   cartao: 'Cartao',
   identificadorFacial: 'Identificador Facial',
-  codigoPerfil: 'Codigo Perfil',
+  // `Codigo Perfil` E LIXO DO PACTO -- confirmado pelo PI, 04/09/2026: quem
+  // diz o papel de verdade e `Permissoes de Acesso`. O valor bruto do CSV
+  // (1/3/4) e traduzido em `traduzirCodigoDePermissao` para o codigo que
+  // `traduzirPerfil` (em `dominio.ts`) ja entende -- sem tocar no mapa
+  // existente nem nos testes que o cobrem.
+  codigoPerfil: 'Permissoes de Acesso',
   dataNascimento: 'Data Nascimento',
   endereco: 'Endereco',
   bairro: 'Bairro',
@@ -163,6 +168,28 @@ function lerCsv(conteudo: string): Record<string, unknown>[] {
 }
 
 /**
+ * `Permissoes de Acesso` do CSV (1/3/4, os unicos valores que o export real
+ * traz) para o codigo que `traduzirPerfil` em `dominio.ts` ja entende
+ * (0=ADMIN, 1=STUDENT, 2=STAFF, 3=TRAINER). Confirmado pelo PI, 04/09/2026.
+ *
+ * NAO HA STAFF nesta base: os 72 registros com valor 3 sao majoritariamente
+ * personal trainer (email com "personal", nome de profissional), e o valor 4
+ * (2 registros) inclui um treinador reconhecivel -- por isso os dois caem
+ * respectivamente em TRAINER e ADMIN, sem terceiro valor para STAFF. Codigo
+ * desconhecido vira string vazia, que `traduzirPerfil` ja trata como perfil
+ * desconhecido (pendencia), em vez de adivinhar.
+ */
+const CODIGO_POR_PERMISSAO: Record<string, string> = {
+  '1': '1', // STUDENT
+  '3': '3', // TRAINER
+  '4': '0', // ADMIN
+};
+
+function traduzirCodigoDePermissao(valor: string): string {
+  return CODIGO_POR_PERMISSAO[valor.trim()] ?? '';
+}
+
+/**
  * `unknown` antes de validar dado externo (`CLAUDE.md`). O arquivo vem de um
  * extrator de terceiro: confiar na forma dele aqui seria confiar num arquivo
  * que ninguem versiona.
@@ -183,7 +210,7 @@ function converter(bruto: unknown): RegistroDePessoaAtiva[] {
       nome: lerTexto(registro, COLUNAS.nome),
       cartao: lerTexto(registro, COLUNAS.cartao),
       identificadorFacial: lerTexto(registro, COLUNAS.identificadorFacial),
-      codigoPerfil: lerTexto(registro, COLUNAS.codigoPerfil),
+      codigoPerfil: traduzirCodigoDePermissao(lerTexto(registro, COLUNAS.codigoPerfil)),
       dataNascimento: lerTexto(registro, COLUNAS.dataNascimento),
       endereco: lerTexto(registro, COLUNAS.endereco),
       bairro: lerTexto(registro, COLUNAS.bairro),
