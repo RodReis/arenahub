@@ -57,6 +57,8 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     yago: '11122233043',
     zara: '22233344073',
     wesley: '33344455001',
+    bento: '44455566023',
+    celia: '55566677053',
   } as const;
 
   beforeAll(async () => {
@@ -529,6 +531,93 @@ describe('importacao da base ativa do Pacto (F48)', () => {
   // A F48 empurrava essas linhas para pendencia humana. Na rodada real foram
   // 49 pessoas que a F47 nunca trouxe -- nao casamento perdido por grafia.
   // ==========================================================================
+
+  it('CONTADOR ATRASADO em relacao as matriculas existentes nao impede o cadastro', async () => {
+    // O DEFEITO QUE DERRUBOU 30 CADASTROS NA RODADA REAL DE 04/09/2026.
+    //
+    // `student_sequences.next_value` e a unica fonte da matricula, mas nada
+    // garante que ele esteja a frente do que ja existe em `students`: um
+    // import anterior que gravou matricula sem passar pelo contador, uma
+    // restauracao de backup, ou um tenant criado por outro caminho deixam o
+    // contador para tras. Quando isso acontece, `proximaMatricula` emite um
+    // numero que outro aluno ja tem e o `create` morre no UNIQUE de
+    // `(tenant_id, membership_number)`.
+    //
+    // PIOR QUE PARECE, e por isso o teste confere DUAS pessoas: cada uma roda
+    // na sua transacao, e o `UPDATE` do contador e revertido junto com o
+    // `create` que falhou. O contador nem avanca -- entao a segunda pessoa
+    // tenta exatamente o mesmo numero da primeira, e assim por diante. Em
+    // producao as 30 tentativas colidiram todas no mesmo valor.
+    const ocupada = 'AP-2026-00009999';
+
+    await db.student.create({
+      data: {
+        tenantId: alvo.tenantId,
+        gymUnitId,
+        membershipNumber: ocupada,
+        fullName: 'ALGUEM COM MATRICULA ALTA',
+        birthDate: new Date(Date.UTC(1990, 0, 15)),
+        status: 'CANCELLED',
+      },
+    });
+
+    // MATRICULA DE LEGADO, fora do formato `AP-{ano}-{8}`: existe na base
+    // real (o Pacto usa `LEGADO-<hex>`) e o hex pode sair todo em digitos.
+    // Ela nao pode quebrar a leitura do maior sufixo NEM inflar o contador
+    // -- ler "os 8 ultimos digitos" aqui saltaria para 99.999.999.
+    await db.student.create({
+      data: {
+        tenantId: alvo.tenantId,
+        gymUnitId,
+        membershipNumber: 'LEGADO-99999999',
+        fullName: 'ALGUEM DO LEGADO SEM FORMATO',
+        birthDate: new Date(Date.UTC(1990, 0, 15)),
+        status: 'CANCELLED',
+      },
+    });
+
+    // Contador ATRAS da matricula acima -- o estado real de producao.
+    await db.$executeRaw`
+      UPDATE student_sequences
+      SET next_value = 9999, updated_at = now()
+      WHERE tenant_id = ${alvo.tenantId}::uuid
+    `;
+
+    const resultado = await importar([
+      registroDe(null, { nome: 'BENTO APOS CONTADOR ATRASADO', cpf: CPF.bento }),
+      registroDe(null, { nome: 'CELIA APOS CONTADOR ATRASADO', cpf: CPF.celia }),
+    ]);
+
+    // AS DUAS ENTRAM. Sem a correcao, ambas viram `erro ao gravar` com
+    // "Unique constraint failed on the fields: (`tenant_id`,
+    // `membership_number`)" e ficam de fora do sistema -- catraca fechada
+    // para gente que treina hoje.
+    expect(resultado.criados).toBe(2);
+    expect(resultado.pendencias.filter((p) => p.motivo === 'erro ao gravar')).toEqual([]);
+
+    const criadas = await db.student.findMany({
+      where: {
+        tenantId: alvo.tenantId,
+        fullName: { in: ['BENTO APOS CONTADOR ATRASADO', 'CELIA APOS CONTADOR ATRASADO'] },
+      },
+      select: { membershipNumber: true },
+    });
+
+    expect(criadas).toHaveLength(2);
+    // Numeros DISTINTOS entre si e distintos do que ja estava ocupado: e o
+    // que o UNIQUE cobra, e conferir so a contagem deixaria passar duas
+    // pessoas com a mesma matricula se o indice fosse afrouxado um dia.
+    const numeros = criadas.map((c) => c.membershipNumber);
+
+    expect(new Set(numeros).size).toBe(2);
+    expect(numeros).not.toContain(ocupada);
+
+    // O SALTO E O MENOR POSSIVEL: retoma logo depois da maior matricula no
+    // formato (9999), sem se contagiar pelos 8 digitos do `LEGADO-99999999`.
+    // Sem esta linha o teste passaria mesmo com o contador saltando para
+    // 100 milhoes -- unico e sequencial, mas queimando a faixa inteira.
+    expect(numeros.sort()).toEqual(['AP-2026-00010000', 'AP-2026-00010001']);
+  });
 
   it('cadastra quem nao existe no cadastro, com matricula e status ACTIVE', async () => {
     const antes = await db.student.count({ where: { tenantId: alvo.tenantId } });

@@ -411,6 +411,43 @@ type Escritor = Pick<
  * numero apos arquivamento (quebra INV-010); fragmento de UUID colide e nao
  * e sequencial; `SEQUENCE` do Postgres e global e vazaria volume entre
  * tenants.
+ *
+ * ---------------------------------------------------------------------------
+ * O CONTADOR SOZINHO NAO BASTA -- ELE PODE ESTAR ATRAS DO QUE JA EXISTE.
+ * ---------------------------------------------------------------------------
+ *
+ * Defeito real da rodada de 04/09/2026 contra producao: 30 cadastros novos
+ * morreram em `Unique constraint failed on (tenant_id, membership_number)`.
+ * `student_sequences` e a unica fonte da matricula, mas NADA garante que ele
+ * esteja a frente de `students` -- um import anterior que gravou matricula
+ * sem passar pelo contador, uma restauracao de backup, ou um tenant criado
+ * por outro caminho deixam o contador para tras, e ele emite um numero que
+ * outro aluno ja tem.
+ *
+ * E NAO SE RECUPERA SOZINHO: cada pessoa roda na sua transacao, e o `UPDATE`
+ * do contador e revertido junto com o `create` que falhou. O contador nem
+ * avanca, entao a pessoa seguinte tenta exatamente o mesmo numero -- em
+ * producao as 30 tentativas colidiram todas no mesmo valor, e o mesmo
+ * aconteceria com as 300 seguintes.
+ *
+ * Por isso o piso vem do MAIOR SUFIXO JA GRAVADO, comparado dentro do mesmo
+ * lock. O sufixo e global por tenant (o contador nao reinicia por ano e o
+ * UNIQUE nao olha o prefixo), entao a comparacao ignora o `AP-{ano}-` e le
+ * so os 8 digitos finais.
+ *
+ * `membership_number` e `String` livre no schema, sem CHECK de formato, e a
+ * base TEM matricula fora do padrao -- o legado do Pacto usa `LEGADO-<hex>`
+ * (ver `students-cadastro-completo.int-spec.ts`). Por isso o `substring` com
+ * a ancora do formato COMPLETO (`^AP-{4}-{8}$`) em vez de "os 8 ultimos
+ * digitos": o que nao casa vira `NULL` e o `MAX` ignora.
+ *
+ * As duas alternativas testadas e descartadas:
+ *   - filtrar por regex no `WHERE` e converter no `SELECT`: o Postgres nao
+ *     garante avaliar o filtro antes da agregacao, entao uma linha estranha
+ *     derruba a consulta -- e o import junto -- conforme o plano escolhido;
+ *   - limpar nao-digitos de `RIGHT(...,8)`: um `LEGADO-1a2b3c4d` cujo hex
+ *     caia todo em digitos viraria 12.345.678 e o contador saltaria uma
+ *     faixa inteira de matriculas por causa de UMA linha de legado.
  */
 async function proximaMatricula(db: Escritor, tenantId: string, ano: number): Promise<string> {
   await db.$executeRaw`
@@ -425,7 +462,22 @@ async function proximaMatricula(db: Escritor, tenantId: string, ano: number): Pr
     FOR UPDATE
   `;
 
-  const sequencial = travadas[0]?.next_value ?? 1;
+  // DENTRO DO LOCK, e nao antes: o `FOR UPDATE` acima serializa as emissoes
+  // concorrentes, e ler o maior sufixo fora dele deixaria duas transacoes
+  // enxergarem o mesmo piso.
+  const maiores = await db.$queryRaw<{ maior: number | null }[]>`
+    SELECT MAX(CAST(substring(membership_number from '^AP-[0-9]{4}-([0-9]{8})$') AS INTEGER))
+      AS maior
+    FROM students
+    WHERE tenant_id = ${tenantId}::uuid
+  `;
+
+  const contador = travadas[0]?.next_value ?? 1;
+  const maiorGravado = maiores[0]?.maior ?? 0;
+  // O piso e o MAIOR dos dois. Com o contador a frente (o caso normal), nada
+  // muda; com ele atras, salta para depois da ultima matricula real em vez
+  // de emitir um numero ja ocupado.
+  const sequencial = Math.max(contador, maiorGravado + 1);
 
   await db.$executeRaw`
     UPDATE student_sequences
