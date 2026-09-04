@@ -298,4 +298,111 @@ describe('F60 -- modalidades por unidade', () => {
       expect(resposta.status).toBe(201);
     });
   });
+
+  /**
+   * Filtro da LISTAGEM por modalidade.
+   *
+   * O que estas suites existem para pegar: a listagem e a contagem do
+   * "20 de N" divergirem. As duas montam o `where` a partir da MESMA funcao
+   * (`condicaoDeModalidade`); se cada uma montasse a sua, a tela mostraria
+   * "20 de 341" enquanto pagina outro conjunto -- e os dois numeros
+   * continuariam plausiveis.
+   */
+  describe('filtro da listagem por modalidade', () => {
+    let comModalidade = '';
+    let semModalidade = '';
+    let pilates = '';
+
+    beforeAll(async () => {
+      pilates = await criarModalidade(unidadeA, 'Pilates');
+
+      const criado = await request(servidor())
+        .post('/api/v1/students')
+        .set('cookie', cookie)
+        .send({
+          fullName: 'Aluno Com Pilates',
+          birthDate: '1990-05-10',
+          cpf: cpfValido('690273184'),
+          gymUnitId: unidadeA,
+          modalityIds: [pilates],
+        });
+
+      expect(criado.status).toBe(201);
+      comModalidade = (criado.body as { id: string }).id;
+
+      const sem = await request(servidor())
+        .post('/api/v1/students')
+        .set('cookie', cookie)
+        .send({
+          fullName: 'Aluno Sem Pilates',
+          birthDate: '1990-05-10',
+          cpf: cpfValido('748916025'),
+          gymUnitId: unidadeA,
+        });
+
+      expect(sem.status).toBe(201);
+      semModalidade = (sem.body as { id: string }).id;
+    });
+
+    it('devolve so quem tem a modalidade, e o total ACOMPANHA o filtro', async () => {
+      const resposta = await request(servidor())
+        .get(`/api/v1/students?modalityId=${pilates}&limit=100`)
+        .set('cookie', cookie);
+
+      expect(resposta.status).toBe(200);
+
+      const ids = (resposta.body as { id: string }[]).map((a) => a.id);
+
+      expect(ids).toContain(comModalidade);
+      // Quem NAO tem modalidade nenhuma fica de fora -- e o caso do
+      // funcionario, do personal e do administrador.
+      expect(ids).not.toContain(semModalidade);
+
+      /*
+       * O TOTAL do cabecalho tem de descrever o MESMO conjunto que a lista.
+       * Ele e o denominador do "20 de N" na tela: se a contagem ignorasse o
+       * filtro, a recepcao veria 20 linhas de "20 de 1968" e acharia que ha
+       * mais paginas de uma lista que acabou.
+       */
+      expect(Number(resposta.headers['x-total-count'])).toBe(ids.length);
+    });
+
+    it('id valido que nao existe devolve lista vazia, nao 400', async () => {
+      const resposta = await request(servidor())
+        .get(`/api/v1/students?modalityId=${randomUUID()}`)
+        .set('cookie', cookie);
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body).toEqual([]);
+    });
+
+    it('id invalido vira SEM FILTRO, nao 400 -- a URL e editada pela recepcao', async () => {
+      const resposta = await request(servidor())
+        .get('/api/v1/students?modalityId=nao-e-uuid&limit=100')
+        .set('cookie', cookie);
+
+      expect(resposta.status).toBe(200);
+
+      // Sem filtro: quem NAO tem modalidade tambem aparece.
+      const ids = (resposta.body as { id: string }[]).map((a) => a.id);
+
+      expect(ids).toContain(semModalidade);
+    });
+
+    it('modalidade de OUTRO TENANT devolve vazio -- nao vaza aluno de ninguem', async () => {
+      const alheia = await criarUnidade(outroTenantId, `Z-${sufixo}`);
+
+      const modalidade = await db.gymUnitModality.create({
+        data: { tenantId: outroTenantId, gymUnitId: alheia, name: 'Alheia Filtro' },
+      });
+
+      const resposta = await request(servidor())
+        .get(`/api/v1/students?modalityId=${modalidade.id}`)
+        .set('cookie', cookie);
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body).toEqual([]);
+      expect(Number(resposta.headers['x-total-count'])).toBe(0);
+    });
+  });
 });

@@ -3,19 +3,19 @@
     "testes": 1585,
     "pass": 1585,
     "falha": 0,
-    "coberturaPct": 69.63
+    "coberturaPct": 69.62
   },
   "apps/api#test:integration": {
-    "testes": 809,
-    "pass": 809,
+    "testes": 813,
+    "pass": 813,
     "falha": 0,
     "coberturaPct": 82.91
   },
   "apps/admin-web#test": {
-    "testes": 489,
-    "pass": 489,
+    "testes": 494,
+    "pass": 494,
     "falha": 0,
-    "coberturaPct": 72.42
+    "coberturaPct": 72.65
   },
   "packages/ui#test": {
     "testes": 215,

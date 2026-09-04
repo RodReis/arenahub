@@ -392,6 +392,7 @@ export class StudentsController {
     @Query('status') status?: string,
     @Query('ordem') ordem?: string,
     @Query('direcao') direcao?: string,
+    @Query('modalityId') modalityId?: string,
   ): Promise<AlunoDto[]> {
     // Teto de 100: sem ele, `?limit=1000000` vira exportacao da base inteira
     // numa requisicao.
@@ -419,6 +420,15 @@ export class StudentsController {
       gymUnitId,
       ...(situacao.success ? { status: situacao.data } : {}),
       /*
+       * Modalidade (F60). `uuid()` no `safeParse` pelo mesmo criterio dos
+       * filtros acima: parametro invalido vira "sem filtro", nao 400 -- a URL
+       * e editada pela recepcao e restaurada pelo navegador, e trocar a
+       * listagem inteira por pagina de erro por causa de um id datilografado
+       * seria pior que ignorar. Id VALIDO que nao existe devolve lista vazia,
+       * que e a resposta correta.
+       */
+      ...(z.string().uuid().safeParse(modalityId).success ? { modalityId } : {}),
+      /*
        * Ordem invalida vira "sem ordem", nao 400 -- mesmo criterio do filtro
        * de situacao logo acima: o parametro chega da URL, que a recepcao
        * edita e o navegador restaura de sessao antiga.
@@ -441,6 +451,7 @@ export class StudentsController {
       termo,
       gymUnitId,
       ...(situacao.success ? { status: situacao.data } : {}),
+      ...(z.string().uuid().safeParse(modalityId).success ? { modalityId } : {}),
     });
 
     resposta.setHeader('X-Total-Count', String(total));

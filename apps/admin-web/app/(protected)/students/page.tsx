@@ -57,6 +57,13 @@ interface Unidade {
   name: string;
 }
 
+/** Modalidade ATIVA de alguma unidade do tenant -- F60. */
+interface Modalidade {
+  id: string;
+  gymUnitId: string;
+  name: string;
+}
+
 const POR_PAGINA = 20;
 
 /**
@@ -82,13 +89,24 @@ export default async function PaginaDeAlunos({
   const termo = texto('q');
   const situacao = texto('status');
   const unidade = texto('gymUnitId');
+  const modalidade = texto('modalityId');
 
   const consulta = new URLSearchParams();
 
   if (termo) consulta.set('q', termo);
   if (situacao) consulta.set('status', situacao);
   if (unidade) consulta.set('gymUnitId', unidade);
+  if (modalidade) consulta.set('modalityId', modalidade);
 
+  /*
+   * QUALQUER filtro ativo, num lugar so.
+   *
+   * A expressao vivia inline no estado vazio, repetida em duas linhas, e a
+   * modalidade (F60) ficou de fora das duas quando entrou: a tela dizia
+   * "Nenhum aluno cadastrado ainda -- comece cadastrando o primeiro" para
+   * uma base com 1.912 alunos, so porque o filtro novo nao aparecia na
+   * condicao. Derivar aqui faz o proximo filtro entrar num lugar so.
+   */
   const ordem = texto('ordem');
   const direcao = texto('direcao') === 'desc' ? 'desc' : 'asc';
 
@@ -96,6 +114,8 @@ export default async function PaginaDeAlunos({
     consulta.set('ordem', ordem);
     consulta.set('direcao', direcao);
   }
+
+  const temFiltro = Boolean(termo || situacao || unidade || modalidade);
 
   const cursor = texto('cursor');
 
@@ -113,12 +133,20 @@ export default async function PaginaDeAlunos({
    * pagina de alunos. Sem ela, o filtro de unidade simplesmente nao aparece,
    * e o resto da tela funciona como antes.
    */
-  const [resposta, respostaDeUnidades] = await Promise.all([
+  const [resposta, respostaDeUnidades, respostaDeModalidades] = await Promise.all([
     chamarApi<Aluno[]>(`/api/v1/students?${consulta.toString()}`),
     chamarApi<Unidade[]>('/api/v1/units'),
+    chamarApi<Modalidade[]>('/api/v1/units/modalities'),
   ]);
 
   const unidades = respostaDeUnidades.ok ? (respostaDeUnidades.dados ?? []) : [];
+
+  /*
+   * Mesma regra da lista de unidades logo acima: falhar ao buscar as
+   * modalidades nao derruba a pagina. Sem elas, o filtro de modalidade
+   * simplesmente nao aparece.
+   */
+  const modalidades = respostaDeModalidades.ok ? (respostaDeModalidades.dados ?? []) : [];
 
   if (!resposta.ok) {
     return (
@@ -167,6 +195,7 @@ export default async function PaginaDeAlunos({
     if (termo) proxima.set('q', termo);
     if (situacao) proxima.set('status', situacao);
     if (unidade) proxima.set('gymUnitId', unidade);
+    if (modalidade) proxima.set('modalityId', modalidade);
 
     /*
      * A ORDEM VAI JUNTO -- issue #263. Sem isto, ordenar por nome e clicar em
@@ -214,6 +243,7 @@ export default async function PaginaDeAlunos({
     if (termo) inicio.set('q', termo);
     if (situacao) inicio.set('status', situacao);
     if (unidade) inicio.set('gymUnitId', unidade);
+    if (modalidade) inicio.set('modalityId', modalidade);
 
     if (ordem) {
       inicio.set('ordem', ordem);
@@ -258,9 +288,11 @@ export default async function PaginaDeAlunos({
       */}
       <FiltroDeAlunos
         unidades={unidades}
+        modalidades={modalidades}
         termoInicial={termo ?? ''}
         situacaoInicial={situacao ?? ''}
         unidadeInicial={unidade ?? ''}
+        modalidadeInicial={modalidade ?? ''}
       />
 
       <DataTable
@@ -296,6 +328,7 @@ export default async function PaginaDeAlunos({
             if (termo) url.set('q', termo);
             if (situacao) url.set('status', situacao);
             if (unidade) url.set('gymUnitId', unidade);
+            if (modalidade) url.set('modalityId', modalidade);
             url.set('ordem', chave);
             url.set('direcao', sentido);
 
@@ -524,12 +557,12 @@ export default async function PaginaDeAlunos({
               cadastrar alguem que ja existe.
             */
             title={
-              termo || situacao || unidade
+              temFiltro
                 ? 'Nenhum aluno encontrado com esses filtros.'
                 : 'Nenhum aluno cadastrado ainda.'
             }
             hint={
-              termo || situacao || unidade
+              temFiltro
                 ? 'Confira a grafia, amplie os filtros ou cadastre um novo aluno.'
                 : 'Comece cadastrando o primeiro.'
             }

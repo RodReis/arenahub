@@ -74,6 +74,12 @@ Rotas aninhadas em `/units/:unitId`, porque modalidade não existe fora de uma u
 | `POST /api/v1/units/:unitId/modalities` | `unit.update` | 409 `MODALITY_ALREADY_EXISTS` quando o nome repete na unidade |
 | `PATCH /api/v1/units/:unitId/modalities/:modalityId` | `unit.update` | renomeia e inativa/reativa. **Não há `DELETE`** |
 
+`GET /api/v1/students` ganha `modalityId`. Filtro inválido vira **sem filtro**, não 400 — mesmo
+critério dos filtros de situação e ordem que já existiam: a URL é editada pela recepção e
+restaurada pelo navegador, e trocar a listagem por uma página de erro por causa de um id
+datilografado seria pior que ignorar. Id **válido** que não existe devolve lista vazia, que é a
+resposta correta.
+
 `POST /api/v1/students` ganha `modalityIds` opcional. Toda modalidade pedida tem de ser **da
 unidade do aluno** — id de outro tenant, de outra unidade, inexistente ou repetido leva 400
 `MODALITY_NOT_IN_UNIT`. A checagem é por **contagem**, numa consulta só já filtrada por tenant
@@ -90,6 +96,22 @@ mesmo instante passariam as duas por uma checagem prévia e a segunda estouraria
 **Unidades** (`/units`) ganha a ação de linha *Modalidades*: modal com a lista, campo para
 adicionar e botão de inativar/reativar. O modal **fica aberto** depois de adicionar — quem
 cadastra modalidade quase sempre cadastra várias seguidas.
+
+**Alunos** (`/students`) ganha o combo **Modalidade** no filtro, ao lado de Situação. A lista de
+opções **acompanha o filtro de unidade** (decisão do PI): sem unidade escolhida oferece todas,
+com unidade escolhida oferece só as dela, e trocar a unidade limpa a modalidade que a nova não
+oferece. Oferecer sempre a lista inteira deixaria montar a combinação *unidade A + modalidade da
+unidade B*, que só devolve lista vazia — e a recepção acharia que não há ninguém, quando a
+pergunta é que era impossível.
+
+O combo aparece com **uma** modalidade cadastrada, diferente do filtro de unidade ao lado, que
+exige duas: com uma unidade só, filtrar por ela não separa ninguém; com uma modalidade só,
+separa quem a tem de quem não a tem — e quem não tem é o funcionário, o personal e o
+administrador.
+
+O total do rodapé usa o **mesmo** `where` da listagem, por uma função compartilhada
+(`condicaoDeModalidade`). Se cada consulta montasse a sua, a tela mostraria "20 de 341" enquanto
+pagina outro conjunto, e os dois números continuariam plausíveis.
 
 **Cadastro de aluno** (`/students/novo`), passo Administrativo: caixas de seleção com as
 modalidades **da unidade escolhida**, obrigatório escolher ao menos uma.
@@ -118,18 +140,23 @@ Nada disso foi pedido, e cada um puxa a cadeia de cobrança.
 
 | verificação | resultado |
 |---|---|
-| Integração da fatia (`modalidades-por-unidade.int-spec.ts`) | 7 casos ✅ |
-| Integração `apps/api` (57 suítes) | ✅ |
+| Integração da fatia (`modalidades-por-unidade.int-spec.ts`) | 11 casos ✅ |
+| Integração `apps/api` (57 suítes) | 813 ✅ |
 | Integração `packages/database` | 74 ✅ |
-| Unitários do wizard | 6 ✅ |
+| Unitários do wizard e do filtro | 15 ✅ |
 | E2E `admin-web` | 70 ✅ |
 | `lint` · `typecheck` · `build` | ✅ (lint com `--force`, sem cache) |
 
-**Canário em dois pontos**, porque teste verde não prova que pega o erro:
+**Canário em quatro pontos**, porque teste verde não prova que pega o erro:
 
 - removida a validação de modalidade no controller da API → os dois casos de isolamento
   (outra unidade, outro tenant) falharam;
-- removidas a validação e a limpeza no wizard → os dois casos correspondentes falharam.
+- removidas a validação e a limpeza no wizard → os dois casos correspondentes falharam;
+- removido o filtro da **contagem** (mantido só na listagem) → os dois casos que comparam o total
+  com a lista falharam. É o defeito clássico do "20 de N": o denominador descrevendo outro
+  conjunto, com os dois números plausíveis;
+- removidas a filtragem por unidade e a limpeza no combo do filtro → os dois casos
+  correspondentes falharam.
 
 O contrato OpenAPI foi regenerado: **só inserções**, nenhuma remoção. As rotas novas declaram
 schema de resposta em vez de entrar em `OPERACOES_SEM_SCHEMA_DE_RESPOSTA` — aquela lista é

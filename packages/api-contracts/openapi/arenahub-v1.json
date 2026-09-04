@@ -517,6 +517,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "modalityId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {

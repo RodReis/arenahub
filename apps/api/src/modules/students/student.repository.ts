@@ -652,6 +652,7 @@ export class StudentRepository {
       termo?: string | undefined;
       gymUnitId?: string | undefined;
       status?: StudentStatus | undefined;
+      modalityId?: string | undefined;
     },
   ): Promise<number> {
     return this.db.student.count({
@@ -659,6 +660,7 @@ export class StudentRepository {
         tenantId: contexto.tenantId,
         ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
         ...(filtro.status ? { status: filtro.status } : {}),
+        ...(filtro.modalityId ? condicaoDeModalidade(filtro.modalityId) : {}),
         ...condicoesDaListagem(filtro.termo),
       },
     });
@@ -697,6 +699,12 @@ export class StudentRepository {
        */
       ordem?: 'nome' | 'matricula' | 'nascimento' | undefined;
       direcao?: 'asc' | 'desc' | undefined;
+      /**
+       * Modalidade (F60). Opcional: ausente, a listagem mostra todo mundo --
+       * inclusive quem nao tem modalidade nenhuma, que e o caso de
+       * funcionario, personal e administrador.
+       */
+      modalityId?: string | undefined;
     },
     /**
      * O "agora" ENTRA POR PARAMETRO (`CLAUDE.md`, Convencoes): so assim o
@@ -712,6 +720,7 @@ export class StudentRepository {
         tenantId: contexto.tenantId,
         ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
         ...(filtro.status ? { status: filtro.status } : {}),
+        ...(filtro.modalityId ? condicaoDeModalidade(filtro.modalityId) : {}),
         ...condicoes,
       },
       orderBy: ordenacao(filtro.ordem, filtro.direcao),
@@ -951,6 +960,26 @@ export class StudentRepository {
  * repete ou pula registro. E o bug classico de lista ordenada por campo
  * repetido.
  */
+/**
+ * O `where` do filtro por MODALIDADE (F60).
+ *
+ * Funcao propria pelo mesmo motivo de `condicoesDaListagem` logo abaixo:
+ * DUAS consultas dependem dela -- a listagem e a contagem do "20 de N". Se
+ * cada uma montasse a propria, a tela mostraria "20 de 341" enquanto pagina
+ * outro conjunto, e os dois numeros continuariam plausiveis.
+ *
+ * `some` na relacao, e nao `every`: o aluno pode ter varias modalidades, e
+ * quem filtra por "Cross Fit" quer todo mundo que a tem -- nao so quem a tem
+ * como unica.
+ *
+ * SEM filtro por tenant aqui: o `where` de fora ja fixa `tenantId` do aluno, e
+ * modalidade de outro tenant simplesmente nao esta vinculada a aluno deste --
+ * o filtro devolveria lista vazia, que e a resposta correta.
+ */
+function condicaoDeModalidade(modalityId: string): Prisma.StudentWhereInput {
+  return { modalities: { some: { modalityId } } };
+}
+
 /**
  * O `where` de BUSCA da listagem -- nome, matricula ou telefone.
  *
