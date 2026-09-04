@@ -38,6 +38,17 @@ const esquemaDeCadastro = z.object({
    * unidade são os obrigatórios; todo o resto do formulário é opcional.
    */
   gymUnitId: z.string().uuid('Selecione a unidade do aluno'),
+  /**
+   * Modalidades da unidade (F60) — academia, quadras de areia, cross fit.
+   *
+   * OBRIGATÓRIO AQUI, opcional na API. A exigência é de aplicação, no
+   * caminho do painel: os 1.912 alunos já cadastrados ganharam a modalidade
+   * por migração, e um import futuro sem modalidade não pode ser recusado
+   * pela API por causa de uma regra de tela.
+   */
+  modalityIds: z
+    .array(z.string().uuid())
+    .min(1, 'Selecione ao menos uma modalidade do aluno'),
   // Obrigatório desde o ADR-043 Decisão 3 (23/08), que REVERTE a decisão do
   // PI de 18/08 ("CPF continua opcional"). O antifraude do checkout de
   // cartão bloqueia cobrança sem CPF no `customer`; exigi-lo no cadastro
@@ -247,6 +258,13 @@ export interface EstadoDaEdicao {
 const MENSAGEM: Record<string, string> = {
   ...MENSAGEM_DE_SESSAO,
   VALIDATION_FAILED: 'Confira os dados informados.',
+  /*
+   * F60. Só chega aqui se a tela e a API divergirem -- o formulário filtra a
+   * lista pela unidade escolhida. A frase diz O QUE fazer ("troque a
+   * unidade ou a modalidade"), porque "dado inválido" mandaria a recepção
+   * conferir vinte e dois campos.
+   */
+  MODALITY_NOT_IN_UNIT: 'A modalidade escolhida não é da unidade selecionada.',
   STUDENT_NOT_FOUND: 'Aluno não encontrado nesta academia.',
   STUDENT_INVALID_TRANSITION:
     'Esta mudança de situação não é permitida a partir da situação atual.',
@@ -440,7 +458,16 @@ export async function cadastrarAluno(
     Object.entries(bruto).filter(([, valor]) => valor !== ''),
   );
 
-  const validado = esquemaDeCadastro.safeParse(preenchidos);
+  /*
+   * `getAll`, e não `get`: modalidade é LISTA (o aluno pode ter várias), e
+   * `get` devolveria só a primeira marcada. Por isso ela não entra em
+   * `CAMPOS_DO_CADASTRO`, que lê um valor por campo.
+   */
+  const modalityIds = formulario
+    .getAll('modalityIds')
+    .filter((valor): valor is string => typeof valor === 'string' && valor !== '');
+
+  const validado = esquemaDeCadastro.safeParse({ ...preenchidos, modalityIds });
 
   if (!validado.success) {
     return {
@@ -465,6 +492,7 @@ export async function cadastrarAluno(
       ...(dados.leadSource ? { leadSource: dados.leadSource } : {}),
       ...(dados.advisorUserId ? { advisorUserId: dados.advisorUserId } : {}),
       ...(dados.status ? { status: dados.status } : {}),
+      modalityIds: dados.modalityIds,
       contacts: montarContatos(dados),
       ...(montarEndereco(dados) ? { address: montarEndereco(dados) } : {}),
     },

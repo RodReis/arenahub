@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { MembershipRepository } from '../iam/membership.repository.js';
+import { GymUnitModalityRepository } from '../tenancy/gym-unit-modality.repository.js';
 import { GymUnitRepository } from '../tenancy/gym-unit.repository.js';
 import { normalizarCep, ufEhValida } from './domain/endereco.js';
 import { cpfEhValido, formatarCpf } from './domain/identificacao.js';
@@ -131,6 +132,19 @@ const esquemaDeCriacao = z
     status: situacaoInicial.optional(),
     contacts: z.array(contato).max(10).default([]),
     address: endereco.optional(),
+    /**
+     * Modalidades da unidade de origem (F60) -- academia, quadras de areia,
+     * cross fit. Varias ao mesmo tempo: decisao do PI em 04/09/2026.
+     *
+     * OPCIONAL AQUI, OBRIGATORIO NO PAINEL. A exigencia e de aplicacao no
+     * cliente, nunca de coluna -- os 1.912 alunos ja cadastrados ganharam a
+     * modalidade por migracao, e um import futuro sem modalidade nao pode
+     * ser recusado pela API.
+     *
+     * NAO E CONTROLE DE ACESSO: e rotulo. A catraca continua decidindo por
+     * plano (regra de arquitetura no 1).
+     */
+    modalityIds: z.array(z.string().uuid()).max(20).optional(),
   })
   .strict();
 
@@ -323,9 +337,16 @@ interface EnderecoDto {
 }
 
 /** `GET /students/:id`: o cadastro inteiro, para a ficha e para a edicao. */
+/** Modalidade vinculada ao aluno -- F60. Nome junto: a ficha exibe texto. */
+interface ModalidadeDoAlunoDto {
+  id: string;
+  name: string;
+}
+
 interface AlunoDetalhadoDto extends AlunoDto {
   contacts: ContatoDto[];
   address: EnderecoDto | null;
+  modalities: ModalidadeDoAlunoDto[];
 }
 
 interface AlunoCriadoDto extends AlunoDto {
@@ -341,6 +362,7 @@ export class StudentsController {
   constructor(
     private readonly alunos: StudentRepository,
     private readonly unidades: GymUnitRepository,
+    private readonly modalidades: GymUnitModalityRepository,
     private readonly membros: MembershipRepository,
     private readonly contexto: TenantContextService,
   ) {}
@@ -449,6 +471,8 @@ export class StudentsController {
     if (dados.advisorUserId !== undefined) {
       await this.exigirConsultorDoTenant(dados.advisorUserId);
     }
+
+    await this.exigirModalidadesDaUnidade(dados.gymUnitId, dados.modalityIds ?? []);
 
     const candidatos = await this.alunos.buscarCandidatosADuplicata(contexto, dados);
 
@@ -645,6 +669,41 @@ export class StudentsController {
     if (!unidade) throw new NotFoundException({ code: 'GYM_UNIT_NOT_FOUND' });
   }
 
+  /**
+   * Toda modalidade pedida tem de ser DA UNIDADE do aluno -- F60.
+   *
+   * A checagem e por CONTAGEM, e nao por id encontrado um a um: a consulta ja
+   * filtra por tenant e por unidade, entao id de outro tenant, de outra
+   * unidade ou inexistente simplesmente nao volta. Se voltou menos do que se
+   * pediu, alguma coisa nao era daqui -- e a resposta e a mesma para os tres
+   * casos, porque distinguir "nao existe" de "existe mas nao e seu"
+   * confirmaria ao atacante que ele acertou o UUID.
+   *
+   * Duplicata no pedido tambem cai aqui: `[x, x]` pede dois e encontra um.
+   */
+  private async exigirModalidadesDaUnidade(
+    gymUnitId: string,
+    modalityIds: readonly string[],
+  ): Promise<void> {
+    if (modalityIds.length === 0) return;
+
+    const pedidas = new Set(modalityIds);
+
+    if (pedidas.size !== modalityIds.length) {
+      throw new BadRequestException({ code: 'MODALITY_NOT_IN_UNIT' });
+    }
+
+    const encontradas = await this.modalidades.encontrarNaUnidade(
+      this.contexto.require(),
+      gymUnitId,
+      modalityIds,
+    );
+
+    if (encontradas.length !== pedidas.size) {
+      throw new BadRequestException({ code: 'MODALITY_NOT_IN_UNIT' });
+    }
+  }
+
   private paraDtoDetalhado(aluno: AlunoComDetalhes): AlunoDetalhadoDto {
     // A tabela e 1:N e a UI oferece um endereco. Pegar o primeiro (a
     // consulta ja ordena por `createdAt`) mantem a leitura deterministica
@@ -659,6 +718,10 @@ export class StudentsController {
         isPrimary: contato.isPrimary,
         label: contato.label,
         relationship: contato.relationship,
+      })),
+      modalities: aluno.modalities.map((vinculo) => ({
+        id: vinculo.modality.id,
+        name: vinculo.modality.name,
       })),
       address: endereco
         ? {

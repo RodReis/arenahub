@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type {
+  GymUnitModality,
   LeadSource,
   Prisma,
   Student,
   StudentAddress,
   StudentContact,
+  StudentModality,
   StudentRegisteredSex,
   StudentStatus,
 } from '@arenahub/database';
@@ -53,6 +55,13 @@ export interface DadosDeCriacaoDeAluno {
   status?: StudentStatus | undefined;
   contacts: readonly ContatoDeEntrada[];
   address?: EnderecoDeEntrada | undefined;
+  /**
+   * Modalidades da unidade de origem (F60). Varias por aluno.
+   *
+   * Quem prova que cada id e da unidade escolhida e o controller, ANTES de
+   * chegar aqui -- pelo mesmo motivo que `gymUnitId` ja funcionava assim.
+   */
+  modalityIds?: readonly string[] | undefined;
 }
 
 /**
@@ -95,6 +104,8 @@ export interface DadosDeEdicaoDeAluno {
 export type AlunoComDetalhes = Student & {
   contacts: StudentContact[];
   addresses: StudentAddress[];
+  /** F60. Vem com a modalidade junto -- a ficha exibe o NOME, nao o UUID. */
+  modalities: (StudentModality & { modality: GymUnitModality })[];
 };
 
 /** Possivel duplicata, ja mascarada para exibicao (INV-014). */
@@ -364,6 +375,19 @@ export class StudentRepository {
                 },
               }
             : {}),
+          // F60: vinculo aluno <-> modalidade, na MESMA transacao do aluno.
+          // Criar depois, fora dela, deixaria aluno gravado sem modalidade
+          // se a segunda escrita falhasse.
+          ...(dados.modalityIds && dados.modalityIds.length > 0
+            ? {
+                modalities: {
+                  create: dados.modalityIds.map((modalityId) => ({
+                    tenantId: contexto.tenantId,
+                    modalityId,
+                  })),
+                },
+              }
+            : {}),
           contacts: {
             create: dados.contacts.map((contato) => ({
               tenantId: contexto.tenantId,
@@ -441,6 +465,10 @@ export class StudentRepository {
         // Uma linha hoje, mas a tabela e 1:N: ordenar deixa a leitura
         // deterministica em vez de depender da ordem fisica das paginas.
         addresses: { orderBy: { createdAt: 'asc' } },
+        // F60. `orderBy` explicito: sem ele a ordem e a fisica do Postgres, e
+        // um UPDATE em qualquer linha embaralha a lista entre dois
+        // carregamentos da mesma ficha.
+        modalities: { include: { modality: true }, orderBy: { modality: { name: 'asc' } } },
       },
     });
   }

@@ -18,12 +18,25 @@ vi.mock('../../../actions/students', () => ({
   cadastrarAluno: vi.fn(),
 }));
 
-const UNIDADES = [{ id: 'unidade-1', code: 'U1', name: 'Unidade Centro' }];
+const UNIDADES = [
+  { id: 'unidade-1', code: 'U1', name: 'Unidade Centro' },
+  { id: 'unidade-2', code: 'U2', name: 'Unidade Norte' },
+];
+
+/**
+ * Modalidades de DUAS unidades (F60): a filtragem por unidade so pode ser
+ * provada se existir alguma que NAO e da unidade escolhida.
+ */
+const MODALIDADES = [
+  { id: 'mod-1', gymUnitId: 'unidade-1', name: 'Academia' },
+  { id: 'mod-2', gymUnitId: 'unidade-1', name: 'Cross Fit' },
+  { id: 'mod-3', gymUnitId: 'unidade-2', name: 'Quadras de Areia' },
+];
 
 function renderizar() {
   return render(
     <ToastProvider>
-      <FormularioDeCadastro unidades={UNIDADES} />
+      <FormularioDeCadastro unidades={UNIDADES} modalidades={MODALIDADES} />
     </ToastProvider>,
   );
 }
@@ -112,5 +125,79 @@ describe('formulario de cadastro -- validacao leva ao passo certo', () => {
     expect(screen.getByTestId('ir-para-passo-3')).toHaveAttribute('aria-current', 'step');
 
     expect(await screen.findByText(/informe a unidade/i)).toBeInTheDocument();
+  });
+
+  /**
+   * F60 -- modalidade e obrigatoria NO PAINEL, e a coluna aceita vazio.
+   *
+   * A checagem nao mora em `OBRIGATORIOS` (que percorre o rascunho, um valor
+   * por campo) e sim num `if` proprio, porque modalidade e LISTA. Este teste
+   * existe para essa checagem nao sumir junto com um refactor do rascunho.
+   */
+  it('barra o envio sem modalidade e vai ao passo 3, avisando', async () => {
+    const user = userEvent.setup();
+    renderizar();
+
+    await user.type(screen.getByTestId('campo-fullName'), 'Aluno de Teste');
+    await user.type(screen.getByTestId('campo-birthDate'), '2000-01-01');
+    await user.type(screen.getByTestId('campo-cpf'), '11144477735');
+
+    await user.click(screen.getByTestId('avancar-passo'));
+    await user.click(screen.getByTestId('avancar-passo'));
+
+    // Unidade PREENCHIDA -- o unico pendente agora e a modalidade.
+    await user.selectOptions(screen.getByTestId('campo-gymUnitId'), 'unidade-1');
+
+    await user.click(screen.getByTestId('avancar-passo'));
+    await user.click(screen.getByTestId('confirmar-cadastro'));
+
+    expect(screen.getByTestId('ir-para-passo-3')).toHaveAttribute('aria-current', 'step');
+
+    expect(await screen.findByText(/selecione ao menos uma modalidade/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * F60 -- a lista de modalidades e DA UNIDADE escolhida.
+ *
+ * O erro que estes casos existem para pegar: enviar ao servidor uma
+ * modalidade de outra unidade. A API recusa com `MODALITY_NOT_IN_UNIT`, e a
+ * recepcao veria erro sobre um campo cuja tela ja mostrava outra lista.
+ */
+describe('formulario de cadastro -- modalidades filtram pela unidade', () => {
+  it('so mostra as modalidades da unidade escolhida', async () => {
+    const user = userEvent.setup();
+    renderizar();
+
+    await user.click(screen.getByTestId('avancar-passo'));
+    await user.click(screen.getByTestId('avancar-passo'));
+
+    await user.selectOptions(screen.getByTestId('campo-gymUnitId'), 'unidade-1');
+
+    expect(screen.getByTestId('campo-modalidade-mod-1')).toBeInTheDocument();
+    expect(screen.getByTestId('campo-modalidade-mod-2')).toBeInTheDocument();
+    // A da unidade 2 NAO aparece.
+    expect(screen.queryByTestId('campo-modalidade-mod-3')).not.toBeInTheDocument();
+  });
+
+  it('trocar de unidade LIMPA o que ja estava marcado', async () => {
+    const user = userEvent.setup();
+    renderizar();
+
+    await user.click(screen.getByTestId('avancar-passo'));
+    await user.click(screen.getByTestId('avancar-passo'));
+
+    await user.selectOptions(screen.getByTestId('campo-gymUnitId'), 'unidade-1');
+    await user.click(screen.getByTestId('campo-modalidade-mod-1'));
+
+    expect(screen.getByTestId('campo-modalidade-mod-1')).toBeChecked();
+
+    // Troca para a unidade 2 e volta: a marca da unidade 1 nao pode ter
+    // sobrevivido escondida. Marcar e trocar deixaria um id orfao no estado,
+    // que so apareceria como 400 no envio.
+    await user.selectOptions(screen.getByTestId('campo-gymUnitId'), 'unidade-2');
+    await user.selectOptions(screen.getByTestId('campo-gymUnitId'), 'unidade-1');
+
+    expect(screen.getByTestId('campo-modalidade-mod-1')).not.toBeChecked();
   });
 });

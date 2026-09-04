@@ -185,6 +185,10 @@ test.describe('cadastro de aluno', () => {
     // unidade") -- `<select>` nativo nao tem atributo proprio para isso.
     await page.getByTestId('campo-gymUnitId').selectOption({ index: 1 });
 
+    // Modalidade (F60): obrigatória no painel, e a lista só aparece depois de
+    // a unidade estar escolhida.
+    await page.getByRole('checkbox', { name: /.+/ }).first().check();
+
     await page.getByTestId('ir-para-passo-4').click();
     await page.getByTestId('confirmar-cadastro').click();
 

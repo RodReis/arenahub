@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 2914 | 2914 | 0 | 75.5 |
+| unitário | 2921 | 2921 | 0 | 75.4 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 810 | 810 | 0 | 83.9 |
+| integração | 883 | 883 | 0 | 84.1 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -116,3 +116,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-01 | #248 | — | integração | 799 | 799 | 0 | 83.9 | — medido suíte a suíte, 56 suítes (o Jest crasha no fim no Windows e o gerador manteve o 810 da entrega anterior); 799 conferido por contagem independente dos `it`/`test` declarados |
 | 2026-09-01 | #250 | — | unitário | 2914 | 2914 | 0 | 75.5 | — |
 | 2026-09-01 | #250 | — | integração | 800 | 800 | 0 | 83.9 | — medido suíte a suíte, 56 suítes (o Jest crasha no fim no Windows e o gerador manteve o 810 herdado); 800 confirmado por três medições: lote (786 + 14 na suíte que rodou vazia, remedida sozinha), execução isolada (14/14) e contagem estática dos `it`/`test` declarados |
+| 2026-09-04 | #270 | SPEC-060 | unitário | 2921 | 2921 | 0 | 75.4 | — |
+| 2026-09-04 | #270 | SPEC-060 | integração | 883 | 883 | 0 | 84.1 | — medido em lotes com `--json`, 57 suítes de `apps/api` (809) + 5 de `@arenahub/database` (74); o Jest crasha no fim no Windows e o gerador manteve o 824 herdado |
