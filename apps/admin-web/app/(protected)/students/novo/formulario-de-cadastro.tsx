@@ -86,6 +86,13 @@ interface Unidade {
   name: string;
 }
 
+/** Modalidade ATIVA de alguma unidade do tenant -- F60. */
+interface Modalidade {
+  id: string;
+  gymUnitId: string;
+  name: string;
+}
+
 /** Rascunho do formulário: nome do campo -> o que foi digitado. */
 type Rascunho = Record<string, string>;
 
@@ -159,7 +166,13 @@ function BotaoDeEnvio() {
  * É o mesmo motivo de o envio ser um `<form action>` único no fim: enviar por
  * passo exigiria rascunho no servidor, que a fatia não pede.
  */
-export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
+export function FormularioDeCadastro({
+  unidades,
+  modalidades,
+}: {
+  unidades: Unidade[];
+  modalidades: Modalidade[];
+}) {
   const [estado, acao] = useActionState(cadastrarAluno, ESTADO_INICIAL);
   const [passo, setPasso] = useState(0);
 
@@ -176,6 +189,14 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
    */
   const [faltando, setFaltando] = useState<string | null>(null);
 
+  /**
+   * Modalidades escolhidas (F60). Estado proprio, e nao `rascunho`: o
+   * rascunho e `Record<string, string>` -- um valor por campo --, e
+   * modalidade e LISTA. Enfia-la la exigiria serializar e desserializar
+   * string a cada clique.
+   */
+  const [modalidadesEscolhidas, setModalidadesEscolhidas] = useState<readonly string[]>([]);
+
   /*
    * Os dois erros da tela viram TOAST -- CLAUDE.md: "sempre usar Toast para:
    * Info, Warn e error".
@@ -191,7 +212,29 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
 
   const anotar = (campo: string, novo: string): void => {
     setRascunho((atual) => ({ ...atual, [campo]: novo }));
+
+    /*
+     * TROCAR A UNIDADE LIMPA AS MODALIDADES (F60).
+     *
+     * Sem isto, quem escolhesse "Cross Fit" na unidade A e depois trocasse
+     * para a B enviaria uma modalidade que não é da unidade escolhida -- a
+     * API recusa com `MODALITY_NOT_IN_UNIT`, e a recepção veria um erro sobre
+     * um campo que, na tela, já mostrava outra lista. Derivar da lista
+     * visível não bastaria: a caixa marcada sai da tela, mas o estado fica.
+     */
+    if (campo === 'gymUnitId') setModalidadesEscolhidas([]);
   };
+
+  const unidadeEscolhida = valor('gymUnitId');
+
+  /**
+   * As modalidades DA UNIDADE escolhida -- F60.
+   *
+   * Derivado a cada render, sem `useMemo` e sem efeito: a lista tem poucas
+   * entradas, e sincronizá-la por `useEffect` seria estado duplicado que
+   * pode divergir do select.
+   */
+  const modalidadesDaUnidade = modalidades.filter((m) => m.gymUnitId === unidadeEscolhida);
 
   /**
    * Campo de texto controlado, com máscara opcional.
@@ -372,15 +415,34 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
   const faltaObrigatorio = (): boolean => {
     const pendente = OBRIGATORIOS.find((o) => valor(o.campo).trim() === '');
 
-    if (!pendente) {
-      setFaltando(null);
-      return false;
+    if (pendente) {
+      setFaltando(`Antes de concluir, informe ${pendente.rotulo}.`);
+      setPasso(pendente.passo);
+
+      return true;
     }
 
-    setFaltando(`Antes de concluir, informe ${pendente.rotulo}.`);
-    setPasso(pendente.passo);
+    /*
+     * MODALIDADE E OBRIGATORIA NO PAINEL, e nao na API (F60): a coluna aceita
+     * vazio porque os 1.912 alunos ja cadastrados ganharam a sua por
+     * migracao. Aqui a recepcao tem de escolher -- e por isso a checagem vive
+     * neste `if`, e nao em `OBRIGATORIOS`, que percorre `rascunho` e nao
+     * enxerga lista.
+     *
+     * `required` nativo nao serviria pelo mesmo motivo dos demais: o passo 3
+     * esta dentro de um contêiner `hidden`, e o navegador desiste em
+     * silencio quando tenta focar um campo escondido.
+     */
+    if (modalidadesEscolhidas.length === 0) {
+      setFaltando('Antes de concluir, selecione ao menos uma modalidade.');
+      setPasso(2);
 
-    return true;
+      return true;
+    }
+
+    setFaltando(null);
+
+    return false;
   };
 
   /**
@@ -664,6 +726,66 @@ export function FormularioDeCadastro({ unidades }: { unidades: Unidade[] }) {
                 'gymUnitId',
                 unidades.map((u) => [u.id, u.name] as const),
                 'Selecione a unidade',
+              )}
+            </Campo>
+
+            {/*
+              MODALIDADES (F60) -- academia, quadras de areia, cross fit. O
+              aluno pode ter várias ao mesmo tempo.
+
+              Caixas de seleção, e não um `<select multiple>`: com quatro ou
+              cinco opções o `multiple` esconde que dá para marcar mais de uma
+              (exige Ctrl, que ninguém descobre sozinho), e no toque é pior
+              ainda.
+
+              É ROTULO, não controle de acesso: quem libera a catraca é o
+              plano. A dica na tela diz isso, porque a recepção que vê
+              "modalidade" ao lado de "unidade" supõe o contrário.
+            */}
+            <Campo
+              id="modalityIds"
+              rotulo="Modalidades"
+              marca="obrigatório"
+              dica={
+                unidadeEscolhida === ''
+                  ? 'Escolha a unidade primeiro — as modalidades são dela.'
+                  : 'O aluno pode ter mais de uma. Não controla a catraca: quem libera o acesso é o plano.'
+              }
+              larguraTotal
+            >
+              {modalidadesDaUnidade.length === 0 ? (
+                <p className={estilos['dica']} data-testid="sem-modalidades-na-unidade">
+                  {unidadeEscolhida === ''
+                    ? 'Nenhuma unidade selecionada.'
+                    : 'Esta unidade ainda não tem modalidade cadastrada. Cadastre em Administração · Unidades.'}
+                </p>
+              ) : (
+                <div
+                  className={estilos['caixasDeSelecao']}
+                  role="group"
+                  aria-labelledby="modalityIds"
+                  aria-describedby="modalityIds-dica"
+                >
+                  {modalidadesDaUnidade.map((modalidade) => (
+                    <label key={modalidade.id} className={estilos['caixaDeSelecao']}>
+                      <input
+                        type="checkbox"
+                        name="modalityIds"
+                        value={modalidade.id}
+                        checked={modalidadesEscolhidas.includes(modalidade.id)}
+                        onChange={(evento) => {
+                          setModalidadesEscolhidas((atual) =>
+                            evento.target.checked
+                              ? [...atual, modalidade.id]
+                              : atual.filter((id) => id !== modalidade.id),
+                          );
+                        }}
+                        data-testid={`campo-modalidade-${modalidade.id}`}
+                      />
+                      {modalidade.name}
+                    </label>
+                  ))}
+                </div>
               )}
             </Campo>
 

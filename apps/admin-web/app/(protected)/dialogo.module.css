@@ -116,3 +116,42 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+/**
+ * Linha de cadastro dentro do diálogo — campo + botão lado a lado (F60).
+ *
+ * `align-items: end` porque o `Field` traz rótulo em cima do controle: sem
+ * isso o botão alinharia pelo topo do rótulo e ficaria acima do campo.
+ */
+.linhaDeCadastro {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.linhaDeCadastro > :first-child {
+  flex: 1;
+}
+
+/** Lista de modalidades da unidade. */
+.listaDoDialogo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.itemDaLista {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+/* O nome ocupa a sobra: estado e ação encostam à direita. */
+.itemDaLista > :first-child {
+  flex: 1;
+}

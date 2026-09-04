@@ -487,3 +487,23 @@
   flex-direction: column;
   gap: 8px;
 }
+
+/**
+ * Caixas de seleção das modalidades (F60).
+ *
+ * `wrap` porque a lista cresce com o que a academia cadastrar: quatro nomes
+ * curtos cabem numa linha, "Academia - Clínica de Musculação" sozinho não.
+ */
+.caixasDeSelecao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 4px 0;
+}
+
+.caixaDeSelecao {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}

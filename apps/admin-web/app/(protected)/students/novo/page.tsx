@@ -16,6 +16,13 @@ interface Unidade {
   status: string;
 }
 
+/** Modalidade ATIVA de alguma unidade do tenant -- F60. */
+interface Modalidade {
+  id: string;
+  gymUnitId: string;
+  name: string;
+}
+
 /**
  * Cadastro completo de aluno — F45, retrabalho da Slice 1.2.
  *
@@ -25,7 +32,19 @@ interface Unidade {
  * enviar, sem nada na tela explicando por quê.
  */
 export default async function PaginaDeCadastro() {
-  const unidades = await chamarApi<Unidade[]>('/api/v1/units');
+  /*
+   * As duas listas EM PARALELO. A de modalidades vem inteira, do tenant
+   * (`/units/modalities`), e o formulário filtra por unidade no cliente
+   * conforme a recepção troca o select: buscar a cada troca faria a tela ir
+   * ao servidor no meio do preenchimento.
+   *
+   * Só as ATIVAS voltam nessa rota -- modalidade fora de operação não pode
+   * ser oferecida a aluno novo.
+   */
+  const [unidades, modalidades] = await Promise.all([
+    chamarApi<Unidade[]>('/api/v1/units'),
+    chamarApi<Modalidade[]>('/api/v1/units/modalities'),
+  ]);
 
   // Unidade inativa não recebe aluno novo: a academia fechou aquela porta.
   // Quem já está cadastrado nela continua onde está — isto filtra o
@@ -40,7 +59,7 @@ export default async function PaginaDeCadastro() {
         breadcrumb={<a href="/students">Cadastros · Alunos</a>}
       />
 
-      <FormularioDeCadastro unidades={disponiveis} />
+      <FormularioDeCadastro unidades={disponiveis} modalidades={modalidades.dados ?? []} />
     </section>
   );
 }

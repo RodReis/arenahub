@@ -223,6 +223,31 @@ async function semear(): Promise<void> {
       update: {},
     });
 
+    /*
+     * MODALIDADE PADRAO DA UNIDADE (F60).
+     *
+     * A mesma que a migration atribuiu aos alunos ja existentes. Sem ela o
+     * cadastro de aluno em ambiente novo nasceria travado: o wizard exige ao
+     * menos uma modalidade, e a lista viria vazia.
+     *
+     * As demais (quadras de areia, cross fit, box) a academia cadastra pela
+     * tela -- o seed nao inventa o catalogo esportivo de ninguem.
+     */
+    await db.gymUnitModality.upsert({
+      where: {
+        gymUnitId_name: {
+          gymUnitId: unidade.id,
+          name: 'Academia - Clínica de Musculação',
+        },
+      },
+      create: {
+        tenantId: tenant.id,
+        gymUnitId: unidade.id,
+        name: 'Academia - Clínica de Musculação',
+      },
+      update: {},
+    });
+
 
     // Vigencia do preco: ancorada no passado para que qualquer invoice de
     // desenvolvimento encontre preco vigente. Reajuste futuro entra como

@@ -12,12 +12,21 @@ import {
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { EditarUnidade } from './editar-unidade';
+import { ModalidadesDaUnidade, type Modalidade } from './modalidades-da-unidade';
 import { SituacaoDaUnidade } from './situacao-da-unidade';
 import estilos from '../dialogo.module.css';
 
 export const metadata: Metadata = {
   title: 'Unidades — ArenaHub',
 };
+
+/** Modalidade como a API devolve -- F60. */
+interface ModalidadeDaApi {
+  id: string;
+  gymUnitId: string;
+  name: string;
+  isActive: boolean;
+}
 
 interface Unidade {
   id: string;
@@ -32,7 +41,22 @@ interface Unidade {
  * estado de carregamento no cliente, sem token exposto ao navegador.
  */
 export default async function PaginaDeUnidades() {
-  const resposta = await chamarApi<Unidade[]>('/api/v1/units');
+  /*
+   * As DUAS consultas em paralelo, e nao uma por unidade (F60).
+   *
+   * `/units/modalities` devolve as modalidades ativas do tenant inteiro numa
+   * chamada; agrupa-se por unidade aqui. Uma chamada por linha da tabela
+   * seria N+1 -- com quatro unidades ja seriam cinco viagens para desenhar
+   * uma tela que cabe numa.
+   *
+   * A lista traz so as ATIVAS: e o que o modal precisa oferecer, e o que o
+   * cadastro de aluno pode escolher. A inativa aparece quando alguem abre o
+   * modal, que consulta a unidade especifica.
+   */
+  const [resposta, respostaDeModalidades] = await Promise.all([
+    chamarApi<Unidade[]>('/api/v1/units'),
+    chamarApi<ModalidadeDaApi[]>('/api/v1/units/modalities'),
+  ]);
 
   if (!resposta.ok) {
     // Negacao explicita, com o codigo estavel visivel. Tela vazia deixaria
@@ -63,6 +87,19 @@ export default async function PaginaDeUnidades() {
   }
 
   const unidades = resposta.dados ?? [];
+
+  /*
+   * Falha na consulta de modalidade NAO derruba a tela: a lista de unidades
+   * e o conteudo principal, e mostrar erro de permissao por causa de uma
+   * coluna secundaria seria pior que a unidade aparecer sem modalidade.
+   */
+  const porUnidade = new Map<string, Modalidade[]>();
+
+  for (const modalidade of respostaDeModalidades.dados ?? []) {
+    const lista = porUnidade.get(modalidade.gymUnitId) ?? [];
+    lista.push({ id: modalidade.id, name: modalidade.name, isActive: modalidade.isActive });
+    porUnidade.set(modalidade.gymUnitId, lista);
+  }
 
   return (
     <section aria-labelledby="titulo-unidades">
@@ -171,6 +208,17 @@ export default async function PaginaDeUnidades() {
                   fisica. Nao ha `DELETE /units/:id` na API, e esta tela nao
                   promete um.
                 */}
+                {/*
+                  MODALIDADES (F60): academia, quadras de areia, cross fit.
+                  E ROTULO -- serve para diferenciar o tipo de aluno na
+                  recepcao e no relatorio, e nao controla a catraca. Quem
+                  libera o acesso continua sendo o plano.
+                */}
+                <ModalidadesDaUnidade
+                  unitId={u.id}
+                  code={u.code}
+                  modalidades={porUnidade.get(u.id) ?? []}
+                />
                 <SituacaoDaUnidade
                   unitId={u.id}
                   code={u.code}

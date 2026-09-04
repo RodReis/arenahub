@@ -23,9 +23,12 @@ const ATRASO_MS = 300;
 
 interface Props {
   unidades: { id: string; name: string }[];
+  /** Modalidades ATIVAS de todas as unidades do tenant -- F60. */
+  modalidades: { id: string; gymUnitId: string; name: string }[];
   termoInicial: string;
   situacaoInicial: string;
   unidadeInicial: string;
+  modalidadeInicial: string;
 }
 
 /**
@@ -40,7 +43,14 @@ interface Props {
  * muda é QUEM escreve nela: antes era o navegador ao enviar o form, agora é
  * `router.replace`, sem adicionar entrada no histórico a cada tecla.
  */
-export function FiltroDeAlunos({ unidades, termoInicial, situacaoInicial, unidadeInicial }: Props) {
+export function FiltroDeAlunos({
+  unidades,
+  modalidades,
+  termoInicial,
+  situacaoInicial,
+  unidadeInicial,
+  modalidadeInicial,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -71,7 +81,12 @@ export function FiltroDeAlunos({ unidades, termoInicial, situacaoInicial, unidad
    */
   const ultimoBuscado = useRef(termoInicial);
 
-  const navegar = (proximoTermo: string, proximaSituacao: string, proximaUnidade: string): void => {
+  const navegar = (
+    proximoTermo: string,
+    proximaSituacao: string,
+    proximaUnidade: string,
+    proximaModalidade: string,
+  ): void => {
     const url = new URLSearchParams(searchParams.toString());
 
     url.delete('cursor');
@@ -85,7 +100,43 @@ export function FiltroDeAlunos({ unidades, termoInicial, situacaoInicial, unidad
     if (proximaUnidade) url.set('gymUnitId', proximaUnidade);
     else url.delete('gymUnitId');
 
+    if (proximaModalidade) url.set('modalityId', proximaModalidade);
+    else url.delete('modalityId');
+
     router.replace(`${pathname}?${url.toString()}`, { scroll: false });
+  };
+
+  /**
+   * As modalidades OFERECIDAS pelo filtro -- F60, decisao do PI (opcao B).
+   *
+   * Com unidade escolhida, so as dela; sem unidade, todas. Oferecer sempre a
+   * lista inteira deixaria escolher a combinacao unidade A + modalidade da
+   * unidade B, que so devolve lista vazia -- e a recepcao acharia que nao ha
+   * ninguem, quando na verdade a pergunta e que era impossivel.
+   *
+   * Derivado a cada renderizacao, sem `useMemo`: a lista tem poucas entradas,
+   * e sincronizar por efeito seria estado duplicado que pode divergir do
+   * select.
+   */
+  const modalidadesOferecidas = unidadeInicial
+    ? modalidades.filter((m) => m.gymUnitId === unidadeInicial)
+    : modalidades;
+
+  /**
+   * Trocar a unidade LIMPA a modalidade que nao e da nova unidade.
+   *
+   * Sem isto, filtrar por "Cross Fit" na unidade A e depois trocar para a B
+   * manteria `modalityId` na URL apontando para modalidade que a B nao
+   * oferece: a lista viria vazia e o combo mostraria "Todas", porque a opcao
+   * escolhida nem existe mais entre as oferecidas. Some o filtro da tela e
+   * fica o efeito -- o pior dos dois mundos.
+   */
+  const trocarUnidade = (proximaUnidade: string): void => {
+    const continuaValida = modalidades.some(
+      (m) => m.id === modalidadeInicial && (!proximaUnidade || m.gymUnitId === proximaUnidade),
+    );
+
+    navegar(termo, situacaoInicial, proximaUnidade, continuaValida ? modalidadeInicial : '');
   };
 
   // Busca automática: só dispara com 3+ caracteres, ou quando o campo volta
@@ -110,7 +161,7 @@ export function FiltroDeAlunos({ unidades, termoInicial, situacaoInicial, unidad
       // no meio da digitação (que nunca chegou a buscar) bloquear a busca
       // real quando a pessoa voltasse a ele.
       ultimoBuscado.current = termo;
-      navegar(termo, situacaoInicial, unidadeInicial);
+      navegar(termo, situacaoInicial, unidadeInicial, modalidadeInicial);
     }, ATRASO_MS);
 
     return () => clearTimeout(debounce.current);
@@ -137,7 +188,7 @@ export function FiltroDeAlunos({ unidades, termoInicial, situacaoInicial, unidad
         name="status"
         label="Situação"
         value={situacaoInicial}
-        onChange={(evento) => navegar(termo, evento.target.value, unidadeInicial)}
+        onChange={(evento) => navegar(termo, evento.target.value, unidadeInicial, modalidadeInicial)}
       >
         <option value="">Todas</option>
         {SITUACOES.map(([chave, rotulo]) => (
@@ -153,12 +204,43 @@ export function FiltroDeAlunos({ unidades, termoInicial, situacaoInicial, unidad
           name="gymUnitId"
           label="Unidade"
           value={unidadeInicial}
-          onChange={(evento) => navegar(termo, situacaoInicial, evento.target.value)}
+          onChange={(evento) => trocarUnidade(evento.target.value)}
         >
           <option value="">Todas</option>
           {unidades.map((u) => (
             <option key={u.id} value={u.id}>
               {u.name}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+
+      {/*
+        MODALIDADE (F60) -- academia, quadras de areia, cross fit.
+
+        Aparece com UMA modalidade cadastrada, diferente do filtro de unidade
+        logo acima, que exige duas: com uma unidade so, filtrar por ela nao
+        separa ninguem; com uma modalidade so, separa quem a tem de quem nao
+        a tem -- e quem nao tem e o funcionario, o personal e o administrador.
+
+        A lista acompanha a unidade escolhida (decisao do PI): ver
+        `modalidadesOferecidas`.
+      */}
+      {modalidadesOferecidas.length > 0 ? (
+        <SelectField
+          id="modalidade"
+          name="modalityId"
+          label="Modalidade"
+          value={modalidadeInicial}
+          onChange={(evento) =>
+            navegar(termo, situacaoInicial, unidadeInicial, evento.target.value)
+          }
+          data-testid="filtro-de-modalidade"
+        >
+          <option value="">Todas</option>
+          {modalidadesOferecidas.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
             </option>
           ))}
         </SelectField>

@@ -16,10 +16,29 @@ import { FiltroDeAlunos } from './filtro-de-alunos';
 
 const PROPS = {
   unidades: [],
+  modalidades: [],
   termoInicial: '',
   situacaoInicial: '',
   unidadeInicial: '',
+  modalidadeInicial: '',
 };
+
+/**
+ * Duas unidades e tres modalidades -- F60.
+ *
+ * A filtragem da lista pela unidade so pode ser provada se existir modalidade
+ * que NAO e da unidade escolhida.
+ */
+const UNIDADES = [
+  { id: 'unidade-1', name: 'Unidade Centro' },
+  { id: 'unidade-2', name: 'Unidade Norte' },
+];
+
+const MODALIDADES = [
+  { id: 'mod-1', gymUnitId: 'unidade-1', name: 'Academia' },
+  { id: 'mod-2', gymUnitId: 'unidade-1', name: 'Cross Fit' },
+  { id: 'mod-3', gymUnitId: 'unidade-2', name: 'Quadras de Areia' },
+];
 
 describe('FiltroDeAlunos', () => {
   beforeEach(() => {
@@ -105,5 +124,103 @@ describe('FiltroDeAlunos', () => {
     });
 
     expect(String(replace.mock.calls.at(-1)?.[0])).not.toContain('q=');
+  });
+});
+
+/**
+ * F60 -- o combo de modalidade.
+ *
+ * O que estas suites existem para pegar: a combinacao unidade A + modalidade
+ * da unidade B, que so devolve lista vazia. A recepcao acharia que nao ha
+ * ninguem, quando a pergunta e que era impossivel.
+ */
+describe('FiltroDeAlunos -- modalidade', () => {
+  beforeEach(() => {
+    replace.mockClear();
+    parametros = new URLSearchParams();
+  });
+
+  it('filtra por modalidade e ZERA o cursor', async () => {
+    const usuario = userEvent.setup();
+
+    parametros = new URLSearchParams('cursor=abc-123');
+
+    render(<FiltroDeAlunos {...PROPS} modalidades={MODALIDADES} />);
+
+    await usuario.selectOptions(screen.getByTestId('filtro-de-modalidade'), 'mod-2');
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalled();
+    });
+
+    const url = String(replace.mock.calls.at(-1)?.[0]);
+
+    expect(url).toContain('modalityId=mod-2');
+    // Mesmo motivo do filtro de texto: o cursor aponta para a lista ANTERIOR.
+    expect(url).not.toContain('cursor');
+  });
+
+  it('sem unidade escolhida, oferece as modalidades de TODAS as unidades', () => {
+    render(<FiltroDeAlunos {...PROPS} unidades={UNIDADES} modalidades={MODALIDADES} />);
+
+    const opcoes = screen.getByTestId('filtro-de-modalidade').querySelectorAll('option');
+
+    // 3 modalidades + "Todas".
+    expect([...opcoes].map((o) => o.textContent)).toEqual([
+      'Todas',
+      'Academia',
+      'Cross Fit',
+      'Quadras de Areia',
+    ]);
+  });
+
+  it('com unidade escolhida, oferece SO as modalidades dela', () => {
+    render(
+      <FiltroDeAlunos
+        {...PROPS}
+        unidades={UNIDADES}
+        modalidades={MODALIDADES}
+        unidadeInicial="unidade-1"
+      />,
+    );
+
+    const opcoes = screen.getByTestId('filtro-de-modalidade').querySelectorAll('option');
+
+    expect([...opcoes].map((o) => o.textContent)).toEqual(['Todas', 'Academia', 'Cross Fit']);
+  });
+
+  it('trocar a unidade LIMPA a modalidade que a nova unidade nao oferece', async () => {
+    const usuario = userEvent.setup();
+
+    parametros = new URLSearchParams('gymUnitId=unidade-1&modalityId=mod-2');
+
+    render(
+      <FiltroDeAlunos
+        {...PROPS}
+        unidades={UNIDADES}
+        modalidades={MODALIDADES}
+        unidadeInicial="unidade-1"
+        modalidadeInicial="mod-2"
+      />,
+    );
+
+    await usuario.selectOptions(screen.getByLabelText('Unidade'), 'unidade-2');
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalled();
+    });
+
+    const url = String(replace.mock.calls.at(-1)?.[0]);
+
+    expect(url).toContain('gymUnitId=unidade-2');
+    // "Cross Fit" e da unidade 1: manter o parametro deixaria a lista vazia
+    // com o combo mostrando "Todas" -- o filtro some da tela e o efeito fica.
+    expect(url).not.toContain('modalityId');
+  });
+
+  it('nao aparece quando a academia nao tem modalidade cadastrada', () => {
+    render(<FiltroDeAlunos {...PROPS} />);
+
+    expect(screen.queryByTestId('filtro-de-modalidade')).not.toBeInTheDocument();
   });
 });

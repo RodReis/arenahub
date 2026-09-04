@@ -95,6 +95,16 @@ export async function preencherCadastro(page: Page, dados: DadosDoAluno): Promis
    */
   await page.getByTestId('campo-gymUnitId').selectOption({ index: 1 });
 
+  /*
+   * MODALIDADE (F60) -- obrigatória no painel, e a lista só existe DEPOIS de
+   * a unidade ser escolhida: trocar a unidade limpa o que estava marcado.
+   *
+   * A primeira caixa, e não uma pelo nome: quem chama este helper quer "um
+   * aluno cadastrado", não uma modalidade específica. O seed garante ao menos
+   * uma na unidade ("Academia - Clínica de Musculação").
+   */
+  await page.getByRole('checkbox', { name: /.+/ }).first().check();
+
   // O envio vive no último passo — é lá que o formulário termina.
   await page.getByTestId('ir-para-passo-4').click();
   await page.getByTestId('confirmar-cadastro').click();

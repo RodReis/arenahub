@@ -569,6 +569,7 @@ model Tenant {
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
   gymUnits     GymUnit[]
+  modalities   GymUnitModality[]
   memberships  TenantMembership[]
   roles        Role[]
   userRoles    UserRole[]
@@ -613,6 +614,7 @@ model Tenant {
   planBenefits           PlanBenefit[]
   familyGroups           FamilyGroup[]
   familyMembers          FamilyMember[]
+  studentModalities      StudentModality[]
   billingSettings        BillingSettings?
   invoices               Invoice[]
   invoiceItems           InvoiceItem[]
@@ -756,10 +758,79 @@ model GymUnit {
   retentionCapacityPolicy RetentionCapacityPolicy?
   retentionTasks          RetentionTask[]
   localHolidays           LocalHoliday[]
+  modalities              GymUnitModality[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
   @@map("gym_units")
+}
+
+/// Modalidade oferecida por uma unidade -- F60.
+///
+/// POR UNIDADE, e nao por tenant: decisao do PI em 04/09/2026. Cada unidade
+/// define a propria lista, e a Arena Positiva e um complexo esportivo cujas
+/// unidades futuras nao oferecem as mesmas coisas. O catalogo por tenant com
+/// tabela de oferta (o padrao `Plan` + `PlanUnit`) so ganha quando existir
+/// relatorio cruzando unidades -- ate la seria uma tabela a mais para
+/// responder a mesma pergunta.
+///
+/// NAO E CONTROLE DE ACESSO. Modalidade e ROTULO: serve para diferenciar o
+/// aluno de quadra do aluno de academia na recepcao e no relatorio. Quem
+/// decide se a catraca abre continua sendo o plano, por `PlanUnit` e
+/// `EntitlementUnitWindow` -- ler esta tabela numa decisao de acesso criaria
+/// a segunda fonte de verdade que a regra de arquitetura no 1 proibe. Hoje
+/// so a Academia tem catraca.
+///
+/// SEM `code`: modalidade nasce como nome livre digitado pela recepcao
+/// ("Quadras de Areia"), e exigir codigo obrigaria a inventar uma regra de
+/// nomenclatura que ninguem pediu. O `name` unico por unidade ja impede a
+/// duplicata que importa.
+model GymUnitModality {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  gymUnitId String   @map("gym_unit_id") @db.Uuid
+  name      String
+  /// Inativar, nunca apagar -- mesmo motivo da propria unidade: aluno ja
+  /// vinculado ficaria orfao, e o historico de quem treinou o que sumiria.
+  /// Modalidade inativa some do cadastro novo e permanece nos vinculos.
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// `RESTRICT` como `Student.gymUnit`: apagar unidade com modalidade falha,
+  /// em vez de levar o vinculo do aluno junto.
+  gymUnit  GymUnit @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
+  students StudentModality[]
+
+  /// Unico POR UNIDADE, nao por tenant: duas unidades do mesmo complexo
+  /// podem oferecer "Cross Fit" cada uma, e sao ofertas distintas.
+  @@unique([gymUnitId, name])
+  @@index([tenantId])
+  @@map("gym_unit_modalities")
+}
+
+/// Vinculo aluno <-> modalidade -- F60.
+///
+/// TABELA DE JUNCAO, e nao coluna no aluno: o PI decidiu em 04/09/2026 que
+/// um aluno pode ter VARIAS modalidades ao mesmo tempo (academia e cross fit
+/// juntos). Array de enum na linha do aluno nao teria integridade
+/// referencial, e nao sobreviveria a uma modalidade renomeada.
+model StudentModality {
+  studentId  String   @map("student_id") @db.Uuid
+  modalityId String   @map("modality_id") @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student  Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /// `RESTRICT`: modalidade com aluno vinculado se INATIVA, nao se apaga.
+  modality GymUnitModality @relation(fields: [modalityId], references: [id], onDelete: Restrict)
+
+  @@id([studentId, modalityId])
+  @@index([tenantId])
+  @@index([modalityId])
+  @@map("student_modalities")
 }
 
 /// Feriado MUNICIPAL da unidade -- F57, `SPEC-057` §5.2.
@@ -1146,6 +1217,7 @@ model Student {
   healthGoals         HealthGoal[]
   attendanceSessions  StudentAttendanceSession[]
   aiAnalyses          AiAnalysis[]
+  modalities          StudentModality[]
   assessmentImports   AssessmentImport[]
   biometricIdentities BiometricIdentity[]
   deviceUsers         DeviceUser[]
