@@ -175,6 +175,28 @@ export class StudentRepository {
    *   - `SEQUENCE` do Postgres e global: o tenant B veria o volume do A.
    *
    * O `ano` entra por parametro para a formatacao continuar pura e testavel.
+   *
+   * -------------------------------------------------------------------------
+   * O CONTADOR SOZINHO NAO BASTA -- ELE PODE ESTAR ATRAS DE `students`.
+   * -------------------------------------------------------------------------
+   *
+   * Defeito real encontrado em producao em 04/09/2026, pelo import da base
+   * ativa: nada garante que `student_sequences` esteja a frente das
+   * matriculas ja gravadas. Um import que gravou matricula sem passar pelo
+   * contador, uma restauracao de backup, ou um tenant criado por outro
+   * caminho deixam o contador para tras -- e ele emite um numero que outro
+   * aluno ja tem, morrendo no UNIQUE `(tenant_id, membership_number)`.
+   *
+   * E NAO SE RECUPERA SOZINHO: o `UPDATE` do contador e revertido junto com o
+   * `create` que falhou, entao a proxima tentativa repete o mesmo numero. No
+   * import foram 30 cadastros seguidos colidindo no mesmo valor; aqui seria a
+   * recepcao sem conseguir cadastrar ninguem, com erro que nao explica nada.
+   *
+   * Por isso o piso e o MAIOR entre o contador e o maior sufixo ja gravado. O
+   * `substring` ancora o formato COMPLETO porque a base tem matricula de
+   * legado fora do padrao (`LEGADO-<hex>`): o que nao casa vira `NULL` e o
+   * `MAX` ignora, em vez de o `CAST` quebrar a consulta ou o hex inflar o
+   * contador em milhoes.
    */
   private async proximaMatricula(
     tx: Prisma.TransactionClient,
@@ -196,7 +218,19 @@ export class StudentRepository {
       FOR UPDATE
     `;
 
-    const sequencial = travadas[0]?.next_value ?? 1;
+    // O CONTADOR PODE ESTAR ATRAS DO QUE JA EXISTE -- ver o bloco no cabecalho
+    // deste metodo. Lido DENTRO do lock, pelo mesmo motivo que o `FOR UPDATE`
+    // existe: fora dele, duas transacoes enxergariam o mesmo piso.
+    const maiores = await tx.$queryRaw<{ maior: number | null }[]>`
+      SELECT MAX(CAST(substring(membership_number from '^AP-[0-9]{4}-([0-9]{8})$') AS INTEGER))
+        AS maior
+      FROM students
+      WHERE tenant_id = ${tenantId}::uuid
+    `;
+
+    const contador = travadas[0]?.next_value ?? 1;
+    const maiorGravado = maiores[0]?.maior ?? 0;
+    const sequencial = Math.max(contador, maiorGravado + 1);
 
     await tx.$executeRaw`
       UPDATE student_sequences

@@ -252,6 +252,65 @@ describe('F45 -- cadastro completo de aluno', () => {
       expect(corpo(resposta).cpf).not.toBeNull();
     });
 
+    /*
+     * O DEFEITO QUE DERRUBOU 30 CADASTROS DO IMPORT EM PRODUCAO (04/09/2026),
+     * e que atinge a recepcao pelo mesmo caminho: `student_sequences` pode
+     * ficar ATRAS das matriculas ja gravadas -- import que gravou sem passar
+     * pelo contador, restauracao de backup, tenant criado por outro caminho.
+     * O contador emite entao um numero que outro aluno ja tem e o cadastro
+     * morre no UNIQUE, com um erro que nao diz nada a quem esta no balcao.
+     *
+     * PIOR: o `UPDATE` do contador e revertido junto com o `create` que
+     * falhou, entao ele nem avanca -- a tentativa seguinte repete o mesmo
+     * numero, e a recepcao fica sem conseguir cadastrar NINGUEM.
+     */
+    it('contador atrasado nao impede o cadastro -- e nao se contagia com o legado', async () => {
+      // O ano SAI DO RELOGIO, nao fica escrito: a matricula usa o ano
+      // corrente, e uma constante `2026` deixaria este teste vermelho sozinho
+      // na virada do ano, sem nenhuma mudanca de codigo.
+      const ano = new Date().getUTCFullYear();
+
+      await db.student.create({
+        data: {
+          tenantId: contas.a.tenantId,
+          gymUnitId: contas.a.unidadeId,
+          membershipNumber: `AP-${String(ano)}-00007777`,
+          fullName: 'Aluno Com Matricula Alta',
+          birthDate: new Date('1990-01-15T00:00:00.000Z'),
+          status: 'ACTIVE',
+        },
+      });
+
+      // Legado fora do formato, com 8 digitos no fim: nao pode quebrar a
+      // leitura nem empurrar o contador para 99 milhoes.
+      await db.student.create({
+        data: {
+          tenantId: contas.a.tenantId,
+          gymUnitId: contas.a.unidadeId,
+          membershipNumber: 'LEGADO-99999999',
+          fullName: 'Aluno Legado Fora Do Formato',
+          birthDate: new Date('1985-03-20T00:00:00.000Z'),
+          status: 'ACTIVE',
+        },
+      });
+
+      await db.$executeRaw`
+        UPDATE student_sequences
+        SET next_value = 10, updated_at = now()
+        WHERE tenant_id = ${contas.a.tenantId}::uuid
+      `;
+
+      const primeira = await criar(contas.a);
+      const segunda = await criar(contas.a);
+
+      expect(primeira.status).toBe(201);
+      expect(segunda.status).toBe(201);
+      // Retoma logo depois da maior matricula NO FORMATO (7777), sem se
+      // contagiar pelo legado -- e as duas sao distintas entre si.
+      expect(corpo(primeira).membershipNumber).toBe(`AP-${String(ano)}-00007778`);
+      expect(corpo(segunda).membershipNumber).toBe(`AP-${String(ano)}-00007779`);
+    });
+
     it('recusa cadastro sem CPF (ADR-043 Decisao 3)', async () => {
       const resposta = await request(servidor())
         .post('/api/v1/students')
