@@ -9,8 +9,14 @@ import estilos from '../../login/login.module.css';
 
 const ESTADO_INICIAL: EstadoDoAceite = {};
 
-/** A mesma da API (`esquemaDeAceite`), repetida para a dica do campo. */
-const MINIMO_DE_SENHA = 12;
+/**
+ * A mesma da API (`esquemaDeAceite`), repetida para a dica do campo.
+ *
+ * 8 desde 05/09/2026 (issue #281, decisão do PI). Terceiro dos três lugares
+ * que carregam este número -- os outros são o `esquemaDeAceite` da API e o
+ * `MINIMO_DE_SENHA` da Server Action.
+ */
+const MINIMO_DE_SENHA = 8;
 
 /**
  * Client Component só pelo estado do formulário -- o resto da tela é

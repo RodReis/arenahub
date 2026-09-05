@@ -229,6 +229,23 @@ describe('convites e MFA', () => {
 
       expect(resposta.status).toBe(400);
     });
+
+    /**
+     * A FRONTEIRA EXATA -- issue #281, quando o minimo caiu de 12 para 8.
+     *
+     * O caso acima usa cinco caracteres e continuaria verde com `min(9)` ou
+     * `min(20)`: so prova que MUITO curta e recusada. Este prova onde a
+     * linha esta, e e o que falha se alguem mexer no numero sem querer.
+     */
+    it('aceita senha de exatamente oito caracteres', async () => {
+      const convite = await convidar(`senha-de-oito-${sufixo}@exemplo.test`);
+
+      const resposta = await request(servidor())
+        .post('/api/v1/users/invitations/accept')
+        .send({ token: (convite.body as { token: string }).token, password: 'oito1234' });
+
+      expect(resposta.status).toBe(200);
+    });
   });
 
   describe('MFA', () => {

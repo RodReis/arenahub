@@ -18,10 +18,25 @@ const esquemaDeConvite = z
   })
   .strict();
 
+/*
+ * MINIMO DE 8 -- decisao do PI em 05/09/2026 (issue #281), olhando a tela de
+ * aceite em producao: os 12 anteriores nao vinham de requisito nenhum (nao ha
+ * NFR, ADR nem linha de PRD sobre tamanho de senha), eram escolha do codigo
+ * feita quando a rota nasceu.
+ *
+ * A REGRA VIVE AQUI, e a tela a espelha para dar a frase certa sem
+ * round-trip. Mudou aqui, muda em `apps/admin-web/app/actions/usuarios.ts` e
+ * na dica do formulario de aceite -- os tres numeros sao o mesmo numero.
+ *
+ * O LOGIN CONTINUA SEM VALIDAR TAMANHO (`min(1)`), tambem por decisao do PI:
+ * ele so confere a senha contra o hash, e exigir tamanho la trancaria para
+ * fora quem ja tem senha menor -- sem tela de recuperacao no produto, isso
+ * seria irreversivel pelo painel.
+ */
 const esquemaDeAceite = z
   .object({
     token: z.string().min(1).max(512),
-    password: z.string().min(12).max(1024),
+    password: z.string().min(8).max(1024),
   })
   .strict();
 

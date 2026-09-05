@@ -15,10 +15,18 @@ import { expect, test, type Page } from '@playwright/test';
 const DONO = { email: 'dono@arena-positiva.test', senha: 'senha-de-bancada-arenahub' };
 
 /**
- * 12+ caracteres, que é o mínimo da API (`esquemaDeAceite`).
+ * Acima do mínimo da API (`esquemaDeAceite`), que é **8** desde 05/09/2026
+ * (issue #281, decisão do PI).
  *
- * Foi este piso que barrou o `dono@1234` (10) pedido pelo PI e obrigou a
- * fatia inteira a existir.
+ * Eram 12 quando esta suíte nasceu, e foi esse piso que barrou o `dono@1234`
+ * (10 caracteres) pedido pelo PI e obrigou a fatia #274 inteira a existir.
+ * Hoje aquela senha passaria.
+ *
+ * A FRONTEIRA EXATA do mínimo é provada onde a regra mora -- no unitário da
+ * action e na integração do IAM. Aqui a senha é confortavelmente longa de
+ * propósito: este teste cobre a JORNADA (convite → link → senha → login), e
+ * amarrá-lo ao número faria a mudança do mínimo quebrar um teste que não
+ * fala sobre isso.
  */
 const SENHA_NOVA = 'senha-de-e2e-do-convite';
 

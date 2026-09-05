@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 2953 | 2953 | 0 | 75.6 |
+| unitário | 2954 | 2954 | 0 | 75.6 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 891 | 891 | 0 | 84.0 |
+| integração | 892 | 892 | 0 | 84.0 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -126,3 +126,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-05 | #274 | — | integração | 891 | 891 | 0 | 84.0 | — medido em lotes com `--json`: 816 em `apps/api` (57 suítes; +3 do `GET /roles`) + 75 em `@arenahub/database`; o Jest crasha no fim no Windows e o gerador herda o número anterior |
 | 2026-09-05 | #276 | — | unitário | 2953 | 2953 | 0 | 75.6 | — |
 | 2026-09-05 | #276 | — | integração | 891 | 891 | 0 | 84.0 | — inalterado: a fatia não toca em `apps/api` nem em `packages/database`. Número herdado da medição da #274 |
+| 2026-09-05 | #281 | — | unitário | 2954 | 2954 | 0 | 75.6 | — |
+| 2026-09-05 | #281 | — | integração | 892 | 892 | 0 | 84.0 | — 817 em `apps/api` (+1: a fronteira exata do mínimo) + 75 em `@arenahub/database`; o Jest crasha no fim no Windows e o gerador herda o número anterior |
