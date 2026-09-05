@@ -135,6 +135,33 @@ test.describe('usuarios do painel', () => {
   });
 
   /**
+   * O E-MAIL É PARTE DA ENTREGA, e a tela tem de dizer o que aconteceu com
+   * ele -- issue #277.
+   *
+   * A suíte roda SEM `RESEND_API_KEY`, então este caso exercita o caminho
+   * real de hoje: o e-mail não sai, e a tela avisa em vez de calar. Silêncio
+   * faria quem convidou esperar por um e-mail que nunca saiu.
+   *
+   * O LINK CONTINUA NA TELA nos dois casos -- e-mail cai em spam e demora, e
+   * o convite tem 24 horas.
+   *
+   * O caminho do envio BEM-SUCEDIDO não é coberto aqui de propósito: exigiria
+   * chave de verdade e uma chamada a um provedor externo dentro do E2E. Ele
+   * está no unitário do serviço, com o cliente do Resend dublado.
+   */
+  test('a tela diz que o e-mail nao saiu, e mostra o link mesmo assim', async ({ page }) => {
+    await entrar(page);
+
+    await page.goto('/users');
+    await page.getByTestId('convidar-usuario').click();
+    await page.getByTestId('campo-email-do-convite').fill(emailUnico('sem-envio'));
+    await page.getByTestId('confirmar-convite').click();
+
+    await expect(page.getByTestId('convite-sem-email')).toBeVisible();
+    await expect(page.getByTestId('link-do-convite')).toBeVisible();
+  });
+
+  /**
    * CONVITE É DE USO ÚNICO -- `aceitar` marca `ACCEPTED` na MESMA transação
    * que cria o usuário, justamente para duas aceitações simultâneas não
    * criarem dois papéis com um convite só.

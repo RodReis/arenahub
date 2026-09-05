@@ -47,6 +47,48 @@ const esquema = z.object({
    * de log fica a cargo de quem consome (`health.module.ts`), nao daqui.
    */
   ANTHROPIC_API_KEY: z.string().optional(),
+
+  /**
+   * Chave do Resend, para enviar o convite de usuario por e-mail (issue
+   * #277, provedor decidido pelo PI em 05/09/2026).
+   *
+   * OPCIONAL, pelo mesmo criterio da chave da Anthropic acima: sem ela o
+   * convite continua sendo criado e o LINK continua valendo -- o painel so
+   * deixa de mandar o e-mail e diz isso na tela. Exigir a chave tiraria do ar
+   * a criacao de usuario inteira por falta de uma variavel que nao trava
+   * nenhuma outra funcionalidade.
+   */
+  RESEND_API_KEY: z.string().optional(),
+
+  /**
+   * Remetente do convite.
+   *
+   * O PADRAO E O DOMINIO DE TESTE DO RESEND (`onboarding@resend.dev`), por
+   * decisao do PI em 05/09/2026: ele entrega SO para o e-mail dono da conta,
+   * o que basta para provar o fluxo enquanto `arenapositiva.com` nao tem
+   * SPF/DKIM publicados.
+   *
+   * Trocar para o dominio proprio e mudar ESTA variavel no ambiente -- nao ha
+   * codigo a alterar. Sem o dominio verificado no Resend, um remetente
+   * proprio faz o envio ser recusado pelo provedor.
+   */
+  RESEND_FROM: z.string().default('ArenaHub <onboarding@resend.dev>'),
+
+  /**
+   * Endereco publico do painel, usado para montar o link do convite no
+   * e-mail.
+   *
+   * A API NAO SABE em que dominio o painel e servido -- ela responde a
+   * localhost, ao dominio de producao e a um tunel, e nenhum deles esta no
+   * corpo da requisicao. A tela resolve isso no cliente
+   * (`window.location.origin`, issue #276), mas o e-mail sai do servidor e
+   * precisa da resposta por configuracao.
+   *
+   * O padrao serve so ao desenvolvimento local; em producao a variavel e
+   * obrigatoria de fato -- um link para `localhost` num e-mail enviado nao
+   * abre para ninguem.
+   */
+  PANEL_PUBLIC_URL: z.string().url().default('http://localhost:3000'),
 });
 
 /** Storage privado S3-compativel. MinIO em dev, S3 em producao. */
@@ -76,6 +118,14 @@ export interface ConfigDaApi {
   storage: ConfigDeStorage;
   /** `null` quando a variavel nao esta definida -- nunca string vazia (INV-104). */
   anthropicApiKey: string | null;
+  /** Envio de convite por e-mail (issue #277). */
+  email: {
+    /** `null` sem `RESEND_API_KEY` -- o convite nasce igual, so nao e enviado. */
+    resendApiKey: string | null;
+    remetente: string;
+    /** Sem barra no fim: o caminho do convite ja comeca com uma. */
+    urlDoPainel: string;
+  };
 }
 
 export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaApi {
@@ -95,6 +145,11 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaAp
     redis: { url: resolverRedisUrl(bruto) },
     storage: resolverStorage(bruto),
     anthropicApiKey: bruto.ANTHROPIC_API_KEY ?? null,
+    email: {
+      resendApiKey: bruto.RESEND_API_KEY ?? null,
+      remetente: bruto.RESEND_FROM,
+      urlDoPainel: bruto.PANEL_PUBLIC_URL.replace(/\/+$/, ''),
+    },
   };
 }
 

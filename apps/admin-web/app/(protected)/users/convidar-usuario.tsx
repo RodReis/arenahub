@@ -91,10 +91,27 @@ export function ConvidarUsuario({ papeis }: Props) {
 
           {convite ? (
             <div className={estilos['corpoDoDialogo']} data-testid="convite-criado">
-              <p className={estilos['notaDoDialogo']}>
-                Envie este link para <strong>{convite.email}</strong>. Ele vale por 24 horas e
-                permite definir a senha de acesso.
-              </p>
+              {/*
+                A FRASE MUDA CONFORME O E-MAIL SAIU (issue #277), e o link
+                aparece NOS DOIS CASOS.
+                ---------------------------------------------------------------
+                Mesmo com o e-mail entregue, o link continua na tela: e-mail
+                cai em spam, demora e chega a caixa errada, e o convite tem 24
+                horas. Esconde-lo porque "ja foi enviado" trocaria um caminho
+                que funciona por um que depende de terceiro.
+              */}
+              {convite.emailEnviado ? (
+                <p className={estilos['notaDoDialogo']} data-testid="convite-enviado-por-email">
+                  Convite enviado para <strong>{convite.email}</strong>. Ele vale por 24 horas.
+                  Se a pessoa não receber, entregue o link abaixo.
+                </p>
+              ) : (
+                <p className={estilos['notaDoDialogo']} data-testid="convite-sem-email">
+                  <strong>O e-mail não saiu</strong> — envie este link para{' '}
+                  <strong>{convite.email}</strong>. Ele vale por 24 horas e permite definir a
+                  senha de acesso.
+                </p>
+              )}
 
               {/*
                 O LINK MONTA A URL NO CLIENTE (issue #276): aqui só se sabe o
@@ -149,14 +166,14 @@ export function ConvidarUsuario({ papeis }: Props) {
                 </SelectField>
 
                 {/*
-                  A FRASE DIZ A VERDADE DE HOJE, e não uma promessa: o envio
-                  por e-mail não existe no produto (issue #277, provedor
-                  Resend decidido pelo PI). Enquanto não existir, quem
-                  convida precisa saber que a entrega é com ele.
+                  A FRASE NÃO PROMETE O E-MAIL (issue #277): ele depende de
+                  chave configurada e domínio verificado no provedor, e a
+                  tela só sabe se saiu DEPOIS de convidar. Prometer aqui e
+                  desmentir depois é pior que não prometer.
                 */}
                 <p className={estilos['notaDoDialogo']} role="note">
-                  O convite vale por 24 horas. Ainda não há envio de e-mail: o link aparece aqui e
-                  você o entrega à pessoa.
+                  O convite vale por 24 horas. O link aparece aqui depois de convidar — e também
+                  vai por e-mail, quando o envio estiver configurado.
                 </p>
               </div>
 
