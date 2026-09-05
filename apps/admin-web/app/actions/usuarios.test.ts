@@ -157,19 +157,42 @@ describe('aceitarConvite', () => {
   /**
    * SENHA CURTA É BARRADA AQUI, e não pela API.
    *
-   * A API exige 12 (`esquemaDeAceite`) e responderia `VALIDATION_FAILED`,
-   * que vira "confira os dados informados" -- sem dizer que o problema é o
+   * A API exige 8 (`esquemaDeAceite`) e responderia `VALIDATION_FAILED`, que
+   * vira "confira os dados informados" -- sem dizer que o problema é o
    * tamanho. Quem está criando a própria conta tentaria de novo com a mesma
-   * senha. Foi exatamente o que barrou `dono@1234` (10 caracteres).
+   * senha.
+   *
+   * O mínimo era 12 até 05/09/2026 e caiu para 8 por decisão do PI (issue
+   * #281). `dono@1234`, os 10 caracteres que motivaram a fatia #274 inteira,
+   * hoje PASSAM -- por isso o caso usa uma senha de 7, que é curta em
+   * qualquer um dos dois regimes e não vira teste que passa por engano
+   * quando o número muda de novo.
    */
-  it('recusa senha com menos de 12 caracteres sem chamar a API', async () => {
+  it('recusa senha com menos de 8 caracteres sem chamar a API', async () => {
     const estado = await aceitarConvite(
       {},
-      formularioDeAceite({ password: 'dono@1234', confirmacao: 'dono@1234' }),
+      formularioDeAceite({ password: 'curta12', confirmacao: 'curta12' }),
     );
 
-    expect(estado.erro).toBe('A senha precisa ter ao menos 12 caracteres');
+    expect(estado.erro).toBe('A senha precisa ter ao menos 8 caracteres');
     expect(chamarApi).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A FRONTEIRA EXATA, e não só o caso curto: com `min(8)`, uma senha de
+   * OITO tem de passar. Sem este caso, trocar o esquema para `min(9)` por
+   * engano não quebraria nada -- o teste acima continuaria verde, porque 7
+   * também é menor que 9.
+   */
+  it('aceita senha de exatamente 8 caracteres', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({ ok: true, dados: {}, cookiesDaApi: [] });
+
+    const estado = await aceitarConvite(
+      {},
+      formularioDeAceite({ password: 'oito1234', confirmacao: 'oito1234' }),
+    );
+
+    expect(estado.sucesso).toBe(true);
   });
 
   /**

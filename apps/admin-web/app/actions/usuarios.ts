@@ -13,12 +13,16 @@ import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
  * desde sempre, e NENHUM chamador: criar um administrador exigia `curl` com
  * um `roleId` descoberto direto no banco. Esta fatia dá tela aos dois.
  *
- * SENHA MÍNIMA DE 12 é a da API (`esquemaDeAceite`), não escolha desta tela.
+ * SENHA MÍNIMA é a da API (`esquemaDeAceite`), não escolha desta tela.
  * Repetir aqui evita o round-trip que devolveria `VALIDATION_FAILED` sem
  * dizer qual campo — quem está criando a própria conta veria "confira os
  * dados" e tentaria de novo com a mesma senha curta.
+ *
+ * Passou de 12 para 8 por decisão do PI em 05/09/2026 (issue #281). Se mudar
+ * de novo, muda nos TRÊS lugares: aqui, no `esquemaDeAceite` da API e na dica
+ * do formulário de aceite.
  */
-const MINIMO_DE_SENHA = 12;
+const MINIMO_DE_SENHA = 8;
 
 const esquemaDeConvite = z.object({
   email: z.string().trim().toLowerCase().email('Informe um e-mail válido').max(320),
