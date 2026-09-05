@@ -1516,6 +1516,24 @@ model Subscription {
   invoices     Invoice[]
 
   @@index([tenantId, studentId, status])
+  /// UMA ASSINATURA VIGENTE POR ALUNO -- issue #272, regra confirmada pelo PI
+  /// em 04/09/2026 ("1 aluno, 1 plano vigente mensal").
+  ///
+  /// O indice e PARCIAL (so `ACTIVE` e `PAST_DUE`) e por isso NAO cabe num
+  /// `@@unique` do Prisma, que nao suporta `WHERE`: ele nasce a mao na
+  /// migration `20260904180000_fix272_uma_assinatura_vigente_por_aluno`. Esta
+  /// anotacao existe para quem ler o schema saber que a garantia EXISTE --
+  /// sem ela, alguem passaria por aqui e concluiria que nada impede a
+  /// duplicata.
+  ///
+  /// NO BANCO, e nao num `if` da aplicacao: import, tela e job de cobranca
+  /// escrevem nesta tabela, e um `SELECT` antes do `INSERT` perde a corrida
+  /// entre dois deles. Foi assim que 276 assinaturas duplicadas entraram em
+  /// producao (617 vigentes para 341 alunos) -- o import criava a linha nova
+  /// sem encerrar a anterior, e o painel somava as duas.
+  ///
+  /// `CANCELLED` e `EXPIRED` ficam FORA do indice de proposito: o aluno que
+  /// sai e volta acumula assinaturas ao longo do tempo, e so uma vale agora.
   /// O JOB DE COBRANCA AUTOMATICA LE POR AQUI: assinaturas com recorrencia
   /// instalada, por tenant. Sem o indice o job varre a tabela inteira a cada
   /// execucao, e ele roda por agendador -- custo que so aparece com a base

@@ -7,7 +7,7 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 04/09/2026 *(F60 entregue — modalidades por unidade e vínculo do aluno)*
+**Última atualização:** 04/09/2026 *(F60 entregue; `[FIX]` #272 — assinatura duplicada inflava a receita esperada do painel financeiro)*
 
 🚀 **02/09/2026 — todas as issues de `admin-web` e `kiosk` fechadas; nasce a implantação.** O PI
 pediu a spec de implantação e, na mesma conversa, tomou seis decisões que viraram o **ADR-051**:

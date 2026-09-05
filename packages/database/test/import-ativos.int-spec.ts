@@ -370,6 +370,47 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(await db.entitlement.count({ where: { studentId: aluno.id } })).toBe(1);
   });
 
+  /**
+   * O DEFEITO DA ISSUE #272, reproduzido.
+   *
+   * O teste de idempotencia acima roda as duas execucoes com a MESMA data --
+   * e por isso ele passava enquanto o defeito existia em producao. A busca
+   * antiga era por `(aluno, plano, startsAt)` exato: com a data DIFERENTE ela
+   * nao encontrava nada e criava a segunda assinatura, sem encerrar a
+   * primeira.
+   *
+   * Foi assim que 617 assinaturas vigentes nasceram para 341 alunos, e o
+   * painel financeiro passou a somar R$ 92.550 onde o certo era R$ 51.150.
+   *
+   * A data muda entre execucoes no mundo real: o arquivo do Pacto e reexportado
+   * com o ciclo novo, e a rodada de 04/09/2026 forcou `01/09` para quem o
+   * import criava.
+   */
+  it('MESMA pessoa com data DIFERENTE nao ganha uma segunda assinatura vigente', async () => {
+    const aluno = await criarAlunoCancelado({ nome: 'IARA DATA MUDOU' });
+
+    await importar([
+      registroDe(aluno, { codigoPerfil: '1', dataInicio: '20260803', dataFim: '20260902' }),
+    ]);
+
+    // Mesma pessoa, ciclo novo -- exatamente o que o arquivo reexportado traz.
+    await importar([
+      registroDe(aluno, { codigoPerfil: '1', dataInicio: '20260901', dataFim: '20270901' }),
+    ]);
+
+    const vigentes = await db.subscription.findMany({
+      where: { studentId: aluno.id, status: { in: ['ACTIVE', 'PAST_DUE'] } },
+    });
+
+    // UMA, nao duas. E a regra do PI: "1 aluno, 1 plano vigente mensal".
+    expect(vigentes).toHaveLength(1);
+
+    // E e a PRIMEIRA que sobrevive -- a que guarda quando a pessoa entrou.
+    // Reusar a existente, em vez de criar e encerrar, mantem o historico sem
+    // reescrever nada.
+    expect(vigentes[0]!.startsAt.toISOString()).toBe('2026-08-03T00:00:00.000Z');
+  });
+
   it('o direito por PLANO recebe janela na unidade certa, nao so linhas', async () => {
     const aluno = await criarAlunoCancelado({ nome: 'HELENA JANELA' });
 

@@ -17,7 +17,7 @@
 |---|---:|---:|---:|---:|
 | unitário | 2926 | 2926 | 0 | 75.4 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 887 | 887 | 0 | 84.0 |
+| integração | 888 | 888 | 0 | 84.0 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -120,3 +120,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-04 | #270 | SPEC-060 | integração | 883 | 883 | 0 | 84.0 | #271 — medido em lotes com `--json`, 57 suítes de `apps/api` (809) + 5 de `@arenahub/database` (74); o Jest crasha no fim no Windows e o gerador manteve o 824 herdado |
 | 2026-09-04 | #270 | SPEC-060 | unitário | 2926 | 2926 | 0 | 75.4 | #271 |
 | 2026-09-04 | #270 | SPEC-060 | integração | 887 | 887 | 0 | 84.0 | #271 — medido em lotes com `--json`, 57 suítes de `apps/api` (813) + 5 de `@arenahub/database` (74); o Jest crasha no fim no Windows e o gerador herda o número anterior |
+| 2026-09-05 | #272 | — | unitário | 2926 | 2926 | 0 | 75.4 | — |
+| 2026-09-05 | #272 | — | integração | 888 | 888 | 0 | 84.0 | — medido em lotes com `--json`: 813 em `apps/api` (inalterado) + 75 em `@arenahub/database`; o Jest crasha no fim no Windows e o gerador herda o número anterior |
