@@ -876,6 +876,23 @@ async function gravarPessoa(
      * corrida entre duas execucoes simultaneas do import. Ela existe para o
      * caso comum nao virar erro de constraint; a constraint existe para o
      * caso raro nao virar duplicata.
+     *
+     * SEM `planId` NO FILTRO, e a consequencia esta escrita aqui para nao
+     * virar surpresa: se o aluno TEM assinatura vigente do plano A e o
+     * arquivo diz plano B, este import MANTEM o A e nao avisa. Trocar de
+     * plano e decisao de produto -- envolve preco, janela de acesso e
+     * cobranca em aberto --, e um import de base nao e o lugar de tomar essa
+     * decisao sozinho.
+     *
+     * Filtrar por `planId` aqui NAO resolveria: a busca nao acharia a
+     * assinatura do plano A, tentaria criar a do B, e o indice recusaria com
+     * erro de constraint no meio da importacao -- trocando um dado errado
+     * silencioso por uma parada barulhenta que tambem nao troca o plano.
+     *
+     * Hoje isso nao muda nada na Arena Positiva: a base ativa usa um plano
+     * so. Quando a troca de plano pelo arquivo precisar existir, ela e fatia
+     * propria -- encerrar a vigente e abrir a nova, com a cobranca do mes
+     * resolvida.
      */
     const assinatura = await db.subscription.findFirst({
       where: {
