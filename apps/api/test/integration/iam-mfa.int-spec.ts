@@ -339,6 +339,79 @@ describe('convites e MFA', () => {
       expect(corpo).not.toMatch(/mfaSecret/i);
     });
   });
+
+  /**
+   * `GET /api/v1/roles` -- issue #274.
+   *
+   * A rota nasceu porque `POST /users/invitations` exige `roleId` e nao havia
+   * como descobri-lo: quem convidava tinha de consultar o banco por fora.
+   */
+  describe('GET /api/v1/roles', () => {
+    it('lista os papeis do tenant', async () => {
+      const resposta = await request(servidor())
+        .get('/api/v1/roles')
+        .set('Cookie', cookieDoDono);
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body).toContainEqual({ id: roleId, name: 'OWNER', isSystem: true });
+    });
+
+    /**
+     * ISOLAMENTO DE TENANT -- regra de arquitetura no 2.
+     *
+     * O `beforeAll` cria um segundo tenant com um `OWNER` proprio (ver
+     * "recusa papel de outro tenant"). Sem o `where` por tenant a consulta
+     * devolveria os dois, e a tela de convite ofereceria o papel alheio --
+     * que o `InvitationService` recusaria depois com 404, deixando a
+     * recepcao escolhendo uma opcao que a API nao aceita.
+     */
+    it('nao devolve papel de outro tenant', async () => {
+      const outro = await db.tenant.create({
+        data: {
+          slug: `vizinho-${sufixo}`,
+          legalName: 'Vizinho LTDA',
+          displayName: 'Vizinho',
+        },
+      });
+
+      const alheio = await db.role.create({
+        data: { tenantId: outro.id, name: 'PAPEL-ALHEIO', isSystem: false },
+      });
+
+      const resposta = await request(servidor())
+        .get('/api/v1/roles')
+        .set('Cookie', cookieDoDono);
+
+      const ids = (resposta.body as Array<{ id: string }>).map((papel) => papel.id);
+
+      expect(ids).not.toContain(alheio.id);
+    });
+
+    /**
+     * `user.manage`, a MESMA permissao do convite: quem nao pode convidar nao
+     * tem o que fazer com a lista de papeis, e a lista revela a estrutura de
+     * autorizacao do tenant.
+     */
+    it('exige permissao user.manage', async () => {
+      const senhas = app.get(PasswordService);
+      const email = `sem-permissao-roles-${sufixo}@exemplo.test`;
+
+      const user = await db.user.create({
+        data: { email, passwordHash: await senhas.gerarHash(SENHA) },
+      });
+      await db.tenantMembership.create({ data: { tenantId, userId: user.id } });
+
+      const login = await request(servidor())
+        .post('/api/v1/auth/login')
+        .send({ email, password: SENHA });
+
+      const resposta = await request(servidor())
+        .get('/api/v1/roles')
+        .set('Cookie', cookieDeAcesso(login));
+
+      expect(resposta.status).toBe(403);
+    });
+  });
 });
 
 /** Decodifica base32 sem padding, para gerar o codigo do lado do teste. */

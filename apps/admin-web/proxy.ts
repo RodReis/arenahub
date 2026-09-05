@@ -46,8 +46,15 @@ const COOKIE_DE_REFRESH = 'arenahub_refresh';
  *
  * `/login` fica de fora porque renovar ali seria trabalho jogado fora --
  * quem esta no login ou nao tem sessao, ou vai criar uma nova.
+ *
+ * `/convite` entra pelo mesmo motivo, com um agravante (issue #274): quem
+ * aceita convite nao tem conta, mas quem ABRE o link para conferir muitas
+ * vezes e a propria pessoa que convidou, logada nesta maquina. Sem esta
+ * linha o proxy gastaria uma ROTACAO de refresh para servir uma pagina que
+ * nao chama nada autenticado -- e refresh rotacionado e detectado como
+ * reuso se reaparecer.
  */
-const PUBLICAS = ['/login'];
+const PUBLICAS = ['/login', '/convite'];
 
 export async function proxy(requisicao: NextRequest): Promise<NextResponse> {
   const { pathname } = requisicao.nextUrl;

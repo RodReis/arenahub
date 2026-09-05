@@ -1,0 +1,29 @@
+/**
+ * Link do convite — issue #274.
+ *
+ * Le so a camada semantica: `--ah-surface-*`, `--ah-border-*`, `--ah-text-*`.
+ * Valor literal aqui e recusado pela guarda `check-css-tokens`.
+ */
+
+/*
+ * O token tem 43 caracteres aleatorios de base64url, e quem copia precisa
+ * conferir se pegou tudo -- por isso mono e por isso a caixa.
+ *
+ * `overflow-wrap: anywhere` e obrigatorio: o token nao tem espaco nem hifen,
+ * entao sem isto ele vaza a largura de 460px do modal em vez de quebrar. E o
+ * unico texto do painel em que quebrar no meio da "palavra" e correto.
+ */
+.link {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: 6px;
+  background: var(--ah-surface-sunken);
+  color: var(--ah-text-strong);
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  overflow-wrap: anywhere;
+  /* `user-select: all` deixa um clique selecionar o token inteiro. */
+  user-select: all;
+}
