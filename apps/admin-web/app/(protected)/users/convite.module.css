@@ -12,6 +12,9 @@
  * `overflow-wrap: anywhere` e obrigatorio: o token nao tem espaco nem hifen,
  * entao sem isto ele vaza a largura de 460px do modal em vez de quebrar. E o
  * unico texto do painel em que quebrar no meio da "palavra" e correto.
+ *
+ * VIROU ANCORA na issue #276 -- era `<p>`. `display: block` porque `<a>` e
+ * inline por padrao e a caixa nao envolveria o texto quebrado.
  */
 .link {
   margin: 0;
@@ -19,11 +22,42 @@
   border: 1px solid var(--ah-border-subtle);
   border-radius: 6px;
   background: var(--ah-surface-sunken);
-  color: var(--ah-text-strong);
+  /*
+    A COR NAO E DECLARADA AQUI de proposito. O `globals.css` tem `a { color:
+    var(--ah-action-text) }` FORA de `@layer`, entao ele vence este modulo --
+    e o proprio arquivo documenta tres tentativas erradas de contornar isso,
+    uma delas derrubando o contraste do menu inteiro. Aceitar a cor de acao e
+    o certo: isto E um link, e `--ah-action-text` e o papel de acao resolvido
+    por contraste.
+  */
   font-family: var(--ah-font-mono);
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   overflow-wrap: anywhere;
-  /* `user-select: all` deixa um clique selecionar o token inteiro. */
+  /*
+    `user-select: all` deixa um clique selecionar a URL inteira -- e continua
+    valendo com o botao de copiar ao lado: `navigator.clipboard` exige
+    contexto seguro e pode ser negado, e ai selecionar a mao e a unica saida.
+  */
   user-select: all;
+  display: block;
+}
+
+/*
+  SUBLINHADO SO NO HOVER: a caixa em mono ja diz que aquilo e um endereco, e
+  sublinhar 60 caracteres de token vira ruido sobre o texto que se precisa
+  conferir caractere a caractere. A cor vem do `globals.css` (ver acima).
+*/
+.link {
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* O botao de copiar encosta a direita, como o rodape do proprio dialogo. */
+.acoesDoLink {
+  display: flex;
+  justify-content: flex-end;
 }

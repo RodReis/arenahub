@@ -6,9 +6,9 @@ import { useFormStatus } from 'react-dom';
 import { Button, Field, SelectField, useToastDeErro } from '@arenahub/ui';
 
 import estilos from '../dialogo.module.css';
-import proprios from './convite.module.css';
 
 import { convidarUsuario, type EstadoDoConvite } from '../../actions/usuarios';
+import { LinkDoConvite } from './link-do-convite';
 
 export interface Papel {
   readonly id: string;
@@ -97,16 +97,11 @@ export function ConvidarUsuario({ papeis }: Props) {
               </p>
 
               {/*
-                O CAMINHO, e não a URL completa: o painel não sabe em que
-                domínio está sendo servido (pode ser localhost, o domínio de
-                produção ou um túnel), e montar `window.location.origin` aqui
-                daria um link certo por acidente e errado quando alguém
-                acessasse por outro endereço. O caminho relativo é verdade em
-                qualquer um deles.
+                O LINK MONTA A URL NO CLIENTE (issue #276): aqui só se sabe o
+                caminho. Ver `LinkDoConvite` para por que o servidor não pode
+                montá-la e o cliente pode.
               */}
-              <p className={proprios['link']} data-testid="link-do-convite">
-                /convite/{convite.token}
-              </p>
+              <LinkDoConvite caminho={`/convite/${convite.token}`} />
 
               {/*
                 O AVISO É A PARTE IMPORTANTE desta tela. A API guarda só o
@@ -153,9 +148,15 @@ export function ConvidarUsuario({ papeis }: Props) {
                   ))}
                 </SelectField>
 
+                {/*
+                  A FRASE DIZ A VERDADE DE HOJE, e não uma promessa: o envio
+                  por e-mail não existe no produto (issue #277, provedor
+                  Resend decidido pelo PI). Enquanto não existir, quem
+                  convida precisa saber que a entrega é com ele.
+                */}
                 <p className={estilos['notaDoDialogo']} role="note">
-                  O convite vale por 24 horas. Não há envio de e-mail: o link aparece aqui e você
-                  o entrega à pessoa.
+                  O convite vale por 24 horas. Ainda não há envio de e-mail: o link aparece aqui e
+                  você o entrega à pessoa.
                 </p>
               </div>
 

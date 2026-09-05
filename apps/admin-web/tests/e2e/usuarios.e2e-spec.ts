@@ -42,7 +42,14 @@ function emailUnico(prefixo: string): string {
   return `${prefixo}-${Date.now()}@exemplo.test`;
 }
 
-/** Convida e devolve o caminho do convite, que aparece UMA vez na tela. */
+/**
+ * Convida e devolve o caminho do convite, que aparece UMA vez na tela.
+ *
+ * LÊ O `href`, e não o texto (issue #276): o texto mostra a URL ABSOLUTA,
+ * montada no cliente a partir de `window.location.origin`, e a porta do
+ * servidor de E2E não é a mesma do desenvolvimento. O `href` fica relativo de
+ * propósito, e é ele que `page.goto` precisa.
+ */
 async function convidar(page: Page, email: string): Promise<string> {
   await page.goto('/users');
   await page.getByTestId('convidar-usuario').click();
@@ -52,7 +59,7 @@ async function convidar(page: Page, email: string): Promise<string> {
   const link = page.getByTestId('link-do-convite');
   await expect(link).toBeVisible();
 
-  return (await link.innerText()).trim();
+  return (await link.getAttribute('href')) ?? '';
 }
 
 test.describe('usuarios do painel', () => {
@@ -87,6 +94,15 @@ test.describe('usuarios do painel', () => {
 
     const caminho = await convidar(page, email);
     expect(caminho).toMatch(/^\/convite\/.+/);
+
+    /*
+     * O TEXTO MOSTRA A URL COMPLETA -- issue #276, e é o ponto dela: colar
+     * `/convite/TOKEN` no WhatsApp não vira link, e quem recebe teria de
+     * saber o domínio do painel. A origem vem do navegador, então bate com a
+     * porta pela qual este teste chegou.
+     */
+    const textoDoLink = (await page.getByTestId('link-do-convite').innerText()).trim();
+    expect(textoDoLink).toBe(`${new URL(page.url()).origin}${caminho}`);
 
     await page.goto(caminho);
     await page.getByLabel('Nova senha').fill(SENHA_NOVA);

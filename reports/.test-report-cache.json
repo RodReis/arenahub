@@ -12,10 +12,10 @@
     "coberturaPct": 82.91
   },
   "apps/admin-web#test": {
-    "testes": 515,
-    "pass": 515,
+    "testes": 521,
+    "pass": 521,
     "falha": 0,
-    "coberturaPct": 73.44
+    "coberturaPct": 73.63
   },
   "packages/ui#test": {
     "testes": 215,
