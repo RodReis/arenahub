@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -25,6 +26,27 @@ const esquemaDeAceite = z
   .strict();
 
 const esquemaDeCodigo = z.object({ code: z.string().length(6) }).strict();
+
+/*
+ * Schema de resposta de `GET /roles` -- declarado, e nao adicionado a
+ * `OPERACOES_SEM_SCHEMA_DE_RESPOSTA`: aquela lista e divida herdada e so pode
+ * ENCOLHER (ver `openapi-divida-de-schema.ts`).
+ *
+ * Objeto simples SEM `as const`: com ele, `required` vira `readonly string[]`
+ * e o `SchemaObject` do Swagger recusa (`string[]`), e o tipo so e exportado
+ * de um caminho interno do pacote.
+ */
+const ESQUEMA_DO_PAPEL = {
+  type: 'object',
+  required: ['id', 'name', 'isSystem'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    name: { type: 'string' },
+    isSystem: { type: 'boolean' },
+  },
+};
+
+const ESQUEMA_DA_LISTA_DE_PAPEIS = { type: 'array', items: ESQUEMA_DO_PAPEL };
 
 @Controller('api/v1')
 export class IamController {
@@ -85,6 +107,32 @@ export class IamController {
     });
 
     return vinculos.map((v) => v.user);
+  }
+
+  /**
+   * Papeis do tenant -- issue #274.
+   *
+   * A tela de convite precisa escolher UM, e ate aqui nao havia como
+   * lista-los: o `POST /users/invitations` exige `roleId`, e quem chamava
+   * tinha de descobrir o UUID por fora (consulta ao banco, na pratica).
+   *
+   * `user.manage`, a mesma permissao do convite: quem nao pode convidar nao
+   * tem o que fazer com a lista de papeis.
+   *
+   * DTO explicito -- `select` e nao o objeto inteiro, pelo mesmo motivo do
+   * `GET /users` acima. `isSystem` sai porque a tela usa: o papel de sistema
+   * (`OWNER`) nao pode ser editado nem apagado, e a interface precisa saber
+   * disso antes de oferecer a acao.
+   */
+  @Get('roles')
+  @RequirePermissions('user.manage')
+  @ApiOkResponse({ schema: ESQUEMA_DA_LISTA_DE_PAPEIS })
+  async listarPapeis(): Promise<Array<{ id: string; name: string; isSystem: boolean }>> {
+    return this.db.role.findMany({
+      where: { tenantId: this.contexto.require().tenantId },
+      select: { id: true, name: true, isSystem: true },
+      orderBy: { name: 'asc' },
+    });
   }
 
   @Post('auth/mfa/setup')

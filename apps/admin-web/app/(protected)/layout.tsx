@@ -116,6 +116,21 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
   */
   { href: '/units', label: 'Unidades' },
   /*
+    USUÁRIOS -- issue #274. Mesmo grupo de Dispositivos e Unidades, mesmo
+    motivo: dar acesso a alguém do time é configuração de uso raro, não a
+    ferramenta do atendimento diário.
+
+    `user.manage` é a permissão que as DUAS rotas da tela já exigem (`GET
+    /users` e `POST /users/invitations`). Sem ela a página só saberia mostrar
+    a recusa -- e link que leva a uma recusa é pior que link nenhum.
+
+    NÃO é o último do grupo: se um dia passar a ser o primeiro, o rótulo
+    "Administração" sumiria junto com ele para quem não tem a permissão. Quem
+    resolve isso é `reancorarGrupos`, que reancora o rótulo no primeiro item
+    VISÍVEL.
+  */
+  { href: '/users', label: 'Usuários', exigePermissao: 'user.manage' },
+  /*
     TOTEM -- grupo criado por decisao do PI em 28/08/2026: *"vamos colocar o
     que for do totem no Menu Totem"*.
 
