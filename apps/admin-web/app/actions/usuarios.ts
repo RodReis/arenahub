@@ -63,6 +63,16 @@ export interface EstadoDoConvite {
      */
     token: string;
     expiresAt: string;
+    /**
+     * Se o convite saiu por e-mail (issue #277).
+     *
+     * `false` NAO e erro: o convite existe e o link vale. Significa que a
+     * entrega e por conta de quem convidou -- sem chave do Resend, com o
+     * dominio ainda nao verificado, ou com o provedor fora do ar. A tela
+     * precisa dizer isso, senao a recepcao espera por um e-mail que nunca
+     * saiu.
+     */
+    emailEnviado: boolean;
   };
   /** Devolvido para o formulário não perder o que foi digitado em erro. */
   valores?: { email?: string; roleId?: string };
@@ -112,7 +122,12 @@ export async function convidarUsuario(
     };
   }
 
-  const resposta = await chamarApi<{ id: string; expiresAt: string; token: string }>(
+  const resposta = await chamarApi<{
+    id: string;
+    expiresAt: string;
+    token: string;
+    emailEnviado?: boolean;
+  }>(
     '/api/v1/users/invitations',
     { metodo: 'POST', corpo: { email: validado.data.email, roleId: validado.data.roleId } },
   );
@@ -140,6 +155,13 @@ export async function convidarUsuario(
       email: validado.data.email,
       token: resposta.dados.token,
       expiresAt: resposta.dados.expiresAt,
+      /*
+       * AUSENTE VIRA `false`, e nao `true`: uma API antiga que ainda nao
+       * devolva o campo faria a tela AFIRMAR que o e-mail saiu quando nem
+       * existe envio. Errar para o lado de "entregue o link a mao" custa um
+       * aviso a mais; errar para o outro lado deixa a pessoa esperando.
+       */
+      emailEnviado: resposta.dados.emailEnviado ?? false,
     },
   };
 }

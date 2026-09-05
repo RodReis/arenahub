@@ -18,7 +18,10 @@
     "KIOSK_KEY_ID",
     "KIOSK_SECRET",
     "MEDIA_FETCHER_FAKE",
-    "YTDLP_BIN"
+    "YTDLP_BIN",
+    "RESEND_API_KEY",
+    "RESEND_FROM",
+    "PANEL_PUBLIC_URL"
   ],
   "tasks": {
     "build": {

@@ -127,7 +127,6 @@ export const OPERACOES_SEM_SCHEMA_DE_RESPOSTA: readonly string[] = [
   'POST /api/v1/subscriptions/{id}/actions',
   'POST /api/v1/subscriptions/{id}/recurrence/cancel',
   'POST /api/v1/units',
-  'POST /api/v1/users/invitations',
   'POST /api/v1/users/invitations/accept',
   'POST /api/v1/webhooks/payments/{provider}',
 ];

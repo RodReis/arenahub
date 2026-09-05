@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
-import { ApiOkResponse } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -8,6 +8,7 @@ import { RequirePermissions } from '../../common/security/permissions.decorator.
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { MfaService } from '../auth/mfa.service.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { EmailDeConviteService } from './email-de-convite.service.js';
 import { InvitationService } from './invitation.service.js';
 
 const esquemaDeConvite = z
@@ -63,10 +64,34 @@ const ESQUEMA_DO_PAPEL = {
 
 const ESQUEMA_DA_LISTA_DE_PAPEIS = { type: 'array', items: ESQUEMA_DO_PAPEL };
 
+/*
+ * Resposta de `POST /users/invitations`.
+ *
+ * DECLARADO AGORA (issue #277) porque esta fatia MUDA o corpo -- entra
+ * `emailEnviado`. A rota estava na divida herdada de
+ * `OPERACOES_SEM_SCHEMA_DE_RESPOSTA`, e essa lista so pode ENCOLHER: mexer no
+ * contrato sem declara-lo seria aumentar a divida por dentro, com a contagem
+ * parecendo igual.
+ *
+ * `token` FICA no contrato, e nao e vazamento: e a unica copia que existe (o
+ * banco guarda so o hash) e quem chama a rota ja tem `user.manage`.
+ */
+const ESQUEMA_DO_CONVITE = {
+  type: 'object',
+  required: ['id', 'expiresAt', 'token', 'emailEnviado'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    expiresAt: { type: 'string', format: 'date-time' },
+    token: { type: 'string' },
+    emailEnviado: { type: 'boolean' },
+  },
+};
+
 @Controller('api/v1')
 export class IamController {
   constructor(
     private readonly convites: InvitationService,
+    private readonly emails: EmailDeConviteService,
     private readonly mfa: MfaService,
     private readonly contexto: TenantContextService,
     private readonly db: PrismaService,
@@ -74,6 +99,7 @@ export class IamController {
 
   @Post('users/invitations')
   @RequirePermissions('user.manage')
+  @ApiCreatedResponse({ schema: ESQUEMA_DO_CONVITE })
   async convidar(@Body() corpo: unknown, @Req() requisicao: Request) {
     const dados = esquemaDeConvite.parse(corpo);
 
@@ -83,9 +109,30 @@ export class IamController {
       requisicao.correlationId ?? 'sem-correlacao',
     );
 
+    /*
+     * O E-MAIL SAI DEPOIS DE O CONVITE EXISTIR, e a ordem nao e indiferente
+     * (issue #277): enviar antes deixaria a pessoa com um link para um
+     * convite que a transacao seguinte poderia nao criar.
+     *
+     * NAO ENTRA NA TRANSACAO nem derruba a resposta. O convite ja esta
+     * gravado e o link ja vale -- desfaze-lo porque o provedor de e-mail
+     * recusou trocaria uma falha parcial (entrega-se o link a mao) por uma
+     * total. `enviar` nunca lanca; devolve se saiu.
+     */
+    const envio = await this.emails.enviar(dados.email, token);
+
     // O token aparece UMA VEZ. Depois disso nem o suporte recupera -- o
     // banco so tem o hash.
-    return { id: convite.id, expiresAt: convite.expiresAt, token };
+    //
+    // `emailEnviado` vai junto para a tela DIZER a verdade: com o e-mail
+    // fora, quem convidou precisa saber que a entrega e por conta dele --
+    // silencio aqui faria a recepcao esperar por um e-mail que nao saiu.
+    return {
+      id: convite.id,
+      expiresAt: convite.expiresAt,
+      token,
+      emailEnviado: envio.enviado,
+    };
   }
 
   @Public()

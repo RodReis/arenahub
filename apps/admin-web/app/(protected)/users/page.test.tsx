@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@arenahub/ui';
 
@@ -62,6 +62,26 @@ async function renderizar() {
 
   return render(<ToastProvider>{elemento}</ToastProvider>);
 }
+
+/**
+ * `jsdom` NÃO implementa `showModal`/`close` do `<dialog>`. Sem estes dublês o
+ * teste estoura com "showModal is not a function" -- o `open` é alternado à
+ * mão porque é dele que a visibilidade do conteúdo depende.
+ *
+ * Mesmo dublê que `plans/acao-de-reajuste.test.tsx` e `plans/editar-plano.test.tsx`
+ * já carregam; repetido pela terceira vez em vez de extraído porque promovê-lo
+ * a `vitest.setup.ts` mudaria o ambiente de 57 arquivos de teste por causa de
+ * um -- e essa é decisão de outro card, não desta fatia.
+ */
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function abrir(this: HTMLDialogElement) {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function fechar(this: HTMLDialogElement) {
+    this.open = false;
+    this.dispatchEvent(new Event('close'));
+  };
+});
 
 describe('pagina de usuarios', () => {
   beforeEach(() => {

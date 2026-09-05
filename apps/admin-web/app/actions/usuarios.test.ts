@@ -40,10 +40,15 @@ function formularioDeAceite(extras: Record<string, string> = {}): FormData {
   return dados;
 }
 
-function convidado() {
+function convidado(emailEnviado = true) {
   return {
     ok: true,
-    dados: { id: 'cv-1', expiresAt: '2026-09-05T12:00:00.000Z', token: 'tok-em-claro' },
+    dados: {
+      id: 'cv-1',
+      expiresAt: '2026-09-05T12:00:00.000Z',
+      token: 'tok-em-claro',
+      emailEnviado,
+    },
     cookiesDaApi: [],
   };
 }
@@ -108,6 +113,33 @@ describe('convidarUsuario', () => {
 
     expect(estado.valores?.email).toBe('nao-e-email');
     expect(estado.valores?.roleId).toBe(PAPEL);
+  });
+
+  /**
+   * `emailEnviado` AUSENTE VIRA `false`, e não `true` -- issue #277.
+   *
+   * Uma API antiga que ainda não devolva o campo faria a tela AFIRMAR que o
+   * e-mail saiu quando nem existe envio, e quem convidou ficaria esperando.
+   * Errar para o lado de "entregue o link à mão" custa um aviso a mais.
+   */
+  it('sem o campo emailEnviado, assume que o e-mail NAO saiu', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({
+      ok: true,
+      dados: { id: 'cv-1', expiresAt: '2026-09-05T12:00:00.000Z', token: 'tok-em-claro' },
+      cookiesDaApi: [],
+    });
+
+    const estado = await convidarUsuario({}, formularioDeConvite());
+
+    expect(estado.sucesso?.emailEnviado).toBe(false);
+  });
+
+  it('repassa que o e-mail saiu, quando saiu', async () => {
+    vi.mocked(chamarApi).mockResolvedValue(convidado(true));
+
+    const estado = await convidarUsuario({}, formularioDeConvite());
+
+    expect(estado.sucesso?.emailEnviado).toBe(true);
   });
 
   it('traduz papel inexistente em frase, sem o codigo cru', async () => {

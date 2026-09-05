@@ -104,6 +104,31 @@ describe('convites e MFA', () => {
       expect(convite?.tokenHash).toMatch(/^[a-f0-9]{64}$/);
     });
 
+    /**
+     * O CONVITE NASCE MESMO SEM E-MAIL -- issue #277.
+     *
+     * A suite roda sem `RESEND_API_KEY`, entao este caso exercita o caminho
+     * real de hoje: o envio nao acontece e o convite existe do mesmo jeito.
+     *
+     * E o que protege a decisao do PI de que falha de e-mail NAO derruba o
+     * convite: sem este caso, alguem faria `enviar` lancar e a criacao de
+     * usuario iria junto, com a suite verde -- porque nenhum outro teste
+     * repara em `emailEnviado`.
+     */
+    it('cria o convite mesmo sem envio de e-mail configurado', async () => {
+      const resposta = await convidar(`sem-email-${sufixo}@exemplo.test`);
+
+      expect(resposta.status).toBe(201);
+      expect(resposta.body).toMatchObject({ token: expect.any(String), emailEnviado: false });
+
+      // O convite esta no banco e vale -- o link e o caminho de entrega.
+      const convite = await db.invitation.findUnique({
+        where: { id: (resposta.body as { id: string }).id },
+      });
+
+      expect(convite?.status).toBe('PENDING');
+    });
+
     it('nao grava e-mail na trilha de auditoria', async () => {
       const email = `convidado-pii-${sufixo}@exemplo.test`;
       const resposta = await convidar(email);
