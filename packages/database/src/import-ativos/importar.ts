@@ -858,35 +858,50 @@ async function gravarPessoa(
       return { ...efeito, semPeriodoDePlano: true };
     }
 
-    // Idempotencia por chave natural `(tenantId, studentId, planId,
-    // startsAt)` -- comportamento original desde a F48, que cobre CASADO
-    // (mesma pessoa, mesma data do CSV em toda execucao) e RENOVACAO (mesmo
-    // plano, novo ciclo, `startsAt` diferente cria uma segunda assinatura).
-    //
-    // CRIADO E DIFERENTE: a primeira execucao grava `INICIO_PARA_CRIADOS`; a
-    // segunda encontra a MESMA pessoa por CPF/nome (casamento) e calcula
-    // `inicio` a partir do CSV -- OUTRO valor -- entao a busca por
-    // `startsAt` exato erra e recriaria a assinatura. `MARCADOR_CRIADO` e o
-    // texto que reconhece essa assinatura em qualquer execucao seguinte,
-    // sem precisar de um campo novo no schema so para isto.
-    const porStartsAt = await db.subscription.findFirst({
-      where: { tenantId: alvo.tenantId, studentId, planId: alvo.planId, startsAt: inicio },
+    /*
+     * UMA ASSINATURA VIGENTE POR ALUNO -- issue #272, regra do PI.
+     *
+     * ESTA BUSCA MUDOU, e o motivo esta em producao: a versao anterior
+     * procurava por `(aluno, plano, startsAt)` exato, tratava `startsAt`
+     * diferente como RENOVACAO e criava a linha nova SEM encerrar a anterior.
+     * Resultado: 617 assinaturas vigentes para 341 alunos, e o painel
+     * financeiro somando R$ 92.550 onde o certo era R$ 51.150.
+     *
+     * Agora a pergunta e a que a regra faz: "este aluno JA TEM assinatura
+     * vigente?". Se tem, reusa -- qualquer que seja a data de inicio dela.
+     * Nao ha caminho que crie a segunda.
+     *
+     * O INDICE PARCIAL NO BANCO e quem garante de verdade
+     * (`subscriptions_uma_vigente_por_aluno`): esta busca sozinha perde a
+     * corrida entre duas execucoes simultaneas do import. Ela existe para o
+     * caso comum nao virar erro de constraint; a constraint existe para o
+     * caso raro nao virar duplicata.
+     *
+     * SEM `planId` NO FILTRO, e a consequencia esta escrita aqui para nao
+     * virar surpresa: se o aluno TEM assinatura vigente do plano A e o
+     * arquivo diz plano B, este import MANTEM o A e nao avisa. Trocar de
+     * plano e decisao de produto -- envolve preco, janela de acesso e
+     * cobranca em aberto --, e um import de base nao e o lugar de tomar essa
+     * decisao sozinho.
+     *
+     * Filtrar por `planId` aqui NAO resolveria: a busca nao acharia a
+     * assinatura do plano A, tentaria criar a do B, e o indice recusaria com
+     * erro de constraint no meio da importacao -- trocando um dado errado
+     * silencioso por uma parada barulhenta que tambem nao troca o plano.
+     *
+     * Hoje isso nao muda nada na Arena Positiva: a base ativa usa um plano
+     * so. Quando a troca de plano pelo arquivo precisar existir, ela e fatia
+     * propria -- encerrar a vigente e abrir a nova, com a cobranca do mes
+     * resolvida.
+     */
+    const assinatura = await db.subscription.findFirst({
+      where: {
+        tenantId: alvo.tenantId,
+        studentId,
+        status: { in: ['ACTIVE', 'PAST_DUE'] },
+      },
       select: { id: true },
     });
-
-    const porMarcadorDeCriacao = criadoNestaExecucao
-      ? null
-      : await db.subscription.findFirst({
-          where: {
-            tenantId: alvo.tenantId,
-            studentId,
-            planId: alvo.planId,
-            lastReason: MARCADOR_CRIADO,
-          },
-          select: { id: true },
-        });
-
-    const assinatura = porStartsAt ?? porMarcadorDeCriacao;
 
     const subscriptionId =
       assinatura?.id ??

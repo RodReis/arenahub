@@ -345,7 +345,21 @@ export class ConsultarResumoFinanceiroUseCase {
           where: { ...doTenant, status: { notIn: ['DRAFT', 'CANCELLED'] } },
         }),
 
-        // Assinaturas que deveriam estar pagando, com o plano para o preco.
+        /*
+          Assinaturas que deveriam estar pagando, com o plano para o preco.
+
+          UMA POR ALUNO -- garantido pelo indice parcial
+          `subscriptions_uma_vigente_por_aluno` (issue #272). A garantia
+          importa AQUI porque esta consulta alimenta dois numeros que a tela
+          mostra lado a lado: a receita esperada soma UMA LINHA POR
+          ASSINATURA, e `alunosPagantes` conta ALUNOS DISTINTOS. Enquanto a
+          duplicata existiu, os dois descreviam conjuntos diferentes -- o
+          painel de producao dizia "R$ 92.550 esperados" para "341
+          assinatura(s)", quando 92.550 / 150 sao 617 linhas.
+
+          Sem a constraint, voltar a divergir seria invisivel: os dois numeros
+          continuam plausiveis sozinhos.
+        */
         this.db.subscription.findMany({
           where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] } },
           select: { status: true, planId: true, studentId: true },
