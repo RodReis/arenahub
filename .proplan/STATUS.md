@@ -35,16 +35,15 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [MVP1][INFRA] tela de usuarios: convidar, listar e aceitar convite (#274)
-- [MVP1][F60] Modalidades por unidade e vinculo do aluno (#270)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][F60] Modalidades por unidade e vinculo do aluno (#270, finalizado em: 2026-09-07)
+- [MVP1][INFRA] tela de usuarios: convidar, listar e aceitar convite (#274, finalizado em: 2026-09-07)
 - [MVP1][FIX] link do convite nao da para copiar nem abrir (#276, finalizado em: 2026-09-07)
 - [MVP1][FIX] senha do convite passa de 12 para 8 caracteres (#281, finalizado em: 2026-09-07)
 - [MVP1][INFRA] enviar convite por e-mail (Resend) (#277, finalizado em: 2026-09-07)
