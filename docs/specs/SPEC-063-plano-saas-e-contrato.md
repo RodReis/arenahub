@@ -7,7 +7,7 @@
 | **Slice do PRD** | não há. Escopo mora nesta spec e no ADR-052 §5–§8 |
 | **Superfície** | `admin-web` (`/platform`) · `api` (`platform`) · PDF |
 | **Card** | [#286](https://github.com/RodReis/arenahub/issues/286) |
-| **Status** | rascunho — decisões do PI em 08/09/2026 |
+| **Status** | aprovada-pi — 08/09/2026 |
 
 ---
 

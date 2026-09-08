@@ -7,7 +7,7 @@
 | **Slice do PRD** | não há. Escopo mora nesta spec e no ADR-052 (Fatura da plataforma) e pendências 1–2 |
 | **Superfície** | `admin-web` (`/platform` e aviso ao `OWNER`) · `api` (`platform`) · job |
 | **Card** | [#287](https://github.com/RodReis/arenahub/issues/287) |
-| **Status** | rascunho — decisões do PI em 08/09/2026 |
+| **Status** | aprovada-pi — 08/09/2026 |
 
 ---
 
@@ -20,7 +20,7 @@ No dia de emissão o ArenaHub conta os alunos do tenant por status (ou aplica o 
 ## 2. Escopo
 
 - `PlatformInvoice`: tenant, contrato, competência, contagem por status congelada (`active_count`, `inactive_count`), valores em minor units, vencimento, status (`OPEN` | `PAID` | `OVERDUE`), `paid_at`.
-- Contagem no dia de emissão: ativo = `Student.status = ACTIVE`; inativo = `CANCELLED` | `ARCHIVED` (ADR-052 §6). **Bloqueio real:** os status `LEAD`, `TRIAL`, `SUSPENDED`, `BLOCKED` esperam decisão do PI (pendência 1). O Code não escolhe.
+- Contagem no dia de emissão (padrão **dia 1**, configurável no contrato): ativo = `Student.status = ACTIVE`; inativo = **todos os demais** — `LEAD`, `TRIAL`, `SUSPENDED`, `BLOCKED`, `CANCELLED`, `ARCHIVED` (ADR-052 §6, fechado em 08/09/2026). Preço do inativo vem do contrato e pode ser zero.
 - Prévia da fatura visível ao `OWNER` do tenant a partir de X dias antes da emissão.
 - Pagamento registrado manualmente pelo Super Admin; `OVERDUE` no vencimento dispara a contagem de carência da F65.
 - Job idempotente por `(tenant_id, competência)` (regra 4).

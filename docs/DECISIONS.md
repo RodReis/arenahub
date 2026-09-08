@@ -3989,7 +3989,7 @@ plataforma e forma do ator de plataforma são caros de desfazer — e o módulo 
 | 3 | **Entrada em tenant só por sessão elevada** — justificativa, expiração, `AuditLog` com `actorType = SUPPORT` (INV-005, INV-008); **MFA obrigatório** (INV-007, `mfa.service.ts` já existe) | impersonation por troca de sessão | é o invariante já escrito; impersonation **é** a elevação, não outra coisa |
 | 4 | **CRUD de tenant e unidades pelo Super Admin** substitui o script de bootstrap. `TenantStatus` passa a `ACTIVE` \| `INACTIVE` \| `SUSPENDED` | manter script | segundo cliente não pode depender de acesso ao banco |
 | 5 | **Plano SaaS em dois modelos**, escolhido no contrato: **(a) por aluno** — preço por aluno **ativo** e por aluno **inativo**, distintos e configuráveis (padrão **R$ 5,00** e **R$ 2,50**); **(b) fixo mensal** corrigido anualmente por índice | preço único por aluno; pacotes por faixa | decisão comercial do PI |
-| 6 | **Aluno ativo = `Student.status = ACTIVE`; inativo = `CANCELLED` ou `ARCHIVED`.** Na base real de 08/09: 409 ativos, 1.582 inativos | Entitlement ativo no dia de corte (proposta do Cowork) | o PI escolheu o status do aluno, que é o que a academia vê na tela |
+| 6 | **Aluno ativo = `Student.status = ACTIVE`; inativo = todo o resto** — `LEAD`, `TRIAL`, `SUSPENDED`, `BLOCKED`, `CANCELLED`, `ARCHIVED` *(fechado pelo PI em 08/09/2026, segunda rodada)*. Na base real de 08/09: 409 ativos, ~1.580 inativos | Entitlement ativo no dia de corte (proposta do Cowork); `LEAD`/`TRIAL` fora da conta | o PI escolheu o status do aluno, que é o que a academia vê na tela. **Consequência registrada:** lead cobrado desestimula cadastrar lead — o preço do inativo é **negociado por contrato** e pode ser zero |
 | 7 | **Índice de correção padrão: IPCA (IBGE)**; o contrato guarda `index_code`, data-base e aniversário; o **valor do índice entra por configuração manual com histórico** | IGP-M; automação pela API SGS do Banco Central (série 433) | IGP-M é de aluguel e oscila demais para serviço; API pública no caminho de faturamento é risco desnecessário no primeiro ano — a automação fica para depois |
 | 8 | **Contrato é registro imutável** — tenant, plano, modelo, valores acordados em **minor units**, índice, aniversário, carência — mais **PDF gerado**. Mudar preço do plano **não** altera contrato vigente; novo valor = novo contrato ou aditivo | contrato = `Subscription`; assinatura eletrônica | fecha o buraco `Contract` do §5 sem amarra externa. Assinatura eletrônica **não entra** |
 | 9 | **Identidade visual configurável no cadastro do tenant:** logo (upload), **ícone SVG** (favicon), **nome exibido** na tela inicial, **texto de missão** e **texto de diferenciais** | domínio próprio / CNAME | é o que o PI marcou na tela de login; CNAME é caro na Railway e ninguém pediu |
@@ -4012,12 +4012,11 @@ para a plataforma é ADR futuro. Vencimento → carência → gate da catraca: A
   existindo.
 - **Assinatura eletrônica fora.** O contrato vale pelo que o PI decidir fora do sistema.
 
-### Pendências do PI (não bloqueiam F61, F62 e F65; bloqueiam a contagem da F64)
+### Pendências do PI — **fechadas em 08/09/2026**
 
-1. **Os quatro status que não são nem ativo nem inativo** — `LEAD`, `TRIAL`, `SUSPENDED`,
-   `BLOCKED`. Proposta do Cowork: `LEAD` e `TRIAL` não contam; `SUSPENDED` e `BLOCKED` contam como
-   **ativo** (têm matrícula e plano). Sem decisão, o contador não fecha.
-2. **Dia de emissão padrão** da fatura da plataforma. Proposta: dia 1, configurável no contrato.
+1. ~~Os quatro status que não são nem ativo nem inativo~~ — **decidido:** todos contam como **inativo** (decisão 6). A proposta do Cowork (não contar `LEAD`/`TRIAL`) foi recusada.
+2. ~~Dia de emissão padrão~~ — **dia 1, configurável no contrato.** O PI aprovou as specs F61–F67 com essa proposta dentro; vale até ele dizer diferente.
+3. **Preço do inativo é negociado por contrato** — o padrão R$ 2,50 é ponto de partida, não regra; o PI viu a inversão da fatura (66% de inativos) e decidiu que isso se resolve na negociação, não no modelo.
 
 ### Consequências normativas
 
