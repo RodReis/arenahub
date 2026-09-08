@@ -3963,3 +3963,149 @@ sentido de tráfego do Edge.
 |---|---|---|
 | F58 — Implantação: nuvem + totem local | [`SPEC-058`](specs/SPEC-058-implantacao-nuvem-e-totem-local.md) | [#253](https://github.com/RodReis/arenahub/issues/253) |
 | F59 — Composição de produção do edge-agent | [`SPEC-059`](specs/SPEC-059-composicao-de-producao-do-edge-agent.md) | [#254](https://github.com/RodReis/arenahub/issues/254) |
+
+---
+
+## ADR-052 — Módulo `platform`: Super Admin, plano SaaS, contrato e identidade visual do tenant
+
+**Data:** 08/09/2026
+**Status:** aceito *(decisão nova — **decidida pelo PI em 08/09/2026**)*
+**Decisor:** Rodrigo Reis (PI)
+**Contexto:** o ArenaHub tem um tenant (`arena-positiva`), criado por script (`bootstrap-tenant.ts`)
+com acesso ao banco. Não existe ator de plataforma, não existe plano SaaS tipado, não existe
+contrato e a cobrança do ArenaHub sobre o tenant estava **fora de escopo** dos MVPs 1 e 2
+(`CONVENTION.md` §5). O PI pediu a análise da super administração de tenants e decidiu o recorte
+na mesma conversa.
+
+**Por que é ADR:** contrato com o cliente (valores, índice, carência), modelo de cobrança da
+plataforma e forma do ator de plataforma são caros de desfazer — e o módulo inteiro nasce aqui.
+
+### Decisões
+
+| # | decisão | alternativa descartada | por quê |
+|---|---|---|---|
+| 1 | **Módulo `platform`**, numerado como **MVP 7 — Plataforma**, fora de `docs/prd/academia/` | fatia solta dentro do MVP 1 | é um produto para outro cliente (o dono do ArenaHub), com ator, dados e cobrança próprios |
+| 2 | **Super Admin é modo do `admin-web`**, rota `/platform` | app separado (caixa "Super Admin" do `ARCHITECTURE.md`) | `User` é global (e-mail único, sem `tenant_id`), então um papel de plataforma sem `tenant_id` basta; um app a mais é um deploy a mais |
+| 3 | **Entrada em tenant só por sessão elevada** — justificativa, expiração, `AuditLog` com `actorType = SUPPORT` (INV-005, INV-008); **MFA obrigatório** (INV-007, `mfa.service.ts` já existe) | impersonation por troca de sessão | é o invariante já escrito; impersonation **é** a elevação, não outra coisa |
+| 4 | **CRUD de tenant e unidades pelo Super Admin** substitui o script de bootstrap. `TenantStatus` passa a `ACTIVE` \| `INACTIVE` \| `SUSPENDED` | manter script | segundo cliente não pode depender de acesso ao banco |
+| 5 | **Plano SaaS em dois modelos**, escolhido no contrato: **(a) por aluno** — preço por aluno **ativo** e por aluno **inativo**, distintos e configuráveis (padrão **R$ 5,00** e **R$ 2,50**); **(b) fixo mensal** corrigido anualmente por índice | preço único por aluno; pacotes por faixa | decisão comercial do PI |
+| 6 | **Aluno ativo = `Student.status = ACTIVE`; inativo = `CANCELLED` ou `ARCHIVED`.** Na base real de 08/09: 409 ativos, 1.582 inativos | Entitlement ativo no dia de corte (proposta do Cowork) | o PI escolheu o status do aluno, que é o que a academia vê na tela |
+| 7 | **Índice de correção padrão: IPCA (IBGE)**; o contrato guarda `index_code`, data-base e aniversário; o **valor do índice entra por configuração manual com histórico** | IGP-M; automação pela API SGS do Banco Central (série 433) | IGP-M é de aluguel e oscila demais para serviço; API pública no caminho de faturamento é risco desnecessário no primeiro ano — a automação fica para depois |
+| 8 | **Contrato é registro imutável** — tenant, plano, modelo, valores acordados em **minor units**, índice, aniversário, carência — mais **PDF gerado**. Mudar preço do plano **não** altera contrato vigente; novo valor = novo contrato ou aditivo | contrato = `Subscription`; assinatura eletrônica | fecha o buraco `Contract` do §5 sem amarra externa. Assinatura eletrônica **não entra** |
+| 9 | **Identidade visual configurável no cadastro do tenant:** logo (upload), **ícone SVG** (favicon), **nome exibido** na tela inicial, **texto de missão** e **texto de diferenciais** | domínio próprio / CNAME | é o que o PI marcou na tela de login; CNAME é caro na Railway e ninguém pediu |
+| 10 | **Tela de login identifica o tenant pelo `slug` na URL** (`/{slug}/login`); sem slug, marca ArenaHub | detectar pelo domínio do e-mail | antes de autenticar não há `TenantContext`, e o `slug` já é "identificador público usado em URL" no schema |
+
+### Fatura da plataforma
+
+Existe, e é do ArenaHub sobre o tenant — **não** reaproveita o módulo `billing` (aquele é do tenant
+cobrando aluno: outro pagador, outro ciclo, outra consequência). Emitida no **dia configurado no
+contrato**, conta os alunos por status **naquele dia** (modelo a) ou aplica o valor fixo corrigido
+(modelo b). Pagamento **registrado manualmente pelo Super Admin** nesta primeira versão — gateway
+para a plataforma é ADR futuro. Vencimento → carência → gate da catraca: ADR-053.
+
+### Riscos que o PI aceitou de olhos abertos
+
+- **Inativo custa mais que ativo na base real.** Arena Positiva hoje: 409 × 5,00 = R$ 2.045 e
+  1.582 × 2,50 = R$ 3.955 — **66% da fatura vem de quem não treina**. O incentivo é o tenant
+  apagar histórico para pagar menos, e `ARCHIVED` é terminal. Mitigação mínima: o tenant vê a
+  **prévia da fatura** no painel antes da emissão, e a exclusão física de aluno continua não
+  existindo.
+- **Assinatura eletrônica fora.** O contrato vale pelo que o PI decidir fora do sistema.
+
+### Pendências do PI (não bloqueiam F61, F62 e F65; bloqueiam a contagem da F64)
+
+1. **Os quatro status que não são nem ativo nem inativo** — `LEAD`, `TRIAL`, `SUSPENDED`,
+   `BLOCKED`. Proposta do Cowork: `LEAD` e `TRIAL` não contam; `SUSPENDED` e `BLOCKED` contam como
+   **ativo** (têm matrícula e plano). Sem decisão, o contador não fecha.
+2. **Dia de emissão padrão** da fatura da plataforma. Proposta: dia 1, configurável no contrato.
+
+### Consequências normativas
+
+- `CONVENTION.md` §5: `SaasPlan` e `Contract` deixam de ser buraco; `FeatureFlag` continua coluna
+  (ADR-049), sem serviço — plano SaaS **não** habilita módulo por flag nesta versão.
+- `ARCHITECTURE.md`: a caixa "Super Admin" passa a ser rota do `admin-web`. Emenda a fazer.
+- Fatias: **F61** Super Admin e ciclo de vida do tenant · **F62** identidade visual e login por
+  slug · **F63** plano SaaS e contrato · **F64** fatura da plataforma · **F65** gate de tenant
+  (ADR-053) · **F66/F67** RLS (ADR-054).
+
+---
+
+## ADR-053 — Tenant suspenso fecha a catraca depois de carência configurável
+
+**Data:** 08/09/2026
+**Status:** aceito *(decisão nova — **decidida pelo PI em 08/09/2026**)*
+**Decisor:** Rodrigo Reis (PI)
+**Contexto:** hoje **nada** em `access`, `device-sync` ou `edge-agent` lê `Tenant.status` — suspender
+um tenant trava o painel e mais nada. O PI decidiu que a inadimplência do tenant com o ArenaHub
+chega à catraca, com carência.
+
+**Por que é ADR:** mexe no motor de decisão (ADR-003) e no snapshot do Edge — a mecânica mais cara
+de desfazer do sistema.
+
+### Decisão
+
+1. **Carência: 15 dias após o vencimento da fatura da plataforma**, padrão global, **configurável
+   por tenant** no contrato. Vencida a carência, o tenant vai para `SUSPENDED` e a catraca **nega
+   todo mundo** — aluno, funcionário, personal. Enquanto não houver fatura automática, a suspensão
+   é **manual** pelo Super Admin e a carência conta da data que ele informar.
+2. **É um gate de tenant no motor de decisão, não revogação de Entitlement.** O motor ganha uma
+   verificação antes das regras de aluno: `tenant.gate_active` → `DENY` com razão
+   **`TENANT_SUSPENDED`**. Entitlements ficam intactos; regularizou, o gate cai e ninguém precisa
+   ser recadastrado. Revogar em massa seria destrutivo e irreversível na prática.
+3. **A regra 1 continua de pé.** "Pagamento não controla acesso" fala do pagamento **do aluno**.
+   O gate é do **contratante**, outro ator, outra cadeia — não passa por `Invoice` nem
+   `Subscription` do aluno.
+4. **Edge:** o snapshot assinado carrega **`tenantGateAt`** (instante em que o gate ativa, ou nulo).
+   Edge online fecha no próximo sync; edge **offline antes da suspensão** só fecha quando o snapshot
+   **expirar** — comportamento aceito; a alternativa (snapshot sem TTL curto) reabriria o `[FIX]`
+   "snapshot expirado permite allow offline".
+5. **Aviso antes de fechar:** desde o vencimento, o `OWNER` vê no painel a contagem regressiva e o
+   valor em aberto. Fechar sem avisar é incidente, não cobrança.
+6. **Reversão imediata:** pagamento registrado → gate cai na hora na nuvem, no próximo sync no Edge.
+
+### Escopo negativo
+
+Não bloqueia login do painel na carência (o dono precisa ver a fatura para pagar); não apaga nada;
+não toca em `Entitlement`, `Subscription` nem `Invoice` do aluno.
+
+---
+
+## ADR-054 — Row-Level Security no Postgres como segunda camada de isolamento
+
+**Data:** 08/09/2026
+**Status:** aceito *(decisão nova — **decidida pelo PI em 08/09/2026**)*
+**Decisor:** Rodrigo Reis (PI)
+**Contexto:** o isolamento de tenant é 100% aplicação — `TenantContext` obrigatório no repositório
+(INV-003) e teste que tenta cruzar e falha (INV-006). Um `where` esquecido vaza. O PI decidiu
+ligar RLS agora, antes do segundo tenant.
+
+**Por que é ADR:** exige um segundo role de banco em produção, mudança no client factory e
+migration de dado em **doze tabelas** — caro de desfazer.
+
+### Decisão
+
+1. **RLS é segunda camada.** `TenantContext` continua obrigatório; RLS pega o `where` que faltou.
+   Nenhum repositório passa a "confiar no banco" para filtrar.
+2. **Role de runtime separado do dono das tabelas** — `arenahub_app`, sem ownership, sem
+   `BYPASSRLS`. Migrations continuam com o dono. Toda tabela com política leva
+   `FORCE ROW LEVEL SECURITY`. Na Railway isso significa **criar o segundo usuário** e duas
+   `DATABASE_URL` (migração × runtime).
+3. **Contexto por transação:** `SET LOCAL app.tenant_id = '<uuid>'` no início de cada transação,
+   via **extensão do Prisma Client** no `packages/database` — nunca `SET` de sessão (pool
+   compartilhado). Query fora de transação com tenant **falha**, não devolve vazio.
+4. **Contextos sem request** — worker, outbox, edge-sync, seed, Super Admin elevado — setam
+   `app.actor = 'system' | 'platform'` explicitamente; a política aceita `app.actor = 'platform'`
+   **só** no caminho da sessão elevada (ADR-052 §3). Nada implícito.
+5. **As doze tabelas sem `tenant_id` ganham a coluna** — `AccessPassage`, `PlanUnit`,
+   `PlanAccessWindow`, `EntitlementUnitWindow`, `RankingEntry`, `InboxReceipt`, `ReplayNonce`,
+   `KioskReplayNonce`, `AiPromptVersion`, e as que a F67 confirmar. Política por `JOIN` é lenta e
+   frágil. `Tenant`, `User`, `Permission` e `RolePermission` são globais e ficam fora.
+6. **Duas fases:** **F66** — role, extensão, política em `students` e `audit_logs`, teste de
+   integração sob o role restrito tentando cruzar tenant (INV-006 no banco). **F67** — coluna nas
+   doze tabelas + política em todas as tabelas com `tenant_id`.
+
+### Riscos
+
+Timeout de **5 s** de transação interativa do Prisma já apareceu no import do Pacto pelo proxy
+público; toda query passar a ser transação aumenta a exposição. Testcontainers precisa do role
+restrito ou o teste mente. Performance: as políticas usam o índice em `tenant_id` que já existe.
