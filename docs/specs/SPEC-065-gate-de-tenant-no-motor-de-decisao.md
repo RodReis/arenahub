@@ -6,7 +6,7 @@
 | **MVP** | 7 — Plataforma (ADR-052) |
 | **Slice do PRD** | não há. Escopo mora nesta spec e no ADR-053 |
 | **Superfície** | `api` (`access`, `device-sync`) · `edge-agent` · `admin-web` (aviso ao `OWNER`) |
-| **Card** | — |
+| **Card** | [#288](https://github.com/RodReis/arenahub/issues/288) |
 | **Status** | rascunho — decisões do PI em 08/09/2026 |
 
 ---

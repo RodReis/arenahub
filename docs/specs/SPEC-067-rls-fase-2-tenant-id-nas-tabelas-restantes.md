@@ -6,7 +6,7 @@
 | **MVP** | 7 — Plataforma (ADR-052) |
 | **Slice do PRD** | não há. Escopo mora nesta spec e no ADR-054 §5–§6 |
 | **Superfície** | `packages/database` (migration de dado) · `api` |
-| **Card** | — |
+| **Card** | [#290](https://github.com/RodReis/arenahub/issues/290) |
 | **Status** | rascunho — decisões do PI em 08/09/2026 |
 
 ---
