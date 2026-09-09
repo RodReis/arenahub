@@ -1,10 +1,12 @@
+import { describe, expect, it } from '@jest/globals';
+
+import { avaliarCarencia } from './carencia.js';
+
 const SAO_PAULO = 'America/Sao_Paulo';
 
 function fatura(dueAt: string, totalMinor = 100_00) {
   return { dueAt: new Date(dueAt), totalMinor };
 }
-
-import { avaliarCarencia } from './carencia';
 
 describe('avaliarCarencia -- F65, ADR-053', () => {
   it('sem fatura vencida, nao ha contagem nem valor', () => {
