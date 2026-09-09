@@ -12,6 +12,14 @@ const esquemaDeLogin = z.object({
   password: z.string().min(1, 'Informe a senha'),
 });
 
+/*
+ * NÃO exportado, de propósito: arquivo `'use server'` só exporta função async,
+ * e exportar isto o transformaria numa Server Action chamável do navegador.
+ */
+function ehDesafioDeSegundoFator(dados: unknown): boolean {
+  return typeof dados === 'object' && dados !== null && 'desafio' in dados;
+}
+
 export interface EstadoDoFormulario {
   erro?: string;
   /** Valores digitados, devolvidos para nao perder o que o usuario escreveu. */
@@ -50,6 +58,27 @@ export async function entrar(
     // Mensagem unica: a API ja nao distingue senha errada de e-mail
     // inexistente, e a interface nao pode desfazer isso.
     return { erro: 'E-mail ou senha invalidos', email: bruto.email };
+  }
+
+  /*
+   * DESAFIO DE SEGUNDO FATOR NÃO É SESSÃO — e chega com status 200.
+   *
+   * O login do Super Admin devolve `{ desafio, preAuth }` e NENHUM cookie
+   * (INV-007: um fator não abre sessão de plataforma). Como o status é de
+   * sucesso, `resposta.ok` é verdadeiro; sem esta checagem o código repassaria
+   * uma lista vazia de cookies e redirecionaria para `/dashboard`, onde o
+   * layout não acha sessão e devolve para `/login`. O resultado é um laço
+   * silencioso: a senha está certa, e a tela insiste em não deixar entrar.
+   *
+   * A tela do segundo fator ainda não existe (a API a ganhou na F61, o painel
+   * não). Enquanto ela não vem, o mínimo honesto é PARAR aqui e dizer por quê,
+   * em vez de fingir um login que não aconteceu.
+   */
+  if (ehDesafioDeSegundoFator(resposta.dados)) {
+    return {
+      erro: 'Esta conta exige segundo fator, e o painel ainda não oferece essa tela.',
+      email: bruto.email,
+    };
   }
 
   await repassarCookies(resposta.cookiesDaApi);
