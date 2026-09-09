@@ -9,7 +9,7 @@ updated: 2026-09-09
 
 ### Sem épico
 
-- [MVP7][SPEC-061][FIX] painel não tem tela de segundo fator, e o Super Admin não entra pelo formulário (#293)
+- [MVP7][SPEC-061][FIX] rotas de MFA aceitam tentativas sem limite (#296)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287)
 - [MVP7][SPEC-067][F67] RLS fase 2 — tenant_id nas tabelas restantes e política em todas (#290)
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289)
@@ -49,6 +49,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][SPEC-061][FIX] painel não tem tela de segundo fator, e o Super Admin não entra pelo formulário (#293, finalizado em: 2026-09-09)
 - [INFRA] drift entre o schema Prisma e o banco: 11 alterações cosméticas pendentes (#292, finalizado em: 2026-09-09)
 - [MVP7][SPEC-061][F61] Super Admin e ciclo de vida do tenant (#284, finalizado em: 2026-09-09)
 - [MVP1][F60] Modalidades por unidade e vinculo do aluno (#270, finalizado em: 2026-09-07)
