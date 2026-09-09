@@ -1,3 +1,4 @@
+import type { PlatformContext } from '../common/platform/platform-context.js';
 import type { TenantContext } from '../common/tenant/tenant-context.js';
 
 declare global {
@@ -13,6 +14,11 @@ declare global {
        * deixar seguir sem tenant.
        */
       tenantContext?: TenantContext;
+      /**
+       * Posto pelo `AuthGuard` quando o token vem SEM tenant -- a sessao do
+       * dono do SaaS. Excludente do `tenantContext`: nunca os dois juntos.
+       */
+      platformContext?: PlatformContext;
     }
   }
 }

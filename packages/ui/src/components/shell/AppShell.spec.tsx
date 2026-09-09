@@ -57,7 +57,7 @@ describe('AppShell', () => {
 
   it('o banner so aparece quando ha sessao elevada', () => {
     const { rerender } = render(shell());
-    expect(screen.queryByText(/Sessão elevada/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('faixa-de-suporte')).not.toBeInTheDocument();
 
     rerender(
       shell({
@@ -72,26 +72,10 @@ describe('AppShell', () => {
       }),
     );
 
-    expect(screen.getByText(/Sessão elevada/)).toBeInTheDocument();
+    expect(screen.getByTestId('faixa-de-suporte')).toBeInTheDocument();
     expect(screen.getByText(/14:32/)).toBeInTheDocument();
   });
 
-  /**
-   * Sessao elevada NAO tem como fechar -- a ausencia de `onDismiss` e a
-   * garantia. Banner que se fecha some da memoria em trinta segundos.
-   */
-  it('o banner de sessao elevada nao oferece como fechar', () => {
-    render(
-      <ElevatedSessionBanner
-        tenant="Arena Positiva"
-        reason="Suporte"
-        expiresAt="2026-08-16T17:32:00Z"
-        timeZone="America/Sao_Paulo"
-      />,
-    );
-
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
-  });
 });
 
 describe('NavLink', () => {

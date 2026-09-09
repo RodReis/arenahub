@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 2962 | 2962 | 0 | 75.6 |
+| unitário | 2991 | 2991 | 0 | 75.7 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 893 | 893 | 0 | 84.0 |
+| integração | 922 | 922 | 0 | 84.0 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -130,3 +130,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-05 | #281 | — | integração | 892 | 892 | 0 | 84.0 | — 817 em `apps/api` (+1: a fronteira exata do mínimo) + 75 em `@arenahub/database`; o Jest crasha no fim no Windows e o gerador herda o número anterior |
 | 2026-09-05 | #277 | — | unitário | 2962 | 2962 | 0 | 75.6 | — |
 | 2026-09-05 | #277 | — | integração | 893 | 893 | 0 | 84.0 | — 818 em `apps/api` (+1: o convite nasce mesmo sem envio configurado) + 75 em `@arenahub/database`; o Jest crasha no fim no Windows e o gerador herda o número anterior |
+| 2026-09-09 | #284 | SPEC-061 | unitário | 2991 | 2991 | 0 | 75.7 | — |
+| 2026-09-09 | #284 | SPEC-061 | integração | 922 | 922 | 0 | 84.1 | — — o Jest crasha no fim no Windows (3221226505, depois dos testes passarem) e o gerador manteria o 896 herdado; medido a mão: apps/api 844 em tres shards (228+290+326) + @arenahub/database 78 |

@@ -16,7 +16,7 @@
  * IDEMPOTENTE: roda quantas vezes for preciso sem duplicar. Seed que so
  * funciona em banco vazio obriga a derrubar tudo antes de cada execucao.
  */
-import { createCipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { CONFIG_PADRAO_DO_TOTEM } from '@arenahub/api-contracts';
@@ -85,6 +85,59 @@ const CREDENCIAL_DO_TOTEM = {
 // precisa exatamente das mesmas, e a copia que ele tinha deixou o OWNER de
 // producao sem enxergar o proprio dashboard.
 const PERMISSOES = PERMISSOES_DO_OWNER;
+
+/**
+ * Dono do SaaS -- o Super Admin da F61.
+ *
+ * NAO E DONO DE TENANT: nao tem `TenantMembership` nem papel, e nao aparece
+ * em `/users` de academia nenhuma. O que o define e a linha em
+ * `platform_admins`, que o `AuthGuard` le para montar `PlatformContext`.
+ *
+ * `dono@arenahub.test` e nao `@arena-positiva.test`: o dominio diz de quem o
+ * usuario e. Confundir os dois num seed que cria os dois seria convite a
+ * testar a jornada errada.
+ *
+ * O SEGREDO TOTP E FIXO E ESTA PUBLICADO AQUI. Como a credencial do totem
+ * logo abaixo: isto e bancada, nunca producao. O `mfaStatus` nasce `ENABLED`,
+ * entao o login pede codigo em vez de oferecer inscricao -- e o seed imprime
+ * o base32 para quem quiser cadastrar no autenticador e entrar a mao.
+ */
+const SUPER_ADMIN = {
+  email: 'dono@arenahub.test',
+  senha: 'senha-de-bancada-do-dono-do-saas',
+  // 20 bytes, o mesmo tamanho que `TotpService.gerarSegredo` emite. Texto
+  // legivel em vez de aleatorio: o segredo e publico de qualquer forma, e
+  // assim fica obvio, olhando o banco, que aquela linha e de bancada.
+  segredoTotp: 'arenahub-seed-mfa-01',
+};
+
+/**
+ * Refresh token da sessao de plataforma que o E2E usa para entrar.
+ *
+ * POR QUE ELE EXISTE. O login do Super Admin exige segundo fator (INV-007), e
+ * o painel ainda nao tem tela de MFA -- entao nao ha como o Playwright entrar
+ * pelo formulario. Gerar TOTP dentro do teste tambem nao serve: o codigo vira
+ * a cada 30 s e o algoritmo mora na API, nao no painel.
+ *
+ * O QUE ELE NAO E: um atalho que forja sessao. O refresh token do ArenaHub e
+ * opaco -- 32 bytes aleatorios cujo SHA-256 o banco guarda (`TokenService`).
+ * Semear a linha da sessao com o hash de um valor conhecido nao inventa
+ * credencial nenhuma: quem emite o token de acesso continua sendo a API, em
+ * `POST /auth/refresh`, com a chave dela e para esta sessao. O teste so
+ * apresenta o cookie; o proxy do painel faz o resto, pelo mesmo caminho que
+ * renova a sessao de qualquer usuario.
+ *
+ * USO UNICO, e isso e do produto, nao do seed: o refresh ROTACIONA a cada
+ * uso, e reapresentar um ja rotacionado derruba a familia inteira (detecao de
+ * reuso). Por isso a sessao e reposta a cada execucao do seed -- e o
+ * `pretest:e2e` roda o seed antes de toda suite.
+ */
+const SESSAO_DE_PLATAFORMA = {
+  refresh: 'refresh-de-bancada-do-super-admin-e2e',
+  // Generoso de proposito: a suite E2E roda em minutos, e sessao expirada
+  // daria 401 com cara de bug de permissao.
+  validoPorDias: 30,
+};
 
 
 /**
@@ -331,6 +384,9 @@ async function semear(): Promise<void> {
     await semearDocumentosDeEngajamento(db, tenant.id);
     await semearCatalogoDeXpEConquistas(db, tenant.id);
     await semearTemplatesDeDesafio(db, tenant.id);
+    // Por ultimo e sem depender do tenant: o dono do SaaS existe FORA de
+    // qualquer academia. So esta na mesma funcao porque o seed e um so.
+    await semearSuperAdmin(db);
 
     console.info(`[seed] tenant "${TENANT.slug}" pronto, com dono ${DONO.email}.`);
   } finally {
@@ -866,6 +922,138 @@ async function semearAlunoECredencialDoTotem(
     `[seed] credencial de totem "${CREDENCIAL_DO_TOTEM.keyId}" -- ` +
       'DESENVOLVIMENTO, segredo publicado no repositorio.',
   );
+}
+
+/**
+ * Base32 sem padding, o mesmo alfabeto que `TotpService.paraBase32` usa.
+ *
+ * Existe aqui, e nao importado, porque `packages/database` NAO depende de
+ * `apps/api` -- a seta aponta ao contrario, e a mesma razao que ja obrigou o
+ * `cifrarSegredo` do totem a morar neste arquivo.
+ */
+function paraBase32(bytes: Buffer): string {
+  const ALFABETO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0;
+  let valor = 0;
+  let saida = '';
+
+  for (const byte of bytes) {
+    valor = (valor << 8) | byte;
+    bits += 8;
+
+    while (bits >= 5) {
+      saida += ALFABETO[(valor >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+
+  if (bits > 0) saida += ALFABETO[(valor << (5 - bits)) & 31];
+
+  return saida;
+}
+
+/**
+ * O dono do SaaS e a sessao de plataforma que o E2E da F61 consome.
+ *
+ * TRES COISAS, e cada uma existe por um motivo diferente:
+ *
+ * 1. O USUARIO e a linha em `platform_admins` -- sem ela ninguem abre
+ *    `/platform`, porque `@PlatformRoute()` recusa quem nao e dono do SaaS.
+ * 2. O SEGREDO TOTP cifrado, com `mfaStatus: ENABLED` -- para o login a mao
+ *    pedir codigo em vez de oferecer inscricao. Depende de
+ *    `MFA_ENCRYPTION_KEY` fixada pelo mesmo motivo da credencial do totem: a
+ *    API gera chave nova a cada arranque quando ela falta, e o ciphertext
+ *    gravado agora nao decifraria depois.
+ * 3. A SESSAO DE PLATAFORMA (`tenantId: null`), com o hash do refresh de
+ *    bancada. E o unico caminho que o E2E tem para entrar -- ver o comentario
+ *    de `SESSAO_DE_PLATAFORMA`.
+ *
+ * REPOE a sessao em vez de so criar: o refresh e de uso unico e rotaciona ao
+ * ser usado, entao a execucao anterior da suite deixou a linha `ROTATED`.
+ * Semear por cima devolve o estado inicial, que e o que um seed idempotente
+ * deve fazer.
+ */
+async function semearSuperAdmin(
+  db: Awaited<ReturnType<typeof criarPrismaClient>>,
+): Promise<void> {
+  const usuario = await db.user.upsert({
+    where: { email: SUPER_ADMIN.email },
+    create: { email: SUPER_ADMIN.email, passwordHash: await gerarHash(SUPER_ADMIN.senha) },
+    update: { status: 'ACTIVE' },
+  });
+
+  await db.platformAdmin.upsert({
+    where: { userId: usuario.id },
+    create: { userId: usuario.id },
+    // `revokedAt: null` no update: um banco onde a revogacao foi exercitada
+    // voltaria do seed com o dono do SaaS ainda de fora.
+    update: { revokedAt: null },
+  });
+
+  const chaveBase64 = process.env['MFA_ENCRYPTION_KEY'];
+
+  if (chaveBase64) {
+    const chave = Buffer.from(chaveBase64, 'base64');
+
+    if (chave.length !== 32) {
+      throw new Error(
+        `MFA_ENCRYPTION_KEY precisa de 32 bytes em base64; recebeu ${String(chave.length)}.`,
+      );
+    }
+
+    const segredo = Buffer.from(SUPER_ADMIN.segredoTotp, 'utf8');
+    const iv = randomBytes(12);
+    const cifra = createCipheriv('aes-256-gcm', chave, iv);
+    const ciphertext = Buffer.concat([cifra.update(segredo), cifra.final()]);
+
+    await db.user.update({
+      where: { id: usuario.id },
+      data: {
+        mfaStatus: 'ENABLED',
+        // `Uint8Array` explicito: o tipo do Prisma 7 nao aceita `Buffer`
+        // direto, apesar de `Buffer` ser subclasse dele.
+        mfaSecretCiphertext: new Uint8Array(ciphertext),
+        mfaSecretIv: new Uint8Array(iv),
+        mfaSecretTag: new Uint8Array(cifra.getAuthTag()),
+        // Zera o contador de replay: o codigo do passo atual precisa ser
+        // aceito num banco recriado, e um contador herdado o recusaria.
+        mfaLastCounter: null,
+      },
+    });
+
+    console.info(
+      `[seed] super admin ${SUPER_ADMIN.email} -- TOTP base32 ${paraBase32(segredo)} ` +
+        '(DESENVOLVIMENTO, segredo publicado no repositorio).',
+    );
+  } else {
+    console.warn(
+      '[seed] segredo TOTP do super admin PULADO: MFA_ENCRYPTION_KEY nao esta\n' +
+        '       fixada. O E2E nao depende dele (entra pela sessao semeada abaixo),\n' +
+        '       mas o login a mao nao funciona sem a chave.',
+    );
+  }
+
+  const tokenHash = createHash('sha256').update(SESSAO_DE_PLATAFORMA.refresh).digest('hex');
+
+  const sessao = {
+    userId: usuario.id,
+    // NULO: sessao de PLATAFORMA nao tem tenant. E isto que faz o `AuthGuard`
+    // montar `PlatformContext` em vez de contexto de tenant.
+    tenantId: null,
+    status: 'ACTIVE' as const,
+    rotatedAt: null,
+    revokedAt: null,
+    revokedReason: null,
+    expiresAt: new Date(Date.now() + SESSAO_DE_PLATAFORMA.validoPorDias * 24 * 60 * 60 * 1000),
+  };
+
+  await db.session.upsert({
+    where: { tokenHash },
+    create: { ...sessao, tokenHash, familyId: randomUUID() },
+    update: sessao,
+  });
+
+  console.info('[seed] sessao de plataforma reposta para o E2E da F61.');
 }
 
 /** Idade em anos completos numa data de referencia. */

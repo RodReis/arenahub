@@ -1,9 +1,10 @@
-import { AppShell, Button } from '@arenahub/ui';
+import { AppShell, Button, ElevatedSessionBanner } from '@arenahub/ui';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { chamarApi } from '../../lib/api/server-client';
 import { sair } from '../actions/auth';
+import { encerrarSuporte } from '../actions/platform';
 import { Navegacao } from './navegacao';
 import { SeletorDeUnidade } from './seletor-de-unidade';
 
@@ -18,6 +19,14 @@ interface Perfil {
    * uma tela que vai recusar a pessoa.
    */
   permissions?: string[];
+  /**
+   * Elevação de suporte viva nesta sessão — F61.
+   *
+   * Presente só quando um Super Admin entrou nesta academia como suporte. É o
+   * que faz a faixa aparecer, e a API só o devolve quando a elevação existe de
+   * verdade — a tela não decide isso.
+   */
+  supportElevation?: { tenant: string; reason: string; expiraEm: string };
 }
 
 interface ItemDeMenu {
@@ -181,6 +190,8 @@ interface Unidade {
   id: string;
   name: string;
   status: string;
+  /** Fuso da unidade — a faixa de suporte mostra a hora de encerramento nele. */
+  timezone?: string;
 }
 
 /**
@@ -295,10 +306,43 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
     ),
   );
 
+  /*
+   * A FAIXA DE SUPORTE — F61, e ela é aviso de segurança, não enfeite.
+   *
+   * Quem opera elevado vê a tela do cliente idêntica à própria; sem a faixa,
+   * age achando que está na própria casa. Por isso ela vai no `banner` do
+   * `AppShell`, acima de tudo, e não tem como dispensar.
+   *
+   * O fuso sai da PRIMEIRA UNIDADE ATIVA da academia visitada, e não do relógio
+   * de quem olha: o suporte de Curitiba vendo a academia de Manaus precisa da
+   * hora de encerramento no fuso de lá, que é onde o prazo termina. Sem unidade
+   * ativa cai no fuso da sede — inexato, mas a faixa aparecendo com a hora
+   * aproximada avisa infinitamente mais que faixa nenhuma.
+   */
+  const elevacao = resposta.dados.supportElevation;
+  const fusoDaAcademia = unidades[0]?.timezone ?? 'America/Sao_Paulo';
+
   // O `ToastProvider` subiu para o layout raiz: a tela de login tambem
   // precisa dele, e ela fica fora de `(protected)`.
   return (
     <AppShell
+      banner={
+        elevacao ? (
+          <ElevatedSessionBanner
+            tenant={elevacao.tenant}
+            reason={elevacao.reason}
+            expiresAt={elevacao.expiraEm}
+            timeZone={fusoDaAcademia}
+            sair={
+              <form action={encerrarSuporte}>
+                <Button type="submit" variant="ghost" data-testid="sair-do-suporte">
+                  Sair do suporte
+                </Button>
+              </form>
+            }
+          />
+        ) : undefined
+      }
       /*
         `navLabel` sem acento: o E2E que ja roda na `main` procura
         `getByRole('navigation', { name: 'Navegacao principal' })`. Esta

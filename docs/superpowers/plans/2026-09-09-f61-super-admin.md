@@ -10,6 +10,25 @@
 
 **Spec:** [`docs/superpowers/specs/2026-09-09-f61-super-admin-design.md`](../specs/2026-09-09-f61-super-admin-design.md)
 
+## Corrigido durante a execução
+
+Descoberto ao executar as tasks 1 e 2, e que o plano original errava. **Vale para todas as tasks seguintes.**
+
+| # | o que o plano dizia | o que é verdade |
+|---|---|---|
+| 1 | teste em `apps/api/test/platform/` | **o `roots` do Jest é `<rootDir>/test/integration`** — teste fora dali **não é coletado**, e a suíte fica verde sem rodar nada. Caminho correto: `apps/api/test/integration/platform-<assunto>.int-spec.ts` (já corrigido no texto abaixo) |
+| 2 | `pnpm --filter @arenahub/database generate` basta | o `exports` do pacote aponta para **`dist`**, e o `generate` só reescreve `src/generated`. Depois de mexer no schema é preciso **`pnpm --filter @arenahub/database build`**, senão o consumidor vê o client velho e o teste falha por um motivo que não é o real |
+| 3 | nada sobre OpenAPI | **toda rota nova exige** `@ApiOkResponse` com schema, entrada na lista de rotas declaradas, e regeneração de `packages/api-contracts/openapi/arenahub-v1.json` com `ATUALIZAR_OPENAPI=1`. Há guarda de CI para isso |
+| 4 | `SessionRepository.abrir/rotacionar` inalterado | `Session.tenantId` nullable **mudou a assinatura**: os dois agora aceitam `tenantId: string \| null`. A Task 5 depende disso |
+| 5 | `logarComoSuperAdmin()` nos testes | **não existe até a Task 6** (o login de plataforma nasce lá). Antes disso, monte o cenário à mão: usuário + `PlatformAdmin` + `Session` com `tenantId: null` + token via `TokenService` |
+| 6 | fixture com `passwordHash` literal | **`vazamento.int-spec` varre a tabela inteira** e falha se achar hash literal. Use `PasswordService.gerarHash` em toda fixture de usuário |
+
+**Ambiente:** o worktree não tem `.env` (é gitignored). Ele foi copiado de `C:\Desenv\Projetos\arenahub\.env`; se sumir, copie de novo — sem ele nenhum teste de integração conecta.
+
+**Crash conhecido no Windows:** a integração completa numa rodada só aborta com `3221226505` **depois** dos testes passarem. É pré-existente, não regressão (memória do projeto registra). Rodar em shards contorna.
+
+---
+
 ## Global Constraints
 
 - **Idioma:** documentação, commits e texto de interface em **pt-BR**; código e identificadores em **inglês**. Comentário de código: pt-BR sem acento (o repo é consistente nisso).
@@ -66,7 +85,7 @@
 - Criar: `packages/ui/src/faixa-de-suporte.tsx`
 
 **Testes**
-- `apps/api/test/platform/*.int-spec.ts` (Jest + Postgres)
+- `apps/api/test/integration/platform-*.int-spec.ts` (Jest + Postgres)
 - `apps/admin-web/app/actions/platform.test.ts` (Vitest)
 - `e2e/platform.spec.ts` (Playwright)
 
@@ -325,7 +344,7 @@ refs #284"
 - Create: `apps/api/src/common/security/platform.guard.ts`
 - Modify: `apps/api/src/common/security/auth.guard.ts`
 - Modify: `apps/api/src/modules/auth/token.service.ts:19-26`
-- Test: `apps/api/test/platform/auth-de-plataforma.int-spec.ts`
+- Test: `apps/api/test/integration/platform-auth-de-plataforma.int-spec.ts`
 
 **Interfaces:**
 - Consumes: models da Task 1
@@ -338,7 +357,7 @@ refs #284"
 
 - [ ] **Step 1: Escrever o teste que falha**
 
-Criar `apps/api/test/platform/auth-de-plataforma.int-spec.ts`:
+Criar `apps/api/test/integration/platform-auth-de-plataforma.int-spec.ts`:
 
 ```ts
 describe('autenticacao de plataforma', () => {
@@ -591,7 +610,7 @@ refs #284"
 - Create: `apps/api/src/modules/platform/criar-tenant.use-case.ts`
 - Create: `apps/api/src/modules/platform/dto/criar-tenant.dto.ts`
 - Create: `apps/api/src/modules/platform/platform.controller.ts`
-- Test: `apps/api/test/platform/criar-tenant.int-spec.ts`
+- Test: `apps/api/test/integration/platform-criar-tenant.int-spec.ts`
 
 **Interfaces:**
 - Consumes: `PlatformContext`, `@PlatformRoute()` (Task 2); `InvitationService.convidar` do módulo `iam`; `PERMISSOES_DO_OWNER` de `@arenahub/database`
@@ -602,7 +621,7 @@ refs #284"
 
 - [ ] **Step 1: Escrever o teste que falha**
 
-Criar `apps/api/test/platform/criar-tenant.int-spec.ts`:
+Criar `apps/api/test/integration/platform-criar-tenant.int-spec.ts`:
 
 ```ts
 describe('criar tenant pelo painel', () => {
@@ -995,7 +1014,7 @@ Esperado: PASS. O teste de 403 da Task 2 agora encontra a rota de verdade — an
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/api/src/modules/platform apps/api/test/platform/criar-tenant.int-spec.ts
+git add apps/api/src/modules/platform apps/api/test/integration/platform-criar-tenant.int-spec.ts
 git commit -m "feat(platform): criar tenant pelo painel com OWNER por convite
 
 Tenant, primeira unidade, papel OWNER com PERMISSOES_DO_OWNER e convite numa
@@ -1013,7 +1032,7 @@ refs #284"
 - Modify: `apps/api/src/modules/platform/tenant.repository.ts`
 - Modify: `apps/api/src/modules/platform/platform.controller.ts`
 - Create: `apps/api/src/modules/platform/dto/alterar-tenant.dto.ts`
-- Test: `apps/api/test/platform/alterar-tenant.int-spec.ts`
+- Test: `apps/api/test/integration/platform-alterar-tenant.int-spec.ts`
 
 **Interfaces:**
 - Consumes: `PlatformAuditService`, `TenantRepository` (Task 3)
@@ -1187,7 +1206,7 @@ Esperado: PASS nos três.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/modules/platform apps/api/test/platform/alterar-tenant.int-spec.ts
+git add apps/api/src/modules/platform apps/api/test/integration/platform-alterar-tenant.int-spec.ts
 git commit -m "feat(platform): editar tenant e alternar status com motivo auditado
 
 Motivo obrigatorio ao tirar de operacao; reativacao nao grava motivo em branco.
@@ -1205,7 +1224,7 @@ refs #284"
 - Create: `apps/api/src/modules/platform/encerrar-elevacao.use-case.ts`
 - Modify: `apps/api/src/common/security/auth.guard.ts`
 - Modify: `apps/api/src/modules/platform/platform.controller.ts`
-- Test: `apps/api/test/platform/elevacao.int-spec.ts`
+- Test: `apps/api/test/integration/platform-elevacao.int-spec.ts`
 
 **Interfaces:**
 - Consumes: `PlatformContext`, `PlatformAuditService`, `TokenService.emitirAcesso`, `SessionRepository`
@@ -1487,7 +1506,7 @@ Esperado: os cinco passam. O par de canário é o que importa: o primeiro **tem*
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/api/src/modules/platform apps/api/src/common/security/auth.guard.ts apps/api/test/platform/elevacao.int-spec.ts
+git add apps/api/src/modules/platform apps/api/src/common/security/auth.guard.ts apps/api/test/integration/platform-elevacao.int-spec.ts
 git commit -m "feat(platform): elevacao de suporte com justificativa, prazo e auditoria dupla
 
 Preenche o supportElevation do TenantContext, declarado e morto desde a
@@ -1503,7 +1522,7 @@ refs #284"
 **Files:**
 - Modify: `apps/api/src/modules/auth/auth.service.ts:58-91`
 - Modify: `apps/api/src/modules/auth/auth.controller.ts`
-- Test: `apps/api/test/platform/mfa-de-plataforma.int-spec.ts`
+- Test: `apps/api/test/integration/platform-mfa-de-plataforma.int-spec.ts`
 
 **Interfaces:**
 - Consumes: `TokenService.emitirPreAuth`/`verificarPreAuth` (existem, nunca chamados); `MfaService`
@@ -1610,7 +1629,7 @@ Esperado: PASS. O segundo caso é o que protege a base existente — se ele queb
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/modules/auth apps/api/test/platform/mfa-de-plataforma.int-spec.ts
+git add apps/api/src/modules/auth apps/api/test/integration/platform-mfa-de-plataforma.int-spec.ts
 git commit -m "feat(auth): MFA obrigatorio no login do Super Admin
 
 Liga emitirPreAuth/verificarPreAuth, que existiam e nunca foram chamados.
@@ -1864,6 +1883,12 @@ refs #284"
 
 **Interfaces:**
 - Consumes: `POST /api/v1/platform/tenants/:id/elevar`, `POST /api/v1/platform/elevacao/encerrar` (Task 5); `/api/v1/auth/me` passa a devolver `supportElevation`
+
+> **Onde enxertar no `/auth/me` (verificado em 09/09):** `apps/api/src/modules/auth/auth.controller.ts:83`
+> já chama `this.contexto.opcional()` e devolve `permissions` a partir dele. O `supportElevation` mora
+> **nesse mesmo `TenantContext`**, preenchido pela Task 5. Ou seja: **zero consulta nova** — basta expor
+> o campo que já está em memória, exatamente como a F54 fez com as permissões. O comentário longo que
+> está lá explica por que não se consulta o banco de novo; siga-o.
 - Produces: `<FaixaDeSuporte tenant expiraEm onSair />`
 
 - [ ] **Step 1: Escrever o teste que falha**
