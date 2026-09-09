@@ -37,10 +37,23 @@ export class AccessProjectionRepository {
     studentStatus: StudentStatus,
     avaliadoEm: Date,
   ): Promise<AccessPolicyInput> {
-    const [unidade, entitlements, bloqueio] = await Promise.all([
+    const [unidade, tenant, entitlements, bloqueio] = await Promise.all([
       this.db.gymUnit.findFirstOrThrow({
         where: { id: gymUnitId, tenantId },
         select: { timezone: true },
+      }),
+
+      /*
+       * GATE DO CONTRATANTE -- F65, ADR-053.
+       *
+       * `findUniqueOrThrow`, e nao `findUnique`: tenant que sumiu no meio da
+       * requisicao nao pode virar `null` e cair no `?? false` de um
+       * opcional, porque `false` aqui significa ABRIR A CATRACA. Falhar alto
+       * e a unica leitura segura de "nao sei o estado do tenant".
+       */
+      this.db.tenant.findUniqueOrThrow({
+        where: { id: tenantId },
+        select: { status: true },
       }),
 
       // Somente ACTIVE e dentro do periodo -- o motor refaz a checagem, e a
@@ -84,6 +97,17 @@ export class AccessProjectionRepository {
       unitId: gymUnitId,
       localDayOfWeek: local.dayOfWeek,
       localMinuteOfDay: local.minuteOfDay,
+      /*
+       * DERIVADO do status, nunca de coluna propria: um `gate_active` a mais
+       * seria um segundo lugar onde a verdade mora, e o primeiro caminho que
+       * escrevesse um sem o outro deixaria a catraca discordando do painel.
+       *
+       * `INACTIVE` NAO fecha a catraca: ADR-052 §4 diz que ele e o dono do
+       * SaaS desligando o cliente, e o ADR-053 fala so de inadimplencia.
+       * Colapsar os dois faria um desligamento administrativo negar com a
+       * razao "suspensa por divida" -- mentira gravada em fato imutavel.
+       */
+      tenant: { gateActive: tenant.status === 'SUSPENDED' },
       student: { status: studentStatus },
       entitlements: entitlements.map((e) => this.paraEntrada(e, gymUnitId)),
       adminBlock: { active: bloqueio !== null },
