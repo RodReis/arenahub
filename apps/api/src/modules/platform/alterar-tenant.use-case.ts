@@ -41,6 +41,15 @@ export interface AlteracaoDeTenant {
   responsavelNome?: string | undefined;
   responsavelEmail?: string | undefined;
   status?: SituacaoDeTenant | undefined;
+  /**
+   * Missao e diferenciais da tela de login por slug (F62).
+   *
+   * String VAZIA e valor legitimo e significa apagar o texto -- por isso ela
+   * atravessa o filtro de `undefined` abaixo, que so remove campo AUSENTE.
+   * "Nao mexer" e diferente de "gravar vazio", e os dois precisam existir.
+   */
+  missionText?: string | undefined;
+  highlightsText?: string | undefined;
 }
 
 /**

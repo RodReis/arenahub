@@ -86,3 +86,31 @@
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
 }
+
+/**
+ * Previa do arquivo de marca ja enviado -- F62.
+ *
+ * FUNDO XADREZ, e nao branco: logo e icone costumam ter fundo transparente, e
+ * um PNG branco sobre branco pareceria "nao subiu nada" para quem acabou de
+ * enviar. O xadrez mostra a transparencia em vez de escondê-la.
+ *
+ * Caixa de tamanho FIXO com `object-fit: contain`: o arquivo pode vir em
+ * qualquer proporcao, e altura livre faria a tela saltar quando a imagem
+ * chegasse. `contain` preserva a proporcao dentro dela.
+ */
+.previa {
+  width: 160px;
+  height: 64px;
+  padding: 4px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-control);
+  object-fit: contain;
+  background-color: var(--ah-surface-canvas);
+  background-image:
+    linear-gradient(45deg, var(--ah-surface-raised) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--ah-surface-raised) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--ah-surface-raised) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--ah-surface-raised) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}

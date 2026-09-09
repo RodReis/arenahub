@@ -133,3 +133,149 @@ test('o dono do SaaS cria a academia e entra nela como suporte', async ({ page, 
   await expect(page).toHaveURL(/\/platform/);
   await expect(page.getByTestId('faixa-de-suporte')).toBeHidden();
 });
+
+/**
+ * Identidade visual e login por slug — F62, issue #285.
+ *
+ * Jornada separada da anterior de propósito: aquela costura a criação e a
+ * elevação, e o refresh de plataforma é de USO ÚNICO (ver a nota no topo).
+ * Emendar a marca no mesmo fio faria uma falha no upload esconder o defeito da
+ * elevação, e vice-versa.
+ *
+ * O que só o E2E prova aqui: a tela `/{slug}/login` renderiza a marca que o
+ * Super Admin acabou de configurar. Unidade e integração cobrem o sanitizador
+ * e a rota; nenhum dos dois abre a página que o time da academia vê.
+ */
+/**
+ * A SEGUNDA sessao semeada (`seed.ts`), e nao a mesma da jornada acima: o
+ * refresh e de uso unico e rotaciona ao ser apresentado. Duas jornadas
+ * partindo do mesmo token fariam a segunda falhar por deteccao de reuso --
+ * erro de sessao no lugar do defeito que o teste procura.
+ */
+const REFRESH_DE_PLATAFORMA_DA_MARCA = 'refresh-de-bancada-do-super-admin-e2e-marca';
+
+const MARCA = {
+  slug: `marca-e2e-${sufixo}`,
+  displayName: `Marca E2E ${sufixo}`,
+  legalName: `Marca E2E ${sufixo} LTDA`,
+  cnpj: '12.345.678/0001-99',
+  responsavelNome: 'Responsavel de Marca',
+  responsavelEmail: `marca-e2e-${sufixo}@exemplo.test`,
+  missao: 'Treinar todo mundo que entra aqui.',
+  diferenciais: 'Quadra de areia\nBox de cross',
+};
+
+const SVG_LIMPO = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 24"><rect width="48" height="24" fill="#0a7"/></svg>',
+  'utf-8',
+);
+
+/** O payload que a fatia existe para barrar. */
+const SVG_COM_SCRIPT = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg"><script>fetch("https://mau.example")</script></svg>',
+  'utf-8',
+);
+
+test('a marca da academia aparece na tela de login por slug', async ({ page, context }) => {
+  await context.addCookies([
+    {
+      name: 'arenahub_refresh',
+      value: REFRESH_DE_PLATAFORMA_DA_MARCA,
+      url: 'http://localhost:3000',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ]);
+
+  await page.goto('/platform/novo');
+  await expect(page).not.toHaveURL(/\/login/);
+
+  await page.getByTestId('campo-nome-da-academia').fill(MARCA.displayName);
+  await page.getByTestId('campo-razao-da-academia').fill(MARCA.legalName);
+  await page.getByTestId('campo-cnpj-da-academia').fill(MARCA.cnpj);
+  await page.getByTestId('campo-slug-da-academia').fill(MARCA.slug);
+  await page.getByTestId('campo-nome-do-responsavel').fill(MARCA.responsavelNome);
+  await page.getByTestId('campo-email-do-responsavel').fill(MARCA.responsavelEmail);
+  await page.getByTestId('campo-codigo-da-unidade').fill('MATRIZ');
+  await page.getByTestId('campo-nome-da-unidade').fill('Unidade Matriz');
+  await page.getByTestId('confirmar-academia').click();
+  await expect(page.getByTestId('academia-criada')).toBeVisible();
+
+  await page.goto('/platform');
+  await page
+    .getByRole('row')
+    .filter({ hasText: MARCA.displayName })
+    .getByTestId('abrir-academia')
+    .click();
+
+  // --- missão e diferenciais, pelo formulário de cadastro ------------------
+  await page.getByTestId('campo-missao-da-academia').fill(MARCA.missao);
+  await page.getByTestId('campo-diferenciais-da-academia').fill(MARCA.diferenciais);
+  await page.getByTestId('salvar-academia').click();
+  await expect(page.getByTestId('academia-salva')).toBeVisible();
+
+  /*
+   * O SVG COM SCRIPT É RECUSADO NA TELA -- o terceiro aceite da issue #285.
+   *
+   * Aqui, e não só no teste de integração: o que importa para quem cadastra é
+   * que a recusa CHEGA como mensagem legível, e não como erro genérico que
+   * mande tentar de novo o mesmo arquivo.
+   */
+  await page.getByTestId('campo-de-logo').setInputFiles({
+    name: 'logo-malicioso.svg',
+    mimeType: 'image/svg+xml',
+    buffer: SVG_COM_SCRIPT,
+  });
+  await page.getByRole('button', { name: /Enviar arquivo/ }).first().click();
+
+  /*
+   * A FRASE, e nao só um estado de erro: quem exportou o vetor do Figma não
+   * sabe que ele saiu com script embutido, e "arquivo inválido" mandaria a
+   * pessoa reenviar o mesmo arquivo. O texto é o que faz a recusa ser
+   * acionável.
+   */
+  await expect(page.getByText(/script embutido/i)).toBeVisible();
+
+  /*
+   * E O ARQUIVO NÃO ENTROU: sem esta asserção, o teste passaria com a API
+   * gravando o SVG malicioso e mostrando o erro depois -- o payload ficaria no
+   * bucket, servido pela rota pública.
+   */
+  await expect(page.getByTestId('previa-de-logo')).toBeHidden();
+
+  // --- o SVG limpo entra ---------------------------------------------------
+  await page.getByTestId('campo-de-logo').setInputFiles({
+    name: 'logo.svg',
+    mimeType: 'image/svg+xml',
+    buffer: SVG_LIMPO,
+  });
+  await page.getByRole('button', { name: /Enviar arquivo|Trocar arquivo/ }).first().click();
+  await expect(page.getByTestId('logo-enviado')).toBeVisible();
+
+  // --- a tela de login da academia mostra tudo ----------------------------
+  //
+  // SEM SESSÃO: o contexto novo é o que prova que a rota é pública. Reusar a
+  // página logada mostraria a marca por um caminho que quem vai fazer login
+  // nunca percorre.
+  const anonimo = await page.context().browser()!.newContext();
+  const telaDeLogin = await anonimo.newPage();
+
+  await telaDeLogin.goto(`/${MARCA.slug}/login`);
+
+  await expect(telaDeLogin.getByTestId('nome-do-tenant')).toHaveText(MARCA.displayName);
+  await expect(telaDeLogin.getByTestId('missao-do-tenant')).toHaveText(MARCA.missao);
+  await expect(telaDeLogin.getByTestId('diferenciais-do-tenant')).toContainText('Quadra de areia');
+  await expect(telaDeLogin.getByTestId('logo-do-tenant')).toBeVisible();
+  await expect(telaDeLogin).toHaveTitle(new RegExp(MARCA.displayName));
+
+  /*
+   * SLUG INEXISTENTE CAI NA MARCA ARENAHUB, sem 404 e sem dizer que não
+   * existe. É o aceite da issue: o status e o conteúdo desta tela não podem
+   * revelar quais academias são clientes.
+   */
+  await telaDeLogin.goto(`/academia-que-nunca-existiu-${sufixo}/login`);
+  await expect(telaDeLogin.getByRole('heading', { name: 'Entrar no painel' })).toBeVisible();
+  await expect(telaDeLogin.getByTestId('nome-do-tenant')).toBeHidden();
+
+  await anonimo.close();
+});

@@ -11,6 +11,20 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      /*
+       * `server-only` vira modulo vazio no teste.
+       *
+       * O pacote real e uma guarda de BUNDLE: seu `index.js` lanca sempre, e
+       * quem o torna inofensivo no servidor e a condicao `react-server` do
+       * `package.json`, que o Next resolve e o Vitest nao. Sem este alias,
+       * TODO modulo que importa `server-only` fica intestavel -- o import
+       * estoura antes de o primeiro `it` rodar.
+       *
+       * O alias NAO afrouxa a guarda: quem decide o que vai ao bundle e o
+       * `next build`, que continua vendo o pacote de verdade. Aqui ele so
+       * some do caminho do runner.
+       */
+      'server-only': fileURLToPath(new URL('./test/server-only-vazio.ts', import.meta.url)),
     },
   },
   // `tsconfig.json` fixa `jsx: "preserve"` -- e o Next quem transforma JSX

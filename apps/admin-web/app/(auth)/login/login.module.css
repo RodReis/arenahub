@@ -52,6 +52,28 @@
   color: var(--ah-text-on-chrome);
 }
 
+/**
+ * O logotipo da academia, quando existe -- F62.
+ *
+ * Ocupa o LUGAR do wordmark, e por isso a altura é comparável à dele: uma
+ * imagem que a academia enviou em 2000px de largura não pode reorganizar a
+ * coluna. `max-width` fecha o outro eixo, para logo horizontal comprido não
+ * estourar a lateral.
+ *
+ * `object-fit: contain` preserva a proporção dentro dessa caixa: sem ele, um
+ * logo quadrado esticaria até a largura máxima e sairia deformado -- e a marca
+ * de outra empresa distorcida na nossa tela é pior que não mostrá-la.
+ *
+ * Altura FIXA, e não `auto`: o arquivo chega depois do HTML, e altura variável
+ * empurraria o discurso para baixo no meio do carregamento.
+ */
+.logo {
+  height: 48px;
+  max-width: 260px;
+  object-fit: contain;
+  object-position: left center;
+}
+
 .discurso {
   display: flex;
   flex-direction: column;
@@ -89,6 +111,27 @@
   max-width: 48ch;
   font-size: var(--ah-type-body-size);
   line-height: var(--ah-type-body-lh);
+  text-wrap: pretty;
+}
+
+/**
+ * Os diferenciais da academia -- F62.
+ *
+ * Um degrau ABAIXO da missao na hierarquia, e e o que a distingue dela: as
+ * duas sao texto corrido no mesmo bloco, e sem contraste de peso a coluna
+ * viraria dois paragrafos indistinguiveis. `caption` e o degrau que a escala
+ * do painel ja tem para isso -- nao se inventa um oitavo tamanho aqui.
+ *
+ * `white-space: pre-line` preserva a quebra de linha que quem cadastrou
+ * digitou: diferencial e lista na cabeca de quem escreve ("Quadra de areia" /
+ * "Box de cross"), e juntar tudo num paragrafo so desfaria a lista sem avisar.
+ */
+.diferenciais {
+  margin: 0;
+  max-width: 48ch;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  white-space: pre-line;
   text-wrap: pretty;
 }
 

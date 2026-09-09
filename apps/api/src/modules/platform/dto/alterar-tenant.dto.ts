@@ -23,6 +23,20 @@ export const esquemaDeAlteracaoDeTenant = z
     responsavelEmail: z.string().trim().toLowerCase().email().max(320).optional(),
     status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
     /*
+     * Missao e diferenciais (F62) -- TEXTO, nunca HTML.
+     *
+     * Nao ha sanitizacao aqui de proposito: o React escapa por padrao ao
+     * renderizar, e o unico jeito de isto virar HTML na tela seria alguem
+     * escrever `dangerouslySetInnerHTML`. Sanitizar no boundary daria a falsa
+     * impressao de que injetar o campo em HTML cru passou a ser seguro.
+     *
+     * `''` e aceito e significa APAGAR o texto -- e por isso o `.min(1)` que
+     * os outros campos tem nao entra aqui: sem o vazio, quem escreveu a
+     * missao por engano nao teria como remove-la.
+     */
+    missionText: z.string().trim().max(280).optional(),
+    highlightsText: z.string().trim().max(500).optional(),
+    /*
      * Motivo do ATO, nao do tenant: vai para o `metadata` do
      * `PlatformAuditLog` e nao vira coluna. Minimo de 10 caracteres pelo mesmo
      * criterio do motivo de inativacao de unidade -- "ok" nao e motivo.

@@ -7149,6 +7149,20 @@
                     },
                     "unidades": {
                       "type": "integer"
+                    },
+                    "missionText": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "highlightsText": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "temLogo": {
+                      "type": "boolean"
+                    },
+                    "temIcone": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -7186,6 +7200,52 @@
                     "id": {
                       "type": "string",
                       "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/branding/{peca}": {
+      "post": {
+        "operationId": "PlatformController_enviarArquivoDeMarca",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "peca",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "objectKey"
+                  ],
+                  "properties": {
+                    "objectKey": {
+                      "type": "string"
                     }
                   }
                 }
@@ -7268,6 +7328,109 @@
         },
         "tags": [
           "Platform"
+        ]
+      }
+    },
+    "/api/v1/branding/{slug}": {
+      "get": {
+        "operationId": "BrandingPublicoController_marca",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "slug",
+                    "displayName",
+                    "temLogo",
+                    "temIcone"
+                  ],
+                  "properties": {
+                    "slug": {
+                      "type": "string"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "missionText": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "highlightsText": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "temLogo": {
+                      "type": "boolean"
+                    },
+                    "temIcone": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "BrandingPublico"
+        ]
+      }
+    },
+    "/api/v1/branding/{slug}/{peca}": {
+      "get": {
+        "operationId": "BrandingPublicoController_arquivo",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "peca",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": [
+          "BrandingPublico"
         ]
       }
     }

@@ -1,4 +1,17 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, Res } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 
@@ -13,7 +26,21 @@ import { esquemaDeElevacao } from './dto/elevar.dto.js';
 import { ElevarUseCase } from './elevar.use-case.js';
 import { EncerrarElevacaoUseCase } from './encerrar-elevacao.use-case.js';
 import { EmailDeConviteService } from '../iam/email-de-convite.service.js';
+import { BrandingService } from './branding.service.js';
+import { TAMANHO_MAXIMO_DE_IDENTIDADE_BYTES } from './domain/identidade-visual.js';
 import { TenantRepository } from './tenant.repository.js';
+
+/**
+ * O arquivo como o `FileInterceptor` o entrega -- mesma declaracao local do
+ * `import.controller.ts` e do `kiosk-admin.controller.ts`, e pela mesma razao:
+ * sao tres campos, e `@types/multer` traria uma dependencia inteira para
+ * descrever seis linhas.
+ */
+interface ArquivoRecebido {
+  readonly originalname: string;
+  readonly mimetype: string;
+  readonly buffer: Buffer;
+}
 
 const ESQUEMA_DO_TENANT_NA_LISTA = {
   type: 'object',
@@ -47,7 +74,17 @@ const ESQUEMA_DO_TENANT_EM_DETALHE = {
     responsavelEmail: { type: 'string', nullable: true },
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'SUSPENDED'] },
     unidades: { type: 'integer' },
+    missionText: { type: 'string', nullable: true },
+    highlightsText: { type: 'string', nullable: true },
+    temLogo: { type: 'boolean' },
+    temIcone: { type: 'boolean' },
   },
+};
+
+const ESQUEMA_DO_ARQUIVO_ENVIADO = {
+  type: 'object',
+  required: ['objectKey'],
+  properties: { objectKey: { type: 'string' } },
 };
 
 const ESQUEMA_DO_TENANT_ALTERADO = {
@@ -109,6 +146,7 @@ export class PlatformController {
     private readonly emails: EmailDeConviteService,
     private readonly elevar: ElevarUseCase,
     private readonly encerrarElevacao: EncerrarElevacaoUseCase,
+    private readonly branding: BrandingService,
   ) {}
 
   @Get('tenants')
@@ -170,6 +208,10 @@ export class PlatformController {
     responsavelEmail: string | null;
     status: string;
     unidades: number;
+    missionText: string | null;
+    highlightsText: string | null;
+    temLogo: boolean;
+    temIcone: boolean;
   }> {
     const tenant = await this.tenants.porId(id);
 
@@ -186,7 +228,51 @@ export class PlatformController {
       responsavelEmail: tenant.responsavelEmail,
       status: tenant.status,
       unidades: tenant._count.gymUnits,
+      missionText: tenant.missionText,
+      highlightsText: tenant.highlightsText,
+      // BOOLEANO, e nao a chave: a chave e caminho interno do bucket. O
+      // formulario so precisa saber se ja ha arquivo para dizer "trocar" em
+      // vez de "enviar", e a pre-visualizacao vem pela rota publica.
+      temLogo: tenant.logoObjectKey !== null,
+      temIcone: tenant.iconObjectKey !== null,
     };
+  }
+
+  /**
+   * Substitui o logo ou o icone da academia -- F62 (ADR-052 §9).
+   *
+   * UMA ROTA para as duas pecas, com a peca no caminho: o que muda entre
+   * logo e icone e so a coluna gravada; duplicar a rota duplicaria as tres
+   * travas de `BrandingService.substituir` (formato, antivirus, storage) e a
+   * primeira que divergisse seria o buraco.
+   *
+   * O teto do interceptor e o MESMO do dominio, e nao um valor proprio:
+   * numeros diferentes fariam o arquivo entre os dois ser recusado por
+   * `PayloadTooLargeException` do Nest -- sem `code` estavel e sem a
+   * mensagem que diz o limite.
+   */
+  @Post('tenants/:id/branding/:peca')
+  @ApiCreatedResponse({ schema: ESQUEMA_DO_ARQUIVO_ENVIADO })
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: TAMANHO_MAXIMO_DE_IDENTIDADE_BYTES } }),
+  )
+  async enviarArquivoDeMarca(
+    @Param('id') id: string,
+    @Param('peca') peca: string,
+    @UploadedFile() arquivo: ArquivoRecebido | undefined,
+  ): Promise<{ objectKey: string }> {
+    if (peca !== 'logo' && peca !== 'icon') {
+      throw new BadRequestException({ code: 'BRANDING_PIECE_INVALID' });
+    }
+
+    if (!arquivo) {
+      throw new BadRequestException({ code: 'FILE_REQUIRED' });
+    }
+
+    return this.branding.substituir(id, peca, {
+      contentType: arquivo.mimetype,
+      conteudo: new Uint8Array(arquivo.buffer),
+    });
   }
 
   @Patch('tenants/:id')

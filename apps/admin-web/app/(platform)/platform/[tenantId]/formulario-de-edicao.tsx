@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, SelectField, useToastDeErro } from '@arenahub/ui';
+import { Button, Field, SelectField, TextareaField, useToastDeErro } from '@arenahub/ui';
 
 import estilos from '../../../formulario.module.css';
 
@@ -21,6 +21,8 @@ interface Props {
   readonly timezone: string;
   readonly responsavelNome: string;
   readonly responsavelEmail: string;
+  readonly missionText: string;
+  readonly highlightsText: string;
 }
 
 function BotaoDeSalvar() {
@@ -133,6 +135,46 @@ export function FormularioDeEdicao(props: Props) {
             data-testid="campo-email-do-responsavel"
           />
         </div>
+      </fieldset>
+
+      {/*
+        IDENTIDADE VISUAL -- F62 (ADR-052 §9).
+
+        Os DOIS TEXTOS moram aqui, junto do cadastro, e não no bloco de
+        arquivos abaixo: eles se salvam com o mesmo botão do resto do cadastro,
+        e cada upload de arquivo é um envio próprio (o navegador manda o
+        arquivo na hora em que se escolhe salvar, e um formulário só faria
+        corrigir um CNPJ reenviar o logo).
+      */}
+      <fieldset className={estilos['grupo']}>
+        <legend>Tela de entrada da academia</legend>
+
+        <p className={estilos['nota']}>
+          Aparecem na coluna da esquerda de{' '}
+          <strong>/{props.slug}/login</strong>, junto do logotipo.
+        </p>
+
+        <TextareaField
+          id="missao-da-academia"
+          name="missionText"
+          label="Missão"
+          defaultValue={valor('missionText')}
+          maxLength={280}
+          rows={2}
+          hint="Uma frase. Até 280 caracteres. Deixe em branco para não exibir."
+          data-testid="campo-missao-da-academia"
+        />
+
+        <TextareaField
+          id="diferenciais-da-academia"
+          name="highlightsText"
+          label="Diferenciais"
+          defaultValue={valor('highlightsText')}
+          maxLength={500}
+          rows={4}
+          hint="Uma linha por diferencial. Até 500 caracteres. Deixe em branco para não exibir."
+          data-testid="campo-diferenciais-da-academia"
+        />
       </fieldset>
 
       {/*

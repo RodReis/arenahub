@@ -100,6 +100,30 @@ const MENSAGEM: Record<string, string> = {
    */
   TENANT_SLUG_TAKEN: 'Já existe uma academia com este identificador.',
   JUSTIFICATIVA_OBRIGATORIA: 'Escreva a justificativa da entrada de suporte (ao menos 10 caracteres).',
+
+  /*
+   * Recusas do upload de marca (F62). Cada uma tem frase própria porque cada
+   * uma pede uma AÇÃO diferente de quem cadastra: arquivo grande se comprime,
+   * formato errado se converte, antivírus fora do ar se tenta de novo. Uma
+   * frase genérica faria a pessoa reenviar o que nunca vai passar.
+   */
+  FILE_REQUIRED: 'Escolha um arquivo.',
+  FILE_TOO_LARGE: 'O arquivo passa de 1 MB. Reduza o tamanho.',
+  FILE_EMPTY: 'O arquivo está vazio.',
+  FILE_TYPE_NOT_ALLOWED: 'Só entram SVG ou PNG.',
+  FILE_SIGNATURE_MISMATCH: 'O conteúdo do arquivo não corresponde ao formato informado.',
+  /*
+   * A recusa do SVG com script DIZ O QUE FAZER. É a mensagem que mais importa
+   * desta fatia: quem exportou o vetor do Illustrator ou do Figma não sabe que
+   * ele saiu com script embutido, e "arquivo inválido" mandaria a pessoa
+   * tentar de novo o mesmo arquivo.
+   */
+  SVG_UNSAFE_CONTENT:
+    'Este SVG tem script embutido e foi recusado. Exporte o vetor sem script, ou envie um PNG.',
+  FILE_INFECTED: 'O antivírus recusou este arquivo.',
+  SCANNER_UNAVAILABLE: 'O antivírus está indisponível. Tente de novo em instantes.',
+  SCANNER_TIMEOUT: 'O antivírus demorou a responder. Tente de novo em instantes.',
+  BRANDING_PIECE_INVALID: 'Peça de identidade desconhecida.',
   /*
    * 409: a sessão já tem uma elevação viva. Não é erro de preenchimento --
    * quem vê isto precisa saber que já ESTÁ dentro de um tenant, e que sair de
@@ -217,6 +241,18 @@ const esquemaDeEdicao = z.object({
     .toLowerCase()
     .email('E-mail do responsável inválido')
     .max(320),
+  /*
+   * Missão e diferenciais (F62) — texto do hero da tela de login por slug.
+   *
+   * SEM `.min(1)`, ao contrário de todos os campos acima: string vazia é o
+   * jeito de APAGAR o texto. Exigir conteúdo aqui deixaria quem escreveu a
+   * missão por engano sem como removê-la.
+   */
+  missionText: z.string().trim().max(280, 'Missão longa demais (máximo 280 caracteres)'),
+  highlightsText: z
+    .string()
+    .trim()
+    .max(500, 'Diferenciais longos demais (máximo 500 caracteres)'),
 });
 
 /** O que a tela de edição devolve ao formulário quando erra. */
@@ -227,6 +263,8 @@ export interface ValoresDaEdicao {
   timezone: string;
   responsavelNome: string;
   responsavelEmail: string;
+  missionText: string;
+  highlightsText: string;
 }
 
 export interface EstadoDaEdicao {
@@ -248,6 +286,8 @@ export async function alterarTenant(
     timezone: texto(formulario, 'timezone'),
     responsavelNome: texto(formulario, 'responsavelNome'),
     responsavelEmail: texto(formulario, 'responsavelEmail'),
+    missionText: texto(formulario, 'missionText'),
+    highlightsText: texto(formulario, 'highlightsText'),
   };
 
   const validado = esquemaDeEdicao.safeParse(valores);
@@ -415,4 +455,58 @@ export async function encerrarSuporte(): Promise<void> {
   if (resposta.ok) await repassarCookies(resposta.cookiesDaApi);
 
   redirect('/platform');
+}
+
+
+/**
+ * Envia o logo ou o ícone da academia — F62 (ADR-052 §9).
+ *
+ * REVALIDA a página do tenant, ao contrário do upload de mídia do totem: lá o
+ * upload devolve uma chave que o gerente ainda vai colocar num rascunho em
+ * memória; aqui a API já gravou a coluna, e a tela precisa refletir isso na
+ * hora — o "trocar logo" que continua dizendo "enviar logo" faz a pessoa
+ * enviar duas vezes achando que a primeira falhou.
+ *
+ * O arquivo é repassado num `FormData` NOVO, e não o do formulário: o
+ * formulário carrega junto o `tenantId` e a peça, que são campos nossos e não
+ * têm por que chegar ao `FileInterceptor` da API.
+ */
+export interface EstadoDoUploadDeMarca {
+  erro?: string;
+  enviado?: boolean;
+}
+
+export async function enviarArquivoDeMarca(
+  _anterior: EstadoDoUploadDeMarca,
+  formulario: FormData,
+): Promise<EstadoDoUploadDeMarca> {
+  const tenantId = texto(formulario, 'tenantId');
+  const peca = texto(formulario, 'peca');
+  const arquivo = formulario.get('file');
+
+  /*
+   * `size === 0` cobre o campo de arquivo VAZIO, que o navegador manda como um
+   * `File` de nome em branco em vez de omitir. Sem esta linha o `submit` sem
+   * escolher arquivo viraria um POST que a API recusa com `FILE_EMPTY` —
+   * mesma frase, uma ida e volta de rede a mais.
+   */
+  if (!(arquivo instanceof File) || arquivo.size === 0) {
+    return { erro: MENSAGEM['FILE_REQUIRED'] ?? 'Escolha um arquivo.' };
+  }
+
+  const envio = new FormData();
+  envio.append('file', arquivo);
+
+  const resposta = await chamarApi<{ objectKey: string }>(
+    `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/branding/${encodeURIComponent(peca)}`,
+    { metodo: 'POST', formulario: envio },
+  );
+
+  if (!resposta.ok) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível enviar o arquivo') };
+  }
+
+  revalidatePath(`/platform/${tenantId}`);
+
+  return { enviado: true };
 }

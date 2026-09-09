@@ -75,6 +75,28 @@ export interface ObjectStoragePort {
   }): Promise<void>;
 
   /**
+   * Le o objeto INTEIRO para a memoria -- F62, identidade visual.
+   *
+   * Diferente de `createPrivateDownload`, que devolve link para o NAVEGADOR
+   * buscar direto no storage. Aqui os bytes passam pela API, e isso e a
+   * escolha, nao um descuido:
+   *
+   *   1. o logo e o icone entram na tela de LOGIN, antes de existir sessao.
+   *      URL assinada expira, e favicon com link expirado vira aba sem icone
+   *      no meio do expediente -- sem erro visivel, sem ninguem para reclamar;
+   *   2. servindo pela API, o `Content-Security-Policy` e o `X-Content-Type-
+   *      Options` da resposta sao NOSSOS. Numa URL do bucket quem escolhe os
+   *      cabecalhos e o storage, e SVG e justamente o formato em que esses
+   *      cabecalhos sao a diferenca entre imagem e execucao de script.
+   *
+   * SO PARA OBJETO PEQUENO E DE TETO CONHECIDO. Exportacao e video do totem
+   * continuam por URL assinada: carregar um CSV de milhares de alunos na
+   * memoria da API para depois cuspi-lo pelo socket e o caminho para derrubar
+   * o processo com um download concorrente.
+   */
+  getPrivateObject(key: string): Promise<{ body: Buffer; contentType: string }>;
+
+  /**
    * URL assinada de leitura, de vida curta.
    *
    * Curta de proposito: exportacao carrega evento de acesso de aluno, e um
