@@ -1,11 +1,17 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, Res } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 import { PlatformContextService } from '../../common/platform/platform-context.service.js';
 import { PlatformRoute } from '../../common/security/platform-route.decorator.js';
+import { COOKIE_DE_ACESSO } from '../auth/cookies.js';
+import { AlterarTenantUseCase } from './alterar-tenant.use-case.js';
 import { CriarTenantUseCase } from './criar-tenant.use-case.js';
+import { esquemaDeAlteracaoDeTenant } from './dto/alterar-tenant.dto.js';
 import { esquemaDeCriacaoDeTenant } from './dto/criar-tenant.dto.js';
+import { esquemaDeElevacao } from './dto/elevar.dto.js';
+import { ElevarUseCase } from './elevar.use-case.js';
+import { EncerrarElevacaoUseCase } from './encerrar-elevacao.use-case.js';
 import { EmailDeConviteService } from '../iam/email-de-convite.service.js';
 import { TenantRepository } from './tenant.repository.js';
 
@@ -21,6 +27,12 @@ const ESQUEMA_DO_TENANT_NA_LISTA = {
   },
 };
 
+const ESQUEMA_DO_TENANT_ALTERADO = {
+  type: 'object',
+  required: ['id'],
+  properties: { id: { type: 'string', format: 'uuid' } },
+};
+
 const ESQUEMA_DO_TENANT_CRIADO = {
   type: 'object',
   required: ['id', 'gymUnitId', 'emailEnviado'],
@@ -29,6 +41,32 @@ const ESQUEMA_DO_TENANT_CRIADO = {
     gymUnitId: { type: 'string', format: 'uuid' },
     emailEnviado: { type: 'boolean' },
   },
+};
+
+const ESQUEMA_DA_ELEVACAO = {
+  type: 'object',
+  required: ['id', 'expiresAt'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    expiresAt: { type: 'string', format: 'date-time' },
+  },
+};
+
+const ESQUEMA_DA_SAIDA_DE_ELEVACAO = {
+  type: 'object',
+  required: ['encerrada'],
+  properties: { encerrada: { type: 'boolean' } },
+};
+
+/** Mesma vida do access token emitido pelo `TokenService`. */
+const ACESSO_VALIDO_POR_MS = 10 * 60 * 1000;
+
+/** Mesmas opcoes do `auth.controller`: HttpOnly, SameSite=Strict, HTTPS fora de dev. */
+const OPCOES_DE_COOKIE = {
+  httpOnly: true,
+  sameSite: 'strict' as const,
+  secure: process.env['NODE_ENV'] === 'production',
+  path: '/',
 };
 
 /**
@@ -43,8 +81,11 @@ export class PlatformController {
   constructor(
     private readonly contexto: PlatformContextService,
     private readonly criarTenant: CriarTenantUseCase,
+    private readonly alterarTenant: AlterarTenantUseCase,
     private readonly tenants: TenantRepository,
     private readonly emails: EmailDeConviteService,
+    private readonly elevar: ElevarUseCase,
+    private readonly encerrarElevacao: EncerrarElevacaoUseCase,
   ) {}
 
   @Get('tenants')
@@ -91,5 +132,74 @@ export class PlatformController {
       gymUnitId: resultado.gymUnitId,
       emailEnviado: envio.enviado,
     };
+  }
+
+  @Patch('tenants/:id')
+  @ApiOkResponse({ schema: ESQUEMA_DO_TENANT_ALTERADO })
+  async alterar(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ id: string }> {
+    const { reason, ...dados } = esquemaDeAlteracaoDeTenant.parse(corpo);
+
+    await this.alterarTenant.executar(
+      this.contexto.require(),
+      id,
+      dados,
+      requisicao.correlationId ?? 'sem-correlacao',
+      reason,
+    );
+
+    return { id };
+  }
+
+  /**
+   * Entra no tenant como suporte. Devolve NOVO cookie de acesso, ja com o
+   * tenant alvo -- a sessao e a mesma, o que muda e o alcance dela.
+   */
+  @Post('tenants/:id/elevar')
+  @ApiCreatedResponse({ schema: ESQUEMA_DA_ELEVACAO })
+  async abrirElevacao(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+    @Res({ passthrough: true }) resposta: Response,
+  ): Promise<{ id: string; expiresAt: string }> {
+    const { reason } = esquemaDeElevacao.parse(corpo);
+
+    const resultado = await this.elevar.executar(
+      this.contexto.require(),
+      id,
+      reason,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    resposta.cookie(COOKIE_DE_ACESSO, resultado.accessToken, {
+      ...OPCOES_DE_COOKIE,
+      maxAge: ACESSO_VALIDO_POR_MS,
+    });
+
+    return { id: resultado.elevacaoId, expiresAt: resultado.expiresAt.toISOString() };
+  }
+
+  /** Sai do tenant. O cookie volta a ser token de plataforma, sem tenant. */
+  @Post('elevacao/encerrar')
+  @ApiOkResponse({ schema: ESQUEMA_DA_SAIDA_DE_ELEVACAO })
+  async fecharElevacao(
+    @Req() requisicao: Request,
+    @Res({ passthrough: true }) resposta: Response,
+  ): Promise<{ encerrada: boolean }> {
+    const resultado = await this.encerrarElevacao.executar(
+      this.contexto.require(),
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    resposta.cookie(COOKIE_DE_ACESSO, resultado.accessToken, {
+      ...OPCOES_DE_COOKIE,
+      maxAge: ACESSO_VALIDO_POR_MS,
+    });
+
+    return { encerrada: true };
   }
 }

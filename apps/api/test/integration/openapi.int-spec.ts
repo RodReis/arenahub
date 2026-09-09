@@ -213,6 +213,10 @@ describe('contrato OpenAPI', () => {
         // tenant: `@PlatformRoute()` recusa usuario de tenant com 403.
         '/api/v1/platform/tenants',
         '/api/v1/platform/tenants/{id}',
+        // F61 -- elevacao de suporte: entrar e sair de um tenant com
+        // justificativa, prazo e auditoria dos dois lados.
+        '/api/v1/platform/tenants/{id}/elevar',
+        '/api/v1/platform/elevacao/encerrar',
       ]),
     );
   });
