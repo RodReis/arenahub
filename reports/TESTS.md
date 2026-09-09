@@ -15,7 +15,7 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3073 | 3073 | 0 | 76.1 |
+| unitário | 3106 | 3106 | 0 | 76.1 |
 | contrato | 0 | 0 | 0 | — |
 | integração | 955 | 955 | 0 | 84.0 |
 | e2e | 0 | 0 | 0 | — |
@@ -138,3 +138,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-09 | #285 | SPEC-062 | integração | 937 | 937 | 0 | 84.0 | — o Jest crasha no fim no Windows (3221226505, DEPOIS de os testes passarem) e o gerador herdou o 922 de duas entregas atrás; medido à mão **suíte a suíte**: `apps/api` 859 em 63 suítes (número confirmado pela execução do CI, que roda em Linux sem o crash) + `@arenahub/database` 78. Os +8 são os da identidade visual (9 de integração da F62, menos 1 do contrato OpenAPI que já existia e passou a cobrir as rotas novas). Rodando as 63 de uma vez, `students-cadastro-completo` falha 1 por acúmulo de estado no banco da varredura — passa isolado duas vezes e não é tocado por esta fatia |
 | 2026-09-09 | #286 | SPEC-063 | unitário | 3073 | 3073 | 0 | 76.1 | [#298](https://github.com/RodReis/arenahub/pull/298) |
 | 2026-09-09 | #286 | SPEC-063 | integração | 955 | 955 | 0 | 84.0 | — o Jest crasha no fim no Windows (3221226505, DEPOIS de os testes passarem) e o gerador herdou o 937 da entrega anterior; medido à mão em dois lotes: `apps/api` 877 (443 + 447, menos 13 de `kiosk-auth` e `platform-auth-de-plataforma`, que casam nos dois filtros e rodaram duas vezes) + `@arenahub/database` 78. Os +18 são os da fatia: `platform-contrato.int-spec.ts`. **O CI confirmou o número**: 64 suítes / 877 em `apps/api`, rodando em Linux sem o crash. | [#298](https://github.com/RodReis/arenahub/pull/298) |
+| 2026-09-09 | #288 | F65 | unitário | 3106 | 3106 | 0 | 76.1 | — |
+| 2026-09-09 | #288 | F65 | integração | 955 | 955 | 0 | 84.0 | — **número não confirmado nesta linha.** O gerador herdou o 955 da SPEC-063 (crash 3221226505) porque as DUAS tentativas locais desta entrega crasharam em pontos DIFERENTES (43 de 67 suítes numa rodada, 19 de 67 na outra — zero `FAIL` nas duas), então "medir à mão somando lotes" (o método das entregas anteriores) não dá um número confiável aqui: nenhuma rodada chegou a rodar as 67 suítes inteiras para somar. As suítes desta fatia rodaram e passaram em pelo menos uma das duas tentativas (`access-gate-de-tenant`, `platform-suspensao-automatica`, `platform-fatura`, `manual-override`, `platform-alterar-tenant`), sem nenhuma falha observada. **O número real desta linha precisa vir do CI** (Linux, sem o crash) antes do merge — preencher à mão depois, igual ao PR |
