@@ -35,9 +35,7 @@ _(vazio)_
 
 ## Em Andamento
 
-### Sem épico
-
-- [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287)
+_(vazio)_
 
 ## Feito
 
@@ -48,6 +46,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
 - [MVP7][SPEC-061][FIX] painel não tem tela de segundo fator, e o Super Admin não entra pelo formulário (#293, finalizado em: 2026-09-09)
