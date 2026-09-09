@@ -63,6 +63,22 @@ describe('MFA do Super Admin', () => {
     return { email, segredo: segredo.bytes };
   };
 
+  /**
+   * Super Admin que ainda NAO tem segundo fator -- o caso da issue #293.
+   * `mfaStatus` nasce no padrao do schema, sem segredo gravado.
+   */
+  const criarSuperAdminSemMfa = async (): Promise<string> => {
+    const email = `super-setup-${randomUUID().slice(0, 8)}@exemplo.test`;
+
+    const usuario = await db.user.create({
+      data: { email, passwordHash: await senhas.gerarHash(SENHA) },
+    });
+
+    await db.platformAdmin.create({ data: { userId: usuario.id } });
+
+    return email;
+  };
+
   /** Usuario de tenant como qualquer outro hoje: vinculo ativo, sem MFA. */
   const criarOwnerDeTenant = async (): Promise<string> => {
     const sufixo = randomUUID().slice(0, 8);
@@ -142,5 +158,157 @@ describe('MFA do Super Admin', () => {
       orderBy: { createdAt: 'desc' },
     });
     expect(sessao.tenantId).toBeNull();
+  });
+  /*
+   * INSCRICAO -- issue #293.
+   *
+   * O Super Admin sem MFA recebia `MFA_SETUP` e nao tinha o que fazer com
+   * ele: as rotas de inscricao exigiam contexto de tenant, que ele nao tem.
+   * Estes testes prendem o caminho novo e, principalmente, as guardas que o
+   * impedem de virar um atalho para dentro.
+   */
+  describe('inscricao no segundo fator', () => {
+    it('login de Super Admin SEM mfa devolve desafio de SETUP, e nao sessao', async () => {
+      const email = await criarSuperAdminSemMfa();
+
+      const resposta = await logar(email);
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body).toMatchObject({ desafio: 'MFA_SETUP', preAuth: expect.any(String) });
+      expect(cookiesDe(resposta)).not.toContainEqual(expect.stringContaining('arenahub_access='));
+    });
+
+    it('o pre-auth de SETUP inscreve, confirma e SO ENTAO abre a sessao', async () => {
+      const email = await criarSuperAdminSemMfa();
+      const login = await logar(email);
+      const preAuth = (login.body as { preAuth: string }).preAuth;
+
+      const inscricao = await request(servidor())
+        .post('/api/v1/auth/mfa/enroll')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send();
+
+      expect(inscricao.status).toBe(200);
+      expect(inscricao.body).toMatchObject({
+        uri: expect.stringContaining('otpauth://'),
+        base32: expect.any(String),
+      });
+
+      // A inscricao NAO abre sessao: so a confirmacao abre.
+      expect(cookiesDe(inscricao)).not.toContainEqual(expect.stringContaining('arenahub_access='));
+
+      // Enquanto nao confirma, o segundo fator fica PENDING -- ativar antes
+      // trancaria a pessoa fora se o autenticador nao lesse o segredo.
+      const pendente = await db.user.findUniqueOrThrow({ where: { email } });
+      expect(pendente.mfaStatus).toBe('PENDING');
+
+      const segredo = cifrador.decifrar({
+        ciphertext: Buffer.from(pendente.mfaSecretCiphertext!),
+        iv: Buffer.from(pendente.mfaSecretIv!),
+        tag: Buffer.from(pendente.mfaSecretTag!),
+      });
+
+      const confirmacao = await request(servidor())
+        .post('/api/v1/auth/mfa/enroll/confirm')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send({ code: totp.gerarCodigo(segredo, Math.floor(Date.now() / 1000)) });
+
+      expect(confirmacao.status).toBe(200);
+      expect(cookiesDe(confirmacao)).toContainEqual(expect.stringContaining('arenahub_access='));
+
+      const ativo = await db.user.findUniqueOrThrow({ where: { email } });
+      expect(ativo.mfaStatus).toBe('ENABLED');
+
+      // Sessao de PLATAFORMA: sem tenant.
+      const sessao = await db.session.findFirstOrThrow({
+        where: { user: { email } },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(sessao.tenantId).toBeNull();
+    });
+
+    it('pre-auth de VERIFY nao serve para reinscrever quem ja tem MFA ativo', async () => {
+      // A guarda que importa: sem ela, quem roubasse um pre-auth de VERIFY
+      // trocaria o segredo do Super Admin, apagando o autenticador que
+      // funciona e ficando com o unico que gera codigo.
+      const { email } = await criarSuperAdminComMfa();
+      const login = await logar(email);
+      const preAuth = (login.body as { preAuth: string }).preAuth;
+
+      const resposta = await request(servidor())
+        .post('/api/v1/auth/mfa/enroll')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send();
+
+      expect(resposta.status).toBe(401);
+
+      // E o segredo continua intacto: o autenticador antigo ainda vale.
+      const usuario = await db.user.findUniqueOrThrow({ where: { email } });
+      expect(usuario.mfaStatus).toBe('ENABLED');
+    });
+
+    it('pre-auth de SETUP nao abre sessao pela rota de verificacao', async () => {
+      /*
+       * O caminho inverso: ter a senha nao pode bastar. Sem esta guarda o
+       * segundo fator viraria decoracao para quem ainda nao o configurou.
+       *
+       * O CODIGO ENVIADO E VALIDO, DE PROPOSITO. A primeira versao mandava
+       * `'000000'` e passava mesmo com a guarda de `purpose` DESLIGADA: o 401
+       * vinha da conferencia do TOTP, nao da guarda sob teste. Com um codigo
+       * que o servidor aceita, so a guarda pode recusar -- e o canario que
+       * apaga a checagem derruba este teste, como tem de derrubar.
+       */
+      const email = await criarSuperAdminSemMfa();
+      const login = await logar(email);
+      const preAuth = (login.body as { preAuth: string }).preAuth;
+
+      await request(servidor())
+        .post('/api/v1/auth/mfa/enroll')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send();
+
+      const usuario = await db.user.findUniqueOrThrow({ where: { email } });
+      const segredo = cifrador.decifrar({
+        ciphertext: Buffer.from(usuario.mfaSecretCiphertext!),
+        iv: Buffer.from(usuario.mfaSecretIv!),
+        tag: Buffer.from(usuario.mfaSecretTag!),
+      });
+
+      const resposta = await request(servidor())
+        .post('/api/v1/auth/mfa/verify')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send({ code: totp.gerarCodigo(segredo, Math.floor(Date.now() / 1000)) });
+
+      expect(resposta.status).toBe(401);
+      expect(cookiesDe(resposta)).not.toContainEqual(expect.stringContaining('arenahub_access='));
+    });
+
+    it('inscricao sem pre-auth nenhum e recusada', async () => {
+      const resposta = await request(servidor()).post('/api/v1/auth/mfa/enroll').send();
+
+      expect(resposta.status).toBe(401);
+    });
+
+    it('codigo errado na confirmacao nao ativa o segundo fator nem abre sessao', async () => {
+      const email = await criarSuperAdminSemMfa();
+      const login = await logar(email);
+      const preAuth = (login.body as { preAuth: string }).preAuth;
+
+      await request(servidor())
+        .post('/api/v1/auth/mfa/enroll')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send();
+
+      const resposta = await request(servidor())
+        .post('/api/v1/auth/mfa/enroll/confirm')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send({ code: '000000' });
+
+      expect(resposta.status).toBe(401);
+      expect(cookiesDe(resposta)).not.toContainEqual(expect.stringContaining('arenahub_access='));
+
+      const usuario = await db.user.findUniqueOrThrow({ where: { email } });
+      expect(usuario.mfaStatus).toBe('PENDING');
+    });
   });
 });

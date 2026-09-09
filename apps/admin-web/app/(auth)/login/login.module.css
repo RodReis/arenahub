@@ -195,3 +195,62 @@
     display: none;
   }
 }
+
+/* -------------------------------------------------- segundo fator (#293) */
+
+/**
+ * A chave TOTP a cadastrar no autenticador.
+ *
+ * Superficie propria, e nao texto solto: e a unica vez que este segredo pode
+ * ser lido, e ele precisa parecer algo a copiar -- nao mais uma linha de
+ * instrucao que a pessoa pula.
+ */
+.segredo {
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-control);
+  background: var(--ah-surface-canvas);
+}
+
+.segredoRotulo {
+  margin: 0 0 4px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/**
+ * MONOESPACADA e com `user-select: all`: a chave e digitada a mao ou copiada
+ * inteira, e nas duas o que atrapalha e o mesmo -- `l` e `1` iguais na fonte
+ * de texto, e um clique duplo que seleciona so um pedaco.
+ *
+ * `word-break` porque o base32 nao tem espaco onde quebrar: sem isto ele
+ * estoura a largura do painel em telas estreitas.
+ */
+.segredoValor {
+  margin: 0 0 8px;
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+  line-height: var(--ah-type-mono-lh);
+  word-break: break-all;
+  user-select: all;
+}
+
+.segredoAjuda {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * O link do `otpauth://` -- escopado NESTE bloco de proposito.
+ *
+ * Uma regra `a { ... }` solta no `globals.css` venceria a classe dos botoes
+ * por especificidade e os despintaria (foi o que ja aconteceu neste projeto).
+ * Aqui o seletor nao alcanca nada fora deste paragrafo.
+ */
+.segredoAjuda a {
+  color: var(--ah-action-text);
+}

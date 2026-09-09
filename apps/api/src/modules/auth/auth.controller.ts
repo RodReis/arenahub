@@ -36,6 +36,25 @@ const esquemaDeLogin = z
 /** Seis digitos: o TOTP do `TotpService`. */
 const esquemaDeVerificacaoDeMfa = z.object({ code: z.string().regex(/^\d{6}$/) }).strict();
 
+/** O que a inscricao devolve -- ver `mfa/enroll`. */
+interface InscricaoDeMfa {
+  /** URI `otpauth://` -- o celular a entrega ao autenticador. */
+  uri: string;
+  /** O mesmo segredo em base32, para quem digita a mao. */
+  base32: string;
+}
+
+/*
+ * Schema declarado a mao: o Nest so infere de CLASSE decorada, e o painel
+ * consome `interface`. A guarda de contrato (`openapi.int-spec.ts`) reprova
+ * rota nova sem `@ApiOkResponse`.
+ */
+const ESQUEMA_DA_INSCRICAO = {
+  type: 'object',
+  properties: { uri: { type: 'string' }, base32: { type: 'string' } },
+  required: ['uri', 'base32'],
+};
+
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(
@@ -95,13 +114,78 @@ export class AuthController {
     @Res({ passthrough: true }) resposta: Response,
   ): Promise<Record<string, never>> {
     const dados = esquemaDeVerificacaoDeMfa.parse(corpo);
+
+    this.gravarCookies(
+      resposta,
+      await this.auth.verificarMfa(this.lerPreAuth(requisicao), dados.code),
+    );
+
+    return {};
+  }
+
+  /**
+   * Inscricao no TOTP para o Super Admin que ainda nao tem segundo fator.
+   *
+   * `@Public()` pelo mesmo motivo de `mfa/verify`: nao ha sessao ainda, e a
+   * credencial que autoriza e o pre-auth no `Authorization`.
+   *
+   * ESTA ROTA EXISTE PORQUE AS DE `iam.controller.ts` NAO SERVEM AO SUPER
+   * ADMIN (issue #293): elas chamam `TenantContextService.require()`, que
+   * lanca para quem nao esta em tenant nenhum. Sem ela, o Super Admin que
+   * cai em `MFA_SETUP` nao tem caminho -- so o seed.
+   *
+   * O segredo sai no corpo de propósito: e a unica vez que ele pode ser
+   * lido, e e o que a pessoa copia para o autenticador. Ele NAO vira sessao
+   * -- `mfaStatus` fica `PENDING` ate a confirmacao.
+   */
+  @Public()
+  @Post('mfa/enroll')
+  @HttpCode(200)
+  @ApiOkResponse({ schema: ESQUEMA_DA_INSCRICAO })
+  async iniciarInscricaoDeMfa(@Req() requisicao: Request): Promise<InscricaoDeMfa> {
+    return this.auth.iniciarInscricaoDeMfa(this.lerPreAuth(requisicao));
+  }
+
+  /**
+   * Confirma a inscricao com o primeiro codigo e ja abre a sessao.
+   *
+   * Devolver sessao aqui nao afrouxa o INV-007: a pessoa apresentou a senha
+   * (no login, que emitiu o pre-auth) e um codigo TOTP que o servidor
+   * conferiu contra o segredo recem-gravado. Sao os dois fatores.
+   */
+  @Public()
+  @Post('mfa/enroll/confirm')
+  @HttpCode(200)
+  @ApiOkResponse({ schema: { type: 'object', properties: {} } })
+  async confirmarInscricaoDeMfa(
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+    @Res({ passthrough: true }) resposta: Response,
+  ): Promise<Record<string, never>> {
+    const dados = esquemaDeVerificacaoDeMfa.parse(corpo);
+
+    this.gravarCookies(
+      resposta,
+      await this.auth.confirmarInscricaoDeMfa(this.lerPreAuth(requisicao), dados.code),
+    );
+
+    return {};
+  }
+
+  /**
+   * Le o pre-auth do `Authorization`. Sem ele, `NaoAutenticadoError`.
+   *
+   * Extraido porque sao TRES rotas lendo o mesmo cabecalho da mesma forma --
+   * e um `startsWith` esquecido faria `slice(7)` cortar sete caracteres de um
+   * cabecalho que nao e Bearer, produzindo um token quebrado em vez de um
+   * 401 claro.
+   */
+  private lerPreAuth(requisicao: Request): string {
     const cabecalho = requisicao.headers.authorization ?? '';
 
     if (!cabecalho.startsWith('Bearer ')) throw new NaoAutenticadoError();
 
-    this.gravarCookies(resposta, await this.auth.verificarMfa(cabecalho.slice(7), dados.code));
-
-    return {};
+    return cabecalho.slice(7);
   }
 
   @Public()

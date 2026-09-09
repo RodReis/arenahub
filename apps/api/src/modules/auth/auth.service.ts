@@ -155,6 +155,72 @@ export class AuthService {
    * tenant.
    */
   async verificarMfa(preAuth: string, codigo: string): Promise<ParDeTokens> {
+    // `MFA_VERIFY` EXATO: um pre-auth de SETUP prova que a pessoa tem a
+    // senha, nao que tem o segundo fator -- ele nao pode virar sessao aqui.
+    const usuarioId = await this.exigirPreAuthDeAdmin(preAuth, 'MFA_VERIFY');
+
+    await this.mfa.verificar(usuarioId, codigo);
+
+    return this.emitirPar({ userId: usuarioId, tenantId: null });
+  }
+
+  /**
+   * Comeca a inscricao no TOTP a partir do pre-auth de SETUP.
+   *
+   * SEM ISTO O SUPER ADMIN SEM MFA FICA TRANCADO FORA (issue #293). O login
+   * dele devolve `MFA_SETUP`, e as rotas de inscricao que existiam
+   * (`iam.controller.ts`) exigem `TenantContextService.require()` -- que
+   * lanca para quem nao tem tenant, e o Super Admin nao tem nenhum. Nao
+   * havia caminho: a unica saida era cadastrar o segredo pelo seed.
+   *
+   * NAO devolve sessao. Quem chama aqui provou a senha e mais nada; a sessao
+   * so nasce em `confirmarInscricaoDeMfa`, depois que a pessoa provar que o
+   * autenticador dela gera um codigo valido. Ativar antes deixaria o dono do
+   * SaaS trancado fora da conta se o autenticador nao tivesse lido o segredo.
+   */
+  async iniciarInscricaoDeMfa(preAuth: string): Promise<{ uri: string; base32: string }> {
+    const usuarioId = await this.exigirPreAuthDeAdmin(preAuth, 'MFA_SETUP');
+
+    const usuario = await this.db.user.findUniqueOrThrow({
+      where: { id: usuarioId },
+      select: { email: true },
+    });
+
+    return this.mfa.iniciarInscricao(usuarioId, usuario.email);
+  }
+
+  /**
+   * Confirma a inscricao e ABRE a sessao -- os dois no mesmo passo.
+   *
+   * Exigir um login novo depois de confirmar seria pedir o TOTP duas vezes
+   * seguidas: a pessoa acabou de provar posse do segundo fator com um codigo
+   * que o servidor conferiu. O codigo tambem nao serviria de novo -- o
+   * `mfaLastCounter` gravado aqui o recusa como REPLAY.
+   */
+  async confirmarInscricaoDeMfa(preAuth: string, codigo: string): Promise<ParDeTokens> {
+    const usuarioId = await this.exigirPreAuthDeAdmin(preAuth, 'MFA_SETUP');
+
+    await this.mfa.confirmarInscricao(usuarioId, codigo);
+
+    return this.emitirPar({ userId: usuarioId, tenantId: null });
+  }
+
+  /**
+   * Guarda comum das tres rotas de segundo fator: valida o pre-auth, exige o
+   * `purpose` EXATO e confere que o dono ainda e Super Admin ativo.
+   *
+   * Uma funcao so, e nao a checagem repetida em cada rota: sao tres pontos
+   * onde esquecer o `purpose` transformaria o token de cinco minutos em
+   * credencial completa. O `purpose` entra por parametro em vez de ser
+   * inferido porque o erro perigoso e aceitar o outro tipo -- um pre-auth de
+   * SETUP nao pode abrir sessao em `verificarMfa`, e um de VERIFY nao pode
+   * reinscrever o segredo de quem ja tem MFA ativo, apagando o autenticador
+   * que funciona.
+   */
+  private async exigirPreAuthDeAdmin(
+    preAuth: string,
+    purpose: 'MFA_SETUP' | 'MFA_VERIFY',
+  ): Promise<string> {
     let claims;
 
     try {
@@ -163,9 +229,7 @@ export class AuthService {
       throw new NaoAutenticadoError();
     }
 
-    // Um pre-auth de SETUP prova que a pessoa tem a senha, nao que tem o
-    // segundo fator: ele nao pode virar sessao aqui.
-    if (claims.purpose !== 'MFA_VERIFY') throw new NaoAutenticadoError();
+    if (claims.purpose !== purpose) throw new NaoAutenticadoError();
 
     const admin = await this.db.platformAdmin.findFirst({
       where: { userId: claims.sub, revokedAt: null },
@@ -174,9 +238,7 @@ export class AuthService {
     // Revogacao vale na hora, mesmo com pre-auth ja emitido.
     if (!admin) throw new NaoAutenticadoError();
 
-    await this.mfa.verificar(claims.sub, codigo);
-
-    return this.emitirPar({ userId: claims.sub, tenantId: null });
+    return claims.sub;
   }
 
   /**
