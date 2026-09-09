@@ -15,7 +15,6 @@ updated: 2026-09-09
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286)
-- [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285)
 - [MVP5][SPEC-031][FIX] tres testes de XP e ranking sao intermitentes no CI (#279)
 - [MVP2][FIX] assinatura duplicada infla a receita esperada do painel financeiro (#272)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268)
@@ -49,6 +48,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
 - [MVP7][SPEC-061][FIX] painel não tem tela de segundo fator, e o Super Admin não entra pelo formulário (#293, finalizado em: 2026-09-09)
 - [INFRA] drift entre o schema Prisma e o banco: 11 alterações cosméticas pendentes (#292, finalizado em: 2026-09-09)
 - [MVP7][SPEC-061][F61] Super Admin e ciclo de vida do tenant (#284, finalizado em: 2026-09-09)
