@@ -236,6 +236,18 @@ describe('contrato OpenAPI', () => {
         // F63 -- historico manual do indice de correcao (ADR-052 §7). A API do
         // Banco Central no caminho de faturamento e ADR futuro.
         '/api/v1/platform/index-values',
+        // F64 -- fatura da plataforma sobre o tenant (ADR-052). Emissao,
+        // previa e pagamento MANUAL: gateway para a plataforma e ADR futuro.
+        '/api/v1/platform/tenants/{tenantId}/invoices',
+        '/api/v1/platform/tenants/{tenantId}/invoices/preview',
+        '/api/v1/platform/invoices',
+        '/api/v1/platform/invoices/{id}/payment',
+        // F64 -- o outro lado: o CONTRATANTE olhando a propria conta. Sob
+        // `/billing/platform` e nao `/platform` porque estas NAO sao do dono
+        // do SaaS -- o `tenantId` vem do contexto autenticado (regra 2), e
+        // nunca da URL.
+        '/api/v1/billing/platform/preview',
+        '/api/v1/billing/platform/invoices',
       ]),
     );
   });

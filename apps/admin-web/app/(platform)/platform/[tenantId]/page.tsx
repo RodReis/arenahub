@@ -98,13 +98,20 @@ export default async function PaginaDaAcademia({
         breadcrumb={<a href="/platform">Plataforma · Academias</a>}
         actions={
           /*
-            LINK para os contratos, e não um quinto bloco nesta tela: contrato é
-            o ato mais pesado da academia -- fechar um é irreversível --, e ele
-            merece uma tela onde seja o único assunto. Esta já tem quatro.
+            LINKS para contratos e faturas, e não mais dois blocos nesta tela:
+            são os dois atos mais pesados da academia -- fechar um contrato é
+            irreversível, e registrar um pagamento afirma que o dinheiro
+            entrou --, e cada um merece uma tela onde seja o único assunto.
+            Esta já tem quatro blocos.
           */
-          <Button href={`/platform/${tenant.id}/contratos`} data-testid="ver-contratos">
-            Contratos
-          </Button>
+          <>
+            <Button href={`/platform/${tenant.id}/contratos`} data-testid="ver-contratos">
+              Contratos
+            </Button>
+            <Button href={`/platform/${tenant.id}/faturas`} data-testid="ver-faturas">
+              Faturas
+            </Button>
+          </>
         }
       />
 

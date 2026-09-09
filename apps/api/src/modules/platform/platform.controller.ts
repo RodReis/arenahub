@@ -51,6 +51,8 @@ const ESQUEMA_DO_TENANT_NA_LISTA = {
     displayName: { type: 'string' },
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'SUSPENDED'] },
     unidades: { type: 'integer' },
+    alunosAtivos: { type: 'integer' },
+    alunosInativos: { type: 'integer' },
   },
 };
 
@@ -74,6 +76,8 @@ const ESQUEMA_DO_TENANT_EM_DETALHE = {
     responsavelEmail: { type: 'string', nullable: true },
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'SUSPENDED'] },
     unidades: { type: 'integer' },
+    alunosAtivos: { type: 'integer' },
+    alunosInativos: { type: 'integer' },
     missionText: { type: 'string', nullable: true },
     highlightsText: { type: 'string', nullable: true },
     temLogo: { type: 'boolean' },
@@ -152,19 +156,46 @@ export class PlatformController {
   @Get('tenants')
   @ApiOkResponse({ schema: { type: 'array', items: ESQUEMA_DO_TENANT_NA_LISTA } })
   async listar(): Promise<
-    Array<{ id: string; slug: string; displayName: string; status: string; unidades: number }>
+    Array<{
+      id: string;
+      slug: string;
+      displayName: string;
+      status: string;
+      unidades: number;
+      alunosAtivos: number;
+      alunosInativos: number;
+    }>
   > {
-    const encontrados = await this.tenants.listar();
+    /*
+     * DUAS consultas para N academias, e nao N+1: a lista e o `groupBy` de
+     * ativos saem em paralelo, e o inativo e complemento do total.
+     */
+    const [encontrados, ativosPorTenant] = await Promise.all([
+      this.tenants.listar(),
+      this.tenants.ativosPorTenant(),
+    ]);
 
     // DTO explicito: `cnpj` e `responsavelEmail` ficam de fora da lista --
     // ela e visao de painel, nao dump da tabela.
-    return encontrados.map((tenant) => ({
-      id: tenant.id,
-      slug: tenant.slug,
-      displayName: tenant.displayName,
-      status: tenant.status,
-      unidades: tenant._count.gymUnits,
-    }));
+    return encontrados.map((tenant) => {
+      const ativos = ativosPorTenant.get(tenant.id) ?? 0;
+
+      return {
+        id: tenant.id,
+        slug: tenant.slug,
+        displayName: tenant.displayName,
+        status: tenant.status,
+        unidades: tenant._count.gymUnits,
+        /*
+         * A MESMA definicao da fatura (ADR-052 §6): ativo e `ACTIVE`, inativo
+         * e TODO o resto. Por complemento, e nao enumerando os seis status --
+         * a lista e a fatura tem de dar o mesmo numero, e duas definicoes
+         * separadas divergem no dia em que um status novo entrar.
+         */
+        alunosAtivos: ativos,
+        alunosInativos: tenant._count.students - ativos,
+      };
+    });
   }
 
   @Post('tenants')

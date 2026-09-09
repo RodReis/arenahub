@@ -387,3 +387,82 @@ test('o dono do SaaS cadastra plano e abre contrato com a academia', async ({ pa
    * Quando o CI ganhar MinIO, o fechamento volta para cá em três linhas.
    */
 });
+
+/**
+ * A jornada da fatura — F64, issue #287.
+ *
+ * O dono do SaaS vê a prévia da fatura da academia, emite, e registra o
+ * pagamento. É o fio que unidade e integração não veem: a decomposição na tela
+ * (contagem × preço unitário) e a ida e volta pelas duas Server Actions.
+ *
+ * USA A ARENA POSITIVA, e não uma academia criada aqui: emitir exige contrato
+ * VIGENTE, e ativar um contrato grava o PDF no bucket -- o runner do CI sobe só
+ * Postgres. O seed repõe um contrato `ACTIVE` para esta jornada, pela mesma
+ * razão que a jornada da F63 para no rascunho.
+ */
+const REFRESH_DE_PLATAFORMA_DA_FATURA = 'refresh-de-bancada-do-super-admin-e2e-fatura';
+
+test('o dono do SaaS vê a prévia, emite a fatura e registra o pagamento', async ({
+  page,
+  context,
+}) => {
+  await context.addCookies([
+    {
+      name: 'arenahub_refresh',
+      value: REFRESH_DE_PLATAFORMA_DA_FATURA,
+      url: 'http://localhost:3000',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ]);
+
+  await page.goto('/platform');
+  await expect(page).not.toHaveURL(/\/login/);
+
+  /*
+   * A LISTA JÁ TRAZ A BASE DA FATURA (F64): ativos e inativos em colunas
+   * próprias, para o dono do SaaS ver de onde vem a conta sem abrir tela. É a
+   * mesma definição do ADR-052 §6 -- ativo é `ACTIVE`, inativo é todo o resto.
+   */
+  const linhaDaAcademia = page.getByRole('row').filter({ hasText: 'Arena Positiva' }).first();
+  // `exact`: sem ele, "Ativos" casa tambem com "Inativos" e o localizador
+  // resolve para dois elementos.
+  await expect(page.getByRole('columnheader', { name: 'Ativos', exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Inativos', exact: true })).toBeVisible();
+
+  await linhaDaAcademia.getByTestId('abrir-academia').click();
+
+  await page.getByTestId('ver-faturas').click();
+
+  /*
+   * A PRÉVIA É A MITIGAÇÃO DE UM RISCO (ADR-052): o tenant vê o número antes
+   * de ele virar cobrança. Se ela não renderizar, o risco volta a ser aceito
+   * sem contrapartida -- por isso o teste afirma a presença, não só o total.
+   */
+  const previa = page.getByTestId('previa-da-fatura');
+  await expect(previa).toBeVisible();
+  await expect(previa).toContainText('Alunos ativos');
+  await expect(previa).toContainText('Alunos inativos');
+  await expect(page.getByTestId('total-da-previa')).toContainText('R$');
+
+  await page.getByTestId('emitir-fatura').click();
+
+  /*
+   * A FATURA APARECE NA TABELA com a base congelada. `Em aberto` porque o
+   * pagamento é ato separado -- e é o registro dele que faz a carência da F65
+   * parar de correr.
+   */
+  const linha = page.getByRole('row').filter({ hasText: 'Em aberto' }).first();
+  await expect(linha).toBeVisible();
+  await expect(linha).toContainText('ativos');
+
+  await linha.getByTestId('registrar-pagamento').click();
+
+  /*
+   * PAGA NÃO MOSTRA BOTÃO. Não é um botão desabilitado: quem já pagou não tem
+   * o que fazer nesta linha, e o que não cabe no estado simplesmente some.
+   */
+  const linhaPaga = page.getByRole('row').filter({ hasText: 'Paga' }).first();
+  await expect(linhaPaga).toBeVisible();
+  await expect(linhaPaga.getByTestId('registrar-pagamento')).toBeHidden();
+});

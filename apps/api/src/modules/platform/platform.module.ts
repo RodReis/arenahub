@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { PlatformContextService } from '../../common/platform/platform-context.service.js';
+import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { AlterarTenantUseCase } from './alterar-tenant.use-case.js';
 import { BrandingPublicoController } from './branding-publico.controller.js';
 import { BrandingService } from './branding.service.js';
@@ -8,11 +9,14 @@ import { AuthModule } from '../auth/auth.module.js';
 import { ContratosController } from './contratos.controller.js';
 import { CriarTenantUseCase } from './criar-tenant.use-case.js';
 import { ElevarUseCase } from './elevar.use-case.js';
+import { FaturasController, PreviaDeFaturaController } from './faturas.controller.js';
 import { EncerrarElevacaoUseCase } from './encerrar-elevacao.use-case.js';
 import { IamModule } from '../iam/iam.module.js';
 import { IndexValueUseCase } from './index-value.use-case.js';
 import { PlatformAuditService } from './platform-audit.service.js';
 import { PlatformController } from './platform.controller.js';
+import { PlatformInvoiceSchedulerService } from './platform-invoice-scheduler.service.js';
+import { PlatformInvoiceUseCase } from './platform-invoice.use-case.js';
 import { SaasPlanUseCase } from './saas-plan.use-case.js';
 import { TenantContractUseCase } from './tenant-contract.use-case.js';
 import { TenantRepository } from './tenant.repository.js';
@@ -34,9 +38,19 @@ import { TenantRepository } from './tenant.repository.js';
    * assunto proprio: uma classe que cresce por acumulo vira o lugar onde
    * ninguem acha nada.
    */
-  controllers: [PlatformController, BrandingPublicoController, ContratosController],
+  controllers: [
+    PlatformController,
+    BrandingPublicoController,
+    ContratosController,
+    FaturasController,
+    PreviaDeFaturaController,
+  ],
   providers: [
     PlatformContextService,
+    // `PreviaDeFaturaController` e do TENANT, nao da plataforma: le o
+    // `tenantId` do contexto autenticado (regra 2). Cada modulo provê a
+    // propria instancia -- mesmo padrao de `BillingModule`.
+    TenantContextService,
     PlatformAuditService,
     TenantRepository,
     CriarTenantUseCase,
@@ -47,6 +61,8 @@ import { TenantRepository } from './tenant.repository.js';
     SaasPlanUseCase,
     TenantContractUseCase,
     IndexValueUseCase,
+    PlatformInvoiceUseCase,
+    PlatformInvoiceSchedulerService,
   ],
   exports: [PlatformContextService, PlatformAuditService, TenantRepository],
 })

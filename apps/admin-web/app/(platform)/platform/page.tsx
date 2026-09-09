@@ -23,6 +23,14 @@ interface TenantNaLista {
   displayName: string;
   status: string;
   unidades: number;
+  /*
+   * A base da fatura da plataforma (F64, ADR-052 §6): ativo e `ACTIVE`,
+   * inativo e todo o resto. Sao os dois numeros que o dono do SaaS multiplica
+   * pelos precos do contrato -- e o inativo domina a conta na base real (66%
+   * em 08/09), que e o risco que ele precisa ver da lista, sem abrir tela.
+   */
+  alunosAtivos: number;
+  alunosInativos: number;
 }
 
 /**
@@ -127,6 +135,24 @@ export default async function PaginaDePlataforma() {
             header: 'Unidades',
             role: 'value',
             render: (t) => t.unidades,
+          },
+          /*
+           * ATIVOS E INATIVOS EM COLUNAS SEPARADAS, e nao "409 / 1583" numa
+           * so: sao os dois fatores da fatura, e cada um multiplica um preco
+           * diferente. Numa celula unica o olho nao compara a coluna inteira,
+           * que e justamente o que mostra a academia cujo inativo cresceu.
+           */
+          {
+            key: 'alunosAtivos',
+            header: 'Ativos',
+            role: 'value',
+            render: (t) => t.alunosAtivos,
+          },
+          {
+            key: 'alunosInativos',
+            header: 'Inativos',
+            role: 'value',
+            render: (t) => t.alunosInativos,
           },
           { key: 'situacao', header: 'Situação', role: 'state', render: (t) => situacao(t.status) },
         ]}

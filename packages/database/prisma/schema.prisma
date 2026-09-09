@@ -610,6 +610,9 @@ model Tenant {
   /// Contratos do ArenaHub com esta academia (F63, ADR-052 §8).
   contracts TenantContract[]
 
+  /// Faturas do ArenaHub sobre esta academia (F64, ADR-052).
+  platformInvoices PlatformInvoice[]
+
   students           Student[]
   studentCredentials StudentCredential[]
   studentSequence    StudentSequence?
@@ -5996,6 +5999,8 @@ model TenantContract {
   supersedes   TenantContract? @relation("SucessaoDeContrato", fields: [supersedesId], references: [id])
   supersededBy TenantContract? @relation("SucessaoDeContrato")
 
+  invoices PlatformInvoice[]
+
   @@index([tenantId, status])
   @@map("tenant_contracts")
 }
@@ -6032,4 +6037,93 @@ model IndexValue {
   @@unique([code, referenceMonth])
   @@index([code, referenceMonth])
   @@map("index_values")
+}
+
+/// Status da fatura da plataforma -- ADR-052 (Fatura da plataforma).
+///
+/// Tres estados e nao mais: `OVERDUE` e o gatilho da carencia da F65
+/// (ADR-053), e nao um rotulo cosmetico. Nao existe `CANCELLED` porque
+/// cancelar fatura emitida e decisao que ninguem pediu -- quando pedirem,
+/// entra com o campo que registra QUEM cancelou e POR QUE.
+enum PlatformInvoiceStatus {
+  OPEN
+  PAID
+  OVERDUE
+
+  @@map("platform_invoice_status")
+}
+
+/// A fatura do ArenaHub sobre a academia -- F64, ADR-052.
+///
+/// ---------------------------------------------------------------------------
+/// NAO E `Invoice`. Outro pagador, outro ciclo, outra consequencia.
+/// ---------------------------------------------------------------------------
+///
+/// `Invoice` e do tenant cobrando o ALUNO; esta e do ArenaHub cobrando o
+/// TENANT. Reaproveitar a tabela juntaria duas cadeias que so se parecem de
+/// longe: uma vencida corta o entitlement de um aluno, esta vencida fecha a
+/// catraca da academia inteira (F65). Regra 1 continua de pe -- o gate e do
+/// contratante, nao do aluno.
+///
+/// A CONTAGEM E CONGELADA. `activeCount`/`inactiveCount` sao o retrato do dia
+/// da emissao, nao uma consulta viva: o aluno que vira `CANCELLED` no dia 10
+/// nao pode reescrever a fatura do dia 1. E o aceite da fatia.
+model PlatformInvoice {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  /// Contrato que produziu esta fatura. Os valores unitarios abaixo sao COPIA
+  /// dele, pela mesma razao que os dele sao copia do plano (ADR-052 §8):
+  /// contrato encerrado nao pode mudar fatura ja emitida.
+  contractId String @map("contract_id") @db.Uuid
+
+  /// Competencia: PRIMEIRO DIA do mes faturado. Mesma forma de
+  /// `IndexValue.referenceMonth` -- ver o CHECK na migration.
+  competence DateTime @map("competence") @db.Date
+
+  /// Modelo aplicado, copiado do contrato. Sem ele, ler uma fatura antiga
+  /// exigiria voltar ao contrato para saber por que os campos de contagem
+  /// estao zerados.
+  model SaasPricingModel
+
+  /// O RETRATO. Alunos com `status = ACTIVE` e todos os demais (`LEAD`,
+  /// `TRIAL`, `SUSPENDED`, `BLOCKED`, `CANCELLED`, `ARCHIVED`) no dia da
+  /// emissao -- ADR-052 §6, pendencia 1 fechada em 08/09/2026.
+  ///
+  /// Zero nos dois no modelo fixo: nao ha contagem a fazer.
+  activeCount   Int @default(0) @map("active_count")
+  inactiveCount Int @default(0) @map("inactive_count")
+
+  /// Precos unitarios aplicados, em centavos. Copia do contrato no instante
+  /// da emissao. Nulos no modelo fixo.
+  activeStudentPriceMinor   Int? @map("active_student_price_minor")
+  inactiveStudentPriceMinor Int? @map("inactive_student_price_minor")
+
+  /// Valor total da fatura, em centavos (regra 6).
+  ///
+  /// PERSISTIDO, e nao derivado na leitura: recalcular `count * preco` a cada
+  /// consulta faria uma correcao de arredondamento futura reescrever fatura
+  /// paga. O total e o que foi cobrado, nao o que a formula de hoje daria.
+  totalMinor Int    @map("total_minor")
+  currency   String @default("BRL")
+
+  dueAt  DateTime              @map("due_at") @db.Date
+  status PlatformInvoiceStatus @default(OPEN)
+  /// Instante do pagamento registrado pelo Super Admin. Nulo enquanto aberta.
+  paidAt DateTime?             @map("paid_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contract TenantContract @relation(fields: [contractId], references: [id])
+
+  /// UMA FATURA POR ACADEMIA E COMPETENCIA -- regra 4 (idempotencia).
+  ///
+  /// A chave e do BANCO e nao um `if` no job: o job rodando duas vezes, ou
+  /// duas instancias da API subindo o mesmo `@Cron`, passam as duas pela
+  /// leitura antes de qualquer escrita. Rodar de novo reencontra a chave.
+  @@unique([tenantId, competence])
+  @@index([tenantId, status])
+  @@index([status, dueAt])
+  @@map("platform_invoices")
 }

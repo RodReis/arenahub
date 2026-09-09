@@ -146,9 +146,10 @@ export default async function PaginaDeContratos({
         id="titulo-contratos"
         title="Contratos"
         breadcrumb={
-          <>
-            <a href="/platform">Plataforma</a> · <a href={`/platform/${tenantId}`}>{nomeDaAcademia}</a>
-          </>
+          <span>
+            <a href="/platform">Plataforma</a> ·{' '}
+            <a href={`/platform/${tenantId}`}>{nomeDaAcademia}</a>
+          </span>
         }
       />
 
