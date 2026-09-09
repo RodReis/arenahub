@@ -69,6 +69,17 @@ export async function chamarApi<T>(
     formulario?: FormData;
     correlationId?: string;
     /**
+     * Pre-auth do segundo fator, enviado como `Bearer` (issue #293).
+     *
+     * As rotas de MFA são `@Public()` e NÃO leem cookie: a credencial que as
+     * autoriza é este token, que não é sessão e não alcança rota nenhuma além
+     * delas. Vai por parâmetro explícito, e não lido do cookie aqui dentro,
+     * porque toda outra chamada do painel deve continuar se autenticando por
+     * cookie -- um fallback silencioso faria o pre-auth virar credencial de
+     * uso geral no dia em que alguém esquecesse de limpá-lo.
+     */
+    preAuth?: string;
+    /**
      * Schema da RESPOSTA. Opcional de proposito: sem ele o generico `T`
      * segue valendo como assercao e o comportamento e o de sempre, o que
      * deixa a migracao das telas ser incremental (issue #167).
@@ -99,6 +110,7 @@ export async function chamarApi<T>(
       ...(formulario === undefined ? { 'content-type': 'application/json' } : {}),
       ...(cabecalhoDeCookie ? { cookie: cabecalhoDeCookie } : {}),
       ...(opcoes.correlationId ? { 'x-correlation-id': opcoes.correlationId } : {}),
+      ...(opcoes.preAuth ? { authorization: `Bearer ${opcoes.preAuth}` } : {}),
     },
     ...(corpo === undefined ? {} : { body: corpo }),
     cache: 'no-store',

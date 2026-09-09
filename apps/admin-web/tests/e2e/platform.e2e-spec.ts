@@ -13,12 +13,17 @@ import { expect, test } from '@playwright/test';
  * COMO A SESSÃO DE SUPER ADMIN É ESTABELECIDA — e por que não é pelo login.
  *
  * O login do dono do SaaS exige segundo fator (INV-007): `POST /auth/login`
- * responde um desafio de MFA, nunca uma sessão. O painel ainda não tem tela
- * para esse desafio, então não há formulário por onde este teste possa entrar.
- * Gerar o TOTP aqui também não serve — o algoritmo mora na API, o código vira
- * a cada 30 s, e o passo já está coberto por três testes de integração
- * (`platform-mfa-de-plataforma.int-spec.ts`). Decisão do PI: o E2E não passa
- * pelo desafio.
+ * responde um desafio de MFA, nunca uma sessão. A TELA DO DESAFIO PASSOU A
+ * EXISTIR (issue #293) — o painel tem `/login/2fa` e `/login/configurar-2fa`,
+ * e o Super Admin entra por elas. O que continua sem servir é atravessá-las
+ * DAQUI: gerar o TOTP no teste exigiria portar o algoritmo para o lado do
+ * painel, e o código vira a cada 30 s — um teste que falha quando a janela
+ * troca no meio da digitação acusa defeito que não existe.
+ *
+ * O desafio está coberto onde é estável: nove testes de integração
+ * (`platform-mfa-de-plataforma.int-spec.ts`) e treze de unidade
+ * (`app/actions/auth.test.ts`). Decisão do PI, mantida: o E2E não passa pelo
+ * desafio.
  *
  * O QUE ELE FAZ NO LUGAR é apresentar o cookie de refresh de uma sessão de
  * plataforma que o seed criou, e deixar o PRODUTO abrir a sessão: o `proxy.ts`

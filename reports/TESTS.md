@@ -15,7 +15,7 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 2991 | 2991 | 0 | 75.7 |
+| unitário | 3002 | 3002 | 0 | 75.7 |
 | contrato | 0 | 0 | 0 | — |
 | integração | 922 | 922 | 0 | 84.0 |
 | e2e | 0 | 0 | 0 | — |
@@ -132,3 +132,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-05 | #277 | — | integração | 893 | 893 | 0 | 84.0 | — 818 em `apps/api` (+1: o convite nasce mesmo sem envio configurado) + 75 em `@arenahub/database`; o Jest crasha no fim no Windows e o gerador herda o número anterior |
 | 2026-09-09 | #284 | SPEC-061 | unitário | 2991 | 2991 | 0 | 75.7 | — |
 | 2026-09-09 | #284 | SPEC-061 | integração | 922 | 922 | 0 | 84.1 | — — o Jest crasha no fim no Windows (3221226505, depois dos testes passarem) e o gerador manteria o 896 herdado; medido a mão: apps/api 844 em tres shards (228+290+326) + @arenahub/database 78 |
+| 2026-09-09 | #293 | SPEC-061 | unitário | 3002 | 3002 | 0 | 75.7 | — |
+| 2026-09-09 | #293 | SPEC-061 | integração | 928 | 928 | 0 | 84.0 | — o Jest crasha no fim no Windows (3221226505, DEPOIS de os testes passarem) e o gerador herdaria o 922 da entrega anterior; medido a mao em dois lotes: `apps/api` 850 em 62 suites (471 + 382, menos 3 de `platform-auth-de-plataforma`, que casa nos dois filtros e rodou duas vezes) + `@arenahub/database` 78. Os +6 sao os da inscricao de MFA |
