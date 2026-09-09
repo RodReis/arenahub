@@ -186,6 +186,44 @@ describe('elevacao de suporte', () => {
   });
 
   /*
+   * A faixa de suporte do painel depende deste campo.
+   *
+   * Sem ele, quem opera elevado ve a tela do cliente identica a sua propria e
+   * age achando que esta na propria casa -- o risco que a faixa existe para
+   * cortar. O `AuthGuard` ja montou a elevacao para esta requisicao, entao
+   * aqui nao ha consulta nova: so se expoe o que ja esta em memoria, como a
+   * F54 fez com as permissoes.
+   */
+  it('/auth/me devolve a elevacao viva, com o nome do tenant para a faixa', async () => {
+    const { cookie, contexto } = await logarComoSuperAdmin();
+    const tenantId = await criarTenantDeTeste(contexto);
+    const { cookieElevado } = await elevar(cookie, tenantId, 'Suporte combinado com o cliente');
+
+    const resposta = await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Cookie', cookieElevado);
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.supportElevation).toMatchObject({
+      reason: 'Suporte combinado com o cliente',
+    });
+    // O nome, e nao so o id: faixa que diz um UUID nao avisa ninguem.
+    expect(resposta.body.supportElevation.tenant).toBeTruthy();
+    expect(resposta.body.supportElevation.expiraEm).toBeTruthy();
+  });
+
+  it('/auth/me NAO traz elevacao quando o Super Admin nao elevou', async () => {
+    const { cookie } = await logarComoSuperAdmin();
+
+    const resposta = await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Cookie', cookie);
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.supportElevation).toBeUndefined();
+  });
+
+  /*
    * CANARIO. Este par prova que a requisicao ALCANCA a checagem de prazo.
    *
    * Sozinho, o teste de "expirada" passaria mesmo que uma guarda anterior

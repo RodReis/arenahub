@@ -116,18 +116,17 @@ describe('criarTenant', () => {
   });
 
   /**
-   * Slug repetido cai em `INTERNAL_ERROR`: o `POST` não traduz o P2002 do
-   * Prisma, e o filtro de `problem+json` manda todo erro imprevisto para o
-   * genérico. A tela não pode fingir que sabe qual campo repetiu, mas o
-   * palpite ao lado do código estável é o que deixa alguém agir.
+   * Slug repetido tem código próprio (409 `TENANT_SLUG_TAKEN`), então a frase
+   * AFIRMA a causa em vez de sugeri-la — e não vaza código na tela, porque
+   * este erro é conhecido e tem tradução.
    */
-  it('sugere o identificador repetido no erro interno, sem esconder o codigo', async () => {
-    vi.mocked(chamarApi).mockResolvedValue(recusado('INTERNAL_ERROR'));
+  it('afirma o identificador repetido, sem despejar o codigo na tela', async () => {
+    vi.mocked(chamarApi).mockResolvedValue(recusado('TENANT_SLUG_TAKEN'));
 
     const estado = await criarTenant({}, formularioValido());
 
     expect(estado.erro).toContain('identificador');
-    expect(estado.erro).toContain('INTERNAL_ERROR');
+    expect(estado.erro).not.toContain('TENANT_SLUG_TAKEN');
   });
 
   it('devolve os valores digitados tambem quando a API recusa', async () => {

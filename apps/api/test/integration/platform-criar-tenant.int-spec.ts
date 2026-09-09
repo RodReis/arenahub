@@ -152,7 +152,17 @@ describe('criar tenant pelo painel', () => {
 
     const antes = await db.tenant.count();
 
-    await expect(useCase.executar(contexto, entrada, `corr-${randomUUID()}`)).rejects.toThrow();
+    /*
+     * Codigo ESTAVEL, e nao um erro qualquer.
+     *
+     * `toThrow()` sem argumento aceitaria a violacao crua do Prisma, que o
+     * `ProblemDetailsFilter` traduz para INTERNAL_ERROR 500 -- e slug em uso
+     * e erro de quem preencheu, nao defeito do servidor. A tela precisa
+     * distinguir para dizer o que fazer.
+     */
+    await expect(
+      useCase.executar(contexto, entrada, `corr-${randomUUID()}`),
+    ).rejects.toMatchObject({ code: 'TENANT_SLUG_TAKEN', status: 409 });
 
     const depois = await db.tenant.count();
 

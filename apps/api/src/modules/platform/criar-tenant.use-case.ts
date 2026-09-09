@@ -3,12 +3,35 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { PERMISSOES_DO_OWNER } from '@arenahub/database';
 
+import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { PlatformContext } from '../../common/platform/platform-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { PlatformAuditService } from './platform-audit.service.js';
 
 const CONVITE_VALIDO_POR_HORAS = 24;
 const BYTES_DE_TOKEN = 32;
+
+/**
+ * O `slug` e identificador publico usado em URL (a F62 fara login por ele),
+ * entao repeti-lo e erro de quem preencheu -- 409, nao 500. Sem este codigo a
+ * tela so poderia dizer "erro interno", que nao diz a ninguem o que corrigir.
+ */
+export class SlugEmUsoError extends ErroDeDominio {
+  constructor() {
+    super('TENANT_SLUG_TAKEN', 409, 'Ja existe uma academia com este identificador');
+  }
+}
+
+/**
+ * Violacao de unicidade do Prisma (P2002).
+ *
+ * So o `code`: no Prisma 7 com adapter-pg o nome da constraint nao chega em
+ * `meta.target`, so em texto livre que muda de forma. Quem precisa saber QUAL
+ * coluna colidiu delimita o `catch`, como este caso de uso faz.
+ */
+function ehViolacaoDeUnicidade(erro: unknown): boolean {
+  return typeof erro === 'object' && erro !== null && 'code' in erro && erro.code === 'P2002';
+}
 
 export interface EntradaDeTenant {
   slug: string;
@@ -56,17 +79,32 @@ export class CriarTenantUseCase {
     const expiresAt = new Date(Date.now() + CONVITE_VALIDO_POR_HORAS * 60 * 60 * 1000);
 
     const resultado = await this.db.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({
-        data: {
-          slug: entrada.slug,
-          legalName: entrada.legalName,
-          displayName: entrada.displayName,
-          cnpj: entrada.cnpj,
-          timezone: entrada.timezone,
-          responsavelNome: entrada.responsavelNome,
-          responsavelEmail: entrada.responsavelEmail,
-        },
-      });
+      /*
+       * O `catch` envolve SO o `create` do tenant.
+       *
+       * Ha duas colunas unicas nesta transacao -- o `slug` do tenant e o
+       * `code` da unidade -- e no Prisma 7 com adapter-pg o nome da constraint
+       * nao vem em `meta.target`, so em texto livre. Capturar por POSICAO em
+       * vez de por nome e o que torna a origem inequivoca: aqui dentro, P2002
+       * so pode ser o slug.
+       */
+      const tenant = await tx.tenant
+        .create({
+          data: {
+            slug: entrada.slug,
+            legalName: entrada.legalName,
+            displayName: entrada.displayName,
+            cnpj: entrada.cnpj,
+            timezone: entrada.timezone,
+            responsavelNome: entrada.responsavelNome,
+            responsavelEmail: entrada.responsavelEmail,
+          },
+        })
+        .catch((erro: unknown) => {
+          if (ehViolacaoDeUnicidade(erro)) throw new SlugEmUsoError();
+
+          throw erro;
+        });
 
       const unidade = await tx.gymUnit.create({
         data: {

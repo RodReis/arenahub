@@ -92,17 +92,11 @@ const MENSAGEM: Record<string, string> = {
   TENANT_NOT_FOUND: 'Esta academia não existe mais.',
   MOTIVO_OBRIGATORIO: 'Escreva o motivo (ao menos 10 caracteres).',
   /*
-   * SLUG REPETIDO CHEGA AQUI COMO `INTERNAL_ERROR`.
-   *
-   * `POST /platform/tenants` não traduz o P2002 do Prisma, e o filtro de
-   * `problem+json` manda todo erro imprevisto para o genérico -- não existe
-   * `TENANT_SLUG_TAKEN` na API. A frase não pode AFIRMAR que foi o slug (o
-   * mesmo código sai de qualquer falha inesperada), mas sugerir a causa mais
-   * provável ao lado do código estável é o que deixa alguém agir. Quando a
-   * API ganhar código próprio, esta linha sai e entra o código de verdade.
+   * O identificador é o que vai na URL, e a F62 fará login por ele. Repetir
+   * é erro de quem preencheu, então a API responde 409 com código próprio --
+   * e a frase pode AFIRMAR a causa em vez de sugeri-la.
    */
-  INTERNAL_ERROR:
-    'Não foi possível criar a academia. Confira se o identificador já está em uso (INTERNAL_ERROR).',
+  TENANT_SLUG_TAKEN: 'Já existe uma academia com este identificador.',
 };
 
 function texto(formulario: FormData, campo: string): string {

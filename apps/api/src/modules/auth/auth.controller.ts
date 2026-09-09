@@ -158,6 +158,24 @@ export class AuthController {
       return {
         ...(await this.auth.perfil(claims.sub)),
         permissions: contexto ? [...contexto.permissions].sort() : [],
+        /*
+         * A FAIXA DE SUPORTE do painel depende disto.
+         *
+         * Quem opera elevado ve a tela do cliente identica a sua propria; sem
+         * o aviso, age achando que esta na propria casa. O nome do tenant vai
+         * junto porque faixa que exibe um UUID nao avisa ninguem -- e e a
+         * unica consulta nova aqui, ja que o resto o `AuthGuard` deixou em
+         * memoria.
+         */
+        ...(contexto?.supportElevation
+          ? {
+              supportElevation: {
+                reason: contexto.supportElevation.reason,
+                expiraEm: contexto.supportElevation.expiresAt.toISOString(),
+                tenant: await this.auth.nomeDoTenant(contexto.tenantId),
+              },
+            }
+          : {}),
       };
     } catch {
       // Token invalido, expirado ou de outro tipo produzem a mesma

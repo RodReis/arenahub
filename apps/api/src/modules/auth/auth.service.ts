@@ -256,6 +256,22 @@ export class AuthService {
     return usuario;
   }
 
+  /**
+   * Nome de exibicao do tenant, para a faixa de suporte.
+   *
+   * Devolve `null` em vez de lancar: o tenant sumir entre a elevacao e a
+   * leitura e improvavel, e derrubar o `/auth/me` por causa do rotulo de uma
+   * faixa trocaria um aviso ausente por um painel inteiro fora do ar.
+   */
+  async nomeDoTenant(tenantId: string): Promise<string | null> {
+    const tenant = await this.db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { displayName: true },
+    });
+
+    return tenant?.displayName ?? null;
+  }
+
   private async emitirPar(dados: {
     userId: string;
     /** Nulo na sessao de PLATAFORMA. */
