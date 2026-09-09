@@ -18,7 +18,8 @@ export interface ConfigDeToken {
 /** Claims do access token. O contrato e fechado: nada entra sem decisao. */
 export interface ClaimsDeAcesso {
   sub: string;
-  tenantId: string;
+  /** Nulo na sessao de plataforma -- o Super Admin nao esta em tenant nenhum. */
+  tenantId: string | null;
   sessionId: string;
   permissions: string[];
   mfa: boolean;
@@ -27,7 +28,12 @@ export interface ClaimsDeAcesso {
 
 export interface ClaimsDePreAuth {
   sub: string;
-  tenantId: string;
+  /**
+   * Nulo no desafio de PLATAFORMA -- o Super Admin nao esta em tenant nenhum.
+   * String vazia seria pior: um valor que finge ser tenant e que alguem
+   * acabaria passando adiante como se fosse.
+   */
+  tenantId: string | null;
   challengeId: string;
   purpose: 'MFA_SETUP' | 'MFA_VERIFY';
 }

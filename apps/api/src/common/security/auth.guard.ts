@@ -1,11 +1,18 @@
-import { Injectable, type CanActivate, type ExecutionContext } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  type CanActivate,
+  type ExecutionContext,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { PERMISSOES_DO_OWNER } from '@arenahub/database';
 import type { Request } from 'express';
 
 import { NaoAutenticadoError } from '../http/erro-de-dominio.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { COOKIE_DE_ACESSO, lerCookie } from '../../modules/auth/cookies.js';
 import { TokenService } from '../../modules/auth/token.service.js';
+import type { PlatformContext } from '../platform/platform-context.js';
 import type { TenantContext } from '../tenant/tenant-context.js';
 import { ROTA_PUBLICA } from './public.decorator.js';
 
@@ -43,8 +50,24 @@ export class AuthGuard implements CanActivate {
     try {
       const claims = this.tokens.verificarAcesso(token);
 
-      requisicao.tenantContext = await this.montarContexto(claims.sub, claims.tenantId, claims);
-    } catch {
+      // Token SEM tenant = sessao de plataforma. E o unico caminho em que
+      // nao existe `TenantContext`, e toda rota de tenant o rejeita.
+      if (claims.tenantId === null || claims.tenantId === undefined) {
+        requisicao.platformContext = await this.montarContextoDePlataforma(claims.sub, claims);
+      } else {
+        requisicao.tenantContext = await this.montarContexto(
+          claims.sub,
+          claims.tenantId,
+          claims,
+          requisicao,
+        );
+      }
+    } catch (erro) {
+      // "Elevacao expirada" e 403 e nao 401: a credencial vale, o que acabou
+      // foi a autorizacao de entrar naquele tenant. Sem este repasse, o
+      // `ForbiddenException` nascido aqui dentro viraria 401 calado.
+      if (erro instanceof ForbiddenException) throw erro;
+
       // Token invalido, expirado, de outro tipo ou sessao revogada dao a
       // mesma resposta: quem sonda nao aprende qual dos casos ocorreu.
       throw new NaoAutenticadoError();
@@ -64,7 +87,12 @@ export class AuthGuard implements CanActivate {
     userId: string,
     tenantId: string,
     claims: { sessionId: string },
+    requisicao: Request,
   ): Promise<TenantContext> {
+    const deSuporte = await this.montarElevacao(userId, tenantId, claims.sessionId, requisicao);
+
+    if (deSuporte) return deSuporte;
+
     const papeis = await this.db.userRole.findMany({
       where: { userId, tenantId },
       include: { role: { include: { permissions: { include: { permission: true } } } } },
@@ -93,4 +121,76 @@ export class AuthGuard implements CanActivate {
     };
   }
 
+  /**
+   * Super Admin operando DENTRO de um tenant -- so vale com elevacao VIVA.
+   *
+   * Devolve `undefined` para todo mundo que nao e ator de plataforma, e ai o
+   * caminho normal de papeis por tenant segue intocado. Quem tem
+   * `TenantMembership` no tenant e usuario de verdade dele e tambem passa
+   * direto: um Super Admin que por acaso e aluno da academia entra como
+   * aluno, sem elevacao.
+   */
+  private async montarElevacao(
+    userId: string,
+    tenantId: string,
+    sessionId: string,
+    requisicao: Request,
+  ): Promise<TenantContext | undefined> {
+    const admin = await this.db.platformAdmin.findFirst({ where: { userId, revokedAt: null } });
+
+    if (!admin) return undefined;
+
+    const membro = await this.db.tenantMembership.findFirst({
+      where: { userId, tenantId, status: 'ACTIVE' },
+    });
+
+    if (membro) return undefined;
+
+    const elevacao = await this.db.supportElevation.findFirst({
+      where: { sessionId, tenantId, endedAt: null, expiresAt: { gt: new Date() } },
+    });
+
+    // 403 e nao 401: a credencial vale, o que falta e a autorizacao de entrar
+    // neste tenant. Este erro escapa do `catch` do `canActivate` de proposito.
+    if (!elevacao) throw new ForbiddenException({ code: 'ELEVATION_REQUIRED' });
+
+    // A rota de encerrar a elevacao mora no `PlatformController`, e o token
+    // desta requisicao ja carrega tenant. Sem o contexto de plataforma aqui,
+    // o `PlatformGuard` recusaria quem esta legitimamente elevado.
+    requisicao.platformContext = { actorId: userId, sessionId, platformAdminId: admin.id };
+
+    return {
+      tenantId,
+      actorId: userId,
+      sessionId,
+      // Sem `UserRole` no tenant alvo, `permissions` sairia vazio e toda rota
+      // com `@RequirePermissions` recusaria -- suporte que nao enxerga nada
+      // nao e suporte.
+      permissions: new Set<string>(PERMISSOES_DO_OWNER),
+      allowedUnitIds: 'ALL',
+      // O gancho declarado em `tenant-context.ts`, morto desde a fatia que o
+      // criou, finalmente e preenchido.
+      supportElevation: { reason: elevacao.reason, expiresAt: elevacao.expiresAt },
+    };
+  }
+
+  /**
+   * Sessao de plataforma. Le `PlatformAdmin` ATIVO -- revogacao vale na
+   * hora, pelo mesmo motivo que as permissoes de tenant vem do banco e nao
+   * do token.
+   */
+  private async montarContextoDePlataforma(
+    userId: string,
+    claims: { sessionId: string },
+  ): Promise<PlatformContext> {
+    const admin = await this.db.platformAdmin.findFirst({
+      where: { userId, revokedAt: null },
+    });
+
+    // Sem `PlatformAdmin` ativo, um token sem tenant nao autoriza nada.
+    // Lancar aqui cai no `catch` do chamador e vira 401.
+    if (!admin) throw new NaoAutenticadoError();
+
+    return { actorId: userId, sessionId: claims.sessionId, platformAdminId: admin.id };
+  }
 }

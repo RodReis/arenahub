@@ -5,10 +5,28 @@
  * concentrado. Le so a camada semantica (regra 2).
  */
 .faixa {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   border-top: 4px solid var(--ah-state-risk);
   padding: 6px 24px;
   background: color-mix(in srgb, var(--ah-state-risk) 10%, var(--ah-surface-raised));
   color: var(--ah-state-risk);
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
+}
+
+/* Empurra a saida para a direita sem depender de margem no filho. */
+.texto {
+  flex: 1;
+}
+
+/*
+ * A acao herda a cor de risco da faixa: o botao dentro dela e um `ghost`, que
+ * pinta por `currentColor` -- sem isto ele voltaria ao cinza do painel e
+ * sumiria no fundo da faixa.
+ */
+.acao {
+  color: inherit;
+  white-space: nowrap;
 }

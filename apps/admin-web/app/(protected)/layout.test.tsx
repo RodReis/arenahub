@@ -26,13 +26,23 @@ vi.mock('../actions/auth', () => ({
   sair: vi.fn(),
 }));
 
+/*
+ * `encerrarSuporte` entra pela FAIXA DE SUPORTE (F61): o layout a importa para
+ * o botão "Sair do suporte". Sem o mock, `app/actions/platform` arrasta
+ * `lib/api/repassar-cookies`, que declara `server-only` e derruba o arquivo
+ * inteiro antes do primeiro teste.
+ */
+vi.mock('../actions/platform', () => ({
+  encerrarSuporte: vi.fn(),
+}));
+
 import { chamarApi } from '../../lib/api/server-client';
 import LayoutProtegido, { reancorarGrupos } from './layout';
 
 const PERFIL = { id: 'u1', email: 'dono@arena-positiva.test' };
 
-function unidade(nome: string, status = 'ACTIVE') {
-  return { id: `id-${nome}`, name: nome, status };
+function unidade(nome: string, status = 'ACTIVE', timezone = 'America/Sao_Paulo') {
+  return { id: `id-${nome}`, name: nome, status, timezone };
 }
 
 function responder(unidades: unknown[], permissions?: string[]) {
@@ -288,5 +298,75 @@ describe('seletor de unidade no topbar', () => {
 
       expect(rotulosDe(resultado).filter((g) => g === 'Financeiro')).toHaveLength(1);
     });
+  });
+});
+
+/**
+ * A FAIXA DE SUPORTE — F61.
+ *
+ * Quem opera elevado vê a tela do cliente idêntica à própria; sem a faixa, age
+ * achando que está na própria casa. É aviso de segurança, não enfeite: aparece
+ * só quando a API declara a elevação, e nunca depende de a tela adivinhar.
+ */
+describe('faixa de suporte', () => {
+  function responderComElevacao(
+    elevacao: { tenant: string; reason: string; expiraEm: string } | undefined,
+  ) {
+    vi.mocked(chamarApi).mockImplementation((caminho: string) => {
+      if (caminho === '/api/v1/units') {
+        return Promise.resolve({
+          ok: true,
+          dados: [unidade('Matriz', 'ACTIVE', 'America/Manaus')],
+          cookiesDaApi: [],
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        dados: elevacao === undefined ? PERFIL : { ...PERFIL, supportElevation: elevacao },
+        cookiesDaApi: [],
+      });
+    });
+  }
+
+  it('nao aparece na sessao comum', async () => {
+    responderComElevacao(undefined);
+
+    await renderizar();
+
+    expect(screen.queryByTestId('faixa-de-suporte')).not.toBeInTheDocument();
+  });
+
+  it('nomeia o tenant e oferece a saida quando ha elevacao viva', async () => {
+    responderComElevacao({
+      tenant: 'Arena Positiva',
+      reason: 'Chamado 4821',
+      expiraEm: '2026-09-09T17:30:00.000Z',
+    });
+
+    await renderizar();
+
+    const faixa = screen.getByTestId('faixa-de-suporte');
+
+    expect(faixa).toHaveTextContent('Arena Positiva');
+    expect(screen.getByTestId('sair-do-suporte')).toBeInTheDocument();
+  });
+
+  /**
+   * O fuso é o da ACADEMIA VISITADA, não o de quem olha: o suporte de Curitiba
+   * vendo a academia de Manaus precisa da hora de encerramento no fuso de lá,
+   * que é onde o prazo termina. 17:30Z em America/Manaus é 13:30 — em
+   * America/Sao_Paulo seria 14:30, e a diferença é o defeito.
+   */
+  it('mostra a hora de encerramento no fuso da academia visitada', async () => {
+    responderComElevacao({
+      tenant: 'Arena Positiva',
+      reason: 'Chamado 4821',
+      expiraEm: '2026-09-09T17:30:00.000Z',
+    });
+
+    await renderizar();
+
+    expect(screen.getByTestId('faixa-de-suporte')).toHaveTextContent('13:30');
   });
 });

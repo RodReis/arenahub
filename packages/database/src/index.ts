@@ -21,6 +21,14 @@ export { criarPrismaClient, type PrismaClientArenaHub } from './client.js';
  * Quem so precisa de uma conexao usa `criarPrismaClient`.
  */
 export { PrismaClient, Prisma } from './generated/client.js';
+
+/**
+ * FONTE UNICA das permissoes do OWNER. Exportada do pacote (e nao so usada
+ * por dentro) porque a F61 cria tenant pela API, e nao mais so pelo
+ * `bootstrap-tenant` -- os dois caminhos leem a MESMA lista. Copia-la ja
+ * produziu OWNER real sem `access.read` em producao; ver `permissoes.ts`.
+ */
+export { PERMISSOES_DO_OWNER } from './permissoes.js';
 export { PrismaPg } from '@prisma/adapter-pg';
 
 /**

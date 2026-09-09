@@ -6,6 +6,7 @@ import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware
 import { ProblemDetailsFilter } from './common/http/problem-details.filter.js';
 import { AuthGuard } from './common/security/auth.guard.js';
 import { PermissionsGuard } from './common/security/permissions.guard.js';
+import { PlatformGuard } from './common/security/platform.guard.js';
 import { AntivirusModule } from './common/antivirus/antivirus.module.js';
 import { MediaFetcherModule } from './common/media-fetcher/media-fetcher.module.js';
 import { StorageModule } from './common/storage/storage.module.js';
@@ -30,6 +31,7 @@ import { KioskAdminModule } from './modules/kiosk-admin/kiosk-admin.module.js';
 import { KioskAuthModule } from './modules/kiosk-auth/kiosk-auth.module.js';
 import { MembershipModule } from './modules/membership/membership.module.js';
 import { OperationsModule } from './modules/operations/operations.module.js';
+import { PlatformModule } from './modules/platform/platform.module.js';
 import { PrivacyModule } from './modules/privacy/privacy.module.js';
 import { StudentsModule } from './modules/students/students.module.js';
 import { TenancyModule } from './modules/tenancy/tenancy.module.js';
@@ -71,6 +73,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     ExportsModule,
     OperationsModule,
     HealthModule,
+    PlatformModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -83,6 +86,10 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     // `TenantContext` na requisicao; `PermissionsGuard` depois, porque le
     // dali. Invertidos, a autorizacao rodaria sem saber quem e o ator.
     { provide: APP_GUARD, useClass: AuthGuard },
+    // Entre os dois: depende do `PlatformContext` que o `AuthGuard` poe, e
+    // barra o usuario de tenant antes de o `PermissionsGuard` procurar
+    // permissao que rota de plataforma nao usa.
+    { provide: APP_GUARD, useClass: PlatformGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })

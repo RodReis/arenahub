@@ -18,8 +18,13 @@ import { MembershipRepository } from './membership.repository.js';
     MembershipRepository,
     TenantContextService,
   ],
-  // Exportado para o `students` validar o consultor responsavel por caso de
-  // uso publico, e nao lendo `tenant_memberships` direto (regra no 9).
-  exports: [MembershipRepository],
+  // `MembershipRepository`: exportado para o `students` validar o consultor
+  // responsavel por caso de uso publico, e nao lendo `tenant_memberships`
+  // direto (regra no 9).
+  //
+  // `EmailDeConviteService`: exportado para o `platform` mandar o convite do
+  // OWNER no tenant recem-criado. UM servico de envio de convite, nao dois --
+  // duplicar o corpo do e-mail faria as duas telas divergirem calado.
+  exports: [MembershipRepository, EmailDeConviteService],
 })
 export class IamModule {}
