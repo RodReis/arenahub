@@ -133,3 +133,125 @@ test('o dono do SaaS cria a academia e entra nela como suporte', async ({ page, 
   await expect(page).toHaveURL(/\/platform/);
   await expect(page.getByTestId('faixa-de-suporte')).toBeHidden();
 });
+
+/**
+ * Identidade visual e login por slug — F62, issue #285.
+ *
+ * Jornada separada da anterior de propósito: aquela costura a criação e a
+ * elevação, e o refresh de plataforma é de USO ÚNICO (ver a nota no topo).
+ * Emendar a marca no mesmo fio faria uma falha no upload esconder o defeito da
+ * elevação, e vice-versa.
+ *
+ * O que só o E2E prova aqui: a tela `/{slug}/login` renderiza a marca que o
+ * Super Admin acabou de configurar. Unidade e integração cobrem o sanitizador
+ * e a rota; nenhum dos dois abre a página que o time da academia vê.
+ */
+/**
+ * A SEGUNDA sessao semeada (`seed.ts`), e nao a mesma da jornada acima: o
+ * refresh e de uso unico e rotaciona ao ser apresentado. Duas jornadas
+ * partindo do mesmo token fariam a segunda falhar por deteccao de reuso --
+ * erro de sessao no lugar do defeito que o teste procura.
+ */
+const REFRESH_DE_PLATAFORMA_DA_MARCA = 'refresh-de-bancada-do-super-admin-e2e-marca';
+
+const MARCA = {
+  slug: `marca-e2e-${sufixo}`,
+  displayName: `Marca E2E ${sufixo}`,
+  legalName: `Marca E2E ${sufixo} LTDA`,
+  cnpj: '12.345.678/0001-99',
+  responsavelNome: 'Responsavel de Marca',
+  responsavelEmail: `marca-e2e-${sufixo}@exemplo.test`,
+  missao: 'Treinar todo mundo que entra aqui.',
+  diferenciais: 'Quadra de areia\nBox de cross',
+};
+
+test('a marca da academia aparece na tela de login por slug', async ({ page, context }) => {
+  await context.addCookies([
+    {
+      name: 'arenahub_refresh',
+      value: REFRESH_DE_PLATAFORMA_DA_MARCA,
+      url: 'http://localhost:3000',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ]);
+
+  await page.goto('/platform/novo');
+  await expect(page).not.toHaveURL(/\/login/);
+
+  await page.getByTestId('campo-nome-da-academia').fill(MARCA.displayName);
+  await page.getByTestId('campo-razao-da-academia').fill(MARCA.legalName);
+  await page.getByTestId('campo-cnpj-da-academia').fill(MARCA.cnpj);
+  await page.getByTestId('campo-slug-da-academia').fill(MARCA.slug);
+  await page.getByTestId('campo-nome-do-responsavel').fill(MARCA.responsavelNome);
+  await page.getByTestId('campo-email-do-responsavel').fill(MARCA.responsavelEmail);
+  await page.getByTestId('campo-codigo-da-unidade').fill('MATRIZ');
+  await page.getByTestId('campo-nome-da-unidade').fill('Unidade Matriz');
+  await page.getByTestId('confirmar-academia').click();
+  await expect(page.getByTestId('academia-criada')).toBeVisible();
+
+  await page.goto('/platform');
+  await page
+    .getByRole('row')
+    .filter({ hasText: MARCA.displayName })
+    .getByTestId('abrir-academia')
+    .click();
+
+  // --- missão e diferenciais, pelo formulário de cadastro ------------------
+  await page.getByTestId('campo-missao-da-academia').fill(MARCA.missao);
+  await page.getByTestId('campo-diferenciais-da-academia').fill(MARCA.diferenciais);
+  await page.getByTestId('salvar-academia').click();
+  await expect(page.getByTestId('academia-salva')).toBeVisible();
+
+  /*
+   * O UPLOAD DE ARQUIVO NÃO ENTRA NESTA JORNADA, e a omissão é decisão, não
+   * esquecimento.
+   *
+   * O runner do CI sobe **só Postgres** — não há MinIO —, e o upload grava no
+   * bucket de verdade: aqui ele morre com `ECONNREFUSED 127.0.0.1:9000`. Na
+   * integração isso se resolve trocando a porta de storage por um dublê; no
+   * E2E não, porque a API roda como processo separado e o teste não alcança o
+   * container de injeção dela.
+   *
+   * O que o upload prova está coberto onde é estável: a recusa do SVG com
+   * script tem **10 testes de unidade** (`identidade-visual.spec.ts`) e a
+   * gravação tem **9 de integração** (`platform-identidade-visual.int-spec.ts`,
+   * incluindo "recusa e não grava nada" e "apaga o arquivo anterior").
+   *
+   * O que SÓ esta jornada prova é o que segue abaixo: a tela `/{slug}/login`,
+   * sem sessão, renderizando a marca que o Super Admin acabou de configurar.
+   * Por isso ela segue sem o logo — `temLogo` é falso, e o hero cai no
+   * wordmark, que é exatamente o caminho de quem ainda não enviou arquivo.
+   *
+   * Quando o CI ganhar MinIO, o upload volta para cá em três linhas.
+   */
+
+  // --- a tela de login da academia mostra tudo ----------------------------
+  //
+  // SEM SESSÃO: o contexto novo é o que prova que a rota é pública. Reusar a
+  // página logada mostraria a marca por um caminho que quem vai fazer login
+  // nunca percorre.
+  const anonimo = await page.context().browser()!.newContext();
+  const telaDeLogin = await anonimo.newPage();
+
+  await telaDeLogin.goto(`/${MARCA.slug}/login`);
+
+  await expect(telaDeLogin.getByTestId('nome-do-tenant')).toHaveText(MARCA.displayName);
+  await expect(telaDeLogin.getByTestId('missao-do-tenant')).toHaveText(MARCA.missao);
+  await expect(telaDeLogin.getByTestId('diferenciais-do-tenant')).toContainText('Quadra de areia');
+  // SEM LOGO nesta jornada (ver a nota acima sobre o CI sem MinIO): o hero cai
+  // no wordmark, que é o caminho de quem ainda não enviou arquivo.
+  await expect(telaDeLogin.getByTestId('logo-do-tenant')).toBeHidden();
+  await expect(telaDeLogin).toHaveTitle(new RegExp(MARCA.displayName));
+
+  /*
+   * SLUG INEXISTENTE CAI NA MARCA ARENAHUB, sem 404 e sem dizer que não
+   * existe. É o aceite da issue: o status e o conteúdo desta tela não podem
+   * revelar quais academias são clientes.
+   */
+  await telaDeLogin.goto(`/academia-que-nunca-existiu-${sufixo}/login`);
+  await expect(telaDeLogin.getByRole('heading', { name: 'Entrar no painel' })).toBeVisible();
+  await expect(telaDeLogin.getByTestId('nome-do-tenant')).toBeHidden();
+
+  await anonimo.close();
+});

@@ -95,6 +95,26 @@ export class S3ObjectStorageAdapter implements ObjectStoragePort {
     );
   }
 
+  /**
+   * Le o objeto inteiro para a memoria. Ver a porta para o porque de existir
+   * ao lado de `createPrivateDownload` em vez de substitui-la.
+   *
+   * `transformToByteArray` e nao `transformToString`: o corpo pode ser PNG,
+   * e decodificar bytes binarios como texto os corrompe silenciosamente.
+   */
+  async getPrivateObject(key: string): Promise<{ body: Buffer; contentType: string }> {
+    const resposta = await this.cliente.send(
+      new GetObjectCommand({ Bucket: this.config.bucket, Key: key }),
+    );
+
+    const bytes = await resposta.Body?.transformToByteArray();
+
+    return {
+      body: Buffer.from(bytes ?? new Uint8Array(0)),
+      contentType: resposta.ContentType ?? 'application/octet-stream',
+    };
+  }
+
   async createPrivateDownload(entrada: {
     key: string;
     expiresInSeconds: number;

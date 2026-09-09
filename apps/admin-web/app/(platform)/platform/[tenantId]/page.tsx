@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { PageHeader, ProblemDetail } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
+import { ArquivosDaMarca } from './arquivos-da-marca';
 import { ElevarTenant } from './elevar-tenant';
 import { FormularioDeEdicao } from './formulario-de-edicao';
 import { SituacaoDoTenant } from './situacao-do-tenant';
@@ -30,6 +31,15 @@ interface TenantEmDetalhe {
   responsavelEmail: string | null;
   status: string;
   unidades: number;
+  /*
+   * Identidade visual (F62). Os textos vêm inteiros porque alimentam campos de
+   * edição; dos ARQUIVOS vem só o booleano -- a chave do objeto é caminho
+   * interno do bucket, e a pré-visualização usa a rota pública.
+   */
+  missionText: string | null;
+  highlightsText: string | null;
+  temLogo: boolean;
+  temIcone: boolean;
 }
 
 /**
@@ -97,6 +107,15 @@ export default async function PaginaDaAcademia({
         timezone={tenant.timezone ?? 'America/Sao_Paulo'}
         responsavelNome={tenant.responsavelNome ?? ''}
         responsavelEmail={tenant.responsavelEmail ?? ''}
+        missionText={tenant.missionText ?? ''}
+        highlightsText={tenant.highlightsText ?? ''}
+      />
+
+      <ArquivosDaMarca
+        tenantId={tenant.id}
+        slug={tenant.slug}
+        temLogo={tenant.temLogo}
+        temIcone={tenant.temIcone}
       />
 
       <SituacaoDoTenant tenantId={tenant.id} status={tenant.status} />

@@ -574,6 +574,23 @@ model Tenant {
   responsavelNome  String? @map("responsavel_nome")
   responsavelEmail String? @map("responsavel_email")
 
+  /// Identidade visual da academia (F62, ADR-052 §9).
+  ///
+  /// CHAVE DE OBJETO, e nao URL: o bucket e privado e a URL publica dele nunca
+  /// e o que a tela usa. Guardar URL assinada em coluna gravaria um link que
+  /// expira -- a coluna passaria a mentir sozinha depois de alguns minutos.
+  ///
+  /// Nulo = sem arquivo enviado, e a tela cai na marca ArenaHub. Opcionais
+  /// porque os tenants que ja existem nasceram sem eles, e porque academia
+  /// sem logo tem de continuar entrando no painel.
+  logoObjectKey  String? @map("logo_object_key")
+  iconObjectKey  String? @map("icon_object_key")
+  /// Missao e diferenciais: texto que ocupa o hero da tela de login por slug.
+  /// TEXTO PURO, escapado pelo React na renderizacao -- nao aceita HTML, pelo
+  /// mesmo motivo que o SVG e sanitizado no upload.
+  missionText    String? @map("mission_text")
+  highlightsText String? @map("highlights_text")
+
   status    TenantStatus @default(ACTIVE)
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")

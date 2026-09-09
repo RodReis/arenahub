@@ -54,7 +54,21 @@ const COOKIE_DE_REFRESH = 'arenahub_refresh';
  * nao chama nada autenticado -- e refresh rotacionado e detectado como
  * reuso se reaparecer.
  */
-const PUBLICAS = ['/login', '/convite'];
+const PUBLICAS = ['/login', '/convite', '/marca'];
+
+/**
+ * `/{slug}/login` — a tela de entrada da academia (F62, ADR-052 §10).
+ *
+ * Casa pelo SUFIXO, e não por prefixo como as rotas acima: o slug é o primeiro
+ * segmento e não se conhece de antemão. Um prefixo dinâmico aqui liberaria
+ * `/qualquer-coisa` inteira, e a renovação de sessão sairia das telas
+ * protegidas junto — que é o bug que o comentário do topo deste arquivo
+ * descreve.
+ *
+ * Dois segmentos exatos: `/arena-positiva/login` casa, `/students/x/login`
+ * não. Nenhuma rota protegida do painel termina em `/login`.
+ */
+const LOGIN_COM_SLUG = /^\/[a-z0-9][a-z0-9-]*\/login$/;
 
 export async function proxy(requisicao: NextRequest): Promise<NextResponse> {
   const { pathname } = requisicao.nextUrl;
@@ -62,6 +76,8 @@ export async function proxy(requisicao: NextRequest): Promise<NextResponse> {
   if (PUBLICAS.some((rota) => pathname === rota || pathname.startsWith(`${rota}/`))) {
     return NextResponse.next();
   }
+
+  if (LOGIN_COM_SLUG.test(pathname)) return NextResponse.next();
 
   const acesso = requisicao.cookies.get(COOKIE_DE_ACESSO)?.value;
   const refresh = requisicao.cookies.get(COOKIE_DE_REFRESH)?.value;

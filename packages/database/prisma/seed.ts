@@ -139,6 +139,24 @@ const SESSAO_DE_PLATAFORMA = {
   validoPorDias: 30,
 };
 
+/**
+ * A SEGUNDA sessao de plataforma, para a jornada da F62 (issue #285).
+ *
+ * UMA SESSAO POR JORNADA, e nao uma compartilhada: o refresh e de USO UNICO --
+ * ele rotaciona ao ser usado, e reapresentar um ja rotacionado derruba a
+ * familia inteira por detecao de reuso (`auth.service.ts`). Duas jornadas
+ * partindo do mesmo token fariam a segunda a rodar falhar com erro de sessao,
+ * escondendo o defeito que ela deveria acusar -- e o Playwright roda os testes
+ * de um arquivo em ordem, mas em paralelo com os de outros.
+ *
+ * Cada jornada nova de plataforma ganha a propria linha aqui. E barato: uma
+ * `Session` a mais no banco de E2E.
+ */
+const SESSAO_DE_PLATAFORMA_DA_MARCA = {
+  refresh: 'refresh-de-bancada-do-super-admin-e2e-marca',
+  validoPorDias: 30,
+};
+
 
 /**
  * Catalogo de planos da Arena Positiva.
@@ -1033,27 +1051,34 @@ async function semearSuperAdmin(
     );
   }
 
-  const tokenHash = createHash('sha256').update(SESSAO_DE_PLATAFORMA.refresh).digest('hex');
+  /*
+   * Uma linha por jornada. `familyId` PROPRIO em cada uma: familia
+   * compartilhada faria a rotacao de uma revogar a outra, que e exatamente o
+   * problema que duas sessoes existem para evitar.
+   */
+  for (const semente of [SESSAO_DE_PLATAFORMA, SESSAO_DE_PLATAFORMA_DA_MARCA]) {
+    const tokenHash = createHash('sha256').update(semente.refresh).digest('hex');
 
-  const sessao = {
-    userId: usuario.id,
-    // NULO: sessao de PLATAFORMA nao tem tenant. E isto que faz o `AuthGuard`
-    // montar `PlatformContext` em vez de contexto de tenant.
-    tenantId: null,
-    status: 'ACTIVE' as const,
-    rotatedAt: null,
-    revokedAt: null,
-    revokedReason: null,
-    expiresAt: new Date(Date.now() + SESSAO_DE_PLATAFORMA.validoPorDias * 24 * 60 * 60 * 1000),
-  };
+    const sessao = {
+      userId: usuario.id,
+      // NULO: sessao de PLATAFORMA nao tem tenant. E isto que faz o `AuthGuard`
+      // montar `PlatformContext` em vez de contexto de tenant.
+      tenantId: null,
+      status: 'ACTIVE' as const,
+      rotatedAt: null,
+      revokedAt: null,
+      revokedReason: null,
+      expiresAt: new Date(Date.now() + semente.validoPorDias * 24 * 60 * 60 * 1000),
+    };
 
-  await db.session.upsert({
-    where: { tokenHash },
-    create: { ...sessao, tokenHash, familyId: randomUUID() },
-    update: sessao,
-  });
+    await db.session.upsert({
+      where: { tokenHash },
+      create: { ...sessao, tokenHash, familyId: randomUUID() },
+      update: sessao,
+    });
+  }
 
-  console.info('[seed] sessao de plataforma reposta para o E2E da F61.');
+  console.info('[seed] duas sessoes de plataforma repostas para os E2E da F61 e da F62.');
 }
 
 /** Idade em anos completos numa data de referencia. */
