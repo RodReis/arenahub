@@ -333,7 +333,7 @@ export class AuthController {
     });
 
     // `diasRestantes` so e `null` quando nao ha fatura vencida, e ja
-    // recusamos esse caso acima -- a asserção documenta a garantia.
+    // recusamos esse caso acima -- a checagem documenta a garantia.
     if (situacao.diasRestantes === null) return undefined;
 
     return {
