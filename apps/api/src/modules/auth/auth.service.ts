@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { Injectable } from '@nestjs/common';
 import { InjectThrottlerStorage, minutes, seconds, type ThrottlerStorage } from '@nestjs/throttler';
 
@@ -8,6 +10,7 @@ import {
   RefreshReutilizadoError,
 } from '../../common/http/erro-de-dominio.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { MfaService } from './mfa.service.js';
 import { PasswordService } from './password.service.js';
 import { SessionRepository } from './session.repository.js';
 import { TokenService } from './token.service.js';
@@ -34,6 +37,23 @@ export interface ParDeTokens {
 }
 
 /**
+ * Desafio de segundo fator. So o Super Admin recebe isto -- ver `login`.
+ *
+ * O par de tokens NAO acompanha: entregar sessao junto com o desafio faria
+ * do segundo fator decoracao.
+ */
+export interface DesafioDeMfa {
+  desafio: 'MFA_SETUP' | 'MFA_VERIFY';
+  preAuth: string;
+}
+
+export type ResultadoDeLogin = ParDeTokens | DesafioDeMfa;
+
+export function ehDesafioDeMfa(resultado: ResultadoDeLogin): resultado is DesafioDeMfa {
+  return 'desafio' in resultado;
+}
+
+/**
  * Envelope de hash usado quando o e-mail nao existe.
  *
  * Sem isso, "e-mail inexistente" responderia na hora e "senha errada"
@@ -52,16 +72,17 @@ export class AuthService {
     private readonly senhas: PasswordService,
     private readonly tokens: TokenService,
     private readonly sessoes: SessionRepository,
+    private readonly mfa: MfaService,
     @InjectThrottlerStorage() private readonly forcaBruta: ThrottlerStorage,
   ) {}
 
-  async login(email: string, senha: string, ip: string): Promise<ParDeTokens> {
+  async login(email: string, senha: string, ip: string): Promise<ResultadoDeLogin> {
     const normalizado = email.trim().toLowerCase();
     const chaveDeForcaBruta = `${ip}:${normalizado}`;
 
     const usuario = await this.db.user.findUnique({
       where: { email: normalizado },
-      include: { memberships: { where: { status: 'ACTIVE' }, take: 1 } },
+      include: { memberships: { where: { status: 'ACTIVE' }, take: 1 }, platformAdmin: true },
     });
 
     // Conferir mesmo sem usuario, para gastar o mesmo tempo. Ver
@@ -69,8 +90,19 @@ export class AuthService {
     const confere = await this.senhas.conferir(senha, usuario?.passwordHash ?? ENVELOPE_FALSO);
 
     const vinculo = usuario?.memberships[0];
+    // ATIVO: revogar e escrever `revokedAt`, nunca deletar. Sem esta
+    // checagem, ex-dono do SaaS continuaria entrando pelo ramo de plataforma.
+    const admin =
+      usuario?.platformAdmin && usuario.platformAdmin.revokedAt === null
+        ? usuario.platformAdmin
+        : undefined;
 
-    if (!usuario || !confere || usuario.status !== 'ACTIVE' || !vinculo) {
+    /*
+     * O Super Admin nao tem `TenantMembership` -- ele nao pertence a tenant
+     * nenhum. Sem esta alternativa ele cairia na recusa abaixo por falta de
+     * vinculo, e o dono do SaaS nunca conseguiria entrar.
+     */
+    if (!usuario || !confere || usuario.status !== 'ACTIVE' || (!vinculo && !admin)) {
       // So a tentativa ERRADA soma contra o limite (AC-7). Login valido
       // nunca chama `increment`: sessao repetida (troca de aba, sessao
       // expirada) nao e o que este limite existe para conter.
@@ -87,7 +119,64 @@ export class AuthService {
       throw new CredencialInvalidaError();
     }
 
+    /*
+     * INV-007: MFA obrigatorio para o dono do SaaS -- e SO para ele.
+     *
+     * Um fator nao abre sessao de plataforma: o que sai daqui e um pre-auth
+     * de cinco minutos que so serve para completar o segundo fator. Ligar
+     * MFA para OWNER, MANAGER, RECEPTIONIST e TECH_OPERATOR quebraria o
+     * login de toda a base existente -- e fatia de migracao propria.
+     */
+    if (admin) {
+      const purpose = usuario.mfaStatus === 'ENABLED' ? 'MFA_VERIFY' : 'MFA_SETUP';
+
+      return {
+        desafio: purpose,
+        preAuth: this.tokens.emitirPreAuth({
+          sub: usuario.id,
+          // Sessao de plataforma nao tem tenant.
+          tenantId: null,
+          challengeId: randomUUID(),
+          purpose,
+        }),
+      };
+    }
+
+    if (!vinculo) throw new CredencialInvalidaError();
+
     return this.emitirPar({ userId: usuario.id, tenantId: vinculo.tenantId });
+  }
+
+  /**
+   * Troca o pre-auth pelo par definitivo, conferindo o TOTP.
+   *
+   * A sessao nasce com `tenantId: null` -- e sessao de PLATAFORMA, e e isso
+   * que o `AuthGuard` le para montar `PlatformContext` em vez de contexto de
+   * tenant.
+   */
+  async verificarMfa(preAuth: string, codigo: string): Promise<ParDeTokens> {
+    let claims;
+
+    try {
+      claims = this.tokens.verificarPreAuth(preAuth);
+    } catch {
+      throw new NaoAutenticadoError();
+    }
+
+    // Um pre-auth de SETUP prova que a pessoa tem a senha, nao que tem o
+    // segundo fator: ele nao pode virar sessao aqui.
+    if (claims.purpose !== 'MFA_VERIFY') throw new NaoAutenticadoError();
+
+    const admin = await this.db.platformAdmin.findFirst({
+      where: { userId: claims.sub, revokedAt: null },
+    });
+
+    // Revogacao vale na hora, mesmo com pre-auth ja emitido.
+    if (!admin) throw new NaoAutenticadoError();
+
+    await this.mfa.verificar(claims.sub, codigo);
+
+    return this.emitirPar({ userId: claims.sub, tenantId: null });
   }
 
   /**
@@ -167,7 +256,11 @@ export class AuthService {
     return usuario;
   }
 
-  private async emitirPar(dados: { userId: string; tenantId: string }): Promise<ParDeTokens> {
+  private async emitirPar(dados: {
+    userId: string;
+    /** Nulo na sessao de PLATAFORMA. */
+    tenantId: string | null;
+  }): Promise<ParDeTokens> {
     const { token, tokenHash } = this.tokens.gerarRefresh();
 
     const sessionId = await this.sessoes.abrir({

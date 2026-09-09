@@ -57,6 +57,28 @@
         ]
       }
     },
+    "/api/v1/auth/mfa/verify": {
+      "post": {
+        "operationId": "AuthController_verificarMfa",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",

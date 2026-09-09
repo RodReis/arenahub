@@ -1,11 +1,17 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { NaoAutenticadoError } from '../../common/http/erro-de-dominio.js';
 import { Public } from '../../common/security/public.decorator.js';
 import { COOKIE_DE_ACESSO, COOKIE_DE_REFRESH, lerCookie } from './cookies.js';
-import { AuthService, type ParDeTokens } from './auth.service.js';
+import {
+  AuthService,
+  ehDesafioDeMfa,
+  type DesafioDeMfa,
+  type ParDeTokens,
+} from './auth.service.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { TokenService } from './token.service.js';
 
@@ -27,6 +33,9 @@ const esquemaDeLogin = z
   })
   .strict();
 
+/** Seis digitos: o TOTP do `TotpService`. */
+const esquemaDeVerificacaoDeMfa = z.object({ code: z.string().regex(/^\d{6}$/) }).strict();
+
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(
@@ -42,18 +51,56 @@ export class AuthController {
     @Body() corpo: unknown,
     @Req() requisicao: Request,
     @Res({ passthrough: true }) resposta: Response,
-  ) {
+  ): Promise<DesafioDeMfa | Record<string, never>> {
     // `unknown` antes de validar (`CLAUDE.md`, Convencoes). O DTO tipado
     // so existe depois que o Zod confirmou a forma.
     const dados = esquemaDeLogin.parse(corpo);
 
-    this.gravarCookies(
-      resposta,
-      await this.auth.login(dados.email, dados.password, requisicao.ip ?? 'sem-ip'),
+    const resultado = await this.auth.login(
+      dados.email,
+      dados.password,
+      requisicao.ip ?? 'sem-ip',
     );
+
+    /*
+     * O DESAFIO NAO GRAVA COOKIE (INV-007).
+     *
+     * O pre-auth vai no corpo justamente porque nao e credencial de sessao:
+     * ele so serve para completar o segundo fator, e nao alcanca rota
+     * nenhuma. Guarda-lo no mesmo cookie do access token o faria parecer
+     * sessao para o resto do sistema.
+     */
+    if (ehDesafioDeMfa(resultado)) return resultado;
+
+    this.gravarCookies(resposta, resultado);
 
     // Corpo vazio de proposito: token vive em cookie HttpOnly. Devolve-lo
     // no JSON o levaria para `localStorage`, legivel por qualquer script.
+    return {};
+  }
+
+  /**
+   * Segundo fator do Super Admin: troca o pre-auth pela sessao definitiva.
+   *
+   * `@Public()` porque ainda nao ha sessao -- a credencial que autoriza esta
+   * chamada e o proprio pre-auth, no cabecalho `Authorization`.
+   */
+  @Public()
+  @Post('mfa/verify')
+  @HttpCode(200)
+  @ApiOkResponse({ schema: { type: 'object', properties: {} } })
+  async verificarMfa(
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+    @Res({ passthrough: true }) resposta: Response,
+  ): Promise<Record<string, never>> {
+    const dados = esquemaDeVerificacaoDeMfa.parse(corpo);
+    const cabecalho = requisicao.headers.authorization ?? '';
+
+    if (!cabecalho.startsWith('Bearer ')) throw new NaoAutenticadoError();
+
+    this.gravarCookies(resposta, await this.auth.verificarMfa(cabecalho.slice(7), dados.code));
+
     return {};
   }
 

@@ -28,7 +28,12 @@ export interface ClaimsDeAcesso {
 
 export interface ClaimsDePreAuth {
   sub: string;
-  tenantId: string;
+  /**
+   * Nulo no desafio de PLATAFORMA -- o Super Admin nao esta em tenant nenhum.
+   * String vazia seria pior: um valor que finge ser tenant e que alguem
+   * acabaria passando adiante como se fosse.
+   */
+  tenantId: string | null;
   challengeId: string;
   purpose: 'MFA_SETUP' | 'MFA_VERIFY';
 }

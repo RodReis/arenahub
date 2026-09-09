@@ -101,6 +101,9 @@ describe('contrato OpenAPI', () => {
         '/api/v1/auth/refresh',
         '/api/v1/auth/logout',
         '/api/v1/auth/me',
+        // F61 -- segundo fator do Super Admin (INV-007). Troca o pre-auth
+        // pela sessao de plataforma; nenhum outro papel passa por aqui.
+        '/api/v1/auth/mfa/verify',
         '/api/v1/units',
         '/api/v1/units/{id}',
         // F7 -- aluno, plano e entitlement manual.
