@@ -23,7 +23,8 @@ export class SessionRepository {
 
   async abrir(dados: {
     userId: string;
-    tenantId: string;
+    /** Nulo na sessao de PLATAFORMA -- o Super Admin nao esta em tenant nenhum. */
+    tenantId: string | null;
     tokenHash: string;
     validoAte: Date;
   }): Promise<string> {
@@ -56,7 +57,8 @@ export class SessionRepository {
     sessaoAtualId: string;
     familyId: string;
     userId: string;
-    tenantId: string;
+    /** Nulo na sessao de PLATAFORMA -- o Super Admin nao esta em tenant nenhum. */
+    tenantId: string | null;
     novoTokenHash: string;
     validoAte: Date;
   }): Promise<string> {

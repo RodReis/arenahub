@@ -18,7 +18,8 @@ export interface ConfigDeToken {
 /** Claims do access token. O contrato e fechado: nada entra sem decisao. */
 export interface ClaimsDeAcesso {
   sub: string;
-  tenantId: string;
+  /** Nulo na sessao de plataforma -- o Super Admin nao esta em tenant nenhum. */
+  tenantId: string | null;
   sessionId: string;
   permissions: string[];
   mfa: boolean;

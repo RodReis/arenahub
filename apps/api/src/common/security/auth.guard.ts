@@ -6,6 +6,7 @@ import { NaoAutenticadoError } from '../http/erro-de-dominio.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { COOKIE_DE_ACESSO, lerCookie } from '../../modules/auth/cookies.js';
 import { TokenService } from '../../modules/auth/token.service.js';
+import type { PlatformContext } from '../platform/platform-context.js';
 import type { TenantContext } from '../tenant/tenant-context.js';
 import { ROTA_PUBLICA } from './public.decorator.js';
 
@@ -43,7 +44,13 @@ export class AuthGuard implements CanActivate {
     try {
       const claims = this.tokens.verificarAcesso(token);
 
-      requisicao.tenantContext = await this.montarContexto(claims.sub, claims.tenantId, claims);
+      // Token SEM tenant = sessao de plataforma. E o unico caminho em que
+      // nao existe `TenantContext`, e toda rota de tenant o rejeita.
+      if (claims.tenantId === null || claims.tenantId === undefined) {
+        requisicao.platformContext = await this.montarContextoDePlataforma(claims.sub, claims);
+      } else {
+        requisicao.tenantContext = await this.montarContexto(claims.sub, claims.tenantId, claims);
+      }
     } catch {
       // Token invalido, expirado, de outro tipo ou sessao revogada dao a
       // mesma resposta: quem sonda nao aprende qual dos casos ocorreu.
@@ -93,4 +100,23 @@ export class AuthGuard implements CanActivate {
     };
   }
 
+  /**
+   * Sessao de plataforma. Le `PlatformAdmin` ATIVO -- revogacao vale na
+   * hora, pelo mesmo motivo que as permissoes de tenant vem do banco e nao
+   * do token.
+   */
+  private async montarContextoDePlataforma(
+    userId: string,
+    claims: { sessionId: string },
+  ): Promise<PlatformContext> {
+    const admin = await this.db.platformAdmin.findFirst({
+      where: { userId, revokedAt: null },
+    });
+
+    // Sem `PlatformAdmin` ativo, um token sem tenant nao autoriza nada.
+    // Lancar aqui cai no `catch` do chamador e vira 401.
+    if (!admin) throw new NaoAutenticadoError();
+
+    return { actorId: userId, sessionId: claims.sessionId, platformAdminId: admin.id };
+  }
 }
