@@ -48,7 +48,7 @@ describe('entrar', () => {
       ok: true,
       dados: { desafio: 'MFA_VERIFY', preAuth: 'token-de-cinco-minutos' },
       cookiesDaApi: [],
-    } as never);
+    });
 
     const estado = await entrar({}, formulario());
 
@@ -65,7 +65,7 @@ describe('entrar', () => {
       ok: true,
       dados: {},
       cookiesDaApi: ['arenahub_access=abc; Path=/'],
-    } as never);
+    });
 
     // O `redirect` do Next lança por construção; o teste só precisa saber que
     // foi chamado.
