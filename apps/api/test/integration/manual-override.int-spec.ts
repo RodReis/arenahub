@@ -389,9 +389,10 @@ describe('F9 -- liberacao manual', () => {
       await db.tenant.update({ where: { id: ctx.tenantId }, data: { status: 'SUSPENDED' } });
 
       const resposta = await pedirOverride();
+      const corpo = resposta.body as { code: string };
 
       expect(resposta.status).toBe(400);
-      expect(resposta.body.code).toBe('TENANT_SUSPENDED');
+      expect(corpo.code).toBe('TENANT_SUSPENDED');
     });
 
     it('F65 -- e nenhum AccessEvent e gravado nesse caso', async () => {
