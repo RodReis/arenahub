@@ -212,6 +212,7 @@ describe('contrato OpenAPI', () => {
         // F61 -- superficie do dono do SaaS. Fora do mecanismo de papeis por
         // tenant: `@PlatformRoute()` recusa usuario de tenant com 403.
         '/api/v1/platform/tenants',
+        '/api/v1/platform/tenants/{id}',
       ]),
     );
   });
