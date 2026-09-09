@@ -26,6 +26,9 @@ datasource db {
 
 enum TenantStatus {
   ACTIVE
+  /// Desligado pelo dono do SaaS -- ato administrativo (ADR-052 secao 4).
+  INACTIVE
+  /// Inadimplencia. Quem escreve e a F65 (ADR-053), nunca o CRUD.
   SUSPENDED
 
   @@map("tenant_status")
@@ -559,14 +562,21 @@ enum PassageState {
 
 /// Academia. Nivel de cima da hierarquia decidida no ADR-002.
 model Tenant {
-  id          String       @id @default(uuid()) @db.Uuid
+  id               String  @id @default(uuid()) @db.Uuid
   /// Global: e o identificador publico do tenant, usado em URL e convite.
-  slug        String       @unique
-  legalName   String       @map("legal_name")
-  displayName String       @map("display_name")
-  status      TenantStatus @default(ACTIVE)
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  slug             String  @unique
+  legalName        String  @map("legal_name")
+  displayName      String  @map("display_name")
+  /// Dados cadastrais do contrato, preenchidos pelo Super Admin (F61).
+  /// Opcionais porque os tenants que ja existem nasceram sem eles.
+  cnpj             String?
+  timezone         String?
+  responsavelNome  String? @map("responsavel_nome")
+  responsavelEmail String? @map("responsavel_email")
+
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
 
   gymUnits     GymUnit[]
   modalities   GymUnitModality[]
@@ -577,6 +587,8 @@ model Tenant {
   invitations  Invitation[]
   auditLogs    AuditLog[]
   outboxEvents OutboxEvent[]
+
+  supportElevations SupportElevation[]
 
   students           Student[]
   studentCredentials StudentCredential[]
@@ -797,10 +809,10 @@ model GymUnitModality {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   /// `RESTRICT` como `Student.gymUnit`: apagar unidade com modalidade falha,
   /// em vez de levar o vinculo do aluno junto.
-  gymUnit  GymUnit @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
+  gymUnit  GymUnit           @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
   students StudentModality[]
 
   /// Unico POR UNIDADE, nao por tenant: duas unidades do mesmo complexo
@@ -918,6 +930,11 @@ model User {
   moderatedProfiles     PublicProfile[]
   resolvedDisputes      EngagementDispute[]
 
+  platformAdmin         PlatformAdmin?     @relation("PlatformAdminUser")
+  platformAdminsGranted PlatformAdmin[]    @relation("PlatformAdminGrantedBy")
+  supportElevations     SupportElevation[] @relation("SupportElevationAdmin")
+  platformAuditLogs     PlatformAuditLog[] @relation("PlatformAuditActor")
+
   @@map("users")
 }
 
@@ -1014,7 +1031,9 @@ model UserRole {
 model Session {
   id            String        @id @default(uuid()) @db.Uuid
   userId        String        @map("user_id") @db.Uuid
-  tenantId      String        @map("tenant_id") @db.Uuid
+  /// Nulo na sessao de PLATAFORMA: o Super Admin nao esta em tenant nenhum.
+  /// Toda rota de tenant rejeita contexto sem tenant -- ver AuthGuard.
+  tenantId      String?       @map("tenant_id") @db.Uuid
   tokenHash     String        @unique @map("token_hash")
   familyId      String        @map("family_id") @db.Uuid
   status        SessionStatus @default(ACTIVE)
@@ -1026,8 +1045,9 @@ model Session {
   revokedReason String?       @map("revoked_reason")
   createdAt     DateTime      @default(now()) @map("created_at")
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant            Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supportElevations SupportElevation[]
 
   @@index([userId])
   @@index([familyId])
@@ -1054,6 +1074,81 @@ model Invitation {
 
   @@index([tenantId, email])
   @@map("invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Plataforma (F61 -- ADR-052)
+// ---------------------------------------------------------------------------
+
+/// Dono do SaaS. Fora do mecanismo de papeis por tenant de proposito:
+/// `Role` e por tenant (`@@unique([tenantId, name])`) e afrouxa-lo poria
+/// papel global e papel de tenant na mesma query -- um bug de filtro ali
+/// vira vazamento entre tenants.
+model PlatformAdmin {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @map("user_id") @db.Uuid
+  grantedByUserId String?   @map("granted_by_user_id") @db.Uuid
+  grantedAt       DateTime  @default(now()) @map("granted_at")
+  /// Revogar e ESCREVER aqui, nunca deletar: o rastro de quem foi dono do
+  /// SaaS nao some. Ativo = `revokedAt IS NULL`.
+  revokedAt       DateTime? @map("revoked_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user      User  @relation("PlatformAdminUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("PlatformAdminGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("platform_admins")
+}
+
+/// Uma entrada de suporte num tenant. Viva = `endedAt IS NULL AND expiresAt > agora`.
+model SupportElevation {
+  id                  String    @id @default(uuid()) @db.Uuid
+  sessionId           String    @map("session_id") @db.Uuid
+  platformAdminUserId String    @map("platform_admin_user_id") @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  /// Justificativa do ato. Texto livre validado no caso de uso (>= 10).
+  reason              String
+  expiresAt           DateTime  @map("expires_at")
+  endedAt             DateTime? @map("ended_at")
+  endedReason         String?   @map("ended_reason")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  session       Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  platformAdmin User    @relation("SupportElevationAdmin", fields: [platformAdminUserId], references: [id], onDelete: Cascade)
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, expiresAt])
+  @@map("support_elevations")
+}
+
+/// Auditoria de ato de PLATAFORMA. Separada do `AuditLog` porque aquele
+/// exige `tenantId` com FK -- e "criou o tenant X" nao tem tenant dono no
+/// momento do ato.
+///
+/// Sem `updatedAt` de proposito: registro de auditoria nao se edita.
+model PlatformAuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  action        String
+  target        String
+  targetId      String?  @map("target_id")
+  /// SEM foreign key de proposito: e referencia historica e precisa
+  /// sobreviver ao tenant que descreve.
+  tenantId      String?  @map("tenant_id") @db.Uuid
+  correlationId String   @map("correlation_id")
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  /// Mesma regra do `AuditLog`: metadados ja mascarados na aplicacao. E-mail,
+  /// CPF e nome de pessoa nao entram -- log nao e lugar de PII.
+  metadata      Json?
+  occurredAt    DateTime @default(now()) @map("occurred_at")
+
+  actor User? @relation("PlatformAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([occurredAt])
+  @@index([correlationId])
+  @@map("platform_audit_logs")
 }
 
 // ---------------------------------------------------------------------------
