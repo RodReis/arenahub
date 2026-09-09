@@ -6930,7 +6930,8 @@
                       "id",
                       "slug",
                       "displayName",
-                      "status"
+                      "status",
+                      "unidades"
                     ],
                     "properties": {
                       "id": {
@@ -6950,7 +6951,47 @@
                           "INACTIVE",
                           "SUSPENDED"
                         ]
+                      },
+                      "unidades": {
+                        "type": "integer"
                       }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformController_criar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "gymUnitId",
+                    "emailEnviado"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "gymUnitId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "emailEnviado": {
+                      "type": "boolean"
                     }
                   }
                 }
