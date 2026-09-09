@@ -5,12 +5,16 @@ import { AlterarTenantUseCase } from './alterar-tenant.use-case.js';
 import { BrandingPublicoController } from './branding-publico.controller.js';
 import { BrandingService } from './branding.service.js';
 import { AuthModule } from '../auth/auth.module.js';
+import { ContratosController } from './contratos.controller.js';
 import { CriarTenantUseCase } from './criar-tenant.use-case.js';
 import { ElevarUseCase } from './elevar.use-case.js';
 import { EncerrarElevacaoUseCase } from './encerrar-elevacao.use-case.js';
 import { IamModule } from '../iam/iam.module.js';
+import { IndexValueUseCase } from './index-value.use-case.js';
 import { PlatformAuditService } from './platform-audit.service.js';
 import { PlatformController } from './platform.controller.js';
+import { SaasPlanUseCase } from './saas-plan.use-case.js';
+import { TenantContractUseCase } from './tenant-contract.use-case.js';
 import { TenantRepository } from './tenant.repository.js';
 
 @Module({
@@ -20,12 +24,17 @@ import { TenantRepository } from './tenant.repository.js';
   // tenant alvo, pelo mesmo emissor do login.
   imports: [IamModule, AuthModule],
   /*
-   * DOIS CONTROLLERS, e a separacao e a protecao: o `PlatformController` e
-   * `@PlatformRoute()` na classe -- toda rota nova nele nasce protegida --, e
-   * o `BrandingPublicoController` e `@Public()` na classe. Uma rota publica
-   * dentro do primeiro seria a excecao que o proximo autor herda como duvida.
+   * TRES CONTROLLERS, e a separacao e a protecao: `PlatformController` e
+   * `ContratosController` sao `@PlatformRoute()` na classe -- toda rota nova
+   * neles nasce protegida --, e o `BrandingPublicoController` e `@Public()`
+   * na classe. Uma rota publica dentro dos dois primeiros seria a excecao que
+   * o proximo autor herda como duvida.
+   *
+   * O de contratos e SEPARADO (F63) porque plano, contrato e indice sao um
+   * assunto proprio: uma classe que cresce por acumulo vira o lugar onde
+   * ninguem acha nada.
    */
-  controllers: [PlatformController, BrandingPublicoController],
+  controllers: [PlatformController, BrandingPublicoController, ContratosController],
   providers: [
     PlatformContextService,
     PlatformAuditService,
@@ -35,6 +44,9 @@ import { TenantRepository } from './tenant.repository.js';
     ElevarUseCase,
     EncerrarElevacaoUseCase,
     BrandingService,
+    SaasPlanUseCase,
+    TenantContractUseCase,
+    IndexValueUseCase,
   ],
   exports: [PlatformContextService, PlatformAuditService, TenantRepository],
 })

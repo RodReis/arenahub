@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { PageHeader, ProblemDetail } from '@arenahub/ui';
+import { Button, PageHeader, ProblemDetail } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
 import { ArquivosDaMarca } from './arquivos-da-marca';
@@ -96,6 +96,16 @@ export default async function PaginaDaAcademia({
         id="titulo-da-academia"
         title={tenant.displayName}
         breadcrumb={<a href="/platform">Plataforma · Academias</a>}
+        actions={
+          /*
+            LINK para os contratos, e não um quinto bloco nesta tela: contrato é
+            o ato mais pesado da academia -- fechar um é irreversível --, e ele
+            merece uma tela onde seja o único assunto. Esta já tem quatro.
+          */
+          <Button href={`/platform/${tenant.id}/contratos`} data-testid="ver-contratos">
+            Contratos
+          </Button>
+        }
       />
 
       <FormularioDeEdicao

@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3039 | 3039 | 0 | 75.8 |
+| unitário | 3073 | 3073 | 0 | 76.1 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 937 | 937 | 0 | 84.0 |
+| integração | 955 | 955 | 0 | 84.0 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -136,3 +136,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-09 | #293 | SPEC-061 | integração | 928 | 928 | 0 | 84.0 | — o Jest crasha no fim no Windows (3221226505, DEPOIS de os testes passarem) e o gerador herdaria o 922 da entrega anterior; medido a mao em dois lotes: `apps/api` 850 em 62 suites (471 + 382, menos 3 de `platform-auth-de-plataforma`, que casa nos dois filtros e rodou duas vezes) + `@arenahub/database` 78. Os +6 sao os da inscricao de MFA |
 | 2026-09-09 | #285 | SPEC-062 | unitário | 3039 | 3039 | 0 | 75.8 | — |
 | 2026-09-09 | #285 | SPEC-062 | integração | 937 | 937 | 0 | 84.0 | — o Jest crasha no fim no Windows (3221226505, DEPOIS de os testes passarem) e o gerador herdou o 922 de duas entregas atrás; medido à mão **suíte a suíte**: `apps/api` 859 em 63 suítes (número confirmado pela execução do CI, que roda em Linux sem o crash) + `@arenahub/database` 78. Os +8 são os da identidade visual (9 de integração da F62, menos 1 do contrato OpenAPI que já existia e passou a cobrir as rotas novas). Rodando as 63 de uma vez, `students-cadastro-completo` falha 1 por acúmulo de estado no banco da varredura — passa isolado duas vezes e não é tocado por esta fatia |
+| 2026-09-09 | #286 | SPEC-063 | unitário | 3073 | 3073 | 0 | 76.1 | — |
+| 2026-09-09 | #286 | SPEC-063 | integração | 955 | 955 | 0 | 84.0 | — o Jest crasha no fim no Windows (3221226505, DEPOIS de os testes passarem) e o gerador herdou o 937 da entrega anterior; medido à mão em dois lotes: `apps/api` 877 (443 + 447, menos 13 de `kiosk-auth` e `platform-auth-de-plataforma`, que casam nos dois filtros e rodaram duas vezes) + `@arenahub/database` 78. Os +18 são os da fatia: `platform-contrato.int-spec.ts` |
