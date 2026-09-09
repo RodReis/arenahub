@@ -220,6 +220,22 @@ describe('contrato OpenAPI', () => {
         // justificativa, prazo e auditoria dos dois lados.
         '/api/v1/platform/tenants/{id}/elevar',
         '/api/v1/platform/elevacao/encerrar',
+        // F63 -- catalogo de planos SaaS. GLOBAL, sem tenant: e o catalogo do
+        // dono do ArenaHub, nao dado de academia.
+        '/api/v1/platform/plans',
+        '/api/v1/platform/plans/{id}',
+        '/api/v1/platform/plans/{id}/archive',
+        // F63 -- contrato entre o ArenaHub e a academia. `activate` gera o PDF
+        // e torna o registro imutavel; `document` serve o PDF gerado.
+        '/api/v1/platform/contracts',
+        '/api/v1/platform/tenants/{tenantId}/contracts',
+        '/api/v1/platform/contracts/{id}/activate',
+        '/api/v1/platform/contracts/{id}/terminate',
+        '/api/v1/platform/contracts/{id}/corrected-value',
+        '/api/v1/platform/contracts/{id}/document',
+        // F63 -- historico manual do indice de correcao (ADR-052 §7). A API do
+        // Banco Central no caminho de faturamento e ADR futuro.
+        '/api/v1/platform/index-values',
       ]),
     );
   });

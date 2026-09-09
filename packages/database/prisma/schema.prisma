@@ -607,6 +607,9 @@ model Tenant {
 
   supportElevations SupportElevation[]
 
+  /// Contratos do ArenaHub com esta academia (F63, ADR-052 §8).
+  contracts TenantContract[]
+
   students           Student[]
   studentCredentials StudentCredential[]
   studentSequence    StudentSequence?
@@ -5848,4 +5851,185 @@ model RetentionExperimentAdverseEvent {
   @@unique([experimentId, studentId, effect])
   @@index([tenantId, experimentId, effect])
   @@map("retention_experiment_adverse_events")
+}
+
+// ===========================================================================
+// MVP 7 -- Plataforma. Plano SaaS e contrato do tenant (F63, ADR-052 §5-§8).
+//
+// ESTAS TABELAS NAO TEM `tenant_id` COMO ESCOPO DE LEITURA. Sao do ArenaHub
+// cobrando a academia -- outro pagador, outro ciclo, outra consequencia que o
+// modulo `billing` (aquele e a academia cobrando o aluno). `SaasPlan` e
+// `IndexValue` sao globais; `TenantContract` referencia o tenant como ALVO da
+// cobranca, e nao como dono da linha. Quem le e o ator de plataforma.
+// ===========================================================================
+
+/// Como o plano SaaS cobra a academia -- ADR-052 §5.
+enum SaasPricingModel {
+  /// Preco por aluno, com valor distinto para ativo e para inativo.
+  /// Ativo = `Student.status = ACTIVE`; inativo = todo o resto (ADR-052 §6).
+  PER_STUDENT
+
+  /// Valor fixo mensal, corrigido anualmente pelo indice do contrato.
+  FIXED_MONTHLY
+
+  @@map("saas_pricing_model")
+}
+
+/// Situacao do plano no catalogo. `ARCHIVED` some da lista de escolha e nao
+/// pode fechar contrato novo -- contrato JA fechado nele continua valendo,
+/// porque contrato guarda copia dos valores (ADR-052 §8).
+enum SaasPlanStatus {
+  ACTIVE
+  ARCHIVED
+
+  @@map("saas_plan_status")
+}
+
+/// Situacao do contrato. `DRAFT` e o unico estado editavel; a partir de
+/// `ACTIVE` o registro e imutavel (ADR-052 §8) e mudanca de valor exige
+/// contrato novo apontando para este pelo `supersedesId`.
+enum TenantContractStatus {
+  DRAFT
+  ACTIVE
+  TERMINATED
+
+  @@map("tenant_contract_status")
+}
+
+/// Plano SaaS do catalogo -- o que o Super Admin oferece a academia.
+///
+/// GLOBAL, sem `tenant_id`: e catalogo do dono do SaaS, nao dado de academia.
+/// Mesma razao de `Tenant` e `Permission` ficarem fora do escopo de tenant.
+///
+/// ALTERAR PRECO AQUI NAO TOCA EM CONTRATO ATIVO -- e o aceite da fatia. O
+/// contrato copia os valores no fechamento; ler o preco pelo `planId` na hora
+/// de faturar reajustaria contrato assinado por efeito colateral de uma
+/// edicao de catalogo.
+model SaasPlan {
+  id    String           @id @default(uuid()) @db.Uuid
+  name  String
+  model SaasPricingModel
+
+  /// Preco mensal por aluno ATIVO, em centavos. Padrao R$ 5,00 (ADR-052 §5).
+  /// Usado so quando `model = PER_STUDENT`; nulo no plano fixo.
+  activeStudentPriceMinor   Int? @map("active_student_price_minor")
+  /// Preco mensal por aluno INATIVO, em centavos. Padrao R$ 2,50.
+  ///
+  /// PODE SER ZERO, e isso e deliberado (ADR-052 §6): cobrar lead desestimula
+  /// cadastrar lead, e o preco do inativo e negociado por contrato.
+  inactiveStudentPriceMinor Int? @map("inactive_student_price_minor")
+  /// Valor fixo mensal, em centavos. Usado so quando `model = FIXED_MONTHLY`.
+  fixedPriceMinor           Int? @map("fixed_price_minor")
+
+  currency String         @default("BRL")
+  status   SaasPlanStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contracts TenantContract[]
+
+  @@index([status])
+  @@map("saas_plans")
+}
+
+/// Contrato entre o ArenaHub e a academia -- ADR-052 §8.
+///
+/// REGISTRO IMUTAVEL depois de `ACTIVE`. Os valores sao COPIA do plano no
+/// instante do fechamento, e nao referencia viva: `planId` fica para saber de
+/// onde veio, mas quem fatura le as colunas daqui.
+model TenantContract {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  planId   String @map("plan_id") @db.Uuid
+
+  /// Modelo e valores COPIADOS do plano no fechamento. Ver o comentario da
+  /// classe: sao estes que a fatura le, nunca os do `SaasPlan`.
+  model                     SaasPricingModel
+  activeStudentPriceMinor   Int?             @map("active_student_price_minor")
+  inactiveStudentPriceMinor Int?             @map("inactive_student_price_minor")
+  fixedPriceMinor           Int?             @map("fixed_price_minor")
+  currency                  String           @default("BRL")
+
+  /// Indice de correcao anual. Padrao `IPCA` (ADR-052 §7). Texto e nao enum
+  /// porque um indice novo e cadastro, nao migracao.
+  indexCode        String   @default("IPCA") @map("index_code")
+  /// Data-base dos valores: a competencia a partir da qual o indice acumula.
+  baseDate         DateTime @map("base_date") @db.Date
+  /// Dia e mes do aniversario do contrato, em que a correcao roda.
+  /// Guardado como data completa; so dia e mes sao lidos.
+  anniversaryDay   Int      @map("anniversary_day")
+  /// Mes do aniversario (1-12).
+  anniversaryMonth Int      @map("anniversary_month")
+
+  /// Dias de carencia depois do vencimento antes de suspender o tenant.
+  /// Padrao 15 (ADR-052, fatura da plataforma; o gate e a F65).
+  graceDays Int @default(15) @map("grace_days")
+  /// Dia do mes em que a fatura da plataforma e emitida (1-28).
+  /// Limitado a 28 para existir em fevereiro sem regra de excecao -- mesma
+  /// razao do `BillingSettings.dueDay`.
+  issueDay  Int @map("issue_day")
+
+  startsAt DateTime  @map("starts_at") @db.Date
+  endsAt   DateTime? @map("ends_at") @db.Date
+
+  status TenantContractStatus @default(DRAFT)
+
+  /// Contrato que este substitui -- aditivo ou renegociacao (ADR-052 §8).
+  /// Nulo no primeiro contrato da academia.
+  supersedesId String? @unique @map("supersedes_id") @db.Uuid
+
+  /// CHAVE DE OBJETO do PDF gerado, no bucket privado. Nao e URL: gravar link
+  /// assinado numa coluna produz um valor que expira sozinho -- mesma regra
+  /// de `Tenant.logoObjectKey`.
+  ///
+  /// Nulo enquanto o contrato e `DRAFT`: o PDF nasce no fechamento, porque
+  /// documento de rascunho circulando como contrato e pior que documento
+  /// nenhum.
+  documentObjectKey String? @map("document_object_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan         SaasPlan        @relation(fields: [planId], references: [id])
+  supersedes   TenantContract? @relation("SucessaoDeContrato", fields: [supersedesId], references: [id])
+  supersededBy TenantContract? @relation("SucessaoDeContrato")
+
+  @@index([tenantId, status])
+  @@map("tenant_contracts")
+}
+
+/// Valor de um indice economico numa competencia -- ADR-052 §7.
+///
+/// ENTRADA MANUAL, com historico. A API publica do Banco Central no caminho
+/// de faturamento e risco sem contrapartida no primeiro ano: indisponibilidade
+/// dela viraria fatura errada ou fatura nenhuma. Automatizar e ADR futuro.
+///
+/// SEM valor cadastrado a correcao NAO roda -- e o aceite da fatia. Aplicar
+/// zero seria inventar que o indice foi zero naquele mes.
+model IndexValue {
+  id   String @id @default(uuid()) @db.Uuid
+  /// Codigo do indice, casando com `TenantContract.indexCode`. Ex.: `IPCA`.
+  code String
+
+  /// Competencia do valor: primeiro dia do mes a que ele se refere.
+  /// Guardar o mes como data evita um par (ano, mes) que ordena errado em
+  /// texto e que exige regra propria para comparar.
+  referenceMonth DateTime @map("reference_month") @db.Date
+
+  /// Variacao do mes em MILESIMOS DE PONTO PERCENTUAL -- 0,44% grava 440.
+  ///
+  /// INTEIRO, e nao `float`: a mesma razao de dinheiro ser inteiro (regra 6).
+  /// O indice multiplica valor em centavos; ponto flutuante aqui produziria
+  /// contrato corrigido para um centavo diferente a cada arredondamento.
+  variationBasisPoints Int @map("variation_basis_points")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// Uma linha por indice e competencia. Reimportar o mesmo mes reencontra a
+  /// chave em vez de somar duas variacoes sobre o mesmo periodo.
+  @@unique([code, referenceMonth])
+  @@index([code, referenceMonth])
+  @@map("index_values")
 }

@@ -7433,6 +7433,930 @@
           "BrandingPublico"
         ]
       }
+    },
+    "/api/v1/platform/plans": {
+      "get": {
+        "operationId": "ContratosController_listarPlanos",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "name",
+                      "model",
+                      "currency",
+                      "status"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string",
+                        "enum": [
+                          "PER_STUDENT",
+                          "FIXED_MONTHLY"
+                        ]
+                      },
+                      "activeStudentPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "inactiveStudentPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "fixedPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "currency": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "ARCHIVED"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      },
+      "post": {
+        "operationId": "ContratosController_criarPlano",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "model",
+                    "currency",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string",
+                      "enum": [
+                        "PER_STUDENT",
+                        "FIXED_MONTHLY"
+                      ]
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "fixedPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "ARCHIVED"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/plans/{id}": {
+      "patch": {
+        "operationId": "ContratosController_alterarPlano",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "model",
+                    "currency",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string",
+                      "enum": [
+                        "PER_STUDENT",
+                        "FIXED_MONTHLY"
+                      ]
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "fixedPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "ARCHIVED"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/plans/{id}/archive": {
+      "post": {
+        "operationId": "ContratosController_arquivarPlano",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "model",
+                    "currency",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string",
+                      "enum": [
+                        "PER_STUDENT",
+                        "FIXED_MONTHLY"
+                      ]
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "fixedPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "ARCHIVED"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenantId}/contracts": {
+      "get": {
+        "operationId": "ContratosController_listarContratos",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "tenantId",
+                      "planId",
+                      "model",
+                      "currency",
+                      "status"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "tenantId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "planId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "model": {
+                        "type": "string",
+                        "enum": [
+                          "PER_STUDENT",
+                          "FIXED_MONTHLY"
+                        ]
+                      },
+                      "activeStudentPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "inactiveStudentPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "fixedPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "currency": {
+                        "type": "string"
+                      },
+                      "indexCode": {
+                        "type": "string"
+                      },
+                      "baseDate": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "anniversaryDay": {
+                        "type": "integer"
+                      },
+                      "anniversaryMonth": {
+                        "type": "integer"
+                      },
+                      "graceDays": {
+                        "type": "integer"
+                      },
+                      "issueDay": {
+                        "type": "integer"
+                      },
+                      "startsAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "endsAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "DRAFT",
+                          "ACTIVE",
+                          "TERMINATED"
+                        ]
+                      },
+                      "supersedesId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "temDocumento": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/contracts": {
+      "post": {
+        "operationId": "ContratosController_criarContrato",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "tenantId",
+                    "planId",
+                    "model",
+                    "currency",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "tenantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "planId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "model": {
+                      "type": "string",
+                      "enum": [
+                        "PER_STUDENT",
+                        "FIXED_MONTHLY"
+                      ]
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "fixedPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "indexCode": {
+                      "type": "string"
+                    },
+                    "baseDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "anniversaryDay": {
+                      "type": "integer"
+                    },
+                    "anniversaryMonth": {
+                      "type": "integer"
+                    },
+                    "graceDays": {
+                      "type": "integer"
+                    },
+                    "issueDay": {
+                      "type": "integer"
+                    },
+                    "startsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "endsAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "DRAFT",
+                        "ACTIVE",
+                        "TERMINATED"
+                      ]
+                    },
+                    "supersedesId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "temDocumento": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/contracts/{id}/activate": {
+      "post": {
+        "operationId": "ContratosController_ativarContrato",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "tenantId",
+                    "planId",
+                    "model",
+                    "currency",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "tenantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "planId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "model": {
+                      "type": "string",
+                      "enum": [
+                        "PER_STUDENT",
+                        "FIXED_MONTHLY"
+                      ]
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "fixedPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "indexCode": {
+                      "type": "string"
+                    },
+                    "baseDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "anniversaryDay": {
+                      "type": "integer"
+                    },
+                    "anniversaryMonth": {
+                      "type": "integer"
+                    },
+                    "graceDays": {
+                      "type": "integer"
+                    },
+                    "issueDay": {
+                      "type": "integer"
+                    },
+                    "startsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "endsAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "DRAFT",
+                        "ACTIVE",
+                        "TERMINATED"
+                      ]
+                    },
+                    "supersedesId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "temDocumento": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/contracts/{id}/terminate": {
+      "post": {
+        "operationId": "ContratosController_encerrarContrato",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "tenantId",
+                    "planId",
+                    "model",
+                    "currency",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "tenantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "planId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "model": {
+                      "type": "string",
+                      "enum": [
+                        "PER_STUDENT",
+                        "FIXED_MONTHLY"
+                      ]
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "fixedPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "indexCode": {
+                      "type": "string"
+                    },
+                    "baseDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "anniversaryDay": {
+                      "type": "integer"
+                    },
+                    "anniversaryMonth": {
+                      "type": "integer"
+                    },
+                    "graceDays": {
+                      "type": "integer"
+                    },
+                    "issueDay": {
+                      "type": "integer"
+                    },
+                    "startsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "endsAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "DRAFT",
+                        "ACTIVE",
+                        "TERMINATED"
+                      ]
+                    },
+                    "supersedesId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "temDocumento": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/contracts/{id}/corrected-value": {
+      "get": {
+        "operationId": "ContratosController_valorCorrigido",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "em",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "valorMinor",
+                    "aniversariosAplicados"
+                  ],
+                  "properties": {
+                    "valorMinor": {
+                      "type": "integer"
+                    },
+                    "aniversariosAplicados": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/contracts/{id}/document": {
+      "get": {
+        "operationId": "ContratosController_documento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/index-values": {
+      "get": {
+        "operationId": "ContratosController_listarIndice",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "code",
+                      "competencia",
+                      "variationBasisPoints"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "code": {
+                        "type": "string"
+                      },
+                      "competencia": {
+                        "type": "string"
+                      },
+                      "variationBasisPoints": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      },
+      "post": {
+        "operationId": "ContratosController_registrarIndice",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "code",
+                    "competencia",
+                    "variationBasisPoints"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "competencia": {
+                      "type": "string"
+                    },
+                    "variationBasisPoints": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
     }
   },
   "info": {

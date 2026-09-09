@@ -157,6 +157,17 @@ const SESSAO_DE_PLATAFORMA_DA_MARCA = {
   validoPorDias: 30,
 };
 
+/**
+ * A TERCEIRA sessao de plataforma, para a jornada da F63 (issue #286):
+ * cadastrar plano SaaS, abrir contrato, fechar e baixar o PDF.
+ *
+ * Linha propria pela mesma razao das duas acima -- o refresh e de uso unico.
+ */
+const SESSAO_DE_PLATAFORMA_DO_CONTRATO = {
+  refresh: 'refresh-de-bancada-do-super-admin-e2e-contrato',
+  validoPorDias: 30,
+};
+
 
 /**
  * Catalogo de planos da Arena Positiva.
@@ -1056,7 +1067,11 @@ async function semearSuperAdmin(
    * compartilhada faria a rotacao de uma revogar a outra, que e exatamente o
    * problema que duas sessoes existem para evitar.
    */
-  for (const semente of [SESSAO_DE_PLATAFORMA, SESSAO_DE_PLATAFORMA_DA_MARCA]) {
+  for (const semente of [
+    SESSAO_DE_PLATAFORMA,
+    SESSAO_DE_PLATAFORMA_DA_MARCA,
+    SESSAO_DE_PLATAFORMA_DO_CONTRATO,
+  ]) {
     const tokenHash = createHash('sha256').update(semente.refresh).digest('hex');
 
     const sessao = {
@@ -1078,7 +1093,7 @@ async function semearSuperAdmin(
     });
   }
 
-  console.info('[seed] duas sessoes de plataforma repostas para os E2E da F61 e da F62.');
+  console.info('[seed] tres sessoes de plataforma repostas para os E2E da F61, da F62 e da F63.');
 }
 
 /** Idade em anos completos numa data de referencia. */

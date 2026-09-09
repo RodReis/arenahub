@@ -255,3 +255,135 @@ test('a marca da academia aparece na tela de login por slug', async ({ page, con
 
   await anonimo.close();
 });
+
+/**
+ * A jornada do contrato — F63, issue #286.
+ *
+ * O dono do SaaS cadastra um plano, abre um contrato com a academia e vê os
+ * valores acordados na tabela. É o fio que teste de unidade e de integração
+ * não veem: o formulário troca de campos conforme o modelo, e a Server Action
+ * converte reais para centavos entre a tela e a API.
+ */
+const REFRESH_DE_PLATAFORMA_DO_CONTRATO = 'refresh-de-bancada-do-super-admin-e2e-contrato';
+
+const CONTRATO = {
+  slug: `contrato-e2e-${sufixo}`,
+  displayName: `Contrato E2E ${sufixo}`,
+  legalName: `Contrato E2E ${sufixo} LTDA`,
+  cnpj: '12.345.678/0001-99',
+  responsavelNome: 'Responsavel de Contrato',
+  responsavelEmail: `contrato-e2e-${sufixo}@exemplo.test`,
+  plano: `Plano E2E ${sufixo}`,
+};
+
+test('o dono do SaaS cadastra plano e abre contrato com a academia', async ({ page, context }) => {
+  await context.addCookies([
+    {
+      name: 'arenahub_refresh',
+      value: REFRESH_DE_PLATAFORMA_DO_CONTRATO,
+      url: 'http://localhost:3000',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ]);
+
+  // --- o plano SaaS, no modelo por aluno ----------------------------------
+  await page.goto('/platform/planos');
+  await expect(page).not.toHaveURL(/\/login/);
+
+  await page.getByTestId('campo-nome-do-plano').fill(CONTRATO.plano);
+  /*
+   * MODELO POR ALUNO: os campos de preço por ativo e por inativo aparecem, e o
+   * de valor fixo NÃO existe na tela. Não é `disabled` -- é ausente, e é isso
+   * que o teste afirma logo abaixo.
+   */
+  await page.getByTestId('campo-modelo-do-plano').selectOption('PER_STUDENT');
+  await expect(page.getByTestId('campo-preco-fixo')).toBeHidden();
+
+  await page.getByTestId('campo-preco-do-ativo').fill('7,50');
+  // ZERO no inativo: é o caso que o ADR-052 §6 previu -- cobrar lead
+  // desestimula cadastrar lead, e o preço é negociado por contrato.
+  await page.getByTestId('campo-preco-do-inativo').fill('0');
+  await page.getByTestId('confirmar-plano').click();
+  await expect(page.getByTestId('plano-salvo')).toBeVisible();
+
+  /*
+   * A CONVERSÃO PARA CENTAVOS SÓ SE VÊ AQUI. `7,50` digitado tem de virar 750
+   * na API e voltar formatado na tabela; um erro de fator de cem passaria por
+   * todos os testes de unidade da action e apareceria só na fatura.
+   */
+  const linhaDoPlano = page.getByRole('row').filter({ hasText: CONTRATO.plano });
+  await expect(linhaDoPlano).toContainText('R$ 7,50');
+  await expect(linhaDoPlano).toContainText('R$ 0,00');
+
+  // --- trocar para fixo esconde os campos por aluno ------------------------
+  await page.getByTestId('campo-modelo-do-plano').selectOption('FIXED_MONTHLY');
+  await expect(page.getByTestId('campo-preco-do-ativo')).toBeHidden();
+  await expect(page.getByTestId('campo-preco-fixo')).toBeVisible();
+  await page.getByTestId('campo-modelo-do-plano').selectOption('PER_STUDENT');
+
+  // --- a academia ---------------------------------------------------------
+  await page.goto('/platform/novo');
+  await page.getByTestId('campo-nome-da-academia').fill(CONTRATO.displayName);
+  await page.getByTestId('campo-razao-da-academia').fill(CONTRATO.legalName);
+  await page.getByTestId('campo-cnpj-da-academia').fill(CONTRATO.cnpj);
+  await page.getByTestId('campo-slug-da-academia').fill(CONTRATO.slug);
+  await page.getByTestId('campo-nome-do-responsavel').fill(CONTRATO.responsavelNome);
+  await page.getByTestId('campo-email-do-responsavel').fill(CONTRATO.responsavelEmail);
+  await page.getByTestId('campo-codigo-da-unidade').fill('MATRIZ');
+  await page.getByTestId('campo-nome-da-unidade').fill('Unidade Matriz');
+  await page.getByTestId('confirmar-academia').click();
+  await expect(page.getByTestId('academia-criada')).toBeVisible();
+
+  // --- o contrato, alcançado pelo detalhe da academia ----------------------
+  await page.goto('/platform');
+  await page
+    .getByRole('row')
+    .filter({ hasText: CONTRATO.displayName })
+    .getByTestId('abrir-academia')
+    .click();
+
+  await page.getByTestId('ver-contratos').click();
+  await expect(page.getByTestId('contratos-vazio')).toBeVisible();
+
+  await page.getByTestId('campo-plano-do-contrato').selectOption({ label: `${CONTRATO.plano} (por aluno)` });
+  /*
+   * PLANO POR ALUNO NÃO PEDE ÍNDICE: o preço acompanha o catálogo do próximo
+   * contrato, não um reajuste anual. Os campos de reajuste somem da tela, e a
+   * data-base vai escondida com o valor do início.
+   */
+  await expect(page.getByTestId('campo-indice-do-contrato')).toBeHidden();
+
+  await page.getByTestId('campo-inicio-do-contrato').fill('2026-03-01');
+  await page.getByTestId('campo-dia-de-emissao').fill('1');
+  await page.getByTestId('campo-carencia-do-contrato').fill('15');
+  await page.getByTestId('confirmar-contrato').click();
+  await expect(page.getByTestId('contrato-aberto')).toBeVisible();
+
+  /*
+   * OS VALORES DA TABELA SÃO OS DO CONTRATO, copiados do plano na abertura.
+   * O contrato nasce em RASCUNHO -- fechar é um segundo ato, e é ele que gera
+   * o PDF.
+   */
+  const linhaDoContrato = page.getByRole('row').filter({ hasText: '01/03/2026' });
+  await expect(linhaDoContrato).toContainText('R$ 7,50');
+  await expect(linhaDoContrato).toContainText('Rascunho');
+  await expect(linhaDoContrato.getByTestId('fechar-contrato')).toBeVisible();
+
+  /*
+   * O FECHAMENTO NÃO ENTRA NESTA JORNADA, e a omissão é decisão, não
+   * esquecimento -- mesma razão do upload de marca acima.
+   *
+   * `activate` GRAVA O PDF no bucket, e o runner do CI sobe só Postgres: aqui
+   * a chamada morreria com `ECONNREFUSED 127.0.0.1:9000`, por falta de MinIO e
+   * não por defeito. Na integração isso se resolve trocando a porta de storage
+   * por um dublê; no E2E não, porque a API roda como processo separado.
+   *
+   * O que o fechamento prova está coberto onde é estável: 18 testes de
+   * integração (`platform-contrato.int-spec.ts`), entre eles "o PDF reproduz o
+   * valor do contrato, e não o do plano atual" e "o BANCO recusa contrato ativo
+   * sem PDF".
+   *
+   * Quando o CI ganhar MinIO, o fechamento volta para cá em três linhas.
+   */
+});
