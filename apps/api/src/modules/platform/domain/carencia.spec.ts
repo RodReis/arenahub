@@ -76,6 +76,21 @@ describe('avaliarCarencia -- F65, ADR-053', () => {
     expect(s.deveSuspender).toBe(false);
   });
 
+  it('graceDays zero suspende no dia seguinte apos 6h locais', () => {
+    // Carencia zero: vence em 09/09, suspendeEm = 09/09 (vencidaEm + 0).
+    // Mas deveSuspender so fica true quando diasRestantes <= 0 AND passou das 6h.
+    // Este teste valida o dia SEGUINTE (09/10 09:00Z = 06:00 Sao Paulo): ja passou
+    // da carencia e ja passou das 6h locais, entao deve suspender.
+    const s = avaliarCarencia({
+      faturasVencidas: [fatura('2026-09-09T00:00:00Z')],
+      graceDays: 0,
+      agora: new Date('2026-09-10T09:00:00Z'), // day after, 06:00 Sao Paulo
+      timezone: SAO_PAULO,
+    });
+
+    expect(s.deveSuspender).toBe(true);
+  });
+
   describe('a janela das 6h locais (decisao D3 do PI)', () => {
     it('NAO suspende as 5h locais, mesmo com a carencia esgotada', () => {
       // 08:00Z = 05:00 em Sao Paulo (UTC-3).

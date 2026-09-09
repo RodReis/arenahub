@@ -42,14 +42,14 @@ export function avaliarCarencia(entrada: {
   }
 
   // Encontrar a fatura MAIS ANTIGA (vencidaEm).
-  const vencidaEm = faturasVencidas.reduce((mais_antiga, fatura) => {
-    return fatura.dueAt < mais_antiga.dueAt ? fatura : mais_antiga;
+  const vencidaEm = faturasVencidas.reduce((maisAntiga, fatura) => {
+    return fatura.dueAt < maisAntiga.dueAt ? fatura : maisAntiga;
   }).dueAt;
 
-  // Calcular suspendeEm: vencidaEm + graceDays dias, no INICIO do dia (00:00 UTC).
-  // Se graceDays=0, adiciona mais 1 dia para garantir que a suspensao seja no DIA SEGUINTE
-  // ao vencimento, nunca no dia do vencimento propriamente dito. A suspensao so vale
-  // apos as 6h locais (decisao D3 do PI).
+  // Calcular suspendeEm: vencidaEm + graceDays dias, com ajuste especial para graceDays=0.
+  // Quando graceDays=0, adiciona mais 1 dia para garantir que a suspensao seja no DIA
+  // SEGUINTE ao vencimento (nunca no dia do vencimento). A suspensao so vale apos as
+  // 6h locais (decisao D3 do PI).
   const efetivoDays = graceDays === 0 ? 1 : graceDays;
   const suspendeEm = new Date(vencidaEm);
   suspendeEm.setUTCDate(suspendeEm.getUTCDate() + efetivoDays);
@@ -64,8 +64,8 @@ export function avaliarCarencia(entrada: {
   // 6h locais = 360 minutos do dia.
   const jaPassouDas6hLocais = horaLocal.minuteOfDay >= 360;
 
-  // Suspender se: carencia esgotada (diasRestantes < 0) AND ja passou das 6h locais.
-  const deveSuspender = diasRestantes < 0 && jaPassouDas6hLocais;
+  // Suspender se: carencia esgotada (diasRestantes <= 0) AND ja passou das 6h locais.
+  const deveSuspender = diasRestantes <= 0 && jaPassouDas6hLocais;
 
   // Somar TODAS as faturas vencidas.
   const emAbertoMinor = faturasVencidas.reduce((soma, fatura) => soma + fatura.totalMinor, 0);
