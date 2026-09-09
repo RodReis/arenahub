@@ -19,6 +19,22 @@ import { AccessEventRepository } from './access-event.repository.js';
  * voltar em cinco minutos, o motor nega de novo -- e e assim que tem de ser.
  */
 
+/**
+ * Gate do contratante -- F65, ADR-053 §1: suspenso, a catraca nega TODO
+ * MUNDO. Inclusive por aqui.
+ *
+ * Sem esta checagem o gate teria uma porta lateral: a recepcao nega na
+ * catraca e libera na tela, e a suspensao por inadimplencia viraria
+ * sugestao. A liberacao manual responde por decisao da OPERACAO sobre uma
+ * pessoa; ela nao tem alcance sobre a divida da academia com o ArenaHub, que
+ * so o dono resolve pagando.
+ */
+export class TenantSuspensoError extends BadRequestException {
+  constructor() {
+    super({ code: 'TENANT_SUSPENDED' });
+  }
+}
+
 export interface PedidoDeOverride {
   gymUnitId: string;
   /** Um dos dois. Aluno conhecido OU visitante descrito. */
@@ -66,6 +82,21 @@ export class ManualOverrideUseCase {
     ) {
       throw new NotFoundException({ code: 'GYM_UNIT_NOT_FOUND' });
     }
+
+    /*
+     * GATE DO CONTRATANTE ANTES DE TUDO -- F65, ADR-053 §1.
+     *
+     * Antes das checagens de dispositivo e aluno de proposito: suspenso, a
+     * resposta e a mesma para todo mundo, e vasculhar o cadastro primeiro so
+     * diria a quem sondasse quais UUIDs existem numa academia que nem
+     * deveria estar respondendo.
+     */
+    const tenant = await this.db.tenant.findUniqueOrThrow({
+      where: { id: contexto.tenantId },
+      select: { status: true },
+    });
+
+    if (tenant.status === 'SUSPENDED') throw new TenantSuspensoError();
 
     const dispositivo = await this.db.device.findFirst({
       where: {
