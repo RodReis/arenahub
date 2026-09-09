@@ -92,6 +92,29 @@ describe('criar tenant pelo painel', () => {
     expect(convite.status).toBe('PENDING');
   });
 
+  /*
+   * O convite do OWNER nao pode prender o dono a primeira unidade.
+   *
+   * O `gymUnitId` do convite vira o `gymUnitId` do `UserRole` ao aceitar, e o
+   * `AuthGuard` le campo preenchido como "vale SO nesta unidade". Com a matriz
+   * amarrada, o dono deixaria de enxergar a segunda unidade no dia em que ela
+   * abrisse -- semanas depois, sem sintoma que apontasse para o cadastro.
+   *
+   * A asercao e sobre o ESCOPO que o convite concede, nao sobre o campo: por
+   * isso ela olha o `allowedUnitIds` que o guard derivaria, e nao so o nulo.
+   */
+  it('convida o OWNER para o tenant inteiro, nao so para a primeira unidade', async () => {
+    const { contexto } = await criarSuperAdmin();
+
+    const resultado = await useCase.executar(contexto, entradaValida(), `corr-${randomUUID()}`);
+
+    const convite = await db.invitation.findFirstOrThrow({
+      where: { tenantId: resultado.tenantId },
+    });
+
+    expect(convite.gymUnitId).toBeNull();
+  });
+
   it('da ao OWNER exatamente as permissoes de PERMISSOES_DO_OWNER, sem lista repetida no teste', async () => {
     const { contexto } = await criarSuperAdmin();
 

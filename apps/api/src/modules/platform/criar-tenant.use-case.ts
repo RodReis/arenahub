@@ -107,7 +107,16 @@ export class CriarTenantUseCase {
           tenantId: tenant.id,
           email: entrada.responsavelEmail.trim().toLowerCase(),
           roleId: papel.id,
-          gymUnitId: unidade.id,
+          /*
+           * SEM `gymUnitId`, e nao por esquecimento.
+           *
+           * O convite carrega o `gymUnitId` para o `UserRole` que nasce ao
+           * aceitar (`invitation.service.ts`), e o `AuthGuard` le `gymUnitId`
+           * preenchido como "vale SO nesta unidade". Amarrar o dono a matriz
+           * o deixaria sem enxergar a segunda unidade no dia em que ela
+           * abrisse -- longe daqui, sem sintoma que aponte para ca.
+           * `bootstrap-tenant.ts` sempre criou o OWNER assim.
+           */
           tokenHash,
           expiresAt,
         },
