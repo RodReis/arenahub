@@ -229,6 +229,17 @@ export const STATE_LABELS: Dictionary = {
       tone: 'warning',
       icon: 'alert-circle',
     },
+    /**
+     * F65 (ADR-053) -- a ACADEMIA esta suspensa por inadimplencia com o
+     * ArenaHub, nao o aluno. `danger`, e nao `warning`: aqui ninguem entra,
+     * de nenhum jeito, ate o dono da academia regularizar -- diferente de
+     * `PAYMENT_OVERDUE`, que se resolve com uma liberacao pontual.
+     */
+    [DENY_REASON.TENANT_SUSPENDED]: {
+      label: 'Academia suspensa por inadimplência',
+      tone: 'danger',
+      icon: 'ban',
+    },
   },
 
   /**
