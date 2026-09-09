@@ -14,6 +14,7 @@ import {
   type ValoresDoContrato,
 } from './domain/calculo-da-fatura.js';
 import { PlatformAuditService } from './platform-audit.service.js';
+import { SuspenderTenantUseCase } from './suspender-tenant.use-case.js';
 import { TenantContractUseCase } from './tenant-contract.use-case.js';
 
 export class FaturaNaoEncontradaError extends ErroDeDominio {
@@ -92,6 +93,7 @@ export class PlatformInvoiceUseCase {
     private readonly db: PrismaService,
     private readonly auditoria: PlatformAuditService,
     private readonly contratos: TenantContractUseCase,
+    private readonly suspensao: SuspenderTenantUseCase,
   ) {}
 
   async listarDoTenant(tenantId: string): Promise<PlatformInvoice[]> {
@@ -267,6 +269,14 @@ export class PlatformInvoiceUseCase {
    * escrita, e o segundo sobrescreveria a data do primeiro. Mesmo padrao da
    * ativacao de contrato na F63.
    */
+  /**
+   * F65 -- pagar a ultima fatura vencida levanta o gate na mesma transacao
+   * (regra de arquitetura no 5, ADR-053).
+   *
+   * `levantarGate` so e chamado se NAO sobrar fatura OVERDUE do tenant --
+   * pagar uma com outra ainda vencida nao pode reabrir a catraca, senao o
+   * inadimplente mantem o acesso pagando sempre a mais velha.
+   */
   async registrarPagamento(
     contexto: PlatformContext,
     id: string,
@@ -277,24 +287,35 @@ export class PlatformInvoiceUseCase {
 
     if (fatura.status === 'PAID') throw new FaturaJaPagaError();
 
-    const alterados = await this.db.platformInvoice.updateMany({
-      where: { id: fatura.id, status: { in: ['OPEN', 'OVERDUE'] } },
-      data: { status: 'PAID', paidAt: pagoEm },
+    await this.db.$transaction(async (tx) => {
+      const alterados = await tx.platformInvoice.updateMany({
+        where: { id: fatura.id, status: { in: ['OPEN', 'OVERDUE'] } },
+        data: { status: 'PAID', paidAt: pagoEm },
+      });
+
+      if (alterados.count === 0) throw new FaturaJaPagaError();
+
+      await this.auditoria.registrar(
+        contexto,
+        {
+          action: 'platform_invoice.paid',
+          target: 'platform_invoice',
+          targetId: fatura.id,
+          tenantId: fatura.tenantId,
+          metadata: { pagoEm: pagoEm.toISOString(), totalMinor: fatura.totalMinor },
+        },
+        correlationId,
+        tx,
+      );
+
+      const aindaVencida = await tx.platformInvoice.count({
+        where: { tenantId: fatura.tenantId, status: 'OVERDUE' },
+      });
+
+      if (aindaVencida === 0) {
+        await this.suspensao.levantarGate(fatura.tenantId, correlationId, tx);
+      }
     });
-
-    if (alterados.count === 0) throw new FaturaJaPagaError();
-
-    await this.auditoria.registrar(
-      contexto,
-      {
-        action: 'platform_invoice.paid',
-        target: 'platform_invoice',
-        targetId: fatura.id,
-        tenantId: fatura.tenantId,
-        metadata: { pagoEm: pagoEm.toISOString(), totalMinor: fatura.totalMinor },
-      },
-      correlationId,
-    );
 
     return this.porId(fatura.id);
   }

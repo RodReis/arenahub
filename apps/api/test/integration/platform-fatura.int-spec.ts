@@ -5,11 +5,18 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
+import {
+  DecideOnlineAccessUseCase,
+  type ReconhecimentoRecebido,
+} from '../../src/modules/access/decide-online-access.use-case.js';
 import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import type { PlatformContext } from '../../src/common/platform/platform-context.js';
+import type { ContextoDoEdge } from '../../src/modules/edge-auth/edge-auth.service.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
+import { AlterarTenantUseCase } from '../../src/modules/platform/alterar-tenant.use-case.js';
 import { CriarTenantUseCase } from '../../src/modules/platform/criar-tenant.use-case.js';
 import { IndexValueUseCase } from '../../src/modules/platform/index-value.use-case.js';
+import { PlatformAuditService } from '../../src/modules/platform/platform-audit.service.js';
 import { PlatformInvoiceSchedulerService } from '../../src/modules/platform/platform-invoice-scheduler.service.js';
 import { PlatformInvoiceUseCase } from '../../src/modules/platform/platform-invoice.use-case.js';
 import { SaasPlanUseCase } from '../../src/modules/platform/saas-plan.use-case.js';
@@ -36,6 +43,9 @@ describe('fatura da plataforma', () => {
   let faturas: PlatformInvoiceUseCase;
   let job: PlatformInvoiceSchedulerService;
   let criarTenant: CriarTenantUseCase;
+  let alterarTenant: AlterarTenantUseCase;
+  let auditoria: PlatformAuditService;
+  let decideOnlineAccess: DecideOnlineAccessUseCase;
   let contexto: PlatformContext;
 
   const gravados = new Map<string, { body: Buffer; contentType: string }>();
@@ -183,6 +193,195 @@ describe('fatura da plataforma', () => {
     }
   };
 
+  /** Fatura OVERDUE gravada direto -- mesmo padrao de suspensao-automatica.int-spec.ts. */
+  const criarFaturaVencida = async (
+    tenantId: string,
+    entrada: { dueAt: string },
+  ): Promise<{ id: string }> => {
+    const contrato = await db.tenantContract.findFirstOrThrow({
+      where: { tenantId, status: 'ACTIVE' },
+    });
+
+    const dueAt = new Date(entrada.dueAt);
+    const competence = new Date(Date.UTC(dueAt.getUTCFullYear(), dueAt.getUTCMonth(), 1));
+
+    const fatura = await db.platformInvoice.create({
+      data: {
+        tenantId,
+        contractId: contrato.id,
+        competence,
+        model: contrato.model,
+        activeStudentPriceMinor: contrato.activeStudentPriceMinor,
+        inactiveStudentPriceMinor: contrato.inactiveStudentPriceMinor,
+        activeCount: 1,
+        totalMinor: 500_00,
+        dueAt,
+        status: 'OVERDUE',
+      },
+    });
+
+    return { id: fatura.id };
+  };
+
+  /**
+   * Grava a auditoria `tenant.suspended_automatically` que `levantarGate`
+   * procura -- e o que o job (Task 6) grava, sem rodar o ciclo inteiro de
+   * carencia aqui.
+   */
+  const registrarSuspensaoAutomatica = async (tenantId: string): Promise<void> => {
+    await auditoria.registrar(
+      { actorId: null as unknown as string } as PlatformContext,
+      { action: 'tenant.suspended_automatically', target: 'tenant', targetId: tenantId, tenantId },
+      'corr-job-de-teste',
+    );
+  };
+
+  /** Suspende pelo caminho manual do PI -- grava `tenant.status_changed`. */
+  const suspenderAMao = async (tenantId: string, motivo: string): Promise<void> => {
+    await alterarTenant.executar(
+      contexto,
+      tenantId,
+      { status: 'SUSPENDED' },
+      `corr-${randomUUID()}`,
+      motivo,
+    );
+  };
+
+  /**
+   * Cria um aluno com a cadeia minima de identidade (biometria, consentimento,
+   * device) para que `decidir` consiga chamar `DecideOnlineAccessUseCase` de
+   * ponta a ponta -- mesmo padrao de `access-gate-de-tenant.int-spec.ts`.
+   */
+  const criarAlunoComAcesso = async (
+    tenantId: string,
+    unidadeId: string,
+  ): Promise<{ alunoId: string; deviceId: string; edgeNodeId: string; externalUserId: string }> => {
+    const sufixo = randomUUID().slice(0, 8);
+
+    const aluno = await db.student.create({
+      data: {
+        tenantId,
+        gymUnitId: unidadeId,
+        membershipNumber: `F65-${sufixo}`,
+        fullName: `Aluno Gate ${sufixo}`,
+        birthDate: new Date('1990-01-01T00:00:00.000Z'),
+        status: 'ACTIVE',
+      },
+    });
+
+    const entitlement = await db.entitlement.create({
+      data: {
+        tenantId,
+        studentId: aluno.id,
+        source: 'SUBSCRIPTION',
+        status: 'ACTIVE',
+        startsAt: new Date('2026-01-01T00:00:00.000Z'),
+        endsAt: new Date('2026-12-31T23:59:59.000Z'),
+        policySnapshot: {},
+      },
+    });
+
+    await db.entitlementUnitWindow.createMany({
+      data: [0, 1, 2, 3, 4, 5, 6].map((dia) => ({
+        entitlementId: entitlement.id,
+        gymUnitId: unidadeId,
+        dayOfWeek: dia,
+        startMinute: 0,
+        endMinute: 1439,
+      })),
+    });
+
+    const edgeNode = await db.edgeNode.create({
+      data: { tenantId, gymUnitId: unidadeId, code: `EDGE-F65-${sufixo}` },
+    });
+
+    const device = await db.device.create({
+      data: {
+        tenantId,
+        gymUnitId: unidadeId,
+        edgeNodeId: edgeNode.id,
+        kind: 'FACIAL_READER',
+        model: 'Inner Fit',
+        serial: `SER-F65-${sufixo}`,
+      },
+    });
+
+    const documento = await db.consentDocument.create({
+      data: {
+        tenantId,
+        type: 'BIOMETRIC',
+        version: 1,
+        purpose: 'Identificacao facial para controle de acesso',
+        content: 'Termo biometrico. '.repeat(5),
+        contentSha256: 'c'.repeat(64),
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    });
+
+    const consentimento = await db.consentRecord.create({
+      data: {
+        tenantId,
+        studentId: aluno.id,
+        documentId: documento.id,
+        subjectKind: 'STUDENT',
+        decision: 'ACCEPTED',
+        subjectAgeYears: 36,
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    });
+
+    const identidade = await db.biometricIdentity.create({
+      data: {
+        tenantId,
+        studentId: aluno.id,
+        consentRecordId: consentimento.id,
+        state: 'ACTIVE',
+      },
+    });
+
+    const externalUserId = `f65-fatura-${sufixo}`;
+
+    await db.deviceUser.create({
+      data: {
+        tenantId,
+        deviceId: device.id,
+        studentId: aluno.id,
+        identityId: identidade.id,
+        externalUserId,
+        state: 'SYNCED',
+      },
+    });
+
+    return { alunoId: aluno.id, deviceId: device.id, edgeNodeId: edgeNode.id, externalUserId };
+  };
+
+  /** Decide o acesso online de ponta a ponta, como o teste de F65 no gate. */
+  const decidir = async (entrada: {
+    tenantId: string;
+    unidadeId: string;
+    deviceId: string;
+    edgeNodeId: string;
+    externalUserId: string;
+  }) => {
+    const edge: ContextoDoEdge = {
+      tenantId: entrada.tenantId,
+      gymUnitId: entrada.unidadeId,
+      edgeNodeId: entrada.edgeNodeId,
+      keyId: 'irrelevante-para-o-gate',
+    };
+
+    const reconhecimento: ReconhecimentoRecebido = {
+      deviceId: entrada.deviceId,
+      externalUserId: entrada.externalUserId,
+      recognitionId: `rec-${randomUUID()}`,
+      recognizedAt: new Date(),
+      idempotencyKey: `idem-${randomUUID()}`,
+      correlationId: randomUUID(),
+    };
+
+    return decideOnlineAccess.executar(edge, reconhecimento);
+  };
+
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(OBJECT_STORAGE)
@@ -200,6 +399,9 @@ describe('fatura da plataforma', () => {
     faturas = app.get(PlatformInvoiceUseCase);
     job = app.get(PlatformInvoiceSchedulerService);
     criarTenant = app.get(CriarTenantUseCase);
+    alterarTenant = app.get(AlterarTenantUseCase);
+    auditoria = app.get(PlatformAuditService);
+    decideOnlineAccess = app.get(DecideOnlineAccessUseCase);
 
     const usuario = await db.user.create({
       data: {
@@ -444,6 +646,127 @@ describe('fatura da plataforma', () => {
       await expect(
         faturas.registrarPagamento(contexto, fatura.id, new Date(), 'corr-p2'),
       ).rejects.toMatchObject({ code: 'PLATFORM_INVOICE_ALREADY_PAID' });
+    });
+
+    it('F65 -- pagar a ultima vencida levanta o gate na hora', async () => {
+      const tenantId = await criarTenantDeTeste();
+      await contratoPorAlunoAtivo(tenantId, 500, 250);
+
+      const fatura = await criarFaturaVencida(tenantId, { dueAt: '2026-08-01' });
+      await db.tenant.update({ where: { id: tenantId }, data: { status: 'SUSPENDED' } });
+      await registrarSuspensaoAutomatica(tenantId);
+
+      await faturas.registrarPagamento(contexto, fatura.id, new Date(), 'corr-gate-1');
+
+      expect((await db.tenant.findUniqueOrThrow({ where: { id: tenantId } })).status).toBe(
+        'ACTIVE',
+      );
+    });
+
+    it('F65 -- pagar UMA com outra vencida NAO reabre', async () => {
+      /*
+       * Pagar janeiro com fevereiro vencida nao reabre a academia -- senao o
+       * inadimplente mantem a catraca aberta pagando sempre a mais velha.
+       */
+      const tenantId = await criarTenantDeTeste();
+      await contratoPorAlunoAtivo(tenantId, 500, 250);
+
+      const agosto = await criarFaturaVencida(tenantId, { dueAt: '2026-08-01' });
+      await criarFaturaVencida(tenantId, { dueAt: '2026-09-01' });
+      await db.tenant.update({ where: { id: tenantId }, data: { status: 'SUSPENDED' } });
+      await registrarSuspensaoAutomatica(tenantId);
+
+      await faturas.registrarPagamento(contexto, agosto.id, new Date(), 'corr-gate-2');
+
+      expect((await db.tenant.findUniqueOrThrow({ where: { id: tenantId } })).status).toBe(
+        'SUSPENDED',
+      );
+    });
+
+    it('F65 -- pagamento NAO reabre quem o PI suspendeu a mao', async () => {
+      /*
+       * Decisao registrada no spec SS5.6: so se levanta automaticamente o
+       * gate que o job baixou. Suspensao manual tem outro motivo, que o
+       * pagamento nao resolve, e reabrir aqui passaria por cima da decisao
+       * do PI.
+       */
+      const tenantId = await criarTenantDeTeste();
+      await contratoPorAlunoAtivo(tenantId, 500, 250);
+
+      const fatura = await criarFaturaVencida(tenantId, { dueAt: '2026-08-01' });
+      await suspenderAMao(tenantId, 'equipamento apreendido pela prefeitura');
+
+      await faturas.registrarPagamento(contexto, fatura.id, new Date(), 'corr-gate-3');
+
+      expect((await db.tenant.findUniqueOrThrow({ where: { id: tenantId } })).status).toBe(
+        'SUSPENDED',
+      );
+    });
+
+    it('F65 -- e a catraca volta a abrir de verdade depois do pagamento', async () => {
+      // Ponta a ponta: o teste acima olha a coluna; este olha a DECISAO.
+      const tenantId = await criarTenantDeTeste();
+      await contratoPorAlunoAtivo(tenantId, 500, 250);
+
+      const unidade = await db.gymUnit.findFirstOrThrow({ where: { tenantId } });
+      const { alunoId, deviceId, edgeNodeId, externalUserId } = await criarAlunoComAcesso(
+        tenantId,
+        unidade.id,
+      );
+
+      const fatura = await criarFaturaVencida(tenantId, { dueAt: '2026-08-01' });
+      await db.tenant.update({ where: { id: tenantId }, data: { status: 'SUSPENDED' } });
+      await registrarSuspensaoAutomatica(tenantId);
+
+      const entradaDecisao = { tenantId, unidadeId: unidade.id, deviceId, edgeNodeId, externalUserId };
+
+      expect((await decidir(entradaDecisao)).reason).toBe('TENANT_SUSPENDED');
+
+      await faturas.registrarPagamento(contexto, fatura.id, new Date(), 'corr-gate-4');
+
+      expect((await decidir(entradaDecisao)).outcome).toBe('ALLOW');
+
+      // Referencia para nao sobrar variavel morta -- alunoId identifica a
+      // cadeia criada acima, mesmo sem ser usado depois da decisao.
+      expect(alunoId).toBeTruthy();
+    });
+
+    it('F65 -- suspensao manual DEPOIS do gate ja levantado nao reabre com novo pagamento', async () => {
+      /*
+       * Caso de borda: auto-suspende, o gate reabre (por pagamento ou
+       * chamada direta), e SO DEPOIS o PI suspende o MESMO tenant a mao por
+       * outro motivo. `levantarGate` achava a linha antiga de
+       * `tenant.suspended_automatically` (unica com essa acao) e reabria por
+       * cima da decisao manual mais recente -- contra o SS5.6 do spec.
+       */
+      const tenantId = await criarTenantDeTeste();
+      await contratoPorAlunoAtivo(tenantId, 500, 250);
+
+      const primeiraFatura = await criarFaturaVencida(tenantId, { dueAt: '2026-06-01' });
+      await db.tenant.update({ where: { id: tenantId }, data: { status: 'SUSPENDED' } });
+      await registrarSuspensaoAutomatica(tenantId);
+
+      // Levanta o gate pagando a fatura -- volta a ACTIVE.
+      await faturas.registrarPagamento(contexto, primeiraFatura.id, new Date(), 'corr-borda-1');
+      expect((await db.tenant.findUniqueOrThrow({ where: { id: tenantId } })).status).toBe(
+        'ACTIVE',
+      );
+
+      // Muito tempo depois, o PI suspende o MESMO tenant a mao, por outro
+      // motivo qualquer -- nao tem nada a ver com inadimplencia.
+      await suspenderAMao(tenantId, 'equipamento apreendido pela prefeitura');
+      expect((await db.tenant.findUniqueOrThrow({ where: { id: tenantId } })).status).toBe(
+        'SUSPENDED',
+      );
+
+      // Uma fatura nova vence e e paga -- o pagamento NAO pode reabrir: quem
+      // suspendeu desta vez foi o PI, nao o job.
+      const segundaFatura = await criarFaturaVencida(tenantId, { dueAt: '2026-09-01' });
+      await faturas.registrarPagamento(contexto, segundaFatura.id, new Date(), 'corr-borda-2');
+
+      expect((await db.tenant.findUniqueOrThrow({ where: { id: tenantId } })).status).toBe(
+        'SUSPENDED',
+      );
     });
   });
 

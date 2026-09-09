@@ -118,9 +118,13 @@ export class SuspenderTenantUseCase {
   /**
    * Levanta o gate de um tenant suspenso AUTOMATICAMENTE.
    *
-   * So volta a `ACTIVE` se a auditoria de suspensao mais recente for a
-   * automatica -- uma suspensao manual (fora desta fatia) nao pode ser
-   * desfeita por engano pelo mesmo caminho.
+   * So volta a `ACTIVE` se a auditoria de mudanca de status mais recente do
+   * tenant -- entre `tenant.suspended_automatically`, `tenant.status_changed`
+   * e `tenant.gate_lifted` -- for a suspensao automatica. Nao basta achar A
+   * linha automatica mais recente (`findFirst` filtrado so por essa acao):
+   * se o PI suspendeu o MESMO tenant a mao depois (`tenant.status_changed`),
+   * essa suspensao automatica antiga deixou de ser a causa do `SUSPENDED`
+   * atual, e reabrir aqui passaria por cima da decisao do PI (spec SS5.6).
    */
   async levantarGate(
     tenantId: string,
@@ -129,12 +133,17 @@ export class SuspenderTenantUseCase {
   ): Promise<boolean> {
     const cliente = tx ?? this.db;
 
-    const ultimaSuspensao = await cliente.platformAuditLog.findFirst({
-      where: { tenantId, action: 'tenant.suspended_automatically' },
+    const ultimaMudancaDeStatus = await cliente.platformAuditLog.findFirst({
+      where: {
+        tenantId,
+        action: {
+          in: ['tenant.suspended_automatically', 'tenant.status_changed', 'tenant.gate_lifted'],
+        },
+      },
       orderBy: { occurredAt: 'desc' },
     });
 
-    if (!ultimaSuspensao) return false;
+    if (ultimaMudancaDeStatus?.action !== 'tenant.suspended_automatically') return false;
 
     const alterados = await cliente.tenant.updateMany({
       where: { id: tenantId, status: 'SUSPENDED' },
