@@ -12,6 +12,12 @@ export class JustificativaObrigatoriaError extends ErroDeDominio {
   }
 }
 
+export class ElevacaoJaAbertaError extends ErroDeDominio {
+  constructor() {
+    super('ELEVACAO_JA_ABERTA', 409, 'Encerre o suporte em andamento antes de entrar em outro');
+  }
+}
+
 const JUSTIFICATIVA_MINIMA = 10;
 const ELEVACAO_VALIDA_POR_MINUTOS = 30;
 
@@ -40,6 +46,21 @@ export class ElevarUseCase {
     const justificativa = reason.trim();
 
     if (justificativa.length < JUSTIFICATIVA_MINIMA) throw new JustificativaObrigatoriaError();
+
+    /*
+     * Uma elevacao viva por sessao.
+     *
+     * `EncerrarElevacaoUseCase` fecha a MAIS RECENTE. Empilhar A e B faria
+     * uma saida deixar A aberta e orfa: quem operou acredita ter saido, e a
+     * linha segue autorizando ate expirar -- o bypass silencioso que INV-005
+     * proibe. Barrar na entrada e mais barato que ensinar a saida a fechar
+     * varias, porque duas elevacoes vivas nunca sao estado desejado.
+     */
+    const jaAberta = await this.db.supportElevation.findFirst({
+      where: { sessionId: contexto.sessionId, endedAt: null, expiresAt: { gt: new Date() } },
+    });
+
+    if (jaAberta) throw new ElevacaoJaAbertaError();
 
     const tenant = await this.db.tenant.findUnique({ where: { id: tenantId } });
 

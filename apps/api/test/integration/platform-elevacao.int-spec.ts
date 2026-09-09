@@ -140,6 +140,34 @@ describe('elevacao de suporte', () => {
     });
   });
 
+  /*
+   * Elevacao nao empilha na mesma sessao.
+   *
+   * `encerrar` fecha a MAIS RECENTE (`orderBy createdAt desc`). Se elevar
+   * para B fosse aceito com A ainda viva, uma saida deixaria A aberta e orfa:
+   * o operador acredita ter saido do suporte, e a linha segue autorizando
+   * ate expirar. INV-005 e sobre isso -- nunca bypass silencioso.
+   *
+   * Barrar na entrada e mais barato que ensinar `encerrar` a fechar varias:
+   * duas elevacoes vivas nunca sao um estado que alguem queira.
+   */
+  it('recusa elevar para um segundo tenant sem encerrar a elevacao viva', async () => {
+    const { contexto } = await logarComoSuperAdmin();
+    const primeiro = await criarTenantDeTeste(contexto);
+    const segundo = await criarTenantDeTeste(contexto);
+
+    await useCase.executar(contexto, primeiro, 'Suporte combinado no primeiro', 'corr-a');
+
+    await expect(
+      useCase.executar(contexto, segundo, 'Suporte combinado no segundo', 'corr-b'),
+    ).rejects.toMatchObject({ code: 'ELEVACAO_JA_ABERTA' });
+
+    const vivas = await db.supportElevation.count({
+      where: { sessionId: contexto.sessionId, endedAt: null },
+    });
+    expect(vivas).toBe(1);
+  });
+
   it('grava DUAS linhas de auditoria: uma de plataforma e uma no tenant alvo', async () => {
     const { contexto } = await logarComoSuperAdmin();
     const tenantId = await criarTenantDeTeste(contexto);
