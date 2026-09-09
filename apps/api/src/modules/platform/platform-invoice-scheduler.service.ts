@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { competenciaDe } from './domain/calculo-da-fatura.js';
 import { PlatformInvoiceUseCase } from './platform-invoice.use-case.js';
+import { SuspenderTenantUseCase } from './suspender-tenant.use-case.js';
 
 /** Correlacao das escritas do job -- nao ha requisicao HTTP por tras. */
 const CORRELACAO_DO_JOB = 'platform-invoice-scheduler';
@@ -32,7 +33,10 @@ export class PlatformInvoiceSchedulerService {
   /** Trava de reentrada -- ver `EngagementRankingSchedulerService.fechando`. */
   private emitindo = false;
 
-  constructor(private readonly faturas: PlatformInvoiceUseCase) {}
+  constructor(
+    private readonly faturas: PlatformInvoiceUseCase,
+    private readonly suspensao: SuspenderTenantUseCase,
+  ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { name: 'emissao-de-fatura-da-plataforma' })
   async emitir(): Promise<void> {
@@ -59,7 +63,13 @@ export class PlatformInvoiceSchedulerService {
    */
   async executarCiclo(
     agora: Date,
-  ): Promise<{ contratos: number; emitidas: number; vencidas: number; falhas: number }> {
+  ): Promise<{
+    contratos: number;
+    emitidas: number;
+    vencidas: number;
+    suspensos: number;
+    falhas: number;
+  }> {
     const contratos = await this.faturas.contratosVigentes();
 
     let emitidas = 0;
@@ -99,6 +109,17 @@ export class PlatformInvoiceSchedulerService {
 
     const vencidas = await this.faturas.marcarVencidas(agora);
 
-    return { contratos: contratos.length, emitidas, vencidas, falhas };
+    // ORDEM: emitir, marcar vencidas, suspender. Suspender antes de marcar
+    // vencidas olharia para um `OVERDUE` que este mesmo ciclo ainda vai
+    // escrever, e a suspensao chegaria um dia atrasada.
+    const { suspensos, falhas: falhasDaSuspensao } = await this.suspensao.executarCiclo(agora);
+
+    return {
+      contratos: contratos.length,
+      emitidas,
+      vencidas,
+      suspensos,
+      falhas: falhas + falhasDaSuspensao,
+    };
   }
 }

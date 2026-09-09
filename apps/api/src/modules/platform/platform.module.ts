@@ -18,6 +18,7 @@ import { PlatformController } from './platform.controller.js';
 import { PlatformInvoiceSchedulerService } from './platform-invoice-scheduler.service.js';
 import { PlatformInvoiceUseCase } from './platform-invoice.use-case.js';
 import { SaasPlanUseCase } from './saas-plan.use-case.js';
+import { SuspenderTenantUseCase } from './suspender-tenant.use-case.js';
 import { TenantContractUseCase } from './tenant-contract.use-case.js';
 import { TenantRepository } from './tenant.repository.js';
 
@@ -62,6 +63,7 @@ import { TenantRepository } from './tenant.repository.js';
     TenantContractUseCase,
     IndexValueUseCase,
     PlatformInvoiceUseCase,
+    SuspenderTenantUseCase,
     PlatformInvoiceSchedulerService,
   ],
   exports: [PlatformContextService, PlatformAuditService, TenantRepository],
