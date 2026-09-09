@@ -13,6 +13,7 @@
  */
 
 export { Ausente } from './components/Ausente.js';
+export { AvisoDeCobranca } from './components/AvisoDeCobranca.js';
 export { Button } from './components/Button.js';
 export { ConsentCard } from './components/ConsentCard.js';
 export { DataFreshness } from './components/DataFreshness.js';

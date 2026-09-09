@@ -370,3 +370,82 @@ describe('faixa de suporte', () => {
     expect(screen.getByTestId('faixa-de-suporte')).toHaveTextContent('13:30');
   });
 });
+
+/**
+ * A FAIXA DE COBRANCA -- F65, Task 9.
+ *
+ * So aparece quando a API declara `cobranca` (fatura vencida). Quando as duas
+ * faixas existem ao mesmo tempo, a de suporte vem primeiro no DOM: quem opera
+ * elevado precisa notar isso antes de qualquer outro aviso da tela.
+ */
+describe('faixa de cobranca', () => {
+  function responderComCobranca(
+    cobranca: { diasRestantes: number; emAbertoMinor: number; suspensa: boolean } | undefined,
+  ) {
+    vi.mocked(chamarApi).mockImplementation((caminho: string) => {
+      if (caminho === '/api/v1/units') {
+        return Promise.resolve({ ok: true, dados: [unidade('Matriz')], cookiesDaApi: [] });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        dados: cobranca === undefined ? PERFIL : { ...PERFIL, cobranca },
+        cookiesDaApi: [],
+      });
+    });
+  }
+
+  it('nao aparece sem fatura vencida', async () => {
+    responderComCobranca(undefined);
+
+    await renderizar();
+
+    expect(screen.queryByTestId('faixa-de-cobranca')).not.toBeInTheDocument();
+  });
+
+  it('aparece com fatura vencida', async () => {
+    responderComCobranca({ diasRestantes: 7, emAbertoMinor: 596250, suspensa: false });
+
+    await renderizar();
+
+    expect(screen.getByTestId('faixa-de-cobranca')).toHaveTextContent('7 dias');
+  });
+
+  /*
+   * AS DUAS FAIXAS JUNTAS -- Super Admin elevado numa academia inadimplente.
+   * A de suporte vem primeiro: e o aviso que mais importa notar primeiro.
+   */
+  it('mostra as duas faixas quando elevacao e cobranca coexistem, suporte primeiro', async () => {
+    vi.mocked(chamarApi).mockImplementation((caminho: string) => {
+      if (caminho === '/api/v1/units') {
+        return Promise.resolve({ ok: true, dados: [unidade('Matriz')], cookiesDaApi: [] });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        dados: {
+          ...PERFIL,
+          supportElevation: {
+            tenant: 'Arena Positiva',
+            reason: 'Chamado 4821',
+            expiraEm: '2026-09-09T17:30:00.000Z',
+          },
+          cobranca: { diasRestantes: 7, emAbertoMinor: 596250, suspensa: false },
+        },
+        cookiesDaApi: [],
+      });
+    });
+
+    await renderizar();
+
+    const faixaDeSuporte = screen.getByTestId('faixa-de-suporte');
+    const faixaDeCobranca = screen.getByTestId('faixa-de-cobranca');
+
+    expect(faixaDeSuporte).toBeInTheDocument();
+    expect(faixaDeCobranca).toBeInTheDocument();
+    // `DOCUMENT_POSITION_FOLLOWING`: suporte vem ANTES de cobranca no DOM.
+    expect(
+      faixaDeSuporte.compareDocumentPosition(faixaDeCobranca) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});

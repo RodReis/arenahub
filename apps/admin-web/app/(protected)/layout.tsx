@@ -1,4 +1,4 @@
-import { AppShell, Button, ElevatedSessionBanner } from '@arenahub/ui';
+import { AppShell, AvisoDeCobranca, Button, ElevatedSessionBanner } from '@arenahub/ui';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
@@ -27,6 +27,13 @@ interface Perfil {
    * verdade — a tela não decide isso.
    */
   supportElevation?: { tenant: string; reason: string; expiraEm: string };
+  /**
+   * Cobranca da plataforma vencida nesta academia -- F65, Task 9.
+   *
+   * Presente so quando ha fatura vencida -- a API que decide, a tela nao
+   * calcula nada. `diasRestantes` fica negativo depois da carencia esgotada.
+   */
+  cobranca?: { diasRestantes: number; emAbertoMinor: number; suspensa: boolean };
 }
 
 interface ItemDeMenu {
@@ -322,25 +329,47 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
   const elevacao = resposta.dados.supportElevation;
   const fusoDaAcademia = unidades[0]?.timezone ?? 'America/Sao_Paulo';
 
+  /*
+   * A FAIXA DE COBRANCA -- F65, Task 9.
+   *
+   * `cobranca` so vem da API quando ha fatura vencida (mesmo padrao de
+   * `supportElevation` ausente). Vai no `banner` do `AppShell` junto da faixa
+   * de suporte -- as DUAS podem existir ao mesmo tempo (Super Admin elevado
+   * numa academia inadimplente), e a de suporte vem primeiro: quem opera
+   * elevado precisa notar isso antes de qualquer outro aviso da tela.
+   */
+  const cobranca = resposta.dados.cobranca;
+
   // O `ToastProvider` subiu para o layout raiz: a tela de login tambem
   // precisa dele, e ela fica fora de `(protected)`.
   return (
     <AppShell
       banner={
-        elevacao ? (
-          <ElevatedSessionBanner
-            tenant={elevacao.tenant}
-            reason={elevacao.reason}
-            expiresAt={elevacao.expiraEm}
-            timeZone={fusoDaAcademia}
-            sair={
-              <form action={encerrarSuporte}>
-                <Button type="submit" variant="ghost" data-testid="sair-do-suporte">
-                  Sair do suporte
-                </Button>
-              </form>
-            }
-          />
+        elevacao || cobranca ? (
+          <>
+            {elevacao ? (
+              <ElevatedSessionBanner
+                tenant={elevacao.tenant}
+                reason={elevacao.reason}
+                expiresAt={elevacao.expiraEm}
+                timeZone={fusoDaAcademia}
+                sair={
+                  <form action={encerrarSuporte}>
+                    <Button type="submit" variant="ghost" data-testid="sair-do-suporte">
+                      Sair do suporte
+                    </Button>
+                  </form>
+                }
+              />
+            ) : null}
+            {cobranca ? (
+              <AvisoDeCobranca
+                diasRestantes={cobranca.diasRestantes}
+                emAbertoMinor={cobranca.emAbertoMinor}
+                suspensa={cobranca.suspensa}
+              />
+            ) : null}
+          </>
         ) : undefined
       }
       /*

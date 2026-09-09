@@ -1,0 +1,22 @@
+/**
+ * Faixa de cobranca vencida -- espelha ElevatedSessionBanner.module.css.
+ *
+ * Mesmo tom de RISCO: fatura vencida com a catraca prestes a fechar nao e
+ * erro do sistema, e um alerta operacional para o dono. Le so a camada
+ * semantica (regra 2).
+ */
+.faixa {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 4px solid var(--ah-state-risk);
+  padding: 6px 24px;
+  background: color-mix(in srgb, var(--ah-state-risk) 10%, var(--ah-surface-raised));
+  color: var(--ah-state-risk);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.texto {
+  flex: 1;
+}
