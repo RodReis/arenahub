@@ -1,0 +1,141 @@
+/**
+ * Fatura da plataforma -- F64, ADR-052.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`,
+ * `--ah-border-*` e `--ah-state-*`, nunca `--ah-carbon-*` cru.
+ *
+ * ## A tese da tela
+ *
+ * O assunto e UM numero e de onde ele vem. A previa fica no topo porque e a
+ * unica coisa da tela que ainda pode mudar -- o historico abaixo e imutavel
+ * por construcao, e ler primeiro o que nao muda faria a pessoa procurar o que
+ * muda.
+ *
+ * A DECOMPOSICAO E O PONTO, e nao o total. O risco que o PI aceitou de olhos
+ * abertos (ADR-052) e a fatura ser dominada por quem nao treina -- 66% na base
+ * real. Um cartao com "R$ 6.000,00" esconde exatamente isso; a linha de ativos
+ * ao lado da de inativos e o que torna o risco visivel antes de virar cobranca.
+ */
+
+/* ─── Prévia ───────────────────────────────────────────────────────────── */
+
+.previa {
+  margin: 0 0 24px;
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.cabecalhoDaPrevia {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.tituloDaPrevia {
+  margin: 0;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: 600;
+  color: var(--ah-text-strong);
+}
+
+.competencia {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * A DECOMPOSICAO, e nao um KPI gigante.
+ *
+ * Duas parcelas e um total, na ordem em que se soma. Cada parcela carrega a
+ * propria contagem e o proprio preco unitario porque e assim que se confere
+ * uma fatura -- "409 x R$ 5,00" e verificavel, "R$ 2.045,00" so e aceitavel.
+ */
+.parcelas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-border-subtle);
+  overflow: hidden;
+}
+
+.parcela {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--ah-surface-raised);
+}
+
+/*
+ * O TOTAL tinge a propria superficie -- `color-mix` com `currentColor`, mesmo
+ * mecanismo do `StateBadge` e da faixa de KPI do painel financeiro. 8% pela
+ * mesma razao de la: a area pintada e grande, e o alfa do badge viraria bloco
+ * de cor.
+ */
+.parcela[data-total] {
+  color: var(--ah-state-info);
+  background: color-mix(in srgb, currentColor 8%, var(--ah-surface-raised));
+}
+
+.rotuloDaParcela {
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ah-text-secondary);
+}
+
+.valorDaParcela {
+  margin: 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.parcela[data-total] .valorDaParcela {
+  color: currentColor;
+}
+
+.contaDaParcela {
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ah-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * O aviso de que a competencia JA foi emitida fica ACIMA das parcelas: quem
+ * le os numeros precisa saber que eles sao a cobranca, e nao a projecao,
+ * ANTES de tirar conclusao deles.
+ */
+.aviso {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-sunken);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.aviso strong {
+  font-weight: 600;
+  color: var(--ah-text-default);
+}

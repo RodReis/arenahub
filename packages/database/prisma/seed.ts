@@ -168,6 +168,27 @@ const SESSAO_DE_PLATAFORMA_DO_CONTRATO = {
   validoPorDias: 30,
 };
 
+/**
+ * A QUARTA sessao de plataforma, para a jornada da F64 (issue #287): emitir a
+ * fatura da plataforma e registrar o pagamento.
+ *
+ * Linha propria pela mesma razao das tres acima -- o refresh e de uso unico.
+ */
+const SESSAO_DE_PLATAFORMA_DA_FATURA = {
+  refresh: 'refresh-de-bancada-do-super-admin-e2e-fatura',
+  validoPorDias: 30,
+};
+
+/**
+ * Ids FIXOS do plano e do contrato de bancada -- F64.
+ *
+ * Fixos e nao sorteados porque o seed e idempotente: `upsert` por id
+ * reencontra o que ja existe, e um uuid novo a cada execucao criaria um plano
+ * por rodada ate a lista da tela virar lixo.
+ */
+const PLANO_SAAS_DE_BANCADA = '00000000-0000-4000-8000-0000000f6401';
+const CONTRATO_SAAS_DE_BANCADA = '00000000-0000-4000-8000-0000000f6402';
+
 
 /**
  * Catalogo de planos da Arena Positiva.
@@ -416,6 +437,7 @@ async function semear(): Promise<void> {
     // Por ultimo e sem depender do tenant: o dono do SaaS existe FORA de
     // qualquer academia. So esta na mesma funcao porque o seed e um so.
     await semearSuperAdmin(db);
+    await semearContratoParaFaturar(db, tenant.id);
 
     console.info(`[seed] tenant "${TENANT.slug}" pronto, com dono ${DONO.email}.`);
   } finally {
@@ -1071,6 +1093,7 @@ async function semearSuperAdmin(
     SESSAO_DE_PLATAFORMA,
     SESSAO_DE_PLATAFORMA_DA_MARCA,
     SESSAO_DE_PLATAFORMA_DO_CONTRATO,
+    SESSAO_DE_PLATAFORMA_DA_FATURA,
   ]) {
     const tokenHash = createHash('sha256').update(semente.refresh).digest('hex');
 
@@ -1093,7 +1116,80 @@ async function semearSuperAdmin(
     });
   }
 
-  console.info('[seed] tres sessoes de plataforma repostas para os E2E da F61, da F62 e da F63.');
+  console.info(
+    '[seed] quatro sessoes de plataforma repostas para os E2E da F61, da F62, da F63 e da F64.',
+  );
+}
+
+/**
+ * Plano e contrato VIGENTE da Arena Positiva -- para a jornada da fatura (F64).
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE O CONTRATO NASCE `ACTIVE` AQUI, e nao pelo caso de uso.
+ * ---------------------------------------------------------------------------
+ *
+ * `TenantContractUseCase.ativar` gera o PDF e o GRAVA no bucket, e o runner do
+ * CI sobe so Postgres (sem MinIO): passar por ele mataria o seed com
+ * `ECONNREFUSED 127.0.0.1:9000`, por falta de servico e nao por defeito. Pela
+ * mesma razao a jornada da F63 para no rascunho.
+ *
+ * A `documentObjectKey` e gravada porque o CHECK
+ * `tenant_contracts_ativo_tem_documento` a exige -- e o OBJETO nao existe, o
+ * que e inofensivo aqui: a tela de faturas nunca le o PDF do contrato. Quem
+ * precisa dele e a rota `/contracts/:id/document`, que esta jornada nao toca.
+ *
+ * IDEMPOTENTE como o resto do arquivo: o indice parcial
+ * `tenant_contracts_um_ativo_por_tenant` recusa um segundo contrato vigente, e
+ * reexecutar o seed tem de reencontrar o que ja existe em vez de estourar.
+ */
+async function semearContratoParaFaturar(
+  db: Awaited<ReturnType<typeof criarPrismaClient>>,
+  tenantId: string,
+): Promise<void> {
+  const jaVigente = await db.tenantContract.findFirst({
+    where: { tenantId, status: 'ACTIVE' },
+    select: { id: true },
+  });
+
+  if (jaVigente) return;
+
+  const plano = await db.saasPlan.upsert({
+    where: { id: PLANO_SAAS_DE_BANCADA },
+    create: {
+      id: PLANO_SAAS_DE_BANCADA,
+      name: 'Plataforma por aluno',
+      model: 'PER_STUDENT',
+      // R$ 5,00 e R$ 2,50 -- os padroes do ADR-052 §5, em CENTAVOS.
+      activeStudentPriceMinor: 500,
+      inactiveStudentPriceMinor: 250,
+    },
+    update: {},
+  });
+
+  const id = CONTRATO_SAAS_DE_BANCADA;
+
+  await db.tenantContract.create({
+    data: {
+      id,
+      tenantId,
+      planId: plano.id,
+      // COPIA dos valores, como faz o caso de uso (ADR-052 §8).
+      model: plano.model,
+      activeStudentPriceMinor: plano.activeStudentPriceMinor,
+      inactiveStudentPriceMinor: plano.inactiveStudentPriceMinor,
+      indexCode: 'IPCA',
+      baseDate: new Date('2026-01-01T00:00:00.000Z'),
+      anniversaryDay: 1,
+      anniversaryMonth: 1,
+      issueDay: 1,
+      startsAt: new Date('2026-01-01T00:00:00.000Z'),
+      status: 'ACTIVE',
+      // Ver o comentario da funcao: a chave existe, o objeto nao.
+      documentObjectKey: `tenants/${tenantId}/contracts/${id}.pdf`,
+    },
+  });
+
+  console.info('[seed] contrato SaaS vigente reposto para o E2E da fatura (F64).');
 }
 
 /** Idade em anos completos numa data de referencia. */

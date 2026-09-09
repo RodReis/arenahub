@@ -7031,6 +7031,12 @@
                       },
                       "unidades": {
                         "type": "integer"
+                      },
+                      "alunosAtivos": {
+                        "type": "integer"
+                      },
+                      "alunosInativos": {
+                        "type": "integer"
                       }
                     }
                   }
@@ -7148,6 +7154,12 @@
                       ]
                     },
                     "unidades": {
+                      "type": "integer"
+                    },
+                    "alunosAtivos": {
+                      "type": "integer"
+                    },
+                    "alunosInativos": {
                       "type": "integer"
                     },
                     "missionText": {
@@ -8355,6 +8367,535 @@
         },
         "tags": [
           "Contratos"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenantId}/invoices": {
+      "get": {
+        "operationId": "FaturasController_listar",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "tenantId",
+                      "competencia",
+                      "model",
+                      "totalMinor",
+                      "currency",
+                      "status"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "tenantId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "contractId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "competencia": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string",
+                        "enum": [
+                          "PER_STUDENT",
+                          "FIXED_MONTHLY"
+                        ]
+                      },
+                      "activeCount": {
+                        "type": "integer"
+                      },
+                      "inactiveCount": {
+                        "type": "integer"
+                      },
+                      "activeStudentPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "inactiveStudentPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "totalMinor": {
+                        "type": "integer"
+                      },
+                      "currency": {
+                        "type": "string"
+                      },
+                      "dueAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "OPEN",
+                          "PAID",
+                          "OVERDUE"
+                        ]
+                      },
+                      "paidAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Faturas"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenantId}/invoices/preview": {
+      "get": {
+        "operationId": "FaturasController_previa",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "competencia",
+                    "emiteEm",
+                    "totalMinor",
+                    "jaEmitida"
+                  ],
+                  "properties": {
+                    "competencia": {
+                      "type": "string"
+                    },
+                    "emiteEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "vencimento": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "activeCount": {
+                      "type": "integer"
+                    },
+                    "inactiveCount": {
+                      "type": "integer"
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "totalMinor": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "jaEmitida": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Faturas"
+        ]
+      }
+    },
+    "/api/v1/platform/invoices": {
+      "post": {
+        "operationId": "FaturasController_emitir",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "tenantId",
+                    "competencia",
+                    "model",
+                    "totalMinor",
+                    "currency",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "tenantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "contractId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "competencia": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string",
+                      "enum": [
+                        "PER_STUDENT",
+                        "FIXED_MONTHLY"
+                      ]
+                    },
+                    "activeCount": {
+                      "type": "integer"
+                    },
+                    "inactiveCount": {
+                      "type": "integer"
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "totalMinor": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "dueAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "OPEN",
+                        "PAID",
+                        "OVERDUE"
+                      ]
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Faturas"
+        ]
+      }
+    },
+    "/api/v1/platform/invoices/{id}/payment": {
+      "post": {
+        "operationId": "FaturasController_registrarPagamento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "tenantId",
+                    "competencia",
+                    "model",
+                    "totalMinor",
+                    "currency",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "tenantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "contractId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "competencia": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string",
+                      "enum": [
+                        "PER_STUDENT",
+                        "FIXED_MONTHLY"
+                      ]
+                    },
+                    "activeCount": {
+                      "type": "integer"
+                    },
+                    "inactiveCount": {
+                      "type": "integer"
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "totalMinor": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "dueAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "OPEN",
+                        "PAID",
+                        "OVERDUE"
+                      ]
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Faturas"
+        ]
+      }
+    },
+    "/api/v1/billing/platform/preview": {
+      "get": {
+        "operationId": "PreviaDeFaturaController_previa",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "competencia",
+                    "emiteEm",
+                    "totalMinor",
+                    "jaEmitida"
+                  ],
+                  "properties": {
+                    "competencia": {
+                      "type": "string"
+                    },
+                    "emiteEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "vencimento": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "activeCount": {
+                      "type": "integer"
+                    },
+                    "inactiveCount": {
+                      "type": "integer"
+                    },
+                    "activeStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "inactiveStudentPriceMinor": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "totalMinor": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "jaEmitida": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PreviaDeFatura"
+        ]
+      }
+    },
+    "/api/v1/billing/platform/invoices": {
+      "get": {
+        "operationId": "PreviaDeFaturaController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "tenantId",
+                      "competencia",
+                      "model",
+                      "totalMinor",
+                      "currency",
+                      "status"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "tenantId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "contractId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "competencia": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string",
+                        "enum": [
+                          "PER_STUDENT",
+                          "FIXED_MONTHLY"
+                        ]
+                      },
+                      "activeCount": {
+                        "type": "integer"
+                      },
+                      "inactiveCount": {
+                        "type": "integer"
+                      },
+                      "activeStudentPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "inactiveStudentPriceMinor": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "totalMinor": {
+                        "type": "integer"
+                      },
+                      "currency": {
+                        "type": "string"
+                      },
+                      "dueAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "OPEN",
+                          "PAID",
+                          "OVERDUE"
+                        ]
+                      },
+                      "paidAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PreviaDeFatura"
         ]
       }
     }
