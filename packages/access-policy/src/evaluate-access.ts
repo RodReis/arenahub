@@ -30,6 +30,21 @@ export function evaluateAccess(input: AccessPolicyInput): AccessPolicyResult {
   // regra -- cada `return` antecipado e uma restricao que nenhuma checagem
   // posterior pode afrouxar.
 
+  // 0. GATE DO CONTRATANTE -- F65, ADR-053. Precede ate o bloqueio
+  //    administrativo, e a ordem e a regra: o gate nega a academia inteira,
+  //    entao perguntar antes por esta pessoa em particular seria responder
+  //    "o aluno X esta bloqueado" quando a resposta verdadeira e "a
+  //    academia esta suspensa". A recepcao agiria sobre o aluno errado.
+  //
+  //    NAO E a regra no 1 caindo. Ela fala do pagamento DO ALUNO, e a
+  //    cadeia dele continua intacta: `gateActive` nao passa por `Invoice`
+  //    nem `Subscription` de ninguem, e nenhum `Entitlement` e tocado aqui
+  //    nem em lugar nenhum (ADR-053 §2). Regularizou, o gate cai e todo
+  //    mundo volta a entrar sem ser recadastrado.
+  if (input.tenant.gateActive) {
+    return { outcome: 'DENY', reason: DENY_REASON.TENANT_SUSPENDED, policyVersion: POLICY_VERSION };
+  }
+
   // 1. Bloqueio administrativo. Precede ate o estado do aluno: e a alavanca
   //    que a operacao puxa quando precisa barrar ALGUEM AGORA, sem esperar
   //    processo de cadastro.

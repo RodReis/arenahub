@@ -514,6 +514,10 @@ enum AccessReason {
   /// F15 -- liberacao financeira excepcional, com prazo. Nao e o mesmo que
   /// `MANUAL_OVERRIDE`: aquele e por passagem, este e por periodo.
   FINANCIAL_OVERRIDE
+  /// F65 (ADR-053) -- a ACADEMIA esta suspensa por inadimplencia com o
+  /// ArenaHub. Nega todo mundo e nao toca em Entitlement nenhum. Nao
+  /// confundir com `PAYMENT_OVERDUE`, que e o ALUNO devendo a academia.
+  TENANT_SUSPENDED
 
   @@map("access_reason")
 }

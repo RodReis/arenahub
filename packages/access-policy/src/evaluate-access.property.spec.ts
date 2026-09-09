@@ -67,6 +67,7 @@ const entradaArb: fc.Arbitrary<AccessPolicyInput> = fc.record({
   student: fc.record({ status: fc.constantFrom(...STATUS_ALUNO) }),
   entitlements: fc.array(entitlementArb, { maxLength: 5 }),
   adminBlock: fc.record({ active: fc.boolean() }),
+  tenant: fc.record({ gateActive: fc.constant(false) }),
 });
 
 describe('propriedade: determinismo', () => {
@@ -111,6 +112,19 @@ describe('propriedade: bloqueio administrativo domina (M1-BR-006)', () => {
         });
       }),
       { numRuns: 500 },
+    );
+  });
+});
+
+describe('propriedade: gate do contratante domina (F65, ADR-053)', () => {
+  it('gate ativo nega SEMPRE, qualquer que seja o resto da entrada', () => {
+    fc.assert(
+      fc.property(entradaArb, (entrada) => {
+        const resultado = evaluateAccess({ ...entrada, tenant: { gateActive: true } });
+
+        expect(resultado.outcome).toBe('DENY');
+        expect(resultado.reason).toBe('TENANT_SUSPENDED');
+      }),
     );
   });
 });

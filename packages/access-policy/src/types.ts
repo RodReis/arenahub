@@ -30,8 +30,16 @@
  *
  *   Minor e nao major porque nenhuma decisao virou de ALLOW para DENY nem o
  *   contrario -- so a explicacao ficou mais especifica.
+ * - **2.0.0** (F65, ADR-053) -- gate do CONTRATANTE antes de tudo:
+ *   `tenant.gateActive` devolve `TENANT_SUSPENDED`.
+ *
+ *   MAJOR, ao contrario da 1.1.0: com o gate ativo, entrada que a 1.1.0
+ *   concedia vira DENY. E a primeira vez que uma versao do motor MUDA O
+ *   DESFECHO, e nao so a explicacao -- reprocessar um evento de 1.1.0 com
+ *   esta regra pode negar quem de fato passou. O numero e o que avisa quem
+ *   for reconciliar historico de que as duas versoes nao sao intercambiaveis.
  */
-export const POLICY_VERSION = '1.1.0';
+export const POLICY_VERSION = '2.0.0';
 
 export type PolicyVersion = typeof POLICY_VERSION;
 
@@ -145,6 +153,26 @@ export const DENY_REASON = {
    * pagamento e catraca.
    */
   PAYMENT_OVERDUE: 'PAYMENT_OVERDUE',
+  /**
+   * O TENANT esta suspenso -- F65, ADR-053.
+   *
+   * ACRESCENTADA PELO FIM, como o ADR-024 exige.
+   *
+   * NAO E o aluno devendo: e a ACADEMIA devendo ao ArenaHub. Vencida a
+   * fatura da plataforma e esgotada a carencia, a catraca nega TODO MUNDO --
+   * aluno, funcionario, personal -- e nenhum Entitlement e tocado.
+   *
+   * A REGRA No 1 CONTINUA DE PE (ADR-053 §3). "Pagamento nao controla
+   * acesso" fala do pagamento DO ALUNO; este e o CONTRATANTE, outro ator,
+   * outra cadeia. O motor nao passa por `Invoice` nem `Subscription` do
+   * aluno para chegar aqui -- ele le um booleano ja derivado.
+   *
+   * Razao propria e nao reuso de `ADMIN_BLOCK`: as duas negam, mas quem
+   * resolve e outra pessoa. `ADMIN_BLOCK` manda a recepcao falar com a
+   * gerencia; esta manda o DONO pagar a fatura da plataforma -- e a recepcao
+   * nao tem o que fazer com ela.
+   */
+  TENANT_SUSPENDED: 'TENANT_SUSPENDED',
 } as const;
 
 export type AllowReason = (typeof ALLOW_REASON)[keyof typeof ALLOW_REASON];
@@ -206,6 +234,21 @@ export interface AccessPolicyInput {
    */
   readonly localDayOfWeek: number;
   readonly localMinuteOfDay: number;
+  /**
+   * Gate do CONTRATANTE -- F65, ADR-053.
+   *
+   * `gateActive` e DERIVADO, nunca uma coluna propria: na nuvem ele e
+   * `tenant.status === 'SUSPENDED'`. Coluna separada seria um segundo lugar
+   * onde a verdade mora, e os dois divergiriam no primeiro caminho que
+   * escrevesse um sem o outro.
+   *
+   * Booleano e nao a data da suspensao: o motor e puro e nao tem relogio, e
+   * comparar `gateAt <= agora` aqui dentro daria ao Edge com relogio
+   * atrasado o poder de reabrir a catraca. Quem resolve a data em booleano e
+   * a projecao, na nuvem -- e o snapshot da F10 carregara o `tenantGateAt`
+   * para o Edge fazer o mesmo com o proprio relogio.
+   */
+  readonly tenant: { readonly gateActive: boolean };
   readonly student: { readonly status: StudentStatus };
   readonly entitlements: readonly EntitlementInput[];
   /** Bloqueio administrativo vigente sobre este aluno. */
