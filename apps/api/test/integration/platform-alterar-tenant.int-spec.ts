@@ -9,6 +9,7 @@ import { PasswordService } from '../../src/modules/auth/password.service.js';
 import type { PlatformContext } from '../../src/common/platform/platform-context.js';
 import { AlterarTenantUseCase } from '../../src/modules/platform/alterar-tenant.use-case.js';
 import { CriarTenantUseCase } from '../../src/modules/platform/criar-tenant.use-case.js';
+import { TenantRepository } from '../../src/modules/platform/tenant.repository.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -23,6 +24,7 @@ describe('alterar tenant', () => {
   let senhas: PasswordService;
   let useCase: AlterarTenantUseCase;
   let criar: CriarTenantUseCase;
+  let tenants: TenantRepository;
 
   const SENHA = 'senha-de-teste-correta';
 
@@ -71,6 +73,7 @@ describe('alterar tenant', () => {
     senhas = app.get(PasswordService);
     useCase = app.get(AlterarTenantUseCase);
     criar = app.get(CriarTenantUseCase);
+    tenants = app.get(TenantRepository);
   });
 
   afterAll(async () => {
@@ -165,5 +168,31 @@ describe('alterar tenant', () => {
 
     const registro = await db.platformAuditLog.findFirst({ where: { correlationId } });
     expect(registro).toBeNull();
+  });
+
+  /**
+   * A TELA DE EDICAO PRECISA DOS CAMPOS QUE A LISTA OMITE.
+   *
+   * `listar()` devolve visao de painel -- sem `cnpj` nem `responsavelEmail`, de
+   * proposito. Um formulario de edicao alimentado por ela nasceria com esses
+   * campos em branco, e salvar apagaria dado que ninguem pediu para apagar.
+   */
+  it('le um tenant com os campos cadastrais que a lista nao carrega', async () => {
+    const { contexto } = await criarSuperAdmin();
+    const tenantId = await criarTenantDeTeste(contexto);
+
+    const encontrado = await tenants.porId(tenantId);
+
+    expect(encontrado).toMatchObject({
+      id: tenantId,
+      cnpj: '12345678000199',
+      responsavelNome: 'Fulano',
+      status: 'ACTIVE',
+    });
+    expect(encontrado?.responsavelEmail).toContain('@academia.local');
+  });
+
+  it('devolve nulo para tenant inexistente, em vez de lancar', async () => {
+    expect(await tenants.porId(randomUUID())).toBeNull();
   });
 });

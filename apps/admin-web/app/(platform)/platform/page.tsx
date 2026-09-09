@@ -106,7 +106,16 @@ export default async function PaginaDePlataforma() {
              * `semAvatar`: academia é uma ORGANIZAÇÃO, não uma pessoa. A
              * inicial num círculo daria a cada linha um rosto que ela não tem.
              */
-            render: (t) => <Identidade semAvatar nome={t.displayName} />,
+            render: (t) => (
+              /*
+                LINK e não botão: o detalhe é uma tela, e abrir em nova aba,
+                copiar o endereço e o anúncio de "link" do leitor de tela não se
+                recuperam com JavaScript.
+              */
+              <a href={`/platform/${t.id}`} data-testid="abrir-academia">
+                <Identidade semAvatar nome={t.displayName} />
+              </a>
+            ),
           },
           /*
            * `code` e não `support`: o slug é identificador de URL, se lê

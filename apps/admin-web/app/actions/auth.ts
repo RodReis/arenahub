@@ -5,14 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
-
-/**
- * Cookies que a Server Action tem permissao de copiar da API.
- *
- * Lista fixa, e nao "copie tudo que veio": um cookie novo que a API passe a
- * emitir amanha nao entra na sessao do navegador sem alguem decidir aqui.
- */
-const COOKIES_PERMITIDOS = ['arenahub_access', 'arenahub_refresh'];
+import { COOKIES_PERMITIDOS, repassarCookies } from '../../lib/api/repassar-cookies';
 
 const esquemaDeLogin = z.object({
   email: z.string().email('Informe um e-mail valido'),
@@ -23,33 +16,6 @@ export interface EstadoDoFormulario {
   erro?: string;
   /** Valores digitados, devolvidos para nao perder o que o usuario escreveu. */
   email?: string;
-}
-
-/**
- * Copia para o navegador so os cookies da lista.
- *
- * O parse e manual e simples de proposito: o que interessa e nome, valor e
- * os atributos de seguranca, que reemitimos com os mesmos valores que a API
- * usou.
- */
-async function repassarCookies(cookiesDaApi: string[]): Promise<void> {
-  const armazem = await cookies();
-
-  for (const bruto of cookiesDaApi) {
-    const [par] = bruto.split(';');
-    const [nome, ...resto] = (par ?? '').split('=');
-
-    if (!nome || !COOKIES_PERMITIDOS.includes(nome)) continue;
-
-    armazem.set({
-      name: nome,
-      value: resto.join('='),
-      httpOnly: true,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-    });
-  }
 }
 
 export async function entrar(

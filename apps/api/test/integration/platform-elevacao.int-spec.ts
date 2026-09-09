@@ -31,6 +31,13 @@ describe('elevacao de suporte', () => {
 
   const SENHA = 'senha-de-teste-correta';
 
+  /** O que `/auth/me` acrescenta quando ha elevacao viva -- e o que a faixa le. */
+  interface PerfilElevado {
+    reason: string;
+    expiraEm: string;
+    tenant: string;
+  }
+
   const servidor = (): Parameters<typeof request>[0] =>
     app.getHttpServer() as Parameters<typeof request>[0];
 
@@ -199,28 +206,29 @@ describe('elevacao de suporte', () => {
     const tenantId = await criarTenantDeTeste(contexto);
     const { cookieElevado } = await elevar(cookie, tenantId, 'Suporte combinado com o cliente');
 
-    const resposta = await request(app.getHttpServer())
+    const resposta = await request(servidor())
       .get('/api/v1/auth/me')
       .set('Cookie', cookieElevado);
 
     expect(resposta.status).toBe(200);
-    expect(resposta.body.supportElevation).toMatchObject({
+
+    const corpo = resposta.body as { supportElevation?: PerfilElevado };
+
+    expect(corpo.supportElevation).toMatchObject({
       reason: 'Suporte combinado com o cliente',
     });
     // O nome, e nao so o id: faixa que diz um UUID nao avisa ninguem.
-    expect(resposta.body.supportElevation.tenant).toBeTruthy();
-    expect(resposta.body.supportElevation.expiraEm).toBeTruthy();
+    expect(corpo.supportElevation?.tenant).toBeTruthy();
+    expect(corpo.supportElevation?.expiraEm).toBeTruthy();
   });
 
   it('/auth/me NAO traz elevacao quando o Super Admin nao elevou', async () => {
     const { cookie } = await logarComoSuperAdmin();
 
-    const resposta = await request(app.getHttpServer())
-      .get('/api/v1/auth/me')
-      .set('Cookie', cookie);
+    const resposta = await request(servidor()).get('/api/v1/auth/me').set('Cookie', cookie);
 
     expect(resposta.status).toBe(200);
-    expect(resposta.body.supportElevation).toBeUndefined();
+    expect((resposta.body as { supportElevation?: PerfilElevado }).supportElevation).toBeUndefined();
   });
 
   /*

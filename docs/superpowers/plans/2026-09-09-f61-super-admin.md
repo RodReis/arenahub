@@ -1883,6 +1883,12 @@ refs #284"
 
 **Interfaces:**
 - Consumes: `POST /api/v1/platform/tenants/:id/elevar`, `POST /api/v1/platform/elevacao/encerrar` (Task 5); `/api/v1/auth/me` passa a devolver `supportElevation`
+
+> **Onde enxertar no `/auth/me` (verificado em 09/09):** `apps/api/src/modules/auth/auth.controller.ts:83`
+> já chama `this.contexto.opcional()` e devolve `permissions` a partir dele. O `supportElevation` mora
+> **nesse mesmo `TenantContext`**, preenchido pela Task 5. Ou seja: **zero consulta nova** — basta expor
+> o campo que já está em memória, exatamente como a F54 fez com as permissões. O comentário longo que
+> está lá explica por que não se consulta o banco de novo; siga-o.
 - Produces: `<FaixaDeSuporte tenant expiraEm onSair />`
 
 - [ ] **Step 1: Escrever o teste que falha**

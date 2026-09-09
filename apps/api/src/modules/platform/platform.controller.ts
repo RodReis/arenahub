@@ -5,7 +5,7 @@ import type { Request, Response } from 'express';
 import { PlatformContextService } from '../../common/platform/platform-context.service.js';
 import { PlatformRoute } from '../../common/security/platform-route.decorator.js';
 import { COOKIE_DE_ACESSO } from '../auth/cookies.js';
-import { AlterarTenantUseCase } from './alterar-tenant.use-case.js';
+import { AlterarTenantUseCase, TenantNaoEncontradoError } from './alterar-tenant.use-case.js';
 import { CriarTenantUseCase } from './criar-tenant.use-case.js';
 import { esquemaDeAlteracaoDeTenant } from './dto/alterar-tenant.dto.js';
 import { esquemaDeCriacaoDeTenant } from './dto/criar-tenant.dto.js';
@@ -22,6 +22,29 @@ const ESQUEMA_DO_TENANT_NA_LISTA = {
     id: { type: 'string', format: 'uuid' },
     slug: { type: 'string' },
     displayName: { type: 'string' },
+    status: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'SUSPENDED'] },
+    unidades: { type: 'integer' },
+  },
+};
+
+/**
+ * Detalhe do tenant. Carrega o que a LISTA omite -- `cnpj`, `timezone` e o
+ * responsavel --, porque e ele que alimenta o formulario de edicao. Sem esses
+ * campos o formulario nasceria em branco e salvar apagaria o que ninguem pediu
+ * para apagar.
+ */
+const ESQUEMA_DO_TENANT_EM_DETALHE = {
+  type: 'object',
+  required: ['id', 'slug', 'displayName', 'legalName', 'status', 'unidades'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    slug: { type: 'string' },
+    displayName: { type: 'string' },
+    legalName: { type: 'string' },
+    cnpj: { type: 'string', nullable: true },
+    timezone: { type: 'string', nullable: true },
+    responsavelNome: { type: 'string', nullable: true },
+    responsavelEmail: { type: 'string', nullable: true },
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'SUSPENDED'] },
     unidades: { type: 'integer' },
   },
@@ -131,6 +154,38 @@ export class PlatformController {
       id: resultado.tenantId,
       gymUnitId: resultado.gymUnitId,
       emailEnviado: envio.enviado,
+    };
+  }
+
+  @Get('tenants/:id')
+  @ApiOkResponse({ schema: ESQUEMA_DO_TENANT_EM_DETALHE })
+  async detalhar(@Param('id') id: string): Promise<{
+    id: string;
+    slug: string;
+    displayName: string;
+    legalName: string;
+    cnpj: string | null;
+    timezone: string | null;
+    responsavelNome: string | null;
+    responsavelEmail: string | null;
+    status: string;
+    unidades: number;
+  }> {
+    const tenant = await this.tenants.porId(id);
+
+    if (!tenant) throw new TenantNaoEncontradoError();
+
+    return {
+      id: tenant.id,
+      slug: tenant.slug,
+      displayName: tenant.displayName,
+      legalName: tenant.legalName,
+      cnpj: tenant.cnpj,
+      timezone: tenant.timezone,
+      responsavelNome: tenant.responsavelNome,
+      responsavelEmail: tenant.responsavelEmail,
+      status: tenant.status,
+      unidades: tenant._count.gymUnits,
     };
   }
 
