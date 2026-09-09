@@ -595,9 +595,21 @@ model Tenant {
   missionText    String? @map("mission_text")
   highlightsText String? @map("highlights_text")
 
-  status    TenantStatus @default(ACTIVE)
-  createdAt DateTime     @default(now()) @map("created_at")
-  updatedAt DateTime     @updatedAt @map("updated_at")
+  status TenantStatus @default(ACTIVE)
+
+  /// F65 (ADR-053, decisao D2 do PI em 09/09/2026) -- suspensao automatica
+  /// por inadimplencia.
+  ///
+  /// AQUI e nao no contrato: `TenantContract` e IMUTAVEL depois de ativo
+  /// (F63), e virar esta chave exigiria contrato novo com PDF novo. Suspender
+  /// ou nao e decisao operacional do dono do SaaS, nao clausula negociada.
+  ///
+  /// Nasce DESLIGADA: ligada por padrao fecharia catraca de inadimplente no
+  /// primeiro deploy, sem ninguem ter decidido isso por aquele cliente.
+  autoSuspend Boolean @default(false) @map("auto_suspend")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   gymUnits     GymUnit[]
   modalities   GymUnitModality[]

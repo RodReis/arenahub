@@ -50,6 +50,12 @@ export interface AlteracaoDeTenant {
    */
   missionText?: string | undefined;
   highlightsText?: string | undefined;
+  /**
+   * F65 -- liga/desliga a suspensao automatica por inadimplencia. Nao entra
+   * em `saindoDeOperacao`: e preferencia de cobranca, nao ato que tira o
+   * tenant de operacao, entao nao exige motivo.
+   */
+  autoSuspend?: boolean | undefined;
 }
 
 /**

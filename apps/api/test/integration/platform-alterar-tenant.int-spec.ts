@@ -195,4 +195,46 @@ describe('alterar tenant', () => {
   it('devolve nulo para tenant inexistente, em vez de lancar', async () => {
     expect(await tenants.porId(randomUUID())).toBeNull();
   });
+
+  it('F65 -- liga e desliga a suspensao automatica', async () => {
+    const { contexto } = await criarSuperAdmin();
+    const tenantId = await criarTenantDeTeste(contexto);
+
+    await useCase.executar(contexto, tenantId, { autoSuspend: true }, `corr-${randomUUID()}`);
+
+    let tenant = await db.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    expect(tenant.autoSuspend).toBe(true);
+
+    await useCase.executar(contexto, tenantId, { autoSuspend: false }, `corr-${randomUUID()}`);
+
+    tenant = await db.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    expect(tenant.autoSuspend).toBe(false);
+  });
+
+  it('F65 -- a suspensao automatica nasce DESLIGADA', async () => {
+    /*
+     * Coluna nova que nascesse ligada fecharia catraca de tenant inadimplente
+     * no primeiro deploy, sem ninguem ter decidido isso por aquele cliente.
+     */
+    const { contexto } = await criarSuperAdmin();
+    const tenantId = await criarTenantDeTeste(contexto);
+
+    const tenant = await db.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+
+    expect(tenant.autoSuspend).toBe(false);
+  });
+
+  it('F65 -- ligar a chave NAO exige motivo, ao contrario de suspender', async () => {
+    // Motivo e exigido para TIRAR DE OPERACAO. Ligar o automatico nao tira
+    // ninguem de lugar nenhum -- e so uma preferencia de cobranca.
+    const { contexto } = await criarSuperAdmin();
+    const tenantId = await criarTenantDeTeste(contexto);
+
+    await expect(
+      useCase.executar(contexto, tenantId, { autoSuspend: true }, `corr-${randomUUID()}`),
+    ).resolves.toBeUndefined();
+
+    const tenant = await db.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    expect(tenant.autoSuspend).toBe(true);
+  });
 });

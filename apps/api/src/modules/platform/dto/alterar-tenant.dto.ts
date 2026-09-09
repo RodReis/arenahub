@@ -37,6 +37,12 @@ export const esquemaDeAlteracaoDeTenant = z
     missionText: z.string().trim().max(280).optional(),
     highlightsText: z.string().trim().max(500).optional(),
     /*
+     * F65 -- liga/desliga a suspensao automatica por inadimplencia. Preferencia
+     * de cobranca, nao ato que tira o tenant de operacao: por isso nao entra no
+     * `.refine` de motivo obrigatorio abaixo.
+     */
+    autoSuspend: z.boolean().optional(),
+    /*
      * Motivo do ATO, nao do tenant: vai para o `metadata` do
      * `PlatformAuditLog` e nao vira coluna. Minimo de 10 caracteres pelo mesmo
      * criterio do motivo de inativacao de unidade -- "ok" nao e motivo.
