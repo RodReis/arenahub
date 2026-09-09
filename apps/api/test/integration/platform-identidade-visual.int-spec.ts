@@ -7,10 +7,7 @@ import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
 import type { PlatformContext } from '../../src/common/platform/platform-context.js';
-import {
-  OBJECT_STORAGE,
-  type ObjectStoragePort,
-} from '../../src/common/storage/object-storage.port.js';
+import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { BrandingService } from '../../src/modules/platform/branding.service.js';
 import { CriarTenantUseCase } from '../../src/modules/platform/criar-tenant.use-case.js';
@@ -39,10 +36,17 @@ function bytesDePng(): Uint8Array {
 /**
  * Identidade visual do tenant e login por slug -- F62 (ADR-052 §9 e §10).
  *
- * Fala com MinIO de verdade: a rota publica le os bytes DE VOLTA do storage,
- * e um dublê de storage que devolve o que recebeu provaria so que o objeto
- * atravessou a memoria do processo -- nao que ele foi gravado sob a chave
- * certa e recuperado por ela.
+ * STORAGE DUBLÊ, e nao MinIO: o CI sobe Postgres e mais nada (ver
+ * `.github/workflows`), e falar com o bucket de verdade fez esta suite falhar
+ * com `ECONNREFUSED 127.0.0.1:9000` na primeira execucao remota. E a mesma
+ * escolha das outras oito suites que tocam storage.
+ *
+ * O DUBLÊ GUARDA POR CHAVE num `Map`, e nao devolve o que recebeu: um fake que
+ * ecoa a entrada provaria so que os bytes atravessaram a memoria do processo.
+ * Guardando por chave, o teste continua provando o que interessa -- que o
+ * objeto foi gravado sob a chave que `montarChaveDeIdentidade` monta, e que a
+ * leitura o encontra POR ELA. O `get` de chave ausente LANCA, como o S3 faz,
+ * que e o que exercita o 404 de objeto sumido do bucket.
  */
 describe('identidade visual do tenant', () => {
   let app: INestApplication;
@@ -52,6 +56,39 @@ describe('identidade visual do tenant', () => {
   let criar: CriarTenantUseCase;
 
   let contexto: PlatformContext;
+
+  /** Objetos gravados pelo storage falso, por chave. */
+  const gravados = new Map<string, { body: Buffer; contentType: string }>();
+
+  const storageFalso = {
+    createPrivateUpload: () =>
+      Promise.resolve({ uploadUrl: 'https://storage.test/x', expiresAt: '' }),
+    headPrivateObject: () => Promise.resolve({ size: 1, contentType: 'image/png' }),
+    deletePrivateObject: (key: string) => {
+      gravados.delete(key);
+
+      return Promise.resolve();
+    },
+    putPrivateObject: (entrada: { key: string; body: Buffer; contentType: string }) => {
+      gravados.set(entrada.key, { body: entrada.body, contentType: entrada.contentType });
+
+      return Promise.resolve();
+    },
+    /*
+     * LANCA em chave ausente, como o S3. Devolver vazio faria o teste do
+     * objeto sumido do bucket passar pelo motivo errado -- e a rota
+     * responderia 200 com zero byte em vez de 404.
+     */
+    getPrivateObject: (key: string) => {
+      const objeto = gravados.get(key);
+
+      if (!objeto) return Promise.reject(new Error('NoSuchKey'));
+
+      return Promise.resolve(objeto);
+    },
+    createPrivateDownload: () =>
+      Promise.resolve({ downloadUrl: 'https://storage.test/x', expiresAt: '' }),
+  };
 
   /*
    * `getHttpServer()` devolve `any` no Nest, e a lint recusa passar `any`
@@ -83,7 +120,10 @@ describe('identidade visual do tenant', () => {
   };
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(OBJECT_STORAGE)
+      .useValue(storageFalso)
+      .compile();
 
     app = moduleRef.createNestApplication();
     await app.init();
@@ -291,11 +331,8 @@ describe('identidade visual do tenant', () => {
 
     expect(depois.logoObjectKey).toBe(`tenants/${tenant.id}/branding/logo.svg`);
 
-    // O PNG antigo saiu do bucket: a leitura direta pela chave velha falha.
-    const storage = app.get<ObjectStoragePort>(OBJECT_STORAGE);
-
-    await expect(
-      storage.getPrivateObject(`tenants/${tenant.id}/branding/logo.png`),
-    ).rejects.toBeDefined();
+    // O PNG antigo saiu do bucket: a chave velha nao esta mais la.
+    expect(gravados.has(`tenants/${tenant.id}/branding/logo.png`)).toBe(false);
+    expect(gravados.has(`tenants/${tenant.id}/branding/logo.svg`)).toBe(true);
   });
 });

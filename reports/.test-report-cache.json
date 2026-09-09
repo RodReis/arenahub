@@ -6,8 +6,8 @@
     "coberturaPct": 69.98
   },
   "apps/api#test:integration": {
-    "testes": 844,
-    "pass": 844,
+    "testes": 859,
+    "pass": 859,
     "falha": 0,
     "coberturaPct": 82.91
   },
