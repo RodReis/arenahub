@@ -31,6 +31,12 @@ interface TenantNaLista {
    */
   alunosAtivos: number;
   alunosInativos: number;
+  /*
+   * Contagem regressiva da plataforma (F65, Task 10) -- `null` explicito
+   * quando o tenant nao tem fatura vencida nenhuma, nunca campo ausente: a
+   * tabela tem formato de linha fixo.
+   */
+  cobranca: { diasRestantes: number | null; emAbertoMinor: number } | null;
 }
 
 /**
@@ -43,10 +49,26 @@ interface TenantNaLista {
  * `SUSPENDED` é escrito pela inadimplência (F65), nunca por este CRUD, e por
  * isso tem tom próprio: quem olha a lista precisa distinguir "o dono desligou"
  * de "parou de pagar" -- a primeira se resolve aqui, a segunda não.
+ *
+ * TRÊS casos visuais (F65, Task 10) -- e não dois:
+ * - `ACTIVE` sem cobrança vencida: "Ativa", como sempre foi.
+ * - `ACTIVE` com cobrança vencida: contagem regressiva, tom de atenção --
+ *   é o aviso que falta suspensão.
+ * - `SUSPENDED`: sempre "Suspensa", NUNCA a contagem. Uma vez suspensa,
+ *   `diasRestantes` fica negativo (carência esgotada há N dias) e mostrar
+ *   "-3 dias" não informa nada que "Suspensa" já não diga -- e lê como um
+ *   erro de sinal.
  */
-function situacao(status: string) {
-  if (status === 'ACTIVE') return <EstadoSimples label="Ativa" tom="positivo" />;
+function situacao(status: string, cobranca: TenantNaLista['cobranca']) {
   if (status === 'SUSPENDED') return <EstadoSimples label="Suspensa" tom="atencao" />;
+
+  if (status === 'ACTIVE') {
+    if (cobranca !== null && cobranca.diasRestantes !== null && cobranca.diasRestantes >= 0) {
+      return <EstadoSimples label={`Vencida — ${cobranca.diasRestantes} dias`} tom="atencao" />;
+    }
+
+    return <EstadoSimples label="Ativa" tom="positivo" />;
+  }
 
   return <EstadoSimples label="Inativa" tom="neutro" />;
 }
@@ -154,7 +176,12 @@ export default async function PaginaDePlataforma() {
             role: 'value',
             render: (t) => t.alunosInativos,
           },
-          { key: 'situacao', header: 'Situação', role: 'state', render: (t) => situacao(t.status) },
+          {
+            key: 'situacao',
+            header: 'Situação',
+            role: 'state',
+            render: (t) => situacao(t.status, t.cobranca),
+          },
         ]}
         empty={
           <EmptyState

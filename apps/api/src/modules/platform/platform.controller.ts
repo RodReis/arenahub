@@ -17,9 +17,11 @@ import type { Request, Response } from 'express';
 
 import { PlatformContextService } from '../../common/platform/platform-context.service.js';
 import { PlatformRoute } from '../../common/security/platform-route.decorator.js';
+import { PrismaService } from '../../persistence/prisma.service.js';
 import { COOKIE_DE_ACESSO } from '../auth/cookies.js';
 import { AlterarTenantUseCase, TenantNaoEncontradoError } from './alterar-tenant.use-case.js';
 import { CriarTenantUseCase } from './criar-tenant.use-case.js';
+import { avaliarCarencia } from './domain/carencia.js';
 import { esquemaDeAlteracaoDeTenant } from './dto/alterar-tenant.dto.js';
 import { esquemaDeCriacaoDeTenant } from './dto/criar-tenant.dto.js';
 import { esquemaDeElevacao } from './dto/elevar.dto.js';
@@ -42,6 +44,24 @@ interface ArquivoRecebido {
   readonly buffer: Buffer;
 }
 
+/**
+ * Cobranca da lista do Super Admin -- F65, Task 10.
+ *
+ * `null` EXPLICITO quando nao ha fatura vencida (e nao campo ausente, como no
+ * `/auth/me`): a lista tem formato de LINHA fixo, e uma linha com campo
+ * ausente vira `undefined` em runtime e obriga o front a checar dois jeitos
+ * de "sem cobranca".
+ */
+const ESQUEMA_DA_COBRANCA_NA_LISTA = {
+  type: 'object',
+  nullable: true,
+  required: ['diasRestantes', 'emAbertoMinor'],
+  properties: {
+    diasRestantes: { type: 'integer', nullable: true },
+    emAbertoMinor: { type: 'integer' },
+  },
+};
+
 const ESQUEMA_DO_TENANT_NA_LISTA = {
   type: 'object',
   required: ['id', 'slug', 'displayName', 'status', 'unidades'],
@@ -53,6 +73,7 @@ const ESQUEMA_DO_TENANT_NA_LISTA = {
     unidades: { type: 'integer' },
     alunosAtivos: { type: 'integer' },
     alunosInativos: { type: 'integer' },
+    cobranca: ESQUEMA_DA_COBRANCA_NA_LISTA,
   },
 };
 
@@ -151,6 +172,7 @@ export class PlatformController {
     private readonly elevar: ElevarUseCase,
     private readonly encerrarElevacao: EncerrarElevacaoUseCase,
     private readonly branding: BrandingService,
+    private readonly db: PrismaService,
   ) {}
 
   @Get('tenants')
@@ -164,15 +186,18 @@ export class PlatformController {
       unidades: number;
       alunosAtivos: number;
       alunosInativos: number;
+      cobranca: { diasRestantes: number | null; emAbertoMinor: number } | null;
     }>
   > {
     /*
-     * DUAS consultas para N academias, e nao N+1: a lista e o `groupBy` de
-     * ativos saem em paralelo, e o inativo e complemento do total.
+     * TRES consultas para N academias, e nao N+1: a lista, o `groupBy` de
+     * ativos e a cobranca (ela mesma outra rodada de consultas agregadas, ver
+     * `cobrancaPorTenant`) saem em paralelo.
      */
-    const [encontrados, ativosPorTenant] = await Promise.all([
+    const [encontrados, ativosPorTenant, cobrancaPorTenant] = await Promise.all([
       this.tenants.listar(),
       this.tenants.ativosPorTenant(),
+      this.cobrancaPorTenant(),
     ]);
 
     // DTO explicito: `cnpj` e `responsavelEmail` ficam de fora da lista --
@@ -194,8 +219,114 @@ export class PlatformController {
          */
         alunosAtivos: ativos,
         alunosInativos: tenant._count.students - ativos,
+        cobranca: cobrancaPorTenant.get(tenant.id) ?? null,
       };
     });
+  }
+
+  /**
+   * Cobranca de TODOS os tenants, numa rodada so -- F65, Task 10.
+   *
+   * MESMA logica do `AuthController.cobranca` (F65, Task 9), com a MESMA
+   * chamada a `avaliarCarencia`: a diferenca e que aqui e para a lista
+   * inteira, entao as consultas sao agregadas por tenant em vez de uma por
+   * chamada.
+   *
+   * QUATRO consultas de tamanho fixo, nunca uma por tenant:
+   * 1. faturas OVERDUE de TODOS os tenants, agrupadas por tenantId;
+   * 2. contratos ATIVOS de todos os tenants (fornece `graceDays`);
+   * 3. timezone dos tenants candidatos (os que tem fatura vencida E
+   *    contrato) -- so estes podem aparecer no resultado;
+   * 4. timezone de fallback (primeira `GymUnit`) SO para os candidatos cujo
+   *    `Tenant.timezone` e nulo -- e o mesmo fallback Tenant->GymUnit do job
+   *    (`SuspenderTenantUseCase.executarCiclo`) e do `/auth/me`.
+   *
+   * Tenant sem fatura vencida ou sem contrato ativo nao entra no mapa -- o
+   * controller le isso como `cobranca: null`.
+   */
+  private async cobrancaPorTenant(): Promise<
+    Map<string, { diasRestantes: number | null; emAbertoMinor: number }>
+  > {
+    const [faturasVencidas, contratosAtivos] = await Promise.all([
+      this.db.platformInvoice.findMany({
+        where: { status: 'OVERDUE' },
+        select: { tenantId: true, dueAt: true, totalMinor: true },
+      }),
+      this.db.tenantContract.findMany({
+        where: { status: 'ACTIVE' },
+        select: { tenantId: true, graceDays: true },
+      }),
+    ]);
+
+    const faturasPorTenant = new Map<string, Array<{ dueAt: Date; totalMinor: number }>>();
+    for (const fatura of faturasVencidas) {
+      const lista = faturasPorTenant.get(fatura.tenantId) ?? [];
+      lista.push({ dueAt: fatura.dueAt, totalMinor: fatura.totalMinor });
+      faturasPorTenant.set(fatura.tenantId, lista);
+    }
+
+    const graceDaysPorTenant = new Map(contratosAtivos.map((c) => [c.tenantId, c.graceDays]));
+
+    // So os candidatos: tenant com fatura vencida E contrato ativo. Os dois
+    // faltando ja decidem `cobranca: null` sem gastar consulta de timezone.
+    const idsCandidatos = [...faturasPorTenant.keys()].filter((id) => graceDaysPorTenant.has(id));
+
+    if (idsCandidatos.length === 0) return new Map();
+
+    const tenantsCandidatos = await this.db.tenant.findMany({
+      where: { id: { in: idsCandidatos } },
+      select: { id: true, timezone: true },
+    });
+
+    const idsSemTimezoneProprio = tenantsCandidatos
+      .filter((t) => !t.timezone)
+      .map((t) => t.id);
+
+    /*
+     * Fallback Tenant->GymUnit -- MESMO fallback do `/auth/me`: primeira
+     * unidade por `createdAt`. `distinct` no lugar de `groupBy` porque o dado
+     * buscado (`timezone`) nao e agregavel -- so a linha mais antiga importa.
+     */
+    const timezonesDeFallback =
+      idsSemTimezoneProprio.length === 0
+        ? []
+        : await this.db.gymUnit.findMany({
+            where: { tenantId: { in: idsSemTimezoneProprio } },
+            select: { tenantId: true, timezone: true },
+            distinct: ['tenantId'],
+            orderBy: { createdAt: 'asc' },
+          });
+
+    const timezoneDeFallbackPorTenant = new Map(
+      timezonesDeFallback.map((g) => [g.tenantId, g.timezone]),
+    );
+
+    const resultado = new Map<string, { diasRestantes: number | null; emAbertoMinor: number }>();
+
+    for (const tenant of tenantsCandidatos) {
+      const timezone = tenant.timezone ?? timezoneDeFallbackPorTenant.get(tenant.id);
+
+      // Sem timezone nao ha como avaliar as 6h locais -- mesmo caminho do
+      // job e do `/auth/me`. Tenant fica fora do mapa: `cobranca: null`.
+      if (!timezone) continue;
+
+      const graceDays = graceDaysPorTenant.get(tenant.id);
+      if (graceDays === undefined) continue;
+
+      const situacao = avaliarCarencia({
+        faturasVencidas: faturasPorTenant.get(tenant.id) ?? [],
+        graceDays,
+        agora: new Date(),
+        timezone,
+      });
+
+      resultado.set(tenant.id, {
+        diasRestantes: situacao.diasRestantes,
+        emAbertoMinor: situacao.emAbertoMinor,
+      });
+    }
+
+    return resultado;
   }
 
   @Post('tenants')

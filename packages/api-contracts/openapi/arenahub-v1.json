@@ -7037,6 +7037,23 @@
                       },
                       "alunosInativos": {
                         "type": "integer"
+                      },
+                      "cobranca": {
+                        "type": "object",
+                        "nullable": true,
+                        "required": [
+                          "diasRestantes",
+                          "emAbertoMinor"
+                        ],
+                        "properties": {
+                          "diasRestantes": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "emAbertoMinor": {
+                            "type": "integer"
+                          }
+                        }
                       }
                     }
                   }
