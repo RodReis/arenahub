@@ -4067,6 +4067,27 @@ de desfazer do sistema.
 Não bloqueia login do painel na carência (o dono precisa ver a fatura para pagar); não apaga nada;
 não toca em `Entitlement`, `Subscription` nem `Invoice` do aluno.
 
+### Emenda — três decisões do PI na F65 (09/09/2026), o ADR não fechava
+
+1. **O aviso vai nos três lugares**, não só "no painel" (§5): grid do Super Admin, faixa
+   não-dispensável no painel do dono, e a linha da fatura vencida no tenant. A terceira ficou
+   **fora do escopo da F65** — nenhuma tela em `admin-web` consumia o endpoint de faturas do
+   tenant, e construí-la era task própria, não acréscimo; fica registrada como pendência, não
+   como decisão revertida.
+2. **A chave automático/manual (`Tenant.autoSuspend`) mora no TENANT, não no contrato.**
+   `TenantContract` é imutável depois de ativo (F63) — pôr a chave lá exigiria contrato novo com
+   PDF novo para virar uma preferência operacional. Nasce **desligada**: coluna ligada por padrão
+   fecharia catraca de inadimplente no primeiro deploy sem ninguém ter decidido isso por aquele
+   cliente.
+3. **A suspensão automática só efetiva às 6h locais do dia seguinte** ao esgotamento da carência,
+   no fuso da própria academia — não no instante exato em que a carência acaba. Sem regra de
+   feriado, mas ninguém fecha a catraca às 3h de um domingo com a recepção fechada.
+
+**O `tenantGateAt` do §4 segue sem produtor** — a F10 (`SPEC-010`, operação offline) continua no
+backlog do MVP 1.5. A F65 entregou o campo que o motor puro vai consumir
+(`AccessPolicyInput.tenant.gateActive`); a serialização para o Edge fica para quando a F10
+existir.
+
 ---
 
 ## ADR-054 — Row-Level Security no Postgres como segunda camada de isolamento
