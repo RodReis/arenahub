@@ -17,7 +17,7 @@
 |---|---:|---:|---:|---:|
 | unitário | 3130 | 3130 | 0 | 75.8 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 996 | 996 | 0 | 83.7 |
+| integração | 1010 | 1010 | 0 | 83.7 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -144,3 +144,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-10 | #289 | SPEC-066 | integração | 996 | 996 | 0 | 83.7 | — 918 em `apps/api` + 78 em `@arenahub/database`, medidos numa rodada completa (68 suítes, zero `FAIL`, 2m56s). **Corrigido à mão:** o `test:report` caiu no crash `3221226505` do Windows e herdou o 955 da entrega anterior. Inclui os 7 casos de `rls-isolation`, que rodam sob o role restrito e **pulam** sem `RUNTIME_INTEGRATION_DATABASE_URL` — número do CI pode diferir se a variável faltar lá |
 | 2026-09-10 | #290 | SPEC-067 | unitário | 3130 | 3130 | 0 | 75.8 | [#303](https://github.com/RodReis/arenahub/pull/303) — 13/13 tarefas |
 | 2026-09-10 | #290 | SPEC-067 | integração | 1004 | 1004 | 0 | 83.7 | — **corrigido à mão**: o gerador avisou que `apps/api#test:integration` terminou com o crash `3221226505` do Windows sem escrever resultado, e manteve o 996 da entrega anterior. Medido em sete lotes de 10 suítes: **926 em `apps/api` (69 suítes, zero `FAIL`)** + 78 em `@arenahub/database`. Inclui os 8 casos de `rls-cobertura` (F67) e os 7 de `rls-isolation` (F66), que pulam sem `RUNTIME_INTEGRATION_DATABASE_URL`. **O CI confirmou o número**: 69 suítes / 926 em `apps/api`, rodando em Linux sem o crash. [#303](https://github.com/RodReis/arenahub/pull/303) |
+| 2026-09-10 | #302 | — | unitário | 3130 | 3130 | 0 | 75.8 | — |
+| 2026-09-10 | #302 | SPEC-066 | integração | 1010 | 1010 | 0 | 83.7 | — **corrigido à mão**, terceira entrega seguida: o gerador avisou que `apps/api#test:integration` terminou com o crash `3221226505` do Windows sem escrever resultado, e manteve o 996. Medido em doze lotes de 6 suítes: **932 em `apps/api` (69 suítes, zero `FAIL`)** + 78 em `@arenahub/database`. **Atenção ao somar por lotes:** o `--testPathPattern` não ancora o início do nome, então `auth` casa também com `kiosk-auth` e `edge-auth` — a soma crua deu 71 suítes / 959, e os 27 testes dessas duas repetidas foram descontados. Os +6 sobre o 926 da SPEC-067 são 4 casos novos em `rls-isolation` (2 do `audit_logs` sem tenant, 2 do `include` que volta nulo) e 3 do MFA que vieram no rebase da [#305](https://github.com/RodReis/arenahub/pull/305), menos 1 de diferença na medição anterior. **Uma falha de tempo limite em `platform-fatura` (`job de emissão`, 5000 ms) é PRÉ-EXISTENTE** — reproduzida na `main` num worktree limpo, sem nenhuma alteração desta entrega, e some com `--testTimeout=30000`. |
