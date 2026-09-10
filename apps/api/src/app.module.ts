@@ -1,10 +1,11 @@
 import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware.js';
 import { ProblemDetailsFilter } from './common/http/problem-details.filter.js';
 import { AuthGuard } from './common/security/auth.guard.js';
+import { TenantRlsInterceptor } from './common/tenant/tenant-rls.interceptor.js';
 import { PermissionsGuard } from './common/security/permissions.guard.js';
 import { PlatformGuard } from './common/security/platform.guard.js';
 import { AntivirusModule } from './common/antivirus/antivirus.module.js';
@@ -91,6 +92,10 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     // permissao que rota de plataforma nao usa.
     { provide: APP_GUARD, useClass: PlatformGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // Depois dos guards, e por isso INTERCEPTOR e nao middleware: quem poe o
+    // `TenantContext` na requisicao e o `AuthGuard`, e middleware roda antes
+    // dele -- o escopo nasceria vazio em toda requisicao autenticada.
+    { provide: APP_INTERCEPTOR, useClass: TenantRlsInterceptor },
   ],
 })
 export class AppModule implements NestModule {
