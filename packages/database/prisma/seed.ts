@@ -376,13 +376,16 @@ async function semear(): Promise<void> {
        * natural, e reescrever mantem o seed idempotente sem inventar id.
        */
       await db.planUnit.deleteMany({ where: { planId: plano.id } });
-      await db.planUnit.create({ data: { planId: plano.id, gymUnitId: unidade.id } });
+      await db.planUnit.create({
+        data: { tenantId: tenant.id, planId: plano.id, gymUnitId: unidade.id },
+      });
 
       // Segunda a sexta, 06:00-22:00 (360 a 1320) -- o mesmo horario que a
       // bancada ja usa nos planos criados pela tela.
       await db.planAccessWindow.deleteMany({ where: { planId: plano.id } });
       await db.planAccessWindow.createMany({
         data: [1, 2, 3, 4, 5].map((dia) => ({
+          tenantId: tenant.id,
           planId: plano.id,
           gymUnitId: unidade.id,
           dayOfWeek: dia,

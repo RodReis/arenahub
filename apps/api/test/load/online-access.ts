@@ -210,6 +210,7 @@ async function semear(db: ReturnType<typeof criarPrismaClient>): Promise<Context
 
   await db.entitlementUnitWindow.createMany({
     data: [0, 1, 2, 3, 4, 5, 6].map((dia) => ({
+      tenantId: tenant.id,
       entitlementId: entitlement.id,
       gymUnitId: unidade.id,
       dayOfWeek: dia,

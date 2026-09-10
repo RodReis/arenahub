@@ -569,7 +569,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
         data: {
           tenantId: contas.a.tenantId,
           name: `Sem Janela ${randomUUID().slice(0, 6)}`,
-          units: { create: [{ gymUnitId: contas.a.unidadeId }] },
+          units: { create: [{ tenantId: contas.a.tenantId, gymUnitId: contas.a.unidadeId }] },
           // Preco entra porque o plano fica VISIVEL em `GET /plans`, e a
           // listagem promete preco vigente para todo plano. So a janela deve
           // faltar -- e ela que este teste exercita.

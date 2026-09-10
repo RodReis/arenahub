@@ -350,6 +350,9 @@ export class EngagementRankingRepository implements PortaDeRanking {
           generatedAt: entrada.generatedAt,
           entries: {
             create: entrada.posicoes.map((posicao) => ({
+              // F67: a entrada carrega o tenant do snapshot. Escrita aninhada
+              // NAO herda coluna do pai -- sem isto o INSERT viola NOT NULL.
+              tenantId: contexto.tenantId,
               position: posicao.position,
               studentId: posicao.studentId,
               points: posicao.points,

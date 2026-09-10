@@ -572,6 +572,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
       await db.entitlementUnitWindow.createMany({
         data: [
           {
+            tenantId: a.tenantId,
             entitlementId: entitlement.id,
             gymUnitId: a.gymUnitId,
             dayOfWeek: 1,
@@ -579,6 +580,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
             endMinute: 1200,
           },
           {
+            tenantId: a.tenantId,
             entitlementId: entitlement.id,
             gymUnitId: a.outraUnidadeId,
             dayOfWeek: 6,

@@ -374,6 +374,7 @@ describe('F57 -- dashboard operacional', () => {
 
       await db.rankingEntry.create({
         data: {
+          tenantId: ids.tenantId,
           snapshotId: rascunho.id,
           studentId: ids.alunoDoPlacar,
           position: 1,

@@ -219,8 +219,16 @@ export class MembershipRepository {
           ...(dados.billingMode === undefined ? {} : { billingMode: dados.billingMode }),
           salesStartAt: dados.salesStartAt ?? null,
           salesEndAt: dados.salesEndAt ?? null,
-          units: { create: dados.gymUnitIds.map((gymUnitId) => ({ gymUnitId })) },
-          accessWindows: { create: janelas.map((j) => ({ ...j })) },
+          units: {
+            create: dados.gymUnitIds.map((gymUnitId) => ({
+              // F67: escrita aninhada NAO herda `tenant_id` do pai.
+              tenantId: contexto.tenantId,
+              gymUnitId,
+            })),
+          },
+          accessWindows: {
+            create: janelas.map((j) => ({ ...j, tenantId: contexto.tenantId })),
+          },
           prices: {
             create: {
               tenantId: contexto.tenantId,
@@ -362,8 +370,16 @@ export class MembershipRepository {
         data: {
           name: dados.name,
           description: dados.description ?? null,
-          units: { create: dados.gymUnitIds.map((gymUnitId) => ({ gymUnitId })) },
-          accessWindows: { create: janelas.map((j) => ({ ...j })) },
+          units: {
+            create: dados.gymUnitIds.map((gymUnitId) => ({
+              // F67: escrita aninhada NAO herda `tenant_id` do pai.
+              tenantId: contexto.tenantId,
+              gymUnitId,
+            })),
+          },
+          accessWindows: {
+            create: janelas.map((j) => ({ ...j, tenantId: contexto.tenantId })),
+          },
         },
       });
 
@@ -653,7 +669,9 @@ export class MembershipRepository {
           startsAt: entrada.startsAt,
           endsAt: entrada.endsAt,
           policySnapshot: snapshot as unknown as Prisma.InputJsonValue,
-          unitWindows: { create: janelas.map((j) => ({ ...j })) },
+          unitWindows: {
+            create: janelas.map((j) => ({ ...j, tenantId: contexto.tenantId })),
+          },
         },
       });
 
@@ -915,7 +933,9 @@ export class MembershipRepository {
           grantedById: contexto.actorId,
           reason: entrada.reason,
           policySnapshot: snapshot as unknown as Prisma.InputJsonValue,
-          unitWindows: { create: janelas.map((j) => ({ ...j })) },
+          unitWindows: {
+            create: janelas.map((j) => ({ ...j, tenantId: contexto.tenantId })),
+          },
         },
       });
 

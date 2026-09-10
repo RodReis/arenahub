@@ -373,7 +373,7 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
     });
 
     await db.accessPassage.create({
-      data: { accessEventId: evento.id, state: 'CONFIRMED' },
+      data: { tenantId, accessEventId: evento.id, state: 'CONFIRMED' },
     });
   };
 
