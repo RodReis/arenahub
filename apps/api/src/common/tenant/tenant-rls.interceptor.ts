@@ -47,6 +47,14 @@ export function paraContextoDeBanco(contexto: TenantContext): TenantDbContext {
  * `contextoRls.run(ctx, () => next.handle())` retornaria o Observable ainda
  * dentro do escopo, mas a inscricao -- onde o trabalho de fato acontece --
  * correria fora dele.
+ *
+ * ARMADILHA PARA QUEM VIER DEPOIS: `lastValueFrom` colapsa o stream no
+ * ULTIMO valor. Hoje nao ha rota que emita mais de um (nenhum `@Sse`, nenhum
+ * `StreamableFile`, nenhum handler devolvendo `Observable` -- verificado), e
+ * para o caso normal, um valor so, o efeito e nenhum. Uma rota de stream
+ * quebraria aqui: os valores intermediarios sumiriam, e o sintoma apareceria
+ * na rota nova, longe deste arquivo. Quando a primeira existir, trocar por um
+ * operador que preserve o stream e mantenha o escopo aberto pela duracao dele.
  */
 @Injectable()
 export class TenantRlsInterceptor implements NestInterceptor {
