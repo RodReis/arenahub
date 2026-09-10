@@ -15,7 +15,7 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3106 | 3106 | 0 | 76.1 |
+| unitário | 3110 | 3110 | 0 | 75.9 |
 | contrato | 0 | 0 | 0 | — |
 | integração | 955 | 955 | 0 | 84.0 |
 | e2e | 0 | 0 | 0 | — |
