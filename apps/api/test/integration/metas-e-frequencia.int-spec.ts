@@ -157,7 +157,7 @@ describe('F20 -- metas e frequencia', () => {
 
     if (opcoes.passagem) {
       await db.accessPassage.create({
-        data: { accessEventId: evento.id, state: opcoes.passagem },
+        data: { tenantId: conta.tenantId, accessEventId: evento.id, state: opcoes.passagem },
       });
     }
 

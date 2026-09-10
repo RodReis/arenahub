@@ -283,6 +283,7 @@ describe('fatura da plataforma', () => {
 
     await db.entitlementUnitWindow.createMany({
       data: [0, 1, 2, 3, 4, 5, 6].map((dia) => ({
+        tenantId,
         entitlementId: entitlement.id,
         gymUnitId: unidadeId,
         dayOfWeek: dia,

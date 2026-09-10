@@ -135,8 +135,21 @@ export class AccessEventRepository {
     const existente = await db.accessPassage.findUnique({ where: { accessEventId } });
 
     if (!existente) {
+      // F67: `tenant_id` proprio, lido do EVENTO e nao recebido por parametro.
+      // A passagem e 1-para-1 com o evento, entao ler do pai e o que impede
+      // as duas linhas divergirem -- um parametro a mais poderia chegar com
+      // outro tenant e a politica RLS aceitaria, por ser coerente consigo
+      // mesma. Se o evento nao existe, a FK recusaria a passagem de todo
+      // jeito; falhar aqui diz por que.
+      const evento = await db.accessEvent.findUnique({
+        where: { id: accessEventId },
+        select: { tenantId: true },
+      });
+
+      if (!evento) throw new ConflictException({ code: 'ACCESS_EVENT_NOT_FOUND' });
+
       await db.accessPassage.create({
-        data: { accessEventId, state: estado, commandId, reportedAt },
+        data: { tenantId: evento.tenantId, accessEventId, state: estado, commandId, reportedAt },
       });
 
       return;

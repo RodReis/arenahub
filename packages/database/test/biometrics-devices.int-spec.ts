@@ -487,6 +487,7 @@ describe('constraints de biometria e dispositivos', () => {
       });
 
       const dados = {
+        tenantId: edge.tenantId,
         edgeNodeId: edge.id,
         keyId: `key-${sufixo}`,
         nonceHash: 'd'.repeat(64),

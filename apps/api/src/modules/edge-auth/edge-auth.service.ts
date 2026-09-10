@@ -128,6 +128,7 @@ export class EdgeAuthService {
 
     // Assinatura valida: agora sim o nonce pode ser gravado.
     const inedito = await this.registrarNonce(
+      credencial.edgeNode.tenantId,
       credencial.edgeNodeId,
       recebida.keyId,
       recebida.nonce,
@@ -158,6 +159,7 @@ export class EdgeAuthService {
    * requisicao chegando juntas veriam "nao existe" as duas.
    */
   private async registrarNonce(
+    tenantId: string,
     edgeNodeId: string,
     keyId: string,
     nonce: string,
@@ -166,6 +168,9 @@ export class EdgeAuthService {
     try {
       await this.db.replayNonce.create({
         data: {
+          // F67: `tenant_id` proprio. Vem do edge node da credencial ja
+          // verificada -- a mesma origem do tenant do resto da resposta.
+          tenantId,
           edgeNodeId,
           keyId,
           // Guarda o hash: o valor bruto nao serve para mais nada depois de

@@ -621,6 +621,14 @@ model Tenant {
   auditLogs    AuditLog[]
   outboxEvents OutboxEvent[]
 
+  /// F67 (ADR-054 §5) -- tabelas que passaram a ter `tenant_id` proprio.
+  accessPassages         AccessPassage[]
+  planUnits              PlanUnit[]
+  planAccessWindows      PlanAccessWindow[]
+  entitlementUnitWindows EntitlementUnitWindow[]
+  rankingEntries         RankingEntry[]
+  replayNonces           ReplayNonce[]
+
   supportElevations SupportElevation[]
 
   /// Contratos do ArenaHub com esta academia (F63, ADR-052 §8).
@@ -1555,12 +1563,19 @@ model Plan {
 }
 
 model PlanUnit {
-  planId    String @map("plan_id") @db.Uuid
+  planId   String @map("plan_id") @db.Uuid
+  /// F67 (ADR-054 §5): `tenant_id` proprio, e nao JOIN ate plans.
+  /// A politica RLS le esta coluna -- politica por JOIN e lenta e fragil.
+  tenantId String @map("tenant_id") @db.Uuid
+
   gymUnitId String @map("gym_unit_id") @db.Uuid
 
   plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@id([planId, gymUnitId])
+  @@index([tenantId])
   @@map("plan_units")
 }
 
@@ -1576,7 +1591,11 @@ model PlanUnit {
 /// Virada de dia (22h-02h) entra como DUAS janelas, nunca como intervalo com
 /// fim menor que o inicio.
 model PlanAccessWindow {
-  id          String @id @default(uuid()) @db.Uuid
+  id       String @id @default(uuid()) @db.Uuid
+  /// F67 (ADR-054 §5): `tenant_id` proprio, e nao JOIN ate plans.
+  /// A politica RLS le esta coluna -- politica por JOIN e lenta e fragil.
+  tenantId String @map("tenant_id") @db.Uuid
+
   planId      String @map("plan_id") @db.Uuid
   gymUnitId   String @map("gym_unit_id") @db.Uuid
   /// 0 = domingo ... 6 = sabado. Eixo do motor de decisao (#129).
@@ -1589,6 +1608,9 @@ model PlanAccessWindow {
 
   plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
   @@index([planId, gymUnitId, dayOfWeek])
   @@map("plan_access_windows")
 }
@@ -1726,7 +1748,11 @@ model Entitlement {
 /// NAO muda. Ler a do plano no momento da decisao reintroduziria exatamente
 /// a retroatividade que o snapshot existe para impedir.
 model EntitlementUnitWindow {
-  id            String @id @default(uuid()) @db.Uuid
+  id       String @id @default(uuid()) @db.Uuid
+  /// F67 (ADR-054 §5): `tenant_id` proprio, e nao JOIN ate entitlements.
+  /// A politica RLS le esta coluna -- politica por JOIN e lenta e fragil.
+  tenantId String @map("tenant_id") @db.Uuid
+
   entitlementId String @map("entitlement_id") @db.Uuid
   gymUnitId     String @map("gym_unit_id") @db.Uuid
   /// 0 = domingo ... 6 = sabado. Eixo do motor de decisao (#129).
@@ -1739,6 +1765,9 @@ model EntitlementUnitWindow {
 
   entitlement Entitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
   @@index([entitlementId, gymUnitId, dayOfWeek])
   @@map("entitlement_unit_windows")
 }
@@ -2035,7 +2064,11 @@ model EdgeCredential {
 /// `expiresAt` permite limpeza: a janela de assinatura e de +-300 s, entao
 /// nonce mais velho que isso nao serve para repetir nada.
 model ReplayNonce {
-  id         String   @id @default(uuid()) @db.Uuid
+  id       String @id @default(uuid()) @db.Uuid
+  /// F67 (ADR-054 §5): `tenant_id` proprio, e nao JOIN ate edge_nodes.
+  /// A politica RLS le esta coluna -- politica por JOIN e lenta e fragil.
+  tenantId String @map("tenant_id") @db.Uuid
+
   edgeNodeId String   @map("edge_node_id") @db.Uuid
   keyId      String   @map("key_id")
   /// SHA-256 do nonce recebido. O valor bruto nao precisa ser guardado.
@@ -2045,7 +2078,10 @@ model ReplayNonce {
 
   edgeNode EdgeNode @relation(fields: [edgeNodeId], references: [id], onDelete: Cascade)
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@unique([edgeNodeId, keyId, nonceHash])
+  @@index([tenantId])
   @@index([expiresAt])
   @@map("replay_nonces")
 }
@@ -2487,7 +2523,11 @@ model AccessEvent {
 /// diferentes e o evento e imutavel. Escrever o desfecho no proprio evento
 /// exigiria `UPDATE` nele, que e exatamente o que `M1-BR-009` proibe.
 model AccessPassage {
-  id            String       @id @default(uuid()) @db.Uuid
+  id       String @id @default(uuid()) @db.Uuid
+  /// F67 (ADR-054 §5): `tenant_id` proprio, e nao JOIN ate access_events.
+  /// A politica RLS le esta coluna -- politica por JOIN e lenta e fragil.
+  tenantId String @map("tenant_id") @db.Uuid
+
   accessEventId String       @unique @map("access_event_id") @db.Uuid
   state         PassageState
   /// Id do comando enviado ao equipamento. E a chave de idempotencia fisica:
@@ -2499,6 +2539,9 @@ model AccessPassage {
 
   accessEvent AccessEvent @relation(fields: [accessEventId], references: [id], onDelete: Cascade)
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
   @@map("access_passages")
 }
 
@@ -4821,7 +4864,11 @@ model RankingSnapshot {
 /// Guarda `studentId` para AUDITORIA. O DTO publico NUNCA o devolve, e o
 /// nome nao mora aqui -- ver o comentario de `RankingSnapshot`.
 model RankingEntry {
-  id          String   @id @default(uuid()) @db.Uuid
+  id       String @id @default(uuid()) @db.Uuid
+  /// F67 (ADR-054 §5): `tenant_id` proprio, e nao JOIN ate ranking_snapshots.
+  /// A politica RLS le esta coluna -- politica por JOIN e lenta e fragil.
+  tenantId String @map("tenant_id") @db.Uuid
+
   snapshotId  String   @map("snapshot_id") @db.Uuid
   position    Int
   studentId   String   @map("student_id") @db.Uuid
@@ -4833,8 +4880,11 @@ model RankingEntry {
   snapshot RankingSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
   student  Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@unique([snapshotId, studentId])
   @@unique([snapshotId, position])
+  @@index([tenantId])
   @@index([snapshotId, position])
   @@map("ranking_entries")
 }

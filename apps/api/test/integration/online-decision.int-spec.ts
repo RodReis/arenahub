@@ -109,6 +109,7 @@ describe('F9 -- decisao online de acesso', () => {
     // provar, e horario nao e ela.
     await db.entitlementUnitWindow.createMany({
       data: [0, 1, 2, 3, 4, 5, 6].map((dia) => ({
+        tenantId: ctx.tenantId,
         entitlementId: entitlement.id,
         gymUnitId: ctx.gymUnitId,
         dayOfWeek: dia,
@@ -352,6 +353,7 @@ describe('F9 -- decisao online de acesso', () => {
 
       await db.entitlementUnitWindow.create({
         data: {
+          tenantId: ctx.tenantId,
           entitlementId: entitlement.id,
           gymUnitId: ctx.gymUnitId,
           dayOfWeek: new Date().getDay(),
@@ -395,6 +397,7 @@ describe('F9 -- decisao online de acesso', () => {
 
       await db.entitlementUnitWindow.create({
         data: {
+          tenantId: ctx.tenantId,
           entitlementId: entitlement.id,
           gymUnitId: outraUnidade.id,
           dayOfWeek: new Date().getDay(),

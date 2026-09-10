@@ -99,6 +99,7 @@ describe('F65 -- a projecao deriva o gate do status do tenant', () => {
     // horario nao e a dimensao que ele quer provar.
     await db.entitlementUnitWindow.createMany({
       data: [0, 1, 2, 3, 4, 5, 6].map((dia) => ({
+        tenantId,
         entitlementId: entitlement.id,
         gymUnitId: unidadeId,
         dayOfWeek: dia,

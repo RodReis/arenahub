@@ -4116,13 +4116,26 @@ migration de dado em **doze tabelas** — caro de desfazer.
 4. **Contextos sem request** — worker, outbox, edge-sync, seed, Super Admin elevado — setam
    `app.actor = 'system' | 'platform'` explicitamente; a política aceita `app.actor = 'platform'`
    **só** no caminho da sessão elevada (ADR-052 §3). Nada implícito.
-5. **As doze tabelas sem `tenant_id` ganham a coluna** — `AccessPassage`, `PlanUnit`,
-   `PlanAccessWindow`, `EntitlementUnitWindow`, `RankingEntry`, `InboxReceipt`, `ReplayNonce`,
-   `KioskReplayNonce`, `AiPromptVersion`, e as que a F67 confirmar. Política por `JOIN` é lenta e
-   frágil. `Tenant`, `User`, `Permission` e `RolePermission` são globais e ficam fora.
+5. **As tabelas sem `tenant_id` que têm dono de tenant ganham a coluna** — `AccessPassage`,
+   `PlanUnit`, `PlanAccessWindow`, `EntitlementUnitWindow`, `RankingEntry`, `ReplayNonce`.
+   Política por `JOIN` é lenta e frágil. `Tenant`, `User`, `Permission` e `RolePermission` são
+   globais e ficam fora.
+
+   > **Emenda em 10/09/2026, decidida pelo PI ao executar a F67.** Este parágrafo dizia "doze
+   > tabelas" e nomeava mais três, escritas antes de conferir o schema. Ao implementar, três não
+   > têm dono de tenant e a coluna as quebraria ou mentiria: **`AiPromptVersion`** — o próprio
+   > schema registra que "prompt é do produto, não do tenant", e `name` é único **globalmente**,
+   > então `tenant_id` exigiria trocar a unicidade por `(tenant_id, name)` e mudaria a semântica;
+   > **`KioskReplayNonce`** — anti-replay por `key_id`, sem nenhum laço com tenant; e
+   > **`InboxReceipt`** — sem pai de onde herdar e **sem escritor nem leitor** em todo o
+   > repositório, de modo que qualquer valor seria dado inventado; ela ganha a coluna na fatia que
+   > lhe der o primeiro uso. Ficam com as globais também `IndexValue` (IPCA), `PlatformAdmin` e
+   > `SaasPlan`, que são da plataforma e nunca de uma academia. **A F67 entregou seis colunas e
+   > política em 109 tabelas**, com guarda de integração que recusa tabela nova com `tenant_id` e
+   > sem política.
 6. **Duas fases:** **F66** — role, extensão, política em `students` e `audit_logs`, teste de
    integração sob o role restrito tentando cruzar tenant (INV-006 no banco). **F67** — coluna nas
-   doze tabelas + política em todas as tabelas com `tenant_id`.
+   tabelas do §5 + política em todas as tabelas com `tenant_id`.
 
 ### Riscos
 

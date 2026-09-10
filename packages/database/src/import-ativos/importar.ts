@@ -680,7 +680,12 @@ async function criarDireito(
 
   if (dados.snapshot.janelas.length > 0) {
     await db.entitlementUnitWindow.createMany({
-      data: dados.snapshot.janelas.map((janela) => ({ entitlementId: direito.id, ...janela })),
+      // F67: `createMany` nao herda `tenant_id` do direito -- vai explicito.
+      data: dados.snapshot.janelas.map((janela) => ({
+        tenantId: dados.tenantId,
+        entitlementId: direito.id,
+        ...janela,
+      })),
     });
   }
 }

@@ -153,7 +153,7 @@ async function corrigir(): Promise<void> {
               gymUnitIds: plano.units.map((u) => u.gymUnitId).sort(),
               janelas,
             },
-            unitWindows: { create: janelas },
+            unitWindows: { create: janelas.map((j) => ({ ...j, tenantId: antigo.tenantId })) },
           },
         });
       });
