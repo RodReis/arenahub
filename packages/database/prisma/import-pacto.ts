@@ -1,4 +1,3 @@
-/* eslint-disable no-console -- programa de linha de comando: console e a interface, nao debug esquecido (mesma excecao de prisma/seed.ts). */
 /**
  * Importacao da base legada Pacto -- F47, issue #118, ADR-033.
  *

@@ -242,6 +242,11 @@ jobs:
       # E2E -- as duas suites rodam no mesmo job, e uma derrubaria o banco sob
       # os pes da outra.
       INTEGRATION_DATABASE_URL: postgresql://arenahub:arenahub_ci@postgres:5432/arenahub_int?schema=public
+      # Role RESTRITO (F66/ADR-054), para o teste de isolamento. Sem esta
+      # variavel a suite `rls-isolation` pula em silencio: ela se recusa a
+      # cair no role dono, que aqui e superusuario e ignora RLS -- passaria
+      # verde sem provar nada.
+      RUNTIME_INTEGRATION_DATABASE_URL: postgresql://arenahub_app:arenahub_app_ci@postgres:5432/arenahub_int?schema=public
 
       # Chave de cifra dos segredos simetricos. FIXA no CI, e nao efemera,
       # porque o E2E do totem exige que o SEED e a API usem a mesma: o seed
@@ -298,6 +303,18 @@ jobs:
       # migration, em vez de gerar uma nova em cima da hora.
       - name: aplicar migrations
         run: pnpm --filter @arenahub/database exec prisma migrate deploy
+
+      # A migration da F66 cria o role `arenahub_app`, mas NAO a senha --
+      # credencial nao se versiona. Sem este passo o teste de isolamento pula
+      # (nao falha), e a fatia ficaria sem prova de que a politica esta ativa.
+      #
+      # `ALTER ROLE` vale para o cluster inteiro, entao uma vez cobre
+      # `arenahub` e `arenahub_int`.
+      #
+      # Pelo Prisma e nao por `psql`: o job roda no container do Playwright,
+      # que nao traz cliente do Postgres.
+      - name: senha do role de runtime (RLS, F66)
+        run: pnpm --filter @arenahub/database exec tsx prisma/senha-do-role-de-runtime.ts arenahub_app_ci
 
       - name: 'test:integration'
         run: pnpm test:integration

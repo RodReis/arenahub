@@ -1,4 +1,3 @@
-/* eslint-disable no-console -- programa de linha de comando: console e a interface, nao debug esquecido (mesma excecao de prisma/seed.ts e prisma/import-pacto.ts). */
 /**
  * Bootstrap de tenant real -- SPEC-058 §6, issue #253.
  *
