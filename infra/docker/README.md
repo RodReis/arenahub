@@ -83,6 +83,40 @@ outro ambiente. Produção e homologação usam secret manager.
 
 **O `.env` real está no `.gitignore` e nunca é versionado.**
 
+## Role de runtime (RLS)
+
+A partir da F66 (ADR-054) o Postgres tem **duas identidades**, no mesmo container:
+
+| role | para quê |
+|---|---|
+| `arenahub` | dono das tabelas. Migrations, e nada mais. |
+| `arenahub_app` | runtime. API, workers e seeds. `NOBYPASSRLS`, sem ownership. |
+
+A migration cria o role, mas **não a senha** — credencial não se versiona, nem em desenvolvimento.
+Depois de rodar as migrations pela primeira vez, setar a senha à mão. `ALTER ROLE` vale para o
+cluster inteiro, então uma vez só cobre `arenahub`, `arenahub_int` e `arenahub_e2e`:
+
+```bash
+docker exec arenahub-postgres psql -U arenahub -d arenahub \
+  -c "ALTER ROLE arenahub_app WITH PASSWORD 'dev_local_arenahub_app';"
+```
+
+Depois, no `.env` local (a porta segue o `POSTGRES_PORT`):
+
+```
+RUNTIME_DATABASE_URL=postgresql://arenahub_app:dev_local_arenahub_app@localhost:5442/arenahub?schema=public
+RUNTIME_INTEGRATION_DATABASE_URL=postgresql://arenahub_app:dev_local_arenahub_app@localhost:5442/arenahub_int?schema=public
+```
+
+Para conferir que o role ficou como deve — as duas colunas têm de vir `f`:
+
+```bash
+docker exec arenahub-postgres psql -U arenahub -d arenahub -tAc \
+  "SELECT rolname, rolbypassrls, rolsuper FROM pg_roles WHERE rolname='arenahub_app';"
+```
+
+`rolbypassrls` verdadeiro faria a política virar decoração, sem nada falhar para avisar.
+
 ## Apagar tudo e recomeçar
 
 ```bash
