@@ -265,6 +265,21 @@ describe('F65 -- suspensao automatica', () => {
     expect((await db.tenant.findUniqueOrThrow({ where: { id: tenantId } })).status).toBe(
       'INACTIVE',
     );
+
+    /*
+     * Sozinha, a assercao de status acima nao prova NADA: `executarCiclo`
+     * filtra `status: 'ACTIVE'` na query de candidatos, entao um tenant
+     * INACTIVE nunca entra no laco -- o teste passaria mesmo se todo o corpo
+     * da suspensao fosse apagado.
+     *
+     * A ausencia da linha de auditoria e o que discrimina "a guarda de status
+     * excluiu corretamente" de "o tenant nunca chegou perto da logica".
+     */
+    const atos = await db.platformAuditLog.count({
+      where: { tenantId, action: 'tenant.suspended_automatically' },
+    });
+
+    expect(atos).toBe(0);
   });
 
   it('falha de um tenant nao derruba os outros', async () => {
