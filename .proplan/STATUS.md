@@ -11,7 +11,6 @@ updated: 2026-09-10
 
 - [MVP7][SPEC-061][FIX] rotas de MFA aceitam tentativas sem limite (#296)
 - [MVP7][SPEC-067][F67] RLS fase 2 — tenant_id nas tabelas restantes e política em todas (#290)
-- [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289)
 - [MVP5][SPEC-031][FIX] tres testes de XP e ranking sao intermitentes no CI (#279)
 - [MVP2][FIX] assinatura duplicada infla a receita esperada do painel financeiro (#272)
 - [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254)
@@ -42,10 +41,11 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
+- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
