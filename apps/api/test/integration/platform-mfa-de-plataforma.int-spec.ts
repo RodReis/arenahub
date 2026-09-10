@@ -311,4 +311,60 @@ describe('MFA do Super Admin', () => {
       expect(usuario.mfaStatus).toBe('PENDING');
     });
   });
+
+  /**
+   * Issue #296: `mfa/verify` e as rotas de inscricao aceitavam quantos
+   * codigos errados o cliente mandasse, por toda a validade do pre-auth.
+   */
+  describe('forca bruta no segundo fator', () => {
+    it('seis codigos errados seguidos bloqueiam mesmo o codigo certo depois', async () => {
+      // Molde do limite de login (SPEC-058 AC-7): o bloqueio dispara na
+      // tentativa que ULTRAPASSA o limite (limite 5 -> bloqueia na 6a).
+      const { email, segredo } = await criarSuperAdminComMfa();
+      const login = await logar(email);
+      const preAuth = (login.body as { preAuth: string }).preAuth;
+
+      for (let tentativa = 0; tentativa < 5; tentativa++) {
+        const resposta = await request(servidor())
+          .post('/api/v1/auth/mfa/verify')
+          .set('Authorization', `Bearer ${preAuth}`)
+          .send({ code: '000000' });
+
+        expect(resposta.status).toBe(401);
+      }
+
+      const sexta = await request(servidor())
+        .post('/api/v1/auth/mfa/verify')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send({ code: '000000' });
+
+      expect(sexta.status).toBe(429);
+      expect((sexta.body as { code: string }).code).toBe('MFA_RATE_LIMITED');
+
+      const comCodigoCerto = await request(servidor())
+        .post('/api/v1/auth/mfa/verify')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send({ code: totp.gerarCodigo(segredo, Math.floor(Date.now() / 1000)) });
+
+      expect(comCodigoCerto.status).toBe(429);
+      expect(cookiesDe(comCodigoCerto)).not.toContainEqual(
+        expect.stringContaining('arenahub_access='),
+      );
+    });
+
+    it('codigo certo antes do limite nao soma contra a tentativa errada de outro usuario', async () => {
+      // A chave e por usuario (`sub`), nao global: garante que o contador de
+      // um Super Admin nao vaza para o proximo.
+      const { email, segredo } = await criarSuperAdminComMfa();
+      const login = await logar(email);
+      const preAuth = (login.body as { preAuth: string }).preAuth;
+
+      const resposta = await request(servidor())
+        .post('/api/v1/auth/mfa/verify')
+        .set('Authorization', `Bearer ${preAuth}`)
+        .send({ code: totp.gerarCodigo(segredo, Math.floor(Date.now() / 1000)) });
+
+      expect(resposta.status).toBe(200);
+    });
+  });
 });

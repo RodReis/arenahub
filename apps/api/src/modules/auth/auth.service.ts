@@ -6,6 +6,7 @@ import { InjectThrottlerStorage, minutes, seconds, type ThrottlerStorage } from 
 import {
   CredencialInvalidaError,
   LoginBloqueadoPorTentativasError,
+  MfaBloqueadoPorTentativasError,
   NaoAutenticadoError,
   RefreshReutilizadoError,
 } from '../../common/http/erro-de-dominio.js';
@@ -30,6 +31,15 @@ const REFRESH_VALIDO_POR_DIAS = 14;
 const JANELA_DE_FORCA_BRUTA_MS = minutes(1);
 const LIMITE_DE_TENTATIVAS_ERRADAS = 10;
 const BLOQUEIO_APOS_LIMITE_MS = seconds(60);
+
+/**
+ * Issue #296: as rotas de MFA nao contavam tentativa nenhuma. Limite mais
+ * baixo que o do login (LIMITE_DE_TENTATIVAS_ERRADAS) porque um TOTP de seis
+ * digitos tem espaco de busca bem menor que uma senha.
+ */
+const JANELA_DE_FORCA_BRUTA_MFA_MS = minutes(1);
+const LIMITE_DE_TENTATIVAS_ERRADAS_MFA = 5;
+const BLOQUEIO_APOS_LIMITE_MFA_MS = seconds(60);
 
 export interface ParDeTokens {
   accessToken: string;
@@ -159,7 +169,7 @@ export class AuthService {
     // senha, nao que tem o segundo fator -- ele nao pode virar sessao aqui.
     const usuarioId = await this.exigirPreAuthDeAdmin(preAuth, 'MFA_VERIFY');
 
-    await this.mfa.verificar(usuarioId, codigo);
+    await this.conferirCodigoMfaComForcaBruta(usuarioId, () => this.mfa.verificar(usuarioId, codigo));
 
     return this.emitirPar({ userId: usuarioId, tenantId: null });
   }
@@ -200,7 +210,9 @@ export class AuthService {
   async confirmarInscricaoDeMfa(preAuth: string, codigo: string): Promise<ParDeTokens> {
     const usuarioId = await this.exigirPreAuthDeAdmin(preAuth, 'MFA_SETUP');
 
-    await this.mfa.confirmarInscricao(usuarioId, codigo);
+    await this.conferirCodigoMfaComForcaBruta(usuarioId, () =>
+      this.mfa.confirmarInscricao(usuarioId, codigo),
+    );
 
     return this.emitirPar({ userId: usuarioId, tenantId: null });
   }
@@ -239,6 +251,38 @@ export class AuthService {
     if (!admin) throw new NaoAutenticadoError();
 
     return claims.sub;
+  }
+
+  /**
+   * Molde do `forcaBruta.increment` do login (issue #296), aplicado ao
+   * segundo fator.
+   *
+   * Chave e o `sub` do pre-auth, nao o `challengeId`: o `challengeId` nao e
+   * persistido em lugar nenhum, muda a cada login, e nao amarraria tentativas
+   * entre pre-auths sucessivos do mesmo atacante.
+   *
+   * Diferente do login: soma TODA tentativa, nao so a errada. A
+   * `ThrottlerStorage` da lib so expoe `increment` (sem leitura isolada), e
+   * um contador que so soma em erro nunca travaria um codigo CERTO acertado
+   * depois do limite estourado -- o proprio ataque que este limite existe
+   * para conter escaparia na tentativa que funciona. A chave e por usuario
+   * (sub), entao isto nao pune ninguem pelo erro de outro Super Admin.
+   */
+  private async conferirCodigoMfaComForcaBruta(
+    usuarioId: string,
+    conferir: () => Promise<void>,
+  ): Promise<void> {
+    const registro = await this.forcaBruta.increment(
+      `mfa:${usuarioId}`,
+      JANELA_DE_FORCA_BRUTA_MFA_MS,
+      LIMITE_DE_TENTATIVAS_ERRADAS_MFA,
+      BLOQUEIO_APOS_LIMITE_MFA_MS,
+      'mfa-bruteforce',
+    );
+
+    if (registro.isBlocked) throw new MfaBloqueadoPorTentativasError();
+
+    await conferir();
   }
 
   /**
