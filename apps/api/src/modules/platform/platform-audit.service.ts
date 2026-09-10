@@ -23,8 +23,13 @@ export interface AtoDePlataforma {
 export class PlatformAuditService {
   constructor(private readonly db: PrismaService) {}
 
+  /**
+   * `contexto` e `null` quando o ato e de JOB, sem usuario de painel por
+   * tras. Nulo aqui e DADO legitimo, nao ausencia de dado:
+   * `PlatformAuditLog.actorUserId` e `String?` no schema exatamente por isso.
+   */
   async registrar(
-    contexto: PlatformContext,
+    contexto: PlatformContext | null,
     ato: AtoDePlataforma,
     correlationId: string,
     tx?: Prisma.TransactionClient,
@@ -33,7 +38,7 @@ export class PlatformAuditService {
 
     await cliente.platformAuditLog.create({
       data: {
-        actorUserId: contexto.actorId,
+        actorUserId: contexto?.actorId ?? null,
         action: ato.action,
         target: ato.target,
         ...(ato.targetId === undefined ? {} : { targetId: ato.targetId }),

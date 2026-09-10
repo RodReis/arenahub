@@ -13,6 +13,8 @@ import {
   type ParDeTokens,
 } from './auth.service.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import { PrismaService } from '../../persistence/prisma.service.js';
+import { avaliarCarencia } from '../platform/domain/carencia.js';
 import { TokenService } from './token.service.js';
 
 const ACESSO_VALIDO_POR_MS = 10 * 60 * 1000;
@@ -61,6 +63,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly tokens: TokenService,
     private readonly contexto: TenantContextService,
+    private readonly db: PrismaService,
   ) {}
 
   @Public()
@@ -260,12 +263,86 @@ export class AuthController {
               },
             }
           : {}),
+        /*
+         * A FAIXA DE COBRANCA do painel depende disto -- F65, Task 9.
+         *
+         * So aparece quando ha fatura vencida: mesmo padrao condicional do
+         * `supportElevation`, um bloco ausente nao renderiza aviso nenhum.
+         */
+        ...((await this.cobranca(contexto?.tenantId)) ?? {}),
       };
     } catch {
       // Token invalido, expirado ou de outro tipo produzem a mesma
       // resposta: quem esta sondando nao aprende qual dos tres foi.
       throw new NaoAutenticadoError();
     }
+  }
+
+  /**
+   * Situacao de cobranca do tenant, para a faixa do painel -- F65, Task 9.
+   *
+   * `undefined` sem `tenantId` (sessao de plataforma) e sem fatura vencida
+   * nenhuma -- mesmo padrao do `supportElevation`: bloco ausente, sem aviso.
+   *
+   * O timezone segue o MESMO fallback Tenant->GymUnit de
+   * `SuspenderTenantUseCase.executarCiclo`: sem um dos dois nao ha como
+   * avaliar as 6h locais que decidem a suspensao.
+   */
+  private async cobranca(
+    tenantId: string | undefined,
+  ): Promise<{ cobranca: { diasRestantes: number; emAbertoMinor: number; suspensa: boolean } } | undefined> {
+    if (!tenantId) return undefined;
+
+    const tenant = await this.db.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        status: true,
+        timezone: true,
+        gymUnits: { take: 1, orderBy: { createdAt: 'asc' }, select: { timezone: true } },
+      },
+    });
+
+    if (!tenant) return undefined;
+
+    const contrato = await this.db.tenantContract.findFirst({
+      where: { tenantId, status: 'ACTIVE' },
+      select: { graceDays: true },
+    });
+
+    // Sem contrato vigente nao ha `graceDays` para avaliar -- mesmo caminho
+    // do job (`SuspenderTenantUseCase`).
+    if (!contrato) return undefined;
+
+    const faturasVencidas = await this.db.platformInvoice.findMany({
+      where: { tenantId, status: 'OVERDUE' },
+      select: { dueAt: true, totalMinor: true },
+    });
+
+    if (faturasVencidas.length === 0) return undefined;
+
+    const timezone = tenant.timezone ?? tenant.gymUnits[0]?.timezone;
+
+    // Sem timezone nao ha como avaliar as 6h locais -- mesmo caminho do job.
+    if (!timezone) return undefined;
+
+    const situacao = avaliarCarencia({
+      faturasVencidas,
+      graceDays: contrato.graceDays,
+      agora: new Date(),
+      timezone,
+    });
+
+    // `diasRestantes` so e `null` quando nao ha fatura vencida, e ja
+    // recusamos esse caso acima -- a checagem documenta a garantia.
+    if (situacao.diasRestantes === null) return undefined;
+
+    return {
+      cobranca: {
+        diasRestantes: situacao.diasRestantes,
+        emAbertoMinor: situacao.emAbertoMinor,
+        suspensa: tenant.status === 'SUSPENDED',
+      },
+    };
   }
 
   private gravarCookies(resposta: Response, par: ParDeTokens): void {

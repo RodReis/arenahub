@@ -15,7 +15,7 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3073 | 3073 | 0 | 76.1 |
+| unitário | 3110 | 3110 | 0 | 75.9 |
 | contrato | 0 | 0 | 0 | — |
 | integração | 955 | 955 | 0 | 84.0 |
 | e2e | 0 | 0 | 0 | — |
@@ -138,3 +138,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-09 | #285 | SPEC-062 | integração | 937 | 937 | 0 | 84.0 | — o Jest crasha no fim no Windows (3221226505, DEPOIS de os testes passarem) e o gerador herdou o 922 de duas entregas atrás; medido à mão **suíte a suíte**: `apps/api` 859 em 63 suítes (número confirmado pela execução do CI, que roda em Linux sem o crash) + `@arenahub/database` 78. Os +8 são os da identidade visual (9 de integração da F62, menos 1 do contrato OpenAPI que já existia e passou a cobrir as rotas novas). Rodando as 63 de uma vez, `students-cadastro-completo` falha 1 por acúmulo de estado no banco da varredura — passa isolado duas vezes e não é tocado por esta fatia |
 | 2026-09-09 | #286 | SPEC-063 | unitário | 3073 | 3073 | 0 | 76.1 | [#298](https://github.com/RodReis/arenahub/pull/298) |
 | 2026-09-09 | #286 | SPEC-063 | integração | 955 | 955 | 0 | 84.0 | — o Jest crasha no fim no Windows (3221226505, DEPOIS de os testes passarem) e o gerador herdou o 937 da entrega anterior; medido à mão em dois lotes: `apps/api` 877 (443 + 447, menos 13 de `kiosk-auth` e `platform-auth-de-plataforma`, que casam nos dois filtros e rodaram duas vezes) + `@arenahub/database` 78. Os +18 são os da fatia: `platform-contrato.int-spec.ts`. **O CI confirmou o número**: 64 suítes / 877 em `apps/api`, rodando em Linux sem o crash. | [#298](https://github.com/RodReis/arenahub/pull/298) |
+| 2026-09-09 | #288 | F65 | unitário | 3110 | 3110 | 0 | 75.9 | [#300](https://github.com/RodReis/arenahub/pull/300) |
+| 2026-09-09 | #288 | F65 | integração | 911 | 911 | 0 | 84.0 | — **número confirmado pelo CI** (Linux, sem o crash `3221226505`), não medido à mão: as DUAS tentativas locais desta entrega tinham crashado em pontos DIFERENTES do conjunto de 67 suítes (43/67 numa rodada, 19/67 na outra — zero `FAIL` nas duas), então "medir à mão somando lotes" (o método das entregas anteriores) não dava número confiável sem nenhuma rodada local completa para somar. **67 suítes / 911 testes**, rodando em Linux. Os +34 sobre o 877 da SPEC-063 são as suítes/testes desta fatia (`access-gate-de-tenant.int-spec.ts` novo, mais os acréscimos em `platform-suspensao-automatica`, `platform-fatura`, `manual-override`, `platform-alterar-tenant`). | [#300](https://github.com/RodReis/arenahub/pull/300) |

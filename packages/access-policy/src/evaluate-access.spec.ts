@@ -44,6 +44,7 @@ function entrada(sobrescreve: Partial<AccessPolicyInput> = {}): AccessPolicyInpu
     student: { status: 'ACTIVE' },
     entitlements: [entitlement()],
     adminBlock: { active: false },
+    tenant: { gateActive: false },
     ...sobrescreve,
   };
 }
@@ -511,5 +512,47 @@ describe('evaluateAccess -- eixo de dayOfWeek nos sete dias (#129)', () => {
     );
 
     expect(resultado).toMatchObject({ outcome: 'DENY', reason: 'OUTSIDE_SCHEDULE' });
+  });
+});
+
+describe('F65 (ADR-053) -- gate do contratante', () => {
+  it('nega aluno perfeitamente regular quando o gate esta ativo', () => {
+    const resultado = evaluateAccess(entrada({ tenant: { gateActive: true } }));
+
+    expect(resultado).toEqual({
+      outcome: 'DENY',
+      reason: 'TENANT_SUSPENDED',
+      policyVersion: POLICY_VERSION,
+    });
+  });
+
+  it('o gate PRECEDE o bloqueio administrativo', () => {
+    // Os dois ativos ao mesmo tempo. Se a ordem inverter, a recepcao le
+    // "bloqueio administrativo" e vai mexer no cadastro do aluno -- quando o
+    // que ha e a academia suspensa, que so o dono resolve pagando.
+    const resultado = evaluateAccess(
+      entrada({ tenant: { gateActive: true }, adminBlock: { active: true } }),
+    );
+
+    expect(resultado.reason).toBe('TENANT_SUSPENDED');
+  });
+
+  it('o gate PRECEDE o estado do aluno', () => {
+    const resultado = evaluateAccess(
+      entrada({ tenant: { gateActive: true }, student: { status: 'BLOCKED' } }),
+    );
+
+    expect(resultado.reason).toBe('TENANT_SUSPENDED');
+  });
+
+  it('levantado o gate, a MESMA entrada volta a permitir', () => {
+    // A reversibilidade e o coracao do ADR-053 §2: o gate nao revoga nada,
+    // entao a mesma entrada com o gate baixo tem de devolver ALLOW sem que
+    // ninguem seja recadastrado.
+    const comGate = evaluateAccess(entrada({ tenant: { gateActive: true } }));
+    const semGate = evaluateAccess(entrada({ tenant: { gateActive: false } }));
+
+    expect(comGate.outcome).toBe('DENY');
+    expect(semGate.outcome).toBe('ALLOW');
   });
 });

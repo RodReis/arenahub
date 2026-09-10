@@ -463,6 +463,9 @@ describe('importacao da base ativa do Pacto (F48)', () => {
         localDayOfWeek: local.dayOfWeek,
         localMinuteOfDay: local.minuteOfDay,
         student: { status: 'ACTIVE' as const },
+        // F65 (ADR-053): campo novo do motor, tenant regular para este teste
+        // -- o caso testado aqui e sobre janela de horario, nao sobre gate.
+        tenant: { gateActive: false },
         adminBlock: { active: false },
         entitlements: [
           {

@@ -68,3 +68,40 @@ export function resolverHoraLocal(instante: string | Date, timeZone: string): Ho
 
   return { dayOfWeek: dia, minuteOfDay: horaNormalizada * 60 + minuto };
 }
+
+/**
+ * Dia do calendario LOCAL de um instante, no formato `YYYY-MM-DD`.
+ *
+ * Existe porque `resolverHoraLocal` responde "que horas sao la", e nao "que
+ * DIA e la" -- e comparar dia com meia-noite UTC erra o dia inteiro em todo
+ * fuso negativo: meia-noite UTC ja e o dia anterior em Sao Paulo.
+ *
+ * O formato ordena lexicograficamente igual a cronologia, entao `<` e `>`
+ * entre duas strings comparam datas sem reintroduzir aritmetica de offset.
+ *
+ * @param instante ISO-8601 ou `Date`.
+ * @param timeZone IANA, ex. `America/Sao_Paulo`.
+ * @throws se o fuso for desconhecido ou o instante invalido -- mesma razao de
+ *   `resolverHoraLocal`: cair para UTC em silencio deslizaria o dia.
+ */
+export function resolverDiaLocal(instante: string | Date, timeZone: string): string {
+  const data = typeof instante === 'string' ? new Date(instante) : instante;
+
+  if (!Number.isFinite(data.getTime())) {
+    throw new RangeError(`instante invalido para conversao de fuso: ${String(instante)}`);
+  }
+
+  // `en-CA` produz exatamente `YYYY-MM-DD`, sem montagem manual de partes.
+  const dia = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(data);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) {
+    throw new RangeError(`fuso desconhecido ou sem tzdata: ${timeZone}`);
+  }
+
+  return dia;
+}

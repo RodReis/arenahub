@@ -29,6 +29,8 @@ const RAZOES_NO_SCHEMA = [
   // F15 -- acrescentadas PELO FIM, como o ADR-024 exige.
   'PAYMENT_OVERDUE',
   'FINANCIAL_OVERRIDE',
+  // F65 (ADR-053) -- gate do CONTRATANTE, tambem pelo fim.
+  'TENANT_SUSPENDED',
 ] as const;
 
 describe('ADR-024 -- razoes do motor e do banco nao divergem', () => {
@@ -63,14 +65,15 @@ describe('ADR-024 -- razoes do motor e do banco nao divergem', () => {
     expect(doMotor.has('MANUAL_OVERRIDE')).toBe(false);
   });
 
-  it('ha exatamente sete razoes de DENY -- ADR-024 mais a F15', () => {
+  it('ha exatamente oito razoes de DENY -- ADR-024, F15 e F65', () => {
     /**
      * O NUMERO E DE PROPOSITO, e nao `.length` de si mesmo: uma razao nova
      * tem de ser uma DECISAO, com ADR e migration, nunca um valor que alguem
      * acrescentou ao objeto e o teste aceitou calado.
      *
-     * Era seis ate a F15, que acrescentou `PAYMENT_OVERDUE` pelo fim.
+     * Era seis ate a F15, que acrescentou `PAYMENT_OVERDUE` pelo fim; e
+     * sete ate a F65, que acrescentou `TENANT_SUSPENDED` do mesmo jeito.
      */
-    expect(Object.values(DENY_REASON)).toHaveLength(7);
+    expect(Object.values(DENY_REASON)).toHaveLength(8);
   });
 });

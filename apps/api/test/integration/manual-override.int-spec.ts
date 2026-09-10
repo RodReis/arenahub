@@ -373,6 +373,41 @@ describe('F9 -- liberacao manual', () => {
     });
   });
 
+  describe('gate do contratante (F65, ADR-053 §1)', () => {
+    afterAll(async () => {
+      // Devolve o tenant ao estado ativo para nao vazar para as suites
+      // seguintes deste arquivo.
+      await db.tenant.update({ where: { id: ctx.tenantId }, data: { status: 'ACTIVE' } });
+    });
+
+    it('F65 -- recepcao NAO libera quando o tenant esta suspenso', async () => {
+      /*
+       * ADR-053 §1 diz "nega todo mundo". Sem esta guarda o gate teria porta
+       * lateral: nega na catraca e libera na tela, e a suspensao por
+       * inadimplencia viraria sugestao.
+       */
+      await db.tenant.update({ where: { id: ctx.tenantId }, data: { status: 'SUSPENDED' } });
+
+      const resposta = await pedirOverride();
+      const corpo = resposta.body as { code: string };
+
+      expect(resposta.status).toBe(400);
+      expect(corpo.code).toBe('TENANT_SUSPENDED');
+    });
+
+    it('F65 -- e nenhum AccessEvent e gravado nesse caso', async () => {
+      // Recusa que grava evento de ALLOW seria pior que nao recusar: o
+      // relatorio diria que a pessoa entrou.
+      await db.tenant.update({ where: { id: ctx.tenantId }, data: { status: 'SUSPENDED' } });
+
+      const antes = await db.accessEvent.count({ where: { tenantId: ctx.tenantId } });
+      await pedirOverride();
+      const depois = await db.accessEvent.count({ where: { tenantId: ctx.tenantId } });
+
+      expect(depois).toBe(antes);
+    });
+  });
+
   describe('idempotencia -- clique duplo nao gira a catraca duas vezes', () => {
     it('a mesma chave devolve o mesmo evento e nao cria segundo comando', async () => {
       const chave = `ovr-fixa-${randomUUID()}`;

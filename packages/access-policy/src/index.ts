@@ -16,4 +16,4 @@ export {
 } from './types.js';
 
 export { evaluateAccess } from './evaluate-access.js';
-export { resolverHoraLocal, type HoraLocal } from './local-time.js';
+export { resolverDiaLocal, resolverHoraLocal, type HoraLocal } from './local-time.js';
