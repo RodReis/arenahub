@@ -29,7 +29,7 @@ export function AvisoDeCobranca({ diasRestantes, emAbertoMinor, suspensa }: Prop
             Acesso bloqueado por falta de pagamento
           </>
         ) : (
-          <>Fatura em atraso -- fecha em {formatarPrazo(diasRestantes)}</>
+          <>Fatura em atraso -- {formatarPrazo(diasRestantes)}</>
         )}{' '}
         · em aberto: <Money cents={emAbertoMinor} />
       </span>
@@ -41,10 +41,16 @@ export function AvisoDeCobranca({ diasRestantes, emAbertoMinor, suspensa }: Prop
  * "Faltam 0 dias" nao avisa ninguem -- "hoje" diz que e AGORA. Extraida
  * porque a mesma regra (0 e "hoje", nao "0 dias") vale em qualquer lugar que
  * `avaliarCarencia` alimentar no futuro.
+ *
+ * O ramo negativo NAO e defensivo: e o estado permanente de todo tenant com
+ * `autoSuspend` desligado (o padrao). A carencia esgota, ninguem suspende, e
+ * `diasRestantes` so afunda -- sem este ramo o dono leria "fecha em -5 dias"
+ * e, meses depois, "fecha em -90 dias".
  */
 function formatarPrazo(diasRestantes: number): string {
-  if (diasRestantes === 0) return 'hoje';
-  if (diasRestantes === 1) return '1 dia';
+  if (diasRestantes < 0) return 'prazo esgotado';
+  if (diasRestantes === 0) return 'fecha hoje';
+  if (diasRestantes === 1) return 'fecha em 1 dia';
 
-  return `${diasRestantes} dias`;
+  return `fecha em ${diasRestantes} dias`;
 }
