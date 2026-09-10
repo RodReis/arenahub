@@ -1,9 +1,9 @@
-import { resolverHoraLocal } from '@arenahub/access-policy';
+import { resolverDiaLocal, resolverHoraLocal } from '@arenahub/access-policy';
 
 export interface SituacaoDeCobranca {
   /** `null` quando nao ha fatura vencida. */
   readonly vencidaEm: Date | null;
-  /** Instante em que o gate fecha. `null` quando nao ha vencida. */
+  /** Ultimo instante de carencia: meia-noite do fim do prazo. `null` sem vencida. */
   readonly suspendeEm: Date | null;
   /** Dias inteiros que faltam. Negativo depois de esgotada; `null` sem vencida. */
   readonly diasRestantes: number | null;
@@ -46,26 +46,43 @@ export function avaliarCarencia(entrada: {
     return fatura.dueAt < maisAntiga.dueAt ? fatura : maisAntiga;
   }).dueAt;
 
-  // Calcular suspendeEm: vencidaEm + graceDays dias, com ajuste especial para graceDays=0.
-  // Quando graceDays=0, adiciona mais 1 dia para garantir que a suspensao seja no DIA
-  // SEGUINTE ao vencimento (nunca no dia do vencimento). A suspensao so vale apos as
-  // 6h locais (decisao D3 do PI).
-  const efetivoDays = graceDays === 0 ? 1 : graceDays;
+  // Fim da carencia: vencidaEm + graceDays dias, a meia-noite.
   const suspendeEm = new Date(vencidaEm);
-  suspendeEm.setUTCDate(suspendeEm.getUTCDate() + efetivoDays);
+  suspendeEm.setUTCDate(suspendeEm.getUTCDate() + graceDays);
   suspendeEm.setUTCHours(0, 0, 0, 0);
 
   // diasRestantes = Math.ceil((suspendeEm - agora) / 86_400_000)
   // "faltam 0 dias" = "fecha hoje", nao "ja fechou".
   const diasRestantes = Math.ceil((suspendeEm.getTime() - agora.getTime()) / 86_400_000);
 
-  // Resolver a hora local da academia.
-  const horaLocal = resolverHoraLocal(agora, timezone);
+  /*
+   * A decisao compara DIAS LOCAIS, nunca instantes UTC.
+   *
+   * Comparar com a meia-noite UTC de `suspendeEm` erra o dia inteiro em todo
+   * fuso negativo -- meia-noite UTC e 21h (Sao Paulo) ou 20h (Manaus) do dia
+   * ANTERIOR local. O job diario roda as 00:00Z; com a comparacao em UTC ele
+   * suspenderia a academia as 21h, aberta e cheia, um dia antes do prazo --
+   * exatamente o que a janela das 6h (decisao D3 do PI) existe para evitar.
+   *
+   * A carencia so se esgota no DIA SEGUINTE ao fim do prazo, no fuso da
+   * academia: quem vence hoje com `graceDays` 0 fecha amanha de manha, nunca
+   * hoje a noite. Por isso `>`, e nao `>=`.
+   *
+   * Os dois lados leem o mesmo eixo de calendario, apesar de origens
+   * diferentes: `dueAt` e uma DATA de vencimento gravada como meia-noite UTC,
+   * entao a fatia UTC dela E a data pretendida -- converte-la para o fuso da
+   * academia a jogaria para o dia anterior. Ja `agora` e um INSTANTE, e o dia
+   * dele so existe depois de resolvido no fuso da academia.
+   */
+  const diaDoFimDaCarencia = suspendeEm.toISOString().slice(0, 10);
+  const diaLocalDeAgora = resolverDiaLocal(agora, timezone);
+  const carenciaEsgotada = diaLocalDeAgora > diaDoFimDaCarencia;
+
   // 6h locais = 360 minutos do dia.
+  const horaLocal = resolverHoraLocal(agora, timezone);
   const jaPassouDas6hLocais = horaLocal.minuteOfDay >= 360;
 
-  // Suspender se: carencia esgotada (diasRestantes <= 0) AND ja passou das 6h locais.
-  const deveSuspender = diasRestantes <= 0 && jaPassouDas6hLocais;
+  const deveSuspender = carenciaEsgotada && jaPassouDas6hLocais;
 
   // Somar TODAS as faturas vencidas.
   const emAbertoMinor = faturasVencidas.reduce((soma, fatura) => soma + fatura.totalMinor, 0);
