@@ -58,3 +58,15 @@ export class LoginBloqueadoPorTentativasError extends ErroDeDominio {
     super('AUTH_LOGIN_RATE_LIMITED', 429, 'Muitas tentativas. Tente novamente em instantes');
   }
 }
+
+/**
+ * Cinco codigos MFA errados em sequencia, do mesmo Super Admin (issue #296).
+ *
+ * Limite mais baixo que o do login: um TOTP de seis digitos tem espaco de
+ * busca bem menor que uma senha.
+ */
+export class MfaBloqueadoPorTentativasError extends ErroDeDominio {
+  constructor() {
+    super('MFA_RATE_LIMITED', 429, 'Muitas tentativas. Tente novamente em instantes');
+  }
+}
