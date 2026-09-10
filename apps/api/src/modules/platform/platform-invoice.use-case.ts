@@ -411,12 +411,10 @@ export class PlatformInvoiceUseCase {
     ato: Parameters<PlatformAuditService['registrar']>[1],
     correlationId: string,
   ): Promise<void> {
-    // Sem usuario agindo -- quem "age" e o job. Mesmo padrao do
-    // `EngagementRankingSchedulerService.SEM_USUARIO`: `actor_user_id` e
-    // anulavel exatamente para isto.
-    const doJob = { actorId: null as unknown as string } as PlatformContext;
-
-    await this.auditoria.registrar(contexto ?? doJob, ato, correlationId, tx);
+    // `null` significa "sem usuario agindo -- quem age e o job". Mesmo padrao
+    // do `EngagementRankingSchedulerService.SEM_USUARIO`: `actor_user_id` e
+    // anulavel exatamente para isto, e `registrar` aceita o nulo de verdade.
+    await this.auditoria.registrar(contexto, ato, correlationId, tx);
   }
 }
 

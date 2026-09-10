@@ -169,9 +169,9 @@ export class SuspenderTenantUseCase {
     ato: Parameters<PlatformAuditService['registrar']>[1],
     correlationId: string,
   ): Promise<void> {
-    const doJob = { actorId: null as unknown as string } as PlatformContext;
-
-    await this.auditoria.registrar(contexto ?? doJob, ato, correlationId, tx);
+    // `null` significa "sem usuario agindo -- quem age e o job".
+    // `actor_user_id` e anulavel no schema exatamente para isto.
+    await this.auditoria.registrar(contexto, ato, correlationId, tx);
   }
 }
 
