@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { comContexto } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -68,47 +69,58 @@ export class ElevarUseCase {
 
     const expiresAt = new Date(Date.now() + ELEVACAO_VALIDA_POR_MINUTOS * 60 * 1000);
 
-    const elevacao = await this.db.$transaction(async (tx) => {
-      const criada = await tx.supportElevation.create({
-        data: {
-          sessionId: contexto.sessionId,
-          platformAdminUserId: contexto.actorId,
-          tenantId,
-          reason: justificativa,
-          expiresAt,
-        },
-      });
+    /*
+     * Issue #302: esta transacao escreve em `audit_logs` (politica RLS desde
+     * a F66, ADR-054) ANTES de a `SupportElevation` existir para o
+     * `AuthGuard` ler -- a rota e autenticada por `PlatformContext`, sem
+     * tenant, entao o `TenantRlsInterceptor` nunca abre escopo aqui. Sem o
+     * `comContexto` explicito, `app.actor` fica NULL na transacao e a
+     * politica recusa a linha com 42501. `platform` e o caminho que o
+     * ADR-052 SS3 reserva para a sessao elevada de Super Admin.
+     */
+    const elevacao = await comContexto({ kind: 'platform' }, () =>
+      this.db.$transaction(async (tx) => {
+        const criada = await tx.supportElevation.create({
+          data: {
+            sessionId: contexto.sessionId,
+            platformAdminUserId: contexto.actorId,
+            tenantId,
+            reason: justificativa,
+            expiresAt,
+          },
+        });
 
-      await this.auditoria.registrar(
-        contexto,
-        {
-          action: 'support.elevated',
-          target: 'tenant',
-          targetId: tenantId,
-          tenantId,
-          metadata: { motivo: justificativa, expiraEm: expiresAt.toISOString() },
-        },
-        correlationId,
-        tx,
-      );
-
-      // A SEGUNDA linha, no tenant alvo: quem opera a academia precisa ver
-      // que houve suporte dentro da casa dele (INV-008).
-      await tx.auditLog.create({
-        data: {
-          tenantId,
-          actorType: 'SUPPORT',
-          actorId: contexto.actorId,
-          action: 'support.elevated',
-          target: 'tenant',
-          targetId: tenantId,
+        await this.auditoria.registrar(
+          contexto,
+          {
+            action: 'support.elevated',
+            target: 'tenant',
+            targetId: tenantId,
+            tenantId,
+            metadata: { motivo: justificativa, expiraEm: expiresAt.toISOString() },
+          },
           correlationId,
-          metadata: { motivo: justificativa, expiraEm: expiresAt.toISOString() },
-        },
-      });
+          tx,
+        );
 
-      return criada;
-    });
+        // A SEGUNDA linha, no tenant alvo: quem opera a academia precisa ver
+        // que houve suporte dentro da casa dele (INV-008).
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            actorType: 'SUPPORT',
+            actorId: contexto.actorId,
+            action: 'support.elevated',
+            target: 'tenant',
+            targetId: tenantId,
+            correlationId,
+            metadata: { motivo: justificativa, expiraEm: expiresAt.toISOString() },
+          },
+        });
+
+        return criada;
+      }),
+    );
 
     const accessToken = this.tokens.emitirAcesso({
       sub: contexto.actorId,

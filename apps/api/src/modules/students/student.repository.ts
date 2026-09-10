@@ -284,51 +284,57 @@ export class StudentRepository {
 
     const selecao = { id: true, membershipNumber: true, fullName: true, status: true };
 
-    if (dados.cpf) {
-      const porCpf = await this.db.student.findMany({
-        where: {
-          tenantId: contexto.tenantId,
-          cpfHash: calcularHashDeCpf(contexto.tenantId, dados.cpf),
-        },
-        select: selecao,
-      });
+    // `comTenant`: sao varias leituras em `students` (politica RLS desde a
+    // F66) fora de qualquer escrita -- sem a transacao interceptada, o
+    // `set_config` nunca aplica e a politica devolve ZERO LINHAS em
+    // silencio sob o role restrito (issue #302).
+    await this.db.comTenant(async (tx) => {
+      if (dados.cpf) {
+        const porCpf = await tx.student.findMany({
+          where: {
+            tenantId: contexto.tenantId,
+            cpfHash: calcularHashDeCpf(contexto.tenantId, dados.cpf),
+          },
+          select: selecao,
+        });
 
-      for (const aluno of porCpf) registrar(aluno, 'CPF');
-    }
-
-    for (const contato of dados.contacts) {
-      // Contato de emergencia e de OUTRA pessoa: o telefone do conjuge nao
-      // torna dois alunos a mesma pessoa. Comparar por ele produziria
-      // duplicata falsa em toda familia que se cadastra junto.
-      if (contato.type === 'EMERGENCY') continue;
-
-      const valor = normalizarValorDeContato(contato.type, contato.value);
-
-      const porContato = await this.db.student.findMany({
-        where: {
-          tenantId: contexto.tenantId,
-          contacts: { some: { type: contato.type, value: valor } },
-        },
-        select: selecao,
-      });
-
-      for (const aluno of porContato) {
-        registrar(aluno, contato.type === 'EMAIL' ? 'EMAIL' : 'PHONE');
+        for (const aluno of porCpf) registrar(aluno, 'CPF');
       }
-    }
 
-    // Sinal mais fraco: mesmo nome E mesma data de nascimento. Sozinho, nome
-    // igual seria ruido; com a data, vira aviso util.
-    const porNome = await this.db.student.findMany({
-      where: {
-        tenantId: contexto.tenantId,
-        fullName: { equals: dados.fullName, mode: 'insensitive' },
-        birthDate: dados.birthDate,
-      },
-      select: selecao,
+      for (const contato of dados.contacts) {
+        // Contato de emergencia e de OUTRA pessoa: o telefone do conjuge nao
+        // torna dois alunos a mesma pessoa. Comparar por ele produziria
+        // duplicata falsa em toda familia que se cadastra junto.
+        if (contato.type === 'EMERGENCY') continue;
+
+        const valor = normalizarValorDeContato(contato.type, contato.value);
+
+        const porContato = await tx.student.findMany({
+          where: {
+            tenantId: contexto.tenantId,
+            contacts: { some: { type: contato.type, value: valor } },
+          },
+          select: selecao,
+        });
+
+        for (const aluno of porContato) {
+          registrar(aluno, contato.type === 'EMAIL' ? 'EMAIL' : 'PHONE');
+        }
+      }
+
+      // Sinal mais fraco: mesmo nome E mesma data de nascimento. Sozinho,
+      // nome igual seria ruido; com a data, vira aviso util.
+      const porNome = await tx.student.findMany({
+        where: {
+          tenantId: contexto.tenantId,
+          fullName: { equals: dados.fullName, mode: 'insensitive' },
+          birthDate: dados.birthDate,
+        },
+        select: selecao,
+      });
+
+      for (const aluno of porNome) registrar(aluno, 'NAME_AND_BIRTH_DATE');
     });
-
-    for (const aluno of porNome) registrar(aluno, 'NAME_AND_BIRTH_DATE');
 
     return [...encontrados.values()];
   }
@@ -444,7 +450,14 @@ export class StudentRepository {
   async encontrar(contexto: TenantContext, id: string): Promise<Student | null> {
     // `findFirst` com tenantId no filtro, nunca `findUnique` por id: id de
     // outro tenant simplesmente nao entra no conjunto.
-    return this.db.student.findFirst({ where: { id, tenantId: contexto.tenantId } });
+    //
+    // `comTenant`: fora de transacao interceptada, o `set_config` nunca
+    // aplica e a politica RLS (F66) devolve ZERO LINHAS em silencio sob o
+    // role restrito -- o "nao encontrei" indistinguivel de "nao ha
+    // contexto" que a issue #302 corrige.
+    return this.db.comTenant((tx) =>
+      tx.student.findFirst({ where: { id, tenantId: contexto.tenantId } }),
+    );
   }
 
   /**
@@ -458,19 +471,21 @@ export class StudentRepository {
     contexto: TenantContext,
     id: string,
   ): Promise<AlunoComDetalhes | null> {
-    return this.db.student.findFirst({
-      where: { id, tenantId: contexto.tenantId },
-      include: {
-        contacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] },
-        // Uma linha hoje, mas a tabela e 1:N: ordenar deixa a leitura
-        // deterministica em vez de depender da ordem fisica das paginas.
-        addresses: { orderBy: { createdAt: 'asc' } },
-        // F60. `orderBy` explicito: sem ele a ordem e a fisica do Postgres, e
-        // um UPDATE em qualquer linha embaralha a lista entre dois
-        // carregamentos da mesma ficha.
-        modalities: { include: { modality: true }, orderBy: { modality: { name: 'asc' } } },
-      },
-    });
+    return this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { id, tenantId: contexto.tenantId },
+        include: {
+          contacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] },
+          // Uma linha hoje, mas a tabela e 1:N: ordenar deixa a leitura
+          // deterministica em vez de depender da ordem fisica das paginas.
+          addresses: { orderBy: { createdAt: 'asc' } },
+          // F60. `orderBy` explicito: sem ele a ordem e a fisica do Postgres, e
+          // um UPDATE em qualquer linha embaralha a lista entre dois
+          // carregamentos da mesma ficha.
+          modalities: { include: { modality: true }, orderBy: { modality: { name: 'asc' } } },
+        },
+      }),
+    );
   }
 
   /**
@@ -614,10 +629,12 @@ export class StudentRepository {
     contexto: TenantContext,
     id: string,
   ): Promise<{ status: StudentStatus; elegivel: boolean } | null> {
-    const aluno = await this.db.student.findFirst({
-      where: { id, tenantId: contexto.tenantId },
-      select: { status: true },
-    });
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { id, tenantId: contexto.tenantId },
+        select: { status: true },
+      }),
+    );
 
     if (!aluno) return null;
 
@@ -655,15 +672,17 @@ export class StudentRepository {
       modalityId?: string | undefined;
     },
   ): Promise<number> {
-    return this.db.student.count({
-      where: {
-        tenantId: contexto.tenantId,
-        ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
-        ...(filtro.status ? { status: filtro.status } : {}),
-        ...(filtro.modalityId ? condicaoDeModalidade(filtro.modalityId) : {}),
-        ...condicoesDaListagem(filtro.termo),
-      },
-    });
+    return this.db.comTenant((tx) =>
+      tx.student.count({
+        where: {
+          tenantId: contexto.tenantId,
+          ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
+          ...(filtro.status ? { status: filtro.status } : {}),
+          ...(filtro.modalityId ? condicaoDeModalidade(filtro.modalityId) : {}),
+          ...condicoesDaListagem(filtro.termo),
+        },
+      }),
+    );
   }
 
   async buscar(
@@ -715,130 +734,135 @@ export class StudentRepository {
   ): Promise<Student[]> {
     const condicoes = condicoesDaListagem(filtro.termo);
 
-    return this.db.student.findMany({
-      where: {
-        tenantId: contexto.tenantId,
-        ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
-        ...(filtro.status ? { status: filtro.status } : {}),
-        ...(filtro.modalityId ? condicaoDeModalidade(filtro.modalityId) : {}),
-        ...condicoes,
-      },
-      orderBy: ordenacao(filtro.ordem, filtro.direcao),
-      take: filtro.limite,
-      ...(filtro.cursor ? { cursor: { id: filtro.cursor }, skip: 1 } : {}),
-      /**
-       * O PLANO VEM JUNTO -- a lista responde "quem e este aluno?", e o plano
-       * e metade da resposta na recepcao ("ele tem Mensal Fit ou Anual
-       * Black?"). Sem isto, descobrir exigia abrir a ficha de cada um.
-       *
-       * SO A ASSINATURA QUE VALE AGORA: `ACTIVE` ou `PAST_DUE`, a mais
-       * recente. Um aluno pode ter historico de assinaturas canceladas, e
-       * mostrar a antiga diria que ele tem plano que nao tem.
-       *
-       * `take: 1` no include, e nao um segundo `findMany`: a alternativa seria
-       * uma consulta por aluno, que e o N+1 que o `docs/REVIEW.md` §3.4 barra.
-       */
-      include: {
-        subscriptions: {
-          where: { status: { in: ['ACTIVE', 'PAST_DUE'] } },
-          orderBy: { startsAt: 'desc' },
-          take: 1,
-          select: {
-            status: true,
-            plan: { select: { name: true } },
-            /*
-             * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente --
-             * F53 Task 12, mesmo criterio de `listar-invoices.use-case.ts`
-             * (`dueAt asc` primeiro traz a mais antiga). SEM segunda consulta:
-             * nested include sob o `take: 1` de cima, mesma tecnica que ja
-             * evita o N+1 aqui.
-             */
-            invoices: {
-              where: { status: { in: ['OPEN', 'OVERDUE'] } },
-              orderBy: [{ dueAt: 'asc' }, { id: 'asc' }],
-              take: 1,
-              select: { status: true, dueAt: true, blockAt: true },
+    // `comTenant`: findMany solto nunca chamava `set_config` -- sob o role
+    // restrito a politica (F66) devolvia ZERO LINHAS em silencio, mesmo com
+    // o aluno existindo no tenant certo (issue #302).
+    return this.db.comTenant((tx) =>
+      tx.student.findMany({
+        where: {
+          tenantId: contexto.tenantId,
+          ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
+          ...(filtro.status ? { status: filtro.status } : {}),
+          ...(filtro.modalityId ? condicaoDeModalidade(filtro.modalityId) : {}),
+          ...condicoes,
+        },
+        orderBy: ordenacao(filtro.ordem, filtro.direcao),
+        take: filtro.limite,
+        ...(filtro.cursor ? { cursor: { id: filtro.cursor }, skip: 1 } : {}),
+        /**
+         * O PLANO VEM JUNTO -- a lista responde "quem e este aluno?", e o plano
+         * e metade da resposta na recepcao ("ele tem Mensal Fit ou Anual
+         * Black?"). Sem isto, descobrir exigia abrir a ficha de cada um.
+         *
+         * SO A ASSINATURA QUE VALE AGORA: `ACTIVE` ou `PAST_DUE`, a mais
+         * recente. Um aluno pode ter historico de assinaturas canceladas, e
+         * mostrar a antiga diria que ele tem plano que nao tem.
+         *
+         * `take: 1` no include, e nao um segundo `findMany`: a alternativa seria
+         * uma consulta por aluno, que e o N+1 que o `docs/REVIEW.md` §3.4 barra.
+         */
+        include: {
+          subscriptions: {
+            where: { status: { in: ['ACTIVE', 'PAST_DUE'] } },
+            orderBy: { startsAt: 'desc' },
+            take: 1,
+            select: {
+              status: true,
+              plan: { select: { name: true } },
+              /*
+               * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente --
+               * F53 Task 12, mesmo criterio de `listar-invoices.use-case.ts`
+               * (`dueAt asc` primeiro traz a mais antiga). SEM segunda consulta:
+               * nested include sob o `take: 1` de cima, mesma tecnica que ja
+               * evita o N+1 aqui.
+               */
+              invoices: {
+                where: { status: { in: ['OPEN', 'OVERDUE'] } },
+                orderBy: [{ dueAt: 'asc' }, { id: 'asc' }],
+                take: 1,
+                select: { status: true, dueAt: true, blockAt: true },
+              },
             },
           },
-        },
-        /*
-         * O DIREITO QUE NAO NASCE DE ASSINATURA -- cortesia, funcionario,
-         * personal trainer, dependente, convenio.
-         *
-         * Sem isto a coluna PLANO saia de `subscriptions[0]` e so ela: quem
-         * tem acesso por VINCULO nao tem assinatura nenhuma, entao a ficha
-         * mostrava "Ativo, Personal trainer, vale agora" e a lista mostrava
-         * "—" para a MESMA pessoa. Eram 33 alunos da bancada (24 funcionarios,
-         * 9 personal trainers), e a recepcao olha a lista para decidir se
-         * libera.
-         *
-         * `subscriptionId: null` FILTRA no banco, nao no DTO: o direito
-         * derivado de assinatura ja chega pelo include de cima, com o NOME do
-         * plano, que e melhor resposta que a origem.
-         *
-         * VIGENTE AGORA, nao qualquer um: `startsAt <= agora <= endsAt` com
-         * status ativo. Direito expirado ou agendado na coluna diria que o
-         * aluno tem acesso hoje.
-         *
-         * `take: 1` pelo mesmo motivo do bloco de cima -- consulta por aluno
-         * seria o N+1 que `docs/REVIEW.md` §3.4 barra.
-         */
-        entitlements: {
-          where: {
-            subscriptionId: null,
-            status: 'ACTIVE',
-            startsAt: { lte: agora },
-            endsAt: { gte: agora },
-          },
-          orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
-          take: 1,
-          select: { source: true },
-        },
-        /*
-         * Fuso da unidade de ORIGEM do aluno (INV-144, ADR-019) -- sem ele
-         * `situacaoDeVencimento` nao tem como decidir o dia civil de `dueAt`.
-         * SEM FALLBACK: unidade sem fuso cadastrado nao aparece com aviso
-         * errado, aparece sem aviso (ver `paraDtoDaLista`).
-         */
-        gymUnit: { select: { timezone: true } },
-        contacts: {
-          where: { type: 'PHONE' },
           /*
-            DUAS chaves, nao uma. `isPrimary` e boolean, logo NAO e ordem
-            total: dois telefones com o mesmo valor de `isPrimary` empatam, e
-            o desempate cai na ordem FISICA do Postgres -- que muda depois de
-            qualquer UPDATE na tabela.
+           * O DIREITO QUE NAO NASCE DE ASSINATURA -- cortesia, funcionario,
+           * personal trainer, dependente, convenio.
+           *
+           * Sem isto a coluna PLANO saia de `subscriptions[0]` e so ela: quem
+           * tem acesso por VINCULO nao tem assinatura nenhuma, entao a ficha
+           * mostrava "Ativo, Personal trainer, vale agora" e a lista mostrava
+           * "—" para a MESMA pessoa. Eram 33 alunos da bancada (24 funcionarios,
+           * 9 personal trainers), e a recepcao olha a lista para decidir se
+           * libera.
+           *
+           * `subscriptionId: null` FILTRA no banco, nao no DTO: o direito
+           * derivado de assinatura ja chega pelo include de cima, com o NOME do
+           * plano, que e melhor resposta que a origem.
+           *
+           * VIGENTE AGORA, nao qualquer um: `startsAt <= agora <= endsAt` com
+           * status ativo. Direito expirado ou agendado na coluna diria que o
+           * aluno tem acesso hoje.
+           *
+           * `take: 1` pelo mesmo motivo do bloco de cima -- consulta por aluno
+           * seria o N+1 que `docs/REVIEW.md` §3.4 barra.
+           */
+          entitlements: {
+            where: {
+              subscriptionId: null,
+              status: 'ACTIVE',
+              startsAt: { lte: agora },
+              endsAt: { gte: agora },
+            },
+            orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
+            take: 1,
+            select: { source: true },
+          },
+          /*
+           * Fuso da unidade de ORIGEM do aluno (INV-144, ADR-019) -- sem ele
+           * `situacaoDeVencimento` nao tem como decidir o dia civil de `dueAt`.
+           * SEM FALLBACK: unidade sem fuso cadastrado nao aparece com aviso
+           * errado, aparece sem aviso (ver `paraDtoDaLista`).
+           */
+          gymUnit: { select: { timezone: true } },
+          contacts: {
+            where: { type: 'PHONE' },
+            /*
+              DUAS chaves, nao uma. `isPrimary` e boolean, logo NAO e ordem
+              total: dois telefones com o mesmo valor de `isPrimary` empatam, e
+              o desempate cai na ordem FISICA do Postgres -- que muda depois de
+              qualquer UPDATE na tabela.
 
-            Com `take: 1` em cima, o empate nao embaralha a ordem: ele troca
-            QUAL telefone aparece. A recepcao ligaria para um numero num
-            carregamento e para outro no seguinte, sem nada ter mudado no
-            cadastro.
+              Com `take: 1` em cima, o empate nao embaralha a ordem: ele troca
+              QUAL telefone aparece. A recepcao ligaria para um numero num
+              carregamento e para outro no seguinte, sem nada ter mudado no
+              cadastro.
 
-            Corrigido junto da F53, que consertou o mesmo defeito no caminho
-            do checkout de cartao (o telefone que vai ao antifraude do
-            provedor). Sao os dois unicos pontos do `apps/api` com boolean
-            como criterio unico de ordenacao.
+              Corrigido junto da F53, que consertou o mesmo defeito no caminho
+              do checkout de cartao (o telefone que vai ao antifraude do
+              provedor). Sao os dois unicos pontos do `apps/api` com boolean
+              como criterio unico de ordenacao.
+            */
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+            take: 1,
+            select: { value: true },
+          },
+          /*
+            O NUMERO QUE A CATRACA LE -- e a pergunta que a recepcao faz
+            olhando a lista ("qual o id dele no equipamento?"), que antes
+            exigia abrir a ficha.
+
+            SEM `take`, ao contrario dos dois de cima: uma pessoa pode ter mais
+            de um numero (cartao trocado, credencial vinda de linha duplicada
+            do Pacto), e cortar em um esconderia justamente o caso que precisa
+            ser resolvido -- um cartao antigo que continua valido no leitor.
           */
-          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
-          take: 1,
-          select: { value: true },
+          credentials: {
+            orderBy: { createdAt: 'asc' },
+            select: { externalId: true },
+          },
         },
-        /*
-          O NUMERO QUE A CATRACA LE -- e a pergunta que a recepcao faz
-          olhando a lista ("qual o id dele no equipamento?"), que antes
-          exigia abrir a ficha.
-
-          SEM `take`, ao contrario dos dois de cima: uma pessoa pode ter mais
-          de um numero (cartao trocado, credencial vinda de linha duplicada
-          do Pacto), e cortar em um esconderia justamente o caso que precisa
-          ser resolvido -- um cartao antigo que continua valido no leitor.
-        */
-        credentials: {
-          orderBy: { createdAt: 'asc' },
-          select: { externalId: true },
-        },
-      },
-    });
+      }),
+    );
   }
 
   /**

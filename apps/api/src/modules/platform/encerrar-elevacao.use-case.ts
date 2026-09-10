@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { comContexto } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -34,40 +35,46 @@ export class EncerrarElevacaoUseCase {
 
     if (!elevacao) throw new ErroDeDominio('NOT_FOUND', 404, 'Nenhuma elevacao viva nesta sessao');
 
-    await this.db.$transaction(async (tx) => {
-      await tx.supportElevation.update({
-        where: { id: elevacao.id },
-        data: { endedAt: new Date(), endedReason: ENCERRADA_A_PEDIDO },
-      });
+    // Issue #302: mesmo caso do ElevarUseCase -- rota autenticada por
+    // `PlatformContext`, sem tenant, entao o `TenantRlsInterceptor` nunca
+    // abre escopo aqui. Sem `comContexto`, o insert em `audit_logs` (RLS
+    // desde a F66) recusa com 42501.
+    await comContexto({ kind: 'platform' }, () =>
+      this.db.$transaction(async (tx) => {
+        await tx.supportElevation.update({
+          where: { id: elevacao.id },
+          data: { endedAt: new Date(), endedReason: ENCERRADA_A_PEDIDO },
+        });
 
-      await this.auditoria.registrar(
-        contexto,
-        {
-          action: 'support.ended',
-          target: 'tenant',
-          targetId: elevacao.tenantId,
-          tenantId: elevacao.tenantId,
-          metadata: { motivoDeSaida: ENCERRADA_A_PEDIDO },
-        },
-        correlationId,
-        tx,
-      );
-
-      // A segunda linha, no tenant alvo: a saida do suporte e tao visivel
-      // para o dono da academia quanto a entrada (INV-008).
-      await tx.auditLog.create({
-        data: {
-          tenantId: elevacao.tenantId,
-          actorType: 'SUPPORT',
-          actorId: contexto.actorId,
-          action: 'support.ended',
-          target: 'tenant',
-          targetId: elevacao.tenantId,
+        await this.auditoria.registrar(
+          contexto,
+          {
+            action: 'support.ended',
+            target: 'tenant',
+            targetId: elevacao.tenantId,
+            tenantId: elevacao.tenantId,
+            metadata: { motivoDeSaida: ENCERRADA_A_PEDIDO },
+          },
           correlationId,
-          metadata: { motivoDeSaida: ENCERRADA_A_PEDIDO },
-        },
-      });
-    });
+          tx,
+        );
+
+        // A segunda linha, no tenant alvo: a saida do suporte e tao visivel
+        // para o dono da academia quanto a entrada (INV-008).
+        await tx.auditLog.create({
+          data: {
+            tenantId: elevacao.tenantId,
+            actorType: 'SUPPORT',
+            actorId: contexto.actorId,
+            action: 'support.ended',
+            target: 'tenant',
+            targetId: elevacao.tenantId,
+            correlationId,
+            metadata: { motivoDeSaida: ENCERRADA_A_PEDIDO },
+          },
+        });
+      }),
+    );
 
     const accessToken = this.tokens.emitirAcesso({
       sub: contexto.actorId,

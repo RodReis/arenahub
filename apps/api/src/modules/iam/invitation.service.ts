@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Invitation } from '@arenahub/database';
+import { comContexto, type Invitation } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -102,51 +102,61 @@ export class InvitationService {
 
     const passwordHash = await this.senhas.gerarHash(senha);
 
-    return this.db.$transaction(async (tx) => {
-      // `upsert`: a mesma pessoa pode ja ter conta por outra academia --
-      // identidade e global, o vinculo e que e por tenant.
-      const usuario = await tx.user.upsert({
-        where: { email: convite.email },
-        create: { email: convite.email, passwordHash },
-        update: {},
-      });
+    /*
+     * Rota `@Public()`: quem aceita ainda nao e usuario autenticado, entao
+     * nao ha `TenantContext` e o `TenantRlsInterceptor` nunca abre escopo
+     * aqui -- mesma classe de bug da issue #302 (Super Admin sem tenant),
+     * so que aqui o `tenantId` certo e conhecido, do proprio convite. Sem
+     * `comContexto`, o insert em `audit_logs` (RLS desde a F66) recusa com
+     * 42501.
+     */
+    return comContexto({ kind: 'tenant', tenantId: convite.tenantId }, () =>
+      this.db.$transaction(async (tx) => {
+        // `upsert`: a mesma pessoa pode ja ter conta por outra academia --
+        // identidade e global, o vinculo e que e por tenant.
+        const usuario = await tx.user.upsert({
+          where: { email: convite.email },
+          create: { email: convite.email, passwordHash },
+          update: {},
+        });
 
-      await tx.tenantMembership.upsert({
-        where: { tenantId_userId: { tenantId: convite.tenantId, userId: usuario.id } },
-        create: { tenantId: convite.tenantId, userId: usuario.id },
-        update: { status: 'ACTIVE' },
-      });
+        await tx.tenantMembership.upsert({
+          where: { tenantId_userId: { tenantId: convite.tenantId, userId: usuario.id } },
+          create: { tenantId: convite.tenantId, userId: usuario.id },
+          update: { status: 'ACTIVE' },
+        });
 
-      await tx.userRole.create({
-        data: {
-          tenantId: convite.tenantId,
-          userId: usuario.id,
-          roleId: convite.roleId,
-          ...(convite.gymUnitId ? { gymUnitId: convite.gymUnitId } : {}),
-        },
-      });
+        await tx.userRole.create({
+          data: {
+            tenantId: convite.tenantId,
+            userId: usuario.id,
+            roleId: convite.roleId,
+            ...(convite.gymUnitId ? { gymUnitId: convite.gymUnitId } : {}),
+          },
+        });
 
-      // Marca aceito NA MESMA transacao: fora dela, duas aceitacoes
-      // simultaneas criariam dois papeis com um convite de uso unico.
-      await tx.invitation.update({
-        where: { id: convite.id, status: 'PENDING' },
-        data: { status: 'ACCEPTED', acceptedAt: new Date() },
-      });
+        // Marca aceito NA MESMA transacao: fora dela, duas aceitacoes
+        // simultaneas criariam dois papeis com um convite de uso unico.
+        await tx.invitation.update({
+          where: { id: convite.id, status: 'PENDING' },
+          data: { status: 'ACCEPTED', acceptedAt: new Date() },
+        });
 
-      await tx.auditLog.create({
-        data: {
-          tenantId: convite.tenantId,
-          actorType: 'USER',
-          actorId: usuario.id,
-          action: 'invitation.accepted',
-          target: 'invitation',
-          targetId: convite.id,
-          correlationId,
-        },
-      });
+        await tx.auditLog.create({
+          data: {
+            tenantId: convite.tenantId,
+            actorType: 'USER',
+            actorId: usuario.id,
+            action: 'invitation.accepted',
+            target: 'invitation',
+            targetId: convite.id,
+            correlationId,
+          },
+        });
 
-      return { userId: usuario.id, tenantId: convite.tenantId };
-    });
+        return { userId: usuario.id, tenantId: convite.tenantId };
+      }),
+    );
   }
 
   private hashDe(token: string): string {

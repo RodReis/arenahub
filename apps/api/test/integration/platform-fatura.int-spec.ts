@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { comContexto } from '@arenahub/database';
 
 import { AppModule } from '../../src/app.module.js';
 import {
@@ -380,7 +381,11 @@ describe('fatura da plataforma', () => {
       correlationId: randomUUID(),
     };
 
-    return decideOnlineAccess.executar(edge, reconhecimento);
+    // `comContexto`: fora de HTTP o `TenantRlsInterceptor` nao roda, e o
+    // caminho de decisao le `students` por `include` (issue #302).
+    return comContexto({ kind: 'tenant', tenantId: entrada.tenantId }, () =>
+      decideOnlineAccess.executar(edge, reconhecimento),
+    );
   };
 
   beforeAll(async () => {
