@@ -101,7 +101,14 @@ export default defineConfig({
       // de desenvolvimento, com a configuracao parecendo correta.
       reuseExistingServer: false,
       timeout: 120_000,
-      env: { DATABASE_URL: URL_DO_BANCO_E2E },
+      // `RUNTIME_DATABASE_URL` vazia, e nao ausente: o `PrismaService` a
+      // PREFERE ao `DATABASE_URL` (F66, ADR-054), e o processo herda o
+      // ambiente de quem chamou -- entao a do `.env`, que aponta para o banco
+      // de DESENVOLVIMENTO, venceria a linha acima e a suite escreveria no
+      // banco errado com a configuracao parecendo correta. E o mesmo defeito
+      // que o `reuseExistingServer: false` existe para impedir, por outro
+      // caminho.
+      env: { DATABASE_URL: URL_DO_BANCO_E2E, RUNTIME_DATABASE_URL: '' },
     },
     {
       command: 'pnpm --filter @arenahub/admin-web start',

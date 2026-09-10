@@ -55,7 +55,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     // migrations. Cair no `DATABASE_URL` mantem de pe quem ainda nao criou o
     // role -- e seguro porque as tabelas com politica levam FORCE ROW LEVEL
     // SECURITY, que sujeita tambem o dono a ela.
-    const connectionString = process.env['RUNTIME_DATABASE_URL'] ?? process.env['DATABASE_URL'];
+    // `||`, e nao `??`: string VAZIA precisa cair no `DATABASE_URL`. Quem
+    // quer desligar o role restrito para um processo (o E2E, que aponta a API
+    // para o banco proprio) passa a variavel vazia -- `delete` nao alcanca um
+    // processo filho, e `??` deixaria a string vazia passar adiante e quebrar
+    // a conexao.
+    const connectionString = process.env['RUNTIME_DATABASE_URL'] || process.env['DATABASE_URL'];
 
     if (!connectionString) {
       throw new Error(
