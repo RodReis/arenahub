@@ -13,7 +13,10 @@ export default [
   {
     // Seed e scripts de manutencao sao programas de linha de comando: console
     // e a interface deles, nao debug esquecido.
-    files: ['prisma/seed.ts', 'prisma/seed-demo.ts', 'scripts/**/*.mjs'],
+    // Glob, e nao lista: a lista ja tinha ficado para tras (`seed-ativos`,
+    // `import-pacto` e afins nunca entraram) e cada script novo repetia a
+    // mesma correcao.
+    files: ['prisma/*.ts', 'scripts/**/*.mjs'],
     rules: { 'no-console': 'off' },
   },
 

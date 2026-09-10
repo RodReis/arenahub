@@ -146,7 +146,16 @@ export default defineConfig({
       // nao tem a credencial do seed, com a configuracao parecendo correta.
       reuseExistingServer: false,
       timeout: 120_000,
-      env: { DATABASE_URL: URL_DO_BANCO_E2E, MFA_ENCRYPTION_KEY: CHAVE_DE_CIFRA },
+      // `RUNTIME_DATABASE_URL` vazia, e nao ausente: o `PrismaService` a
+      // PREFERE ao `DATABASE_URL` (F66, ADR-054), e o processo herda o
+      // ambiente de quem chamou -- entao a do `.env`, que aponta para o banco
+      // de DESENVOLVIMENTO, venceria a linha ao lado. Mesmo defeito que o
+      // `reuseExistingServer: false` acima impede por outro caminho.
+      env: {
+        DATABASE_URL: URL_DO_BANCO_E2E,
+        MFA_ENCRYPTION_KEY: CHAVE_DE_CIFRA,
+        RUNTIME_DATABASE_URL: '',
+      },
     },
     {
       // `-p` explicito: o `start` do pacote ja fixa `--hostname 127.0.0.1`, e

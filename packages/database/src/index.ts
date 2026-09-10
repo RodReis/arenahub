@@ -32,6 +32,25 @@ export { PERMISSOES_DO_OWNER } from './permissoes.js';
 export { PrismaPg } from '@prisma/adapter-pg';
 
 /**
+ * Contexto de tenant para RLS (F66, ADR-054) -- a camada 2 do isolamento.
+ *
+ * A camada 1 nao muda: repositorio continua recebendo `TenantContext` e
+ * filtrando por `tenantId`. Isto e o que faz o Postgres recusar sozinho o
+ * que a aplicacao deixar passar.
+ */
+export {
+  aplicarContextoNaTransacao,
+  comContexto,
+  contextoObrigatorio,
+  contextoRls,
+  gucsDoContexto,
+  SemContextoDeTenantError,
+  type ExecutorDeTransacao,
+  type Guc,
+  type TenantDbContext,
+} from './rls.js';
+
+/**
  * Tipos das entidades. Sem eles, um repositorio fora deste pacote nao
  * consegue NOMEAR o que devolve -- o TypeScript reclama de tipo inferido
  * nao portavel (TS2742) e exige anotacao.

@@ -1,13 +1,13 @@
 {
   "apps/api#test": {
-    "testes": 1654,
-    "pass": 1654,
+    "testes": 1660,
+    "pass": 1660,
     "falha": 0,
-    "coberturaPct": 70.8
+    "coberturaPct": 70.69
   },
   "apps/api#test:integration": {
-    "testes": 877,
-    "pass": 877,
+    "testes": 918,
+    "pass": 918,
     "falha": 0,
     "coberturaPct": 82.91
   },
@@ -15,7 +15,7 @@
     "testes": 598,
     "pass": 598,
     "falha": 0,
-    "coberturaPct": 73.98
+    "coberturaPct": 74.03
   },
   "packages/ui#test": {
     "testes": 221,
@@ -24,16 +24,16 @@
     "coberturaPct": 98.81
   },
   "packages/database#test": {
-    "testes": 44,
-    "pass": 44,
+    "testes": 54,
+    "pass": 54,
     "falha": 0,
-    "coberturaPct": 33.87
+    "coberturaPct": 36.74
   },
   "packages/database#test:integration": {
     "testes": 78,
     "pass": 78,
     "falha": 0,
-    "coberturaPct": 96.28
+    "coberturaPct": 93.5
   },
   "packages/access-policy#test": {
     "testes": 77,

@@ -41,3 +41,21 @@ const urlDaIntegracao = process.env['INTEGRATION_DATABASE_URL'];
 if (urlDaIntegracao) {
   process.env['DATABASE_URL'] = urlDaIntegracao;
 }
+
+/**
+ * A integracao monta cenario pelo ROLE DONO, e nao pelo role restrito de RLS
+ * (F66, ADR-054).
+ *
+ * O `PrismaService` prefere `RUNTIME_DATABASE_URL` quando ela existe. Aqui
+ * ela e apagada de proposito: as suites criam aluno, plano e dispositivo
+ * chamando o client DIRETO, fora de qualquer requisicao HTTP -- entao nao ha
+ * escopo de tenant aberto, e a politica recusa a escrita com `42501`. Sao 51
+ * pontos em cerca de vinte arquivos, todos montando cenario, nenhum
+ * exercitando isolamento.
+ *
+ * Isso NAO afrouxa a prova da politica: quem a prova e
+ * `rls-isolation.int-spec.ts`, que abre o proprio client no role restrito
+ * por `RUNTIME_INTEGRATION_DATABASE_URL` e PULA se ela nao existir, em vez de
+ * cair no dono e passar em falso.
+ */
+delete process.env['RUNTIME_DATABASE_URL'];

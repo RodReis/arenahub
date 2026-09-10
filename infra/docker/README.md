@@ -83,6 +83,53 @@ outro ambiente. Produção e homologação usam secret manager.
 
 **O `.env` real está no `.gitignore` e nunca é versionado.**
 
+## Role de runtime (RLS)
+
+A partir da F66 (ADR-054) o Postgres tem **duas identidades**, no mesmo container:
+
+| role | para quê |
+|---|---|
+| `arenahub` | dono das tabelas. Migrations, e nada mais. |
+| `arenahub_app` | runtime. API, workers e seeds. `NOBYPASSRLS`, sem ownership. |
+
+O role restrito lê e escreve em **todas** as tabelas de negócio, não só nas duas com política. O
+que o separa do dono é não ter ownership, não poder alterar estrutura nem política, e não ter
+`BYPASSRLS`. A única restrição de alcance é `audit_logs`, onde ele insere e lê mas não atualiza
+nem apaga: trilha que a aplicação pode editar não é trilha.
+
+A migration cria o role, mas **não a senha** — credencial não se versiona, nem em desenvolvimento.
+Depois de rodar as migrations pela primeira vez, setar a senha à mão. `ALTER ROLE` vale para o
+cluster inteiro, então uma vez só cobre `arenahub`, `arenahub_int` e `arenahub_e2e`:
+
+```bash
+docker exec arenahub-postgres psql -U arenahub -d arenahub \
+  -c "ALTER ROLE arenahub_app WITH PASSWORD 'dev_local_arenahub_app';"
+```
+
+Depois, no `.env` local (a porta segue o `POSTGRES_PORT`):
+
+```
+RUNTIME_DATABASE_URL=postgresql://arenahub_app:dev_local_arenahub_app@localhost:5442/arenahub?schema=public
+RUNTIME_INTEGRATION_DATABASE_URL=postgresql://arenahub_app:dev_local_arenahub_app@localhost:5442/arenahub_int?schema=public
+```
+
+Para conferir que o role ficou como deve — as duas colunas têm de vir `f`:
+
+```bash
+docker exec arenahub-postgres psql -U arenahub -d arenahub -tAc \
+  "SELECT rolname, rolbypassrls, rolsuper FROM pg_roles WHERE rolname='arenahub_app';"
+```
+
+`rolbypassrls` verdadeiro faria a política virar decoração, sem nada falhar para avisar.
+
+**Superusuário ignora RLS, sempre.** O `arenahub` deste compose é superusuário, então ele enxerga
+todos os tenants sem contexto nenhum — mesmo com `FORCE ROW LEVEL SECURITY` nas tabelas. Em
+desenvolvimento isso é conveniente, porque o seed roda sem precisar declarar contexto. Mas quer
+dizer que a proteção real vem de a aplicação usar `RUNTIME_DATABASE_URL`, não do `FORCE` sozinho.
+
+Em produção, o role que roda migration **não deve ser superusuário** — é o que separa a política
+valer de a política ser decoração.
+
 ## Apagar tudo e recomeçar
 
 ```bash
