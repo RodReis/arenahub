@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { comContexto } from '@arenahub/database';
 
 import { AppModule } from '../../src/app.module.js';
 import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
@@ -56,6 +57,22 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
     edgeNodeId: a.edgeNodeId,
     keyId: 'irrelevante',
   });
+
+  /**
+   * Resolve a identidade abrindo o escopo de RLS, como o
+   * `TenantRlsInterceptor` faz em toda requisicao assinada pelo Edge.
+   *
+   * O teste chama o resolver DIRETO, fora de HTTP, entao o escopo nao nasce
+   * sozinho -- e `IdentityResolver` le `students` por `include` (issue #302).
+   */
+  const resolverComEscopo = (
+    edge: { tenantId: string; gymUnitId: string; edgeNodeId: string; keyId: string },
+    deviceId: string,
+    externalUserId: string,
+  ) =>
+    comContexto({ kind: 'tenant', tenantId: edge.tenantId }, () =>
+      resolver.resolver(edge, deviceId, externalUserId),
+    );
 
   const eventoBase = (sobrescreve: Record<string, unknown> = {}) => ({
     tenantId: a.tenantId,
@@ -243,7 +260,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
 
   describe('resolucao de identidade (M1-FR-019)', () => {
     it('resolve o aluno pelo escopo correto de tenant, unidade e Edge', async () => {
-      const resultado = await resolver.resolver(contextoEdgeA(), a.deviceId, a.externalUserId);
+      const resultado = await resolverComEscopo(contextoEdgeA(), a.deviceId, a.externalUserId);
 
       expect(resultado).toMatchObject({
         resolvida: true,
@@ -254,13 +271,13 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
     });
 
     it('NAO resolve dispositivo de outro tenant, mesmo com o UUID correto', async () => {
-      const resultado = await resolver.resolver(contextoEdgeA(), b.deviceId, a.externalUserId);
+      const resultado = await resolverComEscopo(contextoEdgeA(), b.deviceId, a.externalUserId);
 
       expect(resultado).toMatchObject({ resolvida: false, motivo: 'DEVICE_NOT_IN_SCOPE' });
     });
 
     it('NAO resolve quando o Edge assinante nao e o dono do dispositivo', async () => {
-      const resultado = await resolver.resolver(
+      const resultado = await resolverComEscopo(
         { ...contextoEdgeA(), edgeNodeId: b.edgeNodeId },
         a.deviceId,
         a.externalUserId,
@@ -270,7 +287,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
     });
 
     it('devolve DENY para externalUserId desconhecido, sem excecao', async () => {
-      const resultado = await resolver.resolver(contextoEdgeA(), a.deviceId, '99999');
+      const resultado = await resolverComEscopo(contextoEdgeA(), a.deviceId, '99999');
 
       expect(resultado).toMatchObject({ resolvida: false, motivo: 'UNKNOWN_EXTERNAL_USER' });
     });
@@ -325,7 +342,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
         },
       });
 
-      const resultado = await resolver.resolver(contextoEdgeA(), a.deviceId, '777');
+      const resultado = await resolverComEscopo(contextoEdgeA(), a.deviceId, '777');
 
       expect(resultado).toMatchObject({ resolvida: false, motivo: 'IDENTITY_NOT_ACTIVE' });
     });

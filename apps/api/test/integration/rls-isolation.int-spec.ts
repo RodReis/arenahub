@@ -34,6 +34,10 @@ descreverOuPular('F66 -- o banco recusa o que a aplicacao deixaria passar', () =
   let alunoDeB: string;
   /** Unidade REAL de B -- ver o teste de escrita cruzada. */
   let unidadeDeB: string;
+  /** Unidade de A -- a sessao de frequencia do teste de `include` precisa. */
+  let unidadeDeA: string;
+  /** Usuario REAL -- `audit_logs.actor_id` tem FK; um uuid solto violaria. */
+  let atorId: string;
 
   async function criarTenantComAluno(rotulo: string): Promise<[string, string, string]> {
     const tenant = await dono.tenant.create({
@@ -73,14 +77,24 @@ descreverOuPular('F66 -- o banco recusa o que a aplicacao deixaria passar', () =
     // `descreverOuPular` ja garantiu que a variavel existe.
     restrito = criarPrismaClient({ url: urlRestrita as string });
 
-    [tenantA, alunoDeA] = await criarTenantComAluno('a');
+    [tenantA, alunoDeA, unidadeDeA] = await criarTenantComAluno('a');
     [tenantB, alunoDeB, unidadeDeB] = await criarTenantComAluno('b');
+
+    const usuario = await dono.user.create({
+      data: { email: `f66-ator-${sufixo}@exemplo.test`, passwordHash: 'x' },
+    });
+    atorId = usuario.id;
   }, 60_000);
 
   afterAll(async () => {
+    await dono.auditLog.deleteMany({ where: { tenantId: { in: [tenantA, tenantB] } } });
+    await dono.studentAttendanceSession.deleteMany({
+      where: { tenantId: { in: [tenantA, tenantB] } },
+    });
     await dono.student.deleteMany({ where: { tenantId: { in: [tenantA, tenantB] } } });
     await dono.gymUnit.deleteMany({ where: { tenantId: { in: [tenantA, tenantB] } } });
     await dono.tenant.deleteMany({ where: { id: { in: [tenantA, tenantB] } } });
+    await dono.user.delete({ where: { id: atorId } });
 
     await dono.$disconnect();
     await restrito.$disconnect();
@@ -205,5 +219,119 @@ descreverOuPular('F66 -- o banco recusa o que a aplicacao deixaria passar', () =
     });
 
     expect(semContexto).toHaveLength(0);
+  });
+
+  /*
+   * Issue #302 -- `audit_logs` tem a MESMA politica (tenant_isolation_audit_logs,
+   * F66), com a excecao extra que `students` nao tem: `app.actor = 'platform'`
+   * atravessa qualquer tenant (ADR-052 SS3). E exatamente o caminho que
+   * `ElevarUseCase` e `EncerrarElevacaoUseCase` passaram a abrir com
+   * `comContexto({ kind: 'platform' }, ...)`.
+   *
+   * Sem contexto nenhum, a politica recusa a escrita em `audit_logs` com
+   * 42501 -- diferente da leitura em `students` (que so devolve vazio), aqui
+   * o INSERT FALHA, porque a clausula WITH CHECK nao acha app.tenant_id nem
+   * app.actor = 'platform'. E o proprio 42501 que a issue #302 descreve.
+   */
+  describe('issue #302 -- escrita em audit_logs pelo Super Admin sem tenant', () => {
+    it('sem contexto nenhum, o insert em audit_logs e recusado', async () => {
+      // P2039: o Postgres recusou a query -- aqui, a politica RLS. Sem
+      // `app.tenant_id` nem `app.actor = 'platform'` setados, a clausula
+      // WITH CHECK de `tenant_isolation_audit_logs` nao acha nenhuma das
+      // duas condicoes. E o 42501 que a issue #302 descreve.
+      await expect(
+        restrito.auditLog.create({
+          data: {
+            tenantId: tenantA,
+            actorType: 'SUPPORT',
+            actorId: atorId,
+            action: 'support.elevated',
+            target: 'tenant',
+            targetId: tenantA,
+            correlationId: `corr-302-${sufixo}`,
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2039' });
+    });
+
+    it('com contexto platform, o mesmo insert passa -- o molde que os use cases de plataforma usam', async () => {
+      const criado = await comContexto({ kind: 'platform' }, () =>
+        restrito.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe('SELECT set_config($1, $2, true)', 'app.actor', 'platform');
+
+          return tx.auditLog.create({
+            data: {
+              tenantId: tenantA,
+              actorType: 'SUPPORT',
+              actorId: atorId,
+              action: 'support.elevated',
+              target: 'tenant',
+              targetId: tenantA,
+              correlationId: `corr-302-platform-${sufixo}`,
+            },
+          });
+        }),
+      );
+
+      expect(criado.tenantId).toBe(tenantA);
+    });
+  });
+
+  /*
+   * Issue #302 -- a forma MAIS SILENCIOSA do mesmo defeito.
+   *
+   * Os testes acima leem `students` como RAIZ da query, e ali a politica
+   * some com a linha inteira: a aplicacao recebe `null` e trata como "nao
+   * achei". Quando `students` entra por `include`, a raiz (aqui,
+   * `student_attendance_sessions`) NAO tem politica -- ela volta normalmente,
+   * so que sem o aluno pendurado.
+   *
+   * Foi assim que o `IdentityResolver` decidiria acesso na catraca sem saber
+   * se o aluno esta ativo: o vinculo do dispositivo existe, o `student` vem
+   * nulo, e nada no caminho parece errado.
+   */
+  describe('issue #302 -- `students` por include, com a raiz sem politica', () => {
+    beforeAll(async () => {
+      await dono.studentAttendanceSession.create({
+        data: {
+          tenantId: tenantA,
+          studentId: alunoDeA,
+          gymUnitId: unidadeDeA,
+          sessionDate: new Date('2026-08-17T00:00:00.000Z'),
+          firstPassageAt: new Date('2026-08-17T12:00:00.000Z'),
+          lastPassageAt: new Date('2026-08-17T12:00:00.000Z'),
+          passageCount: 1,
+          // A contagem TEM que bater com os ids -- ha check constraint.
+          passageIds: [randomUUID()],
+          policyVersion: '1.0.0',
+        },
+      });
+    });
+
+    it('sem contexto, a raiz vem mas o aluno do include vem NULO', async () => {
+      const semContexto = await restrito.studentAttendanceSession.findFirst({
+        where: { studentId: alunoDeA },
+        select: { id: true, student: { select: { status: true } } },
+      });
+
+      // A linha existe -- a raiz nao tem politica. O aluno, que tem, sumiu.
+      expect(semContexto).not.toBeNull();
+      expect(semContexto?.student).toBeNull();
+    });
+
+    it('com o contexto do tenant, o aluno do include aparece', async () => {
+      const comEscopo = await comContexto({ kind: 'tenant', tenantId: tenantA }, () =>
+        restrito.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe('SELECT set_config($1, $2, true)', 'app.tenant_id', tenantA);
+
+          return tx.studentAttendanceSession.findFirst({
+            where: { studentId: alunoDeA },
+            select: { id: true, student: { select: { status: true } } },
+          });
+        }),
+      );
+
+      expect(comEscopo?.student?.status).toBe('ACTIVE');
+    });
   });
 });

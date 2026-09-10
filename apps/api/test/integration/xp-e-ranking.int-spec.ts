@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { assinar } from '@arenahub/api-contracts';
+import { comContexto } from '@arenahub/database';
 import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
@@ -377,9 +378,17 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
     });
   };
 
-  /** Forca a projecao de `StudentAttendanceSession` a partir das passagens gravadas. */
+  /**
+   * Forca a projecao de `StudentAttendanceSession` a partir das passagens gravadas.
+   *
+   * `comContexto` explicito: aqui o servico e chamado DIRETO, fora de
+   * requisicao HTTP, entao o `TenantRlsInterceptor` nunca abre o escopo --
+   * e `StudentRepository` le por `comTenant` desde a issue #302.
+   */
   const projetarFrequencia = async (aluno: string, agora: Date = AGORA): Promise<void> => {
-    await frequencia.frequenciaDoAluno(contexto, aluno, 'ALL', 'SEMANAL', agora);
+    await comContexto({ kind: 'tenant', tenantId }, () =>
+      frequencia.frequenciaDoAluno(contexto, aluno, 'ALL', 'SEMANAL', agora),
+    );
   };
 
   /** Aluno com uma unica sessao ja projetada e pronta para receber XP. */
@@ -1146,7 +1155,11 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
      * projeta com teto proprio; o `periodo: 'ALL'` ja cobre o inicio.
      */
     const projetarAte = async (aluno: string, ate: Date): Promise<void> => {
-      await frequencia.frequenciaDoAluno(contexto, aluno, 'ALL', 'SEMANAL', ate);
+      // Mesmo motivo de `projetarFrequencia`: chamada direta ao servico nao
+      // passa pelo interceptor, entao o escopo de RLS abre aqui (issue #302).
+      await comContexto({ kind: 'tenant', tenantId }, () =>
+        frequencia.frequenciaDoAluno(contexto, aluno, 'ALL', 'SEMANAL', ate),
+      );
     };
 
     /** Projeta ate agora -- a semana treinada ja fechou, a corrente ainda corre. */

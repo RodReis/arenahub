@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Prisma } from '@arenahub/database';
+import { comContexto, type Prisma } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -107,7 +107,15 @@ export class ProcessarWebhookDePagamentoUseCase {
 
     const tenantId = conta.tenantId;
 
-    return this.db.$transaction(async (tx) => {
+    /*
+     * Rota `@Public()`: o provedor de pagamento nao tem sessao, entao nao ha
+     * `TenantContext` e o `TenantRlsInterceptor` nunca abre escopo aqui --
+     * mesma classe de bug da issue #302. `system`, e nao `tenant`: quem
+     * grava aqui nao e um usuario do tenant, e o `AuditLog.actorType` abaixo
+     * ja documenta isso como `SYSTEM` (ADR-054 SS4).
+     */
+    return comContexto({ kind: 'system', tenantId }, () =>
+      this.db.$transaction(async (tx) => {
       /**
        * 3. INV-076 -- a constraint E a idempotencia.
        *
@@ -207,7 +215,8 @@ export class ProcessarWebhookDePagamentoUseCase {
         providerEventId: registro.id,
         novoStatus: decisao.novoStatus,
       };
-    });
+      }),
+    );
   }
 
   /**

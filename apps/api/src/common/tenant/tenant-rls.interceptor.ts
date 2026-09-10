@@ -37,6 +37,20 @@ export function paraContextoDeBanco(contexto: TenantContext): TenantDbContext {
  * nunca veria o tenant, e o escopo nasceria vazio em toda requisicao
  * autenticada -- falha que so apareceria ao tocar o banco.
  *
+ * TRES origens de identidade, nao uma. O `AuthGuard` poe `tenantContext`
+ * (pessoa, por cookie); o `KioskAuthGuard` poe `kioskContext` (totem) e o
+ * `EdgeAuthGuard` poe `edgeContext` (catraca), ambos por assinatura HMAC.
+ * Os dois dispositivos sao `@Public()` para o `AuthGuard` justamente porque
+ * um processo nao tem cookie -- ler so `tenantContext` deixaria TODA rota de
+ * dispositivo sem escopo, e as duas leem `students` (issue #302).
+ *
+ * No Edge o defeito seria o mais grave do sistema: `IdentityResolver` traz o
+ * status do aluno por `include`, e a politica recusando essa linha devolve
+ * o vinculo SEM o aluno -- a catraca decidiria sem saber se ele esta ativo.
+ *
+ * Nenhum dispositivo eleva: nao ha sessao de suporte num equipamento, entao
+ * o contexto e sempre o do proprio tenant.
+ *
  * Rota publica nao abre escopo. Nao ha tenant que se possa adivinhar sem
  * sessao, e inventar um seria exatamente o vazamento que a fatia impede.
  * Query a tabela protegida a partir dali falha com
@@ -61,11 +75,18 @@ export class TenantRlsInterceptor implements NestInterceptor {
   intercept(contextoDeExecucao: ExecutionContext, proximo: CallHandler): Observable<unknown> {
     const requisicao = contextoDeExecucao.switchToHttp().getRequest<Request>();
     const contexto = requisicao.tenantContext;
+    const dispositivo = requisicao.kioskContext ?? requisicao.edgeContext;
 
-    if (!contexto) return proximo.handle();
+    const contextoDeBanco: TenantDbContext | undefined = contexto
+      ? paraContextoDeBanco(contexto)
+      : dispositivo
+        ? { kind: 'tenant', tenantId: dispositivo.tenantId }
+        : undefined;
+
+    if (!contextoDeBanco) return proximo.handle();
 
     return from(
-      comContexto(paraContextoDeBanco(contexto), () =>
+      comContexto(contextoDeBanco, () =>
         lastValueFrom(proximo.handle(), { defaultValue: undefined }),
       ),
     );

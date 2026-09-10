@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { comContexto } from '@arenahub/database';
 
 import { AppModule } from '../../src/app.module.js';
 import { AccessProjectionRepository } from '../../src/modules/access/access-projection.repository.js';
@@ -204,7 +205,11 @@ describe('F65 -- a projecao deriva o gate do status do tenant', () => {
       correlationId: randomUUID(),
     };
 
-    return decideOnlineAccess.executar(edge, entrada);
+    // `comContexto`: fora de HTTP o `TenantRlsInterceptor` nao roda, e o
+    // caminho de decisao le `students` por `include` (issue #302).
+    return comContexto({ kind: 'tenant', tenantId }, () =>
+      decideOnlineAccess.executar(edge, entrada),
+    );
   };
 
   it('tenant ACTIVE produz gateActive false', async () => {

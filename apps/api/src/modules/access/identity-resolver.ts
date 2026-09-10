@@ -70,20 +70,29 @@ export class IdentityResolver {
 
     if (!dispositivo) return { resolvida: false, motivo: 'DEVICE_NOT_IN_SCOPE' };
 
-    const deviceUser = await this.db.deviceUser.findFirst({
-      where: {
-        deviceId: dispositivo.id,
-        externalUserId,
-        tenantId: edge.tenantId,
-      },
-      select: {
-        state: true,
-        studentId: true,
-        identityId: true,
-        identity: { select: { state: true } },
-        student: { select: { status: true } },
-      },
-    });
+    /*
+     * `comTenant` embora a raiz seja `device_users`: o `select` traz
+     * `student`, que TEM politica RLS (F66). Fora de transacao o
+     * `set_config` nunca roda, e sob o role restrito a politica recusa a
+     * linha do aluno -- o vinculo voltaria SEM o `student` e a catraca
+     * decidiria sem saber se ele esta ativo (issue #302).
+     */
+    const deviceUser = await this.db.comTenant((tx) =>
+      tx.deviceUser.findFirst({
+        where: {
+          deviceId: dispositivo.id,
+          externalUserId,
+          tenantId: edge.tenantId,
+        },
+        select: {
+          state: true,
+          studentId: true,
+          identityId: true,
+          identity: { select: { state: true } },
+          student: { select: { status: true } },
+        },
+      }),
+    );
 
     if (!deviceUser) {
       return { resolvida: false, motivo: 'UNKNOWN_EXTERNAL_USER', deviceId: dispositivo.id };
