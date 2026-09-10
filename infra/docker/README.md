@@ -117,6 +117,14 @@ docker exec arenahub-postgres psql -U arenahub -d arenahub -tAc \
 
 `rolbypassrls` verdadeiro faria a política virar decoração, sem nada falhar para avisar.
 
+**Superusuário ignora RLS, sempre.** O `arenahub` deste compose é superusuário, então ele enxerga
+todos os tenants sem contexto nenhum — mesmo com `FORCE ROW LEVEL SECURITY` nas tabelas. Em
+desenvolvimento isso é conveniente, porque o seed roda sem precisar declarar contexto. Mas quer
+dizer que a proteção real vem de a aplicação usar `RUNTIME_DATABASE_URL`, não do `FORCE` sozinho.
+
+Em produção, o role que roda migration **não deve ser superusuário** — é o que separa a política
+valer de a política ser decoração.
+
 ## Apagar tudo e recomeçar
 
 ```bash

@@ -38,8 +38,16 @@ GRANT SELECT, INSERT ON audit_logs TO arenahub_app;
 -- 3. FORCE, e nao apenas ENABLE.
 --
 -- Sem FORCE o dono da tabela fica ISENTO da politica -- e o padrao do
--- Postgres. Um script rodando por engano com a URL de migracao veria todos
--- os tenants sem nada avisar. FORCE fecha essa porta.
+-- Postgres. Com FORCE, o dono passa a obedece-la como qualquer outro role.
+--
+-- ATENCAO ao limite disso: SUPERUSUARIO ignora RLS sempre, FORCE ou nao.
+-- Verificado em 10/09/2026 -- o `arenahub` do docker-compose local e
+-- superusuario e enxerga as 1984 linhas sem contexto nenhum. Em
+-- desenvolvimento isso e ate conveniente (o seed roda sem mudanca), mas
+-- significa que a protecao real vem de a aplicacao usar
+-- RUNTIME_DATABASE_URL, nao de FORCE sozinho. Em producao o role de
+-- migracao NAO deve ser superusuario -- e a diferenca entre a politica
+-- valer e ela ser decoracao.
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE students FORCE ROW LEVEL SECURITY;
 
