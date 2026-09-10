@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3110 | 3110 | 0 | 75.9 |
+| unitário | 3126 | 3126 | 0 | 75.7 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 955 | 955 | 0 | 84.0 |
+| integração | 996 | 996 | 0 | 83.7 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -140,3 +140,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-09 | #286 | SPEC-063 | integração | 955 | 955 | 0 | 84.0 | — o Jest crasha no fim no Windows (3221226505, DEPOIS de os testes passarem) e o gerador herdou o 937 da entrega anterior; medido à mão em dois lotes: `apps/api` 877 (443 + 447, menos 13 de `kiosk-auth` e `platform-auth-de-plataforma`, que casam nos dois filtros e rodaram duas vezes) + `@arenahub/database` 78. Os +18 são os da fatia: `platform-contrato.int-spec.ts`. **O CI confirmou o número**: 64 suítes / 877 em `apps/api`, rodando em Linux sem o crash. | [#298](https://github.com/RodReis/arenahub/pull/298) |
 | 2026-09-09 | #288 | F65 | unitário | 3110 | 3110 | 0 | 75.9 | [#300](https://github.com/RodReis/arenahub/pull/300) |
 | 2026-09-09 | #288 | F65 | integração | 911 | 911 | 0 | 84.0 | — **número confirmado pelo CI** (Linux, sem o crash `3221226505`), não medido à mão: as DUAS tentativas locais desta entrega tinham crashado em pontos DIFERENTES do conjunto de 67 suítes (43/67 numa rodada, 19/67 na outra — zero `FAIL` nas duas), então "medir à mão somando lotes" (o método das entregas anteriores) não dava número confiável sem nenhuma rodada local completa para somar. **67 suítes / 911 testes**, rodando em Linux. Os +34 sobre o 877 da SPEC-063 são as suítes/testes desta fatia (`access-gate-de-tenant.int-spec.ts` novo, mais os acréscimos em `platform-suspensao-automatica`, `platform-fatura`, `manual-override`, `platform-alterar-tenant`). | [#300](https://github.com/RodReis/arenahub/pull/300) |
+| 2026-09-10 | #289 | SPEC-066 | unitário | 3126 | 3126 | 0 | 75.7 | — |
+| 2026-09-10 | #289 | SPEC-066 | integração | 996 | 996 | 0 | 83.7 | — 918 em `apps/api` + 78 em `@arenahub/database`, medidos numa rodada completa (68 suítes, zero `FAIL`, 2m56s). **Corrigido à mão:** o `test:report` caiu no crash `3221226505` do Windows e herdou o 955 da entrega anterior. Inclui os 7 casos de `rls-isolation`, que rodam sob o role restrito e **pulam** sem `RUNTIME_INTEGRATION_DATABASE_URL` — número do CI pode diferir se a variável faltar lá |

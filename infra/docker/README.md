@@ -92,6 +92,11 @@ A partir da F66 (ADR-054) o Postgres tem **duas identidades**, no mesmo containe
 | `arenahub` | dono das tabelas. Migrations, e nada mais. |
 | `arenahub_app` | runtime. API, workers e seeds. `NOBYPASSRLS`, sem ownership. |
 
+O role restrito lê e escreve em **todas** as tabelas de negócio, não só nas duas com política. O
+que o separa do dono é não ter ownership, não poder alterar estrutura nem política, e não ter
+`BYPASSRLS`. A única restrição de alcance é `audit_logs`, onde ele insere e lê mas não atualiza
+nem apaga: trilha que a aplicação pode editar não é trilha.
+
 A migration cria o role, mas **não a senha** — credencial não se versiona, nem em desenvolvimento.
 Depois de rodar as migrations pela primeira vez, setar a senha à mão. `ALTER ROLE` vale para o
 cluster inteiro, então uma vez só cobre `arenahub`, `arenahub_int` e `arenahub_e2e`:

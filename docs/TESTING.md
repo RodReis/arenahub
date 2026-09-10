@@ -162,6 +162,13 @@ pnpm --filter @arenahub/database exec tsx prisma/senha-do-role-de-runtime.ts <se
 Depois, `RUNTIME_INTEGRATION_DATABASE_URL` no `.env` — ver `infra/docker/README.md`, seção "Role de
 runtime (RLS)". No CI isso é um passo do job, entre as migrations e a integração.
 
+**As demais suítes de integração seguem no role dono, e isso é deliberado.** Elas criam aluno,
+plano e dispositivo chamando o client direto, fora de qualquer requisição HTTP — não há escopo de
+tenant aberto, e a política recusaria a escrita com `42501`. São 51 pontos em cerca de vinte
+arquivos, todos montando cenário, nenhum exercitando isolamento. Por isso o `setup-env.ts` da
+integração apaga `RUNTIME_DATABASE_URL`. Suíte nova que precise do role restrito abre o próprio
+client, como a de isolamento faz.
+
 ### 4.2 Idempotência
 Para todo consumidor de evento externo: **processar duas vezes produz o mesmo estado**
 (INV-076, INV-085, INV-086). Inclui webhook duplicado, webhook fora de ordem e reprocessamento

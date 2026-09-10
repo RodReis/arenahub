@@ -24,16 +24,32 @@ BEGIN
 END
 $$;
 
--- 2. Permissao de DADO, nao de ESTRUTURA. O role le e escreve nas duas
--- tabelas desta fase, mas nao e dono: nao pode DROP, ALTER, nem criar ou
--- derrubar politica. Quem roda esta migration continua sendo o owner.
+-- 2. Permissao de DADO, nao de ESTRUTURA.
+--
+-- Este e o role de RUNTIME: a API inteira roda com ele, entao precisa de
+-- leitura e escrita em TODAS as tabelas de negocio, e nao so nas duas com
+-- politica. O que o separa do dono nao e alcance de tabela -- e nao ter
+-- ownership, nao poder DROP nem ALTER, nao poder criar ou derrubar
+-- politica, e nao ter BYPASSRLS.
+--
+-- Conceder apenas `students` e `audit_logs` derruba a aplicacao inteira no
+-- primeiro login, com `permission denied for table tenants`.
 GRANT USAGE ON SCHEMA public TO arenahub_app;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON students TO arenahub_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO arenahub_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO arenahub_app;
 
--- audit_logs sem UPDATE e sem DELETE: trilha de auditoria que a aplicacao
--- pode editar nao e trilha de auditoria. Escreve e le, so.
-GRANT SELECT, INSERT ON audit_logs TO arenahub_app;
+-- Tabela criada por migration FUTURA nasceria sem GRANT nenhum, e a falha so
+-- apareceria em execucao. O default privilege cobre o que o dono criar daqui
+-- em diante.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO arenahub_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO arenahub_app;
+
+-- `audit_logs` e a excecao restritiva, e por isso vem DEPOIS do GRANT amplo:
+-- trilha de auditoria que a aplicacao pode editar nao e trilha de auditoria.
+REVOKE UPDATE, DELETE ON audit_logs FROM arenahub_app;
 
 -- 3. FORCE, e nao apenas ENABLE.
 --
