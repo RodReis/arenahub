@@ -329,14 +329,44 @@ describe('F56 -- plano com assinatura mensal', () => {
       expect(fake.recorrenciasInstaladas).toBe(antes + 1);
 
       /*
-       * O TIPO do erro da perdedora, nao so "falhou": `sucessos: 1` sozinho e
-       * satisfeito por qualquer falha, inclusive FK quebrada -- foi assim que
-       * o teste de concorrencia da F53 passou verde sem medir nada.
+       * O MOTIVO do erro da perdedora, nao so "falhou": `sucessos: 1` sozinho
+       * e satisfeito por qualquer falha, inclusive FK quebrada -- foi assim
+       * que o teste de concorrencia da F53 passou verde sem medir nada.
+       *
+       * DUAS CLASSES ACEITAS, e a razao importa (issue #306). A perdedora
+       * pode ser barrada em DOIS pontos, e qual deles depende de temporizacao
+       * que nenhum ambiente garante:
+       *
+       *   - `AdesaoJaEmAndamentoError`, no `updateMany` condicionado a
+       *     `externalSubscriptionId: null` -- as duas leram antes de qualquer
+       *     escrita e disputaram a gravacao;
+       *   - `AdesaoInvalidaError`, na `validarAdesao` -- a segunda ja leu a
+       *     assinatura DEPOIS de a primeira gravar.
+       *
+       * As duas sao o desfecho CERTO: mesmo codigo (`RECURRENCE_ALREADY_ACTIVE`),
+       * mesmo 409, mesma mensagem, e em nenhuma delas a recorrencia e
+       * instalada duas vezes -- que e o que o teste existe para provar, e o
+       * que as duas linhas acima ja afirmam.
+       *
+       * Exigir so a primeira tornava o teste dependente do relogio: passou
+       * 12 de 12 no Windows e caiu no CI em Linux, no mesmo commit. O que
+       * NAO se afrouxa e o codigo do erro: FK quebrada ou qualquer falha
+       * alheia continua reprovando.
        */
       const perdedora = falhas[0];
-      expect(perdedora?.status === 'rejected' && perdedora.reason).toBeInstanceOf(
-        AdesaoJaEmAndamentoError,
-      );
+      // `unknown` e nao inferido: `reason` do `PromiseSettledResult` e `any`,
+      // e deixa-lo entrar assim faz o lint recusar -- com razao, porque um
+      // `any` aqui esconderia erro de digitacao no nome do campo abaixo.
+      const motivo: unknown = perdedora?.status === 'rejected' ? perdedora.reason : undefined;
+
+      expect(
+        motivo instanceof AdesaoJaEmAndamentoError || motivo instanceof AdesaoInvalidaError,
+      ).toBe(true);
+      // `code` direto, e nao `response.code`: `ErroDeDominio` estende `Error`,
+      // nao `HttpException`. Ler o campo errado daria `undefined` -- e um
+      // `toBe('...')` contra `undefined` falha, mas um `toBeUndefined()`
+      // passaria pelo motivo errado.
+      expect((motivo as { code?: string })?.code).toBe('RECURRENCE_ALREADY_ACTIVE');
 
       const assinatura = await db.subscription.findUniqueOrThrow({
         where: { id: subscriptionId },
