@@ -39,6 +39,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][FIX] platform admin cai no painel de tenant apos login e recebe AUTH_REQUIRED (#311, finalizado em: 2026-09-11)
 - [MVP7][FIX] tela de configurar 2FA gera segredo TOTP novo a cada carregamento e tranca o usuario fora (#309, finalizado em: 2026-09-11)
 - [MVP7][SPEC-066][FIX] leituras de students e audit_logs fora de transacao ignoram a politica RLS (#306, finalizado em: 2026-09-11)
 - [MVP7][SPEC-061][FIX] rotas de MFA aceitam tentativas sem limite (#296, finalizado em: 2026-09-11)
