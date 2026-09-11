@@ -264,6 +264,47 @@
 }
 
 /**
+ * O QR Code, gerado como SVG no servidor.
+ *
+ * Fundo branco fixo, e nao token de superficie: o leitor de QR depende do
+ * contraste entre modulo escuro e claro, e um fundo que acompanhasse o tema
+ * escuro inverteria essa relacao e quebraria a leitura.
+ */
+.qrCode {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: var(--ah-radius-control);
+  background: #ffffff;
+}
+
+.qrCode svg {
+  display: block;
+  width: 180px;
+  height: 180px;
+}
+
+/**
+ * A chave em texto fica FECHADA por padrao.
+ *
+ * O QR resolve o cadastro de quem tem o celular na mao; o texto so aparece a
+ * pedido, para quem nao consegue escanear (camera ruim, leitor no proprio
+ * desktop). Menos segredo exposto a quem passa atras da cadeira, sem tirar o
+ * caminho de quem precisa digitar.
+ */
+.segredoAlternativa {
+  margin-top: 4px;
+}
+
+.segredoAlternativaResumo {
+  cursor: pointer;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-action-text);
+}
+
+/**
  * MONOESPACADA e com `user-select: all`: a chave e digitada a mao ou copiada
  * inteira, e nas duas o que atrapalha e o mesmo -- `l` e `1` iguais na fonte
  * de texto, e um clique duplo que seleciona so um pedaco.

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import QRCode from 'qrcode';
 
 import {
   confirmarInscricaoDeSegundoFator,
@@ -36,31 +37,58 @@ export default async function PaginaDeConfiguracaoDeSegundoFator() {
    */
   if (!inscricao) redirect('/login');
 
+  /*
+   * `margin: 0` porque o respiro branco em volta do código já vem do padding
+   * do contêiner — a margem do próprio SVG só encolheria os módulos dentro da
+   * mesma caixa, piorando a leitura.
+   */
+  const qrCodeSvg = await QRCode.toString(inscricao.uri, {
+    type: 'svg',
+    margin: 0,
+    errorCorrectionLevel: 'M',
+  });
+
   return (
     <MolduraDeSegundoFator
       titulo="Configure o segundo fator"
       subtitulo="Esta conta exige um aplicativo autenticador. Cadastre a chave abaixo e confirme com o primeiro código."
     >
       {/*
-        A CHAVE EM TEXTO, e não um QR Code.
+        O QR Code é o caminho principal; a chave em texto fica fechada atrás do
+        `<details>`.
 
-        Todo autenticador aceita entrada manual, e gerar o QR exigiria uma
-        biblioteca nova no bundle da tela de login para desenhar o mesmo
-        segredo que já está aqui. Quem abre o painel no celular tem o link
-        abaixo, que o próprio sistema operacional entrega ao aplicativo.
+        O QR carrega exatamente o mesmo segredo que o texto — esconder o texto
+        não protege contra quem fotografa a tela, só contra quem lê por cima do
+        ombro. O texto continua alcançável porque sem ele quem abre o painel no
+        próprio desktop (sem outra câmera para escanear) não teria como cadastrar.
+
+        O SVG é gerado no servidor: nada de biblioteca de QR no bundle do
+        cliente, e a marcação já chega pronta no HTML.
       */}
       <div className={estilos['segredo']}>
-        <p className={estilos['segredoRotulo']}>Chave de configuração</p>
-        <p className={estilos['segredoValor']}>{inscricao.base32}</p>
+        <p className={estilos['segredoRotulo']}>Escaneie no seu aplicativo autenticador</p>
+        <div
+          className={estilos['qrCode']}
+          /*
+            SVG vem do `qrcode`, gerado a partir da URI `otpauth://` que a
+            própria API montou — não há entrada de usuário no caminho.
+          */
+          dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+        />
         <p className={estilos['segredoAjuda']}>
-          Cadastre no seu aplicativo autenticador, ou{' '}
           {/*
             `otpauth://` é o esquema que Google Authenticator, 1Password, Authy
             e afins registram. No celular, abre direto no aplicativo, já com o
             segredo preenchido.
           */}
-          <a href={inscricao.uri}>abra direto no aplicativo</a>.
+          No celular, <a href={inscricao.uri}>abra direto no aplicativo</a>.
         </p>
+
+        <details className={estilos['segredoAlternativa']}>
+          <summary className={estilos['segredoAlternativaResumo']}>Não consigo escanear</summary>
+          <p className={estilos['segredoRotulo']}>Chave de configuração</p>
+          <p className={estilos['segredoValor']}>{inscricao.base32}</p>
+        </details>
       </div>
 
       <FormularioDeCodigo acao={confirmarInscricaoDeSegundoFator} rotulo="Ativar e entrar" />

@@ -78,6 +78,11 @@ export class TotpService {
     return { valido: false, contador: null, motivo: 'CODIGO_INVALIDO' };
   }
 
+  /** Codifica bytes de segredo ja existentes de volta para base32, para reexibir sem gerar outro. */
+  paraBase32Publico(bytes: Buffer): string {
+    return this.paraBase32(bytes);
+  }
+
   montarUri(emissor: string, conta: string, segredoBase32: string): string {
     const rotulo = encodeURIComponent(`${emissor}:${conta}`);
     const parametros = new URLSearchParams({
