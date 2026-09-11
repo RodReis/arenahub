@@ -4142,3 +4142,81 @@ migration de dado em **doze tabelas** — caro de desfazer.
 Timeout de **5 s** de transação interativa do Prisma já apareceu no import do Pacto pelo proxy
 público; toda query passar a ser transação aumenta a exposição. Testcontainers precisa do role
 restrito ou o teste mente. Performance: as políticas usam o índice em `tenant_id` que já existe.
+
+---
+
+## ADR-055 — O contrato do tenant é licença de uso em regime de assinatura, com termos versionados e assinatura fora do sistema
+
+**Data:** 11/09/2026
+**Status:** aceito *(decisão nova — **decidida pelo PI em 11/09/2026**)*
+**Decisor:** Rodrigo Reis (PI)
+**Contexto:** a F63 entregou o contrato como **ficha de dados** — contratante, plano, superfícies,
+reajuste, vigência. Ao ver o PDF gerado em produção, o PI pediu cláusulas (objeto, escopo, preço,
+propriedade intelectual, sigilo, LGPD), a qualificação da empresa fornecedora e um lugar para o
+cliente assinar, e perguntou se existe integração de assinatura gratuita.
+
+**Por que é ADR:** regime jurídico do contrato com o cliente e eventual contrato com terceiro
+(plataforma de assinatura) — os dois critérios de "caro de desfazer" do `CLAUDE.md`. E porque a
+decisão 2 abaixo muda a forma de um dado já em produção.
+
+### Decisões
+
+| # | decisão | alternativa descartada | por quê |
+|---|---|---|---|
+| 1 | **O documento é "Contrato de licença de uso de software em regime de assinatura e prestação de serviços de suporte"** | "Contrato de prestação de serviço", como está hoje | prestação de serviço é o rótulo de desenvolvimento sob encomenda, onde a titularidade do que se produz é discutível. O ArenaHub é produto da CONTRATADA vendido a vários clientes; o documento diz isso na primeira linha e a Cláusula 1.2 fecha a porta |
+| 2 | **Os termos são versionados (`terms_version`) e o contrato grava a versão fechada** | texto único, sempre o atual | regerar em 2029 o PDF de um contrato de 2026 tem que reproduzir os termos de 2026. É a regra dos valores copiados (ADR-052 §8) aplicada ao texto. Sem isso, editar uma cláusula reescreveria retroativamente todo contrato assinado — inclusive os já usados em cobrança |
+| 3 | **Cláusula de suspensão por inadimplência entra no contrato** (Cláusula 5) | manter a regra só no ADR-053 | o ADR-053 manda a catraca fechar 15 dias após o vencimento. Fechar a catraca de uma academia sem que o contrato preveja é a decisão técnica sem respaldo no documento que a autoriza. A cláusula existe para sustentar o que o sistema já faz |
+| 4 | **Na LGPD, a academia é controladora e a RRB TRADING é operadora** | silêncio sobre o tema | é a repartição correta e a que protege a CONTRATADA: quem decide coletar biometria é a academia. A Cláusula 7.3 põe a coleta do consentimento no colo de quem decide, e a 9.3 registra que o sistema guarda versão e data do consentimento e mantém caminho alternativo — o que o ADR-008 e a regra de arquitetura nº 7 já fazem |
+| 5 | **Entra limitação de responsabilidade** (Cláusula 11) | sem limitação | a catraca depende de energia, internet e equipamento de terceiro na academia. Sem a cláusula, "a catraca parou e eu perdi o dia" é problema da CONTRATADA |
+| 6 | **Dados da CONTRATADA vêm de configuração**, não de literal no `contrato-pdf.service.ts` | constante no código | endereço e representante mudam por ato societário; trocar endereço não pode exigir deploy |
+| 7 | **Sem integração com plataforma de assinatura eletrônica** — o fluxo é: gerar PDF → assinar fora → **subir o PDF assinado** de volta | ZapSign, Autentique, Clicksign, D4Sign por API | ver a seção abaixo |
+
+### Assinatura: por que não integrar agora
+
+A pergunta do PI foi se existe integração gratuita. A resposta honesta tem duas partes.
+
+**Existe plano gratuito, e ele caberia.** ZapSign e Autentique oferecem faixa gratuita de cerca de
+**5 documentos por mês**. O ArenaHub assina contrato com **tenant**, não com aluno: hoje é um
+cliente, e a projeção realista é de poucos contratos por mês. O volume cabe na faixa gratuita — o
+problema não é o preço.
+
+**O problema é o custo de engenharia contra o benefício.** Integrar significa: contrato com terceiro
+(este ADR), segredo de API em produção, webhook de retorno com idempotência por
+`external_event_id` (regra de arquitetura nº 4), tratamento de recusa e expiração, e um fornecedor a
+mais no caminho de um documento que o PI assina **um por mês**. Subir o PDF assinado é um campo,
+um upload e um status — entrega o mesmo resultado (o documento assinado guardado junto do contrato)
+por uma fração do custo, e não amarra o produto a ninguém.
+
+**A API gov.br foi verificada e não serve:** a integração de assinatura avançada gov.br é destinada a
+serviços públicos e exige integração prévia ao Login Único; não é caminho para um SaaS privado.
+
+**Quando reabrir:** volume acima de ~5 contratos/mês, ou exigência de cliente por assinatura com
+carimbo de tempo. Aí a decisão é comparar ZapSign e Autentique pelo que a faixa paga entrega, e
+vira ADR novo. Enquanto isso, assinar pela interface gratuita do fornecedor e subir o PDF é o
+caminho — e não é integração, é operação.
+
+### Limite do que isto é
+
+O texto das cláusulas foi **redigido pelo Cowork**, não por advogado, e o PI foi avisado disso. Ele
+cobre o que um contrato de SaaS costuma cobrir e protege a CONTRATADA nos pontos que o produto
+expõe — biometria, disponibilidade dependente de terceiro, titularidade do código. **Revisão
+jurídica antes do primeiro uso real é lacuna registrada** (SPEC-070 §7, item 8), não é escopo
+dispensado.
+
+### O risco que o PI aceitou
+
+A Cláusula 9 promete o que o produto **ainda não faz por inteiro**: o isolamento por RLS é F66/F67,
+ainda em backlog, e não existe ferramenta de exportação de dados do tenant (Cláusula 8.4) nem de
+eliminação. Assinar contrato com essas cláusulas antes de F66, F67 e da exportação existirem é
+assumir obrigação a descoberto. **Não bloqueia a F70** — bloqueia prometer no papel o que não está
+no ar, e a saída é a ordem: assinar contrato real depois da exportação existir, ou aceitar o risco
+por escrito.
+
+### Consequências normativas
+
+- `CONVENTION.md` §5, linha `Contract`: o contrato do tenant ganha termos versionados; o contrato do
+  **aluno** continua sendo a `Subscription`.
+- **A F70 acrescenta colunas ao `Tenant`** (endereço, telefone, CPF do responsável) — a Especificação
+  §9 já previa endereço e telefone; é dívida sendo paga, não campo novo de produto.
+- ADR-053 §1 ganha respaldo contratual (Cláusula 5.2).
+- Fatia: **F70** — contrato com cláusulas, qualificação das partes e assinatura (`SPEC-070`).
