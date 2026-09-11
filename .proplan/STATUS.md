@@ -39,6 +39,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][FIX] tela de configurar 2FA gera segredo TOTP novo a cada carregamento e tranca o usuario fora (#309, finalizado em: 2026-09-11)
 - [MVP7][SPEC-066][FIX] leituras de students e audit_logs fora de transacao ignoram a politica RLS (#306, finalizado em: 2026-09-11)
 - [MVP7][SPEC-061][FIX] rotas de MFA aceitam tentativas sem limite (#296, finalizado em: 2026-09-11)
 - [MVP7][SPEC-066][FIX] escrita em audit_logs falha com 42501 nos fluxos de Super Admin sob o role restrito (#302, finalizado em: 2026-09-11)
@@ -46,8 +47,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
+- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
