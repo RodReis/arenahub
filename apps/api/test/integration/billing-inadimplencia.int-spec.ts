@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { AplicarInadimplenciaUseCase } from '../../src/modules/billing/aplicar-inadimplencia.use-case.js';
 import { ConsultarInadimplenciaUseCase } from '../../src/modules/billing/consultar-inadimplencia.use-case.js';
@@ -50,9 +51,9 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     db = moduleRef.get(PrismaService);
-    aplicar = moduleRef.get(AplicarInadimplenciaUseCase);
+    aplicar = comContextoDeTenant(moduleRef.get(AplicarInadimplenciaUseCase));
     consultar = moduleRef.get(ConsultarInadimplenciaUseCase);
-    liberar = moduleRef.get(LiberacaoFinanceiraUseCase);
+    liberar = comContextoDeTenant(moduleRef.get(LiberacaoFinanceiraUseCase));
 
     const tenant = await db.tenant.create({
       data: {

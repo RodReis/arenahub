@@ -83,30 +83,37 @@ export class AccessQueryRepository {
     // `limite + 1` para saber se ha proxima pagina sem um `count` separado --
     // `count` numa tabela de eventos e a consulta cara que o teto de periodo
     // existe para evitar.
-    const encontrados = await this.db.accessEvent.findMany({
-      where,
-      // Ordem DECRESCENTE e o que a operacao quer ver: o que acabou de
-      // acontecer primeiro. `id` desempata para o cursor ser estavel quando
-      // dois eventos compartilham o mesmo instante -- e eles compartilham,
-      // porque uma rajada do leitor cabe no mesmo milissegundo.
-      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      take: filtro.limite + 1,
-      select: {
-        id: true,
-        occurredAt: true,
-        receivedAt: true,
-        gymUnitId: true,
-        outcome: true,
-        reason: true,
-        mode: true,
-        method: true,
-        externalUserId: true,
-        deviceId: true,
-        correlationId: true,
-        student: { select: { id: true, fullName: true, membershipNumber: true } },
-        passage: { select: { state: true } },
-      },
-    });
+    // `comTenant` embora a raiz seja `access_events`: o `select` traz
+    // `student`, que TEM politica RLS (F66). Fora de transacao interceptada o
+    // `set_config` nunca aplica, e sob o role restrito o aninhado vem NULO
+    // enquanto a raiz volta inteira -- o Prisma tipa a relacao como nao-nula,
+    // entao nem o TypeScript nem o teste avisam (issue #306).
+    const encontrados = await this.db.comTenant((tx) =>
+      tx.accessEvent.findMany({
+        where,
+        // Ordem DECRESCENTE e o que a operacao quer ver: o que acabou de
+        // acontecer primeiro. `id` desempata para o cursor ser estavel quando
+        // dois eventos compartilham o mesmo instante -- e eles compartilham,
+        // porque uma rajada do leitor cabe no mesmo milissegundo.
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        take: filtro.limite + 1,
+        select: {
+          id: true,
+          occurredAt: true,
+          receivedAt: true,
+          gymUnitId: true,
+          outcome: true,
+          reason: true,
+          mode: true,
+          method: true,
+          externalUserId: true,
+          deviceId: true,
+          correlationId: true,
+          student: { select: { id: true, fullName: true, membershipNumber: true } },
+          passage: { select: { state: true } },
+        },
+      }),
+    );
 
     const temMais = encontrados.length > filtro.limite;
     const pagina = temMais ? encontrados.slice(0, filtro.limite) : encontrados;
@@ -151,36 +158,39 @@ export class AccessQueryRepository {
     recognizedAt: string | null;
     correcoes: { id: string; reason: string; createdAt: string; correctingEventId: string | null }[];
   } | null> {
-    const evento = await this.db.accessEvent.findFirst({
-      where: {
-        id,
-        tenantId: contexto.tenantId,
-        ...this.escopoDeUnidade(contexto),
-      },
-      select: {
-        id: true,
-        occurredAt: true,
-        receivedAt: true,
-        recognizedAt: true,
-        gymUnitId: true,
-        outcome: true,
-        reason: true,
-        mode: true,
-        method: true,
-        externalUserId: true,
-        deviceId: true,
-        correlationId: true,
-        policyVersion: true,
-        validUntil: true,
-        detail: true,
-        student: { select: { id: true, fullName: true, membershipNumber: true } },
-        passage: { select: { state: true } },
-        corrections: {
-          select: { id: true, reason: true, createdAt: true, correctingEventId: true },
-          orderBy: { createdAt: 'asc' },
+    // `comTenant` pelo `student` aninhado -- ver a nota em `listar`.
+    const evento = await this.db.comTenant((tx) =>
+      tx.accessEvent.findFirst({
+        where: {
+          id,
+          tenantId: contexto.tenantId,
+          ...this.escopoDeUnidade(contexto),
         },
-      },
-    });
+        select: {
+          id: true,
+          occurredAt: true,
+          receivedAt: true,
+          recognizedAt: true,
+          gymUnitId: true,
+          outcome: true,
+          reason: true,
+          mode: true,
+          method: true,
+          externalUserId: true,
+          deviceId: true,
+          correlationId: true,
+          policyVersion: true,
+          validUntil: true,
+          detail: true,
+          student: { select: { id: true, fullName: true, membershipNumber: true } },
+          passage: { select: { state: true } },
+          corrections: {
+            select: { id: true, reason: true, createdAt: true, correctingEventId: true },
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+      }),
+    );
 
     if (!evento) return null;
 

@@ -247,6 +247,12 @@ jobs:
       # cair no role dono, que aqui e superusuario e ignora RLS -- passaria
       # verde sem provar nada.
       RUNTIME_INTEGRATION_DATABASE_URL: postgresql://arenahub_app:arenahub_app_ci@postgres:5432/arenahub_int?schema=public
+      # Role RESTRITO para o E2E (issue #306). Sem ela o `playwright.config.ts`
+      # cai no `E2E_DATABASE_URL`, que e do role DONO -- e o dono aqui e
+      # superusuario, que IGNORA RLS mesmo com FORCE. A suite passaria verde
+      # sem enxergar defeito de contexto nenhum, que foi exatamente como as
+      # issues #302 e #306 chegaram ate a `main`.
+      RUNTIME_E2E_DATABASE_URL: postgresql://arenahub_app:arenahub_app_ci@postgres:5432/arenahub_e2e?schema=public
 
       # Chave de cifra dos segredos simetricos. FIXA no CI, e nao efemera,
       # porque o E2E do totem exige que o SEED e a API usem a mesma: o seed

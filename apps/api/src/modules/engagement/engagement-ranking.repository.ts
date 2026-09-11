@@ -201,10 +201,17 @@ export class EngagementRankingRepository implements PortaDeRanking {
     category: RankingCategory = 'XP_DO_MES',
   ): Promise<SaldoParaClassificar[]> {
     if (category === 'XP_DO_MES') {
-      return this.db.studentXpBalance.findMany({
-        where: { tenantId: contexto.tenantId, localMonth, student: { gymUnitId } },
-        select: { studentId: true, points: true, lastEntryAt: true },
-      });
+      // `comTenant` embora a raiz seja `student_xp_balances`: o `where`
+      // FILTRA por `student`, que tem politica RLS (F66). Fora de transacao
+      // interceptada o `set_config` nunca aplica, e sob o role restrito o
+      // filtro relacional nao casa com ninguem -- o saldo do mes inteiro volta
+      // VAZIO, indistinguivel de "ninguem pontuou" (issue #306).
+      return this.db.comTenant((tx) =>
+        tx.studentXpBalance.findMany({
+          where: { tenantId: contexto.tenantId, localMonth, student: { gymUnitId } },
+          select: { studentId: true, points: true, lastEntryAt: true },
+        }),
+      );
     }
 
     // FREQUENCIA e CONSISTENCIA saem da MESMA projecao: as sessoes da F24,
@@ -241,11 +248,17 @@ export class EngagementRankingRepository implements PortaDeRanking {
   ): Promise<readonly ElegibilidadeDoAluno[]> {
     if (studentIds.length === 0) return [];
 
+    // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+    // interceptada, o `set_config` nunca aplica -- sob o role restrito a
+    // lista volta VAZIA e TODO aluno perde a elegibilidade calada, o que
+    // esvazia o snapshot do ranking sem erro nem log (issue #306).
     const [alunos, decisaoPorAluno] = await Promise.all([
-      this.db.student.findMany({
-        where: { tenantId: contexto.tenantId, id: { in: [...studentIds] } },
-        select: { id: true, status: true },
-      }),
+      this.db.comTenant((tx) =>
+        tx.student.findMany({
+          where: { tenantId: contexto.tenantId, id: { in: [...studentIds] } },
+          select: { id: true, status: true },
+        }),
+      ),
       this.decisaoDeRankingPorAluno(contexto, studentIds),
     ]);
 
@@ -453,19 +466,27 @@ export class EngagementRankingRepository implements PortaDeRanking {
     contexto: TenantContext,
     snapshotId: string,
   ): Promise<readonly EntradaComExposicao[]> {
-    const entradas = await this.db.rankingEntry.findMany({
-      where: { snapshotId, snapshot: { tenantId: contexto.tenantId } },
-      orderBy: { position: 'asc' },
-      include: {
-        student: {
-          select: {
-            fullName: true,
-            status: true,
-            publicProfile: true,
+    // `comTenant` embora a raiz seja `ranking_entries`: o `include` traz
+    // `student`, que TEM politica RLS (F66). Fora de transacao interceptada o
+    // `set_config` nunca aplica, e sob o role restrito o aninhado vem NULO
+    // enquanto a raiz volta inteira -- o Prisma tipa a relacao como nao-nula,
+    // entao nem o TypeScript nem o teste avisam, e o `entrada.student.*`
+    // logo abaixo estoura em runtime (issue #306).
+    const entradas = await this.db.comTenant((tx) =>
+      tx.rankingEntry.findMany({
+        where: { snapshotId, snapshot: { tenantId: contexto.tenantId } },
+        orderBy: { position: 'asc' },
+        include: {
+          student: {
+            select: {
+              fullName: true,
+              status: true,
+              publicProfile: true,
+            },
           },
         },
-      },
-    });
+      }),
+    );
 
     const decisaoPorAluno = await this.decisaoDeRankingPorAluno(
       contexto,
@@ -501,11 +522,15 @@ export class EngagementRankingRepository implements PortaDeRanking {
     contexto: TenantContext,
     snapshotId: string,
   ): Promise<readonly EntradaInternaDoPlacar[]> {
-    const entradas = await this.db.rankingEntry.findMany({
-      where: { snapshotId, snapshot: { tenantId: contexto.tenantId } },
-      orderBy: { position: 'asc' },
-      include: { student: { select: { fullName: true } } },
-    });
+    // `comTenant` pelo `student` aninhado -- ver a nota em
+    // `entradasComExposicao`.
+    const entradas = await this.db.comTenant((tx) =>
+      tx.rankingEntry.findMany({
+        where: { snapshotId, snapshot: { tenantId: contexto.tenantId } },
+        orderBy: { position: 'asc' },
+        include: { student: { select: { fullName: true } } },
+      }),
+    );
 
     return entradas.map((entrada) => ({
       position: entrada.position,
@@ -528,11 +553,15 @@ export class EngagementRankingRepository implements PortaDeRanking {
   ): Promise<readonly ExposicaoDoAluno[]> {
     if (studentIds.length === 0) return [];
 
+    // `comTenant`: `students` tem politica RLS (F66) -- ver a nota em
+    // `elegibilidadeDosAlunos`. Aqui o placar ao vivo voltaria vazio.
     const [alunos, decisaoPorAluno] = await Promise.all([
-      this.db.student.findMany({
-        where: { tenantId: contexto.tenantId, id: { in: [...studentIds] } },
-        select: { id: true, fullName: true, status: true, publicProfile: true },
-      }),
+      this.db.comTenant((tx) =>
+        tx.student.findMany({
+          where: { tenantId: contexto.tenantId, id: { in: [...studentIds] } },
+          select: { id: true, fullName: true, status: true, publicProfile: true },
+        }),
+      ),
       this.decisaoDeRankingPorAluno(contexto, studentIds),
     ]);
 

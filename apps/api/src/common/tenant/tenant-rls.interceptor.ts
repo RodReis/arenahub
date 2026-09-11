@@ -81,7 +81,30 @@ export class TenantRlsInterceptor implements NestInterceptor {
       ? paraContextoDeBanco(contexto)
       : dispositivo
         ? { kind: 'tenant', tenantId: dispositivo.tenantId }
-        : undefined;
+        : // QUARTA origem: a sessao de Super Admin (`platformContext`), posta
+          // pelo `AuthGuard` quando o token vem SEM tenant. Ela e a unica que
+          // le entre tenants por desenho (ADR-052 SS3), e por isso mapeia
+          // para `platform`, nao para `tenant`.
+          //
+          // Ficou de fora da #302 e era a causa raiz das contagens de `students`
+          // em `platform/` (issue #306): `PlatformInvoiceUseCase.contarAlunos` e
+          // `TenantRepository.ativosPorTenant` contam `students` (RLS desde a
+          // F66) e, sem escopo aberto, voltavam ZERO -- a fatura do SaaS
+          // sairia a menos e a lista de academias mostraria nenhum aluno, sem
+          // erro nem log. Corrigir aqui alcanca TODA rota de plataforma de
+          // uma vez, em vez de um `comContexto` por chamador.
+          //
+          // A ORDEM DO TERNARIO E GARANTIA, NAO ESTILO. O `AuthGuard` poe
+          // `platformContext` TAMBEM em quem esta elevado dentro de um tenant
+          // (`montarElevacao`, para o `PlatformGuard` aceitar a rota de
+          // encerrar a elevacao) -- e nesse caso `tenantContext` existe e vence
+          // aqui, caindo em `paraContextoDeBanco`, que so devolve `platform`
+          // enquanto a elevacao NAO expirou. Testar `platformContext` antes
+          // daria `platform` a uma elevacao vencida: o bypass silencioso que
+          // INV-005 proibe e que a F66 fechou de proposito.
+          requisicao.platformContext
+          ? { kind: 'platform' }
+          : undefined;
 
     if (!contextoDeBanco) return proximo.handle();
 

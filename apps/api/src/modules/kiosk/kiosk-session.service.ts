@@ -34,33 +34,40 @@ export class KioskSessionService {
   async abrir(contexto: ContextoDoKiosk, cpf: string, agora: Date): Promise<SessaoAberta> {
     const { config } = await this.config.resolverParaDispositivo(contexto);
 
-    const aluno = await this.db.student.findFirst({
-      where: {
-        tenantId: contexto.tenantId,
-        cpfHash: calcularHashDeCpf(contexto.tenantId, cpf),
-        // SUSPENDED entra: e exatamente o aluno inadimplente que o totem
-        // precisa identificar para mostrar a pendencia. BLOCKED, CANCELLED,
-        // ARCHIVED e LEAD caem na mensagem neutra unica abaixo.
-        status: { in: ['ACTIVE', 'TRIAL', 'SUSPENDED'] },
-      },
-      /*
-       * ORDEM EXPLICITA, e nao zelo: `cpfHash` NAO e unico, e a base real
-       * tem CPF repetido -- dois irmaos com o mesmo numero, erro de
-       * digitacao na importacao. Sem `orderBy`, um `findFirst` devolve o
-       * que o Postgres entregar primeiro, e essa ordem MUDA depois de
-       * qualquer UPDATE na tabela: o mesmo CPF abriria a sessao ora de um
-       * aluno, ora de outro, e cada um veria a fatura e a avaliacao do
-       * outro.
-       *
-       * `createdAt asc` com `id` de desempate: o cadastro mais antigo
-       * ganha, sempre o mesmo, e o desfecho para de depender do dia.
-       *
-       * Isto NAO conserta o dado duplicado -- so o torna deterministico.
-       * Corrigir o cadastro e da recepcao.
-       */
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: { id: true, fullName: true },
-    });
+    // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+    // interceptada, o `set_config` nunca aplica -- sob o role restrito a
+    // busca volta VAZIA e TODO aluno do totem cai na mensagem neutra de
+    // `KIOSK_IDENTIFICATION_FAILED`, indistinguivel de CPF errado. O
+    // `TenantRlsInterceptor` do totem ja abre o contexto desde a #302.
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: {
+          tenantId: contexto.tenantId,
+          cpfHash: calcularHashDeCpf(contexto.tenantId, cpf),
+          // SUSPENDED entra: e exatamente o aluno inadimplente que o totem
+          // precisa identificar para mostrar a pendencia. BLOCKED, CANCELLED,
+          // ARCHIVED e LEAD caem na mensagem neutra unica abaixo.
+          status: { in: ['ACTIVE', 'TRIAL', 'SUSPENDED'] },
+        },
+        /*
+         * ORDEM EXPLICITA, e nao zelo: `cpfHash` NAO e unico, e a base real
+         * tem CPF repetido -- dois irmaos com o mesmo numero, erro de
+         * digitacao na importacao. Sem `orderBy`, um `findFirst` devolve o
+         * que o Postgres entregar primeiro, e essa ordem MUDA depois de
+         * qualquer UPDATE na tabela: o mesmo CPF abriria a sessao ora de um
+         * aluno, ora de outro, e cada um veria a fatura e a avaliacao do
+         * outro.
+         *
+         * `createdAt asc` com `id` de desempate: o cadastro mais antigo
+         * ganha, sempre o mesmo, e o desfecho para de depender do dia.
+         *
+         * Isto NAO conserta o dado duplicado -- so o torna deterministico.
+         * Corrigir o cadastro e da recepcao.
+         */
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        select: { id: true, fullName: true },
+      }),
+    );
 
     // Decisao 4 do PI: mensagem UNICA para nao-encontrado, outro tenant,
     // status nao elegivel e erro. Distinguir aqui diria a qualquer um se

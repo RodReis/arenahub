@@ -78,10 +78,16 @@ export class RegistrarMetodoDePagamentoUseCase {
   ) {}
 
   async executar(contexto: TenantContext, entrada: EntradaDeMetodo): Promise<MetodoRegistrado> {
-    const aluno = await this.db.student.findFirst({
-      where: { id: entrada.studentId, tenantId: contexto.tenantId },
-      select: { id: true },
-    });
+    // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+    // interceptada, o `set_config` nunca aplica -- sob o role restrito a
+    // leitura volta VAZIA e o aluno legitimo vira "nao encontrado"
+    // (issue #306).
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { id: entrada.studentId, tenantId: contexto.tenantId },
+        select: { id: true },
+      }),
+    );
 
     if (!aluno) {
       throw new AlunoNaoEncontradoParaMetodoError();

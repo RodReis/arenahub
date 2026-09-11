@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 
 import { AppModule } from '../../src/app.module.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 import { EngagementRankingService } from '../../src/modules/engagement/engagement-ranking.service.js';
 
@@ -12,7 +13,7 @@ describe('F35 -- regerar placar com um PUBLICADO no mesmo mes', () => {
     const app = mod.createNestApplication();
     await app.init();
     const db = app.get(PrismaService);
-    const service = app.get(EngagementRankingService);
+    const service = comContextoDeTenant(app.get(EngagementRankingService));
 
     const unidade = await db.gymUnit.findFirstOrThrow();
     const ctx = {

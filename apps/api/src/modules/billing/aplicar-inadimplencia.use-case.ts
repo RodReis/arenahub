@@ -100,20 +100,32 @@ export class AplicarInadimplenciaUseCase {
    * como funcao pura.
    */
   private async candidatas(tenantId: string, agora: Date): Promise<Candidata[]> {
-    const invoices = await this.db.invoice.findMany({
-      where: {
-        tenantId,
-        status: { in: ['OPEN', 'OVERDUE'] },
-        dueAt: { lte: agora },
-      },
-      select: {
-        id: true,
-        subscriptionId: true,
-        dueAt: true,
-        blockAt: true,
-        student: { select: { gymUnit: { select: { timezone: true } } } },
-      },
-    });
+    // `comTenant` embora a raiz seja `invoices`: o `select` traz `student`,
+    // que TEM politica RLS (F66). Fora de transacao interceptada o
+    // `set_config` nunca aplica, e sob o role restrito o aninhado vem NULO
+    // enquanto a raiz volta inteira -- o Prisma tipa a relacao como nao-nula,
+    // entao nem o TypeScript nem o teste avisam (issue #306). Aqui o dano
+    // seria o fuso da unidade sumir e o corte de vencimento errar o dia.
+    //
+    // O unico chamador e rota HTTP (`billing.controller.ts`), entao o
+    // contexto ja esta aberto pelo interceptor. Worker que venha a chamar
+    // isto precisa abrir o seu com `comContexto`.
+    const invoices = await this.db.comTenant((tx) =>
+      tx.invoice.findMany({
+        where: {
+          tenantId,
+          status: { in: ['OPEN', 'OVERDUE'] },
+          dueAt: { lte: agora },
+        },
+        select: {
+          id: true,
+          subscriptionId: true,
+          dueAt: true,
+          blockAt: true,
+          student: { select: { gymUnit: { select: { timezone: true } } } },
+        },
+      }),
+    );
 
     return invoices.map((invoice) => ({
       id: invoice.id,

@@ -82,28 +82,36 @@ export class EmitirReciboUseCase {
       };
     }
 
-    const pagamento = await this.db.payment.findFirst({
-      where: { id: entrada.paymentId, tenantId: contexto.tenantId },
-      select: {
-        id: true,
-        invoiceId: true,
-        status: true,
-        method: true,
-        amountMinor: true,
-        currency: true,
-        paidAt: true,
-        externalPaymentId: true,
-        invoice: {
-          select: {
-            number: true,
-            billingPeriod: true,
-            items: { select: { description: true, quantity: true, totalMinor: true } },
-            student: { select: { fullName: true, membershipNumber: true } },
+    // `comTenant` embora a raiz seja `payments`: o `select` traz `student`
+    // por baixo de `invoice`, e `students` TEM politica RLS (F66). Fora de
+    // transacao interceptada o `set_config` nunca aplica, e sob o role
+    // restrito o aninhado vem NULO enquanto a raiz volta inteira -- o Prisma
+    // tipa a relacao como nao-nula, entao nem o TypeScript nem o teste avisam
+    // (issue #306). Aqui o dano seria recibo emitido sem o nome do aluno.
+    const pagamento = await this.db.comTenant((tx) =>
+      tx.payment.findFirst({
+        where: { id: entrada.paymentId, tenantId: contexto.tenantId },
+        select: {
+          id: true,
+          invoiceId: true,
+          status: true,
+          method: true,
+          amountMinor: true,
+          currency: true,
+          paidAt: true,
+          externalPaymentId: true,
+          invoice: {
+            select: {
+              number: true,
+              billingPeriod: true,
+              items: { select: { description: true, quantity: true, totalMinor: true } },
+              student: { select: { fullName: true, membershipNumber: true } },
+            },
           },
+          tenant: { select: { legalName: true } },
         },
-        tenant: { select: { legalName: true } },
-      },
-    });
+      }),
+    );
 
     if (!pagamento) {
       throw new PagamentoNaoEncontradoParaReciboError();

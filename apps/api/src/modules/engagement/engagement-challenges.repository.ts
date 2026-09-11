@@ -421,23 +421,29 @@ export class EngagementChallengesRepository implements PortaDeDesafios {
   async alunosElegiveis(ctx: TenantContext, gymUnitId: string | null): Promise<string[]> {
     const agora = new Date();
 
-    const linhas = await this.prisma.student.findMany({
-      where: {
-        tenantId: ctx.tenantId,
-        status: 'ACTIVE',
-        ...(gymUnitId ? { gymUnitId } : {}),
-        entitlements: {
-          some: {
-            status: 'ACTIVE',
-            // Vigente AGORA: `endsAt` nao e anulavel neste schema, entao a
-            // janela e sempre fechada dos dois lados.
-            startsAt: { lte: agora },
-            endsAt: { gte: agora },
+    // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+    // interceptada, o `set_config` nunca aplica -- sob o role restrito a
+    // lista volta VAZIA e o desafio nasce sem nenhum participante, sem erro
+    // nem log (issue #306).
+    const linhas = await this.prisma.comTenant((tx) =>
+      tx.student.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          status: 'ACTIVE',
+          ...(gymUnitId ? { gymUnitId } : {}),
+          entitlements: {
+            some: {
+              status: 'ACTIVE',
+              // Vigente AGORA: `endsAt` nao e anulavel neste schema, entao a
+              // janela e sempre fechada dos dois lados.
+              startsAt: { lte: agora },
+              endsAt: { gte: agora },
+            },
           },
         },
-      },
-      select: { id: true },
-    });
+        select: { id: true },
+      }),
+    );
 
     return linhas.map((l) => l.id);
   }

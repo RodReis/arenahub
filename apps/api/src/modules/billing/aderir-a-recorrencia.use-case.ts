@@ -83,12 +83,30 @@ export class AderirARecorrenciaUseCase {
       emQue: Date;
     },
   ): Promise<RecorrenciaInstalada> {
+    /*
+     * DUAS LEITURAS, e nao um `include` -- a separacao e deliberada.
+     *
+     * `students` tem politica RLS (F66), e fora de transacao com contexto o
+     * aninhado voltaria NULO enquanto a raiz vem inteira: o Prisma tipa a
+     * relacao como nao-nula, entao nem o TypeScript nem o teste avisariam, e
+     * a adesao seria gravada com CPF ausente (issue #306).
+     *
+     * A correcao obvia -- envolver a leitura inteira em `comTenant` -- ABRE
+     * UMA TRANSACAO em volta da validacao, e isso QUEBRA a janela da corrida
+     * que o `updateMany` condicionado logo abaixo existe para fechar: duas
+     * adesoes simultaneas precisam LER ANTES de qualquer escrita para as duas
+     * passarem pela validacao e disputarem a gravacao. Com a transacao, a
+     * segunda passa a ler o estado ja gravado pela primeira e recusa na
+     * validacao. Nao e defeito de producao (o codigo e a mensagem sao os
+     * mesmos), mas desarma a garantia sob teste -- medido: 1 falha em 5
+     * rodadas com a transacao, 8 em 8 no desfecho certo sem ela.
+     *
+     * A assinatura, cuja tabela nao tem politica, segue SOLTA. So o CPF --
+     * a unica coisa que vem do aluno -- passa por `comTenant`.
+     */
     const assinatura = await this.db.subscription.findFirst({
       where: { id: entrada.subscriptionId, tenantId: contexto.tenantId },
-      include: {
-        plan: { include: { prices: true } },
-        student: { select: { cpf: true } },
-      },
+      include: { plan: { include: { prices: true } } },
     });
 
     if (!assinatura) {
@@ -113,12 +131,23 @@ export class AderirARecorrenciaUseCase {
       select: { externalTokenId: true },
     });
 
+    // A unica leitura de `students` daqui -- ver a nota da leitura da
+    // assinatura acima. `comTenant` EXIGE o contexto: sem ele a politica
+    // devolveria vazio e o aluno com CPF cadastrado seria recusado por
+    // "sem CPF", culpando quem preencheu certo.
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { id: assinatura.studentId, tenantId: contexto.tenantId },
+        select: { cpf: true },
+      }),
+    );
+
     const preco = precoVigenteEm(assinatura.plan.prices, entrada.emQue);
 
     validarAdesao({
       modalidadeDoPlano: assinatura.plan.billingMode,
       planoTemPrecoVigente: preco !== undefined,
-      cpfDoAluno: assinatura.student.cpf,
+      cpfDoAluno: aluno?.cpf ?? null,
       temCartaoAtivo: metodo !== null,
       jaAderiu: assinatura.externalSubscriptionId !== null,
       aceitouRecorrencia: entrada.aceitouRecorrencia,

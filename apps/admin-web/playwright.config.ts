@@ -44,12 +44,23 @@ const PORTA_DA_API = 3344;
  */
 const URL_DO_BANCO_E2E = process.env['E2E_DATABASE_URL'];
 
+
 if (!URL_DO_BANCO_E2E) {
   throw new Error(
     'E2E_DATABASE_URL nao definida. Copie a linha do `.env.example` para o seu ' +
       '`.env` e ajuste a porta para a do seu Postgres (veja POSTGRES_PORT).',
   );
 }
+
+/**
+ * O mesmo banco de E2E, pelo role RESTRITO (issue #306).
+ *
+ * Sem ela a API roda sob o dono, que IGNORA RLS mesmo com `FORCE` -- e a
+ * suite passa a nao enxergar defeito de contexto nenhum. Cair no
+ * `E2E_DATABASE_URL` quando ausente mantem de pe quem ainda nao criou o role,
+ * ao custo de perder essa cobertura; o `.env.example` traz a linha.
+ */
+const URL_RESTRITA_E2E = process.env['RUNTIME_E2E_DATABASE_URL'] || URL_DO_BANCO_E2E;
 
 /**
  * E2E de verdade: sobe a API e o painel, e navega como um operador.
@@ -101,14 +112,18 @@ export default defineConfig({
       // de desenvolvimento, com a configuracao parecendo correta.
       reuseExistingServer: false,
       timeout: 120_000,
-      // `RUNTIME_DATABASE_URL` vazia, e nao ausente: o `PrismaService` a
-      // PREFERE ao `DATABASE_URL` (F66, ADR-054), e o processo herda o
-      // ambiente de quem chamou -- entao a do `.env`, que aponta para o banco
-      // de DESENVOLVIMENTO, venceria a linha acima e a suite escreveria no
-      // banco errado com a configuracao parecendo correta. E o mesmo defeito
-      // que o `reuseExistingServer: false` existe para impedir, por outro
-      // caminho.
-      env: { DATABASE_URL: URL_DO_BANCO_E2E, RUNTIME_DATABASE_URL: '' },
+      // ROLE RESTRITO LIGADO (issue #306). Antes era `RUNTIME_DATABASE_URL: ''`
+      // -- o E2E rodava sob o role DONO, que ignora RLS, e por isso ficava
+      // cego a toda uma classe de defeito: os pontos que devolviam lista vazia
+      // sob a politica passavam verdes aqui. Apontar para o banco de E2E pelo
+      // role restrito e o que torna a suite capaz de ver o que a #302 e a #306
+      // corrigiram.
+      //
+      // Continua sendo a variavel do banco de E2E, nunca a do `.env` (que
+      // aponta para DESENVOLVIMENTO): o processo herda o ambiente de quem
+      // chamou, e a do `.env` venceria a linha ao lado -- a suite escreveria
+      // no banco errado com a configuracao parecendo correta.
+      env: { DATABASE_URL: URL_DO_BANCO_E2E, RUNTIME_DATABASE_URL: URL_RESTRITA_E2E },
     },
     {
       command: 'pnpm --filter @arenahub/admin-web start',

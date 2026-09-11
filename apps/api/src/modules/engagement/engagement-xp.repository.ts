@@ -429,10 +429,16 @@ export class EngagementXpRepository implements PortaDeXp {
     contexto: TenantContext,
     studentId: string,
   ): Promise<{ gymUnitId: string; timezone: string } | null> {
-    const aluno = await this.db.student.findFirst({
-      where: { tenantId: contexto.tenantId, id: studentId },
-      select: { gymUnitId: true, gymUnit: { select: { timezone: true } } },
-    });
+    // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+    // interceptada, o `set_config` nunca aplica -- sob o role restrito a
+    // leitura volta VAZIA, a unidade do aluno vira `null` e o XP e creditado
+    // no mes local errado, sem erro nem log (issue #306).
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { tenantId: contexto.tenantId, id: studentId },
+        select: { gymUnitId: true, gymUnit: { select: { timezone: true } } },
+      }),
+    );
 
     return aluno ? { gymUnitId: aluno.gymUnitId, timezone: aluno.gymUnit.timezone } : null;
   }

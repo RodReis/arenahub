@@ -150,18 +150,24 @@ export class DashboardRepository {
      * lista e pequena por construcao (suspensos e bloqueados de UMA unidade),
      * ler as linhas e agrupar em memoria custa menos que a ida extra ao banco.
      */
-    const alunos = await this.db.student.findMany({
-      where: {
-        tenantId: contexto.tenantId,
-        gymUnitId,
-        status: { in: ['SUSPENDED', 'BLOCKED'] },
-      },
-      select: { fullName: true, status: true, statusReason: true },
-      // Ordem ESTAVEL na lista de nomes tambem: sem isto os cinco exibidos
-      // trocariam entre dois carregamentos, e a recepcao leria nomes
-      // diferentes para a mesma situacao.
-      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
-    });
+    // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+    // interceptada, o `set_config` nunca aplica -- sob o role restrito o
+    // painel mostra ZERO suspensos e bloqueados, indistinguivel de "nao ha
+    // nenhum" (issue #306).
+    const alunos = await this.db.comTenant((tx) =>
+      tx.student.findMany({
+        where: {
+          tenantId: contexto.tenantId,
+          gymUnitId,
+          status: { in: ['SUSPENDED', 'BLOCKED'] },
+        },
+        select: { fullName: true, status: true, statusReason: true },
+        // Ordem ESTAVEL na lista de nomes tambem: sem isto os cinco exibidos
+        // trocariam entre dois carregamentos, e a recepcao leria nomes
+        // diferentes para a mesma situacao.
+        orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      }),
+    );
 
     const porGrupo = new Map<string, { status: string; motivo: string | null; nomes: string[] }>();
 

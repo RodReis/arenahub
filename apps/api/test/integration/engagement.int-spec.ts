@@ -6,6 +6,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
@@ -201,7 +202,7 @@ describe('F30 -- engajamento e identidade publica (integracao)', () => {
     await app.init();
 
     db = app.get(PrismaService);
-    service = app.get(EngagementService);
+    service = comContextoDeTenant(app.get(EngagementService));
 
     await montarTenant(tenantA);
     await montarTenant(tenantB);
