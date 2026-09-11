@@ -232,6 +232,43 @@ describe('elevacao de suporte', () => {
   });
 
   /*
+   * O PAINEL ESCOLHE A AREA POR AQUI -- issue #311.
+   *
+   * Sem este sinal o front nao distinguia "dono do SaaS" de "usuario de tenant
+   * sem permissao nenhuma": os dois chegavam com `permissions: []`, e o login
+   * mandava ambos para `/dashboard` -- rota de tenant, que responde 401 a quem
+   * nao tem tenant. Sessao valida, painel inacessivel.
+   */
+  it('/auth/me marca a sessao de plataforma com isPlatformAdmin', async () => {
+    const { cookie } = await logarComoSuperAdmin();
+
+    const resposta = await request(servidor()).get('/api/v1/auth/me').set('Cookie', cookie);
+
+    expect(resposta.status).toBe(200);
+    expect((resposta.body as { isPlatformAdmin?: boolean }).isPlatformAdmin).toBe(true);
+  });
+
+  /*
+   * O outro lado do par: sem ele, um `isPlatformAdmin: true` cravado para todo
+   * mundo passaria no teste acima -- verde pelo motivo errado.
+   *
+   * A elevacao de suporte serve de sessao COM tenant: e o mesmo ator, com
+   * `tenantContext` montado, e a resposta tem de mudar junto.
+   */
+  it('/auth/me NAO marca isPlatformAdmin numa sessao com tenant', async () => {
+    const { cookie, contexto } = await logarComoSuperAdmin();
+    const tenantId = await criarTenantDeTeste(contexto);
+    const { cookieElevado } = await elevar(cookie, tenantId, 'Suporte combinado com o cliente');
+
+    const resposta = await request(servidor())
+      .get('/api/v1/auth/me')
+      .set('Cookie', cookieElevado);
+
+    expect(resposta.status).toBe(200);
+    expect((resposta.body as { isPlatformAdmin?: boolean }).isPlatformAdmin).toBe(false);
+  });
+
+  /*
    * CANARIO. Este par prova que a requisicao ALCANCA a checagem de prazo.
    *
    * Sozinho, o teste de "expirada" passaria mesmo que uma guarda anterior

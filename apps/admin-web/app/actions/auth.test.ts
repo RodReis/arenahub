@@ -113,9 +113,74 @@ describe('entrar', () => {
     expect(repassarCookies).toHaveBeenCalledWith(['arenahub_access=abc; Path=/']);
     expect(gravarPreAuth).not.toHaveBeenCalled();
   });
+
+  /*
+   * O dono do SaaS não tem tenant, e `/dashboard` é rota de TENANT: mandá-lo
+   * para lá devolvia 401 numa sessão válida (issue #311). O destino sai de
+   * `/auth/me`, porque a resposta do login não carrega esse sinal.
+   */
+  it('manda o platform admin para /platform, não para o painel de tenant', async () => {
+    vi.mocked(chamarApi).mockImplementation((caminho: string) =>
+      Promise.resolve(
+        caminho === '/api/v1/auth/me'
+          ? { ok: true, dados: { isPlatformAdmin: true }, cookiesDaApi: [] }
+          : { ok: true, dados: {}, cookiesDaApi: ['arenahub_access=abc; Path=/'] },
+      ),
+    );
+
+    await expect(entrar({}, formulario())).rejects.toThrow('REDIRECIONOU:/platform');
+  });
+
+  it('mantém o usuário de tenant no painel de operação', async () => {
+    vi.mocked(chamarApi).mockImplementation((caminho: string) =>
+      Promise.resolve(
+        caminho === '/api/v1/auth/me'
+          ? { ok: true, dados: { isPlatformAdmin: false }, cookiesDaApi: [] }
+          : { ok: true, dados: {}, cookiesDaApi: ['arenahub_access=abc; Path=/'] },
+      ),
+    );
+
+    await expect(entrar({}, formulario())).rejects.toThrow('REDIRECIONOU:/dashboard');
+  });
+
+  /*
+   * `/auth/me` fora do ar não pode trancar ninguém na tela de login: cair no
+   * destino de sempre deixa o platform admin ver o erro e digitar `/platform`,
+   * enquanto mandar todo mundo para lá tiraria o painel de quem trabalha nele.
+   */
+  it('cai no painel de operação quando /auth/me falha', async () => {
+    vi.mocked(chamarApi).mockImplementation((caminho: string) =>
+      Promise.resolve(
+        caminho === '/api/v1/auth/me'
+          ? { ok: false, cookiesDaApi: [] }
+          : { ok: true, dados: {}, cookiesDaApi: ['arenahub_access=abc; Path=/'] },
+      ),
+    );
+
+    await expect(entrar({}, formulario())).rejects.toThrow('REDIRECIONOU:/dashboard');
+  });
 });
 
 describe('segundo fator', () => {
+  /*
+   * O caminho REAL do platform admin: o login dele sempre devolve desafio de
+   * MFA (INV-007), então quem decide o destino dele é esta função, não `entrar`.
+   */
+  it('manda o platform admin para /platform depois do segundo fator', async () => {
+    vi.mocked(lerPreAuth).mockResolvedValue({ token: 'pre-auth', desafio: 'MFA_VERIFY' });
+    vi.mocked(chamarApi).mockImplementation((caminho: string) =>
+      Promise.resolve(
+        caminho === '/api/v1/auth/me'
+          ? { ok: true, dados: { isPlatformAdmin: true }, cookiesDaApi: [] }
+          : { ok: true, dados: {}, cookiesDaApi: ['arenahub_access=abc; Path=/'] },
+      ),
+    );
+
+    await expect(verificarSegundoFator({}, comCodigo('123456'))).rejects.toThrow(
+      'REDIRECIONOU:/platform',
+    );
+  });
+
   it('troca o código pela sessão e limpa o desafio', async () => {
     vi.mocked(lerPreAuth).mockResolvedValue({ token: 'pre-auth', desafio: 'MFA_VERIFY' });
     vi.mocked(chamarApi).mockResolvedValue({
