@@ -428,6 +428,24 @@ describe('fatura da plataforma', () => {
   });
 
   afterAll(async () => {
+    /*
+     * APAGA OS TENANTS QUE A SUITE CRIOU -- issue #306.
+     *
+     * Sem isto, cada execucao deixa os contratos para tras e o
+     * `PlatformInvoiceSchedulerService` os varre PARA SEMPRE: ele itera
+     * TODOS os contratos vigentes do banco, e o teste do job roda tres
+     * ciclos. Medido no banco de integracao local: **295 contratos ativos**
+     * acumulados, 885 chamadas de `contarAlunos` num teste so, e um tempo
+     * limite de 5 s que parecia defeito do codigo e era lixo de teste.
+     *
+     * Pelo PREFIXO do slug, e nao `deleteMany` amplo: as outras suites
+     * compartilham o banco, e apagar o que nao e desta aqui derrubaria
+     * vizinho por motivo que ninguem relacionaria a este arquivo.
+     *
+     * O cascade do schema leva unidades, alunos, contratos e faturas junto.
+     */
+    await db?.tenant.deleteMany({ where: { slug: { startsWith: 'fatura-' } } });
+
     await app?.close();
   });
 
