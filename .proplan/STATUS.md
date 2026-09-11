@@ -28,9 +28,7 @@ _(vazio)_
 
 ## Em Andamento
 
-### Sem épico
-
-- [MVP7][SPEC-066][FIX] leituras de students e audit_logs fora de transacao ignoram a politica RLS (#306)
+_(vazio)_
 
 ## Feito
 
@@ -41,6 +39,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][SPEC-066][FIX] leituras de students e audit_logs fora de transacao ignoram a politica RLS (#306, finalizado em: 2026-09-11)
 - [MVP7][SPEC-061][FIX] rotas de MFA aceitam tentativas sem limite (#296, finalizado em: 2026-09-11)
 - [MVP7][SPEC-066][FIX] escrita em audit_logs falha com 42501 nos fluxos de Super Admin sob o role restrito (#302, finalizado em: 2026-09-11)
 - [MVP7][SPEC-067][F67] RLS fase 2 — tenant_id nas tabelas restantes e política em todas (#290, finalizado em: 2026-09-10)
