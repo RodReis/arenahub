@@ -156,6 +156,46 @@ export function FormularioDePlano({ plano }: Props) {
         />
       )}
 
+      {/*
+        SUPERFÍCIES: `select` Sim/Não, e não checkbox.
+
+        Checkbox DESMARCADO não entra no `FormData` -- o campo simplesmente não
+        existe no envio, e "desligado" chega à Server Action indistinguível de
+        "a tela nem tem esse campo". Um `select` manda valor nos dois casos, o
+        que mantém a regra de leitura idêntica à dos outros campos e dispensa
+        `input hidden` de acompanhamento.
+      */}
+      <div className={estilos['par']}>
+        <SelectField
+          id="plano-mobile"
+          name="mobileEnabled"
+          label="App mobile do aluno"
+          required
+          defaultValue={valor('mobileEnabled', plano?.mobileEnabled === false ? 'nao' : 'sim', 'sim')}
+          data-testid="campo-mobile-do-plano"
+        >
+          <option value="sim">Sim, faz parte do plano</option>
+          <option value="nao">Não</option>
+        </SelectField>
+
+        <SelectField
+          id="plano-totem"
+          name="kioskEnabled"
+          label="Totem de autoatendimento"
+          required
+          defaultValue={valor('kioskEnabled', plano?.kioskEnabled === false ? 'nao' : 'sim', 'sim')}
+          data-testid="campo-totem-do-plano"
+        >
+          <option value="sim">Sim, faz parte do plano</option>
+          <option value="nao">Não</option>
+        </SelectField>
+      </div>
+
+      <p className={estilos['nota']}>
+        Este é o padrão do catálogo. Cada contrato pode divergir dele na negociação — quem fica
+        sem o totem não consegue autenticar o equipamento.
+      </p>
+
       <p className={estilos['nota']}>
         {porAluno
           ? 'Aluno ativo é o que está em situação ativa no dia da emissão; inativo é qualquer outra situação.'

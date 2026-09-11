@@ -36,6 +36,8 @@ interface ContratoNaLista {
   endsAt: string | null;
   status: 'DRAFT' | 'ACTIVE' | 'TERMINATED';
   supersedesId: string | null;
+  mobileEnabled: boolean;
+  kioskEnabled: boolean;
   temDocumento: boolean;
 }
 
@@ -44,6 +46,9 @@ interface PlanoNaLista {
   name: string;
   model: 'PER_STUDENT' | 'FIXED_MONTHLY';
   status: 'ACTIVE' | 'ARCHIVED';
+  /** Padrão de superfície que o formulário de contrato herda. */
+  mobileEnabled: boolean;
+  kioskEnabled: boolean;
 }
 
 interface TenantEmDetalhe {

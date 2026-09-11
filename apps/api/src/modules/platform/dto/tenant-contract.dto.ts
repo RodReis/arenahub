@@ -30,6 +30,13 @@ export const esquemaDeCriacaoDeContrato = z
     startsAt: diaCivil,
     endsAt: diaCivil.nullish(),
     supersedesId: z.string().uuid().nullish(),
+    /*
+     * Superficies contratadas. OMITIR HERDA O PLANO -- e por isso nao tem
+     * `.default()`: com default, o contrato que nao fala do totem gravaria
+     * `true` por cima de um plano que o vende desligado.
+     */
+    mobileEnabled: z.boolean().optional(),
+    kioskEnabled: z.boolean().optional(),
   })
   .strict();
 

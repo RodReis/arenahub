@@ -28,5 +28,13 @@ export const esquemaDePlanoSaas = z
     inactiveStudentPriceMinor: precoEmCentavos.nullish(),
     fixedPriceMinor: precoEmCentavos.nullish(),
     currency: z.string().trim().length(3).toUpperCase().optional(),
+    /*
+     * Superficies do plano. Omitir qualquer uma vale `true` -- mesmo criterio
+     * do `currency`, e mesmo default da coluna. O PATCH desta rota substitui o
+     * plano inteiro (todos os campos sao reenviados pela tela), entao aqui
+     * "omitido" e "padrao", nunca "mantenha o que estava".
+     */
+    mobileEnabled: z.boolean().optional(),
+    kioskEnabled: z.boolean().optional(),
   })
   .strict();

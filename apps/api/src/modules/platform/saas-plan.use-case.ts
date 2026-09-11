@@ -43,6 +43,9 @@ export interface EntradaDePlano {
   inactiveStudentPriceMinor?: number | null | undefined;
   fixedPriceMinor?: number | null | undefined;
   currency?: string | undefined;
+  /** Superficies que fazem parte do plano. Ausente = `true`. */
+  mobileEnabled?: boolean | undefined;
+  kioskEnabled?: boolean | undefined;
 }
 
 /**
@@ -116,6 +119,8 @@ export class SaasPlanUseCase {
         inactiveStudentPriceMinor: entrada.inactiveStudentPriceMinor ?? null,
         fixedPriceMinor: entrada.fixedPriceMinor ?? null,
         currency: entrada.currency ?? 'BRL',
+        mobileEnabled: entrada.mobileEnabled ?? true,
+        kioskEnabled: entrada.kioskEnabled ?? true,
       },
     });
 
@@ -151,6 +156,8 @@ export class SaasPlanUseCase {
         inactiveStudentPriceMinor: entrada.inactiveStudentPriceMinor ?? null,
         fixedPriceMinor: entrada.fixedPriceMinor ?? null,
         currency: entrada.currency ?? 'BRL',
+        mobileEnabled: entrada.mobileEnabled ?? true,
+        kioskEnabled: entrada.kioskEnabled ?? true,
       },
     });
 

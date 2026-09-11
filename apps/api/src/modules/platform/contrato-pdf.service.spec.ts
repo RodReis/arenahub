@@ -17,6 +17,8 @@ const BASE: DadosDoContratoImpresso = {
   anniversaryMonth: 3,
   graceDays: 15,
   issueDay: 1,
+  mobileEnabled: true,
+  kioskEnabled: true,
   startsAt: new Date('2026-03-01T00:00:00.000Z'),
   endsAt: null,
   geradoEm: new Date('2026-03-05T00:00:00.000Z'),
@@ -68,6 +70,26 @@ describe('gerarPdfDoContrato', () => {
 
     expect(texto).toContain('indeterminado');
     expect(texto).toContain('01/03/2026');
+  });
+
+  /*
+   * O DOCUMENTO DIZ O QUE NAO FOI CONTRATADO -- F68.
+   *
+   * AFIRMA O PAR rotulo->valor, e nao cada palavra solta. `toContain('incluído')`
+   * sozinho e inutil aqui: ele e substring de "não incluído", e passaria com um
+   * PDF que imprimisse as DUAS superficies como nao contratadas -- exatamente o
+   * defeito que este teste existe para pegar.
+   *
+   * Uma ligada e uma desligada no mesmo PDF pela mesma razao: prova que cada
+   * linha le a propria flag, em vez de repetir um texto fixo.
+   */
+  it('imprime a superficie nao contratada, e nao so a contratada', async () => {
+    const texto = await textoDoPdf(
+      await gerarPdfDoContrato({ ...BASE, mobileEnabled: true, kioskEnabled: false }),
+    );
+
+    expect(texto).toMatch(/App mobile do aluno\s*incluído/);
+    expect(texto).toMatch(/Totem de autoatendimento\s*não incluído/);
   });
 
   it('separa milhar e mantem os centavos exatos', async () => {

@@ -160,7 +160,15 @@ export type MotivoDeRecusa =
   | 'EDGE_TIMESTAMP_OUT_OF_WINDOW'
   | 'EDGE_KEY_UNKNOWN'
   | 'EDGE_KEY_REVOKED'
-  | 'EDGE_REPLAY_DETECTED';
+  | 'EDGE_REPLAY_DETECTED'
+  /**
+   * O contrato da academia nao inclui o totem -- F68.
+   *
+   * CODIGO PROPRIO, e nao `EDGE_KEY_REVOKED`: quem opera age diferente. Chave
+   * revogada se resolve emitindo credencial nova; superficie fora do contrato
+   * so se resolve no comercial, e emitir credencial nova nao adianta nada.
+   */
+  | 'CONTRACT_KIOSK_DISABLED';
 
 /**
  * O timestamp esta dentro da janela aceitavel?

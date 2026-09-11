@@ -264,6 +264,130 @@ describe('F49 -- assinatura do totem', () => {
     await db.tenant.delete({ where: { id: vencido.tenantId } });
   });
 
+  /*
+   * F68 -- superficie contratada.
+   *
+   * O contrato e montado DIRETO no banco, e nao pelo caso de uso: ativar pelo
+   * `TenantContractUseCase` exigiria gerar PDF e escrever no bucket so para
+   * ter uma linha `ACTIVE`. O que este teste prova e o comportamento do
+   * `KioskAuthService` diante dessa linha.
+   */
+  const abrirContratoAtivo = async (
+    tenantId: string,
+    superficies: { mobileEnabled: boolean; kioskEnabled: boolean },
+  ): Promise<string> => {
+    const plano = await db.saasPlan.create({
+      data: {
+        name: `Plano F68 ${randomUUID().slice(0, 8)}`,
+        model: 'PER_STUDENT',
+        activeStudentPriceMinor: 500,
+        inactiveStudentPriceMinor: 250,
+      },
+    });
+
+    await db.tenantContract.create({
+      data: {
+        tenantId,
+        planId: plano.id,
+        model: 'PER_STUDENT',
+        activeStudentPriceMinor: 500,
+        inactiveStudentPriceMinor: 250,
+        baseDate: new Date('2026-01-01T00:00:00.000Z'),
+        anniversaryDay: 1,
+        anniversaryMonth: 1,
+        issueDay: 1,
+        startsAt: new Date('2026-01-01T00:00:00.000Z'),
+        status: 'ACTIVE',
+        documentObjectKey: `tenants/${tenantId}/contracts/f69.pdf`,
+        ...superficies,
+      },
+    });
+
+    /*
+     * Devolve o PLANO, e nao o contrato: apagar o tenant cascateia o contrato,
+     * mas o `SaasPlan` nao pendura em tenant nenhum e ficaria no catalogo para
+     * sempre. Uma suite que roda no CI todo dia empilharia um plano por
+     * execucao -- e o catalogo e a mesma lista onde se procura plano de
+     * verdade.
+     */
+    return plano.id;
+  };
+
+  /** Apaga o tenant (cascateia o contrato) e, so entao, o plano orfao. */
+  const limpar = async (tenantId: string, planoId: string): Promise<void> => {
+    await db.tenant.delete({ where: { id: tenantId } });
+    await db.saasPlan.delete({ where: { id: planoId } });
+  };
+
+  it('recusa o totem quando o contrato vigente nao inclui totem', async () => {
+    const semTotem: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
+
+    await montarTotem(semTotem, `sem-totem-${randomUUID().slice(0, 8)}`);
+
+    const planoId = await abrirContratoAtivo(semTotem.tenantId, {
+      mobileEnabled: true,
+      kioskEnabled: false,
+    });
+
+    const resposta = await request(servidor())
+      .post('/api/v1/kiosk/heartbeat')
+      .set(assinarPedido(semTotem, CORPO))
+      .send(CORPO)
+      .expect(401);
+
+    /*
+     * O CODIGO, e nao so o 401: `EDGE_KEY_REVOKED` tambem da 401, e manda quem
+     * opera emitir credencial nova -- acao que nao resolve nada aqui. Afirmar
+     * so o status deixaria a troca de codigo passar despercebida.
+     */
+    expect(resposta.body).toMatchObject({ code: 'CONTRACT_KIOSK_DISABLED' });
+
+    await limpar(semTotem.tenantId, planoId);
+  });
+
+  /*
+   * O PAR do teste acima, e ele e o que da sentido ao outro: sem esta metade,
+   * uma recusa que barrasse TODO totem com contrato ativo passaria verde no
+   * teste de cima. Mesmo cenario, unica diferenca e a flag.
+   */
+  it('aceita o totem quando o contrato vigente inclui totem', async () => {
+    const comTotem: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
+
+    await montarTotem(comTotem, `com-totem-${randomUUID().slice(0, 8)}`);
+
+    const planoId = await abrirContratoAtivo(comTotem.tenantId, {
+      mobileEnabled: false,
+      kioskEnabled: true,
+    });
+
+    await request(servidor())
+      .post('/api/v1/kiosk/heartbeat')
+      .set(assinarPedido(comTotem, CORPO))
+      .send(CORPO)
+      .expect(200);
+
+    await limpar(comTotem.tenantId, planoId);
+  });
+
+  /*
+   * ACADEMIA EM IMPLANTACAO. O totem e o primeiro equipamento testado, e o
+   * contrato costuma fechar depois -- recusar aqui transformaria "contrato
+   * ainda nao assinado" em "catraca nao funciona" no dia da instalacao.
+   */
+  it('aceita o totem da academia que ainda nao tem contrato vigente', async () => {
+    const semContrato: Totem = { tenantId: '', gymUnitId: '', kioskDeviceId: '', keyId: '', segredo: '' };
+
+    await montarTotem(semContrato, `sem-contrato-${randomUUID().slice(0, 8)}`);
+
+    await request(servidor())
+      .post('/api/v1/kiosk/heartbeat')
+      .set(assinarPedido(semContrato, CORPO))
+      .send(CORPO)
+      .expect(200);
+
+    await db.tenant.delete({ where: { id: semContrato.tenantId } });
+  });
+
   it('nao autentica como o tenant do totem B usando a credencial do totem A', async () => {
     const resposta = await request(servidor())
       .post('/api/v1/kiosk/heartbeat')

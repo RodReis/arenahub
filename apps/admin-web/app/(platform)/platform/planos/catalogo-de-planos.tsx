@@ -26,6 +26,8 @@ export interface PlanoNaLista {
   fixedPriceMinor: number | null;
   currency: string;
   status: 'ACTIVE' | 'ARCHIVED';
+  mobileEnabled: boolean;
+  kioskEnabled: boolean;
 }
 
 /**

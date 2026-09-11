@@ -5993,6 +5993,15 @@ model SaasPlan {
   currency String         @default("BRL")
   status   SaasPlanStatus @default(ACTIVE)
 
+  /// Superficies que fazem parte do plano -- padrao do catalogo, negociavel no
+  /// contrato. `true` por padrao porque plano existente JA vende as duas: uma
+  /// coluna que nascesse `false` desligaria o totem de quem contratou antes.
+  ///
+  /// O contrato COPIA estes valores e pode divergir deles (decisao do PI,
+  /// 11/09/2026) -- a negociacao acontece no contrato, nao no catalogo.
+  mobileEnabled Boolean @default(true) @map("mobile_enabled")
+  kioskEnabled  Boolean @default(true) @map("kiosk_enabled")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -6019,6 +6028,18 @@ model TenantContract {
   inactiveStudentPriceMinor Int?             @map("inactive_student_price_minor")
   fixedPriceMinor           Int?             @map("fixed_price_minor")
   currency                  String           @default("BRL")
+
+  /// Superficies contratadas. COPIADAS do plano no rascunho, e editaveis
+  /// enquanto `DRAFT` -- e o que o comercial negocia com o cliente.
+  ///
+  /// Quem RECUSA o acesso le estas colunas, nunca as do `SaasPlan`: mesma regra
+  /// dos precos (ver o comentario da classe). `kioskEnabled = false` derruba o
+  /// login do totem no `KioskAuthService`; `mobileEnabled` fica gravado sem
+  /// executor ate o app do aluno existir (MVP 4) -- vende-se antes de entregar,
+  /// e o campo vazio no contrato ja assinado seria pior que o executor
+  /// faltando.
+  mobileEnabled Boolean @default(true) @map("mobile_enabled")
+  kioskEnabled  Boolean @default(true) @map("kiosk_enabled")
 
   /// Indice de correcao anual. Padrao `IPCA` (ADR-052 §7). Texto e nao enum
   /// porque um indice novo e cadastro, nao migracao.
