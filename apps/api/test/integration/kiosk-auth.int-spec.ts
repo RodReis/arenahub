@@ -265,7 +265,7 @@ describe('F49 -- assinatura do totem', () => {
   });
 
   /*
-   * F68 -- superficie contratada.
+   * F69 -- superficie contratada.
    *
    * O contrato e montado DIRETO no banco, e nao pelo caso de uso: ativar pelo
    * `TenantContractUseCase` exigiria gerar PDF e escrever no bucket so para
@@ -278,7 +278,7 @@ describe('F49 -- assinatura do totem', () => {
   ): Promise<string> => {
     const plano = await db.saasPlan.create({
       data: {
-        name: `Plano F68 ${randomUUID().slice(0, 8)}`,
+        name: `Plano F69 ${randomUUID().slice(0, 8)}`,
         model: 'PER_STUDENT',
         activeStudentPriceMinor: 500,
         inactiveStudentPriceMinor: 250,

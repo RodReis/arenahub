@@ -162,7 +162,7 @@ export type MotivoDeRecusa =
   | 'EDGE_KEY_REVOKED'
   | 'EDGE_REPLAY_DETECTED'
   /**
-   * O contrato da academia nao inclui o totem -- F68.
+   * O contrato da academia nao inclui o totem -- F69.
    *
    * CODIGO PROPRIO, e nao `EDGE_KEY_REVOKED`: quem opera age diferente. Chave
    * revogada se resolve emitindo credencial nova; superficie fora do contrato

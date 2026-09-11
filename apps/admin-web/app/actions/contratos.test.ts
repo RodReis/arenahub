@@ -21,7 +21,7 @@ function corpoEnviado(n = 0): Record<string, unknown> {
 }
 
 /**
- * As superfícies vão em TODO formulário de plano — F68.
+ * As superfícies vão em TODO formulário de plano — F69.
  *
  * O `<select>` da tela sempre manda as duas, e a fixture reproduz isso: sem
  * elas aqui, o teste passaria a exercitar um envio que a tela nunca faz.
@@ -149,7 +149,7 @@ describe('salvarPlano', () => {
   });
 });
 
-describe('salvarPlano — superfícies (F68)', () => {
+describe('salvarPlano — superfícies (F69)', () => {
   /*
    * AFIRMA O CORPO, e não o retorno da action.
    *
@@ -251,7 +251,7 @@ describe('criarContrato', () => {
   });
 
   /*
-   * A NEGOCIAÇÃO ACONTECE AQUI — F68. O plano traz o padrão; este corpo é o
+   * A NEGOCIAÇÃO ACONTECE AQUI — F69. O plano traz o padrão; este corpo é o
    * que fica gravado no contrato e o que o totem lê para decidir se autentica.
    */
   it('manda a superficie negociada no contrato', async () => {

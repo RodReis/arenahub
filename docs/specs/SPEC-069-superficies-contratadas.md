@@ -1,8 +1,8 @@
-# SPEC-068 — Superfícies contratadas: mobile e totem como flag negociável
+# SPEC-069 — Superfícies contratadas: mobile e totem como flag negociável
 
 | campo | valor |
 |---|---|
-| **Fatia** | F68 |
+| **Fatia** | F69 |
 | **MVP** | 7 — Plataforma (ADR-052) |
 | **Slice do PRD** | não há. Escopo mora nesta spec |
 | **Superfície** | `api` (`platform`, `kiosk-auth`) · `admin-web` (`/platform/planos`, `/platform/[tenantId]/contratos`) · `packages/database` · `packages/api-contracts` |

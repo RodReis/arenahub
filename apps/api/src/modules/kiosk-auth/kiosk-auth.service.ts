@@ -126,7 +126,7 @@ export class KioskAuthService {
     }
 
     /*
-     * O TOTEM FAZ PARTE DO CONTRATO? -- F68.
+     * O TOTEM FAZ PARTE DO CONTRATO? -- F69.
      *
      * DEPOIS da assinatura e ANTES do nonce, e as duas bordas importam:
      *

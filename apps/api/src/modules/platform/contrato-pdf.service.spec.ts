@@ -73,7 +73,7 @@ describe('gerarPdfDoContrato', () => {
   });
 
   /*
-   * O DOCUMENTO DIZ O QUE NAO FOI CONTRATADO -- F68.
+   * O DOCUMENTO DIZ O QUE NAO FOI CONTRATADO -- F69.
    *
    * AFIRMA O PAR rotulo->valor, e nao cada palavra solta. `toContain('incluído')`
    * sozinho e inutil aqui: ele e substring de "não incluído", e passaria com um
