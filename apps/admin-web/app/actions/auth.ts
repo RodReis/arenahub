@@ -35,6 +35,28 @@ function lerDesafioDeSegundoFator(
   return { desafio, preAuth };
 }
 
+/*
+ * Rota inicial da sessão recém-aberta.
+ *
+ * NÃO exportado pelo mesmo motivo de `lerDesafioDeSegundoFator`: arquivo
+ * `'use server'` só exporta função async, e exportar isto o transformaria numa
+ * Server Action chamável do navegador.
+ *
+ * Consulta `/auth/me` porque a resposta do login não carrega o sinal: quem é
+ * dono do SaaS não tem tenant, e `/dashboard` é rota de TENANT — mandá-lo para
+ * lá devolve 401 numa sessão perfeitamente válida (issue #311).
+ *
+ * Falha de rede ou resposta estranha cai em `/dashboard`, o destino de sempre:
+ * um platform admin que caia lá vê o erro e digita `/platform`, enquanto
+ * mandar todo mundo para `/platform` na dúvida tiraria o painel de quem
+ * trabalha nele o dia inteiro.
+ */
+async function destinoDaSessao(): Promise<string> {
+  const resposta = await chamarApi<{ isPlatformAdmin?: boolean }>('/api/v1/auth/me');
+
+  return resposta.ok && resposta.dados?.isPlatformAdmin ? '/platform' : '/dashboard';
+}
+
 export interface EstadoDoFormulario {
   erro?: string;
   /** Valores digitados, devolvidos para nao perder o que o usuario escreveu. */
@@ -107,8 +129,10 @@ export async function entrar(
    * não "quais unidades existem?" -- e Unidades virou tela de
    * Administração, aberta uma vez por mês. Cair na configuração ao logar
    * fazia a recepção navegar antes de começar a trabalhar.
+   *
+   * O dono do SaaS é a exceção: não tem tenant, e Operação é rota de tenant.
    */
-  redirect('/dashboard');
+  redirect(await destinoDaSessao());
 }
 
 export async function sair(): Promise<void> {
@@ -249,7 +273,7 @@ async function concluirSegundoFator(
   await repassarCookies(resposta.cookiesDaApi);
   await limparPreAuth();
 
-  redirect('/dashboard');
+  redirect(await destinoDaSessao());
 }
 
 /**

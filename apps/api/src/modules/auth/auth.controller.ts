@@ -12,6 +12,7 @@ import {
   type DesafioDeMfa,
   type ParDeTokens,
 } from './auth.service.js';
+import { PlatformContextService } from '../../common/platform/platform-context.service.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { avaliarCarencia } from '../platform/domain/carencia.js';
@@ -63,6 +64,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly tokens: TokenService,
     private readonly contexto: TenantContextService,
+    private readonly contextoDePlataforma: PlatformContextService,
     private readonly db: PrismaService,
   ) {}
 
@@ -245,6 +247,26 @@ export class AuthController {
       return {
         ...(await this.auth.perfil(claims.sub)),
         permissions: contexto ? [...contexto.permissions].sort() : [],
+        /*
+         * SESSAO DE PLATAFORMA -- o painel precisa disto para escolher a area.
+         *
+         * Sem este sinal o front nao tinha como distinguir "dono do SaaS" de
+         * "usuario de tenant sem permissao nenhuma": os dois chegavam aqui com
+         * `permissions: []`, e o login mandava ambos para `/dashboard` -- rota
+         * de tenant, que responde 401 a quem nao tem tenant (issue #311).
+         *
+         * EXIGE A AUSENCIA DE TENANT, e nao so a presenca do contexto de
+         * plataforma: numa sessao ELEVADA o `AuthGuard` monta os dois de
+         * proposito (`auth.guard.ts:160`, para o `PlatformGuard` aceitar quem
+         * esta legitimamente elevado). Olhar so o contexto de plataforma
+         * mandaria para `/platform` justamente quem entrou para dar suporte
+         * dentro de um tenant.
+         *
+         * NAO E CONTROLE DE ACESSO: quem barra continua sendo o `PlatformGuard`
+         * no servidor. Isto so evita oferecer a alguem a area errada.
+         */
+        isPlatformAdmin:
+          this.contextoDePlataforma.opcional() !== undefined && contexto === undefined,
         /*
          * A FAIXA DE SUPORTE do painel depende disto.
          *
