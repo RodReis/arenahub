@@ -112,6 +112,119 @@
   line-height: var(--ah-type-body-lh);
 }
 
+/**
+ * O CONTROLE DE ARQUIVO fora da tela, mas dentro do teclado.
+ *
+ * `sr-only` e nao `display: none`: o segundo o tira da ordem de tabulacao, e
+ * o envio passaria a existir so para quem usa mouse. Assim o `<label>` abaixo
+ * e o alvo visivel, e quem navega por Tab ainda alcanca o campo real.
+ */
+.esconder-campo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * BOTAO EM CIMA, NOME EMBAIXO -- e nao lado a lado.
+ *
+ * Lado a lado, o nome do arquivo empurrava a caixa de 36px para 56px assim que
+ * ele nao cabia na linha ("logo-arena-positiva.svg" ja quebra numa coluna de
+ * 250px), e as duas pecas voltavam a ter alturas diferentes -- exatamente o
+ * que a moldura vazia acima existe para impedir.
+ */
+.escolha {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+/**
+ * O botao de escolher arquivo -- le a MESMA camada semantica do
+ * `Button[data-variant='outline']`, e nao copia hex nenhum.
+ *
+ * Ele tem moldura e o "Enviar arquivo" e ghost de proposito: escolher e o
+ * passo que ainda nao mudou nada, enviar e o que grava. Dois botoes de igual
+ * peso lado a lado nao dizem qual e a acao e qual e o preparo.
+ */
+.botao-de-escolha {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--ah-control-height);
+  padding: 0 14px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-control-radius);
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-label);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--ah-motion-control) var(--ah-motion-easing),
+    border-color var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.botao-de-escolha:hover {
+  border-color: var(--ah-border-strong);
+}
+
+/*
+ * O ANEL DE FOCO vem do campo escondido, porque e ELE que recebe o foco -- o
+ * `<label>` nao e focavel. Sem esta regra, tabular ate o envio de arquivo nao
+ * acende nada na tela e quem navega por teclado perde a posicao.
+ */
+.esconder-campo:focus-visible + .escolha .botao-de-escolha {
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+  border-color: var(--ah-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .botao-de-escolha {
+    transition: none;
+  }
+}
+
+/*
+ * O nome do arquivo escolhido. `break-all` porque nome de arquivo nao tem
+ * espaco onde quebrar -- "logotipo-arena-positiva-2026-final.svg" sem isso
+ * estoura a coluna de 250px da grade de pecas.
+ */
+/*
+ * DUAS LINHAS RESERVADAS: o nome escolhido substitui a frase de formato, e sem
+ * altura minima o "Enviar arquivo" abaixo pula de lugar no instante em que se
+ * escolhe o arquivo -- justo quando o olho esta ali.
+ *
+ * `break-all` porque nome de arquivo nao tem espaco onde quebrar:
+ * "logotipo-arena-positiva-2026-final.svg" sem isso estoura a coluna de 250px.
+ */
+.nome-do-arquivo {
+  min-width: 0;
+  min-height: calc(var(--ah-type-caption-lh) * 2);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+  word-break: break-all;
+}
+
+/* A confirmacao de envio, no mesmo tom do "Alteracoes salvas" do rodape. */
+.peca-enviada {
+  margin: 0;
+  color: var(--ah-success);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+}
+
 /*
  * A moldura VAZIA tem a mesma caixa da previa: sem ela as duas colunas ficam
  * com alturas diferentes e dancam quando a primeira peca sobe.

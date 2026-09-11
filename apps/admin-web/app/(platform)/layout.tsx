@@ -1,8 +1,9 @@
-import { AppShell, Button, NavLink } from '@arenahub/ui';
+import { AppShell, Button } from '@arenahub/ui';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { chamarApi } from '../../lib/api/server-client';
+import { Navegacao } from '../(protected)/navegacao';
 import { sair } from '../actions/auth';
 
 interface Perfil {
@@ -34,6 +35,12 @@ interface Perfil {
  * Os contratos NÃO têm item próprio: eles são de UM cliente, e se alcançam
  * pela lista ou pelo detalhe dele. Um item de menu levaria a uma lista de
  * contratos sem dono, que ninguém pediu.
+ *
+ * A MARCAÇÃO DO ITEM ATUAL vem da `Navegacao` do painel de tenant, e não de
+ * `current` escrito à mão: o layout não re-renderiza na navegação, então o
+ * valor fixo marcava "Clientes" para sempre -- inclusive em Planos e Índices.
+ * `Navegacao` lê o pathname e casa pelo prefixo mais específico, que é o que
+ * impede `/platform` de acender junto com `/platform/planos`.
  */
 export default async function LayoutDePlataforma({ children }: { children: ReactNode }) {
   const resposta = await chamarApi<Perfil>('/api/v1/auth/me');
@@ -45,11 +52,13 @@ export default async function LayoutDePlataforma({ children }: { children: React
       navLabel="Navegacao da plataforma"
       unitSelector={null}
       nav={
-        <>
-          <NavLink href="/platform" label="Clientes" current />
-          <NavLink href="/platform/planos" label="Planos SaaS" />
-          <NavLink href="/platform/indices" label="Histórico do índice" />
-        </>
+        <Navegacao
+          itens={[
+            { href: '/platform', label: 'Clientes' },
+            { href: '/platform/planos', label: 'Planos SaaS' },
+            { href: '/platform/indices', label: 'Histórico do índice' },
+          ]}
+        />
       }
       user={
         <>

@@ -36,11 +36,18 @@
  * volta pela direita: acao alinhada a esquerda numa coluna larga fica orfa no
  * meio do vazio.
  */
+/*
+ * 4px e nao 8px: com tres alvos na linha (rotulo + dois icones), os 8px
+ * originais custavam 16px de coluna e faziam a tabela transbordar o proprio
+ * container -- a ultima acao so aparecia rolando, com o aluno esperando. Os
+ * alvos continuam com 32px e 36px de area clicavel, que e o que o dedo e o
+ * mouse alcancam; o que encolheu foi o vao entre eles.
+ */
 .acoes {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 4px;
 }
 
 .semAcao {
@@ -56,13 +63,27 @@
  * canonica tem moldura; este nao tem, e a diferenca e o sinal honesto de que
  * um estado e rastreado e o outro e derivado.
  */
+/*
+ * A SUPERFICIE entrou em 11/09/2026 a pedido do PI ("tem espaco e cor nos
+ * status"): como texto colorido solto, o estado desaparecia entre colunas de
+ * numero na varredura vertical -- justamente a coluna que responde "por que
+ * esta pessoa nao passou".
+ *
+ * A FORMULA E A DO BADGE (DS-PAINEL §2.2): fundo = tom a 10% sobre a
+ * superficie. O que continua diferente e a BORDA, e de proposito -- badge de
+ * maquina canonica tem moldura, este nao tem, e essa e a distincao honesta
+ * entre estado RASTREADO e estado DERIVADO. Copiar a borda junto apagaria a
+ * unica pista de que as duas coisas nao sao a mesma.
+ */
 .estado {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--ah-radius-badge);
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -72,7 +93,23 @@
   flex-shrink: 0;
 }
 
+/*
+ * `currentColor` e nao o token repetido: o fundo deriva da cor que cada tom ja
+ * declarou abaixo, entao um tom novo ganha superficie sem tocar nesta regra --
+ * e os dois nunca divergem.
+ */
+.estado[data-tom] {
+  background: color-mix(in srgb, currentColor 10%, var(--ah-surface-raised));
+}
+
+/*
+ * NEUTRO NAO GANHA SUPERFICIE: "Inativo" e a ausencia de noticia, e pinta-lo
+ * faria disputar atencao com a linha que tem fatura vencida. Fundo so onde ha
+ * estado a comunicar -- mesma regra da celula de KPI (PRODUCT.md, emenda de
+ * 01/09).
+ */
 .estado[data-tom='neutro'] {
+  background: none;
   color: var(--ah-text-secondary);
 }
 

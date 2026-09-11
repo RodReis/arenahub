@@ -183,7 +183,7 @@ export function FormularioDeEdicao(props: Props) {
           defaultValue={valor('missionText')}
           maxLength={280}
           rows={2}
-          hint="Uma frase. Até 280 caracteres. Deixe em branco para não exibir."
+          hint="Uma frase. Deixe em branco para não exibir."
           data-testid="campo-missao-da-academia"
         />
 
@@ -194,7 +194,7 @@ export function FormularioDeEdicao(props: Props) {
           defaultValue={valor('highlightsText')}
           maxLength={500}
           rows={4}
-          hint="Uma linha por diferencial. Até 500 caracteres. Deixe em branco para não exibir."
+          hint="Uma linha por diferencial. Deixe em branco para não exibir."
           data-testid="campo-diferenciais-da-academia"
         />
         </div>

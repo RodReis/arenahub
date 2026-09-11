@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { ConfirmDialog, RowMenu, useToastDeErro } from '@arenahub/ui';
+import { AcoesDaLinha, Button, ConfirmDialog, Icon, RowMenu, useToastDeErro } from '@arenahub/ui';
 
 import { alternarStatusDoTenant, type EstadoDoStatus } from '../../actions/platform';
 
@@ -21,6 +21,14 @@ interface Props {
  * trazer as tres para a grid; "Editar" entrou junto porque abrir o cadastro e
  * a quarta coisa que se faz com um cliente, e deixa-la de fora obrigaria a
  * clicar no nome para uma acao e no menu para as outras tres.
+ *
+ * EM 11/09/2026 AS TRES NAVEGACOES SAIRAM DO MENU, a pedido do PI: atras de um
+ * alvo de tres pontos, cada uma custava dois cliques e o alvo nao diz o que
+ * faz. "Editar" ficou com rotulo por ser a mais frequente; "Contratos" e
+ * "Faturas" viraram icone porque a celula tem 133px e a tabela ja ocupa a
+ * largura inteira do container -- tres rotulos comeriam a coluna do nome.
+ *
+ * No menu sobrou SO a mudanca de situacao, que e a unica que altera o mundo.
  *
  * INATIVAR CONFIRMA COM MOTIVO, e a confirmacao e o `SensitiveAction` que o
  * produto ja usa em revogacao de biometria e estorno: desligar um cliente
@@ -66,41 +74,83 @@ export function AcoesDoCliente({ tenantId, displayName, status }: Props) {
 
   return (
     <>
-      <RowMenu
-        label={`Ações de ${displayName}`}
-        testId="acoes-do-cliente"
-        itens={[
-          {
-            id: 'editar',
-            label: 'Editar cadastro',
-            icon: 'pencil',
-            href: `/platform/${tenantId}`,
-          },
-          {
-            id: 'contratos',
-            label: 'Contratos',
-            icon: 'file-text',
-            href: `/platform/${tenantId}/contratos`,
-          },
-          {
-            id: 'faturas',
-            label: 'Faturas',
-            icon: 'receipt',
-            href: `/platform/${tenantId}/faturas`,
-          },
-          ...(suspenso
-            ? []
-            : [
-                {
-                  id: 'situacao',
-                  label: inativando ? 'Inativar cliente' : 'Reativar cliente',
-                  icon: 'power' as const,
-                  onSelect: () => setConfirmando(true),
-                  perigo: inativando,
-                },
-              ]),
-        ]}
-      />
+      <AcoesDaLinha>
+        {/*
+          "EDITAR" PROMOVIDO A BOTAO VISIVEL -- pedido do PI em 11/09/2026.
+
+          E a acao mais frequente da linha e a unica que serve a qualquer
+          situacao do cliente: com as quatro atras dos tres pontos, abrir um
+          cadastro custava dois cliques e um alvo que nao diz o que faz.
+
+          As OUTRAS TRES continuam no menu, e nao promovidas junto: quatro
+          botoes por linha dariam a coluna de acao mais largura que a do nome
+          do cliente, e a lista existe para comparar clientes, nao para operar
+          um de cada vez.
+        */}
+        {/*
+          `outline` e nao uma variante nova de linha: o `DataTable` ja
+          normaliza o botao da celula de acao (altura automatica com piso de
+          36px e teto de 24ch), e uma altura propria aqui perderia para aquela
+          regra -- mais especifica -- sem que nada acusasse.
+        */}
+        <Button variant="outline" href={`/platform/${tenantId}`} data-testid="editar-cliente">
+          Editar
+        </Button>
+
+        {/*
+          CONTRATOS E FATURAS COMO ICONE, e nao como botao de texto: medido na
+          tela, a celula de acao tem 133px e a tabela ja ocupa os 959px do
+          container inteiro -- tres rotulos lado a lado empurrariam a coluna
+          para cima do nome do cliente, que e o que a lista existe para
+          comparar.
+
+          `variant="icon"` e a forma que o design system ja define para acao de
+          LINHA (32px, contra os 36px do controle). O `aria-label` e exigido
+          pelo tipo do componente, entao quem usa leitor de tela ouve "Contratos
+          de Academia Auth", nao "link".
+        */}
+        <Button
+          variant="icon"
+          href={`/platform/${tenantId}/contratos`}
+          aria-label={`Contratos de ${displayName}`}
+          title="Contratos"
+          data-testid="contratos-do-cliente"
+        >
+          <Icon name="file-text" />
+        </Button>
+
+        <Button
+          variant="icon"
+          href={`/platform/${tenantId}/faturas`}
+          aria-label={`Faturas de ${displayName}`}
+          title="Faturas"
+          data-testid="faturas-do-cliente"
+        >
+          <Icon name="receipt" />
+        </Button>
+
+        {/*
+          A SITUACAO CONTINUA NO MENU, sozinha: ela e a unica acao destrutiva
+          da linha, e um alvo de 32px ao lado de dois iguais convidaria ao
+          clique errado. Suspenso nao oferece ato nenhum -- e ai o menu some
+          inteiro em vez de abrir vazio.
+        */}
+        {suspenso ? null : (
+          <RowMenu
+            label={`Mais ações de ${displayName}`}
+            testId="acoes-do-cliente"
+            itens={[
+              {
+                id: 'situacao',
+                label: inativando ? 'Inativar cliente' : 'Reativar cliente',
+                icon: 'power' as const,
+                onSelect: () => setConfirmando(true),
+                perigo: inativando,
+              },
+            ]}
+          />
+        )}
+      </AcoesDaLinha>
 
       <ConfirmDialog
         open={confirmando}
