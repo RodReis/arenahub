@@ -1,72 +1,85 @@
 'use client';
 
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
+import { useState } from 'react';
 
-import { Button, EstadoSimples, TextareaField, useToastDeErro } from '@arenahub/ui';
+import {
+  Button,
+  ConfirmDialog,
+  EstadoSimples,
+  SectionCard,
+  useToastDeErro,
+} from '@arenahub/ui';
 
 import estilos from '../../../formulario.module.css';
+import proprios from './cliente.module.css';
 
 import { alternarStatusDoTenant, type EstadoDoStatus } from '../../../actions/platform';
-
-const ESTADO_INICIAL: EstadoDoStatus = {};
 
 interface Props {
   readonly tenantId: string;
   readonly status: string;
 }
 
-function BotaoDeSituacao({ inativando }: { readonly inativando: boolean }) {
-  const { pending } = useFormStatus();
-
-  return (
-    /*
-      VERBO REAL, nunca "OK" (DS-PAINEL §6): quem lê o botão tem de saber o que
-      vai acontecer sem reler o resumo. `destructive` só ao desligar -- reativar
-      não destrói nada.
-    */
-    <Button
-      type="submit"
-      variant={inativando ? 'destructive' : 'solid'}
-      disabled={pending}
-      data-testid="confirmar-situacao"
-    >
-      {pending ? 'Aplicando…' : inativando ? 'Inativar academia' : 'Reativar academia'}
-    </Button>
-  );
-}
-
 /**
- * Situação da academia — ato com motivo auditado, separado da edição cadastral.
+ * Situação do cliente — ato com motivo auditado, separado da edição cadastral.
  *
- * BLOCO PRÓPRIO e não um campo do formulário de cima: corrigir um CNPJ e
- * desligar uma academia não podem compartilhar o mesmo botão "Salvar". Quem
+ * ABA PRÓPRIA e não um campo do formulário de cadastro: corrigir um CNPJ e
+ * desligar um cliente não podem compartilhar o mesmo botão "Salvar". Quem
  * desliga escreve por quê, e o motivo vai para a auditoria da plataforma.
+ *
+ * A CONFIRMAÇÃO VIRA DIÁLOGO na F68. O motivo era um `<textarea>` sempre
+ * visível ao lado de um botão vermelho: quem rolava a página encontrava os
+ * dois sem ter pedido, e o ato ficava a um clique de distância de quem só
+ * passava por ali. Agora o botão abre o `SensitiveAction` — o mesmo padrão da
+ * revogação de biometria e do estorno —, e o motivo continua obrigatório.
  *
  * `SUSPENDED` NÃO APARECE, e a ausência é o desenho: quem escreve suspensão é
  * a inadimplência (F65). Oferecê-la aqui deixaria o painel fabricar uma
  * suspensão que a cobrança não conhece — e que a cobrança não saberia levantar.
  */
 export function SituacaoDoTenant({ tenantId, status }: Props) {
-  const [estado, acao] = useActionState(alternarStatusDoTenant, ESTADO_INICIAL);
+  const [confirmando, setConfirmando] = useState(false);
+  const [estado, setEstado] = useState<EstadoDoStatus>({});
 
   useToastDeErro(estado.erro, 'error', 'erro-da-situacao');
 
   const inativando = status === 'ACTIVE';
   const suspensa = status === 'SUSPENDED';
 
+  const aplicar = (motivo: string): void => {
+    const dados = new FormData();
+
+    dados.set('tenantId', tenantId);
+    dados.set('status', inativando ? 'INACTIVE' : 'ACTIVE');
+    dados.set('reason', motivo);
+
+    setConfirmando(false);
+    void alternarStatusDoTenant({}, dados).then(setEstado);
+  };
+
   return (
-    <form className={estilos['formulario']} action={acao}>
-      <input type="hidden" name="tenantId" value={tenantId} />
-      <input type="hidden" name="status" value={inativando ? 'INACTIVE' : 'ACTIVE'} />
-
-      <fieldset className={estilos['grupo']}>
-        <legend>Situação</legend>
-
-        <p data-testid="situacao-atual">
-          {status === 'ACTIVE' ? <EstadoSimples label="Ativa" tom="positivo" /> : null}
-          {suspensa ? <EstadoSimples label="Suspensa" tom="atencao" /> : null}
-          {status === 'INACTIVE' ? <EstadoSimples label="Inativa" tom="neutro" /> : null}
+    <SectionCard
+      title="Situação do cliente"
+      icon="power"
+      /*
+        O TOM DE PERIGO só quando o ato disponível é destrutivo. Num cliente já
+        inativo a ação é reativar, que não destrói nada — pintar o card de
+        vermelho ali gastaria o sinal que o caso real precisa.
+      */
+      tom={inativando ? 'perigo' : 'neutro'}
+      summary={
+        inativando
+          ? 'Cliente inativo não libera catraca nem é cobrado. Os dados permanecem, e a reativação devolve tudo.'
+          : 'Reativar devolve o cliente à operação normal.'
+      }
+      testId="situacao-do-tenant"
+    >
+      <div className={proprios['situacao']}>
+        <p className={proprios['estado-atual']} data-testid="situacao-atual">
+          <span className={estilos['nota']}>Situação atual</span>
+          {status === 'ACTIVE' ? <EstadoSimples label="Ativo" tom="positivo" /> : null}
+          {suspensa ? <EstadoSimples label="Suspenso" tom="atencao" /> : null}
+          {status === 'INACTIVE' ? <EstadoSimples label="Inativo" tom="neutro" /> : null}
         </p>
 
         {suspensa ? (
@@ -76,40 +89,47 @@ export function SituacaoDoTenant({ tenantId, status }: Props) {
             recusaria.
           */
           <p className={estilos['nota']} data-testid="situacao-da-cobranca">
-            Esta academia está suspensa por inadimplência. A situação volta ao normal pela cobrança,
+            Este cliente está suspenso por inadimplência. A situação volta ao normal pela cobrança,
             não por aqui.
           </p>
         ) : (
           <>
-            {inativando ? (
-              <TextareaField
-                id="motivo-da-situacao"
-                name="reason"
-                label="Motivo da inativação"
-                required
-                hint="Ao menos 10 caracteres. Vai para a auditoria da plataforma."
-                data-testid="campo-motivo-da-situacao"
-              />
-            ) : null}
-
-            <p className={estilos['nota']}>
-              {inativando
-                ? 'Academia inativa não libera catraca nem cobra assinatura.'
-                : 'Reativar devolve a academia à operação normal.'}
-            </p>
-
             {estado.salvo ? (
-              <p role="status" data-testid="situacao-alterada">
+              <p className={proprios['salvo']} role="status" data-testid="situacao-alterada">
                 Situação alterada.
               </p>
             ) : null}
 
             <div className={estilos['acoes']}>
-              <BotaoDeSituacao inativando={inativando} />
+              {/*
+                VERBO REAL, nunca "OK" (DS-PAINEL §6): quem lê o botão tem de
+                saber o que vai acontecer sem reler o resumo. `destructive` só
+                ao desligar -- reativar não destrói nada.
+              */}
+              <Button
+                variant={inativando ? 'destructive' : 'solid'}
+                onClick={() => setConfirmando(true)}
+                data-testid="confirmar-situacao"
+              >
+                {inativando ? 'Inativar cliente' : 'Reativar cliente'}
+              </Button>
             </div>
           </>
         )}
-      </fieldset>
-    </form>
+      </div>
+
+      <ConfirmDialog
+        open={confirmando}
+        verb={inativando ? 'Inativar cliente' : 'Reativar cliente'}
+        summary={
+          inativando
+            ? 'A catraca deixa de liberar e a cobrança para. Os dados permanecem, e a reativação devolve tudo.'
+            : 'O cliente volta à operação normal: catraca liberada e cobrança retomada.'
+        }
+        onConfirm={aplicar}
+        onCancel={() => setConfirmando(false)}
+        testId="dialogo-de-situacao"
+      />
+    </SectionCard>
   );
 }

@@ -17,6 +17,12 @@
  * `ATUALIZAR_OPENAPI=1 pnpm --filter @arenahub/api test:integration` e apague
  * a linha correspondente daqui.
  */
+/*
+ * PODADA NA F68: as seis operacoes que respondem SO `204` sairam da lista.
+ * Nao foi divida paga -- elas nunca deveram nada: `204` nao tem corpo, e a
+ * guarda passou a reconhecer isso em vez de cobrar o schema de algo que a
+ * especificacao HTTP proibe existir.
+ */
 export const OPERACOES_SEM_SCHEMA_DE_RESPOSTA: readonly string[] = [
   'DELETE /api/v1/students/{id}/health-context/{factor}',
   'DELETE /api/v1/students/{studentId}/biometric-identities/{identityId}',
@@ -81,13 +87,10 @@ export const OPERACOES_SEM_SCHEMA_DE_RESPOSTA: readonly string[] = [
   'POST /api/v1/assessments/{id}/corrections',
   'POST /api/v1/assessments/{id}/publish',
   'POST /api/v1/auth/login',
-  'POST /api/v1/auth/logout',
-  'POST /api/v1/auth/mfa/confirm',
   'POST /api/v1/auth/mfa/setup',
   'POST /api/v1/auth/refresh',
   'POST /api/v1/billing/delinquency/apply',
   'POST /api/v1/billing/financial-overrides',
-  'POST /api/v1/billing/financial-overrides/{id}/revoke',
   'POST /api/v1/consent-documents/biometric',
   'POST /api/v1/devices',
   'POST /api/v1/edge/access-decisions',

@@ -1,0 +1,115 @@
+/**
+ * Menu de acoes de LINHA -- le so a camada semantica (regra 2 do DS §11).
+ *
+ * Popover NATIVO, e nao um `<div>` posicionado: a `.rolagem` do DataTable e
+ * `overflow-x: auto`, e todo menu absoluto dentro dela seria cortado na
+ * primeira linha proxima da borda. A camada superior do navegador nao tem
+ * esse problema, e vem com fechamento por Esc e por clique fora de graca.
+ */
+.menu {
+  /*
+    `position: fixed` mais `inset: auto` desarma a centralizacao que o
+    navegador da ao popover por padrao -- sem isso ele abriria no meio da tela,
+    longe da linha que o abriu. As coordenadas vem do retangulo do gatilho,
+    medidas na abertura: `anchor-name` resolveria isso em CSS puro, mas ainda
+    nao tem suporte no Firefox nem no Safari, e o menu cairia no centro da tela
+    justamente nos navegadores onde ninguem testaria.
+  */
+  position: fixed;
+  inset: auto;
+  z-index: 60;
+  min-width: 208px;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+  /*
+    SOMBRA E LEGITIMA AQUI: o produto reserva sombra a camada que FLUTUA
+    (dropdown, popover, modal) -- card continua com borda. Offset e blur de
+    verdade, nunca halo de raio zero.
+  */
+  box-shadow: var(--ah-elev-2);
+}
+
+.menu::backdrop {
+  background: transparent;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--ah-radius-control);
+  background: transparent;
+  color: var(--ah-text-default);
+  font-family: inherit;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.item:hover {
+  background: var(--ah-surface-sunken);
+}
+
+.item > svg {
+  flex: none;
+  color: var(--ah-text-icon);
+}
+
+/**
+ * O item DESTRUTIVO -- inativar o cliente.
+ *
+ * Fica no fim da lista, separado por regua, e so ele veste o tom de perigo. A
+ * cor entra no GLIFO e no TEXTO, nunca num fundo cheio: item vermelho
+ * preenchido no meio de um menu vira o elemento mais pesado da tela, e
+ * desligar cliente nao e a acao que se faz mais vezes.
+ */
+.item[data-perigo] {
+  color: var(--ah-state-danger);
+}
+
+.item[data-perigo] > svg {
+  color: var(--ah-state-danger);
+}
+
+.item[data-perigo]:hover {
+  background: color-mix(in srgb, var(--ah-state-danger) 7%, var(--ah-surface-raised));
+}
+
+.regua {
+  height: 1px;
+  border: none;
+  margin: 5px 6px;
+  background: var(--ah-border-subtle);
+}
+
+/*
+ * Entrada de 120ms. Menu que aparece em corte seco parece falha de render;
+ * mais que isso e espera, e o balcao nao tem espera a dar.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .menu:popover-open {
+    animation: surgir 120ms var(--ah-motion-easing);
+  }
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

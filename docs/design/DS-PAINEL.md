@@ -369,6 +369,25 @@ Validação: data inválida ou fora do intervalo → borda `err` + mensagem 11 p
 
 Faixa de 42 px com `border-bottom: 1px solid border/subtle` e `overflow-x: auto`. Aba: padding lateral 14 px, 13 px, `border-bottom: 2px`. Ativa: borda `brand/600`, texto `text/strong`, peso 600. Inativa: borda transparente, texto `text/muted`, peso 500. Aba com pendência recebe ponto de 6 px em `warn` após o rótulo.
 
+**Implementado em 11/09/2026 (F68) como `Tabs`, com três emendas ao parágrafo acima:**
+
+- **O realce da ativa é um pseudo-elemento de 2 px**, não `border-bottom` na aba: a borda empurraria o
+  texto 2 px a cada troca, e o pseudo-elemento recuado 10 px de cada lado cobre a régua da faixa,
+  formando um traço só em vez de dois paralelos. A cor é `--ah-action-solid` — accent é legítimo aqui
+  porque aba selecionada é **localização**, o mesmo papel do item ativo da navegação, e não estado de
+  domínio (regra 3 do §11).
+- **O ponto de pendência virou contador**, porque o número é o que manda alguém entrar na aba: quantos arquivos de marca já
+  subiram informa, um ponto de cor não. Badge de 18 px, `tabular-nums`, em `surface/sunken`
+  na aba inativa e `action/subtle-bg` na ativa.
+- **Todos os painéis ficam montados**, e só o inativo recebe `hidden`. Desmontar é o desenho óbvio e faz
+  o formulário esvaziar quando alguém troca de aba e volta — o que o §10 item 3 proíbe. O `hidden`
+  também tira o painel da ordem de tabulação e da árvore de acessibilidade, o que `display: none` por
+  CSS não garante.
+
+Teclado completo (WAI-ARIA Tabs): setas navegam e levam o foco junto, Home e End vão aos extremos, e
+só a aba ativa fica na ordem de tabulação — com as quatro tabuláveis, alcançar o conteúdo custaria
+quatro Tabs.
+
 ### 4.15 Modal de confirmação
 
 Scrim `rgba(10,11,13,.5)`, `z-index: 60`. Caixa 460 px, `surface`, raio 10 px, sombra de modal, padding 20 px, gap 14 px, `role="dialog" aria-modal="true"`.
@@ -376,6 +395,17 @@ Scrim `rgba(10,11,13,.5)`, `z-index: 60`. Caixa 460 px, `surface`, raio 10 px, s
 Ordem: título 16 px/600 → bloco de resumo em `canvas` (raio 6 px, padding `12px 14px`, 13/19 px, com aluno e identificador em mono) → campo de motivo quando a ação é sensível → linha de ações com secundário "Cancelar" e primário/destrutivo à direita.
 
 O título diz o que vai acontecer, não pergunta genérica: "Desbloquear catraca para Rodrigo Reis". Motivo é obrigatório em ação sensível e o botão fica desabilitado até haver texto.
+
+**Implementado em 11/09/2026 (F68) como `ConfirmDialog`**, que é a moldura e delega o conteúdo ao
+`SensitiveAction` que já existia. A separação importa: dentro de um formulário o bloco em fluxo está
+certo, e embrulhar aquele caso num modal interromperia quem já estava decidido. O modal é para o ato
+disparado de uma **linha de tabela ou de um menu**, onde o bloco em fluxo esticaria a linha.
+
+`<dialog>` nativo com `showModal()`, e não o atributo `open`: só o método cria a camada superior,
+prende o foco, torna o resto da página `inert` e liga o Esc. Um `<dialog open>` renderiza igual e não
+faz nenhuma das quatro coisas — a diferença só aparece para quem navega por teclado. O conteúdo monta
+com o diálogo: mantê-lo montado faria a próxima abertura vir com o motivo digitado da anterior, que
+num menu de linha é o motivo de **outro** cliente.
 
 ### 4.16 Toast
 
@@ -416,6 +446,77 @@ Circular, 24 px (topbar) ou 36 px (grade de alunos). Iniciais 10–13 px/700 em 
 ### 4.20 Miniatura de frequência
 
 Sparkline de barras: 8–12 barras de 3 px, raio 1 px, altura proporcional, `brand/600` nas semanas com treino e `border/default` nas vazias, gap 2 px. Sempre acompanhada do número — a miniatura é reforço, não dado.
+
+### 4.21 Card de seção — `SectionCard`
+
+**Acrescentado em 11/09/2026 (F68).** Enquadra um assunto dentro de uma tela que tem vários. Nasceu
+da superfície da plataforma, onde quatro formulários de gravidade diferente — cadastro, marca,
+situação e suporte — empilhavam direto sobre a página, sem nada dizendo onde um terminava.
+
+Borda 1 px `border/default`, raio de card, **sem sombra** — sombra continua reservada à camada que
+flutua (§2.6). Cabeçalho em `surface/sunken` com régua inferior `border/subtle`, padding `13px
+16px`: é a mesma relação do `thead` da tabela com as linhas, e mantê-la faz formulário e tabela
+lerem como um sistema só. Glifo opcional de 30 px em caixa de raio de controle. Título 13 px/600
+`text/strong`, resumo 12 px `text/muted` com medida máxima de 68ch. Ações do cabeçalho à direita.
+
+**Variante de perigo** (`tom="perigo"`): cabeçalho tingido a 6 % do tom `danger`, régua e caixa do
+glifo a 22 %/30 %, glifo na cor cheia. Só para o bloco que **executa** o ato destrutivo — não para
+toda seção importante. Um card já inativo volta ao neutro: a ação disponível ali é reativar, que não
+destrói nada, e gastar o vermelho nele apaga o sinal onde ele importa.
+
+### 4.22 Faixa de resumo — `SummaryStrip`
+
+**Acrescentado em 11/09/2026 (F68).** Números que se leem de longe, acima de uma tabela. Grade
+`auto-fit` com piso de 190 px — quatro células a 1280 px, duas a 768, uma a 360, sem media query.
+Célula com borda de card, rótulo em caixa alta com tracking (o mesmo do `thead`), valor em
+`type/heading` com `tabular-nums`, apoio 12 px `text/muted`. Marcação `<dl>` com um par por célula,
+e não grade de `<div>` com número grande: o leitor de tela anuncia rótulo e valor juntos.
+
+**Herda a §2.10 e estende a licença nominalmente:** quando a célula descreve um **estado**, ela tinge
+o fundo a 7 % e ganha aresta superior de 3 px na cor cheia — as mesmas medidas do KPI do dashboard,
+pelo mesmo motivo. **Sem estado, sem tinta:** "clientes" e "alunos na base" são fatos, não notícias,
+e pintá-los gastaria a cor que a inadimplência precisa. Cada célula tingida carrega glifo **e**
+rótulo textual — cor nunca é canal único.
+
+Fora do dashboard, **só a lista de clientes** usa a faixa: é a tela de resumo do dono do SaaS, a
+única da área que alguém olha de longe. Planos, índices e contratos são superfícies de trabalho e
+seguem a §4.6.
+
+### 4.23 Menu de ações de linha — `RowMenu`
+
+**Acrescentado em 11/09/2026 (F68).** Quando uma linha de tabela tem três ou mais atos, eles vão para
+um menu em vez de ocupar a coluna. A 1280 px — o monitor do balcão — quatro botões lado a lado
+reservam mais de 400 px e empurram as colunas de número para fora da tela.
+
+**Popover nativo, não `<div>` posicionado**, e a razão é técnica: a área de rolagem do `DataTable` é
+`overflow-x: auto`, e todo menu absoluto dentro dela é cortado na linha próxima da borda. A camada
+superior do navegador escapa do recorte e traz Esc, clique-fora e fechamento mútuo de graça. A
+posição vem do retângulo do gatilho, medida na abertura: `anchor-name` resolveria isso em CSS puro
+mas ainda não tem suporte no Firefox nem no Safari, e o menu cairia no centro da tela justamente
+onde ninguém testaria. Vira para cima quando não há espaço abaixo.
+
+Largura mínima 208 px, raio de card, `--ah-elev-2`. Item com padding `8px 10px`, glifo 16 px
+`text/icon`, hover em `surface/sunken`. **Item destrutivo fica por último, separado por `<hr>`, e
+veste o tom `danger` no glifo e no texto — nunca em fundo cheio.** Item com `href` renderiza `<a>` de
+verdade; abrir em nova aba e copiar o endereço não se recuperam com JavaScript.
+
+**Ação de leitura frequente fica fora do menu**, como botão visível: esconder um download atrás de
+dois cliques cobra o preço do menu de quem não corre risco nenhum. **Linha sem ato nenhum não ganha
+gatilho** — menu que abre lista inerte promete ação onde não há.
+
+### 4.24 Campo com máscara — `MaskedField`
+
+**Acrescentado em 11/09/2026 (F68).** O `Field` da §4.9 com formatação a cada tecla. A máscara roda
+na **digitação**, nunca no `blur`: campo que só se formata ao sair deixa quem digita sem saber se já
+pôs os catorze dígitos, e o erro aparece um campo tarde demais. O valor mascarado é o que vai no
+`FormData` — a Server Action limpa a pontuação, que é o que permite ao servidor aceitar
+`12.345.678/0001-95` e `12345678000195` do mesmo jeito.
+
+Máscaras do painel (`lib/mascaras`): CPF, CNPJ, CEP, telefone, dinheiro e percentual. **Dinheiro
+preenche pelos centavos, da direita para a esquerda** — é como a calculadora do balcão se comporta, e
+evita o vaivém do cursor da máscara que caminha para a direita. **Percentual preserva o sinal
+negativo**: mês de deflação existe, e uma máscara que come o `-` transforma queda em alta sem ninguém
+ver.
 
 ---
 

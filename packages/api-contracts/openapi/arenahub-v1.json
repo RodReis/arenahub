@@ -8094,6 +8094,29 @@
         ]
       }
     },
+    "/api/v1/platform/contracts/{id}": {
+      "delete": {
+        "operationId": "ContratosController_descartarContrato",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Rascunho descartado."
+          }
+        },
+        "tags": [
+          "Contratos"
+        ]
+      }
+    },
     "/api/v1/platform/contracts/{id}/terminate": {
       "post": {
         "operationId": "ContratosController_encerrarContrato",

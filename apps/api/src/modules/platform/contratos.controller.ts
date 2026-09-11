@@ -1,5 +1,18 @@
-import { Body, Controller, Get, Header, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
+import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 
 import { PlatformContextService } from '../../common/platform/platform-context.service.js';
@@ -7,6 +20,7 @@ import { PlatformRoute } from '../../common/security/platform-route.decorator.js
 import { esquemaDePlanoSaas } from './dto/saas-plan.dto.js';
 import {
   esquemaDeCriacaoDeContrato,
+  esquemaDeDescarteDeContrato,
   esquemaDeEncerramentoDeContrato,
   esquemaDeValorDeIndice,
 } from './dto/tenant-contract.dto.js';
@@ -249,6 +263,33 @@ export class ContratosController {
     );
 
     return paraResposta(contrato);
+  }
+
+  /**
+   * Descarta um contrato em rascunho -- F68.
+   *
+   * `DELETE` e nao `POST .../discard`: rascunho descartado deixa de existir, e
+   * o verbo que diz isso e o do HTTP. As duas outras transicoes do contrato
+   * (`activate`, `terminate`) sao `POST` porque MUDAM ESTADO de uma linha que
+   * permanece -- aqui a linha some.
+   *
+   * 204 e nao 200: nao ha corpo a devolver: o recurso acabou de deixar de
+   * existir, e devolver o que foi apagado convidaria o painel a renderiza-lo.
+   */
+  @Delete('contracts/:id')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: 'Rascunho descartado.' })
+  async descartarContrato(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<void> {
+    await this.contratos.descartar(
+      this.contexto.require(),
+      id,
+      esquemaDeDescarteDeContrato.parse(corpo).reason,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
   }
 
   @Post('contracts/:id/terminate')

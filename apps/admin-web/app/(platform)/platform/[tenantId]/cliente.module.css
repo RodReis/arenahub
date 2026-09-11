@@ -1,0 +1,168 @@
+/**
+ * Detalhe do cliente -- le so a camada semantica (regra 2 do DS §11).
+ */
+
+/*
+ * A LINHA DE IDENTIDADE sob o titulo: identificador, unidades e situacao.
+ *
+ * Vale para as QUATRO abas, e por isso mora acima delas. Dentro de uma aba,
+ * quem entrasse na de marca perderia de vista de qual cliente e o logo que
+ * esta subindo -- e repetir os tres dados em cada aba seria pior que move-los.
+ */
+.identidade {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -12px 0 18px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+/*
+ * O IDENTIFICADOR em mono, como na coluna `code` da tabela: ele se le
+ * caractere a caractere, e o `0` precisa distinguir-se do `O` -- e o mesmo
+ * slug que aparece na URL publica do login do cliente.
+ */
+.slug {
+  padding: 1px 7px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-badge);
+  background: var(--ah-surface-sunken);
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+  line-height: var(--ah-type-mono-lh);
+  letter-spacing: 0.01em;
+  color: var(--ah-text-default);
+}
+
+/* Separador decorativo: `aria-hidden` no markup, fraco na tela. */
+.ponto {
+  color: var(--ah-text-placeholder);
+}
+
+/*
+ * Os cards da aba de cadastro. Mais largo que os 64ch do formulario comum:
+ * cada card ja limita a propria medida por dentro.
+ */
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 78ch;
+}
+
+/**
+ * Acoes GRUDADAS NO PE -- mesma razao do cadastro: com tres cards a aba rola,
+ * e o botao no fim do documento obriga a voltar depois de conferir um campo.
+ */
+.rodape {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  background: var(--ah-surface-canvas);
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+/*
+ * A confirmacao mora NA BARRA, ao lado do botao que a produziu: como
+ * paragrafo solto acima dela, ela aparecia fora do campo de visao de quem
+ * acabara de clicar.
+ */
+.salvo {
+  margin: 0;
+  color: var(--ah-success);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+}
+
+/*
+ * As duas pecas de marca LADO A LADO quando cabe, empilhadas quando nao.
+ * Empilhadas sempre, elas produziam um bloco alto para duas caixas de 64px --
+ * e a comparacao entre o logo e o icone (que costumam derivar um do outro)
+ * exige ve-los juntos.
+ */
+.pecas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+}
+
+.peca {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-control);
+  background: var(--ah-surface-canvas);
+}
+
+.peca-titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+}
+
+/*
+ * A moldura VAZIA tem a mesma caixa da previa: sem ela as duas colunas ficam
+ * com alturas diferentes e dancam quando a primeira peca sobe.
+ */
+.sem-previa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  height: 64px;
+  margin: 0;
+  padding: 4px;
+  border: 1px dashed var(--ah-border-default);
+  border-radius: var(--ah-radius-control);
+  background: var(--ah-surface-sunken);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  text-align: center;
+}
+
+/*
+ * AS QUATRO ABAS COMPARTILHAM A MEDIDA, e ela e a mesma do card de cadastro:
+ * sem isso, "Situacao" e "Suporte" -- que tem um card so -- esticavam a
+ * largura inteira da tela, e a troca de aba mudava a geometria da pagina.
+ * Formulario com 1200px de largura tambem poe o rotulo a meia tela do campo.
+ */
+.painel {
+  max-width: 78ch;
+}
+
+.situacao {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+/*
+ * A situacao ATUAL antes do ato: quem abre a aba precisa ler em que estado o
+ * cliente esta antes de ver o botao que o muda.
+ */
+.estado-atual {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+}
+
+.elevacao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 64ch;
+}

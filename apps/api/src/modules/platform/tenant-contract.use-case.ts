@@ -287,6 +287,62 @@ export class TenantContractUseCase {
     return this.porId(contrato.id);
   }
 
+  /**
+   * Descarta um contrato em RASCUNHO -- F68.
+   *
+   * APAGA DE VERDADE, e so aqui: rascunho nao e historico. Ele nunca teve PDF,
+   * nunca produziu fatura e nunca valeu para ninguem -- guardar um
+   * `DISCARDED` na tabela empilharia linha morta na lista do cliente, que e a
+   * mesma lista onde se procura o contrato que vale.
+   *
+   * `ACTIVE` e `TERMINATED` NAO PASSAM POR AQUI, e a recusa e o ponto: o
+   * contrato fechado e documento assinado, com PDF gerado e fatura emitida
+   * contra ele. O caminho de saida dele e `encerrar`, que preserva a linha.
+   *
+   * `deleteMany` com `status: 'DRAFT'` no `where`, e nao `delete` por id --
+   * pelo mesmo motivo que `ativar` usa `updateMany`: entre a leitura e a
+   * escrita cabe um fechamento simultaneo, e apagar por id apagaria um
+   * contrato que acabou de virar vigente. Com o filtro na propria escrita,
+   * zero linhas viram 409.
+   */
+  async descartar(
+    contexto: PlatformContext,
+    id: string,
+    motivo: string,
+    correlationId: string,
+  ): Promise<void> {
+    const contrato = await this.porId(id);
+
+    if (contrato.status !== 'DRAFT') throw new ContratoImutavelError();
+
+    const apagados = await this.db.tenantContract.deleteMany({
+      where: { id: contrato.id, status: 'DRAFT' },
+    });
+
+    if (apagados.count === 0) throw new ContratoImutavelError();
+
+    /*
+     * A AUDITORIA FICA depois de a linha sumir: e o unico registro de que o
+     * rascunho existiu. Sem ela, um contrato aberto por engano e descartado
+     * nao deixaria rastro nenhum de quem o abriu -- nem do motivo.
+     *
+     * O MOTIVO VAI NO `metadata` porque e ele que responde a pergunta que
+     * alguem faz depois ("por que o contrato do cliente X sumiu?"). A tela
+     * pede o motivo; grava-lo e o que impede a pergunta de nao ter resposta.
+     */
+    await this.auditoria.registrar(
+      contexto,
+      {
+        action: 'tenant_contract.discarded',
+        target: 'tenant_contract',
+        targetId: contrato.id,
+        tenantId: contrato.tenantId,
+        metadata: { reason: motivo },
+      },
+      correlationId,
+    );
+  }
+
   /** Encerra o contrato vigente. O historico fica: `TERMINATED` nao apaga. */
   async encerrar(
     contexto: PlatformContext,

@@ -34,7 +34,22 @@ function operacoesSemSchemaDeResposta(paths: Record<string, unknown>): string[] 
         Object.values(resposta?.content ?? {}).some((conteudo) => conteudo?.schema !== undefined),
       );
 
-      if (!temSchema) achadas.push(`${metodo.toUpperCase()} ${caminho}`);
+      /*
+       * 204 NAO TEM CORPO, e exigir schema dele seria exigir a descricao de
+       * algo que a especificacao HTTP proibe existir. A operacao que so
+       * responde `204` esta COMPLETAMENTE descrita sem `content` -- e o que
+       * esta guarda persegue e a operacao que devolve corpo e nao o descreve.
+       *
+       * A checagem e ESTREITA de proposito: `204` como UNICA resposta de
+       * sucesso. Uma rota que responda 200 e 204 continua devendo o schema do
+       * 200, que e o caso em que a forma pode mudar sem aviso.
+       */
+      const sucessos = Object.keys(operacao.responses ?? {}).filter((codigo) =>
+        codigo.startsWith('2'),
+      );
+      const semCorpoPorContrato = sucessos.length === 1 && sucessos[0] === '204';
+
+      if (!temSchema && !semCorpoPorContrato) achadas.push(`${metodo.toUpperCase()} ${caminho}`);
     }
   }
 
@@ -230,6 +245,10 @@ describe('contrato OpenAPI', () => {
         '/api/v1/platform/contracts',
         '/api/v1/platform/tenants/{tenantId}/contracts',
         '/api/v1/platform/contracts/{id}/activate',
+        // F68 -- `DELETE` descarta o RASCUNHO, que nunca teve PDF nem gerou
+        // fatura. Contrato fechado nao passa por aqui: o caminho dele e
+        // `terminate`, que preserva a linha.
+        '/api/v1/platform/contracts/{id}',
         '/api/v1/platform/contracts/{id}/terminate',
         '/api/v1/platform/contracts/{id}/corrected-value',
         '/api/v1/platform/contracts/{id}/document',

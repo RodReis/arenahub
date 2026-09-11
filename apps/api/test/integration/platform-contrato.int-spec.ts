@@ -326,6 +326,102 @@ describe('plano SaaS e contrato do tenant', () => {
       expect(ativado.status).toBe('ACTIVE');
       expect((await contratos.porId(primeiro)).status).toBe('TERMINATED');
     });
+
+    it('descartar apaga o rascunho e libera a vaga', async () => {
+      const tenantId = await criarTenantDeTeste();
+      const rascunho = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      await contratos.descartar(contexto, rascunho, 'aberto por engano', `corr-${randomUUID()}`);
+
+      /*
+       * APAGA DE VERDADE: rascunho nao e historico. Se virasse `DISCARDED`,
+       * a lista do cliente empilharia linha morta junto do contrato que vale.
+       */
+      expect(await db.tenantContract.findUnique({ where: { id: rascunho } })).toBeNull();
+
+      const outro = await contratoFixo(tenantId, await criarPlanoFixo(120_000));
+
+      expect((await contratos.ativar(contexto, outro, `corr-${randomUUID()}`)).status).toBe(
+        'ACTIVE',
+      );
+    });
+
+    it('o motivo do descarte sobrevive ao rascunho, na auditoria', async () => {
+      /*
+       * A LINHA DE AUDITORIA e o unico lugar onde sobra registro de que o
+       * rascunho existiu -- a linha do contrato foi apagada. Sem o motivo
+       * gravado, ela responde "quem apagou" e nao responde "por que", que e a
+       * pergunta que alguem faz depois.
+       */
+      const tenantId = await criarTenantDeTeste();
+      const rascunho = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      await contratos.descartar(contexto, rascunho, 'valor digitado errado', `corr-${randomUUID()}`);
+
+      const registro = await db.platformAuditLog.findFirst({
+        where: { action: 'tenant_contract.discarded', targetId: rascunho },
+      });
+
+      expect(registro).not.toBeNull();
+      expect(registro?.metadata).toMatchObject({ reason: 'valor digitado errado' });
+    });
+
+    it('descartar RECUSA contrato vigente -- fechado nao se apaga', async () => {
+      /*
+       * O aceite da fatia: contrato fechado e documento assinado, com PDF
+       * gerado e fatura emitida contra ele. Apagar a linha deixaria a fatura
+       * apontando para nada. O caminho de saida dele e `encerrar`.
+       */
+      const tenantId = await criarTenantDeTeste();
+      const contratoId = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      await contratos.ativar(contexto, contratoId, `corr-${randomUUID()}`);
+
+      await expect(
+        contratos.descartar(contexto, contratoId, 'tentativa indevida', `corr-${randomUUID()}`),
+      ).rejects.toMatchObject({ code: 'TENANT_CONTRACT_IMMUTABLE' });
+
+      expect((await contratos.porId(contratoId)).status).toBe('ACTIVE');
+    });
+
+    it('descartar RECUSA contrato encerrado', async () => {
+      const tenantId = await criarTenantDeTeste();
+      const contratoId = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      await contratos.ativar(contexto, contratoId, `corr-${randomUUID()}`);
+      await contratos.encerrar(
+        contexto,
+        contratoId,
+        new Date('2026-03-01T00:00:00.000Z'),
+        `corr-${randomUUID()}`,
+      );
+
+      await expect(
+        contratos.descartar(contexto, contratoId, 'tentativa indevida', `corr-${randomUUID()}`),
+      ).rejects.toMatchObject({ code: 'TENANT_CONTRACT_IMMUTABLE' });
+
+      expect(await db.tenantContract.findUnique({ where: { id: contratoId } })).not.toBeNull();
+    });
+
+    it('dois descartes simultaneos: um apaga, o outro recusa', async () => {
+      /*
+       * Entre a leitura do estado e o `DELETE` cabe outro descarte inteiro.
+       * `deleteMany` com `status: 'DRAFT'` no proprio `where` e o que faz o
+       * segundo apagar zero linhas e virar recusa, em vez de suceder calado
+       * sobre uma linha que ja nao existe.
+       */
+      const tenantId = await criarTenantDeTeste();
+      const rascunho = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      const resultados = await Promise.allSettled([
+        contratos.descartar(contexto, rascunho, 'aberto por engano', `corr-${randomUUID()}`),
+        contratos.descartar(contexto, rascunho, 'aberto por engano', `corr-${randomUUID()}`),
+      ]);
+
+      expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(resultados.filter((r) => r.status === 'rejected')).toHaveLength(1);
+      expect(await db.tenantContract.findUnique({ where: { id: rascunho } })).toBeNull();
+    });
   });
 
   describe('correcao pelo indice', () => {

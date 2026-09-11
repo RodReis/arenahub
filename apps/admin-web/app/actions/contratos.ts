@@ -317,6 +317,41 @@ export async function encerrarContrato(
   return { salvo: true };
 }
 
+/**
+ * Descarta um contrato em rascunho — F68.
+ *
+ * O RASCUNHO SOME, e é por isso que a tela confirma antes: ele nunca teve PDF
+ * nem gerou fatura, mas os valores digitados se perdem, e a API não tem
+ * desfazer. Contrato fechado nunca chega aqui — a rota recusa com 409, e a
+ * tela sequer oferece a ação.
+ */
+export async function descartarContrato(
+  _anterior: EstadoSimplesDaAcao,
+  formulario: FormData,
+): Promise<EstadoSimplesDaAcao> {
+  const id = texto(formulario, 'id');
+  const tenantId = texto(formulario, 'tenantId');
+
+  const motivo = texto(formulario, 'reason');
+
+  if (motivo.trim().length < 10) {
+    return { erro: 'Descreva o motivo do descarte em ao menos 10 caracteres.' };
+  }
+
+  const resposta = await chamarApi<unknown>(
+    `/api/v1/platform/contracts/${encodeURIComponent(id)}`,
+    { metodo: 'DELETE', corpo: { reason: motivo } },
+  );
+
+  if (!resposta.ok) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível descartar o rascunho') };
+  }
+
+  revalidatePath(`/platform/${tenantId}/contratos`);
+
+  return { salvo: true };
+}
+
 // --- Histórico do índice ---------------------------------------------------
 
 export interface EstadoDoIndice {

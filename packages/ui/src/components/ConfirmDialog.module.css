@@ -1,0 +1,77 @@
+/**
+ * Moldura de dialogo para acao sensivel -- le so a camada semantica (regra 2).
+ *
+ * O `SensitiveAction` e um BLOCO EM FLUXO: correto onde ele nasceu (dentro de
+ * um formulario), impossivel dentro de uma celula de tabela de 40px -- ele
+ * esticaria a linha e empurraria as colunas vizinhas.
+ *
+ * `<dialog>` NATIVO, e nao um `<div>` com `position: fixed`: ele traz
+ * fechamento por Esc, foco preso dentro do dialogo, `inert` no resto da pagina
+ * e restauracao do foco ao fechar. Sao quatro comportamentos que um modal
+ * artesanal erra um por um, e que a promessa de teclado do produto exige.
+ */
+.dialogo {
+  /* 460px, como o §4.15 do DS-PAINEL fixa. */
+  max-width: 460px;
+  width: calc(100vw - 32px);
+  padding: 0;
+  border: none;
+  border-radius: var(--ah-radius-modal);
+  background: transparent;
+  /* O `SensitiveAction` ja desenha a propria caixa; aqui so posicionamos. */
+  overflow: visible;
+  /*
+   * CENTRALIZACAO EXPLICITA, e ela NAO e redundante com o padrao do navegador.
+   *
+   * O `<dialog>` nativo se centra com `margin: auto` no user-agent stylesheet
+   * -- e o preflight do Tailwind zera `margin` em TODO elemento, inclusive
+   * neste. Visto na tela em 11/09/2026: o dialogo abria colado no canto
+   * superior esquerdo, por cima da topbar.
+   *
+   * `position: fixed` com os quatro `inset` e `margin: auto` reconstroi o
+   * comportamento sem depender de qual reset o app carrega -- o componente do
+   * design system nao sabe em que pagina vai parar.
+   */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  /* `height: fit-content` impede o `inset: 0` de esticar a caixa na vertical. */
+  height: fit-content;
+}
+
+.dialogo::backdrop {
+  background: color-mix(in srgb, var(--ah-surface-chrome) 55%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialogo[open] {
+    animation: surgir 140ms var(--ah-motion-easing);
+  }
+
+  .dialogo[open]::backdrop {
+    animation: revelar 140ms var(--ah-motion-easing);
+  }
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes revelar {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

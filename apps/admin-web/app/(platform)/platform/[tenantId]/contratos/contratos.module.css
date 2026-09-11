@@ -1,0 +1,59 @@
+/**
+ * Contratos do cliente -- le so a camada semantica (regra 2 do DS §11).
+ */
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/*
+ * O CONVITE que substitui o formulario sempre aberto quando ja ha contrato
+ * vigente. Nao e um card: e uma frase e um botao, e enquadra-los daria a
+ * mesma moldura do formulario de verdade -- que e o que se quer distinguir.
+ */
+.convite {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 1px dashed var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.convite > p {
+  flex: 1 1 34ch;
+  margin: 0;
+}
+
+.salvo {
+  margin: 0;
+  color: var(--ah-success);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+}
+
+/*
+ * A CELULA DE ACOES guarda um link de rotulo curto e um menu de 32px, e os
+ * dois cabem lado a lado. O teto de 24ch que o `DataTable` poe em todo botao
+ * de acao existe para rotulo longo ("Aceitar diferenca documentada"); aqui ele
+ * espremia "Baixar PDF" em duas linhas e esticava a altura da linha. Visto na
+ * tela em 11/09/2026.
+ */
+.pagina td[data-role='actions'] {
+  white-space: nowrap;
+}
+
+.pagina td[data-role='actions'] a {
+  max-inline-size: none;
+  /*
+    `nowrap` tambem no link: o `DataTable` poe `white-space: normal` em todo
+    botao de acao (para rotulo longo poder quebrar em duas linhas), e com o
+    teto removido o que sobrava era a quebra -- "Baixar PDF" saia em duas
+    linhas e esticava a altura da linha da tabela.
+  */
+  white-space: nowrap;
+}
