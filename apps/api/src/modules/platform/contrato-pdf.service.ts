@@ -26,6 +26,9 @@ export interface DadosDoContratoImpresso {
   readonly anniversaryMonth: number;
   readonly graceDays: number;
   readonly issueDay: number;
+  /** Superficies contratadas -- o que a academia recebe, e o que ela nao recebe. */
+  readonly mobileEnabled: boolean;
+  readonly kioskEnabled: boolean;
   readonly startsAt: Date;
   readonly endsAt: Date | null;
   readonly geradoEm: Date;
@@ -134,6 +137,18 @@ export function gerarPdfDoContrato(dados: DadosDoContratoImpresso): Promise<Buff
       linha('Modelo', 'Fixo mensal');
       linha('Valor mensal', formatarDinheiro(dados.fixedPriceMinor ?? 0, dados.currency));
     }
+
+    /*
+     * SUPERFICIES NO PAPEL, incluindo as NAO contratadas.
+     *
+     * Imprimir so o que foi incluido faria o documento calar sobre a metade
+     * que mais gera discussao depois -- "o totem nao liga" com um contrato
+     * que nao diz nada a respeito. O "Nao incluido" impresso e a prova do que
+     * foi negociado.
+     */
+    secao('Superfícies contratadas');
+    linha('App mobile do aluno', dados.mobileEnabled ? 'incluído' : 'não incluído');
+    linha('Totem de autoatendimento', dados.kioskEnabled ? 'incluído' : 'não incluído');
 
     secao('Reajuste e cobrança');
     linha('Índice de correção', dados.indexCode);

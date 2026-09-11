@@ -84,6 +84,15 @@ export interface EntradaDeContrato {
   endsAt?: Date | null | undefined;
   /** Contrato que este substitui -- aditivo ou renegociacao. */
   supersedesId?: string | null | undefined;
+  /**
+   * Superficies contratadas. Ausentes herdam o plano; presentes DIVERGEM dele.
+   *
+   * Divergir e o caso de uso, nao a excecao: o catalogo traz o padrao e o
+   * comercial negocia por cliente (decisao do PI, 11/09/2026). Travar no plano
+   * obrigaria a cadastrar um plano novo por concessao comercial.
+   */
+  mobileEnabled?: boolean | undefined;
+  kioskEnabled?: boolean | undefined;
 }
 
 /** Chave do PDF no bucket privado. Servidor monta; ninguem envia prefixo. */
@@ -169,6 +178,9 @@ export class TenantContractUseCase {
         inactiveStudentPriceMinor: plano.inactiveStudentPriceMinor,
         fixedPriceMinor: plano.fixedPriceMinor,
         currency: plano.currency,
+        // Superficie: o plano e o PADRAO, a entrada VENCE. Ver `EntradaDeContrato`.
+        mobileEnabled: entrada.mobileEnabled ?? plano.mobileEnabled,
+        kioskEnabled: entrada.kioskEnabled ?? plano.kioskEnabled,
         indexCode: entrada.indexCode ?? 'IPCA',
         baseDate: entrada.baseDate,
         anniversaryDay: entrada.anniversaryDay,
@@ -248,6 +260,8 @@ export class TenantContractUseCase {
       anniversaryMonth: contrato.anniversaryMonth,
       graceDays: contrato.graceDays,
       issueDay: contrato.issueDay,
+      mobileEnabled: contrato.mobileEnabled,
+      kioskEnabled: contrato.kioskEnabled,
       startsAt: contrato.startsAt,
       endsAt: contrato.endsAt,
       geradoEm: new Date(),

@@ -23,6 +23,8 @@ interface PlanoParaEscolher {
   id: string;
   name: string;
   model: 'PER_STUDENT' | 'FIXED_MONTHLY';
+  mobileEnabled: boolean;
+  kioskEnabled: boolean;
 }
 
 interface Props {
@@ -269,6 +271,46 @@ export function FormularioDeContrato({ tenantId, planos, temVigente }: Props) {
             </p>
           </>
         )}
+
+        {/*
+          SUPERFÍCIES: o plano traz o padrão, ESTE campo é o que se negocia.
+
+          A `key` é o plano: trocar de plano tem que reposicionar os dois campos
+          no padrão do novo. Sem ela, `defaultValue` ficaria preso ao plano que
+          estava escolhido na montagem -- e o contrato sairia com a superfície
+          do plano errado.
+        */}
+        <div className={estilos['par']} key={escolhido?.id ?? 'sem-plano'}>
+          <SelectField
+            id="mobile-do-contrato"
+            name="mobileEnabled"
+            label="App mobile do aluno"
+            required
+            hint="O app do aluno chega no MVP 4; o contrato já registra se está incluído."
+            defaultValue={
+              estado.valores?.['mobileEnabled'] ?? (escolhido?.mobileEnabled === false ? 'nao' : 'sim')
+            }
+            data-testid="campo-mobile-do-contrato"
+          >
+            <option value="sim">Incluído</option>
+            <option value="nao">Não incluído</option>
+          </SelectField>
+
+          <SelectField
+            id="totem-do-contrato"
+            name="kioskEnabled"
+            label="Totem de autoatendimento"
+            required
+            hint="Não incluído: o totem desta academia para de autenticar assim que o contrato fecha."
+            defaultValue={
+              estado.valores?.['kioskEnabled'] ?? (escolhido?.kioskEnabled === false ? 'nao' : 'sim')
+            }
+            data-testid="campo-totem-do-contrato"
+          >
+            <option value="sim">Incluído</option>
+            <option value="nao">Não incluído</option>
+          </SelectField>
+        </div>
 
         {estado.salvo ? (
           <p className={proprios['salvo']} role="status" data-testid="contrato-aberto">

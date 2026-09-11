@@ -7519,6 +7519,12 @@
                           "ACTIVE",
                           "ARCHIVED"
                         ]
+                      },
+                      "mobileEnabled": {
+                        "type": "boolean"
+                      },
+                      "kioskEnabled": {
+                        "type": "boolean"
                       }
                     }
                   }
@@ -7584,6 +7590,12 @@
                         "ACTIVE",
                         "ARCHIVED"
                       ]
+                    },
+                    "mobileEnabled": {
+                      "type": "boolean"
+                    },
+                    "kioskEnabled": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -7659,6 +7671,12 @@
                         "ACTIVE",
                         "ARCHIVED"
                       ]
+                    },
+                    "mobileEnabled": {
+                      "type": "boolean"
+                    },
+                    "kioskEnabled": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -7734,6 +7752,12 @@
                         "ACTIVE",
                         "ARCHIVED"
                       ]
+                    },
+                    "mobileEnabled": {
+                      "type": "boolean"
+                    },
+                    "kioskEnabled": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -7852,6 +7876,12 @@
                         "format": "uuid",
                         "nullable": true
                       },
+                      "mobileEnabled": {
+                        "type": "boolean"
+                      },
+                      "kioskEnabled": {
+                        "type": "boolean"
+                      },
                       "temDocumento": {
                         "type": "boolean"
                       }
@@ -7961,6 +7991,12 @@
                       "type": "string",
                       "format": "uuid",
                       "nullable": true
+                    },
+                    "mobileEnabled": {
+                      "type": "boolean"
+                    },
+                    "kioskEnabled": {
+                      "type": "boolean"
                     },
                     "temDocumento": {
                       "type": "boolean"
@@ -8079,6 +8115,12 @@
                       "type": "string",
                       "format": "uuid",
                       "nullable": true
+                    },
+                    "mobileEnabled": {
+                      "type": "boolean"
+                    },
+                    "kioskEnabled": {
+                      "type": "boolean"
                     },
                     "temDocumento": {
                       "type": "boolean"
@@ -8220,6 +8262,12 @@
                       "type": "string",
                       "format": "uuid",
                       "nullable": true
+                    },
+                    "mobileEnabled": {
+                      "type": "boolean"
+                    },
+                    "kioskEnabled": {
+                      "type": "boolean"
                     },
                     "temDocumento": {
                       "type": "boolean"

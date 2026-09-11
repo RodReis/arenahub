@@ -40,6 +40,8 @@ const ESQUEMA_DO_PLANO = {
     fixedPriceMinor: { type: 'integer', nullable: true },
     currency: { type: 'string' },
     status: { type: 'string', enum: ['ACTIVE', 'ARCHIVED'] },
+    mobileEnabled: { type: 'boolean' },
+    kioskEnabled: { type: 'boolean' },
   },
 };
 
@@ -65,6 +67,8 @@ const ESQUEMA_DO_CONTRATO = {
     endsAt: { type: 'string', format: 'date-time', nullable: true },
     status: { type: 'string', enum: ['DRAFT', 'ACTIVE', 'TERMINATED'] },
     supersedesId: { type: 'string', format: 'uuid', nullable: true },
+    mobileEnabled: { type: 'boolean' },
+    kioskEnabled: { type: 'boolean' },
     temDocumento: { type: 'boolean' },
   },
 };
@@ -109,6 +113,8 @@ interface ContratoNaResposta {
   endsAt: string | null;
   status: string;
   supersedesId: string | null;
+  mobileEnabled: boolean;
+  kioskEnabled: boolean;
   temDocumento: boolean;
 }
 
@@ -139,6 +145,8 @@ function paraResposta(contrato: {
   endsAt: Date | null;
   status: string;
   supersedesId: string | null;
+  mobileEnabled: boolean;
+  kioskEnabled: boolean;
   documentObjectKey: string | null;
 }): ContratoNaResposta {
   return {
@@ -160,6 +168,8 @@ function paraResposta(contrato: {
     endsAt: contrato.endsAt?.toISOString() ?? null,
     status: contrato.status,
     supersedesId: contrato.supersedesId,
+    mobileEnabled: contrato.mobileEnabled,
+    kioskEnabled: contrato.kioskEnabled,
     temDocumento: contrato.documentObjectKey !== null,
   };
 }

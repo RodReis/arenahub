@@ -125,7 +125,36 @@ export class KioskAuthService {
       return { ok: false, motivo: 'EDGE_SIGNATURE_INVALID' };
     }
 
-    // Assinatura valida: agora sim o nonce pode ser gravado.
+    /*
+     * O TOTEM FAZ PARTE DO CONTRATO? -- F69.
+     *
+     * DEPOIS da assinatura e ANTES do nonce, e as duas bordas importam:
+     *
+     *   - depois, porque consultar o contrato para cada requisicao com chave
+     *     inventada daria a qualquer um uma consulta de banco de graca;
+     *   - antes, porque gravar o nonce e o unico efeito colateral deste
+     *     metodo. Recusar DEPOIS de grava-lo queimaria o nonce de uma
+     *     requisicao que nunca foi atendida -- e o totem que reenviasse a
+     *     mesma requisicao apos religar o contrato levaria `EDGE_REPLAY_
+     *     DETECTED`, um erro que manda investigar ataque onde houve
+     *     renegociacao comercial.
+     *
+     * SEM CONTRATO ATIVO O TOTEM PASSA. Academia em implantacao opera antes
+     * de o contrato fechar, e a catraca e o primeiro equipamento a ser
+     * testado; recusar aqui transformaria "contrato ainda nao assinado" em
+     * "catraca nao funciona" no dia da instalacao. Quem barra inadimplencia e
+     * o gate de suspensao (F65), que ja tem regra e carencia proprias.
+     */
+    const contrato = await this.db.tenantContract.findFirst({
+      where: { tenantId: credencial.kioskDevice.tenantId, status: 'ACTIVE' },
+      select: { kioskEnabled: true },
+    });
+
+    if (contrato && !contrato.kioskEnabled) {
+      return { ok: false, motivo: 'CONTRACT_KIOSK_DISABLED' };
+    }
+
+    // Assinatura valida e superficie contratada: agora sim o nonce pode ser gravado.
     const inedito = await this.registrarNonce(recebida.keyId, recebida.nonce, agora);
 
     if (!inedito) return { ok: false, motivo: 'EDGE_REPLAY_DETECTED' };

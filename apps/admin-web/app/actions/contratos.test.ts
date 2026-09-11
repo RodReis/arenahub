@@ -20,23 +20,40 @@ function corpoEnviado(n = 0): Record<string, unknown> {
   return opcoes?.corpo ?? {};
 }
 
-function formularioDePlanoFixo(valor: string): FormData {
+/**
+ * As superfícies vão em TODO formulário de plano — F69.
+ *
+ * O `<select>` da tela sempre manda as duas, e a fixture reproduz isso: sem
+ * elas aqui, o teste passaria a exercitar um envio que a tela nunca faz.
+ */
+function superficies(dados: FormData, extras: Record<string, string>): void {
+  dados.set('mobileEnabled', extras['mobileEnabled'] ?? 'sim');
+  dados.set('kioskEnabled', extras['kioskEnabled'] ?? 'sim');
+}
+
+function formularioDePlanoFixo(valor: string, extras: Record<string, string> = {}): FormData {
   const dados = new FormData();
 
   dados.set('name', 'Plano fixo');
   dados.set('model', 'FIXED_MONTHLY');
   dados.set('fixedPrice', valor);
+  superficies(dados, extras);
 
   return dados;
 }
 
-function formularioDePlanoPorAluno(ativo: string, inativo: string): FormData {
+function formularioDePlanoPorAluno(
+  ativo: string,
+  inativo: string,
+  extras: Record<string, string> = {},
+): FormData {
   const dados = new FormData();
 
   dados.set('name', 'Plano por aluno');
   dados.set('model', 'PER_STUDENT');
   dados.set('activeStudentPrice', ativo);
   dados.set('inactiveStudentPrice', inativo);
+  superficies(dados, extras);
 
   return dados;
 }
@@ -132,6 +149,36 @@ describe('salvarPlano', () => {
   });
 });
 
+describe('salvarPlano — superfícies (F69)', () => {
+  /*
+   * AFIRMA O CORPO, e não o retorno da action.
+   *
+   * O campo que some entre a tela e a API é invisível num teste que só olha
+   * `estado.salvo` — a action responde "salvo" do mesmo jeito com ou sem a
+   * flag no corpo. Aqui o que se afirma é o que a API recebeu.
+   */
+  it('manda booleano, e nao o texto do select', async () => {
+    await salvarPlano({}, formularioDePlanoFixo('100,00', { kioskEnabled: 'nao' }));
+
+    const corpo = corpoEnviado();
+
+    expect(corpo).toMatchObject({ mobileEnabled: true, kioskEnabled: false });
+    // `'nao'` cru passaria pelo `z.boolean().optional()` da API como erro de
+    // validação — mas `'sim'` cru seria aceito como *truthy* em qualquer
+    // reimplementação desatenta. Afirmar o tipo é o que pega os dois casos.
+    expect(typeof corpo['kioskEnabled']).toBe('boolean');
+  });
+
+  it('desliga as duas superficies quando o plano nao inclui nenhuma', async () => {
+    await salvarPlano(
+      {},
+      formularioDePlanoPorAluno('5,00', '2,50', { mobileEnabled: 'nao', kioskEnabled: 'nao' }),
+    );
+
+    expect(corpoEnviado()).toMatchObject({ mobileEnabled: false, kioskEnabled: false });
+  });
+});
+
 describe('registrarValorDeIndice', () => {
   const formulario = (variacao: string, competencia = '2026-03'): FormData => {
     const dados = new FormData();
@@ -183,6 +230,8 @@ describe('criarContrato', () => {
     dados.set('issueDay', '1');
     dados.set('graceDays', '15');
     dados.set('indexCode', 'IPCA');
+    dados.set('mobileEnabled', 'sim');
+    dados.set('kioskEnabled', 'sim');
 
     for (const [campo, valor] of Object.entries(extras)) dados.set(campo, valor);
 
@@ -199,6 +248,16 @@ describe('criarContrato', () => {
       graceDays: 15,
       indexCode: 'IPCA',
     });
+  });
+
+  /*
+   * A NEGOCIAÇÃO ACONTECE AQUI — F69. O plano traz o padrão; este corpo é o
+   * que fica gravado no contrato e o que o totem lê para decidir se autentica.
+   */
+  it('manda a superficie negociada no contrato', async () => {
+    await criarContrato({}, formulario({ kioskEnabled: 'nao' }));
+
+    expect(corpoEnviado()).toMatchObject({ mobileEnabled: true, kioskEnabled: false });
   });
 
   it('recusa dia de emissao acima de 28 sem chamar a API', async () => {

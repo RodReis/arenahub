@@ -103,6 +103,13 @@ export interface EstadoDoPlano {
 const esquemaDePlano = z.object({
   name: z.string().trim().min(1, 'Informe o nome do plano').max(120, 'Nome longo demais'),
   model: z.enum(['PER_STUDENT', 'FIXED_MONTHLY']),
+  /*
+   * `'sim'`/`'nao'` -> booleano. A API quer `boolean`; o `<select>` só sabe
+   * mandar texto. Converter aqui e não na tela mantém o formulário sem estado:
+   * ele reexibe exatamente o que foi enviado quando a ação recusa.
+   */
+  mobileEnabled: z.enum(['sim', 'nao']).transform((valor) => valor === 'sim'),
+  kioskEnabled: z.enum(['sim', 'nao']).transform((valor) => valor === 'sim'),
 });
 
 export async function salvarPlano(
@@ -118,6 +125,8 @@ export async function salvarPlano(
     activeStudentPrice: texto(formulario, 'activeStudentPrice'),
     inactiveStudentPrice: texto(formulario, 'inactiveStudentPrice'),
     fixedPrice: texto(formulario, 'fixedPrice'),
+    mobileEnabled: texto(formulario, 'mobileEnabled'),
+    kioskEnabled: texto(formulario, 'kioskEnabled'),
   };
 
   const validado = esquemaDePlano.safeParse(valores);
@@ -161,7 +170,13 @@ export async function salvarPlano(
     precos = { fixedPriceMinor: fixo.data };
   }
 
-  const corpo = { name: validado.data.name, model: validado.data.model, ...precos };
+  const corpo = {
+    name: validado.data.name,
+    model: validado.data.model,
+    mobileEnabled: validado.data.mobileEnabled,
+    kioskEnabled: validado.data.kioskEnabled,
+    ...precos,
+  };
 
   const resposta = id
     ? await chamarApi<{ id: string }>(`/api/v1/platform/plans/${encodeURIComponent(id)}`, {
@@ -223,6 +238,9 @@ const esquemaDeContrato = z.object({
   issueDay: z.coerce.number().int().min(1, 'Dia de emissão entre 1 e 28').max(28, 'Dia de emissão entre 1 e 28'),
   graceDays: z.coerce.number().int().min(0).max(180),
   indexCode: z.string().trim().min(1).max(24),
+  /* `'sim'`/`'nao'` -> booleano, pelo mesmo motivo do formulário de plano. */
+  mobileEnabled: z.enum(['sim', 'nao']).transform((valor) => valor === 'sim'),
+  kioskEnabled: z.enum(['sim', 'nao']).transform((valor) => valor === 'sim'),
 });
 
 export interface EstadoDoContrato {
@@ -246,6 +264,8 @@ export async function criarContrato(
     issueDay: texto(formulario, 'issueDay'),
     graceDays: texto(formulario, 'graceDays'),
     indexCode: texto(formulario, 'indexCode'),
+    mobileEnabled: texto(formulario, 'mobileEnabled'),
+    kioskEnabled: texto(formulario, 'kioskEnabled'),
   };
 
   const validado = esquemaDeContrato.safeParse(valores);
