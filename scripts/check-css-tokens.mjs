@@ -67,6 +67,13 @@ const EXCECOES = [
       'maioria dos leitores de celular nao encontra o padrao.',
   },
   {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '#ffffff',
+    motivo:
+      'QR do segundo fator SEMPRE sobre branco, mesmo motivo do totem: fundo que ' +
+      'seguisse o tema escuro inverteria o contraste dos modulos e o leitor falha.',
+  },
+  {
     arquivo: join('apps', 'kiosk', 'app', 'globals.css'),
     trecho: 'linear-gradient(145deg, #d8dee5, #8d97a3 45%, #e9edf1)',
     motivo:

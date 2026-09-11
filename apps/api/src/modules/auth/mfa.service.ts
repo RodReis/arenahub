@@ -44,8 +44,43 @@ export class MfaService {
    *
    * Ativar direto deixaria o usuario trancado fora da propria conta se o
    * autenticador nao tivesse lido o segredo direito.
+   *
+   * Reaproveita segredo `PENDING` ja existente em vez de gerar outro: a tela
+   * chama esta rota de novo a cada reload/remount, e gerar segredo novo toda
+   * vez troca a chave debaixo do usuario que acabou de cadastrar a anterior
+   * no autenticador -- o codigo dele nunca bate porque o app tem a chave
+   * velha e o banco ja tem outra.
    */
   async iniciarInscricao(userId: string, email: string): Promise<{ uri: string; base32: string }> {
+    const usuario = await this.db.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        mfaStatus: true,
+        mfaSecretCiphertext: true,
+        mfaSecretIv: true,
+        mfaSecretTag: true,
+      },
+    });
+
+    if (
+      usuario.mfaStatus === 'PENDING' &&
+      usuario.mfaSecretCiphertext &&
+      usuario.mfaSecretIv &&
+      usuario.mfaSecretTag
+    ) {
+      const segredoExistente = this.cifrador.decifrar({
+        ciphertext: Buffer.from(usuario.mfaSecretCiphertext),
+        iv: Buffer.from(usuario.mfaSecretIv),
+        tag: Buffer.from(usuario.mfaSecretTag),
+      });
+      const base32Existente = this.totp.paraBase32Publico(segredoExistente);
+
+      return {
+        uri: this.totp.montarUri(EMISSOR, email, base32Existente),
+        base32: base32Existente,
+      };
+    }
+
     const segredo = this.totp.gerarSegredo();
     const cifrado = this.cifrador.cifrar(segredo.bytes);
 
