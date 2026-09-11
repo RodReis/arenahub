@@ -9,8 +9,6 @@ updated: 2026-09-11
 
 ### Sem épico
 
-- [MVP7][SPEC-066][FIX] leituras de students e audit_logs fora de transacao ignoram a politica RLS (#306)
-- [MVP7][SPEC-061][FIX] rotas de MFA aceitam tentativas sem limite (#296)
 - [MVP5][SPEC-031][FIX] tres testes de XP e ranking sao intermitentes no CI (#279)
 - [MVP2][FIX] assinatura duplicada infla a receita esperada do painel financeiro (#272)
 - [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254)
@@ -30,7 +28,9 @@ _(vazio)_
 
 ## Em Andamento
 
-_(vazio)_
+### Sem épico
+
+- [MVP7][SPEC-066][FIX] leituras de students e audit_logs fora de transacao ignoram a politica RLS (#306)
 
 ## Feito
 
@@ -41,6 +41,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][SPEC-061][FIX] rotas de MFA aceitam tentativas sem limite (#296, finalizado em: 2026-09-11)
 - [MVP7][SPEC-066][FIX] escrita em audit_logs falha com 42501 nos fluxos de Super Admin sob o role restrito (#302, finalizado em: 2026-09-11)
 - [MVP7][SPEC-067][F67] RLS fase 2 — tenant_id nas tabelas restantes e política em todas (#290, finalizado em: 2026-09-10)
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
