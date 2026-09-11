@@ -1,15 +1,13 @@
 import type { Metadata } from 'next';
 
-import { Button, PageHeader, ProblemDetail } from '@arenahub/ui';
+import { Button, EstadoSimples, PageHeader, ProblemDetail } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
-import { ArquivosDaMarca } from './arquivos-da-marca';
-import { ElevarTenant } from './elevar-tenant';
-import { FormularioDeEdicao } from './formulario-de-edicao';
-import { SituacaoDoTenant } from './situacao-do-tenant';
+import estilos from './cliente.module.css';
+import { AbasDoCliente } from './abas-do-cliente';
 
 export const metadata: Metadata = {
-  title: 'Academia — ArenaHub',
+  title: 'Cliente — ArenaHub',
 };
 
 /**
@@ -42,17 +40,29 @@ interface TenantEmDetalhe {
   temIcone: boolean;
 }
 
+/** A situação do cliente, em três canais — o mesmo vocabulário da lista. */
+function situacao(status: string) {
+  if (status === 'ACTIVE') return <EstadoSimples label="Ativo" tom="positivo" />;
+  if (status === 'SUSPENDED') return <EstadoSimples label="Suspenso" tom="atencao" />;
+
+  return <EstadoSimples label="Inativo" tom="neutro" />;
+}
+
 /**
- * Detalhe da academia — a tela onde o dono do SaaS edita, liga/desliga e entra
+ * Detalhe do cliente — a tela onde o dono do SaaS edita, liga/desliga e entra
  * como suporte.
  *
- * Server Component: os dados chegam prontos do servidor, e cada um dos três
- * blocos é um Client Component próprio com sua Server Action. Um formulário só
- * misturaria três atos de peso muito diferente — corrigir um CNPJ, desligar
- * uma academia e entrar no tenant do cliente não podem compartilhar o mesmo
- * botão "Salvar".
+ * Server Component: os dados chegam prontos do servidor, e cada uma das quatro
+ * seções é um Client Component próprio com sua Server Action. Um formulário só
+ * misturaria atos de peso muito diferente — corrigir um CNPJ, desligar um
+ * cliente e entrar no tenant dele não podem compartilhar o mesmo botão
+ * "Salvar".
+ *
+ * AS SEÇÕES VIRARAM ABAS na F68. Empilhadas, elas produziam uma página de
+ * rolagem longa em que a ação destrutiva ficava no caminho de quem só queria
+ * conferir um dado — e longe demais de quem realmente a procurava.
  */
-export default async function PaginaDaAcademia({
+export default async function PaginaDoCliente({
   params,
 }: {
   params: Promise<{ tenantId: string }>;
@@ -66,12 +76,12 @@ export default async function PaginaDaAcademia({
   if (!resposta.ok || !resposta.dados) {
     /*
      * Negação explícita com o código estável visível. Tela vazia deixaria quem
-     * abriu sem saber se a academia sumiu ou se este perfil não administra a
+     * abriu sem saber se o cliente sumiu ou se este perfil não administra a
      * plataforma — e são coisas que se resolvem de modos opostos.
      */
     return (
       <section aria-labelledby="titulo-da-academia">
-        <PageHeader id="titulo-da-academia" title="Academia" />
+        <PageHeader id="titulo-da-academia" title="Cliente" />
         <ProblemDetail
           testId="erro-da-academia"
           problem={{
@@ -81,7 +91,7 @@ export default async function PaginaDaAcademia({
               code: 'erro',
               correlationId: '',
             }),
-            title: `Não foi possível abrir esta academia (${resposta.erro?.code ?? 'erro'}).`,
+            title: `Não foi possível abrir este cliente (${resposta.erro?.code ?? 'erro'}).`,
           }}
         />
       </section>
@@ -95,27 +105,65 @@ export default async function PaginaDaAcademia({
       <PageHeader
         id="titulo-da-academia"
         title={tenant.displayName}
-        breadcrumb={<a href="/platform">Plataforma · Academias</a>}
+        breadcrumb={
+          <span>
+            <a href="/platform">Plataforma · Clientes</a>
+          </span>
+        }
         actions={
           /*
-            LINKS para contratos e faturas, e não mais dois blocos nesta tela:
-            são os dois atos mais pesados da academia -- fechar um contrato é
-            irreversível, e registrar um pagamento afirma que o dinheiro
-            entrou --, e cada um merece uma tela onde seja o único assunto.
-            Esta já tem quatro blocos.
+            LINKS para contratos e faturas: são os dois atos mais pesados do
+            cliente -- fechar um contrato é irreversível, e registrar um
+            pagamento afirma que o dinheiro entrou --, e cada um merece uma tela
+            onde seja o único assunto.
+
+            AQUI E TAMBÉM NO MENU DA LISTA, e a duplicação é deliberada: da
+            lista se alcança o contrato de qualquer cliente sem abrir nenhum;
+            daqui se alcança o do cliente que já está aberto. Tirar um dos dois
+            caminhos obrigaria a voltar para usar o outro.
           */
           <>
-            <Button href={`/platform/${tenant.id}/contratos`} data-testid="ver-contratos">
+            <Button
+              href={`/platform/${tenant.id}/contratos`}
+              variant="outline"
+              data-testid="ver-contratos"
+            >
               Contratos
             </Button>
-            <Button href={`/platform/${tenant.id}/faturas`} data-testid="ver-faturas">
+            <Button
+              href={`/platform/${tenant.id}/faturas`}
+              variant="outline"
+              data-testid="ver-faturas"
+            >
               Faturas
             </Button>
           </>
         }
       />
 
-      <FormularioDeEdicao
+      {/*
+        A IDENTIDADE DO CLIENTE fica acima das abas, e não dentro de uma delas:
+        identificador e situação valem para as quatro seções, e repeti-los em
+        cada uma seria pior do que tirá-los da aba onde estavam. Quem entra na
+        aba de marca continua sabendo de qual cliente é o logo que vai subir.
+      */}
+      <p className={estilos['identidade']}>
+        <span className={estilos['slug']} data-testid="slug-da-academia">
+          {tenant.slug}
+        </span>
+        <span className={estilos['ponto']} aria-hidden="true">
+          ·
+        </span>
+        <span>
+          {tenant.unidades} {tenant.unidades === 1 ? 'unidade' : 'unidades'}
+        </span>
+        <span className={estilos['ponto']} aria-hidden="true">
+          ·
+        </span>
+        <span data-testid="situacao-do-cliente">{situacao(tenant.status)}</span>
+      </p>
+
+      <AbasDoCliente
         tenantId={tenant.id}
         slug={tenant.slug}
         displayName={tenant.displayName}
@@ -126,18 +174,10 @@ export default async function PaginaDaAcademia({
         responsavelEmail={tenant.responsavelEmail ?? ''}
         missionText={tenant.missionText ?? ''}
         highlightsText={tenant.highlightsText ?? ''}
-      />
-
-      <ArquivosDaMarca
-        tenantId={tenant.id}
-        slug={tenant.slug}
         temLogo={tenant.temLogo}
         temIcone={tenant.temIcone}
+        status={tenant.status}
       />
-
-      <SituacaoDoTenant tenantId={tenant.id} status={tenant.status} />
-
-      <ElevarTenant tenantId={tenant.id} displayName={tenant.displayName} />
     </section>
   );
 }

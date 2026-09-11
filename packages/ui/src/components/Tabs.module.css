@@ -1,0 +1,153 @@
+/**
+ * Abas -- le so a camada semantica (regra 2 do DS §11).
+ *
+ * Existe porque a tela do cliente tinha quatro assuntos empilhados num scroll
+ * de 1600px: cadastro, marca, situacao e suporte. Rolagem nao e hierarquia --
+ * ela poe o ato mais perigoso da tela (desligar o cliente) no lugar mais
+ * dificil de alcancar e, ao mesmo tempo, no caminho de quem so queria corrigir
+ * um CNPJ.
+ */
+.lista {
+  display: flex;
+  gap: 2px;
+  /*
+    A REGUA sob as abas e o que as transforma em abas.
+    Sem ela, tres botoes lado a lado leem como barra de ferramentas, e a aba
+    ativa nao tem de onde se destacar.
+  */
+  /* Regua `subtle`, como manda o §4.14 do DS-PAINEL. */
+  border-bottom: 1px solid var(--ah-border-subtle);
+  margin-bottom: 20px;
+  /*
+    Rola de lado em vez de quebrar em duas linhas: aba na segunda linha perde
+    a regua e deixa de parecer aba. A 320px a quarta aba fica a um arrasto.
+  */
+  overflow-x: auto;
+  /*
+    `overflow-y: hidden` E NECESSARIO: com `overflow-x: auto` sozinho, o eixo
+    vertical vira `auto` por especificacao, e o sublinhado da aba ativa (que
+    mora 1px ABAIXO da caixa, para cobrir a regua) basta para o navegador
+    desenhar uma barra de rolagem vertical ao lado das abas. Visto na tela em
+    11/09/2026.
+  */
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.aba {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  /* 14px lateral e 13px vertical -- a faixa fecha em 42px (§4.14). */
+  padding: 13px 14px 11px;
+  border: none;
+  border-radius: var(--ah-radius-control) var(--ah-radius-control) 0 0;
+  background: transparent;
+  color: var(--ah-text-secondary);
+  font-family: inherit;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--ah-motion-control) var(--ah-motion-easing),
+    background var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.aba:hover:not([aria-selected='true']) {
+  color: var(--ah-text-strong);
+  background: var(--ah-surface-sunken);
+}
+
+/**
+ * A aba ativa carrega TRES canais, nao so a cor: peso do texto, sublinhado de
+ * accent e `aria-selected`. Quem opera com brilho baixo no balcao le o peso;
+ * quem usa leitor de tela ouve o estado; o sublinhado ancora o olho.
+ *
+ * Accent E legitimo aqui: aba selecionada e LOCALIZACAO, o mesmo papel do item
+ * ativo da navegacao -- nao e estado de dominio (regra 3 do DS §11).
+ */
+.aba[aria-selected='true'] {
+  color: var(--ah-action-text);
+  font-weight: 600;
+}
+
+.aba[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  /*
+    -1px cobre a regua da lista, para o sublinhado da aba e a linha do grupo
+    formarem um traco so em vez de dois paralelos.
+  */
+  bottom: -1px;
+  height: 2px;
+  border-radius: var(--ah-radius-badge) var(--ah-radius-badge) 0 0;
+  background: var(--ah-action-solid);
+}
+
+/**
+ * O CONTADOR ao lado do rotulo -- quantos arquivos de marca faltam, quantos
+ * contratos existem. E o que deixa a aba fechada continuar informando.
+ */
+.contador {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--ah-radius-badge);
+  background: var(--ah-surface-sunken);
+  color: var(--ah-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.aba[aria-selected='true'] .contador {
+  background: var(--ah-action-subtle-bg);
+  color: var(--ah-action-text);
+}
+
+/**
+ * A entrada do painel -- 140ms de opacidade e 4px de deslocamento.
+ *
+ * Movimento CURTO de proposito: o painel promete p95 < 300ms na catraca e nao
+ * pode parecer mais lento que o motor. O que estes 140ms compram e a
+ * continuidade -- sem eles o conteudo troca em corte seco e o olho volta ao
+ * topo procurar o que mudou.
+ */
+.painel {
+  animation: entrar 140ms var(--ah-motion-easing);
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Quem pediu menos movimento recebe a troca instantanea. O conteudo e o mesmo
+ * -- o que sai e a interpolacao, nunca a informacao.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .painel {
+    animation: none;
+  }
+
+  .aba {
+    transition: none;
+  }
+}

@@ -35,6 +35,12 @@ export {
 export { ElevatedSessionBanner } from './components/ElevatedSessionBanner.js';
 export { EmptyState } from './components/EmptyState.js';
 export { Field } from './components/Field.js';
+export { MaskedField } from './components/MaskedField.js';
+export { Tabs, type Aba } from './components/Tabs.js';
+export { RowMenu, type ItemDeMenu } from './components/RowMenu.js';
+export { SectionCard } from './components/SectionCard.js';
+export { ConfirmDialog } from './components/ConfirmDialog.js';
+export { SummaryStrip, type CelulaDeResumo } from './components/SummaryStrip.js';
 export { Icon, type IconName } from './components/Icon.js';
 export { PasswordField } from './components/PasswordField.js';
 export { Cpf } from './components/Cpf.js';

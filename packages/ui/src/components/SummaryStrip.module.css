@@ -1,0 +1,124 @@
+/**
+ * Faixa de resumo da carteira -- le so a camada semantica (regra 2 do DS §11).
+ *
+ * A LICENCA DE COR VEM DA EMENDA DE 01/09 do PRODUCT.md, e ela e nominal: o
+ * dashboard pode tingir a superficie com o tom do ESTADO que o numero
+ * descreve. Esta faixa e o mesmo caso e o unico fora do dashboard -- /platform
+ * e a tela de resumo do dono do SaaS, a unica da area que alguem olha de
+ * longe. As telas de trabalho da plataforma (planos, indices, contratos)
+ * seguem sob a regra original.
+ *
+ * A cor nunca e canal unico: cada celula carrega glifo e rotulo.
+ */
+.faixa {
+  display: grid;
+  /*
+    `auto-fit` com piso de 190px: quatro celulas a 1280px, duas a 768, uma a
+    360 -- sem media query e sem numero de coluna fixo que mentiria quando a
+    carteira crescer.
+  */
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.celula {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 15px 14px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+  overflow: hidden;
+}
+
+/**
+ * A ARESTA de 3px no topo, na cor cheia -- o mesmo desenho que o KPI do
+ * dashboard usa. Nao e faixa lateral decorativa: ela fecha a borda superior do
+ * card e some junto com o estado, quando a celula nao descreve nenhum.
+ */
+.celula[data-tom]::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+}
+
+.celula[data-tom='positivo'] {
+  background: color-mix(in srgb, var(--ah-state-success) 7%, var(--ah-surface-raised));
+}
+
+.celula[data-tom='positivo']::before {
+  background: var(--ah-state-success);
+}
+
+.celula[data-tom='atencao'] {
+  background: color-mix(in srgb, var(--ah-state-warning) 7%, var(--ah-surface-raised));
+}
+
+.celula[data-tom='atencao']::before {
+  background: var(--ah-state-warning);
+}
+
+.celula[data-tom='risco'] {
+  background: color-mix(in srgb, var(--ah-state-danger) 7%, var(--ah-surface-raised));
+}
+
+.celula[data-tom='risco']::before {
+  background: var(--ah-state-danger);
+}
+
+.rotulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  /*
+    Caixa alta com tracking, como o cabecalho da tabela: e a mesma classe de
+    rotulo, e diferenciar as duas faria a pagina ter dois vocabularios.
+  */
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/*
+ * O GLIFO herda o tom da celula, e o rotulo permanece em texto secundario: a
+ * cor entra num canal, o texto noutro, e nenhum depende do outro para a
+ * leitura funcionar.
+ */
+.celula[data-tom='positivo'] .rotulo > svg {
+  color: var(--ah-state-success);
+}
+
+.celula[data-tom='atencao'] .rotulo > svg {
+  color: var(--ah-state-warning);
+}
+
+.celula[data-tom='risco'] .rotulo > svg {
+  color: var(--ah-state-danger);
+}
+
+.valor {
+  color: var(--ah-text-strong);
+  /*
+    Um degrau acima do titulo de pagina e o suficiente: o numero e o que se le
+    de longe, mas a faixa e resumo, nao heroi. Display inteiro empurraria a
+    tabela -- que e o conteudo -- para fora da primeira dobra.
+  */
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.apoio {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}

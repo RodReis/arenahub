@@ -11,10 +11,11 @@ import {
 
 import { chamarApi } from '../../../../../lib/api/server-client';
 import { AcoesDoContrato } from './acoes-do-contrato';
+import estilos from './contratos.module.css';
 import { FormularioDeContrato } from './formulario-de-contrato';
 
 export const metadata: Metadata = {
-  title: 'Contratos da academia — ArenaHub',
+  title: 'Contratos do cliente — ArenaHub',
 };
 
 interface ContratoNaLista {
@@ -141,7 +142,7 @@ export default async function PaginaDeContratos({
   const nomeDaAcademia = respostaDoTenant.dados?.displayName ?? 'Academia';
 
   return (
-    <section aria-labelledby="titulo-contratos">
+    <section className={estilos['pagina']} aria-labelledby="titulo-contratos">
       <PageHeader
         id="titulo-contratos"
         title="Contratos"
@@ -188,6 +189,7 @@ export default async function PaginaDeContratos({
           {
             key: 'acoes',
             header: 'Ações',
+            role: 'actions',
             render: (c) => (
               <AcoesDoContrato
                 contratoId={c.id}
@@ -207,7 +209,11 @@ export default async function PaginaDeContratos({
         }
       />
 
-      <FormularioDeContrato tenantId={tenantId} planos={planos} />
+      <FormularioDeContrato
+        tenantId={tenantId}
+        planos={planos}
+        temVigente={contratos.some((contrato) => contrato.status === 'ACTIVE')}
+      />
     </section>
   );
 }

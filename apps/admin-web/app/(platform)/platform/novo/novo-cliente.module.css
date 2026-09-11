@@ -1,0 +1,62 @@
+/**
+ * Cadastro de cliente -- le so a camada semantica (regra 2 do DS §11).
+ */
+
+/*
+ * A COLUNA E MAIS LARGA que os 64ch do formulario comum: aqui cada card ja
+ * limita a propria medida por dentro, e prender os tres a 64ch deixaria a
+ * pagina com uma tira estreita no canto esquerdo de um monitor de 1280.
+ */
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 78ch;
+}
+
+/**
+ * As acoes GRUDAM NO PE da janela.
+ *
+ * Com tres cards a pagina rola, e um botao no fim do documento obriga a rolar
+ * de volta depois de conferir qualquer campo acima. `sticky` mantem o ato ao
+ * alcance sem tira-lo do fluxo -- barra `fixed` tamparia a ultima linha do
+ * formulario justamente quando o zoom esta em 200%.
+ */
+.rodape {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  padding: 12px 0;
+  background: var(--ah-surface-canvas);
+  /*
+    A regua sobe junto e separa a barra do conteudo que passa por baixo dela;
+    sem ela o botao flutua sobre o texto sem nada dizendo onde um termina.
+  */
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.desfecho {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.desfecho p {
+  margin: 0;
+  color: var(--ah-text-default);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  max-inline-size: 68ch;
+}
+
+/*
+ * O convite que NAO saiu -- tom de atencao, com o texto em negrito carregando
+ * a mesma informacao. Cor nunca e canal unico (§10 item 1).
+ */
+.alerta {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-warning) 35%, var(--ah-border-default));
+  border-radius: var(--ah-radius-control);
+  background: color-mix(in srgb, var(--ah-state-warning) 8%, var(--ah-surface-raised));
+}

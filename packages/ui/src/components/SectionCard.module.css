@@ -1,0 +1,104 @@
+/**
+ * Card de secao -- le so a camada semantica (regra 2 do DS §11).
+ *
+ * Existe porque a superficie da plataforma empilhava formularios direto sobre
+ * a pagina: cadastro, marca, situacao e suporte no mesmo fluxo vertical, sem
+ * nada dizendo onde um assunto termina e o outro comeca.
+ *
+ * BORDA, NAO SOMBRA -- o produto reserva sombra a camada que flutua (popover,
+ * modal). Superficie plana le melhor em densidade alta, e o card aqui separa
+ * assuntos; ele nao paira sobre nada.
+ */
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+  overflow: hidden;
+}
+
+/*
+ * O cabecalho fica AFUNDADO, como o `thead` do DataTable: e a mesma relacao
+ * -- rotulo sobre o qual o conteudo repousa, nao um bloco sobre ele. Mantem a
+ * superficie legivel como um sistema so entre tabela e formulario.
+ */
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+  background: var(--ah-surface-sunken);
+}
+
+.glifo {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--ah-radius-control);
+  border: 1px solid var(--ah-border-subtle);
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-icon);
+}
+
+/*
+ * O card PERIGOSO -- desligar o cliente. Cabecalho tingido a 6% e glifo no tom
+ * cheio: a cor diz "aqui e outra classe de ato" antes de a pessoa ler o
+ * titulo, e o rotulo textual continua sendo o canal que decide (§10 item 1).
+ *
+ * Tom SEMANTICO e nao accent: perigo tem tom fixo, senao um tenant de accent
+ * vermelho faria "salvar" e "desligar" parecerem a mesma coisa (regra 3).
+ */
+.card[data-tom='perigo'] .cabecalho {
+  background: color-mix(in srgb, var(--ah-state-danger) 6%, var(--ah-surface-raised));
+  border-bottom-color: color-mix(in srgb, var(--ah-state-danger) 22%, var(--ah-border-subtle));
+}
+
+.card[data-tom='perigo'] .glifo {
+  color: var(--ah-state-danger);
+  border-color: color-mix(in srgb, var(--ah-state-danger) 30%, var(--ah-border-subtle));
+}
+
+.textos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+.resumo {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  /* Medida de leitura: a frase explica uma regra, e frase larga demais cansa. */
+  max-inline-size: 68ch;
+}
+
+.acoes {
+  margin-left: auto;
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.corpo {
+  padding: 16px;
+}
+
+/* Corpo que ja e uma tabela nao leva respiro proprio: a tabela tem o dela. */
+.card[data-encaixe] .corpo {
+  padding: 0;
+}

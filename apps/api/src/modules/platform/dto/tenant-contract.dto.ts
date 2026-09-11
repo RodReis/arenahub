@@ -38,6 +38,24 @@ export const esquemaDeEncerramentoDeContrato = z
   .strict();
 
 /**
+ * Descarte de rascunho -- F68.
+ *
+ * O MOTIVO E OBRIGATORIO, com o mesmo piso de 10 caracteres da inativacao de
+ * tenant e da elevacao de suporte: o rascunho e apagado de verdade, e a linha
+ * de auditoria e o unico lugar onde sobra registro de que ele existiu. Sem o
+ * motivo, esse registro responde "quem" e nao responde "por que".
+ */
+export const esquemaDeDescarteDeContrato = z
+  .object({
+    reason: z
+      .string()
+      .trim()
+      .min(10, 'Descreva o motivo em ao menos 10 caracteres')
+      .max(500),
+  })
+  .strict();
+
+/**
  * Competencia e MES, nao dia. Aceitar `2026-03-15` criaria duas linhas para
  * marco, e a chave unica `(code, reference_month)` nao as veria como a mesma
  * competencia.

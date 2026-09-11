@@ -333,5 +333,44 @@ descreverOuPular('F66 -- o banco recusa o que a aplicacao deixaria passar', () =
 
       expect(comEscopo?.student?.status).toBe('ACTIVE');
     });
+
+    /**
+     * F68 -- `_count` ANINHADO tem a mesma cegueira do `include`, e e pior.
+     *
+     * O `include` devolve `null` no campo aninhado, o que ao menos aparece
+     * como ausencia. O `_count` devolve **zero**, que e um numero valido e se
+     * confunde com "nao ha aluno". Foi assim que a lista de clientes chegou a
+     * mostrar `-401 inativos`: `listar()` lia o `_count` FORA do contexto
+     * (zero) enquanto `ativosPorTenant()` lia DENTRO (401), e o inativo sai
+     * por complemento.
+     *
+     * A raiz (`tenants`) nao tem politica, entao a linha volta inteira e
+     * nada falha -- o Prisma tipa a contagem como `number`, e um zero passa
+     * por toda a cadeia ate a tela.
+     */
+    it('o `_count` de students volta ZERO sem contexto -- e nao nulo', async () => {
+      const semContexto = await restrito.tenant.findUnique({
+        where: { id: tenantA },
+        include: { _count: { select: { students: true } } },
+      });
+
+      expect(semContexto).not.toBeNull();
+      expect(semContexto?._count.students).toBe(0);
+    });
+
+    it('com o contexto do tenant, o `_count` conta os alunos de verdade', async () => {
+      const comEscopo = await comContexto({ kind: 'tenant', tenantId: tenantA }, () =>
+        restrito.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe('SELECT set_config($1, $2, true)', 'app.tenant_id', tenantA);
+
+          return tx.tenant.findUnique({
+            where: { id: tenantA },
+            include: { _count: { select: { students: true } } },
+          });
+        }),
+      );
+
+      expect(comEscopo?._count.students).toBeGreaterThan(0);
+    });
   });
 });

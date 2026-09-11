@@ -1,0 +1,49 @@
+/**
+ * Catalogo de planos -- le so a camada semantica (regra 2 do DS §11).
+ */
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/**
+ * O AVISO DO CATALOGO -- "alterar preco nao mexe em contrato fechado".
+ *
+ * Nao e nota de rodape: e a regra que faz esta tela nao ser o que ela parece.
+ * Quem reajusta o catalogo acreditaria estar reajustando os clientes, e
+ * descobriria o contrario so na fatura. Por isso tem moldura e fica ANTES da
+ * tabela, nao depois.
+ *
+ * Tom INFORMATIVO e nao de alerta: nada esta errado -- e como o produto
+ * funciona. Alerta gastaria o sinal que a inadimplencia precisa.
+ */
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-info) 28%, var(--ah-border-default));
+  border-radius: var(--ah-radius-card);
+  background: color-mix(in srgb, var(--ah-state-info) 6%, var(--ah-surface-raised));
+  color: var(--ah-text-default);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  max-inline-size: 84ch;
+}
+
+.aviso > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--ah-state-info);
+}
+
+.salvo {
+  margin: 0;
+  align-self: center;
+  color: var(--ah-success);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+}

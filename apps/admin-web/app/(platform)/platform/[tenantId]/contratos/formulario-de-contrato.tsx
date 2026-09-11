@@ -3,9 +3,17 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, EmptyState, Field, SelectField, useToastDeErro } from '@arenahub/ui';
+import {
+  Button,
+  EmptyState,
+  Field,
+  SectionCard,
+  SelectField,
+  useToastDeErro,
+} from '@arenahub/ui';
 
 import estilos from '../../../../formulario.module.css';
+import proprios from './contratos.module.css';
 
 import { criarContrato, type EstadoDoContrato } from '../../../../actions/contratos';
 
@@ -20,6 +28,14 @@ interface PlanoParaEscolher {
 interface Props {
   readonly tenantId: string;
   readonly planos: readonly PlanoParaEscolher[];
+  /**
+   * Já existe contrato vigente? Decide se o formulário nasce aberto.
+   *
+   * O BANCO SÓ ADMITE UM CONTRATO ATIVO POR CLIENTE (índice parcial, ADR-052
+   * §8). Com um vigente, o formulário sempre aberto oferecia um segundo
+   * contrato que a API recusaria depois de a pessoa preencher oito campos.
+   */
+  readonly temVigente: boolean;
 }
 
 function BotaoDeAbrir() {
@@ -45,8 +61,14 @@ function BotaoDeAbrir() {
  * catálogo do próximo contrato, não um índice — pedir índice e aniversário
  * neles faria a pessoa preencher um dado que nada lê.
  */
-export function FormularioDeContrato({ tenantId, planos }: Props) {
+export function FormularioDeContrato({ tenantId, planos, temVigente }: Props) {
   const [estado, acao] = useActionState(criarContrato, ESTADO_INICIAL);
+  /*
+   * Aberto quando NÃO há vigente -- abrir contrato é o que se veio fazer numa
+   * lista vazia. Com vigente, pede um clique: o segundo contrato existe (é
+   * assim que se reajusta), mas ele começa por encerrar o atual.
+   */
+  const [aberto, setAberto] = useState(!temVigente);
   const [planoId, setPlanoId] = useState(planos[0]?.id ?? '');
   /*
    * O início é CONTROLADO porque o plano por aluno reaproveita o valor dele
@@ -63,7 +85,7 @@ export function FormularioDeContrato({ tenantId, planos }: Props) {
       <EmptyState
         testId="sem-plano-para-contrato"
         title="Nenhum plano ativo no catálogo."
-        hint="Cadastre um plano SaaS antes de abrir contrato com esta academia."
+        hint="Cadastre um plano SaaS antes de abrir contrato com este cliente."
         action={
           <Button href="/platform/planos" data-testid="ir-para-planos">
             Ver planos
@@ -76,13 +98,40 @@ export function FormularioDeContrato({ tenantId, planos }: Props) {
   const escolhido = planos.find((plano) => plano.id === planoId) ?? planos[0];
   const fixo = escolhido?.model === 'FIXED_MONTHLY';
 
+  if (!aberto) {
+    return (
+      <div className={proprios['convite']}>
+        <p className={estilos['nota']}>
+          Este cliente já tem contrato vigente. Abrir outro exige encerrar o atual primeiro — o
+          banco só admite um contrato ativo por cliente.
+        </p>
+        <Button variant="outline" onClick={() => setAberto(true)} data-testid="abrir-novo-contrato">
+          Preparar contrato novo
+        </Button>
+      </div>
+    );
+  }
+
   return (
+    <SectionCard
+      title="Novo contrato"
+      icon="file-text"
+      summary="Nasce em rascunho. Fechar é um segundo ato — a partir dele o contrato é imutável e o PDF existe."
+      testId="novo-contrato"
+      {...(temVigente
+        ? {
+            actions: (
+              <Button variant="ghost" onClick={() => setAberto(false)} data-testid="cancelar-contrato">
+                Cancelar
+              </Button>
+            ),
+          }
+        : {})}
+    >
     <form className={estilos['formulario']} action={acao}>
       <input type="hidden" name="tenantId" value={tenantId} />
 
-      <fieldset className={estilos['grupo']}>
-        <legend>Novo contrato</legend>
-
+      <div className={estilos['formulario']}>
         <SelectField
           id="plano-do-contrato"
           name="planId"
@@ -222,15 +271,17 @@ export function FormularioDeContrato({ tenantId, planos }: Props) {
         )}
 
         {estado.salvo ? (
-          <p role="status" data-testid="contrato-aberto">
-            Contrato aberto em rascunho. Confira os dados e feche o contrato para gerar o PDF.
+          <p className={proprios['salvo']} role="status" data-testid="contrato-aberto">
+            Contrato aberto em rascunho. Confira os dados na tabela acima e feche o contrato para
+            gerar o PDF.
           </p>
         ) : null}
 
         <div className={estilos['acoes']}>
           <BotaoDeAbrir />
         </div>
-      </fieldset>
+      </div>
     </form>
+    </SectionCard>
   );
 }

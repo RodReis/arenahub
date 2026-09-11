@@ -3,9 +3,10 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, useToastDeErro } from '@arenahub/ui';
+import { Button, SectionCard, useToastDeErro } from '@arenahub/ui';
 
 import estilos from '../../../formulario.module.css';
+import proprios from './cliente.module.css';
 
 import {
   enviarArquivoDeMarca,
@@ -50,12 +51,13 @@ function EnvioDePeca(props: PropsDoEnvio) {
   useToastDeErro(estado.erro, 'error', `erro-do-envio-de-${props.peca}`);
 
   return (
-    <form className={estilos['grupo']} action={acao}>
+    <form className={proprios['peca']} action={acao}>
       <input type="hidden" name="tenantId" value={props.tenantId} />
       <input type="hidden" name="peca" value={props.peca} />
 
-      <p className={estilos['nota']}>
-        <strong>{props.titulo}</strong> — {props.ajuda}
+      <p className={proprios['peca-titulo']}>
+        <strong>{props.titulo}</strong>
+        <span className={estilos['nota']}>{props.ajuda}</span>
       </p>
 
       {/*
@@ -73,10 +75,20 @@ function EnvioDePeca(props: PropsDoEnvio) {
           key={String(estado.enviado)}
           className={estilos['previa']}
           src={`/marca/${encodeURIComponent(props.slug)}/${props.peca}`}
-          alt={`${props.titulo} da academia`}
+          alt={`${props.titulo} do cliente`}
           data-testid={`previa-de-${props.peca}`}
         />
-      ) : null}
+      ) : (
+        /*
+          MOLDURA VAZIA no lugar de nada: sem ela a peca enviada e a nao
+          enviada tem alturas diferentes, e as duas colunas dancam quando a
+          primeira sobe. A frase dentro dela e o canal que decide -- a moldura
+          sozinha poderia ser confundida com uma imagem que nao carregou.
+        */
+        <p className={proprios['sem-previa']} data-testid={`sem-${props.peca}`}>
+          Nenhum arquivo enviado
+        </p>
+      )}
 
       <input
         type="file"
@@ -107,7 +119,7 @@ interface Props {
 }
 
 /**
- * Logotipo e ícone da academia — F62 (ADR-052 §9).
+ * Logotipo e ícone do cliente — F62 (ADR-052 §9).
  *
  * SEPARADO do formulário de cadastro, pelo mesmo critério que já separou a
  * situação e a elevação de suporte nesta tela: envio de arquivo e edição de
@@ -120,31 +132,31 @@ interface Props {
  */
 export function ArquivosDaMarca(props: Props) {
   return (
-    <section className={estilos['formulario']} aria-labelledby="titulo-da-marca">
-      <h2 id="titulo-da-marca">Logotipo e ícone</h2>
-
-      <p className={estilos['nota']}>
-        SVG ou PNG, até 1 MB. SVG com script é recusado — exporte o vetor sem
-        script.
-      </p>
-
-      <EnvioDePeca
+    <SectionCard
+      title="Logotipo e ícone"
+      icon="image"
+      summary="SVG ou PNG, até 1 MB. SVG com script é recusado — exporte o vetor sem script."
+      testId="arquivos-da-marca"
+    >
+      <div className={proprios['pecas']}>
+        <EnvioDePeca
         tenantId={props.tenantId}
         slug={props.slug}
         peca="logo"
         titulo="Logotipo"
-        ajuda="aparece na tela de entrada da academia."
-        jaEnviado={props.temLogo}
-      />
+          ajuda="Aparece na tela de entrada do cliente."
+          jaEnviado={props.temLogo}
+        />
 
-      <EnvioDePeca
+        <EnvioDePeca
         tenantId={props.tenantId}
         slug={props.slug}
         peca="icon"
         titulo="Ícone"
-        ajuda="aparece na aba do navegador. Use um vetor quadrado."
-        jaEnviado={props.temIcone}
-      />
-    </section>
+          ajuda="Aparece na aba do navegador. Use um vetor quadrado."
+          jaEnviado={props.temIcone}
+        />
+      </div>
+    </SectionCard>
   );
 }

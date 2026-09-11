@@ -23,10 +23,30 @@ export class TenantRepository {
   constructor(private readonly db: PrismaService) {}
 
   async listar(): Promise<TenantNaLista[]> {
-    return this.db.tenant.findMany({
-      orderBy: { displayName: 'asc' },
-      include: { _count: { select: { gymUnits: true, students: true } } },
-    });
+    /*
+     * `comTenant` TAMBEM AQUI, e a razao e o defeito que a tela mostrou: o
+     * `_count.students` conta uma tabela COM POLITICA RLS (F66), e fora de
+     * transacao interceptada o `set_config` nunca aplica -- sob o role
+     * restrito ele volta ZERO.
+     *
+     * Sozinho isso ja seria errado; o que o torna VISIVEL e a combinacao com
+     * `ativosPorTenant`, que le DENTRO do contexto e devolve o numero certo.
+     * O inativo sai por complemento (`total - ativos`), entao as duas leituras
+     * em escopos diferentes produzem `0 - 401 = -401` na coluna de inativos e
+     * um total de alunos MENOR que a contagem de ativos. Visto na tela em
+     * 11/09/2026: "ALUNOS NA BASE: 0" com "401 ativos - -401 inativos".
+     *
+     * `tenants` nao tem politica, mas o `_count` aninhado atravessa para
+     * `students`, que tem -- e o Prisma tipa a contagem como numero, entao
+     * nada avisa. E a mesma classe de defeito da issue #306: a raiz volta
+     * inteira e so o aninhado vem recortado.
+     */
+    return this.db.comTenant((tx) =>
+      tx.tenant.findMany({
+        orderBy: { displayName: 'asc' },
+        include: { _count: { select: { gymUnits: true, students: true } } },
+      }),
+    );
   }
 
   /**

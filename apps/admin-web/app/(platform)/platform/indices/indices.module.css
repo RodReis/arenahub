@@ -1,0 +1,52 @@
+/**
+ * Historico do indice -- le so a camada semantica (regra 2 do DS §11).
+ */
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/*
+ * Mesmo desenho do aviso do catalogo de planos: e a regra que explica por que
+ * a tela existe, nao rodape. Tom informativo -- nada esta errado.
+ */
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-info) 28%, var(--ah-border-default));
+  border-radius: var(--ah-radius-card);
+  background: color-mix(in srgb, var(--ah-state-info) 6%, var(--ah-surface-raised));
+  color: var(--ah-text-default);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  max-inline-size: 84ch;
+}
+
+.aviso > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--ah-state-info);
+}
+
+/*
+ * DEFLACAO num tom proprio. O `-` continua sendo o canal que decide (§10 item
+ * 1); a cor so impede que ele passe batido numa coluna de doze linhas quase
+ * iguais, onde o olho le a ordem de grandeza e pula o sinal.
+ */
+.variacao[data-negativa] {
+  color: var(--ah-state-danger);
+  font-weight: 600;
+}
+
+.salvo {
+  margin: 0;
+  align-self: center;
+  color: var(--ah-success);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+}
