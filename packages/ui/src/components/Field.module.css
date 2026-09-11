@@ -159,3 +159,46 @@ select.controle {
   */
   resize: vertical;
 }
+
+/**
+ * A DICA E O CONTADOR na mesma linha, nas duas pontas.
+ *
+ * O contador empilhado abaixo da dica somava uma terceira linha sob cada
+ * campo longo e afastava o proximo rotulo -- num formulario de tres cards isso
+ * custa uma rolagem. Nas pontas, a dica ocupa a medida de leitura e o numero
+ * fica na margem direita, onde o olho ja procura quantidade.
+ *
+ * `gap` com `flex-wrap`: em coluna estreita o contador desce sozinho em vez de
+ * espremer a dica a uma palavra por linha.
+ */
+.rodape-do-campo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+
+/**
+ * O contador -- numeral tabular porque ele MUDA A CADA TECLA: sem largura
+ * fixa por digito, "111 de 500" e "119 de 500" tem larguras diferentes e o
+ * numero treme enquanto se digita.
+ */
+.contador {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-secondary);
+  transition: color var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+/**
+ * Excedido: cor E frase. A cor sozinha nao e canal (§10 item 1) -- por isso o
+ * texto troca de "480 de 500" para dizer quantos caracteres sobram cortar,
+ * que e a acao, nao o diagnostico.
+ */
+.contador[data-excedido='true'] {
+  color: var(--ah-danger);
+  font-weight: 600;
+}

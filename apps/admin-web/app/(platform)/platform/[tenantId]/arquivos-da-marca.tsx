@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useId, useState, type ChangeEvent } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button, SectionCard, useToastDeErro } from '@arenahub/ui';
@@ -48,7 +48,22 @@ function BotaoDeEnvio({ jaEnviado }: { readonly jaEnviado: boolean }) {
 function EnvioDePeca(props: PropsDoEnvio) {
   const [estado, acao] = useActionState(enviarArquivoDeMarca, ESTADO_INICIAL);
 
+  /*
+   * O NOME DO ARQUIVO ESCOLHIDO, guardado por nós.
+   *
+   * O controle nativo escrevia "Nenhum arquivo escolhido" ao lado de um botão
+   * cinza que o navegador desenha e que nenhum design system alcança -- e o
+   * texto dele vem no idioma do navegador, não no do painel. Escondendo o
+   * controle para vestir o rótulo, o nome do arquivo passa a ser nosso.
+   */
+  const [arquivo, setArquivo] = useState<string | null>(null);
+  const idDoCampo = useId();
+
   useToastDeErro(estado.erro, 'error', `erro-do-envio-de-${props.peca}`);
+
+  function aoEscolher(evento: ChangeEvent<HTMLInputElement>) {
+    setArquivo(evento.target.files?.[0]?.name ?? null);
+  }
 
   return (
     <form className={proprios['peca']} action={acao}>
@@ -90,16 +105,45 @@ function EnvioDePeca(props: PropsDoEnvio) {
         </p>
       )}
 
+      {/*
+        O CONTROLE NATIVO CONTINUA NO DOM -- é ele que o navegador abre e é
+        nele que o Playwright deposita o arquivo (`setInputFiles`). O que muda
+        é quem o usuário vê: `.esconder-campo` o tira da tela sem tirá-lo do
+        teclado (`sr-only`, não `display:none` -- este último o removeria da
+        ordem de tabulação e deixaria o envio só para quem usa mouse).
+
+        O `<label>` é o alvo visível, e é `<label>` e não `<button>` de
+        propósito: rótulo ligado ao campo por `htmlFor` já abre o seletor no
+        clique e no Enter, sem uma linha de JavaScript e sem `ref`.
+      */}
       <input
         type="file"
         name="file"
+        id={idDoCampo}
         accept={FORMATOS}
+        className={proprios['esconder-campo']}
         aria-label={`Arquivo do ${props.titulo.toLowerCase()}`}
         data-testid={`campo-de-${props.peca}`}
+        onChange={aoEscolher}
       />
 
+      <div className={proprios['escolha']}>
+        <label className={proprios['botao-de-escolha']} htmlFor={idDoCampo}>
+          {props.jaEnviado ? 'Escolher outro' : 'Escolher arquivo'}
+        </label>
+
+        {/*
+          O NOME DO ARQUIVO é a confirmação de que o certo entrou -- e o vazio
+          diz o que fazer, não o que falta: "Nenhum arquivo escolhido" do
+          navegador descreve o estado; "SVG ou PNG, até 1 MB" descreve o aceito.
+        */}
+        <span className={proprios['nome-do-arquivo']} data-testid={`nome-de-${props.peca}`}>
+          {arquivo ?? 'SVG ou PNG, até 1 MB'}
+        </span>
+      </div>
+
       {estado.enviado ? (
-        <p role="status" data-testid={`${props.peca}-enviado`}>
+        <p className={proprios['peca-enviada']} role="status" data-testid={`${props.peca}-enviado`}>
           Enviado.
         </p>
       ) : null}
