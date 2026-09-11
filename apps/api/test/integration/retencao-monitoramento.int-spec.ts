@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 
 import { AppModule } from '../../src/app.module.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { RetentionMonitoringService } from '../../src/modules/retention/retention-monitoring.service.js';
 import { RetentionScoresService } from '../../src/modules/retention/retention-scores.service.js';
@@ -33,6 +34,11 @@ describe('F41 -- producao controlada e monitoramento', () => {
   let db: PrismaService;
   let monitoramento: RetentionMonitoringService;
   let scores: RetentionScoresService;
+  /**
+   * Com o contexto de banco aberto: fora de HTTP o `TenantRlsInterceptor`
+   * nao roda, e `candidatosDoDia` le `retention_scores` trazendo `student`
+   * por `include` -- tabela com politica RLS desde a F66 (issue #306).
+   */
   let tarefas: RetentionTasksService;
 
   const sufixo = randomUUID().slice(0, 8);
@@ -161,7 +167,7 @@ describe('F41 -- producao controlada e monitoramento', () => {
     db = app.get(PrismaService);
     monitoramento = app.get(RetentionMonitoringService);
     scores = app.get(RetentionScoresService);
-    tarefas = app.get(RetentionTasksService);
+    tarefas = comContextoDeTenant(app.get(RetentionTasksService));
   });
 
   afterAll(async () => {

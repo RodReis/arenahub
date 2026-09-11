@@ -202,18 +202,24 @@ export class HealthExportService {
 
     // O QUE SAIU, e quando. Para a LGPD o que importa e o instante em que o
     // dado deixou o sistema -- e ele sai aqui, nao no pedido.
-    await this.db.auditLog.create({
-      data: {
-        tenantId: contexto.tenantId,
-        actorType: 'USER',
-        actorId: contexto.actorId,
-        action: 'health.exported',
-        target: 'student',
-        targetId: studentId,
-        correlationId,
-        metadata: { rowCount: linhas, jobId: completo.id },
-      },
-    });
+    // `comTenant`: `audit_logs` tem politica RLS (F66). ESCRITA fora de
+    // transacao interceptada nao volta vazia -- FALHA com `42501`, o mesmo
+    // erro que originou a #302. Aqui derrubaria a exportacao de saude
+    // depois de o arquivo ja ter sido gerado (issue #306).
+    await this.db.comTenant((tx) =>
+      tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'health.exported',
+          target: 'student',
+          targetId: studentId,
+          correlationId,
+          metadata: { rowCount: linhas, jobId: completo.id },
+        },
+      }),
+    );
 
     const url = await this.assinar(completo);
 

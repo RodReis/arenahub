@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import {
   AderirARecorrenciaUseCase,
@@ -119,9 +120,9 @@ describe('F56 -- plano com assinatura mensal', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     db = moduleRef.get(PrismaService);
-    aderir = moduleRef.get(AderirARecorrenciaUseCase);
+    aderir = comContextoDeTenant(moduleRef.get(AderirARecorrenciaUseCase));
     cancelar = moduleRef.get(CancelarRecorrenciaUseCase);
-    registrarMetodo = moduleRef.get(RegistrarMetodoDePagamentoUseCase);
+    registrarMetodo = comContextoDeTenant(moduleRef.get(RegistrarMetodoDePagamentoUseCase));
     fake = moduleRef.get(PAYMENT_PROVIDER);
 
     const tenant = await db.tenant.create({

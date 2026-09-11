@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { AderirARecorrenciaUseCase } from '../../src/modules/billing/aderir-a-recorrencia.use-case.js';
 import { RodarCicloDeAssinaturasUseCase } from '../../src/modules/billing/rodar-ciclo-de-assinaturas.use-case.js';
@@ -121,8 +122,8 @@ describe('F56 -- ciclo mensal de assinaturas', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     db = moduleRef.get(PrismaService);
     ciclo = moduleRef.get(RodarCicloDeAssinaturasUseCase);
-    aderir = moduleRef.get(AderirARecorrenciaUseCase);
-    registrarMetodo = moduleRef.get(RegistrarMetodoDePagamentoUseCase);
+    aderir = comContextoDeTenant(moduleRef.get(AderirARecorrenciaUseCase));
+    registrarMetodo = comContextoDeTenant(moduleRef.get(RegistrarMetodoDePagamentoUseCase));
 
     const tenant = await db.tenant.create({
       data: {

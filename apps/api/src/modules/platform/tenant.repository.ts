@@ -42,11 +42,31 @@ export class TenantRepository {
    * erro que `PlatformInvoiceUseCase.contarAlunos` evita.
    */
   async ativosPorTenant(): Promise<Map<string, number>> {
-    const grupos = await this.db.student.groupBy({
-      by: ['tenantId'],
-      where: { status: 'ACTIVE' },
-      _count: { _all: true },
-    });
+    // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+    // interceptada, o `set_config` nunca aplica -- sob o role restrito o
+    // agrupamento volta VAZIO e a lista de academias mostra zero aluno em
+    // todas, indistinguivel de base nova (issue #306).
+    //
+    // Esta e a leitura que ATRAVESSA tenant de proposito (nao ha `tenantId`
+    // no `where`), e por isso so funciona sob o contexto `platform` -- o
+    // unico que a politica deixa passar (ADR-052 SS3). O
+    // `TenantRlsInterceptor` o abre a partir do `platformContext` da sessao
+    // de Super Admin.
+    //
+    // O QUE GARANTE QUE E SEMPRE `platform`: o unico chamador e o
+    // `PlatformController`, que leva `@PlatformRoute()` na CLASSE -- toda
+    // rota dali exige sessao de plataforma. Chamada a partir de rota de
+    // tenant abriria contexto `tenant`, e ai a politica recortaria o
+    // `groupBy` a UMA academia, devolvendo zero para todas as outras na
+    // lista. Se um dia este metodo ganhar chamador fora da plataforma, ele
+    // precisa de `comContexto({ kind: 'platform' })` explicito.
+    const grupos = await this.db.comTenant((tx) =>
+      tx.student.groupBy({
+        by: ['tenantId'],
+        where: { status: 'ACTIVE' },
+        _count: { _all: true },
+      }),
+    );
 
     return new Map(grupos.map((grupo) => [grupo.tenantId, grupo._count._all]));
   }

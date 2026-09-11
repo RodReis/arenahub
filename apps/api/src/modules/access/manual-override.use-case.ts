@@ -110,10 +110,16 @@ export class ManualOverrideUseCase {
     if (!dispositivo) throw new NotFoundException({ code: 'DEVICE_NOT_FOUND' });
 
     if (temAluno) {
-      const aluno = await this.db.student.findFirst({
-        where: { id: pedido.studentId ?? '', tenantId: contexto.tenantId },
-        select: { id: true },
-      });
+      // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+      // interceptada, o `set_config` nunca aplica -- sob o role restrito a
+      // leitura volta VAZIA e o aluno legitimo vira `STUDENT_NOT_FOUND`
+      // (issue #306).
+      const aluno = await this.db.comTenant((tx) =>
+        tx.student.findFirst({
+          where: { id: pedido.studentId ?? '', tenantId: contexto.tenantId },
+          select: { id: true },
+        }),
+      );
 
       if (!aluno) throw new NotFoundException({ code: 'STUDENT_NOT_FOUND' });
     }

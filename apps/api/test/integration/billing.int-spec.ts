@@ -5,6 +5,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { BillingRepository } from '../../src/modules/billing/billing.repository.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
@@ -136,7 +137,7 @@ describe('F12 -- invoice e pagamento manual', () => {
     await app.init();
 
     db = app.get(PrismaService);
-    billing = app.get(BillingRepository);
+    billing = comContextoDeTenant(app.get(BillingRepository));
 
     Object.assign(a, await semearTenant('a'));
     Object.assign(b, await semearTenant('b'));

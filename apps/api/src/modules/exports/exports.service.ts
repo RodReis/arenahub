@@ -320,18 +320,24 @@ export class ExportsService {
 
     // O DOWNLOAD tambem e auditado, nao so o pedido: o que importa para a
     // LGPD e quando o dado saiu, e ele sai aqui.
-    await this.db.auditLog.create({
-      data: {
-        tenantId: contexto.tenantId,
-        actorType: 'USER',
-        actorId: contexto.actorId,
-        action: 'exports.downloaded',
-        target: 'data_export_job',
-        targetId: job.id,
-        correlationId,
-        metadata: { rowCount: job.rowCount },
-      },
-    });
+    // `comTenant`: `audit_logs` tem politica RLS (F66). ESCRITA fora de
+    // transacao interceptada nao volta vazia -- FALHA com `42501`, o mesmo
+    // erro que originou a #302. Aqui derrubaria o download inteiro
+    // (issue #306).
+    await this.db.comTenant((tx) =>
+      tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'exports.downloaded',
+          target: 'data_export_job',
+          targetId: job.id,
+          correlationId,
+          metadata: { rowCount: job.rowCount },
+        },
+      }),
+    );
 
     return url;
   }

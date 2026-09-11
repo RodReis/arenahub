@@ -199,14 +199,22 @@ export class RetentionTasksRepository implements PortaDeTarefas {
       return [];
     }
 
-    const scores = await this.prisma.retentionScore.findMany({
-      where: { tenantId: contexto.tenantId, observedAt: ultimo.observedAt },
-      orderBy: [{ value: 'desc' }, { id: 'asc' }],
-      include: {
-        factors: { orderBy: { position: 'asc' }, take: 1 },
-        student: { select: { gymUnitId: true } },
-      },
-    });
+    // `comTenant` embora a raiz seja `retention_scores`: o `include` traz
+    // `student`, que TEM politica RLS (F66). Fora de transacao interceptada o
+    // `set_config` nunca aplica, e sob o role restrito o aninhado vem NULO
+    // enquanto a raiz volta inteira -- o Prisma tipa a relacao como nao-nula,
+    // entao nem o TypeScript nem o teste avisam (issue #306). Aqui o dano
+    // seria a unidade do aluno sumir do filtro da fila de retencao.
+    const scores = await this.prisma.comTenant((tx) =>
+      tx.retentionScore.findMany({
+        where: { tenantId: contexto.tenantId, observedAt: ultimo.observedAt },
+        orderBy: [{ value: 'desc' }, { id: 'asc' }],
+        include: {
+          factors: { orderBy: { position: 'asc' }, take: 1 },
+          student: { select: { gymUnitId: true } },
+        },
+      }),
+    );
 
     // Uma consulta para todas as tarefas dos alunos do dia, em vez de N+1.
     const tarefas = await this.prisma.retentionTask.findMany({

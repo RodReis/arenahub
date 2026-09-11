@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import {
   CobrancaEsgotadaError,
@@ -84,8 +85,8 @@ describe('F14 -- cartao, recorrencia e politica de retry', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     db = moduleRef.get(PrismaService);
-    registrarMetodo = moduleRef.get(RegistrarMetodoDePagamentoUseCase);
-    cobrar = moduleRef.get(CobrarAssinaturaNoCartaoUseCase);
+    registrarMetodo = comContextoDeTenant(moduleRef.get(RegistrarMetodoDePagamentoUseCase));
+    cobrar = comContextoDeTenant(moduleRef.get(CobrarAssinaturaNoCartaoUseCase));
     cancelar = moduleRef.get(CancelarRecorrenciaUseCase);
     fake = moduleRef.get(PAYMENT_PROVIDER);
 

@@ -275,10 +275,16 @@ export class BillingRepository {
     contexto: TenantContext,
     studentId: string,
   ): Promise<InvoicesDoAlunoComFuso> {
-    const aluno = await this.db.student.findFirst({
-      where: { id: studentId, tenantId: contexto.tenantId },
-      include: { gymUnit: { select: { timezone: true } } },
-    });
+    // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+    // interceptada, o `set_config` nunca aplica -- sob o role restrito a
+    // leitura volta VAZIA e o aluno legitimo vira "nao encontrado"
+    // (issue #306).
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { id: studentId, tenantId: contexto.tenantId },
+        include: { gymUnit: { select: { timezone: true } } },
+      }),
+    );
 
     if (!aluno) {
       throw new AlunoNaoEncontradoError();

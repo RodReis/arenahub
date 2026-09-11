@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { ConciliarMovimentosUseCase } from '../../src/modules/billing/conciliar-movimentos.use-case.js';
 import {
@@ -176,7 +177,7 @@ describe('F16 -- estorno, conciliacao e recibo', () => {
     observar = moduleRef.get(ObservarEstornoUseCase);
     conciliar = moduleRef.get(ConciliarMovimentosUseCase);
     resolver = moduleRef.get(ResolverDivergenciaUseCase);
-    recibo = moduleRef.get(EmitirReciboUseCase);
+    recibo = comContextoDeTenant(moduleRef.get(EmitirReciboUseCase));
     provedor = moduleRef.get(PAYMENT_PROVIDER);
 
     const tenant = await db.tenant.create({

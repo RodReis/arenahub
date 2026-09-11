@@ -235,10 +235,16 @@ export class EngagementRepository implements PortaDeEngajamento {
   constructor(private readonly db: PrismaService) {}
 
   async buscarAluno(tenantId: string, studentId: string): Promise<AlunoParaExposicao | null> {
-    const aluno = await this.db.student.findFirst({
-      where: { id: studentId, tenantId },
-      select: { id: true, tenantId: true, fullName: true, status: true, birthDate: true },
-    });
+    // `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+    // interceptada, o `set_config` nunca aplica -- sob o role restrito a
+    // leitura volta VAZIA e o aluno legitimo vira "nao encontrado"
+    // (issue #306).
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { id: studentId, tenantId },
+        select: { id: true, tenantId: true, fullName: true, status: true, birthDate: true },
+      }),
+    );
 
     return aluno;
   }
@@ -462,12 +468,20 @@ export class EngagementRepository implements PortaDeEngajamento {
     status: StatusDoPerfilPublico,
     limite: number,
   ): Promise<PerfilParaModeracao[]> {
-    const perfis = await this.db.publicProfile.findMany({
-      where: { tenantId, status },
-      orderBy: [{ createdAt: 'asc' }],
-      take: limite,
-      include: { student: { select: { fullName: true } } },
-    });
+    // `comTenant` embora a raiz seja `public_profiles`: o `include` traz
+    // `student`, que TEM politica RLS (F66). Fora de transacao interceptada o
+    // `set_config` nunca aplica, e sob o role restrito o aninhado vem NULO
+    // enquanto a raiz volta inteira -- o Prisma tipa a relacao como nao-nula,
+    // entao o `perfil.student.fullName` logo abaixo estoura em runtime
+    // (issue #306).
+    const perfis = await this.db.comTenant((tx) =>
+      tx.publicProfile.findMany({
+        where: { tenantId, status },
+        orderBy: [{ createdAt: 'asc' }],
+        take: limite,
+        include: { student: { select: { fullName: true } } },
+      }),
+    );
 
     return perfis.map((perfil) => ({
       ...paraPerfilPublico(perfil),
@@ -555,12 +569,18 @@ export class EngagementRepository implements PortaDeEngajamento {
     limite: number,
     escopo: EscopoDeUnidade,
   ): Promise<ContestacaoParaFila[]> {
-    const linhas = await this.db.engagementDispute.findMany({
-      where: { tenantId, status, ...filtroDeUnidade(escopo) },
-      orderBy: [{ createdAt: 'asc' }],
-      take: limite,
-      include: { student: { select: { fullName: true } } },
-    });
+    // `comTenant` pelo `student` aninhado -- e tambem porque
+    // `filtroDeUnidade` FILTRA por `student.gymUnitId`. Ver a nota em
+    // `listarPorStatus`: aqui o `linha.student.fullName` logo abaixo estoura
+    // em runtime (issue #306).
+    const linhas = await this.db.comTenant((tx) =>
+      tx.engagementDispute.findMany({
+        where: { tenantId, status, ...filtroDeUnidade(escopo) },
+        orderBy: [{ createdAt: 'asc' }],
+        take: limite,
+        include: { student: { select: { fullName: true } } },
+      }),
+    );
 
     return linhas.map((linha) => ({
       ...paraContestacao(linha),
@@ -589,25 +609,33 @@ export class EngagementRepository implements PortaDeEngajamento {
    * daria quase zero numa academia inteira -- o oposto da verdade.
    */
   async indicadores(tenantId: string): Promise<IndicadoresDeEngajamento> {
+    // `comTenant` em volta dos CINCO: o primeiro conta `students` e o segundo
+    // FILTRA por `student`, e `students` tem politica RLS (F66). Fora de
+    // transacao interceptada o `set_config` nunca aplica, e sob o role
+    // restrito ambos voltam ZERO -- o painel diz "nenhum aluno ativo" sem
+    // erro nem log (issue #306). Uma transacao so, e nao cinco: o
+    // `set_config` custa uma ida ao banco por transacao aberta.
     const [alunosAtivos, optOut, apelidosPendentes, apelidosOcultos, contestacoesAbertas] =
-      await Promise.all([
-        this.db.student.count({ where: { tenantId, status: 'ACTIVE' } }),
-        // So conta o opt-out de quem esta ATIVO: aluno inativo ja nao aparece
-        // em exposicao nenhuma (INV-155), e conta-lo aqui faria a soma de
-        // participantes + opt-out passar do total de ativos.
-        this.db.consentRecord.count({
-          where: {
-            tenantId,
-            document: { type: 'RANKING' },
-            decision: 'REFUSED',
-            supersededAt: null,
-            student: { status: 'ACTIVE' },
-          },
-        }),
-        this.db.publicProfile.count({ where: { tenantId, status: 'PENDING' } }),
-        this.db.publicProfile.count({ where: { tenantId, status: 'HIDDEN' } }),
-        this.db.engagementDispute.count({ where: { tenantId, status: 'ABERTA' } }),
-      ]);
+      await this.db.comTenant((tx) =>
+        Promise.all([
+          tx.student.count({ where: { tenantId, status: 'ACTIVE' } }),
+          // So conta o opt-out de quem esta ATIVO: aluno inativo ja nao aparece
+          // em exposicao nenhuma (INV-155), e conta-lo aqui faria a soma de
+          // participantes + opt-out passar do total de ativos.
+          tx.consentRecord.count({
+            where: {
+              tenantId,
+              document: { type: 'RANKING' },
+              decision: 'REFUSED',
+              supersededAt: null,
+              student: { status: 'ACTIVE' },
+            },
+          }),
+          tx.publicProfile.count({ where: { tenantId, status: 'PENDING' } }),
+          tx.publicProfile.count({ where: { tenantId, status: 'HIDDEN' } }),
+          tx.engagementDispute.count({ where: { tenantId, status: 'ABERTA' } }),
+        ]),
+      );
 
     return {
       alunosAtivos,
