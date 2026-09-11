@@ -39,6 +39,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][SPEC-069][F69] Superfícies contratadas: mobile e totem como flag negociável do plano e do contrato (#317, finalizado em: 2026-09-11)
 - [MVP7][FIX] menu de plataforma nao destaca a tela atual e demais defeitos de UI na area de clientes (#315, finalizado em: 2026-09-11)
 - [MVP7][INFRA] UI da área de plataforma: layout, abas, máscaras e as ações que a API já oferecia (#313, finalizado em: 2026-09-11)
 - [MVP7][FIX] platform admin cai no painel de tenant apos login e recebe AUTH_REQUIRED (#311, finalizado em: 2026-09-11)
@@ -50,8 +51,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
+- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
