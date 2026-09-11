@@ -110,6 +110,12 @@ test('o dono do SaaS cria a academia e entra nela como suporte', async ({ page, 
   await expect(linha).toBeVisible();
   await linha.getByTestId('abrir-academia').click();
 
+  /*
+   * SUPORTE É UMA ABA desde a F68, e o painel inativo fica montado com
+   * `hidden` -- o botao existe no DOM antes do clique na aba, e clicar nele
+   * direto trava ate o timeout em vez de falhar dizendo o que falta.
+   */
+  await page.getByTestId('aba-contato').click();
   await page.getByTestId('elevar').click();
   await page
     .getByTestId('justificativa')
@@ -368,7 +374,13 @@ test('o dono do SaaS cadastra plano e abre contrato com a academia', async ({ pa
   const linhaDoContrato = page.getByRole('row').filter({ hasText: '01/03/2026' });
   await expect(linhaDoContrato).toContainText('R$ 7,50');
   await expect(linhaDoContrato).toContainText('Rascunho');
-  await expect(linhaDoContrato.getByTestId('fechar-contrato')).toBeVisible();
+  /*
+   * FECHAR VIROU ITEM DE MENU na F68, e o menu e popover nativo: o item so
+   * existe no DOM depois que o gatilho abre. Assertar o gatilho sozinho nao
+   * provaria que o rascunho oferece o fechamento.
+   */
+  await linhaDoContrato.getByTestId('acoes-do-contrato').click();
+  await expect(page.getByTestId('menu-fechar')).toBeVisible();
 
   /*
    * O FECHAMENTO NÃO ENTRA NESTA JORNADA, e a omissão é decisão, não
