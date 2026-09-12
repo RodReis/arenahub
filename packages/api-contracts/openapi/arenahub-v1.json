@@ -6351,6 +6351,214 @@
         ]
       }
     },
+    "/api/v1/mobile/plano": {
+      "get": {
+        "operationId": "MobilePlanoController_obter",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Plano do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "AVAILABLE",
+                        "UNAVAILABLE"
+                      ]
+                    },
+                    "plano": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "situacao": {
+                          "type": "string",
+                          "enum": [
+                            "SCHEDULED",
+                            "ACTIVE",
+                            "SUSPENDED",
+                            "REVOKED",
+                            "EXPIRED"
+                          ]
+                        },
+                        "inicioEm": {
+                          "type": "string"
+                        },
+                        "fimEm": {
+                          "type": "string"
+                        },
+                        "nome": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "situacao",
+                        "inicioEm",
+                        "fimEm",
+                        "nome"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "status",
+                    "plano"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobilePlano"
+        ]
+      }
+    },
+    "/api/v1/mobile/frequencia": {
+      "get": {
+        "operationId": "MobileFrequenciaController_obter",
+        "parameters": [
+          {
+            "name": "periodo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "30D",
+                "90D",
+                "6M",
+                "1Y",
+                "ALL"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularidade",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "SEMANAL",
+                "MENSAL",
+                "ANUAL"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Frequência do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "AVAILABLE",
+                        "UNAVAILABLE"
+                      ]
+                    },
+                    "periodo": {
+                      "type": "string",
+                      "enum": [
+                        "30D",
+                        "90D",
+                        "6M",
+                        "1Y",
+                        "ALL"
+                      ]
+                    },
+                    "granularidade": {
+                      "type": "string",
+                      "enum": [
+                        "SEMANAL",
+                        "MENSAL",
+                        "ANUAL"
+                      ]
+                    },
+                    "totalDeSessoes": {
+                      "type": "number"
+                    },
+                    "totalDePassagens": {
+                      "type": "number"
+                    },
+                    "baldes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rotulo": {
+                            "type": "string"
+                          },
+                          "sessoes": {
+                            "type": "number"
+                          },
+                          "passagens": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "rotulo",
+                          "sessoes",
+                          "passagens"
+                        ]
+                      }
+                    },
+                    "consistencia": {
+                      "type": "object",
+                      "properties": {
+                        "semanasComSessao": {
+                          "type": "number"
+                        },
+                        "semanasElegiveis": {
+                          "type": "number"
+                        },
+                        "proporcao": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "semanasComSessao",
+                        "semanasElegiveis",
+                        "proporcao"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "status",
+                    "periodo",
+                    "granularidade",
+                    "totalDeSessoes",
+                    "totalDePassagens",
+                    "baldes",
+                    "consistencia"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileFrequencia"
+        ]
+      }
+    },
     "/api/v1/admin/kiosk-devices": {
       "get": {
         "operationId": "KioskAdminController_listar",

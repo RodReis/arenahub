@@ -19,6 +19,8 @@ const renderizar = (dados: Partial<DadosDaHome> = {}) =>
         dados={{ ...base, ...dados }}
         onSair={jest.fn()}
         onAtualizarApp={jest.fn()}
+        onVerPlano={jest.fn()}
+        onVerFrequencia={jest.fn()}
       />
     </ProvedorDeTema>,
   );

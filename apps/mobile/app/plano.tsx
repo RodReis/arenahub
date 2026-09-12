@@ -1,38 +1,32 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Redirect, router } from 'expo-router';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { Redirect } from 'expo-router';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSessao } from '@/auth/sessao';
-import { Home, type DadosDaHome } from '@/features/inicio/home';
+import { Plano, type DadosDoPlano } from '@/features/plano/plano';
 import { useTema } from '@/ui/theme';
 
 /**
- * Rota protegida da Home.
+ * Rota protegida do plano -- Slice 4.2.
  *
  * Falha de rede vira `UNAVAILABLE`, e nao tela de erro: o `M4-NFR-002` pede
- * shell util durante indisponibilidade. O aluno que abriu o app na catraca
- * precisa de alguma tela, nao de um alerta.
+ * shell util durante indisponibilidade. E aqui a regra pesa mais que na Home
+ * -- um plano antigo exibido como atual faz o aluno sair de casa contando com
+ * um direito que pode ter vencido.
  */
-export default function Inicio() {
+export default function TelaDoPlano() {
   const t = useTema();
   const inset = useSafeAreaInsets();
-  const { estado, cliente, sair } = useSessao();
+  const { estado, cliente } = useSessao();
 
-  const [dados, setDados] = useState<DadosDaHome | null>(null);
+  const [dados, setDados] = useState<DadosDoPlano | null>(null);
 
   const carregar = useCallback(async () => {
     try {
-      setDados((await cliente.get('/api/v1/mobile/home')) as DadosDaHome);
+      setDados((await cliente.get('/api/v1/mobile/plano')) as DadosDoPlano);
     } catch {
-      // Sem conteudo, mas COM shell. A ausencia de dado aparece como
-      // ausencia -- nunca como dado antigo apresentado como atual.
-      setDados({
-        asOf: new Date().toISOString(),
-        status: 'UNAVAILABLE',
-        saudacao: '',
-        versionPolicy: { state: 'SUPPORTED', updateUrl: null },
-      });
+      setDados({ asOf: new Date().toISOString(), status: 'UNAVAILABLE', plano: null });
     }
   }, [cliente]);
 
@@ -58,17 +52,7 @@ export default function Inicio() {
         { paddingTop: Math.max(inset.top, t.size.safeAreaTop) },
       ]}
     >
-      <Home
-        dados={dados}
-        onSair={() => void sair()}
-        onAtualizarApp={() => {
-          const url = dados.versionPolicy.updateUrl;
-          if (url) void Linking.openURL(url);
-        }}
-        onVerPlano={() => router.push('/plano')}
-        onVerFrequencia={() => router.push('/frequencia')}
-        testID="home"
-      />
+      <Plano dados={dados} testID="plano" />
     </ScrollView>
   );
 }
