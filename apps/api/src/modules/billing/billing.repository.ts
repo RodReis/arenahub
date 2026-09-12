@@ -368,6 +368,27 @@ export class BillingRepository {
   }
 
   /**
+   * O pagamento E do aluno? Mesmo raciocinio de `buscarTentativaDoAluno`,
+   * pelo lado do `Payment` -- usado pela F25 antes de emitir recibo mobile.
+   * Sem isso, uma sessao mobile valida emitiria recibo de qualquer pagamento
+   * do tenant trocando um UUID.
+   */
+  async buscarPagamentoDoAluno(
+    contexto: TenantContext,
+    studentId: string,
+    paymentId: string,
+  ): Promise<{ id: string } | null> {
+    return this.db.payment.findFirst({
+      where: {
+        id: paymentId,
+        tenantId: contexto.tenantId,
+        invoice: { studentId, tenantId: contexto.tenantId },
+      },
+      select: { id: true },
+    });
+  }
+
+  /**
    * Proximo numero de invoice do tenant.
    *
    * Mesmo padrao de `StudentRepository.proximaMatricula`, e pelas mesmas
