@@ -272,12 +272,32 @@ export default async function PaginaDeContratos({
               do contrato ATIVO do tenant, e atribuí-la a um rascunho ou a um
               encerrado diria que eles cobram algo.
             */
-            render: (c) =>
-              c.status === 'ACTIVE' && previa ? (
-                <Money cents={previa.totalMinor} currency={previa.currency} />
-              ) : (
-                '—'
-              ),
+            render: (c) => {
+              if (c.status !== 'ACTIVE' || !previa) return '—';
+
+              return (
+                <>
+                  <Money cents={previa.totalMinor} currency={previa.currency} />
+                  {/*
+                    A CONTAGEM SOB O VALOR, e ela é o ponto quando o total é
+                    zero: `R$ 0,00` sozinho lê-se como defeito da tela, e a
+                    pergunta ("por que está zerado?") foi feita na primeira vez
+                    que a coluna apareceu. Com "0 ativos · 0 inativos" embaixo,
+                    o zero se explica sozinho -- a academia não tem aluno, e é
+                    isso que o modelo por aluno cobra.
+
+                    No modelo fixo a contagem não entra na conta (a prévia a
+                    zera de propósito, F64), então a linha some em vez de
+                    afirmar zero aluno para quem tem mil.
+                  */}
+                  {c.model === 'PER_STUDENT' ? (
+                    <div className={estilos['variacao']}>
+                      {previa.activeCount} ativos · {previa.inactiveCount} inativos
+                    </div>
+                  ) : null}
+                </>
+              );
+            },
           },
           {
             key: 'reajuste',
