@@ -294,6 +294,11 @@ enum StudentTimelineEventType {
   BIOMETRIC_CONSENT_ACCEPTED
   BIOMETRIC_CONSENT_REFUSED
   BIOMETRIC_CONSENT_REVOKED
+  /// Consentimento de tipo nao-biometrico decidido pelo proprio aluno (F26).
+  /// O tipo (TERMS, PRIVACY, HEALTH, MARKETING...) vai no `payload`: um
+  /// evento por tipo multiplicaria o enum a cada termo novo.
+  CONSENT_ACCEPTED
+  CONSENT_REVOKED
   BIOMETRIC_IDENTITY_CREATED
   BIOMETRIC_IDENTITY_REVOKED
   BIOMETRIC_IDENTITY_DELETED
@@ -315,6 +320,15 @@ enum ConsentDocumentType {
   HEALTH
 
   AI_ANALYSIS
+
+  /// Termo de uso do app. OPT-IN. F26.
+  TERMS
+
+  /// Politica de privacidade. OPT-IN. F26.
+  PRIVACY
+
+  /// Comunicacao de marketing. OPT-OUT. F26.
+  MARKETING
 
   /// Aparecer em ranking. OPT-OUT.
   RANKING

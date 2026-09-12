@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { DataExportJob } from '@arenahub/database';
 
 import {
@@ -24,16 +24,24 @@ import { cabecalhoDeMedida, linhaDeMedida } from './domain/csv-de-saude.js';
  * `linhaDeEvento`, `carregarFusos`. Torna-lo generico mexeria em F11 ja
  * entregue e testada, contra a regra de alteracao cirurgica do `CLAUDE.md`.
  *
- * ## Sincrono, e por que isso e correto AQUI
+ * ## Assincrono desde a F26 -- e por que MUDOU
  *
- * A F11 e assincrona porque exporta ate 100 mil eventos de acesso. O
- * historico de UM aluno tem dezenas de avaliacoes -- o laudo real de
- * 03/08/2026 tem 15 medidas; cinco anos de avaliacoes trimestrais dao 300
- * linhas. Montar isso em background, com polling e segunda chamada para o
- * link, custaria mais ao operador do que a espera de menos de um segundo.
+ * Ate 12/09/2026 este servico montava o CSV dentro da requisicao, e o
+ * comentario aqui defendia a escolha: o historico de UM aluno tem dezenas de
+ * avaliacoes, e a espera era de menos de um segundo.
  *
- * O job continua sendo gravado: a auditoria precisa saber que o dado saiu, e
- * `M3-NFR-008` exige exportacao com politica LGPD testada.
+ * O que mudou nao foi o volume, foi QUEM PEDE. Pelo painel, quem exporta e a
+ * recepcao, numa rede boa, olhando a tela ate o download comecar. Pelo app
+ * (`M4-FR-013`, Slice 4.4) quem pede e o aluno, no celular, e a Slice exige
+ * "exportacao solicitada de forma ASSINCRONA" -- decisao do PI em
+ * 12/09/2026. Segurar a resposta HTTP enquanto o arquivo sobe para o storage
+ * amarra a tela do aluno a uma latencia que nao e dele.
+ *
+ * O caminho passa a ser o mesmo da F11: `solicitar` grava `PENDING` e
+ * devolve na hora; `processar` roda em background; o cliente consulta o job
+ * ate `COMPLETED` e so entao pede o link. Os dois chamadores -- painel e app
+ * -- usam o mesmo fluxo, porque duas politicas de exportacao para o mesmo
+ * dado dariam dois lugares para o expurgo errar.
  */
 
 /** Vida da URL de download. Curta: o arquivo carrega dado de saude. */
@@ -54,6 +62,8 @@ const BOM_UTF8 = String.fromCharCode(0xfeff);
 
 @Injectable()
 export class HealthExportService {
+  private readonly log = new Logger(HealthExportService.name);
+
   constructor(
     private readonly db: PrismaService,
     private readonly avaliacoes: AssessmentRepository,
@@ -63,17 +73,23 @@ export class HealthExportService {
   ) {}
 
   /**
-   * Monta o CSV do historico do aluno e devolve o link de download.
+   * Registra o pedido e devolve o job SEM esperar o arquivo (`M4-FR-013`).
    *
    * `idempotencyKey` por `(tenant, solicitante, chave)`, como na F11: clique
-   * duplo no botao devolve o MESMO arquivo, nao dois.
+   * duplo no botao devolve o MESMO job, nao dois arquivos.
+   *
+   * `requesterId` e o solicitante -- o usuario do painel, ou o PROPRIO ALUNO
+   * quando o pedido vem do app. A coluna nao tem FK para `users` (nunca
+   * teve), entao o id do aluno cabe ali, e a unique passa a isolar por
+   * titular: dois alunos podem usar a mesma `idempotencyKey` sem colidir.
    */
-  async exportar(
+  async solicitar(
     contexto: TenantContext,
     studentId: string,
+    requesterId: string,
     idempotencyKey: string,
     correlationId: string,
-  ): Promise<{ job: DataExportJob; downloadUrl: string; expiresAt: string }> {
+  ): Promise<DataExportJob> {
     const aluno = await this.alunos.encontrar(contexto, studentId);
 
     if (aluno === null) {
@@ -81,30 +97,151 @@ export class HealthExportService {
     }
 
     const existente = await this.db.dataExportJob.findFirst({
+      where: { tenantId: contexto.tenantId, requesterId, idempotencyKey },
+    });
+
+    // Pedido repetido devolve o MESMO job, em qualquer estado: quem clicou de
+    // novo acompanha o que ja esta rodando. Reprocessar um `FAILED` seria
+    // pedido novo, com chave nova -- reusar a chave para tentar de novo
+    // apagaria o registro da falha, que a auditoria precisa ver.
+    if (existente !== null) return existente;
+
+    const job = await this.db.$transaction(async (tx) => {
+      const criado = await tx.dataExportJob.create({
+        data: {
+          tenantId: contexto.tenantId,
+          requesterId,
+          type: 'HEALTH_HISTORY',
+          status: 'PENDING',
+          filters: { studentId },
+          idempotencyKey,
+          expiresAt: new Date(Date.now() + VALIDADE_DO_ARQUIVO_HORAS * 3_600_000),
+        },
+      });
+
+      // Quem pediu, o que pediu e quando -- ANTES de o arquivo existir. Dado
+      // de saude saindo da empresa e o evento que a auditoria precisa ver
+      // mesmo quando a geracao falha depois.
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'health.export_requested',
+          target: 'data_export_job',
+          targetId: criado.id,
+          correlationId,
+          metadata: { studentId },
+        },
+      });
+
+      return criado;
+    });
+
+    // Dispara e NAO espera -- e o que torna a resposta imediata.
+    //
+    // ⚠️ LIMITE CONHECIDO, o mesmo da F11: se o processo cair no meio, o job
+    // fica `RUNNING` para sempre e ninguem o retoma. Aceitavel enquanto ha
+    // uma instancia e exportacao e ato manual; com varias instancias isto
+    // vira job duravel com lease. Registrado para nao ser descoberto em
+    // producao.
+    void this.processar(contexto, job.id, correlationId).catch((erro: unknown) => {
+      this.log.error(
+        `exportacao de saude ${job.id} falhou: ${erro instanceof Error ? erro.message : 'erro'}`,
+      );
+    });
+
+    return job;
+  }
+
+  /**
+   * Estado do job, para o cliente acompanhar ate `COMPLETED`.
+   *
+   * `requesterId` RESTRINGE ao solicitante quando informado, e o app SEMPRE o
+   * informa: sem ele, um id de job adivinhado dentro do mesmo tenant daria o
+   * historico de saude de outro aluno. O painel omite de proposito -- quem
+   * tem `health.read` acompanha a exportacao que a colega pediu.
+   */
+  async consultar(
+    contexto: TenantContext,
+    jobId: string,
+    requesterId?: string,
+  ): Promise<DataExportJob> {
+    const job = await this.db.dataExportJob.findFirst({
       where: {
+        id: jobId,
         tenantId: contexto.tenantId,
-        requesterId: contexto.actorId,
-        idempotencyKey,
+        type: 'HEALTH_HISTORY',
+        ...(requesterId === undefined ? {} : { requesterId }),
       },
     });
 
-    // Job repetido que ja completou devolve o MESMO arquivo. Um que falhou ou
-    // ficou pelo caminho nao serve de resposta: quem clicou de novo quer o
-    // dado, nao a lembranca de um erro.
-    if (existente !== null && existente.status === 'COMPLETED' && existente.objectKey !== null) {
-      if (existente.expiresAt !== null && existente.expiresAt <= new Date()) {
-        throw new ConflictException({ code: 'EXPORT_EXPIRED' });
-      }
+    // 404 e nao 403 para job de outro solicitante: responder "existe, mas nao
+    // e seu" confirmaria a existencia de uma exportacao alheia.
+    if (job === null) {
+      throw new NotFoundException({ code: 'EXPORT_NOT_FOUND' });
+    }
 
-      const url = await this.assinar(existente);
+    return job;
+  }
 
-      return { job: existente, ...url };
+  /**
+   * Link de download do job pronto.
+   *
+   * Separado da consulta de proposito: a URL assinada vive 300 segundos, e
+   * gera-la a cada polling produziria uma fila de links vivos para dado de
+   * saude. O cliente pede o link uma vez, quando vai baixar.
+   */
+  async baixar(
+    contexto: TenantContext,
+    jobId: string,
+    requesterId?: string,
+  ): Promise<{ downloadUrl: string; expiresAt: string }> {
+    const job = await this.consultar(contexto, jobId, requesterId);
+
+    if (job.status !== 'COMPLETED') {
+      throw new ConflictException({ code: 'EXPORT_NOT_READY' });
+    }
+
+    if (job.expiresAt !== null && job.expiresAt <= new Date()) {
+      throw new ConflictException({ code: 'EXPORT_EXPIRED' });
+    }
+
+    return this.assinar(job);
+  }
+
+  /** Monta o CSV e grava no storage privado. Roda FORA da requisicao. */
+  async processar(contexto: TenantContext, jobId: string, correlationId: string): Promise<void> {
+    const job = await this.db.dataExportJob.findFirst({
+      where: { id: jobId, tenantId: contexto.tenantId },
+    });
+
+    // Job que nao esta `PENDING` ja foi processado, ou esta sendo agora: nao
+    // ha o que refazer, e refazer sobrescreveria o arquivo que alguem pode
+    // estar baixando.
+    if (!job || job.status !== 'PENDING') return;
+
+    const studentId = (job.filters as { studentId: string }).studentId;
+
+    await this.db.dataExportJob.update({
+      where: { id: jobId },
+      data: { status: 'RUNNING', startedAt: new Date() },
+    });
+
+    const aluno = await this.alunos.encontrar(contexto, studentId);
+
+    if (aluno === null) {
+      await this.falhar(jobId, 'STUDENT_NOT_FOUND');
+
+      return;
     }
 
     const unidade = await this.unidades.encontrar(contexto, aluno.gymUnitId);
 
     if (unidade === null) {
-      throw new NotFoundException({ code: 'GYM_UNIT_NOT_FOUND' });
+      await this.falhar(jobId, 'GYM_UNIT_NOT_FOUND');
+
+      return;
     }
 
     // TODAS as publicadas, sem corte de periodo: a exportacao e a prova
@@ -144,28 +281,6 @@ export class HealthExportService {
       }
     }
 
-    const agora = new Date();
-
-    const job = await this.db.dataExportJob.upsert({
-      where: {
-        tenantId_requesterId_idempotencyKey: {
-          tenantId: contexto.tenantId,
-          requesterId: contexto.actorId,
-          idempotencyKey,
-        },
-      },
-      create: {
-        tenantId: contexto.tenantId,
-        requesterId: contexto.actorId,
-        type: 'HEALTH_HISTORY',
-        status: 'RUNNING',
-        filters: { studentId },
-        idempotencyKey,
-        startedAt: agora,
-      },
-      update: { status: 'RUNNING', startedAt: agora, errorCode: null },
-    });
-
     const chave = `exports/${contexto.tenantId}/health/${job.id}.csv`;
 
     try {
@@ -175,16 +290,7 @@ export class HealthExportService {
         contentType: 'text/csv; charset=utf-8',
       });
     } catch (erro: unknown) {
-      await this.db.dataExportJob.update({
-        where: { id: job.id },
-        data: {
-          status: 'FAILED',
-          // Codigo estavel, nunca a mensagem crua: ela carrega trecho de
-          // query, e query de saude carrega id de aluno.
-          errorCode: 'EXPORT_PROCESSING_FAILED',
-          completedAt: new Date(),
-        },
-      });
+      await this.falhar(job.id, 'EXPORT_PROCESSING_FAILED');
 
       throw erro;
     }
@@ -221,9 +327,19 @@ export class HealthExportService {
       }),
     );
 
-    const url = await this.assinar(completo);
+  }
 
-    return { job: completo, ...url };
+  /**
+   * Marca o job como falho com codigo ESTAVEL.
+   *
+   * Nunca a mensagem crua: ela carrega trecho de query, e query de saude
+   * carrega id de aluno.
+   */
+  private async falhar(jobId: string, errorCode: string): Promise<void> {
+    await this.db.dataExportJob.update({
+      where: { id: jobId },
+      data: { status: 'FAILED', errorCode, completedAt: new Date() },
+    });
   }
 
   private async assinar(job: DataExportJob): Promise<{ downloadUrl: string; expiresAt: string }> {

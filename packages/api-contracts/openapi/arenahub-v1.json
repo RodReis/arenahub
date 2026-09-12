@@ -5565,6 +5565,111 @@
         ]
       }
     },
+    "/api/v1/health-exports/{id}": {
+      "get": {
+        "operationId": "HealthProgressController_consultarExportacao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado do job de exportacao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING",
+                        "RUNNING",
+                        "COMPLETED",
+                        "FAILED",
+                        "CANCELLED"
+                      ]
+                    },
+                    "rowCount": {
+                      "type": "number"
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "rowCount",
+                    "errorCode",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "HealthProgress"
+        ]
+      }
+    },
+    "/api/v1/health-exports/{id}/download": {
+      "post": {
+        "operationId": "HealthProgressController_baixarExportacao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link temporario do arquivo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "downloadUrl": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "downloadUrl",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "HealthProgress"
+        ]
+      }
+    },
     "/api/v1/health-goals/{id}/close": {
       "post": {
         "operationId": "HealthProgressController_encerrarMeta",
@@ -6867,6 +6972,445 @@
         },
         "tags": [
           "MobileFinanceiro"
+        ]
+      }
+    },
+    "/api/v1/mobile/avaliacoes": {
+      "get": {
+        "operationId": "MobileAvaliacoesController_listar",
+        "parameters": [
+          {
+            "name": "periodo",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historico corporal do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "periodo": {
+                      "type": "string",
+                      "enum": [
+                        "30D",
+                        "90D",
+                        "6M",
+                        "1Y",
+                        "ALL"
+                      ]
+                    },
+                    "series": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tipo": {
+                            "type": "string"
+                          },
+                          "unidade": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "pontos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "avaliacaoId": {
+                                  "type": "string"
+                                },
+                                "medidaEm": {
+                                  "type": "string"
+                                },
+                                "valor": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "avaliacaoId",
+                                "medidaEm",
+                                "valor"
+                              ]
+                            }
+                          },
+                          "meta": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "alvo": {
+                                "type": "number"
+                              },
+                              "prazo": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "alvo",
+                              "prazo"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tipo",
+                          "unidade",
+                          "pontos",
+                          "meta"
+                        ]
+                      }
+                    },
+                    "analise": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "geradaEm": {
+                          "type": "string"
+                        },
+                        "analise": {
+                          "type": "object",
+                          "properties": {
+                            "disclaimerCode": {
+                              "type": "string",
+                              "enum": [
+                                "NOT_MEDICAL_DIAGNOSIS"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "disclaimerCode"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "geradaEm",
+                        "analise"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "periodo",
+                    "series",
+                    "analise"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileAvaliacoes"
+        ]
+      }
+    },
+    "/api/v1/mobile/consentimentos": {
+      "get": {
+        "operationId": "MobileConsentimentosController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Consentimentos do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "consentimentos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "TERMS",
+                              "PRIVACY",
+                              "HEALTH",
+                              "AI_ANALYSIS",
+                              "MARKETING",
+                              "RANKING"
+                            ]
+                          },
+                          "concedido": {
+                            "type": "boolean"
+                          },
+                          "motivo": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "decididoEm": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "finalidade": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "versao": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "editavel": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "tipo",
+                          "concedido",
+                          "motivo",
+                          "decididoEm",
+                          "finalidade",
+                          "versao",
+                          "editavel"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "consentimentos"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileConsentimentos"
+        ]
+      },
+      "put": {
+        "operationId": "MobileConsentimentosController_decidir",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Consentimento apos a decisao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tipo": {
+                      "type": "string",
+                      "enum": [
+                        "TERMS",
+                        "PRIVACY",
+                        "HEALTH",
+                        "AI_ANALYSIS",
+                        "MARKETING",
+                        "RANKING"
+                      ]
+                    },
+                    "concedido": {
+                      "type": "boolean"
+                    },
+                    "motivo": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "decididoEm": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "finalidade": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "versao": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "editavel": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "tipo",
+                    "concedido",
+                    "motivo",
+                    "decididoEm",
+                    "finalidade",
+                    "versao",
+                    "editavel"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileConsentimentos"
+        ]
+      }
+    },
+    "/api/v1/mobile/exportacoes": {
+      "post": {
+        "operationId": "MobileExportacoesController_solicitar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Pedido registrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING",
+                        "RUNNING",
+                        "COMPLETED",
+                        "FAILED",
+                        "CANCELLED"
+                      ]
+                    },
+                    "rowCount": {
+                      "type": "number"
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "rowCount",
+                    "errorCode",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileExportacoes"
+        ]
+      }
+    },
+    "/api/v1/mobile/exportacoes/{id}": {
+      "get": {
+        "operationId": "MobileExportacoesController_consultar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado do pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING",
+                        "RUNNING",
+                        "COMPLETED",
+                        "FAILED",
+                        "CANCELLED"
+                      ]
+                    },
+                    "rowCount": {
+                      "type": "number"
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "rowCount",
+                    "errorCode",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileExportacoes"
+        ]
+      }
+    },
+    "/api/v1/mobile/exportacoes/{id}/download": {
+      "post": {
+        "operationId": "MobileExportacoesController_baixar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link temporario do arquivo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "downloadUrl": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "downloadUrl",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileExportacoes"
         ]
       }
     },

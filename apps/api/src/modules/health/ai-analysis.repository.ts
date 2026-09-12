@@ -203,11 +203,27 @@ export class AiAnalysisRepository {
   async ultimaPublicada(
     contexto: TenantContext,
     studentId: string,
-  ): Promise<{ id: string; saida: SaidaDaAnalise; geradaEm: Date } | null> {
+  ): Promise<{
+    id: string;
+    saida: SaidaDaAnalise;
+    geradaEm: Date;
+    model: string;
+    promptVersion: string;
+  } | null> {
     const linha = await this.db.aiAnalysis.findFirst({
       where: { tenantId: contexto.tenantId, studentId, status: 'PUBLISHED' },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, output: true, createdAt: true },
+      // `model` e `promptVersion` saem daqui porque a tela do app os EXIGE: o
+      // `AIDisclaimerProps` (`packages/ui`) pede as duas versoes ao lado do
+      // aviso, e `M3-NFR-006` manda numero na tela ter origem conferivel.
+      // Sem eles o app inventaria um rotulo, que e pior que nao mostrar.
+      select: {
+        id: true,
+        output: true,
+        createdAt: true,
+        model: true,
+        promptVersion: { select: { name: true } },
+      },
     });
 
     if (linha === null || linha.output === null) return null;
@@ -216,6 +232,8 @@ export class AiAnalysisRepository {
       id: linha.id,
       saida: linha.output as unknown as SaidaDaAnalise,
       geradaEm: linha.createdAt,
+      model: linha.model,
+      promptVersion: linha.promptVersion.name,
     };
   }
 

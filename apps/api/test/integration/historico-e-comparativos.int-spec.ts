@@ -553,6 +553,10 @@ describe('F18 -- historico e comparativos', () => {
   });
 
   describe('exportacao (M3-FR-017, M3-AC-010)', () => {
+    /**
+     * ASSINCRONA desde a F26: devolve o job e nao o arquivo. O motivo da
+     * mudanca esta no cabecalho do `HealthExportService`.
+     */
     const exportar = async (
       conta: (typeof contas)['a'],
       studentId: string,
@@ -562,6 +566,42 @@ describe('F18 -- historico e comparativos', () => {
         .post(`/api/v1/students/${studentId}/health-exports`)
         .set('Cookie', conta.cookie)
         .send({ idempotencyKey: chave });
+
+    interface JobDeExportacao {
+      id: string;
+      status: string;
+      rowCount: number;
+      errorCode: string | null;
+      expiresAt: string | null;
+    }
+
+    /** Consulta ate o job sair de `PENDING`/`RUNNING`. Espera ATIVA, nao fixa. */
+    const aguardarConclusao = async (
+      conta: (typeof contas)['a'],
+      jobId: string,
+    ): Promise<JobDeExportacao> => {
+      for (let tentativa = 0; tentativa < 40; tentativa += 1) {
+        const resposta = await request(servidor())
+          .get(`/api/v1/health-exports/${jobId}`)
+          .set('Cookie', conta.cookie);
+
+        const job = resposta.body as JobDeExportacao;
+
+        if (job.status !== 'PENDING' && job.status !== 'RUNNING') return job;
+
+        await new Promise((resolva) => setTimeout(resolva, 100));
+      }
+
+      throw new Error(`exportacao ${jobId} nao concluiu a tempo`);
+    };
+
+    const baixar = async (
+      conta: (typeof contas)['a'],
+      jobId: string,
+    ): Promise<request.Response> =>
+      request(servidor())
+        .post(`/api/v1/health-exports/${jobId}/download`)
+        .set('Cookie', conta.cookie);
 
     it('exporta avaliacoes, medidas, origem e datas (M3-AC-010)', async () => {
       const aluno = await criarAluno(contas.a);
@@ -574,15 +614,18 @@ describe('F18 -- historico e comparativos', () => {
         { type: 'WEIGHT', value: 81.25, unit: 'kg' },
       ]);
 
-      const resposta = await exportar(contas.a, aluno, `f18-export-${sufixo}-1`);
+      const pedido = await exportar(contas.a, aluno, `f18-export-${sufixo}-1`);
 
-      expect(resposta.status).toBe(201);
+      expect(pedido.status).toBe(201);
 
-      const corpo = resposta.body as { rowCount: number; downloadUrl: string };
+      const job = await aguardarConclusao(contas.a, (pedido.body as { id: string }).id);
 
       // Uma linha por MEDIDA, nao por avaliacao: 2 + 1.
-      expect(corpo.rowCount).toBe(3);
-      expect(corpo.downloadUrl).toContain('assinada=1');
+      expect(job.status).toBe('COMPLETED');
+      expect(job.rowCount).toBe(3);
+
+      const download = await baixar(contas.a, job.id);
+      expect((download.body as { downloadUrl: string }).downloadUrl).toContain('assinada=1');
 
       const csv = csvGravado();
 
@@ -602,7 +645,8 @@ describe('F18 -- historico e comparativos', () => {
         { type: 'WEIGHT', value: 81.25, unit: 'kg' },
       ]);
 
-      await exportar(contas.a, aluno, `f18-export-${sufixo}-decimal`);
+      const pedido = await exportar(contas.a, aluno, `f18-export-${sufixo}-decimal`);
+      await aguardarConclusao(contas.a, (pedido.body as { id: string }).id);
 
       // O `Decimal(10,4)` do banco chega como texto: `81.25` vira `81.25`, e
       // nao `81.2500000001`. Quem confere a planilha contra o laudo veria a
@@ -619,7 +663,8 @@ describe('F18 -- historico e comparativos', () => {
         { type: 'WEIGHT', value: 200, unit: 'lb' },
       ]);
 
-      await exportar(contas.a, aluno, `f18-export-${sufixo}-unidade`);
+      const pedido = await exportar(contas.a, aluno, `f18-export-${sufixo}-unidade`);
+      await aguardarConclusao(contas.a, (pedido.body as { id: string }).id);
 
       const csv = csvGravado();
 
@@ -645,9 +690,10 @@ describe('F18 -- historico e comparativos', () => {
 
       expect(correcao.status).toBe(201);
 
-      const resposta = await exportar(contas.a, aluno, `f18-export-${sufixo}-correcao`);
+      const pedido = await exportar(contas.a, aluno, `f18-export-${sufixo}-correcao`);
+      const job = await aguardarConclusao(contas.a, (pedido.body as { id: string }).id);
 
-      expect((resposta.body as { rowCount: number }).rowCount).toBe(2);
+      expect(job.rowCount).toBe(2);
 
       const csv = csvGravado();
 
@@ -673,7 +719,8 @@ describe('F18 -- historico e comparativos', () => {
 
       expect(fator.status).toBe(201);
 
-      await exportar(contas.a, aluno, `f18-export-${sufixo}-lgpd`);
+      const pedido = await exportar(contas.a, aluno, `f18-export-${sufixo}-lgpd`);
+      await aguardarConclusao(contas.a, (pedido.body as { id: string }).id);
 
       const csv = csvGravado();
 
@@ -698,29 +745,38 @@ describe('F18 -- historico e comparativos', () => {
       expect(primeira.status).toBe(201);
       expect(segunda.status).toBe(201);
 
-      // Clique duplo no botao NAO gera dois arquivos no storage.
+      // Clique duplo no botao NAO gera dois jobs.
       expect((segunda.body as { id: string }).id).toBe((primeira.body as { id: string }).id);
     });
 
-    it('registra na auditoria o instante em que o dado saiu', async () => {
+    it('registra na auditoria QUEM PEDIU e QUANDO, antes de o arquivo existir', async () => {
       const aluno = await criarAluno(contas.a);
 
       await publicada(contas.a, aluno, '2026-06-10T12:00:00.000Z', [
         { type: 'WEIGHT', value: 81, unit: 'kg' },
       ]);
 
-      await exportar(contas.a, aluno, `f18-export-${sufixo}-auditoria`);
+      const pedido = await exportar(contas.a, aluno, `f18-export-${sufixo}-auditoria`);
+      await aguardarConclusao(contas.a, (pedido.body as { id: string }).id);
 
-      // Para a LGPD o que importa e QUANDO o dado deixou o sistema.
+      /*
+       * `health.exported` virou `health.export_requested` na F26: o evento
+       * passou a ser gravado no PEDIDO, na mesma transacao do job `PENDING`
+       * -- nao mais na conclusao. Para a LGPD o que importa e quando o
+       * PEDIDO aconteceu, e o pedido e sincrono mesmo com o processamento em
+       * background.
+       */
       const trilha = await db.auditLog.findFirst({
-        where: { tenantId: contas.a.tenantId, action: 'health.exported', targetId: aluno },
+        where: {
+          tenantId: contas.a.tenantId,
+          action: 'health.export_requested',
+          targetId: (pedido.body as { id: string }).id,
+        },
       });
 
       expect(trilha).not.toBeNull();
-      expect(trilha?.action).toBe('health.exported');
-      // Quem levou o dado embora, e quantas linhas saíram.
       expect(trilha?.actorId).not.toBeNull();
-      expect((trilha?.metadata as { rowCount: number } | null)?.rowCount).toBe(1);
+      expect((trilha?.metadata as { studentId: string } | null)?.studentId).toBe(aluno);
     });
 
     it('academia B nao exporta historico de aluno da academia A (INV-006)', async () => {

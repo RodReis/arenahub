@@ -9,6 +9,8 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import type { DataExportJob } from '@arenahub/database';
+import { ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -86,9 +88,30 @@ interface ExportacaoDeSaudeDto {
   status: string;
   /** Medidas escritas -- uma linha por medida, nao por avaliacao. */
   rowCount: number;
-  downloadUrl: string;
-  /** A URL e curta: o arquivo carrega dado de saude. */
-  expiresAt: string;
+  /**
+   * Codigo estavel do erro, quando `status` e `FAILED`. Nunca a mensagem
+   * crua: ela carrega trecho de query, e query de saude carrega id de aluno.
+   */
+  errorCode: string | null;
+  /** Ate quando o ARQUIVO existe. Nulo antes de o job terminar. */
+  expiresAt: string | null;
+}
+
+/**
+ * Job -> DTO. SEM `downloadUrl`.
+ *
+ * O link sai por `POST /health-exports/:id/download`, e nao junto do estado:
+ * a URL assinada vive 300 segundos, e devolve-la a cada polling deixaria uma
+ * fila de links vivos para dado de saude.
+ */
+function paraExportacaoDto(job: DataExportJob): ExportacaoDeSaudeDto {
+  return {
+    id: job.id,
+    status: job.status,
+    rowCount: job.rowCount,
+    errorCode: job.errorCode,
+    expiresAt: job.expiresAt?.toISOString() ?? null,
+  };
 }
 
 interface VariacaoDto {
@@ -312,11 +335,12 @@ export class HealthProgressController {
   }
 
   /**
-   * Exporta o historico corporal do aluno em CSV (`M3-FR-017`, `M3-AC-010`).
+   * Solicita a exportacao do historico corporal em CSV (`M3-FR-017`,
+   * `M3-AC-010`).
    *
-   * Sincrono: o historico de UM aluno tem dezenas de linhas, e polling para
-   * isso custaria mais ao operador que a espera. A F11 e assincrona porque
-   * exporta ate 100 mil eventos -- ordem de grandeza diferente.
+   * ASSINCRONO desde a F26: devolve o job e o cliente acompanha ate
+   * `COMPLETED`. Era sincrono ate 12/09/2026 -- o porque da mudanca esta no
+   * cabecalho do `HealthExportService`.
    *
    * `health.read` e nao uma permissao propria: quem pode VER o historico pode
    * levar o proprio historico embora. Exigir permissao extra para exportar o
@@ -330,21 +354,63 @@ export class HealthProgressController {
     @Req() requisicao: Request,
   ): Promise<ExportacaoDeSaudeDto> {
     const dados = esquemaDeExportacao.parse(corpo);
+    const contexto = this.contexto.require();
 
-    const { job, downloadUrl, expiresAt } = await this.exportacoes.exportar(
-      this.contexto.require(),
+    const job = await this.exportacoes.solicitar(
+      contexto,
       studentId,
+      contexto.actorId,
       dados.idempotencyKey,
       requisicao.correlationId ?? 'sem-correlacao',
     );
 
-    return {
-      id: job.id,
-      status: job.status,
-      rowCount: job.rowCount,
-      downloadUrl,
-      expiresAt,
-    };
+    return paraExportacaoDto(job);
+  }
+
+  /** Estado do job, para o painel acompanhar ate `COMPLETED`. */
+  @Get('health-exports/:id')
+  @RequirePermissions('health.read')
+  @ApiOkResponse({
+    description: 'Estado do job de exportacao.',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        status: {
+          type: 'string',
+          enum: ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'],
+        },
+        rowCount: { type: 'number' },
+        errorCode: { type: 'string', nullable: true },
+        expiresAt: { type: 'string', nullable: true },
+      },
+      required: ['id', 'status', 'rowCount', 'errorCode', 'expiresAt'],
+    },
+  })
+  async consultarExportacao(@Param('id') jobId: string): Promise<ExportacaoDeSaudeDto> {
+    return paraExportacaoDto(await this.exportacoes.consultar(this.contexto.require(), jobId));
+  }
+
+  /**
+   * Link de download do arquivo pronto.
+   *
+   * `POST` e nao `GET` porque gerar link assinado e efeito, nao leitura: cada
+   * chamada cria uma URL viva por 300 segundos para dado de saude.
+   */
+  @Post('health-exports/:id/download')
+  @RequirePermissions('health.read')
+  @ApiOkResponse({
+    description: 'Link temporario do arquivo.',
+    schema: {
+      type: 'object',
+      properties: { downloadUrl: { type: 'string' }, expiresAt: { type: 'string' } },
+      required: ['downloadUrl', 'expiresAt'],
+    },
+  })
+  async baixarExportacao(
+    @Param('id') jobId: string,
+  ): Promise<{ downloadUrl: string; expiresAt: string }> {
+    return this.exportacoes.baixar(this.contexto.require(), jobId);
   }
 
   /** Encerra a meta. Encerrada nao some -- deixa de disputar o tipo. */
