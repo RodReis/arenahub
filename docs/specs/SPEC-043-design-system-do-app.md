@@ -7,8 +7,8 @@
 | **Slice** | **2.5.2** — definida no **ADR-025** (o design system não tem PRD) |
 | **Fonte de verdade** | [`docs/design/DS-APP.md`](../design/DS-APP.md) — contrato de implementação |
 | **Referência visual** | `docs/design/DS App.dc.html` e `ios-frame.jsx` — protótipo, **não é código a instalar** (ADR-026 decisão 2) |
-| **Status** | `aprovada-pi` |
-| **Gate de entrada** | **o PI priorizar o MVP 4.** `apps/mobile` não existe |
+| **Status** | ✅ **entregue** em 12/09/2026 — PR [#321](https://github.com/RodReis/arenahub/pull/321), aguardando aceite |
+| **Gate de entrada** | **aberto em 11/09/2026** — o PI mandou executar F43 e F23, e escolheu a ordem (design system primeiro). `apps/mobile` existe |
 | **ADRs que bloqueiam** | nenhum. Depende do card `[INFRA]` do pipeline de tokens e de F42 |
 
 > **Esta spec é um ponteiro (ADR-022).** O escopo mora em `docs/design/DS-APP.md`.
@@ -46,6 +46,48 @@ Camada de UI do app do aluno em Expo / React Native, conforme `docs/design/DS-AP
 4. **Toggles de engajamento nascem desligados**, com opt-out a no máximo dois toques
    (`DS-APP.md` §7.4). Padrão opt-in é requisito, não cortesia.
 
+### Decisões tomadas durante a execução (12/09/2026)
+
+5. **A borda do card é o padrão, não a exceção** — e isso contraria a letra do `DS-APP.md` §4.3
+   ("sem borda quando o contraste de superfície já separa"). A razão é medida: a separação entre
+   as três superfícies fica entre **1,07 e 1,22 nos dois temas**, e nesse patamar ela não separa
+   nada. Sem borda o card desaparece no fundo — visível assim que a vitrine abriu no tema claro.
+   O §2.7 continua valendo no que ele decide de fato (**nada de sombra**); o que muda é que a
+   hierarquia passa a vir do contorno. O §4.3 foi emendado com a medição.
+
+6. **`border/default` do dark subiu de `#2B3037` para `#646D79`** — o valor da v1.0 entregava
+   1,19 sobre `bg/raised`, contra o alvo de 3,0 da WCAG 1.4.11, e essa borda delimita o alvo
+   tocável do campo (§4.1) e do botão secundário (§4.2). Mesmo defeito e mesma correção do totem
+   (PR #232). Decidido pelo PI; §2.1 emendado.
+
+7. **O tint do badge é por tema** — 16% no dark (receita do §2.4) e 10% no light (a do painel).
+   Um número único para os dois reprovava: a 16% sobre branco o `err` entrega 4,43 contra o alvo
+   de 4,5. A mesma opacidade em fundos opostos não produz o mesmo par.
+
+8. **O app não emite CSS.** React Native não lê custom property, então a superfície sai só em
+   TypeScript, por entrypoint próprio (`@arenahub/ui/app-tokens`) — o entrypoint principal exporta
+   componente React web e arrastaria `react-dom` e `recharts` para o bundle do celular. Pelo mesmo
+   motivo nasceu `@arenahub/ui/domain`, que é como `state-labels.ts` fica **compartilhado** sem
+   duplicação (§6 deste documento).
+
+9. **Migrado para o DS-APP v2.1 em 12/09/2026.** A fatia foi implementada contra a v1.0 e o
+   documento subiu para v2.1 na `main` no meio do caminho — rebrand azul royal alinhado ao totem,
+   botão primário com **gradiente**, e um tema claro completo com os neutros do painel. Os
+   componentes não mudaram (leem token); o que mudou foi a camada de cor. Duas decisões de gate,
+   ambas com precedente no repositório: **dois tokens de borda** onde a v2.1 traz um — o hex do
+   documento no escuro (`#232A3D`) é *literalmente* o que o totem reprovou e corrigiu no PR #232,
+   então `border/default` sobe para `#5F71A0` e delimita o que o dedo toca, enquanto
+   `border/hairline` fica com o valor do documento para divisor e linha de tabela; e **dois pares
+   reportados sem quebrar o build**, como o totem já faz com o CTA — branco sobre a ponta clara do
+   gradiente (3,33, e o rótulo é 16px/700, que pede 3,0) e o verde do painel sobre o próprio tint
+   no claro (4,44, o mesmo desvio que `state.success` do painel carrega). Mexer nesses dois muda a
+   identidade da marca em toda tela: é decisão de produto, não de guarda.
+
+10. **O gate ganhou uma guarda que contraste não dá.** Um canário mostrou que a razão de contraste
+    é **simétrica**: QR invertido (tinta clara sobre fundo escuro) mede exatamente igual ao certo e
+    passaria batido — mas a câmera do leitor não decodifica. A guarda agora afirma a **luminância
+    absoluta** de cada lado, nos dois temas, como o §2.11 armadilha 2 exige.
+
 ## 3. Escopo negativo
 
 - **`apps/mobile` em si** — telas, navegação, chamadas de API e autenticação são das fatias do
@@ -70,8 +112,8 @@ Camada de UI do app do aluno em Expo / React Native, conforme `docs/design/DS-AP
 
 | # | pergunta | resposta | data |
 |---|---|---|---|
-| 1 | Esta fatia é construída **antes** das telas do MVP 4, ou junto com elas? O ADR-025 registra o risco de componente sem consumidor; o gate diz "não pegar antes do MVP 4", mas a ordem dentro do MVP 4 é sua | — | — |
-| 2 | Semânticos em light mode do app — validar agora junto de F42, ou adiar para o MVP 4 como o §12 propõe? | — | — |
+| 1 | Esta fatia é construída **antes** das telas do MVP 4, ou junto com elas? O ADR-025 registra o risco de componente sem consumidor; o gate diz "não pegar antes do MVP 4", mas a ordem dentro do MVP 4 é sua | **Antes**, em PR próprio; a F23 vem em seguida. O risco do ADR-025 foi mitigado com uma **vitrine** (`apps/mobile/app/index.tsx`) que dá consumidor real aos componentes — e ela se pagou: foi ela que revelou que nenhum card desenhava borda | 11/09/2026 |
+| 2 | Semânticos em light mode do app — validar agora junto de F42, ou adiar para o MVP 4 como o §12 propõe? | **Validar agora, reusando a paleta do painel.** Não há hex novo a inventar: o dark do app já é a rampa carbon invertida, então o light é a mesma rampa lida no sentido do painel, com contraste já validado. Derivar uma segunda paleta criaria hex que nenhum documento define | 11/09/2026 |
 
 ## 6. Antes de codificar, confirme
 

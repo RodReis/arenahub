@@ -1,0 +1,300 @@
+{
+  "$comment": "Camada 1 (primitivo) da superficie do APP do aluno (apps/mobile) -- F43, DS-APP.md v2.1 §2. Mesma regra do primitive.json e do totem.json: NENHUM componente le esta camada direto (regra de lint 2), e os hex vivem AQUI e em nenhum outro lugar do repositorio (regra de lint 1). O app e React Native: nao ha CSS, entao esta camada sai SO em TypeScript (`app-tokens.generated.ts`). ESCURO e o padrao (§1); CLARO e o arquivo irmao do DS, com os neutros do painel web.",
+
+  "app": {
+    "$comment": "TEMA ESCURO -- DS-APP.md §2.1. Mesma escala do totem (base #0A0B0D, superficie #121417), e por isso `bg.raised` e a variacao AZULADA do app: e o card que precisa se destacar dentro da tela. `contrastOnApp` mede contra `bg.app`, o fundo real (mesma convencao do totem.json).",
+
+    "bg": {
+      "app": {
+        "value": "#0A0B0D",
+        "$role": "fundo do app, poco interno (trilho de barra, campo dentro de card)"
+      },
+      "surface": {
+        "value": "#121417",
+        "contrastOnApp": 1.07,
+        "$role": "card padrao, campo de texto, sheet, tile de atalho"
+      },
+      "raised": {
+        "value": "#1A2032",
+        "contrastOnApp": 1.22,
+        "$role": "card em destaque (plano, fatura), avatar, chip inativo, barra vazia"
+      }
+    },
+
+    "border": {
+      "$comment": "DOIS tokens, e o DS-APP v2.1 §2.1 traz um so. A divisao vem do totem, que ja enfrentou exatamente este caso no PR #232 -- e o hex da v2.1 no escuro (#232A3D) e LITERALMENTE o que o totem reprovou la. Decidido pelo PI em 12/09/2026.",
+      "default": {
+        "value": "#5F71A0",
+        "contrastOnApp": 4.08,
+        "$role": "borda de CAMPO, BOTAO SECUNDARIO e CARD -- o que delimita alvo tocavel",
+        "$comment": "O DS-APP v2.1 §2.1 diz #232A3D, que entrega 1.38 sobre bg.app, 1.29 sobre bg.surface e 1.13 sobre bg.raised -- REPROVA o alvo de 3.0 do WCAG 1.4.11 nos tres, por larga margem. E o MESMO hex que o totem carregava e corrigiu no PR #232, pelo mesmo motivo: e a borda que DELIMITA o alvo tocavel do campo (§4.1) e do botao secundario (§4.2), e o §1 do DS descreve o app usado sob luz de academia, celular na mao e suor na tela. O totem foi para #51618C, que da 3.22 sobre a base DELE -- mas sobre `bg.raised` do app (#1A2032, mais claro que a superficie do totem) cai para 2.65 e reprovaria. #5F71A0 mantem o matiz azul e passa nos TRES: 4.08 / 3.83 / 3.36. O menor manda, porque a borda aparece nos tres."
+      },
+      "hairline": {
+        "value": "#232A3D",
+        "contrastOnApp": 1.38,
+        "$role": "divisor interno de card e linha de tabela -- decoracao, nao affordance",
+        "$comment": "ESTE e o valor do DS-APP v2.1 §2.1, preservado onde ele esta certo. Isento nominalmente do alvo de 3.0: a WCAG 1.4.11 cobre o que o usuario precisa PERCEBER para operar, e o alvo tocavel e delimitado por `border.default`, que passa. Um divisor a 3:1 viraria grade, nao divisor. Mesma isencao e mesmo papel de `totem.border.hairline`, que carrega #1A2032 a 1.22."
+      }
+    },
+
+    "text": {
+      "primary": {
+        "value": "#F5F7F9",
+        "contrastOnApp": 18.33,
+        "$role": "titulo, valor, corpo forte"
+      },
+      "secondary": {
+        "value": "#A6AEB9",
+        "contrastOnApp": 8.79,
+        "$role": "descricao, label, metrica secundaria"
+      },
+      "muted": {
+        "value": "#7B8491",
+        "contrastOnApp": 5.2,
+        "$role": "metadado, timestamp, matricula",
+        "$comment": "4.28 sobre bg.raised -- reprova o alvo de texto normal so nesse fundo. Legitimo e exigido pelo proprio DS: §7 diz 'text/muted so em metadado, nunca em informacao necessaria'. Isencao nominal em ISENTOS_DO_APP."
+      },
+      "placeholder": {
+        "value": "#565E69",
+        "contrastOnApp": 3.0,
+        "$role": "placeholder de campo",
+        "$comment": "Reprova em todos os fundos, e e isento por WCAG 2.2 §1.4.3: placeholder e DICA, nao conteudo -- o rotulo do campo (§4.1, obrigatorio) carrega a informacao. Mesma isencao nominal que o painel ja carrega em `semantic.text.placeholder`."
+      },
+      "onImage": {
+        "value": "#FFFFFF",
+        "$role": "titulo e valor sobre o render 3D e qualquer foto com scrim",
+        "$comment": "NAO INVERTE entre os temas -- DS-APP.md §2.2: o gradiente de legibilidade sobre a imagem e o mesmo nos dois. Por isso o valor e identico no bloco `light`, e nao um par claro/escuro."
+      },
+      "onImageMuted": {
+        "value": "#E5E9EE",
+        "$role": "legenda sobre imagem",
+        "$comment": "Idem -- nao inverte (§2.2)."
+      }
+    },
+
+    "accent": {
+      "$comment": "Azul royal da Clinica de Musculacao -- DS-APP.md §2.3. REGRA: gradiente e ACAO, tinta e INFORMACAO. Botao primario sempre com `gradient` + texto branco; NUNCA `solid` chapado como fundo de botao. `ink` e traco de icone, `text` e texto -- nao inverter, o mais claro e o que precisa de contraste em corpo pequeno.",
+      "solid": {
+        "value": "#4D7CFF",
+        "contrastOnApp": 5.29,
+        "$role": "barra de frequencia, aba de segmento ativa, chip de periodo ativo, medalhao da propria linha, 'Atual' no comparativo"
+      },
+      "gradientFrom": {
+        "value": "#5B86FF",
+        "contrastOnApp": 5.91,
+        "$role": "inicio do gradiente do botao primario"
+      },
+      "gradientTo": {
+        "value": "#3E63E8",
+        "contrastOnApp": 3.89,
+        "$role": "fim do gradiente do botao primario"
+      },
+      "gradientHoverFrom": {
+        "value": "#6B92FF",
+        "contrastOnApp": 6.73,
+        "$role": "inicio do gradiente em hover"
+      },
+      "gradientHoverTo": {
+        "value": "#4A6FF0",
+        "contrastOnApp": 4.52,
+        "$role": "fim do gradiente em hover"
+      },
+      "ink": {
+        "value": "#7DA2FF",
+        "contrastOnApp": 7.95,
+        "$role": "traco de icone sobre escuro, marca"
+      },
+      "text": {
+        "value": "#8FB0FF",
+        "contrastOnApp": 9.21,
+        "$role": "link, texto de botao fantasma, hover de borda, rotulo de eixo, overline azul, aba ativa"
+      },
+      "soft": {
+        "value": "#C9D9FF",
+        "contrastOnApp": 13.93,
+        "$role": "hover de link"
+      },
+      "tint": {
+        "value": "rgba(77,124,255,.12)",
+        "$role": "fundo da propria linha no ranking",
+        "$comment": "Sem `contrastOnApp`: fundo translucido nao tem luminancia fixa para medir. Mesma razao de `totem.brand.tint`."
+      },
+      "onAccent": {
+        "value": "#FFFFFF",
+        "$role": "texto e icone sobre azul de acao",
+        "$comment": "O par que importa nao e contra bg.app -- e contra o gradiente. Medido nominalmente em PARES_DO_APP: 3.33 na ponta clara e 5.05 na escura."
+      }
+    },
+
+    "brand": {
+      "frame": {
+        "value": "#0D1226",
+        "contrastOnApp": 1.06,
+        "$role": "miolo da moldura de gradiente da marca (§4.5b)",
+        "$comment": "Permanece escuro NOS DOIS TEMAS -- o simbolo da marca nao inverte (§2.1 do tema claro)."
+      },
+      "markFrom": { "value": "#7DA2FF", "$role": "inicio do gradiente da moldura da marca" },
+      "markMid": { "value": "#2E4FD0", "$role": "meio do gradiente da moldura da marca" },
+      "markTo": { "value": "#9DB8FF", "$role": "fim do gradiente da moldura da marca" }
+    },
+
+    "state": {
+      "$comment": "Quatro tons -- DS-APP.md §2.4. Tripla [texto, fundo 16%, borda 34%]: mais opaca que os 10% do painel, porque o fundo aqui e escuro. O gate mede o texto sobre o PROPRIO tint, nao sobre a superficie limpa. Delta de metrica usa `ok` quando melhora e `warn` quando piora -- nunca `err`, reservado a falha e alerta clinico.",
+      "ok": { "value": "#3DDC84", "contrastOnApp": 11.03, "$role": "plano ativo, pago, metrica melhorando" },
+      "warn": { "value": "#F5A524", "contrastOnApp": 9.65, "$role": "fatura vencida, metrica piorando, sequencia" },
+      "err": { "value": "#FF6B6B", "contrastOnApp": 7.09, "$role": "bloqueio, falha, alerta clinico" },
+      "info": { "value": "#6AB0FF", "contrastOnApp": 8.69, "$role": "em aberto, processando, spinner" }
+    },
+
+    "scrim": {
+      "default": {
+        "value": "rgba(10,11,13,.7)",
+        "$role": "fundo atras do sheet da carteirinha",
+        "$comment": "Sem contraste medido: e vidro sobre a tela, nao par texto/superficie."
+      }
+    },
+
+    "optico": {
+      "$comment": "NAO E COR DE DESIGN -- e requisito fisico de leitura optica, e por isso NAO inverte com o tema (DS-APP.md §2.11 armadilha 2: inverter o QR torna o codigo ilegivel para a camera). Existe como token para que a carteirinha nao precise de hex literal com `eslint-disable` ao lado.",
+      "qrBackground": { "value": "#FFFFFF", "$role": "bloco branco atras do QR -- §4.8" },
+      "qrInk": { "value": "#1F2328", "$role": "tinta do QR -- §2.11: escura sobre branco nos DOIS temas" }
+    }
+  },
+
+  "light": {
+    "$comment": "TEMA CLARO -- DS-APP.md v2.1 §2.1/§2.2/§2.3/§2.4, com os neutros do painel web. Mesmos papeis, mesma estrutura, mesmos componentes: SO os tokens mudam (§1). O azul de ACAO e identico ao do escuro; so as tintas de LEITURA escurecem para ter contraste sobre branco (§2.3).",
+
+    "bg": {
+      "app": { "value": "#EDF0F5", "$role": "fundo do app e poco interno (trilho de barra)" },
+      "surface": { "value": "#FFFFFF", "$role": "card -- SEMPRE com borda no claro (§2.11 armadilha 3)" },
+      "raised": { "value": "#E4EAF6", "$role": "card em destaque" }
+    },
+
+    "border": {
+      "$comment": "Mesma divisao em dois do escuro, pelo mesmo motivo. O `hairline` aqui e o #E5E9EE que a v2.1 nomeia para borda de card branco e linha de tabela.",
+      "default": {
+        "value": "#7B8491",
+        "$role": "borda de CAMPO, BOTAO SECUNDARIO e CARD -- o que delimita alvo tocavel",
+        "$comment": "O DS-APP v2.1 §2.1 diz #CBD1D9, que entrega 1.35 / 1.54 / 1.27 nos tres fundos e REPROVA o alvo de 3.0 do WCAG 1.4.11 -- mesmo problema do escuro, na mesma prop. #7B8491 (carbon-400 do painel) passa nos tres: 3.31 / 3.78 / 3.13."
+      },
+      "hairline": {
+        "value": "#E5E9EE",
+        "$role": "borda de card branco e linha de tabela -- decoracao, nao affordance",
+        "$comment": "Valor da v2.1, preservado. Isento pela mesma clausula do `hairline` escuro. O §2.11 armadilha 3 EXIGE esta borda no card branco: sem ela, branco sobre #EDF0F5 nao separa -- foi o defeito que a tela revelou na primeira versao desta fatia."
+      }
+    },
+
+    "text": {
+      "primary": { "value": "#1F2328", "$role": "titulo, valor, corpo forte" },
+      "secondary": { "value": "#565E69", "$role": "descricao, label, metrica secundaria" },
+      "muted": { "value": "#7B8491", "$role": "metadado, timestamp, matricula", "$comment": "Identico ao escuro -- a v2.1 §2.2 mantem o mesmo hex nos dois temas. Mesma isencao nominal." },
+      "placeholder": { "value": "#9AA3AE", "$role": "placeholder de campo", "$comment": "Isento por WCAG 2.2 §1.4.3, como no escuro." },
+      "onImage": { "value": "#FFFFFF", "$role": "titulo e valor sobre imagem -- NAO inverte (§2.2)" },
+      "onImageMuted": { "value": "#E5E9EE", "$role": "legenda sobre imagem -- NAO inverte (§2.2)" }
+    },
+
+    "accent": {
+      "$comment": "§2.3: o azul de ACAO (gradiente e solid) e IDENTICO ao do escuro. So as tintas de leitura escurecem.",
+      "solid": { "value": "#4D7CFF", "$role": "barra de frequencia, aba de segmento ativa, chip ativo, medalhao" },
+      "gradientFrom": { "value": "#5B86FF", "$role": "inicio do gradiente do botao primario" },
+      "gradientTo": { "value": "#3E63E8", "$role": "fim do gradiente do botao primario" },
+      "gradientHoverFrom": { "value": "#6B92FF", "$role": "inicio do gradiente em hover" },
+      "gradientHoverTo": { "value": "#4A6FF0", "$role": "fim do gradiente em hover" },
+      "ink": { "value": "#3E63E8", "$role": "traco de icone", "$comment": "4.19 sobre bg.raised. Icone que acompanha rotulo textual e decorativo (DS §7: estado nunca so por cor), e por isso isento -- mesma clausula de `semantic.text.icon` no painel." },
+      "text": { "value": "#2E4FD0", "$role": "link, texto de botao fantasma, overline, aba ativa" },
+      "soft": { "value": "#1B3AAE", "$role": "hover de link" },
+      "tint": { "value": "rgba(77,124,255,.12)", "$role": "fundo da propria linha no ranking" },
+      "onAccent": { "value": "#FFFFFF", "$role": "texto e icone sobre azul de acao" }
+    },
+
+    "brand": {
+      "frame": { "value": "#0D1226", "$role": "miolo da marca -- permanece ESCURO no tema claro (§2.1)" },
+      "markFrom": { "value": "#7DA2FF", "$role": "inicio do gradiente da moldura da marca" },
+      "markMid": { "value": "#2E4FD0", "$role": "meio do gradiente da moldura da marca" },
+      "markTo": { "value": "#9DB8FF", "$role": "fim do gradiente da moldura da marca" }
+    },
+
+    "state": {
+      "$comment": "§2.4: mesmos quatro tons nos hexes do painel web, com fundo a 10% e borda a 30% -- sobre branco, 16%/34% ficaria pesado.",
+      "ok": { "value": "#157F3D", "$role": "plano ativo, pago, metrica melhorando" },
+      "warn": { "value": "#8A5200", "$role": "fatura vencida, metrica piorando, sequencia" },
+      "err": { "value": "#C22B2B", "$role": "bloqueio, falha, alerta clinico" },
+      "info": { "value": "#1F5FD0", "$role": "em aberto, processando, spinner" }
+    },
+
+    "scrim": {
+      "default": { "value": "rgba(31,35,40,.45)", "$role": "fundo atras do sheet" }
+    },
+
+    "optico": {
+      "$comment": "Identico ao escuro, e de proposito: o QR nao inverte (§2.11 armadilha 2). Repetido em vez de herdado porque o objeto gerado tem a MESMA forma nos dois temas -- um `optico` faltando aqui viraria `undefined` em runtime e o leitor falharia sem erro na tela.",
+      "qrBackground": { "value": "#FFFFFF", "$role": "bloco branco atras do QR" },
+      "qrInk": { "value": "#1F2328", "$role": "tinta do QR" }
+    }
+  },
+
+  "size": {
+    "$comment": "DS-APP.md §2.6 e §2.8. Numero cru em px -- React Native ja trabalha em unidade independente de densidade.",
+    "safeAreaTop": { "value": 58, "$role": "safe area superior do shell (§2.6)" },
+    "gutter": { "value": 20, "$role": "padding lateral de todo conteudo (§2.6)" },
+    "control": { "value": 48, "$role": "botao primario e campo (§2.8)" },
+    "controlInCard": { "value": 44, "$role": "botao secundario dentro de card e sheet" },
+    "tile": { "value": 64, "$role": "tile de atalho da Home" },
+    "segment": { "value": 40, "$role": "aba de segmento -- v2.1 §3.4 subiu de 36 para 40" },
+    "chip": { "value": 30, "$role": "chip de periodo -- v2.1 §3.5 desceu de 32 para 30, com area estendida pelo padding" },
+    "badge": { "value": 26, "$role": "badge e chip de status" },
+    "row": { "value": 56, "$role": "linha de ranking -- v2.1 §4.13 subiu de 44 para 56" },
+    "rowTable": { "value": 44, "$role": "linha de tabela de evolucao (§4.12)" },
+    "tabBar": { "value": 56, "$role": "tab bar, mais a safe area inferior" },
+    "avatar": { "value": 44, "$role": "avatar da carteirinha" },
+    "mark": { "value": 52, "$role": "quadrado da marca no login (§4.5b)" },
+    "render3d": { "value": 200, "$role": "altura do render 3D no card de avaliacao (§4.10b)" },
+    "touchMin": { "value": 44, "$role": "alvo minimo -- §2.8 e §7. O gate recusa size tocavel abaixo disto, exceto os isentos nominais" }
+  },
+
+  "radius": {
+    "$comment": "DS-APP.md §2.7. Sem sombra em lugar nenhum -- a hierarquia vem dos tres niveis de superficie e da borda.",
+    "sheet": { "value": 20, "$role": "sheet (so as duas pontas de cima)" },
+    "card": { "value": 16, "$role": "card e bloco de QR" },
+    "mark": { "value": 15, "$role": "miolo da marca (§4.5b)" },
+    "control": { "value": 12, "$role": "botao, campo, tile" },
+    "segment": { "value": 9, "$role": "segmento ativo dentro do container -- v2.1 §3.4" },
+    "progress": { "value": 4, "$role": "barra do card de avaliacao 3D (§4.10b)" },
+    "bar": { "value": 3, "$role": "barra de frequencia" },
+    "pill": { "value": 999, "$role": "badge, chip de status e chip de periodo" }
+  },
+
+  "space": {
+    "$comment": "Escala de 2px do §2.6. Emitida como lista para o gate poder recusar valor fora dela.",
+    "scale": [2, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 24, 32]
+  },
+
+  "type": {
+    "$comment": "DS-APP.md §2.5. Inter na interface, JetBrains Mono em identificador (matricula, chave PIX, referencia de fatura). Todo numero em serie leva tabular-nums. O minimo de 10px so vale no rotulo da tab bar.",
+    "loginTitle": { "size": 26, "lineHeight": 32, "weight": 700, "$role": "titulo de login" },
+    "screenTitle": { "size": 24, "lineHeight": 30, "weight": 700, "$role": "saudacao e titulo de tela" },
+    "value": { "size": 30, "lineHeight": 36, "weight": 700, "$role": "valor grande (fatura, peso)" },
+    "sheetTitle": { "size": 18, "lineHeight": 24, "weight": 700, "$role": "titulo de sheet e de bloco" },
+    "cardTitle": { "size": 16, "lineHeight": 22, "weight": 600, "$role": "titulo de card" },
+    "buttonPrimary": { "size": 16, "lineHeight": 20, "weight": 700, "$role": "rotulo de botao primario" },
+    "buttonSecondary": { "size": 15, "lineHeight": 20, "weight": 600, "$role": "rotulo de botao secundario" },
+    "body": { "size": 14, "lineHeight": 20, "weight": 400, "$role": "corpo" },
+    "fieldLabel": { "size": 13, "lineHeight": 18, "weight": 600, "$role": "label de campo" },
+    "tileLabel": { "size": 13, "lineHeight": 18, "weight": 600, "$role": "rotulo de tile e chip" },
+    "overline": { "size": 12, "lineHeight": 16, "weight": 700, "$role": "overline de eixo no card de avaliacao (§4.10b)" },
+    "meta": { "size": 12, "lineHeight": 16, "weight": 400, "$role": "metadado" },
+    "tabLabel": { "size": 11, "lineHeight": 14, "weight": 600, "$role": "rotulo de aba -- o unico papel abaixo de 12px (§2.5)" }
+  },
+
+  "font": {
+    "$comment": "Mesmas familias do painel. No Expo as fontes sao carregadas por `expo-font`; o nome aqui e o que o RN resolve depois do load.",
+    "sans": "Inter",
+    "mono": "JetBrainsMono"
+  },
+
+  "motion": {
+    "$comment": "DS-APP.md §7: `ah-pulse` e `ah-spin` sao os UNICOS movimentos; nada pisca fora deles. Duracoes em ms.",
+    "pulse": { "value": 1400, "$role": "pulsar de placeholder de carregamento" },
+    "spin": { "value": 1400, "$role": "spinner do estado de espera (§4.10)" }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "extends": "@arenahub/config/tsconfig/base.json",
+  "//lib": "Sem `DOM`: o app nao tem `window`, `document` nem `HTMLElement`. Incluir a lib do navegador faria o typecheck ACEITAR codigo que so quebra no aparelho -- e o erro apareceria como tela branca em teste de campo, nao como vermelho aqui.",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["jest"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "incremental": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", "dist", ".expo"]
+}

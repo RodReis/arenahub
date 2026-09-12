@@ -26,6 +26,8 @@ const PKG = join(HERE, '..');
 const TOKENS = join(PKG, 'tokens');
 const OUT_CSS = join(PKG, 'dist-tokens', 'theme.css');
 const OUT_TS = join(PKG, 'src', 'tokens.generated.ts');
+/** O app nao tem CSS -- React Native nao le custom property. So TypeScript. */
+const OUT_APP_TS = join(PKG, 'src', 'app-tokens.generated.ts');
 
 const CHECK_ONLY = process.argv.includes('--check');
 
@@ -35,6 +37,7 @@ const primitive = readJson('primitive.json');
 const semantic = readJson('semantic.json');
 const expression = readJson('expression.json');
 const totem = readJson('totem.json');
+const app = readJson('app.json');
 
 const errors = [];
 
@@ -473,6 +476,375 @@ for (const [accent, papeis] of Object.entries(totem.totem.accentsDerivados ?? {}
   }
 }
 
+/* --------------------------------------------------- contraste do APP (F43) */
+
+/**
+ * O MESMO GATE, na terceira superficie -- `apps/mobile`, DS-APP.md §2.
+ *
+ * O app nao emite CSS: React Native nao le custom property. A saida dele e so
+ * TypeScript (`app-tokens.generated.ts`). Mas a VERIFICACAO e identica a das
+ * outras duas superficies, e esse e o ponto: o gate nao existe para produzir
+ * CSS, existe para impedir que um par texto/fundo chegue a tela reprovando.
+ *
+ * O app tem DOIS temas, e cada token e medido contra o fundo do SEU tema. Foi
+ * assim que a borda do dark caiu: `#2B3037` do DS-APP v1.0 dava 1.19 sobre
+ * `bg.raised` -- o mesmo defeito que o totem carregou ate o PR #232, na mesma
+ * superficie escura, pela mesma razao (ninguem mede a borda, so o texto).
+ *
+ * TRES ALVOS, iguais aos do totem:
+ *
+ *   texto normal ....... 4.5  (WCAG 1.4.3)
+ *   texto grande ....... 3.0  (>= 18.66px bold ou >= 24px)
+ *   componente/borda ... 3.0  (WCAG 1.4.11)
+ */
+
+const ALVO_APP = { texto: 4.5, textoGrande: 3.0, componente: 3.0 };
+
+/**
+ * O fundo em que cada token REALMENTE aparece, e o piso que o papel dele pede.
+ *
+ * `fundos` e lista pela mesma razao do totem: `border.default` contorna card
+ * (sobre `bg.app`), campo (sobre `bg.surface`) e chip (sobre `bg.raised`). O
+ * MENOR dos tres manda -- passar num e reprovar noutro e reprovar.
+ */
+const TODAS_AS_SUPERFICIES = ['bg.app', 'bg.surface', 'bg.raised'];
+
+/**
+ * `temas` diz em QUAL tema o papel e medido, porque o papel de um token pode
+ * mudar entre os dois -- ver `accent.ink`, que so no light chega perto do
+ * limite.
+ *
+ * `border.hairline` NAO entra aqui: e divisor decorativo, isento por papel, e
+ * medi-lo produziria uma reprovacao que a propria isencao ja responde.
+ */
+const PAPEIS_DO_APP = [
+  { token: 'text.primary', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'text.secondary', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'text.muted', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'text.placeholder', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'border.default', alvo: 'componente', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'accent.text', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'accent.ink', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'accent.soft', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+];
+
+/**
+ * Excecao NOMINAL, com a clausula que isenta -- nunca um "por enquanto".
+ *
+ * Mesmo molde de `ISENTOS_DO_TOTEM` e do `$exempt` do painel.
+ */
+const ISENTOS_DO_APP = {
+  'text.muted': {
+    why:
+      'Metadado, timestamp e matricula -- o DS-APP.md §7 restringe este token a ' +
+      '"metadado, nunca informacao necessaria", e a WCAG 2.2 §1.4.3 trata texto ' +
+      'que nao carrega conteudo como dica. So reprova sobre `bg.raised`, onde o ' +
+      'papel e a matricula em mono dentro do card em destaque -- acompanhada do ' +
+      'nome do aluno em `text.primary`, que carrega a identificacao.',
+  },
+  'text.placeholder': {
+    why:
+      'WCAG 2.2 §1.4.3 -- placeholder e DICA, nao conteudo. O §4.1 do DS-APP ' +
+      'exige `<label>` em todo campo, e e o rotulo que carrega a informacao. ' +
+      'Mesma isencao nominal que o painel ja carrega em `semantic.text.placeholder`.',
+  },
+  'accent.ink': {
+    why:
+      'Traco de ICONE, nao texto -- §2.3: "accent/ink para traco de icone, ' +
+      'accent/text para texto". Icone no app nunca carrega informacao sozinho ' +
+      '(§7: estado nunca so por cor; badge sempre com icone E texto), entao ' +
+      'responde ao alvo de 3.0 de componente e nao ao de 4.5 de texto. So o ' +
+      'light chega perto do limite (4.19 sobre `bg.raised`), e passa folgado ' +
+      'no alvo que o papel realmente pede. Mesma clausula de `semantic.text.icon`.',
+  },
+};
+
+/**
+ * Papeis de ACAO do app medidos como PAR, nao contra o fundo da tela.
+ *
+ * O botao primario do DS-APP v2.1 e GRADIENTE (§2.3: "gradiente e acao, tinta
+ * e informacao"), entao o par que importa e branco sobre CADA PONTA dele --
+ * medir contra `bg.app` responde a pergunta errada, porque ninguem le azul
+ * sobre o fundo da tela; le-se BRANCO sobre o azul.
+ *
+ * A ponta clara (`gradientFrom`) e sempre o lado pior. `accent.solid` entra
+ * porque o §3.4 e o §3.5 o usam como fundo de segmento e chip ATIVOS, com
+ * texto branco por cima -- e ali ele e fundo de texto, nao decoracao.
+ */
+const PARES_DO_APP = [
+  { rotulo: 'ctaFrom', fg: 'accent.onAccent', bg: 'accent.gradientFrom', alvo: 'textoGrande' },
+  { rotulo: 'ctaTo', fg: 'accent.onAccent', bg: 'accent.gradientTo', alvo: 'textoGrande' },
+  { rotulo: 'segmentoAtivo', fg: 'accent.onAccent', bg: 'accent.solid', alvo: 'textoGrande' },
+  { rotulo: 'qr', fg: 'optico.qrInk', bg: 'optico.qrBackground', alvo: 'componente' },
+];
+
+/**
+ * O que o gate REPORTA sem quebrar o build -- com o motivo escrito.
+ *
+ * Mesmo molde de `CTA_CONHECIDO` no totem: o gate existe para tornar o
+ * problema visivel, nao para decidir no lugar do PI. Mexer nestes valores
+ * muda a identidade da marca em todas as telas, e isso e decisao de produto.
+ */
+const REPORTADOS_DO_APP = {
+  ctaFrom:
+    'O rotulo do botao primario e 16px/700 -- TEXTO GRANDE pela WCAG (>= 18.66px ' +
+    'bold e o piso; 16px/700 fica logo abaixo), e entrega 3.33 sobre a ponta ' +
+    'clara do gradiente. Passa no alvo de 3.0 que o papel pede e fica abaixo dos ' +
+    '4.5 de texto normal. Escurecer a ponta mudaria o azul da marca em toda tela ' +
+    'do app -- decisao de produto, nao de guarda. Decidido pelo PI em 12/09/2026.',
+  segmentoAtivo:
+    'Mesma razao do `ctaFrom`: o rotulo do segmento ativo (§3.4) e 14px/600 ' +
+    'sobre `accent.solid`, dando 3.72. O par vive na mesma rampa do CTA e ' +
+    'muda junto com ele.',
+};
+
+/**
+ * Tint dos semanticos, POR TEMA -- e nao um numero unico para os dois.
+ *
+ * O dark usa 16% porque o §2.4 do DS-APP pede tripla mais opaca: sobre fundo
+ * escuro, 10% mal se ve. O light usa os 10% do painel (§2.2 do DS-PAINEL),
+ * porque sobre branco o tint CLAREIA o fundo e aperta o contraste do proprio
+ * texto que ele carrega -- a 16% o `err` entregava 4.43 e reprovava.
+ *
+ * Um numero unico para os dois temas era erro de modelagem meu: a mesma
+ * opacidade em fundos opostos nao produz o mesmo par.
+ */
+const TINT_DO_APP = { app: 0.16, light: 0.1 };
+
+/**
+ * Estado que o gate REPORTA sem quebrar, com o motivo escrito.
+ *
+ * Chave `<tema>.<tom>`. O precedente e do proprio painel, que conviveu com
+ * `success` a 4.44 sobre o tint pela mesma razao: o hex e o verde do DS, e
+ * trocar a cor de um estado semantico muda o significado em todas as telas.
+ */
+const ESTADOS_REPORTADOS = {
+  'light.ok':
+    'O verde do painel (#157F3D) entrega 4.44 sobre o proprio tint de 10%, a ' +
+    '0.06 do alvo. E o MESMO hex e o MESMO desvio que o painel ja carrega em ' +
+    '`state.success` -- o app reusa a semantica do painel no tema claro (§2.4) ' +
+    'de proposito, e divergir aqui criaria dois verdes de "pago" no produto. ' +
+    'O badge nunca depende so da cor (§7: sempre com icone E texto). Decidido ' +
+    'pelo PI em 12/09/2026.',
+};
+
+const valorDoApp = (tema, caminho) => {
+  const [grupo, nome] = caminho.split('.');
+  return app[tema]?.[grupo]?.[nome]?.value ?? null;
+};
+
+for (const tema of ['app', 'light']) {
+  for (const papel of PAPEIS_DO_APP) {
+    if (papel.temas && !papel.temas.includes(tema)) continue;
+    const fg = valorDoApp(tema, papel.token);
+    if (!fg) {
+      errors.push(`app(${tema}): token inexistente em PAPEIS_DO_APP: "${papel.token}"`);
+      continue;
+    }
+
+    const alvo = ALVO_APP[papel.alvo];
+    const isento = ISENTOS_DO_APP[papel.token];
+
+    let pior = null;
+    for (const chave of papel.fundos) {
+      const bg = valorDoApp(tema, chave);
+      if (!bg) {
+        errors.push(`app(${tema}): fundo inexistente: "${chave}"`);
+        continue;
+      }
+      const value = round2(contrast(fg, bg));
+      if (pior === null || value < pior.value) pior = { value, bg: chave, hex: bg };
+    }
+    if (pior === null) continue;
+
+    contrastReport.push({
+      role: `app.${tema}.${papel.token}`,
+      fg,
+      bg: pior.bg,
+      value: pior.value,
+      exempt: isento ? isento.why : null,
+    });
+
+    if (pior.value < alvo && !isento) {
+      errors.push(
+        `contraste reprovado: app.${tema}.${papel.token} (${fg}) sobre ${pior.bg} ` +
+          `(${pior.hex}) = ${pior.value}, alvo ${alvo} (${papel.alvo}). ` +
+          `Use um tom com mais contraste OU declare a isencao em ISENTOS_DO_APP ` +
+          `com a clausula WCAG que a justifica.`,
+      );
+    }
+  }
+
+  for (const par of PARES_DO_APP) {
+    const fg = valorDoApp(tema, par.fg);
+    const bg = valorDoApp(tema, par.bg);
+    if (!fg || !bg) {
+      errors.push(`app(${tema}): par inexistente: ${par.fg} sobre ${par.bg}`);
+      continue;
+    }
+    const value = round2(contrast(fg, bg));
+    const reportado = REPORTADOS_DO_APP[par.rotulo];
+    contrastReport.push({
+      role: `app.${tema}.${par.rotulo}`,
+      fg,
+      bg: par.bg,
+      value,
+      exempt: reportado ?? null,
+    });
+    if (value < ALVO_APP[par.alvo] && !reportado) {
+      errors.push(
+        `contraste reprovado: app.${tema}.${par.rotulo} -- ${par.fg} (${fg}) sobre ` +
+          `${par.bg} (${bg}) = ${value}, alvo ${ALVO_APP[par.alvo]}.`,
+      );
+    }
+  }
+
+  // Estado sobre o PROPRIO tint, nunca sobre a superficie limpa (§2.4).
+  const superficieDoTint = valorDoApp(tema, 'bg.surface');
+  const tint = TINT_DO_APP[tema];
+  for (const [name, def] of Object.entries(app[tema].state ?? {})) {
+    if (name.startsWith('$')) continue;
+    const fg = def.value;
+    if (!fg || !superficieDoTint) continue;
+
+    const fundo = mix(fg, superficieDoTint, tint);
+    const value = round2(contrast(fg, fundo));
+
+    const reportado = ESTADOS_REPORTADOS[`${tema}.${name}`];
+    contrastReport.push({
+      role: `app.${tema}.state.${name}`,
+      fg,
+      bg: fundo,
+      value,
+      exempt: reportado ?? null,
+    });
+
+    if (value < ALVO_APP.texto && !reportado) {
+      errors.push(
+        `contraste reprovado: app.${tema}.state.${name} (${fg}) sobre o proprio ` +
+          `tint de ${tint * 100}% (${fundo}) = ${value}, alvo ${ALVO_APP.texto}.`,
+      );
+    }
+  }
+}
+
+/**
+ * `contrastOnApp` do JSON tem de BATER com o medido -- mesma regra do totem.
+ *
+ * Escrevi seis desses numeros errados ao criar o arquivo (os quatro estados e
+ * mais dois): a conta de cabeca some com o tint e erra por mais de um ponto.
+ * A guarda pegou antes do commit, que e exatamente para isso que ela existe.
+ */
+const conferirAnotacaoDoApp = (rotulo, def) => {
+  if (def.contrastOnApp === undefined) return;
+  const medido = round2(contrast(def.value, valorDoApp('app', 'bg.app')));
+  if (Math.abs(medido - def.contrastOnApp) > 0.01) {
+    errors.push(
+      `${rotulo}: "contrastOnApp" diz ${def.contrastOnApp} mas o medido contra ` +
+        `bg.app e ${medido}. O campo nao pode divergir do calculo -- numero que ` +
+        `so um humano mantem volta a mentir.`,
+    );
+  }
+};
+
+for (const [grupo, entradas] of Object.entries(app.app)) {
+  if (grupo.startsWith('$')) continue;
+  for (const [nome, def] of Object.entries(entradas)) {
+    if (nome.startsWith('$') || typeof def !== 'object') continue;
+    conferirAnotacaoDoApp(`app.${grupo}.${nome}`, def);
+  }
+}
+
+/**
+ * Alvo tocavel abaixo de 44 px reprova -- DS-APP.md §2.8 e §7.
+ *
+ * A regra e do documento e nao da WCAG (que pede 24 no nivel AA), e o app a
+ * adota porque e usado com o polegar, uma mao, celular suado. `chip` e a
+ * unica excecao escrita no proprio DS: 32 px com area estendida pelo padding
+ * do container.
+ */
+const TOCAVEIS_DO_APP = [
+  'control',
+  'controlInCard',
+  'tile',
+  'segment',
+  'chip',
+  'badge',
+  'row',
+  'rowTable',
+  'tabBar',
+  'avatar',
+];
+const ISENTOS_DE_TOQUE = {
+  chip:
+    'DS-APP.md §2.8 nomeia a excecao, e a v2.1 §3.5 a desceu de 32 para 30 px ' +
+    'com raio de pill. A area de toque e estendida pelo padding do container: ' +
+    'o chip de periodo vive em fila de quatro dentro de um container de 20 px ' +
+    'de padding lateral.',
+  badge:
+    'Badge e chip de status NAO sao tocaveis -- sao rotulo de estado (§4.4). ' +
+    'Entram na lista para que virar botao um dia falhe a guarda em vez de ' +
+    'passar calado.',
+  segment:
+    'A v2.1 §3.4 fixa 40 px para a aba de segmento (era 36 na v1.0). O alvo ' +
+    'real inclui o padding de 4 px do container em cima e embaixo, chegando a 48.',
+  rowTable:
+    'Linha de TABELA de evolucao (§4.12), nao de ranking: 44 px e exatamente o ' +
+    'minimo, e ela entra na lista para que baixar o valor um dia falhe a guarda.',
+};
+
+for (const nome of TOCAVEIS_DO_APP) {
+  const def = app.size?.[nome];
+  if (!def) {
+    errors.push(`app: size tocavel inexistente: "${nome}"`);
+    continue;
+  }
+  if (def.value < app.size.touchMin.value && !ISENTOS_DE_TOQUE[nome]) {
+    errors.push(
+      `alvo de toque reprovado: size.${nome} = ${def.value}px, minimo ` +
+        `${app.size.touchMin.value}px (DS-APP.md §2.8/§7). Aumente OU declare a ` +
+        `isencao em ISENTOS_DE_TOQUE com o motivo escrito.`,
+    );
+  }
+}
+
+/**
+ * O QR nao inverte -- DS-APP.md §2.11, armadilha 2.
+ *
+ * CONTRASTE NAO PEGA ISTO, e foi um canario que mostrou: a razao de contraste
+ * e SIMETRICA, entao tinta clara sobre fundo escuro mede exatamente igual a
+ * tinta escura sobre fundo claro. O par invertido passa no gate de contraste
+ * com o mesmo numero -- e a camera do leitor nao le.
+ *
+ * A afirmacao correta e sobre LUMINANCIA ABSOLUTA, nao sobre a razao entre as
+ * duas: o fundo tem de ser o lado claro e a tinta o lado escuro, nos dois
+ * temas. O limiar de 0.5 e o meio da escala de luminancia relativa.
+ */
+for (const tema of ['app', 'light']) {
+  const fundo = valorDoApp(tema, 'optico.qrBackground');
+  const tinta = valorDoApp(tema, 'optico.qrInk');
+  if (!fundo || !tinta) {
+    errors.push(`app(${tema}): optico.qrBackground ou optico.qrInk ausente.`);
+    continue;
+  }
+  if (luminance(fundo) < 0.5 || luminance(tinta) > 0.5) {
+    errors.push(
+      `app(${tema}): o QR esta INVERTIDO -- fundo ${fundo} e tinta ${tinta}. ` +
+        `O DS-APP.md §2.11 (armadilha 2) exige tinta escura sobre bloco claro nos ` +
+        `DOIS temas: a camera do leitor nao decodifica o inverso. O gate de ` +
+        `contraste nao pega isto sozinho, porque a razao e simetrica.`,
+    );
+  }
+}
+
+/** Espacamento fora da escala de 2 px do §2.6 vira gambiarra silenciosa. */
+for (const [nome, def] of Object.entries(app.radius)) {
+  if (nome.startsWith('$')) continue;
+  if (!Number.isInteger(def.value) || def.value < 0) {
+    errors.push(`app: radius.${nome} precisa ser inteiro nao-negativo, veio "${def.value}".`);
+  }
+}
+
 /* ------------------------------------------------------------------ saida */
 
 const cssLines = [];
@@ -719,6 +1091,99 @@ export const BRAND = ${JSON.stringify(
 export const CONTRAST_REPORT = ${JSON.stringify(contrastReport, null, 2)} as const;
 `;
 
+/* ------------------------------------------------ saida do APP (F43) ----- */
+
+/**
+ * React Native nao le CSS -- entao o app leva SO TypeScript.
+ *
+ * Nao ha `theme.css` do app, e nao ha `--ah-app-*`: custom property nao existe
+ * no RN, e emitir uma seria emitir codigo morto que alguem tentaria importar.
+ * O objeto abaixo e o equivalente exato -- os mesmos tokens, conferidos pelo
+ * mesmo gate, na unica forma que a plataforma consome.
+ *
+ * `$comment`, `$role` e `$sameAs` NAO viajam para o TS: sao documentacao do
+ * JSON, e um objeto de runtime carregando prosa e peso morto no bundle do
+ * celular. O que sai e valor.
+ */
+const soValores = (no) => {
+  const out = {};
+  for (const [k, v] of Object.entries(no)) {
+    if (k.startsWith('$')) continue;
+    if (v && typeof v === 'object') {
+      out[k] = 'value' in v ? v.value : soValores(v);
+    }
+  }
+  return out;
+};
+
+const temaDoApp = (tema) => soValores(app[tema]);
+
+const appTs = `/* GERADO POR scripts/build-tokens.mjs -- NAO EDITE A MAO. */
+/* Fonte: packages/ui/tokens/app.json  ·  Contrato: docs/design/DS-APP.md */
+
+/**
+ * Tokens da superficie \`apps/mobile\` (app do aluno).
+ *
+ * React Native nao tem custom property: este objeto E a camada de tokens do
+ * app, e nao um espelho de um CSS que existe noutro lugar. Componente le
+ * daqui e de nenhum outro lugar -- hex literal em \`apps/mobile\` e erro de
+ * lint (regra 1 do DS-APP.md §2).
+ *
+ * DARK e o padrao (DS-APP.md §1). LIGHT segue o SO a partir do MVP 4 e reusa
+ * a paleta do painel, ja validada -- ver o \`$comment\` de \`light\` no JSON.
+ */
+export const APP_TOKENS = {
+  dark: ${JSON.stringify(temaDoApp('app'), null, 2).replace(/\n/g, '\n  ')},
+  light: ${JSON.stringify(temaDoApp('light'), null, 2).replace(/\n/g, '\n  ')},
+} as const;
+
+/** Tamanhos em px do DS-APP.md §2.6 e §2.8. Alvo tocavel minimo: 44. */
+export const APP_SIZE = ${JSON.stringify(soValores(app.size), null, 2)} as const;
+
+/** Raios do DS-APP.md §2.7. Sem sombra: a hierarquia vem das superficies. */
+export const APP_RADIUS = ${JSON.stringify(soValores(app.radius), null, 2)} as const;
+
+/** Escala de espacamento de 2px -- DS-APP.md §2.6. */
+export const APP_SPACE = ${JSON.stringify(app.space.scale)} as const;
+
+/** Papeis tipograficos do DS-APP.md §2.5. */
+export const APP_TYPE = ${JSON.stringify(
+  Object.fromEntries(
+    Object.entries(app.type)
+      .filter(([k]) => !k.startsWith('$'))
+      .map(([k, v]) => [
+        k,
+        { size: v.size, lineHeight: v.lineHeight, weight: v.weight },
+      ]),
+  ),
+  null,
+  2,
+)} as const;
+
+export const APP_FONT = ${JSON.stringify({ sans: app.font.sans, mono: app.font.mono }, null, 2)} as const;
+
+/** Duracoes em ms -- DS-APP.md §7: pulse e spin sao os unicos movimentos. */
+export const APP_MOTION = ${JSON.stringify(soValores(app.motion), null, 2)} as const;
+
+/**
+ * Opacidade do fundo e da borda do badge de estado, POR TEMA.
+ *
+ * Dark usa 16% (§2.4: "mais opaca que no painel, porque o fundo aqui e
+ * escuro"); light usa os 10% do painel. A diferenca nao e cosmetica: a 16%
+ * sobre branco o \`err\` entrega 4.43 e REPROVA o alvo de 4.5. O build mede
+ * o texto sobre o tint que estes numeros produzem -- mudar um deles aqui
+ * sem rodar o gate e como o badge do painel passou anos medindo o par errado.
+ */
+export const APP_STATE_TINT = ${JSON.stringify(
+  { dark: { bg: TINT_DO_APP.app, border: 0.34 }, light: { bg: TINT_DO_APP.light, border: 0.3 } },
+  null,
+  2,
+)} as const;
+
+export type AppTheme = keyof typeof APP_TOKENS;
+export type AppTokens = (typeof APP_TOKENS)[AppTheme];
+`;
+
 /* ------------------------------------------------------------- resultado */
 
 if (errors.length > 0) {
@@ -744,6 +1209,7 @@ if (CHECK_ONLY) {
   for (const [path, expected] of [
     [OUT_CSS, css],
     [OUT_TS, ts],
+    [OUT_APP_TS, appTs],
   ]) {
     let actual = null;
     try {
@@ -764,8 +1230,9 @@ if (CHECK_ONLY) {
 mkdirSync(dirname(OUT_CSS), { recursive: true });
 writeFileSync(OUT_CSS, css, 'utf8');
 writeFileSync(OUT_TS, ts, 'utf8');
+writeFileSync(OUT_APP_TS, appTs, 'utf8');
 
 process.stdout.write(
   `✓ tokens: ${contrastReport.length} pares de contraste verificados\n` +
-    `  ${OUT_CSS}\n  ${OUT_TS}\n`,
+    `  ${OUT_CSS}\n  ${OUT_TS}\n  ${OUT_APP_TS}\n`,
 );
