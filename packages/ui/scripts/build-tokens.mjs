@@ -511,18 +511,21 @@ const TODAS_AS_SUPERFICIES = ['bg.app', 'bg.surface', 'bg.raised'];
 
 /**
  * `temas` diz em QUAL tema o papel e medido, porque o papel de um token pode
- * mudar entre os dois. `accent.soft` e o caso: no dark e TINTA (hover de link,
- * §2.3) e no light e FUNDO tonal de acao (accent-50). Medi-lo como texto no
- * light reprovava com 1.0 -- e a reprovacao estava certa sobre a pergunta
- * errada, porque ninguem le letra `accent-50` sobre `carbon-50`.
+ * mudar entre os dois -- ver `accent.ink`, que so no light chega perto do
+ * limite.
+ *
+ * `border.hairline` NAO entra aqui: e divisor decorativo, isento por papel, e
+ * medi-lo produziria uma reprovacao que a propria isencao ja responde.
  */
 const PAPEIS_DO_APP = [
   { token: 'text.primary', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
   { token: 'text.secondary', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
   { token: 'text.muted', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'text.placeholder', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
   { token: 'border.default', alvo: 'componente', fundos: TODAS_AS_SUPERFICIES },
-  { token: 'accent.hover', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
-  { token: 'accent.soft', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES, temas: ['app'] },
+  { token: 'accent.text', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'accent.ink', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
+  { token: 'accent.soft', alvo: 'texto', fundos: TODAS_AS_SUPERFICIES },
 ];
 
 /**
@@ -533,27 +536,67 @@ const PAPEIS_DO_APP = [
 const ISENTOS_DO_APP = {
   'text.muted': {
     why:
-      'Metadado, timestamp, matricula e placeholder -- o DS-APP.md §7 restringe ' +
-      'este token a "metadado, nunca informacao necessaria", e a WCAG 2.2 §1.4.3 ' +
-      'trata texto que nao carrega conteudo como dica. Passa sobre `bg.app` (4.88) ' +
-      'e `bg.surface` (4.57); so reprova sobre `bg.raised` (4.18), onde o papel e ' +
-      'a matricula em mono dentro do card em destaque -- acompanhada do nome do ' +
-      'aluno em `text.primary`, que carrega a identificacao.',
+      'Metadado, timestamp e matricula -- o DS-APP.md §7 restringe este token a ' +
+      '"metadado, nunca informacao necessaria", e a WCAG 2.2 §1.4.3 trata texto ' +
+      'que nao carrega conteudo como dica. So reprova sobre `bg.raised`, onde o ' +
+      'papel e a matricula em mono dentro do card em destaque -- acompanhada do ' +
+      'nome do aluno em `text.primary`, que carrega a identificacao.',
+  },
+  'text.placeholder': {
+    why:
+      'WCAG 2.2 §1.4.3 -- placeholder e DICA, nao conteudo. O §4.1 do DS-APP ' +
+      'exige `<label>` em todo campo, e e o rotulo que carrega a informacao. ' +
+      'Mesma isencao nominal que o painel ja carrega em `semantic.text.placeholder`.',
+  },
+  'accent.ink': {
+    why:
+      'Traco de ICONE, nao texto -- §2.3: "accent/ink para traco de icone, ' +
+      'accent/text para texto". Icone no app nunca carrega informacao sozinho ' +
+      '(§7: estado nunca so por cor; badge sempre com icone E texto), entao ' +
+      'responde ao alvo de 3.0 de componente e nao ao de 4.5 de texto. So o ' +
+      'light chega perto do limite (4.19 sobre `bg.raised`), e passa folgado ' +
+      'no alvo que o papel realmente pede. Mesma clausula de `semantic.text.icon`.',
   },
 };
 
 /**
  * Papeis de ACAO do app medidos como PAR, nao contra o fundo da tela.
  *
- * `accent.solid` e FUNDO de botao (§2.3), e `accent.onAccent` e a tinta que
- * pousa nele. Medir qualquer um dos dois contra `bg.app` responde a pergunta
- * errada: ninguem le ciano sobre o fundo da tela, le-se PRETO sobre o ciano.
- * A mesma armadilha do badge do painel, que media contra branco e entregava
- * 4.44 na tela.
+ * O botao primario do DS-APP v2.1 e GRADIENTE (§2.3: "gradiente e acao, tinta
+ * e informacao"), entao o par que importa e branco sobre CADA PONTA dele --
+ * medir contra `bg.app` responde a pergunta errada, porque ninguem le azul
+ * sobre o fundo da tela; le-se BRANCO sobre o azul.
+ *
+ * A ponta clara (`gradientFrom`) e sempre o lado pior. `accent.solid` entra
+ * porque o §3.4 e o §3.5 o usam como fundo de segmento e chip ATIVOS, com
+ * texto branco por cima -- e ali ele e fundo de texto, nao decoracao.
  */
 const PARES_DO_APP = [
-  { rotulo: 'action', fg: 'accent.onAccent', bg: 'accent.solid', alvo: 'texto' },
+  { rotulo: 'ctaFrom', fg: 'accent.onAccent', bg: 'accent.gradientFrom', alvo: 'textoGrande' },
+  { rotulo: 'ctaTo', fg: 'accent.onAccent', bg: 'accent.gradientTo', alvo: 'textoGrande' },
+  { rotulo: 'segmentoAtivo', fg: 'accent.onAccent', bg: 'accent.solid', alvo: 'textoGrande' },
+  { rotulo: 'qr', fg: 'optico.qrInk', bg: 'optico.qrBackground', alvo: 'componente' },
 ];
+
+/**
+ * O que o gate REPORTA sem quebrar o build -- com o motivo escrito.
+ *
+ * Mesmo molde de `CTA_CONHECIDO` no totem: o gate existe para tornar o
+ * problema visivel, nao para decidir no lugar do PI. Mexer nestes valores
+ * muda a identidade da marca em todas as telas, e isso e decisao de produto.
+ */
+const REPORTADOS_DO_APP = {
+  ctaFrom:
+    'O rotulo do botao primario e 16px/700 -- TEXTO GRANDE pela WCAG (>= 18.66px ' +
+    'bold e o piso; 16px/700 fica logo abaixo), e entrega 3.33 sobre a ponta ' +
+    'clara do gradiente. Passa no alvo de 3.0 que o papel pede e fica abaixo dos ' +
+    '4.5 de texto normal. Escurecer a ponta mudaria o azul da marca em toda tela ' +
+    'do app -- decisao de produto, nao de guarda. Decidido pelo PI em 12/09/2026.',
+  segmentoAtivo:
+    'Mesma razao do `ctaFrom`: o rotulo do segmento ativo (§3.4) e 14px/600 ' +
+    'sobre `accent.solid`, dando 3.72. O par vive na mesma rampa do CTA e ' +
+    'muda junto com ele.',
+};
 
 /**
  * Tint dos semanticos, POR TEMA -- e nao um numero unico para os dois.
@@ -567,6 +610,23 @@ const PARES_DO_APP = [
  * opacidade em fundos opostos nao produz o mesmo par.
  */
 const TINT_DO_APP = { app: 0.16, light: 0.1 };
+
+/**
+ * Estado que o gate REPORTA sem quebrar, com o motivo escrito.
+ *
+ * Chave `<tema>.<tom>`. O precedente e do proprio painel, que conviveu com
+ * `success` a 4.44 sobre o tint pela mesma razao: o hex e o verde do DS, e
+ * trocar a cor de um estado semantico muda o significado em todas as telas.
+ */
+const ESTADOS_REPORTADOS = {
+  'light.ok':
+    'O verde do painel (#157F3D) entrega 4.44 sobre o proprio tint de 10%, a ' +
+    '0.06 do alvo. E o MESMO hex e o MESMO desvio que o painel ja carrega em ' +
+    '`state.success` -- o app reusa a semantica do painel no tema claro (§2.4) ' +
+    'de proposito, e divergir aqui criaria dois verdes de "pago" no produto. ' +
+    'O badge nunca depende so da cor (§7: sempre com icone E texto). Decidido ' +
+    'pelo PI em 12/09/2026.',
+};
 
 const valorDoApp = (tema, caminho) => {
   const [grupo, nome] = caminho.split('.');
@@ -623,8 +683,15 @@ for (const tema of ['app', 'light']) {
       continue;
     }
     const value = round2(contrast(fg, bg));
-    contrastReport.push({ role: `app.${tema}.${par.rotulo}`, fg, bg: par.bg, value, exempt: null });
-    if (value < ALVO_APP[par.alvo]) {
+    const reportado = REPORTADOS_DO_APP[par.rotulo];
+    contrastReport.push({
+      role: `app.${tema}.${par.rotulo}`,
+      fg,
+      bg: par.bg,
+      value,
+      exempt: reportado ?? null,
+    });
+    if (value < ALVO_APP[par.alvo] && !reportado) {
       errors.push(
         `contraste reprovado: app.${tema}.${par.rotulo} -- ${par.fg} (${fg}) sobre ` +
           `${par.bg} (${bg}) = ${value}, alvo ${ALVO_APP[par.alvo]}.`,
@@ -643,9 +710,16 @@ for (const tema of ['app', 'light']) {
     const fundo = mix(fg, superficieDoTint, tint);
     const value = round2(contrast(fg, fundo));
 
-    contrastReport.push({ role: `app.${tema}.state.${name}`, fg, bg: fundo, value, exempt: null });
+    const reportado = ESTADOS_REPORTADOS[`${tema}.${name}`];
+    contrastReport.push({
+      role: `app.${tema}.state.${name}`,
+      fg,
+      bg: fundo,
+      value,
+      exempt: reportado ?? null,
+    });
 
-    if (value < ALVO_APP.texto) {
+    if (value < ALVO_APP.texto && !reportado) {
       errors.push(
         `contraste reprovado: app.${tema}.state.${name} (${fg}) sobre o proprio ` +
           `tint de ${tint * 100}% (${fundo}) = ${value}, alvo ${ALVO_APP.texto}.`,
@@ -697,21 +771,26 @@ const TOCAVEIS_DO_APP = [
   'chip',
   'badge',
   'row',
+  'rowTable',
   'tabBar',
   'avatar',
 ];
 const ISENTOS_DE_TOQUE = {
   chip:
-    'DS-APP.md §2.8 nomeia a excecao: 32 px com area de toque estendida pelo ' +
-    'padding do container. O chip de periodo vive em fila de quatro dentro de ' +
-    'um container de 20 px de padding lateral.',
+    'DS-APP.md §2.8 nomeia a excecao, e a v2.1 §3.5 a desceu de 32 para 30 px ' +
+    'com raio de pill. A area de toque e estendida pelo padding do container: ' +
+    'o chip de periodo vive em fila de quatro dentro de um container de 20 px ' +
+    'de padding lateral.',
   badge:
     'Badge e chip de status NAO sao tocaveis -- sao rotulo de estado (§4.4). ' +
     'Entram na lista para que virar botao um dia falhe a guarda em vez de ' +
     'passar calado.',
   segment:
-    'DS-APP.md §2.8 fixa 36 px para a aba de segmento. O alvo real inclui o ' +
-    'padding de 4 px do container em cima e embaixo, chegando a 44.',
+    'A v2.1 §3.4 fixa 40 px para a aba de segmento (era 36 na v1.0). O alvo ' +
+    'real inclui o padding de 4 px do container em cima e embaixo, chegando a 48.',
+  rowTable:
+    'Linha de TABELA de evolucao (§4.12), nao de ranking: 44 px e exatamente o ' +
+    'minimo, e ela entra na lista para que baixar o valor um dia falhe a guarda.',
 };
 
 for (const nome of TOCAVEIS_DO_APP) {
@@ -725,6 +804,35 @@ for (const nome of TOCAVEIS_DO_APP) {
       `alvo de toque reprovado: size.${nome} = ${def.value}px, minimo ` +
         `${app.size.touchMin.value}px (DS-APP.md §2.8/§7). Aumente OU declare a ` +
         `isencao em ISENTOS_DE_TOQUE com o motivo escrito.`,
+    );
+  }
+}
+
+/**
+ * O QR nao inverte -- DS-APP.md §2.11, armadilha 2.
+ *
+ * CONTRASTE NAO PEGA ISTO, e foi um canario que mostrou: a razao de contraste
+ * e SIMETRICA, entao tinta clara sobre fundo escuro mede exatamente igual a
+ * tinta escura sobre fundo claro. O par invertido passa no gate de contraste
+ * com o mesmo numero -- e a camera do leitor nao le.
+ *
+ * A afirmacao correta e sobre LUMINANCIA ABSOLUTA, nao sobre a razao entre as
+ * duas: o fundo tem de ser o lado claro e a tinta o lado escuro, nos dois
+ * temas. O limiar de 0.5 e o meio da escala de luminancia relativa.
+ */
+for (const tema of ['app', 'light']) {
+  const fundo = valorDoApp(tema, 'optico.qrBackground');
+  const tinta = valorDoApp(tema, 'optico.qrInk');
+  if (!fundo || !tinta) {
+    errors.push(`app(${tema}): optico.qrBackground ou optico.qrInk ausente.`);
+    continue;
+  }
+  if (luminance(fundo) < 0.5 || luminance(tinta) > 0.5) {
+    errors.push(
+      `app(${tema}): o QR esta INVERTIDO -- fundo ${fundo} e tinta ${tinta}. ` +
+        `O DS-APP.md §2.11 (armadilha 2) exige tinta escura sobre bloco claro nos ` +
+        `DOIS temas: a camera do leitor nao decodifica o inverso. O gate de ` +
+        `contraste nao pega isto sozinho, porque a razao e simetrica.`,
     );
   }
 }
@@ -1067,7 +1175,7 @@ export const APP_MOTION = ${JSON.stringify(soValores(app.motion), null, 2)} as c
  * sem rodar o gate e como o badge do painel passou anos medindo o par errado.
  */
 export const APP_STATE_TINT = ${JSON.stringify(
-  { dark: { bg: TINT_DO_APP.app, border: 0.34 }, light: { bg: TINT_DO_APP.light, border: 0.32 } },
+  { dark: { bg: TINT_DO_APP.app, border: 0.34 }, light: { bg: TINT_DO_APP.light, border: 0.3 } },
   null,
   2,
 )} as const;

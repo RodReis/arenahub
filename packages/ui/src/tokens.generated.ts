@@ -273,127 +273,204 @@ export const CONTRAST_REPORT = [
     "role": "app.app.text.primary",
     "fg": "#F5F7F9",
     "bg": "bg.raised",
-    "value": 14.71,
+    "value": 15.08,
     "exempt": null
   },
   {
     "role": "app.app.text.secondary",
     "fg": "#A6AEB9",
     "bg": "bg.raised",
-    "value": 7.05,
+    "value": 7.23,
     "exempt": null
   },
   {
     "role": "app.app.text.muted",
     "fg": "#7B8491",
     "bg": "bg.raised",
-    "value": 4.18,
-    "exempt": "Metadado, timestamp, matricula e placeholder -- o DS-APP.md §7 restringe este token a \"metadado, nunca informacao necessaria\", e a WCAG 2.2 §1.4.3 trata texto que nao carrega conteudo como dica. Passa sobre `bg.app` (4.88) e `bg.surface` (4.57); so reprova sobre `bg.raised` (4.18), onde o papel e a matricula em mono dentro do card em destaque -- acompanhada do nome do aluno em `text.primary`, que carrega a identificacao."
+    "value": 4.28,
+    "exempt": "Metadado, timestamp e matricula -- o DS-APP.md §7 restringe este token a \"metadado, nunca informacao necessaria\", e a WCAG 2.2 §1.4.3 trata texto que nao carrega conteudo como dica. So reprova sobre `bg.raised`, onde o papel e a matricula em mono dentro do card em destaque -- acompanhada do nome do aluno em `text.primary`, que carrega a identificacao."
+  },
+  {
+    "role": "app.app.text.placeholder",
+    "fg": "#565E69",
+    "bg": "bg.raised",
+    "value": 2.47,
+    "exempt": "WCAG 2.2 §1.4.3 -- placeholder e DICA, nao conteudo. O §4.1 do DS-APP exige `<label>` em todo campo, e e o rotulo que carrega a informacao. Mesma isencao nominal que o painel ja carrega em `semantic.text.placeholder`."
   },
   {
     "role": "app.app.border.default",
-    "fg": "#646D79",
+    "fg": "#5F71A0",
     "bg": "bg.raised",
-    "value": 3.01,
+    "value": 3.36,
     "exempt": null
   },
   {
-    "role": "app.app.accent.hover",
-    "fg": "#4FD5E3",
+    "role": "app.app.accent.text",
+    "fg": "#8FB0FF",
     "bg": "bg.raised",
-    "value": 9,
+    "value": 7.58,
     "exempt": null
+  },
+  {
+    "role": "app.app.accent.ink",
+    "fg": "#7DA2FF",
+    "bg": "bg.raised",
+    "value": 6.54,
+    "exempt": "Traco de ICONE, nao texto -- §2.3: \"accent/ink para traco de icone, accent/text para texto\". Icone no app nunca carrega informacao sozinho (§7: estado nunca so por cor; badge sempre com icone E texto), entao responde ao alvo de 3.0 de componente e nao ao de 4.5 de texto. So o light chega perto do limite (4.19 sobre `bg.raised`), e passa folgado no alvo que o papel realmente pede. Mesma clausula de `semantic.text.icon`."
   },
   {
     "role": "app.app.accent.soft",
-    "fg": "#C2F2F7",
+    "fg": "#C9D9FF",
     "bg": "bg.raised",
-    "value": 13.04,
+    "value": 11.46,
     "exempt": null
   },
   {
-    "role": "app.app.action",
-    "fg": "#0A0B0D",
+    "role": "app.app.ctaFrom",
+    "fg": "#FFFFFF",
+    "bg": "accent.gradientFrom",
+    "value": 3.33,
+    "exempt": "O rotulo do botao primario e 16px/700 -- TEXTO GRANDE pela WCAG (>= 18.66px bold e o piso; 16px/700 fica logo abaixo), e entrega 3.33 sobre a ponta clara do gradiente. Passa no alvo de 3.0 que o papel pede e fica abaixo dos 4.5 de texto normal. Escurecer a ponta mudaria o azul da marca em toda tela do app -- decisao de produto, nao de guarda. Decidido pelo PI em 12/09/2026."
+  },
+  {
+    "role": "app.app.ctaTo",
+    "fg": "#FFFFFF",
+    "bg": "accent.gradientTo",
+    "value": 5.05,
+    "exempt": null
+  },
+  {
+    "role": "app.app.segmentoAtivo",
+    "fg": "#FFFFFF",
     "bg": "accent.solid",
-    "value": 8.75,
+    "value": 3.72,
+    "exempt": "Mesma razao do `ctaFrom`: o rotulo do segmento ativo (§3.4) e 14px/600 sobre `accent.solid`, dando 3.72. O par vive na mesma rampa do CTA e muda junto com ele."
+  },
+  {
+    "role": "app.app.qr",
+    "fg": "#1F2328",
+    "bg": "optico.qrBackground",
+    "value": 15.8,
     "exempt": null
   },
   {
     "role": "app.app.state.ok",
     "fg": "#3DDC84",
-    "bg": "#1e3a2f",
-    "value": 6.92,
+    "bg": "#193428",
+    "value": 7.53,
     "exempt": null
   },
   {
     "role": "app.app.state.warn",
     "fg": "#F5A524",
-    "bg": "#3b3120",
-    "value": 6.25,
+    "bg": "#362b19",
+    "value": 6.79,
     "exempt": null
   },
   {
     "role": "app.app.state.err",
     "fg": "#FF6B6B",
-    "bg": "#3d282b",
-    "value": 4.92,
+    "bg": "#382224",
+    "value": 5.32,
     "exempt": null
   },
   {
     "role": "app.app.state.info",
     "fg": "#6AB0FF",
-    "bg": "#253343",
-    "value": 5.67,
+    "bg": "#202d3c",
+    "value": 6.17,
     "exempt": null
   },
   {
     "role": "app.light.text.primary",
     "fg": "#1F2328",
     "bg": "bg.raised",
-    "value": 12.96,
+    "value": 13.09,
     "exempt": null
   },
   {
     "role": "app.light.text.secondary",
     "fg": "#565E69",
     "bg": "bg.raised",
-    "value": 5.38,
+    "value": 5.44,
     "exempt": null
   },
   {
     "role": "app.light.text.muted",
     "fg": "#7B8491",
     "bg": "bg.raised",
-    "value": 3.1,
-    "exempt": "Metadado, timestamp, matricula e placeholder -- o DS-APP.md §7 restringe este token a \"metadado, nunca informacao necessaria\", e a WCAG 2.2 §1.4.3 trata texto que nao carrega conteudo como dica. Passa sobre `bg.app` (4.88) e `bg.surface` (4.57); so reprova sobre `bg.raised` (4.18), onde o papel e a matricula em mono dentro do card em destaque -- acompanhada do nome do aluno em `text.primary`, que carrega a identificacao."
+    "value": 3.13,
+    "exempt": "Metadado, timestamp e matricula -- o DS-APP.md §7 restringe este token a \"metadado, nunca informacao necessaria\", e a WCAG 2.2 §1.4.3 trata texto que nao carrega conteudo como dica. So reprova sobre `bg.raised`, onde o papel e a matricula em mono dentro do card em destaque -- acompanhada do nome do aluno em `text.primary`, que carrega a identificacao."
+  },
+  {
+    "role": "app.light.text.placeholder",
+    "fg": "#9AA3AE",
+    "bg": "bg.raised",
+    "value": 2.12,
+    "exempt": "WCAG 2.2 §1.4.3 -- placeholder e DICA, nao conteudo. O §4.1 do DS-APP exige `<label>` em todo campo, e e o rotulo que carrega a informacao. Mesma isencao nominal que o painel ja carrega em `semantic.text.placeholder`."
   },
   {
     "role": "app.light.border.default",
     "fg": "#7B8491",
     "bg": "bg.raised",
-    "value": 3.1,
+    "value": 3.13,
     "exempt": null
   },
   {
-    "role": "app.light.accent.hover",
-    "fg": "#005760",
+    "role": "app.light.accent.text",
+    "fg": "#2E4FD0",
     "bg": "bg.raised",
-    "value": 6.8,
+    "value": 5.53,
     "exempt": null
   },
   {
-    "role": "app.light.action",
+    "role": "app.light.accent.ink",
+    "fg": "#3E63E8",
+    "bg": "bg.raised",
+    "value": 4.19,
+    "exempt": "Traco de ICONE, nao texto -- §2.3: \"accent/ink para traco de icone, accent/text para texto\". Icone no app nunca carrega informacao sozinho (§7: estado nunca so por cor; badge sempre com icone E texto), entao responde ao alvo de 3.0 de componente e nao ao de 4.5 de texto. So o light chega perto do limite (4.19 sobre `bg.raised`), e passa folgado no alvo que o papel realmente pede. Mesma clausula de `semantic.text.icon`."
+  },
+  {
+    "role": "app.light.accent.soft",
+    "fg": "#1B3AAE",
+    "bg": "bg.raised",
+    "value": 7.69,
+    "exempt": null
+  },
+  {
+    "role": "app.light.ctaFrom",
+    "fg": "#FFFFFF",
+    "bg": "accent.gradientFrom",
+    "value": 3.33,
+    "exempt": "O rotulo do botao primario e 16px/700 -- TEXTO GRANDE pela WCAG (>= 18.66px bold e o piso; 16px/700 fica logo abaixo), e entrega 3.33 sobre a ponta clara do gradiente. Passa no alvo de 3.0 que o papel pede e fica abaixo dos 4.5 de texto normal. Escurecer a ponta mudaria o azul da marca em toda tela do app -- decisao de produto, nao de guarda. Decidido pelo PI em 12/09/2026."
+  },
+  {
+    "role": "app.light.ctaTo",
+    "fg": "#FFFFFF",
+    "bg": "accent.gradientTo",
+    "value": 5.05,
+    "exempt": null
+  },
+  {
+    "role": "app.light.segmentoAtivo",
     "fg": "#FFFFFF",
     "bg": "accent.solid",
-    "value": 5.83,
+    "value": 3.72,
+    "exempt": "Mesma razao do `ctaFrom`: o rotulo do segmento ativo (§3.4) e 14px/600 sobre `accent.solid`, dando 3.72. O par vive na mesma rampa do CTA e muda junto com ele."
+  },
+  {
+    "role": "app.light.qr",
+    "fg": "#1F2328",
+    "bg": "optico.qrBackground",
+    "value": 15.8,
     "exempt": null
   },
   {
     "role": "app.light.state.ok",
-    "fg": "#13763A",
-    "bg": "#e7f1eb",
-    "value": 4.94,
-    "exempt": null
+    "fg": "#157F3D",
+    "bg": "#e8f2ec",
+    "value": 4.44,
+    "exempt": "O verde do painel (#157F3D) entrega 4.44 sobre o proprio tint de 10%, a 0.06 do alvo. E o MESMO hex e o MESMO desvio que o painel ja carrega em `state.success` -- o app reusa a semantica do painel no tema claro (§2.4) de proposito, e divergir aqui criaria dois verdes de \"pago\" no produto. O badge nunca depende so da cor (§7: sempre com icone E texto). Decidido pelo PI em 12/09/2026."
   },
   {
     "role": "app.light.state.warn",

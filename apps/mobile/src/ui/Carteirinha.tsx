@@ -57,7 +57,7 @@ export function Carteirinha({
       >
         <View
           accessibilityElementsHidden
-          style={[estilos.alca, { backgroundColor: t.cor.border.default }]}
+          style={[estilos.alca, { backgroundColor: t.cor.border.hairline }]}
         />
 
         <View style={estilos.identidade}>
@@ -117,7 +117,7 @@ export function Carteirinha({
               style={[
                 estilos.preenchimento,
                 {
-                  backgroundColor: t.cor.accent.hover,
+                  backgroundColor: t.cor.accent.solid,
                   width: `${Math.max(0, Math.min(100, (segundosParaRenovar / 30) * 100))}%`,
                 },
               ]}

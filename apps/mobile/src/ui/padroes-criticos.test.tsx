@@ -91,7 +91,7 @@ describe('carteirinha — token opaco, sem PII', () => {
     expect(JSON.stringify(screen.toJSON())).not.toContain(CPF);
   });
 
-  it('o QR fica sobre a MESMA cor nos dois temas — requisito optico, nao estetico', () => {
+  it('o QR nao inverte entre os temas — §2.11 armadilha 2', () => {
     /**
      * A afirmacao e sobre INVARIANCIA, nao sobre o hex.
      *
@@ -100,10 +100,12 @@ describe('carteirinha — token opaco, sem PII', () => {
      * mesmo num teste: o dia em que o token mudasse, este arquivo passaria a
      * ser a segunda verdade que diz qual e a cor certa.
      *
-     * O que o QR exige e que a cor NAO INVERTA com o tema. Isso se afirma
-     * comparando os dois temas entre si, sem nomear a cor.
+     * O que o QR exige e que fundo E TINTA nao invertam com o tema: a camera
+     * do leitor nao decodifica o negativo. Isso se afirma comparando os dois
+     * temas entre si, sem nomear a cor.
      */
     expect(APP_TOKENS.light.optico.qrBackground).toBe(APP_TOKENS.dark.optico.qrBackground);
+    expect(APP_TOKENS.light.optico.qrInk).toBe(APP_TOKENS.dark.optico.qrInk);
   });
 });
 

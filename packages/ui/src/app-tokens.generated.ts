@@ -15,24 +15,39 @@
 export const APP_TOKENS = {
   dark: {
     "bg": {
-      "app": "#121417",
-      "surface": "#181B1F",
-      "raised": "#1F2328"
+      "app": "#0A0B0D",
+      "surface": "#121417",
+      "raised": "#1A2032"
     },
     "border": {
-      "default": "#646D79"
+      "default": "#5F71A0",
+      "hairline": "#232A3D"
     },
     "text": {
       "primary": "#F5F7F9",
       "secondary": "#A6AEB9",
-      "muted": "#7B8491"
+      "muted": "#7B8491",
+      "placeholder": "#565E69",
+      "onImage": "#FFFFFF",
+      "onImageMuted": "#E5E9EE"
     },
     "accent": {
-      "solid": "#1FBED0",
-      "hover": "#4FD5E3",
-      "soft": "#C2F2F7",
-      "tint": "rgba(31,190,208,.10)",
-      "onAccent": "#0A0B0D"
+      "solid": "#4D7CFF",
+      "gradientFrom": "#5B86FF",
+      "gradientTo": "#3E63E8",
+      "gradientHoverFrom": "#6B92FF",
+      "gradientHoverTo": "#4A6FF0",
+      "ink": "#7DA2FF",
+      "text": "#8FB0FF",
+      "soft": "#C9D9FF",
+      "tint": "rgba(77,124,255,.12)",
+      "onAccent": "#FFFFFF"
+    },
+    "brand": {
+      "frame": "#0D1226",
+      "markFrom": "#7DA2FF",
+      "markMid": "#2E4FD0",
+      "markTo": "#9DB8FF"
     },
     "state": {
       "ok": "#3DDC84",
@@ -44,41 +59,58 @@ export const APP_TOKENS = {
       "default": "rgba(10,11,13,.7)"
     },
     "optico": {
-      "qrBackground": "#FFFFFF"
+      "qrBackground": "#FFFFFF",
+      "qrInk": "#1F2328"
     }
   },
   light: {
     "bg": {
-      "app": "#F5F7F9",
+      "app": "#EDF0F5",
       "surface": "#FFFFFF",
-      "raised": "#E5E9EE"
+      "raised": "#E4EAF6"
     },
     "border": {
-      "default": "#7B8491"
+      "default": "#7B8491",
+      "hairline": "#E5E9EE"
     },
     "text": {
       "primary": "#1F2328",
       "secondary": "#565E69",
-      "muted": "#7B8491"
+      "muted": "#7B8491",
+      "placeholder": "#9AA3AE",
+      "onImage": "#FFFFFF",
+      "onImageMuted": "#E5E9EE"
     },
     "accent": {
-      "solid": "#00707B",
-      "hover": "#005760",
-      "soft": "#E8FBFD",
-      "tint": "rgba(0,112,123,.10)",
+      "solid": "#4D7CFF",
+      "gradientFrom": "#5B86FF",
+      "gradientTo": "#3E63E8",
+      "gradientHoverFrom": "#6B92FF",
+      "gradientHoverTo": "#4A6FF0",
+      "ink": "#3E63E8",
+      "text": "#2E4FD0",
+      "soft": "#1B3AAE",
+      "tint": "rgba(77,124,255,.12)",
       "onAccent": "#FFFFFF"
     },
+    "brand": {
+      "frame": "#0D1226",
+      "markFrom": "#7DA2FF",
+      "markMid": "#2E4FD0",
+      "markTo": "#9DB8FF"
+    },
     "state": {
-      "ok": "#13763A",
+      "ok": "#157F3D",
       "warn": "#8A5200",
       "err": "#C22B2B",
       "info": "#1F5FD0"
     },
     "scrim": {
-      "default": "rgba(18,20,23,.5)"
+      "default": "rgba(31,35,40,.45)"
     },
     "optico": {
-      "qrBackground": "#FFFFFF"
+      "qrBackground": "#FFFFFF",
+      "qrInk": "#1F2328"
     }
   },
 } as const;
@@ -90,12 +122,15 @@ export const APP_SIZE = {
   "control": 48,
   "controlInCard": 44,
   "tile": 64,
-  "segment": 36,
-  "chip": 32,
+  "segment": 40,
+  "chip": 30,
   "badge": 26,
-  "row": 44,
+  "row": 56,
+  "rowTable": 44,
   "tabBar": 56,
   "avatar": 44,
+  "mark": 52,
+  "render3d": 200,
   "touchMin": 44
 } as const;
 
@@ -103,10 +138,11 @@ export const APP_SIZE = {
 export const APP_RADIUS = {
   "sheet": 20,
   "card": 16,
+  "mark": 15,
   "control": 12,
-  "segment": 8,
+  "segment": 9,
+  "progress": 4,
   "bar": 3,
-  "progress": 2,
   "pill": 999
 } as const;
 
@@ -165,6 +201,11 @@ export const APP_TYPE = {
     "lineHeight": 18,
     "weight": 600
   },
+  "overline": {
+    "size": 12,
+    "lineHeight": 16,
+    "weight": 700
+  },
   "meta": {
     "size": 12,
     "lineHeight": 16,
@@ -204,7 +245,7 @@ export const APP_STATE_TINT = {
   },
   "light": {
     "bg": 0.1,
-    "border": 0.32
+    "border": 0.3
   }
 } as const;
 

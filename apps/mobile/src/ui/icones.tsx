@@ -9,9 +9,13 @@ import { useTema, type Tom } from './theme.js';
  * (botao primario) e 20 (tab bar).
  *
  * Cor: quando `tom` vem, usa a cor do estado (e o glifo que acompanha o badge
- * -- §7, cor nunca e o unico canal); sem `tom`, `accent/hover`, que e a tinta
- * sobre escuro do §2.3. O componente NUNCA recebe hex: a regra 1 do DS vale
- * aqui como em qualquer outro arquivo.
+ * -- §7, cor nunca e o unico canal); sem `tom`, `accent/ink`, que o §2.3
+ * reserva para TRACO DE ICONE. Nao usar `accent/text` aqui: o §2.3 diz
+ * explicitamente "nao inverter, o mais claro e o que precisa de contraste em
+ * corpo pequeno" -- texto pede o tom mais claro, traco de icone nao.
+ *
+ * O componente NUNCA recebe hex: a regra 1 do DS vale aqui como em qualquer
+ * outro arquivo.
  */
 
 type PropsDeIcone = {
@@ -25,7 +29,7 @@ function useCorDoIcone({ tom, neutro }: PropsDeIcone): string {
   const t = useTema();
   if (tom) return t.cor.state[tom];
   if (neutro) return t.cor.text.primary;
-  return t.cor.accent.hover;
+  return t.cor.accent.ink;
 }
 
 const BASE = {

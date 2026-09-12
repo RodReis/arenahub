@@ -80,7 +80,7 @@ export function DivisorDeCard({ children }: { children: ReactNode }) {
     <View
       style={{
         borderTopWidth: 1,
-        borderTopColor: t.cor.border.default,
+        borderTopColor: t.cor.border.hairline,
         paddingTop: 12,
         gap: 8,
       }}

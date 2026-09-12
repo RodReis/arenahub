@@ -1,8 +1,8 @@
 # DS-APP — Design System do Aplicativo do Aluno
 
 Academia ArenaHub · plataforma ArenaHub
-Arquivo de referência: `App Mobile.dc.html`
-Versão 2.0 — rebrand azul alinhado ao totem, avaliação 3D na aba Evolução
+Arquivos de referência: `App Mobile.dc.html` (escuro) · `App Mobile Claro.dc.html` (claro)
+Versão 2.1 — dois temas: escuro alinhado ao totem, claro alinhado ao painel web
 
 ---
 
@@ -16,7 +16,7 @@ App do aluno. É a superfície **pessoal** da plataforma: carteirinha, plano, pa
 
 **O alerta vem antes do conteúdo.** Fatura vencida, bloqueio de catraca e achado clínico aparecem no topo da Home e da aba correspondente, nunca enterrados.
 
-**Escuro por padrão.** O app é usado na academia, com luz baixa, celular na mão e suor. Fundo escuro, contraste alto, alvos grandes.
+**Escuro por padrão, claro por escolha.** O app é usado na academia, com luz baixa, celular na mão e suor — o tema escuro é o padrão. O tema claro existe para uso fora da academia e para quem prefere, e reusa os neutros do painel web. Mesma estrutura, mesmos componentes, mesma marca: **só os tokens mudam.**
 
 **Mesma marca em todas as superfícies.** App, totem e painel são a mesma Clínica de Musculação: azul royal sobre preto, mesma escala de superfícies e mesmos tons semânticos. Um aluno que vê a avaliação no totem reconhece a mesma leitura no app.
 
@@ -28,7 +28,7 @@ App do aluno. É a superfície **pessoal** da plataforma: carteirinha, plano, pa
 
 | Aspecto | Definição |
 |---|---|
-| Moldura | iPhone, 390 × 780 px (`ios-frame.jsx`, `dark="true"`) |
+| Moldura | iPhone, 390 × 780 px (`ios-frame.jsx` · `dark="true"` no escuro, `dark="false"` no claro) |
 | Safe area superior | 58 px de `padding-top` no shell |
 | Entrada | Toque, uma mão, polegar na metade inferior |
 | Densidade | Confortável: controles de 44–48 px, corpo de 14–15 px |
@@ -56,13 +56,32 @@ Três níveis de escuro. Nunca mais do que isso na mesma tela.
 
 Mesma escala do totem: base `#0A0B0D`, superfície `#121417`, borda `#232A3D`. `bg/raised` é a variação azulada do app para o card que precisa se destacar dentro da tela.
 
+#### Tema claro
+
+Mesmos papéis, neutros do painel web (DS-PAINEL §2.1). No claro, card branco **sempre com borda** — sem ela a hierarquia some.
+
+| Token | Escuro | Claro | Observação no claro |
+|---|---|---|---|
+| `bg/app` | `#0A0B0D` | `#EDF0F5` | Fundo do app e poço interno (trilho de barra) |
+| `bg/surface` | `#121417` | `#FFFFFF` | Card · `border: 1px solid #E5E9EE` |
+| `bg/raised` | `#1A2032` | `#E4EAF6` | Card em destaque · `border: 1px solid #CFDAF0` |
+| `border/default` | `#232A3D` | `#CBD1D9` | Input, botão secundário, divisor |
+| `border/hairline` | — | `#E5E9EE` | Borda de card branco, linha de tabela |
+| `brand/frame` | `#0D1226` | `#0D1226` | Miolo da marca permanece escuro |
+| `scrim` | `rgba(10,11,13,.7)` | `rgba(31,35,40,.45)` | Atrás do sheet |
+| `ink/on-accent` | `#FFFFFF` | `#FFFFFF` | Texto sobre azul de ação |
+| Página que hospeda a moldura | `#F5F7F9` | `#E5E9EE` | Fora do frame |
+
 ### 2.2 Cor — texto
 
-| Token | Hex | Uso |
-|---|---|---|
-| `text/primary` | `#F5F7F9` | Título, valor, corpo forte |
-| `text/secondary` | `#A6AEB9` | Descrição, label, métrica secundária |
-| `text/muted` | `#7B8491` | Metadado, timestamp, matrícula, placeholder |
+| Token | Escuro | Claro | Uso |
+|---|---|---|---|
+| `text/primary` | `#F5F7F9` | `#1F2328` | Título, valor, corpo forte |
+| `text/secondary` | `#A6AEB9` | `#565E69` | Descrição, label, métrica secundária |
+| `text/muted` | `#7B8491` | `#7B8491` | Metadado, timestamp, matrícula |
+| `text/placeholder` | `#565E69` | `#9AA3AE` | Placeholder de campo |
+
+**Texto sobre imagem não inverte.** Sobre o render 3D e qualquer foto com scrim escuro, o texto permanece claro nos dois temas: título e valor em `#FFFFFF`, legenda em `#E5E9EE`, chip e overline em `#8FB0FF`. O gradiente de legibilidade é o mesmo nos dois temas.
 
 ### 2.3 Cor — marca
 
@@ -79,6 +98,15 @@ Mesma escala do totem: base `#0A0B0D`, superfície `#121417`, borda `#232A3D`. `
 
 Regra: **gradiente é ação, tinta é informação.** Botão primário sempre com `accent/gradient` + texto branco; nunca `accent/solid` chapado como fundo de botão. `accent/ink` para traço de ícone, `accent/text` para texto — não inverter, o mais claro é o que precisa de contraste em corpo pequeno.
 
+No **tema claro** o gradiente, o hover e `accent/solid` são idênticos — azul de ação não muda entre temas. Só as duas tintas de leitura escurecem para ter contraste sobre branco:
+
+| Token | Escuro | Claro |
+|---|---|---|
+| `accent/ink` (traço de ícone) | `#7DA2FF` | `#3E63E8` |
+| `accent/text` (texto, overline, link) | `#8FB0FF` | `#2E4FD0` |
+| `accent/soft` (hover de link) | `#C9D9FF` | `#1B3AAE` |
+| `accent/solid`, `accent/gradient` | iguais | iguais |
+
 ### 2.4 Cor — semântica
 
 Quatro tons. Tripla `[texto, fundo 16%, borda 34%]` — mais opaca que no painel, porque o fundo aqui é escuro.
@@ -91,6 +119,15 @@ Quatro tons. Tripla `[texto, fundo 16%, borda 34%]` — mais opaca que no painel
 | `info` | `#6AB0FF` | `rgba(106,176,255,.16)` | `rgba(106,176,255,.34)` | Em aberto, processando, spinner |
 
 No código: `T.ok[0]` texto, `T.ok[1]` fundo, `T.ok[2]` borda. Delta de métrica usa `ok` quando melhora e `warn` quando piora — nunca `err`, que é reservado a falha e alerta clínico.
+
+**Tema claro** — mesmos quatro tons nos hexes do painel web, com fundo a 10% e borda a 30% (sobre branco, 16%/34% ficaria pesado):
+
+| Tom | Texto | Fundo | Borda |
+|---|---|---|---|
+| `ok` | `#157F3D` | `rgba(21,127,61,.10)` | `rgba(21,127,61,.30)` |
+| `warn` | `#8A5200` | `rgba(138,82,0,.10)` | `rgba(138,82,0,.30)` |
+| `err` | `#C22B2B` | `rgba(194,43,43,.10)` | `rgba(194,43,43,.30)` |
+| `info` | `#1F5FD0` | `rgba(31,95,208,.10)` | `rgba(31,95,208,.30)` |
 
 ### 2.5 Tipografia
 
@@ -168,10 +205,17 @@ Traço, `viewBox` 24×24, `stroke-width: 2`, `linecap/linejoin: round`, sem fill
 O único CSS fora do inline — tudo o que não pode ser expresso em `style`:
 
 ```css
+/* tema escuro */
 body { margin: 0; background: #F5F7F9; -webkit-font-smoothing: antialiased; }
 a { color: #8FB0FF; }
 a:hover { color: #C9D9FF; }
 input::placeholder { color: #565E69; }
+
+/* tema claro */
+body { margin: 0; background: #E5E9EE; -webkit-font-smoothing: antialiased; }
+a { color: #2E4FD0; }
+a:hover { color: #1B3AAE; }
+input::placeholder { color: #9AA3AE; }
 
 @keyframes ah-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .3 } }
 @keyframes ah-spin  { to { transform: rotate(360deg) } }
@@ -184,13 +228,23 @@ O `#F5F7F9` do `body` é o fundo da **página que hospeda a moldura**, não do a
 **Estados interativos** usam `style-hover` / `style-active` no elemento (o DC compila para pseudo-estado), nunca classe CSS:
 
 ```html
-<!-- botão primário -->
+<!-- botão primário (idêntico nos dois temas) -->
 style-hover="background:linear-gradient(100deg,#6B92FF,#4A6FF0)"
-<!-- botão secundário, campo, tile -->
+<!-- botão secundário, campo, tile — #8FB0FF no escuro, #2E4FD0 no claro -->
 style-hover="border-color:#8FB0FF"
 <!-- campo em foco -->
 style-focus="border-color:#8FB0FF;outline:2px solid #8FB0FF;outline-offset:2px"
 ```
+
+### 2.11 Manter os dois temas
+
+O claro é um arquivo irmão, não um switch em tempo de execução — tema por hole (`style="background:{{ bg }}"`) impediria a tela de pintar durante o streaming. Mudança estrutural entra primeiro no escuro e depois é portada, aplicando a tabela de tokens acima.
+
+Três armadilhas na conversão, todas já encontradas:
+
+1. **Texto sobre foto** — não inverte (§2.2).
+2. **QR Code** — permanece tinta escura (`#1F2328`) sobre bloco branco nos dois temas; inverter torna o código ilegível para a câmera.
+3. **Card branco** — no claro precisa de `border: 1px solid #E5E9EE`; sem borda, branco sobre `#EDF0F5` não separa.
 
 ---
 
@@ -292,15 +346,7 @@ Altura 48 px (principal), 44 px (dentro de card e sheet), 64 px (tile). Raio 12 
 
 ### 4.3 Card
 
-`bg/surface` (ou `bg/raised` quando é o card em destaque da tela), raio 16 px, padding `18px 20px`, `display: flex; flex-direction: column; gap: 8–12px`. Borda `border/default` por padrão; sem borda apenas quando o contraste de superfície realmente separa.
-
-> **Emenda de 12/09/2026 (F43) — a borda passou a ser o padrão.** A v1.0 dizia "sem borda quando o
-> contraste de superfície já separa". A medição mostra que ele **não separa**: a razão de contraste
-> entre as três superfícies fica entre **1,07 e 1,22 nos dois temas** — no escuro e no claro. Nesse
-> patamar o card se dissolve no fundo, o que apareceu assim que a vitrine abriu no tema claro, com
-> o card de plano indistinguível da página. O §2.7 continua valendo no que ele realmente decide
-> (**nada de sombra**); o que muda é que a hierarquia passa a vir do **contorno**, não de três tons
-> de fundo que o olho não distingue. Decidido pelo PI em 12/09/2026.
+`bg/surface` (ou `bg/raised` quando é o card em destaque da tela), raio 16 px, padding `18px 20px`, `display: flex; flex-direction: column; gap: 8–12px`. Sem borda quando o contraste de superfície já separa; com borda `border/default` quando está sobre superfície de mesmo nível.
 
 Cabeçalho interno: título 16 px/600 à esquerda, badge ou métrica à direita, `justify-content: space-between`. Divisor interno: `border-top: 1px solid border/default; padding-top: 12px`.
 
@@ -460,6 +506,14 @@ Ranking com opt-in explícito e reversível dentro do app. Carteirinha com token
 - [ ] `accent/ink` em traço de ícone, `accent/text` em texto — não invertidos
 - [ ] Delta de métrica em `ok`/`warn`, nunca `err`
 - [ ] Superfícies iguais às do totem (`#0A0B0D` / `#121417` / `#232A3D`)
+
+**Tema claro**
+- [ ] Card branco com borda `#E5E9EE`; destaque com `#CFDAF0`
+- [ ] Texto sobre foto permanece claro (`#FFFFFF` / `#E5E9EE` / `#8FB0FF`)
+- [ ] QR em `#1F2328` sobre branco
+- [ ] Tintas de leitura escurecidas (`#3E63E8` / `#2E4FD0`); azul de ação inalterado
+- [ ] Semântica nos hexes do painel, fundo 10% / borda 30%
+- [ ] Moldura com `dark="false"`
 
 **Layout**
 - [ ] Só a área central rola; tab bar e safe area fixas
