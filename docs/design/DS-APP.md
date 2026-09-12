@@ -292,7 +292,15 @@ Altura 48 px (principal), 44 px (dentro de card e sheet), 64 px (tile). Raio 12 
 
 ### 4.3 Card
 
-`bg/surface` (ou `bg/raised` quando é o card em destaque da tela), raio 16 px, padding `18px 20px`, `display: flex; flex-direction: column; gap: 8–12px`. Sem borda quando o contraste de superfície já separa; com borda `border/default` quando está sobre superfície de mesmo nível.
+`bg/surface` (ou `bg/raised` quando é o card em destaque da tela), raio 16 px, padding `18px 20px`, `display: flex; flex-direction: column; gap: 8–12px`. Borda `border/default` por padrão; sem borda apenas quando o contraste de superfície realmente separa.
+
+> **Emenda de 12/09/2026 (F43) — a borda passou a ser o padrão.** A v1.0 dizia "sem borda quando o
+> contraste de superfície já separa". A medição mostra que ele **não separa**: a razão de contraste
+> entre as três superfícies fica entre **1,07 e 1,22 nos dois temas** — no escuro e no claro. Nesse
+> patamar o card se dissolve no fundo, o que apareceu assim que a vitrine abriu no tema claro, com
+> o card de plano indistinguível da página. O §2.7 continua valendo no que ele realmente decide
+> (**nada de sombra**); o que muda é que a hierarquia passa a vir do **contorno**, não de três tons
+> de fundo que o olho não distingue. Decidido pelo PI em 12/09/2026.
 
 Cabeçalho interno: título 16 px/600 à esquerda, badge ou métrica à direita, `justify-content: space-between`. Divisor interno: `border-top: 1px solid border/default; padding-top: 12px`.
 

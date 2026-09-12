@@ -11,15 +11,22 @@ import { useTema } from './theme.js';
  * ou `shadowOpacity` aqui contraria o §8 e some com a unica pista de
  * profundidade que o design quis.
  *
- * A borda so aparece quando o card esta sobre superficie do MESMO nivel; com
- * contraste de superficie ela e ruido.
+ * A BORDA VEM LIGADA, e isso contraria a letra do §4.3 ("sem borda quando o
+ * contraste de superficie ja separa"). A razao e medida, nao estetica: a
+ * separacao entre as tres superficies fica entre 1.07 e 1.22 nos DOIS temas,
+ * e nesse patamar ela nao separa nada. Sem borda o card desaparece no fundo
+ * -- visivel na primeira vez que a vitrine abriu no tema claro, com o card de
+ * plano indistinguivel da pagina.
+ *
+ * `semBorda` existe para o caso em que o §4.3 esta certo: card sobre uma
+ * superficie de nivel diferente o bastante, onde o contorno vira ruido.
  */
 export function Card({
   children,
   titulo,
   acessorio,
   destaque = false,
-  comBorda = false,
+  semBorda = false,
   testID,
 }: {
   children?: ReactNode;
@@ -27,7 +34,8 @@ export function Card({
   /** Badge ou metrica a direita do titulo (§4.3). */
   acessorio?: ReactNode;
   destaque?: boolean;
-  comBorda?: boolean;
+  /** Desliga o contorno. Ver o porque no cabecalho -- o padrao e COM borda. */
+  semBorda?: boolean | undefined;
   testID?: string | undefined;
 }) {
   const t = useTema();
@@ -40,7 +48,7 @@ export function Card({
         {
           backgroundColor: destaque ? t.cor.bg.raised : t.cor.bg.surface,
           borderRadius: t.radius.card,
-          borderWidth: comBorda ? 1 : 0,
+          borderWidth: semBorda ? 0 : 1,
           borderColor: t.cor.border.default,
         },
       ]}
