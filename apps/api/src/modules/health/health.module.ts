@@ -141,6 +141,18 @@ const ANTHROPIC_CLIENT = Symbol('ANTHROPIC_CLIENT');
      */
     BodyEvolutionService,
     HealthProgressService,
+    /*
+     * Exportado para o APP (F24, Slice 4.2). `M4-FR-008` manda "exibir
+     * frequencia DERIVADA PELO BACKEND", e a derivacao inteira -- passagem
+     * elegivel, dia civil local, agregacao, consistencia -- ja mora aqui
+     * desde a F18.
+     *
+     * O SERVICO, e nao `AttendanceRepository`: o repositorio le
+     * `access_events` e `access_passages`, e expo-lo convidaria o BFF do app
+     * a montar a propria contagem. Duas contagens divergem, e a divergencia
+     * so apareceria quando alguem comparasse o app com o painel.
+     */
+    AttendanceService,
   ],
 })
 export class HealthModule {}

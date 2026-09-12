@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3264 | 3264 | 0 | 75.9 |
+| unitário | 3276 | 3276 | 0 | 76.0 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 1068 | 1068 | 0 | 83.7 |
+| integração | 1079 | 1079 | 0 | 83.7 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -156,3 +156,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-12 | #82 | — | integração | 1028 | 1028 | 0 | 83.7 | [#321](https://github.com/RodReis/arenahub/pull/321) — a fatia **não toca no backend**; o número vem do CI no Linux (950 na API + 78 no database), porque o Jest crasha no Windows com exit 3221226505 **depois** dos testes passarem (defeito pré-existente do ambiente, `docs/TESTING.md` §5) |
 | 2026-09-12 | #23 | — | unitário | 3264 | 3264 | 0 | 75.9 | [#322](https://github.com/RodReis/arenahub/pull/322) — inclui os **49 do app** e os **12 das regras puras** de identidade |
 | 2026-09-12 | #23 | — | integração | 1068 | 1068 | 0 | 83.7 | [#322](https://github.com/RodReis/arenahub/pull/322) — **corrigido à mão**: o Jest crasha no Windows (exit 3221226505) **depois** dos testes passarem, e o gerador herdava o número da entrega anterior (1028). O valor vem da execução verde do CI no Linux — **990 na API** (72 suítes) + 78 no database. A F23 acrescenta **40 testes de integração** |
+| 2026-09-12 | #24 | F24 | unitário | 3276 | 3276 | 0 | 76.0 | — — inclui os **12 testes de tela** das duas superfícies novas do app (plano e frequência); o backend da fatia é coberto por integração, porque o que ela precisa provar (RLS, isolamento por sessão, janela do entitlement) não existe sem banco |
+| 2026-09-12 | #24 | F24 | integração | 1079 | 1079 | 0 | 83.7 | [#323](https://github.com/RodReis/arenahub/pull/323) — **corrigido à mão**, mesma razão da F23: o Jest crasha no Windows (exit 3221226505) e o gerador herda o número da entrega anterior (1068). O valor vem da **execução verde do CI no Linux** — **1001 na API** (73 suítes) + **78 no database** (6 arquivos). ⚠️ **A medição local suíte a suíte deu 1049, e estava inflada**: `--testPathPattern` **não ancora o nome**, então o padrão `billing.int-spec` casa também as 8 suítes `billing-*` (e `engagement` casa mais 2), contando-as duas vezes. Conferir o total de suítes contra o `ls` (73 em disco × 74 somadas) é o que denuncia. A F24 acrescenta **11 testes de integração**, dos quais 2 nasceram da revisão adversarial |

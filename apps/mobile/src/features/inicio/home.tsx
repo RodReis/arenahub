@@ -30,11 +30,15 @@ export function Home({
   dados,
   onSair,
   onAtualizarApp,
+  onVerPlano,
+  onVerFrequencia,
   testID,
 }: {
   dados: DadosDaHome;
   onSair: () => void;
   onAtualizarApp: () => void;
+  onVerPlano: () => void;
+  onVerFrequencia: () => void;
   testID?: string | undefined;
 }) {
   const t = useTema();
@@ -98,9 +102,17 @@ export function Home({
               lineHeight: t.type.body.lineHeight,
             }}
           >
-            Plano, carteirinha e frequência chegam nas próximas atualizações do
-            aplicativo.
+            Consulte seu plano e sua frequência. A carteirinha chega numa próxima
+            atualização.
           </Text>
+          <Botao titulo="Meu plano" emCard onPress={onVerPlano} testID="botao-plano" />
+          <Botao
+            titulo="Minha frequência"
+            variante="neutro"
+            emCard
+            onPress={onVerFrequencia}
+            testID="botao-frequencia"
+          />
         </Card>
       )}
 
