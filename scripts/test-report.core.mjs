@@ -33,6 +33,9 @@ export const ALVOS = [
   { pacote: 'apps/edge-agent', nivel: 'unitário', script: 'test', runner: 'jest' },
   { pacote: 'apps/kiosk', nivel: 'unitário', script: 'test', runner: 'vitest' },
   { pacote: 'packages/api-contracts', nivel: 'unitário', script: 'test', runner: 'jest' },
+  // F43 -- o app do aluno. `jest-expo`, e nao vitest como as outras duas
+  // superficies web: o preset e que traz a transformacao do React Native.
+  { pacote: 'apps/mobile', nivel: 'unitário', script: 'test', runner: 'jest' },
 ];
 
 /**
