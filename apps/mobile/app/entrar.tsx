@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,7 +20,21 @@ import { TENANT_SLUG } from '@/config';
 export default function Entrar() {
   const t = useTema();
   const inset = useSafeAreaInsets();
-  const { entrar } = useSessao();
+  const { estado, entrar } = useSessao();
+
+  /*
+   * SAIR DAQUI QUANDO A SESSAO EXISTIR -- e nao so na abertura do app.
+   *
+   * O defeito que isto corrige so apareceu no emulador: o login funcionava
+   * (a API recebia e respondia 200, sem erro em log nenhum), o estado virava
+   * `AUTENTICADO`, e a TELA NAO SAIA DO LOGIN. So `app/index.tsx`
+   * redirecionava, e quem ja estava em `/entrar` ficava.
+   *
+   * Nenhum teste pegava: os unitarios afirmam que `onEntrar` foi chamado, e o
+   * de integracao que a API responde. A navegacao entre as duas coisas nao
+   * era exercitada por ninguem.
+   */
+  if (estado.tipo === 'AUTENTICADO') return <Redirect href="/inicio" />;
 
   return (
     <ScrollView
