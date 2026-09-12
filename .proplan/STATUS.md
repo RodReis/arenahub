@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-11
+updated: 2026-09-12
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,13 +9,13 @@ updated: 2026-09-11
 
 ### Sem épico
 
+- [MVP7][SPEC-070][F70] Contrato com cláusulas, qualificação das partes e assinatura (#319)
 - [MVP5][SPEC-031][FIX] tres testes de XP e ranking sao intermitentes no CI (#279)
 - [MVP2][FIX] assinatura duplicada infla a receita esperada do painel financeiro (#272)
 - [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
-- [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82)
 - [MVP4][SPEC-029][F29] Piloto e distribuição (#29)
 - [MVP4][SPEC-026][F26] Avaliações e consentimentos (#26)
 - [MVP4][SPEC-025][F25] Financeiro mobile (#25)
@@ -39,6 +39,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82, finalizado em: 2026-09-12)
 - [MVP7][SPEC-069][F69] Superfícies contratadas: mobile e totem como flag negociável do plano e do contrato (#317, finalizado em: 2026-09-11)
 - [MVP7][FIX] menu de plataforma nao destaca a tela atual e demais defeitos de UI na area de clientes (#315, finalizado em: 2026-09-11)
 - [MVP7][INFRA] UI da área de plataforma: layout, abas, máscaras e as ações que a API já oferecia (#313, finalizado em: 2026-09-11)
