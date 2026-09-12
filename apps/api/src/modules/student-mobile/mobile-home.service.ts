@@ -35,10 +35,24 @@ export class MobileHomeService {
   constructor(private readonly db: PrismaService) {}
 
   async montar(ctx: StudentChannelContext, agora: Date): Promise<RespostaDaHome> {
-    const aluno = await this.db.student.findUnique({
-      where: { id: ctx.studentId },
-      select: { fullName: true },
-    });
+    /*
+     * `comTenant` e nao `db.student` direto -- ADR-054 §3.
+     *
+     * `students` tem politica RLS com FORCE. Fora de transacao com contexto,
+     * o Postgres devolve ZERO LINHAS sob o role restrito: sem erro, sem log,
+     * e a Home responde `UNAVAILABLE` com a sessao perfeitamente valida.
+     *
+     * Foi exatamente o que aconteceu aqui, e SO A TELA revelou: os testes de
+     * integracao criam o aluno na propria suite, com contexto ja aberto, e
+     * passavam. A guarda `check-rls-fora-de-transacao` tambem apontou --
+     * depois de eu rodar, que e o ponto.
+     */
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findUnique({
+        where: { id: ctx.studentId },
+        select: { fullName: true },
+      }),
+    );
 
     if (!aluno) {
       // Sessao valida apontando para aluno que sumiu (arquivado, apagado):

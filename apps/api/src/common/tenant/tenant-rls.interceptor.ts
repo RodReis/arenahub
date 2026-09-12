@@ -75,7 +75,20 @@ export class TenantRlsInterceptor implements NestInterceptor {
   intercept(contextoDeExecucao: ExecutionContext, proximo: CallHandler): Observable<unknown> {
     const requisicao = contextoDeExecucao.switchToHttp().getRequest<Request>();
     const contexto = requisicao.tenantContext;
-    const dispositivo = requisicao.kioskContext ?? requisicao.edgeContext;
+    /*
+     * QUINTA origem: o APP DO ALUNO (F23), posta pelo `StudentSessionGuard`.
+     *
+     * Entra junto de `kioskContext` e `edgeContext` porque e o mesmo caso --
+     * identidade que nao e usuario de painel, mas pertence a um tenant. Sem
+     * ela, toda leitura de tabela com RLS pelo canal mobile voltava VAZIA sem
+     * erro: a Home respondia `UNAVAILABLE` com a sessao perfeitamente valida,
+     * e nada no log dizia por que.
+     *
+     * SO A TELA REVELOU. Os testes de integracao criam o aluno na propria
+     * suite, com contexto ja aberto pelo `beforeAll`, e passavam os 41.
+     */
+    const dispositivo =
+      requisicao.kioskContext ?? requisicao.edgeContext ?? requisicao.studentContext;
 
     const contextoDeBanco: TenantDbContext | undefined = contexto
       ? paraContextoDeBanco(contexto)
