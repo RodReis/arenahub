@@ -1,3 +1,4 @@
+import { describe, expect, it } from '@jest/globals';
 import { decidirRotacao } from './sessao-do-aluno.js';
 
 const AGORA = new Date('2026-09-12T12:00:00Z');

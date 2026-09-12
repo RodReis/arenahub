@@ -1,3 +1,4 @@
+import { describe, expect, it } from '@jest/globals';
 import { consumirTokenDeUsoUnico } from './token-de-uso-unico.js';
 
 const AGORA = new Date('2026-09-12T12:00:00Z');
