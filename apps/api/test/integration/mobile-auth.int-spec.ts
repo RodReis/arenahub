@@ -304,6 +304,103 @@ describe('F23 -- rotas do canal mobile', () => {
     });
   });
 
+  describe('tenant do token x tenant da sessao', () => {
+    it('token com tenant DIFERENTE do da sessao nao passa', async () => {
+      /*
+       * A sessao e a autoridade sobre a que tenant ela pertence -- nao o
+       * claim. Este teste existe porque a guarda que ele protege NAO e
+       * exploravel hoje: nenhuma rota do modulo le `ctx.tenantId`, todas
+       * usam `accountId` vindo do banco.
+       *
+       * Sem o teste, a guarda parece codigo morto e o proximo a passar por
+       * aqui a remove com razao aparente. Com ele, a remocao falha -- e o
+       * dia em que alguma rota do aluno filtrar por `ctx.tenantId` (o padrao
+       * do resto do repositorio), o tenant que ela usar sera o da sessao.
+       */
+      const body = await logarComCorpo();
+
+      const deOutroTenant = tokens.emitirAcesso({
+        sub: randomUUID(),
+        tenantId: randomUUID(), // tenant que nao e o da sessao
+        sessionId: body.sessionId,
+        permissions: [],
+        mfa: false,
+        canal: 'MOBILE',
+        studentId: randomUUID(),
+      });
+
+      const resposta = await request(servidor())
+        .get('/api/v1/mobile/sessions')
+        .set('Authorization', `Bearer ${deOutroTenant}`);
+
+      expect(resposta.status).toBe(401);
+    });
+  });
+
+  describe('step-up pelo HTTP -- M4-FR-005', () => {
+    /**
+     * O teste de revogacao acima NAO prova step-up, e um achado de revisao
+     * mostrou por que: o login preenche `reauthenticatedAt` com o agora, e a
+     * chamada seguinte sempre cai dentro da janela de 5 minutos. Removendo a
+     * guarda inteira do servico, aquele teste continuaria verde.
+     *
+     * Aqui a autenticacao e ENVELHECIDA no banco antes da chamada, que e o
+     * unico jeito de exercitar a guarda pela porta HTTP.
+     */
+    const envelhecerAutenticacao = async (sessionId: string): Promise<void> => {
+      await db.studentSession.update({
+        where: { id: sessionId },
+        data: { reauthenticatedAt: new Date(Date.now() - 60 * 60_000) },
+      });
+    };
+
+    it('recusa revogar quando a autenticacao ficou velha', async () => {
+      const body = await logarComCorpo();
+      await envelhecerAutenticacao(body.sessionId);
+
+      const resposta = await request(servidor())
+        .delete(`/api/v1/mobile/sessions/${body.sessionId}`)
+        .set('Authorization', `Bearer ${body.accessToken}`);
+
+      expect(resposta.status).toBe(403);
+      expect(problema(resposta).code).toBe('REAUTENTICACAO_NECESSARIA');
+    });
+
+    it('confirmar a senha pelo HTTP libera a revogacao', async () => {
+      const body = await logarComCorpo();
+      await envelhecerAutenticacao(body.sessionId);
+
+      const confirmacao = await request(servidor())
+        .post('/api/v1/mobile/auth/reauthenticate')
+        .set('Authorization', `Bearer ${body.accessToken}`)
+        .send({ senha: SENHA });
+      expect(confirmacao.status).toBe(200);
+
+      const resposta = await request(servidor())
+        .delete(`/api/v1/mobile/sessions/${body.sessionId}`)
+        .set('Authorization', `Bearer ${body.accessToken}`);
+
+      expect(resposta.status).toBe(200);
+    });
+
+    it('senha errada na reautenticacao nao libera nada', async () => {
+      const body = await logarComCorpo();
+      await envelhecerAutenticacao(body.sessionId);
+
+      const confirmacao = await request(servidor())
+        .post('/api/v1/mobile/auth/reauthenticate')
+        .set('Authorization', `Bearer ${body.accessToken}`)
+        .send({ senha: 'senha-errada-porem-longa' });
+      expect(confirmacao.status).toBe(401);
+
+      const resposta = await request(servidor())
+        .delete(`/api/v1/mobile/sessions/${body.sessionId}`)
+        .set('Authorization', `Bearer ${body.accessToken}`);
+
+      expect(resposta.status).toBe(403);
+    });
+  });
+
   describe('jornada completa -- M4-AC-001', () => {
     it('o aluno volta ao app sem digitar senha enquanto a sessao vale', async () => {
       const body = await logarComCorpo();

@@ -48,21 +48,47 @@ const RECUPERACAO_EM_MINUTOS = 30;
 const STEP_UP_EM_MINUTOS = 5;
 
 /**
- * Hash descartavel para o caminho do identificador inexistente.
+ * Senha aleatoria cujo hash serve de alvo descartavel.
  *
- * Existe para o login GASTAR O MESMO TEMPO quando a conta nao existe. Sem
- * isso, a resposta volta na hora para identificador desconhecido e so depois
- * do scrypt para conhecido -- e a diferenca de tempo enumera a base inteira,
- * mesmo com a mensagem sendo identica. Mensagem igual com tempo diferente nao
- * e antienumeracao, e a aparencia dela.
+ * Ver `envelopeDescartavel()` -- o valor real e derivado no arranque, nunca
+ * escrito a mao.
  */
-const ENVELOPE_DESCARTAVEL =
-  'scrypt$16384$8$1$0000000000000000000000000000000000000000000000000000000000000000$' +
-  '0000000000000000000000000000000000000000000000000000000000000000';
+const SENHA_DESCARTAVEL = randomBytes(32).toString('base64url');
+
+/**
+ * UUID que nao pertence a tenant nenhum.
+ *
+ * Serve para a consulta de login rodar tambem quando o slug da academia nao
+ * existe. Zerado de proposito: um UUID aleatorio a cada chamada seria igual
+ * na pratica, mas este deixa claro na leitura que e um valor impossivel, e
+ * nao um id real que alguem esqueceu no codigo.
+ */
+const TENANT_INEXISTENTE = '00000000-0000-0000-0000-000000000000';
 
 @Injectable()
 export class StudentIdentityService {
   private readonly logger = new Logger(StudentIdentityService.name);
+
+  /**
+   * Alvo descartavel para o login GASTAR O MESMO TEMPO sem conta.
+   *
+   * DERIVADO pelo proprio `PasswordService`, nunca escrito a mao -- e a
+   * primeira versao desta fatia escreveu, com consequencia medida:
+   *
+   *   conta existe .... 20,6 ms (scrypt roda)
+   *   conta nao existe .. 0,0 ms (envelope malformado -> `return false`)
+   *
+   * O `conferir` valida o FORMATO do envelope (7 campos, `v=`, `N=`, `r=`,
+   * `p=`) e sai antes do scrypt quando nao bate. Um envelope inventado
+   * atravessa essa porta em microssegundos, e a base inteira vira enumeravel
+   * por cronometro -- com a mensagem de erro sendo identica nos dois casos.
+   * Mensagem igual com tempo diferente nao e antienumeracao, e a aparencia
+   * dela.
+   *
+   * `Promise` memoizada: o scrypt roda UMA vez, no primeiro login, e nao a
+   * cada requisicao. Derivar por tentativa somaria 20 ms a todo login valido.
+   */
+  private envelopeDescartavel: Promise<string> | null = null;
 
   constructor(
     private readonly contas: StudentAccountRepository,
@@ -71,6 +97,11 @@ export class StudentIdentityService {
     private readonly tokens: TokenService,
     private readonly email: EmailDeAtivacaoService,
   ) {}
+
+  private alvoDescartavel(): Promise<string> {
+    this.envelopeDescartavel ??= this.senhas.gerarHash(SENHA_DESCARTAVEL);
+    return this.envelopeDescartavel;
+  }
 
   /**
    * Emite o convite de ativacao.
@@ -136,14 +167,16 @@ export class StudentIdentityService {
     deviceLabel: string | null;
     agora: Date;
   }): Promise<SessaoAberta> {
-    // `tenantId` nulo = slug de academia inexistente. O caminho segue ate o
-    // fim, com o hash descartavel: parar aqui responderia mais rapido para
-    // academia que nao existe, e isso enumera os tenants.
-    const conta = dados.tenantId
-      ? await this.contas.encontrarPorIdentificador(dados.tenantId, dados.identificador)
-      : null;
+    // `tenantId` nulo = slug de academia inexistente. A consulta roda MESMO
+    // ASSIM, contra um UUID que nao existe: pular a ida ao banco devolveria
+    // mais rapido para academia inexistente, e isso enumera os tenants pelo
+    // mesmo cronometro que o hash descartavel fecha do outro lado.
+    const conta = await this.contas.encontrarPorIdentificador(
+      dados.tenantId ?? TENANT_INEXISTENTE,
+      dados.identificador,
+    );
 
-    const envelope = conta?.passwordHash ?? ENVELOPE_DESCARTAVEL;
+    const envelope = conta?.passwordHash ?? (await this.alvoDescartavel());
     const senhaConfere = await this.senhas.conferir(dados.senha, envelope);
 
     if (!conta || !senhaConfere || conta.status !== 'ACTIVE') {
@@ -317,7 +350,7 @@ export class StudentIdentityService {
     agora: Date,
   ): Promise<void> {
     const conta = await this.contas.encontrarPorId(ctx.accountId);
-    const envelope = conta?.passwordHash ?? ENVELOPE_DESCARTAVEL;
+    const envelope = conta?.passwordHash ?? (await this.alvoDescartavel());
 
     if (!conta || !(await this.senhas.conferir(senha, envelope))) {
       throw new CredencialInvalidaError();

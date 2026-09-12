@@ -59,8 +59,25 @@ export class StudentSessionGuard implements CanActivate {
       // que ja foi emitido, ate ele expirar. So `REVOKED` e o fim.
       if (!sessao || sessao.status === 'REVOKED') throw new NaoAutenticadoError();
 
+      /*
+       * O TENANT DO TOKEN TEM DE BATER COM O DA SESSAO.
+       *
+       * Hoje nada no modulo le `ctx.tenantId` -- todos os `where` usam
+       * `accountId`, que vem da LINHA DO BANCO. Mas o resto do repositorio
+       * filtra por `ctx.tenantId` o tempo todo, e a primeira rota do aluno
+       * que seguir esse padrao herdaria um tenant vindo do claim, sem
+       * ninguem notar a troca.
+       *
+       * Achado de revisao adversarial: nao explorável na versao atual, e e
+       * justamente por isso que entra agora -- depois de existir a rota que
+       * o usa, o defeito ja teria consequencia.
+       */
+      if (sessao.tenantId !== claims.tenantId) throw new NaoAutenticadoError();
+
       requisicao.studentContext = {
-        tenantId: claims.tenantId,
+        // Do BANCO, nao do claim: a sessao e a autoridade sobre a que tenant
+        // e a que conta ela pertence.
+        tenantId: sessao.tenantId,
         studentId: claims.studentId,
         accountId: sessao.accountId,
         sessionId: sessao.id,
