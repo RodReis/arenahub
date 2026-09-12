@@ -18,7 +18,6 @@ updated: 2026-09-12
 - [MVP4][SPEC-029][F29] Piloto e distribuição (#29)
 - [MVP4][SPEC-026][F26] Avaliações e consentimentos (#26)
 - [MVP4][SPEC-025][F25] Financeiro mobile (#25)
-- [MVP4][SPEC-024][F24] Carteirinha, plano e frequência (#24)
 
 ## A Fazer
 
@@ -37,6 +36,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP4][SPEC-024][F24] Carteirinha, plano e frequência (#24, finalizado em: 2026-09-12)
 - [MVP7][SPEC-070][F70] Contrato com cláusulas, qualificação das partes e assinatura (#319, finalizado em: 2026-09-12)
 - [MVP4][SPEC-023][F23] Identidade e shell mobile (#23, finalizado em: 2026-09-12)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82, finalizado em: 2026-09-12)
