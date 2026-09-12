@@ -54,7 +54,7 @@ Legenda de `tenant_id`: **✔** declarado · **~** coberto só pela regra geral 
 
 | entidade | campos declarados | `tenant_id` | origem |
 |---|---|---|---|
-| `Tenant` | razão social, nome fantasia, CNPJ, endereço, telefone, e-mail, responsável, timezone, status (`ACTIVE` \| `INACTIVE` \| `SUSPENDED`), **identidade visual** (logo, ícone SVG, nome exibido, texto de missão, texto de diferenciais — ADR-052 §9), contrato vigente (`TenantContract`) | n/a | Especificação §9, ADR-052 |
+| `Tenant` | razão social, nome fantasia, CNPJ, endereço (`addressLine`/`addressCity`/`addressState`/`addressZip` — ADR-055 §6, F70), telefone, e-mail, responsável (nome, e-mail, `responsavelCpf` — ADR-055 §6), timezone, status (`ACTIVE` \| `INACTIVE` \| `SUSPENDED`), **identidade visual** (logo, ícone SVG, nome exibido, texto de missão, texto de diferenciais — ADR-052 §9), contrato vigente (`TenantContract`) | n/a | Especificação §9, ADR-052, ADR-055 |
 | `GymUnit` | `id`, `tenant_id`, `name`, `code`, `address`, `phone`, `timezone`, `status`, `capacity`, `opening_hours` | ✔ | Especificação §10 |
 | `User` | **`[indefinido]`** | ~ | Especificação §8 |
 | `Role`, `Permission` | **`[indefinido]`**. Permissões citadas: `student.create/update/delete`, `payment.read/refund`, `device.configure`, `assessment.create`, `access.override` | ~ | Especificação §8 |
@@ -581,7 +581,7 @@ Conceitos usados em telas, menus e regras **sem entidade nem campo**. O Code **n
 |---|---|---|
 | **Meta / `Goal`** | totem §44, mobile §46, comparativo §51, ranking §57, menu §116 | Quem define, qual métrica, qual prazo, quem altera. Único traço: `M3-FR-012` (baseline, alvo, unidade, prazo, responsável) |
 | **`Lead`** | §11 "origem do lead", menu Comercial §116 | Hoje é atributo textual + status de `Student`. Sem entidade, funil ou origem enumerada |
-| ~~**`Contract`**~~ | fluxo de matrícula §93, menu §116 | **Resolvido em parte (ADR-052):** o contrato **do tenant com o ArenaHub** é `TenantContract` — registro imutável + PDF (F63). O contrato **do aluno com a academia** continua sem entidade: segue sendo a `Subscription` até o PI decidir diferente |
+| ~~**`Contract`**~~ | fluxo de matrícula §93, menu §116 | **Resolvido em parte (ADR-052, ADR-055):** o contrato **do tenant com o ArenaHub** é `TenantContract` — registro imutável + PDF com cláusulas versionadas por `termsVersion` e assinatura fora do sistema (F63/F70). O contrato **do aluno com a academia** continua sem entidade: segue sendo a `Subscription` até o PI decidir diferente |
 | **`Discount`, `Coupon`, bolsa, negociação** | §36, `M2` §4 (`discount.apply/approve`) | Sem entidade, sem campo, sem limite de aprovação |
 | **Feriado / horário especial** | §10 | Sem entidade — mas as regras 6, 8 e 15 do motor de acesso dependem disso |
 | **`FeatureFlag`** | §100, §101, PRDs §19 | Escopo (global/tenant/unidade), quem alterna, auditoria, conflito com plano SaaS |

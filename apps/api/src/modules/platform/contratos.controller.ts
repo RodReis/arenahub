@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,7 +12,10 @@ import {
   Query,
   Req,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 
@@ -19,6 +23,7 @@ import { PlatformContextService } from '../../common/platform/platform-context.s
 import { PlatformRoute } from '../../common/security/platform-route.decorator.js';
 import { esquemaDePlanoSaas } from './dto/saas-plan.dto.js';
 import {
+  esquemaDeAssinaturaDeContrato,
   esquemaDeCriacaoDeContrato,
   esquemaDeDescarteDeContrato,
   esquemaDeEncerramentoDeContrato,
@@ -27,6 +32,25 @@ import {
 import { IndexValueUseCase } from './index-value.use-case.js';
 import { SaasPlanUseCase } from './saas-plan.use-case.js';
 import { TenantContractUseCase } from './tenant-contract.use-case.js';
+
+/**
+ * O arquivo como o `FileInterceptor` o entrega -- mesma declaracao local do
+ * `platform.controller.ts`, e pela mesma razao: sao tres campos, e
+ * `@types/multer` traria uma dependencia inteira para descrever seis linhas.
+ */
+interface ArquivoRecebido {
+  readonly originalname: string;
+  readonly mimetype: string;
+  readonly buffer: Buffer;
+}
+
+/**
+ * Teto do PDF assinado -- F70. MAIOR que o de identidade visual (1 MB): um
+ * contrato digitalizado com duas paginas de assinatura passa de 1 MB com
+ * facilidade, e recusar o upload do documento que a fatia existe para
+ * guardar seria o proprio aceite falhando.
+ */
+const TAMANHO_MAXIMO_DO_CONTRATO_ASSINADO_BYTES = 10 * 1024 * 1024;
 
 const ESQUEMA_DO_PLANO = {
   type: 'object',
@@ -70,6 +94,11 @@ const ESQUEMA_DO_CONTRATO = {
     mobileEnabled: { type: 'boolean' },
     kioskEnabled: { type: 'boolean' },
     temDocumento: { type: 'boolean' },
+    termsVersion: { type: 'string' },
+    signatureStatus: { type: 'string', enum: ['PENDING', 'SIGNED', 'WAIVED'] },
+    foroCidade: { type: 'string', nullable: true },
+    foroUf: { type: 'string', nullable: true },
+    temDocumentoAssinado: { type: 'boolean' },
   },
 };
 
@@ -116,6 +145,11 @@ interface ContratoNaResposta {
   mobileEnabled: boolean;
   kioskEnabled: boolean;
   temDocumento: boolean;
+  termsVersion: string;
+  signatureStatus: string;
+  foroCidade: string | null;
+  foroUf: string | null;
+  temDocumentoAssinado: boolean;
 }
 
 /**
@@ -148,6 +182,11 @@ function paraResposta(contrato: {
   mobileEnabled: boolean;
   kioskEnabled: boolean;
   documentObjectKey: string | null;
+  termsVersion: string;
+  signatureStatus: string;
+  foroCidade: string | null;
+  foroUf: string | null;
+  signedDocumentObjectKey: string | null;
 }): ContratoNaResposta {
   return {
     id: contrato.id,
@@ -171,6 +210,11 @@ function paraResposta(contrato: {
     mobileEnabled: contrato.mobileEnabled,
     kioskEnabled: contrato.kioskEnabled,
     temDocumento: contrato.documentObjectKey !== null,
+    termsVersion: contrato.termsVersion,
+    signatureStatus: contrato.signatureStatus,
+    foroCidade: contrato.foroCidade,
+    foroUf: contrato.foroUf,
+    temDocumentoAssinado: contrato.signedDocumentObjectKey !== null,
   };
 }
 
@@ -355,6 +399,66 @@ export class ContratosController {
   @Header('X-Content-Type-Options', 'nosniff')
   async documento(@Param('id') id: string, @Res() resposta: Response): Promise<void> {
     const arquivo = await this.contratos.lerDocumento(id);
+
+    resposta
+      .type('application/pdf')
+      .setHeader('Content-Disposition', `attachment; filename="${arquivo.nome}"`);
+    resposta.send(Buffer.from(arquivo.conteudo));
+  }
+
+  /**
+   * Sobe o PDF assinado -- F70 (SPEC-070 §3.3, ADR-055).
+   *
+   * NAO SUBSTITUI `/document`: o gerado e o assinado convivem sob chaves
+   * proprias (ver `TenantContractUseCase.registrarAssinatura`).
+   */
+  @Post('contracts/:id/signed-document')
+  @ApiCreatedResponse({ schema: ESQUEMA_DO_CONTRATO })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: TAMANHO_MAXIMO_DO_CONTRATO_ASSINADO_BYTES },
+    }),
+  )
+  async enviarDocumentoAssinado(
+    @Param('id') id: string,
+    @UploadedFile() arquivo: ArquivoRecebido | undefined,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<ContratoNaResposta> {
+    if (!arquivo) {
+      throw new BadRequestException({ code: 'FILE_REQUIRED' });
+    }
+
+    if (arquivo.mimetype !== 'application/pdf') {
+      throw new BadRequestException({ code: 'FILE_MUST_BE_PDF' });
+    }
+
+    const entrada = esquemaDeAssinaturaDeContrato.parse(corpo);
+
+    const contrato = await this.contratos.registrarAssinatura(
+      this.contexto.require(),
+      id,
+      arquivo.buffer,
+      entrada.signedAt ?? new Date(),
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    return paraResposta(contrato);
+  }
+
+  /**
+   * O PDF assinado do contrato.
+   *
+   * `attachment`, e nao `inline`, pela mesma razao de `/document`.
+   */
+  @Get('contracts/:id/signed-document')
+  @ApiOkResponse({
+    content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } },
+  })
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async documentoAssinado(@Param('id') id: string, @Res() resposta: Response): Promise<void> {
+    const arquivo = await this.contratos.lerDocumentoAssinado(id);
 
     resposta
       .type('application/pdf')

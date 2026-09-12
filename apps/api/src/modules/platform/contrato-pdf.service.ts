@@ -1,5 +1,23 @@
 import PDFDocument from 'pdfkit';
 
+import { A_DEFINIR, termosDaVersao } from './domain/termos-do-contrato.js';
+
+/**
+ * Qualificacao de uma parte no contrato -- F70 (ADR-055 §6, SPEC-070 §4).
+ *
+ * Campo `null` vira `A_DEFINIR` no papel, NUNCA "não informado" -- e a
+ * distincao que a SPEC-070 §6 exige: "não informado" leu como dado que
+ * ninguem preencheu ainda; a marca visivel le como contrato que nao pode
+ * ativar sem ele (ver `tenant-contract.use-case.ts`).
+ */
+export interface ParteDoContrato {
+  readonly razaoSocial: string;
+  readonly cnpj: string | null;
+  readonly endereco: string | null;
+  readonly representante: string | null;
+  readonly email: string | null;
+}
+
 /**
  * O que sai impresso no contrato. Note o que NAO esta aqui: nenhum campo do
  * `SaasPlan`.
@@ -32,6 +50,17 @@ export interface DadosDoContratoImpresso {
   readonly startsAt: Date;
   readonly endsAt: Date | null;
   readonly geradoEm: Date;
+  /**
+   * Seçao II e III -- F70. Opcional para nao quebrar chamador antigo, mas
+   * `tenant-contract.use-case.ts` sempre preenche a partir da F70 em diante.
+   */
+  readonly clausulas?: {
+    readonly termsVersion: string;
+    readonly contratada: ParteDoContrato;
+    readonly contratante: ParteDoContrato;
+    readonly foroCidade: string | null;
+    readonly foroUf: string | null;
+  };
 }
 
 /**
@@ -64,15 +93,24 @@ const MARGEM = 56;
 const LARGURA_DO_ROTULO = 190;
 
 /**
- * PDF do contrato entre o ArenaHub e a academia -- ADR-052 §8.
+ * PDF do contrato entre o ArenaHub e a academia -- F63/F70 (ADR-052 §8,
+ * ADR-055).
  *
- * SEM ASSINATURA ELETRONICA, por decisao registrada: o documento REGISTRA o
- * que foi acordado, e nao substitui contrato assinado fora do sistema.
+ * TRES SECOES, nesta ordem: I. Quadro resumo (o que ja existia -- valores
+ * copiados do contrato, nunca do plano); II. Clausulas (texto versionado por
+ * `termsVersion`, lido de `termos-do-contrato.ts`); III. Assinaturas (as
+ * duas partes e duas testemunhas). A Secao I sozinha era "ficha de dados";
+ * as tres juntas sao contrato (SPEC-070 §1).
+ *
+ * SEM ASSINATURA ELETRONICA, por decisao registrada (ADR-055, "Assinatura:
+ * por que nao integrar agora"): o documento REGISTRA o que foi acordado, e
+ * quem assina sobe o PDF assinado depois pela rota propria.
  *
  * `pdfkit`, e nao HTML para PDF: um renderizador de navegador no servidor e
  * uma dependencia de centenas de megabytes e um processo a mais para gerar
- * uma pagina de texto. Montar os bytes do PDF a mao foi descartado pelo outro
- * lado -- fonte, encoding e tabela de offsets sao onde esse arquivo quebra.
+ * um documento de texto. Montar os bytes do PDF a mao foi descartado pelo
+ * outro lado -- fonte, encoding e tabela de offsets sao onde esse arquivo
+ * quebra.
  */
 export function gerarPdfDoContrato(dados: DadosDoContratoImpresso): Promise<Buffer> {
   return new Promise((resolver, rejeitar) => {
@@ -101,13 +139,67 @@ export function gerarPdfDoContrato(dados: DadosDoContratoImpresso): Promise<Buff
       documento.moveDown(0.4);
     };
 
-    documento.font('Helvetica-Bold').fontSize(18).fillColor('#111111').text('Contrato de prestação de serviço');
-    documento.font('Helvetica').fontSize(10).fillColor('#555555').text(`ArenaHub · nº ${dados.numero}`);
+    const paragrafo = (texto: string, opcoes: { negrito?: boolean; tamanho?: number; cor?: string } = {}): void => {
+      documento
+        .font(opcoes.negrito ? 'Helvetica-Bold' : 'Helvetica')
+        .fontSize(opcoes.tamanho ?? 10)
+        .fillColor(opcoes.cor ?? '#111111')
+        .text(texto, MARGEM, documento.y, { width: documento.page.width - MARGEM * 2 });
+      documento.moveDown(0.4);
+    };
 
-    secao('Contratante');
-    linha('Nome', dados.tenant.displayName);
-    linha('Razão social', dados.tenant.legalName);
-    linha('CNPJ', dados.tenant.cnpj ?? 'não informado');
+    // -------------------------------------------------------------------
+    // CABECALHO
+    // -------------------------------------------------------------------
+    const titulo = dados.clausulas
+      ? 'Contrato de licença de uso de software em regime de assinatura e prestação de serviços de suporte'
+      // Chamador antigo (sem `clausulas`) mantem o titulo pre-F70 -- nao ha
+      // chamador assim em producao, mas o tipo continua opcional.
+      : 'Contrato de prestação de serviço';
+
+    documento.font('Helvetica-Bold').fontSize(16).fillColor('#111111').text(titulo);
+    documento.font('Helvetica').fontSize(10).fillColor('#555555').text(`ArenaHub · nº ${dados.numero}`);
+    if (dados.clausulas) {
+      documento.text(`Versão dos termos: ${dados.clausulas.termsVersion}`);
+    }
+
+    // -------------------------------------------------------------------
+    // QUALIFICACAO DAS PARTES -- so quando ha dados de clausulas (F70).
+    // -------------------------------------------------------------------
+    if (dados.clausulas) {
+      const { contratada, contratante } = dados.clausulas;
+
+      secao('Contratada');
+      linha('Razão social', contratada.razaoSocial);
+      linha('CNPJ', contratada.cnpj ?? A_DEFINIR);
+      linha('Endereço', contratada.endereco ?? A_DEFINIR);
+      linha('Representante', contratada.representante ?? A_DEFINIR);
+      linha('E-mail', contratada.email ?? A_DEFINIR);
+
+      secao('Contratante');
+      linha('Razão social', contratante.razaoSocial);
+      linha('CNPJ', contratante.cnpj ?? A_DEFINIR);
+      linha('Endereço', contratante.endereco ?? A_DEFINIR);
+      linha('Representante', contratante.representante ?? A_DEFINIR);
+      linha('E-mail', contratante.email ?? A_DEFINIR);
+
+      documento.moveDown(0.4);
+      paragrafo(
+        'As partes acima qualificadas celebram o presente contrato, que se regerá pelas cláusulas seguintes e pelo Quadro resumo da Seção I, parte integrante deste instrumento.',
+        { tamanho: 9, cor: '#555555' },
+      );
+    } else {
+      secao('Contratante');
+      linha('Nome', dados.tenant.displayName);
+      linha('Razão social', dados.tenant.legalName);
+      linha('CNPJ', dados.tenant.cnpj ?? 'não informado');
+    }
+
+    // -------------------------------------------------------------------
+    // SECAO I -- QUADRO RESUMO (F63, mantida integralmente)
+    // -------------------------------------------------------------------
+    documento.addPage();
+    secao('Seção I — Quadro resumo');
 
     secao('Plano contratado');
     linha('Plano', dados.planoNome);
@@ -175,6 +267,85 @@ export function gerarPdfDoContrato(dados: DadosDoContratoImpresso): Promise<Buff
         documento.y,
         { width: documento.page.width - MARGEM * 2 },
       );
+
+    // -------------------------------------------------------------------
+    // SECAO II -- CLAUSULAS, e SECAO III -- ASSINATURAS (F70)
+    // -------------------------------------------------------------------
+    if (dados.clausulas) {
+      const termos = termosDaVersao(dados.clausulas.termsVersion);
+
+      documento.addPage();
+      secao('Seção II — Cláusulas');
+
+      for (const clausula of termos.clausulas) {
+        documento.font('Helvetica-Bold').fontSize(11).fillColor('#111111').text(clausula.titulo);
+        documento.moveDown(0.3);
+
+        for (const paragrafoTexto of clausula.paragrafos) {
+          paragrafo(paragrafoTexto, { tamanho: 9.5 });
+        }
+
+        documento.moveDown(0.4);
+      }
+
+      documento.addPage();
+      secao('Seção III — Assinaturas');
+
+      const foro = dados.clausulas.foroCidade
+        ? `${dados.clausulas.foroCidade}${dados.clausulas.foroUf ? `/${dados.clausulas.foroUf}` : ''}`
+        : A_DEFINIR;
+
+      paragrafo(`Local e data: ${foro}, ${formatarData(dados.geradoEm)}.`, { tamanho: 10 });
+      documento.moveDown(1.5);
+
+      const larguraColuna = (documento.page.width - MARGEM * 2 - 20) / 2;
+      const yAssinaturas = documento.y;
+
+      documento
+        .font('Helvetica')
+        .fontSize(9)
+        .text('_______________________________', MARGEM, yAssinaturas, { width: larguraColuna });
+      documento.text('CONTRATADA', MARGEM, documento.y, { width: larguraColuna });
+      documento.text(dados.clausulas.contratada.razaoSocial, MARGEM, documento.y, { width: larguraColuna });
+      documento.text(dados.clausulas.contratada.representante ?? A_DEFINIR, MARGEM, documento.y, {
+        width: larguraColuna,
+      });
+
+      const xColunaDois = MARGEM + larguraColuna + 20;
+
+      documento
+        .font('Helvetica')
+        .fontSize(9)
+        .text('_______________________________', xColunaDois, yAssinaturas, { width: larguraColuna });
+      documento.text('CONTRATANTE', xColunaDois, undefined, { width: larguraColuna });
+      documento.text(dados.clausulas.contratante.razaoSocial, xColunaDois, undefined, { width: larguraColuna });
+      documento.text(
+        `${dados.clausulas.contratante.representante ?? A_DEFINIR}`,
+        xColunaDois,
+        undefined,
+        { width: larguraColuna },
+      );
+
+      documento.moveDown(2);
+      documento.font('Helvetica-Bold').fontSize(10).text('Testemunhas', MARGEM, documento.y);
+      documento.moveDown(1.5);
+
+      const yTestemunhas = documento.y;
+
+      documento
+        .font('Helvetica')
+        .fontSize(9)
+        .text('_______________________________', MARGEM, yTestemunhas, { width: larguraColuna });
+      documento.text('Nome:', MARGEM, documento.y, { width: larguraColuna });
+      documento.text('CPF:', MARGEM, documento.y, { width: larguraColuna });
+
+      documento
+        .font('Helvetica')
+        .fontSize(9)
+        .text('_______________________________', xColunaDois, yTestemunhas, { width: larguraColuna });
+      documento.text('Nome:', xColunaDois, undefined, { width: larguraColuna });
+      documento.text('CPF:', xColunaDois, undefined, { width: larguraColuna });
+    }
 
     documento.end();
   });

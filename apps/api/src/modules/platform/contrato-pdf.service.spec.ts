@@ -105,4 +105,86 @@ describe('gerarPdfDoContrato', () => {
 
     expect(texto).toContain('R$ 12.345,67');
   });
+
+  /*
+   * SECAO II E III -- F70 (ADR-055).
+   *
+   * `clausulas` presente muda o titulo, qualifica as DUAS partes e acrescenta
+   * as clausulas 1-13 e o bloco de assinaturas. Ausente (chamador antigo),
+   * o comportamento pre-F70 continua identico -- os testes acima provam isso.
+   */
+  const COM_CLAUSULAS: DadosDoContratoImpresso = {
+    ...BASE,
+    clausulas: {
+      termsVersion: '2026.1',
+      contratada: {
+        razaoSocial: 'RRB TRADING LTDA',
+        cnpj: '11222333000144',
+        endereco: 'Rua Exemplo, 100, São Paulo/SP',
+        representante: 'Rodrigo Reis',
+        email: 'contato@rrbtrading.com',
+      },
+      contratante: {
+        razaoSocial: 'Arena Positiva LTDA',
+        cnpj: '12345678000199',
+        endereco: 'Av. Central, 200, Arenápolis/MT',
+        representante: 'Fulano de Tal',
+        email: 'contato@arenapositiva.com',
+      },
+      foroCidade: 'Cuiabá',
+      foroUf: 'MT',
+    },
+  };
+
+  it('imprime o titulo de licenca de uso quando ha clausulas, e qualifica as duas partes', async () => {
+    const texto = await textoDoPdf(await gerarPdfDoContrato(COM_CLAUSULAS));
+
+    expect(texto).toContain('Contrato de licença de uso de software');
+    expect(texto).toContain('RRB TRADING LTDA');
+    expect(texto).toContain('Arena Positiva LTDA');
+    expect(texto).toContain('2026.1');
+  });
+
+  it('imprime as clausulas da versao gravada, incluindo suspensao por inadimplencia e LGPD', async () => {
+    const texto = await textoDoPdf(await gerarPdfDoContrato(COM_CLAUSULAS));
+
+    expect(texto).toContain('Cláusula 5 — Inadimplência e suspensão');
+    expect(texto).toContain('CONTRATANTE é a controladora');
+    expect(texto).toContain('CONTRATADA é a operadora');
+    expect(texto).toContain('biometria facial é dado pessoal sensível');
+  });
+
+  it('imprime a secao de assinaturas com as duas partes e testemunhas', async () => {
+    const texto = await textoDoPdf(await gerarPdfDoContrato(COM_CLAUSULAS));
+
+    expect(texto).toContain('Seção III — Assinaturas');
+    expect(texto).toContain('CONTRATADA');
+    expect(texto).toContain('CONTRATANTE');
+    expect(texto).toContain('Testemunhas');
+    expect(texto).toContain('Cuiabá/MT');
+  });
+
+  it('marca campo sem valor decidido com placeholder visivel, nunca com silencio', async () => {
+    const texto = await textoDoPdf(
+      await gerarPdfDoContrato({
+        ...COM_CLAUSULAS,
+        clausulas: {
+          ...COM_CLAUSULAS.clausulas!,
+          contratada: { ...COM_CLAUSULAS.clausulas!.contratada, cnpj: null },
+          foroCidade: null,
+          foroUf: null,
+        },
+      }),
+    );
+
+    expect(texto).toContain('[a definir pelo PI]');
+    expect(texto).not.toContain('não informado');
+  });
+
+  it('nao muda a secao I quando chamado sem clausulas -- compatibilidade com o chamador anterior', async () => {
+    const texto = await textoDoPdf(await gerarPdfDoContrato(BASE));
+
+    expect(texto).toContain('Contrato de prestação de serviço');
+    expect(texto).not.toContain('Seção II');
+  });
 });

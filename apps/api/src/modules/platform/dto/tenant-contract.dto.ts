@@ -37,11 +37,35 @@ export const esquemaDeCriacaoDeContrato = z
      */
     mobileEnabled: z.boolean().optional(),
     kioskEnabled: z.boolean().optional(),
+    /**
+     * Foro eleito -- F70 (SPEC-070 §3.3). Ausente aqui e preenchivel ate a
+     * ativacao exigir; a rota de ativar recusa (422) sem os dois.
+     */
+    foroCidade: z.string().trim().min(1).max(120).optional(),
+    foroUf: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{2}$/, 'use a sigla de 2 letras da UF')
+      .optional(),
   })
   .strict();
 
 export const esquemaDeEncerramentoDeContrato = z
   .object({ encerradoEm: diaCivil })
+  .strict();
+
+/**
+ * Upload do PDF assinado -- F70. O ARQUIVO vem por `multipart/form-data`
+ * (`FileInterceptor`, fora do Zod); este esquema valida so o campo de texto
+ * que acompanha, a data em que a assinatura aconteceu.
+ *
+ * OPCIONAL: ausente, o servidor usa o proprio relogio -- e o caso normal de
+ * quem sobe o PDF logo depois de coletar a assinatura. O campo existe para
+ * quando o upload acontece dias depois da assinatura de fato.
+ */
+export const esquemaDeAssinaturaDeContrato = z
+  .object({ signedAt: diaCivil.optional() })
   .strict();
 
 /**
