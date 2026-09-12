@@ -1,0 +1,29 @@
+/**
+ * Lista de clientes da plataforma -- lê só a camada semântica (regra 2 do DS §11).
+ */
+
+/*
+ * O VÃO QUE SUBSTITUI O MENU na linha do cliente suspenso.
+ *
+ * `AcoesDaLinha` é `inline-flex` encostado à direita: quando o `RowMenu` não
+ * é renderizado, a linha perde a largura dele e TODOS os alvos daquela linha
+ * escorregam, saindo do eixo das demais. Visto na tela em 11/09/2026, numa
+ * lista de 89 clientes com 6 suspensos -- a coluna de "Editar" serrilhava em
+ * seis pontos.
+ *
+ * 16px É MEDIDO, não deduzido do design system. O gatilho do `RowMenu` é um
+ * `Button variant="icon"`, que vale 32px solto -- mas dentro da célula de
+ * ação o `DataTable` o comprime, e ali ele mede 16px. Reservar os 32px do
+ * componente empurrava o "Editar" da linha suspensa 16px para a ESQUERDA,
+ * trocando um desalinhamento por outro (visto e medido no navegador antes de
+ * fechar este número).
+ */
+.vaoDoMenu {
+  display: inline-block;
+  inline-size: 16px;
+  block-size: 36px;
+  /* `flex-shrink: 0` porque o contêiner é flex: sem ele, o vão cederia
+     primeiro que os alvos de verdade numa largura apertada, e o problema
+     voltaria exatamente onde ele aparece. */
+  flex-shrink: 0;
+}

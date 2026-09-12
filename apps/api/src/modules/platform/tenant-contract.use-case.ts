@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { TenantContract } from '@arenahub/database';
 
+import { carregarConfig } from '../../config/env.js';
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { PlatformContext } from '../../common/platform/platform-context.js';
 import {
@@ -14,6 +15,10 @@ import {
   competenciasDaJanela,
   corrigirPorIndice,
 } from './domain/correcao-por-indice.js';
+import { contarAlunosDoTenant } from './contagem-de-alunos.js';
+import { calcularFatura, competenciaDe } from './domain/calculo-da-fatura.js';
+import { camposFaltandoParaContrato } from './domain/qualificacao-da-contratante.js';
+import { VERSAO_ATUAL_DOS_TERMOS } from './domain/termos-do-contrato.js';
 import { PlatformAuditService } from './platform-audit.service.js';
 import { PlanoArquivadoError, PlanoNaoEncontradoError } from './saas-plan.use-case.js';
 
@@ -71,6 +76,35 @@ export class IndiceIndisponivelError extends ErroDeDominio {
   }
 }
 
+/**
+ * Contrato sem qualificacao completa da CONTRATANTE nao ativa -- F70
+ * (SPEC-070 §6, §8 invariante 4).
+ *
+ * Antes desta fatia o gerador imprimia "não informado" e seguia. O aceite
+ * muda o comportamento: falta CNPJ, endereco, telefone, responsavel ou CPF
+ * do responsavel BLOQUEIA a ativacao, e a mensagem nomeia o campo -- o painel
+ * so consegue dizer "falta o endereco" se o backend disser.
+ */
+export class TenantSemQualificacaoParaContratoError extends ErroDeDominio {
+  constructor(readonly camposFaltando: readonly string[]) {
+    super(
+      'TENANT_CONTRACT_TENANT_INCOMPLETE',
+      422,
+      `Contrato não pode ativar: falta no cadastro da academia: ${camposFaltando.join(', ')}`,
+    );
+  }
+}
+
+export class ContratoJaAssinadoError extends ErroDeDominio {
+  constructor() {
+    super(
+      'TENANT_CONTRACT_ALREADY_SIGNED',
+      409,
+      'Este contrato já tem PDF assinado registrado',
+    );
+  }
+}
+
 export interface EntradaDeContrato {
   tenantId: string;
   planId: string;
@@ -93,6 +127,14 @@ export interface EntradaDeContrato {
    */
   mobileEnabled?: boolean | undefined;
   kioskEnabled?: boolean | undefined;
+  /**
+   * Foro eleito -- F70 (SPEC-070 §3.3, §7 item 3). E negociado por contrato,
+   * nunca constante do produto. Ausente aqui e preenchivel ate a ativacao
+   * exigir (ver `camposFaltandoParaContrato` -- o foro entra na mesma
+   * checagem por ser dado do contrato, nao do tenant).
+   */
+  foroCidade?: string | undefined;
+  foroUf?: string | undefined;
 }
 
 /** Chave do PDF no bucket privado. Servidor monta; ninguem envia prefixo. */
@@ -109,6 +151,15 @@ export function montarChaveDoContrato(tenantId: string, contratoId: string): str
  */
 export function prefixoDeContrato(tenantId: string): string {
   return `tenants/${tenantId}/contracts/`;
+}
+
+/**
+ * Chave do PDF ASSINADO -- F70. Sufixo `-signed`, no MESMO diretorio do
+ * gerado: os dois convivem sob `prefixoDeContrato`, nunca um sobrescreve o
+ * outro (SPEC-070 §3.3, §8 invariante 2).
+ */
+export function montarChaveDoContratoAssinado(tenantId: string, contratoId: string): string {
+  return `tenants/${tenantId}/contracts/${contratoId}-signed.pdf`;
 }
 
 /**
@@ -190,6 +241,14 @@ export class TenantContractUseCase {
         startsAt: entrada.startsAt,
         endsAt: entrada.endsAt ?? null,
         supersedesId: entrada.supersedesId ?? null,
+        // Termos e foro -- F70. `termsVersion` fixa a versao ATUAL no
+        // instante do fechamento do rascunho: e o mesmo momento em que os
+        // precos sao copiados do plano (ver comentario da classe), e pela
+        // mesma razao -- gravar aqui, e nao na ativacao, impede que editar a
+        // versao entre o `criar` e o `ativar` mude o contrato por baixo.
+        termsVersion: VERSAO_ATUAL_DOS_TERMOS,
+        ...(entrada.foroCidade === undefined ? {} : { foroCidade: entrada.foroCidade }),
+        ...(entrada.foroUf === undefined ? {} : { foroUf: entrada.foroUf }),
       },
     });
 
@@ -239,6 +298,57 @@ export class TenantContractUseCase {
 
     if (jaAtivo) throw new ContratoJaAtivoNoTenantError();
 
+    /*
+     * QUALIFICACAO COMPLETA OU NAO ATIVA -- F70 (SPEC-070 §6, §8 invariante
+     * 4). Antes desta fatia, CNPJ/endereco/representante ausentes imprimiam
+     * "não informado" e o contrato ativava do mesmo jeito. O foro entra na
+     * mesma checagem por ser dado NEGOCIADO do contrato (nao constante do
+     * produto, ADR-055 §3.3), nao porque falte no tenant.
+     */
+    const camposFaltando = [
+      ...camposFaltandoParaContrato(tenant),
+      // `.trim()` pelo mesmo motivo de `camposFaltandoParaContrato`: a coluna
+      // e opcional e nada impede uma importacao gravar espaco, que sairia
+      // impresso como foro em branco -- pior que ausente, porque nao se ve.
+      ...(contrato.foroCidade !== null && contrato.foroCidade.trim().length > 0 ? [] : ['foro']),
+    ];
+
+    if (camposFaltando.length > 0) {
+      throw new TenantSemQualificacaoParaContratoError(camposFaltando);
+    }
+
+    const config = carregarConfig();
+    const enderecoTenant = [tenant.addressLine, tenant.addressCity, tenant.addressState]
+      .filter((parte): parte is string => Boolean(parte))
+      .join(', ');
+
+    /*
+     * O VALOR APURADO E A VARIAÇÃO DO ÍNDICE -- pedido do PI em 11/09/2026.
+     *
+     * A apuracao usa `calcularFatura`, a MESMA funcao pura que a fatura usa
+     * (F64). Repetir a multiplicacao aqui criaria uma segunda aritmetica de
+     * dinheiro fora do lugar onde ela e testada -- e as duas divergiriam no
+     * dia em que uma regra entrasse so numa delas.
+     */
+    const agora = new Date();
+    const [contagem, indiceCorrente] = await Promise.all([
+      contarAlunosDoTenant(this.db, contrato.tenantId),
+      this.db.indexValue.findFirst({
+        where: { code: contrato.indexCode },
+        orderBy: { referenceMonth: 'desc' },
+      }),
+    ]);
+
+    const apurado = calcularFatura(
+      {
+        model: contrato.model,
+        activeStudentPriceMinor: contrato.activeStudentPriceMinor,
+        inactiveStudentPriceMinor: contrato.inactiveStudentPriceMinor,
+        fixedPriceMinor: contrato.fixedPriceMinor,
+      },
+      contagem,
+    );
+
     const pdf = await gerarPdfDoContrato({
       numero: contrato.id.slice(0, 8).toUpperCase(),
       tenant: {
@@ -264,7 +374,46 @@ export class TenantContractUseCase {
       kioskEnabled: contrato.kioskEnabled,
       startsAt: contrato.startsAt,
       endsAt: contrato.endsAt,
-      geradoEm: new Date(),
+      geradoEm: agora,
+      apuracao: {
+        competencia: competenciaDe(agora).toISOString().slice(0, 7),
+        activeCount: apurado.activeCount,
+        inactiveCount: apurado.inactiveCount,
+        totalMinor: apurado.totalMinor,
+      },
+      ...(indiceCorrente
+        ? {
+            indiceCorrente: {
+              competencia: indiceCorrente.referenceMonth.toISOString().slice(0, 7),
+              variationBasisPoints: indiceCorrente.variationBasisPoints,
+            },
+          }
+        : {}),
+      clausulas: {
+        termsVersion: contrato.termsVersion,
+        contratada: {
+          // A checagem acima e do TENANT; a CONTRATADA vem de configuracao
+          // (ADR-055 §6) e pode legitimamente faltar ate o PI passar os
+          // dados da RRB TRADING (SPEC-070 §7 item 1) -- por isso NAO entra
+          // em `camposFaltando`: bloquear a ativacao de todo contrato do
+          // ArenaHub por uma variavel de ambiente ainda nao definida
+          // impediria fechar contrato nenhum.
+          razaoSocial: config.contratada.razaoSocial ?? 'RRB TRADING',
+          cnpj: config.contratada.cnpj,
+          endereco: config.contratada.endereco,
+          representante: config.contratada.representante,
+          email: config.contratada.email,
+        },
+        contratante: {
+          razaoSocial: tenant.legalName,
+          cnpj: tenant.cnpj,
+          endereco: enderecoTenant || null,
+          representante: tenant.responsavelNome,
+          email: tenant.responsavelEmail,
+        },
+        foroCidade: contrato.foroCidade,
+        foroUf: contrato.foroUf,
+      },
     });
 
     const key = montarChaveDoContrato(contrato.tenantId, contrato.id);
@@ -463,5 +612,83 @@ export class TenantContractUseCase {
     }
 
     return { valorMinor, aniversariosAplicados: aniversarios.length };
+  }
+
+  /**
+   * Sobe o PDF assinado -- F70 (SPEC-070 §3.3, §6, §8 invariante 2).
+   *
+   * NUNCA SOBRESCREVE `documentObjectKey`: grava numa chave PROPRIA
+   * (`montarChaveDoContratoAssinado`) e move `signatureStatus` para
+   * `SIGNED`. Os dois arquivos convivem -- o gerado prova o que o sistema
+   * emitiu, o assinado prova o que as partes assinaram.
+   *
+   * SO EM CONTRATO `ACTIVE`: rascunho nao tem PDF gerado para acompanhar, e
+   * contrato encerrado ja fechou o ciclo -- assinar um documento que nunca
+   * vigorou de fato nao tem para que.
+   *
+   * IDEMPOTENTE POR ESTADO, e nao por reenvio: um segundo upload sobre
+   * contrato ja `SIGNED` e recusado (409), em vez de trocar silenciosamente
+   * o arquivo assinado por outro -- o PDF assinado e documento juridico, e
+   * versao dele nao e "a ultima que chegou".
+   */
+  async registrarAssinatura(
+    contexto: PlatformContext,
+    id: string,
+    pdfAssinado: Buffer,
+    assinadoEm: Date,
+    correlationId: string,
+  ): Promise<TenantContract> {
+    const contrato = await this.porId(id);
+
+    if (contrato.status !== 'ACTIVE') {
+      throw new ErroDeDominio(
+        'TENANT_CONTRACT_NOT_ACTIVE',
+        409,
+        'Só contrato ativo recebe PDF assinado',
+      );
+    }
+
+    if (contrato.signatureStatus === 'SIGNED') throw new ContratoJaAssinadoError();
+
+    const key = montarChaveDoContratoAssinado(contrato.tenantId, contrato.id);
+
+    await this.storage.putPrivateObject({ key, body: pdfAssinado, contentType: 'application/pdf' });
+
+    const alterados = await this.db.tenantContract.updateMany({
+      where: { id: contrato.id, signatureStatus: { not: 'SIGNED' } },
+      data: { signatureStatus: 'SIGNED', signedDocumentObjectKey: key, signedAt: assinadoEm },
+    });
+
+    if (alterados.count === 0) throw new ContratoJaAssinadoError();
+
+    await this.auditoria.registrar(
+      contexto,
+      {
+        action: 'tenant_contract.signed',
+        target: 'tenant_contract',
+        targetId: contrato.id,
+        tenantId: contrato.tenantId,
+      },
+      correlationId,
+    );
+
+    return this.porId(contrato.id);
+  }
+
+  /** O PDF assinado do contrato, para o painel servir -- F70. */
+  async lerDocumentoAssinado(id: string): Promise<{ conteudo: Uint8Array; nome: string }> {
+    const contrato = await this.porId(id);
+
+    if (!contrato.signedDocumentObjectKey) throw new ContratoNaoEncontradoError();
+
+    // Mesma guarda de pertencimento de `lerDocumento`: a chave sai de coluna,
+    // e coluna e dado.
+    if (!contrato.signedDocumentObjectKey.startsWith(prefixoDeContrato(contrato.tenantId))) {
+      throw new ContratoNaoEncontradoError();
+    }
+
+    const objeto = await this.storage.getPrivateObject(contrato.signedDocumentObjectKey);
+
+    return { conteudo: objeto.body, nome: `contrato-${contrato.id.slice(0, 8)}-assinado.pdf` };
   }
 }

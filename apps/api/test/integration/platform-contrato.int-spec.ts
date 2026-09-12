@@ -8,6 +8,7 @@ import { AppModule } from '../../src/app.module.js';
 import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import type { PlatformContext } from '../../src/common/platform/platform-context.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
+import { AlterarTenantUseCase } from '../../src/modules/platform/alterar-tenant.use-case.js';
 import { CriarTenantUseCase } from '../../src/modules/platform/criar-tenant.use-case.js';
 import { IndexValueUseCase } from '../../src/modules/platform/index-value.use-case.js';
 import { SaasPlanUseCase } from '../../src/modules/platform/saas-plan.use-case.js';
@@ -29,6 +30,7 @@ describe('plano SaaS e contrato do tenant', () => {
   let contratos: TenantContractUseCase;
   let indices: IndexValueUseCase;
   let criarTenant: CriarTenantUseCase;
+  let alterarTenant: AlterarTenantUseCase;
   let contexto: PlatformContext;
 
   /** Objetos gravados pelo storage falso, por chave. */
@@ -60,6 +62,12 @@ describe('plano SaaS e contrato do tenant', () => {
       Promise.resolve({ downloadUrl: 'https://storage.test/x', expiresAt: '' }),
   };
 
+  /**
+   * Tenant QUALIFICADO para contrato -- F70. `criarTenant.executar` nao
+   * aceita endereco nem CPF do responsavel (sao dados de contrato, nao de
+   * bootstrap do tenant), entao completa-los aqui via `AlterarTenantUseCase`
+   * -- o mesmo caminho que o painel usa.
+   */
   const criarTenantDeTeste = async (): Promise<string> => {
     const { tenantId } = await criarTenant.executar(
       contexto,
@@ -72,6 +80,18 @@ describe('plano SaaS e contrato do tenant', () => {
         responsavelNome: 'Fulano',
         responsavelEmail: `dono-${randomUUID().slice(0, 8)}@academia.local`,
         unidade: { code: 'MATRIZ', name: 'Matriz', timezone: 'America/Sao_Paulo' },
+      },
+      `corr-${randomUUID()}`,
+    );
+
+    await alterarTenant.executar(
+      contexto,
+      tenantId,
+      {
+        addressLine: 'Av. Central, 200',
+        addressCity: 'Arenápolis',
+        addressState: 'MT',
+        responsavelCpf: '12345678900',
       },
       `corr-${randomUUID()}`,
     );
@@ -108,7 +128,7 @@ describe('plano SaaS e contrato do tenant', () => {
     return plano.id;
   };
 
-  /** Contrato fixo com data-base e aniversario em 1º de marco de 2025. */
+  /** Contrato fixo com data-base e aniversario em 1º de marco de 2025, e FORO -- F70. */
   const contratoFixo = async (tenantId: string, planId: string): Promise<string> => {
     const contrato = await contratos.criar(
       contexto,
@@ -120,6 +140,8 @@ describe('plano SaaS e contrato do tenant', () => {
         anniversaryMonth: 3,
         issueDay: 1,
         startsAt: new Date('2025-03-01T00:00:00.000Z'),
+        foroCidade: 'Cuiabá',
+        foroUf: 'MT',
       },
       `corr-${randomUUID()}`,
     );
@@ -142,6 +164,7 @@ describe('plano SaaS e contrato do tenant', () => {
     contratos = app.get(TenantContractUseCase);
     indices = app.get(IndexValueUseCase);
     criarTenant = app.get(CriarTenantUseCase);
+    alterarTenant = app.get(AlterarTenantUseCase);
 
     const usuario = await db.user.create({
       data: {
@@ -460,6 +483,8 @@ describe('plano SaaS e contrato do tenant', () => {
           anniversaryMonth: 3,
           issueDay: 1,
           startsAt: new Date('2025-03-01T00:00:00.000Z'),
+          foroCidade: 'Cuiabá',
+          foroUf: 'MT',
         },
         `corr-${randomUUID()}`,
       );
@@ -617,6 +642,166 @@ describe('plano SaaS e contrato do tenant', () => {
       await expect(contratos.lerDocumento(contratoId)).rejects.toMatchObject({
         code: 'TENANT_CONTRACT_NOT_FOUND',
       });
+    });
+  });
+
+  /*
+   * QUALIFICACAO DA CONTRATANTE -- F70 (SPEC-070 §6, §8 invariante 4).
+   *
+   * O aceite muda o comportamento de `ativar`: antes desta fatia, tenant sem
+   * CNPJ/endereco/responsavel ativava do mesmo jeito e o PDF imprimia "não
+   * informado". Agora a ativacao e RECUSADA e a mensagem nomeia o campo.
+   */
+  describe('qualificacao da contratante para ativar', () => {
+    it('tenant sem CNPJ, endereco e CPF do responsavel nao ativa contrato', async () => {
+      // Cria SEM passar pelo `criarTenantDeTeste` -- este tenant e o "cru",
+      // igual aos que ja existem em producao sem os campos novos.
+      const { tenantId } = await criarTenant.executar(
+        contexto,
+        {
+          slug: `cru-${randomUUID().slice(0, 8)}`,
+          legalName: 'Academia Crua LTDA',
+          displayName: 'Academia Crua',
+          cnpj: '',
+          timezone: 'America/Sao_Paulo',
+          responsavelNome: '',
+          responsavelEmail: `cru-${randomUUID().slice(0, 8)}@academia.local`,
+          unidade: { code: 'MATRIZ', name: 'Matriz', timezone: 'America/Sao_Paulo' },
+        },
+        `corr-${randomUUID()}`,
+      );
+
+      // `cnpj: ''` e `responsavelNome: ''` viram `null` no banco no sentido
+      // que interessa ao teste -- zera explicitamente para nao depender de
+      // como `criarTenant` trata string vazia.
+      await db.tenant.update({
+        where: { id: tenantId },
+        data: { cnpj: null, responsavelNome: null },
+      });
+
+      const contratoId = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      await expect(
+        contratos.ativar(contexto, contratoId, `corr-${randomUUID()}`),
+      ).rejects.toMatchObject({ code: 'TENANT_CONTRACT_TENANT_INCOMPLETE' });
+
+      expect((await contratos.porId(contratoId)).status).toBe('DRAFT');
+    });
+
+    it('contrato sem foro nao ativa, mesmo com o tenant completo', async () => {
+      const tenantId = await criarTenantDeTeste();
+      const planId = await criarPlanoFixo(100_000);
+
+      // Sem `foroCidade`/`foroUf` -- diferente de `contratoFixo`.
+      const contrato = await contratos.criar(
+        contexto,
+        {
+          tenantId,
+          planId,
+          baseDate: new Date('2025-03-01T00:00:00.000Z'),
+          anniversaryDay: 1,
+          anniversaryMonth: 3,
+          issueDay: 1,
+          startsAt: new Date('2025-03-01T00:00:00.000Z'),
+        },
+        `corr-${randomUUID()}`,
+      );
+
+      await expect(
+        contratos.ativar(contexto, contrato.id, `corr-${randomUUID()}`),
+      ).rejects.toMatchObject({ code: 'TENANT_CONTRACT_TENANT_INCOMPLETE' });
+    });
+
+    it('tenant qualificado e contrato com foro ativam e o PDF traz as tres secoes', async () => {
+      const tenantId = await criarTenantDeTeste();
+      const contratoId = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      await contratos.ativar(contexto, contratoId, `corr-${randomUUID()}`);
+
+      const documento = await contratos.lerDocumento(contratoId);
+      const { extractText, getDocumentProxy } = await import('unpdf');
+      const pdf = await getDocumentProxy(new Uint8Array(documento.conteudo));
+      const { text } = await extractText(pdf, { mergePages: true });
+      const texto = Array.isArray(text) ? text.join(' ') : text;
+
+      expect(texto).toContain('Seção I — Quadro resumo');
+      expect(texto).toContain('Seção II — Cláusulas');
+      expect(texto).toContain('Seção III — Assinaturas');
+      expect(texto).toContain('Academia do Contrato LTDA');
+    });
+  });
+
+  /*
+   * UPLOAD DO PDF ASSINADO -- F70 (SPEC-070 §3.3, §6, §8 invariante 2).
+   */
+  describe('assinatura do contrato', () => {
+    it('sobe o PDF assinado sem tocar no documento gerado', async () => {
+      const tenantId = await criarTenantDeTeste();
+      const contratoId = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      await contratos.ativar(contexto, contratoId, `corr-${randomUUID()}`);
+      const antes = await contratos.porId(contratoId);
+
+      const pdfAssinado = Buffer.from('%PDF-1.4 conteudo assinado de teste');
+      const atualizado = await contratos.registrarAssinatura(
+        contexto,
+        contratoId,
+        pdfAssinado,
+        new Date('2026-09-11T00:00:00.000Z'),
+        `corr-${randomUUID()}`,
+      );
+
+      expect(atualizado.signatureStatus).toBe('SIGNED');
+      expect(atualizado.signedDocumentObjectKey).not.toBeNull();
+      // O GERADO nao mudou -- os dois arquivos convivem sob chaves proprias.
+      expect(atualizado.documentObjectKey).toBe(antes.documentObjectKey);
+
+      const lido = await contratos.lerDocumentoAssinado(contratoId);
+      expect(Buffer.from(lido.conteudo).toString()).toBe(pdfAssinado.toString());
+
+      // O gerado continua legivel e IGUAL ao que era antes da assinatura.
+      const geradoDepois = await contratos.lerDocumento(contratoId);
+      const geradoAntes = await contratos.lerDocumento(contratoId);
+      expect(Buffer.from(geradoDepois.conteudo)).toEqual(Buffer.from(geradoAntes.conteudo));
+    });
+
+    it('nao aceita assinatura em contrato rascunho', async () => {
+      const tenantId = await criarTenantDeTeste();
+      const contratoId = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      await expect(
+        contratos.registrarAssinatura(
+          contexto,
+          contratoId,
+          Buffer.from('%PDF-1.4'),
+          new Date(),
+          `corr-${randomUUID()}`,
+        ),
+      ).rejects.toMatchObject({ code: 'TENANT_CONTRACT_NOT_ACTIVE' });
+    });
+
+    it('recusa segundo upload sobre contrato ja assinado', async () => {
+      const tenantId = await criarTenantDeTeste();
+      const contratoId = await contratoFixo(tenantId, await criarPlanoFixo(100_000));
+
+      await contratos.ativar(contexto, contratoId, `corr-${randomUUID()}`);
+      await contratos.registrarAssinatura(
+        contexto,
+        contratoId,
+        Buffer.from('%PDF-1.4 primeiro'),
+        new Date(),
+        `corr-${randomUUID()}`,
+      );
+
+      await expect(
+        contratos.registrarAssinatura(
+          contexto,
+          contratoId,
+          Buffer.from('%PDF-1.4 segundo'),
+          new Date(),
+          `corr-${randomUUID()}`,
+        ),
+      ).rejects.toMatchObject({ code: 'TENANT_CONTRACT_ALREADY_SIGNED' });
     });
   });
 });

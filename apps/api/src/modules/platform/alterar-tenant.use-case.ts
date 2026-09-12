@@ -40,6 +40,13 @@ export interface AlteracaoDeTenant {
   timezone?: string | undefined;
   responsavelNome?: string | undefined;
   responsavelEmail?: string | undefined;
+  /** Qualificacao para o contrato -- F70 (ADR-055 §6). */
+  addressLine?: string | undefined;
+  addressCity?: string | undefined;
+  addressState?: string | undefined;
+  addressZip?: string | undefined;
+  phone?: string | undefined;
+  responsavelCpf?: string | undefined;
   status?: SituacaoDeTenant | undefined;
   /**
    * Missao e diferenciais da tela de login por slug (F62).

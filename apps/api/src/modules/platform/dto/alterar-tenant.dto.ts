@@ -21,6 +21,30 @@ export const esquemaDeAlteracaoDeTenant = z
     timezone: z.string().min(1).optional(),
     responsavelNome: z.string().trim().min(1).max(120).optional(),
     responsavelEmail: z.string().trim().toLowerCase().email().max(320).optional(),
+    /*
+     * Qualificacao para o contrato -- F70 (ADR-055 §6). Divida antiga da
+     * Especificacao §9, paga agora porque `TenantContractUseCase.ativar`
+     * passa a exigir os quatro para ativar (ver `camposFaltandoParaContrato`).
+     */
+    addressLine: z.string().trim().min(1).max(200).optional(),
+    addressCity: z.string().trim().min(1).max(120).optional(),
+    addressState: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{2}$/, 'use a sigla de 2 letras da UF')
+      .optional(),
+    addressZip: z
+      .string()
+      .trim()
+      .regex(/^\d{8}$/, 'CEP deve ter 8 dígitos')
+      .optional(),
+    phone: z.string().trim().min(8).max(20).optional(),
+    responsavelCpf: z
+      .string()
+      .trim()
+      .regex(/^\d{11}$/, 'CPF deve ter 11 dígitos')
+      .optional(),
     status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
     /*
      * Missao e diferenciais (F62) -- TEXTO, nunca HTML.

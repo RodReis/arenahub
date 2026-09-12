@@ -252,6 +252,10 @@ describe('contrato OpenAPI', () => {
         '/api/v1/platform/contracts/{id}/terminate',
         '/api/v1/platform/contracts/{id}/corrected-value',
         '/api/v1/platform/contracts/{id}/document',
+        // F70 -- PDF ASSINADO, ao lado do gerado e nunca no lugar dele
+        // (ADR-055). `POST` sobe o documento que as partes assinaram fora do
+        // sistema; `GET` o serve de volta. Mesmo path, dois metodos.
+        '/api/v1/platform/contracts/{id}/signed-document',
         // F63 -- historico manual do indice de correcao (ADR-052 §7). A API do
         // Banco Central no caminho de faturamento e ADR futuro.
         '/api/v1/platform/index-values',

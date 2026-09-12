@@ -57,3 +57,44 @@
   */
   white-space: nowrap;
 }
+
+/*
+ * PREÇO UNITÁRIO EM GRADE DE DUAS COLUNAS -- número e rótulo.
+ *
+ * Com "R$ 3,00 por ativo" numa string só, o `R$ 3,00` e o `R$ 1,00` da linha
+ * de baixo terminavam em pontos diferentes: o rótulo mais longo ("por
+ * inativo") empurrava o número para a esquerda, e a coluna de dinheiro perdia
+ * o alinhamento que é a razão de ela existir. Separados em duas colunas, os
+ * valores encostam na mesma borda direita e os rótulos começam no mesmo ponto.
+ *
+ * `max-content` nas duas: a grade encolhe ao conteúdo em vez de esticar até a
+ * largura da célula, e o par fica junto em vez de flutuar com um vão no meio.
+ */
+.precos {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: end;
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 2px;
+}
+
+.precos > span {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  /* O rótulo NÃO é número: a tabela inteira tem `tabular-nums`, e herdar isso
+     aqui abriria espaço de dígito entre letras. */
+  font-variant-numeric: normal;
+}
+
+/*
+ * A VARIAÇÃO CORRENTE do índice, sob o nome dele. Texto de apoio: quem lê a
+ * coluna procura o índice, e o percentual responde a pergunta seguinte ("já
+ * cadastraram o mês?") sem competir com ela.
+ */
+.variacao {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}

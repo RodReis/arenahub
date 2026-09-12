@@ -76,6 +76,7 @@ describe('fatura da plataforma', () => {
       Promise.resolve({ downloadUrl: 'https://storage.test/x', expiresAt: '' }),
   };
 
+  /** Tenant QUALIFICADO para contrato -- F70. Ver mesma nota em platform-contrato.int-spec.ts. */
   const criarTenantDeTeste = async (): Promise<string> => {
     const { tenantId } = await criarTenant.executar(
       contexto,
@@ -88,6 +89,18 @@ describe('fatura da plataforma', () => {
         responsavelNome: 'Fulano',
         responsavelEmail: `dono-${randomUUID().slice(0, 8)}@academia.local`,
         unidade: { code: 'MATRIZ', name: 'Matriz', timezone: 'America/Sao_Paulo' },
+      },
+      `corr-${randomUUID()}`,
+    );
+
+    await alterarTenant.executar(
+      contexto,
+      tenantId,
+      {
+        addressLine: 'Av. Central, 200',
+        addressCity: 'Arenápolis',
+        addressState: 'MT',
+        responsavelCpf: '12345678900',
       },
       `corr-${randomUUID()}`,
     );
@@ -122,6 +135,8 @@ describe('fatura da plataforma', () => {
         anniversaryMonth: 1,
         issueDay: 1,
         startsAt: new Date('2026-01-01T00:00:00.000Z'),
+        foroCidade: 'Cuiabá',
+        foroUf: 'MT',
       },
       `corr-${randomUUID()}`,
     );
@@ -153,6 +168,8 @@ describe('fatura da plataforma', () => {
         anniversaryMonth: 3,
         issueDay: 1,
         startsAt: new Date('2025-03-01T00:00:00.000Z'),
+        foroCidade: 'Cuiabá',
+        foroUf: 'MT',
       },
       `corr-${randomUUID()}`,
     );

@@ -577,6 +577,15 @@ model Tenant {
   timezone         String?
   responsavelNome  String? @map("responsavel_nome")
   responsavelEmail String? @map("responsavel_email")
+  /// Qualificacao da CONTRATANTE no contrato (F70, ADR-055). Divida antiga
+  /// (Especificacao §9 ja previa endereco e telefone), paga agora porque o
+  /// contrato passa a exigi-los para ativar.
+  addressLine    String? @map("address_line")
+  addressCity    String? @map("address_city")
+  addressState   String? @map("address_state")
+  addressZip     String? @map("address_zip")
+  phone          String?
+  responsavelCpf String? @map("responsavel_cpf")
 
   /// Identidade visual da academia (F62, ADR-052 §9).
   ///
@@ -5965,6 +5974,19 @@ enum TenantContractStatus {
   @@map("tenant_contract_status")
 }
 
+/// Situacao da assinatura do contrato -- F70 (ADR-055). Nasce `PENDING`: o
+/// contrato ativa sem exigir assinatura ja anexada (o PDF gerado circula
+/// primeiro fisicamente ou fora do sistema), e o upload do PDF assinado move
+/// para `SIGNED`. `WAIVED` cobre o caso operacional de dispensa registrada
+/// pelo Super Admin -- nao ha rota para ele nesta fatia, so o valor existe.
+enum ContractSignatureStatus {
+  PENDING
+  SIGNED
+  WAIVED
+
+  @@map("contract_signature_status")
+}
+
 /// Plano SaaS do catalogo -- o que o Super Admin oferece a academia.
 ///
 /// GLOBAL, sem `tenant_id`: e catalogo do dono do SaaS, nao dado de academia.
@@ -6077,6 +6099,27 @@ model TenantContract {
   /// documento de rascunho circulando como contrato e pior que documento
   /// nenhum.
   documentObjectKey String? @map("document_object_key")
+
+  /// Versao do texto das clausulas fechada com este contrato -- F70 (ADR-055
+  /// decisao 2). O gerador de PDF le SEMPRE esta coluna, nunca "a versao
+  /// atual": regerar o documento anos depois reproduz o texto de quando foi
+  /// fechado, a mesma regra que ja vale para os precos copiados (ADR-052 §8).
+  /// Obrigatorio porque todo contrato desta fatia em diante tem cláusulas.
+  termsVersion String @default("2026.1") @map("terms_version")
+
+  /// Situacao da assinatura -- F70. Nasce `PENDING`.
+  signatureStatus ContractSignatureStatus @default(PENDING) @map("signature_status")
+  /// CHAVE DE OBJETO do PDF ASSINADO -- diferente de `documentObjectKey`
+  /// (o PDF GERADO). Os dois convivem, nunca um sobrescreve o outro (§3.3 da
+  /// spec): o gerado prova o que o sistema emitiu, o assinado prova o que as
+  /// partes assinaram.
+  signedDocumentObjectKey String?   @map("signed_document_object_key")
+  signedAt                DateTime? @map("signed_at")
+
+  /// Foro eleito -- e negociado por contrato, nunca constante do produto
+  /// (SPEC-070 §3.3). Nulo ate o Super Admin preencher; a ativacao exige.
+  foroCidade String? @map("foro_cidade")
+  foroUf     String? @map("foro_uf")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

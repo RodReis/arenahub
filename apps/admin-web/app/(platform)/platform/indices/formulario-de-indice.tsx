@@ -76,6 +76,17 @@ export function FormularioDeIndice({ codigo, corrigindo, onCancelar }: Props) {
             type="month"
             required
             defaultValue={corrigindo?.competencia ?? ''}
+            /*
+              TRAVADO AO CORRIGIR, e este é o ponto: a API grava por `upsert`
+              em `(code, competencia)`, então trocar o mês aqui não corrige a
+              linha que se clicou -- CRIA outra competência, e a original fica
+              com o valor errado que se queria consertar. Visto na tela em
+              11/09/2026: corrigir 09/2026 e mudar o ano inseria 09/2027.
+
+              `readOnly` e não `disabled`: campo desabilitado não entra no
+              `FormData`, e a Server Action receberia competência vazia.
+            */
+            {...(corrigindo === undefined ? {} : { readOnly: true })}
             data-testid="campo-competencia-do-indice"
           />
         </div>

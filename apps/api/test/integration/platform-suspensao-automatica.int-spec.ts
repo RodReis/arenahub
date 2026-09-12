@@ -8,6 +8,7 @@ import { AppModule } from '../../src/app.module.js';
 import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import type { PlatformContext } from '../../src/common/platform/platform-context.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
+import { AlterarTenantUseCase } from '../../src/modules/platform/alterar-tenant.use-case.js';
 import { CriarTenantUseCase } from '../../src/modules/platform/criar-tenant.use-case.js';
 import { SaasPlanUseCase } from '../../src/modules/platform/saas-plan.use-case.js';
 import { SuspenderTenantUseCase } from '../../src/modules/platform/suspender-tenant.use-case.js';
@@ -28,6 +29,7 @@ describe('F65 -- suspensao automatica', () => {
   let planos: SaasPlanUseCase;
   let contratos: TenantContractUseCase;
   let criarTenant: CriarTenantUseCase;
+  let alterarTenant: AlterarTenantUseCase;
   let suspender: SuspenderTenantUseCase;
   let contexto: PlatformContext;
 
@@ -58,6 +60,7 @@ describe('F65 -- suspensao automatica', () => {
       Promise.resolve({ downloadUrl: 'https://storage.test/x', expiresAt: '' }),
   };
 
+  /** Tenant QUALIFICADO para contrato -- F70. Ver mesma nota em platform-contrato.int-spec.ts. */
   const criarTenantDeTeste = async (): Promise<string> => {
     const { tenantId } = await criarTenant.executar(
       contexto,
@@ -70,6 +73,18 @@ describe('F65 -- suspensao automatica', () => {
         responsavelNome: 'Fulano',
         responsavelEmail: `dono-${randomUUID().slice(0, 8)}@academia.local`,
         unidade: { code: 'MATRIZ', name: 'Matriz', timezone: 'America/Sao_Paulo' },
+      },
+      `corr-${randomUUID()}`,
+    );
+
+    await alterarTenant.executar(
+      contexto,
+      tenantId,
+      {
+        addressLine: 'Av. Central, 200',
+        addressCity: 'Arenápolis',
+        addressState: 'MT',
+        responsavelCpf: '12345678900',
       },
       `corr-${randomUUID()}`,
     );
@@ -101,6 +116,8 @@ describe('F65 -- suspensao automatica', () => {
         issueDay: 1,
         startsAt: new Date('2026-01-01T00:00:00.000Z'),
         graceDays,
+        foroCidade: 'Cuiabá',
+        foroUf: 'MT',
       },
       `corr-${randomUUID()}`,
     );
@@ -152,6 +169,7 @@ describe('F65 -- suspensao automatica', () => {
     planos = app.get(SaasPlanUseCase);
     contratos = app.get(TenantContractUseCase);
     criarTenant = app.get(CriarTenantUseCase);
+    alterarTenant = app.get(AlterarTenantUseCase);
     suspender = app.get(SuspenderTenantUseCase);
 
     const usuario = await db.user.create({

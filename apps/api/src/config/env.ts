@@ -89,6 +89,26 @@ const esquema = z.object({
    * abre para ninguem.
    */
   PANEL_PUBLIC_URL: z.string().url().default('http://localhost:3000'),
+
+  /**
+   * Qualificacao da CONTRATADA (RRB TRADING) no contrato -- F70 (ADR-055 §6).
+   *
+   * CONFIGURACAO, e nao literal em `contrato-pdf.service.ts`: endereco e
+   * representante mudam por ato societario, e trocar endereco da empresa nao
+   * pode exigir deploy.
+   *
+   * TODAS OPCIONAIS no schema, com placeholder visivel como padrao -- a
+   * SPEC-070 §7 registra que nome, CNPJ, endereco e representante da RRB
+   * TRADING sao lacuna do PI, nao dado que o Code inventa. Sem a variavel, o
+   * PDF sai com `[a definir pelo PI]` no campo que falta, em vez de "não
+   * informado" silencioso -- e o painel recusa ATIVAR contrato com a lacuna
+   * (ver `tenant-contract.use-case.ts`).
+   */
+  CONTRATADA_RAZAO_SOCIAL: z.string().optional(),
+  CONTRATADA_CNPJ: z.string().optional(),
+  CONTRATADA_ENDERECO: z.string().optional(),
+  CONTRATADA_REPRESENTANTE: z.string().optional(),
+  CONTRATADA_EMAIL: z.string().optional(),
 });
 
 /** Storage privado S3-compativel. MinIO em dev, S3 em producao. */
@@ -126,6 +146,20 @@ export interface ConfigDaApi {
     /** Sem barra no fim: o caminho do convite ja comeca com uma. */
     urlDoPainel: string;
   };
+  /**
+   * Qualificacao da CONTRATADA no contrato -- F70 (ADR-055 §6).
+   *
+   * `null` no campo cujo dado o PI ainda nao passou (SPEC-070 §7): o gerador
+   * de PDF imprime placeholder visivel nesse campo, nunca "não informado"
+   * silencioso.
+   */
+  contratada: {
+    razaoSocial: string | null;
+    cnpj: string | null;
+    endereco: string | null;
+    representante: string | null;
+    email: string | null;
+  };
 }
 
 export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaApi {
@@ -149,6 +183,13 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaAp
       resendApiKey: bruto.RESEND_API_KEY ?? null,
       remetente: bruto.RESEND_FROM,
       urlDoPainel: bruto.PANEL_PUBLIC_URL.replace(/\/+$/, ''),
+    },
+    contratada: {
+      razaoSocial: bruto.CONTRATADA_RAZAO_SOCIAL ?? null,
+      cnpj: bruto.CONTRATADA_CNPJ ?? null,
+      endereco: bruto.CONTRATADA_ENDERECO ?? null,
+      representante: bruto.CONTRATADA_REPRESENTANTE ?? null,
+      email: bruto.CONTRATADA_EMAIL ?? null,
     },
   };
 }
