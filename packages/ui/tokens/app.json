@@ -1,0 +1,217 @@
+{
+  "$comment": "Camada 1 (primitivo) da superficie do APP do aluno (apps/mobile) -- F43, DS-APP.md §2. Mesma regra do primitive.json e do totem.json: NENHUM componente le esta camada direto (regra de lint 2), e os hex vivem AQUI e em nenhum outro lugar do repositorio (regra de lint 1). O app e React Native: nao ha CSS, entao esta camada sai SO em TypeScript (`app-tokens.generated.ts`) -- ver a nota de `light` abaixo.",
+
+  "app": {
+    "$comment": "DARK e a superficie padrao do app -- DS-APP.md §1: 'usado na academia, com luz baixa, celular na mao e suor'. `contrastOnApp` mede contra `bg.app`, o fundo real da tela (mesma convencao do totem.json, que mede contra `totem.bg.base` em vez de branco).",
+
+    "bg": {
+      "app": {
+        "value": "#121417",
+        "$role": "fundo do app, trilho de barra de progresso",
+        "$comment": "E carbon-900 do primitive.json. NAO vira `ref`: esta camada e primitiva como a do totem, e um `ref` aqui criaria dependencia de ordem entre dois arquivos primitivos. O valor coincidir e proposital -- o app e a rampa do painel invertida, e por isso o light mode (abaixo) reusa o painel sem hex novo."
+      },
+      "surface": {
+        "value": "#181B1F",
+        "contrastOnApp": 1.07,
+        "$role": "card padrao, campo de texto, sheet, tile de atalho",
+        "$comment": "Unico hex do DS-APP que nao existe na rampa carbon -- fica entre carbon-900 (#121417) e carbon-800 (#1F2328). Existe porque o app precisa de TRES niveis de escuro (§2.1) e a rampa do painel so oferece dois nessa faixa."
+      },
+      "raised": {
+        "value": "#1F2328",
+        "contrastOnApp": 1.17,
+        "$role": "card em destaque (plano, fatura), avatar, chip inativo, barra vazia"
+      }
+    },
+
+    "border": {
+      "default": {
+        "value": "#646D79",
+        "contrastOnApp": 3.52,
+        "$role": "borda de card, input, botao secundario, divisor interno",
+        "$comment": "Era #2B3037 no DS-APP.md §2.1 v1.0 -- 1.39 sobre bg.app, 1.30 sobre bg.surface e 1.19 sobre bg.raised. REPROVAVA o alvo de 3.0 do WCAG 1.4.11 nos tres fundos, e por larga margem. Nao e detalhe estetico: esta borda e o que DELIMITA o alvo tocavel do campo de texto (§4.1) e do botao secundario (§4.2), e o §1 do DS descreve o app usado sob luz de academia, com o celular na mao e suor na tela. Um contorno a 1.2 desaparece exatamente na condicao para a qual a superficie foi desenhada. Mesmo defeito e mesma correcao do totem, que tinha #232A3D a 1.38 e foi para #51618C (PR #232). O novo valor mantem o cinza-azulado e passa nos TRES fundos: 3.52 / 3.30 / 3.01 -- o menor manda, porque a borda aparece nos tres (campo sobre surface, botao sobre app, chip sobre raised). Decidido pelo PI em 11/09/2026; o DS-APP.md §2.1 foi emendado junto."
+      }
+    },
+
+    "text": {
+      "primary": {
+        "value": "#F5F7F9",
+        "contrastOnApp": 17.18,
+        "$role": "titulo, valor, corpo forte"
+      },
+      "secondary": {
+        "value": "#A6AEB9",
+        "contrastOnApp": 8.24,
+        "$role": "descricao, label, metrica secundaria"
+      },
+      "muted": {
+        "value": "#7B8491",
+        "contrastOnApp": 4.88,
+        "$role": "metadado, timestamp, matricula, placeholder",
+        "$comment": "4.57 sobre bg.surface e 4.18 sobre bg.raised -- passa o alvo de texto normal nos dois primeiros fundos e REPROVA sobre raised. Legitimo e exigido pelo proprio DS: §7 diz 'text/muted so em metadado, nunca em informacao necessaria'. A isencao e nominal em ISENTOS_DO_APP, com a clausula que a sustenta."
+      }
+    },
+
+    "accent": {
+      "$comment": "Ciano Arena, o mesmo seed do painel (#00A9B8). `solid` e accent-400 e `hover` e accent-300 da rampa do primitive.json -- em fundo escuro o resolvedor sobe na rampa em vez de descer, e por isso os papeis se invertem em relacao ao painel. REGRA DO §2.3: `solid` e FUNDO de acao, `hover` e TINTA sobre escuro. Nao trocar os papeis -- ciano claro como fundo de botao perde contraste com o texto escuro.",
+      "solid": {
+        "value": "#1FBED0",
+        "contrastOnApp": 8.2,
+        "$role": "botao primario (fundo), aba ativa, barra de frequencia, chip de periodo ativo"
+      },
+      "hover": {
+        "value": "#4FD5E3",
+        "contrastOnApp": 10.51,
+        "$role": "icone sobre escuro, link, texto de botao fantasma, hover de borda"
+      },
+      "soft": {
+        "value": "#C2F2F7",
+        "contrastOnApp": 15.23,
+        "$role": "hover de link"
+      },
+      "tint": {
+        "value": "rgba(31,190,208,.10)",
+        "$role": "fundo da propria linha no ranking",
+        "$comment": "Sem `contrastOnApp`: e fundo translucido, nao par texto/superficie solido -- rgba com alpha nao tem luminancia fixa para medir. Mesma razao de `totem.brand.tint`."
+      },
+      "onAccent": {
+        "value": "#0A0B0D",
+        "contrastOnApp": 1.07,
+        "$role": "texto e icone sobre acento ciano",
+        "$comment": "O par que importa nao e contra bg.app -- e contra `accent.solid`, que da 8.75. O gate mede esse par nominalmente em PARES_DO_APP."
+      }
+    },
+
+    "state": {
+      "$comment": "Quatro tons -- DS-APP.md §2.4. Tripla [texto, fundo 16%, borda 34%]: mais opaca que os 10% do painel, porque o fundo aqui e escuro. O gate mede o texto sobre o PROPRIO tint de 16%, nao sobre a superficie limpa: e o fundo que ele realmente pinta. Delta de metrica usa `ok` quando melhora e `warn` quando piora -- nunca `err`, reservado a falha e alerta clinico (§2.4, §5.3).",
+      "ok": {
+        "value": "#3DDC84",
+        "contrastOnApp": 10.34,
+        "$role": "plano ativo, pago, metrica melhorando"
+      },
+      "warn": {
+        "value": "#F5A524",
+        "contrastOnApp": 9.04,
+        "$role": "fatura vencida, metrica piorando, sequencia"
+      },
+      "err": {
+        "value": "#FF6B6B",
+        "contrastOnApp": 6.65,
+        "$role": "bloqueio, falha, alerta clinico"
+      },
+      "info": {
+        "value": "#6AB0FF",
+        "contrastOnApp": 8.14,
+        "$role": "em aberto, processando, spinner"
+      }
+    },
+
+    "scrim": {
+      "default": {
+        "value": "rgba(10,11,13,.7)",
+        "$role": "fundo atras do sheet da carteirinha",
+        "$comment": "Sem contraste medido: e vidro sobre a tela, nao par texto/superficie."
+      }
+    }
+  },
+
+  "light": {
+    "$comment": "LIGHT MODE -- decidido pelo PI em 11/09/2026 (SPEC-043 §5 pergunta 2): validar agora, REUSANDO a paleta do painel em vez de derivar uma nova do dark do app. O motivo e que nao ha hex novo a inventar: o dark do app JA E a rampa carbon invertida (text/primary = carbon-50, text/secondary = carbon-300, bg/app = carbon-900, bg/raised = carbon-800), entao o light e simplesmente a mesma rampa lida no sentido do painel, com contraste ja validado ali. Derivar uma segunda paleta criaria hex que nenhum documento define -- segunda verdade na primeira mudanca. O app segue o SO a partir do MVP 4 (DS-APP.md §1: 'escuro por padrao'); este bloco existe para que seguir o SO nao exija inventar cor no meio da fatia que precisar disso.",
+
+    "bg": {
+      "app": { "value": "#F5F7F9", "$role": "fundo do app", "$sameAs": "carbon.50" },
+      "surface": { "value": "#FFFFFF", "$role": "card, campo, sheet", "$sameAs": "white" },
+      "raised": { "value": "#E5E9EE", "$role": "card em destaque, chip inativo, barra vazia", "$sameAs": "carbon.100" }
+    },
+
+    "border": {
+      "default": { "value": "#7B8491", "$role": "borda de card, input, botao secundario", "$sameAs": "carbon.400", "$comment": "A borda do painel e carbon-200 (#CBD1D9, 1.54 sobre branco) e a primeira tentativa aqui foi carbon-300 (#A6AEB9): AMBAS reprovam o alvo de 3.0 do WCAG 1.4.11, e o gate pegou a segunda em 1.84 sobre bg.raised. No painel um contorno fraco passa como decoracao de card; no app a MESMA borda delimita o alvo tocavel de 44px do campo (§4.1) e do botao secundario (§4.2) -- o papel e o que decide o alvo, nao a superficie. carbon-400 passa nos tres fundos do light: 3.52 / 3.78 / 3.10. E o espelho exato da correcao do dark (#2B3037 -> #646D79): a mesma decisao, nos dois temas, pelo mesmo motivo." }
+    },
+
+    "text": {
+      "primary": { "value": "#1F2328", "$role": "titulo, valor, corpo forte", "$sameAs": "carbon.800" },
+      "secondary": { "value": "#565E69", "$role": "descricao, label, metrica secundaria", "$sameAs": "carbon.500" },
+      "muted": { "value": "#7B8491", "$role": "metadado, timestamp, matricula, placeholder", "$sameAs": "carbon.400", "$comment": "Mesmo papel e mesma isencao do muted dark: 3.78 sobre branco, e o §7 do DS-APP restringe o token a metadado." }
+    },
+
+    "accent": {
+      "$comment": "Em fundo CLARO os papeis voltam a ser os do painel: `solid` desce na rampa ate passar 4.5 contra branco (accent-700), e `onAccent` vira branco. O app nao reusa o ciano-400 aqui -- ele da 2.42 sobre branco e reprovaria com o rotulo escuro do botao primario. Este e o ponto do bloco: o mesmo seed, resolvido para o fundo que a tela realmente tem.",
+      "solid": { "value": "#00707B", "$role": "botao primario (fundo), aba ativa", "$sameAs": "accent.700" },
+      "hover": { "value": "#005760", "$role": "hover do botao primario, texto de link", "$sameAs": "accent.800" },
+      "soft": { "value": "#E8FBFD", "$role": "fundo tonal de acao", "$sameAs": "accent.50" },
+      "tint": { "value": "rgba(0,112,123,.10)", "$role": "fundo da propria linha no ranking" },
+      "onAccent": { "value": "#FFFFFF", "$role": "texto e icone sobre acento" }
+    },
+
+    "state": {
+      "$comment": "Os semanticos de FUNDO CLARO sao os do painel (primitive.semantic), nao os do dark do app: #3DDC84 da 1.76 sobre branco e seria ilegivel como texto de badge. Mesma tripla de receita, com o tint de 10% do painel em vez dos 16% do dark.",
+      "ok": { "value": "#13763A", "$role": "plano ativo, pago, metrica melhorando", "$sameAs": "semantic.success" },
+      "warn": { "value": "#8A5200", "$role": "fatura vencida, metrica piorando", "$sameAs": "semantic.warning" },
+      "err": { "value": "#C22B2B", "$role": "bloqueio, falha, alerta clinico", "$sameAs": "semantic.danger" },
+      "info": { "value": "#1F5FD0", "$role": "em aberto, processando, spinner", "$sameAs": "semantic.info" }
+    },
+
+    "scrim": {
+      "default": { "value": "rgba(18,20,23,.5)", "$role": "fundo atras do sheet da carteirinha" }
+    }
+  },
+
+  "size": {
+    "$comment": "DS-APP.md §2.6 e §2.8. Numero cru em px -- React Native ja trabalha em unidade independente de densidade, entao nao ha `px` a concatenar como no CSS do painel.",
+    "safeAreaTop": { "value": 58, "$role": "safe area superior do shell (§2.6)" },
+    "gutter": { "value": 20, "$role": "padding lateral de todo conteudo (§2.6)" },
+    "control": { "value": 48, "$role": "botao primario e campo (§2.8)" },
+    "controlInCard": { "value": 44, "$role": "botao secundario dentro de card e sheet" },
+    "tile": { "value": 64, "$role": "tile de atalho da Home" },
+    "segment": { "value": 36, "$role": "aba de segmento (PIX/Cartao, Freq./Evolucao)" },
+    "chip": { "value": 32, "$role": "chip de periodo -- unico tocavel abaixo de 44, com area estendida pelo padding do container (§2.8)" },
+    "badge": { "value": 26, "$role": "badge e chip de status" },
+    "row": { "value": 44, "$role": "linha de ranking e de tabela de evolucao" },
+    "tabBar": { "value": 56, "$role": "tab bar, mais a safe area inferior" },
+    "avatar": { "value": 44, "$role": "avatar da carteirinha" },
+    "touchMin": { "value": 44, "$role": "alvo minimo -- §2.8 e §7. O gate recusa qualquer size tocavel abaixo disto, exceto `chip`, isento nominalmente" }
+  },
+
+  "radius": {
+    "$comment": "DS-APP.md §2.7. Sem sombra em lugar nenhum -- a hierarquia vem dos tres niveis de superficie.",
+    "sheet": { "value": 20, "$role": "sheet (so as duas pontas de cima)" },
+    "card": { "value": 16, "$role": "card e bloco de QR" },
+    "control": { "value": 12, "$role": "botao, campo, tile, chip de periodo" },
+    "segment": { "value": 8, "$role": "segmento ativo dentro do container" },
+    "bar": { "value": 3, "$role": "barra de frequencia" },
+    "progress": { "value": 2, "$role": "barra de progresso" },
+    "pill": { "value": 999, "$role": "badge e chip de status" }
+  },
+
+  "space": {
+    "$comment": "Escala de 2px do §2.6: 2 · 4 · 5 · 6 · 8 · 10 · 12 · 14 · 16 · 18 · 20 · 24 · 32. Emitida como lista para o gate poder recusar valor fora dela.",
+    "scale": [2, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 24, 32]
+  },
+
+  "type": {
+    "$comment": "DS-APP.md §2.5. Inter na interface, JetBrains Mono em identificador (matricula, chave PIX, referencia de fatura). Todo numero em serie leva tabular-nums. O minimo de 10px so vale no rotulo da tab bar.",
+    "loginTitle": { "size": 26, "lineHeight": 32, "weight": 700, "$role": "titulo de login" },
+    "screenTitle": { "size": 24, "lineHeight": 30, "weight": 700, "$role": "saudacao e titulo de tela" },
+    "value": { "size": 30, "lineHeight": 36, "weight": 700, "$role": "valor grande (fatura, peso)" },
+    "sheetTitle": { "size": 18, "lineHeight": 24, "weight": 700, "$role": "titulo de sheet e de bloco" },
+    "cardTitle": { "size": 16, "lineHeight": 22, "weight": 600, "$role": "titulo de card" },
+    "buttonPrimary": { "size": 16, "lineHeight": 20, "weight": 700, "$role": "rotulo de botao primario" },
+    "buttonSecondary": { "size": 15, "lineHeight": 20, "weight": 600, "$role": "rotulo de botao secundario" },
+    "body": { "size": 14, "lineHeight": 20, "weight": 400, "$role": "corpo" },
+    "fieldLabel": { "size": 13, "lineHeight": 18, "weight": 600, "$role": "label de campo" },
+    "tileLabel": { "size": 13, "lineHeight": 18, "weight": 600, "$role": "rotulo de tile e chip" },
+    "meta": { "size": 12, "lineHeight": 16, "weight": 400, "$role": "metadado" },
+    "tabLabel": { "size": 11, "lineHeight": 14, "weight": 600, "$role": "rotulo de aba -- o unico papel abaixo de 12px (§2.5)" }
+  },
+
+  "font": {
+    "$comment": "Mesmas familias do painel. No Expo as fontes sao carregadas por `expo-font`; o nome aqui e o que o RN resolve depois do load.",
+    "sans": "Inter",
+    "mono": "JetBrainsMono"
+  },
+
+  "motion": {
+    "$comment": "DS-APP.md §7: `ah-pulse` e `ah-spin` sao os UNICOS movimentos; nada pisca fora deles. Duracoes em ms.",
+    "pulse": { "value": 1400, "$role": "pulsar de placeholder de carregamento" },
+    "spin": { "value": 1400, "$role": "spinner do estado de espera (§4.10)" }
+  }
+}

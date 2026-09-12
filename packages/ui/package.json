@@ -16,6 +16,12 @@
       "types": "./dist/tokens.generated.d.ts",
       "import": "./dist/tokens.generated.js",
       "default": "./src/tokens.generated.ts"
+    },
+    "//app-tokens": "Entrypoint PROPRIO do app (apps/mobile), separado de `.` de proposito: o entrypoint principal exporta componente React web e arrastaria react-dom e recharts para o bundle do celular. Este aqui e so objeto literal -- nenhuma dependencia, nada que o Metro precise resolver.",
+    "./app-tokens": {
+      "types": "./dist/app-tokens.generated.d.ts",
+      "import": "./dist/app-tokens.generated.js",
+      "default": "./src/app-tokens.generated.ts"
     }
   },
   "files": [

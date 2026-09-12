@@ -268,5 +268,152 @@ export const CONTRAST_REPORT = [
     "bg": "#AA83FF",
     "value": 2.84,
     "exempt": "#230 -- idem"
+  },
+  {
+    "role": "app.app.text.primary",
+    "fg": "#F5F7F9",
+    "bg": "bg.raised",
+    "value": 14.71,
+    "exempt": null
+  },
+  {
+    "role": "app.app.text.secondary",
+    "fg": "#A6AEB9",
+    "bg": "bg.raised",
+    "value": 7.05,
+    "exempt": null
+  },
+  {
+    "role": "app.app.text.muted",
+    "fg": "#7B8491",
+    "bg": "bg.raised",
+    "value": 4.18,
+    "exempt": "Metadado, timestamp, matricula e placeholder -- o DS-APP.md §7 restringe este token a \"metadado, nunca informacao necessaria\", e a WCAG 2.2 §1.4.3 trata texto que nao carrega conteudo como dica. Passa sobre `bg.app` (4.88) e `bg.surface` (4.57); so reprova sobre `bg.raised` (4.18), onde o papel e a matricula em mono dentro do card em destaque -- acompanhada do nome do aluno em `text.primary`, que carrega a identificacao."
+  },
+  {
+    "role": "app.app.border.default",
+    "fg": "#646D79",
+    "bg": "bg.raised",
+    "value": 3.01,
+    "exempt": null
+  },
+  {
+    "role": "app.app.accent.hover",
+    "fg": "#4FD5E3",
+    "bg": "bg.raised",
+    "value": 9,
+    "exempt": null
+  },
+  {
+    "role": "app.app.accent.soft",
+    "fg": "#C2F2F7",
+    "bg": "bg.raised",
+    "value": 13.04,
+    "exempt": null
+  },
+  {
+    "role": "app.app.action",
+    "fg": "#0A0B0D",
+    "bg": "accent.solid",
+    "value": 8.75,
+    "exempt": null
+  },
+  {
+    "role": "app.app.state.ok",
+    "fg": "#3DDC84",
+    "bg": "#1e3a2f",
+    "value": 6.92,
+    "exempt": null
+  },
+  {
+    "role": "app.app.state.warn",
+    "fg": "#F5A524",
+    "bg": "#3b3120",
+    "value": 6.25,
+    "exempt": null
+  },
+  {
+    "role": "app.app.state.err",
+    "fg": "#FF6B6B",
+    "bg": "#3d282b",
+    "value": 4.92,
+    "exempt": null
+  },
+  {
+    "role": "app.app.state.info",
+    "fg": "#6AB0FF",
+    "bg": "#253343",
+    "value": 5.67,
+    "exempt": null
+  },
+  {
+    "role": "app.light.text.primary",
+    "fg": "#1F2328",
+    "bg": "bg.raised",
+    "value": 12.96,
+    "exempt": null
+  },
+  {
+    "role": "app.light.text.secondary",
+    "fg": "#565E69",
+    "bg": "bg.raised",
+    "value": 5.38,
+    "exempt": null
+  },
+  {
+    "role": "app.light.text.muted",
+    "fg": "#7B8491",
+    "bg": "bg.raised",
+    "value": 3.1,
+    "exempt": "Metadado, timestamp, matricula e placeholder -- o DS-APP.md §7 restringe este token a \"metadado, nunca informacao necessaria\", e a WCAG 2.2 §1.4.3 trata texto que nao carrega conteudo como dica. Passa sobre `bg.app` (4.88) e `bg.surface` (4.57); so reprova sobre `bg.raised` (4.18), onde o papel e a matricula em mono dentro do card em destaque -- acompanhada do nome do aluno em `text.primary`, que carrega a identificacao."
+  },
+  {
+    "role": "app.light.border.default",
+    "fg": "#7B8491",
+    "bg": "bg.raised",
+    "value": 3.1,
+    "exempt": null
+  },
+  {
+    "role": "app.light.accent.hover",
+    "fg": "#005760",
+    "bg": "bg.raised",
+    "value": 6.8,
+    "exempt": null
+  },
+  {
+    "role": "app.light.action",
+    "fg": "#FFFFFF",
+    "bg": "accent.solid",
+    "value": 5.83,
+    "exempt": null
+  },
+  {
+    "role": "app.light.state.ok",
+    "fg": "#13763A",
+    "bg": "#e7f1eb",
+    "value": 4.94,
+    "exempt": null
+  },
+  {
+    "role": "app.light.state.warn",
+    "fg": "#8A5200",
+    "bg": "#f3eee6",
+    "value": 5.53,
+    "exempt": null
+  },
+  {
+    "role": "app.light.state.err",
+    "fg": "#C22B2B",
+    "bg": "#f9eaea",
+    "value": 4.89,
+    "exempt": null
+  },
+  {
+    "role": "app.light.state.info",
+    "fg": "#1F5FD0",
+    "bg": "#e9effa",
+    "value": 5.04,
+    "exempt": null
   }
 ] as const;
