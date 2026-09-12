@@ -32,9 +32,39 @@ export interface TermosDoContrato {
 export const A_DEFINIR = '[a definir pelo PI]';
 
 /**
- * Versao `2026.1` -- a unica que existe nesta fatia. Texto de
- * `SPEC-070-contrato-com-clausulas-e-assinatura.md` §4, com os campos
- * marcados `⟪⟫` na spec substituidos por `A_DEFINIR` aqui.
+ * Onde a comarca do contrato entra no texto da Clausula 13.4.
+ *
+ * O foro e NEGOCIADO por cliente (ADR-055 §3.3; o PI decidiu em 11/09/2026
+ * que e a comarca da academia), entao ele mora em `TenantContract.foroCidade`
+ * e `foroUf`, nao no texto versionado. O gerador troca este marcador pela
+ * comarca gravada antes de imprimir.
+ *
+ * Chaves duplas para nao colidir com nada que o texto juridico use.
+ */
+export const MARCADOR_DO_FORO = '{{foro}}';
+
+/**
+ * Versao `2026.1` -- a unica que existe. Texto de
+ * `SPEC-070-contrato-com-clausulas-e-assinatura.md` §4.
+ *
+ * OS VALORES QUE A SPEC DEIXOU EM `⟪⟫` FORAM DECIDIDOS pelo PI em
+ * 11/09/2026 e estao escritos aqui: vencimento em 10 dias (4.3), multa de
+ * 2% e juros de 1% ao mes (4.6), suporte por WhatsApp em dias uteis das 9h
+ * as 18h (6.2), aviso previo de 30 dias (1.3 e 12.2), rescisao por
+ * inadimplencia acima de 60 dias (12.3), exportacao em 30 dias (8.4),
+ * incidente comunicado em 48 horas (9.4), sigilo por 5 anos (10.3) e teto
+ * de responsabilidade nos 12 meses pagos (11.3). O uso de dado agregado
+ * anonimizado (8.3) foi MANTIDO.
+ *
+ * A `2026.1` FOI CORRIGIDA EM VEZ DE SUBSTITUIDA por uma `2026.2`, por
+ * decisao do PI na mesma conversa: ela so existiu com marcas de pendencia e
+ * nenhum contrato chegou a ser assinado sob ela, entao preencher foi
+ * terminar o rascunho, nao reescrever o que alguem ja tinha assinado. A
+ * regra do ADR-055 segue valendo daqui em diante -- alterar este texto
+ * agora exige versao nova.
+ *
+ * O FORO NAO ESTA AQUI: e negociado por cliente e mora no contrato. Ver
+ * `MARCADOR_DO_FORO`.
  */
 const VERSAO_2026_1: TermosDoContrato = {
   versao: '2026.1',
@@ -44,7 +74,7 @@ const VERSAO_2026_1: TermosDoContrato = {
       paragrafos: [
         '1.1. A CONTRATADA licencia à CONTRATANTE, em caráter não exclusivo, intransferível e pelo prazo deste contrato, o uso do sistema ArenaHub, plataforma de gestão para academias disponibilizada em regime de software como serviço (SaaS) e acessada pela internet, nas superfícies descritas no Quadro resumo.',
         '1.2. Este contrato não é de desenvolvimento de software sob encomenda. Correções, melhorias e funcionalidades novas — inclusive as sugeridas pela CONTRATANTE — integram o produto e permanecem de titularidade exclusiva da CONTRATADA, sem que disso decorra qualquer direito de propriedade, exclusividade ou participação da CONTRATANTE.',
-        `1.3. A CONTRATADA poderá alterar, evoluir e descontinuar funcionalidades do produto, desde que não suprima função essencial ao uso contratado sem aviso prévio de ${A_DEFINIR} dias.`,
+        '1.3. A CONTRATADA poderá alterar, evoluir e descontinuar funcionalidades do produto, desde que não suprima função essencial ao uso contratado sem aviso prévio de 30 (trinta) dias.',
         '1.4. O ArenaHub não emite documento fiscal, não substitui sistema contábil, não é prontuário médico, não é instituição de pagamento ou adquirente e não substitui prescrição ou avaliação de profissional de educação física ou de saúde. As informações produzidas por recursos automatizados do sistema têm caráter informativo e não constituem diagnóstico.',
       ],
     },
@@ -69,10 +99,10 @@ const VERSAO_2026_1: TermosDoContrato = {
       paragrafos: [
         '4.1. A remuneração é a do Quadro resumo, no modelo ali indicado.',
         '4.2. No modelo por aluno, considera-se aluno ativo aquele em situação ativa no dia da emissão da fatura, e aluno inativo qualquer outra situação cadastral. A apuração é feita no dia da emissão e não se altera por mudanças posteriores.',
-        `4.3. A fatura é emitida no dia indicado no Quadro resumo, com vencimento em ${A_DEFINIR} dias.`,
+        '4.3. A fatura é emitida no dia indicado no Quadro resumo, com vencimento em 10 (dez) dias.',
         '4.4. O valor é reajustado anualmente, na data de aniversário indicada no Quadro resumo, pela variação acumulada do índice ali previsto nos doze meses anteriores. Extinto o índice, aplica-se o que oficialmente o substituir; na ausência de substituto, as partes acordarão índice equivalente.',
         '4.5. Os valores não incluem tributos que venham a incidir sobre a operação e que sejam de responsabilidade da CONTRATANTE.',
-        `4.6. O atraso sujeita a CONTRATANTE a multa de ${A_DEFINIR}% e juros de ${A_DEFINIR}% ao mês, pro rata die, sobre o valor em aberto.`,
+        '4.6. O atraso sujeita a CONTRATANTE a multa de 2% (dois por cento) e juros de 1% (um por cento) ao mês, pro rata die, sobre o valor em aberto.',
       ],
     },
     {
@@ -88,7 +118,7 @@ const VERSAO_2026_1: TermosDoContrato = {
       titulo: 'Cláusula 6 — Obrigações da CONTRATADA',
       paragrafos: [
         '6.1. Manter o sistema em funcionamento e disponível pela internet, ressalvadas as hipóteses da Cláusula 11.',
-        `6.2. Prestar suporte por ${A_DEFINIR}, em ${A_DEFINIR}, para dúvidas de uso e falhas do sistema.`,
+        '6.2. Prestar suporte por WhatsApp, em dias úteis, das 9h às 18h, para dúvidas de uso e falhas do sistema.',
         '6.3. Manter rotina de cópia de segurança dos dados da CONTRATANTE.',
         '6.4. Corrigir, em prazo razoável, os defeitos que impeçam o uso das funções contratadas.',
         '6.5. Comunicar com antecedência as paradas programadas.',
@@ -111,7 +141,7 @@ const VERSAO_2026_1: TermosDoContrato = {
         '8.1. O ArenaHub, seu código-fonte, arquitetura, bases de dados estruturais, marca, identidade visual e documentação são de titularidade exclusiva da CONTRATADA. Este contrato transfere apenas o direito de uso, nos limites da Cláusula 1.',
         '8.2. Os dados inseridos no sistema pela CONTRATANTE — cadastro de alunos, financeiro, avaliações, registros de acesso — são de titularidade da CONTRATANTE. A CONTRATADA não os comercializa, não os cede a terceiros e os utiliza exclusivamente para executar este contrato.',
         '8.3. A CONTRATADA poderá utilizar dados estatísticos agregados e anonimizados, que não permitam identificar a CONTRATANTE nem qualquer titular, para aferir e melhorar o produto.',
-        `8.4. Encerrado o contrato, a CONTRATANTE poderá solicitar a exportação de seus dados em formato legível por máquina no prazo de ${A_DEFINIR} dias contados do encerramento. Decorrido o prazo, a CONTRATADA poderá eliminá-los, ressalvada a guarda exigida por lei.`,
+        '8.4. Encerrado o contrato, a CONTRATANTE poderá solicitar a exportação de seus dados em formato legível por máquina no prazo de 30 (trinta) dias contados do encerramento. Decorrido o prazo, a CONTRATADA poderá eliminá-los, ressalvada a guarda exigida por lei.',
       ],
     },
     {
@@ -120,7 +150,7 @@ const VERSAO_2026_1: TermosDoContrato = {
         '9.1. Para os fins da Lei nº 13.709/2018, a CONTRATANTE é a controladora dos dados pessoais tratados no sistema, e a CONTRATADA é a operadora, tratando-os exclusivamente conforme as instruções da controladora e para executar este contrato.',
         '9.2. A CONTRATANTE declara possuir base legal adequada para o tratamento que realiza e responde pela relação com os titulares.',
         '9.3. A biometria facial é dado pessoal sensível. A definição da base legal e a coleta do consentimento são de responsabilidade da CONTRATANTE. O sistema registra a versão e a data do consentimento de cada aluno, permite sua revogação e mantém meio alternativo de identificação para quem não consentir — sem prejuízo do acesso.',
-        `9.4. A CONTRATADA adota medidas técnicas de proteção compatíveis com a natureza dos dados e comunicará à CONTRATANTE, em até ${A_DEFINIR} horas do conhecimento, incidente de segurança que possa acarretar risco relevante aos titulares.`,
+        '9.4. A CONTRATADA adota medidas técnicas de proteção compatíveis com a natureza dos dados e comunicará à CONTRATANTE, em até 48 (quarenta e oito) horas do conhecimento, incidente de segurança que possa acarretar risco relevante aos titulares.',
         '9.5. Pedido de titular recebido pela CONTRATADA é encaminhado à CONTRATANTE, a quem cabe respondê-lo; a CONTRATADA presta o apoio técnico necessário.',
         '9.6. A CONTRATANTE autoriza a CONTRATADA a utilizar prestadores de infraestrutura em nuvem para hospedagem e processamento, permanecendo a CONTRATADA responsável perante a CONTRATANTE pelos serviços que subcontratar.',
         '9.7. Encerrado o contrato, aplica-se a Cláusula 8.4 quanto à devolução e à eliminação.',
@@ -131,7 +161,7 @@ const VERSAO_2026_1: TermosDoContrato = {
       paragrafos: [
         '10.1. Cada parte se obriga a manter sigilo sobre informações técnicas, comerciais, financeiras e operacionais da outra a que tenha acesso em razão deste contrato, e a não utilizá-las para finalidade distinta da sua execução.',
         '10.2. A obrigação não alcança informação que já fosse pública, que se torne pública sem culpa da parte receptora, ou cuja divulgação seja exigida por autoridade competente — caso em que a outra parte será informada, quando permitido.',
-        `10.3. O dever de sigilo subsiste por ${A_DEFINIR} anos após o término deste contrato.`,
+        '10.3. O dever de sigilo subsiste por 5 (cinco) anos após o término deste contrato.',
       ],
     },
     {
@@ -139,7 +169,7 @@ const VERSAO_2026_1: TermosDoContrato = {
       paragrafos: [
         '11.1. A CONTRATADA não responde por indisponibilidade ou falha decorrente de: interrupção de energia elétrica ou de conexão de internet no local; defeito, configuração ou substituição de equipamento de controle de acesso, computador ou rede da CONTRATANTE; ato de terceiro fornecedor de equipamento; uso em desacordo com este contrato; ou caso fortuito e força maior.',
         '11.2. A CONTRATADA não responde por lucros cessantes, perda de oportunidade ou danos indiretos.',
-        `11.3. A responsabilidade total da CONTRATADA, por qualquer causa, fica limitada a ${A_DEFINIR}.`,
+        '11.3. A responsabilidade total da CONTRATADA, por qualquer causa, fica limitada ao valor pago pela CONTRATANTE nos 12 (doze) meses anteriores ao evento.',
         '11.4. A limitação não se aplica a dolo.',
       ],
     },
@@ -147,8 +177,8 @@ const VERSAO_2026_1: TermosDoContrato = {
       titulo: 'Cláusula 12 — Vigência, renovação e rescisão',
       paragrafos: [
         '12.1. A vigência é a do Quadro resumo. Sendo por prazo indeterminado, o contrato permanece válido até que uma das partes o encerre na forma desta cláusula.',
-        `12.2. Qualquer das partes pode rescindir imotivadamente, mediante aviso por escrito com ${A_DEFINIR} dias de antecedência.`,
-        `12.3. A CONTRATADA pode rescindir de pleno direito se a inadimplência ultrapassar ${A_DEFINIR} dias do vencimento, ou em caso de violação das Cláusulas 7.4, 8.1 ou 10.`,
+        '12.2. Qualquer das partes pode rescindir imotivadamente, mediante aviso por escrito com 30 (trinta) dias de antecedência.',
+        '12.3. A CONTRATADA pode rescindir de pleno direito se a inadimplência ultrapassar 60 (sessenta) dias do vencimento, ou em caso de violação das Cláusulas 7.4, 8.1 ou 10.',
         '12.4. A rescisão não dispensa o pagamento dos valores relativos ao período efetivamente utilizado.',
         '12.5. Encerrado o contrato, aplicam-se as Cláusulas 8.4 e 9.7.',
       ],
@@ -159,7 +189,17 @@ const VERSAO_2026_1: TermosDoContrato = {
         '13.1. Alterações só valem por aditivo escrito.',
         '13.2. A tolerância quanto ao descumprimento de qualquer cláusula não implica novação nem renúncia.',
         '13.3. A nulidade de uma cláusula não contamina as demais.',
-        `13.4. As partes elegem o foro da comarca de ${A_DEFINIR}, com renúncia a qualquer outro.`,
+        /*
+         * O FORO VEM DO CONTRATO, não do texto: ele é negociado por cliente
+         * (ADR-055 §3.3, decisão do PI em 11/09/2026 -- comarca da academia),
+         * e por isso mora em `TenantContract.foroCidade`/`foroUf`. O gerador
+         * troca o marcador pela comarca gravada antes de imprimir.
+         *
+         * Marcador, e não `${}`: o texto da versão é uma constante, e uma
+         * interpolação aqui exigiria que a versão inteira virasse função --
+         * espalhando parâmetro por treze cláusulas para servir a uma.
+         */
+        `13.4. As partes elegem o foro da comarca de ${MARCADOR_DO_FORO}, com renúncia a qualquer outro.`,
       ],
     },
   ],

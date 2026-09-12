@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 
-import { A_DEFINIR, termosDaVersao } from './domain/termos-do-contrato.js';
+import { A_DEFINIR, MARCADOR_DO_FORO, termosDaVersao } from './domain/termos-do-contrato.js';
 
 /**
  * Qualificacao de uma parte no contrato -- F70 (ADR-055 §6, SPEC-070 §4).
@@ -378,6 +378,16 @@ export function gerarPdfDoContrato(dados: DadosDoContratoImpresso): Promise<Buff
     if (dados.clausulas) {
       const termos = termosDaVersao(dados.clausulas.termsVersion);
 
+      /*
+       * A COMARCA, montada UMA VEZ: ela entra na Clausula 13.4 (pelo
+       * marcador) e de novo no "Local e data" da Secao III. Calcula-la duas
+       * vezes deixaria as duas divergirem no dia em que o formato mudasse --
+       * e o contrato diria dois foros diferentes.
+       */
+      const foro = dados.clausulas.foroCidade
+        ? `${dados.clausulas.foroCidade}${dados.clausulas.foroUf ? `/${dados.clausulas.foroUf}` : ''}`
+        : A_DEFINIR;
+
       documento.addPage();
       secao('Seção II — Cláusulas');
 
@@ -386,7 +396,9 @@ export function gerarPdfDoContrato(dados: DadosDoContratoImpresso): Promise<Buff
         documento.moveDown(0.3);
 
         for (const paragrafoTexto of clausula.paragrafos) {
-          paragrafo(paragrafoTexto, { tamanho: 9.5 });
+          // O foro é do CONTRATO, não do texto versionado: ver
+          // `MARCADOR_DO_FORO` em `termos-do-contrato.ts`.
+          paragrafo(paragrafoTexto.replace(MARCADOR_DO_FORO, foro), { tamanho: 9.5 });
         }
 
         documento.moveDown(0.4);
@@ -394,10 +406,6 @@ export function gerarPdfDoContrato(dados: DadosDoContratoImpresso): Promise<Buff
 
       documento.addPage();
       secao('Seção III — Assinaturas');
-
-      const foro = dados.clausulas.foroCidade
-        ? `${dados.clausulas.foroCidade}${dados.clausulas.foroUf ? `/${dados.clausulas.foroUf}` : ''}`
-        : A_DEFINIR;
 
       paragrafo(`Local e data: ${foro}, ${formatarData(dados.geradoEm)}.`, { tamanho: 10 });
       documento.moveDown(1.5);

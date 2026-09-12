@@ -232,6 +232,51 @@ describe('gerarPdfDoContrato', () => {
     expect(texto).toContain('sem variação cadastrada');
   });
 
+  /*
+   * VALORES DECIDIDOS PELO PI em 11/09/2026 -- os `⟪⟫` da spec §7 que
+   * viraram texto na `2026.1`. Afirmar cada um aqui e o que impede alguem
+   * reabrir uma lacuna sem perceber: o texto e constante, e uma troca de
+   * numero passaria despercebida sem um teste que cite o numero.
+   */
+  it('imprime os prazos e percentuais decididos, e nao marca de pendencia', async () => {
+    const texto = await textoDoPdf(await gerarPdfDoContrato(COM_CLAUSULAS));
+
+    expect(texto).toContain('vencimento em 10 (dez) dias');
+    expect(texto).toContain('multa de 2% (dois por cento) e juros de 1% (um por cento) ao mês');
+    expect(texto).toContain('suporte por WhatsApp, em dias úteis, das 9h às 18h');
+    expect(texto).toContain('aviso por escrito com 30 (trinta) dias');
+    expect(texto).toContain('inadimplência ultrapassar 60 (sessenta) dias');
+    expect(texto).toContain('12 (doze) meses anteriores ao evento');
+    expect(texto).toContain('5 (cinco) anos após o término');
+    expect(texto).toContain('48 (quarenta e oito) horas');
+  });
+
+  /*
+   * O FORO É DO CONTRATO, não do texto versionado: ele é negociado por
+   * cliente (ADR-055 §3.3), e o gerador troca o marcador pela comarca
+   * gravada. Sem esta troca, a Cláusula 13.4 sairia com `{{foro}}` literal
+   * no papel -- e um contrato que elege o foro da comarca de `{{foro}}` não
+   * elege foro nenhum.
+   */
+  it('troca o marcador do foro pela comarca gravada no contrato, na clausula 13.4', async () => {
+    const texto = await textoDoPdf(await gerarPdfDoContrato(COM_CLAUSULAS));
+
+    expect(texto).toContain('foro da comarca de Cuiabá/MT');
+    expect(texto).not.toContain('{{foro}}');
+  });
+
+  it('sem foro gravado, a clausula 13.4 mostra a pendencia em vez do marcador cru', async () => {
+    const texto = await textoDoPdf(
+      await gerarPdfDoContrato({
+        ...COM_CLAUSULAS,
+        clausulas: { ...COM_CLAUSULAS.clausulas!, foroCidade: null, foroUf: null },
+      }),
+    );
+
+    expect(texto).toContain('foro da comarca de [a definir pelo PI]');
+    expect(texto).not.toContain('{{foro}}');
+  });
+
   it('imprime variacao negativa com o sinal, porque deflacao existe', async () => {
     const texto = await textoDoPdf(
       await gerarPdfDoContrato({
