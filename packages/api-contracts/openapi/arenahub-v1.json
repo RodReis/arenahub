@@ -6559,6 +6559,317 @@
         ]
       }
     },
+    "/api/v1/mobile/invoices": {
+      "get": {
+        "operationId": "MobileFinanceiroController_listarInvoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Invoices do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "asOf",
+                    "invoices"
+                  ],
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "invoices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "invoiceId",
+                          "status",
+                          "vencimentoEm",
+                          "pagoEm",
+                          "valorEmCentavos",
+                          "moeda"
+                        ],
+                        "properties": {
+                          "invoiceId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "vencimentoEm": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "pagoEm": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "valorEmCentavos": {
+                            "type": "integer"
+                          },
+                          "moeda": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileFinanceiro"
+        ]
+      }
+    },
+    "/api/v1/mobile/invoices/{id}/pix": {
+      "post": {
+        "operationId": "MobileFinanceiroController_criarPix",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Cobranca PIX da invoice.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "paymentAttemptId",
+                    "expiraEm",
+                    "valorEmCentavos",
+                    "moeda"
+                  ],
+                  "properties": {
+                    "paymentAttemptId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "qrCodeDataUri": {
+                      "type": "string"
+                    },
+                    "copiaECola": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "checkoutUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "expiraEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "valorEmCentavos": {
+                      "type": "integer"
+                    },
+                    "moeda": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileFinanceiro"
+        ]
+      }
+    },
+    "/api/v1/mobile/invoices/{id}/checkout": {
+      "post": {
+        "operationId": "MobileFinanceiroController_criarCheckout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Checkout de cartao hospedado da invoice.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "paymentAttemptId",
+                    "expiraEm",
+                    "valorEmCentavos",
+                    "moeda"
+                  ],
+                  "properties": {
+                    "paymentAttemptId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "qrCodeDataUri": {
+                      "type": "string"
+                    },
+                    "copiaECola": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "checkoutUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "expiraEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "valorEmCentavos": {
+                      "type": "integer"
+                    },
+                    "moeda": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileFinanceiro"
+        ]
+      }
+    },
+    "/api/v1/mobile/payment-attempts/{id}": {
+      "get": {
+        "operationId": "MobileFinanceiroController_observarTentativa",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status da tentativa de pagamento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "paymentAttemptId",
+                    "status",
+                    "statusDaFatura",
+                    "pagoEm",
+                    "receiptId",
+                    "paymentId"
+                  ],
+                  "properties": {
+                    "paymentAttemptId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "statusDaFatura": {
+                      "type": "string"
+                    },
+                    "pagoEm": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "receiptId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "paymentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileFinanceiro"
+        ]
+      }
+    },
+    "/api/v1/mobile/payments/{id}/receipt": {
+      "post": {
+        "operationId": "MobileFinanceiroController_emitirRecibo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Recibo do pagamento, emitido ou ja existente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "receiptId",
+                    "numero",
+                    "verificationHash",
+                    "snapshot"
+                  ],
+                  "properties": {
+                    "receiptId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "numero": {
+                      "type": "integer"
+                    },
+                    "verificationHash": {
+                      "type": "string"
+                    },
+                    "snapshot": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileFinanceiro"
+        ]
+      }
+    },
     "/api/v1/admin/kiosk-devices": {
       "get": {
         "operationId": "KioskAdminController_listar",

@@ -118,6 +118,12 @@ import { WebhookController } from './webhook.controller.js';
     CriarCobrancaPixUseCase,
     CriarCheckoutDeCartaoUseCase,
     ConsultarTentativaUseCase,
+    /*
+     * Exportado para o APP DO ALUNO (F25, Slice 4.3): o financeiro mobile
+     * emite o mesmo recibo nao fiscal que o painel, pelo CASO DE USO -- nunca
+     * lendo `receipts` direto (regra de arquitetura no 9).
+     */
+    EmitirReciboUseCase,
   ],
 })
 export class BillingModule {}
