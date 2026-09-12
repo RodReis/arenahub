@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { AcoesDaLinha, Button, ConfirmDialog, Icon, RowMenu, useToastDeErro } from '@arenahub/ui';
 
 import { alternarStatusDoTenant, type EstadoDoStatus } from '../../actions/platform';
+import estilos from './clientes.module.css';
 
 interface Props {
   readonly tenantId: string;
@@ -135,7 +136,26 @@ export function AcoesDoCliente({ tenantId, displayName, status }: Props) {
           clique errado. Suspenso nao oferece ato nenhum -- e ai o menu some
           inteiro em vez de abrir vazio.
         */}
-        {suspenso ? null : (
+        {suspenso ? (
+          /*
+            O ESPACO DO MENU FICA RESERVADO quando ele nao existe -- visto na
+            tela em 11/09/2026.
+
+            `AcoesDaLinha` e `inline-flex` encostado a direita: sem o menu, a
+            linha suspensa encolhia 32px e TODOS os alvos dela escorregavam
+            para a direita, saindo do eixo das demais. Numa lista de 89
+            clientes com 6 suspensos, isso e uma coluna de "Editar" que
+            serrilha em seis pontos.
+
+            Um `<span>` vazio do tamanho do alvo, e nao um botao desabilitado:
+            botao cinza convida ao clique e nao explica nada -- a razao de o
+            ato nao aparecer continua sendo a do comentario acima.
+
+            `aria-hidden` porque nao ha nada a anunciar: quem usa leitor de
+            tela ouve as tres acoes que existem, sem um quarto item mudo.
+          */
+          <span className={estilos['vaoDoMenu']} aria-hidden="true" />
+        ) : (
           <RowMenu
             label={`Mais ações de ${displayName}`}
             testId="acoes-do-cliente"
