@@ -20,6 +20,7 @@
     "@arenahub/ui": "workspace:*",
     "@expo/metro-runtime": "57.0.15",
     "expo": "57.0.22",
+    "expo-constants": "57.0.7",
     "expo-font": "57.0.4",
     "expo-linear-gradient": "57.0.2",
     "expo-router": "57.0.21",
