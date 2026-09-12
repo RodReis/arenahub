@@ -111,6 +111,15 @@
         "$role": "fundo atras do sheet da carteirinha",
         "$comment": "Sem contraste medido: e vidro sobre a tela, nao par texto/superficie."
       }
+    },
+
+    "optico": {
+      "$comment": "NAO E COR DE DESIGN -- e requisito fisico de leitura optica, e por isso nao muda entre os temas nem acompanha a identidade do tenant. Existe como token para que a carteirinha nao precise de hex literal com `eslint-disable` ao lado: uma excecao silenciada na linha e um convite para a proxima; uma excecao NOMEADA e um contrato.",
+      "qrBackground": {
+        "value": "#FFFFFF",
+        "$role": "fundo do bloco de QR -- §4.8: 'o QR sempre sobre branco'",
+        "$comment": "O leitor da catraca le contraste, nao paleta. Em light mode continua branco: o QR nao inverte."
+      }
     }
   },
 
@@ -152,6 +161,11 @@
 
     "scrim": {
       "default": { "value": "rgba(18,20,23,.5)", "$role": "fundo atras do sheet da carteirinha" }
+    },
+
+    "optico": {
+      "$comment": "Identico ao do dark, e de proposito: o QR nao inverte com o tema. Repetido em vez de herdado porque o objeto gerado tem a MESMA forma nos dois temas -- um `optico` faltando no light viraria `undefined` em runtime, e o bloco cairia em fundo transparente sobre superficie clara. O leitor optico falharia sem nenhum erro na tela.",
+      "qrBackground": { "value": "#FFFFFF", "$role": "fundo do bloco de QR -- §4.8" }
     }
   },
 

@@ -1,0 +1,50 @@
+{
+  "name": "@arenahub/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "description": "App do aluno do ArenaHub: Expo / React Native",
+  "//versoes": "Os pares Expo/React Native NAO se escolhem a olho nem com `latest`: a versao de `react-native`, `expo-router` e dos modulos nativos vem do `bundledNativeModules.json` do proprio `expo@57.0.22`, que e a fonte autoritativa do que aquele SDK foi testado para rodar. Trocar um deles sozinho quebra no build nativo, nao no typecheck. Fixadas em EXATO (sem `~`) pela regra do repositorio: versao e decisao registrada.",
+  "scripts": {
+    "//start": "O Expo dev server vai na porta padrao (8081) -- e a unica superficie do repositorio que nao disputa porta com outra, porque nem o admin-web (3000) nem o totem (3210) nem a API (3344) usam a faixa do Metro.",
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "//build": "O app nao tem build de servidor como as superficies Next: `expo export` gera o bundle. Existe para que `pnpm build` na raiz nao pule esta workspace em silencio. | `--platform ios --platform android`, NUNCA `all`: `all` inclui WEB, que exigiria `react-native-web` para exportar uma superficie que o produto nao tem -- o canal web do ArenaHub e o `admin-web`, em Next. Instalar a dependencia para satisfazer o build seria carregar um alvo que ninguem publica.",
+    "build": "expo export --platform ios --platform android --output-dir dist",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@arenahub/ui": "workspace:*",
+    "@expo/metro-runtime": "57.0.15",
+    "expo": "57.0.22",
+    "expo-font": "57.0.4",
+    "expo-router": "57.0.21",
+    "expo-status-bar": "57.0.1",
+    "expo-system-ui": "57.0.4",
+    "react": "19.2.8",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.0",
+    "react-native-svg": "15.15.4",
+    "whatwg-fetch": "3.6.20"
+  },
+  "//devDependencies": "`jest` fica em 29.7.0 para acompanhar o resto do repositorio (apps/api), e o `jest-expo` do SDK 57 aceita: o preset e que traz a transformacao do RN, nao a versao do runner. | `@testing-library/react-native` fica em 13, NAO no 14: o 14 trocou o backend de render para o pacote `test-renderer`, e com este par (React 19.2 + RN 0.86 + Jest 29) o `render()` devolve OBJETO VAZIO -- sem lancar erro. O sintoma e `render function has not been called` em todo teste, que acusa o teste em vez da biblioteca. O 13.3.3 usa `react-test-renderer`, que e peer obrigatorio e precisa estar declarado aqui: o pnpm nao instala peer sozinho.",
+  "devDependencies": {
+    "@arenahub/config": "workspace:*",
+    "@testing-library/react-native": "13.3.3",
+    "@types/jest": "29.5.14",
+    "@types/react": "19.2.14",
+    "babel-preset-expo": "57.0.11",
+    "eslint": "9.39.5",
+    "jest": "29.7.0",
+    "jest-expo": "57.0.5",
+    "react-test-renderer": "19.2.8",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22.5.0 <23.0.0"
+  }
+}

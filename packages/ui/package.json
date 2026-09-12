@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Design system do ArenaHub: pipeline de tokens e primitivas compartilhadas",
   "//exports": "O `dist` e o entrypoint, e o build COPIA os `.module.css` para la. O `tsc` sozinho nao copia: ele transpila o `.tsx` e deixa `import './Button.module.css'` apontando para um arquivo que nunca chegou. Apontar o entrypoint para `src` nao resolve -- os imports internos usam extensao `.js` (NodeNext), e o bundler lendo `.tsx` nao mapeia `.js` de volta.",
+  "//exports-nao-aceita-comentario": "NUNCA por chave `//alguma-coisa` DENTRO de `exports`. Ao contrario de `scripts`, o mapa de exports so aceita chave que comece com `.`: uma chave de comentario faz o Node RECUSAR O MAPA INTEIRO com ERR_INVALID_PACKAGE_CONFIG, e todos os subpaths param de resolver de uma vez -- inclusive os que ja funcionavam. Foi assim na F43: dois comentarios derrubaram `./tokens`, `./app-tokens` e `./domain` juntos, e o erro que o TypeScript mostra e 'Cannot find module', que manda investigar o import em vez do package.json. Comentario de export mora aqui fora.",
+  "//exports-app-tokens": "Entrypoint PROPRIO do app (apps/mobile), separado de `.` de proposito: o entrypoint principal exporta componente React web e arrastaria react-dom e recharts para o bundle do celular. Este aqui e so objeto literal -- nenhuma dependencia, nada que o Metro precise resolver.",
+  "//exports-domain": "O dicionario de estado e os contratos de componente, SEM React -- pela mesma razao de `./app-tokens`. A SPEC-043 §6 exige que `state-labels.ts` seja COMPARTILHADO com o painel e nao duplicado; sem este entrypoint a unica porta seria `.`, que traz react-dom junto, e a saida pratica seria copiar o arquivo para o app. Uma copia diverge na primeira correcao de rotulo, que e exatamente o que `state-labels.ts` existe para impedir.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -17,11 +20,15 @@
       "import": "./dist/tokens.generated.js",
       "default": "./src/tokens.generated.ts"
     },
-    "//app-tokens": "Entrypoint PROPRIO do app (apps/mobile), separado de `.` de proposito: o entrypoint principal exporta componente React web e arrastaria react-dom e recharts para o bundle do celular. Este aqui e so objeto literal -- nenhuma dependencia, nada que o Metro precise resolver.",
     "./app-tokens": {
       "types": "./dist/app-tokens.generated.d.ts",
       "import": "./dist/app-tokens.generated.js",
       "default": "./src/app-tokens.generated.ts"
+    },
+    "./domain": {
+      "types": "./dist/domain/index.d.ts",
+      "import": "./dist/domain/index.js",
+      "default": "./src/domain/index.ts"
     }
   },
   "files": [

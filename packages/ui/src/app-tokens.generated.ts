@@ -42,6 +42,9 @@ export const APP_TOKENS = {
     },
     "scrim": {
       "default": "rgba(10,11,13,.7)"
+    },
+    "optico": {
+      "qrBackground": "#FFFFFF"
     }
   },
   light: {
@@ -73,6 +76,9 @@ export const APP_TOKENS = {
     },
     "scrim": {
       "default": "rgba(18,20,23,.5)"
+    },
+    "optico": {
+      "qrBackground": "#FFFFFF"
     }
   },
 } as const;
