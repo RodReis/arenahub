@@ -5979,6 +5979,378 @@
         ]
       }
     },
+    "/api/v1/mobile/auth/activate": {
+      "post": {
+        "operationId": "StudentAuthController_ativar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Conta ativada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentAuth"
+        ]
+      }
+    },
+    "/api/v1/mobile/auth/login": {
+      "post": {
+        "operationId": "StudentAuthController_entrar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sessao aberta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "expiraEm": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "accessToken",
+                    "refreshToken",
+                    "sessionId",
+                    "expiraEm"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentAuth"
+        ]
+      }
+    },
+    "/api/v1/mobile/auth/refresh": {
+      "post": {
+        "operationId": "StudentAuthController_renovar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sessao renovada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "expiraEm": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "accessToken",
+                    "refreshToken",
+                    "sessionId",
+                    "expiraEm"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentAuth"
+        ]
+      }
+    },
+    "/api/v1/mobile/auth/logout": {
+      "post": {
+        "operationId": "StudentAuthController_sair",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sessao encerrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentAuth"
+        ]
+      }
+    },
+    "/api/v1/mobile/auth/recovery/request": {
+      "post": {
+        "operationId": "StudentAuthController_pedirRecuperacao",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Pedido aceito.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "aceito": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "aceito"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentAuth"
+        ]
+      }
+    },
+    "/api/v1/mobile/auth/recovery/confirm": {
+      "post": {
+        "operationId": "StudentAuthController_confirmarRecuperacao",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Senha redefinida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentAuth"
+        ]
+      }
+    },
+    "/api/v1/mobile/auth/reauthenticate": {
+      "post": {
+        "operationId": "StudentAuthController_reautenticar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Autenticacao confirmada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentAuth"
+        ]
+      }
+    },
+    "/api/v1/mobile/sessions": {
+      "get": {
+        "operationId": "StudentSessionsController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sessoes ativas do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "deviceLabel": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "criadaEm": {
+                        "type": "string"
+                      },
+                      "atual": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "criadaEm",
+                      "atual"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentSessions"
+        ]
+      }
+    },
+    "/api/v1/mobile/sessions/{id}": {
+      "delete": {
+        "operationId": "StudentSessionsController_revogar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sessao revogada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentSessions"
+        ]
+      }
+    },
+    "/api/v1/mobile/home": {
+      "get": {
+        "operationId": "MobileHomeController_obter",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Home do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "AVAILABLE",
+                        "UNAVAILABLE"
+                      ]
+                    },
+                    "saudacao": {
+                      "type": "string"
+                    },
+                    "versionPolicy": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "SUPPORTED",
+                            "GRACE",
+                            "BLOCKED"
+                          ]
+                        },
+                        "updateUrl": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "updateUrl"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "status",
+                    "saudacao",
+                    "versionPolicy"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileHome"
+        ]
+      }
+    },
     "/api/v1/admin/kiosk-devices": {
       "get": {
         "operationId": "KioskAdminController_listar",

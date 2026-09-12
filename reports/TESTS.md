@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3215 | 3215 | 0 | 75.7 |
+| unitário | 3264 | 3264 | 0 | 75.9 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 1028 | 1028 | 0 | 83.7 |
+| integração | 1068 | 1068 | 0 | 83.7 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -154,3 +154,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-11 | #319 | F70 | integração | 1028 | 1028 | 0 | 83.7 | [#320](https://github.com/RodReis/arenahub/pull/320) — **corrigido à mão**, quinta entrega seguida: o gerador avisou que `apps/api#test:integration` terminou com o crash `3221226505` do Windows sem escrever resultado, e manteve o 1019 da entrega anterior. Medido em quatro lotes, com as 69 suítes conferidas contra o `ls` (17+19+17+16) para nenhuma ser contada duas vezes nem ficar de fora: 254 + 208 + 208 + 280 = **950 em `apps/api`**, mais **78** em `@arenahub/database` (6 arquivos). Zero `FAIL` em todos os lotes. Desta fatia são **6 casos novos** em `platform-contrato.int-spec.ts` (3 de qualificação obrigatória para ativar, 3 de upload do PDF assinado); `openapi.int-spec.ts` precisou do snapshot regerado e da rota nova declarada na lista em prosa |
 | 2026-09-12 | #82 | — | unitário | 3215 | 3215 | 0 | 75.7 | [#321](https://github.com/RodReis/arenahub/pull/321) — inclui os **12 testes** dos quatro padrões críticos do app; primeira aparição de `apps/mobile` neste relatório (a guarda do self-check pegou a superfície fora de `ALVOS`, e ela entrou) |
 | 2026-09-12 | #82 | — | integração | 1028 | 1028 | 0 | 83.7 | [#321](https://github.com/RodReis/arenahub/pull/321) — a fatia **não toca no backend**; o número vem do CI no Linux (950 na API + 78 no database), porque o Jest crasha no Windows com exit 3221226505 **depois** dos testes passarem (defeito pré-existente do ambiente, `docs/TESTING.md` §5) |
+| 2026-09-12 | #23 | — | unitário | 3264 | 3264 | 0 | 75.9 | [#322](https://github.com/RodReis/arenahub/pull/322) — inclui os **49 do app** e os **12 das regras puras** de identidade |
+| 2026-09-12 | #23 | — | integração | 1068 | 1068 | 0 | 83.7 | [#322](https://github.com/RodReis/arenahub/pull/322) — **corrigido à mão**: o Jest crasha no Windows (exit 3221226505) **depois** dos testes passarem, e o gerador herdava o número da entrega anterior (1028). O valor vem da execução verde do CI no Linux — **990 na API** (72 suítes) + 78 no database. A F23 acrescenta **40 testes de integração** |

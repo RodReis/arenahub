@@ -724,6 +724,11 @@ model Tenant {
   challengeParticipants            ChallengeParticipant[]
   challengeNotices                 ChallengeNotice[]
   engagementDisputes               EngagementDispute[]
+
+  /// F23 -- identidade do aluno no aplicativo.
+  studentAccounts                  StudentAccount[]
+  studentAccountTokens             StudentAccountToken[]
+  studentSessions                  StudentSession[]
   retentionTargetVersions          RetentionTargetVersion[]
   retentionFeatureSetVersions      RetentionFeatureSetVersion[]
   studentFeatureSnapshots          StudentFeatureSnapshot[]
@@ -1382,6 +1387,9 @@ model Student {
   invoices              Invoice[]
   accountCredits        AccountCredit[]
   publicProfile         PublicProfile?
+  /// Conta de login do app (F23). Opcional: aluno cadastrado na recepcao
+  /// existe muito antes de ativar o aplicativo -- e pode nunca ativar.
+  account               StudentAccount?
 
   xpLedgerEntries                  XpLedgerEntry[]
   xpBalances                       StudentXpBalance[]
@@ -6256,4 +6264,125 @@ model PlatformInvoice {
   @@index([tenantId, status])
   @@index([status, dueAt])
   @@map("platform_invoices")
+}
+
+/// ---------------------------------------------------------------------------
+/// F23 -- identidade do ALUNO no aplicativo.
+///
+/// O aluno e um sujeito autenticavel DIFERENTE do `User` do painel, e por isso
+/// tem tabela propria em vez de virar mais um `User` com um papel "aluno":
+///
+///   1. `User.email` e unico GLOBAL. A mesma pessoa matriculada em duas
+///      academias colidiria -- e multi-tenant e a premissa do produto.
+///   2. O aluno nunca tera papel, permissao, MFA nem elevacao de suporte.
+///      Reusar `User` faria toda consulta do painel filtrar "e nao e aluno".
+///   3. A conta do aluno morre com a matricula; a do funcionario, nao.
+/// ---------------------------------------------------------------------------
+
+/// Conta de login do aluno.
+model StudentAccount {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @unique @map("student_id") @db.Uuid
+  /// E-mail ou telefone com que o aluno entra. Unico DENTRO do tenant, nunca
+  /// global -- ver o motivo 1 no cabecalho deste bloco.
+  identifier String
+  /// Nulo enquanto a conta esta `PENDING`: o convite ja foi emitido, mas o
+  /// aluno ainda nao escolheu a senha. Quem define a senha e ele, nunca a
+  /// recepcao (`M4-AC-001`).
+  passwordHash String?              @map("password_hash")
+  status       StudentAccountStatus @default(PENDING)
+  activatedAt  DateTime?            @map("activated_at")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student  Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  tokens   StudentAccountToken[]
+  sessions StudentSession[]
+
+  @@unique([tenantId, identifier])
+  @@index([tenantId])
+  @@map("student_accounts")
+}
+
+enum StudentAccountStatus {
+  PENDING
+  ACTIVE
+  DISABLED
+}
+
+/// Token de uso unico: ativacao de conta e recuperacao de senha.
+///
+/// Guarda SO o hash, como `Invitation` ja faz. Vazamento de banco nao pode
+/// entregar um token utilizavel -- e o token em claro existe apenas no
+/// intervalo entre gerar e enviar.
+model StudentAccountToken {
+  id         String                     @id @default(uuid()) @db.Uuid
+  tenantId   String                     @map("tenant_id") @db.Uuid
+  accountId  String                     @map("account_id") @db.Uuid
+  purpose    StudentAccountTokenPurpose
+  tokenHash  String                     @unique @map("token_hash")
+  status     StudentAccountTokenStatus  @default(PENDING)
+  expiresAt  DateTime                   @map("expires_at")
+  consumedAt DateTime?                  @map("consumed_at")
+  createdAt  DateTime                   @default(now()) @map("created_at")
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account StudentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, accountId, purpose])
+  @@map("student_account_tokens")
+}
+
+enum StudentAccountTokenPurpose {
+  ACTIVATION
+  PASSWORD_RESET
+}
+
+enum StudentAccountTokenStatus {
+  PENDING
+  CONSUMED
+  REVOKED
+}
+
+/// Sessao do app do aluno -- espelha `Session` do painel, inclusive a FAMILIA
+/// de rotacao.
+///
+/// Tabela separada, e nao uma coluna a mais em `Session`, porque o sujeito e
+/// outro: `Session.userId` aponta para `User`, e nao existe join entre sessao
+/// de aluno e usuario de painel. Uma coluna nullable a mais deixaria as duas
+/// tabelas meio certas.
+model StudentSession {
+  id        String               @id @default(uuid()) @db.Uuid
+  tenantId  String               @map("tenant_id") @db.Uuid
+  accountId String               @map("account_id") @db.Uuid
+  tokenHash String               @unique @map("token_hash")
+  familyId  String               @map("family_id") @db.Uuid
+  status    StudentSessionStatus @default(ACTIVE)
+  /// Rotulo do aparelho para a lista de sessoes fazer sentido ao aluno
+  /// ("iPhone de Ana"). OPACO de proposito: nunca IMEI, nunca identificador
+  /// de publicidade, nunca nada que rastreie o aparelho fora do app.
+  deviceLabel String? @map("device_label")
+  /// Quando o aluno confirmou a senha de novo -- `M4-FR-005`. Acao sensivel
+  /// exige que este instante seja recente.
+  reauthenticatedAt DateTime? @map("reauthenticated_at")
+  expiresAt         DateTime  @map("expires_at")
+  rotatedAt         DateTime? @map("rotated_at")
+  revokedAt         DateTime? @map("revoked_at")
+  revokedReason     String?   @map("revoked_reason")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account StudentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, accountId])
+  @@index([familyId])
+  @@map("student_sessions")
+}
+
+enum StudentSessionStatus {
+  ACTIVE
+  ROTATED
+  REVOKED
 }

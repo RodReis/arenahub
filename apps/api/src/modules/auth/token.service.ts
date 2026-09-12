@@ -15,6 +15,20 @@ export interface ConfigDeToken {
   audiencia: string;
 }
 
+/**
+ * Canal que emitiu o access token.
+ *
+ * NAO e metadado: e o que impede um token do APP DO ALUNO de abrir rota do
+ * painel, e vice-versa. Os dois sao assinados pela mesma chave, entao a
+ * verificacao de assinatura aprova ambos -- sem esta marca, o unico jeito de
+ * separar os sujeitos seria cada guard adivinhar pelo formato dos claims.
+ *
+ * Ausente (`undefined`) significa PAINEL, e nao "qualquer um": os tokens
+ * emitidos antes da F23 nao tem o campo, e tratar a ausencia como coringa
+ * daria a eles acesso ao canal mobile.
+ */
+export type CanalDeAcesso = 'PANEL' | 'MOBILE';
+
 /** Claims do access token. O contrato e fechado: nada entra sem decisao. */
 export interface ClaimsDeAcesso {
   sub: string;
@@ -24,6 +38,10 @@ export interface ClaimsDeAcesso {
   permissions: string[];
   mfa: boolean;
   unitIds?: string[];
+  /** F23. Ausente = painel, por compatibilidade com token ja emitido. */
+  canal?: CanalDeAcesso;
+  /** F23, so no canal mobile: o aluno dono da sessao. Identificador opaco. */
+  studentId?: string;
 }
 
 export interface ClaimsDePreAuth {
