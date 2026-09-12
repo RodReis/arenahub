@@ -15,6 +15,8 @@ import {
   competenciasDaJanela,
   corrigirPorIndice,
 } from './domain/correcao-por-indice.js';
+import { contarAlunosDoTenant } from './contagem-de-alunos.js';
+import { calcularFatura, competenciaDe } from './domain/calculo-da-fatura.js';
 import { camposFaltandoParaContrato } from './domain/qualificacao-da-contratante.js';
 import { VERSAO_ATUAL_DOS_TERMOS } from './domain/termos-do-contrato.js';
 import { PlatformAuditService } from './platform-audit.service.js';
@@ -317,6 +319,33 @@ export class TenantContractUseCase {
       .filter((parte): parte is string => Boolean(parte))
       .join(', ');
 
+    /*
+     * O VALOR APURADO E A VARIAÇÃO DO ÍNDICE -- pedido do PI em 11/09/2026.
+     *
+     * A apuracao usa `calcularFatura`, a MESMA funcao pura que a fatura usa
+     * (F64). Repetir a multiplicacao aqui criaria uma segunda aritmetica de
+     * dinheiro fora do lugar onde ela e testada -- e as duas divergiriam no
+     * dia em que uma regra entrasse so numa delas.
+     */
+    const agora = new Date();
+    const [contagem, indiceCorrente] = await Promise.all([
+      contarAlunosDoTenant(this.db, contrato.tenantId),
+      this.db.indexValue.findFirst({
+        where: { code: contrato.indexCode },
+        orderBy: { referenceMonth: 'desc' },
+      }),
+    ]);
+
+    const apurado = calcularFatura(
+      {
+        model: contrato.model,
+        activeStudentPriceMinor: contrato.activeStudentPriceMinor,
+        inactiveStudentPriceMinor: contrato.inactiveStudentPriceMinor,
+        fixedPriceMinor: contrato.fixedPriceMinor,
+      },
+      contagem,
+    );
+
     const pdf = await gerarPdfDoContrato({
       numero: contrato.id.slice(0, 8).toUpperCase(),
       tenant: {
@@ -342,7 +371,21 @@ export class TenantContractUseCase {
       kioskEnabled: contrato.kioskEnabled,
       startsAt: contrato.startsAt,
       endsAt: contrato.endsAt,
-      geradoEm: new Date(),
+      geradoEm: agora,
+      apuracao: {
+        competencia: competenciaDe(agora).toISOString().slice(0, 7),
+        activeCount: apurado.activeCount,
+        inactiveCount: apurado.inactiveCount,
+        totalMinor: apurado.totalMinor,
+      },
+      ...(indiceCorrente
+        ? {
+            indiceCorrente: {
+              competencia: indiceCorrente.referenceMonth.toISOString().slice(0, 7),
+              variationBasisPoints: indiceCorrente.variationBasisPoints,
+            },
+          }
+        : {}),
       clausulas: {
         termsVersion: contrato.termsVersion,
         contratada: {

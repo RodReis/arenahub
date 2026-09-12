@@ -187,4 +187,59 @@ describe('gerarPdfDoContrato', () => {
     expect(texto).toContain('Contrato de prestação de serviço');
     expect(texto).not.toContain('Seção II');
   });
+
+  /*
+   * VALOR APURADO E VARIACAO DO INDICE -- pedido do PI em 11/09/2026.
+   *
+   * O contrato por aluno so trazia precos unitarios, e quem o lia nao tinha a
+   * resposta da pergunta que faz ao pegar o papel ("quanto me custa?").
+   */
+  it('imprime a memoria de calculo do valor apurado, e nao so o total', async () => {
+    const texto = await textoDoPdf(
+      await gerarPdfDoContrato({
+        ...COM_CLAUSULAS,
+        // 40 ativos x R$ 5,00 = R$ 200,00; 10 inativos x R$ 2,50 = R$ 25,00.
+        apuracao: { competencia: '2026-03', activeCount: 40, inactiveCount: 10, totalMinor: 22_500 },
+      }),
+    );
+
+    expect(texto).toContain('03/2026');
+    // AS DUAS PARCELAS, e nao so o total: sem elas o numero nao se confere.
+    expect(texto).toMatch(/40\s*×\s*R\$ 5,00\s*=\s*R\$ 200,00/);
+    expect(texto).toMatch(/10\s*×\s*R\$ 2,50\s*=\s*R\$ 25,00/);
+    expect(texto).toContain('R$ 225,00');
+  });
+
+  it('imprime a variacao corrente do indice ao lado do nome dele', async () => {
+    const texto = await textoDoPdf(
+      await gerarPdfDoContrato({
+        ...COM_CLAUSULAS,
+        indiceCorrente: { competencia: '2026-09', variationBasisPoints: 440 },
+      }),
+    );
+
+    expect(texto).toContain('0,44% em 09/2026');
+  });
+
+  /*
+   * SEM VARIACAO CADASTRADA O DOCUMENTO DIZ ISSO, em vez de calar: a correcao
+   * anual so roda com a janela completa (ADR-052 §7), e silencio ali se leria
+   * como "o indice nao se aplica".
+   */
+  it('diz que nao ha variacao cadastrada quando o indice esta vazio', async () => {
+    const texto = await textoDoPdf(await gerarPdfDoContrato(COM_CLAUSULAS));
+
+    expect(texto).toContain('sem variação cadastrada');
+  });
+
+  it('imprime variacao negativa com o sinal, porque deflacao existe', async () => {
+    const texto = await textoDoPdf(
+      await gerarPdfDoContrato({
+        ...COM_CLAUSULAS,
+        indiceCorrente: { competencia: '2026-09', variationBasisPoints: -230 },
+      }),
+    );
+
+    expect(texto).toContain('-0,23% em 09/2026');
+  });
 });

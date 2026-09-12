@@ -61,6 +61,41 @@ export interface DadosDoContratoImpresso {
     readonly foroCidade: string | null;
     readonly foroUf: string | null;
   };
+  /**
+   * A apuracao do mes corrente -- quanto a academia paga HOJE, com a conta a
+   * vista.
+   *
+   * No modelo por aluno o contrato nao tem "um valor": ele tem precos
+   * unitarios, e o numero que a academia paga so existe multiplicado pela
+   * contagem do mes. Imprimir so os precos unitarios deixava quem le o
+   * contrato sem a resposta da unica pergunta que ele faz -- "quanto isso me
+   * custa?".
+   *
+   * INSTANTANEO, e o documento diz isso: a contagem muda todo mes, e o PDF
+   * gravado no fechamento nao se atualiza. Por isso a linha vem com a
+   * competencia em que foi apurada -- sem ela, o numero pareceria uma
+   * obrigacao fixa do contrato, que e o oposto do que o modelo por aluno e.
+   */
+  readonly apuracao?: {
+    /** `AAAA-MM` da competencia apurada. */
+    readonly competencia: string;
+    readonly activeCount: number;
+    readonly inactiveCount: number;
+    readonly totalMinor: number;
+  };
+  /**
+   * A ultima variacao cadastrada do indice de reajuste do contrato.
+   *
+   * `indexCode` sozinho ("IPCA") nao diz se alguem cadastrou o mes, e a
+   * correcao anual so roda com a janela completa (ADR-052 §7). Ausente, o
+   * documento diz que nao ha variacao cadastrada em vez de calar -- silencio
+   * ali se leria como "o indice nao se aplica".
+   */
+  readonly indiceCorrente?: {
+    /** `AAAA-MM`. */
+    readonly competencia: string;
+    readonly variationBasisPoints: number;
+  };
 }
 
 /**
@@ -79,6 +114,25 @@ function formatarDinheiro(minor: number, moeda: string): string {
   const simbolo = moeda === 'BRL' ? 'R$ ' : `${moeda} `;
 
   return `${sinal}${simbolo}${comSeparador},${centavos}`;
+}
+
+/** `2026-03` -> `03/2026`. Competencia e MES, e o olho le mes/ano. */
+function mesDaCompetencia(competencia: string): string {
+  const [ano, mes] = competencia.split('-');
+
+  return `${mes}/${ano}`;
+}
+
+/** `440` -> `0,44%`. O banco guarda milesimos de ponto; o documento imprime porcento. */
+function porcentoDoIndice(basisPoints: number): string {
+  const sinal = basisPoints < 0 ? '-' : '';
+  const absoluto = Math.abs(basisPoints);
+  const inteiros = Math.trunc(absoluto / 1000).toString();
+  const decimais = Math.round((absoluto % 1000) / 10)
+    .toString()
+    .padStart(2, '0');
+
+  return `${sinal}${inteiros},${decimais}%`;
 }
 
 /** `2026-03-01` -> `01/03/2026`, sempre em UTC (a data e `@db.Date`). */
@@ -231,6 +285,50 @@ export function gerarPdfDoContrato(dados: DadosDoContratoImpresso): Promise<Buff
     }
 
     /*
+     * A CONTA A VISTA -- quanto a academia paga hoje, e como se chega la.
+     *
+     * O contrato por aluno so trazia precos unitarios, e quem o lia nao tinha
+     * a resposta da pergunta que faz ao pegar o papel ("quanto me custa?").
+     * A memoria de calculo responde SEM esconder de onde o numero veio: as
+     * duas parcelas na linha, o total embaixo.
+     *
+     * A COMPETENCIA APURADA FICA A VISTA porque o numero e instantaneo: a
+     * contagem muda todo mes, e um total sem data pareceria obrigacao fixa do
+     * contrato -- que e o oposto do que o modelo por aluno e.
+     */
+    if (dados.apuracao) {
+      secao(`Valor apurado na competência ${mesDaCompetencia(dados.apuracao.competencia)}`);
+
+      if (dados.model === 'PER_STUDENT') {
+        const precoAtivo = dados.activeStudentPriceMinor ?? 0;
+        const precoInativo = dados.inactiveStudentPriceMinor ?? 0;
+
+        linha(
+          'Alunos ativos',
+          `${dados.apuracao.activeCount} × ${formatarDinheiro(precoAtivo, dados.currency)} = ${formatarDinheiro(dados.apuracao.activeCount * precoAtivo, dados.currency)}`,
+        );
+        linha(
+          'Alunos inativos',
+          `${dados.apuracao.inactiveCount} × ${formatarDinheiro(precoInativo, dados.currency)} = ${formatarDinheiro(dados.apuracao.inactiveCount * precoInativo, dados.currency)}`,
+        );
+      }
+
+      linha('Total do mês', formatarDinheiro(dados.apuracao.totalMinor, dados.currency));
+
+      documento
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#555555')
+        .text(
+          'Valor apurado na data de geração deste documento. No modelo por aluno ele acompanha a contagem de cada mês; a fatura congela a contagem no dia da emissão.',
+          MARGEM,
+          documento.y,
+          { width: documento.page.width - MARGEM * 2 },
+        );
+      documento.moveDown(0.6);
+    }
+
+    /*
      * SUPERFICIES NO PAPEL, incluindo as NAO contratadas.
      *
      * Imprimir so o que foi incluido faria o documento calar sobre a metade
@@ -244,6 +342,12 @@ export function gerarPdfDoContrato(dados: DadosDoContratoImpresso): Promise<Buff
 
     secao('Reajuste e cobrança');
     linha('Índice de correção', dados.indexCode);
+    linha(
+      'Variação corrente',
+      dados.indiceCorrente
+        ? `${porcentoDoIndice(dados.indiceCorrente.variationBasisPoints)} em ${mesDaCompetencia(dados.indiceCorrente.competencia)}`
+        : 'sem variação cadastrada',
+    );
     linha('Data-base', formatarData(dados.baseDate));
     linha(
       'Aniversário',

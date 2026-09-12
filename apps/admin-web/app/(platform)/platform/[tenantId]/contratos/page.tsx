@@ -56,6 +56,33 @@ interface TenantEmDetalhe {
   displayName: string;
 }
 
+/**
+ * A prévia da fatura corrente — é ela que dá o VALOR do contrato em reais.
+ *
+ * No modelo por aluno o contrato não tem um valor: tem preços unitários. O
+ * número que a academia paga só existe multiplicado pela contagem do mês, e é
+ * a prévia quem faz essa conta (`calculo-da-fatura.ts`, F64). Repetir a
+ * multiplicação aqui criaria uma segunda aritmética de dinheiro fora do lugar
+ * onde ela é testada.
+ */
+interface PreviaDaFatura {
+  competencia: string;
+  model: string;
+  activeCount: number;
+  inactiveCount: number;
+  activeStudentPriceMinor: number | null;
+  inactiveStudentPriceMinor: number | null;
+  totalMinor: number;
+  currency: string;
+}
+
+interface ValorDeIndice {
+  id: string;
+  code: string;
+  competencia: string;
+  variationBasisPoints: number;
+}
+
 /** `2026-03-01T00:00:00.000Z` -> `01/03/2026`. Data é `@db.Date`: lê-se em UTC. */
 function dia(iso: string): string {
   const data = new Date(iso);
@@ -65,20 +92,39 @@ function dia(iso: string): string {
   return `${d}/${m}/${data.getUTCFullYear()}`;
 }
 
+/** `2026-03` -> `03/2026`. Competência é MÊS, e o olho lê mês/ano. */
+function mes(competencia: string): string {
+  const [ano, numero] = competencia.split('-');
+
+  return `${numero}/${ano}`;
+}
+
+/** `440` -> `0,44%`. O banco guarda milésimos de ponto; o olho lê porcento. */
+function porcentoDoIndice(basisPoints: number): string {
+  return `${(basisPoints / 1000).toFixed(2).replace('.', ',')}%`;
+}
+
+/**
+ * O preço unitário do contrato.
+ *
+ * O RÓTULO VAI DEPOIS DO NÚMERO, em elemento próprio: com "R$ 3,00 por ativo"
+ * numa string só, o `R$ 3,00` e o `R$ 1,00` da linha de baixo terminavam em
+ * pontos diferentes, e a coluna de dinheiro perdia o alinhamento que é a razão
+ * de ela existir. Separados, os dois valores encostam na mesma borda e os
+ * rótulos ficam numa coluna própria à direita.
+ */
 function valor(contrato: ContratoNaLista) {
   if (contrato.model === 'FIXED_MONTHLY') {
     return <Money cents={contrato.fixedPriceMinor} currency={contrato.currency} />;
   }
 
   return (
-    <>
-      <div>
-        <Money cents={contrato.activeStudentPriceMinor} currency={contrato.currency} /> por ativo
-      </div>
-      <div>
-        <Money cents={contrato.inactiveStudentPriceMinor} currency={contrato.currency} /> por inativo
-      </div>
-    </>
+    <div className={estilos['precos']}>
+      <Money cents={contrato.activeStudentPriceMinor} currency={contrato.currency} />
+      <span>por ativo</span>
+      <Money cents={contrato.inactiveStudentPriceMinor} currency={contrato.currency} />
+      <span>por inativo</span>
+    </div>
   );
 }
 
@@ -109,13 +155,22 @@ export default async function PaginaDeContratos({
 }) {
   const { tenantId } = await params;
 
-  const [respostaDeContratos, respostaDePlanos, respostaDoTenant] = await Promise.all([
-    chamarApi<ContratoNaLista[]>(
-      `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/contracts`,
-    ),
-    chamarApi<PlanoNaLista[]>('/api/v1/platform/plans'),
-    chamarApi<TenantEmDetalhe>(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}`),
-  ]);
+  const [respostaDeContratos, respostaDePlanos, respostaDoTenant, respostaDaPrevia] =
+    await Promise.all([
+      chamarApi<ContratoNaLista[]>(
+        `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/contracts`,
+      ),
+      chamarApi<PlanoNaLista[]>('/api/v1/platform/plans'),
+      chamarApi<TenantEmDetalhe>(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}`),
+      /*
+       * A PRÉVIA PODE FALHAR sem levar a tela junto: ela exige contrato
+       * vigente, e esta página existe justamente para o caso de não haver um.
+       * A coluna de valor cai em "—" e o resto da tela continua servindo.
+       */
+      chamarApi<PreviaDaFatura>(
+        `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/invoices/preview`,
+      ),
+    ]);
 
   if (!respostaDeContratos.ok) {
     return (
@@ -145,6 +200,28 @@ export default async function PaginaDeContratos({
    */
   const planos = (respostaDePlanos.dados ?? []).filter((plano) => plano.status === 'ACTIVE');
   const nomeDaAcademia = respostaDoTenant.dados?.displayName ?? 'Academia';
+  const previa = respostaDaPrevia.ok ? respostaDaPrevia.dados : undefined;
+
+  /*
+   * A VARIAÇÃO CORRENTE do índice de cada contrato — a última competência
+   * cadastrada. Busca depois dos contratos porque depende do `indexCode`
+   * deles; `Set` porque dois contratos costumam usar o mesmo índice e pedir a
+   * mesma lista duas vezes seria desperdício.
+   */
+  const codigos = [...new Set(contratos.map((contrato) => contrato.indexCode))];
+  const historicos = await Promise.all(
+    codigos.map(async (codigo) => {
+      const resposta = await chamarApi<ValorDeIndice[]>(
+        `/api/v1/platform/index-values?code=${encodeURIComponent(codigo)}`,
+      );
+
+      return [codigo, resposta.dados ?? []] as const;
+    }),
+  );
+  /** `IPCA` -> a competência mais recente cadastrada. A API já devolve em ordem decrescente. */
+  const correnteDoIndice = new Map(
+    historicos.map(([codigo, valores]) => [codigo, valores[0]] as const),
+  );
 
   return (
     <section className={estilos['pagina']} aria-labelledby="titulo-contratos">
@@ -169,26 +246,70 @@ export default async function PaginaDeContratos({
             key: 'vigencia',
             header: 'Vigência',
             role: 'identity',
-            render: (c) => (
-              <>
-                {dia(c.startsAt)}
-                {c.endsAt ? ` até ${dia(c.endsAt)}` : ' — sem prazo'}
-              </>
-            ),
+            /*
+              SEM PRAZO É A REGRA, não a exceção: quase todo contrato é por
+              prazo indeterminado, e imprimir "— sem prazo" em cada linha
+              gastava duas linhas de altura para dizer o que não distingue
+              nada. Só o contrato COM prazo ganha texto.
+            */
+            render: (c) => (c.endsAt ? `${dia(c.startsAt)} a ${dia(c.endsAt)}` : dia(c.startsAt)),
           },
           {
             key: 'modelo',
             header: 'Modelo',
             render: (c) => (c.model === 'PER_STUDENT' ? 'Por aluno' : 'Fixo mensal'),
           },
-          { key: 'valor', header: 'Valor acordado', role: 'value', render: valor },
+          { key: 'valor', header: 'Preço acordado', role: 'value', render: valor },
+          {
+            key: 'total',
+            header: 'Valor do mês',
+            role: 'value',
+            /*
+              O QUE A ACADEMIA PAGA neste mês, e não o preço unitário da coluna
+              ao lado. No modelo por aluno o contrato não tem um valor — ele só
+              existe multiplicado pela contagem, e é a prévia da fatura quem faz
+              essa conta (F64). Contrato não vigente não tem prévia: a prévia é
+              do contrato ATIVO do tenant, e atribuí-la a um rascunho ou a um
+              encerrado diria que eles cobram algo.
+            */
+            render: (c) =>
+              c.status === 'ACTIVE' && previa ? (
+                <Money cents={previa.totalMinor} currency={previa.currency} />
+              ) : (
+                '—'
+              ),
+          },
           {
             key: 'reajuste',
             header: 'Reajuste',
-            render: (c) =>
-              c.model === 'FIXED_MONTHLY'
-                ? `${c.indexCode}, dia ${c.anniversaryDay}/${c.anniversaryMonth}`
-                : '—',
+            render: (c) => {
+              const corrente = correnteDoIndice.get(c.indexCode);
+
+              return (
+                <>
+                  {/*
+                    O DIA VEM COM ZERO À ESQUERDA e a palavra "aniversário"
+                    junto: "IPCA · 1/1" solto lê-se como fração, não como data.
+                  */}
+                  <div>{c.indexCode}</div>
+                  <div className={estilos['variacao']}>
+                    aniversário em{' '}
+                    {`${c.anniversaryDay.toString().padStart(2, '0')}/${c.anniversaryMonth.toString().padStart(2, '0')}`}
+                  </div>
+                  {/*
+                    A VARIAÇÃO CORRENTE ao lado do nome do índice: "IPCA" sozinho
+                    não diz se alguém cadastrou o mês, e a correção anual não roda
+                    com a janela incompleta. Sem valor nenhum, a linha diz isso em
+                    vez de calar.
+                  */}
+                  <div className={estilos['variacao']}>
+                    {corrente
+                      ? `${porcentoDoIndice(corrente.variationBasisPoints)} em ${mes(corrente.competencia)}`
+                      : 'sem variação cadastrada'}
+                  </div>
+                </>
+              );
+            },
           },
           { key: 'situacao', header: 'Situação', role: 'state', render: (c) => situacao(c.status) },
           {
