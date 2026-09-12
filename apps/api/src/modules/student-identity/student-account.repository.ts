@@ -29,6 +29,28 @@ export class StudentAccountRepository {
     return this.db.studentAccount.findUnique({ where: { id: accountId } });
   }
 
+  /**
+   * Resolve o slug da academia para o id do tenant.
+   *
+   * Necessario porque o identificador do aluno e unico POR TENANT, e nao
+   * global como o `User.email` do painel: sem saber a academia, "ana@x.test"
+   * pode ser duas pessoas. O painel nao precisa disso -- la o vinculo do
+   * usuario diz o tenant --, mas o aluno se identifica antes de existir
+   * qualquer vinculo autenticado.
+   *
+   * Devolve `null` para slug inexistente, e QUEM CHAMA decide o que fazer.
+   * No login, o caminho segue ate o fim mesmo assim: parar aqui responderia
+   * mais rapido para academia que nao existe, e isso enumera os tenants.
+   */
+  async resolverTenantPorSlug(slug: string): Promise<string | null> {
+    const tenant = await this.db.tenant.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+
+    return tenant?.id ?? null;
+  }
+
   async encontrarTokenPorHash(tokenHash: string): Promise<TokenComConta | null> {
     return this.db.studentAccountToken.findUnique({
       where: { tokenHash },

@@ -50,6 +50,20 @@ export class AuthGuard implements CanActivate {
     try {
       const claims = this.tokens.verificarAcesso(token);
 
+      /*
+       * Token do APP DO ALUNO nao abre rota de painel (F23).
+       *
+       * Os dois canais sao assinados pela MESMA chave, entao a verificacao de
+       * assinatura aprova ambos -- sem esta checagem, o unico obstaculo seria
+       * o transporte (o app manda por header, o painel le cookie), e isso e
+       * acidente, nao garantia. Basta alguem passar a aceitar `Authorization`
+       * aqui, ou o app gravar um cookie, para um token sem permissao nenhuma
+       * atravessar o guard e cair no caminho de papeis.
+       *
+       * Ausente = PAINEL, por compatibilidade com token emitido antes da F23.
+       */
+      if (claims.canal === 'MOBILE') throw new NaoAutenticadoError();
+
       // Token SEM tenant = sessao de plataforma. E o unico caminho em que
       // nao existe `TenantContext`, e toda rota de tenant o rejeita.
       if (claims.tenantId === null || claims.tenantId === undefined) {

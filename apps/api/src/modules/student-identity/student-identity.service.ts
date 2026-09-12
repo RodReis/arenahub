@@ -130,16 +130,18 @@ export class StudentIdentityService {
    * MESMO erro. E o scrypt roda nos tres casos (ver `ENVELOPE_DESCARTAVEL`).
    */
   async entrar(dados: {
-    tenantId: string;
+    tenantId: string | null;
     identificador: string;
     senha: string;
     deviceLabel: string | null;
     agora: Date;
   }): Promise<SessaoAberta> {
-    const conta = await this.contas.encontrarPorIdentificador(
-      dados.tenantId,
-      dados.identificador,
-    );
+    // `tenantId` nulo = slug de academia inexistente. O caminho segue ate o
+    // fim, com o hash descartavel: parar aqui responderia mais rapido para
+    // academia que nao existe, e isso enumera os tenants.
+    const conta = dados.tenantId
+      ? await this.contas.encontrarPorIdentificador(dados.tenantId, dados.identificador)
+      : null;
 
     const envelope = conta?.passwordHash ?? ENVELOPE_DESCARTAVEL;
     const senhaConfere = await this.senhas.conferir(dados.senha, envelope);
@@ -164,14 +166,13 @@ export class StudentIdentityService {
    * existe. O envio so acontece quando ha conta.
    */
   async pedirRecuperacao(dados: {
-    tenantId: string;
+    tenantId: string | null;
     identificador: string;
     agora: Date;
   }): Promise<{ aceito: true }> {
-    const conta = await this.contas.encontrarPorIdentificador(
-      dados.tenantId,
-      dados.identificador,
-    );
+    const conta = dados.tenantId
+      ? await this.contas.encontrarPorIdentificador(dados.tenantId, dados.identificador)
+      : null;
 
     if (conta && conta.status === 'ACTIVE') {
       const { token, tokenHash } = this.gerarTokenDeUsoUnico();

@@ -48,6 +48,11 @@ export class StudentSessionRepository {
     return this.db.studentSession.findUnique({ where: { tokenHash } });
   }
 
+  /** Usado pelo guard a cada requisicao, para pegar revogacao na hora. */
+  async encontrarPorId(sessaoId: string): Promise<StudentSession | null> {
+    return this.db.studentSession.findUnique({ where: { id: sessaoId } });
+  }
+
   /**
    * Rotaciona numa transacao so: marca o elo atual como usado e cria o
    * proximo com o mesmo `familyId`.
