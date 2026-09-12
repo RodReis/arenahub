@@ -1,19 +1,17 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { ProvedorDeSessao } from '@/auth/sessao';
 import { ProvedorDeTema, useTema } from '@/ui/theme';
 
 /**
  * Shell do app.
  *
- * A F43 entrega a CAMADA DE UI, nao o produto: aqui so existe o provedor de
- * tema e a pilha vazia que o `expo-router` exige para montar. As telas, a
- * navegacao por abas do §3 e a autenticacao sao da F23 e seguintes -- este
- * arquivo e o ponto onde elas se penduram.
- *
- * A barra de status acompanha o tema pelo mesmo motivo do `backgroundColor`
- * do `app.config.ts`: texto escuro sobre fundo escuro e invisivel, e o
- * padrao do sistema nao sabe qual dos dois o app esta usando.
+ * A ORDEM DOS PROVEDORES IMPORTA: o tema por fora, a sessao por dentro. A
+ * sessao nao precisa de tema, mas a tela de carregamento que aparece enquanto
+ * ela resolve PRECISA -- e sem o tema por fora ela pintaria com a cor padrao
+ * do sistema por um quadro.
  */
 function Pilha() {
   const t = useTema();
@@ -35,7 +33,9 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <ProvedorDeTema>
-        <Pilha />
+        <ProvedorDeSessao>
+          <Pilha />
+        </ProvedorDeSessao>
       </ProvedorDeTema>
     </SafeAreaProvider>
   );

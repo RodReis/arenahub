@@ -45,3 +45,14 @@ function derivarBaseUrl(): string {
 }
 
 export const API_BASE_URL = derivarBaseUrl();
+
+/**
+ * A academia deste build.
+ *
+ * O ALUNO NAO DIGITA ISTO. Pedir a ele o identificador tecnico da propria
+ * academia transferiria um detalhe de implementacao para quem so quer entrar.
+ * No piloto ha um cliente; quando houver mais, a escolha entre build proprio
+ * por academia e uma tela de selecao e decisao de produto -- e quando ela
+ * vier, o unico ponto a mudar e este.
+ */
+export const TENANT_SLUG = ambiente?.['EXPO_PUBLIC_TENANT_SLUG'] ?? 'arena-positiva';

@@ -27,6 +27,6 @@ import { StudentSessionsController } from './student-sessions.controller.js';
     EmailDeAtivacaoService,
     StudentSessionGuard,
   ],
-  exports: [StudentIdentityService],
+  exports: [StudentIdentityService, StudentSessionGuard, StudentSessionRepository],
 })
 export class StudentIdentityModule {}

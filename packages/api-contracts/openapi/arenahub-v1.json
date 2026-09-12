@@ -6288,6 +6288,69 @@
         ]
       }
     },
+    "/api/v1/mobile/home": {
+      "get": {
+        "operationId": "MobileHomeController_obter",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Home do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "AVAILABLE",
+                        "UNAVAILABLE"
+                      ]
+                    },
+                    "saudacao": {
+                      "type": "string"
+                    },
+                    "versionPolicy": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "SUPPORTED",
+                            "GRACE",
+                            "BLOCKED"
+                          ]
+                        },
+                        "updateUrl": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "updateUrl"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "status",
+                    "saudacao",
+                    "versionPolicy"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileHome"
+        ]
+      }
+    },
     "/api/v1/admin/kiosk-devices": {
       "get": {
         "operationId": "KioskAdminController_listar",

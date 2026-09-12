@@ -29,6 +29,7 @@ import { HealthModule } from './modules/health/health.module.js';
 import { BillingModule } from './modules/billing/billing.module.js';
 import { KioskModule } from './modules/kiosk/kiosk.module.js';
 import { StudentIdentityModule } from './modules/student-identity/student-identity.module.js';
+import { StudentMobileModule } from './modules/student-mobile/student-mobile.module.js';
 import { KioskAdminModule } from './modules/kiosk-admin/kiosk-admin.module.js';
 import { KioskAuthModule } from './modules/kiosk-auth/kiosk-auth.module.js';
 import { MembershipModule } from './modules/membership/membership.module.js';
@@ -69,6 +70,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     KioskAuthModule,
     KioskModule,
     StudentIdentityModule,
+    StudentMobileModule,
     KioskAdminModule,
     DeviceSyncModule,
     AccessModule,
