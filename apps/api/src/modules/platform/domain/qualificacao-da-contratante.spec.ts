@@ -31,6 +31,26 @@ describe('camposFaltandoParaContrato', () => {
     ).toEqual(['nome do responsável', 'CPF do responsável']);
   });
 
+  /*
+   * ESPACO EM BRANCO NAO E PREENCHIMENTO.
+   *
+   * O PATCH de tenant corta o espaco antes de validar, mas a coluna e
+   * opcional, nasceu nula em producao e nada impede uma importacao ou um
+   * `psql` gravar `'   '`. Sem o corte aqui, esse CNPJ passaria na checagem e
+   * sairia impresso como espaco em branco no contrato -- pior que o "não
+   * informado" que esta fatia veio remover, porque nao se ve.
+   */
+  it('trata espaco em branco como campo ausente, e nao como preenchido', () => {
+    expect(
+      camposFaltandoParaContrato({
+        ...COMPLETO,
+        cnpj: '   ',
+        addressCity: '\t',
+        responsavelCpf: ' ',
+      }),
+    ).toEqual(['CNPJ', 'endereço', 'CPF do responsável']);
+  });
+
   it('aponta todos os campos quando o tenant nasceu sem nenhum -- caso real de producao', () => {
     expect(
       camposFaltandoParaContrato({

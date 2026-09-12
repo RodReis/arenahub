@@ -307,7 +307,10 @@ export class TenantContractUseCase {
      */
     const camposFaltando = [
       ...camposFaltandoParaContrato(tenant),
-      ...(contrato.foroCidade ? [] : ['foro']),
+      // `.trim()` pelo mesmo motivo de `camposFaltandoParaContrato`: a coluna
+      // e opcional e nada impede uma importacao gravar espaco, que sairia
+      // impresso como foro em branco -- pior que ausente, porque nao se ve.
+      ...(contrato.foroCidade !== null && contrato.foroCidade.trim().length > 0 ? [] : ['foro']),
     ];
 
     if (camposFaltando.length > 0) {
