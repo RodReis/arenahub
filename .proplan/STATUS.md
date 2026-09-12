@@ -9,7 +9,6 @@ updated: 2026-09-12
 
 ### Sem épico
 
-- [MVP7][SPEC-070][F70] Contrato com cláusulas, qualificação das partes e assinatura (#319)
 - [MVP5][SPEC-031][FIX] tres testes de XP e ranking sao intermitentes no CI (#279)
 - [MVP2][FIX] assinatura duplicada infla a receita esperada do painel financeiro (#272)
 - [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254)
@@ -38,6 +37,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP7][SPEC-070][F70] Contrato com cláusulas, qualificação das partes e assinatura (#319, finalizado em: 2026-09-12)
 - [MVP4][SPEC-023][F23] Identidade e shell mobile (#23, finalizado em: 2026-09-12)
 - [MVP2.5][SPEC-043][F43] Design system da superfície mobile (#82, finalizado em: 2026-09-12)
 - [MVP7][SPEC-069][F69] Superfícies contratadas: mobile e totem como flag negociável do plano e do contrato (#317, finalizado em: 2026-09-11)
