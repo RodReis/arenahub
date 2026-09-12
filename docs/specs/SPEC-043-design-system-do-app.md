@@ -70,6 +70,24 @@ Camada de UI do app do aluno em Expo / React Native, conforme `docs/design/DS-AP
    motivo nasceu `@arenahub/ui/domain`, que é como `state-labels.ts` fica **compartilhado** sem
    duplicação (§6 deste documento).
 
+9. **Migrado para o DS-APP v2.1 em 12/09/2026.** A fatia foi implementada contra a v1.0 e o
+   documento subiu para v2.1 na `main` no meio do caminho — rebrand azul royal alinhado ao totem,
+   botão primário com **gradiente**, e um tema claro completo com os neutros do painel. Os
+   componentes não mudaram (leem token); o que mudou foi a camada de cor. Duas decisões de gate,
+   ambas com precedente no repositório: **dois tokens de borda** onde a v2.1 traz um — o hex do
+   documento no escuro (`#232A3D`) é *literalmente* o que o totem reprovou e corrigiu no PR #232,
+   então `border/default` sobe para `#5F71A0` e delimita o que o dedo toca, enquanto
+   `border/hairline` fica com o valor do documento para divisor e linha de tabela; e **dois pares
+   reportados sem quebrar o build**, como o totem já faz com o CTA — branco sobre a ponta clara do
+   gradiente (3,33, e o rótulo é 16px/700, que pede 3,0) e o verde do painel sobre o próprio tint
+   no claro (4,44, o mesmo desvio que `state.success` do painel carrega). Mexer nesses dois muda a
+   identidade da marca em toda tela: é decisão de produto, não de guarda.
+
+10. **O gate ganhou uma guarda que contraste não dá.** Um canário mostrou que a razão de contraste
+    é **simétrica**: QR invertido (tinta clara sobre fundo escuro) mede exatamente igual ao certo e
+    passaria batido — mas a câmera do leitor não decodifica. A guarda agora afirma a **luminância
+    absoluta** de cada lado, nos dois temas, como o §2.11 armadilha 2 exige.
+
 ## 3. Escopo negativo
 
 - **`apps/mobile` em si** — telas, navegação, chamadas de API e autenticação são das fatias do
