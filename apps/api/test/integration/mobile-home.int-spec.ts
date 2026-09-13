@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -135,6 +135,89 @@ describe('F23 -- Home do app', () => {
 
   it('sem token responde 401', async () => {
     await request(servidor()).get('/api/v1/mobile/home').expect(401);
+  });
+
+  /**
+   * -------------------------------------------------------------------------
+   * POLITICA DE VERSAO -- F29, `M4-NFR-008`.
+   * -------------------------------------------------------------------------
+   *
+   * Ate a F29 o campo `versionPolicy` existia na resposta mas era FIXO em
+   * `SUPPORTED`: o gancho estava na Home desde a F23 (o app ja tinha o botao
+   * de atualizar) e nada o alimentava. Trocar o valor fixo pela regra real
+   * nao derrubou nenhum teste -- porque nenhum cobria isto. Estes cobrem.
+   */
+  describe('politica de versao', () => {
+    const ambienteOriginal = { ...process.env };
+
+    afterEach(() => {
+      process.env = { ...ambienteOriginal };
+    });
+
+    it('bloqueia app abaixo da versao minima', async () => {
+      process.env['MOBILE_MIN_VERSION'] = '2.0.0';
+      process.env['MOBILE_UPDATE_URL'] = 'https://arenahub.test/app';
+
+      const acesso = await entrar();
+
+      const resposta = await request(servidor())
+        .get('/api/v1/mobile/home')
+        .set('Authorization', `Bearer ${acesso}`)
+        .set('x-app-version', '1.0.0');
+
+      const corpo = resposta.body as CorpoDaHome;
+      expect(corpo.versionPolicy.state).toBe('BLOCKED');
+      // Bloquear sem dizer para onde ir deixaria o aluno sem saida.
+      expect(corpo.versionPolicy.updateUrl).toBe('https://arenahub.test/app');
+    });
+
+    it('libera app na versao minima', async () => {
+      process.env['MOBILE_MIN_VERSION'] = '1.0.0';
+
+      const acesso = await entrar();
+
+      const resposta = await request(servidor())
+        .get('/api/v1/mobile/home')
+        .set('Authorization', `Bearer ${acesso}`)
+        .set('x-app-version', '1.0.0');
+
+      expect((resposta.body as CorpoDaHome).versionPolicy.state).toBe('SUPPORTED');
+    });
+
+    /**
+     * O buraco que este teste fecha: se cliente sem `x-app-version` fosse
+     * liberado, bastaria OMITIR o header para escapar do bloqueio -- e a
+     * politica inteira viraria decoracao.
+     */
+    it('bloqueia cliente que nao declara a propria versao', async () => {
+      process.env['MOBILE_MIN_VERSION'] = '1.0.0';
+
+      const acesso = await entrar();
+
+      const resposta = await request(servidor())
+        .get('/api/v1/mobile/home')
+        .set('Authorization', `Bearer ${acesso}`);
+
+      expect((resposta.body as CorpoDaHome).versionPolicy.state).toBe('BLOCKED');
+    });
+
+    // Bloqueio NAO e app morto: o resto da resposta continua vindo, porque a
+    // tela de atualizacao e a de suporte precisam do shell de pe.
+    it('a resposta continua completa mesmo bloqueada', async () => {
+      process.env['MOBILE_MIN_VERSION'] = '9.0.0';
+
+      const acesso = await entrar();
+
+      const resposta = await request(servidor())
+        .get('/api/v1/mobile/home')
+        .set('Authorization', `Bearer ${acesso}`)
+        .set('x-app-version', '1.0.0');
+
+      const corpo = resposta.body as CorpoDaHome;
+      expect(resposta.status).toBe(200);
+      expect(corpo.status).toBe('AVAILABLE');
+      expect(corpo.saudacao).toMatch(/Mariana/);
+    });
   });
 
   it('a resposta nao carrega dado de negocio -- Slices 4.2 e 4.3', async () => {

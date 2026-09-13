@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../persistence/prisma.service.js';
 import type { StudentChannelContext } from '../student-identity/student-identity.service.js';
+import { PoliticaDeCanalService } from './politica-de-canal.service.js';
 
 /**
  * Politica de versao minima -- `M4-NFR-008`.
@@ -32,9 +33,24 @@ export interface RespostaDaHome {
 
 @Injectable()
 export class MobileHomeService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly politica: PoliticaDeCanalService,
+  ) {}
 
-  async montar(ctx: StudentChannelContext, agora: Date): Promise<RespostaDaHome> {
+  /**
+   * `versaoDoApp` vem do header `x-app-version` -- F29.
+   *
+   * Ate a F29 este campo era fixo em `SUPPORTED`: o gancho existia na Home
+   * desde a F23 (e o app ja tem o botao de atualizar), mas nada o alimentava.
+   * Agora a decisao e do servidor, como `M4-NFR-008` exige.
+   */
+  async montar(
+    ctx: StudentChannelContext,
+    agora: Date,
+    versaoDoApp?: string,
+  ): Promise<RespostaDaHome> {
+    const versao = this.politica.resolverVersao(versaoDoApp, agora);
     /*
      * `comTenant` e nao `db.student` direto -- ADR-054 §3.
      *
@@ -61,7 +77,7 @@ export class MobileHomeService {
         asOf: agora.toISOString(),
         status: 'UNAVAILABLE',
         saudacao: '',
-        versionPolicy: { state: 'SUPPORTED', updateUrl: null },
+        versionPolicy: { state: versao.estado, updateUrl: versao.urlDeAtualizacao },
       };
     }
 
@@ -69,7 +85,7 @@ export class MobileHomeService {
       asOf: agora.toISOString(),
       status: 'AVAILABLE',
       saudacao: `${this.periodoDoDia(agora)}, ${this.primeiroNome(aluno.fullName)}`,
-      versionPolicy: { state: 'SUPPORTED', updateUrl: null },
+      versionPolicy: { state: versao.estado, updateUrl: versao.urlDeAtualizacao },
     };
   }
 

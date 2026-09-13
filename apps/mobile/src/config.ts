@@ -56,3 +56,24 @@ export const API_BASE_URL = derivarBaseUrl();
  * vier, o unico ponto a mudar e este.
  */
 export const TENANT_SLUG = ambiente?.['EXPO_PUBLIC_TENANT_SLUG'] ?? 'arena-positiva';
+
+/**
+ * A versao deste build, declarada em toda chamada -- F29, `M4-NFR-008`.
+ *
+ * QUEM DECIDE SE ELA AINDA RODA E O SERVIDOR. O app so DIZ qual e; um
+ * aplicativo que carrega a propria versao minima julgaria com a regra do dia
+ * em que foi publicado -- e a versao antiga e justamente a que precisa ser
+ * bloqueada.
+ *
+ * Sai de `expo.version` do `app.json`, que e a mesma fonte do numero que a
+ * loja exibe. Sem ela o servidor responde `BLOCKED`, e esse e o padrao certo:
+ * se cliente sem versao fosse liberado, bastaria omitir o header para escapar
+ * da politica.
+ */
+function derivarVersao(): string {
+  const config = Constants as unknown as { expoConfig?: { version?: string } };
+
+  return config.expoConfig?.version ?? '0.0.0';
+}
+
+export const APP_VERSION = derivarVersao();

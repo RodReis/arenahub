@@ -6396,7 +6396,17 @@
     "/api/v1/mobile/home": {
       "get": {
         "operationId": "MobileHomeController_obter",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "x-app-version",
+            "required": false,
+            "in": "header",
+            "description": "Versao do app (1.4.0).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Home do aluno.",
@@ -7411,6 +7421,154 @@
         },
         "tags": [
           "MobileExportacoes"
+        ]
+      }
+    },
+    "/api/v1/mobile/avisos": {
+      "get": {
+        "operationId": "MobileAvisosController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Avisos do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "BILLING",
+                              "ASSESSMENT",
+                              "MEMBERSHIP",
+                              "GENERAL"
+                            ]
+                          },
+                          "titulo": {
+                            "type": "string"
+                          },
+                          "corpo": {
+                            "type": "string"
+                          },
+                          "rota": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "lido": {
+                            "type": "boolean"
+                          },
+                          "criadoEm": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "tipo",
+                          "titulo",
+                          "corpo",
+                          "rota",
+                          "lido",
+                          "criadoEm"
+                        ]
+                      }
+                    },
+                    "naoLidos": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "avisos",
+                    "naoLidos"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileAvisos"
+        ]
+      }
+    },
+    "/api/v1/mobile/avisos/{id}/lido": {
+      "post": {
+        "operationId": "MobileAvisosController_marcarComoLido",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aviso marcado como lido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "tipo": {
+                      "type": "string",
+                      "enum": [
+                        "BILLING",
+                        "ASSESSMENT",
+                        "MEMBERSHIP",
+                        "GENERAL"
+                      ]
+                    },
+                    "titulo": {
+                      "type": "string"
+                    },
+                    "corpo": {
+                      "type": "string"
+                    },
+                    "rota": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lido": {
+                      "type": "boolean"
+                    },
+                    "criadoEm": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "tipo",
+                    "titulo",
+                    "corpo",
+                    "rota",
+                    "lido",
+                    "criadoEm"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileAvisos"
         ]
       }
     },

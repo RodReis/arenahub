@@ -21,6 +21,7 @@ const renderizar = (dados: Partial<DadosDaHome> = {}) =>
         onAtualizarApp={jest.fn()}
         onVerPlano={jest.fn()}
         onVerFrequencia={jest.fn()}
+        onVerAvisos={jest.fn()}
       />
     </ProvedorDeTema>,
   );
@@ -65,5 +66,34 @@ describe('Home', () => {
 
     expect(screen.queryByTestId('botao-atualizar')).toBeNull();
     expect(screen.getByTestId('botao-sair')).toBeTruthy();
+  });
+
+  /** Contador de avisos nao lidos -- F29. */
+  describe('atalho de avisos', () => {
+    it('mostra a contagem quando ha nao lidos', () => {
+      renderizar({ naoLidos: 3 });
+
+      expect(screen.getByText('Meus avisos (3)')).toBeTruthy();
+    });
+
+    it('omite a contagem quando esta tudo lido', () => {
+      // "(0)" e ruido: zero nao lidos e a ausencia de novidade, nao um dado
+      // que mereca destaque no botao.
+      renderizar({ naoLidos: 0 });
+
+      expect(screen.getByText('Meus avisos')).toBeTruthy();
+    });
+
+    /**
+     * `undefined` e "ainda nao sei", e e diferente de zero.
+     *
+     * A contagem vem de uma segunda chamada, depois da Home. Mostrar "(0)"
+     * enquanto ela nao voltou afirmaria que nao ha aviso -- e pode haver.
+     */
+    it('omite a contagem enquanto ela nao chegou', () => {
+      renderizar();
+
+      expect(screen.getByText('Meus avisos')).toBeTruthy();
+    });
   });
 });

@@ -14,6 +14,7 @@ import { MobileFinanceiroController } from './mobile-financeiro.controller.js';
 import { MobileFinanceiroService } from './mobile-financeiro.service.js';
 import { MobileFrequenciaController } from './mobile-frequencia.controller.js';
 import { MobileFrequenciaService } from './mobile-frequencia.service.js';
+import { PoliticaDeCanalService } from './politica-de-canal.service.js';
 import { MobileAvisosController } from './mobile-avisos.controller.js';
 import { MobileAvisosService } from './mobile-avisos.service.js';
 import { FakePushProviderAdapter } from './provider/fake-push-provider.adapter.js';
@@ -59,6 +60,7 @@ import { MobilePlanoService } from './mobile-plano.service.js';
     MobileAvaliacoesService,
     MobileConsentimentosService,
     MobileAvisosService,
+    PoliticaDeCanalService,
     FakePushProviderAdapter,
     /**
      * Real com credencial, dublê sem ela -- mesmo criterio de `AI_PROVIDER` e

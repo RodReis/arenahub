@@ -77,7 +77,7 @@ describe('cliente de API', () => {
     }) as unknown as typeof fetch;
   });
 
-  const criar = () =>
+  const criar = (versaoDoApp?: string) =>
     criarCliente({
       baseUrl: BASE,
       armazenamento,
@@ -86,7 +86,59 @@ describe('cliente de API', () => {
         acessoAtual = token;
       },
       aoPerderSessao: jest.fn(),
+      ...(versaoDoApp === undefined ? {} : { versaoDoApp }),
     });
+
+  const cabecalhosDaChamada = (indice: number): Record<string, string> => {
+    const [, opcoes] = (globalThis.fetch as unknown as jest.Mock).mock.calls[indice] as [
+      string,
+      RequestInit,
+    ];
+
+    return opcoes.headers as Record<string, string>;
+  };
+
+  /**
+   * A versao viaja em TODA chamada -- F29, `M4-NFR-008`.
+   *
+   * O app so DECLARA qual e; quem decide se ela ainda roda e o servidor. Um
+   * aplicativo que carrega a propria versao minima julgaria com a regra do
+   * dia em que foi publicado, e a versao antiga e justamente a que precisa
+   * ser bloqueada.
+   */
+  describe('versao do app', () => {
+    it('declara a versao no cabecalho', async () => {
+      enfileirar('/x', [{ status: 200, corpo: { ok: true } }]);
+
+      await criar('1.4.0').get('/x');
+
+      expect(cabecalhosDaChamada(0)['x-app-version']).toBe('1.4.0');
+    });
+
+    // Nao so na Home: qualquer endpoint pode precisar recusar versao antiga,
+    // e header que so viaja numa rota obriga cada nova a lembrar de pedi-lo.
+    it('declara em toda chamada, nao so na primeira', async () => {
+      enfileirar('/a', [{ status: 200, corpo: {} }]);
+      enfileirar('/b', [{ status: 200, corpo: {} }]);
+
+      const cliente = criar('1.4.0');
+      await cliente.get('/a');
+      await cliente.post('/b', { x: 1 });
+
+      expect(cabecalhosDaChamada(0)['x-app-version']).toBe('1.4.0');
+      expect(cabecalhosDaChamada(1)['x-app-version']).toBe('1.4.0');
+    });
+
+    it('omite o cabecalho quando nao ha versao', async () => {
+      enfileirar('/x', [{ status: 200, corpo: {} }]);
+
+      await criar().get('/x');
+
+      // Omitir e diferente de mandar vazio: o servidor bloqueia os dois, mas
+      // `x-app-version: ''` pareceria uma versao declarada e ilegivel.
+      expect(cabecalhosDaChamada(0)['x-app-version']).toBeUndefined();
+    });
+  });
 
   it('manda o access token no cabecalho', async () => {
     enfileirar('/x', [{ status: 200, corpo: { ok: true } }]);
