@@ -15,7 +15,7 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3300 | 3300 | 0 | 74.8 |
+| unitário | 3415 | 3415 | 0 | 75.1 |
 | contrato | 0 | 0 | 0 | — |
 | integração | 1079 | 1079 | 0 | 83.7 |
 | e2e | 0 | 0 | 0 | — |
@@ -160,3 +160,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-12 | #24 | F24 | integração | 1079 | 1079 | 0 | 83.7 | [#323](https://github.com/RodReis/arenahub/pull/323) — **corrigido à mão**, mesma razão da F23: o Jest crasha no Windows (exit 3221226505) e o gerador herda o número da entrega anterior (1068). O valor vem da **execução verde do CI no Linux** — **1001 na API** (73 suítes) + **78 no database** (6 arquivos). ⚠️ **A medição local suíte a suíte deu 1049, e estava inflada**: `--testPathPattern` **não ancora o nome**, então o padrão `billing.int-spec` casa também as 8 suítes `billing-*` (e `engagement` casa mais 2), contando-as duas vezes. Conferir o total de suítes contra o `ls` (73 em disco × 74 somadas) é o que denuncia. A F24 acrescenta **11 testes de integração**, dos quais 2 nasceram da revisão adversarial |
 | 2026-09-12 | #25 | F25 | unitário | 3300 | 3300 | 0 | 74.8 | [#324](https://github.com/RodReis/arenahub/pull/324) — inclui os **10 testes** do `MobileFinanceiroService` (posse de invoice/tentativa/pagamento do aluno da sessão) e os **9 de tela/hook** do financeiro mobile (lista, cobrança PIX/checkout, polling de status) |
 | 2026-09-12 | #25 | F25 | integração | 1088 | 1088 | 0 | 83.7 | [#324](https://github.com/RodReis/arenahub/pull/324) — **corrigido à mão**, mesma razão da F23/F24: o Jest crasha no Windows (exit 3221226505) e o gerador herda o número da entrega anterior (1079). A F25 acrescenta `mobile-financeiro.int-spec.ts` (74 suítes em disco, confirmado por `ls`), com **9 testes novos**: `1079 + 9 = 1088` |
+| 2026-09-14 | #29 | F29 | unitário | 3415 | 3415 | 0 | 75.1 | — pendente PR |
+| 2026-09-14 | #29 | F29 | integração | 1079 | 1079 | 0 | 83.7 | — **número mantido do cache/CI (1001 API + 78 database), não recalculado localmente.** A F29 acrescenta `mobile-avisos-telemetria.int-spec.ts` (12 testes) e 4 testes novos em `mobile-home.int-spec.ts` — 16 no total —, todos verdes em execução local (confirmado suíte a suíte, sem agrupar padrão: `edge-auth`/`kiosk-auth`/`mobile-auth` dobram quando o padrão `auth` roda junto, mesmo defeito de medição que a F24 documentou). O Jest crasha (exit 3221226505) antes de escrever `--outputFile` ao rodar a suíte inteira com `--coverage`, então `test:report` não recalculou por si — **o total corrigido entra depois da confirmação do CI deste PR**, mesmo padrão da F23/F24/F25 |

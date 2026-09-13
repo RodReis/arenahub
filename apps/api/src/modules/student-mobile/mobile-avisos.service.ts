@@ -41,6 +41,32 @@ const TAMANHO_DA_PAGINA = 50;
  * A ROTA E RESOLVIDA AQUI, a partir do codigo guardado no banco. O app recebe
  * caminho local pronto e nao interpreta nada: com URL no banco, quem
  * escrevesse uma linha escolheria para onde o aplicativo navega.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE `this.db` DIRETO, e nao `comTenant` como os vizinhos deste modulo.
+ * ---------------------------------------------------------------------------
+ *
+ * `mobile-home`, `mobile-plano` e `mobile-consentimentos` usam `comTenant`
+ * porque leem `students`, que TEM politica RLS com FORCE -- fora de transacao
+ * com contexto, o Postgres devolve zero linhas sem erro e sem log (ADR-054
+ * §3).
+ *
+ * `student_notifications` NAO tem politica, e isso e deliberado. O cabecalho
+ * da migration da F67 promete "politica em TODAS as tabelas de negocio", mas
+ * a SECAO 3 dela revoga a promessa e explica: a politica geral fica para a
+ * F68, porque com ~100 tabelas cobertas as 394 queries fora de transacao
+ * passariam a devolver LISTA VAZIA -- medido na tela, com a pagina de planos
+ * carregando vazia sobre 6 planos no banco.
+ *
+ * Ou seja: ligar RLS nesta tabela HOJE produziria exatamente esse defeito
+ * aqui, porque este servico le fora de transacao. Quando a F68 resolver como
+ * o contexto chega ao Prisma, esta consulta migra junto com as outras ~100.
+ * A guarda `check-rls-fora-de-transacao` conhece a lista real (`student`,
+ * `auditLog`) e passa.
+ *
+ * O isolamento NAO depende disso: ele vem do `where` com `tenantId` E
+ * `studentId`, e ha teste de integracao com DOIS alunos provando que a
+ * sessao de um nao alcanca o aviso do outro.
  */
 @Injectable()
 export class MobileAvisosService {
