@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3300 | 3300 | 0 | 74.8 |
+| unitário | 3415 | 3415 | 0 | 75.1 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 1079 | 1079 | 0 | 83.7 |
+| integração | 1122 | 1122 | 0 | 83.7 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -160,3 +160,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-12 | #24 | F24 | integração | 1079 | 1079 | 0 | 83.7 | [#323](https://github.com/RodReis/arenahub/pull/323) — **corrigido à mão**, mesma razão da F23: o Jest crasha no Windows (exit 3221226505) e o gerador herda o número da entrega anterior (1068). O valor vem da **execução verde do CI no Linux** — **1001 na API** (73 suítes) + **78 no database** (6 arquivos). ⚠️ **A medição local suíte a suíte deu 1049, e estava inflada**: `--testPathPattern` **não ancora o nome**, então o padrão `billing.int-spec` casa também as 8 suítes `billing-*` (e `engagement` casa mais 2), contando-as duas vezes. Conferir o total de suítes contra o `ls` (73 em disco × 74 somadas) é o que denuncia. A F24 acrescenta **11 testes de integração**, dos quais 2 nasceram da revisão adversarial |
 | 2026-09-12 | #25 | F25 | unitário | 3300 | 3300 | 0 | 74.8 | [#324](https://github.com/RodReis/arenahub/pull/324) — inclui os **10 testes** do `MobileFinanceiroService` (posse de invoice/tentativa/pagamento do aluno da sessão) e os **9 de tela/hook** do financeiro mobile (lista, cobrança PIX/checkout, polling de status) |
 | 2026-09-12 | #25 | F25 | integração | 1088 | 1088 | 0 | 83.7 | [#324](https://github.com/RodReis/arenahub/pull/324) — **corrigido à mão**, mesma razão da F23/F24: o Jest crasha no Windows (exit 3221226505) e o gerador herda o número da entrega anterior (1079). A F25 acrescenta `mobile-financeiro.int-spec.ts` (74 suítes em disco, confirmado por `ls`), com **9 testes novos**: `1079 + 9 = 1088` |
+| 2026-09-14 | #29 | F29 | unitário | 3415 | 3415 | 0 | 75.1 | [#326](https://github.com/RodReis/arenahub/pull/326) |
+| 2026-09-14 | #29 | F29 | integração | 1122 | 1122 | 0 | 83.7 | [#326](https://github.com/RodReis/arenahub/pull/326) — **número do CI (76 suítes na API + 6 no database)**, confirmado na terceira run do PR. A primeira estourou heap (OOM, exit 134) na 76ª suíte por acúmulo entre suítes já documentado desde a F50 — corrigido subindo `--max-old-space-size` de 6144 para 10240 (issue #327 registra o conserto de raiz). A segunda achou um teste real quebrado perto da virada de meia-noite em SP, bug pré-existente da F24 (`mobile-plano-frequencia`) nunca antes exposto — corrigido ancorando o teste no meio-dia UTC (issue #328). A F29 em si acrescenta 16 testes (`mobile-avisos-telemetria.int-spec.ts` + 4 em `mobile-home.int-spec.ts`): `1001 (F24) + 9 (F25) + 16 (F29) = 1026` na API, mas o cache tinha ficado em 1001 desde a F24 sem as correções de F25/F29 nunca terem sido persistidas — `1044` é o número real medido pelo CI, e é esse que fica |

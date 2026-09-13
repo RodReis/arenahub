@@ -1133,7 +1133,14 @@ que já se sabe que vão doer:
   F49–F52. Quando o MVP 4 for detalhado, verificar o que sobrou delas em vez de reimplementar.
 - **F28** (pagamento no totem) é o app do aluno inteiro, com dinheiro, numa tela pública — e
   depende de regra de proração que **não existe** para upgrade/downgrade.
-- **F29** depende de `M4-DIST-01` (política de publicação em lojas), indefinida.
+- **F29 entrou parcial em 14/09/2026** (issue #29). `M4-DIST-01` (publicação em lojas)
+  continua indefinido — o PI adiou na abertura da fatia, distribuição interna cobre o piloto. O
+  código entrou: inbox interna de avisos (`GET /mobile/avisos`, `POST /:id/lido`, tela no app),
+  telemetria por allowlist (`POST /mobile/telemetria`), e a política de versão mínima que
+  existia na Home desde a F23 mas era fixa em `SUPPORTED` — ligada à regra real, sem nenhum
+  teste derrubado (o que revelou a lacuna de cobertura). `PushProvider` fica atrás de porta com
+  dublê, provedor **OneSignal** escolhido pelo PI mas sem credenciais ainda — adapter real,
+  builds assinados e piloto com coortes ficam para quando destravar.
 - **F33** carrega a contradição interna da Especificação sobre ranking de perda de peso
   (INV-121). É ela que destrava o módulo *Ranking* do totem — pela trava 2 da Decisão 5 do
   ADR-042, módulo sem fatia entregue **não aparece**.

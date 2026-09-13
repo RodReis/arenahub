@@ -109,6 +109,60 @@ const esquema = z.object({
   CONTRATADA_ENDERECO: z.string().optional(),
   CONTRATADA_REPRESENTANTE: z.string().optional(),
   CONTRATADA_EMAIL: z.string().optional(),
+
+  /**
+   * ---------------------------------------------------------------------
+   * PILOTO DO APP E DO TOTEM -- F29, Slice 4.7.
+   * ---------------------------------------------------------------------
+   *
+   * VARIAVEL, e nao constante: desligar o pagamento no app as 22h de um
+   * sabado nao pode exigir build, revisao de loja e atualizacao do aluno.
+   *
+   * TODAS AS FLAGS NASCEM DESLIGADAS, e a ausencia FECHA -- ver
+   * `politica-de-versao.ts`. Abrir na duvida transformaria erro de deploy
+   * em ausencia silenciosa de controle: tudo continua funcionando e
+   * ninguem descobre que o freio sumiu.
+   */
+
+  /** Menor versao do app que ainda roda. Ausente = ninguem passa. */
+  MOBILE_MIN_VERSION: z.string().optional(),
+  /** Ate quando a versao abaixo da minima ainda funciona (ISO 8601). */
+  MOBILE_VERSION_GRACE_UNTIL: z.string().datetime().optional(),
+  /** Para onde mandar o aluno atualizar. Precisa ser https. */
+  MOBILE_UPDATE_URL: z.string().optional(),
+
+  /**
+   * `z.coerce.boolean()` NAO serve aqui: ele converte toda string nao vazia
+   * em `true`, e `FEATURE_KIOSK=false` ligaria o totem. A comparacao
+   * explicita com `'true'` e o que faz a flag significar o que esta escrito.
+   */
+  FEATURE_STUDENT_MOBILE: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
+  FEATURE_MOBILE_PAYMENTS: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
+  FEATURE_KIOSK: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
+  FEATURE_KIOSK_PAYMENTS: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
+  /**
+   * Push externo. Fica DESLIGADO ate existir credencial do OneSignal
+   * (provedor escolhido pelo PI em 14/09/2026).
+   *
+   * Desligado NAO tira funcionalidade do aluno: a caixa interna e a entrega
+   * e o push e so um atalho ate ela.
+   */
+  FEATURE_PUSH_NOTIFICATIONS: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
 });
 
 /** Storage privado S3-compativel. MinIO em dev, S3 em producao. */
@@ -160,6 +214,25 @@ export interface ConfigDaApi {
     representante: string | null;
     email: string | null;
   };
+  /**
+   * Piloto do app e do totem -- F29, Slice 4.7.
+   *
+   * `null` e `false` sao os padroes SEGUROS: sem versao minima ninguem passa,
+   * e funcionalidade sem flag fica desligada. A regra que le isto
+   * (`politica-de-versao.ts`) fecha na ausencia de proposito.
+   */
+  canais: {
+    versaoMinima: string | null;
+    carenciaAte: string | null;
+    urlDeAtualizacao: string | null;
+    funcionalidades: {
+      STUDENT_MOBILE: boolean;
+      MOBILE_PAYMENTS: boolean;
+      KIOSK: boolean;
+      KIOSK_PAYMENTS: boolean;
+      PUSH_NOTIFICATIONS: boolean;
+    };
+  };
 }
 
 export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaApi {
@@ -190,6 +263,18 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaAp
       endereco: bruto.CONTRATADA_ENDERECO ?? null,
       representante: bruto.CONTRATADA_REPRESENTANTE ?? null,
       email: bruto.CONTRATADA_EMAIL ?? null,
+    },
+    canais: {
+      versaoMinima: bruto.MOBILE_MIN_VERSION ?? null,
+      carenciaAte: bruto.MOBILE_VERSION_GRACE_UNTIL ?? null,
+      urlDeAtualizacao: bruto.MOBILE_UPDATE_URL ?? null,
+      funcionalidades: {
+        STUDENT_MOBILE: bruto.FEATURE_STUDENT_MOBILE,
+        MOBILE_PAYMENTS: bruto.FEATURE_MOBILE_PAYMENTS,
+        KIOSK: bruto.FEATURE_KIOSK,
+        KIOSK_PAYMENTS: bruto.FEATURE_KIOSK_PAYMENTS,
+        PUSH_NOTIFICATIONS: bruto.FEATURE_PUSH_NOTIFICATIONS,
+      },
     },
   };
 }

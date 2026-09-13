@@ -23,7 +23,27 @@ export default function Inicio() {
 
   const carregar = useCallback(async () => {
     try {
-      setDados((await cliente.get('/api/v1/mobile/home')) as DadosDaHome);
+      const home = (await cliente.get('/api/v1/mobile/home')) as DadosDaHome;
+
+      /*
+       * A contagem vem DEPOIS e nao derruba a Home -- F29.
+       *
+       * Duas chamadas em vez de engordar a resposta da Home: a caixa de
+       * avisos e da Slice 4.7 e a Home e da 4.1, e juntar as duas faria toda
+       * abertura do app pagar por uma consulta que so alimenta um numero
+       * entre parenteses.
+       *
+       * O `catch` proprio e o ponto: falha aqui deixa `naoLidos` indefinido
+       * (o botao aparece sem numero) em vez de mandar a Home inteira para
+       * `UNAVAILABLE` por causa de um contador.
+       */
+      setDados(home);
+
+      const avisos = (await cliente
+        .get('/api/v1/mobile/avisos')
+        .catch(() => null)) as { naoLidos: number } | null;
+
+      if (avisos) setDados({ ...home, naoLidos: avisos.naoLidos });
     } catch {
       // Sem conteudo, mas COM shell. A ausencia de dado aparece como
       // ausencia -- nunca como dado antigo apresentado como atual.
@@ -67,6 +87,7 @@ export default function Inicio() {
         }}
         onVerPlano={() => router.push('/plano')}
         onVerFrequencia={() => router.push('/frequencia')}
+        onVerAvisos={() => router.push('/avisos')}
         testID="home"
       />
     </ScrollView>

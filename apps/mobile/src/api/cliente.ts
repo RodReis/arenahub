@@ -27,6 +27,13 @@ export interface OpcoesDoCliente {
   readonly guardarAcesso: (token: string | null) => void;
   /** Chamado quando nao ha mais o que renovar: a tela volta para o login. */
   readonly aoPerderSessao: () => void;
+  /**
+   * Versao deste build, enviada em `x-app-version` -- F29, `M4-NFR-008`.
+   *
+   * OPCAO, e nao leitura direta de `config.ts`: o teste precisa fixar a
+   * versao sem carregar o `expo-constants`, que so existe no aparelho.
+   */
+  readonly versaoDoApp?: string;
 }
 
 export class ErroDeApi extends Error {
@@ -103,6 +110,10 @@ export function criarCliente(opcoes: OpcoesDoCliente) {
       ...init,
       headers: {
         'Content-Type': 'application/json',
+        // Declarada em TODA chamada, nao so na Home: qualquer endpoint pode
+        // precisar recusar uma versao antiga, e um header que so viaja numa
+        // rota obrigaria cada nova a lembrar de pedi-lo.
+        ...(opcoes.versaoDoApp ? { 'x-app-version': opcoes.versaoDoApp } : {}),
         ...(acesso ? { Authorization: `Bearer ${acesso}` } : {}),
         ...(init.headers ?? {}),
       },

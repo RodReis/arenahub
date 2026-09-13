@@ -912,11 +912,21 @@ describe('F45 -- cadastro completo de aluno', () => {
       const recente = '11922220000';
 
       /*
-       * AMBOS `isPrimary: true` -- o empate que o defeito precisa. Criados em
-       * chamadas separadas para `createdAt` diferir de verdade; `createMany`
-       * numa transacao so daria o mesmo instante aos dois e o desempate ficaria
-       * indefinido tambem na versao corrigida.
+       * AMBOS `isPrimary: true` -- o empate que o defeito precisa.
+       *
+       * `createdAt` EXPLICITO, e nao duas chamadas separadas confiando no
+       * relogio: `TIMESTAMP(3)` tem precisao de milissegundo, e duas
+       * chamadas sequenciais podem cair no MESMO milissegundo sob carga do
+       * CI -- foi o que aconteceu no PR #326, com a suite inteira competindo
+       * por CPU depois que o teto de heap parou de cortar a execucao pela
+       * metade. O desempate real (`orderBy: [isPrimary desc, createdAt
+       * desc]`) e correto; o teste so precisa GARANTIR o empate que ele
+       * afirma testar, nao esperar que o relogio produza dois instantes
+       * distintos por sorte.
        */
+      const ha1Hora = new Date(Date.now() - 3_600_000);
+      const agora = new Date();
+
       await db.studentContact.create({
         data: {
           tenantId: contas.a.tenantId,
@@ -924,6 +934,7 @@ describe('F45 -- cadastro completo de aluno', () => {
           type: 'PHONE',
           value: antigo,
           isPrimary: true,
+          createdAt: ha1Hora,
         },
       });
 
@@ -934,6 +945,7 @@ describe('F45 -- cadastro completo de aluno', () => {
           type: 'PHONE',
           value: recente,
           isPrimary: true,
+          createdAt: agora,
         },
       });
 

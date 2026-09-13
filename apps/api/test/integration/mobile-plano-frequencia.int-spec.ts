@@ -185,9 +185,26 @@ describe('F24 -- Plano e frequencia do app', () => {
     // Dois treinos em DIAS distintos, e duas passagens no MESMO dia: a
     // distincao entre `totalDeSessoes` (dias) e `totalDePassagens` so aparece
     // com os dois casos presentes.
-    await registrarTreino(alunoId, new Date(Date.now() - 3 * 86_400_000));
-    await registrarTreino(alunoId, new Date(Date.now() - 1 * 86_400_000));
-    await registrarTreino(alunoId, new Date(Date.now() - 1 * 86_400_000 + 3_600_000));
+    //
+    // ANCORADO NO MEIO-DIA UTC (09h em Sao Paulo), nao em `Date.now()`
+    // puro: o teste rodando perto da virada de meia-noite local faz "1 dia
+    // atras" e "1 dia atras + 1 hora" carem em dias civis DIFERENTES, e a
+    // suite conta 3 sessoes em vez de 2 -- foi exatamente isso que aconteceu
+    // no CI as 02h06 UTC (23h06 em SP), issue achada na F29 mas o bug e da
+    // F24. Meio-dia UTC fica a 12h de qualquer virada, entao a soma de 1h
+    // nunca cruza a fronteira do dia civil, seja qual for o horario em que
+    // o CI decidir rodar.
+    const meioDiaUtcHaDias = (dias: number): Date => {
+      const agora = new Date();
+      const ancora = new Date(
+        Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), 12, 0, 0),
+      );
+      return new Date(ancora.getTime() - dias * 86_400_000);
+    };
+
+    await registrarTreino(alunoId, meioDiaUtcHaDias(3));
+    await registrarTreino(alunoId, meioDiaUtcHaDias(1));
+    await registrarTreino(alunoId, new Date(meioDiaUtcHaDias(1).getTime() + 3_600_000));
   });
 
   afterAll(async () => {

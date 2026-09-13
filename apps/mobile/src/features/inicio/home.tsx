@@ -12,6 +12,14 @@ export interface DadosDaHome {
     readonly state: 'SUPPORTED' | 'GRACE' | 'BLOCKED';
     readonly updateUrl: string | null;
   };
+  /**
+   * Avisos nao lidos -- F29.
+   *
+   * OPCIONAL: vem de uma segunda chamada, e a Home tem de renderizar antes
+   * dela voltar. `undefined` e "ainda nao sei", que e diferente de zero --
+   * mostrar "(0)" enquanto carrega seria afirmar algo que ninguem apurou.
+   */
+  readonly naoLidos?: number;
 }
 
 /**
@@ -32,6 +40,7 @@ export function Home({
   onAtualizarApp,
   onVerPlano,
   onVerFrequencia,
+  onVerAvisos,
   testID,
 }: {
   dados: DadosDaHome;
@@ -39,6 +48,7 @@ export function Home({
   onAtualizarApp: () => void;
   onVerPlano: () => void;
   onVerFrequencia: () => void;
+  onVerAvisos: () => void;
   testID?: string | undefined;
 }) {
   const t = useTema();
@@ -112,6 +122,24 @@ export function Home({
             emCard
             onPress={onVerFrequencia}
             testID="botao-frequencia"
+          />
+          {/*
+            O contador entra no TITULO do botao -- F29.
+
+            Nao ha bolinha sobreposta porque nao ha barra de abas neste app: o
+            atalho e um botao numa lista, e numero entre parenteses e o que
+            leitor de tela anuncia sem marcacao extra.
+          */}
+          <Botao
+            titulo={
+              dados.naoLidos !== undefined && dados.naoLidos > 0
+                ? `Meus avisos (${dados.naoLidos})`
+                : 'Meus avisos'
+            }
+            variante="neutro"
+            emCard
+            onPress={onVerAvisos}
+            testID="botao-avisos"
           />
         </Card>
       )}

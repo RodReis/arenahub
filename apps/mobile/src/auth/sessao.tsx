@@ -11,7 +11,7 @@ import {
 
 import { criarCliente, ErroDeApi, type ArmazenamentoDeSessao } from '../api/cliente.js';
 import { armazenamentoSeguro } from './armazenamento-seguro.js';
-import { API_BASE_URL } from '../config.js';
+import { API_BASE_URL, APP_VERSION } from '../config.js';
 
 export type EstadoDaSessao =
   /** Ainda lendo o armazenamento -- a tela mostra o shell, nao o login. */
@@ -76,6 +76,7 @@ export function ProvedorDeSessao({
           acesso.current = token;
         },
         aoPerderSessao,
+        versaoDoApp: APP_VERSION,
       }),
     [armazenamento, aoPerderSessao],
   );
