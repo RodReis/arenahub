@@ -4220,3 +4220,43 @@ por escrito.
   §9 já previa endereço e telefone; é dívida sendo paga, não campo novo de produto.
 - ADR-053 §1 ganha respaldo contratual (Cláusula 5.2).
 - Fatia: **F70** — contrato com cláusulas, qualificação das partes e assinatura (`SPEC-070`).
+
+## ADR-056 — Consentimento self-service no app e exportação de saúde assíncrona (F26)
+
+**Data:** 12/09/2026
+**Status:** aceito *(decisão nova — **decidida pelo PI em 12/09/2026**)*
+**Decisor:** Rodrigo Reis (PI)
+**Contexto:** a issue #26 (F26, SPEC-026, Slice 4.4) citava tipos de consentimento (`TERMS`,
+`PRIVACY`, `MARKETING`) que não existiam no enum `ConsentDocumentType` — só `BIOMETRIC`, `HEALTH`,
+`AI_ANALYSIS`, `RANKING`, `CHALLENGE`, `ENGAGEMENT_PUSH`, `PHYSICAL_EVOLUTION_RANKING`. E o PRD
+(§7, Slice 4.4) pede exportação do histórico de saúde "solicitada de forma assíncrona", enquanto o
+`HealthExportService` (F18) era síncrono por decisão registrada no próprio cabeçalho do arquivo.
+
+**Por que é ADR:** as duas mudanças são caras de desfazer. Expandir um enum de consentimento é
+schema em produção que outros módulos já leem; reverter a exportação de assíncrono para síncrono
+desfaria um contrato de API (`POST /health-exports` deixa de devolver o arquivo na resposta) que o
+painel e o app passam a depender.
+
+### Decisões
+
+| # | decisão | alternativa descartada | por quê |
+|---|---|---|---|
+| 1 | **`ConsentDocumentType` ganha `TERMS`, `PRIVACY`, `MARKETING`** | manter só os tipos que já existiam e a issue estava desatualizada | o PI confirmou que a issue é que estava certa — os tipos são novos, não erro de nomenclatura |
+| 2 | **`HealthExportService` deixa de ser síncrono**: `solicitar` grava `DataExportJob` `PENDING` e devolve na hora; `processar` roda em background; o cliente consulta até `COMPLETED` e só então pede o link (`POST .../download`) | manter síncrono só para o painel e criar caminho assíncrono separado para o app | duas políticas de exportação para o mesmo dado dariam dois lugares para o expurgo e a auditoria divergirem. O PI escolheu unificar: painel e app entram pelo mesmo `HealthExportService`, mesma tabela `data_export_jobs`, mesmo padrão da F11 (`ExportsService`, disparo sem `await`) |
+| 3 | **Consentimento self-service do app cobre `TERMS, PRIVACY, HEALTH, AI_ANALYSIS, MARKETING, RANKING` — não `BIOMETRIC`** | incluir biometria também | cadastro biométrico é presencial (F19), e revogar implica marcar exclusão física nos leitores (INV-018/INV-019) — fora do escopo desta fatia. Confirmado com o PI durante a implementação |
+
+### Consequências
+
+- `apps/api/src/modules/privacy/consent.repository.ts`: os métodos que só aceitavam o literal
+  `'BIOMETRIC'` passam a aceitar qualquer `ConsentDocumentType`. O evento de timeline grava
+  `BIOMETRIC_CONSENT_*` quando chamado sem `documentType` (compatibilidade com a F19) e
+  `CONSENT_ACCEPTED`/`CONSENT_REVOKED` (novos, com o tipo no `payload`) quando chamado com um tipo
+  explícito.
+- `apps/api/src/modules/health/health-progress.controller.ts`: `POST /students/:id/health-exports`
+  muda de contrato — não devolve mais `downloadUrl` na resposta. Ganha `GET /health-exports/:id` e
+  `POST /health-exports/:id/download`. Snapshot OpenAPI regenerado
+  (`packages/api-contracts/openapi/arenahub-v1.json`).
+- Migração `20260912120000_f26_consentimentos_do_aluno`: `ALTER TYPE ... ADD VALUE` em statements
+  separados (exigência do Postgres fora de transação) para os dois enums (`consent_document_type` e
+  `student_timeline_event_type`).
+- Fatia: **F26** (`SPEC-026`).

@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, type ConsentDocument, type ConsentRecord } from '@arenahub/database';
+import {
+  Prisma,
+  type ConsentDocument,
+  type ConsentDocumentType,
+  type ConsentRecord,
+  type StudentTimelineEventType,
+} from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -8,6 +14,14 @@ import type { DecisaoRegistrada, SujeitoDoConsentimento } from './domain/consent
 export interface DadosDeDecisao {
   studentId: string;
   documentId: string;
+  /**
+   * Tipo do documento que esta decisao aponta.
+   *
+   * Vem do chamador, que ja carregou o documento, em vez de um `include` a
+   * mais dentro da transacao: decide qual evento de timeline gravar. Ausente
+   * (o caso da F19, biometria) mantem os eventos `BIOMETRIC_*`.
+   */
+  documentType?: ConsentDocumentType | undefined;
   decision: 'ACCEPTED' | 'REFUSED';
   subjectKind: SujeitoDoConsentimento;
   guardianName?: string | undefined;
@@ -19,7 +33,35 @@ export interface DadosDeDecisao {
 }
 
 /** Decisao vigente somada ao estado do documento que ela aponta. */
-export type DecisaoVigente = DecisaoRegistrada & { id: string; documentVersion: number };
+export type DecisaoVigente = DecisaoRegistrada & {
+  id: string;
+  documentVersion: number;
+  occurredAt: Date;
+};
+
+/**
+ * Qual evento de timeline registra esta decisao.
+ *
+ * `BIOMETRIC_*` sem `documentType` preserva o que a F19 ja grava -- ela
+ * chama sem o campo, e biometria e o unico consentimento que a recepcao
+ * registra pelo painel. O resto cai nos eventos genericos da F26, com o
+ * tipo no payload.
+ *
+ * `REFUSED` do aluno vira `CONSENT_REVOKED` e nao um `CONSENT_REFUSED`
+ * proprio: pelo app, recusar um termo que ja estava aceito E revogar, e
+ * recusar um que nunca foi aceito nao muda nada que a timeline precise
+ * distinguir.
+ */
+function tipoDeEventoDeTimeline(
+  tipo: ConsentDocumentType | undefined,
+  decisao: 'ACCEPTED' | 'REFUSED',
+): StudentTimelineEventType {
+  if (tipo === undefined) {
+    return decisao === 'ACCEPTED' ? 'BIOMETRIC_CONSENT_ACCEPTED' : 'BIOMETRIC_CONSENT_REFUSED';
+  }
+
+  return decisao === 'ACCEPTED' ? 'CONSENT_ACCEPTED' : 'CONSENT_REVOKED';
+}
 
 /**
  * Acesso a consentimento.
@@ -40,7 +82,7 @@ export class ConsentRepository {
    */
   async encontrarDocumentoVigente(
     contexto: TenantContext,
-    tipo: 'BIOMETRIC',
+    tipo: ConsentDocumentType,
     agora: Date,
   ): Promise<ConsentDocument | null> {
     const candidatos = await this.db.consentDocument.findMany({
@@ -72,7 +114,7 @@ export class ConsentRepository {
   async encontrarDecisaoVigente(
     contexto: TenantContext,
     studentId: string,
-    tipo: 'BIOMETRIC',
+    tipo: ConsentDocumentType,
   ): Promise<DecisaoVigente | null> {
     const registro = await this.db.consentRecord.findFirst({
       where: {
@@ -94,6 +136,7 @@ export class ConsentRepository {
       supersededAt: registro.supersededAt,
       documentRetiredAt: registro.document.retiredAt,
       documentVersion: registro.document.version,
+      occurredAt: registro.occurredAt,
     };
   }
 
@@ -145,15 +188,21 @@ export class ConsentRepository {
         data: {
           tenantId: contexto.tenantId,
           studentId: dados.studentId,
-          type:
-            dados.decision === 'ACCEPTED'
-              ? 'BIOMETRIC_CONSENT_ACCEPTED'
-              : 'BIOMETRIC_CONSENT_REFUSED',
+          type: tipoDeEventoDeTimeline(dados.documentType, dados.decision),
           actorType: 'USER',
+          // Nulo quando quem decidiu foi o proprio aluno pelo app: o canal
+          // mobile nao tem usuario de painel (`tenantContextDoAluno`). Quem
+          // le a timeline distingue pelo `actorId` ausente somado ao
+          // `consentType` do payload -- `ActorType` nao tem `STUDENT`, e
+          // adicionar um valor la mexeria na auditoria do sistema inteiro.
           actorId: contexto.actorId,
           correlationId,
           // Sem PII: nem nome do responsavel, nem evidencia.
-          payload: { decision: dados.decision, subjectKind: dados.subjectKind },
+          payload: {
+            decision: dados.decision,
+            subjectKind: dados.subjectKind,
+            ...(dados.documentType === undefined ? {} : { consentType: dados.documentType }),
+          },
         },
       });
 

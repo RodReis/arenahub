@@ -153,6 +153,21 @@ const ANTHROPIC_CLIENT = Symbol('ANTHROPIC_CLIENT');
      * so apareceria quando alguem comparasse o app com o painel.
      */
     AttendanceService,
+    /*
+     * Exportados para o APP (F26, Slice 4.4).
+     *
+     * `AiAnalysisService` e nao o repositorio: `ultimaPublicada` e o unico
+     * caminho que devolve analise JA ENDOSSADA por um profissional (regra de
+     * arquitetura no 8). Expor o repositorio deixaria o BFF do app ler
+     * rascunho ou saida rejeitada, que e exatamente o que a confirmacao
+     * humana existe para impedir.
+     *
+     * `HealthExportService` porque a exportacao do historico e a MESMA para
+     * painel e app desde que virou assincrona -- duas politicas de
+     * exportacao para o mesmo dado dariam dois lugares para o expurgo errar.
+     */
+    AiAnalysisService,
+    HealthExportService,
   ],
 })
 export class HealthModule {}

@@ -53,22 +53,34 @@ describe('ProvedorDeSessao', () => {
     jest.clearAllMocks();
   });
 
-  it('comeca CARREGANDO, nao ANONIMO', async () => {
-    /*
-     * A diferenca aparece na abertura do app: com `ANONIMO` inicial, quem tem
-     * sessao valida ve a tela de login PISCAR antes do redirecionamento -- e
-     * quem estiver numa rota protegida seria expulso no primeiro render.
-     */
-    refreshGuardado = 'refresh-valido';
-    globalThis.fetch = jest.fn(() =>
-      responder(200, { accessToken: 'a', refreshToken: 'r2', sessionId: 's1', expiraEm: 600 }),
-    );
+  it(
+    'comeca CARREGANDO, nao ANONIMO',
+    async () => {
+      /*
+       * A diferenca aparece na abertura do app: com `ANONIMO` inicial, quem tem
+       * sessao valida ve a tela de login PISCAR antes do redirecionamento -- e
+       * quem estiver numa rota protegida seria expulso no primeiro render.
+       *
+       * Timeout proprio: o CI roda os 14 arquivos de teste do pacote em
+       * paralelo, e sob essa carga o `waitFor` padrao (1s) somado ao timeout
+       * do `it` (5s, o default do Jest) já estourou uma vez -- isolado o
+       * teste leva menos de 200ms. Nao e o comportamento que mudou, e a
+       * maquina sob carga.
+       */
+      refreshGuardado = 'refresh-valido';
+      globalThis.fetch = jest.fn(() =>
+        responder(200, { accessToken: 'a', refreshToken: 'r2', sessionId: 's1', expiraEm: 600 }),
+      );
 
-    renderizar();
+      renderizar();
 
-    expect(screen.getByTestId('estado')).toHaveTextContent('CARREGANDO');
-    await waitFor(() => expect(screen.getByTestId('estado')).toHaveTextContent('AUTENTICADO'));
-  });
+      expect(screen.getByTestId('estado')).toHaveTextContent('CARREGANDO');
+      await waitFor(() => expect(screen.getByTestId('estado')).toHaveTextContent('AUTENTICADO'), {
+        timeout: 8000,
+      });
+    },
+    10000,
+  );
 
   it('sem refresh guardado vai direto para ANONIMO, sem chamar a API', async () => {
     globalThis.fetch = jest.fn();

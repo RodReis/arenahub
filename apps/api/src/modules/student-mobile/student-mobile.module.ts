@@ -3,7 +3,13 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { BillingModule } from '../billing/billing.module.js';
 import { HealthModule } from '../health/health.module.js';
+import { PrivacyModule } from '../privacy/privacy.module.js';
 import { StudentIdentityModule } from '../student-identity/student-identity.module.js';
+import { MobileAvaliacoesController } from './mobile-avaliacoes.controller.js';
+import { MobileAvaliacoesService } from './mobile-avaliacoes.service.js';
+import { MobileConsentimentosController } from './mobile-consentimentos.controller.js';
+import { MobileConsentimentosService } from './mobile-consentimentos.service.js';
+import { MobileExportacoesController } from './mobile-exportacoes.controller.js';
 import { MobileFinanceiroController } from './mobile-financeiro.controller.js';
 import { MobileFinanceiroService } from './mobile-financeiro.service.js';
 import { MobileFrequenciaController } from './mobile-frequencia.controller.js';
@@ -17,7 +23,8 @@ import { MobilePlanoService } from './mobile-plano.service.js';
  * O que o APP LE -- separado do modulo de identidade, que cuida de quem o
  * aluno e.
  *
- * A Slice 4.3 (F25) pendura aqui o financeiro e a 4.4 as avaliacoes. A 4.2
+ * A Slice 4.3 (F25) pendurou aqui o financeiro e a 4.4 (F26) as avaliacoes,
+ * os consentimentos e a exportacao do historico. A 4.2
  * entrou SEM carteirinha e sem QR: foram cortados por decisao do PI em
  * 12/09/2026, e voltam quando ele decidir quem escaneia o QR.
  *
@@ -29,18 +36,23 @@ import { MobilePlanoService } from './mobile-plano.service.js';
  * arquitetura no 9: nunca a tabela do outro modulo).
  */
 @Module({
-  imports: [AuthModule, StudentIdentityModule, HealthModule, BillingModule],
+  imports: [AuthModule, StudentIdentityModule, HealthModule, BillingModule, PrivacyModule],
   controllers: [
     MobileHomeController,
     MobilePlanoController,
     MobileFrequenciaController,
     MobileFinanceiroController,
+    MobileAvaliacoesController,
+    MobileConsentimentosController,
+    MobileExportacoesController,
   ],
   providers: [
     MobileHomeService,
     MobilePlanoService,
     MobileFrequenciaService,
     MobileFinanceiroService,
+    MobileAvaliacoesService,
+    MobileConsentimentosService,
   ],
 })
 export class StudentMobileModule {}

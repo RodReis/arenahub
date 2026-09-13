@@ -224,7 +224,13 @@ export class AiAnalysisService {
   async ultimaPublicada(
     contexto: TenantContext,
     studentId: string,
-  ): Promise<{ id: string; saida: SaidaDaAnalise; geradaEm: Date } | null> {
+  ): Promise<{
+    id: string;
+    saida: SaidaDaAnalise;
+    geradaEm: Date;
+    model: string;
+    promptVersion: string;
+  } | null> {
     const aluno = await this.alunos.encontrar(contexto, studentId);
 
     if (aluno === null) {

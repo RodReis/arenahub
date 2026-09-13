@@ -130,6 +130,12 @@ export function criarCliente(opcoes: OpcoesDoCliente) {
         { method: 'POST', ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }) },
         false,
       ),
+    put: (caminho: string, corpo?: unknown) =>
+      requisitar(
+        caminho,
+        { method: 'PUT', ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }) },
+        false,
+      ),
     delete: (caminho: string) => requisitar(caminho, { method: 'DELETE' }, false),
   };
 }
