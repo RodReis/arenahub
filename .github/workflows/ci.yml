@@ -203,25 +203,35 @@ jobs:
       # NOS DOIS lugares -- aqui e no `turbo.json`.
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
-      # Heap maior para `test:integration`, que roda com `--runInBand`: as 43
+      # Heap maior para `test:integration`, que roda com `--runInBand`: as
       # suites compartilham UM processo, e cada uma monta um `AppModule` Nest
-      # proprio. A maioria delas nao chama `app.close()` no `afterAll`, entao
-      # os modulos ficam vivos ate o fim da execucao e o heap so cresce.
+      # proprio. A maioria delas fecha a app no `afterAll` (confirmado em
+      # 14/09/2026 -- toda suite com `INestApplication` tem `app?.close()`),
+      # mas o heap ainda cresce por suite: Prisma, Jest e o Node acumulam
+      # estado que a garbage collection nao libera antes da proxima suite
+      # montar outro modulo inteiro.
       #
       # NAO E DEFEITO DA FATIA QUE ESTOUROU: na F50 eram 42 suites e 640
-      # testes, e passava; a 43a cruzou o limiar do heap padrao do runner e o
-      # job morreu com `FATAL ERROR: Reached heap limit` (exit 134), que
-      # parece crash de teste e nao e -- nenhum teste falhou.
+      # testes, passava com 6144 MB; em 14/09/2026 (F29) eram 76 suites e o
+      # job morreu com `FATAL ERROR: Reached heap limit` (exit 134) na 76a --
+      # `mobile-avisos-telemetria.int-spec.ts` (F29) passou, quem nao coube
+      # foi `engagement-placar-imutavel.int-spec.ts`, pre-existente. Mesmo
+      # padrao do heap cruzando o limiar por ACUMULO, nao por suite ruim --
+      # nenhum teste falhou, todo o resto de 75/76 passou limpo.
       #
-      # Elevar o teto e a correcao PROPORCIONAL: fechar a app em ~40 suites
-      # alheias e refatoracao que nenhuma fatia pediu. O conserto de raiz
-      # (`afterAll` fechando a app em toda suite, ou tirar o `--runInBand`)
-      # vira card [INFRA] proprio.
+      # Elevar o teto e a correcao PROPORCIONAL, pela segunda vez: o `ubuntu-
+      # latest` do GitHub Actions tem 16 GB de RAM desde 2023 (era 7 GB
+      # quando o valor anterior foi calibrado), e 6144 MB de heap V8 deixava
+      # pouco para o resto do processo. 10240 MB tem folga real medida contra
+      # o runner atual. O conserto de raiz (parar de montar `AppModule` novo
+      # por suite, ou tirar o `--runInBand`) continua sendo card [INFRA]
+      # proprio -- subir o teto de novo quando a proxima fatia crescer e o
+      # sintoma de que ele precisa ser feito, nao a licenca para nunca fazer.
       #
       # Declarado AQUI e no `globalEnv` do `turbo.json`: o Turbo sanitiza o
       # ambiente e descarta variavel que nao esteja na lista -- ela sumiria
       # sem erro nenhum que apontasse a causa.
-      NODE_OPTIONS: --max-old-space-size=6144
+      NODE_OPTIONS: --max-old-space-size=10240
 
       # `postgres`, e NÃO `localhost`: com o job dentro de um container, o
       # runner liga os dois por uma rede Docker e o serviço passa a atender
