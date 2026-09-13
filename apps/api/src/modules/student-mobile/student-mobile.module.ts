@@ -14,6 +14,10 @@ import { MobileFinanceiroController } from './mobile-financeiro.controller.js';
 import { MobileFinanceiroService } from './mobile-financeiro.service.js';
 import { MobileFrequenciaController } from './mobile-frequencia.controller.js';
 import { MobileFrequenciaService } from './mobile-frequencia.service.js';
+import { MobileAvisosController } from './mobile-avisos.controller.js';
+import { MobileAvisosService } from './mobile-avisos.service.js';
+import { FakePushProviderAdapter } from './provider/fake-push-provider.adapter.js';
+import { PUSH_PROVIDER } from './provider/push-provider.port.js';
 import { MobileHomeController } from './mobile-home.controller.js';
 import { MobileHomeService } from './mobile-home.service.js';
 import { MobilePlanoController } from './mobile-plano.controller.js';
@@ -45,6 +49,7 @@ import { MobilePlanoService } from './mobile-plano.service.js';
     MobileAvaliacoesController,
     MobileConsentimentosController,
     MobileExportacoesController,
+    MobileAvisosController,
   ],
   providers: [
     MobileHomeService,
@@ -53,6 +58,18 @@ import { MobilePlanoService } from './mobile-plano.service.js';
     MobileFinanceiroService,
     MobileAvaliacoesService,
     MobileConsentimentosService,
+    MobileAvisosService,
+    FakePushProviderAdapter,
+    /**
+     * Real com credencial, dublê sem ela -- mesmo criterio de `AI_PROVIDER` e
+     * `DOCUMENT_EXTRACTOR`. O adapter do OneSignal (provedor escolhido pelo PI
+     * em 14/09/2026) entra quando as credenciais existirem; ate la o dublê
+     * atende, e `PUSH_NOTIFICATIONS` fica desligado.
+     *
+     * Sem provedor o aluno NAO perde aviso: a caixa interna e a entrega, e
+     * push e so um atalho ate ela.
+     */
+    { provide: PUSH_PROVIDER, useExisting: FakePushProviderAdapter },
   ],
 })
 export class StudentMobileModule {}

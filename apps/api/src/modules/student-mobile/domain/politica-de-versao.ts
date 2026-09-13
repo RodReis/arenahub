@@ -130,12 +130,13 @@ export function resolverVersao(
 
   // `>` e nao `>=`: carencia "ate as 12h" que ainda libera as 12h em ponto e,
   // na pratica, carencia ate 12h00'01".
-  const naCarencia = politica.carenciaAte !== undefined && politica.carenciaAte.getTime() > agora.getTime();
+  const carencia = politica.carenciaAte;
+  const naCarencia = carencia !== undefined && carencia.getTime() > agora.getTime();
 
   return {
     estado: naCarencia ? 'GRACE' : 'BLOCKED',
     minima: politica.minima,
-    carenciaAte: naCarencia ? (politica.carenciaAte as Date).toISOString() : null,
+    carenciaAte: naCarencia ? carencia.toISOString() : null,
     urlDeAtualizacao: url,
   };
 }
