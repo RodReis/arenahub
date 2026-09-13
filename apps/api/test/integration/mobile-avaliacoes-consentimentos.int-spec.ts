@@ -6,6 +6,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
+import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
@@ -163,7 +164,28 @@ describe('F26 -- Avaliacoes e consentimentos do app', () => {
   };
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    /*
+     * Storage FALSO -- mesmo padrao de `historico-e-comparativos.int-spec.ts`
+     * (F18). Sem o override, o `HealthExportService` bate no adaptador S3
+     * real: passa local com o MinIO de dev rodando e falha no CI, que nao
+     * sobe um servico de storage (`ECONNREFUSED 127.0.0.1:9000`).
+     */
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(OBJECT_STORAGE)
+      .useValue({
+        putPrivateObject: () => Promise.resolve(),
+        createPrivateDownload: (entrada: { key: string }) =>
+          Promise.resolve({
+            downloadUrl: `https://storage.test/${entrada.key}?assinada=1`,
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          }),
+        createPrivateUpload: () =>
+          Promise.resolve({ uploadUrl: 'https://storage.test/x', expiresAt: '' }),
+        headPrivateObject: () => Promise.resolve({ size: 1, contentType: 'text/csv' }),
+        deletePrivateObject: () => Promise.resolve(),
+        verificar: () => Promise.resolve(true),
+      })
+      .compile();
     app = moduleRef.createNestApplication();
     await app.init();
 
