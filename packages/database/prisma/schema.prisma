@@ -743,6 +743,10 @@ model Tenant {
   studentAccounts                  StudentAccount[]
   studentAccountTokens             StudentAccountToken[]
   studentSessions                  StudentSession[]
+
+  /// F29 -- avisos ao aluno e entrega por push.
+  studentNotifications             StudentNotification[]
+  pushSubscriptions                PushSubscription[]
   retentionTargetVersions          RetentionTargetVersion[]
   retentionFeatureSetVersions      RetentionFeatureSetVersion[]
   studentFeatureSnapshots          StudentFeatureSnapshot[]
@@ -1419,6 +1423,8 @@ model Student {
   retentionTasks                   RetentionTask[]
   retentionExperimentAssignments   RetentionExperimentAssignment[]
   retentionExperimentAdverseEvents RetentionExperimentAdverseEvent[]
+  notifications                    StudentNotification[]
+  pushSubscriptions                PushSubscription[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -6399,4 +6405,166 @@ enum StudentSessionStatus {
   ACTIVE
   ROTATED
   REVOKED
+}
+
+/// ---------------------------------------------------------------------------
+/// F29 -- aviso ao aluno.
+///
+/// A CAIXA INTERNA E A ENTREGA; O PUSH E SO UM ATALHO ATE ELA. As duas tabelas
+/// abaixo existem nessa ordem de importancia, e o desenho depende disso:
+///
+///   1. O aviso VIVE no banco e o aluno o le abrindo o app. Push negado,
+///      aparelho trocado, provedor fora do ar -- nada disso perde o aviso.
+///   2. `PushSubscription` e cache de endereco de entrega, descartavel por
+///      definicao. Perder a linha custa uma notificacao que nao toca o
+///      celular, nunca um aviso que some.
+///
+/// O inverso -- push como canal e banco como registro do que foi enviado --
+/// tornaria a fatura vencida invisivel para quem recusou notificacao, que e
+/// justamente o aluno que mais precisa ve-la.
+/// ---------------------------------------------------------------------------
+
+/// Um aviso para UM aluno.
+model StudentNotification {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  kind  StudentNotificationKind
+  title String
+  body  String
+
+  /// PARA ONDE o toque leva, como CODIGO -- nunca URL.
+  ///
+  /// O app traduz o codigo numa rota local que ele mesmo conhece. Guardar URL
+  /// aqui faria a tabela decidir para onde o app navega: quem conseguisse
+  /// escrever uma linha escolheria o destino, e `https://` num campo que o
+  /// app abre e phishing com a marca da academia em volta.
+  action StudentNotificationAction @default(NONE)
+
+  /// Alvo do `action`, quando ele precisa de um (a invoice de `OPEN_INVOICE`).
+  ///
+  /// UUID, nao texto livre: o app monta `/financeiro/{id}` e nada mais. Sem
+  /// alvo, `action` navega para a lista.
+  actionTargetId String? @map("action_target_id") @db.Uuid
+
+  /// Quando o aluno abriu. Nulo = nao lido, e e isso que o contador usa.
+  readAt DateTime? @map("read_at")
+
+  /// Quando o aviso deixa de valer a pena mostrar.
+  ///
+  /// "Sua fatura vence amanha" e ruido em marco se venceu em janeiro. Nulo
+  /// para aviso que nao envelhece.
+  expiresAt DateTime? @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// A consulta da caixa e sempre "os deste aluno, mais novos primeiro".
+  @@index([tenantId, studentId, createdAt])
+  @@map("student_notifications")
+}
+
+enum StudentNotificationKind {
+  /// Fatura aberta, vencendo ou vencida.
+  BILLING
+
+  /// Avaliacao fisica publicada.
+  ASSESSMENT
+
+  /// Plano suspenso, renovado, prestes a vencer.
+  MEMBERSHIP
+
+  /// Recado da academia.
+  GENERAL
+
+  @@map("student_notification_kind")
+}
+
+enum StudentNotificationAction {
+  NONE
+  OPEN_INVOICE
+  OPEN_ATTENDANCE
+  OPEN_HEALTH
+
+  @@map("student_notification_action")
+}
+
+/// Endereco de push de UM aparelho.
+///
+/// O TOKEN NAO E GUARDADO EM CLARO. `tokenCipher` e AES-256-GCM, e
+/// `tokenHash` (SHA-256) existe para achar a linha sem decifrar -- reenviar o
+/// mesmo token nao pode criar linha nova, e comparar criptograma nao funciona
+/// porque GCM usa nonce diferente a cada cifragem.
+model PushSubscription {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  provider PushProviderKind
+  platform PushPlatform
+
+  /// SHA-256 do token, em hex minusculo. Chave de idempotencia.
+  tokenHash String @map("token_hash")
+  /// Token cifrado (AES-256-GCM), base64. Decifrado so em memoria, no
+  /// instante anterior a chamada do provedor -- nunca logado, nunca serializado.
+  tokenCipher String @map("token_cipher")
+
+  /// Rotulo do aparelho, para o aluno reconhecer a linha numa lista.
+  /// OPACO, pelo mesmo criterio de `StudentSession.deviceLabel`.
+  deviceLabel String? @map("device_label")
+
+  /// Versao do termo `ENGAGEMENT_PUSH` vigente quando o aluno assinou.
+  ///
+  /// Congelada: saber sob QUAL texto ele consentiu e o que uma fiscalizacao
+  /// pergunta, e o documento vigente hoje pode ser outro.
+  consentVersion Int @map("consent_version")
+
+  /// Por que parou de valer. Nulo = ativa.
+  ///
+  /// Nao ha DELETE: o provedor devolvendo "token invalido" desativa a linha,
+  /// e apagar perderia a informacao de que aquele aparelho ja foi registrado.
+  revokedAt     DateTime?             @map("revoked_at")
+  revokedReason PushRevocationReason? @map("revoked_reason")
+
+  /// Ultimo envio aceito pelo provedor. Diagnostico, nao regra.
+  lastDeliveredAt DateTime? @map("last_delivered_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Um token, uma linha POR TENANT. Reenviar o mesmo token atualiza.
+  @@unique([tenantId, tokenHash])
+  @@index([tenantId, studentId])
+  @@map("push_subscriptions")
+}
+
+enum PushProviderKind {
+  /// Escolhido pelo PI em 14/09/2026. Adapter entra com as credenciais.
+  ONESIGNAL
+
+  @@map("push_provider_kind")
+}
+
+enum PushPlatform {
+  IOS
+  ANDROID
+
+  @@map("push_platform")
+}
+
+enum PushRevocationReason {
+  /// O aluno revogou `ENGAGEMENT_PUSH`.
+  CONSENT_REVOKED
+  /// O provedor recusou o token (app desinstalado, token rotacionado).
+  TOKEN_REJECTED
+  /// O aluno saiu da sessao naquele aparelho.
+  SESSION_ENDED
+
+  @@map("push_revocation_reason")
 }
