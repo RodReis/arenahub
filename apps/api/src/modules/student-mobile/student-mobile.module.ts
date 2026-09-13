@@ -14,6 +14,7 @@ import { MobileFinanceiroController } from './mobile-financeiro.controller.js';
 import { MobileFinanceiroService } from './mobile-financeiro.service.js';
 import { MobileFrequenciaController } from './mobile-frequencia.controller.js';
 import { MobileFrequenciaService } from './mobile-frequencia.service.js';
+import { MobileTelemetriaController } from './mobile-telemetria.controller.js';
 import { PoliticaDeCanalService } from './politica-de-canal.service.js';
 import { MobileAvisosController } from './mobile-avisos.controller.js';
 import { MobileAvisosService } from './mobile-avisos.service.js';
@@ -51,6 +52,7 @@ import { MobilePlanoService } from './mobile-plano.service.js';
     MobileConsentimentosController,
     MobileExportacoesController,
     MobileAvisosController,
+    MobileTelemetriaController,
   ],
   providers: [
     MobileHomeService,
