@@ -398,6 +398,13 @@ raiz:** fechar a app em ~40 suítes alheias é refatoração que nenhuma fatia p
 verdade — `afterAll` fechando a app em toda suíte, ou abandonar o `--runInBand` — é card `[INFRA]`
 próprio, e **a próxima fatia que acrescentar suíte de integração pode reencontrar o teto**.
 
+> **Atualização de 14/09/2026 (issue #327, `[FIX]`):** o teto subiu de novo (10240) quando a suíte
+> cresceu para 76+ suítes, e depois o `--runInBand` foi **abandonado** — o conserto de raiz que este
+> parágrafo previa. Confirmado antes de trocar: toda suíte com `INestApplication` já chama
+> `app?.close()` no `afterAll`; o heap crescia mesmo assim porque o processo era um só. Com
+> `--maxWorkers=4` cada worker tem heap próprio e o acúmulo deixa de existir por construção — ver
+> a entrega `FIX #327` no `docs/DEVELOPMENT.md`.
+
 🔴 **O CI sobe SÓ Postgres — nem MinIO, nem Redis.** Descoberto pela F51, que foi a **primeira
 suíte de integração a gravar objeto de verdade** no object storage e derrubou o pipeline com
 `ECONNREFUSED 127.0.0.1:9000`. Toda suíte de integração desta casa dubla o storage com
