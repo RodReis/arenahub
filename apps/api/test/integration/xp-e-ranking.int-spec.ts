@@ -17,6 +17,7 @@ import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { calcularHashDeCpf } from '../../src/modules/students/domain/identificacao.js';
 import { inicioDaSemanaLocal } from '../../src/modules/engagement/domain/semana-de-consistencia.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
+import { instanteDePassagemDeHoje } from './helpers/instante-de-passagem.js';
 
 /**
  * Fatia F31, Task 1 -- o modelo de dados do ledger de XP, conquistas e
@@ -570,21 +571,18 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
       const agoraReal = new Date();
       /*
        * DENTRO DO DIA LOCAL E JA NO PASSADO -- as duas condicoes, e nenhuma
-       * das duas e obvia:
+       * das duas e obvia. A escolha mora em `instanteDePassagemDeHoje`, que
+       * tem teste proprio varrendo os 1440 minutos do dia.
        *
-       *   `T12:00Z` fixo esta no FUTURO quando a suite roda de madrugada, e
-       *   passagem futura nao vira sessao -- o saldo voltava 0.
-       *
-       *   `agora - 1h` cego cai em ONTEM entre 00:00 e 01:00 no fuso da
-       *   academia, e ai a sessao nasce fora do mes/dia que o endpoint
-       *   consulta.
-       *
-       * O maior entre os dois satisfaz as duas em qualquer horario.
+       * A versao anterior pegava o MAIOR entre `agora - 1h` e
+       * `hoje local T00:05`. Resolve as duas condicoes isoladamente, mas se
+       * contradiz entre 00:00 e 00:05 local: nessa janela de cinco minutos
+       * `T00:05` ainda NAO ACONTECEU, ganha o maior, e a fixture nascia no
+       * FUTURO -- excluida pelo `lte: agora` de `frequenciaDoAluno`, nenhuma
+       * sessao gravada, saldo 0. Quebrou o CI em 05/09/2026 as 00:01 local
+       * (issue #279).
        */
-      const umaHoraAtras = new Date(agoraReal.getTime() - 60 * 60 * 1000);
-      const logoAposMeiaNoiteLocal = new Date(`${hojeLocal()}T00:05:00.000-03:00`);
-      const quandoPassou =
-        umaHoraAtras > logoAposMeiaNoiteLocal ? umaHoraAtras : logoAposMeiaNoiteLocal;
+      const quandoPassou = instanteDePassagemDeHoje(agoraReal);
 
       await gravarPassagemConfirmada(aluno, quandoPassou.toISOString());
       await projetarFrequencia(aluno, agoraReal);
@@ -755,13 +753,39 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
     };
 
     it('entrega o placar ja sem quem pediu opt-out, e sem studentId', async () => {
-      const idPorNome = await placarAoVivoCom(['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa']);
+      /*
+       * SEIS nomes, e nao cinco, para UM poder sair no opt-out e ainda sobrar
+       * a coorte minima (`Tenant.rankingMinimumCohort`, `@default(5)`).
+       *
+       * Com cinco, o teste so passava porque os alunos criados pelos casos
+       * ANTERIORES desta suite tambem tinham saldo no mes corrente e na mesma
+       * unidade -- `saldosDaUnidade` filtra por `(tenant, mes, unidade)`, nao
+       * pelos alunos que o caso criou. Era acoplamento invisivel: quando a
+       * correcao da issue #279 ainda nao existia e os casos anteriores nao
+       * gravavam saldo, sobravam 4 elegiveis, o placar vinha VAZIO e este
+       * caso falhava com `Expected substring: "Ana"`.
+       */
+      const idPorNome = await placarAoVivoCom([
+        'Ana',
+        'Bruno',
+        'Carla',
+        'Diego',
+        'Elisa',
+        'Fabio',
+      ]);
       await optOut(idPorNome['Bruno']!);
 
       const resposta = await heartbeat().expect(200);
 
       const corpo = resposta.body as { indicadores: { placar: unknown[] } };
       const serializado = JSON.stringify(corpo.indicadores.placar);
+
+      /*
+       * PRIMEIRO provar que o placar NAO esta vazio. Sem esta linha,
+       * `not.toContain('Bruno')` passa vacuamente num placar `[]` -- foi
+       * exatamente o que mascarou a coorte insuficiente ate a #279.
+       */
+      expect(corpo.indicadores.placar.length).toBeGreaterThan(0);
 
       expect(serializado).not.toContain('Bruno');
       expect(serializado).not.toContain('studentId');
