@@ -51,7 +51,7 @@ export function Badge({
           color: t.cor.state[tom],
           fontSize: t.type.tileLabel.size,
           lineHeight: t.type.tileLabel.lineHeight,
-          fontWeight: '600',
+          fontFamily: t.fonte(600),
         }}
       >
         {texto}

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Redirect } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Redirect, router } from 'expo-router';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useSessao } from '@/auth/sessao';
 import {
@@ -9,6 +8,7 @@ import {
   type DadosDaFrequencia,
   type PeriodoDaFrequencia,
 } from '@/features/frequencia/frequencia';
+import { Tela, TituloDaTela, Voltar } from '@/ui/Tela';
 import { useTema } from '@/ui/theme';
 
 /** O mesmo padrao do backend -- ausente vira `30D` la e aqui. */
@@ -24,7 +24,6 @@ const PERIODO_INICIAL: PeriodoDaFrequencia = '30D';
  */
 export default function TelaDaFrequencia() {
   const t = useTema();
-  const inset = useSafeAreaInsets();
   const { estado, cliente } = useSessao();
 
   const [periodo, setPeriodo] = useState<PeriodoDaFrequencia>(PERIODO_INICIAL);
@@ -76,15 +75,11 @@ export default function TelaDaFrequencia() {
   }
 
   return (
-    <ScrollView
-      style={{ backgroundColor: t.cor.bg.app }}
-      contentContainerStyle={[
-        estilos.conteudo,
-        { paddingTop: Math.max(inset.top, t.size.safeAreaTop) },
-      ]}
-    >
+    <Tela>
+      <Voltar rotulo="Voltar" onPress={() => (router.canGoBack() ? router.back() : router.navigate('/perfil'))} />
+      <TituloDaTela>Frequência</TituloDaTela>
       <Frequencia dados={dados} onTrocarPeriodo={setPeriodo} testID="frequencia" />
-    </ScrollView>
+    </Tela>
   );
 }
 

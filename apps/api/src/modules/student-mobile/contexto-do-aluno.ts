@@ -1,3 +1,4 @@
+import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import type { StudentChannelContext } from '../student-identity/student-identity.service.js';
 
@@ -42,4 +43,18 @@ export function tenantContextDoAluno(ctx: StudentChannelContext): TenantContext 
     permissions: new Set<string>(),
     allowedUnitIds: 'ALL',
   };
+}
+
+/**
+ * Sessao valida apontando para aluno que nao existe mais no tenant.
+ *
+ * 404 com codigo PROPRIO do canal, e nao o `UNAVAILABLE` da Home: a Home e o
+ * shell e tem de abrir mesmo sem conteudo, mas perfil e engajamento sao telas
+ * de DADO -- responder 200 com campos vazios faria o app exibir um perfil em
+ * branco como se fosse o do aluno.
+ */
+export class AlunoDaSessaoNaoEncontradoError extends ErroDeDominio {
+  constructor() {
+    super('MOBILE_STUDENT_NOT_FOUND', 404, 'Aluno nao encontrado');
+  }
 }

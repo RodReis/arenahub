@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Botao } from '../../ui/Botao.js';
 import { Campo } from '../../ui/Campo.js';
@@ -79,6 +79,7 @@ export function FormularioDeLogin({
           accessibilityRole="alert"
           style={{
             color: t.cor.state.err,
+            fontFamily: t.fonte(500),
             fontSize: t.type.body.size,
             lineHeight: t.type.body.lineHeight,
           }}
@@ -89,13 +90,23 @@ export function FormularioDeLogin({
 
       <Botao titulo="Entrar" onPress={enviar} carregando={enviando} testID="botao-entrar" />
 
-      <Botao
-        titulo="Esqueci minha senha"
-        variante="secundario"
-        emCard
+      {/*
+        Link, e nao botao secundario -- App Mobile v2: recuperar senha e saida
+        lateral do login, nao uma segunda acao do mesmo peso que "Entrar".
+        "Entrar com biometria" do prototipo NAO entra: o app nao tem login
+        biometrico, e o link levaria a lugar nenhum.
+      */}
+      <Pressable
         onPress={onEsqueciSenha}
+        accessibilityRole="link"
+        hitSlop={12}
         testID="botao-esqueci"
-      />
+        style={estilos.link}
+      >
+        <Text style={{ color: t.cor.accent.text, fontSize: 13, fontFamily: t.fonte(600) }}>
+          Esqueci minha senha
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -103,5 +114,8 @@ export function FormularioDeLogin({
 const estilos = StyleSheet.create({
   bloco: {
     gap: 14,
+  },
+  link: {
+    alignSelf: 'flex-start',
   },
 });

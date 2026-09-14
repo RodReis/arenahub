@@ -7122,6 +7122,302 @@
         ]
       }
     },
+    "/api/v1/mobile/avaliacoes/laudo": {
+      "get": {
+        "operationId": "MobileAvaliacoesController_laudo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Laudo da ultima avaliacao publicada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "avaliacao": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "data": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "metricas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string"
+                              },
+                              "valor": {
+                                "type": "number"
+                              },
+                              "unidade": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "leitura": {
+                                "type": "string",
+                                "enum": [
+                                  "BELOW",
+                                  "WITHIN",
+                                  "ABOVE",
+                                  "AT_LIMIT",
+                                  "UNKNOWN"
+                                ]
+                              },
+                              "faixaMin": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "faixaMax": {
+                                "type": "number",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "valor",
+                              "unidade",
+                              "leitura",
+                              "faixaMin",
+                              "faixaMax"
+                            ]
+                          }
+                        },
+                        "regioes": {
+                          "type": "object",
+                          "properties": {
+                            "ARM_LEFT": {
+                              "type": "object",
+                              "properties": {
+                                "gorduraKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "musculoKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "leituraGordura": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                },
+                                "leituraMusculo": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "gorduraKg",
+                                "musculoKg",
+                                "leituraGordura",
+                                "leituraMusculo"
+                              ]
+                            },
+                            "ARM_RIGHT": {
+                              "type": "object",
+                              "properties": {
+                                "gorduraKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "musculoKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "leituraGordura": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                },
+                                "leituraMusculo": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "gorduraKg",
+                                "musculoKg",
+                                "leituraGordura",
+                                "leituraMusculo"
+                              ]
+                            },
+                            "TRUNK": {
+                              "type": "object",
+                              "properties": {
+                                "gorduraKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "musculoKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "leituraGordura": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                },
+                                "leituraMusculo": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "gorduraKg",
+                                "musculoKg",
+                                "leituraGordura",
+                                "leituraMusculo"
+                              ]
+                            },
+                            "LEG_LEFT": {
+                              "type": "object",
+                              "properties": {
+                                "gorduraKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "musculoKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "leituraGordura": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                },
+                                "leituraMusculo": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "gorduraKg",
+                                "musculoKg",
+                                "leituraGordura",
+                                "leituraMusculo"
+                              ]
+                            },
+                            "LEG_RIGHT": {
+                              "type": "object",
+                              "properties": {
+                                "gorduraKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "musculoKg": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "leituraGordura": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                },
+                                "leituraMusculo": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BELOW",
+                                    "WITHIN",
+                                    "ABOVE",
+                                    "AT_LIMIT",
+                                    "UNKNOWN"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "gorduraKg",
+                                "musculoKg",
+                                "leituraGordura",
+                                "leituraMusculo"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "ARM_LEFT",
+                            "ARM_RIGHT",
+                            "TRUNK",
+                            "LEG_LEFT",
+                            "LEG_RIGHT"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "data",
+                        "metricas",
+                        "regioes"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "avaliacao"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileAvaliacoes"
+        ]
+      }
+    },
     "/api/v1/mobile/consentimentos": {
       "get": {
         "operationId": "MobileConsentimentosController_listar",
@@ -7583,6 +7879,327 @@
         },
         "tags": [
           "MobileTelemetria"
+        ]
+      }
+    },
+    "/api/v1/mobile/engajamento": {
+      "get": {
+        "operationId": "MobileEngajamentoController_obter",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Engajamento do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "AVAILABLE"
+                      ]
+                    },
+                    "mes": {
+                      "type": "string"
+                    },
+                    "unidade": {
+                      "type": "object",
+                      "properties": {
+                        "nome": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "nome"
+                      ]
+                    },
+                    "xp": {
+                      "type": "object",
+                      "properties": {
+                        "saldoDoMes": {
+                          "type": "number"
+                        },
+                        "conquistas": {
+                          "type": "array",
+                          "nullable": true,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "titulo": {
+                                "type": "string"
+                              },
+                              "desbloqueadaEm": {
+                                "type": "string"
+                              },
+                              "revertida": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "titulo",
+                              "desbloqueadaEm",
+                              "revertida"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "saldoDoMes",
+                        "conquistas"
+                      ]
+                    },
+                    "consistencia": {
+                      "type": "object",
+                      "properties": {
+                        "atual": {
+                          "type": "number"
+                        },
+                        "recorde": {
+                          "type": "number"
+                        },
+                        "diasPorSemana": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "atual",
+                        "recorde",
+                        "diasPorSemana"
+                      ]
+                    },
+                    "ranking": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "participa": {
+                          "type": "boolean"
+                        },
+                        "nomeExibido": {
+                          "type": "string"
+                        },
+                        "minhaPosicao": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "posicao": {
+                              "type": "number"
+                            },
+                            "pontos": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "posicao",
+                            "pontos"
+                          ]
+                        },
+                        "placar": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "posicao": {
+                                "type": "number"
+                              },
+                              "nome": {
+                                "type": "string"
+                              },
+                              "pontos": {
+                                "type": "number"
+                              },
+                              "souEu": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "posicao",
+                              "nome",
+                              "pontos",
+                              "souEu"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "participa",
+                        "nomeExibido",
+                        "minhaPosicao",
+                        "placar"
+                      ]
+                    },
+                    "desafios": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "titulo": {
+                            "type": "string"
+                          },
+                          "meta": {
+                            "type": "number"
+                          },
+                          "progresso": {
+                            "type": "number"
+                          },
+                          "inscrito": {
+                            "type": "boolean"
+                          },
+                          "inicio": {
+                            "type": "string"
+                          },
+                          "fim": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "titulo",
+                          "meta",
+                          "progresso",
+                          "inscrito",
+                          "inicio",
+                          "fim"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "status",
+                    "mes",
+                    "unidade",
+                    "xp",
+                    "consistencia",
+                    "ranking",
+                    "desafios"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileEngajamento"
+        ]
+      }
+    },
+    "/api/v1/mobile/engajamento/ranking": {
+      "post": {
+        "operationId": "MobileEngajamentoController_atualizarRanking",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chave de 8 a 120 caracteres.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preferencia de ranking apos a decisao.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "participa": {
+                      "type": "boolean"
+                    },
+                    "nomeExibido": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "participa",
+                    "nomeExibido"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobileEngajamento"
+        ]
+      }
+    },
+    "/api/v1/mobile/perfil": {
+      "get": {
+        "operationId": "MobilePerfilController_obter",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Perfil do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "nome": {
+                      "type": "string"
+                    },
+                    "matricula": {
+                      "type": "string"
+                    },
+                    "nascimento": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "email": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "telefone": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "alunoDesde": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "unidade": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "nome",
+                    "matricula",
+                    "nascimento",
+                    "email",
+                    "telefone",
+                    "alunoDesde",
+                    "unidade"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MobilePerfil"
         ]
       }
     },

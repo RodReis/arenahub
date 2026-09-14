@@ -68,7 +68,7 @@ export function Frequencia({
 
   const corpo = {
     color: t.cor.text.secondary,
-    fontSize: t.type.body.size,
+    fontSize: t.type.body.size, fontFamily: t.fonte(400),
     lineHeight: t.type.body.lineHeight,
   };
 
@@ -109,7 +109,7 @@ export function Frequencia({
               style={{
                 color: ativo ? t.cor.text.primary : t.cor.text.secondary,
                 fontSize: t.type.meta.size,
-                fontWeight: ativo ? '600' : '400',
+                fontFamily: t.fonte((ativo ? 600 : 400)),
               }}
             >
               {ROTULO_DO_PERIODO[periodo]}
@@ -152,9 +152,8 @@ export function Frequencia({
               testID="frequencia-total"
               style={{
                 color: t.cor.text.primary,
-                fontSize: t.type.screenTitle.size,
+                fontSize: t.type.screenTitle.size, fontFamily: t.fonte(700),
                 lineHeight: t.type.screenTitle.lineHeight,
-                fontWeight: '700',
               }}
             >
               {dados.totalDeSessoes}

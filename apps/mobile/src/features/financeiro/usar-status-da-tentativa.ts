@@ -34,6 +34,11 @@ export function usarStatusDaTentativa(
   consultarRef.current = consultar;
 
   useEffect(() => {
+    // Tentativa NOVA zera o status da anterior -- App Mobile v2: "Tentar de
+    // novo" depois de um FAILED mostraria o FAILED velho ate a primeira
+    // consulta da tentativa nova voltar.
+    setStatus(null);
+
     // Sem tentativa ainda (id vazio): nao ha o que consultar. A tela de
     // pagamento chama este hook antes de criar o PIX/checkout.
     if (!paymentAttemptId) return;

@@ -59,6 +59,61 @@ const ESQUEMA_DO_HISTORICO = {
   required: ['asOf', 'periodo', 'series', 'analise'],
 };
 
+const LEITURAS = ['BELOW', 'WITHIN', 'ABOVE', 'AT_LIMIT', 'UNKNOWN'];
+
+const ESQUEMA_DA_REGIAO_DO_LAUDO = {
+  type: 'object',
+  properties: {
+    gorduraKg: { type: 'number', nullable: true },
+    musculoKg: { type: 'number', nullable: true },
+    leituraGordura: { type: 'string', enum: LEITURAS },
+    leituraMusculo: { type: 'string', enum: LEITURAS },
+  },
+  required: ['gorduraKg', 'musculoKg', 'leituraGordura', 'leituraMusculo'],
+};
+
+const ESQUEMA_DO_LAUDO = {
+  type: 'object',
+  properties: {
+    asOf: { type: 'string' },
+    avaliacao: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        data: { type: 'string', format: 'date' },
+        metricas: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              tipo: { type: 'string' },
+              valor: { type: 'number' },
+              unidade: { type: 'string', nullable: true },
+              leitura: { type: 'string', enum: LEITURAS },
+              faixaMin: { type: 'number', nullable: true },
+              faixaMax: { type: 'number', nullable: true },
+            },
+            required: ['tipo', 'valor', 'unidade', 'leitura', 'faixaMin', 'faixaMax'],
+          },
+        },
+        regioes: {
+          type: 'object',
+          properties: {
+            ARM_LEFT: ESQUEMA_DA_REGIAO_DO_LAUDO,
+            ARM_RIGHT: ESQUEMA_DA_REGIAO_DO_LAUDO,
+            TRUNK: ESQUEMA_DA_REGIAO_DO_LAUDO,
+            LEG_LEFT: ESQUEMA_DA_REGIAO_DO_LAUDO,
+            LEG_RIGHT: ESQUEMA_DA_REGIAO_DO_LAUDO,
+          },
+          required: ['ARM_LEFT', 'ARM_RIGHT', 'TRUNK', 'LEG_LEFT', 'LEG_RIGHT'],
+        },
+      },
+      required: ['data', 'metricas', 'regioes'],
+    },
+  },
+  required: ['asOf', 'avaliacao'],
+};
+
 /** Periodo padrao: o suficiente para o grafico ter forma sem virar historia. */
 const PERIODO_PADRAO: Periodo = '90D';
 
@@ -88,5 +143,19 @@ export class MobileAvaliacoesController {
     const escolhido = PERIODOS.find((p) => p === periodo) ?? PERIODO_PADRAO;
 
     return this.avaliacoes.montar(ctx, escolhido, new Date());
+  }
+
+  /**
+   * `laudo` e caminho LITERAL, e este controller nao tem rota `:param` -- nao
+   * ha colisao. Se um dia entrar `GET :id`, esta rota tem de ficar declarada
+   * ANTES dela, senao o Express casa `laudo` como id.
+   */
+  @Get('laudo')
+  @ApiOkResponse({ description: 'Laudo da ultima avaliacao publicada.', schema: ESQUEMA_DO_LAUDO })
+  async laudo(@Req() requisicao: Request) {
+    const ctx = requisicao.studentContext;
+    if (!ctx) throw new NaoAutenticadoError();
+
+    return this.avaliacoes.laudo(ctx, new Date());
   }
 }

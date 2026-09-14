@@ -41,7 +41,7 @@ export function Campo({
           color: t.cor.text.secondary,
           fontSize: t.type.fieldLabel.size,
           lineHeight: t.type.fieldLabel.lineHeight,
-          fontWeight: '600',
+          fontFamily: t.fonte(600),
         }}
       >
         {rotulo}
@@ -58,7 +58,9 @@ export function Campo({
           {
             height: t.size.control,
             borderRadius: t.radius.control,
-            backgroundColor: t.cor.bg.surface,
+            // `bg/app` -- o poco dentro do card e da folha (DS-APP §2.1, v2).
+            backgroundColor: t.cor.bg.app,
+            fontFamily: t.fonte(400),
             borderColor: corDaBorda,
             color: t.cor.text.primary,
           },
@@ -73,7 +75,7 @@ export function Campo({
           accessibilityRole="alert"
           style={{
             color: t.cor.state.err,
-            fontSize: t.type.meta.size,
+            fontSize: t.type.meta.size, fontFamily: t.fonte(400),
             lineHeight: t.type.meta.lineHeight,
           }}
         >
@@ -91,6 +93,6 @@ const estilos = StyleSheet.create({
   campo: {
     borderWidth: 1,
     paddingHorizontal: 14,
-    fontSize: 15,
+    fontSize: 16,
   },
 });

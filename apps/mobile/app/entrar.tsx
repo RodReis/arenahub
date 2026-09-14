@@ -1,89 +1,78 @@
+import { useState } from 'react';
 import { Redirect, router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { Text, View } from 'react-native';
 
 import { useSessao } from '@/auth/sessao';
 import { FormularioDeLogin } from '@/features/auth/formulario-de-login';
-import { useTema } from '@/ui/theme';
+import { BoasVindas } from '@/features/boas-vindas/boas-vindas';
+import { Folha } from '@/ui/Folha';
+import { ProvedorDeTema, useTema } from '@/ui/theme';
 import { TENANT_SLUG } from '@/config';
 
 /**
- * Login -- DS-APP.md §3.2: a unica tela fora do shell de abas.
+ * Entrada de quem nao tem sessao -- App Mobile v2: a abertura com a arte 3D e
+ * o login numa folha por cima dela.
+ *
+ * A ROTA CONTINUA SENDO `/entrar`: toda guarda do app redireciona para ca, e
+ * a F23 ja registrou o que acontece quando so uma porta sabe sair do login.
  *
  * O SLUG DA ACADEMIA NAO E DIGITADO PELO ALUNO. Ele vem da configuracao do
  * build (`EXPO_PUBLIC_TENANT_SLUG`): pedir ao aluno que saiba o
  * identificador tecnico da propria academia seria transferir a ele um
- * detalhe de implementacao. No piloto ha um cliente; quando houver mais, a
- * escolha e por build proprio ou por tela de selecao -- decisao de produto,
- * nao deste arquivo.
+ * detalhe de implementacao.
+ *
+ * TEMA ESCURO FORCADO, nos dois temas do SO: a abertura e desenhada sobre a
+ * arte, e a arte e escura (ver `BoasVindas`).
  */
 export default function Entrar() {
-  const t = useTema();
-  const inset = useSafeAreaInsets();
-  const { estado, entrar } = useSessao();
+  const { estado } = useSessao();
 
   /*
    * SAIR DAQUI QUANDO A SESSAO EXISTIR -- e nao so na abertura do app.
    *
-   * O defeito que isto corrige so apareceu no emulador: o login funcionava
-   * (a API recebia e respondia 200, sem erro em log nenhum), o estado virava
-   * `AUTENTICADO`, e a TELA NAO SAIA DO LOGIN. So `app/index.tsx`
-   * redirecionava, e quem ja estava em `/entrar` ficava.
-   *
-   * Nenhum teste pegava: os unitarios afirmam que `onEntrar` foi chamado, e o
-   * de integracao que a API responde. A navegacao entre as duas coisas nao
-   * era exercitada por ninguem.
+   * O defeito que isto corrige so apareceu no emulador (F23): o login
+   * funcionava, o estado virava `AUTENTICADO`, e a TELA NAO SAIA DO LOGIN.
    */
   if (estado.tipo === 'AUTENTICADO') return <Redirect href="/inicio" />;
 
   return (
-    <ScrollView
-      style={{ backgroundColor: t.cor.bg.app }}
-      contentContainerStyle={[
-        estilos.conteudo,
-        { paddingTop: Math.max(inset.top, t.size.safeAreaTop) + 40 },
-      ]}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={estilos.cabecalho}>
-        <Text
-          style={{
-            color: t.cor.text.primary,
-            fontSize: t.type.loginTitle.size,
-            lineHeight: t.type.loginTitle.lineHeight,
-            fontWeight: '700',
-          }}
-        >
-          Clínica de Musculação
-        </Text>
-        <Text
-          style={{
-            color: t.cor.text.secondary,
-            fontSize: t.type.body.size,
-            lineHeight: t.type.body.lineHeight,
-          }}
-        >
-          Disciplina hoje, resultados sempre.
-        </Text>
-      </View>
-
-      <FormularioDeLogin
-        onEntrar={({ identificador, senha }) =>
-          entrar({ tenantSlug: TENANT_SLUG, identificador, senha })
-        }
-        onEsqueciSenha={() => router.push('/recuperar')}
-      />
-    </ScrollView>
+    <ProvedorDeTema forcarTema="dark">
+      <StatusBar style="light" />
+      <Abertura />
+    </ProvedorDeTema>
   );
 }
 
-const estilos = StyleSheet.create({
-  conteudo: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-    gap: 24,
-  },
-  cabecalho: {
-    gap: 6,
-  },
-});
+function Abertura() {
+  const t = useTema();
+  const { entrar } = useSessao();
+  const [loginAberto, setLoginAberto] = useState(false);
+
+  return (
+    <>
+      <BoasVindas onEntrar={() => setLoginAberto(true)} testID="boas-vindas" />
+
+      <Folha aberta={loginAberto} onFechar={() => setLoginAberto(false)} testID="folha-login">
+        <View>
+          <Text accessibilityRole="header" style={{ color: t.cor.text.primary, fontSize: 20, fontFamily: t.fonte(700) }}>
+            Entrar
+          </Text>
+          <Text style={{ color: t.cor.text.muted, fontSize: 13, marginTop: 2, fontFamily: t.fonte(400) }}>
+            Use o e-mail ou telefone cadastrado na recepção.
+          </Text>
+        </View>
+
+        <FormularioDeLogin
+          onEntrar={({ identificador, senha }) =>
+            entrar({ tenantSlug: TENANT_SLUG, identificador, senha })
+          }
+          onEsqueciSenha={() => {
+            setLoginAberto(false);
+            router.push('/recuperar');
+          }}
+        />
+      </Folha>
+    </>
+  );
+}

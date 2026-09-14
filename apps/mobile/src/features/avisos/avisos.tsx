@@ -73,7 +73,7 @@ export function Avisos({
 
   const corpo = {
     color: t.cor.text.secondary,
-    fontSize: t.type.body.size,
+    fontSize: t.type.body.size, fontFamily: t.fonte(400),
     lineHeight: t.type.body.lineHeight,
   };
 
@@ -128,7 +128,7 @@ export function Avisos({
                       lineHeight: t.type.cardTitle.lineHeight,
                       // Nao lido em negrito: peso e o segundo canal, ao lado
                       // do ponto, para quem nao distingue a cor do ponto.
-                      fontWeight: aviso.lido ? '400' : '700',
+                      fontFamily: t.fonte((aviso.lido ? 400 : 700)),
                     }}
                   >
                     {aviso.titulo}

@@ -27,6 +27,7 @@ export default function Entrada() {
     );
   }
 
+  // `/inicio` e a primeira aba do grupo `(abas)` -- o grupo nao entra na URL.
   return <Redirect href={estado.tipo === 'AUTENTICADO' ? '/inicio' : '/entrar'} />;
 }
 

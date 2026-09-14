@@ -2,11 +2,16 @@ import { Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module.js';
 import { BillingModule } from '../billing/billing.module.js';
+import { EngagementModule } from '../engagement/engagement.module.js';
 import { HealthModule } from '../health/health.module.js';
 import { PrivacyModule } from '../privacy/privacy.module.js';
 import { StudentIdentityModule } from '../student-identity/student-identity.module.js';
 import { MobileAvaliacoesController } from './mobile-avaliacoes.controller.js';
 import { MobileAvaliacoesService } from './mobile-avaliacoes.service.js';
+import { MobileEngajamentoController } from './mobile-engajamento.controller.js';
+import { MobileEngajamentoService } from './mobile-engajamento.service.js';
+import { MobilePerfilController } from './mobile-perfil.controller.js';
+import { MobilePerfilService } from './mobile-perfil.service.js';
 import { MobileConsentimentosController } from './mobile-consentimentos.controller.js';
 import { MobileConsentimentosService } from './mobile-consentimentos.service.js';
 import { MobileExportacoesController } from './mobile-exportacoes.controller.js';
@@ -39,10 +44,19 @@ import { MobilePlanoService } from './mobile-plano.service.js';
  * `AttendanceService` -- a frequencia e derivada la desde a F18, e este
  * modulo so a traduz para o app (`M4-FR-008`) --, e `BillingModule` pelos
  * casos de uso de PIX/checkout/tentativa/recibo que a F25 reusa (regra de
- * arquitetura no 9: nunca a tabela do outro modulo).
+ * arquitetura no 9: nunca a tabela do outro modulo). `EngagementModule` entra
+ * pelos casos de uso de XP, placar e desafios que o totem ja consome -- o app
+ * os traduz, nao os recalcula.
  */
 @Module({
-  imports: [AuthModule, StudentIdentityModule, HealthModule, BillingModule, PrivacyModule],
+  imports: [
+    AuthModule,
+    StudentIdentityModule,
+    HealthModule,
+    BillingModule,
+    PrivacyModule,
+    EngagementModule,
+  ],
   controllers: [
     MobileHomeController,
     MobilePlanoController,
@@ -53,6 +67,8 @@ import { MobilePlanoService } from './mobile-plano.service.js';
     MobileExportacoesController,
     MobileAvisosController,
     MobileTelemetriaController,
+    MobileEngajamentoController,
+    MobilePerfilController,
   ],
   providers: [
     MobileHomeService,
@@ -63,6 +79,8 @@ import { MobilePlanoService } from './mobile-plano.service.js';
     MobileConsentimentosService,
     MobileAvisosService,
     PoliticaDeCanalService,
+    MobileEngajamentoService,
+    MobilePerfilService,
     FakePushProviderAdapter,
     /**
      * Real com credencial, dublê sem ela -- mesmo criterio de `AI_PROVIDER` e

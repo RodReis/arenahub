@@ -66,9 +66,8 @@ export function Carteirinha({
               numberOfLines={1}
               style={{
                 color: t.cor.text.primary,
-                fontSize: t.type.cardTitle.size,
+                fontSize: t.type.cardTitle.size, fontFamily: t.fonte(600),
                 lineHeight: t.type.cardTitle.lineHeight,
-                fontWeight: '600',
               }}
             >
               {nome}
@@ -88,7 +87,7 @@ export function Carteirinha({
           <Text
             style={{
               color: t.cor.text.muted,
-              fontSize: t.type.meta.size,
+              fontSize: t.type.meta.size, fontFamily: t.fonte(400),
               lineHeight: t.type.meta.lineHeight,
               textAlign: 'right',
             }}
@@ -126,7 +125,7 @@ export function Carteirinha({
           <Text
             style={{
               color: t.cor.text.muted,
-              fontSize: t.type.meta.size,
+              fontSize: t.type.meta.size, fontFamily: t.fonte(400),
               lineHeight: t.type.meta.lineHeight,
               textAlign: 'center',
             }}

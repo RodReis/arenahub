@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Redirect } from 'expo-router';
-import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Redirect, router } from 'expo-router';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { useSessao } from '@/auth/sessao';
 import { Botao } from '@/ui/Botao';
 import { Card } from '@/ui/Card';
+import { Tela, TituloDaTela, Voltar } from '@/ui/Tela';
 import { useTema } from '@/ui/theme';
 
 interface Exportacao {
@@ -57,7 +57,6 @@ const TEXTO: Record<Exportacao['status'], { titulo: string; descricao: string }>
  */
 export default function TelaDeExportacao() {
   const t = useTema();
-  const inset = useSafeAreaInsets();
   const { estado, cliente } = useSessao();
 
   const [job, setJob] = useState<Exportacao | null>(null);
@@ -136,20 +135,15 @@ export default function TelaDeExportacao() {
   const texto = job === null ? null : TEXTO[job.status];
 
   return (
-    <ScrollView
-      style={{ backgroundColor: t.cor.bg.app }}
-      contentContainerStyle={[
-        estilos.conteudo,
-        { paddingTop: Math.max(inset.top, t.size.safeAreaTop) },
-      ]}
-    >
+    <Tela>
+      <Voltar rotulo="Voltar" onPress={() => (router.canGoBack() ? router.back() : router.navigate('/perfil'))} />
+      <TituloDaTela>Exportar histórico</TituloDaTela>
       <Card testID="exportacao">
         <Text
           style={{
             color: t.cor.text.primary,
-            fontSize: t.type.cardTitle.size,
+            fontSize: t.type.cardTitle.size, fontFamily: t.fonte(600),
             lineHeight: t.type.cardTitle.lineHeight,
-            fontWeight: '600',
           }}
         >
           Levar meus dados
@@ -158,7 +152,7 @@ export default function TelaDeExportacao() {
         <Text
           style={{
             color: t.cor.text.secondary,
-            fontSize: t.type.body.size,
+            fontSize: t.type.body.size, fontFamily: t.fonte(400),
             lineHeight: t.type.body.lineHeight,
             marginTop: 6,
           }}
@@ -168,13 +162,13 @@ export default function TelaDeExportacao() {
 
         {texto !== null && (
           <View style={estilos.estado} testID="exportacao-estado">
-            <Text style={{ color: t.cor.text.primary, fontSize: 15, fontWeight: '600' }}>
+            <Text style={{ color: t.cor.text.primary, fontSize: 15, fontFamily: t.fonte(600),}}>
               {texto.titulo}
             </Text>
             <Text
               style={{
                 color: t.cor.text.secondary,
-                fontSize: t.type.body.size,
+                fontSize: t.type.body.size, fontFamily: t.fonte(400),
                 lineHeight: t.type.body.lineHeight,
               }}
             >
@@ -184,7 +178,7 @@ export default function TelaDeExportacao() {
         )}
 
         {erro !== null && (
-          <Text style={{ color: t.cor.state.err, fontSize: 13, marginTop: 12 }} testID="exportacao-erro">
+          <Text style={{ color: t.cor.state.err, fontSize: 13, fontFamily: t.fonte(400), marginTop: 12 }} testID="exportacao-erro">
             {erro}
           </Text>
         )}
@@ -203,7 +197,7 @@ export default function TelaDeExportacao() {
           )}
         </View>
       </Card>
-    </ScrollView>
+    </Tela>
   );
 }
 
