@@ -43,9 +43,8 @@ export function EstadoDeEspera({
         <Text
           style={{
             color: t.cor.text.primary,
-            fontSize: t.type.sheetTitle.size,
+            fontSize: t.type.sheetTitle.size, fontFamily: t.fonte(700),
             lineHeight: t.type.sheetTitle.lineHeight,
-            fontWeight: '700',
             textAlign: 'center',
           }}
         >
@@ -55,7 +54,7 @@ export function EstadoDeEspera({
         <Text
           style={{
             color: t.cor.text.secondary,
-            fontSize: t.type.body.size,
+            fontSize: t.type.body.size, fontFamily: t.fonte(400),
             lineHeight: t.type.body.lineHeight,
             textAlign: 'center',
           }}

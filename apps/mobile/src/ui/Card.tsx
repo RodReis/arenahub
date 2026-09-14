@@ -49,7 +49,15 @@ export function Card({
           backgroundColor: destaque ? t.cor.bg.raised : t.cor.bg.surface,
           borderRadius: t.radius.card,
           borderWidth: semBorda ? 0 : 1,
-          borderColor: t.cor.border.default,
+          /*
+           * `hairline`, e nao `default` -- App Mobile v2. O prototipo v2 pinta
+           * card sem contorno visivel no escuro; o fio `hairline` mantem a
+           * separacao medida acima sem o traco claro de `default`, que e a
+           * borda de CONTROLE tocavel (WCAG 1.4.11 vale para campo e botao,
+           * nao para card). No claro, `hairline` e exatamente o `#E5E9EE` que
+           * o DS-APP §2.1 pede em todo card branco.
+           */
+          borderColor: t.cor.border.hairline,
         },
       ]}
     >
@@ -60,7 +68,7 @@ export function Card({
               color: t.cor.text.primary,
               fontSize: t.type.cardTitle.size,
               lineHeight: t.type.cardTitle.lineHeight,
-              fontWeight: '600',
+              fontFamily: t.fonte(600),
             }}
           >
             {titulo}

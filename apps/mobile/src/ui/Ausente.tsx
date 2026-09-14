@@ -21,7 +21,7 @@ export function Ausente({ motivo, testID }: { motivo?: string; testID?: string }
       accessibilityLabel={motivo ?? 'sem informação'}
       style={{
         color: t.cor.text.muted,
-        fontSize: t.type.body.size,
+        fontSize: t.type.body.size, fontFamily: t.fonte(400),
         lineHeight: t.type.body.lineHeight,
       }}
     >

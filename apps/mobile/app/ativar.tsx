@@ -65,7 +65,7 @@ export default function Ativar() {
         <Text
           style={{
             color: t.cor.text.secondary,
-            fontSize: t.type.body.size,
+            fontSize: t.type.body.size, fontFamily: t.fonte(400),
             textAlign: 'center',
           }}
         >
@@ -88,9 +88,8 @@ export default function Ativar() {
         <Text
           style={{
             color: t.cor.text.primary,
-            fontSize: t.type.loginTitle.size,
+            fontSize: t.type.loginTitle.size, fontFamily: t.fonte(700),
             lineHeight: t.type.loginTitle.lineHeight,
-            fontWeight: '700',
           }}
         >
           Criar sua senha
@@ -98,7 +97,7 @@ export default function Ativar() {
         <Text
           style={{
             color: t.cor.text.secondary,
-            fontSize: t.type.body.size,
+            fontSize: t.type.body.size, fontFamily: t.fonte(400),
             lineHeight: t.type.body.lineHeight,
           }}
         >

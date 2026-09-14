@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { useTema } from './theme.js';
 
-export type VarianteDeBotao = 'primario' | 'secundario' | 'neutro';
+export type VarianteDeBotao = 'primario' | 'secundario' | 'neutro' | 'destrutivo';
 
 /**
  * Botao -- DS-APP.md v2.1 §4.2.
@@ -44,8 +44,11 @@ export function Botao({
   const inativo = desabilitado || carregando;
   const primario = variante === 'primario';
 
+  const destrutivo = variante === 'destrutivo';
   const tinta = primario
     ? t.cor.accent.onAccent
+    : destrutivo
+      ? t.cor.state.err
     : variante === 'secundario'
       ? t.cor.accent.text
       : t.cor.text.primary;
@@ -63,7 +66,7 @@ export function Botao({
           color: tinta,
           fontSize: papel.size,
           lineHeight: papel.lineHeight,
-          fontWeight: String(papel.weight) as '600' | '700',
+          fontFamily: t.fonte(papel.weight),
         }}
       >
         {titulo}
@@ -110,7 +113,9 @@ export function Botao({
               height: altura,
               borderRadius: t.radius.control,
               borderWidth: 1,
-              borderColor: t.cor.border.default,
+              // Destrutivo: contorno no tom de erro, texto no mesmo tom -- o
+              // gradiente azul e ACAO da marca, e "Sair da conta" nao e isso.
+              borderColor: destrutivo ? t.cor.state.err : t.cor.border.default,
             },
           ]}
         >

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Redirect } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Redirect, router } from 'expo-router';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useSessao } from '@/auth/sessao';
 import {
@@ -10,6 +9,7 @@ import {
   type DadosDosConsentimentos,
 } from '@/features/consentimentos/consentimentos';
 import { Ausente } from '@/ui/Ausente';
+import { Tela, TituloDaTela, Voltar } from '@/ui/Tela';
 import { useTema } from '@/ui/theme';
 
 /**
@@ -22,7 +22,6 @@ import { useTema } from '@/ui/theme';
  */
 export default function TelaDosConsentimentos() {
   const t = useTema();
-  const inset = useSafeAreaInsets();
   const { estado, cliente } = useSessao();
 
   const [dados, setDados] = useState<DadosDosConsentimentos | null>(null);
@@ -89,13 +88,9 @@ export default function TelaDosConsentimentos() {
   }
 
   return (
-    <ScrollView
-      style={{ backgroundColor: t.cor.bg.app }}
-      contentContainerStyle={[
-        estilos.conteudo,
-        { paddingTop: Math.max(inset.top, t.size.safeAreaTop) },
-      ]}
-    >
+    <Tela>
+      <Voltar rotulo="Voltar" onPress={() => (router.canGoBack() ? router.back() : router.navigate('/perfil'))} />
+      <TituloDaTela>Permissões e privacidade</TituloDaTela>
       {dados === null ? (
         <Ausente
           motivo="Não foi possível carregar suas permissões agora. Tente de novo em instantes."
@@ -109,7 +104,7 @@ export default function TelaDosConsentimentos() {
           testID="consentimentos"
         />
       )}
-    </ScrollView>
+    </Tela>
   );
 }
 

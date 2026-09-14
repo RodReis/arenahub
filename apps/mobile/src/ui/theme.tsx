@@ -40,7 +40,28 @@ export interface Tema {
    * esta funcao produz.
    */
   readonly tint: (tom: Tom) => { readonly bg: string; readonly border: string };
+  /**
+   * Familia da Inter no peso pedido -- App Mobile v2.
+   *
+   * FAMILIA POR PESO, e nao `fontWeight` sobre uma familia so: no Android uma
+   * fonte carregada por `expo-font` ignora `fontWeight`, e o titulo 800 do
+   * prototipo sairia no peso regular. Cada peso e um arquivo, e o nome do
+   * arquivo e o nome da familia.
+   */
+  readonly fonte: (peso: PesoDaFonte) => string;
+  /** JetBrains Mono -- identificador e codigo (matricula, copia e cola). */
+  readonly mono: string;
 }
+
+export type PesoDaFonte = 400 | 500 | 600 | 700 | 800;
+
+const FAMILIA_DO_PESO: Record<PesoDaFonte, string> = {
+  400: 'Inter_400Regular',
+  500: 'Inter_500Medium',
+  600: 'Inter_600SemiBold',
+  700: 'Inter_700Bold',
+  800: 'Inter_800ExtraBold',
+};
 
 /**
  * `rgba` a partir do hex do tom.
@@ -52,7 +73,7 @@ export interface Tema {
  * dois chegam ao mesmo pixel, porque a superficie sob o badge e sempre
  * `bg/surface` -- que e o fundo contra o qual o build mistura.
  */
-const rgba = (hex: string, alpha: number): string => {
+export const rgba = (hex: string, alpha: number): string => {
   const c = hex.replace('#', '');
   const r = Number.parseInt(c.slice(0, 2), 16);
   const g = Number.parseInt(c.slice(2, 4), 16);
@@ -76,6 +97,8 @@ const criarTema = (nome: AppTheme): Tema => {
       bg: rgba(cor.state[tom], opacidade.bg),
       border: rgba(cor.state[tom], opacidade.border),
     }),
+    fonte: (peso) => FAMILIA_DO_PESO[peso],
+    mono: 'JetBrainsMono_400Regular',
   };
 };
 

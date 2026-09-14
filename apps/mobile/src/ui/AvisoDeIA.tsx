@@ -50,9 +50,8 @@ export function AvisoDeIA({
         <Text
           style={{
             color: t.cor.text.primary,
-            fontSize: t.type.body.size,
+            fontSize: t.type.body.size, fontFamily: t.fonte(600),
             lineHeight: t.type.body.lineHeight,
-            fontWeight: '600',
           }}
         >
           Não é diagnóstico médico
@@ -60,7 +59,7 @@ export function AvisoDeIA({
         <Text
           style={{
             color: t.cor.text.secondary,
-            fontSize: t.type.body.size,
+            fontSize: t.type.body.size, fontFamily: t.fonte(400),
             lineHeight: t.type.body.lineHeight,
           }}
         >
@@ -71,7 +70,7 @@ export function AvisoDeIA({
         <Text
           style={{
             color: t.cor.text.muted,
-            fontSize: t.type.meta.size,
+            fontSize: t.type.meta.size, fontFamily: t.fonte(400),
             lineHeight: t.type.meta.lineHeight,
           }}
         >

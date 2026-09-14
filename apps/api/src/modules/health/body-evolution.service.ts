@@ -43,6 +43,17 @@ export interface MetricaDoMes {
   readonly value: number;
   readonly unit: string | null;
   readonly reading: Leitura;
+  /**
+   * Faixa ABSOLUTA do fabricante (na unidade canonica) que decidiu `reading`
+   * -- `null` quando a medida nao veio de laudo importado ou o laudo so trouxe
+   * percentual do padrao.
+   *
+   * Vai junto para o app DESENHAR a faixa ao lado do valor (F-mobile-v2). A
+   * leitura continua decidida aqui: o cliente pinta a barra, nunca compara o
+   * valor com a faixa por conta propria (topo de `domain/leitura-de-faixa.ts`).
+   */
+  readonly referenceMin: number | null;
+  readonly referenceMax: number | null;
 }
 
 export interface MesDaEvolucao {
@@ -334,5 +345,7 @@ function montarMetricas(
       value: medida.canonicalValue.toNumber(),
       unit: medida.canonicalUnit?.toLowerCase() ?? null,
       reading: leituraDaMedida(medida, faixas),
+      referenceMin: faixas.get(medida.type)?.min ?? null,
+      referenceMax: faixas.get(medida.type)?.max ?? null,
     }));
 }

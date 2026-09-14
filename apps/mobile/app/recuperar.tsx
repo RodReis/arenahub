@@ -54,7 +54,7 @@ export default function Recuperar() {
           <Text
             style={{
               color: t.cor.text.secondary,
-              fontSize: t.type.body.size,
+              fontSize: t.type.body.size, fontFamily: t.fonte(400),
               lineHeight: t.type.body.lineHeight,
             }}
           >
@@ -86,9 +86,8 @@ export default function Recuperar() {
         <Text
           style={{
             color: t.cor.text.primary,
-            fontSize: t.type.loginTitle.size,
+            fontSize: t.type.loginTitle.size, fontFamily: t.fonte(700),
             lineHeight: t.type.loginTitle.lineHeight,
-            fontWeight: '700',
           }}
         >
           Recuperar senha
@@ -96,7 +95,7 @@ export default function Recuperar() {
         <Text
           style={{
             color: t.cor.text.secondary,
-            fontSize: t.type.body.size,
+            fontSize: t.type.body.size, fontFamily: t.fonte(400),
             lineHeight: t.type.body.lineHeight,
           }}
         >

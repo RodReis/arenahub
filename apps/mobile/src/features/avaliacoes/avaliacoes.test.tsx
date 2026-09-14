@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import { ProvedorDeTema } from '../../ui/theme.js';
-import { Avaliacoes, type DadosDasAvaliacoes } from './avaliacoes.js';
+import { Evolucao, formatarValor, type DadosDasAvaliacoes } from './avaliacoes.js';
 
 const base: DadosDasAvaliacoes = {
   asOf: '2026-09-12T12:00:00.000Z',
@@ -23,19 +23,22 @@ const base: DadosDasAvaliacoes = {
 const renderizar = (dados: Partial<DadosDasAvaliacoes> = {}) =>
   render(
     <ProvedorDeTema forcarTema="dark">
-      <Avaliacoes
+      <Evolucao
         dados={{ ...base, ...dados }}
         periodo="90D"
         onPeriodo={() => undefined}
+        onVerLaudo={() => undefined}
         testID="avaliacoes"
       />
     </ProvedorDeTema>,
   );
 
-describe('Avaliacoes', () => {
+const tabela = () => within(screen.getByTestId('avaliacoes-serie-WEIGHT-tabela'));
+
+describe('Evolucao', () => {
   it('traduz o tipo de medida para o nome que o aluno entende', () => {
     renderizar();
-    expect(screen.getByText('Peso')).toBeTruthy();
+    expect(screen.getByText('Histórico · Peso')).toBeTruthy();
   });
 
   it('a TABELA traz os mesmos numeros do grafico, nao um resumo', () => {
@@ -49,8 +52,8 @@ describe('Avaliacoes', () => {
     fireEvent.press(screen.getByTestId('avaliacoes-serie-WEIGHT-alternar'));
 
     expect(screen.getByTestId('avaliacoes-serie-WEIGHT-tabela')).toBeTruthy();
-    expect(screen.getByText('80,5 kg')).toBeTruthy();
-    expect(screen.getByText('78,2 kg')).toBeTruthy();
+    expect(tabela().getByText('80,5 kg')).toBeTruthy();
+    expect(tabela().getByText('78,2 kg')).toBeTruthy();
   });
 
   it('o delta diz a DIRECAO por texto, nao so por cor', () => {
@@ -60,7 +63,7 @@ describe('Avaliacoes', () => {
 
     fireEvent.press(screen.getByTestId('avaliacoes-serie-WEIGHT-alternar'));
 
-    expect(screen.getByText('−2,3 kg')).toBeTruthy();
+    expect(tabela().getByText('−2,3 kg')).toBeTruthy();
   });
 
   it('a primeira linha nao inventa comparacao', () => {
@@ -68,7 +71,7 @@ describe('Avaliacoes', () => {
 
     fireEvent.press(screen.getByTestId('avaliacoes-serie-WEIGHT-alternar'));
 
-    expect(screen.getByText('—')).toBeTruthy();
+    expect(tabela().getByText('—')).toBeTruthy();
   });
 
   it('formata o numero em pt-BR mesmo com o aparelho em outro idioma', () => {
@@ -144,6 +147,38 @@ describe('Avaliacoes', () => {
       ],
     });
 
-    expect(screen.getByText('TIPO_NOVO')).toBeTruthy();
+    expect(screen.getByText('Histórico · TIPO_NOVO')).toBeTruthy();
+  });
+
+  it('metrica sem serie no periodo aparece como AUSENTE, nunca como zero', () => {
+    renderizar();
+    // So ha peso na fixture: gordura e musculo nao foram medidos.
+    expect(within(screen.getByTestId('avaliacoes-metrica-Gordura')).getByLabelText('Gordura não medido no período')).toBeTruthy();
+  });
+
+  it('o delta do topo compara a primeira e a ultima medida do periodo', () => {
+    renderizar();
+    expect(within(screen.getByTestId('avaliacoes-metrica-Peso')).getByText('−2,3 kg')).toBeTruthy();
+  });
+
+  it('abre o laudo pelo cartao da avaliacao', () => {
+    const onVerLaudo = jest.fn();
+    render(
+      <ProvedorDeTema forcarTema="dark">
+        <Evolucao dados={base} periodo="90D" onPeriodo={() => undefined} onVerLaudo={onVerLaudo} />
+      </ProvedorDeTema>,
+    );
+
+    fireEvent.press(screen.getByTestId('botao-ver-laudo'));
+    expect(onVerLaudo).toHaveBeenCalled();
+  });
+});
+
+describe('formatarValor', () => {
+  it('reconhece a unidade em minusculas, como a API manda', () => {
+    // O smoke do App Mobile v2 achou `22,5 percent` na tela: a API manda
+    // `percent`/`kg` e o dicionario so tinha as chaves em maiusculas.
+    expect(formatarValor(22.5, 'percent')).toBe('22,5 %');
+    expect(formatarValor(92.25, 'kg', 2)).toBe('92,25 kg');
   });
 });

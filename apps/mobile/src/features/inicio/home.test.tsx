@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { ProvedorDeTema } from '../../ui/theme.js';
-import { Home, type DadosDaHome } from './home.js';
+import type { AvisoDoAluno } from '../avisos/avisos.js';
+import type { DadosDaFrequencia } from '../frequencia/frequencia.js';
+import { Home, type ComplementosDaHome, type DadosDaHome } from './home.js';
 
 const NOME_ANTERIOR = 'Ana Souza';
 
@@ -12,31 +14,59 @@ const base: DadosDaHome = {
   versionPolicy: { state: 'SUPPORTED', updateUrl: null },
 };
 
-const renderizar = (dados: Partial<DadosDaHome> = {}) =>
+const aviso: AvisoDoAluno = {
+  id: 'aviso-1',
+  tipo: 'BILLING',
+  titulo: 'Fatura em aberto',
+  corpo: 'Aguardando pagamento',
+  rota: '/financeiro',
+  lido: false,
+  criadoEm: '2026-09-10T12:00:00.000Z',
+};
+
+const frequencia: DadosDaFrequencia = {
+  asOf: '2026-09-12T12:00:00.000Z',
+  status: 'AVAILABLE',
+  periodo: '90D',
+  granularidade: 'SEMANAL',
+  totalDeSessoes: 14,
+  totalDePassagens: 16,
+  baldes: [
+    { rotulo: '2026-W35', sessoes: 3, passagens: 3 },
+    { rotulo: '2026-W36', sessoes: 0, passagens: 0 },
+  ],
+  consistencia: { semanasComSessao: 1, semanasElegiveis: 2, proporcao: 0.5 },
+};
+
+const renderizar = (dados: Partial<DadosDaHome> = {}, complementos: ComplementosDaHome = {}) => {
+  const acoes = {
+    onAtualizarApp: jest.fn(),
+    onVerPerfil: jest.fn(),
+    onVerFrequencia: jest.fn(),
+    onVerAvisos: jest.fn(),
+    onAbrirAviso: jest.fn(),
+    onVerDesafios: jest.fn(),
+  };
+
   render(
     <ProvedorDeTema forcarTema="dark">
-      <Home
-        dados={{ ...base, ...dados }}
-        onSair={jest.fn()}
-        onAtualizarApp={jest.fn()}
-        onVerPlano={jest.fn()}
-        onVerFrequencia={jest.fn()}
-        onVerAvisos={jest.fn()}
-      />
+      <Home dados={{ ...base, ...dados }} complementos={complementos} {...acoes} />
     </ProvedorDeTema>,
   );
 
+  return acoes;
+};
+
 describe('Home', () => {
-  it('mostra a saudacao quando o servidor respondeu', () => {
+  it('mostra o periodo e o primeiro nome que o servidor mandou', () => {
     renderizar();
-    expect(screen.getByText(/boa tarde/i)).toBeTruthy();
+    expect(screen.getByText('Boa tarde,')).toBeTruthy();
+    expect(screen.getByText('Ana')).toBeTruthy();
   });
 
   it('indisponivel mostra o SHELL, e nao o dado antigo como se fosse atual', () => {
     /*
      * `M4-NFR-002`. O perigo nao e a tela vazia -- e a tela que parece certa.
-     * Num app que fala de plano, fatura e acesso, mostrar dado vencido como
-     * atual faz o aluno decidir sobre informacao que ja mudou.
      */
     renderizar({ status: 'UNAVAILABLE', saudacao: `Boa tarde, ${NOME_ANTERIOR}` });
 
@@ -47,7 +77,7 @@ describe('Home', () => {
   it('NAO recalcula estado -- nao inventa vencimento nem atraso', () => {
     // `M4-BR-008`. Se a Home derivasse "vencida" de uma data, o app viraria
     // uma segunda autoridade sobre dinheiro.
-    renderizar();
+    renderizar({}, { frequencia, avisos: [] });
     expect(screen.queryByText(/vencid|em atraso|inadimplen/i)).toBeNull();
   });
 
@@ -55,45 +85,77 @@ describe('Home', () => {
     renderizar({ versionPolicy: { state: 'BLOCKED', updateUrl: 'https://exemplo.test' } });
 
     expect(screen.getByTestId('botao-atualizar')).toBeTruthy();
-    // E nao deixa passar: a Home normal nao aparece junto.
-    expect(screen.queryByTestId('botao-sair')).toBeNull();
+    expect(screen.queryByTestId('botao-perfil')).toBeNull();
   });
 
   it('GRACE nao bloqueia -- o aluno na catraca precisa entrar agora', () => {
-    // Obrigar a baixar 40 MB na porta da academia e pior do que deixar
-    // passar com a versao de ontem.
     renderizar({ versionPolicy: { state: 'GRACE', updateUrl: 'https://exemplo.test' } });
 
     expect(screen.queryByTestId('botao-atualizar')).toBeNull();
-    expect(screen.getByTestId('botao-sair')).toBeTruthy();
+    expect(screen.getByTestId('botao-perfil')).toBeTruthy();
+  });
+
+  it('nao oferece carteirinha -- cortada pelo PI na F24', () => {
+    renderizar({}, { frequencia, avisos: [aviso] });
+    expect(screen.queryByText(/carteirinha/i)).toBeNull();
+  });
+
+  describe('blocos secundarios', () => {
+    it('leitura que ainda nao chegou NAO aparece como zero', () => {
+      // Ausencia nao e zero: sem a frequencia, "0 treinos" afirmaria algo.
+      renderizar();
+
+      expect(screen.queryByTestId('home-frequencia')).toBeNull();
+      expect(screen.queryByTestId('home-avisos')).toBeNull();
+      expect(screen.queryByText(/0 treinos/)).toBeNull();
+    });
+
+    it('frequencia mostra o total que o servidor contou e abre o detalhe', () => {
+      const acoes = renderizar({}, { frequencia, sequencia: 6 });
+
+      expect(screen.getByText('14 treinos')).toBeTruthy();
+      expect(screen.getByText('6 semanas seguidas treinando')).toBeTruthy();
+
+      fireEvent.press(screen.getByTestId('home-frequencia'));
+      expect(acoes.onVerFrequencia).toHaveBeenCalled();
+    });
+
+    it('sem sequencia, cai na consistencia do proprio periodo', () => {
+      renderizar({}, { frequencia, sequencia: 0 });
+      expect(screen.getByText('1 de 2 semanas com treino')).toBeTruthy();
+    });
+
+    it('aviso tocado vai inteiro para quem navega', () => {
+      const acoes = renderizar({}, { avisos: [aviso] });
+
+      fireEvent.press(screen.getByTestId('home-aviso-aviso-1'));
+      expect(acoes.onAbrirAviso).toHaveBeenCalledWith(aviso);
+    });
+
+    it('desafio aberto vira o banner, com a data civil do fim', () => {
+      renderizar({}, { desafio: { titulo: 'Desafio 4 treinos', meta: 4, fim: '2026-09-27', inscrito: false } });
+
+      expect(screen.getByText('Desafio 4 treinos')).toBeTruthy();
+      expect(screen.getByText(/Até 27\/09/)).toBeTruthy();
+    });
   });
 
   /** Contador de avisos nao lidos -- F29. */
-  describe('atalho de avisos', () => {
+  describe('contador de avisos', () => {
     it('mostra a contagem quando ha nao lidos', () => {
-      renderizar({ naoLidos: 3 });
-
-      expect(screen.getByText('Meus avisos (3)')).toBeTruthy();
+      renderizar({ naoLidos: 3 }, { avisos: [aviso] });
+      expect(screen.getByText('Ver todos (3)')).toBeTruthy();
     });
 
     it('omite a contagem quando esta tudo lido', () => {
-      // "(0)" e ruido: zero nao lidos e a ausencia de novidade, nao um dado
-      // que mereca destaque no botao.
-      renderizar({ naoLidos: 0 });
-
-      expect(screen.getByText('Meus avisos')).toBeTruthy();
+      renderizar({ naoLidos: 0 }, { avisos: [aviso] });
+      expect(screen.getByText('Ver todos')).toBeTruthy();
     });
 
-    /**
-     * `undefined` e "ainda nao sei", e e diferente de zero.
-     *
-     * A contagem vem de uma segunda chamada, depois da Home. Mostrar "(0)"
-     * enquanto ela nao voltou afirmaria que nao ha aviso -- e pode haver.
-     */
     it('omite a contagem enquanto ela nao chegou', () => {
-      renderizar();
-
-      expect(screen.getByText('Meus avisos')).toBeTruthy();
+      // `undefined` e "ainda nao sei", e e diferente de zero.
+      renderizar({}, { avisos: [aviso] });
+      expect(screen.getByText('Ver todos')).toBeTruthy();
     });
   });
 });

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Redirect, router } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useSessao } from '@/auth/sessao';
 import { Avisos, type AvisoDoAluno, type DadosDosAvisos } from '@/features/avisos/avisos';
+import { Tela, TituloDaTela, Voltar } from '@/ui/Tela';
 import { useTema } from '@/ui/theme';
 
 /**
@@ -15,7 +15,6 @@ import { useTema } from '@/ui/theme';
  */
 export default function TelaDeAvisos() {
   const t = useTema();
-  const inset = useSafeAreaInsets();
   const { estado, cliente } = useSessao();
 
   const [dados, setDados] = useState<DadosDosAvisos | null>(null);
@@ -69,7 +68,7 @@ export default function TelaDeAvisos() {
         });
       }
 
-      if (aviso.rota) router.push(aviso.rota as never);
+      if (aviso.rota) router.push(aviso.rota);
     },
     [cliente],
   );
@@ -85,15 +84,11 @@ export default function TelaDeAvisos() {
   }
 
   return (
-    <ScrollView
-      style={{ backgroundColor: t.cor.bg.app }}
-      contentContainerStyle={[
-        estilos.conteudo,
-        { paddingTop: Math.max(inset.top, t.size.safeAreaTop) },
-      ]}
-    >
+    <Tela>
+      <Voltar rotulo="Voltar" onPress={() => (router.canGoBack() ? router.back() : router.navigate('/perfil'))} />
+      <TituloDaTela>Avisos</TituloDaTela>
       <Avisos dados={dados} onAbrir={abrir} testID="avisos" />
-    </ScrollView>
+    </Tela>
   );
 }
 

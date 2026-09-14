@@ -103,9 +103,8 @@ export function Consentimentos({
                 <Text
                   style={{
                     color: t.cor.text.primary,
-                    fontSize: t.type.cardTitle.size,
+                    fontSize: t.type.cardTitle.size, fontFamily: t.fonte(600),
                     lineHeight: t.type.cardTitle.lineHeight,
-                    fontWeight: '600',
                   }}
                 >
                   {titulo}
@@ -113,7 +112,7 @@ export function Consentimentos({
                 <Text
                   style={{
                     color: t.cor.text.secondary,
-                    fontSize: t.type.body.size,
+                    fontSize: t.type.body.size, fontFamily: t.fonte(400),
                     lineHeight: t.type.body.lineHeight,
                   }}
                 >
@@ -121,11 +120,11 @@ export function Consentimentos({
                 </Text>
 
                 {impedimento !== null && (
-                  <Text style={{ color: t.cor.state.warn, fontSize: 13 }}>{impedimento}</Text>
+                  <Text style={{ color: t.cor.state.warn, fontSize: 13 , fontFamily: t.fonte(400),}}>{impedimento}</Text>
                 )}
 
                 {!consentimento.editavel && (
-                  <Text style={{ color: t.cor.text.muted, fontSize: 13 }}>
+                  <Text style={{ color: t.cor.text.muted, fontSize: 13 , fontFamily: t.fonte(400),}}>
                     Quem decide esta permissão é o responsável legal, na recepção.
                   </Text>
                 )}
