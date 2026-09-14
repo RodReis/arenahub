@@ -9,12 +9,9 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
 import { KioskAuthService } from '../../src/modules/kiosk-auth/kiosk-auth.service.js';
-// A MESMA funcao que o codigo de producao usa para cortar o dia -- importar em
-// vez de reimplementar o offset aqui e o que impede o teste e a regra de
-// divergirem na proxima mudanca de fuso.
-import { inicioDoDiaLocal } from '../../src/modules/kiosk/domain/indicadores-da-unidade.js';
 import { OBJECT_STORAGE } from '../../src/common/storage/object-storage.port.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
+import { instanteDePassagemDeHoje } from './helpers/instante-de-passagem.js';
 
 /**
  * F51 -- tela publica: blocos, midia e indicadores.
@@ -276,19 +273,20 @@ describe('F51 -- tela publica do totem', () => {
    * `agora - 1h` cego NAO serve, e a falha foi observada: entre 00:00 e 01:00
    * no fuso da academia, "uma hora atras" e ONTEM, `inicioDoDiaLocal` corta a
    * entrada e os dois indicadores voltam 0. O CI caiu as 03:12 UTC de
-   * 01/09/2026 -- 00:12 em Sao Paulo (issue #237). Todo dia tem essa janela;
-   * o mes virando so tornou o defeito visivel.
+   * 01/09/2026 -- 00:12 em Sao Paulo (issue #237).
    *
-   * O maior entre "1 hora atras" e "logo depois da meia-noite local" satisfaz
-   * as duas janelas em qualquer horario do dia.
+   * A CORRECAO DE 01/09 TROUXE O DEFEITO IRMAO, e ele sobreviveu ate a #279:
+   * pegar o MAIOR entre `agora - 1h` e `meia-noite local + 1min` resolve as
+   * duas janelas isoladamente, mas se contradiz entre 00:00 e 00:01 local --
+   * nesse minuto `meia-noite + 1min` ainda NAO ACONTECEU, ganha o maior, e a
+   * entrada nasce no FUTURO. Mesma classe da #279 (que tinha folga de cinco
+   * minutos em vez de um), so que nunca observada aqui porque a janela e
+   * cinco vezes mais estreita.
+   *
+   * `instanteDePassagemDeHoje` resolve as duas condicoes por construcao, e
+   * tem teste proprio varrendo os 1440 minutos do dia.
    */
-  const dentroDoDiaLocal = (): Date => {
-    const agora = new Date();
-    const haUmaHora = new Date(agora.getTime() - 60 * 60 * 1000);
-    const logoAposMeiaNoite = new Date(inicioDoDiaLocal(agora).getTime() + 60 * 1000);
-
-    return haUmaHora > logoAposMeiaNoite ? haUmaHora : logoAposMeiaNoite;
-  };
+  const dentroDoDiaLocal = (): Date => instanteDePassagemDeHoje();
 
   it('o heartbeat conta as entradas da unidade DESTE totem, e so dela', async () => {
     const quandoEntrou = dentroDoDiaLocal();
