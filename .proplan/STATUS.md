@@ -9,7 +9,6 @@ updated: 2026-09-14
 
 ### Sem épico
 
-- [MVP1][FIX] fixture de contatos empata createdAt no mesmo milissegundo sob carga do CI (#329)
 - [MVP2][FIX] assinatura duplicada infla a receita esperada do painel financeiro (#272)
 - [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
@@ -33,6 +32,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] fixture de contatos empata createdAt no mesmo milissegundo sob carga do CI (#329, finalizado em: 2026-09-14)
 - [MVP4][FIX] frequência conta 3 sessões em vez de 2 perto da virada de meia-noite em SP (#328, finalizado em: 2026-09-14)
 - [INFRA][FIX] Heap do CI cruza o limiar de novo conforme a suíte de integração cresce (#327, finalizado em: 2026-09-14)
 - [MVP5][SPEC-031][FIX] tres testes de XP e ranking sao intermitentes no CI (#279, finalizado em: 2026-09-14)
