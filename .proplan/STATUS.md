@@ -9,9 +9,7 @@ updated: 2026-09-14
 
 ### Sem épico
 
-- [INFRA][FIX] Heap do CI cruza o limiar de novo conforme a suíte de integração cresce (#327)
 - [MVP1][FIX] fixture de contatos empata createdAt no mesmo milissegundo sob carga do CI (#329)
-- [MVP4][FIX] frequência conta 3 sessões em vez de 2 perto da virada de meia-noite em SP (#328)
 - [MVP2][FIX] assinatura duplicada infla a receita esperada do painel financeiro (#272)
 - [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
@@ -35,6 +33,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP4][FIX] frequência conta 3 sessões em vez de 2 perto da virada de meia-noite em SP (#328, finalizado em: 2026-09-14)
+- [INFRA][FIX] Heap do CI cruza o limiar de novo conforme a suíte de integração cresce (#327, finalizado em: 2026-09-14)
 - [MVP5][SPEC-031][FIX] tres testes de XP e ranking sao intermitentes no CI (#279, finalizado em: 2026-09-14)
 - [MVP4][SPEC-029][F29] Piloto e distribuição (#29, finalizado em: 2026-09-13)
 - [MVP4][SPEC-026][F26] Avaliações e consentimentos (#26, finalizado em: 2026-09-13)
@@ -55,8 +55,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
+- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
