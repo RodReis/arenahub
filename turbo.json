@@ -23,7 +23,10 @@
     "YTDLP_BIN",
     "RESEND_API_KEY",
     "RESEND_FROM",
-    "PANEL_PUBLIC_URL"
+    "PANEL_PUBLIC_URL",
+    "MOBILE_MIN_VERSION",
+    "MOBILE_UPDATE_URL",
+    "MOBILE_VERSION_GRACE_UNTIL"
   ],
   "tasks": {
     "build": {
