@@ -203,35 +203,39 @@ jobs:
       # NOS DOIS lugares -- aqui e no `turbo.json`.
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
-      # Heap maior para `test:integration`, que roda com `--runInBand`: as
-      # suites compartilham UM processo, e cada uma monta um `AppModule` Nest
-      # proprio. A maioria delas fecha a app no `afterAll` (confirmado em
-      # 14/09/2026 -- toda suite com `INestApplication` tem `app?.close()`),
-      # mas o heap ainda cresce por suite: Prisma, Jest e o Node acumulam
-      # estado que a garbage collection nao libera antes da proxima suite
-      # montar outro modulo inteiro.
+      # CONSERTO DE RAIZ da issue #327 (14/09/2026): `test:integration`
+      # trocou `--runInBand` por `--maxWorkers=4`. O problema nunca foi
+      # "suite ruim" -- era UM processo so acumulando heap entre 76+ suites,
+      # cada uma montando um `AppModule` Nest proprio sem o GC liberar tudo
+      # antes da proxima. Com processos SEPARADOS por worker, o heap de cada
+      # um comeca do zero a cada punhado de suites (o Jest recicla workers
+      # entre arquivos), e o acumulo deixa de existir por construcao.
       #
-      # NAO E DEFEITO DA FATIA QUE ESTOUROU: na F50 eram 42 suites e 640
-      # testes, passava com 6144 MB; em 14/09/2026 (F29) eram 76 suites e o
-      # job morreu com `FATAL ERROR: Reached heap limit` (exit 134) na 76a --
-      # `mobile-avisos-telemetria.int-spec.ts` (F29) passou, quem nao coube
-      # foi `engagement-placar-imutavel.int-spec.ts`, pre-existente. Mesmo
-      # padrao do heap cruzando o limiar por ACUMULO, nao por suite ruim --
-      # nenhum teste falhou, todo o resto de 75/76 passou limpo.
+      # `--maxWorkers=4`: o runner GitHub-hosted de repositorio PUBLICO tem
+      # 4 vCPUs / 16 GB desde dez/2023 -- 1 worker por vCPU e o teto usual.
+      # Medido na bancada (4 vCPUs tambem): 77 suites, 1048 testes, 0 falha,
+      # 48s -- contra os ~4 min em serie e sem o exit 134 (OOM) nem o exit
+      # 3221226505 (crash do Jest no Windows, que so acontecia com
+      # `--experimental-vm-modules` + processo unico).
       #
-      # Elevar o teto e a correcao PROPORCIONAL, pela segunda vez: o `ubuntu-
-      # latest` do GitHub Actions tem 16 GB de RAM desde 2023 (era 7 GB
-      # quando o valor anterior foi calibrado), e 6144 MB de heap V8 deixava
-      # pouco para o resto do processo. 10240 MB tem folga real medida contra
-      # o runner atual. O conserto de raiz (parar de montar `AppModule` novo
-      # por suite, ou tirar o `--runInBand`) continua sendo card [INFRA]
-      # proprio -- subir o teto de novo quando a proxima fatia crescer e o
-      # sintoma de que ele precisa ser feito, nao a licenca para nunca fazer.
+      # ISOLAMENTO: nunca dependeu da serializacao. Cada suite cria o
+      # proprio tenant com sufixo `randomUUID().slice(0,8)` e apaga no
+      # `afterAll` -- os workers nao disputam fixture nenhuma, so o mesmo
+      # Postgres, que aguenta conexao concorrente.
+      #
+      # HEAP POR WORKER, nao mais por processo unico: 10240 MB era o teto
+      # calibrado para UM processo acumulando 76+ suites. Com 4 processos
+      # paralelos, 4x10240 estouraria os 16 GB do runner. Baixado para
+      # 3072 MB -- folga generosa para uma fracao das suites (Jest recicla
+      # workers, nenhum roda as 77 sozinho), e ainda assim maior que o que
+      # a bancada mediu por worker. Se um worker isolado precisar de mais
+      # no futuro, o sintoma e o mesmo OOM de sempre, e o teto sobe nesta
+      # mesma variavel -- so que agora dividido por processo, nao um so.
       #
       # Declarado AQUI e no `globalEnv` do `turbo.json`: o Turbo sanitiza o
       # ambiente e descarta variavel que nao esteja na lista -- ela sumiria
       # sem erro nenhum que apontasse a causa.
-      NODE_OPTIONS: --max-old-space-size=10240
+      NODE_OPTIONS: --max-old-space-size=3072
 
       # `postgres`, e NÃO `localhost`: com o job dentro de um container, o
       # runner liga os dois por uma rede Docker e o serviço passa a atender
@@ -331,6 +335,13 @@ jobs:
       # que nao traz cliente do Postgres.
       - name: senha do role de runtime (RLS, F66)
         run: pnpm --filter @arenahub/database exec tsx prisma/senha-do-role-de-runtime.ts arenahub_app_ci
+
+      # Prova no log o hardware REAL do runner, nao documentacao: a divisao
+      # do heap por worker (issue #327) foi calibrada assumindo 4 vCPUs /
+      # 16 GB (repositorio publico, GitHub-hosted, desde dez/2023). Se o
+      # runner mudar de tier o log denuncia antes do OOM denunciar.
+      - name: hardware do runner (calibra --maxWorkers e heap por worker)
+        run: nproc && free -h
 
       - name: 'test:integration'
         run: pnpm test:integration

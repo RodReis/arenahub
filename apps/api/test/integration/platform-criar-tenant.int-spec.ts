@@ -150,8 +150,6 @@ describe('criar tenant pelo painel', () => {
 
     await useCase.executar(contexto, entrada, `corr-${randomUUID()}`);
 
-    const antes = await db.tenant.count();
-
     /*
      * Codigo ESTAVEL, e nao um erro qualquer.
      *
@@ -164,10 +162,22 @@ describe('criar tenant pelo painel', () => {
       useCase.executar(contexto, entrada, `corr-${randomUUID()}`),
     ).rejects.toMatchObject({ code: 'TENANT_SLUG_TAKEN', status: 409 });
 
-    const depois = await db.tenant.count();
+    /*
+     * FILTRADO PELO SLUG DESTA fixture, nao `db.tenant.count()` cru --
+     * issue #327: a suite passou a rodar com `--maxWorkers`, e contagem
+     * global da tabela inteira vira falso positivo quando OUTRA suite cria
+     * ou apaga tenant no mesmo instante. `count()` sem `where` nunca provou
+     * exclusao mutua, so parecia provar enquanto `--runInBand` garantia que
+     * mais nada escrevia no banco ao mesmo tempo.
+     *
+     * Filtrar por slug basta: se a transacao vazasse unidade ou papel sem o
+     * tenant pai, a FK teria recusado a escrita antes -- a garantia real e
+     * "nenhum tenant com este slug sobrou por causa da segunda chamada".
+     */
+    const tenantsComEsteSlug = await db.tenant.count({ where: { slug: entrada.slug } });
 
-    // A transacao inteira volta atras: slug repetido nao deixa unidade,
-    // papel nem convite pendurados.
-    expect(depois).toBe(antes);
+    // Exatamente 1 -- o da PRIMEIRA chamada (bem-sucedida). A segunda
+    // (recusada) nao deixou um segundo, nem apagou o primeiro.
+    expect(tenantsComEsteSlug).toBe(1);
   });
 });
