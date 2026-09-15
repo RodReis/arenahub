@@ -9,6 +9,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { ContratosController } from './contratos.controller.js';
 import { CriarTenantUseCase } from './criar-tenant.use-case.js';
 import { ElevarUseCase } from './elevar.use-case.js';
+import { EstatisticasPublicasController } from './estatisticas-publicas.controller.js';
 import { FaturasController, PreviaDeFaturaController } from './faturas.controller.js';
 import { EncerrarElevacaoUseCase } from './encerrar-elevacao.use-case.js';
 import { IamModule } from '../iam/iam.module.js';
@@ -29,19 +30,23 @@ import { TenantRepository } from './tenant.repository.js';
   // tenant alvo, pelo mesmo emissor do login.
   imports: [IamModule, AuthModule],
   /*
-   * TRES CONTROLLERS, e a separacao e a protecao: `PlatformController` e
+   * QUATRO CONTROLLERS, e a separacao e a protecao: `PlatformController` e
    * `ContratosController` sao `@PlatformRoute()` na classe -- toda rota nova
-   * neles nasce protegida --, e o `BrandingPublicoController` e `@Public()`
-   * na classe. Uma rota publica dentro dos dois primeiros seria a excecao que
-   * o proximo autor herda como duvida.
+   * neles nasce protegida --, e `BrandingPublicoController` e
+   * `EstatisticasPublicasController` sao `@Public()` na classe. Uma rota
+   * publica dentro dos dois primeiros seria a excecao que o proximo autor
+   * herda como duvida.
    *
    * O de contratos e SEPARADO (F63) porque plano, contrato e indice sao um
    * assunto proprio: uma classe que cresce por acumulo vira o lugar onde
-   * ninguem acha nada.
+   * ninguem acha nada. O de estatisticas e SEPARADO do de branding (F71)
+   * porque um le UM tenant por slug e o outro atravessa todos -- ver o
+   * comentario do proprio controller.
    */
   controllers: [
     PlatformController,
     BrandingPublicoController,
+    EstatisticasPublicasController,
     ContratosController,
     FaturasController,
     PreviaDeFaturaController,
