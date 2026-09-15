@@ -15,9 +15,11 @@
 
 ## 0. Fiel ao protótipo
 
-Esta spec segue as 4 telas anexadas pelo PI em 15/09/2026 (`docs/design/` — a incluir como
-anexo desta spec quando o PI enviar os arquivos de design; por ora a referência é a própria
-conversa). Nenhum campo, rótulo ou texto de apoio abaixo foi inventado — todos vêm das telas.
+Esta spec segue as 4 telas anexadas pelo PI em 15/09/2026. Nenhum campo, rótulo ou texto de apoio
+abaixo foi inventado — todos vêm das telas. **A tela de login (§6.1) vai ganhar um campo/opção de
+CPF** — o protótipo original (print 2) trazia só "E-mail ou telefone"; o PI confirmou que vai
+corrigir o design para incluir CPF, em vez de mudar o texto da tela de confirmação que promete
+login por CPF+senha (ver §3, decisão 3, e §9, pergunta 3 — resolvida).
 
 ---
 
@@ -35,7 +37,7 @@ a senha.
 |---|---|
 | Gate de entrada do MVP | MVP 4 aprovado para planejamento em 14/08/2026 (`MVP-04-app-totem.md` §1) |
 | ADRs que bloqueiam | **ADR-057** — decidido pelo PI em 15/09/2026; texto pronto na §11, pendente de commit em `docs/DECISIONS.md` (nota abaixo) |
-| Fatias anteriores | F23 (Identidade e shell mobile) — ✅ entregue, aguardando aceite. Login por e-mail/telefone + senha **continua existindo, tela inalterada** — o protótipo confirma isso (tela 2) |
+| Fatias anteriores | F23 (Identidade e shell mobile) — ✅ entregue, aguardando aceite. Login continua existindo; ganha CPF como identificador adicional nesta fatia (§3, decisão 3) |
 | Decisões dos PRDs | `M4-FR-001`, `M4-FR-002` — atendidas por desenho (ver §3) |
 
 > **Nota de processo:** a ADR-057 e a linha F71 do Índice Fatia↔SPEC (`docs/STATUS.md` §5) têm o
@@ -52,7 +54,7 @@ a senha.
 |---|---|---|---|
 | 1 | Consulta (CPF+data → nome) e criação de senha são dois passos/dois endpoints, não um | um único request fazendo os dois | erro ao criar a senha não deveria obrigar redigitar CPF e data; e é a consulta sozinha que precisa da mensagem neutra do `M4-FR-002` |
 | 2 | Campos exibidos (CPF, datas) usam as máscaras já convencionadas no `CLAUDE.md` — aplicação da convenção existente, não decisão nova | máscara própria para esta tela | duas implementações da mesma máscara divergem na primeira mudança |
-| 3 | **Login (`POST /api/v1/mobile/auth/login`, da F23) passa a aceitar CPF como identificador alternativo a e-mail/telefone** | manter login só por e-mail/telefone e mudar o texto da tela de confirmação para não prometer CPF | a tela 4 do protótipo diz ao aluno *"você vai usar esta senha junto com seu CPF para entrar"* — se o login não aceitar CPF, a própria ativação ensina algo que não funciona. Extensão de baixo custo (mais um formato de identificador aceito na mesma consulta que já existe), não decisão cara de desfazer — não vira ADR. **Confirmar com o PI (Pergunta 3, §9)** |
+| 3 | **Login (`POST /api/v1/mobile/auth/login`, da F23) passa a aceitar CPF como identificador alternativo a e-mail/telefone; o design da tela de login é corrigido para expor isso** | mudar o texto da tela de confirmação para não prometer CPF | **Decidido pelo PI em 15/09/2026** — o protótipo original da tela de login (print 2) tinha só e-mail/telefone; o PI confirmou que vai corrigir o design, não o texto. Extensão de baixo custo no backend (mais um formato de identificador na mesma consulta que já existe) |
 | 4 | "Primeiro acesso" não tem nenhum passo de e-mail — nem coleta, nem confirmação, nem convite | manter convite por e-mail como alternativa dentro do mesmo fluxo | o PI foi explícito: "só por CPF + data, sem e-mail". O convite da F23 continua existindo como fluxo **separado**, iniciado por quem envia o convite (recepção), não pelo aluno |
 
 Decisões com efeito além desta fatia estão na **ADR-057** (§11).
@@ -85,9 +87,10 @@ Decisões com efeito além desta fatia estão na **ADR-057** (§11).
 
 ## 6. Telas e cópia exata (fiel ao protótipo)
 
-### 6.1 Entrada — tela de login (já existente, F23; só ganha o link)
+### 6.1 Entrada — tela de login (F23, ajustada nesta fatia)
 
-- Campos: **"E-mail ou telefone"** (placeholder `nome@email.com`), **"Senha"**.
+- Campos: identificador (**e-mail, telefone ou CPF** — protótipo original só tinha "E-mail ou
+  telefone"; o PI vai corrigir o design para expor as três opções), **"Senha"**.
 - Botão: **"Entrar"**.
 - Links: **"Esqueci minha senha"** · **"Entrar com biometria"**.
 - Novo, em destaque: **"Primeiro acesso?"** + link **"Criar minha senha"**.
@@ -143,7 +146,8 @@ Mensagem única, genérica, sem distinguir motivo: recomendação de texto —
 
 - `POST /api/v1/mobile/auth/login` (F23) — body ganha aceitar `cpf` como alternativa a
   `emailOuTelefone`; validação e resposta seguem `M4-FR-002` (mesma forma para credencial errada e
-  identificador inexistente).
+  identificador inexistente). **Decidido e confirmado pelo PI (§3, decisão 3)** — o design da tela
+  de login é corrigido para expor essa opção, não o texto da tela de confirmação.
 
 **Eventos** — reaproveita o evento de ativação de conta já emitido pela F23, com um campo indicando
 o canal (`INVITE` | `SELF_SERVICE`) para permitir auditoria de qual caminho cada aluno usou.
@@ -166,6 +170,7 @@ de persistência com expiração, cabe em `account_activation_tokens` (já exist
 - [ ] AC-5 — login por e-mail/telefone (F23) continua funcionando sem alteração de comportamento
       para quem já usa esse caminho.
 - [ ] AC-6 — CPF exibido é mascarado (`000.000.000-00`); datas em `dd/mm/aaaa`.
+- [ ] AC-7 — tela de login exibe a opção de CPF como identificador, conforme design corrigido pelo PI.
 
 Mapeia para `M4-AC-001` (aluno ativa conta sem intervenção administrativa sobre senha).
 
@@ -177,7 +182,9 @@ Mapeia para `M4-AC-001` (aluno ativa conta sem intervenção administrativa sobr
 |---|---|---|---|
 | 1 | ~~"Primeiro acesso" e o convite por e-mail coexistem?~~ | **Resolvido**: coexistem — "Primeiro acesso" é caminho adicional, exclusivo de CPF+data; convite da F23 segue existindo, disparado pela recepção | 15/09/2026 |
 | 2 | ~~Os campos Plano/Local/Data de Início já existem na Home da F23?~~ | **Resolvido pelo protótipo**: é tela nova (§6.3), não a Home | 15/09/2026 |
-| 3 | O login deve passar a aceitar CPF (decisão 3, §3), ou o texto da tela 4 ("...junto com seu CPF para entrar") deve mudar para "e-mail/telefone"? Assumi a primeira opção como default. | — | — |
+| 3 | ~~O login deve aceitar CPF, ou o texto da tela 4 deve mudar?~~ | **Resolvido**: login vai aceitar CPF — o PI vai corrigir o design da tela de login para expor isso | 15/09/2026 |
+
+Todas as perguntas resolvidas — spec pronta para virar `em-revisao` quando o PI quiser aprovar.
 
 ---
 
@@ -189,6 +196,8 @@ Mapeia para `M4-AC-001` (aluno ativa conta sem intervenção administrativa sobr
   Decisão 2) — não é omissão, é decisão registrada.
 - **Os campos da tela de confirmação (§6.3) são de uma tela nova desta fatia**, não da Home
   entregue pela F23 — confirmado pelo protótipo.
+- **A tela de login ganha CPF por decisão do PI**, não por suposição desta spec — o design
+  original só tinha e-mail/telefone; a correção fica a cargo de quem atualizar o protótipo.
 
 ---
 
@@ -230,9 +239,9 @@ com risco de enumeração aceito conscientemente) — precedente que outra fatia
 5. **Se a mesma conta for ativada pelos dois caminhos em corrida**, o primeiro a definir a senha
    vence — o token de convite, se ainda não consumido, passa a apontar para uma conta já ativada e
    falha como "já ativada" ao ser usado depois.
-6. **Login recorrente passa a aceitar CPF como identificador alternativo** (`SPEC-071` §3, decisão
-   3) — consequência direta de a tela de confirmação prometer login "com seu CPF". Pendente de
-   confirmação final do PI (`SPEC-071` §9, pergunta 3).
+6. **Login recorrente passa a aceitar CPF como identificador alternativo, e o design da tela de
+   login é corrigido para expor essa opção** — **confirmado pelo PI em 15/09/2026**: a correção é
+   no design (adicionar CPF), não no texto da tela de confirmação (que promete login por CPF).
 
 ### Consequências
 
@@ -242,7 +251,7 @@ com risco de enumeração aceito conscientemente) — precedente que outra fatia
 | 2 | `M4-FR-001` ganha um segundo modo de ativação; `M4-FR-002` se aplica também a este caminho | `MVP-04-app-totem.md` §8 |
 | 3 | Enumeração de CPF+data de nascimento é risco vivo e aceito nesta fatia | `SPEC-071` §8 |
 | 4 | Convite por e-mail (F23) permanece ativo, sem nenhuma etapa de e-mail no caminho novo | `SPEC-023` |
-| 5 | Login (`mobile/auth/login`) ganha CPF como identificador aceito, além de e-mail/telefone | `SPEC-023`, `SPEC-071` §7 |
+| 5 | Login (`mobile/auth/login`) ganha CPF como identificador aceito, além de e-mail/telefone; design da tela de login é corrigido | `SPEC-023`, `SPEC-071` §6.1, §7 |
 
 ### Gatilho de revisão
 
