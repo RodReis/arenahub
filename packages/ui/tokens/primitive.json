@@ -22,19 +22,19 @@
     "risk":    { "value": "#B4470B", "contrastOnWhite": 5.46 }
   },
 
-  "$accentComment": "Rampa DERIVADA do hex seed do tenant. Os valores abaixo sao o padrao comercial Ciano Arena #00A9B8 (DS-PAINEL.md §13 pendencia 4, fechada em 16/08/2026). Em runtime a rampa vem do tenant; estes existem para o build ter um default e para o teste de contraste ter alvo fixo.",
+  "$accentComment": "Rampa DERIVADA do hex seed do tenant. Os valores abaixo sao o padrao Azul ArenaHub #3E63E8 (DS-PAINEL.md v2 §2.2, alinhado ao app -- troca o Ciano Arena #00A9B8 da v1). Em runtime a rampa vem do tenant; estes existem para o build ter um default e para o teste de contraste ter alvo fixo. Gerados por packages/ui/src/accent.ts:deriveRamp('#3E63E8').",
   "accent": {
-    "seed": "#00A9B8",
-    "50":  { "value": "#E8FBFD", "contrastOnWhite": 1.06 },
-    "100": { "value": "#C2F2F7", "contrastOnWhite": 1.21 },
-    "200": { "value": "#8AE5EF", "contrastOnWhite": 1.51 },
-    "300": { "value": "#4FD5E3", "contrastOnWhite": 1.94 },
-    "400": { "value": "#1FBED0", "contrastOnWhite": 2.42 },
-    "500": { "value": "#00A9B8", "contrastOnWhite": 2.85 },
-    "600": { "value": "#008C99", "contrastOnWhite": 4.03, "$comment": "REPROVA para texto branco (4.03 < 4.5). O resolvedor pula este tom." },
-    "700": { "value": "#00707B", "contrastOnWhite": 5.83 },
-    "800": { "value": "#005760", "contrastOnWhite": 8.29 },
-    "900": { "value": "#003F46", "contrastOnWhite": 11.24 }
+    "seed": "#3E63E8",
+    "50":  { "value": "#C9F2FF", "contrastOnWhite": 1.19 },
+    "100": { "value": "#B8E2FF", "contrastOnWhite": 1.37 },
+    "200": { "value": "#A0CBFF", "contrastOnWhite": 1.68 },
+    "300": { "value": "#86B2FF", "contrastOnWhite": 2.14 },
+    "400": { "value": "#6D99FF", "contrastOnWhite": 2.74 },
+    "500": { "value": "#5781FF", "contrastOnWhite": 3.51 },
+    "600": { "value": "#4569E5", "contrastOnWhite": 4.77 },
+    "700": { "value": "#3251C0", "contrastOnWhite": 6.83 },
+    "800": { "value": "#213A9C", "contrastOnWhite": 9.77 },
+    "900": { "value": "#12247B", "contrastOnWhite": 13.43 }
   },
 
   "space": {
@@ -44,15 +44,17 @@
   },
 
   "radius": {
-    "control": 6,
-    "card": 8,
-    "badge": 4,
+    "$comment": "DS-PAINEL.md v2 §2.6 (era control:6, card:8, badge:4 na v1).",
+    "control": 10,
+    "card": 12,
+    "badge": 8,
     "modal": 10
   },
 
   "size": {
-    "control": 36,
-    "tableRow": 40,
+    "$comment": "DS-PAINEL.md v2 §2.7 (era control:36, tableRow:40 na v1).",
+    "control": 40,
+    "tableRow": 48,
     "cardPadding": 16,
     "pageGutter": 24,
     "touchTargetMin": 24,

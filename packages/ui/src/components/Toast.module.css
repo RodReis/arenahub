@@ -22,7 +22,6 @@
   padding: 12px 14px;
   background: var(--ah-surface-raised);
   border: 1px solid;
-  border-left-width: 1px;
   border-radius: var(--ah-radius-card);
   box-shadow: var(--ah-elev-2);
   animation: entrar var(--ah-motion-layer) var(--ah-motion-easing);
@@ -42,6 +41,12 @@
 
 .toast[data-kind] {
   border-color: color-mix(in srgb, currentColor 32%, transparent);
+}
+
+/* Faixa lateral solida no tom -- DS-PAINEL.md v2 §4.16 (era borda uniforme nos 4 lados). */
+.toast[data-kind] {
+  border-left-width: 3px;
+  border-left-color: currentColor;
 }
 
 .mensagem {

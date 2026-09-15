@@ -124,12 +124,12 @@ const EXCECOES = [
    */
   {
     arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
-    trecho: '--ah-action-solid: linear-gradient(100deg, #5B86FF, #3E63E8)',
+    trecho: '--ah-action-gradient: linear-gradient(100deg, #5B86FF, #3E63E8)',
     motivo: 'accent.gradientFrom/To do app.json -- botao primario do login sem tenant.',
   },
   {
     arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
-    trecho: '--ah-action-hover: linear-gradient(100deg, #6B92FF, #4A6FF0)',
+    trecho: '--ah-action-gradient-hover: linear-gradient(100deg, #6B92FF, #4A6FF0)',
     motivo: 'accent.gradientHoverFrom/To do app.json -- hover do botao primario.',
   },
   {

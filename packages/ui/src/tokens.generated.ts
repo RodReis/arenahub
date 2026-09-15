@@ -22,7 +22,7 @@ export const SEMANTIC_COLOR = {
   "risk": "#B4470B"
 } as const;
 
-export const ACCENT_SEED_DEFAULT = "#00A9B8";
+export const ACCENT_SEED_DEFAULT = "#3E63E8";
 
 export const TYPE_SCALE = {
   "display": {

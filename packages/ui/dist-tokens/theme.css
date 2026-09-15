@@ -19,16 +19,16 @@
   --ah-info: #1F5FD0;
   --ah-risk: #B4470B;
 
-  --ah-accent-50: #E8FBFD;
-  --ah-accent-100: #C2F2F7;
-  --ah-accent-200: #8AE5EF;
-  --ah-accent-300: #4FD5E3;
-  --ah-accent-400: #1FBED0;
-  --ah-accent-500: #00A9B8;
-  --ah-accent-600: #008C99;
-  --ah-accent-700: #00707B;
-  --ah-accent-800: #005760;
-  --ah-accent-900: #003F46;
+  --ah-accent-50: #C9F2FF;
+  --ah-accent-100: #B8E2FF;
+  --ah-accent-200: #A0CBFF;
+  --ah-accent-300: #86B2FF;
+  --ah-accent-400: #6D99FF;
+  --ah-accent-500: #5781FF;
+  --ah-accent-600: #4569E5;
+  --ah-accent-700: #3251C0;
+  --ah-accent-800: #213A9C;
+  --ah-accent-900: #12247B;
 
   --ah-type-display-size: 28px;
   --ah-type-display-lh: 34px;
@@ -88,9 +88,9 @@
   --ah-state-risk: #B4470B;
   --ah-state-neutral: #565E69;
   --ah-action-on-solid: #FFFFFF;
-  --ah-action-subtle-bg: #E8FBFD;
-  --ah-control-height: 36px;
-  --ah-control-radius: 6px;
+  --ah-action-subtle-bg: #C9F2FF;
+  --ah-control-height: 40px;
+  --ah-control-radius: 10px;
   --ah-control-disabled-bg: #F5F7F9;
   --ah-control-disabled-border: #E5E9EE;
   --ah-control-disabled-text: #7B8491;
@@ -98,11 +98,11 @@
 
 /* Papeis de acao: RESOLVIDOS por contraste. Runtime sobrescreve por tenant. */
 :root {
-  --ah-action-solid: #00707B;
+  --ah-action-solid: #4569E5;
   --ah-action-on-solid: #FFFFFF;
-  --ah-action-text: #00707B;
-  --ah-action-hover: #005760;
-  --ah-focus-ring: #00707B;
+  --ah-action-text: #4569E5;
+  --ah-action-hover: #3251C0;
+  --ah-focus-ring: #4569E5;
   --ah-focus-ring-width: 2px;
   --ah-focus-ring-offset: 2px;
 }

@@ -7,6 +7,7 @@ import { sair } from '../actions/auth';
 import { encerrarSuporte } from '../actions/platform';
 import { Navegacao } from './navegacao';
 import { SeletorDeUnidade } from './seletor-de-unidade';
+import { Usuario } from './usuario';
 
 interface Perfil {
   id: string;
@@ -389,7 +390,7 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
       }
       user={
         <>
-          <span data-testid="usuario-logado">{resposta.dados.email}</span>
+          <Usuario email={resposta.dados.email} />
           <form action={sair}>
             <Button type="submit" variant="ghost">
               Sair

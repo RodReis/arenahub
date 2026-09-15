@@ -38,10 +38,10 @@
 
   "action": {
     "$comment": "RESOLVIDO POR CONTRASTE, nunca por numero fixo de tom -- DS-PAINEL.md §2.3. O resolvedor varre a rampa e escolhe o MENOR tom que atinge o alvo. Trocar o seed do tenant re-resolve; nao ha numero magico a manter.",
-    "solid":    { "resolve": "minToneWithContrast", "against": "#FFFFFF", "target": 4.5, "$expected": "accent.700" },
+    "solid":    { "resolve": "minToneWithContrast", "against": "#FFFFFF", "target": 4.5, "$expected": "accent.600" },
     "onSolid":  { "ref": "white" },
-    "text":     { "resolve": "minToneWithContrast", "against": "surface.raised", "target": 4.5, "$expected": "accent.700" },
-    "hover":    { "resolve": "nextDarkerTone", "from": "action.solid", "$expected": "accent.800" },
+    "text":     { "resolve": "minToneWithContrast", "against": "surface.raised", "target": 4.5, "$expected": "accent.600" },
+    "hover":    { "resolve": "nextDarkerTone", "from": "action.solid", "$expected": "accent.700" },
     "subtleBg": { "ref": "accent.50" },
     "focusRing":{ "resolve": "minToneWithContrast", "against": "#FFFFFF", "target": 4.5, "width": 2, "offset": 2 }
   },

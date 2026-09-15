@@ -36,10 +36,50 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  height: 52px;
+  /* Altura 56px -- DS-PAINEL.md v2 §2.7 (era 52px na v1). */
+  height: 56px;
   padding: 0 24px;
   background: var(--ah-surface-chrome);
   color: var(--ah-text-on-chrome);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/**
+ * Selo halter -- DS-PAINEL.md v2 §4.1, mesmo traço do hero de login
+ * (`hero-da-marca.tsx`). Gradiente e miolo só com tokens de accent -- nunca
+ * hex novo aqui (regra 1 do DS): o selo acompanha o accent do tenant, igual a
+ * qualquer outro uso de `--ah-accent-*`.
+ */
+.selo {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  padding: 1px;
+  box-sizing: border-box;
+  background: linear-gradient(
+    145deg,
+    var(--ah-accent-300),
+    var(--ah-accent-600) 55%,
+    var(--ah-accent-400)
+  );
+}
+
+.seloMiolo {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  background: var(--ah-surface-chrome);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  color: var(--ah-accent-300);
 }
 
 .logo {
@@ -47,6 +87,11 @@
   font-size: var(--ah-type-heading-size);
   line-height: var(--ah-type-heading-lh);
   font-weight: var(--ah-type-heading-weight);
+  letter-spacing: -0.02em;
+}
+
+.ponto {
+  color: var(--ah-accent-300);
 }
 
 .direita {
@@ -79,14 +124,16 @@
 .corpo {
   flex: 1;
   display: grid;
-  grid-template-columns: 224px 1fr;
+  /* 204px -- DS-PAINEL.md v2 §2.8/§3.2 (era 224px na v1). */
+  grid-template-columns: 204px 1fr;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 16px 12px;
+  /* 12px 10px -- DS-PAINEL.md v2 §4.3 (era 16px 12px na v1). */
+  padding: 12px 10px;
   background: var(--ah-surface-chrome);
 }
 

@@ -28,7 +28,8 @@
  */
 .select {
   appearance: none;
-  height: 30px;
+  /* 34px -- DS-PAINEL.md v2 §4.1 (era 30px). */
+  height: 34px;
   padding: 0 30px 0 12px;
   border: 1px solid color-mix(in srgb, var(--ah-text-on-chrome) 22%, transparent);
   border-radius: 6px;

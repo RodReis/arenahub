@@ -38,7 +38,12 @@
 
 .tabela th,
 .tabela td {
-  height: 40px;
+  /*
+    36px -- DS-PAINEL.md v2 §2.7 (cabeçalho de tabela). Na prática só vale
+    para `th`: `td` sobrescreve com `height:auto; min-height` mais abaixo,
+    porque célula composta (avatar, apoio de duas linhas) precisa crescer.
+  */
+  height: 36px;
   padding: 0 16px;
   border-bottom: 1px solid var(--ah-border-subtle);
   text-align: left;
@@ -341,16 +346,17 @@
 }
 
 /*
- * ALTURA MINIMA, NAO FIXA -- DS-PAINEL §4 diz 40 px, e o `height: 40px` acima
- * cumpre isso na linha simples. Celula composta (identidade com avatar,
- * apoio de duas linhas) precisa CRESCER; travar em 40 px cortaria conteudo,
- * e o §10.8 proibe altura fixa em container de texto por causa do zoom de 200%.
+ * ALTURA MINIMA, NAO FIXA -- DS-PAINEL.md v2 §2.7 diz 48-64px, e
+ * `var(--ah-size-table-row)` (48px) cumpre o piso na linha simples. Celula
+ * composta (identidade com avatar, apoio de duas linhas) precisa CRESCER;
+ * travar a altura cortaria conteudo, e o §10.8 proibe altura fixa em
+ * container de texto por causa do zoom de 200%.
  *
  * O que mantem o ritmo nao e a altura igual: e o padding vertical constante.
  */
 .tabela td {
   height: auto;
-  min-height: 40px;
+  min-height: var(--ah-size-table-row);
   padding-block: 8px;
 }
 

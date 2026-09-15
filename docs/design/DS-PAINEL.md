@@ -12,7 +12,7 @@ Painel web operado pelo time da academia (recepção, gerência, super admin). �
 
 ### Princípios
 
-**Densidade sobre respiro.** É uma ferramenta de trabalho usada 8 h por dia em tela de 1366–1920 px. Alturas de controle de 36 px, texto de corpo em 13 px, linhas de tabela de 44–48 px. Não é um site.
+**Densidade confortável.** É uma ferramenta de trabalho usada 8 h por dia em tela de 1366–1920 px, mas densidade compacta demais cansa em turnos longos. Alturas de controle de 40–44 px, texto de corpo em 13–14 px, linhas de tabela de 48–64 px. Não é um site.
 
 **Cada ação sensível deixa rastro.** Desbloqueio de catraca, revogação de consentimento, alteração de CPF, sessão elevada: exigem motivo e entram em auditoria imutável.
 
@@ -26,7 +26,7 @@ Painel web operado pelo time da academia (recepção, gerência, super admin). �
 |---|---|
 | Largura de trabalho | 1366–1920 px; conteúdo com `max-width: 1180px` centralizado |
 | Entrada | Mouse + teclado; atalhos e tab-order importam |
-| Densidade | Compacta (36 px de controle, 13 px de corpo) |
+| Densidade | Confortável (40–44 px de controle, 13–14 px de corpo) |
 | Fuso | America/Sao_Paulo, exibido no rodapé do login |
 | Locale | pt-BR — `R$ 1.234,56`, `dd/mm/aaaa`, `92,25 kg` |
 
@@ -34,50 +34,50 @@ Painel web operado pelo time da academia (recepção, gerência, super admin). �
 
 ## 2. Tokens
 
-### 2.1 Cor — neutros
+### 2.1 Cor — neutros e marca, em variável CSS
 
-Escala fria única, do papel ao quase-preto. Toda a interface se resolve com ela; cor só entra para significar.
+O painel troca claro/escuro **dentro do arquivo**, pelo mesmo mecanismo do app (DS-APP §9.7): todo hex de tema é `var(--pa-token,<hex claro>)`, o claro é o fallback (a tela pinta certa durante o streaming) e o escuro entra por um `<style>` montado em `renderVals()` que redefine os tokens em `[data-pa-app]`. Nenhum hole em `style=` de tema.
 
-| Token | Hex | Uso |
-|---|---|---|
-| `canvas` | `#F5F7F9` | Fundo da aplicação, fundo de campo somente-leitura, fundo de resumo em modal |
-| `surface` | `#FFFFFF` | Card, tabela, painel, campo editável |
-| `border/subtle` | `#E5E9EE` | Divisor interno: linha de tabela, borda de aba, separador de bloco |
-| `border/default` | `#CBD1D9` | Borda de card, input, botão secundário |
-| `text/placeholder` | `#7B8491` | Placeholder, matrícula secundária, chevron de combo |
-| `text/muted` | `#565E69` | Metadado, label de KPI, hint de campo, breadcrumb |
-| `text/label` | `#3C424B` | Label de formulário, valor de célula secundária |
-| `text/body` | `#2B3037` | Corpo, nome em célula, valor de tabela |
-| `text/strong` | `#1F2328` | Título de tela, valor de KPI |
-| `chrome` | `#121417` | Topbar e sidebar, painel escuro do login |
-| `chrome/raised` | `#1F2328` | Botão dentro da topbar |
-| `chrome/border` | `#2B3037` | Divisor e borda dentro do chrome |
-| `chrome/text` | `#E5E9EE` | Texto sobre chrome |
-| `chrome/text-muted` | `#A6AEB9` | Texto secundário sobre chrome |
+| Token | Claro | Escuro | Uso |
+|---|---|---|---|
+| `--pa-bg` (canvas) | `#F5F7F9` | `#0A0B0D` | Fundo da aplicação, campo somente-leitura, resumo em modal |
+| `--pa-card` (surface) | `#FFFFFF` | `#121417` | Card, tabela, painel, campo editável |
+| `--pa-line2` (border/subtle) | `#E5E9EE` | `#1A2032` | Divisor interno: linha de tabela, borda de aba |
+| `--pa-line` (border/default) | `#CBD1D9` | `#232A3D` | Borda de card, input, botão secundário |
+| `--pa-ink4` (text/placeholder) | `#7B8491` | `#8D97A3` | Placeholder, matrícula secundária |
+| `--pa-ink3` (text/muted) | `#565E69` | `#A6AEB9` | Metadado, label de KPI, breadcrumb |
+| `--pa-ink2` (text/label) | `#3C424B` | `#C3CAD4` | Label de formulário, célula secundária |
+| `--pa-ink1` (text/body) | `#2B3037` | `#E5E9EE` | Corpo, nome em célula |
+| `--pa-ink` (text/strong) | `#1F2328` | `#F5F7F9` | Título de tela, valor de KPI |
+
+`chrome` (topbar/sidebar) não troca de tema — fica sempre escuro (`#121417`, borda `#232A3D`, texto `#E5E9EE`, texto secundário `#A6AEB9`), igual à moldura do app. É a única superfície fixa nos dois temas.
 
 ### 2.2 Cor — marca
 
-| Token | Hex | Uso |
-|---|---|---|
-| `brand/700` | `#005760` | Hover de botão primário, hover de link |
-| `brand/600` | `#00707B` | **Primária.** Botão primário, link, avatar, switch ligado, aba ativa |
-| `brand/tint` | `#EAF6F7` | Fundo de badge de marca |
-| `brand/accent` | `#4FD5E3` | Somente o ponto do logotipo `arenahub.` |
+Mesma marca do app (DS-APP §2.3): azul, não mais o teal da v1.
 
-O acento ciano é ornamento de marca — nunca cor de estado, nunca fundo de área.
+| Token | Claro | Escuro | Uso |
+|---|---|---|---|
+| `--pa-acc` | `#3E63E8` | `#8FB0FF` | **Primária.** Botão primário (gradiente, ver abaixo), link, aba ativa, foco |
+| `--pa-accH` | `#2E4FD0` | `#C9D9FF` | Hover de botão primário e de link |
+| `--pa-accBg` | `#EEF3FF` | `rgba(91,134,255,.14)` | Fundo de badge/botão de marca |
+
+Botão primário usa o **gradiente** da marca, não uma cor chapada: `linear-gradient(100deg,#5B86FF,#3E63E8)`, hover `linear-gradient(100deg,#6B92FF,#4A6FF0)` — igual ao app. O ponto do logotipo `arenahub.` usa `#7DA2FF` sobre chrome (não troca de tema, porque o chrome não troca).
 
 ### 2.3 Cor — semântica
 
-Seis tons. Cada um é uma tripla `[texto, fundo, borda]`, com fundo a 10% e borda a 32% de opacidade — o que mantém o badge legível sobre `surface` e sobre `canvas`.
+Seis tons, cada um com token de tema (`--pa-ok`, `--pa-warn`, `--pa-err`, `--pa-info`; `risk` fica fixo, `neu` usa `--pa-ink3`). Cada um é uma tripla `[texto, fundo, borda]`, fundo a 10% e borda a 32% de opacidade — legível sobre `surface` e `canvas` nos dois temas.
 
-| Tom | Texto | Fundo | Borda | Significado |
+| Tom | Token | Claro | Escuro | Significado |
 |---|---|---|---|---|
-| `ok` | `#157F3D` | `rgba(21,127,61,.10)` | `rgba(21,127,61,.32)` | Ativo, pago, sincronizado, dentro da faixa |
-| `warn` | `#8A5200` | `rgba(138,82,0,.10)` | `rgba(138,82,0,.32)` | Vence hoje, pendente de revisão, atenção |
-| `err` | `#C22B2B` | `rgba(194,43,43,.10)` | `rgba(194,43,43,.32)` | Bloqueado, falha, inadimplente, revogar |
-| `info` | `#1F5FD0` | `rgba(31,95,208,.10)` | `rgba(31,95,208,.32)` | Em processamento, experimental, informativo |
-| `risk` | `#B4470B` | `rgba(180,71,11,.10)` | `rgba(180,71,11,.32)` | Risco de churn, ação sensível, sessão elevada |
-| `neu` | `#565E69` | `rgba(86,94,105,.10)` | `rgba(86,94,105,.32)` | Inativo, arquivado, sem dado |
+| `ok` | `--pa-ok` | `#157F3D` | `#3DDC84` | Ativo, pago, sincronizado, dentro da faixa |
+| `warn` | `--pa-warn` | `#8A5200` | `#F5A524` | Vence hoje, pendente de revisão, atenção |
+| `err` | `--pa-err` | `#C22B2B` | `#FF6B6B` | Bloqueado, falha, inadimplente, revogar |
+| `info` | `--pa-info` | `#1F5FD0` | `#6AB0FF` | Em processamento, experimental, informativo |
+| `risk` | — | `#B4470B` | `#FF9558` | Risco de churn, ação sensível, sessão elevada |
+| `neu` | `--pa-ink3` | `#565E69` | `#A6AEB9` | Inativo, arquivado, sem dado |
+
+Fundo e borda de cada tom mantêm a mesma opacidade fixa nos dois temas — só o hex de referência muda por `var()`.
 
 Chamada no código: `bdg(tone, icon, label, prefixo)` → devolve `{ bC, bBg, bBd, bD, bLabel }`. O prefixo permite dois badges na mesma linha (`bdg(tone,…,'es')` + `bdg(rTone,…,'er')`).
 
@@ -125,9 +125,9 @@ Escala de 2 px: **2 · 4 · 6 · 8 · 10 · 12 · 14 · 16 · 20 · 24 · 48**.
 | Elemento | Raio |
 |---|---|
 | Modal | 10 px |
-| Card, tabela, painel | 8 px |
-| Input, select, botão, aba | 6 px |
-| Badge, botão fantasma pequeno | 4 px |
+| Card, tabela, painel | 12 px |
+| Input, select, botão, aba | 10 px |
+| Badge, botão fantasma pequeno | 8 px |
 | Switch | 11 px (pill) |
 | Avatar | circular |
 
@@ -142,59 +142,44 @@ Elevação só em camada flutuante:
 
 | Elemento | Altura |
 |---|---|
-| Topbar | 52 px |
-| Faixa de sessão elevada | 28 px (com `border-top` 4 px) |
-| Input, select, botão padrão | 36 px |
-| Botão dentro de tabela / secundário compacto | 28 px |
-| Botão fantasma em célula | 26 px |
-| Item de navegação | 34 px |
+| Topbar | 56 px |
+| Faixa de sessão elevada | 30 px (com `border-top` 4 px) |
+| Input, select, botão padrão | 40–44 px |
+| Botão dentro de tabela / secundário compacto | 32–34 px |
+| Botão fantasma em célula | 30 px |
+| Item de navegação | 38 px |
 | Botão de ícone na topbar | 32 px |
 | Aba | 42 px |
-| Badge | 22 px |
+| Badge | 24 px |
 | Switch | 22 × 38 px |
-| Linha de tabela | 44–48 px (`min-height`) |
+| Linha de tabela | 48–64 px (`min-height`) |
 | Cabeçalho de tabela | 36 px |
 
 ### 2.8 Largura de coluna e ícones
 
-Sidebar 204 px · painel de login 42% (mín. 360 px) · card de login 340 px · modal 460 px · busca 280 px.
+Sidebar 212 px · painel de foto do login 46% (mín. 380 px) · card de login 368 px · modal 440 px · busca 280 px (na topbar, não mais numa barra de filtros dedicada).
 
 Ícones: traço, `viewBox` 24×24, `stroke-width: 2`, `linecap/linejoin: round`, sem fill. 13 px em badge e chevron, 15 px na navegação, 16 px na topbar, 14 px na faixa elevada. Cor por `currentColor`.
+
+### 2.8b Troca de tema e botão de tema
+
+Botão sol/lua de 32–36 px (borda `--pa-line`, fundo `--pa-card`), `title`/`aria-label` dizendo o que o toque faz. Presente em toda tela: canto superior direito do painel de login e à direita, na topbar, ao lado do sino de alertas.
 
 ### 2.9 Movimento
 
 Praticamente nenhum. `@keyframes ah-pulse` (opacidade 1 → .3) marca indicador ao vivo. Switch move o knob por `transform: translateX(16px)`. Toast entra e sai em 160 ms. Nada mais anima.
 
-**Exceção do dashboard — emenda de 01/09/2026 (F57, decisão do PI).** A tela de dashboard
-operacional acrescenta duas animações, e só ela:
-
-| o que | duração | o que comunica |
-|---|---|---|
-| `ah-halo` — anel que expande e some sob o ponto "ao vivo" | 2 s, contínuo | o feed está recarregando **agora**; para junto com a recarga quando a aba fica oculta |
-| `ah-entra` — linha nova do feed desliza 6 px e aparece | 220 ms, `cubic-bezier(0.16, 1, 0.3, 1)` | alguém acabou de passar na catraca |
-
-As duas passam em `transform` e `opacity` (compositor, sem recálculo de layout) e **desligam em
-`prefers-reduced-motion: reduce`**, onde o estado continua legível por cor, ícone e texto. Nenhuma
-delas é transição entre telas, que continua proibida.
-
-### 2.10 Superfície tingida por estado — dashboard
-
-**Emenda de 01/09/2026 (F57, decisão do PI).** A célula de KPI do dashboard pinta o próprio fundo
-com `color-mix(in srgb, currentColor 7%, var(--ah-surface-raised))` e ganha aresta superior de
-3 px na cor cheia do tom.
-
-- **7% e não os 10% do `StateBadge`**: a área pintada é uma célula inteira, e o mesmo alfa numa
-  faixa de quatro vira bloco de cor em vez de tinta.
-- **Sem estado, sem tinta.** Célula neutra fica branca — a faixa nunca tem quatro cores.
-- **Contraste medido**, não estimado: valor entre 5,13 e 5,77 e rótulo entre 5,88 e 5,95 nos quatro
-  tons, contra os 3,0 (texto grande) e 4,5 (texto normal) exigidos.
-- **Não vale para as demais telas.** Grid, cobrança e operação seguem a §4.6.
-
 ---
 
 ## 3. Grids e layout
 
-### 3.1 Estrutura da aplicação
+### 3.1 Login — hero com render 3D
+
+O login deixou de ser um painel de texto sobre fundo escuro. Segue a mesma receita de camadas da welcome do app (DS-APP §9.1): render 3D (`app-bio-3d.jpg`) → scrim vertical (`rgba(10,11,13,.78)` no topo, transparente no miolo, `#0A0B0D` a partir de 78%) → **scrim horizontal** adicional (transparente até 30%, escurecendo até `#0A0B0D` na borda direita) que funde a foto ao fundo do formulário no tema escuro, eliminando a emenda entre os dois painéis → marca com símbolo halter + "arenahub." → headline 34/40 px/800 → linha de apoio → grade 2×2 de cards translúcidos do que a plataforma faz (cadastro/biometria, receita/cobrança, bioimpedância, catracas/totem) → rodapé mono com versão, fuso e contagem de alunos.
+
+Painel de foto **70%** da largura, formulário **30%** (mínimo 320 px na foto). Fundo do lado do formulário em `--pa-loginBg`: branco no claro, `#0A0B0D` no escuro — o mesmo tom em que a foto termina, para que a transição só exista no tema claro (contraste proposital entre bloco de marca escuro e formulário claro) e desapareça no escuro (uma só superfície).
+
+### 3.2 Estrutura da aplicação
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -217,15 +202,15 @@ com `color-mix(in srgb, currentColor 7%, var(--ah-surface-raised))` e ganha ares
 
 `display: flex; min-height: 100vh` no shell; a área de conteúdo é a única que rola (`flex: 1; overflow: auto; min-height: 0`).
 
-### 3.2 Grade de KPI
+### 3.3 Grade de KPI
 
-`grid-template-columns: repeat(4, 1fr); gap: 12px`. Três colunas quando há gráfico ao lado. Cada card: overline → valor 26 px → badge opcional.
+`grid-template-columns: repeat(4, 1fr); gap: 12px`. No dashboard, os dois blocos ao vivo (ocupação e fluxo por hora) vêm antes da grade de KPI, em `grid-template-columns: 1.15fr 1fr`. Cada card: overline → valor 26 px → badge opcional.
 
-### 3.3 Grade de formulário
+### 3.4 Grade de formulário
 
 `grid-template-columns: 1fr 1fr; gap: 14px 16px`. Campo largo (endereço, observação) ocupa as duas colunas. Nunca três colunas em formulário — o olho perde o par label/campo.
 
-### 3.4 Grade de tabela
+### 3.5 Grade de tabela
 
 Tabelas são **grid explícito**, não `<table>` — permite alinhar cabeçalho e linha com a mesma declaração e usar `minmax(0,1fr)` para a coluna que trunca.
 
@@ -242,11 +227,11 @@ Regras:
 - Cabeçalho repete exatamente as mesmas colunas, 12 px/600 em `text/muted`, `border-bottom: 1px solid border/subtle`.
 - Tabela larga: `overflow-x: auto` no wrapper + `min-width` na linha (ex. 640 px).
 
-### 3.5 Grade de cards de plano
+### 3.6 Grade de cards de plano
 
 `repeat(auto-fill, minmax(260px, 1fr)); gap: 12px`.
 
-### 3.6 Layout de ficha (detalhe)
+### 3.7 Layout de ficha (detalhe)
 
 Duas colunas: coluna principal em `minmax(0,1fr)` com as abas, coluna lateral de 300 px com resumo, ações sensíveis e atalhos. A lateral não rola separado.
 
@@ -256,7 +241,7 @@ Duas colunas: coluna principal em `minmax(0,1fr)` com as abas, coluna lateral de
 
 ### 4.1 Topbar
 
-52 px, `chrome`. Da esquerda: logotipo `arenahub.` 16 px/800 com ponto em `brand/accent`; divisor de 1 px × 20 px; seletor de tenant/unidade (botão 30 px em `chrome/raised`, borda `chrome/border`, chevron 13 px); espaçador; botão de notificação 32 px com contador (`min-width:14px; height:14px; border-radius:7px; background:err`); menu de usuário com avatar 24 px em `brand/600` e iniciais 10 px/700.
+56 px, `chrome` (fixo, não troca de tema). Da esquerda: marca 26 px (mesmo selo do app, halter em gradiente) + `arenahub.` 16 px/800 com ponto em `#7DA2FF`; divisor de 1 px × 22 px; seletor de tenant/unidade (botão 34 px em `#1A2032`, borda `chrome/border`, chevron 13 px); busca global 34 px com ícone (280 px, substitui a barra de filtros da tela de Alunos); espaçador; botão de tema (§2.8b); botão de notificação 32 px com contador (`min-width:14px; height:14px; border-radius:7px; background:err`); menu de usuário com avatar 26 px em gradiente da marca e iniciais 10 px/700.
 
 ### 4.2 Faixa de sessão elevada
 
@@ -274,6 +259,16 @@ Breadcrumb 12 px `text/muted` → linha com `h1` 20 px/600 à esquerda e indicad
 
 `surface`, borda 1 px `border/default`, raio 8 px, padding 16 px. Sem sombra. Cabeçalho interno: título 14 px/600 + ação à direita, separado por `border-bottom: 1px solid border/subtle` quando o card contém lista.
 
+### 4.5b Dashboard operacional
+
+Ordem fixa, do que muda a cada minuto para o que muda por semana:
+
+1. **Na academia agora.** Card largo: contagem ao vivo (44 px/800) sobre capacidade, barra de progresso em gradiente da marca, grade de 4 áreas (Musculação, Cardio, Funcional, Avaliação) e, quando há incidente, um aviso `warn` sobre liberação manual.
+2. **Fluxo de hoje.** Card ao lado: total de acessos e recusas do dia, barras por hora (a hora de pico em gradiente, as demais em `border/default`) com o rótulo da hora embaixo, nota de contexto.
+3. **Grade de KPI** (§3.3): recebido no mês, inadimplência, avaliações pendentes, matrículas líquidas.
+4. **Alunos em risco de evasão.** Tabela compacta — nome/matrícula, badge de risco, motivo em uma linha, botão "Criar tarefa" — com atalho para a tela de Retenção.
+5. **Acessos em tempo real** (feed existente) na coluna principal; **Avaliações pendentes**, **Dispositivos** e **Sincronização de cadastros** na coluna lateral de 372 px.
+
 ### 4.6 Card de KPI
 
 Overline 11 px uppercase → valor 26/32 px 700 tabular (margem `6px 0 8px`) → badge ou sublinha 12 px. Valor pode assumir cor semântica quando o próprio número é o alerta.
@@ -286,14 +281,14 @@ Overline 11 px uppercase → valor 26/32 px 700 tabular (margem `6px 0 8px`) →
 
 | Variante | Fundo | Borda | Texto | Uso |
 |---|---|---|---|---|
-| Primário | `brand/600` → hover `brand/700` | — | branco | Uma por tela |
+| Primário | gradiente `#5B86FF→#3E63E8` → hover `#6B92FF→#4A6FF0` | — | branco | Uma por tela |
 | Secundário | `surface` → hover `canvas` | `border/default` | `text/label` | Ações de apoio |
 | Fantasma | transparente | — | `text/label` | Terciária, em célula |
 | Destrutivo | transparente → hover `rgba(194,43,43,.08)` | — | `err` | Revogar, excluir |
 | Sensível | transparente | `risk` a 30% | `risk` | Desbloquear catraca |
-| Sobre chrome | `chrome/raised` | `chrome/border` | `chrome/text` | Topbar |
+| Sobre chrome | `#1A2032` | `chrome/border` | `chrome/text` | Topbar |
 
-Altura 36 px (padrão), 28 px (em tabela), 26 px (fantasma em célula). Raio 6 px, 4 px no fantasma pequeno. Peso 600. `font-family: inherit` obrigatório.
+Altura 40–44 px (padrão), 32–34 px (em tabela), 30 px (fantasma em célula). Raio 10 px, 8 px no fantasma pequeno. Peso 600. `font-family: inherit` obrigatório.
 
 ### 4.9 Campo de texto
 
@@ -369,25 +364,6 @@ Validação: data inválida ou fora do intervalo → borda `err` + mensagem 11 p
 
 Faixa de 42 px com `border-bottom: 1px solid border/subtle` e `overflow-x: auto`. Aba: padding lateral 14 px, 13 px, `border-bottom: 2px`. Ativa: borda `brand/600`, texto `text/strong`, peso 600. Inativa: borda transparente, texto `text/muted`, peso 500. Aba com pendência recebe ponto de 6 px em `warn` após o rótulo.
 
-**Implementado em 11/09/2026 (F68) como `Tabs`, com três emendas ao parágrafo acima:**
-
-- **O realce da ativa é um pseudo-elemento de 2 px**, não `border-bottom` na aba: a borda empurraria o
-  texto 2 px a cada troca, e o pseudo-elemento recuado 10 px de cada lado cobre a régua da faixa,
-  formando um traço só em vez de dois paralelos. A cor é `--ah-action-solid` — accent é legítimo aqui
-  porque aba selecionada é **localização**, o mesmo papel do item ativo da navegação, e não estado de
-  domínio (regra 3 do §11).
-- **O ponto de pendência virou contador**, porque o número é o que manda alguém entrar na aba: quantos arquivos de marca já
-  subiram informa, um ponto de cor não. Badge de 18 px, `tabular-nums`, em `surface/sunken`
-  na aba inativa e `action/subtle-bg` na ativa.
-- **Todos os painéis ficam montados**, e só o inativo recebe `hidden`. Desmontar é o desenho óbvio e faz
-  o formulário esvaziar quando alguém troca de aba e volta — o que o §10 item 3 proíbe. O `hidden`
-  também tira o painel da ordem de tabulação e da árvore de acessibilidade, o que `display: none` por
-  CSS não garante.
-
-Teclado completo (WAI-ARIA Tabs): setas navegam e levam o foco junto, Home e End vão aos extremos, e
-só a aba ativa fica na ordem de tabulação — com as quatro tabuláveis, alcançar o conteúdo custaria
-quatro Tabs.
-
 ### 4.15 Modal de confirmação
 
 Scrim `rgba(10,11,13,.5)`, `z-index: 60`. Caixa 460 px, `surface`, raio 10 px, sombra de modal, padding 20 px, gap 14 px, `role="dialog" aria-modal="true"`.
@@ -395,17 +371,6 @@ Scrim `rgba(10,11,13,.5)`, `z-index: 60`. Caixa 460 px, `surface`, raio 10 px, s
 Ordem: título 16 px/600 → bloco de resumo em `canvas` (raio 6 px, padding `12px 14px`, 13/19 px, com aluno e identificador em mono) → campo de motivo quando a ação é sensível → linha de ações com secundário "Cancelar" e primário/destrutivo à direita.
 
 O título diz o que vai acontecer, não pergunta genérica: "Desbloquear catraca para Rodrigo Reis". Motivo é obrigatório em ação sensível e o botão fica desabilitado até haver texto.
-
-**Implementado em 11/09/2026 (F68) como `ConfirmDialog`**, que é a moldura e delega o conteúdo ao
-`SensitiveAction` que já existia. A separação importa: dentro de um formulário o bloco em fluxo está
-certo, e embrulhar aquele caso num modal interromperia quem já estava decidido. O modal é para o ato
-disparado de uma **linha de tabela ou de um menu**, onde o bloco em fluxo esticaria a linha.
-
-`<dialog>` nativo com `showModal()`, e não o atributo `open`: só o método cria a camada superior,
-prende o foco, torna o resto da página `inert` e liga o Esc. Um `<dialog open>` renderiza igual e não
-faz nenhuma das quatro coisas — a diferença só aparece para quem navega por teclado. O conteúdo monta
-com o diálogo: mantê-lo montado faria a próxima abertura vir com o motivo digitado da anterior, que
-num menu de linha é o motivo de **outro** cliente.
 
 ### 4.16 Toast
 
@@ -446,77 +411,6 @@ Circular, 24 px (topbar) ou 36 px (grade de alunos). Iniciais 10–13 px/700 em 
 ### 4.20 Miniatura de frequência
 
 Sparkline de barras: 8–12 barras de 3 px, raio 1 px, altura proporcional, `brand/600` nas semanas com treino e `border/default` nas vazias, gap 2 px. Sempre acompanhada do número — a miniatura é reforço, não dado.
-
-### 4.21 Card de seção — `SectionCard`
-
-**Acrescentado em 11/09/2026 (F68).** Enquadra um assunto dentro de uma tela que tem vários. Nasceu
-da superfície da plataforma, onde quatro formulários de gravidade diferente — cadastro, marca,
-situação e suporte — empilhavam direto sobre a página, sem nada dizendo onde um terminava.
-
-Borda 1 px `border/default`, raio de card, **sem sombra** — sombra continua reservada à camada que
-flutua (§2.6). Cabeçalho em `surface/sunken` com régua inferior `border/subtle`, padding `13px
-16px`: é a mesma relação do `thead` da tabela com as linhas, e mantê-la faz formulário e tabela
-lerem como um sistema só. Glifo opcional de 30 px em caixa de raio de controle. Título 13 px/600
-`text/strong`, resumo 12 px `text/muted` com medida máxima de 68ch. Ações do cabeçalho à direita.
-
-**Variante de perigo** (`tom="perigo"`): cabeçalho tingido a 6 % do tom `danger`, régua e caixa do
-glifo a 22 %/30 %, glifo na cor cheia. Só para o bloco que **executa** o ato destrutivo — não para
-toda seção importante. Um card já inativo volta ao neutro: a ação disponível ali é reativar, que não
-destrói nada, e gastar o vermelho nele apaga o sinal onde ele importa.
-
-### 4.22 Faixa de resumo — `SummaryStrip`
-
-**Acrescentado em 11/09/2026 (F68).** Números que se leem de longe, acima de uma tabela. Grade
-`auto-fit` com piso de 190 px — quatro células a 1280 px, duas a 768, uma a 360, sem media query.
-Célula com borda de card, rótulo em caixa alta com tracking (o mesmo do `thead`), valor em
-`type/heading` com `tabular-nums`, apoio 12 px `text/muted`. Marcação `<dl>` com um par por célula,
-e não grade de `<div>` com número grande: o leitor de tela anuncia rótulo e valor juntos.
-
-**Herda a §2.10 e estende a licença nominalmente:** quando a célula descreve um **estado**, ela tinge
-o fundo a 7 % e ganha aresta superior de 3 px na cor cheia — as mesmas medidas do KPI do dashboard,
-pelo mesmo motivo. **Sem estado, sem tinta:** "clientes" e "alunos na base" são fatos, não notícias,
-e pintá-los gastaria a cor que a inadimplência precisa. Cada célula tingida carrega glifo **e**
-rótulo textual — cor nunca é canal único.
-
-Fora do dashboard, **só a lista de clientes** usa a faixa: é a tela de resumo do dono do SaaS, a
-única da área que alguém olha de longe. Planos, índices e contratos são superfícies de trabalho e
-seguem a §4.6.
-
-### 4.23 Menu de ações de linha — `RowMenu`
-
-**Acrescentado em 11/09/2026 (F68).** Quando uma linha de tabela tem três ou mais atos, eles vão para
-um menu em vez de ocupar a coluna. A 1280 px — o monitor do balcão — quatro botões lado a lado
-reservam mais de 400 px e empurram as colunas de número para fora da tela.
-
-**Popover nativo, não `<div>` posicionado**, e a razão é técnica: a área de rolagem do `DataTable` é
-`overflow-x: auto`, e todo menu absoluto dentro dela é cortado na linha próxima da borda. A camada
-superior do navegador escapa do recorte e traz Esc, clique-fora e fechamento mútuo de graça. A
-posição vem do retângulo do gatilho, medida na abertura: `anchor-name` resolveria isso em CSS puro
-mas ainda não tem suporte no Firefox nem no Safari, e o menu cairia no centro da tela justamente
-onde ninguém testaria. Vira para cima quando não há espaço abaixo.
-
-Largura mínima 208 px, raio de card, `--ah-elev-2`. Item com padding `8px 10px`, glifo 16 px
-`text/icon`, hover em `surface/sunken`. **Item destrutivo fica por último, separado por `<hr>`, e
-veste o tom `danger` no glifo e no texto — nunca em fundo cheio.** Item com `href` renderiza `<a>` de
-verdade; abrir em nova aba e copiar o endereço não se recuperam com JavaScript.
-
-**Ação de leitura frequente fica fora do menu**, como botão visível: esconder um download atrás de
-dois cliques cobra o preço do menu de quem não corre risco nenhum. **Linha sem ato nenhum não ganha
-gatilho** — menu que abre lista inerte promete ação onde não há.
-
-### 4.24 Campo com máscara — `MaskedField`
-
-**Acrescentado em 11/09/2026 (F68).** O `Field` da §4.9 com formatação a cada tecla. A máscara roda
-na **digitação**, nunca no `blur`: campo que só se formata ao sair deixa quem digita sem saber se já
-pôs os catorze dígitos, e o erro aparece um campo tarde demais. O valor mascarado é o que vai no
-`FormData` — a Server Action limpa a pontuação, que é o que permite ao servidor aceitar
-`12.345.678/0001-95` e `12345678000195` do mesmo jeito.
-
-Máscaras do painel (`lib/mascaras`): CPF, CNPJ, CEP, telefone, dinheiro e percentual. **Dinheiro
-preenche pelos centavos, da direita para a esquerda** — é como a calculadora do balcão se comporta, e
-evita o vaivém do cursor da máscara que caminha para a direita. **Percentual preserva o sinal
-negativo**: mês de deflação existe, e uma máscara que come o `-` transforma queda em alta sem ninguém
-ver.
 
 ---
 
@@ -576,7 +470,8 @@ Campo a campo, com valor lido, confiança e original ao lado; confiança baixa d
 **Tokens**
 - [ ] Nenhum hex fora das tabelas da seção 2
 - [ ] Semântica via `bdg()`, não cor solta
-- [ ] `brand/accent` só no ponto do logotipo
+- [ ] Cor de tema em `var(--pa-token,<hex claro>)`, nunca hex solto
+- [ ] `chrome` (topbar/sidebar) fica escuro nos dois temas
 
 **Layout**
 - [ ] Conteúdo em `max-width: 1180px`
@@ -586,9 +481,10 @@ Campo a campo, com valor lido, confiança e original ao lado; confiança baixa d
 - [ ] Valor e data com `tabular-nums`; monetário à direita
 
 **Componentes**
-- [ ] Controles em 36 px; 28 px dentro de tabela
+- [ ] Controles em 40–44 px; 32–34 px dentro de tabela
 - [ ] Um único botão primário por tela
 - [ ] Card sem sombra; sombra só em camada flutuante
+- [ ] Botão primário em gradiente `#5B86FF→#3E63E8`, nunca cor chapada
 - [ ] Select nativo só para lista curta; lista longa é combobox
 - [ ] Campo de data digitável com máscara, calendário como apoio
 
