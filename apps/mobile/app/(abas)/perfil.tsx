@@ -58,7 +58,7 @@ export default function TelaDoPerfil() {
             Sair da conta?
           </Text>
           <Text style={{ color: t.cor.text.secondary, fontSize: 14, lineHeight: 20, fontFamily: t.fonte(400) }}>
-            Para voltar você vai precisar do e-mail e da senha.
+            Para voltar você vai precisar do CPF e da senha.
           </Text>
         </View>
         <Botao

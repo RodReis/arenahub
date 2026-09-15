@@ -11,7 +11,10 @@ import { useTema } from '@/ui/theme';
 import { TENANT_SLUG } from '@/config';
 
 /**
- * Recuperacao de senha -- `M4-FR-002` tambem vale aqui.
+ * Recuperacao de senha -- `M4-FR-002` tambem vale aqui. Inalterada pela
+ * SPEC-071 (F71): ela so troca o identificador do LOGIN por CPF e adiciona
+ * o primeiro acesso self-service; a recuperacao continua a da F23, por
+ * e-mail/telefone + token de uso unico.
  *
  * A TELA DIZ A MESMA COISA SEMPRE, tenha o identificador conta ou nao. A API
  * responde `{ aceito: true }` nos dois casos; mostrar "enviamos" so quando

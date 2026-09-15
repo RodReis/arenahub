@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 
 import { useSessao } from '@/auth/sessao';
 import { FormularioDeLogin } from '@/features/auth/formulario-de-login';
+import { FormularioDePrimeiroAcesso, type AtivacaoEncontrada } from '@/features/auth/formulario-de-primeiro-acesso';
 import { BoasVindas } from '@/features/boas-vindas/boas-vindas';
 import { Folha } from '@/ui/Folha';
 import { ProvedorDeTema, useTema } from '@/ui/theme';
@@ -44,34 +45,61 @@ export default function Entrar() {
   );
 }
 
+type ModoDaFolha = 'fechada' | 'login' | 'primeiro-acesso';
+
 function Abertura() {
   const t = useTema();
-  const { entrar } = useSessao();
-  const [loginAberto, setLoginAberto] = useState(false);
+  const { entrar, confirmarPrimeiroAcesso, cliente } = useSessao();
+  const [modo, setModo] = useState<ModoDaFolha>('fechada');
 
   return (
     <>
-      <BoasVindas onEntrar={() => setLoginAberto(true)} testID="boas-vindas" />
+      <BoasVindas onEntrar={() => setModo('login')} testID="boas-vindas" />
 
-      <Folha aberta={loginAberto} onFechar={() => setLoginAberto(false)} testID="folha-login">
-        <View>
-          <Text accessibilityRole="header" style={{ color: t.cor.text.primary, fontSize: 20, fontFamily: t.fonte(700) }}>
-            Entrar
-          </Text>
-          <Text style={{ color: t.cor.text.muted, fontSize: 13, marginTop: 2, fontFamily: t.fonte(400) }}>
-            Use o e-mail ou telefone cadastrado na recepção.
-          </Text>
-        </View>
+      <Folha aberta={modo !== 'fechada'} onFechar={() => setModo('fechada')} testID="folha-login">
+        {modo === 'primeiro-acesso' ? (
+          <>
+            <View>
+              <Text accessibilityRole="header" style={{ color: t.cor.text.primary, fontSize: 20, fontFamily: t.fonte(700) }}>
+                Primeiro acesso
+              </Text>
+              <Text style={{ color: t.cor.text.muted, fontSize: 13, marginTop: 2, fontFamily: t.fonte(400) }}>
+                Confirme seus dados de matrícula para criar sua senha de acesso.
+              </Text>
+            </View>
 
-        <FormularioDeLogin
-          onEntrar={({ identificador, senha }) =>
-            entrar({ tenantSlug: TENANT_SLUG, identificador, senha })
-          }
-          onEsqueciSenha={() => {
-            setLoginAberto(false);
-            router.push('/recuperar');
-          }}
-        />
+            <FormularioDePrimeiroAcesso
+              onConsultar={({ cpf, dataNascimento }) =>
+                cliente.post('/api/v1/mobile/activation/lookup', {
+                  tenantSlug: TENANT_SLUG,
+                  cpf,
+                  dataNascimento,
+                }) as Promise<AtivacaoEncontrada>
+              }
+              onCriarSenha={confirmarPrimeiroAcesso}
+            />
+          </>
+        ) : (
+          <>
+            <View>
+              <Text accessibilityRole="header" style={{ color: t.cor.text.primary, fontSize: 20, fontFamily: t.fonte(700) }}>
+                Entrar
+              </Text>
+              <Text style={{ color: t.cor.text.muted, fontSize: 13, marginTop: 2, fontFamily: t.fonte(400) }}>
+                Use o CPF cadastrado na recepção.
+              </Text>
+            </View>
+
+            <FormularioDeLogin
+              onEntrar={({ cpf, senha }) => entrar({ tenantSlug: TENANT_SLUG, cpf, senha })}
+              onEsqueciSenha={() => {
+                setModo('fechada');
+                router.push('/recuperar');
+              }}
+              onPrimeiroAcesso={() => setModo('primeiro-acesso')}
+            />
+          </>
+        )}
       </Folha>
     </>
   );

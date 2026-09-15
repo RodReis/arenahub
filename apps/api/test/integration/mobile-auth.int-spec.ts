@@ -9,6 +9,7 @@ import { AppModule } from '../../src/app.module.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { TokenService } from '../../src/modules/auth/token.service.js';
+import { calcularHashDeCpf } from '../../src/modules/students/domain/identificacao.js';
 
 /**
  * As rotas do canal mobile pela porta HTTP.
@@ -26,11 +27,11 @@ describe('F23 -- rotas do canal mobile', () => {
 
   const sufixo = randomUUID().slice(0, 8);
   const SLUG = `f23http-${sufixo}`;
-  const EMAIL = `aluno-http-${sufixo}@exemplo.test`;
   const EMAIL_DO_PAINEL = `dono-http-${sufixo}@exemplo.test`;
   const SENHA = 'senha-de-teste-longa';
 
   const NOME_DO_ALUNO = 'Ana Souza Http';
+  /** ADR-057: identificador de login do app passa a ser o CPF. */
   const CPF_DO_ALUNO = '52998224725';
 
   let tenantId: string;
@@ -49,7 +50,7 @@ describe('F23 -- rotas do canal mobile', () => {
   const logar = async () =>
     request(servidor())
       .post('/api/v1/mobile/auth/login')
-      .send({ tenantSlug: SLUG, identificador: EMAIL, senha: SENHA });
+      .send({ tenantSlug: SLUG, cpf: CPF_DO_ALUNO, senha: SENHA });
 
   /** Loga e devolve o corpo ja estreitado, para nao espalhar `any` nos testes. */
   const logarComCorpo = async (): Promise<CorpoDaSessao> => {
@@ -103,7 +104,7 @@ describe('F23 -- rotas do canal mobile', () => {
       data: {
         tenantId,
         studentId: aluno.id,
-        identifier: EMAIL,
+        identifier: CPF_DO_ALUNO,
         passwordHash: await senhas.gerarHash(SENHA),
         status: 'ACTIVE',
         activatedAt: new Date(),
@@ -140,23 +141,23 @@ describe('F23 -- rotas do canal mobile', () => {
     it('senha errada responde problem+json sem revelar existencia', async () => {
       const resposta = await request(servidor())
         .post('/api/v1/mobile/auth/login')
-        .send({ tenantSlug: SLUG, identificador: EMAIL, senha: 'senha-errada-longa' });
+        .send({ tenantSlug: SLUG, cpf: CPF_DO_ALUNO, senha: 'senha-errada-longa' });
 
       expect(resposta.status).toBe(401);
       expect(resposta.headers['content-type']).toMatch(/application\/problem\+json/);
       expect(JSON.stringify(resposta.body)).not.toMatch(/existe|cadastrad|encontrad/i);
     });
 
-    it('identificador inexistente responde IGUAL a senha errada', async () => {
+    it('CPF inexistente responde IGUAL a senha errada', async () => {
       const senhaErrada = await request(servidor())
         .post('/api/v1/mobile/auth/login')
-        .send({ tenantSlug: SLUG, identificador: EMAIL, senha: 'senha-errada-longa' });
+        .send({ tenantSlug: SLUG, cpf: CPF_DO_ALUNO, senha: 'senha-errada-longa' });
 
       const inexistente = await request(servidor())
         .post('/api/v1/mobile/auth/login')
         .send({
           tenantSlug: SLUG,
-          identificador: `fantasma-${sufixo}@exemplo.test`,
+          cpf: '00000000191',
           senha: SENHA,
         });
 
@@ -167,7 +168,7 @@ describe('F23 -- rotas do canal mobile', () => {
     it('academia inexistente responde IGUAL -- nao enumera tenant', async () => {
       const resposta = await request(servidor())
         .post('/api/v1/mobile/auth/login')
-        .send({ tenantSlug: `nao-existe-${sufixo}`, identificador: EMAIL, senha: SENHA });
+        .send({ tenantSlug: `nao-existe-${sufixo}`, cpf: CPF_DO_ALUNO, senha: SENHA });
 
       expect(resposta.status).toBe(401);
       expect(problema(resposta).code).toBe('AUTH_INVALID_CREDENTIALS');
@@ -178,7 +179,114 @@ describe('F23 -- rotas do canal mobile', () => {
       // dia, ler o tenant do corpo -- o que a regra de arquitetura 2 proibe.
       const resposta = await request(servidor())
         .post('/api/v1/mobile/auth/login')
-        .send({ tenantSlug: SLUG, identificador: EMAIL, senha: SENHA, tenantId: 'forjado' });
+        .send({ tenantSlug: SLUG, cpf: CPF_DO_ALUNO, senha: SENHA, tenantId: 'forjado' });
+
+      expect(resposta.status).toBeGreaterThanOrEqual(400);
+    });
+  });
+
+  describe('primeiro acesso self-service -- issue #333, SPEC-071', () => {
+    const NASCIMENTO_PENDENTE = new Date('1995-03-20');
+    // Formato de 11 digitos basta -- o DTO nao confere digito verificador
+    // (ver mobile-auth.dto.ts): o dono de um CPF cadastrado errado ainda
+    // precisa conseguir usar o primeiro acesso com o numero gravado.
+    const cpfPendente = '96536696087';
+
+    interface CorpoDaConsulta {
+      nomeCompleto: string;
+      cpfFormatado: string;
+      dataNascimento: string;
+      plano: string;
+      local: string;
+      dataInicio: string;
+      activationRef: string;
+    }
+    const consultaDe = (resposta: request.Response): CorpoDaConsulta =>
+      resposta.body as CorpoDaConsulta;
+
+    beforeAll(async () => {
+      const unidade = await db.gymUnit.findFirstOrThrow({ where: { tenantId } });
+      await db.student.create({
+        data: {
+          tenantId,
+          gymUnitId: unidade.id,
+          membershipNumber: `HTTP-${sufixo}-pendente`,
+          fullName: 'Bruno Pendente Http',
+          birthDate: NASCIMENTO_PENDENTE,
+          status: 'ACTIVE',
+          cpf: cpfPendente,
+          cpfHash: calcularHashDeCpf(tenantId, cpfPendente),
+        },
+      });
+    });
+
+    it('consulta encontra o aluno e devolve os dados da tela de confirmacao', async () => {
+      const resposta = await request(servidor())
+        .post('/api/v1/mobile/activation/lookup')
+        .send({ tenantSlug: SLUG, cpf: cpfPendente, dataNascimento: '1995-03-20' });
+
+      expect(resposta.status).toBe(200);
+      expect(consultaDe(resposta)).toMatchObject({
+        nomeCompleto: 'Bruno Pendente Http',
+        cpfFormatado: '965.366.960-87',
+        dataNascimento: '1995-03-20',
+      });
+      expect(consultaDe(resposta).activationRef).toBeTruthy();
+    });
+
+    it('consulta com CPF inexistente responde com a mensagem generica, sem distinguir motivo', async () => {
+      const resposta = await request(servidor())
+        .post('/api/v1/mobile/activation/lookup')
+        .send({ tenantSlug: SLUG, cpf: '00000000191', dataNascimento: '1995-03-20' });
+
+      expect(resposta.status).toBe(401);
+      expect(problema(resposta).code).toBe('AUTH_INVALID_CREDENTIALS');
+    });
+
+    it('cria a senha depois da consulta e ja abre sessao, sem exigir login separado', async () => {
+      const consulta = await request(servidor())
+        .post('/api/v1/mobile/activation/lookup')
+        .send({ tenantSlug: SLUG, cpf: cpfPendente, dataNascimento: '1995-03-20' });
+
+      const resposta = await request(servidor())
+        .post('/api/v1/mobile/activation/self-service')
+        .send({
+          activationRef: consultaDe(consulta).activationRef,
+          senha: 'senha-do-primeiro-acesso-http',
+          confirmacaoSenha: 'senha-do-primeiro-acesso-http',
+        });
+
+      expect(resposta.status).toBe(200);
+      expect(sessaoDe(resposta).accessToken).toBeTruthy();
+
+      // A MESMA consulta, agora que a conta esta ACTIVE, some pelo mesmo
+      // erro generico -- nao pode virar oraculo de "ja tem senha".
+      const consultaDepois = await request(servidor())
+        .post('/api/v1/mobile/activation/lookup')
+        .send({ tenantSlug: SLUG, cpf: cpfPendente, dataNascimento: '1995-03-20' });
+      expect(consultaDepois.status).toBe(401);
+
+      // E o login por CPF, direto, ja funciona com a senha escolhida.
+      const login = await request(servidor())
+        .post('/api/v1/mobile/auth/login')
+        .send({ tenantSlug: SLUG, cpf: cpfPendente, senha: 'senha-do-primeiro-acesso-http' });
+      expect(login.status).toBe(200);
+    });
+
+    it('recusa senha e confirmacaoSenha diferentes antes de chegar ao servico', async () => {
+      const consulta = await request(servidor())
+        .post('/api/v1/mobile/activation/lookup')
+        .send({ tenantSlug: SLUG, cpf: cpfPendente, dataNascimento: '1995-03-20' });
+
+      // A conta ja foi ativada pelo teste anterior -- aqui so importa que o
+      // corpo com senhas divergentes nem chega a `confirmarAtivacao`.
+      const resposta = await request(servidor())
+        .post('/api/v1/mobile/activation/self-service')
+        .send({
+          activationRef: consultaDe(consulta).activationRef ?? 'qualquer',
+          senha: 'senha-forte-123456',
+          confirmacaoSenha: 'outra-senha-diferente',
+        });
 
       expect(resposta.status).toBeGreaterThanOrEqual(400);
     });
@@ -194,7 +302,7 @@ describe('F23 -- rotas do canal mobile', () => {
 
       // Um JWT vai para o disco do aparelho e para todo log de proxy no
       // caminho. Nome e CPF nele nao voltam atras.
-      for (const proibido of [NOME_DO_ALUNO, CPF_DO_ALUNO, EMAIL]) {
+      for (const proibido of [NOME_DO_ALUNO, CPF_DO_ALUNO]) {
         expect(texto).not.toContain(proibido);
       }
     });

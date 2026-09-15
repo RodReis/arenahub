@@ -29,8 +29,10 @@ describe('F24 -- Plano e frequencia do app', () => {
 
   const sufixo = randomUUID().slice(0, 8);
   const SLUG = `f24pf-${sufixo}`;
-  const EMAIL = `aluno-pf-${sufixo}@exemplo.test`;
-  const EMAIL_SEM_PLANO = `aluno-sp-${sufixo}@exemplo.test`;
+  const CPF = '39053344705';
+  const CPF_SEM_PLANO = '05461767970';
+  const CPF_VENCIDO = '11144477735';
+  const CPF_DOIS = '52998224725';
   const SENHA = 'senha-de-teste-longa';
 
   let tenantId: string;
@@ -69,10 +71,10 @@ describe('F24 -- Plano e frequencia do app', () => {
     baldes: { rotulo: string; sessoes: number; passagens: number }[];
   }
 
-  const entrar = async (identificador = EMAIL): Promise<string> => {
+  const entrar = async (cpf = CPF): Promise<string> => {
     const resposta = await request(servidor())
       .post('/api/v1/mobile/auth/login')
-      .send({ tenantSlug: SLUG, identificador, senha: SENHA });
+      .send({ tenantSlug: SLUG, cpf, senha: SENHA });
 
     return (resposta.body as { accessToken: string }).accessToken;
   };
@@ -162,8 +164,8 @@ describe('F24 -- Plano e frequencia do app', () => {
     });
     unidadeId = unidade.id;
 
-    alunoId = await criarAluno(EMAIL, 'Joana Ribeiro Costa', 'COMPLANO');
-    alunoSemPlanoId = await criarAluno(EMAIL_SEM_PLANO, 'Pedro Santos Lima', 'SEMPLANO');
+    alunoId = await criarAluno(CPF, 'Joana Ribeiro Costa', 'COMPLANO');
+    alunoSemPlanoId = await criarAluno(CPF_SEM_PLANO, 'Pedro Santos Lima', 'SEMPLANO');
 
     /*
      * Entitlement VIGENTE do primeiro aluno: comeca no passado e termina no
@@ -234,7 +236,7 @@ describe('F24 -- Plano e frequencia do app', () => {
        * afirmar uma situacao para quem nao tem nenhuma e inventar dado. A
        * tela decide o texto do estado vazio; a API nao mente para facilitar.
        */
-      const acesso = await entrar(EMAIL_SEM_PLANO);
+      const acesso = await entrar(CPF_SEM_PLANO);
 
       const resposta = await request(servidor())
         .get('/api/v1/mobile/plano')
@@ -264,8 +266,8 @@ describe('F24 -- Plano e frequencia do app', () => {
        * O vencido COMECOU depois, entao `startsAt desc` -- a ordem antiga --
        * o escolheria.
        */
-      const email = `vencido-${sufixo}@exemplo.test`;
-      const id = await criarAluno(email, 'Carla Dias Moura', 'VENCIDO');
+      const cpf = CPF_VENCIDO;
+      const id = await criarAluno(cpf, 'Carla Dias Moura', 'VENCIDO');
       const vigenteAte = new Date(Date.now() + 20 * 86_400_000);
 
       await db.entitlement.create({
@@ -295,7 +297,7 @@ describe('F24 -- Plano e frequencia do app', () => {
 
       const resposta = await request(servidor())
         .get('/api/v1/mobile/plano')
-        .set('Authorization', `Bearer ${await entrar(email)}`);
+        .set('Authorization', `Bearer ${await entrar(cpf)}`);
 
       const corpo = resposta.body as CorpoDoPlano;
       // O que vale HOJE, e nao a linha vencida que o `status` ainda chama de
@@ -311,8 +313,8 @@ describe('F24 -- Plano e frequencia do app', () => {
        * mensalidade que vai ate dezembro -- e a pergunta que a tela responde
        * e "ate quando posso treinar?".
        */
-      const email = `dois-${sufixo}@exemplo.test`;
-      const id = await criarAluno(email, 'Rafael Neves Pinto', 'DOIS');
+      const cpf = CPF_DOIS;
+      const id = await criarAluno(cpf, 'Rafael Neves Pinto', 'DOIS');
 
       const longo = new Date(Date.now() + 120 * 86_400_000);
 
@@ -344,7 +346,7 @@ describe('F24 -- Plano e frequencia do app', () => {
 
       const resposta = await request(servidor())
         .get('/api/v1/mobile/plano')
-        .set('Authorization', `Bearer ${await entrar(email)}`);
+        .set('Authorization', `Bearer ${await entrar(cpf)}`);
 
       const corpo = resposta.body as CorpoDoPlano;
       expect(new Date(corpo.plano!.fimEm).toISOString()).toBe(longo.toISOString());
@@ -392,7 +394,7 @@ describe('F24 -- Plano e frequencia do app', () => {
 
     it('aluno sem treino no periodo recebe serie vazia, e nao erro', async () => {
       // Estado vazio e resposta legitima: "nenhum treino" nao e falha.
-      const acesso = await entrar(EMAIL_SEM_PLANO);
+      const acesso = await entrar(CPF_SEM_PLANO);
 
       const resposta = await request(servidor())
         .get('/api/v1/mobile/frequencia?periodo=30D&granularidade=SEMANAL')
@@ -428,7 +430,7 @@ describe('F24 -- Plano e frequencia do app', () => {
     });
 
     it('nao aceita id de aluno na consulta -- o aluno sai da sessao', async () => {
-      const acesso = await entrar(EMAIL_SEM_PLANO);
+      const acesso = await entrar(CPF_SEM_PLANO);
 
       const resposta = await request(servidor())
         .get(`/api/v1/mobile/frequencia?periodo=30D&granularidade=SEMANAL&studentId=${alunoId}`)

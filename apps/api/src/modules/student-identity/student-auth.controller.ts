@@ -56,7 +56,8 @@ const ESQUEMA_ACEITO = {
 };
 
 /**
- * Autenticacao do APP DO ALUNO -- F23.
+ * Autenticacao do APP DO ALUNO -- F23. Login ganhou CPF como alternativa ao
+ * identificador (e-mail/telefone) na SPEC-071 -- ver `entrar()` abaixo.
  *
  * TOKEN NO CORPO, nao em cookie -- e a diferenca visivel em relacao ao
  * `auth.controller.ts` do painel. O painel usa cookie HttpOnly porque o
@@ -87,7 +88,15 @@ export class StudentAuthController {
     return { ok: true };
   }
 
-  /** Login -- `M4-FR-002`, resposta indistinguivel. */
+  /**
+   * Login -- `M4-FR-002`, resposta indistinguivel.
+   *
+   * SPEC-071 §3 Decisao 3: o corpo aceita `cpf` OU `identificador`
+   * (e-mail/telefone, F23) -- a UI so manda `cpf`, mas o backend continua
+   * aceitando o formato antigo para quem ja ativou pela F23 antes desta
+   * fatia. `loginDto` ja garante que exatamente um dos dois veio; aqui so
+   * normaliza para o campo unico que o servico entende.
+   */
   @Public()
   @Post('login')
   @HttpCode(200)
@@ -102,7 +111,7 @@ export class StudentAuthController {
 
     return this.identidade.entrar({
       tenantId,
-      identificador: entrada.identificador,
+      identificador: entrada.cpf ?? entrada.identificador ?? '',
       senha: entrada.senha,
       deviceLabel: entrada.deviceLabel ?? null,
       agora: new Date(),

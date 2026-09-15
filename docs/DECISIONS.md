@@ -4260,3 +4260,72 @@ painel e o app passam a depender.
   separados (exigência do Postgres fora de transação) para os dois enums (`consent_document_type` e
   `student_timeline_event_type`).
 - Fatia: **F26** (`SPEC-026`).
+
+---
+
+## ADR-057 — Primeiro acesso self-service por CPF + data de nascimento (F71)
+
+**Data:** 15/09/2026
+**Status:** aceito *(decisão nova — decidida e aprovada pelo PI em 15/09/2026)*
+**Decisor:** Rodrigo Reis (PI)
+**Fatia:** F71 (`SPEC-071`), issue [#333](https://github.com/RodReis/arenahub/issues/333)
+
+**Contexto:** a F23 (`SPEC-023`, Slice 4.1) entregou ativação de conta por convite/token de uso
+único enviado por e-mail (`M4-FR-001`) — é o único caminho de ativação em produção hoje, com login
+por e-mail/telefone + senha. O PI pediu, em 15/09/2026, um segundo caminho de ativação, fiel a um
+protótipo de telas: o aluno sem senha ainda informa CPF e data de nascimento, o sistema localiza o
+cadastro e devolve nome, CPF, data de nascimento, plano, unidade e data de início formatados;
+encontrado, libera dois campos para criar a senha; não encontrado, mostra mensagem única pedindo
+para procurar a administração da academia. **Sem nenhuma etapa de e-mail** — confirmado
+explicitamente pelo PI. Na mesma conversa, o PI corrigiu também a tela de login: o campo visível
+deixa de ser "e-mail ou telefone" e passa a ser **CPF**.
+
+**Por que é ADR:** introduz um segundo mecanismo de prova de identidade para criar credencial de
+aluno, ao lado do que a F23 já entregou e já está em produção — não é ajuste de tela, é um caminho
+novo de acesso que, uma vez comunicado a alunos, é caro de desfazer. E muda o identificador
+principal do login recorrente (e-mail/telefone → CPF na UI), decisão que outra fatia e o suporte ao
+aluno vão herdar. Fixa também um precedente de segurança da mesma família do ADR-045 (CPF como
+parte de um mecanismo de autenticação/ativação, com risco de enumeração aceito conscientemente).
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **CPF + data de nascimento autenticam a CONSULTA, não abrem sessão.** Localizam o cadastro e liberam a tela de criação de senha; só a senha, uma vez criada, autentica dali em diante | separa prova de identidade (fraca, CPF+data) de credencial de longo prazo (senha) |
+| 2 | **Risco aceito, sem throttling nem segundo fator nesta fatia.** CPF e data de nascimento não são segredo, e quem souber os dois de outro aluno consegue chegar primeiro à tela de criar senha daquela conta | PI confrontado com o risco de antecipação de conta e decidiu aceitar como está |
+| 3 | **Mensagem única e neutra para qualquer falha de localização**, disciplina já usada nas ADR-024 e ADR-045 | antienumeração (`M4-FR-002`) |
+| 4 | **O convite por e-mail da F23 não é revogado; os dois caminhos coexistem, e "Primeiro acesso" não tem nenhuma etapa de e-mail** | quem recebeu convite ativa por ele; quem não recebeu usa "Primeiro acesso" |
+| 5 | **Se a mesma conta for ativada pelos dois caminhos em corrida**, o primeiro a definir a senha vence — o token de convite, se ainda não consumido, passa a apontar para uma conta já ativada e falha como "já ativada" ao ser usado depois | exclusão mútua na escrita, não numa leitura seguida de decisão (mesma disciplina de `consumirTokenEDefinirSenha`) |
+| 6 | **A tela de login mostra só CPF; o backend continua aceitando e-mail/telefone por baixo** — retrocompatibilidade evita quebrar quem já ativou pela F23 antes desta fatia | protótipo corrigido pelo PI em 15/09/2026 |
+
+### Gatilho de revisão
+
+Qualquer indício de uso do "Primeiro acesso" para ativar conta de aluno diferente do que a
+solicitou reabre a Decisão 2 — throttling e/ou segundo fator deixam de ser opcionais.
+
+### Consequências
+
+- `apps/api/src/modules/student-identity/dto/mobile-auth.dto.ts`: `loginDto` aceita `cpf` OU
+  `identificador`, nunca os dois; novos `ativacaoConsultaDto`/`ativacaoSelfServiceDto`.
+- `StudentAccountRepository.encontrarCandidatoParaAtivacao`: busca `Student` por `cpfHash` (nunca
+  `cpf` em claro) + `birthDate`, escopada por tenant via `comContexto` (a rota é `@Public()`, sem
+  `TenantRlsInterceptor` — o método abre o próprio escopo de RLS pelo tenant já resolvido do
+  `tenantSlug`). `criarOuAtivarConta`: cria a conta (sem convite prévio) ou ativa uma `PENDING`
+  por cima — exclusão mútua via `updateMany` condicionado + índice único de `studentId`.
+  `encontrarPorIdentificador` (F23) fica como estava — CPF entra pelo mesmo campo `identifier`
+  quando um self-service o grava ali.
+- `StudentIdentityService.consultarAtivacao`/`confirmarAtivacao`: a consulta emite um
+  `activationRef` — um token pré-auth de curta duração (`TokenService.emitirPreAuth`, mesmo
+  mecanismo do desafio de MFA, novo `purpose: 'STUDENT_SELF_SERVICE_ACTIVATION'`) — em vez de uma
+  linha nova em `student_account_tokens`: evita migração, e a mesma disciplina de expiração do MFA
+  já resolve "curta duração, uso único de fato" (o `criarOuAtivarConta` fecha a corrida do lado do
+  banco, não do token).
+- Endpoints NOVOS, prefixo próprio `/api/v1/mobile/activation` (não `/auth`):
+  `POST .../lookup` (consulta) e `POST .../self-service` (confirmação) — `StudentActivationController`.
+- `POST /api/v1/mobile/auth/login` (F23): body aceita `cpf` como alternativa a `identificador`; a
+  UI manda só `cpf`, o campo antigo continua funcionando por baixo.
+- `docs/design/DS-APP.md` §3.1/§4.2/§5.5: campo de login muda de "e-mail/telefone" para "CPF";
+  novo fluxo de dois passos na Folha para o primeiro acesso.
+- `docs/CONVENTION.md` INV-012 ganha nota de exceção apontando para este ADR, igual ao padrão já
+  usado para ADR-045/`M4-BR-004`.
+- Fatia: **F71** (`SPEC-071`), issue #333 — ver `docs/STATUS.md` §5 (Índice Fatia ↔ SPEC).

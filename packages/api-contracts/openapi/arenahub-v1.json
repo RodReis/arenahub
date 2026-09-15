@@ -6311,6 +6311,100 @@
         ]
       }
     },
+    "/api/v1/mobile/activation/lookup": {
+      "post": {
+        "operationId": "StudentActivationController_consultar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Aluno localizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nomeCompleto": {
+                      "type": "string"
+                    },
+                    "cpfFormatado": {
+                      "type": "string"
+                    },
+                    "dataNascimento": {
+                      "type": "string"
+                    },
+                    "plano": {
+                      "type": "string"
+                    },
+                    "local": {
+                      "type": "string"
+                    },
+                    "dataInicio": {
+                      "type": "string"
+                    },
+                    "activationRef": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "nomeCompleto",
+                    "cpfFormatado",
+                    "dataNascimento",
+                    "plano",
+                    "local",
+                    "dataInicio",
+                    "activationRef"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentActivation"
+        ]
+      }
+    },
+    "/api/v1/mobile/activation/self-service": {
+      "post": {
+        "operationId": "StudentActivationController_confirmar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Conta ativada, sessao aberta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "expiraEm": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "accessToken",
+                    "refreshToken",
+                    "sessionId",
+                    "expiraEm"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentActivation"
+        ]
+      }
+    },
     "/api/v1/mobile/sessions": {
       "get": {
         "operationId": "StudentSessionsController_listar",

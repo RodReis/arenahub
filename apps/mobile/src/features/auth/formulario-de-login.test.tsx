@@ -3,28 +3,59 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react-nativ
 import { ProvedorDeTema } from '../../ui/theme.js';
 import { FormularioDeLogin } from './formulario-de-login.js';
 
-const renderizar = (onEntrar: (dados: { identificador: string; senha: string }) => Promise<void>) =>
+const renderizar = (onEntrar: (dados: { cpf: string; senha: string }) => Promise<void>) =>
   render(
     <ProvedorDeTema forcarTema="dark">
-      <FormularioDeLogin onEntrar={onEntrar} onEsqueciSenha={jest.fn()} />
+      <FormularioDeLogin
+        onEntrar={onEntrar}
+        onEsqueciSenha={jest.fn()}
+        onPrimeiroAcesso={jest.fn()}
+      />
     </ProvedorDeTema>,
   );
 
 describe('FormularioDeLogin', () => {
-  it('envia o que foi digitado', async () => {
+  it('envia o CPF SEM MASCARA -- ADR-057', async () => {
     const onEntrar = jest.fn(() => Promise.resolve());
     renderizar(onEntrar);
 
-    fireEvent.changeText(screen.getByTestId('campo-identificador'), 'ana@exemplo.test');
+    fireEvent.changeText(screen.getByTestId('campo-identificador'), '11144477735');
     fireEvent.changeText(screen.getByTestId('campo-senha'), 'senha-longa-aqui');
     fireEvent.press(screen.getByTestId('botao-entrar'));
 
     await waitFor(() =>
       expect(onEntrar).toHaveBeenCalledWith({
-        identificador: 'ana@exemplo.test',
+        cpf: '11144477735',
         senha: 'senha-longa-aqui',
       }),
     );
+  });
+
+  it('mascara o CPF enquanto o aluno digita', () => {
+    const onEntrar = jest.fn(() => Promise.resolve());
+    renderizar(onEntrar);
+
+    fireEvent.changeText(screen.getByTestId('campo-identificador'), '11144477735');
+
+    const campo = screen.getByTestId('campo-identificador').props as { value?: string };
+    expect(campo.value).toBe('111.444.777-35');
+  });
+
+  it('abre o primeiro acesso ao tocar no link', () => {
+    const onPrimeiroAcesso = jest.fn();
+    render(
+      <ProvedorDeTema forcarTema="dark">
+        <FormularioDeLogin
+          onEntrar={() => Promise.resolve()}
+          onEsqueciSenha={jest.fn()}
+          onPrimeiroAcesso={onPrimeiroAcesso}
+        />
+      </ProvedorDeTema>,
+    );
+
+    fireEvent.press(screen.getByTestId('botao-primeiro-acesso'));
+
+    expect(onPrimeiroAcesso).toHaveBeenCalledTimes(1);
   });
 
   it('NAO envia duas vezes com toque duplo', () => {

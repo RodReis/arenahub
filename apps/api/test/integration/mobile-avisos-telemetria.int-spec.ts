@@ -25,8 +25,8 @@ describe('F29 -- avisos e telemetria', () => {
   const sufixo = randomUUID().slice(0, 8);
   const SLUG = `f29-${sufixo}`;
   const SENHA = 'senha-de-teste-longa';
-  const EMAIL_A = `aluno-a-${sufixo}@exemplo.test`;
-  const EMAIL_B = `aluno-b-${sufixo}@exemplo.test`;
+  const CPF_A = '11144477735';
+  const CPF_B = '52998224725';
 
   let tenantId: string;
   let alunoA: string;
@@ -51,10 +51,10 @@ describe('F29 -- avisos e telemetria', () => {
     naoLidos: number;
   }
 
-  const entrar = async (identificador: string): Promise<string> => {
+  const entrar = async (cpf: string): Promise<string> => {
     const resposta = await request(servidor())
       .post('/api/v1/mobile/auth/login')
-      .send({ tenantSlug: SLUG, identificador, senha: SENHA });
+      .send({ tenantSlug: SLUG, cpf, senha: SENHA });
 
     return (resposta.body as { accessToken: string }).accessToken;
   };
@@ -112,11 +112,11 @@ describe('F29 -- avisos e telemetria', () => {
       },
     });
 
-    alunoA = await criarAluno(EMAIL_A, 'Ana Silva', 'F29A', unidade.id);
-    // O id do B nao e usado: o teste entra como ele pelo e-mail. O aluno
+    alunoA = await criarAluno(CPF_A, 'Ana Silva', 'F29A', unidade.id);
+    // O id do B nao e usado: o teste entra como ele pelo CPF. O aluno
     // precisa EXISTIR para a sessao dele ser valida -- e e com sessao valida
     // que ele nao pode ver a caixa do A.
-    await criarAluno(EMAIL_B, 'Bruno Costa', 'F29B', unidade.id);
+    await criarAluno(CPF_B, 'Bruno Costa', 'F29B', unidade.id);
 
     const aviso = await db.studentNotification.create({
       data: {
@@ -151,7 +151,7 @@ describe('F29 -- avisos e telemetria', () => {
 
   describe('caixa de avisos', () => {
     it('devolve o aviso do proprio aluno com a rota resolvida', async () => {
-      const acesso = await entrar(EMAIL_A);
+      const acesso = await entrar(CPF_A);
 
       const resposta = await request(servidor())
         .get('/api/v1/mobile/avisos')
@@ -168,7 +168,7 @@ describe('F29 -- avisos e telemetria', () => {
     });
 
     it('esconde o aviso expirado, sem apaga-lo do banco', async () => {
-      const acesso = await entrar(EMAIL_A);
+      const acesso = await entrar(CPF_A);
 
       const resposta = await request(servidor())
         .get('/api/v1/mobile/avisos')
@@ -193,7 +193,7 @@ describe('F29 -- avisos e telemetria', () => {
      * ele leria a caixa do aluno A -- e nada no sistema acusaria.
      */
     it('o aluno B nao ve o aviso do aluno A', async () => {
-      const acesso = await entrar(EMAIL_B);
+      const acesso = await entrar(CPF_B);
 
       const resposta = await request(servidor())
         .get('/api/v1/mobile/avisos')
@@ -205,7 +205,7 @@ describe('F29 -- avisos e telemetria', () => {
     });
 
     it('o aluno B nao marca como lido o aviso do aluno A', async () => {
-      const acesso = await entrar(EMAIL_B);
+      const acesso = await entrar(CPF_B);
 
       const resposta = await request(servidor())
         .post(`/api/v1/mobile/avisos/${avisoDeA}/lido`)
@@ -221,7 +221,7 @@ describe('F29 -- avisos e telemetria', () => {
     });
 
     it('marca como lido e a contagem cai', async () => {
-      const acesso = await entrar(EMAIL_A);
+      const acesso = await entrar(CPF_A);
 
       const antes = await request(servidor())
         .get('/api/v1/mobile/avisos')
@@ -245,7 +245,7 @@ describe('F29 -- avisos e telemetria', () => {
     // Idempotente: a segunda marcacao nao move o instante, senao apagaria
     // quando o aviso foi visto de fato.
     it('marcar duas vezes nao move o instante de leitura', async () => {
-      const acesso = await entrar(EMAIL_A);
+      const acesso = await entrar(CPF_A);
 
       await request(servidor())
         .post(`/api/v1/mobile/avisos/${avisoDeA}/lido`)
@@ -278,7 +278,7 @@ describe('F29 -- avisos e telemetria', () => {
     };
 
     it('aceita o evento declarado', async () => {
-      const acesso = await entrar(EMAIL_A);
+      const acesso = await entrar(CPF_A);
 
       await request(servidor())
         .post('/api/v1/mobile/telemetria')
@@ -288,7 +288,7 @@ describe('F29 -- avisos e telemetria', () => {
     });
 
     it('recusa evento fora da lista', async () => {
-      const acesso = await entrar(EMAIL_A);
+      const acesso = await entrar(CPF_A);
 
       await request(servidor())
         .post('/api/v1/mobile/telemetria')
@@ -305,7 +305,7 @@ describe('F29 -- avisos e telemetria', () => {
      * mantem a metrica e nao deixa o dado vazar.
      */
     it('descarta PII e aceita o evento mesmo assim', async () => {
-      const acesso = await entrar(EMAIL_A);
+      const acesso = await entrar(CPF_A);
 
       await request(servidor())
         .post('/api/v1/mobile/telemetria')
@@ -321,7 +321,7 @@ describe('F29 -- avisos e telemetria', () => {
     });
 
     it('recusa versao malformada', async () => {
-      const acesso = await entrar(EMAIL_A);
+      const acesso = await entrar(CPF_A);
 
       await request(servidor())
         .post('/api/v1/mobile/telemetria')
