@@ -451,7 +451,14 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 
 - **INV-101** Toda medida oficial tem tipo, valor decimal, unidade canônica, origem, responsável e instante.
 - **INV-102** **Avaliação publicada é imutável.** Correção cria nova versão vinculada.
-- **INV-103** **OCR/IA nunca publica automaticamente** — exige confirmação humana.
+- **INV-103** ~~**OCR/IA nunca publica automaticamente** — exige confirmação humana.~~
+  **Revogado na parte do OCR pelo [ADR-039](DECISIONS.md#adr-039)** (21/08/2026, decidido
+  pelo PI): o valor extraído do laudo **publica automaticamente**, sem revisão campo a campo,
+  e baixa confiança não segura nada. O que permanece: publica-se o **último arquivo da
+  medição** (`ultimoDaSessao` — marcação ausente não publica, a importação fica em
+  `EXTRACTED` na fila da F22), o erro continua virando **correção vinculada** (INV-102), e a
+  **saída de IA** segue validada e rejeitável (INV-111, INV-112) — publicar valor medido não
+  é rodar IA sobre saúde.
 - **INV-104** **Ausência de dado não é zero.**
 - **INV-105** Unidade original é preservada; conversão usa regra testada.
 - **INV-106** **Arredondamento é só de apresentação**; cálculo usa a precisão armazenada.

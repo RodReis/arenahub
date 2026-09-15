@@ -65,6 +65,7 @@ existe para expulsar deste repositório.
 | [033](#adr-033) | Importação da base legada do Pacto: 1.926 alunos entram como `CANCELLED` | `aceito` | — |
 | [034](#adr-034) | CPF passa a ser persistido em claro e exibido sem máscara | `aceito` | — |
 | [035](#adr-035) | ECG no MVP 3: o ArenaHub guarda e cita, nunca interpreta | `aceito` | — |
+| [036](#adr-036) | Modelos de IA do MVP 3 e teto de gasto como parâmetro do cliente | `aceito` | — **fecha o ADR-008 e destrava F21** |
 | [037](#adr-037) | Contexto de saúde do aluno: lista fechada que suprime alerta | `aceito` | — |
 | [038](#adr-038) | Uma medição, três arquivos: a importação passa a ser N:1 | `aceito` | — |
 | [039](#adr-039) | Laudo de bioimpedância publica automaticamente | `aceito` | — |
@@ -80,6 +81,12 @@ existe para expulsar deste repositório.
 | [049](#adr-049) | F35 roda antes do gate do MVP 5; correção recusa por teto; flag é coluna de tenant | `aceito` | — |
 | [050](#adr-050) | A F40 não é executada: o gate `M6-ML-01` não é atingível | `aceito` | — |
 | [051](#adr-051) | **Topologia de implantação: nuvem na Railway, totem e edge-agent na academia** | `aceito` | — **cria F58–F59** |
+| [052](#adr-052) | **Módulo `platform`: Super Admin, plano SaaS, contrato e identidade visual do tenant** | `aceito` | — **cria F61–F67** |
+| [053](#adr-053) | Tenant suspenso fecha a catraca depois de carência configurável | `aceito` | — |
+| [054](#adr-054) | Row-Level Security no Postgres como segunda camada de isolamento | `aceito` | — |
+| [055](#adr-055) | O contrato do tenant é licença de uso, com termos versionados e assinatura fora do sistema | `aceito` | — |
+| [056](#adr-056) | Consentimento self-service no app e exportação de saúde assíncrona | `aceito` | — |
+| [057](#adr-057) | Primeiro acesso self-service por CPF + data de nascimento | `aceito` | — |
 
 ---
 
@@ -1995,6 +2002,52 @@ por mês. Nenhum dos dois impede começar F17–F20, que não chamam IA nenhuma.
 ---
 
 <a id="adr-037"></a>
+## ADR-036 — Modelos de IA do MVP 3 e teto de gasto como parâmetro do cliente
+
+**Data:** 19/08/2026 · **Status:** `aceito` *(**consolidação** — a decisão é do PI em 19/08/2026 e
+já estava registrada no `docs/STATUS.md`; este ADR só a traz para o lugar citável)*
+· **Fecha:** o ponto remanescente do **ADR-008** · **Destrava:** F21
+· **Sustenta:** `MVP-03` §16 (`M3-NFR-005` e `M3-NFR-009`)
+
+**Contexto.** Três documentos citam o ADR-036 desde 19/08/2026 — `MVP-03` §16, o `docs/STATUS.md`
+e o `CLAUDE.md`. **Ele nunca foi escrito.** A decisão existia como parágrafo do `STATUS.md` e como
+linha da tabela §3.1, e duas NFRs apoiavam-se num ponteiro para lugar nenhum. A dívida foi
+apontada pelo ADR-042 em 22/08/2026 e ficou aberta.
+
+Isto é **consolidação, não decisão nova**: cada item abaixo estava registrado no `STATUS.md` antes
+desta escrita, e nada foi acrescentado.
+
+**Decisão (PI, 19/08/2026).**
+
+1. **Extração: `claude-haiku-4-5`. Análise: `claude-sonnet-4-6`.** Os dois passos usam modelos
+   diferentes de propósito — extrair campo de laudo é leitura, analisar evolução é julgamento;
+   pagar o modelo caro na extração seria gastar no passo que menos precisa.
+2. **O teto de gasto é parâmetro do cliente, não constante do código** (`M3-NFR-005`). Estourado o
+   teto, a análise **degrada para modo manual** e a avaliação continua funcionando
+   (`M3-NFR-004`) — o produto não fatura sem limite nem para de medir.
+3. **O snapshot enviado ao provedor é pseudonimizado**, e **nenhum campo de origem `ECG` o
+   integra** (`M3-NFR-009`). É a aplicação do ADR-035 ao payload da IA.
+4. **Custo estimado em ~US$ 28/mês para 300 avaliações.** O "300" é **premissa, não dado**: o
+   número real tende ao total de alunos com o benefício, e o catálogo de planos dá bioimpedância a
+   cada 30/60 dias.
+
+**Consequências.**
+
+- A **F21** deixou de ter ADR bloqueando em 19/08/2026 — o que restava era firmar contrato com o
+  provedor, que é ato de terceiro.
+- O ponto remanescente do **ADR-008** (modelo e regime da análise) fecha aqui.
+- Modelo é decisão registrada: trocar `claude-haiku-4-5` ou `claude-sonnet-4-6` exige ADR novo.
+
+**O que este ADR não decide.** Nada sobre consentimento, sobre interpretação de ECG (ADR-035) ou
+sobre publicação automática de laudo (ADR-039). O que não estava no `STATUS.md` não foi
+acrescentado aqui.
+
+> **Nota de origem.** Escrito em 15/09/2026 pelo Cowork, a partir do `docs/STATUS.md` (registro de
+> 19/08/2026 e tabela §3.1), na auditoria de cobertura Especificação × MVPs. O conteúdo é o que já
+> estava decidido; só o lugar mudou.
+
+---
+
 ## ADR-037 — Contexto de saúde do aluno: lista fechada que suprime alerta, não texto que gera texto
 
 **Data:** 19/08/2026 · **Status:** `aceito` · **Decidido pelo PI em 19/08/2026**
