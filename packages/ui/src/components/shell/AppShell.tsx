@@ -62,7 +62,28 @@ export function AppShell({
       </a>
 
       <header className={estilos['topbar']}>
-        <span className={estilos['logo']}>ArenaHub</span>
+        <span className={estilos['marca']}>
+          {/* Selo halter -- mesmo traço do hero de login (DS-PAINEL.md v2 §4.1). */}
+          <span className={estilos['selo']} aria-hidden="true">
+            <span className={estilos['seloMiolo']}>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M2.5 9.5v5 M5 7.5v9 M19 7.5v9 M21.5 9.5v5 M5 12h3.2 M15.8 12H19" />
+              </svg>
+            </span>
+          </span>
+          <span className={estilos['logo']}>
+            arenahub<span className={estilos['ponto']}>.</span>
+          </span>
+        </span>
         {unitSelector}
         <div className={estilos['direita']}>{user}</div>
       </header>

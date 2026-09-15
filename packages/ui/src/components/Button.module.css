@@ -39,13 +39,33 @@
   }
 }
 
+/*
+ * Gradiente, nunca cor chapada -- DS-PAINEL.md v2 §4.8/§8. Por padrão as
+ * pontas vêm da rampa de accent já resolvida (accent-400 -> action.solid),
+ * então o gradiente acompanha o accent do tenant como qualquer outro uso de
+ * `--ah-accent-*`/`--ah-action-*`.
+ *
+ * `--ah-action-gradient(-hover)` é a válvula de escape para quem precisa de
+ * marca FIXA (ex.: login sem tenant, `login.module.css` `.trabalhoSemTenant`
+ * -- decisão do PI, F71): sobrescrever a variável troca o gradiente inteiro
+ * sem tocar aqui. Empilhar `linear-gradient(... , var(--ah-action-solid))`
+ * quando `--ah-action-solid` já É uma string de gradiente (o hack antigo)
+ * gera `linear-gradient` aninhado, que é CSS inválido e derruba a
+ * declaração inteira -- é o que fazia o botão do login sair transparente.
+ */
 .botao[data-variant='solid'] {
-  background: var(--ah-action-solid);
+  background: var(
+    --ah-action-gradient,
+    linear-gradient(100deg, var(--ah-accent-400), var(--ah-action-solid))
+  );
   color: var(--ah-action-on-solid);
 }
 
 .botao[data-variant='solid']:hover:not(:disabled) {
-  background: var(--ah-action-hover);
+  background: var(
+    --ah-action-gradient-hover,
+    linear-gradient(100deg, var(--ah-accent-300), var(--ah-action-hover))
+  );
 }
 
 .botao[data-variant='outline'] {

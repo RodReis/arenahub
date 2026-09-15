@@ -205,13 +205,16 @@
  * academia para resolver accent por contraste. `/{slug}/login`, com tenant,
  * continua com `--ah-action-*` resolvido por tenant, sem tocar esta classe.
  *
- * Redefine a MESMA variavel que `Button.module.css` ja le
- * (`background: var(--ah-action-solid)`) -- funciona em cima de custom
- * property, gradiente incluso, sem tocar o componente compartilhado.
+ * Redefine `--ah-action-gradient(-hover)` -- a valvula de escape que
+ * `Button.module.css` reserva para marca fixa, sem tocar o componente
+ * compartilhado. NAO redefinir `--ah-action-solid` com uma string de
+ * gradiente: o Button monta `linear-gradient(..., var(--ah-action-solid))`
+ * por padrao, e um gradiente dentro de outro e CSS invalido -- foi assim que
+ * o botao saiu transparente.
  */
 .trabalhoSemTenant {
-  --ah-action-solid: linear-gradient(100deg, #5B86FF, #3E63E8);
-  --ah-action-hover: linear-gradient(100deg, #6B92FF, #4A6FF0);
+  --ah-action-gradient: linear-gradient(100deg, #5B86FF, #3E63E8);
+  --ah-action-gradient-hover: linear-gradient(100deg, #6B92FF, #4A6FF0);
   --ah-action-text: #3E63E8;
   --ah-focus-ring: #3E63E8;
 }
@@ -232,8 +235,8 @@
   --ah-text-label: #C3CAD4;
   --ah-text-default: #E5E9EE;
   --ah-text-strong: #F5F7F9;
-  --ah-action-solid: linear-gradient(100deg, #5B86FF, #3E63E8);
-  --ah-action-hover: linear-gradient(100deg, #6B92FF, #4A6FF0);
+  --ah-action-gradient: linear-gradient(100deg, #5B86FF, #3E63E8);
+  --ah-action-gradient-hover: linear-gradient(100deg, #6B92FF, #4A6FF0);
   --ah-action-text: #8FB0FF;
   --ah-focus-ring: #8FB0FF;
 }

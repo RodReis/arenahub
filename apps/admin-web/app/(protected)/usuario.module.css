@@ -1,0 +1,32 @@
+/**
+ * Chip do usuário logado na topbar -- DS-PAINEL.md v2 §4.1/§4.19.
+ *
+ * Vive sobre `--ah-surface-chrome`; o avatar usa `--ah-accent-*` como
+ * qualquer outro selo de marca no shell (AppShell.module.css `.selo`).
+ */
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, var(--ah-accent-400), var(--ah-accent-700));
+  color: var(--ah-surface-raised);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.email {
+  color: var(--ah-text-on-chrome);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}

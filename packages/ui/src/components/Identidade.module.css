@@ -28,12 +28,10 @@
 }
 
 /**
- * O AVATAR -- 28 px, e o tamanho e uma decisao, nao um arredondamento.
- *
- * A linha tem 40 px (DS-PAINEL §4). Um avatar de 32 px deixaria 4 px de folga
- * em cima e embaixo e obrigaria toda linha com identidade a crescer, quebrando
- * o ritmo que a densidade depende. 28 px cabe com respiro e continua legivel a
- * duas iniciais.
+ * O AVATAR -- 36 px, DS-PAINEL.md v2 §4.19 ("grade de alunos" -- era 28px na
+ * v1, calibrado para a linha de 40px de entao). A linha da tabela passou a
+ * 48px (v2 §2.7): 36px cabe com respiro dos dois lados e casa com o tamanho
+ * que a spec nomeia para esta grade -- 24px e só o da topbar.
  *
  * `flex-shrink: 0` porque avatar espremido vira elipse -- e elipse le como
  * defeito, nao como design.
@@ -43,8 +41,8 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  inline-size: 28px;
-  block-size: 28px;
+  inline-size: 36px;
+  block-size: 36px;
   overflow: hidden;
   border: 1px solid var(--ah-border-subtle);
   border-radius: 50%;
