@@ -1,4 +1,4 @@
-# SPEC-071 — Primeiro acesso self-service e exibição de dados cadastrais no app
+# SPEC-071 — Primeiro acesso self-service por CPF e data de nascimento
 
 | campo | valor |
 |---|---|
@@ -13,11 +13,19 @@
 
 ---
 
+## 0. Fiel ao protótipo
+
+Esta spec segue as 4 telas anexadas pelo PI em 15/09/2026 (`docs/design/` — a incluir como
+anexo desta spec quando o PI enviar os arquivos de design; por ora a referência é a própria
+conversa). Nenhum campo, rótulo ou texto de apoio abaixo foi inventado — todos vêm das telas.
+
+---
+
 ## 1. Objetivo em uma frase
 
-Aluno sem convite ativo cria a própria senha informando CPF e data de nascimento, e os dados que
-aparecem na jornada (CPF, data de nascimento, plano, unidade/local e data de início) ficam
-formatados e mascarados em vez de exibidos em cru.
+Aluno sem senha ainda cria a própria conta informando **apenas CPF e data de nascimento** — sem
+e-mail, sem convite, sem token — e vê os próprios dados de matrícula formatados antes de definir
+a senha.
 
 ---
 
@@ -26,16 +34,15 @@ formatados e mascarados em vez de exibidos em cru.
 | item | estado |
 |---|---|
 | Gate de entrada do MVP | MVP 4 aprovado para planejamento em 14/08/2026 (`MVP-04-app-totem.md` §1) |
-| ADRs que bloqueiam | **ADR-057** — decidido pelo PI em 15/09/2026 nesta conversa; ainda não commitado em `docs/DECISIONS.md` (ver nota abaixo) |
-| Fatias anteriores | F23 (Identidade e shell mobile) — ✅ entregue, aguardando aceite |
+| ADRs que bloqueiam | **ADR-057** — decidido pelo PI em 15/09/2026; texto pronto na §11, pendente de commit em `docs/DECISIONS.md` (nota abaixo) |
+| Fatias anteriores | F23 (Identidade e shell mobile) — ✅ entregue, aguardando aceite. Login por e-mail/telefone + senha **continua existindo, tela inalterada** — o protótipo confirma isso (tela 2) |
 | Decisões dos PRDs | `M4-FR-001`, `M4-FR-002` — atendidas por desenho (ver §3) |
 
-> **Nota de processo:** a ADR-057 e a linha F71 do Índice Fatia↔SPEC (`docs/STATUS.md` §5) foram
-> redigidas nesta sessão mas **não foram commitadas** — os dois arquivos passam de 150 KB e
+> **Nota de processo:** a ADR-057 e a linha F71 do Índice Fatia↔SPEC (`docs/STATUS.md` §5) têm o
+> texto pronto (§11 e nota abaixo) mas não foram commitadas — os dois arquivos passam de 150 KB e
 > 260 KB, e reescrevê-los por inteiro nesta sessão arriscava corromper conteúdo histórico sem
-> possibilidade de revisão por diff. O texto integral da ADR-057 está pronto (entregue nesta
-> conversa) para ser aplicado na próxima escrita em `docs/DECISIONS.md`, junto com a linha
-> `| F71 | SPEC-071 | 4 | — | ... | rascunho |` logo após a linha F70 em `docs/STATUS.md` §5.
+> revisão por diff. Linha para `STATUS.md` §5, logo após F70:
+> `| F71 | SPEC-071 | 4 | — | Primeiro acesso self-service por CPF e data de nascimento | [SPEC-071-primeiro-acesso-self-service.md] · [ADR-057] | #333 | rascunho |`
 
 ---
 
@@ -43,12 +50,12 @@ formatados e mascarados em vez de exibidos em cru.
 
 | # | decisão | alternativa descartada | por quê |
 |---|---|---|---|
-| 1 | Consulta por CPF + data de nascimento é um passo separado da criação de senha — dois endpoints, não um | consulta e criação num único request | erro ao criar a senha não deveria obrigar redigitar CPF e data; e é a consulta sozinha que precisa da mensagem neutra do `M4-FR-002` |
-| 2 | Campos exibidos usam as máscaras já convencionadas no `CLAUDE.md` (CPF, datas) — não é decisão nova, é aplicação da convenção existente | criar máscara própria para esta tela | duas implementações da mesma máscara de CPF divergem na primeira mudança |
-| 3 | "Primeiro acesso" não desativa nem substitui o convite por e-mail da F23 | migrar todo mundo para o novo caminho | decisão de operação fora do escopo desta fatia — ver Pergunta 1 |
+| 1 | Consulta (CPF+data → nome) e criação de senha são dois passos/dois endpoints, não um | um único request fazendo os dois | erro ao criar a senha não deveria obrigar redigitar CPF e data; e é a consulta sozinha que precisa da mensagem neutra do `M4-FR-002` |
+| 2 | Campos exibidos (CPF, datas) usam as máscaras já convencionadas no `CLAUDE.md` — aplicação da convenção existente, não decisão nova | máscara própria para esta tela | duas implementações da mesma máscara divergem na primeira mudança |
+| 3 | **Login (`POST /api/v1/mobile/auth/login`, da F23) passa a aceitar CPF como identificador alternativo a e-mail/telefone** | manter login só por e-mail/telefone e mudar o texto da tela de confirmação para não prometer CPF | a tela 4 do protótipo diz ao aluno *"você vai usar esta senha junto com seu CPF para entrar"* — se o login não aceitar CPF, a própria ativação ensina algo que não funciona. Extensão de baixo custo (mais um formato de identificador aceito na mesma consulta que já existe), não decisão cara de desfazer — não vira ADR. **Confirmar com o PI (Pergunta 3, §9)** |
+| 4 | "Primeiro acesso" não tem nenhum passo de e-mail — nem coleta, nem confirmação, nem convite | manter convite por e-mail como alternativa dentro do mesmo fluxo | o PI foi explícito: "só por CPF + data, sem e-mail". O convite da F23 continua existindo como fluxo **separado**, iniciado por quem envia o convite (recepção), não pelo aluno |
 
-Decisões com efeito além desta fatia estão na **ADR-057** (texto no fim deste arquivo, §11 —
-pendente de commit em `docs/DECISIONS.md`, ver nota da §2).
+Decisões com efeito além desta fatia estão na **ADR-057** (§11).
 
 ---
 
@@ -58,8 +65,9 @@ pendente de commit em `docs/DECISIONS.md`, ver nota da §2).
 |---|---|
 | Rebuild da carteirinha completa (QR, frequência) | F24 — Slice 4.2, ainda `planejada` |
 | Throttling ou segundo fator na consulta por CPF+data | backlog — reabre se o gatilho de revisão da ADR-057 disparar |
-| Descontinuar o convite por e-mail | decisão de operação futura, não desta fatia |
-| Autenticação recorrente por CPF (login do dia a dia) | fora de escopo — CPF+data só localiza a conta no primeiro acesso; login subsequente é sempre por senha |
+| Remover ou alterar o convite por e-mail da F23 | permanece como está — fluxo separado, disparado pela recepção |
+| Coleta ou confirmação de e-mail dentro do "Primeiro acesso" | nunca — decisão explícita do PI (§3, decisão 4) |
+| Autenticação recorrente só por CPF sem senha | fora de escopo — CPF é identificador de login (decisão 3), a senha continua obrigatória |
 | CPF como autenticador no totem | já resolvido, de forma diferente, pela ADR-045 — superfície distinta, não reaberta aqui |
 
 ---
@@ -69,54 +77,97 @@ pendente de commit em `docs/DECISIONS.md`, ver nota da §2).
 - **Resposta que não distingue identificador existente de inexistente** (`M4-FR-002`) — a consulta
   por CPF+data devolve a mesma forma de resposta para "não encontrado", "cancelado" e erro interno.
 - **Nunca logar CPF, data de nascimento, senha ou hash em claro** — mesma regra da `SPEC-023` §4.
-- **`tenant_id` vindo da identidade autenticada** não se aplica à consulta (ela é pré-autenticação)
-  — a busca por CPF é escopada pelo `tenantSlug` do build do app, nunca por um tenant informado no
-  corpo da requisição.
+- **`tenant_id` vindo da identidade autenticada** não se aplica à consulta (pré-autenticação) — a
+  busca por CPF é escopada pelo `tenantSlug` do build do app, nunca por um tenant no corpo da
+  requisição.
 
 ---
 
-## 6. Contrato
+## 6. Telas e cópia exata (fiel ao protótipo)
+
+### 6.1 Entrada — tela de login (já existente, F23; só ganha o link)
+
+- Campos: **"E-mail ou telefone"** (placeholder `nome@email.com`), **"Senha"**.
+- Botão: **"Entrar"**.
+- Links: **"Esqueci minha senha"** · **"Entrar com biometria"**.
+- Novo, em destaque: **"Primeiro acesso?"** + link **"Criar minha senha"**.
+
+### 6.2 Primeiro acesso — consulta
+
+- Título: **"Primeiro acesso"**.
+- Subtítulo: **"Confirme seus dados de matrícula para criar sua senha de acesso."**
+- Campos: **CPF** (placeholder `000.000.000-00`), **Data de nascimento** (placeholder `dd/mm/aaaa`).
+- Botão: **"Consultar meu cadastro"**.
+- Texto de apoio: **"Consultamos o CPF no cadastro da academia. Nada é criado sem confirmação dos seus dados."**
+
+### 6.3 Primeiro acesso — cadastro encontrado
+
+- Título: **"Primeiro acesso"**.
+- Subtítulo: **"Encontramos sua matrícula. Agora defina a senha de acesso."**
+- Selo: **"✓ Cadastro encontrado"** (verde).
+- Nome completo em destaque.
+- Lista de dados, rótulo em caixa alta à esquerda, valor formatado à direita:
+
+  | rótulo | formato | exemplo do protótipo |
+  |---|---|---|
+  | CPF | `000.000.000-00` | `857.906.721-91` |
+  | DATA DE NASCIMENTO | `dd/mm/aaaa` | `06/10/1978` |
+  | PLANO | texto do plano | `Mensal Fit` |
+  | LOCAL | nome da unidade | `Unidade Centro` |
+  | DATA DE INÍCIO | `dd/mm/aaaa` | `05/01/2026` |
+
+- Seção **"Crie sua senha"**: campos **"Nova senha"**, **"Confirmar senha"**.
+- Texto de apoio: **"Use ao menos 6 caracteres. Você vai usar esta senha junto com seu CPF para entrar."**
+- Botão: **"Criar senha e entrar"**.
+
+### 6.4 Falha na consulta (não coberta por print, mas exigida por `M4-FR-002`)
+
+Mensagem única, genérica, sem distinguir motivo: recomendação de texto —
+**"Não encontramos seu cadastro. Procure a administração da academia."** — mesma disciplina de
+`ADR-024`/`ADR-045`.
+
+---
+
+## 7. Contrato
 
 **Endpoints** (novos, prefixo `/api/v1/mobile/activation`):
 
 - `POST .../lookup` — body `{ cpf, dataNascimento }`; sucesso devolve
-  `{ nomeCompleto, activationRef }` (referência opaca de curta duração, nunca o `studentId`);
-  falha devolve o mesmo formato/status para não encontrado, cancelado ou erro, com mensagem
-  genérica.
+  `{ nomeCompleto, cpfFormatado, dataNascimento, plano, local, dataInicio, activationRef }`
+  (referência opaca de curta duração, nunca o `studentId`); falha devolve o mesmo
+  formato/status para não encontrado, cancelado ou erro, com a mensagem genérica da §6.4.
 - `POST .../self-service` — body `{ activationRef, senha, confirmacaoSenha }`; cria a senha e
   ativa a conta; mesmas regras de força de senha já usadas na `SPEC-023`.
+
+**Endpoint alterado:**
+
+- `POST /api/v1/mobile/auth/login` (F23) — body ganha aceitar `cpf` como alternativa a
+  `emailOuTelefone`; validação e resposta seguem `M4-FR-002` (mesma forma para credencial errada e
+  identificador inexistente).
 
 **Eventos** — reaproveita o evento de ativação de conta já emitido pela F23, com um campo indicando
 o canal (`INVITE` | `SELF_SERVICE`) para permitir auditoria de qual caminho cada aluno usou.
 
-**Migrações** — nenhuma tabela nova; reaproveita `student_accounts`. Se `activationRef` precisar de
-persistência com expiração, cabe em `account_activation_tokens` (já existe — `SPEC-023` / PRD §11),
-com um tipo `SELF_SERVICE_LOOKUP`.
+**Migrações** — nenhuma tabela nova; reaproveita `student_accounts`. `activationRef`, se precisar
+de persistência com expiração, cabe em `account_activation_tokens` (já existe — `SPEC-023` / PRD
+§11), com um tipo `SELF_SERVICE_LOOKUP`.
 
 ---
 
-## 7. Critérios de aceite
+## 8. Critérios de aceite
 
-- [ ] AC-1 — aluno com CPF e data de nascimento cadastrados, sem convite ativo, informa os dois e
-      vê o próprio nome completo, sem mais nenhum dado sensível na tela de consulta.
-- [ ] AC-2 — aluno informa CPF ou data que não localizam ninguém e vê a mesma mensagem genérica
-      pedindo para procurar a administração — indistinguível de "encontrado e cancelado".
-- [ ] AC-3 — aluno cria senha após localizado e consegue entrar no app com ela.
-- [ ] AC-4 — CPF, data de nascimento, plano, unidade e data de início aparecem formatados (CPF
-      mascarado, datas em dd/mm/aaaa) em toda tela onde já aparecem hoje.
-- [ ] AC-5 — convite por e-mail (F23) continua funcionando sem alteração de comportamento.
+- [ ] AC-1 — aluno com CPF e data de nascimento cadastrados, sem senha ainda, informa os dois e
+      vê o próprio nome completo e os 5 campos formatados (§6.3), sem mais nenhum dado sensível.
+- [ ] AC-2 — aluno informa CPF ou data que não localizam ninguém e vê a mesma mensagem genérica —
+      indistinguível de "encontrado e cancelado".
+- [ ] AC-3 — aluno cria senha após localizado e consegue entrar no app com **CPF + senha** (não só
+      e-mail — decisão 3, §3).
+- [ ] AC-4 — nenhuma etapa do "Primeiro acesso" pede, mostra ou confirma e-mail.
+- [ ] AC-5 — login por e-mail/telefone (F23) continua funcionando sem alteração de comportamento
+      para quem já usa esse caminho.
+- [ ] AC-6 — CPF exibido é mascarado (`000.000.000-00`); datas em `dd/mm/aaaa`.
 
 Mapeia para `M4-AC-001` (aluno ativa conta sem intervenção administrativa sobre senha).
-
----
-
-## 8. Riscos e o que pode dar errado
-
-| risco | sinal de que aconteceu | o que fazer |
-|---|---|---|
-| Alguém ativa a conta de outro aluno sabendo CPF+data (ADR-057, Decisão 2 — risco aceito) | aluno reclama que a conta "já tinha senha" na primeira tentativa dele | suporte trata como incidente pontual; se recorrente, reabre ADR-057 (throttling/segundo fator) |
-| `activationRef` vaza ou é reaproveitado fora da janela de validade | tentativa de `self-service` com `activationRef` expirado ou de outro CPF | endpoint recusa e exige novo `lookup`; nunca aceita `activationRef` sem checar vínculo com o CPF que o gerou |
-| Corrida entre convite pendente e self-service concluído | token de convite usado depois da conta já ativada por self-service | token responde "já ativada", não erro genérico (ADR-057, Decisão 5) |
 
 ---
 
@@ -124,8 +175,9 @@ Mapeia para `M4-AC-001` (aluno ativa conta sem intervenção administrativa sobr
 
 | # | pergunta | resposta | data |
 |---|---|---|---|
-| 1 | "Primeiro acesso" e o convite por e-mail coexistem indefinidamente, ou o self-service deve virar o caminho padrão e o convite vira exceção operacional? | — | — |
-| 2 | Os campos Plano, Local e Data de Início citados para formatação — já aparecem hoje na Home entregue pela F23, ou é tela nova desta fatia? Não foi possível confirmar contra o código nesta sessão (ponte com o computador do PI indisponível — falha conhecida do Windows desde 08/09). | — | — |
+| 1 | ~~"Primeiro acesso" e o convite por e-mail coexistem?~~ | **Resolvido**: coexistem — "Primeiro acesso" é caminho adicional, exclusivo de CPF+data; convite da F23 segue existindo, disparado pela recepção | 15/09/2026 |
+| 2 | ~~Os campos Plano/Local/Data de Início já existem na Home da F23?~~ | **Resolvido pelo protótipo**: é tela nova (§6.3), não a Home | 15/09/2026 |
+| 3 | O login deve passar a aceitar CPF (decisão 3, §3), ou o texto da tela 4 ("...junto com seu CPF para entrar") deve mudar para "e-mail/telefone"? Assumi a primeira opção como default. | — | — |
 
 ---
 
@@ -135,6 +187,8 @@ Mapeia para `M4-AC-001` (aluno ativa conta sem intervenção administrativa sobr
   superfícies e mecanismos diferentes (login recorrente no totem vs. ativação única no app).
 - **O risco de account takeover por antecipação foi apresentado e aceito pelo PI** (ADR-057,
   Decisão 2) — não é omissão, é decisão registrada.
+- **Os campos da tela de confirmação (§6.3) são de uma tela nova desta fatia**, não da Home
+  entregue pela F23 — confirmado pelo protótipo.
 
 ---
 
@@ -147,55 +201,50 @@ Mapeia para `M4-AC-001` (aluno ativa conta sem intervenção administrativa sobr
 **Decisor:** Rodrigo Reis (PI)
 **Contexto:** a F23 (SPEC-023, Slice 4.1) entregou ativação de conta por convite/token de uso
 único enviado por e-mail (`M4-FR-001`) — é o único caminho de ativação em produção hoje. O PI
-pediu, em 15/09/2026, um segundo caminho na tela de login do app: o aluno sem convite ativo
-informa CPF e data de nascimento, o sistema localiza o cadastro e devolve o nome completo;
-encontrado, libera dois campos para criar a senha; não encontrado, mostra mensagem única pedindo
-para procurar a administração da academia.
+pediu, em 15/09/2026, um segundo caminho na tela de login do app, fiel a um protótipo de 4 telas:
+o aluno sem senha ainda informa CPF e data de nascimento, o sistema localiza o cadastro e devolve
+nome, CPF, data de nascimento, plano, unidade e data de início formatados; encontrado, libera dois
+campos para criar a senha; não encontrado, mostra mensagem única pedindo para procurar a
+administração da academia. **Sem nenhuma etapa de e-mail** — confirmado explicitamente pelo PI.
 
 **Por que é ADR:** introduz um segundo mecanismo de prova de identidade para criar credencial de
 aluno, ao lado do que a F23 já entregou e já está em produção — não é ajuste de tela, é um caminho
-novo de acesso que, uma vez comunicado a alunos, é caro de desfazer (quem usou uma vez espera que
-continue existindo). E fixa um precedente de segurança da mesma família do ADR-045 (CPF como parte
-de um mecanismo de autenticação/ativação, com risco de enumeração aceito conscientemente) —
-precedente que outra fatia vai citar.
+novo de acesso que, uma vez comunicado a alunos, é caro de desfazer. E fixa um precedente de
+segurança da mesma família do ADR-045 (CPF como parte de um mecanismo de autenticação/ativação,
+com risco de enumeração aceito conscientemente) — precedente que outra fatia vai citar.
 
 ### Decisões
 
 1. **CPF + data de nascimento autenticam a CONSULTA, não abrem sessão.** Localizam o cadastro e
    liberam a tela de criação de senha; só a senha, uma vez criada, autentica dali em diante.
-   Diferente do ADR-045 (CPF sozinho abre sessão no totem a cada uso), aqui o par é usado uma
-   única vez, no primeiro acesso.
 2. **Risco aceito, sem throttling nem segundo fator nesta fatia.** CPF e data de nascimento não
    são segredo — circulam em contratos, grupos de turma, redes sociais — e quem souber os dois de
    outro aluno consegue chegar primeiro à tela de criar senha daquela conta. **O PI foi confrontado
    com o risco de antecipação de conta e decidiu aceitar como está** — sem limite de tentativas,
-   sem confirmação por segundo canal (e-mail/telefone) nesta fatia. Fica registrado aqui porque
-   risco aceito que mora em corpo de PR some.
-3. **Mensagem única e neutra para qualquer falha de localização** — CPF inexistente, aluno
-   cancelado, erro interno — mesma frase, sem distinguir motivo, disciplina já usada nas ADR-024 e
-   ADR-045. Mesmo com o segundo fator (data de nascimento) reduzindo a enumeração em relação ao
-   totem (ADR-045), a mensagem única segue obrigatória: é a defesa que resta depois que o par
-   CPF+data é aceito como suficiente.
-4. **O convite por e-mail da F23 não é revogado.** Os dois caminhos coexistem: quem recebeu
-   convite ativa por ele; quem não recebeu, perdeu ou cuja recepção não disparou o convite usa
-   "Primeiro acesso". Qual caminho passa a ser o padrão nas telas da recepção é decisão de
-   operação, não desta ADR — fica como pergunta aberta na SPEC-071 §9.
+   sem confirmação por segundo canal nesta fatia.
+3. **Mensagem única e neutra para qualquer falha de localização**, disciplina já usada nas
+   ADR-024 e ADR-045.
+4. **O convite por e-mail da F23 não é revogado; os dois caminhos coexistem, e "Primeiro acesso"
+   não tem nenhuma etapa de e-mail** — confirmado pelo PI em 15/09/2026: quem recebeu convite ativa
+   por ele; quem não recebeu usa "Primeiro acesso", que é exclusivamente CPF+data do início ao fim.
 5. **Se a mesma conta for ativada pelos dois caminhos em corrida**, o primeiro a definir a senha
    vence — o token de convite, se ainda não consumido, passa a apontar para uma conta já ativada e
-   falha como "já ativada" ao ser usado depois. Nenhum dos dois caminhos invalida o outro
-   proativamente; a corrida se resolve pelo estado da conta, não por um cancelando o outro.
+   falha como "já ativada" ao ser usado depois.
+6. **Login recorrente passa a aceitar CPF como identificador alternativo** (`SPEC-071` §3, decisão
+   3) — consequência direta de a tela de confirmação prometer login "com seu CPF". Pendente de
+   confirmação final do PI (`SPEC-071` §9, pergunta 3).
 
 ### Consequências
 
 | # | consequência | onde |
 |---|---|---|
-| 1 | Novo endpoint de consulta por CPF+data de nascimento e endpoint de definição de senha por esse caminho, além do já existente `POST /api/v1/mobile/activation/confirm` (token) | `MVP-04-app-totem.md` §10, `SPEC-071` |
-| 2 | `M4-FR-001` ganha um segundo modo de ativação; `M4-FR-002` (não revelar identificador existente) se aplica também a este caminho | `MVP-04-app-totem.md` §8 |
+| 1 | Novo endpoint de consulta por CPF+data e endpoint de definição de senha, além do já existente `POST /api/v1/mobile/activation/confirm` (token) | `MVP-04-app-totem.md` §10, `SPEC-071` |
+| 2 | `M4-FR-001` ganha um segundo modo de ativação; `M4-FR-002` se aplica também a este caminho | `MVP-04-app-totem.md` §8 |
 | 3 | Enumeração de CPF+data de nascimento é risco vivo e aceito nesta fatia | `SPEC-071` §8 |
-| 4 | Convite por e-mail (F23) permanece ativo; nenhuma fatia futura pode assumir que ele foi descontinuado sem nova decisão | `SPEC-023` |
+| 4 | Convite por e-mail (F23) permanece ativo, sem nenhuma etapa de e-mail no caminho novo | `SPEC-023` |
+| 5 | Login (`mobile/auth/login`) ganha CPF como identificador aceito, além de e-mail/telefone | `SPEC-023`, `SPEC-071` §7 |
 
 ### Gatilho de revisão
 
 Qualquer indício de uso do "Primeiro acesso" para ativar conta de aluno diferente do que a
-solicitou (queixa de aluno que não conseguiu mais ativar a própria conta, ou suporte reportando
-padrão de tentativas) reabre a Decisão 2 — throttling e/ou segundo fator deixam de ser opcionais.
+solicitou reabre a Decisão 2 — throttling e/ou segundo fator deixam de ser opcionais.
