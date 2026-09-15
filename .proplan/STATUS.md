@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-14
+updated: 2026-09-15
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -32,6 +32,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP4][SPEC-071][F71] Primeiro acesso self-service e exibição de dados cadastrais no app (#333, finalizado em: 2026-09-15)
 - [MVP1][FIX] fixture de contatos empata createdAt no mesmo milissegundo sob carga do CI (#329, finalizado em: 2026-09-14)
 - [MVP4][FIX] frequência conta 3 sessões em vez de 2 perto da virada de meia-noite em SP (#328, finalizado em: 2026-09-14)
 - [INFRA][FIX] Heap do CI cruza o limiar de novo conforme a suíte de integração cresce (#327, finalizado em: 2026-09-14)
