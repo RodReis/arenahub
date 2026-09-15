@@ -6,9 +6,9 @@
 | **Slice do PRD** | — (sem Slice correspondente; escopo mora nesta spec, como nas F49–F70) |
 | **MVP** | 4 |
 | **Plano de apoio** | — |
-| **Status** | `rascunho` |
+| **Status** | `aprovada-pi` |
 | **Criada em** | 2026-09-15 |
-| **Aprovada pelo PI em** | — |
+| **Aprovada pelo PI em** | 2026-09-15 |
 | **Card** | [#333](https://github.com/RodReis/arenahub/issues/333) |
 
 ---
@@ -17,8 +17,8 @@
 
 Esta spec segue as telas anexadas pelo PI em 15/09/2026, incluindo a correção da tela de login
 enviada na mesma data. Nenhum campo, rótulo ou texto de apoio abaixo foi inventado — todos vêm
-das telas. **A tela de login (§6.1) agora mostra CPF como único identificador visível**,
-substituindo "e-mail ou telefone" do primeiro rascunho do protótipo.
+das telas. **A tela de login (§6.1) mostra CPF como único identificador visível**, substituindo
+"e-mail ou telefone" do primeiro rascunho do protótipo.
 
 ---
 
@@ -35,7 +35,7 @@ a senha; a partir daí, entra sempre com **CPF + senha**.
 | item | estado |
 |---|---|
 | Gate de entrada do MVP | MVP 4 aprovado para planejamento em 14/08/2026 (`MVP-04-app-totem.md` §1) |
-| ADRs que bloqueiam | **ADR-057** — decidido pelo PI em 15/09/2026; texto pronto na §11, pendente de commit em `docs/DECISIONS.md` (nota abaixo) |
+| ADRs que bloqueiam | **ADR-057** — decidido e aprovado pelo PI em 15/09/2026; texto pronto na §11, pendente de commit em `docs/DECISIONS.md` (nota abaixo) — não bloqueia o início do código, é registro |
 | Fatias anteriores | F23 (Identidade e shell mobile) — ✅ entregue, aguardando aceite. Login (endpoint) é reaproveitado; a UI passa a mostrar CPF em vez de e-mail/telefone (§3, decisão 3) |
 | Decisões dos PRDs | `M4-FR-001`, `M4-FR-002` — atendidas por desenho (ver §3) |
 
@@ -43,7 +43,7 @@ a senha; a partir daí, entra sempre com **CPF + senha**.
 > texto pronto (§11 e nota abaixo) mas não foram commitadas — os dois arquivos passam de 150 KB e
 > 260 KB, e reescrevê-los por inteiro nesta sessão arriscava corromper conteúdo histórico sem
 > revisão por diff. Linha para `STATUS.md` §5, logo após F70:
-> `| F71 | SPEC-071 | 4 | — | Primeiro acesso self-service por CPF e data de nascimento | [SPEC-071-primeiro-acesso-self-service.md] · [ADR-057] | #333 | rascunho |`
+> `| F71 | SPEC-071 | 4 | — | Primeiro acesso self-service por CPF e data de nascimento | [SPEC-071-primeiro-acesso-self-service.md] · [ADR-057] | #333 | aprovada-pi |`
 
 ---
 
@@ -53,7 +53,7 @@ a senha; a partir daí, entra sempre com **CPF + senha**.
 |---|---|---|---|
 | 1 | Consulta (CPF+data → nome) e criação de senha são dois passos/dois endpoints, não um | um único request fazendo os dois | erro ao criar a senha não deveria obrigar redigitar CPF e data; e é a consulta sozinha que precisa da mensagem neutra do `M4-FR-002` |
 | 2 | Campos exibidos (CPF, datas) usam as máscaras já convencionadas no `CLAUDE.md` — aplicação da convenção existente, não decisão nova | máscara própria para esta tela | duas implementações da mesma máscara divergem na primeira mudança |
-| 3 | **A tela de login passa a mostrar só o campo CPF (não mais "e-mail ou telefone"); o endpoint (`POST /api/v1/mobile/auth/login`, F23) continua aceitando e-mail/telefone por baixo, além de CPF** | remover e-mail/telefone também do backend | **Decidido pelo PI em 15/09/2026** (protótipo corrigido). Manter o backend aceitando os dois formatos evita quebrar quem já ativou pela F23 antes desta fatia existir — a UI muda, o contrato antigo não morre |
+| 3 | **A tela de login mostra só o campo CPF (não mais "e-mail ou telefone"); o endpoint (`POST /api/v1/mobile/auth/login`, F23) continua aceitando e-mail/telefone por baixo, além de CPF** | remover e-mail/telefone também do backend | **Decidido pelo PI em 15/09/2026** (protótipo corrigido). Manter o backend aceitando os dois formatos evita quebrar quem já ativou pela F23 antes desta fatia existir — a UI muda, o contrato antigo não morre |
 | 4 | "Primeiro acesso" não tem nenhum passo de e-mail — nem coleta, nem confirmação, nem convite | manter convite por e-mail como alternativa dentro do mesmo fluxo | o PI foi explícito: "só por CPF + data, sem e-mail". O convite da F23 continua existindo como fluxo **separado**, iniciado por quem envia o convite (recepção), não pelo aluno |
 
 Decisões com efeito além desta fatia estão na **ADR-057** (§11).
@@ -187,7 +187,7 @@ Mapeia para `M4-AC-001` (aluno ativa conta sem intervenção administrativa sobr
 | 2 | ~~Os campos Plano/Local/Data de Início já existem na Home da F23?~~ | **Resolvido pelo protótipo**: é tela nova (§6.3), não a Home | 15/09/2026 |
 | 3 | ~~O login deve aceitar CPF, ou o texto da tela 4 deve mudar?~~ | **Resolvido**: login mostra só CPF na UI; backend segue aceitando e-mail/telefone por retrocompatibilidade | 15/09/2026 |
 
-Todas as perguntas resolvidas — spec pronta para virar `em-revisao` quando o PI quiser aprovar.
+Todas as perguntas resolvidas. **Spec aprovada pelo PI em 15/09/2026.**
 
 ---
 
@@ -209,7 +209,7 @@ Todas as perguntas resolvidas — spec pronta para virar `em-revisao` quando o P
 ## ADR-057 — Primeiro acesso self-service por CPF + data de nascimento (F71)
 
 **Data:** 15/09/2026
-**Status:** aceito *(decisão nova — decidida pelo PI em 15/09/2026)*
+**Status:** aceito *(decisão nova — decidida e aprovada pelo PI em 15/09/2026)*
 **Decisor:** Rodrigo Reis (PI)
 **Contexto:** a F23 (SPEC-023, Slice 4.1) entregou ativação de conta por convite/token de uso
 único enviado por e-mail (`M4-FR-001`) — é o único caminho de ativação em produção hoje, com
@@ -257,7 +257,7 @@ parte de um mecanismo de autenticação/ativação, com risco de enumeração ac
 | 2 | `M4-FR-001` ganha um segundo modo de ativação; `M4-FR-002` se aplica também a este caminho | `MVP-04-app-totem.md` §8 |
 | 3 | Enumeração de CPF+data de nascimento é risco vivo e aceito nesta fatia | `SPEC-071` §8 |
 | 4 | Convite por e-mail (F23) permanece ativo, sem nenhuma etapa de e-mail no caminho novo | `SPEC-023` |
-| 5 | UI do login (`admin` app do aluno) muda de e-mail/telefone para CPF; backend segue os dois formatos, e-mail/telefone vira caminho "invisível" mas funcional | `SPEC-023`, `SPEC-071` §6.1, §7 |
+| 5 | UI do login (app do aluno) muda de e-mail/telefone para CPF; backend segue os dois formatos, e-mail/telefone vira caminho "invisível" mas funcional | `SPEC-023`, `SPEC-071` §6.1, §7 |
 
 ### Gatilho de revisão
 
