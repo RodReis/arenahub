@@ -1,6 +1,8 @@
+import { AlternadorDeTema } from './alternador-de-tema';
 import { FormularioDeLogin } from './formulario-de-login';
 import { HeroDaMarca } from './hero-da-marca';
 import estilos from './login.module.css';
+import { lerEstatisticasPublicas } from '../../../lib/api/estatisticas-publicas';
 import type { MarcaDaAcademia } from '../../../src/marca/ler-marca';
 
 interface Props {
@@ -20,27 +22,48 @@ interface Props {
  * expectativa de que `/outra-academia/login` recusa quem é de outro tenant —
  * garantia que o modelo de identidade não dá.
  */
-export function PainelDeEntrada({ marca }: Props) {
+export async function PainelDeEntrada({ marca }: Props) {
   const daAcademia = marca.slug !== '';
 
+  /*
+   * SO PARA O DISCURSO DO ARENAHUB -- a coluna da academia (com slug) nunca
+   * mostra a contagem, mesma regra de "a marca substitui, nao soma" que o
+   * resto do componente ja segue.
+   */
+  const estatisticas = daAcademia ? null : await lerEstatisticasPublicas();
+
   return (
-    <main className={estilos['tela']}>
-      <HeroDaMarca marca={marca} />
+    <main className={`${estilos['tela']} ${daAcademia ? '' : estilos['telaSemTenant']}`}>
+      <HeroDaMarca marca={marca} estatisticas={estatisticas} />
 
-      <div className={estilos['trabalho']}>
-        <div className={estilos['painel']}>
-          <div className={estilos['cabecalho']}>
-            <h1 className={estilos['titulo']}>Entrar no painel</h1>
-            <p className={estilos['subtitulo']}>
-              {daAcademia
-                ? `Acesso do time da ${marca.displayName}. Alunos usam o aplicativo.`
-                : 'Acesso do time da academia. Alunos usam o aplicativo.'}
-            </p>
+      <div
+        className={`${estilos['trabalho']} ${daAcademia ? '' : estilos['trabalhoSemTenant']}`}
+      >
+        {/*
+          O botao de tema so existe no login sem tenant (F71, DS-PAINEL.md
+          §2.8b) -- e o unico lado desta tela com um segundo tema para
+          alternar; a coluna da academia continua sempre clara, como hoje.
+        */}
+        {daAcademia ? null : (
+          <div className={estilos['trabalhoTopo']}>
+            <AlternadorDeTema />
           </div>
+        )}
 
-          <FormularioDeLogin />
+        <div className={estilos['trabalhoMiolo']}>
+          <div className={estilos['painel']}>
+            <div className={estilos['cabecalho']}>
+              <h1 className={estilos['titulo']}>Entrar no painel</h1>
+              <p className={estilos['subtitulo']}>
+                {daAcademia
+                  ? `Acesso do time da ${marca.displayName}. Alunos usam o aplicativo.`
+                  : 'Acesso do time da academia. Alunos usam o aplicativo.'}
+              </p>
+            </div>
 
-          {/*
+            <FormularioDeLogin />
+
+            {/*
             A referência visual trazia "Esqueci minha senha" e "MFA obrigatório
             para administradores" abaixo do botão. Nenhum dos dois entrou, e a
             omissão é deliberada:
@@ -56,7 +79,8 @@ export function PainelDeEntrada({ marca }: Props) {
               não tem.
 
             Quando qualquer um dos dois existir de verdade, o lugar é aqui.
-          */}
+            */}
+          </div>
         </div>
       </div>
     </main>

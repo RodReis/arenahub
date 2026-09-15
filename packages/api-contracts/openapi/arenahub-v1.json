@@ -9781,6 +9781,39 @@
         ]
       }
     },
+    "/api/v1/plataforma/estatisticas-publicas": {
+      "get": {
+        "operationId": "EstatisticasPublicasController_estatisticas",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "totalAlunosAtivos",
+                    "totalUnidadesAtivas"
+                  ],
+                  "properties": {
+                    "totalAlunosAtivos": {
+                      "type": "number"
+                    },
+                    "totalUnidadesAtivas": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EstatisticasPublicas"
+        ]
+      }
+    },
     "/api/v1/platform/plans": {
       "get": {
         "operationId": "ContratosController_listarPlanos",

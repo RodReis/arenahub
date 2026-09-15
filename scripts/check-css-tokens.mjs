@@ -80,6 +80,123 @@ const EXCECOES = [
       'Gradiente metalico da moldura de pre-visualizacao -- DS-TOTEM.md §3.1 o ' +
       'especifica em hex. E cromo de moldura, nao cor de marca nem de conteudo.',
   },
+  /*
+   * As cinco entradas abaixo sao a MESMA decisao: o hero de login sem tenant
+   * (F71) nao tem accent resolvido por tenant -- nao ha tenant nesta coluna --
+   * e o gradiente do icone/badge usa o azul de MARCA do ArenaHub, identico ao
+   * que `packages/ui/tokens/app.json` ja declara para o mobile
+   * (brand.markFrom/markMid/markTo/frame, accent.text). So a DECLARACAO das
+   * cinco variaveis locais precisa do literal; todo uso delas no resto do
+   * arquivo segue por `color-mix()`, ja isento pela funcao acima.
+   */
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--hero-mark-from: #7DA2FF',
+    motivo: 'brand.markFrom do app.json -- inicio do gradiente do icone da marca.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--hero-mark-mid: #2E4FD0',
+    motivo: 'brand.markMid do app.json -- meio do gradiente do icone da marca.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--hero-mark-to: #9DB8FF',
+    motivo: 'brand.markTo do app.json -- fim do gradiente do icone da marca.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--hero-mark-frame: #0D1226',
+    motivo: 'brand.frame do app.json -- miolo escuro atras do icone da marca.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--hero-kicker: #8FB0FF',
+    motivo: 'accent.text (tema escuro) do app.json -- overline e texto de apoio sobre a foto.',
+  },
+  /*
+   * Bloco do TEMA claro/escuro do lado do formulario, so no login sem tenant
+   * (F71) -- DS-PAINEL.md §2.1/§2.2. Escopo FECHADO nesta tela: portar tema
+   * para o resto do painel exige extender packages/ui/tokens (fatia propria).
+   * O claro reaproveita --ah-* ja gerados sem hex novo; so o bloco ESCURO e o
+   * gradiente do botao fixo precisam de literal, porque nenhum dos dois
+   * existe ainda no pipeline de tokens.
+   */
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-action-solid: linear-gradient(100deg, #5B86FF, #3E63E8)',
+    motivo: 'accent.gradientFrom/To do app.json -- botao primario do login sem tenant.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-action-hover: linear-gradient(100deg, #6B92FF, #4A6FF0)',
+    motivo: 'accent.gradientHoverFrom/To do app.json -- hover do botao primario.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-action-text: #3E63E8',
+    motivo: 'DS-PAINEL.md §2.2 -- --pa-acc claro, fixo no login sem tenant.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-focus-ring: #3E63E8',
+    motivo: 'DS-PAINEL.md §2.2 -- --pa-acc claro, anel de foco do botao fixo.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-surface-canvas: #0A0B0D',
+    motivo: 'DS-PAINEL.md §2.1 -- --pa-bg escuro, fundo do lado do formulario.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-surface-raised: #121417',
+    motivo: 'DS-PAINEL.md §2.1 -- --pa-card escuro, fundo de campo.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-border-subtle: #1A2032',
+    motivo: 'DS-PAINEL.md §2.1 -- --pa-line2 escuro.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-border-default: #232A3D',
+    motivo: 'DS-PAINEL.md §2.1 -- --pa-line escuro.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-text-placeholder: #8D97A3',
+    motivo: 'DS-PAINEL.md §2.1 -- --pa-ink4 escuro.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-text-secondary: #A6AEB9',
+    motivo: 'DS-PAINEL.md §2.1 -- --pa-ink3 escuro.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-text-label: #C3CAD4',
+    motivo: 'DS-PAINEL.md §2.1 -- --pa-ink2 escuro.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-text-default: #E5E9EE',
+    motivo: 'DS-PAINEL.md §2.1 -- --pa-ink1 escuro.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-text-strong: #F5F7F9',
+    motivo: 'DS-PAINEL.md §2.1 -- --pa-ink escuro.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-action-text: #8FB0FF',
+    motivo: 'DS-PAINEL.md §2.2 -- --pa-acc escuro, fixo no login sem tenant.',
+  },
+  {
+    arquivo: join('apps', 'admin-web', 'app', '(auth)', 'login', 'login.module.css'),
+    trecho: '--ah-focus-ring: #8FB0FF',
+    motivo: 'DS-PAINEL.md §2.2 -- --pa-acc escuro, anel de foco do botao fixo.',
+  },
 ];
 
 const COR_LITERAL =

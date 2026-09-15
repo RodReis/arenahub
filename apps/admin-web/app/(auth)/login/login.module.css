@@ -22,6 +22,16 @@
   min-height: 100dvh;
 }
 
+/**
+ * SO no login sem tenant -- DS-PAINEL.md §3.1 fixa 70% de foto / 30% de
+ * formulario (min. 320px na foto) para o hero com render 3D, proporcao
+ * diferente da coluna de texto simples que a academia com marca continua
+ * usando.
+ */
+.telaSemTenant {
+  grid-template-columns: minmax(320px, 70fr) minmax(0, 30fr);
+}
+
 /* -------------------------------------------------------------- identidade */
 
 .identidade {
@@ -153,10 +163,79 @@
 
 .trabalho {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
   padding: 24px;
   background: var(--ah-surface-canvas);
+}
+
+.trabalhoMiolo {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trabalhoTopo {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.botaoDeTema {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-control-radius);
+  background: var(--ah-surface-raised);
+  color: var(--ah-text-secondary);
+  cursor: pointer;
+}
+
+.botaoDeTema:hover {
+  border-color: var(--ah-action-text);
+  color: var(--ah-action-text);
+}
+
+/**
+ * O BOTAO PRIMARIO E A COR DE MARCA FIXA DO ARENAHUB, so no login sem tenant
+ * -- decisao do PI (F71): esta tela e o pitch do proprio produto, e nao ha
+ * academia para resolver accent por contraste. `/{slug}/login`, com tenant,
+ * continua com `--ah-action-*` resolvido por tenant, sem tocar esta classe.
+ *
+ * Redefine a MESMA variavel que `Button.module.css` ja le
+ * (`background: var(--ah-action-solid)`) -- funciona em cima de custom
+ * property, gradiente incluso, sem tocar o componente compartilhado.
+ */
+.trabalhoSemTenant {
+  --ah-action-solid: linear-gradient(100deg, #5B86FF, #3E63E8);
+  --ah-action-hover: linear-gradient(100deg, #6B92FF, #4A6FF0);
+  --ah-action-text: #3E63E8;
+  --ah-focus-ring: #3E63E8;
+}
+
+/*
+ * TEMA CLARO/ESCURO -- so aqui, so o lado do formulario (DS-PAINEL.md
+ * §2.1/§2.2). Redefine os MESMOS tokens `--ah-*` que Field/Button/o resto
+ * desta tela ja consomem: todo descendente reage sem codigo extra. Escopo
+ * fechado a esta tela -- ver nota em scripts/check-css-tokens.mjs.
+ */
+:global(html[data-pa-tema='escuro']) .trabalhoSemTenant {
+  --ah-surface-canvas: #0A0B0D;
+  --ah-surface-raised: #121417;
+  --ah-border-subtle: #1A2032;
+  --ah-border-default: #232A3D;
+  --ah-text-placeholder: #8D97A3;
+  --ah-text-secondary: #A6AEB9;
+  --ah-text-label: #C3CAD4;
+  --ah-text-default: #E5E9EE;
+  --ah-text-strong: #F5F7F9;
+  --ah-action-solid: linear-gradient(100deg, #5B86FF, #3E63E8);
+  --ah-action-hover: linear-gradient(100deg, #6B92FF, #4A6FF0);
+  --ah-action-text: #8FB0FF;
+  --ah-focus-ring: #8FB0FF;
 }
 
 /**
@@ -180,6 +259,13 @@
   font-size: var(--ah-type-title-size);
   line-height: var(--ah-type-title-lh);
   font-weight: var(--ah-type-title-weight);
+  /*
+   * COR EXPLICITA, e nao herdada do `body` -- o `body` esta FORA de
+   * `.trabalhoSemTenant`, entao o tema escuro (que redefine `--ah-text-*`
+   * dentro daquela div) nunca alcancaria uma cor so herdada. Achado ao
+   * testar o toggle no navegador: o titulo ficava ilegivel no escuro.
+   */
+  color: var(--ah-text-strong);
 }
 
 .subtitulo {
@@ -337,4 +423,208 @@
  */
 .segredoAjuda a {
   color: var(--ah-action-text);
+}
+
+/* ---------------------------------------------- hero com foto (F71) ------ */
+
+/**
+ * SO no login sem tenant -- a coluna com marca da academia nao usa nada
+ * daqui. As cinco variaveis abaixo sao o azul de MARCA do ArenaHub, o mesmo
+ * que `packages/ui/tokens/app.json` ja declara para o mobile: nao ha accent
+ * resolvido por tenant nesta coluna porque nao ha tenant. Exceção nominal em
+ * `scripts/check-css-tokens.mjs`. Todo uso delas no resto do arquivo passa
+ * por `color-mix()`, que a guarda ja isenta.
+ */
+.identidadeComFoto {
+  --hero-mark-from: #7DA2FF;
+  --hero-mark-mid: #2E4FD0;
+  --hero-mark-to: #9DB8FF;
+  --hero-mark-frame: #0D1226;
+  --hero-kicker: #8FB0FF;
+
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+}
+
+.heroFoto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+}
+
+/**
+ * Dois gradientes sobrepostos, como o mock -- vertical escurece o rodape (onde
+ * o texto precisa de contraste), horizontal escurece a borda que encosta na
+ * coluna de trabalho. `color-mix` com o token de chrome, e nao o preto exato
+ * do mock: a diferenca e imperceptivel a esta opacidade e evita hex novo.
+ */
+.heroGradienteVertical {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ah-surface-chrome) 78%, transparent) 0%,
+    color-mix(in srgb, var(--ah-surface-chrome) 30%, transparent) 24%,
+    color-mix(in srgb, var(--ah-surface-chrome) 72%, transparent) 56%,
+    color-mix(in srgb, var(--ah-surface-chrome) 96%, transparent) 78%,
+    var(--ah-surface-chrome) 92%
+  );
+}
+
+.heroGradienteHorizontal {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 30%,
+    color-mix(in srgb, var(--ah-surface-chrome) 45%, transparent) 62%,
+    color-mix(in srgb, var(--ah-surface-chrome) 85%, transparent) 84%,
+    var(--ah-surface-chrome) 100%
+  );
+}
+
+.heroConteudo {
+  position: relative;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 44px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.heroTopo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.heroBadge {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  padding: 1px;
+  box-sizing: border-box;
+  background: linear-gradient(
+    145deg,
+    var(--hero-mark-from),
+    var(--hero-mark-mid) 55%,
+    var(--hero-mark-to)
+  );
+}
+
+.heroBadgeMiolo {
+  width: 100%;
+  height: 100%;
+  border-radius: 11px;
+  background: var(--hero-mark-frame);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  color: var(--hero-mark-from);
+}
+
+.heroWordmark {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ah-surface-raised);
+}
+
+.heroWordmark span {
+  color: var(--hero-mark-from);
+}
+
+.heroSelo {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--hero-kicker);
+}
+
+.heroPitch {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 520px;
+}
+
+.heroKicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--hero-kicker);
+}
+
+.heroHeadline {
+  margin: 0;
+  max-width: 24ch;
+  font-size: var(--ah-type-display-size);
+  line-height: var(--ah-type-display-lh);
+  font-weight: var(--ah-type-display-weight);
+  color: var(--ah-surface-raised);
+  text-wrap: balance;
+}
+
+.heroApoio {
+  margin: 0;
+  max-width: 48ch;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-on-chrome);
+  text-wrap: pretty;
+}
+
+.heroGrade {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.heroCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ah-surface-chrome) 66%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hero-mark-from) 20%, transparent);
+  backdrop-filter: blur(12px);
+  color: var(--hero-mark-from);
+}
+
+.heroCardTitulo {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ah-surface-raised);
+}
+
+.heroCardTexto {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ah-text-on-chrome);
+}
+
+.heroRodape {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0;
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+  line-height: var(--ah-type-mono-lh);
+  color: var(--ah-text-on-chrome);
 }
