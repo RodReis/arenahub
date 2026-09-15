@@ -31,8 +31,8 @@ describe('F25 -- Financeiro do app do aluno', () => {
 
   const sufixo = randomUUID().slice(0, 8);
   const SLUG = `f25-${sufixo}`;
-  const EMAIL = `aluno-f25-${sufixo}@exemplo.test`;
-  const EMAIL_OUTRO = `aluno-f25-outro-${sufixo}@exemplo.test`;
+  const CPF = '93072176004';
+  const CPF_OUTRO = '11144477735';
   const SENHA = 'senha-de-teste-f25-longa';
   const CONTA_PIX = `acct_f25_pix_${sufixo}`;
 
@@ -68,10 +68,10 @@ describe('F25 -- Financeiro do app do aluno', () => {
     pagoEm: string | null;
   }
 
-  const entrar = async (identificador = EMAIL): Promise<string> => {
+  const entrar = async (cpf = CPF): Promise<string> => {
     const resposta = await request(servidor())
       .post('/api/v1/mobile/auth/login')
-      .send({ tenantSlug: SLUG, identificador, senha: SENHA });
+      .send({ tenantSlug: SLUG, cpf, senha: SENHA });
 
     return (resposta.body as { accessToken: string }).accessToken;
   };
@@ -174,8 +174,8 @@ describe('F25 -- Financeiro do app do aluno', () => {
       },
     });
 
-    const alunoId = await criarAlunoComConta(EMAIL, 'Aluna F25', 'F25A', unidade.id);
-    const outroAlunoId = await criarAlunoComConta(EMAIL_OUTRO, 'Aluno F25 Outro', 'F25B', unidade.id);
+    const alunoId = await criarAlunoComConta(CPF, 'Aluna F25', 'F25A', unidade.id);
+    const outroAlunoId = await criarAlunoComConta(CPF_OUTRO, 'Aluno F25 Outro', 'F25B', unidade.id);
 
     const assinatura = await db.subscription.create({
       data: {
@@ -295,7 +295,7 @@ describe('F25 -- Financeiro do app do aluno', () => {
        * dele) e o aluno original tenta observa-la trocando o UUID -- prova
        * a checagem de posse do `MobileFinanceiroService.observarTentativa`.
        */
-      const acessoDoOutro = await entrar(EMAIL_OUTRO);
+      const acessoDoOutro = await entrar(CPF_OUTRO);
 
       const cobranca = await request(servidor())
         .post(`/api/v1/mobile/invoices/${invoiceDeOutroAluno}/pix`)

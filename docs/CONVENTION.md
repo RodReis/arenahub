@@ -307,7 +307,7 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 - **INV-009** Todo aluno tem matrícula; a matrícula **nunca** depende do CPF.
 - **INV-010** A matrícula é única e imutável dentro do tenant.
 - **INV-011** CPF ajuda a detectar duplicidade, mas não é matrícula.
-- **INV-012** **CPF nunca é identificador técnico de dispositivo.**
+- **INV-012** **CPF nunca é identificador técnico de dispositivo de acesso físico (catraca/edge).** Exceção: login do app do aluno usa CPF como identificador de conta — ADR-057.
 - **INV-013** Exclusão administrativa vira arquivamento quando há histórico legal ou operacional; arquivar preserva histórico e bloqueia novos acessos.
 - **INV-014** Cadastro detecta possível duplicidade dentro do tenant.
 - **INV-015** Soft delete não libera unicidade sem regra explícita.

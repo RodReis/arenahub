@@ -30,9 +30,10 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
 
   const sufixo = randomUUID().slice(0, 8);
   const SLUG = `mob-eng-${sufixo}`;
-  const EMAIL_ANA = `ana-${sufixo}@exemplo.test`;
-  const EMAIL_BRUNO = `bruno-${sufixo}@exemplo.test`;
+  const EMAIL_ANA = `ana-${sufixo}@exemplo.test`; // contato, nao login
   const EMAIL_AVALIADOR = `avaliador-${sufixo}@exemplo.test`;
+  const CPF_ANA = '11144477735';
+  const CPF_BRUNO = '52998224725';
   const SENHA = 'senha-de-teste-longa';
 
   let tenantId: string;
@@ -85,10 +86,10 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
     } | null;
   }
 
-  const entrar = async (identificador: string): Promise<string> => {
+  const entrar = async (cpf: string): Promise<string> => {
     const resposta = await request(servidor())
       .post('/api/v1/mobile/auth/login')
-      .send({ tenantSlug: SLUG, identificador, senha: SENHA });
+      .send({ tenantSlug: SLUG, cpf, senha: SENHA });
 
     return (resposta.body as { accessToken: string }).accessToken;
   };
@@ -186,8 +187,8 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
     });
     unidadeId = unidade.id;
 
-    anaId = await criarAluno(EMAIL_ANA, 'Ana Carolina Prado', 'ANA');
-    brunoId = await criarAluno(EMAIL_BRUNO, 'Bruno Teixeira Lopes', 'BRUNO');
+    anaId = await criarAluno(CPF_ANA, 'Ana Carolina Prado', 'ANA');
+    brunoId = await criarAluno(CPF_BRUNO, 'Bruno Teixeira Lopes', 'BRUNO');
 
     const conteudo = `Termo de ranking de teste -- ${sufixo}. `.repeat(3);
     await db.consentDocument.create({
@@ -245,7 +246,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
 
   describe('GET /api/v1/mobile/engajamento', () => {
     it('devolve o XP do aluno da SESSAO e marca so a linha dele no placar', async () => {
-      const resposta = await buscar('/api/v1/mobile/engajamento', await entrar(EMAIL_ANA));
+      const resposta = await buscar('/api/v1/mobile/engajamento', await entrar(CPF_ANA));
 
       expect(resposta.status).toBe(200);
 
@@ -274,7 +275,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
     it('ignora `?studentId=` de outro aluno', async () => {
       const resposta = await buscar(
         `/api/v1/mobile/engajamento?studentId=${brunoId}`,
-        await entrar(EMAIL_ANA),
+        await entrar(CPF_ANA),
       );
 
       expect((resposta.body as CorpoDoEngajamento).xp.saldoDoMes).toBe(20);
@@ -287,7 +288,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
       });
 
       try {
-        const resposta = await buscar('/api/v1/mobile/engajamento', await entrar(EMAIL_ANA));
+        const resposta = await buscar('/api/v1/mobile/engajamento', await entrar(CPF_ANA));
         const corpo = resposta.body as CorpoDoEngajamento;
 
         expect(corpo.desafios).toBeNull();
@@ -318,7 +319,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
     };
 
     it('desliga e religa, com ator nulo, e o GET seguinte reflete', async () => {
-      const token = await entrar(EMAIL_ANA);
+      const token = await entrar(CPF_ANA);
 
       const saiu = await decidir(token, { participa: false }, `sair-${sufixo}`);
       expect(saiu.status).toBe(200);
@@ -345,7 +346,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
     });
 
     it('mesma Idempotency-Key nao grava segunda decisao', async () => {
-      const token = await entrar(EMAIL_BRUNO);
+      const token = await entrar(CPF_BRUNO);
       const chave = `dedupe-${sufixo}`;
 
       await decidir(token, { participa: false }, chave).expect(200);
@@ -356,7 +357,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
     });
 
     it('corpo invalido responde 400 com codigo estavel', async () => {
-      const token = await entrar(EMAIL_ANA);
+      const token = await entrar(CPF_ANA);
 
       for (const corpo of [{}, { participa: 'sim' }, { participa: true, studentId: brunoId }]) {
         const resposta = await decidir(token, corpo);
@@ -372,7 +373,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
 
   describe('GET /api/v1/mobile/perfil', () => {
     it('devolve o aluno da sessao, com contato principal, e ignora `?studentId=`', async () => {
-      const resposta = await buscar(`/api/v1/mobile/perfil?studentId=${brunoId}`, await entrar(EMAIL_ANA));
+      const resposta = await buscar(`/api/v1/mobile/perfil?studentId=${brunoId}`, await entrar(CPF_ANA));
 
       expect(resposta.status).toBe(200);
 
@@ -388,7 +389,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
     });
 
     it('aluno sem contato recebe `null`, e nao string vazia', async () => {
-      const corpo = (await buscar('/api/v1/mobile/perfil', await entrar(EMAIL_BRUNO))).body as CorpoDoPerfil;
+      const corpo = (await buscar('/api/v1/mobile/perfil', await entrar(CPF_BRUNO))).body as CorpoDoPerfil;
 
       expect(corpo.nome).toBe('Bruno Teixeira Lopes');
       expect(corpo.email).toBeNull();
@@ -398,7 +399,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
 
   describe('GET /api/v1/mobile/avaliacoes/laudo', () => {
     it('sem avaliacao publicada responde `avaliacao: null`', async () => {
-      const resposta = await buscar('/api/v1/mobile/avaliacoes/laudo', await entrar(EMAIL_BRUNO));
+      const resposta = await buscar('/api/v1/mobile/avaliacoes/laudo', await entrar(CPF_BRUNO));
 
       expect(resposta.status).toBe(200);
       expect((resposta.body as CorpoDoLaudo).avaliacao).toBeNull();
@@ -455,7 +456,7 @@ describe('App do aluno -- engajamento, perfil e laudo', () => {
         },
       });
 
-      const resposta = await buscar('/api/v1/mobile/avaliacoes/laudo', await entrar(EMAIL_ANA));
+      const resposta = await buscar('/api/v1/mobile/avaliacoes/laudo', await entrar(CPF_ANA));
       expect(resposta.status).toBe(200);
 
       const avaliacao = (resposta.body as CorpoDoLaudo).avaliacao;

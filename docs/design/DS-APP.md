@@ -241,14 +241,23 @@ Quem não tem sessão vê a **abertura** (`BoasVindas`, `src/features/boas-vinda
 ┌─────────────────────────┐
 │  ═══  alça               │
 │  Entrar                  │
-│  e-mail/telefone          │
+│  CPF                      │
 │  senha                    │
 │  [ Entrar ]               │
-│  Esqueci minha senha      │
+│  Esqueci minha senha · Primeiro acesso? │
 └─────────────────────────┘
 ```
 
 A abertura é a **única** tela do app fora do shell de abas e sem `Tela`/`TituloDaTela` (§4.7) — é tela cheia, com tema escuro **forçado** independente do sistema: a arte é escura, e o claro pintaria o título em carvão sobre a foto preta.
+
+**Login mostra só CPF (issue #333, SPEC-071, ADR-057 Decisão 6).** A UI parou de expor "e-mail ou telefone", mas o backend continua aceitando os dois formatos por baixo — quem já ativou pela F23 antes desta fatia não fica sem entrar. O campo formata como `000.000.000-00` enquanto o aluno digita (`mascararCpf`, `src/lib/mascaras.ts`) e manda só os 11 dígitos para a API — a máscara é exibição, nunca o valor enviado.
+
+**Primeiro acesso self-service, ao lado de "Esqueci minha senha".** Quem nunca criou senha toca "Primeiro acesso?" e a mesma `Folha` troca de conteúdo, em dois passos, sem fechar e reabrir:
+
+1. **Consulta** (`POST .../activation/lookup`) — CPF + data de nascimento (`DD/MM/AAAA`, mascarados). CPF + data aqui **não abrem sessão** — só localizam o cadastro e emitem um `activationRef` de curta duração. Achado, a folha mostra o selo "✓ Cadastro encontrado", o **nome completo** e uma lista de 5 campos formatados (CPF, data de nascimento, plano, local, data de início — "Acesso sem plano assinado" quando não há assinatura, nunca um nome comercial inventado), e libera os campos de senha; não achado (CPF errado, nascimento errado ou conta já ativa — mesmo motivo, nunca distinguido), uma única frase: "Não encontramos seu cadastro. Procure a administração da academia."
+2. **Criar senha** (`POST .../activation/self-service`, com o `activationRef` da consulta) — "Nova senha" + "Confirmar senha" (piso de 10 caracteres, mesma política da ativação por convite — o texto de apoio da tela segue essa regra, não o "6 caracteres" do protótipo original). Ao confirmar, a sessão abre direto — o aluno não loga de novo.
+
+O convite por e-mail da F23 (`/ativar`, deep link com token) **continua funcionando sem alteração** — os dois caminhos coexistem (ADR-057, Decisão 4), inclusive em corrida: o primeiro a definir a senha vence (Decisão 5).
 
 ### 3.2 Shell de abas
 
@@ -302,7 +311,7 @@ Três movimentos sobre a arte da boas-vindas, todos `pointerEvents="none"` e des
 
 ### 4.2 Folha (`Folha`, sheet reutilizável)
 
-Substitui a "Sheet da carteirinha" da v2.1 como o componente genérico de folha inferior — hoje usado no **login** e na **confirmação de saída da conta**; qualquer confirmação nova do app deveria reusar este componente, não um `Modal` próprio.
+Substitui a "Sheet da carteirinha" da v2.1 como o componente genérico de folha inferior — hoje usado no **login**, no **primeiro acesso** (§3.1, dois passos trocando o conteúdo da mesma folha) e na **confirmação de saída da conta**; qualquer confirmação nova do app deveria reusar este componente, não um `Modal` próprio.
 
 `Modal` nativo (não uma `View` absoluta): prende o foco do leitor de tela dentro da folha e o botão voltar do Android fecha a folha em vez de sair do app. Alça de 36×4 px em `border/hairline`, painel `bg/surface`, raio de folha, `KeyboardAvoidingView behavior="padding"` **nos dois sistemas** — no Android, com o layout edge-to-edge do SDK 57, o `Modal` translúcido não redimensiona sozinho, e sem esse comportamento o teclado cobria os campos de login (achado no emulador). `paddingBottom` soma o inset inferior do aparelho.
 
@@ -415,7 +424,7 @@ Uma seção desligada pelo tenant (`rankingEnabled`/`challengesEnabled`/`achieve
 
 ### 5.5 Confirmação de ação irreversível
 
-Sair da conta (e qualquer confirmação futura do mesmo peso) usa a `Folha` (§4.2): título curto, uma frase dizendo a consequência ("Para voltar você vai precisar do e-mail e da senha"), botão **destrutivo** (§4.9) primeiro, "Cancelar" (neutro) depois.
+Sair da conta (e qualquer confirmação futura do mesmo peso) usa a `Folha` (§4.2): título curto, uma frase dizendo a consequência ("Para voltar você vai precisar do CPF e da senha"), botão **destrutivo** (§4.9) primeiro, "Cancelar" (neutro) depois.
 
 ---
 

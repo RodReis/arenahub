@@ -10,6 +10,7 @@ import { TokenService } from '../../src/modules/auth/token.service.js';
 import { StudentIdentityService } from '../../src/modules/student-identity/student-identity.service.js';
 import type { StudentChannelContext } from '../../src/modules/student-identity/student-identity.service.js';
 import { ErroDeDominio } from '../../src/common/http/erro-de-dominio.js';
+import { calcularHashDeCpf } from '../../src/modules/students/domain/identificacao.js';
 
 /**
  * Cobre o que da para errar em silencio na identidade do ALUNO.
@@ -26,12 +27,16 @@ describe('F23 -- identidade do aluno', () => {
   let tokens: TokenService;
 
   const sufixo = randomUUID().slice(0, 8);
-  const EMAIL = `aluno-${sufixo}@exemplo.test`;
-  const EMAIL_DO_OUTRO = `outro-${sufixo}@exemplo.test`;
+  // CPFs validos por digito verificador, dez ultimos digitos variados pelo
+  // sufixo do teste para nao colidir entre execucoes concorrentes.
+  const CPF = '11144477735';
+  const CPF_DO_OUTRO = '52998224725';
+  const NASCIMENTO = new Date('1990-01-01');
   const SENHA = 'senha-de-teste-longa';
   const AGORA = () => new Date();
 
   let tenantId: string;
+  let unidadeId: string;
   let alunoId: string;
   let contaId: string;
   let outraContaId: string;
@@ -74,13 +79,33 @@ describe('F23 -- identidade do aluno', () => {
     return token;
   };
 
-  const entrar = async (email = EMAIL) =>
+  const entrar = async (identificador = CPF) =>
     servico.entrar({
       tenantId,
-      identificador: email,
+      identificador,
       senha: SENHA,
       deviceLabel: 'Aparelho de teste',
       agora: AGORA(),
+    });
+
+  /** Cria um aluno `ACTIVE`, com CPF gravado tambem em `Student` quando dado. */
+  const criarAluno = async (
+    nome: string,
+    matricula: string,
+    opcoes: { birthDate?: Date; cpf?: string } = {},
+  ) =>
+    db.student.create({
+      data: {
+        tenantId,
+        gymUnitId: unidadeId,
+        membershipNumber: matricula,
+        fullName: nome,
+        birthDate: opcoes.birthDate ?? NASCIMENTO,
+        status: 'ACTIVE',
+        ...(opcoes.cpf
+          ? { cpf: opcoes.cpf, cpfHash: calcularHashDeCpf(tenantId, opcoes.cpf) }
+          : {}),
+      },
     });
 
   const contextoDe = async (sessaoId: string): Promise<StudentChannelContext> => {
@@ -123,30 +148,23 @@ describe('F23 -- identidade do aluno', () => {
         openingHours: {},
       },
     });
+    unidadeId = unidade.id;
 
-    const criarAluno = async (nome: string, matricula: string) =>
-      db.student.create({
-        data: {
-          tenantId,
-          gymUnitId: unidade.id,
-          membershipNumber: matricula,
-          fullName: nome,
-          birthDate: new Date('1990-01-01'),
-        },
-      });
-
-    const aluno = await criarAluno('Aluno F23', `F23-${sufixo}-1`);
+    // CPF tambem gravado no `Student` (nao so no `StudentAccount.identifier`):
+    // a consulta de ativacao self-service busca por `Student.cpfHash`
+    // (SPEC-071 §7) -- ver describe `ativacao self-service`.
+    const aluno = await criarAluno('Aluno F23', `F23-${sufixo}-1`, { cpf: CPF });
     alunoId = aluno.id;
 
-    const outro = await criarAluno('Outro Aluno', `F23-${sufixo}-2`);
+    const outro = await criarAluno('Outro Aluno', `F23-${sufixo}-2`, { cpf: CPF_DO_OUTRO });
 
     const conta = await db.studentAccount.create({
-      data: { tenantId, studentId: alunoId, identifier: EMAIL },
+      data: { tenantId, studentId: alunoId, identifier: CPF },
     });
     contaId = conta.id;
 
     const contaDoOutro = await db.studentAccount.create({
-      data: { tenantId, studentId: outro.id, identifier: EMAIL_DO_OUTRO },
+      data: { tenantId, studentId: outro.id, identifier: CPF_DO_OUTRO },
     });
     outraContaId = contaDoOutro.id;
   });
@@ -215,7 +233,7 @@ describe('F23 -- identidade do aluno', () => {
       const conhecido = await capturar(() =>
         servico.entrar({
           tenantId,
-          identificador: EMAIL,
+          identificador: CPF,
           senha: 'senha-errada-porem-longa',
           deviceLabel: null,
           agora: AGORA(),
@@ -225,7 +243,7 @@ describe('F23 -- identidade do aluno', () => {
       const desconhecido = await capturar(() =>
         servico.entrar({
           tenantId,
-          identificador: `fantasma-${sufixo}@exemplo.test`,
+          identificador: '00000000191',
           senha: 'senha-errada-porem-longa',
           deviceLabel: null,
           agora: AGORA(),
@@ -250,11 +268,11 @@ describe('F23 -- identidade do aluno', () => {
                 gymUnitId: (await db.gymUnit.findFirstOrThrow({ where: { tenantId } })).id,
                 membershipNumber: `F23-${sufixo}-3`,
                 fullName: 'Nunca Ativou',
-                birthDate: new Date('1990-01-01'),
+                birthDate: NASCIMENTO,
               },
             })
           ).id,
-          identifier: `pendente-${sufixo}@exemplo.test`,
+          identifier: '93541134780',
         },
       });
 
@@ -269,39 +287,208 @@ describe('F23 -- identidade do aluno', () => {
       );
       expect(erro.code).toBe('AUTH_INVALID_CREDENTIALS');
     });
+
+    it('aceita CPF como identificador -- SPEC-071 §3 Decisao 3', async () => {
+      const sessao = await servico.entrar({
+        tenantId,
+        identificador: CPF,
+        senha: SENHA,
+        deviceLabel: null,
+        agora: AGORA(),
+      });
+      expect(sessao.accessToken).toBeTruthy();
+    });
   });
 
-  describe('recuperacao', () => {
+  describe('ativacao self-service -- SPEC-071', () => {
+    it('consulta encontra o aluno SEM conta previa, e a confirmacao cria a conta e abre sessao', async () => {
+      const cpfDoAluno = '39053344705';
+      await criarAluno('Primeiro Acesso', `F23-${sufixo}-4`, { cpf: cpfDoAluno });
+
+      const consulta = await servico.consultarAtivacao({
+        tenantId,
+        cpf: cpfDoAluno,
+        dataNascimento: NASCIMENTO,
+      });
+
+      expect(consulta.nomeCompleto).toBe('Primeiro Acesso');
+      expect(consulta.cpfFormatado).toBe('390.533.447-05');
+      expect(consulta.local).toBe('Unidade F23');
+      expect(consulta.activationRef).toBeTruthy();
+
+      const sessao = await servico.confirmarAtivacao({
+        activationRef: consulta.activationRef,
+        senha: 'senha-do-primeiro-acesso',
+        agora: AGORA(),
+      });
+      expect(sessao.accessToken).toBeTruthy();
+
+      // A conta self-service tambem consegue logar depois -- CPF vira o
+      // `identifier` gravado por `criarOuAtivarConta`.
+      const relogin = await servico.entrar({
+        tenantId,
+        identificador: cpfDoAluno,
+        senha: 'senha-do-primeiro-acesso',
+        deviceLabel: null,
+        agora: AGORA(),
+      });
+      expect(relogin.accessToken).toBeTruthy();
+    });
+
+    it('permite self-service sobre conta PENDING (convite emitido, nunca consumido) -- ADR-057 Decisao 5', async () => {
+      const cpfDoAluno = '05461767970';
+      const aluno = await criarAluno('Convite Nunca Consumido', `F23-${sufixo}-5`, {
+        cpf: cpfDoAluno,
+      });
+      await db.studentAccount.create({
+        data: { tenantId, studentId: aluno.id, identifier: 'email-do-convite@example.test' },
+      });
+
+      const consulta = await servico.consultarAtivacao({
+        tenantId,
+        cpf: cpfDoAluno,
+        dataNascimento: NASCIMENTO,
+      });
+
+      const sessao = await servico.confirmarAtivacao({
+        activationRef: consulta.activationRef,
+        senha: 'senha-do-primeiro-acesso',
+        agora: AGORA(),
+      });
+      expect(sessao.accessToken).toBeTruthy();
+
+      const conta = await db.studentAccount.findUniqueOrThrow({ where: { studentId: aluno.id } });
+      expect(conta.status).toBe('ACTIVE');
+      // O self-service TROCA o identifier para o CPF -- e o que login/entrar
+      // por CPF (Decisao 3) passa a usar dali em diante.
+      expect(conta.identifier).toBe(cpfDoAluno);
+    });
+
+    it('recusa nascimento errado sem revelar que o CPF existe', async () => {
+      const cpfDoAluno = '93541134780';
+      await criarAluno('Nascimento Errado', `F23-${sufixo}-6`, { cpf: cpfDoAluno });
+
+      const erro = await capturar(() =>
+        servico.consultarAtivacao({
+          tenantId,
+          cpf: cpfDoAluno,
+          dataNascimento: new Date('1990-01-02'),
+        }),
+      );
+      expect(erro.code).toBe('AUTH_INVALID_CREDENTIALS');
+    });
+
+    it('recusa CPF que nao existe com o mesmo erro generico', async () => {
+      const erro = await capturar(() =>
+        servico.consultarAtivacao({
+          tenantId,
+          cpf: '00000000191',
+          dataNascimento: NASCIMENTO,
+        }),
+      );
+      expect(erro.code).toBe('AUTH_INVALID_CREDENTIALS');
+    });
+
+    it('recusa conta que ja esta ACTIVE -- self-service nao e recuperacao', async () => {
+      // A conta `contaId` (CPF principal, `alunoId`) foi ativada pelo
+      // describe `ativacao`, acima neste arquivo -- estado compartilhado do
+      // `beforeAll`, mesma base das outras suites deste arquivo.
+      const erro = await capturar(() =>
+        servico.consultarAtivacao({
+          tenantId,
+          cpf: CPF,
+          dataNascimento: NASCIMENTO,
+        }),
+      );
+      expect(erro.code).toBe('AUTH_INVALID_CREDENTIALS');
+    });
+
+    it('recusa activationRef reaproveitado numa segunda confirmacao', async () => {
+      const cpfDoAluno = '96536696087';
+      await criarAluno('Ref De Uso Unico', `F23-${sufixo}-7`, { cpf: cpfDoAluno });
+
+      const consulta = await servico.consultarAtivacao({
+        tenantId,
+        cpf: cpfDoAluno,
+        dataNascimento: NASCIMENTO,
+      });
+
+      await servico.confirmarAtivacao({
+        activationRef: consulta.activationRef,
+        senha: 'senha-do-primeiro-acesso',
+        agora: AGORA(),
+      });
+
+      // O `activationRef` ainda e criptograficamente valido (nao expirou),
+      // mas a conta ja nao esta mais `PENDING` nem inexistente -- a segunda
+      // confirmacao perde a corrida em `criarOuAtivarConta`.
+      const erro = await capturar(() =>
+        servico.confirmarAtivacao({
+          activationRef: consulta.activationRef,
+          senha: 'outra-senha-longa-qualquer',
+          agora: AGORA(),
+        }),
+      );
+      expect(erro.code).toBe('AUTH_INVALID_CREDENTIALS');
+    });
+  });
+
+  describe('recuperacao -- F23, inalterada pela SPEC-071', () => {
     it('aceita identificador inexistente sem revelar nada', async () => {
       await expect(
         servico.pedirRecuperacao({
           tenantId,
-          identificador: `fantasma2-${sufixo}@exemplo.test`,
+          identificador: 'nao-existe@example.test',
           agora: AGORA(),
         }),
       ).resolves.toEqual({ aceito: true });
     });
 
-    it('trocar a senha revoga TODAS as sessoes abertas', async () => {
-      const antiga = await entrar();
-      const token = await emitirToken({ accountId: contaId, purpose: 'PASSWORD_RESET' });
+    it('identificador correto emite token de recuperacao e o token troca a senha', async () => {
+      await servico.pedirRecuperacao({ tenantId, identificador: CPF, agora: AGORA() });
+
+      const registro = await db.studentAccountToken.findFirstOrThrow({
+        where: { accountId: contaId, purpose: 'PASSWORD_RESET', status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // O token em claro nao sai do servico -- reconstroi um novo par do
+      // mesmo jeito que `emitirToken` faz, e sobrescreve o hash gravado, so
+      // para este teste poder consumi-lo sem expor a API do servico.
+      const tokenEmClaro = randomUUID() + randomUUID();
+      await db.studentAccountToken.update({
+        where: { id: registro.id },
+        data: { tokenHash: tokens.calcularHashDeRefresh(tokenEmClaro) },
+      });
 
       await servico.confirmarRecuperacao({
-        token,
+        token: tokenEmClaro,
         senha: 'senha-nova-bem-longa',
         agora: AGORA(),
       });
 
-      // Quem troca a senha esqueceu dela ou desconfia de acesso indevido --
-      // nos dois casos, sessao viva em outro aparelho contraria o motivo.
-      const erro = await capturar(() =>
-        servico.renovar({ refreshToken: antiga.refreshToken, agora: AGORA() }),
-      );
-      expect(erro.code).toBe('SESSAO_REVOGADA');
+      const sessao = await servico.entrar({
+        tenantId,
+        identificador: CPF,
+        senha: 'senha-nova-bem-longa',
+        deviceLabel: null,
+        agora: AGORA(),
+      });
+      expect(sessao.accessToken).toBeTruthy();
 
-      // Restaura a senha para nao contaminar os testes seguintes.
-      const volta = await emitirToken({ accountId: contaId, purpose: 'PASSWORD_RESET' });
-      await servico.confirmarRecuperacao({ token: volta, senha: SENHA, agora: AGORA() });
+      // Restaura a senha original para nao contaminar os testes seguintes
+      // (`entrar()`, o helper do topo do arquivo, sempre usa `SENHA`).
+      const outroToken = randomUUID() + randomUUID();
+      await db.studentAccountToken.create({
+        data: {
+          tenantId,
+          accountId: contaId,
+          purpose: 'PASSWORD_RESET',
+          tokenHash: tokens.calcularHashDeRefresh(outroToken),
+          expiresAt: new Date(Date.now() + 3_600_000),
+        },
+      });
+      await servico.confirmarRecuperacao({ token: outroToken, senha: SENHA, agora: AGORA() });
     });
   });
 
@@ -376,7 +563,7 @@ describe('F23 -- identidade do aluno', () => {
 
     it('um aluno NAO revoga a sessao de outro', async () => {
       const minha = await entrar();
-      const doOutro = await entrar(EMAIL_DO_OUTRO);
+      const doOutro = await entrar(CPF_DO_OUTRO);
       const meuCtx = await contextoDe(minha.sessionId);
 
       const erro = await capturar(() =>

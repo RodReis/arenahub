@@ -8,6 +8,7 @@ import {
 } from '../../common/http/erro-de-dominio.js';
 import { PasswordService } from '../auth/password.service.js';
 import { TokenService } from '../auth/token.service.js';
+import { formatarCpf } from '../students/domain/identificacao.js';
 import { consumirTokenDeUsoUnico } from './domain/token-de-uso-unico.js';
 import { decidirRotacao } from './domain/sessao-do-aluno.js';
 import { StudentAccountRepository } from './student-account.repository.js';
@@ -145,6 +146,111 @@ export class StudentIdentityService {
     await this.consumirEDefinirSenha({ ...dados, purpose: 'ACTIVATION' });
   }
 
+  /**
+   * Consulta da ativacao self-service -- SPEC-071 §6.2/§7. Localiza o aluno
+   * por CPF + nascimento e devolve os dados da tela de confirmacao (§6.3)
+   * mais um `activationRef` de curta duracao -- ainda NAO abre sessao nem
+   * cria senha, so prova que o cadastro foi encontrado.
+   *
+   * Mesmo erro generico para CPF inexistente, nascimento errado e conta que
+   * ja tem senha -- a tela pede para procurar a administracao nos tres
+   * casos, sem distinguir motivo (ADR-057, risco de enumeracao aceito pelo
+   * PI, Decisao 2).
+   */
+  async consultarAtivacao(dados: {
+    tenantId: string | null;
+    cpf: string;
+    dataNascimento: Date;
+  }): Promise<{
+    nomeCompleto: string;
+    cpfFormatado: string;
+    dataNascimento: string;
+    plano: string;
+    local: string;
+    dataInicio: string;
+    activationRef: string;
+  }> {
+    if (!dados.tenantId) throw new CredencialInvalidaError();
+
+    const candidato = await this.contas.encontrarCandidatoParaAtivacao(
+      dados.tenantId,
+      dados.cpf,
+      dados.dataNascimento,
+    );
+
+    // Sem candidato, ou candidato com conta JA ATIVA (self-service nao e
+    // recuperacao -- essa e outra tela, `pedirRecuperacao`): mesmo erro.
+    if (!candidato || candidato.contaExistente?.status === 'ACTIVE') {
+      throw new CredencialInvalidaError();
+    }
+
+    const activationRef = this.tokens.emitirPreAuth({
+      sub: candidato.studentId,
+      tenantId: dados.tenantId,
+      challengeId: candidato.cpf,
+      purpose: 'STUDENT_SELF_SERVICE_ACTIVATION',
+    });
+
+    return {
+      nomeCompleto: candidato.fullName,
+      cpfFormatado: formatarCpf(candidato.cpf) ?? candidato.cpf,
+      dataNascimento: candidato.birthDate.toISOString().slice(0, 10),
+      // "Acesso sem plano assinado" -- mesma regra do card do plano no app
+      // (DS-APP.md §4.12): nunca inventa um nome comercial.
+      plano: candidato.planoAtivo ?? 'Acesso sem plano assinado',
+      local: candidato.gymUnitName,
+      dataInicio: (candidato.inicioDoPlano ?? candidato.createdAt).toISOString().slice(0, 10),
+      activationRef,
+    };
+  }
+
+  /**
+   * Confirma a ativacao self-service -- SPEC-071 §7, ADR-057 Decisao 5. O
+   * `activationRef` (emitido por `consultarAtivacao`) prova que o CPF +
+   * nascimento ja foram conferidos; aqui so falta a senha. Cria a conta se
+   * nao existir, ou ativa por cima de um convite `PENDING` nunca consumido
+   * -- o primeiro caminho a chegar aqui vence a corrida.
+   */
+  async confirmarAtivacao(dados: {
+    activationRef: string;
+    senha: string;
+    agora: Date;
+  }): Promise<SessaoAberta> {
+    this.exigirSenhaAceitavel(dados.senha);
+
+    let claims;
+    try {
+      claims = this.tokens.verificarPreAuth(dados.activationRef);
+    } catch {
+      throw new CredencialInvalidaError();
+    }
+
+    if (claims.purpose !== 'STUDENT_SELF_SERVICE_ACTIVATION' || !claims.tenantId) {
+      throw new CredencialInvalidaError();
+    }
+
+    const passwordHash = await this.senhas.gerarHash(dados.senha);
+    const conta = await this.contas.criarOuAtivarConta({
+      tenantId: claims.tenantId,
+      studentId: claims.sub,
+      identifier: claims.challengeId,
+      passwordHash,
+      agora: dados.agora,
+    });
+
+    // Corrida perdida (conta ja ACTIVE quando este pedido chegou): mesmo
+    // erro generico do resto do fluxo.
+    if (!conta) throw new CredencialInvalidaError();
+
+    return this.abrirSessao({
+      tenantId: claims.tenantId,
+      accountId: conta.id,
+      studentId: claims.sub,
+      deviceLabel: null,
+      agora: dados.agora,
+    });
+  }
+
   /** Confirma a recuperacao com uma senha nova. */
   async confirmarRecuperacao(dados: {
     token: string;
@@ -157,8 +263,12 @@ export class StudentIdentityService {
   /**
    * Login -- `M4-FR-002`, resposta indistinguivel.
    *
-   * Identificador inexistente, senha errada e conta desativada saem todos pelo
-   * MESMO erro. E o scrypt roda nos tres casos (ver `ENVELOPE_DESCARTAVEL`).
+   * Identificador inexistente, senha errada e conta desativada saem todos
+   * pelo MESMO erro. E o scrypt roda nos tres casos (ver
+   * `ENVELOPE_DESCARTAVEL`). SPEC-071 §3 Decisao 3: o corpo aceita CPF ou
+   * e-mail/telefone (F23) -- o CONTROLLER normaliza os dois no mesmo campo
+   * `identificador` antes de chamar este metodo, porque os dois resolvem
+   * pela mesma coluna (`StudentAccount.identifier`).
    */
   async entrar(dados: {
     tenantId: string | null;
@@ -193,7 +303,8 @@ export class StudentIdentityService {
   }
 
   /**
-   * Pede recuperacao de senha -- sempre aceita, nunca revela.
+   * Pede recuperacao de senha -- sempre aceita, nunca revela (F23,
+   * inalterado pela SPEC-071 -- ela nao toca em recuperacao).
    *
    * Responde `{ aceito: true }` para identificador que existe e que nao
    * existe. O envio so acontece quando ha conta.

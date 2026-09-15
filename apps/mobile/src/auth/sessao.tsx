@@ -27,10 +27,18 @@ interface ParDeTokens {
 
 interface ValorDaSessao {
   readonly estado: EstadoDaSessao;
-  readonly entrar: (dados: {
-    tenantSlug: string;
-    identificador: string;
+  readonly entrar: (dados: { tenantSlug: string; cpf: string; senha: string }) => Promise<void>;
+  /**
+   * Confirmacao do primeiro acesso self-service -- SPEC-071 §7, issue #333.
+   * Como `entrar`, a sessao ja abre ao criar a senha; o aluno nao loga de
+   * novo. A CONSULTA que mostra os dados da tela de confirmacao (antes
+   * deste passo, `POST .../activation/lookup`) nao muda o estado da sessao,
+   * entao nao entra aqui -- a tela chama `cliente.post` direto.
+   */
+  readonly confirmarPrimeiroAcesso: (dados: {
+    activationRef: string;
     senha: string;
+    confirmacaoSenha: string;
   }) => Promise<void>;
   readonly sair: () => Promise<void>;
   readonly cliente: ReturnType<typeof criarCliente>;
@@ -123,8 +131,19 @@ export function ProvedorDeSessao({
   }, [armazenamento, cliente]);
 
   const entrar = useCallback(
-    async (dados: { tenantSlug: string; identificador: string; senha: string }) => {
+    async (dados: { tenantSlug: string; cpf: string; senha: string }) => {
       const par = (await cliente.post('/api/v1/mobile/auth/login', dados)) as ParDeTokens;
+
+      acesso.current = par.accessToken;
+      await armazenamento.salvarRefresh(par.refreshToken);
+      setEstado({ tipo: 'AUTENTICADO', sessionId: par.sessionId });
+    },
+    [armazenamento, cliente],
+  );
+
+  const confirmarPrimeiroAcesso = useCallback(
+    async (dados: { activationRef: string; senha: string; confirmacaoSenha: string }) => {
+      const par = (await cliente.post('/api/v1/mobile/activation/self-service', dados)) as ParDeTokens;
 
       acesso.current = par.accessToken;
       await armazenamento.salvarRefresh(par.refreshToken);
@@ -160,8 +179,8 @@ export function ProvedorDeSessao({
   }, [armazenamento, cliente]);
 
   const valor = useMemo<ValorDaSessao>(
-    () => ({ estado, entrar, sair, cliente }),
-    [estado, entrar, sair, cliente],
+    () => ({ estado, entrar, confirmarPrimeiroAcesso, sair, cliente }),
+    [estado, entrar, confirmarPrimeiroAcesso, sair, cliente],
   );
 
   return <SessaoContext.Provider value={valor}>{children}</SessaoContext.Provider>;

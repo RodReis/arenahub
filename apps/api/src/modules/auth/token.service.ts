@@ -52,8 +52,16 @@ export interface ClaimsDePreAuth {
    * acabaria passando adiante como se fosse.
    */
   tenantId: string | null;
+  /**
+   * `STUDENT_SELF_SERVICE_ACTIVATION` (SPEC-071): `sub` guarda o `studentId`
+   * achado pela consulta, `challengeId` guarda o CPF normalizado -- os dois
+   * dados que o passo de confirmacao precisa para criar/ativar a conta, sem
+   * reabrir a busca por CPF+nascimento nem depender de tabela nova. Curta
+   * duracao (`PRE_AUTH_VALIDO_POR_SEGUNDOS`) e o mesmo motivo do MFA: prova
+   * que a consulta ja aconteceu, sem virar credencial de longo prazo.
+   */
   challengeId: string;
-  purpose: 'MFA_SETUP' | 'MFA_VERIFY';
+  purpose: 'MFA_SETUP' | 'MFA_VERIFY' | 'STUDENT_SELF_SERVICE_ACTIVATION';
 }
 
 const ALGORITMO = 'RS256';

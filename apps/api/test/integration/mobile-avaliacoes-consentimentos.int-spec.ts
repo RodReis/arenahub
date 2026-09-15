@@ -26,9 +26,9 @@ describe('F26 -- Avaliacoes e consentimentos do app', () => {
 
   const sufixo = randomUUID().slice(0, 8);
   const SLUG = `f26-${sufixo}`;
-  const EMAIL = `aluno-f26-${sufixo}@exemplo.test`;
-  const EMAIL_VIZINHO = `vizinho-f26-${sufixo}@exemplo.test`;
-  const EMAIL_MENOR = `menor-f26-${sufixo}@exemplo.test`;
+  const CPF = '05461767970';
+  const CPF_VIZINHO = '93541134780';
+  const CPF_MENOR = '93072176004';
   const SENHA = 'senha-de-teste-longa';
 
   let tenantId: string;
@@ -75,10 +75,10 @@ describe('F26 -- Avaliacoes e consentimentos do app', () => {
     expiresAt: string | null;
   }
 
-  const entrar = async (identificador = EMAIL): Promise<string> => {
+  const entrar = async (cpf = CPF): Promise<string> => {
     const resposta = await request(servidor())
       .post('/api/v1/mobile/auth/login')
-      .send({ tenantSlug: SLUG, identificador, senha: SENHA });
+      .send({ tenantSlug: SLUG, cpf, senha: SENHA });
 
     return (resposta.body as { accessToken: string }).accessToken;
   };
@@ -220,14 +220,14 @@ describe('F26 -- Avaliacoes e consentimentos do app', () => {
 
     await db.tenantMembership.create({ data: { tenantId, userId: avaliadorId } });
 
-    alunoId = await criarAluno(EMAIL, 'Joana Ribeiro Costa', 'F26A', new Date('1990-01-01'));
-    vizinhoId = await criarAluno(EMAIL_VIZINHO, 'Pedro Santos Lima', 'F26B', new Date('1988-05-10'));
+    alunoId = await criarAluno(CPF, 'Joana Ribeiro Costa', 'F26A', new Date('1990-01-01'));
+    vizinhoId = await criarAluno(CPF_VIZINHO, 'Pedro Santos Lima', 'F26B', new Date('1988-05-10'));
 
     // Menor de idade: nasceu ha 15 anos, contados do instante da suite para
     // que o teste nao envelheca e fique vermelho sozinho no CI.
     const quinzeAnos = new Date();
     quinzeAnos.setUTCFullYear(quinzeAnos.getUTCFullYear() - 15);
-    await criarAluno(EMAIL_MENOR, 'Lucas Prado Alves', 'F26C', quinzeAnos);
+    await criarAluno(CPF_MENOR, 'Lucas Prado Alves', 'F26C', quinzeAnos);
 
     await publicarTermo('TERMS');
     await publicarTermo('HEALTH');
@@ -335,7 +335,7 @@ describe('F26 -- Avaliacoes e consentimentos do app', () => {
     });
 
     it('OPT-IN nasce NEGADO e OPT-OUT nasce CONCEDIDO quando nunca houve decisao', async () => {
-      const acesso = await entrar(EMAIL_VIZINHO);
+      const acesso = await entrar(CPF_VIZINHO);
 
       const resposta = await request(servidor())
         .get('/api/v1/mobile/consentimentos')
@@ -348,7 +348,7 @@ describe('F26 -- Avaliacoes e consentimentos do app', () => {
     });
 
     it('menor de idade NAO decide sozinho (INV-143)', async () => {
-      const acesso = await entrar(EMAIL_MENOR);
+      const acesso = await entrar(CPF_MENOR);
 
       const resposta = await request(servidor())
         .get('/api/v1/mobile/consentimentos')
@@ -444,7 +444,7 @@ describe('F26 -- Avaliacoes e consentimentos do app', () => {
        * `decisao.decision === 'ACCEPTED'` passa verde -- foi o que um canario
        * plantado provou durante a F26.
        */
-      const acesso = await entrar(EMAIL_VIZINHO);
+      const acesso = await entrar(CPF_VIZINHO);
 
       await request(servidor())
         .put('/api/v1/mobile/consentimentos')
@@ -484,7 +484,7 @@ describe('F26 -- Avaliacoes e consentimentos do app', () => {
     });
 
     it('menor de idade nao consegue decidir', async () => {
-      const acesso = await entrar(EMAIL_MENOR);
+      const acesso = await entrar(CPF_MENOR);
 
       const resposta = await request(servidor())
         .put('/api/v1/mobile/consentimentos')
@@ -567,7 +567,7 @@ describe('F26 -- Avaliacoes e consentimentos do app', () => {
     });
 
     it('aluno NAO consulta a exportacao de outro aluno', async () => {
-      const doVizinho = await entrar(EMAIL_VIZINHO);
+      const doVizinho = await entrar(CPF_VIZINHO);
 
       const pedido = await request(servidor())
         .post('/api/v1/mobile/exportacoes')

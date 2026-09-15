@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { EmailDeAtivacaoService } from './email-de-ativacao.service.js';
 import { StudentAccountRepository } from './student-account.repository.js';
+import { StudentActivationController } from './student-activation.controller.js';
 import { StudentAuthController } from './student-auth.controller.js';
 import { StudentIdentityService } from './student-identity.service.js';
 import { StudentSessionGuard } from './student-session.guard.js';
@@ -19,7 +20,7 @@ import { StudentSessionsController } from './student-sessions.controller.js';
  */
 @Module({
   imports: [AuthModule],
-  controllers: [StudentAuthController, StudentSessionsController],
+  controllers: [StudentAuthController, StudentActivationController, StudentSessionsController],
   providers: [
     StudentAccountRepository,
     StudentSessionRepository,

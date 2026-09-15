@@ -28,7 +28,8 @@ describe('F23 -- Home do app', () => {
 
   const sufixo = randomUUID().slice(0, 8);
   const SLUG = `f23home-${sufixo}`;
-  const EMAIL = `aluno-home-${sufixo}@exemplo.test`;
+  /** ADR-057: identificador de login do app passa a ser o CPF. */
+  const CPF = '11144477735';
   const SENHA = 'senha-de-teste-longa';
   const NOME_COMPLETO = 'Mariana Alves Pereira';
 
@@ -47,7 +48,7 @@ describe('F23 -- Home do app', () => {
   const entrar = async (): Promise<string> => {
     const resposta = await request(servidor())
       .post('/api/v1/mobile/auth/login')
-      .send({ tenantSlug: SLUG, identificador: EMAIL, senha: SENHA });
+      .send({ tenantSlug: SLUG, cpf: CPF, senha: SENHA });
 
     return (resposta.body as { accessToken: string }).accessToken;
   };
@@ -89,7 +90,7 @@ describe('F23 -- Home do app', () => {
       data: {
         tenantId,
         studentId: aluno.id,
-        identifier: EMAIL,
+        identifier: CPF,
         passwordHash: await senhas.gerarHash(SENHA),
         status: 'ACTIVE',
         activatedAt: new Date(),

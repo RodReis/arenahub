@@ -1305,7 +1305,9 @@ model InboxReceipt {
 ///
 /// A MATRICULA NUNCA DERIVA DO CPF (INV-009, INV-011, INV-012, `M1-BR-001`).
 /// CPF ajuda a detectar duplicidade e identifica o aluno para a recepcao --
-/// nao e identificador tecnico, nao vai para dispositivo, nao entra em URL.
+/// nao e identificador tecnico de dispositivo de acesso fisico (catraca/edge),
+/// nao entra em URL. EXCECAO (ADR-057): e identificador de login no app do
+/// aluno, guardado em `StudentAccount.identifier`.
 ///
 /// O CPF e guardado em DOIS campos com finalidades distintas (ADR-034):
 ///
