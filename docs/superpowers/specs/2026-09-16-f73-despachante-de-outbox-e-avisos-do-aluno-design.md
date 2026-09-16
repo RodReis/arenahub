@@ -21,13 +21,16 @@ Três entregas:
    consumidores, registra recibo por `(consumidor, evento)`.
 2. **Consumidor de inbox in-app** — grava `StudentNotification` a partir do
    evento, com `kind`/`action` mapeados por tipo.
-3. **Os nove produtores da §70** — três já existem como mutação
-   (`InvoicePaid`, `MembershipRenewed` a plugar), dois já existem sem
-   consumidor (`AssessmentPublished`, `HealthGoalReached` — credita XP do
-   MVP-05 §12), e quatro nascem de prazo, não de mutação, e precisam de job
-   (`InvoiceDueSoon`, `InvoiceOverdue`, `MembershipExpiringSoon`,
-   `StudentAbsent`) mais um de cron já existente (`RankingUpdated`, no
-   `EngagementRankingSchedulerService`).
+3. **Oito dos nove produtores da §70** — um já existe como mutação
+   (`InvoicePaid`), dois já existem sem consumidor (`AssessmentPublished`,
+   `HealthGoalReached` — credita XP do MVP-05 §12), quatro nascem de prazo,
+   não de mutação, e precisam de job (`InvoiceDueSoon`, `InvoiceOverdue`,
+   `MembershipExpiringSoon`, `StudentAbsent`) e um de cron já existente
+   (`RankingUpdated`, no `EngagementRankingSchedulerService`).
+   **`MembershipRenewed` sai do escopo** (decisão do PI, 16/09/2026): não
+   existe ação "renovar assinatura" no código — o plano continua ativo
+   porque a próxima invoice foi paga, e isso já é `InvoicePaid`. Um segundo
+   evento no mesmo instante seria aviso duplicado do mesmo fato.
 
 Decisões do PI (ADR-058): os nove entram todos nesta fatia; despachante é
 peça própria, não publicação direta por produtor; canal é só in-app, sem
@@ -92,7 +95,6 @@ grava `StudentNotification`, credita XP, ou ambos.
 | `InvoicePaid` | `BILLING` | `OPEN_INVOICE` | nulo |
 | `InvoiceDueSoon` | `BILLING` | `OPEN_INVOICE` | data de vencimento + 1 dia |
 | `InvoiceOverdue` | `BILLING` | `OPEN_INVOICE` | nulo |
-| `MembershipRenewed` | `MEMBERSHIP` | `NONE` | nulo |
 | `MembershipExpiringSoon` | `MEMBERSHIP` | `NONE` | data de vencimento do plano + 1 dia |
 | `HealthGoalReached` | `GENERAL` | `OPEN_HEALTH` | nulo |
 | `AssessmentPublished` | `ASSESSMENT` | `OPEN_HEALTH` | nulo |
@@ -105,26 +107,21 @@ faz `processar-webhook-de-pagamento` para outros textos do sistema).
 
 ### 3.2 Por que `StudentNotificationAction` não ganha valor novo
 
-`RankingUpdated` e `MembershipRenewed` usam `NONE` (a inbox informa, não
-navega) em vez de criar `OPEN_RANKING`/`OPEN_MEMBERSHIP` — YAGNI: adicionar
-uma tela de destino é decisão de produto que este card não pediu, e o enum
-cresce quando a tela existir.
+`RankingUpdated` e `MembershipExpiringSoon` usam `NONE` (a inbox informa,
+não navega) em vez de criar `OPEN_RANKING`/`OPEN_MEMBERSHIP` — YAGNI:
+adicionar uma tela de destino é decisão de produto que este card não pediu,
+e o enum cresce quando a tela existir.
 
 ## 4. Produtores que faltam
 
-### 4.1 Mutação — plugar no ponto que já muda o estado
-
-- `MembershipRenewed`: `MembershipRepository`, mesmo padrão de
-  `publicarEvento` privado do módulo, na transação que já grava a renovação.
-
-### 4.2 Já existem, só falta consumidor
+### 4.1 Já existem, só falta consumidor
 
 - `AssessmentPublished`, `HealthGoalReached`: produtor já grava
   `OutboxEvent`. O consumidor de XP (handler `eventType → creditar XP`,
   MVP-05 §12: +20 avaliação, +100 meta) é o que falta — mesma lista de
   handlers do despachante, chave `xp-por-evento`.
 
-### 4.3 De prazo — job novo, não mutação
+### 4.2 De prazo — job novo, não mutação
 
 Um serviço `NotificationDeadlineSchedulerService`, `@Cron` diário (mesmo
 horário do `PlatformInvoiceSchedulerService`, meia-noite), mesmo padrão de
@@ -146,7 +143,7 @@ trava de reentrada + `agora` injetado:
   emitido nos últimos 7 dias para o mesmo aluno (não repete o aviso todo dia
   enquanto a ausência continua).
 
-### 4.4 Ranking — plugar no cron existente
+### 4.3 Ranking — plugar no cron existente
 
 `EngagementRankingSchedulerService` já publica o snapshot mensal; ganha uma
 chamada a `publicarEvento('RankingUpdated', ...)` por aluno exposto no

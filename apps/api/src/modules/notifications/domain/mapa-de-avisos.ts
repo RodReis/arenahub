@@ -63,16 +63,6 @@ export function avisoParaEvento(evento: EventoDeOutbox, agora: Date): AvisoAGrav
         expiresAt: null,
       };
 
-    case 'MembershipRenewed':
-      return {
-        kind: 'MEMBERSHIP',
-        title: 'Plano renovado',
-        body: 'Seu plano foi renovado com sucesso.',
-        action: 'NONE',
-        actionTargetId: null,
-        expiresAt: null,
-      };
-
     case 'MembershipExpiringSoon':
       return {
         kind: 'MEMBERSHIP',

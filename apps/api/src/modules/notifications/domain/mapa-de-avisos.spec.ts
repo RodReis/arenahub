@@ -60,22 +60,6 @@ describe('avisoParaEvento', () => {
     });
   });
 
-  it('mapeia MembershipRenewed para aviso MEMBERSHIP sem ação e sem expiração', () => {
-    const aviso = avisoParaEvento(
-      { eventType: 'MembershipRenewed', aggregateType: 'Membership', aggregateId: 'membership-1', payload: {} },
-      new Date('2026-09-16T12:00:00Z'),
-    );
-
-    expect(aviso).toEqual({
-      kind: 'MEMBERSHIP',
-      title: expect.any(String),
-      body: expect.any(String),
-      action: 'NONE',
-      actionTargetId: null,
-      expiresAt: null,
-    });
-  });
-
   it('mapeia MembershipExpiringSoon para aviso MEMBERSHIP que expira um dia após o vencimento', () => {
     const aviso = avisoParaEvento(
       {
