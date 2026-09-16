@@ -1,6 +1,13 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { concederPorSessao, mesAnterior, mesLocal, reverter, somarSaldo } from './movimento-de-xp.js';
+import {
+  concederPorEvento,
+  concederPorSessao,
+  mesAnterior,
+  mesLocal,
+  reverter,
+  somarSaldo,
+} from './movimento-de-xp.js';
 import type { VersaoDeRegra } from './regra-de-xp.js';
 
 const regra: VersaoDeRegra = {
@@ -49,6 +56,38 @@ describe('concederPorSessao', () => {
       ruleVersionId: 'r1',
       sourceKind: 'ATTENDANCE_SESSION',
       sourceId: 'sess-1',
+      reversesEntryId: null,
+      localMonth: '2026-08',
+    });
+  });
+});
+
+describe('concederPorEvento', () => {
+  const regraDeMeta: VersaoDeRegra = {
+    id: 'r2',
+    code: 'meta-atingida',
+    version: 1,
+    trigger: 'META_ATINGIDA',
+    points: 100,
+    effectiveFrom: new Date('2026-01-01T00:00:00Z'),
+    effectiveTo: null,
+  };
+
+  it('carrega a origem GENERIC_EVENT e a versao de regra, sem sessao', () => {
+    const movimento = concederPorEvento({
+      regra: regraDeMeta,
+      sourceKind: 'HEALTH_GOAL',
+      sourceId: 'goal-1',
+      occurredAt: new Date('2026-08-10T12:00:00Z'),
+      fusoDaUnidade: 'America/Sao_Paulo',
+    });
+
+    expect(movimento).toMatchObject({
+      type: 'GRANT',
+      points: 100,
+      ruleVersionId: 'r2',
+      sourceKind: 'HEALTH_GOAL',
+      sourceId: 'goal-1',
       reversesEntryId: null,
       localMonth: '2026-08',
     });

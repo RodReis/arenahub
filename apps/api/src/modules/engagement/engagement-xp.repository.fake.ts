@@ -1,6 +1,6 @@
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import type { GatilhoDeXp, VersaoDeRegra } from './domain/regra-de-xp.js';
-import { somarSaldo } from './domain/movimento-de-xp.js';
+import { somarSaldo, type OrigemDeMovimento } from './domain/movimento-de-xp.js';
 import type { DefinicaoDeConquista } from './domain/conquista.js';
 import type {
   ConquistaDoExtratoDeXp,
@@ -18,6 +18,9 @@ export interface RegraDeTeste {
   points: number;
   effectiveFrom?: Date;
   effectiveTo?: Date | null;
+  /** F73: consumidores de XP por evento usam `AVALIACAO_PUBLICADA`/
+   * `META_ATINGIDA`. Default mantem o comportamento anterior a esta fatia. */
+  trigger?: GatilhoDeXp;
 }
 
 /** Entrada de configuracao de `comDefinicoes`. */
@@ -37,7 +40,7 @@ interface LinhaDoLedger {
   points: number;
   localMonth: string;
   type: 'GRANT' | 'ADJUSTMENT' | 'REVERSAL';
-  sourceKind: 'ATTENDANCE_SESSION' | 'MANUAL_ADJUSTMENT';
+  sourceKind: OrigemDeMovimento;
   sourceId: string;
   reversesEntryId: string | null;
   ruleVersionId: string;
@@ -98,7 +101,7 @@ export class FakePortaDeXp implements PortaDeXp {
       id: `regra-${this.proximoId++}`,
       code: 'treino-diario',
       version: this.regras.length + 1,
-      trigger: 'SESSAO_CONFIRMADA',
+      trigger: entrada.trigger ?? 'SESSAO_CONFIRMADA',
       points: entrada.points,
       effectiveFrom: entrada.effectiveFrom ?? new Date('2000-01-01T00:00:00Z'),
       effectiveTo: entrada.effectiveTo ?? null,

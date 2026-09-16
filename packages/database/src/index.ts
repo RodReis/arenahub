@@ -180,4 +180,5 @@ export type {
   StudentTimelineEventType,
   SubscriptionStatus,
   TenantContractStatus,
+  XpSourceKind,
 } from './generated/client.js';

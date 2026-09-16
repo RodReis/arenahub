@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@arenahub/database';
+import { Prisma, type XpSourceKind } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -48,7 +48,7 @@ export interface MovimentoDoLedger {
   points: number;
   localMonth: string;
   type: 'GRANT' | 'ADJUSTMENT' | 'REVERSAL';
-  sourceKind: 'ATTENDANCE_SESSION' | 'MANUAL_ADJUSTMENT';
+  sourceKind: XpSourceKind;
   sourceId: string;
   reversesEntryId: string | null;
 }

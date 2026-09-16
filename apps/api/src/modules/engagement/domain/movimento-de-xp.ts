@@ -13,7 +13,11 @@ import type { VersaoDeRegra } from './regra-de-xp.js';
 
 export type TipoDeMovimento = 'GRANT' | 'ADJUSTMENT' | 'REVERSAL';
 
-export type OrigemDeMovimento = 'ATTENDANCE_SESSION' | 'MANUAL_ADJUSTMENT';
+export type OrigemDeMovimento =
+  | 'ATTENDANCE_SESSION'
+  | 'MANUAL_ADJUSTMENT'
+  | 'ASSESSMENT'
+  | 'HEALTH_GOAL';
 
 export interface MovimentoDeXp {
   type: TipoDeMovimento;
@@ -41,6 +45,16 @@ export interface MovimentoOriginal {
 export interface EntradaDeConcessao {
   regra: VersaoDeRegra;
   sessionId: string;
+  occurredAt: Date;
+  fusoDaUnidade: string;
+}
+
+/** O que `concederPorEvento` precisa -- concessao disparada por um evento
+ * de outbox (avaliacao publicada, meta atingida), sem sessao de treino. */
+export interface EntradaDeConcessaoPorEvento {
+  regra: VersaoDeRegra;
+  sourceKind: OrigemDeMovimento;
+  sourceId: string;
   occurredAt: Date;
   fusoDaUnidade: string;
 }
@@ -100,6 +114,28 @@ export function concederPorSessao(entrada: EntradaDeConcessao): MovimentoDeXp {
     ruleVersionId: entrada.regra.id,
     sourceKind: 'ATTENDANCE_SESSION',
     sourceId: entrada.sessionId,
+    reversesEntryId: null,
+    occurredAt: entrada.occurredAt,
+    localMonth: mesLocal(entrada.occurredAt, entrada.fusoDaUnidade),
+    reason: null,
+  };
+}
+
+/**
+ * Concessao disparada por evento de outbox -- F73. Mesma forma de
+ * `concederPorSessao`, sem `sourceKind` fixo: `AssessmentPublished` grava
+ * `ASSESSMENT`, `HealthGoalReached` grava `HEALTH_GOAL`. A idempotencia e a
+ * mesma chave unica (`tenantId, studentId, sourceKind, sourceId,
+ * ruleVersionId, type`) -- reprocessar o mesmo evento colide e vira
+ * sucesso idempotente no service, igual `concederPorSessao`.
+ */
+export function concederPorEvento(entrada: EntradaDeConcessaoPorEvento): MovimentoDeXp {
+  return {
+    type: 'GRANT',
+    points: entrada.regra.points,
+    ruleVersionId: entrada.regra.id,
+    sourceKind: entrada.sourceKind,
+    sourceId: entrada.sourceId,
     reversesEntryId: null,
     occurredAt: entrada.occurredAt,
     localMonth: mesLocal(entrada.occurredAt, entrada.fusoDaUnidade),
