@@ -10,7 +10,6 @@ updated: 2026-09-16
 ### Sem épico
 
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
-- [MVP3][INFRA] Decisão: sinais vitais (§53) — `HealthMeasurement` não existe no schema, e o aparelho que mede pressão já está no balcão (#345)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
 - [MVP5][INFRA] Decisão: os nove eventos de notificação da §70 não têm produtor — a caixa de avisos do app nasce vazia (#343)
 - [MVP6][INFRA] Decisão: o pipeline de retenção não tem job agendado — F36–F41 produzem zero em produção (#341)
@@ -43,6 +42,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][INFRA] Decisão: sinais vitais (§53) — `HealthMeasurement` não existe no schema, e o aparelho que mede pressão já está no balcão (#345, finalizado em: 2026-09-16)
 - [MVP1][FIX] busca por nome na listagem de alunos casa telefone por dígito solto do termo (#351, finalizado em: 2026-09-16)
 - [MVP1][INFRA] Decisão: foto do aluno — cortada em 18/08 para uma fatia que já tinha fechado dois dias antes (#348, finalizado em: 2026-09-16)
 - [INFRA] Login sem tenant: hero com foto, tema claro/escuro e contagem real de alunos/unidades (#342, finalizado em: 2026-09-15)
