@@ -4,11 +4,13 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import type { EventoDeOutbox } from './domain/mapa-de-avisos.js';
 import { PORTA_DE_DISPATCH, type EventoPendente, type PortaDeDispatch } from './outbox-dispatcher.repository.js';
 
-/** Um consumidor do outbox: decide se trata o `eventType` e o que fazer. */
+/** Um consumidor do outbox: decide se trata o `eventType` e o que fazer.
+ * `agora` entra por parametro (CLAUDE.md), nunca `new Date()` dentro do
+ * consumidor -- o mesmo ciclo do despachante deve datar tudo igual. */
 export interface ConsumidorDeEvento {
   readonly nome: string;
   trata(eventType: string): boolean;
-  processar(evento: EventoDeOutbox & { id: string; tenantId: string }): Promise<void>;
+  processar(evento: EventoDeOutbox & { id: string; tenantId: string }, agora: Date): Promise<void>;
 }
 
 /** Teto de eventos processados por ciclo -- protege contra fila represada. */
@@ -64,7 +66,7 @@ export class OutboxDispatcherService {
 
   /** Um ciclo completo. `agora` injetado -- o teste nao espera o minuto. */
   async executarCiclo(
-    _agora: Date,
+    agora: Date,
   ): Promise<{ eventos: number; entregas: number; falhas: number }> {
     const eventos = await this.porta.eventosPendentes(TETO_POR_CICLO);
 
@@ -72,7 +74,7 @@ export class OutboxDispatcherService {
     let falhas = 0;
 
     for (const evento of eventos) {
-      const resultado = await this.entregar(evento);
+      const resultado = await this.entregar(evento, agora);
       entregas += resultado.entregas;
       falhas += resultado.falhas;
 
@@ -86,6 +88,7 @@ export class OutboxDispatcherService {
    * consumidor vira log e nao impede os demais. */
   private async entregar(
     evento: EventoPendente,
+    agora: Date,
   ): Promise<{ entregas: number; falhas: number }> {
     let entregas = 0;
     let falhas = 0;
@@ -97,7 +100,7 @@ export class OutboxDispatcherService {
       if (jaProcessado) continue;
 
       try {
-        await consumidor.processar(evento);
+        await consumidor.processar(evento, agora);
         await this.porta.registrarProcessado(consumidor.nome, evento.id);
         entregas += 1;
       } catch (erro: unknown) {

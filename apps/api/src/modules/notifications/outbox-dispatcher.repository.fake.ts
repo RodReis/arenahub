@@ -10,23 +10,29 @@ export class FakePortaDeDispatch implements PortaDeDispatch {
     this.eventos.push(evento);
   }
 
-  async eventosPendentes(limite: number): Promise<readonly EventoPendente[]> {
-    return this.eventos
-      .filter((evento) => !this.publicados.has(evento.id))
-      .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime())
-      .slice(0, limite);
+  eventosPendentes(limite: number): Promise<readonly EventoPendente[]> {
+    return Promise.resolve(
+      this.eventos
+        .filter((evento) => !this.publicados.has(evento.id))
+        .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime())
+        .slice(0, limite),
+    );
   }
 
-  async jaProcessado(consumer: string, eventId: string): Promise<boolean> {
-    return this.recibos.has(this.chave(consumer, eventId));
+  jaProcessado(consumer: string, eventId: string): Promise<boolean> {
+    return Promise.resolve(this.recibos.has(this.chave(consumer, eventId)));
   }
 
-  async registrarProcessado(consumer: string, eventId: string): Promise<void> {
+  registrarProcessado(consumer: string, eventId: string): Promise<void> {
     this.recibos.add(this.chave(consumer, eventId));
+
+    return Promise.resolve();
   }
 
-  async marcarPublicado(eventId: string): Promise<void> {
+  marcarPublicado(eventId: string): Promise<void> {
     this.publicados.add(eventId);
+
+    return Promise.resolve();
   }
 
   private chave(consumer: string, eventId: string): string {

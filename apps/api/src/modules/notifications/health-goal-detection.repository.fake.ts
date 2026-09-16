@@ -17,24 +17,20 @@ export class FakePortaDeDeteccaoDeMeta implements PortaDeDeteccaoDeMeta {
     this.valores.set(`${tenantId}::${studentId}::${type}`, valor);
   }
 
-  async metasAtivasSemConquista(): Promise<readonly MetaAtivaParaAvaliar[]> {
-    return this.metas;
+  metasAtivasSemConquista(): Promise<readonly MetaAtivaParaAvaliar[]> {
+    return Promise.resolve(this.metas);
   }
 
-  async ultimoValorPublicado(
-    tenantId: string,
-    studentId: string,
-    type: string,
-  ): Promise<number | null> {
-    return this.valores.get(`${tenantId}::${studentId}::${type}`) ?? null;
+  ultimoValorPublicado(tenantId: string, studentId: string, type: string): Promise<number | null> {
+    return Promise.resolve(this.valores.get(`${tenantId}::${studentId}::${type}`) ?? null);
   }
 
-  async marcarAtingidaEPublicar(tenantId: string, goalId: string): Promise<boolean> {
+  marcarAtingidaEPublicar(tenantId: string, goalId: string): Promise<boolean> {
     const meta = this.metas.find((item) => item.id === goalId);
-    if (!meta || meta.achievedAt !== null) return false;
+    if (!meta || meta.achievedAt !== null) return Promise.resolve(false);
 
     this.conquistasGravadas.push({ tenantId, goalId });
 
-    return true;
+    return Promise.resolve(true);
   }
 }

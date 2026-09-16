@@ -28,7 +28,8 @@ const MAPA: Record<string, MapaDeGatilho> = {
     gatilho: 'META_ATINGIDA',
     sourceKind: 'HEALTH_GOAL',
     aggregateTypeDoAluno: null,
-    sourceId: (evento) => String(evento.payload['goalId'] ?? evento.aggregateId),
+    sourceId: (evento) =>
+      typeof evento.payload['goalId'] === 'string' ? evento.payload['goalId'] : evento.aggregateId,
   },
   AssessmentPublished: {
     gatilho: 'AVALIACAO_PUBLICADA',
@@ -59,14 +60,16 @@ export class EngagementXpConsumer implements ConsumidorDeEvento {
   constructor(
     @Inject(PORTA_DE_XP) private readonly porta: PortaDeXp,
     @Inject(PORTA_DE_AVISOS) private readonly portaDeAvisos: PortaDeAvisos,
-    private readonly agora: () => Date,
   ) {}
 
   trata(eventType: string): boolean {
     return eventType in MAPA;
   }
 
-  async processar(evento: EventoDeOutbox & { id: string; tenantId: string }): Promise<void> {
+  async processar(
+    evento: EventoDeOutbox & { id: string; tenantId: string },
+    agora: Date,
+  ): Promise<void> {
     const mapa = MAPA[evento.eventType];
     if (mapa === undefined) return;
 
@@ -99,7 +102,6 @@ export class EngagementXpConsumer implements ConsumidorDeEvento {
     }
 
     const regras = await this.porta.regrasDoTenant(contexto, mapa.gatilho);
-    const agora = this.agora();
     const regra = resolverRegraVigente(regras, mapa.gatilho, agora);
     if (regra === null) return;
 

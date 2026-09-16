@@ -32,19 +32,19 @@ export class FakePortaDePrazo implements PortaDePrazo {
     this.alunos.push(aluno);
   }
 
-  async invoicesAbertasSemAvisoDeVencimento(): Promise<readonly InvoiceParaAvaliar[]> {
-    return this.invoices;
+  invoicesAbertasSemAvisoDeVencimento(): Promise<readonly InvoiceParaAvaliar[]> {
+    return Promise.resolve(this.invoices);
   }
 
-  async assinaturasAtivasSemAvisoDeVencimento(): Promise<readonly SubscriptionParaAvaliar[]> {
-    return this.assinaturas;
+  assinaturasAtivasSemAvisoDeVencimento(): Promise<readonly SubscriptionParaAvaliar[]> {
+    return Promise.resolve(this.assinaturas);
   }
 
-  async alunosSemAvisoDeAusencia(): Promise<readonly AlunoParaAvaliar[]> {
-    return this.alunos;
+  alunosSemAvisoDeAusencia(): Promise<readonly AlunoParaAvaliar[]> {
+    return Promise.resolve(this.alunos);
   }
 
-  async publicarEvento(
+  publicarEvento(
     tenantId: string,
     eventType: string,
     aggregateType: string,
@@ -52,5 +52,7 @@ export class FakePortaDePrazo implements PortaDePrazo {
     payload: Record<string, unknown>,
   ): Promise<void> {
     this.eventosPublicados.push({ tenantId, eventType, aggregateType, aggregateId, payload });
+
+    return Promise.resolve();
   }
 }

@@ -26,8 +26,9 @@ describe('OutboxDispatcherService', () => {
     const consumidor: ConsumidorDeEvento = {
       nome: 'inbox',
       trata: (eventType) => eventType === 'InvoicePaid',
-      processar: async (ev) => {
+      processar: (ev) => {
         recebidos.push(ev.id);
+        return Promise.resolve();
       },
     };
 
@@ -47,8 +48,9 @@ describe('OutboxDispatcherService', () => {
     const consumidor: ConsumidorDeEvento = {
       nome: 'inbox',
       trata: () => true,
-      processar: async () => {
+      processar: () => {
         chamadas += 1;
+        return Promise.resolve();
       },
     };
 
@@ -67,15 +69,16 @@ describe('OutboxDispatcherService', () => {
     const consumidorQuebrado: ConsumidorDeEvento = {
       nome: 'quebrado',
       trata: () => true,
-      processar: async () => {
+      processar: () => {
         throw new Error('falha simulada');
       },
     };
     const consumidorOk: ConsumidorDeEvento = {
       nome: 'ok',
       trata: () => true,
-      processar: async (ev) => {
+      processar: (ev) => {
         recebidos.push(ev.id);
+        return Promise.resolve();
       },
     };
 
@@ -93,7 +96,7 @@ describe('OutboxDispatcherService', () => {
     const consumidor: ConsumidorDeEvento = {
       nome: 'inbox',
       trata: (eventType) => eventType === 'InvoicePaid',
-      processar: async () => {
+      processar: () => {
         throw new Error('nao deveria ser chamado');
       },
     };

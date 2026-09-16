@@ -15,7 +15,7 @@ const CONTEXTO_QUALQUER = {
 
 describe('EngagementXpConsumer', () => {
   it('trata AssessmentPublished e HealthGoalReached, mais nenhum outro', () => {
-    const consumer = new EngagementXpConsumer(new FakePortaDeXp(), new FakePortaDeAvisos(), () => AGORA);
+    const consumer = new EngagementXpConsumer(new FakePortaDeXp(), new FakePortaDeAvisos());
 
     expect(consumer.trata('AssessmentPublished')).toBe(true);
     expect(consumer.trata('HealthGoalReached')).toBe(true);
@@ -27,7 +27,7 @@ describe('EngagementXpConsumer', () => {
     porta.comRegra({ points: 100, trigger: 'META_ATINGIDA' });
     porta.comAluno('student-1', 'America/Sao_Paulo');
 
-    const consumer = new EngagementXpConsumer(porta, new FakePortaDeAvisos(), () => AGORA);
+    const consumer = new EngagementXpConsumer(porta, new FakePortaDeAvisos());
 
     await consumer.processar({
       id: 'e1',
@@ -36,7 +36,7 @@ describe('EngagementXpConsumer', () => {
       aggregateType: 'Student',
       aggregateId: 'student-1',
       payload: { goalId: 'goal-1' },
-    });
+    }, AGORA);
 
     const movimentos = await porta.movimentosDoAluno(CONTEXTO_QUALQUER, 'student-1');
     expect(movimentos).toEqual([
@@ -52,7 +52,7 @@ describe('EngagementXpConsumer', () => {
     const portaDeAvisos = new FakePortaDeAvisos();
     portaDeAvisos.comAgregado('BodyAssessment', 'assessment-1', 'student-2');
 
-    const consumer = new EngagementXpConsumer(porta, portaDeAvisos, () => AGORA);
+    const consumer = new EngagementXpConsumer(porta, portaDeAvisos);
 
     await consumer.processar({
       id: 'e2',
@@ -61,7 +61,7 @@ describe('EngagementXpConsumer', () => {
       aggregateType: 'BodyAssessment',
       aggregateId: 'assessment-1',
       payload: {},
-    });
+    }, AGORA);
 
     const movimentos = await porta.movimentosDoAluno(CONTEXTO_QUALQUER, 'student-2');
     expect(movimentos).toEqual([
@@ -74,7 +74,7 @@ describe('EngagementXpConsumer', () => {
     porta.comRegra({ points: 20, trigger: 'AVALIACAO_PUBLICADA' });
     porta.comAluno('student-nunca-usado', 'America/Sao_Paulo');
 
-    const consumer = new EngagementXpConsumer(porta, new FakePortaDeAvisos(), () => AGORA);
+    const consumer = new EngagementXpConsumer(porta, new FakePortaDeAvisos());
 
     await consumer.processar({
       id: 'e2',
@@ -83,7 +83,7 @@ describe('EngagementXpConsumer', () => {
       aggregateType: 'BodyAssessment',
       aggregateId: 'assessment-inexistente',
       payload: {},
-    });
+    }, AGORA);
 
     const movimentos = await porta.movimentosDoAluno(CONTEXTO_QUALQUER, 'student-nunca-usado');
     expect(movimentos).toEqual([]);
@@ -93,7 +93,7 @@ describe('EngagementXpConsumer', () => {
     const porta = new FakePortaDeXp();
     porta.comAluno('student-1', 'America/Sao_Paulo');
 
-    const consumer = new EngagementXpConsumer(porta, new FakePortaDeAvisos(), () => AGORA);
+    const consumer = new EngagementXpConsumer(porta, new FakePortaDeAvisos());
 
     await consumer.processar({
       id: 'e1',
@@ -102,7 +102,7 @@ describe('EngagementXpConsumer', () => {
       aggregateType: 'Student',
       aggregateId: 'student-1',
       payload: {},
-    });
+    }, AGORA);
 
     const movimentos = await porta.movimentosDoAluno(CONTEXTO_QUALQUER, 'student-1');
     expect(movimentos).toEqual([]);

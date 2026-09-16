@@ -22,11 +22,13 @@ export class FakePortaDeAvisos implements PortaDeAvisos {
     this.alunosPorAgregado.set(`${aggregateType}::${aggregateId}`, studentId);
   }
 
-  async resolverStudentId(aggregateType: string, aggregateId: string): Promise<string | null> {
-    return this.alunosPorAgregado.get(`${aggregateType}::${aggregateId}`) ?? null;
+  resolverStudentId(aggregateType: string, aggregateId: string): Promise<string | null> {
+    return Promise.resolve(this.alunosPorAgregado.get(`${aggregateType}::${aggregateId}`) ?? null);
   }
 
-  async gravar(tenantId: string, studentId: string, aviso: AvisoAGravar): Promise<void> {
+  gravar(tenantId: string, studentId: string, aviso: AvisoAGravar): Promise<void> {
     this.gravados.push({ tenantId, studentId, ...aviso });
+
+    return Promise.resolve();
   }
 }

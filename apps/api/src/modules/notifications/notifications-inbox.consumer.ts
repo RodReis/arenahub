@@ -5,13 +5,14 @@ import { avisoParaEvento } from './domain/mapa-de-avisos.js';
 import { PORTA_DE_AVISOS, type PortaDeAvisos } from './notifications-inbox.repository.js';
 import type { ConsumidorDeEvento } from './outbox-dispatcher.service.js';
 
+/** `avisoParaEvento` so retorna `null` quando o tipo nao esta no `switch`
+ * -- nenhum ramo depende de `agora` para decidir SE trata, so para calcular
+ * `expiresAt`. Uma data fixa e suficiente para perguntar "reconhece?". */
+const DATA_QUALQUER_PARA_SONDAGEM = new Date(0);
+
 /**
  * Consumidor de inbox in-app -- F73 §3. Grava `StudentNotification` a
  * partir de um `OutboxEvent`, quando o mapa de avisos reconhece o tipo.
- *
- * `agora` chega como funcao (nao valor), porque o consumidor e resolvido
- * uma vez pelo Nest e chamado a cada ciclo do despachante -- capturar um
- * `Date` fixo na construcao congelaria o relogio.
  */
 @Injectable()
 export class NotificationsInboxConsumer implements ConsumidorDeEvento {
@@ -19,17 +20,22 @@ export class NotificationsInboxConsumer implements ConsumidorDeEvento {
 
   private readonly log = new Logger(NotificationsInboxConsumer.name);
 
-  constructor(
-    @Inject(PORTA_DE_AVISOS) private readonly porta: PortaDeAvisos,
-    private readonly agora: () => Date,
-  ) {}
+  constructor(@Inject(PORTA_DE_AVISOS) private readonly porta: PortaDeAvisos) {}
 
   trata(eventType: string): boolean {
-    return avisoParaEvento({ eventType, aggregateType: '', aggregateId: '', payload: {} }, this.agora()) !== null;
+    return (
+      avisoParaEvento(
+        { eventType, aggregateType: '', aggregateId: '', payload: {} },
+        DATA_QUALQUER_PARA_SONDAGEM,
+      ) !== null
+    );
   }
 
-  async processar(evento: EventoDeOutbox & { id: string; tenantId: string }): Promise<void> {
-    const aviso = avisoParaEvento(evento, this.agora());
+  async processar(
+    evento: EventoDeOutbox & { id: string; tenantId: string },
+    agora: Date,
+  ): Promise<void> {
+    const aviso = avisoParaEvento(evento, agora);
     if (aviso === null) return;
 
     const studentId = await this.resolverStudentId(evento);
