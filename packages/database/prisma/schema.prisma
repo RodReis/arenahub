@@ -1364,6 +1364,10 @@ model Student {
   /// Papel da pessoa (F48). Default `STUDENT` porque e o caso comum e
   /// porque as 1.926 linhas ja existentes precisam de um valor.
   profile          StudentProfile        @default(STUDENT)
+  /// Chave do objeto no storage privado (F72, issue #348). `null` = sem
+  /// foto. Nunca a URL: mesma disciplina de `Tenant.logoObjectKey` -- quem
+  /// quer o arquivo pede pela rota que confere o pertencimento ao tenant.
+  photoObjectKey   String?               @map("photo_object_key")
   /// Preenchido no arquivamento. Soft delete (INV-013): preserva historico
   /// legal e operacional em vez de apagar.
   archivedAt       DateTime?             @map("archived_at")

@@ -1014,17 +1014,29 @@ function condicaoDeModalidade(modalityId: string): Prisma.StudentWhereInput {
  *
  * Termo vazio devolve `{}`, nao um OR com string vazia: `contains: ''` casa
  * com tudo, mas o `OR` acrescenta trabalho ao planejador sem filtrar nada.
+ *
+ * O braco de telefone só entra com 8+ digitos normalizados (refs #351): um
+ * nome ou UUID pode ter 1-3 digitos soltos no meio, e `contains` de uma
+ * sequencia curta casa qualquer telefone que a contenha por acaso -- a busca
+ * por nome devolveria aluno nenhum a ver com o termo.
  */
+const DIGITOS_MINIMOS_PARA_BUSCAR_COMO_TELEFONE = 8;
+
 function condicoesDaListagem(termoBruto?: string): Prisma.StudentWhereInput {
   const termo = termoBruto?.trim();
 
   if (!termo) return {};
 
+  const digitos = normalizarTelefone(termo);
+  const pareceTelefone = digitos.length >= DIGITOS_MINIMOS_PARA_BUSCAR_COMO_TELEFONE;
+
   return {
     OR: [
       { fullName: { contains: termo, mode: 'insensitive' } },
       { membershipNumber: termo },
-      { contacts: { some: { value: { contains: normalizarTelefone(termo) || termo } } } },
+      ...(pareceTelefone
+        ? [{ contacts: { some: { value: { contains: digitos } } } } satisfies Prisma.StudentWhereInput]
+        : []),
     ],
   };
 }

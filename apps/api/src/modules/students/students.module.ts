@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { IamModule } from '../iam/iam.module.js';
 import { TenancyModule } from '../tenancy/tenancy.module.js';
+import { StudentPhotoService } from './student-photo.service.js';
 import { StudentRepository } from './student.repository.js';
 import { StudentsController } from './students.controller.js';
 
@@ -15,7 +16,7 @@ import { StudentsController } from './students.controller.js';
   // `TenantMembership`.
   imports: [TenancyModule, IamModule],
   controllers: [StudentsController],
-  providers: [StudentRepository, TenantContextService],
+  providers: [StudentRepository, TenantContextService, StudentPhotoService],
   // Exportado porque `membership` precisa consultar o aluno -- por provider
   // publico, nunca lendo a tabela do outro modulo (regra de arquitetura 9).
   exports: [StudentRepository],

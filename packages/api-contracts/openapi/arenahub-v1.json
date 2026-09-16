@@ -763,6 +763,70 @@
         ]
       }
     },
+    "/api/v1/students/{id}/photo": {
+      "put": {
+        "operationId": "StudentsController_substituirFoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "temFoto": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Students"
+        ]
+      },
+      "get": {
+        "operationId": "StudentsController_foto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": [
+          "Students"
+        ]
+      }
+    },
     "/api/v1/invoices": {
       "post": {
         "operationId": "BillingController_abrirInvoice",
