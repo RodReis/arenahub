@@ -114,6 +114,7 @@ packages/database/prisma/import/*.json
 .claude/hooks/
 .codex/
 .war-room-runtime/
+Claude outputs/
 
 # Worktrees do Claude Code — arvore de trabalho isolada, nunca conteudo do repo.
 .claude/worktrees/
