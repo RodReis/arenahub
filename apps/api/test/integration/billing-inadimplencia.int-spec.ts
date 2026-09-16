@@ -217,6 +217,12 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
     });
     expect(direito?.status).toBe('SUSPENDED');
     expect(direito?.suspendedAt).not.toBeNull();
+
+    /** F73 §4.2: a transicao OPEN->OVERDUE publica InvoiceOverdue. */
+    const eventos = await db.outboxEvent.findMany({
+      where: { tenantId: contexto.tenantId, eventType: 'InvoiceOverdue', aggregateId: invoiceId },
+    });
+    expect(eventos).toHaveLength(1);
   });
 
   it('rodar o job DE NOVO nao muda nada -- idempotente (M2-FR-013)', async () => {
@@ -231,6 +237,12 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
       assinaturasEmAtraso: 0,
       direitosSuspensos: 0,
     });
+
+    /** Nao reemite InvoiceOverdue: a invoice ja era OVERDUE, nao transicionou. */
+    const eventos = await db.outboxEvent.findMany({
+      where: { tenantId: contexto.tenantId, eventType: 'InvoiceOverdue', aggregateId: invoiceId },
+    });
+    expect(eventos).toHaveLength(1);
 
     const direito = await db.entitlement.findUnique({
       where: { id: entitlementId },

@@ -45,10 +45,14 @@ export interface ResultadoDaInadimplencia {
 /** Invoice candidata, com o que a politica precisa para decidir. */
 interface Candidata {
   readonly id: string;
+  readonly tenantId: string;
   readonly subscriptionId: string;
   readonly dueAt: Date;
   readonly blockAt: Date | null;
   readonly fusoDaUnidade: string;
+  /** OPEN vira OVERDUE nesta passada; OVERDUE ja tinha virado num ciclo
+   * anterior. So a transicao OPEN->OVERDUE publica `InvoiceOverdue`. */
+  readonly status: 'OPEN' | 'OVERDUE';
 }
 
 @Injectable()
@@ -122,6 +126,7 @@ export class AplicarInadimplenciaUseCase {
           subscriptionId: true,
           dueAt: true,
           blockAt: true,
+          status: true,
           student: { select: { gymUnit: { select: { timezone: true } } } },
         },
       }),
@@ -129,9 +134,11 @@ export class AplicarInadimplenciaUseCase {
 
     return invoices.map((invoice) => ({
       id: invoice.id,
+      tenantId,
       subscriptionId: invoice.subscriptionId,
       dueAt: invoice.dueAt,
       blockAt: invoice.blockAt,
+      status: invoice.status as 'OPEN' | 'OVERDUE',
       /**
        * Fuso da UNIDADE DO ALUNO, sem fallback (ADR-019 3). `gym_unit_id` e
        * obrigatorio em `students` desde a F45, entao o encadeamento nao pode
@@ -210,6 +217,24 @@ export class AplicarInadimplenciaUseCase {
       where: { id: { in: ids }, tenantId, status: 'OPEN' },
       data: { status: 'OVERDUE', version: { increment: 1 } },
     });
+
+    /**
+     * `InvoiceOverdue` -- F73 §4.2. So para quem TRANSICIONOU agora (estava
+     * `OPEN` nesta leitura): reexecutar o job nao pode reemitir o aviso para
+     * quem ja virou `OVERDUE` num ciclo anterior, senao o aluno recebe o
+     * mesmo aviso todo dia enquanto a divida persistir.
+     */
+    for (const invoice of invoices.filter((item) => item.status === 'OPEN')) {
+      await tx.outboxEvent.create({
+        data: {
+          tenantId: invoice.tenantId,
+          eventType: 'InvoiceOverdue',
+          aggregateType: 'Invoice',
+          aggregateId: invoice.id,
+          payload: {},
+        },
+      });
+    }
 
     /**
      * RELE DENTRO DA TRANSACAO quais invoices continuam devendo.
