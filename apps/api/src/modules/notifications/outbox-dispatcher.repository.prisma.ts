@@ -3,10 +3,6 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import type { EventoPendente, PortaDeDispatch } from './outbox-dispatcher.repository.js';
 
-/** Teto de idade do outbox considerado -- protege contra full scan de
- * eventos antigos que todo consumidor ja processou ha muito tempo. */
-const JANELA_EM_DIAS = 7;
-
 /**
  * `OutboxEvent`/`InboxReceipt` NAO tem politica RLS (so `Student` e
  * `AuditLog` tem, ver `MODELOS_COM_RLS`) -- `this.db` direto e correto
@@ -19,10 +15,22 @@ export class OutboxDispatcherRepository implements PortaDeDispatch {
   constructor(private readonly db: PrismaService) {}
 
   async eventosPendentes(limite: number): Promise<readonly EventoPendente[]> {
-    const desde = new Date(Date.now() - JANELA_EM_DIAS * 24 * 60 * 60 * 1000);
-
+    /*
+     * `publishedAt IS NULL` -- SEM ISSO O CICLO NUNCA PROGRIDE. Um evento
+     * marcado como publicado ja teve todos os consumidores REGISTRADOS
+     * tentando-o (ver `marcarPublicado`); reincluir esses eventos a cada
+     * ciclo faria os `TETO_POR_CICLO` mais antigos represar o despachante
+     * para sempre sob acumulo -- achado real no teste de integracao F73
+     * contra banco compartilhado com outbox historico de outras suites.
+     *
+     * Trade-off aceito: um consumidor NOVO, registrado depois que um
+     * evento ja foi `publishedAt`, nao vera esse evento antigo. Aceitavel
+     * porque a idempotencia de negocio (InboxReceipt) e por consumidor, e
+     * o caso de "consumidor novo precisa reprocessar historico" e raro e
+     * pode ser feito por script pontual, nao pelo ciclo normal.
+     */
     const eventos = await this.db.outboxEvent.findMany({
-      where: { occurredAt: { gte: desde } },
+      where: { publishedAt: null },
       orderBy: { occurredAt: 'asc' },
       take: limite,
     });

@@ -64,20 +64,18 @@ arquitetura 4 — é o que torna reprocessar seguro, não uma esperança de
 exactly-once do cron. Dois ciclos concorrentes tentando o mesmo evento: o
 segundo bate no unique constraint e pula, sem duplicar aviso nem XP.
 
-`publishedAt` no evento é housekeeping (para a query "o que falta processar"
-não crescer sem limite) — a idempotência de verdade é do `InboxReceipt`, por
-consumidor. Um consumidor novo, adicionado depois, processa eventos antigos
-já `publishedAt` normalmente — a query de pendências do despachante é sobre
-`OutboxEvent`, mas cada consumidor decide o que já viu pelo próprio
-`InboxReceipt`.
+`eventosPendentes` filtra por `publishedAt IS NULL` de fato — **sem esse
+filtro o ciclo nunca progride**: achado real no teste de integração fim a
+fim (banco de teste compartilhado, outbox represado por outras suítes) —
+sem o filtro, os `TETO_POR_CICLO` eventos mais antigos represam o
+despachante para sempre, e eventos novos nunca são alcançados. A
+idempotência de negócio (não duplicar aviso/XP) é do `InboxReceipt`, por
+consumidor; `publishedAt IS NULL` só decide o que ainda falta processar por
+QUALQUER consumidor registrado.
 
-**Correção sobre a redação acima**, para não haver dubiedade na implementação:
-o despachante nunca filtra por `publishedAt` ao decidir o que entregar a um
-consumidor — ele **sempre** varre os eventos dos tipos que aquele consumidor
-trata, dentro de uma janela (ex.: `occurredAt` dos últimos N dias, teto de
-segurança) e deixa o `InboxReceipt` decidir o que é novo. `publishedAt`
-marca "todo consumidor registrado no momento do evento já tentou", só para
-relatório/observabilidade — nunca é o que impede reprocessamento.
+**Trade-off aceito**: um consumidor novo, registrado depois que um evento
+já foi marcado `publishedAt`, não o verá — reprocessar histórico para um
+consumidor novo é script pontual, não o ciclo normal.
 
 ### 2.3 Registro de consumidores
 
