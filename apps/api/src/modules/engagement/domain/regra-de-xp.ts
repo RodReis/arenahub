@@ -10,8 +10,14 @@
  * PURA: sem banco, sem relogio. O instante do fato entra por parametro.
  */
 
-/** Os gatilhos que o catalogo aceita. Allowlist, nao validacao. */
-export type GatilhoDeXp = 'SESSAO_CONFIRMADA';
+/**
+ * Os gatilhos que o catalogo aceita. Allowlist, nao validacao.
+ *
+ * `AVALIACAO_PUBLICADA`/`META_ATINGIDA` -- F73, MVP-05 §12 (+20/+100) --
+ * fecham o buraco achado na auditoria de 15/09/2026 (issue #343): os dois
+ * eram DECLARADOS consumidos pelo MVP-05 e nunca produzidos.
+ */
+export type GatilhoDeXp = 'SESSAO_CONFIRMADA' | 'AVALIACAO_PUBLICADA' | 'META_ATINGIDA';
 
 export interface VersaoDeRegra {
   id: string;

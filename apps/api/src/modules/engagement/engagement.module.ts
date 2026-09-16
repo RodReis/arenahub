@@ -70,6 +70,11 @@ import { EngagementChallengesService } from './engagement-challenges.service.js'
     // O KioskModule consome os desafios como caso de uso publico (regra de
     // arquitetura 9) -- nunca lendo `Challenge`/`ChallengeParticipant` direto.
     EngagementChallengesService,
+    // `NotificationsModule` (F73) injeta a PORTA diretamente -- o consumidor
+    // de XP credita a partir de evento de outbox, sem passar pelo caso de
+    // uso `sincronizarXp` (que e orientado a sessao de treino, nao a evento
+    // avulso).
+    PORTA_DE_XP,
   ],
 })
 export class EngagementModule {}

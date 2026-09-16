@@ -4706,6 +4706,10 @@ enum XpTrigger {
   /// catalogo v1. Enum e nao string livre: e o que impede regra nova de
   /// chegar como expressao executavel (`M5-RULES-01`, item 4).
   SESSAO_CONFIRMADA
+  /// F73 -- avaliacao fisica publicada (`AssessmentPublished`). MVP-05 §12: +20.
+  AVALIACAO_PUBLICADA
+  /// F73 -- meta de saude atingida (`HealthGoalReached`). MVP-05 §12: +100.
+  META_ATINGIDA
 
   @@map("xp_trigger")
 }
@@ -4762,6 +4766,10 @@ enum XpSourceKind {
   /// Ajuste manual do operador. `sourceId` e a chave de idempotencia que o
   /// painel envia.
   MANUAL_ADJUSTMENT
+  /// F73 -- `OutboxEvent.aggregateId` de `AssessmentPublished`.
+  ASSESSMENT
+  /// F73 -- `OutboxEvent.aggregateId` de `HealthGoalReached`.
+  HEALTH_GOAL
 
   @@map("xp_source_kind")
 }

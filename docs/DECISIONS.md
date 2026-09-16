@@ -87,6 +87,7 @@ existe para expulsar deste repositório.
 | [055](#adr-055) | O contrato do tenant é licença de uso, com termos versionados e assinatura fora do sistema | `aceito` | — |
 | [056](#adr-056) | Consentimento self-service no app e exportação de saúde assíncrona | `aceito` | — |
 | [057](#adr-057) | Primeiro acesso self-service por CPF + data de nascimento | `aceito` | — |
+| [058](#adr-058) | Despachante de outbox como fatia própria; os nove eventos da §70 entram todos na v1 | `aceito` | — **cria F73** |
 
 ---
 
@@ -4382,3 +4383,49 @@ solicitou reabre a Decisão 2 — throttling e/ou segundo fator deixam de ser op
 - `docs/CONVENTION.md` INV-012 ganha nota de exceção apontando para este ADR, igual ao padrão já
   usado para ADR-045/`M4-BR-004`.
 - Fatia: **F71** (`SPEC-071`), issue #333 — ver `docs/STATUS.md` §5 (Índice Fatia ↔ SPEC).
+
+---
+
+## ADR-058 — Despachante de outbox como fatia própria; os nove eventos de notificação da §70 entram todos na primeira versão
+
+**Data:** 16/09/2026
+**Status:** aceito *(decisão nova — decidida e aprovada pelo PI em 16/09/2026)*
+**Decisor:** Rodrigo Reis (PI)
+**Fatia:** F73 (`SPEC-073`), issue [#343](https://github.com/RodReis/arenahub/issues/343)
+
+**Contexto:** a auditoria de cobertura de 15/09/2026 achou que os nove eventos de notificação da
+Especificação §70 (pagamento próximo, pagamento vencido, pagamento aprovado, plano renovado, plano
+vencendo, meta atingida, nova avaliação, ranking atualizado, aluno ausente) não têm produtor —
+busca literal por três termos diferentes, zero ocorrências fora da Especificação. A inbox do app
+(`GET /mobile/avisos`, F29) nasce vazia por construção: nada escreve nela. O mesmo buraco atinge
+duas coisas já entregues: `AssessmentPublished` e `HealthGoalReached` são declaradas **consumidas**
+pelo `MVP-05` §12 (XP de avaliação +20, XP de meta +100) e **nunca produzidas** — o XP dessas duas
+fontes nunca é creditado. E "notificações internas de eventos financeiros" está no **Incluído** do
+`MVP-02` §6, dado por entregue sem nota sobre a lacuna. A peça que destravaria os três casos é o
+despachante de outbox, cortado no ADR-047 decisão 8 sem destino.
+
+**Por que é ADR:** cria infraestrutura compartilhada nova (despachante de outbox) que três
+consumidores diferentes (XP, inbox de avisos, analytics §119) vão depender — decisão cara de
+desfazer se cada produtor tivesse publicado direto e precisasse ser desmontado depois. E fecha uma
+decisão de escopo de produto (quais dos nove eventos entram na v1) que o card `[INFRA]` #343
+marcou explicitamente como bloqueante.
+
+### Decisões
+
+| # | decisão | por quê |
+|---|---|---|
+| 1 | **Os nove eventos da §70 entram todos na primeira versão**, não só os três de pagamento | decisão do PI — escopo completo de uma vez, em vez de fatiar por evento |
+| 2 | **Despachante de outbox é fatia própria** (F73), não publicação direta por cada produtor | é pré-requisito de três consumidores (XP do MVP-05 §12, inbox §70, analytics §119); construir uma vez e os produtores plugam depois evita retrabalho quando os três casos vierem em sequência |
+| 3 | **Canal é só in-app (inbox `GET /mobile/avisos` da F29) nesta fatia** — sem WhatsApp/e-mail | preenche a inbox que já existe e nasce vazia; canal externo fica para card separado, não bloqueia esta entrega |
+
+### Consequências
+
+- Nova fatia **F73** (`SPEC-073`) para o despachante de outbox: lê a tabela de outbox (transactional
+  outbox já é regra de arquitetura, item 5 do `CLAUDE.md`) e publica nos três consumidores.
+- `AssessmentPublished` e `HealthGoalReached` (já existentes) passam a ter produtor real assim que
+  a F73 estiver de pé — o XP do MVP-05 §12 deixa de estar quebrado.
+- Os nove eventos da §70 precisam de produtor cada um; a ordem de implementação entre eles fica a
+  critério do Code (não é decisão de produto).
+- Canal externo (WhatsApp/e-mail) fica fora de escopo — abre card `[INFRA]` ou spec própria quando
+  o PI pedir.
+- Fatia: **F73** (`SPEC-073`), issue #343 — ver `docs/STATUS.md` §5 (Índice Fatia ↔ SPEC).
