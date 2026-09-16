@@ -6148,6 +6148,214 @@
         ]
       }
     },
+    "/api/v1/students/{id}/vitals": {
+      "get": {
+        "operationId": "VitalController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "studentId": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      },
+                      "secondaryValue": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "unit": {
+                        "type": "string"
+                      },
+                      "measuredAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "recordedByUserId": {
+                        "type": "string"
+                      },
+                      "deviceReport": {
+                        "type": "object",
+                        "nullable": true
+                      },
+                      "deviceModel": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Vital"
+        ]
+      },
+      "post": {
+        "operationId": "VitalController_registrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "studentId": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    },
+                    "secondaryValue": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "measuredAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "recordedByUserId": {
+                      "type": "string"
+                    },
+                    "deviceReport": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "deviceModel": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Vital"
+        ]
+      }
+    },
+    "/api/v1/students/{id}/vitals/import": {
+      "post": {
+        "operationId": "VitalController_importarDePdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "studentId": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    },
+                    "secondaryValue": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "measuredAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "recordedByUserId": {
+                      "type": "string"
+                    },
+                    "deviceReport": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "deviceModel": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Vital"
+        ]
+      }
+    },
     "/api/v1/mobile/auth/activate": {
       "post": {
         "operationId": "StudentAuthController_ativar",
