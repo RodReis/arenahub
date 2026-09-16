@@ -226,6 +226,17 @@ export class AssessmentRepository {
         throw new AvaliacaoImutavelError('avaliacao ja publicada');
       }
 
+      /** F73 §4.1: credita XP do aluno (MVP-05 §12: +20) e avisa a inbox. */
+      await tx.outboxEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          eventType: 'AssessmentPublished',
+          aggregateType: 'BodyAssessment',
+          aggregateId: assessmentId,
+          payload: {},
+        },
+      });
+
       return this.exigirComMedidas(tx, contexto, assessmentId);
     });
   }

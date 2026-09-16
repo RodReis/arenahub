@@ -6,6 +6,7 @@ import { concederPorEvento } from '../engagement/domain/movimento-de-xp.js';
 import { resolverRegraVigente, type GatilhoDeXp } from '../engagement/domain/regra-de-xp.js';
 import type { OrigemDeMovimento } from '../engagement/domain/movimento-de-xp.js';
 import type { EventoDeOutbox } from './domain/mapa-de-avisos.js';
+import { PORTA_DE_AVISOS, type PortaDeAvisos } from './notifications-inbox.repository.js';
 import type { ConsumidorDeEvento } from './outbox-dispatcher.service.js';
 
 /** Sem usuario de painel agindo -- quem "age" e o proprio despachante.
@@ -15,9 +16,10 @@ const SEM_USUARIO = null as unknown as string;
 interface MapaDeGatilho {
   gatilho: GatilhoDeXp;
   sourceKind: OrigemDeMovimento;
-  /** De onde tirar o `studentId`: do proprio `aggregateId`, ou de um campo
-   * do `payload` quando o agregado e outra entidade (ex.: Assessment). */
-  studentId(evento: EventoDeOutbox): string | null;
+  /** Como achar quem e o aluno -- `null` quando o agregado JA E o aluno
+   * (`Student`, caso de `HealthGoalReached`); senao o `aggregateType` que
+   * `PortaDeAvisos.resolverStudentId` sabe resolver (`BodyAssessment`). */
+  aggregateTypeDoAluno: string | null;
   sourceId(evento: EventoDeOutbox): string;
 }
 
@@ -25,13 +27,13 @@ const MAPA: Record<string, MapaDeGatilho> = {
   HealthGoalReached: {
     gatilho: 'META_ATINGIDA',
     sourceKind: 'HEALTH_GOAL',
-    studentId: (evento) => evento.aggregateId,
+    aggregateTypeDoAluno: null,
     sourceId: (evento) => String(evento.payload['goalId'] ?? evento.aggregateId),
   },
   AssessmentPublished: {
     gatilho: 'AVALIACAO_PUBLICADA',
     sourceKind: 'ASSESSMENT',
-    studentId: (evento) => (typeof evento.payload['studentId'] === 'string' ? evento.payload['studentId'] : null),
+    aggregateTypeDoAluno: 'BodyAssessment',
     sourceId: (evento) => evento.aggregateId,
   },
 };
@@ -56,6 +58,7 @@ export class EngagementXpConsumer implements ConsumidorDeEvento {
 
   constructor(
     @Inject(PORTA_DE_XP) private readonly porta: PortaDeXp,
+    @Inject(PORTA_DE_AVISOS) private readonly portaDeAvisos: PortaDeAvisos,
     private readonly agora: () => Date,
   ) {}
 
@@ -67,7 +70,11 @@ export class EngagementXpConsumer implements ConsumidorDeEvento {
     const mapa = MAPA[evento.eventType];
     if (mapa === undefined) return;
 
-    const studentId = mapa.studentId(evento);
+    const studentId =
+      mapa.aggregateTypeDoAluno === null
+        ? evento.aggregateId
+        : await this.portaDeAvisos.resolverStudentId(mapa.aggregateTypeDoAluno, evento.aggregateId);
+
     if (studentId === null) {
       this.log.warn(
         `evento ${evento.eventType} (${evento.id}) sem studentId resolvivel -- XP nao creditado`,

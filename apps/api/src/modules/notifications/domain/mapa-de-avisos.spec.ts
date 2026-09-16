@@ -99,7 +99,7 @@ describe('avisoParaEvento', () => {
 
   it('mapeia AssessmentPublished para aviso ASSESSMENT com ação OPEN_HEALTH', () => {
     const aviso = avisoParaEvento(
-      { eventType: 'AssessmentPublished', aggregateType: 'Assessment', aggregateId: 'assessment-1', payload: {} },
+      { eventType: 'AssessmentPublished', aggregateType: 'BodyAssessment', aggregateId: 'assessment-1', payload: {} },
       new Date('2026-09-16T12:00:00Z'),
     );
 
