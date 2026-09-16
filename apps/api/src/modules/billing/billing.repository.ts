@@ -444,6 +444,19 @@ export class BillingRepository {
       },
     });
   }
+
+  /** Mesma query de `OperationsRepository.listarTenantsAtivos` (F11) --
+   * duplicada aqui, e nao importada do modulo de operations, para nao
+   * acoplar dois modulos sem relacao de dominio por uma consulta de uma
+   * linha. */
+  async listarTenantsAtivos(): Promise<string[]> {
+    const tenants = await this.db.tenant.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true },
+    });
+
+    return tenants.map((t) => t.id);
+  }
 }
 
 export type InvoiceComItens = Prisma.InvoiceGetPayload<{

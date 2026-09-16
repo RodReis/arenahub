@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from '@jest/glob
 
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { ConsultarResumoFinanceiroUseCase } from '../../src/modules/billing/consultar-resumo-financeiro.use-case.js';
+import { ExpirarAssinaturasVencidasUseCase } from '../../src/modules/billing/expirar-assinaturas-vencidas.use-case.js';
 import { JanelaDoResumoInvalidaError } from '../../src/modules/billing/domain/resumo-financeiro.js';
 import { AppModule } from '../../src/app.module.js';
 import { Test } from '@nestjs/testing';
@@ -437,6 +438,58 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
     const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
 
     expect(resumo.receitaEsperadaMinor).toBe(15_000);
+  });
+
+  /**
+   * LACUNA ACHADA APOS O FIX ORIGINAL DA ISSUE #272 (PR #273).
+   *
+   * O fix garantiu UMA assinatura vigente por aluno, mas nada expira uma
+   * assinatura `ACTIVE` cujo `endsAt` ja passou -- ela continua contando na
+   * receita esperada indefinidamente. Este teste prova o ANTES (a assinatura
+   * vencida ainda infla o numero, porque nada rodou `ExpirarAssinaturasVencidasUseCase`)
+   * e o DEPOIS (rodar o use case a remove do calculo) no mesmo teste, para
+   * que a asserção alcance de fato a lacuna -- e não passe pelo motivo errado.
+   */
+  it('assinatura ACTIVE com endsAt vencido so sai da receita esperada apos o job de expiracao', async () => {
+    const s = await semearTenant({ precoMinor: 15_000 });
+
+    await db.subscription.update({
+      where: { id: s.subscriptionId },
+      data: { endsAt: new Date('2026-08-01T00:00:00.000Z') },
+    });
+
+    const antes = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+    expect(antes.receitaEsperadaMinor).toBe(15_000);
+    expect(antes.base.alunosPagantes).toBe(1);
+
+    const expirar = new ExpirarAssinaturasVencidasUseCase(db);
+    const resultado = await expirar.executar(s.contexto.tenantId, AGORA);
+    expect(resultado.expiradas).toBe(1);
+
+    const depois = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+    expect(depois.receitaEsperadaMinor).toBe(0);
+    expect(depois.base.alunosPagantes).toBe(0);
+  });
+
+  /**
+   * REEXECUTAR NAO MUDA O RESULTADO -- `M2-FR-013`, mesmo padrao do job de
+   * inadimplencia: o `where` filtra pelo estado de ORIGEM, entao a segunda
+   * passada nao encontra nada para expirar.
+   */
+  it('rodar o job de expiracao duas vezes produz o mesmo resultado', async () => {
+    const s = await semearTenant({ precoMinor: 15_000 });
+
+    await db.subscription.update({
+      where: { id: s.subscriptionId },
+      data: { endsAt: new Date('2026-08-01T00:00:00.000Z') },
+    });
+
+    const expirar = new ExpirarAssinaturasVencidasUseCase(db);
+    const primeira = await expirar.executar(s.contexto.tenantId, AGORA);
+    const segunda = await expirar.executar(s.contexto.tenantId, AGORA);
+
+    expect(primeira.expiradas).toBe(1);
+    expect(segunda.expiradas).toBe(0);
   });
 
   /**
