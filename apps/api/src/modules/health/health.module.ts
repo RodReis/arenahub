@@ -16,6 +16,9 @@ import { BodyEvolutionService } from './body-evolution.service.js';
 import { ImportController } from './import.controller.js';
 import { ImportRepository } from './import.repository.js';
 import { ImportService } from './import.service.js';
+import { VitalController } from './vital.controller.js';
+import { VitalRepository } from './vital.repository.js';
+import { SinalVitalExtractor } from './provider/sinal-vital.extractor.js';
 import { escolherOcrReal, escolherProvedorDeIa } from './provider/anthropic-gate.js';
 import { ANTHROPIC_OCR_EXTRACTOR } from './provider/anthropic-ocr-extractor.token.js';
 import { CsvDocumentExtractorAdapter } from './provider/csv-document-extractor.adapter.js';
@@ -63,6 +66,7 @@ const ANTHROPIC_CLIENT = Symbol('ANTHROPIC_CLIENT');
     BodyEvolutionController,
     AiAnalysisController,
     ImportController,
+    VitalController,
   ],
   providers: [
     AssessmentRepository,
@@ -73,6 +77,8 @@ const ANTHROPIC_CLIENT = Symbol('ANTHROPIC_CLIENT');
     AiAnalysisService,
     ImportRepository,
     ImportService,
+    VitalRepository,
+    SinalVitalExtractor,
     // O parser de CSV e PRODUCAO -- deterministico, sem terceiro. CSV e PDF
     // (laudo de bioimpedancia e ECG) tem extrator real (`LaudoBioimpedanciaExtractor`);
     // imagem (PNG/JPEG) vai para o OCR real da Anthropic quando ha chave

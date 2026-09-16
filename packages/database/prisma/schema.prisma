@@ -594,12 +594,12 @@ model Tenant {
   /// Qualificacao da CONTRATANTE no contrato (F70, ADR-055). Divida antiga
   /// (Especificacao §9 ja previa endereco e telefone), paga agora porque o
   /// contrato passa a exigi-los para ativar.
-  addressLine    String? @map("address_line")
-  addressCity    String? @map("address_city")
-  addressState   String? @map("address_state")
-  addressZip     String? @map("address_zip")
-  phone          String?
-  responsavelCpf String? @map("responsavel_cpf")
+  addressLine      String? @map("address_line")
+  addressCity      String? @map("address_city")
+  addressState     String? @map("address_state")
+  addressZip       String? @map("address_zip")
+  phone            String?
+  responsavelCpf   String? @map("responsavel_cpf")
 
   /// Identidade visual da academia (F62, ADR-052 §9).
   ///
@@ -719,6 +719,7 @@ model Tenant {
   bodyAssessments      BodyAssessment[]
   bodyMeasurements     BodyMeasurement[]
   studentHealthContext StudentHealthContext[]
+  healthMeasurements   HealthMeasurement[]
   healthGoals          HealthGoal[]
   attendanceSessions   StudentAttendanceSession[]
   aiAnalyses           AiAnalysis[]
@@ -727,22 +728,22 @@ model Tenant {
 
   publicProfiles PublicProfile[]
 
-  xpRuleVersions                   XpRuleVersion[]
-  xpLedgerEntries                  XpLedgerEntry[]
-  xpBalances                       StudentXpBalance[]
-  achievementDefinitions           AchievementDefinitionVersion[]
-  achievements                     StudentAchievement[]
-  rankingSnapshots                 RankingSnapshot[]
-  challengeTemplates               ChallengeTemplateVersion[]
-  challenges                       Challenge[]
-  challengeParticipants            ChallengeParticipant[]
-  challengeNotices                 ChallengeNotice[]
-  engagementDisputes               EngagementDispute[]
+  xpRuleVersions         XpRuleVersion[]
+  xpLedgerEntries        XpLedgerEntry[]
+  xpBalances             StudentXpBalance[]
+  achievementDefinitions AchievementDefinitionVersion[]
+  achievements           StudentAchievement[]
+  rankingSnapshots       RankingSnapshot[]
+  challengeTemplates     ChallengeTemplateVersion[]
+  challenges             Challenge[]
+  challengeParticipants  ChallengeParticipant[]
+  challengeNotices       ChallengeNotice[]
+  engagementDisputes     EngagementDispute[]
 
   /// F23 -- identidade do aluno no aplicativo.
-  studentAccounts                  StudentAccount[]
-  studentAccountTokens             StudentAccountToken[]
-  studentSessions                  StudentSession[]
+  studentAccounts      StudentAccount[]
+  studentAccountTokens StudentAccountToken[]
+  studentSessions      StudentSession[]
 
   /// F29 -- avisos ao aluno e entrega por push.
   studentNotifications             StudentNotification[]
@@ -994,20 +995,21 @@ model User {
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")
 
-  memberships           TenantMembership[]
-  userRoles             UserRole[]
-  sessions              Session[]
-  auditLogs             AuditLog[]
+  memberships                TenantMembership[]
+  userRoles                  UserRole[]
+  sessions                   Session[]
+  auditLogs                  AuditLog[]
   /// Alunos de quem este usuario e consultor responsavel.
-  advisedStudents       Student[]              @relation("StudentAdvisor")
-  evaluatedAssessments  BodyAssessment[]       @relation("AssessmentEvaluator")
-  recordedHealthContext StudentHealthContext[] @relation("HealthContextRecorder")
-  authoredHealthGoals   HealthGoal[]           @relation("HealthGoalAuthor")
-  requestedAiAnalyses   AiAnalysis[]           @relation("AiAnalysisRequester")
-  uploadedImports       AssessmentImport[]     @relation("ImportUploader")
-  reviewedImports       AssessmentImport[]     @relation("ImportReviewer")
-  moderatedProfiles     PublicProfile[]
-  resolvedDisputes      EngagementDispute[]
+  advisedStudents            Student[]              @relation("StudentAdvisor")
+  evaluatedAssessments       BodyAssessment[]       @relation("AssessmentEvaluator")
+  recordedHealthContext      StudentHealthContext[] @relation("HealthContextRecorder")
+  recordedHealthMeasurements HealthMeasurement[]    @relation("HealthMeasurementRecorder")
+  authoredHealthGoals        HealthGoal[]           @relation("HealthGoalAuthor")
+  requestedAiAnalyses        AiAnalysis[]           @relation("AiAnalysisRequester")
+  uploadedImports            AssessmentImport[]     @relation("ImportUploader")
+  reviewedImports            AssessmentImport[]     @relation("ImportReviewer")
+  moderatedProfiles          PublicProfile[]
+  resolvedDisputes           EngagementDispute[]
 
   platformAdmin         PlatformAdmin?     @relation("PlatformAdminUser")
   platformAdminsGranted PlatformAdmin[]    @relation("PlatformAdminGrantedBy")
@@ -1431,6 +1433,7 @@ model Student {
   retentionExperimentAdverseEvents RetentionExperimentAdverseEvent[]
   notifications                    StudentNotification[]
   pushSubscriptions                PushSubscription[]
+  healthMeasurements               HealthMeasurement[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -3875,6 +3878,23 @@ enum MeasurementSource {
   @@map("measurement_source")
 }
 
+/// Tipo de sinal vital. Espelha `TipoDeSinalVital` do dominio.
+///
+/// Lista fechada, igual `BodyMeasurementType` e pelo mesmo motivo: tipo
+/// livre viraria taxonomia paralela por academia.
+///
+/// NAO inclui `HEART_RATE` de novo -- esse ja existe em `BodyMeasurementType`
+/// (ADR-038), preso ao ciclo de `BodyAssessment`. `RESTING_HEART_RATE` aqui e
+/// conceito DIFERENTE: FC de repouso avulsa, sem avaliacao fisica completa
+/// por tras (decisao do PI, card #345).
+enum HealthMeasurementType {
+  BLOOD_PRESSURE
+  OXYGEN_SATURATION
+  RESTING_HEART_RATE
+
+  @@map("health_measurement_type")
+}
+
 /// Fator individual que muda como o laudo deve ser lido (ADR-037).
 ///
 /// LISTA FECHADA, sem campo de texto livre: fator individual e dado de saude
@@ -4117,6 +4137,71 @@ model StudentHealthContext {
   /// a corrida por construcao (mesma classe do bug da F14).
   @@index([tenantId, studentId, factor])
   @@map("student_health_context")
+}
+
+/// Sinal vital avulso do aluno (pressao, saturacao, FC de repouso) --
+/// CONVENTION.md secao 4, Especificacao secao 53. Card de decisao #345.
+///
+/// STANDALONE de proposito: NAO passa por `BodyAssessment`. Uma avaliacao
+/// fisica e um evento raro e completo (peso, composicao, medidas), enquanto
+/// pressao e saturacao sao aferidas soltas no balcao, a qualquer momento, sem
+/// abrir uma avaliacao inteira para isso -- exigir `BodyAssessment` para
+/// registrar uma pressao do dia obrigaria a recepcao a preencher uma
+/// avaliacao vazia soh para guardar um numero.
+///
+/// LINHA por medida, nunca coluna por tipo -- mesma razao de
+/// `BodyMeasurement`: tipo novo nao pede coluna nova.
+///
+/// Nao versiona nem corrige (sem draft/publish/correction como
+/// `BodyAssessment`): e uma leitura pontual do aparelho, nao um documento
+/// oficial que alguem edita depois. Medida errada gera OUTRO registro; a
+/// linha errada permanece, com o mesmo raciocinio de nunca apagar historico
+/// que ja circulou.
+model HealthMeasurement {
+  id        String                @id @default(uuid()) @db.Uuid
+  tenantId  String                @map("tenant_id") @db.Uuid
+  studentId String                @map("student_id") @db.Uuid
+  type      HealthMeasurementType
+
+  /// Valor numerico. `BLOOD_PRESSURE` guarda so a SISTOLICA aqui --
+  /// diastolica vai em `secondaryValue` (par inseparavel: pressao sem
+  /// diastolica e leitura incompleta, e criar duas linhas faria a listagem
+  /// por tipo contar "duas medidas" para UMA aferição).
+  value          Decimal  @map("value") @db.Decimal(10, 4)
+  /// Preenchido so quando `type = BLOOD_PRESSURE` (diastolica). `null` nos
+  /// demais tipos -- unario nao tem segundo numero.
+  secondaryValue Decimal? @map("secondary_value") @db.Decimal(10, 4)
+  unit           String   @map("unit")
+
+  /// Instante da MEDICAO, nao do registro. Mesma razao de `assessedAt` na
+  /// F17: aferição de ontem digitada hoje ordena por ontem.
+  measuredAt DateTime @map("measured_at")
+
+  source          MeasurementSource @default(MANUAL)
+  /// Quando `source = IMPORT`: id do arquivo/PDF que originou a leitura, para
+  /// a mesma auditoria que `BodyAssessment.sourceReference` ja da.
+  sourceReference String?           @map("source_reference")
+
+  /// Quem registrou (recepcao ou avaliador, no manual) ou quem confirmou o
+  /// upload do PDF. Fronteira do INV-101/regra de arquitetura no 8: todo
+  /// dado de saude tem dono humano, nunca "o sistema decidiu sozinho".
+  recordedByUserId String @map("recorded_by_user_id") @db.Uuid
+
+  /// Texto OPACO que o aparelho imprimiu (ex.: achado de ECG, tags,
+  /// observacoes do operador) -- guardado e citado, NUNCA interpretado
+  /// (ADR-035, regra de arquitetura no 8). `null` quando a origem e manual ou
+  /// o PDF nao traz nada alem do numero.
+  deviceReport Json?   @map("device_report")
+  deviceModel  String? @map("device_model")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation("HealthMeasurementRecorder", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, studentId, type, measuredAt])
+  @@map("health_measurements")
 }
 
 /// Meta de composicao corporal do aluno (`M3-FR-012`, F18).
@@ -6142,13 +6227,13 @@ model TenantContract {
   termsVersion String @default("2026.1") @map("terms_version")
 
   /// Situacao da assinatura -- F70. Nasce `PENDING`.
-  signatureStatus ContractSignatureStatus @default(PENDING) @map("signature_status")
+  signatureStatus         ContractSignatureStatus @default(PENDING) @map("signature_status")
   /// CHAVE DE OBJETO do PDF ASSINADO -- diferente de `documentObjectKey`
   /// (o PDF GERADO). Os dois convivem, nunca um sobrescreve o outro (§3.3 da
   /// spec): o gerado prova o que o sistema emitiu, o assinado prova o que as
   /// partes assinaram.
-  signedDocumentObjectKey String?   @map("signed_document_object_key")
-  signedAt                DateTime? @map("signed_at")
+  signedDocumentObjectKey String?                 @map("signed_document_object_key")
+  signedAt                DateTime?               @map("signed_at")
 
   /// Foro eleito -- e negociado por contrato, nunca constante do produto
   /// (SPEC-070 §3.3). Nulo ate o Super Admin preencher; a ativacao exige.
@@ -6307,12 +6392,12 @@ model PlatformInvoice {
 
 /// Conta de login do aluno.
 model StudentAccount {
-  id        String @id @default(uuid()) @db.Uuid
-  tenantId  String @map("tenant_id") @db.Uuid
-  studentId String @unique @map("student_id") @db.Uuid
+  id           String               @id @default(uuid()) @db.Uuid
+  tenantId     String               @map("tenant_id") @db.Uuid
+  studentId    String               @unique @map("student_id") @db.Uuid
   /// E-mail ou telefone com que o aluno entra. Unico DENTRO do tenant, nunca
   /// global -- ver o motivo 1 no cabecalho deste bloco.
-  identifier String
+  identifier   String
   /// Nulo enquanto a conta esta `PENDING`: o convite ja foi emitido, mas o
   /// aluno ainda nao escolheu a senha. Quem define a senha e ele, nunca a
   /// recepcao (`M4-AC-001`).
@@ -6380,24 +6465,24 @@ enum StudentAccountTokenStatus {
 /// de aluno e usuario de painel. Uma coluna nullable a mais deixaria as duas
 /// tabelas meio certas.
 model StudentSession {
-  id        String               @id @default(uuid()) @db.Uuid
-  tenantId  String               @map("tenant_id") @db.Uuid
-  accountId String               @map("account_id") @db.Uuid
-  tokenHash String               @unique @map("token_hash")
-  familyId  String               @map("family_id") @db.Uuid
-  status    StudentSessionStatus @default(ACTIVE)
+  id                String               @id @default(uuid()) @db.Uuid
+  tenantId          String               @map("tenant_id") @db.Uuid
+  accountId         String               @map("account_id") @db.Uuid
+  tokenHash         String               @unique @map("token_hash")
+  familyId          String               @map("family_id") @db.Uuid
+  status            StudentSessionStatus @default(ACTIVE)
   /// Rotulo do aparelho para a lista de sessoes fazer sentido ao aluno
   /// ("iPhone de Ana"). OPACO de proposito: nunca IMEI, nunca identificador
   /// de publicidade, nunca nada que rastreie o aparelho fora do app.
-  deviceLabel String? @map("device_label")
+  deviceLabel       String?              @map("device_label")
   /// Quando o aluno confirmou a senha de novo -- `M4-FR-005`. Acao sensivel
   /// exige que este instante seja recente.
-  reauthenticatedAt DateTime? @map("reauthenticated_at")
-  expiresAt         DateTime  @map("expires_at")
-  rotatedAt         DateTime? @map("rotated_at")
-  revokedAt         DateTime? @map("revoked_at")
-  revokedReason     String?   @map("revoked_reason")
-  createdAt         DateTime  @default(now()) @map("created_at")
+  reauthenticatedAt DateTime?            @map("reauthenticated_at")
+  expiresAt         DateTime             @map("expires_at")
+  rotatedAt         DateTime?            @map("rotated_at")
+  revokedAt         DateTime?            @map("revoked_at")
+  revokedReason     String?              @map("revoked_reason")
+  createdAt         DateTime             @default(now()) @map("created_at")
 
   tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   account StudentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
@@ -6513,7 +6598,7 @@ model PushSubscription {
   platform PushPlatform
 
   /// SHA-256 do token, em hex minusculo. Chave de idempotencia.
-  tokenHash String @map("token_hash")
+  tokenHash   String @map("token_hash")
   /// Token cifrado (AES-256-GCM), base64. Decifrado so em memoria, no
   /// instante anterior a chamada do provedor -- nunca logado, nunca serializado.
   tokenCipher String @map("token_cipher")
