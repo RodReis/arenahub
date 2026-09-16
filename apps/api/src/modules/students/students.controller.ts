@@ -3,14 +3,20 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   NotFoundException,
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiOkResponse } from '@nestjs/swagger';
 import type { Student } from '@arenahub/database';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
@@ -23,11 +29,24 @@ import { GymUnitRepository } from '../tenancy/gym-unit.repository.js';
 import { normalizarCep, ufEhValida } from './domain/endereco.js';
 import { cpfEhValido, formatarCpf } from './domain/identificacao.js';
 import { transicionarAluno } from './domain/student.js';
+import { TAMANHO_MAXIMO_DE_FOTO_BYTES } from './domain/foto-do-aluno.js';
+import { StudentPhotoService } from './student-photo.service.js';
 import {
   StudentRepository,
   type AlunoComDetalhes,
   type CandidatoADuplicata,
 } from './student.repository.js';
+
+/**
+ * O arquivo como o `FileInterceptor` o entrega -- mesma declaracao local do
+ * `contratos.controller.ts`, e pela mesma razao: `@types/multer` traria uma
+ * dependencia inteira para descrever tres campos.
+ */
+interface ArquivoRecebido {
+  readonly originalname: string;
+  readonly mimetype: string;
+  readonly buffer: Buffer;
+}
 
 /**
  * Data no formato `YYYY-MM-DD`, convertida para meia-noite UTC.
@@ -306,6 +325,8 @@ interface AlunoDto {
    * Vazia na ficha, que nao carrega credenciais -- so a lista as busca.
    */
   deviceIds: string[];
+  /** Tem foto cadastrada? (F72). Nunca a chave -- e detalhe interno de storage. */
+  temFoto: boolean;
   /**
    * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente -- F53
    * Task 12, aviso de vencimento derivado (SPEC-053 §3.4). `null` quando
@@ -365,6 +386,7 @@ export class StudentsController {
     private readonly modalidades: GymUnitModalityRepository,
     private readonly membros: MembershipRepository,
     private readonly contexto: TenantContextService,
+    private readonly fotos: StudentPhotoService,
   ) {}
 
   /**
@@ -649,6 +671,49 @@ export class StudentsController {
   }
 
   /**
+   * Substitui a foto do aluno na ficha -- F72 (issue #348).
+   *
+   * MESMA PERMISSAO de `editar`: nao existe um nivel de acesso so para foto,
+   * e criar um so para este campo seria antecipar necessidade que ninguem
+   * pediu.
+   */
+  @Put(':id/photo')
+  @RequirePermissions('student.update')
+  @ApiOkResponse({ schema: { type: 'object', properties: { temFoto: { type: 'boolean' } } } })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: TAMANHO_MAXIMO_DE_FOTO_BYTES } }))
+  async substituirFoto(
+    @Param('id') id: string,
+    @UploadedFile() arquivo: ArquivoRecebido | undefined,
+  ): Promise<{ temFoto: true }> {
+    if (!arquivo) {
+      throw new BadRequestException({ code: 'FILE_REQUIRED' });
+    }
+
+    await this.fotos.substituir(this.contexto.require(), id, {
+      contentType: arquivo.mimetype,
+      conteudo: arquivo.buffer,
+    });
+
+    return { temFoto: true };
+  }
+
+  /**
+   * Os bytes da foto do aluno -- rota PRIVADA, sob a mesma sessao de painel
+   * que ja le a ficha.
+   */
+  @Get(':id/photo')
+  @RequirePermissions('student.read')
+  @ApiOkResponse({ content: { 'image/*': { schema: { type: 'string', format: 'binary' } } } })
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async foto(@Param('id') id: string, @Res() resposta: Response): Promise<void> {
+    const arquivo = await this.fotos.lerArquivo(this.contexto.require(), id);
+
+    resposta.type(arquivo.contentType);
+    resposta.send(arquivo.body);
+  }
+
+  /**
    * A unidade existe NESTE tenant?
    *
    * Sem esta checagem o banco ainda recusaria a FK, mas com erro de
@@ -772,6 +837,7 @@ export class StudentsController {
       subscriptionStatus: null,
       phone: null,
       deviceIds: [],
+      temFoto: aluno.photoObjectKey !== null,
       // A ficha (`GET /students/:id`) busca o aviso de vencimento pela sua
       // PROPRIA rota (`/students/:id/invoices`, ja existente) -- estes dois
       // campos so a lista preenche, em `paraDtoDaLista`.
