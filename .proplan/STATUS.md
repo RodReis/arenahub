@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-15
+updated: 2026-09-16
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,7 +9,7 @@ updated: 2026-09-15
 
 ### Sem épico
 
-- [MVP1][INFRA] Decisão: foto do aluno — cortada em 18/08 para uma fatia que já tinha fechado dois dias antes (#348)
+- [MVP1][FIX] busca por nome na listagem de alunos casa telefone por dígito solto do termo (#351)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [MVP3][INFRA] Decisão: sinais vitais (§53) — `HealthMeasurement` não existe no schema, e o aparelho que mede pressão já está no balcão (#345)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
@@ -44,6 +44,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][INFRA] Decisão: foto do aluno — cortada em 18/08 para uma fatia que já tinha fechado dois dias antes (#348, finalizado em: 2026-09-16)
 - [INFRA] Login sem tenant: hero com foto, tema claro/escuro e contagem real de alunos/unidades (#342, finalizado em: 2026-09-15)
 - [MVP4][SPEC-071][F71] Primeiro acesso self-service e exibição de dados cadastrais no app (#333, finalizado em: 2026-09-15)
 - [MVP1][FIX] fixture de contatos empata createdAt no mesmo milissegundo sob carga do CI (#329, finalizado em: 2026-09-14)
@@ -69,8 +70,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
+- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
