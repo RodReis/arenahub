@@ -982,6 +982,12 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
         .expect(201);
 
       expect(publicado.body).toMatchObject({ status: 'PUBLISHED' });
+
+      /** F73 §4.3: publicar o snapshot emite RankingUpdated por aluno exposto. */
+      const eventos = await db.outboxEvent.findMany({
+        where: { tenantId, eventType: 'RankingUpdated', aggregateType: 'Student' },
+      });
+      expect(eventos).toHaveLength(5);
     });
 
     /*

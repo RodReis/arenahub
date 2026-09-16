@@ -396,9 +396,34 @@ export class EngagementRankingRepository implements PortaDeRanking {
   ): Promise<SnapshotDeRanking> {
     // Compare-and-swap contra o status: so publica quem ainda nao foi
     // publicado. `M5-AC-007` -- o snapshot e imutavel depois de PUBLISHED.
-    const resultado = await this.db.rankingSnapshot.updateMany({
-      where: { id: snapshotId, tenantId: contexto.tenantId, status: { not: 'PUBLISHED' } },
-      data: { status: 'PUBLISHED', publishedAt: agora },
+    //
+    // A ESCRITA E O EVENTO NA MESMA TRANSACAO (regra de arquitetura 5,
+    // F73 §4.3): `RankingUpdated` por aluno exposto no snapshot, para a
+    // inbox in-app avisar quem subiu no placar.
+    const resultado = await this.db.$transaction(async (tx) => {
+      const atualizado = await tx.rankingSnapshot.updateMany({
+        where: { id: snapshotId, tenantId: contexto.tenantId, status: { not: 'PUBLISHED' } },
+        data: { status: 'PUBLISHED', publishedAt: agora },
+      });
+
+      if (atualizado.count === 0) return atualizado;
+
+      const entradas = await tx.rankingEntry.findMany({
+        where: { snapshotId },
+        select: { studentId: true },
+      });
+
+      await tx.outboxEvent.createMany({
+        data: entradas.map((entrada) => ({
+          tenantId: contexto.tenantId,
+          eventType: 'RankingUpdated',
+          aggregateType: 'Student',
+          aggregateId: entrada.studentId,
+          payload: {},
+        })),
+      });
+
+      return atualizado;
     });
 
     if (resultado.count === 0) {
