@@ -55,7 +55,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const { ArmazenamentoDeCredencialWindows } = await import(
+  const { ArmazenamentoDeCredencialWindows, CredencialIlegivelError } = await import(
     './producao/armazenamento-de-credencial.js'
   );
   const { resolverCredencial, CredencialAusenteError } = await import(
@@ -75,13 +75,25 @@ async function main(): Promise<void> {
   );
   const armazenamento = new ArmazenamentoDeCredencialWindows(caminhoDaCredencial);
 
-  const credencial = await resolverCredencial({
-    cloudApiUrl: config.CLOUD_API_URL,
-    keyIdDoEnv: config.CLOUD_EDGE_KEY_ID,
-    secretDoEnv: config.CLOUD_EDGE_SECRET,
-    codigoDePareamento: config.EDGE_PAIRING_CODE,
-    armazenamento,
-  });
+  let credencial;
+  try {
+    credencial = await resolverCredencial({
+      cloudApiUrl: config.CLOUD_API_URL,
+      keyIdDoEnv: config.CLOUD_EDGE_KEY_ID,
+      secretDoEnv: config.CLOUD_EDGE_SECRET,
+      codigoDePareamento: config.EDGE_PAIRING_CODE,
+      armazenamento,
+    });
+  } catch (erro: unknown) {
+    if (erro instanceof CredencialIlegivelError) {
+      // So a mensagem, nunca a `cause` (stack do PowerShell embutido) -- e
+      // isso que impede o loop de restart do sc.exe de logar o mesmo bloco
+      // criptico a cada 5s (F59, achado de revisao 3).
+      logger.error(erro.message);
+      process.exit(1);
+    }
+    throw erro;
+  }
 
   if (!credencial) {
     logger.error(new CredencialAusenteError().message);

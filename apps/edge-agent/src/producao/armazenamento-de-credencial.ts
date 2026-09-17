@@ -4,6 +4,31 @@ import { promisify } from 'node:util';
 const executarArquivo = promisify(execFile);
 
 /**
+ * Lancado por `ArmazenamentoDeCredencialWindows.carregar()` quando o
+ * PowerShell/DPAPI falha ao descriptografar um arquivo de credencial
+ * EXISTENTE -- tipicamente porque a conta Windows atual nao e a mesma que
+ * gravou o arquivo (`DataProtectionScope.CurrentUser`, ver comentario de
+ * classe). Mensagem em portugues, sem a stack do PowerShell embutido, para
+ * `main.ts` logar algo acionavel em vez do "Command failed: powershell.exe
+ * ... <script inteiro>" cru que o Node devolve (F59, achado de revisao 3).
+ */
+export class CredencialIlegivelError extends Error {
+  readonly code = 'EDGE_CREDENCIAL_ILEGIVEL';
+
+  constructor(caminhoDoArquivo: string, causa: unknown) {
+    super(
+      `A credencial existe em "${caminhoDoArquivo}" mas nao pode ser descriptografada ` +
+        '(provavelmente foi cifrada por outra conta Windows -- DPAPI CurrentUser so e legivel ' +
+        'pela mesma conta que gravou). Repare rodando novamente sob a MESMA conta que fez o ' +
+        'pareamento com EDGE_PAIRING_CODE definido, ou apague o arquivo para forcar novo ' +
+        'pareamento.',
+      { cause: causa },
+    );
+    this.name = 'CredencialIlegivelError';
+  }
+}
+
+/**
  * Abstrai onde a credencial de pareamento vive -- DPAPI/Credential Manager
  * no Windows (ADR-011), NUNCA arquivo texto. `M0-NFR-005`.
  */
@@ -83,21 +108,30 @@ export class ArmazenamentoDeCredencialWindows implements ArmazenamentoDeCredenci
   }
 
   async carregar(): Promise<{ keyId: string; secret: string } | null> {
-    const { stdout } = await this.executarPowerShell(
-      `
-      $ErrorActionPreference = 'Stop'
-      if (-not (Test-Path $env:AH_CAMINHO)) { exit 0 }
-      $protegido = [System.IO.File]::ReadAllBytes($env:AH_CAMINHO)
-      # CurrentUser: falha com erro DPAPI criptico se a conta que roda este
-      # 'carregar' nao for a mesma que rodou 'salvar' (ver comentario de
-      # classe -- decisao pendente para a Task 13 / servico Windows).
-      $bytes = [System.Security.Cryptography.ProtectedData]::Unprotect(
-        $protegido, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser
-      )
-      [Console]::Out.Write([System.Text.Encoding]::UTF8.GetString($bytes))
-      `,
-      { AH_CAMINHO: this.caminhoDoArquivo },
-    );
+    let stdout: string;
+
+    try {
+      ({ stdout } = await this.executarPowerShell(
+        `
+        $ErrorActionPreference = 'Stop'
+        if (-not (Test-Path $env:AH_CAMINHO)) { exit 0 }
+        $protegido = [System.IO.File]::ReadAllBytes($env:AH_CAMINHO)
+        # CurrentUser: falha com erro DPAPI criptico se a conta que roda este
+        # 'carregar' nao for a mesma que rodou 'salvar' (ver comentario de
+        # classe -- decisao pendente para a Task 13 / servico Windows).
+        $bytes = [System.Security.Cryptography.ProtectedData]::Unprotect(
+          $protegido, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser
+        )
+        [Console]::Out.Write([System.Text.Encoding]::UTF8.GetString($bytes))
+        `,
+        { AH_CAMINHO: this.caminhoDoArquivo },
+      ));
+    } catch (erro: unknown) {
+      // O arquivo existe (senao o script teria feito `exit 0` sem erro) mas
+      // o Unprotect falhou -- relanca com mensagem acionavel em vez do erro
+      // cru do execFile (ver CredencialIlegivelError).
+      throw new CredencialIlegivelError(this.caminhoDoArquivo, erro);
+    }
 
     if (!stdout) return null;
 
