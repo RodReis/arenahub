@@ -90,6 +90,22 @@ describe('descreverConfig', () => {
     expect(JSON.stringify(visao)).not.toContain('nao-pode-aparecer');
   });
 
+  it('mascara EDGE_PAIRING_CODE presente', () => {
+    // O codigo e de uso unico, mas ate ser trocado por credencial ele fica
+    // sentado em texto claro em qualquer agregador de log que capture
+    // 'edge-agent iniciando' -- exatamente o que CAMPOS_SECRETOS existe para
+    // evitar.
+    const config = carregarConfig({
+      ...VALIDO,
+      EDGE_PAIRING_CODE: 'codigo-de-pareamento-secreto',
+    });
+
+    const visao = descreverConfig(config);
+
+    expect(visao['EDGE_PAIRING_CODE']).toBe('***');
+    expect(JSON.stringify(visao)).not.toContain('codigo-de-pareamento-secreto');
+  });
+
   it('distingue segredo ausente de segredo mascarado', () => {
     // "nao configurei" e "configurei errado" sao problemas diferentes.
     // Esconder os dois do mesmo jeito atrapalha o diagnostico sem proteger

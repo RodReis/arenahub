@@ -73,6 +73,7 @@ export type Config = z.infer<typeof esquemaConfig>;
 const CAMPOS_SECRETOS = [
   'COLLECTOR_HMAC_SECRET',
   'CLOUD_EDGE_SECRET',
+  'EDGE_PAIRING_CODE',
 ] as const satisfies readonly (keyof Config)[];
 
 export class ConfigInvalidaError extends Error {
