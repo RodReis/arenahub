@@ -31,6 +31,10 @@ playwright-report/
 *.sqlite3
 *.db
 
+# evidencia de execucao do edge-agent lab:run (F59) -- artefato runtime,
+# nunca material do produto (ver apps/edge-agent/src/lab/escritor-de-evidencia.ts)
+apps/edge-agent/data/*.json
+
 # grafo de conhecimento (cache local, ver CLAUDE.md)
 graphify-out/
 

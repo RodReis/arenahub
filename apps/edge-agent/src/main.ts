@@ -12,24 +12,23 @@ import { config as carregarEnv } from 'dotenv';
 // reclamando de EDGE_AGENT_ID -- com o valor sentado no `.env` ao lado.
 carregarEnv({ path: join(process.cwd(), '../../.env') });
 
-const { carregarConfig, descreverConfig, ConfigInvalidaError } = await import(
-  './config/env.js'
-);
-const { componenteProcesso, montarHeartbeat } = await import('./health/health-check.js');
+const { carregarConfig, descreverConfig, ConfigInvalidaError } = await import('./config/env.js');
 const { criarLogger, loggerDaTentativa } = await import('./observability/logger.js');
+const { compor } = await import('./producao/compor-agente.js');
+const { SignedCloudClient } = await import('./cloud/signed-client.js');
+const { iniciarLacoDeHeartbeat } = await import('./producao/laco-de-heartbeat.js');
 
 /**
- * Ponto de entrada do edge-agent.
+ * Ponto de entrada de PRODUCAO do edge-agent (F59).
  *
- * `M0-NFR-007`: inicia sem interface grafica e encerra graciosamente. Roda
- * como servico no Windows -- nao ha console para responder a prompt, e
- * encerramento abrupto perde evento que o SQLite ainda nao confirmou.
- *
- * Hoje o agente so sobe, valida configuracao e emite heartbeat. Adapter de
- * dispositivo, fila e reconciliacao sao das fatias seguintes: F2 em diante.
+ * Sobe a composicao real (Task 5), inicia o laco de heartbeat HTTP para a
+ * nuvem (F11/AC-8) e encerra graciosamente. `USE_SIMULATOR` deu lugar a
+ * `FACIAL_MODE`/`CATRACA_MODE` (F59, Task 1) -- cada dispositivo escolhe
+ * real ou simulador de forma independente.
  */
 
 const INTERVALO_HEARTBEAT_MS = 30_000;
+const VERSAO_DO_AGENTE = process.env['npm_package_version'] ?? '0.0.0';
 
 async function main(): Promise<void> {
   let config;
@@ -47,40 +46,127 @@ async function main(): Promise<void> {
 
   const logger = criarLogger(config);
 
-  logger.info(
-    { config: descreverConfig(config) },
-    'edge-agent iniciando',
-  );
+  logger.info({ config: descreverConfig(config) }, 'edge-agent iniciando');
 
-  if (config.USE_SIMULATOR) {
+  if (config.FACIAL_MODE === 'simulador' || config.CATRACA_MODE === 'simulador') {
     logger.warn(
-      'modo simulador: nenhum equipamento real sera contatado (M0-NFR-006)',
+      { facial: config.FACIAL_MODE, catraca: config.CATRACA_MODE },
+      'modo simulador ativo para ao menos um dispositivo (M0-NFR-006)',
     );
   }
 
-  const timer = setInterval(() => {
-    const heartbeat = montarHeartbeat(config, [componenteProcesso(config)], new Date());
-    loggerDaTentativa(logger).info({ heartbeat }, 'heartbeat');
-  }, INTERVALO_HEARTBEAT_MS);
+  const { ArmazenamentoDeCredencialWindows, CredencialIlegivelError } = await import(
+    './producao/armazenamento-de-credencial.js'
+  );
+  const { resolverCredencial, CredencialAusenteError } = await import(
+    './producao/resolver-credencial.js'
+  );
 
-  // Primeiro heartbeat imediato: esperar 30 s para saber se o agente subiu
-  // torna o runbook lento e faz parecer travado.
-  const inicial = montarHeartbeat(config, [componenteProcesso(config)], new Date());
-  loggerDaTentativa(logger).info({ heartbeat: inicial }, 'heartbeat');
+  // %LOCALAPPDATA% ja e restrito ao perfil da conta Windows atual (nao
+  // world-readable) -- resolve a SUPOSICAO de ACL documentada em
+  // armazenamento-de-credencial.ts sem aplicar ACL propria. O risco de
+  // escopo DPAPI (pareamento e servico rodando sob contas diferentes,
+  // Task 13) permanece em aberto: ver comentario de classe.
+  const caminhoDaCredencial = join(
+    process.env['LOCALAPPDATA'] ?? process.cwd(),
+    'ArenaHub',
+    'edge-agent',
+    'credencial.dat',
+  );
+  const armazenamento = new ArmazenamentoDeCredencialWindows(caminhoDaCredencial);
 
-  /** Encerramento gracioso -- `M0-NFR-007`. */
+  let credencial;
+  try {
+    credencial = await resolverCredencial({
+      cloudApiUrl: config.CLOUD_API_URL,
+      keyIdDoEnv: config.CLOUD_EDGE_KEY_ID,
+      secretDoEnv: config.CLOUD_EDGE_SECRET,
+      codigoDePareamento: config.EDGE_PAIRING_CODE,
+      armazenamento,
+    });
+  } catch (erro: unknown) {
+    if (erro instanceof CredencialIlegivelError) {
+      // So a mensagem, nunca a `cause` (stack do PowerShell embutido) -- e
+      // isso que impede o loop de restart do sc.exe de logar o mesmo bloco
+      // criptico a cada 5s (F59, achado de revisao 3).
+      logger.error(erro.message);
+      process.exit(1);
+    }
+    throw erro;
+  }
+
+  if (!credencial) {
+    logger.error(new CredencialAusenteError().message);
+    process.exit(1);
+  }
+
+  // Um unico cliente assinado, construido com a credencial RESOLVIDA (nao o
+  // valor cru de config.CLOUD_EDGE_KEY_ID/SECRET) -- compartilhado entre a
+  // composicao (decisao de acesso) e o laco de heartbeat, para os dois
+  // falarem com a nuvem com a mesma identidade.
+  const clienteNuvem = new SignedCloudClient({
+    baseUrl: config.CLOUD_API_URL ?? '',
+    keyId: credencial.keyId,
+    secret: credencial.secret,
+  });
+
+  const composto = await compor(config, logger, { cliente: clienteNuvem });
+
+  // DECISAO REGISTRADA (revisao final de branch F59, achado 1): `devices`
+  // vai vazio de proposito. O heartbeat so teria como preencher `serial` real
+  // se `montarDispositivos`/`TopdataInnerAdapter`/`TopdataFacialAdapter`
+  // expusessem o serial do fabricante de volta ate aqui -- hoje eles nao
+  // expoem, e simular um serial sintetico (ex.: `${EDGE_AGENT_ID}-catraca`)
+  // NAO bateria com o `Device.serial` cadastrado no painel, entao nao
+  // resolveria o alerta abaixo, so esconderia que ele nao foi resolvido.
+  //
+  // CONSEQUENCIA CONHECIDA: `avaliarDispositivo`
+  // (apps/api/.../operations/domain/alert-rules.ts) trata
+  // `Device.lastHeartbeat === null` como silencio infinito e dispara
+  // DEVICE_OFFLINE (CRITICAL) permanente para catraca e facial reais, mesmo
+  // com o agente funcionando -- porque `EdgeController.heartbeat` so
+  // atualiza `Device.lastHeartbeat` iterando `dados.devices`. O heartbeat do
+  // proprio Edge (`EdgeNode.lastHeartbeat`) continua correto, entao o Edge
+  // aparece "Respondendo" no painel; so o alerta por DISPOSITIVO fica falso.
+  //
+  // Corrigir de verdade exige threading do serial real dos adapters Topdata
+  // ate aqui (Task futura, fora do escopo desta correcao pontual) ou uma
+  // decisao do PI sobre como popular `Device.serial` a partir do Edge.
+  const pararHeartbeat = iniciarLacoDeHeartbeat({
+    cliente: clienteNuvem,
+    intervaloMs: INTERVALO_HEARTBEAT_MS,
+    montarCorpo: () => ({
+      agentVersion: VERSAO_DO_AGENTE,
+      localTimeMs: Date.now(),
+      queueDepth: 0,
+      devices: [],
+    }),
+    aoFalhar: (erro) => {
+      loggerDaTentativa(logger).warn({ erro }, 'heartbeat nao chegou na nuvem');
+    },
+  });
+
+  logger.info('edge-agent pronto');
+
+  let encerrando = false;
+
   const encerrar = (sinal: string): void => {
+    if (encerrando) return;
+    encerrando = true;
+
     logger.info({ sinal }, 'encerrando');
-    clearInterval(timer);
-    // Aqui entram, nas fatias seguintes: drenar a fila, fechar o SQLite e
-    // desconectar os adapters. Hoje nao ha nenhum dos tres.
-    process.exit(0);
+    pararHeartbeat();
+
+    void composto
+      .encerrar()
+      .catch((erro: unknown) => {
+        logger.error({ erro: erro instanceof Error ? erro.message : erro }, 'erro ao encerrar');
+      })
+      .finally(() => process.exit(0));
   };
 
   process.once('SIGINT', () => encerrar('SIGINT'));
   process.once('SIGTERM', () => encerrar('SIGTERM'));
-
-  await Promise.resolve();
 }
 
 main().catch((erro: unknown) => {

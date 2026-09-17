@@ -70,3 +70,31 @@ export class MfaBloqueadoPorTentativasError extends ErroDeDominio {
     super('MFA_RATE_LIMITED', 429, 'Muitas tentativas. Tente novamente em instantes');
   }
 }
+
+/**
+ * Codigo de pareamento do Edge recusado (F59, ADR-011).
+ *
+ * UM erro para codigo inexistente, expirado OU ja usado, de proposito --
+ * igual a `CredencialInvalidaError`. Distinguir os tres transformaria a rota
+ * num oraculo para quem esta tentando codigos ao acaso.
+ */
+export class RecusaDePareamentoError extends ErroDeDominio {
+  constructor() {
+    super('EDGE_PAIRING_REJECTED', 409, 'Codigo de pareamento invalido');
+  }
+}
+
+/**
+ * `EdgeNode` inexistente OU de outro tenant, ao gerar codigo de pareamento
+ * (F59, Task 9).
+ *
+ * UM erro para os dois casos, de proposito -- regra de arquitetura no 2:
+ * distinguir "nao existe" de "existe mas e de outro tenant" vazaria a
+ * existencia do recurso alheio para quem nao deveria nem saber que ele
+ * existe.
+ */
+export class EdgeNodeNaoEncontradoError extends ErroDeDominio {
+  constructor() {
+    super('EDGE_NODE_NOT_FOUND', 404, 'Dispositivo de borda nao encontrado');
+  }
+}

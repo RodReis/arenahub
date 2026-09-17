@@ -42,20 +42,49 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
 
 ## 3. Instalação
 
-1. Execute o instalador como administrador
-2. Informe o **código de pareamento** quando pedido
-3. O agente troca o código por um segredo próprio, guardado pelo **DPAPI/Credential Manager** do
-   Windows — nunca em arquivo de texto
-4. O código morre no primeiro uso; se precisar reinstalar, gere outro
+> **Conta Windows: use SEMPRE a mesma para pareamento e para instalar o serviço.** A credencial
+> de pareamento é cifrada com DPAPI `CurrentUser` (ADR-011) — só a MESMA conta Windows que a
+> gravou consegue lê-la de volta. O serviço `ArenaHub Edge` é instalado para rodar sob a conta
+> interativa que executa `pnpm service:install` (nunca `LocalSystem` nem conta de serviço
+> dedicada), justamente para que essa conta seja a mesma do pareamento. Numa academia com PC
+> compartilhado e um usuário Windows só (o cenário do ADR-011), isso é automático; se a máquina
+> tiver mais de uma conta, **não alterne entre elas**.
+
+1. Logado com a conta Windows que vai rodar o serviço, rode `pnpm build`
+2. Defina `EDGE_PAIRING_CODE=<código gerado no painel>` no `.env` da **raiz do monorepo** (dois
+   níveis acima de `apps/edge-agent` — é de lá que `main.ts` resolve o arquivo, pela mesma
+   convenção usada pelo docker-compose e pela API) **antes** de rodar o agente. Não há prompt
+   interativo: o agente lê a variável de ambiente/`.env` no arranque. Rode o agente uma vez
+   (`pnpm start` ou `pnpm dev`) — ele troca o código por um segredo próprio, guardado cifrado por
+   **DPAPI** (`%LOCALAPPDATA%\ArenaHub\edge-agent\credencial.dat`), nunca em texto puro. Se
+   `EDGE_PAIRING_CODE` não estiver definido e não houver credencial salva, o agente falha com
+   `CredencialAusenteError` e sai (exit 1) — nesse caso, confira o `.env`
+3. O código morre no primeiro uso; se precisar reparear, defina um novo `EDGE_PAIRING_CODE` no
+   `.env` (gerado no painel) e rode o agente de novo
+4. Abra PowerShell **como Administrador**, na mesma conta, e rode:
+   ```powershell
+   pnpm service:install
+   ```
+   O script pede a senha da conta Windows atual (necessária para o serviço rodar sob essa
+   conta) e nunca a grava em arquivo, log ou linha de comando do serviço
+5. Inicie o serviço:
+   ```powershell
+   Start-Service "ArenaHub Edge"
+   ```
 
 **Serviço Windows:**
 
 - Nome: `ArenaHub Edge`
+- Conta: a mesma conta Windows interativa que rodou o pareamento (ver aviso acima) — **nunca**
+  `LocalSystem`
 - Início: **automático**
-- Recuperação: **reiniciar o serviço** em caso de falha (1ª, 2ª e falhas seguintes)
+- Recuperação: **reiniciar o serviço** em caso de falha (1ª, 2ª e falhas seguintes), já
+  configurado por `service:install` via `sc.exe failure`
 
-```
-services.msc → ArenaHub Edge → Propriedades → Recuperação
+Para remover o serviço (preserva SQLite e credencial):
+
+```powershell
+pnpm service:uninstall
 ```
 
 ---
@@ -104,10 +133,14 @@ Edge sempre inicia a conexão.
 
 | item | estado |
 |---|---|
-| Instalação em academia real | ⬜ **pendente** |
 | Execução por pessoa diferente do autor (exigência da Task 6) | ⬜ **pendente** |
 | Tempo real do procedimento | ⬜ não medido |
 | Comportamento com rede instável durante o pareamento | ⬜ não testado |
+
+**Instalação real do serviço (F59, Task 13):** os scripts `install-service.ps1` /
+`uninstall-service.ps1` existem e foram revisados manualmente (`.superpowers/sdd/2026-09-16-f59-composicao-edge-agent/task-13-report.md`),
+mas **não foram ensaiados numa máquina Windows real**. `AC-9` continua pendente até esse ensaio
+presencial acontecer.
 
 **Quem executar pela primeira vez: anote o que divergiu e corrija este arquivo.** Runbook que
 ninguém rodou é hipótese escrita com confiança.

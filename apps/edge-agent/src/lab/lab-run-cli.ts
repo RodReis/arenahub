@@ -20,21 +20,34 @@
  *   pnpm --filter @arenahub/edge-agent lab:run -- --permitidos 100000000042
  *
  * Encerra com Ctrl+C e imprime p50/p95/max da latencia rosto -> comando.
+ *
+ * MODO `--headless` (insumo F59 SS5.4): substitui os dois adapters por
+ * `FacialSimulator`/`TurnstileSimulator`, dispara reconhecimentos sintéticos
+ * sem esperar confirmacao do operador, e grava a evidencia via
+ * `escreverEvidencia` ao final. Existe para o `lab:run` rodar no CI --
+ * o modo com hardware real nunca roda la (M0-NFR-006).
  */
 import { join } from 'node:path';
 
 import pino from 'pino';
 
 import { type SentidoGiro } from '../domain/turnstile.js';
+import { type EventoReconhecimento } from '../domain/facial-device.js';
 import { TopdataFacialAdapter } from '../adapters/topdata/topdata-facial-adapter.js';
 import { TopdataInnerAdapter } from '../adapters/topdata/topdata-inner-adapter.js';
 import { PonteEasyInnerProcesso } from '../adapters/topdata/ponte-easyinner-processo.js';
+import { FacialSimulator } from '../adapters/facial-simulator.js';
+import { TurnstileSimulator } from '../adapters/turnstile-simulator.js';
 import { resumirLatencia } from '../application/orquestrar-passagem.js';
 import { criarBancadaLab } from './lab-run.js';
+import { escreverEvidencia, type TentativaDeEvidencia } from './escritor-de-evidencia.js';
 
 const PORTA_CATRACA = 3570;
 const INNER = 1;
 const PORTA_FACIAL = 7792;
+const CAMINHO_EVIDENCIA = join('data', 'lab-run-evidencia.json');
+const ENROLLID_HEADLESS_PERMITIDO = 'lab-headless-permitido-1';
+const ENROLLID_HEADLESS_NEGADO = 'lab-headless-negado-1';
 
 function lerPermitidos(argv: readonly string[]): string[] {
   const i = argv.indexOf('--permitidos');
@@ -64,10 +77,96 @@ function lerSentido(argv: readonly string[]): SentidoGiro {
   return 'entrada';
 }
 
+/** Roda sem hardware, com simuladores, para o CI (insumo F59 SS5.4). */
+function lerHeadless(argv: readonly string[]): boolean {
+  return argv.includes('--headless');
+}
+
+/**
+ * Fio da bancada sem hardware -- simuladores no lugar dos adapters reais.
+ *
+ * Processa dois reconhecimentos sinteticos (um permitido, um negado) para o
+ * arquivo de evidencia sempre carregar as duas decisoes, encerra sozinho
+ * (sem esperar Ctrl+C) e grava a evidencia via `escreverEvidencia`.
+ *
+ * Chama `bancada.processar` DIRETAMENTE em vez de rotear por
+ * `facial.simularReconhecimento` + `aoReconhecer`: o objetivo aqui e gerar
+ * evidencia deterministica, nao exercitar o wiring do simulador de leitor.
+ * Rotear pelo callback tornaria o resultado dependente de quando o
+ * `.then()` resolve -- so daria para saber que as duas tentativas
+ * terminaram esperando um tempo fixo, o que e frágil sob CI com CPU
+ * variavel (pode gravar evidencia incompleta com exit code 0, sem sinal de
+ * erro). Chamando `processar` direto, o `await` de cada chamada e a propria
+ * garantia de termino -- sem timer.
+ */
+async function rodarHeadless(logger: pino.Logger, permitidosArg: readonly string[]): Promise<void> {
+  const permitidos = permitidosArg.length > 0 ? permitidosArg : [ENROLLID_HEADLESS_PERMITIDO];
+
+  const catraca = new TurnstileSimulator();
+  const facial = new FacialSimulator();
+
+  const bancada = criarBancadaLab({
+    catraca,
+    permitidos,
+    agoraMonotonicoMs: () => Number(process.hrtime.bigint() / 1_000_000n),
+    nomeDoLeitor: facial.nome,
+  });
+
+  const eventoPermitido: EventoReconhecimento = {
+    externalEnrollId: permitidos[0]!,
+    ocorridoEm: new Date(),
+    recebidoEm: new Date(),
+    metodo: 'facial',
+  };
+  const eventoNegado: EventoReconhecimento = {
+    externalEnrollId: ENROLLID_HEADLESS_NEGADO,
+    ocorridoEm: new Date(),
+    recebidoEm: new Date(),
+    metodo: 'facial',
+  };
+
+  const [resultadoPermitido, resultadoNegado] = await Promise.all([
+    bancada.processar(eventoPermitido, 'lab-headless-1', new Date()),
+    bancada.processar(eventoNegado, 'lab-headless-2', new Date()),
+  ]);
+
+  const tentativas: TentativaDeEvidencia[] = [
+    {
+      externalEnrollId: eventoPermitido.externalEnrollId,
+      decisao: resultadoPermitido.decisao.resultado,
+      latenciaMs: resultadoPermitido.latenciaDecisaoMs,
+    },
+    {
+      externalEnrollId: eventoNegado.externalEnrollId,
+      decisao: resultadoNegado.decisao.resultado,
+      latenciaMs: resultadoNegado.latenciaDecisaoMs,
+    },
+  ];
+
+  const resumo = resumirLatencia(bancada.latencias());
+  escreverEvidencia(CAMINHO_EVIDENCIA, {
+    executadoEm: new Date().toISOString(),
+    modo: { facial: 'simulador', catraca: 'simulador' },
+    tentativas,
+    percentis: resumo ? { p50: resumo.p50, p95: resumo.p95, max: resumo.max } : { p50: 0, p95: 0, max: 0 },
+  });
+
+  logger.info({ caminho: CAMINHO_EVIDENCIA, tentativas: tentativas.length }, 'evidencia headless gravada');
+
+  await facial.encerrar();
+  await catraca.encerrar();
+}
+
 async function main(): Promise<void> {
   const logger = pino({ level: 'info' });
 
   const permitidos = lerPermitidos(process.argv);
+
+  if (lerHeadless(process.argv)) {
+    await rodarHeadless(logger, permitidos);
+    process.exit(0);
+  }
+
   if (permitidos.length === 0) {
     logger.error('informe ao menos um enrollid: --permitidos 100000000042');
     process.exit(1);

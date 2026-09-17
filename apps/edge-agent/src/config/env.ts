@@ -48,20 +48,23 @@ export const esquemaConfig = z.object({
   /** Segredo HMAC. NUNCA em log, nem mascarado. */
   CLOUD_EDGE_SECRET: segredo.optional(),
 
+  /** Codigo de pareamento de uso unico, gerado no painel (ADR-011). */
+  EDGE_PAIRING_CODE: z.string().min(8).optional(),
+
   /** Intervalo de busca por comando, em ms. */
   SYNC_POLL_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   /**
-   * Sem hardware, o agente sobe com simulador. `M0-NFR-006` exige que o
-   * simulador rode em CI sem equipamento -- por isso o padrao e `true`:
-   * quem tem bancada liga explicitamente, quem nao tem nao precisa saber
-   * que a variavel existe.
+   * Um flag por dispositivo (decisao do PI, insumo F59 SS4 no2). Substitui
+   * o antigo `USE_SIMULATOR` booleano -- permite ensaiar o facial real com
+   * catraca simulada, sem girar nada.
+   *
+   * `M0-NFR-006`: o padrao de ambos e simulador -- CI roda sem hardware.
    */
-  USE_SIMULATOR: z
-    .union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')])
-    .default(true),
+  FACIAL_MODE: z.enum(['real', 'simulador']).default('simulador'),
+  CATRACA_MODE: z.enum(['real', 'simulador']).default('simulador'),
 });
 
 export type Config = z.infer<typeof esquemaConfig>;
@@ -70,6 +73,7 @@ export type Config = z.infer<typeof esquemaConfig>;
 const CAMPOS_SECRETOS = [
   'COLLECTOR_HMAC_SECRET',
   'CLOUD_EDGE_SECRET',
+  'EDGE_PAIRING_CODE',
 ] as const satisfies readonly (keyof Config)[];
 
 export class ConfigInvalidaError extends Error {

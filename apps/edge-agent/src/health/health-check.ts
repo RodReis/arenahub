@@ -60,6 +60,9 @@ export function componenteProcesso(config: Config): Componente {
   return {
     nome: 'edge-agent',
     estado: 'ok',
-    detalhe: config.USE_SIMULATOR ? 'em execucao (modo simulador)' : 'em execucao',
+    detalhe:
+      config.FACIAL_MODE === 'simulador' || config.CATRACA_MODE === 'simulador'
+        ? 'em execucao (modo simulador)'
+        : 'em execucao',
   };
 }
