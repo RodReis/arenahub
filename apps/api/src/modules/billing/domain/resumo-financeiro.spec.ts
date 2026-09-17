@@ -4,10 +4,14 @@ import {
   janelaPadrao,
   JanelaDoResumoInvalidaError,
   MINIMO_DE_PONTOS_DA_SERIE,
+  MINIMO_DE_CANCELAMENTOS_PARA_LTV,
   montarSerie,
+  taxaDeChurn,
   taxaDeInadimplencia,
   ticketMedio,
   validarJanela,
+  vidaMediaEmMeses,
+  ltv,
 } from './resumo-financeiro.js';
 
 const AGORA = new Date('2026-09-01T12:00:00.000Z');
@@ -179,6 +183,65 @@ describe('montarSerie', () => {
     expect(serie.pontos).toEqual([
       { competencia: '2026-08', faturadoMinor: 0, recebidoMinor: 12_000 },
     ]);
+  });
+});
+
+describe('taxaDeChurn', () => {
+  it('calcula o percentual com uma casa', () => {
+    expect(taxaDeChurn(3, 300)).toBe(1);
+  });
+
+  /** Sem pagante no inicio do periodo nao ha base para churn algum. */
+  it('devolve null quando nao ha pagante no inicio do periodo', () => {
+    expect(taxaDeChurn(0, 0)).toBeNull();
+  });
+
+  it('devolve zero quando havia pagante e ninguem cancelou', () => {
+    expect(taxaDeChurn(0, 340)).toBe(0);
+  });
+});
+
+describe('vidaMediaEmMeses', () => {
+  /**
+   * SO PARES COM OS DOIS EVENTOS entram na media -- ver `SPEC-074` §3. Um
+   * cancelamento sem o `SUBSCRIPTION_CREATED` correspondente (a base do
+   * Pacto, sem timeline) nao tem "vida" para medir, e inventar uma data
+   * contrariaria o CLAUDE.md.
+   */
+  it('calcula a media em meses entre criacao e cancelamento', () => {
+    const pares = [
+      { criadoEm: new Date('2026-01-01T00:00:00.000Z'), canceladoEm: new Date('2026-04-01T00:00:00.000Z') }, // 3 meses
+      { criadoEm: new Date('2026-01-01T00:00:00.000Z'), canceladoEm: new Date('2026-07-01T00:00:00.000Z') }, // 6 meses
+    ];
+
+    expect(vidaMediaEmMeses(pares)).toBe(4.5);
+  });
+
+  it('devolve null sem nenhum par completo', () => {
+    expect(vidaMediaEmMeses([])).toBeNull();
+  });
+});
+
+describe('ltv', () => {
+  it('multiplica ticket medio pela vida media', () => {
+    expect(ltv(15_000, 6, MINIMO_DE_CANCELAMENTOS_PARA_LTV)).toBe(90_000);
+  });
+
+  it('devolve null sem ticket medio', () => {
+    expect(ltv(null, 6, MINIMO_DE_CANCELAMENTOS_PARA_LTV)).toBeNull();
+  });
+
+  it('devolve null sem vida media', () => {
+    expect(ltv(15_000, null, MINIMO_DE_CANCELAMENTOS_PARA_LTV)).toBeNull();
+  });
+
+  /**
+   * AMOSTRA PEQUENA NAO VIRA NUMERO -- mesma disciplina do
+   * `MINIMO_DE_PONTOS_DA_SERIE`: um ou dois cancelamentos com timeline
+   * completa nao sustentam uma media que o dono vai usar para decidir algo.
+   */
+  it('devolve null com menos cancelamentos que o minimo', () => {
+    expect(ltv(15_000, 6, 2)).toBeNull();
   });
 });
 

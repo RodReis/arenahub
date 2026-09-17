@@ -4,10 +4,13 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { precoVigenteEm } from './domain/dinheiro.js';
 import {
+  ltv,
   montarSerie,
+  taxaDeChurn,
   taxaDeInadimplencia,
   ticketMedio,
   validarJanela,
+  vidaMediaEmMeses,
   type SerieDeCompetencia,
 } from './domain/resumo-financeiro.js';
 
@@ -127,6 +130,35 @@ export interface ResumoFinanceiro {
     readonly alunosInadimplentes: number;
     readonly assinaturasAtivas: number;
   };
+
+  /**
+   * Os cinco KPIs que faltavam para a §64/§117 -- F74, `SPEC-074`.
+   *
+   * `novosAlunos`, `cancelamentos`, `taxaDeChurn` e `ltv` vem da TIMELINE
+   * (`StudentTimelineEvent.occurredAt`), nunca do status corrente: os ~1.926
+   * registros importados do Pacto sao `CANCELLED` sem evento correspondente
+   * (ADR-033), e contá-los aqui inventaria uma data que ninguem registrou
+   * (`SPEC-074` §3).
+   */
+
+  /** SNAPSHOT DE AGORA, nao da janela -- "quantos ha", nao "quantos ficaram". */
+  readonly alunosAtivos: number;
+
+  /** `SUBSCRIPTION_CREATED` na timeline, `occurredAt` na janela. */
+  readonly novosAlunos: number;
+
+  /** `SUBSCRIPTION_CANCELLED` na timeline, `occurredAt` na janela. */
+  readonly cancelamentos: number;
+
+  /** Cancelamentos do periodo sobre pagantes no INICIO do periodo. `null` sem base. */
+  readonly taxaDeChurn: number | null;
+
+  /**
+   * Ticket medio vezes vida media dos cancelamentos com timeline completa.
+   * `null` sem ticket medio, sem vida media, ou com amostra abaixo do piso
+   * (`MINIMO_DE_CANCELAMENTOS_PARA_LTV`).
+   */
+  readonly ltv: number | null;
 }
 
 const UM_DIA_EM_MS = 86_400_000;
@@ -196,6 +228,12 @@ export class ConsultarResumoFinanceiroUseCase {
       recebidoNaSerie,
       competencias,
       assinaturas,
+      alunosAtivosAgora,
+      novosAlunosNaJanela,
+      cancelamentosNaJanela,
+      alunosCriadosAntesDaJanela,
+      cancelamentosAntesDaJanela,
+      eventosCancelamentoParaLtv,
     ] = await Promise.all([
         // RECEBIDO: pagamento CONFIRMED com `paidAt` na janela.
         //
@@ -364,7 +402,106 @@ export class ConsultarResumoFinanceiroUseCase {
           where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] } },
           select: { status: true, planId: true, studentId: true },
         }),
+
+        // ALUNOS ATIVOS: snapshot de AGORA, contagem distinta -- um aluno
+        // pode ter mais de uma assinatura ao longo da vida, mas so uma
+        // vigente por vez (indice parcial da issue #272).
+        this.db.subscription.findMany({
+          where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] } },
+          select: { studentId: true },
+          distinct: ['studentId'],
+        }),
+
+        // NOVOS ALUNOS: SUBSCRIPTION_CREATED na timeline, na janela -- F74.
+        this.db.studentTimelineEvent.count({
+          where: {
+            ...doTenant,
+            type: 'SUBSCRIPTION_CREATED',
+            occurredAt: { gte: entrada.de, lt: entrada.ate },
+          },
+        }),
+
+        // CANCELAMENTOS: SUBSCRIPTION_CANCELLED na timeline, na janela.
+        // NAO CONTA status corrente CANCELLED sem este evento -- e o caso
+        // dos ~1.926 registros do import do Pacto (`SPEC-074` §3).
+        this.db.studentTimelineEvent.count({
+          where: {
+            ...doTenant,
+            type: 'SUBSCRIPTION_CANCELLED',
+            occurredAt: { gte: entrada.de, lt: entrada.ate },
+          },
+        }),
+
+        // ALUNOS COM SUBSCRIPTION_CREATED ANTES DA JANELA -- candidatos a
+        // "pagante no inicio do periodo". MESMA FONTE que novos/cancelamentos
+        // (`SPEC-074` §3): `Subscription.createdAt` e quando a LINHA foi
+        // gravada, que para o import do Pacto e a data do import, nao a data
+        // real de adesao -- usar aquela inflaria a base de todo tenant
+        // importado com o dia do import.
+        this.db.studentTimelineEvent.findMany({
+          where: { ...doTenant, type: 'SUBSCRIPTION_CREATED', occurredAt: { lt: entrada.de } },
+          select: { studentId: true },
+          distinct: ['studentId'],
+        }),
+
+        // CANCELAMENTOS ANTES DA JANELA, para excluir do denominador do
+        // churn quem ja tinha saido quando o periodo comecou.
+        this.db.studentTimelineEvent.findMany({
+          where: { ...doTenant, type: 'SUBSCRIPTION_CANCELLED', occurredAt: { lt: entrada.de } },
+          select: { studentId: true },
+        }),
+
+        // PARA O LTV: todo SUBSCRIPTION_CANCELLED do tenant com o
+        // SUBSCRIPTION_CREATED correspondente do MESMO aluno -- nao
+        // recortado pela janela, porque a vida media e sobre o historico
+        // inteiro de cancelamentos com timeline completa, nao so os do
+        // periodo escolhido (`SPEC-074` §4.1).
+        this.db.studentTimelineEvent.findMany({
+          where: { ...doTenant, type: 'SUBSCRIPTION_CANCELLED' },
+          select: { studentId: true, occurredAt: true },
+        }),
       ]);
+
+    const criacoesPorAluno = eventosCancelamentoParaLtv.length
+      ? await this.db.studentTimelineEvent.findMany({
+          where: {
+            ...doTenant,
+            type: 'SUBSCRIPTION_CREATED',
+            studentId: { in: eventosCancelamentoParaLtv.map((e) => e.studentId) },
+          },
+          select: { studentId: true, occurredAt: true },
+          orderBy: { occurredAt: 'asc' },
+        })
+      : [];
+
+    /**
+     * PARES CRIACAO/CANCELAMENTO POR ALUNO -- `SPEC-074` §3.
+     *
+     * Pega a criacao MAIS ANTIGA de cada aluno para casar com o
+     * cancelamento: um aluno pode ter mais de um ciclo (saiu e voltou), e o
+     * primeiro `SUBSCRIPTION_CREATED` e o que abre a vida que o
+     * cancelamento fecha. Aluno sem `SUBSCRIPTION_CREATED` correspondente
+     * (a base do Pacto) fica de fora -- nao ha par para formar.
+     */
+    const primeiraCriacaoPorAluno = new Map<string, Date>();
+    for (const evento of criacoesPorAluno) {
+      if (!primeiraCriacaoPorAluno.has(evento.studentId)) {
+        primeiraCriacaoPorAluno.set(evento.studentId, evento.occurredAt);
+      }
+    }
+
+    const paresDeVida = eventosCancelamentoParaLtv.flatMap((cancelamento) => {
+      const criadoEm = primeiraCriacaoPorAluno.get(cancelamento.studentId);
+
+      return criadoEm ? [{ criadoEm, canceladoEm: cancelamento.occurredAt }] : [];
+    });
+
+    const canceladosAntes = new Set(cancelamentosAntesDaJanela.map((e) => e.studentId));
+    const pagantesNoInicioDoPeriodo = new Set(
+      alunosCriadosAntesDaJanela
+        .map((a) => a.studentId)
+        .filter((studentId) => !canceladosAntes.has(studentId)),
+    );
 
     const inadimplentes = new Set(vencidas.map((invoice) => invoice.studentId));
     const pagantes = new Set(assinaturas.map((assinatura) => assinatura.studentId));
@@ -436,6 +573,16 @@ export class ConsultarResumoFinanceiroUseCase {
         alunosInadimplentes: inadimplentes.size,
         assinaturasAtivas: assinaturas.filter((a) => a.status === 'ACTIVE').length,
       },
+
+      alunosAtivos: alunosAtivosAgora.length,
+      novosAlunos: novosAlunosNaJanela,
+      cancelamentos: cancelamentosNaJanela,
+      taxaDeChurn: taxaDeChurn(cancelamentosNaJanela, pagantesNoInicioDoPeriodo.size),
+      ltv: ltv(
+        ticketMedio(recebidoMinor, recebido._count),
+        vidaMediaEmMeses(paresDeVida),
+        paresDeVida.length,
+      ),
     };
   }
 

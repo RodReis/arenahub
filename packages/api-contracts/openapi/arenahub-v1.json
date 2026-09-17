@@ -1191,6 +1191,23 @@
                     },
                     "base": {
                       "type": "object"
+                    },
+                    "alunosAtivos": {
+                      "type": "integer"
+                    },
+                    "novosAlunos": {
+                      "type": "integer"
+                    },
+                    "cancelamentos": {
+                      "type": "integer"
+                    },
+                    "taxaDeChurn": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "ltv": {
+                      "type": "integer",
+                      "nullable": true
                     }
                   }
                 }

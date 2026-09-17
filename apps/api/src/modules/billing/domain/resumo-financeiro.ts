@@ -93,6 +93,99 @@ export function taxaDeInadimplencia(
   return Math.round((alunosInadimplentes / alunosPagantes) * 1000) / 10;
 }
 
+/**
+ * Taxa de churn: cancelamentos no periodo sobre alunos pagantes no INICIO do
+ * periodo -- F74, `SPEC-074` §4.1.
+ *
+ * O denominador e a base de ONTEM, nao a de hoje: a base de hoje ja reflete
+ * os proprios cancelamentos do periodo, e dividir por ela subestimaria a
+ * taxa exatamente quando mais gente saiu.
+ *
+ * `null` sem pagante no inicio do periodo -- mesma razao de
+ * `taxaDeInadimplencia`: 0% seria meta batida em cima de nada.
+ */
+export function taxaDeChurn(cancelamentos: number, pagantesNoInicio: number): number | null {
+  if (pagantesNoInicio === 0) {
+    return null;
+  }
+
+  return Math.round((cancelamentos / pagantesNoInicio) * 1000) / 10;
+}
+
+/** Um par criacao/cancelamento com os dois eventos de timeline presentes. */
+export interface ParDeVidaDaAssinatura {
+  readonly criadoEm: Date;
+  readonly canceladoEm: Date;
+}
+
+const MS_POR_MES = 30 * 86_400_000;
+
+/**
+ * Vida media, em meses, dos cancelamentos com os DOIS eventos de timeline
+ * presentes -- F74, `SPEC-074` §3 e §4.1.
+ *
+ * SO PARES COMPLETOS ENTRAM: os ~1.926 registros importados do Pacto tem
+ * `SUBSCRIPTION_CANCELLED`... na verdade nem isso -- entraram como status
+ * `CANCELLED` sem NENHUM evento de timeline (ADR-033). Um cancelamento sem o
+ * `SUBSCRIPTION_CREATED` correspondente nao tem "vida" para medir, e
+ * inventar uma data de inicio contrariaria o `CLAUDE.md` ("sem dado
+ * inventado no caminho de producao"). O CHAMADOR decide o que fazer com uma
+ * lista vazia -- aqui so se calcula a media do que existe de verdade.
+ *
+ * Meses de 30 dias, nao mes de calendario: a vida de uma assinatura nao
+ * anda em meses de calendario (fevereiro tem menos dias que julho), e o
+ * numero aqui e estatistica de leitura, nao data a cravar.
+ */
+export function vidaMediaEmMeses(pares: readonly ParDeVidaDaAssinatura[]): number | null {
+  if (pares.length === 0) {
+    return null;
+  }
+
+  const totalDeMeses = pares.reduce((soma, par) => {
+    const meses = (par.canceladoEm.getTime() - par.criadoEm.getTime()) / MS_POR_MES;
+
+    return soma + meses;
+  }, 0);
+
+  // Uma casa decimal: o dia calendario nao divide exato por "mes de 30
+  // dias", e duas casas exibiriam ruido de arredondamento como se fosse
+  // precisao real sobre uma base que ja e aproximacao.
+  return Math.round((totalDeMeses / pares.length) * 10) / 10;
+}
+
+/**
+ * Piso de cancelamentos com timeline completa para o LTV virar numero --
+ * `SPEC-074` §4.2. Mesma disciplina de `MINIMO_DE_PONTOS_DA_SERIE`: um ou
+ * dois cancelamentos nao sustentam uma media que o dono vai usar para
+ * decidir algo.
+ */
+export const MINIMO_DE_CANCELAMENTOS_PARA_LTV = 3;
+
+/**
+ * LTV: ticket medio vezes vida media observada -- decisao do PI em
+ * `SPEC-074` §2.4.
+ *
+ * `null` sem ticket medio, sem vida media, OU com menos cancelamentos
+ * completos que o piso -- qualquer um dos tres torna o numero uma afirmacao
+ * sobre amostra vazia ou pequena demais, e a tela mostra ausencia em vez de
+ * um valor que parece preciso e nao e.
+ */
+export function ltv(
+  ticketMedioMinor: number | null,
+  vidaMedia: number | null,
+  cancelamentosComTimelineCompleta: number,
+): number | null {
+  if (ticketMedioMinor === null || vidaMedia === null) {
+    return null;
+  }
+
+  if (cancelamentosComTimelineCompleta < MINIMO_DE_CANCELAMENTOS_PARA_LTV) {
+    return null;
+  }
+
+  return Math.round(ticketMedioMinor * vidaMedia);
+}
+
 /** Um ponto da serie por competencia. Competencia e `YYYY-MM`, nunca instante. */
 export interface PontoDaSerie {
   readonly competencia: string;
