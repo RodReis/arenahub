@@ -18,7 +18,11 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "diagnostico": "tsx src/diagnostics/run.ts",
-    "bridge:build": "powershell -ExecutionPolicy Bypass -File native/easyinner-bridge/build.ps1"
+    "bridge:build": "powershell -ExecutionPolicy Bypass -File native/easyinner-bridge/build.ps1",
+    "//service:install": "Instala o edge-agent como servico Windows. Requer PowerShell como Administrador.",
+    "service:install": "powershell -ExecutionPolicy Bypass -File scripts/install-service.ps1",
+    "//service:uninstall": "Remove o servico Windows, preservando SQLite e credencial.",
+    "service:uninstall": "powershell -ExecutionPolicy Bypass -File scripts/uninstall-service.ps1"
   },
   "dependencies": {
     "@arenahub/api-contracts": "workspace:*",
