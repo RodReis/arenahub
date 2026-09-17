@@ -29,6 +29,60 @@
  * move — ocupa a coluna larga, e o contexto do mês fica na estreita.
  */
 
+/* ─── Banner de aniversário hoje ───────────────────────────────────────── */
+
+/*
+ * O BANNER É O ÚNICO BLOCO DO PAINEL MAIS OUSADO QUE O KPI -- de propósito.
+ * Ele só existe no dia em que existe (some sem ninguém fazendo aniversário),
+ * então quando aparece precisa saltar acima da faixa de KPI e do resto da
+ * tela sóbria, ou a recepção não nota a diferença entre "hoje" e "este mês"
+ * (que já está no cartão da coluna larga).
+ *
+ * Ainda assim seguem as regras do painel: cor SEMÂNTICA
+ * (`--ah-state-warning`, o âmbar do sistema, não um dourado inventado),
+ * ícone traçado (nunca emoji) e texto -- nunca só cor. Sem listra lateral
+ * (banida em `DS-PAINEL.md`): o destaque vem da superfície inteira tingida
+ * e da borda cheia, não de um risco decorativo.
+ */
+.bannerDeHoje {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 14px 16px 16px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-warning) 35%, transparent);
+  border-radius: var(--ah-radius-card);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ah-state-warning) 12%, var(--ah-surface-raised)) 0%,
+    color-mix(in srgb, var(--ah-state-warning) 4%, var(--ah-surface-raised)) 100%
+  );
+}
+
+.bannerTitulo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: 700;
+  color: var(--ah-state-warning);
+}
+
+.bannerLista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bannerItem {
+  min-width: 0;
+}
+
 /* ─── Faixa de KPI ─────────────────────────────────────────────────────── */
 
 /*
@@ -446,6 +500,11 @@
  * O cabeçalho do cartão tem fundo REBAIXADO, não a mesma superfície do corpo:
  * separa título de conteúdo por material em vez de por uma linha só, o que dá
  * profundidade sem sombra nenhuma.
+ *
+ * TRÊS dos cinco cartões são `<summary>` de um `<details>` -- accordion nativo,
+ * sem JS. `list-style: none` (+ o seletor `::-webkit-details-marker` abaixo)
+ * apaga o triângulo padrão do navegador; o chevron próprio (`.tituloDoCartao
+ * + svg`, ver abaixo) substitui com o mesmo traçado do resto do painel.
  */
 .cabecalhoDoCartao {
   display: flex;
@@ -457,6 +516,64 @@
   border-radius: var(--ah-radius-card) var(--ah-radius-card) 0 0;
   /* Mesma luz-de-cima dos KPIs, para o material ler igual na tela toda. */
   background: linear-gradient(180deg, var(--ah-surface-canvas) 0%, var(--ah-surface-sunken) 100%);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+summary.cabecalhoDoCartao::-webkit-details-marker {
+  display: none;
+}
+
+/*
+ * FOCO VISÍVEL no `<summary>` -- ele agora é um controle interativo
+ * (teclado ativa com Enter/Espaço), e o painel exige anel de 2px + offset
+ * em todo controle (`PRODUCT.md` -- Acessibilidade).
+ */
+summary.cabecalhoDoCartao:focus-visible {
+  outline: 2px solid var(--ah-action-text);
+  outline-offset: -2px;
+}
+
+/*
+ * O CHEVRON do accordion -- sempre o último ícone do `<summary>`, à direita,
+ * ao lado de qualquer badge que já exista ali (ex.: "ao vivo"). Gira 180°
+ * quando `<details open>`. `transform`, não troca de ícone: menos DOM, e a
+ * rotação já comunica "isto vai abrir/fechar" por movimento (Princípio 3,
+ * terceiro canal além de estado e texto).
+ *
+ * `svg:last-child` (descendente, não filho direto): no cartão sem badge o
+ * SVG é filho direto do `<summary>`; no de "Acessos em tempo real" ele mora
+ * dentro de `.acoesDoCabecalho`, junto do "ao vivo" -- os dois precisam do
+ * mesmo destino final (canto direito) sem duplicar a regra.
+ */
+summary.cabecalhoDoCartao svg:last-child {
+  flex-shrink: 0;
+  color: var(--ah-text-secondary);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+details[open] > summary.cabecalhoDoCartao svg:last-child {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  summary.cabecalhoDoCartao svg:last-child {
+    transition: none;
+  }
+}
+
+/*
+ * WRAPPER do lado direito do cabeçalho quando há mais de um elemento além
+ * do título -- hoje só "Acessos em tempo real" (badge "ao vivo" + chevron).
+ * Sem ele os dois ficariam espalhados pelo `justify-content: space-between`
+ * do cabeçalho em vez de agrupados no canto.
+ */
+.acoesDoCabecalho {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
 }
 
 /*
@@ -840,6 +957,64 @@
   font-size: 10px;
   font-weight: 600;
   color: var(--ah-text-secondary);
+}
+
+/* ─── Aniversariantes ──────────────────────────────────────────────────── */
+
+/*
+ * MESMO BLOCO DE DIA do feriado (`.diaDoFeriado`) -- as duas listas são
+ * "calendário do mês" e merecem ler igual. O que muda é o destaque de quem
+ * faz aniversário HOJE, que o feriado não tem.
+ */
+.aniversario {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 7px;
+}
+
+.aniversario:not(:last-child) {
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+/*
+ * HOJE ganha a MESMA linguagem de superfície tingida do KPI com estado
+ * (emenda de 01/09/2026) -- SEM listra lateral: `DS-PAINEL.md` bane a aresta
+ * decorativa de borda (o "side-tab" que marca interface gerada por IA de
+ * relance). O destaque vem da superfície tingida a 7%, do bloco de dia em
+ * verde e do selo "Hoje" -- três canais sem precisar de risco na lateral.
+ */
+.aniversario[data-hoje='true'] {
+  border-bottom-color: transparent;
+  background: color-mix(in srgb, var(--ah-state-success) 7%, transparent);
+}
+
+.aniversario[data-hoje='true'] .diaDoFeriado {
+  border-color: color-mix(in srgb, var(--ah-state-success) 40%, transparent);
+  background: color-mix(in srgb, var(--ah-state-success) 14%, var(--ah-surface-sunken));
+}
+
+.aniversario[data-hoje='true'] .diaDoFeriadoNumero {
+  color: var(--ah-state-success);
+}
+
+/*
+ * O SELO "Hoje" -- ícone de bolo + texto, terceiro canal além de cor e
+ * aresta. Quem não distingue a tinta verde ainda lê a palavra.
+ */
+.hojeSelo {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ah-state-success) 16%, transparent);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ah-state-success);
 }
 
 /* ─── Movimento reduzido ───────────────────────────────────────────────── */

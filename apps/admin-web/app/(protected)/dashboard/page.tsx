@@ -5,6 +5,7 @@ import {
   DataFreshness,
   EmptyState,
   Icon,
+  Identidade,
   type IconName,
   PageHeader,
   ProblemDetail,
@@ -53,6 +54,7 @@ interface Dashboard {
   } | null;
   desafiosAtivos: { id: string; title: string; endsOn: string; participantes: number }[];
   feriados: { data: string; nome: string; origem: string }[];
+  aniversariantes: { nome: string; diaEMes: string; hoje: boolean }[];
 }
 
 /** Os quatro motivos da lista fechada da issue #241. */
@@ -144,6 +146,13 @@ function partesDaData(data: string): { dia: string; mes: string } {
   return { dia, mes: MES_ABREVIADO[Number(mes) - 1] ?? mes };
 }
 
+/** Dia e mês de um `diaEMes` (`MM-DD`) — mesmo formato do feriado, ordem invertida. */
+function partesDoAniversario(diaEMes: string): { dia: string; mes: string } {
+  const [mes = '01', dia = '01'] = diaEMes.split('-');
+
+  return { dia, mes: MES_ABREVIADO[Number(mes) - 1] ?? mes };
+}
+
 /**
  * Dashboard operacional — F57, `SPEC-057`.
  *
@@ -205,6 +214,8 @@ export default async function PaginaDoDashboard({
   const tudoOnline =
     dados.dispositivos.total > 0 && dados.dispositivos.online === dados.dispositivos.total;
 
+  const aniversariantesDeHoje = dados.aniversariantes.filter((a) => a.hoje);
+
   return (
     <>
       <PageHeader
@@ -212,6 +223,30 @@ export default async function PaginaDoDashboard({
         title="Dashboard operacional"
         actions={<DataFreshness state="current" at={dados.geradoEm} timeZone={fuso} />}
       />
+
+      {/*
+        BANNER DE HOJE, separado da lista do mês (Princípio 1: a exceção é o
+        caso principal -- e "tem aluno fazendo aniversário agora" é a única
+        situação deste bloco que pede ação da recepção NA HORA, não só
+        contexto de calendário). Só aparece quando há alguém; sem isso um
+        banner permanente vazio vira ruído no topo da tela mais aberta do
+        painel.
+      */}
+      {aniversariantesDeHoje.length > 0 ? (
+        <div className={estilos['bannerDeHoje']} data-testid="banner-aniversario-hoje">
+          <p className={estilos['bannerTitulo']}>
+            <Icon name="cake" />
+            Aniversário hoje · {aniversariantesDeHoje.length}
+          </p>
+          <ul className={estilos['bannerLista']}>
+            {aniversariantesDeHoje.map((aniversariante) => (
+              <li className={estilos['bannerItem']} key={aniversariante.nome}>
+                <Identidade nome={doisNomes(aniversariante.nome)} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {unidade === null ? (
         <EmptyState
@@ -370,13 +405,14 @@ export default async function PaginaDoDashboard({
             <FeedAoVivo gymUnitId={unidade.id} timeZone={unidade.timezone} inicial={feedInicial} />
           ) : null}
 
-          <section className={estilos['cartao']} aria-labelledby="titulo-das-situacoes">
-            <header className={estilos['cabecalhoDoCartao']}>
-              <h2 className={estilos['tituloDoCartao']} id="titulo-das-situacoes">
+          <details className={estilos['cartao']}>
+            <summary className={estilos['cabecalhoDoCartao']}>
+              <h2 className={estilos['tituloDoCartao']}>
                 <Icon name="user-x" />
                 Bloqueados e suspensos
               </h2>
-            </header>
+              <Icon name="chevron-down" />
+            </summary>
             <div className={estilos['conteudoDoCartao']}>
               {dados.situacoes.length === 0 ? (
                 <Vazio icone="check-circle" tom="success">
@@ -426,7 +462,52 @@ export default async function PaginaDoDashboard({
                 </p>
               ) : null}
             </div>
-          </section>
+          </details>
+
+          <details className={estilos['cartao']}>
+            <summary className={estilos['cabecalhoDoCartao']}>
+              <h2 className={estilos['tituloDoCartao']}>
+                <Icon name="cake" />
+                Aniversariantes do mês
+              </h2>
+              <Icon name="chevron-down" />
+            </summary>
+            <div className={estilos['conteudoDoCartao']}>
+              {dados.aniversariantes.length === 0 ? (
+                <Vazio icone="cake">Nenhum aniversário neste mês.</Vazio>
+              ) : (
+                <ul className={estilos['lista']} data-testid="aniversariantes-do-mes">
+                  {dados.aniversariantes.map((aniversariante) => {
+                    const { dia, mes } = partesDoAniversario(aniversariante.diaEMes);
+
+                    return (
+                      <li
+                        className={estilos['aniversario']}
+                        key={`${aniversariante.diaEMes}-${aniversariante.nome}`}
+                        data-hoje={aniversariante.hoje}
+                      >
+                        <span className={estilos['diaDoFeriado']}>
+                          <span className={estilos['diaDoFeriadoNumero']}>{dia}</span>
+                          <span className={estilos['diaDoFeriadoMes']}>{mes}</span>
+                        </span>
+                        <span className={estilos['linhaTexto']}>{doisNomes(aniversariante.nome)}</span>
+                        {/*
+                          HOJE em texto, não só na aresta colorida — cor nunca
+                          é canal único (Princípio 3).
+                        */}
+                        {aniversariante.hoje ? (
+                          <span className={estilos['hojeSelo']}>
+                            <Icon name="cake" />
+                            Hoje
+                          </span>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </details>
         </div>
 
         <div className={estilos['coluna']}>

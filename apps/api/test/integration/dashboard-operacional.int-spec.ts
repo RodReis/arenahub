@@ -428,6 +428,103 @@ describe('F57 -- dashboard operacional', () => {
   });
 
   /*
+   * Aniversariantes do mes -- bloco novo do dashboard.
+   *
+   * O que so integracao prova: o corte por MES-DIA contra dado real (o
+   * aluno de outro mes nao aparece), o `hoje: true` bate com a data local da
+   * unidade, e ARCHIVED/CANCELLED nao entram.
+   */
+  describe('Aniversariantes do mes', () => {
+    // "MM-DD" -- en-CA formata nessa ordem quando so mes e dia sao pedidos.
+    const hojeMesDia = new Intl.DateTimeFormat('en-CA', {
+      timeZone: FUSO,
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    beforeAll(async () => {
+      const nascidoEm = (mesDia: string) => new Date(`1990-${mesDia}T00:00:00.000Z`);
+
+      const aluno = async (
+        nome: string,
+        mesDia: string,
+        status: 'ACTIVE' | 'ARCHIVED' | 'CANCELLED',
+        gymUnitId: string,
+      ) =>
+        db.student.create({
+          data: {
+            tenantId: ids.tenantId,
+            gymUnitId,
+            fullName: nome,
+            membershipNumber: `${sufixo}-aniv-${randomUUID().slice(0, 6)}`,
+            birthDate: nascidoEm(mesDia),
+            status,
+          },
+        });
+
+      const mesDeHoje = hojeMesDia.slice(0, 2);
+      const diaDeHoje = hojeMesDia.slice(3, 5);
+      // Outro DIA no mesmo mes -- nunca 01, para nao colidir se hoje for dia 1.
+      const outroDiaDoMes = `${mesDeHoje}-${diaDeHoje === '15' ? '16' : '15'}`;
+      const proximoMes = ((Number(mesDeHoje) % 12) + 1).toString().padStart(2, '0');
+
+      await Promise.all([
+        aluno('Aniversariante de Hoje', hojeMesDia, 'ACTIVE', ids.unidadeA),
+        aluno('Aniversariante do Mes', outroDiaDoMes, 'ACTIVE', ids.unidadeA),
+        aluno('Arquivado de Hoje', hojeMesDia, 'ARCHIVED', ids.unidadeA),
+        aluno('Cancelado de Hoje', hojeMesDia, 'CANCELLED', ids.unidadeA),
+        aluno('Do Mes Errado', `${proximoMes}-10`, 'ACTIVE', ids.unidadeA),
+        aluno('Aniversariante da Filial', hojeMesDia, 'ACTIVE', ids.unidadeB),
+      ]);
+    });
+
+    it('traz quem faz aniversario no mes, marcando hoje corretamente', async () => {
+      const resposta = await request(servidor())
+        .get(`/api/v1/dashboard?gymUnitId=${ids.unidadeA}`)
+        .set('Cookie', cookieAdmin)
+        .expect(200);
+
+      const aniversariantes = (
+        resposta.body as { aniversariantes: { nome: string; diaEMes: string; hoje: boolean }[] }
+      ).aniversariantes;
+
+      const deHoje = aniversariantes.find((a) => a.nome === 'Aniversariante de Hoje');
+      expect(deHoje?.hoje).toBe(true);
+      expect(deHoje?.diaEMes).toBe(hojeMesDia);
+
+      expect(aniversariantes.some((a) => a.nome === 'Aniversariante do Mes')).toBe(true);
+      expect(aniversariantes.some((a) => a.nome === 'Do Mes Errado')).toBe(false);
+    });
+
+    it('nao traz arquivado nem cancelado, mesmo fazendo aniversario hoje', async () => {
+      const resposta = await request(servidor())
+        .get(`/api/v1/dashboard?gymUnitId=${ids.unidadeA}`)
+        .set('Cookie', cookieAdmin)
+        .expect(200);
+
+      const nomes = (resposta.body as { aniversariantes: { nome: string }[] }).aniversariantes.map(
+        (a) => a.nome,
+      );
+
+      expect(nomes).not.toContain('Arquivado de Hoje');
+      expect(nomes).not.toContain('Cancelado de Hoje');
+    });
+
+    it('o aniversariante da FILIAL nao aparece na matriz', async () => {
+      const resposta = await request(servidor())
+        .get(`/api/v1/dashboard?gymUnitId=${ids.unidadeA}`)
+        .set('Cookie', cookieAdmin)
+        .expect(200);
+
+      const nomes = (resposta.body as { aniversariantes: { nome: string }[] }).aniversariantes.map(
+        (a) => a.nome,
+      );
+
+      expect(nomes).not.toContain('Aniversariante da Filial');
+    });
+  });
+
+  /*
    * AC-8 -- escopo de unidade. O gerente restrito a matriz nao le a filial.
    */
   describe('AC-8 -- escopo de unidade', () => {

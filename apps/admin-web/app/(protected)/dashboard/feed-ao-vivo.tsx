@@ -99,21 +99,22 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial }: Props) {
   }, [atualizar]);
 
   return (
-    <section className={estilos['cartao']} aria-labelledby="titulo-do-feed">
-      <header className={estilos['cabecalhoDoCartao']}>
-        <h2 className={estilos['tituloDoCartao']} id="titulo-do-feed">
-          Acessos em tempo real
-        </h2>
-        <span
-          className={estilos['aoVivo']}
-          data-pausado={pausado}
-          data-testid="estado-do-feed"
-          role="status"
-        >
-          <span className={estilos['pulso']} aria-hidden="true" />
-          {pausado ? 'pausado' : 'ao vivo'}
+    <details className={estilos['cartao']} open>
+      <summary className={estilos['cabecalhoDoCartao']}>
+        <h2 className={estilos['tituloDoCartao']}>Acessos em tempo real</h2>
+        <span className={estilos['acoesDoCabecalho']}>
+          <span
+            className={estilos['aoVivo']}
+            data-pausado={pausado}
+            data-testid="estado-do-feed"
+            role="status"
+          >
+            <span className={estilos['pulso']} aria-hidden="true" />
+            {pausado ? 'pausado' : 'ao vivo'}
+          </span>
+          <Icon name="chevron-down" />
         </span>
-      </header>
+      </summary>
 
       <div className={estilos['conteudoDoCartao']}>
         {eventos.length === 0 ? (
@@ -164,6 +165,6 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial }: Props) {
           </ul>
         )}
       </div>
-    </section>
+    </details>
   );
 }

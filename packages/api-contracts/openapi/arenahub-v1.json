@@ -9515,6 +9515,29 @@
                           }
                         }
                       }
+                    },
+                    "aniversariantes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "nome",
+                          "diaEMes",
+                          "hoje"
+                        ],
+                        "properties": {
+                          "nome": {
+                            "type": "string"
+                          },
+                          "diaEMes": {
+                            "type": "string",
+                            "description": "MM-DD"
+                          },
+                          "hoje": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
                     }
                   }
                 }
