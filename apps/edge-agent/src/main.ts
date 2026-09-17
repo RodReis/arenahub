@@ -12,24 +12,23 @@ import { config as carregarEnv } from 'dotenv';
 // reclamando de EDGE_AGENT_ID -- com o valor sentado no `.env` ao lado.
 carregarEnv({ path: join(process.cwd(), '../../.env') });
 
-const { carregarConfig, descreverConfig, ConfigInvalidaError } = await import(
-  './config/env.js'
-);
-const { componenteProcesso, montarHeartbeat } = await import('./health/health-check.js');
+const { carregarConfig, descreverConfig, ConfigInvalidaError } = await import('./config/env.js');
 const { criarLogger, loggerDaTentativa } = await import('./observability/logger.js');
+const { compor } = await import('./producao/compor-agente.js');
+const { SignedCloudClient } = await import('./cloud/signed-client.js');
+const { iniciarLacoDeHeartbeat } = await import('./producao/laco-de-heartbeat.js');
 
 /**
- * Ponto de entrada do edge-agent.
+ * Ponto de entrada de PRODUCAO do edge-agent (F59).
  *
- * `M0-NFR-007`: inicia sem interface grafica e encerra graciosamente. Roda
- * como servico no Windows -- nao ha console para responder a prompt, e
- * encerramento abrupto perde evento que o SQLite ainda nao confirmou.
- *
- * Hoje o agente so sobe, valida configuracao e emite heartbeat. Adapter de
- * dispositivo, fila e reconciliacao sao das fatias seguintes: F2 em diante.
+ * Sobe a composicao real (Task 5), inicia o laco de heartbeat HTTP para a
+ * nuvem (F11/AC-8) e encerra graciosamente. `USE_SIMULATOR` deu lugar a
+ * `FACIAL_MODE`/`CATRACA_MODE` (F59, Task 1) -- cada dispositivo escolhe
+ * real ou simulador de forma independente.
  */
 
 const INTERVALO_HEARTBEAT_MS = 30_000;
+const VERSAO_DO_AGENTE = process.env['npm_package_version'] ?? '0.0.0';
 
 async function main(): Promise<void> {
   let config;
@@ -47,40 +46,58 @@ async function main(): Promise<void> {
 
   const logger = criarLogger(config);
 
-  logger.info(
-    { config: descreverConfig(config) },
-    'edge-agent iniciando',
-  );
+  logger.info({ config: descreverConfig(config) }, 'edge-agent iniciando');
 
   if (config.FACIAL_MODE === 'simulador' || config.CATRACA_MODE === 'simulador') {
     logger.warn(
-      'modo simulador: nenhum equipamento real sera contatado (M0-NFR-006)',
+      { facial: config.FACIAL_MODE, catraca: config.CATRACA_MODE },
+      'modo simulador ativo para ao menos um dispositivo (M0-NFR-006)',
     );
   }
 
-  const timer = setInterval(() => {
-    const heartbeat = montarHeartbeat(config, [componenteProcesso(config)], new Date());
-    loggerDaTentativa(logger).info({ heartbeat }, 'heartbeat');
-  }, INTERVALO_HEARTBEAT_MS);
+  const composto = await compor(config, logger);
 
-  // Primeiro heartbeat imediato: esperar 30 s para saber se o agente subiu
-  // torna o runbook lento e faz parecer travado.
-  const inicial = montarHeartbeat(config, [componenteProcesso(config)], new Date());
-  loggerDaTentativa(logger).info({ heartbeat: inicial }, 'heartbeat');
+  const clienteHeartbeat = new SignedCloudClient({
+    baseUrl: config.CLOUD_API_URL ?? '',
+    keyId: config.CLOUD_EDGE_KEY_ID ?? '',
+    secret: config.CLOUD_EDGE_SECRET ?? '',
+  });
 
-  /** Encerramento gracioso -- `M0-NFR-007`. */
+  const pararHeartbeat = iniciarLacoDeHeartbeat({
+    cliente: clienteHeartbeat,
+    intervaloMs: INTERVALO_HEARTBEAT_MS,
+    montarCorpo: () => ({
+      agentVersion: VERSAO_DO_AGENTE,
+      localTimeMs: Date.now(),
+      queueDepth: 0,
+      devices: [],
+    }),
+    aoFalhar: (erro) => {
+      loggerDaTentativa(logger).warn({ erro }, 'heartbeat nao chegou na nuvem');
+    },
+  });
+
+  logger.info('edge-agent pronto');
+
+  let encerrando = false;
+
   const encerrar = (sinal: string): void => {
+    if (encerrando) return;
+    encerrando = true;
+
     logger.info({ sinal }, 'encerrando');
-    clearInterval(timer);
-    // Aqui entram, nas fatias seguintes: drenar a fila, fechar o SQLite e
-    // desconectar os adapters. Hoje nao ha nenhum dos tres.
-    process.exit(0);
+    pararHeartbeat();
+
+    void composto
+      .encerrar()
+      .catch((erro: unknown) => {
+        logger.error({ erro: erro instanceof Error ? erro.message : erro }, 'erro ao encerrar');
+      })
+      .finally(() => process.exit(0));
   };
 
   process.once('SIGINT', () => encerrar('SIGINT'));
   process.once('SIGTERM', () => encerrar('SIGTERM'));
-
-  await Promise.resolve();
 }
 
 main().catch((erro: unknown) => {
