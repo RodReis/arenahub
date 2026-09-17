@@ -79,4 +79,102 @@ describe('compor', () => {
 
     await composto.encerrar();
   });
+
+  it('uma tentativa em COMMAND_PENDING sobrevive ao encerramento e e reportada na proxima composicao', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'arenahub-compor-agente-retomada-'));
+    const caminhoSqlite = join(dir, 'teste-retomada.sqlite');
+
+    const config = carregarConfig({
+      EDGE_AGENT_ID: 'edge-1',
+      TENANT_ID: '11111111-1111-4111-8111-111111111111',
+      GYM_UNIT_ID: '22222222-2222-4222-8222-222222222222',
+      SQLITE_PATH: caminhoSqlite,
+      CLOUD_API_URL: 'https://nuvem.teste',
+      CLOUD_EDGE_KEY_ID: 'key-1',
+      CLOUD_EDGE_SECRET: 'segredo-com-16-bytes-ou-mais',
+    });
+    const logger = criarLogger(config);
+
+    // Simula reportarPassagem falhando na primeira composicao (rede caiu bem
+    // no momento do report), deixando a tentativa pendente.
+    const clienteQueFalhaNoReport = {
+      post: jest.fn(async (path: string) => {
+        if (path === '/api/v1/edge/access-decisions') {
+          return {
+            ok: true,
+            status: 201,
+            body: {
+              accessEventId: 'evt-2',
+              correlationId: 'c-2',
+              outcome: 'ALLOW',
+              reason: 'TESTE',
+              policyVersion: 'v1',
+              validUntil: null,
+              replayed: false,
+            },
+            errorCode: null,
+          };
+        }
+        return { ok: false, status: 0, body: null, errorCode: 'CLOUD_UNREACHABLE' };
+      }),
+      get: jest.fn(),
+    } as unknown as SignedCloudClient;
+
+    const facialDaPrimeiraComposicao = new FacialSimulator();
+
+    const primeiraComposicao = await compor(config, logger, {
+      cliente: clienteQueFalhaNoReport,
+      dispositivos: {
+        facial: facialDaPrimeiraComposicao,
+        catraca: {
+          nome: 'catraca-falsa',
+          liberar: jest.fn(async () => ({ desfecho: 'girou' as const, duracaoMs: 10 })),
+          encerrar: jest.fn(async () => {}),
+        },
+        encerrar: async () => {},
+      },
+    });
+
+    facialDaPrimeiraComposicao.simularReconhecimento('aluno-2', new Date());
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await primeiraComposicao.encerrar();
+
+    // Segunda composicao, agora com a nuvem respondendo: retomarPendentes
+    // deve reportar a tentativa presa, sem recomandar a catraca.
+    const catracaDaSegundaComposicao = {
+      nome: 'catraca-falsa-2',
+      liberar: jest.fn(async () => ({ desfecho: 'girou' as const, duracaoMs: 10 })),
+      encerrar: jest.fn(async () => {}),
+    };
+
+    const clienteQueFunciona = {
+      post: jest.fn(async () => ({
+        ok: true,
+        status: 201,
+        body: { accessEventId: 'evt-2', state: 'TIMED_OUT' },
+        errorCode: null,
+      })),
+      get: jest.fn(),
+    } as unknown as SignedCloudClient;
+
+    const segundaComposicao = await compor(config, logger, {
+      cliente: clienteQueFunciona,
+      dispositivos: {
+        facial: new FacialSimulator(),
+        catraca: catracaDaSegundaComposicao,
+        encerrar: async () => {},
+      },
+    });
+
+    expect(clienteQueFunciona.post).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/edge/access-events/evt-2/passage'),
+      expect.objectContaining({ commandId: expect.any(String) }),
+    );
+
+    // A regra central de retomarPendentes: nunca recomanda a catraca.
+    expect(catracaDaSegundaComposicao.liberar).not.toHaveBeenCalled();
+
+    await segundaComposicao.encerrar();
+  });
 });
