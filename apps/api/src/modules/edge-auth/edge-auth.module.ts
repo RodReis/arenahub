@@ -4,6 +4,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { EdgeAuthGuard } from './edge-auth.guard.js';
 import { EdgeAuthService } from './edge-auth.service.js';
 import { EdgeController } from './edge.controller.js';
+import { PairingController } from './pairing.controller.js';
+import { PairingService } from './pairing.service.js';
 
 /**
  * Autenticacao do Edge por assinatura HMAC.
@@ -17,8 +19,12 @@ import { EdgeController } from './edge.controller.js';
  * consome o stream antes de qualquer middleware de modulo rodar.
  */
 @Module({
-  controllers: [EdgeController],
-  providers: [EdgeAuthService, { provide: APP_GUARD, useClass: EdgeAuthGuard }],
+  controllers: [EdgeController, PairingController],
+  providers: [
+    EdgeAuthService,
+    PairingService,
+    { provide: APP_GUARD, useClass: EdgeAuthGuard },
+  ],
   exports: [EdgeAuthService],
 })
 export class EdgeAuthModule {}

@@ -3780,6 +3780,39 @@
         ]
       }
     },
+    "/api/v1/edge/pair": {
+      "post": {
+        "operationId": "PairingController_pair",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "keyId",
+                    "secret"
+                  ],
+                  "properties": {
+                    "keyId": {
+                      "type": "string"
+                    },
+                    "secret": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Pairing"
+        ]
+      }
+    },
     "/api/v1/kiosk/heartbeat": {
       "post": {
         "operationId": "KioskController_heartbeat",

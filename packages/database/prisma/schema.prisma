@@ -674,6 +674,7 @@ model Tenant {
   privacySettings     TenantPrivacySettings?
   edgeNodes           EdgeNode[]
   edgeCredentials     EdgeCredential[]
+  edgePairingCodes    EdgePairingCode[]
   devices             Device[]
   deviceUsers         DeviceUser[]
   deviceSyncJobs      DeviceSyncJob[]
@@ -2050,9 +2051,10 @@ model EdgeNode {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
-  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   devices      Device[]
   credentials  EdgeCredential[]
+  pairingCodes EdgePairingCode[]
   commands     DeviceCommand[]
   nonces       ReplayNonce[]
   accessEvents AccessEvent[]
@@ -2098,6 +2100,27 @@ model EdgeCredential {
 
   @@index([tenantId, edgeNodeId, revokedAt])
   @@map("edge_credentials")
+}
+
+/// Codigo de pareamento de uso unico -- ADR-011. Trocado por
+/// `EdgeCredential` no primeiro arranque do agente. Nasce no painel,
+/// morre no uso (ou no TTL).
+model EdgePairingCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  gymUnitId  String    @map("gym_unit_id") @db.Uuid
+  edgeNodeId String    @map("edge_node_id") @db.Uuid
+  /// Hash do codigo (nunca o codigo em claro -- mesma logica de senha).
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  edgeNode EdgeNode @relation(fields: [edgeNodeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, gymUnitId])
+  @@map("edge_pairing_codes")
 }
 
 /// Nonce ja usado, para barrar repeticao de requisicao assinada.

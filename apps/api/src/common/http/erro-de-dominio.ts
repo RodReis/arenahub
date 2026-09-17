@@ -70,3 +70,16 @@ export class MfaBloqueadoPorTentativasError extends ErroDeDominio {
     super('MFA_RATE_LIMITED', 429, 'Muitas tentativas. Tente novamente em instantes');
   }
 }
+
+/**
+ * Codigo de pareamento do Edge recusado (F59, ADR-011).
+ *
+ * UM erro para codigo inexistente, expirado OU ja usado, de proposito --
+ * igual a `CredencialInvalidaError`. Distinguir os tres transformaria a rota
+ * num oraculo para quem esta tentando codigos ao acaso.
+ */
+export class RecusaDePareamentoError extends ErroDeDominio {
+  constructor() {
+    super('EDGE_PAIRING_REJECTED', 409, 'Codigo de pareamento invalido');
+  }
+}
