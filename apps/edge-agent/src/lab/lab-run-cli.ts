@@ -32,6 +32,7 @@ import { join } from 'node:path';
 import pino from 'pino';
 
 import { type SentidoGiro } from '../domain/turnstile.js';
+import { type EventoReconhecimento } from '../domain/facial-device.js';
 import { TopdataFacialAdapter } from '../adapters/topdata/topdata-facial-adapter.js';
 import { TopdataInnerAdapter } from '../adapters/topdata/topdata-inner-adapter.js';
 import { PonteEasyInnerProcesso } from '../adapters/topdata/ponte-easyinner-processo.js';
@@ -84,9 +85,19 @@ function lerHeadless(argv: readonly string[]): boolean {
 /**
  * Fio da bancada sem hardware -- simuladores no lugar dos adapters reais.
  *
- * Dispara dois reconhecimentos sinteticos (um permitido, um negado) para o
+ * Processa dois reconhecimentos sinteticos (um permitido, um negado) para o
  * arquivo de evidencia sempre carregar as duas decisoes, encerra sozinho
  * (sem esperar Ctrl+C) e grava a evidencia via `escreverEvidencia`.
+ *
+ * Chama `bancada.processar` DIRETAMENTE em vez de rotear por
+ * `facial.simularReconhecimento` + `aoReconhecer`: o objetivo aqui e gerar
+ * evidencia deterministica, nao exercitar o wiring do simulador de leitor.
+ * Rotear pelo callback tornaria o resultado dependente de quando o
+ * `.then()` resolve -- so daria para saber que as duas tentativas
+ * terminaram esperando um tempo fixo, o que e frágil sob CI com CPU
+ * variavel (pode gravar evidencia incompleta com exit code 0, sem sinal de
+ * erro). Chamando `processar` direto, o `await` de cada chamada e a propria
+ * garantia de termino -- sem timer.
  */
 async function rodarHeadless(logger: pino.Logger, permitidosArg: readonly string[]): Promise<void> {
   const permitidos = permitidosArg.length > 0 ? permitidosArg : [ENROLLID_HEADLESS_PERMITIDO];
@@ -101,26 +112,36 @@ async function rodarHeadless(logger: pino.Logger, permitidosArg: readonly string
     nomeDoLeitor: facial.nome,
   });
 
-  const tentativas: TentativaDeEvidencia[] = [];
-  let seq = 0;
-  facial.aoReconhecer((evento) => {
-    const correlationId = `lab-headless-${Date.now()}-${(seq += 1)}`;
-    void bancada.processar(evento, correlationId, new Date()).then((r) => {
-      tentativas.push({
-        externalEnrollId: evento.externalEnrollId,
-        decisao: r.decisao.resultado,
-        latenciaMs: r.latenciaDecisaoMs,
-      });
-    });
-  });
+  const eventoPermitido: EventoReconhecimento = {
+    externalEnrollId: permitidos[0]!,
+    ocorridoEm: new Date(),
+    recebidoEm: new Date(),
+    metodo: 'facial',
+  };
+  const eventoNegado: EventoReconhecimento = {
+    externalEnrollId: ENROLLID_HEADLESS_NEGADO,
+    ocorridoEm: new Date(),
+    recebidoEm: new Date(),
+    metodo: 'facial',
+  };
 
-  facial.simularReconhecimento(permitidos[0]!, new Date());
-  facial.simularReconhecimento(ENROLLID_HEADLESS_NEGADO, new Date());
+  const [resultadoPermitido, resultadoNegado] = await Promise.all([
+    bancada.processar(eventoPermitido, 'lab-headless-1', new Date()),
+    bancada.processar(eventoNegado, 'lab-headless-2', new Date()),
+  ]);
 
-  // As duas chamadas acima disparam processamento assincrono; aguarda a fila
-  // esvaziar antes de encerrar, senao a evidencia sai vazia (achado
-  // conhecido em fio assincrono sem espera explicita).
-  await new Promise((r) => setTimeout(r, 200));
+  const tentativas: TentativaDeEvidencia[] = [
+    {
+      externalEnrollId: eventoPermitido.externalEnrollId,
+      decisao: resultadoPermitido.decisao.resultado,
+      latenciaMs: resultadoPermitido.latenciaDecisaoMs,
+    },
+    {
+      externalEnrollId: eventoNegado.externalEnrollId,
+      decisao: resultadoNegado.decisao.resultado,
+      latenciaMs: resultadoNegado.latenciaDecisaoMs,
+    },
+  ];
 
   const resumo = resumirLatencia(bancada.latencias());
   escreverEvidencia(CAMINHO_EVIDENCIA, {
