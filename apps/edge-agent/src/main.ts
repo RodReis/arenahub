@@ -55,16 +55,53 @@ async function main(): Promise<void> {
     );
   }
 
-  const composto = await compor(config, logger);
+  const { ArmazenamentoDeCredencialWindows } = await import(
+    './producao/armazenamento-de-credencial.js'
+  );
+  const { resolverCredencial, CredencialAusenteError } = await import(
+    './producao/resolver-credencial.js'
+  );
 
-  const clienteHeartbeat = new SignedCloudClient({
-    baseUrl: config.CLOUD_API_URL ?? '',
-    keyId: config.CLOUD_EDGE_KEY_ID ?? '',
-    secret: config.CLOUD_EDGE_SECRET ?? '',
+  // %LOCALAPPDATA% ja e restrito ao perfil da conta Windows atual (nao
+  // world-readable) -- resolve a SUPOSICAO de ACL documentada em
+  // armazenamento-de-credencial.ts sem aplicar ACL propria. O risco de
+  // escopo DPAPI (pareamento e servico rodando sob contas diferentes,
+  // Task 13) permanece em aberto: ver comentario de classe.
+  const caminhoDaCredencial = join(
+    process.env['LOCALAPPDATA'] ?? process.cwd(),
+    'ArenaHub',
+    'edge-agent',
+    'credencial.dat',
+  );
+  const armazenamento = new ArmazenamentoDeCredencialWindows(caminhoDaCredencial);
+
+  const credencial = await resolverCredencial({
+    cloudApiUrl: config.CLOUD_API_URL,
+    keyIdDoEnv: config.CLOUD_EDGE_KEY_ID,
+    secretDoEnv: config.CLOUD_EDGE_SECRET,
+    codigoDePareamento: config.EDGE_PAIRING_CODE,
+    armazenamento,
   });
 
+  if (!credencial) {
+    logger.error(new CredencialAusenteError().message);
+    process.exit(1);
+  }
+
+  // Um unico cliente assinado, construido com a credencial RESOLVIDA (nao o
+  // valor cru de config.CLOUD_EDGE_KEY_ID/SECRET) -- compartilhado entre a
+  // composicao (decisao de acesso) e o laco de heartbeat, para os dois
+  // falarem com a nuvem com a mesma identidade.
+  const clienteNuvem = new SignedCloudClient({
+    baseUrl: config.CLOUD_API_URL ?? '',
+    keyId: credencial.keyId,
+    secret: credencial.secret,
+  });
+
+  const composto = await compor(config, logger, { cliente: clienteNuvem });
+
   const pararHeartbeat = iniciarLacoDeHeartbeat({
-    cliente: clienteHeartbeat,
+    cliente: clienteNuvem,
     intervaloMs: INTERVALO_HEARTBEAT_MS,
     montarCorpo: () => ({
       agentVersion: VERSAO_DO_AGENTE,

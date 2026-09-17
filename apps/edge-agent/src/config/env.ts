@@ -48,6 +48,9 @@ export const esquemaConfig = z.object({
   /** Segredo HMAC. NUNCA em log, nem mascarado. */
   CLOUD_EDGE_SECRET: segredo.optional(),
 
+  /** Codigo de pareamento de uso unico, gerado no painel (ADR-011). */
+  EDGE_PAIRING_CODE: z.string().min(8).optional(),
+
   /** Intervalo de busca por comando, em ms. */
   SYNC_POLL_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
 
