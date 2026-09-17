@@ -13,6 +13,8 @@
     "test:hardware:access": "tsx src/diagnostics/medir-passagem-online.ts",
     "//lab:run": "MVP 0: cadeia fisica ponta a ponta (facial -> decisao local -> catraca). Exige bancada montada. NAO roda no CI.",
     "lab:run": "tsx src/lab/lab-run-cli.ts",
+    "//lab:run:headless": "MVP 0: mesmo fio do lab:run, sem hardware. Roda no CI.",
+    "lab:run:headless": "tsx src/lab/lab-run-cli.ts --headless",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "diagnostico": "tsx src/diagnostics/run.ts",
