@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 
+import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { EdgeAuthGuard } from './edge-auth.guard.js';
 import { EdgeAuthService } from './edge-auth.service.js';
 import { EdgeController } from './edge.controller.js';
+import { PairingCodesController } from './pairing-codes.controller.js';
 import { PairingController } from './pairing.controller.js';
 import { PairingService } from './pairing.service.js';
 
@@ -19,10 +21,11 @@ import { PairingService } from './pairing.service.js';
  * consome o stream antes de qualquer middleware de modulo rodar.
  */
 @Module({
-  controllers: [EdgeController, PairingController],
+  controllers: [EdgeController, PairingController, PairingCodesController],
   providers: [
     EdgeAuthService,
     PairingService,
+    TenantContextService,
     { provide: APP_GUARD, useClass: EdgeAuthGuard },
   ],
   exports: [EdgeAuthService],

@@ -7,6 +7,7 @@ import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
 import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
+import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -20,6 +21,8 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
  * recusa NUNCA diferencia "nao existe" de "expirado" de "ja usado" -- as
  * quatro situacoes de falha caem no mesmo 409 genérico.
  */
+const SENHA_DO_PAINEL = 'SenhaForte#2026';
+
 describe('POST /api/v1/edge/pair', () => {
   let app: INestApplication;
   let db: PrismaService;
@@ -154,5 +157,149 @@ describe('POST /api/v1/edge/pair', () => {
       status: (respostaExpirado.body as { status: number }).status,
     });
     expect(respostaExpirado.body).toMatchObject({ code: 'EDGE_PAIRING_REJECTED' });
+  });
+});
+
+/**
+ * F59, Task 9 -- lado do painel: gerar o codigo que a Task 8 troca por
+ * credencial.
+ */
+describe('POST /api/v1/edge-nodes/:edgeNodeId/pairing-codes', () => {
+  let app: INestApplication;
+  let db: PrismaService;
+
+  const sufixo = randomUUID().slice(0, 8);
+
+  let tenantId: string;
+  let outroTenantId: string;
+  let edgeNodeId: string;
+  let edgeNodeDeOutroTenant: string;
+  let cookieDoPainel = '';
+
+  const servidor = (): Parameters<typeof request>[0] =>
+    app.getHttpServer() as Parameters<typeof request>[0];
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+
+    app = moduleRef.createNestApplication();
+    aplicarParserComCorpoCru(app);
+    await app.init();
+
+    db = app.get(PrismaService);
+
+    const tenant = await db.tenant.create({
+      data: {
+        slug: `f59-gerar-${sufixo}`,
+        legalName: 'Gerador de Codigo LTDA',
+        displayName: 'Gerador de Codigo',
+      },
+    });
+
+    tenantId = tenant.id;
+
+    const unidade = await db.gymUnit.create({
+      data: {
+        tenantId: tenant.id,
+        code: 'CENTRO',
+        name: 'Centro',
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+      },
+    });
+
+    const node = await db.edgeNode.create({
+      data: { tenantId: tenant.id, gymUnitId: unidade.id, code: `EDGE-GERAR-${sufixo}` },
+    });
+
+    edgeNodeId = node.id;
+
+    const email = `admin-gerar-${sufixo}@arenahub.test`;
+
+    const usuario = await db.user.create({
+      data: { email, passwordHash: await app.get(PasswordService).gerarHash(SENHA_DO_PAINEL) },
+    });
+
+    await db.tenantMembership.create({ data: { tenantId, userId: usuario.id } });
+
+    const papel = await db.role.create({
+      data: { tenantId, name: 'ADMIN DE PAREAMENTO', isSystem: false },
+    });
+
+    const permissao = await db.permission.upsert({
+      where: { code: 'device.manage' },
+      create: { code: 'device.manage' },
+      update: {},
+    });
+
+    await db.rolePermission.create({ data: { roleId: papel.id, permissionId: permissao.id } });
+    await db.userRole.create({ data: { tenantId, userId: usuario.id, roleId: papel.id } });
+
+    const login = await request(servidor())
+      .post('/api/v1/auth/login')
+      .send({ email, password: SENHA_DO_PAINEL });
+
+    const cabecalho: unknown = login.headers['set-cookie'];
+    const lista: string[] = Array.isArray(cabecalho) ? (cabecalho as string[]) : [];
+
+    cookieDoPainel = lista.find((c) => c.startsWith('arenahub_access=')) ?? '';
+
+    // Segundo tenant, so para provar isolamento (regra de arquitetura no 2).
+    const outroTenant = await db.tenant.create({
+      data: {
+        slug: `f59-gerar-outro-${sufixo}`,
+        legalName: 'Outro Tenant LTDA',
+        displayName: 'Outro Tenant',
+      },
+    });
+
+    outroTenantId = outroTenant.id;
+
+    const outraUnidade = await db.gymUnit.create({
+      data: {
+        tenantId: outroTenant.id,
+        code: 'CENTRO-2',
+        name: 'Centro 2',
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+      },
+    });
+
+    const nodeDeOutroTenant = await db.edgeNode.create({
+      data: {
+        tenantId: outroTenant.id,
+        gymUnitId: outraUnidade.id,
+        code: `EDGE-GERAR-OUTRO-${sufixo}`,
+      },
+    });
+
+    edgeNodeDeOutroTenant = nodeDeOutroTenant.id;
+  });
+
+  afterAll(async () => {
+    await db.tenant.delete({ where: { id: outroTenantId } });
+    await db.tenant.delete({ where: { id: tenantId } });
+    await app?.close();
+  });
+
+  it('gera um codigo que o pair aceita', async () => {
+    const geracao = await request(servidor())
+      .post(`/api/v1/edge-nodes/${edgeNodeId}/pairing-codes`)
+      .set('Cookie', cookieDoPainel)
+      .expect(201);
+
+    expect(geracao.body).toEqual({ code: expect.any(String), expiresAt: expect.any(String) });
+
+    await request(servidor())
+      .post('/api/v1/edge/pair')
+      .send({ code: (geracao.body as { code: string }).code })
+      .expect(201);
+  });
+
+  it('recusa gerar codigo para edgeNode de outro tenant', async () => {
+    await request(servidor())
+      .post(`/api/v1/edge-nodes/${edgeNodeDeOutroTenant}/pairing-codes`)
+      .set('Cookie', cookieDoPainel)
+      .expect(404);
   });
 });

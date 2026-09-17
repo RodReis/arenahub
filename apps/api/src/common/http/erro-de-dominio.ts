@@ -83,3 +83,18 @@ export class RecusaDePareamentoError extends ErroDeDominio {
     super('EDGE_PAIRING_REJECTED', 409, 'Codigo de pareamento invalido');
   }
 }
+
+/**
+ * `EdgeNode` inexistente OU de outro tenant, ao gerar codigo de pareamento
+ * (F59, Task 9).
+ *
+ * UM erro para os dois casos, de proposito -- regra de arquitetura no 2:
+ * distinguir "nao existe" de "existe mas e de outro tenant" vazaria a
+ * existencia do recurso alheio para quem nao deveria nem saber que ele
+ * existe.
+ */
+export class EdgeNodeNaoEncontradoError extends ErroDeDominio {
+  constructor() {
+    super('EDGE_NODE_NOT_FOUND', 404, 'Dispositivo de borda nao encontrado');
+  }
+}

@@ -3813,6 +3813,49 @@
         ]
       }
     },
+    "/api/v1/edge-nodes/{edgeNodeId}/pairing-codes": {
+      "post": {
+        "operationId": "PairingCodesController_gerar",
+        "parameters": [
+          {
+            "name": "edgeNodeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "expiresAt"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PairingCodes"
+        ]
+      }
+    },
     "/api/v1/kiosk/heartbeat": {
       "post": {
         "operationId": "KioskController_heartbeat",
