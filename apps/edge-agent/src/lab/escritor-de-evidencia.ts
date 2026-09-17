@@ -1,4 +1,5 @@
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 export interface TentativaDeEvidencia {
   externalEnrollId: string;
@@ -34,5 +35,8 @@ export function escreverEvidencia(caminho: string, dados: EvidenciaDeExecucao): 
     }
   }
 
+  // `data/` e artefato runtime, gitignored -- num checkout limpo (ou no CI)
+  // ele nao existe ainda. `writeFileSync` nao cria diretorio pai sozinho.
+  mkdirSync(dirname(caminho), { recursive: true });
   writeFileSync(caminho, JSON.stringify(dados, null, 2), 'utf-8');
 }
