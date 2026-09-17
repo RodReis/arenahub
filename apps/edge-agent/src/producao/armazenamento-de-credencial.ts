@@ -39,6 +39,26 @@ export interface ArmazenamentoDeCredencial {
  * CI roda Linux/macOS para esta suite. So a implementacao em memoria abaixo
  * tem teste automatizado; esta classe e verificada manualmente na bancada
  * Windows (ADR-010/011 fixam a plataforma de producao).
+ *
+ * RISCO CONHECIDO -- escopo DPAPI (ver tambem os comentarios em `salvar` e
+ * `carregar`): `DataProtectionScope.CurrentUser` amarra a cifra a MESMA
+ * conta Windows que a criou. Quando o edge-agent rodar como servico Windows
+ * (ADR-011, Task 13 -- ainda nao implementada), se o pareamento acontecer
+ * sob uma conta (ex.: instalador rodando interativo) e o servico depois
+ * rodar sob outra (ex.: LocalSystem ou conta de servico dedicada),
+ * `Unprotect` falha em TODO arranque do servico, com erro DPAPI criptico e
+ * sem fallback. A Task 13 precisa decidir DELIBERADAMENTE: (a) garantir que
+ * o pareamento roda sob a mesma conta do servico, ou (b) trocar para
+ * `DataProtectionScope.LocalMachine` (qualquer conta na mesma maquina
+ * descriptografa -- sacrifica isolamento por conta em troca de nao quebrar
+ * entre pareamento e servico).
+ *
+ * SUPOSICAO -- ACL do arquivo: esta classe escreve `caminhoDoArquivo` sem
+ * aplicar nenhuma ACL/permissao propria. A protecao vem inteiramente da
+ * cifra DPAPI, o que so e seguro se o caminho ja estiver restrito ao
+ * perfil da conta que vai rodar o servico (nao world-readable). Quem
+ * instancia esta classe (Task 11/13) e responsavel por escolher um caminho
+ * ja restrito -- este codigo nao aplica ACL propria.
  */
 export class ArmazenamentoDeCredencialWindows implements ArmazenamentoDeCredencial {
   constructor(private readonly caminhoDoArquivo: string) {}
@@ -50,6 +70,9 @@ export class ArmazenamentoDeCredencialWindows implements ArmazenamentoDeCredenci
       `
       $ErrorActionPreference = 'Stop'
       $bytes = [System.Text.Encoding]::UTF8.GetBytes($env:AH_TEXTO_CLARO)
+      # CurrentUser: so a MESMA conta Windows que rodou este 'salvar' consegue
+      # descriptografar depois (ver comentario de classe -- risco de escopo
+      # DPAPI para a Task 13 / servico Windows).
       $protegido = [System.Security.Cryptography.ProtectedData]::Protect(
         $bytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser
       )
@@ -65,6 +88,9 @@ export class ArmazenamentoDeCredencialWindows implements ArmazenamentoDeCredenci
       $ErrorActionPreference = 'Stop'
       if (-not (Test-Path $env:AH_CAMINHO)) { exit 0 }
       $protegido = [System.IO.File]::ReadAllBytes($env:AH_CAMINHO)
+      # CurrentUser: falha com erro DPAPI criptico se a conta que roda este
+      # 'carregar' nao for a mesma que rodou 'salvar' (ver comentario de
+      # classe -- decisao pendente para a Task 13 / servico Windows).
       $bytes = [System.Security.Cryptography.ProtectedData]::Unprotect(
         $protegido, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser
       )
