@@ -112,6 +112,26 @@ async function main(): Promise<void> {
 
   const composto = await compor(config, logger, { cliente: clienteNuvem });
 
+  // DECISAO REGISTRADA (revisao final de branch F59, achado 1): `devices`
+  // vai vazio de proposito. O heartbeat so teria como preencher `serial` real
+  // se `montarDispositivos`/`TopdataInnerAdapter`/`TopdataFacialAdapter`
+  // expusessem o serial do fabricante de volta ate aqui -- hoje eles nao
+  // expoem, e simular um serial sintetico (ex.: `${EDGE_AGENT_ID}-catraca`)
+  // NAO bateria com o `Device.serial` cadastrado no painel, entao nao
+  // resolveria o alerta abaixo, so esconderia que ele nao foi resolvido.
+  //
+  // CONSEQUENCIA CONHECIDA: `avaliarDispositivo`
+  // (apps/api/.../operations/domain/alert-rules.ts) trata
+  // `Device.lastHeartbeat === null` como silencio infinito e dispara
+  // DEVICE_OFFLINE (CRITICAL) permanente para catraca e facial reais, mesmo
+  // com o agente funcionando -- porque `EdgeController.heartbeat` so
+  // atualiza `Device.lastHeartbeat` iterando `dados.devices`. O heartbeat do
+  // proprio Edge (`EdgeNode.lastHeartbeat`) continua correto, entao o Edge
+  // aparece "Respondendo" no painel; so o alerta por DISPOSITIVO fica falso.
+  //
+  // Corrigir de verdade exige threading do serial real dos adapters Topdata
+  // ate aqui (Task futura, fora do escopo desta correcao pontual) ou uma
+  // decisao do PI sobre como popular `Device.serial` a partir do Edge.
   const pararHeartbeat = iniciarLacoDeHeartbeat({
     cliente: clienteNuvem,
     intervaloMs: INTERVALO_HEARTBEAT_MS,
