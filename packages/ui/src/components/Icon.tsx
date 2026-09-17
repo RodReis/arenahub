@@ -49,6 +49,10 @@ export const ICON_NAMES = [
   'trending-up',
   'users',
   'power',
+  // Bolo com vela: o cartao de aniversariantes do dashboard.
+  'cake',
+  // Seta simples: o indicador de accordion recolhivel/expansivel.
+  'chevron-down',
 ] as const;
 
 /**
@@ -162,6 +166,16 @@ const PATHS: Record<IconName, readonly string[]> = {
    * reto: barra central, dois pesos, dois colares.
    */
   dumbbell: ['M6 6v12', 'M18 6v12', 'M3 9v6', 'M21 9v6', 'M6 12h12'],
+  // Bolo com uma vela acesa: corpo, base do prato e chama sobre o pavio.
+  cake: [
+    'M4 12h16v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z',
+    'M2 12h20',
+    'M4 12c0-3 2.5-3 2.5-6S4 3 4 3',
+    'M20 12c0-3-2.5-3-2.5-6S20 3 20 3',
+    'M12 12V8',
+    'M12 8c1.4 0 2-1 2-2s-2-3-2-3-2 1.7-2 3 .6 2 2 2z',
+  ],
+  'chevron-down': ['m6 9 6 6 6-6'],
 };
 
 export function Icon({ name }: { name: IconName }) {

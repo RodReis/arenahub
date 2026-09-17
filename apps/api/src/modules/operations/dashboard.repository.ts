@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { inicioDoDiaLocal } from '../health/domain/periodo.js';
+import { ordenarAniversariantes, type Aniversariante } from './domain/aniversariantes.js';
 import { feriadosDoMes, type FeriadoDoCalendario } from './domain/feriados.js';
 
 /**
@@ -285,6 +286,48 @@ export class DashboardRepository {
       data: f.date.toISOString().slice(0, 10),
       nome: f.name,
     }));
+  }
+
+  /**
+   * Aniversariantes do MES corrente da unidade -- bloco novo.
+   *
+   * So aluno com matricula corrente: `ARCHIVED` e `CANCELLED` ja nao sao a
+   * academia de hoje, e um aniversariante que nunca mais volta e ruido para
+   * quem le o cartao. So nome e data de nascimento -- sem idade, sem
+   * telefone (decisao do PI: menor exposicao de dado de aluno na tela mais
+   * aberta do painel).
+   *
+   * `comTenant`: `students` tem politica RLS (F66) e, fora de transacao
+   * interceptada, a consulta materializa ZERO linhas sob o role restrito
+   * (mesmo risco de `situacoesRestritivas`, issue #306).
+   */
+  async aniversariantesDoMes(
+    contexto: TenantContext,
+    gymUnitId: string,
+    mes: number,
+    hojeMesDia: string,
+  ): Promise<readonly Aniversariante[]> {
+    const alunos = await this.db.comTenant((tx) =>
+      tx.student.findMany({
+        where: {
+          tenantId: contexto.tenantId,
+          gymUnitId,
+          status: { notIn: ['ARCHIVED', 'CANCELLED'] },
+        },
+        select: { fullName: true, birthDate: true },
+      }),
+    );
+
+    const doMes = alunos
+      .filter((a) => a.birthDate.getUTCMonth() + 1 === mes)
+      .map((a) => ({
+        nome: a.fullName,
+        // `@db.Date` volta como Date a meia-noite UTC -- o prefixo do ISO E a
+        // data local que foi gravada (mesmo raciocinio de `feriadosDoMesCorrente`).
+        diaEMes: a.birthDate.toISOString().slice(5, 10),
+      }));
+
+    return ordenarAniversariantes(doMes, hojeMesDia);
   }
 
   /** Fuso e nome da unidade -- o "hoje" nao existe sem eles. */

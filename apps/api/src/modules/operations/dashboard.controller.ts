@@ -18,6 +18,7 @@ import { EngagementChallengesService } from '../engagement/engagement-challenges
 import { EngagementRankingService } from '../engagement/engagement-ranking.service.js';
 import { dataLocalIso } from '../health/domain/periodo.js';
 import { DashboardRepository, type ContagemDeSituacao } from './dashboard.repository.js';
+import type { Aniversariante } from './domain/aniversariantes.js';
 import type { FeriadoDoCalendario } from './domain/feriados.js';
 import { OperationsRepository } from './operations.repository.js';
 
@@ -157,6 +158,18 @@ const ESQUEMA_DO_DASHBOARD = {
       },
     },
     feriados: { type: 'array', items: ESQUEMA_DO_FERIADO },
+    aniversariantes: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['nome', 'diaEMes', 'hoje'],
+        properties: {
+          nome: { type: 'string' },
+          diaEMes: { type: 'string', description: 'MM-DD' },
+          hoje: { type: 'boolean' },
+        },
+      },
+    },
   },
 };
 
@@ -201,6 +214,7 @@ export interface DashboardDto {
   } | null;
   desafiosAtivos: readonly { id: string; title: string; endsOn: string; participantes: number }[];
   feriados: readonly FeriadoDoCalendario[];
+  aniversariantes: readonly Aniversariante[];
 }
 
 @Controller('api/v1/dashboard')
@@ -275,21 +289,31 @@ export class DashboardController {
         placar: null,
         desafiosAtivos: [],
         feriados: [],
+        aniversariantes: [],
       };
     }
 
     // `AAAA-MM` no fuso da UNIDADE: o mes do placar e o mes do calendario sao
     // os da academia, nao os de UTC. Virada de mes as 21h de Brasilia com
     // corte UTC mostraria o placar do mes seguinte, ainda vazio.
-    const mes = dataLocalIso(agora, escolhida.timezone).slice(0, 7);
+    const dataLocalDeHoje = dataLocalIso(agora, escolhida.timezone);
+    const mes = dataLocalDeHoje.slice(0, 7);
+    const hojeMesDia = dataLocalDeHoje.slice(5);
 
-    const [acessosDeHoje, situacoes, placar, desafios, feriados] = await Promise.all([
-      this.dashboard.acessosDeHoje(contexto, escolhida.id, escolhida.timezone, agora),
-      this.dashboard.situacoesRestritivas(contexto, escolhida.id),
-      this.ranking.lerPlacarInterno(contexto, escolhida.id, mes),
-      this.desafios.listar(contexto),
-      this.dashboard.feriadosDoMesCorrente(contexto, escolhida.id, mes),
-    ]);
+    const [acessosDeHoje, situacoes, placar, desafios, feriados, aniversariantes] =
+      await Promise.all([
+        this.dashboard.acessosDeHoje(contexto, escolhida.id, escolhida.timezone, agora),
+        this.dashboard.situacoesRestritivas(contexto, escolhida.id),
+        this.ranking.lerPlacarInterno(contexto, escolhida.id, mes),
+        this.desafios.listar(contexto),
+        this.dashboard.feriadosDoMesCorrente(contexto, escolhida.id, mes),
+        this.dashboard.aniversariantesDoMes(
+          contexto,
+          escolhida.id,
+          Number(mes.slice(5, 7)),
+          hojeMesDia,
+        ),
+      ]);
 
     return {
       ...base,
@@ -313,6 +337,7 @@ export class DashboardController {
           participantes: d.participantes,
         })),
       feriados,
+      aniversariantes,
     };
   }
 
