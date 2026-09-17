@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-16
+updated: 2026-09-17
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -11,7 +11,6 @@ updated: 2026-09-16
 
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
-- [MVP5][INFRA] Decisão: os nove eventos de notificação da §70 não têm produtor — a caixa de avisos do app nasce vazia (#343)
 - [MVP6][INFRA] Decisão: o pipeline de retenção não tem job agendado — F36–F41 produzem zero em produção (#341)
 - [MVP1][INFRA] Decisão: dashboard executivo (§64/§117) — MRR, LTV, churn e cancelamentos não existem em documento nenhum (#340)
 - [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339)
@@ -19,8 +18,6 @@ updated: 2026-09-16
 - [MVP2][INFRA] Decisão: upgrade e downgrade de plano — não existe regra de proração (#337)
 - [MVP1][INFRA] Decisão: QR, cartão e PIN como caminho de acesso — a regra de arquitetura nº 7 não tem implementação (#336)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
-- [MVP2][FIX] assinatura duplicada infla a receita esperada do painel financeiro (#272)
-- [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
@@ -31,7 +28,9 @@ _(vazio)_
 
 ## Em Andamento
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254)
 
 ## Feito
 
@@ -42,6 +41,9 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][FIX] assinatura duplicada infla a receita esperada do painel financeiro (#272, finalizado em: 2026-09-17)
+- [MVP5][INFRA] Decisão: os nove eventos de notificação da §70 não têm produtor — a caixa de avisos do app nasce vazia (#343, finalizado em: 2026-09-17)
+- [MVP2][FIX] Subscription vencida nunca expira -- receita esperada volta a inflar (issue #272, causa nova) (#354, finalizado em: 2026-09-16)
 - [MVP3][INFRA] Decisão: sinais vitais (§53) — `HealthMeasurement` não existe no schema, e o aparelho que mede pressão já está no balcão (#345, finalizado em: 2026-09-16)
 - [MVP1][FIX] busca por nome na listagem de alunos casa telefone por dígito solto do termo (#351, finalizado em: 2026-09-16)
 - [MVP1][INFRA] Decisão: foto do aluno — cortada em 18/08 para uma fatia que já tinha fechado dois dias antes (#348, finalizado em: 2026-09-16)
