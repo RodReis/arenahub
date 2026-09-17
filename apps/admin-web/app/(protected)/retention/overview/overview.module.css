@@ -1,0 +1,121 @@
+/**
+ * Painel de retencao -- F75, `SPEC-075` §3.2.
+ *
+ * Mesma faixa de KPI do painel financeiro (F54): superficie tingida por
+ * ESTADO, nunca pelo accent do tenant (Principio 5). So tres blocos aqui --
+ * pipeline, fila de risco, fila de tarefas -- entao a faixa nao precisa do
+ * `auto-fit` do billing.
+ */
+
+.faixaDeKpi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1px;
+  margin: 0 0 24px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-border-subtle);
+  overflow: hidden;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--ah-surface-raised);
+}
+
+.kpi[data-tom] {
+  background: color-mix(in srgb, currentColor 8%, var(--ah-surface-raised));
+}
+
+.kpi[data-tom='danger'] {
+  color: var(--ah-state-danger);
+}
+.kpi[data-tom='risk'] {
+  color: var(--ah-state-risk);
+}
+.kpi[data-tom='neutral'] {
+  color: var(--ah-text-secondary);
+}
+
+.kpiRotulo {
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ah-text-secondary);
+}
+
+.kpiValor {
+  margin: 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi[data-tom] .kpiValor {
+  color: currentColor;
+}
+
+.kpiApoio {
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ah-text-secondary);
+}
+
+/* ─── Blocos de distribuicao (bandas / estados) ────────────────────────── */
+
+.duasColunas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .duasColunas {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cartao {
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.tituloDoCartao {
+  margin: 0 0 12px;
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: 600;
+  color: var(--ah-text-default);
+}
+
+.linhaDeContagem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ah-border-subtle);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-default);
+}
+
+.linhaDeContagem:last-child {
+  border-bottom: none;
+}
+
+.linhaDeContagem strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-strong);
+}

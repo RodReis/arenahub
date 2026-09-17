@@ -3783,6 +3783,70 @@
         ]
       }
     },
+    "/api/v1/retention/overview": {
+      "get": {
+        "operationId": "RetentionOverviewController_visaoGeral",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pipeline": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "SAUDAVEL",
+                            "ATRASADO",
+                            "DESLIGADO",
+                            "NUNCA_RODOU"
+                          ]
+                        },
+                        "hoursSinceLastRun": {
+                          "type": "integer",
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "riskQueue": {
+                      "type": "object",
+                      "properties": {
+                        "BAIXO": {
+                          "type": "integer"
+                        },
+                        "MEDIO": {
+                          "type": "integer"
+                        },
+                        "ALTO": {
+                          "type": "integer"
+                        },
+                        "CRITICO": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "taskQueue": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "RetentionOverview"
+        ]
+      }
+    },
     "/api/v1/edge/heartbeat": {
       "post": {
         "operationId": "EdgeController_heartbeat",

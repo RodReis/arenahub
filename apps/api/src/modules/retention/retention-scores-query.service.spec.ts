@@ -40,6 +40,7 @@ const gravado = (parcial: Partial<ScoreGravado> = {}): ScoreGravado => ({
 class PortaFake implements PortaDeConsultaDeScores {
   scores: ScoreGravado[] = [gravado()];
   historico: ScoreGravado[] = [gravado()];
+  contagem: Record<ScoreGravado['faixa'], number> = { BAIXO: 0, MEDIO: 0, ALTO: 1, CRITICO: 0 };
 
   filaDeRisco(): Promise<ScoreGravado[]> {
     return Promise.resolve(this.scores);
@@ -47,6 +48,10 @@ class PortaFake implements PortaDeConsultaDeScores {
 
   historicoDoAluno(): Promise<ScoreGravado[]> {
     return Promise.resolve(this.historico);
+  }
+
+  contagemPorBanda(): Promise<Record<ScoreGravado['faixa'], number>> {
+    return Promise.resolve(this.contagem);
   }
 }
 
@@ -57,6 +62,17 @@ describe('RetentionScoresQueryService', () => {
   beforeEach(() => {
     porta = new PortaFake();
     service = new RetentionScoresQueryService(porta);
+  });
+
+  it('repassa a contagem por banda da porta, sem recalcular', async () => {
+    porta.contagem = { BAIXO: 3, MEDIO: 2, ALTO: 1, CRITICO: 0 };
+
+    await expect(service.contagemPorBanda(contexto)).resolves.toEqual({
+      BAIXO: 3,
+      MEDIO: 2,
+      ALTO: 1,
+      CRITICO: 0,
+    });
   });
 
   it('marca o score do dia como ATUAL', async () => {

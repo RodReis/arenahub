@@ -103,4 +103,21 @@ export class RetentionTasksQueryRepository implements PortaDeConsultaDeTarefas {
       })),
     }));
   }
+
+  /** `groupBy` no banco, sem `take` -- mesma população de `filaDeTarefas`. */
+  async contagemPorEstado(
+    contexto: TenantContext,
+  ): Promise<Readonly<Partial<Record<EstadoDeTarefa, number>>>> {
+    const grupos = await this.prisma.retentionTask.groupBy({
+      by: ['status'],
+      where: { tenantId: contexto.tenantId },
+      _count: { _all: true },
+    });
+
+    return grupos.reduce<Partial<Record<EstadoDeTarefa, number>>>((contagem, grupo) => {
+      const estado = ESTADO_DO_BANCO[grupo.status];
+      if (estado === undefined) return contagem;
+      return { ...contagem, [estado]: grupo._count._all };
+    }, {});
+  }
 }

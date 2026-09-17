@@ -36,6 +36,15 @@ export interface PortaDeConsultaDeScores {
     studentId: string,
     limite: number,
   ): Promise<ScoreGravado[]>;
+  /**
+   * Contagem por banda da MESMA fila que `filaDeRisco` devolve (o dia mais
+   * recente com score) -- mas via `groupBy` no banco, sem teto de paginação.
+   *
+   * Existe separada de `filaDeRisco` porque a leitura paginada nunca poderia
+   * servir de contagem: um tenant com mais scores que o limite da página
+   * sub-contaria a fila em silêncio (F75, achado do code review).
+   */
+  contagemPorBanda(contexto: TenantContext): Promise<Readonly<Record<FaixaDeRisco, number>>>;
 }
 
 /**
@@ -93,6 +102,10 @@ export class RetentionScoresQueryService {
   ): Promise<ScoreParaLeitura[]> {
     const scores = await this.porta.historicoDoAluno(contexto, studentId, opcoes.limite);
     return scores.map((score) => this.comValidade(score, opcoes.agora));
+  }
+
+  async contagemPorBanda(contexto: TenantContext): Promise<Readonly<Record<FaixaDeRisco, number>>> {
+    return this.porta.contagemPorBanda(contexto);
   }
 
   private comValidade(score: ScoreGravado, agora: Date): ScoreParaLeitura {

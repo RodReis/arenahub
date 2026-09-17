@@ -77,6 +77,36 @@ export class RetentionScoresQueryRepository implements PortaDeConsultaDeScores {
     return scores.map((score) => this.paraDominio(score));
   }
 
+  /**
+   * Mesmo recorte de `filaDeRisco` (o dia mais recente com score) -- mas
+   * `groupBy` no banco, sem `take`. Contagem real, nunca truncada.
+   */
+  async contagemPorBanda(contexto: TenantContext): Promise<Readonly<Record<FaixaDeRisco, number>>> {
+    const zerado: Record<FaixaDeRisco, number> = { BAIXO: 0, MEDIO: 0, ALTO: 0, CRITICO: 0 };
+
+    const ultimo = await this.prisma.retentionScore.findFirst({
+      where: { tenantId: contexto.tenantId },
+      orderBy: { observedAt: 'desc' },
+      select: { observedAt: true },
+    });
+
+    if (ultimo === null) {
+      return zerado;
+    }
+
+    const grupos = await this.prisma.retentionScore.groupBy({
+      by: ['band'],
+      where: { tenantId: contexto.tenantId, observedAt: ultimo.observedAt },
+      _count: { _all: true },
+    });
+
+    return grupos.reduce((contagem, grupo) => {
+      const faixa = FAIXA_DO_BANCO[grupo.band];
+      if (faixa === undefined) return contagem;
+      return { ...contagem, [faixa]: grupo._count._all };
+    }, zerado);
+  }
+
   private paraDominio(score: {
     id: string;
     studentId: string;

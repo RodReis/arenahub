@@ -38,9 +38,14 @@ const naFila = (parcial: Partial<TarefaNaFila> = {}): TarefaNaFila => ({
 
 class PortaFake implements PortaDeConsultaDeTarefas {
   tarefas: TarefaNaFila[] = [naFila()];
+  contagem: Partial<Record<TarefaNaFila['estado'], number>> = { ABERTA: 1 };
 
   filaDeTarefas(): Promise<TarefaNaFila[]> {
     return Promise.resolve(this.tarefas);
+  }
+
+  contagemPorEstado(): Promise<Partial<Record<TarefaNaFila['estado'], number>>> {
+    return Promise.resolve(this.contagem);
   }
 }
 
@@ -51,6 +56,15 @@ describe('RetentionTasksQueryService', () => {
   beforeEach(() => {
     porta = new PortaFake();
     service = new RetentionTasksQueryService(porta);
+  });
+
+  it('repassa a contagem por estado da porta, sem recalcular', async () => {
+    porta.contagem = { ABERTA: 2, CONCLUIDA: 1 };
+
+    await expect(service.contagemPorEstado(contexto)).resolves.toEqual({
+      ABERTA: 2,
+      CONCLUIDA: 1,
+    });
   });
 
   it('marca como vencida a tarefa que passou do prazo', async () => {

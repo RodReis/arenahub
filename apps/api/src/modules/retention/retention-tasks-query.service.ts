@@ -46,6 +46,12 @@ export interface TarefaParaLeitura extends TarefaNaFila {
 
 export interface PortaDeConsultaDeTarefas {
   filaDeTarefas(contexto: TenantContext, limite: number): Promise<TarefaNaFila[]>;
+  /**
+   * Contagem por estado da MESMA fila que `filaDeTarefas` devolve -- via
+   * `groupBy` no banco, sem teto de paginação (F75, achado do code review:
+   * contar a página trunca em silêncio quando há mais tarefas que o limite).
+   */
+  contagemPorEstado(contexto: TenantContext): Promise<Readonly<Partial<Record<EstadoDeTarefa, number>>>>;
 }
 
 export interface OpcoesDeLeituraDeFila {
@@ -84,5 +90,11 @@ export class RetentionTasksQueryService {
       ...tarefa,
       vencida: estaAtiva(tarefa.estado) && tarefa.venceEm.getTime() < opcoes.agora.getTime(),
     }));
+  }
+
+  async contagemPorEstado(
+    contexto: TenantContext,
+  ): Promise<Readonly<Partial<Record<EstadoDeTarefa, number>>>> {
+    return this.porta.contagemPorEstado(contexto);
   }
 }
