@@ -6,12 +6,14 @@ describe('iniciarLacoDeHeartbeat', () => {
   it('envia heartbeat no intervalo configurado e para quando pedido', () => {
     jest.useFakeTimers();
 
-    const post = jest.fn(async () => ({
-      ok: true,
-      status: 200,
-      body: { serverTime: new Date().toISOString(), clockOffsetMs: 0, acknowledgedDevices: 0 },
-      errorCode: null,
-    }));
+    const post = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        body: { serverTime: new Date().toISOString(), clockOffsetMs: 0, acknowledgedDevices: 0 },
+        errorCode: null,
+      }),
+    );
 
     const cliente = {
       post,
@@ -36,7 +38,7 @@ describe('iniciarLacoDeHeartbeat', () => {
     jest.useFakeTimers({ doNotFake: ['nextTick'] });
 
     const cliente = {
-      post: jest.fn(async () => ({ ok: false, status: 0, body: null, errorCode: 'CLOUD_UNREACHABLE' })),
+      post: jest.fn(() => Promise.resolve({ ok: false, status: 0, body: null, errorCode: 'CLOUD_UNREACHABLE' })),
       get: jest.fn(),
     } as unknown as SignedCloudClient;
 
@@ -62,12 +64,14 @@ describe('iniciarLacoDeHeartbeat', () => {
   it('nao agenda proxima chamada apos parar', () => {
     jest.useFakeTimers();
 
-    const post = jest.fn(async () => ({
-      ok: true,
-      status: 200,
-      body: { serverTime: new Date().toISOString(), clockOffsetMs: 0, acknowledgedDevices: 0 },
-      errorCode: null,
-    }));
+    const post = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        body: { serverTime: new Date().toISOString(), clockOffsetMs: 0, acknowledgedDevices: 0 },
+        errorCode: null,
+      }),
+    );
 
     const cliente = {
       post,

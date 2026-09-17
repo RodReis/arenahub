@@ -30,28 +30,31 @@ describe('compor', () => {
     });
     const logger = criarLogger(config);
 
-    const clienteFalso = {
-      post: jest.fn(async (path: string) => {
-        if (path === '/api/v1/edge/access-decisions') {
-          return {
-            ok: true,
-            status: 201,
-            body: {
-              accessEventId: 'evt-1',
-              correlationId: 'c-1',
-              outcome: 'ALLOW',
-              reason: 'TESTE',
-              policyVersion: 'v1',
-              validUntil: null,
-              replayed: false,
-            },
-            errorCode: null,
-          };
-        }
-        return { ok: true, status: 201, body: { accessEventId: 'evt-1', state: 'CONFIRMED' }, errorCode: null };
-      }),
-      get: jest.fn(),
-    } as unknown as SignedCloudClient;
+    const postMock = jest.fn((path: string) => {
+      if (path === '/api/v1/edge/access-decisions') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          body: {
+            accessEventId: 'evt-1',
+            correlationId: 'c-1',
+            outcome: 'ALLOW',
+            reason: 'TESTE',
+            policyVersion: 'v1',
+            validUntil: null,
+            replayed: false,
+          },
+          errorCode: null,
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 201,
+        body: { accessEventId: 'evt-1', state: 'CONFIRMED' },
+        errorCode: null,
+      });
+    });
+    const clienteFalso = { post: postMock, get: jest.fn() } as unknown as SignedCloudClient;
 
     const facial = new FacialSimulator();
 
@@ -61,10 +64,10 @@ describe('compor', () => {
         facial,
         catraca: {
           nome: 'catraca-falsa',
-          liberar: jest.fn(async () => ({ desfecho: 'girou' as const, duracaoMs: 10 })),
-          encerrar: jest.fn(async () => {}),
+          liberar: jest.fn(() => Promise.resolve({ desfecho: 'girou' as const, duracaoMs: 10 })),
+          encerrar: jest.fn(() => Promise.resolve()),
         },
-        encerrar: async () => {},
+        encerrar: () => Promise.resolve(),
       },
     });
 
@@ -72,7 +75,7 @@ describe('compor', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(clienteFalso.post).toHaveBeenCalledWith(
+    expect(postMock).toHaveBeenCalledWith(
       '/api/v1/edge/access-decisions',
       expect.objectContaining({ externalUserId: 'aluno-1' }),
     );
@@ -98,9 +101,9 @@ describe('compor', () => {
     // Simula reportarPassagem falhando na primeira composicao (rede caiu bem
     // no momento do report), deixando a tentativa pendente.
     const clienteQueFalhaNoReport = {
-      post: jest.fn(async (path: string) => {
+      post: jest.fn((path: string) => {
         if (path === '/api/v1/edge/access-decisions') {
-          return {
+          return Promise.resolve({
             ok: true,
             status: 201,
             body: {
@@ -113,9 +116,9 @@ describe('compor', () => {
               replayed: false,
             },
             errorCode: null,
-          };
+          });
         }
-        return { ok: false, status: 0, body: null, errorCode: 'CLOUD_UNREACHABLE' };
+        return Promise.resolve({ ok: false, status: 0, body: null, errorCode: 'CLOUD_UNREACHABLE' });
       }),
       get: jest.fn(),
     } as unknown as SignedCloudClient;
@@ -128,10 +131,10 @@ describe('compor', () => {
         facial: facialDaPrimeiraComposicao,
         catraca: {
           nome: 'catraca-falsa',
-          liberar: jest.fn(async () => ({ desfecho: 'girou' as const, duracaoMs: 10 })),
-          encerrar: jest.fn(async () => {}),
+          liberar: jest.fn(() => Promise.resolve({ desfecho: 'girou' as const, duracaoMs: 10 })),
+          encerrar: jest.fn(() => Promise.resolve()),
         },
-        encerrar: async () => {},
+        encerrar: () => Promise.resolve(),
       },
     });
 
@@ -144,17 +147,20 @@ describe('compor', () => {
     // deve reportar a tentativa presa, sem recomandar a catraca.
     const catracaDaSegundaComposicao = {
       nome: 'catraca-falsa-2',
-      liberar: jest.fn(async () => ({ desfecho: 'girou' as const, duracaoMs: 10 })),
-      encerrar: jest.fn(async () => {}),
+      liberar: jest.fn(() => Promise.resolve({ desfecho: 'girou' as const, duracaoMs: 10 })),
+      encerrar: jest.fn(() => Promise.resolve()),
     };
 
-    const clienteQueFunciona = {
-      post: jest.fn(async () => ({
+    const postMockDaSegundaComposicao = jest.fn(() =>
+      Promise.resolve({
         ok: true,
         status: 201,
         body: { accessEventId: 'evt-2', state: 'TIMED_OUT' },
         errorCode: null,
-      })),
+      }),
+    );
+    const clienteQueFunciona = {
+      post: postMockDaSegundaComposicao,
       get: jest.fn(),
     } as unknown as SignedCloudClient;
 
@@ -163,11 +169,11 @@ describe('compor', () => {
       dispositivos: {
         facial: new FacialSimulator(),
         catraca: catracaDaSegundaComposicao,
-        encerrar: async () => {},
+        encerrar: () => Promise.resolve(),
       },
     });
 
-    expect(clienteQueFunciona.post).toHaveBeenCalledWith(
+    expect(postMockDaSegundaComposicao).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/edge/access-events/evt-2/passage'),
       expect.objectContaining({ commandId: expect.any(String) }),
     );
