@@ -9,7 +9,6 @@ updated: 2026-09-17
 
 ### Sem épico
 
-- [MVP1][INFRA] Decisão: dashboard executivo (§64/§117) — MRR, LTV, churn e cancelamentos não existem em documento nenhum (#340)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
 - [MVP6][INFRA] Decisão: o pipeline de retenção não tem job agendado — F36–F41 produzem zero em produção (#341)
@@ -39,6 +38,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][INFRA] Decisão: dashboard executivo (§64/§117) — MRR, LTV, churn e cancelamentos não existem em documento nenhum (#340, finalizado em: 2026-09-17)
 - [MVP1][SPEC-074][F74] KPIs executivos no painel financeiro (§64/§117): alunos ativos, novos, cancelamentos, churn e LTV (#357, finalizado em: 2026-09-17)
 - [FIX] Dashboard: aniversariantes do mês, banner de hoje e cards em accordion (#360, finalizado em: 2026-09-17)
 - [MVP1][SPEC-059][F59] Composição de produção do edge-agent: adapters no main.ts, serviço Windows e pareamento (#254, finalizado em: 2026-09-17)
