@@ -53,6 +53,11 @@ const RESUMO = {
   },
   competenciasDisponiveis: ['2026-06', '2026-07', '2026-08'],
   base: { alunosPagantes: 3, alunosInadimplentes: 1, assinaturasAtivas: 2 },
+  alunosAtivos: 3,
+  novosAlunos: 1,
+  cancelamentos: 1,
+  taxaDeChurn: 33.3,
+  ltv: 90_000,
 };
 
 async function renderizar(
@@ -462,6 +467,28 @@ describe('painel financeiro', () => {
 
     expect(screen.getByTestId('erro-de-permissao')).toBeInTheDocument();
     expect(screen.queryByTestId('recebido-no-periodo')).not.toBeInTheDocument();
+  });
+
+  /**
+   * OS CINCO KPIS DA F74 (`SPEC-074`): alunos ativos, novos, cancelamentos,
+   * churn e LTV -- os que faltavam para a §64/§117.
+   */
+  it('mostra os cinco KPIs executivos novos', async () => {
+    await renderizar();
+
+    expect(screen.getByTestId('alunos-ativos')).toHaveTextContent('3');
+    expect(screen.getByTestId('novos-alunos')).toHaveTextContent('1');
+    expect(screen.getByTestId('cancelamentos')).toHaveTextContent('1');
+    expect(screen.getByTestId('taxa-de-churn')).toHaveTextContent('33,3%');
+    expect(screen.getByTestId('ltv')).toHaveTextContent('900,00');
+  });
+
+  /** `—`, nao `0%`/`R$ 0,00` -- mesma disciplina dos KPIs da F54. */
+  it('mostra ausencia, nao zero, quando churn ou LTV nao existem', async () => {
+    await renderizar({ ...RESUMO, taxaDeChurn: null, ltv: null });
+
+    expect(screen.getByTestId('taxa-de-churn')).toHaveTextContent('—');
+    expect(screen.getByTestId('ltv')).toHaveTextContent('—');
   });
 });
 

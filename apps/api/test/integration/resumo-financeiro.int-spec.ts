@@ -216,6 +216,24 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
     return pagamento.id;
   }
 
+  /** Evento real de timeline -- `SUBSCRIPTION_CREATED`/`SUBSCRIPTION_CANCELLED`, F74. */
+  async function criarEventoDeTimeline(
+    s: Semente,
+    tipo: 'SUBSCRIPTION_CREATED' | 'SUBSCRIPTION_CANCELLED',
+    occurredAt: Date,
+  ): Promise<void> {
+    await db.studentTimelineEvent.create({
+      data: {
+        tenantId: s.contexto.tenantId,
+        studentId: s.studentId,
+        type: tipo,
+        actorType: 'SYSTEM',
+        correlationId: randomUUID(),
+        occurredAt,
+      },
+    });
+  }
+
   async function criarEstorno(
     s: Semente,
     invoiceId: string,
@@ -828,5 +846,93 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
       select: { status: true },
     });
     expect(depois.status).toBe('OPEN');
+  });
+
+  /**
+   * F74, `SPEC-074` §4.1. Alunos ativos e SNAPSHOT DE AGORA, nao da janela --
+   * "quantos ha", nao "quantos ficaram".
+   */
+  it('conta alunos ativos como snapshot de agora, independente da janela', async () => {
+    const s = await semearTenant();
+    await outraAssinaturaDoMesmoTenant(s);
+
+    const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    expect(resumo.alunosAtivos).toBe(2);
+  });
+
+  /**
+   * NOVOS ALUNOS E CANCELAMENTOS vem da TIMELINE, nunca do status corrente --
+   * `SPEC-074` §3. Um `SUBSCRIPTION_CREATED` fora da janela nao conta.
+   */
+  it('conta novos alunos e cancelamentos pela timeline, recortados pela janela', async () => {
+    const s = await semearTenant();
+
+    await criarEventoDeTimeline(s, 'SUBSCRIPTION_CREATED', new Date('2026-08-05T00:00:00Z'));
+    await criarEventoDeTimeline(s, 'SUBSCRIPTION_CANCELLED', new Date('2026-08-20T00:00:00Z'));
+    // Fora da janela de agosto: nao conta.
+    await criarEventoDeTimeline(s, 'SUBSCRIPTION_CREATED', new Date('2026-07-01T00:00:00Z'));
+
+    const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    expect(resumo.novosAlunos).toBe(1);
+    expect(resumo.cancelamentos).toBe(1);
+  });
+
+  /**
+   * OS REGISTROS DO IMPORT DO PACTO NAO TEM EVENTO DE TIMELINE (ADR-033) --
+   * `SPEC-074` §3. Um aluno `CANCELLED` sem `SUBSCRIPTION_CANCELLED` na
+   * timeline NAO conta como cancelamento do periodo, porque nao ha data real
+   * de transicao para julgar se caiu na janela.
+   */
+  it('nao conta como cancelamento do periodo um status CANCELLED sem evento de timeline', async () => {
+    const s = await semearTenant();
+
+    await db.student.update({ where: { id: s.studentId }, data: { status: 'CANCELLED' } });
+    await db.subscription.update({ where: { id: s.subscriptionId }, data: { status: 'CANCELLED' } });
+
+    const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    expect(resumo.cancelamentos).toBe(0);
+  });
+
+  /**
+   * TAXA DE CHURN: cancelamentos do periodo sobre pagantes no INICIO do
+   * periodo -- `SPEC-074` §4.1. O denominador nao pode ja refletir os
+   * proprios cancelamentos, senao a taxa cai exatamente quando piora.
+   */
+  it('calcula a taxa de churn sobre a base pagante do inicio do periodo', async () => {
+    const s = await semearTenant();
+    const segundo = await outraAssinaturaDoMesmoTenant(s);
+    const terceiro = await outraAssinaturaDoMesmoTenant(s);
+
+    // Tres pagantes no inicio de agosto; um cancela durante o mes.
+    await criarEventoDeTimeline(s, 'SUBSCRIPTION_CREATED', new Date('2026-01-01T00:00:00Z'));
+    await criarEventoDeTimeline(segundo, 'SUBSCRIPTION_CREATED', new Date('2026-01-01T00:00:00Z'));
+    await criarEventoDeTimeline(terceiro, 'SUBSCRIPTION_CREATED', new Date('2026-01-01T00:00:00Z'));
+    await criarEventoDeTimeline(s, 'SUBSCRIPTION_CANCELLED', new Date('2026-08-15T00:00:00Z'));
+    await db.subscription.update({ where: { id: s.subscriptionId }, data: { status: 'CANCELLED' } });
+
+    const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    expect(resumo.taxaDeChurn).toBe(33.3);
+  });
+
+  /**
+   * LTV: ticket medio vezes vida media dos cancelamentos com timeline
+   * COMPLETA (criacao e cancelamento) -- `SPEC-074` §2.4/§4.2. Amostra
+   * abaixo do piso devolve `null`, nao um numero sobre base pequena demais.
+   */
+  it('devolve LTV nulo quando ha menos cancelamentos completos que o piso', async () => {
+    const s = await semearTenant();
+    const invoice = await criarInvoice(s);
+    await criarPagamento(s, invoice, { amountMinor: 10_000 });
+
+    await criarEventoDeTimeline(s, 'SUBSCRIPTION_CREATED', new Date('2026-01-01T00:00:00Z'));
+    await criarEventoDeTimeline(s, 'SUBSCRIPTION_CANCELLED', new Date('2026-08-15T00:00:00Z'));
+
+    const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    expect(resumo.ltv).toBeNull();
   });
 });

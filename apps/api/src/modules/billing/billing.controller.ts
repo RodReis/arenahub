@@ -376,6 +376,11 @@ interface ResumoFinanceiroDto {
   };
   competenciasDisponiveis: string[];
   base: { alunosPagantes: number; alunosInadimplentes: number; assinaturasAtivas: number };
+  alunosAtivos: number;
+  novosAlunos: number;
+  cancelamentos: number;
+  taxaDeChurn: number | null;
+  ltv: number | null;
 }
 
 interface LiberacaoDto {
@@ -761,6 +766,11 @@ export class BillingController {
         serie: { type: 'object' },
         competenciasDisponiveis: { type: 'array', items: { type: 'string' } },
         base: { type: 'object' },
+        alunosAtivos: { type: 'integer' },
+        novosAlunos: { type: 'integer' },
+        cancelamentos: { type: 'integer' },
+        taxaDeChurn: { type: 'number', nullable: true },
+        ltv: { type: 'integer', nullable: true },
       },
     },
   })

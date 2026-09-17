@@ -67,6 +67,12 @@ interface Resumo {
    */
   competenciasDisponiveis: string[];
   base: { alunosPagantes: number; alunosInadimplentes: number; assinaturasAtivas: number };
+  /** Os cinco KPIs da F74 (`SPEC-074`) que faltavam para a §64/§117. */
+  alunosAtivos: number;
+  novosAlunos: number;
+  cancelamentos: number;
+  taxaDeChurn: number | null;
+  ltv: number | null;
 }
 
 /**
@@ -397,6 +403,61 @@ export default async function PainelFinanceiroPage({
               ? 'sem pagamento no período'
               : `${resumo.pagamentosConfirmados} pagamento(s) confirmado(s)`}
           </p>
+        </div>
+
+        {/*
+          OS CINCO KPIS DA F74 (`SPEC-074`) -- alunos ativos, novos,
+          cancelamentos, churn e LTV. Faltavam para a §64/§117; os seis
+          anteriores ja sao da F54.
+        */}
+        <div className={estilos['kpi']}>
+          <p className={estilos['kpiRotulo']}>Alunos ativos</p>
+          <p className={estilos['kpiValor']} data-testid="alunos-ativos">
+            {resumo.alunosAtivos}
+          </p>
+          {/* SNAPSHOT DE AGORA, nao do periodo -- "quantos ha", nao "quantos ficaram". */}
+          <p className={estilos['kpiApoio']}>agora, independente do período</p>
+        </div>
+
+        <div className={estilos['kpi']}>
+          <p className={estilos['kpiRotulo']}>Novos alunos</p>
+          <p className={estilos['kpiValor']} data-testid="novos-alunos">
+            {resumo.novosAlunos}
+          </p>
+          <p className={estilos['kpiApoio']}>no período</p>
+        </div>
+
+        <div className={estilos['kpi']} {...(resumo.cancelamentos > 0 ? { 'data-tom': 'risk' } : {})}>
+          <p className={estilos['kpiRotulo']}>Cancelamentos</p>
+          <p className={estilos['kpiValor']} data-testid="cancelamentos">
+            {resumo.cancelamentos}
+          </p>
+          <p className={estilos['kpiApoio']}>no período</p>
+        </div>
+
+        <div className={estilos['kpi']} {...(resumo.cancelamentos > 0 ? { 'data-tom': 'risk' } : {})}>
+          <p className={estilos['kpiRotulo']}>Taxa de churn</p>
+          <p className={estilos['kpiValor']} data-testid="taxa-de-churn">
+            {resumo.taxaDeChurn === null ? (
+              <Ausente />
+            ) : (
+              `${String(resumo.taxaDeChurn).replace('.', ',')}%`
+            )}
+          </p>
+          <p className={estilos['kpiApoio']}>sobre a base pagante do início do período</p>
+        </div>
+
+        <div className={estilos['kpi']}>
+          <p className={estilos['kpiRotulo']}>LTV</p>
+          <p className={estilos['kpiValor']} data-testid="ltv">
+            {resumo.ltv === null ? <Ausente /> : <Money cents={resumo.ltv} currency="BRL" />}
+          </p>
+          {/*
+            LTV E CHURN carregam a mesma ressalva da base do Pacto que a §5.2
+            da F54 ja aplica a inadimplencia: cancelamento sem evento de
+            timeline nao entra na conta (`SPEC-074` §3).
+          */}
+          <p className={estilos['kpiApoio']}>ticket médio × vida média observada</p>
         </div>
 
         {/*
