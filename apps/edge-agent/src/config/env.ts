@@ -54,14 +54,14 @@ export const esquemaConfig = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   /**
-   * Sem hardware, o agente sobe com simulador. `M0-NFR-006` exige que o
-   * simulador rode em CI sem equipamento -- por isso o padrao e `true`:
-   * quem tem bancada liga explicitamente, quem nao tem nao precisa saber
-   * que a variavel existe.
+   * Um flag por dispositivo (decisao do PI, insumo F59 SS4 no2). Substitui
+   * o antigo `USE_SIMULATOR` booleano -- permite ensaiar o facial real com
+   * catraca simulada, sem girar nada.
+   *
+   * `M0-NFR-006`: o padrao de ambos e simulador -- CI roda sem hardware.
    */
-  USE_SIMULATOR: z
-    .union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')])
-    .default(true),
+  FACIAL_MODE: z.enum(['real', 'simulador']).default('simulador'),
+  CATRACA_MODE: z.enum(['real', 'simulador']).default('simulador'),
 });
 
 export type Config = z.infer<typeof esquemaConfig>;

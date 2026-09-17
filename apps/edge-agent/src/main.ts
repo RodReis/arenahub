@@ -52,7 +52,7 @@ async function main(): Promise<void> {
     'edge-agent iniciando',
   );
 
-  if (config.USE_SIMULATOR) {
+  if (config.FACIAL_MODE === 'simulador' || config.CATRACA_MODE === 'simulador') {
     logger.warn(
       'modo simulador: nenhum equipamento real sera contatado (M0-NFR-006)',
     );

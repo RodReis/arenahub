@@ -16,7 +16,8 @@ describe('carregarConfig', () => {
     expect(config.LOG_LEVEL).toBe('info');
     // M0-NFR-006: o simulador tem de rodar em CI sem hardware, entao quem
     // nao configura nada nao precisa de equipamento.
-    expect(config.USE_SIMULATOR).toBe(true);
+    expect(config.FACIAL_MODE).toBe('simulador');
+    expect(config.CATRACA_MODE).toBe('simulador');
   });
 
   it('rejeita tenant que nao e uuid', () => {
@@ -37,10 +38,6 @@ describe('carregarConfig', () => {
     }
   });
 
-  it('aceita USE_SIMULATOR como string, porque variavel de ambiente e string', () => {
-    expect(carregarConfig({ ...VALIDO, USE_SIMULATOR: 'false' }).USE_SIMULATOR).toBe(false);
-    expect(carregarConfig({ ...VALIDO, USE_SIMULATOR: 'true' }).USE_SIMULATOR).toBe(true);
-  });
 
   it('nao coloca o valor recebido na mensagem de erro', () => {
     // M0-NFR-005: um segredo malformado ainda e um segredo. A mensagem diz o
@@ -52,6 +49,30 @@ describe('carregarConfig', () => {
     } catch (erro: unknown) {
       expect((erro as ConfigInvalidaError).message).not.toContain(segredo);
     }
+  });
+});
+
+describe('FACIAL_MODE e CATRACA_MODE', () => {
+  it('usa simulador por padrao quando as variaveis nao existem', () => {
+    const config = carregarConfig(VALIDO);
+    expect(config.FACIAL_MODE).toBe('simulador');
+    expect(config.CATRACA_MODE).toBe('simulador');
+  });
+
+  it('aceita real e simulador explicitamente, um por dispositivo', () => {
+    const config = carregarConfig({ ...VALIDO, FACIAL_MODE: 'real', CATRACA_MODE: 'simulador' });
+    expect(config.FACIAL_MODE).toBe('real');
+    expect(config.CATRACA_MODE).toBe('simulador');
+  });
+
+  it('recusa valor fora do enum', () => {
+    expect(() => carregarConfig({ ...VALIDO, FACIAL_MODE: 'hardware' })).toThrow();
+  });
+
+  it('descreverConfig nao esconde o modo -- nao e segredo', () => {
+    const config = carregarConfig({ ...VALIDO, FACIAL_MODE: 'real' });
+    const visao = descreverConfig(config);
+    expect(visao['FACIAL_MODE']).toBe('real');
   });
 });
 
