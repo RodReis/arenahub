@@ -34,6 +34,13 @@ import {
   RetentionSnapshotsRepository,
 } from './retention-snapshots.repository.js';
 import { RetentionSnapshotsService } from './retention-snapshots.service.js';
+import {
+  PORTA_DE_UNIDADES_DE_RETENCAO,
+  RetentionSchedulerRepository,
+} from './retention-scheduler.repository.js';
+import { RetentionSchedulerService } from './retention-scheduler.service.js';
+import { RetentionOverviewController } from './retention-overview.controller.js';
+import { RetentionOverviewService } from './retention-overview.service.js';
 
 /**
  * Contrato de dados (F36, Slice 6.1) e regras explicaveis (F37, Slice 6.2).
@@ -66,6 +73,7 @@ import { RetentionSnapshotsService } from './retention-snapshots.service.js';
     RetentionScoresController,
     RetentionTasksController,
     RetentionMonitoringController,
+    RetentionOverviewController,
   ],
   providers: [
     TenantContextService,
@@ -83,6 +91,9 @@ import { RetentionSnapshotsService } from './retention-snapshots.service.js';
     { provide: PORTA_DE_EXPERIMENTOS, useClass: RetentionExperimentsRepository },
     RetentionMonitoringService,
     { provide: PORTA_DE_MONITORAMENTO, useClass: RetentionMonitoringRepository },
+    RetentionSchedulerService,
+    { provide: PORTA_DE_UNIDADES_DE_RETENCAO, useClass: RetentionSchedulerRepository },
+    RetentionOverviewService,
   ],
   exports: [
     RetentionSnapshotsService,
