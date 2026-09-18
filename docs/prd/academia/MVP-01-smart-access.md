@@ -169,6 +169,15 @@ Aceite: equipe opera um turno completo sem acesso direto a banco, terminal ou lo
 - `M1-FR-011`: derivar entitlement explícito da assinatura e regras do plano.
 - `M1-FR-012`: criar entitlement de cortesia com razão, responsável e validade.
 
+> **Emenda de 18/09/2026 — [ADR-059](../../DECISIONS.md#adr-059), decidida pelo PI.** Das seis
+> regras de plano da Especificação §34 sem campo (`CONVENTION.md` INV-059), **aulas inclusas**
+> e **convidados** foram confirmadas no escopo do MVP1. `M1-FR-009` continua cobrindo só
+> unidades, dias, horários e validade — o campo em `Plan` e o comportamento de aulas
+> inclusas/convidados **não foram desenhados** por esta emenda e não têm `F<n>`/`SPEC-<nnn>`
+> alocado; nascem quando o desenho existir. Limite semanal de acessos, pausa com teto de dias,
+> fidelidade e multa por quebra de fidelidade **seguem fora de escopo** — a decisão do PI foi
+> "não entra agora", não "resolvido".
+
 ### Biometria e dispositivos
 
 - `M1-FR-013`: registrar aceite ou recusa de consentimento biométrico versionado.

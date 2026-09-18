@@ -380,7 +380,13 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 
 ### 4.9 Planos, assinatura e entitlement (INV-059 a INV-064)
 
-- **INV-059** As regras de plano da Especificação §34 (unidades, dias, horários, limite semanal, aulas inclusas, convidados, pausa, fidelidade, multa, multiunidade) **não têm campo em `Plan`** — `[indefinido]`. Só unidades, dias, horários e validade estão cobertos por `M1-FR-009`.
+- **INV-059** Das regras de plano da Especificação §34: unidades, dias, horários e validade
+  estão cobertas por `M1-FR-009`. **Aulas inclusas** e **convidados** foram confirmadas no
+  escopo do MVP1 pelo [ADR-059](DECISIONS.md#adr-059) — campo em `Plan` e comportamento ainda
+  não desenhados, sem fatia aberta. Limite semanal de acessos, pausa permitida + número de
+  dias de pausa, fidelidade, multa por quebra de fidelidade e acesso multiunidade **seguem
+  `[indefinido]`** — o ADR-059 decidiu "não entra agora" para as quatro primeiras; multiunidade
+  não foi tratado por ele.
 - **INV-060** Plano é criado com unidades, dias, horários e validade.
 - **INV-061** Assinatura é criada, pausada, retomada e cancelada manualmente **com auditoria**.
 - **INV-062** O entitlement é **derivado explicitamente** da assinatura e das regras do plano.
@@ -593,7 +599,8 @@ Conceitos usados em telas, menus e regras **sem entidade nem campo**. O Code **n
 | **Feriado / horário especial** | §10 | Sem entidade — mas as regras 6, 8 e 15 do motor de acesso dependem disso |
 | **`FeatureFlag`** | §100, §101, PRDs §19 | Escopo (global/tenant/unidade), quem alterna, auditoria, conflito com plano SaaS |
 | ~~**`SaasPlan`**~~ | §9, §100, §102 | **Resolvido (ADR-052):** `SaasPlan` com dois modelos — por aluno ativo/inativo ou fixo corrigido por índice — e `PlatformInvoice` (F63/F64). Billing da plataforma **entrou** no MVP 7 — Plataforma. Starter/Pro/Enterprise por módulo **não** existe: flag continua coluna (ADR-049) |
-| **Aulas / `Class`** | §34 "aulas inclusas" | Sem entidade, agenda, professor ou reserva |
+| **Aulas / `Class`** | §34 "aulas inclusas" | **Confirmado no escopo do MVP1 ([ADR-059](DECISIONS.md#adr-059))** — falta desenhar campo e comportamento; entidade `Class` (agenda, professor, reserva) continua sem existir até então |
+| **Convidados (plano)** | §34 "convidados" | **Confirmado no escopo do MVP1 ([ADR-059](DECISIONS.md#adr-059))** — falta desenhar campo e comportamento (nº de passes? vínculo nomeado?). Distinto do `visitante` de `Entitlement.source` (INV-064), que é tipo de acesso, não benefício de plano |
 | **Antifraude, limite de acessos, acesso duplicado** | §20 regras 11-14 | Sem parâmetro, campo ou fonte de configuração |
 | ~~**Nível "Academia"**~~ | §6 | **Resolvido:** dois níveis (ADR-002). A Especificação §6 precisa de nota de emenda |
 | **`Payment`** | §90, `M2` §11 | Nenhum campo. Ver **ADR-027** |

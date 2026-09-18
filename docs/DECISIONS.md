@@ -88,6 +88,7 @@ existe para expulsar deste repositório.
 | [056](#adr-056) | Consentimento self-service no app e exportação de saúde assíncrona | `aceito` | — |
 | [057](#adr-057) | Primeiro acesso self-service por CPF + data de nascimento | `aceito` | — |
 | [058](#adr-058) | Despachante de outbox como fatia própria; os nove eventos da §70 entram todos na v1 | `aceito` | — **cria F73** |
+| [059](#adr-059) | Plano §34: aulas inclusas e convidados entram no MVP1; as outras quatro seguem `[indefinido]` | `aceito` | — |
 
 ---
 
@@ -4429,3 +4430,61 @@ marcou explicitamente como bloqueante.
 - Canal externo (WhatsApp/e-mail) fica fora de escopo — abre card `[INFRA]` ou spec própria quando
   o PI pedir.
 - Fatia: **F73** (`SPEC-073`), issue #343 — ver `docs/STATUS.md` §5 (Índice Fatia ↔ SPEC).
+
+---
+
+## ADR-059 — Plano §34: aulas inclusas e convidados entram no MVP1; limite semanal, pausa com teto, fidelidade e multa seguem `[indefinido]`
+
+**Data:** 18/09/2026
+**Status:** aceito *(decisão nova — decidida pelo PI em 18/09/2026)*
+**Decisor:** Rodrigo Reis (PI)
+**Issue:** [#339](https://github.com/RodReis/arenahub/issues/339) — card de decisão, não de fatia
+
+**Contexto:** a auditoria de cobertura de 15/09/2026 achou que seis das onze regras de plano da
+Especificação §34 nunca ganharam campo, ADR ou nota de "fora de escopo": limite semanal de
+acessos, aulas inclusas, convidados, pausa permitida + número de dias de pausa, fidelidade e multa
+por quebra de fidelidade. `CONVENTION.md` (INV-059) já registrava isso com todas as letras: hoje
+todo plano do ArenaHub é ilimitado, sem prazo mínimo e pausável à vontade por qualquer
+recepcionista, e o contrato do aluno — de onde fidelidade e multa dependeriam — também não existe
+como entidade. A pausa em particular está meio construída: `SUBSCRIPTION_PAUSED`/`RESUMED` já são
+gravados pelo repositório e `POST /subscriptions/:id/pause` (`MVP-01` §12) já existe, mas sem tela
+e sem teto de dias — a recepção segue cancelando em vez de pausar, o que já produz churn falso no
+MVP 6.
+
+**Por que é ADR:** mexe no schema de `Plan`, entidade central do MVP 1 já em produção com dado real
+de tenant — campo novo aqui é migração, e desfazer depois de aluno ativo ter "aulas inclusas" ou
+"convidados" preenchidos é caro. Fecha também a decisão de escopo de produto que o card `[INFRA]`
+#339 marcou como bloqueante.
+
+### Decisões
+
+| # | regra da §34 | decisão | por quê |
+|---|---|---|---|
+| 1 | Limite semanal de acessos | **não entra** — segue `[indefinido]` | decisão do PI |
+| 2 | Aulas inclusas | **entra no MVP1** | decisão do PI |
+| 3 | Convidados | **entra no MVP1** | decisão do PI |
+| 4 | Pausa permitida + número de dias de pausa | **não entra** — segue `[indefinido]`; mantém o estado atual (rota de pause/resume sem tela, sem teto de dias, recepção cancela em vez de pausar) | decisão do PI — as duas andam juntas |
+| 5 | Fidelidade | **não entra agora** | depende do contrato do aluno, que também fica fora de escopo por ora |
+| 6 | Multa por quebra de fidelidade | **não entra agora** | mesma dependência da decisão 5 |
+
+**O que esta decisão não decide.** O PI decidiu **se** aulas inclusas e convidados entram, não
+**como**. Cardinalidade, unidade de medida, se "convidado" é um número de passes ou um vínculo
+nomeado, e a dependência ou não da entidade `Class` — que **não existe** (`CONVENTION.md` §5:
+"sem entidade, agenda, professor ou reserva") — não foram decididos aqui e não são inventados por
+este ADR. O **nome e o tipo do campo** em `Plan` são decisão de implementação do Code (`CLAUDE.md`,
+*O que pode bloquear o desenvolvimento*), mas o **comportamento** que "aulas inclusas" e
+"convidados" impõem é escopo de produto: se não estiver óbvio a partir desta decisão, volta a ser
+pergunta ao PI antes da fatia que precisar dele.
+
+### Consequências
+
+- `CONVENTION.md` INV-059 e a linha "Aulas / `Class`" do §5 passam a citar este ADR: os dois itens
+  saem de "sem campo, sem registro" para "confirmados no escopo do MVP1; campo e comportamento
+  ainda não desenhados".
+- `MVP-01-smart-access.md` ganha nota junto de `M1-FR-009` apontando para este ADR.
+- Este ADR **não abre fatia**. `F<n>`/`SPEC-<nnn>` nascem quando o desenho do campo e do
+  comportamento existir — até lá, #339 pode ser fechada pelo PI como decisão registrada, sem virar
+  fatia.
+- Limite semanal, pausa com teto de dias, fidelidade e multa continuam `[indefinido]` em
+  `CONVENTION.md`, agora com a referência a este ADR — a decisão para elas foi "não entra agora",
+  não "resolvido".
