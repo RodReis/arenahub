@@ -9,14 +9,13 @@ updated: 2026-09-18
 
 ### Sem épico
 
-- [MVP6][SPEC-075][F75] Job diário do pipeline de retenção + /retention/overview (#362)
+- [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339)
+- [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
-- [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339)
 - [MVP2][INFRA] Decisão: só existe plano mensal — os ciclos da §33 (trimestral, semestral, anual) nunca foram discutidos (#338)
 - [MVP2][INFRA] Decisão: upgrade e downgrade de plano — não existe regra de proração (#337)
 - [MVP1][INFRA] Decisão: QR, cartão e PIN como caminho de acesso — a regra de arquitetura nº 7 não tem implementação (#336)
-- [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
@@ -38,6 +37,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [INFRA] Rate limiting nas rotas públicas (mobile activation, totem, kiosk) (#364, finalizado em: 2026-09-18)
+- [MVP6][SPEC-075][F75] Job diário do pipeline de retenção + /retention/overview (#362, finalizado em: 2026-09-18)
 - [MVP6][INFRA] Decisão: o pipeline de retenção não tem job agendado — F36–F41 produzem zero em produção (#341, finalizado em: 2026-09-18)
 - [MVP1][INFRA] Decisão: dashboard executivo (§64/§117) — MRR, LTV, churn e cancelamentos não existem em documento nenhum (#340, finalizado em: 2026-09-17)
 - [MVP1][SPEC-074][F74] KPIs executivos no painel financeiro (§64/§117): alunos ativos, novos, cancelamentos, churn e LTV (#357, finalizado em: 2026-09-17)
