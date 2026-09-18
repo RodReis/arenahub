@@ -59,3 +59,11 @@ if (urlDaIntegracao) {
  * cair no dono e passar em falso.
  */
 delete process.env['RUNTIME_DATABASE_URL'];
+
+/**
+ * Throttle global por IP (issue #364) e desenhado para totem/app reais, nao
+ * para uma suite que dispara centenas de requisicoes por minuto do MESMO IP
+ * de teste (supertest local). Sem isto, `429 Too Many Requests` aparece como
+ * defeito de logica em qualquer teste que chame a mesma rota varias vezes.
+ */
+process.env['THROTTLE_LIMITE_POR_MINUTO'] = '100000';

@@ -20,6 +20,15 @@ const esquema = z.object({
 
   REDIS_URL: z.string().optional(),
 
+  /**
+   * Teto do throttle global por IP, requisicoes por minuto (issue #364,
+   * #335). Padrao pensado para totem/app reais; suites de integracao e E2E
+   * disparam centenas de requisicoes por minuto do MESMO IP de teste e
+   * precisam de um teto bem mais alto para nao confundir throttle com
+   * defeito -- `.env` de desenvolvimento/teste sobrescreve.
+   */
+  THROTTLE_LIMITE_POR_MINUTO: z.coerce.number().int().positive().default(30),
+
   STORAGE_ENDPOINT: z.string().default('http://127.0.0.1:9000'),
   STORAGE_REGION: z.string().default('us-east-1'),
   STORAGE_BUCKET: z.string().default('arenahub-biometrics'),
@@ -189,6 +198,8 @@ export interface ConfigDaApi {
   /** Chave AES-256 para o segredo TOTP. */
   mfa: { chave: Buffer };
   redis: { url: string };
+  /** Throttle global por IP (issue #364). */
+  throttle: { limitePorMinuto: number };
   storage: ConfigDeStorage;
   /** `null` quando a variavel nao esta definida -- nunca string vazia (INV-104). */
   anthropicApiKey: string | null;
@@ -250,6 +261,7 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaAp
     },
     mfa: { chave: resolverChaveDeMfa(bruto) },
     redis: { url: resolverRedisUrl(bruto) },
+    throttle: { limitePorMinuto: bruto.THROTTLE_LIMITE_POR_MINUTO },
     storage: resolverStorage(bruto),
     anthropicApiKey: bruto.ANTHROPIC_API_KEY ?? null,
     email: {

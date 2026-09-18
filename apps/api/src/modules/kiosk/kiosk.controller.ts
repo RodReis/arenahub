@@ -12,6 +12,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiNoContentResponse, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import { Throttle, minutes } from '@nestjs/throttler';
 import { z } from 'zod';
 import type { Request } from 'express';
 import {
@@ -165,6 +166,11 @@ export class KioskController {
     return this.midia.resolverMidias(contexto, resolvida);
   }
 
+  // Login por CPF sozinho (issue #364): o totem fica atras de UM IP na
+  // recepcao e abre sessao por aluno da fila, entao o teto tem que
+  // acomodar rajada de uso legitimo -- ainda bem abaixo do que enumeracao
+  // de CPF exigiria para ser pratica.
+  @Throttle({ default: { ttl: minutes(1), limit: 60 } })
   @Post('sessions')
   @HttpCode(201)
   @ApiCreatedResponse({
