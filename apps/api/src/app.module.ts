@@ -1,6 +1,9 @@
 import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard, minutes } from '@nestjs/throttler';
+
+import { carregarConfig } from './config/env.js';
 
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware.js';
 import { ProblemDetailsFilter } from './common/http/problem-details.filter.js';
@@ -52,6 +55,15 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     // so, na raiz -- registrar por modulo criaria varios agendadores para o
     // mesmo `@Interval`.
     ScheduleModule.forRoot(),
+    // Throttle global por IP (issue #364, #335): sem isto, rota `@Public()`
+    // como `/mobile/activation/lookup` (CPF + nascimento) e a ponte do
+    // totem sao enumeraveis a custo zero. Limite vem de config
+    // (`THROTTLE_LIMITE_POR_MINUTO`) porque integracao/E2E disparam muito
+    // mais requisicoes por minuto do mesmo IP de teste do que o totem/app
+    // real jamais faria; rota sensivel pode apertar com `@Throttle()` proprio.
+    ThrottlerModule.forRoot([
+      { ttl: minutes(1), limit: carregarConfig().throttle.limitePorMinuto },
+    ]),
     PersistenceModule,
     AntivirusModule,
     MediaFetcherModule,
@@ -92,6 +104,9 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     // A ORDEM IMPORTA. `AuthGuard` primeiro porque e ele que poe o
     // `TenantContext` na requisicao; `PermissionsGuard` depois, porque le
     // dali. Invertidos, a autorizacao rodaria sem saber quem e o ator.
+    // Primeiro de todos: barra enumeracao por IP antes de qualquer outro
+    // guard gastar trabalho decidindo tenant ou permissao.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     // Entre os dois: depende do `PlatformContext` que o `AuthGuard` poe, e
     // barra o usuario de tenant antes de o `PermissionsGuard` procurar

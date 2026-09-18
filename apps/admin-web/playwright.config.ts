@@ -123,7 +123,14 @@ export default defineConfig({
       // aponta para DESENVOLVIMENTO): o processo herda o ambiente de quem
       // chamou, e a do `.env` venceria a linha ao lado -- a suite escreveria
       // no banco errado com a configuracao parecendo correta.
-      env: { DATABASE_URL: URL_DO_BANCO_E2E, RUNTIME_DATABASE_URL: URL_RESTRITA_E2E },
+      // Throttle global por IP (issue #364) e pensado para painel/app real, e
+      // a jornada de E2E dispara muitas requisicoes seguidas do MESMO IP de
+      // teste -- sem isto, `429` no meio da jornada pareceria defeito de logica.
+      env: {
+        DATABASE_URL: URL_DO_BANCO_E2E,
+        RUNTIME_DATABASE_URL: URL_RESTRITA_E2E,
+        THROTTLE_LIMITE_POR_MINUTO: '100000',
+      },
     },
     {
       command: 'pnpm --filter @arenahub/admin-web start',

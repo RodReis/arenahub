@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { ApiOkResponse } from '@nestjs/swagger';
+import { Throttle, minutes } from '@nestjs/throttler';
 
 import { Public } from '../../common/security/public.decorator.js';
 import { StudentAccountRepository } from './student-account.repository.js';
@@ -58,6 +59,9 @@ export class StudentActivationController {
    * tela de confirmacao (SPEC-071 §6.3) mais um `activationRef` de curta
    * duracao. NAO abre sessao.
    */
+  // Mais apertado que o teto global (issue #364): CPF + nascimento sao
+  // enumeraveis, e esta rota devolve dado de matricula sem sessao nenhuma.
+  @Throttle({ default: { ttl: minutes(1), limit: 10 } })
   @Public()
   @Post('lookup')
   @HttpCode(200)
@@ -77,6 +81,7 @@ export class StudentActivationController {
    * Confirmacao -- o `activationRef` da consulta prova o CPF + nascimento;
    * aqui so falta a senha. Ja abre sessao (o aluno nao loga de novo).
    */
+  @Throttle({ default: { ttl: minutes(1), limit: 10 } })
   @Public()
   @Post('self-service')
   @HttpCode(200)

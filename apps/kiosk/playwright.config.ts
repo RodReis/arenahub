@@ -172,6 +172,10 @@ export default defineConfig({
         DATABASE_URL: URL_DO_BANCO_E2E,
         MFA_ENCRYPTION_KEY: CHAVE_DE_CIFRA,
         RUNTIME_DATABASE_URL: URL_RESTRITA_E2E,
+        // Throttle global por IP (issue #364) e pensado para totem real, e a
+        // jornada de E2E abre varias sessoes seguidas do MESMO IP de teste --
+        // sem isto, `429` no meio da jornada pareceria defeito de logica.
+        THROTTLE_LIMITE_POR_MINUTO: '100000',
       },
     },
     {
