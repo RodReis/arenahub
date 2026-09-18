@@ -382,8 +382,9 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 
 - **INV-059** Das regras de plano da Especificação §34: unidades, dias, horários e validade
   estão cobertas por `M1-FR-009`. **Aulas inclusas** e **convidados** foram confirmadas no
-  escopo do MVP1 pelo [ADR-059](DECISIONS.md#adr-059) — campo em `Plan` e comportamento ainda
-  não desenhados, sem fatia aberta. Limite semanal de acessos, pausa permitida + número de
+  escopo do MVP1 pelo [ADR-059](DECISIONS.md#adr-059) e **desenhados em 18/09/2026**: convidados
+  pelo [ADR-060](DECISIONS.md#adr-060) (F76) e aulas inclusas pelo
+  [ADR-061](DECISIONS.md#adr-061) (F77/F78). Limite semanal de acessos, pausa permitida + número de
   dias de pausa, fidelidade, multa por quebra de fidelidade e acesso multiunidade **seguem
   `[indefinido]`** — o ADR-059 decidiu "não entra agora" para as quatro primeiras; multiunidade
   não foi tratado por ele.
@@ -599,7 +600,7 @@ Conceitos usados em telas, menus e regras **sem entidade nem campo**. O Code **n
 | **Feriado / horário especial** | §10 | Sem entidade — mas as regras 6, 8 e 15 do motor de acesso dependem disso |
 | **`FeatureFlag`** | §100, §101, PRDs §19 | Escopo (global/tenant/unidade), quem alterna, auditoria, conflito com plano SaaS |
 | ~~**`SaasPlan`**~~ | §9, §100, §102 | **Resolvido (ADR-052):** `SaasPlan` com dois modelos — por aluno ativo/inativo ou fixo corrigido por índice — e `PlatformInvoice` (F63/F64). Billing da plataforma **entrou** no MVP 7 — Plataforma. Starter/Pro/Enterprise por módulo **não** existe: flag continua coluna (ADR-049) |
-| **Aulas / `Class`** | §34 "aulas inclusas" | **Confirmado no escopo do MVP1 ([ADR-059](DECISIONS.md#adr-059))** — falta desenhar campo e comportamento; entidade `Class` (agenda, professor, reserva) continua sem existir até então |
+| **Aulas / `Class`** | §34 "aulas inclusas" | **Desenhado ([ADR-061](DECISIONS.md#adr-061)), em construção pelas F77/F78** — agenda é módulo operacional próprio (a Arena Positiva já opera assim), professor é `Student` com `profile = TRAINER`, reserva **não** entra no motor de acesso e no-show **só registra**. "Aulas inclusas" é qualitativo: quais aulas o plano autoriza reservar. Seguem `[indefinido]`: aula avulsa paga, reserva pelo app do aluno, lista de espera (depende de #345), limite quantitativo por período e teto de reservas simultâneas |
 | **Convidados (plano)** | §34 "convidados" | **Confirmado no escopo do MVP1 ([ADR-059](DECISIONS.md#adr-059))** — falta desenhar campo e comportamento (nº de passes? vínculo nomeado?). Distinto do `visitante` de `Entitlement.source` (INV-064), que é tipo de acesso, não benefício de plano |
 | **Antifraude, limite de acessos, acesso duplicado** | §20 regras 11-14 | Sem parâmetro, campo ou fonte de configuração |
 | ~~**Nível "Academia"**~~ | §6 | **Resolvido:** dois níveis (ADR-002). A Especificação §6 precisa de nota de emenda |

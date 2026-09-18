@@ -1003,6 +1003,8 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F | SPEC | MVP | Slice | título | spec | issue | status |
 |---|---|---|---|---|---|---|---|
 | F76 | SPEC-076 | 1 | — | Convidados no plano: passe mensal com nome e CPF | [`SPEC-076-convidados-no-plano.md`](specs/SPEC-076-convidados-no-plano.md) · [ADR-060](DECISIONS.md#adr-060) | [#366](https://github.com/RodReis/arenahub/issues/366) | aprovada-pi — decisões de #339 em 18/09/2026 |
+| F77 | SPEC-077 | 1 | — | Agenda de aulas: grade recorrente, professor e capacidade | [`SPEC-077-agenda-de-aulas-professor-e-capacidade.md`](specs/SPEC-077-agenda-de-aulas-professor-e-capacidade.md) · [ADR-061](DECISIONS.md#adr-061) | [#367](https://github.com/RodReis/arenahub/issues/367) | aprovada-pi — decisões de #339 em 18/09/2026 |
+| F78 | SPEC-078 | 1 | — | Reserva, presença/no-show e aulas inclusas no plano (depende da F77) | [`SPEC-078-reserva-presenca-e-aulas-inclusas-no-plano.md`](specs/SPEC-078-reserva-presenca-e-aulas-inclusas-no-plano.md) · [ADR-061](DECISIONS.md#adr-061) | [#368](https://github.com/RodReis/arenahub/issues/368) | aprovada-pi — decisões de #339 em 18/09/2026 |
 | F1 | SPEC-001 | 0 | 0.1 | Bancada reproduzível | [`SPEC-001-bancada-reproduzivel.md`](specs/SPEC-001-bancada-reproduzivel.md) | [#1](https://github.com/RodReis/arenahub/issues/1) | aprovada-pi |
 | F2 | SPEC-002 | 0 | 0.2 | Ciclo de vida facial | [`SPEC-002-ciclo-de-vida-facial.md`](specs/SPEC-002-ciclo-de-vida-facial.md) | [#2](https://github.com/RodReis/arenahub/issues/2) | aprovada-pi |
 | F3 | SPEC-003 | 0 | 0.3 | Catraca e passagem | [`SPEC-003-catraca-e-passagem.md`](specs/SPEC-003-catraca-e-passagem.md) | [#3](https://github.com/RodReis/arenahub/issues/3) | aprovada-pi |

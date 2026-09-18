@@ -173,8 +173,11 @@ Aceite: equipe opera um turno completo sem acesso direto a banco, terminal ou lo
 > regras de plano da Especificação §34 sem campo (`CONVENTION.md` INV-059), **aulas inclusas**
 > e **convidados** foram confirmadas no escopo do MVP1. `M1-FR-009` continua cobrindo só
 > unidades, dias, horários e validade — o campo em `Plan` e o comportamento de aulas
-> inclusas/convidados **não foram desenhados** por esta emenda e não têm `F<n>`/`SPEC-<nnn>`
-> alocado; nascem quando o desenho existir. Limite semanal de acessos, pausa com teto de dias,
+> inclusas/convidados não foram desenhados por esta emenda. **Desenhados em 18/09/2026**, em
+> emenda posterior: convidados pelo [ADR-060](../../DECISIONS.md#adr-060) (F76) e aulas inclusas
+> pelo [ADR-061](../../DECISIONS.md#adr-061), que criou a entidade `Class` como módulo próprio
+> (F77) e o vínculo com o plano (F78) — lá, "aulas inclusas" é **qualitativo** (quais aulas o
+> plano autoriza reservar) e a reserva **não** entra no motor de decisão de acesso. Limite semanal de acessos, pausa com teto de dias,
 > fidelidade e multa por quebra de fidelidade **seguem fora de escopo** — a decisão do PI foi
 > "não entra agora", não "resolvido".
 

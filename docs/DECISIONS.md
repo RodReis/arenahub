@@ -90,6 +90,7 @@ existe para expulsar deste repositório.
 | [058](#adr-058) | Despachante de outbox como fatia própria; os nove eventos da §70 entram todos na v1 | `aceito` | — **cria F73** |
 | [059](#adr-059) | Plano §34: aulas inclusas e convidados entram no MVP1; as outras quatro seguem `[indefinido]` | `aceito` | — |
 | [060](#adr-060) | Desenho de convidados (detalha o ADR-059): passe mensal com nome/CPF, acesso via `visitante` | `aceito` | — **cria F76** |
+| [061](#adr-061) | Desenho da `Class` (detalha o ADR-060): agenda é módulo próprio, reserva não toca na catraca, no-show só registra | `aceito` | — **cria F77 e F78** |
 
 ---
 
@@ -4539,3 +4540,84 @@ do PI, não deste ADR.
 - `CONVENTION.md` §5 (linha "Aulas / `Class`") permanece como estava depois do ADR-059: escopo
   confirmado, entidade e comportamento ainda `[indefinido]` — este ADR não altera essa linha porque
   não resolveu o desenho de `Class`, só registrou que ele é necessário.
+
+---
+
+## ADR-061 — Desenho da entidade `Class` (detalha o ADR-060): agenda é módulo operacional próprio, reserva não toca na catraca, no-show só registra
+
+**Data:** 18/09/2026
+**Status:** aceito *(decisão nova — decidida pelo PI em 18/09/2026)*
+**Decisor:** Rodrigo Reis (PI)
+**Issue:** [#339](https://github.com/RodReis/arenahub/issues/339) — mesma origem do ADR-059/060
+
+**Contexto:** o [ADR-060](#adr-060) escolheu, para "aulas inclusas", o **vínculo com agenda/aula
+específica**, e registrou que essa opção obriga a construir do zero a entidade `Class` — agenda
+recorrente, professor, capacidade, reserva e política de cancelamento/no-show. Nenhum dos cinco
+pontos estava decidido, e o próprio ADR-060 recusou abrir fatia sobre desenho inexistente,
+recomendando uma rodada de decisão específica. Esta é a rodada.
+
+**O contraponto que foi levado ao PI antes de decidir, e o que ele respondeu.** A Especificação
+Completa menciona aula exatamente **duas vezes** — "aula experimental" na lista de origens de
+entitlement (INV-064) e "aulas inclusas" na lista de regras de plano (§34). Não há, em ~395 capacidades
+especificadas, um único requisito de grade horária, professor, turma ou reserva de vaga. Pela
+Especificação sozinha, construir agenda e reserva para satisfazer **uma linha** da §34 seria
+inverter o custo: um módulo inteiro para dar força a um campo. O PI respondeu que o gatilho **não
+é** a §34: o Complexo Arena Positiva **já opera assim** — cross fit, box e quadras de areia têm
+horário, professor e turma no dia a dia, hoje fora do sistema. A agenda é necessidade operacional
+própria do cliente inaugural, e "aulas inclusas" passa a ser consequência pequena dela, não a
+justificativa. Registrado assim de propósito: o dia em que alguém perguntar por que existe um
+módulo de agenda que a Especificação não pede, a resposta está aqui.
+
+**Por que é ADR:** cria entidades novas no MVP 1 já em produção com dado real de tenant, define o
+que a catraca **não** passa a consultar (regra de arquitetura nº 1) e fixa o alcance de "aulas
+inclusas" em `Plan` — campo cuja remoção depois de aluno ativo preenchido é cara. Emenda também o
+tamanho registrado no ADR-060: o que lá era "campo de plano" é aqui um módulo.
+
+### Decisões
+
+| # | pergunta | decisão |
+|---|---|---|
+| 1 | Por que a agenda existe | **Necessidade operacional da Arena Positiva** — a agenda é módulo próprio, não um acessório de "aulas inclusas". Emenda a leitura de tamanho do ADR-060 |
+| 2 | Reserva controla acesso na catraca? | **Não.** A catraca segue consultando só o `Entitlement`. Ter ou não reserva **não** entra na decisão de acesso |
+| 3 | Cancelamento e no-show | **Só registram.** Sem consumo de aula, sem bloqueio de reserva, sem penalidade automática. O registro alimenta relatório e o risco de churn do MVP 6 |
+| 4 | Fatiamento | **Duas fatias:** F77 (agenda, professor, capacidade) e F78 (reserva, presença/no-show, "aulas inclusas" em `Plan`) |
+| 5 | Quem é o professor | **`Student` com `profile = TRAINER`**, que já existe no schema ("Professor ou personal. Acesso liberado por vínculo"). Nenhuma entidade de pessoa nova |
+| 6 | Quem marca a reserva | **Só a recepção, no painel.** O app do aluno não entra nesta rodada |
+| 7 | Aula lotada | **Recusa, sem lista de espera.** Fila de espera exigiria notificação, e os nove eventos de notificação ainda são card de decisão aberto (#345) |
+| 8 | Aluno cujo plano não inclui a aula | **Recusa por padrão, com liberação manual da recepção registrada** — quem liberou fica gravado. Cobrança avulsa **não** entra |
+
+### O que decorre disso, e não é invenção deste ADR
+
+- **"Aulas inclusas" é qualitativo, não quantitativo.** A decisão nº 1 do ADR-060 (vínculo com
+  aula específica) mais a nº 8 acima definem o campo em `Plan` como *quais* aulas o plano autoriza
+  a reservar. Nenhum limite de quantidade por período foi decidido, e não é suposto aqui.
+- **A única força que "aulas inclusas" ganha é a recusa da reserva.** Como a catraca não consulta
+  reserva (nº 2) e a falta não penaliza (nº 3), não há nenhum outro ponto do sistema onde a regra
+  se manifeste. Quem quiser mais força depois precisa de decisão nova.
+- **A aula é de uma unidade e de uma modalidade.** `GymUnitModality` já existe por unidade (F60),
+  e a aula não tem outro lugar natural para morar.
+- **Comportamento exigido, sem ditar tabela:** cancelar uma ocorrência sem desfazer a grade, e
+  trocar o professor de um dia específico. O modelo de dados que entrega isso é decisão do Code.
+
+### Risco aceito pelo PI, com o gatilho para revisão
+
+Com as decisões nº 2, nº 3 e nº 8 juntas, **reservar não custa nada e faltar não custa nada**. A
+consequência conhecida em academia é lotação nominal com sala vazia: as vagas se esgotam na tela e
+metade não aparece. O PI aceitou isso para a primeira versão, preferindo registrar a falta a
+inventar punição antes de ter dado. **Gatilho para reabrir:** taxa de no-show medida acima do que o
+professor tolera, ou reclamação de aluno que não conseguiu vaga em aula que rodou vazia — nesse
+dia, a decisão nº 3 volta à mesa, e o registro que a F78 entrega é exatamente o dado que faltaria.
+
+### Consequências
+
+- Duas fatias novas: **F77** (`SPEC-077`) e **F78** (`SPEC-078`), sem Slice de PRD — nascem deste
+  ADR, mesmo regime das F49–F76. Ver `docs/STATUS.md` §5.
+- `CONVENTION.md` §5, linha "Aulas / `Class`", sai de "falta desenhar campo e comportamento" para
+  "desenhado (ADR-061), em construção pelas F77/F78".
+- A regra de arquitetura nº 1 (`CLAUDE.md`) **não muda e não ganha exceção** — a decisão nº 2 existe
+  justamente para deixar isso escrito antes de alguém propor o contrário numa PR.
+- Tabela nova carrega `tenant_id` (regra de arquitetura nº 2) e passa na guarda de catálogo que a
+  F67 deixou no CI — ela recusa tabela nova sem a coluna, pelo nome.
+- Seguem `[indefinido]`, nomeados para não virarem órfãos de novo: cobrança de aula avulsa; reserva
+  pelo app do aluno; lista de espera e suas notificações (depende de #345); limite quantitativo de
+  aulas por período; e teto de reservas simultâneas por aluno.
