@@ -89,6 +89,7 @@ existe para expulsar deste repositório.
 | [057](#adr-057) | Primeiro acesso self-service por CPF + data de nascimento | `aceito` | — |
 | [058](#adr-058) | Despachante de outbox como fatia própria; os nove eventos da §70 entram todos na v1 | `aceito` | — **cria F73** |
 | [059](#adr-059) | Plano §34: aulas inclusas e convidados entram no MVP1; as outras quatro seguem `[indefinido]` | `aceito` | — |
+| [060](#adr-060) | Desenho de convidados (detalha o ADR-059): passe mensal com nome/CPF, acesso via `visitante` | `aceito` | — **cria F76** |
 
 ---
 
@@ -4488,3 +4489,53 @@ pergunta ao PI antes da fatia que precisar dele.
 - Limite semanal, pausa com teto de dias, fidelidade e multa continuam `[indefinido]` em
   `CONVENTION.md`, agora com a referência a este ADR — a decisão para elas foi "não entra agora",
   não "resolvido".
+
+---
+
+## ADR-060 — Desenho de convidados no plano (detalha o ADR-059): passe mensal com nome/CPF, acesso via `Entitlement.source=visitante`; aulas inclusas segue sem fatia
+
+**Data:** 18/09/2026
+**Status:** aceito *(decisão nova — decidida pelo PI em 18/09/2026)*
+**Decisor:** Rodrigo Reis (PI)
+**Issue:** [#339](https://github.com/RodReis/arenahub/issues/339)
+
+**Contexto:** o [ADR-059](#adr-059) confirmou que aulas inclusas e convidados entram no MVP1, mas
+deixou em aberto **como** — cardinalidade, unidade de medida, e se convidados depende de alguma
+entidade nova. O Cowork levou três perguntas dirigidas ao PI para fechar esse "como".
+
+### Decisões
+
+| # | pergunta | decisão |
+|---|---|---|
+| 1 | Formato de "aulas inclusas" | **Vínculo com agenda/aula específica** — a opção que exige criar a entidade `Class` (agenda, professor, reserva), que hoje **não existe** (`CONVENTION.md` §5) |
+| 2 | Formato de "convidados" | **Nº de passes por mês, com nome e CPF do convidado registrados** a cada uso — não é só um contador |
+| 3 | Acesso do convidado na catraca | Reaproveita `Entitlement.source = visitante`, que **já existe** (INV-064) — nenhuma tabela de decisão de acesso nova |
+
+### O que isto muda de tamanho — registrado, não só aceito
+
+**Convidados** ficou com desenho suficiente para virar fatia agora: reaproveita infraestrutura que
+já existe (`Entitlement.source=visitante`) e não depende de entidade nova — só de `Plan` ganhar o
+limite mensal e de um registro de uso (nome, CPF, data, a assinatura a que se refere).
+
+**Aulas inclusas** não. A opção escolhida — vínculo com agenda/aula específica — implica construir
+do zero a entidade `Class`: agenda recorrente, atribuição de professor, capacidade/vagas, reserva
+do aluno, política de cancelamento/no-show. Nenhum desses cinco pontos foi decidido, e não são
+inventados por este ADR — abrir fatia hoje para "aulas inclusas" seria estimar sobre um desenho que
+não existe. **Este ADR não aloca fatia para aulas inclusas.** Ela nasce depois de uma rodada de
+decisão específica sobre o desenho de `Class` — recomendo isso como próximo card `[INFRA]`, decisão
+do PI, não deste ADR.
+
+### Consequências
+
+- Fatia nova **F76** (`SPEC-076`) para convidados — sem Slice de PRD (nasce do ADR-059/060, mesmo
+  regime de F49–F75 sem Slice). Ver `docs/STATUS.md` §5.
+- `docs/specs/SPEC-076-convidados-no-plano.md` carrega o escopo completo (não há Slice para
+  apontar), incluindo o registro explícito de que o critério de reset mensal (mês-calendário ou
+  ciclo de cobrança da assinatura) **não foi decidido** e volta a ser pergunta ao PI antes da
+  implementação — não é suposição do Code.
+- Consentimento/base legal para o CPF do convidado **não é escopo desta fatia nem deste ADR** —
+  `CLAUDE.md` já veda o Cowork de inventar exigência de LGPD, consentimento ou aceite duplo sem
+  decisão explícita do PI, e nenhuma foi pedida aqui.
+- `CONVENTION.md` §5 (linha "Aulas / `Class`") permanece como estava depois do ADR-059: escopo
+  confirmado, entidade e comportamento ainda `[indefinido]` — este ADR não altera essa linha porque
+  não resolveu o desenho de `Class`, só registrou que ele é necessário.
