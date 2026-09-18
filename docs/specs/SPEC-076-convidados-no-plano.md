@@ -6,7 +6,7 @@
 | **MVP** | 1 *(posição na fila)* — decisão do PI, não Slice de PRD |
 | **Slice do PRD** | não há. Nasce do [ADR-059](../DECISIONS.md#adr-059)/[ADR-060](../DECISIONS.md#adr-060) — auditoria de cobertura, issue #339 |
 | **Superfície** | `apps/api` (campo em `Plan`, registro de uso do convidado). UI de cadastro do plano e de registro do convidado (recepção/totem): a critério do Code — não é decisão de produto pendente |
-| **Card** | *(a criar)* |
+| **Card** | [#366](https://github.com/RodReis/arenahub/issues/366) |
 | **Status** | `aprovada-pi` — decisões tomadas em 18/09/2026, ver §2 |
 | **Depende de** | nenhuma — `Plan` e `Entitlement.source=visitante` já existem |
 
