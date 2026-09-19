@@ -43,6 +43,7 @@ import { PrivacyModule } from './modules/privacy/privacy.module.js';
 import { StudentsModule } from './modules/students/students.module.js';
 import { TenancyModule } from './modules/tenancy/tenancy.module.js';
 import { ClassesModule } from './modules/classes/classes.module.js';
+import { ClassReservationsModule } from './modules/class-reservations/class-reservations.module.js';
 import { PersistenceModule } from './persistence/persistence.module.js';
 
 /**
@@ -74,6 +75,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     TenancyModule,
     StudentsModule,
     ClassesModule,
+    ClassReservationsModule,
     BillingModule,
     MembershipModule,
     PrivacyModule,

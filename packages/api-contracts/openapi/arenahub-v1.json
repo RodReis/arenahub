@@ -1300,6 +1300,292 @@
         ]
       }
     },
+    "/api/v1/units/{unitId}/classes/{classId}/reservations": {
+      "post": {
+        "operationId": "ClassReservationController_reservar",
+        "parameters": [
+          {
+            "name": "classId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Reserva criada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "classId",
+                    "studentId",
+                    "occurrenceDate",
+                    "status",
+                    "overriddenById",
+                    "cancelledById"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "classId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "studentId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurrenceDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "RESERVED",
+                        "CANCELLED"
+                      ]
+                    },
+                    "overriddenById": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "cancelledById": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ClassReservation"
+        ]
+      },
+      "get": {
+        "operationId": "ClassReservationController_listar",
+        "parameters": [
+          {
+            "name": "classId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "occurrenceDate",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reservas da ocorrencia",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "classId",
+                      "studentId",
+                      "occurrenceDate",
+                      "status",
+                      "overriddenById",
+                      "cancelledById"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "classId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "studentId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "occurrenceDate": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "RESERVED",
+                          "CANCELLED"
+                        ]
+                      },
+                      "overriddenById": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "cancelledById": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ClassReservation"
+        ]
+      }
+    },
+    "/api/v1/units/{unitId}/classes/{classId}/reservations/{reservationId}/cancel": {
+      "patch": {
+        "operationId": "ClassReservationController_cancelar",
+        "parameters": [
+          {
+            "name": "reservationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reserva cancelada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "classId",
+                    "studentId",
+                    "occurrenceDate",
+                    "status",
+                    "overriddenById",
+                    "cancelledById"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "classId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "studentId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurrenceDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "RESERVED",
+                        "CANCELLED"
+                      ]
+                    },
+                    "overriddenById": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "cancelledById": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ClassReservation"
+        ]
+      }
+    },
+    "/api/v1/units/{unitId}/classes/{classId}/attendance": {
+      "post": {
+        "operationId": "ClassReservationController_marcarPresenca",
+        "parameters": [
+          {
+            "name": "classId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Presenca registrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "reservationId",
+                      "studentId",
+                      "status"
+                    ],
+                    "properties": {
+                      "reservationId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "studentId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "PRESENT",
+                          "NO_SHOW"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ClassReservation"
+        ]
+      }
+    },
     "/api/v1/invoices": {
       "post": {
         "operationId": "BillingController_abrirInvoice",
