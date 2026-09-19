@@ -672,15 +672,18 @@ model Tenant {
   /// Faturas do ArenaHub sobre esta academia (F64, ADR-052).
   platformInvoices PlatformInvoice[]
 
-  students           Student[]
-  studentCredentials StudentCredential[]
-  studentSequence    StudentSequence?
-  plans              Plan[]
-  subscriptions      Subscription[]
-  entitlements       Entitlement[]
-  guestPasses        GuestPass[]
-  classes            Class[]
-  classExceptions    ClassException[]
+  students              Student[]
+  studentCredentials    StudentCredential[]
+  studentSequence       StudentSequence?
+  plans                 Plan[]
+  subscriptions         Subscription[]
+  entitlements          Entitlement[]
+  guestPasses           GuestPass[]
+  classes               Class[]
+  classExceptions       ClassException[]
+  planClassEntitlements PlanClassEntitlement[]
+  classReservations     ClassReservation[]
+  classAttendances      ClassAttendance[]
 
   consentDocuments    ConsentDocument[]
   consentRecords      ConsentRecord[]
@@ -906,12 +909,13 @@ model GymUnitModality {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   /// `RESTRICT` como `Student.gymUnit`: apagar unidade com modalidade falha,
   /// em vez de levar o vinculo do aluno junto.
-  gymUnit  GymUnit           @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
-  students StudentModality[]
-  classes  Class[]
+  gymUnit          GymUnit                @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
+  students         StudentModality[]
+  classes          Class[]
+  planEntitlements PlanClassEntitlement[]
 
   /// Unico POR UNIDADE, nao por tenant: duas unidades do mesmo complexo
   /// podem oferecer "Cross Fit" cada uma, e sao ofertas distintas.
@@ -942,34 +946,35 @@ model GymUnitModality {
 /// inativada manualmente, mesmo padrao de `GymUnitModality.isActive`. Sem
 /// campo de inicio/fim.
 model Class {
-  id               String  @id @default(uuid()) @db.Uuid
-  tenantId         String  @map("tenant_id") @db.Uuid
-  gymUnitId        String  @map("gym_unit_id") @db.Uuid
-  modalityId       String  @map("modality_id") @db.Uuid
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  gymUnitId       String   @map("gym_unit_id") @db.Uuid
+  modalityId      String   @map("modality_id") @db.Uuid
   /// `Student` com `profile = TRAINER` (ADR-061 decisao 5) -- nenhuma
   /// entidade de pessoa nova. Nulo = aula sem professor definido.
-  trainerId        String? @map("trainer_id") @db.Uuid
+  trainerId       String?  @map("trainer_id") @db.Uuid
   /// 0 = domingo ... 6 = sabado, mesmo eixo de `PlanAccessWindow` (#129).
-  dayOfWeek        Int     @map("day_of_week")
-  startMinute      Int     @map("start_minute")
-  durationMinutes  Int     @map("duration_minutes")
-  capacity         Int
+  dayOfWeek       Int      @map("day_of_week")
+  startMinute     Int      @map("start_minute")
+  durationMinutes Int      @map("duration_minutes")
+  capacity        Int
   /// Inativar, nunca apagar -- mesmo motivo de `GymUnitModality`: a F78 vai
   /// gravar reserva apontando para aqui, e apagar deixaria o historico orfao.
   /// Aula inativa some do que se pode reservar e permanece no historico.
-  isActive         Boolean @default(true) @map("is_active")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   /// `RESTRICT`, mesmo padrao de `GymUnitModality.gymUnit`: apagar unidade
   /// com aula cadastrada falha, em vez de levar a grade junto.
-  gymUnit    GymUnit           @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
-  modality   GymUnitModality   @relation(fields: [modalityId], references: [id], onDelete: Restrict)
+  gymUnit      GymUnit            @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
+  modality     GymUnitModality    @relation(fields: [modalityId], references: [id], onDelete: Restrict)
   /// `SET NULL`: o professor que sai do quadro nao apaga a aula, so libera o
   /// campo -- mesmo padrao de `Student.advisor`.
-  trainer    Student?          @relation(fields: [trainerId], references: [id], onDelete: SetNull)
-  exceptions ClassException[]
+  trainer      Student?           @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  exceptions   ClassException[]
+  reservations ClassReservation[]
 
   @@index([tenantId, gymUnitId, dayOfWeek])
   @@index([tenantId, trainerId])
@@ -1001,8 +1006,8 @@ model ClassException {
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  class           Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   overrideTrainer Student? @relation("ClassExceptionOverrideTrainer", fields: [overrideTrainerId], references: [id], onDelete: SetNull)
 
   /// UMA excecao por dia por aula -- duas exceções no mesmo feriado para a
@@ -1010,6 +1015,111 @@ model ClassException {
   @@unique([classId, occurrenceDate])
   @@index([tenantId, classId])
   @@map("class_exceptions")
+}
+
+/// Vinculo Plan <-> modalidade de aula -- F78 (SPEC-078, ADR-061/ADR-062).
+///
+/// "AULAS INCLUSAS" E QUALITATIVO E APONTA PARA MODALIDADE, NAO PARA A AULA
+/// ESPECIFICA -- decisao do PI em 19/09/2026 (ADR-062), que emenda a decisao
+/// no 1 do ADR-060 (que havia escolhido vinculo com aula especifica antes de
+/// `Class`/`GymUnitModality` existirem no desenho concreto).
+///
+/// AUSENCIA DE LINHA PARA UM PLANO AUTORIZA TODAS AS MODALIDADES -- mesma
+/// regra do `DEFAULT true` da F69: nenhum plano em producao hoje tem
+/// entitlement cadastrado, e nascer restritivo recusaria reserva para a base
+/// inteira no dia do deploy.
+model PlanClassEntitlement {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  planId     String @map("plan_id") @db.Uuid
+  modalityId String @map("modality_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan     Plan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  modality GymUnitModality @relation(fields: [modalityId], references: [id], onDelete: Restrict)
+
+  /// UMA linha por par plano/modalidade -- duplicata nao muda o
+  /// comportamento (autoriza do mesmo jeito), so polui a listagem.
+  @@unique([planId, modalityId])
+  @@index([tenantId, planId])
+  @@map("plan_class_entitlements")
+}
+
+enum ClassReservationStatus {
+  RESERVED
+  CANCELLED
+
+  @@map("class_reservation_status")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  NO_SHOW
+
+  @@map("attendance_status")
+}
+
+/// Reserva de aluno numa ocorrencia de aula -- F78 (SPEC-078, ADR-061).
+///
+/// NAO DECIDE ACESSO -- ADR-061 decisao no 2, igual `Class`/`ClassException`.
+/// A catraca nao consulta esta tabela; ha teste estrutural que prova isso
+/// (`reserva-nao-decide-acesso.spec.ts`).
+///
+/// CANCELAMENTO E NO-SHOW SO REGISTRAM -- ADR-061 decisao no 3: sem consumo
+/// de aula, sem bloqueio de reserva futura, sem penalidade automatica.
+model ClassReservation {
+  id             String                 @id @default(uuid()) @db.Uuid
+  tenantId       String                 @map("tenant_id") @db.Uuid
+  classId        String                 @map("class_id") @db.Uuid
+  studentId      String                 @map("student_id") @db.Uuid
+  /// Dia de CALENDARIO da ocorrencia reservada, mesmo eixo de
+  /// `ClassException.occurrenceDate`.
+  occurrenceDate DateTime               @map("occurrence_date") @db.Date
+  status         ClassReservationStatus @default(RESERVED)
+  /// Preenchidos SO quando a reserva foi aceita apesar de a modalidade nao
+  /// estar no `PlanClassEntitlement` do aluno -- ADR-061 decisao no 8: quem
+  /// liberou e quando ficam gravados.
+  overriddenById String?                @map("overridden_by_id") @db.Uuid
+  overriddenAt   DateTime?              @map("overridden_at")
+  cancelledById  String?                @map("cancelled_by_id") @db.Uuid
+  cancelledAt    DateTime?              @map("cancelled_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  class        Class            @relation(fields: [classId], references: [id], onDelete: Restrict)
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  overriddenBy User?            @relation("ClassReservationOverriddenBy", fields: [overriddenById], references: [id], onDelete: SetNull)
+  cancelledBy  User?            @relation("ClassReservationCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  attendance   ClassAttendance?
+
+  /// UMA linha por aluno/ocorrencia -- reabrir depois de cancelar reusa esta
+  /// linha (Task 3), nunca duplica.
+  @@unique([classId, occurrenceDate, studentId])
+  @@index([tenantId, classId, occurrenceDate])
+  @@map("class_reservations")
+}
+
+/// Presenca ou falta de UMA reserva -- F78 (SPEC-078, ADR-061).
+///
+/// 1:1 COM `ClassReservation`: so existe registro para quem reservou (ADR-061
+/// decisao no 6 -- so a recepcao marca, e so marca quem ja esta na lista).
+model ClassAttendance {
+  id            String           @id @default(uuid()) @db.Uuid
+  tenantId      String           @map("tenant_id") @db.Uuid
+  reservationId String           @unique @map("reservation_id") @db.Uuid
+  status        AttendanceStatus
+  markedById    String           @map("marked_by_id") @db.Uuid
+  markedAt      DateTime         @default(now()) @map("marked_at")
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reservation ClassReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  markedBy    User             @relation("ClassAttendanceMarkedBy", fields: [markedById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, reservationId])
+  @@map("class_attendances")
 }
 
 /// Vinculo aluno <-> modalidade -- F60.
@@ -1125,6 +1235,10 @@ model User {
   platformAdminsGranted PlatformAdmin[]    @relation("PlatformAdminGrantedBy")
   supportElevations     SupportElevation[] @relation("SupportElevationAdmin")
   platformAuditLogs     PlatformAuditLog[] @relation("PlatformAuditActor")
+
+  overriddenClassReservations ClassReservation[] @relation("ClassReservationOverriddenBy")
+  cancelledClassReservations  ClassReservation[] @relation("ClassReservationCancelledBy")
+  markedClassAttendances      ClassAttendance[]  @relation("ClassAttendanceMarkedBy")
 
   @@map("users")
 }
@@ -1550,7 +1664,9 @@ model Student {
   classesAsTrainer        Class[]
   /// Ocorrencias em que este `Student` substituiu o professor titular por
   /// um dia (`ClassException.overrideTrainerId`).
-  classExceptionOverrides ClassException[] @relation("ClassExceptionOverrideTrainer")
+  classExceptionOverrides ClassException[]   @relation("ClassExceptionOverrideTrainer")
+  /// Reservas feitas por este aluno em aulas -- F78 (SPEC-078, ADR-061).
+  classReservations       ClassReservation[]
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])
@@ -1693,15 +1809,15 @@ model StudentTimelineEvent {
 /// inclusas, convidados, fidelidade, multa) sao `[indefinido]` por INV-059 --
 /// NAO inventar campo para elas aqui.
 model Plan {
-  id           String          @id @default(uuid()) @db.Uuid
-  tenantId     String          @map("tenant_id") @db.Uuid
-  name         String
-  description  String?
-  isActive     Boolean         @default(true) @map("is_active")
+  id                  String          @id @default(uuid()) @db.Uuid
+  tenantId            String          @map("tenant_id") @db.Uuid
+  name                String
+  description         String?
+  isActive            Boolean         @default(true) @map("is_active")
   /// Validade de VENDA do plano (ate quando pode ser contratado), diferente
   /// da vigencia da assinatura de um aluno.
-  salesStartAt DateTime?       @map("sales_start_at")
-  salesEndAt   DateTime?       @map("sales_end_at")
+  salesStartAt        DateTime?       @map("sales_start_at")
+  salesEndAt          DateTime?       @map("sales_end_at")
   /// Como o plano cobra (ADR-043, Decisao 2). `AVULSO` e o padrao porque e o
   /// que todo plano existente E -- migration que mudasse o comportamento de
   /// plano ja vendido cobraria aluno que nunca autorizou recorrencia.
@@ -1709,7 +1825,7 @@ model Plan {
   /// Plano `ASSINATURA` exige `PlanPrice` vigente: nao se assina o que nao tem
   /// preco. A regra e de aplicacao, nao de coluna -- a vigencia e uma LINHA em
   /// outra tabela, e nenhuma constraint de coluna alcanca isso.
-  billingMode  PlanBillingMode @default(AVULSO) @map("billing_mode")
+  billingMode         PlanBillingMode @default(AVULSO) @map("billing_mode")
   /// Limite mensal de convidados (F76, ADR-060). Nulo = plano sem esse
   /// beneficio -- e o que todo plano existente E, entao a migration nao
   /// concede convidado a ninguem por omissao.
@@ -1717,15 +1833,16 @@ model Plan {
   /// Reset por MES-CALENDARIO, decisao do PI de 18/09/2026: todo aluno
   /// reseta no dia 1, independente do ciclo de cobranca da assinatura dele.
   guestPassesPerMonth Int?            @map("guest_passes_per_month")
-  createdAt    DateTime        @default(now()) @map("created_at")
-  updatedAt    DateTime        @updatedAt @map("updated_at")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
 
-  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  units         PlanUnit[]
-  accessWindows PlanAccessWindow[]
-  subscriptions Subscription[]
-  prices        PlanPrice[]
-  benefits      PlanBenefit[]
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  units             PlanUnit[]
+  accessWindows     PlanAccessWindow[]
+  subscriptions     Subscription[]
+  prices            PlanPrice[]
+  benefits          PlanBenefit[]
+  classEntitlements PlanClassEntitlement[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
@@ -2206,7 +2323,7 @@ model EdgeNode {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
-  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   devices      Device[]
   credentials  EdgeCredential[]
   pairingCodes EdgePairingCode[]
