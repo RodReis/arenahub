@@ -166,5 +166,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-14 | #279 | — | integração | 1126 | 1126 | 0 | 83.7 | *(preencher após o merge)* — **corrigido à mão**: o Jest crasha no Windows (exit 3221226505) e o gerador herda o número da entrega anterior. Medido em lotes: **1048 na API** (77 suítes, 0 falha) + **78 no `database`** (6 suítes) = **1126**. Os **4 novos** são de `helpers/instante-de-passagem.int-spec.ts`, que varre os 1440 minutos do dia (issue #279) |
 | 2026-09-14 | #327 | — | unitário | 3415 | 3415 | 0 | 75.1 | — |
 | 2026-09-14 | #327 | — | integração | 1126 | 1126 | 0 | 81.0 | — |
-| 2026-09-19 | #368 | SPEC-078 | unitário | 3669 | 3669 | 0 | 75.1 | — |
-| 2026-09-19 | #368 | SPEC-078 | integração | 1214 | 1214 | 0 | 80.6 | — |
+| 2026-09-19 | #368 | SPEC-078 | unitário | 3669 | 3669 | 0 | 75.1 | #372 |
+| 2026-09-19 | #368 | SPEC-078 | integração | 1214 | 1214 | 0 | 80.6 | #372 |
