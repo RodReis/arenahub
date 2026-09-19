@@ -75,6 +75,13 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
   { href: '/students', label: 'Alunos' },
   { href: '/plans', label: 'Planos' },
   /*
+    AGENDA DE AULAS -- F77 (SPEC-077, ADR-061). Modulo operacional proprio,
+    nao acessorio de Planos: serve a recepcao mesmo sem nenhum plano com aula
+    inclusa (ADR-061 decisao 1). `class.read` -- some para quem so cadastra
+    aluno e nao opera a grade.
+  */
+  { href: '/classes', label: 'Aulas', exigePermissao: 'class.read' },
+  /*
     FINANCEIRO -- decisao do PI em 25/08/2026, mesmo criterio que criou
     "Administração" no dia anterior.
 
