@@ -685,6 +685,32 @@ export class StudentRepository {
     );
   }
 
+  /**
+   * Professores da unidade -- `Student` com `profile = TRAINER`, para a
+   * agenda de aulas escolher quem da a aula (F77, ADR-061 decisao 5).
+   *
+   * Lista LEVE de proposito: so `id` e `fullName`, sem o `include` pesado de
+   * `buscar` (assinatura, invoice). Quem chama e um `<select>`, nao uma
+   * grade de aluno.
+   */
+  async listarProfessores(
+    contexto: TenantContext,
+    gymUnitId: string,
+  ): Promise<{ id: string; fullName: string }[]> {
+    return this.db.comTenant((tx) =>
+      tx.student.findMany({
+        where: {
+          tenantId: contexto.tenantId,
+          gymUnitId,
+          profile: 'TRAINER',
+          archivedAt: null,
+        },
+        select: { id: true, fullName: true },
+        orderBy: { fullName: 'asc' },
+      }),
+    );
+  }
+
   async buscar(
     contexto: TenantContext,
     filtro: {

@@ -275,6 +275,18 @@ enum EntitlementSource {
   @@map("entitlement_source")
 }
 
+/// Excecao de calendario sobre a grade de aula (F77, ADR-061).
+///
+/// CANCELLED: a ocorrencia daquele dia nao acontece (feriado, professor
+/// doente), sem desfazer a grade. TRAINER_OVERRIDE: troca o professor de
+/// UM dia especifico, sem alterar os outros.
+enum ClassExceptionType {
+  CANCELLED
+  TRAINER_OVERRIDE
+
+  @@map("class_exception_type")
+}
+
 /// Tipo de evento da timeline administrativa do aluno.
 enum StudentTimelineEventType {
   STUDENT_CREATED
@@ -667,6 +679,8 @@ model Tenant {
   subscriptions      Subscription[]
   entitlements       Entitlement[]
   guestPasses        GuestPass[]
+  classes            Class[]
+  classExceptions    ClassException[]
 
   consentDocuments    ConsentDocument[]
   consentRecords      ConsentRecord[]
@@ -853,6 +867,7 @@ model GymUnit {
   retentionTasks          RetentionTask[]
   localHolidays           LocalHoliday[]
   modalities              GymUnitModality[]
+  classes                 Class[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -896,12 +911,105 @@ model GymUnitModality {
   /// em vez de levar o vinculo do aluno junto.
   gymUnit  GymUnit           @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
   students StudentModality[]
+  classes  Class[]
 
   /// Unico POR UNIDADE, nao por tenant: duas unidades do mesmo complexo
   /// podem oferecer "Cross Fit" cada uma, e sao ofertas distintas.
   @@unique([gymUnitId, name])
   @@index([tenantId])
   @@map("gym_unit_modalities")
+}
+
+/// Grade recorrente de aula -- F77 (SPEC-077, ADR-061).
+///
+/// AGENDA E MODULO OPERACIONAL PROPRIO (ADR-061 decisao 1), nao acessorio de
+/// "aulas inclusas" -- serve a recepcao mesmo sem nenhum plano com aula
+/// inclusa. De UMA unidade e de UMA modalidade: `GymUnitModality` e por
+/// unidade (F60), e nao ha outro lugar natural para a aula viver.
+///
+/// NAO DECIDE ACESSO. A catraca nao consulta esta tabela nem nenhuma daqui
+/// (ADR-061 decisao no 2) -- ha teste que prova que a fatia nao alterou
+/// nenhum caminho do motor (`gym-unit-nao-decide-acesso.spec.ts` e o
+/// precedente do mesmo motivo em `GymUnitModality`).
+///
+/// PROFESSOR OPCIONAL E UNICO -- decisao do PI em 18/09/2026 (F77, pendencia
+/// da SPEC-077 3.1): quadra de areia alugada sem professor e caso real no
+/// complexo, entao `trainerId` e nulavel. Um so professor por aula; caso de
+/// aula com dois professores (existe em box) fica para fatia futura se vier
+/// a ser pedido.
+///
+/// SEM VALIDADE DE TEMPORADA -- mesma decisao do PI: a grade vale ate ser
+/// inativada manualmente, mesmo padrao de `GymUnitModality.isActive`. Sem
+/// campo de inicio/fim.
+model Class {
+  id               String  @id @default(uuid()) @db.Uuid
+  tenantId         String  @map("tenant_id") @db.Uuid
+  gymUnitId        String  @map("gym_unit_id") @db.Uuid
+  modalityId       String  @map("modality_id") @db.Uuid
+  /// `Student` com `profile = TRAINER` (ADR-061 decisao 5) -- nenhuma
+  /// entidade de pessoa nova. Nulo = aula sem professor definido.
+  trainerId        String? @map("trainer_id") @db.Uuid
+  /// 0 = domingo ... 6 = sabado, mesmo eixo de `PlanAccessWindow` (#129).
+  dayOfWeek        Int     @map("day_of_week")
+  startMinute      Int     @map("start_minute")
+  durationMinutes  Int     @map("duration_minutes")
+  capacity         Int
+  /// Inativar, nunca apagar -- mesmo motivo de `GymUnitModality`: a F78 vai
+  /// gravar reserva apontando para aqui, e apagar deixaria o historico orfao.
+  /// Aula inativa some do que se pode reservar e permanece no historico.
+  isActive         Boolean @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// `RESTRICT`, mesmo padrao de `GymUnitModality.gymUnit`: apagar unidade
+  /// com aula cadastrada falha, em vez de levar a grade junto.
+  gymUnit    GymUnit           @relation(fields: [gymUnitId], references: [id], onDelete: Restrict)
+  modality   GymUnitModality   @relation(fields: [modalityId], references: [id], onDelete: Restrict)
+  /// `SET NULL`: o professor que sai do quadro nao apaga a aula, so libera o
+  /// campo -- mesmo padrao de `Student.advisor`.
+  trainer    Student?          @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  exceptions ClassException[]
+
+  @@index([tenantId, gymUnitId, dayOfWeek])
+  @@index([tenantId, trainerId])
+  @@map("classes")
+}
+
+/// Excecao de calendario sobre UMA ocorrencia da grade -- F77.
+///
+/// GRADE + OCORRENCIAS MATERIALIZADAS: desenho do Code para o comportamento
+/// exigido pela spec ("cancelar uma ocorrencia sem desfazer a grade, trocar
+/// o professor de um dia especifico"), nao imposicao da SPEC-077 (que deixou
+/// o modelo de dados em aberto).
+///
+/// `overrideTrainerId` so e lido quando `type = TRAINER_OVERRIDE`; nulo em
+/// `CANCELLED`. A validacao dessa amarra mora na aplicacao (funcao pura de
+/// `classes/domain/class.ts`), nao em CHECK de coluna -- mesma escolha de
+/// `EntitlementUnitWindow`/`PlanAccessWindow` para faixas que o Prisma nao
+/// modela.
+model ClassException {
+  id                String             @id @default(uuid()) @db.Uuid
+  tenantId          String             @map("tenant_id") @db.Uuid
+  classId           String             @map("class_id") @db.Uuid
+  /// Dia de CALENDARIO da ocorrencia, nao o dia da semana da grade -- a
+  /// grade repete toda semana, a excecao vale para UM feriado especifico.
+  occurrenceDate    DateTime           @map("occurrence_date") @db.Date
+  type              ClassExceptionType
+  /// So preenchido em `TRAINER_OVERRIDE`.
+  overrideTrainerId String?            @map("override_trainer_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  overrideTrainer Student? @relation("ClassExceptionOverrideTrainer", fields: [overrideTrainerId], references: [id], onDelete: SetNull)
+
+  /// UMA excecao por dia por aula -- duas exceções no mesmo feriado para a
+  /// mesma grade seria estado ambiguo (cancela ou troca? as duas?).
+  @@unique([classId, occurrenceDate])
+  @@index([tenantId, classId])
+  @@map("class_exceptions")
 }
 
 /// Vinculo aluno <-> modalidade -- F60.
@@ -1436,6 +1544,13 @@ model Student {
   notifications                    StudentNotification[]
   pushSubscriptions                PushSubscription[]
   healthMeasurements               HealthMeasurement[]
+
+  /// Aulas em que este `Student` (profile TRAINER) e o professor titular da
+  /// grade -- ADR-061 decisao 5.
+  classesAsTrainer        Class[]
+  /// Ocorrencias em que este `Student` substituiu o professor titular por
+  /// um dia (`ClassException.overrideTrainerId`).
+  classExceptionOverrides ClassException[] @relation("ClassExceptionOverrideTrainer")
 
   @@unique([tenantId, membershipNumber])
   @@index([tenantId, gymUnitId])

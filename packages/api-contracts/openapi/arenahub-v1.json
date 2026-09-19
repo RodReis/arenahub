@@ -696,6 +696,51 @@
         ]
       }
     },
+    "/api/v1/students/trainers": {
+      "get": {
+        "operationId": "StudentsController_listarProfessores",
+        "parameters": [
+          {
+            "name": "gymUnitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "fullName"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "fullName": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Students"
+        ]
+      }
+    },
     "/api/v1/students/{id}": {
       "get": {
         "operationId": "StudentsController_detalhar",
@@ -824,6 +869,434 @@
         },
         "tags": [
           "Students"
+        ]
+      }
+    },
+    "/api/v1/units/{unitId}/classes": {
+      "get": {
+        "operationId": "ClassController_listar",
+        "parameters": [
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "gymUnitId",
+                      "modalityId",
+                      "trainerId",
+                      "dayOfWeek",
+                      "startMinute",
+                      "durationMinutes",
+                      "capacity",
+                      "isActive"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "gymUnitId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "modalityId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "trainerId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "dayOfWeek": {
+                        "type": "integer"
+                      },
+                      "startMinute": {
+                        "type": "integer"
+                      },
+                      "durationMinutes": {
+                        "type": "integer"
+                      },
+                      "capacity": {
+                        "type": "integer"
+                      },
+                      "isActive": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Class"
+        ]
+      },
+      "post": {
+        "operationId": "ClassController_criar",
+        "parameters": [
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "gymUnitId",
+                    "modalityId",
+                    "trainerId",
+                    "dayOfWeek",
+                    "startMinute",
+                    "durationMinutes",
+                    "capacity",
+                    "isActive"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "gymUnitId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "modalityId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "trainerId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "dayOfWeek": {
+                      "type": "integer"
+                    },
+                    "startMinute": {
+                      "type": "integer"
+                    },
+                    "durationMinutes": {
+                      "type": "integer"
+                    },
+                    "capacity": {
+                      "type": "integer"
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Class"
+        ]
+      }
+    },
+    "/api/v1/units/{unitId}/classes/{classId}": {
+      "patch": {
+        "operationId": "ClassController_editar",
+        "parameters": [
+          {
+            "name": "classId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "gymUnitId",
+                    "modalityId",
+                    "trainerId",
+                    "dayOfWeek",
+                    "startMinute",
+                    "durationMinutes",
+                    "capacity",
+                    "isActive"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "gymUnitId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "modalityId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "trainerId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "dayOfWeek": {
+                      "type": "integer"
+                    },
+                    "startMinute": {
+                      "type": "integer"
+                    },
+                    "durationMinutes": {
+                      "type": "integer"
+                    },
+                    "capacity": {
+                      "type": "integer"
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Class"
+        ]
+      }
+    },
+    "/api/v1/units/{unitId}/classes/{classId}/activation": {
+      "patch": {
+        "operationId": "ClassController_alterarAtivacao",
+        "parameters": [
+          {
+            "name": "classId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "gymUnitId",
+                    "modalityId",
+                    "trainerId",
+                    "dayOfWeek",
+                    "startMinute",
+                    "durationMinutes",
+                    "capacity",
+                    "isActive"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "gymUnitId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "modalityId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "trainerId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "dayOfWeek": {
+                      "type": "integer"
+                    },
+                    "startMinute": {
+                      "type": "integer"
+                    },
+                    "durationMinutes": {
+                      "type": "integer"
+                    },
+                    "capacity": {
+                      "type": "integer"
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Class"
+        ]
+      }
+    },
+    "/api/v1/units/{unitId}/classes/{classId}/exceptions": {
+      "get": {
+        "operationId": "ClassController_listarExcecoes",
+        "parameters": [
+          {
+            "name": "classId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "classId",
+                      "occurrenceDate",
+                      "type",
+                      "overrideTrainerId"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "classId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "occurrenceDate": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "CANCELLED",
+                          "TRAINER_OVERRIDE"
+                        ]
+                      },
+                      "overrideTrainerId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Class"
+        ]
+      },
+      "post": {
+        "operationId": "ClassController_registrarExcecao",
+        "parameters": [
+          {
+            "name": "classId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "classId",
+                    "occurrenceDate",
+                    "type",
+                    "overrideTrainerId"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "classId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurrenceDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "CANCELLED",
+                        "TRAINER_OVERRIDE"
+                      ]
+                    },
+                    "overrideTrainerId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Class"
         ]
       }
     },

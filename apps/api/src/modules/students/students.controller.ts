@@ -482,6 +482,34 @@ export class StudentsController {
     return encontrados.map((a) => this.paraDtoDaLista(a));
   }
 
+  /**
+   * Professores da unidade -- `Student` com `profile = TRAINER` (F77,
+   * ADR-061 decisao 5). Consumido pela agenda de aulas para preencher o
+   * `<select>` de professor.
+   *
+   * DECLARADA ANTES de `:id`: o Nest casa por ordem, e `trainers` bateria em
+   * `:id` se viesse depois -- mesmo cuidado de `GymUnitModalityController`.
+   */
+  @Get('trainers')
+  @RequirePermissions('student.read')
+  @ApiOkResponse({
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'fullName'],
+        properties: { id: { type: 'string' }, fullName: { type: 'string' } },
+      },
+    },
+  })
+  async listarProfessores(
+    @Query('gymUnitId') gymUnitId?: string,
+  ): Promise<{ id: string; fullName: string }[]> {
+    if (!gymUnitId) return [];
+
+    return this.alunos.listarProfessores(this.contexto.require(), gymUnitId);
+  }
+
   @Get(':id')
   @RequirePermissions('student.read')
   async detalhar(@Param('id') id: string): Promise<AlunoDetalhadoDto> {

@@ -141,4 +141,12 @@ export const PERMISSOES_DO_OWNER = [
   // trabalho de rotina; DESLIGAR o pipeline afeta todo mundo e e decisao de
   // operacao, nao de consulta.
   'retention.kill_switch',
+  // F77: agenda de aulas -- grade recorrente, professor e capacidade.
+  //
+  // `class.manage` cobre criar/editar grade e exceção de calendário;
+  // `class.read` cobre so a visao da semana. Mesmo par de `plan.manage`/
+  // `plan.read` -- a recepcao que so consulta a grade nao precisa poder
+  // alterar quem da a aula.
+  'class.manage',
+  'class.read',
 ];
