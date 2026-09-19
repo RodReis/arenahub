@@ -80,6 +80,7 @@ export type {
   EntitlementUnitWindow,
   FamilyGroup,
   FamilyMember,
+  GuestPass,
   Invoice,
   InvoiceItem,
   InvoiceSequence,

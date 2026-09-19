@@ -51,6 +51,11 @@ const esquemaDePlano = z
      * plano avulso, e nenhum plano passa a cobrar sozinho por omissao.
      */
     billingMode: z.enum(['AVULSO', 'ASSINATURA']).optional(),
+    /**
+     * Limite mensal de convidados (F76, ADR-060). Ausente = sem o
+     * beneficio, mesmo default da coluna.
+     */
+    guestPassesPerMonth: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -103,6 +108,13 @@ const esquemaDeAlteracao = z
   })
   .strict();
 
+const esquemaDeConvidado = z
+  .object({
+    guestName: z.string().min(1).max(120),
+    guestCpf: z.string().min(11).max(14),
+  })
+  .strict();
+
 const esquemaDeCortesia = z
   .object({
     studentId: z.uuid(),
@@ -135,6 +147,15 @@ interface PlanoDto {
   prices: PrecoDto[];
   /** Como o plano cobra (ADR-043, Decisao 2). */
   billingMode: 'AVULSO' | 'ASSINATURA';
+  /** Limite mensal de convidados (F76, ADR-060). Nulo = sem o beneficio. */
+  guestPassesPerMonth: number | null;
+}
+
+interface ConvidadoDto {
+  id: string;
+  guestName: string;
+  guestCpf: string;
+  usedAt: string;
 }
 
 interface EntitlementDto {
@@ -204,6 +225,7 @@ export class MembershipController {
         salesEndAt: dados.salesEndAt ? new Date(dados.salesEndAt) : undefined,
         amountMinor: dados.amountMinor,
         billingMode: dados.billingMode,
+        guestPassesPerMonth: dados.guestPassesPerMonth,
       },
       requisicao.correlationId ?? 'sem-correlacao',
       new Date(),
@@ -441,6 +463,67 @@ export class MembershipController {
     return { id: assinatura.id, status: assinatura.status };
   }
 
+  /**
+   * Registra o uso de um convidado sob a assinatura (F76, ADR-060).
+   *
+   * NAO libera acesso: o convidado passa pela catraca pelo caminho de
+   * VISITOR que ja existe hoje (override manual). Esta rota so registra
+   * quem usou o beneficio e recusa acima do limite mensal do plano.
+   */
+  @Post('subscriptions/:id/guest-passes')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['id', 'guestName', 'guestCpf', 'usedAt'],
+      properties: {
+        id: { type: 'string' },
+        guestName: { type: 'string' },
+        guestCpf: { type: 'string' },
+        usedAt: { type: 'string' },
+      },
+    },
+  })
+  @RequirePermissions('subscription.manage')
+  async registrarConvidado(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<ConvidadoDto> {
+    const dados = esquemaDeConvidado.parse(corpo);
+
+    const convidado = await this.membership.registrarConvidado(
+      this.contexto.require(),
+      { subscriptionId: id, guestName: dados.guestName, guestCpf: dados.guestCpf },
+      requisicao.correlationId ?? 'sem-correlacao',
+      new Date(),
+    );
+
+    return this.convidadoParaDto(convidado);
+  }
+
+  @Get('subscriptions/:id/guest-passes')
+  @ApiOkResponse({
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'guestName', 'guestCpf', 'usedAt'],
+        properties: {
+          id: { type: 'string' },
+          guestName: { type: 'string' },
+          guestCpf: { type: 'string' },
+          usedAt: { type: 'string' },
+        },
+      },
+    },
+  })
+  @RequirePermissions('subscription.manage')
+  async listarConvidados(@Param('id') id: string): Promise<ConvidadoDto[]> {
+    const convidados = await this.membership.listarConvidados(this.contexto.require(), id);
+
+    return convidados.map((c) => this.convidadoParaDto(c));
+  }
+
   @Post('entitlements/courtesy')
   @RequirePermissions('subscription.manage')
   async concederCortesia(
@@ -565,10 +648,25 @@ export class MembershipController {
         endMinute: j.endMinute,
       })),
       billingMode: plano.billingMode,
+      guestPassesPerMonth: plano.guestPassesPerMonth,
       currentPrice: vigente
         ? { amountMinor: vigente.amountMinor, currency: vigente.currency, validFrom: vigente.validFrom.toISOString() }
         : null,
       prices: precos,
+    };
+  }
+
+  private convidadoParaDto(convidado: {
+    id: string;
+    guestName: string;
+    guestCpf: string;
+    usedAt: Date;
+  }): ConvidadoDto {
+    return {
+      id: convidado.id,
+      guestName: convidado.guestName,
+      guestCpf: convidado.guestCpf,
+      usedAt: convidado.usedAt.toISOString(),
     };
   }
 

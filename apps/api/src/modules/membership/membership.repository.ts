@@ -1,14 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import type { Entitlement, Plan, PlanPrice, Prisma, Subscription } from '@arenahub/database';
+import type {
+  Entitlement,
+  GuestPass,
+  Plan,
+  PlanPrice,
+  Prisma,
+  Subscription,
+} from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { competenciaDe } from '../billing/domain/ciclo-de-cobranca.js';
 import { validarValorMonetario } from '../billing/domain/dinheiro.js';
+import { cpfEhValido, normalizarCpf } from '../students/domain/identificacao.js';
 import { alunoRecebeAcessoNormal, type StatusDeAluno } from '../students/domain/student.js';
 import { StudentRepository } from '../students/student.repository.js';
 import { montarSnapshotDePolitica } from './domain/entitlement.js';
+import { competenciaMensalDe, limiteDeConvidadosExcedido } from './domain/guest-pass.js';
 import { validarJanelas, type JanelaDeAcesso } from './domain/plan.js';
 
 export class PlanoNaoEncontradoError extends ErroDeDominio {
@@ -108,6 +117,41 @@ export class PlanoSemJanelaError extends ErroDeDominio {
   }
 }
 
+/**
+ * Assinatura cujo plano nao tem `guestPassesPerMonth` (F76, ADR-060).
+ *
+ * O limite vive no PLANO, nao na assinatura -- registrar convidado sem que
+ * o plano ofereca o beneficio seria conceder algo que a venda nunca
+ * prometeu.
+ */
+export class BeneficioDeConvidadoNaoIncluidoError extends ErroDeDominio {
+  constructor() {
+    super(
+      'GUEST_PASS_NOT_INCLUDED',
+      422,
+      'O plano desta assinatura nao inclui convidados',
+    );
+  }
+}
+
+/** CPF do convidado reprovado pelo digito verificador (INV-014, mesma regra de aluno). */
+export class CpfDeConvidadoInvalidoError extends ErroDeDominio {
+  constructor() {
+    super('GUEST_PASS_INVALID_CPF', 422, 'CPF do convidado invalido');
+  }
+}
+
+/** Limite mensal de convidados da assinatura ja foi usado (SPEC-076 5). */
+export class LimiteDeConvidadosExcedidoError extends ErroDeDominio {
+  constructor(limite: number) {
+    super(
+      'GUEST_PASS_LIMIT_EXCEEDED',
+      409,
+      `Limite de ${limite} convidado(s) neste mes ja foi atingido`,
+    );
+  }
+}
+
 export interface DadosDeCriacaoDePlano {
   name: string;
   description?: string | undefined;
@@ -122,6 +166,11 @@ export interface DadosDeCriacaoDePlano {
    * default da coluna -- plano criado por chamador antigo continua avulso.
    */
   billingMode?: 'AVULSO' | 'ASSINATURA' | undefined;
+  /**
+   * Limite mensal de convidados (F76, ADR-060). Ausente = sem o beneficio,
+   * mesmo default da coluna.
+   */
+  guestPassesPerMonth?: number | undefined;
 }
 
 export interface DadosDeEdicaoDePlano {
@@ -217,6 +266,7 @@ export class MembershipRepository {
           name: dados.name,
           description: dados.description ?? null,
           ...(dados.billingMode === undefined ? {} : { billingMode: dados.billingMode }),
+          guestPassesPerMonth: dados.guestPassesPerMonth ?? null,
           salesStartAt: dados.salesStartAt ?? null,
           salesEndAt: dados.salesEndAt ?? null,
           units: {
@@ -975,6 +1025,120 @@ export class MembershipRepository {
       });
 
       return entitlement;
+    });
+  }
+
+  /**
+   * Registra o uso de um convidado sob a assinatura -- limite mensal do
+   * plano, mes-calendario (F76, ADR-059/ADR-060, decisao do PI de
+   * 18/09/2026).
+   *
+   * NAO CONCEDE ACESSO NOVO: o convidado passa pela catraca como VISITOR
+   * (`Entitlement.source`, INV-064), caminho que ja existe hoje por
+   * `ManualOverrideUseCase`. Esta funcao so registra QUEM usou o beneficio
+   * e RECUSA acima do limite -- ela nunca cria `Entitlement`.
+   *
+   * TRAVA POR `Subscription FOR UPDATE`, mesmo remedio de
+   * `travarAlunoElegivel`: sem ela, duas requisicoes simultaneas leem a
+   * mesma contagem, as duas veem "1 de 2 usados" e as duas passam --
+   * furando o limite por corrida. A trava serializa por assinatura, entao
+   * a segunda requisicao so conta DEPOIS que a primeira commitou.
+   */
+  async registrarConvidado(
+    contexto: TenantContext,
+    entrada: {
+      subscriptionId: string;
+      guestName: string;
+      guestCpf: string;
+    },
+    correlationId: string,
+    agora: Date,
+  ): Promise<GuestPass> {
+    if (!cpfEhValido(entrada.guestCpf)) throw new CpfDeConvidadoInvalidoError();
+
+    const competencia = competenciaMensalDe(agora);
+    const proximaCompetencia = new Date(
+      Date.UTC(competencia.getUTCFullYear(), competencia.getUTCMonth() + 1, 1),
+    );
+
+    return this.db.$transaction(async (tx) => {
+      const travada = await tx.$queryRaw<{ id: string; plan_id: string }[]>`
+        SELECT s.id, s.plan_id
+        FROM subscriptions s
+        WHERE s.id = ${entrada.subscriptionId}::uuid
+          AND s.tenant_id = ${contexto.tenantId}::uuid
+        FOR UPDATE
+      `;
+
+      const assinatura = travada[0];
+      if (!assinatura) {
+        throw new ErroDeDominio('SUBSCRIPTION_NOT_FOUND', 404, 'Assinatura nao encontrada');
+      }
+
+      const plano = await tx.plan.findUniqueOrThrow({
+        where: { id: assinatura.plan_id },
+        select: { guestPassesPerMonth: true },
+      });
+
+      if (plano.guestPassesPerMonth === null) {
+        throw new BeneficioDeConvidadoNaoIncluidoError();
+      }
+
+      const usosNoMes = await tx.guestPass.count({
+        where: {
+          tenantId: contexto.tenantId,
+          subscriptionId: entrada.subscriptionId,
+          usedAt: { gte: competencia, lt: proximaCompetencia },
+        },
+      });
+
+      if (limiteDeConvidadosExcedido(usosNoMes, plano.guestPassesPerMonth)) {
+        throw new LimiteDeConvidadosExcedidoError(plano.guestPassesPerMonth);
+      }
+
+      const convidado = await tx.guestPass.create({
+        data: {
+          tenantId: contexto.tenantId,
+          subscriptionId: entrada.subscriptionId,
+          guestName: entrada.guestName,
+          guestCpf: normalizarCpf(entrada.guestCpf),
+          usedAt: agora,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'guest_pass.registered',
+          target: 'guest_pass',
+          targetId: convidado.id,
+          correlationId,
+          metadata: { subscriptionId: entrada.subscriptionId },
+        },
+      });
+
+      return convidado;
+    });
+  }
+
+  async listarConvidados(
+    contexto: TenantContext,
+    subscriptionId: string,
+  ): Promise<GuestPass[]> {
+    const assinatura = await this.db.subscription.findFirst({
+      where: { id: subscriptionId, tenantId: contexto.tenantId },
+      select: { id: true },
+    });
+
+    if (!assinatura) {
+      throw new ErroDeDominio('SUBSCRIPTION_NOT_FOUND', 404, 'Assinatura nao encontrada');
+    }
+
+    return this.db.guestPass.findMany({
+      where: { tenantId: contexto.tenantId, subscriptionId },
+      orderBy: [{ usedAt: 'asc' }, { id: 'asc' }],
     });
   }
 

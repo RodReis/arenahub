@@ -666,6 +666,7 @@ model Tenant {
   plans              Plan[]
   subscriptions      Subscription[]
   entitlements       Entitlement[]
+  guestPasses        GuestPass[]
 
   consentDocuments    ConsentDocument[]
   consentRecords      ConsentRecord[]
@@ -1594,6 +1595,13 @@ model Plan {
   /// preco. A regra e de aplicacao, nao de coluna -- a vigencia e uma LINHA em
   /// outra tabela, e nenhuma constraint de coluna alcanca isso.
   billingMode  PlanBillingMode @default(AVULSO) @map("billing_mode")
+  /// Limite mensal de convidados (F76, ADR-060). Nulo = plano sem esse
+  /// beneficio -- e o que todo plano existente E, entao a migration nao
+  /// concede convidado a ninguem por omissao.
+  ///
+  /// Reset por MES-CALENDARIO, decisao do PI de 18/09/2026: todo aluno
+  /// reseta no dia 1, independente do ciclo de cobranca da assinatura dele.
+  guestPassesPerMonth Int?            @map("guest_passes_per_month")
   createdAt    DateTime        @default(now()) @map("created_at")
   updatedAt    DateTime        @updatedAt @map("updated_at")
 
@@ -1717,6 +1725,7 @@ model Subscription {
   entitlements Entitlement[]
   familyGroup  FamilyGroup?
   invoices     Invoice[]
+  guestPasses  GuestPass[]
 
   @@index([tenantId, studentId, status])
   /// UMA ASSINATURA VIGENTE POR ALUNO -- issue #272, regra confirmada pelo PI
@@ -1743,6 +1752,37 @@ model Subscription {
   /// crescida, quando ja e tarde.
   @@index([tenantId, externalSubscriptionId])
   @@map("subscriptions")
+}
+
+/// Registro de uso do beneficio de convidado (F76, ADR-060).
+///
+/// NAO E UM CONTADOR SOLTO -- decisao do PI: cada uso grava nome e CPF de
+/// quem entrou, quando, e sob qual assinatura. `usedAt` e o instante do
+/// registro; a competencia do mes-calendario (`competenciaMensalDe`) deriva
+/// dele na consulta, nunca e gravada solta para nao divergir se a regra de
+/// calculo mudar.
+///
+/// O convidado entra pela catraca como VISITOR (`Entitlement.source`,
+/// INV-064) -- esta tabela e so o registro do beneficio consumido, nao um
+/// caminho de acesso novo.
+model GuestPass {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  /// Mesma mascara/validacao de CPF de aluno (`identificacao.ts`) -- nao e
+  /// cadastro de convidado, so o registro do uso (SPEC-076 4).
+  guestName      String   @map("guest_name")
+  guestCpf       String   @map("guest_cpf")
+  usedAt         DateTime @map("used_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  /// Caminho quente da checagem de limite: "quantos usos esta assinatura
+  /// ja teve neste mes?".
+  @@index([tenantId, subscriptionId, usedAt])
+  @@map("guest_passes")
 }
 
 /// Direito de acesso. O QUE A CATRACA CONSULTA.

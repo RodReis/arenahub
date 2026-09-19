@@ -1808,6 +1808,107 @@
         ]
       }
     },
+    "/api/v1/subscriptions/{id}/guest-passes": {
+      "post": {
+        "operationId": "MembershipController_registrarConvidado",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "guestName",
+                    "guestCpf",
+                    "usedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "guestName": {
+                      "type": "string"
+                    },
+                    "guestCpf": {
+                      "type": "string"
+                    },
+                    "usedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Membership"
+        ]
+      },
+      "get": {
+        "operationId": "MembershipController_listarConvidados",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "guestName",
+                      "guestCpf",
+                      "usedAt"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "guestName": {
+                        "type": "string"
+                      },
+                      "guestCpf": {
+                        "type": "string"
+                      },
+                      "usedAt": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Membership"
+        ]
+      }
+    },
     "/api/v1/entitlements/courtesy": {
       "post": {
         "operationId": "MembershipController_concederCortesia",
