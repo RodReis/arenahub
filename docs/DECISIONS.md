@@ -91,6 +91,7 @@ existe para expulsar deste repositório.
 | [059](#adr-059) | Plano §34: aulas inclusas e convidados entram no MVP1; as outras quatro seguem `[indefinido]` | `aceito` | — |
 | [060](#adr-060) | Desenho de convidados (detalha o ADR-059): passe mensal com nome/CPF, acesso via `visitante` | `aceito` | — **cria F76** |
 | [061](#adr-061) | Desenho da `Class` (detalha o ADR-060): agenda é módulo próprio, reserva não toca na catraca, no-show só registra | `aceito` | — **cria F77 e F78** |
+| [062](#adr-062) | F78: sem teto de reservas, sem janela de cancelamento, "aulas inclusas" aponta para modalidade (emenda o nº 1 do ADR-060) | `aceito` | — |
 
 ---
 
@@ -4621,3 +4622,42 @@ dia, a decisão nº 3 volta à mesa, e o registro que a F78 entrega é exatament
 - Seguem `[indefinido]`, nomeados para não virarem órfãos de novo: cobrança de aula avulsa; reserva
   pelo app do aluno; lista de espera e suas notificações (depende de #345); limite quantitativo de
   aulas por período; e teto de reservas simultâneas por aluno.
+
+---
+
+<a id="adr-062"></a>
+## ADR-062 — F78: sem teto de reservas, sem janela de cancelamento, "aulas inclusas" aponta para modalidade (emenda o nº 1 do ADR-060)
+
+**Data:** 19/09/2026
+**Status:** aceito *(decisão nova — decidida pelo PI em 19/09/2026)*
+**Decisor:** Rodrigo Reis (PI)
+**Issue:** [#368](https://github.com/RodReis/arenahub/issues/368)
+
+**Contexto:** a [SPEC-078](../specs/SPEC-078-reserva-presenca-e-aulas-inclusas-no-plano.md) §3.1
+listou três pontos em aberto que o Code não decide sozinho. O Code perguntou ao PI antes de
+implementar a F78.
+
+### Decisões
+
+| # | pergunta | decisão |
+|---|---|---|
+| 1 | Teto de reservas simultâneas por aluno | **Sem limite.** Nenhum teto nesta fatia — mesmo risco já aceito no ADR-061 §"Risco registrado" |
+| 2 | Janela de cancelamento | **Sem janela.** A recepção cancela a qualquer momento antes ou depois do horário; falta nasce só de reserva não marcada como presença, nunca de cancelamento tardio |
+| 3 | Campo em `Plan` aponta para modalidade ou para a grade específica (`Class`)? | **Modalidade.** Emenda a decisão nº 1 do [ADR-060](#adr-060), que havia escolhido "vínculo com agenda/aula específica" |
+
+**Por que a decisão nº 3 diverge do ADR-060:** o ADR-060 escolheu vínculo com aula específica antes
+de a entidade `Class` existir — na prática, decidia sobre um desenho que ainda não tinha `Class`
+nem `Modality` desenhados. Com `Class` construída na F77 (grade recorrente por modalidade, não por
+instância), vincular o plano à modalidade é mais barato de manter (grade muda sem exigir recadastro
+do plano) e é o nível que a Especificação §34 realmente descreve ("quais aulas", não "qual horário
+exato"). O PI decidiu pela modalidade ao ver o desenho concreto da F77.
+
+### Consequências
+
+- `PlanClassEntitlement` (F78) referencia `Plan` × `GymUnitModality`, não `Plan` × `Class`. Ausência
+  de linha para um `Plan` autoriza todas as modalidades (mesma regra do `DEFAULT true` da F69) —
+  nenhum plano em produção hoje tem entitlement cadastrado.
+- Sem teto e sem janela: nada a implementar além do que a SPEC-078 já descreve. O risco de "reservar
+  não custa nada" segue como o ADR-061 já registrou.
+- `CONVENTION.md` e `docs/specs/SPEC-078-*.md` são atualizados para refletir "modalidade" em vez de
+  deixar a pergunta em aberto.
