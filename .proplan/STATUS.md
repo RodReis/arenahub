@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-18
+updated: 2026-09-19
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -10,6 +10,8 @@ updated: 2026-09-18
 ### Sem épico
 
 - [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339)
+- [MVP1][INFRA] Decisão: desenho de `Class` para aulas inclusas (agenda, professor, capacidade, reserva, no-show) (#369)
+- [MVP1][SPEC-078][F78] Reserva, presença/no-show e aulas inclusas no plano (#368)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
@@ -37,6 +39,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][SPEC-076][F76] Convidados no plano: passe mensal com nome e CPF (#366, finalizado em: 2026-09-19)
+- [MVP1][SPEC-077][F77] Agenda de aulas: grade recorrente, professor e capacidade (#367, finalizado em: 2026-09-19)
 - [INFRA] Rate limiting nas rotas públicas (mobile activation, totem, kiosk) (#364, finalizado em: 2026-09-18)
 - [MVP6][SPEC-075][F75] Job diário do pipeline de retenção + /retention/overview (#362, finalizado em: 2026-09-18)
 - [MVP6][INFRA] Decisão: o pipeline de retenção não tem job agendado — F36–F41 produzem zero em produção (#341, finalizado em: 2026-09-18)
