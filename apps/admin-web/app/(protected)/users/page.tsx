@@ -117,10 +117,10 @@ export default async function PaginaDeUsuarios() {
             header: 'Perfil',
             /*
               O QUE A LISTA NÃO DIZIA ATÉ A F80: quem é quem. Com um papel só
-              no sistema (), a coluna teria sido ruído; com cinco, ela
+              no sistema (`OWNER`), a coluna teria sido ruído; com cinco, ela
               é a informação que decide se alguém precisa ser revogado.
 
-              Rótulo em pt-BR pelo mapa único de . Sem papel
+              Rótulo em pt-BR pelo mapa único de `src/iam/rotulos`. Sem papel
               nenhum é estado real (vínculo criado, papel ainda não), e um
               traço diz isso melhor que célula vazia.
             */
