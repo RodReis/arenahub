@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-19
+updated: 2026-09-22
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -38,6 +38,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][SPEC-079][F79] Acesso do Admin do tenant: ver, reenviar, corrigir e revogar (#373, finalizado em: 2026-09-22)
+- [MVP1][SPEC-080][F80] Perfis prontos e tela de equipe do tenant (#374, finalizado em: 2026-09-22)
 - [MVP1][SPEC-078][F78] Reserva, presença/no-show e aulas inclusas no plano (#368, finalizado em: 2026-09-19)
 - [MVP1][SPEC-076][F76] Convidados no plano: passe mensal com nome e CPF (#366, finalizado em: 2026-09-19)
 - [MVP1][SPEC-077][F77] Agenda de aulas: grade recorrente, professor e capacidade (#367, finalizado em: 2026-09-19)
@@ -79,8 +81,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
+- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
