@@ -95,6 +95,16 @@ const MENSAGEM: Record<string, string> = {
    * não tenta adivinhar qual dos quatro é.
    */
   INVITATION_INVALID: 'Convite inválido ou expirado. Peça um novo à academia.',
+
+  /*
+   * Recusas da revogação de acesso (F80). Cada uma pede um ato diferente de
+   * quem está na tela, então cada uma tem frase própria.
+   */
+  MOTIVO_OBRIGATORIO: 'Escreva o motivo da revogação (ao menos 10 caracteres).',
+  USER_NOT_FOUND: 'Esta pessoa não tem mais acesso a esta academia.',
+  NAO_REVOGA_A_SI_MESMO: 'Você não pode revogar o próprio acesso.',
+  ULTIMO_DONO:
+    'Este é o único dono da academia. Convide outro dono antes de revogar este acesso.',
 };
 
 function texto(formulario: FormData, campo: string): string {
@@ -204,4 +214,50 @@ export async function aceitarConvite(
   }
 
   return { sucesso: true };
+}
+
+const esquemaDeRevogacao = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(10, 'Escreva o motivo da revogação (ao menos 10 caracteres).')
+    .max(500, 'Motivo longo demais'),
+});
+
+export interface EstadoDaRevogacao {
+  erro?: string;
+  revogado?: boolean;
+}
+
+/**
+ * Tira o acesso de alguém ao painel — F80.
+ *
+ * O MOTIVO É OBRIGATÓRIO e vai para a auditoria do tenant. Pedi-lo na tela e
+ * descartá-lo aqui seria teatro — a pergunta existe porque a resposta fica
+ * gravada, como no desligamento de cliente e na revogação de biometria.
+ */
+export async function revogarAcesso(
+  _anterior: EstadoDaRevogacao,
+  formulario: FormData,
+): Promise<EstadoDaRevogacao> {
+  const userId = texto(formulario, 'userId');
+
+  const validado = esquemaDeRevogacao.safeParse({ reason: texto(formulario, 'reason') });
+
+  if (!validado.success) {
+    return { erro: validado.error.issues[0]?.message ?? 'Escreva o motivo da revogação.' };
+  }
+
+  const resposta = await chamarApi<{ revogado: boolean }>(
+    `/api/v1/users/${encodeURIComponent(userId)}/revogar`,
+    { metodo: 'POST', corpo: { reason: validado.data.reason } },
+  );
+
+  if (!resposta.ok) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível revogar o acesso') };
+  }
+
+  revalidatePath('/users');
+
+  return { revogado: true };
 }

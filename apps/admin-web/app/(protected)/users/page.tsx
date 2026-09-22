@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import {
+  Ausente,
   DataTable,
   EmptyState,
   EstadoSimples,
@@ -10,7 +11,9 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
+import { rotuloDePerfil } from '../../../src/iam/rotulos';
 import { ConvidarUsuario, type Papel } from './convidar-usuario';
+import { RevogarAcesso } from './revogar-acesso';
 
 export const metadata: Metadata = {
   title: 'Usuários — ArenaHub',
@@ -21,6 +24,12 @@ interface Usuario {
   email: string;
   status: string;
   mfaStatus: string;
+  /*
+   * Os papéis da pessoa NESTA academia (F80). Lista e não string: o schema
+   * permite mais de um por pessoa, e mostrar só o primeiro esconderia acesso
+   * que existe.
+   */
+  papeis: string[];
 }
 
 /**
@@ -104,6 +113,25 @@ export default async function PaginaDeUsuarios() {
             render: (u) => <Identidade semAvatar nome={u.email} />,
           },
           {
+            key: 'perfil',
+            header: 'Perfil',
+            /*
+              O QUE A LISTA NÃO DIZIA ATÉ A F80: quem é quem. Com um papel só
+              no sistema (), a coluna teria sido ruído; com cinco, ela
+              é a informação que decide se alguém precisa ser revogado.
+
+              Rótulo em pt-BR pelo mapa único de . Sem papel
+              nenhum é estado real (vínculo criado, papel ainda não), e um
+              traço diz isso melhor que célula vazia.
+            */
+            render: (u) =>
+              u.papeis.length === 0 ? (
+                <Ausente />
+              ) : (
+                <>{u.papeis.map((papel) => rotuloDePerfil(papel)).join(', ')}</>
+              ),
+          },
+          {
             key: 'situacao',
             header: 'Situação',
             role: 'state',
@@ -137,6 +165,12 @@ export default async function PaginaDeUsuarios() {
               ) : (
                 <EstadoSimples label="Pendente" tom="neutro" />
               ),
+          },
+          {
+            key: 'acoes',
+            header: 'Ações',
+            role: 'actions',
+            render: (u) => <RevogarAcesso userId={u.id} email={u.email} />,
           },
         ]}
         empty={

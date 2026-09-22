@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
-import { PERMISSOES_DO_OWNER } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { PlatformContext } from '../../common/platform/platform-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { garantirPapeisDeSistema } from './domain/papeis-de-sistema.js';
 import { PlatformAuditService } from './platform-audit.service.js';
 
 const CONVITE_VALIDO_POR_HORAS = 24;
@@ -116,35 +116,33 @@ export class CriarTenantUseCase {
         },
       });
 
-      const papel = await tx.role.create({
-        data: { tenantId: tenant.id, name: 'OWNER', isSystem: true },
-      });
+      /*
+       * OS CINCO PAPEIS DE SISTEMA, e nao so o OWNER (F80).
+       *
+       * Ate aqui o tenant nascia com um papel unico, e toda pessoa que
+       * entrasse na academia entrava como dono -- a recepcionista do balcao
+       * enxergava faturamento consolidado e bioimpedancia. Os outros quatro
+       * nascem junto para que a tela de convite tenha o que oferecer no dia
+       * em que o Admin montar a equipe.
+       *
+       * A montagem mora em `garantirPapeisDeSistema` porque o backfill dos
+       * tenants que ja existem precisa da MESMA logica -- fonte unica pelo
+       * mesmo motivo que `PERMISSOES_DO_OWNER` e uma constante so.
+       */
+      const papeis = await garantirPapeisDeSistema(tx, tenant.id);
+      const papelDoOwner = papeis.get('OWNER');
 
-      // Fonte unica: `PERMISSOES_DO_OWNER`. Repetir a lista aqui ja produziu
-      // OWNER real sem `access.read` em producao.
-      //
-      // `upsert` uma a uma porque o catalogo `Permission` e global e pode nao
-      // ter o codigo ainda; o vinculo com o papel vai em lote so.
-      const permissoes = [];
-
-      for (const code of PERMISSOES_DO_OWNER) {
-        permissoes.push(
-          await tx.permission.upsert({ where: { code }, create: { code }, update: {} }),
-        );
-      }
-
-      await tx.rolePermission.createMany({
-        data: permissoes.map((permissao) => ({
-          roleId: papel.id,
-          permissionId: permissao.id,
-        })),
-      });
+      // Nunca acontece: `PAPEIS_DE_SISTEMA` tem OWNER por construcao, e o
+      // teste de perfis prova. O `throw` existe porque `Map.get` devolve
+      // `string | undefined`, e usar `!` aqui esconderia o dia em que
+      // alguem renomear a constante.
+      if (!papelDoOwner) throw new Error('PAPEIS_DE_SISTEMA sem OWNER');
 
       await tx.invitation.create({
         data: {
           tenantId: tenant.id,
           email: entrada.responsavelEmail.trim().toLowerCase(),
-          roleId: papel.id,
+          roleId: papelDoOwner,
           /*
            * SEM `gymUnitId`, e nao por esquecimento.
            *
