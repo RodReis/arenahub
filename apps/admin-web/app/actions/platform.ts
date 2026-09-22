@@ -102,6 +102,16 @@ const MENSAGEM: Record<string, string> = {
   JUSTIFICATIVA_OBRIGATORIA: 'Escreva a justificativa da entrada de suporte (ao menos 10 caracteres).',
 
   /*
+   * Recusas do convite do Admin (F79). Frase própria para cada uma porque
+   * cada uma pede um ato diferente de quem está na tela.
+   */
+  ADMIN_JA_ACEITOU:
+    'O administrador já entrou. Trocar o e-mail dele agora é alteração de conta, não de convite.',
+  CONVITE_NAO_ENCONTRADO: 'Não há convite pendente. Informe o e-mail para criar um novo.',
+  TENANT_SEM_OWNER:
+    'Esta academia não tem papel de administrador. Fale com quem cuida da plataforma.',
+
+  /*
    * Recusas do upload de marca (F62). Cada uma tem frase própria porque cada
    * uma pede uma AÇÃO diferente de quem cadastra: arquivo grande se comprime,
    * formato errado se converte, antivírus fora do ar se tenta de novo. Uma
@@ -509,4 +519,106 @@ export async function enviarArquivoDeMarca(
   revalidatePath(`/platform/${tenantId}`);
 
   return { enviado: true };
+}
+
+const esquemaDeEmailDeAdmin = z.object({
+  email: z.string().trim().toLowerCase().email('Informe um e-mail válido.').max(320),
+});
+
+export interface EstadoDoConviteDeAdmin {
+  erro?: string;
+  /*
+   * `emailEnviado` sobe até a tela para ela DIZER A VERDADE: com o provedor de
+   * e-mail fora, o convite existe e o link vale, mas a entrega é por conta de
+   * quem convidou. Silêncio aqui faria alguém esperar por um e-mail que não
+   * saiu — o mesmo motivo pelo qual a criação do tenant já carrega o campo.
+   */
+  convidado?: { email: string; emailEnviado: boolean };
+  revogado?: boolean;
+}
+
+/**
+ * Cria, reenvia ou corrige o convite do Admin da academia — F79.
+ *
+ * Uma action para os três atos porque a rota é uma só: os três terminam no
+ * mesmo estado, um convite pendente válido. `email` em branco significa
+ * "mande de novo para onde já ia".
+ */
+export async function convidarAdminDoTenant(
+  _anterior: EstadoDoConviteDeAdmin,
+  formulario: FormData,
+): Promise<EstadoDoConviteDeAdmin> {
+  const tenantId = texto(formulario, 'tenantId');
+  const email = texto(formulario, 'email');
+
+  // Só valida o que foi digitado. Reenvio sem e-mail é o caso mais comum, e
+  // exigir o endereço ali obrigaria a redigitar o que a tela já mostra.
+  if (email !== '') {
+    const validado = esquemaDeEmailDeAdmin.safeParse({ email });
+
+    if (!validado.success) {
+      return { erro: validado.error.issues[0]?.message ?? 'Confira o e-mail informado.' };
+    }
+  }
+
+  const resposta = await chamarApi<{ email: string; emailEnviado: boolean }>(
+    `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/admin/convite`,
+    { metodo: 'POST', corpo: email === '' ? {} : { email } },
+  );
+
+  /*
+   * `dados` ENTRA NA GUARDA junto do `ok`: a tela afirma para qual endereço o
+   * convite foi, e afirmar isso sem ter recebido o endereço de volta seria
+   * inventar. Corpo vazio com 2xx é resposta quebrada, não sucesso.
+   */
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível enviar o convite') };
+  }
+
+  revalidatePath(`/platform/${tenantId}`);
+
+  return {
+    convidado: { email: resposta.dados.email, emailEnviado: resposta.dados.emailEnviado },
+  };
+}
+
+const esquemaDeRevogacao = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(10, 'Escreva o motivo da revogação (ao menos 10 caracteres).')
+    .max(500, 'Motivo longo demais'),
+});
+
+/**
+ * Revoga o convite pendente do Admin. O link para de valer na hora.
+ *
+ * O MOTIVO É OBRIGATÓRIO e vai para a auditoria dos dois lados. Pedi-lo na
+ * tela e descartá-lo aqui seria teatro — a pergunta existe porque a resposta
+ * fica gravada.
+ */
+export async function revogarConviteDeAdmin(
+  _anterior: EstadoDoConviteDeAdmin,
+  formulario: FormData,
+): Promise<EstadoDoConviteDeAdmin> {
+  const tenantId = texto(formulario, 'tenantId');
+
+  const validado = esquemaDeRevogacao.safeParse({ reason: texto(formulario, 'reason') });
+
+  if (!validado.success) {
+    return { erro: validado.error.issues[0]?.message ?? 'Escreva o motivo da revogação.' };
+  }
+
+  const resposta = await chamarApi<{ revogado: boolean }>(
+    `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/admin/convite/revogar`,
+    { metodo: 'POST', corpo: { reason: validado.data.reason } },
+  );
+
+  if (!resposta.ok) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível revogar o convite') };
+  }
+
+  revalidatePath(`/platform/${tenantId}`);
+
+  return { revogado: true };
 }

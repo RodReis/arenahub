@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { PlatformContextService } from '../../common/platform/platform-context.service.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import { AdminDoTenantUseCase } from './admin-do-tenant.use-case.js';
 import { AlterarTenantUseCase } from './alterar-tenant.use-case.js';
 import { BrandingPublicoController } from './branding-publico.controller.js';
 import { BrandingService } from './branding.service.js';
@@ -61,6 +62,7 @@ import { TenantRepository } from './tenant.repository.js';
     TenantRepository,
     CriarTenantUseCase,
     AlterarTenantUseCase,
+    AdminDoTenantUseCase,
     ElevarUseCase,
     EncerrarElevacaoUseCase,
     BrandingService,

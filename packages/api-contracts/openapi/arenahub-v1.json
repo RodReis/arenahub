@@ -10961,6 +10961,156 @@
         ]
       }
     },
+    "/api/v1/platform/tenants/{id}/admin": {
+      "get": {
+        "operationId": "PlatformController_consultarAdmin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "estado",
+                    "email",
+                    "desde",
+                    "expiraEm"
+                  ],
+                  "properties": {
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "ATIVO",
+                        "PENDENTE",
+                        "VENCIDO",
+                        "SEM_CONVITE"
+                      ]
+                    },
+                    "email": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "desde": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "expiraEm": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/admin/convite": {
+      "post": {
+        "operationId": "PlatformController_convidarAdmin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "email",
+                    "expiresAt",
+                    "token",
+                    "emailEnviado"
+                  ],
+                  "properties": {
+                    "email": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "emailEnviado": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/admin/convite/revogar": {
+      "post": {
+        "operationId": "PlatformController_revogarConviteDeAdmin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "revogado"
+                  ],
+                  "properties": {
+                    "revogado": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
     "/api/v1/platform/elevacao/encerrar": {
       "post": {
         "operationId": "PlatformController_fecharElevacao",

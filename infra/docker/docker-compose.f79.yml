@@ -1,0 +1,25 @@
+# Override local, so para a worktree da F79 -- container names e volumes
+# distintos da bancada principal e da F78, que ja ocupam
+# arenahub-postgres/-f78-postgres e as portas 5442/5443.
+# Uso: docker compose --env-file .env -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.f79.yml up -d
+
+services:
+  postgres:
+    container_name: arenahub-f79-postgres
+    volumes:
+      - postgres-data-f79:/var/lib/postgresql/data
+
+  redis:
+    container_name: arenahub-f79-redis
+    volumes:
+      - redis-data-f79:/data
+
+  minio:
+    container_name: arenahub-f79-minio
+    volumes:
+      - minio-data-f79:/data
+
+volumes:
+  postgres-data-f79:
+  redis-data-f79:
+  minio-data-f79:
