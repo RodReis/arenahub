@@ -40,6 +40,19 @@ interface TenantEmDetalhe {
   temIcone: boolean;
 }
 
+/**
+ * O que `GET /api/v1/platform/tenants/:id/admin` devolve — F79.
+ *
+ * Forma FIXA com `null` explícito: `desde` só existe no estado ATIVO e
+ * `expiraEm` só nos dois de convite, mas a linha é sempre a mesma.
+ */
+interface AcessoDoAdminEmDetalhe {
+  estado: 'ATIVO' | 'PENDENTE' | 'VENCIDO' | 'SEM_CONVITE';
+  email: string | null;
+  desde: string | null;
+  expiraEm: string | null;
+}
+
 /** A situação do cliente, em três canais — o mesmo vocabulário da lista. */
 function situacao(status: string) {
   if (status === 'ACTIVE') return <EstadoSimples label="Ativo" tom="positivo" />;
@@ -69,9 +82,16 @@ export default async function PaginaDoCliente({
 }) {
   const { tenantId } = await params;
 
-  const resposta = await chamarApi<TenantEmDetalhe>(
-    `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}`,
-  );
+  /*
+   * AS DUAS EM PARALELO, e não uma depois da outra: são independentes, e
+   * encadeá-las somaria as latências para mostrar a mesma tela.
+   */
+  const [resposta, acesso] = await Promise.all([
+    chamarApi<TenantEmDetalhe>(`/api/v1/platform/tenants/${encodeURIComponent(tenantId)}`),
+    chamarApi<AcessoDoAdminEmDetalhe>(
+      `/api/v1/platform/tenants/${encodeURIComponent(tenantId)}/admin`,
+    ),
+  ]);
 
   if (!resposta.ok || !resposta.dados) {
     /*
@@ -177,6 +197,17 @@ export default async function PaginaDoCliente({
         temLogo={tenant.temLogo}
         temIcone={tenant.temIcone}
         status={tenant.status}
+        /*
+          A CONSULTA DO ACESSO PODE FALHAR SEM DERRUBAR A TELA: ela é a quinta
+          aba, não o assunto da página. Cair aqui faria um cliente inteiro
+          deixar de abrir por causa de uma aba — `SEM_CONVITE` é o estado que
+          não promete nada e oferece o único ato que sempre vale.
+        */
+        acessoDoAdmin={
+          acesso.ok && acesso.dados
+            ? acesso.dados
+            : { estado: 'SEM_CONVITE', email: null, desde: null, expiraEm: null }
+        }
       />
     </section>
   );

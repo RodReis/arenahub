@@ -4,6 +4,7 @@ import { Tabs } from '@arenahub/ui';
 
 import estilos from './cliente.module.css';
 
+import { AcessoDoAdmin } from './acesso-do-admin';
 import { ArquivosDaMarca } from './arquivos-da-marca';
 import { ElevarTenant } from './elevar-tenant';
 import { FormularioDeEdicao } from './formulario-de-edicao';
@@ -23,6 +24,17 @@ interface Props {
   readonly temLogo: boolean;
   readonly temIcone: boolean;
   readonly status: string;
+  /*
+    Estado do Admin (F79). Vem ACHATADO da pagina, com `null` onde o campo nao
+    se aplica -- e a mesma forma que a API devolve, e evita que esta camada
+    tenha de remontar a uniao discriminada so para repassa-la.
+  */
+  readonly acessoDoAdmin: {
+    estado: 'ATIVO' | 'PENDENTE' | 'VENCIDO' | 'SEM_CONVITE';
+    email: string | null;
+    desde: string | null;
+    expiraEm: string | null;
+  };
 }
 
 /**
@@ -96,6 +108,28 @@ export function AbasDoCliente(props: Props) {
           content: (
             <div className={estilos['painel']}>
               <SituacaoDoTenant tenantId={props.tenantId} status={props.status} />
+            </div>
+          ),
+        },
+        {
+          /*
+            ACESSO ANTES DE SUPORTE, e a ordem e o argumento: entrar como
+            suporte e o ultimo recurso; a pergunta que vem antes dele e se o
+            administrador da academia consegue entrar sozinho.
+          */
+          id: 'acesso',
+          label: 'Acesso',
+          icon: 'user-check',
+          content: (
+            <div className={estilos['painel']}>
+              <AcessoDoAdmin
+                tenantId={props.tenantId}
+                timezone={props.timezone}
+                estado={props.acessoDoAdmin.estado}
+                email={props.acessoDoAdmin.email}
+                desde={props.acessoDoAdmin.desde}
+                expiraEm={props.acessoDoAdmin.expiraEm}
+              />
             </div>
           ),
         },

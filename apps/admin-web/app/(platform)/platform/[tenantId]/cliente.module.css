@@ -279,3 +279,30 @@
   gap: 12px;
   max-width: 64ch;
 }
+
+/*
+  Correção do e-mail do Admin (F79) — o campo que só aparece quando alguém
+  pediu para corrigir. Mesma respiração vertical do bloco de situação: as duas
+  seções vivem no mesmo card e alternam no mesmo lugar.
+*/
+.correcao {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+/*
+  Convite criado, e-mail NÃO entregue (F79).
+
+  Verde seria mentira: o ato deu certo pela metade, e quem lê precisa AGIR —
+  avisar o administrador por outro canal. Pintar de sucesso faria a mensagem
+  ser lida como confirmação e o aviso passar batido, que é justamente o modo
+  de alguém ficar esperando um e-mail que nunca saiu.
+*/
+.aviso {
+  margin: 0;
+  color: var(--ah-warning);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+}

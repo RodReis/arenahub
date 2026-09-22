@@ -19,10 +19,15 @@ import { PlatformContextService } from '../../common/platform/platform-context.s
 import { PlatformRoute } from '../../common/security/platform-route.decorator.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { COOKIE_DE_ACESSO } from '../auth/cookies.js';
+import { AdminDoTenantUseCase } from './admin-do-tenant.use-case.js';
 import { AlterarTenantUseCase, TenantNaoEncontradoError } from './alterar-tenant.use-case.js';
 import { CriarTenantUseCase } from './criar-tenant.use-case.js';
 import { avaliarCarencia } from './domain/carencia.js';
 import { esquemaDeAlteracaoDeTenant } from './dto/alterar-tenant.dto.js';
+import {
+  esquemaDeConviteDeAdmin,
+  esquemaDeRevogacaoDeConvite,
+} from './dto/convite-de-admin.dto.js';
 import { esquemaDeCriacaoDeTenant } from './dto/criar-tenant.dto.js';
 import { esquemaDeElevacao } from './dto/elevar.dto.js';
 import { ElevarUseCase } from './elevar.use-case.js';
@@ -143,6 +148,47 @@ const ESQUEMA_DA_SAIDA_DE_ELEVACAO = {
   properties: { encerrada: { type: 'boolean' } },
 };
 
+/**
+ * Acesso do Admin do tenant -- F79.
+ *
+ * FORMA FIXA com `null` explicito, e nao campo ausente: `desde` so existe no
+ * estado ATIVO e `expiraEm` so nos dois de convite, mas a linha e sempre a
+ * mesma. Campo ausente vira `undefined` e obriga a tela a checar dois jeitos
+ * de "nao tem" -- o motivo pelo qual `ESQUEMA_DA_COBRANCA_NA_LISTA` faz igual.
+ */
+const ESQUEMA_DO_ADMIN_DO_TENANT = {
+  type: 'object',
+  required: ['estado', 'email', 'desde', 'expiraEm'],
+  properties: {
+    estado: { type: 'string', enum: ['ATIVO', 'PENDENTE', 'VENCIDO', 'SEM_CONVITE'] },
+    email: { type: 'string', nullable: true },
+    desde: { type: 'string', format: 'date-time', nullable: true },
+    expiraEm: { type: 'string', format: 'date-time', nullable: true },
+  },
+};
+
+/**
+ * `token` FICA no contrato, como em `ESQUEMA_DO_CONVITE` do `iam.controller`:
+ * e a unica copia que existe (o banco guarda so o hash) e quem chama a rota ja
+ * e Super Admin. Com o provedor de e-mail fora, e por ele que o acesso chega.
+ */
+const ESQUEMA_DO_CONVITE_DE_ADMIN = {
+  type: 'object',
+  required: ['email', 'expiresAt', 'token', 'emailEnviado'],
+  properties: {
+    email: { type: 'string' },
+    expiresAt: { type: 'string', format: 'date-time' },
+    token: { type: 'string' },
+    emailEnviado: { type: 'boolean' },
+  },
+};
+
+const ESQUEMA_DA_REVOGACAO_DE_CONVITE = {
+  type: 'object',
+  required: ['revogado'],
+  properties: { revogado: { type: 'boolean' } },
+};
+
 /** Mesma vida do access token emitido pelo `TokenService`. */
 const ACESSO_VALIDO_POR_MS = 10 * 60 * 1000;
 
@@ -170,6 +216,7 @@ export class PlatformController {
     private readonly tenants: TenantRepository,
     private readonly emails: EmailDeConviteService,
     private readonly elevar: ElevarUseCase,
+    private readonly adminDoTenant: AdminDoTenantUseCase,
     private readonly encerrarElevacao: EncerrarElevacaoUseCase,
     private readonly branding: BrandingService,
     private readonly db: PrismaService,
@@ -484,6 +531,110 @@ export class PlatformController {
     });
 
     return { id: resultado.elevacaoId, expiresAt: resultado.expiresAt.toISOString() };
+  }
+
+  /**
+   * O acesso do Admin desta academia -- F79.
+   *
+   * Responde a pergunta que a aba "Acesso" faz: o Admin consegue entrar? Os
+   * quatro estados saem de `Invitation` cruzada com `UserRole`.
+   */
+  @Get('tenants/:id/admin')
+  @ApiOkResponse({ schema: ESQUEMA_DO_ADMIN_DO_TENANT })
+  async consultarAdmin(@Param('id') id: string): Promise<{
+    estado: string;
+    email: string | null;
+    desde: string | null;
+    expiraEm: string | null;
+  }> {
+    const estado = await this.adminDoTenant.consultar(id);
+
+    /*
+     * ACHATA a uniao discriminada num objeto de forma FIXA, com `null` onde
+     * o campo nao se aplica.
+     *
+     * Campo ausente vira `undefined` em runtime e obriga a tela a checar dois
+     * jeitos de "nao tem" -- a mesma razao que `ESQUEMA_DA_COBRANCA_NA_LISTA`
+     * declara `null` explicito.
+     */
+    return {
+      estado: estado.estado,
+      email: estado.email,
+      desde: estado.estado === 'ATIVO' ? estado.desde.toISOString() : null,
+      expiraEm:
+        estado.estado === 'PENDENTE'
+          ? estado.expiraEm.toISOString()
+          : estado.estado === 'VENCIDO'
+            ? estado.expirouEm.toISOString()
+            : null,
+    };
+  }
+
+  /**
+   * Cria, reenvia ou corrige o convite do Admin -- F79.
+   *
+   * Uma rota para os tres atos porque os tres terminam no mesmo estado: UM
+   * convite pendente valido.
+   */
+  @Post('tenants/:id/admin/convite')
+  @ApiCreatedResponse({ schema: ESQUEMA_DO_CONVITE_DE_ADMIN })
+  async convidarAdmin(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ email: string; expiresAt: string; token: string; emailEnviado: boolean }> {
+    const { email } = esquemaDeConviteDeAdmin.parse(corpo);
+
+    const resultado = await this.adminDoTenant.convidar(
+      this.contexto.require(),
+      id,
+      email,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    /*
+     * FORA DA TRANSACAO, como `criar` e o `iam.controller` ja fazem: provedor
+     * de e-mail que recusa nao pode desfazer o convite ja gravado. O link
+     * vale, e `emailEnviado` deixa a tela dizer a verdade a quem convidou --
+     * silencio aqui faria alguem esperar por um e-mail que nao saiu.
+     */
+    const envio = await this.emails.enviar(resultado.email, resultado.token);
+
+    // O token aparece UMA VEZ: o banco guarda so o SHA-256. Quem chama a rota
+    // ja e Super Admin, entao entregar o link a mao e caminho legitimo quando
+    // o e-mail nao sai.
+    return {
+      email: resultado.email,
+      expiresAt: resultado.expiresAt.toISOString(),
+      token: resultado.token,
+      emailEnviado: envio.enviado,
+    };
+  }
+
+  /**
+   * Revoga o convite pendente do Admin. O link para de valer na hora.
+   *
+   * MOTIVO OBRIGATORIO: o ato tira o acesso de alguem e nao se desfaz. A
+   * justificativa vai para a auditoria dos dois lados, como no desligamento de
+   * cliente.
+   */
+  @Post('tenants/:id/admin/convite/revogar')
+  @ApiOkResponse({ schema: ESQUEMA_DA_REVOGACAO_DE_CONVITE })
+  async revogarConviteDeAdmin(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ revogado: boolean }> {
+    const { reason } = esquemaDeRevogacaoDeConvite.parse(corpo);
+
+    await this.adminDoTenant.revogar(
+      this.contexto.require(),
+      id,
+      reason,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    return { revogado: true };
   }
 
   /** Sai do tenant. O cookie volta a ser token de plataforma, sem tenant. */
