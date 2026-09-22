@@ -29,7 +29,7 @@ import { config as carregarEnv } from 'dotenv';
 carregarEnv({ path: fileURLToPath(new URL('../../../.env', import.meta.url)) });
 
 import { criarPrismaClient } from '../src/client.js';
-import { PERMISSOES_DO_OWNER } from '../src/permissoes.js';
+import { PAPEIS_DE_SISTEMA } from '../src/permissoes.js';
 import { gerarHash } from '../src/senha.js';
 
 const TENANT = { slug: 'arena-positiva', legalName: 'Complexo Arena Positiva LTDA', displayName: 'Arena Positiva' };
@@ -84,7 +84,6 @@ const CREDENCIAL_DO_TOTEM = {
 // Lista movida para `src/permissoes.ts` -- o bootstrap de tenant real (F58)
 // precisa exatamente das mesmas, e a copia que ele tinha deixou o OWNER de
 // producao sem enxergar o proprio dashboard.
-const PERMISSOES = PERMISSOES_DO_OWNER;
 
 /**
  * Dono do SaaS -- o Super Admin da F61.
@@ -290,24 +289,42 @@ async function semear(): Promise<void> {
       update: { status: 'ACTIVE' },
     });
 
-    const papel = await db.role.upsert({
-      where: { tenantId_name: { tenantId: tenant.id, name: 'OWNER' } },
-      create: { tenantId: tenant.id, name: 'OWNER', isSystem: true },
-      update: {},
-    });
+    /*
+     * OS CINCO PAPEIS DE SISTEMA (F80), nao so o OWNER.
+     *
+     * O SEED PRECISA MONTAR OS CINCO, e nao basta a migration de backfill: ela
+     * roda ANTES de existir tenant nenhum num banco recriado do zero, e o
+     *  nao encontra nada para popular. Sem isto, todo
+     * banco de bancada e de integracao nasce com o combo de perfis vazio --
+     * exatamente o defeito que a F80 existe para consertar.
+     *
+     * A lista sai de , a mesma que o caso de uso e o
+     * gerador da migration leem.
+     */
+    let papel = { id: '' };
 
-    for (const code of PERMISSOES) {
-      const permissao = await db.permission.upsert({
-        where: { code },
-        create: { code },
-        update: {},
+    for (const doSistema of PAPEIS_DE_SISTEMA) {
+      const criado = await db.role.upsert({
+        where: { tenantId_name: { tenantId: tenant.id, name: doSistema.name } },
+        create: { tenantId: tenant.id, name: doSistema.name, isSystem: true },
+        update: { isSystem: true },
       });
 
-      await db.rolePermission.upsert({
-        where: { roleId_permissionId: { roleId: papel.id, permissionId: permissao.id } },
-        create: { roleId: papel.id, permissionId: permissao.id },
-        update: {},
-      });
+      if (doSistema.name === 'OWNER') papel = criado;
+
+      for (const code of doSistema.permissoes) {
+        const permissao = await db.permission.upsert({
+          where: { code },
+          create: { code },
+          update: {},
+        });
+
+        await db.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: criado.id, permissionId: permissao.id } },
+          create: { roleId: criado.id, permissionId: permissao.id },
+          update: {},
+        });
+      }
     }
 
     const jaTemPapel = await db.userRole.findFirst({

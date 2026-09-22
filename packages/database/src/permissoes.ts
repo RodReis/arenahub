@@ -150,3 +150,124 @@ export const PERMISSOES_DO_OWNER = [
   'class.manage',
   'class.read',
 ];
+
+/**
+ * Os quatro perfis prontos que a academia escolhe ao convidar -- F80.
+ *
+ * MESMA REGRA DO `PERMISSOES_DO_OWNER` ACIMA, e pelo mesmo preco ja pago: a
+ * lista mora AQUI, e o caso de uso e a migration de backfill leem daqui.
+ * Repetir qualquer uma delas em outro arquivo e como o `bootstrap-tenant`
+ * nasceu com uma copia de sete itens -- a divergencia so aparece em producao.
+ *
+ * `MANAGER` deriva do OWNER por SUBTRACAO, nunca por copia: permissao nova
+ * entra no gerente junto com o dono, que e o comportamento desejado. Os
+ * outros tres sao listas proprias, porque o recorte deles NAO acompanha o
+ * crescimento do catalogo -- recepcao que herdasse tudo o que for criado
+ * deixaria de ser recepcao na primeira fatia seguinte.
+ */
+
+/**
+ * O que o gerente NAO tem, e a razao de cada ausencia:
+ *
+ * - `user.manage`/`role.assign`: quem gerencia a operacao nao decide quem
+ *   entra no sistema. Isso fica com o dono.
+ * - `retention.kill_switch`: desligar o scoring afeta a academia inteira --
+ *   `decisao de operacao, nao de consulta`, como o proprio catalogo registra.
+ */
+const NEGADAS_AO_MANAGER = ['user.manage', 'role.assign', 'retention.kill_switch'];
+
+export const PERMISSOES_DO_MANAGER = PERMISSOES_DO_OWNER.filter(
+  (codigo) => !NEGADAS_AO_MANAGER.includes(codigo),
+);
+
+/**
+ * Balcao: cadastra aluno, acha a fatura de UM aluno, confere a grade, anexa
+ * laudo e inscreve biometria.
+ *
+ * DUAS AUSENCIAS QUE PARECEM ESQUECIMENTO E NAO SAO:
+ *
+ * - SEM `billing.dashboard`: o painel consolida faturamento, ticket medio e
+ *   inadimplencia do tenant inteiro. Quem atende na porta precisa achar a
+ *   fatura de um aluno -- a separacao entre as duas e decisao do PI de
+ *   25/08/2026, registrada no catalogo acima.
+ * - SEM `health.read`: ela ANEXA o laudo (`health.upload`) e o sistema
+ *   extrai sozinho; ela nunca ve o percentual de gordura de ninguem
+ *   (ADR-039). `biometric.enroll` sem `biometric.read`/`revoke` segue a
+ *   mesma logica: inscrever a face e trabalho de balcao, ler ou apagar
+ *   template e ato sobre dado sensivel do art. 11.
+ */
+export const PERMISSOES_DA_RECEPCAO = [
+  'tenant.read',
+  'unit.read',
+  'student.create',
+  'student.read',
+  'student.update',
+  'plan.read',
+  'billing.read',
+  'receipt.read',
+  'consent.manage',
+  'consent.read',
+  'biometric.enroll',
+  'device.read',
+  'access.read',
+  'class.read',
+  'health.upload',
+  'engagement.read',
+];
+
+/**
+ * Dinheiro: cobranca, assinatura, plano, conciliacao e o painel gerencial.
+ *
+ * SEM `student.create`/`update` e SEM biometria: ele LE o aluno para cobrar,
+ * nao para cadastrar. `billing.refund` entra porque estorno e ato do
+ * financeiro por definicao -- e ja nasce com motivo obrigatorio no dominio.
+ */
+export const PERMISSOES_DO_FINANCEIRO = [
+  'tenant.read',
+  'unit.read',
+  'student.read',
+  'plan.manage',
+  'plan.read',
+  'subscription.manage',
+  'billing.manage',
+  'billing.read',
+  'billing.refund',
+  'billing.dashboard',
+  'receipt.issue',
+  'receipt.read',
+  'reconciliation.read',
+  'reconciliation.resolve',
+];
+
+/**
+ * Quem da aula: a grade, a ficha do aluno e a avaliacao fisica.
+ *
+ * `health.read`/`health.assess` aqui e o oposto da recepcao, e de proposito:
+ * o professor MEDE e EXPLICA a medicao -- e o profissional que o ADR-037
+ * pressupoe do outro lado da separacao.
+ */
+export const PERMISSOES_DO_PROFESSOR = [
+  'tenant.read',
+  'unit.read',
+  'student.read',
+  'class.manage',
+  'class.read',
+  'health.read',
+  'health.assess',
+  'engagement.read',
+];
+
+/**
+ * Os cinco papeis de sistema de um tenant, na ordem em que a tela os mostra
+ * (do mais amplo ao mais estreito).
+ *
+ * `name` em INGLES como todo identificador do dominio; o rotulo em pt-BR e da
+ * camada de apresentacao (`CLAUDE.md`, Regras de trabalho).
+ */
+export const PAPEIS_DE_SISTEMA = [
+  { name: 'OWNER', permissoes: PERMISSOES_DO_OWNER },
+  { name: 'MANAGER', permissoes: PERMISSOES_DO_MANAGER },
+  { name: 'FINANCE', permissoes: PERMISSOES_DO_FINANCEIRO },
+  { name: 'RECEPTION', permissoes: PERMISSOES_DA_RECEPCAO },
+  { name: 'TRAINER', permissoes: PERMISSOES_DO_PROFESSOR },
+] as const;

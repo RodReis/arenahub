@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import { MfaService } from '../auth/mfa.service.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { EmailDeConviteService } from './email-de-convite.service.js';
 import { InvitationService } from './invitation.service.js';
+import { RevogarAcessoUseCase } from './revogar-acesso.use-case.js';
 
 const esquemaDeConvite = z
   .object({
@@ -41,6 +42,17 @@ const esquemaDeAceite = z
   })
   .strict();
 
+/**
+ * Revogacao de acesso -- F80.
+ *
+ * O motivo e o ato: tirar o acesso de alguem nao se desfaz sozinho, e a
+ * justificativa vai para a auditoria do tenant. Mesmo minimo da elevacao de
+ * suporte -- 10 caracteres nao aceitam "ok" nem ".".
+ */
+const esquemaDeRevogacaoDeAcesso = z
+  .object({ reason: z.string().trim().min(10).max(500) })
+  .strict();
+
 const esquemaDeCodigo = z.object({ code: z.string().length(6) }).strict();
 
 /*
@@ -63,6 +75,12 @@ const ESQUEMA_DO_PAPEL = {
 };
 
 const ESQUEMA_DA_LISTA_DE_PAPEIS = { type: 'array', items: ESQUEMA_DO_PAPEL };
+
+const ESQUEMA_DA_REVOGACAO_DE_ACESSO = {
+  type: 'object',
+  required: ['revogado'],
+  properties: { revogado: { type: 'boolean' } },
+};
 
 /*
  * Resposta de `POST /users/invitations`.
@@ -91,6 +109,7 @@ const ESQUEMA_DO_CONVITE = {
 export class IamController {
   constructor(
     private readonly convites: InvitationService,
+    private readonly revogarAcesso: RevogarAcessoUseCase,
     private readonly emails: EmailDeConviteService,
     private readonly mfa: MfaService,
     private readonly contexto: TenantContextService,
@@ -157,18 +176,51 @@ export class IamController {
   // pacote (TS2742). Tambem serve de DTO explicito -- so estes quatro
   // campos saem.
   async listar(): Promise<
-    Array<{ id: string; email: string; status: string; mfaStatus: string }>
+    Array<{ id: string; email: string; status: string; mfaStatus: string; papeis: string[] }>
   > {
     const contexto = this.contexto.require();
 
     const vinculos = await this.db.tenantMembership.findMany({
-      where: { tenantId: contexto.tenantId },
+      // SO OS ATIVOS (F80): quem foi revogado nao tem acesso, e continuar
+      // listando-o faria a tela mostrar equipe que nao existe -- e oferecer
+      // "revogar" a quem ja foi revogado.
+      where: { tenantId: contexto.tenantId, status: 'ACTIVE' },
       // `select` explicito: sem ele o objeto traria `passwordHash` e os
       // campos de MFA para uma resposta HTTP.
-      select: { user: { select: { id: true, email: true, status: true, mfaStatus: true } } },
+      select: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            status: true,
+            mfaStatus: true,
+            /*
+             * O PERFIL, que ate a F80 a lista nao dizia (issue #374).
+             *
+             * Filtrado por tenant: `User` e global, e sem o `where` a lista
+             * de uma academia mostraria o papel que a pessoa tem em OUTRA.
+             *
+             * `orderBy` porque a ordem fisica do Postgres muda depois de
+             * qualquer UPDATE -- sem ele, a mesma pessoa apareceria como
+             * "Gerente" numa carga e "Recepcao" na seguinte.
+             */
+            userRoles: {
+              where: { tenantId: contexto.tenantId },
+              select: { role: { select: { name: true } } },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
+      },
     });
 
-    return vinculos.map((v) => v.user);
+    return vinculos.map((v) => ({
+      id: v.user.id,
+      email: v.user.email,
+      status: v.user.status,
+      mfaStatus: v.user.mfaStatus,
+      papeis: v.user.userRoles.map((ur) => ur.role.name),
+    }));
   }
 
   /**
@@ -186,6 +238,37 @@ export class IamController {
    * (`OWNER`) nao pode ser editado nem apagado, e a interface precisa saber
    * disso antes de oferecer a acao.
    */
+  /**
+   * Tira o acesso de alguem ao painel -- F80.
+   *
+   * MOTIVO OBRIGATORIO, como toda revogacao no ArenaHub: o ato nao se desfaz
+   * sozinho (o caminho de volta e convidar de novo) e a justificativa vai
+   * para a auditoria do tenant.
+   *
+   * , a mesma permissao de convidar: quem abre a porta e quem a
+   * fecha.
+   */
+  @Post('users/:id/revogar')
+  @RequirePermissions('user.manage')
+  @ApiOkResponse({ schema: ESQUEMA_DA_REVOGACAO_DE_ACESSO })
+  @HttpCode(200)
+  async revogar(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ revogado: boolean }> {
+    const { reason } = esquemaDeRevogacaoDeAcesso.parse(corpo);
+
+    await this.revogarAcesso.executar(
+      this.contexto.require(),
+      id,
+      reason,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    return { revogado: true };
+  }
+
   @Get('roles')
   @RequirePermissions('user.manage')
   @ApiOkResponse({ schema: ESQUEMA_DA_LISTA_DE_PAPEIS })

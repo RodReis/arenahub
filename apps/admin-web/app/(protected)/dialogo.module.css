@@ -155,3 +155,18 @@
 .itemDaLista > :first-child {
   flex: 1;
 }
+
+/*
+  Descrição do perfil escolhido no convite (F80).
+
+  Logo abaixo do combo e presa a ele pela proximidade, não por borda: é uma
+  legenda do que acabou de ser selecionado, não um aviso. Tom secundário pelo
+  mesmo motivo — ela informa quem está em dúvida e sai do caminho de quem já
+  sabe o que escolheu.
+*/
+.dica {
+  margin: -4px 0 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}

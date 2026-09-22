@@ -28,7 +28,14 @@ export { PrismaClient, Prisma } from './generated/client.js';
  * `bootstrap-tenant` -- os dois caminhos leem a MESMA lista. Copia-la ja
  * produziu OWNER real sem `access.read` em producao; ver `permissoes.ts`.
  */
-export { PERMISSOES_DO_OWNER } from './permissoes.js';
+export {
+  PERMISSOES_DO_OWNER,
+  PERMISSOES_DO_MANAGER,
+  PERMISSOES_DA_RECEPCAO,
+  PERMISSOES_DO_FINANCEIRO,
+  PERMISSOES_DO_PROFESSOR,
+  PAPEIS_DE_SISTEMA,
+} from './permissoes.js';
 export { PrismaPg } from '@prisma/adapter-pg';
 
 /**

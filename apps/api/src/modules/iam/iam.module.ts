@@ -5,12 +5,14 @@ import { AuthModule } from '../auth/auth.module.js';
 import { IamController } from './iam.controller.js';
 import { EmailDeConviteService } from './email-de-convite.service.js';
 import { InvitationService } from './invitation.service.js';
+import { RevogarAcessoUseCase } from './revogar-acesso.use-case.js';
 import { MembershipRepository } from './membership.repository.js';
 
 @Module({
   imports: [AuthModule],
   controllers: [IamController],
   providers: [
+    RevogarAcessoUseCase,
     InvitationService,
     // Envio do convite por e-mail (issue #277). Sem `RESEND_API_KEY` ele
     // nao envia e nao quebra -- ver o proprio servico.

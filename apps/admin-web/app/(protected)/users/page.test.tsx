@@ -15,6 +15,8 @@ const USUARIO = {
   email: 'douglas@arenapositiva.com',
   status: 'ACTIVE',
   mfaStatus: 'PENDING',
+  // `papeis` entra na F80: a lista passou a dizer o que cada pessoa pode.
+  papeis: ['OWNER'],
 };
 
 const PAPEL = {
@@ -200,5 +202,58 @@ describe('pagina de usuarios', () => {
 
     expect(screen.getByText('douglas@arenapositiva.com')).toBeInTheDocument();
     expect(screen.queryByTestId('erro-de-permissao')).not.toBeInTheDocument();
+  });
+  /* F80 -- a coluna de perfil e a acao de revogar. */
+
+  it('mostra o perfil em pt-BR, nunca o codigo cru', async () => {
+    responder({ '/api/v1/users': ok([{ ...USUARIO, papeis: ['RECEPTION'] }]), '/api/v1/roles': ok([PAPEL]) });
+
+    await renderizar();
+
+    expect(screen.getByText('Recepção')).toBeInTheDocument();
+    expect(screen.queryByText('RECEPTION')).not.toBeInTheDocument();
+  });
+
+  /**
+   * DOIS PAPÉIS APARECEM OS DOIS: o schema permite, e mostrar só o primeiro
+   * esconderia acesso que existe -- exatamente o que esta coluna veio revelar.
+   */
+  it('lista todos os papeis de quem tem mais de um', async () => {
+    responder({
+      '/api/v1/users': ok([{ ...USUARIO, papeis: ['FINANCE', 'TRAINER'] }]),
+      '/api/v1/roles': ok([PAPEL]),
+    });
+
+    await renderizar();
+
+    expect(screen.getByText('Financeiro, Professor')).toBeInTheDocument();
+  });
+
+  /**
+   * Papel herdado de antes da F80 nao esta no mapa de rotulos. Mostrar o
+   * codigo cru e melhor que vazio: quem ve `SUPERVISOR` entende que existe um
+   * papel que a tela nao conhece; quem ve um traco acha que nao ha perfil.
+   */
+  it('mostra o codigo quando o papel nao esta no mapa', async () => {
+    responder({
+      '/api/v1/users': ok([{ ...USUARIO, papeis: ['SUPERVISOR'] }]),
+      '/api/v1/roles': ok([PAPEL]),
+    });
+
+    await renderizar();
+
+    expect(screen.getByText('SUPERVISOR')).toBeInTheDocument();
+  });
+
+  it('oferece revogar o acesso de cada linha', async () => {
+    responder({ '/api/v1/users': ok([USUARIO]), '/api/v1/roles': ok([PAPEL]) });
+
+    await renderizar();
+
+    const botao = screen.getByTestId(`revogar-${USUARIO.id}`);
+
+    // O rotulo acessivel diz DE QUEM -- quem navega por leitor de tela ouve
+    // os botoes fora do contexto da linha.
+    expect(botao).toHaveAccessibleName(`Revogar acesso de ${USUARIO.email}`);
   });
 });
