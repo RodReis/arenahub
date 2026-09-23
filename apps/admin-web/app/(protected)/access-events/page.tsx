@@ -74,12 +74,42 @@ export default async function PaginaDeEventos({
     return typeof valor === 'string' && valor !== '' ? valor : undefined;
   };
 
+  /*
+   * O INPUT `datetime-local` MANDA `2026-09-01T12:04`, SEM FUSO -- FIX.
+   *
+   * O `<form method="get">` põe esse valor cru na URL, e a API exige
+   * ISO-8601 completo (`z.string().datetime()`). Sem a conversão, TODO
+   * filtro de período recusava com `VALIDATION_FAILED` -- a mensagem falava
+   * em "permissão", que não era a causa, e o defeito reaparecia a cada
+   * carregamento porque o filtro fica salvo na própria URL.
+   *
+   * Mesmo padrão de `app/actions/membership.ts` (`instanteIso`): teto
+   * `Number.isFinite` para entrada mal-formada não travar a consulta.
+   */
+  const instanteIso = (valor: string): string | undefined => {
+    const data = new Date(valor);
+
+    return Number.isFinite(data.getTime()) ? data.toISOString() : undefined;
+  };
+
   const consulta = new URLSearchParams();
 
-  for (const chave of ['from', 'to', 'outcome', 'mode', 'gymUnitId', 'studentId', 'cursor']) {
+  for (const chave of ['outcome', 'mode', 'gymUnitId', 'studentId', 'cursor']) {
     const valor = texto(chave);
 
     if (valor) consulta.set(chave, valor);
+  }
+
+  // `from`/`to` passam por `instanteIso`, os demais não: são os dois únicos
+  // campos que o input `datetime-local` preenche.
+  for (const chave of ['from', 'to']) {
+    const valor = texto(chave);
+    const convertido = valor ? instanteIso(valor) : undefined;
+
+    // Entrada mal-formada vira campo AUSENTE, nunca string vazia na query --
+    // `z.string().datetime().optional()` recusaria `''` do mesmo jeito que
+    // recusava o formato incompleto.
+    if (convertido) consulta.set(chave, convertido);
   }
 
   consulta.set('limit', '50');
