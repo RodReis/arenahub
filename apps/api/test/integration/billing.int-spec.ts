@@ -258,6 +258,57 @@ describe('F12 -- invoice e pagamento manual', () => {
     expect(creditos[0]?.originPaymentId).toBe(pagamento.id);
   });
 
+  it('pagamento manual promove entitlement SCHEDULED para ACTIVE (INV-091, FIX 23/09/2026)', async () => {
+    // Antes do fix, registrarPagamentoManual fechava a invoice mas nunca
+    // chamava ativarDireitoDeAcessoSePendente -- so o webhook promovia. Aluno
+    // pago pela recepcao (dinheiro/PIX manual) ficava com entitlement parado
+    // em SCHEDULED, batendo na porta fechada mesmo com o financeiro OK.
+    const entitlement = await db.entitlement.create({
+      data: {
+        tenantId: a.tenantId,
+        studentId: a.studentId,
+        subscriptionId: a.subscriptionId,
+        source: 'SUBSCRIPTION',
+        status: 'SCHEDULED',
+        startsAt: new Date('2026-09-01T00:00:00Z'),
+        endsAt: new Date('2026-09-30T00:00:00Z'),
+        policySnapshot: {},
+      },
+    });
+
+    await db.subscription.update({
+      where: { id: a.subscriptionId },
+      data: { status: 'PENDING' },
+    });
+
+    const invoice = await billing.abrirInvoiceDoPeriodo(contexto(a.tenantId, a.actorId), {
+      subscriptionId: a.subscriptionId,
+      emQue: new Date('2026-09-18T12:00:00Z'),
+    });
+
+    await billing.registrarPagamentoManual(
+      contexto(a.tenantId, a.actorId),
+      {
+        invoiceId: invoice.id,
+        amountMinor: PRECO_MINOR,
+        reason: 'mensalidade em dinheiro na recepcao',
+        paidAt: new Date('2026-09-18T12:00:00Z'),
+      },
+      randomUUID(),
+    );
+
+    const assinaturaAtualizada = await db.subscription.findUniqueOrThrow({
+      where: { id: a.subscriptionId },
+    });
+    expect(assinaturaAtualizada.status).toBe('ACTIVE');
+
+    const entitlementAtualizado = await db.entitlement.findUniqueOrThrow({
+      where: { id: entitlement.id },
+    });
+    expect(entitlementAtualizado.status).toBe('ACTIVE');
+    expect(entitlementAtualizado.suspendedAt).toBeNull();
+  });
+
   it('invoice paga NAO aceita segundo pagamento -- PAID e terminal (INV-069)', async () => {
     const invoice = await db.invoice.findFirstOrThrow({
       where: { tenantId: b.tenantId, status: 'PAID' },

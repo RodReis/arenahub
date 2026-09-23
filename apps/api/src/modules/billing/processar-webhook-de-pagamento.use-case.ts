@@ -3,6 +3,7 @@ import { comContexto, type Prisma } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { BillingRepository } from './billing.repository.js';
 import {
   decidirSobreEvento,
   type MotivoDeDescarte,
@@ -70,6 +71,7 @@ export type ResultadoDoWebhook =
 export class ProcessarWebhookDePagamentoUseCase {
   constructor(
     private readonly db: PrismaService,
+    private readonly billing: BillingRepository,
     @Inject(PAYMENT_PROVIDER) private readonly provedor: PaymentProvider,
   ) {}
 
@@ -445,7 +447,10 @@ export class ProcessarWebhookDePagamentoUseCase {
       data: { status: 'PAID', paidAt: dados.occurredAt, version: { increment: 1 } },
     });
 
-    await this.ativarDireitoDeAcesso(tx, dados, invoice.subscriptionId);
+    await this.billing.ativarDireitoDeAcessoSePendente(tx, {
+      tenantId: dados.tenantId,
+      subscriptionId: invoice.subscriptionId,
+    });
 
     await tx.outboxEvent.create({
       data: {
@@ -496,42 +501,6 @@ export class ProcessarWebhookDePagamentoUseCase {
         throw new Error(`Metodo de pagamento desconhecido: ${String(_exaustivo)}`);
       }
     }
-  }
-
-  /**
-   * Ultimo elo da cadeia: assinatura ativa, entitlement ativo.
-   *
-   * SO PROMOVE O QUE ESTA ESPERANDO. Assinatura ja `ACTIVE` nao e tocada, e
-   * entitlement `REVOKED` NAO ressuscita por pagamento -- revogacao tem
-   * motivo proprio (inelegibilidade, LGPD), e dinheiro nao a desfaz.
-   *
-   * Nao CRIA entitlement: quem cria e a matricula (F7/F10), com o snapshot
-   * de politica do plano. Criar um aqui exigiria montar snapshot dentro do
-   * financeiro -- modulo lendo regra de outro, que e o que a regra de
-   * arquitetura no 9 proibe.
-   */
-  private async ativarDireitoDeAcesso(
-    tx: Prisma.TransactionClient,
-    dados: { tenantId: string; agora: Date },
-    subscriptionId: string,
-  ): Promise<void> {
-    await tx.subscription.updateMany({
-      where: {
-        id: subscriptionId,
-        tenantId: dados.tenantId,
-        status: { in: ['PENDING', 'PAST_DUE'] },
-      },
-      data: { status: 'ACTIVE', version: { increment: 1 } },
-    });
-
-    await tx.entitlement.updateMany({
-      where: {
-        subscriptionId,
-        tenantId: dados.tenantId,
-        status: { in: ['SCHEDULED', 'SUSPENDED'] },
-      },
-      data: { status: 'ACTIVE', suspendedAt: null, version: { increment: 1 } },
-    });
   }
 
   private async auditar(

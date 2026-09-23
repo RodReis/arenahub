@@ -247,6 +247,11 @@ export class BillingRepository {
         },
       });
 
+      await this.ativarDireitoDeAcessoSePendente(tx, {
+        tenantId: contexto.tenantId,
+        subscriptionId: invoice.subscriptionId,
+      });
+
       await this.publicarEvento(tx, contexto, {
         invoiceId: invoice.id,
         eventType: 'InvoicePaid',
@@ -254,6 +259,47 @@ export class BillingRepository {
       });
 
       return pagamento;
+    });
+  }
+
+  /**
+   * Ultimo elo da cadeia (regra de arquitetura 1, INV-091): assinatura
+   * ativa, entitlement ativo. SO PROMOVE O QUE JA ESTAVA ESPERANDO --
+   * assinatura ja `ACTIVE` nao e tocada, e entitlement `REVOKED` nao
+   * ressuscita por pagamento (revogacao tem motivo proprio).
+   *
+   * Compartilhado entre pagamento manual (aqui) e webhook de provedor
+   * (`ProcessarWebhookDePagamentoUseCase`). FIX: antes de 23/09/2026, so o
+   * webhook promovia -- pagamento em dinheiro/PIX reconhecido na recepcao
+   * fechava a invoice mas deixava o aluno "pagando e batendo na porta
+   * fechada" (comentario original do use-case do webhook, que descrevia
+   * exatamente o sintoma sem perceber que o caminho manual tinha o mesmo
+   * buraco).
+   *
+   * Nao CRIA entitlement -- quem cria e a matricula (F7/F10), com o
+   * snapshot de politica do plano. Criar aqui exigiria montar snapshot
+   * dentro do financeiro, que e o que a regra de arquitetura no 9 proibe.
+   */
+  async ativarDireitoDeAcessoSePendente(
+    tx: Prisma.TransactionClient,
+    dados: { tenantId: string; subscriptionId: string },
+  ): Promise<void> {
+    await tx.subscription.updateMany({
+      where: {
+        id: dados.subscriptionId,
+        tenantId: dados.tenantId,
+        status: { in: ['PENDING', 'PAST_DUE'] },
+      },
+      data: { status: 'ACTIVE', version: { increment: 1 } },
+    });
+
+    await tx.entitlement.updateMany({
+      where: {
+        subscriptionId: dados.subscriptionId,
+        tenantId: dados.tenantId,
+        status: { in: ['SCHEDULED', 'SUSPENDED'] },
+      },
+      data: { status: 'ACTIVE', suspendedAt: null, version: { increment: 1 } },
     });
   }
 
