@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,6 +9,7 @@ updated: 2026-09-22
 
 ### Sem épico
 
+- [FIX] platform-estatisticas-publicas.int-spec.ts falha por corrida com suítes que suspendem tenant (#383)
 - [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339)
 - [MVP1][INFRA] Decisão: desenho de `Class` para aulas inclusas (agenda, professor, capacidade, reserva, no-show) (#369)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
@@ -38,6 +39,9 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [INFRA] Eventos de acesso: preencher De/Até com o período padrão (últimas 24h) (#381, finalizado em: 2026-09-23)
+- [FIX] datetime-local em /access-events derruba filtro de periodo com VALIDATION_FAILED (#379, finalizado em: 2026-09-23)
+- [FIX] Filtro vazio em query derruba GET /access-events, /billing/invoices e /billing/reconciliation/items (#377, finalizado em: 2026-09-23)
 - [MVP1][SPEC-079][F79] Acesso do Admin do tenant: ver, reenviar, corrigir e revogar (#373, finalizado em: 2026-09-22)
 - [MVP1][SPEC-080][F80] Perfis prontos e tela de equipe do tenant (#374, finalizado em: 2026-09-22)
 - [MVP1][SPEC-078][F78] Reserva, presença/no-show e aulas inclusas no plano (#368, finalizado em: 2026-09-19)
