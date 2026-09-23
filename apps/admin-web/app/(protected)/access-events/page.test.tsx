@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/api/server-client', () => ({
@@ -73,5 +73,47 @@ describe('pagina de eventos de acesso', () => {
     const consulta = new URL(url, 'http://localhost').searchParams;
 
     expect(consulta.has('from')).toBe(false);
+  });
+
+  /*
+   * FIX (achado ao vivo): a API ja abre em "ultimas 24h" quando from/to
+   * ausentes, mas nunca devolvia esse periodo na resposta -- o formulario
+   * mostrava os campos EM BRANCO com a lista cheia de eventos, e a academia
+   * nao tinha como saber o periodo real sem ler a hora do primeiro/ultimo
+   * evento na tabela.
+   */
+  it('preenche De/Ate com as ultimas 24h quando a URL nao traz filtro', async () => {
+    const elemento = await PaginaDeEventos({ searchParams: Promise.resolve({}) });
+
+    render(elemento);
+
+    // `.getAttribute('value')`, não `.value`: o campo é renderizado pelo
+    // servidor via `defaultValue` e nunca sofreu interação -- é o atributo
+    // HTML que se lê, e `getByLabelText` tipa como `HTMLElement` genérico,
+    // sem `.value` conhecido estaticamente.
+    const valorDe = screen.getByLabelText('De').getAttribute('value');
+    const valorAte = screen.getByLabelText('Até').getAttribute('value');
+
+    // Ambos preenchidos, no formato datetime-local -- nunca vazio.
+    expect(valorDe).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(valorAte).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+
+    // A diferenca entre os dois e exatamente 24h.
+    const diferencaMs = new Date(valorAte ?? '').getTime() - new Date(valorDe ?? '').getTime();
+
+    expect(diferencaMs).toBe(24 * 60 * 60 * 1000);
+  });
+
+  it('respeita o filtro do operador -- o padrao e so para quem ainda nao filtrou', async () => {
+    const elemento = await PaginaDeEventos({
+      searchParams: Promise.resolve({ from: '2020-01-01T08:00', to: '2020-01-02T08:00' }),
+    });
+
+    render(elemento);
+
+    // O valor escolhido pelo operador aparece de volta no campo, sem virar
+    // o periodo padrao das ultimas 24h.
+    expect(screen.getByLabelText('De').getAttribute('value')).toBe('2020-01-01T08:00');
+    expect(screen.getByLabelText('Até').getAttribute('value')).toBe('2020-01-02T08:00');
   });
 });

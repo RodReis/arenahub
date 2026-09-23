@@ -50,6 +50,15 @@ const FORMATADORES_AUTORIZADOS = [
    */
   '**/vencimento.ts',
   '**/vencimento.test.ts',
+  /**
+   * FIX #379 -- `periodoPadraoDeEventos` calcula as ultimas 24h no FUSO DA
+   * ACADEMIA para preencher `De`/`Ate` como valor inicial do filtro de
+   * eventos de acesso. A API ja abre o periodo assim (`PERIODO_PADRAO_HORAS`)
+   * mas nunca devolve o calculo na resposta; sem preencher, o operador via os
+   * campos em branco com a lista cheia. Mesma tecnica de `vencimento.ts`.
+   */
+  '**/periodo-padrao.ts',
+  '**/periodo-padrao.test.ts',
 ];
 
 /** Arquivos onde `--ah-action-*` e proibido -- regra 3. */
