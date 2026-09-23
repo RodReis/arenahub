@@ -19,6 +19,7 @@ import estilos from './access-events.module.css';
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { ROTULO_DE_METODO, ROTULO_DE_MODO, traduzir } from '../../../src/operations/formatar';
+import { periodoPadraoDeEventos } from '../../../src/operations/periodo-padrao';
 
 /**
  * Fuso FIXO, preservado de `instanteLegivel` -- mesma divida das outras telas.
@@ -112,6 +113,22 @@ export default async function PaginaDeEventos({
     if (convertido) consulta.set(chave, convertido);
   }
 
+  /*
+   * O FORMULÁRIO MOSTRA O PERÍODO QUE A API JÁ USA, mesmo sem filtro
+   * explícito na URL -- a API abre em "últimas 24h" quando `from`/`to`
+   * ausentes (`PERIODO_PADRAO_HORAS`), mas nunca devolve esse cálculo na
+   * resposta. Sem preencher, a academia via os campos em branco com a lista
+   * cheia, e não tinha como saber o período real sem ler a hora do primeiro
+   * e do último evento na tabela.
+   *
+   * SÓ QUANDO A URL NÃO TRAZ FILTRO: se o operador já escolheu um período
+   * (mesmo que inválido), o formulário respeita a escolha dele -- o padrão
+   * é só para quem ainda não filtrou nada.
+   */
+  const padrao = periodoPadraoDeEventos(new Date(), FUSO_PROVISORIO);
+  const valorDe = texto('from') ?? padrao.de;
+  const valorAte = texto('to') ?? padrao.ate;
+
   consulta.set('limit', '50');
 
   const resposta = await chamarApi<Pagina>(`/api/v1/access-events?${consulta.toString()}`);
@@ -160,7 +177,7 @@ export default async function PaginaDeEventos({
           name="from"
           label="De"
           type="datetime-local"
-          defaultValue={texto('from') ?? ''}
+          defaultValue={valorDe}
         />
 
         <Field
@@ -168,7 +185,7 @@ export default async function PaginaDeEventos({
           name="to"
           label="Até"
           type="datetime-local"
-          defaultValue={texto('to') ?? ''}
+          defaultValue={valorAte}
         />
 
         <SelectField
