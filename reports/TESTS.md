@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3669 | 3669 | 0 | 75.1 |
+| unitário | 3724 | 3724 | 0 | 74.6 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 1214 | 1214 | 0 | 80.6 |
+| integração | 1252 | 1252 | 0 | 80.7 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -168,3 +168,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-14 | #327 | — | integração | 1126 | 1126 | 0 | 81.0 | — |
 | 2026-09-19 | #368 | SPEC-078 | unitário | 3669 | 3669 | 0 | 75.1 | #372 |
 | 2026-09-19 | #368 | SPEC-078 | integração | 1214 | 1214 | 0 | 80.6 | #372 |
+| 2026-09-23 | #384 | — | integração | — | — | 0 | — | [#385](https://github.com/RodReis/arenahub/pull/385) — **não é o total do repo**: medido isolado no módulo `billing` antes do merge (252 unit + 128 integração, 10 suítes, zero falha), pra provar o fix com canário (falha sem ele) sem esperar rodada completa. Número final do repo vai na linha seguinte |
+| 2026-09-23 | #386 | — | unitário | 3724 | 3724 | 0 | 74.6 | [#387](https://github.com/RodReis/arenahub/pull/387) — rodada única após o merge de #385 e #387, sem crash Windows: **157 suítes / 3724 unit**, **90 suítes / 1252 integração** (`apps/api`, inclui `@arenahub/database`). Cobre as duas entregas: o fix de entitlement (#385) e o import de pagamentos (#387, +12 unit / +7 integração de `import-pagamentos-set2026/{dominio,importar}.spec.ts` e `import-pagamentos-set2026.int-spec.ts`) |
+| 2026-09-23 | #386 | — | integração | 1252 | 1252 | 0 | 80.7 | [#387](https://github.com/RodReis/arenahub/pull/387) |
