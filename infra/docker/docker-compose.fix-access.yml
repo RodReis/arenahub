@@ -1,0 +1,17 @@
+services:
+  postgres:
+    container_name: arenahub-fixaccess-postgres
+    volumes:
+      - postgres-data-fixaccess:/var/lib/postgresql/data
+  redis:
+    container_name: arenahub-fixaccess-redis
+    volumes:
+      - redis-data-fixaccess:/data
+  minio:
+    container_name: arenahub-fixaccess-minio
+    volumes:
+      - minio-data-fixaccess:/data
+volumes:
+  postgres-data-fixaccess:
+  redis-data-fixaccess:
+  minio-data-fixaccess:

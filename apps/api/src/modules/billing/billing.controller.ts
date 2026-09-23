@@ -13,6 +13,7 @@ import { ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
+import { enumOpcionalDeQuery } from '../../common/http/enum-opcional-de-query.js';
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import {
@@ -119,7 +120,12 @@ const esquemaDeLiberacao = z
  */
 const esquemaDeListagem = z
   .object({
-    status: z.enum(['DRAFT', 'OPEN', 'PAID', 'OVERDUE', 'CANCELLED', 'REFUNDED']).optional(),
+    /*
+     * `enumOpcionalDeQuery` e nao `z.enum(...).optional()` (FIX): o combo
+     * "Todos" serializa como `status=`, string vazia -- que `.optional()`
+     * sozinho nao aceita.
+     */
+    status: enumOpcionalDeQuery(['DRAFT', 'OPEN', 'PAID', 'OVERDUE', 'CANCELLED', 'REFUNDED']),
     vencendoDe: z.iso.datetime().optional(),
     vencendoAte: z.iso.datetime().optional(),
     pagina: z.coerce.number().int().min(1).default(1),

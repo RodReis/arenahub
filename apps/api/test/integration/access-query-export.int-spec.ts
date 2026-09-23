@@ -270,6 +270,34 @@ describe('F11 -- consulta e exportacao de eventos', () => {
       expect(eventos.length).toBeGreaterThan(0);
       expect(eventos.every((e) => e.mode === 'OVERRIDE')).toBe(true);
     });
+
+    /*
+     * FIX: o combo "Todos" da tela serializa `outcome=&mode=` -- string
+     * vazia, nao ausencia do parametro. `z.enum(...).optional()` sozinho so
+     * aceita `undefined`, e a rota inteira recusava com `VALIDATION_FAILED`
+     * mesmo quando quem abriu a tela nao escolheu filtro nenhum.
+     */
+    it('outcome e mode vazios ("Todos" na tela) NAO derrubam a consulta', async () => {
+      await criarEvento(a.tenantId, a.gymUnitId, new Date());
+
+      const resposta = await request(servidor())
+        .get('/api/v1/access-events')
+        .query({ outcome: '', mode: '' })
+        .set('Cookie', a.cookie);
+
+      expect(resposta.status).toBe(200);
+      expect((resposta.body as { eventos: unknown[] }).eventos.length).toBeGreaterThan(0);
+    });
+
+    it('outcome invalido continua recusado -- string vazia nao vira licenca geral', async () => {
+      const resposta = await request(servidor())
+        .get('/api/v1/access-events')
+        .query({ outcome: 'LIXO' })
+        .set('Cookie', a.cookie);
+
+      expect(resposta.status).toBe(400);
+      expect((resposta.body as { code: string }).code).toBe('VALIDATION_FAILED');
+    });
   });
 
   describe('cursor estavel', () => {

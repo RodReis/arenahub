@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { z } from 'zod';
 
 import { MfaService } from '../auth/mfa.service.js';
+import { enumOpcionalDeQuery } from '../../common/http/enum-opcional-de-query.js';
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
@@ -61,9 +62,18 @@ const esquemaDeResolucao = z
 const esquemaDeFiltroDeItens = z
   .object({
     runId: z.uuid().optional(),
-    status: z
-      .enum(['MATCHED', 'MISSING_INTERNAL', 'MISSING_EXTERNAL', 'AMOUNT_MISMATCH', 'RESOLVED'])
-      .optional(),
+    /*
+     * `enumOpcionalDeQuery` e nao `z.enum(...).optional()` (FIX): o combo
+     * "Todos" serializa como `status=`, string vazia -- que `.optional()`
+     * sozinho nao aceita.
+     */
+    status: enumOpcionalDeQuery([
+      'MATCHED',
+      'MISSING_INTERNAL',
+      'MISSING_EXTERNAL',
+      'AMOUNT_MISMATCH',
+      'RESOLVED',
+    ]),
   })
   .strict();
 
