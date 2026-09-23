@@ -39,6 +39,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [INFRA] Import de pagamentos de setembro/2026 (Arena Positiva) por nome (#386, finalizado em: 2026-09-23)
+- [MVP2][SPEC-012][FIX] pagamento manual fecha invoice mas nao promove entitlement (aluno paga e continua bloqueado) (#384, finalizado em: 2026-09-23)
 - [INFRA] Eventos de acesso: preencher De/Até com o período padrão (últimas 24h) (#381, finalizado em: 2026-09-23)
 - [FIX] datetime-local em /access-events derruba filtro de periodo com VALIDATION_FAILED (#379, finalizado em: 2026-09-23)
 - [FIX] Filtro vazio em query derruba GET /access-events, /billing/invoices e /billing/reconciliation/items (#377, finalizado em: 2026-09-23)
