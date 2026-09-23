@@ -13,6 +13,47 @@
 
 ---
 
+## 2026-09-23 — Troca de identidade do Admin da Arena Positiva, fora do fluxo auditado
+
+**O que aconteceu:** o `User` `8de27348-d8c5-4837-b734-e0524065c7eb` fazia dois papéis ao mesmo
+tempo — Super Admin da plataforma (`rodreisb@gmail.com`) **e** Dono (`OWNER`) da Arena Positiva.
+A pedido do PI, a identidade do Admin do tenant foi trocada para um usuário próprio
+(`douglas@arenapositiva.com.br`), separando os dois papéis em dois `User`s distintos.
+
+**Feito direto no banco de produção (Railway), via `psql`, sem passar pela API.** Não há linha em
+`audit_logs` nem `platform_audit` para este ato — está registrado aqui porque é o único lugar que
+sobrou.
+
+**A sequência final** (depois de duas tentativas corrigidas no caminho):
+
+1. `users.id = 8de27348-...` devolvido a `rodreisb@gmail.com`, com MFA resetado
+   (`mfa_status = DISABLED`, segredo TOTP apagado — precisa reconfigurar no próximo login).
+2. `User` novo criado para `douglas@arenapositiva.com.br` (`id = f8b52b73-7aaa-465c-8ce2-94c8f3a1a3e0`).
+3. `tenant_memberships` e `user_roles` (papel `OWNER` na Arena Positiva) movidos do `id` antigo
+   para o novo.
+
+**Dois defeitos no processo, registrados para não repetir:**
+
+- **`created_at`/`updated_at` não têm `DEFAULT` na coluna do Postgres** — só o Prisma Client
+  preenche via `@default(now())`/`@updatedAt` em runtime. Um `INSERT` em SQL puro sem os dois
+  campos explícitos falha com `null value ... violates not-null constraint`. O `id` órfão dessa
+  primeira tentativa (`b54cd600-...`) nunca existiu de fato — a transação deu `ROLLBACK`.
+- **`pg_terminate_backend` numa conexão em plena escrita derrubou o Postgres inteiro por ~1
+  segundo** (`all server processes terminated; reinitializing` → crash recovery automático → `redo
+  done` → voltou ao ar). Três conexões do mesmo operador ficaram penduradas competindo pela mesma
+  linha de `tenant_memberships` (duas travadas em lock mútuo, uma `idle in transaction` havia 16
+  minutos com um `UPDATE` já aplicado e nunca commitado) — matar a errada no meio do `UPDATE`
+  corrompeu memória compartilhada o suficiente para o postmaster preferir reiniciar a arriscar
+  dado inconsistente. Nenhum dado foi perdido (o WAL redo garante isso), mas o correto teria sido
+  identificar e fechar `idle in transaction` primeiro, nunca `UPDATE`s `active` no meio da escrita.
+
+**Estado final, conferido por consulta independente:** `platform_admins` de `rodreisb@gmail.com`
+intacto (`revoked_at IS NULL`); zero vínculo ativo desse `id` com a Arena Positiva; um vínculo
+`OWNER` ativo de `douglas@arenapositiva.com.br` com a Arena Positiva. Login dos dois confirmado
+pelo PI.
+
+---
+
 ## 2026-08-19 — F15: a regra nº 1 fechou o circuito, e um gráfico quase mentiu
 
 ### A cadeia inteira existe agora
