@@ -1,6 +1,7 @@
 import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
 import { z } from 'zod';
 
+import { enumOpcionalDeQuery } from '../../common/http/enum-opcional-de-query.js';
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import {
@@ -23,8 +24,13 @@ const esquemaDeConsulta = z
     to: z.string().datetime().optional(),
     gymUnitId: z.string().uuid().optional(),
     studentId: z.string().uuid().optional(),
-    outcome: z.enum(['ALLOW', 'DENY']).optional(),
-    mode: z.enum(['ONLINE', 'OFFLINE', 'OVERRIDE']).optional(),
+    /*
+     * `enumOpcionalDeQuery` e nao `z.enum(...).optional()` (FIX): o combo
+     * "Todos" da tela serializa como `outcome=`, string vazia -- e
+     * `.optional()` sozinho so aceita `undefined`, nunca `''`.
+     */
+    outcome: enumOpcionalDeQuery(['ALLOW', 'DENY']),
+    mode: enumOpcionalDeQuery(['ONLINE', 'OFFLINE', 'OVERRIDE']),
     cursor: z.string().max(200).optional(),
     limit: z.coerce.number().int().min(1).max(200).default(50),
   })
