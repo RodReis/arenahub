@@ -309,6 +309,51 @@ describe('F12 -- invoice e pagamento manual', () => {
     expect(entitlementAtualizado.suspendedAt).toBeNull();
   });
 
+  it('tenant que nao define vencimento nasce com dia 10 e carencia 10 (decisao do PI, 23/09/2026)', async () => {
+    // Antes o default era `dueDay` OBRIGATORIO e `graceDays: 0` -- academia
+    // nova ficava sem configuracao financeira (emissao recusava com
+    // BILLING_SETTINGS_MISSING), e quem criasse a linha sem informar carencia
+    // bloqueava a catraca na meia-noite do proprio vencimento.
+    //
+    // AFIRMA O DEFAULT NO CATALOGO DO POSTGRES, nao o valor que volta do
+    // `create`. O Prisma Client aplica o default do schema no lado da
+    // aplicacao, entao um `create` sem os campos devolve 10/10 mesmo com a
+    // migration NAO aplicada -- verificado: revertendo o default no banco,
+    // a versao anterior deste teste continuava verde. Quem grava por SQL
+    // direto (psql, script de manutencao, outro servico) depende do default
+    // real da coluna, e e esse que precisa de guarda.
+    const colunas = await db.$queryRaw<{ column_name: string; column_default: string | null }[]>`
+      SELECT column_name, column_default
+      FROM information_schema.columns
+      WHERE table_name = 'billing_settings'
+        AND column_name IN ('due_day', 'grace_days')
+    `;
+
+    const porColuna = new Map(colunas.map((c) => [c.column_name, c.column_default]));
+
+    expect(porColuna.get('due_day')).toBe('10');
+    expect(porColuna.get('grace_days')).toBe('10');
+
+    // E o caminho do Prisma tambem entrega o mesmo, para os dois nao
+    // divergirem em silencio.
+    const tenant = await db.tenant.create({
+      data: {
+        slug: `t-default-${sufixo}`,
+        legalName: `Tenant Default ${sufixo} LTDA`,
+        displayName: `Tenant Default ${sufixo}`,
+      },
+    });
+
+    try {
+      const config = await db.billingSettings.create({ data: { tenantId: tenant.id } });
+
+      expect(config.dueDay).toBe(10);
+      expect(config.graceDays).toBe(10);
+    } finally {
+      await db.tenant.delete({ where: { id: tenant.id } }).catch(() => undefined);
+    }
+  });
+
   it('invoice paga NAO aceita segundo pagamento -- PAID e terminal (INV-069)', async () => {
     const invoice = await db.invoice.findFirstOrThrow({
       where: { tenantId: b.tenantId, status: 'PAID' },
