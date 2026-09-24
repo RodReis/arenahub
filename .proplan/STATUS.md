@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-23
+updated: 2026-09-24
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,7 +9,7 @@ updated: 2026-09-23
 
 ### Sem épico
 
-- [FIX] platform-estatisticas-publicas.int-spec.ts falha por corrida com suítes que suspendem tenant (#383)
+- [FIX] Fila de cobranca mostra Bloqueado simulado, sem checar o Entitlement real (#392)
 - [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339)
 - [MVP1][INFRA] Decisão: desenho de `Class` para aulas inclusas (agenda, professor, capacidade, reserva, no-show) (#369)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
@@ -39,6 +39,9 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][SPEC-012][INFRA] Vencimento e carencia com padrao 10/10 no BillingSettings (#388, finalizado em: 2026-09-24)
+- [MVP1][SPEC-008][INFRA] Consolidacao de assinaturas duplicadas (imports F47/F48) (#390, finalizado em: 2026-09-24)
+- [FIX] platform-estatisticas-publicas.int-spec.ts falha por corrida com suítes que suspendem tenant (#383, finalizado em: 2026-09-24)
 - [INFRA] Import de pagamentos de setembro/2026 (Arena Positiva) por nome (#386, finalizado em: 2026-09-23)
 - [MVP2][SPEC-012][FIX] pagamento manual fecha invoice mas nao promove entitlement (aluno paga e continua bloqueado) (#384, finalizado em: 2026-09-23)
 - [INFRA] Eventos de acesso: preencher De/Até com o período padrão (últimas 24h) (#381, finalizado em: 2026-09-23)
