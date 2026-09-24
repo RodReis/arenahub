@@ -184,6 +184,32 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
     expect(painel.resumo.emAtrasoMinor).toBe(12990);
   });
 
+  it('FIX #392: invoice vencida sem o job rodar NAO aparece como BLOQUEADO', async () => {
+    /**
+     * O caso real que revelou o defeito: 228 invoices geradas de uma vez
+     * (implantacao da Arena Positiva, 24/09/2026), vencimento retroativo em
+     * 10/09, carencia ate 20/09 -- e `AplicarInadimplenciaUseCase` nunca
+     * rodou de proposito. O Entitlement continuava `ACTIVE`, mas a tela
+     * mostrava "Bloqueado" para 116 alunos que entravam normalmente.
+     *
+     * Aqui: mesmo instante (`JA_BLOQUEIA`, apos vencimento + carencia) que a
+     * proxima verificacao usa DEPOIS do job rodar -- a diferenca e so nao
+     * chamar `aplicar.executar` antes. Sem o fix, a tela bloquearia do mesmo
+     * jeito, so pela conta de `blockAt`/`graceDays`.
+     */
+    const painel = await consultar.executar(contexto, JA_BLOQUEIA);
+
+    expect(painel.linhas).toHaveLength(1);
+    expect(painel.linhas[0]?.situacao).toBe('EM_CARENCIA');
+    expect(painel.resumo.bloqueados).toBe(0);
+
+    const direito = await db.entitlement.findUnique({
+      where: { id: entitlementId },
+      select: { status: true },
+    });
+    expect(direito?.status).toBe('ACTIVE');
+  });
+
   it('no PRIMEIRO INSTANTE do bloqueio, a cadeia inteira anda', async () => {
     /**
      * A REGRA No 1 EM ACAO: invoice -> assinatura -> entitlement. A catraca
@@ -505,8 +531,28 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
           tenantId: tenantSemCarencia,
           studentId: aluno.id,
           planId: plano.id,
-          status: 'ACTIVE',
+          status: 'PAST_DUE',
           startsAt: new Date('2026-08-01T00:00:00Z'),
+        },
+      });
+
+      /**
+       * FIX #392: "Bloqueado" so existe quando o Entitlement REAL esta
+       * suspenso -- este cenario testa o bloqueio de fato, entao o
+       * Entitlement precisa estar no estado que `AplicarInadimplenciaUseCase`
+       * deixaria (`SUSPENDED`), nao `ACTIVE` como um aluno em dia.
+       */
+      await db.entitlement.create({
+        data: {
+          tenantId: tenantSemCarencia,
+          studentId: aluno.id,
+          subscriptionId: assinatura.id,
+          source: 'SUBSCRIPTION',
+          status: 'SUSPENDED',
+          policySnapshot: {},
+          startsAt: new Date('2026-08-01T00:00:00Z'),
+          endsAt: new Date('2026-09-30T23:59:59Z'),
+          suspendedAt: new Date('2026-08-10T14:00:00.000Z'),
         },
       });
 

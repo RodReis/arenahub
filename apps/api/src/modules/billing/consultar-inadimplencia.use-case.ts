@@ -23,6 +23,12 @@ import { deveBloquear } from './domain/bloqueio-por-inadimplencia.js';
 
 export type SituacaoDeAcesso = 'BLOQUEADO' | 'EM_CARENCIA';
 
+/**
+ * Situacao de acesso derivada do `Entitlement` real da assinatura -- ver o
+ * comentario de `situacao()` (FIX #392) para o porque disto existir.
+ */
+type SituacaoDoEntitlement = 'ACTIVE' | 'SUSPENDED' | 'REVOKED' | 'SCHEDULED' | 'EXPIRED' | null;
+
 export interface LinhaDeInadimplencia {
   readonly invoiceId: string;
   readonly invoiceNumber: number;
@@ -128,6 +134,7 @@ export class ConsultarInadimplenciaUseCase {
         dueAt: true,
         blockAt: true,
         studentId: true,
+        subscriptionId: true,
         student: {
           select: {
             fullName: true,
@@ -148,6 +155,18 @@ export class ConsultarInadimplenciaUseCase {
       },
       orderBy: { dueAt: 'asc' },
     });
+
+    /**
+     * O ENTITLEMENT REAL de cada assinatura envolvida, numa consulta so --
+     * ver `situacao()` para o porque de precisar disto (FIX #392).
+     *
+     * Uma assinatura pode ter mais de um Entitlement no historico (F17); o
+     * que importa aqui e o mais recente por `createdAt`, que e o vigente.
+     */
+    const entitlementsPorAssinatura = await this.entitlementsVigentes(
+      contexto.tenantId,
+      [...new Set(invoices.map((i) => i.subscriptionId))],
+    );
 
     /**
      * Uma consulta so para todas as liberacoes vivas, e nao uma por linha:
@@ -181,7 +200,12 @@ export class ConsultarInadimplenciaUseCase {
       currency: invoice.currency,
       dueAt: invoice.dueAt,
       diasEmAtraso: Math.floor((agora.getTime() - invoice.dueAt.getTime()) / UM_DIA_EM_MS),
-      situacao: this.situacao(invoice, configuracao, agora),
+      situacao: this.situacao(
+        invoice,
+        configuracao,
+        agora,
+        entitlementsPorAssinatura.get(invoice.subscriptionId) ?? null,
+      ),
       telefone:
         invoice.student.contacts.find((c) => c.type === 'WHATSAPP')?.value ??
         invoice.student.contacts[0]?.value ??
@@ -286,21 +310,66 @@ export class ConsultarInadimplenciaUseCase {
   }
 
   /**
+   * O ENTITLEMENT MAIS RECENTE de cada assinatura da lista, numa consulta so.
+   *
+   * `distinct` nao alcanca "o mais recente por grupo" no Prisma -- ordena
+   * por `subscriptionId` e depois `createdAt desc`, e o primeiro de cada
+   * assinatura no laco e o vigente. Lista vazia de `subscriptionIds` nao
+   * dispara consulta: nenhuma invoice vencida, nada a resolver.
+   */
+  private async entitlementsVigentes(
+    tenantId: string,
+    subscriptionIds: readonly string[],
+  ): Promise<ReadonlyMap<string, SituacaoDoEntitlement>> {
+    if (subscriptionIds.length === 0) {
+      return new Map();
+    }
+
+    const entitlements = await this.db.entitlement.findMany({
+      where: { tenantId, subscriptionId: { in: [...subscriptionIds] } },
+      select: { subscriptionId: true, status: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const mapa = new Map<string, SituacaoDoEntitlement>();
+    for (const entitlement of entitlements) {
+      if (entitlement.subscriptionId === null) continue;
+      if (!mapa.has(entitlement.subscriptionId)) {
+        mapa.set(entitlement.subscriptionId, entitlement.status);
+      }
+    }
+
+    return mapa;
+  }
+
+  /**
    * Bloqueado ou em carencia?
    *
-   * `blockAt` congelado tem precedencia -- ver `AplicarInadimplenciaUseCase`:
-   * quem ja entrou na regua mantem o instante, e trocar a politica nao move
-   * ninguem retroativamente.
+   * FIX #392: "Bloqueado" so pode ser afirmado quando o ENTITLEMENT REAL da
+   * assinatura esta `SUSPENDED` ou `REVOKED` -- e a Regra de Arquitetura no 1
+   * (`CLAUDE.md`): "Pagamento nao controla acesso. Entitlement controla."
    *
-   * SEM CONFIGURACAO, TODO MUNDO APARECE EM CARENCIA. E o mesmo criterio do
-   * job, que sem `BillingSettings` nao bloqueia ninguem: a tela nao pode
-   * afirmar um bloqueio que o motor nao aplica.
+   * A conta de `blockAt`/`graceDays` abaixo continua existindo, mas so decide
+   * ENTRE "em carencia" e "vencida sem bloqueio real" -- nunca produz
+   * "Bloqueado" sozinha. Antes deste fix, uma invoice vencida virava
+   * "Bloqueado" na tela mesmo quando `AplicarInadimplenciaUseCase` (o job que
+   * de fato suspende o Entitlement) nunca tinha rodado -- a recepcao lia
+   * "sem acesso a catraca" para alguem que continuava entrando normalmente.
+   *
+   * SEM CONFIGURACAO, OU SEM ENTITLEMENT LOCALIZADO, NUNCA BLOQUEIA. O mesmo
+   * criterio do job: a tela nao pode afirmar um bloqueio que o motor nao
+   * aplica nem consegue confirmar.
    */
   private situacao(
     invoice: { dueAt: Date; blockAt: Date | null; student: { gymUnit: { timezone: string } } },
     configuracao: { graceDays: number; blockAnchor: 'DUE_PLUS_GRACE' } | null,
     agora: Date,
+    situacaoDoEntitlement: SituacaoDoEntitlement,
   ): SituacaoDeAcesso {
+    if (situacaoDoEntitlement !== 'SUSPENDED' && situacaoDoEntitlement !== 'REVOKED') {
+      return 'EM_CARENCIA';
+    }
+
     if (invoice.blockAt !== null) {
       return agora.getTime() >= invoice.blockAt.getTime() ? 'BLOQUEADO' : 'EM_CARENCIA';
     }
