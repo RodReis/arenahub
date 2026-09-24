@@ -3281,9 +3281,19 @@ model BillingSettings {
   currency        String      @default("BRL")
   /// Dia do mes do vencimento (1-28). Limitado a 28 para existir em
   /// fevereiro sem regra de excecao.
-  dueDay          Int         @map("due_day")
+  ///
+  /// Padrao 10, decidido pelo PI em 23/09/2026: cada tenant define o seu,
+  /// e quem nao definir nasce com o da Arena Positiva. Antes era
+  /// obrigatorio informar, e nao havia tela que o preenchesse -- academia
+  /// nova ficava sem configuracao financeira nenhuma, e a emissao de
+  /// invoice recusava com `BILLING_SETTINGS_MISSING`.
+  dueDay          Int         @default(10) @map("due_day")
   /// Dias de carencia depois do vencimento antes do bloqueio.
-  graceDays       Int         @default(0) @map("grace_days")
+  ///
+  /// Padrao 10 (mesma decisao): vence dia 10, bloqueia dia 20. O default
+  /// anterior era `0`, que bloqueia a catraca na meia-noite do proprio dia
+  /// do vencimento -- severo demais para nascer por omissao.
+  graceDays       Int         @default(10) @map("grace_days")
   /// Dias apos o vencimento em que cada tentativa de cobranca acontece.
   ///
   /// O TAMANHO DA LISTA E O MAXIMO DE TENTATIVAS -- nao existe um segundo
