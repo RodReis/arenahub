@@ -1205,6 +1205,128 @@ export class MembershipRepository {
       take: limite,
     });
   }
+
+  /**
+   * Encerra UMA assinatura duplicada em favor de outra que sobrevive --
+   * issue #390 (consolidacao pos-import F47/F48).
+   *
+   * DIFERENTE de `alterarAssinatura(CANCEL)`: aquele SEMPRE revoga o
+   * entitlement da assinatura (REVOKED, terminal). Aqui, quando
+   * `entitlementParaMigrarId` vem preenchido, o entitlement de risco
+   * (ACTIVE e valido AGORA) MUDA DE DONO -- passa a apontar para
+   * `sobreviventeId` em vez de ser revogado -- porque a assinatura
+   * encerrada era a UNICA coisa dando acesso aquela pessoa. Decisao do PI
+   * (23/09/2026): limpeza de cadastro nunca fecha a catraca de quem entra
+   * hoje.
+   *
+   * `entitlementParaMigrarId` nulo = comportamento normal (revoga). A
+   * decisao de QUAL entitlement migra, se algum, e do dominio puro
+   * (`decidirConsolidacaoDoAluno`), nunca deste metodo.
+   */
+  async consolidarAssinaturaDuplicada(
+    contexto: TenantContext,
+    entrada: {
+      assinaturaId: string;
+      sobreviventeId: string;
+      entitlementParaMigrarId: string | null;
+      reason: string;
+    },
+    correlationId: string,
+    agora: Date,
+  ): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      const alterada = await tx.subscription.updateMany({
+        where: { id: entrada.assinaturaId, tenantId: contexto.tenantId },
+        data: {
+          status: 'CANCELLED',
+          version: { increment: 1 },
+          lastActorId: contexto.actorId,
+          lastReason: entrada.reason,
+        },
+      });
+
+      if (alterada.count === 0) {
+        throw new ErroDeDominio(
+          'SUBSCRIPTION_NOT_FOUND',
+          404,
+          `Assinatura ${entrada.assinaturaId} nao encontrada neste tenant`,
+        );
+      }
+
+      const assinatura = await tx.subscription.findFirstOrThrow({
+        where: { id: entrada.assinaturaId, tenantId: contexto.tenantId },
+      });
+
+      if (entrada.entitlementParaMigrarId) {
+        // MIGRA: muda de subscriptionId, permanece ACTIVE. Nao passa por
+        // REVOKED em nenhum momento -- ininterrupto para quem depende dele
+        // para entrar.
+        await tx.entitlement.updateMany({
+          where: {
+            id: entrada.entitlementParaMigrarId,
+            tenantId: contexto.tenantId,
+            subscriptionId: entrada.assinaturaId,
+            status: 'ACTIVE',
+          },
+          data: { subscriptionId: entrada.sobreviventeId, version: { increment: 1 } },
+        });
+      } else {
+        // Comportamento normal: revoga o que ainda nao e terminal.
+        await tx.entitlement.updateMany({
+          where: {
+            tenantId: contexto.tenantId,
+            subscriptionId: entrada.assinaturaId,
+            status: { notIn: ['REVOKED', 'EXPIRED'] },
+          },
+          data: { status: 'REVOKED', revokedAt: agora, version: { increment: 1 } },
+        });
+      }
+
+      await tx.studentTimelineEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: assinatura.studentId,
+          type: 'SUBSCRIPTION_CANCELLED',
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          correlationId,
+          payload: {
+            subscriptionId: entrada.assinaturaId,
+            consolidacao: true,
+            sobreviventeId: entrada.sobreviventeId,
+            entitlementMigrado: entrada.entitlementParaMigrarId,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'membership.subscription.consolidated',
+          target: 'subscription',
+          targetId: entrada.assinaturaId,
+          correlationId,
+          metadata: {
+            reason: entrada.reason,
+            sobreviventeId: entrada.sobreviventeId,
+            entitlementMigrado: entrada.entitlementParaMigrarId,
+          },
+        },
+      });
+
+      await tx.outboxEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          eventType: 'SubscriptionCancelled',
+          aggregateType: 'Subscription',
+          aggregateId: entrada.assinaturaId,
+          payload: { studentId: assinatura.studentId, consolidacao: true },
+        },
+      });
+    });
+  }
 }
 
 export type PlanoComRegras = Prisma.PlanGetPayload<{
