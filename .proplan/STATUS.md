@@ -9,6 +9,7 @@ updated: 2026-09-25
 
 ### Sem épico
 
+- [MVP3][SPEC-021][FIX] validarSaida recusa diferenca calculada e 'treino de N%' como prescricao (#401)
 - [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339)
 - [MVP1][INFRA] Decisão: desenho de `Class` para aulas inclusas (agenda, professor, capacidade, reserva, no-show) (#369)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
@@ -27,7 +28,9 @@ _(vazio)_
 
 ## Em Andamento
 
-_(vazio)_
+### Sem épico
+
+- [MVP3][SPEC-021][FIX] IA de saude: JSON por structured outputs em vez de pedido em prosa (#400)
 
 ## Feito
 
@@ -38,6 +41,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [FIX] Busca de aluno em /students nao ignora acento (#398, finalizado em: 2026-09-25)
 - [FIX] Ficha do aluno nao mostra o nome do plano na tabela Direitos de acesso (#394, finalizado em: 2026-09-25)
 - [FIX] Sem campo para cadastrar manualmente o identificador de catraca/facial do aluno (#396, finalizado em: 2026-09-25)
 - [FIX] Fila de cobranca mostra Bloqueado simulado, sem checar o Entitlement real (#392, finalizado em: 2026-09-24)
