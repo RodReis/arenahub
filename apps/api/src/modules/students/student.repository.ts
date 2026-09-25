@@ -672,17 +672,19 @@ export class StudentRepository {
       modalityId?: string | undefined;
     },
   ): Promise<number> {
-    return this.db.comTenant((tx) =>
-      tx.student.count({
+    return this.db.comTenant(async (tx) => {
+      const condicoes = await condicoesDaListagem(tx, contexto.tenantId, filtro.termo);
+
+      return tx.student.count({
         where: {
           tenantId: contexto.tenantId,
           ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
           ...(filtro.status ? { status: filtro.status } : {}),
           ...(filtro.modalityId ? condicaoDeModalidade(filtro.modalityId) : {}),
-          ...condicoesDaListagem(filtro.termo),
+          ...condicoes,
         },
-      }),
-    );
+      });
+    });
   }
 
   /**
@@ -758,13 +760,13 @@ export class StudentRepository {
      */
     agora: Date = new Date(),
   ): Promise<Student[]> {
-    const condicoes = condicoesDaListagem(filtro.termo);
-
     // `comTenant`: findMany solto nunca chamava `set_config` -- sob o role
     // restrito a politica (F66) devolvia ZERO LINHAS em silencio, mesmo com
     // o aluno existindo no tenant certo (issue #302).
-    return this.db.comTenant((tx) =>
-      tx.student.findMany({
+    return this.db.comTenant(async (tx) => {
+      const condicoes = await condicoesDaListagem(tx, contexto.tenantId, filtro.termo);
+
+      return tx.student.findMany({
         where: {
           tenantId: contexto.tenantId,
           ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
@@ -887,8 +889,8 @@ export class StudentRepository {
             select: { externalId: true },
           },
         },
-      }),
-    );
+      });
+    });
   }
 
   /**
@@ -1048,7 +1050,49 @@ function condicaoDeModalidade(modalityId: string): Prisma.StudentWhereInput {
  */
 const DIGITOS_MINIMOS_PARA_BUSCAR_COMO_TELEFONE = 8;
 
-function condicoesDaListagem(termoBruto?: string): Prisma.StudentWhereInput {
+/**
+ * IDs cujo nome bate com o termo IGNORANDO ACENTO -- issue #398.
+ *
+ * `contains` do Prisma nao ignora acento (so caixa, via `mode:
+ * 'insensitive'`): "Julio Cesar" nunca casava com "Julio César" no banco.
+ * 179 de 1995 alunos do tenant de bancada tem acento no nome -- nao e caso
+ * raro, e qualquer um deles so aparecia na busca se o operador digitasse o
+ * acento exato.
+ *
+ * `immutable_unaccent` e a funcao SQL da migration
+ * `20260925123000_busca_de_aluno_ignora_acento` -- wrapper IMMUTABLE sobre
+ * `unaccent()` (extensao padrao do Postgres), com indice funcional para nao
+ * virar sequential scan.
+ *
+ * `$queryRaw` PORQUE o Prisma nao expõe funcao SQL arbitraria dentro de
+ * `where` estruturado -- so assim para comparar `unaccent(coluna)` contra
+ * `unaccent(termo)`. Devolve so `id`: o resultado alimenta `id: { in: [...] }`
+ * no `where` de quem chama, que continua 100% Prisma (paginacao, cursor,
+ * orderBy, count) -- nada disso muda.
+ *
+ * `tx`, nao `this.db`: precisa rodar DENTRO da mesma transacao com RLS
+ * (`comTenant`) que a consulta principal usa -- fora dela o `set_config` de
+ * tenant nao se aplica e a policy (F66) devolveria zero linhas em silencio.
+ */
+async function idsPorNomeSemAcento(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  termo: string,
+): Promise<string[]> {
+  const linhas = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM students
+    WHERE tenant_id = ${tenantId}::uuid
+      AND immutable_unaccent(full_name) ILIKE immutable_unaccent(${`%${termo}%`})
+  `;
+
+  return linhas.map((l) => l.id);
+}
+
+async function condicoesDaListagem(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  termoBruto?: string,
+): Promise<Prisma.StudentWhereInput> {
   const termo = termoBruto?.trim();
 
   if (!termo) return {};
@@ -1056,9 +1100,17 @@ function condicoesDaListagem(termoBruto?: string): Prisma.StudentWhereInput {
   const digitos = normalizarTelefone(termo);
   const pareceTelefone = digitos.length >= DIGITOS_MINIMOS_PARA_BUSCAR_COMO_TELEFONE;
 
+  const idsSemAcento = await idsPorNomeSemAcento(tx, tenantId, termo);
+
   return {
     OR: [
       { fullName: { contains: termo, mode: 'insensitive' } },
+      // So entra com resultado: `id: { in: [] }` e valido (lista vazia), mas
+      // somar um braco vazio ao OR e trabalho para o planejador sem mudar o
+      // resultado -- mesmo criterio do "termo vazio nao entra no OR" acima.
+      ...(idsSemAcento.length > 0
+        ? [{ id: { in: idsSemAcento } } satisfies Prisma.StudentWhereInput]
+        : []),
       { membershipNumber: termo },
       ...(pareceTelefone
         ? [{ contacts: { some: { value: { contains: digitos } } } } satisfies Prisma.StudentWhereInput]
