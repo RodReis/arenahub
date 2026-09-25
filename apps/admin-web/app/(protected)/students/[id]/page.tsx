@@ -22,6 +22,7 @@ import {
   ROTULO_DE_ORIGEM,
   impedeAcesso,
   janelaLegivel,
+  planoDaListagem,
   vigenteAgora,
 } from '../../../../src/students/formatar';
 
@@ -102,6 +103,8 @@ interface Entitlement {
   endsAt: string;
   reason: string | null;
   subscriptionId: string | null;
+  /** Nome do plano vigente na assinatura -- nulo em direito por vinculo (cortesia etc). */
+  planName: string | null;
   /** Versão da assinatura de origem — o que a troca de plano precisa para cancelar. */
   subscriptionVersion: number | null;
   /** F56: modalidade do plano da assinatura. Nulo em cortesia. */
@@ -603,18 +606,21 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                   },
                   {
                     key: 'origem',
-                    header: 'Origem',
+                    header: 'Plano',
                     /*
-                     * `code`: origem e um ENUM curto e fechado ("Assinatura",
-                     * "Cortesia") -- identifica a linha sem ser o que se procura.
-                     * Nao e `state`, porque nao e situacao: um direito cancelado
-                     * continua tendo vindo de uma assinatura.
+                     * `code`: continua um rotulo curto e fechado -- so que agora e o
+                     * NOME do plano ("Plano Familiar") quando ha assinatura, nao mais
+                     * a palavra generica "Assinatura". Mesmo bug que `planoDaListagem`
+                     * documenta na listagem (`formatar.ts`): a ficha so mostrava a
+                     * ORIGEM do direito, nunca QUAL plano -- impossivel conferir, na
+                     * tela do aluno, se ele esta no plano certo sem abrir a fatura.
                      *
-                     * `ROTULO_DE_ORIGEM` FICA: origem do entitlement (ADR-009) e enum
-                     * extensivel, nao maquina de estado -- o §7 nao a cobre.
+                     * `ROTULO_DE_ORIGEM` continua sendo o fallback dentro de
+                     * `planoDaListagem` para direito por vinculo (cortesia,
+                     * funcionario, etc.), que nao tem `planName`.
                      */
                     role: 'code',
-                    render: (d) => traduzir(ROTULO_DE_ORIGEM, d.source),
+                    render: (d) => planoDaListagem(d.planName, d.source) ?? traduzir(ROTULO_DE_ORIGEM, d.source),
                   },
                   {
                     key: 'vigencia',
