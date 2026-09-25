@@ -26,6 +26,15 @@ import {
  * inclusao, e este adapter nao faz calculo paralelo nenhum.
  *
  * ---------------------------------------------------------------------------
+ * ESTRUTURA GARANTIDA POR `output_config.format` (structured outputs).
+ * ---------------------------------------------------------------------------
+ *
+ * O schema vem no pedido e a API devolve JSON que o cumpre -- nada de pedir
+ * "SOMENTE JSON" na prosa nem garimpar `{...}` no texto. Resposta cortada
+ * (`max_tokens`) ou recusada (`refusal`) nao cumpre o schema: vira erro com a
+ * causa nomeada, antes do parse.
+ *
+ * ---------------------------------------------------------------------------
  * A SAIDA E `unknown` ATE `validarSaida` (fronteira do dominio).
  * ---------------------------------------------------------------------------
  *
@@ -49,8 +58,10 @@ export class AnthropicAiProviderAdapter implements AiProvider {
     try {
       resposta = await this.client.messages.create({
         model: AnthropicAiProviderAdapter.MODELO,
-        max_tokens: 8192,
+        // Thinking adaptativo consome deste teto; 8192 cortava o JSON no meio.
+        max_tokens: 16000,
         thinking: { type: 'adaptive' },
+        output_config: { format: { type: 'json_schema', schema: pedido.schema } },
         system: pedido.prompt,
         messages: [
           {
@@ -63,6 +74,14 @@ export class AnthropicAiProviderAdapter implements AiProvider {
       throw traduzirErro(erro);
     }
 
+    if (resposta.stop_reason === 'max_tokens' || resposta.stop_reason === 'refusal') {
+      throw new ErroDaIa(
+        'AI_PROVIDER_INVALID_REQUEST',
+        false,
+        `resposta da IA interrompida (${resposta.stop_reason})`,
+      );
+    }
+
     const texto = resposta.content
       .filter((bloco): bloco is Anthropic.TextBlock => bloco.type === 'text')
       .map((bloco) => bloco.text)
@@ -71,7 +90,7 @@ export class AnthropicAiProviderAdapter implements AiProvider {
     let bruta: unknown;
 
     try {
-      bruta = JSON.parse(extrairJson(texto)) as unknown;
+      bruta = JSON.parse(texto) as unknown;
     } catch {
       throw new ErroDaIa(
         'AI_PROVIDER_INVALID_REQUEST',
@@ -114,17 +133,6 @@ function calcularCustoMicros(usage: Anthropic.Usage): number {
   const custoSaidaUsd = (usage.output_tokens / 1_000_000) * PRECO_SAIDA_USD_POR_MILHAO;
 
   return Math.round((custoEntradaUsd + custoSaidaUsd) * MICROCENTAVOS_POR_DOLAR);
-}
-
-function extrairJson(texto: string): string {
-  const inicio = texto.indexOf('{');
-  const fim = texto.lastIndexOf('}');
-
-  if (inicio === -1 || fim === -1 || fim < inicio) {
-    return texto;
-  }
-
-  return texto.slice(inicio, fim + 1);
 }
 
 /** Classifica o erro do SDK no vocabulario do `AiProvider`. */

@@ -9,6 +9,7 @@ import { AppModule } from '../../src/app.module.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { FakeAiProviderAdapter } from '../../src/modules/health/provider/fake-ai-provider.adapter.js';
 import { ErroDaIa } from '../../src/modules/health/provider/ai-provider.port.js';
+import { PROMPT_DE_ANALISE } from '../../src/modules/health/prompt-de-analise.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -254,6 +255,19 @@ describe('F21 -- analise assistiva por IA', () => {
       expect(resposta.body).toMatchObject({ status: 'PUBLISHED' });
       expect((resposta.body as { analysis: { disclaimerCode: string } }).analysis.disclaimerCode)
         .toBe('NOT_MEDICAL_DIAGNOSIS');
+    });
+
+    it('a versao do prompt grava o schema de saida junto do texto (M3-FR-016)', async () => {
+      const aluno = await alunoPronto(contas.a);
+
+      await gerar(contas.a, aluno);
+
+      const versao = await db.aiPromptVersion.findUniqueOrThrow({
+        where: { name: PROMPT_DE_ANALISE.name },
+      });
+
+      expect(versao.outputSchema).toEqual(PROMPT_DE_ANALISE.schema);
+      expect(versao.contentSha256).toBe(PROMPT_DE_ANALISE.contentSha256);
     });
 
     it('sem assinatura nenhuma responde 403 e nao gera analise', async () => {

@@ -22,7 +22,7 @@ function pedidoDeImagem(): { conteudo: Uint8Array; tipo: 'PNG' } {
 }
 
 describe('AnthropicOcrExtractorAdapter', () => {
-  it('usa o modelo haiku 4.5, sem thinking nem effort (ADR-036)', async () => {
+  it('usa o modelo haiku 4.5, sem thinking nem effort, com structured outputs (ADR-036)', async () => {
     const client = clienteComTexto(
       JSON.stringify({ measuredAt: null, sourceLabel: null, fields: [] }),
     );
@@ -37,7 +37,8 @@ describe('AnthropicOcrExtractorAdapter', () => {
 
     expect(chamada['model']).toBe('claude-haiku-4-5');
     expect(chamada).not.toHaveProperty('thinking');
-    expect(chamada).not.toHaveProperty('output_config');
+    expect(chamada['output_config']).not.toHaveProperty('effort');
+    expect(chamada['output_config']).toHaveProperty('format.type', 'json_schema');
   });
 
   it('converte campos reconhecidos em CampoProposto', async () => {
@@ -59,7 +60,7 @@ describe('AnthropicOcrExtractorAdapter', () => {
     expect(resultado.campos[0]).toMatchObject({ type: 'WEIGHT', value: 88.4, unit: 'kg' });
     expect(resultado.sourceLabel).toBe('CF610_G');
     expect(resultado.tipoDeLaudo).toBe('BIOIMPEDANCE');
-    expect(resultado.extractor).toBe('anthropic-ocr@1');
+    expect(resultado.extractor).toBe('anthropic-ocr@2');
   });
 
   it('DESCARTA campo cujo type nao esta em TIPOS_DE_MEDIDA -- nunca adivinha', async () => {
@@ -124,23 +125,6 @@ describe('AnthropicOcrExtractorAdapter', () => {
 
     expect(resultado.campos).toHaveLength(1);
     expect(resultado.campos.some((c) => c.type === 'HEIGHT')).toBe(false);
-  });
-
-  it('extrai o JSON mesmo quando o modelo envolve em crase de markdown', async () => {
-    const client = clienteComTexto(
-      '```json\n' +
-        JSON.stringify({
-          measuredAt: null,
-          sourceLabel: null,
-          fields: [{ type: 'WEIGHT', value: 70, unit: 'kg', confidence: 0.9 }],
-        }) +
-        '\n```',
-    );
-    const adapter = new AnthropicOcrExtractorAdapter(client);
-
-    const resultado = await adapter.extrair(pedidoDeImagem());
-
-    expect(resultado.campos).toHaveLength(1);
   });
 
   it('rejeita tipo de arquivo que nao seja PNG/JPEG', async () => {

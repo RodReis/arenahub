@@ -4657,12 +4657,17 @@ enum AiAnalysisStatus {
 /// que a gerou -- nao o nome dele.
 model AiPromptVersion {
   id            String    @id @default(uuid()) @db.Uuid
-  /// `analise-de-saude@3`. Unico globalmente: prompt e do produto, nao do
+  /// `analise-de-saude@4`. Unico globalmente: prompt e do produto, nao do
   /// tenant.
   name          String    @unique
   content       String
-  /// SHA-256 do `content`, em hex minusculo. E o que prova que o texto nao
-  /// mudou por baixo de uma analise ja publicada.
+  /// JSON Schema enviado em `output_config.format` (desde `@4`). Faz parte do
+  /// pedido tanto quanto o texto. `null` nas versoes anteriores, que pediam o
+  /// formato na propria prosa.
+  outputSchema  Json?     @map("output_schema")
+  /// SHA-256 do `content` (e do `outputSchema` serializado, quando existe), em
+  /// hex minusculo. E o que prova que o pedido nao mudou por baixo de uma
+  /// analise ja publicada.
   contentSha256 String    @map("content_sha256")
   createdAt     DateTime  @default(now()) @map("created_at")
   /// Preenchido quando uma versao nova entra. Versao aposentada continua

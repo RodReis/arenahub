@@ -16,13 +16,15 @@ import {
  * Anthropic (ADR-036 decisao 1).
  *
  * ---------------------------------------------------------------------------
- * MODELO: `claude-haiku-4-5`, SEM `effort` E SEM `thinking`.
+ * MODELO: `claude-haiku-4-5`, SEM `effort` E SEM `thinking`, COM `output_config.format`.
  * ---------------------------------------------------------------------------
  *
  * Nota de implementacao do ADR-036 que "erra silenciosamente se ignorada":
  * haiku 4.5 NAO aceita `output_config.effort` e nao tem *adaptive thinking* --
  * a chamada retorna erro se qualquer um dos dois for enviado. Por isso este
- * adapter NUNCA envia `thinking` nem `output_config`.
+ * adapter NUNCA envia `thinking` nem `output_config.effort`. Ja
+ * `output_config.format` (structured outputs) e suportado no haiku 4.5 e e o
+ * que garante o JSON -- a lista fechada de tipos vai como `enum` no schema.
  *
  * ---------------------------------------------------------------------------
  * SAIDA E `unknown` ATE VALIDAR (`CLAUDE.md`).
@@ -68,6 +70,7 @@ export class AnthropicOcrExtractorAdapter implements DocumentExtractor {
       resposta = await this.client.messages.create({
         model: AnthropicOcrExtractorAdapter.MODELO,
         max_tokens: 4096,
+        output_config: { format: { type: 'json_schema', schema: SCHEMA_DE_EXTRACAO } },
         system: PROMPT_DE_EXTRACAO,
         messages: [
           {
@@ -79,7 +82,7 @@ export class AnthropicOcrExtractorAdapter implements DocumentExtractor {
               },
               {
                 type: 'text',
-                text: 'Extraia os campos deste laudo de bioimpedancia, respondendo SOMENTE com o JSON pedido.',
+                text: 'Extraia os campos deste laudo de bioimpedancia.',
               },
             ],
           },
@@ -100,37 +103,60 @@ export class AnthropicOcrExtractorAdapter implements DocumentExtractor {
 
 const PROMPT_DE_EXTRACAO = `Voce le laudos de bioimpedancia (relatorio de balanca de composicao corporal) e devolve os campos em JSON estruturado.
 
-TIPOS DE CAMPO ACEITOS (use EXATAMENTE um destes nomes; qualquer outro rotulo do laudo -- indice do fabricante, idade corporal, pontuacao de saude, sugestao de treino -- NAO ENTRA no JSON):
+TIPOS DE CAMPO ACEITOS (use EXATAMENTE um destes nomes; qualquer outro rotulo do laudo -- indice do fabricante, idade corporal, pontuacao de saude, sugestao de treino -- nao entra no JSON):
 ${TIPOS_DE_MEDIDA.join(', ')}
 
-REGRAS ABSOLUTAS
-1. Campo ilegivel, borrado ou duvidoso: inclua com "confidence" BAIXO (perto de 0). NUNCA adivinhe o valor -- um numero errado com confianca alta e pior que nao ler o campo.
-2. Campo que voce NAO CONSEGUE LER de jeito nenhum: OMITA da lista. Nunca escreva 0 nem invente um valor para preencher a ausencia.
-3. So use tipo desta lista fechada. Indice proprietario do fabricante (idade corporal, pontuacao, peso ideal, "controles" sugeridos) NAO E MEDIDA -- ignore essas linhas.
+REGRAS
+1. Campo ilegivel, borrado ou duvidoso: inclua com "confidence" baixo (perto de 0), sem adivinhar o valor -- um numero errado com confianca alta e pior que nao ler o campo.
+2. Campo que voce nao consegue ler de jeito nenhum: omita da lista. Nunca escreva 0 nem invente um valor para preencher a ausencia.
+3. So use tipo desta lista fechada. Indice proprietario do fabricante (idade corporal, pontuacao, peso ideal, "controles" sugeridos) nao e medida -- ignore essas linhas.
 4. Se o laudo mostrar a data/hora da MEDICAO (nao a data de hoje), inclua em "measuredAt" no formato ISO 8601. Se nao houver essa informacao no laudo, "measuredAt": null.
 5. "unit" e a unidade IMPRESSA no laudo para aquele campo -- nunca converta. Use uma destas: ${UNIDADES_DE_MEDIDA.join(', ')}. Campo adimensional (indice visceral, razao cintura-quadril, batimentos por minuto): "unit": null.
 6. Se o laudo trouxer faixa de referencia do fabricante para o campo, inclua "referenceMin" e "referenceMax". Se trouxer percentual do padrao (comum em segmentares), inclua "standardPercent". Ausente: null.
 7. Se identificar a marca/modelo do aparelho (ex.: "CF610_G"), inclua em "sourceLabel". Sem certeza: null.
 
-FORMATO DE RESPOSTA
-Responda SOMENTE com um JSON deste formato, sem texto antes ou depois:
+"sourceLocation" diz onde o campo aparece no laudo (ex.: "linha 2"); sem referencia clara, null.`;
 
-{
-  "measuredAt": "2026-08-01T10:00:00.000Z" | null,
-  "sourceLabel": "string" | null,
-  "fields": [
-    {
-      "type": "WEIGHT",
-      "value": 88.4,
-      "unit": "kg",
-      "confidence": 0.97,
-      "sourceLocation": "linha 2" | null,
-      "referenceMin": 60.6 | null,
-      "referenceMax": 82.0 | null,
-      "standardPercent": null
-    }
-  ]
-}`;
+const NUMERO_OU_NULO = { anyOf: [{ type: 'number' }, { type: 'null' }] } as const;
+const TEXTO_OU_NULO = { anyOf: [{ type: 'string' }, { type: 'null' }] } as const;
+
+/** Schema de `output_config.format`: a API garante a forma, `interpretarResposta` segue filtrando. */
+const SCHEMA_DE_EXTRACAO = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['measuredAt', 'sourceLabel', 'fields'],
+  properties: {
+    measuredAt: { anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }] },
+    sourceLabel: TEXTO_OU_NULO,
+    fields: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'type',
+          'value',
+          'unit',
+          'confidence',
+          'sourceLocation',
+          'referenceMin',
+          'referenceMax',
+          'standardPercent',
+        ],
+        properties: {
+          type: { type: 'string', enum: [...TIPOS_DE_MEDIDA] },
+          value: { type: 'number' },
+          unit: { anyOf: [{ type: 'string', enum: [...UNIDADES_DE_MEDIDA] }, { type: 'null' }] },
+          confidence: { type: 'number' },
+          sourceLocation: TEXTO_OU_NULO,
+          referenceMin: NUMERO_OU_NULO,
+          referenceMax: NUMERO_OU_NULO,
+          standardPercent: NUMERO_OU_NULO,
+        },
+      },
+    },
+  },
+};
 
 /** O shape que o prompt pede, ainda `unknown` ate a validacao de campo a campo. */
 interface RespostaBrutaEsperada {
@@ -163,7 +189,7 @@ function interpretarResposta(texto: string): ResultadoDaExtracao {
   let bruta: unknown;
 
   try {
-    bruta = JSON.parse(extrairJson(texto)) as unknown;
+    bruta = JSON.parse(texto) as unknown;
   } catch {
     throw new ErroDeExtracao(
       'EXTRACTOR_NO_CONTENT',
@@ -221,7 +247,7 @@ function interpretarResposta(texto: string): ResultadoDaExtracao {
   return {
     campos,
     measuredAt,
-    extractor: 'anthropic-ocr@1',
+    extractor: 'anthropic-ocr@2',
     tipoDeLaudo: 'BIOIMPEDANCE',
     ...(sourceLabel !== undefined ? { sourceLabel } : {}),
   };
@@ -234,22 +260,6 @@ function interpretarData(valor: unknown): Date | null {
   const data = new Date(valor);
 
   return Number.isNaN(data.getTime()) ? null : data;
-}
-
-/**
- * O modelo pode envolver o JSON em crase de markdown apesar do pedido
- * explicito de "SOMENTE o JSON". Extrai o primeiro bloco `{...}` do texto em
- * vez de confiar que a resposta comeca exatamente no `{`.
- */
-function extrairJson(texto: string): string {
-  const inicio = texto.indexOf('{');
-  const fim = texto.lastIndexOf('}');
-
-  if (inicio === -1 || fim === -1 || fim < inicio) {
-    return texto;
-  }
-
-  return texto.slice(inicio, fim + 1);
 }
 
 /** Classifica o erro do SDK da Anthropic no vocabulario do `DocumentExtractor`. */

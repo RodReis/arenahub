@@ -47,6 +47,8 @@ export interface PedidoDeAnalise {
   /** Texto exato do prompt, para reprodutibilidade (`M3-FR-016`). */
   readonly prompt: string;
   readonly promptName: string;
+  /** JSON Schema da saida, enviado em `output_config.format` (versiona com o prompt). */
+  readonly schema: Record<string, unknown>;
 }
 
 export interface AiProvider {

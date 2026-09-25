@@ -8,11 +8,13 @@ import type { SnapshotDeAnalise } from '../domain/snapshot-de-analise.js';
 function clienteComResposta(
   texto: string,
   usage: { input_tokens: number; output_tokens: number },
+  stopReason = 'end_turn',
 ): Anthropic {
   const create = jest.fn(() =>
     Promise.resolve({
       model: 'claude-sonnet-4-6',
       content: [{ type: 'text', text: texto }],
+      stop_reason: stopReason,
       usage,
     }),
   );
@@ -21,13 +23,15 @@ function clienteComResposta(
 }
 
 const snapshotMinimo = { analysisRef: 'an_teste' } as unknown as SnapshotDeAnalise;
+const schema = { type: 'object', additionalProperties: false, properties: {}, required: [] };
+const pedido = { snapshot: snapshotMinimo, prompt: 'prompt', promptName: 'p@1', schema };
 
 describe('AnthropicAiProviderAdapter', () => {
   it('usa thinking adaptativo, sem budget_tokens (ADR-036)', async () => {
     const client = clienteComResposta('{"summary":"ok"}', { input_tokens: 100, output_tokens: 50 });
     const adapter = new AnthropicAiProviderAdapter(client);
 
-    await adapter.analisar({ snapshot: snapshotMinimo, prompt: 'prompt', promptName: 'p@1' });
+    await adapter.analisar(pedido);
 
     const chamada = (client.messages.create as jest.Mock).mock.calls[0]?.[0] as Record<
       string,
@@ -39,6 +43,35 @@ describe('AnthropicAiProviderAdapter', () => {
     expect(chamada['thinking']).not.toHaveProperty('budget_tokens');
   });
 
+  it('envia o schema do pedido em output_config.format (structured outputs)', async () => {
+    const client = clienteComResposta('{}', { input_tokens: 1, output_tokens: 1 });
+    const adapter = new AnthropicAiProviderAdapter(client);
+
+    await adapter.analisar(pedido);
+
+    const chamada = (client.messages.create as jest.Mock).mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+
+    expect(chamada['output_config']).toEqual({ format: { type: 'json_schema', schema } });
+    expect(chamada['max_tokens']).toBe(16000);
+  });
+
+  it.each(['max_tokens', 'refusal'])(
+    'resposta interrompida por %s vira erro nomeado, nao falha de parse',
+    async (stopReason) => {
+      const client = clienteComResposta('{"summ', { input_tokens: 1, output_tokens: 1 }, stopReason);
+      const adapter = new AnthropicAiProviderAdapter(client);
+
+      await expect(adapter.analisar(pedido)).rejects.toMatchObject({
+        codigo: 'AI_PROVIDER_INVALID_REQUEST',
+        recuperavel: false,
+        message: `resposta da IA interrompida (${stopReason})`,
+      });
+    },
+  );
+
   it('devolve o JSON bruto sem validar -- validacao e do dominio', async () => {
     const client = clienteComResposta(
       '{"summary":"resumo","progress":[]}',
@@ -46,11 +79,7 @@ describe('AnthropicAiProviderAdapter', () => {
     );
     const adapter = new AnthropicAiProviderAdapter(client);
 
-    const resposta = await adapter.analisar({
-      snapshot: snapshotMinimo,
-      prompt: 'prompt',
-      promptName: 'p@1',
-    });
+    const resposta = await adapter.analisar(pedido);
 
     expect(resposta.bruta).toEqual({ summary: 'resumo', progress: [] });
   });
@@ -59,11 +88,7 @@ describe('AnthropicAiProviderAdapter', () => {
     const client = clienteComResposta('{}', { input_tokens: 1_000_000, output_tokens: 1_000_000 });
     const adapter = new AnthropicAiProviderAdapter(client);
 
-    const resposta = await adapter.analisar({
-      snapshot: snapshotMinimo,
-      prompt: 'prompt',
-      promptName: 'p@1',
-    });
+    const resposta = await adapter.analisar(pedido);
 
     // 1M tokens de entrada a US$3/milhao + 1M de saida a US$15/milhao =
     // US$18 = 1_800_000 milesimos de centavo.
@@ -77,7 +102,7 @@ describe('AnthropicAiProviderAdapter', () => {
     const adapter = new AnthropicAiProviderAdapter(client);
 
     await expect(
-      adapter.analisar({ snapshot: snapshotMinimo, prompt: 'prompt', promptName: 'p@1' }),
+      adapter.analisar(pedido),
     ).rejects.toBeInstanceOf(ErroDaIa);
   });
 
@@ -91,7 +116,7 @@ describe('AnthropicAiProviderAdapter', () => {
     const adapter = new AnthropicAiProviderAdapter(client);
 
     await expect(
-      adapter.analisar({ snapshot: snapshotMinimo, prompt: 'prompt', promptName: 'p@1' }),
+      adapter.analisar(pedido),
     ).rejects.toMatchObject({ codigo: 'AI_PROVIDER_TIMEOUT', recuperavel: true });
   });
 });
