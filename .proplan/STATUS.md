@@ -9,11 +9,8 @@ updated: 2026-09-25
 
 ### Sem épico
 
-- [MVP3][SPEC-021][FIX] validarSaida recusa diferenca calculada e 'treino de N%' como prescricao (#401)
-- [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339)
-- [MVP1][INFRA] Decisão: desenho de `Class` para aulas inclusas (agenda, professor, capacidade, reserva, no-show) (#369)
-- [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
+- [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
 - [MVP2][INFRA] Decisão: só existe plano mensal — os ciclos da §33 (trimestral, semestral, anual) nunca foram discutidos (#338)
 - [MVP2][INFRA] Decisão: upgrade e downgrade de plano — não existe regra de proração (#337)
@@ -39,6 +36,9 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-021][FIX] validarSaida recusa diferenca calculada e 'treino de N%' como prescricao (#401, finalizado em: 2026-09-25)
+- [MVP1][INFRA] Decisão: desenho de `Class` para aulas inclusas (agenda, professor, capacidade, reserva, no-show) (#369, finalizado em: 2026-09-25)
+- [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339, finalizado em: 2026-09-25)
 - [MVP3][SPEC-021][FIX] IA de saude: JSON por structured outputs em vez de pedido em prosa (#400, finalizado em: 2026-09-25)
 - [FIX] Busca de aluno em /students nao ignora acento (#398, finalizado em: 2026-09-25)
 - [FIX] Ficha do aluno nao mostra o nome do plano na tabela Direitos de acesso (#394, finalizado em: 2026-09-25)
