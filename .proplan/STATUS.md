@@ -28,9 +28,7 @@ _(vazio)_
 
 ## Em Andamento
 
-### Sem épico
-
-- [MVP3][SPEC-021][FIX] IA de saude: JSON por structured outputs em vez de pedido em prosa (#400)
+_(vazio)_
 
 ## Feito
 
@@ -41,6 +39,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-021][FIX] IA de saude: JSON por structured outputs em vez de pedido em prosa (#400, finalizado em: 2026-09-25)
 - [FIX] Busca de aluno em /students nao ignora acento (#398, finalizado em: 2026-09-25)
 - [FIX] Ficha do aluno nao mostra o nome do plano na tabela Direitos de acesso (#394, finalizado em: 2026-09-25)
 - [FIX] Sem campo para cadastrar manualmente o identificador de catraca/facial do aluno (#396, finalizado em: 2026-09-25)
