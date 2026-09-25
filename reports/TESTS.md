@@ -15,7 +15,7 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3735 | 3735 | 0 | 74.6 |
+| unitário | 3740 | 3740 | 0 | 74.6 |
 | contrato | 0 | 0 | 0 | — |
 | integração | 1269 | 1267 | 2 | 80.9 |
 | e2e | 0 | 0 | 0 | — |
@@ -173,3 +173,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-23 | #386 | — | integração | 1252 | 1252 | 0 | 80.7 | [#387](https://github.com/RodReis/arenahub/pull/387) |
 | 2026-09-25 | #400 | SPEC-021 | unitário | 3735 | 3735 | 0 | 74.6 | [#402](https://github.com/RodReis/arenahub/pull/402) |
 | 2026-09-25 | #400 | SPEC-021 | integração | 1269 | 1267 | 2 | 80.9 | [#402](https://github.com/RodReis/arenahub/pull/402) — as 2 falhas são `platform-estatisticas-publicas.int-spec.ts` ("Unable to start a transaction"), que reprova também na `main` (conferido por `git stash`): a suíte soma todos os tenants e o banco de integração local acumula dados sem o reset (bloqueado para agente de IA). Não vêm desta entrega; falhou também rodando sozinha, então não é a corrida do #383. CI do PR: os dois jobs verdes |
+| 2026-09-25 | #401 | SPEC-021 | unitário | 3740 | 3740 | 0 | 74.6 | — |
+| 2026-09-25 | #401 | SPEC-021 | integração | 1269 | 1267 | 2 | 80.9 | — — mesmas 2 falhas ja registradas na entrega do #400, `platform-estatisticas-publicas.int-spec.ts`, nao relacionadas a esta mudanca |
