@@ -1,21 +1,21 @@
 {
   "apps/api#test": {
-    "testes": 1973,
-    "pass": 1973,
+    "testes": 1978,
+    "pass": 1978,
     "falha": 0,
-    "coberturaPct": 69.08
+    "coberturaPct": 69.16
   },
   "apps/api#test:integration": {
     "testes": 1191,
     "pass": 1189,
     "falha": 2,
-    "coberturaPct": 80.09
+    "coberturaPct": 80.03
   },
   "apps/admin-web#test": {
     "testes": 657,
     "pass": 657,
     "falha": 0,
-    "coberturaPct": 73
+    "coberturaPct": 72.7
   },
   "packages/ui#test": {
     "testes": 249,

@@ -27,7 +27,10 @@ import type { TipoDeMedida } from './medida.js';
  * analise que cita "sua gordura caiu de 24,1% para 21,8%" quando o snapshot
  * so tem 24,1 e 22,3 e mais perigosa que uma que diagnostica: o diagnostico o
  * avaliador percebe, o numero errado ele repassa ao aluno. Por isso todo
- * numero citado na prosa e conferido contra o snapshot que gerou a analise.
+ * numero citado na prosa e conferido contra o snapshot que gerou a analise --
+ * o proprio valor OU a diferenca entre duas medicoes da MESMA metrica
+ * ("peso caiu 3,2 kg" com 88,4 e 85,2 no JSON), que e conta correta, nao
+ * invencao.
  */
 
 export type CodigoDeAviso = 'NOT_MEDICAL_DIAGNOSIS';
@@ -109,7 +112,14 @@ const DIAGNOSTICO: readonly RegExp[] = [
   // SEM `\b` no fim: a fronteira depois de `\d` exige nao-digito colado, e o
   // que vem em "4 series de 12 repeticoes" e um ESPACO -- o padrao original
   // nunca casava, e uma prescricao de treino passava direto pela guarda.
-  /\b(?:trein\w*\s+de\s+\d+|s[eé]ries\s+de\s+\d+|\d+\s*x\s*\d+\s+repeti\w*)/i,
+  //
+  // `(?![.,\d]*\s*%)` depois do numero: "consistencia de treino de 80%" e
+  // frequencia (percentual), nao prescricao -- sem a excecao, toda vez que a
+  // prosa comentava a propria consistencia a analise inteira era descartada
+  // (achado #401, sonda real contra `@3` e `@4`). O lookahead cobre o numero
+  // INTEIRO (nao so o proximo caractere): `\d+` sozinho faz backtrack e
+  // "50%" casaria como "de 5" com `%` a distancia -- so pega o `%` colado.
+  /\b(?:trein\w*\s+de\s+\d+(?![.,\d]*\s*%)|s[eé]ries\s+de\s+\d+(?![.,\d]*\s*%)|\d+\s*x\s*\d+\s+repeti\w*)/i,
   /\b(?:dieta\s+de\s+\d+|consuma\s+\d+|ingira\s+\d+)/i,
   // Tranquilizacao clinica -- tao perigosa quanto o alarme.
   /\b(n[aã]o\s+h[aá]\s+risco|est[aá]\s+saud[aá]vel|sem\s+problem\w*\s+de\s+sa[uú]de)\b/i,
@@ -326,7 +336,11 @@ export function validarSaida(
       continue;
     }
 
-    if (!contexto.numerosPermitidos.some((permitido) => ehQuaseIgual(permitido, numero))) {
+    const citaValorPermitido = contexto.numerosPermitidos.some((permitido) =>
+      ehQuaseIgual(permitido, numero),
+    );
+
+    if (!citaValorPermitido) {
       return {
         aceita: false,
         motivo: 'VALUE_NOT_IN_SNAPSHOT',
@@ -341,18 +355,52 @@ export function validarSaida(
 /**
  * Todo numero do snapshot, para o validador conferir contra a prosa.
  *
- * Reune medidas, metas e agregados de frequencia -- e nada mais: numero que
- * o modelo nao recebeu, ele nao pode citar.
+ * Reune medidas, metas, agregados de frequencia e a diferenca entre
+ * qualquer par de medicoes de uma mesma metrica -- e nada mais: numero que
+ * o modelo nao recebeu (ou nao pode calcular de forma inequivoca), ele
+ * nao pode citar.
  */
 export function numerosDoSnapshot(snapshot: {
-  assessments: readonly { measurements: readonly { value: number }[] }[];
+  assessments: readonly { measurements: readonly { type: TipoDeMedida; value: number }[] }[];
   goals: readonly { baseline: number; target: number; fraction: number | null }[];
   attendance: { totalSessions: number; consistencyRatio: number | null };
 }): number[] {
   const numeros: number[] = [];
+  const porMetrica = new Map<TipoDeMedida, number[]>();
 
   for (const avaliacao of snapshot.assessments) {
-    for (const medida of avaliacao.measurements) numeros.push(medida.value);
+    for (const medida of avaliacao.measurements) {
+      numeros.push(medida.value);
+
+      const serie = porMetrica.get(medida.type) ?? [];
+      serie.push(medida.value);
+      porMetrica.set(medida.type, serie);
+    }
+  }
+
+  // "Peso caiu 3,2 kg" (88,4 -> 85,2) e conta correta, nao numero inventado
+  // -- mas so entre medicoes da MESMA metrica. Diferenca entre grandezas
+  // distintas (ex.: percentual de gordura menos fracao de meta) e
+  // coincidencia numerica, nao o que o aluno le como "quanto mudou"
+  // (achado #401).
+  //
+  // TODO PAR, nao so consecutivas: com 3+ avaliacoes (90 -> 88,4 -> 85,2), a
+  // prosa narra tanto o passo mais recente (3,2) quanto a variacao do
+  // periodo inteiro (90 -> 85,2 = 4,8) -- so a primeira e conta que a
+  // analise realmente escreve. `n` e o numero de avaliacoes de UM aluno, sem
+  // crescer com a base, entao `O(n^2)` por metrica e barato.
+  for (const serie of porMetrica.values()) {
+    for (let i = 0; i < serie.length; i++) {
+      const valorI = serie[i];
+
+      if (valorI === undefined) continue;
+
+      for (let j = i + 1; j < serie.length; j++) {
+        const valorJ = serie[j];
+
+        if (valorJ !== undefined) numeros.push(Math.abs(valorI - valorJ));
+      }
+    }
   }
 
   for (const meta of snapshot.goals) {

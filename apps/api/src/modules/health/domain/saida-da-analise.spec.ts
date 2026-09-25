@@ -93,6 +93,24 @@ describe('validarSaida -- diagnostico e conduta (regra no 8, M3-AC-008)', () => 
   });
 
   /**
+   * Achado #401, sonda real: "consistencia de treino de 80%" e frequencia
+   * (percentual), nao prescricao -- e o regex de "trein... de N" casava. Sem
+   * a excecao do `%`, comentar a propria consistencia derrubava a analise.
+   */
+  it('nao confunde percentual de frequencia com prescricao de treino', () => {
+    // 50 esta em `numerosPermitidos` (contexto padrao): e o `consistencyRatio`
+    // de 0,5 convertido para percentual -- a mesma prosa que o modelo escreve.
+    // "treino de 50%" e a frase que sem o lookahead correto casava como
+    // prescricao (backtrack de `\d+` casando so o "5" de "50%").
+    const resultado = validarSaida(
+      saida({ positivePoints: ['A consistencia de treino de 50% ficou boa.'] }),
+      contexto(),
+    );
+
+    expect(resultado.aceita).toBe(true);
+  });
+
+  /**
    * A lista mira o ATO, nao o assunto: falar de gordura corporal e o proposito
    * do produto. Se estes casos falharem, o validador virou censura e o produto
    * nao consegue dizer nada util.
@@ -173,6 +191,35 @@ describe('validarSaida -- valor inexistente', () => {
 
     expect(resultado).toMatchObject({ motivo: 'VALUE_NOT_IN_SNAPSHOT' });
   });
+
+  /**
+   * Achado #401, sonda real: "peso caiu 3,2 kg" (88,4 - 85,2 no snapshot) e
+   * conta correta, mas 3,2 nunca aparece como campo do JSON -- 0 de 3
+   * rodadas reais eram aceitas so por isso.
+   */
+  it('aceita numero que e a diferenca entre duas medicoes -- via numerosDoSnapshot', () => {
+    // O call site real (ai-analysis.service.ts) monta numerosPermitidos com
+    // numerosDoSnapshot; o teste passa pelo mesmo caminho, nao injeta a
+    // diferenca crua.
+    const permitidos = numerosDoSnapshot({
+      assessments: [
+        { measurements: [{ type: 'WEIGHT', value: 88.4 }] },
+        { measurements: [{ type: 'WEIGHT', value: 85.2 }] },
+      ],
+      goals: [],
+      attendance: { totalSessions: 0, consistencyRatio: null },
+    });
+
+    const resultado = validarSaida(
+      saida({
+        summary: 'Seu peso caiu 3,2 kg no periodo.',
+        progress: [{ metric: 'WEIGHT', observation: 'De 88,4 kg para 85,2 kg.' }],
+      }),
+      contexto({ numerosPermitidos: permitidos }),
+    );
+
+    expect(resultado.aceita).toBe(true);
+  });
 });
 
 describe('validarSaida -- ADR-037', () => {
@@ -249,7 +296,7 @@ describe('validarSaida -- ADR-037', () => {
 describe('numerosDoSnapshot', () => {
   it('reune medidas, metas e agregados -- e nada mais', () => {
     const numeros = numerosDoSnapshot({
-      assessments: [{ measurements: [{ value: 90 }, { value: 24.1 }] }],
+      assessments: [{ measurements: [{ type: 'WEIGHT', value: 90 }, { type: 'BODY_FAT_PERCENT', value: 24.1 }] }],
       goals: [{ baseline: 90, target: 85, fraction: 0.5 }],
       attendance: { totalSessions: 8, consistencyRatio: 0.75 },
     });
@@ -270,5 +317,61 @@ describe('numerosDoSnapshot', () => {
     // O modelo tende a escrever "50%" onde o snapshot tem 0,5. Rejeitar isso
     // seria rejeitar prosa correta.
     expect(numeros).toContain(50);
+  });
+
+  /**
+   * #401: "peso caiu 3,2 kg" (88,4 -> 85,2) e conta correta, nao numero
+   * inventado. So entre medicoes da MESMA metrica -- e o motivo de
+   * `measurements` carregar `type` agora.
+   */
+  it('inclui a diferenca entre medicoes consecutivas da mesma metrica', () => {
+    const numeros = numerosDoSnapshot({
+      assessments: [
+        { measurements: [{ type: 'WEIGHT', value: 88.4 }] },
+        { measurements: [{ type: 'WEIGHT', value: 85.2 }] },
+      ],
+      goals: [],
+      attendance: { totalSessions: 0, consistencyRatio: null },
+    });
+
+    expect(numeros.some((n) => Math.abs(n - 3.2) <= 0.05)).toBe(true);
+  });
+
+  /**
+   * Achado da revisao adversarial: com 3+ avaliacoes, a prosa narra tanto o
+   * ultimo passo (1,6) quanto a variacao do periodo inteiro (4,8) -- so a
+   * primeira entrava quando a diferenca cobria apenas pares consecutivos.
+   */
+  it('inclui a diferenca entre QUALQUER par de medicoes da mesma metrica, nao so consecutivas', () => {
+    const numeros = numerosDoSnapshot({
+      assessments: [
+        { measurements: [{ type: 'WEIGHT', value: 90 }] },
+        { measurements: [{ type: 'WEIGHT', value: 88.4 }] },
+        { measurements: [{ type: 'WEIGHT', value: 85.2 }] },
+      ],
+      goals: [],
+      attendance: { totalSessions: 0, consistencyRatio: null },
+    });
+
+    expect(numeros.some((n) => Math.abs(n - 1.6) <= 0.05)).toBe(true); // 90 -> 88,4
+    expect(numeros.some((n) => Math.abs(n - 3.2) <= 0.05)).toBe(true); // 88,4 -> 85,2
+    expect(numeros.some((n) => Math.abs(n - 4.8) <= 0.05)).toBe(true); // 90 -> 85,2 (ponta a ponta)
+  });
+
+  /**
+   * A cobertura errada da primeira tentativa deste fix: comparar QUALQUER
+   * par de numeros do snapshot aceitava "21,8" so porque 22,3 (gordura) menos
+   * 0,5 (fracao de meta) da 21,8 -- coincidencia entre grandezas diferentes,
+   * nao "quanto mudou" nenhuma medida. A diferenca so pode vir de duas
+   * medicoes da MESMA metrica.
+   */
+  it('nao mistura diferenca entre metricas diferentes', () => {
+    const numeros = numerosDoSnapshot({
+      assessments: [{ measurements: [{ type: 'BODY_FAT_PERCENT', value: 22.3 }] }],
+      goals: [{ baseline: 1, target: 1, fraction: 0.5 }],
+      attendance: { totalSessions: 0, consistencyRatio: null },
+    });
+
+    expect(numeros.some((n) => Math.abs(n - 21.8) <= 0.05)).toBe(false);
   });
 });
