@@ -30,6 +30,7 @@ import { normalizarCep, ufEhValida } from './domain/endereco.js';
 import { cpfEhValido, formatarCpf } from './domain/identificacao.js';
 import { transicionarAluno } from './domain/student.js';
 import { TAMANHO_MAXIMO_DE_FOTO_BYTES } from './domain/foto-do-aluno.js';
+import { StudentCredentialRepository } from './student-credential.repository.js';
 import { StudentPhotoService } from './student-photo.service.js';
 import {
   StudentRepository,
@@ -268,6 +269,19 @@ const esquemaDeStatus = z
 /** Colunas por onde a listagem aceita ordenar. Lista branca. */
 const ordemDeListagem = z.enum(['nome', 'matricula', 'nascimento']);
 
+/**
+ * Numero que o leitor (cartao de catraca ou identificador facial) reconhece
+ * para o aluno -- issue #396. `externalId` e o texto como o equipamento o
+ * grava: zero a esquerda importa, por isso `string`, nao `number`, mesmo
+ * padrao do campo no schema (`packages/database/prisma/schema.prisma`).
+ */
+const credencialDoAluno = z
+  .object({
+    kind: z.enum(['TURNSTILE_CARD', 'FACIAL_ENROLL_ID']),
+    externalId: z.string().trim().min(1).max(60),
+  })
+  .strict();
+
 /** DTO de saida. Nunca a entidade. */
 interface AlunoDto {
   id: string;
@@ -387,6 +401,7 @@ export class StudentsController {
     private readonly membros: MembershipRepository,
     private readonly contexto: TenantContextService,
     private readonly fotos: StudentPhotoService,
+    private readonly credenciais: StudentCredentialRepository,
   ) {}
 
   /**
@@ -742,6 +757,86 @@ export class StudentsController {
   }
 
   /**
+   * As credenciais do aluno -- numero de cartao e/ou identificador facial.
+   * ISSUE #396.
+   */
+  @Get(':id/credentials')
+  @RequirePermissions('student.read')
+  @ApiOkResponse({
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['kind', 'externalId'],
+        properties: { kind: { type: 'string' }, externalId: { type: 'string' } },
+      },
+    },
+  })
+  async credenciaisDoAluno(
+    @Param('id') id: string,
+  ): Promise<{ kind: string; externalId: string }[]> {
+    const linhas = await this.credenciais.listarPorAluno(this.contexto.require(), id);
+
+    return linhas.map((c) => ({ kind: c.kind, externalId: c.externalId }));
+  }
+
+  /**
+   * Vincula o numero que o leitor reconhece para o aluno -- ISSUE #396.
+   *
+   * CAMINHO MANUAL, nao sincronizacao com o equipamento: a recepcao digita
+   * o numero que a academia ja levantou por fora (ex.: no proprio leitor
+   * Topdata), do mesmo jeito que o import em lote grava o que le do CSV do
+   * Pacto. Sincronizar automaticamente com o leitor e fatia propria, com
+   * SPEC do PI -- nao este endpoint.
+   *
+   * MESMA PERMISSAO de `editar`: nao existe nivel de acesso proprio so para
+   * credencial de catraca.
+   */
+  @Put(':id/credentials')
+  @RequirePermissions('student.update')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['kind', 'externalId'],
+      properties: { kind: { type: 'string' }, externalId: { type: 'string' } },
+    },
+  })
+  async definirCredencial(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+  ): Promise<{ kind: string; externalId: string }> {
+    const dados = credencialDoAluno.parse(corpo);
+    const contexto = this.contexto.require();
+
+    const atual = await this.alunos.encontrar(contexto, id);
+    if (!atual) throw new NotFoundException({ code: 'STUDENT_NOT_FOUND' });
+
+    try {
+      const credencial = await this.credenciais.definir(
+        contexto,
+        id,
+        dados.kind,
+        dados.externalId,
+      );
+
+      return { kind: credencial.kind, externalId: credencial.externalId };
+    } catch (erro: unknown) {
+      // P2002: o numero ja pertence a OUTRO aluno -- o `upsert` tentou
+      // criar porque o par (tenant, kind, externalId) existe com studentId
+      // diferente. A catraca so decide uma pessoa por numero; a mensagem
+      // deixa claro que o numero esta ocupado, nao que o pedido falhou por
+      // acaso.
+      if (ehViolacaoDeUnicidade(erro)) {
+        throw new BadRequestException({
+          code: 'CREDENTIAL_ALREADY_ASSIGNED',
+          title: 'Este número já está vinculado a outro aluno.',
+        });
+      }
+      throw erro;
+    }
+  }
+
+  /**
    * A unidade existe NESTE tenant?
    *
    * Sem esta checagem o banco ainda recusaria a FK, mas com erro de
@@ -926,6 +1021,14 @@ export class StudentsController {
  */
 function numerosDeEquipamento(credenciais: readonly { externalId: string }[]): string[] {
   return [...new Set(credenciais.map((c) => c.externalId))];
+}
+
+/**
+ * `P2002` e o codigo de violacao de indice unico do Prisma -- mesmo padrao
+ * de `class.repository.ts` e dos casos de uso de `billing`.
+ */
+function ehViolacaoDeUnicidade(erro: unknown): boolean {
+  return typeof erro === 'object' && erro !== null && 'code' in erro && erro.code === 'P2002';
 }
 
 /** O aluno como a busca o devolve: com a assinatura vigente e o telefone. */

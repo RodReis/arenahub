@@ -36,6 +36,7 @@ import { IconeBioimpedancia, IconePagamento } from '../acoes-do-aluno';
 import { Abas } from '../../../../src/components/abas';
 import { AlterarSituacao } from './alterar-situacao';
 import { AtribuirPlano } from './atribuir-plano';
+import { CredencialDeAcesso } from './credencial-de-acesso';
 import { CobrancaRecorrente } from './cobranca-recorrente';
 import { EditarCadastro } from './editar-cadastro';
 
@@ -154,13 +155,14 @@ interface InvoicesDoAluno {
 export default async function PaginaDaFicha({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  // Em série o operador esperaria cinco viagens; em paralelo, uma.
+  // Em série o operador esperaria seis viagens; em paralelo, uma.
   const [
     respostaDoAluno,
     respostaDosDireitos,
     respostaDosPlanos,
     respostaDasUnidades,
     respostaDasInvoices,
+    respostaDasCredenciais,
   ] = await Promise.all([
     chamarApi<Aluno>(`/api/v1/students/${id}`),
     chamarApi<Entitlement[]>(`/api/v1/students/${id}/entitlements`),
@@ -171,6 +173,9 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
     // sem ele. Ver `invoiceEmDestaque` abaixo, que trata ausencia como "nada
     // a avisar", nao como aluno em dia.
     chamarApi<InvoicesDoAluno>(`/api/v1/students/${id}/invoices`),
+    // Issue #396 -- numero que o leitor reconhece. Acessorio, mesmo criterio
+    // de planos e unidades: falha aqui nao impede ver quem e o aluno.
+    chamarApi<{ kind: string; externalId: string }[]>(`/api/v1/students/${id}/credentials`),
   ]);
 
   if (!respostaDoAluno.ok || !respostaDoAluno.dados) {
@@ -241,6 +246,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
   const planos = respostaDosPlanos.dados ?? [];
   const unidades = respostaDasUnidades.dados ?? [];
   const unidadesIndisponiveis = !respostaDasUnidades.ok;
+  const credenciais = respostaDasCredenciais.dados ?? [];
   const planosIndisponiveis = !respostaDosPlanos.ok;
 
   const nomeDaUnidade = (unidadeId: string): string =>
@@ -745,6 +751,19 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                   vigente={assinaturaVigente}
                 />
               )}
+            </section>
+
+            {/*
+              ISSUE #396 -- numero que o leitor reconhece (cartao de catraca
+              e/ou identificador facial). Caminho MANUAL: quem cadastra o
+              aluno direto no painel, fora do import em lote do Pacto, nao
+              tinha onde digitar o numero que a academia ja levantou por
+              fora. Junto de "Direitos de acesso" porque e a mesma pergunta
+              -- "este aluno consegue passar na catraca".
+            */}
+            <section aria-labelledby="titulo-credencial" className={estilos['secao']}>
+              <h2 id="titulo-credencial">Número da catraca</h2>
+              <CredencialDeAcesso studentId={aluno.id} credenciais={credenciais} />
             </section>
 
             {/*

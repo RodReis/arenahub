@@ -99,6 +99,7 @@ const MENSAGEM: Record<string, string> = {
     'Este plano tem assinatura em vigor. Encerre ou troque o plano dos alunos antes de desativá-lo.',
   PLAN_PRICE_RETROACTIVE:
     'A data de início não pode estar no passado — reajuste retroativo não é permitido.',
+  CREDENTIAL_ALREADY_ASSIGNED: 'Este número já está vinculado a outro aluno.',
 };
 
 function texto(formulario: FormData, campo: string): string {
@@ -575,4 +576,64 @@ export async function editarPlano(
   revalidatePath('/plans');
 
   return { sucesso: { planId: resposta.dados.id, name: resposta.dados.name } };
+}
+
+/**
+ * Vincula o numero que o leitor (catraca ou identificador facial) reconhece
+ * para o aluno -- issue #396.
+ *
+ * CAMINHO MANUAL, para o aluno que nao veio do import em lote do Pacto: a
+ * recepcao digita o numero que a academia ja levantou por fora (ex.: no
+ * proprio leitor Topdata). Nao e sincronizacao automatica com o
+ * equipamento -- isso e fatia propria, com SPEC do PI.
+ */
+const esquemaDeCredencial = z.object({
+  studentId: z.string().uuid(),
+  kind: z.enum(['TURNSTILE_CARD', 'FACIAL_ENROLL_ID']),
+  externalId: z.string().trim().min(1, 'Informe o número').max(60, 'Número longo demais'),
+});
+
+export interface EstadoDaCredencial {
+  erro?: string;
+  sucesso?: { kind: string; externalId: string };
+  valores?: { kind?: string; externalId?: string };
+}
+
+export async function definirCredencial(
+  _anterior: EstadoDaCredencial,
+  formulario: FormData,
+): Promise<EstadoDaCredencial> {
+  const studentId = texto(formulario, 'studentId');
+  const bruto = {
+    studentId,
+    kind: texto(formulario, 'kind'),
+    externalId: texto(formulario, 'externalId'),
+  };
+
+  const valores = { kind: bruto.kind, externalId: bruto.externalId };
+
+  const validado = esquemaDeCredencial.safeParse(bruto);
+
+  if (!validado.success) {
+    return {
+      erro: validado.error.issues[0]?.message ?? 'Confira os dados informados.',
+      valores,
+    };
+  }
+
+  const resposta = await chamarApi<{ kind: string; externalId: string }>(
+    `/api/v1/students/${studentId}/credentials`,
+    { metodo: 'PUT', corpo: { kind: validado.data.kind, externalId: validado.data.externalId } },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      erro: frase(resposta.erro?.code ?? '', 'Não foi possível vincular o número'),
+      valores,
+    };
+  }
+
+  revalidatePath(`/students/${studentId}`);
+
+  return { sucesso: { kind: resposta.dados.kind, externalId: resposta.dados.externalId } };
 }
