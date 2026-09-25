@@ -19,6 +19,7 @@ vi.mock('../../../actions/students', () => ({
 
 vi.mock('../../../actions/membership', () => ({
   atribuirPlano: vi.fn(),
+  definirCredencial: vi.fn(),
 }));
 
 import { chamarApi } from '../../../../lib/api/server-client';
@@ -83,6 +84,9 @@ function responder(direitos: unknown[]) {
         dados: { timezone: 'America/Sao_Paulo', invoices: [] },
         cookiesDaApi: [],
       });
+    }
+    if (caminho.endsWith('/credentials')) {
+      return Promise.resolve({ ok: true, dados: [], cookiesDaApi: [] });
     }
     return Promise.resolve({ ok: true, dados: aluno(), cookiesDaApi: [] });
   });
