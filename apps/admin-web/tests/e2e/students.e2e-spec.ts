@@ -405,7 +405,10 @@ test.describe('plano e direito de acesso', () => {
 
     await expect(direitos).toBeVisible();
     await expect(direitos).toContainText('Segunda, 06:00–22:00');
-    await expect(direitos).toContainText('Assinatura');
+    // A coluna mostra o NOME do plano ("Plano Atribuível ..."), não mais o
+    // rótulo genérico "Assinatura" -- issue #394: a ficha não dava para
+    // conferir qual plano o aluno tinha sem abrir a fatura.
+    await expect(direitos).toContainText(nomeDoPlano);
   });
 
   test('a vigência precisa terminar depois de começar', async ({ page }) => {
