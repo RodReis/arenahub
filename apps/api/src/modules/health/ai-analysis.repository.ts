@@ -130,11 +130,13 @@ export class AiAnalysisRepository {
    * `upsert` por nome: o prompt e do produto e nasce com o codigo, nao com um
    * seed que alguem pode esquecer de rodar. Se o texto mudar sem o nome
    * mudar, o `content` NAO e reescrito -- reescrever quebraria a
-   * reprodutibilidade de toda analise ja publicada com aquela versao.
+   * reprodutibilidade de toda analise ja publicada com aquela versao. O
+   * mesmo vale para o `outputSchema`, que e metade do pedido desde a `@4`.
    */
   async versaoDePromptVigente(prompt: {
     name: string;
     content: string;
+    schema: Record<string, unknown>;
     contentSha256: string;
   }): Promise<string> {
     const versao = await this.db.aiPromptVersion.upsert({
@@ -142,6 +144,7 @@ export class AiAnalysisRepository {
       create: {
         name: prompt.name,
         content: prompt.content,
+        outputSchema: prompt.schema as Prisma.InputJsonObject,
         contentSha256: prompt.contentSha256,
       },
       update: {},

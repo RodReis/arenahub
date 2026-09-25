@@ -106,6 +106,7 @@ export class AiAnalysisService {
         snapshot,
         prompt: PROMPT_DE_ANALISE.content,
         promptName: PROMPT_DE_ANALISE.name,
+        schema: PROMPT_DE_ANALISE.schema,
       });
     } catch (erro) {
       // `M3-NFR-004`: indisponibilidade de IA nao impede avaliacao manual. A

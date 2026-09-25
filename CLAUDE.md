@@ -21,7 +21,7 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 ## Papéis e governança
 
 - **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Nunca faz commit, push, PR nem merge** — o PI não toca no Git. O portão do PI é o **aceite na issue**, não o merge: o PI não segura o código na porta da `main`, ele carimba o que já entrou como realmente pronto. **descisão final e verdade do é PI, code atualiza documentação e/ou cria a ADR e merge na main**.
-- **Claude Cowork (planejamento)** — mantém `docs/` e registra decisões. **Não cria spec e não aprova nada.** A Slice do PRD **é** a especificação (ADR-022); `docs/specs/**` deixou de ser artefato de processo em **18/08/2026** — os arquivos existentes ficam como histórico e não bloqueiam ninguém. Cria a issue-fatia e a `[INFRA]` no board (Backlog, assignee PI) e os metadados de label (ADR-023). Escreve documento direto na `main` — escopo no **criar spec sem bloqueio, aceito duplo, LGPD, amarra juridica, consentimento e não criar ou inventa regra sempre pergunta o PI, isso não trava ou impede o desenvolvimento complento do sistema, descisão final é do PI. Não nos preocupamos com LGPD, consentimento, juridicos, nos só desenvolvemos o produto.**. Nunca implementa código, nunca toca em `apps/`, `packages/`, `infra/` nem `.github/`. **Em `docs/prd/**` escreve só emenda que materializa decisão do PI já registrada em ADR aceito, citando o ADR na própria emenda** — requisito novo, não inventar decisão sem o consentimento do PI, não criar regra sem o PI aceitar, e decisão do PI esta acima das ADR ou de qualquer outro documento. 
+- **Claude Cowork (planejamento)** — mantém `docs/` e registra decisões. **Não cria spec e não aprova nada.** A Slice do PRD **é** a especificação (ADR-022); a regra de `docs/specs/` está em *Documentos-chave*. Cria a issue-fatia e a `[INFRA]` no board (Backlog, assignee PI) e os metadados de label (ADR-023). Escreve documento direto na `main` — escopo no **criar spec sem bloqueio, aceito duplo, LGPD, amarra juridica, consentimento e não criar ou inventa regra sempre pergunta o PI, isso não trava ou impede o desenvolvimento complento do sistema, descisão final é do PI. Não nos preocupamos com LGPD, consentimento, juridicos, nos só desenvolvemos o produto.**. Nunca implementa código, nunca toca em `apps/`, `packages/`, `infra/` nem `.github/`. **Em `docs/prd/**` escreve só emenda que materializa decisão do PI já registrada em ADR aceito, citando o ADR na própria emenda** — requisito novo, não inventar decisão sem o consentimento do PI, não criar regra sem o PI aceitar, e decisão do PI esta acima das ADR ou de qualquer outro documento. 
 - **Claude Code (developer)** — codifica, testa (usar a skill /code-review; e para frontend, as skills do /impeccable e /frontend-design:frontend-design) antes do commit, atualiza a documentação e **commita os documentos de `docs/`** junto da entrega. **Implementa a partir deste arquivo + `docs/` + a Slice do PRD da fatia** — não espera spec nem aprovação de ninguém. pega o card, move pelo fluxo e monitora para não ficar parado atoa e entrega com PR. Cria a própria issue `[FIX]` ou de `[INFRA]` de bug. Pode criticar arquitetura, **não escopo**. **Só para e pergunta em dois casos** — ver *O que pode bloquear o desenvolvimento*. Fora deles: decide, implementa, e registra a decisão no corpo do PR. **Code não criar ou inventa regra, segui a que esta especificada, e a descisão final é o PI**
 
 #### Dois atores escrevem no Git — quem cede no conflito
@@ -114,8 +114,9 @@ primeiro caso da tabela acima.
 - **Nunca afirmar estado de CI, PR ou job sem verificar no momento da fala.** Se o PI diz que
   terminou, a resposta é `gh pr checks <n>` — nunca contradizer sem checar. Silêncio de
   ferramenta não é evidência de nada: um watcher que emudece parece idêntico a um job que ainda
-  roda. Para esperar CI, usar **`gh pr checks <n> --watch`** em background (ele bloqueia até o
-  fim e devolve código de saída), nunca loop de monitor artesanal — o loop que espera "todos
+  roda. Para esperar CI, usar **`gh run watch <run-id> --exit-status`** em background e conferir
+  job a job ao terminar — o exit de `gh pr checks --watch` já saiu 0 com job vermelho. Nunca loop
+  de monitor artesanal — o loop que espera "todos
   saírem de `pending`" fica girando calado quando uma chamada falha, e foi assim que uma entrega
   pronta ficou parada até o PI olhar por conta própria (18/08/2026, PR #102).
 
@@ -135,7 +136,7 @@ Cinco pilares (`docs/Especificação Completa — Plataforma Inteligente de Gest
 
 **O que o ArenaHub não é** (`docs/prd/README.md` §3): não é ERP contábil, não emite nota fiscal, não é prontuário médico, não é adquirente, não substitui prescrição profissional.
 
-**Estado atual (18/08/2026): MVP 1 em execução.** O bootstrap fechou, o monorepo existe com `apps/`, `packages/`, `infra/` e `.github/`, e o MVP 0 encerrou em 18/08 com `GO_WITH_CONSTRAINTS` (ADR-029) — com quatro restrições que o MVP 1 carrega. Estado corrente sempre no `docs/STATUS.md`, nunca aqui.
+O MVP 0 encerrou com `GO_WITH_CONSTRAINTS` (ADR-029). Estado corrente sempre no `docs/STATUS.md`, nunca aqui.
 
 ## Regras de arquitetura (não violar)
 
