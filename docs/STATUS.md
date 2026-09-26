@@ -215,11 +215,14 @@ os giros medidos são reais, mas teriam acontecido **sem o comando** — a garan
 quem tem direito entra **não está valendo** hoje na bancada. É config do equipamento, não código,
 e só se muda pela API/SDK. **`M0-AC-004` não fecha antes disso.**
 
-⚠️ **O código de 17/08 não está na `main` e não tem PR.** As branches `feat/f2-facial-senduser`
-(fix `senduser` do firmware v2.16, `conectar` na ponte, `lab:run`) e `docs/f3-poc-fisica-17-08`
-(relatório da janela da catraca) vivem só no remoto. **Elas colidem entre si** — as duas escrevem
-uma seção `## 9` diferente no mesmo `docs/reports/MVP-00-relatorio-poc-topdata.md`. Resolver é do
-Code; registrado aqui porque avanço fora da `main` é o *fechamento frágil* do `CLAUDE.md` §3.
+✅ **Corrigido em 26/09/2026.** O código de 17/08 já está na `main`: PR
+[#91](https://github.com/RodReis/arenahub/pull/91) (fix `senduser` v2.16, `conectar`, `lab:run`) e
+PR [#93](https://github.com/RodReis/arenahub/pull/93) (fallback de ordenação para relógio
+implausível, decisão 3 da `SPEC-002`). A branch `feat/f2-facial-senduser` não existe mais —
+mergeada e apagada. `removerIdentidade` também já está implementado
+(`apps/edge-agent/src/application/sincronizar-identidade.ts`). O que resta de F2 é só bancada:
+`M0-AC-002` (remover as três identidades e confirmar ausência no leitor físico) e acertar o
+relógio do leitor no menu — ver `docs/DEVELOPMENT.md` linha da F2.
 
 🏁 **18/08/2026 — o gate §15 do MVP 0 foi assinado: `GO_WITH_CONSTRAINTS` (ADR-029). O MVP 1
 começou.** O `M0-AC-010` está satisfeito pelo PI, acumulando tecnologia e operação. **Quatro
