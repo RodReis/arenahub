@@ -25,7 +25,12 @@ const esquemaDeEdgeNode = z.object({
 
 export interface EstadoDoEdgeNode {
   erro?: string;
-  sucesso?: { id: string; code: string };
+  /**
+   * `gymUnitId` vem do SERVIDOR, não do formulário: é o fuso desta unidade
+   * que datará a validade do código de pareamento, e ler o do formulário
+   * arriscaria mostrar o prazo no fuso de outra unidade (DS §11, regra 5).
+   */
+  sucesso?: { id: string; code: string; gymUnitId: string };
   valores?: Record<string, string>;
 }
 
@@ -44,6 +49,7 @@ const MENSAGEM: Record<string, string> = {
   VALIDATION_FAILED: 'Confira os dados informados.',
   FORBIDDEN: 'Seu perfil não tem permissão para cadastrar Edge.',
   GYM_UNIT_NOT_FOUND: 'Unidade não encontrada nesta academia.',
+  GYM_UNIT_NOT_ACTIVE: 'Esta unidade não está ativa e não recebe Edge novo.',
   EDGE_NODE_CODE_TAKEN: 'Já existe um Edge com este código nesta academia.',
   EDGE_NODE_NOT_FOUND: 'Edge não encontrado nesta academia.',
 };
@@ -76,10 +82,13 @@ export async function cadastrarEdgeNode(
     };
   }
 
-  const resposta = await chamarApi<{ id: string; code: string }>('/api/v1/edge-nodes', {
-    metodo: 'POST',
-    corpo: { gymUnitId: validado.data.gymUnitId, code: validado.data.code },
-  });
+  const resposta = await chamarApi<{ id: string; code: string; gymUnitId: string }>(
+    '/api/v1/edge-nodes',
+    {
+      metodo: 'POST',
+      corpo: { gymUnitId: validado.data.gymUnitId, code: validado.data.code },
+    },
+  );
 
   if (!resposta.ok || !resposta.dados) {
     return {
@@ -90,7 +99,13 @@ export async function cadastrarEdgeNode(
 
   revalidatePath('/operations');
 
-  return { sucesso: { id: resposta.dados.id, code: resposta.dados.code } };
+  return {
+    sucesso: {
+      id: resposta.dados.id,
+      code: resposta.dados.code,
+      gymUnitId: resposta.dados.gymUnitId,
+    },
+  };
 }
 
 /**

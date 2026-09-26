@@ -40,12 +40,6 @@ export class EdgeNodeRepository {
     }
   }
 
-  async listar(contexto: TenantContext): Promise<EdgeNode[]> {
-    return this.db.edgeNode.findMany({
-      where: { tenantId: contexto.tenantId },
-      orderBy: [{ createdAt: 'desc' }],
-    });
-  }
 }
 
 /**

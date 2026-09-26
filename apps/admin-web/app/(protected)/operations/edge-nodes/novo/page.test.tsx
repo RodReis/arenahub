@@ -77,3 +77,4 @@ describe('cadastro de Edge', () => {
     expect(screen.queryByTestId('confirmar-edge-node')).not.toBeInTheDocument();
   });
 });
+

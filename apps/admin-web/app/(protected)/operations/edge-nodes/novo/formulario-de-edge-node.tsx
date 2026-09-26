@@ -63,18 +63,22 @@ export function FormularioDeEdgeNode({ unidades }: Props) {
   );
 
   /*
-   * A unidade escolhida é estado porque o FUSO dela decide como a validade do
-   * código é exibida -- `TenantDateTime` exige `timeZone` sem default, e o
-   * fuso do navegador não serve (DS §11, regra 5).
+   * NÃO semeia de `estado.valores`: o componente não remonta entre a falha e
+   * a nova tentativa, então o inicializador só correria uma vez e daria a
+   * impressão de preservar o que o próprio select controlado já preserva.
    */
-  const [unidadeEscolhida, setUnidadeEscolhida] = useState(
-    estado.valores?.['gymUnitId'] ?? unidades[0]?.id ?? '',
-  );
+  const [unidadeEscolhida, setUnidadeEscolhida] = useState(unidades[0]?.id ?? '');
 
-  const fusoDaUnidade =
-    unidades.find((unidade) => unidade.id === unidadeEscolhida)?.timezone ??
-    unidades[0]?.timezone ??
-    'America/Sao_Paulo';
+  /*
+   * O fuso sai da unidade que o SERVIDOR confirmou, e só cai na escolha do
+   * formulário enquanto não há Edge criado. `TenantDateTime` exige
+   * `timeZone` sem default e o fuso do navegador não serve (DS §11, regra 5)
+   * -- ler o do formulário depois do sucesso arriscaria datar a validade no
+   * fuso de outra unidade.
+   */
+  const unidadeDoFuso = estado.sucesso?.gymUnitId ?? unidadeEscolhida;
+
+  const fusoDaUnidade = unidades.find((unidade) => unidade.id === unidadeDoFuso)?.timezone;
 
   useToastDeErro(estado.erro, 'error', 'erro-do-edge-node');
   useToastDeErro(pareamento.erro, 'error', 'erro-do-pareamento');
@@ -101,9 +105,15 @@ export function FormularioDeEdgeNode({ unidades }: Props) {
               Código de pareamento: <strong>{pareamento.sucesso.code}</strong>
             </p>
             <p role="note" className={estilos['nota']}>
-              Ele aparece <strong>uma única vez</strong> e vale até{' '}
-              <TenantDateTime iso={pareamento.sucesso.expiresAt} timeZone={fusoDaUnidade} />.
-              Copie agora para o <code>.env</code> do PC da recepção, em{' '}
+              Ele aparece <strong>uma única vez</strong>
+              {fusoDaUnidade === undefined ? null : (
+                <>
+                  {' '}
+                  e vale até{' '}
+                  <TenantDateTime iso={pareamento.sucesso.expiresAt} timeZone={fusoDaUnidade} />
+                </>
+              )}
+              . Copie agora para o <code>.env</code> do PC da recepção, em{' '}
               <code>EDGE_PAIRING_CODE</code>. Se fechar sem copiar, gere outro — este morre no
               primeiro uso.
             </p>

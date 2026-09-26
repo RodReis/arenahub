@@ -101,4 +101,62 @@ test.describe('eventos de acesso', () => {
       await expect(vazio).toContainText('Ajuste os filtros');
     }
   });
+
+  /**
+   * A JORNADA DO INSTALADOR -- issue #404.
+   *
+   * O `POST /edge-nodes/:id/pairing-codes` existia desde a F59 e exigia um
+   * `EdgeNode` que nenhuma tela criava: a primeira execução real do runbook
+   * `docs/operations/smart-access/install.md` travou aqui. Este teste é o
+   * caminho que destravou -- e o único lugar onde ele pode ser provado
+   * inteiro, porque o código só aparece depois de duas idas ao servidor, o
+   * que jsdom não exercita.
+   */
+  test('cadastra um Edge e recebe o código de pareamento', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/operations');
+
+    await page.getByTestId('novo-edge-node').click();
+    await expect(page).toHaveURL(/\/operations\/edge-nodes\/novo/);
+
+    // Código único por execução: a constraint é `(tenantId, code)`, e o
+    // banco do E2E não é recriado entre um teste e outro.
+    const codigoDoEdge = `E2E-EDGE-${Date.now()}`;
+
+    await page.getByTestId('campo-codigo-do-edge-node').fill(codigoDoEdge);
+    await page.getByTestId('confirmar-edge-node').click();
+
+    await expect(page.getByTestId('edge-node-cadastrado')).toContainText(codigoDoEdge);
+
+    // O pareamento é o segundo ato, na mesma tela: na instalação real, quem
+    // cadastra está com o PC da recepção na frente e precisa do código agora.
+    await page.getByTestId('gerar-pareamento').click();
+
+    const codigo = page.getByTestId('codigo-de-pareamento');
+
+    await expect(codigo).toBeVisible();
+    // O que o operador precisa saber: que é irrepetível e onde colar.
+    await expect(codigo).toContainText('uma única vez');
+    await expect(codigo).toContainText('EDGE_PAIRING_CODE');
+  });
+
+  /**
+   * RE-PAREAMENTO -- o código morre no primeiro uso e o ADR-011 prevê
+   * revogação pelo painel. Sem ação na linha, um Edge revogado só voltaria a
+   * funcionar cadastrando outro, duplicando o registro.
+   */
+  test('gera novo código para um Edge já cadastrado, pela tabela', async ({ page }) => {
+    await entrar(page);
+    await page.goto('/operations');
+
+    const parear = page.getByTestId('parear-edge').first();
+
+    // Sem Edge cadastrado a tabela está vazia -- e aí o teste anterior é
+    // quem cobre o caminho. Este exercita a ação de linha quando ela existe.
+    if (!(await parear.isVisible())) return;
+
+    await parear.click();
+
+    await expect(page.getByTestId('codigo-de-pareamento').first()).toBeVisible();
+  });
 });

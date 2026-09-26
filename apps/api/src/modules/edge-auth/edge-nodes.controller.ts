@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
-import type { EdgeNode } from '@arenahub/database';
+import { BadRequestException, Body, Controller, NotFoundException, Post } from '@nestjs/common';
+import { ApiCreatedResponse } from '@nestjs/swagger';
+import type { EdgeNode, EdgeNodeStatus } from '@arenahub/database';
 import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import { GymUnitRepository } from '../tenancy/gym-unit.repository.js';
 import { EdgeNodeRepository } from './edge-node.repository.js';
 
 // `.strict()`: `tenantId` no corpo e RECUSADO. O tenant vem da identidade
@@ -20,7 +21,12 @@ interface EdgeNodeDto {
   id: string;
   gymUnitId: string;
   code: string;
-  status: string;
+  /*
+   * O tipo do Prisma, nao `string`: o OpenAPI promete `enum` logo abaixo, e
+   * `string` deixaria o tipo mentir sobre o contrato (ADR-005 -- vocabulario
+   * unico entre schema, tipo e documento).
+   */
+  status: EdgeNodeStatus;
   agentVersion: string | null;
   lastHeartbeat: string | null;
 }
@@ -51,17 +57,9 @@ const SCHEMA_DO_EDGE_NODE = {
 export class EdgeNodesController {
   constructor(
     private readonly edgeNodes: EdgeNodeRepository,
+    private readonly unidades: GymUnitRepository,
     private readonly contexto: TenantContextService,
   ) {}
-
-  @Get()
-  @RequirePermissions('device.read')
-  @ApiOkResponse({ schema: { type: 'array', items: SCHEMA_DO_EDGE_NODE } })
-  async listar(): Promise<EdgeNodeDto[]> {
-    const encontrados = await this.edgeNodes.listar(this.contexto.require());
-
-    return encontrados.map((n) => this.paraDto(n));
-  }
 
   @Post()
   @RequirePermissions('device.manage')
@@ -69,9 +67,39 @@ export class EdgeNodesController {
   async criar(@Body() corpo: unknown): Promise<EdgeNodeDto> {
     const dados = esquemaDeCriacao.parse(corpo);
 
+    await this.exigirUnidadeDoTenant(dados.gymUnitId);
+
     const edgeNode = await this.edgeNodes.criar(this.contexto.require(), dados);
 
     return this.paraDto(edgeNode);
+  }
+
+  /**
+   * A unidade tem de ser DESTE tenant -- regra de arquitetura no 2, INV-006.
+   *
+   * `EdgeNode.gymUnitId` nao tem FK para `GymUnit` no schema, entao o banco
+   * nao barra: sem esta checagem, um admin do tenant A criaria um Edge
+   * apontando para a unidade FISICA do tenant B, e o pareamento (ADR-011)
+   * passaria a vincular um par inconsistente -- num agente que decide catraca.
+   *
+   * 404 e nao 403 pelo mesmo motivo do resto do sistema: distinguir "nao
+   * existe" de "existe mas e de outro tenant" confirmaria ao atacante que ele
+   * acertou o UUID.
+   */
+  private async exigirUnidadeDoTenant(gymUnitId: string): Promise<void> {
+    const unidade = await this.unidades.encontrar(this.contexto.require(), gymUnitId);
+
+    if (!unidade) throw new NotFoundException({ code: 'GYM_UNIT_NOT_FOUND' });
+
+    /*
+     * Unidade inativa não recebe Edge novo -- a academia fechou aquela porta.
+     * A REGRA VIVE AQUI, e não só no filtro da tela: um `POST` direto
+     * contornaria a tela, e o Edge é o agente que decide catraca de uma
+     * instalação física que já não opera.
+     */
+    if (unidade.status !== 'ACTIVE') {
+      throw new BadRequestException({ code: 'GYM_UNIT_NOT_ACTIVE' });
+    }
   }
 
   private paraDto(edgeNode: EdgeNode): EdgeNodeDto {

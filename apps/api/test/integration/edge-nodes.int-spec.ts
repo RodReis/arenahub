@@ -26,6 +26,9 @@ describe('POST /api/v1/edge-nodes', () => {
 
   let tenantId: string;
   let gymUnitId: string;
+  let unidadeInativaId: string;
+  let outroTenantId: string;
+  let unidadeDeOutroTenantId: string;
   let cookieDoPainel = '';
 
   const servidor = (): Parameters<typeof request>[0] =>
@@ -62,6 +65,19 @@ describe('POST /api/v1/edge-nodes', () => {
 
     gymUnitId = unidade.id;
 
+    const inativa = await db.gymUnit.create({
+      data: {
+        tenantId: tenant.id,
+        code: 'FECHADA',
+        name: 'Fechada',
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+        status: 'INACTIVE',
+      },
+    });
+
+    unidadeInativaId = inativa.id;
+
     const email = `admin-edge-node-${sufixo}@arenahub.test`;
 
     const usuario = await db.user.create({
@@ -91,9 +107,33 @@ describe('POST /api/v1/edge-nodes', () => {
     const lista: string[] = Array.isArray(cabecalho) ? (cabecalho as string[]) : [];
 
     cookieDoPainel = lista.find((c) => c.startsWith('arenahub_access=')) ?? '';
+
+    // Segundo tenant, so para provar isolamento (regra de arquitetura no 2).
+    const outroTenant = await db.tenant.create({
+      data: {
+        slug: `f404-outro-${sufixo}`,
+        legalName: 'Outro Tenant LTDA',
+        displayName: 'Outro Tenant',
+      },
+    });
+
+    outroTenantId = outroTenant.id;
+
+    const unidadeAlheia = await db.gymUnit.create({
+      data: {
+        tenantId: outroTenant.id,
+        code: 'CENTRO-2',
+        name: 'Centro 2',
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+      },
+    });
+
+    unidadeDeOutroTenantId = unidadeAlheia.id;
   });
 
   afterAll(async () => {
+    await db.tenant.delete({ where: { id: outroTenantId } });
     await db.tenant.delete({ where: { id: tenantId } });
     await app?.close();
   });
@@ -120,7 +160,12 @@ describe('POST /api/v1/edge-nodes', () => {
     expect(criado?.tenantId).toBe(tenantId);
   });
 
-  it('permite gerar codigo de pareamento para o EdgeNode recem-criado', async () => {
+  /**
+   * A CADEIA INTEIRA, sem contornar nenhum endpoint -- que e o vicio que a
+   * issue #404 apontou no `edge-pairing.int-spec.ts`, onde o `EdgeNode`
+   * nascia direto via Prisma porque nao havia rota para cria-lo.
+   */
+  it('cadastra, gera codigo com validade e o pair aceita esse codigo', async () => {
     const criacao = await request(servidor())
       .post('/api/v1/edge-nodes')
       .set('Cookie', cookieDoPainel)
@@ -129,10 +174,62 @@ describe('POST /api/v1/edge-nodes', () => {
 
     const edgeNodeId = (criacao.body as { id: string }).id;
 
-    await request(servidor())
+    const geracao = await request(servidor())
       .post(`/api/v1/edge-nodes/${edgeNodeId}/pairing-codes`)
       .set('Cookie', cookieDoPainel)
       .expect(201);
+
+    // O painel MOSTRA a validade ao operador (ADR-011, TTL curto): sem
+    // `expiresAt` no corpo, a tela nao teria o que exibir.
+    expect(geracao.body).toEqual({ code: expect.any(String), expiresAt: expect.any(String) });
+    expect(new Date((geracao.body as { expiresAt: string }).expiresAt).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
+
+    await request(servidor())
+      .post('/api/v1/edge/pair')
+      .send({ code: (geracao.body as { code: string }).code })
+      .expect(201);
+  });
+
+  /**
+   * INV-006 -- `EdgeNode.gymUnitId` NAO tem FK no schema, entao o banco nao
+   * barra: sem a checagem do caso de uso, o tenant A criaria um Edge
+   * apontando para a instalacao FISICA do tenant B.
+   */
+  it('recusa gymUnitId de outro tenant com o mesmo 404 de inexistente', async () => {
+    const alheia = await request(servidor())
+      .post('/api/v1/edge-nodes')
+      .set('Cookie', cookieDoPainel)
+      .send({ gymUnitId: unidadeDeOutroTenantId, code: `EDGE-ALHEIO-${sufixo}` })
+      .expect(404);
+
+    const inexistente = await request(servidor())
+      .post('/api/v1/edge-nodes')
+      .set('Cookie', cookieDoPainel)
+      .send({ gymUnitId: randomUUID(), code: `EDGE-FANTASMA-${sufixo}` })
+      .expect(404);
+
+    // A recusa nunca distingue "nao existe" de "e de outro tenant" --
+    // distinguir confirmaria ao atacante que ele acertou o UUID.
+    expect(alheia.body).toMatchObject({ code: 'GYM_UNIT_NOT_FOUND' });
+    expect(inexistente.body).toMatchObject({ code: 'GYM_UNIT_NOT_FOUND' });
+
+    const criado = await db.edgeNode.findFirst({
+      where: { gymUnitId: unidadeDeOutroTenantId },
+    });
+
+    expect(criado).toBeNull();
+  });
+
+  it('recusa unidade inativa', async () => {
+    const resposta = await request(servidor())
+      .post('/api/v1/edge-nodes')
+      .set('Cookie', cookieDoPainel)
+      .send({ gymUnitId: unidadeInativaId, code: `EDGE-INATIVA-${sufixo}` })
+      .expect(400);
+
+    expect(resposta.body).toMatchObject({ code: 'GYM_UNIT_NOT_ACTIVE' });
   });
 
   it('recusa codigo duplicado no mesmo tenant com 409', async () => {
@@ -156,6 +253,15 @@ describe('POST /api/v1/edge-nodes', () => {
       .post('/api/v1/edge-nodes')
       .set('Cookie', cookieDoPainel)
       .send({ code: 'SEM-UNIDADE' })
+      .expect(400);
+  });
+
+  /** O tenant vem da identidade autenticada, nunca do corpo (regra no 2). */
+  it('recusa tenantId no corpo', async () => {
+    await request(servidor())
+      .post('/api/v1/edge-nodes')
+      .set('Cookie', cookieDoPainel)
+      .send({ gymUnitId, code: `EDGE-TENANT-${sufixo}`, tenantId: outroTenantId })
       .expect(400);
   });
 
