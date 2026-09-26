@@ -85,6 +85,33 @@ describe('ArmazenamentoDeCredencialWindows', () => {
     expect(script.indexOf('Add-Type')).toBeLessThan(script.indexOf('ProtectedData'));
   });
 
+  /**
+   * Issue #406, terceiro defeito da mesma cadeia -- Arena Positiva,
+   * 26/09/2026. Com o assembly ja carregado, `salvar` passou a morrer em
+   * `WriteAllBytes`: "Nao foi possivel localizar uma parte do caminho
+   * ...\ArenaHub\edge-agent\credencial.dat". A pasta nao existe numa maquina
+   * nova e ninguem a cria. E de novo o codigo de uso unico ja tinha sido
+   * queimado quando isso acontece.
+   */
+  it('cria a pasta da credencial antes de gravar', async () => {
+    const { chamadas, executar } = espiao();
+
+    await new ArmazenamentoDeCredencialWindows(CAMINHO, executar).salvar('key-1', 'segredo-1');
+
+    const script = chamadas[0] ?? '';
+
+    expect(script).toContain('New-Item');
+    /*
+     * A pasta tem de nascer ANTES da gravacao, nao depois. Compara com a
+     * CHAMADA (`[System.IO.File]::WriteAllBytes`), nao com a palavra solta:
+     * o comentario do script tambem menciona `WriteAllBytes`, e medir por
+     * ele daria falso negativo.
+     */
+    expect(script.indexOf('New-Item')).toBeLessThan(
+      script.indexOf('[System.IO.File]::WriteAllBytes'),
+    );
+  });
+
   /** O segredo nunca viaja na linha de comando -- so por variavel de ambiente. */
   it('passa o segredo por ambiente, nunca como argumento', async () => {
     const { chamadas, executar } = espiao();

@@ -56,6 +56,12 @@ export interface DepsPareamento {
   armazenamento: ArmazenamentoDeCredencial;
   /** Injetavel para teste -- em producao, POST simples a /api/v1/edge/pair. */
   trocarPorHttp: (url: string, codigo: string) => Promise<ResultadoDaTroca>;
+  /**
+   * Chamado quando a credencial foi obtida mas NAO pode ser persistida.
+   * Quem instala precisa saber que este arranque funciona e o proximo vai
+   * pedir pareamento de novo.
+   */
+  aoFalharPersistencia?: (erro: unknown) => void;
 }
 
 /**
@@ -81,7 +87,21 @@ export async function parear(
       : new PareamentoSemRedeError(deps.cloudApiUrl, resultado.detalhe);
   }
 
-  await deps.armazenamento.salvar(resultado.keyId, resultado.secret);
+  /*
+   * A TROCA JA CONSUMIU O CODIGO. Se o armazenamento falha aqui (assembly
+   * ausente, pasta inexistente, DPAPI de outra conta -- os tres casos reais
+   * da Arena Positiva, #406), relancar perderia credencial E codigo de uma
+   * vez, e a unica saida seria gerar outro no painel.
+   *
+   * A credencial esta em maos: devolve-la deixa ESTE arranque funcionar. O
+   * que se perde e a persistencia, e o proximo arranque pedira pareamento de
+   * novo -- por isso a falha nao e engolida, vai para quem instalou.
+   */
+  try {
+    await deps.armazenamento.salvar(resultado.keyId, resultado.secret);
+  } catch (erro: unknown) {
+    deps.aoFalharPersistencia?.(erro);
+  }
 
   return { keyId: resultado.keyId, secret: resultado.secret };
 }
