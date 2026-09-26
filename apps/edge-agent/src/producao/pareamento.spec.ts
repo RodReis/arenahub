@@ -94,6 +94,47 @@ describe('parear', () => {
     expect(erro.message).not.toContain('Parear');
   });
 
+  /**
+   * Issue #406 -- o padrao que apareceu tres vezes na mesma instalacao.
+   *
+   * A troca CONSOME o codigo de uso unico. Se o `salvar` falha depois disso
+   * (assembly ausente, pasta inexistente, DPAPI de outra conta), o agente
+   * perdia credencial E codigo de uma vez, e a unica saida era gerar outro
+   * no painel -- tres vezes seguidas, na Arena Positiva.
+   *
+   * A credencial JA ESTA EM MAOS neste ponto. Devolve-la deixa este arranque
+   * funcionar (o heartbeat sobe, a catraca decide); o que se perde e a
+   * persistencia, e o proximo arranque pedira novo pareamento. Melhor que
+   * perder tudo -- e o erro do armazenamento nao e engolido, sobe no log.
+   */
+  it('devolve a credencial mesmo quando o armazenamento falha ao salvar', async () => {
+    const armazenamento = new ArmazenamentoDeCredencialEmMemoria();
+
+    jest
+      .spyOn(armazenamento, 'salvar')
+      .mockRejectedValue(new Error('WriteAllBytes: caminho nao encontrado'));
+
+    const trocarPorHttp = jest.fn(() =>
+      Promise.resolve({ ok: true as const, keyId: 'key-1', secret: 'segredo-1' }),
+    );
+
+    const aoFalharPersistencia = jest.fn();
+
+    const resultado = await parear({
+      cloudApiUrl: 'https://nuvem.teste',
+      codigo: 'codigo-123',
+      armazenamento,
+      trocarPorHttp,
+      aoFalharPersistencia,
+    });
+
+    // O codigo foi gasto: a credencial nao se perde junto.
+    expect(resultado).toEqual({ keyId: 'key-1', secret: 'segredo-1' });
+    // Mas a falha nao e silenciosa -- quem instala precisa saber que o
+    // proximo arranque vai pedir pareamento de novo.
+    expect(aoFalharPersistencia).toHaveBeenCalledTimes(1);
+  });
+
   it('se ja existe credencial salva, nao troca de novo -- devolve a existente', async () => {
     const armazenamento = new ArmazenamentoDeCredencialEmMemoria();
     await armazenamento.salvar('key-existente', 'segredo-existente');

@@ -86,6 +86,19 @@ async function main(): Promise<void> {
       secretDoEnv: config.CLOUD_EDGE_SECRET,
       codigoDePareamento: config.EDGE_PAIRING_CODE,
       armazenamento,
+      /*
+       * O pareamento funcionou, mas a credencial nao ficou gravada (#406).
+       * O agente SOBE -- a catraca decide -- e o proximo arranque vai pedir
+       * pareamento de novo. Isso precisa aparecer alto para quem instala,
+       * senao vira surpresa no primeiro reinicio da recepcao.
+       */
+      aoFalharPersistencia: (erro: unknown) => {
+        logger.error(
+          { erro: erro instanceof Error ? erro.message : String(erro) },
+          'pareamento OK, mas a credencial NAO foi gravada: este arranque funciona e o ' +
+            'proximo vai exigir novo EDGE_PAIRING_CODE. Resolva antes de instalar o servico.',
+        );
+      },
     });
   } catch (erro: unknown) {
     /*

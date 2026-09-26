@@ -29,6 +29,8 @@ export async function resolverCredencial(deps: {
   secretDoEnv: string | undefined;
   codigoDePareamento: string | undefined;
   armazenamento: ArmazenamentoDeCredencial;
+  /** Repassado a `parear` -- ver o porque la (#406). */
+  aoFalharPersistencia?: (erro: unknown) => void;
 }): Promise<CredencialResolvida | null> {
   if (deps.keyIdDoEnv && deps.secretDoEnv) {
     return { keyId: deps.keyIdDoEnv, secret: deps.secretDoEnv };
@@ -44,5 +46,6 @@ export async function resolverCredencial(deps: {
     codigo: deps.codigoDePareamento,
     armazenamento: deps.armazenamento,
     trocarPorHttp: trocarCodigoPorCredencial,
+    ...(deps.aoFalharPersistencia ? { aoFalharPersistencia: deps.aoFalharPersistencia } : {}),
   });
 }

@@ -126,6 +126,12 @@ export class ArmazenamentoDeCredencialWindows implements ArmazenamentoDeCredenci
       $protegido = [System.Security.Cryptography.ProtectedData]::Protect(
         $bytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser
       )
+      # A pasta nao existe numa maquina nova, e WriteAllBytes nao a cria --
+      # ele falha com "nao foi possivel localizar uma parte do caminho",
+      # DEPOIS de a nuvem ja ter queimado o codigo de uso unico (#406).
+      # -Force aqui e idempotente: nao apaga pasta existente nem o conteudo.
+      $pasta = Split-Path -Parent $env:AH_CAMINHO
+      New-Item -ItemType Directory -Force -Path $pasta | Out-Null
       [System.IO.File]::WriteAllBytes($env:AH_CAMINHO, $protegido)
       `,
       { AH_TEXTO_CLARO: texto, AH_CAMINHO: this.caminhoDoArquivo },
