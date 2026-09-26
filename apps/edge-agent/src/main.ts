@@ -1,16 +1,29 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { config as carregarEnv } from 'dotenv';
 
+import { absoluto, raizDoPacote } from './producao/caminhos.js';
+
+/**
+ * Raiz do pacote (`apps/edge-agent`), derivada da LOCALIZACAO DESTE ARQUIVO
+ * e nao de `process.cwd()`.
+ *
+ * Como servico Windows o diretorio de trabalho e `C:\Windows\System32`: um
+ * caminho relativo a `cwd` procuraria o `.env` em `C:\Windows\.env` e
+ * tentaria criar o SQLite em `C:\Windows\System32\data\` (#406). Este
+ * arquivo compilado vive em `<pacote>/dist/main.js`, entao a raiz do pacote
+ * e um nivel acima.
+ */
+const RAIZ_DO_PACOTE = raizDoPacote(import.meta.url);
+
 // O `.env` vive na raiz do monorepo -- mesma fonte que o docker-compose e a
-// API. Em producao o agente roda como servico no Windows, com as variaveis
-// vindo do ambiente; `dotenv` ignora a ausencia do arquivo em silencio, que
-// e o comportamento certo aqui.
+// API. `dotenv` ignora a ausencia do arquivo em silencio, o que e o
+// comportamento certo: como servico, as variaveis podem vir do ambiente.
 //
 // ORDEM IMPORTA: antes de qualquer import que leia `process.env`. Sem esta
 // linha o agente subia lendo so o ambiente do shell e morria no arranque
 // reclamando de EDGE_AGENT_ID -- com o valor sentado no `.env` ao lado.
-carregarEnv({ path: join(process.cwd(), '../../.env') });
+carregarEnv({ path: join(RAIZ_DO_PACOTE, '../../.env') });
 
 const { carregarConfig, descreverConfig, ConfigInvalidaError } = await import('./config/env.js');
 const { criarLogger, loggerDaTentativa } = await import('./observability/logger.js');
@@ -30,10 +43,27 @@ const { iniciarLacoDeHeartbeat } = await import('./producao/laco-de-heartbeat.js
 const INTERVALO_HEARTBEAT_MS = 30_000;
 const VERSAO_DO_AGENTE = process.env['npm_package_version'] ?? '0.0.0';
 
+/** Raiz do monorepo -- dois niveis acima de `apps/edge-agent`. */
+const RAIZ_DO_MONOREPO = resolve(RAIZ_DO_PACOTE, '../..');
+
 async function main(): Promise<void> {
   let config;
   try {
-    config = carregarConfig();
+    const bruta = carregarConfig();
+
+    /*
+     * Caminho relativo passa a valer a partir da RAIZ DO PACOTE, nao de
+     * `process.cwd()`. Como servico Windows o `cwd` e `C:\Windows\System32`,
+     * e o default `data/edge-agent.sqlite` tentaria criar
+     * `C:\Windows\System32\data\` -- sem permissao, e o servico entraria em
+     * loop de restart a cada 5 s (#406). Caminho absoluto no `.env` continua
+     * respeitado como veio.
+     */
+    config = {
+      ...bruta,
+      SQLITE_PATH: absoluto(bruta.SQLITE_PATH, RAIZ_DO_PACOTE),
+      INVENTORY_PATH: absoluto(bruta.INVENTORY_PATH, RAIZ_DO_MONOREPO),
+    };
   } catch (erro: unknown) {
     if (erro instanceof ConfigInvalidaError) {
       // Sem logger ainda: a config e o que o configura. Falhar em stderr com
