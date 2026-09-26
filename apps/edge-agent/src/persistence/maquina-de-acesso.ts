@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 /**
@@ -134,6 +136,15 @@ export class MaquinaDeAcesso {
   private fechada = false;
 
   constructor(caminho: string) {
+    /*
+     * `SQLITE_PATH` tem default relativo (`data/edge-agent.sqlite`) e a
+     * pasta nao existe numa instalacao nova -- `DatabaseSync` nao a cria e
+     * morre com "unable to open database file", sem dizer qual arquivo nem
+     * por que (#406, Arena Positiva). `recursive: true` e idempotente: nao
+     * reclama se a pasta ja existe nem toca no conteudo.
+     */
+    mkdirSync(dirname(caminho), { recursive: true });
+
     this.db = new DatabaseSync(caminho);
 
     // WAL com `synchronous = FULL`: o padrao `NORMAL` devolve "gravei" antes
