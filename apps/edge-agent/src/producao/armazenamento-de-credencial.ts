@@ -29,6 +29,21 @@ export class CredencialIlegivelError extends Error {
 }
 
 /**
+ * `ProtectedData` mora em `System.Security.dll`, que NAO vem carregado numa
+ * sessao `powershell.exe -NoProfile` (issue #406, achado na instalacao real
+ * da Arena Positiva). Sem esta linha, os scripts morrem com "Nao e possivel
+ * localizar o tipo [System.Security.Cryptography.ProtectedData]" -- e, no
+ * caminho do `salvar`, isso acontece DEPOIS de a nuvem ja ter queimado o
+ * codigo de pareamento de uso unico.
+ *
+ * `System.Security` e o nome do assembly no .NET Framework (PowerShell 5.1
+ * Desktop, que e o que roda no PC da recepcao).
+ * `System.Security.Cryptography.ProtectedData` -- o nome no .NET Core -- NAO
+ * existe la e faz o `Add-Type` falhar com `ASSEMBLY_NOT_FOUND`.
+ */
+const CARREGAR_SYSTEM_SECURITY = 'Add-Type -AssemblyName System.Security';
+
+/**
  * Abstrai onde a credencial de pareamento vive -- DPAPI/Credential Manager
  * no Windows (ADR-011), NUNCA arquivo texto. `M0-NFR-005`.
  */
@@ -86,7 +101,16 @@ export interface ArmazenamentoDeCredencial {
  * ja restrito -- este codigo nao aplica ACL propria.
  */
 export class ArmazenamentoDeCredencialWindows implements ArmazenamentoDeCredencial {
-  constructor(private readonly caminhoDoArquivo: string) {}
+  /**
+   * `executar` e injetavel SO para teste: sem isso, verificar o script que
+   * vai ao PowerShell exigiria rodar o PowerShell -- e o defeito da #406
+   * (assembly nao carregado) so aparece numa maquina Windows real, que o CI
+   * nao tem. O default e o `execFile` de producao.
+   */
+  constructor(
+    private readonly caminhoDoArquivo: string,
+    private readonly executar: typeof executarArquivo = executarArquivo,
+  ) {}
 
   async salvar(keyId: string, secret: string): Promise<void> {
     const texto = JSON.stringify({ keyId, secret });
@@ -94,6 +118,7 @@ export class ArmazenamentoDeCredencialWindows implements ArmazenamentoDeCredenci
     await this.executarPowerShell(
       `
       $ErrorActionPreference = 'Stop'
+      ${CARREGAR_SYSTEM_SECURITY}
       $bytes = [System.Text.Encoding]::UTF8.GetBytes($env:AH_TEXTO_CLARO)
       # CurrentUser: so a MESMA conta Windows que rodou este 'salvar' consegue
       # descriptografar depois (ver comentario de classe -- risco de escopo
@@ -114,6 +139,7 @@ export class ArmazenamentoDeCredencialWindows implements ArmazenamentoDeCredenci
       ({ stdout } = await this.executarPowerShell(
         `
         $ErrorActionPreference = 'Stop'
+        ${CARREGAR_SYSTEM_SECURITY}
         if (-not (Test-Path $env:AH_CAMINHO)) { exit 0 }
         $protegido = [System.IO.File]::ReadAllBytes($env:AH_CAMINHO)
         # CurrentUser: falha com erro DPAPI criptico se a conta que roda este
@@ -151,7 +177,7 @@ export class ArmazenamentoDeCredencialWindows implements ArmazenamentoDeCredenci
     script: string,
     variaveis: Record<string, string>,
   ): Promise<{ stdout: string }> {
-    const resultado = await executarArquivo(
+    const resultado = await this.executar(
       'powershell.exe',
       ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
       { env: { ...process.env, ...variaveis } },
