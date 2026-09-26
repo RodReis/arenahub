@@ -4,6 +4,7 @@ import {
   AcoesDaLinha,
   Ausente,
   AusenteDeAcao,
+  Button,
   DataTable,
   EmptyState,
   EstadoSimples,
@@ -13,6 +14,7 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
+import { PareaEdge } from './parear-edge';
 import { ReconhecerAlerta } from './reconhecer-alerta';
 import {
   ROTULO_DE_ESTADO_DE_ALERTA,
@@ -44,6 +46,11 @@ interface Alerta {
   recommendedAction: string;
   firstSeenAt: string;
   lastSeenAt: string;
+}
+
+interface Unidade {
+  id: string;
+  timezone: string;
 }
 
 interface Panorama {
@@ -91,9 +98,16 @@ interface Panorama {
  * idade e ação.
  */
 export default async function PaginaDeOperacao() {
-  const [panorama, alertas] = await Promise.all([
+  const [panorama, alertas, unidades] = await Promise.all([
     chamarApi<Panorama>('/api/v1/operations/overview'),
     chamarApi<Alerta[]>('/api/v1/operations/alerts?open=true&limit=50'),
+    /*
+     * O overview devolve `gymUnitId`, não o fuso da unidade -- e a validade
+     * do código de pareamento tem de sair no fuso DELA, nunca no do
+     * navegador (DS §11, regra 5). Em paralelo com as outras duas: a tela
+     * não espera uma para pedir a próxima.
+     */
+    chamarApi<Unidade[]>('/api/v1/units'),
   ]);
 
   if (!panorama.ok) {
@@ -119,6 +133,15 @@ export default async function PaginaDeOperacao() {
   const dados = panorama.dados!;
   const listaDeAlertas = alertas.dados ?? [];
 
+  /*
+   * Fuso POR UNIDADE. Sem fallback global: o Edge sempre tem unidade, e um
+   * fuso chutado na validade de um código de pareamento faria o operador
+   * achar que tem mais (ou menos) tempo do que tem.
+   */
+  const fusoPorUnidade = new Map(
+    (unidades.dados ?? []).map((unidade) => [unidade.id, unidade.timezone]),
+  );
+
   const criticos = listaDeAlertas.filter((a) => a.severity === 'CRITICAL');
   const demais = listaDeAlertas.filter((a) => a.severity !== 'CRITICAL');
 
@@ -136,7 +159,21 @@ export default async function PaginaDeOperacao() {
 
   return (
     <section aria-labelledby="titulo-operacao">
-      <PageHeader id="titulo-operacao" title="Operação" />
+      <PageHeader
+        id="titulo-operacao"
+        title="Operação"
+        actions={
+          /*
+            `POST /edge-nodes/:id/pairing-codes` existia desde a F59 e exigia
+            um Edge ja cadastrado -- mas nao havia como cadastra-lo, nem por
+            API nem por tela. A instalacao real na Arena Positiva travou aqui
+            (issue #404).
+          */
+          <Button href="/operations/edge-nodes/novo" data-testid="novo-edge-node">
+            Novo Edge
+          </Button>
+        }
+      />
 
       {/*
         Resumo em uma frase, antes de qualquer tabela. Quem passa pela tela
@@ -292,12 +329,39 @@ export default async function PaginaDeOperacao() {
                 `${e.derivaMs > 0 ? '+' : ''}${Math.round(e.derivaMs / 1000)}s`
               ),
           },
+          {
+            key: 'acao',
+            header: 'Ação',
+            role: 'actions',
+            /*
+             * PAREAMENTO NÃO É EVENTO ÚNICO: o código tem TTL curto, morre no
+             * primeiro uso, e o ADR-011 prevê revogação pelo painel. Sem esta
+             * ação, um Edge revogado ou com código expirado só voltaria a
+             * funcionar cadastrando OUTRO -- duplicando o registro e perdendo
+             * o histórico de heartbeat (issue #404).
+             *
+             * Sem fuso da unidade não há ação: exibir validade no fuso errado
+             * é pior que não oferecer o botão, porque o operador agiria sobre
+             * um prazo que não é o dele.
+             */
+            render: (e) => {
+              const fuso = fusoPorUnidade.get(e.gymUnitId);
+
+              return fuso === undefined ? (
+                <AusenteDeAcao />
+              ) : (
+                <AcoesDaLinha>
+                  <PareaEdge edgeNodeId={e.id} timeZone={fuso} />
+                </AcoesDaLinha>
+              );
+            },
+          },
         ]}
         empty={
           <EmptyState
             testId="sem-edge"
             title="Nenhum Edge cadastrado."
-            hint="Sem Edge, a catraca não decide nada."
+            hint='Sem Edge, a catraca não decide nada. Use "Novo Edge" para cadastrar o agente da recepção e gerar o código de pareamento.'
           />
         }
       />

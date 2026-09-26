@@ -22,7 +22,8 @@ domínio, ver `docs/CONVENTION.md`. Para o estado corrente do roadmap, ver `docs
                         ┌──────────────────────────┐
                         │  @arenahub/api            │  (NestJS)
                         │  arenahubapi.railway.internal
-                        │  SEM domínio público       │
+                        │  arenahubapi-production      │
+                        │  .up.railway.app (público)   │
                         └───────┬──────────┬─────────┘
                                 │          │
                     ┌───────────┘          └───────────┐
@@ -75,19 +76,24 @@ antes do push` + `ci.yml`), não um ambiente intermediário.
 | Pre-Deploy | `pnpm --filter @arenahub/database migrate:deploy` — **roda migration automaticamente a cada deploy, antes do start** |
 | Start command | `pnpm --filter @arenahub/api start` |
 | Healthcheck | `GET /health/ready`, timeout 30s |
-| Domínio público | **Nenhum.** Endpoint privado: `arenahubapi.railway.internal` |
-| Rede | Só acessível de dentro da rede privada Railway (outro serviço do mesmo projeto) ou via TCP proxy manual (não configurado para a API) |
+| Domínio público | `arenahubapi-production.up.railway.app` — **existe e responde** (`GET /health/ready` → `200`, verificado em 26/09/2026). Endpoint privado: `arenahubapi.railway.internal:3344` |
+| Rede | Pública na internet **e** alcançável pela rede privada Railway. O `admin-web` usa a privada (`API_INTERNAL_URL`); o totem e o Edge, que rodam fora do Railway, usam a pública |
 | Réplicas | 1, região `us-west2` |
 
-**Por que a API não tem domínio público**: nada no admin-web nem no kiosk precisa alcançá-la de
-fora da rede Railway — o `admin-web` é o único consumidor, e fala com ela por rede interna
-(`API_INTERNAL_URL`). Isso reduz superfície de ataque: a API nunca recebe tráfego da internet
-pública diretamente.
+**Por que a API tem domínio público** (corrigido em 26/09/2026): a versão anterior deste documento
+afirmava que a API não tinha domínio público e que só o `admin-web` a consumia. Isso estava errado
+por omissão — o **totem** (`apps/kiosk`) e o **edge-agent** rodam no PC da academia, **fora** do
+Railway (ADR-051), e `arenahubapi.railway.internal` não resolve de lá. A superfície pública é o
+que torna a topologia do ADR-051 possível; sem ela, nem totem nem Edge alcançam a nuvem.
 
-**Consequência prática**: não dá para bater na API de produção com `curl`/Postman de fora do
-Railway. Verificação de comportamento em produção passa por (a) ler os logs via MCP do Railway,
-(b) consultar o Postgres direto via TCP proxy (§4), ou (c) passar pela sessão autenticada do
-`admin-web`.
+A redução de superfície continua valendo onde é de graça: o `admin-web`, que roda dentro do
+Railway, segue falando pela rede privada (`API_INTERNAL_URL`), e não pela internet.
+
+**Consequência prática**: dá para verificar a API de produção com `curl` de fora
+(`GET https://arenahubapi-production.up.railway.app/health/ready` → `200`). Continuam valendo os
+outros caminhos: (a) ler os logs via MCP do Railway, (b) consultar o Postgres via TCP proxy (§4),
+(c) passar pela sessão autenticada do `admin-web` — este último é o único que prova o que a tela
+mostra.
 
 **Variáveis de ambiente** (nomes; valores nunca entram neste documento):
 `ANTHROPIC_API_KEY`, `CONTRATADA_CNPJ`, `CONTRATADA_EMAIL`, `CONTRATADA_ENDERECO`,
@@ -223,12 +229,13 @@ observabilidade externa configurada (sem Sentry/Datadog neste projeto ainda):
   quando um deploy falha — só existe depois que o deploy falhou, não substitui olhar o log.
 - **Métricas de serviço** (`get-service-metrics`): CPU/memória/rede por serviço.
 
-**Limite real, batido nesta sessão**: como a API não tem domínio público, não é possível bater
-numa rota dela com `curl` de fora do Railway para confirmar comportamento ao vivo. Verificação
-pós-deploy de uma correção passa por: (1) confirmar o deploy correto está `SUCCESS` e o boot log
-está limpo; (2) reproduzir a lógica de negócio contra o dado real do Postgres via TCP proxy; (3)
-pedir para alguém com sessão autenticada no `admin-web` confirmar visualmente — não há atalho que
-dispense o passo 3 quando o que se quer provar é o que a tela mostra.
+**O limite que sobra** (revisto em 26/09/2026 — a versão anterior dizia que não havia como bater
+na API de fora, o que era consequência da afirmação errada sobre o domínio público): rota pública
+sem sessão dá para conferir com `curl`, e é assim que se prova que a API está de pé. O que `curl`
+**não** prova é o que a tela mostra: para isso, verificação pós-deploy continua sendo (1)
+confirmar o deploy `SUCCESS` e o boot log limpo; (2) reproduzir a regra contra o dado real do
+Postgres via TCP proxy; (3) pedir a alguém com sessão autenticada no `admin-web` que confirme
+visualmente. Não há atalho que dispense o passo 3.
 
 ## 7. O que este documento não cobre (fora do escopo)
 
@@ -243,8 +250,15 @@ dispense o passo 3 quando o que se quer provar é o que a tela mostra.
 
 ## 8. Fonte da verdade
 
-Este documento reflete o estado levantado em **24/09/2026** via consulta direta ao Railway (MCP).
-Configuração de serviço, variáveis e domínios podem mudar sem que este arquivo seja atualizado no
-mesmo commit — em caso de dúvida, o Railway (dashboard ou MCP) é sempre a fonte de verdade sobre
-o estado *atual*; este documento é a fonte de verdade sobre *como as coisas foram desenhadas para
-funcionar* e o histórico de decisões operacionais (como a nota da §3.3).
+Levantado em **24/09/2026** via consulta direta ao Railway (MCP), com a §3.1 e a §6 **corrigidas
+em 26/09/2026**: o serviço `api` tem domínio público (`arenahubapi-production.up.railway.app`,
+`GET /health/ready` → `200`), e o documento afirmava o contrário. O erro foi descoberto ao
+preparar a instalação do edge-agent na Arena Positiva, quando a afirmação virou um bloqueio
+aparente — o Edge precisa alcançar a API de fora do Railway, e o documento dizia que isso não
+existia.
+
+**A lição, que vale mais que a correção**: este arquivo envelhece em silêncio. Configuração de
+serviço, variáveis e domínios mudam sem que ele seja atualizado no mesmo commit. Em caso de
+dúvida, o Railway (dashboard ou MCP) é sempre a fonte de verdade sobre o estado *atual*, e
+**checar custa um `curl`**; este documento é a fonte de verdade sobre *como as coisas foram
+desenhadas para funcionar* e o histórico de decisões operacionais (como a nota da §3.3).

@@ -13,7 +13,10 @@
 ## 1. Antes de ir
 
 - [ ] Unidade cadastrada no painel, com **timezone correto** (ele decide a janela de horário)
-- [ ] Código de pareamento gerado no painel (uso único, TTL curto — ADR-011)
+- [ ] **Edge cadastrado no painel**: Operação → **Novo Edge** → unidade + código (ex.: `RECEPCAO-01`)
+- [ ] Código de pareamento gerado (uso único, TTL curto — ADR-011). Sai na mesma tela, logo depois
+  do cadastro, e também pela ação **Parear** na tabela de Edge do `/operations` — é por ali que se
+  gera outro quando o anterior expira ou é revogado
 - [ ] Modelo do leitor e da catraca confirmados na lista de hardware homologado
 - [ ] Alguém da academia disponível para testar a passagem
 
@@ -51,16 +54,25 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
 > tiver mais de uma conta, **não alterne entre elas**.
 
 1. Logado com a conta Windows que vai rodar o serviço, rode `pnpm build`
-2. Defina `EDGE_PAIRING_CODE=<código gerado no painel>` no `.env` da **raiz do monorepo** (dois
-   níveis acima de `apps/edge-agent` — é de lá que `main.ts` resolve o arquivo, pela mesma
-   convenção usada pelo docker-compose e pela API) **antes** de rodar o agente. Não há prompt
-   interativo: o agente lê a variável de ambiente/`.env` no arranque. Rode o agente uma vez
-   (`pnpm start` ou `pnpm dev`) — ele troca o código por um segredo próprio, guardado cifrado por
-   **DPAPI** (`%LOCALAPPDATA%\ArenaHub\edge-agent\credencial.dat`), nunca em texto puro. Se
-   `EDGE_PAIRING_CODE` não estiver definido e não houver credencial salva, o agente falha com
-   `CredencialAusenteError` e sai (exit 1) — nesse caso, confira o `.env`
-3. O código morre no primeiro uso; se precisar reparear, defina um novo `EDGE_PAIRING_CODE` no
-   `.env` (gerado no painel) e rode o agente de novo
+2. Preencha o `.env` da **raiz do monorepo** (dois níveis acima de `apps/edge-agent` — é de lá que
+   `main.ts` resolve o arquivo, pela mesma convenção usada pelo docker-compose e pela API)
+   **antes** de rodar o agente. Não há prompt interativo: o agente lê a variável de
+   ambiente/`.env` no arranque.
+
+   | variável | valor |
+   |---|---|
+   | `EDGE_AGENT_ID` | o mesmo código que você deu ao Edge no painel (ex.: `RECEPCAO-01`) |
+   | `TENANT_ID` / `GYM_UNIT_ID` | UUIDs do tenant e da unidade — o agente **valida e encerra** se faltarem |
+   | `CLOUD_API_URL` | URL **pública** da API. `arenahubapi.railway.internal` **não resolve** do PC da academia (§1 do `docs/DEPLOY.md`) |
+   | `EDGE_PAIRING_CODE` | o código gerado no painel, uso único |
+   | `FACIAL_MODE` / `CATRACA_MODE` | `real` na academia; `simulador` é o padrão e não gira nada |
+
+   Rode o agente uma vez (`pnpm start`) — ele troca o código por um segredo próprio, guardado
+   cifrado por **DPAPI** (`%LOCALAPPDATA%\ArenaHub\edge-agent\credencial.dat`), nunca em texto
+   puro. Se `EDGE_PAIRING_CODE` não estiver definido e não houver credencial salva, o agente falha
+   com `CredencialAusenteError` e sai (exit 1) — nesse caso, confira o `.env`
+3. O código morre no primeiro uso. Para reparear: painel → **Operação** → ação **Parear** na linha
+   do Edge → novo código no `.env` → rode o agente de novo
 4. Abra PowerShell **como Administrador**, na mesma conta, e rode:
    ```powershell
    pnpm service:install
@@ -133,9 +145,32 @@ Edge sempre inicia a conexão.
 
 | item | estado |
 |---|---|
-| Execução por pessoa diferente do autor (exigência da Task 6) | ⬜ **pendente** |
+| Execução por pessoa diferente do autor (exigência da Task 6) | 🚧 **iniciada em 26/09/2026**, pelo PI, na Arena Positiva — parou no passo 1 (ver abaixo) |
 | Tempo real do procedimento | ⬜ não medido |
 | Comportamento com rede instável durante o pareamento | ⬜ não testado |
+
+### O que a primeira execução real revelou (26/09/2026)
+
+**O passo 1 era impossível de cumprir.** "Código de pareamento gerado no painel" pressupunha um
+`EdgeNode` cadastrado, e **não havia como cadastrá-lo**: nem endpoint, nem tela. O
+`POST /api/v1/edge-nodes/:id/pairing-codes` existia desde a F59 e exigia o id de um registro que
+nenhum caminho do produto criava. O teste de integração da F59 criava o `EdgeNode` direto via
+Prisma no `beforeAll`, então os critérios automatizados passavam sobre um caminho que nenhum
+operador consegue percorrer — que é exatamente o tipo de buraco que "AC-6–9 só fecham na academia"
+existia para pegar.
+
+Corrigido na [issue #404](https://github.com/RodReis/arenahub/issues/404): a tela **Operação →
+Novo Edge** cadastra e gera o código na mesma etapa, e a ação **Parear** na tabela de Edge gera
+outro quando o anterior expira ou é revogado (o ADR-011 §4 prevê revogação pelo painel, e sem essa
+ação um Edge revogado só voltaria a funcionar cadastrando um segundo registro).
+
+**Também corrigido junto:** `docs/DEPLOY.md` afirmava que a API não tinha domínio público. Tem
+(`arenahubapi-production.up.railway.app`). A afirmação errada virou bloqueio aparente na hora de
+apontar `CLOUD_API_URL` do Edge para a nuvem — `railway.internal` não resolve do PC da academia.
+
+**Lição para quem executar o resto:** o runbook ainda tem passos que nunca ninguém percorreu. Ao
+bater num que não fecha, **o passo está errado até prova em contrário** — não é você que não
+entendeu.
 
 **Instalação real do serviço (F59, Task 13):** os scripts `install-service.ps1` /
 `uninstall-service.ps1` existem e foram revisados manualmente (`.superpowers/sdd/2026-09-16-f59-composicao-edge-agent/task-13-report.md`),

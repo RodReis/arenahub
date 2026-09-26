@@ -98,3 +98,15 @@ export class EdgeNodeNaoEncontradoError extends ErroDeDominio {
     super('EDGE_NODE_NOT_FOUND', 404, 'Dispositivo de borda nao encontrado');
   }
 }
+
+/**
+ * `code` de EdgeNode ja usado no mesmo tenant (issue #404).
+ *
+ * `@@unique([tenantId, code])` no schema e quem garante; este erro traduz o
+ * `P2002` para o 409 de dominio, mesmo padrao de `goal.repository.ts`.
+ */
+export class EdgeNodeCodigoDuplicadoError extends ErroDeDominio {
+  constructor() {
+    super('EDGE_NODE_CODE_TAKEN', 409, 'Ja existe um Edge com este codigo nesta conta');
+  }
+}
