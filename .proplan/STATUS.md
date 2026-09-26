@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -36,6 +36,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][SPEC-059][FIX] Falha de pareamento do Edge mente sobre a causa — código expirado vira "defina EDGE_PAIRING_CODE" (#406, finalizado em: 2026-09-26)
+- [MVP1][SPEC-059][FIX] Não existe endpoint nem tela para criar EdgeNode — pareamento do Edge é inatingível em produção (#404, finalizado em: 2026-09-26)
 - [MVP3][SPEC-021][FIX] validarSaida recusa diferenca calculada e 'treino de N%' como prescricao (#401, finalizado em: 2026-09-25)
 - [MVP1][INFRA] Decisão: desenho de `Class` para aulas inclusas (agenda, professor, capacidade, reserva, no-show) (#369, finalizado em: 2026-09-25)
 - [MVP1][INFRA] Decisão: seis das onze regras de plano da §34 não têm campo (limite semanal, aulas, convidados, pausa, fidelidade, multa) (#339, finalizado em: 2026-09-25)
