@@ -16,6 +16,9 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://arenahubapi-production.up.railway.app"
       },
+      "android": {
+        "buildType": "apk"
+      },
       "ios": {
         "resourceClass": "m-medium"
       }
