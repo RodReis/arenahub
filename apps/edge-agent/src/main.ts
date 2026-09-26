@@ -159,6 +159,8 @@ async function main(): Promise<void> {
   // Corrigir de verdade exige threading do serial real dos adapters Topdata
   // ate aqui (Task futura, fora do escopo desta correcao pontual) ou uma
   // decisao do PI sobre como popular `Device.serial` a partir do Edge.
+  let primeiroHeartbeat = true;
+
   const pararHeartbeat = iniciarLacoDeHeartbeat({
     cliente: clienteNuvem,
     intervaloMs: INTERVALO_HEARTBEAT_MS,
@@ -170,6 +172,26 @@ async function main(): Promise<void> {
     }),
     aoFalhar: (erro) => {
       loggerDaTentativa(logger).warn({ erro }, 'heartbeat nao chegou na nuvem');
+    },
+    /*
+     * Sucesso tambem vira log (#406). Sem isto so a FALHA aparecia, e um
+     * agente mudo era indistinguivel de um agente morto -- que foi
+     * exatamente o que aconteceu em campo: "edge-agent pronto", silencio, e
+     * o painel dizendo "Sem resposta / nunca".
+     *
+     * O PRIMEIRO em `info`, os seguintes em `debug`: quem instala precisa
+     * de uma linha dizendo "chegou na nuvem" sem mexer em LOG_LEVEL, mas
+     * uma linha a cada 30 s para sempre encheria o log da recepcao.
+     */
+    aoEnviar: () => {
+      if (primeiroHeartbeat) {
+        primeiroHeartbeat = false;
+        logger.info('primeiro heartbeat aceito pela nuvem -- o Edge aparece no painel');
+
+        return;
+      }
+
+      logger.debug('heartbeat aceito pela nuvem');
     },
   });
 
