@@ -12,6 +12,8 @@
     "ios": "expo start --ios",
     "//build": "O app nao tem build de servidor como as superficies Next: `expo export` gera o bundle. Existe para que `pnpm build` na raiz nao pule esta workspace em silencio. | `--platform ios --platform android`, NUNCA `all`: `all` inclui WEB, que exigiria `react-native-web` para exportar uma superficie que o produto nao tem -- o canal web do ArenaHub e o `admin-web`, em Next. Instalar a dependencia para satisfazer o build seria carregar um alvo que ninguem publica.",
     "build": "expo export --platform ios --platform android --output-dir dist",
+    "//eas-build-post-install": "Hook de lifecycle do EAS Build (docs.expo.dev/build-reference/npm-hooks): roda apos `pnpm install`, antes do bundle Metro. O EAS clona o repo do zero e nao builda os `packages/*` do workspace sozinho -- sem isto, `dist/` dos pacotes fica vazio e o Metro nao resolve os subpaths de `exports` (ex.: `@arenahub/ui/app-tokens`, usado em `src/ui/theme.tsx`). `@arenahub/ui...` (reticencias DEPOIS do nome) inclui as DEPENDENCIAS workspace do `ui` (ex. `@arenahub/access-policy`, de que `src/domain/state-labels.ts` importa) e builda todas na ordem certa. Reticencias ANTES do nome faz o oposto -- pega quem DEPENDE do pacote -- e arrastou `kiosk`/`admin-web` para o hook, quebrando o build por dependencia deles (`@arenahub/api-contracts`) que nao vem ao caso aqui.",
+    "eas-build-post-install": "pnpm --filter @arenahub/ui... build",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "jest"
@@ -24,6 +26,7 @@
     "expo": "57.0.22",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "57.0.7",
+    "expo-dev-client": "~57.0.19",
     "expo-font": "57.0.4",
     "expo-linear-gradient": "57.0.2",
     "expo-linking": "~57.0.10",

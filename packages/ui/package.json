@@ -39,7 +39,8 @@
   ],
   "scripts": {
     "build:tokens": "node scripts/build-tokens.mjs",
-    "build": "node scripts/build-tokens.mjs && tsc -p tsconfig.build.json && node scripts/copy-css.mjs",
+    "//build": "`incremental: true` vem do tsconfig base e grava `tsconfig.build.tsbuildinfo`. Um `.tsbuildinfo` de sessao anterior faz o `tsc` concluir 'nada mudou' e sair 0 SEM EMITIR nada -- inclusive quando o `dist` foi apagado por fora (rebuild limpo, EAS clonando do zero). `--force` so existe no modo `--build` (project references), que este pacote nao usa; a saida e apagar o `.tsbuildinfo` antes de cada build.",
+    "build": "node scripts/build-tokens.mjs && node -e \"require('fs').rmSync('tsconfig.build.tsbuildinfo',{force:true})\" && tsc -p tsconfig.build.json && node scripts/copy-css.mjs",
     "//lint": "Escopo em `src` porque `scripts/build-tokens.mjs` e JavaScript de build que roda em Node, fora do programa TypeScript do pacote -- o parser type-aware exigiria inclui-lo no tsconfig, e incluir arrastaria o pipeline para o typecheck do que ele mesmo gera. Mesmo tratamento dos `scripts/*.mjs` da raiz, que tambem nao sao lintados.",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",

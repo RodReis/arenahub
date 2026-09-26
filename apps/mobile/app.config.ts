@@ -39,6 +39,11 @@ const config: ExpoConfig = {
     package: 'br.com.arenahub.app',
   },
   plugins: ['expo-router', 'expo-font'],
+  extra: {
+    eas: {
+      projectId: '5ea4b0e1-41f5-4882-a113-17627a65050a',
+    },
+  },
 };
 
 export default config;

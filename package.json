@@ -41,10 +41,11 @@
   "devDependencies": {
     "turbo": "2.10.10"
   },
-  "//pnpm": "Overrides do SDK 57 do Expo (F43). Os dois pacotes abaixo NAO sao dependencia declarada de ninguem aqui: chegam por faixa aberta de dependencia transitiva, e o resolvedor pega a mais nova publicada -- que e mais nova do que o SDK foi testado para rodar. O Expo publica a versao certa de cada um no proprio `bundledNativeModules.json`, e e de la que estes numeros saem. Sem os overrides o `pnpm install` avisa em peer desencontrado e segue; o preco vem depois, no build nativo ou em runtime no aparelho, longe da causa.",
+  "//pnpm": "Overrides do SDK 57 do Expo (F43, ampliado apos falha de build EAS em producao). Nenhum dos pacotes abaixo e dependencia declarada de ninguem aqui: chegam por faixa aberta de dependencia transitiva, e o resolvedor pega a mais nova publicada -- que e mais nova do que o SDK foi testado para rodar. O Expo publica a versao certa de cada um no proprio `bundledNativeModules.json` (`expo/bundledNativeModules.json`: worklets 0.10.1, reanimated 4.5.1), e e de la que estes numeros saem. Sem os overrides o `pnpm install` avisa em peer desencontrado e segue; o preco vem depois, no build nativo ou em runtime no aparelho, longe da causa. `react-native-reanimated` faltava aqui: so `worklets` estava travado, e sem o par o resolvedor subiu reanimated para 4.6.0 sozinho -- que exige worklets >=0.12, incompativel com o 0.10.1 travado. Gradle falhou com 'assertWorkletsVersionTask' na EAS antes deste par entrar.",
   "pnpm": {
     "overrides": {
       "react-native-worklets": "0.10.1",
+      "react-native-reanimated": "4.5.1",
       "@react-native/metro-config": "0.86.3"
     }
   }
