@@ -61,6 +61,9 @@ async function main(): Promise<void> {
   const { resolverCredencial, CredencialAusenteError } = await import(
     './producao/resolver-credencial.js'
   );
+  const { PareamentoRecusadoError, PareamentoSemRedeError } = await import(
+    './producao/pareamento.js'
+  );
 
   // %LOCALAPPDATA% ja e restrito ao perfil da conta Windows atual (nao
   // world-readable) -- resolve a SUPOSICAO de ACL documentada em
@@ -85,7 +88,18 @@ async function main(): Promise<void> {
       armazenamento,
     });
   } catch (erro: unknown) {
-    if (erro instanceof CredencialIlegivelError) {
+    /*
+     * Erro de instalacao NUNCA sobe como stack crua: o servico reinicia a
+     * cada 5s (`sc.exe failure`), e stack repetida esconde a linha que diz o
+     * que fazer. `PareamentoRecusadoError` e `PareamentoSemRedeError` entram
+     * aqui pela issue #406 -- antes, a recusa da nuvem virava "defina
+     * EDGE_PAIRING_CODE" para uma variavel que estava definida.
+     */
+    if (
+      erro instanceof CredencialIlegivelError ||
+      erro instanceof PareamentoRecusadoError ||
+      erro instanceof PareamentoSemRedeError
+    ) {
       // So a mensagem, nunca a `cause` (stack do PowerShell embutido) -- e
       // isso que impede o loop de restart do sc.exe de logar o mesmo bloco
       // criptico a cada 5s (F59, achado de revisao 3).
