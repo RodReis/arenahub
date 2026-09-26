@@ -4,6 +4,7 @@ import {
   AcoesDaLinha,
   Ausente,
   AusenteDeAcao,
+  Button,
   DataTable,
   EmptyState,
   EstadoSimples,
@@ -136,7 +137,21 @@ export default async function PaginaDeOperacao() {
 
   return (
     <section aria-labelledby="titulo-operacao">
-      <PageHeader id="titulo-operacao" title="Operação" />
+      <PageHeader
+        id="titulo-operacao"
+        title="Operação"
+        actions={
+          /*
+            `POST /edge-nodes/:id/pairing-codes` existia desde a F59 e exigia
+            um Edge ja cadastrado -- mas nao havia como cadastra-lo, nem por
+            API nem por tela. A instalacao real na Arena Positiva travou aqui
+            (issue #404).
+          */
+          <Button href="/operations/edge-nodes/novo" data-testid="novo-edge-node">
+            Novo Edge
+          </Button>
+        }
+      />
 
       {/*
         Resumo em uma frase, antes de qualquer tabela. Quem passa pela tela
@@ -297,7 +312,7 @@ export default async function PaginaDeOperacao() {
           <EmptyState
             testId="sem-edge"
             title="Nenhum Edge cadastrado."
-            hint="Sem Edge, a catraca não decide nada."
+            hint='Sem Edge, a catraca não decide nada. Use "Novo Edge" para cadastrar o agente da recepção e gerar o código de pareamento.'
           />
         }
       />

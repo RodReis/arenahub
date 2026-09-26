@@ -4920,6 +4920,119 @@
         ]
       }
     },
+    "/api/v1/edge-nodes": {
+      "get": {
+        "operationId": "EdgeNodesController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "gymUnitId",
+                      "code",
+                      "status"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "gymUnitId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "code": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "SUSPENDED"
+                        ]
+                      },
+                      "agentVersion": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "lastHeartbeat": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EdgeNodes"
+        ]
+      },
+      "post": {
+        "operationId": "EdgeNodesController_criar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "gymUnitId",
+                    "code",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "gymUnitId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "SUSPENDED"
+                      ]
+                    },
+                    "agentVersion": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lastHeartbeat": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EdgeNodes"
+        ]
+      }
+    },
     "/api/v1/kiosk/heartbeat": {
       "post": {
         "operationId": "KioskController_heartbeat",
