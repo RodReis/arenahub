@@ -152,6 +152,20 @@ enum StudentContactType {
   @@map("student_contact_type")
 }
 
+/// Vinculo trabalhista de quem NAO e aluno (TRAINER/STAFF/ADMIN) -- F81.
+/// Nulo para `profile = STUDENT`: campo nao tem sentido pra aluno comum, e
+/// os 347 alunos existentes nao ganham valor por essa fatia.
+enum EmploymentType {
+  /// Carteira assinada.
+  CLT
+  /// Pessoa juridica.
+  PJ
+  /// Autonomo, sem CLT nem PJ.
+  AUTONOMOUS
+
+  @@map("employment_type")
+}
+
 /// Papel da pessoa na academia. NAO decide acesso -- origina um
 /// `Entitlement` (F48). Ler isto dentro do motor de decisao criaria a
 /// segunda fonte de verdade que a regra de arquitetura no 1 proibe.
@@ -1544,36 +1558,36 @@ model InboxReceipt {
 ///     duplicata compara; manter o indice em hash evita varredura de tabela
 ///     ao comparar texto claro.
 model Student {
-  id               String                @id @default(uuid()) @db.Uuid
-  tenantId         String                @map("tenant_id") @db.Uuid
+  id                  String                @id @default(uuid()) @db.Uuid
+  tenantId            String                @map("tenant_id") @db.Uuid
   /// `AP-{ano}-{8 digitos}`. IMUTAVEL apos a criacao (INV-010): nenhum caso
   /// de uso desta fatia a altera, e a unicidade sobrevive ao arquivamento
   /// (INV-015) porque soft delete nao remove a linha.
-  membershipNumber String                @map("membership_number")
-  fullName         String                @map("full_name")
+  membershipNumber    String                @map("membership_number")
+  fullName            String                @map("full_name")
   /// `@db.Date`: data de nascimento nao tem hora nem fuso. Gravar como
   /// timestamp faria 01/01 virar 31/12 na conversao de timezone.
-  birthDate        DateTime              @map("birth_date") @db.Date
+  birthDate           DateTime              @map("birth_date") @db.Date
   /// Numero completo, em claro (ADR-034). Nunca em log (CLAUDE.md).
-  cpf              String?
-  cpfHash          String?               @map("cpf_hash")
+  cpf                 String?
+  cpfHash             String?               @map("cpf_hash")
   /// Texto livre e opcional. RG nao tem formato nacional unico -- cada
   /// estado emite o seu, e validar digito verificador aqui seria inventar
   /// regra que orgao nenhum garante.
-  rg               String?
-  registeredSex    StudentRegisteredSex? @map("registered_sex")
-  leadSource       LeadSource?           @map("lead_source")
+  rg                  String?
+  registeredSex       StudentRegisteredSex? @map("registered_sex")
+  leadSource          LeadSource?           @map("lead_source")
   /// UNIDADE DE ORIGEM -- onde o aluno se cadastrou e para onde a recepcao o
   /// conta. NAO E CONTROLE DE ACESSO: quem decide em qual unidade ele entra
   /// continua sendo o plano, por `PlanUnit` e `EntitlementUnitWindow`. Ler
   /// esta coluna numa decisao de acesso criaria a segunda fonte de verdade
   /// que a regra de arquitetura no 1 proibe -- ha teste que prova que nao
   /// acontece (`gym-unit-nao-decide-acesso.spec.ts`).
-  gymUnitId        String                @map("gym_unit_id") @db.Uuid
+  gymUnitId           String                @map("gym_unit_id") @db.Uuid
   /// Consultor responsavel (Espec 11). FK, nao texto livre: texto livre nao
   /// sobrevive a saida do funcionario.
-  advisorUserId    String?               @map("advisor_user_id") @db.Uuid
-  status           StudentStatus         @default(LEAD)
+  advisorUserId       String?               @map("advisor_user_id") @db.Uuid
+  status              StudentStatus         @default(LEAD)
   /// POR QUE o aluno esta suspenso ou bloqueado (issue #241).
   ///
   /// Anulavel e LIMPO na volta para `ACTIVE`: motivo e do status VIGENTE,
@@ -1583,25 +1597,37 @@ model Student {
   /// Mora na tabela, e nao so na auditoria, porque a GRID o exibe: pintar a
   /// lista de alunos a partir do `AuditLog` seria varrer o log a cada
   /// carregamento para responder algo que e estado corrente.
-  statusReason     StudentStatusReason?  @map("status_reason")
+  statusReason        StudentStatusReason?  @map("status_reason")
   /// O caso concreto, em texto livre, ao lado da razao fechada. Opcional: a
   /// razao ja responde "por que"; isto responde "o que exatamente".
-  statusReasonNote String?               @map("status_reason_note")
+  statusReasonNote    String?               @map("status_reason_note")
   /// Papel da pessoa (F48). Default `STUDENT` porque e o caso comum e
   /// porque as 1.926 linhas ja existentes precisam de um valor.
-  profile          StudentProfile        @default(STUDENT)
+  profile             StudentProfile        @default(STUDENT)
+  /// Vinculo trabalhista -- F81, issue #415. Nulo para `profile = STUDENT`
+  /// (aluno comum nao tem vinculo) e para os TRAINER/STAFF/ADMIN existentes
+  /// ate a tela de equipe preencher. NAO EXISTE VALIDACAO DE "so preenche se
+  /// profile != STUDENT" no banco -- e regra de aplicacao (Zod do endpoint
+  /// de edicao), mesmo criterio de `modalityIds` na F60: CHECK de coluna
+  /// cruzando duas colunas exigiria trigger, e a aplicacao ja e a fronteira
+  /// que decide isso em todo outro campo condicional do Student.
+  employmentType      EmploymentType?       @map("employment_type")
+  /// Data de entrada no vinculo (nao e `createdAt` do cadastro -- um
+  /// professor pode ser cadastrado no sistema muito depois de comecar a dar
+  /// aula na Arena Positiva).
+  employmentStartedAt DateTime?             @map("employment_started_at") @db.Date
   /// Chave do objeto no storage privado (F72, issue #348). `null` = sem
   /// foto. Nunca a URL: mesma disciplina de `Tenant.logoObjectKey` -- quem
   /// quer o arquivo pede pela rota que confere o pertencimento ao tenant.
-  photoObjectKey   String?               @map("photo_object_key")
+  photoObjectKey      String?               @map("photo_object_key")
   /// Preenchido no arquivamento. Soft delete (INV-013): preserva historico
   /// legal e operacional em vez de apagar.
-  archivedAt       DateTime?             @map("archived_at")
-  createdAt        DateTime              @default(now()) @map("created_at")
-  updatedAt        DateTime              @updatedAt @map("updated_at")
+  archivedAt          DateTime?             @map("archived_at")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
   /// Trava otimista. Comando concorrente que leu a versao antiga falha em
   /// vez de sobrescrever decisao que nao viu.
-  version          Int                   @default(0)
+  version             Int                   @default(0)
 
   tenant             Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   /// `RESTRICT`: apagar unidade que ainda tem aluno falha, em vez de deixar

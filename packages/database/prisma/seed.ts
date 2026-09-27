@@ -61,6 +61,23 @@ const ALUNO_DO_TOTEM = {
 };
 
 /**
+ * Professor de fixture para o E2E da F81 (Task 9, issue #415).
+ *
+ * `Student` com `profile = TRAINER` -- nao ha entidade de pessoa nova
+ * (ADR-061 decisao 5). Sem esta linha, `/team` nasce sempre vazia em banco
+ * de bancada/CI, e o teste que prova "`/team` mostra professor, `/students`
+ * nao mostra" nao tem o que afirmar.
+ *
+ * Mesmo prefixo de matricula fora da faixa emitida pela API, mesma razao do
+ * aluno do totem acima: nunca colide com cadastro real feito pela tela.
+ */
+const PROFESSOR_DE_BANCADA = {
+  membershipNumber: 'SEED-TEAM-0001',
+  fullName: 'Professor de Bancada',
+  birthDate: '1985-02-10',
+};
+
+/**
  * Credencial HMAC do totem para DESENVOLVIMENTO LOCAL.
  *
  * ISTO NAO E SEGREDO DE PRODUCAO E NUNCA PODE VIRAR UM. Esta em texto claro
@@ -450,6 +467,7 @@ async function semear(): Promise<void> {
     // Depois do totem (precisa do dispositivo) e ANTES do aceite de IA, que
     // varre os alunos ativos -- inclusive este.
     await semearAlunoECredencialDoTotem(db, tenant.id, unidade.id);
+    await semearProfessorDeBancada(db, tenant.id, unidade.id);
     await semearAceiteDaAnalise(db, tenant.id);
     await semearDocumentosDeEngajamento(db, tenant.id);
     await semearCatalogoDeXpEConquistas(db, tenant.id);
@@ -842,6 +860,46 @@ async function semearTotem(
   }
 
   console.info('[seed] totem "TOTEM01" com configuracao de unidade v1 publicada.');
+}
+
+/**
+ * Professor de bancada -- F81 (Task 9, issue #415).
+ *
+ * `Student` com `profile = TRAINER`, sem CPF nem credencial: o E2E desta
+ * fatia so precisa que ele APAREÇA em `/team` e NÃO apareça em `/students`.
+ * Idempotente pela chave natural (`tenantId`, `membershipNumber`), mesmo
+ * padrao do resto do arquivo.
+ */
+async function semearProfessorDeBancada(
+  db: Awaited<ReturnType<typeof criarPrismaClient>>,
+  tenantId: string,
+  gymUnitId: string,
+): Promise<void> {
+  await db.student.upsert({
+    where: {
+      tenantId_membershipNumber: {
+        tenantId,
+        membershipNumber: PROFESSOR_DE_BANCADA.membershipNumber,
+      },
+    },
+    create: {
+      tenantId,
+      gymUnitId,
+      membershipNumber: PROFESSOR_DE_BANCADA.membershipNumber,
+      fullName: PROFESSOR_DE_BANCADA.fullName,
+      birthDate: new Date(PROFESSOR_DE_BANCADA.birthDate),
+      status: 'ACTIVE',
+      profile: 'TRAINER',
+    },
+    update: {
+      profile: 'TRAINER',
+      status: 'ACTIVE',
+    },
+  });
+
+  console.info(
+    `[seed] professor de bancada "${PROFESSOR_DE_BANCADA.membershipNumber}" (dado falso, de bancada).`,
+  );
 }
 
 /**

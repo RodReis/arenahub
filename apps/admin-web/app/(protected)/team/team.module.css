@@ -1,0 +1,24 @@
+/**
+ * Lista de time -- mesmo padrao de layout de `students.module.css` (DS-PAINEL §5.3):
+ * filtro em linha unica que quebra sozinha, sem media query.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`
+ * e `--ah-border-*`, nunca `--ah-carbon-*` cru.
+ */
+
+.filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.filtro > * {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.busca {
+  flex: 2 1 280px;
+}

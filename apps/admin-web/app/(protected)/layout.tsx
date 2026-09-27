@@ -155,6 +155,13 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
   */
   { href: '/users', label: 'Usuários', exigePermissao: 'user.manage' },
   /*
+    TIME -- F81 (issue #415). Mesmo grupo de Usuários, mesmo motivo: consultar
+    o vinculo e a agenda de professor/staff/admin e configuracao de uso raro,
+    nao o atendimento diario -- diferente de Alunos, que fica fora deste
+    grupo. `team.read` some para quem nao pode consultar o time.
+  */
+  { href: '/team', label: 'Time', exigePermissao: 'team.read' },
+  /*
     TOTEM -- grupo criado por decisao do PI em 28/08/2026: *"vamos colocar o
     que for do totem no Menu Totem"*.
 

@@ -1,0 +1,43 @@
+/**
+ * Ficha do time -- mesma grade de rotulo/valor de `students/[id]/ficha.module.css`.
+ *
+ * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-surface-*`
+ * e `--ah-border-*`, nunca `--ah-carbon-*` cru.
+ */
+
+.dados {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  align-items: baseline;
+  margin: 0;
+}
+
+.dados dt {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-label);
+}
+
+.dados dd {
+  margin: 0;
+  color: var(--ah-text-default);
+}
+
+/** Grade de formulario -- DS-PAINEL §3.4: 1fr 1fr, campo largo nao existe aqui. */
+.formularioDeVinculo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+  align-items: end;
+}
+
+.formularioDeVinculo p[role='status'] {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.formularioDeVinculo button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}

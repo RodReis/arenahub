@@ -149,6 +149,13 @@ export const PERMISSOES_DO_OWNER = [
   // alterar quem da a aula.
   'class.manage',
   'class.read',
+  // F81: tela de equipe -- professor, staff e admin fora da grade de aluno.
+  //
+  // Separada de `student.*` porque e outra tela, mas mesma logica de "quem
+  // gerencia o cadastro do dono do sistema tambem gerencia o cadastro de
+  // quem trabalha nele" -- OWNER tem os dois pares.
+  'team.read',
+  'team.update',
 ];
 
 /**

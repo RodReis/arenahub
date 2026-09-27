@@ -995,6 +995,252 @@
         ]
       }
     },
+    "/api/v1/team": {
+      "get": {
+        "operationId": "TeamController_buscar",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "membershipNumber": {
+                        "type": "string"
+                      },
+                      "fullName": {
+                        "type": "string"
+                      },
+                      "profile": {
+                        "type": "string"
+                      },
+                      "gymUnitId": {
+                        "type": "string"
+                      },
+                      "employmentType": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "employmentStartedAt": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "version": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Team"
+        ]
+      }
+    },
+    "/api/v1/team/{id}": {
+      "get": {
+        "operationId": "TeamController_encontrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "membershipNumber": {
+                      "type": "string"
+                    },
+                    "fullName": {
+                      "type": "string"
+                    },
+                    "profile": {
+                      "type": "string"
+                    },
+                    "gymUnitId": {
+                      "type": "string"
+                    },
+                    "employmentType": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "employmentStartedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "version": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Team"
+        ]
+      }
+    },
+    "/api/v1/team/{id}/agenda": {
+      "get": {
+        "operationId": "TeamController_agenda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "classId": {
+                        "type": "string"
+                      },
+                      "modalityId": {
+                        "type": "string"
+                      },
+                      "dayOfWeek": {
+                        "type": "number"
+                      },
+                      "startMinute": {
+                        "type": "number"
+                      },
+                      "durationMinutes": {
+                        "type": "number"
+                      },
+                      "gymUnitId": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Team"
+        ]
+      }
+    },
+    "/api/v1/team/{id}/employment": {
+      "patch": {
+        "operationId": "TeamController_atualizarVinculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "membershipNumber": {
+                      "type": "string"
+                    },
+                    "fullName": {
+                      "type": "string"
+                    },
+                    "profile": {
+                      "type": "string"
+                    },
+                    "gymUnitId": {
+                      "type": "string"
+                    },
+                    "employmentType": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "employmentStartedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "version": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Team"
+        ]
+      }
+    },
     "/api/v1/units/{unitId}/classes": {
       "get": {
         "operationId": "ClassController_listar",
