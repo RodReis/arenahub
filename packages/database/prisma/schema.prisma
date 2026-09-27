@@ -868,6 +868,10 @@ model GymUnit {
   /// academia; vira tabela quando alguem precisar consultar por faixa.
   openingHours Json          @map("opening_hours")
   status       GymUnitStatus @default(ACTIVE)
+  /// Capacidade máxima de alunos simultaneamente matriculados. `null` = sem
+  /// limite definido; o painel financeiro só mostra o widget de ocupação
+  /// quando este campo está preenchido.
+  capacidadeMaxima Int?       @map("capacidade_maxima")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
