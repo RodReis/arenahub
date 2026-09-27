@@ -161,15 +161,23 @@ function diaLegivel(iso: string): string {
  * DERIVADOS DA SERIE QUE O BACKEND JA DEVOLVE, e nao de um calendario
  * inventado: oferecer um mes sem movimento levaria o gerente a uma tela vazia
  * que parece defeito. Se a competencia esta na serie, ha o que mostrar nela.
- *
- * `agora` NAO entra aqui: a funcao e pura, e o mes corrente ja fica de fora
- * porque o backend so devolve competencia anterior ao fim da janela.
  */
 export interface OpcaoDePeriodo {
   readonly rotulo: string;
   readonly de: string;
   readonly ate: string;
   readonly atual: boolean;
+  /**
+   * O MES EM CURSO VIRA CHIP TAMBEM, mas com `ate = agora` em vez de 1o do
+   * mes seguinte -- `validarJanela()` aceita `ate <= agora` (o limite exato
+   * "ate agora" e o de uma janela que acabou de fechar por um fio). Sem isto
+   * o unico dado de um tenant recem-criado (a fatura do mes corrente) nunca
+   * teria chip nenhum ate o mes fechar sozinho.
+   *
+   * O NUMERO AINDA MUDA: `parcial` avisa a tela para dizer isso, em vez de
+   * "periodo fechado" como os demais.
+   */
+  readonly parcial: boolean;
 }
 
 export function periodosDisponiveis(
@@ -186,7 +194,9 @@ export function periodosDisponiveis(
     .map((competencia) => {
       const [ano, mes] = competencia.split('-').map(Number);
       const de = new Date(Date.UTC(ano ?? 0, (mes ?? 1) - 1, 1));
-      const ate = new Date(Date.UTC(ano ?? 0, mes ?? 1, 1));
+      const fimDoMes = new Date(Date.UTC(ano ?? 0, mes ?? 1, 1));
+      const parcial = fimDoMes.getTime() > agora.getTime();
+      const ate = parcial ? agora : fimDoMes;
 
       return {
         rotulo: competenciaLegivel(competencia),
@@ -200,17 +210,9 @@ export function periodosDisponiveis(
         atual:
           de.toISOString().slice(0, 10) === janelaAtual.de.slice(0, 10) &&
           ate.toISOString().slice(0, 10) === janelaAtual.ate.slice(0, 10),
+        parcial,
       };
-    })
-    /*
-      MES EM CURSO NAO VIRA CHIP -- `validarJanela()` do backend recusa `ate`
-      no futuro (BILLING_SUMMARY_INVALID_WINDOW), e `competenciasDisponiveis`
-      lista toda competencia com invoice, inclusive a do mes corrente. Sem
-      este filtro o unico dado do tenant (a fatura de setembro, mes ainda em
-      curso) virava um chip clicavel que a propria API recusava -- a tela
-      quebrava exatamente ao clicar no periodo que ela mesma ofereceu.
-    */
-    .filter((periodo) => new Date(periodo.ate).getTime() <= agora.getTime());
+    });
 }
 
 /**
@@ -273,6 +275,14 @@ export default async function PainelFinanceiroPage({
   */
   const temDivida = resumo.vencidoMinor > 0;
 
+  /*
+    A JANELA ABERTA E PARCIAL quando o chip que bate com ela e do mes em
+    curso -- "fim exclusivo, período fechado" mentiria ali: o numero ainda
+    muda a cada pagamento novo, e `resumo.ate` nao e mais o 1o dia do mes
+    seguinte.
+  */
+  const periodoParcial = periodos.find((periodo) => periodo.atual)?.parcial ?? false;
+
   return (
     <section aria-labelledby="titulo-financeiro">
       <PageHeader
@@ -298,6 +308,7 @@ export default async function PainelFinanceiroPage({
                 data-testid={`periodo-${periodo.rotulo}`}
               >
                 {periodo.rotulo}
+                {periodo.parcial ? ' (parcial)' : ''}
               </a>
             ))}
           </nav>
@@ -307,7 +318,7 @@ export default async function PainelFinanceiroPage({
           <strong>
             {diaLegivel(resumo.de)} a {diaLegivel(resumo.ate)}
           </strong>{' '}
-          · fim exclusivo, período fechado
+          · {periodoParcial ? 'mês em andamento, número ainda muda' : 'fim exclusivo, período fechado'}
         </p>
       </div>
 

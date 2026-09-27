@@ -131,6 +131,38 @@ describe('painel financeiro', () => {
     await renderizar();
 
     expect(screen.getByTestId('periodo-do-resumo')).toHaveTextContent('01/08/2026 a 01/09/2026');
+    expect(screen.getByTestId('periodo-do-resumo')).toHaveTextContent('período fechado');
+  });
+
+  /**
+   * QUANDO A JANELA APLICADA E O MES EM CURSO (competencia parcial), o rotulo
+   * "fim exclusivo, período fechado" mentiria -- `resumo.ate` nao e mais o
+   * 1o dia do mes seguinte, e o numero ainda muda a cada pagamento novo.
+   *
+   * `agora` FIXO via fake timers: `periodosDisponiveis()` chama `new Date()`
+   * internamente quando a pagina nao passa `agora` explicito, e sem fixar o
+   * relogio este teste ficaria refem do dia em que roda -- passaria hoje e
+   * quebraria sozinho quando setembro/2026 fechar.
+   */
+  it('avisa que o periodo apurado e parcial quando e o mes em curso', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-27T12:00:00.000Z'));
+
+    try {
+      await renderizar({
+        ...RESUMO,
+        de: '2026-09-01T00:00:00.000Z',
+        ate: '2026-09-27T12:00:00.000Z',
+        competenciasDisponiveis: ['2026-06', '2026-07', '2026-09'],
+      });
+
+      const periodo = screen.getByTestId('periodo-do-resumo');
+      expect(periodo).toHaveTextContent('mês em andamento, número ainda muda');
+      expect(periodo).not.toHaveTextContent('período fechado');
+      expect(screen.getByTestId('periodo-set/2026')).toHaveTextContent('(parcial)');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   /**
@@ -549,22 +581,35 @@ describe('periodosDisponiveis', () => {
 
   /**
    * O BUG DO PI: a competencia do MES EM CURSO virava chip clicavel, e
-   * clicar mandava `ate` no futuro -- o backend recusa com
-   * `BILLING_SUMMARY_INVALID_WINDOW`. `competenciasDisponiveis` lista toda
-   * competencia com invoice, inclusive a do mes que ainda nao fechou.
+   * clicar mandava `ate` no 1o dia do mes seguinte -- o backend recusa
+   * (`ate` no futuro) com `BILLING_SUMMARY_INVALID_WINDOW`.
+   *
+   * O FIX NAO E OMITIR O CHIP: um tenant recem-criado so tem dado no mes
+   * corrente, e sem chip nenhum ele fica sem jeito de ver o proprio numero
+   * ate o mes fechar sozinho. O chip continua existindo, com `ate = agora`
+   * (que `validarJanela()` aceita) e marcado `parcial` para a tela avisar
+   * que o numero ainda muda.
    */
-  it('nao oferece chip para o mes em curso', () => {
+  it('oferece chip para o mes em curso, com ate=agora e parcial=true', () => {
     const agora = new Date('2026-09-27T12:00:00.000Z');
     const periodos = periodosDisponiveis(['2026-08', '2026-09'], JANELA, 6, agora);
 
-    expect(periodos.map((p) => p.rotulo)).toEqual(['ago/2026']);
+    expect(periodos.map((p) => p.rotulo)).toEqual(['ago/2026', 'set/2026']);
+
+    const setembro = periodos.find((p) => p.rotulo === 'set/2026');
+    expect(setembro?.parcial).toBe(true);
+    expect(setembro?.ate).toBe(agora.toISOString());
+
+    const agosto = periodos.find((p) => p.rotulo === 'ago/2026');
+    expect(agosto?.parcial).toBe(false);
   });
 
-  /** O mes que acabou de fechar (virou o dia 1) ja pode ser chip. */
-  it('oferece o mes que fechou exatamente agora', () => {
+  /** O mes que acabou de fechar (virou o dia 1) nao e mais parcial. */
+  it('oferece o mes que fechou exatamente agora, sem marcar parcial', () => {
     const agora = new Date('2026-09-01T00:00:00.000Z');
     const periodos = periodosDisponiveis(['2026-08'], JANELA, 6, agora);
 
     expect(periodos.map((p) => p.rotulo)).toEqual(['ago/2026']);
+    expect(periodos[0]?.parcial).toBe(false);
   });
 });
