@@ -1,22 +1,27 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import {
   Ausente,
-  BarrasVerticais,
   DataTable,
   EmptyState,
   formatarDinheiro,
-  GraficoDeRosca,
   Money,
   PageHeader,
   percentualDoTotal,
   ProblemDetail,
-  SerieFinanceira,
   Sparkline,
 } from '@arenahub/ui';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress, ProgressValue } from '@/components/ui/progress';
+
 import { chamarApi } from '../../../lib/api/server-client';
-import estilos from './summary.module.css';
+import { AgingDaDivida } from './_graficos/aging-da-divida';
+import { ComposicaoPorMetodo } from './_graficos/composicao-por-metodo';
+import { EvolucaoDeReceita } from './_graficos/evolucao-de-receita';
 
 export const metadata: Metadata = {
   title: 'Painel financeiro — ArenaHub',
@@ -74,6 +79,12 @@ interface Resumo {
   cancelamentos: number;
   taxaDeChurn: number | null;
   ltv: number | null;
+  planoMaisPopular: { nome: string; quantidade: number } | null;
+  ocupacaoPorUnidade: readonly {
+    nomeDaUnidade: string;
+    alunosAtivos: number;
+    capacidadeMaxima: number | null;
+  }[];
 }
 
 /**
@@ -172,6 +183,30 @@ function mesSeguinte(competencia: string): string {
   const proximoAno = mesBase === 12 ? anoBase + 1 : anoBase;
 
   return `${proximoAno}-${String(proximoMes).padStart(2, '0')}`;
+}
+
+function metaMensalMinor(resumo: Resumo): number {
+  return resumo.receitaEsperadaMinor;
+}
+
+function projecaoFechamentoMinor(resumo: Resumo): number {
+  return resumo.recebidoMinor + resumo.aReceberMinor;
+}
+
+/** Clampada em 100 -- unidade que passou da capacidade cadastrada mostra barra cheia, nao estourada. */
+function capacidadePercentual(alunosAtivos: number, capacidadeMaxima: number): number {
+  return Math.min(Math.round((alunosAtivos / capacidadeMaxima) * 100), 100);
+}
+
+/**
+ * So RECEITA decide o score -- novosAlunos/cancelamentos ficam so como
+ * contexto no card. Mesmas 3 guardas do badge de tendencia do Recebido:
+ * dado insuficiente, periodo parcial ou meses nao consecutivos viram
+ * 'neutro', nunca um veredito que a propria tela contradiz ao lado.
+ */
+function scoreDoNegocio(variacaoRecebido: number | null): 'saudavel' | 'atencao' | 'neutro' {
+  if (variacaoRecebido === null) return 'neutro';
+  return variacaoRecebido > 0 ? 'saudavel' : 'atencao';
 }
 
 /**
@@ -339,20 +374,26 @@ export default async function PainelFinanceiroPage({
         ) / 10
       : null;
 
-  /*
-    O METODO COM MAIOR RECEBIDO decide o rotulo/valor central do GraficoDeRosca.
-    Calculado uma unica vez aqui, e nao dentro do JSX, para nao repetir o
-    reduce ao montar rotuloCentral e valorCentral separadamente.
-  */
-  const maiorMetodo =
-    resumo.recebidoMinor > 0
-      ? resumo.quebraPorMetodo.reduce((maior, atual) =>
-          atual.minorTotal > maior.minorTotal ? atual : maior,
-        )
-      : null;
-  const proporcaoDoMaiorMetodo = maiorMetodo
-    ? percentualDoTotal(maiorMetodo.minorTotal, resumo.recebidoMinor)
-    : null;
+  const scoreDoPeriodo = scoreDoNegocio(variacaoRecebido);
+  const ROTULO_DO_SCORE: Readonly<Record<typeof scoreDoPeriodo, string>> = {
+    saudavel: 'Saudável',
+    atencao: 'Atenção',
+    neutro: 'Sem dado suficiente',
+  };
+  const VARIANTE_DO_SCORE: Readonly<Record<typeof scoreDoPeriodo, 'default' | 'destructive' | 'secondary'>> = {
+    saudavel: 'default',
+    atencao: 'destructive',
+    neutro: 'secondary',
+  };
+
+  const progressoDoRecebido = Math.min(
+    Math.round((resumo.recebidoMinor / metaMensalMinor(resumo)) * 100),
+    100,
+  );
+
+  const unidadesComCapacidade = resumo.ocupacaoPorUnidade.filter(
+    (unidade) => unidade.capacidadeMaxima !== null,
+  );
 
   return (
     <section aria-labelledby="titulo-financeiro">
@@ -367,13 +408,13 @@ export default async function PainelFinanceiroPage({
         o gerente manda "olha julho" para o contador e o link abre no mesmo
         lugar.
       */}
-      <div className={estilos['barraDoPeriodo']}>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         {periodos.length > 0 ? (
-          <nav className={estilos['chips']} aria-label="Período apurado">
+          <nav className="flex flex-wrap gap-2" aria-label="Período apurado">
             {periodos.map((periodo) => (
               <a
                 key={periodo.rotulo}
-                className={estilos['chip']}
+                className="rounded-full border border-border px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted aria-[current=page]:border-transparent aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground"
                 href={`/billing?de=${encodeURIComponent(periodo.de)}&ate=${encodeURIComponent(periodo.ate)}`}
                 {...(periodo.atual ? { 'aria-current': 'page' as const } : {})}
                 data-testid={`periodo-${periodo.rotulo}`}
@@ -385,8 +426,8 @@ export default async function PainelFinanceiroPage({
           </nav>
         ) : null}
 
-        <p className={estilos['periodoApurado']} data-testid="periodo-do-resumo">
-          <strong>
+        <p className="text-sm text-muted-foreground" data-testid="periodo-do-resumo">
+          <strong className="text-foreground">
             {diaLegivel(resumo.de)} a {diaLegivel(resumo.ate)}
           </strong>{' '}
           · {periodoParcial ? 'mês em andamento, número ainda muda' : 'fim exclusivo, período fechado'}
@@ -399,75 +440,123 @@ export default async function PainelFinanceiroPage({
         Destacados da faixa compacta que segue, com badge de tendencia so
         quando ha dado real de mes anterior.
       */}
-      <section className={estilos['heroKpis']} aria-label="Indicadores principais do período">
-        <div className={estilos['heroCard']} data-tom="success">
-          <div className={estilos['heroCabecalho']}>
-            <p className={estilos['heroRotulo']}>Recebido</p>
-            {variacaoRecebido !== null ? (
-              <span
-                className={estilos['heroBadge']}
-                data-testid="tendencia-do-recebido-badge"
-                /*
-                  ZERO E NEUTRO -- nem sucesso nem risco. `>= 0` sozinho
-                  pintaria um "0%" de verde, afirmando melhora que nao houve.
-                */
-                data-tom={variacaoRecebido > 0 ? 'success' : variacaoRecebido < 0 ? 'danger' : 'neutral'}
-              >
-                {variacaoRecebido > 0 ? '↑' : variacaoRecebido < 0 ? '↓' : '·'}{' '}
-                {String(Math.abs(variacaoRecebido)).replace('.', ',')}% vs mês anterior
-              </span>
+      <section
+        className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3"
+        aria-label="Indicadores principais do período"
+      >
+        <Card>
+          <CardContent>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-muted-foreground">Recebido</p>
+              {variacaoRecebido !== null ? (
+                <Badge
+                  data-testid="tendencia-do-recebido-badge"
+                  /*
+                    ZERO E NEUTRO -- nem sucesso nem risco. `>= 0` sozinho
+                    pintaria um "0%" de verde, afirmando melhora que nao houve.
+                  */
+                  variant={variacaoRecebido > 0 ? 'default' : variacaoRecebido < 0 ? 'destructive' : 'secondary'}
+                >
+                  {variacaoRecebido > 0 ? '↑' : variacaoRecebido < 0 ? '↓' : '·'}{' '}
+                  {String(Math.abs(variacaoRecebido)).replace('.', ',')}% vs mês anterior
+                </Badge>
+              ) : null}
+            </div>
+            <p className="mt-1 text-2xl font-semibold" data-testid="recebido-no-periodo">
+              <Money cents={resumo.recebidoMinor} currency="BRL" />
+            </p>
+            {/*
+              TENDENCIA DO RECEBIDO, e so dele. A serie ja vem do backend, entao
+              este sparkline sai de graca. "A receber" e "vencido" NAO ganham o
+              equivalente: sao fotos do instante, e o banco nao guarda historico
+              delas -- fabricar a curva exigiria snapshot mensal, que e fatia
+              nova. Decisao do PI em 25/08/2026.
+            */}
+            <div className="mt-2">
+              <Sparkline
+                testId="tendencia-do-recebido"
+                valores={resumo.serie.pontos.map((ponto) => ponto.recebidoMinor)}
+                tokenDeCor="--ah-state-success"
+              />
+            </div>
+            <div className="mt-3">
+              <Progress value={progressoDoRecebido} />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {progressoDoRecebido}% da meta mensal de <Money cents={metaMensalMinor(resumo)} currency="BRL" />
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            {/*
+              "ASSINATURAS VIGENTES", nao "alunos ativos" (issue #416): a query
+              conta `subscriptions` em `ACTIVE`/`PAST_DUE`, nao a coluna
+              `students.status`. Enquanto o rotulo dizia "aluno", este numero
+              contradizia a lista de alunos na tela ao lado -- os dois corretos,
+              medindo eixos diferentes: contrato vigente aqui, cadastro ativo la.
+            */}
+            <p className="text-sm text-muted-foreground">Assinaturas vigentes</p>
+            <p className="mt-1 text-2xl font-semibold" data-testid="alunos-ativos">
+              {resumo.alunosAtivos}
+            </p>
+            {/* SNAPSHOT DE AGORA, nao do periodo -- "quantos ha", nao "quantos ficaram". */}
+            <p className="mt-1 text-xs text-muted-foreground">agora, independente do período</p>
+
+            {resumo.planoMaisPopular !== null ? (
+              <p className="mt-3 text-xs text-muted-foreground" data-testid="plano-mais-popular">
+                Plano mais popular: <span className="text-foreground">{resumo.planoMaisPopular.nome}</span> (
+                {resumo.planoMaisPopular.quantidade})
+              </p>
             ) : null}
-          </div>
-          <p className={estilos['heroValor']} data-testid="recebido-no-periodo">
-            <Money cents={resumo.recebidoMinor} currency="BRL" />
-          </p>
-          {/*
-            TENDENCIA DO RECEBIDO, e so dele. A serie ja vem do backend, entao
-            este sparkline sai de graca. "A receber" e "vencido" NAO ganham o
-            equivalente: sao fotos do instante, e o banco nao guarda historico
-            delas -- fabricar a curva exigiria snapshot mensal, que e fatia
-            nova. Decisao do PI em 25/08/2026.
-          */}
-          <div className={estilos['heroTendencia']}>
-            <Sparkline
-              testId="tendencia-do-recebido"
-              valores={resumo.serie.pontos.map((ponto) => ponto.recebidoMinor)}
-              tokenDeCor="--ah-state-success"
-            />
-          </div>
-        </div>
 
-        <div className={estilos['heroCard']}>
-          {/*
-            "ASSINATURAS VIGENTES", nao "alunos ativos" (issue #416): a query
-            conta `subscriptions` em `ACTIVE`/`PAST_DUE`, nao a coluna
-            `students.status`. Enquanto o rotulo dizia "aluno", este numero
-            contradizia a lista de alunos na tela ao lado -- os dois corretos,
-            medindo eixos diferentes: contrato vigente aqui, cadastro ativo la.
-          */}
-          <p className={estilos['heroRotulo']}>Assinaturas vigentes</p>
-          <p className={estilos['heroValor']} data-testid="alunos-ativos">
-            {resumo.alunosAtivos}
-          </p>
-          {/* SNAPSHOT DE AGORA, nao do periodo -- "quantos ha", nao "quantos ficaram". */}
-          <p className={estilos['heroApoio']}>agora, independente do período</p>
-        </div>
+            {unidadesComCapacidade.length > 0 ? (
+              <ul className="mt-3 space-y-2" data-testid="ocupacao-por-unidade">
+                {resumo.ocupacaoPorUnidade.map((unidade) => (
+                  <li key={unidade.nomeDaUnidade}>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{unidade.nomeDaUnidade}</span>
+                      <span>
+                        {unidade.alunosAtivos}
+                        {unidade.capacidadeMaxima === null ? '' : ` / ${unidade.capacidadeMaxima}`}
+                      </span>
+                    </div>
+                    {unidade.capacidadeMaxima === null ? null : (
+                      <Progress
+                        value={capacidadePercentual(unidade.alunosAtivos, unidade.capacidadeMaxima)}
+                        className="mt-1"
+                      >
+                        <ProgressValue className="sr-only" />
+                      </Progress>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </CardContent>
+        </Card>
 
-        <div className={estilos['heroCard']}>
-          <p className={estilos['heroRotulo']}>Ticket médio</p>
-          <p className={estilos['heroValor']} data-testid="ticket-medio">
-            {resumo.ticketMedioMinor === null ? (
-              <Ausente />
-            ) : (
-              <Money cents={resumo.ticketMedioMinor} currency="BRL" />
-            )}
-          </p>
-          <p className={estilos['heroApoio']}>
-            {resumo.pagamentosConfirmados === 0
-              ? 'sem pagamento no período'
-              : `${resumo.pagamentosConfirmados} pagamento(s) confirmado(s)`}
-          </p>
-        </div>
+        <Card>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Ticket médio</p>
+            <p className="mt-1 text-2xl font-semibold" data-testid="ticket-medio">
+              {resumo.ticketMedioMinor === null ? (
+                <Ausente />
+              ) : (
+                <Money cents={resumo.ticketMedioMinor} currency="BRL" />
+              )}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {resumo.pagamentosConfirmados === 0
+                ? 'sem pagamento no período'
+                : `${resumo.pagamentosConfirmados} pagamento(s) confirmado(s)`}
+            </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              projeção de fechamento: <Money cents={projecaoFechamentoMinor(resumo)} currency="BRL" />
+            </p>
+          </CardContent>
+        </Card>
       </section>
 
       {/*
@@ -475,64 +564,75 @@ export default async function PainelFinanceiroPage({
         Novos alunos/Cancelamentos/Churn/LTV saem daqui e viram o bloco de
         "Saude do negocio & retencao" mais abaixo, ao lado da divida.
       */}
-      <section className={estilos['faixaDeKpi']} aria-label="Indicadores do período">
-        <div className={estilos['kpi']}>
-          <p className={estilos['kpiRotulo']}>Esperado por mês</p>
-          <p className={estilos['kpiValor']} data-testid="receita-esperada">
-            <Money cents={resumo.receitaEsperadaMinor} currency="BRL" />
-          </p>
-          {/*
-            DECISAO 3 DO PI: vem do PLANO matriculado, nao da soma das invoices
-            emitidas -- no dia 1 do mes, antes do faturamento, a soma das
-            invoices seria zero.
-          */}
-          <p className={estilos['kpiApoio']}>
-            {resumo.base.alunosPagantes} assinatura(s), pelo plano
-          </p>
-        </div>
-
-        <div className={estilos['kpi']}>
-          <p className={estilos['kpiRotulo']}>A receber</p>
-          <p className={estilos['kpiValor']} data-testid="a-receber">
-            <Money cents={resumo.aReceberMinor} currency="BRL" />
-          </p>
-          <p className={estilos['kpiApoio']}>
-            {resumo.faturasAReceber} fatura(s) vencendo no período
-          </p>
-        </div>
-
-        <div className={estilos['kpi']} {...(temDivida ? { 'data-tom': 'danger' } : {})}>
-          <p className={estilos['kpiRotulo']}>Vencido</p>
-          <p className={estilos['kpiValor']} data-testid="vencido">
-            <Money cents={resumo.vencidoMinor} currency="BRL" />
-          </p>
-          {/*
-            O VENCIDO NAO E RECORTADO PELO PERIODO -- divida de junho continua
-            faltando em agosto. A frase esta aqui porque o numero ao lado fala
-            do periodo e este fala de agora.
-          */}
-          <p className={estilos['kpiApoio']}>
-            {resumo.faturasVencidas} fatura(s), toda a dívida em aberto
-          </p>
-        </div>
-
-        <div className={estilos['kpi']} {...(temDivida ? { 'data-tom': 'risk' } : {})}>
-          <p className={estilos['kpiRotulo']}>Inadimplência</p>
-          <p className={estilos['kpiValor']} data-testid="taxa-de-inadimplencia">
+      <section
+        className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        aria-label="Indicadores do período"
+      >
+        <Card size="sm">
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Esperado por mês</p>
+            <p className="mt-1 text-xl font-semibold" data-testid="receita-esperada">
+              <Money cents={resumo.receitaEsperadaMinor} currency="BRL" />
+            </p>
             {/*
-              `—` e nao `0%` quando nao ha pagante: academia sem assinatura nao
-              tem 0% de inadimplencia, tem uma taxa que nao existe.
+              DECISAO 3 DO PI: vem do PLANO matriculado, nao da soma das invoices
+              emitidas -- no dia 1 do mes, antes do faturamento, a soma das
+              invoices seria zero.
             */}
-            {resumo.taxaDeInadimplencia === null ? (
-              <Ausente />
-            ) : (
-              `${String(resumo.taxaDeInadimplencia).replace('.', ',')}%`
-            )}
-          </p>
-          <p className={estilos['kpiApoio']}>
-            {resumo.base.alunosInadimplentes} de {resumo.base.alunosPagantes} aluno(s)
-          </p>
-        </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {resumo.base.alunosPagantes} assinatura(s), pelo plano
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card size="sm">
+          <CardContent>
+            <p className="text-sm text-muted-foreground">A receber</p>
+            <p className="mt-1 text-xl font-semibold" data-testid="a-receber">
+              <Money cents={resumo.aReceberMinor} currency="BRL" />
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {resumo.faturasAReceber} fatura(s) vencendo no período
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card size="sm" className={temDivida ? 'ring-(--ah-state-danger)' : undefined}>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Vencido</p>
+            <p className="mt-1 text-xl font-semibold" data-testid="vencido">
+              <Money cents={resumo.vencidoMinor} currency="BRL" />
+            </p>
+            {/*
+              O VENCIDO NAO E RECORTADO PELO PERIODO -- divida de junho continua
+              faltando em agosto. A frase esta aqui porque o numero ao lado fala
+              do periodo e este fala de agora.
+            */}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {resumo.faturasVencidas} fatura(s), toda a dívida em aberto
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card size="sm" className={temDivida ? 'ring-(--ah-state-risk)' : undefined}>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Inadimplência</p>
+            <p className="mt-1 text-xl font-semibold" data-testid="taxa-de-inadimplencia">
+              {/*
+                `—` e nao `0%` quando nao ha pagante: academia sem assinatura nao
+                tem 0% de inadimplencia, tem uma taxa que nao existe.
+              */}
+              {resumo.taxaDeInadimplencia === null ? (
+                <Ausente />
+              ) : (
+                `${String(resumo.taxaDeInadimplencia).replace('.', ',')}%`
+              )}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {resumo.base.alunosInadimplentes} de {resumo.base.alunosPagantes} aluno(s)
+            </p>
+          </CardContent>
+        </Card>
 
         {/*
           O ESTORNO SO APARECE QUANDO EXISTE. Uma celula fixa "R$ 0,00" em todo
@@ -540,238 +640,284 @@ export default async function PainelFinanceiroPage({
           recebido ja e LIQUIDO, entao a ausencia nao esconde nada.
         */}
         {resumo.estornadoMinor > 0 ? (
-          <div className={estilos['kpi']} data-tom="warning">
-            <p className={estilos['kpiRotulo']}>Estornado</p>
-            <p className={estilos['kpiValor']} data-testid="estornado">
-              <Money cents={resumo.estornadoMinor} currency="BRL" />
-            </p>
-            <p className={estilos['kpiApoio']}>já descontado do recebido</p>
-          </div>
+          <Card size="sm" className="ring-(--ah-state-warning)">
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Estornado</p>
+              <p className="mt-1 text-xl font-semibold" data-testid="estornado">
+                <Money cents={resumo.estornadoMinor} currency="BRL" />
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">já descontado do recebido</p>
+            </CardContent>
+          </Card>
         ) : null}
       </section>
 
       {/*
-        LINHA 1 DE GRAFICOS: evolucao de receita (SerieFinanceira, que antes
-        era uma secao cheia embaixo) lado a lado com a composicao de metodo de
-        pagamento (agora GraficoDeRosca, no lugar de BarrasDeFaixa).
+        LINHA 1 DE GRAFICOS: evolucao de receita (EvolucaoDeReceita, que antes
+        era SerieFinanceira numa secao cheia embaixo) lado a lado com a
+        composicao de metodo de pagamento (ComposicaoPorMetodo, no lugar de
+        GraficoDeRosca).
       */}
-      <div className={estilos['duasColunasGraficos']}>
-        <div className={estilos['cartao']}>
-          <h2 className={estilos['tituloDoCartao']}>Faturado e recebido por competência</h2>
-          <p className={estilos['apoioDoTitulo']}>
-            pelo mês de referência da fatura, não pela data do pagamento
-          </p>
-
-          {resumo.serie.pontos.length === 0 ? (
-            <EmptyState
-              testId="sem-competencia"
-              title="Nenhuma competência no período"
-              hint="Não há faturas emitidas nem pagamentos confirmados para o período apurado."
-            />
-          ) : (
-            <div className={estilos['grafico']}>
-              {/*
-                SERIE CURTA NAO VIRA TENDENCIA (`SPEC-054` §5.1): com um ponto
-                nao ha comparacao, com dois a reta entre eles sempre parece
-                tendencia. O aviso vem ANTES do grafico -- quem le a curva
-                precisa saber que ela e curta antes de concluir dela.
-              */}
-              {!resumo.serie.suficienteParaLinha ? (
-                <p className={estilos['avisoDaSerie']} data-testid="serie-insuficiente">
-                  Dado insuficiente para comparar períodos:{' '}
-                  {resumo.serie.pontos.length === 1
-                    ? 'há uma competência apurada'
-                    : `há ${resumo.serie.pontos.length} competências apuradas`}
-                  , e a comparação de tendência exige pelo menos três.
-                </p>
-              ) : null}
-
-              <SerieFinanceira
-                testId="grafico-de-competencia"
-                descricao="Valor faturado e recebido por mês de competência"
-                pontos={resumo.serie.pontos.map((ponto) => ({
-                  rotulo: competenciaLegivel(ponto.competencia),
-                  faturadoMinor: ponto.faturadoMinor,
-                  recebidoMinor: ponto.recebidoMinor,
-                }))}
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Faturado e recebido por competência</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              pelo mês de referência da fatura, não pela data do pagamento
+            </p>
+          </CardHeader>
+          <CardContent>
+            {resumo.serie.pontos.length === 0 ? (
+              <EmptyState
+                testId="sem-competencia"
+                title="Nenhuma competência no período"
+                hint="Não há faturas emitidas nem pagamentos confirmados para o período apurado."
               />
+            ) : (
+              <div>
+                {/*
+                  SERIE CURTA NAO VIRA TENDENCIA (`SPEC-054` §5.1): com um ponto
+                  nao ha comparacao, com dois a reta entre eles sempre parece
+                  tendencia. O aviso vem ANTES do grafico -- quem le a curva
+                  precisa saber que ela e curta antes de concluir dela.
+                */}
+                {!resumo.serie.suficienteParaLinha ? (
+                  <p className="mb-2 text-sm text-muted-foreground" data-testid="serie-insuficiente">
+                    Dado insuficiente para comparar períodos:{' '}
+                    {resumo.serie.pontos.length === 1
+                      ? 'há uma competência apurada'
+                      : `há ${resumo.serie.pontos.length} competências apuradas`}
+                    , e a comparação de tendência exige pelo menos três.
+                  </p>
+                ) : null}
 
-              {/*
-                A TABELA FICA RECOLHIDA, e o `SerieFinanceira` ja publica uma
-                tabela INVISIVEL para leitor de tela -- entao a regra "todo
-                grafico tem tabela equivalente no DOM" (PRD) esta cumprida com
-                o `<details>` fechado.
+                <EvolucaoDeReceita
+                  testId="grafico-de-competencia"
+                  pontos={resumo.serie.pontos.map((ponto) => ({
+                    rotulo: competenciaLegivel(ponto.competencia),
+                    faturadoMinor: ponto.faturadoMinor,
+                    recebidoMinor: ponto.recebidoMinor,
+                  }))}
+                />
 
-                Quem abre a tela quer a TENDENCIA; quem vai conferir um numero
-                abre o detalhe, e e a minoria dos acessos. Aberta por padrao,
-                ela custava ~300px repetindo o que o grafico ja desenha.
-              */}
-              <details className={estilos['detalhe']}>
-                <summary className={estilos['detalheGatilho']}>Ver valores exatos</summary>
+                {/*
+                  A TABELA FICA RECOLHIDA -- `EvolucaoDeReceita` nao publica
+                  tabela sr-only para os casos com >= 3 pontos com o mesmo
+                  formato desta, entao a regra "todo grafico tem tabela
+                  equivalente no DOM" (PRD) fica por conta deste `<details>`.
 
-                <div className={estilos['detalheConteudo']}>
-                  <DataTable
-                    testId="serie-por-competencia"
-                    empty={<EmptyState title="Nenhuma competência no período" />}
-                    rows={resumo.serie.pontos}
-                    rowKey={(ponto) => ponto.competencia}
-                    caption="Valor faturado e recebido por mês de competência"
-                    columns={[
-                      {
-                        key: 'competencia',
-                        header: 'Competência',
-                        role: 'identity',
-                        render: (ponto) => competenciaLegivel(ponto.competencia),
-                      },
-                      {
-                        key: 'faturado',
-                        header: 'Faturado',
-                        role: 'value',
-                        render: (ponto) => <Money cents={ponto.faturadoMinor} currency="BRL" />,
-                      },
-                      {
-                        key: 'recebido',
-                        header: 'Recebido',
-                        role: 'value',
-                        render: (ponto) => <Money cents={ponto.recebidoMinor} currency="BRL" />,
-                      },
-                      {
-                        /*
-                          A COLUNA QUE A TABELA ANTIGA NAO TINHA. O gestor vinha
-                          subtraindo faturado menos recebido a cada linha para
-                          achar o buraco do mes -- que e a pergunta do bloco.
-                        */
-                        key: 'naoEntrou',
-                        header: 'Não entrou',
-                        role: 'value',
-                        render: (ponto) => (
-                          <Money
-                            cents={Math.max(ponto.faturadoMinor - ponto.recebidoMinor, 0)}
-                            currency="BRL"
-                          />
-                        ),
-                      },
-                    ]}
-                  />
-                </div>
-              </details>
-            </div>
-          )}
-        </div>
+                  Quem abre a tela quer a TENDENCIA; quem vai conferir um numero
+                  abre o detalhe, e e a minoria dos acessos. Aberta por padrao,
+                  ela custava ~300px repetindo o que o grafico ja desenha.
+                */}
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                    Ver valores exatos
+                  </summary>
 
-        <div className={estilos['cartao']}>
-          <h2 className={estilos['tituloDoCartao']}>Por onde o dinheiro entrou</h2>
-          {resumo.recebidoMinor === 0 ? (
-            <EmptyState
-              testId="sem-pagamento"
-              title="Nenhum pagamento no período"
-              hint="Nenhuma forma de pagamento registrou entrada no período apurado."
-            />
-          ) : (
-            <GraficoDeRosca
-              testId="quebra-por-metodo"
-              descricao="Valor recebido por forma de pagamento no período apurado"
-              {...(maiorMetodo
-                ? { rotuloCentral: NOME_DO_METODO[maiorMetodo.metodo] ?? maiorMetodo.metodo }
-                : {})}
-              {...(proporcaoDoMaiorMetodo === null
-                ? {}
-                : { valorCentral: `${String(proporcaoDoMaiorMetodo).replace('.', ',')}%` })}
-              segmentos={resumo.quebraPorMetodo.map((metodo) => {
-                const proporcao = percentualDoTotal(metodo.minorTotal, resumo.recebidoMinor);
+                  <div className="mt-2">
+                    <DataTable
+                      testId="serie-por-competencia"
+                      empty={<EmptyState title="Nenhuma competência no período" />}
+                      rows={resumo.serie.pontos}
+                      rowKey={(ponto) => ponto.competencia}
+                      caption="Valor faturado e recebido por mês de competência"
+                      columns={[
+                        {
+                          key: 'competencia',
+                          header: 'Competência',
+                          role: 'identity',
+                          render: (ponto) => competenciaLegivel(ponto.competencia),
+                        },
+                        {
+                          key: 'faturado',
+                          header: 'Faturado',
+                          role: 'value',
+                          render: (ponto) => <Money cents={ponto.faturadoMinor} currency="BRL" />,
+                        },
+                        {
+                          key: 'recebido',
+                          header: 'Recebido',
+                          role: 'value',
+                          render: (ponto) => <Money cents={ponto.recebidoMinor} currency="BRL" />,
+                        },
+                        {
+                          /*
+                            A COLUNA QUE A TABELA ANTIGA NAO TINHA. O gestor vinha
+                            subtraindo faturado menos recebido a cada linha para
+                            achar o buraco do mes -- que e a pergunta do bloco.
+                          */
+                          key: 'naoEntrou',
+                          header: 'Não entrou',
+                          role: 'value',
+                          render: (ponto) => (
+                            <Money
+                              cents={Math.max(ponto.faturadoMinor - ponto.recebidoMinor, 0)}
+                              currency="BRL"
+                            />
+                          ),
+                        },
+                      ]}
+                    />
+                  </div>
+                </details>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-                return {
-                  rotulo: NOME_DO_METODO[metodo.metodo] ?? metodo.metodo,
-                  valor: metodo.minorTotal,
-                  tokenDeCor: COR_DO_METODO[metodo.metodo] ?? '--ah-text-muted',
-                  valorLegivel:
-                    proporcao === null
-                      ? formatarDinheiro(metodo.minorTotal)
-                      : `${formatarDinheiro(metodo.minorTotal)} · ${String(proporcao).replace('.', ',')}%`,
-                };
-              })}
-            />
-          )}
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Por onde o dinheiro entrou</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {resumo.recebidoMinor === 0 ? (
+              <EmptyState
+                testId="sem-pagamento"
+                title="Nenhum pagamento no período"
+                hint="Nenhuma forma de pagamento registrou entrada no período apurado."
+              />
+            ) : (
+              /*
+                TESTID NO WRAPPER, mesmo motivo do aging ao lado.
+
+                `ComposicaoPorMetodo` OMITE de proposito (e testado assim na
+                task 8) o metodo sem movimento -- comportamento correto para o
+                GRAFICO, que so desenha fatia com area. Mas a regra desta tela
+                (`SPEC-054`) e mais forte: "a quebra mostra as tres formas,
+                mesmo zeradas" -- omitir "Cartão" faria PIX+Espécie parecer o
+                total e esconderia que uma terceira forma existe e nao entrou.
+                A lista de apoio abaixo do grafico cobre exatamente o metodo
+                que o grafico deixou de fora.
+              */
+              <div data-testid="quebra-por-metodo">
+                <ComposicaoPorMetodo
+                  segmentos={resumo.quebraPorMetodo.map((metodo) => ({
+                    rotulo: NOME_DO_METODO[metodo.metodo] ?? metodo.metodo,
+                    valorMinor: metodo.minorTotal,
+                    percentual: percentualDoTotal(metodo.minorTotal, resumo.recebidoMinor),
+                    tokenDeCor: COR_DO_METODO[metodo.metodo] ?? '--ah-text-muted',
+                  }))}
+                />
+
+                {resumo.quebraPorMetodo.some((metodo) => metodo.minorTotal === 0) ? (
+                  <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    {resumo.quebraPorMetodo
+                      .filter((metodo) => metodo.minorTotal === 0)
+                      .map((metodo) => (
+                        <li key={metodo.metodo}>
+                          {NOME_DO_METODO[metodo.metodo] ?? metodo.metodo}: {formatarDinheiro(0)} · 0%
+                        </li>
+                      ))}
+                  </ul>
+                ) : null}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/*
-        LINHA 2 DE GRAFICOS: aging da divida (BarrasVerticais, no lugar de
-        BarrasDeFaixa) lado a lado com o bloco de saude do negocio, que reune
+        LINHA 2 DE GRAFICOS: aging da divida (AgingDaDivida, no lugar de
+        BarrasVerticais) lado a lado com o bloco de saude do negocio, que reune
         os quatro KPIs de retencao que saíram da faixa compacta.
       */}
-      <div className={estilos['duasColunasGraficos']}>
-        <div className={estilos['cartao']}>
-          <h2 className={estilos['tituloDoCartao']}>Onde o dinheiro parou</h2>
-          {resumo.faturasVencidas === 0 ? (
-            <EmptyState
-              testId="sem-divida"
-              title="Nenhuma fatura vencida"
-              hint="Não há dinheiro parado no momento."
-            />
-          ) : (
-            <BarrasVerticais
-              testId="faixas-da-divida"
-              descricao="Valor vencido por faixa de tempo, considerando toda a dívida em aberto"
-              faixas={resumo.faixas.map((faixa) => ({
-                rotulo: faixa.rotulo,
-                valor: faixa.minorTotal,
-                tokenDeCor: COR_DA_FAIXA[faixa.rotulo] ?? '--ah-text-muted',
-                valorLegivel: formatarDinheiro(faixa.minorTotal),
-              }))}
-            />
-          )}
-        </div>
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Onde o dinheiro parou</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {resumo.faturasVencidas === 0 ? (
+              <EmptyState
+                testId="sem-divida"
+                title="Nenhuma fatura vencida"
+                hint="Não há dinheiro parado no momento."
+              />
+            ) : (
+              /*
+                O TESTID DA PAGINA VAI NO WRAPPER, NAO REPASSADO AO COMPONENTE:
+                `AgingDaDivida` aplica seu `testId` so no wrapper `aria-hidden`
+                do grafico visual, deixando a tabela sr-only (onde o valor
+                formatado em R$ realmente aparece) de fora do escopo desse
+                testid -- comportamento proprio e testado do componente
+                (task 8). Aqui o testid precisa cobrir os dois.
+              */
+              <div data-testid="faixas-da-divida">
+                <AgingDaDivida
+                  faixas={resumo.faixas.map((faixa) => ({
+                    rotulo: faixa.rotulo,
+                    valorMinor: faixa.minorTotal,
+                    tokenDeCor: COR_DA_FAIXA[faixa.rotulo] ?? '--ah-text-muted',
+                  }))}
+                />
+              </div>
+            )}
 
-        <div className={estilos['cartao']}>
-          <h2 className={estilos['tituloDoCartao']}>Saúde do negócio &amp; retenção</h2>
-          {/*
-            OS QUATRO KPIS DA F74 (`SPEC-074`) que restam: novos, cancelamentos,
-            churn e LTV. Alunos ativos ja virou hero card acima.
-          */}
-          <div className={estilos['subKpis']}>
-            <div className={estilos['subKpi']}>
-              <p className={estilos['kpiRotulo']}>Novos alunos</p>
-              <p className={estilos['kpiValor']} data-testid="novos-alunos">
-                {resumo.novosAlunos}
-              </p>
-              <p className={estilos['kpiApoio']}>no período</p>
+            <div className="mt-4">
+              <Button render={<Link href="/billing/delinquency" />} nativeButton={false}>
+                Acessar fila de cobrança
+              </Button>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className={estilos['subKpi']} {...(resumo.cancelamentos > 0 ? { 'data-tom': 'risk' } : {})}>
-              <p className={estilos['kpiRotulo']}>Cancelamentos</p>
-              <p className={estilos['kpiValor']} data-testid="cancelamentos">
-                {resumo.cancelamentos}
-              </p>
-              <p className={estilos['kpiApoio']}>no período</p>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Saúde do negócio &amp; retenção</CardTitle>
+            <Badge variant={VARIANTE_DO_SCORE[scoreDoPeriodo]} data-testid="score-do-negocio">
+              {ROTULO_DO_SCORE[scoreDoPeriodo]}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            {/*
+              OS QUATRO KPIS DA F74 (`SPEC-074`) que restam: novos, cancelamentos,
+              churn e LTV. Alunos ativos ja virou hero card acima.
+            */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Novos alunos</p>
+                <p className="mt-1 text-lg font-semibold" data-testid="novos-alunos">
+                  {resumo.novosAlunos}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">no período</p>
+              </div>
 
-            <div className={estilos['subKpi']} {...(resumo.cancelamentos > 0 ? { 'data-tom': 'risk' } : {})}>
-              <p className={estilos['kpiRotulo']}>Taxa de churn</p>
-              <p className={estilos['kpiValor']} data-testid="taxa-de-churn">
-                {resumo.taxaDeChurn === null ? (
-                  <Ausente />
-                ) : (
-                  `${String(resumo.taxaDeChurn).replace('.', ',')}%`
-                )}
-              </p>
-              {/*
-                LTV E CHURN carregam a mesma ressalva da base do Pacto que a
-                §5.2 da F54 ja aplica a inadimplencia: cancelamento sem evento
-                de timeline nao entra na conta (`SPEC-074` §3).
-              */}
-              <p className={estilos['kpiApoio']}>sobre a base pagante do início do período</p>
-            </div>
+              <div className={resumo.cancelamentos > 0 ? 'text-(--ah-state-risk)' : undefined}>
+                <p className="text-sm text-muted-foreground">Cancelamentos</p>
+                <p className="mt-1 text-lg font-semibold" data-testid="cancelamentos">
+                  {resumo.cancelamentos}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">no período</p>
+              </div>
 
-            <div className={estilos['subKpi']}>
-              <p className={estilos['kpiRotulo']}>LTV</p>
-              <p className={estilos['kpiValor']} data-testid="ltv">
-                {resumo.ltv === null ? <Ausente /> : <Money cents={resumo.ltv} currency="BRL" />}
-              </p>
-              <p className={estilos['kpiApoio']}>ticket médio × vida média observada</p>
+              <div className={resumo.cancelamentos > 0 ? 'text-(--ah-state-risk)' : undefined}>
+                <p className="text-sm text-muted-foreground">Taxa de churn</p>
+                <p className="mt-1 text-lg font-semibold" data-testid="taxa-de-churn">
+                  {resumo.taxaDeChurn === null ? (
+                    <Ausente />
+                  ) : (
+                    `${String(resumo.taxaDeChurn).replace('.', ',')}%`
+                  )}
+                </p>
+                {/*
+                  LTV E CHURN carregam a mesma ressalva da base do Pacto que a
+                  §5.2 da F54 ja aplica a inadimplencia: cancelamento sem evento
+                  de timeline nao entra na conta (`SPEC-074` §3).
+                */}
+                <p className="mt-1 text-xs text-muted-foreground">sobre a base pagante do início do período</p>
+              </div>
+
+              <div>
+                <p className="text-sm text-muted-foreground">LTV</p>
+                <p className="mt-1 text-lg font-semibold" data-testid="ltv">
+                  {resumo.ltv === null ? <Ausente /> : <Money cents={resumo.ltv} currency="BRL" />}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">ticket médio × vida média observada</p>
+              </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/*
@@ -781,18 +927,20 @@ export default async function PainelFinanceiroPage({
         distorcem qualquer percentual. Uma taxa lida sem o denominador afirma
         sobre a ACADEMIA o que e verdade sobre a IMPORTACAO.
       */}
-      <dl className={estilos['base']} data-testid="base-de-calculo">
+      <dl className="grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-3" data-testid="base-de-calculo">
         <div>
-          <dt>Base de cálculo:</dt>
-          <dd>{resumo.base.alunosPagantes} aluno(s) com assinatura ativa ou em atraso</dd>
+          <dt className="inline">Base de cálculo:</dt>
+          <dd className="inline text-foreground">
+            {resumo.base.alunosPagantes} aluno(s) com assinatura ativa ou em atraso
+          </dd>
         </div>
         <div>
-          <dt>Com fatura vencida:</dt>
-          <dd>{resumo.base.alunosInadimplentes}</dd>
+          <dt className="inline">Com fatura vencida:</dt>
+          <dd className="inline text-foreground">{resumo.base.alunosInadimplentes}</dd>
         </div>
         <div>
-          <dt>Assinaturas ativas:</dt>
-          <dd>{resumo.base.assinaturasAtivas}</dd>
+          <dt className="inline">Assinaturas ativas:</dt>
+          <dd className="inline text-foreground">{resumo.base.assinaturasAtivas}</dd>
         </div>
       </dl>
     </section>

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@arenahub/ui';
@@ -58,6 +58,8 @@ const RESUMO = {
   cancelamentos: 1,
   taxaDeChurn: 33.3,
   ltv: 90_000,
+  planoMaisPopular: null,
+  ocupacaoPorUnidade: [],
 };
 
 async function renderizar(
@@ -604,6 +606,74 @@ describe('painel financeiro', () => {
 
     expect(screen.getByTestId('taxa-de-churn')).toHaveTextContent('—');
     expect(screen.getByTestId('ltv')).toHaveTextContent('—');
+  });
+});
+
+describe('capacidade instalada por unidade', () => {
+  it('nao mostra a secao quando nenhuma unidade tem capacidadeMaxima definida', async () => {
+    await renderizar({
+      ...RESUMO,
+      ocupacaoPorUnidade: [{ nomeDaUnidade: 'Jardins', alunosAtivos: 224, capacidadeMaxima: null }],
+    });
+    expect(screen.queryByTestId('ocupacao-por-unidade')).not.toBeInTheDocument();
+  });
+
+  it('mostra uma barra por unidade com capacidadeMaxima definida', async () => {
+    await renderizar({
+      ...RESUMO,
+      ocupacaoPorUnidade: [
+        { nomeDaUnidade: 'Jardins', alunosAtivos: 224, capacidadeMaxima: 300 },
+        { nomeDaUnidade: 'Centro', alunosAtivos: 80, capacidadeMaxima: null },
+      ],
+    });
+
+    const secao = screen.getByTestId('ocupacao-por-unidade');
+    expect(within(secao).getByText('Jardins')).toBeInTheDocument();
+    expect(within(secao).getByText(/74%|75%/)).toBeInTheDocument(); // 224/300 arredondado
+    // unidade sem capacidadeMaxima aparece so com a contagem, sem barra
+    expect(within(secao).getByText('Centro')).toBeInTheDocument();
+  });
+
+  it('clampa a barra em 100% quando alunosAtivos excede capacidadeMaxima', async () => {
+    await renderizar({
+      ...RESUMO,
+      ocupacaoPorUnidade: [{ nomeDaUnidade: 'Jardins', alunosAtivos: 350, capacidadeMaxima: 300 }],
+    });
+
+    expect(screen.getByTestId('ocupacao-por-unidade')).toHaveTextContent('100%');
+    expect(screen.getByTestId('ocupacao-por-unidade')).not.toHaveTextContent('116%');
+  });
+
+  it('nao mostra a secao inteira quando ocupacaoPorUnidade vem vazio', async () => {
+    await renderizar({ ...RESUMO, ocupacaoPorUnidade: [] });
+    expect(screen.queryByTestId('ocupacao-por-unidade')).not.toBeInTheDocument();
+  });
+});
+
+describe('score saudavel', () => {
+  it('mostra Sem dado suficiente quando variacaoRecebido e null (serie curta)', async () => {
+    await renderizar({
+      ...RESUMO,
+      serie: { pontos: RESUMO.serie.pontos.slice(0, 1), suficienteParaLinha: false },
+    });
+    expect(screen.getByTestId('score-do-negocio')).toHaveTextContent(/sem dado suficiente/i);
+  });
+
+  it('mostra Saudavel quando a receita cresceu vs o mes anterior', async () => {
+    await renderizar();
+    expect(screen.getByTestId('score-do-negocio')).toHaveTextContent(/saud/i);
+  });
+});
+
+describe('plano mais popular', () => {
+  it('mostra o nome do plano quando presente no resumo', async () => {
+    await renderizar({ ...RESUMO, planoMaisPopular: { nome: 'Plano Anual', quantidade: 5 } });
+    expect(screen.getByText(/plano anual/i)).toBeInTheDocument();
+  });
+
+  it('nao mostra a linha quando planoMaisPopular e null', async () => {
+    await renderizar({ ...RESUMO, planoMaisPopular: null });
+    expect(screen.queryByTestId('plano-mais-popular')).not.toBeInTheDocument();
   });
 });
 
