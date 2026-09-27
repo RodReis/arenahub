@@ -108,7 +108,7 @@ export function renderPontoDaSerie(
   props: { cx?: number; cy?: number; index?: number },
   totalDePontos: number,
   cor: string,
-): ReactElement {
+): ReactElement<{ r: number }> {
   const ehUltimo = props.index === totalDePontos - 1;
   const raio = ehUltimo ? 6 : 4;
 
