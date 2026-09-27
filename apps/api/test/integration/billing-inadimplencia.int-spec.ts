@@ -697,6 +697,102 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
     }
   });
 
+  it('FIX #416: o contador da aba conta ALUNO, nao fatura', async () => {
+    /**
+     * A aba "Inadimplentes" fica ao lado de "Pagantes", que conta ALUNOS
+     * distintos (`ConsultarPagosUseCase` deduplica por `studentId`). Enquanto
+     * esta contava `linhas.length`, as duas abas mediam unidades diferentes --
+     * e a comparacao que a tela convida a fazer ("109 devem, 119 pagaram")
+     * nao significava nada.
+     *
+     * NAO APARECE NA BASE DE HOJE: em producao so ha set/2026 faturado, com
+     * uma invoice por aluno, entao fatura e aluno coincidem por acidente. O
+     * cenario abaixo e o primeiro em que divergem -- DOIS meses vencidos do
+     * MESMO aluno, que e o que acontece na segunda competencia ou num acordo
+     * parcelado.
+     *
+     * `faturasVencidas` continua contando FATURA de proposito: o card
+     * "FATURAS VENCIDAS AGORA" pergunta quantas faturas, nao quantas pessoas.
+     */
+    const tenantDoAluno = await tenantVazio(`duas-faturas-${sufixo}`);
+
+    try {
+      await db.billingSettings.create({
+        data: { tenantId: tenantDoAluno, dueDay: 10, graceDays: 3 },
+      });
+
+      const unidade = await db.gymUnit.create({
+        data: {
+          tenantId: tenantDoAluno,
+          code: 'MTZ',
+          name: 'Matriz',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+
+      const plano = await db.plan.create({
+        data: { tenantId: tenantDoAluno, name: `Plano Duas Faturas ${sufixo}` },
+      });
+
+      const aluno = await db.student.create({
+        data: {
+          tenantId: tenantDoAluno,
+          gymUnitId: unidade.id,
+          membershipNumber: `DF-${sufixo}`,
+          fullName: 'Aluno Com Duas Faturas',
+          birthDate: new Date('2000-01-01T00:00:00Z'),
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      const assinatura = await db.subscription.create({
+        data: {
+          tenantId: tenantDoAluno,
+          studentId: aluno.id,
+          planId: plano.id,
+          status: 'ACTIVE',
+          startsAt: new Date('2026-07-01T00:00:00Z'),
+        },
+        select: { id: true },
+      });
+
+      // DUAS competencias vencidas do MESMO aluno -- julho e agosto.
+      for (const [indice, competencia] of [
+        new Date('2026-07-01T00:00:00Z'),
+        new Date('2026-08-01T00:00:00Z'),
+      ].entries()) {
+        await db.invoice.create({
+          data: {
+            tenantId: tenantDoAluno,
+            subscriptionId: assinatura.id,
+            studentId: aluno.id,
+            billingPeriod: competencia,
+            number: indice + 1,
+            status: 'OPEN',
+            currency: 'BRL',
+            subtotalMinor: 12990,
+            totalMinor: 12990,
+            dueAt: new Date(competencia.getTime() + 9 * 24 * 60 * 60 * 1000 + 14 * 60 * 60 * 1000),
+          },
+        });
+      }
+
+      const painel = await consultar.executar(
+        { ...contexto, tenantId: tenantDoAluno },
+        DENTRO_DA_CARENCIA,
+      );
+
+      // Duas faturas, UMA pessoa devendo.
+      expect(painel.linhas).toHaveLength(2);
+      expect(painel.resumo.faturasVencidas).toBe(2);
+      expect(painel.resumo.alunosInadimplentes).toBe(1);
+    } finally {
+      await db.tenant.delete({ where: { id: tenantDoAluno } });
+    }
+  });
+
   it('pagina 10 em 10, por cursor', async () => {
     const tenantComVolume = await tenantVazio(`paginacao-${sufixo}`);
 

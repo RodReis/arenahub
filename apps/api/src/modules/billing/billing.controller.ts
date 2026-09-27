@@ -344,6 +344,7 @@ interface PainelDeInadimplenciaDto {
   resumo: {
     emAtrasoMinor: number;
     faturasVencidas: number;
+    alunosInadimplentes: number;
     bloqueados: number;
     taxaDeInadimplencia: number | null;
   };

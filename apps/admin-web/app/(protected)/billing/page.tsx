@@ -411,7 +411,14 @@ export default async function PainelFinanceiroPage({
           anteriores ja sao da F54.
         */}
         <div className={estilos['kpi']}>
-          <p className={estilos['kpiRotulo']}>Alunos ativos</p>
+          {/*
+            "ASSINATURAS VIGENTES", nao "alunos ativos" (issue #416): a query
+            conta `subscriptions` em `ACTIVE`/`PAST_DUE`, nao a coluna
+            `students.status`. Enquanto o rotulo dizia "aluno", este numero
+            contradizia a lista de alunos na tela ao lado -- os dois corretos,
+            medindo eixos diferentes: contrato vigente aqui, cadastro ativo la.
+          */}
+          <p className={estilos['kpiRotulo']}>Assinaturas vigentes</p>
           <p className={estilos['kpiValor']} data-testid="alunos-ativos">
             {resumo.alunosAtivos}
           </p>

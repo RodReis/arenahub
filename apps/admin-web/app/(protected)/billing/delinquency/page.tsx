@@ -49,6 +49,7 @@ interface Painel {
   resumo: {
     emAtrasoMinor: number;
     faturasVencidas: number;
+    alunosInadimplentes: number;
     bloqueados: number;
     taxaDeInadimplencia: number | null;
   };
@@ -288,7 +289,13 @@ export default async function InadimplenciaPage({
           {
             id: 'inadimplentes',
             label: 'Inadimplentes',
-            contador: resumo.faturasVencidas,
+            /*
+              ALUNO, nao fatura (issue #416): a aba vizinha conta aluno
+              distinto, e contar fatura aqui fazia as duas medirem unidades
+              diferentes lado a lado. O card do topo continua em
+              `faturasVencidas` -- la a pergunta e quantas faturas.
+            */
+            contador: resumo.alunosInadimplentes,
             content: (
               <FilaDeCobranca
                 linhas={linhas}
