@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -228,6 +228,8 @@ const NAO_E_CONSOLIDACAO: Prisma.StudentTimelineEventWhereInput = {
 
 @Injectable()
 export class ConsultarResumoFinanceiroUseCase {
+  private readonly log = new Logger(ConsultarResumoFinanceiroUseCase.name);
+
   constructor(private readonly db: PrismaService) {}
 
   /**
@@ -597,11 +599,24 @@ export class ConsultarResumoFinanceiroUseCase {
      * aninhado voltar nulo com o Prisma tipando como nao-nulo neste
      * repositorio antes (ver `rls-include-volta-nulo` no historico do
      * projeto).
+     *
+     * O `continue` NAO PODE FICAR MUDO: se o RLS quebrar para todo mundo, a
+     * lista sairia com todas as unidades zeradas, e "academia vazia" e um
+     * estado plausivel -- ninguem notaria pela tela que a causa foi RLS, nao
+     * ausencia real de aluno. O log ANTES do `continue` e o que torna essa
+     * falha visivel em producao, e nao so no comentario do fonte. So
+     * `studentId` (UUID interno) vai na mensagem -- nunca nome, CPF ou
+     * qualquer PII do aluno (`CLAUDE.md`).
      */
     const alunosAtivosPorUnidade = new Map<string, number>();
     for (const aluno of alunosAtivosAgora) {
       const unidadeDoAluno = aluno.student?.gymUnitId;
-      if (!unidadeDoAluno) continue;
+      if (!unidadeDoAluno) {
+        this.log.error(
+          `ocupacaoPorUnidade: aluno ${aluno.studentId} sem gymUnitId (RLS?)`,
+        );
+        continue;
+      }
 
       alunosAtivosPorUnidade.set(
         unidadeDoAluno,
