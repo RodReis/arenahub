@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import type { Prisma } from '@arenahub/database';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from '@jest/globals';
 
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
@@ -221,6 +222,7 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
     s: Semente,
     tipo: 'SUBSCRIPTION_CREATED' | 'SUBSCRIPTION_CANCELLED',
     occurredAt: Date,
+    payload?: Prisma.InputJsonObject,
   ): Promise<void> {
     await db.studentTimelineEvent.create({
       data: {
@@ -230,6 +232,7 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
         actorType: 'SYSTEM',
         correlationId: randomUUID(),
         occurredAt,
+        ...(payload ? { payload } : {}),
       },
     });
   }
@@ -934,5 +937,32 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
     const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
 
     expect(resumo.ltv).toBeNull();
+  });
+
+  /**
+   * O DEFEITO DA ISSUE #427/#429: `SUBSCRIPTION_CANCELLED` com
+   * `payload.consolidacao: true` e a marca que o script de consolidacao de
+   * assinaturas duplicadas (issue #390, F47/F48) grava ao encerrar a
+   * assinatura duplicada em favor do "sobrevivente" -- e limpeza de
+   * cadastro, o aluno continua pagante. Um lote de 608 desses num tenant
+   * real inflou Cancelamentos, Taxa de churn e LTV como se fosse churn.
+   */
+  it('nao conta consolidacao de assinatura duplicada como cancelamento', async () => {
+    const s = await semearTenant();
+    const segundo = await outraAssinaturaDoMesmoTenant(s);
+
+    await criarEventoDeTimeline(s, 'SUBSCRIPTION_CREATED', new Date('2026-01-01T00:00:00Z'));
+    await criarEventoDeTimeline(segundo, 'SUBSCRIPTION_CREATED', new Date('2026-01-01T00:00:00Z'));
+    await criarEventoDeTimeline(s, 'SUBSCRIPTION_CANCELLED', new Date('2026-08-15T00:00:00Z'), {
+      consolidacao: true,
+      sobreviventeId: segundo.studentId,
+    });
+    // Cancelamento real, sem a marca -- continua contando normalmente.
+    await criarEventoDeTimeline(segundo, 'SUBSCRIPTION_CANCELLED', new Date('2026-08-16T00:00:00Z'));
+
+    const resumo = await useCase.executar(s.contexto, { de: DE, ate: ATE, agora: AGORA });
+
+    expect(resumo.cancelamentos).toBe(1);
+    expect(resumo.taxaDeChurn).toBe(50);
   });
 });
