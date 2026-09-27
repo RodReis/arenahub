@@ -176,6 +176,7 @@ export function periodosDisponiveis(
   competencias: readonly string[],
   janelaAtual: { de: string; ate: string },
   limite = 6,
+  agora: Date = new Date(),
 ): readonly OpcaoDePeriodo[] {
   return [...competencias]
     .sort()
@@ -200,7 +201,16 @@ export function periodosDisponiveis(
           de.toISOString().slice(0, 10) === janelaAtual.de.slice(0, 10) &&
           ate.toISOString().slice(0, 10) === janelaAtual.ate.slice(0, 10),
       };
-    });
+    })
+    /*
+      MES EM CURSO NAO VIRA CHIP -- `validarJanela()` do backend recusa `ate`
+      no futuro (BILLING_SUMMARY_INVALID_WINDOW), e `competenciasDisponiveis`
+      lista toda competencia com invoice, inclusive a do mes corrente. Sem
+      este filtro o unico dado do tenant (a fatura de setembro, mes ainda em
+      curso) virava um chip clicavel que a propria API recusava -- a tela
+      quebrava exatamente ao clicar no periodo que ela mesma ofereceu.
+    */
+    .filter((periodo) => new Date(periodo.ate).getTime() <= agora.getTime());
 }
 
 /**
