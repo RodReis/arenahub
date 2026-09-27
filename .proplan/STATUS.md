@@ -11,7 +11,6 @@ updated: 2026-09-27
 
 - [FIX] Valdivino duplicado no arquivo (confirmado) e Daniel Flavio Cabriny — provável cadastro duplicado (#421)
 - [MVP1][SPEC-082][F82] Trocar plano de assinatura ativa preservando histórico (#420)
-- [FIX] 5 alunos pagaram certo em set/2026 e seguem bloqueados por invoice com preço desatualizado (#419)
 - [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
@@ -40,6 +39,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [FIX] 5 alunos pagaram certo em set/2026 e seguem bloqueados por invoice com preço desatualizado (#419, finalizado em: 2026-09-27)
 - [MVP1][SPEC-081][F81] Tela de equipe: professor, staff e admin fora da contagem de aluno (#415, finalizado em: 2026-09-27)
 - [MVP1][FIX] outras rotas de contagem de aluno somam professor/staff/admin, mesmo defeito da #413 (#423, finalizado em: 2026-09-27)
 - [MVP1][SPEC-074][FIX] contador da aba Inadimplentes conta fatura, e KPI do painel diz aluno onde e assinatura (#416, finalizado em: 2026-09-27)
