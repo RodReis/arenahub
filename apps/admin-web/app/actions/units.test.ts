@@ -153,4 +153,21 @@ describe('editarUnidade', () => {
     expect(estado.valores?.timezone).toBe('America/Manaus');
     expect(vi.mocked(chamarApi)).not.toHaveBeenCalled();
   });
+
+  it('inclui capacidadeMaxima no corpo do PATCH quando preenchida', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({ ok: true, dados: { id: 'u1', name: 'Unidade X' }, cookiesDaApi: [] });
+
+    const formulario = new FormData();
+    formulario.set('unitId', '11111111-1111-4111-8111-111111111111');
+    formulario.set('name', 'Unidade X');
+    formulario.set('timezone', 'America/Sao_Paulo');
+    formulario.set('capacidadeMaxima', '300');
+
+    await editarUnidade({}, formulario);
+
+    expect(vi.mocked(chamarApi).mock.calls[0]?.[0]).toContain('/units/');
+
+    const corpo = vi.mocked(chamarApi).mock.calls[0]?.[1]?.corpo as Record<string, unknown>;
+    expect(corpo['capacidadeMaxima']).toBe(300);
+  });
 });

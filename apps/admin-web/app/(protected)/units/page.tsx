@@ -34,6 +34,7 @@ interface Unidade {
   name: string;
   timezone: string;
   status: string;
+  capacidadeMaxima: number | null;
 }
 
 /**
@@ -200,6 +201,7 @@ export default async function PaginaDeUnidades() {
                   code={u.code}
                   name={u.name}
                   timezone={u.timezone}
+                  capacidadeMaxima={u.capacidadeMaxima}
                 />
                 {/*
                   INATIVAR, e nao excluir (issue #241): dez tabelas

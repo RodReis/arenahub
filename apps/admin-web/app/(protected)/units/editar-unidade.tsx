@@ -15,6 +15,7 @@ interface Props {
   readonly code: string;
   readonly name: string;
   readonly timezone: string;
+  readonly capacidadeMaxima: number | null;
 }
 
 const ESTADO_INICIAL: EstadoDaUnidade = {};
@@ -39,7 +40,7 @@ function BotaoDeEdicao() {
  *
  * `<dialog>` nativo: foco preso, `Esc` e backdrop de graça.
  */
-export function EditarUnidade({ unitId, code, name, timezone }: Props) {
+export function EditarUnidade({ unitId, code, name, timezone, capacidadeMaxima }: Props) {
   const [aberto, setAberto] = useState(false);
   const [estado, acao] = useActionState(editarUnidade, ESTADO_INICIAL);
   const dialogo = useRef<HTMLDialogElement>(null);
@@ -129,6 +130,16 @@ export function EditarUnidade({ unitId, code, name, timezone }: Props) {
                 </option>
               ))}
             </SelectField>
+
+            <Field
+              id={`edicao-capacidade-unidade-${unitId}`}
+              name="capacidadeMaxima"
+              label="Capacidade máxima (opcional)"
+              type="number"
+              min={1}
+              defaultValue={estado.valores?.capacidadeMaxima ?? capacidadeMaxima ?? ''}
+              data-testid="campo-edicao-capacidade-da-unidade"
+            />
 
             {/*
               O CÓDIGO NÃO SE EDITA, e a tela diz por quê em vez de só omitir
