@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -188,6 +189,27 @@ const FAIXAS: ReadonlyArray<{ rotulo: string; de: number; ate: number }> = [
 ];
 
 const METODOS: ReadonlyArray<'MANUAL' | 'PIX' | 'CARD'> = ['MANUAL', 'PIX', 'CARD'];
+
+/**
+ * EXCLUI `SUBSCRIPTION_CANCELLED` de consolidacao de assinatura duplicada
+ * (issue #427/#429, script de consolidacao pos-import #390, F47/F48).
+ *
+ * `NOT: { payload: { path: [...], equals: true } }` SOZINHO NAO FUNCIONA: a
+ * maioria dos eventos tem `payload` NULL no banco (nunca usaram a marca), e
+ * SQL trata `NULL op x` como NULL -- nunca `true` -- entao `NOT NULL`
+ * TAMBEM e NULL, e a linha inteira some do `WHERE`. Foi o que quebrou os
+ * testes existentes de cancelamento/churn ao introduzir o filtro: eventos
+ * SEM payload nenhum sumiam junto com os de consolidacao.
+ *
+ * O `OR` explicito cobre os dois casos validos: payload ausente (o normal)
+ * OU a marca presente mas nao-`true`.
+ */
+const NAO_E_CONSOLIDACAO: Prisma.StudentTimelineEventWhereInput = {
+  OR: [
+    { payload: { equals: Prisma.AnyNull } },
+    { NOT: { payload: { path: ['consolidacao'], equals: true } } },
+  ],
+};
 
 @Injectable()
 export class ConsultarResumoFinanceiroUseCase {
@@ -424,11 +446,20 @@ export class ConsultarResumoFinanceiroUseCase {
         // CANCELAMENTOS: SUBSCRIPTION_CANCELLED na timeline, na janela.
         // NAO CONTA status corrente CANCELLED sem este evento -- e o caso
         // dos ~1.926 registros do import do Pacto (`SPEC-074` §3).
+        //
+        // NAO CONTA CONSOLIDACAO DE DUPLICATA (issue #427/#429): o script de
+        // consolidacao pos-import (issue #390, F47/F48) cancela a assinatura
+        // duplicada e migra o entitlement para o "sobrevivente" -- e limpeza
+        // de cadastro, nao o aluno saindo. Grava `payload.consolidacao: true`
+        // para poder ser distinguido (`membership.repository.ts`), mas
+        // ninguem lia essa marca ate aqui: 608 desses num unico lote inflaram
+        // Cancelamentos, Taxa de churn e LTV como se fossem churn real.
         this.db.studentTimelineEvent.count({
           where: {
             ...doTenant,
             type: 'SUBSCRIPTION_CANCELLED',
             occurredAt: { gte: entrada.de, lt: entrada.ate },
+            ...NAO_E_CONSOLIDACAO,
           },
         }),
 
@@ -446,8 +477,18 @@ export class ConsultarResumoFinanceiroUseCase {
 
         // CANCELAMENTOS ANTES DA JANELA, para excluir do denominador do
         // churn quem ja tinha saido quando o periodo comecou.
+        //
+        // MESMA EXCLUSAO DE CONSOLIDACAO do bloco acima: um aluno que so
+        // teve a assinatura duplicada cancelada por merge de cadastro nunca
+        // "saiu" -- contá-lo aqui excluiria do denominador do churn um
+        // pagante que continua pagante.
         this.db.studentTimelineEvent.findMany({
-          where: { ...doTenant, type: 'SUBSCRIPTION_CANCELLED', occurredAt: { lt: entrada.de } },
+          where: {
+            ...doTenant,
+            type: 'SUBSCRIPTION_CANCELLED',
+            occurredAt: { lt: entrada.de },
+            ...NAO_E_CONSOLIDACAO,
+          },
           select: { studentId: true },
         }),
 
@@ -456,8 +497,16 @@ export class ConsultarResumoFinanceiroUseCase {
         // recortado pela janela, porque a vida media e sobre o historico
         // inteiro de cancelamentos com timeline completa, nao so os do
         // periodo escolhido (`SPEC-074` §4.1).
+        //
+        // MESMA EXCLUSAO DE CONSOLIDACAO: a "vida" de uma assinatura
+        // consolidada nao terminou por churn, terminou por merge de
+        // cadastro -- contá-la aqui subestimaria a vida media real.
         this.db.studentTimelineEvent.findMany({
-          where: { ...doTenant, type: 'SUBSCRIPTION_CANCELLED' },
+          where: {
+            ...doTenant,
+            type: 'SUBSCRIPTION_CANCELLED',
+            ...NAO_E_CONSOLIDACAO,
+          },
           select: { studentId: true, occurredAt: true },
         }),
       ]);
