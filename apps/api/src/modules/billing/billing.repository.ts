@@ -10,7 +10,13 @@ import {
   proximoVencimento,
 } from './domain/ciclo-de-cobranca.js';
 import { precoVigenteEm } from './domain/dinheiro.js';
-import { abrirInvoice, aplicarPagamento, podeTransicionar } from './domain/invoice.js';
+import {
+  abrirInvoice,
+  aplicarPagamento,
+  corrigirValorDaInvoice,
+  podeTransicionar,
+  validarStatusParaCorrecao,
+} from './domain/invoice.js';
 
 export class AssinaturaNaoEncontradaError extends ErroDeDominio {
   constructor() {
@@ -49,6 +55,16 @@ export class AlunoNaoEncontradoError extends ErroDeDominio {
 export class TransicaoDeInvoiceInvalidaError extends ErroDeDominio {
   constructor(de: string, para: string) {
     super('INVOICE_INVALID_TRANSITION', 409, `Invoice em ${de} nao vai para ${para}`);
+  }
+}
+
+export class InvoiceComMaisDeUmItemError extends ErroDeDominio {
+  constructor() {
+    super(
+      'INVOICE_MULTI_ITEM_NOT_SUPPORTED',
+      422,
+      'Correcao de valor so suporta invoice com exatamente um item',
+    );
   }
 }
 
@@ -259,6 +275,108 @@ export class BillingRepository {
       });
 
       return pagamento;
+    });
+  }
+
+  /**
+   * Corrige o valor de uma invoice ainda nao paga (issue #419): 5 alunos
+   * pagaram o preco vigente do plano, mas a invoice de set/2026 abriu com o
+   * preco antigo (reajuste nao propagado). NAO e edicao livre -- so muda o
+   * valor unitario do item unico contra o preco vigente do plano na
+   * competencia, e so em invoice OPEN/OVERDUE (`validarStatusParaCorrecao`,
+   * INV-069: invoice PAID ja tem dinheiro reconhecido contra o valor
+   * anterior).
+   *
+   * Recusa invoice com mais de um item: hoje toda invoice nasce com
+   * exatamente um (`abrirInvoiceDoPeriodo`), e corrigir "o item errado" sem
+   * saber qual seria inventar regra de negocio que nao existe.
+   */
+  async corrigirValorDaInvoice(
+    contexto: TenantContext,
+    entrada: { invoiceId: string; novoValorUnitarioMinor: number; reason: string },
+    correlationId: string,
+  ): Promise<Invoice> {
+    const invoice = await this.db.invoice.findFirst({
+      where: { id: entrada.invoiceId, tenantId: contexto.tenantId },
+      include: { items: true },
+    });
+
+    if (!invoice) {
+      throw new InvoiceNaoEncontradaError();
+    }
+
+    validarStatusParaCorrecao(invoice.status);
+
+    if (invoice.items.length !== 1) {
+      throw new InvoiceComMaisDeUmItemError();
+    }
+
+    const item = invoice.items[0]!;
+    const totais = corrigirValorDaInvoice({
+      quantity: item.quantity,
+      novoValorUnitarioMinor: entrada.novoValorUnitarioMinor,
+      discountMinor: invoice.discountMinor,
+    });
+
+    return this.db.$transaction(async (tx) => {
+      await tx.invoiceItem.update({
+        where: { id: item.id },
+        data: {
+          unitAmountMinor: entrada.novoValorUnitarioMinor,
+          totalMinor: entrada.novoValorUnitarioMinor * item.quantity,
+        },
+      });
+
+      const atualizada = await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          subtotalMinor: totais.subtotalMinor,
+          totalMinor: totais.totalMinor,
+          version: { increment: 1 },
+        },
+      });
+
+      await tx.studentTimelineEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: invoice.studentId,
+          type: 'INVOICE_CORRECTED',
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          correlationId,
+          payload: {
+            invoiceId: invoice.id,
+            deTotalMinor: invoice.totalMinor,
+            paraTotalMinor: totais.totalMinor,
+            reason: entrada.reason,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'billing.invoice.correct_amount',
+          target: 'Invoice',
+          targetId: invoice.id,
+          correlationId,
+          metadata: {
+            deTotalMinor: invoice.totalMinor,
+            paraTotalMinor: totais.totalMinor,
+            reason: entrada.reason,
+          },
+        },
+      });
+
+      await this.publicarEvento(tx, contexto, {
+        invoiceId: invoice.id,
+        eventType: 'InvoiceAmountCorrected',
+        payload: { deTotalMinor: invoice.totalMinor, paraTotalMinor: totais.totalMinor },
+      });
+
+      return atualizada;
     });
   }
 

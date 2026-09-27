@@ -187,6 +187,14 @@ const esquemaDePagamentoManual = z
   })
   .strict();
 
+/** Correcao de valor de invoice ainda nao paga. Issue #419. */
+const esquemaDeCorrecaoDeValor = z
+  .object({
+    novoValorUnitarioMinor: z.number().int().min(0),
+    reason: z.string().min(3).max(300),
+  })
+  .strict();
+
 interface InvoiceItemDto {
   description: string;
   quantity: number;
@@ -498,6 +506,40 @@ export class BillingController {
         amountMinor: dados.amountMinor,
         reason: dados.reason,
         paidAt: new Date(dados.paidAt),
+      },
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    const completa = await this.billing.timelineDaInvoice(this.contexto.require(), id);
+
+    return this.paraDto(completa!);
+  }
+
+  /**
+   * Corrige o valor de uma invoice ainda nao paga contra o preco vigente do
+   * plano. Issue #419: reajuste que nao propagou para a invoice ja aberta,
+   * cobrando o aluno pelo preco antigo e bloqueando na catraca quem pagou
+   * certo. NAO e edicao livre de valor -- so corrige o item unico da
+   * invoice, e so em OPEN/OVERDUE.
+   *
+   * Mesma permissao de `billing.manage`: diferente do pagamento manual, nao
+   * reconhece dinheiro, so ajusta a cobranca.
+   */
+  @Post('invoices/:id/correct-amount')
+  @RequirePermissions('billing.manage')
+  async corrigirValorDaInvoice(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<InvoiceDto> {
+    const dados = esquemaDeCorrecaoDeValor.parse(corpo);
+
+    await this.billing.corrigirValorDaInvoice(
+      this.contexto.require(),
+      {
+        invoiceId: id,
+        novoValorUnitarioMinor: dados.novoValorUnitarioMinor,
+        reason: dados.reason,
       },
       requisicao.correlationId ?? 'sem-correlacao',
     );

@@ -5,7 +5,9 @@ import {
   abrirInvoice,
   aplicarPagamento,
   calcularTotais,
+  corrigirValorDaInvoice,
   podeTransicionar,
+  validarStatusParaCorrecao,
 } from './invoice.js';
 
 /**
@@ -111,5 +113,30 @@ describe('aplicarPagamento', () => {
 
   it('sobrepagamento paga e gera credito da diferenca', () => {
     expect(aplicarPagamento(12000, 12100)).toEqual({ status: 'PAID', creditoMinor: 100 });
+  });
+});
+
+/**
+ * Issue #419: 5 alunos pagaram o preco vigente do plano, mas a invoice de
+ * set/2026 ficou com o preco antigo (reajuste nao propagado). INV-068 diz
+ * que valor nao muda depois da abertura -- esta funcao e a excecao
+ * deliberada para ESTE bug: corrige o preco ERRADO para o preco CERTO que
+ * ja deveria estar la, nao um reajuste novo.
+ */
+describe('corrigirValorDaInvoice', () => {
+  it('recalcula subtotal e total para o novo valor unitario, mantendo o desconto', () => {
+    const totais = corrigirValorDaInvoice({
+      discountMinor: 0,
+      novoValorUnitarioMinor: 20000,
+      quantity: 1,
+    });
+    expect(totais).toEqual({ subtotalMinor: 20000, discountMinor: 0, totalMinor: 20000 });
+  });
+
+  it('so corrige invoice OPEN ou OVERDUE -- paga ja tem dinheiro reconhecido (INV-069)', () => {
+    expect(() => validarStatusParaCorrecao('PAID')).toThrow(InvoiceInvalidaError);
+    expect(() => validarStatusParaCorrecao('CANCELLED')).toThrow(InvoiceInvalidaError);
+    expect(() => validarStatusParaCorrecao('OPEN')).not.toThrow();
+    expect(() => validarStatusParaCorrecao('OVERDUE')).not.toThrow();
   });
 });

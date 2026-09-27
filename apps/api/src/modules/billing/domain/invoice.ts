@@ -115,3 +115,39 @@ export function aplicarPagamento(totalMinor: number, valorPagoMinor: number): Re
 
   return { status: 'PAID', creditoMinor: valorPagoMinor - totalMinor };
 }
+
+export interface EntradaDeCorrecao {
+  quantity: number;
+  novoValorUnitarioMinor: number;
+  discountMinor: number;
+}
+
+/**
+ * Corrige o valor de uma invoice ainda nao paga (issue #419): o preco do
+ * plano reajustou e a invoice nasceu com o preco antigo. NAO E reajuste
+ * novo -- e o preco que ja deveria estar la desde a abertura.
+ *
+ * Excecao deliberada a INV-068 ("valor nao muda depois da abertura"): o
+ * invariante protege contra reescrever o passado por conveniencia, nao
+ * contra corrigir um valor que nunca deveria ter sido esse.
+ */
+export function corrigirValorDaInvoice(entrada: EntradaDeCorrecao): TotaisDaInvoice {
+  return calcularTotais(
+    [{ quantity: entrada.quantity, unitAmountMinor: entrada.novoValorUnitarioMinor }],
+    entrada.discountMinor,
+  );
+}
+
+/**
+ * So corrige invoice que ainda pode virar PAID (OPEN/OVERDUE). Invoice PAID
+ * ja tem dinheiro reconhecido contra o valor errado -- corrigir o preco
+ * dali romperia o pagamento ja registrado (INV-069, mesmo raciocinio de
+ * `podeTransicionar`). CANCELLED nao tem cobranca ativa para corrigir.
+ */
+export function validarStatusParaCorrecao(status: StatusDaInvoice): void {
+  if (status !== 'OPEN' && status !== 'OVERDUE') {
+    throw new InvoiceInvalidaError(
+      `invoice em ${status} nao aceita correcao de valor; so OPEN ou OVERDUE`,
+    );
+  }
+}
