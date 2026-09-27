@@ -536,7 +536,7 @@ describe('periodosDisponiveis', () => {
    */
   it('corta os mais antigos ao passar do limite', () => {
     const doze = Array.from({ length: 12 }, (_, i) => `2026-${String(i + 1).padStart(2, '0')}`);
-    const periodos = periodosDisponiveis(doze, JANELA, 6);
+    const periodos = periodosDisponiveis(doze, JANELA, 6, new Date('2027-01-01T00:00:00.000Z'));
 
     expect(periodos).toHaveLength(6);
     expect(periodos[0]?.rotulo).toBe('jul/2026');
@@ -545,5 +545,26 @@ describe('periodosDisponiveis', () => {
 
   it('devolve lista vazia quando nao ha competencia', () => {
     expect(periodosDisponiveis([], JANELA)).toEqual([]);
+  });
+
+  /**
+   * O BUG DO PI: a competencia do MES EM CURSO virava chip clicavel, e
+   * clicar mandava `ate` no futuro -- o backend recusa com
+   * `BILLING_SUMMARY_INVALID_WINDOW`. `competenciasDisponiveis` lista toda
+   * competencia com invoice, inclusive a do mes que ainda nao fechou.
+   */
+  it('nao oferece chip para o mes em curso', () => {
+    const agora = new Date('2026-09-27T12:00:00.000Z');
+    const periodos = periodosDisponiveis(['2026-08', '2026-09'], JANELA, 6, agora);
+
+    expect(periodos.map((p) => p.rotulo)).toEqual(['ago/2026']);
+  });
+
+  /** O mes que acabou de fechar (virou o dia 1) ja pode ser chip. */
+  it('oferece o mes que fechou exatamente agora', () => {
+    const agora = new Date('2026-09-01T00:00:00.000Z');
+    const periodos = periodosDisponiveis(['2026-08'], JANELA, 6, agora);
+
+    expect(periodos.map((p) => p.rotulo)).toEqual(['ago/2026']);
   });
 });
