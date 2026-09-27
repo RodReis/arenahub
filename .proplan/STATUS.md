@@ -32,15 +32,14 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [MVP3][SPEC-074][FIX] consolidacao de assinatura duplicada infla Cancelamentos/Churn/LTV no painel financeiro (#431)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-074][FIX] consolidacao de assinatura duplicada infla Cancelamentos/Churn/LTV no painel financeiro (#431, finalizado em: 2026-09-27)
 - [MVP3][SPEC-054][FIX] painel financeiro oferece consulta parcial do mes em curso (#429, finalizado em: 2026-09-27)
 - [MVP3][SPEC-054][FIX] chip de período no painel financeiro oferece mês em curso e backend recusa (#427, finalizado em: 2026-09-27)
 - [FIX] 5 alunos pagaram certo em set/2026 e seguem bloqueados por invoice com preço desatualizado (#419, finalizado em: 2026-09-27)
