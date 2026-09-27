@@ -32,13 +32,17 @@ _(vazio)_
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [MVP3][SPEC-074][FIX] consolidacao de assinatura duplicada infla Cancelamentos/Churn/LTV no painel financeiro (#431)
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP3][SPEC-054][FIX] painel financeiro oferece consulta parcial do mes em curso (#429, finalizado em: 2026-09-27)
+- [MVP3][SPEC-054][FIX] chip de período no painel financeiro oferece mês em curso e backend recusa (#427, finalizado em: 2026-09-27)
 - [FIX] 5 alunos pagaram certo em set/2026 e seguem bloqueados por invoice com preço desatualizado (#419, finalizado em: 2026-09-27)
 - [MVP1][SPEC-081][F81] Tela de equipe: professor, staff e admin fora da contagem de aluno (#415, finalizado em: 2026-09-27)
 - [MVP1][FIX] outras rotas de contagem de aluno somam professor/staff/admin, mesmo defeito da #413 (#423, finalizado em: 2026-09-27)
