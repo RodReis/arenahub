@@ -67,6 +67,25 @@ Unidades existentes nascem com `null`; nenhuma migração de dado retroativo.
     ganham o campo; `cadastrarUnidade`/`editarUnidade` incluem `capacidadeMaxima` no corpo da chamada quando
     preenchido.
 
+### `ocupacaoPorUnidade` no resumo financeiro
+
+Achado durante o planejamento: `alunosAtivos` no resumo é agregado do **tenant inteiro**
+(`consultar-resumo-financeiro.use-case.ts` não filtra por `gymUnitId`), e um tenant pode ter várias unidades
+(`Tenant.gymUnits: GymUnit[]`). Comparar `alunosAtivos` (tenant todo) contra `capacidadeMaxima` (de uma
+unidade) só faz sentido sem ambiguidade quando há exatamente uma unidade — em multi-unidade seria uma
+comparação sem sentido.
+
+Decisão do usuário: o widget mostra **uma barra por unidade do mesmo tenant** (nunca de outro tenant — a
+mesma garantia de sempre via `TenantContext`/RLS). `ResumoFinanceiroDto.ocupacaoPorUnidade:
+{ nomeDaUnidade: string; alunosAtivos: number; capacidadeMaxima: number | null }[]`, calculado agrupando
+assinaturas ativas/inadimplentes por `gymUnitId` dentro do próprio tenant. Unidade sem `capacidadeMaxima`
+definida aparece na lista só com a contagem de alunos, sem barra de progresso. Com uma única unidade no
+tenant, o widget é visualmente idêntico a uma barra única.
+
+Isso exige uma query nova no use case (contagem de assinaturas agrupada por `gymUnitId`, análoga ao padrão de
+`groupBy` já usado para "quebra por método") — diferente de `planoMaisPopular`, que reaproveita dado já
+carregado.
+
 ### `planoMaisPopular` no resumo financeiro
 
 `ResumoFinanceiroDto.planoMaisPopular: { nome: string; quantidade: number } | null`. Calculado em
@@ -100,8 +119,10 @@ Não entram no DTO — evita inflar a API com derivados que o front já pode mon
    - **Recebido**: valor + badge de tendência (mantém as 3 guardas existentes: `suficienteParaLinha`,
      `!periodoParcial`, `competenciasConsecutivas`) + barra de progresso da meta mensal
      (`recebidoMinor / metaMensalMinor`, shadcn `Progress`) + sparkline existente.
-   - **Assinaturas vigentes**: valor + barra de capacidade instalada (`alunosAtivos / capacidadeMaxima`) —
-     **condicional: só renderiza se `capacidadeMaxima` não for `null`**.
+   - **Assinaturas vigentes**: valor total do tenant + lista de barras de ocupação, **uma por unidade**
+     (`ocupacaoPorUnidade`), cada uma `alunosAtivos / capacidadeMaxima` daquela unidade — unidade sem
+     `capacidadeMaxima` aparece só com a contagem, sem barra. Lista vazia (nenhuma unidade com capacidade
+     definida) omite a seção inteira.
    - **Ticket médio**: como está hoje + linha de apoio com "Plano mais popular" (texto, não é widget próprio).
 
 3. **Faixa compacta de KPIs** (Esperado, A receber, Vencido, Inadimplência, Estornado condicional) — shadcn
