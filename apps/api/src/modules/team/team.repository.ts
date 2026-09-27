@@ -129,7 +129,7 @@ export class TeamRepository {
           actorType: 'USER',
           actorId: contexto.actorId,
           correlationId,
-          payload: { campos: Object.keys(dados) },
+          payload: { campos: Object.keys(dados).filter((c) => dados[c as keyof typeof dados] !== undefined) },
         },
       });
 
@@ -142,7 +142,7 @@ export class TeamRepository {
           target: 'student',
           targetId: id,
           correlationId,
-          metadata: { campos: Object.keys(dados) },
+          metadata: { campos: Object.keys(dados).filter((c) => dados[c as keyof typeof dados] !== undefined) },
         },
       });
 
