@@ -118,6 +118,108 @@
   color: var(--ah-text-default);
 }
 
+/* ─── Hero KPIs ────────────────────────────────────────────────────────── */
+
+/*
+ * OS TRES INDICADORES QUE ABREM A TELA -- dinheiro (recebido), alunos
+ * (assinaturas vigentes), ticket medio. Destacados da faixa compacta que
+ * segue, sem repetir a mesma lauda do PI de 25/08/2026 sobre nao criar um
+ * numero gigante isolado: aqui sao tres cards, nao um so.
+ */
+.heroKpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+@media (max-width: 900px) {
+  .heroKpis {
+    grid-template-columns: 1fr;
+  }
+}
+
+.heroCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.heroCard[data-tom] {
+  background: color-mix(in srgb, currentColor 6%, var(--ah-surface-raised));
+}
+
+.heroCard[data-tom='success'] {
+  color: var(--ah-state-success);
+}
+
+.heroCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.heroRotulo {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ah-text-secondary);
+}
+
+/*
+ * O BADGE SO APARECE COM DADO REAL de mes anterior -- ver `page.tsx`. Sem
+ * ele, nenhum elemento ocupa o lugar (nao ha "-- %" nem espaco vazio).
+ */
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.heroBadge[data-tom='success'] {
+  color: var(--ah-state-success);
+  background: color-mix(in srgb, var(--ah-state-success) 12%, transparent);
+}
+
+.heroBadge[data-tom='danger'] {
+  color: var(--ah-state-danger);
+  background: color-mix(in srgb, var(--ah-state-danger) 12%, transparent);
+}
+
+.heroValor {
+  margin: 0;
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.heroCard[data-tom] .heroValor {
+  color: currentColor;
+}
+
+.heroApoio {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ah-text-secondary);
+}
+
+.heroTendencia {
+  margin-top: 4px;
+}
+
 /* ─── Faixa de KPI ─────────────────────────────────────────────────────── */
 
 /*
@@ -221,24 +323,7 @@
   color: var(--ah-text-secondary);
 }
 
-/* O sparkline mora dentro do KPI, sem margem propria. */
-.kpiTendencia {
-  margin-top: 2px;
-}
-
 /* ─── Blocos ───────────────────────────────────────────────────────────── */
-
-.tituloDaSecao {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0 0 12px;
-  font-size: var(--ah-type-heading-size);
-  line-height: var(--ah-type-heading-lh);
-  font-weight: 600;
-  color: var(--ah-text-strong);
-}
 
 .apoioDoTitulo {
   font-size: var(--ah-type-caption-size);
@@ -248,22 +333,19 @@
 }
 
 /*
- * DUAS PERGUNTAS IRMAS LADO A LADO: "onde o dinheiro parou" e "por onde ele
- * entrou". Empilhadas custavam ~380px e obrigavam a rolar entre duas metades
- * da mesma leitura.
- *
- * A 1024px viram uma coluna -- e o breakpoint `degraded` do DS, abaixo do qual
- * a densidade lado a lado deixa de caber.
+ * DUAS LINHAS DE GRAFICO LADO A LADO: evolucao de receita + metodo de
+ * pagamento, e aging da divida + saude do negocio. Mesmo breakpoint
+ * `degraded` do DS (1024px) que a faixa antiga ja usava.
  */
-.duasColunas {
+.duasColunasGraficos {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 3fr 2fr;
   gap: 16px;
   margin: 0 0 24px;
 }
 
 @media (max-width: 1024px) {
-  .duasColunas {
+  .duasColunasGraficos {
     grid-template-columns: 1fr;
   }
 }
@@ -293,8 +375,33 @@
   color: var(--ah-text-default);
 }
 
-.secao {
-  margin: 0 0 24px;
+/*
+ * SUB-KPIS DO BLOCO DE SAUDE DO NEGOCIO. Reusa a mesma tipografia de
+ * `.kpi`/`.kpiRotulo`/`.kpiValor`/`.kpiApoio` (por isso o JSX aplica essas
+ * classes aos <p> internos), so o container muda: grade 2x2 dentro do
+ * cartao, em vez da faixa horizontal com divisores de 1px.
+ */
+.subKpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.subKpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-radius: calc(var(--ah-radius-card) - 2px);
+  background: var(--ah-surface-sunken);
+}
+
+.subKpi[data-tom='risk'] {
+  color: var(--ah-state-risk);
+}
+
+.subKpi[data-tom] .kpiValor {
+  color: currentColor;
 }
 
 .grafico {
