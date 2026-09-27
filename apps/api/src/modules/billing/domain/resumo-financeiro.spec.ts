@@ -6,6 +6,7 @@ import {
   MINIMO_DE_PONTOS_DA_SERIE,
   MINIMO_DE_CANCELAMENTOS_PARA_LTV,
   montarSerie,
+  ocupacaoPorUnidade,
   planoMaisPopular,
   taxaDeChurn,
   taxaDeInadimplencia,
@@ -313,5 +314,32 @@ describe('planoMaisPopular', () => {
     const assinaturas = [{ planId: 'orfao' }];
 
     expect(planoMaisPopular(assinaturas, new Map())).toBeNull();
+  });
+});
+
+describe('ocupacaoPorUnidade', () => {
+  it('retorna lista vazia sem unidades', () => {
+    expect(ocupacaoPorUnidade([], new Map())).toEqual([]);
+  });
+
+  it('junta capacidade da unidade com a contagem de alunos ativos dela', () => {
+    const unidades = [
+      { id: 'u1', nome: 'Jardins', capacidadeMaxima: 300 },
+      { id: 'u2', nome: 'Centro', capacidadeMaxima: null },
+    ];
+    const alunosPorUnidade = new Map([['u1', 224], ['u2', 80]]);
+
+    expect(ocupacaoPorUnidade(unidades, alunosPorUnidade)).toEqual([
+      { nomeDaUnidade: 'Jardins', alunosAtivos: 224, capacidadeMaxima: 300 },
+      { nomeDaUnidade: 'Centro', alunosAtivos: 80, capacidadeMaxima: null },
+    ]);
+  });
+
+  it('unidade sem aluno nenhum entra com contagem zero, nao e omitida', () => {
+    const unidades = [{ id: 'u1', nome: 'Nova Unidade', capacidadeMaxima: 100 }];
+
+    expect(ocupacaoPorUnidade(unidades, new Map())).toEqual([
+      { nomeDaUnidade: 'Nova Unidade', alunosAtivos: 0, capacidadeMaxima: 100 },
+    ]);
   });
 });

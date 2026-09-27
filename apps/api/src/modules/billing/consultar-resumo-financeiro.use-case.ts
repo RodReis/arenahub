@@ -7,6 +7,7 @@ import { precoVigenteEm } from './domain/dinheiro.js';
 import {
   ltv,
   montarSerie,
+  ocupacaoPorUnidade,
   planoMaisPopular,
   taxaDeChurn,
   taxaDeInadimplencia,
@@ -164,6 +165,16 @@ export interface ResumoFinanceiro {
 
   /** O plano com mais assinaturas ativas/inadimplentes no periodo. Ver `planoMaisPopular()`. */
   readonly planoMaisPopular: { nome: string; quantidade: number } | null;
+
+  /**
+   * Ocupacao de cada unidade do tenant -- widget "Capacidade instalada".
+   * Ver `ocupacaoPorUnidade()`.
+   */
+  readonly ocupacaoPorUnidade: readonly {
+    nomeDaUnidade: string;
+    alunosAtivos: number;
+    capacidadeMaxima: number | null;
+  }[];
 }
 
 const UM_DIA_EM_MS = 86_400_000;
@@ -260,6 +271,7 @@ export class ConsultarResumoFinanceiroUseCase {
       alunosCriadosAntesDaJanela,
       cancelamentosAntesDaJanela,
       eventosCancelamentoParaLtv,
+      unidadesDoTenant,
     ] = await Promise.all([
         // RECEBIDO: pagamento CONFIRMED com `paidAt` na janela.
         //
@@ -432,9 +444,17 @@ export class ConsultarResumoFinanceiroUseCase {
         // ALUNOS ATIVOS: snapshot de AGORA, contagem distinta -- um aluno
         // pode ter mais de uma assinatura ao longo da vida, mas so uma
         // vigente por vez (indice parcial da issue #272).
+        //
+        // O SELECT ATRAVESSA A RELACAO ATE `student.gymUnitId` para a
+        // ocupacao por unidade (F-ocupacao) poder agrupar sem uma segunda
+        // consulta: `Subscription` nao tem unidade propria, quem tem e o
+        // `Student` (`gymUnitId` obrigatorio no schema). O padrao ja existe
+        // em varios use cases deste modulo (`aplicar-inadimplencia`,
+        // `consultar-inadimplencia`, `consultar-pagos`,
+        // `criar-checkout-de-cartao`, `emitir-recibo`).
         this.db.subscription.findMany({
           where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] } },
-          select: { studentId: true },
+          select: { studentId: true, student: { select: { gymUnitId: true } } },
           distinct: ['studentId'],
         }),
 
@@ -513,6 +533,14 @@ export class ConsultarResumoFinanceiroUseCase {
           },
           select: { studentId: true, occurredAt: true },
         }),
+
+        // UNIDADES DO TENANT, com a capacidade cadastrada -- widget
+        // "Capacidade instalada". `doTenant` no where: unidade de outro
+        // tenant nunca pode vazar para este resumo.
+        this.db.gymUnit.findMany({
+          where: doTenant,
+          select: { id: true, name: true, capacidadeMaxima: true },
+        }),
       ]);
 
     const criacoesPorAluno = eventosCancelamentoParaLtv.length
@@ -558,6 +586,28 @@ export class ConsultarResumoFinanceiroUseCase {
 
     const inadimplentes = new Set(vencidas.map((invoice) => invoice.studentId));
     const pagantes = new Set(assinaturas.map((assinatura) => assinatura.studentId));
+
+    /**
+     * ALUNOS ATIVOS POR UNIDADE -- alimenta `ocupacaoPorUnidade()`.
+     *
+     * A unidade vem de `aluno.student.gymUnitId` (atravessado no select de
+     * `alunosAtivosAgora`), nao de `Subscription`: `Subscription` nao tem
+     * coluna de unidade. `Student.gymUnitId` e obrigatorio no schema, mas o
+     * `if` abaixo fica de guarda mesmo assim -- RLS ja fez `include`
+     * aninhado voltar nulo com o Prisma tipando como nao-nulo neste
+     * repositorio antes (ver `rls-include-volta-nulo` no historico do
+     * projeto).
+     */
+    const alunosAtivosPorUnidade = new Map<string, number>();
+    for (const aluno of alunosAtivosAgora) {
+      const unidadeDoAluno = aluno.student?.gymUnitId;
+      if (!unidadeDoAluno) continue;
+
+      alunosAtivosPorUnidade.set(
+        unidadeDoAluno,
+        (alunosAtivosPorUnidade.get(unidadeDoAluno) ?? 0) + 1,
+      );
+    }
 
     const estornadoMinor = estornado._sum.amountMinor ?? 0;
 
@@ -646,6 +696,14 @@ export class ConsultarResumoFinanceiroUseCase {
         paresDeVida.length,
       ),
       planoMaisPopular: planoMaisPopular(assinaturas, nomesPorId),
+      ocupacaoPorUnidade: ocupacaoPorUnidade(
+        unidadesDoTenant.map((unidade) => ({
+          id: unidade.id,
+          nome: unidade.name,
+          capacidadeMaxima: unidade.capacidadeMaxima,
+        })),
+        alunosAtivosPorUnidade,
+      ),
     };
   }
 

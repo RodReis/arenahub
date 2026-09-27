@@ -431,6 +431,7 @@ interface ResumoFinanceiroDto {
   taxaDeChurn: number | null;
   ltv: number | null;
   planoMaisPopular: { nome: string; quantidade: number } | null;
+  ocupacaoPorUnidade: { nomeDaUnidade: string; alunosAtivos: number; capacidadeMaxima: number | null }[];
 }
 
 interface LiberacaoDto {
@@ -942,6 +943,17 @@ export class BillingController {
           nullable: true,
           properties: { nome: { type: 'string' }, quantidade: { type: 'integer' } },
         },
+        ocupacaoPorUnidade: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              nomeDaUnidade: { type: 'string' },
+              alunosAtivos: { type: 'integer' },
+              capacidadeMaxima: { type: 'integer', nullable: true },
+            },
+          },
+        },
       },
     },
   })
@@ -965,6 +977,7 @@ export class BillingController {
       quebraPorMetodo: [...resumo.quebraPorMetodo],
       serie: { pontos: [...resumo.serie.pontos], suficienteParaLinha: resumo.serie.suficienteParaLinha },
       competenciasDisponiveis: [...resumo.competenciasDisponiveis],
+      ocupacaoPorUnidade: [...resumo.ocupacaoPorUnidade],
     };
   }
 

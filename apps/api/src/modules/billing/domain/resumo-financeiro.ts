@@ -315,3 +315,26 @@ export function planoMaisPopular(
 
   return grupos[0] ?? null;
 }
+
+/**
+ * Ocupacao de cada unidade do tenant -- widget "Capacidade instalada".
+ *
+ * POR UNIDADE, NUNCA UMA BARRA SO SOMANDO O TENANT: `alunosAtivos` no resumo
+ * e do tenant inteiro, e um tenant pode ter varias unidades
+ * (`Tenant.gymUnits`). Comparar o total do tenant contra a capacidade de UMA
+ * unidade seria uma comparacao sem sentido assim que existisse uma segunda
+ * unidade -- achado durante o planejamento desta fatia.
+ *
+ * UNIDADE SEM ALUNO NENHUM ENTRA COM ZERO, nao e omitida: unidade nova sem
+ * matricula ainda e informacao real (zero ocupada), nao ausencia de dado.
+ */
+export function ocupacaoPorUnidade(
+  unidades: readonly { id: string; nome: string; capacidadeMaxima: number | null }[],
+  alunosAtivosPorUnidade: ReadonlyMap<string, number>,
+): readonly { nomeDaUnidade: string; alunosAtivos: number; capacidadeMaxima: number | null }[] {
+  return unidades.map((unidade) => ({
+    nomeDaUnidade: unidade.nome,
+    alunosAtivos: alunosAtivosPorUnidade.get(unidade.id) ?? 0,
+    capacidadeMaxima: unidade.capacidadeMaxima,
+  }));
+}
