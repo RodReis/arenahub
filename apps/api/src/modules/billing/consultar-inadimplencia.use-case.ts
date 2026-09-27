@@ -76,7 +76,19 @@ export interface FaixaDeAtraso {
 
 export interface ResumoDaInadimplencia {
   readonly emAtrasoMinor: number;
+  /**
+   * Quantas FATURAS estao vencidas -- o card "Faturas vencidas agora" da
+   * tela. Um aluno com duas competencias em atraso conta DUAS.
+   */
   readonly faturasVencidas: number;
+  /**
+   * Quantas PESSOAS devem -- o contador da aba "Inadimplentes" (issue #416).
+   *
+   * Separado de `faturasVencidas` porque a aba vizinha ("Pagantes") conta
+   * aluno distinto: enquanto esta contava fatura, as duas mediam unidades
+   * diferentes lado a lado e a comparacao entre elas nao significava nada.
+   */
+  readonly alunosInadimplentes: number;
   readonly bloqueados: number;
   /** Percentual com uma casa. `null` quando nao ha assinatura ativa alguma. */
   readonly taxaDeInadimplencia: number | null;
@@ -516,6 +528,7 @@ export class ConsultarInadimplenciaUseCase {
     return {
       emAtrasoMinor,
       faturasVencidas: linhas.length,
+      alunosInadimplentes: inadimplentes,
       bloqueados,
       /**
        * `null` e nao zero quando nao ha pagante: academia sem assinatura nao
