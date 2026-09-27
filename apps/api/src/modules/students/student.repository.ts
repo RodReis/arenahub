@@ -678,6 +678,7 @@ export class StudentRepository {
       return tx.student.count({
         where: {
           tenantId: contexto.tenantId,
+          profile: 'STUDENT',
           ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
           ...(filtro.status ? { status: filtro.status } : {}),
           ...(filtro.modalityId ? condicaoDeModalidade(filtro.modalityId) : {}),
@@ -769,6 +770,7 @@ export class StudentRepository {
       return tx.student.findMany({
         where: {
           tenantId: contexto.tenantId,
+          profile: 'STUDENT',
           ...(filtro.gymUnitId ? { gymUnitId: filtro.gymUnitId } : {}),
           ...(filtro.status ? { status: filtro.status } : {}),
           ...(filtro.modalityId ? condicaoDeModalidade(filtro.modalityId) : {}),
