@@ -104,8 +104,8 @@ describe('SerieFinanceira', () => {
    * isolada.
    */
   it('desenha o ultimo ponto com raio maior que os demais', () => {
-    const pontoComum = renderPontoDaSerie({ cx: 10, cy: 20, index: 0 }, 3, '#006c49');
-    const ultimoPonto = renderPontoDaSerie({ cx: 10, cy: 20, index: 2 }, 3, '#006c49');
+    const pontoComum = renderPontoDaSerie({ cx: 10, cy: 20, index: 0 }, 3, 'currentColor');
+    const ultimoPonto = renderPontoDaSerie({ cx: 10, cy: 20, index: 2 }, 3, 'currentColor');
 
     expect(pontoComum.props.r).toBe(4);
     expect(ultimoPonto.props.r).toBe(6);
