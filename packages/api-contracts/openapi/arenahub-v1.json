@@ -1990,6 +1990,47 @@
         ]
       }
     },
+    "/api/v1/billing/paid-invoices": {
+      "get": {
+        "operationId": "BillingController_consultarPagos",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "total",
+                    "linhas",
+                    "proximoCursor"
+                  ],
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "linhas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "proximoCursor": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/billing/summary": {
       "get": {
         "operationId": "BillingController_consultarResumoFinanceiro",

@@ -785,6 +785,17 @@ export class BillingController {
    * corrigir aqui, so historico de fatura ja paga.
    */
   @Get('billing/paid-invoices')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['total', 'linhas', 'proximoCursor'],
+      properties: {
+        total: { type: 'integer' },
+        linhas: { type: 'array', items: { type: 'object' } },
+        proximoCursor: { type: 'string', nullable: true },
+      },
+    },
+  })
   @RequirePermissions('billing.read')
   async consultarPagos(@Query() consulta: unknown): Promise<PainelDePagosDto> {
     const filtro = esquemaDeBuscaPaginada.parse(consulta);
