@@ -32,14 +32,32 @@ compacta.
 6. Componentes novos e dados seguem `--ah-*` em claro e escuro — nunca hex fixo no SVG.
 7. Zero mudança de backend/endpoint. `Resumo` (interface em `page.tsx`) já carrega todo dado necessário.
 
+## Correção sobre a stack de gráficos (achado durante o plano)
+
+Ao ler o código-fonte de `BarrasDeFaixa`, `SerieFinanceira` e `Sparkline`, os três **já usam Recharts**
+(`recharts` já é dependência do design system) — não SVG puro à mão, como este spec assumia antes de ler o
+código. Mantém-se a decisão de não usar shadcn/ui/Tailwind (isso é sobre estilo de componente e tokens, não sobre
+a lib de gráfico), mas os componentes novos seguem o padrão real do repo: Recharts + `getComputedStyle` para
+resolver token `--ah-*` em cor (hook `useCoresDosTokens`/`useCorDoToken`, já implementado três vezes de forma
+quase idêntica — candidato a extrair para um hook compartilhado, mas fora de escopo aqui: YAGNI, só extrair
+quando um quarto uso pedir).
+
+Achado adicional: **`SerieFinanceira` já tem boa parte do que o spec original pedia como "evolução"** — grid
+pontilhado (`CartesianGrid strokeDasharray`), linha tracejada para o faturado/esperado, ponto (`dot`) na linha de
+recebido, área de contexto entre as duas curvas. Falta só: destacar o último ponto (mais recente) com raio maior,
+e avaliar se um gradiente de preenchimento sob a curva de recebido (do zero até a linha, não só entre as duas
+linhas) agrega ou compete visualmente com a área "não entrou" que já existe — decisão de implementação, ver Task
+correspondente no plano.
+
 ## Componentes novos
 
 ### `GraficoDeRosca` (`packages/ui/src/components/GraficoDeRosca.tsx`)
 
-SVG puro, sem lib de gráfico. `viewBox="0 0 100 100"`, anéis desenhados por `<circle>` com
-`stroke-dasharray`/`stroke-dashoffset` calculados a partir da lista de segmentos (acumulado sobre a
-circunferência). Raio e `stroke-width` fixos, coerentes com o restante do design system (círculos concêntricos,
-sem borda dura entre segmentos).
+Recharts `PieChart`/`Pie` com `innerRadius` (rosca, não pizza cheia), seguindo o padrão de
+`BarrasDeFaixa`/`SerieFinanceira`: `ResponsiveContainer` + `accessibilityLayer={false}` + wrapper `aria-hidden`
++ tabela invisível antes do SVG para leitor de tela. Cor de cada fatia resolvida via `getComputedStyle` do token
+(mesmo hook `useCoresDosTokens` que `BarrasDeFaixa` já implementa — copiar a implementação, já que extrair um
+hook compartilhado é decisão de escopo maior, fora deste redesign).
 
 Props (mesma forma de dado que `BarrasDeFaixa` já usa, para reduzir atrito de adaptação na page):
 
@@ -73,9 +91,10 @@ como faz hoje com `EmptyState` antes de `BarrasDeFaixa`. Mesmo padrão se repete
 
 ### `BarrasVerticais` (`packages/ui/src/components/BarrasVerticais.tsx`)
 
-Colunas verticais com eixo Y implícito (grid horizontal pontilhado leve de fundo, 3–4 linhas guia). Rótulo da
-faixa embaixo de cada coluna, valor formatado no topo da barra. Altura da coluna proporcional ao maior valor do
-conjunto (mesma lógica de normalização que `BarrasDeFaixa` já faz para largura).
+Recharts `BarChart` com `layout` vertical padrão (colunas, eixo Y numérico) — o inverso de `BarrasDeFaixa`, que
+usa `layout="vertical"` do Recharts para barras *horizontais*. `YAxis` com grid (`CartesianGrid`), `XAxis`
+categórico com o rótulo da faixa embaixo de cada coluna, `LabelList` com o valor formatado no topo da barra
+(mesmo padrão de `BarrasDeFaixa`). Mesmo wrapper de acessibilidade (tabela invisível + `aria-hidden` no SVG).
 
 Props (mesma forma de dado que `BarrasDeFaixa`, reuso direto do array `faixas` que a page já monta):
 
