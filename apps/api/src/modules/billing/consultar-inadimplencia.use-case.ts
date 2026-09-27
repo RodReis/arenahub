@@ -86,7 +86,19 @@ export interface PainelDeInadimplencia {
   readonly resumo: ResumoDaInadimplencia;
   readonly faixas: readonly FaixaDeAtraso[];
   readonly linhas: readonly LinhaDeInadimplencia[];
+  /** Ha mais linhas depois desta pagina? `null` quando nao ha proxima. */
+  readonly proximoCursor: string | null;
 }
+
+/** Filtro e paginacao da fila -- pedido do PI (busca por nome, 10 em 10). */
+export interface OpcoesDeConsulta {
+  /** Nome do aluno, comparacao livre de acentos e caixa. */
+  readonly busca?: string;
+  /** `invoiceId` da ultima linha da pagina anterior. */
+  readonly cursor?: string;
+}
+
+const TAMANHO_DA_PAGINA = 10;
 
 /**
  * As quatro idades da divida.
@@ -106,6 +118,20 @@ const FAIXAS: ReadonlyArray<{ rotulo: string; ate: number }> = [
 
 const UM_DIA_EM_MS = 86_400_000;
 
+/**
+ * Compara nome livre de acento e caixa -- "jose" acha "José", "MARIA" acha
+ * "maria". Mesmo padrao de `semAcento` em `triagem-de-alias.ts` (engagement),
+ * repetido aqui em vez de importado: e uma funcao de duas linhas, e importar
+ * de outro modulo por isto criaria acoplamento que a regra de arquitetura no
+ * 9 reserva para caso de uso publico, nao para um utilitario deste tamanho.
+ */
+function nomeContem(nome: string, busca: string): boolean {
+  const semAcento = (texto: string): string =>
+    texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+  return semAcento(nome).includes(semAcento(busca));
+}
+
 @Injectable()
 export class ConsultarInadimplenciaUseCase {
   constructor(private readonly db: PrismaService) {}
@@ -113,48 +139,72 @@ export class ConsultarInadimplenciaUseCase {
   /**
    * `agora` entra por parametro (`CLAUDE.md`): "dias em atraso" e a situacao
    * dependem do relogio, e o teste precisa fixar o instante.
+   *
+   * `opcoes` filtra e pagina SO a lista devolvida -- `resumo` e `faixas`
+   * continuam sobre o TENANT INTEIRO, nunca sobre a pagina atual. Se o cartao
+   * "Faturas vencidas agora" mudasse ao digitar na busca, ele deixaria de
+   * responder "quanto e a divida real" e passaria a responder "quantos
+   * resultados bateram com o texto" -- duas perguntas diferentes.
    */
-  async executar(contexto: TenantContext, agora: Date): Promise<PainelDeInadimplencia> {
+  async executar(
+    contexto: TenantContext,
+    agora: Date,
+    opcoes: OpcoesDeConsulta = {},
+  ): Promise<PainelDeInadimplencia> {
     const configuracao = await this.db.billingSettings.findUnique({
       where: { tenantId: contexto.tenantId },
       select: { graceDays: true, blockAnchor: true },
     });
 
-    const invoices = await this.db.invoice.findMany({
-      where: {
-        tenantId: contexto.tenantId,
-        status: { in: ['OPEN', 'OVERDUE'] },
-        dueAt: { lt: agora },
-      },
-      select: {
-        id: true,
-        number: true,
-        totalMinor: true,
-        currency: true,
-        dueAt: true,
-        blockAt: true,
-        studentId: true,
-        subscriptionId: true,
-        student: {
-          select: {
-            fullName: true,
-            gymUnit: { select: { timezone: true } },
-            /**
-             * WHATSAPP na frente de PHONE. O botao de cobranca abre o
-             * WhatsApp, e o aluno pode ter um numero fixo cadastrado como
-             * `PHONE` que nunca receberia a mensagem. `orderBy` no tipo
-             * resolve sem duas consultas.
-             */
-            contacts: {
-              where: { type: { in: ['WHATSAPP', 'PHONE'] } },
-              orderBy: [{ type: 'asc' }, { createdAt: 'asc' }],
-              select: { value: true, type: true },
+    /*
+     * FIX (issue #306, mesmo padrao ja documentado em `EmitirReciboUseCase`):
+     * `comTenant`, embora a raiz seja `invoice`. O `select` traz `student` por
+     * baixo, e `students` TEM politica RLS (F66). Fora de transacao
+     * interceptada o `set_config` nunca aplica, e sob o role restrito
+     * (`RUNTIME_DATABASE_URL`, o que a API usa de verdade) o aninhado vinha
+     * NULO enquanto a raiz voltava inteira -- o Prisma tipa a relacao como
+     * nao-nula, entao nem o TypeScript nem um teste de integracao SEM RLS
+     * avisavam. Reproduzido contra o tenant Arena Positiva: toda invoice
+     * vencida vinha com `student: null`, e `invoice.student.fullName` estourava
+     * em runtime.
+     */
+    const invoices = await this.db.comTenant((tx) =>
+      tx.invoice.findMany({
+        where: {
+          tenantId: contexto.tenantId,
+          status: { in: ['OPEN', 'OVERDUE'] },
+          dueAt: { lt: agora },
+        },
+        select: {
+          id: true,
+          number: true,
+          totalMinor: true,
+          currency: true,
+          dueAt: true,
+          blockAt: true,
+          studentId: true,
+          subscriptionId: true,
+          student: {
+            select: {
+              fullName: true,
+              gymUnit: { select: { timezone: true } },
+              /**
+               * WHATSAPP na frente de PHONE. O botao de cobranca abre o
+               * WhatsApp, e o aluno pode ter um numero fixo cadastrado como
+               * `PHONE` que nunca receberia a mensagem. `orderBy` no tipo
+               * resolve sem duas consultas.
+               */
+              contacts: {
+                where: { type: { in: ['WHATSAPP', 'PHONE'] } },
+                orderBy: [{ type: 'asc' }, { createdAt: 'asc' }],
+                select: { value: true, type: true },
+              },
             },
           },
         },
-      },
-      orderBy: { dueAt: 'asc' },
-    });
+        orderBy: { dueAt: 'asc' },
+      }),
+    );
 
     /**
      * O ENTITLEMENT REAL de cada assinatura envolvida, numa consulta so --
@@ -214,10 +264,62 @@ export class ConsultarInadimplenciaUseCase {
       fusoDaUnidade: invoice.student.gymUnit.timezone,
     }));
 
+    const ordenadas = this.ordenadasPorUrgencia(linhas);
+    const { pagina, proximoCursor } = this.paginar(ordenadas, opcoes);
+
     return {
       resumo: await this.resumo(contexto, linhas),
       faixas: this.faixas(linhas),
-      linhas: this.ordenadasPorUrgencia(linhas),
+      linhas: pagina,
+      proximoCursor,
+    };
+  }
+
+  /**
+   * Busca por nome (livre de acento e caixa) e paginacao por cursor -- as
+   * DUAS em memoria, sobre a lista ja ordenada por urgencia.
+   *
+   * NAO E SQL porque a ordenacao nao e uma coluna do banco: `valor x dias` e
+   * calculado apos juntar invoice, entitlement e liberacao (ver
+   * `ordenadasPorUrgencia`). Pedir ao Postgres para paginar uma ordem que so
+   * existe depois do calculo exigiria refazer o calculo inteiro em SQL, ou
+   * duas leituras. Em memoria, sobre o volume real de uma academia (centenas
+   * de faturas vencidas, nao milhoes), o custo e desprezivel -- o mesmo motivo
+   * que ja fazia a consulta trazer tudo de uma vez, sem paginacao alguma, ate
+   * esta fatia.
+   *
+   * CURSOR = INVOICEID da ultima linha da pagina anterior, nao um numero de
+   * pagina: a lista pode mudar de tamanho entre uma carga e outra (fatura
+   * paga sai da fila), e um numero fixo devolveria a pagina errada. Buscando
+   * o indice do cursor na lista ATUAL, a proxima pagina sempre comeca
+   * imediatamente apos a ultima linha que a pessoa viu.
+   */
+  private paginar(
+    linhas: readonly LinhaDeInadimplencia[],
+    opcoes: OpcoesDeConsulta,
+  ): { pagina: readonly LinhaDeInadimplencia[]; proximoCursor: string | null } {
+    const filtradas = opcoes.busca
+      ? linhas.filter((linha) => nomeContem(linha.studentName, opcoes.busca!))
+      : linhas;
+
+    const inicio = opcoes.cursor
+      ? filtradas.findIndex((linha) => linha.invoiceId === opcoes.cursor) + 1
+      : 0;
+
+    /*
+     * CURSOR NAO ENCONTRADO (`findIndex` devolveu -1, `inicio` vira 0) volta
+     * para a PRIMEIRA pagina, em vez de lancar erro ou devolver lista vazia.
+     * Acontece de verdade quando a fatura que ancorava o cursor foi paga
+     * entre uma pagina e outra -- a recepcao nao pode ficar presa numa tela
+     * em branco por isso.
+     */
+    const pagina = filtradas.slice(inicio, inicio + TAMANHO_DA_PAGINA);
+    const haProxima = inicio + TAMANHO_DA_PAGINA < filtradas.length;
+    const ultima = pagina[pagina.length - 1];
+
+    return {
+      pagina,
+      proximoCursor: haProxima && ultima ? ultima.invoiceId : null,
     };
   }
 

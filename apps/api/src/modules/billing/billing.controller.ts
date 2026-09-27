@@ -32,6 +32,7 @@ import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
 import { AderirARecorrenciaUseCase } from './aderir-a-recorrencia.use-case.js';
 import { RodarCicloDeAssinaturasUseCase } from './rodar-ciclo-de-assinaturas.use-case.js';
 import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
+import { ConsultarPagosUseCase } from './consultar-pagos.use-case.js';
 import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
 import { CriarCheckoutDeCartaoUseCase } from './criar-checkout-de-cartao.use-case.js';
@@ -130,6 +131,21 @@ const esquemaDeListagem = z
     vencendoAte: z.iso.datetime().optional(),
     pagina: z.coerce.number().int().min(1).default(1),
     tamanho: z.coerce.number().int().min(1).max(TAMANHO_MAXIMO_DA_PAGINA).default(20),
+  })
+  .strict();
+
+/**
+ * Busca e paginacao por cursor da fila de cobranca e da aba Pagantes. Pedido
+ * do PI: nome do aluno na grid, 10 em 10.
+ *
+ * `q` tem piso de 3 caracteres pelo mesmo motivo do filtro de `/students`
+ * (issue #118): busca de 1-2 letras devolve a base inteira e nao filtra nada
+ * de util, so custa a mais.
+ */
+const esquemaDeBuscaPaginada = z
+  .object({
+    q: z.string().trim().min(3).optional(),
+    cursor: z.string().optional(),
   })
   .strict();
 
@@ -346,12 +362,30 @@ interface PainelDeInadimplenciaDto {
     liberadoAte: string | null;
     fusoDaUnidade: string;
   }[];
+  proximoCursor: string | null;
 }
 
 interface ResultadoDaInadimplenciaDto {
   invoicesVencidas: number;
   assinaturasEmAtraso: number;
   direitosSuspensos: number;
+}
+
+/** A aba "Pagantes" da tela de cobranca -- espelho de `PainelDeInadimplenciaDto`. */
+interface PainelDePagosDto {
+  total: number;
+  linhas: {
+    invoiceId: string;
+    invoiceNumber: number;
+    studentId: string;
+    studentName: string;
+    amountMinor: number;
+    currency: string;
+    paidAt: string;
+    telefone: string | null;
+    fusoDaUnidade: string;
+  }[];
+  proximoCursor: string | null;
 }
 
 /**
@@ -410,6 +444,7 @@ export class BillingController {
     private readonly adesaoARecorrencia: AderirARecorrenciaUseCase,
     private readonly cicloDeAssinaturas: RodarCicloDeAssinaturasUseCase,
     private readonly inadimplencia: ConsultarInadimplenciaUseCase,
+    private readonly pagos: ConsultarPagosUseCase,
     private readonly resumoFinanceiro: ConsultarResumoFinanceiroUseCase,
     private readonly aplicarInadimplencia: AplicarInadimplenciaUseCase,
     private readonly liberacao: LiberacaoFinanceiraUseCase,
@@ -720,8 +755,13 @@ export class BillingController {
    */
   @Get('billing/delinquency')
   @RequirePermissions('billing.read')
-  async consultarInadimplencia(): Promise<PainelDeInadimplenciaDto> {
-    const painel = await this.inadimplencia.executar(this.contexto.require(), new Date());
+  async consultarInadimplencia(@Query() consulta: unknown): Promise<PainelDeInadimplenciaDto> {
+    const filtro = esquemaDeBuscaPaginada.parse(consulta);
+
+    const painel = await this.inadimplencia.executar(this.contexto.require(), new Date(), {
+      ...(filtro.q ? { busca: filtro.q } : {}),
+      ...(filtro.cursor ? { cursor: filtro.cursor } : {}),
+    });
 
     return {
       resumo: painel.resumo,
@@ -731,6 +771,47 @@ export class BillingController {
         dueAt: linha.dueAt.toISOString(),
         liberadoAte: linha.liberadoAte?.toISOString() ?? null,
       })),
+      proximoCursor: painel.proximoCursor,
+    };
+  }
+
+  /**
+   * A aba "Pagantes" da tela de cobranca -- espelho de `billing/delinquency`.
+   *
+   * MESMA PERMISSAO da inadimplencia: quem ve quem deve pode ver quem pagou --
+   * e a mesma tela, a outra metade da mesma pergunta.
+   *
+   * SO LE, pelo mesmo motivo do painel de inadimplencia: nao ha estado a
+   * corrigir aqui, so historico de fatura ja paga.
+   */
+  @Get('billing/paid-invoices')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['total', 'linhas', 'proximoCursor'],
+      properties: {
+        total: { type: 'integer' },
+        linhas: { type: 'array', items: { type: 'object' } },
+        proximoCursor: { type: 'string', nullable: true },
+      },
+    },
+  })
+  @RequirePermissions('billing.read')
+  async consultarPagos(@Query() consulta: unknown): Promise<PainelDePagosDto> {
+    const filtro = esquemaDeBuscaPaginada.parse(consulta);
+
+    const painel = await this.pagos.executar(this.contexto.require(), {
+      ...(filtro.q ? { busca: filtro.q } : {}),
+      ...(filtro.cursor ? { cursor: filtro.cursor } : {}),
+    });
+
+    return {
+      total: painel.total,
+      linhas: painel.linhas.map((linha) => ({
+        ...linha,
+        paidAt: linha.paidAt.toISOString(),
+      })),
+      proximoCursor: painel.proximoCursor,
     };
   }
 

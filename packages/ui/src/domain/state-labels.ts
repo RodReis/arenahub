@@ -33,6 +33,8 @@ export type StateMachine =
   | 'invoice'
   /** F15 -- situacao de ACESSO de quem esta devendo. Nao e o estado da invoice. */
   | 'delinquencyAccess'
+  /** Aba "Pagantes" da tela de cobranca -- espelho de `delinquencyAccess`. */
+  | 'paidAccess'
   | 'payment'
   | 'reconciliation'
   /** F34 -- estado do DESAFIO na tela da secretaria (ADR-048). */
@@ -285,6 +287,11 @@ export const STATE_LABELS: Dictionary = {
     EM_CARENCIA: { label: 'Em carência', tone: 'warning', icon: 'clock' },
     BLOQUEADO: { label: 'Bloqueado', tone: 'danger', icon: 'x-circle' },
     LIBERADO: { label: 'Liberado com pendência', tone: 'info', icon: 'user-check' },
+  },
+
+  /** So um estado: fatura paga nao tem "em carencia" nem "bloqueado". */
+  paidAccess: {
+    EM_DIA: { label: 'Em dia', tone: 'success', icon: 'check-circle' },
   },
 
   payment: {
