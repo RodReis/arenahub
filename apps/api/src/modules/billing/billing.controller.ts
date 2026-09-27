@@ -430,6 +430,7 @@ interface ResumoFinanceiroDto {
   cancelamentos: number;
   taxaDeChurn: number | null;
   ltv: number | null;
+  planoMaisPopular: { nome: string; quantidade: number } | null;
 }
 
 interface LiberacaoDto {
@@ -936,6 +937,11 @@ export class BillingController {
         cancelamentos: { type: 'integer' },
         taxaDeChurn: { type: 'number', nullable: true },
         ltv: { type: 'integer', nullable: true },
+        planoMaisPopular: {
+          type: 'object',
+          nullable: true,
+          properties: { nome: { type: 'string' }, quantidade: { type: 'integer' } },
+        },
       },
     },
   })

@@ -7,6 +7,7 @@ import { precoVigenteEm } from './domain/dinheiro.js';
 import {
   ltv,
   montarSerie,
+  planoMaisPopular,
   taxaDeChurn,
   taxaDeInadimplencia,
   ticketMedio,
@@ -160,6 +161,9 @@ export interface ResumoFinanceiro {
    * (`MINIMO_DE_CANCELAMENTOS_PARA_LTV`).
    */
   readonly ltv: number | null;
+
+  /** O plano com mais assinaturas ativas/inadimplentes no periodo. Ver `planoMaisPopular()`. */
+  readonly planoMaisPopular: { nome: string; quantidade: number } | null;
 }
 
 const UM_DIA_EM_MS = 86_400_000;
@@ -568,6 +572,15 @@ export class ConsultarResumoFinanceiroUseCase {
      */
     const recebidoMinor = Math.max((recebido._sum.amountMinor ?? 0) - estornadoMinor, 0);
 
+    const idsDosPlanos = [...new Set(assinaturas.map((a) => a.planId))];
+    const planos = idsDosPlanos.length
+      ? await this.db.plan.findMany({
+          where: { id: { in: idsDosPlanos } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const nomesPorId = new Map(planos.map((p) => [p.id, p.name]));
+
     return {
       de: entrada.de,
       ate: entrada.ate,
@@ -632,6 +645,7 @@ export class ConsultarResumoFinanceiroUseCase {
         vidaMediaEmMeses(paresDeVida),
         paresDeVida.length,
       ),
+      planoMaisPopular: planoMaisPopular(assinaturas, nomesPorId),
     };
   }
 
