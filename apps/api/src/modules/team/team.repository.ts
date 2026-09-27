@@ -17,6 +17,16 @@ export interface MembroDeTimeRow {
   version: number;
 }
 
+/** Ocorrencia de grade em que este professor da a aula -- F81, le F77. */
+export interface AgendaDoProfessorRow {
+  classId: string;
+  modalityId: string;
+  dayOfWeek: number;
+  startMinute: number;
+  durationMinutes: number;
+  gymUnitId: string;
+}
+
 /**
  * Le a MESMA tabela `students`, com o filtro invertido -- F81 (issue #415).
  *
@@ -171,5 +181,29 @@ export class TeamRepository {
         },
       }) as Promise<MembroDeTimeRow | null>;
     });
+  }
+
+  /**
+   * Agenda do professor -- F81, le a relacao `Class.classesAsTrainer` que
+   * ja existe (ADR-061 decisao 5, construida pela F77). SO LEITURA: nenhuma
+   * escrita em `Class` nesta fatia.
+   */
+  async buscarAgenda(contexto: TenantContext, trainerId: string): Promise<AgendaDoProfessorRow[]> {
+    return this.db.comTenant((tx) =>
+      tx.class.findMany({
+        where: { tenantId: contexto.tenantId, trainerId, isActive: true },
+        select: { id: true, modalityId: true, dayOfWeek: true, startMinute: true, durationMinutes: true, gymUnitId: true },
+        orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
+      }),
+    ).then((linhas) =>
+      linhas.map((l) => ({
+        classId: l.id,
+        modalityId: l.modalityId,
+        dayOfWeek: l.dayOfWeek,
+        startMinute: l.startMinute,
+        durationMinutes: l.durationMinutes,
+        gymUnitId: l.gymUnitId,
+      })),
+    );
   }
 }
