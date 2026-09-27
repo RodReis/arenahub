@@ -158,6 +158,42 @@ describe('estatisticas publicas da plataforma', () => {
     expect(tenantsAtivos.map((t) => t.id)).not.toContain(suspenso.id);
   });
 
+  /*
+   * ISOLADO POR TENANT, e nao pelo total agregado da rota: o total
+   * agregado soma TODOS os tenants ativos e cresce sozinho com outras
+   * 100+ suites escrevendo em paralelo -- medido numa corrida real desta
+   * suite completa, um delta esperado de +1 chegou como +2 por escrita
+   * concorrente alheia, nao pelo defeito desta issue. Restrito ao
+   * `tenantId` que so este teste cria, elimina esse ruido sem deixar de
+   * exercitar a mesma condicao de filtro que `contarEstatisticasPublicas`
+   * aplica por tenant dentro do loop.
+   *
+   * Issue #423, mesmo defeito da #413 (F81): sem `profile: 'STUDENT'` no
+   * `where`, o professor teria entrado nesta contagem junto com o aluno.
+   */
+  it('conta so profile = STUDENT no tenant isolado deste teste', async () => {
+    const tenant = await criarTenantDeTeste();
+
+    await db.student.create({
+      data: {
+        tenantId: tenant.id,
+        gymUnitId: tenant.unidadeId,
+        membershipNumber: `F423-${randomUUID().slice(0, 12)}`,
+        fullName: `Professor ${randomUUID().slice(0, 8)}`,
+        birthDate: new Date('1985-01-01T00:00:00.000Z'),
+        profile: 'TRAINER',
+        status: 'ACTIVE',
+      },
+    });
+    await criarAluno(tenant.id, tenant.unidadeId, 'ACTIVE');
+
+    const alunosAtivos = await db.student.count({
+      where: { tenantId: tenant.id, profile: 'STUDENT', status: 'ACTIVE' },
+    });
+
+    expect(alunosAtivos).toBe(1);
+  });
+
   it('nao exige autenticacao', async () => {
     await request(servidor())
       .get('/api/v1/plataforma/estatisticas-publicas')
