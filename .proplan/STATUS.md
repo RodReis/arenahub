@@ -9,6 +9,11 @@ updated: 2026-09-27
 
 ### Sem épico
 
+- [FIX] Valdivino duplicado no arquivo (confirmado) e Daniel Flavio Cabriny — provável cadastro duplicado (#421)
+- [MVP1][SPEC-082][F82] Trocar plano de assinatura ativa preservando histórico (#420)
+- [FIX] 5 alunos pagaram certo em set/2026 e seguem bloqueados por invoice com preço desatualizado (#419)
+- [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417)
+- [MVP1][SPEC-081][F81] Tela de equipe: professor, staff e admin fora da contagem de aluno (#415)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
@@ -36,6 +41,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][SPEC-074][FIX] contador da aba Inadimplentes conta fatura, e KPI do painel diz aluno onde e assinatura (#416, finalizado em: 2026-09-27)
 - [INFRA] Aba Pagantes na tela de cobrança, com busca e paginação (#413, finalizado em: 2026-09-27)
 - [MVP1][SPEC-059][FIX] Falha de pareamento do Edge mente sobre a causa — código expirado vira "defina EDGE_PAIRING_CODE" (#406, finalizado em: 2026-09-26)
 - [MVP1][SPEC-059][FIX] Não existe endpoint nem tela para criar EdgeNode — pareamento do Edge é inatingível em produção (#404, finalizado em: 2026-09-26)
