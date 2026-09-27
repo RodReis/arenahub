@@ -57,6 +57,17 @@ pnpm-debug.log*
 # client gerado pelo Prisma (recriado por `pnpm --filter @arenahub/database generate`)
 packages/database/src/generated/
 
+# scripts descartaveis de investigacao/correcao pontual contra producao --
+# uso unico, nao versionado (nomes tipo conferir-*.mjs, corrigir-*.local.mjs
+# na raiz de apps/api). Nao confundir com jest.config.mjs, que E versionado.
+apps/api/*.local.mjs
+apps/api/*.inner.mjs
+apps/api/conferir-*.mjs
+apps/api/investigar-*.mjs
+apps/api/corrigir-*.mjs
+apps/api/verificar-*.mjs
+apps/api/remover-*.mjs
+
 # NÃO ignorar: os tokens do design system são gerados E versionados.
 #
 # `packages/ui/dist-tokens/theme.css` e `packages/ui/src/tokens.generated.ts`

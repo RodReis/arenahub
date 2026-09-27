@@ -272,18 +272,6 @@
   white-space: nowrap;
 }
 
-/*
- * O valor ordena a fila, entao e o maior peso da linha depois do nome. Sem
- * isto ele competia com o numero da fatura, que ninguem compara entre linhas.
- */
-.valor {
-  font-size: var(--ah-type-body-strong-size);
-  line-height: var(--ah-type-body-strong-lh);
-  font-weight: 600;
-  color: var(--ah-text-strong);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ─── Ações ────────────────────────────────────────────────────────────── */
 
 /*

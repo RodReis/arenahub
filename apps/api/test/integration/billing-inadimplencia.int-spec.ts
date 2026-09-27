@@ -52,7 +52,7 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     db = moduleRef.get(PrismaService);
     aplicar = comContextoDeTenant(moduleRef.get(AplicarInadimplenciaUseCase));
-    consultar = moduleRef.get(ConsultarInadimplenciaUseCase);
+    consultar = comContextoDeTenant(moduleRef.get(ConsultarInadimplenciaUseCase));
     liberar = comContextoDeTenant(moduleRef.get(LiberacaoFinanceiraUseCase));
 
     const tenant = await db.tenant.create({
@@ -610,6 +610,254 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
     const pesos = bloqueados.map((l) => l.amountMinor * Math.max(l.diasEmAtraso, 1));
 
     expect([...pesos].sort((a, b) => b - a)).toEqual(pesos);
+  });
+
+  it('busca por nome, livre de acento e caixa', async () => {
+    /**
+     * TENANT PROPRIO, isolado dos demais testes deste describe -- o aluno
+     * padrao da suite (`studentId`) muda de estado entre os testes anteriores
+     * (bloqueia, e depois e pago), e nesta altura da sequencia ja nao tem
+     * fatura vencida. Buscar exige um cenario que nao dependa de ONDE, na
+     * sequencia, o teste roda.
+     */
+    const tenantDaBusca = await tenantVazio(`busca-${sufixo}`);
+
+    try {
+      const unidade = await db.gymUnit.create({
+        data: {
+          tenantId: tenantDaBusca,
+          code: 'MTZ',
+          name: 'Matriz',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+
+      const plano = await db.plan.create({
+        data: { tenantId: tenantDaBusca, name: `Plano Busca ${sufixo}` },
+      });
+
+      const aluno = await db.student.create({
+        data: {
+          tenantId: tenantDaBusca,
+          gymUnitId: unidade.id,
+          membershipNumber: `BUSCA-${sufixo}`,
+          fullName: 'José da Silva Ação',
+          birthDate: new Date('2000-01-01T00:00:00Z'),
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      const assinatura = await db.subscription.create({
+        data: {
+          tenantId: tenantDaBusca,
+          studentId: aluno.id,
+          planId: plano.id,
+          status: 'ACTIVE',
+          startsAt: new Date('2026-08-01T00:00:00Z'),
+        },
+        select: { id: true },
+      });
+
+      const invoice = await db.invoice.create({
+        data: {
+          tenantId: tenantDaBusca,
+          subscriptionId: assinatura.id,
+          studentId: aluno.id,
+          billingPeriod: new Date('2026-08-01T00:00:00Z'),
+          number: 1,
+          status: 'OPEN',
+          currency: 'BRL',
+          subtotalMinor: 10000,
+          totalMinor: 10000,
+          dueAt: VENCIMENTO,
+        },
+        select: { id: true },
+      });
+
+      const contextoDaBusca = { ...contexto, tenantId: tenantDaBusca };
+
+      // SEM acento, SEM caixa igual ao cadastro -- ainda tem de achar.
+      const painel = await consultar.executar(contextoDaBusca, DENTRO_DA_CARENCIA, {
+        busca: 'jose da silva acao',
+      });
+
+      expect(painel.linhas.some((l) => l.invoiceId === invoice.id)).toBe(true);
+
+      const semResultado = await consultar.executar(contextoDaBusca, DENTRO_DA_CARENCIA, {
+        busca: 'nome que nao existe',
+      });
+
+      expect(semResultado.linhas).toHaveLength(0);
+      /** `resumo` NAO muda com a busca -- e do tenant inteiro, nao da pagina. */
+      expect(semResultado.resumo.emAtrasoMinor).toBe(painel.resumo.emAtrasoMinor);
+    } finally {
+      await db.tenant.delete({ where: { id: tenantDaBusca } });
+    }
+  });
+
+  it('pagina 10 em 10, por cursor', async () => {
+    const tenantComVolume = await tenantVazio(`paginacao-${sufixo}`);
+
+    try {
+      const unidade = await db.gymUnit.create({
+        data: {
+          tenantId: tenantComVolume,
+          code: 'MTZ',
+          name: 'Matriz',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+
+      const plano = await db.plan.create({
+        data: { tenantId: tenantComVolume, name: `Plano Paginacao ${sufixo}` },
+      });
+
+      // 25 alunos com fatura vencida -- 3 paginas de 10/10/5.
+      for (let indice = 0; indice < 25; indice += 1) {
+        const aluno = await db.student.create({
+          data: {
+            tenantId: tenantComVolume,
+            gymUnitId: unidade.id,
+            membershipNumber: `PG-${sufixo}-${String(indice)}`,
+            fullName: `Aluno Paginacao ${String(indice).padStart(2, '0')}`,
+            birthDate: new Date('2000-01-01T00:00:00Z'),
+            status: 'ACTIVE',
+          },
+          select: { id: true },
+        });
+
+        const assinatura = await db.subscription.create({
+          data: {
+            tenantId: tenantComVolume,
+            studentId: aluno.id,
+            planId: plano.id,
+            status: 'ACTIVE',
+            startsAt: new Date('2026-08-01T00:00:00Z'),
+          },
+          select: { id: true },
+        });
+
+        await db.invoice.create({
+          data: {
+            tenantId: tenantComVolume,
+            subscriptionId: assinatura.id,
+            studentId: aluno.id,
+            billingPeriod: new Date('2026-08-01T00:00:00Z'),
+            number: indice + 1,
+            status: 'OPEN',
+            currency: 'BRL',
+            subtotalMinor: 10000 + indice,
+            totalMinor: 10000 + indice,
+            dueAt: VENCIMENTO,
+          },
+        });
+      }
+
+      const contextoDoVolume = { ...contexto, tenantId: tenantComVolume };
+
+      const primeira = await consultar.executar(contextoDoVolume, DENTRO_DA_CARENCIA);
+      expect(primeira.linhas).toHaveLength(10);
+      expect(primeira.proximoCursor).not.toBeNull();
+      /** `resumo.faturasVencidas` conta as 25, nao as 10 da pagina. */
+      expect(primeira.resumo.faturasVencidas).toBe(25);
+
+      const segunda = await consultar.executar(contextoDoVolume, DENTRO_DA_CARENCIA, {
+        cursor: primeira.proximoCursor!,
+      });
+      expect(segunda.linhas).toHaveLength(10);
+      expect(segunda.proximoCursor).not.toBeNull();
+
+      // NENHUMA linha se repete entre as duas paginas.
+      const idsDaPrimeira = new Set(primeira.linhas.map((l) => l.invoiceId));
+      expect(segunda.linhas.every((l) => !idsDaPrimeira.has(l.invoiceId))).toBe(true);
+
+      const terceira = await consultar.executar(contextoDoVolume, DENTRO_DA_CARENCIA, {
+        cursor: segunda.proximoCursor!,
+      });
+      expect(terceira.linhas).toHaveLength(5);
+      /** ULTIMA pagina -- nao ha proxima. */
+      expect(terceira.proximoCursor).toBeNull();
+    } finally {
+      await db.tenant.delete({ where: { id: tenantComVolume } });
+    }
+  });
+
+  it('cursor de linha que nao existe mais volta para a PRIMEIRA pagina', async () => {
+    /**
+     * Acontece de verdade quando a fatura que ancorava o cursor foi paga
+     * entre uma pagina e outra -- a recepcao nao pode ficar presa numa tela
+     * em branco por isso. TENANT PROPRIO, mesmo motivo do teste de busca
+     * acima: o aluno padrao da suite ja nao tem fatura vencida nesta altura
+     * da sequencia.
+     */
+    const tenantDoCursor = await tenantVazio(`cursor-${sufixo}`);
+
+    try {
+      const unidade = await db.gymUnit.create({
+        data: {
+          tenantId: tenantDoCursor,
+          code: 'MTZ',
+          name: 'Matriz',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+
+      const plano = await db.plan.create({
+        data: { tenantId: tenantDoCursor, name: `Plano Cursor ${sufixo}` },
+      });
+
+      const aluno = await db.student.create({
+        data: {
+          tenantId: tenantDoCursor,
+          gymUnitId: unidade.id,
+          membershipNumber: `CURSOR-${sufixo}`,
+          fullName: 'Aluno Cursor Invalido',
+          birthDate: new Date('2000-01-01T00:00:00Z'),
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      const assinatura = await db.subscription.create({
+        data: {
+          tenantId: tenantDoCursor,
+          studentId: aluno.id,
+          planId: plano.id,
+          status: 'ACTIVE',
+          startsAt: new Date('2026-08-01T00:00:00Z'),
+        },
+        select: { id: true },
+      });
+
+      await db.invoice.create({
+        data: {
+          tenantId: tenantDoCursor,
+          subscriptionId: assinatura.id,
+          studentId: aluno.id,
+          billingPeriod: new Date('2026-08-01T00:00:00Z'),
+          number: 1,
+          status: 'OPEN',
+          currency: 'BRL',
+          subtotalMinor: 10000,
+          totalMinor: 10000,
+          dueAt: VENCIMENTO,
+        },
+      });
+
+      const painel = await consultar.executar(
+        { ...contexto, tenantId: tenantDoCursor },
+        DENTRO_DA_CARENCIA,
+        { cursor: 'cursor-que-nunca-existiu' },
+      );
+
+      expect(painel.linhas.length).toBeGreaterThan(0);
+    } finally {
+      await db.tenant.delete({ where: { id: tenantDoCursor } });
+    }
   });
 
   it('INV-006: a CONSULTA nao ve o inadimplente de outro tenant', async () => {

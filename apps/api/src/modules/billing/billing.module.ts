@@ -9,6 +9,7 @@ import { ExpirarAssinaturasVencidasUseCase } from './expirar-assinaturas-vencida
 import { ExpirarAssinaturasSchedulerService } from './expirar-assinaturas-scheduler.service.js';
 import { ConsultarResumoFinanceiroUseCase } from './consultar-resumo-financeiro.use-case.js';
 import { ConsultarInadimplenciaUseCase } from './consultar-inadimplencia.use-case.js';
+import { ConsultarPagosUseCase } from './consultar-pagos.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
 import { AderirARecorrenciaUseCase } from './aderir-a-recorrencia.use-case.js';
 import { RodarCicloDeAssinaturasUseCase } from './rodar-ciclo-de-assinaturas.use-case.js';
@@ -85,6 +86,7 @@ import { WebhookController } from './webhook.controller.js';
     ExpirarAssinaturasVencidasUseCase,
     ExpirarAssinaturasSchedulerService,
     ConsultarInadimplenciaUseCase,
+    ConsultarPagosUseCase,
     ConsultarResumoFinanceiroUseCase,
     LiberacaoFinanceiraUseCase,
     EstornarPagamentoUseCase,
