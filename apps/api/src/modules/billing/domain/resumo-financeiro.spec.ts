@@ -6,6 +6,7 @@ import {
   MINIMO_DE_PONTOS_DA_SERIE,
   MINIMO_DE_CANCELAMENTOS_PARA_LTV,
   montarSerie,
+  planoMaisPopular,
   taxaDeChurn,
   taxaDeInadimplencia,
   ticketMedio,
@@ -278,5 +279,39 @@ describe('janelaPadrao', () => {
     const { de, ate } = janelaPadrao(agora);
 
     expect(() => validarJanela(de, ate, agora)).not.toThrow();
+  });
+});
+
+describe('planoMaisPopular', () => {
+  it('retorna null sem nenhuma assinatura', () => {
+    expect(planoMaisPopular([], new Map())).toBeNull();
+  });
+
+  it('retorna o plano com mais assinaturas', () => {
+    const assinaturas = [{ planId: 'p1' }, { planId: 'p1' }, { planId: 'p2' }];
+    const nomes = new Map([['p1', 'Mensal'], ['p2', 'Anual']]);
+
+    expect(planoMaisPopular(assinaturas, nomes)).toEqual({ nome: 'Mensal', quantidade: 2 });
+  });
+
+  it('desempata por ordem alfabetica do nome', () => {
+    const assinaturas = [{ planId: 'p1' }, { planId: 'p2' }];
+    const nomes = new Map([['p1', 'Zebra'], ['p2', 'Alfa']]);
+
+    expect(planoMaisPopular(assinaturas, nomes)).toEqual({ nome: 'Alfa', quantidade: 1 });
+  });
+
+  it('ignora assinaturas cujo plano nao tem nome conhecido', () => {
+    const assinaturas = [{ planId: 'p1' }, { planId: 'p1' }, { planId: 'orfao' }, { planId: 'orfao' }, { planId: 'orfao' }];
+    const nomes = new Map([['p1', 'Mensal']]);
+
+    // 'orfao' tem mais ocorrencias mas nao tem nome -- e excluido do agrupamento
+    expect(planoMaisPopular(assinaturas, nomes)).toEqual({ nome: 'Mensal', quantidade: 2 });
+  });
+
+  it('retorna null quando so ha assinaturas de planos sem nome conhecido', () => {
+    const assinaturas = [{ planId: 'orfao' }];
+
+    expect(planoMaisPopular(assinaturas, new Map())).toBeNull();
   });
 });
