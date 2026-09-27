@@ -89,4 +89,87 @@ export class TeamRepository {
       }),
     ) as Promise<MembroDeTimeRow | null>;
   }
+
+  /**
+   * Grava vinculo trabalhista -- F81. Mesmo padrao de
+   * `StudentRepository.atualizar`: trava otimista por `version`, timeline,
+   * auditLog e outbox na MESMA transacao (regras de arquitetura 4 e 5).
+   *
+   * Devolve `null` quando o id nao existe neste tenant, quando pertence a
+   * `profile = STUDENT` (nao e "time"), ou quando `versaoEsperada` nao bate
+   * com a versao gravada -- os tres casos sao "nao atualizei", e quem chama
+   * decide o HTTP certo para cada um.
+   */
+  async atualizarVinculo(
+    contexto: TenantContext,
+    id: string,
+    versaoEsperada: number,
+    dados: { employmentType?: EmploymentType | null; employmentStartedAt?: Date | null },
+    correlationId: string,
+  ): Promise<MembroDeTimeRow | null> {
+    return this.db.$transaction(async (tx) => {
+      const alterados = await tx.student.updateMany({
+        where: { id, tenantId: contexto.tenantId, version: versaoEsperada, profile: { not: 'STUDENT' } },
+        data: {
+          version: { increment: 1 },
+          ...(dados.employmentType !== undefined ? { employmentType: dados.employmentType } : {}),
+          ...(dados.employmentStartedAt !== undefined
+            ? { employmentStartedAt: dados.employmentStartedAt }
+            : {}),
+        },
+      });
+
+      if (alterados.count === 0) return null;
+
+      await tx.studentTimelineEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: id,
+          type: 'STUDENT_UPDATED',
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          correlationId,
+          payload: { campos: Object.keys(dados) },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'team.employment_updated',
+          target: 'student',
+          targetId: id,
+          correlationId,
+          metadata: { campos: Object.keys(dados) },
+        },
+      });
+
+      await tx.outboxEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          eventType: 'StudentUpdated',
+          aggregateType: 'Student',
+          aggregateId: id,
+          payload: { studentId: id },
+        },
+      });
+
+      return tx.student.findFirst({
+        where: { id, tenantId: contexto.tenantId },
+        select: {
+          id: true,
+          membershipNumber: true,
+          fullName: true,
+          profile: true,
+          gymUnitId: true,
+          employmentType: true,
+          employmentStartedAt: true,
+          archivedAt: true,
+          version: true,
+        },
+      }) as Promise<MembroDeTimeRow | null>;
+    });
+  }
 }

@@ -101,4 +101,53 @@ describe('TeamRepository (F81)', () => {
 
     await db.tenant.delete({ where: { id: outroTenantId } });
   });
+
+  it('atualizarVinculo grava employmentType e registra timeline/audit/outbox', async () => {
+    const professor = await db.student.create({
+      data: { tenantId, gymUnitId, membershipNumber: 'TEAM-0010', fullName: 'Professor Vinculo', birthDate: new Date('1985-01-01'), profile: 'TRAINER' },
+    });
+
+    const atualizado = await comContexto({ kind: 'system', tenantId }, () =>
+      repo.atualizarVinculo(
+        { tenantId } as never,
+        professor.id,
+        0,
+        { employmentType: 'CLT', employmentStartedAt: new Date('2024-03-01') },
+        'corr-f81-teste',
+      ),
+    );
+
+    expect(atualizado?.employmentType).toBe('CLT');
+    expect(atualizado?.version).toBe(1);
+
+    const timeline = await db.studentTimelineEvent.findFirst({ where: { studentId: professor.id, type: 'STUDENT_UPDATED' } });
+    expect(timeline).not.toBeNull();
+
+    const outbox = await db.outboxEvent.findFirst({ where: { aggregateId: professor.id, eventType: 'StudentUpdated' } });
+    expect(outbox).not.toBeNull();
+  });
+
+  it('atualizarVinculo devolve null quando version nao bata', async () => {
+    const professor = await db.student.create({
+      data: { tenantId, gymUnitId, membershipNumber: 'TEAM-0011', fullName: 'Professor Versao', birthDate: new Date('1985-01-01'), profile: 'TRAINER' },
+    });
+
+    const resultado = await comContexto({ kind: 'system', tenantId }, () =>
+      repo.atualizarVinculo({ tenantId } as never, professor.id, 99, { employmentType: 'PJ' }, 'corr-f81-teste-2'),
+    );
+
+    expect(resultado).toBeNull();
+  });
+
+  it('atualizarVinculo devolve null para Student com profile STUDENT', async () => {
+    const aluno = await db.student.create({
+      data: { tenantId, gymUnitId, membershipNumber: 'TEAM-0012', fullName: 'Aluno Nao Time', birthDate: new Date('1995-01-01'), profile: 'STUDENT' },
+    });
+
+    const resultado = await comContexto({ kind: 'system', tenantId }, () =>
+      repo.atualizarVinculo({ tenantId } as never, aluno.id, 0, { employmentType: 'CLT' }, 'corr-f81-teste-3'),
+    );
+
+    expect(resultado).toBeNull();
+  });
 });
