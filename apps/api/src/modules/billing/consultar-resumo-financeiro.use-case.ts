@@ -447,16 +447,34 @@ export class ConsultarResumoFinanceiroUseCase {
         // pode ter mais de uma assinatura ao longo da vida, mas so uma
         // vigente por vez (indice parcial da issue #272).
         //
-        // O SELECT ATRAVESSA A RELACAO ATE `student.gymUnitId` para a
-        // ocupacao por unidade (F-ocupacao) poder agrupar sem uma segunda
-        // consulta: `Subscription` nao tem unidade propria, quem tem e o
-        // `Student` (`gymUnitId` obrigatorio no schema). O padrao ja existe
-        // em varios use cases deste modulo (`aplicar-inadimplencia`,
-        // `consultar-inadimplencia`, `consultar-pagos`,
-        // `criar-checkout-de-cartao`, `emitir-recibo`).
+        // O SELECT NAO ATRAVESSA PARA `student.gymUnitId` -- ISSO JA FOI
+        // TENTADO E MEDIDO COMO QUEBRADO SOB RLS.
+        //
+        // `Student` tem politica RLS ativa (`MODELOS_COM_RLS` em
+        // `prisma.service.ts`). Um `select` aninhado a partir de
+        // `Subscription` (`select: { studentId: true, student: { select: {
+        // gymUnitId: true } } }`) devolveu `student: null` em 100% das
+        // linhas contra a API real, sob o role restrito
+        // (`RUNTIME_DATABASE_URL`) -- mesmo padrao ja registrado no
+        // historico do projeto e em `consultar-inadimplencia.use-case.ts`
+        // (issue #306): o Prisma tipa a relacao como nao-nula e nem o
+        // TypeScript nem um teste sem RLS avisam.
+        //
+        // A CORRECAO NAO E "trocar o join por consulta direta" -- e ABRIR
+        // A CONSULTA DENTRO DE `comTenant`. A causa raiz e mais funda que
+        // "aninhado quebra, raiz nao quebra": QUALQUER consulta que toque
+        // `Student`, aninhada ou na raiz, precisa rodar dentro de uma
+        // transacao interceptada pelo `PrismaService` para o `set_config`
+        // da politica ser aplicado -- o `TenantRlsInterceptor` so abre o
+        // `AsyncLocalStorage` por requisicao, quem aplica o `set_config` e
+        // o `$transaction`/`comTenant` do `PrismaService`. Uma consulta
+        // solta a `Student` (join aninhado OU raiz) roda fora dessa
+        // interceptacao e ve `app.tenant_id` vazio. Ver o comentario
+        // completo, com a medicao das duas tentativas, em
+        // `alunosDaOcupacao` mais abaixo.
         this.db.subscription.findMany({
           where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] } },
-          select: { studentId: true, student: { select: { gymUnitId: true } } },
+          select: { studentId: true },
           distinct: ['studentId'],
         }),
 
@@ -558,6 +576,45 @@ export class ConsultarResumoFinanceiroUseCase {
       : [];
 
     /**
+     * UNIDADE DE CADA ALUNO ATIVO -- consulta PROPRIA, direto na raiz de
+     * `Student`, e nao um `select` aninhado a partir de `Subscription`.
+     *
+     * `comTenant`, NAO `this.db.student.findMany` solto -- MESMO PADRAO JA
+     * DOCUMENTADO em `consultar-inadimplencia.use-case.ts` e
+     * `emitir-recibo.use-case.ts` (issue #306). `Student` tem politica RLS
+     * (F66, `MODELOS_COM_RLS` em `prisma.service.ts`), e o `set_config` que
+     * a politica precisa SO E APLICADO dentro de uma transacao interceptada
+     * pelo `PrismaService` (`$transaction`/`comTenant`) -- uma chamada solta
+     * como `this.db.student.findMany(...)` roda FORA dessa interceptacao,
+     * entao o `set_config` nunca acontece e a politica ve `app.tenant_id`
+     * vazio.
+     *
+     * MEDIDO EM DUAS RODADAS CONTRA O BANCO REAL SOB O ROLE RESTRITO
+     * (`RUNTIME_DATABASE_URL`, o que a API usa de verdade): a primeira
+     * tentativa desta correcao trocou o `select` aninhado por uma consulta
+     * solta na raiz, aplicando `set_config` A MAO num script isolado -- e
+     * pareceu funcionar (`gymUnitId` preenchido nas 9 linhas). Contra a API
+     * de verdade, rodando dentro do `TenantRlsInterceptor` (que so abre o
+     * `AsyncLocalStorage`, sem `$transaction` proprio), a MESMA consulta
+     * solta devolveu ZERO alunos -- o log de guarda abaixo disparou 9 vezes
+     * ("sem gymUnitId (RLS?)") e a tela mostrou `0/12` em vez de `9/12`.
+     * So envolvendo a consulta em `comTenant` (que abre a transacao e
+     * aplica `set_config` antes da query) o dado voltou certo.
+     *
+     * NAO "OTIMIZE" DE VOLTA PARA UMA CHAMADA SOLTA: e a mesma classe de
+     * erro que a issue #306 ja pagou duas vezes neste modulo.
+     */
+    const alunosDaOcupacao = alunosAtivosAgora.length
+      ? await this.db.comTenant((tx) =>
+          tx.student.findMany({
+            where: { ...doTenant, id: { in: alunosAtivosAgora.map((a) => a.studentId) } },
+            select: { id: true, gymUnitId: true },
+          }),
+        )
+      : [];
+    const unidadePorAluno = new Map(alunosDaOcupacao.map((aluno) => [aluno.id, aluno.gymUnitId]));
+
+    /**
      * PARES CRIACAO/CANCELAMENTO POR ALUNO -- `SPEC-074` §3.
      *
      * Pega a criacao MAIS ANTIGA de cada aluno para casar com o
@@ -592,25 +649,27 @@ export class ConsultarResumoFinanceiroUseCase {
     /**
      * ALUNOS ATIVOS POR UNIDADE -- alimenta `ocupacaoPorUnidade()`.
      *
-     * A unidade vem de `aluno.student.gymUnitId` (atravessado no select de
-     * `alunosAtivosAgora`), nao de `Subscription`: `Subscription` nao tem
-     * coluna de unidade. `Student.gymUnitId` e obrigatorio no schema, mas o
-     * `if` abaixo fica de guarda mesmo assim -- RLS ja fez `include`
-     * aninhado voltar nulo com o Prisma tipando como nao-nulo neste
-     * repositorio antes (ver `rls-include-volta-nulo` no historico do
-     * projeto).
+     * A unidade vem de `unidadePorAluno` (consulta PROPRIA em `Student`,
+     * montada acima), NAO de um `select` aninhado a partir de
+     * `Subscription` -- essa alternativa foi tentada e medida como quebrada
+     * sob RLS (ver o comentario extenso na consulta de `alunosAtivosAgora`).
      *
-     * O `continue` NAO PODE FICAR MUDO: se o RLS quebrar para todo mundo, a
-     * lista sairia com todas as unidades zeradas, e "academia vazia" e um
-     * estado plausivel -- ninguem notaria pela tela que a causa foi RLS, nao
-     * ausencia real de aluno. O log ANTES do `continue` e o que torna essa
-     * falha visivel em producao, e nao so no comentario do fonte. So
-     * `studentId` (UUID interno) vai na mensagem -- nunca nome, CPF ou
-     * qualquer PII do aluno (`CLAUDE.md`).
+     * `Student.gymUnitId` e obrigatorio no schema, mas o `if` abaixo fica de
+     * guarda mesmo assim, agora cobrindo o caso de um `studentId` que nao
+     * apareceu no mapa (aluno nao encontrado em `alunosDaOcupacao` -- RLS
+     * bloqueando de novo, ou inconsistencia de dado).
+     *
+     * O `continue` NAO PODE FICAR MUDO: se a consulta de unidade falhar
+     * para todo mundo, a lista sairia com todas as unidades zeradas, e
+     * "academia vazia" e um estado plausivel -- ninguem notaria pela tela
+     * que a causa foi uma falha de leitura, nao ausencia real de aluno. O
+     * log ANTES do `continue` e o que torna essa falha visivel em producao,
+     * e nao so no comentario do fonte. So `studentId` (UUID interno) vai na
+     * mensagem -- nunca nome, CPF ou qualquer PII do aluno (`CLAUDE.md`).
      */
     const alunosAtivosPorUnidade = new Map<string, number>();
     for (const aluno of alunosAtivosAgora) {
-      const unidadeDoAluno = aluno.student?.gymUnitId;
+      const unidadeDoAluno = unidadePorAluno.get(aluno.studentId);
       if (!unidadeDoAluno) {
         this.log.error(
           `ocupacaoPorUnidade: aluno ${aluno.studentId} sem gymUnitId (RLS?)`,
