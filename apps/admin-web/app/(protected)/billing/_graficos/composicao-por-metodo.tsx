@@ -26,11 +26,23 @@ interface Props {
   readonly testId?: string;
 }
 
-/** Mesma implementacao de GraficoDeRosca -- a dependencia e a STRING, nao o array. */
+/**
+ * Mesma implementacao de GraficoDeRosca -- a dependencia e a STRING, nao o array.
+ *
+ * ESTADO INICIAL SEMPRE VAZIO, nunca `lerCores(chave)` direto no `useState`:
+ * o inicializador de `useState` roda tambem no PRIMEIRO render do cliente,
+ * antes do `useEffect` -- e nesse momento `document` ja existe, entao
+ * `lerCores` devolveria cor de verdade enquanto o HTML vindo do servidor
+ * (onde `document` nao existe) saiu sem cor nenhuma. O React compara os dois
+ * na hidratacao e acusa mismatch. Resolver a cor so dentro do `useEffect`
+ * garante que o primeiro render do cliente reproduz exatamente o HTML do
+ * servidor -- a cor real chega no re-render seguinte, de forma identica em
+ * ambos os lados.
+ */
 function useCoresDosTokens(tokens: readonly string[]): readonly string[] {
   const chave = tokens.join('|');
 
-  const [cores, setCores] = useState<readonly string[]>(() => lerCores(chave));
+  const [cores, setCores] = useState<readonly string[]>([]);
 
   useEffect(() => {
     setCores(lerCores(chave));
@@ -116,14 +128,15 @@ export function ComposicaoPorMetodo({ segmentos, testId }: Props) {
         </ResponsiveContainer>
 
         {/* Legenda visual -- fora da arvore de acessibilidade, ver comentario do doc do componente. */}
-        <ul>
+        <ul className="mt-2 space-y-1 text-xs">
           {comValor.map((segmento) => (
-            <li key={segmento.rotulo}>
+            <li key={segmento.rotulo} className="flex items-center gap-1.5">
               <span
+                className="inline-block size-2.5 shrink-0 rounded-full"
                 style={{ background: cores[segmentos.findIndex((s) => s.rotulo === segmento.rotulo)] ?? 'currentColor' }}
               />
               <span>{segmento.rotulo}</span>
-              <span>{valorLegivel(segmento)}</span>
+              <span className="text-muted-foreground">{valorLegivel(segmento)}</span>
             </li>
           ))}
         </ul>

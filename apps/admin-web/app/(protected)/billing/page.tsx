@@ -412,9 +412,24 @@ export default async function PainelFinanceiroPage({
         {periodos.length > 0 ? (
           <nav className="flex flex-wrap gap-2" aria-label="Período apurado">
             {periodos.map((periodo) => (
+              /*
+                SEM `bg-primary`/`text-primary-foreground` NO ATIVO -- de
+                proposito. `<a>` fora de `data-slot='button'` e pintado pela
+                regra `a { color: var(--ah-action-text) }` do globals.css, que
+                mora FORA de layer e por isso vence qualquer utilitaria
+                Tailwind de `color` (documentado ali mesmo: um botao que virou
+                "retangulo colorido vazio", contraste 1:1). Um pill azul com
+                texto tambem azul repetiria o mesmo defeito.
+
+                O padrao ja usado no resto do app para "chip de periodo ativo"
+                (`filtro-de-periodo.tsx` / `health.module.css`) nao disputa
+                `color` nenhuma: usa DOIS canais que nao colidem com a regra
+                global -- peso da fonte e borda inferior mais grossa. Replicado
+                aqui em Tailwind puro, sem CSS module novo.
+              */
               <a
                 key={periodo.rotulo}
-                className="rounded-full border border-border px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted aria-[current=page]:border-transparent aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground"
+                className="border-b-2 border-transparent px-3 py-1 text-sm transition-colors aria-[current=page]:border-primary aria-[current=page]:font-semibold"
                 href={`/billing?de=${encodeURIComponent(periodo.de)}&ate=${encodeURIComponent(periodo.ate)}`}
                 {...(periodo.atual ? { 'aria-current': 'page' as const } : {})}
                 data-testid={`periodo-${periodo.rotulo}`}
@@ -440,7 +455,17 @@ export default async function PainelFinanceiroPage({
         Destacados da faixa compacta que segue, com badge de tendencia so
         quando ha dado real de mes anterior.
       */}
-      <section
+      {/*
+        `<div role="region">`, NUNCA `<section>` aqui: `globals.css` estiliza
+        todo `<section>` como CARD (`display:flex`, borda, padding, fundo --
+        fora de `@layer`, entao vence a utilitaria `grid` do Tailwind). Este
+        elemento e um CONTEINER DE LAYOUT (grade de 3 cards), nao um card em
+        si -- vira `<section>` derrubaria a grade inteira para
+        `display:flex` empilhado. `role="region"` + `aria-label` preserva a
+        mesma semantica de landmark que `<section aria-label>` teria.
+      */}
+      <div
+        role="region"
         className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3"
         aria-label="Indicadores principais do período"
       >
@@ -557,14 +582,19 @@ export default async function PainelFinanceiroPage({
             </p>
           </CardContent>
         </Card>
-      </section>
+      </div>
 
       {/*
         FAIXA COMPACTA -- os KPIs restantes, menos os tres promovidos a hero.
         Novos alunos/Cancelamentos/Churn/LTV saem daqui e viram o bloco de
         "Saude do negocio & retencao" mais abaixo, ao lado da divida.
+
+        `<div role="region">`, mesmo motivo do bloco de hero KPIs acima:
+        `<section>` herdaria `display:flex` do `globals.css` e quebraria a
+        grade de 4 colunas.
       */}
-      <section
+      <div
+        role="region"
         className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
         aria-label="Indicadores do período"
       >
@@ -650,7 +680,7 @@ export default async function PainelFinanceiroPage({
             </CardContent>
           </Card>
         ) : null}
-      </section>
+      </div>
 
       {/*
         LINHA 1 DE GRAFICOS: evolucao de receita (EvolucaoDeReceita, que antes

@@ -37,11 +37,20 @@ interface Props {
 
 const MINIMO_DE_PONTOS_PARA_TENDENCIA = 3;
 
-/** Mesma implementacao de SerieFinanceira -- a dependencia e a STRING, nao o array. */
+/**
+ * Mesma implementacao de SerieFinanceira -- a dependencia e a STRING, nao o array.
+ *
+ * ESTADO INICIAL SEMPRE VAZIO -- mesmo motivo do `ComposicaoPorMetodo`
+ * (defeito de hidratacao achado na integracao da task 9): `lerCores(chave)`
+ * direto no `useState` roda tambem no primeiro render do cliente, ja com
+ * `document` disponivel, e diverge do HTML do servidor (que nao tem
+ * `document`). A cor real so chega via `useEffect`, depois do primeiro
+ * paint identico nos dois lados.
+ */
 function useCoresDosTokens(tokens: readonly string[]): readonly string[] {
   const chave = tokens.join('|');
 
-  const [cores, setCores] = useState<readonly string[]>(() => lerCores(chave));
+  const [cores, setCores] = useState<readonly string[]>([]);
 
   useEffect(() => {
     setCores(lerCores(chave));
