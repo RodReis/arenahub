@@ -618,7 +618,7 @@ export class EngagementRepository implements PortaDeEngajamento {
     const [alunosAtivos, optOut, apelidosPendentes, apelidosOcultos, contestacoesAbertas] =
       await this.db.comTenant((tx) =>
         Promise.all([
-          tx.student.count({ where: { tenantId, status: 'ACTIVE' } }),
+          tx.student.count({ where: { tenantId, profile: 'STUDENT', status: 'ACTIVE' } }),
           // So conta o opt-out de quem esta ATIVO: aluno inativo ja nao aparece
           // em exposicao nenhuma (INV-155), e conta-lo aqui faria a soma de
           // participantes + opt-out passar do total de ativos.

@@ -45,8 +45,8 @@ export async function contarAlunosDoTenant(
   const [total, ativos] = await comContexto({ kind: 'system', tenantId }, () =>
     db.comTenant((tx) =>
       Promise.all([
-        tx.student.count({ where: { tenantId } }),
-        tx.student.count({ where: { tenantId, status: 'ACTIVE' } }),
+        tx.student.count({ where: { tenantId, profile: 'STUDENT' } }),
+        tx.student.count({ where: { tenantId, profile: 'STUDENT', status: 'ACTIVE' } }),
       ]),
     ),
   );

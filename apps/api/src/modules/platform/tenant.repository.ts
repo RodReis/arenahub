@@ -83,7 +83,7 @@ export class TenantRepository {
     const grupos = await this.db.comTenant((tx) =>
       tx.student.groupBy({
         by: ['tenantId'],
-        where: { status: 'ACTIVE' },
+        where: { profile: 'STUDENT', status: 'ACTIVE' },
         _count: { _all: true },
       }),
     );

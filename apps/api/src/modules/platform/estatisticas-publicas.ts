@@ -36,7 +36,7 @@ export async function contarEstatisticasPublicas(
     const [alunos, unidades] = await comContexto({ kind: 'system', tenantId }, () =>
       db.comTenant((tx) =>
         Promise.all([
-          tx.student.count({ where: { tenantId, status: 'ACTIVE' } }),
+          tx.student.count({ where: { tenantId, profile: 'STUDENT', status: 'ACTIVE' } }),
           tx.gymUnit.count({ where: { tenantId, status: 'ACTIVE' } }),
         ]),
       ),
