@@ -30,7 +30,15 @@ test.describe('separação de perfis entre /team e /students (F81)', () => {
 
   test('tela de alunos lista aluno comum e nao lista professor', async ({ page }) => {
     await entrar(page);
-    await page.goto('/students');
+    /*
+     * `?q=Bancada` casa com OS DOIS nomes de fixture ("Aluno de Bancada do
+     * Totem" e "Professor de Bancada"). Sem o filtro de busca, a ausencia do
+     * professor poderia se explicar so pela paginacao (72 nao-aluno + 1
+     * aluno, o professor pode nunca estar na pagina que o aluno esta) -- o
+     * termo de busca garante que SO o filtro `profile: 'STUDENT'` explica a
+     * ausencia dele aqui.
+     */
+    await page.goto('/students?q=Bancada');
 
     await expect(page.getByText('Aluno de Bancada do Totem')).toBeVisible();
     await expect(page.getByText('Professor de Bancada')).not.toBeVisible();

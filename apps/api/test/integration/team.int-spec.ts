@@ -217,6 +217,37 @@ describe('TeamController (F81)', () => {
     expect((resposta.body as { code: string }).code).toBe('TEAM_MEMBER_NOT_FOUND');
   });
 
+  it('GET /api/v1/team pagina pelo cursor -- a segunda pagina nao repete a primeira', async () => {
+    const criados = [];
+
+    for (let i = 0; i < 3; i += 1) {
+      criados.push(await criarProfessorDeFixture(contas.a));
+    }
+
+    const primeira = await request(servidor())
+      .get('/api/v1/team?limit=2')
+      .set('Cookie', contas.a.cookie);
+
+    expect(primeira.status).toBe(200);
+    const idsDaPrimeira = (primeira.body as { id: string }[]).map((m) => m.id);
+    expect(idsDaPrimeira).toHaveLength(2);
+
+    const ultimoDaPrimeira = idsDaPrimeira[idsDaPrimeira.length - 1];
+
+    const segunda = await request(servidor())
+      .get(`/api/v1/team?limit=2&cursor=${ultimoDaPrimeira}`)
+      .set('Cookie', contas.a.cookie);
+
+    expect(segunda.status).toBe(200);
+    const idsDaSegunda = (segunda.body as { id: string }[]).map((m) => m.id);
+
+    // A segunda pagina nao pode conter nenhum id da primeira -- se o
+    // controller descartasse o `cursor` (o defeito que este teste existe
+    // para pegar), a segunda chamada devolveria os MESMOS dois primeiros.
+    expect(idsDaSegunda.some((id) => idsDaPrimeira.includes(id))).toBe(false);
+    expect(idsDaSegunda.length).toBeGreaterThan(0);
+  });
+
   it('PATCH /api/v1/team/:id/employment em id inexistente responde 404', async () => {
     const resposta = await request(servidor())
       .patch(`/api/v1/team/${randomUUID()}/employment`)

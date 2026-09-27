@@ -1,6 +1,6 @@
-import { Body, ConflictException, Controller, Get, NotFoundException, Param, Patch, Query, Res } from '@nestjs/common';
+import { Body, ConflictException, Controller, Get, NotFoundException, Param, Patch, Query, Req, Res } from '@nestjs/common';
 import { ApiOkResponse } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
@@ -105,11 +105,12 @@ export class TeamController {
     @Res({ passthrough: true }) resposta: Response,
     @Query('q') termo?: string,
     @Query('limit') limite?: string,
+    @Query('cursor') cursor?: string,
   ): Promise<MembroDeTimeDto[]> {
     const take = Math.min(Number(limite) || 20, 100);
     const contexto = this.contexto.require();
 
-    const membros = await this.time.buscar(contexto, { termo, limite: take });
+    const membros = await this.time.buscar(contexto, { termo, limite: take, cursor });
     const total = await this.time.contar(contexto, { termo });
 
     resposta.setHeader('X-Total-Count', String(total));
@@ -157,7 +158,11 @@ export class TeamController {
   @Patch(':id/employment')
   @RequirePermissions('team.update')
   @ApiOkResponse({ schema: SCHEMA_MEMBRO_DE_TIME })
-  async atualizarVinculo(@Param('id') id: string, @Body() corpo: unknown): Promise<MembroDeTimeDto> {
+  async atualizarVinculo(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<MembroDeTimeDto> {
     const dados = esquemaDeVinculo.parse(corpo);
     const contexto = this.contexto.require();
 
@@ -171,7 +176,7 @@ export class TeamController {
           ? { employmentStartedAt: dados.employmentStartedAt ? new Date(dados.employmentStartedAt) : null }
           : {}),
       },
-      'sem-correlacao',
+      requisicao.correlationId ?? 'sem-correlacao',
     );
 
     if (!atualizado) {
