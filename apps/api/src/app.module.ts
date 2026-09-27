@@ -41,6 +41,7 @@ import { OperationsModule } from './modules/operations/operations.module.js';
 import { PlatformModule } from './modules/platform/platform.module.js';
 import { PrivacyModule } from './modules/privacy/privacy.module.js';
 import { StudentsModule } from './modules/students/students.module.js';
+import { TeamModule } from './modules/team/team.module.js';
 import { TenancyModule } from './modules/tenancy/tenancy.module.js';
 import { ClassesModule } from './modules/classes/classes.module.js';
 import { ClassReservationsModule } from './modules/class-reservations/class-reservations.module.js';
@@ -74,6 +75,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     IamModule,
     TenancyModule,
     StudentsModule,
+    TeamModule,
     ClassesModule,
     ClassReservationsModule,
     BillingModule,
