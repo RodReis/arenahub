@@ -18,6 +18,8 @@ export { Button } from './components/Button.js';
 export { ConsentCard } from './components/ConsentCard.js';
 export { DataFreshness } from './components/DataFreshness.js';
 export { BarrasDeFaixa, type FaixaDeBarra } from './components/BarrasDeFaixa.js';
+export { BarrasVerticais, type FaixaVertical } from './components/BarrasVerticais.js';
+export { GraficoDeRosca, type SegmentoDeRosca } from './components/GraficoDeRosca.js';
 export { SerieFinanceira, type PontoFinanceiro } from './components/SerieFinanceira.js';
 export { Sparkline } from './components/Sparkline.js';
 export { formatarDinheiro, percentualDoTotal } from './dinheiro.js';
