@@ -66,7 +66,7 @@ describe('atualizarVinculo -- vínculo trabalhista do time (F81)', () => {
     vi.mocked(chamarApi).mockResolvedValueOnce({
       ok: false,
       dados: null,
-      erro: { code: 'STALE_VERSION' },
+      erro: { type: 'about:blank', title: 'stale', status: 409, code: 'STALE_VERSION', correlationId: 'x' },
       cookiesDaApi: [],
     });
 
@@ -88,7 +88,7 @@ describe('atualizarVinculo -- vínculo trabalhista do time (F81)', () => {
     vi.mocked(chamarApi).mockResolvedValueOnce({
       ok: false,
       dados: null,
-      erro: { code: 'INTERNAL_ERROR' },
+      erro: { type: 'about:blank', title: 'erro', status: 500, code: 'INTERNAL_ERROR', correlationId: 'x' },
       cookiesDaApi: [],
     });
 
