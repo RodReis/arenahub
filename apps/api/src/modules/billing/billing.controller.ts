@@ -527,6 +527,41 @@ export class BillingController {
    */
   @Post('invoices/:id/correct-amount')
   @RequirePermissions('billing.manage')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: [
+        'id',
+        'number',
+        'status',
+        'currency',
+        'billingPeriod',
+        'subtotalMinor',
+        'discountMinor',
+        'totalMinor',
+        'dueAt',
+        'blockAt',
+        'paidAt',
+        'items',
+        'payments',
+      ],
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        number: { type: 'integer' },
+        status: { type: 'string' },
+        currency: { type: 'string' },
+        billingPeriod: { type: 'string' },
+        subtotalMinor: { type: 'integer' },
+        discountMinor: { type: 'integer' },
+        totalMinor: { type: 'integer' },
+        dueAt: { type: 'string' },
+        blockAt: { type: 'string', nullable: true },
+        paidAt: { type: 'string', nullable: true },
+        items: { type: 'array', items: { type: 'object' } },
+        payments: { type: 'array', items: { type: 'object' } },
+      },
+    },
+  })
   async corrigirValorDaInvoice(
     @Param('id') id: string,
     @Body() corpo: unknown,
