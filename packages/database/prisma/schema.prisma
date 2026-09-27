@@ -152,6 +152,20 @@ enum StudentContactType {
   @@map("student_contact_type")
 }
 
+/// Vinculo trabalhista de quem NAO e aluno (TRAINER/STAFF/ADMIN) -- F81.
+/// Nulo para `profile = STUDENT`: campo nao tem sentido pra aluno comum, e
+/// os 347 alunos existentes nao ganham valor por essa fatia.
+enum EmploymentType {
+  /// Carteira assinada.
+  CLT
+  /// Pessoa juridica.
+  PJ
+  /// Autonomo, sem CLT nem PJ.
+  AUTONOMOUS
+
+  @@map("employment_type")
+}
+
 /// Papel da pessoa na academia. NAO decide acesso -- origina um
 /// `Entitlement` (F48). Ler isto dentro do motor de decisao criaria a
 /// segunda fonte de verdade que a regra de arquitetura no 1 proibe.
@@ -1590,6 +1604,18 @@ model Student {
   /// Papel da pessoa (F48). Default `STUDENT` porque e o caso comum e
   /// porque as 1.926 linhas ja existentes precisam de um valor.
   profile          StudentProfile        @default(STUDENT)
+  /// Vinculo trabalhista -- F81, issue #415. Nulo para `profile = STUDENT`
+  /// (aluno comum nao tem vinculo) e para os TRAINER/STAFF/ADMIN existentes
+  /// ate a tela de equipe preencher. NAO EXISTE VALIDACAO DE "so preenche se
+  /// profile != STUDENT" no banco -- e regra de aplicacao (Zod do endpoint
+  /// de edicao), mesmo criterio de `modalityIds` na F60: CHECK de coluna
+  /// cruzando duas colunas exigiria trigger, e a aplicacao ja e a fronteira
+  /// que decide isso em todo outro campo condicional do Student.
+  employmentType      EmploymentType? @map("employment_type")
+  /// Data de entrada no vinculo (nao e `createdAt` do cadastro -- um
+  /// professor pode ser cadastrado no sistema muito depois de comecar a dar
+  /// aula na Arena Positiva).
+  employmentStartedAt DateTime?       @map("employment_started_at") @db.Date
   /// Chave do objeto no storage privado (F72, issue #348). `null` = sem
   /// foto. Nunca a URL: mesma disciplina de `Tenant.logoObjectKey` -- quem
   /// quer o arquivo pede pela rota que confere o pertencimento ao tenant.
