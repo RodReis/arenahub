@@ -26,24 +26,25 @@ export async function contarEstatisticasPublicas(
 ): Promise<EstatisticasPublicas> {
   const tenants = await db.tenant.findMany({ where: { status: 'ACTIVE' }, select: { id: true } });
 
-  const contagens = await Promise.all(
-    tenants.map(({ id: tenantId }) =>
-      comContexto({ kind: 'system', tenantId }, () =>
-        db.comTenant((tx) =>
-          Promise.all([
-            tx.student.count({ where: { tenantId, status: 'ACTIVE' } }),
-            tx.gymUnit.count({ where: { tenantId, status: 'ACTIVE' } }),
-          ]),
-        ),
-      ),
-    ),
-  );
+  // SERIALIZADO, e nao Promise.all: uma transacao por tenant, todas em
+  // paralelo, disputava o pool de conexoes do Postgres e estourava com N
+  // tenants ativos crescendo (issue #417). Rota publica de tela de login,
+  // sem requisito de latencia que justifique concorrencia.
+  const acumulado: EstatisticasPublicas = { totalAlunosAtivos: 0, totalUnidadesAtivas: 0 };
 
-  return contagens.reduce<EstatisticasPublicas>(
-    (acumulado, [alunos, unidades]) => ({
-      totalAlunosAtivos: acumulado.totalAlunosAtivos + alunos,
-      totalUnidadesAtivas: acumulado.totalUnidadesAtivas + unidades,
-    }),
-    { totalAlunosAtivos: 0, totalUnidadesAtivas: 0 },
-  );
+  for (const { id: tenantId } of tenants) {
+    const [alunos, unidades] = await comContexto({ kind: 'system', tenantId }, () =>
+      db.comTenant((tx) =>
+        Promise.all([
+          tx.student.count({ where: { tenantId, status: 'ACTIVE' } }),
+          tx.gymUnit.count({ where: { tenantId, status: 'ACTIVE' } }),
+        ]),
+      ),
+    );
+
+    acumulado.totalAlunosAtivos += alunos;
+    acumulado.totalUnidadesAtivas += unidades;
+  }
+
+  return acumulado;
 }
