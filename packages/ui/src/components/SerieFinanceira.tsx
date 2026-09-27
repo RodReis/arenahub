@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import {
   Area,
   CartesianGrid,
@@ -94,6 +94,35 @@ function useCoresDosTokens(tokens: readonly string[]): readonly string[] {
   }, [chave]);
 
   return cores;
+}
+
+/**
+ * Desenha o ponto da linha de recebido. Funcao de MODULO, nao inline no JSX,
+ * para ser testavel isolada -- Recharts nao renderiza SVG em jsdom (ver topo
+ * do arquivo de teste), entao nao ha como inspecionar o circulo via DOM.
+ *
+ * ULTIMO PONTO (competencia mais recente) ganha raio maior: e onde o olho
+ * deve ir primeiro, porque e o numero que ainda pode mudar.
+ */
+export function renderPontoDaSerie(
+  props: { cx?: number; cy?: number; index?: number },
+  totalDePontos: number,
+  cor: string,
+): ReactElement {
+  const ehUltimo = props.index === totalDePontos - 1;
+  const raio = ehUltimo ? 6 : 4;
+
+  return (
+    <circle
+      key={`ponto-${String(props.index)}`}
+      cx={props.cx}
+      cy={props.cy}
+      r={raio}
+      fill={cor}
+      stroke="var(--ah-surface-raised)"
+      strokeWidth={ehUltimo ? 2 : 0}
+    />
+  );
 }
 
 export function SerieFinanceira({ pontos, descricao, testId }: Props) {
@@ -282,7 +311,9 @@ export function SerieFinanceira({ pontos, descricao, testId }: Props) {
               name="Recebido"
               stroke={corRecebido}
               strokeWidth={2.5}
-              dot={{ r: 4, fill: corRecebido }}
+              dot={(props: { cx?: number; cy?: number; index?: number }) =>
+                renderPontoDaSerie(props, dados.length, corRecebido)
+              }
               isAnimationActive={false}
             />
           </ComposedChart>
