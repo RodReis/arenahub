@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { BarrasVerticais } from './BarrasVerticais.js';
+import { BarrasVerticais, prepararColunas } from './BarrasVerticais.js';
 
 const FAIXAS = [
   { rotulo: 'Até 15 dias', valor: 630_000, tokenDeCor: '--ah-state-warning', valorLegivel: 'R$ 6.300,00' },
@@ -20,7 +20,34 @@ describe('BarrasVerticais', () => {
   it('mostra o valor legível no topo de cada coluna', () => {
     render(<BarrasVerticais faixas={FAIXAS} descricao="Dívida por faixa de atraso" />);
 
-    expect(screen.getAllByText('R$ 6.750,00')).toHaveLength(1);
+    // Recharts nao desenha SVG em jsdom (ResponsiveContainer mede zero) --
+    // o que se prova aqui e que o texto existe em algum lugar do DOM
+    // (a tabela invisivel), nao que o LabelList visual desenhou. A prova do
+    // LabelList em si e `prepararColunas`, abaixo.
+    expect(screen.getAllByText('R$ 6.750,00').length).toBeGreaterThan(0);
+  });
+
+  /**
+   * FAIXA ZERADA SAI DO GRAFICO, mas continua na tabela do leitor de tela --
+   * mesma regra que `BarrasDeFaixa` ja aplica (achado na revisao final: a
+   * primeira versao deste componente desenhava TODAS as faixas, inclusive
+   * as zeradas, e uma coluna de altura zero com rotulo "R$ 0,00" no topo
+   * parece dado que nao carregou).
+   *
+   * `prepararColunas` e a funcao PURA que decide isso -- extraida para ser
+   * testavel sem depender do Recharts renderizar (que nao acontece em
+   * jsdom).
+   */
+  it('prepararColunas remove faixas zeradas, mantendo as com valor', () => {
+    const colunas = prepararColunas(FAIXAS);
+
+    expect(colunas).toHaveLength(3);
+
+    const comZero = [...FAIXAS, { rotulo: 'Zerada', valor: 0, tokenDeCor: '--ah-text-muted', valorLegivel: 'R$ 0,00' }];
+    const colunasComZero = prepararColunas(comZero);
+
+    expect(colunasComZero).toHaveLength(3);
+    expect(colunasComZero.some((c) => c.rotulo === 'Zerada')).toBe(false);
   });
 
   /** Mesma regra de BarrasDeFaixa: sem dado e frase, nao eixo vazio. */
@@ -46,6 +73,12 @@ describe('BarrasVerticais', () => {
       { rotulo: 'Até 15 dias', valor: 0, tokenDeCor: '--ah-state-warning', valorLegivel: 'R$ 0,00' },
       { rotulo: '16 a 30 dias', valor: 500_000, tokenDeCor: '--ah-state-risk', valorLegivel: 'R$ 5.000,00' },
     ];
+
+    const colunas = prepararColunas(faixas);
+
+    // So a faixa com valor entra -- nenhum NaN, nenhuma altura negativa,
+    // porque a faixa zerada nem chega ao Recharts para normalizar.
+    expect(colunas).toEqual([{ rotulo: '16 a 30 dias', valor: 500_000, valorLegivel: 'R$ 5.000,00' }]);
 
     render(<BarrasVerticais faixas={faixas} descricao="Dívida por faixa de atraso" />);
 

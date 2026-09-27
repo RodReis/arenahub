@@ -122,7 +122,14 @@ export function GraficoDeRosca({
           ) : null}
         </div>
 
-        <ul className={estilos['legenda']}>
+        {/*
+          A LEGENDA FICA FORA DA ARVORE DE ACESSIBILIDADE -- a tabela
+          invisivel acima ja anuncia cada segmento. Sem este `aria-hidden`,
+          o leitor de tela ouviria "PIX Automatico" duas vezes: uma pela
+          tabela, outra por aqui. Mesmo defeito que `BarrasDeFaixa` ja pagou
+          e documentou antes deste componente existir.
+        */}
+        <ul className={estilos['legenda']} aria-hidden="true">
           {segmentos.map((segmento, indice) => (
             <li key={segmento.rotulo} className={estilos['legendaItem']}>
               <span

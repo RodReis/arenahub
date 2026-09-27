@@ -157,6 +157,24 @@ function diaLegivel(iso: string): string {
 }
 
 /**
+ * `2026-07` vira `2026-08`; `2026-12` vira `2027-01`.
+ *
+ * Sem `Date`, mesmo motivo de `competenciaLegivel`: competencia e um mes de
+ * referencia, nao um instante -- construir um `Date` reintroduz o fuso que o
+ * backend ja tirou do caminho.
+ */
+function mesSeguinte(competencia: string): string {
+  const [ano, mes] = competencia.split('-').map(Number);
+  const anoBase = ano ?? 0;
+  const mesBase = mes ?? 1;
+
+  const proximoMes = mesBase === 12 ? 1 : mesBase + 1;
+  const proximoAno = mesBase === 12 ? anoBase + 1 : anoBase;
+
+  return `${proximoAno}-${String(proximoMes).padStart(2, '0')}`;
+}
+
+/**
  * Os meses que o filtro oferece, do mais recente para tras.
  *
  * DERIVADOS DA SERIE QUE O BACKEND JA DEVOLVE, e nao de um calendario
@@ -285,14 +303,37 @@ export default async function PainelFinanceiroPage({
   const periodoParcial = periodos.find((periodo) => periodo.atual)?.parcial ?? false;
 
   /*
-    VARIACAO DO RECEBIDO -- so existe com pelo menos dois pontos na serie.
-    Sem dado de mes anterior, o badge nao aparece (nunca inventar percentual).
+    VARIACAO DO RECEBIDO -- a mesma garantia do grafico de serie (achado na
+    revisao final: a primeira versao comparava competencia com competencia
+    sem essas tres guardas, e "↓ 100%" aparecia toda vez que a competencia
+    mais recente ainda estava recebendo pagamento).
+
+    1. `suficienteParaLinha` (>= 3 pontos): mesma regra que libera o proprio
+       grafico de tendencia. Com 2 pontos so, a reta entre eles sempre
+       parece tendencia (SPEC-054 §5.1) -- e o badge contradiria o aviso
+       "dado insuficiente" que a tela mostra ao lado.
+    2. Periodo NAO PARCIAL: o mes em curso ainda esta recebendo pagamento, e
+       compara-lo com o mes anterior fechado produz uma "queda" que e so o
+       mes nao ter terminado.
+    3. Competencias CONSECUTIVAS: `montarSerie` no backend so lista meses
+       com movimento -- sem fatura nem pagamento, o mes nao aparece. Os dois
+       ultimos pontos da serie podem estar a varios meses de distancia, e
+       chamar isso de "mes anterior" mentiria.
   */
   const pontosDaSerie = resumo.serie.pontos;
   const penultimoPonto = pontosDaSerie.at(-2);
   const ultimoPonto = pontosDaSerie.at(-1);
+  const competenciasConsecutivas =
+    penultimoPonto && ultimoPonto
+      ? mesSeguinte(penultimoPonto.competencia) === ultimoPonto.competencia
+      : false;
   const variacaoRecebido =
-    penultimoPonto && ultimoPonto && penultimoPonto.recebidoMinor > 0
+    resumo.serie.suficienteParaLinha &&
+    !periodoParcial &&
+    competenciasConsecutivas &&
+    penultimoPonto &&
+    ultimoPonto &&
+    penultimoPonto.recebidoMinor > 0
       ? Math.round(
           ((ultimoPonto.recebidoMinor - penultimoPonto.recebidoMinor) / penultimoPonto.recebidoMinor) * 1000,
         ) / 10
@@ -365,9 +406,15 @@ export default async function PainelFinanceiroPage({
             {variacaoRecebido !== null ? (
               <span
                 className={estilos['heroBadge']}
-                data-tom={variacaoRecebido >= 0 ? 'success' : 'danger'}
+                data-testid="tendencia-do-recebido-badge"
+                /*
+                  ZERO E NEUTRO -- nem sucesso nem risco. `>= 0` sozinho
+                  pintaria um "0%" de verde, afirmando melhora que nao houve.
+                */
+                data-tom={variacaoRecebido > 0 ? 'success' : variacaoRecebido < 0 ? 'danger' : 'neutral'}
               >
-                {variacaoRecebido >= 0 ? '↑' : '↓'} {String(Math.abs(variacaoRecebido)).replace('.', ',')}%
+                {variacaoRecebido > 0 ? '↑' : variacaoRecebido < 0 ? '↓' : '·'}{' '}
+                {String(Math.abs(variacaoRecebido)).replace('.', ',')}% vs mês anterior
               </span>
             ) : null}
           </div>

@@ -48,6 +48,31 @@ function lerCores(chave: string): readonly string[] {
   return chave.split('|').map((token) => estilo.getPropertyValue(token).trim());
 }
 
+interface Coluna {
+  readonly rotulo: string;
+  readonly valor: number;
+  readonly valorLegivel: string;
+}
+
+/**
+ * FAIXA ZERADA SAI DO GRAFICO, mas continua na tabela do leitor de tela --
+ * mesma regra que `BarrasDeFaixa` ja aplica. Uma coluna de altura zero com
+ * "R$ 0,00" no topo parece dado que nao carregou, nao uma boa noticia.
+ *
+ * Funcao PURA de modulo, exportada so para teste: o Recharts nao renderiza
+ * SVG em jsdom, entao a unica forma de provar "faixa zerada nao vira coluna"
+ * e testar esta funcao isolada, sem depender do canvas.
+ */
+export function prepararColunas(faixas: readonly FaixaVertical[]): readonly Coluna[] {
+  return faixas
+    .filter((faixa) => faixa.valor > 0)
+    .map((faixa) => ({
+      rotulo: faixa.rotulo,
+      valor: faixa.valor,
+      valorLegivel: faixa.valorLegivel,
+    }));
+}
+
 export function BarrasVerticais({ faixas, descricao, testId }: Props) {
   const cores = useCoresDosTokens(faixas.map((f) => f.tokenDeCor));
 
@@ -61,11 +86,7 @@ export function BarrasVerticais({ faixas, descricao, testId }: Props) {
     );
   }
 
-  const dados = faixas.map((faixa) => ({
-    rotulo: faixa.rotulo,
-    valor: faixa.valor,
-    valorLegivel: faixa.valorLegivel,
-  }));
+  const dados = prepararColunas(faixas);
 
   return (
     <div className={estilos['area']} data-testid={testId}>
@@ -93,8 +114,18 @@ export function BarrasVerticais({ faixas, descricao, testId }: Props) {
             />
             <YAxis hide domain={[0, 'auto']} />
             <Bar dataKey="valor" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-              {dados.map((item, indice) => (
-                <Cell key={item.rotulo} fill={cores[indice] ?? 'currentColor'} />
+              {/*
+                COR PELO ROTULO, nao pelo indice de `dados`: `dados` e
+                FILTRADO (sem as faixas zeradas), entao o indice dele nao
+                bate mais com o indice de `faixas`/`cores`, que inclui todas.
+                Um filtro no meio da lista desalinharia as cores das colunas
+                seguintes.
+              */}
+              {dados.map((item) => (
+                <Cell
+                  key={item.rotulo}
+                  fill={cores[faixas.findIndex((f) => f.rotulo === item.rotulo)] ?? 'currentColor'}
+                />
               ))}
               <LabelList dataKey="valorLegivel" position="top" fill="currentColor" fontSize={12} />
             </Bar>

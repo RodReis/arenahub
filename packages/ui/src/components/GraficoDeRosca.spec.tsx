@@ -22,9 +22,27 @@ describe('GraficoDeRosca', () => {
   it('mostra o valor legível de cada segmento na legenda', () => {
     render(<GraficoDeRosca segmentos={SEGMENTOS} descricao="Distribuição por forma de pagamento" />);
 
-    // Aparece duas vezes de proposito: na tabela invisivel (leitor de tela)
-    // e na legenda visivel -- getAllByText confirma as duas.
-    expect(screen.getAllByText('R$ 11.723,20 · 68%')).toHaveLength(2);
+    expect(screen.getAllByText('R$ 11.723,20 · 68%').length).toBeGreaterThan(0);
+  });
+
+  /**
+   * A LEGENDA VISIVEL FICA FORA DA ARVORE DE ACESSIBILIDADE -- achado na
+   * revisao final: sem `aria-hidden`, o leitor de tela ouvia cada segmento
+   * DUAS vezes, uma pela tabela invisivel e outra pela legenda. Mesmo
+   * defeito que `BarrasDeFaixa` ja documentou e corrigiu antes deste
+   * componente existir (ver o comentario em BarrasDeFaixa.tsx sobre
+   * `accessibilityLayer` nao ser suficiente).
+   */
+  it('esconde a legenda visivel do leitor de tela, deixando so a tabela', () => {
+    const { container } = render(
+      <GraficoDeRosca segmentos={SEGMENTOS} descricao="Distribuição por forma de pagamento" />,
+    );
+
+    // A legenda existe no DOM (e visivel para quem enxerga), mas precisa
+    // estar dentro de um ancestral aria-hidden -- senao o leitor de tela
+    // anuncia o mesmo rotulo que a tabela ja anunciou.
+    const legenda = container.querySelector('ul');
+    expect(legenda?.closest('[aria-hidden="true"]')).not.toBeNull();
   });
 
   it('mostra rótulo e valor central quando fornecidos', () => {

@@ -108,7 +108,8 @@ export function renderPontoDaSerie(
   props: { cx?: number; cy?: number; index?: number },
   totalDePontos: number,
   cor: string,
-): ReactElement<{ r: number }> {
+  corDaBorda: string,
+): ReactElement<{ r: number; stroke: string }> {
   const ehUltimo = props.index === totalDePontos - 1;
   const raio = ehUltimo ? 6 : 4;
 
@@ -119,18 +120,24 @@ export function renderPontoDaSerie(
       cy={props.cy}
       r={raio}
       fill={cor}
-      stroke="var(--ah-surface-raised)"
+      stroke={corDaBorda}
       strokeWidth={ehUltimo ? 2 : 0}
     />
   );
 }
 
 export function SerieFinanceira({ pontos, descricao, testId }: Props) {
-  const cores = useCoresDosTokens(['--ah-state-info', '--ah-state-success']);
+  const cores = useCoresDosTokens(['--ah-state-info', '--ah-state-success', '--ah-surface-raised']);
 
   /* `currentColor` e nao hex literal -- regra 1 de lint. */
   const corFaturado = cores[0] ?? 'currentColor';
   const corRecebido = cores[1] ?? 'currentColor';
+  /*
+    RESOLVIDA, nao `var(--token)` literal -- BarrasDeFaixa ja documenta que o
+    SVG do Recharts nao aceita `var()` de forma confiavel em atributo de
+    apresentacao entre navegadores.
+  */
+  const corDaBordaDoPonto = cores[2] ?? 'currentColor';
 
   /**
    * SEM PONTO NAO E GRAFICO VAZIO -- e uma frase.
@@ -312,7 +319,7 @@ export function SerieFinanceira({ pontos, descricao, testId }: Props) {
               stroke={corRecebido}
               strokeWidth={2.5}
               dot={(props: { cx?: number; cy?: number; index?: number }) =>
-                renderPontoDaSerie(props, dados.length, corRecebido)
+                renderPontoDaSerie(props, dados.length, corRecebido, corDaBordaDoPonto)
               }
               isAnimationActive={false}
             />

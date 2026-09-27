@@ -196,6 +196,12 @@
   background: color-mix(in srgb, var(--ah-state-danger) 12%, transparent);
 }
 
+/* Variacao exatamente zero -- nem sucesso nem risco, so estavel. */
+.heroBadge[data-tom='neutral'] {
+  color: var(--ah-state-neutral);
+  background: color-mix(in srgb, var(--ah-state-neutral) 12%, transparent);
+}
+
 .heroValor {
   margin: 0;
   font-size: 30px;
@@ -223,13 +229,12 @@
 /* ─── Faixa de KPI ─────────────────────────────────────────────────────── */
 
 /*
- * PISO DE 155px, e o numero foi MEDIDO, nao escolhido: a area de conteudo a
- * 1280px tem 974px, e sao SEIS indicadores (sete quando ha estorno). Com o
- * piso de 190px que esta faixa tinha, cabiam cinco -- e o sexto descia sozinho
- * para uma segunda linha, deixando um vao cinza de quatro colunas ao lado.
- *
- * 974 / 6 = 162, entao 155 cabe com folga e ainda permite o setimo KPI quebrar
- * em duas linhas CHEIAS em vez de uma linha e um orfao.
+ * PISO DE 155px, e o numero foi MEDIDO, nao escolhido -- historico completo
+ * na F54 (`SPEC-054`), de quando esta faixa tinha seis a sete indicadores.
+ * Este redesign promoveu tres deles (Recebido, Assinaturas vigentes, Ticket
+ * medio) a hero cards acima e moveu quatro (Novos alunos, Cancelamentos,
+ * Churn, LTV) para o bloco de Saude do Negocio -- a faixa compacta ficou com
+ * quatro (cinco com estorno), que cabem com folga no mesmo piso.
  *
  * `gap: 1px` sobre fundo de borda desenha os divisores SEM borda por celula:
  * uma linha de 1px entre KPIs, nunca duas encostadas.
@@ -265,9 +270,6 @@
   background: color-mix(in srgb, currentColor 8%, var(--ah-surface-raised));
 }
 
-.kpi[data-tom='success'] {
-  color: var(--ah-state-success);
-}
 .kpi[data-tom='warning'] {
   color: var(--ah-state-warning);
 }
@@ -276,9 +278,6 @@
 }
 .kpi[data-tom='danger'] {
   color: var(--ah-state-danger);
-}
-.kpi[data-tom='info'] {
-  color: var(--ah-state-info);
 }
 
 .kpiRotulo {
@@ -417,13 +416,6 @@
  */
 .avisoDaSerie {
   margin: 0 0 12px;
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
-  color: var(--ah-text-secondary);
-}
-
-.apoio {
-  margin: 8px 0 0;
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
