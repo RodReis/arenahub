@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { redirect } from 'next/navigation';
+
 import {
   Ausente,
   BarrasVerticais,
@@ -241,9 +243,12 @@ export function periodosDisponiveis(
  * gestor manda para o contador ou para o socio, e um painel que so existe na
  * sessao de quem abriu nao pode ser compartilhado nem recarregado.
  *
- * SEM PARAMETRO, o backend aplica o ultimo mes fechado -- por isso os dois sao
- * repassados so quando existem, em vez de a tela inventar um default proprio.
- * Dois lugares decidindo a mesma janela e como elas divergem.
+ * SEM PARAMETRO NA URL, a TELA redireciona para o MES CORRENTE -- decisao do
+ * PI em 28/09/2026 (pediu o chip do mes em curso ja vindo marcado, em vez do
+ * ultimo mes fechado). O backend continua com `janelaPadrao()` no ultimo mes
+ * fechado quando chamado sem `de`/`ate` (contrato dele, intocado); e a tela
+ * quem passa a nunca chamar sem os dois, preenchendo-os antes com a mesma
+ * conta do chip "parcial" de `periodosDisponiveis()`.
  */
 export default async function PainelFinanceiroPage({
   searchParams,
@@ -251,6 +256,17 @@ export default async function PainelFinanceiroPage({
   searchParams: Promise<{ de?: string; ate?: string }>;
 }) {
   const { de, ate } = await searchParams;
+
+  if (!de || !ate) {
+    const agora = new Date();
+    const inicioDoMes = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), 1));
+    const parametros = new URLSearchParams({
+      de: inicioDoMes.toISOString(),
+      ate: agora.toISOString(),
+    });
+
+    redirect(`/billing?${parametros}`);
+  }
 
   const consulta = new URLSearchParams();
   if (de) consulta.set('de', de);

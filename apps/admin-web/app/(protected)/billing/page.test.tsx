@@ -62,7 +62,7 @@ const RESUMO = {
 
 async function renderizar(
   resumo: unknown = RESUMO,
-  busca: { de?: string; ate?: string } = {},
+  busca: { de?: string; ate?: string } = { de: RESUMO.de, ate: RESUMO.ate },
 ) {
   vi.mocked(chamarApi).mockResolvedValue({ ok: true, dados: resumo, cookiesDaApi: [] });
 
@@ -115,11 +115,29 @@ describe('painel financeiro', () => {
     );
   });
 
-  /** Sem parametro, quem decide a janela e o backend -- nao a tela. */
-  it('nao inventa janela quando a URL nao traz periodo', async () => {
-    await renderizar();
+  /**
+   * SEM PARAMETRO, a tela redireciona para o MES CORRENTE -- decisao do PI em
+   * 28/09/2026 (o chip do mes em curso vem marcado por default, no lugar do
+   * ultimo mes fechado que o backend aplicaria). `redirect()` do Next lanca
+   * `NEXT_REDIRECT`, entao a asserção captura a rejeição em vez de aguardar
+   * o retorno normal da funcao.
+   */
+  it('redireciona para o mes corrente quando a URL nao traz periodo', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-15T12:00:00.000Z'));
+    vi.mocked(chamarApi).mockResolvedValue({ ok: true, dados: RESUMO, cookiesDaApi: [] });
+    const chamadasAntes = vi.mocked(chamarApi).mock.calls.length;
 
-    expect(chamarApi).toHaveBeenCalledWith('/api/v1/billing/summary');
+    const erro = await PainelFinanceiroPage({ searchParams: Promise.resolve({}) }).catch(
+      (erroCapturado: unknown) => erroCapturado,
+    );
+
+    expect((erro as { digest?: string }).digest).toContain(
+      '/billing?de=2026-09-01T00%3A00%3A00.000Z&ate=2026-09-15T12%3A00%3A00.000Z',
+    );
+    expect(vi.mocked(chamarApi).mock.calls.length).toBe(chamadasAntes);
+
+    vi.useRealTimers();
   });
 
   /**
@@ -577,7 +595,9 @@ describe('painel financeiro', () => {
       cookiesDaApi: [],
     });
 
-    const elemento = await PainelFinanceiroPage({ searchParams: Promise.resolve({}) });
+    const elemento = await PainelFinanceiroPage({
+      searchParams: Promise.resolve({ de: RESUMO.de, ate: RESUMO.ate }),
+    });
     render(<ToastProvider>{elemento}</ToastProvider>);
 
     expect(screen.getByTestId('erro-de-permissao')).toBeInTheDocument();
