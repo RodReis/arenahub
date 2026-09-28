@@ -8,15 +8,11 @@ import { EmptyState, Field, Money, SensitiveAction, useToast, useToastDeErro } f
 import {
   abrirCobranca,
   emitirReciboDaInvoice,
-  iniciarCheckoutDeCartao,
-  iniciarCobrancaPix,
   registrarPagamentoNoBalcao,
-  type EstadoDaCobrancaPorQr,
   type EstadoDaInvoice,
   type EstadoDoPagamento,
 } from '../../../../actions/billing';
-import { CobrancaPorQr } from './cobranca-por-qr';
-import { SeletorDeForma, type DadoFaltante, type FormaDePagamento } from './seletor-de-forma';
+import { SeletorDeForma, type FormaDePagamento } from './seletor-de-forma';
 
 interface InvoiceEmAberto {
   id: string;
@@ -25,15 +21,26 @@ interface InvoiceEmAberto {
   currency: string;
 }
 
+interface Cobrando {
+  invoice: InvoiceEmAberto;
+  forma: FormaDePagamento;
+}
+
 interface Props {
-  readonly studentId: string;
   readonly subscriptionId: string | null;
   readonly invoicesEmAberto: readonly InvoiceEmAberto[];
-  readonly faltandoParaCartao: readonly DadoFaltante[];
 }
 
 const ESTADO_DA_INVOICE: EstadoDaInvoice = {};
 const ESTADO_DO_PAGAMENTO: EstadoDoPagamento = {};
+
+/** Texto do resumo de confirmacao, por forma -- SensitiveAction le em voz alta o que vai acontecer. */
+const RESUMO_POR_FORMA: Record<FormaDePagamento, string> = {
+  DINHEIRO: 'em dinheiro',
+  PIX: 'via PIX pela maquininha',
+  DEBITO: 'no débito pela maquininha',
+  CREDITO: 'no crédito pela maquininha',
+};
 
 function BotaoDeGerar() {
   const { pending } = useFormStatus();
@@ -47,41 +54,38 @@ function BotaoDeGerar() {
 
 /**
  * Cobrança e recebimento no balcão — F12, Slice 2.1. Forma de pagamento
- * antes do valor — F53, Task 10.
+ * antes do valor — F53, Task 10. Maquininha física, baixa manual —
+ * F-painel-financeiro, decisão do PI em 28/09/2026.
  *
- * A CENA REAL: a recepcionista tem a pessoa no balcão escolhendo como paga.
- * Por isso o `SeletorDeForma` vem primeiro por cobrança em aberto, e só
- * depois de escolhido é que o caminho específico aparece:
+ * A CENA REAL: a academia tem maquininha física (ainda não integrada ao
+ * sistema). A recepcionista recebe por ela — dinheiro, PIX, débito ou
+ * crédito — e dá baixa manual aqui. Os quatro caminhos do `SeletorDeForma`
+ * convergem no MESMO fluxo: valor → `SensitiveAction` com motivo
+ * obrigatório → recibo. Só o canal registrado (`receivedVia`, ver
+ * `billing.repository.ts`) muda entre eles — `method` continua sempre
+ * `MANUAL`.
  *
- *   1. DINHEIRO — entra no fluxo que já existia (INTOCADO): valor →
- *      `SensitiveAction` com motivo obrigatório. Não porque possa duplicar,
- *      mas porque reconhecer dinheiro sem provedor é o ato que a auditoria
- *      vai ler depois. Com a dupla permissão fora do MVP 2 (ADR-027), o
- *      motivo é parte do único controle que restou.
- *   2. PIX / CARTÃO — chamam as novas Server Actions e entregam QR/link ao
- *      componente da Task 11 (`CobrancaPorQr`, ainda não criado nesta task).
+ * O CHECKOUT HOSPEDADO SAIU DESTA TELA (QR, copia-e-cola, link de
+ * checkout): a maquininha física é o caminho real hoje, e o checkout nunca
+ * foi integrado. `iniciarCobrancaPix`/`iniciarCheckoutDeCartao`
+ * (`app/actions/billing.ts`) e `cobranca-por-qr.tsx` ficam órfãos de
+ * propósito — voltam como caminho SEPARADO quando um provedor de checkout
+ * hospedado for integrado de verdade (fatia futura, ver spec anterior
+ * SPEC-053 §3.1 para o desenho original).
  *
  * GERAR a cobrança do mês continua separada, idempotente no servidor
  * (INV-066): clique duplo não cobra duas vezes, por isso sem confirmação.
  */
-export function PainelDeCobranca({
-  studentId,
-  subscriptionId,
-  invoicesEmAberto,
-  faltandoParaCartao,
-}: Props) {
+export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
   const [estadoDaInvoice, gerar] = useActionState(abrirCobranca, ESTADO_DA_INVOICE);
   const [estadoDoPagamento, receber] = useActionState(
     registrarPagamentoNoBalcao,
     ESTADO_DO_PAGAMENTO,
   );
-  const [cobrando, setCobrando] = useState<InvoiceEmAberto | null>(null);
+  const [cobrando, setCobrando] = useState<Cobrando | null>(null);
   const [valor, setValor] = useState('');
   const idDoValor = useId();
   const { show } = useToast();
-
-  const [cobrancaPorQr, setCobrancaPorQr] = useState<EstadoDaCobrancaPorQr | null>(null);
-  const [gerandoQr, setGerandoQr] = useState(false);
 
   const [reciboDoBalcao, setReciboDoBalcao] = useState<{ numero: number } | null>(null);
   const invoiceDoReciboPedidoRef = useRef<string | null>(null);
@@ -90,13 +94,8 @@ export function PainelDeCobranca({
   // Info, Warn e error". Cada acao anuncia a propria falha.
   useToastDeErro(estadoDaInvoice.erro, 'error', 'erro-ao-gerar');
   useToastDeErro(estadoDoPagamento.erro, 'error', 'erro-ao-receber');
-  useToastDeErro(cobrancaPorQr?.erro, 'error', 'erro-ao-gerar-qr');
 
-  /*
-   * Recibo em toda confirmacao, nos tres caminhos (SPEC-053 item 5) -- este
-   * efeito cobre o DINHEIRO. PIX e cartao emitem dentro de `CobrancaPorQr`,
-   * quando o proprio polling ve a invoice virar PAID.
-   */
+  // Recibo em toda confirmacao -- os quatro canais fecham pelo mesmo fluxo.
   useEffect(() => {
     const invoiceId = estadoDoPagamento.sucesso?.invoiceId;
 
@@ -135,9 +134,10 @@ export function PainelDeCobranca({
     if (!cobrando) return;
 
     const dados = new FormData();
-    dados.set('invoiceId', cobrando.id);
+    dados.set('invoiceId', cobrando.invoice.id);
     dados.set('valor', valor);
     dados.set('reason', motivo);
+    dados.set('receivedVia', cobrando.forma);
 
     receber(dados);
     setCobrando(null);
@@ -145,28 +145,13 @@ export function PainelDeCobranca({
   };
 
   const escolherForma = (invoice: InvoiceEmAberto, forma: FormaDePagamento): void => {
-    setCobrancaPorQr(null);
-
-    if (forma === 'DINHEIRO') {
-      setCobrando(invoice);
-      /*
-       * Pré-preenche com o valor integral: é o caso comum, e pagamento
-       * parcial é recusado pelo servidor de qualquer forma (ADR-027,
-       * resposta 1). Digitar do zero só criaria chance de errar centavo.
-       */
-      setValor((invoice.totalMinor / 100).toFixed(2).replace('.', ','));
-      return;
-    }
-
-    setCobrando(null);
-    setGerandoQr(true);
-
-    const gerar = forma === 'PIX' ? iniciarCobrancaPix : iniciarCheckoutDeCartao;
-
-    void gerar(invoice.id).then((resultado) => {
-      setGerandoQr(false);
-      setCobrancaPorQr(resultado);
-    });
+    setCobrando({ invoice, forma });
+    /*
+     * Pré-preenche com o valor integral: é o caso comum, e pagamento
+     * parcial é recusado pelo servidor de qualquer forma (ADR-027,
+     * resposta 1). Digitar do zero só criaria chance de errar centavo.
+     */
+    setValor((invoice.totalMinor / 100).toFixed(2).replace('.', ','));
   };
 
   return (
@@ -218,42 +203,10 @@ export function PainelDeCobranca({
               <li key={invoice.id}>
                 Cobrança nº {invoice.number} —{' '}
                 <Money cents={invoice.totalMinor} currency={invoice.currency} />
-                <SeletorDeForma
-                  studentId={studentId}
-                  faltandoParaCartao={faltandoParaCartao}
-                  onEscolher={(forma) => escolherForma(invoice, forma)}
-                />
+                <SeletorDeForma onEscolher={(forma) => escolherForma(invoice, forma)} />
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
-
-      {gerandoQr ? (
-        <p role="status" data-testid="gerando-qr">
-          Gerando cobrança…
-        </p>
-      ) : null}
-
-      {/*
-        QR, copia-e-cola, checkoutUrl e polling controlado -- Task 11.
-        `key={paymentAttemptId}` remonta o componente a cada nova cobranca,
-        para o laco de polling da tentativa anterior nao sobreviver a uma
-        cobranca gerada de novo (aluno cancelou e pediu outro QR).
-      */}
-      {cobrancaPorQr?.sucesso ? (
-        <section aria-labelledby="titulo-cobranca-por-qr">
-          <h3 id="titulo-cobranca-por-qr">Aguardando pagamento</h3>
-          <CobrancaPorQr
-            key={cobrancaPorQr.sucesso.paymentAttemptId}
-            paymentAttemptId={cobrancaPorQr.sucesso.paymentAttemptId}
-            qrCodeDataUri={cobrancaPorQr.sucesso.qrCodeDataUri}
-            copiaECola={cobrancaPorQr.sucesso.copiaECola}
-            checkoutUrl={cobrancaPorQr.sucesso.checkoutUrl}
-            expiresAt={cobrancaPorQr.sucesso.expiresAt}
-            amountMinor={cobrancaPorQr.sucesso.amountMinor}
-            currency={cobrancaPorQr.sucesso.currency}
-          />
         </section>
       ) : null}
 
@@ -271,7 +224,7 @@ export function PainelDeCobranca({
           />
           <SensitiveAction
             verb="Registrar recebimento"
-            summary={`Confirma o recebimento em dinheiro ou transferência da cobrança nº ${String(cobrando.number)}. A cobrança será marcada como paga e o registro fica ligado ao seu usuário na auditoria.`}
+            summary={`Confirma o recebimento ${RESUMO_POR_FORMA[cobrando.forma]} da cobrança nº ${String(cobrando.invoice.number)}. A cobrança será marcada como paga e o registro fica ligado ao seu usuário na auditoria.`}
             onConfirm={(motivo) => {
               confirmarRecebimento(motivo);
               show('info', 'Registrando o recebimento…');

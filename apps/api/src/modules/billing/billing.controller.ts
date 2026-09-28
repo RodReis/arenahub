@@ -184,6 +184,12 @@ const esquemaDePagamentoManual = z
      * (ADR-027, consequencia 3).
      */
     reason: z.string().min(3).max(300),
+    /**
+     * Canal da maquininha fisica -- a academia recebe por ela (nao
+     * integrada) e da baixa manual aqui. `method` continua sempre `MANUAL`;
+     * este campo so registra por onde o dinheiro chegou.
+     */
+    receivedVia: z.enum(['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO']),
   })
   .strict();
 
@@ -209,6 +215,8 @@ interface PagamentoDto {
   amountMinor: number;
   paidAt: string | null;
   recognizedByUserId: string | null;
+  /** Canal da maquininha fisica -- preenchido so quando `method = MANUAL`. */
+  receivedVia: string | null;
 }
 
 interface InvoiceDto {
@@ -508,6 +516,7 @@ export class BillingController {
         amountMinor: dados.amountMinor,
         reason: dados.reason,
         paidAt: new Date(dados.paidAt),
+        receivedVia: dados.receivedVia,
       },
       requisicao.correlationId ?? 'sem-correlacao',
     );
@@ -1195,6 +1204,7 @@ export class BillingController {
         amountMinor: pagamento.amountMinor,
         paidAt: pagamento.paidAt?.toISOString() ?? null,
         recognizedByUserId: pagamento.recognizedByUserId,
+        receivedVia: pagamento.receivedVia,
       })),
     };
   }

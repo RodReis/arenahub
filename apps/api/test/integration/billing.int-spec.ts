@@ -219,6 +219,7 @@ describe('F12 -- invoice e pagamento manual', () => {
           amountMinor: PRECO_MINOR - 100,
           reason: 'tentativa parcial',
           paidAt: new Date('2026-08-09T10:00:00Z'),
+          receivedVia: 'DINHEIRO',
         },
         randomUUID(),
       ),
@@ -239,12 +240,14 @@ describe('F12 -- invoice e pagamento manual', () => {
         amountMinor: PRECO_MINOR + 100,
         reason: 'pagou com nota maior',
         paidAt: new Date('2026-08-09T10:00:00Z'),
+        receivedVia: 'DINHEIRO',
       },
       randomUUID(),
     );
 
     expect(pagamento.method).toBe('MANUAL');
     expect(pagamento.status).toBe('CONFIRMED');
+    expect(pagamento.receivedVia).toBe('DINHEIRO');
     // A mitigacao detectiva do ADR-027: o dinheiro manual fica ligado a
     // uma pessoa.
     expect(pagamento.recognizedByUserId).toBe(ctx.actorId);
@@ -257,6 +260,46 @@ describe('F12 -- invoice e pagamento manual', () => {
     expect(creditos[0]?.amountMinor).toBe(100);
     expect(creditos[0]?.originPaymentId).toBe(pagamento.id);
   });
+
+  /*
+   * PIX e cartao NESTA ROTA sao a maquininha fisica da academia (nao
+   * integrada) -- ver F-painel-financeiro. `method` grava sempre `MANUAL`;
+   * so `receivedVia` muda. Gravar `method: 'PIX'`/`'CARD'` aqui seria
+   * regressao: `validarPedidoDeEstorno` (estorno.ts) deixaria de bloquear o
+   * estorno pelo sistema para um pagamento que nao tem `providerAccountId`
+   * real -- a maquininha nao fala com nenhum provedor integrado.
+   */
+  const COMPETENCIAS_DA_MAQUININHA = {
+    PIX: new Date('2026-03-18T12:00:00Z'),
+    DEBITO: new Date('2026-04-18T12:00:00Z'),
+    CREDITO: new Date('2026-05-18T12:00:00Z'),
+  } as const;
+
+  it.each(['PIX', 'DEBITO', 'CREDITO'] as const)(
+    'maquininha fisica (%s) grava method MANUAL com o canal em receivedVia',
+    async (canal) => {
+      const invoice = await billing.abrirInvoiceDoPeriodo(contexto(b.tenantId, b.actorId), {
+        subscriptionId: b.subscriptionId,
+        emQue: COMPETENCIAS_DA_MAQUININHA[canal],
+      });
+
+      const pagamento = await billing.registrarPagamentoManual(
+        contexto(b.tenantId, b.actorId),
+        {
+          invoiceId: invoice.id,
+          amountMinor: PRECO_MINOR,
+          reason: `recebido na maquininha - ${canal}`,
+          paidAt: new Date(),
+          receivedVia: canal,
+        },
+        randomUUID(),
+      );
+
+      expect(pagamento.method).toBe('MANUAL');
+      expect(pagamento.receivedVia).toBe(canal);
+      expect(pagamento.providerAccountId).toBeNull();
+    },
+  );
 
   it('pagamento manual promove entitlement SCHEDULED para ACTIVE (INV-091, FIX 23/09/2026)', async () => {
     // Antes do fix, registrarPagamentoManual fechava a invoice mas nunca
@@ -293,6 +336,7 @@ describe('F12 -- invoice e pagamento manual', () => {
         amountMinor: PRECO_MINOR,
         reason: 'mensalidade em dinheiro na recepcao',
         paidAt: new Date('2026-09-18T12:00:00Z'),
+        receivedVia: 'DINHEIRO',
       },
       randomUUID(),
     );
@@ -367,6 +411,7 @@ describe('F12 -- invoice e pagamento manual', () => {
           amountMinor: PRECO_MINOR,
           reason: 'pagamento duplicado',
           paidAt: new Date('2026-08-11T10:00:00Z'),
+          receivedVia: 'DINHEIRO',
         },
         randomUUID(),
       ),
@@ -384,6 +429,7 @@ describe('F12 -- invoice e pagamento manual', () => {
           amountMinor: PRECO_MINOR,
           reason: 'cross-tenant',
           paidAt: new Date('2026-08-09T10:00:00Z'),
+          receivedVia: 'DINHEIRO',
         },
         randomUUID(),
       ),

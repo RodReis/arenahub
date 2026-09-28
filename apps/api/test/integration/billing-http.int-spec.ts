@@ -228,6 +228,7 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
         amountMinor: PRECO_MINOR,
         paidAt: '2026-08-09T10:00:00.000Z',
         reason: 'tentativa sem permissao',
+        receivedVia: 'DINHEIRO',
       });
 
     expect(resposta.status).toBe(403);
@@ -243,6 +244,7 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
         amountMinor: 150.5,
         paidAt: '2026-08-09T10:00:00.000Z',
         reason: 'valor com centavo fracionario',
+        receivedVia: 'DINHEIRO',
       });
 
     expect(resposta.status).toBe(400);
@@ -258,15 +260,19 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
         amountMinor: PRECO_MINOR,
         paidAt: '2026-08-09T10:00:00.000Z',
         reason: 'dinheiro na recepcao',
+        receivedVia: 'DINHEIRO',
       });
 
     expect(resposta.status).toBe(201);
     expect(resposta.body).toMatchObject({ status: 'PAID' });
 
-    const corpo = resposta.body as { payments: { recognizedByUserId: string | null }[] };
+    const corpo = resposta.body as {
+      payments: { recognizedByUserId: string | null; receivedVia: string | null }[];
+    };
     expect(corpo.payments).toHaveLength(1);
     // A mitigacao detectiva: o dinheiro manual fica ligado a uma pessoa.
     expect(corpo.payments[0]?.recognizedByUserId).not.toBeNull();
+    expect(corpo.payments[0]?.receivedVia).toBe('DINHEIRO');
   });
 
   it('lista as invoices do aluno, com o fuso da unidade de origem', async () => {
