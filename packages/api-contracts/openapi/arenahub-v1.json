@@ -2472,6 +2472,36 @@
                     "ltv": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "planoMaisPopular": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "nome": {
+                          "type": "string"
+                        },
+                        "quantidade": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "ocupacaoPorUnidade": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nomeDaUnidade": {
+                            "type": "string"
+                          },
+                          "alunosAtivos": {
+                            "type": "integer"
+                          },
+                          "capacidadeMaxima": {
+                            "type": "integer",
+                            "nullable": true
+                          }
+                        }
+                      }
                     }
                   }
                 }
