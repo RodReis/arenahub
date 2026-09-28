@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-27
+updated: 2026-09-28
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,6 +9,7 @@ updated: 2026-09-27
 
 ### Sem épico
 
+- [FIX] painel financeiro deve abrir no mes corrente por default (#435)
 - [FIX] Valdivino duplicado no arquivo (confirmado) e Daniel Flavio Cabriny — provável cadastro duplicado (#421)
 - [MVP1][SPEC-082][F82] Trocar plano de assinatura ativa preservando histórico (#420)
 - [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417)
@@ -39,6 +40,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [INFRA] Pagamento pela maquininha física (Dinheiro/PIX/Débito/Crédito), baixa manual (#442, finalizado em: 2026-09-28)
+- [MVP1][FIX] /billing/summary devolve INTERNAL_ERROR sem detalhe no log (#439, finalizado em: 2026-09-28)
 - [MVP3][SPEC-074][FIX] consolidacao de assinatura duplicada infla Cancelamentos/Churn/LTV no painel financeiro (#431, finalizado em: 2026-09-27)
 - [MVP3][SPEC-054][FIX] painel financeiro oferece consulta parcial do mes em curso (#429, finalizado em: 2026-09-27)
 - [MVP3][SPEC-054][FIX] chip de período no painel financeiro oferece mês em curso e backend recusa (#427, finalizado em: 2026-09-27)
