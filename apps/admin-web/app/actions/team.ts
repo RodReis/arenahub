@@ -136,5 +136,5 @@ export async function alterarPerfilDeTime(
 
   revalidatePath('/team');
   revalidatePath('/students');
-  redirect('/team');
+  redirect('/team?perfilAlterado=1');
 }

@@ -16,6 +16,7 @@ import {
 import { chamarApi } from '../../../lib/api/server-client';
 import { situacaoDeVencimento } from '../../../src/billing/vencimento';
 import { MOTIVO_DA_SITUACAO, planoDaListagem } from '../../../src/students/formatar';
+import { AvisoDePerfilAlterado } from '../../../src/components/aviso-de-perfil-alterado';
 import { AcoesDoAluno } from './acoes-do-aluno';
 import { BotaoDeLiberacao } from './botao-de-liberacao';
 import { FiltroDeAlunos } from './filtro-de-alunos';
@@ -259,6 +260,7 @@ export default async function PaginaDeAlunos({
 
   return (
     <section aria-labelledby="titulo-alunos">
+      <AvisoDePerfilAlterado />
       <PageHeader
         id="titulo-alunos"
         title="Alunos"

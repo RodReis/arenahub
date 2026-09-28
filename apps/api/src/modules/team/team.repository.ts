@@ -206,7 +206,14 @@ export class TeamRepository {
    *
    * Ao trocar PARA `STUDENT`, zera `employmentType`/`employmentStartedAt` --
    * vinculo trabalhista nao faz sentido para aluno comum (mesma regra do
-   * schema, comentario de `Student.employmentType`).
+   * schema, comentario de `Student.employmentType`) -- e SUSPENDE os
+   * entitlements que nasceram do vinculo (`EMPLOYEE`/`PERSONAL_TRAINER`,
+   * import F48 ou concedidos depois): o direito de acesso de professor/staff
+   * nao sobrevive ao rebaixamento. Mesmo padrao de arquivar aluno
+   * (`StudentRepository.alterarSituacao`) -- SUSPENDED, nao REVOKED, porque
+   * e reversivel se a pessoa promover de volta. NAO mexe em entitlement de
+   * assinatura (`subscriptionId` preenchido): perfil e vinculo trabalhista
+   * sao independentes de o aluno pagar um plano por conta propria.
    */
   async alterarPerfil(
     contexto: TenantContext,
@@ -214,6 +221,7 @@ export class TeamRepository {
     versaoEsperada: number,
     novoPerfil: StudentProfile,
     correlationId: string,
+    agora: Date,
   ): Promise<MembroDeTimeRow | null> {
     return this.db.$transaction(async (tx) => {
       const alterados = await tx.student.updateMany({
@@ -228,6 +236,19 @@ export class TeamRepository {
       });
 
       if (alterados.count === 0) return null;
+
+      if (novoPerfil === 'STUDENT') {
+        await tx.entitlement.updateMany({
+          where: {
+            tenantId: contexto.tenantId,
+            studentId: id,
+            subscriptionId: null,
+            source: { in: ['EMPLOYEE', 'PERSONAL_TRAINER'] },
+            status: { in: ['SCHEDULED', 'ACTIVE'] },
+          },
+          data: { status: 'SUSPENDED', suspendedAt: agora },
+        });
+      }
 
       await tx.studentTimelineEvent.create({
         data: {
