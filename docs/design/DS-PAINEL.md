@@ -136,9 +136,12 @@ Bordas de **1 px**: `border/default` no que é interativo ou contido, `border/su
 Elevação:
 - Modal: `0 12px 32px rgba(10,11,13,.18)` sobre scrim `rgba(10,11,13,.5)`
 - Dropdown, popover, toast: `0 8px 24px rgba(10,11,13,.14)`
-- Card: `elev/1` em repouso (`0 1px 2px rgba(10,11,13,.06)`), `elev/2` no hover
-  (`0 4px 12px rgba(10,11,13,.10)`), transição de 150 ms. **Emenda de
-  28/09/2026, decisão do PI** — revoga "card não tem sombra, nunca" (v1.0).
+- Card: `--ah-card-shadow` em repouso (contato `0 1px 2px` a 6% + ambiente
+  `0 6px 16px -6px` a 14%), `--ah-card-shadow-hover` no hover (`0 2px 4px` a 7% +
+  `0 16px 32px -10px` a 22%), transição de 200 ms. Os dois moram em
+  `apps/admin-web/app/globals.css` (alfa sobre `carbon-900` via `color-mix`, mesmo
+  motivo do scrim). **Emenda de 28/09/2026, decisão do PI** — revoga "card não tem
+  sombra, nunca" (v1.0).
   A borda 1 px continua (a sombra não a substitui, soma-se a ela); o que
   muda é que card deixou de ser puramente plano. Vale para **todo o
   admin-web**, não só uma tela.
@@ -177,7 +180,9 @@ Botão sol/lua de 32–36 px (borda `--pa-line`, fundo `--pa-card`), `title`/`ar
 
 ### 2.9 Movimento
 
-Praticamente nenhum. `@keyframes ah-pulse` (opacidade 1 → .3) marca indicador ao vivo. Switch move o knob por `transform: translateX(16px)`. Toast entra e sai em 160 ms. Nada mais anima.
+Praticamente nenhum. `@keyframes ah-pulse` (opacidade 1 → .3) marca indicador ao vivo. Switch move o knob por `transform: translateX(16px)`. Toast entra e sai em 160 ms.
+
+**Emenda de 28/09/2026 (decisão do PI), só nas grades de KPI:** entrada `ah-entrar` (opacidade 0 → 1 e `translateY(6px)` → 0, 360 ms, `cubic-bezier(.16,1,.3,1)`, escalonada em 45 ms por card via `--ordem`) e subida de 2 px no hover (`hover:-translate-y-0.5`). Card de tabela e de formulário não sobe — só a sombra muda. `prefers-reduced-motion: reduce` desliga as duas coisas. Nada mais anima.
 
 ---
 
@@ -282,6 +287,10 @@ Ordem fixa, do que muda a cada minuto para o que muda por semana:
 ### 4.6 Card de KPI
 
 Overline 11 px uppercase → valor 26/32 px 700 tabular (margem `6px 0 8px`) → badge ou sublinha 12 px. Valor pode assumir cor semântica quando o próprio número é o alerta.
+
+**Tom do indicador (emenda de 28/09/2026, decisão do PI — "não quero card branco simples").** Todo card de KPI carrega o tom do que mede, pela tabela da §2.3: pago → `ok`, fato informativo → `info`, pendente → `warn`, dívida → `err`, risco → `risk`, sem movimento → `neu`. O tom aparece em três lugares: aresta superior de 3 px, degradê de 165° que parte do tom a 9% e some aos 55% do card, e um selo de 32 px (raio 8 px, fundo do tom a 13%, ícone lucide 16 px na cor cheia) à direita do rótulo.
+
+Duas intensidades, para o alerta não se diluir num painel colorido: **repouso** (acima) e **alerta**, quando o número é o problema (dívida em aberto, queda do recebido): fundo inteiro a 7% e degradê a 14%. O texto não muda de cor em nenhum dos dois — valor em `text/strong`, rótulo em `text/muted` — e o selo é `aria-hidden`: quem informa é o rótulo. Implementação de referência: `estiloDoKpi()`, `SeloDoTom` e `CabecalhoDoKpi` em `apps/admin-web/app/(protected)/billing/page.tsx`. Card de gráfico usa o mesmo tom no título (`TituloDoGrafico`).
 
 ### 4.7 Badge
 

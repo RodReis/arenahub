@@ -104,6 +104,14 @@ export function ComposicaoPorMetodo({ segmentos, testId }: Props) {
       </table>
 
       <div {...(testId ? { 'data-testid': testId } : {})} aria-hidden="true">
+        <div className="relative size-40">
+          {/* Total no miolo da rosca: a pergunta "quanto entrou" se responde sem ler a legenda. */}
+          <div className="pointer-events-none absolute inset-0 grid place-content-center text-center">
+            <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              Recebido
+            </span>
+            <span className="text-sm font-semibold tabular-nums">{formatarDinheiro(total)}</span>
+          </div>
         <ResponsiveContainer width={160} height={160}>
           <PieChart>
             <Pie
@@ -126,6 +134,7 @@ export function ComposicaoPorMetodo({ segmentos, testId }: Props) {
             </Pie>
           </PieChart>
         </ResponsiveContainer>
+        </div>
 
         {/* Legenda visual -- fora da arvore de acessibilidade, ver comentario do doc do componente. */}
         <ul className="mt-2 space-y-1 text-xs">

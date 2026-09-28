@@ -1,6 +1,21 @@
 import type { Metadata } from 'next';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import Link from 'next/link';
+import {
+  CalendarClock,
+  ChartPie,
+  HeartPulse,
+  Hourglass,
+  Receipt,
+  Target,
+  TrendingUp,
+  TriangleAlert,
+  Undo2,
+  Users,
+  UserX,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 
 import { redirect } from 'next/navigation';
 
@@ -122,19 +137,78 @@ const COR_DO_METODO: Readonly<Record<string, string>> = {
 };
 
 /**
- * Superfície tingida pelo estado -- exceção do PI em 28/09/2026 estendendo a
- * emenda de 01/09/2026 (PRODUCT.md) do dashboard operacional para o painel
- * financeiro. Mesma regra: aresta superior de 3px na cor cheia + fundo a 7%,
- * nunca decorativo -- só quando o número que o card mostra tem um estado real
- * (vencido > 0, tendência caiu). Contraste do texto não muda: só o fundo e a
- * aresta usam a cor semântica, o valor continua em `--ah-text-strong`.
+ * Todo card do painel carrega o TOM DO QUE MEDE (DS-PAINEL §2.3: pago = ok,
+ * pendente = warn, divida = err, risco = risk, fato informativo = info) --
+ * decisao do PI em 28/09/2026, "nao quero card branco simples". Duas
+ * intensidades, para o alerta nao se diluir entre cards coloridos: em
+ * repouso, aresta de 3 px + degrade que some antes do meio do card; em
+ * alerta (divida em aberto, queda do recebido), fundo inteiro a 7% + degrade
+ * mais forte. O texto nao muda de cor: o valor segue em `--ah-text-strong`.
  */
-function estiloDeEstado(tokenDeCor: string): CSSProperties {
+function estiloDoKpi(tom: string, emAlerta = false): CSSProperties {
   return {
     borderTopWidth: '3px',
-    borderTopColor: `var(${tokenDeCor})`,
-    backgroundColor: `color-mix(in srgb, var(${tokenDeCor}) 7%, var(--ah-surface-raised))`,
+    borderTopColor: `var(${tom})`,
+    backgroundColor: emAlerta
+      ? `color-mix(in srgb, var(${tom}) 7%, var(--ah-surface-raised))`
+      : 'var(--ah-surface-raised)',
+    backgroundImage: `linear-gradient(165deg, color-mix(in srgb, var(${tom}) ${emAlerta ? 14 : 9}%, transparent) 0%, transparent 55%)`,
   };
+}
+
+const CLASSE_DO_KPI =
+  'ah-entrar hover:-translate-y-0.5 motion-reduce:hover:translate-y-0';
+
+/** Posicao do card no escalonamento da entrada (`.ah-entrar` no globals.css). */
+const ordem = (posicao: number) => ({ '--ordem': posicao }) as CSSProperties;
+
+/** Icone num quadrado tingido pelo tom. Decorativo: quem informa e o rotulo ao lado. */
+function SeloDoTom({ tom, Icone }: { tom: string; Icone: LucideIcon }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-8 shrink-0 place-items-center rounded-lg"
+      style={{
+        color: `var(${tom})`,
+        backgroundColor: `color-mix(in srgb, var(${tom}) 13%, var(--ah-surface-raised))`,
+      }}
+    >
+      <Icone className="size-4" strokeWidth={2} />
+    </span>
+  );
+}
+
+/** Titulo de card de grafico com o selo do tom a esquerda. */
+function TituloDoGrafico({ tom, Icone, children }: { tom: string; Icone: LucideIcon; children: ReactNode }) {
+  return (
+    <CardTitle className="flex items-center gap-2.5">
+      <SeloDoTom tom={tom} Icone={Icone} />
+      {children}
+    </CardTitle>
+  );
+}
+
+/** Rotulo + icone no tom do card. O icone reforca, o rotulo informa (cor nunca e canal unico). */
+function CabecalhoDoKpi({
+  rotulo,
+  tom,
+  Icone,
+  children,
+}: {
+  rotulo: string;
+  tom: string;
+  Icone: LucideIcon;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <p className="text-sm text-muted-foreground">{rotulo}</p>
+      <div className="flex items-center gap-2">
+        {children}
+        <SeloDoTom tom={tom} Icone={Icone} />
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -418,6 +492,11 @@ export default async function PainelFinanceiroPage({
     atencao: 'destructive',
     neutro: 'secondary',
   };
+  const TOM_DO_SCORE: Readonly<Record<typeof scoreDoPeriodo, string>> = {
+    saudavel: '--ah-state-success',
+    atencao: '--ah-state-danger',
+    neutro: '--ah-state-info',
+  };
 
   /*
     METAMENSALMINOR PODE SER ZERO -- tenant sem assinatura ativa
@@ -529,16 +608,20 @@ export default async function PainelFinanceiroPage({
         aria-label="Indicadores principais do período"
       >
         <Card
-          className="transition-[background-color,border-color] duration-150"
-          style={
-            variacaoRecebido !== null && variacaoRecebido !== 0
-              ? estiloDeEstado(variacaoRecebido > 0 ? '--ah-state-success' : '--ah-state-danger')
-              : undefined
-          }
+          className={CLASSE_DO_KPI}
+          style={{
+            ...ordem(0),
+            ...(variacaoRecebido !== null && variacaoRecebido < 0
+              ? estiloDoKpi('--ah-state-danger', true)
+              : estiloDoKpi('--ah-state-success', variacaoRecebido !== null && variacaoRecebido > 0)),
+          }}
         >
           <CardContent>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm text-muted-foreground">Recebido</p>
+            <CabecalhoDoKpi
+              rotulo="Recebido"
+              tom={variacaoRecebido !== null && variacaoRecebido < 0 ? '--ah-state-danger' : '--ah-state-success'}
+              Icone={Wallet}
+            >
               {variacaoRecebido !== null ? (
                 <Badge
                   data-testid="tendencia-do-recebido-badge"
@@ -552,8 +635,8 @@ export default async function PainelFinanceiroPage({
                   {String(Math.abs(variacaoRecebido)).replace('.', ',')}% vs mês anterior
                 </Badge>
               ) : null}
-            </div>
-            <p className="mt-1 text-2xl font-semibold" data-testid="recebido-no-periodo">
+            </CabecalhoDoKpi>
+            <p className="mt-1 text-2xl font-semibold tracking-tight" data-testid="recebido-no-periodo">
               <Money cents={resumo.recebidoMinor} currency="BRL" />
             </p>
             {/*
@@ -581,7 +664,10 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
+        <Card
+          className={CLASSE_DO_KPI}
+          style={{ ...ordem(1), ...estiloDoKpi('--ah-state-info') }}
+        >
           <CardContent>
             {/*
               "ASSINATURAS VIGENTES", nao "alunos ativos" (issue #416): a query
@@ -590,8 +676,8 @@ export default async function PainelFinanceiroPage({
               contradizia a lista de alunos na tela ao lado -- os dois corretos,
               medindo eixos diferentes: contrato vigente aqui, cadastro ativo la.
             */}
-            <p className="text-sm text-muted-foreground">Assinaturas vigentes</p>
-            <p className="mt-1 text-2xl font-semibold" data-testid="alunos-ativos">
+            <CabecalhoDoKpi rotulo="Assinaturas vigentes" tom="--ah-state-info" Icone={Users} />
+            <p className="mt-1 text-2xl font-semibold tracking-tight" data-testid="alunos-ativos">
               {resumo.alunosAtivos}
             </p>
             {/* SNAPSHOT DE AGORA, nao do periodo -- "quantos ha", nao "quantos ficaram". */}
@@ -630,10 +716,13 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
+        <Card
+          className={CLASSE_DO_KPI}
+          style={{ ...ordem(2), ...estiloDoKpi('--ah-state-info') }}
+        >
           <CardContent>
-            <p className="text-sm text-muted-foreground">Ticket médio</p>
-            <p className="mt-1 text-2xl font-semibold" data-testid="ticket-medio">
+            <CabecalhoDoKpi rotulo="Ticket médio" tom="--ah-state-info" Icone={Receipt} />
+            <p className="mt-1 text-2xl font-semibold tracking-tight" data-testid="ticket-medio">
               {resumo.ticketMedioMinor === null ? (
                 <Ausente />
               ) : (
@@ -666,10 +755,14 @@ export default async function PainelFinanceiroPage({
         className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
         aria-label="Indicadores do período"
       >
-        <Card size="sm" className="transition-colors duration-150 hover:border-(--ah-border-hover)">
+        <Card
+          size="sm"
+          className={CLASSE_DO_KPI}
+          style={{ ...ordem(3), ...estiloDoKpi('--ah-state-info') }}
+        >
           <CardContent>
-            <p className="text-sm text-muted-foreground">Esperado por mês</p>
-            <p className="mt-1 text-xl font-semibold" data-testid="receita-esperada">
+            <CabecalhoDoKpi rotulo="Esperado por mês" tom="--ah-state-info" Icone={Target} />
+            <p className="mt-1 text-xl font-semibold tracking-tight" data-testid="receita-esperada">
               <Money cents={resumo.receitaEsperadaMinor} currency="BRL" />
             </p>
             {/*
@@ -683,10 +776,21 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card size="sm" className="transition-colors duration-150 hover:border-(--ah-border-hover)">
+        <Card
+          size="sm"
+          className={CLASSE_DO_KPI}
+          style={{
+            ...ordem(4),
+            ...estiloDoKpi(resumo.aReceberMinor > 0 ? '--ah-state-warning' : '--ah-state-neutral'),
+          }}
+        >
           <CardContent>
-            <p className="text-sm text-muted-foreground">A receber</p>
-            <p className="mt-1 text-xl font-semibold" data-testid="a-receber">
+            <CabecalhoDoKpi
+              rotulo="A receber"
+              tom={resumo.aReceberMinor > 0 ? '--ah-state-warning' : '--ah-state-neutral'}
+              Icone={CalendarClock}
+            />
+            <p className="mt-1 text-xl font-semibold tracking-tight" data-testid="a-receber">
               <Money cents={resumo.aReceberMinor} currency="BRL" />
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -697,12 +801,19 @@ export default async function PainelFinanceiroPage({
 
         <Card
           size="sm"
-          className="transition-[background-color,border-color] duration-150"
-          style={temDivida ? estiloDeEstado('--ah-state-danger') : undefined}
+          className={CLASSE_DO_KPI}
+          style={{
+            ...ordem(5),
+            ...(temDivida ? estiloDoKpi('--ah-state-danger', true) : estiloDoKpi('--ah-state-success')),
+          }}
         >
           <CardContent>
-            <p className="text-sm text-muted-foreground">Vencido</p>
-            <p className="mt-1 text-xl font-semibold" data-testid="vencido">
+            <CabecalhoDoKpi
+              rotulo="Vencido"
+              tom={temDivida ? '--ah-state-danger' : '--ah-state-success'}
+              Icone={TriangleAlert}
+            />
+            <p className="mt-1 text-xl font-semibold tracking-tight" data-testid="vencido">
               <Money cents={resumo.vencidoMinor} currency="BRL" />
             </p>
             {/*
@@ -718,12 +829,19 @@ export default async function PainelFinanceiroPage({
 
         <Card
           size="sm"
-          className="transition-[background-color,border-color] duration-150"
-          style={temDivida ? estiloDeEstado('--ah-state-risk') : undefined}
+          className={CLASSE_DO_KPI}
+          style={{
+            ...ordem(6),
+            ...(temDivida ? estiloDoKpi('--ah-state-risk', true) : estiloDoKpi('--ah-state-success')),
+          }}
         >
           <CardContent>
-            <p className="text-sm text-muted-foreground">Inadimplência</p>
-            <p className="mt-1 text-xl font-semibold" data-testid="taxa-de-inadimplencia">
+            <CabecalhoDoKpi
+              rotulo="Inadimplência"
+              tom={temDivida ? '--ah-state-risk' : '--ah-state-success'}
+              Icone={UserX}
+            />
+            <p className="mt-1 text-xl font-semibold tracking-tight" data-testid="taxa-de-inadimplencia">
               {/*
                 `—` e nao `0%` quando nao ha pagante: academia sem assinatura nao
                 tem 0% de inadimplencia, tem uma taxa que nao existe.
@@ -746,10 +864,14 @@ export default async function PainelFinanceiroPage({
           recebido ja e LIQUIDO, entao a ausencia nao esconde nada.
         */}
         {resumo.estornadoMinor > 0 ? (
-          <Card size="sm" style={estiloDeEstado('--ah-state-warning')}>
+          <Card
+            size="sm"
+            className={CLASSE_DO_KPI}
+            style={{ ...ordem(7), ...estiloDoKpi('--ah-state-warning', true) }}
+          >
             <CardContent>
-              <p className="text-sm text-muted-foreground">Estornado</p>
-              <p className="mt-1 text-xl font-semibold" data-testid="estornado">
+              <CabecalhoDoKpi rotulo="Estornado" tom="--ah-state-warning" Icone={Undo2} />
+              <p className="mt-1 text-xl font-semibold tracking-tight" data-testid="estornado">
                 <Money cents={resumo.estornadoMinor} currency="BRL" />
               </p>
               <p className="mt-1 text-xs text-muted-foreground">já descontado do recebido</p>
@@ -765,9 +887,11 @@ export default async function PainelFinanceiroPage({
         GraficoDeRosca).
       */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
+        <Card style={estiloDoKpi('--ah-state-success')}>
           <CardHeader>
-            <CardTitle>Faturado e recebido por competência</CardTitle>
+            <TituloDoGrafico tom="--ah-state-success" Icone={TrendingUp}>
+              Faturado e recebido por competência
+            </TituloDoGrafico>
             <p className="text-sm text-muted-foreground">
               pelo mês de referência da fatura, não pela data do pagamento
             </p>
@@ -787,6 +911,12 @@ export default async function PainelFinanceiroPage({
                   tendencia. O aviso vem ANTES do grafico -- quem le a curva
                   precisa saber que ela e curta antes de concluir dela.
                 */}
+                {/*
+                  UM AVISO SO: `EvolucaoDeReceita` tambem escreve o seu quando a
+                  serie e curta, e as duas frases apareciam empilhadas na tela.
+                  Serie curta = so o aviso da pagina; serie suficiente = so o
+                  grafico.
+                */}
                 {!resumo.serie.suficienteParaLinha ? (
                   <p className="mb-2 text-sm text-muted-foreground" data-testid="serie-insuficiente">
                     Dado insuficiente para comparar períodos:{' '}
@@ -795,16 +925,16 @@ export default async function PainelFinanceiroPage({
                       : `há ${resumo.serie.pontos.length} competências apuradas`}
                     , e a comparação de tendência exige pelo menos três.
                   </p>
-                ) : null}
-
-                <EvolucaoDeReceita
-                  testId="grafico-de-competencia"
-                  pontos={resumo.serie.pontos.map((ponto) => ({
-                    rotulo: competenciaLegivel(ponto.competencia),
-                    faturadoMinor: ponto.faturadoMinor,
-                    recebidoMinor: ponto.recebidoMinor,
-                  }))}
-                />
+                ) : (
+                  <EvolucaoDeReceita
+                    testId="grafico-de-competencia"
+                    pontos={resumo.serie.pontos.map((ponto) => ({
+                      rotulo: competenciaLegivel(ponto.competencia),
+                      faturadoMinor: ponto.faturadoMinor,
+                      recebidoMinor: ponto.recebidoMinor,
+                    }))}
+                  />
+                )}
 
                 {/*
                   A TABELA FICA RECOLHIDA -- `EvolucaoDeReceita` nao publica
@@ -872,9 +1002,11 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
+        <Card style={estiloDoKpi('--ah-state-info')}>
           <CardHeader>
-            <CardTitle>Por onde o dinheiro entrou</CardTitle>
+            <TituloDoGrafico tom="--ah-state-info" Icone={ChartPie}>
+              Por onde o dinheiro entrou
+            </TituloDoGrafico>
           </CardHeader>
           <CardContent>
             {resumo.recebidoMinor === 0 ? (
@@ -929,9 +1061,11 @@ export default async function PainelFinanceiroPage({
         os quatro KPIs de retencao que saíram da faixa compacta.
       */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
+        <Card style={estiloDoKpi(temDivida ? '--ah-state-danger' : '--ah-state-success')}>
           <CardHeader>
-            <CardTitle>Onde o dinheiro parou</CardTitle>
+            <TituloDoGrafico tom={temDivida ? '--ah-state-danger' : '--ah-state-success'} Icone={Hourglass}>
+              Onde o dinheiro parou
+            </TituloDoGrafico>
           </CardHeader>
           <CardContent>
             {resumo.faturasVencidas === 0 ? (
@@ -969,15 +1103,12 @@ export default async function PainelFinanceiroPage({
         </Card>
 
         <Card
-          className="transition-[background-color,border-color] duration-150"
-          style={
-            scoreDoPeriodo === 'neutro'
-              ? undefined
-              : estiloDeEstado(scoreDoPeriodo === 'saudavel' ? '--ah-state-success' : '--ah-state-danger')
-          }
+          style={estiloDoKpi(TOM_DO_SCORE[scoreDoPeriodo], scoreDoPeriodo !== 'neutro')}
         >
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Saúde do negócio &amp; retenção</CardTitle>
+            <TituloDoGrafico tom={TOM_DO_SCORE[scoreDoPeriodo]} Icone={HeartPulse}>
+              Saúde do negócio &amp; retenção
+            </TituloDoGrafico>
             <Badge variant={VARIANTE_DO_SCORE[scoreDoPeriodo]} data-testid="score-do-negocio">
               {ROTULO_DO_SCORE[scoreDoPeriodo]}
             </Badge>
