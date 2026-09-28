@@ -584,10 +584,10 @@ export class ConsultarResumoFinanceiroUseCase {
      * `emitir-recibo.use-case.ts` (issue #306). `Student` tem politica RLS
      * (F66, `MODELOS_COM_RLS` em `prisma.service.ts`), e o `set_config` que
      * a politica precisa SO E APLICADO dentro de uma transacao interceptada
-     * pelo `PrismaService` (`$transaction`/`comTenant`) -- uma chamada solta
-     * como `this.db.student.findMany(...)` roda FORA dessa interceptacao,
-     * entao o `set_config` nunca acontece e a politica ve `app.tenant_id`
-     * vazio.
+     * pelo `PrismaService` (`$transaction`/`comTenant`) -- uma chamada solta,
+     * `student.findMany` direto no client, sem passar por `comTenant`, roda
+     * FORA dessa interceptacao, entao o `set_config` nunca acontece e a
+     * politica ve `app.tenant_id` vazio.
      *
      * MEDIDO EM DUAS RODADAS CONTRA O BANCO REAL SOB O ROLE RESTRITO
      * (`RUNTIME_DATABASE_URL`, o que a API usa de verdade): a primeira
@@ -699,7 +699,7 @@ export class ConsultarResumoFinanceiroUseCase {
     const idsDosPlanos = [...new Set(assinaturas.map((a) => a.planId))];
     const planos = idsDosPlanos.length
       ? await this.db.plan.findMany({
-          where: { id: { in: idsDosPlanos } },
+          where: { ...doTenant, id: { in: idsDosPlanos } },
           select: { id: true, name: true },
         })
       : [];
