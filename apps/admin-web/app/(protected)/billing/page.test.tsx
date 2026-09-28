@@ -363,6 +363,89 @@ describe('painel financeiro', () => {
   });
 
   /**
+   * O BADGE DE TENDENCIA compara COMPETENCIA, nao data de pagamento -- por
+   * isso so aparece quando a mesma garantia que libera o grafico de serie
+   * (>= 3 pontos, consecutivos, mes fechado) tambem vale para ele. Mostrar
+   * "-100%" vermelho na competencia mais recente (que ainda esta recebendo
+   * pagamento) contradiria o proprio aviso "dado insuficiente" da tela.
+   */
+  it('mostra o badge de tendencia quando a serie tem pelo menos tres competencias consecutivas', async () => {
+    await renderizar();
+
+    // (45.000 - 20.000) / 20.000 = 125%.
+    expect(screen.getByTestId('tendencia-do-recebido-badge')).toHaveTextContent('↑ 125%');
+    expect(screen.getByTestId('tendencia-do-recebido-badge')).toHaveTextContent('vs mês anterior');
+  });
+
+  it('nao mostra o badge quando a serie e curta demais (mesmo aviso do grafico)', async () => {
+    await renderizar({
+      ...RESUMO,
+      serie: {
+        pontos: [
+          { competencia: '2026-07', faturadoMinor: 40_000, recebidoMinor: 20_000 },
+          { competencia: '2026-08', faturadoMinor: 50_000, recebidoMinor: 45_000 },
+        ],
+        suficienteParaLinha: false,
+      },
+    });
+
+    expect(screen.queryByTestId('tendencia-do-recebido-badge')).not.toBeInTheDocument();
+  });
+
+  /**
+   * O MES EM CURSO (parcial) NAO GANHA BADGE: o numero do mes atual ainda
+   * muda a cada pagamento, entao compara-lo com o mes anterior fechado
+   * produziria uma queda que nao e queda -- e so o mes nao ter terminado.
+   */
+  it('nao mostra o badge quando o periodo apurado e o mes em curso', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-27T12:00:00.000Z'));
+
+    try {
+      await renderizar({
+        ...RESUMO,
+        de: '2026-09-01T00:00:00.000Z',
+        ate: '2026-09-27T12:00:00.000Z',
+        competenciasDisponiveis: ['2026-07', '2026-08', '2026-09'],
+        serie: {
+          pontos: [
+            { competencia: '2026-07', faturadoMinor: 40_000, recebidoMinor: 20_000 },
+            { competencia: '2026-08', faturadoMinor: 50_000, recebidoMinor: 45_000 },
+            { competencia: '2026-09', faturadoMinor: 50_000, recebidoMinor: 5_000 },
+          ],
+          suficienteParaLinha: true,
+        },
+      });
+
+      expect(screen.queryByTestId('tendencia-do-recebido-badge')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * COMPETENCIAS NAO CONSECUTIVAS: a serie so lista meses com movimento
+   * (`montarSerie` no backend), entao o penultimo ponto pode ser varios
+   * meses antes do ultimo. Comparar os dois como "mes anterior" mentiria.
+   */
+  it('nao mostra o badge quando as duas ultimas competencias nao sao consecutivas', async () => {
+    await renderizar({
+      ...RESUMO,
+      serie: {
+        pontos: [
+          { competencia: '2026-03', faturadoMinor: 40_000, recebidoMinor: 20_000 },
+          { competencia: '2026-04', faturadoMinor: 40_000, recebidoMinor: 35_000 },
+          // Pulo de abril direto para agosto -- sem movimento em maio/jun/jul.
+          { competencia: '2026-08', faturadoMinor: 50_000, recebidoMinor: 45_000 },
+        ],
+        suficienteParaLinha: true,
+      },
+    });
+
+    expect(screen.queryByTestId('tendencia-do-recebido-badge')).not.toBeInTheDocument();
+  });
+
+  /**
    * Sem entrada no periodo nao ha proporcao a mostrar -- e dividir por zero
    * produziria `NaN%` na tela.
    */

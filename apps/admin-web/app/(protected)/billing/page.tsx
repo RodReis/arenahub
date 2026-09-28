@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 
 import {
   Ausente,
-  BarrasDeFaixa,
+  BarrasVerticais,
   DataTable,
   EmptyState,
   formatarDinheiro,
+  GraficoDeRosca,
   Money,
   PageHeader,
   percentualDoTotal,
@@ -156,6 +157,24 @@ function diaLegivel(iso: string): string {
 }
 
 /**
+ * `2026-07` vira `2026-08`; `2026-12` vira `2027-01`.
+ *
+ * Sem `Date`, mesmo motivo de `competenciaLegivel`: competencia e um mes de
+ * referencia, nao um instante -- construir um `Date` reintroduz o fuso que o
+ * backend ja tirou do caminho.
+ */
+function mesSeguinte(competencia: string): string {
+  const [ano, mes] = competencia.split('-').map(Number);
+  const anoBase = ano ?? 0;
+  const mesBase = mes ?? 1;
+
+  const proximoMes = mesBase === 12 ? 1 : mesBase + 1;
+  const proximoAno = mesBase === 12 ? anoBase + 1 : anoBase;
+
+  return `${proximoAno}-${String(proximoMes).padStart(2, '0')}`;
+}
+
+/**
  * Os meses que o filtro oferece, do mais recente para tras.
  *
  * DERIVADOS DA SERIE QUE O BACKEND JA DEVOLVE, e nao de um calendario
@@ -283,6 +302,58 @@ export default async function PainelFinanceiroPage({
   */
   const periodoParcial = periodos.find((periodo) => periodo.atual)?.parcial ?? false;
 
+  /*
+    VARIACAO DO RECEBIDO -- a mesma garantia do grafico de serie (achado na
+    revisao final: a primeira versao comparava competencia com competencia
+    sem essas tres guardas, e "↓ 100%" aparecia toda vez que a competencia
+    mais recente ainda estava recebendo pagamento).
+
+    1. `suficienteParaLinha` (>= 3 pontos): mesma regra que libera o proprio
+       grafico de tendencia. Com 2 pontos so, a reta entre eles sempre
+       parece tendencia (SPEC-054 §5.1) -- e o badge contradiria o aviso
+       "dado insuficiente" que a tela mostra ao lado.
+    2. Periodo NAO PARCIAL: o mes em curso ainda esta recebendo pagamento, e
+       compara-lo com o mes anterior fechado produz uma "queda" que e so o
+       mes nao ter terminado.
+    3. Competencias CONSECUTIVAS: `montarSerie` no backend so lista meses
+       com movimento -- sem fatura nem pagamento, o mes nao aparece. Os dois
+       ultimos pontos da serie podem estar a varios meses de distancia, e
+       chamar isso de "mes anterior" mentiria.
+  */
+  const pontosDaSerie = resumo.serie.pontos;
+  const penultimoPonto = pontosDaSerie.at(-2);
+  const ultimoPonto = pontosDaSerie.at(-1);
+  const competenciasConsecutivas =
+    penultimoPonto && ultimoPonto
+      ? mesSeguinte(penultimoPonto.competencia) === ultimoPonto.competencia
+      : false;
+  const variacaoRecebido =
+    resumo.serie.suficienteParaLinha &&
+    !periodoParcial &&
+    competenciasConsecutivas &&
+    penultimoPonto &&
+    ultimoPonto &&
+    penultimoPonto.recebidoMinor > 0
+      ? Math.round(
+          ((ultimoPonto.recebidoMinor - penultimoPonto.recebidoMinor) / penultimoPonto.recebidoMinor) * 1000,
+        ) / 10
+      : null;
+
+  /*
+    O METODO COM MAIOR RECEBIDO decide o rotulo/valor central do GraficoDeRosca.
+    Calculado uma unica vez aqui, e nao dentro do JSX, para nao repetir o
+    reduce ao montar rotuloCentral e valorCentral separadamente.
+  */
+  const maiorMetodo =
+    resumo.recebidoMinor > 0
+      ? resumo.quebraPorMetodo.reduce((maior, atual) =>
+          atual.minorTotal > maior.minorTotal ? atual : maior,
+        )
+      : null;
+  const proporcaoDoMaiorMetodo = maiorMetodo
+    ? percentualDoTotal(maiorMetodo.minorTotal, resumo.recebidoMinor)
+    : null;
+
   return (
     <section aria-labelledby="titulo-financeiro">
       <PageHeader
@@ -323,17 +394,31 @@ export default async function PainelFinanceiroPage({
       </div>
 
       {/*
-        FAIXA UNICA DE KPI, no lugar do numero de 3rem mais dois cards soltos.
-
-        Seis indicadores compactos custam menos altura que um gigante, e o
-        gerente COMPARA valores lado a lado -- que e o que ele faz -- em vez de
-        rolar entre eles. Os que carregam estado tingem a propria superficie
-        (ver o CSS); os neutros ficam brancos, e por isso os coloridos saltam.
+        HERO KPIS -- os tres indicadores que o gestor abre a tela para ver:
+        dinheiro (recebido), alunos (assinaturas vigentes), ticket medio.
+        Destacados da faixa compacta que segue, com badge de tendencia so
+        quando ha dado real de mes anterior.
       */}
-      <section className={estilos['faixaDeKpi']} aria-label="Indicadores do período">
-        <div className={estilos['kpi']} data-tom="success">
-          <p className={estilos['kpiRotulo']}>Recebido</p>
-          <p className={estilos['kpiValor']} data-testid="recebido-no-periodo">
+      <section className={estilos['heroKpis']} aria-label="Indicadores principais do período">
+        <div className={estilos['heroCard']} data-tom="success">
+          <div className={estilos['heroCabecalho']}>
+            <p className={estilos['heroRotulo']}>Recebido</p>
+            {variacaoRecebido !== null ? (
+              <span
+                className={estilos['heroBadge']}
+                data-testid="tendencia-do-recebido-badge"
+                /*
+                  ZERO E NEUTRO -- nem sucesso nem risco. `>= 0` sozinho
+                  pintaria um "0%" de verde, afirmando melhora que nao houve.
+                */
+                data-tom={variacaoRecebido > 0 ? 'success' : variacaoRecebido < 0 ? 'danger' : 'neutral'}
+              >
+                {variacaoRecebido > 0 ? '↑' : variacaoRecebido < 0 ? '↓' : '·'}{' '}
+                {String(Math.abs(variacaoRecebido)).replace('.', ',')}% vs mês anterior
+              </span>
+            ) : null}
+          </div>
+          <p className={estilos['heroValor']} data-testid="recebido-no-periodo">
             <Money cents={resumo.recebidoMinor} currency="BRL" />
           </p>
           {/*
@@ -343,7 +428,7 @@ export default async function PainelFinanceiroPage({
             delas -- fabricar a curva exigiria snapshot mensal, que e fatia
             nova. Decisao do PI em 25/08/2026.
           */}
-          <div className={estilos['kpiTendencia']}>
+          <div className={estilos['heroTendencia']}>
             <Sparkline
               testId="tendencia-do-recebido"
               valores={resumo.serie.pontos.map((ponto) => ponto.recebidoMinor)}
@@ -352,6 +437,45 @@ export default async function PainelFinanceiroPage({
           </div>
         </div>
 
+        <div className={estilos['heroCard']}>
+          {/*
+            "ASSINATURAS VIGENTES", nao "alunos ativos" (issue #416): a query
+            conta `subscriptions` em `ACTIVE`/`PAST_DUE`, nao a coluna
+            `students.status`. Enquanto o rotulo dizia "aluno", este numero
+            contradizia a lista de alunos na tela ao lado -- os dois corretos,
+            medindo eixos diferentes: contrato vigente aqui, cadastro ativo la.
+          */}
+          <p className={estilos['heroRotulo']}>Assinaturas vigentes</p>
+          <p className={estilos['heroValor']} data-testid="alunos-ativos">
+            {resumo.alunosAtivos}
+          </p>
+          {/* SNAPSHOT DE AGORA, nao do periodo -- "quantos ha", nao "quantos ficaram". */}
+          <p className={estilos['heroApoio']}>agora, independente do período</p>
+        </div>
+
+        <div className={estilos['heroCard']}>
+          <p className={estilos['heroRotulo']}>Ticket médio</p>
+          <p className={estilos['heroValor']} data-testid="ticket-medio">
+            {resumo.ticketMedioMinor === null ? (
+              <Ausente />
+            ) : (
+              <Money cents={resumo.ticketMedioMinor} currency="BRL" />
+            )}
+          </p>
+          <p className={estilos['heroApoio']}>
+            {resumo.pagamentosConfirmados === 0
+              ? 'sem pagamento no período'
+              : `${resumo.pagamentosConfirmados} pagamento(s) confirmado(s)`}
+          </p>
+        </div>
+      </section>
+
+      {/*
+        FAIXA COMPACTA -- os KPIs restantes, menos os tres promovidos a hero.
+        Novos alunos/Cancelamentos/Churn/LTV saem daqui e viram o bloco de
+        "Saude do negocio & retencao" mais abaixo, ao lado da divida.
+      */}
+      <section className={estilos['faixaDeKpi']} aria-label="Indicadores do período">
         <div className={estilos['kpi']}>
           <p className={estilos['kpiRotulo']}>Esperado por mês</p>
           <p className={estilos['kpiValor']} data-testid="receita-esperada">
@@ -410,84 +534,6 @@ export default async function PainelFinanceiroPage({
           </p>
         </div>
 
-        <div className={estilos['kpi']}>
-          <p className={estilos['kpiRotulo']}>Ticket médio</p>
-          <p className={estilos['kpiValor']} data-testid="ticket-medio">
-            {resumo.ticketMedioMinor === null ? (
-              <Ausente />
-            ) : (
-              <Money cents={resumo.ticketMedioMinor} currency="BRL" />
-            )}
-          </p>
-          <p className={estilos['kpiApoio']}>
-            {resumo.pagamentosConfirmados === 0
-              ? 'sem pagamento no período'
-              : `${resumo.pagamentosConfirmados} pagamento(s) confirmado(s)`}
-          </p>
-        </div>
-
-        {/*
-          OS CINCO KPIS DA F74 (`SPEC-074`) -- alunos ativos, novos,
-          cancelamentos, churn e LTV. Faltavam para a §64/§117; os seis
-          anteriores ja sao da F54.
-        */}
-        <div className={estilos['kpi']}>
-          {/*
-            "ASSINATURAS VIGENTES", nao "alunos ativos" (issue #416): a query
-            conta `subscriptions` em `ACTIVE`/`PAST_DUE`, nao a coluna
-            `students.status`. Enquanto o rotulo dizia "aluno", este numero
-            contradizia a lista de alunos na tela ao lado -- os dois corretos,
-            medindo eixos diferentes: contrato vigente aqui, cadastro ativo la.
-          */}
-          <p className={estilos['kpiRotulo']}>Assinaturas vigentes</p>
-          <p className={estilos['kpiValor']} data-testid="alunos-ativos">
-            {resumo.alunosAtivos}
-          </p>
-          {/* SNAPSHOT DE AGORA, nao do periodo -- "quantos ha", nao "quantos ficaram". */}
-          <p className={estilos['kpiApoio']}>agora, independente do período</p>
-        </div>
-
-        <div className={estilos['kpi']}>
-          <p className={estilos['kpiRotulo']}>Novos alunos</p>
-          <p className={estilos['kpiValor']} data-testid="novos-alunos">
-            {resumo.novosAlunos}
-          </p>
-          <p className={estilos['kpiApoio']}>no período</p>
-        </div>
-
-        <div className={estilos['kpi']} {...(resumo.cancelamentos > 0 ? { 'data-tom': 'risk' } : {})}>
-          <p className={estilos['kpiRotulo']}>Cancelamentos</p>
-          <p className={estilos['kpiValor']} data-testid="cancelamentos">
-            {resumo.cancelamentos}
-          </p>
-          <p className={estilos['kpiApoio']}>no período</p>
-        </div>
-
-        <div className={estilos['kpi']} {...(resumo.cancelamentos > 0 ? { 'data-tom': 'risk' } : {})}>
-          <p className={estilos['kpiRotulo']}>Taxa de churn</p>
-          <p className={estilos['kpiValor']} data-testid="taxa-de-churn">
-            {resumo.taxaDeChurn === null ? (
-              <Ausente />
-            ) : (
-              `${String(resumo.taxaDeChurn).replace('.', ',')}%`
-            )}
-          </p>
-          <p className={estilos['kpiApoio']}>sobre a base pagante do início do período</p>
-        </div>
-
-        <div className={estilos['kpi']}>
-          <p className={estilos['kpiRotulo']}>LTV</p>
-          <p className={estilos['kpiValor']} data-testid="ltv">
-            {resumo.ltv === null ? <Ausente /> : <Money cents={resumo.ltv} currency="BRL" />}
-          </p>
-          {/*
-            LTV E CHURN carregam a mesma ressalva da base do Pacto que a §5.2
-            da F54 ja aplica a inadimplencia: cancelamento sem evento de
-            timeline nao entra na conta (`SPEC-074` §3).
-          */}
-          <p className={estilos['kpiApoio']}>ticket médio × vida média observada</p>
-        </div>
-
         {/*
           O ESTORNO SO APARECE QUANDO EXISTE. Uma celula fixa "R$ 0,00" em todo
           mes sem devolucao gastaria peso permanente com o caso raro -- e o
@@ -505,11 +551,156 @@ export default async function PainelFinanceiroPage({
       </section>
 
       {/*
-        DUAS PERGUNTAS IRMAS LADO A LADO: "onde o dinheiro parou" e "por onde
-        ele entrou". Empilhadas custavam ~380px e obrigavam a rolar entre duas
-        metades da mesma leitura.
+        LINHA 1 DE GRAFICOS: evolucao de receita (SerieFinanceira, que antes
+        era uma secao cheia embaixo) lado a lado com a composicao de metodo de
+        pagamento (agora GraficoDeRosca, no lugar de BarrasDeFaixa).
       */}
-      <div className={estilos['duasColunas']}>
+      <div className={estilos['duasColunasGraficos']}>
+        <div className={estilos['cartao']}>
+          <h2 className={estilos['tituloDoCartao']}>Faturado e recebido por competência</h2>
+          <p className={estilos['apoioDoTitulo']}>
+            pelo mês de referência da fatura, não pela data do pagamento
+          </p>
+
+          {resumo.serie.pontos.length === 0 ? (
+            <EmptyState
+              testId="sem-competencia"
+              title="Nenhuma competência no período"
+              hint="Não há faturas emitidas nem pagamentos confirmados para o período apurado."
+            />
+          ) : (
+            <div className={estilos['grafico']}>
+              {/*
+                SERIE CURTA NAO VIRA TENDENCIA (`SPEC-054` §5.1): com um ponto
+                nao ha comparacao, com dois a reta entre eles sempre parece
+                tendencia. O aviso vem ANTES do grafico -- quem le a curva
+                precisa saber que ela e curta antes de concluir dela.
+              */}
+              {!resumo.serie.suficienteParaLinha ? (
+                <p className={estilos['avisoDaSerie']} data-testid="serie-insuficiente">
+                  Dado insuficiente para comparar períodos:{' '}
+                  {resumo.serie.pontos.length === 1
+                    ? 'há uma competência apurada'
+                    : `há ${resumo.serie.pontos.length} competências apuradas`}
+                  , e a comparação de tendência exige pelo menos três.
+                </p>
+              ) : null}
+
+              <SerieFinanceira
+                testId="grafico-de-competencia"
+                descricao="Valor faturado e recebido por mês de competência"
+                pontos={resumo.serie.pontos.map((ponto) => ({
+                  rotulo: competenciaLegivel(ponto.competencia),
+                  faturadoMinor: ponto.faturadoMinor,
+                  recebidoMinor: ponto.recebidoMinor,
+                }))}
+              />
+
+              {/*
+                A TABELA FICA RECOLHIDA, e o `SerieFinanceira` ja publica uma
+                tabela INVISIVEL para leitor de tela -- entao a regra "todo
+                grafico tem tabela equivalente no DOM" (PRD) esta cumprida com
+                o `<details>` fechado.
+
+                Quem abre a tela quer a TENDENCIA; quem vai conferir um numero
+                abre o detalhe, e e a minoria dos acessos. Aberta por padrao,
+                ela custava ~300px repetindo o que o grafico ja desenha.
+              */}
+              <details className={estilos['detalhe']}>
+                <summary className={estilos['detalheGatilho']}>Ver valores exatos</summary>
+
+                <div className={estilos['detalheConteudo']}>
+                  <DataTable
+                    testId="serie-por-competencia"
+                    empty={<EmptyState title="Nenhuma competência no período" />}
+                    rows={resumo.serie.pontos}
+                    rowKey={(ponto) => ponto.competencia}
+                    caption="Valor faturado e recebido por mês de competência"
+                    columns={[
+                      {
+                        key: 'competencia',
+                        header: 'Competência',
+                        role: 'identity',
+                        render: (ponto) => competenciaLegivel(ponto.competencia),
+                      },
+                      {
+                        key: 'faturado',
+                        header: 'Faturado',
+                        role: 'value',
+                        render: (ponto) => <Money cents={ponto.faturadoMinor} currency="BRL" />,
+                      },
+                      {
+                        key: 'recebido',
+                        header: 'Recebido',
+                        role: 'value',
+                        render: (ponto) => <Money cents={ponto.recebidoMinor} currency="BRL" />,
+                      },
+                      {
+                        /*
+                          A COLUNA QUE A TABELA ANTIGA NAO TINHA. O gestor vinha
+                          subtraindo faturado menos recebido a cada linha para
+                          achar o buraco do mes -- que e a pergunta do bloco.
+                        */
+                        key: 'naoEntrou',
+                        header: 'Não entrou',
+                        role: 'value',
+                        render: (ponto) => (
+                          <Money
+                            cents={Math.max(ponto.faturadoMinor - ponto.recebidoMinor, 0)}
+                            currency="BRL"
+                          />
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              </details>
+            </div>
+          )}
+        </div>
+
+        <div className={estilos['cartao']}>
+          <h2 className={estilos['tituloDoCartao']}>Por onde o dinheiro entrou</h2>
+          {resumo.recebidoMinor === 0 ? (
+            <EmptyState
+              testId="sem-pagamento"
+              title="Nenhum pagamento no período"
+              hint="Nenhuma forma de pagamento registrou entrada no período apurado."
+            />
+          ) : (
+            <GraficoDeRosca
+              testId="quebra-por-metodo"
+              descricao="Valor recebido por forma de pagamento no período apurado"
+              {...(maiorMetodo
+                ? { rotuloCentral: NOME_DO_METODO[maiorMetodo.metodo] ?? maiorMetodo.metodo }
+                : {})}
+              {...(proporcaoDoMaiorMetodo === null
+                ? {}
+                : { valorCentral: `${String(proporcaoDoMaiorMetodo).replace('.', ',')}%` })}
+              segmentos={resumo.quebraPorMetodo.map((metodo) => {
+                const proporcao = percentualDoTotal(metodo.minorTotal, resumo.recebidoMinor);
+
+                return {
+                  rotulo: NOME_DO_METODO[metodo.metodo] ?? metodo.metodo,
+                  valor: metodo.minorTotal,
+                  tokenDeCor: COR_DO_METODO[metodo.metodo] ?? '--ah-text-muted',
+                  valorLegivel:
+                    proporcao === null
+                      ? formatarDinheiro(metodo.minorTotal)
+                      : `${formatarDinheiro(metodo.minorTotal)} · ${String(proporcao).replace('.', ',')}%`,
+                };
+              })}
+            />
+          )}
+        </div>
+      </div>
+
+      {/*
+        LINHA 2 DE GRAFICOS: aging da divida (BarrasVerticais, no lugar de
+        BarrasDeFaixa) lado a lado com o bloco de saude do negocio, que reune
+        os quatro KPIs de retencao que saíram da faixa compacta.
+      */}
+      <div className={estilos['duasColunasGraficos']}>
         <div className={estilos['cartao']}>
           <h2 className={estilos['tituloDoCartao']}>Onde o dinheiro parou</h2>
           {resumo.faturasVencidas === 0 ? (
@@ -519,7 +710,7 @@ export default async function PainelFinanceiroPage({
               hint="Não há dinheiro parado no momento."
             />
           ) : (
-            <BarrasDeFaixa
+            <BarrasVerticais
               testId="faixas-da-divida"
               descricao="Valor vencido por faixa de tempo, considerando toda a dívida em aberto"
               faixas={resumo.faixas.map((faixa) => ({
@@ -533,149 +724,55 @@ export default async function PainelFinanceiroPage({
         </div>
 
         <div className={estilos['cartao']}>
-          <h2 className={estilos['tituloDoCartao']}>Por onde o dinheiro entrou</h2>
+          <h2 className={estilos['tituloDoCartao']}>Saúde do negócio &amp; retenção</h2>
           {/*
-            BARRAS E NAO TABELA: a pergunta aqui e de PROPORCAO -- "o PIX e
-            quanto do meu caixa?" --, e proporcao se le comparando comprimentos,
-            nao alinhando tres numeros em coluna.
+            OS QUATRO KPIS DA F74 (`SPEC-074`) que restam: novos, cancelamentos,
+            churn e LTV. Alunos ativos ja virou hero card acima.
           */}
-          {resumo.recebidoMinor === 0 ? (
-            <EmptyState
-              testId="sem-pagamento"
-              title="Nenhum pagamento no período"
-              hint="Nenhuma forma de pagamento registrou entrada no período apurado."
-            />
-          ) : (
-            <BarrasDeFaixa
-              testId="quebra-por-metodo"
-              descricao="Valor recebido por forma de pagamento no período apurado"
-              faixas={resumo.quebraPorMetodo.map((metodo) => {
-                const proporcao = percentualDoTotal(metodo.minorTotal, resumo.recebidoMinor);
+          <div className={estilos['subKpis']}>
+            <div className={estilos['subKpi']}>
+              <p className={estilos['kpiRotulo']}>Novos alunos</p>
+              <p className={estilos['kpiValor']} data-testid="novos-alunos">
+                {resumo.novosAlunos}
+              </p>
+              <p className={estilos['kpiApoio']}>no período</p>
+            </div>
 
-                return {
-                  rotulo: NOME_DO_METODO[metodo.metodo] ?? metodo.metodo,
-                  valor: metodo.minorTotal,
-                  tokenDeCor: COR_DO_METODO[metodo.metodo] ?? '--ah-text-muted',
-                  /*
-                    VALOR E PROPORCAO, sem a contagem: tres informacoes na ponta
-                    da barra estouravam a largura e quebravam em duas linhas. A
-                    contagem de pagamentos nao responde a pergunta do bloco.
-                  */
-                  valorLegivel:
-                    proporcao === null
-                      ? formatarDinheiro(metodo.minorTotal)
-                      : `${formatarDinheiro(metodo.minorTotal)} · ${String(proporcao).replace('.', ',')}%`,
-                };
-              })}
-            />
-          )}
+            <div className={estilos['subKpi']} {...(resumo.cancelamentos > 0 ? { 'data-tom': 'risk' } : {})}>
+              <p className={estilos['kpiRotulo']}>Cancelamentos</p>
+              <p className={estilos['kpiValor']} data-testid="cancelamentos">
+                {resumo.cancelamentos}
+              </p>
+              <p className={estilos['kpiApoio']}>no período</p>
+            </div>
+
+            <div className={estilos['subKpi']} {...(resumo.cancelamentos > 0 ? { 'data-tom': 'risk' } : {})}>
+              <p className={estilos['kpiRotulo']}>Taxa de churn</p>
+              <p className={estilos['kpiValor']} data-testid="taxa-de-churn">
+                {resumo.taxaDeChurn === null ? (
+                  <Ausente />
+                ) : (
+                  `${String(resumo.taxaDeChurn).replace('.', ',')}%`
+                )}
+              </p>
+              {/*
+                LTV E CHURN carregam a mesma ressalva da base do Pacto que a
+                §5.2 da F54 ja aplica a inadimplencia: cancelamento sem evento
+                de timeline nao entra na conta (`SPEC-074` §3).
+              */}
+              <p className={estilos['kpiApoio']}>sobre a base pagante do início do período</p>
+            </div>
+
+            <div className={estilos['subKpi']}>
+              <p className={estilos['kpiRotulo']}>LTV</p>
+              <p className={estilos['kpiValor']} data-testid="ltv">
+                {resumo.ltv === null ? <Ausente /> : <Money cents={resumo.ltv} currency="BRL" />}
+              </p>
+              <p className={estilos['kpiApoio']}>ticket médio × vida média observada</p>
+            </div>
+          </div>
         </div>
       </div>
-
-      <section className={estilos['secao']} aria-labelledby="titulo-competencia">
-        <h2 id="titulo-competencia" className={estilos['tituloDaSecao']}>
-          Faturado e recebido por competência
-          <span className={estilos['apoioDoTitulo']}>
-            pelo mês de referência da fatura, não pela data do pagamento
-          </span>
-        </h2>
-
-        {resumo.serie.pontos.length === 0 ? (
-          <EmptyState
-            testId="sem-competencia"
-            title="Nenhuma competência no período"
-            hint="Não há faturas emitidas nem pagamentos confirmados para o período apurado."
-          />
-        ) : (
-          <div className={estilos['grafico']}>
-            {/*
-              SERIE CURTA NAO VIRA TENDENCIA (`SPEC-054` §5.1): com um ponto
-              nao ha comparacao, com dois a reta entre eles sempre parece
-              tendencia. O aviso vem ANTES do grafico -- quem le a curva
-              precisa saber que ela e curta antes de concluir dela.
-            */}
-            {!resumo.serie.suficienteParaLinha ? (
-              <p className={estilos['avisoDaSerie']} data-testid="serie-insuficiente">
-                Dado insuficiente para comparar períodos:{' '}
-                {resumo.serie.pontos.length === 1
-                  ? 'há uma competência apurada'
-                  : `há ${resumo.serie.pontos.length} competências apuradas`}
-                , e a comparação de tendência exige pelo menos três.
-              </p>
-            ) : null}
-
-            <SerieFinanceira
-              testId="grafico-de-competencia"
-              descricao="Valor faturado e recebido por mês de competência"
-              pontos={resumo.serie.pontos.map((ponto) => ({
-                rotulo: competenciaLegivel(ponto.competencia),
-                faturadoMinor: ponto.faturadoMinor,
-                recebidoMinor: ponto.recebidoMinor,
-              }))}
-            />
-
-            {/*
-              A TABELA FICA RECOLHIDA, e o `SerieFinanceira` ja publica uma
-              tabela INVISIVEL para leitor de tela -- entao a regra "todo
-              grafico tem tabela equivalente no DOM" (PRD) esta cumprida com o
-              `<details>` fechado.
-
-              Quem abre a tela quer a TENDENCIA; quem vai conferir um numero
-              abre o detalhe, e e a minoria dos acessos. Aberta por padrao, ela
-              custava ~300px repetindo o que o grafico ja desenha.
-            */}
-            <details className={estilos['detalhe']}>
-              <summary className={estilos['detalheGatilho']}>Ver valores exatos</summary>
-
-              <div className={estilos['detalheConteudo']}>
-                <DataTable
-                  testId="serie-por-competencia"
-                  empty={<EmptyState title="Nenhuma competência no período" />}
-                  rows={resumo.serie.pontos}
-                  rowKey={(ponto) => ponto.competencia}
-                  caption="Valor faturado e recebido por mês de competência"
-                  columns={[
-                    {
-                      key: 'competencia',
-                      header: 'Competência',
-                      role: 'identity',
-                      render: (ponto) => competenciaLegivel(ponto.competencia),
-                    },
-                    {
-                      key: 'faturado',
-                      header: 'Faturado',
-                      role: 'value',
-                      render: (ponto) => <Money cents={ponto.faturadoMinor} currency="BRL" />,
-                    },
-                    {
-                      key: 'recebido',
-                      header: 'Recebido',
-                      role: 'value',
-                      render: (ponto) => <Money cents={ponto.recebidoMinor} currency="BRL" />,
-                    },
-                    {
-                      /*
-                        A COLUNA QUE A TABELA ANTIGA NAO TINHA. O gestor vinha
-                        subtraindo faturado menos recebido a cada linha para
-                        achar o buraco do mes -- que e a pergunta do bloco.
-                      */
-                      key: 'naoEntrou',
-                      header: 'Não entrou',
-                      role: 'value',
-                      render: (ponto) => (
-                        <Money
-                          cents={Math.max(ponto.faturadoMinor - ponto.recebidoMinor, 0)}
-                          currency="BRL"
-                        />
-                      ),
-                    },
-                  ]}
-                />
-              </div>
-            </details>
-          </div>
-        )}
-      </section>
 
       {/*
         A BASE SOBRE A QUAL A TELA CALCULA (`SPEC-054` §5.2).

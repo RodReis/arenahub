@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { SerieFinanceira } from './SerieFinanceira.js';
+import { renderPontoDaSerie, SerieFinanceira } from './SerieFinanceira.js';
 
 /**
  * O SVG do Recharts NAO renderiza em jsdom -- o `ResponsiveContainer` mede o
@@ -91,5 +91,43 @@ describe('SerieFinanceira', () => {
     );
 
     expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  /**
+   * O ULTIMO PONTO (competencia mais recente) ganha destaque -- e para onde o
+   * olho deve ir primeiro, porque e o numero que ainda pode mudar.
+   *
+   * TESTADO CHAMANDO A FUNCAO `dot` DIRETO, nao via DOM: Recharts nao
+   * desenha SVG em jsdom (ver nota no topo deste arquivo), entao nao existe
+   * circulo para inspecionar na arvore renderizada. A funcao que decide o
+   * raio e pura -- recebe indice, devolve elemento -- e pode ser testada
+   * isolada.
+   */
+  it('desenha o ultimo ponto com raio maior que os demais', () => {
+    const pontoComum = renderPontoDaSerie({ cx: 10, cy: 20, index: 0 }, 3, 'currentColor', 'currentColor');
+    const ultimoPonto = renderPontoDaSerie({ cx: 10, cy: 20, index: 2 }, 3, 'currentColor', 'currentColor');
+
+    expect(pontoComum.props.r).toBe(4);
+    expect(ultimoPonto.props.r).toBe(6);
+  });
+
+  /**
+   * A BORDA DO PONTO usa cor RESOLVIDA, nao `var(--token)` literal -- achado
+   * na revisao final: `BarrasDeFaixa` ja documenta que o SVG do Recharts nao
+   * aceita `var(--token)` de forma confiavel em atributo de apresentacao.
+   * `renderPontoDaSerie` recebia a cor da borda como string fixa em vez de
+   * receber, como o `fill`, um valor ja resolvido pelo chamador.
+   */
+  it('recebe a cor da borda como parametro, nao como var() fixo', () => {
+    const ponto = renderPontoDaSerie({ cx: 10, cy: 20, index: 0 }, 3, 'currentColor', 'rgb(1, 2, 3)');
+
+    expect(ponto.props.stroke).toBe('rgb(1, 2, 3)');
+  });
+
+  /** Serie de um ponto so: esse unico ponto e o ultimo, e ganha o raio maior. */
+  it('destaca o unico ponto quando a serie tem uma competencia so', () => {
+    const ponto = renderPontoDaSerie({ cx: 10, cy: 20, index: 0 }, 1, 'currentColor', 'currentColor');
+
+    expect(ponto.props.r).toBe(6);
   });
 });

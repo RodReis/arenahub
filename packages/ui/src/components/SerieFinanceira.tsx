@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import {
   Area,
   CartesianGrid,
@@ -96,12 +96,48 @@ function useCoresDosTokens(tokens: readonly string[]): readonly string[] {
   return cores;
 }
 
+/**
+ * Desenha o ponto da linha de recebido. Funcao de MODULO, nao inline no JSX,
+ * para ser testavel isolada -- Recharts nao renderiza SVG em jsdom (ver topo
+ * do arquivo de teste), entao nao ha como inspecionar o circulo via DOM.
+ *
+ * ULTIMO PONTO (competencia mais recente) ganha raio maior: e onde o olho
+ * deve ir primeiro, porque e o numero que ainda pode mudar.
+ */
+export function renderPontoDaSerie(
+  props: { cx?: number; cy?: number; index?: number },
+  totalDePontos: number,
+  cor: string,
+  corDaBorda: string,
+): ReactElement<{ r: number; stroke: string }> {
+  const ehUltimo = props.index === totalDePontos - 1;
+  const raio = ehUltimo ? 6 : 4;
+
+  return (
+    <circle
+      key={`ponto-${String(props.index)}`}
+      cx={props.cx}
+      cy={props.cy}
+      r={raio}
+      fill={cor}
+      stroke={corDaBorda}
+      strokeWidth={ehUltimo ? 2 : 0}
+    />
+  );
+}
+
 export function SerieFinanceira({ pontos, descricao, testId }: Props) {
-  const cores = useCoresDosTokens(['--ah-state-info', '--ah-state-success']);
+  const cores = useCoresDosTokens(['--ah-state-info', '--ah-state-success', '--ah-surface-raised']);
 
   /* `currentColor` e nao hex literal -- regra 1 de lint. */
   const corFaturado = cores[0] ?? 'currentColor';
   const corRecebido = cores[1] ?? 'currentColor';
+  /*
+    RESOLVIDA, nao `var(--token)` literal -- BarrasDeFaixa ja documenta que o
+    SVG do Recharts nao aceita `var()` de forma confiavel em atributo de
+    apresentacao entre navegadores.
+  */
+  const corDaBordaDoPonto = cores[2] ?? 'currentColor';
 
   /**
    * SEM PONTO NAO E GRAFICO VAZIO -- e uma frase.
@@ -282,7 +318,9 @@ export function SerieFinanceira({ pontos, descricao, testId }: Props) {
               name="Recebido"
               stroke={corRecebido}
               strokeWidth={2.5}
-              dot={{ r: 4, fill: corRecebido }}
+              dot={(props: { cx?: number; cy?: number; index?: number }) =>
+                renderPontoDaSerie(props, dados.length, corRecebido, corDaBordaDoPonto)
+              }
               isAnimationActive={false}
             />
           </ComposedChart>
