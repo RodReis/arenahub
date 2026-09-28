@@ -345,8 +345,9 @@ samp {
  * inteiro vieram do `shadcn add` em cor literal e NUNCA foram ligados ao DS
  * -- 32 valores de cinza sem opiniao, exatamente o que o paragrafo acima
  * proibe. Nenhum era consumido: nao ha componente `Sidebar` nem grafico
- * shadcn no painel (os graficos sao `SerieFinanceira` e `SerieDeMedidas`, de
- * `@arenahub/ui`), e `.dark` nunca chega ao DOM -- o painel nao tem tema
+ * shadcn no painel (os graficos vêm de `@arenahub/ui` -- `SerieFinanceira`,
+ * `SerieDeMedidas` -- e dos componentes locais de `billing/_graficos/`),
+ * e `.dark` nunca chega ao DOM -- o painel nao tem tema
  * escuro, porque o balcao opera sob luz fluorescente forte (PRODUCT.md).
  * Token morto com contraste nao verificado e um convite para alguem "so usar
  * aquele que ja existe" e furar o DS sem perceber. Voltando a existir

@@ -153,4 +153,47 @@ describe('editarUnidade', () => {
     expect(estado.valores?.timezone).toBe('America/Manaus');
     expect(vi.mocked(chamarApi)).not.toHaveBeenCalled();
   });
+
+  it('inclui capacidadeMaxima no corpo do PATCH quando preenchida', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({ ok: true, dados: { id: 'u1', name: 'Unidade X' }, cookiesDaApi: [] });
+
+    const formulario = new FormData();
+    formulario.set('unitId', '11111111-1111-4111-8111-111111111111');
+    formulario.set('name', 'Unidade X');
+    formulario.set('timezone', 'America/Sao_Paulo');
+    formulario.set('capacidadeMaxima', '300');
+
+    await editarUnidade({}, formulario);
+
+    expect(vi.mocked(chamarApi).mock.calls[0]?.[0]).toContain('/units/');
+
+    const corpo = vi.mocked(chamarApi).mock.calls[0]?.[1]?.corpo as Record<string, unknown>;
+    expect(corpo['capacidadeMaxima']).toBe(300);
+  });
+
+  /**
+   * Campo VAZIO na edicao manda `null`, e nao omite a chave.
+   *
+   * Decisao do dono do produto: a spec define `null` como "sem limite
+   * definido" e o comentario desta action ja prometia "campo presente e
+   * vazio e esvazie" -- promessa que o formulario nao conseguia cumprir
+   * antes desta correcao, porque o Zod transformava vazio em `undefined` e
+   * o corpo do PATCH omitia a chave (a API entendia "nao mexer" e o valor
+   * antigo sobrevivia). Sem a correcao este teste reprova: a chave some.
+   */
+  it('manda capacidadeMaxima: null no PATCH quando o campo vem vazio, para limpar o valor anterior', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({ ok: true, dados: { id: 'u1', name: 'Unidade X' }, cookiesDaApi: [] });
+
+    const formulario = new FormData();
+    formulario.set('unitId', '11111111-1111-4111-8111-111111111111');
+    formulario.set('name', 'Unidade X');
+    formulario.set('timezone', 'America/Sao_Paulo');
+    formulario.set('capacidadeMaxima', '');
+
+    await editarUnidade({}, formulario);
+
+    const corpo = vi.mocked(chamarApi).mock.calls[0]?.[1]?.corpo as Record<string, unknown>;
+    expect(corpo).toHaveProperty('capacidadeMaxima');
+    expect(corpo['capacidadeMaxima']).toBeNull();
+  });
 });

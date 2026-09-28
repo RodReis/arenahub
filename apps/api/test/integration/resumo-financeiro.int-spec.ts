@@ -4,6 +4,7 @@ import type { Prisma } from '@arenahub/database';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from '@jest/globals';
 
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
+import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import { ConsultarResumoFinanceiroUseCase } from '../../src/modules/billing/consultar-resumo-financeiro.use-case.js';
 import { ExpirarAssinaturasVencidasUseCase } from '../../src/modules/billing/expirar-assinaturas-vencidas.use-case.js';
 import { JanelaDoResumoInvalidaError } from '../../src/modules/billing/domain/resumo-financeiro.js';
@@ -262,7 +263,28 @@ describe('ConsultarResumoFinanceiroUseCase', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     db = moduleRef.get(PrismaService);
-    useCase = moduleRef.get(ConsultarResumoFinanceiroUseCase);
+
+    /**
+     * `comContextoDeTenant`, e nao a instancia crua -- MESMO PADRAO de
+     * `billing-inadimplencia.int-spec.ts` para `ConsultarInadimplenciaUseCase`,
+     * que tambem usa `comTenant` internamente (`consultar-resumo-financeiro.use-case.ts`,
+     * na consulta de `alunosDaOcupacao`, ver o comentario la).
+     *
+     * Fora de uma requisicao HTTP nao ha `TenantRlsInterceptor` para abrir o
+     * `AsyncLocalStorage`, entao a chamada direta ao use case (como este
+     * teste faz) precisa do escopo aberto pelo helper -- exatamente o que a
+     * requisicao real faz sozinha. Sem isto, todo `it` deste arquivo falha
+     * com `SemContextoDeTenantError`, que e o comportamento CERTO do
+     * `comTenant` sem escopo (ADR-054 SS3): falhar alto, nao devolver vazio.
+     *
+     * NAO AFROUXA O ISOLAMENTO: o helper so declara AO POSTGRES qual tenant
+     * esta rodando, pelo primeiro argumento (`TenantContext`) que cada `it`
+     * ja passa. O `where { tenantId: ... }` de cada consulta do use case
+     * continua sendo exercitado normalmente -- inclusive o teste
+     * `nao soma o dinheiro de outro tenant`, que semeia DOIS tenants e prova
+     * que o resumo de um nao ve o do outro.
+     */
+    useCase = comContextoDeTenant(moduleRef.get(ConsultarResumoFinanceiroUseCase));
   });
 
   afterEach(async () => {

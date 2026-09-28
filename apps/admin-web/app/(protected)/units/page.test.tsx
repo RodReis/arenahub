@@ -16,6 +16,7 @@ const UNIDADE = {
   name: 'Unidade Matriz',
   timezone: 'America/Sao_Paulo',
   status: 'ACTIVE',
+  capacidadeMaxima: null,
 };
 
 async function renderizar() {

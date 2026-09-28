@@ -48,12 +48,23 @@ export class GymUnitRepository {
       name: string;
       timezone: string;
       openingHours: Prisma.InputJsonValue;
+      capacidadeMaxima?: number | undefined;
     },
     correlationId: string,
   ): Promise<GymUnit> {
     return this.db.$transaction(async (tx) => {
+      // `capacidadeMaxima` isolado do spread: com `exactOptionalPropertyTypes`,
+      // `undefined` explicito (campo ausente no corpo) nao e atribuivel a um
+      // campo Prisma que so aceita `number | null` -- mesmo motivo do filtro
+      // em `atualizar()`.
+      const { capacidadeMaxima, ...camposObrigatorios } = dados;
+
       const unidade = await tx.gymUnit.create({
-        data: { ...dados, tenantId: contexto.tenantId },
+        data: {
+          ...camposObrigatorios,
+          tenantId: contexto.tenantId,
+          ...(capacidadeMaxima === undefined ? {} : { capacidadeMaxima }),
+        },
       });
 
       await tx.auditLog.create({
@@ -104,6 +115,10 @@ export class GymUnitRepository {
       timezone?: string | undefined;
       openingHours?: Prisma.InputJsonValue | undefined;
       status?: 'ACTIVE' | 'INACTIVE' | undefined;
+      // `null` explicito e "esvazie" e ATRAVESSA o filtro de `undefined"
+      // abaixo -- so `undefined` (campo ausente no PATCH) e removido antes
+      // do `updateMany`. `null` e `undefined` sao estados diferentes aqui.
+      capacidadeMaxima?: number | null | undefined;
     },
     correlationId: string,
     /*

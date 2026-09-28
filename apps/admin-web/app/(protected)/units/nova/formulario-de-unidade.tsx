@@ -87,6 +87,16 @@ export function FormularioDeUnidade() {
         ))}
       </SelectField>
 
+      <Field
+        id="capacidade-da-unidade"
+        name="capacidadeMaxima"
+        label="Capacidade máxima (opcional)"
+        type="number"
+        min={1}
+        defaultValue={estado.valores?.capacidadeMaxima ?? ''}
+        data-testid="campo-capacidade-da-unidade"
+      />
+
       {/*
         O FUSO NÃO É DETALHE: toda data, horário e política de acesso da
         unidade dependem dele, e o bloqueio por inadimplência o usa sem

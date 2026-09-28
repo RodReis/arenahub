@@ -280,3 +280,61 @@ export function janelaPadrao(agora: Date): { de: Date; ate: Date } {
 
   return { de, ate };
 }
+
+/**
+ * O plano com mais assinaturas ativas/inadimplentes no periodo -- widget
+ * "Plano mais popular" do card de ticket medio.
+ *
+ * ASSINATURA SEM NOME CONHECIDO E EXCLUIDA DO AGRUPAMENTO, nao vira "plano
+ * sem nome": mostrar um id no lugar do nome seria pior que nao mostrar nada,
+ * e um plano excluido/inativado nao e o que o gestor quer ver destacado.
+ *
+ * EMPATE RESOLVE POR ORDEM ALFABETICA DO NOME -- determinismo, nao juizo de
+ * valor sobre qual plano "ganha": sem uma regra de desempate explicita, a
+ * ordem de iteracao do Map dependeria da ordem de insercao, que dependeria
+ * da ordem da consulta ao banco, que nao e garantida entre execucoes.
+ */
+export function planoMaisPopular(
+  assinaturas: readonly { planId: string }[],
+  nomesPorId: ReadonlyMap<string, string>,
+): { nome: string; quantidade: number } | null {
+  const contagem = new Map<string, number>();
+
+  for (const assinatura of assinaturas) {
+    if (!nomesPorId.has(assinatura.planId)) continue;
+
+    contagem.set(assinatura.planId, (contagem.get(assinatura.planId) ?? 0) + 1);
+  }
+
+  const grupos = [...contagem.entries()]
+    .map(([planId, quantidade]) => ({ nome: nomesPorId.get(planId) as string, quantidade }))
+    .sort((a, b) => {
+      if (a.quantidade !== b.quantidade) return b.quantidade - a.quantidade;
+      return a.nome.localeCompare(b.nome);
+    });
+
+  return grupos[0] ?? null;
+}
+
+/**
+ * Ocupacao de cada unidade do tenant -- widget "Capacidade instalada".
+ *
+ * POR UNIDADE, NUNCA UMA BARRA SO SOMANDO O TENANT: `alunosAtivos` no resumo
+ * e do tenant inteiro, e um tenant pode ter varias unidades
+ * (`Tenant.gymUnits`). Comparar o total do tenant contra a capacidade de UMA
+ * unidade seria uma comparacao sem sentido assim que existisse uma segunda
+ * unidade -- achado durante o planejamento desta fatia.
+ *
+ * UNIDADE SEM ALUNO NENHUM ENTRA COM ZERO, nao e omitida: unidade nova sem
+ * matricula ainda e informacao real (zero ocupada), nao ausencia de dado.
+ */
+export function ocupacaoPorUnidade(
+  unidades: readonly { id: string; nome: string; capacidadeMaxima: number | null }[],
+  alunosAtivosPorUnidade: ReadonlyMap<string, number>,
+): readonly { nomeDaUnidade: string; alunosAtivos: number; capacidadeMaxima: number | null }[] {
+  return unidades.map((unidade) => ({
+    nomeDaUnidade: unidade.nome,
+    alunosAtivos: alunosAtivosPorUnidade.get(unidade.id) ?? 0,
+    capacidadeMaxima: unidade.capacidadeMaxima,
+  }));
+}

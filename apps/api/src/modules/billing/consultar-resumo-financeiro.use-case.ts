@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -7,6 +7,8 @@ import { precoVigenteEm } from './domain/dinheiro.js';
 import {
   ltv,
   montarSerie,
+  ocupacaoPorUnidade,
+  planoMaisPopular,
   taxaDeChurn,
   taxaDeInadimplencia,
   ticketMedio,
@@ -160,6 +162,19 @@ export interface ResumoFinanceiro {
    * (`MINIMO_DE_CANCELAMENTOS_PARA_LTV`).
    */
   readonly ltv: number | null;
+
+  /** O plano com mais assinaturas ativas/inadimplentes no periodo. Ver `planoMaisPopular()`. */
+  readonly planoMaisPopular: { nome: string; quantidade: number } | null;
+
+  /**
+   * Ocupacao de cada unidade do tenant -- widget "Capacidade instalada".
+   * Ver `ocupacaoPorUnidade()`.
+   */
+  readonly ocupacaoPorUnidade: readonly {
+    nomeDaUnidade: string;
+    alunosAtivos: number;
+    capacidadeMaxima: number | null;
+  }[];
 }
 
 const UM_DIA_EM_MS = 86_400_000;
@@ -213,6 +228,8 @@ const NAO_E_CONSOLIDACAO: Prisma.StudentTimelineEventWhereInput = {
 
 @Injectable()
 export class ConsultarResumoFinanceiroUseCase {
+  private readonly log = new Logger(ConsultarResumoFinanceiroUseCase.name);
+
   constructor(private readonly db: PrismaService) {}
 
   /**
@@ -256,6 +273,7 @@ export class ConsultarResumoFinanceiroUseCase {
       alunosCriadosAntesDaJanela,
       cancelamentosAntesDaJanela,
       eventosCancelamentoParaLtv,
+      unidadesDoTenant,
     ] = await Promise.all([
         // RECEBIDO: pagamento CONFIRMED com `paidAt` na janela.
         //
@@ -428,6 +446,32 @@ export class ConsultarResumoFinanceiroUseCase {
         // ALUNOS ATIVOS: snapshot de AGORA, contagem distinta -- um aluno
         // pode ter mais de uma assinatura ao longo da vida, mas so uma
         // vigente por vez (indice parcial da issue #272).
+        //
+        // O SELECT NAO ATRAVESSA PARA `student.gymUnitId` -- ISSO JA FOI
+        // TENTADO E MEDIDO COMO QUEBRADO SOB RLS.
+        //
+        // `Student` tem politica RLS ativa (`MODELOS_COM_RLS` em
+        // `prisma.service.ts`). Um `select` aninhado a partir de
+        // `Subscription` (`select: { studentId: true, student: { select: {
+        // gymUnitId: true } } }`) devolveu `student: null` em 100% das
+        // linhas contra a API real, sob o role restrito
+        // (`RUNTIME_DATABASE_URL`) -- mesmo padrao ja registrado no
+        // historico do projeto e em `consultar-inadimplencia.use-case.ts`
+        // (issue #306): o Prisma tipa a relacao como nao-nula e nem o
+        // TypeScript nem um teste sem RLS avisam.
+        //
+        // A CORRECAO NAO E "trocar o join por consulta direta" -- e ABRIR
+        // A CONSULTA DENTRO DE `comTenant`. A causa raiz e mais funda que
+        // "aninhado quebra, raiz nao quebra": QUALQUER consulta que toque
+        // `Student`, aninhada ou na raiz, precisa rodar dentro de uma
+        // transacao interceptada pelo `PrismaService` para o `set_config`
+        // da politica ser aplicado -- o `TenantRlsInterceptor` so abre o
+        // `AsyncLocalStorage` por requisicao, quem aplica o `set_config` e
+        // o `$transaction`/`comTenant` do `PrismaService`. Uma consulta
+        // solta a `Student` (join aninhado OU raiz) roda fora dessa
+        // interceptacao e ve `app.tenant_id` vazio. Ver o comentario
+        // completo, com a medicao das duas tentativas, em
+        // `alunosDaOcupacao` mais abaixo.
         this.db.subscription.findMany({
           where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] } },
           select: { studentId: true },
@@ -509,6 +553,14 @@ export class ConsultarResumoFinanceiroUseCase {
           },
           select: { studentId: true, occurredAt: true },
         }),
+
+        // UNIDADES DO TENANT, com a capacidade cadastrada -- widget
+        // "Capacidade instalada". `doTenant` no where: unidade de outro
+        // tenant nunca pode vazar para este resumo.
+        this.db.gymUnit.findMany({
+          where: doTenant,
+          select: { id: true, name: true, capacidadeMaxima: true },
+        }),
       ]);
 
     const criacoesPorAluno = eventosCancelamentoParaLtv.length
@@ -522,6 +574,45 @@ export class ConsultarResumoFinanceiroUseCase {
           orderBy: { occurredAt: 'asc' },
         })
       : [];
+
+    /**
+     * UNIDADE DE CADA ALUNO ATIVO -- consulta PROPRIA, direto na raiz de
+     * `Student`, e nao um `select` aninhado a partir de `Subscription`.
+     *
+     * `comTenant`, NAO `this.db.student.findMany` solto -- MESMO PADRAO JA
+     * DOCUMENTADO em `consultar-inadimplencia.use-case.ts` e
+     * `emitir-recibo.use-case.ts` (issue #306). `Student` tem politica RLS
+     * (F66, `MODELOS_COM_RLS` em `prisma.service.ts`), e o `set_config` que
+     * a politica precisa SO E APLICADO dentro de uma transacao interceptada
+     * pelo `PrismaService` (`$transaction`/`comTenant`) -- uma chamada solta,
+     * `student.findMany` direto no client, sem passar por `comTenant`, roda
+     * FORA dessa interceptacao, entao o `set_config` nunca acontece e a
+     * politica ve `app.tenant_id` vazio.
+     *
+     * MEDIDO EM DUAS RODADAS CONTRA O BANCO REAL SOB O ROLE RESTRITO
+     * (`RUNTIME_DATABASE_URL`, o que a API usa de verdade): a primeira
+     * tentativa desta correcao trocou o `select` aninhado por uma consulta
+     * solta na raiz, aplicando `set_config` A MAO num script isolado -- e
+     * pareceu funcionar (`gymUnitId` preenchido nas 9 linhas). Contra a API
+     * de verdade, rodando dentro do `TenantRlsInterceptor` (que so abre o
+     * `AsyncLocalStorage`, sem `$transaction` proprio), a MESMA consulta
+     * solta devolveu ZERO alunos -- o log de guarda abaixo disparou 9 vezes
+     * ("sem gymUnitId (RLS?)") e a tela mostrou `0/12` em vez de `9/12`.
+     * So envolvendo a consulta em `comTenant` (que abre a transacao e
+     * aplica `set_config` antes da query) o dado voltou certo.
+     *
+     * NAO "OTIMIZE" DE VOLTA PARA UMA CHAMADA SOLTA: e a mesma classe de
+     * erro que a issue #306 ja pagou duas vezes neste modulo.
+     */
+    const alunosDaOcupacao = alunosAtivosAgora.length
+      ? await this.db.comTenant((tx) =>
+          tx.student.findMany({
+            where: { ...doTenant, id: { in: alunosAtivosAgora.map((a) => a.studentId) } },
+            select: { id: true, gymUnitId: true },
+          }),
+        )
+      : [];
+    const unidadePorAluno = new Map(alunosDaOcupacao.map((aluno) => [aluno.id, aluno.gymUnitId]));
 
     /**
      * PARES CRIACAO/CANCELAMENTO POR ALUNO -- `SPEC-074` §3.
@@ -555,6 +646,43 @@ export class ConsultarResumoFinanceiroUseCase {
     const inadimplentes = new Set(vencidas.map((invoice) => invoice.studentId));
     const pagantes = new Set(assinaturas.map((assinatura) => assinatura.studentId));
 
+    /**
+     * ALUNOS ATIVOS POR UNIDADE -- alimenta `ocupacaoPorUnidade()`.
+     *
+     * A unidade vem de `unidadePorAluno` (consulta PROPRIA em `Student`,
+     * montada acima), NAO de um `select` aninhado a partir de
+     * `Subscription` -- essa alternativa foi tentada e medida como quebrada
+     * sob RLS (ver o comentario extenso na consulta de `alunosAtivosAgora`).
+     *
+     * `Student.gymUnitId` e obrigatorio no schema, mas o `if` abaixo fica de
+     * guarda mesmo assim, agora cobrindo o caso de um `studentId` que nao
+     * apareceu no mapa (aluno nao encontrado em `alunosDaOcupacao` -- RLS
+     * bloqueando de novo, ou inconsistencia de dado).
+     *
+     * O `continue` NAO PODE FICAR MUDO: se a consulta de unidade falhar
+     * para todo mundo, a lista sairia com todas as unidades zeradas, e
+     * "academia vazia" e um estado plausivel -- ninguem notaria pela tela
+     * que a causa foi uma falha de leitura, nao ausencia real de aluno. O
+     * log ANTES do `continue` e o que torna essa falha visivel em producao,
+     * e nao so no comentario do fonte. So `studentId` (UUID interno) vai na
+     * mensagem -- nunca nome, CPF ou qualquer PII do aluno (`CLAUDE.md`).
+     */
+    const alunosAtivosPorUnidade = new Map<string, number>();
+    for (const aluno of alunosAtivosAgora) {
+      const unidadeDoAluno = unidadePorAluno.get(aluno.studentId);
+      if (!unidadeDoAluno) {
+        this.log.error(
+          `ocupacaoPorUnidade: aluno ${aluno.studentId} sem gymUnitId (RLS?)`,
+        );
+        continue;
+      }
+
+      alunosAtivosPorUnidade.set(
+        unidadeDoAluno,
+        (alunosAtivosPorUnidade.get(unidadeDoAluno) ?? 0) + 1,
+      );
+    }
+
     const estornadoMinor = estornado._sum.amountMinor ?? 0;
 
     /**
@@ -567,6 +695,15 @@ export class ConsultarResumoFinanceiroUseCase {
      * entrada em zero e o estorno declarado ao lado, que e o que a tela faz.
      */
     const recebidoMinor = Math.max((recebido._sum.amountMinor ?? 0) - estornadoMinor, 0);
+
+    const idsDosPlanos = [...new Set(assinaturas.map((a) => a.planId))];
+    const planos = idsDosPlanos.length
+      ? await this.db.plan.findMany({
+          where: { ...doTenant, id: { in: idsDosPlanos } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const nomesPorId = new Map(planos.map((p) => [p.id, p.name]));
 
     return {
       de: entrada.de,
@@ -631,6 +768,15 @@ export class ConsultarResumoFinanceiroUseCase {
         ticketMedio(recebidoMinor, recebido._count),
         vidaMediaEmMeses(paresDeVida),
         paresDeVida.length,
+      ),
+      planoMaisPopular: planoMaisPopular(assinaturas, nomesPorId),
+      ocupacaoPorUnidade: ocupacaoPorUnidade(
+        unidadesDoTenant.map((unidade) => ({
+          id: unidade.id,
+          nome: unidade.name,
+          capacidadeMaxima: unidade.capacidadeMaxima,
+        })),
+        alunosAtivosPorUnidade,
       ),
     };
   }

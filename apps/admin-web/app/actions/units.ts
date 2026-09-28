@@ -32,6 +32,20 @@ const esquemaDeUnidade = z.object({
    * checagem é só de presença -- a lista da tela já é fechada.
    */
   timezone: z.string().min(1, 'Selecione o fuso horário da unidade'),
+  /*
+   * Opcional em ambos os formulários: deixar vazio significa "sem limite
+   * definido", e isso é válido -- não é erro de validação. A API RECUSA `0`
+   * e negativos (`z.number().int().positive().optional()`), então a mesma
+   * regra é replicada aqui para o erro aparecer sem perder o preenchimento.
+   */
+  capacidadeMaxima: z
+    .string()
+    .trim()
+    .optional()
+    .transform((valor) => (valor ? Number(valor) : undefined))
+    .refine((valor) => valor === undefined || (Number.isInteger(valor) && valor > 0), {
+      message: 'Capacidade deve ser um número inteiro maior que zero',
+    }),
 });
 
 /**
@@ -46,13 +60,28 @@ const esquemaDeEdicaoDeUnidade = z.object({
   unitId: z.string().uuid(),
   name: z.string().trim().min(1, 'Informe o nome da unidade').max(120, 'Nome longo demais'),
   timezone: z.string().min(1, 'Selecione o fuso horário da unidade'),
+  /*
+   * DIFERENTE do cadastro: aqui vazio produz `null`, nao `undefined`.
+   * Campo vazio na EDIÇÃO significa "esvazie o limite anterior" (decisão do
+   * dono do produto) -- e omitir a chave no PATCH faria a API entender "não
+   * mexer", mantendo o valor antigo sem erro nenhum na tela. `null` viaja
+   * até o corpo da requisição; `esquemaDeAtualizacao` na API aceita.
+   */
+  capacidadeMaxima: z
+    .string()
+    .trim()
+    .optional()
+    .transform((valor) => (valor ? Number(valor) : null))
+    .refine((valor) => valor === null || (Number.isInteger(valor) && valor > 0), {
+      message: 'Capacidade deve ser um número inteiro maior que zero',
+    }),
 });
 
 export interface EstadoDaUnidade {
   erro?: string;
   sucesso?: { id: string; name: string };
   /** Devolvidos para o formulário não perder o preenchimento em erro. */
-  valores?: { code?: string; name?: string; timezone?: string };
+  valores?: { code?: string; name?: string; timezone?: string; capacidadeMaxima?: string };
 }
 
 const MENSAGEM: Record<string, string> = {
@@ -85,6 +114,7 @@ export async function cadastrarUnidade(
     code: texto(formulario, 'code'),
     name: texto(formulario, 'name'),
     timezone: texto(formulario, 'timezone'),
+    capacidadeMaxima: texto(formulario, 'capacidadeMaxima'),
   };
 
   const validado = esquemaDeUnidade.safeParse(valores);
@@ -110,6 +140,9 @@ export async function cadastrarUnidade(
        * o consuma; `PATCH /units/:id` já aceita a alteração.
        */
       openingHours: {},
+      ...(validado.data.capacidadeMaxima !== undefined
+        ? { capacidadeMaxima: validado.data.capacidadeMaxima }
+        : {}),
     },
   });
 
@@ -131,6 +164,7 @@ export async function editarUnidade(
   const valores = {
     name: texto(formulario, 'name'),
     timezone: texto(formulario, 'timezone'),
+    capacidadeMaxima: texto(formulario, 'capacidadeMaxima'),
   };
 
   const validado = esquemaDeEdicaoDeUnidade.safeParse({ unitId, ...valores });
@@ -145,12 +179,19 @@ export async function editarUnidade(
   const resposta = await chamarApi<{ id: string; name: string }>(`/api/v1/units/${unitId}`, {
     metodo: 'PATCH',
     /*
-     * SÓ nome e fuso. `openingHours` fica de fora de propósito: o schema o
-     * declara opcional, e mandá-lo vazio aqui APAGARIA o horário de uma
-     * unidade que já o tivesse — campo ausente é "não mexer", campo presente
-     * e vazio é "esvazie".
+     * SÓ nome e fuso, mais capacidadeMaxima. `openingHours` fica de fora de
+     * propósito: o schema o declara opcional, e mandá-lo vazio aqui APAGARIA
+     * o horário de uma unidade que já o tivesse — campo ausente é "não
+     * mexer", campo presente e vazio é "esvazie". `capacidadeMaxima` SEMPRE
+     * entra no corpo: preenchida vai como número, vazia vai como `null`
+     * (esvazia o limite anterior) -- diferente de `openingHours`, aqui a
+     * chave nunca é omitida.
      */
-    corpo: { name: validado.data.name, timezone: validado.data.timezone },
+    corpo: {
+      name: validado.data.name,
+      timezone: validado.data.timezone,
+      capacidadeMaxima: validado.data.capacidadeMaxima,
+    },
   });
 
   if (!resposta.ok || !resposta.dados) {

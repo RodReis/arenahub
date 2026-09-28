@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@arenahub/ui';
@@ -58,6 +58,8 @@ const RESUMO = {
   cancelamentos: 1,
   taxaDeChurn: 33.3,
   ltv: 90_000,
+  planoMaisPopular: null,
+  ocupacaoPorUnidade: [],
 };
 
 async function renderizar(
@@ -464,6 +466,22 @@ describe('painel financeiro', () => {
   });
 
   /**
+   * META MENSAL ZERADA -- backend documenta dois caminhos reais para
+   * `receitaEsperadaMinor: 0`: tenant sem assinatura ativa, ou plano sem
+   * preco vigente (reajuste agendado). Dividir `recebidoMinor` por zero
+   * produz `NaN%`, e tratar meta zero como "100% batido" afirmaria uma meta
+   * que nao existe. A tela precisa OMITIR a barra de progresso, nao mostrar
+   * `NaN%` nem `0%`/`100%` fabricado.
+   */
+  it('nao mostra a barra de progresso da meta quando a meta mensal e zero', async () => {
+    await renderizar({ ...RESUMO, receitaEsperadaMinor: 0 });
+
+    expect(screen.queryByTestId('progresso-da-meta')).not.toBeInTheDocument();
+    expect(screen.queryByText(/da meta mensal de/)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/NaN/);
+  });
+
+  /**
    * Sem entrada no periodo nao ha proporcao a mostrar -- e dividir por zero
    * produziria `NaN%` na tela.
    */
@@ -624,6 +642,74 @@ describe('painel financeiro', () => {
 
     expect(screen.getByTestId('taxa-de-churn')).toHaveTextContent('—');
     expect(screen.getByTestId('ltv')).toHaveTextContent('—');
+  });
+});
+
+describe('capacidade instalada por unidade', () => {
+  it('nao mostra a secao quando nenhuma unidade tem capacidadeMaxima definida', async () => {
+    await renderizar({
+      ...RESUMO,
+      ocupacaoPorUnidade: [{ nomeDaUnidade: 'Jardins', alunosAtivos: 224, capacidadeMaxima: null }],
+    });
+    expect(screen.queryByTestId('ocupacao-por-unidade')).not.toBeInTheDocument();
+  });
+
+  it('mostra uma barra por unidade com capacidadeMaxima definida', async () => {
+    await renderizar({
+      ...RESUMO,
+      ocupacaoPorUnidade: [
+        { nomeDaUnidade: 'Jardins', alunosAtivos: 224, capacidadeMaxima: 300 },
+        { nomeDaUnidade: 'Centro', alunosAtivos: 80, capacidadeMaxima: null },
+      ],
+    });
+
+    const secao = screen.getByTestId('ocupacao-por-unidade');
+    expect(within(secao).getByText('Jardins')).toBeInTheDocument();
+    expect(within(secao).getByText('75%')).toBeInTheDocument(); // 224/300 arredondado
+    // unidade sem capacidadeMaxima aparece so com a contagem, sem barra
+    expect(within(secao).getByText('Centro')).toBeInTheDocument();
+  });
+
+  it('clampa a barra em 100% quando alunosAtivos excede capacidadeMaxima', async () => {
+    await renderizar({
+      ...RESUMO,
+      ocupacaoPorUnidade: [{ nomeDaUnidade: 'Jardins', alunosAtivos: 350, capacidadeMaxima: 300 }],
+    });
+
+    expect(screen.getByTestId('ocupacao-por-unidade')).toHaveTextContent('100%');
+    expect(screen.getByTestId('ocupacao-por-unidade')).not.toHaveTextContent('116%');
+  });
+
+  it('nao mostra a secao inteira quando ocupacaoPorUnidade vem vazio', async () => {
+    await renderizar({ ...RESUMO, ocupacaoPorUnidade: [] });
+    expect(screen.queryByTestId('ocupacao-por-unidade')).not.toBeInTheDocument();
+  });
+});
+
+describe('score saudavel', () => {
+  it('mostra Sem dado suficiente quando variacaoRecebido e null (serie curta)', async () => {
+    await renderizar({
+      ...RESUMO,
+      serie: { pontos: RESUMO.serie.pontos.slice(0, 1), suficienteParaLinha: false },
+    });
+    expect(screen.getByTestId('score-do-negocio')).toHaveTextContent(/sem dado suficiente/i);
+  });
+
+  it('mostra Saudavel quando a receita cresceu vs o mes anterior', async () => {
+    await renderizar();
+    expect(screen.getByTestId('score-do-negocio')).toHaveTextContent(/saud/i);
+  });
+});
+
+describe('plano mais popular', () => {
+  it('mostra o nome do plano quando presente no resumo', async () => {
+    await renderizar({ ...RESUMO, planoMaisPopular: { nome: 'Plano Anual', quantidade: 5 } });
+    expect(screen.getByText(/plano anual/i)).toBeInTheDocument();
+  });
+
+  it('nao mostra a linha quando planoMaisPopular e null', async () => {
+    await renderizar({ ...RESUMO, planoMaisPopular: null });
+    expect(screen.queryByTestId('plano-mais-popular')).not.toBeInTheDocument();
   });
 });
 

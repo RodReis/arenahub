@@ -42,6 +42,7 @@ const esquemaDeCriacao = z
     name: z.string().min(1).max(120),
     timezone: timezoneValido,
     openingHours: esquemaDeHorario,
+    capacidadeMaxima: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -70,6 +71,14 @@ const esquemaDeAtualizacao = z
      * `ManualAccessOverride.reason` -- "ok" nao e motivo.
      */
     reason: z.string().trim().min(10).max(500).optional(),
+    /*
+     * `.nullable()` alem de `.optional()`: `null` explicito e "esvazie o
+     * limite" (estado de produto valido -- "sem limite definido"), enquanto
+     * campo AUSENTE continua sendo "nao mexer" (regra ja existente no
+     * repositorio). `0` e negativos seguem recusados por `.positive()`, que
+     * so roda quando o valor nao e nulo.
+     */
+    capacidadeMaxima: z.number().int().positive().nullable().optional(),
   })
   .strict()
   /*
@@ -90,6 +99,7 @@ interface UnidadeDto {
   timezone: string;
   openingHours: unknown;
   status: string;
+  capacidadeMaxima: number | null;
 }
 
 @Controller('api/v1/units')
@@ -162,6 +172,7 @@ export class GymUnitController {
       timezone: unidade.timezone,
       openingHours: unidade.openingHours,
       status: unidade.status,
+      capacidadeMaxima: unidade.capacidadeMaxima,
     };
   }
 }
