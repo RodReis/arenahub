@@ -49,6 +49,17 @@ const SITUACAO_INICIAL = [
   ['ACTIVE', 'Ativo'],
 ] as const;
 
+/**
+ * Perfil de quem está sendo cadastrado -- F82. Ausente (placeholder
+ * "Aluno") continua criando `STUDENT`, o default do schema: o cadastro de
+ * sempre não muda para quem não mexe neste campo.
+ */
+const PERFIL_INICIAL = [
+  ['TRAINER', 'Professor'],
+  ['STAFF', 'Funcionário'],
+  ['ADMIN', 'Administrador'],
+] as const;
+
 /** As 27 UFs. Lista fechada — "XX" passaria por qualquer campo de texto. */
 const UFS = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO',
@@ -795,6 +806,15 @@ export function FormularioDeCadastro({
 
             <Campo id="status" rotulo="Situação inicial" marca="opcional">
               {selecao('status', SITUACAO_INICIAL, 'Lead')}
+            </Campo>
+
+            <Campo
+              id="profile"
+              rotulo="Perfil"
+              marca="opcional"
+              dica="Deixe em branco para cadastrar como aluno comum."
+            >
+              {selecao('profile', PERFIL_INICIAL, 'Aluno')}
             </Campo>
           </div>
         </div>

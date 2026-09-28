@@ -184,6 +184,104 @@ export class TeamRepository {
   }
 
   /**
+   * Existe ESTE `Student` neste tenant, qualquer que seja o profile -- F82.
+   *
+   * `encontrar()` nao serve para o branch 404-vs-409 de `alterarPerfil`: ele
+   * filtra `profile != STUDENT`, e um alvo que E `STUDENT` (o caso comum de
+   * "promover aluno") pareceria inexistente mesmo estando la.
+   */
+  async existe(contexto: TenantContext, id: string): Promise<boolean> {
+    const encontrado = await this.db.comTenant((tx) =>
+      tx.student.findFirst({ where: { id, tenantId: contexto.tenantId }, select: { id: true } }),
+    );
+    return encontrado !== null;
+  }
+
+  /**
+   * Troca o `profile` -- F82. Move a pessoa entre "aluno" e "time" (ou entre
+   * papeis dentro do time), SEM filtro de profile no `where`: e o unico
+   * caminho de escrita deste repository que precisa aceitar `profile =
+   * STUDENT` de entrada, porque e exatamente o caso "promover aluno para
+   * professor/staff/admin".
+   *
+   * Ao trocar PARA `STUDENT`, zera `employmentType`/`employmentStartedAt` --
+   * vinculo trabalhista nao faz sentido para aluno comum (mesma regra do
+   * schema, comentario de `Student.employmentType`).
+   */
+  async alterarPerfil(
+    contexto: TenantContext,
+    id: string,
+    versaoEsperada: number,
+    novoPerfil: StudentProfile,
+    correlationId: string,
+  ): Promise<MembroDeTimeRow | null> {
+    return this.db.$transaction(async (tx) => {
+      const alterados = await tx.student.updateMany({
+        where: { id, tenantId: contexto.tenantId, version: versaoEsperada },
+        data: {
+          version: { increment: 1 },
+          profile: novoPerfil,
+          ...(novoPerfil === 'STUDENT'
+            ? { employmentType: null, employmentStartedAt: null }
+            : {}),
+        },
+      });
+
+      if (alterados.count === 0) return null;
+
+      await tx.studentTimelineEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: id,
+          type: 'STUDENT_UPDATED',
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          correlationId,
+          payload: { campos: ['profile'] },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'team.profile_changed',
+          target: 'student',
+          targetId: id,
+          correlationId,
+          metadata: { profile: novoPerfil },
+        },
+      });
+
+      await tx.outboxEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          eventType: 'StudentUpdated',
+          aggregateType: 'Student',
+          aggregateId: id,
+          payload: { studentId: id },
+        },
+      });
+
+      return tx.student.findFirst({
+        where: { id, tenantId: contexto.tenantId },
+        select: {
+          id: true,
+          membershipNumber: true,
+          fullName: true,
+          profile: true,
+          gymUnitId: true,
+          employmentType: true,
+          employmentStartedAt: true,
+          archivedAt: true,
+          version: true,
+        },
+      }) as Promise<MembroDeTimeRow | null>;
+    });
+  }
+
+  /**
    * Agenda do professor -- F81, le a relacao `Class.classesAsTrainer` que
    * ja existe (ADR-061 decisao 5, construida pela F77). SO LEITURA: nenhuma
    * escrita em `Class` nesta fatia.

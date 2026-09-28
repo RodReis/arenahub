@@ -15,6 +15,7 @@ vi.mock('../../../../lib/api/server-client', () => ({
 vi.mock('../../../actions/students', () => ({
   editarAluno: vi.fn(),
   alterarSituacao: vi.fn(),
+  alterarPerfilDeAluno: vi.fn(),
 }));
 
 vi.mock('../../../actions/membership', () => ({
@@ -37,6 +38,7 @@ function aluno(sobrescritas: Record<string, unknown> = {}) {
     birthDate: '1999-07-16',
     cpf: '05047398161',
     status: 'ACTIVE',
+    profile: 'STUDENT',
     archivedAt: null,
     version: 3,
     rg: null,

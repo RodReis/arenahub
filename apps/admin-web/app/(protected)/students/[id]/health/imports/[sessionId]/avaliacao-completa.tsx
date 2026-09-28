@@ -1,4 +1,4 @@
-import { PageHeader, ProblemDetail } from '@arenahub/ui';
+import { Breadcrumb, PageHeader, ProblemDetail } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../../../../lib/api/server-client';
 import { AchadoDoEcg } from './achado-do-ecg';
@@ -128,7 +128,19 @@ export async function AvaliacaoCompleta({
 
     return (
       <section aria-labelledby="titulo-revisao-erro">
-        <PageHeader id="titulo-revisao-erro" title="Avaliação" />
+        <PageHeader
+          id="titulo-revisao-erro"
+          title="Avaliação"
+          breadcrumb={
+            <Breadcrumb
+              trilha={[
+                { rotulo: 'Alunos', href: '/students' },
+                { rotulo: 'Evolução corporal', href: `/students/${id}/health` },
+                { rotulo: 'Avaliação' },
+              ]}
+            />
+          }
+        />
         <ProblemDetail
           testId={codigo === 'STUDENT_NOT_FOUND' ? 'aluno-nao-encontrado' : 'erro-do-aluno'}
           problem={{
@@ -155,7 +167,20 @@ export async function AvaliacaoCompleta({
 
     return (
       <section aria-labelledby="titulo-revisao-erro">
-        <PageHeader id="titulo-revisao-erro" title={`Avaliação — ${aluno.fullName}`} />
+        <PageHeader
+          id="titulo-revisao-erro"
+          title={`Avaliação — ${aluno.fullName}`}
+          breadcrumb={
+            <Breadcrumb
+              trilha={[
+                { rotulo: 'Alunos', href: '/students' },
+                { rotulo: aluno.fullName, href: `/students/${id}` },
+                { rotulo: 'Evolução corporal', href: `/students/${id}/health` },
+                { rotulo: 'Avaliação' },
+              ]}
+            />
+          }
+        />
         <ProblemDetail
           testId={codigo === 'SESSION_NOT_FOUND' ? 'sessao-nao-encontrada' : 'erro-da-sessao'}
           problem={{
@@ -171,9 +196,6 @@ export async function AvaliacaoCompleta({
                 : `Não foi possível carregar os arquivos desta sessão (${codigo}).`,
           }}
         />
-        <p>
-          <a href={`/students/${id}/health`}>Voltar para a evolução corporal</a>
-        </p>
       </section>
     );
   }
@@ -240,7 +262,20 @@ export async function AvaliacaoCompleta({
 
   return (
     <section aria-labelledby="titulo-revisao">
-      <PageHeader id="titulo-revisao" title={`Avaliação — ${aluno.fullName}`} />
+      <PageHeader
+        id="titulo-revisao"
+        title={`Avaliação — ${aluno.fullName}`}
+        breadcrumb={
+          <Breadcrumb
+            trilha={[
+              { rotulo: 'Alunos', href: '/students' },
+              { rotulo: aluno.fullName, href: `/students/${id}` },
+              { rotulo: 'Evolução corporal', href: `/students/${id}/health` },
+              { rotulo: 'Avaliação' },
+            ]}
+          />
+        }
+      />
 
       {cabecalho}
 
