@@ -147,10 +147,11 @@ p {
 }
 
 /**
- * `<section>` e o card do painel: borda, nunca sombra (DS-PAINEL §4). Sombra
- * fica reservada para camada que FLUTUA -- dropdown, popover, modal. Superficie
- * plana le melhor em densidade alta, e e o que separa este painel de um
- * dashboard generico.
+ * `<section>` e o card do painel: borda + sombra de repouso, subindo no
+ * hover (DS-PAINEL §4.5/§2.6, emenda de 28/09/2026 -- decisao do PI,
+ * revoga "card nunca tem sombra" da v1.0, vale para todo o admin-web).
+ * `elev/1`/`elev/2` sao os mesmos tokens que dropdown/popover/modal usam
+ * para camada flutuante; aqui a diferenca e so a intensidade.
  *
  * `> h2` ganha o respiro; o primeiro nao, senao o card abre com buraco.
  */
@@ -162,6 +163,12 @@ section {
   border: 1px solid var(--ah-border-default);
   border-radius: var(--ah-radius-card);
   background: var(--ah-surface-raised);
+  box-shadow: var(--ah-elev-1);
+  transition: box-shadow 150ms var(--ah-motion-easing);
+}
+
+section:hover {
+  box-shadow: var(--ah-elev-2);
 }
 
 /* Card dentro de card e sempre erro: a segunda borda nao acrescenta divisao

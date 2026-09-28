@@ -133,10 +133,20 @@ Escala de 2 px: **2 · 4 · 6 · 8 · 10 · 12 · 14 · 16 · 20 · 24 · 48**.
 
 Bordas de **1 px**: `border/default` no que é interativo ou contido, `border/subtle` no que apenas separa.
 
-Elevação só em camada flutuante:
+Elevação:
 - Modal: `0 12px 32px rgba(10,11,13,.18)` sobre scrim `rgba(10,11,13,.5)`
 - Dropdown, popover, toast: `0 8px 24px rgba(10,11,13,.14)`
-- Card não tem sombra. Nunca.
+- Card: `elev/1` em repouso (`0 1px 2px rgba(10,11,13,.06)`), `elev/2` no hover
+  (`0 4px 12px rgba(10,11,13,.10)`), transição de 150 ms. **Emenda de
+  28/09/2026, decisão do PI** — revoga "card não tem sombra, nunca" (v1.0).
+  A borda 1 px continua (a sombra não a substitui, soma-se a ela); o que
+  muda é que card deixou de ser puramente plano. Vale para **todo o
+  admin-web**, não só uma tela.
+
+  Continua proibido: sombra sem offset e sem blur (`box-shadow` chapado tipo
+  neobrutalismo), sombra colorida decorativa, e qualquer elevação que
+  dependa só de cor (contraste do texto sobre o card não muda com a
+  sombra — ela é ambiente, nunca canal de informação).
 
 ### 2.7 Alturas
 
@@ -257,7 +267,7 @@ Breadcrumb 12 px `text/muted` → linha com `h1` 20 px/600 à esquerda e indicad
 
 ### 4.5 Card
 
-`surface`, borda 1 px `border/default`, raio 8 px, padding 16 px. Sem sombra. Cabeçalho interno: título 14 px/600 + ação à direita, separado por `border-bottom: 1px solid border/subtle` quando o card contém lista.
+`surface`, borda 1 px `border/default`, raio 8 px, padding 16 px, sombra `elev/1` em repouso subindo para `elev/2` no hover (§2.6, emenda de 28/09/2026). Cabeçalho interno: título 14 px/600 + ação à direita, separado por `border-bottom: 1px solid border/subtle` quando o card contém lista.
 
 ### 4.5b Dashboard operacional
 
@@ -483,7 +493,7 @@ Campo a campo, com valor lido, confiança e original ao lado; confiança baixa d
 **Componentes**
 - [ ] Controles em 40–44 px; 32–34 px dentro de tabela
 - [ ] Um único botão primário por tela
-- [ ] Card sem sombra; sombra só em camada flutuante
+- [ ] Card com `elev/1` em repouso, `elev/2` no hover (emenda de 28/09/2026) — nunca sombra chapada sem blur, nunca sombra colorida decorativa
 - [ ] Botão primário em gradiente `#5B86FF→#3E63E8`, nunca cor chapada
 - [ ] Select nativo só para lista curta; lista longa é combobox
 - [ ] Campo de data digitável com máscara, calendário como apoio
