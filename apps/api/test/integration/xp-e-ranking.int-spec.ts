@@ -1153,8 +1153,25 @@ describe('F31 -- XP, conquistas e ranking (integracao)', () => {
      *     ADJACENTE (sem semana perdida entre ela e hoje para romper o
      *     streak).
      */
+    /*
+     * DIA LOCAL NO FUSO DA UNIDADE, e nao `.toISOString()`. A API calcula
+     * `hojeLocal` com `diaLocal(agora, 'America/Sao_Paulo')`
+     * (`kiosk-xp.service.ts`) -- `Intl.DateTimeFormat` no fuso, nao UTC. Entre
+     * 21h e meia-noite em Sao Paulo (0h-3h UTC), `.toISOString()` ja mostra o
+     * dia SEGUINTE: a pausa construida aqui cobria a semana errada, e
+     * `semanaPausada` vinha `undefined` -- exatamente a janela do CI (rodou
+     * 2h13 UTC = 23h13 em SP, um dia atras do que o teste calculava).
+     */
+    const diaLocalDoTeste = (instante: Date): string =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(instante);
+
     const segundaDaSemanaCorrente = (): string =>
-      inicioDaSemanaLocal(new Date().toISOString().slice(0, 10));
+      inicioDaSemanaLocal(diaLocalDoTeste(new Date()));
 
     /** Segunda-feira da semana treinada (a anterior a corrente), `AAAA-MM-DD`. */
     const inicioDaSemanaTreinada = (): string => {
