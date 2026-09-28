@@ -115,7 +115,10 @@ export class GymUnitRepository {
       timezone?: string | undefined;
       openingHours?: Prisma.InputJsonValue | undefined;
       status?: 'ACTIVE' | 'INACTIVE' | undefined;
-      capacidadeMaxima?: number | undefined;
+      // `null` explicito e "esvazie" e ATRAVESSA o filtro de `undefined"
+      // abaixo -- so `undefined` (campo ausente no PATCH) e removido antes
+      // do `updateMany`. `null` e `undefined` sao estados diferentes aqui.
+      capacidadeMaxima?: number | null | undefined;
     },
     correlationId: string,
     /*

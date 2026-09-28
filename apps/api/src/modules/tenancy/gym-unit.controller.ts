@@ -71,7 +71,14 @@ const esquemaDeAtualizacao = z
      * `ManualAccessOverride.reason` -- "ok" nao e motivo.
      */
     reason: z.string().trim().min(10).max(500).optional(),
-    capacidadeMaxima: z.number().int().positive().optional(),
+    /*
+     * `.nullable()` alem de `.optional()`: `null` explicito e "esvazie o
+     * limite" (estado de produto valido -- "sem limite definido"), enquanto
+     * campo AUSENTE continua sendo "nao mexer" (regra ja existente no
+     * repositorio). `0` e negativos seguem recusados por `.positive()`, que
+     * so roda quando o valor nao e nulo.
+     */
+    capacidadeMaxima: z.number().int().positive().nullable().optional(),
   })
   .strict()
   /*

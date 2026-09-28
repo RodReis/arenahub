@@ -60,12 +60,19 @@ const esquemaDeEdicaoDeUnidade = z.object({
   unitId: z.string().uuid(),
   name: z.string().trim().min(1, 'Informe o nome da unidade').max(120, 'Nome longo demais'),
   timezone: z.string().min(1, 'Selecione o fuso horário da unidade'),
+  /*
+   * DIFERENTE do cadastro: aqui vazio produz `null`, nao `undefined`.
+   * Campo vazio na EDIÇÃO significa "esvazie o limite anterior" (decisão do
+   * dono do produto) -- e omitir a chave no PATCH faria a API entender "não
+   * mexer", mantendo o valor antigo sem erro nenhum na tela. `null` viaja
+   * até o corpo da requisição; `esquemaDeAtualizacao` na API aceita.
+   */
   capacidadeMaxima: z
     .string()
     .trim()
     .optional()
-    .transform((valor) => (valor ? Number(valor) : undefined))
-    .refine((valor) => valor === undefined || (Number.isInteger(valor) && valor > 0), {
+    .transform((valor) => (valor ? Number(valor) : null))
+    .refine((valor) => valor === null || (Number.isInteger(valor) && valor > 0), {
       message: 'Capacidade deve ser um número inteiro maior que zero',
     }),
 });
@@ -172,19 +179,18 @@ export async function editarUnidade(
   const resposta = await chamarApi<{ id: string; name: string }>(`/api/v1/units/${unitId}`, {
     metodo: 'PATCH',
     /*
-     * SÓ nome e fuso, mais capacidadeMaxima quando preenchida. `openingHours`
-     * fica de fora de propósito: o schema o declara opcional, e mandá-lo
-     * vazio aqui APAGARIA o horário de uma unidade que já o tivesse — campo
-     * ausente é "não mexer", campo presente e vazio é "esvazie". A mesma
-     * regra vale para `capacidadeMaxima`: só entra no corpo quando o valor
-     * veio preenchido.
+     * SÓ nome e fuso, mais capacidadeMaxima. `openingHours` fica de fora de
+     * propósito: o schema o declara opcional, e mandá-lo vazio aqui APAGARIA
+     * o horário de uma unidade que já o tivesse — campo ausente é "não
+     * mexer", campo presente e vazio é "esvazie". `capacidadeMaxima` SEMPRE
+     * entra no corpo: preenchida vai como número, vazia vai como `null`
+     * (esvazia o limite anterior) -- diferente de `openingHours`, aqui a
+     * chave nunca é omitida.
      */
     corpo: {
       name: validado.data.name,
       timezone: validado.data.timezone,
-      ...(validado.data.capacidadeMaxima !== undefined
-        ? { capacidadeMaxima: validado.data.capacidadeMaxima }
-        : {}),
+      capacidadeMaxima: validado.data.capacidadeMaxima,
     },
   });
 

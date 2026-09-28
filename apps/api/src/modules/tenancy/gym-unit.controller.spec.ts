@@ -80,4 +80,43 @@ describe('GymUnitController — capacidadeMaxima', () => {
     );
     expect(erro.issues.some((issue) => issue.code === 'unrecognized_keys')).toBe(false);
   });
+
+  /**
+   * `null` E ESTADO DE PRODUTO VALIDO na atualizacao: "sem limite definido".
+   * Diferente de campo AUSENTE (que significa "nao mexer" no repositorio),
+   * `null` explicito significa "esvazie". Sem `.nullable()` no schema, esta
+   * chamada rejeitaria com ZodError antes mesmo de chegar no repositorio --
+   * e e exatamente isso que este teste prova que NAO acontece mais.
+   */
+  it('aceita capacidadeMaxima null na atualizacao, sem rejeitar por tipo', async () => {
+    const unidadeAtualizada = {
+      id: 'id-qualquer',
+      code: 'UN1',
+      name: 'Unidade 1',
+      timezone: 'America/Sao_Paulo',
+      openingHours: {},
+      status: 'ACTIVE',
+      capacidadeMaxima: null,
+    };
+    const atualizarFake = jest.fn<() => Promise<typeof unidadeAtualizada>>();
+    atualizarFake.mockResolvedValue(unidadeAtualizada);
+    const repositorioFake = { atualizar: atualizarFake } as never;
+    const contextoFake = { require: () => ({ tenantId: 'x', actorId: 'y' }) } as never;
+    const controller = new GymUnitController(repositorioFake, contextoFake);
+
+    const dto = await controller.atualizar(
+      'id-qualquer',
+      { capacidadeMaxima: null },
+      { correlationId: 'c1' } as never,
+    );
+
+    expect(dto.capacidadeMaxima).toBeNull();
+    expect(atualizarFake).toHaveBeenCalledWith(
+      { tenantId: 'x', actorId: 'y' },
+      'id-qualquer',
+      expect.objectContaining({ capacidadeMaxima: null }),
+      'c1',
+      undefined,
+    );
+  });
 });
