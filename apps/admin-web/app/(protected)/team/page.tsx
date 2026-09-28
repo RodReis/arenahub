@@ -4,6 +4,7 @@ import { Ausente, DataTable, EmptyState, Identidade, PageHeader, ProblemDetail }
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { ROTULO_DE_PERFIL, ROTULO_DE_VINCULO } from '../../../src/team/formatar';
+import { AvisoDePerfilAlterado } from '../../../src/components/aviso-de-perfil-alterado';
 import { FiltroDeTime } from './filtro-de-time';
 
 export const metadata: Metadata = {
@@ -116,6 +117,7 @@ export default async function PaginaDeTime({
 
   return (
     <section aria-labelledby="titulo-time">
+      <AvisoDePerfilAlterado />
       <PageHeader id="titulo-time" title="Time" breadcrumb={<span>Cadastros</span>} />
 
       <FiltroDeTime termoInicial={termo ?? ''} />

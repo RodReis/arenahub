@@ -116,9 +116,16 @@ primeiro caso da tabela acima.
   ferramenta não é evidência de nada: um watcher que emudece parece idêntico a um job que ainda
   roda. Para esperar CI, usar **`gh run watch <run-id> --exit-status`** em background e conferir
   job a job ao terminar — o exit de `gh pr checks --watch` já saiu 0 com job vermelho. Nunca loop
-  de monitor artesanal — o loop que espera "todos
-  saírem de `pending`" fica girando calado quando uma chamada falha, e foi assim que uma entrega
-  pronta ficou parada até o PI olhar por conta própria (18/08/2026, PR #102).
+  de monitor artesanal — o loop que espera "todos saírem de `pending`" fica girando calado quando
+  uma chamada falha, e foi assim que uma entrega pronta ficou parada até o PI olhar por conta
+  própria (18/08/2026, PR #102).
+  **Enquanto o watch roda, nada de silêncio total** — decisão do PI em 28/09/2026: watcher rodando
+  em background sem nenhuma palavra por vários minutos parece trabalho parado, mesmo sendo o
+  padrão correto por trás. Ao disparar o watch, avisar em uma frase que a espera é assíncrona
+  ("CI rodando em background, aviso quando sair") e, se não houver notificação de conclusão em
+  ~3-5 min, fazer UMA checagem de status (`gh pr checks <n>` ou equivalente) e reportar
+  "ainda rodando" antes de voltar a esperar — nunca reintroduzir loop de poll, só parar de ficar
+  mudo por tempo indefinido.
 
 ## O que é
 

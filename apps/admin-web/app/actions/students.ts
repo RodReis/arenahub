@@ -836,5 +836,5 @@ export async function alterarPerfilDeAluno(
 
   revalidatePath('/students');
   revalidatePath('/team');
-  redirect('/students');
+  redirect('/students?perfilAlterado=1');
 }

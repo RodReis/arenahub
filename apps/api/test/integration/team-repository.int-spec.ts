@@ -157,7 +157,7 @@ describe('TeamRepository (F81)', () => {
     });
 
     const atualizado = await comContexto({ kind: 'system', tenantId }, () =>
-      repo.alterarPerfil({ tenantId } as never, aluno.id, 0, 'TRAINER', 'corr-f81-perfil-1'),
+      repo.alterarPerfil({ tenantId } as never, aluno.id, 0, 'TRAINER', 'corr-f81-perfil-1', new Date()),
     );
 
     expect(atualizado?.profile).toBe('TRAINER');
@@ -179,7 +179,7 @@ describe('TeamRepository (F81)', () => {
     });
 
     const atualizado = await comContexto({ kind: 'system', tenantId }, () =>
-      repo.alterarPerfil({ tenantId } as never, professor.id, 0, 'STUDENT', 'corr-f81-perfil-2'),
+      repo.alterarPerfil({ tenantId } as never, professor.id, 0, 'STUDENT', 'corr-f81-perfil-2', new Date()),
     );
 
     expect(atualizado?.profile).toBe('STUDENT');
@@ -193,7 +193,7 @@ describe('TeamRepository (F81)', () => {
     });
 
     const resultado = await comContexto({ kind: 'system', tenantId }, () =>
-      repo.alterarPerfil({ tenantId } as never, aluno.id, 99, 'TRAINER', 'corr-f81-perfil-3'),
+      repo.alterarPerfil({ tenantId } as never, aluno.id, 99, 'TRAINER', 'corr-f81-perfil-3', new Date()),
     );
 
     expect(resultado).toBeNull();
@@ -205,7 +205,7 @@ describe('TeamRepository (F81)', () => {
     });
 
     await comContexto({ kind: 'system', tenantId }, () =>
-      repo.alterarPerfil({ tenantId } as never, aluno.id, 0, 'STAFF', 'corr-f81-perfil-4'),
+      repo.alterarPerfil({ tenantId } as never, aluno.id, 0, 'STAFF', 'corr-f81-perfil-4', new Date()),
     );
 
     const timeline = await db.studentTimelineEvent.findFirst({
@@ -217,5 +217,65 @@ describe('TeamRepository (F81)', () => {
       where: { targetId: aluno.id, action: 'team.profile_changed' },
     });
     expect(audit).not.toBeNull();
+  });
+
+  it('alterarPerfil para STUDENT suspende entitlement de vinculo (EMPLOYEE/PERSONAL_TRAINER)', async () => {
+    const professor = await db.student.create({
+      data: {
+        tenantId,
+        gymUnitId,
+        membershipNumber: 'TEAM-0024',
+        fullName: 'Professor Rebaixado',
+        birthDate: new Date('1985-01-01'),
+        profile: 'TRAINER',
+      },
+    });
+
+    const direitoDeVinculo = await db.entitlement.create({
+      data: {
+        tenantId,
+        studentId: professor.id,
+        source: 'PERSONAL_TRAINER',
+        status: 'ACTIVE',
+        policySnapshot: {},
+        startsAt: new Date('2026-01-01T00:00:00Z'),
+        endsAt: new Date('2027-01-01T00:00:00Z'),
+      },
+      select: { id: true },
+    });
+
+    // Assinatura PROPRIA do aluno -- nao pode ser tocada pelo rebaixamento
+    // de perfil: perfil e vinculo trabalhista sao independentes de o aluno
+    // pagar um plano por conta propria.
+    const direitoDeAssinatura = await db.entitlement.create({
+      data: {
+        tenantId,
+        studentId: professor.id,
+        source: 'SUBSCRIPTION',
+        status: 'ACTIVE',
+        policySnapshot: {},
+        startsAt: new Date('2026-01-01T00:00:00Z'),
+        endsAt: new Date('2027-01-01T00:00:00Z'),
+      },
+      select: { id: true },
+    });
+
+    await comContexto({ kind: 'system', tenantId }, () =>
+      repo.alterarPerfil(
+        { tenantId } as never,
+        professor.id,
+        0,
+        'STUDENT',
+        'corr-f82-suspende-vinculo',
+        new Date('2026-06-15T00:00:00Z'),
+      ),
+    );
+
+    const vinculo = await db.entitlement.findUniqueOrThrow({ where: { id: direitoDeVinculo.id } });
+    expect(vinculo.status).toBe('SUSPENDED');
+    expect(vinculo.suspendedAt).toEqual(new Date('2026-06-15T00:00:00Z'));
+
+    const assinatura = await db.entitlement.findUniqueOrThrow({ where: { id: direitoDeAssinatura.id } });
+    expect(assinatura.status).toBe('ACTIVE');
   });
 });

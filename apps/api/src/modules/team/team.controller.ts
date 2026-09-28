@@ -217,6 +217,7 @@ export class TeamController {
       dados.version,
       dados.profile,
       requisicao.correlationId ?? 'sem-correlacao',
+      new Date(),
     );
 
     if (!atualizado) {
