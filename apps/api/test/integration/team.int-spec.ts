@@ -257,4 +257,28 @@ describe('TeamController (F81)', () => {
     expect(resposta.status).toBe(404);
     expect((resposta.body as { code: string }).code).toBe('TEAM_MEMBER_NOT_FOUND');
   });
+
+  it('PATCH /api/v1/team/:id/profile promove aluno para professor e responde 200', async () => {
+    const aluno = await criarAlunoDeFixture(contas.a);
+
+    const resposta = await request(servidor())
+      .patch(`/api/v1/team/${aluno.id}/profile`)
+      .set('Cookie', contas.a.cookie)
+      .send({ profile: 'TRAINER', version: 0 });
+
+    expect(resposta.status).toBe(200);
+    expect((resposta.body as { profile: string }).profile).toBe('TRAINER');
+  });
+
+  it('PATCH /api/v1/team/:id/profile com version desatualizada responde 409', async () => {
+    const professor = await criarProfessorDeFixture(contas.a);
+
+    const resposta = await request(servidor())
+      .patch(`/api/v1/team/${professor.id}/profile`)
+      .set('Cookie', contas.a.cookie)
+      .send({ profile: 'STUDENT', version: 99 });
+
+    expect(resposta.status).toBe(409);
+    expect((resposta.body as { code: string }).code).toBe('STALE_VERSION');
+  });
 });

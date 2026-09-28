@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 
-import { DataTable, EmptyState, PageHeader, ProblemDetail, SectionCard } from '@arenahub/ui';
+import { Breadcrumb, DataTable, EmptyState, PageHeader, ProblemDetail, SectionCard } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
+import { AlterarPerfil } from '../../../../src/components/alterar-perfil';
 import { diaDaSemana, horaDoMinuto } from '../../../../src/students/formatar';
 import { ROTULO_DE_PERFIL } from '../../../../src/team/formatar';
+import { alterarPerfilDeTime } from '../../../actions/team';
 import { AlterarVinculo } from './alterar-vinculo';
 import estilos from './ficha.module.css';
 
@@ -64,7 +66,11 @@ export default async function PaginaDaFichaDeTime({
 
     return (
       <section aria-labelledby="titulo-ficha-de-time">
-        <PageHeader id="titulo-ficha-de-time" title="Ficha do time" />
+        <PageHeader
+          id="titulo-ficha-de-time"
+          title="Ficha do time"
+          breadcrumb={<Breadcrumb trilha={[{ rotulo: 'Time', href: '/team' }, { rotulo: 'Ficha do time' }]} />}
+        />
         <ProblemDetail
           testId={codigo === 'TEAM_MEMBER_NOT_FOUND' ? 'membro-nao-encontrado' : 'erro-da-ficha'}
           problem={{
@@ -80,9 +86,6 @@ export default async function PaginaDaFichaDeTime({
                 : `Não foi possível abrir a ficha (${codigo}).`,
           }}
         />
-        <p>
-          <a href="/team">Voltar para a lista de time</a>
-        </p>
       </section>
     );
   }
@@ -100,7 +103,7 @@ export default async function PaginaDaFichaDeTime({
       <PageHeader
         id="titulo-ficha-de-time"
         title={membro.fullName}
-        breadcrumb={<a href="/team">Voltar para a lista de time</a>}
+        breadcrumb={<Breadcrumb trilha={[{ rotulo: 'Time', href: '/team' }, { rotulo: membro.fullName }]} />}
       />
 
       <SectionCard title="Dados básicos" testId="dados-do-membro">
@@ -111,6 +114,19 @@ export default async function PaginaDaFichaDeTime({
           <dt>Perfil</dt>
           <dd data-testid="perfil">{ROTULO_DE_PERFIL[membro.profile] ?? membro.profile}</dd>
         </dl>
+      </SectionCard>
+
+      <SectionCard
+        title="Trocar perfil"
+        summary="Move esta pessoa entre aluno, professor, funcionário e administrador."
+      >
+        <AlterarPerfil
+          nomeDoCampoDeId="teamMemberId"
+          id={membro.id}
+          perfilAtual={membro.profile}
+          version={membro.version}
+          acao={alterarPerfilDeTime}
+        />
       </SectionCard>
 
       <SectionCard title="Vínculo" summary="Tipo de contrato e data de início.">

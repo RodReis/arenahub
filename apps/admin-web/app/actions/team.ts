@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
@@ -89,4 +90,51 @@ export async function atualizarVinculo(
       version: resposta.dados.version,
     },
   };
+}
+
+/**
+ * Troca de perfil -- F82, PATCH `/api/v1/team/:id/profile`.
+ *
+ * A pessoa MUDA DE LISTA ao trocar perfil: quem vira `STUDENT` some de
+ * `/team` no próximo carregamento (o repositório filtra `profile != STUDENT`).
+ * Por isso o sucesso REDIRECIONA para `/team` em vez de manter a ficha aberta
+ * -- decisão do PI: um F5 na URL antiga bateria 404 (`TEAM_MEMBER_NOT_FOUND`),
+ * e a lista é o destino que continua válido qualquer que seja o perfil novo.
+ */
+const esquemaDePerfil = z.object({
+  teamMemberId: z.string().uuid(),
+  profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']),
+  version: z.coerce.number().int().min(0),
+});
+
+export interface EstadoDoPerfil {
+  erro?: string;
+}
+
+export async function alterarPerfilDeTime(
+  _anterior: EstadoDoPerfil,
+  formulario: FormData,
+): Promise<EstadoDoPerfil> {
+  const validado = esquemaDePerfil.safeParse({
+    teamMemberId: texto(formulario, 'teamMemberId'),
+    profile: texto(formulario, 'profile'),
+    version: texto(formulario, 'version'),
+  });
+
+  if (!validado.success) {
+    return { erro: validado.error.issues[0]?.message ?? 'Confira o perfil escolhido.' };
+  }
+
+  const resposta = await chamarApi<{ profile: string }>(
+    `/api/v1/team/${validado.data.teamMemberId}/profile`,
+    { metodo: 'PATCH', corpo: { profile: validado.data.profile, version: validado.data.version } },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível trocar o perfil') };
+  }
+
+  revalidatePath('/team');
+  revalidatePath('/students');
+  redirect('/team');
 }

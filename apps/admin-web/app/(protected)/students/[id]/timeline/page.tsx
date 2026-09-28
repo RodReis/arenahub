@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import {
   Ausente,
+  Breadcrumb,
   DataTable,
   EmptyState,
   PageHeader,
@@ -93,10 +94,22 @@ export default async function PaginaDaTimeline({
     chamarApi<Pagina>(`/api/v1/students/${id}/timeline?${consulta.toString()}`),
   ]);
 
+  const trilha = (rotuloFinal: string) => [
+    { rotulo: 'Alunos', href: '/students' },
+    ...(respostaDoAluno.dados
+      ? [{ rotulo: respostaDoAluno.dados.fullName, href: `/students/${id}` }]
+      : [{ rotulo: 'Ficha do aluno', href: `/students/${id}` }]),
+    { rotulo: rotuloFinal },
+  ];
+
   if (!resposta.ok || !resposta.dados) {
     return (
       <section aria-labelledby="titulo-timeline">
-        <PageHeader id="titulo-timeline" title="Histórico administrativo" />
+        <PageHeader
+          id="titulo-timeline"
+          title="Histórico administrativo"
+          breadcrumb={<Breadcrumb trilha={trilha('Histórico administrativo')} />}
+        />
         <ProblemDetail
           testId="erro-da-timeline"
           problem={{
@@ -109,9 +122,6 @@ export default async function PaginaDaTimeline({
             title: `Não foi possível carregar o histórico (${resposta.erro?.code ?? 'erro'}).`,
           }}
         />
-        <p>
-          <a href={`/students/${id}`}>Voltar para a ficha</a>
-        </p>
       </section>
     );
   }
@@ -123,17 +133,17 @@ export default async function PaginaDaTimeline({
 
   return (
     <section aria-labelledby="titulo-timeline">
-      <PageHeader id="titulo-timeline" title="Histórico administrativo" />
+      <PageHeader
+        id="titulo-timeline"
+        title="Histórico administrativo"
+        breadcrumb={<Breadcrumb trilha={trilha('Histórico administrativo')} />}
+      />
 
       {aluno ? (
         <p data-testid="aluno-da-timeline">
           {aluno.fullName} ({aluno.membershipNumber})
         </p>
       ) : null}
-
-      <p>
-        <a href={`/students/${id}`}>Voltar para a ficha</a>
-      </p>
 
       <DataTable
         testId="tabela-da-timeline"

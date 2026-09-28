@@ -57,6 +57,7 @@ export { useToastDeErro } from './components/useToastDeErro.js';
 
 export { AppShell } from './components/shell/AppShell.js';
 export { NavLink } from './components/shell/NavLink.js';
+export { Breadcrumb, type Migalha } from './components/shell/Breadcrumb.js';
 export { PageHeader } from './components/shell/PageHeader.js';
 
 /**

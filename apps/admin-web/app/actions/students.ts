@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
@@ -63,6 +64,8 @@ const esquemaDeCadastro = z.object({
     .optional(),
   advisorUserId: z.string().uuid().optional(),
   status: z.enum(['LEAD', 'TRIAL', 'ACTIVE']).optional(),
+  /** F82 -- ausente cai no default `STUDENT` da API. */
+  profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']).optional(),
   telefone: z.string().trim().max(160).optional(),
   whatsapp: z.string().trim().max(160).optional(),
   email: z.string().trim().max(160).optional(),
@@ -312,6 +315,7 @@ const CAMPOS_DO_CADASTRO = [
   'leadSource',
   'advisorUserId',
   'status',
+  'profile',
   'telefone',
   'whatsapp',
   'email',
@@ -492,6 +496,7 @@ export async function cadastrarAluno(
       ...(dados.leadSource ? { leadSource: dados.leadSource } : {}),
       ...(dados.advisorUserId ? { advisorUserId: dados.advisorUserId } : {}),
       ...(dados.status ? { status: dados.status } : {}),
+      ...(dados.profile ? { profile: dados.profile } : {}),
       modalityIds: dados.modalityIds,
       contacts: montarContatos(dados),
       ...(montarEndereco(dados) ? { address: montarEndereco(dados) } : {}),
@@ -786,4 +791,50 @@ export async function liberarFinanceiramente(
   return {
     sucesso: { studentId: resposta.dados.studentId, expiresAt: resposta.dados.expiresAt },
   };
+}
+
+/**
+ * Troca de perfil -- F82, PATCH `/api/v1/students/:id/profile`.
+ *
+ * Mesmo motivo de `alterarPerfilDeTime` em `actions/team.ts`: quem vira
+ * `TRAINER`/`STAFF`/`ADMIN` some de `/students` no próximo carregamento (a
+ * listagem filtra `profile = STUDENT`) -- o sucesso REDIRECIONA para
+ * `/students` em vez de manter a ficha aberta numa URL que quebraria no F5.
+ */
+const esquemaDePerfil = z.object({
+  studentId: z.string().uuid(),
+  profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']),
+  version: z.coerce.number().int().min(0),
+});
+
+export interface EstadoDoPerfil {
+  erro?: string;
+}
+
+export async function alterarPerfilDeAluno(
+  _anterior: EstadoDoPerfil,
+  formulario: FormData,
+): Promise<EstadoDoPerfil> {
+  const validado = esquemaDePerfil.safeParse({
+    studentId: texto(formulario, 'studentId'),
+    profile: texto(formulario, 'profile'),
+    version: texto(formulario, 'version'),
+  });
+
+  if (!validado.success) {
+    return { erro: validado.error.issues[0]?.message ?? 'Confira o perfil escolhido.' };
+  }
+
+  const resposta = await chamarApi<{ profile: string }>(
+    `/api/v1/students/${validado.data.studentId}/profile`,
+    { metodo: 'PATCH', corpo: { profile: validado.data.profile, version: validado.data.version } },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: frase(resposta.erro?.code ?? '', 'Não foi possível trocar o perfil') };
+  }
+
+  revalidatePath('/students');
+  revalidatePath('/team');
+  redirect('/students');
 }

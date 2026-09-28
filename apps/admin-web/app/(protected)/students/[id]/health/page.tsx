@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import {
   Ausente,
+  Breadcrumb,
   EmptyState,
   PageHeader,
   ProblemDetail,
@@ -261,7 +262,15 @@ export default async function PaginaDaEvolucao({
 
     return (
       <section aria-labelledby="titulo-evolucao">
-        <PageHeader id="titulo-evolucao" title="Evolução corporal" />
+        <PageHeader
+          id="titulo-evolucao"
+          title="Evolução corporal"
+          breadcrumb={
+            <Breadcrumb
+              trilha={[{ rotulo: 'Alunos', href: '/students' }, { rotulo: 'Evolução corporal' }]}
+            />
+          }
+        />
         <ProblemDetail
           testId={codigo === 'STUDENT_NOT_FOUND' ? 'aluno-nao-encontrado' : 'erro-da-evolucao'}
           problem={{
@@ -277,9 +286,6 @@ export default async function PaginaDaEvolucao({
                 : `Não foi possível abrir a evolução corporal (${codigo}).`,
           }}
         />
-        <p>
-          <a href="/students">Voltar para a lista de alunos</a>
-        </p>
       </section>
     );
   }
@@ -295,7 +301,19 @@ export default async function PaginaDaEvolucao({
   if (!respostaDoHistorico.ok || !respostaDoHistorico.dados) {
     return (
       <section aria-labelledby="titulo-evolucao">
-        <PageHeader id="titulo-evolucao" title={aluno.fullName} />
+        <PageHeader
+          id="titulo-evolucao"
+          title={aluno.fullName}
+          breadcrumb={
+            <Breadcrumb
+              trilha={[
+                { rotulo: 'Alunos', href: '/students' },
+                { rotulo: aluno.fullName, href: `/students/${id}` },
+                { rotulo: 'Evolução corporal' },
+              ]}
+            />
+          }
+        />
         <ProblemDetail
           testId="erro-do-historico"
           problem={{
@@ -308,9 +326,6 @@ export default async function PaginaDaEvolucao({
             title: `Não foi possível carregar a evolução corporal (${respostaDoHistorico.erro?.code ?? 'erro'}). Recarregue a página — enquanto isso, esta tela não consegue dizer o que foi medido.`,
           }}
         />
-        <p>
-          <a href={`/students/${id}`}>Voltar para a ficha</a>
-        </p>
       </section>
     );
   }
@@ -380,7 +395,19 @@ export default async function PaginaDaEvolucao({
   if (escolhida === null) {
     return (
       <section aria-labelledby="titulo-evolucao">
-        <PageHeader id="titulo-evolucao" title={`Evolução corporal — ${aluno.fullName}`} />
+        <PageHeader
+          id="titulo-evolucao"
+          title={`Evolução corporal — ${aluno.fullName}`}
+          breadcrumb={
+            <Breadcrumb
+              trilha={[
+                { rotulo: 'Alunos', href: '/students' },
+                { rotulo: aluno.fullName, href: `/students/${id}` },
+                { rotulo: 'Evolução corporal' },
+              ]}
+            />
+          }
+        />
         <EnvioDeLaudos studentId={id} />
         {graficos}
         {linkDaFicha}

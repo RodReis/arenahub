@@ -55,6 +55,13 @@ const esquemaDeVinculo = z
   })
   .strict();
 
+const esquemaDePerfil = z
+  .object({
+    profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']),
+    version: z.number().int().min(0),
+  })
+  .strict();
+
 /**
  * Expoe `TeamRepository` como API REST -- F81 (issue #415).
  *
@@ -183,6 +190,38 @@ export class TeamController {
       const existe = await this.time.encontrar(contexto, id);
       if (!existe) throw new NotFoundException({ code: 'TEAM_MEMBER_NOT_FOUND' });
       // Existe mas nao atualizou: so pode ser conflito de versao.
+      throw new ConflictException({ code: 'STALE_VERSION' });
+    }
+
+    return this.paraDto(atualizado);
+  }
+
+  /**
+   * Troca de profile -- F82. Move a pessoa entre aluno e time (ou entre
+   * papeis do time). Mesma trava otimista de `/employment`.
+   */
+  @Patch(':id/profile')
+  @RequirePermissions('team.update')
+  @ApiOkResponse({ schema: SCHEMA_MEMBRO_DE_TIME })
+  async alterarPerfil(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<MembroDeTimeDto> {
+    const dados = esquemaDePerfil.parse(corpo);
+    const contexto = this.contexto.require();
+
+    const atualizado = await this.time.alterarPerfil(
+      contexto,
+      id,
+      dados.version,
+      dados.profile,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    if (!atualizado) {
+      const existe = await this.time.existe(contexto, id);
+      if (!existe) throw new NotFoundException({ code: 'TEAM_MEMBER_NOT_FOUND' });
       throw new ConflictException({ code: 'STALE_VERSION' });
     }
 

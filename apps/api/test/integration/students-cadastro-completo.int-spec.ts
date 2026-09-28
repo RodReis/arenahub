@@ -252,6 +252,7 @@ describe('F45 -- cadastro completo de aluno', () => {
       expect(corpo(resposta).cpf).not.toBeNull();
     });
 
+
     /*
      * O DEFEITO QUE DERRUBOU 30 CADASTROS DO IMPORT EM PRODUCAO (04/09/2026),
      * e que atinge a recepcao pelo mesmo caminho: `student_sequences` pode

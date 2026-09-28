@@ -150,4 +150,72 @@ describe('TeamRepository (F81)', () => {
 
     expect(resultado).toBeNull();
   });
+
+  it('alterarPerfil promove aluno (STUDENT) para professor (TRAINER)', async () => {
+    const aluno = await db.student.create({
+      data: { tenantId, gymUnitId, membershipNumber: 'TEAM-0020', fullName: 'Aluno Promovido', birthDate: new Date('1995-01-01'), profile: 'STUDENT' },
+    });
+
+    const atualizado = await comContexto({ kind: 'system', tenantId }, () =>
+      repo.alterarPerfil({ tenantId } as never, aluno.id, 0, 'TRAINER', 'corr-f81-perfil-1'),
+    );
+
+    expect(atualizado?.profile).toBe('TRAINER');
+    expect(atualizado?.version).toBe(1);
+  });
+
+  it('alterarPerfil rebaixa professor (TRAINER) para aluno (STUDENT) e zera vinculo', async () => {
+    const professor = await db.student.create({
+      data: {
+        tenantId,
+        gymUnitId,
+        membershipNumber: 'TEAM-0021',
+        fullName: 'Professor Rebaixado',
+        birthDate: new Date('1985-01-01'),
+        profile: 'TRAINER',
+        employmentType: 'CLT',
+        employmentStartedAt: new Date('2020-01-01'),
+      },
+    });
+
+    const atualizado = await comContexto({ kind: 'system', tenantId }, () =>
+      repo.alterarPerfil({ tenantId } as never, professor.id, 0, 'STUDENT', 'corr-f81-perfil-2'),
+    );
+
+    expect(atualizado?.profile).toBe('STUDENT');
+    expect(atualizado?.employmentType).toBeNull();
+    expect(atualizado?.employmentStartedAt).toBeNull();
+  });
+
+  it('alterarPerfil devolve null quando version nao bate', async () => {
+    const aluno = await db.student.create({
+      data: { tenantId, gymUnitId, membershipNumber: 'TEAM-0022', fullName: 'Aluno Versao Perfil', birthDate: new Date('1995-01-01'), profile: 'STUDENT' },
+    });
+
+    const resultado = await comContexto({ kind: 'system', tenantId }, () =>
+      repo.alterarPerfil({ tenantId } as never, aluno.id, 99, 'TRAINER', 'corr-f81-perfil-3'),
+    );
+
+    expect(resultado).toBeNull();
+  });
+
+  it('alterarPerfil registra timeline e audit log', async () => {
+    const aluno = await db.student.create({
+      data: { tenantId, gymUnitId, membershipNumber: 'TEAM-0023', fullName: 'Aluno Auditado', birthDate: new Date('1995-01-01'), profile: 'STUDENT' },
+    });
+
+    await comContexto({ kind: 'system', tenantId }, () =>
+      repo.alterarPerfil({ tenantId } as never, aluno.id, 0, 'STAFF', 'corr-f81-perfil-4'),
+    );
+
+    const timeline = await db.studentTimelineEvent.findFirst({
+      where: { studentId: aluno.id, type: 'STUDENT_UPDATED' },
+    });
+    expect(timeline).not.toBeNull();
+
+    const audit = await db.auditLog.findFirst({
+      where: { targetId: aluno.id, action: 'team.profile_changed' },
+    });
+    expect(audit).not.toBeNull();
+  });
 });

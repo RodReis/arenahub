@@ -7,6 +7,7 @@ import type {
   StudentAddress,
   StudentContact,
   StudentModality,
+  StudentProfile,
   StudentRegisteredSex,
   StudentStatus,
 } from '@arenahub/database';
@@ -62,6 +63,8 @@ export interface DadosDeCriacaoDeAluno {
    * chegar aqui -- pelo mesmo motivo que `gymUnitId` ja funcionava assim.
    */
   modalityIds?: readonly string[] | undefined;
+  /** F82 -- criar ja como professor/staff/admin. Ausente cai no `@default(STUDENT)` do schema. */
+  profile?: StudentProfile | undefined;
 }
 
 /**
@@ -372,6 +375,9 @@ export class StudentRepository {
           leadSource: dados.leadSource ?? null,
           advisorUserId: dados.advisorUserId ?? null,
           ...(dados.status ? { status: dados.status } : {}),
+          // F82: ausente cai no `@default(STUDENT)` do schema -- o cadastro
+          // de sempre, sem este campo, continua se comportando igual.
+          ...(dados.profile ? { profile: dados.profile } : {}),
           // `student_addresses` existe desde a F7 e nunca foi escrita por
           // nada. Aqui ela passa a ser.
           ...(dados.address

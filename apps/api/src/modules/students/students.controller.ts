@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   Header,
@@ -24,6 +25,7 @@ import { z } from 'zod';
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { MembershipRepository } from '../iam/membership.repository.js';
+import { TeamRepository } from '../team/team.repository.js';
 import { GymUnitModalityRepository } from '../tenancy/gym-unit-modality.repository.js';
 import { GymUnitRepository } from '../tenancy/gym-unit.repository.js';
 import { normalizarCep, ufEhValida } from './domain/endereco.js';
@@ -165,6 +167,21 @@ const esquemaDeCriacao = z
      * plano (regra de arquitetura no 1).
      */
     modalityIds: z.array(z.string().uuid()).max(20).optional(),
+    /**
+     * F82 -- criar JA como professor/staff/admin, sem passar por
+     * `PATCH /:id/profile` logo em seguida. Ausente continua `STUDENT` (o
+     * default do schema): todo cadastro de sempre, sem este campo, funciona
+     * igual.
+     */
+    profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']).optional(),
+  })
+  .strict();
+
+/** `PATCH /:id/profile` -- F82, mesma troca de `/team/:id/profile`. */
+const esquemaDePerfil = z
+  .object({
+    profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']),
+    version: z.number().int().min(0),
   })
   .strict();
 
@@ -297,6 +314,8 @@ interface AlunoDto {
   gymUnitId: string;
   advisorUserId: string | null;
   status: string;
+  /** Papel da pessoa -- F82. `STUDENT` no caso comum, `TRAINER`/`STAFF`/`ADMIN` no time. */
+  profile: string;
   /**
    * POR QUE o aluno está suspenso ou bloqueado (issue #241). `null` em toda
    * outra situação -- e o `CHECK` do banco garante que seja assim.
@@ -402,6 +421,7 @@ export class StudentsController {
     private readonly contexto: TenantContextService,
     private readonly fotos: StudentPhotoService,
     private readonly credenciais: StudentCredentialRepository,
+    private readonly time: TeamRepository,
   ) {}
 
   /**
@@ -714,6 +734,49 @@ export class StudentsController {
   }
 
   /**
+   * Troca de profile -- F82. Espelho de `PATCH /team/:id/profile`: mesma
+   * escrita (`TeamRepository.alterarPerfil`, sem filtro de profile no
+   * `where`), rota diferente porque a ficha do ALUNO tambem promove para
+   * professor/staff/admin -- e nao so a ficha do time rebaixa de volta.
+   */
+  @Patch(':id/profile')
+  @RequirePermissions('student.update')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        profile: { type: 'string' },
+        version: { type: 'number' },
+      },
+    },
+  })
+  async alterarPerfil(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ id: string; profile: string; version: number }> {
+    const dados = esquemaDePerfil.parse(corpo);
+    const contexto = this.contexto.require();
+
+    const atualizado = await this.time.alterarPerfil(
+      contexto,
+      id,
+      dados.version,
+      dados.profile,
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
+
+    if (!atualizado) {
+      const existe = await this.time.existe(contexto, id);
+      if (!existe) throw new NotFoundException({ code: 'STUDENT_NOT_FOUND' });
+      throw new ConflictException({ code: 'STUDENT_VERSION_CONFLICT' });
+    }
+
+    return { id: atualizado.id, profile: atualizado.profile, version: atualizado.version };
+  }
+
+  /**
    * Substitui a foto do aluno na ficha -- F72 (issue #348).
    *
    * MESMA PERMISSAO de `editar`: nao existe um nivel de acesso so para foto,
@@ -951,6 +1014,7 @@ export class StudentsController {
       gymUnitId: aluno.gymUnitId,
       advisorUserId: aluno.advisorUserId,
       status: aluno.status,
+      profile: aluno.profile,
       statusReason: aluno.statusReason,
       statusReasonNote: aluno.statusReasonNote,
       archivedAt: aluno.archivedAt?.toISOString() ?? null,

@@ -846,6 +846,47 @@
         ]
       }
     },
+    "/api/v1/students/{id}/profile": {
+      "patch": {
+        "operationId": "StudentsController_alterarPerfil",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "profile": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Students"
+        ]
+      }
+    },
     "/api/v1/students/{id}/photo": {
       "put": {
         "operationId": "StudentsController_substituirFoto",
@@ -1186,6 +1227,64 @@
     "/api/v1/team/{id}/employment": {
       "patch": {
         "operationId": "TeamController_atualizarVinculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "membershipNumber": {
+                      "type": "string"
+                    },
+                    "fullName": {
+                      "type": "string"
+                    },
+                    "profile": {
+                      "type": "string"
+                    },
+                    "gymUnitId": {
+                      "type": "string"
+                    },
+                    "employmentType": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "employmentStartedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "version": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Team"
+        ]
+      }
+    },
+    "/api/v1/team/{id}/profile": {
+      "patch": {
+        "operationId": "TeamController_alterarPerfil",
         "parameters": [
           {
             "name": "id",

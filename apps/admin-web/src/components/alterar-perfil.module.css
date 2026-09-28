@@ -1,0 +1,15 @@
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/**
+ * Botao largura AUTOMATICA -- mesmo padrao de `AlterarVinculo`
+ * (`.formularioDeVinculo button { justify-self: start }`) e de todo outro
+ * formulario de campo unico do painel. Full-width era o botao maior da tela
+ * inteira ao lado de "Salvar vinculo", que fica pequeno de proposito.
+ */
+.formulario button {
+  align-self: start;
+}

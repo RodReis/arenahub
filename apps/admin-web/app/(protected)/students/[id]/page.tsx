@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import {
   Ausente,
+  Breadcrumb,
   Consequencia,
   Cpf,
   DataTable,
@@ -16,6 +17,7 @@ import {
 
 import { chamarApi } from '../../../../lib/api/server-client';
 import { faturaEmDestaque, situacaoDeVencimento } from '../../../../src/billing/vencimento';
+import { AlterarPerfil } from '../../../../src/components/alterar-perfil';
 import { traduzir } from '../../../../src/operations/formatar';
 import {
   MOTIVO_DA_SITUACAO,
@@ -39,6 +41,7 @@ import { AtribuirPlano } from './atribuir-plano';
 import { CredencialDeAcesso } from './credencial-de-acesso';
 import { CobrancaRecorrente } from './cobranca-recorrente';
 import { EditarCadastro } from './editar-cadastro';
+import { alterarPerfilDeAluno } from '../../../actions/students';
 
 export const metadata: Metadata = {
   title: 'Ficha do aluno — ArenaHub',
@@ -71,6 +74,8 @@ interface Aluno {
   birthDate: string;
   cpf: string | null;
   status: string;
+  /** Papel da pessoa -- F82. `STUDENT` no caso comum. */
+  profile: string;
   /** Por que está suspenso ou bloqueado. `null` em toda outra situação. */
   statusReason: string | null;
   /** O caso concreto, ao lado da razão fechada. Lido por extenso AQUI. */
@@ -183,7 +188,11 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
 
     return (
       <section aria-labelledby="titulo-ficha">
-        <PageHeader id="titulo-ficha" title="Ficha do aluno" />
+        <PageHeader
+          id="titulo-ficha"
+          title="Ficha do aluno"
+          breadcrumb={<Breadcrumb trilha={[{ rotulo: 'Alunos', href: '/students' }, { rotulo: 'Ficha do aluno' }]} />}
+        />
         <ProblemDetail
           testId={codigo === 'STUDENT_NOT_FOUND' ? 'aluno-nao-encontrado' : 'erro-da-ficha'}
           problem={{
@@ -199,9 +208,6 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                 : `Não foi possível abrir a ficha (${codigo}).`,
           }}
         />
-        <p>
-          <a href="/students">Voltar para a lista de alunos</a>
-        </p>
       </section>
     );
   }
@@ -218,7 +224,11 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
   if (!respostaDosDireitos.ok || !respostaDosDireitos.dados) {
     return (
       <section aria-labelledby="titulo-ficha">
-        <PageHeader id="titulo-ficha" title={aluno.fullName} />
+        <PageHeader
+          id="titulo-ficha"
+          title={aluno.fullName}
+          breadcrumb={<Breadcrumb trilha={[{ rotulo: 'Alunos', href: '/students' }, { rotulo: aluno.fullName }]} />}
+        />
         <ProblemDetail
           testId="erro-dos-direitos"
           problem={{
@@ -231,9 +241,6 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             title: `Não foi possível carregar os direitos de acesso deste aluno (${respostaDosDireitos.erro?.code ?? 'erro'}). Recarregue a página — enquanto isso, esta tela não consegue dizer se o acesso está válido.`,
           }}
         />
-        <p>
-          <a href="/students">Voltar para a lista de alunos</a>
-        </p>
       </section>
     );
   }
@@ -318,7 +325,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
       <PageHeader
         id="titulo-ficha"
         title={aluno.fullName}
-        breadcrumb={<a href="/students">Voltar para a lista de alunos</a>}
+        breadcrumb={<Breadcrumb trilha={[{ rotulo: 'Alunos', href: '/students' }, { rotulo: aluno.fullName }]} />}
       />
 
 
@@ -475,6 +482,23 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                 studentId={aluno.id}
                 situacaoAtual={aluno.status}
                 version={aluno.version}
+              />
+            </section>
+
+            {/*
+              TROCA DE PERFIL -- F82. Move esta pessoa para professor, staff
+              ou admin: sai da listagem de alunos e passa a aparecer em
+              `/team`. Mesmo componente que a ficha do time usa, só a action e
+              o campo oculto de id mudam.
+            */}
+            <section aria-labelledby="titulo-perfil" className={estilos['secao']}>
+              <h2 id="titulo-perfil">Perfil</h2>
+              <AlterarPerfil
+                nomeDoCampoDeId="studentId"
+                id={aluno.id}
+                perfilAtual={aluno.profile}
+                version={aluno.version}
+                acao={alterarPerfilDeAluno}
               />
             </section>
 
