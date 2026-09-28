@@ -89,6 +89,37 @@ output,
  */
 :root {
   --ah-scrim: color-mix(in srgb, var(--ah-carbon-900) 45%, transparent);
+
+  /* Sombra de card em duas camadas: contato curto + ambiente difuso. Mesmo
+     motivo do scrim para morar aqui e nao no pipeline de tokens: alfa. */
+  --ah-card-shadow:
+    0 1px 2px color-mix(in srgb, var(--ah-carbon-900) 6%, transparent),
+    0 6px 16px -6px color-mix(in srgb, var(--ah-carbon-900) 14%, transparent);
+  --ah-card-shadow-hover:
+    0 2px 4px color-mix(in srgb, var(--ah-carbon-900) 7%, transparent),
+    0 16px 32px -10px color-mix(in srgb, var(--ah-carbon-900) 22%, transparent);
+}
+
+/**
+ * Entrada da grade de KPI -- o UNICO movimento autoral do painel financeiro
+ * (DS-PAINEL §2.9, emenda de 28/09/2026). `--ordem` escalona 45 ms por card.
+ */
+@keyframes ah-entrar {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.ah-entrar {
+  animation: ah-entrar 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--ordem, 0) * 45ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ah-entrar {
+    animation: none;
+  }
 }
 
 /**
@@ -163,12 +194,12 @@ section {
   border: 1px solid var(--ah-border-default);
   border-radius: var(--ah-radius-card);
   background: var(--ah-surface-raised);
-  box-shadow: var(--ah-elev-1);
-  transition: box-shadow 150ms var(--ah-motion-easing);
+  box-shadow: var(--ah-card-shadow);
+  transition: box-shadow 200ms var(--ah-motion-easing);
 }
 
 section:hover {
-  box-shadow: var(--ah-elev-2);
+  box-shadow: var(--ah-card-shadow-hover);
 }
 
 /* Card dentro de card e sempre erro: a segunda borda nao acrescenta divisao
