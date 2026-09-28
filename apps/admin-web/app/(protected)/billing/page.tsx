@@ -386,10 +386,18 @@ export default async function PainelFinanceiroPage({
     neutro: 'secondary',
   };
 
-  const progressoDoRecebido = Math.min(
-    Math.round((resumo.recebidoMinor / metaMensalMinor(resumo)) * 100),
-    100,
-  );
+  /*
+    METAMENSALMINOR PODE SER ZERO -- tenant sem assinatura ativa
+    (`if (planIds.length === 0) return 0`) ou plano sem preco vigente
+    (reajuste agendado pro mes seguinte). Divisao por zero vira `NaN`, e
+    tratar zero como 100% afirmaria "meta batida" sobre meta inexistente.
+    `null` aqui significa "sem meta", nao "0%" -- mesma disciplina do
+    `<Ausente />` usado no resto da tela.
+  */
+  const progressoDoRecebido =
+    metaMensalMinor(resumo) === 0
+      ? null
+      : Math.min(Math.round((resumo.recebidoMinor / metaMensalMinor(resumo)) * 100), 100);
 
   const unidadesComCapacidade = resumo.ocupacaoPorUnidade.filter(
     (unidade) => unidade.capacidadeMaxima !== null,
@@ -504,12 +512,14 @@ export default async function PainelFinanceiroPage({
                 tokenDeCor="--ah-state-success"
               />
             </div>
-            <div className="mt-3">
-              <Progress value={progressoDoRecebido} />
-              <p className="mt-1 text-xs text-muted-foreground">
-                {progressoDoRecebido}% da meta mensal de <Money cents={metaMensalMinor(resumo)} currency="BRL" />
-              </p>
-            </div>
+            {progressoDoRecebido === null ? null : (
+              <div className="mt-3" data-testid="progresso-da-meta">
+                <Progress value={progressoDoRecebido} />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {progressoDoRecebido}% da meta mensal de <Money cents={metaMensalMinor(resumo)} currency="BRL" />
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

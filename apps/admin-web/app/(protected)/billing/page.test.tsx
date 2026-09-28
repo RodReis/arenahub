@@ -448,6 +448,22 @@ describe('painel financeiro', () => {
   });
 
   /**
+   * META MENSAL ZERADA -- backend documenta dois caminhos reais para
+   * `receitaEsperadaMinor: 0`: tenant sem assinatura ativa, ou plano sem
+   * preco vigente (reajuste agendado). Dividir `recebidoMinor` por zero
+   * produz `NaN%`, e tratar meta zero como "100% batido" afirmaria uma meta
+   * que nao existe. A tela precisa OMITIR a barra de progresso, nao mostrar
+   * `NaN%` nem `0%`/`100%` fabricado.
+   */
+  it('nao mostra a barra de progresso da meta quando a meta mensal e zero', async () => {
+    await renderizar({ ...RESUMO, receitaEsperadaMinor: 0 });
+
+    expect(screen.queryByTestId('progresso-da-meta')).not.toBeInTheDocument();
+    expect(screen.queryByText(/da meta mensal de/)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/NaN/);
+  });
+
+  /**
    * Sem entrada no periodo nao ha proporcao a mostrar -- e dividir por zero
    * produziria `NaN%` na tela.
    */
@@ -629,7 +645,7 @@ describe('capacidade instalada por unidade', () => {
 
     const secao = screen.getByTestId('ocupacao-por-unidade');
     expect(within(secao).getByText('Jardins')).toBeInTheDocument();
-    expect(within(secao).getByText(/74%|75%/)).toBeInTheDocument(); // 224/300 arredondado
+    expect(within(secao).getByText('75%')).toBeInTheDocument(); // 224/300 arredondado
     // unidade sem capacidadeMaxima aparece so com a contagem, sem barra
     expect(within(secao).getByText('Centro')).toBeInTheDocument();
   });
