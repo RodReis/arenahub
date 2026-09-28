@@ -7,7 +7,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 /**
  * Rosca de composicao por metodo de pagamento -- local a tela `/billing`.
  *
- * Mesmo padrao de `packages/ui/src/components/GraficoDeRosca.tsx`: `Cell`
+ * Mesmo padrao dos graficos do design system (`SerieFinanceira`): `Cell`
  * dentro de `Pie`, `useCoresDosTokens` resolvendo token CSS, tabela sr-only
  * antes do SVG, wrapper visual e legenda `aria-hidden` (a tabela ja anuncia
  * cada segmento -- sem o `aria-hidden` na legenda, o leitor de tela leria

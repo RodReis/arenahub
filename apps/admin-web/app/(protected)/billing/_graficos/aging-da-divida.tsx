@@ -8,7 +8,7 @@ import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from 'recharts
  * Barras horizontais de aging da divida -- local a tela `/billing`
  * (task 9 monta esta tela; este componente e puro de apresentacao).
  *
- * Mesmo padrao de `packages/ui/src/components/BarrasVerticais.tsx`:
+ * Mesmo padrao dos graficos do design system (`SerieFinanceira`):
  * `Cell` dentro de `Bar` para cor por item, `useCoresDosTokens` resolvendo
  * token CSS via `getComputedStyle`, tabela sr-only para leitor de tela,
  * wrapper visual `aria-hidden`.
