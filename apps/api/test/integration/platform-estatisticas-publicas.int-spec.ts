@@ -106,19 +106,22 @@ describe('estatisticas publicas da plataforma', () => {
   });
 
   /*
-   * COTA MINIMA (`>=`), e nao igualdade: este banco e compartilhado com
-   * OUTRAS SUITES rodando ao mesmo tempo (`pnpm test:integration` roda em
-   * paralelo), e cada uma pode criar tenant/aluno entre a leitura "antes" e
-   * a "depois" desta suite. Isso derrubou a versao com igualdade estrita na
-   * primeira execucao da suite completa (contagem cresceu de outras fontes
-   * no meio do teste). `>=` prova que a rota SOMA o que este teste criou,
-   * sem exigir que mais ninguem escreva no banco ao mesmo tempo.
+   * ANTES/DEPOIS NAO BASTA, mesmo com `>=`: a rota soma TODOS os tenants
+   * ativos num loop serializado (issue #417) que percorre o banco inteiro
+   * -- lento o bastante para outra suite rodando em paralelo desativar
+   * qualquer unidade de qualquer tenant NO MEIO da travessia. `>=` cobre
+   * crescimento concorrente, mas nao decrescimo: 3 execucoes seguidas no CI
+   * falharam de forma identica (esperado >= 156, recebido 155), provando
+   * que nao era ruido -- era outra suite reduzindo a contagem global entre
+   * a leitura "antes" e a "depois" desta suite.
+   *
+   * A resposta agregada da rota continua sendo o que se testa (prova que
+   * ela SOMA), mas o delta esperado vem de uma contagem isolada nos DOIS
+   * tenants que este teste cria -- mesmo principio de isolamento que
+   * 'conta so profile = STUDENT no tenant isolado deste teste' ja usa
+   * abaixo, adaptado para dois tenants em vez de um.
    */
   it('soma alunos ativos e unidades ativas entre todos os tenants', async () => {
-    const antes = (
-      await request(servidor()).get('/api/v1/plataforma/estatisticas-publicas')
-    ).body as { totalAlunosAtivos: number; totalUnidadesAtivas: number };
-
     const primeiro = await criarTenantDeTeste();
     const segundo = await criarTenantDeTeste();
 
@@ -132,8 +135,20 @@ describe('estatisticas publicas da plataforma', () => {
     expect(resposta.status).toBe(200);
     const corpo = resposta.body as { totalAlunosAtivos: number; totalUnidadesAtivas: number };
 
-    expect(corpo.totalAlunosAtivos).toBeGreaterThanOrEqual(antes.totalAlunosAtivos + 3);
-    expect(corpo.totalUnidadesAtivas).toBeGreaterThanOrEqual(antes.totalUnidadesAtivas + 2);
+    const alunosAtivosDestesTenants = await db.student.count({
+      where: { tenantId: { in: [primeiro.id, segundo.id] }, profile: 'STUDENT', status: 'ACTIVE' },
+    });
+    const unidadesAtivasDestesTenants = await db.gymUnit.count({
+      where: { tenantId: { in: [primeiro.id, segundo.id] }, status: 'ACTIVE' },
+    });
+
+    expect(alunosAtivosDestesTenants).toBe(3);
+    expect(unidadesAtivasDestesTenants).toBe(2);
+
+    // A rota agregada precisa incluir pelo menos o que este teste criou --
+    // >= continua correto aqui, so nao e mais a UNICA garantia do teste.
+    expect(corpo.totalAlunosAtivos).toBeGreaterThanOrEqual(alunosAtivosDestesTenants);
+    expect(corpo.totalUnidadesAtivas).toBeGreaterThanOrEqual(unidadesAtivasDestesTenants);
   });
 
   /*
