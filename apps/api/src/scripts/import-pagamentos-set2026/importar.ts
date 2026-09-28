@@ -128,6 +128,7 @@ export async function gravarPagamentosProntos(
     amountMinor: number;
     reason: string;
     paidAt: Date;
+    receivedVia: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
   }) => Promise<unknown>,
   prontos: readonly Extract<VereditoDaLinha, { tipo: 'PRONTO' }>[],
 ): Promise<ResultadoDaGravacao> {
@@ -141,6 +142,9 @@ export async function gravarPagamentosProntos(
         amountMinor: item.amountMinor,
         reason: 'Importado do relatorio de pagamentos de setembro/2026 (issue #386)',
         paidAt: item.paidAt,
+        // Relatorio de origem (software anterior) nao distingue canal --
+        // DINHEIRO e o rotulo neutro para dado retroativo sem essa info.
+        receivedVia: 'DINHEIRO',
       });
       reconciliados += 1;
     } catch (erro: unknown) {

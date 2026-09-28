@@ -40,7 +40,15 @@ describe('gravarPagamentosProntos', () => {
 
   it('falha de UM item nao aborta os demais -- cada pagamento e independente', async () => {
     const registrar = jest
-      .fn<(entrada: { invoiceId: string; amountMinor: number; reason: string; paidAt: Date }) => Promise<unknown>>()
+      .fn<
+        (entrada: {
+          invoiceId: string;
+          amountMinor: number;
+          reason: string;
+          paidAt: Date;
+          receivedVia: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
+        }) => Promise<unknown>
+      >()
       .mockImplementationOnce(() => Promise.resolve({}))
       .mockImplementationOnce(() => Promise.reject(new Error('invoice ja paga')))
       .mockImplementationOnce(() => Promise.resolve({}));

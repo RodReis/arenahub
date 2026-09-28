@@ -3471,6 +3471,18 @@ enum PaymentMethodKind {
   CARD
 }
 
+/// Canal de recebimento da maquininha fisica, dentro de `method = MANUAL`.
+/// F-painel-financeiro. A academia tem maquininha propria (nao integrada);
+/// a recepcao recebe por ela e da baixa manual no sistema -- por isso
+/// `method` continua `MANUAL` (estorno pelo sistema continua bloqueado,
+/// `estorno.ts`), e este campo so registra POR ONDE o dinheiro chegou.
+enum PaymentChannel {
+  DINHEIRO
+  PIX
+  DEBITO
+  CREDITO
+}
+
 /// `CONVENTION.md` 3.5, lado do `Payment` (ADR-027).
 /// `CONFIRMED` nao volta atras -- e o par de INV-069 do lado do pagamento.
 enum PaymentStatus {
@@ -3581,6 +3593,10 @@ model Payment {
   method      PaymentMethodKind
   status      PaymentStatus     @default(PENDING)
   paidAt      DateTime?         @map("paid_at")
+
+  /// Canal da maquininha fisica quando `method = MANUAL`. Nulo em pagamento
+  /// anterior a esta fatia -- dado novo, nao ha de onde inferir o historico.
+  receivedVia PaymentChannel?   @map("received_via")
 
   /// Quem reconheceu, preenchido SO quando `method = MANUAL`.
   ///

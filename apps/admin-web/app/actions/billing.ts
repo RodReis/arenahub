@@ -32,6 +32,11 @@ const esquemaDePagamento = z.object({
     .trim()
     .min(3, 'Descreva o motivo — a auditoria depende disso')
     .max(300, 'Motivo longo demais'),
+  /**
+   * Canal da maquininha fisica -- a academia recebe por ela (nao integrada)
+   * e da baixa manual aqui. Ver `SeletorDeForma`.
+   */
+  receivedVia: z.enum(['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO']),
 });
 
 export interface EstadoDaInvoice {
@@ -233,6 +238,7 @@ export async function registrarPagamentoNoBalcao(
     invoiceId: formulario.get('invoiceId'),
     valor: formulario.get('valor'),
     reason: formulario.get('reason'),
+    receivedVia: formulario.get('receivedVia'),
   });
 
   if (!analisado.success) {
@@ -253,6 +259,7 @@ export async function registrarPagamentoNoBalcao(
         amountMinor,
         paidAt: new Date().toISOString(),
         reason: analisado.data.reason,
+        receivedVia: analisado.data.receivedVia,
       },
     },
   );

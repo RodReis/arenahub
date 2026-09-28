@@ -14,7 +14,6 @@ import {
 import { faturaEmDestaque } from '../../../../../src/billing/vencimento';
 import { chamarApi } from '../../../../../lib/api/server-client';
 import { PainelDeCobranca } from './painel-de-cobranca';
-import type { DadoFaltante } from './seletor-de-forma';
 import { SituacaoAtual } from './situacao-atual';
 
 export const metadata: Metadata = {
@@ -30,6 +29,8 @@ interface Pagamento {
   amountMinor: number;
   paidAt: string | null;
   recognizedByUserId: string | null;
+  /** Canal da maquininha fisica -- preenchido so quando `method = MANUAL`. */
+  receivedVia: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO' | null;
 }
 
 interface Invoice {
@@ -69,31 +70,25 @@ interface InvoicesDoAluno {
 }
 
 /**
- * O que falta no cadastro para pagar com CARTAO. F53, Task 10.
+ * Texto da coluna Recebimento. F-painel-financeiro.
  *
- * REIMPLEMENTAR NAO -- espelha `faltaParaCartao` de
- * `apps/api/src/modules/billing/domain/dados-de-cobranca.ts`, que e quem
- * BLOQUEIA de verdade (o caso de uso do checkout recusa com 422
- * `STUDENT_BILLING_DATA_INCOMPLETE` se o cadastro estiver incompleto,
- * independente do que esta tela mostrar). Nao ha pacote compartilhado entre
- * `apps/api` e `apps/admin-web` para importar a funcao original -- esta copia
- * so decide COMO EXIBIR o aviso antes do clique; nunca decide se o pagamento
- * e aceito.
+ * Todo recebimento e `MANUAL` (maquininha fisica, nao integrada) -- o que
+ * distingue e o canal (`receivedVia`). Pagamento anterior a esta fatia nao
+ * tem canal registrado; cai no rotulo generico que ja existia.
  */
-function faltandoParaCartao(aluno: Aluno | undefined): readonly DadoFaltante[] {
-  if (!aluno) return [];
-
-  const faltando: DadoFaltante[] = [];
-
-  if (aluno.cpf === null || aluno.cpf.trim() === '') {
-    faltando.push('CPF');
+function rotuloDoRecebimento(pagamento: Pagamento): string {
+  switch (pagamento.receivedVia) {
+    case 'DINHEIRO':
+      return 'Dinheiro no balcão';
+    case 'PIX':
+      return 'PIX na maquininha';
+    case 'DEBITO':
+      return 'Débito na maquininha';
+    case 'CREDITO':
+      return 'Crédito na maquininha';
+    default:
+      return pagamento.method === 'MANUAL' ? 'Dinheiro no balcão' : pagamento.method;
   }
-
-  if (aluno.address === null) {
-    faltando.push('ENDERECO');
-  }
-
-  return faltando;
 }
 
 /**
@@ -272,7 +267,7 @@ export default async function PaginaFinanceiroDoAluno({
                 <ul>
                   {invoice.payments.map((pagamento) => (
                     <li key={pagamento.id}>
-                      {pagamento.method === 'MANUAL' ? 'Dinheiro no balcão' : pagamento.method}
+                      {rotuloDoRecebimento(pagamento)}
                       {pagamento.paidAt ? (
                         <>
                           {' — '}
@@ -295,9 +290,7 @@ export default async function PaginaFinanceiroDoAluno({
       />
 
       <PainelDeCobranca
-        studentId={id}
         subscriptionId={assinaturaAtiva}
-        faltandoParaCartao={faltandoParaCartao(aluno)}
         invoicesEmAberto={invoicesEmAberto.map((invoice) => ({
           id: invoice.id,
           number: invoice.number,

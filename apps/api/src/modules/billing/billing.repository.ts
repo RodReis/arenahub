@@ -192,7 +192,13 @@ export class BillingRepository {
    */
   async registrarPagamentoManual(
     contexto: TenantContext,
-    entrada: { invoiceId: string; amountMinor: number; reason: string; paidAt: Date },
+    entrada: {
+      invoiceId: string;
+      amountMinor: number;
+      reason: string;
+      paidAt: Date;
+      receivedVia: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
+    },
     correlationId: string,
   ): Promise<Payment> {
     const invoice = await this.db.invoice.findFirst({
@@ -222,6 +228,7 @@ export class BillingRepository {
           status: 'CONFIRMED',
           paidAt: entrada.paidAt,
           recognizedByUserId: contexto.actorId,
+          receivedVia: entrada.receivedVia,
         },
       });
 
@@ -259,6 +266,7 @@ export class BillingRepository {
             amountMinor: entrada.amountMinor,
             creditoMinor: resultado.creditoMinor,
             reason: entrada.reason,
+            receivedVia: entrada.receivedVia,
           },
         },
       });
