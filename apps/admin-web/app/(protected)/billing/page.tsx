@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { CSSProperties } from 'react';
 import Link from 'next/link';
 
 import { redirect } from 'next/navigation';
@@ -119,6 +120,22 @@ const COR_DO_METODO: Readonly<Record<string, string>> = {
   CARD: '--ah-state-info',
   MANUAL: '--ah-state-neutral',
 };
+
+/**
+ * Superfície tingida pelo estado -- exceção do PI em 28/09/2026 estendendo a
+ * emenda de 01/09/2026 (PRODUCT.md) do dashboard operacional para o painel
+ * financeiro. Mesma regra: aresta superior de 3px na cor cheia + fundo a 7%,
+ * nunca decorativo -- só quando o número que o card mostra tem um estado real
+ * (vencido > 0, tendência caiu). Contraste do texto não muda: só o fundo e a
+ * aresta usam a cor semântica, o valor continua em `--ah-text-strong`.
+ */
+function estiloDeEstado(tokenDeCor: string): CSSProperties {
+  return {
+    borderTopWidth: '3px',
+    borderTopColor: `var(${tokenDeCor})`,
+    backgroundColor: `color-mix(in srgb, var(${tokenDeCor}) 7%, var(--ah-surface-raised))`,
+  };
+}
 
 /**
  * Nome curto de proposito: o eixo do `BarrasDeFaixa` reserva 104px, e
@@ -469,7 +486,25 @@ export default async function PainelFinanceiroPage({
           <strong className="text-foreground">
             {diaLegivel(resumo.de)} a {diaLegivel(resumo.ate)}
           </strong>{' '}
-          · {periodoParcial ? 'mês em andamento, número ainda muda' : 'fim exclusivo, período fechado'}
+          ·{' '}
+          {periodoParcial ? (
+            <>
+              {/*
+                PULSO SO NO MES EM CURSO -- mesmo espirito do indicador "ao
+                vivo" do dashboard (DS-PAINEL §2.9): diz "isto ainda muda" sem
+                precisar de outra frase. `animate-pulse` do Tailwind ja respeita
+                `prefers-reduced-motion` via o `@media` global do theme.css
+                (zera duracao para 100ms).
+              */}
+              <span
+                aria-hidden="true"
+                className="mr-1 inline-block size-1.5 animate-pulse rounded-full bg-(--ah-state-info) align-middle"
+              />
+              mês em andamento, número ainda muda
+            </>
+          ) : (
+            'fim exclusivo, período fechado'
+          )}
         </p>
       </div>
 
@@ -493,7 +528,14 @@ export default async function PainelFinanceiroPage({
         className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3"
         aria-label="Indicadores principais do período"
       >
-        <Card>
+        <Card
+          className="transition-[background-color,border-color] duration-150"
+          style={
+            variacaoRecebido !== null && variacaoRecebido !== 0
+              ? estiloDeEstado(variacaoRecebido > 0 ? '--ah-state-success' : '--ah-state-danger')
+              : undefined
+          }
+        >
           <CardContent>
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm text-muted-foreground">Recebido</p>
@@ -539,7 +581,7 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
           <CardContent>
             {/*
               "ASSINATURAS VIGENTES", nao "alunos ativos" (issue #416): a query
@@ -588,7 +630,7 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
           <CardContent>
             <p className="text-sm text-muted-foreground">Ticket médio</p>
             <p className="mt-1 text-2xl font-semibold" data-testid="ticket-medio">
@@ -624,7 +666,7 @@ export default async function PainelFinanceiroPage({
         className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
         aria-label="Indicadores do período"
       >
-        <Card size="sm">
+        <Card size="sm" className="transition-colors duration-150 hover:border-(--ah-border-hover)">
           <CardContent>
             <p className="text-sm text-muted-foreground">Esperado por mês</p>
             <p className="mt-1 text-xl font-semibold" data-testid="receita-esperada">
@@ -641,7 +683,7 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card size="sm">
+        <Card size="sm" className="transition-colors duration-150 hover:border-(--ah-border-hover)">
           <CardContent>
             <p className="text-sm text-muted-foreground">A receber</p>
             <p className="mt-1 text-xl font-semibold" data-testid="a-receber">
@@ -653,7 +695,11 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card size="sm" className={temDivida ? 'ring-(--ah-state-danger)' : undefined}>
+        <Card
+          size="sm"
+          className="transition-[background-color,border-color] duration-150"
+          style={temDivida ? estiloDeEstado('--ah-state-danger') : undefined}
+        >
           <CardContent>
             <p className="text-sm text-muted-foreground">Vencido</p>
             <p className="mt-1 text-xl font-semibold" data-testid="vencido">
@@ -670,7 +716,11 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card size="sm" className={temDivida ? 'ring-(--ah-state-risk)' : undefined}>
+        <Card
+          size="sm"
+          className="transition-[background-color,border-color] duration-150"
+          style={temDivida ? estiloDeEstado('--ah-state-risk') : undefined}
+        >
           <CardContent>
             <p className="text-sm text-muted-foreground">Inadimplência</p>
             <p className="mt-1 text-xl font-semibold" data-testid="taxa-de-inadimplencia">
@@ -696,7 +746,7 @@ export default async function PainelFinanceiroPage({
           recebido ja e LIQUIDO, entao a ausencia nao esconde nada.
         */}
         {resumo.estornadoMinor > 0 ? (
-          <Card size="sm" className="ring-(--ah-state-warning)">
+          <Card size="sm" style={estiloDeEstado('--ah-state-warning')}>
             <CardContent>
               <p className="text-sm text-muted-foreground">Estornado</p>
               <p className="mt-1 text-xl font-semibold" data-testid="estornado">
@@ -715,7 +765,7 @@ export default async function PainelFinanceiroPage({
         GraficoDeRosca).
       */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
+        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
           <CardHeader>
             <CardTitle>Faturado e recebido por competência</CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -822,7 +872,7 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
           <CardHeader>
             <CardTitle>Por onde o dinheiro entrou</CardTitle>
           </CardHeader>
@@ -879,7 +929,7 @@ export default async function PainelFinanceiroPage({
         os quatro KPIs de retencao que saíram da faixa compacta.
       */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
+        <Card className="transition-colors duration-150 hover:border-(--ah-border-hover)">
           <CardHeader>
             <CardTitle>Onde o dinheiro parou</CardTitle>
           </CardHeader>
@@ -918,7 +968,14 @@ export default async function PainelFinanceiroPage({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className="transition-[background-color,border-color] duration-150"
+          style={
+            scoreDoPeriodo === 'neutro'
+              ? undefined
+              : estiloDeEstado(scoreDoPeriodo === 'saudavel' ? '--ah-state-success' : '--ah-state-danger')
+          }
+        >
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Saúde do negócio &amp; retenção</CardTitle>
             <Badge variant={VARIANTE_DO_SCORE[scoreDoPeriodo]} data-testid="score-do-negocio">
