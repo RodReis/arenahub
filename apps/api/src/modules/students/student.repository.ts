@@ -1194,6 +1194,11 @@ async function idsPorNomeSemAcento(
  *     erra por um dia -- foi exatamente o bug que `vencimento.ts` documenta.
  *   - so a invoice em aberto MAIS ANTIGA (`due_at asc`, `id asc` no empate)
  *     conta -- mesmo criterio de `faturaEmDestaque`.
+ *   - e SO DA ASSINATURA VIGENTE (`ACTIVE`/`PAST_DUE` de `starts_at` mais
+ *     recente), a MESMA que `includeDaListagem` usa para montar a coluna.
+ *     Juntar por `student_id` em todas as invoices ordenava como devedor o
+ *     aluno com fatura aberta numa assinatura CANCELADA, enquanto a celula
+ *     mostrava "em dia" -- a ordem contradizia a coluna.
  *
  * `LEFT JOIN gym_units`, nao `JOIN`: aluno cuja unidade sumiu (ou sem fuso
  * cadastrado) NAO PODE DESAPARECER DA LISTA por causa da ordenacao --
@@ -1213,15 +1218,25 @@ async function idsOrdenadosPorSituacaoFinanceira(
   },
 ): Promise<string[]> {
   const linhas = await tx.$queryRaw<{ id: string }[]>`
-    WITH invoice_em_aberto AS (
-      SELECT DISTINCT ON (i.student_id)
-        i.student_id,
+    WITH assinatura_vigente AS (
+      SELECT DISTINCT ON (sub.student_id)
+        sub.student_id,
+        sub.id
+      FROM subscriptions sub
+      WHERE sub.tenant_id = ${tenantId}::uuid
+        AND sub.status IN ('ACTIVE', 'PAST_DUE')
+      ORDER BY sub.student_id, sub.starts_at DESC, sub.id DESC
+    ),
+    invoice_em_aberto AS (
+      SELECT DISTINCT ON (av.student_id)
+        av.student_id,
         i.due_at,
         i.block_at
-      FROM invoices i
+      FROM assinatura_vigente av
+      JOIN invoices i ON i.subscription_id = av.id
       WHERE i.tenant_id = ${tenantId}::uuid
         AND i.status IN ('OPEN', 'OVERDUE')
-      ORDER BY i.student_id, i.due_at ASC, i.id ASC
+      ORDER BY av.student_id, i.due_at ASC, i.id ASC
     ),
     prioridade AS (
       SELECT

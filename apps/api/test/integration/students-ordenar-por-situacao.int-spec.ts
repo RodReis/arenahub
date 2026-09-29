@@ -139,6 +139,7 @@ describe('GET /api/v1/students?ordem=situacao (integracao)', () => {
     opcoes: {
       status?: 'ACTIVE' | 'BLOCKED';
       invoice?: { status: 'OPEN' | 'OVERDUE'; dueAt: Date; blockAt: Date | null };
+      statusDaAssinatura?: 'ACTIVE' | 'CANCELLED';
     } = {},
   ): Promise<string> => {
     proximoNumero += 1;
@@ -155,14 +156,14 @@ describe('GET /api/v1/students?ordem=situacao (integracao)', () => {
     });
 
     if (opcoes.invoice) {
-      // A invoice pende de assinatura ACTIVE: e por ela que a listagem devolve
-      // `invoiceParaAviso`, que o teste de paridade le.
+      // A invoice pende de assinatura ACTIVE (padrao): e por ela que a
+      // listagem devolve `invoiceParaAviso`, que o teste de paridade le.
       const assinatura = await db.subscription.create({
         data: {
           tenantId: conta.tenantId,
           studentId: aluno.id,
           planId: conta.planoId,
-          status: 'ACTIVE',
+          status: opcoes.statusDaAssinatura ?? 'ACTIVE',
           startsAt: emDias(-60),
         },
       });
@@ -381,6 +382,32 @@ describe('GET /api/v1/students?ordem=situacao (integracao)', () => {
     // Contraprova: sem o filtro o BLOCKED aparece -- ele sumiu pelo filtro,
     // nao por outro motivo.
     expect(todos.map((a) => a.id)).toContain(bloqueado);
+  });
+
+  it('fatura aberta em assinatura CANCELADA nao arrasta o aluno para devedor', async () => {
+    const gymUnitId = await criarUnidade();
+    // Pior caso possivel se contasse: vencida ha 10 dias com bloqueio ja
+    // vigente -- seria prioridade 0 e viria no topo.
+    const cancelada = await criarAluno(gymUnitId, 'A Cancelada', {
+      statusDaAssinatura: 'CANCELLED',
+      invoice: { status: 'OVERDUE', dueAt: emDias(-10), blockAt: emDias(-2) },
+    });
+    const vencida = await criarAluno(gymUnitId, 'Z Vencida', {
+      invoice: { status: 'OVERDUE', dueAt: emDias(-5), blockAt: null },
+    });
+    const emDia = await criarAluno(gymUnitId, 'M Em Dia');
+
+    const alunos = await listar({ gymUnitId, status: 'ACTIVE', direcao: 'asc' });
+
+    // A celula nao ve a fatura (so olha a assinatura vigente)...
+    const daCancelada = alunos.find((a) => a.id === cancelada);
+    expect(daCancelada?.invoiceParaAviso).toBeNull();
+    expect(situacaoEsperada(daCancelada!.invoiceParaAviso, daCancelada!.timezoneDaUnidade)).toBe(
+      'EM_DIA',
+    );
+    // ...e a ordem tambem nao: a cancelada empata com o em dia (prioridade 3)
+    // e desempata por nome, atras da unica vencida de verdade.
+    expect(alunos.map((a) => a.id)).toEqual([vencida, cancelada, emDia]);
   });
 
   it('paridade TS/SQL: a ordem do servidor bate com situacaoDeVencimento', async () => {
