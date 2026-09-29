@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@arenahub/database';
 import type {
   GymUnitModality,
   LeadSource,
-  Prisma,
   Student,
   StudentAddress,
   StudentContact,
@@ -751,7 +751,7 @@ export class StudentRepository {
        * usuario e injecao de campo -- o Prisma recusaria coluna inexistente,
        * mas ordenar por `cpfHash` vazaria a ordem do hash.
        */
-      ordem?: 'nome' | 'matricula' | 'nascimento' | undefined;
+      ordem?: 'nome' | 'matricula' | 'nascimento' | 'situacao' | undefined;
       direcao?: 'asc' | 'desc' | undefined;
       /**
        * Modalidade (F60). Opcional: ausente, a listagem mostra todo mundo --
@@ -772,6 +772,57 @@ export class StudentRepository {
     // o aluno existindo no tenant certo (issue #302).
     return this.db.comTenant(async (tx) => {
       const condicoes = await condicoesDaListagem(tx, contexto.tenantId, filtro.termo);
+
+      if (filtro.ordem === 'situacao') {
+        const idsNaOrdem = await idsOrdenadosPorSituacaoFinanceira(
+          tx,
+          contexto.tenantId,
+          filtro.direcao ?? 'asc',
+          filtro,
+        );
+
+        /*
+         * O TERMO DE BUSCA continua vindo do `where` do Prisma, nao do SQL
+         * raw: `condicoesDaListagem` ja resolve nome sem acento, matricula e
+         * telefone, e reimplementar isso no SQL seria a TERCEIRA copia da
+         * mesma regra. A intersecao acontece aqui -- os ids que casam com o
+         * termo filtram a lista ja ordenada.
+         *
+         * CONSEQUENCIA: a paginacao precisa acontecer DEPOIS dessa
+         * intersecao, senao a pagina 1 poderia vir vazia (os 20 primeiros da
+         * ordem podem nao casar com o termo). Por isso, quando ha termo, o
+         * corte e feito sobre os ids que sobreviveram ao filtro.
+         */
+        const idsQueCasam = filtro.termo
+          ? new Set(
+              (
+                await tx.student.findMany({
+                  where: { tenantId: contexto.tenantId, profile: 'STUDENT', ...condicoes },
+                  select: { id: true },
+                })
+              ).map((a) => a.id),
+            )
+          : null;
+
+        const elegiveis = idsQueCasam
+          ? idsNaOrdem.filter((id) => idsQueCasam.has(id))
+          : idsNaOrdem;
+
+        const pagina = paginarIds(elegiveis, filtro.cursor, filtro.limite);
+
+        if (pagina.length === 0) return [];
+
+        const alunos = await tx.student.findMany({
+          where: { id: { in: pagina } },
+          include: includeDaListagem(agora),
+        });
+
+        // O `findMany` com `id: { in }` NAO preserva a ordem de `pagina` --
+        // reordena aqui, no mesmo criterio que a paginacao usou.
+        const posicao = new Map(pagina.map((id, indice) => [id, indice]));
+
+        return alunos.sort((a, b) => (posicao.get(a.id) ?? 0) - (posicao.get(b.id) ?? 0));
+      }
 
       return tx.student.findMany({
         where: {
@@ -1105,6 +1156,126 @@ async function idsPorNomeSemAcento(
   `;
 
   return linhas.map((l) => l.id);
+}
+
+/**
+ * IDs de aluno ORDENADOS por situacao financeira, mais grave primeiro --
+ * replica em SQL a MESMA regra de `situacaoDeVencimento`
+ * (`apps/admin-web/src/billing/vencimento.ts`), com teste de paridade em
+ * `students-ordenar-por-situacao.int-spec.ts`.
+ *
+ * DUAS IMPLEMENTACOES DA MESMA REGRA, de proposito: o Prisma nao expressa
+ * "compare o DIA CIVIL de `due_at` contra 'agora' NO FUSO DA UNIDADE" dentro
+ * de `orderBy` estruturado -- so SQL alcanca `AT TIME ZONE`. O `$queryRaw`
+ * devolve so `id`, na ordem certa; `buscar` pagina esse array, busca a
+ * pagina com `id: { in }` e reordena em JS -- o Prisma NAO preserva a ordem
+ * do `IN`.
+ *
+ * PRIORIDADE -- MENOR NUMERO E MAIS GRAVE, de proposito:
+ *   0 = BLOQUEIO_PROXIMO (catraca ja fechada -- o pior caso)
+ *   1 = VENCIDA
+ *   2 = VENCE_EM_BREVE
+ *   3 = EM_DIA / sem fatura em aberto
+ *
+ * A ESCALA E INVERTIDA porque `DataTable.tsx:235` faz o PRIMEIRO clique numa
+ * coluna ser sempre `asc`: a recepcao clica em "Situacao" para achar quem
+ * esta devendo, e com a escala natural (maior = pior) o primeiro clique
+ * mostraria quem esta em dia. Ordenar `asc` por este numero poe os problemas
+ * no topo, que e o que o clique quer dizer.
+ *
+ * Espelha `situacaoDeVencimento`:
+ *   - so invoice `OPEN`/`OVERDUE` entra na conta; qualquer outro status (ou
+ *     ausencia de invoice em aberto) e EM_DIA;
+ *   - ASSIMETRIA DELIBERADA nas datas, copiada de `diferencaEmDias`
+ *     (`vencimento.ts:140`): `due_at`/`block_at` sao DATAS-CALENDARIO
+ *     gravadas como meia-noite UTC, entao le-se o dia delas EM UTC
+ *     (`AT TIME ZONE 'UTC'`); `now()` e um INSTANTE de verdade, e so ele
+ *     converte para o fuso da unidade. Converter os dois pelo mesmo fuso
+ *     erra por um dia -- foi exatamente o bug que `vencimento.ts` documenta.
+ *   - so a invoice em aberto MAIS ANTIGA (`due_at asc`, `id asc` no empate)
+ *     conta -- mesmo criterio de `faturaEmDestaque`.
+ *
+ * `LEFT JOIN gym_units`, nao `JOIN`: aluno cuja unidade sumiu (ou sem fuso
+ * cadastrado) NAO PODE DESAPARECER DA LISTA por causa da ordenacao --
+ * `COALESCE(gu.timezone, 'UTC')` o mantem visivel.
+ *
+ * `tx`, nao `this.db`: roda DENTRO da transacao com RLS (`comTenant`), pelo
+ * mesmo motivo de `idsPorNomeSemAcento`.
+ */
+async function idsOrdenadosPorSituacaoFinanceira(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  direcao: 'asc' | 'desc',
+  filtro: {
+    status?: StudentStatus | undefined;
+    gymUnitId?: string | undefined;
+    modalityId?: string | undefined;
+  },
+): Promise<string[]> {
+  const linhas = await tx.$queryRaw<{ id: string }[]>`
+    WITH invoice_em_aberto AS (
+      SELECT DISTINCT ON (i.student_id)
+        i.student_id,
+        i.due_at,
+        i.block_at
+      FROM invoices i
+      WHERE i.tenant_id = ${tenantId}::uuid
+        AND i.status IN ('OPEN', 'OVERDUE')
+      ORDER BY i.student_id, i.due_at ASC, i.id ASC
+    ),
+    prioridade AS (
+      SELECT
+        s.id,
+        s.full_name,
+        CASE
+          WHEN io.student_id IS NULL THEN 3
+          WHEN (io.due_at AT TIME ZONE 'UTC')::date
+               > (now() AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 3
+          WHEN (io.due_at AT TIME ZONE 'UTC')::date
+               = (now() AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 2
+          WHEN io.block_at IS NOT NULL
+               AND (io.block_at AT TIME ZONE 'UTC')::date
+                   <= (now() AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 0
+          ELSE 1
+        END AS prioridade
+      FROM students s
+      LEFT JOIN gym_units gu ON gu.id = s.gym_unit_id
+      LEFT JOIN invoice_em_aberto io ON io.student_id = s.id
+      WHERE s.tenant_id = ${tenantId}::uuid
+        AND s.profile = 'STUDENT'
+        ${filtro.status ? Prisma.sql`AND s.status = ${filtro.status}::student_status` : Prisma.empty}
+        ${filtro.gymUnitId ? Prisma.sql`AND s.gym_unit_id = ${filtro.gymUnitId}::uuid` : Prisma.empty}
+        ${
+          filtro.modalityId
+            ? Prisma.sql`AND EXISTS (
+                SELECT 1 FROM student_modalities sm
+                WHERE sm.student_id = s.id AND sm.modality_id = ${filtro.modalityId}::uuid
+              )`
+            : Prisma.empty
+        }
+    )
+    SELECT id FROM prioridade
+    ORDER BY
+      prioridade ${direcao === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`},
+      full_name ASC,
+      id DESC
+  `;
+
+  return linhas.map((l) => l.id);
+}
+
+/**
+ * Corta `idsNaOrdem` a partir de `cursor` (exclusivo) e pega `limite`.
+ *
+ * `indexOf` devolve -1 para cursor que nao esta mais na lista (o aluno mudou
+ * de situacao entre uma pagina e outra, ou foi arquivado). `-1 + 1 = 0`
+ * reinicia do comeco -- repetir a primeira pagina e melhor que devolver
+ * vazio, que a tela leria como "acabou" e esconderia o resto da base.
+ */
+function paginarIds(idsNaOrdem: string[], cursor: string | undefined, limite: number): string[] {
+  const inicio = cursor ? idsNaOrdem.indexOf(cursor) + 1 : 0;
+
+  return idsNaOrdem.slice(inicio, inicio + limite);
 }
 
 async function condicoesDaListagem(
