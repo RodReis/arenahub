@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@arenahub/ui';
@@ -139,5 +139,165 @@ describe('grid de alunos', () => {
       screen.queryByTestId(`acao-liberacao-manual-${BLOQUEADO.id}`),
     ).not.toBeInTheDocument();
     expect(screen.getByTestId(`acao-editar-${BLOQUEADO.id}`)).toBeInTheDocument();
+  });
+
+  /*
+   * A data é RELATIVA a hoje, nunca literal: `page.tsx` usa `new Date()` como
+   * "agora", que o teste não controla. Data fixa faria o CI ficar vermelho
+   * sozinho semanas depois, sem ninguém ter mexido em nada.
+   */
+  function emDias(n: number): string {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + n);
+
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
+  }
+
+  const ATIVO_VENCIDO = {
+    ...BASE,
+    id: '44444444-4444-4444-8444-444444444444',
+    fullName: 'Marcos Vinicius Alves',
+    status: 'ACTIVE',
+    invoiceParaAviso: { status: 'OVERDUE', dueAt: emDias(-7), blockAt: null },
+  };
+
+  const ATIVO_VENCE_HOJE = {
+    ...BASE,
+    id: '55555555-5555-4555-8555-555555555555',
+    fullName: 'Carla Souza Lima',
+    status: 'ACTIVE',
+    invoiceParaAviso: { status: 'OPEN', dueAt: emDias(0), blockAt: null },
+  };
+
+  const ATIVO_BLOQUEIO_CHEGOU = {
+    ...BASE,
+    id: '66666666-6666-4666-8666-666666666666',
+    fullName: 'Paulo Henrique Dias',
+    status: 'ACTIVE',
+    invoiceParaAviso: { status: 'OVERDUE', dueAt: emDias(-15), blockAt: emDias(-2) },
+  };
+
+  const ATIVO_EM_DIA = {
+    ...BASE,
+    id: '77777777-7777-4777-8777-777777777777',
+    fullName: 'Renata Campos Melo',
+    status: 'ACTIVE',
+    invoiceParaAviso: { status: 'OPEN', dueAt: emDias(+10), blockAt: null },
+  };
+
+  /**
+   * A COLUNA SITUACAO RESPONDE "ELE ESTA PAGANDO?" PARA QUEM ESTA ATIVO.
+   *
+   * Antes desta fatia ela dizia sempre "Ativo" -- verdade inutil para a
+   * recepcao, que ja sabe que o aluno esta ativo porque ele esta na frente
+   * dela. O que ela precisa saber e se pode liberar sem cobrar.
+   */
+  it('mostra a situacao financeira no lugar do status, para aluno ativo', async () => {
+    await renderizar([ATIVO_VENCIDO]);
+
+    // Escopado a tabela: o filtro acima tem <option>Ativo</option> sempre
+    // presente na tela, e colidiria com o texto do badge se a busca fosse
+    // global.
+    const tabela = within(screen.getByTestId('tabela-de-alunos'));
+
+    expect(tabela.getByText('Vencida')).toBeInTheDocument();
+    expect(tabela.queryByText('Ativo')).not.toBeInTheDocument();
+  });
+
+  it('mostra "Vence hoje" para quem vence no dia', async () => {
+    await renderizar([ATIVO_VENCE_HOJE]);
+
+    expect(screen.getByText('Vence hoje')).toBeInTheDocument();
+  });
+
+  /*
+   * BLOQUEIO_PROXIMO E O ESTADO MAIS GRAVE -- `blockAt` JA passou. Ver "A
+   * semantica REAL dos 4 estados" no plano: nao e aviso de bloqueio futuro.
+   */
+  it('mostra "Bloqueio proximo" para quem ja passou do prazo de bloqueio', async () => {
+    await renderizar([ATIVO_BLOQUEIO_CHEGOU]);
+
+    expect(screen.getByText('Bloqueio próximo')).toBeInTheDocument();
+  });
+
+  it('mostra "Em dia" para quem tem fatura em aberto ainda por vencer', async () => {
+    await renderizar([ATIVO_EM_DIA]);
+
+    expect(screen.getByText('Em dia')).toBeInTheDocument();
+  });
+
+  /**
+   * ALUNO NAO-ATIVO MANTEM O STATUS na coluna Situacao.
+   *
+   * "Em dia" para um aluno bloqueado seria a informacao errada na hora errada:
+   * quem esta na catraca precisa saber que ele nao entra, nao que a ultima
+   * fatura esta paga.
+   */
+  it('mantem o status na coluna Situacao para aluno bloqueado', async () => {
+    await renderizar([{ ...BLOQUEADO, invoiceParaAviso: { status: 'OVERDUE', dueAt: emDias(-30), blockAt: emDias(-20) } }]);
+
+    // Escopado a tabela: o filtro acima tem <option>Bloqueado</option>
+    // sempre presente na tela.
+    const tabela = within(screen.getByTestId('tabela-de-alunos'));
+
+    expect(tabela.getByText('Bloqueado')).toBeInTheDocument();
+    expect(tabela.queryByText('Bloqueio próximo')).not.toBeInTheDocument();
+  });
+
+  /**
+   * SEM FUSO DA UNIDADE NAO HA COMO DECIDIR O DIA -- a celula volta ao status.
+   *
+   * `timezoneDaUnidade` nulo acontece de verdade: unidade cadastrada sem fuso
+   * (ADR-019 exige, mas dado antigo pode nao ter). Mostrar badge financeira
+   * calculada em UTC erraria por um dia perto da meia-noite.
+   */
+  it('cai no status quando falta o fuso da unidade', async () => {
+    await renderizar([
+      { ...ATIVO_VENCIDO, timezoneDaUnidade: null },
+    ]);
+
+    // Escopado a tabela: o filtro acima tem <option>Ativo</option> sempre
+    // presente na tela.
+    const tabela = within(screen.getByTestId('tabela-de-alunos'));
+
+    expect(tabela.getByText('Ativo')).toBeInTheDocument();
+    expect(tabela.queryByText('Vencida')).not.toBeInTheDocument();
+  });
+
+  /**
+   * A COLUNA MOTIVO EXPLICA A SITUACAO QUE A COLUNA AO LADO MOSTRA.
+   *
+   * As duas precisam contar a MESMA historia: badge financeira com motivo de
+   * status ao lado ("Vencida" + "Atestado medico") seria incoerente.
+   */
+  it('explica a situacao financeira na coluna Motivo', async () => {
+    await renderizar([ATIVO_VENCIDO]);
+
+    expect(screen.getByTestId(`motivo-financeiro-${ATIVO_VENCIDO.id}`)).toHaveTextContent(
+      'Mensalidade vencida há 7 dias',
+    );
+  });
+
+  it('nao mostra motivo financeiro para quem esta em dia', async () => {
+    await renderizar([ATIVO_EM_DIA]);
+
+    expect(screen.queryByTestId(`motivo-financeiro-${ATIVO_EM_DIA.id}`)).not.toBeInTheDocument();
+  });
+
+  it('mantem o motivo de status para aluno suspenso', async () => {
+    await renderizar([SUSPENSO]);
+
+    expect(screen.getByTestId(`motivo-${SUSPENSO.id}`)).toHaveTextContent('Atestado médico');
+  });
+
+  /**
+   * A COLUNA CATRACA e ordenavel por SITUACAO -- o cabecalho vira link.
+   */
+  it('permite ordenar pela coluna Situacao', async () => {
+    await renderizar([ATIVO_VENCIDO]);
+
+    const cabecalho = screen.getByRole('columnheader', { name: /Situação/ });
+
+    expect(cabecalho.querySelector('a')).not.toBeNull();
   });
 });
