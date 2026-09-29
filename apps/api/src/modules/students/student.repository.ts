@@ -785,118 +785,7 @@ export class StudentRepository {
         orderBy: ordenacao(filtro.ordem, filtro.direcao),
         take: filtro.limite,
         ...(filtro.cursor ? { cursor: { id: filtro.cursor }, skip: 1 } : {}),
-        /**
-         * O PLANO VEM JUNTO -- a lista responde "quem e este aluno?", e o plano
-         * e metade da resposta na recepcao ("ele tem Mensal Fit ou Anual
-         * Black?"). Sem isto, descobrir exigia abrir a ficha de cada um.
-         *
-         * SO A ASSINATURA QUE VALE AGORA: `ACTIVE` ou `PAST_DUE`, a mais
-         * recente. Um aluno pode ter historico de assinaturas canceladas, e
-         * mostrar a antiga diria que ele tem plano que nao tem.
-         *
-         * `take: 1` no include, e nao um segundo `findMany`: a alternativa seria
-         * uma consulta por aluno, que e o N+1 que o `docs/REVIEW.md` §3.4 barra.
-         */
-        include: {
-          subscriptions: {
-            where: { status: { in: ['ACTIVE', 'PAST_DUE'] } },
-            orderBy: { startsAt: 'desc' },
-            take: 1,
-            select: {
-              status: true,
-              plan: { select: { name: true } },
-              /*
-               * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente --
-               * F53 Task 12, mesmo criterio de `listar-invoices.use-case.ts`
-               * (`dueAt asc` primeiro traz a mais antiga). SEM segunda consulta:
-               * nested include sob o `take: 1` de cima, mesma tecnica que ja
-               * evita o N+1 aqui.
-               */
-              invoices: {
-                where: { status: { in: ['OPEN', 'OVERDUE'] } },
-                orderBy: [{ dueAt: 'asc' }, { id: 'asc' }],
-                take: 1,
-                select: { status: true, dueAt: true, blockAt: true },
-              },
-            },
-          },
-          /*
-           * O DIREITO QUE NAO NASCE DE ASSINATURA -- cortesia, funcionario,
-           * personal trainer, dependente, convenio.
-           *
-           * Sem isto a coluna PLANO saia de `subscriptions[0]` e so ela: quem
-           * tem acesso por VINCULO nao tem assinatura nenhuma, entao a ficha
-           * mostrava "Ativo, Personal trainer, vale agora" e a lista mostrava
-           * "—" para a MESMA pessoa. Eram 33 alunos da bancada (24 funcionarios,
-           * 9 personal trainers), e a recepcao olha a lista para decidir se
-           * libera.
-           *
-           * `subscriptionId: null` FILTRA no banco, nao no DTO: o direito
-           * derivado de assinatura ja chega pelo include de cima, com o NOME do
-           * plano, que e melhor resposta que a origem.
-           *
-           * VIGENTE AGORA, nao qualquer um: `startsAt <= agora <= endsAt` com
-           * status ativo. Direito expirado ou agendado na coluna diria que o
-           * aluno tem acesso hoje.
-           *
-           * `take: 1` pelo mesmo motivo do bloco de cima -- consulta por aluno
-           * seria o N+1 que `docs/REVIEW.md` §3.4 barra.
-           */
-          entitlements: {
-            where: {
-              subscriptionId: null,
-              status: 'ACTIVE',
-              startsAt: { lte: agora },
-              endsAt: { gte: agora },
-            },
-            orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
-            take: 1,
-            select: { source: true },
-          },
-          /*
-           * Fuso da unidade de ORIGEM do aluno (INV-144, ADR-019) -- sem ele
-           * `situacaoDeVencimento` nao tem como decidir o dia civil de `dueAt`.
-           * SEM FALLBACK: unidade sem fuso cadastrado nao aparece com aviso
-           * errado, aparece sem aviso (ver `paraDtoDaLista`).
-           */
-          gymUnit: { select: { timezone: true } },
-          contacts: {
-            where: { type: 'PHONE' },
-            /*
-              DUAS chaves, nao uma. `isPrimary` e boolean, logo NAO e ordem
-              total: dois telefones com o mesmo valor de `isPrimary` empatam, e
-              o desempate cai na ordem FISICA do Postgres -- que muda depois de
-              qualquer UPDATE na tabela.
-
-              Com `take: 1` em cima, o empate nao embaralha a ordem: ele troca
-              QUAL telefone aparece. A recepcao ligaria para um numero num
-              carregamento e para outro no seguinte, sem nada ter mudado no
-              cadastro.
-
-              Corrigido junto da F53, que consertou o mesmo defeito no caminho
-              do checkout de cartao (o telefone que vai ao antifraude do
-              provedor). Sao os dois unicos pontos do `apps/api` com boolean
-              como criterio unico de ordenacao.
-            */
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
-            take: 1,
-            select: { value: true },
-          },
-          /*
-            O NUMERO QUE A CATRACA LE -- e a pergunta que a recepcao faz
-            olhando a lista ("qual o id dele no equipamento?"), que antes
-            exigia abrir a ficha.
-
-            SEM `take`, ao contrario dos dois de cima: uma pessoa pode ter mais
-            de um numero (cartao trocado, credencial vinda de linha duplicada
-            do Pacto), e cortar em um esconderia justamente o caso que precisa
-            ser resolvido -- um cartao antigo que continua valido no leitor.
-          */
-          credentials: {
-            orderBy: { createdAt: 'asc' },
-            select: { externalId: true },
-          },
-        },
+        include: includeDaListagem(agora),
       });
     });
   }
@@ -1010,6 +899,128 @@ export class StudentRepository {
       return tx.student.findFirstOrThrow({ where: { id, tenantId: contexto.tenantId } });
     });
   }
+}
+
+/**
+ * O PLANO VEM JUNTO -- a lista responde "quem e este aluno?", e o plano
+ * e metade da resposta na recepcao ("ele tem Mensal Fit ou Anual
+ * Black?"). Sem isto, descobrir exigia abrir a ficha de cada um.
+ *
+ * SO A ASSINATURA QUE VALE AGORA: `ACTIVE` ou `PAST_DUE`, a mais
+ * recente. Um aluno pode ter historico de assinaturas canceladas, e
+ * mostrar a antiga diria que ele tem plano que nao tem.
+ *
+ * `take: 1` no include, e nao um segundo `findMany`: a alternativa seria
+ * uma consulta por aluno, que e o N+1 que o `docs/REVIEW.md` §3.4 barra.
+ *
+ * CONSTANTE DO MODULO, e nao literal dentro de `buscar`: os dois caminhos
+ * da listagem (ordem estruturada e ordem por situacao financeira) usam o
+ * MESMO include -- duas copias divergiriam na primeira edicao, e um dos
+ * caminhos passaria a devolver aluno sem plano ou sem telefone.
+ *
+ * FUNCAO, e nao objeto: o filtro de `entitlements` depende de `agora`.
+ */
+function includeDaListagem(agora: Date) {
+  return {
+    subscriptions: {
+      where: { status: { in: ['ACTIVE', 'PAST_DUE'] } },
+      orderBy: { startsAt: 'desc' },
+      take: 1,
+      select: {
+        status: true,
+        plan: { select: { name: true } },
+        /*
+         * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente --
+         * F53 Task 12, mesmo criterio de `listar-invoices.use-case.ts`
+         * (`dueAt asc` primeiro traz a mais antiga). SEM segunda consulta:
+         * nested include sob o `take: 1` de cima, mesma tecnica que ja
+         * evita o N+1 aqui.
+         */
+        invoices: {
+          where: { status: { in: ['OPEN', 'OVERDUE'] } },
+          orderBy: [{ dueAt: 'asc' }, { id: 'asc' }],
+          take: 1,
+          select: { status: true, dueAt: true, blockAt: true },
+        },
+      },
+    },
+    /*
+     * O DIREITO QUE NAO NASCE DE ASSINATURA -- cortesia, funcionario,
+     * personal trainer, dependente, convenio.
+     *
+     * Sem isto a coluna PLANO saia de `subscriptions[0]` e so ela: quem
+     * tem acesso por VINCULO nao tem assinatura nenhuma, entao a ficha
+     * mostrava "Ativo, Personal trainer, vale agora" e a lista mostrava
+     * "—" para a MESMA pessoa. Eram 33 alunos da bancada (24 funcionarios,
+     * 9 personal trainers), e a recepcao olha a lista para decidir se
+     * libera.
+     *
+     * `subscriptionId: null` FILTRA no banco, nao no DTO: o direito
+     * derivado de assinatura ja chega pelo include de cima, com o NOME do
+     * plano, que e melhor resposta que a origem.
+     *
+     * VIGENTE AGORA, nao qualquer um: `startsAt <= agora <= endsAt` com
+     * status ativo. Direito expirado ou agendado na coluna diria que o
+     * aluno tem acesso hoje.
+     *
+     * `take: 1` pelo mesmo motivo do bloco de cima -- consulta por aluno
+     * seria o N+1 que `docs/REVIEW.md` §3.4 barra.
+     */
+    entitlements: {
+      where: {
+        subscriptionId: null,
+        status: 'ACTIVE',
+        startsAt: { lte: agora },
+        endsAt: { gte: agora },
+      },
+      orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
+      take: 1,
+      select: { source: true },
+    },
+    /*
+     * Fuso da unidade de ORIGEM do aluno (INV-144, ADR-019) -- sem ele
+     * `situacaoDeVencimento` nao tem como decidir o dia civil de `dueAt`.
+     * SEM FALLBACK: unidade sem fuso cadastrado nao aparece com aviso
+     * errado, aparece sem aviso (ver `paraDtoDaLista`).
+     */
+    gymUnit: { select: { timezone: true } },
+    contacts: {
+      where: { type: 'PHONE' },
+      /*
+        DUAS chaves, nao uma. `isPrimary` e boolean, logo NAO e ordem
+        total: dois telefones com o mesmo valor de `isPrimary` empatam, e
+        o desempate cai na ordem FISICA do Postgres -- que muda depois de
+        qualquer UPDATE na tabela.
+
+        Com `take: 1` em cima, o empate nao embaralha a ordem: ele troca
+        QUAL telefone aparece. A recepcao ligaria para um numero num
+        carregamento e para outro no seguinte, sem nada ter mudado no
+        cadastro.
+
+        Corrigido junto da F53, que consertou o mesmo defeito no caminho
+        do checkout de cartao (o telefone que vai ao antifraude do
+        provedor). Sao os dois unicos pontos do `apps/api` com boolean
+        como criterio unico de ordenacao.
+      */
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+      take: 1,
+      select: { value: true },
+    },
+    /*
+      O NUMERO QUE A CATRACA LE -- e a pergunta que a recepcao faz
+      olhando a lista ("qual o id dele no equipamento?"), que antes
+      exigia abrir a ficha.
+
+      SEM `take`, ao contrario dos dois de cima: uma pessoa pode ter mais
+      de um numero (cartao trocado, credencial vinda de linha duplicada
+      do Pacto), e cortar em um esconderia justamente o caso que precisa
+      ser resolvido -- um cartao antigo que continua valido no leitor.
+    */
+    credentials: {
+      orderBy: { createdAt: 'asc' },
+      select: { externalId: true },
+    },
+  } satisfies Prisma.StudentInclude;
 }
 
 /**
