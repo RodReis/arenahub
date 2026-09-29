@@ -145,12 +145,12 @@ describe('state-labels', () => {
     });
     expect(stateLabel('paymentStanding', 'BLOQUEIO_PROXIMO')).toEqual({
       label: 'Bloqueio próximo',
-      tone: 'risk',
+      tone: 'danger',
       icon: 'alert-triangle',
     });
     expect(stateLabel('paymentStanding', 'VENCIDA')).toEqual({
       label: 'Vencida',
-      tone: 'danger',
+      tone: 'risk',
       icon: 'x-circle',
     });
   });

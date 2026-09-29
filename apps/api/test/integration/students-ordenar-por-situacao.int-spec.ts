@@ -45,7 +45,8 @@ describe('GET /api/v1/students?ordem=situacao (integracao)', () => {
   };
 
   /*
-   * ATENCAO AO 'AGORA': o SQL usa `now()` do BANCO, que o teste nao controla.
+   * ATENCAO AO 'AGORA': a rota nao recebe `agora`, entao o SQL usa o relogio
+   * da aplicacao (`new Date()` no `buscar`), que o teste nao controla.
    * Datas RELATIVAS a hoje, nunca literais -- data fixa envelhece e o CI fica
    * vermelho sozinho semanas depois.
    *
@@ -275,6 +276,9 @@ describe('GET /api/v1/students?ordem=situacao (integracao)', () => {
   });
 
   afterAll(async () => {
+    // Suite que cria tenant precisa apagar -- mesmo padrao de
+    // `billing-inadimplencia.int-spec.ts`.
+    if (conta.tenantId) await db.tenant.deleteMany({ where: { id: conta.tenantId } });
     await app?.close();
   });
 
@@ -408,6 +412,26 @@ describe('GET /api/v1/students?ordem=situacao (integracao)', () => {
     // ...e a ordem tambem nao: a cancelada empata com o em dia (prioridade 3)
     // e desempata por nome, atras da unica vencida de verdade.
     expect(alunos.map((a) => a.id)).toEqual([vencida, cancelada, emDia]);
+  });
+
+  it('blockAt = hoje ja e BLOQUEIO_PROXIMO, nao VENCIDA (limiar <=)', async () => {
+    const gymUnitId = await criarUnidade();
+    // Nomes contra a gravidade: com `<` no lugar de `<=` os dois empatariam
+    // em VENCIDA e o desempate por nome poria "A" primeiro.
+    const vencida = await criarAluno(gymUnitId, 'A Bloqueia Amanha', {
+      invoice: { status: 'OVERDUE', dueAt: emDias(-5), blockAt: emDias(1) },
+    });
+    const bloqueioHoje = await criarAluno(gymUnitId, 'Z Bloqueia Hoje', {
+      invoice: { status: 'OVERDUE', dueAt: emDias(-5), blockAt: emDias(0) },
+    });
+
+    const alunos = await listar({ gymUnitId, status: 'ACTIVE', direcao: 'asc' });
+
+    expect(alunos.map((a) => a.id)).toEqual([bloqueioHoje, vencida]);
+    expect(alunos.map((a) => situacaoEsperada(a.invoiceParaAviso, a.timezoneDaUnidade))).toEqual([
+      'BLOQUEIO_PROXIMO',
+      'VENCIDA',
+    ]);
   });
 
   it('paridade TS/SQL: a ordem do servidor bate com situacaoDeVencimento', async () => {

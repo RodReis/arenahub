@@ -382,13 +382,15 @@ export const STATE_LABELS: Dictionary = {
     EM_DIA: { label: 'Em dia', tone: 'success', icon: 'check-circle' },
     VENCE_EM_BREVE: { label: 'Vence hoje', tone: 'warning', icon: 'alert-circle' },
     /**
-     * `risk`, nao `warning` nem `danger`: mais grave que "vence hoje"
-     * (ainda entra, mas por pouco tempo) e menos definitivo que "vencida"
-     * (ja passou do prazo). Mesmo tom que `riskBand.HIGH` usa para o mesmo
-     * proposito -- alertar sem afirmar o pior caso.
+     * Escala de gravidade: EM_DIA < VENCE_EM_BREVE < VENCIDA < BLOQUEIO_PROXIMO.
+     * Apesar do nome, `BLOQUEIO_PROXIMO` NAO e aviso de bloqueio futuro: o
+     * `blockAt` da invoice JA chegou (`blockAt <= hoje`) e a catraca ja fecha
+     * -- e o pior caso, por isso `danger`. `VENCIDA` e grave mas o aluno ainda
+     * entra (o bloqueio nao chegou), por isso `risk`: o mesmo tom que
+     * `riskBand.HIGH` usa para alertar sem afirmar o pior caso.
      */
-    BLOQUEIO_PROXIMO: { label: 'Bloqueio próximo', tone: 'risk', icon: 'alert-triangle' },
-    VENCIDA: { label: 'Vencida', tone: 'danger', icon: 'x-circle' },
+    BLOQUEIO_PROXIMO: { label: 'Bloqueio próximo', tone: 'danger', icon: 'alert-triangle' },
+    VENCIDA: { label: 'Vencida', tone: 'risk', icon: 'x-circle' },
   },
 };
 

@@ -291,7 +291,7 @@ describe('grid de alunos', () => {
   });
 
   /**
-   * A COLUNA CATRACA e ordenavel por SITUACAO -- o cabecalho vira link.
+   * A COLUNA SITUACAO e ordenavel -- o cabecalho vira link.
    */
   it('permite ordenar pela coluna Situacao', async () => {
     await renderizar([ATIVO_VENCIDO]);

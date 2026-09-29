@@ -779,6 +779,7 @@ export class StudentRepository {
           contexto.tenantId,
           filtro.direcao ?? 'asc',
           filtro,
+          agora,
         );
 
         /*
@@ -975,7 +976,10 @@ function includeDaListagem(agora: Date) {
   return {
     subscriptions: {
       where: { status: { in: ['ACTIVE', 'PAST_DUE'] } },
-      orderBy: { startsAt: 'desc' },
+      // `id desc` desempata como o `DISTINCT ON` de
+      // `idsOrdenadosPorSituacaoFinanceira` -- sem ele, duas assinaturas com
+      // o mesmo `startsAt` podiam dar coluna e ordenacao de assinaturas diferentes.
+      orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
       take: 1,
       select: {
         status: true,
@@ -1189,7 +1193,7 @@ async function idsPorNomeSemAcento(
  *   - ASSIMETRIA DELIBERADA nas datas, copiada de `diferencaEmDias`
  *     (`vencimento.ts:140`): `due_at`/`block_at` sao DATAS-CALENDARIO
  *     gravadas como meia-noite UTC, entao le-se o dia delas EM UTC
- *     (`AT TIME ZONE 'UTC'`); `now()` e um INSTANTE de verdade, e so ele
+ *     (`AT TIME ZONE 'UTC'`); `agora` e um INSTANTE de verdade, e so ele
  *     converte para o fuso da unidade. Converter os dois pelo mesmo fuso
  *     erra por um dia -- foi exatamente o bug que `vencimento.ts` documenta.
  *   - so a invoice em aberto MAIS ANTIGA (`due_at asc`, `id asc` no empate)
@@ -1216,6 +1220,7 @@ async function idsOrdenadosPorSituacaoFinanceira(
     gymUnitId?: string | undefined;
     modalityId?: string | undefined;
   },
+  agora: Date,
 ): Promise<string[]> {
   const linhas = await tx.$queryRaw<{ id: string }[]>`
     WITH assinatura_vigente AS (
@@ -1245,12 +1250,12 @@ async function idsOrdenadosPorSituacaoFinanceira(
         CASE
           WHEN io.student_id IS NULL THEN 3
           WHEN (io.due_at AT TIME ZONE 'UTC')::date
-               > (now() AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 3
+               > (${agora}::timestamptz AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 3
           WHEN (io.due_at AT TIME ZONE 'UTC')::date
-               = (now() AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 2
+               = (${agora}::timestamptz AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 2
           WHEN io.block_at IS NOT NULL
                AND (io.block_at AT TIME ZONE 'UTC')::date
-                   <= (now() AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 0
+                   <= (${agora}::timestamptz AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 0
           ELSE 1
         END AS prioridade
       FROM students s
