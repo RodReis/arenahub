@@ -14,7 +14,11 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
-import { fraseDeVencimento, situacaoDeVencimento } from '../../../src/billing/vencimento';
+import {
+  fraseDeVencimento,
+  situacaoDeVencimento,
+  type SituacaoDeVencimento,
+} from '../../../src/billing/vencimento';
 import { MOTIVO_DA_SITUACAO, planoDaListagem } from '../../../src/students/formatar';
 import { AvisoDePerfilAlterado } from '../../../src/components/aviso-de-perfil-alterado';
 import { AcoesDoAluno } from './acoes-do-aluno';
@@ -51,6 +55,23 @@ interface Aluno {
   invoiceParaAviso: { status: string; dueAt: string; blockAt: string | null } | null;
   /** Fuso da unidade de origem do aluno (INV-144/ADR-019), para o mesmo aviso. */
   timezoneDaUnidade: string | null;
+}
+
+/**
+ * A SITUACAO FINANCEIRA so existe para aluno ATIVO com invoice e fuso
+ * cadastrados -- ver o comentario da coluna Situacao. Extraida porque as
+ * colunas Situacao, Motivo e Acao decidiam esse mesmo criterio cada uma do
+ * seu jeito (29/09/2026): a de Acao nao calculava a situacao, so checava
+ * `status`, e por isso nunca liberava a catraca de quem so tem o bloqueio
+ * financeiro (`BLOQUEIO_PROXIMO`) sem que alguem tenha mudado o status do
+ * aluno a mao.
+ */
+function situacaoFinanceira(aluno: Aluno, agora: Date): SituacaoDeVencimento | null {
+  if (aluno.status !== 'ACTIVE' || !aluno.invoiceParaAviso || !aluno.timezoneDaUnidade) {
+    return null;
+  }
+
+  return situacaoDeVencimento(aluno.invoiceParaAviso, agora, aluno.timezoneDaUnidade);
 }
 
 interface Unidade {
@@ -450,19 +471,14 @@ export default async function PaginaDeAlunos({
               Cancelado, Interessado ou Experimental mostra o PROPRIO status,
               porque isso e mais urgente que saber se a ultima fatura venceu.
 
-              Sem invoice em aberto OU sem o fuso da unidade cadastrado, a
-              situacao cai em EM_DIA -- e junto com `podeSerFinanceira` abaixo
-              isso faz a celula mostrar o status normal, exatamente como
-              antes desta fatia.
+              Sem invoice em aberto OU sem o fuso da unidade cadastrado,
+              `situacaoFinanceira` devolve `null` e a celula mostra o status
+              normal, exatamente como antes desta fatia.
             */
             render: (aluno) => {
-              const podeSerFinanceira = aluno.status === 'ACTIVE';
-              const situacao =
-                podeSerFinanceira && aluno.invoiceParaAviso && aluno.timezoneDaUnidade
-                  ? situacaoDeVencimento(aluno.invoiceParaAviso, agora, aluno.timezoneDaUnidade)
-                  : 'EM_DIA';
+              const situacao = situacaoFinanceira(aluno, agora);
 
-              if (podeSerFinanceira && aluno.invoiceParaAviso && aluno.timezoneDaUnidade) {
+              if (situacao) {
                 return <StateBadge machine="paymentStanding" state={situacao} />;
               }
 
@@ -499,21 +515,16 @@ export default async function PaginaDeAlunos({
             /*
               MOTIVO FINANCEIRO para quem a coluna Situacao mostrou o badge
               financeiro (aluno ATIVO com fatura em aberto/vencida); motivo de
-              STATUS para todo o resto -- mesmo criterio de `podeSerFinanceira`
-              da coluna Situacao, ao lado. As duas colunas precisam concordar:
-              uma mostra o ESTADO, a outra explica O ESTADO — mostrar o motivo
-              de status ao lado de uma badge financeira contaria uma historia
-              e a outra, outra.
+              STATUS para todo o resto -- mesmo `situacaoFinanceira` da coluna
+              Situacao, ao lado. As duas colunas precisam concordar: uma
+              mostra o ESTADO, a outra explica O ESTADO — mostrar o motivo de
+              status ao lado de uma badge financeira contaria uma historia e
+              a outra, outra.
             */
             render: (aluno) => {
-              const podeSerFinanceira = aluno.status === 'ACTIVE';
+              const situacao = situacaoFinanceira(aluno, agora);
 
-              if (podeSerFinanceira && aluno.invoiceParaAviso && aluno.timezoneDaUnidade) {
-                const situacao = situacaoDeVencimento(
-                  aluno.invoiceParaAviso,
-                  agora,
-                  aluno.timezoneDaUnidade,
-                );
+              if (situacao && aluno.invoiceParaAviso && aluno.timezoneDaUnidade) {
                 const frase = fraseDeVencimento(
                   situacao,
                   aluno.invoiceParaAviso,
@@ -553,12 +564,19 @@ export default async function PaginaDeAlunos({
               Cada ícone carrega `aria-label` e `title`: forma sozinha é
               canal único, e isso o PRODUCT.md proíbe. Ver `acoes-do-aluno`.
 
-              A liberação é para BLOCKED ou SUSPENDED (issue #118, ampliado em
-              29/09/2026): sao os dois status que uma acao manual no painel
-              aplica quando a catraca esta de fato fechada (M2-BR-007), sem
-              oferecer "liberação financeira" para os 1.926 alunos importados
-              (CANCELLED, sem cobrança real) nem para cancelamento por outro
-              motivo.
+              A liberação é para BLOCKED, SUSPENDED ou BLOQUEIO_PROXIMO
+              (issue #118, ampliado em 29/09/2026): os dois primeiros sao
+              status que uma acao manual no painel aplica quando a catraca
+              esta de fato fechada (M2-BR-007); o terceiro e a mesma situacao
+              financeira que a coluna Situacao mostra como badge "Bloqueada"
+              -- aluno ATIVO cujo `blockAt` ja passou, MAS cujo `status` nunca
+              mudou porque nenhum job aplica `BLOCKED` automaticamente (ver
+              `situacaoFinanceira`, definida acima). Sem essa terceira perna,
+              quem tem so o bloqueio financeiro nunca ganhava o botao.
+
+              Nao oferece "liberação financeira" para os 1.926 alunos
+              importados (CANCELLED, sem cobrança real) nem para cancelamento
+              por outro motivo.
             */
             /*
               O ATALHO DE OVERRIDE MANUAL SAIU DAQUI (decisão do PI,
@@ -570,7 +588,11 @@ export default async function PaginaDeAlunos({
             render: (aluno) => (
               <AcoesDoAluno
                 studentId={aluno.id}
-                podeLiberar={aluno.status === 'BLOCKED' || aluno.status === 'SUSPENDED'}
+                podeLiberar={
+                  aluno.status === 'BLOCKED' ||
+                  aluno.status === 'SUSPENDED' ||
+                  situacaoFinanceira(aluno, agora) === 'BLOQUEIO_PROXIMO'
+                }
                 liberacao={<BotaoDeLiberacao studentId={aluno.id} />}
               />
             ),
