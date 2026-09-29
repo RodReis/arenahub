@@ -14,7 +14,7 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
-import { situacaoDeVencimento } from '../../../src/billing/vencimento';
+import { fraseDeVencimento, situacaoDeVencimento } from '../../../src/billing/vencimento';
 import { MOTIVO_DA_SITUACAO, planoDaListagem } from '../../../src/students/formatar';
 import { AvisoDePerfilAlterado } from '../../../src/components/aviso-de-perfil-alterado';
 import { AcoesDoAluno } from './acoes-do-aluno';
@@ -354,7 +354,7 @@ export default async function PaginaDeAlunos({
           },
           {
             key: 'catraca',
-            header: 'ID da catraca',
+            header: 'Catraca',
             role: 'code',
             /*
               O NÚMERO DO EQUIPAMENTO NO LUGAR DA MATRÍCULA.
@@ -437,41 +437,36 @@ export default async function PaginaDeAlunos({
           },
           {
             key: 'situacao',
+            sortKey: 'situacao',
             header: 'Situação',
             role: 'state',
             /*
-              MARCA DE VENCIMENTO -- F53 Task 12, spec SPEC-053 §3.4.
+              SITUACAO FINANCEIRA para quem esta ATIVO, STATUS para todo o
+              resto -- decisao do PI, 29/09/2026.
 
-              A CENA REAL: a recepcionista olha a LISTA de alunos, nao so a
-              ficha de um, e precisa ver quem esta vencido ou vencendo sem
-              abrir cada cadastro. `situacaoDeVencimento` e derivada de
-              `invoiceParaAviso`/`timezoneDaUnidade`, que a lista ja traz --
-              sem tabela nova, sem provedor, sem push.
+              As duas perguntas sao diferentes ("ele pode treinar?" contra
+              "ele esta pagando em dia?"), e so faz sentido responder a
+              segunda quando a primeira ja e sim: aluno Bloqueado, Suspenso,
+              Cancelado, Interessado ou Experimental mostra o PROPRIO status,
+              porque isso e mais urgente que saber se a ultima fatura venceu.
 
-              Sem invoice em aberto OU sem o fuso da unidade cadastrado, nao
-              ha base para avisar -- a linha fica exatamente como antes desta
-              fatia.
+              Sem invoice em aberto OU sem o fuso da unidade cadastrado, a
+              situacao cai em EM_DIA -- e junto com `podeSerFinanceira` abaixo
+              isso faz a celula mostrar o status normal, exatamente como
+              antes desta fatia.
             */
             render: (aluno) => {
+              const podeSerFinanceira = aluno.status === 'ACTIVE';
               const situacao =
-                aluno.invoiceParaAviso && aluno.timezoneDaUnidade
+                podeSerFinanceira && aluno.invoiceParaAviso && aluno.timezoneDaUnidade
                   ? situacaoDeVencimento(aluno.invoiceParaAviso, agora, aluno.timezoneDaUnidade)
                   : 'EM_DIA';
 
-              return (
-                <>
-                  <StateBadge machine="student" state={aluno.status} />
-                  {situacao !== 'EM_DIA' ? (
-                    <Consequencia tom="danger" testId={`vencimento-${aluno.id}`}>
-                      {situacao === 'VENCE_EM_BREVE'
-                        ? ' — mensalidade vence hoje'
-                        : situacao === 'BLOQUEIO_PROXIMO'
-                          ? ' — mensalidade vencida, bloqueio próximo'
-                          : ' — mensalidade vencida'}
-                    </Consequencia>
-                  ) : null}
-                </>
-              );
+              if (podeSerFinanceira && aluno.invoiceParaAviso && aluno.timezoneDaUnidade) {
+                return <StateBadge machine="paymentStanding" state={situacao} />;
+              }
+
+              return <StateBadge machine="student" state={aluno.status} />;
             },
           },
           {
@@ -501,8 +496,39 @@ export default async function PaginaDeAlunos({
               escreveu por extenso. Quem não tem mouse lê o texto completo na
               ficha do aluno.
             */
-            render: (aluno) =>
-              aluno.statusReason ? (
+            /*
+              MOTIVO FINANCEIRO para quem a coluna Situacao mostrou o badge
+              financeiro (aluno ATIVO com fatura em aberto/vencida); motivo de
+              STATUS para todo o resto -- mesmo criterio de `podeSerFinanceira`
+              da coluna Situacao, ao lado. As duas colunas precisam concordar:
+              uma mostra o ESTADO, a outra explica O ESTADO — mostrar o motivo
+              de status ao lado de uma badge financeira contaria uma historia
+              e a outra, outra.
+            */
+            render: (aluno) => {
+              const podeSerFinanceira = aluno.status === 'ACTIVE';
+
+              if (podeSerFinanceira && aluno.invoiceParaAviso && aluno.timezoneDaUnidade) {
+                const situacao = situacaoDeVencimento(
+                  aluno.invoiceParaAviso,
+                  agora,
+                  aluno.timezoneDaUnidade,
+                );
+                const frase = fraseDeVencimento(
+                  situacao,
+                  aluno.invoiceParaAviso,
+                  agora,
+                  aluno.timezoneDaUnidade,
+                );
+
+                return frase ? (
+                  <span data-testid={`motivo-financeiro-${aluno.id}`}>{frase}</span>
+                ) : (
+                  <Ausente />
+                );
+              }
+
+              return aluno.statusReason ? (
                 <span
                   data-testid={`motivo-${aluno.id}`}
                   {...(aluno.statusReasonNote ? { title: aluno.statusReasonNote } : {})}
@@ -511,7 +537,8 @@ export default async function PaginaDeAlunos({
                 </span>
               ) : (
                 <Ausente />
-              ),
+              );
+            },
           },
           {
             key: 'acao',

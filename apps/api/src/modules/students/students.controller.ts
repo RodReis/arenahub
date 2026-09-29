@@ -284,7 +284,7 @@ const esquemaDeStatus = z
   });
 
 /** Colunas por onde a listagem aceita ordenar. Lista branca. */
-const ordemDeListagem = z.enum(['nome', 'matricula', 'nascimento']);
+const ordemDeListagem = z.enum(['nome', 'matricula', 'nascimento', 'situacao']);
 
 /**
  * Numero que o leitor (cartao de catraca ou identificador facial) reconhece
@@ -491,7 +491,7 @@ export class StudentsController {
        * edita e o navegador restaura de sessao antiga.
        */
       ...(ordemDeListagem.safeParse(ordem).success
-        ? { ordem: ordem as 'nome' | 'matricula' | 'nascimento' }
+        ? { ordem: ordem as 'nome' | 'matricula' | 'nascimento' | 'situacao' }
         : {}),
       ...(direcao === 'asc' || direcao === 'desc' ? { direcao } : {}),
     });

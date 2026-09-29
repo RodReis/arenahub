@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { diasDeAtraso, faturaEmDestaque, situacaoDeVencimento } from './vencimento';
+import { diasDeAtraso, faturaEmDestaque, fraseDeVencimento, situacaoDeVencimento } from './vencimento';
 
 describe('situacaoDeVencimento', () => {
   it('vencida quando o vencimento ja passou e a invoice segue aberta', () => {
@@ -182,5 +182,108 @@ describe('diasDeAtraso', () => {
 
     expect(diasDeAtraso(vencida('2026-08-24'), instante, 'America/Sao_Paulo')).toBe(1);
     expect(diasDeAtraso(vencida('2026-08-24'), instante, 'America/Manaus')).toBe(0);
+  });
+});
+
+describe('fraseDeVencimento', () => {
+  const tz = 'America/Sao_Paulo';
+  const agora = new Date('2026-09-25T12:00:00Z');
+
+  it('EM_DIA nao tem frase -- a celula mostra Ausente', () => {
+    expect(
+      fraseDeVencimento(
+        'EM_DIA',
+        { status: 'OPEN', dueAt: '2026-10-05T00:00:00Z', blockAt: null },
+        agora,
+        tz,
+      ),
+    ).toBeNull();
+  });
+
+  it('VENCE_EM_BREVE diz que vence hoje, sem numero', () => {
+    expect(
+      fraseDeVencimento(
+        'VENCE_EM_BREVE',
+        { status: 'OPEN', dueAt: '2026-09-25T00:00:00Z', blockAt: null },
+        agora,
+        tz,
+      ),
+    ).toBe('Mensalidade vence hoje');
+  });
+
+  /*
+   * BLOQUEIO_PROXIMO E O ESTADO MAIS GRAVE: `blockAt` ja chegou. Nao existe
+   * "faltam N dias" aqui -- por definicao o prazo acabou. A frase diz o que a
+   * recepcao precisa saber: a catraca esta fechando por este aluno.
+   */
+  it('BLOQUEIO_PROXIMO diz que o bloqueio chegou, quando blockAt e hoje', () => {
+    expect(
+      fraseDeVencimento(
+        'BLOQUEIO_PROXIMO',
+        { status: 'OVERDUE', dueAt: '2026-09-20T00:00:00Z', blockAt: '2026-09-25T00:00:00Z' },
+        agora,
+        tz,
+      ),
+    ).toBe('Bloqueio da catraca a partir de hoje');
+  });
+
+  it('BLOQUEIO_PROXIMO diz ha quantos dias bloqueou, quando blockAt ja passou', () => {
+    expect(
+      fraseDeVencimento(
+        'BLOQUEIO_PROXIMO',
+        { status: 'OVERDUE', dueAt: '2026-09-15T00:00:00Z', blockAt: '2026-09-22T00:00:00Z' },
+        agora,
+        tz,
+      ),
+    ).toBe('Catraca bloqueada há 3 dias');
+  });
+
+  it('BLOQUEIO_PROXIMO no singular', () => {
+    expect(
+      fraseDeVencimento(
+        'BLOQUEIO_PROXIMO',
+        { status: 'OVERDUE', dueAt: '2026-09-15T00:00:00Z', blockAt: '2026-09-24T00:00:00Z' },
+        agora,
+        tz,
+      ),
+    ).toBe('Catraca bloqueada há 1 dia');
+  });
+
+  /*
+   * VENCIDA com `blockAt` no FUTURO e o unico estado onde "bloqueio em N
+   * dias" e verdade -- e e a informacao acionavel: da para cobrar antes de a
+   * catraca fechar.
+   */
+  it('VENCIDA anuncia o bloqueio futuro quando ha blockAt', () => {
+    expect(
+      fraseDeVencimento(
+        'VENCIDA',
+        { status: 'OVERDUE', dueAt: '2026-09-20T00:00:00Z', blockAt: '2026-09-28T00:00:00Z' },
+        agora,
+        tz,
+      ),
+    ).toBe('Mensalidade vencida há 5 dias — bloqueio em 3 dias');
+  });
+
+  it('VENCIDA com bloqueio amanha usa o singular nos dois numeros', () => {
+    expect(
+      fraseDeVencimento(
+        'VENCIDA',
+        { status: 'OVERDUE', dueAt: '2026-09-24T00:00:00Z', blockAt: '2026-09-26T00:00:00Z' },
+        agora,
+        tz,
+      ),
+    ).toBe('Mensalidade vencida há 1 dia — bloqueio em 1 dia');
+  });
+
+  it('VENCIDA sem blockAt fala so do vencimento', () => {
+    expect(
+      fraseDeVencimento(
+        'VENCIDA',
+        { status: 'OVERDUE', dueAt: '2026-09-18T00:00:00Z', blockAt: null },
+        agora,
+        tz,
+      ),
+    ).toBe('Mensalidade vencida há 7 dias');
   });
 });

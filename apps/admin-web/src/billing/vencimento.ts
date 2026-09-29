@@ -195,3 +195,59 @@ function diaCivilComoNumero(instante: Date, timezone: string): number {
 
   return Date.UTC(valor('year'), valor('month') - 1, valor('day'));
 }
+
+/**
+ * A frase da coluna MOTIVO para a situacao financeira da linha -- `null`
+ * quando `EM_DIA`, que e o caso comum e nao precisa de explicacao (a celula
+ * mostra `Ausente`, como qualquer motivo vazio na grid).
+ *
+ * SEPARADA de `situacaoDeVencimento`: aquela decide o ESTADO, esta so
+ * formata o texto para o estado ja decidido -- quem chama sempre calcula os
+ * dois com o MESMO `invoice`/`agora`/`timezone`, senao a frase falaria de um
+ * instante diferente do que a badge ao lado mostra.
+ *
+ * `BLOQUEIO_PROXIMO` NAO ANUNCIA PRAZO FUTURO, e o nome do estado engana:
+ * ele so e alcancado quando `blockAt <= hoje` (ver `situacaoDeVencimento`
+ * acima), ou seja, o bloqueio JA VALE. Quem tem bloqueio marcado para o
+ * futuro esta em `VENCIDA` -- e e la que a contagem regressiva aparece,
+ * porque la ela e acionavel: da para cobrar antes de a catraca fechar.
+ */
+export function fraseDeVencimento(
+  situacao: SituacaoDeVencimento,
+  invoice: InvoiceParaAviso,
+  agora: Date,
+  timezone: string,
+): string | null {
+  switch (situacao) {
+    case 'EM_DIA':
+      return null;
+
+    case 'VENCE_EM_BREVE':
+      return 'Mensalidade vence hoje';
+
+    case 'BLOQUEIO_PROXIMO': {
+      // `blockAt` nunca e nulo aqui -- `situacaoDeVencimento` so devolve este
+      // estado depois de checa-lo. O `?? ''` existe so para o compilador:
+      // `diferencaEmDias` pede `string`, e o estreitamento nao atravessa a
+      // fronteira da funcao.
+      const dias = -diferencaEmDias(invoice.blockAt ?? '', agora, timezone);
+
+      if (dias <= 0) return 'Bloqueio da catraca a partir de hoje';
+
+      return `Catraca bloqueada há ${dias} ${dias === 1 ? 'dia' : 'dias'}`;
+    }
+
+    case 'VENCIDA': {
+      const atraso = diasDeAtraso(invoice, agora, timezone);
+      const base = `Mensalidade vencida há ${atraso} ${atraso === 1 ? 'dia' : 'dias'}`;
+
+      if (invoice.blockAt === null) return base;
+
+      // Aqui `blockAt` esta no FUTURO -- se estivesse no passado ou hoje, o
+      // estado seria `BLOQUEIO_PROXIMO`, nao `VENCIDA`.
+      const ateBloquear = diferencaEmDias(invoice.blockAt, agora, timezone);
+
+      return `${base} — bloqueio em ${ateBloquear} ${ateBloquear === 1 ? 'dia' : 'dias'}`;
+    }
+  }
+}
