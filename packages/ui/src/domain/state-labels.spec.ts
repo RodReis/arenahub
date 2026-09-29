@@ -144,7 +144,7 @@ describe('state-labels', () => {
       icon: 'alert-circle',
     });
     expect(stateLabel('paymentStanding', 'BLOQUEIO_PROXIMO')).toEqual({
-      label: 'Bloqueio próximo',
+      label: 'Bloqueada',
       tone: 'danger',
       icon: 'alert-triangle',
     });

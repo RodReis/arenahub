@@ -141,6 +141,30 @@ describe('grid de alunos', () => {
     expect(screen.getByTestId(`acao-editar-${BLOQUEADO.id}`)).toBeInTheDocument();
   });
 
+  /**
+   * A LIBERACAO FINANCEIRA (BotaoDeLiberacao) cobre BLOCKED e SUSPENDED
+   * (ampliado em 29/09/2026): sao os dois status que uma acao manual no
+   * painel aplica quando a catraca esta de fato fechada -- ver o comentario
+   * em page.tsx acima de <AcoesDoAluno>.
+   */
+  it('oferece liberacao financeira para aluno bloqueado', async () => {
+    await renderizar([BLOQUEADO]);
+
+    expect(screen.getByTestId(`liberar-${BLOQUEADO.id}`)).toBeInTheDocument();
+  });
+
+  it('oferece liberacao financeira para aluno suspenso', async () => {
+    await renderizar([SUSPENSO]);
+
+    expect(screen.getByTestId(`liberar-${SUSPENSO.id}`)).toBeInTheDocument();
+  });
+
+  it('nao oferece liberacao financeira para aluno ativo', async () => {
+    await renderizar([BASE]);
+
+    expect(screen.queryByTestId(`liberar-${BASE.id}`)).not.toBeInTheDocument();
+  });
+
   /*
    * A data é RELATIVA a hoje, nunca literal: `page.tsx` usa `new Date()` como
    * "agora", que o teste não controla. Data fixa faria o CI ficar vermelho
@@ -214,10 +238,10 @@ describe('grid de alunos', () => {
    * BLOQUEIO_PROXIMO E O ESTADO MAIS GRAVE -- `blockAt` JA passou. Ver "A
    * semantica REAL dos 4 estados" no plano: nao e aviso de bloqueio futuro.
    */
-  it('mostra "Bloqueio proximo" para quem ja passou do prazo de bloqueio', async () => {
+  it('mostra "Bloqueada" para quem ja passou do prazo de bloqueio', async () => {
     await renderizar([ATIVO_BLOQUEIO_CHEGOU]);
 
-    expect(screen.getByText('Bloqueio próximo')).toBeInTheDocument();
+    expect(screen.getByText('Bloqueada')).toBeInTheDocument();
   });
 
   it('mostra "Em dia" para quem tem fatura em aberto ainda por vencer', async () => {
@@ -241,7 +265,7 @@ describe('grid de alunos', () => {
     const tabela = within(screen.getByTestId('tabela-de-alunos'));
 
     expect(tabela.getByText('Bloqueado')).toBeInTheDocument();
-    expect(tabela.queryByText('Bloqueio próximo')).not.toBeInTheDocument();
+    expect(tabela.queryByText('Bloqueada')).not.toBeInTheDocument();
   });
 
   /**
