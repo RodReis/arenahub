@@ -292,6 +292,33 @@ Overline 11 px uppercase → valor 26/32 px 700 tabular (margem `6px 0 8px`) →
 
 Duas intensidades, para o alerta não se diluir num painel colorido: **repouso** (acima) e **alerta**, quando o número é o problema (dívida em aberto, queda do recebido): fundo inteiro a 7% e degradê a 14%. O texto não muda de cor em nenhum dos dois — valor em `text/strong`, rótulo em `text/muted` — e o selo é `aria-hidden`: quem informa é o rótulo. Implementação de referência: `estiloDoKpi()`, `SeloDoTom` e `CabecalhoDoKpi` em `apps/admin-web/app/(protected)/billing/page.tsx`. Card de gráfico usa o mesmo tom no título (`TituloDoGrafico`).
 
+### 4.6b `PainelDeEstado` — o tom saiu do dashboard e virou componente
+
+**Emenda de 29/09/2026, decisão do PI.** O tratamento da §4.6 valia só na tela de resumo: a v1.0 dizia que a licença expressiva "não se estende às demais telas por tabela". O PI pediu a mesma presença visual no **financeiro do aluno** — uma superfície de trabalho — e, informado de que isso contrariava a restrição, decidiu **ampliar o design system** em vez de copiar o estilo numa segunda tela.
+
+O que muda:
+
+- Os três helpers privados de `billing/page.tsx` (`estiloDoKpi`, `SeloDoTom`, `CabecalhoDoKpi`) têm agora um equivalente público: **`PainelDeEstado`**, em `packages/ui`. A razão é concreta — cópia foi como o painel financeiro e a inadimplência acabaram com **dois vermelhos diferentes** para a mesma faixa de atraso (ver o comentário de `COR_DA_FAIXA`). Um componente só tem um vermelho só.
+- **Qualquer tela pode usá-lo**, não só o dashboard. O que continua valendo é a regra de conteúdo: o tom é o do **estado que o número descreve**, e some quando não há estado. Tela de trabalho não ganha cor por enfeite — ganha quando tem estado a comunicar.
+- A intensidade de **alerta** exige que o próprio número seja o problema. Cobrança em aberto do mês corrente é o caso **normal** do balcão: pinta em repouso. Vencida pinta em alerta.
+
+Contrato do componente:
+
+| Prop | Papel |
+|---|---|
+| `rotulo` | Overline. **É o canal textual** — cor nunca informa sozinha |
+| `tom` | Um dos seis da §2.3 |
+| `icone` | Selo de 32 px, `aria-hidden`, decorativo |
+| `emAlerta` | Liga a segunda intensidade |
+| `children` | O valor. `<output>` e `<strong>` escalam para 28 px; o resto volta a corpo |
+| `apoio` | Linha abaixo do valor. `<strong>` aqui recebe o tom |
+
+**O tom viaja em `--tomCheio`, não em `color`.** Com `color`, toda a árvore herdaria o tom e o valor sairia vermelho no estado de alerta — foi o que aconteceu na primeira versão, e só apareceu no navegador: typecheck, lint e 260 testes passaram verdes com o número da cor e do tamanho errados. Com a variável, o padrão é **não** tingir; quem quer o tom pede por nome.
+
+**Contraste medido no navegador**, no pior caso (topo do degradê em alerta): valor **11,39** · rótulo e apoio **4,73** · nota de urgência **5,80** — contra os 3,0 e 4,5 exigidos por `M1-NFR-008`. A nota de urgência só passa porque o tom vai **misturado a `text/strong` a 72%**: o `--ah-state-danger` puro dava 4,12 em 14 px, e reprovava.
+
+**Aresta de 3 px sobre canto arredondado** é sinalizada pelo detector genérico de antipadrão como conflito com o raio. Verificada no navegador: o canto renderiza mitrado e limpo. É o padrão aprovado da §4.6 e **fica** — a decisão do PI vence a regra genérica.
+
 ### 4.7 Badge
 
 `inline-flex`, 22 px, padding lateral 8 px, raio 4 px, gap 6 px, 12 px/600. Fundo, borda e texto vêm da tripla do tom; ícone 13 px em `currentColor`. Em célula de tabela leva `white-space: nowrap`.

@@ -115,6 +115,26 @@ O que a emenda **não toca**, porque não é estética e sim contrato:
 sob a regra original: elas são superfícies de trabalho, e o dashboard é a de resumo — a única que
 alguém olha de longe, entre atendimentos.
 
+### Emenda de 29/09/2026 — a superfície tingida virou componente do design system
+
+**Decisão do PI.** Pedido o mesmo tratamento visual no **financeiro do aluno** — superfície de
+trabalho, não de resumo — e avisado de que a emenda acima o excluía, o PI optou por **ampliar o
+design system** em vez de abrir exceção tela a tela.
+
+O que a emenda de 01/09 abriu para o dashboard agora existe como **`PainelDeEstado`**
+(`packages/ui`, DS-PAINEL §4.6b) e **qualquer tela pode usar**. O que ficou de pé é o que sempre
+foi a regra real, e que nunca foi sobre *qual tela*:
+
+- **O tom é o do estado que o número descreve, e some quando não há estado.** Cor por enfeite
+  continua fora — em toda tela, inclusive no dashboard.
+- **Alerta exige que o número seja o problema.** Cobrança do mês em aberto é o caso normal do
+  balcão e pinta em repouso; vencida pinta em alerta. Se tudo alarma, nada alarma.
+- **Contraste AA e cor nunca como canal único** seguem verificados por medição, não por
+  intenção — ver os números em DS-PAINEL §4.6b.
+
+A frase acima ("não se estende às demais telas") passa a valer como **regra de conteúdo, não de
+rota**: o que não se estende é pintar tela sem estado, não o componente.
+
 ## Design Principles
 
 1. **A exceção é o caso principal.** A recepção abre o painel quando algo deu errado. O caminho

@@ -3,7 +3,18 @@
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { EmptyState, Field, Money, SensitiveAction, useToast, useToastDeErro } from '@arenahub/ui';
+import {
+  Button,
+  EmptyState,
+  Field,
+  Icon,
+  Money,
+  SensitiveAction,
+  useToast,
+  useToastDeErro,
+} from '@arenahub/ui';
+
+import estilos from './painel-de-cobranca.module.css';
 
 import {
   abrirCobranca,
@@ -42,13 +53,22 @@ const RESUMO_POR_FORMA: Record<FormaDePagamento, string> = {
   CREDITO: 'no crédito pela maquininha',
 };
 
+/**
+ * O UNICO PRIMARIO DA TELA (DS-PAINEL §4.8).
+ *
+ * Era um `<button>` cru, sem classe -- renderizava como texto sublinhado
+ * colado na propria nota de rodape, indistinguivel de um link. O `Button` do
+ * design system traz o gradiente de acao, a altura de 36 px e o estado
+ * `disabled` que o `useFormStatus` precisa mostrar durante o envio.
+ */
 function BotaoDeGerar() {
   const { pending } = useFormStatus();
 
   return (
-    <button type="submit" disabled={pending} data-testid="gerar-cobranca">
+    <Button variant="solid" type="submit" disabled={pending} data-testid="gerar-cobranca">
+      <Icon name="receipt" />
       {pending ? 'Gerando…' : 'Gerar cobrança do mês'}
-    </button>
+    </Button>
   );
 }
 
@@ -164,13 +184,20 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
         pagou mais e a tela só diria "paga".
       */}
       {estadoDoPagamento.sucesso?.creditoGerado ? (
-        <p role="status" data-testid="credito-gerado">
+        <p role="status" data-testid="credito-gerado" className={estilos['aviso']} data-tom="info">
+          <Icon name="alert-circle" />
           Pagamento registrado. A diferença virou crédito do aluno e abate a próxima cobrança.
         </p>
       ) : null}
 
       {reciboDoBalcao ? (
-        <p role="status" data-testid="recibo-emitido-em-especie">
+        <p
+          role="status"
+          data-testid="recibo-emitido-em-especie"
+          className={estilos['aviso']}
+          data-tom="success"
+        >
+          <Icon name="check-circle" />
           Recibo nº {reciboDoBalcao.numero} emitido.
         </p>
       ) : null}
@@ -182,7 +209,13 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
           hint="A cobrança nasce da assinatura — atribua um plano antes de gerar."
         />
       ) : (
-        <form action={gerar}>
+        /*
+          O botao e a nota ficam EMPILHADOS, nao lado a lado. Eram irmaos
+          diretos de um `<form>` sem estilo: o `<small>` colava no rotulo do
+          botao e a frase lia como parte dele ("Gerar cobranca do mesGerar de
+          novo no mesmo mes nao duplica").
+        */
+        <form action={gerar} className={estilos['gerar']}>
           <input type="hidden" name="subscriptionId" value={subscriptionId} />
           <BotaoDeGerar />
           {/*
@@ -190,20 +223,36 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
             ANTES de clicar de novo — senão evita o clique com medo de cobrar
             duas vezes, e liga para o suporte.
           */}
-          <small>Gerar de novo no mesmo mês não duplica: devolve a mesma cobrança.</small>
+          <small className={estilos['nota']}>
+            Gerar de novo no mesmo mês não duplica: devolve a mesma cobrança.
+          </small>
         </form>
       )}
 
       {invoicesEmAberto.length > 0 ? (
-        <section aria-labelledby="titulo-receber">
+        <section aria-labelledby="titulo-receber" className={estilos['receber']}>
           <h3 id="titulo-receber">Receber no balcão</h3>
 
-          <ul>
+          <ul className={estilos['lista']}>
             {invoicesEmAberto.map((invoice) => (
-              <li key={invoice.id}>
-                Cobrança nº {invoice.number} —{' '}
-                <Money cents={invoice.totalMinor} currency={invoice.currency} />
-                <SeletorDeForma onEscolher={(forma) => escolherForma(invoice, forma)} />
+              /*
+                Cada cobranca e um BLOCO fechado, nao um item de lista solto: o
+                valor e os quatro canais que o recebem precisam ler como uma
+                unidade. Com duas cobrancas em aberto -- que acontece -- a
+                versao anterior deixava oito botoes seguidos sem dizer quais
+                quatro pertenciam a qual valor.
+              */
+              <li key={invoice.id} className={estilos['cobranca']}>
+                <div className={estilos['identificacao']}>
+                  <span className={estilos['numeroDaCobranca']}>Cobrança nº {invoice.number}</span>
+                  <span className={estilos['valorDaCobranca']}>
+                    <Money cents={invoice.totalMinor} currency={invoice.currency} />
+                  </span>
+                </div>
+                <SeletorDeForma
+                  onEscolher={(forma) => escolherForma(invoice, forma)}
+                  escolhida={cobrando?.invoice.id === invoice.id ? cobrando.forma : null}
+                />
               </li>
             ))}
           </ul>

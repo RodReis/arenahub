@@ -53,6 +53,14 @@ export const ICON_NAMES = [
   'cake',
   // Seta simples: o indicador de accordion recolhivel/expansivel.
   'chevron-down',
+  // Canais de recebimento no balcao -- um glifo por forma, para os quatro
+  // botoes do seletor pararem de ser quatro retangulos identicos. O canal e
+  // a unica coisa que muda entre eles (`receivedVia`), e ate aqui so o texto
+  // dizia qual era.
+  'banknote',
+  'qr-code',
+  'credit-card',
+  'wallet',
 ] as const;
 
 /**
@@ -176,6 +184,15 @@ const PATHS: Record<IconName, readonly string[]> = {
     'M12 8c1.4 0 2-1 2-2s-2-3-2-3-2 1.7-2 3 .6 2 2 2z',
   ],
   'chevron-down': ['m6 9 6 6 6-6'],
+  // Cedula com a marca no centro: dinheiro em especie.
+  banknote: ['M2 6h20v12H2z', 'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z', 'M6 12h.01', 'M18 12h.01'],
+  // Tres modulos de leitura mais um alvo: o codigo lido na maquininha.
+  'qr-code': ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M3 14h7v7H3z', 'M14 14h3v3h-3z', 'M19 19h2v2h-2z'],
+  // Cartao com tarja: debito e credito compartilham o glifo, e o rotulo
+  // textual distingue -- sao o mesmo objeto fisico na mao da recepcionista.
+  'credit-card': ['M2 5h20v14H2z', 'M2 10h20'],
+  // Carteira com fecho: o agrupador do bloco de recebimento.
+  wallet: ['M19 7V5a1 1 0 0 0-1-1H4a2 2 0 0 0 0 4h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a2 2 0 0 1-2-2V6', 'M17 13h.01'],
 };
 
 export function Icon({ name }: { name: IconName }) {

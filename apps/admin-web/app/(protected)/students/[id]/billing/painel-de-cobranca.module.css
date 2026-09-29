@@ -1,0 +1,143 @@
+/**
+ * Painel de cobranca -- F-painel-financeiro, reformado em 29/09/2026.
+ *
+ * O bloco inteiro era HTML sem estilo: `<form>`, `<ul>` e `<li>` herdando o
+ * user-agent. Na tela isso virava o botao colado na propria nota de rodape e
+ * quatro botoes identicos pendurados sob um marcador de lista.
+ *
+ * So camada semantica (regra 2 de lint).
+ */
+
+/*
+ * GERAR -- botao acima, nota abaixo. `align-items: start` impede o botao de
+ * esticar para a largura da nota, que e o que `flex-direction: column` sozinho
+ * faz num container largo.
+ */
+.gerar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.nota {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  /* Medida de leitura: a frase explica uma regra do servidor, nao um rotulo. */
+  max-inline-size: 60ch;
+}
+
+/*
+ * RECEBER -- o bloco de trabalho do balcao. Separado do "Gerar" por uma linha,
+ * porque sao dois atos diferentes: um cria a divida, o outro a liquida.
+ */
+.receber {
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * Cada cobranca em aberto e uma superficie AFUNDADA -- o inverso do card, que
+ * e elevado. O bloco esta dentro de um card e recebe trabalho; afundar diz
+ * "aqui voce age" sem abrir uma segunda moldura sobre a primeira (card dentro
+ * de card e sempre erro, `globals.css`).
+ */
+.cobranca {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-sunken);
+}
+
+/*
+ * Numero a esquerda, valor a direita -- o valor e o que a recepcionista
+ * confere contra o dinheiro na mao, e alinhado a direita ele cai na mesma
+ * coluna quando ha duas cobrancas empilhadas.
+ */
+.identificacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.numeroDaCobranca {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * O VALOR e o numero que se confere -- sobe um degrau de escala e ganha o
+ * peso. Tabular para as casas decimais caírem na mesma vertical entre linhas.
+ */
+.valorDaCobranca output,
+.valorDaCobranca {
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: var(--ah-type-heading-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * AVISO de resultado -- credito gerado, recibo emitido. Faixa do tom com
+ * icone, nao paragrafo solto: sao as duas frases que respondem "o dinheiro
+ * entrou?", e em texto cru elas somem no meio do painel.
+ *
+ * Tom por `currentColor`, como o `StateBadge`: dois tons em duas regras.
+ */
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid;
+  border-radius: var(--ah-radius-card);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+}
+
+/*
+ * O TOM entra por `--tom`, e NAO por `color`.
+ *
+ * A primeira versao usava `currentColor` como o `StateBadge` faz -- mas o
+ * badge inteiro e do tom, e aqui o texto nao pode ser: texto colorido sobre
+ * fundo tingido do mesmo tom e onde o contraste cai, e o contraste e
+ * contratual (M1-NFR-008). Com `currentColor` seria preciso pintar `color`
+ * para o fundo funcionar e despintar para o texto ficar legivel -- duas
+ * regras brigando, e a ultima vencia calada, deixando fundo e borda
+ * transparentes.
+ */
+.aviso[data-tom='success'] { --tom: var(--ah-state-success); }
+.aviso[data-tom='info'] { --tom: var(--ah-state-info); }
+
+.aviso[data-tom] {
+  color: var(--ah-text-body);
+  background: color-mix(in srgb, var(--tom) 8%, var(--ah-surface-raised));
+  border-color: color-mix(in srgb, var(--tom) 28%, transparent);
+}
+
+/* O glifo carrega o tom cheio -- e o unico elemento do aviso que o faz. */
+.aviso[data-tom] svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--tom);
+}
