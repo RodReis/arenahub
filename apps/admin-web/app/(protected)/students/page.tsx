@@ -354,7 +354,7 @@ export default async function PaginaDeAlunos({
           },
           {
             key: 'catraca',
-            header: 'ID da catraca',
+            header: 'Catraca',
             role: 'code',
             /*
               O NÚMERO DO EQUIPAMENTO NO LUGAR DA MATRÍCULA.
