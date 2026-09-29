@@ -1,6 +1,8 @@
+import { isAbsolute, sep } from 'node:path';
+
 import { describe, expect, it } from '@jest/globals';
 
-import { montarDispositivos } from './montar-dispositivos.js';
+import { CAMINHO_PONTE, montarDispositivos } from './montar-dispositivos.js';
 import { carregarConfig } from '../config/env.js';
 import { criarLogger } from '../observability/logger.js';
 import { FacialSimulator } from '../adapters/facial-simulator.js';
@@ -11,6 +13,32 @@ const baseEnv = {
   TENANT_ID: '11111111-1111-4111-8111-111111111111',
   GYM_UNIT_ID: '22222222-2222-4222-8222-222222222222',
 };
+
+/**
+ * Issue #406, oitavo elo -- Arena Positiva, 26-29/09/2026.
+ *
+ * `CAMINHO_PONTE` era `'native/easyinner-bridge/EasyInnerBridge.exe'`,
+ * relativo. Como servico Windows o `cwd` e `C:\Windows\System32`, e o spawn
+ * morria com `ENOENT` -- so achado ao testar contra hardware real, porque o
+ * driver de diagnostico (`driver-teste.mjs`) nao passa por
+ * `montarDispositivos`.
+ *
+ * Segundo defeito, escondido atras do primeiro: faltava o segmento `bin/`
+ * -- `bridge:build` gera o executavel em `native/easyinner-bridge/bin/
+ * EasyInnerBridge.exe` (`build.ps1`), nao direto em `native/easyinner-
+ * bridge/`. Corrigir so o `cwd` teria continuado a dar ENOENT, pela pasta
+ * errada.
+ */
+describe('CAMINHO_PONTE', () => {
+  it('e absoluto, nao depende do cwd do processo', () => {
+    expect(isAbsolute(CAMINHO_PONTE)).toBe(true);
+  });
+
+  it('aponta para dentro de bin/, onde bridge:build gera o executavel', () => {
+    expect(CAMINHO_PONTE).toContain(`${sep}native${sep}easyinner-bridge${sep}bin${sep}`);
+    expect(CAMINHO_PONTE.endsWith('EasyInnerBridge.exe')).toBe(true);
+  });
+});
 
 describe('montarDispositivos', () => {
   it('monta os dois simuladores quando os flags sao simulador (padrao)', async () => {

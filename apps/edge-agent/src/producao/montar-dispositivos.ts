@@ -8,12 +8,24 @@ import { TurnstileSimulator } from '../adapters/turnstile-simulator.js';
 import { TopdataFacialAdapter } from '../adapters/topdata/topdata-facial-adapter.js';
 import { TopdataInnerAdapter } from '../adapters/topdata/topdata-inner-adapter.js';
 import { PonteEasyInnerProcesso } from '../adapters/topdata/ponte-easyinner-processo.js';
+import { absoluto, raizDoPacote } from './caminhos.js';
 import { conectarComRetry } from './conectar-com-retry.js';
 
 const MAX_TENTATIVAS = 5;
 const INTERVALO_RETRY_MS = 3_000;
 const INNER_PADRAO = 1;
-const CAMINHO_PONTE = 'native/easyinner-bridge/EasyInnerBridge.exe';
+/*
+ * Absoluto a partir da localizacao DESTE ARQUIVO, nao de `process.cwd()`.
+ * Como servico Windows o cwd e `C:\Windows\System32`, e um caminho relativo
+ * aqui daria `spawn ... ENOENT` -- mesma classe de defeito que `SQLITE_PATH`
+ * e `INVENTORY_PATH` tiveram no `main.ts` (#406), agora achada ao testar
+ * contra hardware real: o driver de diagnostico nao passa por
+ * `montarDispositivos`, entao nunca exercitou este caminho.
+ */
+export const CAMINHO_PONTE = absoluto(
+  'native/easyinner-bridge/bin/EasyInnerBridge.exe',
+  raizDoPacote(import.meta.url),
+);
 const PORTA_CATRACA = 3570;
 const TEMPO_CONECTAR_CATRACA_S = 10;
 const PORTA_FACIAL = 7792;
