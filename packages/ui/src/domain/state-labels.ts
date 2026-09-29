@@ -389,7 +389,7 @@ export const STATE_LABELS: Dictionary = {
      * entra (o bloqueio nao chegou), por isso `risk`: o mesmo tom que
      * `riskBand.HIGH` usa para alertar sem afirmar o pior caso.
      */
-    BLOQUEIO_PROXIMO: { label: 'Bloqueio próximo', tone: 'danger', icon: 'alert-triangle' },
+    BLOQUEIO_PROXIMO: { label: 'Bloqueada', tone: 'danger', icon: 'alert-triangle' },
     VENCIDA: { label: 'Vencida', tone: 'risk', icon: 'x-circle' },
   },
 };

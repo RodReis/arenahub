@@ -553,10 +553,12 @@ export default async function PaginaDeAlunos({
               Cada ícone carrega `aria-label` e `title`: forma sozinha é
               canal único, e isso o PRODUCT.md proíbe. Ver `acoes-do-aluno`.
 
-              A liberação é SÓ para BLOCKED (issue #118): é o status que o job
-              de inadimplência aplica (M2-BR-007), sem oferecer "liberação
-              financeira" para os 1.926 alunos importados (CANCELLED, sem
-              cobrança real) nem para cancelamento por outro motivo.
+              A liberação é para BLOCKED ou SUSPENDED (issue #118, ampliado em
+              29/09/2026): sao os dois status que uma acao manual no painel
+              aplica quando a catraca esta de fato fechada (M2-BR-007), sem
+              oferecer "liberação financeira" para os 1.926 alunos importados
+              (CANCELLED, sem cobrança real) nem para cancelamento por outro
+              motivo.
             */
             /*
               O ATALHO DE OVERRIDE MANUAL SAIU DAQUI (decisão do PI,
@@ -568,7 +570,7 @@ export default async function PaginaDeAlunos({
             render: (aluno) => (
               <AcoesDoAluno
                 studentId={aluno.id}
-                podeLiberar={aluno.status === 'BLOCKED'}
+                podeLiberar={aluno.status === 'BLOCKED' || aluno.status === 'SUSPENDED'}
                 liberacao={<BotaoDeLiberacao studentId={aluno.id} />}
               />
             ),
