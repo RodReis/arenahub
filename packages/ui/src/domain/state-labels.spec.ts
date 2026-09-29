@@ -131,4 +131,27 @@ describe('state-labels', () => {
   it('estado desconhecido devolve undefined em vez de rotulo inventado', () => {
     expect(stateLabel('student', 'NAO_EXISTE')).toBeUndefined();
   });
+
+  it('paymentStanding cobre os 4 estados de situacaoDeVencimento, com tom crescente de gravidade', () => {
+    expect(stateLabel('paymentStanding', 'EM_DIA')).toEqual({
+      label: 'Em dia',
+      tone: 'success',
+      icon: 'check-circle',
+    });
+    expect(stateLabel('paymentStanding', 'VENCE_EM_BREVE')).toEqual({
+      label: 'Vence hoje',
+      tone: 'warning',
+      icon: 'alert-circle',
+    });
+    expect(stateLabel('paymentStanding', 'BLOQUEIO_PROXIMO')).toEqual({
+      label: 'Bloqueio próximo',
+      tone: 'risk',
+      icon: 'alert-triangle',
+    });
+    expect(stateLabel('paymentStanding', 'VENCIDA')).toEqual({
+      label: 'Vencida',
+      tone: 'danger',
+      icon: 'x-circle',
+    });
+  });
 });

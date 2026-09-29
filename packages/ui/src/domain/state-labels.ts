@@ -60,7 +60,18 @@ export type StateMachine =
    * do minimo NAO E ERRO, e sim a politica funcionando; `danger`/`warning`
    * pintaria como falha o que e comportamento esperado.
    */
-  | 'rankingSnapshot';
+  | 'rankingSnapshot'
+  /**
+   * Situacao FINANCEIRA do aluno ATIVO -- espelha os 4 valores de
+   * `situacaoDeVencimento` (`apps/admin-web/src/billing/vencimento.ts`).
+   *
+   * NAO E O STATUS DO ALUNO (`student`): um aluno pode estar `ACTIVE` e em
+   * qualquer um destes 4 estados financeiros ao mesmo tempo. Maquina propria
+   * porque as duas perguntas sao diferentes -- "ele pode treinar?" contra
+   * "ele esta pagando em dia?" -- e a coluna Situacao da grid de Alunos
+   * mostra APENAS UMA das duas por vez, conforme o status do aluno.
+   */
+  | 'paymentStanding';
 
 type Dictionary = Readonly<Record<StateMachine, Readonly<Record<string, StateLabel>>>>;
 
@@ -365,6 +376,19 @@ export const STATE_LABELS: Dictionary = {
     PUBLISHED: { label: 'Publicado', tone: 'success', icon: 'check-circle' },
     // NEUTRO, nao danger/warning -- ver o comentario do StateMachine acima.
     WITHHELD: { label: 'Retido — coorte abaixo do mínimo', tone: 'neutral', icon: 'minus' },
+  },
+
+  paymentStanding: {
+    EM_DIA: { label: 'Em dia', tone: 'success', icon: 'check-circle' },
+    VENCE_EM_BREVE: { label: 'Vence hoje', tone: 'warning', icon: 'alert-circle' },
+    /**
+     * `risk`, nao `warning` nem `danger`: mais grave que "vence hoje"
+     * (ainda entra, mas por pouco tempo) e menos definitivo que "vencida"
+     * (ja passou do prazo). Mesmo tom que `riskBand.HIGH` usa para o mesmo
+     * proposito -- alertar sem afirmar o pior caso.
+     */
+    BLOQUEIO_PROXIMO: { label: 'Bloqueio próximo', tone: 'risk', icon: 'alert-triangle' },
+    VENCIDA: { label: 'Vencida', tone: 'danger', icon: 'x-circle' },
   },
 };
 
