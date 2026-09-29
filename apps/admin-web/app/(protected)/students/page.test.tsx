@@ -244,6 +244,26 @@ describe('grid de alunos', () => {
     expect(screen.getByText('Bloqueada')).toBeInTheDocument();
   });
 
+  /**
+   * O BOTAO DE LIBERAR TEM QUE ACOMPANHAR A BADGE "Bloqueada" (29/09/2026).
+   *
+   * `ATIVO_BLOQUEIO_CHEGOU` tem `status: 'ACTIVE'` -- nenhum job muda o
+   * status do aluno sozinho (ver comentario em `situacaoFinanceira`,
+   * page.tsx). Sem essa cobertura, quem so tem o bloqueio financeiro nunca
+   * ganhava o botao, mesmo com a catraca de fato fechada.
+   */
+  it('oferece liberacao financeira para aluno ativo com bloqueio ja chegado', async () => {
+    await renderizar([ATIVO_BLOQUEIO_CHEGOU]);
+
+    expect(screen.getByTestId(`liberar-${ATIVO_BLOQUEIO_CHEGOU.id}`)).toBeInTheDocument();
+  });
+
+  it('nao oferece liberacao financeira para aluno ativo so vencido (bloqueio ainda nao chegou)', async () => {
+    await renderizar([ATIVO_VENCIDO]);
+
+    expect(screen.queryByTestId(`liberar-${ATIVO_VENCIDO.id}`)).not.toBeInTheDocument();
+  });
+
   it('mostra "Em dia" para quem tem fatura em aberto ainda por vencer', async () => {
     await renderizar([ATIVO_EM_DIA]);
 
