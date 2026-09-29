@@ -1,4 +1,4 @@
-import { Button } from '@arenahub/ui';
+import { Button, Icon, type IconName } from '@arenahub/ui';
 
 import estilos from './seletor-de-forma.module.css';
 
@@ -19,32 +19,72 @@ import estilos from './seletor-de-forma.module.css';
  */
 export type FormaDePagamento = 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
 
+/**
+ * Um glifo por canal. Ate aqui os quatro botoes eram retangulos IDENTICOS
+ * distinguidos so pela palavra -- e a escolha e a acao mais repetida do
+ * balcao, feita de relance com a pessoa esperando. O icone da o alvo; o
+ * rotulo continua sendo quem informa (cor e forma nunca sao canal unico).
+ *
+ * Debito e credito compartilham o cartao de proposito: e o mesmo objeto
+ * fisico na mao de quem paga, e inventar dois desenhos diferentes para o
+ * mesmo plastico ensinaria uma distincao que nao existe no balcao.
+ */
+const FORMAS: readonly {
+  readonly forma: FormaDePagamento;
+  readonly rotulo: string;
+  readonly icone: IconName;
+  readonly testId: string;
+}[] = [
+  { forma: 'DINHEIRO', rotulo: 'Dinheiro', icone: 'banknote', testId: 'forma-dinheiro' },
+  { forma: 'PIX', rotulo: 'PIX', icone: 'qr-code', testId: 'forma-pix' },
+  { forma: 'DEBITO', rotulo: 'Débito', icone: 'credit-card', testId: 'forma-debito' },
+  { forma: 'CREDITO', rotulo: 'Crédito', icone: 'credit-card', testId: 'forma-credito' },
+];
+
 interface Props {
   readonly onEscolher: (forma: FormaDePagamento) => void;
+  /** A forma ja escolhida, quando o recebimento esta em curso. */
+  readonly escolhida?: FormaDePagamento | null;
 }
 
-export function SeletorDeForma({ onEscolher }: Props) {
+export function SeletorDeForma({ onEscolher, escolhida = null }: Props) {
   return (
     <fieldset className={estilos['seletor']}>
       <legend className={estilos['legenda']}>Forma de pagamento</legend>
 
       <div className={estilos['opcoes']}>
-        <Button
-          type="button"
-          data-testid="forma-dinheiro"
-          onClick={() => onEscolher('DINHEIRO')}
-        >
-          Dinheiro
-        </Button>
-        <Button type="button" data-testid="forma-pix" onClick={() => onEscolher('PIX')}>
-          PIX
-        </Button>
-        <Button type="button" data-testid="forma-debito" onClick={() => onEscolher('DEBITO')}>
-          Débito
-        </Button>
-        <Button type="button" data-testid="forma-credito" onClick={() => onEscolher('CREDITO')}>
-          Crédito
-        </Button>
+        {FORMAS.map(({ forma, rotulo, icone, testId }) => {
+          const estaEscolhida = escolhida === forma;
+
+          return (
+            <Button
+              key={forma}
+              /*
+               * `outline` e nao `solid`: o unico primario da tela e "Gerar
+               * cobranca do mes" (DS-PAINEL §4.8, um primario por tela). Quatro
+               * botoes cheios lado a lado faziam a tela gritar quatro vezes e
+               * nao apontar para nada.
+               */
+              variant="outline"
+              type="button"
+              data-testid={testId}
+              /*
+               * TRES CANAIS para a escolha, nao so o fundo cinza do hover que
+               * sobrava antes: `aria-pressed` diz ao leitor de tela, o
+               * `data-escolhida` pinta a borda e o fundo no accent, e o rotulo
+               * continua ali. Escolher o canal decide o que vai para a
+               * auditoria -- merece ler como estado, nao como resquicio de
+               * ponteiro.
+               */
+              aria-pressed={estaEscolhida}
+              data-escolhida={estaEscolhida ? 'true' : undefined}
+              onClick={() => onEscolher(forma)}
+            >
+              <Icon name={icone} />
+              {rotulo}
+            </Button>
+          );
+        })}
       </div>
     </fieldset>
   );

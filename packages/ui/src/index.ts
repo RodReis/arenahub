@@ -42,6 +42,7 @@ export { SectionCard } from './components/SectionCard.js';
 export { ConfirmDialog } from './components/ConfirmDialog.js';
 export { SummaryStrip, type CelulaDeResumo } from './components/SummaryStrip.js';
 export { Icon, type IconName } from './components/Icon.js';
+export { PainelDeEstado, type TomDeEstado } from './components/PainelDeEstado.js';
 export { PasswordField } from './components/PasswordField.js';
 export { Cpf } from './components/Cpf.js';
 export { Money } from './components/Money.js';

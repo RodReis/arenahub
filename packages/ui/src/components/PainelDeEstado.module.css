@@ -1,0 +1,199 @@
+/**
+ * Painel de estado -- a superficie tingida pelo tom do que ela mede.
+ *
+ * Generaliza o que a tela de cobranca (`app/(protected)/billing/page.tsx`)
+ * tinha inline desde a emenda de 28/09/2026: aresta superior, degrade que
+ * some antes do meio e selo tingido. Aquilo nasceu como tres helpers privados
+ * de UMA tela; virar componente e o que permite a segunda tela usar sem
+ * copiar -- e copia foi exatamente como o painel financeiro e a tela de
+ * inadimplencia acabaram com dois vermelhos diferentes para "mais de 30 dias".
+ *
+ * UMA VARIAVEL carrega o tom (`--tomCheio`): seis tons em seis linhas, e as
+ * quatro camadas que o usam (aresta, fundo, degrade, selo) derivam dela por
+ * `color-mix`. O StateBadge faz o mesmo com `currentColor`, e aqui isso NAO
+ * serve -- o badge inteiro e do tom, enquanto neste painel o texto nao pode
+ * ser (ver a regra de `.corpo`).
+ *
+ * Le so a camada semantica (regra 2 do DS §11): `--ah-state-*`, nunca
+ * `--ah-carbon-*` cru nem hex literal.
+ */
+.painel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ah-border-default);
+  /* A aresta do tom entra por cima da borda neutra, nao no lugar dela: a
+     borda continua sendo o que separa o card do fundo em tema claro. */
+  border-top: 3px solid var(--tomCheio, var(--ah-border-default));
+  border-radius: var(--ah-radius-card);
+  background-color: var(--ah-surface-raised);
+  box-shadow: var(--ah-card-shadow);
+}
+
+/*
+ * REPOUSO: degrade que parte do tom a 9% e some aos 55%. O card fica tingido
+ * sem que o texto perca contraste -- o fundo sob a linha de base do valor ja
+ * e superficie limpa.
+ */
+.painel[data-tom] {
+  background-image: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--tomCheio) 9%, transparent) 0%,
+    transparent 55%
+  );
+}
+
+/*
+ * ALERTA: o numero E o problema (divida em aberto, bloqueio proximo). Fundo
+ * inteiro a 7% e degrade a 14%.
+ *
+ * Duas intensidades existem para o alerta nao se diluir: num painel onde tudo
+ * e colorido, colorido para de significar. Quem esta em repouso cede contraste
+ * para quem esta em alerta poder gritar.
+ */
+.painel[data-alerta='true'] {
+  background-color: color-mix(in srgb, var(--tomCheio) 7%, var(--ah-surface-raised));
+  background-image: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--tomCheio) 14%, transparent) 0%,
+    transparent 55%
+  );
+}
+
+/*
+ * O tom entra por `--tomCheio` e NAO por `color`.
+ *
+ * Com `color`, toda a arvore herdaria o tom -- e o valor, que e o texto de
+ * maior area do painel, sairia vermelho no estado de alerta. Despintar
+ * elemento por elemento depois seria uma regra nova a cada filho novo, e a
+ * que faltasse sairia colorida em silencio. Com a variavel, o padrao e nao
+ * tingir: quem quer o tom pede por nome.
+ */
+.painel[data-tom='success'] { --tomCheio: var(--ah-state-success); }
+.painel[data-tom='warning'] { --tomCheio: var(--ah-state-warning); }
+.painel[data-tom='danger']  { --tomCheio: var(--ah-state-danger); }
+.painel[data-tom='info']    { --tomCheio: var(--ah-state-info); }
+.painel[data-tom='risk']    { --tomCheio: var(--ah-state-risk); }
+.painel[data-tom='neutral'] { --tomCheio: var(--ah-state-neutral); }
+
+/*
+ * O CABECALHO. Rotulo a esquerda, selo a direita -- a mesma ordem do card de
+ * KPI da tela de cobranca, porque sao a mesma coisa em escalas diferentes.
+ */
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/*
+ * O rotulo e `text-secondary` e NAO o tom: o tom ja esta na aresta, no fundo
+ * e no selo. Pintar tambem o texto derrubaria o contraste sem acrescentar
+ * canal -- e o contraste aqui e contratual (M1-NFR-008), nao preferencia.
+ */
+.rotulo {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/*
+ * O SELO -- icone num quadrado tingido. `aria-hidden` no TSX: quem informa e
+ * o rotulo ao lado, e um leitor de tela anunciando "icone de relogio" antes
+ * de "em aberto" so atrasa a leitura.
+ */
+.selo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ah-radius-control);
+  color: var(--tomCheio);
+  background: color-mix(in srgb, var(--tomCheio) 13%, var(--ah-surface-raised));
+}
+
+/*
+ * A ESCALA DO VALOR MORA NO `.corpo`, nao numa classe `.valor` que quem chama
+ * teria de lembrar de aplicar.
+ *
+ * A primeira versao tinha `.valor` com 28px e `.corpo output { font-size:
+ * inherit }`. O `<output>` do `Money` nao carrega classe nenhuma -- entao
+ * `inherit` puxava do `.corpo`, que nao tinha tamanho, e o valor saia em 14px
+ * de corpo. O defeito so apareceu no navegador: typecheck, lint e 260 testes
+ * passaram verdes com o numero do tamanho errado.
+ *
+ * `color` explicito e nao herdado: o painel inteiro carrega o tom em `color`
+ * para o `color-mix` das camadas funcionar, e sem esta linha o valor sairia
+ * vermelho no estado de alerta -- que foi exatamente o que aconteceu.
+ */
+.corpo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-display-size, 28px);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * O NUMERO escala; o resto nao.
+ *
+ * So `<output>` e `<strong>` herdam o display -- sao os elementos de VALOR.
+ * `<span>` ao lado (badge de estado, unidade, qualificador) volta a escala de
+ * corpo: em 28px o badge roubaria a leitura do proprio numero que qualifica.
+ *
+ * Alvo por ELEMENTO e nao por classe hasheada: `[class*='badge']` dependeria
+ * do nome que o bundler gera para o CSS Module do StateBadge, e quebraria
+ * calado na primeira troca de hash.
+ */
+.corpo > :not(output):not(strong) {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+.apoio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+}
+
+/*
+ * A NOTA DE URGENCIA -- "111 dias de atraso". `<strong>` no apoio carrega o
+ * tom: e a unica linha do painel cujo sentido E a propria urgencia, e ela vem
+ * sempre acompanhada do numero e da palavra (§10 item 1, cor nunca e canal
+ * unico).
+ *
+ * Alvo por ELEMENTO, como no corpo: quem chama escreve `<strong>` e recebe o
+ * tom, sem importar classe do design system para dentro da tela. A primeira
+ * versao exportava uma classe `.urgencia` que nenhuma tela aplicou -- a nota
+ * saiu cinza no navegador com todo o CI verde.
+ *
+ * O TOM VEM ESCURECIDO, e nao cheio. Medido no navegador sobre o painel em
+ * alerta: `--ah-state-danger` puro dava 4,12 no topo do degrade -- abaixo dos
+ * 4,5 que 14 px exige (`M1-NFR-008`). A mistura com `text-strong` mantem o
+ * vermelho legivel como vermelho e sobe o contraste para ~7. Nao e ajuste
+ * estetico: o valor cru reprovava a medicao.
+ */
+.apoio strong {
+  color: color-mix(in srgb, var(--tomCheio) 72%, var(--ah-text-strong));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

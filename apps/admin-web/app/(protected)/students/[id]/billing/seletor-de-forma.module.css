@@ -1,11 +1,11 @@
 /**
- * Seletor de forma de pagamento -- F53, Task 10.
+ * Seletor de forma de pagamento -- F53 Task 10, reformado em 29/09/2026.
  *
  * Le so a camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-state-*`,
  * `--ah-space-*`, nunca `--ah-carbon-*` cru nem hex literal.
  */
 .seletor {
-  margin: 0 0 24px;
+  margin: 0;
   padding: 0;
   border: none;
 }
@@ -13,27 +13,88 @@
 .legenda {
   padding: 0;
   margin-bottom: 8px;
-  font-size: var(--ah-type-body-strong-size);
-  line-height: var(--ah-type-body-strong-lh);
-  font-weight: var(--ah-type-body-strong-weight);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 /*
- * As tres formas em linha, quebrando sozinhas -- e a pessoa esta no balcao,
- * a tela pode estar num monitor estreito de caixa.
+ * As quatro formas em linha, quebrando sozinhas -- a pessoa esta no balcao e a
+ * tela pode estar num monitor estreito de caixa.
+ *
+ * `auto-fit` com minimo de 132 px: em tela larga os quatro cabem numa linha;
+ * num monitor de caixa viram dois por dois, sem nunca deixar um botao orfao
+ * ocupando a largura inteira, que era o que `flex-wrap` produzia.
  */
 .opcoes {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
 }
 
 /*
- * O motivo do cartao indisponivel usa o tom de atencao -- e informativo, nao
- * um erro que a recepcao causou.
+ * O ALVO E O BOTAO INTEIRO, nao o rotulo.
+ *
+ * Escolher o canal e a acao mais repetida do balcao. 56 px de altura da um
+ * alvo confortavel para quem clica rapido com a pessoa esperando, e deixa o
+ * icone respirar acima do rotulo sem virar um bloco de anuncio.
+ *
+ * Estiliza por seletor de descendente porque o `Button` do design system nao
+ * encaminha `className` -- ele fixa a propria classe. Mexer na assinatura do
+ * componente para esta tela seria mudar o contrato de trinta chamadas por
+ * causa de uma.
  */
-.motivo {
-  margin: 8px 0 0;
-  color: var(--ah-state-warning);
-  font-size: var(--ah-type-body-size);
+.opcoes button {
+  flex-direction: column;
+  gap: 6px;
+  height: auto;
+  min-height: 56px;
+  padding: 10px 12px;
+}
+
+/*
+ * O hover traz DOIS canais -- borda E superficie. Realce so por cor some para
+ * quem opera com brilho baixo, que e o caso do balcao sob luz fluorescente.
+ */
+.opcoes button:hover:not(:disabled) {
+  background: var(--ah-surface-sunken);
+}
+
+/*
+ * O glifo fica em `text-icon` e nao no accent: escolher o canal e navegacao
+ * dentro do fluxo, nao o ato de cobrar. O accent pertence ao "Gerar cobranca
+ * do mes", que e o unico primario da tela (regra 5 do PRODUCT.md).
+ */
+.opcoes button svg {
+  color: var(--ah-text-icon);
+}
+
+.opcoes button:hover:not(:disabled) svg {
+  color: var(--ah-text-strong);
+}
+
+/*
+ * A FORMA ESCOLHIDA -- accent, e aqui ele e legitimo: escolher o canal E a
+ * acao em curso, nao navegacao (regra 5 do PRODUCT.md, accent e acao).
+ *
+ * Antes da reforma a unica marca era o fundo cinza que sobrava do hover --
+ * indistinguivel de "o ponteiro passou por aqui" e invisivel depois de tirar
+ * a mao do mouse. O botao carrega `aria-pressed`, entao o estado ja existia
+ * para o leitor de tela; faltava existir para quem enxerga.
+ *
+ * Borda de 2 px com `inset` em vez de `border-width`: trocar a espessura da
+ * borda mexeria na caixa e faria o botao pular 1 px ao ser escolhido.
+ */
+.opcoes button[data-escolhida] {
+  background: color-mix(in srgb, var(--ah-action-solid) 10%, var(--ah-surface-raised));
+  border-color: var(--ah-action-solid);
+  box-shadow: inset 0 0 0 1px var(--ah-action-solid);
+  color: var(--ah-text-strong);
+}
+
+.opcoes button[data-escolhida] svg {
+  color: var(--ah-action-solid);
 }
