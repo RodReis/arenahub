@@ -15,6 +15,7 @@ import {
   esquemaReg,
   esquemaSendLog,
   respostaReg,
+  respostaSendLog,
   respostaSendUser,
 } from './protocolo.js';
 
@@ -244,6 +245,14 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
 
       for (const ouvinte of this.ouvintes) ouvinte(evento);
     }
+
+    /*
+     * O ack vai DEPOIS de entregar os eventos aos ouvintes: confirmar antes e
+     * cair no meio perderia o registro, porque o leitor nao reenvia o que ja
+     * foi confirmado. Sem ack nenhum, porem, o leitor corta a conexao a cada
+     * ~20 s e reenvia o mesmo lote para sempre (#406, achado de campo).
+     */
+    this.enviar(respostaSendLog({ count: log.data.count, logindex: log.data.logindex }));
   }
 
   private enviar(mensagem: string): void {

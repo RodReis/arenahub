@@ -294,6 +294,31 @@ describe('TopdataFacialAdapter', () => {
     expect(resposta?.['result']).toBe(true);
   });
 
+  it('confirma o sendlog com o mesmo logindex -- sem ack o leitor corta a conexao', async () => {
+    // Achado de campo 30/09/2026 (#406), mesmo firmware v2.16: a cada conexao
+    // o leitor manda reg -> sendlog, espera ~20 s e corta com 1006, sem
+    // mensagem alguma no meio. Ao reconectar, reenvia o MESMO sendlog (894
+    // bytes, identico) -- o registro nunca confirmado. Mesmo contrato do reg
+    // e do senduser: `ret` + `result`, ecoando `count` e `logindex` para o
+    // leitor saber QUAL lote foi confirmado.
+    leitor.enviar({
+      cmd: 'sendlog',
+      sn: leitor.sn,
+      count: 1,
+      logindex: 321,
+      record: [
+        { enrollid: 12345, time: '2026-09-30 10:00:00', mode: 1, inout: 0, event: 0 },
+      ],
+    });
+
+    await leitor.esperar(() => leitor.recebidos.some((m) => m['ret'] === 'sendlog'));
+
+    const resposta = leitor.recebidos.find((m) => m['ret'] === 'sendlog');
+    expect(resposta?.['result']).toBe(true);
+    expect(resposta?.['logindex']).toBe(321);
+    expect(resposta?.['count']).toBe(1);
+  });
+
   it('recusa externalEnrollId que nao cabe no equipamento', async () => {
     // O UUID hexadecimal da primeira versao da F2 cai aqui. Falhar alto e
     // melhor que recusa silenciosa no leitor.

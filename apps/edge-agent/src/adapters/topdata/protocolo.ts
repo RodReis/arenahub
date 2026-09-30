@@ -181,6 +181,28 @@ export function respostaSendUser(): string {
 }
 
 /**
+ * Ack do `sendlog`. OBRIGATORIO, como o do `reg` e o do `senduser`.
+ *
+ * Achado de campo 30/09/2026 (#406), firmware v2.16: sem esta resposta o
+ * leitor espera ~20 s, corta a conexao com 1006 e, ao reconectar, REENVIA o
+ * mesmo registro -- num loop que so acaba quando alguem confirma. O resumo do
+ * manual em `docs/vendor/topdata/PROTOCOLO-FACIAL.md` nao documenta a
+ * resposta; o formato segue o contrato dos outros dois acks, ecoando `count`
+ * e `logindex` para o leitor saber QUAL lote foi confirmado.
+ */
+export function respostaSendLog(dados: {
+  count?: number | undefined;
+  logindex?: number | undefined;
+}): string {
+  return JSON.stringify({
+    ret: 'sendlog',
+    result: true,
+    ...(dados.count !== undefined ? { count: dados.count } : {}),
+    ...(dados.logindex !== undefined ? { logindex: dados.logindex } : {}),
+  });
+}
+
+/**
  * "YYYY-MM-DD HH:mm:ss" -- o formato que o equipamento espera no
  * `cloudtime`. ISO com T e Z nao serve.
  *
