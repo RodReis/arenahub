@@ -96,6 +96,10 @@ async function montarCatracaReal(logger: Logger): Promise<TurnstileAdapter> {
     },
   });
 
+  // O sucesso tambem vira log (#406): na Arena Positiva a catraca conectou e
+  // nada disse -- so dava para deduzir pelo facial ter subido depois dela.
+  logger.info({ porta: PORTA_CATRACA }, 'catraca conectada');
+
   return adapter;
 }
 
