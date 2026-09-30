@@ -6,6 +6,8 @@ import { PrivacyModule } from '../privacy/privacy.module.js';
 import { StudentsModule } from '../students/students.module.js';
 import { BiometricIdentityRepository } from './biometric-identity.repository.js';
 import { BiometricsController } from './biometrics.controller.js';
+import { EdgeLegacyLinkController } from './edge-legacy-link.controller.js';
+import { VincularCadastroLegadoUseCase } from './vincular-cadastro-legado.use-case.js';
 
 /**
  * Identidade biometrica e seu ciclo de vida.
@@ -17,8 +19,8 @@ import { BiometricsController } from './biometrics.controller.js';
  */
 @Module({
   imports: [PrivacyModule, StudentsModule, DevicesModule],
-  controllers: [BiometricsController],
-  providers: [BiometricIdentityRepository, TenantContextService],
+  controllers: [BiometricsController, EdgeLegacyLinkController],
+  providers: [BiometricIdentityRepository, TenantContextService, VincularCadastroLegadoUseCase],
   exports: [BiometricIdentityRepository],
 })
 export class BiometricsModule {}

@@ -13,6 +13,7 @@ import {
   type ReconhecimentoComOrigem,
 } from '../application/orquestrar-acesso-online.js';
 import type { EventoReconhecimento } from '../domain/facial-device.js';
+import { ligarVinculoLegado } from './vinculo-legado.js';
 
 export interface AgenteComposto {
   encerrar: () => Promise<void>;
@@ -73,6 +74,11 @@ export async function compor(
 
   logger.info({ retomada }, 'tentativas pendentes retomadas no arranque');
 
+  // A base do leitor vai para a nuvem vincular os alunos legados e os
+  // cadastros feitos direto no equipamento (#468). Antes do `aoReconhecer`:
+  // o registro do leitor pode chegar a qualquer momento depois daqui.
+  const vinculoLegado = ligarVinculoLegado({ facial: dispositivos.facial, cliente, logger });
+
   // AO RECONHECER POR ULTIMO: registrar o ouvinte "liga a chave" -- tudo a
   // jusante (maquina, processador, catraca) ja esta pronto acima.
   dispositivos.facial.aoReconhecer((evento: EventoReconhecimento) => {
@@ -126,6 +132,7 @@ export async function compor(
 
   return {
     encerrar: async () => {
+      vinculoLegado.encerrar();
       await dispositivos.encerrar();
       maquina.fechar();
     },

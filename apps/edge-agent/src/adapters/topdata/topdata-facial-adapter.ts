@@ -58,6 +58,11 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
   private serieDoEquipamento: string | null = null;
 
   private readonly ouvintes: ((evento: EventoReconhecimento) => void)[] = [];
+  private readonly ouvintesDeRegistro: ((serial: string) => void)[] = [];
+  private readonly ouvintesDeCadastro: ((cadastro: {
+    serial: string;
+    externalUserId: string;
+  }) => void)[] = [];
 
   /**
    * Comandos aguardando retorno, por nome (`ret`).
@@ -158,9 +163,16 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     }
 
     if ('cmd' in mensagem && mensagem.cmd === 'senduser') {
-      // O leitor sincroniza a base dele. Nao importamos (a nuvem e a fonte da
-      // verdade), mas o ack e obrigatorio: sem ele o firmware v2.16 derruba a
+      // O leitor informa um cadastro dele. So o NUMERO sai daqui (#468): e
+      // como o cadastro feito direto no equipamento chega a nuvem para ser
+      // vinculado. Foto e nome ficam -- a nuvem e a fonte da verdade do
+      // aluno. O ack e obrigatorio: sem ele o firmware v2.16 derruba a
       // conexao num loop. Ver protocolo.ts / esquemaSendUser.
+      const serial = typeof mensagem.sn === 'string' ? mensagem.sn : this.serieDoEquipamento;
+      if (typeof mensagem.enrollid === 'number' && serial !== null) {
+        const cadastro = { serial, externalUserId: String(mensagem.enrollid) };
+        for (const ouvinte of this.ouvintesDeCadastro) ouvinte(cadastro);
+      }
       this.enviar(respostaSendUser());
       return;
     }
@@ -205,6 +217,10 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     // legal para nos (regra de arquitetura no 7, ADR-008). Ligar e decisao
     // do PI, nao padrao.
     this.enviar(comandos.desligarEnvioDeFoto());
+
+    // So DEPOIS do ack e do setdevinfo: quem ouve vai conversar com o leitor
+    // (listar a base, #468), e o handshake precisa estar fechado antes.
+    for (const ouvinte of this.ouvintesDeRegistro) ouvinte(reg.data.sn);
   }
 
   private tratarSendLog(json: unknown): void {
@@ -395,6 +411,16 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     this.ouvintes.push(ouvinte);
   }
 
+  aoRegistrar(ouvinte: (serial: string) => void): void {
+    this.ouvintesDeRegistro.push(ouvinte);
+  }
+
+  aoInformarCadastro(
+    ouvinte: (cadastro: { serial: string; externalUserId: string }) => void,
+  ): void {
+    this.ouvintesDeCadastro.push(ouvinte);
+  }
+
   encerrar(): Promise<void> {
     return new Promise((resolve) => {
       for (const pendente of this.pendentes.values()) {
@@ -403,6 +429,8 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
       }
       this.pendentes.clear();
       this.ouvintes.length = 0;
+      this.ouvintesDeRegistro.length = 0;
+      this.ouvintesDeCadastro.length = 0;
 
       this.conexao?.close();
       this.conexao = null;

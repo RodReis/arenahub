@@ -109,6 +109,23 @@ export interface FacialDeviceAdapter {
   /** Registra quem recebe evento de reconhecimento (`M0-FR-004`). */
   aoReconhecer(ouvinte: (evento: EventoReconhecimento) => void): void;
 
+  /**
+   * Avisa quando o leitor se registra, com o serial dele -- #468.
+   *
+   * E a deixa para listar a base do leitor e vincular os alunos legados.
+   * So AVISA: quem decide listar e a composicao, porque listar pausa o
+   * leitor (`disabledevice`) e nao pode correr em paralelo com um cadastro.
+   * Opcional: o simulador nao tem handshake.
+   */
+  aoRegistrar?(ouvinte: (serial: string) => void): void;
+
+  /**
+   * Avisa cada cadastro que o LEITOR informa por conta propria (`senduser`)
+   * -- #468. E como o cadastro facial feito direto no equipamento chega ao
+   * ArenaHub sem sincronismo manual. Nunca foto nem nome: so o numero.
+   */
+  aoInformarCadastro?(ouvinte: (cadastro: { serial: string; externalUserId: string }) => void): void;
+
   /** Encerra a conexao. Chamado no shutdown gracioso (`M0-NFR-007`). */
   encerrar(): Promise<void>;
 }

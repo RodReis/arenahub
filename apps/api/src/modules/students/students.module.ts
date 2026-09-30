@@ -28,6 +28,8 @@ import { StudentsController } from './students.controller.js';
   ],
   // Exportado porque `membership` precisa consultar o aluno -- por provider
   // publico, nunca lendo a tabela do outro modulo (regra de arquitetura 9).
-  exports: [StudentRepository],
+  // `StudentCredentialRepository` -- #468: o vinculo legado do leitor casa o
+  // numero do equipamento com o aluno, pela mesma regra.
+  exports: [StudentRepository, StudentCredentialRepository],
 })
 export class StudentsModule {}

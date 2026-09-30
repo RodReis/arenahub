@@ -40,7 +40,7 @@ export class BiometricIdentityRepository {
 
   /** Identidade utilizavel agora: existe e nao foi revogada (INV-018). */
   async encontrarAtiva(
-    contexto: TenantContext,
+    contexto: Pick<TenantContext, 'tenantId'>,
     studentId: string,
   ): Promise<BiometricIdentity | null> {
     return this.db.biometricIdentity.findFirst({
@@ -139,6 +139,117 @@ export class BiometricIdentityRepository {
       });
 
       return identidade;
+    });
+  }
+
+  /**
+   * O aluno ja teve identidade revogada, em exclusao ou excluida (#468).
+   *
+   * Identidade so sai de `ACTIVE` por revogacao (INV-018). Se isso ja
+   * aconteceu, o cadastro que sobrou no leitor NAO pode voltar a abrir a
+   * catraca por importacao -- seria desfazer a revogacao (regra no 7).
+   */
+  async temIdentidadeEncerrada(tenantId: string, studentId: string): Promise<boolean> {
+    const encerrada = await this.db.biometricIdentity.findFirst({
+      where: { tenantId, studentId, state: { not: 'ACTIVE' } },
+      select: { id: true },
+    });
+
+    return encerrada !== null;
+  }
+
+  /** Todos os vinculos do leitor: quem ja tem numero nele (#468). */
+  async vinculosDoDispositivo(
+    tenantId: string,
+    deviceId: string,
+  ): Promise<{ externalUserId: string; studentId: string }[]> {
+    return this.db.deviceUser.findMany({
+      where: { tenantId, deviceId },
+      select: { externalUserId: true, studentId: true },
+    });
+  }
+
+  /**
+   * Vincula um aluno a um cadastro que JA ESTA no leitor -- #468.
+   *
+   * Difere de `criarComSync` no que importa: o cadastro facial ja existe no
+   * equipamento (veio do sistema anterior), entao o `DeviceUser` nasce
+   * `SYNCED` e NENHUM job de sync e criado. Um UPSERT aqui mandaria o
+   * cadastro de volta sem foto -- e apagaria a face da pessoa no leitor.
+   *
+   * Sem evento de outbox pelo mesmo motivo: `BiometricIdentityCreated`
+   * significa "precisa ir para os leitores", e este ja esta.
+   *
+   * Reusa a identidade ATIVA do aluno quando existe; so cria quando nao ha,
+   * e ai exige o consentimento que o chamador ja registrou (INV-017).
+   */
+  async vincularLegado(
+    tenantId: string,
+    dados: {
+      studentId: string;
+      deviceId: string;
+      externalUserId: string;
+      identidadeAtivaId: string | null;
+      consentRecordId: string | null;
+    },
+    correlationId: string,
+    agora: Date,
+  ): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      let identityId = dados.identidadeAtivaId;
+
+      if (identityId === null) {
+        if (dados.consentRecordId === null) {
+          throw new Error('identidade nova exige consentimento (INV-017)');
+        }
+
+        const identidade = await tx.biometricIdentity.create({
+          data: {
+            tenantId,
+            studentId: dados.studentId,
+            consentRecordId: dados.consentRecordId,
+          },
+        });
+        identityId = identidade.id;
+
+        await tx.studentTimelineEvent.create({
+          data: {
+            tenantId,
+            studentId: dados.studentId,
+            type: 'BIOMETRIC_IDENTITY_CREATED',
+            actorType: 'SYSTEM',
+            actorId: null,
+            correlationId,
+            payload: { origem: 'CADASTRO_FACIAL_LEGADO' },
+          },
+        });
+      }
+
+      await tx.deviceUser.create({
+        data: {
+          tenantId,
+          deviceId: dados.deviceId,
+          studentId: dados.studentId,
+          identityId,
+          externalUserId: dados.externalUserId,
+          state: 'SYNCED',
+          syncedAt: agora,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          actorType: 'SYSTEM',
+          actorId: null,
+          action: 'biometric.legacy_linked',
+          target: 'device_user',
+          targetId: identityId,
+          correlationId,
+          // O numero do leitor e chave de equipamento, nao PII.
+          metadata: { deviceId: dados.deviceId, externalUserId: dados.externalUserId },
+        },
+      });
     });
   }
 

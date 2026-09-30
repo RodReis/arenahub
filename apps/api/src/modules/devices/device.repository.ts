@@ -144,6 +144,28 @@ export class DeviceRepository {
   }
 
   /**
+   * O leitor pelo SERIAL, no escopo do Edge que assinou (#468).
+   *
+   * O Edge nao conhece o UUID do `Device`, so o `sn` do equipamento. O
+   * escopo e o mesmo da decisao de acesso (`IdentityResolver`): tenant,
+   * unidade e EdgeNode vem da assinatura, nunca do corpo (regra no 2).
+   */
+  async encontrarDoEdgePorSerial(
+    edge: { tenantId: string; gymUnitId: string; edgeNodeId: string },
+    serial: string,
+  ): Promise<{ id: string } | null> {
+    return this.db.device.findFirst({
+      where: {
+        serial,
+        tenantId: edge.tenantId,
+        gymUnitId: edge.gymUnitId,
+        edgeNodeId: edge.edgeNodeId,
+      },
+      select: { id: true },
+    });
+  }
+
+  /**
    * Proximo `external_user_id` do dispositivo.
    *
    * `MAX + 1` dentro da transacao do chamador. A unicidade real e da
