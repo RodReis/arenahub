@@ -355,52 +355,42 @@ export async function atribuirPlano(
   }
 
   /*
-   * TROCA DE PLANO: cancela a anterior ANTES de criar a nova.
-   *
-   * `POST /subscriptions` não substitui nada — cria. Atribuir um segundo
-   * plano sem cancelar o primeiro deixa DUAS assinaturas e DOIS entitlements
-   * ativos, e a catraca segue honrando o antigo pela união das janelas: a
-   * tela mostra o plano novo (a lista lê a assinatura mais recente) enquanto
-   * o acesso continua valendo pelo velho. Bug silencioso, no caminho da
-   * catraca.
-   *
-   * A ORDEM não é indiferente. Cancelar depois de criar deixaria os dois
-   * ativos se o cancelamento falhasse — exatamente o estado que este código
-   * existe para impedir. Cancelando antes, a falha inversa (cancelou e a
-   * criação falhou) deixa o aluno SEM plano: visível na hora, na própria
-   * ficha, e corrigível atribuindo de novo. Entre um erro que se vê e um que
-   * some, escolhe-se o que se vê.
-   *
-   * O `CANCEL` revoga o entitlement na mesma transação da API
-   * (`alterarAssinatura`), então não há janela em que a assinatura esteja
-   * cancelada e o direito de acesso continue de pé.
+   * TROCA DE PLANO: uma chamada so, atomica (F82) -- POST
+   * /subscriptions/:id/trocar-plano substitui as duas chamadas sequenciais
+   * (CANCEL depois POST) que existiam aqui. Sem janela de falha parcial: a
+   * troca acontece numa transacao so no backend
+   * (MembershipRepository.trocarPlanoDaAssinatura), entao nao ha mais como
+   * o aluno ficar sem plano no meio do caminho.
    */
   if (validado.data.substituiSubscriptionId !== undefined) {
     if (validado.data.substituiVersion === undefined) {
       return { erro: 'Não foi possível identificar a assinatura atual. Recarregue a ficha.', valores };
     }
 
-    const cancelamento = await chamarApi<{ id: string; status: string }>(
-      `/api/v1/subscriptions/${validado.data.substituiSubscriptionId}/actions`,
-      {
-        metodo: 'POST',
-        corpo: {
-          action: 'CANCEL',
-          version: validado.data.substituiVersion,
-          reason: validado.data.reason,
-        },
+    const troca = await chamarApi<{
+      subscriptionId: string;
+      entitlement: { id: string };
+    }>(`/api/v1/subscriptions/${validado.data.substituiSubscriptionId}/trocar-plano`, {
+      metodo: 'POST',
+      corpo: {
+        planId: validado.data.planId,
+        version: validado.data.substituiVersion,
+        reason: validado.data.reason,
       },
-    );
+    });
 
-    if (!cancelamento.ok) {
-      return {
-        erro: frase(
-          cancelamento.erro?.code ?? '',
-          'Não foi possível encerrar o plano atual, e por isso o novo não foi atribuído',
-        ),
-        valores,
-      };
+    if (!troca.ok || !troca.dados) {
+      return { erro: frase(troca.erro?.code ?? '', 'Não foi possível trocar o plano'), valores };
     }
+
+    revalidatePath(`/students/${bruto.studentId}`);
+
+    return {
+      sucesso: {
+        subscriptionId: troca.dados.subscriptionId,
+        entitlementId: troca.dados.entitlement.id,
+      },
+    };
   }
 
   // ATENÇÃO: esta rota NÃO é idempotente — decisão registrada na issue #7,
