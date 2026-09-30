@@ -49,6 +49,10 @@ const IGNORADOS = [
   'coverage',
   '.turbo',
   '.git',
+  // Worktree filha (skill using-git-worktrees) e arvore de trabalho
+  // paralela -- nao e a arvore corrente e nao deve ser varrida por ela
+  // (issue #454).
+  join('.claude', 'worktrees'),
 ];
 
 /**
