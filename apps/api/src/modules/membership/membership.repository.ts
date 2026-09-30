@@ -38,6 +38,16 @@ export class ConflitoDeVersaoError extends ErroDeDominio {
   }
 }
 
+export class AssinaturaNaoEstaAtivaError extends ErroDeDominio {
+  constructor(status: string) {
+    super(
+      'SUBSCRIPTION_NOT_ACTIVE',
+      409,
+      `Assinatura em estado ${status} nao pode trocar de plano`,
+    );
+  }
+}
+
 /**
  * `validFrom` de reajuste ja usado para este plano. `@@unique([planId,
  * validFrom])` da a garantia; este erro traduz o `P2002` em 409 de dominio.
@@ -918,6 +928,178 @@ export class MembershipRepository {
       });
 
       return assinatura;
+    });
+  }
+
+  /**
+   * Troca o plano de uma assinatura ACTIVE numa operacao atomica.
+   *
+   * NAO reaproveita `alterarAssinatura`: aquele muda o ESTADO da mesma
+   * assinatura (PAUSE/RESUME/CANCEL); trocar plano CRIA uma assinatura nova
+   * -- `planId` e imutavel numa `Subscription` existente. Substitui a UI
+   * atual (`atribuir-plano.tsx`), que fazia isso como duas chamadas HTTP
+   * separadas (CANCEL depois POST) com risco de falha parcial documentado
+   * em comentario -- ver `apps/admin-web/app/actions/membership.ts:357-404`.
+   *
+   * Trava otimista por `version` (INV-061), mesmo padrao de
+   * `alterarAssinatura`: comando que leu estado antigo devolve `null` em vez
+   * de sobrescrever.
+   */
+  async trocarPlanoDaAssinatura(
+    contexto: TenantContext,
+    subscriptionId: string,
+    entrada: { planId: string; versaoEsperada: number; reason: string },
+    correlationId: string,
+    agora: Date,
+  ): Promise<{ subscription: Subscription; entitlement: Entitlement } | null> {
+    const plano = await this.encontrarPlano(contexto, entrada.planId);
+    if (!plano) throw new PlanoNaoEncontradoError();
+
+    // Falha ANTES da transacao: nao ha o que desfazer. Mesma ordem de
+    // `ativarAssinatura` (linha 680) -- o entitlement nunca nasce sem
+    // janela nenhuma (PlanoSemJanelaError).
+    if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
+
+    const janelas: JanelaDeAcesso[] = plano.accessWindows.map((j) => ({
+      gymUnitId: j.gymUnitId,
+      dayOfWeek: j.dayOfWeek,
+      startMinute: j.startMinute,
+      endMinute: j.endMinute,
+    }));
+
+    const snapshot = montarSnapshotDePolitica(
+      plano.id,
+      plano.name,
+      plano.units.map((u) => u.gymUnitId),
+      janelas,
+    );
+
+    return this.db.$transaction(async (tx) => {
+      const alterados = await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          tenantId: contexto.tenantId,
+          version: entrada.versaoEsperada,
+          status: 'ACTIVE',
+        },
+        data: {
+          status: 'CANCELLED',
+          version: { increment: 1 },
+          lastActorId: contexto.actorId,
+          lastReason: entrada.reason,
+        },
+      });
+
+      if (alterados.count === 0) return null;
+
+      const antiga = await tx.subscription.findFirstOrThrow({
+        where: { id: subscriptionId, tenantId: contexto.tenantId },
+      });
+
+      const nova = await tx.subscription.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: antiga.studentId,
+          planId: entrada.planId,
+          status: 'ACTIVE',
+          startsAt: agora,
+          // Mesma vigencia contratual -- trocar plano nao estende nem
+          // encurta o contrato (spec SEC-082 #6).
+          endsAt: antiga.endsAt,
+          lastActorId: contexto.actorId,
+          lastReason: entrada.reason,
+        },
+      });
+
+      const entitlementNovo = await tx.entitlement.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: antiga.studentId,
+          source: 'SUBSCRIPTION',
+          subscriptionId: nova.id,
+          status: 'ACTIVE',
+          startsAt: agora,
+          endsAt: antiga.endsAt ?? new Date('9999-12-31'),
+          policySnapshot: snapshot as unknown as Prisma.InputJsonValue,
+          unitWindows: {
+            create: janelas.map((j) => ({ ...j, tenantId: contexto.tenantId })),
+          },
+        },
+      });
+
+      // REVOKED e EXPIRED sao terminais (CONVENTION 3.3) -- mesmo filtro de
+      // `alterarAssinatura` (linha 873).
+      await tx.entitlement.updateMany({
+        where: {
+          tenantId: contexto.tenantId,
+          subscriptionId,
+          status: { notIn: ['REVOKED', 'EXPIRED'] },
+        },
+        data: { status: 'REVOKED', revokedAt: agora },
+      });
+
+      // Sem reemissao automatica -- a proxima cobranca sai do ciclo normal,
+      // ja no plano novo (spec SEC-082 #6, fora de escopo #3). Caminho
+      // comum tem ZERO invoice pendente: `updateMany` sobre zero linhas nao
+      // e erro, so nao muda nada.
+      await tx.invoice.updateMany({
+        where: {
+          tenantId: contexto.tenantId,
+          subscriptionId,
+          status: { in: ['OPEN', 'OVERDUE'] },
+        },
+        data: { status: 'CANCELLED' },
+      });
+
+      await tx.studentTimelineEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: antiga.studentId,
+          type: 'SUBSCRIPTION_PLAN_CHANGED',
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          correlationId,
+          payload: {
+            fromSubscriptionId: subscriptionId,
+            toSubscriptionId: nova.id,
+            fromPlanId: antiga.planId,
+            toPlanId: entrada.planId,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'subscription.plan_changed',
+          target: 'subscription',
+          targetId: nova.id,
+          correlationId,
+          metadata: {
+            fromSubscriptionId: subscriptionId,
+            toSubscriptionId: nova.id,
+            reason: entrada.reason,
+          },
+        },
+      });
+
+      await tx.outboxEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          eventType: 'SubscriptionPlanChanged',
+          aggregateType: 'Subscription',
+          aggregateId: nova.id,
+          payload: {
+            studentId: antiga.studentId,
+            fromSubscriptionId: subscriptionId,
+            toSubscriptionId: nova.id,
+          },
+        },
+      });
+
+      return { subscription: nova, entitlement: entitlementNovo };
     });
   }
 
