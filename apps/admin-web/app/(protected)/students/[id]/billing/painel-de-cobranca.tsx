@@ -14,6 +14,13 @@ import { FaixaDeMeses } from './faixa-de-meses';
 
 interface Props {
   readonly subscriptionId: string | null;
+  /**
+   * Assinatura para o LOTE (`FaixaDeMeses`) -- ACTIVE OU SUSPENDED
+   * (`page.tsx`). Pode divergir de `subscriptionId`: um aluno SUSPENDED nao
+   * tem "Gerar cobranca do mes" mas tem FaixaDeMeses, exatamente o caminho de
+   * volta para ACTIVE.
+   */
+  readonly subscriptionIdParaPagamento: string | null;
   readonly mesesPagaveis: readonly MesPagavelUI[];
 }
 
@@ -61,7 +68,7 @@ function BotaoDeGerar() {
  * GERAR a cobrança do mês continua separada, idempotente no servidor
  * (INV-066): clique duplo não cobra duas vezes, por isso sem confirmação.
  */
-export function PainelDeCobranca({ subscriptionId, mesesPagaveis }: Props) {
+export function PainelDeCobranca({ subscriptionId, subscriptionIdParaPagamento, mesesPagaveis }: Props) {
   const [estadoDaInvoice, gerar] = useActionState(abrirCobranca, ESTADO_DA_INVOICE);
   const router = useRouter();
 
@@ -73,7 +80,7 @@ export function PainelDeCobranca({ subscriptionId, mesesPagaveis }: Props) {
     <section aria-labelledby="titulo-cobranca">
       <h2 id="titulo-cobranca">Cobrança</h2>
 
-      {subscriptionId === null ? (
+      {subscriptionId === null && subscriptionIdParaPagamento === null ? (
         <EmptyState
           testId="sem-assinatura-ativa"
           title="Este aluno não tem assinatura ativa."
@@ -81,29 +88,31 @@ export function PainelDeCobranca({ subscriptionId, mesesPagaveis }: Props) {
         />
       ) : (
         <>
-          {/*
-            O botao e a nota ficam EMPILHADOS, nao lado a lado. Eram irmaos
-            diretos de um `<form>` sem estilo: o `<small>` colava no rotulo do
-            botao e a frase lia como parte dele ("Gerar cobranca do mesGerar de
-            novo no mesmo mes nao duplica").
-          */}
-          <form action={gerar} className={estilos['gerar']}>
-            <input type="hidden" name="subscriptionId" value={subscriptionId} />
-            <BotaoDeGerar />
-            {/*
-              A idempotência é do servidor, mas quem opera precisa saber disso
-              ANTES de clicar de novo — senão evita o clique com medo de cobrar
-              duas vezes, e liga para o suporte.
-            */}
-            <small className={estilos['nota']}>
-              Gerar de novo no mesmo mês não duplica: devolve a mesma cobrança.
-            </small>
-          </form>
+          {subscriptionId !== null ? (
+            /*
+              O botao e a nota ficam EMPILHADOS, nao lado a lado. Eram irmaos
+              diretos de um `<form>` sem estilo: o `<small>` colava no rotulo do
+              botao e a frase lia como parte dele ("Gerar cobranca do mesGerar de
+              novo no mesmo mes nao duplica").
+            */
+            <form action={gerar} className={estilos['gerar']}>
+              <input type="hidden" name="subscriptionId" value={subscriptionId} />
+              <BotaoDeGerar />
+              {/*
+                A idempotência é do servidor, mas quem opera precisa saber disso
+                ANTES de clicar de novo — senão evita o clique com medo de cobrar
+                duas vezes, e liga para o suporte.
+              */}
+              <small className={estilos['nota']}>
+                Gerar de novo no mesmo mês não duplica: devolve a mesma cobrança.
+              </small>
+            </form>
+          ) : null}
 
-          {mesesPagaveis.length > 0 ? (
+          {subscriptionIdParaPagamento !== null && mesesPagaveis.length > 0 ? (
             <FaixaDeMeses
               faixa={mesesPagaveis}
-              subscriptionId={subscriptionId}
+              subscriptionId={subscriptionIdParaPagamento}
               onPago={() => router.refresh()}
             />
           ) : null}

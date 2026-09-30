@@ -180,12 +180,27 @@ export default async function PaginaFinanceiroDoAluno({
   const invoiceEmDestaque = faturaEmDestaque(invoices);
 
   /*
-   * A faixa de meses pagaveis so existe com assinatura ativa -- sem ela nao
-   * ha o que montar em lote (mesma guarda de `assinaturaAtiva` do bloco
-   * "Gerar cobranca do mes"). F83, Task 7.
+   * PAGAR (FaixaDeMeses) precisa de ACTIVE OU SUSPENDED -- nao so ACTIVE.
+   *
+   * SUSPENDED e exatamente o aluno inadimplente (`aplicar-inadimplencia.
+   * use-case.ts`): entitlement suspenso por atraso, mas `registrarPagamentoManual`
+   * (por baixo do lote) reativa a assinatura no pagamento bem-sucedido. Negar
+   * o botao de pagar a quem esta suspenso tranca o UNICO caminho de volta —
+   * antes desta fatia, "Receber no balcao" nao tinha essa restricao (ver
+   * commit 6c33233, `invoicesEmAberto` independia de status de entitlement).
+   *
+   * "Gerar cobranca do mes" (abaixo, `assinaturaAtiva`) continua so ACTIVE:
+   * abrir cobranca NOVA para quem ja esta suspenso nao faz sentido.
    */
+  const assinaturaParaPagamento =
+    (respostaDosDireitos.dados ?? []).find(
+      (direito) =>
+        (direito.status === 'ACTIVE' || direito.status === 'SUSPENDED') &&
+        direito.subscriptionId !== null,
+    )?.subscriptionId ?? null;
+
   const mesesPagaveis =
-    assinaturaAtiva !== null ? await consultarMesesPagaveis(assinaturaAtiva) : [];
+    assinaturaParaPagamento !== null ? await consultarMesesPagaveis(assinaturaParaPagamento) : [];
 
   return (
     <section aria-labelledby="titulo-financeiro">
@@ -294,7 +309,11 @@ export default async function PaginaFinanceiroDoAluno({
         }
       />
 
-      <PainelDeCobranca subscriptionId={assinaturaAtiva} mesesPagaveis={mesesPagaveis} />
+      <PainelDeCobranca
+        subscriptionId={assinaturaAtiva}
+        subscriptionIdParaPagamento={assinaturaParaPagamento}
+        mesesPagaveis={mesesPagaveis}
+      />
     </section>
   );
 }
