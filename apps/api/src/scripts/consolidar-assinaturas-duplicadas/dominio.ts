@@ -95,7 +95,15 @@ export function decidirConsolidacaoDoAluno(
     // nao finge saber escolher: pega a primeira apos ordenar, e um
     // empate real produziria resultado deterministico (estavel), nao
     // um erro escondido.
-    const ordenadas = [...assinaturas].sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+    //
+    // CANCELLED so vence se nao houver outra (#450): o historico da F47 nasceu
+    // CANCELLED com startsAt = hora da importacao, mais recente que as reais,
+    // e sobreviveu no lugar delas -- 130 alunos ficaram fora do faturamento.
+    const ordenadas = [...assinaturas].sort(
+      (a, b) =>
+        Number(a.status === 'CANCELLED') - Number(b.status === 'CANCELLED') ||
+        b.startsAt.getTime() - a.startsAt.getTime(),
+    );
     sobrevivente = ordenadas[0]!;
     criterio = 'MAIS_RECENTE';
   }

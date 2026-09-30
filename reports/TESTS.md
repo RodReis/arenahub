@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 3740 | 3740 | 0 | 74.6 |
+| unitário | 3872 | 3870 | 2 | 75.1 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 1269 | 1267 | 2 | 80.9 |
+| integração | 1339 | 1339 | 0 | 81.1 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -175,3 +175,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-25 | #400 | SPEC-021 | integração | 1269 | 1267 | 2 | 80.9 | [#402](https://github.com/RodReis/arenahub/pull/402) — as 2 falhas são `platform-estatisticas-publicas.int-spec.ts` ("Unable to start a transaction"), que reprova também na `main` (conferido por `git stash`): a suíte soma todos os tenants e o banco de integração local acumula dados sem o reset (bloqueado para agente de IA). Não vêm desta entrega; falhou também rodando sozinha, então não é a corrida do #383. CI do PR: os dois jobs verdes |
 | 2026-09-25 | #401 | SPEC-021 | unitário | 3740 | 3740 | 0 | 74.6 | [#403](https://github.com/RodReis/arenahub/pull/403) |
 | 2026-09-25 | #401 | SPEC-021 | integração | 1269 | 1267 | 2 | 80.9 | [#403](https://github.com/RodReis/arenahub/pull/403) — mesmas 2 falhas ja registradas na entrega do #400, `platform-estatisticas-publicas.int-spec.ts`, nao relacionadas a esta mudanca |
+| 2026-09-30 | #450 | — | unitário | 3872 | 3870 | 2 | 75.1 | — — as 2 falhas são `admin-web/app/(protected)/students/page.test.tsx` ("Vence hoje"), que reprovam também na `main` entre 21h e 24h BRT: o teste monta "hoje" em UTC e a página usa o fuso da unidade. Registrado em #451; não vem desta entrega (diff só em `apps/api`) |
+| 2026-09-30 | #450 | — | integração | 1339 | 1339 | 0 | 81.1 | — |

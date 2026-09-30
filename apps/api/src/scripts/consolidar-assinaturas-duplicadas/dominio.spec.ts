@@ -70,6 +70,24 @@ describe('decidirConsolidacaoDoAluno', () => {
     }
   });
 
+  it('#450: CANCELLED nao sobrevive quando ha outra, mesmo com startsAt mais recente', () => {
+    // Caso real de producao: o registro historico da F47 nasceu CANCELLED com
+    // startsAt = hora da importacao (02/09 20:17), depois das assinaturas reais.
+    const veredito = decidirConsolidacaoDoAluno(
+      [
+        assinatura('historico-f47', 'CANCELLED', '2026-09-02T20:17:44Z'),
+        assinatura('real-set', 'PAST_DUE', '2026-09-01'),
+        assinatura('real-ago', 'PAST_DUE', '2026-08-24'),
+      ],
+      AGORA,
+    );
+
+    expect(veredito.tipo).toBe('CONSOLIDAR');
+    if (veredito.tipo === 'CONSOLIDAR') {
+      expect(veredito.sobreviventeId).toBe('real-set');
+    }
+  });
+
   it('CASO DE RISCO: entitlement ativo-e-valido de uma assinatura encerrada MIGRA quando a sobrevivente nao tem nenhum', () => {
     const veredito = decidirConsolidacaoDoAluno(
       [
