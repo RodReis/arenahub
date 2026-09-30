@@ -319,6 +319,22 @@ Contrato do componente:
 
 **Aresta de 3 px sobre canto arredondado** é sinalizada pelo detector genérico de antipadrão como conflito com o raio. Verificada no navegador: o canto renderiza mitrado e limpo. É o padrão aprovado da §4.6 e **fica** — a decisão do PI vence a regra genérica.
 
+### 4.6c `SummaryStrip` — a faixa de resumo, mesma regra de tom
+
+**Emenda de 30/09/2026, decisão do PI.** `PainelDeEstado` (§4.6b) é um card por vez; `SummaryStrip` é a variante em **faixa**, para quando a tela responde a um punhado de perguntas curtas de relance — "qual situação, qual acesso, quanto devo" — e não cabe uma grade de KPI. Já existia em `packages/ui` para o resumo de `/platform`; a emenda de 29/09 já tinha aberto o tom a qualquer tela, então aplicá-lo à **ficha do aluno** (Informação → Situação agora) não abriu exceção nova — só usou o componente que já existia para o que ele já fazia.
+
+Contrato:
+
+| Prop | Papel |
+|---|---|
+| `label` | Nome acessível do grupo (`aria-label` da `<dl>`) |
+| `celulas` | Lista de `CelulaDeResumo`: `id`, `label`, `icon`, `value`, `hint?`, `tom?` |
+| `tom` | Um dos quatro tons curtos — `positivo` / `atencao` / `risco`, e ausência de tom quando a célula não descreve estado |
+
+Cada célula é um par rótulo/valor em `<dl>`, não uma grade de `<div>` — é o que faz o leitor de tela anunciar o par como tal em vez de números soltos. O tom pinta o fundo a 7% e uma aresta superior de 3 px na cor cheia, igual à §4.6; o glifo herda o tom, o rótulo segue em `text/secondary`. `hint` aceita nó React, não só texto — é o que permite a célula de financeiro embutir `Money` e `TenantDateTime` na mesma frase, sem duplicar formatação.
+
+**A regra de conteúdo não muda entre §4.6, §4.6b e aqui**: o tom é o do estado que o valor descreve, nunca decoração; cor nunca é canal único (rótulo e ícone sempre presentes); alerta (`risco`) exige que o valor seja o problema — financeiro "Em dia" pinta `positivo`, "Vencida" pinta `risco`, e sem cobrança vencida a faixa não força alarme onde não há um.
+
 ### 4.7 Badge
 
 `inline-flex`, 22 px, padding lateral 8 px, raio 4 px, gap 6 px, 12 px/600. Fundo, borda e texto vêm da tripla do tom; ícone 13 px em `currentColor`. Em célula de tabela leva `white-space: nowrap`.

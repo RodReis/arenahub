@@ -10,9 +10,12 @@ import {
   Money,
   PageHeader,
   ProblemDetail,
+  SectionCard,
   StateBadge,
+  SummaryStrip,
   Telefone,
   TenantDateTime,
+  type CelulaDeResumo,
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
@@ -22,6 +25,7 @@ import { traduzir } from '../../../../src/operations/formatar';
 import {
   MOTIVO_DA_SITUACAO,
   ROTULO_DE_ORIGEM,
+  ROTULO_DE_SITUACAO,
   impedeAcesso,
   janelaLegivel,
   planoDaListagem,
@@ -320,6 +324,120 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
       ? situacaoDeVencimento(invoiceEmDestaque, agora, timezoneDaUnidade)
       : 'EM_DIA';
 
+  /*
+   * RESUMO de relance -- as três perguntas que a recepção faz com o aluno na
+   * frente, cada uma respondida pela SUA fonte: cadastro pela situação, acesso
+   * pelo entitlement, dinheiro pela invoice. Ficam em células separadas de
+   * propósito: pagamento não controla acesso (regra 1), e juntar as duas numa
+   * frase ensinaria a recepção a diagnosticar errado.
+   */
+  const fimDoDireito = vigentes.reduce<string | null>(
+    (maisTarde, direito) => (maisTarde === null || direito.endsAt > maisTarde ? direito.endsAt : maisTarde),
+    null,
+  );
+  const direitoEmDestaque = vigentes[0];
+
+  const celulaDoCadastro: CelulaDeResumo = {
+    id: 'cadastro',
+    label: 'Cadastro',
+    icon: bloqueado ? 'user-x' : 'user-check',
+    /*
+      A SITUAÇÃO VIGENTE mora só aqui (PI, 30/09/2026): o poço repetido no
+      card "Situação do cadastro" dizia a mesma coisa duas vezes. Os testids
+      vieram junto -- o E2E lê `situacao-do-aluno` para provar que o select
+      nunca oferece a situação atual.
+    */
+    value: <span data-testid="situacao-do-aluno">{ROTULO_DE_SITUACAO[aluno.status] ?? aluno.status}</span>,
+    tom: aluno.status === 'ACTIVE' || aluno.status === 'TRIAL' ? 'positivo' : bloqueado ? 'risco' : 'atencao',
+    hint: aluno.statusReason ? (
+      <span data-testid="motivo-da-situacao">
+        {MOTIVO_DA_SITUACAO[aluno.statusReason] ?? aluno.statusReason}
+        {aluno.statusReasonNote ? ` — ${aluno.statusReasonNote}` : null}
+      </span>
+    ) : bloqueado ? (
+      'Impede o acesso'
+    ) : (
+      'Não impede o acesso'
+    ),
+  };
+
+  const celulaDoAcesso: CelulaDeResumo = bloqueado
+    ? {
+        id: 'acesso',
+        label: 'Acesso',
+        icon: 'lock',
+        value: 'Impedido',
+        tom: 'risco',
+        hint: <span data-testid="acesso-impedido">Impede o acesso, mesmo com plano vigente</span>,
+      }
+    : direitoEmDestaque && fimDoDireito
+      ? {
+          id: 'acesso',
+          label: 'Acesso',
+          icon: 'key-round',
+          value:
+            planoDaListagem(direitoEmDestaque.planName, direitoEmDestaque.source) ??
+            traduzir(ROTULO_DE_ORIGEM, direitoEmDestaque.source),
+          tom: 'positivo',
+          hint: (
+            <>
+              Vale até <TenantDateTime iso={fimDoDireito} timeZone={FUSO_PROVISORIO} format="date" />
+            </>
+          ),
+        }
+      : {
+          id: 'acesso',
+          label: 'Acesso',
+          icon: 'key-round',
+          value: 'Sem plano vigente',
+          tom: 'atencao',
+          hint: 'Atribua um plano na aba Plano',
+        };
+
+  const celulaDoFinanceiro: CelulaDeResumo = !respostaDasInvoices.ok
+    ? {
+        id: 'financeiro',
+        label: 'Financeiro',
+        icon: 'wallet',
+        value: 'Indisponível',
+        hint: 'Não foi possível consultar as cobranças',
+      }
+    : invoiceEmDestaque && situacaoDoVencimento !== 'EM_DIA'
+      ? {
+          id: 'financeiro',
+          label: 'Financeiro',
+          icon: 'receipt',
+          value: situacaoDoVencimento === 'VENCE_EM_BREVE' ? 'Vence hoje' : 'Vencida',
+          tom: situacaoDoVencimento === 'VENCE_EM_BREVE' ? 'atencao' : 'risco',
+          /*
+            FAIXA DE VENCIMENTO -- F53 Task 12, SPEC-053 §3.4. Mudou de lugar,
+            não de conteúdo: testid, `data-situacao` e texto seguem os mesmos.
+            EM_DIA não mostra faixa -- é o caso comum, e aviso sempre presente
+            vira ruído.
+          */
+          hint: (
+            <span role="status" data-testid="faixa-de-vencimento" data-situacao={situacaoDoVencimento}>
+              Cobrança nº {invoiceEmDestaque.number} —{' '}
+              <Money cents={invoiceEmDestaque.totalMinor} currency={invoiceEmDestaque.currency} />
+              {', vencimento em '}
+              <TenantDateTime
+                iso={invoiceEmDestaque.dueAt}
+                timeZone={timezoneDaUnidade ?? FUSO_PROVISORIO}
+                format="date"
+              />
+              {situacaoDoVencimento === 'BLOQUEIO_PROXIMO' ? ' — bloqueio de acesso próximo' : null}
+            </span>
+          ),
+        }
+      : {
+          id: 'financeiro',
+          label: 'Financeiro',
+          icon: 'wallet',
+          value: 'Em dia',
+          tom: 'positivo',
+          hint: 'Nenhuma cobrança vencida',
+        };
+
   return (
     <section aria-labelledby="titulo-ficha">
       <PageHeader
@@ -337,225 +455,158 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             rotulo: 'Informação',
             conteudo: (
               <>
-            <dl className={estilos['dados']} data-testid="dados-do-aluno">
-              <dt>Matrícula</dt>
-              <dd data-testid="matricula">{aluno.membershipNumber}</dd>
-
-              <dt>Nascimento</dt>
-              <dd>
-                <TenantDateTime iso={aluno.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
-              </dd>
-
-              <dt>CPF</dt>
-              {/*
-                "não informado" preservado byte a byte: aqui a ficha usa a frase, nao
-                o travessao do `Ausente`. Trocar mudaria texto de tela numa fatia que
-                muda aparencia.
-              */}
-              <dd>{aluno.cpf ? <Cpf value={aluno.cpf} /> : 'não informado'}</dd>
-
-
-              {/*
-                CONTATO na ficha, e nao so na edicao: a recepcao liga para o aluno a
-                partir daqui. O telefone vivia so no formulario de cadastro e na
-                lista -- quem abria a ficha para resolver a excecao tinha que voltar
-                para a listagem para achar o numero.
-              */}
-              <dt>Telefone</dt>
-              {/* O proprio `Telefone` renderiza `Ausente` quando o numero e nulo. */}
-              <dd data-testid="telefone-do-aluno">
-                <Telefone numero={telefonePrincipal} testId="telefone-principal" />
-              </dd>
-
-              <dt>E-mail</dt>
-              <dd data-testid="email-do-aluno">{email ? email : <Ausente />}</dd>
-            </dl>
-
-            {/*
-              EDICAO em modal, ao lado dos dados que ela edita. Ver
-              `EditarCadastro`: a ficha e tela de consulta, e dezoito campos
-              abertos empurrariam "Acesso agora" para baixo da dobra em 1280px.
-
-              O `<div>` existe para o botao nao esticar na largura da pagina --
-              ver `.acoesDaIdentificacao`.
-            */}
-            <div className={estilos['acoesDaIdentificacao']}>
-              <EditarCadastro
-                studentId={aluno.id}
-                nomeDoAluno={aluno.fullName}
-                status={aluno.status}
-                statusReason={aluno.statusReason}
-                statusReasonNote={aluno.statusReasonNote}
-                version={aluno.version}
-                fullName={aluno.fullName}
-                birthDate={aluno.birthDate}
-                cpf={aluno.cpf}
-                rg={aluno.rg}
-                registeredSex={aluno.registeredSex}
-                contacts={aluno.contacts ?? []}
-                address={aluno.address}
+            <div className={estilos['resumo']}>
+              <SummaryStrip
+                label="Situação agora"
+                testId="resumo-do-aluno"
+                celulas={[celulaDoCadastro, celulaDoAcesso, celulaDoFinanceiro]}
               />
             </div>
 
-            {/*
-              FAIXA DE VENCIMENTO -- F53 Task 12, spec SPEC-053 §3.4.
-
-              A CENA REAL: a recepcionista abre a ficha com a pessoa na frente e
-              precisa ver, sem clicar em nada, quem esta com mensalidade vencida ou
-              vencendo -- para cobrar na hora, e nao depois. `situacaoDeVencimento`
-              e derivada de `dueAt`/`blockAt`/`status`, que a resposta de
-              `/invoices` ja traz -- sem tabela nova, sem provedor, sem push.
-
-              EM_DIA nao mostra nada: e o caso comum (mensalidade paga ou nada em
-              aberto), e uma faixa que aparece sempre viraria ruido.
-            */}
-            {invoiceEmDestaque && situacaoDoVencimento !== 'EM_DIA' ? (
-              <p role="status" data-testid="faixa-de-vencimento" data-situacao={situacaoDoVencimento}>
-                Cobrança nº {invoiceEmDestaque.number} —{' '}
-                <Money cents={invoiceEmDestaque.totalMinor} currency={invoiceEmDestaque.currency} />
-                {', vencimento em '}
-                <TenantDateTime
-                  iso={invoiceEmDestaque.dueAt}
-                  timeZone={timezoneDaUnidade ?? FUSO_PROVISORIO}
-                  format="date"
-                />
-                <Consequencia tom="danger">
-                  {' — '}
-                  {situacaoDoVencimento === 'VENCE_EM_BREVE'
-                    ? 'vence hoje'
-                    : situacaoDoVencimento === 'BLOQUEIO_PROXIMO'
-                      ? 'vencida, bloqueio de acesso próximo'
-                      : 'vencida'}
-                </Consequencia>
-              </p>
-            ) : null}
-
-            {/*
-              SITUAÇÃO DO CADASTRO vive em INFORMAÇÃO, não em Plano (decisão
-              do PI, 24/08/2026): ela é atributo de QUEM a pessoa é -- ativo,
-              suspenso, cancelado --, e não do que ela contratou. Plano trata
-              de assinatura e direito de acesso.
-            */}
-            <section aria-labelledby="titulo-situacao" className={estilos['secao']}>
-              <h2 id="titulo-situacao">Situação do cadastro</h2>
+            <div className={estilos['grade']}>
+              {/*
+                EDIÇÃO em modal, no cabeçalho do card que ela edita. A ficha é
+                tela de consulta: dezoito campos abertos empurrariam o resto
+                para baixo da dobra em 1280px -- ver `EditarCadastro`.
+              */}
+              <div className={estilos['largo']}>
+                <SectionCard
+                  title="Identificação"
+                  icon="file-text"
+                  actions={
+                    <EditarCadastro
+                      studentId={aluno.id}
+                      nomeDoAluno={aluno.fullName}
+                      status={aluno.status}
+                      statusReason={aluno.statusReason}
+                      statusReasonNote={aluno.statusReasonNote}
+                      version={aluno.version}
+                      fullName={aluno.fullName}
+                      birthDate={aluno.birthDate}
+                      cpf={aluno.cpf}
+                      rg={aluno.rg}
+                      registeredSex={aluno.registeredSex}
+                      contacts={aluno.contacts ?? []}
+                      address={aluno.address}
+                    />
+                  }
+                >
+                  <dl className={estilos['dados']} data-testid="dados-do-aluno">
+                    <div>
+                      <dt>Matrícula</dt>
+                      <dd data-testid="matricula" className={estilos['identificador']}>
+                        {aluno.membershipNumber}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Nascimento</dt>
+                      <dd>
+                        <TenantDateTime iso={aluno.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>CPF</dt>
+                      {/* "não informado" preservado byte a byte, não o travessão do `Ausente`. */}
+                      <dd>{aluno.cpf ? <Cpf value={aluno.cpf} /> : 'não informado'}</dd>
+                    </div>
+                    <div>
+                      {/* A recepção liga para o aluno a partir daqui, sem voltar à lista. */}
+                      <dt>Telefone</dt>
+                      <dd data-testid="telefone-do-aluno">
+                        <Telefone numero={telefonePrincipal} testId="telefone-principal" />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>E-mail</dt>
+                      <dd data-testid="email-do-aluno">{email ? email : <Ausente />}</dd>
+                    </div>
+                  </dl>
+                </SectionCard>
+              </div>
 
               {/*
-                A SITUAÇÃO VIGENTE MORA AQUI, junto do que a altera -- decisão
-                do PI em 01/09/2026.
-
-                Ela ficava também na lista de leitura do topo, ao lado de
-                matrícula e nascimento, e a ficha dizia a mesma coisa duas
-                vezes na mesma tela. Um lugar só: quem lê a situação está a
-                um clique de mudá-la, e não precisa procurar onde.
-
-                Os três andam juntos porque respondem a mesma pergunta em
-                sequência -- QUAL estado, o que ele CAUSA, e POR QUÊ.
+                SITUAÇÃO DO CADASTRO vive em Informação, não em Plano (decisão
+                do PI, 24/08/2026): é atributo de QUEM a pessoa é. A vigente
+                mora junto do que a altera (PI, 01/09/2026) -- QUAL estado, o
+                que ele CAUSA e POR QUÊ, nessa ordem.
               */}
-              <p data-testid="situacao-do-aluno" className={estilos['situacaoVigente']}>
-                <StateBadge machine="student" state={aluno.status} />
-                {/*
-                  A CONSEQUÊNCIA, não só o rótulo. "Bloqueado" sozinho não
-                  avisa que a catraca nega MESMO com plano vigente -- e a
-                  recepção atribuiria um plano esperando resolver.
-                */}
-                {bloqueado ? (
-                  <Consequencia tom="danger" testId="acesso-impedido">
-                    impede o acesso, mesmo com plano vigente
-                  </Consequencia>
-                ) : null}
-              </p>
+              <SectionCard
+                title="Situação do cadastro"
+                icon={bloqueado ? 'user-x' : 'user-check'}
+                summary="Suspender e bloquear pedem motivo. Bloquear impede o acesso mesmo com plano vigente."
+              >
+                <div className={estilos['conteudo']}>
+                  <AlterarSituacao
+                    studentId={aluno.id}
+                    situacaoAtual={aluno.status}
+                    version={aluno.version}
+                  />
+                </div>
+              </SectionCard>
 
               {/*
-                O motivo só existe em SUSPENDED/BLOCKED -- o `CHECK` do banco
-                garante -- então não há travessão a mostrar no caso normal. É
-                aqui que a observação é lida por extenso: na grid cabe só a
-                razão fechada, com o texto no `title`.
+                TROCA DE PERFIL -- F82. Mesmo componente da ficha do time; só a
+                action e o campo oculto de id mudam.
               */}
-              {aluno.statusReason ? (
-                <p data-testid="motivo-da-situacao" className={estilos['motivoVigente']}>
-                  {MOTIVO_DA_SITUACAO[aluno.statusReason] ?? aluno.statusReason}
-                  {aluno.statusReasonNote ? ` — ${aluno.statusReasonNote}` : null}
-                </p>
-              ) : null}
+              <SectionCard
+                title="Perfil"
+                icon="users"
+                summary="Trocar para professor, staff ou admin tira esta pessoa da lista de alunos e a leva para Equipe."
+              >
+                <div className={estilos['conteudo']}>
+                  <AlterarPerfil
+                    nomeDoCampoDeId="studentId"
+                    id={aluno.id}
+                    perfilAtual={aluno.profile}
+                    version={aluno.version}
+                    acao={alterarPerfilDeAluno}
+                  />
+                </div>
+              </SectionCard>
 
-              <AlterarSituacao
-                studentId={aluno.id}
-                situacaoAtual={aluno.status}
-                version={aluno.version}
-              />
-            </section>
-
-            {/*
-              TROCA DE PERFIL -- F82. Move esta pessoa para professor, staff
-              ou admin: sai da listagem de alunos e passa a aparecer em
-              `/team`. Mesmo componente que a ficha do time usa, só a action e
-              o campo oculto de id mudam.
-            */}
-            <section aria-labelledby="titulo-perfil" className={estilos['secao']}>
-              <h2 id="titulo-perfil">Perfil</h2>
-              <AlterarPerfil
-                nomeDoCampoDeId="studentId"
-                id={aluno.id}
-                perfilAtual={aluno.profile}
-                version={aluno.version}
-                acao={alterarPerfilDeAluno}
-              />
-            </section>
-
-            <section aria-labelledby="titulo-mais" className={estilos['secao']}>
-              <h2 id="titulo-mais">Mais sobre este aluno</h2>
-
-              <ul className={estilos['portas']}>
-                <li>
-                  <a
-                    className={estilos['porta']}
-                    href={`/students/${aluno.id}/timeline`}
-                    data-testid="link-timeline"
-                  >
-                    <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                      <FcClock size={22} aria-hidden />
-                    </span>
-                    <span className={estilos['rotuloDaPorta']}>Histórico administrativo</span>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className={estilos['porta']}
-                    href={`/students/${aluno.id}/biometrics`}
-                    data-testid="link-biometria"
-                  >
-                    <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                      <FcPortraitMode size={22} aria-hidden />
-                    </span>
-                    <span className={estilos['rotuloDaPorta']}>Consentimento e biometria</span>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className={estilos['porta']}
-                    href={`/students/${aluno.id}/billing`}
-                    data-testid="link-financeiro"
-                  >
-                    <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                      <IconePagamento />
-                    </span>
-                    <span className={estilos['rotuloDaPorta']}>Financeiro e cobranças</span>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className={estilos['porta']}
-                    href={`/students/${aluno.id}/health`}
-                    data-testid="link-evolucao"
-                  >
-                    <span className={estilos['iconeDaPorta']} aria-hidden="true">
-                      <IconeBioimpedancia />
-                    </span>
-                    <span className={estilos['rotuloDaPorta']}>Evolução corporal</span>
-                  </a>
-                </li>
-              </ul>
-            </section>
+              {/*
+                AS QUATRO PORTAS do aluno, como destino navegável. Cada uma leva
+                o ícone que a MESMA ação usa na listagem.
+              */}
+              <div className={estilos['largo']}>
+                <SectionCard title="Mais sobre este aluno" icon="eye">
+                  <ul className={estilos['portas']}>
+                    <li>
+                      <a className={estilos['porta']} href={`/students/${aluno.id}/timeline`} data-testid="link-timeline">
+                        <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                          <FcClock size={22} aria-hidden />
+                        </span>
+                        <span className={estilos['rotuloDaPorta']}>Histórico administrativo</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a className={estilos['porta']} href={`/students/${aluno.id}/biometrics`} data-testid="link-biometria">
+                        <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                          <FcPortraitMode size={22} aria-hidden />
+                        </span>
+                        <span className={estilos['rotuloDaPorta']}>Consentimento e biometria</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a className={estilos['porta']} href={`/students/${aluno.id}/billing`} data-testid="link-financeiro">
+                        <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                          <IconePagamento />
+                        </span>
+                        <span className={estilos['rotuloDaPorta']}>Financeiro e cobranças</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a className={estilos['porta']} href={`/students/${aluno.id}/health`} data-testid="link-evolucao">
+                        <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                          <IconeBioimpedancia />
+                        </span>
+                        <span className={estilos['rotuloDaPorta']}>Evolução corporal</span>
+                      </a>
+                    </li>
+                  </ul>
+                </SectionCard>
+              </div>
+            </div>
               </>
             ),
           },

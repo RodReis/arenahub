@@ -124,7 +124,7 @@ export function AlterarSituacao({ studentId, situacaoAtual, version }: Props) {
         onChange={(evento) => setDestinoEscolhido(evento.target.value)}
         data-testid="campo-situacao"
       >
-        <option value="">Selecione…</option>
+        <option value="">Mover para…</option>
         {destinos.map((destino) => (
           <option key={destino} value={destino}>
             {ROTULO_DE_SITUACAO[destino] ?? destino}
