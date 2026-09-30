@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
 import { paraCentavos } from '../../src/billing/dinheiro';
+import type { MesPagavelUI } from '../../src/billing/meses-pagaveis';
 import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
@@ -69,6 +70,10 @@ const MENSAGEM: Record<string, string> = {
     'Pagamento parcial não é aceito: a cobrança só fecha com o valor integral.',
   BILLING_INVALID_MONETARY_AMOUNT: 'Valor inválido. Informe em reais, com até duas casas.',
   FORBIDDEN: 'Seu perfil não tem permissão para esta ação.',
+  BILLING_BATCH_TOTAL_CHANGED:
+    'O total mudou desde que a tela carregou. Atualize a página e confira os meses antes de repetir.',
+  IDEMPOTENCY_KEY_BODY_MISMATCH:
+    'Esta operação já foi tentada com dados diferentes. Atualize a página antes de repetir.',
 };
 
 function mensagemDe(code: string | undefined, padrao: string): string {
@@ -445,4 +450,79 @@ export async function emitirReciboDaInvoice(invoiceId: string): Promise<EstadoDo
   }
 
   return emitirReciboDoPagamento(pagamentoConfirmado.id);
+}
+
+interface FaixaPagavelRetornada {
+  months: MesPagavelUI[];
+}
+
+/**
+ * Faixa de meses pagaveis da assinatura -- `GET .../payable-months` (F83).
+ *
+ * Leitura pura, sem `useActionState`: e chamada direto pelo Server Component
+ * da tela (Task 7) para desenhar a faixa, nao a partir de um formulario.
+ * Erro devolve faixa vazia -- a tela trata "nada pagavel" e "erro de rede" da
+ * mesma forma aqui, porque nenhuma das duas tem lote para montar.
+ */
+export async function consultarMesesPagaveis(subscriptionId: string): Promise<MesPagavelUI[]> {
+  const resposta = await chamarApi<FaixaPagavelRetornada>(
+    `/api/v1/subscriptions/${subscriptionId}/payable-months`,
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return [];
+  }
+
+  return resposta.dados.months;
+}
+
+interface PagamentoEmLoteRetornado {
+  batchId: string;
+  invoiceIds: string[];
+  totalMinor: number;
+}
+
+/**
+ * Recebe uma faixa continua de meses numa unica operacao -- `POST
+ * .../manual-payment-batch` (F83). Mesmo caminho de PRIMEIRA CLASSE de
+ * `registrarPagamentoNoBalcao`: sem provedor, permissao propria
+ * (`billing.payment.manual`).
+ *
+ * `Idempotency-Key` e gerada aqui, uma por chamada -- repetir o clique (duplo
+ * clique, F5 no meio da requisicao) com o MESMO corpo devolve o resultado
+ * anterior sem regravar; o servidor recusa se o corpo mudar para a mesma
+ * chave (`IDEMPOTENCY_KEY_BODY_MISMATCH`).
+ */
+export async function receberPagamentoEmLote(input: {
+  subscriptionId: string;
+  ateCompetencia: string;
+  channel: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
+  expectedTotalMinor: number;
+  receivedAmountMinor?: number;
+}): Promise<{ ok: true; batchId: string } | { ok: false; error: string }> {
+  const idempotencyKey = crypto.randomUUID();
+
+  const resposta = await chamarApi<PagamentoEmLoteRetornado>(
+    `/api/v1/subscriptions/${input.subscriptionId}/manual-payment-batch`,
+    {
+      metodo: 'POST',
+      cabecalhosExtras: { 'idempotency-key': idempotencyKey },
+      corpo: {
+        ateCompetencia: input.ateCompetencia,
+        channel: input.channel,
+        expectedTotalMinor: input.expectedTotalMinor,
+        ...(input.receivedAmountMinor !== undefined
+          ? { receivedAmountMinor: input.receivedAmountMinor }
+          : {}),
+      },
+    },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return { ok: false, error: mensagemDe(resposta.erro?.code, 'Não foi possível registrar o pagamento em lote.') };
+  }
+
+  revalidatePath('/billing');
+
+  return { ok: true, batchId: resposta.dados.batchId };
 }
