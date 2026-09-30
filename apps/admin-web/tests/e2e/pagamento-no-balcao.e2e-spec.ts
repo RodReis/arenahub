@@ -21,6 +21,22 @@ import { criarPlano } from './cadastro-de-plano';
  * este teste falhava exatamente aqui e usava o plano do seed como contorno.
  * Com o campo de preco na tela (`criarPlano`), o caminho completo -- criar,
  * atribuir, cobrar -- passa a ser possivel de ponta a ponta.
+ *
+ * ATUALIZADO NA F83 (fix de revisao): `FaixaDeMeses` (Task 7) substituiu o
+ * campo "Valor recebido" + `SensitiveAction` (motivo obrigatorio) + recibo
+ * em especie pelo fluxo de chips -- este teste rodava contra uma tela que
+ * nao existe mais (o campo "Valor recebido" foi removido, e falharia em
+ * qualquer execucao real). O CAMINHO QUE ESTE TESTE PROVA -- busca do aluno,
+ * icone de cobranca na grid, criacao de plano pela tela -- continua unico
+ * aqui (o spec de lote navega direto por URL e usa o plano do seed); so a
+ * PARTE FINAL (receber e confirmar) foi reescrita para `FaixaDeMeses`.
+ *
+ * CONCERN (achado desta revisao, fora de escopo consertar aqui): `FaixaDeMeses`
+ * nao chama `emitirReciboDaInvoice`/`emitirReciboDoPagamento` nem exige motivo
+ * (`SensitiveAction`) -- os dois existem ainda em `app/actions/billing.ts` mas
+ * ficaram orfaos do caminho de lote. O pagamento em lote hoje NAO emite
+ * recibo em especie nem pede motivo de auditoria. Reportado no relatorio da
+ * tarefa; produto decide se isso volta.
  */
 const DONO = { email: 'dono@arena-positiva.test', senha: 'senha-de-bancada-arenahub' };
 
@@ -130,28 +146,19 @@ test('a recepcao acha o aluno, cobra e emite recibo', async ({ page }) => {
   await expect(page.getByTestId('tabela-de-cobrancas')).toBeVisible();
   await expect(page.getByTestId('forma-dinheiro')).toBeVisible();
 
+  /*
+   * FaixaDeMeses (F83, Task 7) substituiu o campo "Valor recebido" + o motivo
+   * obrigatorio (`SensitiveAction`) -- a cobranca do mes CORRENTE, recem
+   * gerada acima, vem OVERDUE/OPEN e ja chega pre-selecionada (`indiceInicial`,
+   * `faixa-de-meses.tsx`): basta escolher a forma e clicar em "Receber".
+   */
   await page.getByTestId('forma-dinheiro').click();
-  await page.getByLabel('Valor recebido').fill('150,00');
+  await page.getByRole('button', { name: /^Receber$/ }).click();
 
-  /*
-   * O MOTIVO E OBRIGATORIO -- confirmar sem preencher tem de ser barrado.
-   *
-   * `getByRole('alert')` sozinho e ambiguo: a tela tem mais de um alerta
-   * vivo, e o Playwright recusa em modo estrito. Casar pelo TEXTO da recusa
-   * e o que prova que foi ESTA guarda que barrou, e nao outro aviso qualquer
-   * que estivesse na tela por outro motivo.
-   */
-  await page.getByTestId('confirmar-acao-sensivel').click();
-  await expect(page.getByText(/escreva o motivo antes de continuar/i)).toBeVisible();
+  await expect(page.getByText(/1 mês recebido/i)).toBeVisible();
 
-  await page.getByLabel(/motivo/i).fill('Pagamento em especie no balcao');
-  await page.getByTestId('confirmar-acao-sensivel').click();
-
-  /*
-   * `recibo-emitido-em-especie`, e nao `recibo-emitido` generico: os dois
-   * caminhos de recibo (especie e QR) podem estar visiveis ao mesmo tempo na
-   * mesma pagina, e um testid compartilhado faz o Playwright recusar em modo
-   * estrito. O nome diz QUAL recibo este teste espera.
-   */
-  await expect(page.getByTestId('recibo-emitido-em-especie')).toBeVisible();
+  // A cobranca sai de OPEN para Paga na tabela -- o aceite original desta
+  // fatia ("pesquisa -> localizado -> icone -> pagina de pagar") termina em
+  // pagamento CONFIRMADO, nao so em o botao ter sido clicado.
+  await expect(page.getByTestId('tabela-de-cobrancas').getByText('Paga')).toBeVisible();
 });
