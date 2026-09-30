@@ -111,6 +111,13 @@ export function PainelDeCobranca({ subscriptionId, subscriptionIdParaPagamento, 
 
           {subscriptionIdParaPagamento !== null && mesesPagaveis.length > 0 ? (
             <FaixaDeMeses
+              // `key` muda sempre que o CONTEUDO da faixa muda (mes pago some,
+              // mes novo aparece, status muda) -- forca remontar o componente
+              // para que `useState(() => indiceInicial(faixa))` rode de novo.
+              // Sem isso, `router.refresh()` troca a prop mas a selecao antiga
+              // (indices de ANTES do pagamento) sobrevive por cima dos dados
+              // novos -- risco de cobrar mes que o aluno nao pediu.
+              key={mesesPagaveis.map((m) => `${m.competencia}:${m.status}`).join('|')}
               faixa={mesesPagaveis}
               subscriptionId={subscriptionIdParaPagamento}
               onPago={() => router.refresh()}
