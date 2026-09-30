@@ -815,6 +815,47 @@ export class MembershipRepository {
   }
 
   /**
+   * SO a metade de `registrarDerivacao` que fala do ENTITLEMENT: timeline
+   * `ENTITLEMENT_ACTIVATED` + outbox `EntitlementActivated`.
+   *
+   * NAO reaproveita `registrarDerivacao` inteiro (achado da revisao de
+   * branch inteiro): aquele tambem grava `SUBSCRIPTION_ACTIVATED` +
+   * `SubscriptionActivated` + `AuditLog` de `subscription.activated` -- que
+   * aqui seria FALSO. A assinatura desta troca nao foi "ativada", foi criada
+   * por uma substituicao, e ja tem o proprio evento dedicado
+   * (`SUBSCRIPTION_PLAN_CHANGED`/`SubscriptionPlanChanged`, gravado por
+   * `trocarPlanoDaAssinatura`). Duplicar o rotulo de ativacao confundiria
+   * qualquer consumidor de outbox que conte ativacoes de assinatura.
+   */
+  private async registrarEntitlementAtivado(
+    tx: Prisma.TransactionClient,
+    contexto: TenantContext,
+    dados: { studentId: string; entitlementId: string; correlationId: string },
+  ): Promise<void> {
+    await tx.studentTimelineEvent.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId: dados.studentId,
+        type: 'ENTITLEMENT_ACTIVATED',
+        actorType: 'USER',
+        actorId: contexto.actorId,
+        correlationId: dados.correlationId,
+        payload: { entitlementId: dados.entitlementId, source: 'SUBSCRIPTION' },
+      },
+    });
+
+    await tx.outboxEvent.create({
+      data: {
+        tenantId: contexto.tenantId,
+        eventType: 'EntitlementActivated',
+        aggregateType: 'Entitlement',
+        aggregateId: dados.entitlementId,
+        payload: { studentId: dados.studentId, source: 'SUBSCRIPTION' },
+      },
+    });
+  }
+
+  /**
    * Pausa, retoma ou cancela a assinatura, propagando ao entitlement.
    *
    * A propagacao e o ponto: mexer na assinatura sem mexer no direito
@@ -951,6 +992,16 @@ export class MembershipRepository {
     correlationId: string,
     agora: Date,
   ): Promise<{ subscription: Subscription; entitlement: Entitlement } | null> {
+    const origem = await this.encontrarAssinatura(contexto, subscriptionId);
+    if (!origem) return null;
+
+    // INV-033, mesma ordem de `ativarAssinatura` (linha 676): falha ANTES da
+    // transacao -- senao a assinatura antiga seria cancelada sem o aluno
+    // poder receber a nova.
+    const aluno = await this.alunos.verificarElegibilidade(contexto, origem.studentId);
+    if (!aluno) throw new ErroDeDominio('STUDENT_NOT_FOUND', 404, 'Aluno nao encontrado');
+    if (!aluno.elegivel) throw new AlunoNaoElegivelError(aluno.status);
+
     const plano = await this.encontrarPlano(contexto, entrada.planId);
     if (!plano) throw new PlanoNaoEncontradoError();
 
@@ -973,7 +1024,16 @@ export class MembershipRepository {
       janelas,
     );
 
+    // Competencia CORRENTE apenas (achado da revisao de branch inteiro,
+    // decisao do PI): trocar de plano cancela so a invoice do mes atual, nao
+    // divida vencida de meses anteriores -- trocar de plano nao perdoa
+    // atraso. Mesma funcao pura de normalizacao usada em todo o resto do
+    // modulo de billing (`abrirInvoiceDoPeriodo`, `criarPlano`).
+    const competenciaCorrente = competenciaDe(agora);
+
     return this.db.$transaction(async (tx) => {
+      await this.travarAlunoElegivel(tx, contexto, origem.studentId);
+
       const alterados = await tx.subscription.updateMany({
         where: {
           id: subscriptionId,
@@ -1038,17 +1098,27 @@ export class MembershipRepository {
       });
 
       // Sem reemissao automatica -- a proxima cobranca sai do ciclo normal,
-      // ja no plano novo (spec SEC-082 #6, fora de escopo #3). Caminho
+      // ja no plano novo (spec SEC-082 #6, fora de escopo #3). SO a
+      // competencia CORRENTE: divida vencida de mes anterior nao e
+      // perdoada pela troca (achado da revisao de branch inteiro). Caminho
       // comum tem ZERO invoice pendente: `updateMany` sobre zero linhas nao
       // e erro, so nao muda nada.
-      await tx.invoice.updateMany({
+      const invoicesCanceladas = await tx.invoice.findMany({
         where: {
           tenantId: contexto.tenantId,
           subscriptionId,
           status: { in: ['OPEN', 'OVERDUE'] },
+          billingPeriod: competenciaCorrente,
         },
-        data: { status: 'CANCELLED' },
+        select: { id: true },
       });
+
+      if (invoicesCanceladas.length > 0) {
+        await tx.invoice.updateMany({
+          where: { id: { in: invoicesCanceladas.map((i) => i.id) } },
+          data: { status: 'CANCELLED', version: { increment: 1 } },
+        });
+      }
 
       await tx.studentTimelineEvent.create({
         data: {
@@ -1080,6 +1150,7 @@ export class MembershipRepository {
             fromSubscriptionId: subscriptionId,
             toSubscriptionId: nova.id,
             reason: entrada.reason,
+            cancelledInvoiceIds: invoicesCanceladas.map((i) => i.id),
           },
         },
       });
@@ -1096,6 +1167,18 @@ export class MembershipRepository {
             toSubscriptionId: nova.id,
           },
         },
+      });
+
+      // MESMO evento de ENTITLEMENT que `ativarAssinatura` gera (achado da
+      // revisao de branch inteiro): qualquer consumidor futuro de outbox que
+      // espera `EntitlementActivated` para conceder/atualizar acesso nao
+      // pode ficar cego so porque o entitlement nasceu de uma troca em vez
+      // de uma ativacao. NAO usa `registrarDerivacao` inteiro -- ver
+      // `registrarEntitlementAtivado`.
+      await this.registrarEntitlementAtivado(tx, contexto, {
+        studentId: antiga.studentId,
+        entitlementId: entitlementNovo.id,
+        correlationId,
       });
 
       return { subscription: nova, entitlement: entitlementNovo };
@@ -1354,23 +1437,6 @@ export class MembershipRepository {
     id: string,
   ): Promise<Subscription | null> {
     return this.db.subscription.findFirst({ where: { id, tenantId: contexto.tenantId } });
-  }
-
-  /**
-   * Confirma se a assinatura pertence ao tenant do contexto, SEM devolver a
-   * entidade -- so o suficiente pra decidir 404 vs seguir adiante.
-   *
-   * Existe pra rotas como `trocarPlano` que precisam distinguir "id nao
-   * existe em lugar nenhum" / "existe mas e de OUTRO tenant" (ambos 404,
-   * politica do arquivo de teste de isolamento: nunca confirmar existencia
-   * cross-tenant) de "existe no MEU tenant mas version/status nao bateu"
-   * (409, resolvido pelo `updateMany` que ja filtra por tenant). Busca o id
-   * sozinho, sem filtrar tenant, e so compara -- nunca devolve campo da
-   * linha encontrada.
-   */
-  async assinaturaPertenceAoTenant(contexto: TenantContext, id: string): Promise<boolean> {
-    const achada = await this.db.subscription.findUnique({ where: { id }, select: { tenantId: true } });
-    return achada !== null && achada.tenantId === contexto.tenantId;
   }
 
   /**

@@ -1620,6 +1620,148 @@ describe('F7 -- aluno, plano e entitlement', () => {
         where: { aggregateId: corpo.subscriptionId, eventType: 'SubscriptionPlanChanged' },
       });
       expect(eventos).toHaveLength(1);
+
+      // Achado da revisao de branch inteiro: o entitlement criado pela
+      // troca gera o MESMO evento `EntitlementActivated` que
+      // `ativarAssinatura` gera -- qualquer consumidor de outbox que
+      // espera por esse evento para conceder/atualizar acesso nao pode
+      // ficar cego so porque o entitlement nasceu de uma troca.
+      const eventosDeEntitlement = await db.outboxEvent.findMany({
+        where: { aggregateId: corpo.entitlement.id, eventType: 'EntitlementActivated' },
+      });
+      expect(eventosDeEntitlement).toHaveLength(1);
+
+      // Filtra pelo `payload.entitlementId` do entitlement da TROCA -- o
+      // aluno ja tem um `ENTITLEMENT_ACTIVATED` da assinatura ORIGINAL
+      // (criada por `POST /subscriptions` no inicio deste teste), entao
+      // contar so por `studentId` contaria os dois.
+      const timelineDeEntitlement = await db.studentTimelineEvent.findMany({
+        where: { studentId: alunoId, type: 'ENTITLEMENT_ACTIVATED' },
+      });
+      expect(
+        timelineDeEntitlement.filter(
+          (e) => (e.payload as { entitlementId?: string }).entitlementId === corpo.entitlement.id,
+        ),
+      ).toHaveLength(1);
+    });
+
+    /**
+     * Achado da revisao de branch inteiro: `trocarPlanoDaAssinatura` pulava
+     * INV-033 -- um aluno inelegivel (bloqueado/cancelado/arquivado) nao
+     * pode receber o entitlement novo que a troca cria, mesmo a assinatura
+     * antiga sendo ACTIVE. Mesmo padrao de `ativarAssinatura`
+     * ('recusa nova assinatura para aluno arquivado').
+     */
+    it('recusa trocar plano de aluno inelegivel', async () => {
+      const criado = await criarAluno(contas.a, { fullName: 'Inelegivel Para Troca' });
+      const alunoId = (criado.body as { id: string }).id;
+      const planAntigoId = await criarPlano(contas.a);
+      const planNovoId = await criarPlano(contas.a);
+
+      const assinatura = await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: alunoId,
+          planId: planAntigoId,
+          startsAt: '2026-08-01T00:00:00.000Z',
+          endsAt: '2027-08-01T00:00:00.000Z',
+          reason: 'assinatura inicial',
+        });
+
+      const subscriptionId = (assinatura.body as { subscriptionId: string }).subscriptionId;
+
+      await request(servidor())
+        .patch(`/api/v1/students/${alunoId}/status`)
+        .set('Cookie', contas.a.cookie)
+        .send({ status: 'ARCHIVED', version: 0 });
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/subscriptions/${subscriptionId}/trocar-plano`)
+        .set('Cookie', contas.a.cookie)
+        .send({ planId: planNovoId, version: 0, reason: 'nao deveria passar' });
+
+      expect(resposta.status).toBe(409);
+      expect((resposta.body as { code: string }).code).toBe('STUDENT_NOT_ELIGIBLE');
+
+      // A recusa e ANTES da transacao: a assinatura antiga continua ACTIVE,
+      // nunca cancelada sem o aluno poder receber a nova.
+      const inalterada = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
+      expect(inalterada.status).toBe('ACTIVE');
+    });
+
+    /**
+     * Minor 2 do relatorio da revisao final: ataque cross-tenant NAO pelo
+     * `subscriptionId` (ja coberto acima), mas pelo `planId` do CORPO
+     * apontando para um plano de OUTRO tenant.
+     */
+    it('recusa trocar plano quando o planId do corpo e de outro tenant', async () => {
+      const criado = await criarAluno(contas.a, { fullName: 'PlanId Cruzado' });
+      const alunoId = (criado.body as { id: string }).id;
+      const planDoAId = await criarPlano(contas.a);
+      const planDoBId = await criarPlano(contas.b);
+
+      const assinatura = await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: alunoId,
+          planId: planDoAId,
+          startsAt: '2026-08-01T00:00:00.000Z',
+          endsAt: '2027-08-01T00:00:00.000Z',
+          reason: 'assinatura inicial',
+        });
+
+      const subscriptionId = (assinatura.body as { subscriptionId: string }).subscriptionId;
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/subscriptions/${subscriptionId}/trocar-plano`)
+        .set('Cookie', contas.a.cookie)
+        .send({ planId: planDoBId, version: 0, reason: 'plano de outro tenant' });
+
+      expect(resposta.status).toBe(404);
+      expect((resposta.body as { code: string }).code).toBe('PLAN_NOT_FOUND');
+
+      const inalterada = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
+      expect(inalterada.status).toBe('ACTIVE');
+      expect(inalterada.planId).toBe(planDoAId);
+    });
+
+    /**
+     * Minor 3 do relatorio da revisao final: prova a ordem "`encontrarPlano`
+     * roda ANTES da transacao" -- se a assinatura antiga fosse cancelada
+     * antes de descobrir que o plano nao existe, ela ficaria cancelada sem
+     * substituta.
+     */
+    it('plano inexistente nao cancela a assinatura antiga', async () => {
+      const criado = await criarAluno(contas.a, { fullName: 'Plano Inexistente Na Troca' });
+      const alunoId = (criado.body as { id: string }).id;
+      const planAntigoId = await criarPlano(contas.a);
+
+      const assinatura = await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: alunoId,
+          planId: planAntigoId,
+          startsAt: '2026-08-01T00:00:00.000Z',
+          endsAt: '2027-08-01T00:00:00.000Z',
+          reason: 'assinatura inicial',
+        });
+
+      const subscriptionId = (assinatura.body as { subscriptionId: string }).subscriptionId;
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/subscriptions/${subscriptionId}/trocar-plano`)
+        .set('Cookie', contas.a.cookie)
+        .send({ planId: randomUUID(), version: 0, reason: 'plano que nao existe' });
+
+      expect(resposta.status).toBe(404);
+      expect((resposta.body as { code: string }).code).toBe('PLAN_NOT_FOUND');
+
+      const inalterada = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
+      expect(inalterada.status).toBe('ACTIVE');
+      expect(inalterada.planId).toBe(planAntigoId);
     });
 
     it('cancela a invoice pendente da assinatura antiga ao trocar de plano', async () => {
@@ -1651,12 +1793,20 @@ describe('F7 -- aluno, plano e entitlement', () => {
         where: { tenantId: contas.a.tenantId },
         _max: { number: true },
       });
+      // COMPETENCIA CORRENTE de verdade (`agora`, nao uma data fixa de
+      // 2026-08): a correcao da revisao de branch inteiro cancela SO a
+      // invoice da competencia do mes atual -- uma data fixa de agosto
+      // faria este teste comecar a falhar em qualquer mes diferente de
+      // agosto/2026, porque a invoice nao estaria mais na competencia
+      // corrente no dia em que o teste roda.
+      const agora = new Date();
+      const competenciaCorrente = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), 1));
       const invoicePendente = await db.invoice.create({
         data: {
           tenantId: contas.a.tenantId,
           subscriptionId: subscriptionAntigaId,
           studentId: alunoId,
-          billingPeriod: new Date('2026-08-01T00:00:00.000Z'),
+          billingPeriod: competenciaCorrente,
           status: 'OPEN',
           number: (maiorNumero._max.number ?? 0) + 1,
           currency: 'BRL',
@@ -1673,6 +1823,82 @@ describe('F7 -- aluno, plano e entitlement', () => {
 
       const invoiceDepois = await db.invoice.findUniqueOrThrow({ where: { id: invoicePendente.id } });
       expect(invoiceDepois.status).toBe('CANCELLED');
+      // `version` incrementada e trilha de quem cancelou no auditLog --
+      // achado da revisao de branch inteiro.
+      expect(invoiceDepois.version).toBe(1);
+
+      const auditoria = await db.auditLog.findFirst({
+        where: {
+          tenantId: contas.a.tenantId,
+          action: 'subscription.plan_changed',
+          targetId: (
+            await db.subscription.findFirstOrThrow({
+              where: { tenantId: contas.a.tenantId, studentId: alunoId, status: 'ACTIVE' },
+            })
+          ).id,
+        },
+      });
+      expect(auditoria?.metadata).toMatchObject({
+        cancelledInvoiceIds: [invoicePendente.id],
+      });
+    });
+
+    /**
+     * Achado da revisao de branch inteiro: trocar de plano NAO perdoa
+     * divida vencida. So a invoice da competencia CORRENTE e cancelada; uma
+     * invoice de mes ANTERIOR (ja vencida, dinheiro que a academia ja
+     * deveria ter recebido) precisa continuar cobravel depois da troca.
+     */
+    it('NAO cancela invoice de competencia anterior (divida vencida) ao trocar de plano', async () => {
+      const criado = await criarAluno(contas.a, { fullName: 'Troca Com Divida Vencida' });
+      const alunoId = (criado.body as { id: string }).id;
+      const planAntigoId = await criarPlano(contas.a);
+      const planNovoId = await criarPlano(contas.a);
+
+      const assinatura = await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: alunoId,
+          planId: planAntigoId,
+          startsAt: '2026-01-01T00:00:00.000Z',
+          endsAt: '2027-08-01T00:00:00.000Z',
+          reason: 'assinatura inicial',
+        });
+
+      const subscriptionAntigaId = (assinatura.body as { subscriptionId: string }).subscriptionId;
+
+      // Competencia de um mes bem no passado -- nunca vai coincidir com a
+      // competencia corrente, seja qual for o dia em que o teste rodar.
+      const competenciaAntiga = new Date(Date.UTC(2020, 0, 1));
+      const maiorNumero = await db.invoice.aggregate({
+        where: { tenantId: contas.a.tenantId },
+        _max: { number: true },
+      });
+      const invoiceVencida = await db.invoice.create({
+        data: {
+          tenantId: contas.a.tenantId,
+          subscriptionId: subscriptionAntigaId,
+          studentId: alunoId,
+          billingPeriod: competenciaAntiga,
+          status: 'OVERDUE',
+          number: (maiorNumero._max.number ?? 0) + 1,
+          currency: 'BRL',
+          subtotalMinor: 15000,
+          totalMinor: 15000,
+          dueAt: new Date(Date.UTC(2020, 0, 10)),
+        },
+      });
+
+      await request(servidor())
+        .post(`/api/v1/subscriptions/${subscriptionAntigaId}/trocar-plano`)
+        .set('Cookie', contas.a.cookie)
+        .send({ planId: planNovoId, version: 0, reason: 'plano cadastrado errado' });
+
+      const invoiceDepois = await db.invoice.findUniqueOrThrow({ where: { id: invoiceVencida.id } });
+      // Continua OVERDUE -- a troca de plano nao perdoa atraso.
+      expect(invoiceDepois.status).toBe('OVERDUE');
+      expect(invoiceDepois.version).toBe(0);
     });
 
     it('recusa trocar plano com version desatualizada', async () => {
