@@ -9,6 +9,16 @@ updated: 2026-09-30
 
 ### Sem épico
 
+- [MVP1.5] Registrar como frequência as passagens que o leitor guardou offline (#477)
+- [MVP1][FIX] sendlog com vários registros: só o primeiro é decidido, e passagem antiga é tratada como ao vivo (#476)
+- [MVP1][FIX] Cadastro de aluno fornece o ID da catraca livre, sem colidir com o leitor (#475)
+- [MVP1][FIX] Sincronismo ArenaHub → leitor: command-poller não está ligado no agente de produção (#469)
+- [MVP1][FIX] Sem keep-alive em produção a catraca cai para offline e decide sozinha (#470)
+- [MVP1][FIX] Sincronismo leitor → ArenaHub: vincular os IDs do leitor aos alunos pela credencial do cadastro (#468)
+- [MVP1][FIX] Edge manda EDGE_AGENT_ID como deviceId — a decisão de acesso nunca chega na nuvem (#467)
+- [INFRA][FIX] invoice_sequences sem linha para tenant com faturas de seed (#462)
+- [MVP1][SPEC-059][FIX] Alerta DEVICE_OFFLINE crítico permanente com catraca e facial conectados — heartbeat manda devices vazio (#461)
+- [SPEC-083][F83] Pagamento em lote no balcão — atrasados, mês corrente e adiantados (#458)
 - [INFRA] test:guardas varre worktree filha em .claude/worktrees (#454)
 - [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
 - [FIX] painel financeiro deve abrir no mes corrente por default (#435)
@@ -42,6 +52,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][FIX] sem como pagar mês futuro adiantado na ficha do aluno (#464, finalizado em: 2026-09-30)
 - [MVP2][FIX] consolidação escolheu assinatura cancelada e tirou 130 alunos do faturamento de set/2026 (#450, finalizado em: 2026-09-30)
 - [MVP2][FIX] grid de alunos ordena por situação financeira e mostra sub-status para quem está ativo (#455, finalizado em: 2026-09-30)
 - [MVP2][FIX] Financeiro do aluno sem tom de estado, botões sem hierarquia (#444, finalizado em: 2026-09-29)
@@ -116,8 +127,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
+- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
