@@ -472,6 +472,67 @@ export class MembershipController {
   }
 
   @Post('subscriptions/:id/trocar-plano')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['subscriptionId', 'entitlement'],
+      properties: {
+        subscriptionId: { type: 'string' },
+        entitlement: {
+          type: 'object',
+          required: [
+            'id',
+            'source',
+            'status',
+            'startsAt',
+            'endsAt',
+            'reason',
+            'subscriptionId',
+            'subscriptionVersion',
+            'planBillingMode',
+            'recorrenciaAtiva',
+            'planName',
+            'planCurrentPrice',
+            'janelas',
+          ],
+          properties: {
+            id: { type: 'string' },
+            source: { type: 'string' },
+            status: { type: 'string' },
+            startsAt: { type: 'string' },
+            endsAt: { type: 'string' },
+            reason: { type: 'string', nullable: true },
+            subscriptionId: { type: 'string', nullable: true },
+            subscriptionVersion: { type: 'number', nullable: true },
+            planBillingMode: { type: 'string', nullable: true },
+            recorrenciaAtiva: { type: 'boolean' },
+            planName: { type: 'string', nullable: true },
+            planCurrentPrice: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                amountMinor: { type: 'number' },
+                currency: { type: 'string' },
+                validFrom: { type: 'string' },
+              },
+            },
+            janelas: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  gymUnitId: { type: 'string' },
+                  dayOfWeek: { type: 'number' },
+                  startMinute: { type: 'number' },
+                  endMinute: { type: 'number' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
   @RequirePermissions('subscription.manage')
   async trocarPlano(
     @Param('id') id: string,
