@@ -80,6 +80,13 @@ export async function chamarApi<T>(
      */
     preAuth?: string;
     /**
+     * Cabecalhos extras alem dos ja fixos deste helper (content-type, cookie,
+     * correlation-id, authorization) -- caso de uso atual: `Idempotency-Key`
+     * em `manual-payment-batch` (F83). Nunca sobrepoe os cabecalhos fixos
+     * acima; para isso, teria que virar parametro proprio, como `preAuth`.
+     */
+    cabecalhosExtras?: Record<string, string>;
+    /**
      * Schema da RESPOSTA. Opcional de proposito: sem ele o generico `T`
      * segue valendo como assercao e o comportamento e o de sempre, o que
      * deixa a migracao das telas ser incremental (issue #167).
@@ -111,6 +118,7 @@ export async function chamarApi<T>(
       ...(cabecalhoDeCookie ? { cookie: cabecalhoDeCookie } : {}),
       ...(opcoes.correlationId ? { 'x-correlation-id': opcoes.correlationId } : {}),
       ...(opcoes.preAuth ? { authorization: `Bearer ${opcoes.preAuth}` } : {}),
+      ...(opcoes.cabecalhosExtras ?? {}),
     },
     ...(corpo === undefined ? {} : { body: corpo }),
     cache: 'no-store',

@@ -15,6 +15,7 @@ import {
   aplicarPagamento,
   corrigirValorDaInvoice,
   podeTransicionar,
+  TransicaoDeInvoiceConcorrenteError,
   validarStatusParaCorrecao,
 } from './domain/invoice.js';
 
@@ -87,10 +88,16 @@ export class BillingRepository {
   async abrirInvoiceDoPeriodo(
     contexto: TenantContext,
     entrada: { subscriptionId: string; emQue: Date },
+    tx?: Prisma.TransactionClient,
   ): Promise<Invoice> {
     const competencia = competenciaDe(entrada.emQue);
 
-    const assinatura = await this.db.subscription.findFirst({
+    // As duas leituras iniciais ja rodavam fora da transacao original; um
+    // `tx` recebido de fora (Task 3, lote) so precisa ser usado aqui tambem
+    // para nao abrir uma segunda conexao dentro de uma transacao alheia.
+    const cliente = tx ?? this.db;
+
+    const assinatura = await cliente.subscription.findFirst({
       where: { id: entrada.subscriptionId, tenantId: contexto.tenantId },
       include: { plan: { include: { prices: true } } },
     });
@@ -99,7 +106,7 @@ export class BillingRepository {
       throw new AssinaturaNaoEncontradaError();
     }
 
-    const configuracao = await this.db.billingSettings.findUnique({
+    const configuracao = await cliente.billingSettings.findUnique({
       where: { tenantId: contexto.tenantId },
     });
 
@@ -120,7 +127,7 @@ export class BillingRepository {
       dueAt: vencimento,
     });
 
-    return this.db.$transaction(async (tx) => {
+    const executar = async (tx: Prisma.TransactionClient): Promise<Invoice> => {
       // Idempotencia ANTES de consumir numero: sem isto, a segunda chamada
       // gastaria um numero de invoice para depois descobrir que a linha ja
       // existe -- e a numeracao ficaria com buraco.
@@ -177,7 +184,11 @@ export class BillingRepository {
       });
 
       return invoice;
-    });
+    };
+
+    // `tx` vindo de fora (Task 3, lote) participa da transacao do chamador;
+    // sem ele, abre a propria -- caminho existente preservado.
+    return tx ? executar(tx) : this.db.$transaction(executar);
   }
 
   /**
@@ -198,10 +209,14 @@ export class BillingRepository {
       reason: string;
       paidAt: Date;
       receivedVia: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
+      batchId?: string;
     },
     correlationId: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<Payment> {
-    const invoice = await this.db.invoice.findFirst({
+    const cliente = tx ?? this.db;
+
+    const invoice = await cliente.invoice.findFirst({
       where: { id: entrada.invoiceId, tenantId: contexto.tenantId },
     });
 
@@ -217,7 +232,29 @@ export class BillingRepository {
     // dominio puro, testada sem banco.
     const resultado = aplicarPagamento(invoice.totalMinor, entrada.amountMinor);
 
-    return this.db.$transaction(async (tx) => {
+    const executar = async (tx: Prisma.TransactionClient): Promise<Payment> => {
+      /**
+       * Transicao CONDICIONADA, nao `update` incondicional (F83, issue
+       * #458): duas chamadas concorrentes sobre a MESMA invoice -- um
+       * recebimento avulso e um lote, por exemplo -- podem ambas ler
+       * `OPEN` e ambas tentar pagar. O `updateMany` com filtro de status
+       * garante que so UMA transiciona para `PAID`; a outra recebe
+       * `count !== 1` e falha aqui, antes de criar qualquer `Payment`.
+       *
+       * A garantia real e "a invoice transiciona para PAID uma vez so" --
+       * NAO "no maximo 1 Payment CONFIRMED por invoice" (esse invariante e
+       * falso por desenho: o webhook PIX grava um segundo Payment numa
+       * invoice ja PAID e manda o valor para credito).
+       */
+      const transicao = await tx.invoice.updateMany({
+        where: { id: invoice.id, tenantId: contexto.tenantId, status: { in: ['OPEN', 'OVERDUE'] } },
+        data: { status: 'PAID', paidAt: entrada.paidAt, version: { increment: 1 } },
+      });
+
+      if (transicao.count !== 1) {
+        throw new TransicaoDeInvoiceConcorrenteError(invoice.id);
+      }
+
       const pagamento = await tx.payment.create({
         data: {
           tenantId: contexto.tenantId,
@@ -229,12 +266,8 @@ export class BillingRepository {
           paidAt: entrada.paidAt,
           recognizedByUserId: contexto.actorId,
           receivedVia: entrada.receivedVia,
+          batchId: entrada.batchId ?? null,
         },
-      });
-
-      await tx.invoice.update({
-        where: { id: invoice.id },
-        data: { status: 'PAID', paidAt: entrada.paidAt, version: { increment: 1 } },
       });
 
       // Sobrepagamento vira credito do aluno (ADR-027, resposta 4 do PI).
@@ -267,6 +300,7 @@ export class BillingRepository {
             creditoMinor: resultado.creditoMinor,
             reason: entrada.reason,
             receivedVia: entrada.receivedVia,
+            batchId: entrada.batchId ?? null,
           },
         },
       });
@@ -283,7 +317,9 @@ export class BillingRepository {
       });
 
       return pagamento;
-    });
+    };
+
+    return tx ? executar(tx) : this.db.$transaction(executar);
   }
 
   /**

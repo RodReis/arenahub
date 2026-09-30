@@ -3611,6 +3611,15 @@ model Payment {
   providerAccountId String? @map("provider_account_id")
   externalPaymentId String? @map("external_payment_id")
 
+  /// Agrupa N Payments de um pagamento em lote (F83). Null para pagamento
+  /// avulso -- nao existe lote de 1.
+  batchId         String? @map("batch_id")
+  /// Hash do corpo do primeiro pedido deste batchId (ateCompetencia +
+  /// channel + expectedTotalMinor). So preenchido no primeiro Payment do
+  /// lote; usado para recusar reenvio da mesma Idempotency-Key com corpo
+  /// diferente (F83, issue #458).
+  batchRequestHash String? @map("batch_request_hash")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -3624,6 +3633,7 @@ model Payment {
   /// ADR-006 / INV-076: idempotencia do evento externo.
   @@unique([providerAccountId, externalPaymentId])
   @@index([tenantId, invoiceId, status])
+  @@index([tenantId, batchId])
   @@map("payments")
 }
 

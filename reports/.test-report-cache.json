@@ -1,21 +1,21 @@
 {
   "apps/api#test": {
-    "testes": 2009,
-    "pass": 2009,
+    "testes": 2019,
+    "pass": 2019,
     "falha": 0,
-    "coberturaPct": 69.12
+    "coberturaPct": 69.17
   },
   "apps/api#test:integration": {
-    "testes": 1259,
-    "pass": 1259,
+    "testes": 1271,
+    "pass": 1271,
     "falha": 0,
-    "coberturaPct": 80.23
+    "coberturaPct": 80.31
   },
   "apps/admin-web#test": {
-    "testes": 735,
-    "pass": 735,
+    "testes": 737,
+    "pass": 737,
     "falha": 0,
-    "coberturaPct": 72.8
+    "coberturaPct": 73.23
   },
   "packages/ui#test": {
     "testes": 265,
@@ -42,10 +42,10 @@
     "coberturaPct": 86.44
   },
   "apps/edge-agent#test": {
-    "testes": 250,
-    "pass": 250,
+    "testes": 254,
+    "pass": 254,
     "falha": 0,
-    "coberturaPct": 88.47
+    "coberturaPct": 88.37
   },
   "apps/kiosk#test": {
     "testes": 251,

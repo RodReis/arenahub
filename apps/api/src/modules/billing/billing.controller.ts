@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   NotFoundException,
   Param,
@@ -13,6 +14,7 @@ import { ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
+import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import { enumOpcionalDeQuery } from '../../common/http/enum-opcional-de-query.js';
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
@@ -23,6 +25,8 @@ import {
 } from './billing.repository.js';
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { ConsultarTentativaUseCase } from './consultar-tentativa.use-case.js';
+import { ConsultarMesesPagaveisUseCase } from './consultar-meses-pagaveis.use-case.js';
+import { RegistrarPagamentoEmLoteUseCase } from './registrar-pagamento-em-lote.use-case.js';
 import { ConsultarResumoFinanceiroUseCase } from './consultar-resumo-financeiro.use-case.js';
 import { janelaPadrao } from './domain/resumo-financeiro.js';
 import { ListarInvoicesUseCase, TAMANHO_MAXIMO_DA_PAGINA } from './listar-invoices.use-case.js';
@@ -37,6 +41,13 @@ import { LiberacaoFinanceiraUseCase } from './liberacao-financeira.use-case.js';
 import { CobrarAssinaturaNoCartaoUseCase } from './cobrar-assinatura-no-cartao.use-case.js';
 import { CriarCheckoutDeCartaoUseCase } from './criar-checkout-de-cartao.use-case.js';
 import { RegistrarMetodoDePagamentoUseCase } from './registrar-metodo-de-pagamento.use-case.js';
+
+/** Falta o header `Idempotency-Key` no lote -- recusa antes do Zod (F83, issue #458). */
+class IdempotencyKeyAusenteError extends ErroDeDominio {
+  constructor() {
+    super('BILLING_IDEMPOTENCY_KEY_REQUIRED', 422, 'header Idempotency-Key e obrigatorio para pagamento em lote');
+  }
+}
 
 const esquemaDeAbertura = z
   .object({
@@ -198,6 +209,17 @@ const esquemaDeCorrecaoDeValor = z
   .object({
     novoValorUnitarioMinor: z.number().int().min(0),
     reason: z.string().min(3).max(300),
+  })
+  .strict();
+
+/** Pagamento em lote no balcao. F83, issue #458. */
+const esquemaDePagamentoEmLote = z
+  .object({
+    /** 'YYYY-MM' -- mesmo formato usado na tela, convertido para Date(UTC, dia 1) no controller. */
+    ateCompetencia: z.string().regex(/^\d{4}-\d{2}$/),
+    channel: z.enum(['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO']),
+    expectedTotalMinor: z.number().int().min(0),
+    receivedAmountMinor: z.number().int().min(0).optional(),
   })
   .strict();
 
@@ -448,6 +470,15 @@ interface LiberacaoDto {
   expiresAt: string;
 }
 
+/** Um mes da faixa pagavel. F83, issue #458. */
+interface MesPagavelDto {
+  competencia: string;
+  status: 'OVERDUE' | 'OPEN' | 'NOT_OPENED';
+  invoiceId: string | null;
+  totalMinor: number;
+  dueAt: string;
+}
+
 @Controller('api/v1')
 export class BillingController {
   constructor(
@@ -467,6 +498,8 @@ export class BillingController {
     private readonly resumoFinanceiro: ConsultarResumoFinanceiroUseCase,
     private readonly aplicarInadimplencia: AplicarInadimplenciaUseCase,
     private readonly liberacao: LiberacaoFinanceiraUseCase,
+    private readonly consultarMesesPagaveis: ConsultarMesesPagaveisUseCase,
+    private readonly registrarPagamentoEmLote: RegistrarPagamentoEmLoteUseCase,
     private readonly contexto: TenantContextService,
   ) {}
 
@@ -524,6 +557,111 @@ export class BillingController {
     const completa = await this.billing.timelineDaInvoice(this.contexto.require(), id);
 
     return this.paraDto(completa!);
+  }
+
+  /**
+   * Faixa de meses pagaveis: do mais antigo em aberto ate corrente + 6
+   * (F83, issue #458). Leitura pura -- nao grava nada.
+   *
+   * `billing.read`, nao `billing.manage`: mesma permissao das outras
+   * leituras deste controller (`consultarPagos`, `listar`, `detalhar`) --
+   * quem ve a fatura do aluno pode ver a faixa que falta pagar.
+   */
+  @Get('subscriptions/:id/payable-months')
+  @RequirePermissions('billing.read')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['months'],
+      properties: {
+        months: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['competencia', 'status', 'invoiceId', 'totalMinor', 'dueAt'],
+            properties: {
+              competencia: { type: 'string', example: '2026-09' },
+              status: { type: 'string', enum: ['OVERDUE', 'OPEN', 'NOT_OPENED'] },
+              invoiceId: { type: 'string', nullable: true },
+              totalMinor: { type: 'integer' },
+              dueAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+      },
+    },
+  })
+  async consultarMesesPagaveisRota(@Param('id') id: string): Promise<{ months: MesPagavelDto[] }> {
+    const agora = new Date();
+    const meses = await this.consultarMesesPagaveis.executar(this.contexto.require(), id, agora);
+
+    return {
+      months: meses.map((m) => ({
+        competencia: m.competencia.toISOString().slice(0, 7),
+        status: m.status,
+        invoiceId: m.invoiceId,
+        totalMinor: m.totalMinor,
+        dueAt: m.dueAt.toISOString(),
+      })),
+    };
+  }
+
+  /**
+   * Recebe uma faixa continua de meses numa unica operacao (F83, issue
+   * #458). `Idempotency-Key` e obrigatorio -- vira o `batchId`, e repetir
+   * a chave com o MESMO corpo devolve o resultado anterior sem regravar;
+   * com corpo DIFERENTE, recusa (422).
+   *
+   * Mesma permissao de `manual-payment`, acima: reconhecer dinheiro sem
+   * provedor e ato excepcional, em lote ou nao.
+   *
+   * Header checado ANTES do Zod: corpo ausente/invalido some do interesse
+   * do cliente assim que falta a chave -- e o mesmo motivo, 422, entao nao
+   * ha vantagem em validar o corpo primeiro so para trocar de mensagem.
+   */
+  @Post('subscriptions/:id/manual-payment-batch')
+  @RequirePermissions('billing.payment.manual')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['batchId', 'invoiceIds', 'totalMinor'],
+      properties: {
+        batchId: { type: 'string' },
+        invoiceIds: { type: 'array', items: { type: 'string' } },
+        totalMinor: { type: 'integer' },
+      },
+    },
+  })
+  async registrarPagamentoEmLoteRota(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Req() requisicao: Request,
+  ): Promise<{ batchId: string; invoiceIds: string[]; totalMinor: number }> {
+    if (!idempotencyKey) {
+      throw new IdempotencyKeyAusenteError();
+    }
+
+    const dados = esquemaDePagamentoEmLote.parse(corpo);
+    const [ano, mes] = dados.ateCompetencia.split('-').map(Number);
+
+    return this.registrarPagamentoEmLote.executar(
+      this.contexto.require(),
+      {
+        subscriptionId: id,
+        ateCompetencia: new Date(Date.UTC(ano!, mes! - 1, 1)),
+        channel: dados.channel,
+        expectedTotalMinor: dados.expectedTotalMinor,
+        ...(dados.receivedAmountMinor !== undefined ? { receivedAmountMinor: dados.receivedAmountMinor } : {}),
+        idempotencyKey,
+        agora: new Date(),
+      },
+      // Mesmo padrao das demais rotas deste controller (ver
+      // `registrarPagamentoManual`, `criarCobrancaPix`,
+      // `criarCheckoutDeCartao`) -- nao ha helper dedicado nem interceptor,
+      // e o campo vem de `express-request-id` (ou similar) via `Req()`.
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
   }
 
   /**

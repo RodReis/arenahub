@@ -13,6 +13,7 @@ import {
 
 import { faturaEmDestaque } from '../../../../../src/billing/vencimento';
 import { chamarApi } from '../../../../../lib/api/server-client';
+import { consultarMesesPagaveis } from '../../../../actions/billing';
 import { PainelDeCobranca } from './painel-de-cobranca';
 import { SituacaoAtual } from './situacao-atual';
 
@@ -176,11 +177,30 @@ export default async function PaginaFinanceiroDoAluno({
    * a ficha do aluno mostra o aviso de vencimento sobre a MESMA fatura, e duas
    * implementacoes divergiriam.
    */
-  const invoicesEmAberto = invoices.filter(
-    (invoice) => invoice.status === 'OPEN' || invoice.status === 'OVERDUE',
-  );
-
   const invoiceEmDestaque = faturaEmDestaque(invoices);
+
+  /*
+   * PAGAR (FaixaDeMeses) precisa de ACTIVE OU SUSPENDED -- nao so ACTIVE.
+   *
+   * SUSPENDED e exatamente o aluno inadimplente (`aplicar-inadimplencia.
+   * use-case.ts`): entitlement suspenso por atraso, mas `registrarPagamentoManual`
+   * (por baixo do lote) reativa a assinatura no pagamento bem-sucedido. Negar
+   * o botao de pagar a quem esta suspenso tranca o UNICO caminho de volta —
+   * antes desta fatia, "Receber no balcao" nao tinha essa restricao (ver
+   * commit 6c33233, `invoicesEmAberto` independia de status de entitlement).
+   *
+   * "Gerar cobranca do mes" (abaixo, `assinaturaAtiva`) continua so ACTIVE:
+   * abrir cobranca NOVA para quem ja esta suspenso nao faz sentido.
+   */
+  const assinaturaParaPagamento =
+    (respostaDosDireitos.dados ?? []).find(
+      (direito) =>
+        (direito.status === 'ACTIVE' || direito.status === 'SUSPENDED') &&
+        direito.subscriptionId !== null,
+    )?.subscriptionId ?? null;
+
+  const mesesPagaveis =
+    assinaturaParaPagamento !== null ? await consultarMesesPagaveis(assinaturaParaPagamento) : [];
 
   return (
     <section aria-labelledby="titulo-financeiro">
@@ -291,12 +311,8 @@ export default async function PaginaFinanceiroDoAluno({
 
       <PainelDeCobranca
         subscriptionId={assinaturaAtiva}
-        invoicesEmAberto={invoicesEmAberto.map((invoice) => ({
-          id: invoice.id,
-          number: invoice.number,
-          totalMinor: invoice.totalMinor,
-          currency: invoice.currency,
-        }))}
+        subscriptionIdParaPagamento={assinaturaParaPagamento}
+        mesesPagaveis={mesesPagaveis}
       />
     </section>
   );

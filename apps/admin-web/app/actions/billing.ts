@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
-import { competenciasParaAdiantar } from '../../src/billing/adiantamento';
 import { paraCentavos } from '../../src/billing/dinheiro';
+import type { MesPagavelUI } from '../../src/billing/meses-pagaveis';
 import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 /**
@@ -23,12 +23,6 @@ import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 const esquemaDeAbertura = z.object({
   subscriptionId: z.string().uuid('Selecione a assinatura'),
-  /**
-   * Quantos meses gerar de uma vez -- adiantamento (decisao do PI,
-   * 30/09/2026). `1` e o comportamento de sempre (so o mes corrente);
-   * ausente no formulario cai no mesmo padrao.
-   */
-  quantidadeDeMeses: z.coerce.number().int().min(1).max(12).default(1),
 });
 
 const esquemaDePagamento = z.object({
@@ -48,8 +42,7 @@ const esquemaDePagamento = z.object({
 
 export interface EstadoDaInvoice {
   erro?: string;
-  /** Uma entrada por competencia gerada -- 1 no caso comum, N no adiantamento. */
-  sucesso?: { invoiceId: string; number: number }[];
+  sucesso?: { invoiceId: string; number: number };
 }
 
 export interface EstadoDoPagamento {
@@ -77,6 +70,10 @@ const MENSAGEM: Record<string, string> = {
     'Pagamento parcial não é aceito: a cobrança só fecha com o valor integral.',
   BILLING_INVALID_MONETARY_AMOUNT: 'Valor inválido. Informe em reais, com até duas casas.',
   FORBIDDEN: 'Seu perfil não tem permissão para esta ação.',
+  BILLING_BATCH_TOTAL_CHANGED:
+    'O total mudou desde que a tela carregou. Atualize a página e confira os meses antes de repetir.',
+  IDEMPOTENCY_KEY_BODY_MISMATCH:
+    'Esta operação já foi tentada com dados diferentes. Atualize a página antes de repetir.',
 };
 
 function mensagemDe(code: string | undefined, padrao: string): string {
@@ -218,42 +215,29 @@ export async function abrirCobranca(
 ): Promise<EstadoDaInvoice> {
   const analisado = esquemaDeAbertura.safeParse({
     subscriptionId: formulario.get('subscriptionId'),
-    quantidadeDeMeses: formulario.get('quantidadeDeMeses') ?? undefined,
   });
 
   if (!analisado.success) {
     return { erro: analisado.error.issues[0]?.message ?? 'Confira os dados informados.' };
   }
 
-  const competencias = competenciasParaAdiantar(new Date(), analisado.data.quantidadeDeMeses);
-  const geradas: { invoiceId: string; number: number }[] = [];
+  const resposta = await chamarApi<InvoiceRetornada>('/api/v1/invoices', {
+    metodo: 'POST',
+    corpo: {
+      subscriptionId: analisado.data.subscriptionId,
+      // O ciclo é do mês corrente. A API normaliza para o primeiro dia, e a
+      // idempotência de INV-066 garante que repetir não gera segunda cobrança.
+      emQue: new Date().toISOString(),
+    },
+  });
 
-  for (const competencia of competencias) {
-    const resposta = await chamarApi<InvoiceRetornada>('/api/v1/invoices', {
-      metodo: 'POST',
-      corpo: {
-        subscriptionId: analisado.data.subscriptionId,
-        emQue: competencia.toISOString(),
-      },
-    });
-
-    if (!resposta.ok || !resposta.dados) {
-      if (geradas.length > 0) {
-        revalidatePath('/billing');
-      }
-
-      return {
-        erro: mensagemDe(resposta.erro?.code, 'Não foi possível gerar a cobrança.'),
-        ...(geradas.length > 0 ? { sucesso: geradas } : {}),
-      };
-    }
-
-    geradas.push({ invoiceId: resposta.dados.id, number: resposta.dados.number });
+  if (!resposta.ok || !resposta.dados) {
+    return { erro: mensagemDe(resposta.erro?.code, 'Não foi possível gerar a cobrança.') };
   }
 
   revalidatePath('/billing');
 
-  return { sucesso: geradas };
+  return { sucesso: { invoiceId: resposta.dados.id, number: resposta.dados.number } };
 }
 
 /**
@@ -478,4 +462,79 @@ export async function emitirReciboDaInvoice(invoiceId: string): Promise<EstadoDo
   }
 
   return emitirReciboDoPagamento(pagamentoConfirmado.id);
+}
+
+interface FaixaPagavelRetornada {
+  months: MesPagavelUI[];
+}
+
+/**
+ * Faixa de meses pagaveis da assinatura -- `GET .../payable-months` (F83).
+ *
+ * Leitura pura, sem `useActionState`: e chamada direto pelo Server Component
+ * da tela (Task 7) para desenhar a faixa, nao a partir de um formulario.
+ * Erro devolve faixa vazia -- a tela trata "nada pagavel" e "erro de rede" da
+ * mesma forma aqui, porque nenhuma das duas tem lote para montar.
+ */
+export async function consultarMesesPagaveis(subscriptionId: string): Promise<MesPagavelUI[]> {
+  const resposta = await chamarApi<FaixaPagavelRetornada>(
+    `/api/v1/subscriptions/${subscriptionId}/payable-months`,
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return [];
+  }
+
+  return resposta.dados.months;
+}
+
+interface PagamentoEmLoteRetornado {
+  batchId: string;
+  invoiceIds: string[];
+  totalMinor: number;
+}
+
+/**
+ * Recebe uma faixa continua de meses numa unica operacao -- `POST
+ * .../manual-payment-batch` (F83). Mesmo caminho de PRIMEIRA CLASSE de
+ * `registrarPagamentoNoBalcao`: sem provedor, permissao propria
+ * (`billing.payment.manual`).
+ *
+ * `Idempotency-Key` e gerada aqui, uma por chamada -- repetir o clique (duplo
+ * clique, F5 no meio da requisicao) com o MESMO corpo devolve o resultado
+ * anterior sem regravar; o servidor recusa se o corpo mudar para a mesma
+ * chave (`IDEMPOTENCY_KEY_BODY_MISMATCH`).
+ */
+export async function receberPagamentoEmLote(input: {
+  subscriptionId: string;
+  ateCompetencia: string;
+  channel: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
+  expectedTotalMinor: number;
+  receivedAmountMinor?: number;
+}): Promise<{ ok: true; batchId: string } | { ok: false; error: string }> {
+  const idempotencyKey = crypto.randomUUID();
+
+  const resposta = await chamarApi<PagamentoEmLoteRetornado>(
+    `/api/v1/subscriptions/${input.subscriptionId}/manual-payment-batch`,
+    {
+      metodo: 'POST',
+      cabecalhosExtras: { 'idempotency-key': idempotencyKey },
+      corpo: {
+        ateCompetencia: input.ateCompetencia,
+        channel: input.channel,
+        expectedTotalMinor: input.expectedTotalMinor,
+        ...(input.receivedAmountMinor !== undefined
+          ? { receivedAmountMinor: input.receivedAmountMinor }
+          : {}),
+      },
+    },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return { ok: false, error: mensagemDe(resposta.erro?.code, 'Não foi possível registrar o pagamento em lote.') };
+  }
+
+  revalidatePath('/billing');
+
+  return { ok: true, batchId: resposta.dados.batchId };
 }
