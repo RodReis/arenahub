@@ -207,6 +207,15 @@ export class MembershipRepository {
     private readonly alunos: StudentRepository,
   ) {}
 
+  /**
+   * Sentinela para "sem termino previsto" -- distingue assinatura recorrente
+   * com prazo aberto (endsAt null) de entitlement que exige endsAt nao-nulo
+   * no schema. O valor absurdamente distante evita colisao com datas legais e
+   * torna o intent claro em logs/queries. Mesma pratica em
+   * `operations.repository.ts:escolherVigenciaMaisLonga`.
+   */
+  private readonly SEM_TERMINO_PREVISTO = new Date('9999-12-31T00:00:00.000Z');
+
   // -------------------------------------------------------------------------
   // Planos
   // -------------------------------------------------------------------------
@@ -1019,7 +1028,7 @@ export class MembershipRepository {
           subscriptionId: nova.id,
           status: 'ACTIVE',
           startsAt: agora,
-          endsAt: antiga.endsAt ?? new Date('9999-12-31'),
+          endsAt: antiga.endsAt ?? this.SEM_TERMINO_PREVISTO,
           policySnapshot: snapshot as unknown as Prisma.InputJsonValue,
           unitWindows: {
             create: janelas.map((j) => ({ ...j, tenantId: contexto.tenantId })),
