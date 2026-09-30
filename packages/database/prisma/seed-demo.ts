@@ -614,6 +614,23 @@ async function semearDemonstracao(): Promise<void> {
       }
     }
 
+    /*
+      `invoice_sequences` precisa refletir o `number` mais alto ja gravado --
+      senao a primeira invoice aberta pela API depois do seed tenta nascer com
+      um numero que este loop ja usou (issue #462). So toca a linha quando
+      este seed de fato criou invoice; reexecucao sem novidade nao mexe em
+      sequencia de quem faturou pela API nesse meio tempo.
+    */
+    if (invoicesCriadas > 0) {
+      await db.$executeRaw`
+        INSERT INTO invoice_sequences (tenant_id, next_value, updated_at)
+        VALUES (${tenant.id}::uuid, ${proximoNumero}, now())
+        ON CONFLICT (tenant_id) DO UPDATE
+        SET next_value = GREATEST(invoice_sequences.next_value, EXCLUDED.next_value),
+            updated_at = now()
+      `;
+    }
+
     console.info(
       `[demo] ${String(ALUNOS.length)} alunos, 1 leitor + 1 catraca, ${String(eventos)} eventos de acesso.`,
     );
