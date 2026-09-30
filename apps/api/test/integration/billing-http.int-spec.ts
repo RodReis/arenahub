@@ -288,6 +288,39 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
   });
 
   /**
+   * F83, issue #458 -- pagamento em lote no balcao. O caso de uso ja e
+   * coberto direto em `billing-pagamento-em-lote.int-spec.ts`; aqui o foco
+   * e SO o que a porta HTTP acrescenta, como nas demais rotas deste
+   * arquivo: autenticacao/permissao por cookie e a traducao do erro de
+   * dominio para status HTTP certo.
+   */
+  describe('pagamento em lote', () => {
+    it('consulta a faixa de meses pagaveis da assinatura', async () => {
+      const resposta = await request(servidor())
+        .get(`/api/v1/subscriptions/${cenario.subscriptionId}/payable-months`)
+        .set('Cookie', cenario.cookieGestor);
+
+      expect(resposta.status).toBe(200);
+      const corpo = resposta.body as { months: { competencia: string; status: string }[] };
+      expect(Array.isArray(corpo.months)).toBe(true);
+      expect(corpo.months.length).toBeGreaterThan(0);
+    });
+
+    it('lote sem o header Idempotency-Key e recusado com 422', async () => {
+      const resposta = await request(servidor())
+        .post(`/api/v1/subscriptions/${cenario.subscriptionId}/manual-payment-batch`)
+        .set('Cookie', cenario.cookieCaixa)
+        .send({
+          ateCompetencia: '2026-09',
+          channel: 'DINHEIRO',
+          expectedTotalMinor: PRECO_MINOR,
+        });
+
+      expect(resposta.status).toBe(422);
+    });
+  });
+
+  /**
    * F53, task 16 -- o buraco entre o caso de uso (task 9, ja testado em
    * `checkout-de-cartao.int-spec.ts`) e a rota HTTP que o balcao chama.
    * `checkout-de-cartao.int-spec.ts` cobre o caso de uso direto; aqui o foco
