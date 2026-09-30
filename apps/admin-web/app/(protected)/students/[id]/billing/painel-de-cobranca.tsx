@@ -60,14 +60,23 @@ const RESUMO_POR_FORMA: Record<FormaDePagamento, string> = {
  * colado na propria nota de rodape, indistinguivel de um link. O `Button` do
  * design system traz o gradiente de acao, a altura de 36 px e o estado
  * `disabled` que o `useFormStatus` precisa mostrar durante o envio.
+ *
+ * O ROTULO MUDA COM `quantidadeDeMeses` (adiantamento, 30/09/2026): "Gerar
+ * cobrança do mês" some quando ha mais de 1, porque "gerar 3 cobranças" e
+ * outra promessa -- a recepcao precisa saber, antes de clicar, que vai sair
+ * de la com varias faturas na lista de recebimento.
  */
-function BotaoDeGerar() {
+function BotaoDeGerar({ quantidadeDeMeses }: { quantidadeDeMeses: number }) {
   const { pending } = useFormStatus();
+  const rotulo =
+    quantidadeDeMeses > 1
+      ? `Gerar ${String(quantidadeDeMeses)} cobranças`
+      : 'Gerar cobrança do mês';
 
   return (
     <Button variant="solid" type="submit" disabled={pending} data-testid="gerar-cobranca">
       <Icon name="receipt" />
-      {pending ? 'Gerando…' : 'Gerar cobrança do mês'}
+      {pending ? 'Gerando…' : rotulo}
     </Button>
   );
 }
@@ -104,7 +113,9 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
   );
   const [cobrando, setCobrando] = useState<Cobrando | null>(null);
   const [valor, setValor] = useState('');
+  const [quantidadeDeMeses, setQuantidadeDeMeses] = useState('1');
   const idDoValor = useId();
+  const idDaQuantidade = useId();
   const { show } = useToast();
 
   const [reciboDoBalcao, setReciboDoBalcao] = useState<{ numero: number } | null>(null);
@@ -217,7 +228,27 @@ export function PainelDeCobranca({ subscriptionId, invoicesEmAberto }: Props) {
         */
         <form action={gerar} className={estilos['gerar']}>
           <input type="hidden" name="subscriptionId" value={subscriptionId} />
-          <BotaoDeGerar />
+          {/*
+            ADIANTAMENTO (30/09/2026): aluno que vai viajar, por exemplo, paga
+            hoje varios meses de uma vez. O campo fica ao lado do botao, nao
+            escondido atras de um "mais opcoes" -- e a mesma acao de sempre,
+            so com um numero maior. Padrao "1" preserva o comportamento
+            anterior para quem nao mexe nele.
+          */}
+          <div className={estilos['linhaDeGerar']}>
+            <div className={estilos['quantidadeDeMeses']}>
+              <Field
+                id={idDaQuantidade}
+                label="Meses"
+                name="quantidadeDeMeses"
+                value={quantidadeDeMeses}
+                onChange={(evento) => setQuantidadeDeMeses(evento.target.value)}
+                hint="Quantos meses gerar de uma vez, a partir do mês atual."
+                inputMode="numeric"
+              />
+            </div>
+            <BotaoDeGerar quantidadeDeMeses={Number(quantidadeDeMeses) || 1} />
+          </div>
           {/*
             A idempotência é do servidor, mas quem opera precisa saber disso
             ANTES de clicar de novo — senão evita o clique com medo de cobrar

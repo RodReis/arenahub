@@ -9,15 +9,27 @@
  */
 
 /*
- * GERAR -- botao acima, nota abaixo. `align-items: start` impede o botao de
- * esticar para a largura da nota, que e o que `flex-direction: column` sozinho
- * faz num container largo.
+ * GERAR -- campo e botao NA MESMA LINHA (adiantamento, 30/09/2026), nota
+ * abaixo dos dois. `align-items: flex-end` alinha a base do botao com a base
+ * do campo (que carrega rotulo + dica acima do input) em vez da base do
+ * proprio input, que ficaria mais alto.
  */
 .gerar {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: 6px;
+}
+
+.linhaDeGerar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* Numero de 1 a 2 digitos -- largura de rotulo herdada do Field sobraria vazia. */
+.quantidadeDeMeses {
+  max-inline-size: 88px;
 }
 
 .nota {
