@@ -135,6 +135,31 @@ foi a regra real, e que nunca foi sobre *qual tela*:
 A frase acima ("não se estende às demais telas") passa a valer como **regra de conteúdo, não de
 rota**: o que não se estende é pintar tela sem estado, não o componente.
 
+### Emenda de 30/09/2026 — a restrição por rota acaba
+
+**Decisão do PI.** Ao pedir o mesmo tratamento na **ficha do aluno** (aba Informação), e informado
+de que a emenda de 29/09 já não excluía nenhuma tela por nome — só exigia que houvesse estado a
+comunicar —, o PI decidiu fechar de vez a frase residual da emenda de 01/09: **nenhuma superfície
+do painel é excluída por ser "tela de trabalho".**
+
+O que muda: a distinção entre "dashboard, superfície de resumo" e "grid de alunos, cobrança,
+operação, superfícies de trabalho" deixa de existir como critério de acesso à cor semântica.
+Qualquer tela — tabela densa incluída — pode tingir um elemento pelo tom do estado que ele
+descreve, usando `PainelDeEstado` ou `SummaryStrip` (DS-PAINEL §4.6b, §4.6c).
+
+O que **não** muda, porque nunca foi sobre rota:
+
+- **O tom é do estado, nunca decoração.** Célula sem estado a descrever não ganha cor "para ficar
+  bonita" — isso continua proibido em qualquer tela, dashboard incluído.
+- **Cor nunca é canal único.** Ícone e rótulo textual sempre acompanham.
+- **Alerta exige que o valor seja o problema**, não o assunto. "Em dia" pinta `ok`; só o que
+  precisa de ação pinta `warn`/`err`/`risk`.
+- **Contraste AA** segue verificado por medição no navegador, não por intenção.
+
+Exemplo já em produção: a ficha do aluno resume três perguntas (situação do cadastro, acesso
+vigente, financeiro) em três células de `SummaryStrip`, cada uma tingida pelo próprio estado — não
+pela tela ser "de resumo".
+
 ## Design Principles
 
 1. **A exceção é o caso principal.** A recepção abre o painel quando algo deu errado. O caminho

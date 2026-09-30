@@ -9,7 +9,7 @@ export interface CelulaDeResumo {
   readonly icon: IconName;
   readonly value: ReactNode;
   /** Uma linha de contexto sob o numero -- o que ele decompoe, ou de quando e. */
-  readonly hint?: string;
+  readonly hint?: ReactNode;
   /**
    * O tom vem do ESTADO que o numero descreve, e some quando nao ha estado:
    * "clientes ativos" nao e uma boa noticia, e um numero verde por ser numero
