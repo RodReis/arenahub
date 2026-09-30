@@ -109,6 +109,13 @@ uso separado, mesmo padrão interno.
 - Mudar `startsAt`/`endsAt` da vigência contratual — só o plano muda.
 - Reemitir automaticamente a invoice cancelada no valor do plano novo — a próxima cobrança segue
   o ciclo normal (`rodar-ciclo-de-assinaturas.use-case.ts`).
+- Assinatura com recorrência de cartão ativa perde a recorrência após a troca — a nova assinatura
+  não herda `externalSubscriptionId`; readesão manual necessária. Comportamento pré-existente
+  (idêntico ao fluxo antigo de CANCEL+POST), não corrigido nesta fatia. **Correção de
+  30/09/2026 (achado da revisão de branch inteiro):** a §4.2 passo 6 acima afirmava que "a próxima
+  cobrança sai do ciclo normal, já no plano novo" — isso é falso quando a assinatura antiga tinha
+  recorrência de cartão ativa, porque `rodar-ciclo-de-assinaturas` só cobra quem tem
+  `externalSubscriptionId`, e a assinatura nova nasce sem esse campo.
 
 ## 7. Critérios de aceite
 
