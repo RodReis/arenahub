@@ -14,6 +14,7 @@ import {
   RegistrarPagamentoEmLoteUseCase,
   TotalDoLoteDivergenteError,
 } from '../../src/modules/billing/registrar-pagamento-em-lote.use-case.js';
+import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -64,10 +65,11 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     });
     contexto.tenantId = tenant.id;
 
+    const senhas = moduleRef.get(PasswordService);
     const operador = await db.user.create({
       data: {
         email: `lote-op-${sufixo}@exemplo.test`,
-        passwordHash: 'hash-de-teste-nao-usado-em-producao',
+        passwordHash: await senhas.gerarHash('lote-senha-de-teste-nao-usada-em-producao'),
       },
       select: { id: true },
     });

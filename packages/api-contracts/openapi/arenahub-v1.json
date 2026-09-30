@@ -2103,6 +2103,128 @@
         ]
       }
     },
+    "/api/v1/subscriptions/{id}/payable-months": {
+      "get": {
+        "operationId": "BillingController_consultarMesesPagaveisRota",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "months"
+                  ],
+                  "properties": {
+                    "months": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "competencia",
+                          "status",
+                          "invoiceId",
+                          "totalMinor",
+                          "dueAt"
+                        ],
+                        "properties": {
+                          "competencia": {
+                            "type": "string",
+                            "example": "2026-09"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "OVERDUE",
+                              "OPEN",
+                              "NOT_OPENED"
+                            ]
+                          },
+                          "invoiceId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "totalMinor": {
+                            "type": "integer"
+                          },
+                          "dueAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/api/v1/subscriptions/{id}/manual-payment-batch": {
+      "post": {
+        "operationId": "BillingController_registrarPagamentoEmLoteRota",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "batchId",
+                    "invoiceIds",
+                    "totalMinor"
+                  ],
+                  "properties": {
+                    "batchId": {
+                      "type": "string"
+                    },
+                    "invoiceIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "totalMinor": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/invoices/{id}/correct-amount": {
       "post": {
         "operationId": "BillingController_corrigirValorDaInvoice",

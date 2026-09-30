@@ -569,6 +569,28 @@ export class BillingController {
    */
   @Get('subscriptions/:id/payable-months')
   @RequirePermissions('billing.read')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['months'],
+      properties: {
+        months: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['competencia', 'status', 'invoiceId', 'totalMinor', 'dueAt'],
+            properties: {
+              competencia: { type: 'string', example: '2026-09' },
+              status: { type: 'string', enum: ['OVERDUE', 'OPEN', 'NOT_OPENED'] },
+              invoiceId: { type: 'string', nullable: true },
+              totalMinor: { type: 'integer' },
+              dueAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+      },
+    },
+  })
   async consultarMesesPagaveisRota(@Param('id') id: string): Promise<{ months: MesPagavelDto[] }> {
     const agora = new Date();
     const meses = await this.consultarMesesPagaveis.executar(this.contexto.require(), id, agora);
@@ -599,6 +621,17 @@ export class BillingController {
    */
   @Post('subscriptions/:id/manual-payment-batch')
   @RequirePermissions('billing.payment.manual')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['batchId', 'invoiceIds', 'totalMinor'],
+      properties: {
+        batchId: { type: 'string' },
+        invoiceIds: { type: 'array', items: { type: 'string' } },
+        totalMinor: { type: 'integer' },
+      },
+    },
+  })
   async registrarPagamentoEmLoteRota(
     @Param('id') id: string,
     @Body() corpo: unknown,
