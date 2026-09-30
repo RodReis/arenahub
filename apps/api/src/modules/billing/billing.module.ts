@@ -23,6 +23,8 @@ import { ConciliarMovimentosUseCase } from './conciliar-movimentos.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { CriarCheckoutDeCartaoUseCase } from './criar-checkout-de-cartao.use-case.js';
 import { EmitirReciboUseCase } from './emitir-recibo.use-case.js';
+import { ConsultarMesesPagaveisUseCase } from './consultar-meses-pagaveis.use-case.js';
+import { RegistrarPagamentoEmLoteUseCase } from './registrar-pagamento-em-lote.use-case.js';
 import { EstornarPagamentoUseCase } from './estornar-pagamento.use-case.js';
 import { EstornoConciliacaoController } from './estorno-conciliacao.controller.js';
 import { ObservarEstornoUseCase } from './observar-estorno.use-case.js';
@@ -94,6 +96,8 @@ import { WebhookController } from './webhook.controller.js';
     ConciliarMovimentosUseCase,
     ResolverDivergenciaUseCase,
     EmitirReciboUseCase,
+    ConsultarMesesPagaveisUseCase,
+    RegistrarPagamentoEmLoteUseCase,
     { provide: PAYMENT_PROVIDER, useClass: FakePaymentProvider },
   ],
   /**
