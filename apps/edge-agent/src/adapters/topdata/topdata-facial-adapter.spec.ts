@@ -231,6 +231,28 @@ describe('TopdataFacialAdapter', () => {
     expect(eventos[0]?.ocorridoEm.getHours()).toBe(9);
   });
 
+  it('da identificador proprio a cada registro do mesmo sendlog (#476)', async () => {
+    // O `logindex` e do LOTE. Usado como id de todos os registros, o segundo
+    // em diante virava REENTRADA e era descartado -- visto em campo.
+    const ids: (string | undefined)[] = [];
+    adapter.aoReconhecer((e) => ids.push(e.idExternoDoEvento));
+
+    leitor.enviar({
+      cmd: 'sendlog',
+      sn: leitor.sn,
+      count: 2,
+      logindex: 90,
+      record: [
+        { enrollid: 28, time: '2026-09-30 10:00:00', mode: 1, inout: 0, event: 0 },
+        { enrollid: 4, time: '2026-09-30 10:05:00', mode: 1, inout: 0, event: 0 },
+      ],
+    });
+
+    await leitor.esperar(() => ids.length === 2);
+
+    expect(ids).toEqual(['90-0', '90-1']);
+  });
+
   it('carrega o serial do leitor que reconheceu -- e ele que a nuvem conhece (#467)', async () => {
     // O Edge mandava o proprio EDGE_AGENT_ID como deviceId; a nuvem so
     // conhece o leitor pelo UUID do Device ou pelo serial do fabricante.

@@ -13,6 +13,7 @@ import {
   type ReconhecimentoComOrigem,
 } from '../application/orquestrar-acesso-online.js';
 import type { EventoReconhecimento } from '../domain/facial-device.js';
+import { ehPassagemAoVivo } from '../domain/passagem-ao-vivo.js';
 import { ligarVinculoLegado } from './vinculo-legado.js';
 
 export interface AgenteComposto {
@@ -92,6 +93,24 @@ export async function compor(
       logger.warn(
         { correlationId, enrollid: evento.externalEnrollId },
         'reconhecimento sem serial do leitor -- ignorado',
+      );
+      return;
+    }
+
+    // Backlog do leitor (passagens guardadas enquanto o ArenaHub estava
+    // fora) nao e pessoa na frente da catraca: nao pede decisao e nunca
+    // gira nada (#476). O registro como frequencia e o #477.
+    if (!ehPassagemAoVivo(evento.ocorridoEm, evento.recebidoEm)) {
+      logger.info(
+        {
+          correlationId,
+          enrollid: evento.externalEnrollId,
+          leitor: evento.serialDoDispositivo,
+          ocorridoEm: Number.isNaN(evento.ocorridoEm.getTime())
+            ? 'invalido'
+            : evento.ocorridoEm.toISOString(),
+        },
+        'passagem antiga do leitor -- nao aciona a catraca',
       );
       return;
     }

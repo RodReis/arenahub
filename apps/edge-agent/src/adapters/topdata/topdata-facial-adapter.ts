@@ -227,7 +227,7 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     const log = esquemaSendLog.safeParse(json);
     if (!log.success) return;
 
-    for (const registro of log.data.record) {
+    for (const [posicao, registro] of log.data.record.entries()) {
       if (registro.image !== undefined) {
         // Chegou foto apesar do setdevinfo. DESCARTA sem persistir e sem
         // logar o conteudo -- so o fato, para alguem investigar a config do
@@ -256,7 +256,10 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
         metodo: 'facial',
         serialDoDispositivo: log.data.sn,
         ...(log.data.logindex !== undefined
-          ? { idExternoDoEvento: String(log.data.logindex) }
+          ? // Por REGISTRO, nao por lote: o `logindex` e do sendlog inteiro, e
+            // repeti-lo em todos fazia o segundo em diante virar REENTRADA
+            // (#476). Continua estavel quando o leitor reenvia o mesmo lote.
+            { idExternoDoEvento: `${log.data.logindex}-${posicao}` }
           : {}),
       };
 
