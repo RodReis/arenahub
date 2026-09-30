@@ -15,6 +15,7 @@ import {
   esquemaReg,
   esquemaSendLog,
   respostaReg,
+  respostaSendLog,
   respostaSendUser,
 } from './protocolo.js';
 
@@ -96,8 +97,17 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
         // num array de Buffer.
         socket.on('message', (dados) => this.aoReceber(paraTexto(dados)));
 
-        socket.on('close', () => {
-          this.logger.warn('leitor facial desconectou');
+        /*
+         * Codigo e motivo do fechamento (#406): o leitor real caia a cada
+         * 20 s exatos e o log so dizia "desconectou". 1000 = fechou por
+         * vontade propria, 1006 = conexao cortada sem fechamento, 4xxx =
+         * codigo do firmware -- cada um aponta para uma causa diferente.
+         */
+        socket.on('close', (codigo: number, motivo: Buffer) => {
+          this.logger.warn(
+            { codigo, motivo: motivo.toString('utf8') },
+            'leitor facial desconectou',
+          );
           if (this.conexao === socket) this.conexao = null;
         });
 
@@ -125,6 +135,14 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
       this.logger.warn({ bytes: bruto.length }, 'mensagem ilegivel do equipamento');
       return;
     }
+
+    /*
+     * So o TIPO (`cmd` ou `ret`) e o tamanho, nunca o conteudo: `sendlog` e
+     * `senduser` podem trazer foto em Base64, que e dado biometrico. Em
+     * `debug` porque em operacao normal seria ruido; para diagnosticar a
+     * queda de conexao (#406) sobe-se o LOG_LEVEL.
+     */
+    this.logger.debug({ tipo: tipoDaMensagem(json), bytes: bruto.length }, 'mensagem do leitor');
 
     const validacao = esquemaMensagemDoEquipamento.safeParse(json);
     if (!validacao.success) {
@@ -227,6 +245,14 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
 
       for (const ouvinte of this.ouvintes) ouvinte(evento);
     }
+
+    /*
+     * O ack vai DEPOIS de entregar os eventos aos ouvintes: confirmar antes e
+     * cair no meio perderia o registro, porque o leitor nao reenvia o que ja
+     * foi confirmado. Sem ack nenhum, porem, o leitor corta a conexao a cada
+     * ~20 s e reenvia o mesmo lote para sempre (#406, achado de campo).
+     */
+    this.enviar(respostaSendLog({ count: log.data.count, logindex: log.data.logindex }));
   }
 
   private enviar(mensagem: string): void {
@@ -396,6 +422,21 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
   get serie(): string | null {
     return this.serieDoEquipamento;
   }
+}
+
+/**
+ * `cmd` (o leitor pedindo) ou `ret` (o leitor respondendo) -- nada alem
+ * disso sai daqui, para o log de diagnostico nunca carregar dado da pessoa.
+ */
+function tipoDaMensagem(json: unknown): string {
+  if (typeof json !== 'object' || json === null) return 'desconhecido';
+
+  const { cmd, ret } = json as { cmd?: unknown; ret?: unknown };
+
+  if (typeof cmd === 'string') return cmd;
+  if (typeof ret === 'string') return `ret:${ret}`;
+
+  return 'desconhecido';
 }
 
 /** Normaliza o payload do ws (Buffer | ArrayBuffer | Buffer[]) para texto. */

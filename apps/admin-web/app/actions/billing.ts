@@ -197,6 +197,18 @@ export async function iniciarCheckoutDeCartao(
   };
 }
 
+/**
+ * Gera a cobrança do mês corrente, ou várias competências consecutivas de
+ * uma vez (adiantamento — decisão do PI, 30/09/2026, ex.: aluno paga hoje
+ * setembro + outubro + novembro).
+ *
+ * SEQUENCIAL, NÃO EM PARALELO: cada `POST` depende do preço vigente NA
+ * COMPETÊNCIA dele, e disparar tudo junto não mudaria isso — mas parar no
+ * primeiro erro em vez de tentar as próximas evita reportar sucesso parcial
+ * como se fosse total. A idempotência de INV-066 torna clicar de novo
+ * seguro: as competências já abertas voltam iguais, só as que faltam são
+ * criadas.
+ */
 export async function abrirCobranca(
   _anterior: EstadoDaInvoice,
   formulario: FormData,

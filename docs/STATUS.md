@@ -1027,6 +1027,7 @@ nenhuma seção foi inventada. Alinhar ADR e documento é tarefa do Cowork.
 | F80 | SPEC-080 | 1 | — | Perfis prontos e gestão de equipe do tenant (depende da F79) | [`SPEC-080-perfis-prontos-e-equipe-do-tenant.md`](specs/SPEC-080-perfis-prontos-e-equipe-do-tenant.md) | [#374](https://github.com/RodReis/arenahub/issues/374) | aprovada-pi — decisões do PI em 22/09/2026 |
 | F81 | SPEC-081 | 1 | — | Tela de equipe: professor, staff e admin fora da contagem de aluno | — | [#415](https://github.com/RodReis/arenahub/issues/415) | decisões do PI em 26/09/2026 |
 | F82 | SPEC-082 | 1 | — | Trocar plano de assinatura ativa preservando histórico | — | [#420](https://github.com/RodReis/arenahub/issues/420) | decisões do PI em 27/09/2026 |
+| F83 | SPEC-083 | — | — | Pagamento em lote no balcão: atrasados, mês corrente e adiantados (até corrente + 6) | — | [#458](https://github.com/RodReis/arenahub/issues/458) | decisões do PI em 30/09/2026 |
 | F1 | SPEC-001 | 0 | 0.1 | Bancada reproduzível | [`SPEC-001-bancada-reproduzivel.md`](specs/SPEC-001-bancada-reproduzivel.md) | [#1](https://github.com/RodReis/arenahub/issues/1) | aprovada-pi |
 | F2 | SPEC-002 | 0 | 0.2 | Ciclo de vida facial | [`SPEC-002-ciclo-de-vida-facial.md`](specs/SPEC-002-ciclo-de-vida-facial.md) | [#2](https://github.com/RodReis/arenahub/issues/2) | aprovada-pi |
 | F3 | SPEC-003 | 0 | 0.3 | Catraca e passagem | [`SPEC-003-catraca-e-passagem.md`](specs/SPEC-003-catraca-e-passagem.md) | [#3](https://github.com/RodReis/arenahub/issues/3) | aprovada-pi |

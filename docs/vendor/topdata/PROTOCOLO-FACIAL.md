@@ -127,6 +127,22 @@ o que vier primeiro.
 | `enrollid` | `99999999` é o **ID especial de desconhecido** |
 | `image` | **foto em Base64** |
 
+### Resposta ao `sendlog` — obrigatória, e o manual não diz
+
+> ⚠️ **Achado de campo, Arena Positiva, 30/09/2026 (issue #406), firmware `ai518_fp26v_v2.16`.**
+> Os manuais que recebemos não documentam resposta ao `sendlog`. Sem ela, a cada conexão o leitor
+> manda `reg` → `sendlog`, espera ~20 s e **corta a conexão (WebSocket 1006)**. Ao reconectar,
+> **reenvia o mesmo registro**, e isso vira um loop que só termina quando alguém confirma.
+>
+> A resposta segue o mesmo contrato do `reg` e do `senduser`, ecoando `count` e `logindex`:
+>
+> ```json
+> {"ret":"sendlog","result":true,"count":1,"logindex":123}
+> ```
+>
+> O mesmo vale para o `senduser` (achado de 17/08/2026, loop de ~5 s). **Regra prática: todo
+> `cmd` que o leitor envia espera um `ret` de volta.**
+
 > 🔴 **`image` é dado biométrico chegando no `edge-agent`.** Cai direto na regra de arquitetura
 > nº 7 e no ADR-008. O envio é **configurável** por `setdevinfo`:
 >

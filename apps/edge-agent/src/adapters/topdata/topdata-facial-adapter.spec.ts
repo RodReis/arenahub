@@ -71,6 +71,11 @@ class LeitorFalso {
     this.socket?.close();
   }
 
+  /** Fecha com codigo e motivo, como o firmware faz ao derrubar a conexao. */
+  fecharCom(codigo: number, motivo: string): void {
+    this.socket?.close(codigo, motivo);
+  }
+
   /** Espera até `condicao` valer, ou estoura. */
   async esperar(condicao: () => boolean, ms = 2000): Promise<void> {
     const limite = Date.now() + ms;
@@ -289,12 +294,114 @@ describe('TopdataFacialAdapter', () => {
     expect(resposta?.['result']).toBe(true);
   });
 
+  it('confirma o sendlog com o mesmo logindex -- sem ack o leitor corta a conexao', async () => {
+    // Achado de campo 30/09/2026 (#406), mesmo firmware v2.16: a cada conexao
+    // o leitor manda reg -> sendlog, espera ~20 s e corta com 1006, sem
+    // mensagem alguma no meio. Ao reconectar, reenvia o MESMO sendlog (894
+    // bytes, identico) -- o registro nunca confirmado. Mesmo contrato do reg
+    // e do senduser: `ret` + `result`, ecoando `count` e `logindex` para o
+    // leitor saber QUAL lote foi confirmado.
+    leitor.enviar({
+      cmd: 'sendlog',
+      sn: leitor.sn,
+      count: 1,
+      logindex: 321,
+      record: [
+        { enrollid: 12345, time: '2026-09-30 10:00:00', mode: 1, inout: 0, event: 0 },
+      ],
+    });
+
+    await leitor.esperar(() => leitor.recebidos.some((m) => m['ret'] === 'sendlog'));
+
+    const resposta = leitor.recebidos.find((m) => m['ret'] === 'sendlog');
+    expect(resposta?.['result']).toBe(true);
+    expect(resposta?.['logindex']).toBe(321);
+    expect(resposta?.['count']).toBe(1);
+  });
+
   it('recusa externalEnrollId que nao cabe no equipamento', async () => {
     // O UUID hexadecimal da primeira versao da F2 cai aqui. Falhar alto e
     // melhor que recusa silenciosa no leitor.
     await expect(adapter.cadastrar({ externalEnrollId: 'a'.repeat(32), rotulo: 't' })).rejects.toThrow(
       /nao cabe no enrollid/,
     );
+  });
+});
+
+/**
+ * #406 -- Arena Positiva, 30/09/2026. O leitor real (`AYTI11108174`, fw
+ * v2.16) cai e reconecta a cada 20 s exatos, e o log so dizia "leitor facial
+ * desconectou". Sem o codigo de fechamento do WebSocket e sem saber o que foi
+ * trocado antes da queda, qualquer correcao seria chute.
+ *
+ * O diagnostico registra o TIPO de cada mensagem (`cmd`/`ret`) e o codigo e
+ * motivo do fechamento -- nunca o conteudo: `sendlog` e `senduser` podem
+ * carregar foto em Base64, que e dado biometrico.
+ */
+describe('TopdataFacialAdapter -- diagnostico de conexao', () => {
+  let linhas: Record<string, unknown>[];
+  let adapter: TopdataFacialAdapter;
+  let leitor: LeitorFalso;
+  let porta: number;
+
+  beforeEach(async () => {
+    linhas = [];
+    const capturador = pino(
+      { level: 'debug' },
+      { write: (linha: string) => linhas.push(JSON.parse(linha) as Record<string, unknown>) },
+    );
+
+    porta = proximaPorta += 1;
+    adapter = new TopdataFacialAdapter(capturador, porta);
+    await adapter.iniciar();
+    leitor = new LeitorFalso();
+    await leitor.conectar(porta);
+  });
+
+  afterEach(async () => {
+    leitor.fechar();
+    await adapter.encerrar();
+  });
+
+  it('registra o codigo e o motivo quando o leitor desconecta', async () => {
+    leitor.fecharCom(4001, 'motivo do equipamento');
+
+    const achar = (): Record<string, unknown> | undefined =>
+      linhas.find((l) => l['msg'] === 'leitor facial desconectou');
+
+    await leitor.esperar(() => achar() !== undefined);
+
+    expect(achar()?.['codigo']).toBe(4001);
+    expect(achar()?.['motivo']).toBe('motivo do equipamento');
+  });
+
+  it('registra o tipo de cada mensagem recebida, nunca o conteudo', async () => {
+    leitor.enviar({
+      cmd: 'sendlog',
+      sn: leitor.sn,
+      count: 1,
+      logindex: 7,
+      record: [
+        {
+          enrollid: 12345,
+          name: 'ALUNO FICTICIO',
+          time: '2026-09-30 10:00:00',
+          mode: 8,
+          inout: 0,
+          event: 0,
+          image: 'BASE64-DE-FOTO-NAO-PODE-IR-AO-LOG',
+        },
+      ],
+    });
+
+    const achar = (): Record<string, unknown> | undefined =>
+      linhas.find((l) => l['msg'] === 'mensagem do leitor' && l['tipo'] === 'sendlog');
+
+    await leitor.esperar(() => achar() !== undefined);
+
+    const tudo = JSON.stringify(linhas);
+    expect(tudo).not.toContain('BASE64-DE-FOTO-NAO-PODE-IR-AO-LOG');
+    expect(tudo).not.toContain('ALUNO FICTICIO');
   });
 });
 

@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 import { type Logger } from 'pino';
 
 import type { Config } from '../config/env.js';
@@ -24,7 +26,13 @@ const INNER_PADRAO = 1;
  */
 export const CAMINHO_PONTE = absoluto(
   'native/easyinner-bridge/bin/EasyInnerBridge.exe',
-  raizDoPacote(import.meta.url),
+  /*
+   * `raizDoPacote` sobe UM nivel -- vale para `dist/main.js`. Este modulo
+   * mora em `producao/` (`dist/producao/` compilado, `src/producao/` no
+   * teste), um nivel mais fundo: sem o `..` o caminho saia com `dist\` a
+   * mais e o spawn dava ENOENT de novo (#406, nono elo).
+   */
+  resolve(raizDoPacote(import.meta.url), '..'),
 );
 const PORTA_CATRACA = 3570;
 const TEMPO_CONECTAR_CATRACA_S = 10;
@@ -87,6 +95,10 @@ async function montarCatracaReal(logger: Logger): Promise<TurnstileAdapter> {
       if (!conectado) throw new Error('testarConexao devolveu false');
     },
   });
+
+  // O sucesso tambem vira log (#406): na Arena Positiva a catraca conectou e
+  // nada disse -- so dava para deduzir pelo facial ter subido depois dela.
+  logger.info({ porta: PORTA_CATRACA }, 'catraca conectada');
 
   return adapter;
 }

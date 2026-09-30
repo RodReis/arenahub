@@ -6,15 +6,9 @@
  * So camada semantica (regra 2 de lint).
  */
 
-/*
- * GERAR -- botao acima, nota abaixo. `align-items: start` impede o botao de
- * esticar para a largura da nota, que e o que `flex-direction: column` sozinho
- * faz num container largo.
- */
 .gerar {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: 6px;
 }
 

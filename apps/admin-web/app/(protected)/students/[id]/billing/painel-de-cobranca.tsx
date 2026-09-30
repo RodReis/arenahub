@@ -33,6 +33,7 @@ const ESTADO_DA_INVOICE: EstadoDaInvoice = {};
  * colado na propria nota de rodape, indistinguivel de um link. O `Button` do
  * design system traz o gradiente de acao, a altura de 36 px e o estado
  * `disabled` que o `useFormStatus` precisa mostrar durante o envio.
+ *
  */
 function BotaoDeGerar() {
   const { pending } = useFormStatus();
