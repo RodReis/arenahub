@@ -255,6 +255,25 @@ para trabalho de terceiros com aparência de evidência conferida. `—` é hone
 **Preencher depois do merge é passo do fluxo**, junto com `proplan:done` — ver `CLAUDE.md`,
 *Ciclo de vida de uma fatia*, passo 2.
 
+### Evidência da `SPEC-083` — F83, pagamento em lote no balcão
+
+Registrada em `reports/TESTS.md` por
+`pnpm test:report --issue 458 --spec SPEC-083`, em 30/09/2026. **PR: `—`** — preencher depois do
+merge, pela regra acima.
+
+**Unitário e integração verdes** (735+ testes unitários entre Vitest/web e Jest/api, mais os
+cenários de integração da spec §6 — Postgres real, cobrindo lote com múltiplos meses, concorrência
+avulso × lote sobre a mesma invoice, idempotência com `Idempotency-Key` repetida e com corpo
+divergente, rollback parcial e não-suspensão de quem adiantou).
+
+**⚠️ E2E (Playwright) não confirmado ao vivo nesta entrega.** As portas 3000/3344 — fixas por
+convenção do projeto (`CLAUDE.md`) — estavam ocupadas pelo processo de desenvolvimento do próprio
+operador humano durante toda a sessão, e corretamente não foram derrubadas para liberar a porta. O
+código E2E foi escrito e revisado estaticamente por dois revisores independentes, mas isso **não
+substitui** a execução real: falta rodar a suíte E2E contra um servidor vivo antes desta branch
+mergear. Registrar aqui em vez de afirmar "E2E verde" é deliberado — ver `docs/DEVELOPMENT.md`
+(entrega F83) e ADR-063 para as pendências de produto encontradas na mesma revisão.
+
 ### Evidência da `SPEC-049` — F49, kiosk seguro
 
 Registrada em `reports/TESTS.md` por

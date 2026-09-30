@@ -4661,3 +4661,89 @@ exato"). O PI decidiu pela modalidade ao ver o desenho concreto da F77.
   não custa nada" segue como o ADR-061 já registrou.
 - `CONVENTION.md` e `docs/specs/SPEC-078-*.md` são atualizados para refletir "modalidade" em vez de
   deixar a pergunta em aberto.
+
+## ADR-063 — Pagamento em lote no balcão: faixa contínua, sem desconto, um `Payment` por mês (F83)
+
+**Data:** 30/09/2026
+**Status:** aceito *(decisão nova — decidida pelo PI em 30/09/2026)*
+**Decisor:** Rodrigo Reis (PI)
+**Issue:** [#458](https://github.com/RodReis/arenahub/issues/458)
+**Spec:** [`2026-09-30-pagamento-em-lote-design.md`](../superpowers/specs/2026-09-30-pagamento-em-lote-design.md)
+
+**Contexto:** "Receber no balcão" quitava uma invoice por vez. Aluno atrasado em vários meses, ou
+aluno que quer adiantar 2-6 meses, não tinha como resolver numa operação só. O PI decidiu as oito
+perguntas da spec §2 antes da implementação.
+
+### Decisões
+
+| # | pergunta | decisão |
+|---|---|---|
+| 1 | A seleção pode pular mês? | **Não.** Contínua a partir do mês em aberto mais antigo, sem buraco — vale para vencidos e adiantados (INV-162). |
+| 2 | Adiantar dá benefício? | **Sem desconto.** Cada mês pelo preço vigente da própria competência; o efeito colateral é travar o preço (INV-068). |
+| 3 | Cancelamento com meses futuros pagos? | **Fora desta fatia.** Meses seguem `PAID`; estorno, se houver, é manual. Limitação conhecida. |
+| 4 | Modelagem | **Um `Payment` por invoice, agrupados por `batchId`**, numa transação. Sem tabela de alocação, sem invoice consolidada. |
+| 5 | Formas de pagamento | Só as do balcão (Dinheiro, PIX maquininha, Débito, Crédito). PIX por QR do provedor segue um mês por vez. |
+| 6 | Teto de meses adiantados? | **Competência corrente + 6.** |
+| 7 | Estorno de mês adiantado pago? | **Usa `EstornarPagamentoUseCase` existente**, aceitando que a `refundAccessPolicy` do tenant pode suspender o acesso mesmo com o mês corrente pago. Nada novo nesta fatia. |
+| 8 | Aviso no app por lote ou por mês? | **Um aviso por mês.** Mantém o comportamento atual: N eventos `InvoicePaid` → N avisos "Pagamento confirmado". |
+
+### Consequências
+
+- `Payment.batchId String?` + índice `(tenantId, batchId)` — migração aditiva, sem backfill.
+  `Payment.batchRequestHash` guarda o hash do corpo do primeiro pedido do lote, para a checagem de
+  idempotência com corpo divergente (`IDEMPOTENCY_KEY_BODY_MISMATCH`).
+- `mesesPagaveis`/`resolverLote` são domínio puro (sem banco, rede ou relógio); a rota de leitura
+  (`GET /subscriptions/:id/payable-months`) e a de escrita
+  (`POST /subscriptions/:id/manual-payment-batch`) seguem o contrato da spec §4.
+- Nova invariante **INV-162** (`docs/CONVENTION.md` §4.10).
+- **Correção de concorrência em código já existente, fora do escopo original da fatia:** o
+  `registrarPagamentoManual` de hoje conferia `podeTransicionar` fora da transação e gravava com
+  `update` incondicional — duas chamadas concorrentes sobre a mesma invoice (um recebimento avulso e
+  um lote, por exemplo) podiam cobrar o aluno em dobro. Corrigido nos dois caminhos (avulso e lote)
+  trocando o par `findFirst` + `update` por uma transição condicionada
+  (`updateMany` com `where: status IN (OPEN, OVERDUE)`, checando `count === 1`). A garantia real é
+  **"a invoice transiciona para `PAID` uma vez só"**, não "no máximo um `Payment CONFIRMED` por
+  invoice" — esse segundo invariante é falso por desenho, porque o webhook PIX já grava um segundo
+  `Payment` sobre invoice `PAID` e manda o valor para crédito (fluxo existente, fora desta fatia).
+  Não foi introduzido índice único parcial em `payments` — quebraria esse fluxo.
+
+### Pendências de produto — três perguntas que a implementação achou e não decide sozinha
+
+A revisão de código desta fatia achou três lacunas reais de produto. Nenhuma foi corrigida aqui —
+são decisão do PI, registradas para a próxima fatia de billing ou para resposta direta:
+
+1. **Aluno com entitlement `REVOKED` ou `EXPIRED` e dívida em aberto não tem como pagar por esta
+   tela.** O widget de pagamento em lote só aparece com entitlement `ACTIVE` ou `SUSPENDED` — um
+   aluno revogado ou expirado com meses atrasados fica sem caminho de quitação nesta superfície.
+2. **Aluno ARQUIVADO tem entitlement `SUSPENDED` pelo próprio processo de arquivamento**, sem
+   relação com inadimplência. Isso significa que a ficha financeira de um aluno arquivado ainda
+   mostra o widget de lote, e pagar por ele **reativaria o entitlement para `ACTIVE`** — o que pode
+   não ser o comportamento desejado para um aluno arquivado. Não foi corrigido porque depende de
+   decisão de produto (arquivamento deveria ser um estado genuinamente distinto de
+   suspensão-por-inadimplência?), não de um ajuste de código dentro do escopo desta fatia.
+3. **Desvio real e assumido em relação à spec escrita:** a §5 da spec descreve "Dinheiro mantém o
+   valor recebido atual (excedente → crédito)" e um botão de envio com o total embutido
+   (`"Receber R$ 450,00"`). O que foi entregue tem só um botão "Receber" simples, sem total
+   embutido e sem campo de valor recebido para tratar sobra em dinheiro no caminho de lote. Fica
+   registrado como divergência conhecida, não como descuido silencioso.
+
+### Fix history — por que há múltiplos commits com "fix round" nesta fatia
+
+- A correção de concorrência (consequências, acima) alcançou código **pré-existente** — não é
+  regressão desta fatia, é defeito latente que a revisão achou ao tocar no mesmo caminho.
+- A implementação do componente React (tela de "Financeiro do aluno") introduziu, numa primeira
+  versão, um gate que exigia `entitlement.status === 'ACTIVE'` para exibir o widget — o que teria
+  tornado o recurso invisível exatamente para quem ele existe (alunos suspensos por inadimplência).
+  Achado em revisão e corrigido antes do merge; o código final usa `ACTIVE` **ou** `SUSPENDED`
+  (registrado aqui como quase-incidente, não como pendência).
+
+### Evidência
+
+- Unitário (Vitest/Jest, web + api): 735+ testes verdes.
+- Integração (Postgres real, Jest): verde, cobrindo os cenários da spec §6 (lote, concorrência
+  avulso × lote, idempotência com corpo divergente, rollback parcial, job de inadimplência não
+  suspende quem adiantou).
+- **E2E (Playwright) não confirmado ao vivo nesta entrega** — as portas 3000/3344 estavam ocupadas
+  pelo processo de desenvolvimento do operador humano durante toda a sessão, e corretamente não
+  foram tocadas. O código E2E foi escrito e revisado estaticamente por dois revisores
+  independentes, mas falta a confirmação viva antes do merge — ver `docs/TESTING.md`.
