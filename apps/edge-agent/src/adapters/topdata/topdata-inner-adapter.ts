@@ -30,6 +30,12 @@ const TIMEOUT_GIRO_MS = 10_000;
 /** Quanto cada leitura de evento espera antes de devolver "sem evento". */
 const JANELA_POLLING_MS = 500;
 
+/**
+ * Ritmo do `PingOnline` -- metade dos 10 s que o `conectar` configura na
+ * mudanca automatica online/offline. Folga para um ping perdido (#470).
+ */
+export const INTERVALO_KEEP_ALIVE_MS = 5_000;
+
 export class TopdataInnerAdapter implements TurnstileAdapter {
   readonly nome = 'topdata-inner';
 
@@ -44,6 +50,9 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
    * entre um retry e uma segunda passagem indevida.
    */
   private readonly executados = new Map<string, ResultadoLiberacao>();
+
+  /** Laco de `PingOnline` que mantem a catraca online (#470). */
+  private keepAlive: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly ponte: PonteEasyInner,
@@ -90,6 +99,46 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
   async ping(): Promise<boolean> {
     const r = await this.ponte.executar({ cmd: 'ping', inner: this.inner });
     return r.tipo === 'retorno' && r.retorno === 0;
+  }
+
+  /**
+   * Mantem a catraca ONLINE, obedecendo o ArenaHub -- #470.
+   *
+   * O manual: `PingOnline` "regularmente, em um intervalo MENOR que o Tempo
+   * configurado na mudanca automatica". O `conectar` configura 10 s, entao o
+   * ping sai a cada 5 s por padrao. Sem isto, a catraca caia para offline e
+   * liberava pela lista propria enquanto o ArenaHub negava (visto em campo,
+   * 30/09/2026).
+   *
+   * O AVESSO E O PLANO B: `encerrar` para o ping, e a catraca volta sozinha
+   * ao modo offline no `tempo` -- agente fora do ar nao tranca a recepcao.
+   *
+   * A ponte responde em ordem (FIFO), entao o ping no meio do polling de um
+   * giro nao troca a resposta de ninguem.
+   */
+  manterOnline(intervaloMs = INTERVALO_KEEP_ALIVE_MS): void {
+    if (this.keepAlive) return;
+
+    let respondendo = true;
+
+    this.keepAlive = setInterval(() => {
+      void this.ping()
+        .then((ok) => {
+          // So a TRANSICAO vira log: um aviso a cada 5 s encheria o log da
+          // recepcao sem dizer nada novo.
+          if (ok !== respondendo) {
+            respondendo = ok;
+            if (ok) this.logger.info('catraca voltou a responder ao ping');
+            else this.logger.warn('catraca nao respondeu ao ping -- pode cair para offline');
+          }
+        })
+        .catch((erro: unknown) => {
+          this.logger.warn(
+            { erro: erro instanceof Error ? erro.message : erro },
+            'ping da catraca falhou',
+          );
+        });
+    }, intervaloMs);
   }
 
   async liberar(
@@ -223,6 +272,11 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
   }
 
   async encerrar(): Promise<void> {
+    // Primeiro o ping: sem ele a catraca volta ao modo offline e decide
+    // sozinha -- o plano B (#470).
+    if (this.keepAlive) clearInterval(this.keepAlive);
+    this.keepAlive = null;
+
     this.executados.clear();
     await this.ponte.encerrar();
   }

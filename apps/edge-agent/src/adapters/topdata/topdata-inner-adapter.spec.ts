@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import pino from 'pino';
 
 import {
@@ -7,7 +7,7 @@ import {
   type PonteEasyInner,
   type RespostaPonte,
 } from './easyinner-ponte.js';
-import { TopdataInnerAdapter } from './topdata-inner-adapter.js';
+import { INTERVALO_KEEP_ALIVE_MS, TopdataInnerAdapter } from './topdata-inner-adapter.js';
 
 /**
  * Ponte falsa: responde como a EasyInner.dll responderia, segundo o manual.
@@ -217,5 +217,65 @@ describe('TopdataInnerAdapter', () => {
 
   it('testarConexao devolve true so com retorno 0', async () => {
     expect(await adapter.testarConexao()).toBe(true);
+  });
+});
+
+/**
+ * #470 -- Arena Positiva, 30/09/2026. Sem `PingOnline`, a catraca cai para
+ * offline depois do `tempo` configurado no `conectar` (10 s) e passa a
+ * decidir sozinha, pela lista dela: o ArenaHub negava e a pessoa passava. O
+ * manual: "a falta do PingOnline fara com que a catraca mude para o modo
+ * offline". O ping so saia enquanto o agente esperava um giro.
+ *
+ * O avesso e o plano B: agente parado, ping parado, e em 10 s a catraca volta
+ * a decidir sozinha -- a recepcao nao para.
+ */
+describe('TopdataInnerAdapter -- keep-alive (#470)', () => {
+  let ponte: PonteFalsa;
+  let adapter: TopdataInnerAdapter;
+
+  beforeEach(() => {
+    // Relogio falso: com timer real, a granularidade do Windows (~15 ms)
+    // tornava a contagem de pings instavel.
+    jest.useFakeTimers();
+    ponte = new PonteFalsa();
+    adapter = new TopdataInnerAdapter(ponte, logger, 1);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const pings = () => ponte.recebidos.filter((c) => c.cmd === 'ping').length;
+
+  it('pinga a catraca a cada intervalo enquanto mantem online', async () => {
+    adapter.manterOnline(5_000);
+    jest.advanceTimersByTime(15_000);
+    await adapter.encerrar();
+
+    expect(pings()).toBe(3);
+  });
+
+  it('para de pingar no encerramento -- e o que devolve a catraca ao modo offline', async () => {
+    adapter.manterOnline(5_000);
+    jest.advanceTimersByTime(10_000);
+    await adapter.encerrar();
+
+    jest.advanceTimersByTime(30_000);
+
+    expect(pings()).toBe(2);
+  });
+
+  it('chamar duas vezes nao dobra o ritmo do ping', async () => {
+    adapter.manterOnline(5_000);
+    adapter.manterOnline(5_000);
+    jest.advanceTimersByTime(15_000);
+    await adapter.encerrar();
+
+    expect(pings()).toBe(3);
+  });
+
+  it('o ritmo padrao fica abaixo dos 10 s em que a catraca cai para offline', () => {
+    expect(INTERVALO_KEEP_ALIVE_MS).toBeLessThan(10_000);
   });
 });

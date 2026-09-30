@@ -8,7 +8,10 @@ import type { TurnstileAdapter } from '../domain/turnstile.js';
 import { FacialSimulator } from '../adapters/facial-simulator.js';
 import { TurnstileSimulator } from '../adapters/turnstile-simulator.js';
 import { TopdataFacialAdapter } from '../adapters/topdata/topdata-facial-adapter.js';
-import { TopdataInnerAdapter } from '../adapters/topdata/topdata-inner-adapter.js';
+import {
+  INTERVALO_KEEP_ALIVE_MS,
+  TopdataInnerAdapter,
+} from '../adapters/topdata/topdata-inner-adapter.js';
 import { PonteEasyInnerProcesso } from '../adapters/topdata/ponte-easyinner-processo.js';
 import { absoluto, raizDoPacote } from './caminhos.js';
 import { conectarComRetry } from './conectar-com-retry.js';
@@ -102,6 +105,15 @@ async function montarCatracaReal(
   // O sucesso tambem vira log (#406): na Arena Positiva a catraca conectou e
   // nada disse -- so dava para deduzir pelo facial ter subido depois dela.
   logger.info({ porta: PORTA_CATRACA }, 'catraca conectada');
+
+  // A PARTIR DAQUI A CATRACA OBEDECE O ARENAHUB (#470). Sem o ping ela caia
+  // para offline em 10 s e liberava pela lista propria. Parar o agente para
+  // o ping, e a catraca volta sozinha ao modo offline -- o plano B.
+  adapter.manterOnline();
+  logger.info(
+    { intervaloMs: INTERVALO_KEEP_ALIVE_MS },
+    'catraca mantida online -- decisao de acesso e do ArenaHub',
+  );
 
   return adapter;
 }
