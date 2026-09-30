@@ -484,15 +484,17 @@ export class MembershipController {
     // Duas etapas, igual a convencao do arquivo de teste (404 "nunca
     // confirma existencia" de recurso de outro tenant -- ver
     // `devolve 404 ao detalhar aluno de outro tenant`): 1) confirma que o id
-    // pertence ao MEU tenant sem revelar mais nada sobre ele, "nao existe"
-    // e "existe em outro tenant" caem os dois em 404
-    // SUBSCRIPTION_NOT_FOUND, mesmo resultado pratico de `alterarAssinatura`.
-    // So chegando aqui com o tenant certo e que o `updateMany` de
+    // existe no MEU tenant sem revelar mais nada sobre ele -- `encontrarAssinatura`
+    // ja filtra por tenant, entao "nao existe" e "existe em outro tenant" caem
+    // os dois em `null`/404 SUBSCRIPTION_NOT_FOUND, mesmo resultado pratico de
+    // `alterarAssinatura` (equivalente a `assinaturaPertenceAoTenant`, removido
+    // do repository na revisao de branch inteiro por ser redundante com este
+    // metodo). So chegando aqui com o tenant certo e que o `updateMany` de
     // `trocarPlanoDaAssinatura` (que ja filtra id + tenantId + version +
     // status no mesmo comando) decide entre sucesso e 409 por
     // version/status desatualizado.
-    const pertenceAoTenant = await this.membership.assinaturaPertenceAoTenant(contexto, id);
-    if (!pertenceAoTenant) throw new NotFoundException({ code: 'SUBSCRIPTION_NOT_FOUND' });
+    const existente = await this.membership.encontrarAssinatura(contexto, id);
+    if (!existente) throw new NotFoundException({ code: 'SUBSCRIPTION_NOT_FOUND' });
 
     const resultado = await this.membership.trocarPlanoDaAssinatura(
       contexto,
