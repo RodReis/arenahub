@@ -65,6 +65,18 @@ export const esquemaConfig = z.object({
    */
   FACIAL_MODE: z.enum(['real', 'simulador']).default('simulador'),
   CATRACA_MODE: z.enum(['real', 'simulador']).default('simulador'),
+
+  /**
+   * Se a instalacao fisica exige as funcoes de liberacao invertidas.
+   *
+   * So se descobre testando na bancada -- ver o comentario do
+   * `TopdataInnerAdapter`. Achado de campo, Arena Positiva, 30/09/2026
+   * (issue #407): sem isto a catraca girava para o sentido errado.
+   */
+  CATRACA_INVERTIDA: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 });
 
 export type Config = z.infer<typeof esquemaConfig>;

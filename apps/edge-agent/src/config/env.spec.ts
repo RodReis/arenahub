@@ -76,6 +76,33 @@ describe('FACIAL_MODE e CATRACA_MODE', () => {
   });
 });
 
+/**
+ * Issue #407 -- Arena Positiva, 30/09/2026. Achado de campo com `lab:run
+ * --invertido`: a instalacao fisica exige o sentido invertido, ou a catraca
+ * gira para o lado errado. Configuravel porque so se descobre testando
+ * (comentario do `TopdataInnerAdapter`) -- outra bancada pode nao precisar.
+ */
+describe('CATRACA_INVERTIDA', () => {
+  it('e false por padrao quando a variavel nao existe', () => {
+    const config = carregarConfig(VALIDO);
+    expect(config.CATRACA_INVERTIDA).toBe(false);
+  });
+
+  it('vira true com a variavel "true"', () => {
+    const config = carregarConfig({ ...VALIDO, CATRACA_INVERTIDA: 'true' });
+    expect(config.CATRACA_INVERTIDA).toBe(true);
+  });
+
+  it('vira false com a variavel "false"', () => {
+    const config = carregarConfig({ ...VALIDO, CATRACA_INVERTIDA: 'false' });
+    expect(config.CATRACA_INVERTIDA).toBe(false);
+  });
+
+  it('recusa valor fora do enum', () => {
+    expect(() => carregarConfig({ ...VALIDO, CATRACA_INVERTIDA: 'sim' })).toThrow();
+  });
+});
+
 describe('descreverConfig', () => {
   it('mascara segredo presente', () => {
     const config = carregarConfig({
