@@ -1643,6 +1643,14 @@ describe('F7 -- aluno, plano e entitlement', () => {
 
       // Invoice pendente criada direto no banco -- nao ha rota publica para
       // abrir invoice avulsa fora do ciclo de cobranca automatico.
+      // `number` nao pode ser fixo: os testes de reajuste de preco, que
+      // rodam antes neste mesmo describe, ja emitem invoice real para
+      // contas.a via abrirInvoiceDoPeriodo e ocupam numero baixo --
+      // @@unique([tenantId, number]) rejeita a colisao.
+      const maiorNumero = await db.invoice.aggregate({
+        where: { tenantId: contas.a.tenantId },
+        _max: { number: true },
+      });
       const invoicePendente = await db.invoice.create({
         data: {
           tenantId: contas.a.tenantId,
@@ -1650,7 +1658,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
           studentId: alunoId,
           billingPeriod: new Date('2026-08-01T00:00:00.000Z'),
           status: 'OPEN',
-          number: 1,
+          number: (maiorNumero._max.number ?? 0) + 1,
           currency: 'BRL',
           subtotalMinor: 15000,
           totalMinor: 15000,

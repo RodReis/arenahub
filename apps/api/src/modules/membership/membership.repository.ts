@@ -38,16 +38,6 @@ export class ConflitoDeVersaoError extends ErroDeDominio {
   }
 }
 
-export class AssinaturaNaoEstaAtivaError extends ErroDeDominio {
-  constructor(status: string) {
-    super(
-      'SUBSCRIPTION_NOT_ACTIVE',
-      409,
-      `Assinatura em estado ${status} nao pode trocar de plano`,
-    );
-  }
-}
-
 /**
  * `validFrom` de reajuste ja usado para este plano. `@@unique([planId,
  * validFrom])` da a garantia; este erro traduz o `P2002` em 409 de dominio.

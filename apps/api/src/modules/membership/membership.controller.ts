@@ -108,6 +108,14 @@ const esquemaDeAlteracao = z
   })
   .strict();
 
+const esquemaDeTrocaDePlano = z
+  .object({
+    planId: z.uuid(),
+    version: z.number().int().min(0),
+    reason: z.string().min(3).max(300),
+  })
+  .strict();
+
 const esquemaDeConvidado = z
   .object({
     guestName: z.string().min(1).max(120),
@@ -461,6 +469,47 @@ export class MembershipController {
     if (!assinatura) throw new ConflitoDeVersaoError();
 
     return { id: assinatura.id, status: assinatura.status };
+  }
+
+  @Post('subscriptions/:id/trocar-plano')
+  @RequirePermissions('subscription.manage')
+  async trocarPlano(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ subscriptionId: string; entitlement: EntitlementDto }> {
+    const dados = esquemaDeTrocaDePlano.parse(corpo);
+    const contexto = this.contexto.require();
+
+    // Sem pre-check de existencia (diferente de `alterarAssinatura`):
+    // `encontrarAssinatura` ja filtra por tenant, e devolver 404 quando a
+    // assinatura e de OUTRO tenant vazaria essa distincao pra fora. Aqui o
+    // `updateMany` de `trocarPlanoDaAssinatura` filtra por id + tenantId +
+    // version + status no mesmo comando: id inexistente, tenant errado,
+    // versao desatualizada ou status != ACTIVE caem todos em `count === 0`
+    // -> null -> 409 generico, sem distinguir o motivo pra fora (teste de
+    // isolamento entre tenants exige 409, nao 404).
+    const resultado = await this.membership.trocarPlanoDaAssinatura(
+      contexto,
+      id,
+      { planId: dados.planId, versaoEsperada: dados.version, reason: dados.reason },
+      requisicao.correlationId ?? 'sem-correlacao',
+      new Date(),
+    );
+
+    if (!resultado) throw new ConflitoDeVersaoError();
+
+    const comJanelas = await this.membership.listarEntitlementsDoAluno(
+      contexto,
+      resultado.subscription.studentId,
+    );
+
+    const criado = comJanelas.find((e) => e.id === resultado.entitlement.id)!;
+
+    return {
+      subscriptionId: resultado.subscription.id,
+      entitlement: this.entitlementParaDto(criado),
+    };
   }
 
   /**
