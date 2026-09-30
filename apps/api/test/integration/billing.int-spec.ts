@@ -472,4 +472,53 @@ describe('F12 -- invoice e pagamento manual', () => {
 
     expect(resposta.timezone).toBe('America/Manaus');
   });
+
+  /*
+   * Issue #462: seed/import grava invoice direto (sem passar por
+   * `proximoNumero`) e nunca populou `invoice_sequences`. A proxima invoice
+   * aberta pela API tentava nascer com `next_value = 1` -- colidia com o
+   * `number` que ja existia e estourava unique constraint. So a migration
+   * de reparo (20260930202233) ou o sync do seed corrige; este teste prova
+   * o efeito fim-a-fim contra o repository real.
+   */
+  it('tenant com invoice gravada sem invoice_sequences nao colide ao abrir a proxima (#462)', async () => {
+    const c = await semearTenant('c');
+
+    try {
+      // Simula o que o seed/import faz: grava a invoice direto no banco, sem
+      // passar por `proximoNumero` -- `invoice_sequences` fica sem linha.
+      await db.invoice.create({
+        data: {
+          tenantId: c.tenantId,
+          subscriptionId: c.subscriptionId,
+          studentId: c.studentId,
+          billingPeriod: new Date('2026-07-01T00:00:00Z'),
+          status: 'PAID',
+          number: 7,
+          currency: 'BRL',
+          subtotalMinor: PRECO_MINOR,
+          totalMinor: PRECO_MINOR,
+          dueAt: new Date('2026-07-10T00:00:00Z'),
+          paidAt: new Date('2026-07-09T00:00:00Z'),
+        },
+      });
+
+      const semSequencia = await db.$queryRaw<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM invoice_sequences WHERE tenant_id = ${c.tenantId}::uuid
+      `;
+      expect(semSequencia[0]?.n).toBe(0);
+
+      const proxima = await billing.abrirInvoiceDoPeriodo(contexto(c.tenantId, c.actorId), {
+        subscriptionId: c.subscriptionId,
+        emQue: COMPETENCIA,
+      });
+
+      expect(proxima.number).toBeGreaterThan(7);
+    } finally {
+      // Tenant `c` e local a este teste -- o `afterAll` da suite so conhece
+      // a/b. Limpa aqui para nao vazar tenant entre execucoes.
+      await db.tenant.delete({ where: { id: c.tenantId } });
+      await db.user.delete({ where: { id: c.actorId } });
+    }
+  });
 });

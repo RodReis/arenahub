@@ -566,11 +566,17 @@ export class BillingRepository {
    * Mesmo padrao de `StudentRepository.proximaMatricula`, e pelas mesmas
    * razoes: `COUNT(*) + 1` reusa numero depois de cancelamento, e
    * `SEQUENCE` do Postgres e global -- o tenant B veria o volume do A.
+   *
+   * Semente da linha nova usa `max(number)+1` da propria `invoices`, nao `1`
+   * fixo -- tenant com invoice gravada por fora deste metodo (seed, import)
+   * tinha a sequencia nascendo atras do numero ja existente e colidia na
+   * unique constraint (issue #462).
    */
   private async proximoNumero(tx: Prisma.TransactionClient, tenantId: string): Promise<number> {
     await tx.$executeRaw`
       INSERT INTO invoice_sequences (tenant_id, next_value, updated_at)
-      VALUES (${tenantId}::uuid, 1, now())
+      SELECT ${tenantId}::uuid, COALESCE(MAX(number), 0) + 1, now()
+      FROM invoices WHERE tenant_id = ${tenantId}::uuid
       ON CONFLICT (tenant_id) DO NOTHING
     `;
 
