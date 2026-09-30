@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@arenahub/database';
 import type {
   GymUnitModality,
   LeadSource,
-  Prisma,
   Student,
   StudentAddress,
   StudentContact,
@@ -751,7 +751,7 @@ export class StudentRepository {
        * usuario e injecao de campo -- o Prisma recusaria coluna inexistente,
        * mas ordenar por `cpfHash` vazaria a ordem do hash.
        */
-      ordem?: 'nome' | 'matricula' | 'nascimento' | undefined;
+      ordem?: 'nome' | 'matricula' | 'nascimento' | 'situacao' | undefined;
       direcao?: 'asc' | 'desc' | undefined;
       /**
        * Modalidade (F60). Opcional: ausente, a listagem mostra todo mundo --
@@ -773,6 +773,58 @@ export class StudentRepository {
     return this.db.comTenant(async (tx) => {
       const condicoes = await condicoesDaListagem(tx, contexto.tenantId, filtro.termo);
 
+      if (filtro.ordem === 'situacao') {
+        const idsNaOrdem = await idsOrdenadosPorSituacaoFinanceira(
+          tx,
+          contexto.tenantId,
+          filtro.direcao ?? 'asc',
+          filtro,
+          agora,
+        );
+
+        /*
+         * O TERMO DE BUSCA continua vindo do `where` do Prisma, nao do SQL
+         * raw: `condicoesDaListagem` ja resolve nome sem acento, matricula e
+         * telefone, e reimplementar isso no SQL seria a TERCEIRA copia da
+         * mesma regra. A intersecao acontece aqui -- os ids que casam com o
+         * termo filtram a lista ja ordenada.
+         *
+         * CONSEQUENCIA: a paginacao precisa acontecer DEPOIS dessa
+         * intersecao, senao a pagina 1 poderia vir vazia (os 20 primeiros da
+         * ordem podem nao casar com o termo). Por isso, quando ha termo, o
+         * corte e feito sobre os ids que sobreviveram ao filtro.
+         */
+        const idsQueCasam = filtro.termo
+          ? new Set(
+              (
+                await tx.student.findMany({
+                  where: { tenantId: contexto.tenantId, profile: 'STUDENT', ...condicoes },
+                  select: { id: true },
+                })
+              ).map((a) => a.id),
+            )
+          : null;
+
+        const elegiveis = idsQueCasam
+          ? idsNaOrdem.filter((id) => idsQueCasam.has(id))
+          : idsNaOrdem;
+
+        const pagina = paginarIds(elegiveis, filtro.cursor, filtro.limite);
+
+        if (pagina.length === 0) return [];
+
+        const alunos = await tx.student.findMany({
+          where: { id: { in: pagina } },
+          include: includeDaListagem(agora),
+        });
+
+        // O `findMany` com `id: { in }` NAO preserva a ordem de `pagina` --
+        // reordena aqui, no mesmo criterio que a paginacao usou.
+        const posicao = new Map(pagina.map((id, indice) => [id, indice]));
+
+        return alunos.sort((a, b) => (posicao.get(a.id) ?? 0) - (posicao.get(b.id) ?? 0));
+      }
+
       return tx.student.findMany({
         where: {
           tenantId: contexto.tenantId,
@@ -785,118 +837,7 @@ export class StudentRepository {
         orderBy: ordenacao(filtro.ordem, filtro.direcao),
         take: filtro.limite,
         ...(filtro.cursor ? { cursor: { id: filtro.cursor }, skip: 1 } : {}),
-        /**
-         * O PLANO VEM JUNTO -- a lista responde "quem e este aluno?", e o plano
-         * e metade da resposta na recepcao ("ele tem Mensal Fit ou Anual
-         * Black?"). Sem isto, descobrir exigia abrir a ficha de cada um.
-         *
-         * SO A ASSINATURA QUE VALE AGORA: `ACTIVE` ou `PAST_DUE`, a mais
-         * recente. Um aluno pode ter historico de assinaturas canceladas, e
-         * mostrar a antiga diria que ele tem plano que nao tem.
-         *
-         * `take: 1` no include, e nao um segundo `findMany`: a alternativa seria
-         * uma consulta por aluno, que e o N+1 que o `docs/REVIEW.md` §3.4 barra.
-         */
-        include: {
-          subscriptions: {
-            where: { status: { in: ['ACTIVE', 'PAST_DUE'] } },
-            orderBy: { startsAt: 'desc' },
-            take: 1,
-            select: {
-              status: true,
-              plan: { select: { name: true } },
-              /*
-               * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente --
-               * F53 Task 12, mesmo criterio de `listar-invoices.use-case.ts`
-               * (`dueAt asc` primeiro traz a mais antiga). SEM segunda consulta:
-               * nested include sob o `take: 1` de cima, mesma tecnica que ja
-               * evita o N+1 aqui.
-               */
-              invoices: {
-                where: { status: { in: ['OPEN', 'OVERDUE'] } },
-                orderBy: [{ dueAt: 'asc' }, { id: 'asc' }],
-                take: 1,
-                select: { status: true, dueAt: true, blockAt: true },
-              },
-            },
-          },
-          /*
-           * O DIREITO QUE NAO NASCE DE ASSINATURA -- cortesia, funcionario,
-           * personal trainer, dependente, convenio.
-           *
-           * Sem isto a coluna PLANO saia de `subscriptions[0]` e so ela: quem
-           * tem acesso por VINCULO nao tem assinatura nenhuma, entao a ficha
-           * mostrava "Ativo, Personal trainer, vale agora" e a lista mostrava
-           * "—" para a MESMA pessoa. Eram 33 alunos da bancada (24 funcionarios,
-           * 9 personal trainers), e a recepcao olha a lista para decidir se
-           * libera.
-           *
-           * `subscriptionId: null` FILTRA no banco, nao no DTO: o direito
-           * derivado de assinatura ja chega pelo include de cima, com o NOME do
-           * plano, que e melhor resposta que a origem.
-           *
-           * VIGENTE AGORA, nao qualquer um: `startsAt <= agora <= endsAt` com
-           * status ativo. Direito expirado ou agendado na coluna diria que o
-           * aluno tem acesso hoje.
-           *
-           * `take: 1` pelo mesmo motivo do bloco de cima -- consulta por aluno
-           * seria o N+1 que `docs/REVIEW.md` §3.4 barra.
-           */
-          entitlements: {
-            where: {
-              subscriptionId: null,
-              status: 'ACTIVE',
-              startsAt: { lte: agora },
-              endsAt: { gte: agora },
-            },
-            orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
-            take: 1,
-            select: { source: true },
-          },
-          /*
-           * Fuso da unidade de ORIGEM do aluno (INV-144, ADR-019) -- sem ele
-           * `situacaoDeVencimento` nao tem como decidir o dia civil de `dueAt`.
-           * SEM FALLBACK: unidade sem fuso cadastrado nao aparece com aviso
-           * errado, aparece sem aviso (ver `paraDtoDaLista`).
-           */
-          gymUnit: { select: { timezone: true } },
-          contacts: {
-            where: { type: 'PHONE' },
-            /*
-              DUAS chaves, nao uma. `isPrimary` e boolean, logo NAO e ordem
-              total: dois telefones com o mesmo valor de `isPrimary` empatam, e
-              o desempate cai na ordem FISICA do Postgres -- que muda depois de
-              qualquer UPDATE na tabela.
-
-              Com `take: 1` em cima, o empate nao embaralha a ordem: ele troca
-              QUAL telefone aparece. A recepcao ligaria para um numero num
-              carregamento e para outro no seguinte, sem nada ter mudado no
-              cadastro.
-
-              Corrigido junto da F53, que consertou o mesmo defeito no caminho
-              do checkout de cartao (o telefone que vai ao antifraude do
-              provedor). Sao os dois unicos pontos do `apps/api` com boolean
-              como criterio unico de ordenacao.
-            */
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
-            take: 1,
-            select: { value: true },
-          },
-          /*
-            O NUMERO QUE A CATRACA LE -- e a pergunta que a recepcao faz
-            olhando a lista ("qual o id dele no equipamento?"), que antes
-            exigia abrir a ficha.
-
-            SEM `take`, ao contrario dos dois de cima: uma pessoa pode ter mais
-            de um numero (cartao trocado, credencial vinda de linha duplicada
-            do Pacto), e cortar em um esconderia justamente o caso que precisa
-            ser resolvido -- um cartao antigo que continua valido no leitor.
-          */
-          credentials: {
-            orderBy: { createdAt: 'asc' },
-            select: { externalId: true },
-          },
-        },
+        include: includeDaListagem(agora),
       });
     });
   }
@@ -1013,6 +954,131 @@ export class StudentRepository {
 }
 
 /**
+ * O PLANO VEM JUNTO -- a lista responde "quem e este aluno?", e o plano
+ * e metade da resposta na recepcao ("ele tem Mensal Fit ou Anual
+ * Black?"). Sem isto, descobrir exigia abrir a ficha de cada um.
+ *
+ * SO A ASSINATURA QUE VALE AGORA: `ACTIVE` ou `PAST_DUE`, a mais
+ * recente. Um aluno pode ter historico de assinaturas canceladas, e
+ * mostrar a antiga diria que ele tem plano que nao tem.
+ *
+ * `take: 1` no include, e nao um segundo `findMany`: a alternativa seria
+ * uma consulta por aluno, que e o N+1 que o `docs/REVIEW.md` §3.4 barra.
+ *
+ * CONSTANTE DO MODULO, e nao literal dentro de `buscar`: os dois caminhos
+ * da listagem (ordem estruturada e ordem por situacao financeira) usam o
+ * MESMO include -- duas copias divergiriam na primeira edicao, e um dos
+ * caminhos passaria a devolver aluno sem plano ou sem telefone.
+ *
+ * FUNCAO, e nao objeto: o filtro de `entitlements` depende de `agora`.
+ */
+function includeDaListagem(agora: Date) {
+  return {
+    subscriptions: {
+      where: { status: { in: ['ACTIVE', 'PAST_DUE'] } },
+      // `id desc` desempata como o `DISTINCT ON` de
+      // `idsOrdenadosPorSituacaoFinanceira` -- sem ele, duas assinaturas com
+      // o mesmo `startsAt` podiam dar coluna e ordenacao de assinaturas diferentes.
+      orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
+      take: 1,
+      select: {
+        status: true,
+        plan: { select: { name: true } },
+        /*
+         * A invoice em aberto/vencida MAIS ANTIGA da assinatura vigente --
+         * F53 Task 12, mesmo criterio de `listar-invoices.use-case.ts`
+         * (`dueAt asc` primeiro traz a mais antiga). SEM segunda consulta:
+         * nested include sob o `take: 1` de cima, mesma tecnica que ja
+         * evita o N+1 aqui.
+         */
+        invoices: {
+          where: { status: { in: ['OPEN', 'OVERDUE'] } },
+          orderBy: [{ dueAt: 'asc' }, { id: 'asc' }],
+          take: 1,
+          select: { status: true, dueAt: true, blockAt: true },
+        },
+      },
+    },
+    /*
+     * O DIREITO QUE NAO NASCE DE ASSINATURA -- cortesia, funcionario,
+     * personal trainer, dependente, convenio.
+     *
+     * Sem isto a coluna PLANO saia de `subscriptions[0]` e so ela: quem
+     * tem acesso por VINCULO nao tem assinatura nenhuma, entao a ficha
+     * mostrava "Ativo, Personal trainer, vale agora" e a lista mostrava
+     * "—" para a MESMA pessoa. Eram 33 alunos da bancada (24 funcionarios,
+     * 9 personal trainers), e a recepcao olha a lista para decidir se
+     * libera.
+     *
+     * `subscriptionId: null` FILTRA no banco, nao no DTO: o direito
+     * derivado de assinatura ja chega pelo include de cima, com o NOME do
+     * plano, que e melhor resposta que a origem.
+     *
+     * VIGENTE AGORA, nao qualquer um: `startsAt <= agora <= endsAt` com
+     * status ativo. Direito expirado ou agendado na coluna diria que o
+     * aluno tem acesso hoje.
+     *
+     * `take: 1` pelo mesmo motivo do bloco de cima -- consulta por aluno
+     * seria o N+1 que `docs/REVIEW.md` §3.4 barra.
+     */
+    entitlements: {
+      where: {
+        subscriptionId: null,
+        status: 'ACTIVE',
+        startsAt: { lte: agora },
+        endsAt: { gte: agora },
+      },
+      orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
+      take: 1,
+      select: { source: true },
+    },
+    /*
+     * Fuso da unidade de ORIGEM do aluno (INV-144, ADR-019) -- sem ele
+     * `situacaoDeVencimento` nao tem como decidir o dia civil de `dueAt`.
+     * SEM FALLBACK: unidade sem fuso cadastrado nao aparece com aviso
+     * errado, aparece sem aviso (ver `paraDtoDaLista`).
+     */
+    gymUnit: { select: { timezone: true } },
+    contacts: {
+      where: { type: 'PHONE' },
+      /*
+        DUAS chaves, nao uma. `isPrimary` e boolean, logo NAO e ordem
+        total: dois telefones com o mesmo valor de `isPrimary` empatam, e
+        o desempate cai na ordem FISICA do Postgres -- que muda depois de
+        qualquer UPDATE na tabela.
+
+        Com `take: 1` em cima, o empate nao embaralha a ordem: ele troca
+        QUAL telefone aparece. A recepcao ligaria para um numero num
+        carregamento e para outro no seguinte, sem nada ter mudado no
+        cadastro.
+
+        Corrigido junto da F53, que consertou o mesmo defeito no caminho
+        do checkout de cartao (o telefone que vai ao antifraude do
+        provedor). Sao os dois unicos pontos do `apps/api` com boolean
+        como criterio unico de ordenacao.
+      */
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+      take: 1,
+      select: { value: true },
+    },
+    /*
+      O NUMERO QUE A CATRACA LE -- e a pergunta que a recepcao faz
+      olhando a lista ("qual o id dele no equipamento?"), que antes
+      exigia abrir a ficha.
+
+      SEM `take`, ao contrario dos dois de cima: uma pessoa pode ter mais
+      de um numero (cartao trocado, credencial vinda de linha duplicada
+      do Pacto), e cortar em um esconderia justamente o caso que precisa
+      ser resolvido -- um cartao antigo que continua valido no leitor.
+    */
+    credentials: {
+      orderBy: { createdAt: 'asc' },
+      select: { externalId: true },
+    },
+  } satisfies Prisma.StudentInclude;
+}
+
+/**
  * Traduz a ordem pedida para o `orderBy` do Prisma.
  *
  * O `id` entra SEMPRE como ultimo criterio: sem desempate estavel, duas linhas
@@ -1094,6 +1160,142 @@ async function idsPorNomeSemAcento(
   `;
 
   return linhas.map((l) => l.id);
+}
+
+/**
+ * IDs de aluno ORDENADOS por situacao financeira, mais grave primeiro --
+ * replica em SQL a MESMA regra de `situacaoDeVencimento`
+ * (`apps/admin-web/src/billing/vencimento.ts`), com teste de paridade em
+ * `students-ordenar-por-situacao.int-spec.ts`.
+ *
+ * DUAS IMPLEMENTACOES DA MESMA REGRA, de proposito: o Prisma nao expressa
+ * "compare o DIA CIVIL de `due_at` contra 'agora' NO FUSO DA UNIDADE" dentro
+ * de `orderBy` estruturado -- so SQL alcanca `AT TIME ZONE`. O `$queryRaw`
+ * devolve so `id`, na ordem certa; `buscar` pagina esse array, busca a
+ * pagina com `id: { in }` e reordena em JS -- o Prisma NAO preserva a ordem
+ * do `IN`.
+ *
+ * PRIORIDADE -- MENOR NUMERO E MAIS GRAVE, de proposito:
+ *   0 = BLOQUEIO_PROXIMO (catraca ja fechada -- o pior caso)
+ *   1 = VENCIDA
+ *   2 = VENCE_EM_BREVE
+ *   3 = EM_DIA / sem fatura em aberto
+ *
+ * A ESCALA E INVERTIDA porque `DataTable.tsx:235` faz o PRIMEIRO clique numa
+ * coluna ser sempre `asc`: a recepcao clica em "Situacao" para achar quem
+ * esta devendo, e com a escala natural (maior = pior) o primeiro clique
+ * mostraria quem esta em dia. Ordenar `asc` por este numero poe os problemas
+ * no topo, que e o que o clique quer dizer.
+ *
+ * Espelha `situacaoDeVencimento`:
+ *   - so invoice `OPEN`/`OVERDUE` entra na conta; qualquer outro status (ou
+ *     ausencia de invoice em aberto) e EM_DIA;
+ *   - ASSIMETRIA DELIBERADA nas datas, copiada de `diferencaEmDias`
+ *     (`vencimento.ts:140`): `due_at`/`block_at` sao DATAS-CALENDARIO
+ *     gravadas como meia-noite UTC, entao le-se o dia delas EM UTC
+ *     (`AT TIME ZONE 'UTC'`); `agora` e um INSTANTE de verdade, e so ele
+ *     converte para o fuso da unidade. Converter os dois pelo mesmo fuso
+ *     erra por um dia -- foi exatamente o bug que `vencimento.ts` documenta.
+ *   - so a invoice em aberto MAIS ANTIGA (`due_at asc`, `id asc` no empate)
+ *     conta -- mesmo criterio de `faturaEmDestaque`.
+ *   - e SO DA ASSINATURA VIGENTE (`ACTIVE`/`PAST_DUE` de `starts_at` mais
+ *     recente), a MESMA que `includeDaListagem` usa para montar a coluna.
+ *     Juntar por `student_id` em todas as invoices ordenava como devedor o
+ *     aluno com fatura aberta numa assinatura CANCELADA, enquanto a celula
+ *     mostrava "em dia" -- a ordem contradizia a coluna.
+ *
+ * `LEFT JOIN gym_units`, nao `JOIN`: aluno cuja unidade sumiu (ou sem fuso
+ * cadastrado) NAO PODE DESAPARECER DA LISTA por causa da ordenacao --
+ * `COALESCE(gu.timezone, 'UTC')` o mantem visivel.
+ *
+ * `tx`, nao `this.db`: roda DENTRO da transacao com RLS (`comTenant`), pelo
+ * mesmo motivo de `idsPorNomeSemAcento`.
+ */
+async function idsOrdenadosPorSituacaoFinanceira(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  direcao: 'asc' | 'desc',
+  filtro: {
+    status?: StudentStatus | undefined;
+    gymUnitId?: string | undefined;
+    modalityId?: string | undefined;
+  },
+  agora: Date,
+): Promise<string[]> {
+  const linhas = await tx.$queryRaw<{ id: string }[]>`
+    WITH assinatura_vigente AS (
+      SELECT DISTINCT ON (sub.student_id)
+        sub.student_id,
+        sub.id
+      FROM subscriptions sub
+      WHERE sub.tenant_id = ${tenantId}::uuid
+        AND sub.status IN ('ACTIVE', 'PAST_DUE')
+      ORDER BY sub.student_id, sub.starts_at DESC, sub.id DESC
+    ),
+    invoice_em_aberto AS (
+      SELECT DISTINCT ON (av.student_id)
+        av.student_id,
+        i.due_at,
+        i.block_at
+      FROM assinatura_vigente av
+      JOIN invoices i ON i.subscription_id = av.id
+      WHERE i.tenant_id = ${tenantId}::uuid
+        AND i.status IN ('OPEN', 'OVERDUE')
+      ORDER BY av.student_id, i.due_at ASC, i.id ASC
+    ),
+    prioridade AS (
+      SELECT
+        s.id,
+        s.full_name,
+        CASE
+          WHEN io.student_id IS NULL THEN 3
+          WHEN (io.due_at AT TIME ZONE 'UTC')::date
+               > (${agora}::timestamptz AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 3
+          WHEN (io.due_at AT TIME ZONE 'UTC')::date
+               = (${agora}::timestamptz AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 2
+          WHEN io.block_at IS NOT NULL
+               AND (io.block_at AT TIME ZONE 'UTC')::date
+                   <= (${agora}::timestamptz AT TIME ZONE COALESCE(gu.timezone, 'UTC'))::date THEN 0
+          ELSE 1
+        END AS prioridade
+      FROM students s
+      LEFT JOIN gym_units gu ON gu.id = s.gym_unit_id
+      LEFT JOIN invoice_em_aberto io ON io.student_id = s.id
+      WHERE s.tenant_id = ${tenantId}::uuid
+        AND s.profile = 'STUDENT'
+        ${filtro.status ? Prisma.sql`AND s.status = ${filtro.status}::student_status` : Prisma.empty}
+        ${filtro.gymUnitId ? Prisma.sql`AND s.gym_unit_id = ${filtro.gymUnitId}::uuid` : Prisma.empty}
+        ${
+          filtro.modalityId
+            ? Prisma.sql`AND EXISTS (
+                SELECT 1 FROM student_modalities sm
+                WHERE sm.student_id = s.id AND sm.modality_id = ${filtro.modalityId}::uuid
+              )`
+            : Prisma.empty
+        }
+    )
+    SELECT id FROM prioridade
+    ORDER BY
+      prioridade ${direcao === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`},
+      full_name ASC,
+      id DESC
+  `;
+
+  return linhas.map((l) => l.id);
+}
+
+/**
+ * Corta `idsNaOrdem` a partir de `cursor` (exclusivo) e pega `limite`.
+ *
+ * `indexOf` devolve -1 para cursor que nao esta mais na lista (o aluno mudou
+ * de situacao entre uma pagina e outra, ou foi arquivado). `-1 + 1 = 0`
+ * reinicia do comeco -- repetir a primeira pagina e melhor que devolver
+ * vazio, que a tela leria como "acabou" e esconderia o resto da base.
+ */
+function paginarIds(idsNaOrdem: string[], cursor: string | undefined, limite: number): string[] {
+  const inicio = cursor ? idsNaOrdem.indexOf(cursor) + 1 : 0;
+
+  return idsNaOrdem.slice(inicio, inicio + limite);
 }
 
 async function condicoesDaListagem(
