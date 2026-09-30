@@ -26,6 +26,18 @@ export class InvoiceInvalidaError extends ErroDeDominio {
   }
 }
 
+/**
+ * A invoice ja foi paga (ou cancelada/estornada) por OUTRA operacao entre a
+ * leitura do status e a escrita desta. 409, nao 422: o pedido em si estava
+ * correto, so chegou depois de outro que jah resolveu a mesma invoice --
+ * caso classico de recebimento avulso e lote em corrida sobre o mesmo mes.
+ */
+export class TransicaoDeInvoiceConcorrenteError extends ErroDeDominio {
+  constructor(invoiceId: string) {
+    super('BILLING_INVOICE_ALREADY_SETTLED', 409, `invoice ${invoiceId} ja foi resolvida por outra operacao`);
+  }
+}
+
 export interface TotaisDaInvoice {
   subtotalMinor: number;
   discountMinor: number;
