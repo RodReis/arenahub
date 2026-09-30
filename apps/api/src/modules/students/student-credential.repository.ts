@@ -90,6 +90,35 @@ export class StudentCredentialRepository {
     });
   }
 
+  /**
+   * Quem tem cada numero de equipamento -- o vinculo legado do leitor (#468).
+   *
+   * Qualquer `kind`: a coluna CATRACA mostra cartao e facial juntos, e na
+   * Arena Positiva e o mesmo numero no leitor e na catraca. Devolve TODAS as
+   * linhas; decidir o que fazer com numero repetido entre dois alunos e de
+   * quem chama. `birthDate` vai junto porque o consentimento congela a idade
+   * na data da decisao (INV-143).
+   */
+  async encontrarPorNumeros(
+    tenantId: string,
+    externalIds: readonly string[],
+  ): Promise<{ externalId: string; studentId: string; birthDate: Date }[]> {
+    if (externalIds.length === 0) return [];
+
+    const linhas = await this.db.comTenant((tx) =>
+      tx.studentCredential.findMany({
+        where: { tenantId, externalId: { in: [...externalIds] } },
+        select: { externalId: true, studentId: true, student: { select: { birthDate: true } } },
+      }),
+    );
+
+    return linhas.map((l) => ({
+      externalId: l.externalId,
+      studentId: l.studentId,
+      birthDate: l.student.birthDate,
+    }));
+  }
+
   async listarPorAluno(
     contexto: TenantContext,
     studentId: string,

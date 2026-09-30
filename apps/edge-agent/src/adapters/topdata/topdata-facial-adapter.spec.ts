@@ -313,6 +313,45 @@ describe('TopdataFacialAdapter', () => {
     expect(resposta?.['result']).toBe(true);
   });
 
+  /**
+   * #468 -- o cadastro feito direto no leitor precisa chegar ao ArenaHub para
+   * ser vinculado ao aluno, sem sincronismo manual. So o NUMERO sai: nome e
+   * foto do `senduser` ficam no adapter.
+   */
+  it('informa o numero de cada senduser, sem nome nem foto (#468)', async () => {
+    const cadastros: unknown[] = [];
+    adapter.aoInformarCadastro((c) => cadastros.push(c));
+
+    leitor.enviar({
+      cmd: 'senduser',
+      sn: leitor.sn,
+      enrollid: 1491,
+      name: 'Fulano',
+      backupnum: 50,
+      record: 'data:image/jpeg;base64,/9j/FOTO-NAO-PODE-SAIR',
+    });
+
+    await leitor.esperar(() => cadastros.length > 0);
+
+    expect(cadastros[0]).toEqual({ serial: leitor.sn, externalUserId: '1491' });
+    expect(JSON.stringify(cadastros)).not.toContain('FOTO-NAO-PODE-SAIR');
+    expect(JSON.stringify(cadastros)).not.toContain('Fulano');
+  });
+
+  it('avisa o registro do leitor com o serial, depois do handshake (#468)', async () => {
+    const seriais: string[] = [];
+    adapter.aoRegistrar((s) => seriais.push(s));
+
+    leitor.enviarReg();
+
+    await leitor.esperar(() => seriais.length > 0);
+
+    expect(seriais).toEqual([leitor.sn]);
+    // O handshake ja fechou quando o aviso sai: quem ouve vai conversar com
+    // o leitor e nao pode atropelar o ack do reg.
+    expect(leitor.recebidos.some((m) => m['ret'] === 'reg')).toBe(true);
+  });
+
   it('confirma o sendlog com o mesmo logindex -- sem ack o leitor corta a conexao', async () => {
     // Achado de campo 30/09/2026 (#406), mesmo firmware v2.16: a cada conexao
     // o leitor manda reg -> sendlog, espera ~20 s e corta com 1006, sem

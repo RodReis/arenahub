@@ -3635,6 +3635,74 @@
         ]
       }
     },
+    "/api/v1/edge/device-users/legacy-links": {
+      "post": {
+        "operationId": "EdgeLegacyLinkController_vincularLegado",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "linked": {
+                      "type": "integer"
+                    },
+                    "alreadyLinked": {
+                      "type": "integer"
+                    },
+                    "withoutStudent": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "ambiguous": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "studentAlreadyLinked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "withoutConsentDocument": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "refusedOrRevoked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "linked",
+                    "alreadyLinked",
+                    "withoutStudent",
+                    "ambiguous",
+                    "studentAlreadyLinked",
+                    "withoutConsentDocument",
+                    "refusedOrRevoked"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EdgeLegacyLink"
+        ]
+      }
+    },
     "/api/v1/engagement/aliases": {
       "get": {
         "operationId": "EngagementController_listar",

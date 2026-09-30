@@ -81,7 +81,7 @@ export class ConsentRepository {
    * controladora pode substitui-lo.
    */
   async encontrarDocumentoVigente(
-    contexto: TenantContext,
+    contexto: Pick<TenantContext, 'tenantId'>,
     tipo: ConsentDocumentType,
     agora: Date,
   ): Promise<ConsentDocument | null> {
@@ -112,7 +112,7 @@ export class ConsentRepository {
    * o documento ser aposentado no meio.
    */
   async encontrarDecisaoVigente(
-    contexto: TenantContext,
+    contexto: Pick<TenantContext, 'tenantId'>,
     studentId: string,
     tipo: ConsentDocumentType,
   ): Promise<DecisaoVigente | null> {
@@ -217,6 +217,84 @@ export class ConsentRepository {
           targetId: registro.id,
           correlationId,
           metadata: { subjectKind: dados.subjectKind },
+        },
+      });
+
+      return registro;
+    });
+  }
+
+  /**
+   * Consentimento biometrico de cadastro LEGADO -- #468, decisao do PI em
+   * 30/09/2026.
+   *
+   * O aluno fez o cadastro facial no sistema anterior; a identidade
+   * biometrica exige um consentimento (INV-017) e o ArenaHub nao tem o
+   * original. Esta linha NAO finge ser a assinatura do aluno: o ator e o
+   * SISTEMA (`actorId` nulo) e a `evidence` carrega `origem:
+   * CADASTRO_FACIAL_LEGADO`, o que a separa de qualquer consentimento real.
+   *
+   * Mesmo regime do `registrarDecisao`: a decisao anterior do aluno para o
+   * documento ganha `supersededAt`, nunca e reescrita (INV-021).
+   */
+  async registrarConsentimentoLegado(
+    tenantId: string,
+    dados: {
+      studentId: string;
+      documentId: string;
+      subjectAgeYears: number;
+      evidence: Prisma.InputJsonObject;
+    },
+    correlationId: string,
+    agora: Date,
+  ): Promise<ConsentRecord> {
+    return this.db.$transaction(async (tx) => {
+      await tx.consentRecord.updateMany({
+        where: {
+          tenantId,
+          studentId: dados.studentId,
+          documentId: dados.documentId,
+          supersededAt: null,
+        },
+        data: { supersededAt: agora },
+      });
+
+      const registro = await tx.consentRecord.create({
+        data: {
+          tenantId,
+          studentId: dados.studentId,
+          documentId: dados.documentId,
+          decision: 'ACCEPTED',
+          subjectKind: 'STUDENT',
+          subjectAgeYears: dados.subjectAgeYears,
+          actorId: null,
+          evidence: dados.evidence,
+          occurredAt: agora,
+        },
+      });
+
+      await tx.studentTimelineEvent.create({
+        data: {
+          tenantId,
+          studentId: dados.studentId,
+          type: 'BIOMETRIC_CONSENT_ACCEPTED',
+          actorType: 'SYSTEM',
+          actorId: null,
+          correlationId,
+          payload: { decision: 'ACCEPTED', origem: 'CADASTRO_FACIAL_LEGADO' },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          actorType: 'SYSTEM',
+          actorId: null,
+          action: 'consent.accepted_legacy',
+          target: 'consent_record',
+          targetId: registro.id,
+          correlationId,
+          metadata: { origem: 'CADASTRO_FACIAL_LEGADO' },
         },
       });
 

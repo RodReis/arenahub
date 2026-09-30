@@ -153,6 +153,19 @@ o que vier primeiro.
 > que é exatamente o caso do `stranger_photo` — é tratamento de dado biométrico sem base
 > legal.
 
+## `senduser` — o leitor informa a própria base, mas só uma vez
+
+> ⚠️ **Achado de campo, Arena Positiva, 30/09/2026 (issue #468), firmware `ai518_fp26v_v2.16`.**
+> Na primeira conexão com o ArenaHub, o leitor mandou **424 `senduser`**, um por cadastro, logo
+> depois do `reg`. Na conexão seguinte, **nenhum**. Pelo comportamento, o leitor só reenvia o
+> cadastro que ainda **não foi confirmado** por um `ret: senduser`.
+>
+> Consequência: o `senduser` **não serve** para conhecer a base inteira. Ela sai da **listagem**
+> (`getuserlist`, paginado) feita quando o leitor se registra. O `senduser` cobre o cadastro
+> **novo** feito direto no equipamento. O `edge-agent` usa os dois
+> (`apps/edge-agent/src/producao/vinculo-legado.ts`) e manda só o **número** para a nuvem, sem
+> foto nem nome.
+
 ## Requisitos da foto de cadastro
 
 - JPG ou JPEG, **menor que 150 KB**
