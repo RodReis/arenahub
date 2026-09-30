@@ -31,6 +31,8 @@ const RAZOES_NO_SCHEMA = [
   'FINANCIAL_OVERRIDE',
   // F65 (ADR-053) -- gate do CONTRATANTE, tambem pelo fim.
   'TENANT_SUSPENDED',
+  // F477 -- a catraca decidiu sozinha, offline; o Edge so registra o fato.
+  'OFFLINE_DEVICE_DECISION',
 ] as const;
 
 describe('ADR-024 -- razoes do motor e do banco nao divergem', () => {
@@ -40,18 +42,23 @@ describe('ADR-024 -- razoes do motor e do banco nao divergem', () => {
     expect(doMotor).toEqual([...RAZOES_NO_SCHEMA].sort());
   });
 
-  it('ha tres razoes de ALLOW: a do motor e as DUAS de liberacao humana', () => {
+  it('ha quatro razoes de ALLOW: a do motor e as TRES que ele nunca produz', () => {
     /**
      * `FINANCIAL_OVERRIDE` entrou na F15. Razao propria e nao reuso de
      * `MANUAL_OVERRIDE` porque as duas nascem de decisoes diferentes e
      * prestam contas em relatorios diferentes: "quantas vezes a recepcao
      * abriu a catraca na mao" e "quantos alunos entraram devendo" sao
      * perguntas distintas.
+     *
+     * `OFFLINE_DEVICE_DECISION` entrou na F477: a catraca decidiu sozinha,
+     * offline, e o Edge so registra o fato -- tambem nunca calculada pelo
+     * motor (mesma familia de `MANUAL_OVERRIDE`/`FINANCIAL_OVERRIDE`).
      */
     expect([...Object.values(ALLOW_REASON)].sort()).toEqual([
       'ACTIVE_ENTITLEMENT',
       'FINANCIAL_OVERRIDE',
       'MANUAL_OVERRIDE',
+      'OFFLINE_DEVICE_DECISION',
     ]);
   });
 

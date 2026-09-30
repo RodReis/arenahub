@@ -181,6 +181,51 @@ describe('compor', () => {
       await composto.encerrar();
     });
 
+    /*
+     * #477 -- decisao do PI (30/09/2026): a passagem antiga CONTA como
+     * frequencia. O Edge relata o FATO -- horario do equipamento, leitor e
+     * numero --, nunca o outcome: quem decidiu foi a catraca, offline.
+     */
+    it('passagem antiga vai para a nuvem como frequencia, com o horario do equipamento (#477)', async () => {
+      const { composto, facial, postMock } = await montar([]);
+
+      const umaHoraAtras = new Date(Date.now() - 3_600_000);
+      facial.simularReconhecimento('aluno-1', umaHoraAtras, 'facial', new Date());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const chamadas = postMock.mock.calls as unknown as [string, Record<string, unknown>][];
+      const corpo = chamadas.find(([path]) => path === '/api/v1/edge/offline-passages')?.[1];
+
+      expect(corpo).toMatchObject({
+        deviceSerial: facial.serie,
+        externalUserId: 'aluno-1',
+        occurredAt: umaHoraAtras.toISOString(),
+      });
+      expect(corpo).not.toHaveProperty('outcome');
+      expect(corpo).not.toHaveProperty('reason');
+
+      await composto.encerrar();
+    });
+
+    it('a MESMA passagem antiga gera a MESMA chave -- reenvio do leitor nao duplica (#477)', async () => {
+      const { composto, facial, postMock } = await montar([]);
+
+      const umaHoraAtras = new Date(Date.now() - 3_600_000);
+      facial.simularReconhecimento('aluno-1', umaHoraAtras, 'facial', new Date());
+      facial.simularReconhecimento('aluno-1', umaHoraAtras, 'facial', new Date());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const chamadas = postMock.mock.calls as unknown as [string, Record<string, unknown>][];
+      const chaves = chamadas
+        .filter(([path]) => path === '/api/v1/edge/offline-passages')
+        .map(([, corpo]) => corpo['idempotencyKey']);
+
+      expect(chaves).toHaveLength(2);
+      expect(chaves[0]).toBe(chaves[1]);
+
+      await composto.encerrar();
+    });
+
     it('registra cada decisao em log, com o motivo', async () => {
       const linhas: Record<string, unknown>[] = [];
       const { composto, facial } = await montar(linhas);

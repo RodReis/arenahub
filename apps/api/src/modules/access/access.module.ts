@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { EdgeAuthModule } from '../edge-auth/edge-auth.module.js';
 import { BillingModule } from '../billing/billing.module.js';
+import { DevicesModule } from '../devices/devices.module.js';
 import { AccessEventRepository } from './access-event.repository.js';
 import { AccessProjectionRepository } from './access-projection.repository.js';
 import { DecideOnlineAccessUseCase } from './decide-online-access.use-case.js';
@@ -10,6 +11,7 @@ import { EdgeAccessController } from './edge-access.controller.js';
 import { IdentityResolver } from './identity-resolver.js';
 import { ManualOverrideController } from './manual-override.controller.js';
 import { ManualOverrideUseCase } from './manual-override.use-case.js';
+import { RecordOfflinePassageUseCase } from './record-offline-passage.use-case.js';
 
 /**
  * Decisao de acesso e passagem -- F9.
@@ -25,13 +27,14 @@ import { ManualOverrideUseCase } from './manual-override.use-case.js';
    * divida, o acesso pergunta se ha liberacao viva. Consome o CASO DE USO
    * publico, nunca a tabela (regra de arquitetura no 9).
    */
-  imports: [EdgeAuthModule, BillingModule],
+  imports: [EdgeAuthModule, BillingModule, DevicesModule],
   controllers: [EdgeAccessController, ManualOverrideController],
   providers: [
     IdentityResolver,
     AccessProjectionRepository,
     AccessEventRepository,
     DecideOnlineAccessUseCase,
+    RecordOfflinePassageUseCase,
     ManualOverrideUseCase,
     TenantContextService,
   ],

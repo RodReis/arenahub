@@ -562,6 +562,10 @@ enum AccessReason {
   /// ArenaHub. Nega todo mundo e nao toca em Entitlement nenhum. Nao
   /// confundir com `PAYMENT_OVERDUE`, que e o ALUNO devendo a academia.
   TENANT_SUSPENDED
+  /// F477 -- a CATRACA decidiu sozinha, offline, sem o ArenaHub avaliar
+  /// nada. O Edge registra o fato ao reconciliar o backlog do leitor; nunca
+  /// produzido pelo motor. Ver `packages/access-policy/src/types.ts`.
+  OFFLINE_DEVICE_DECISION
 
   @@map("access_reason")
 }

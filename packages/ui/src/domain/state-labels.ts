@@ -253,6 +253,18 @@ export const STATE_LABELS: Dictionary = {
       tone: 'danger',
       icon: 'ban',
     },
+    /**
+     * F477 -- a CATRACA decidiu sozinha, offline, sem o ArenaHub avaliar
+     * nada. `info`, e nao `success`: a pessoa entrou de fato, mas o rotulo
+     * precisa deixar claro que ninguem do ArenaHub decidiu -- foi o
+     * equipamento. Confundir com `ACTIVE_ENTITLEMENT` esconderia que o
+     * evento e reconciliacao de backlog, nao decisao ao vivo.
+     */
+    [ALLOW_REASON.OFFLINE_DEVICE_DECISION]: {
+      label: 'Liberado pela catraca offline',
+      tone: 'info',
+      icon: 'wifi-off',
+    },
   },
 
   /**

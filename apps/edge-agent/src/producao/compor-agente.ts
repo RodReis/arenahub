@@ -14,6 +14,7 @@ import {
 } from '../application/orquestrar-acesso-online.js';
 import type { EventoReconhecimento } from '../domain/facial-device.js';
 import { ehPassagemAoVivo } from '../domain/passagem-ao-vivo.js';
+import { registrarPassagemOffline } from './passagem-offline.js';
 import { ligarVinculoLegado } from './vinculo-legado.js';
 
 export interface AgenteComposto {
@@ -99,7 +100,7 @@ export async function compor(
 
     // Backlog do leitor (passagens guardadas enquanto o ArenaHub estava
     // fora) nao e pessoa na frente da catraca: nao pede decisao e nunca
-    // gira nada (#476). O registro como frequencia e o #477.
+    // gira nada (#476). Vai para a nuvem como frequencia (#477).
     if (!ehPassagemAoVivo(evento.ocorridoEm, evento.recebidoEm)) {
       logger.info(
         {
@@ -112,6 +113,18 @@ export async function compor(
         },
         'passagem antiga do leitor -- nao aciona a catraca',
       );
+
+      void registrarPassagemOffline({
+        cliente,
+        logger,
+        evento: { ...evento, serialDoDispositivo: evento.serialDoDispositivo },
+        correlationId,
+      }).catch((erro: unknown) => {
+        logger.warn(
+          { correlationId, erro: erro instanceof Error ? erro.message : erro },
+          'falha ao registrar passagem antiga',
+        );
+      });
       return;
     }
 
