@@ -1357,6 +1357,23 @@ export class MembershipRepository {
   }
 
   /**
+   * Confirma se a assinatura pertence ao tenant do contexto, SEM devolver a
+   * entidade -- so o suficiente pra decidir 404 vs seguir adiante.
+   *
+   * Existe pra rotas como `trocarPlano` que precisam distinguir "id nao
+   * existe em lugar nenhum" / "existe mas e de OUTRO tenant" (ambos 404,
+   * politica do arquivo de teste de isolamento: nunca confirmar existencia
+   * cross-tenant) de "existe no MEU tenant mas version/status nao bateu"
+   * (409, resolvido pelo `updateMany` que ja filtra por tenant). Busca o id
+   * sozinho, sem filtrar tenant, e so compara -- nunca devolve campo da
+   * linha encontrada.
+   */
+  async assinaturaPertenceAoTenant(contexto: TenantContext, id: string): Promise<boolean> {
+    const achada = await this.db.subscription.findUnique({ where: { id }, select: { tenantId: true } });
+    return achada !== null && achada.tenantId === contexto.tenantId;
+  }
+
+  /**
    * Timeline administrativa com cursor `(occurredAt, id)`.
    *
    * `id` desempata eventos no mesmo instante -- sem ele, paginacao por

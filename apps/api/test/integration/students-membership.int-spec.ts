@@ -1761,7 +1761,12 @@ describe('F7 -- aluno, plano e entitlement', () => {
         .set('Cookie', contas.b.cookie)
         .send({ planId: planNovoDoB, version: 0, reason: 'tentativa cruzada' });
 
-      expect(resposta.status).toBe(409);
+      // 404, nunca 409: 409 confirmaria que a assinatura existe. Mesma
+      // politica de isolamento de `devolve 404 ao detalhar aluno de outro
+      // tenant` (linha ~361) -- recurso de outro tenant "nao existe" do
+      // ponto de vista de quem pergunta.
+      expect(resposta.status).toBe(404);
+      expect((resposta.body as { code: string }).code).toBe('SUBSCRIPTION_NOT_FOUND');
 
       const inalterada = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
       expect(inalterada.status).toBe('ACTIVE');

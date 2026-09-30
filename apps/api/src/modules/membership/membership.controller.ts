@@ -481,14 +481,19 @@ export class MembershipController {
     const dados = esquemaDeTrocaDePlano.parse(corpo);
     const contexto = this.contexto.require();
 
-    // Sem pre-check de existencia (diferente de `alterarAssinatura`):
-    // `encontrarAssinatura` ja filtra por tenant, e devolver 404 quando a
-    // assinatura e de OUTRO tenant vazaria essa distincao pra fora. Aqui o
-    // `updateMany` de `trocarPlanoDaAssinatura` filtra por id + tenantId +
-    // version + status no mesmo comando: id inexistente, tenant errado,
-    // versao desatualizada ou status != ACTIVE caem todos em `count === 0`
-    // -> null -> 409 generico, sem distinguir o motivo pra fora (teste de
-    // isolamento entre tenants exige 409, nao 404).
+    // Duas etapas, igual a convencao do arquivo de teste (404 "nunca
+    // confirma existencia" de recurso de outro tenant -- ver
+    // `devolve 404 ao detalhar aluno de outro tenant`): 1) confirma que o id
+    // pertence ao MEU tenant sem revelar mais nada sobre ele, "nao existe"
+    // e "existe em outro tenant" caem os dois em 404
+    // SUBSCRIPTION_NOT_FOUND, mesmo resultado pratico de `alterarAssinatura`.
+    // So chegando aqui com o tenant certo e que o `updateMany` de
+    // `trocarPlanoDaAssinatura` (que ja filtra id + tenantId + version +
+    // status no mesmo comando) decide entre sucesso e 409 por
+    // version/status desatualizado.
+    const pertenceAoTenant = await this.membership.assinaturaPertenceAoTenant(contexto, id);
+    if (!pertenceAoTenant) throw new NotFoundException({ code: 'SUBSCRIPTION_NOT_FOUND' });
+
     const resultado = await this.membership.trocarPlanoDaAssinatura(
       contexto,
       id,
