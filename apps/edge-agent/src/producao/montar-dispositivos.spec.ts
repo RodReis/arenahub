@@ -1,4 +1,5 @@
-import { isAbsolute, sep } from 'node:path';
+import { existsSync } from 'node:fs';
+import { isAbsolute, join, resolve, sep } from 'node:path';
 
 import { describe, expect, it } from '@jest/globals';
 
@@ -37,6 +38,23 @@ describe('CAMINHO_PONTE', () => {
   it('aponta para dentro de bin/, onde bridge:build gera o executavel', () => {
     expect(CAMINHO_PONTE).toContain(`${sep}native${sep}easyinner-bridge${sep}bin${sep}`);
     expect(CAMINHO_PONTE.endsWith('EasyInnerBridge.exe')).toBe(true);
+  });
+
+  /**
+   * #406, nono elo: a correcao do #447 subia UM nivel a partir deste arquivo,
+   * o que so vale para `dist/main.js`. Este modulo compila para
+   * `dist/producao/`, e o caminho saiu com um `dist\` a mais --
+   * `...\edge-agent\dist\native\...\EasyInnerBridge.exe`, ENOENT de novo.
+   *
+   * Os dois testes acima passavam assim mesmo: conferiam o SUFIXO do caminho,
+   * nunca a raiz. Este confere a raiz pelo que a define -- quatro niveis acima
+   * do executavel (bin, easyinner-bridge, native) tem de estar o
+   * `package.json` do pacote. `dist/` e `src/` nao tem um.
+   */
+  it('parte da raiz do pacote, onde esta o package.json', () => {
+    const raiz = resolve(CAMINHO_PONTE, '..', '..', '..', '..');
+
+    expect(existsSync(join(raiz, 'package.json'))).toBe(true);
   });
 });
 
