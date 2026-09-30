@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@arenahub/ui';
 
@@ -176,6 +176,20 @@ describe('grid de alunos', () => {
 
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
   }
+
+  // `emDias` monta o dia em UTC e a pagina compara no fuso da unidade: das 21h
+  // a meia-noite de Brasilia os dois dias divergem (#451). Meio-dia UTC cai no
+  // mesmo dia nos dois fusos. So `Date` e falso -- timers reais seguem, senao
+  // as esperas do Testing Library travam.
+  beforeEach(() => {
+    const hoje = new Date();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate(), 12));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   const ATIVO_VENCIDO = {
     ...BASE,
