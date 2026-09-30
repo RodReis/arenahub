@@ -66,7 +66,7 @@ export function mesesPagaveis(entrada: {
     if (existente) {
       meses.push({
         competencia: cursor,
-        status: existente.status,
+        status: existente.status as StatusDoMesPagavel,
         invoiceId: existente.id,
         totalMinor: existente.totalMinor,
         dueAt: existente.dueAt,
