@@ -85,6 +85,11 @@ número.
 catraca está instalada à sua **esquerda**"* (F1) — o manual diz que a escolha *"depende da
 orientação física da catraca"*. **Isso se verifica na bancada, não se adivinha.**
 
+> ✅ **Confirmado em produção, Arena Positiva, 30/09/2026 (issue #407).** Teste com `lab:run`:
+> sem `--invertido` a catraca destravava para o sentido errado; com `--invertido` o sentido ficou
+> correto. Configurável em produção pela env `CATRACA_INVERTIDA=true` (default `false`) — ver
+> `apps/edge-agent/src/config/env.ts`.
+
 ⚠️ **Não usar `ConfigurarAcionamento1/2` para girar.** O manual é explícito: *"Estes comandos não
 devem ser utilizados em catracas se a intenção for acionar o mecanismo de giro. Para o giro de
 catracas, utilize os comandos `LiberarCatraca...()`"*.

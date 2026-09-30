@@ -238,6 +238,7 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
         // equipamento for implausivel. Ver `plausibilidade-de-relogio.ts`.
         recebidoEm: new Date(),
         metodo: 'facial',
+        serialDoDispositivo: log.data.sn,
         ...(log.data.logindex !== undefined
           ? { idExternoDoEvento: String(log.data.logindex) }
           : {}),

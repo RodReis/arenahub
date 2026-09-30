@@ -231,6 +231,25 @@ describe('TopdataFacialAdapter', () => {
     expect(eventos[0]?.ocorridoEm.getHours()).toBe(9);
   });
 
+  it('carrega o serial do leitor que reconheceu -- e ele que a nuvem conhece (#467)', async () => {
+    // O Edge mandava o proprio EDGE_AGENT_ID como deviceId; a nuvem so
+    // conhece o leitor pelo UUID do Device ou pelo serial do fabricante.
+    const eventos: { serialDoDispositivo?: string }[] = [];
+    adapter.aoReconhecer((e) => eventos.push(e));
+
+    leitor.enviar({
+      cmd: 'sendlog',
+      sn: leitor.sn,
+      count: 1,
+      logindex: 78,
+      record: [{ enrollid: 12345, time: '2026-08-14 09:12:33', mode: 1, inout: 0, event: 0 }],
+    });
+
+    await leitor.esperar(() => eventos.length > 0);
+
+    expect(eventos[0]?.serialDoDispositivo).toBe(leitor.sn);
+  });
+
   it('NAO emite evento para rosto desconhecido', async () => {
     // enrollid 99999999 e o ID especial de desconhecido. Nao ha pessoa a
     // identificar, entao o motor de acesso nao tem o que decidir.

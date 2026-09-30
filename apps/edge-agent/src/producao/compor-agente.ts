@@ -76,21 +76,52 @@ export async function compor(
   // AO RECONHECER POR ULTIMO: registrar o ouvinte "liga a chave" -- tudo a
   // jusante (maquina, processador, catraca) ja esta pronto acima.
   dispositivos.facial.aoReconhecer((evento: EventoReconhecimento) => {
+    const correlationId = randomUUID();
+
+    // O leitor pelo SERIAL, nunca pelo `EDGE_AGENT_ID`: a nuvem acha o
+    // `Device` por ele. Mandar o id do Edge fazia a validacao recusar e
+    // nenhum evento chegar ao painel (#467). Sem serial nao ha o que
+    // perguntar -- e isso precisa aparecer, nao virar DENY calado.
+    if (evento.serialDoDispositivo === undefined) {
+      logger.warn(
+        { correlationId, enrollid: evento.externalEnrollId },
+        'reconhecimento sem serial do leitor -- ignorado',
+      );
+      return;
+    }
+
     const reconhecimento: ReconhecimentoComOrigem = {
       externalEnrollId: evento.externalEnrollId,
-      deviceId: config.EDGE_AGENT_ID,
+      deviceSerial: evento.serialDoDispositivo,
       recognitionId: evento.idExternoDoEvento ?? randomUUID(),
       ocorridoEm: evento.ocorridoEm,
     };
 
-    const correlationId = randomUUID();
-
-    processar(reconhecimento, correlationId, new Date()).catch((erro: unknown) => {
-      logger.error(
-        { correlationId, erro: erro instanceof Error ? erro.message : erro },
-        'falha ao processar reconhecimento',
-      );
-    });
+    processar(reconhecimento, correlationId, new Date())
+      .then((r) => {
+        // Toda decisao vira linha de log (#467): antes so a EXCECAO aparecia,
+        // e um DENY por `CLOUD_UNAVAILABLE` era indistinguivel de nada ter
+        // acontecido. Nunca nome nem foto -- so o enrollid do leitor.
+        logger.info(
+          {
+            correlationId,
+            enrollid: evento.externalEnrollId,
+            leitor: evento.serialDoDispositivo,
+            outcome: r.outcome,
+            reason: r.reason,
+            estado: r.estado,
+            latenciaDecisaoMs: r.latenciaDecisaoMs,
+            duracaoPassagemMs: r.duracaoPassagemMs,
+          },
+          'decisao de acesso',
+        );
+      })
+      .catch((erro: unknown) => {
+        logger.error(
+          { correlationId, erro: erro instanceof Error ? erro.message : erro },
+          'falha ao processar reconhecimento',
+        );
+      });
   });
 
   return {

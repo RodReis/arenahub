@@ -11,7 +11,7 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 import { AccessEventRepository } from './access-event.repository.js';
 import { AccessProjectionRepository } from './access-projection.repository.js';
 import { LiberacaoFinanceiraUseCase } from '../billing/liberacao-financeira.use-case.js';
-import { IdentityResolver } from './identity-resolver.js';
+import { IdentityResolver, type ReferenciaDeDispositivo } from './identity-resolver.js';
 
 /**
  * Decisao online de acesso -- `M1-FR-019` a `M1-FR-022`.
@@ -28,7 +28,8 @@ import { IdentityResolver } from './identity-resolver.js';
  */
 
 export interface ReconhecimentoRecebido {
-  deviceId: string;
+  /** UUID do `Device` ou serial do fabricante -- ver `ReferenciaDeDispositivo`. */
+  dispositivo: ReferenciaDeDispositivo;
   externalUserId: string;
   recognitionId: string;
   /** Relogio do EQUIPAMENTO. Evidencia, nao fonte da decisao. */
@@ -84,7 +85,7 @@ export class DecideOnlineAccessUseCase {
 
     const identidade = await this.identidades.resolver(
       edge,
-      entrada.deviceId,
+      entrada.dispositivo,
       entrada.externalUserId,
     );
 

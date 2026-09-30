@@ -41,6 +41,17 @@ export type IdentidadeResolvida =
       readonly studentId?: string;
     };
 
+/**
+ * Como o Edge aponta o leitor: pelo UUID do `Device` ou pelo SERIAL do
+ * fabricante.
+ *
+ * O serial existe porque o Edge NAO conhece o UUID -- conhece o `sn` que o
+ * leitor manda no `reg`. Mandava o proprio `EDGE_AGENT_ID` no lugar, a
+ * validacao recusava e nenhum evento de acesso chegava ao painel (#467,
+ * Arena Positiva, 30/09/2026). Os dois caminhos passam pelo MESMO escopo.
+ */
+export type ReferenciaDeDispositivo = { readonly id: string } | { readonly serial: string };
+
 @Injectable()
 export class IdentityResolver {
   constructor(private readonly db: PrismaService) {}
@@ -52,15 +63,15 @@ export class IdentityResolver {
    */
   async resolver(
     edge: ContextoDoEdge,
-    deviceId: string,
+    referencia: ReferenciaDeDispositivo,
     externalUserId: string,
   ): Promise<IdentidadeResolvida> {
     // O dispositivo precisa pertencer AO MESMO tenant, A MESMA unidade e AO
     // MESMO Edge que assinou. Um Edge comprometido nao consegue decidir por
-    // dispositivo de outra unidade nem que saiba o UUID dele.
+    // dispositivo de outra unidade nem que saiba o UUID -- ou o serial -- dele.
     const dispositivo = await this.db.device.findFirst({
       where: {
-        id: deviceId,
+        ...('id' in referencia ? { id: referencia.id } : { serial: referencia.serial }),
         tenantId: edge.tenantId,
         gymUnitId: edge.gymUnitId,
         edgeNodeId: edge.edgeNodeId,

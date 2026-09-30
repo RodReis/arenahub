@@ -48,6 +48,15 @@ export type EventoReconhecimento = {
   metodo: MetodoReconhecimento;
   /** Identificador do proprio evento no dispositivo, quando houver. */
   idExternoDoEvento?: string;
+  /**
+   * Serie do fabricante do leitor que reconheceu -- o `sn` do `sendlog`.
+   *
+   * E por ele que a nuvem acha o `Device`: o Edge nao conhece o UUID. Sem
+   * este campo o Edge mandava o proprio `EDGE_AGENT_ID` e nenhum evento
+   * chegava ao painel (#467). Opcional porque a bancada do MVP 0 decide
+   * localmente e nao precisa dele.
+   */
+  serialDoDispositivo?: string;
 };
 
 export type IdentidadeNoDispositivo = {

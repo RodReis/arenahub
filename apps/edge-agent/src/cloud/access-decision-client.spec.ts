@@ -24,7 +24,7 @@ describe('criarPedirDecisao', () => {
     const pedirDecisao = criarPedirDecisao(cliente);
 
     const resultado = await pedirDecisao({
-      deviceId: 'dev-1', externalUserId: 'user-1', recognitionId: 'rec-1',
+      deviceSerial: 'AYTI11108174', externalUserId: 'user-1', recognitionId: 'rec-1',
       recognizedAt: new Date('2026-09-16T10:00:00Z'), idempotencyKey: 'idem-1',
     });
 
@@ -32,7 +32,7 @@ describe('criarPedirDecisao', () => {
       accessEventId: 'evt-1', outcome: 'ALLOW', reason: 'ENTITLEMENT_ACTIVE', validUntil: null,
     });
     expect(postMock).toHaveBeenCalledWith('/api/v1/edge/access-decisions', {
-      deviceId: 'dev-1', externalUserId: 'user-1', recognitionId: 'rec-1',
+      deviceSerial: 'AYTI11108174', externalUserId: 'user-1', recognitionId: 'rec-1',
       recognizedAt: '2026-09-16T10:00:00.000Z', idempotencyKey: 'idem-1',
     });
   });
@@ -42,7 +42,7 @@ describe('criarPedirDecisao', () => {
     const pedirDecisao = criarPedirDecisao(cliente);
 
     const resultado = await pedirDecisao({
-      deviceId: 'dev-1', externalUserId: 'user-1', recognitionId: 'rec-1',
+      deviceSerial: 'AYTI11108174', externalUserId: 'user-1', recognitionId: 'rec-1',
       recognizedAt: new Date(), idempotencyKey: 'idem-1',
     });
 

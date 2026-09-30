@@ -15,7 +15,7 @@ interface RespostaDePassagemHttp {
 export function criarPedirDecisao(cliente: SignedCloudClient): DepsAcessoOnline['pedirDecisao'] {
   return async (entrada) => {
     const resposta = await cliente.post<RespostaDeDecisao>('/api/v1/edge/access-decisions', {
-      deviceId: entrada.deviceId,
+      deviceSerial: entrada.deviceSerial,
       externalUserId: entrada.externalUserId,
       recognitionId: entrada.recognitionId,
       recognizedAt: entrada.recognizedAt.toISOString(),

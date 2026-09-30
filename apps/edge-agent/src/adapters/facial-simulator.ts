@@ -27,6 +27,8 @@ import {
  */
 export class FacialSimulator implements FacialDeviceAdapter {
   readonly nome = 'simulador-facial';
+  /** Serie do "equipamento", como o leitor real manda no `sendlog` (#467). */
+  readonly serie = 'SIMULADOR-FACIAL';
 
   private readonly identidades = new Map<ExternalEnrollId, IdentidadeNoDispositivo>();
   private readonly ouvintes: ((evento: EventoReconhecimento) => void)[] = [];
@@ -99,7 +101,13 @@ export class FacialSimulator implements FacialDeviceAdapter {
      */
     recebidoEm: Date = ocorridoEm,
   ): void {
-    const evento: EventoReconhecimento = { externalEnrollId, ocorridoEm, recebidoEm, metodo };
+    const evento: EventoReconhecimento = {
+      externalEnrollId,
+      ocorridoEm,
+      recebidoEm,
+      metodo,
+      serialDoDispositivo: this.serie,
+    };
     for (const ouvinte of this.ouvintes) ouvinte(evento);
   }
 
