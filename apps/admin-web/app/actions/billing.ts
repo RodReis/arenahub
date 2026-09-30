@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
+import { competenciasParaAdiantar } from '../../src/billing/adiantamento';
 import { paraCentavos } from '../../src/billing/dinheiro';
 import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
@@ -22,6 +23,12 @@ import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
 
 const esquemaDeAbertura = z.object({
   subscriptionId: z.string().uuid('Selecione a assinatura'),
+  /**
+   * Quantos meses gerar de uma vez -- adiantamento (decisao do PI,
+   * 30/09/2026). `1` e o comportamento de sempre (so o mes corrente);
+   * ausente no formulario cai no mesmo padrao.
+   */
+  quantidadeDeMeses: z.coerce.number().int().min(1).max(12).default(1),
 });
 
 const esquemaDePagamento = z.object({
@@ -41,7 +48,8 @@ const esquemaDePagamento = z.object({
 
 export interface EstadoDaInvoice {
   erro?: string;
-  sucesso?: { invoiceId: string; number: number };
+  /** Uma entrada por competencia gerada -- 1 no caso comum, N no adiantamento. */
+  sucesso?: { invoiceId: string; number: number }[];
 }
 
 export interface EstadoDoPagamento {
@@ -192,35 +200,60 @@ export async function iniciarCheckoutDeCartao(
   };
 }
 
+/**
+ * Gera a cobrança do mês corrente, ou várias competências consecutivas de
+ * uma vez (adiantamento — decisão do PI, 30/09/2026, ex.: aluno paga hoje
+ * setembro + outubro + novembro).
+ *
+ * SEQUENCIAL, NÃO EM PARALELO: cada `POST` depende do preço vigente NA
+ * COMPETÊNCIA dele, e disparar tudo junto não mudaria isso — mas parar no
+ * primeiro erro em vez de tentar as próximas evita reportar sucesso parcial
+ * como se fosse total. A idempotência de INV-066 torna clicar de novo
+ * seguro: as competências já abertas voltam iguais, só as que faltam são
+ * criadas.
+ */
 export async function abrirCobranca(
   _anterior: EstadoDaInvoice,
   formulario: FormData,
 ): Promise<EstadoDaInvoice> {
   const analisado = esquemaDeAbertura.safeParse({
     subscriptionId: formulario.get('subscriptionId'),
+    quantidadeDeMeses: formulario.get('quantidadeDeMeses') ?? undefined,
   });
 
   if (!analisado.success) {
     return { erro: analisado.error.issues[0]?.message ?? 'Confira os dados informados.' };
   }
 
-  const resposta = await chamarApi<InvoiceRetornada>('/api/v1/invoices', {
-    metodo: 'POST',
-    corpo: {
-      subscriptionId: analisado.data.subscriptionId,
-      // O ciclo é do mês corrente. A API normaliza para o primeiro dia, e a
-      // idempotência de INV-066 garante que repetir não gera segunda cobrança.
-      emQue: new Date().toISOString(),
-    },
-  });
+  const competencias = competenciasParaAdiantar(new Date(), analisado.data.quantidadeDeMeses);
+  const geradas: { invoiceId: string; number: number }[] = [];
 
-  if (!resposta.ok || !resposta.dados) {
-    return { erro: mensagemDe(resposta.erro?.code, 'Não foi possível gerar a cobrança.') };
+  for (const competencia of competencias) {
+    const resposta = await chamarApi<InvoiceRetornada>('/api/v1/invoices', {
+      metodo: 'POST',
+      corpo: {
+        subscriptionId: analisado.data.subscriptionId,
+        emQue: competencia.toISOString(),
+      },
+    });
+
+    if (!resposta.ok || !resposta.dados) {
+      if (geradas.length > 0) {
+        revalidatePath('/billing');
+      }
+
+      return {
+        erro: mensagemDe(resposta.erro?.code, 'Não foi possível gerar a cobrança.'),
+        ...(geradas.length > 0 ? { sucesso: geradas } : {}),
+      };
+    }
+
+    geradas.push({ invoiceId: resposta.dados.id, number: resposta.dados.number });
   }
 
   revalidatePath('/billing');
 
-  return { sucesso: { invoiceId: resposta.dados.id, number: resposta.dados.number } };
+  return { sucesso: geradas };
 }
 
 /**
