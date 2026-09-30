@@ -13,6 +13,7 @@ import {
 
 import { faturaEmDestaque } from '../../../../../src/billing/vencimento';
 import { chamarApi } from '../../../../../lib/api/server-client';
+import { consultarMesesPagaveis } from '../../../../actions/billing';
 import { PainelDeCobranca } from './painel-de-cobranca';
 import { SituacaoAtual } from './situacao-atual';
 
@@ -176,11 +177,15 @@ export default async function PaginaFinanceiroDoAluno({
    * a ficha do aluno mostra o aviso de vencimento sobre a MESMA fatura, e duas
    * implementacoes divergiriam.
    */
-  const invoicesEmAberto = invoices.filter(
-    (invoice) => invoice.status === 'OPEN' || invoice.status === 'OVERDUE',
-  );
-
   const invoiceEmDestaque = faturaEmDestaque(invoices);
+
+  /*
+   * A faixa de meses pagaveis so existe com assinatura ativa -- sem ela nao
+   * ha o que montar em lote (mesma guarda de `assinaturaAtiva` do bloco
+   * "Gerar cobranca do mes"). F83, Task 7.
+   */
+  const mesesPagaveis =
+    assinaturaAtiva !== null ? await consultarMesesPagaveis(assinaturaAtiva) : [];
 
   return (
     <section aria-labelledby="titulo-financeiro">
@@ -289,15 +294,7 @@ export default async function PaginaFinanceiroDoAluno({
         }
       />
 
-      <PainelDeCobranca
-        subscriptionId={assinaturaAtiva}
-        invoicesEmAberto={invoicesEmAberto.map((invoice) => ({
-          id: invoice.id,
-          number: invoice.number,
-          totalMinor: invoice.totalMinor,
-          currency: invoice.currency,
-        }))}
-      />
+      <PainelDeCobranca subscriptionId={assinaturaAtiva} mesesPagaveis={mesesPagaveis} />
     </section>
   );
 }

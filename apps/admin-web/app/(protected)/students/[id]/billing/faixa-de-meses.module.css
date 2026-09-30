@@ -1,0 +1,81 @@
+/**
+ * Faixa de meses -- F83, Task 7.
+ *
+ * So camada semantica (regra 2 de lint): `--ah-text-*`, `--ah-state-*`,
+ * `--ah-surface-*`, `--ah-border-*`, nunca `--ah-carbon-*` cru nem hex
+ * literal. Espacamento em px, como `painel-de-cobranca.module.css` e
+ * `seletor-de-forma.module.css` ja fazem -- este design system nao tem
+ * tokens `--ah-space-*`.
+ */
+.faixa {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-block: 4px;
+}
+
+.chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  min-width: 88px;
+  padding: 10px 12px;
+  border-radius: var(--ah-radius-card);
+  border: 1px solid var(--ah-border-subtle);
+  background: var(--ah-surface-sunken);
+  cursor: pointer;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--ah-border-hover);
+}
+
+/*
+ * O mes selecionado -- accent, porque escolher ate onde receber E a acao em
+ * curso (DS-PAINEL §4.8, accent e acao). Borda `inset` para nao mudar a
+ * caixa do chip ao ser selecionado (mesma tecnica de
+ * `seletor-de-forma.module.css`).
+ */
+.chip[data-selecionado] {
+  border-color: var(--ah-action-solid);
+  background: color-mix(in srgb, var(--ah-action-solid) 10%, var(--ah-surface-raised));
+  box-shadow: inset 0 0 0 1px var(--ah-action-solid);
+}
+
+.mesAno {
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+.status {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.valor {
+  color: var(--ah-text-default);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+.resumo {
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+}
