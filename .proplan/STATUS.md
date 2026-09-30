@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-29
+updated: 2026-09-30
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,6 +9,8 @@ updated: 2026-09-29
 
 ### Sem épico
 
+- [INFRA] test:guardas varre worktree filha em .claude/worktrees (#454)
+- [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
 - [FIX] painel financeiro deve abrir no mes corrente por default (#435)
 - [FIX] Valdivino duplicado no arquivo (confirmado) e Daniel Flavio Cabriny — provável cadastro duplicado (#421)
 - [MVP1][SPEC-082][F82] Trocar plano de assinatura ativa preservando histórico (#420)
@@ -40,6 +42,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][FIX] consolidação escolheu assinatura cancelada e tirou 130 alunos do faturamento de set/2026 (#450, finalizado em: 2026-09-30)
+- [MVP2][FIX] grid de alunos ordena por situação financeira e mostra sub-status para quem está ativo (#455, finalizado em: 2026-09-30)
 - [MVP2][FIX] Financeiro do aluno sem tom de estado, botões sem hierarquia (#444, finalizado em: 2026-09-29)
 - [INFRA] Pagamento pela maquininha física (Dinheiro/PIX/Débito/Crédito), baixa manual (#442, finalizado em: 2026-09-28)
 - [MVP1][FIX] /billing/summary devolve INTERNAL_ERROR sem detalhe no log (#439, finalizado em: 2026-09-28)
