@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ToastProvider } from '@arenahub/ui';
 
 import { FaixaDeMeses } from './faixa-de-meses';
+import { PainelDeCobranca } from './painel-de-cobranca';
 
 /**
  * Faixa de meses -- F83, Task 7.
@@ -10,9 +11,18 @@ import { FaixaDeMeses } from './faixa-de-meses';
  * `receberPagamentoEmLote` e mockado: e Server Action (`'use server'`), e o
  * componente so precisa provar que CHAMA com os dados certos, nao que a rota
  * de rede funciona -- isso e teste de integracao (F83, Task 5).
+ *
+ * `abrirCobranca` entra aqui so porque `PainelDeCobranca` (usado nos testes
+ * de regressao abaixo) importa do mesmo modulo -- sem mocka-la o modulo real
+ * tentaria chamar a API.
  */
 vi.mock('../../../../actions/billing', () => ({
   receberPagamentoEmLote: vi.fn().mockResolvedValue({ ok: true, batchId: 'batch-1' }),
+  abrirCobranca: vi.fn(),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
 /** `useToast` exige `<ToastProvider>` acima na arvore -- mesmo padrao de `fila-de-moderacao.test.tsx`. */
@@ -155,5 +165,99 @@ describe('FaixaDeMeses', () => {
     );
 
     expect(screen.getByText(/4 meses/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Guarda de regressao de verdade do bug CRITICO (fix round 2) -- fix round 3.
+ *
+ * Os testes acima em `FaixaDeMeses` provam a semantica do `key` do React EM
+ * GERAL, com uma copia LOCAL da logica de chave (`chaveDe`) escrita aqui no
+ * teste. Isso nao prova que `painel-de-cobranca.tsx` de fato tem a linha
+ * `key={mesesPagaveis.map(...).join('|')}` -- se alguem apagar essa linha do
+ * arquivo real amanha, a suite acima continua verde, porque ela nunca toca
+ * `painel-de-cobranca.tsx`.
+ *
+ * Estes dois testes renderizam o `PainelDeCobranca` DE VERDADE e provam o
+ * comportamento nos dois sentidos.
+ */
+describe('PainelDeCobranca -- key de FaixaDeMeses (regressao de verdade)', () => {
+  const FAIXA_A = [
+    { competencia: '2026-07', status: 'OVERDUE' as const, invoiceId: 'jul', totalMinor: 15000, dueAt: '2026-07-09' },
+    { competencia: '2026-08', status: 'OVERDUE' as const, invoiceId: 'ago', totalMinor: 15000, dueAt: '2026-08-09' },
+    { competencia: '2026-09', status: 'OPEN' as const, invoiceId: 'set', totalMinor: 15000, dueAt: '2026-09-09' },
+    { competencia: '2026-10', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-10-09' },
+  ];
+
+  // Depois de pagar jul/ago/set em lote: esses 3 somem, entram meses novos
+  // adiantados -- exatamente o que o server re-fetch devolve apos
+  // `router.refresh()` (`onPago` de `FaixaDeMeses`).
+  const FAIXA_B = [
+    { competencia: '2026-10', status: 'OPEN' as const, invoiceId: 'out', totalMinor: 15000, dueAt: '2026-10-09' },
+    { competencia: '2026-11', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-11-09' },
+    { competencia: '2026-12', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-12-09' },
+  ];
+
+  it('conteudo da faixa muda (pagamento anterior) -> selecao recalcula a partir da faixa NOVA', () => {
+    const { rerender } = renderComToast(
+      <PainelDeCobranca
+        subscriptionId="sub-1"
+        subscriptionIdParaPagamento="sub-1"
+        mesesPagaveis={FAIXA_A}
+      />,
+    );
+
+    // Selecao inicial com FAIXA_A: jul+ago (OVERDUE) + set (OPEN) = 3 meses.
+    expect(screen.getByText(/^3 meses/i)).toBeInTheDocument();
+
+    rerender(
+      <ToastProvider>
+        <PainelDeCobranca
+          subscriptionId="sub-1"
+          subscriptionIdParaPagamento="sub-1"
+          mesesPagaveis={FAIXA_B}
+        />
+      </ToastProvider>,
+    );
+
+    // FAIXA_B comeca com "out" OPEN -- indiceInicial seleciona so ele (1 mes).
+    // Se a selecao antiga (indice 2, apontando para o 3o item) vazasse, o
+    // resumo mostraria "3 meses" ou selecionaria "dez" por engano de indice.
+    expect(screen.getByText(/^1 mês/i)).toBeInTheDocument();
+    expect(screen.getByText(/Total/).textContent).toMatch(/R\$\s*150,00/);
+    expect(screen.getByRole('button', { name: /nov\/26/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /dez\/26/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('re-render com faixa de MESMO conteudo (nova referencia de array) -> preserva a selecao do usuario', () => {
+    // Array reference NOVA, mesmo competencia/status -- a chave calculada em
+    // `painel-de-cobranca.tsx` fica igual, entao NAO deve remontar.
+    const faixaAMesmoConteudo = FAIXA_A.map((m) => ({ ...m }));
+
+    const { rerender } = renderComToast(
+      <PainelDeCobranca
+        subscriptionId="sub-1"
+        subscriptionIdParaPagamento="sub-1"
+        mesesPagaveis={FAIXA_A}
+      />,
+    );
+
+    // Usuario estende a selecao para incluir "out" (adiantado) -- afasta do
+    // default (3 meses) para 4.
+    fireEvent.click(screen.getByRole('button', { name: /out\/26/i }));
+    expect(screen.getByText(/^4 meses/i)).toBeInTheDocument();
+
+    rerender(
+      <ToastProvider>
+        <PainelDeCobranca
+          subscriptionId="sub-1"
+          subscriptionIdParaPagamento="sub-1"
+          mesesPagaveis={faixaAMesmoConteudo}
+        />
+      </ToastProvider>,
+    );
+
+    // Mesmo conteudo -> mesma key -> React nao remonta -> selecao do usuario sobrevive.
+    expect(screen.getByText(/^4 meses/i)).toBeInTheDocument();
   });
 });
