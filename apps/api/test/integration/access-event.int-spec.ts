@@ -9,7 +9,10 @@ import { AppModule } from '../../src/app.module.js';
 import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
 import { AccessEventRepository } from '../../src/modules/access/access-event.repository.js';
 import { AccessProjectionRepository } from '../../src/modules/access/access-projection.repository.js';
-import { IdentityResolver } from '../../src/modules/access/identity-resolver.js';
+import {
+  IdentityResolver,
+  type ReferenciaDeDispositivo,
+} from '../../src/modules/access/identity-resolver.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { EdgeAuthService } from '../../src/modules/edge-auth/edge-auth.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
@@ -41,6 +44,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
     outraUnidadeId: '',
     edgeNodeId: '',
     deviceId: '',
+    serial: '',
     studentId: '',
     identityId: '',
     externalUserId: '1',
@@ -49,7 +53,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
   };
 
   /** Tenant vizinho -- existe so para provar que nao se enxergam. */
-  const b = { tenantId: '', gymUnitId: '', edgeNodeId: '', deviceId: '' };
+  const b = { tenantId: '', gymUnitId: '', edgeNodeId: '', deviceId: '', serial: '' };
 
   const contextoEdgeA = () => ({
     tenantId: a.tenantId,
@@ -67,11 +71,11 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
    */
   const resolverComEscopo = (
     edge: { tenantId: string; gymUnitId: string; edgeNodeId: string; keyId: string },
-    deviceId: string,
+    dispositivo: ReferenciaDeDispositivo,
     externalUserId: string,
   ) =>
     comContexto({ kind: 'tenant', tenantId: edge.tenantId }, () =>
-      resolver.resolver(edge, deviceId, externalUserId),
+      resolver.resolver(edge, dispositivo, externalUserId),
     );
 
   const eventoBase = (sobrescreve: Record<string, unknown> = {}) => ({
@@ -100,7 +104,13 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
 
   const criarTenant = async (
     rotulo: string,
-  ): Promise<{ tenantId: string; gymUnitId: string; edgeNodeId: string; deviceId: string }> => {
+  ): Promise<{
+    tenantId: string;
+    gymUnitId: string;
+    edgeNodeId: string;
+    deviceId: string;
+    serial: string;
+  }> => {
     const tenant = await db.tenant.create({
       data: {
         slug: `f9-${rotulo}-${sufixo}`,
@@ -151,6 +161,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
       gymUnitId: unidade.id,
       edgeNodeId: node.id,
       deviceId: dispositivo.id,
+      serial: dispositivo.serial,
     };
   };
 
@@ -260,7 +271,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
 
   describe('resolucao de identidade (M1-FR-019)', () => {
     it('resolve o aluno pelo escopo correto de tenant, unidade e Edge', async () => {
-      const resultado = await resolverComEscopo(contextoEdgeA(), a.deviceId, a.externalUserId);
+      const resultado = await resolverComEscopo(contextoEdgeA(), { id: a.deviceId }, a.externalUserId);
 
       expect(resultado).toMatchObject({
         resolvida: true,
@@ -271,7 +282,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
     });
 
     it('NAO resolve dispositivo de outro tenant, mesmo com o UUID correto', async () => {
-      const resultado = await resolverComEscopo(contextoEdgeA(), b.deviceId, a.externalUserId);
+      const resultado = await resolverComEscopo(contextoEdgeA(), { id: b.deviceId }, a.externalUserId);
 
       expect(resultado).toMatchObject({ resolvida: false, motivo: 'DEVICE_NOT_IN_SCOPE' });
     });
@@ -279,7 +290,48 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
     it('NAO resolve quando o Edge assinante nao e o dono do dispositivo', async () => {
       const resultado = await resolverComEscopo(
         { ...contextoEdgeA(), edgeNodeId: b.edgeNodeId },
-        a.deviceId,
+        { id: a.deviceId },
+        a.externalUserId,
+      );
+
+      expect(resultado).toMatchObject({ resolvida: false, motivo: 'DEVICE_NOT_IN_SCOPE' });
+    });
+
+    /*
+     * #467 -- Arena Positiva, 30/09/2026. O Edge conhece o SERIAL do leitor
+     * (`sn` do `reg`), nunca o UUID do `Device` na nuvem. Mandava o
+     * `EDGE_AGENT_ID` no lugar do UUID, a validacao recusava e nenhum evento
+     * chegava ao painel. O serial so resolve dentro do escopo do Edge que
+     * assinou -- a mesma regra do UUID.
+     */
+    it('resolve o aluno pelo SERIAL do leitor, no escopo do Edge assinante (#467)', async () => {
+      const resultado = await resolverComEscopo(
+        contextoEdgeA(),
+        { serial: a.serial },
+        a.externalUserId,
+      );
+
+      expect(resultado).toMatchObject({
+        resolvida: true,
+        deviceId: a.deviceId,
+        studentId: a.studentId,
+      });
+    });
+
+    it('NAO resolve o serial de leitor de outro tenant (#467)', async () => {
+      const resultado = await resolverComEscopo(
+        contextoEdgeA(),
+        { serial: b.serial },
+        a.externalUserId,
+      );
+
+      expect(resultado).toMatchObject({ resolvida: false, motivo: 'DEVICE_NOT_IN_SCOPE' });
+    });
+
+    it('NAO resolve o serial quando o Edge assinante nao e o dono do leitor (#467)', async () => {
+      const resultado = await resolverComEscopo(
+        { ...contextoEdgeA(), edgeNodeId: b.edgeNodeId },
+        { serial: a.serial },
         a.externalUserId,
       );
 
@@ -287,7 +339,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
     });
 
     it('devolve DENY para externalUserId desconhecido, sem excecao', async () => {
-      const resultado = await resolverComEscopo(contextoEdgeA(), a.deviceId, '99999');
+      const resultado = await resolverComEscopo(contextoEdgeA(), { id: a.deviceId }, '99999');
 
       expect(resultado).toMatchObject({ resolvida: false, motivo: 'UNKNOWN_EXTERNAL_USER' });
     });
@@ -342,7 +394,7 @@ describe('F9 -- evento de acesso e resolucao de identidade', () => {
         },
       });
 
-      const resultado = await resolverComEscopo(contextoEdgeA(), a.deviceId, '777');
+      const resultado = await resolverComEscopo(contextoEdgeA(), { id: a.deviceId }, '777');
 
       expect(resultado).toMatchObject({ resolvida: false, motivo: 'IDENTITY_NOT_ACTIVE' });
     });

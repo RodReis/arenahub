@@ -19,7 +19,13 @@ import {
  */
 const esquemaDeDecisao = z
   .object({
-    deviceId: z.string().uuid(),
+    /**
+     * O leitor, por UUID do `Device` OU por serial do fabricante -- exatamente
+     * um dos dois. O Edge so conhece o serial (`sn` do `reg`); o UUID segue
+     * aceito para nao quebrar Edge ainda nao atualizado (#467).
+     */
+    deviceId: z.string().uuid().optional(),
+    deviceSerial: z.string().min(1).max(64).optional(),
     /** O `enrollid` que o leitor informou. String porque cada fabricante formata do seu jeito. */
     externalUserId: z.string().min(1).max(64),
     /** Id do reconhecimento no equipamento, para casar log fisico com o nosso. */
@@ -30,7 +36,11 @@ const esquemaDeDecisao = z
     /** Dedupe (ADR-006). O Edge gera e repete em cada retry da MESMA tentativa. */
     idempotencyKey: z.string().min(8).max(120),
   })
-  .strict();
+  .strict()
+  .refine((d) => (d.deviceId === undefined) !== (d.deviceSerial === undefined), {
+    message: 'informe exatamente um entre deviceId e deviceSerial',
+    path: ['deviceId'],
+  });
 
 /**
  * Desfecho fisico reportado pelo Edge.
@@ -79,7 +89,9 @@ export class EdgeAccessController {
     const edge = requisicao.edgeContext!;
 
     return this.decidir.executar(edge, {
-      deviceId: dados.deviceId,
+      // O `refine` garante exatamente um dos dois.
+      dispositivo:
+        dados.deviceSerial !== undefined ? { serial: dados.deviceSerial } : { id: dados.deviceId! },
       externalUserId: dados.externalUserId,
       recognitionId: dados.recognitionId,
       recognizedAt: new Date(dados.recognizedAt),

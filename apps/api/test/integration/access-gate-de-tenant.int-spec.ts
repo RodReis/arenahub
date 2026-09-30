@@ -197,7 +197,7 @@ describe('F65 -- a projecao deriva o gate do status do tenant', () => {
     };
 
     const entrada: ReconhecimentoRecebido = {
-      deviceId,
+      dispositivo: { id: deviceId },
       externalUserId,
       recognitionId: `rec-${randomUUID()}`,
       recognizedAt: new Date(),

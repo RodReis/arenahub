@@ -390,7 +390,7 @@ describe('fatura da plataforma', () => {
     };
 
     const reconhecimento: ReconhecimentoRecebido = {
-      deviceId: entrada.deviceId,
+      dispositivo: { id: entrada.deviceId },
       externalUserId: entrada.externalUserId,
       recognitionId: `rec-${randomUUID()}`,
       recognizedAt: new Date(),

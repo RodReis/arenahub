@@ -259,6 +259,33 @@ describe('F9 -- decisao online de acesso', () => {
     await app?.close();
   });
 
+  /**
+   * #467 -- Arena Positiva, 30/09/2026. O Edge so conhece o SERIAL do leitor.
+   * Mandava o proprio `EDGE_AGENT_ID` no `deviceId`, a validacao de UUID
+   * recusava com 400 e nenhum evento chegava ao painel.
+   */
+  describe('leitor pelo serial (#467)', () => {
+    it('libera pelo serial do leitor e grava o evento no Device certo', async () => {
+      await darDireitoVigente(ctx.studentId);
+
+      const resposta = await pedirDecisao({
+        deviceId: undefined,
+        deviceSerial: `SER-ON-${sufixo}`,
+      });
+
+      expect(resposta.status).toBe(201);
+      expect(resposta.body).toMatchObject({ outcome: 'ALLOW' });
+
+      const { accessEventId } = resposta.body as { accessEventId: string };
+      const evento = await db.accessEvent.findUniqueOrThrow({ where: { id: accessEventId } });
+
+      expect(evento.deviceId).toBe(ctx.deviceId);
+      expect(evento.studentId).toBe(ctx.studentId);
+
+      await limparDireitos(ctx.studentId);
+    });
+  });
+
   describe('caminho de entrada (M1-AC-005)', () => {
     it('libera aluno com direito vigente e grava evento correlacionado', async () => {
       const entitlementId = await darDireitoVigente(ctx.studentId);
@@ -500,6 +527,24 @@ describe('F9 -- decisao online de acesso', () => {
   describe('falha de protocolo e 4xx sem gravar evento', () => {
     const contarEventos = () =>
       db.accessEvent.count({ where: { tenantId: ctx.tenantId } });
+
+    it('recusa corpo sem deviceId nem deviceSerial (#467)', async () => {
+      const antes = await contarEventos();
+
+      const resposta = await pedirDecisao({ deviceId: undefined });
+
+      expect(resposta.status).toBe(400);
+      expect(await contarEventos()).toBe(antes);
+    });
+
+    it('recusa corpo com deviceId E deviceSerial -- ambiguo (#467)', async () => {
+      const antes = await contarEventos();
+
+      const resposta = await pedirDecisao({ deviceSerial: `SER-ON-${sufixo}` });
+
+      expect(resposta.status).toBe(400);
+      expect(await contarEventos()).toBe(antes);
+    });
 
     it('recusa assinatura invalida e nao registra nada', async () => {
       const antes = await contarEventos();
