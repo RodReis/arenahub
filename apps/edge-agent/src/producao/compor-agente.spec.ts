@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import pino from 'pino';
+
 import { compor } from './compor-agente.js';
 import { carregarConfig } from '../config/env.js';
 import { criarLogger } from '../observability/logger.js';
@@ -81,6 +83,102 @@ describe('compor', () => {
     );
 
     await composto.encerrar();
+  });
+
+  /**
+   * #467 -- Arena Positiva, 30/09/2026. O leitor reconheceu duas pessoas e
+   * nenhum evento chegou ao painel: o Edge mandava o proprio `EDGE_AGENT_ID`
+   * onde a nuvem espera o leitor, a validacao recusava e o log ficava mudo --
+   * o caminho de producao so registrava excecao, nunca a decisao.
+   */
+  describe('#467 -- leitor pelo serial e decisao visivel no log', () => {
+    const montar = async (linhas: Record<string, unknown>[]) => {
+      dir = mkdtempSync(join(tmpdir(), 'arenahub-compor-agente-467-'));
+
+      const config = carregarConfig({
+        EDGE_AGENT_ID: 'edge-1',
+        TENANT_ID: '11111111-1111-4111-8111-111111111111',
+        GYM_UNIT_ID: '22222222-2222-4222-8222-222222222222',
+        SQLITE_PATH: join(dir, 'teste-467.sqlite'),
+        CLOUD_API_URL: 'https://nuvem.teste',
+      });
+      const logger = pino(
+        { level: 'info' },
+        { write: (linha: string) => linhas.push(JSON.parse(linha) as Record<string, unknown>) },
+      );
+
+      const postMock = jest.fn((path: string) =>
+        Promise.resolve(
+          path === '/api/v1/edge/access-decisions'
+            ? {
+                ok: true,
+                status: 201,
+                body: {
+                  accessEventId: 'evt-467',
+                  correlationId: 'c-467',
+                  outcome: 'DENY',
+                  reason: 'NO_ENTITLEMENT',
+                  policyVersion: 'v1',
+                  validUntil: null,
+                  replayed: false,
+                },
+                errorCode: null,
+              }
+            : { ok: true, status: 201, body: {}, errorCode: null },
+        ),
+      );
+      const facial = new FacialSimulator();
+
+      const composto = await compor(config, logger, {
+        cliente: { post: postMock, get: jest.fn() } as unknown as SignedCloudClient,
+        dispositivos: {
+          facial,
+          catraca: {
+            nome: 'catraca-falsa',
+            liberar: jest.fn(() => Promise.resolve({ desfecho: 'girou' as const, duracaoMs: 10 })),
+            encerrar: jest.fn(() => Promise.resolve()),
+          },
+          encerrar: () => Promise.resolve(),
+        },
+      });
+
+      return { composto, facial, postMock };
+    };
+
+    it('manda o serial do leitor que reconheceu, nunca o EDGE_AGENT_ID', async () => {
+      const { composto, facial, postMock } = await montar([]);
+
+      facial.simularReconhecimento('aluno-1', new Date());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // O mock declara so o `path`; o corpo chega como segundo argumento.
+      const chamadas = postMock.mock.calls as unknown as [string, Record<string, unknown>][];
+      const corpo = chamadas.find(([path]) => path === '/api/v1/edge/access-decisions')?.[1];
+
+      expect(corpo).toMatchObject({ deviceSerial: facial.serie });
+      expect(corpo).not.toHaveProperty('deviceId');
+
+      await composto.encerrar();
+    });
+
+    it('registra cada decisao em log, com o motivo', async () => {
+      const linhas: Record<string, unknown>[] = [];
+      const { composto, facial } = await montar(linhas);
+
+      facial.simularReconhecimento('aluno-1', new Date());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(linhas).toContainEqual(
+        expect.objectContaining({
+          msg: 'decisao de acesso',
+          enrollid: 'aluno-1',
+          outcome: 'DENY',
+          reason: 'NO_ENTITLEMENT',
+        }),
+      );
+
+      await composto.encerrar();
+    });
   });
 
   it('uma tentativa em COMMAND_PENDING sobrevive ao encerramento e e reportada na proxima composicao', async () => {

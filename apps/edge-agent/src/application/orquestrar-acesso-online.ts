@@ -58,7 +58,8 @@ export interface RespostaDeDecisao {
  */
 export interface ReconhecimentoComOrigem {
   externalEnrollId: string;
-  deviceId: string;
+  /** Serie do fabricante do leitor (#467). E por ela que a nuvem acha o `Device`. */
+  deviceSerial: string;
   recognitionId: string;
   ocorridoEm: Date;
 }
@@ -68,7 +69,7 @@ export interface DepsAcessoOnline {
   catraca: TurnstileAdapter;
   /** Pergunta a nuvem. Rejeita ou devolve `null` quando nao deu para falar. */
   pedirDecisao: (entrada: {
-    deviceId: string;
+    deviceSerial: string;
     externalUserId: string;
     recognitionId: string;
     recognizedAt: Date;
@@ -119,7 +120,7 @@ export async function processarAcessoOnline(
   const tentativa = deps.maquina.registrarReconhecimento({
     correlationId,
     externalUserId: evento.externalEnrollId,
-    deviceId: evento.deviceId,
+    deviceId: evento.deviceSerial,
     recognitionId: evento.recognitionId,
     recognizedAt: agora,
   });
@@ -243,7 +244,7 @@ async function pedirComTimeout(
   try {
     const decisao = await Promise.race([
       deps.pedirDecisao({
-        deviceId: evento.deviceId,
+        deviceSerial: evento.deviceSerial,
         externalUserId: evento.externalEnrollId,
         recognitionId: evento.recognitionId,
         recognizedAt: agora,

@@ -29,7 +29,7 @@ const DEVICE = 'device-catraca-1';
 function eventoDe(sobrescreve: Partial<ReconhecimentoComOrigem> = {}): ReconhecimentoComOrigem {
   return {
     externalEnrollId: '42',
-    deviceId: DEVICE,
+    deviceSerial: DEVICE,
     recognitionId: `rec-${Math.random().toString(36).slice(2)}`,
     ocorridoEm: new Date('2026-08-16T12:00:00.000Z'),
     ...sobrescreve,
