@@ -252,19 +252,28 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
   });
 
   it('mesma Idempotency-Key + mesmo corpo repetido: nenhum Payment novo, devolve resultado anterior', async () => {
-    const { studentId, subscriptionId } = await novaAssinatura('2026-08-01T00:00:00Z');
+    const { studentId, subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
     const AGORA = new Date('2026-09-15T12:00:00.000Z');
 
+    // Lote de PELO MENOS 3 meses (jul, ago, set) -- nao 1: com um lote de um
+    // mes so, `invoiceIds` do replay bater com o da primeira chamada nao
+    // prova nada alem do batchId ecoado (achado da revisao, fix round 1).
     await invoiceEmAberto({
       subscriptionId,
       studentId,
-      competencia: '2026-09-01T00:00:00Z',
-      dueAt: '2026-09-09T00:00:00Z',
-      status: 'OPEN',
+      competencia: '2026-07-01T00:00:00Z',
+      dueAt: '2026-07-09T00:00:00Z',
+    });
+    await invoiceEmAberto({
+      subscriptionId,
+      studentId,
+      competencia: '2026-08-01T00:00:00Z',
+      dueAt: '2026-08-09T00:00:00Z',
     });
 
     const ateCompetencia = new Date('2026-09-01T00:00:00Z');
     const expectedTotalMinor = await totalDoLote(subscriptionId, AGORA, ateCompetencia);
+    expect(expectedTotalMinor).toBe(30000);
     const idempotencyKey = randomUUID();
 
     const entrada = {
@@ -283,7 +292,71 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     const contagemDepois = await db.payment.count({ where: { tenantId: contexto.tenantId, batchId: idempotencyKey } });
 
     expect(contagemDepois).toBe(contagemAntes);
+    expect(primeira.invoiceIds).toHaveLength(3);
+    // Deep-equal do CONTEUDO, nao so do batchId (que e trivialmente igual
+    // por ser o eco da propria chave).
     expect(segunda.batchId).toBe(primeira.batchId);
+    expect(segunda.invoiceIds).toEqual(primeira.invoiceIds);
+    expect(segunda.totalMinor).toBe(primeira.totalMinor);
+  });
+
+  it('mesma Idempotency-Key + mesmo corpo, mas subscriptionId DIFERENTE: 422, nunca devolve o lote do outro aluno', async () => {
+    const { studentId: studentA, subscriptionId: subscriptionA } = await novaAssinatura('2026-08-01T00:00:00Z');
+    const { subscriptionId: subscriptionB } = await novaAssinatura('2026-08-01T00:00:00Z');
+    const AGORA = new Date('2026-09-15T12:00:00.000Z');
+
+    await invoiceEmAberto({
+      subscriptionId: subscriptionA,
+      studentId: studentA,
+      competencia: '2026-09-01T00:00:00Z',
+      dueAt: '2026-09-09T00:00:00Z',
+      status: 'OPEN',
+    });
+
+    const ateCompetencia = new Date('2026-09-01T00:00:00Z');
+    const expectedTotalMinor = await totalDoLote(subscriptionA, AGORA, ateCompetencia);
+    const idempotencyKey = randomUUID();
+
+    const resultadoA = await registrarLote.executar(
+      contexto,
+      {
+        subscriptionId: subscriptionA,
+        ateCompetencia,
+        channel: 'DINHEIRO',
+        expectedTotalMinor,
+        idempotencyKey,
+        agora: AGORA,
+      },
+      'corr-cruzado-1',
+    );
+
+    // MESMA chave, MESMO ateCompetencia/channel/expectedTotalMinor -- so o
+    // subscriptionId muda. Sem o subscriptionId no hash, isto devolveria o
+    // lote do aluno A como se fosse sucesso para o aluno B (achado da
+    // revisao, fix round 1).
+    await expect(
+      registrarLote.executar(
+        contexto,
+        {
+          subscriptionId: subscriptionB,
+          ateCompetencia,
+          channel: 'DINHEIRO',
+          expectedTotalMinor,
+          idempotencyKey,
+          agora: AGORA,
+        },
+        'corr-cruzado-2',
+      ),
+    ).rejects.toBeInstanceOf(IdempotencyKeyComCorpoDiferenteError);
+
+    const paymentsDoB = await db.payment.findMany({
+      where: { tenantId: contexto.tenantId, invoice: { subscriptionId: subscriptionB } },
+    });
+    expect(paymentsDoB).toHaveLength(0);
+
+    // O aluno A continua com o resultado dele, intocado.
+    const paymentsDoA = await db.payment.findMany({ where: { tenantId: contexto.tenantId, batchId: resultadoA.batchId } });
+    expect(paymentsDoA.every((p) => p.invoiceId !== paymentsDoB[0]?.invoiceId)).toBe(true);
   });
 
   it('mesma Idempotency-Key + corpo diferente: 422, nada gravado', async () => {
@@ -346,9 +419,25 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
   /*
    * Regressao direta da correcao da Task 2: duas chamadas concorrentes sobre
    * a MESMA invoice -- um recebimento avulso via `registrarPagamentoManual` e
-   * um lote de um mes so -- disputam o MESMO `updateMany` condicionado. Para
-   * ser corrida de verdade (nao sequencial-parecendo-paralela), as duas
-   * promises comecam ANTES de qualquer uma resolver.
+   * um lote de um mes so -- disputam o MESMO `updateMany` condicionado.
+   *
+   * DISPARAR AS DUAS PROMISES ANTES DE QUALQUER UMA RESOLVER NAO BASTA (achado
+   * da revisao, fix round 1): o lote faz 4 leituras SEQUENCIAIS fora da
+   * transacao antes de entrar nela (lookup de idempotencia, assinatura,
+   * config, invoices abertas -- `registrar-pagamento-em-lote.use-case.ts`
+   * linhas ~70-110). Dependendo de quem "vence" essas leituras, o teste podia
+   * nunca chegar a exercitar o `updateMany` condicionado -- podia falhar antes,
+   * por `LoteInvalidoError` ou por `TransicaoDeInvoiceInvalidaError` na
+   * checagem pre-transacao. Isso e o padrao "canario passa por guarda
+   * anterior" da memoria do projeto: um teste que passa mesmo revertendo a
+   * correcao real.
+   *
+   * FIX: uma barreira controlada por spy. O avulso so entra na CORRIDA de
+   * verdade depois que o lote ja passou pelas leituras pre-transacao e esta
+   * prestes a chamar `registrarPagamentoManual` de dentro da propria
+   * transacao -- momento em que o spy libera o avulso. Isso garante que os
+   * dois cheguem ao `updateMany` quase ao mesmo tempo, exercitando a guarda
+   * de verdade (nao uma guarda anterior).
    */
   it('recebimento avulso e lote concorrentes sobre a mesma invoice: so um transiciona para PAID', async () => {
     const { studentId, subscriptionId } = await novaAssinatura('2026-07-01T00:00:00Z');
@@ -364,17 +453,20 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     const julho = new Date('2026-07-01T00:00:00Z');
     const totalJulho = await totalDoLote(subscriptionId, AGORA, julho);
 
-    const promiseAvulso = billingRepository.registrarPagamentoManual(
-      contexto,
-      {
-        invoiceId,
-        amountMinor: totalJulho,
-        reason: 'recebimento avulso concorrente',
-        paidAt: AGORA,
-        receivedVia: 'DINHEIRO',
-      },
-      'corr-avulso-concorrente',
-    );
+    // Barreira: o avulso so dispara quando o lote sinaliza que ja esta
+    // dentro da propria transacao, prestes a chamar `registrarPagamentoManual`.
+    let liberarAvulso: () => void = () => {};
+    const loteChegouNaTransacao = new Promise<void>((resolve) => {
+      liberarAvulso = resolve;
+    });
+
+    const original = billingRepository.registrarPagamentoManual.bind(billingRepository);
+    jest
+      .spyOn(billingRepository, 'registrarPagamentoManual')
+      .mockImplementation(async (...args: Parameters<typeof original>) => {
+        liberarAvulso();
+        return original(...args);
+      });
 
     const promiseLote = registrarLote.executar(
       contexto,
@@ -387,6 +479,20 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         agora: AGORA,
       },
       'corr-lote-concorrente',
+    );
+
+    const promiseAvulso = loteChegouNaTransacao.then(() =>
+      billingRepository.registrarPagamentoManual(
+        contexto,
+        {
+          invoiceId,
+          amountMinor: totalJulho,
+          reason: 'recebimento avulso concorrente',
+          paidAt: AGORA,
+          receivedVia: 'DINHEIRO',
+        },
+        'corr-avulso-concorrente',
+      ),
     );
 
     const resultados = await Promise.allSettled([promiseAvulso, promiseLote]);
@@ -438,6 +544,55 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         'corr-total-divergente',
       ),
     ).rejects.toBeInstanceOf(TotalDoLoteDivergenteError);
+
+    const invoiceCountDepois = await db.invoice.count({ where: { subscriptionId, tenantId: contexto.tenantId } });
+    const paymentCountDepois = await db.payment.count({ where: { tenantId: contexto.tenantId } });
+
+    expect(invoiceCountDepois).toBe(invoiceCountAntes);
+    expect(paymentCountDepois).toBe(paymentCountAntes);
+  });
+
+  /*
+   * ADR-027 resposta 1 ("pagamento parcial nao existe") vale para o lote
+   * exatamente como ja vale para invoice unica (`aplicarPagamento` em
+   * `domain/invoice.ts`, usado por `registrarPagamentoManual`). Sem esta
+   * guarda, `receivedAmountMinor < totalCalculado` silenciosamente pagava o
+   * valor cheio de cada invoice mesmo o operador tendo recebido menos
+   * (achado da revisao, fix round 1).
+   */
+  it('receivedAmountMinor menor que o total calculado: rejeita, nada gravado (sem subpagamento silencioso)', async () => {
+    const { studentId, subscriptionId } = await novaAssinatura('2026-08-01T00:00:00Z');
+    const AGORA = new Date('2026-09-15T12:00:00.000Z');
+
+    await invoiceEmAberto({
+      subscriptionId,
+      studentId,
+      competencia: '2026-09-01T00:00:00Z',
+      dueAt: '2026-09-09T00:00:00Z',
+      status: 'OPEN',
+    });
+
+    const setembro = new Date('2026-09-01T00:00:00Z');
+    const totalReal = await totalDoLote(subscriptionId, AGORA, setembro);
+
+    const invoiceCountAntes = await db.invoice.count({ where: { subscriptionId, tenantId: contexto.tenantId } });
+    const paymentCountAntes = await db.payment.count({ where: { tenantId: contexto.tenantId } });
+
+    await expect(
+      registrarLote.executar(
+        contexto,
+        {
+          subscriptionId,
+          ateCompetencia: setembro,
+          channel: 'DINHEIRO',
+          expectedTotalMinor: totalReal,
+          receivedAmountMinor: totalReal - 1,
+          idempotencyKey: randomUUID(),
+          agora: AGORA,
+        },
+        'corr-subpagamento',
+      ),
+    ).rejects.toMatchObject({ code: 'BILLING_INVALID_INVOICE' });
 
     const invoiceCountDepois = await db.invoice.count({ where: { subscriptionId, tenantId: contexto.tenantId } });
     const paymentCountDepois = await db.payment.count({ where: { tenantId: contexto.tenantId } });

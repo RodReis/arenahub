@@ -8,6 +8,7 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 
 import { AssinaturaNaoEncontradaError, BillingRepository, ConfiguracaoFinanceiraAusenteError } from './billing.repository.js';
 import { mesesPagaveis, resolverLote, type InvoiceParaFaixa } from './domain/meses-pagaveis.js';
+import { InvoiceInvalidaError } from './domain/invoice.js';
 
 export class TotalDoLoteDivergenteError extends ErroDeDominio {
   constructor() {
@@ -58,13 +59,16 @@ export class RegistrarPagamentoEmLoteUseCase {
     const corpoHash = hashDoCorpo(entrada);
 
     /**
-     * Idempotencia: procura um Payment ja gravado com este batchId. Se
-     * achar, compara o hash do corpo -- corpo igual devolve o resultado
-     * anterior sem gravar de novo; corpo diferente recusa (F83, decisao
-     * tecnica da issue #458: nunca reprocessar nem devolver o lote errado).
+     * Idempotencia: procura o Payment que carrega o hash do PRIMEIRO pedido
+     * deste batchId. So esse Payment tem `batchRequestHash` preenchido -- os
+     * demais do mesmo lote ficam com o campo nulo (ver comentario onde ele e
+     * gravado, mais abaixo) -- entao o filtro `not: null` e obrigatorio: sem
+     * ele, o Postgres pode devolver qualquer linha do lote, inclusive uma com
+     * hash nulo, e `null !== corpoHash` rejeitaria um replay legitimo com o
+     * MESMO corpo (issue #458, achado da revisao, fix round 1).
      */
     const existente = await this.db.payment.findFirst({
-      where: { tenantId: contexto.tenantId, batchId: entrada.idempotencyKey },
+      where: { tenantId: contexto.tenantId, batchId: entrada.idempotencyKey, batchRequestHash: { not: null } },
       select: { batchId: true, batchRequestHash: true, invoiceId: true, amountMinor: true },
     });
 
@@ -124,17 +128,32 @@ export class RegistrarPagamentoEmLoteUseCase {
       throw new TotalDoLoteDivergenteError();
     }
 
+    /**
+     * Subpagamento nao existe no lote, pela MESMA regra que ja vale para
+     * invoice unica (ADR-027 resposta 1, `aplicarPagamento` em
+     * `domain/invoice.ts`): reaproveita `InvoiceInvalidaError`, nao inventa
+     * codigo novo (achado da revisao, fix round 1).
+     */
+    if (entrada.receivedAmountMinor !== undefined && entrada.receivedAmountMinor < totalCalculado) {
+      throw new InvoiceInvalidaError(
+        'pagamento parcial nao e aceito no MVP 2; o lote so fecha com o valor integral',
+      );
+    }
+
     const invoiceIds: string[] = [];
 
     await this.db.$transaction(async (tx) => {
-      // Guarda o ultimo Payment criado no lote -- o excedente (troco de
-      // sobrepagamento) precisa de `originPaymentId` rastreavel, e o schema
-      // exige a coluna preenchida (nao aceita `null`).
+      // Guarda o ultimo Payment criado no lote e a moeda da ultima invoice --
+      // o excedente (troco de sobrepagamento) precisa de `originPaymentId`
+      // rastreavel (schema exige a coluna preenchida, nao aceita `null`) e da
+      // moeda REAL da invoice, nao de um valor arbitrario do catalogo de
+      // precos (achado da revisao, fix round 1).
       let ultimoPagamentoId: string | null = null;
+      let ultimaMoeda: string | null = null;
 
       for (const mes of lote) {
         const invoice = mes.invoiceId
-          ? await tx.invoice.findUniqueOrThrow({ where: { id: mes.invoiceId } })
+          ? await tx.invoice.findUniqueOrThrow({ where: { id: mes.invoiceId, tenantId: contexto.tenantId } })
           : await this.billing.abrirInvoiceDoPeriodo(contexto, { subscriptionId: entrada.subscriptionId, emQue: mes.competencia }, tx);
 
         const pagamento = await this.billing.registrarPagamentoManual(
@@ -153,6 +172,7 @@ export class RegistrarPagamentoEmLoteUseCase {
 
         invoiceIds.push(invoice.id);
         ultimoPagamentoId = pagamento.id;
+        ultimaMoeda = invoice.currency;
 
         // So o PRIMEIRO Payment do lote carrega o hash -- e o que a
         // checagem de idempotencia acima consulta.
@@ -163,14 +183,14 @@ export class RegistrarPagamentoEmLoteUseCase {
 
       const excedente = (entrada.receivedAmountMinor ?? totalCalculado) - totalCalculado;
 
-      if (excedente > 0 && ultimoPagamentoId) {
+      if (excedente > 0 && ultimoPagamentoId && ultimaMoeda) {
         await tx.accountCredit.create({
           data: {
             tenantId: contexto.tenantId,
             studentId: assinatura.studentId,
             originPaymentId: ultimoPagamentoId,
             amountMinor: excedente,
-            currency: lote[0]?.totalMinor !== undefined ? assinatura.plan.prices[0]!.currency : 'BRL',
+            currency: ultimaMoeda,
           },
         });
       }
@@ -180,8 +200,26 @@ export class RegistrarPagamentoEmLoteUseCase {
   }
 }
 
-function hashDoCorpo(entrada: { ateCompetencia: Date; channel: string; expectedTotalMinor: number }): string {
+/**
+ * Inclui `subscriptionId`: sem ele, duas assinaturas DIFERENTES reusando por
+ * engano a mesma Idempotency-Key com o mesmo `ateCompetencia`/`channel`/
+ * `expectedTotalMinor` fariam a segunda chamada devolver o lote da PRIMEIRA
+ * como se fosse sucesso -- dinheiro contabilizado no aluno errado, em
+ * silencio (issue #458, achado da revisao, fix round 1).
+ *
+ * Inclui tambem `receivedAmountMinor`: sem ele, o valor efetivamente recebido
+ * poderia mudar sob a mesma chave sem re-checagem.
+ */
+function hashDoCorpo(entrada: {
+  subscriptionId: string;
+  ateCompetencia: Date;
+  channel: string;
+  expectedTotalMinor: number;
+  receivedAmountMinor?: number;
+}): string {
   return createHash('sha256')
-    .update(`${entrada.ateCompetencia.toISOString()}|${entrada.channel}|${entrada.expectedTotalMinor}`)
+    .update(
+      `${entrada.subscriptionId}|${entrada.ateCompetencia.toISOString()}|${entrada.channel}|${entrada.expectedTotalMinor}|${entrada.receivedAmountMinor ?? ''}`,
+    )
     .digest('hex');
 }
