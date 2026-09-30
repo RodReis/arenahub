@@ -2,8 +2,8 @@
 
 - **Data:** 30/09/2026
 - **Origem:** pedido do PI na conversa de 30/09/2026 (brainstorming)
-- **Status:** desenho aprovado pelo PI em conversa; aguardando revisão desta spec
-- **Fatia/SPEC:** a alocar pelo Cowork no Índice Fatia ↔ SPEC do `docs/STATUS.md` (não há Slice de PRD)
+- **Status:** revisada pelo Cowork; card aberto
+- **Fatia/SPEC:** `F83` / `SPEC-083` — issue #458
 
 ## 1. Problema
 
@@ -27,6 +27,9 @@ nesses meses.
 | 3 | Cancelamento com meses futuros pagos? | **Fora desta fatia.** Meses seguem `PAID`; estorno, se houver, é manual. Limitação conhecida. |
 | 4 | Modelagem | **Um `Payment` por invoice, agrupados por `batchId`**, numa transação. Sem tabela de alocação, sem invoice consolidada. |
 | 5 | Formas | Só as do balcão (Dinheiro, PIX maquininha, Débito, Crédito). PIX por QR do provedor segue um mês por vez. |
+| 6 | Teto de meses adiantados? | **Competência corrente + 6.** (já refletido em §4.1) |
+| 7 | Estorno de mês adiantado pago? | **Usa `EstornarPagamentoUseCase` existente**, aceitando que a `refundAccessPolicy` do tenant pode suspender o acesso mesmo com o mês corrente pago. Nada novo nesta fatia. |
+| 8 | Aviso no app por lote ou por mês? | **Um aviso por mês.** Mantém o comportamento atual: N eventos `InvoicePaid` → N avisos "Pagamento confirmado". |
 
 ## 3. Contexto do código atual
 
@@ -85,23 +88,64 @@ Erros (`application/problem+json`, código estável):
 
 Uma transação:
 
-1. abre as invoices faltantes via `abrirInvoiceDoPeriodo`;
+1. abre as invoices faltantes via `abrirInvoiceDoPeriodo` (recebendo `tx`, ver §4.4.1);
 2. para cada invoice, em ordem de competência: `Payment` `CONFIRMED` com `batchId` e o `channel`,
-   invoice → `PAID` com `paidAt`, audit log, evento `InvoicePaid` no padrão atual;
+   transição condicionada da invoice para `PAID` (ver §4.4.2), audit log, evento `InvoicePaid` no
+   padrão atual;
 3. excedente (`receivedAmountMinor - total`) vira **um** `AccountCredit` por lote;
 4. `ativarDireitoDeAcessoSePendente` uma vez.
 
 Falha em qualquer passo desfaz tudo.
 
-**Idempotência:** se já existem `Payment` com aquele `batchId` no tenant, devolve o resultado do
-lote anterior sem gravar. **Concorrência:** a exclusão "no máximo um `Payment` `CONFIRMED` por
-invoice" tem de estar garantida no banco (índice/transição condicionada), não em `if` de aplicação.
+**Idempotência:**
+- Mesma `Idempotency-Key` + mesmo corpo (`ateCompetencia`, `channel`, `expectedTotalMinor`) →
+  devolve o resultado do lote já gravado, sem gravar de novo.
+- Mesma `Idempotency-Key` + corpo **diferente** → **422** `IDEMPOTENCY_KEY_BODY_MISMATCH`. Nunca
+  processa o corpo novo nem devolve o lote antigo como se fosse a resposta dele.
+- A chave (`tenantId`, `batchId`) mais o hash do corpo relevante é o que decide entre os dois
+  casos acima; guardado em `PaymentBatch` (ver §4.3) ou, na falta de tabela própria, num campo do
+  primeiro `Payment` do lote.
 
 Permissão: `billing.payment.manual`. Tenant da identidade autenticada, nunca do corpo.
+
+### 4.2.1 Concorrência — recebimento avulso e lote sobre o mesmo mês
+
+O `registrarPagamentoManual` de hoje confere `podeTransicionar` **fora** da transação e faz
+`update` **sem condição** (`billing.repository.ts:212-238`). Duas chamadas concorrentes sobre a
+mesma invoice — um recebimento avulso e um lote, por exemplo — podem cobrar o aluno em dobro: as
+duas leem `OPEN`, as duas passam na checagem, as duas gravam `Payment` `CONFIRMED`.
+
+**Correção, nos dois caminhos (avulso e lote):** substituir o par
+`findFirst` + `update` incondicional por uma transição condicionada no banco:
+
+```ts
+const resultado = await tx.invoice.updateMany({
+  where: { id: invoice.id, tenantId, status: { in: ['OPEN', 'OVERDUE'] } },
+  data: { status: 'PAID', paidAt, version: { increment: 1 } },
+});
+
+if (resultado.count !== 1) {
+  throw new TransicaoDeInvoiceInvalidaError(/* ... */);
+}
+```
+
+Isso garante **a transição para `PAID` uma vez só**, que é a garantia real — não "no máximo um
+`Payment` `CONFIRMED` por invoice": esse invariante é **falso por desenho**, porque o webhook PIX
+já grava um segundo `Payment` sobre uma invoice `PAID` e manda o valor para crédito (fluxo
+existente, fora desta fatia). Não introduzir índice único parcial em `payments` — quebraria esse
+fluxo.
+
+O `Payment` só é criado **depois** que o `updateMany` confirma `count === 1`, para não sobrar
+`Payment` órfão do lado perdedor da corrida.
 
 ### 4.3 Schema
 
 `Payment.batchId String?` + índice `(tenantId, batchId)`. Migração aditiva, sem backfill.
+
+Para a checagem de idempotência com corpo (§4.2), o corpo relevante do primeiro pedido do lote
+fica em `Payment.batchRequestHash String?` (hash estável de `ateCompetencia|channel|expectedTotalMinor`),
+gravado só no primeiro `Payment` de cada `batchId`. Repetir a chave: busca 1 `Payment` por
+`(tenantId, batchId)`, compara o hash. Sem tabela nova — reaproveita a coluna já adicionada.
 
 ### 4.4 Domínio puro
 
@@ -109,6 +153,27 @@ Permissão: `billing.payment.manual`. Tenant da identidade autenticada, nunca do
 - `resolverLote(faixa, ateCompetencia)` → subconjunto contínuo ou erro de domínio.
 
 Sem banco, rede ou relógio; o "agora" entra por parâmetro.
+
+### 4.4.1 Transação compartilhada
+
+`abrirInvoiceDoPeriodo` e `registrarPagamentoManual` hoje abrem a própria `$transaction`
+(`billing.repository.ts:123` e `:220`). Para o lote rodar como uma transação única (§4.2, passo
+1-4), as duas passam a aceitar um `tx` opcional:
+
+```ts
+async abrirInvoiceDoPeriodo(
+  contexto: TenantContext,
+  entrada: { subscriptionId: string; emQue: Date },
+  tx?: PrismaTx,
+): Promise<Invoice> {
+  const executar = async (tx: PrismaTx) => { /* corpo atual */ };
+  return tx ? executar(tx) : this.db.$transaction(executar);
+}
+```
+
+Mesmo padrão em `registrarPagamentoManual`. Caminho hoje existente (avulso, ciclo) continua
+chamando sem `tx` e abre a própria transação, comportamento inalterado. O novo caso de uso do lote
+chama as duas passando o mesmo `tx`.
 
 ## 5. Tela — Financeiro do aluno
 
@@ -142,12 +207,20 @@ meio, virada de ano, teto +6. `resolverLote` — vazio, fora da faixa, conjunto 
 **Integração (Postgres real):**
 - deve 2 meses, paga até corrente+2 → 5 invoices `PAID`, 5 `Payment` com mesmo `batchId`,
   assinatura e entitlement `ACTIVE`;
-- mesmo `Idempotency-Key` repetido → nenhum `Payment` novo;
-- duas requisições paralelas, chaves diferentes, mesmo mês → uma paga, outra 409; afirma o
-  invariante "≤ 1 `Payment` `CONFIRMED` por invoice", não o relógio;
+- mesmo `Idempotency-Key` + mesmo corpo repetido → nenhum `Payment` novo, devolve o resultado do
+  lote anterior;
+- mesmo `Idempotency-Key` + corpo diferente (outro `ateCompetencia`) → 422, nada gravado;
+- **recebimento avulso e lote concorrentes sobre o mesmo mês** (chamando
+  `registrarPagamentoManual` e o novo caso de uso em paralelo para a mesma invoice) → só um
+  transiciona para `PAID`, o outro recebe erro de transição inválida; afirma
+  "a invoice transiciona para `PAID` uma vez só", nunca o relógio;
+- duas requisições de lote paralelas, chaves diferentes, faixas sobrepostas → cada invoice paga
+  uma vez só, a outra recebe erro por invoice já paga;
 - `expectedTotalMinor` divergente → 409 e nada gravado;
-- falha plantada no 3º mês desfaz os anteriores;
+- falha plantada no 3º mês desfaz os anteriores (inclusive as invoices abertas nesta mesma
+  transação);
 - job de inadimplência depois não suspende quem pagou adiantado;
+- quitar os atrasados reativa assinatura `PAST_DUE` e entitlement `SUSPENDED`;
 - tenant B não enxerga assinatura de A.
 
 **Web (Vitest):** seleção contínua, sem buraco, seleção inicial, total/rótulo do botão, corpo da
@@ -164,8 +237,19 @@ action (`ateCompetencia`, `expectedTotalMinor`, `Idempotency-Key`).
 
 ## 8. Fora de escopo
 
-- Cancelamento/estorno de meses adiantados (decisão 3).
+- Cancelamento com meses adiantados pagos (decisão 3).
 - Desconto por antecipação (decisão 2).
 - PIX por QR do provedor em lote.
 - Aplicar `AccountCredit` existente para abater meses (o crédito continua sem consumo, como hoje).
 - Relatório de caixa agrupado por `batchId` — o dado fica pronto; a tela de relatório é outra fatia.
+- Estorno de mês adiantado: usa o `EstornarPagamentoUseCase` já existente, sem alteração (decisão 7).
+
+## 9. Critérios de aceite (issue #458)
+
+- [ ] A recepção seleciona uma faixa contínua (do mais antigo em aberto até no máximo corrente + 6)
+      e recebe numa operação só, com uma forma e um total.
+- [ ] Os meses adiantados pagos não são cobrados pelo ciclo nem suspensos pela inadimplência.
+- [ ] Quitar os atrasados reativa assinatura `PAST_DUE` e entitlement `SUSPENDED`.
+- [ ] Falha em qualquer mês desfaz o lote inteiro.
+- [ ] Recebimento avulso e lote concorrentes sobre o mesmo mês: só um passa.
+- [ ] Repetir a mesma `Idempotency-Key` não grava nada novo; a mesma chave com corpo diferente dá 422.
