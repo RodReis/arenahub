@@ -161,6 +161,26 @@ describe('compor', () => {
       await composto.encerrar();
     });
 
+    /*
+     * #476 -- passagem de horas atras (backlog do leitor ao reconectar) nao e
+     * pessoa na frente da catraca. Nao pede decisao, nao gira nada.
+     */
+    it('passagem antiga do leitor nao pede decisao nem aciona a catraca (#476)', async () => {
+      const linhas: Record<string, unknown>[] = [];
+      const { composto, facial, postMock } = await montar(linhas);
+
+      const umaHoraAtras = new Date(Date.now() - 3_600_000);
+      facial.simularReconhecimento('aluno-1', umaHoraAtras, 'facial', new Date());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(postMock).not.toHaveBeenCalledWith('/api/v1/edge/access-decisions', expect.anything());
+      expect(linhas).toContainEqual(
+        expect.objectContaining({ msg: 'passagem antiga do leitor -- nao aciona a catraca' }),
+      );
+
+      await composto.encerrar();
+    });
+
     it('registra cada decisao em log, com o motivo', async () => {
       const linhas: Record<string, unknown>[] = [];
       const { composto, facial } = await montar(linhas);
