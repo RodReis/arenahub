@@ -10924,6 +10924,49 @@
         ]
       }
     },
+    "/api/v1/edge/offline-passages": {
+      "post": {
+        "operationId": "EdgeAccessController_registrarPassagemOffline",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessEventId": {
+                      "type": "string"
+                    },
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "ALLOW"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "OFFLINE_DEVICE_DECISION"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "accessEventId",
+                    "outcome",
+                    "reason"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EdgeAccess"
+        ]
+      }
+    },
     "/api/v1/access/manual-overrides": {
       "post": {
         "operationId": "ManualOverrideController_criar",

@@ -1,4 +1,5 @@
 import { Body, Controller, NotFoundException, Param, Post, Req } from '@nestjs/common';
+import { ApiCreatedResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -8,6 +9,10 @@ import {
   DecideOnlineAccessUseCase,
   type DecisaoRespondida,
 } from './decide-online-access.use-case.js';
+import {
+  RecordOfflinePassageUseCase,
+  type OfflinePassageRegistrada,
+} from './record-offline-passage.use-case.js';
 
 /**
  * Decisao de acesso pedida pelo Edge -- `M1` §12.
@@ -57,11 +62,32 @@ const esquemaDePassagem = z
   })
   .strict();
 
+/**
+ * Passagem que a catraca JA DECIDIU sozinha, offline -- #477.
+ *
+ * `.strict()` pela mesma regra: `tenantId`/`gymUnitId` vem da assinatura.
+ * `outcome` e `reason` NAO ENTRAM -- o Edge relata o fato, nunca decide; se
+ * entrassem, um corpo malicioso ou um bug no Edge poderia gravar `DENY` para
+ * uma passagem que a catraca liberou, ou inventar razao que o motor nunca
+ * produziu.
+ */
+const esquemaDePassagemOffline = z
+  .object({
+    deviceSerial: z.string().min(1).max(64),
+    externalUserId: z.string().min(1).max(64),
+    recognitionId: z.string().min(1).max(80),
+    /** Horario do EQUIPAMENTO -- o fato aconteceu ali, nao no recebimento. */
+    occurredAt: z.string().datetime(),
+    idempotencyKey: z.string().min(8).max(120),
+  })
+  .strict();
+
 @Controller('api/v1/edge')
 export class EdgeAccessController {
   constructor(
     private readonly decidir: DecideOnlineAccessUseCase,
     private readonly eventos: AccessEventRepository,
+    private readonly offline: RecordOfflinePassageUseCase,
   ) {}
 
   /**
@@ -134,5 +160,46 @@ export class EdgeAccessController {
     );
 
     return { accessEventId: evento.id, state: dados.state };
+  }
+
+  /**
+   * Registra passagem que o leitor guardou offline -- #477.
+   *
+   * ADR-012 deixou a operacao offline plena (cache, fila, decisao local) para
+   * o MVP 1.5. Isto e mais estreito: o equipamento JA decidiu sozinho
+   * (catraca em modo offline), e o ArenaHub so registra o que ja aconteceu --
+   * nunca avalia entitlement, nunca comanda a catraca de novo.
+   *
+   * 201 sempre que o corpo e valido: a pessoa passou de fato, nao ha
+   * "negativa de dominio" aqui como em `decidirAcesso`.
+   */
+  @Post('offline-passages')
+  @EdgeRoute()
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        accessEventId: { type: 'string' },
+        outcome: { type: 'string', enum: ['ALLOW'] },
+        reason: { type: 'string', enum: ['OFFLINE_DEVICE_DECISION'] },
+      },
+      required: ['accessEventId', 'outcome', 'reason'],
+    },
+  })
+  async registrarPassagemOffline(
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<OfflinePassageRegistrada> {
+    const dados = esquemaDePassagemOffline.parse(corpo);
+    const edge = requisicao.edgeContext!;
+
+    return this.offline.executar(edge, {
+      deviceSerial: dados.deviceSerial,
+      externalUserId: dados.externalUserId,
+      recognitionId: dados.recognitionId,
+      occurredAt: new Date(dados.occurredAt),
+      idempotencyKey: dados.idempotencyKey,
+      correlationId: requisicao.correlationId ?? 'sem-correlacao',
+    });
   }
 }

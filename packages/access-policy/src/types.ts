@@ -117,6 +117,21 @@ export const ALLOW_REASON = {
    * esquecesse contaria excecao como regra.
    */
   MANUAL_OVERRIDE: 'MANUAL_OVERRIDE',
+  /**
+   * A CATRACA decidiu sozinha, offline, sem o ArenaHub avaliar nada -- #477.
+   *
+   * ⚠️ **O MOTOR NAO PRODUZ ESTE VALOR**, pela mesma razao de
+   * `MANUAL_OVERRIDE` e `FINANCIAL_OVERRIDE`: nao ha entitlement consultado
+   * aqui, o equipamento ja tinha liberado antes de qualquer decisao da nuvem
+   * existir. O Edge grava direto, ao reconciliar o backlog que o leitor
+   * acumulou desconectado (ADR-012 -- offline pleno continua MVP 1.5; isto
+   * antecipa so o REGISTRO do que o equipamento ja decidiu, no MVP 1).
+   *
+   * Sempre `ALLOW`: a pessoa passou de fato. Nao ha DENY_REASON equivalente
+   * porque uma negativa do equipamento nao produz evento nenhum -- ninguem
+   * entrou, nao ha o que registrar.
+   */
+  OFFLINE_DEVICE_DECISION: 'OFFLINE_DEVICE_DECISION',
 } as const;
 
 export const DENY_REASON = {

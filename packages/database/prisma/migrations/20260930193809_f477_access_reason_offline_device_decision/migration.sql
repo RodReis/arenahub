@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "access_reason" ADD VALUE 'OFFLINE_DEVICE_DECISION';

@@ -11,6 +11,21 @@ import { criarLogger } from '../observability/logger.js';
 import { FacialSimulator } from '../adapters/facial-simulator.js';
 import type { SignedCloudClient } from '../cloud/signed-client.js';
 
+/**
+ * Espera ATE a condicao valer, com teto. Janela fixa passava no Windows e
+ * estourava no CI, com todos os pacotes testando em paralelo.
+ */
+async function ate(condicao: () => boolean, tetoMs = 2_000): Promise<void> {
+  const limite = Date.now() + tetoMs;
+  while (!condicao()) {
+    if (Date.now() > limite) throw new Error('condicao nao ocorreu a tempo');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+const chamou = (mock: { mock: { calls: unknown[][] } }, caminho: string, vezes = 1): boolean =>
+  mock.mock.calls.filter(([path]) => path === caminho).length >= vezes;
+
 describe('compor', () => {
   let dir: string;
 
@@ -149,7 +164,7 @@ describe('compor', () => {
       const { composto, facial, postMock } = await montar([]);
 
       facial.simularReconhecimento('aluno-1', new Date());
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await ate(() => chamou(postMock, '/api/v1/edge/access-decisions'));
 
       // O mock declara so o `path`; o corpo chega como segundo argumento.
       const chamadas = postMock.mock.calls as unknown as [string, Record<string, unknown>][];
@@ -171,7 +186,7 @@ describe('compor', () => {
 
       const umaHoraAtras = new Date(Date.now() - 3_600_000);
       facial.simularReconhecimento('aluno-1', umaHoraAtras, 'facial', new Date());
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await ate(() => chamou(postMock, '/api/v1/edge/offline-passages'));
 
       expect(postMock).not.toHaveBeenCalledWith('/api/v1/edge/access-decisions', expect.anything());
       expect(linhas).toContainEqual(
@@ -181,12 +196,57 @@ describe('compor', () => {
       await composto.encerrar();
     });
 
+    /*
+     * #477 -- decisao do PI (30/09/2026): a passagem antiga CONTA como
+     * frequencia. O Edge relata o FATO -- horario do equipamento, leitor e
+     * numero --, nunca o outcome: quem decidiu foi a catraca, offline.
+     */
+    it('passagem antiga vai para a nuvem como frequencia, com o horario do equipamento (#477)', async () => {
+      const { composto, facial, postMock } = await montar([]);
+
+      const umaHoraAtras = new Date(Date.now() - 3_600_000);
+      facial.simularReconhecimento('aluno-1', umaHoraAtras, 'facial', new Date());
+      await ate(() => chamou(postMock, '/api/v1/edge/offline-passages'));
+
+      const chamadas = postMock.mock.calls as unknown as [string, Record<string, unknown>][];
+      const corpo = chamadas.find(([path]) => path === '/api/v1/edge/offline-passages')?.[1];
+
+      expect(corpo).toMatchObject({
+        deviceSerial: facial.serie,
+        externalUserId: 'aluno-1',
+        occurredAt: umaHoraAtras.toISOString(),
+      });
+      expect(corpo).not.toHaveProperty('outcome');
+      expect(corpo).not.toHaveProperty('reason');
+
+      await composto.encerrar();
+    });
+
+    it('a MESMA passagem antiga gera a MESMA chave -- reenvio do leitor nao duplica (#477)', async () => {
+      const { composto, facial, postMock } = await montar([]);
+
+      const umaHoraAtras = new Date(Date.now() - 3_600_000);
+      facial.simularReconhecimento('aluno-1', umaHoraAtras, 'facial', new Date());
+      facial.simularReconhecimento('aluno-1', umaHoraAtras, 'facial', new Date());
+      await ate(() => chamou(postMock, '/api/v1/edge/offline-passages', 2));
+
+      const chamadas = postMock.mock.calls as unknown as [string, Record<string, unknown>][];
+      const chaves = chamadas
+        .filter(([path]) => path === '/api/v1/edge/offline-passages')
+        .map(([, corpo]) => corpo['idempotencyKey']);
+
+      expect(chaves).toHaveLength(2);
+      expect(chaves[0]).toBe(chaves[1]);
+
+      await composto.encerrar();
+    });
+
     it('registra cada decisao em log, com o motivo', async () => {
       const linhas: Record<string, unknown>[] = [];
       const { composto, facial } = await montar(linhas);
 
       facial.simularReconhecimento('aluno-1', new Date());
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await ate(() => linhas.some((l) => l['msg'] === 'decisao de acesso'));
 
       expect(linhas).toContainEqual(
         expect.objectContaining({

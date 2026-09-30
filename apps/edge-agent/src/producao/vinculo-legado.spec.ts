@@ -24,7 +24,7 @@ const RESPOSTA = {
   withoutConsentDocument: [],
 };
 
-function montar(base: readonly string[] = []) {
+function montar(base: readonly string[] = [], janelaMs = 20) {
   let aoRegistrar: ((serial: string) => void) | undefined;
   let aoInformar: ((c: { serial: string; externalUserId: string }) => void) | undefined;
 
@@ -53,7 +53,7 @@ function montar(base: readonly string[] = []) {
     { write: (l: string) => linhas.push(JSON.parse(l) as Record<string, unknown>) },
   );
 
-  const ligado = ligarVinculoLegado({ facial, cliente, logger, janelaMs: 20 });
+  const ligado = ligarVinculoLegado({ facial, cliente, logger, janelaMs });
 
   return {
     listar,
@@ -67,12 +67,25 @@ function montar(base: readonly string[] = []) {
 
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Espera ATE a condicao valer, com teto. Janela fixa de 20 ms passava no
+ * Windows e estourava no CI, com todos os pacotes testando em paralelo e a
+ * CPU disputada.
+ */
+async function ate(condicao: () => boolean, tetoMs = 2_000): Promise<void> {
+  const limite = Date.now() + tetoMs;
+  while (!condicao()) {
+    if (Date.now() > limite) throw new Error('condicao nao ocorreu a tempo');
+    await esperar(5);
+  }
+}
+
 describe('ligarVinculoLegado', () => {
   it('no registro, lista a base do leitor e manda os numeros com o serial', async () => {
     const { post, registrar, ligado } = montar(['1491', '2002']);
 
     registrar('AYTI11108174');
-    await esperar(20);
+    await ate(() => post.mock.calls.length > 0);
 
     expect(post).toHaveBeenCalledWith('/api/v1/edge/device-users/legacy-links', {
       deviceSerial: 'AYTI11108174',
@@ -87,7 +100,7 @@ describe('ligarVinculoLegado', () => {
     const { post, registrar, ligado } = montar(base);
 
     registrar('AYTI11108174');
-    await esperar(30);
+    await ate(() => post.mock.calls.length >= 2);
 
     expect(post).toHaveBeenCalledTimes(2);
 
@@ -100,6 +113,8 @@ describe('ligarVinculoLegado', () => {
     informar('AYTI11108174', '10');
     informar('AYTI11108174', '11');
     informar('AYTI11108174', '10');
+    await ate(() => post.mock.calls.length > 0);
+    // Folga para um eventual segundo envio indevido aparecer.
     await esperar(60);
 
     expect(post).toHaveBeenCalledTimes(1);
@@ -115,7 +130,7 @@ describe('ligarVinculoLegado', () => {
     const { linhas, registrar, ligado } = montar(['1491']);
 
     registrar('AYTI11108174');
-    await esperar(20);
+    await ate(() => linhas.some((l) => l['msg'] === 'base do leitor vinculada'));
 
     expect(linhas).toContainEqual(
       expect.objectContaining({ msg: 'base do leitor vinculada', leitor: 'AYTI11108174', vinculados: 1 }),
@@ -127,12 +142,12 @@ describe('ligarVinculoLegado', () => {
   it('lista a base UMA vez por leitor -- listar pausa o leitor', async () => {
     // `listar` manda `disabledevice`: a cada reconexao, o leitor ficaria
     // segundos sem reconhecer ninguem. A base nao muda por reconectar.
-    const { listar, registrar, ligado } = montar(['1491']);
+    const { listar, post, registrar, ligado } = montar(['1491']);
 
     registrar('AYTI11108174');
-    await esperar(20);
+    await ate(() => post.mock.calls.length > 0);
     registrar('AYTI11108174');
-    await esperar(20);
+    await esperar(60);
 
     expect(listar).toHaveBeenCalledTimes(1);
 
@@ -153,7 +168,7 @@ describe('ligarVinculoLegado', () => {
 
     registrar('AYTI11108174');
     informar('AYTI11108174', '1491');
-    await esperar(150);
+    await ate(() => post.mock.calls.length >= 2 && emVoo === 0);
 
     expect(post).toHaveBeenCalledTimes(2);
     expect(maximo).toBe(1);
@@ -162,10 +177,11 @@ describe('ligarVinculoLegado', () => {
   });
 
   it('manda o lote de senduser assim que enche, sem esperar a janela', async () => {
-    const { post, informar, ligado } = montar();
+    // Janela de 10 s: se o envio esperasse a janela, o teste estouraria o teto.
+    const { post, informar, ligado } = montar([], 10_000);
 
     for (let i = 0; i < TAMANHO_DO_LOTE; i += 1) informar('AYTI11108174', String(i));
-    await esperar(5);
+    await ate(() => post.mock.calls.length > 0);
 
     expect(post).toHaveBeenCalledTimes(1);
 
@@ -177,7 +193,7 @@ describe('ligarVinculoLegado', () => {
     listar.mockImplementation(() => Promise.reject(new Error('sem resposta')));
 
     registrar('AYTI11108174');
-    await esperar(20);
+    await ate(() => linhas.some((l) => l['msg'] === 'nao foi possivel listar a base do leitor'));
 
     expect(linhas).toContainEqual(
       expect.objectContaining({ msg: 'nao foi possivel listar a base do leitor' }),

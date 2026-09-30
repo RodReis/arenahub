@@ -602,6 +602,15 @@ alto, a fila na recepção machuca a percepção do produto logo na primeira sem
 incidente desse tipo é o gatilho para reavaliar a prioridade do MVP 1.5 — não para improvisar
 cache no meio do MVP 1.
 
+> **Emenda de 30/09/2026 — decisão do PI (issue #477).** Na implantação da Arena Positiva, o
+> leitor facial guarda as passagens que a catraca liberou sozinha enquanto o ArenaHub esteve fora
+> e as manda ao reconectar. O PI decidiu que essas passagens **contam como frequência**. Isso
+> antecipa **só o registro** do que o equipamento já decidiu: evento `mode = OFFLINE`, motivo
+> `OFFLINE_DEVICE_DECISION`, gravado pela rota `POST /api/v1/edge/offline-passages`, sem passar
+> pelo motor e sem nunca acionar a catraca (#476). Cache de permissões, decisão local, fila
+> durável e reconciliação de conflito **continuam no MVP 1.5**. Hoje o Edge tenta enviar uma vez;
+> se a nuvem não responder, a passagem fica só no log.
+
 ---
 
 <a id="adr-013"></a>
