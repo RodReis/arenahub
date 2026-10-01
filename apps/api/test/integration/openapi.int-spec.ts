@@ -271,6 +271,9 @@ describe('contrato OpenAPI', () => {
         // nunca da URL.
         '/api/v1/billing/platform/preview',
         '/api/v1/billing/platform/invoices',
+        // #475 -- sugestao de proximo numero de catraca livre, so sugestao,
+        // nao reserva (a confirmacao continua em PUT /students/{id}/credentials).
+        '/api/v1/students/credentials/next-available',
       ]),
     );
   });

@@ -187,4 +187,18 @@ export class DeviceRepository {
 
     return maior + 1;
   }
+
+  /**
+   * Todos os numeros ja usados por `DeviceUser`, em qualquer leitor do
+   * tenant -- #475. Mesmo numero vinculado em dois leitores diferentes do
+   * mesmo tenant continua contando uma vez (`Set` de quem chama).
+   */
+  async listarNumerosVinculadosDoTenant(tenantId: string): Promise<string[]> {
+    const linhas = await this.db.deviceUser.findMany({
+      where: { tenantId },
+      select: { externalUserId: true },
+    });
+
+    return linhas.map((l) => l.externalUserId);
+  }
 }

@@ -255,4 +255,114 @@ describe('issue #396 -- credencial de acesso do aluno', () => {
 
     expect(resposta.status).toBe(400);
   });
+
+  /**
+   * #475 -- a recepcao escolhia o numero na mao, procurando um livre. Esta
+   * rota sugere, sem reservar: a confirmacao continua sendo o PUT acima.
+   */
+  describe('GET /credentials/next-available -- #475', () => {
+    it('devolve um numero que nao colide com nenhuma credencial ja atribuida', async () => {
+      const ocupado = await criarAluno(contas.a);
+      const antes = await request(servidor())
+        .get('/api/v1/students/credentials/next-available')
+        .set('Cookie', contas.a.cookie);
+
+      await request(servidor())
+        .put(`/api/v1/students/${ocupado}/credentials`)
+        .set('Cookie', contas.a.cookie)
+        .send({ kind: 'TURNSTILE_CARD', externalId: (antes.body as { externalId: string }).externalId })
+        .expect(200);
+
+      const depois = await request(servidor())
+        .get('/api/v1/students/credentials/next-available')
+        .set('Cookie', contas.a.cookie);
+
+      expect(depois.status).toBe(200);
+      expect(depois.body).not.toEqual(antes.body);
+
+      // A sugestao nova precisa estar livre de verdade -- confirmar pelo
+      // mesmo caminho que a recepcao usaria.
+      const novoAluno = await criarAluno(contas.a);
+      await request(servidor())
+        .put(`/api/v1/students/${novoAluno}/credentials`)
+        .set('Cookie', contas.a.cookie)
+        .send({ kind: 'TURNSTILE_CARD', externalId: (depois.body as { externalId: string }).externalId })
+        .expect(200);
+    });
+
+    it('nao sugere numero ja registrado pelo leitor, mesmo sem aluno vinculado', async () => {
+      const leitor = await db.device.create({
+        data: {
+          tenantId: contas.a.tenantId,
+          gymUnitId: contas.a.unidadeId,
+          kind: 'FACIAL_READER',
+          model: 'AiFace',
+          serial: `SER-475-${sufixo}`,
+        },
+      });
+
+      const sugestaoAntes = await request(servidor())
+        .get('/api/v1/students/credentials/next-available')
+        .set('Cookie', contas.a.cookie);
+
+      const numeroSugerido = (sugestaoAntes.body as { externalId: string }).externalId;
+
+      // O leitor ja tem este numero -- cadastro de fabrica ou feito direto
+      // no equipamento, que a nuvem so passa a ver no proximo `legacy-links`.
+      await db.deviceReaderNumber.create({
+        data: {
+          tenantId: contas.a.tenantId,
+          deviceId: leitor.id,
+          externalUserId: numeroSugerido,
+          seenAt: new Date(),
+        },
+      });
+
+      const sugestaoDepois = await request(servidor())
+        .get('/api/v1/students/credentials/next-available')
+        .set('Cookie', contas.a.cookie);
+
+      expect((sugestaoDepois.body as { externalId: string }).externalId).not.toBe(numeroSugerido);
+    });
+
+    /*
+     * #475: ISOLAMENTO ENTRE TENANTS. O calculo e por tenant -- numero
+     * ocupado no B nao pode influenciar a sugestao do A, e vice-versa.
+     * `nao sugere numero ja vinculado por DeviceUser` mora em
+     * `legacy-device-link.int-spec.ts`, que ja tem a infra de Edge e
+     * consentimento prontas para produzir um DeviceUser de verdade.
+     */
+    it('a sugestao de um tenant nao depende do que o outro ocupou', async () => {
+      const alunoB = await criarAluno(contas.b);
+      const sugestaoB = await request(servidor())
+        .get('/api/v1/students/credentials/next-available')
+        .set('Cookie', contas.b.cookie);
+
+      await request(servidor())
+        .put(`/api/v1/students/${alunoB}/credentials`)
+        .set('Cookie', contas.b.cookie)
+        .send({
+          kind: 'TURNSTILE_CARD',
+          externalId: (sugestaoB.body as { externalId: string }).externalId,
+        })
+        .expect(200);
+
+      // O tenant A sugere um numero -- precisa estar livre LA, e
+      // independente do que aconteceu no B.
+      const sugestaoA = await request(servidor())
+        .get('/api/v1/students/credentials/next-available')
+        .set('Cookie', contas.a.cookie);
+
+      const alunoA = await criarAluno(contas.a);
+      const resposta = await request(servidor())
+        .put(`/api/v1/students/${alunoA}/credentials`)
+        .set('Cookie', contas.a.cookie)
+        .send({
+          kind: 'TURNSTILE_CARD',
+          externalId: (sugestaoA.body as { externalId: string }).externalId,
+        });
+
+      expect(resposta.status).toBe(200);
+    });
+  });
 });

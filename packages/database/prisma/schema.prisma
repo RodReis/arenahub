@@ -718,6 +718,7 @@ model Tenant {
   edgePairingCodes    EdgePairingCode[]
   devices             Device[]
   deviceUsers         DeviceUser[]
+  deviceReaderNumbers DeviceReaderNumber[]
   deviceSyncJobs      DeviceSyncJob[]
   deviceCommands      DeviceCommand[]
 
@@ -860,25 +861,25 @@ model Tenant {
 
 /// Unidade fisica. Onde a catraca mora.
 model GymUnit {
-  id           String        @id @default(uuid()) @db.Uuid
-  tenantId     String        @map("tenant_id") @db.Uuid
+  id               String        @id @default(uuid()) @db.Uuid
+  tenantId         String        @map("tenant_id") @db.Uuid
   /// Unico dentro do tenant, reutilizavel entre tenants: duas academias sem
   /// relacao podem ter uma unidade "CENTRO" cada.
-  code         String
-  name         String
+  code             String
+  name             String
   /// IANA (`America/Sao_Paulo`). O ADR-019 exige timezone da unidade, sem
   /// fallback -- horario de funcionamento e bloqueio dependem dele.
-  timezone     String
+  timezone         String
   /// Horario semanal de funcionamento. JSON porque a forma ainda varia por
   /// academia; vira tabela quando alguem precisar consultar por faixa.
-  openingHours Json          @map("opening_hours")
-  status       GymUnitStatus @default(ACTIVE)
+  openingHours     Json          @map("opening_hours")
+  status           GymUnitStatus @default(ACTIVE)
   /// Capacidade máxima de alunos simultaneamente matriculados. `null` = sem
   /// limite definido; o painel financeiro só mostra o widget de ocupação
   /// quando este campo está preenchido.
-  capacidadeMaxima Int?       @map("capacidade_maxima")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+  capacidadeMaxima Int?          @map("capacidade_maxima")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles UserRole[]
@@ -2618,10 +2619,11 @@ model Device {
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
-  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  edgeNode    EdgeNode?       @relation(fields: [edgeNodeId], references: [id], onDelete: SetNull)
-  deviceUsers DeviceUser[]
-  syncJobs    DeviceSyncJob[]
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  edgeNode      EdgeNode?            @relation(fields: [edgeNodeId], references: [id], onDelete: SetNull)
+  deviceUsers   DeviceUser[]
+  readerNumbers DeviceReaderNumber[]
+  syncJobs      DeviceSyncJob[]
 
   accessEvents          AccessEvent[]
   manualAccessOverrides ManualAccessOverride[]
@@ -2660,6 +2662,33 @@ model DeviceUser {
   @@index([tenantId, state])
   @@index([tenantId, studentId])
   @@map("device_users")
+}
+
+/// O que o leitor FISICAMENTE tem, vinculado a aluno ou nao -- #475.
+///
+/// `DeviceUser` so existe depois do vinculo (#468); antes disso um numero de
+/// fabrica ou um cadastro feito direto no equipamento e invisivel para a
+/// nuvem. Sem este registro, sugerir "proximo numero livre" colidiria com
+/// cadastro que o leitor ja tem mas que a nuvem nunca viu.
+///
+/// Escrito pelo mesmo caminho que ja recebe a base do leitor
+/// (`VincularCadastroLegadoUseCase`, rota `legacy-links` do #468) -- o
+/// `senduser`/`getuserlist` que o Edge ja manda a cada conexao.
+model DeviceReaderNumber {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  deviceId       String   @map("device_id") @db.Uuid
+  /// O `enrollid` dentro do leitor -- mesmo espaco de `DeviceUser.externalUserId`.
+  externalUserId String   @map("external_user_id")
+  seenAt         DateTime @map("seen_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, externalUserId])
+  @@index([tenantId, deviceId])
+  @@map("device_reader_numbers")
 }
 
 /// Uma operacao de sync por identidade E por dispositivo (INV-024).
@@ -3601,7 +3630,7 @@ model Payment {
 
   /// Canal da maquininha fisica quando `method = MANUAL`. Nulo em pagamento
   /// anterior a esta fatia -- dado novo, nao ha de onde inferir o historico.
-  receivedVia PaymentChannel?   @map("received_via")
+  receivedVia PaymentChannel? @map("received_via")
 
   /// Quem reconheceu, preenchido SO quando `method = MANUAL`.
   ///
@@ -3618,7 +3647,7 @@ model Payment {
 
   /// Agrupa N Payments de um pagamento em lote (F83). Null para pagamento
   /// avulso -- nao existe lote de 1.
-  batchId         String? @map("batch_id")
+  batchId          String? @map("batch_id")
   /// Hash do corpo do primeiro pedido deste batchId (ateCompetencia +
   /// channel + expectedTotalMinor). So preenchido no primeiro Payment do
   /// lote; usado para recusar reenvio da mesma Idempotency-Key com corpo

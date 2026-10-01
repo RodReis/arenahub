@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import { DevicesModule } from '../devices/devices.module.js';
 import { IamModule } from '../iam/iam.module.js';
 import { TeamModule } from '../team/team.module.js';
 import { TenancyModule } from '../tenancy/tenancy.module.js';
@@ -18,7 +19,11 @@ import { StudentsController } from './students.controller.js';
   // `TenantMembership`.
   // `TeamModule` -- F82: troca de profile e a mesma escrita de
   // `/team/:id/profile`, exportada de la para nao duplicar transacao.
-  imports: [TenancyModule, IamModule, TeamModule],
+  // `DevicesModule` -- #475: sugestao de proximo numero de catraca livre
+  // precisa do que o leitor tem (`DeviceReaderNumber`) e do que ja esta
+  // vinculado (`DeviceUser`), e quem sabe responder isso e o dono das duas
+  // tabelas, nao `students` lendo por conta propria.
+  imports: [TenancyModule, IamModule, TeamModule, DevicesModule],
   controllers: [StudentsController],
   providers: [
     StudentRepository,
