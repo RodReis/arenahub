@@ -64,22 +64,26 @@ verdade.
 
 ## 3. Edge sem resposta (`EDGE_OFFLINE`)
 
-**O que isso significa:** a catraca desta unidade **não está liberando acesso**. Sem operação
-offline (ADR-012), Edge fora é catraca parada — não é modo degradado.
+**O que isso significa:** o ArenaHub **não está verificando o plano** nesta unidade. Em ~10 s a
+catraca volta ao modo offline e passa a decidir **sozinha, pela lista dela** (ADR-012): libera quem
+estiver nela, sem consultar plano, e o que guardar entra como frequência quando o agente voltar.
 
 **Na academia, nesta ordem:**
 
 1. O PC da recepção está ligado?
 2. Ele está na rede? (o cabo pode ter sido esbarrado)
-3. O serviço `ArenaHub Edge` está rodando?
-   - `services.msc` → procure `ArenaHub Edge` → deve estar **Em execução**
-   - Se estiver parado: clique com o botão direito → **Iniciar**
+3. O agente está rodando? **Não é um serviço do Windows** — é a tarefa agendada `ArenaHub Edge`
+   (`pnpm service:install` não funciona, #499).
+   - Clique duas vezes em `apps\edge-agent\scripts\windows\ver-log-edge.cmd`: o log deve andar.
+   - Se não anda: `schtasks /Run /TN "ArenaHub Edge"` (sozinho, uma linha por vez).
 4. Depois de iniciar, volte ao painel. O Edge reaparece como *Respondendo* em até 30 s.
+
+Operação e causas comuns: [`docs/runbooks/operacao-edge-arena-positiva.md`](../../runbooks/operacao-edge-arena-positiva.md).
 
 > ⚠️ **Este PC não se desliga.** É regra de implantação, não sugestão (ADR-011). Enquanto ele
 > estiver fora, a recepção libera manualmente.
 
-**Se o serviço não iniciar**, colete a versão e a última mensagem:
+**Se o agente não iniciar**, colete a versão e a última mensagem:
 
 ```bash
 pnpm --filter @arenahub/edge-agent diagnostico
