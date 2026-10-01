@@ -19,12 +19,13 @@ export interface DepsLacoDeHeartbeat {
  * rede volta).
  *
  * SEM `unref`, ao contrario do `command-poller` de onde este laco foi
- * copiado. La existe outro handle segurando o processo; aqui o heartbeat e
- * o UNICO timer ativo depois do arranque, e timer `unref`ado nao segura o
- * event loop -- o Node dava o processo por terminado logo apos
- * "edge-agent pronto", com codigo 0, sem erro e sem nunca mandar um
- * heartbeat (#406, Arena Positiva). O painel mostrava "Sem resposta /
- * nunca" para um agente que tinha "subido com sucesso".
+ * copiado. Timer `unref`ado nao segura o event loop sozinho -- o Node dava
+ * o processo por terminado logo apos "edge-agent pronto", com codigo 0, sem
+ * erro e sem nunca mandar um heartbeat (#406, Arena Positiva). O painel
+ * mostrava "Sem resposta / nunca" para um agente que tinha "subido com
+ * sucesso". (O `command-poller` passou a rodar em producao desde #469 --
+ * ele e `unref`ado porque, com o heartbeat ativo, ja existe outro timer
+ * segurando o processo; antes disso o unico handle era este.)
  *
  * Quem para o laco e o `parar()` devolvido daqui, chamado no SIGINT/SIGTERM
  * do `main.ts` -- nao o coletor de handles do Node.

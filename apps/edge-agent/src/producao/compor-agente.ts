@@ -6,7 +6,10 @@ import type { Config } from '../config/env.js';
 import { montarDispositivos, type DispositivosMontados } from './montar-dispositivos.js';
 import { SignedCloudClient } from '../cloud/signed-client.js';
 import { criarPedirDecisao, criarReportarPassagem } from '../cloud/access-decision-client.js';
+import { iniciarPoller } from '../cloud/command-poller.js';
 import { MaquinaDeAcesso } from '../persistence/maquina-de-acesso.js';
+import { CommandInbox } from '../persistence/command-inbox.js';
+import { DeviceUserRepository } from '../persistence/device-user-repository.js';
 import {
   criarProcessadorDeAcessoOnline,
   retomarPendentes,
@@ -52,6 +55,8 @@ export async function compor(
     });
 
   const maquina = new MaquinaDeAcesso(config.SQLITE_PATH);
+  const inbox = new CommandInbox(config.SQLITE_PATH);
+  const deviceUsers = new DeviceUserRepository(config.SQLITE_PATH);
 
   const pedirDecisao = criarPedirDecisao(cliente);
   const reportarPassagem = criarReportarPassagem(cliente);
@@ -80,6 +85,36 @@ export async function compor(
   // cadastros feitos direto no equipamento (#468). Antes do `aoReconhecer`:
   // o registro do leitor pode chegar a qualquer momento depois daqui.
   const vinculoLegado = ligarVinculoLegado({ facial: dispositivos.facial, cliente, logger });
+
+  // Sincronismo ArenaHub -> leitor (F8, #469): o worker ja existia e tinha
+  // teste, mas nada o chamava no agente de producao -- cadastro feito no
+  // painel nunca chegava ao equipamento. So liga com CLOUD_API_URL presente:
+  // ausente e modo bancada, sem fila de comando (mesma condicao do cliente
+  // de nuvem acima).
+  const pararPoller =
+    config.CLOUD_API_URL === undefined
+      ? undefined
+      : iniciarPoller({
+          cliente,
+          worker: {
+            repo: deviceUsers,
+            dispositivo: dispositivos.facial,
+            registrarExecucao: (commandId, sucesso) =>
+              inbox.registrarExecucao(commandId, sucesso),
+            jaExecutado: (commandId) => inbox.jaExecutado(commandId),
+          },
+          estado: { ultimaSequencia: 0n },
+          intervaloMs: config.SYNC_POLL_INTERVAL_MS,
+          aoCiclo: (resultado) => {
+            if (resultado.erro) {
+              logger.warn({ erro: resultado.erro }, 'ciclo de sincronismo com erro');
+              return;
+            }
+            if (resultado.executados > 0) {
+              logger.info(resultado, 'comandos de sincronismo executados');
+            }
+          },
+        });
 
   // AO RECONHECER POR ULTIMO: registrar o ouvinte "liga a chave" -- tudo a
   // jusante (maquina, processador, catraca) ja esta pronto acima.
@@ -164,9 +199,12 @@ export async function compor(
 
   return {
     encerrar: async () => {
+      pararPoller?.();
       vinculoLegado.encerrar();
       await dispositivos.encerrar();
       maquina.fechar();
+      inbox.fechar();
+      deviceUsers.fechar();
     },
   };
 }
