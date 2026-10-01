@@ -12,14 +12,9 @@ interface Props {
   /**
    * Foto, quando houver.
    *
-   * NÃO EXISTE FONTE PARA ELA HOJE, e a ausência é deliberada: o único retrato
-   * que o ArenaHub guarda é a imagem BIOMÉTRICA facial, cujo consentimento
-   * versionado declara finalidade de identificação na catraca — não exibição em
-   * lista administrativa. Reusá-la aqui mudaria a finalidade do dado sem base
-   * legal nova (LGPD art. 11), e é decisão do PI, não de componente.
-   *
-   * O parâmetro existe para que ligar a foto, quando a fonte for decidida, seja
-   * uma linha — e não uma refatoração de treze telas.
+   * A lista de alunos liga a foto da ficha -- enviada pela recepção ou vinda do
+   * leitor facial (#503, decisão do PI de 01/10/2026, com base no ADR-064).
+   * Sem foto, o avatar mostra as iniciais.
    */
   readonly fotoUrl?: string;
   /** Esconde o avatar. Use quando a linha não é uma pessoa nem um equipamento. */

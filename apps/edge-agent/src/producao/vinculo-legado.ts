@@ -16,7 +16,8 @@ import type { SignedCloudClient } from '../cloud/signed-client.js';
  *     por uma janela curta: a rajada da primeira conexao vira uma chamada.
  *
  * Quem decide o vinculo e a nuvem (regra de arquitetura no 3). Daqui so sai
- * o NUMERO -- nunca nome nem foto.
+ * o NUMERO -- nunca nome nem foto. A foto sobe depois, por outro caminho e so
+ * para numero ja vinculado (`fotos-do-leitor.ts`, #503).
  */
 
 /** Espera sem `senduser` novo antes de mandar o lote. */
@@ -59,6 +60,11 @@ export function ligarVinculoLegado(deps: {
   intervaloEntreTentativasMs?: number;
   /** Relogio injetavel: o 'agora' entra por parametro (CLAUDE.md). */
   agoraMs?: () => number;
+  /**
+   * Chamado quando a base do leitor CHEGOU na nuvem -- #503: e a deixa para
+   * importar as fotos, que so existem para numero ja vinculado.
+   */
+  aposVincular?: (serial: string) => void;
 }): { encerrar: () => void } {
   const { facial, cliente, logger } = deps;
   const janelaMs = deps.janelaMs ?? JANELA_DE_CADASTROS_MS;
@@ -179,6 +185,7 @@ export function ligarVinculoLegado(deps: {
             base.map((i) => i.externalEnrollId),
           );
           if (!chegou) listados.delete(serial);
+          else deps.aposVincular?.(serial);
         } catch (erro: unknown) {
           listados.delete(serial);
           throw erro;

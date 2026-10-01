@@ -9,6 +9,7 @@ import {
   type ResultadoOperacao,
 } from '../../domain/facial-device.js';
 import {
+  BACKUPNUM,
   ENROLL_ID_DESCONHECIDO,
   comandos,
   esquemaMensagemDoEquipamento,
@@ -98,6 +99,25 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
   /** Aviso de leitor ausente agendado -- #504. `null` com o leitor registrado. */
   private vigia: NodeJS.Timeout | null = null;
   private ausenteDesde = Date.now();
+
+  /**
+   * Fila das OPERACOES no leitor (cadastrar, remover, listar, ler foto) --
+   * #503. Cada uma abre com `disabledevice` e fecha com `enabledevice`, e o
+   * protocolo so aceita um comando de cada tipo aguardando: duas operacoes
+   * ao mesmo tempo (a importacao de fotos rodando enquanto o sincronismo
+   * cadastra alguem) colidiriam no `disabledevice`. Em fila, nunca colidem.
+   */
+  private filaDeOperacoes: Promise<unknown> = Promise.resolve();
+
+  /** `getuserinfo` respondeu sucesso sem foto no `record` -- avisado (#503). */
+  private avisouFotoForaDoRecord = false;
+
+  private exclusivo<T>(operacao: () => Promise<T>): Promise<T> {
+    const vez = this.filaDeOperacoes.then(operacao, operacao);
+    this.filaDeOperacoes = vez.catch(() => undefined);
+
+    return vez;
+  }
 
   constructor(
     private readonly logger: Logger,
@@ -389,16 +409,22 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     pendente.resolver(retorno);
   }
 
-  async cadastrar(identidade: IdentidadeNoDispositivo): Promise<ResultadoOperacao> {
-    const enrollid = paraEnrollId(identidade.externalEnrollId);
+  cadastrar(identidade: IdentidadeNoDispositivo): Promise<ResultadoOperacao> {
+    // `paraEnrollId` DENTRO da fila: id invalido vira promessa rejeitada,
+    // como sempre foi, e nao excecao sincrona para quem chama.
+    return this.exclusivo(() =>
+      this.cadastrarAgora(paraEnrollId(identidade.externalEnrollId), identidade.rotulo),
+    );
+  }
 
+  private async cadastrarAgora(enrollid: number, rotulo: string): Promise<ResultadoOperacao> {
     // O manual manda desabilitar antes de outros comandos: enquanto o leitor
     // trata acesso, ele nao processa cadastro.
     await this.comandar(comandos.disableDevice(), 'disabledevice');
 
     try {
       const retorno = await this.comandar(
-        comandos.setUserInfoSemFoto({ enrollid, name: identidade.rotulo }),
+        comandos.setUserInfoSemFoto({ enrollid, name: rotulo }),
         'setuserinfo',
       );
 
@@ -412,9 +438,11 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     }
   }
 
-  async remover(externalEnrollId: ExternalEnrollId): Promise<ResultadoOperacao> {
-    const enrollid = paraEnrollId(externalEnrollId);
+  remover(externalEnrollId: ExternalEnrollId): Promise<ResultadoOperacao> {
+    return this.exclusivo(() => this.removerAgora(paraEnrollId(externalEnrollId)));
+  }
 
+  private async removerAgora(enrollid: number): Promise<ResultadoOperacao> {
     await this.comandar(comandos.disableDevice(), 'disabledevice');
 
     try {
@@ -442,7 +470,55 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
    * fim como lista VAZIA -- ver PROTOCOLO-FACIAL.md. Trata os dois, e o que
    * vier primeiro encerra.
    */
-  async listar(): Promise<readonly IdentidadeNoDispositivo[]> {
+  listar(): Promise<readonly IdentidadeNoDispositivo[]> {
+    return this.exclusivo(() => this.listarAgora());
+  }
+
+  /**
+   * A foto de cadastro de uma pessoa, em Base64 -- #503. `getuserinfo` com
+   * `backupnum: 50` (PROTOCOLO-FACIAL.md, tabela do `backupnum`).
+   *
+   * Uma pessoa por chamada, com o leitor pausado so durante ela: a
+   * importacao de centenas de fotos nao pode deixar o leitor parado minutos
+   * seguidos. O conteudo NUNCA vai para o log -- e foto de pessoa.
+   */
+  lerFoto(externalEnrollId: ExternalEnrollId): Promise<string | null> {
+    return this.exclusivo(async () => {
+      const enrollid = paraEnrollId(externalEnrollId);
+
+      await this.comandar(comandos.disableDevice(), 'disabledevice');
+
+      try {
+        const retorno = await this.comandar(
+          comandos.getUserInfo(enrollid, BACKUPNUM.FOTO),
+          'getuserinfo',
+        );
+        const record = retorno['record'];
+
+        // Sem foto o leitor responde `result: false` ("have no data") ou um
+        // `record` vazio/"0" -- nos dois casos nao ha o que importar.
+        if (retorno['result'] !== true || typeof record !== 'string' || record.length < 16) {
+          // Sucesso SEM foto no `record`: firmware que manda a imagem em outro
+          // campo. So os NOMES dos campos vao ao log -- o suficiente para
+          // ajustar o adapter, sem nenhum dado da pessoa.
+          // UMA vez por execucao: com o firmware assim, seriam centenas de
+          // linhas iguais.
+          if (retorno['result'] === true && !this.avisouFotoForaDoRecord) {
+            this.avisouFotoForaDoRecord = true;
+            this.logger.warn({ campos: Object.keys(retorno) }, 'getuserinfo sem foto no record');
+          }
+
+          return null;
+        }
+
+        return record;
+      } finally {
+        await this.comandar(comandos.enableDevice(), 'enabledevice').catch(() => undefined);
+      }
+    });
+  }
+
+  private async listarAgora(): Promise<readonly IdentidadeNoDispositivo[]> {
     await this.comandar(comandos.disableDevice(), 'disabledevice');
 
     try {

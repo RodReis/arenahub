@@ -619,6 +619,63 @@ describe('TopdataFacialAdapter -- leitor que nao chega ao agente (#504)', () => 
   });
 });
 
+/**
+ * #503 -- foto de cadastro do leitor (`getuserinfo`, `backupnum: 50`).
+ */
+describe('TopdataFacialAdapter -- foto do leitor (#503)', () => {
+  let adapter: TopdataFacialAdapter;
+  let leitor: LeitorFalso;
+
+  beforeEach(async () => {
+    const porta = (proximaPorta += 1);
+    adapter = new TopdataFacialAdapter(logger, porta);
+    await adapter.iniciar();
+    leitor = new LeitorFalso();
+    await leitor.conectar(porta);
+  });
+
+  afterEach(async () => {
+    leitor.fechar();
+    await adapter.encerrar();
+  });
+
+  it('pede a foto com backupnum 50 entre disable e enable e devolve o Base64', async () => {
+    leitor.responderCom('getuserinfo', {
+      result: true,
+      enrollid: 1491,
+      backupnum: 50,
+      record: '/9j/4AAQSkZJRgABAQAAAQABAAD',
+    });
+
+    const foto = await adapter.lerFoto('1491');
+
+    expect(foto).toBe('/9j/4AAQSkZJRgABAQAAAQABAAD');
+    expect(leitor.recebidos.map((m) => m['cmd'])).toEqual([
+      'disabledevice',
+      'getuserinfo',
+      'enabledevice',
+    ]);
+    const pedido = leitor.recebidos.find((m) => m['cmd'] === 'getuserinfo');
+    expect(pedido).toMatchObject({ enrollid: 1491, backupnum: 50 });
+  });
+
+  it('devolve null quando o cadastro nao tem foto', async () => {
+    leitor.responderCom('getuserinfo', { result: false, msg: 'have no data' });
+
+    expect(await adapter.lerFoto('1491')).toBeNull();
+  });
+
+  it('serializa os comandos: foto e listagem juntas nao colidem no disabledevice', async () => {
+    leitor.responderCom('getuserinfo', { result: true, record: '/9j/4AAQSkZJRgABAQAAAQABAAD' });
+    leitor.responderCom('getuserlist', { result: true, count: 0, from: 0, to: 0, record: [] });
+
+    const [foto, base] = await Promise.all([adapter.lerFoto('1491'), adapter.listar()]);
+
+    expect(foto).not.toBeNull();
+    expect(base).toEqual([]);
+  });
+});
+
 describe('interpretarDataHora', () => {
   it('interpreta como hora local, nao UTC', () => {
     // O equipamento manda hora local sem fuso. Ler como UTC deslocaria todo

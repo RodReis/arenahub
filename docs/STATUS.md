@@ -35,7 +35,13 @@ Depois do boot o rosto era reconhecido, mas a catraca não abria e nada chegava 
 subindo antes do login, ficava com o leitor. **Desativado no PC pelo PI**; a reversão está no
 [runbook de operação](runbooks/operacao-edge-arena-positiva.md) §7. O agente agora avisa no log
 quando o leitor não chega e para de informá-lo no heartbeat, e o painel passa a alertar
-`DEVICE_OFFLINE`. **Pausada:** importação das fotos dos alunos a partir do leitor (#503).
+`DEVICE_OFFLINE`.
+
+📷 **01/10/2026 — fotos dos alunos, professores e funcionários vêm do leitor facial (#503, pedido do
+PI).** Depois de vincular a base do leitor, o agente pergunta à nuvem quem está vinculado e ainda
+não tem foto, lê a foto de cadastro de cada um no leitor (`getuserinfo`, `backupnum: 50`) e envia
+uma por vez. A foto entra pela mesma porta do upload da ficha (formato, antivírus, storage privado),
+**nunca sobrescreve** foto existente, e aparece no avatar da lista de alunos.
 
 🚀 **02/09/2026 — todas as issues de `admin-web` e `kiosk` fechadas; nasce a implantação.** O PI
 pediu a spec de implantação e, na mesma conversa, tomou seis decisões que viraram o **ADR-051**:

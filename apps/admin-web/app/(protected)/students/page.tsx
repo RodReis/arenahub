@@ -39,6 +39,8 @@ interface Aluno {
   deviceIds: string[];
   fullName: string;
   birthDate: string;
+  /** Há foto na ficha -- enviada pela recepção ou vinda do leitor facial (#503). */
+  temFoto?: boolean;
   planName: string | null;
   /** Origem do direito vigente quando o acesso nao vem de assinatura. */
   accessSource: string | null;
@@ -371,7 +373,18 @@ export default async function PaginaDeAlunos({
              * alguém vai procurá-lo.
              */
             role: 'identity',
-            render: (aluno) => <Identidade nome={aluno.fullName} href={`/students/${aluno.id}`} />,
+            /*
+              A FOTO NO AVATAR -- #503. Vem do leitor facial (ou da ficha) e é
+              servida pela rota do painel, que repassa a sessão. Sem foto, as
+              iniciais de sempre.
+            */
+            render: (aluno) => (
+              <Identidade
+                nome={aluno.fullName}
+                href={`/students/${aluno.id}`}
+                {...(aluno.temFoto ? { fotoUrl: `/fotos-de-aluno/${aluno.id}` } : {})}
+              />
+            ),
           },
           {
             key: 'catraca',

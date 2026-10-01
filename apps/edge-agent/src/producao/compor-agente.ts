@@ -18,6 +18,7 @@ import {
 import type { EventoReconhecimento } from '../domain/facial-device.js';
 import { ehPassagemAoVivo } from '../domain/passagem-ao-vivo.js';
 import { registrarPassagemOffline } from './passagem-offline.js';
+import { ligarImportacaoDeFotos } from './fotos-do-leitor.js';
 import { ligarVinculoLegado } from './vinculo-legado.js';
 import { motivoLegivel } from './motivo-legivel.js';
 
@@ -93,7 +94,15 @@ export async function compor(
   // A base do leitor vai para a nuvem vincular os alunos legados e os
   // cadastros feitos direto no equipamento (#468). Antes do `aoReconhecer`:
   // o registro do leitor pode chegar a qualquer momento depois daqui.
-  const vinculoLegado = ligarVinculoLegado({ facial: dispositivos.facial, cliente, logger });
+  // Depois do vinculo, as fotos de cadastro do leitor viram a foto do aluno
+  // no ArenaHub (#503) -- so de quem ainda nao tem foto.
+  const fotosDoLeitor = ligarImportacaoDeFotos({ facial: dispositivos.facial, cliente, logger });
+  const vinculoLegado = ligarVinculoLegado({
+    facial: dispositivos.facial,
+    cliente,
+    logger,
+    aposVincular: fotosDoLeitor.importar,
+  });
 
   // Sincronismo ArenaHub -> leitor (F8, #469): o worker ja existia e tinha
   // teste, mas nada o chamava no agente de producao -- cadastro feito no
@@ -212,6 +221,7 @@ export async function compor(
     encerrar: async () => {
       pararPoller?.();
       vinculoLegado.encerrar();
+      fotosDoLeitor.encerrar();
       await dispositivos.encerrar();
       maquina.fechar();
       inbox.fechar();

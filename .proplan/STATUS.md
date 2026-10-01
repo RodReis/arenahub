@@ -37,7 +37,9 @@ _(vazio)_
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][FIX] Leitor facial que não reconecta ao agente fica invisível: log mudo e heartbeat informa o leitor como ativo (#504)
 
 ## Finalizado
 
