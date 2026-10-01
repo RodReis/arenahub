@@ -745,20 +745,21 @@ legado `192.168.2.106`. O bloqueio de F3 deixou de ser técnico e virou **operac
 | Feito | `proplan:done` | PR mergeado com CI verde | **1** — [F44](https://github.com/RodReis/arenahub/issues/83) |
 | Finalizado | `proplan:finalizado` | **PI aceitou e fechou a issue** | **81** |
 
-> 💳 **30/09/2026 — F83 (pagamento em lote no balcão) implementada, branch `sdd/pagamento-em-lote`,
-> ainda não mergeada.** Quita atrasados e adianta até corrente+6 numa operação só, um `Payment` por
-> mês agrupado por `batchId` (ADR-063, INV-162). **De quebra, corrigido um defeito real de
+> 💳 **30/09/2026 — F83 (pagamento em lote no balcão) mergeada** ([PR #472](https://github.com/RodReis/arenahub/pull/472),
+> CI verde nos dois jobs). Quita atrasados e adianta até corrente+6 numa operação só, um `Payment`
+> por mês agrupado por `batchId` (ADR-063, INV-162). **De quebra, corrigido um defeito real de
 > concorrência em código pré-existente** (`registrarPagamentoManual`): `update` incondicional virou
 > `updateMany` condicionado, fechando uma corrida que podia cobrar o aluno em dobro. **Três
 > pendências de produto acharam na revisão e ficaram parked, não corrigidas** — aluno `REVOKED`/
 > `EXPIRED` sem caminho de pagamento nesta tela, aluno arquivado reativando entitlement ao pagar
 > (arquivamento usa o mesmo `SUSPENDED` da inadimplência), e desvio assumido da spec §5 (botão
 > "Receber" sem total embutido, sem campo de valor recebido para troco em dinheiro no lote) — as
-> três detalhadas no ADR-063. **E2E não confirmado ao vivo** (portas 3000/3344 ocupadas pelo dev
-> server do operador durante a sessão inteira) — unitário/integração verdes, E2E revisado
-> estaticamente por dois revisores, falta rodar antes do merge. **F83/SPEC-083 (issue #458) ainda
-> não consta no Índice Fatia ↔ SPEC da §5** — tabela escrita só pelo Cowork; sinalizado aqui em vez
-> de editado.
+> três detalhadas no ADR-063. **E2E confirmado no CI do PR** (job `integração e E2E`, verde) — a
+> pendência de confirmação viva local (portas 3000/3344 ocupadas pelo dev server do operador)
+> ficou resolvida pela run do próprio PR. **Issue #458 ainda `OPEN`/`proplan:backlog`** — PR
+> mergeado sem o comentário de encerramento nem a label `proplan:done`; aguardando esse passo e o
+> aceite do PI. **F83/SPEC-083 (issue #458) ainda não consta no Índice Fatia ↔ SPEC da §5** —
+> tabela escrita só pelo Cowork; sinalizado aqui em vez de editado.
 >
 > 🧾 **25/08/2026 — o quadro foi reconciliado contra o board, não estimado.** A tabela acima
 > estava defasada: listava F2, F10 e F53 em *Em Andamento* e quatro cards em *Feito*, mas F2 e
