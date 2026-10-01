@@ -120,6 +120,11 @@ Espera-se `[OK]` em todas as linhas. Depois, no painel → **Operação**:
 > `sn` que o leitor informa (`sn` na linha `leitor registrado` do log do agente) — serial diferente
 > dá 404 no vínculo dos alunos e todo reconhecimento é negado (#488).
 
+> **Publique o termo biométrico antes de subir o agente.** Painel → Administração → **Termo
+> biométrico**. Sem termo vigente, os alunos que já estão no leitor facial não são vinculados
+> (`semTermoBiometrico` na linha `base do leitor vinculada` do log) e todo reconhecimento é
+> negado (#491). Publicou depois? Reinicie o agente para refazer o vínculo.
+
 ---
 
 ## 5. Teste de passagem assistido

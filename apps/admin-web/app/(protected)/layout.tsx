@@ -140,6 +140,17 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
   */
   { href: '/units', label: 'Unidades' },
   /*
+    TERMO BIOMÉTRICO -- issue #491. Configuração de uso raro (publica-se uma
+    vez, revisa-se de ano em ano), mesmo grupo de Dispositivos. Sem ele
+    nenhuma biometria nasce. `consent.manage` é o que a rota de publicação
+    exige.
+  */
+  {
+    href: '/operations/biometric-term',
+    label: 'Termo biométrico',
+    exigePermissao: 'consent.manage',
+  },
+  /*
     USUÁRIOS -- issue #274. Mesmo grupo de Dispositivos e Unidades, mesmo
     motivo: dar acesso a alguém do time é configuração de uso raro, não a
     ferramenta do atendimento diário.
