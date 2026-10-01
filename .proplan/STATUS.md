@@ -9,13 +9,6 @@ updated: 2026-10-01
 
 ### Sem épico
 
-- [MVP1.5] Registrar como frequência as passagens que o leitor guardou offline (#477)
-- [MVP1][FIX] sendlog com vários registros: só o primeiro é decidido, e passagem antiga é tratada como ao vivo (#476)
-- [MVP1][FIX] Cadastro de aluno fornece o ID da catraca livre, sem colidir com o leitor (#475)
-- [MVP1][FIX] Sincronismo ArenaHub → leitor: command-poller não está ligado no agente de produção (#469)
-- [MVP1][FIX] Sem keep-alive em produção a catraca cai para offline e decide sozinha (#470)
-- [MVP1][FIX] Sincronismo leitor → ArenaHub: vincular os IDs do leitor aos alunos pela credencial do cadastro (#468)
-- [MVP1][FIX] Edge manda EDGE_AGENT_ID como deviceId — a decisão de acesso nunca chega na nuvem (#467)
 - [MVP1][SPEC-059][FIX] Alerta DEVICE_OFFLINE crítico permanente com catraca e facial conectados — heartbeat manda devices vazio (#461)
 - [SPEC-083][F83] Pagamento em lote no balcão — atrasados, mês corrente e adiantados (#458)
 - [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
@@ -42,13 +35,21 @@ _(vazio)_
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [MVP1.5] Registrar como frequência as passagens que o leitor guardou offline (#477)
+- [MVP1][FIX] sendlog com vários registros: só o primeiro é decidido, e passagem antiga é tratada como ao vivo (#476)
+- [MVP1][FIX] Sem keep-alive em produção a catraca cai para offline e decide sozinha (#470)
+- [MVP1][FIX] Sincronismo leitor → ArenaHub: vincular os IDs do leitor aos alunos pela credencial do cadastro (#468)
+- [MVP1][FIX] Edge manda EDGE_AGENT_ID como deviceId — a decisão de acesso nunca chega na nuvem (#467)
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] Sincronismo ArenaHub → leitor: command-poller não está ligado no agente de produção (#469, finalizado em: 2026-10-01)
+- [MVP1][FIX] Cadastro de aluno fornece o ID da catraca livre, sem colidir com o leitor (#475, finalizado em: 2026-10-01)
 - [MVP1][SPEC-082][F82] Trocar plano de assinatura ativa preservando histórico (#420, finalizado em: 2026-10-01)
 - [INFRA][FIX] invoice_sequences sem linha para tenant com faturas de seed (#462, finalizado em: 2026-09-30)
 - [INFRA] test:guardas varre worktree filha em .claude/worktrees (#454, finalizado em: 2026-09-30)
