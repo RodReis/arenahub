@@ -154,6 +154,45 @@ describe('ligarVinculoLegado', () => {
     ligado.encerrar();
   });
 
+  /*
+   * #488 -- Arena Positiva, 01/10/2026. A nuvem respondeu 404 (leitor sem
+   * Edge) e a base ficou marcada como feita: o vinculo so seria tentado de
+   * novo no proximo reinicio do agente. Falha nao pode contar como feito.
+   */
+  it('se a nuvem recusar o vinculo, tenta de novo no proximo registro do leitor (#488)', async () => {
+    const { listar, post, registrar, ligado } = montar(['1491']);
+    // O mock nasce tipado pela resposta de sucesso; a falha tem corpo nulo.
+    (post as jest.Mock).mockImplementationOnce(() =>
+      Promise.resolve({ ok: false, status: 404, body: null, errorCode: 'DEVICE_NOT_IN_SCOPE' }),
+    );
+
+    registrar('AYTI11108174');
+    await ate(() => post.mock.calls.length >= 1);
+    // Deixa a falha ser processada antes do leitor se registrar de novo.
+    await esperar(30);
+    registrar('AYTI11108174');
+    await ate(() => post.mock.calls.length >= 2);
+
+    expect(listar).toHaveBeenCalledTimes(2);
+
+    ligado.encerrar();
+  });
+
+  it('se listar a base falhar, tenta de novo no proximo registro do leitor (#488)', async () => {
+    const { listar, post, registrar, ligado } = montar(['1491']);
+    listar.mockImplementationOnce(() => Promise.reject(new Error('sem resposta')));
+
+    registrar('AYTI11108174');
+    await ate(() => listar.mock.calls.length >= 1);
+    await esperar(30);
+    registrar('AYTI11108174');
+    await ate(() => post.mock.calls.length >= 1);
+
+    expect(listar).toHaveBeenCalledTimes(2);
+
+    ligado.encerrar();
+  });
+
   it('manda um lote por vez -- chamadas simultaneas disputariam o mesmo vinculo', async () => {
     const { post, registrar, informar, ligado } = montar(['1491']);
     let emVoo = 0;

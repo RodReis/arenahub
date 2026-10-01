@@ -46,7 +46,10 @@ export function ligarVinculoLegado(deps: {
   const { facial, cliente, logger } = deps;
   const janelaMs = deps.janelaMs ?? JANELA_DE_CADASTROS_MS;
 
-  const informar = async (serial: string, numeros: readonly string[]): Promise<void> => {
+  /** `true` quando TODOS os lotes chegaram na nuvem. */
+  const informar = async (serial: string, numeros: readonly string[]): Promise<boolean> => {
+    let todosChegaram = true;
+
     for (let i = 0; i < numeros.length; i += TAMANHO_DO_LOTE) {
       const lote = numeros.slice(i, i + TAMANHO_DO_LOTE);
       const resposta = await cliente.post<RespostaDoVinculo>(CAMINHO, {
@@ -59,6 +62,7 @@ export function ligarVinculoLegado(deps: {
           { leitor: serial, numeros: lote.length, status: resposta.status },
           'vinculo da base do leitor nao chegou na nuvem',
         );
+        todosChegaram = false;
         continue;
       }
 
@@ -80,6 +84,8 @@ export function ligarVinculoLegado(deps: {
         'base do leitor vinculada',
       );
     }
+
+    return todosChegaram;
   };
 
   /*
@@ -94,9 +100,14 @@ export function ligarVinculoLegado(deps: {
     });
   };
 
-  // Uma listagem por leitor por execucao: `listar` pausa o leitor
-  // (`disabledevice`), e a base nao muda por reconectar. Cadastro novo
+  // Uma listagem BEM-SUCEDIDA por leitor por execucao: `listar` pausa o
+  // leitor (`disabledevice`), e a base nao muda por reconectar. Cadastro novo
   // chega pelo `senduser`.
+  //
+  // So conta como feita quando chegou na nuvem (#488): na Arena Positiva a
+  // nuvem respondeu 404 e a base ficou marcada como feita, sem nova tentativa
+  // ate o agente reiniciar. Falha libera a proxima tentativa -- no proximo
+  // registro do leitor.
   const listados = new Set<string>();
 
   facial.aoRegistrar?.((serial) => {
@@ -105,11 +116,17 @@ export function ligarVinculoLegado(deps: {
 
     enfileirar(
       async () => {
-        const base = await facial.listar();
-        await informar(
-          serial,
-          base.map((i) => i.externalEnrollId),
-        );
+        try {
+          const base = await facial.listar();
+          const chegou = await informar(
+            serial,
+            base.map((i) => i.externalEnrollId),
+          );
+          if (!chegou) listados.delete(serial);
+        } catch (erro: unknown) {
+          listados.delete(serial);
+          throw erro;
+        }
       },
       'nao foi possivel listar a base do leitor',
       serial,
@@ -124,7 +141,13 @@ export function ligarVinculoLegado(deps: {
     temporizador = null;
     for (const [serial, numeros] of pendentes) {
       pendentes.delete(serial);
-      enfileirar(() => informar(serial, [...numeros]), 'vinculo de cadastro novo do leitor falhou', serial);
+      enfileirar(
+        async () => {
+          await informar(serial, [...numeros]);
+        },
+        'vinculo de cadastro novo do leitor falhou',
+        serial,
+      );
     }
   };
 

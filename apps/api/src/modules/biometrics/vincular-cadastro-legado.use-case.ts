@@ -62,7 +62,7 @@ export class VincularCadastroLegadoUseCase {
     correlationId: string,
     agora: Date,
   ): Promise<ResultadoDoVinculoLegado> {
-    const leitor = await this.dispositivos.encontrarDoEdgePorSerial(edge, entrada.deviceSerial);
+    const leitor = await this.dispositivos.resolverDoEdgePorSerial(edge, entrada.deviceSerial);
 
     if (!leitor) throw new NotFoundException({ code: 'DEVICE_NOT_IN_SCOPE' });
 

@@ -56,7 +56,7 @@ export class RecordOfflinePassageUseCase {
     edge: ContextoDoEdge,
     entrada: PassagemOffline,
   ): Promise<OfflinePassageRegistrada> {
-    const leitor = await this.dispositivos.encontrarDoEdgePorSerial(edge, entrada.deviceSerial);
+    const leitor = await this.dispositivos.resolverDoEdgePorSerial(edge, entrada.deviceSerial);
 
     if (!leitor) throw new NotFoundException({ code: 'DEVICE_NOT_IN_SCOPE' });
 

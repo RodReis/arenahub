@@ -3,6 +3,7 @@ import type { StudentStatus } from '@arenahub/access-policy';
 
 import type { ContextoDoEdge } from '../edge-auth/edge-auth.service.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { DeviceRepository } from '../devices/device.repository.js';
 
 /**
  * De um `externalUserId` de leitor ate o aluno -- `M1-FR-019`.
@@ -54,7 +55,10 @@ export type ReferenciaDeDispositivo = { readonly id: string } | { readonly seria
 
 @Injectable()
 export class IdentityResolver {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly dispositivos: DeviceRepository,
+  ) {}
 
   /**
    * @param edge contexto da assinatura HMAC -- e ELE quem define tenant e
@@ -69,15 +73,22 @@ export class IdentityResolver {
     // O dispositivo precisa pertencer AO MESMO tenant, A MESMA unidade e AO
     // MESMO Edge que assinou. Um Edge comprometido nao consegue decidir por
     // dispositivo de outra unidade nem que saiba o UUID -- ou o serial -- dele.
-    const dispositivo = await this.db.device.findFirst({
-      where: {
-        ...('id' in referencia ? { id: referencia.id } : { serial: referencia.serial }),
-        tenantId: edge.tenantId,
-        gymUnitId: edge.gymUnitId,
-        edgeNodeId: edge.edgeNodeId,
-      },
-      select: { id: true },
-    });
+    //
+    // Pelo SERIAL a busca tambem REIVINDICA o dispositivo sem dono da propria
+    // unidade (#488); pelo UUID continua estrita -- quem manda o UUID e um
+    // cliente que ja conhece o dispositivo, e nao ha o que reivindicar.
+    const dispositivo =
+      'id' in referencia
+        ? await this.db.device.findFirst({
+            where: {
+              id: referencia.id,
+              tenantId: edge.tenantId,
+              gymUnitId: edge.gymUnitId,
+              edgeNodeId: edge.edgeNodeId,
+            },
+            select: { id: true },
+          })
+        : await this.dispositivos.resolverDoEdgePorSerial(edge, referencia.serial);
 
     if (!dispositivo) return { resolvida: false, motivo: 'DEVICE_NOT_IN_SCOPE' };
 
