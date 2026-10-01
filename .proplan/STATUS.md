@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-09-30
+updated: 2026-10-01
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -21,7 +21,6 @@ updated: 2026-09-30
 - [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
 - [FIX] painel financeiro deve abrir no mes corrente por default (#435)
 - [FIX] Valdivino duplicado no arquivo (confirmado) e Daniel Flavio Cabriny — provável cadastro duplicado (#421)
-- [MVP1][SPEC-082][F82] Trocar plano de assinatura ativa preservando histórico (#420)
 - [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
@@ -50,6 +49,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][SPEC-082][F82] Trocar plano de assinatura ativa preservando histórico (#420, finalizado em: 2026-10-01)
 - [INFRA][FIX] invoice_sequences sem linha para tenant com faturas de seed (#462, finalizado em: 2026-09-30)
 - [INFRA] test:guardas varre worktree filha em .claude/worktrees (#454, finalizado em: 2026-09-30)
 - [MVP2][FIX] sem como pagar mês futuro adiantado na ficha do aluno (#464, finalizado em: 2026-09-30)
