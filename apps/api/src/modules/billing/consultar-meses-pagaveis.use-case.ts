@@ -4,7 +4,8 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 
 import { AssinaturaNaoEncontradaError, ConfiguracaoFinanceiraAusenteError } from './billing.repository.js';
-import { mesesPagaveis, type InvoiceParaFaixa, type MesPagavel } from './domain/meses-pagaveis.js';
+import { mesesPagaveis, type MesPagavel } from './domain/meses-pagaveis.js';
+import { invoicesDaFaixa } from './invoices-da-faixa.js';
 
 /**
  * Leitura pura da faixa de meses pagaveis (F83, issue #458). Nao grava
@@ -33,14 +34,10 @@ export class ConsultarMesesPagaveisUseCase {
       throw new ConfiguracaoFinanceiraAusenteError();
     }
 
-    // Todas as invoices da assinatura, em qualquer status: mes ja pago,
-    // cancelado ou estornado nao pode voltar a aparecer como pagavel.
-    const invoices = await this.db.invoice.findMany({
-      where: { subscriptionId, tenantId: contexto.tenantId },
-    });
+    const invoices = await invoicesDaFaixa(this.db, contexto.tenantId, assinatura);
 
     return mesesPagaveis({
-      invoices: invoices as InvoiceParaFaixa[],
+      invoices,
       agora,
       endsAt: assinatura.endsAt,
       prices: assinatura.plan.prices,

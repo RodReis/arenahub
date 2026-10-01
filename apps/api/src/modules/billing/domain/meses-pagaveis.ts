@@ -72,7 +72,7 @@ export function mesesPagaveis(entrada: {
 
     // Mes que ja tem invoice resolvida (PAID/CANCELLED/REFUNDED) nao e mais
     // pagavel: sem isto, mes pago continuava aparecendo como "Adiantado".
-    if (!existente && resolvidos.has(cursor.getTime())) {
+    if (resolvidos.has(cursor.getTime())) {
       cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
       continue;
     }

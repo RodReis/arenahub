@@ -15,9 +15,9 @@ import {
   resolverDispensa,
   resolverLote,
   vencimentoAposPagamento,
-  type InvoiceParaFaixa,
 } from './domain/meses-pagaveis.js';
 import { InvoiceInvalidaError } from './domain/invoice.js';
+import { invoicesDaFaixa } from './invoices-da-faixa.js';
 
 const MESES_A_FRENTE_PARA_ANCORAR = 7;
 
@@ -127,14 +127,10 @@ export class RegistrarPagamentoEmLoteUseCase {
       throw new ConfiguracaoFinanceiraAusenteError();
     }
 
-    // Todas as invoices, em qualquer status: mes ja pago/cancelado/estornado
-    // fica fora da faixa e, portanto, nao pode ser pago de novo.
-    const invoicesDaAssinatura = await this.db.invoice.findMany({
-      where: { subscriptionId: entrada.subscriptionId, tenantId: contexto.tenantId },
-    });
+    const invoicesDaAssinatura = await invoicesDaFaixa(this.db, contexto.tenantId, assinatura);
 
     const faixa = mesesPagaveis({
-      invoices: invoicesDaAssinatura as InvoiceParaFaixa[],
+      invoices: invoicesDaAssinatura,
       agora: entrada.agora,
       endsAt: assinatura.endsAt,
       prices: assinatura.plan.prices,
@@ -202,6 +198,14 @@ export class RegistrarPagamentoEmLoteUseCase {
           await tx.payment.update({ where: { id: pagamento.id }, data: { batchRequestHash: corpoHash } });
         }
       }
+
+      // A fatura paga pode ser de assinatura ANTIGA (cancelada), e o
+      // `registrarPagamentoManual` so reativa a assinatura da propria fatura:
+      // reativa explicitamente a assinatura ATIVA do aluno (idempotente).
+      await this.billing.ativarDireitoDeAcessoSePendente(tx, {
+        tenantId: contexto.tenantId,
+        subscriptionId: entrada.subscriptionId,
+      });
 
       for (const mes of dispensadas) {
         await this.dispensarInvoice(tx, contexto, mes.invoiceId!, correlationId);

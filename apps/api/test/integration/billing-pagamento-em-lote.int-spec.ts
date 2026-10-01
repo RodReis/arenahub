@@ -418,6 +418,79 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     ).rejects.toMatchObject({ code: 'BILLING_BATCH_OUT_OF_RANGE' });
   });
 
+  it('fatura em aberto presa a assinatura CANCELADA aparece na faixa, e pagar reativa a assinatura ativa', async () => {
+    // Caso real de set/2026 (7 alunos): duplicata consolidada deixou a fatura
+    // de setembro na assinatura antiga, e a ativa nao tinha fatura do mes.
+    const { studentId, subscriptionId } = await novaAssinatura('2026-09-01T00:00:00Z');
+    const antiga = await db.subscription.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId,
+        planId: planoId,
+        status: 'CANCELLED',
+        startsAt: new Date('2026-08-27T00:00:00Z'),
+        endsAt: new Date('2026-09-26T00:00:00Z'),
+      },
+      select: { id: true },
+    });
+    const faturaAntiga = await invoiceEmAberto({
+      subscriptionId: antiga.id,
+      studentId,
+      competencia: '2026-09-01T00:00:00Z',
+      dueAt: '2026-09-09T00:00:00Z',
+      status: 'OPEN',
+    });
+    await db.subscription.update({ where: { id: subscriptionId }, data: { status: 'PAST_DUE' } });
+
+    const AGORA = new Date('2026-10-01T15:00:00.000Z');
+    const faixa = await consultarMeses.executar(contexto, subscriptionId, AGORA);
+    const setembro = faixa.find((m) => m.competencia.toISOString().slice(0, 7) === '2026-09');
+
+    expect(setembro).toMatchObject({ status: 'OPEN', invoiceId: faturaAntiga });
+
+    await registrarLote.executar(
+      contexto,
+      {
+        subscriptionId,
+        competencias: [new Date('2026-09-01T00:00:00Z')],
+        dispensar: [],
+        paidAt: diaUtc('2026-10-01'),
+        channel: 'DINHEIRO',
+        expectedTotalMinor: 10000,
+        idempotencyKey: randomUUID(),
+        agora: AGORA,
+      },
+      'corr-assinatura-antiga',
+    );
+
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: faturaAntiga } })).status).toBe('PAID');
+    expect((await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } })).status).toBe('ACTIVE');
+    expect((await db.entitlement.findFirstOrThrow({ where: { subscriptionId } })).status).toBe('ACTIVE');
+  });
+
+  it('fatura da assinatura ATIVA vence a de outra assinatura na mesma competencia (nao cobra o mes duas vezes)', async () => {
+    const { studentId, subscriptionId } = await novaAssinatura('2026-09-01T00:00:00Z');
+    const antiga = await db.subscription.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId,
+        planId: planoId,
+        status: 'CANCELLED',
+        startsAt: new Date('2026-08-27T00:00:00Z'),
+        endsAt: new Date('2026-09-26T00:00:00Z'),
+      },
+      select: { id: true },
+    });
+    await invoiceEmAberto({ subscriptionId: antiga.id, studentId, competencia: '2026-09-01T00:00:00Z', dueAt: '2026-09-09T00:00:00Z', status: 'OPEN' });
+    const daAtiva = await invoiceEmAberto({ subscriptionId, studentId, competencia: '2026-09-01T00:00:00Z', dueAt: '2026-09-09T00:00:00Z', status: 'OPEN' });
+
+    const faixa = await consultarMeses.executar(contexto, subscriptionId, new Date('2026-10-01T15:00:00.000Z'));
+    const setembros = faixa.filter((m) => m.competencia.toISOString().slice(0, 7) === '2026-09');
+
+    expect(setembros).toHaveLength(1);
+    expect(setembros[0]!.invoiceId).toBe(daAtiva);
+  });
+
   it('data de pagamento FUTURA e recusada', async () => {
     const { subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
 

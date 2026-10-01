@@ -159,6 +159,21 @@ describe('mesesPagaveis -- mes ja resolvido nao reaparece', () => {
     expect(faixa[0]!.invoiceId).toBe('out');
   });
 
+  it('mes PAGO tem precedencia sobre OPEN da mesma competencia (nao cobra duas vezes)', () => {
+    const faixa = mesesPagaveis({
+      invoices: [
+        invoice({ id: 'paga', billingPeriod: new Date('2026-09-01T00:00:00Z'), status: 'PAID' }),
+        invoice({ id: 'duplicada', billingPeriod: new Date('2026-09-01T00:00:00Z'), status: 'OPEN' }),
+      ],
+      agora: new Date('2026-10-01T15:00:00Z'),
+      endsAt: null,
+      prices: PRECO_150,
+      dueDay: 9,
+    });
+
+    expect(faixa.map((m) => m.invoiceId)).not.toContain('duplicada');
+  });
+
   it('pagar mes que ja esta pago e recusado pelo lote', () => {
     const faixa = mesesPagaveis({
       invoices: [invoice({ id: 'out', billingPeriod: new Date('2026-10-01T00:00:00Z'), status: 'PAID' })],
