@@ -59,6 +59,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     wesley: '33344455001',
     bento: '44455566023',
     celia: '55566677053',
+    vencido: '66677788830',
   } as const;
 
   beforeAll(async () => {
@@ -298,6 +299,66 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(resultado.pendencias).toEqual([
       { nome: 'EVA SEM PERIODO', motivo: 'aluno sem periodo de plano' },
     ]);
+  });
+
+  it('Data Fim ja vencida no arquivo: atualiza cadastro e credencial, NAO cria direito e lista a pessoa', async () => {
+    // Decisao do PI, 01/10/2026: quem veio do leitor com plano vencido (AGORA e
+    // 20/08/2026 na fixture) recebe cadastro e ID da catraca, mas o acesso segue
+    // o que ja esta no banco -- a importacao nao concede nem renova direito.
+    const casado = await criarAlunoCancelado({ nome: 'VERA VENCIDA CASADA' });
+
+    const resultado = await importar([
+      registroDe(casado, {
+        cartao: '70001',
+        identificadorFacial: '70001',
+        dataInicio: '20260701',
+        dataFim: '20260810',
+      }),
+      registroDe(null, {
+        nome: 'NILO VENCIDO CRIADO',
+        cpf: CPF.vencido,
+        cartao: '70002',
+        identificadorFacial: '70002',
+        dataInicio: '20260701',
+        dataFim: '20260810',
+      }),
+    ]);
+
+    const criado = await db.student.findFirstOrThrow({
+      where: { tenantId: alvo.tenantId, fullName: 'NILO VENCIDO CRIADO' },
+    });
+
+    for (const id of [casado.id, criado.id]) {
+      const credenciais = await db.studentCredential.findMany({ where: { studentId: id } });
+
+      expect((await db.student.findUniqueOrThrow({ where: { id } })).status).toBe('ACTIVE');
+      expect(credenciais.map((c) => c.externalId).sort()).toHaveLength(2);
+      expect(await db.entitlement.count({ where: { studentId: id } })).toBe(0);
+      expect(await db.subscription.count({ where: { studentId: id } })).toBe(0);
+    }
+
+    expect(resultado.criados).toBe(1);
+    expect(resultado.direitosPorPlano).toBe(0);
+    expect(resultado.pendencias).toEqual(
+      expect.arrayContaining([
+        { nome: 'VERA VENCIDA CASADA', motivo: 'plano vencido no arquivo, direito nao alterado' },
+        { nome: 'NILO VENCIDO CRIADO', motivo: 'plano vencido no arquivo, direito nao alterado' },
+      ]),
+    );
+  });
+
+  it('Data Fim igual a HOJE ainda vale: o ultimo dia do plano nao e vencido', async () => {
+    const aluno = await criarAlunoCancelado({ nome: 'OLGA ULTIMO DIA' });
+
+    const resultado = await importar([
+      registroDe(aluno, { dataInicio: '20260720', dataFim: '20260820' }),
+    ]);
+
+    expect(resultado.direitosPorPlano).toBe(1);
+    expect(resultado.pendencias).not.toContainEqual({
+      nome: 'OLGA ULTIMO DIA',
+      motivo: 'plano vencido no arquivo, direito nao alterado',
+    });
   });
 
   it('funcionario ganha direito por vinculo, sem assinatura', async () => {
@@ -1022,7 +1083,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
         nome: 'YAGO CRIADO COM DATA FORCADA',
         cpf: CPF.yago,
         dataInicio: '20200101',
-        dataFim: '20200201',
+        dataFim: '20270201',
       }),
     ]);
 
@@ -1038,7 +1099,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
         nome: 'YAGO CRIADO COM DATA FORCADA',
         cpf: CPF.yago,
         dataInicio: '20200101',
-        dataFim: '20200201',
+        dataFim: '20270201',
       }),
     ]);
 

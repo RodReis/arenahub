@@ -90,18 +90,10 @@ const COLUNAS = {
   cep: 'Cep',
   municipio: 'Municipio',
   uf: 'Uf',
-  /*
-   * TELEFONE E CELULAR SAO A MESMA COLUNA no export atual (confirmado pelo
-   * PI, 02/09/2026): o Pacto passou a exportar `Telefone/Celular` unico. Os
-   * dois campos apontam para ela de proposito -- `gravarContato` grava
-   * `PHONE` e `WHATSAPP` com o mesmo numero, que e o que a recepcao precisa
-   * (ela liga e manda mensagem para o mesmo aparelho).
-   *
-   * Nao e duplicacao acidental: apontar so um deixaria o outro canal vazio,
-   * e o painel oferece os dois.
-   */
-  telefone: 'Telefone/Celular',
-  celular: 'Telefone/Celular',
+  // O export de 01/10/2026 separou as colunas; o anterior trazia `Telefone/Celular`
+  // unico (ver `FONE_UNICO`), que continua valendo como reserva.
+  telefone: 'Telefone',
+  celular: 'Celular',
   cpf: 'Cpf',
   // AUSENTES do export atual -- caem em `INICIO_PADRAO`/`FIM_PADRAO`. Ficam
   // mapeadas para a linha que um dia as traga voltar a mandar sozinha.
@@ -109,6 +101,8 @@ const COLUNAS = {
   dataFim: 'Data Fim',
   email: 'Email',
 } as const satisfies Record<keyof RegistroDePessoaAtiva, string>;
+
+const FONE_UNICO = 'Telefone/Celular';
 
 /**
  * Le uma coluna como texto, tolerando ausencia e numero.
@@ -216,8 +210,9 @@ function converter(bruto: unknown): RegistroDePessoaAtiva[] {
       cep: lerTexto(registro, COLUNAS.cep),
       municipio: lerTexto(registro, COLUNAS.municipio),
       uf: lerTexto(registro, COLUNAS.uf),
-      telefone: lerTexto(registro, COLUNAS.telefone),
-      celular: lerTexto(registro, COLUNAS.celular),
+      // Cada canal cai na coluna unica do export antigo quando a propria vem vazia.
+      telefone: lerTexto(registro, COLUNAS.telefone) || lerTexto(registro, FONE_UNICO),
+      celular: lerTexto(registro, COLUNAS.celular) || lerTexto(registro, FONE_UNICO),
       cpf: lerTexto(registro, COLUNAS.cpf),
       // O PADRAO SO ENTRA QUANDO O ARQUIVO NAO TRAZ (`||`, sobre string
       // vazia). Linha datada usa a data dela -- o padrao existe para o
