@@ -130,4 +130,21 @@ export class StudentCredentialRepository {
       }),
     );
   }
+
+  /**
+   * Todos os numeros ja usados por alguma credencial do tenant -- #475.
+   *
+   * Qualquer `kind`: cartao e facial dividem o mesmo espaco de numero no
+   * leitor (mesmo motivo de `encontrarPorNumeros`).
+   */
+  async listarNumerosDoTenant(tenantId: string): Promise<string[]> {
+    const linhas = await this.db.comTenant((tx) =>
+      tx.studentCredential.findMany({
+        where: { tenantId },
+        select: { externalId: true },
+      }),
+    );
+
+    return linhas.map((l) => l.externalId);
+  }
 }

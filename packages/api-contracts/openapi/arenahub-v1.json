@@ -643,6 +643,35 @@
         ]
       }
     },
+    "/api/v1/students/credentials/next-available": {
+      "get": {
+        "operationId": "StudentsController_proximaCredencialDisponivel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "externalId"
+                  ],
+                  "properties": {
+                    "externalId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Students"
+        ]
+      }
+    },
     "/api/v1/students": {
       "get": {
         "operationId": "StudentsController_buscar",
@@ -1337,6 +1366,93 @@
         },
         "tags": [
           "Team"
+        ]
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "operationId": "DevicesController_listar",
+        "parameters": [
+          {
+            "name": "gymUnitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      },
+      "post": {
+        "operationId": "DevicesController_criar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{id}": {
+      "get": {
+        "operationId": "DevicesController_detalhar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
+        ]
+      },
+      "patch": {
+        "operationId": "DevicesController_atualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Devices"
         ]
       }
     },
@@ -3701,93 +3817,6 @@
         },
         "tags": [
           "Consent"
-        ]
-      }
-    },
-    "/api/v1/devices": {
-      "get": {
-        "operationId": "DevicesController_listar",
-        "parameters": [
-          {
-            "name": "gymUnitId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Devices"
-        ]
-      },
-      "post": {
-        "operationId": "DevicesController_criar",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Devices"
-        ]
-      }
-    },
-    "/api/v1/devices/{id}": {
-      "get": {
-        "operationId": "DevicesController_detalhar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Devices"
-        ]
-      },
-      "patch": {
-        "operationId": "DevicesController_atualizar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Devices"
         ]
       }
     },

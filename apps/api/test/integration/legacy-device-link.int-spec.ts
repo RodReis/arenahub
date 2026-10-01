@@ -8,6 +8,7 @@ import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
 import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
+import { DeviceRepository } from '../../src/modules/devices/device.repository.js';
 import { EdgeAuthService } from '../../src/modules/edge-auth/edge-auth.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
@@ -249,6 +250,52 @@ describe('#468 -- vinculo legado do leitor', () => {
     const resposta = await vincular({ deviceSerial: serial, externalUserIds: ['9999001'] });
 
     expect(resposta.body).toMatchObject({ linked: 0, withoutStudent: ['9999001'] });
+  });
+
+  /**
+   * #475 -- pre-requisito para "proximo numero livre": o numero sem aluno
+   * precisa ficar REGISTRADO, nao so devolvido na resposta. Sem isto, uma
+   * segunda chamada a sugestao de numero colidiria com um cadastro que o
+   * leitor ja tem mas a nuvem "esqueceu" assim que a resposta HTTP terminou.
+   */
+  it('registra o numero do leitor mesmo sem aluno -- #475', async () => {
+    await vincular({ deviceSerial: serial, externalUserIds: ['9999002'] });
+
+    const registro = await db.deviceReaderNumber.findUniqueOrThrow({
+      where: { deviceId_externalUserId: { deviceId: ctx.deviceId, externalUserId: '9999002' } },
+    });
+
+    expect(registro.tenantId).toBe(ctx.tenantId);
+  });
+
+  it('reenviar o mesmo numero so atualiza seenAt -- nao duplica o registro', async () => {
+    await vincular({ deviceSerial: serial, externalUserIds: ['9999003'] });
+    await vincular({ deviceSerial: serial, externalUserIds: ['9999003'] });
+
+    const registros = await db.deviceReaderNumber.findMany({
+      where: { deviceId: ctx.deviceId, externalUserId: '9999003' },
+    });
+
+    expect(registros).toHaveLength(1);
+  });
+
+  /**
+   * #475 -- numero que JA VIROU `DeviceUser` (vinculo confirmado) tambem
+   * nao pode ser sugerido de novo. `DeviceReaderNumber` sozinho nao bastaria
+   * aqui: o teste usa o fluxo real de vinculo para produzir um DeviceUser
+   * de verdade, com identidade e consentimento, em vez de inserir a linha a
+   * mao.
+   */
+  it('o numero que virou DeviceUser aparece na lista de numeros vinculados do tenant -- #475', async () => {
+    await criarAluno('J475', [{ kind: 'TURNSTILE_CARD', externalId: '9999004' }]);
+
+    const resposta = await vincular({ deviceSerial: serial, externalUserIds: ['9999004'] });
+    expect(resposta.body).toMatchObject({ linked: 1 });
+
+    const dispositivos = app.get(DeviceRepository);
+    const vinculados = await dispositivos.listarNumerosVinculadosDoTenant(ctx.tenantId);
+
+    expect(vinculados).toContain('9999004');
   });
 
   it('NAO vincula numero que aponta para dois alunos -- catraca nao abre para o errado', async () => {

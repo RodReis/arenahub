@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import type { ContextoDoEdge } from '../edge-auth/edge-auth.service.js';
 import { DeviceRepository } from '../devices/device.repository.js';
+import { DeviceReaderNumberRepository } from '../devices/device-reader-number.repository.js';
 import { ConsentRepository } from '../privacy/consent.repository.js';
 import { StudentCredentialRepository } from '../students/student-credential.repository.js';
 import { BiometricIdentityRepository } from './biometric-identity.repository.js';
@@ -49,6 +50,7 @@ export interface ResultadoDoVinculoLegado {
 export class VincularCadastroLegadoUseCase {
   constructor(
     private readonly dispositivos: DeviceRepository,
+    private readonly numerosDoLeitor: DeviceReaderNumberRepository,
     private readonly credenciais: StudentCredentialRepository,
     private readonly consentimentos: ConsentRepository,
     private readonly identidades: BiometricIdentityRepository,
@@ -63,6 +65,17 @@ export class VincularCadastroLegadoUseCase {
     const leitor = await this.dispositivos.encontrarDoEdgePorSerial(edge, entrada.deviceSerial);
 
     if (!leitor) throw new NotFoundException({ code: 'DEVICE_NOT_IN_SCOPE' });
+
+    // Registra o que o leitor TEM, com ou sem aluno vinculado -- #475. Antes
+    // do vinculo: mesmo o numero que fica `withoutStudent` abaixo precisa
+    // ficar visivel para "proximo numero livre" nao sugerir um que o
+    // equipamento ja usa.
+    await this.numerosDoLeitor.registrarLote(
+      edge.tenantId,
+      leitor.id,
+      [...new Set(entrada.externalUserIds)],
+      agora,
+    );
 
     const resultado: ResultadoDoVinculoLegado = {
       linked: 0,

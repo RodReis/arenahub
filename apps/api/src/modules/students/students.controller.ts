@@ -24,12 +24,15 @@ import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import { DeviceRepository } from '../devices/device.repository.js';
+import { DeviceReaderNumberRepository } from '../devices/device-reader-number.repository.js';
 import { MembershipRepository } from '../iam/membership.repository.js';
 import { TeamRepository } from '../team/team.repository.js';
 import { GymUnitModalityRepository } from '../tenancy/gym-unit-modality.repository.js';
 import { GymUnitRepository } from '../tenancy/gym-unit.repository.js';
 import { normalizarCep, ufEhValida } from './domain/endereco.js';
 import { cpfEhValido, formatarCpf } from './domain/identificacao.js';
+import { proximoNumeroLivre } from '../devices/domain/proximo-numero-livre.js';
 import { transicionarAluno } from './domain/student.js';
 import { TAMANHO_MAXIMO_DE_FOTO_BYTES } from './domain/foto-do-aluno.js';
 import { StudentCredentialRepository } from './student-credential.repository.js';
@@ -422,7 +425,46 @@ export class StudentsController {
     private readonly fotos: StudentPhotoService,
     private readonly credenciais: StudentCredentialRepository,
     private readonly time: TeamRepository,
+    private readonly dispositivos: DeviceRepository,
+    private readonly numerosDoLeitor: DeviceReaderNumberRepository,
   ) {}
+
+  /**
+   * Proximo numero de catraca livre -- #475.
+   *
+   * O numero do equipamento NAO E SEQUENCIAL (decisao do PI): a recepcao
+   * hoje escolhe na mao, procurando um que nao esteja em uso. A sugestao
+   * precisa estar livre SIMULTANEAMENTE em tres lugares: no leitor (mesmo
+   * sem aluno vinculado), em toda `StudentCredential` do tenant, e em todo
+   * `DeviceUser` do tenant -- a issue e explicita sobre os tres.
+   *
+   * SO SUGESTAO -- nao reserva nada. A confirmacao continua sendo
+   * `PUT /:id/credentials`, que ja recusa numero ocupado por outro aluno
+   * (`CREDENTIAL_ALREADY_ASSIGNED`). Path literal, ANTES de `:id/credentials`
+   * (ordem de rota do Nest: literal primeiro, senao cai no `:id`).
+   */
+  @Get('credentials/next-available')
+  @RequirePermissions('student.read')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['externalId'],
+      properties: { externalId: { type: 'string' } },
+    },
+  })
+  async proximaCredencialDisponivel(): Promise<{ externalId: string }> {
+    const contexto = this.contexto.require();
+
+    const [doLeitor, deCredencial, vinculados] = await Promise.all([
+      this.numerosDoLeitor.listarNumerosDoTenant(contexto.tenantId),
+      this.credenciais.listarNumerosDoTenant(contexto.tenantId),
+      this.dispositivos.listarNumerosVinculadosDoTenant(contexto.tenantId),
+    ]);
+
+    const ocupados = new Set([...doLeitor, ...deCredencial, ...vinculados]);
+
+    return { externalId: proximoNumeroLivre(ocupados) };
+  }
 
   /**
    * O TOTAL vai no CABECALHO `X-Total-Count`, nao no corpo.
