@@ -27,15 +27,13 @@ updated: 2026-10-01
 
 ## A Fazer
 
-### Sem épico
-
-- [MVP1] Fotos dos alunos vindas do leitor facial: importar, gravar e mostrar na lista (#503) — pausada a pedido do PI
+_(vazio)_
 
 ## Em Andamento
 
 ### Sem épico
 
-- [MVP1][FIX] Leitor facial que não reconecta ao agente fica invisível: log mudo e heartbeat informa o leitor como ativo (#504)
+- [MVP1] Fotos dos alunos vindas do leitor facial: importar, gravar e mostrar na lista (#503)
 
 ## Feito
 
@@ -46,6 +44,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] Leitor facial que não reconecta ao agente fica invisível: log mudo e heartbeat informa o leitor como ativo (#504, finalizado em: 2026-10-01)
 - [MVP1][FIX] Catraca destravada só 5 s (fixo na ponte) — liberado e "Não passou" (#497, finalizado em: 2026-10-01)
 - [MVP1][FIX] Passagem nova repetia o id de uma antiga — Edge devolvia decisão velha sem perguntar à nuvem (#495, finalizado em: 2026-10-01)
 - [MVP1][FIX] Regra nº 7 revogada: aluno da base do leitor entra com consentimento aceito (ADR-064) (#493, finalizado em: 2026-10-01)
