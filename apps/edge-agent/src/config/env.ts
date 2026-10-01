@@ -77,6 +77,17 @@ export const esquemaConfig = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+
+  /**
+   * Segundos que a catraca fica destravada depois de liberar. O equipamento
+   * aceita de 1 a 50 (`ConfigurarAcionamento1`).
+   *
+   * Era 5 fixo na ponte. Arena Positiva, 01/10/2026: tirando a latencia da
+   * decisao, sobravam ~4,5 s para empurrar, e a passagem fechou em 4.992 ms
+   * sem giro. Com o leitor segurando a mesma pessoa por ~2 min, perder a
+   * janela deixa o aluno travado na frente da catraca.
+   */
+  CATRACA_TEMPO_LIBERADA_S: z.coerce.number().int().min(1).max(50).default(10),
 });
 
 export type Config = z.infer<typeof esquemaConfig>;

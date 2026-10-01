@@ -64,13 +64,19 @@ export async function compor(
   const pedirDecisao = criarPedirDecisao(cliente);
   const reportarPassagem = criarReportarPassagem(cliente);
 
-  const processar = criarProcessadorDeAcessoOnline({
-    maquina,
-    catraca: dispositivos.catraca,
-    pedirDecisao,
-    reportarPassagem,
-    agoraMonotonicoMs: () => performance.now(),
-  });
+  // O agente espera o giro um pouco MAIS que o tempo destravado: quem manda
+  // no prazo e a catraca (Origem 5 = tempo acabou), e desistir antes dela
+  // registraria "nao passou" de quem ainda podia passar.
+  const processar = criarProcessadorDeAcessoOnline(
+    {
+      maquina,
+      catraca: dispositivos.catraca,
+      pedirDecisao,
+      reportarPassagem,
+      agoraMonotonicoMs: () => performance.now(),
+    },
+    (config.CATRACA_TEMPO_LIBERADA_S + 3) * 1_000,
+  );
 
   // Fecha o ciclo de REGISTRO de tentativas presas de uma execucao anterior
   // -- nunca recomanda a catraca (ver comentario em retomarPendentes).

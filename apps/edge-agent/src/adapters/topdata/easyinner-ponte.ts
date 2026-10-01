@@ -109,6 +109,8 @@ export const esquemaComandoPonte = z.discriminatedUnion('cmd', [
     cmd: z.literal('conectar'),
     porta: z.number().int().positive(),
     tempo: z.number().int().positive().default(10),
+    /** Segundos destravada (`ConfigurarAcionamento1`), 1 a 50. */
+    tempoLiberadaS: z.number().int().min(1).max(50).default(5),
   }),
 
   /** Testa se a catraca esta conectada. `TestarConexaoInner`. */

@@ -66,7 +66,7 @@ export async function montarDispositivos(
   const catraca: TurnstileAdapter =
     config.CATRACA_MODE === 'simulador'
       ? new TurnstileSimulator()
-      : await montarCatracaReal(logger, config.CATRACA_INVERTIDA);
+      : await montarCatracaReal(logger, config.CATRACA_INVERTIDA, config.CATRACA_TEMPO_LIBERADA_S);
 
   const facial: FacialDeviceAdapter =
     config.FACIAL_MODE === 'simulador' ? new FacialSimulator() : await montarFacialReal(logger);
@@ -85,6 +85,7 @@ export async function montarDispositivos(
 async function montarCatracaReal(
   logger: Logger,
   invertida: boolean,
+  tempoLiberadaS: number,
 ): Promise<TurnstileAdapter> {
   const ponte = PonteEasyInnerProcesso.lancar({ comando: CAMINHO_PONTE });
   const adapter = new TopdataInnerAdapter(ponte, logger, INNER_PADRAO, invertida);
@@ -95,7 +96,7 @@ async function montarCatracaReal(
     intervaloMs: INTERVALO_RETRY_MS,
     esperar,
     tentar: async () => {
-      await adapter.conectar(PORTA_CATRACA, TEMPO_CONECTAR_CATRACA_S);
+      await adapter.conectar(PORTA_CATRACA, TEMPO_CONECTAR_CATRACA_S, tempoLiberadaS);
 
       const conectado = await adapter.testarConexao();
       if (!conectado) throw new Error('testarConexao devolveu false');
