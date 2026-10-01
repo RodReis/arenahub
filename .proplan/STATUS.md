@@ -9,6 +9,7 @@ updated: 2026-10-01
 
 ### Sem épico
 
+- [MVP1][FIX] service:install registra node.exe direto como serviço Windows — não sobe (#499)
 - [MVP1][FIX] Reatribuir o Edge de um dispositivo — hoje não há como desfazer a reivindicação automática (#488) (#490)
 - [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
 - [FIX] painel financeiro deve abrir no mes corrente por default (#435)
@@ -30,9 +31,7 @@ _(vazio)_
 
 ## Em Andamento
 
-### Sem épico
-
-- [MVP1][FIX] Catraca destravada só 5 s (fixo na ponte) — liberado e "Não passou" (#497)
+_(vazio)_
 
 ## Feito
 
@@ -43,6 +42,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] Catraca destravada só 5 s (fixo na ponte) — liberado e "Não passou" (#497, finalizado em: 2026-10-01)
 - [MVP1][FIX] Passagem nova repetia o id de uma antiga — Edge devolvia decisão velha sem perguntar à nuvem (#495, finalizado em: 2026-10-01)
 - [MVP1][FIX] Regra nº 7 revogada: aluno da base do leitor entra com consentimento aceito (ADR-064) (#493, finalizado em: 2026-10-01)
 - [MVP1][FIX] painel não publica termo biométrico — vínculo legado não vincula ninguém (#491, finalizado em: 2026-10-01)
