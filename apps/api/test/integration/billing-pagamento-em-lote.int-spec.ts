@@ -192,6 +192,18 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     return invoice.id;
   }
 
+  /** Meses da faixa do mais antigo ate `ate`, sem dispensa, com a data de hoje como dia do pagamento. */
+  async function pagarAte(subscriptionId: string, agora: Date, ate: Date) {
+    const faixa = await consultarMeses.executar(contexto, subscriptionId, agora);
+    const indice = faixa.findIndex((m) => m.competencia.getTime() === ate.getTime());
+
+    return {
+      competencias: faixa.slice(0, indice + 1).map((m) => m.competencia),
+      dispensar: [] as Date[],
+      paidAt: new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate())),
+    };
+  }
+
   async function totalDoLote(subscriptionId: string, agora: Date, ateCompetencia: Date): Promise<number> {
     const faixa = await consultarMeses.executar(contexto, subscriptionId, agora);
     const indice = faixa.findIndex((m) => m.competencia.getTime() === ateCompetencia.getTime());
@@ -226,7 +238,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
       contexto,
       {
         subscriptionId,
-        ateCompetencia,
+        ...(await pagarAte(subscriptionId, AGORA, ateCompetencia)),
         channel: 'DINHEIRO',
         expectedTotalMinor,
         idempotencyKey: randomUUID(),
@@ -239,8 +251,10 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     expect(resultado.totalMinor).toBe(50000);
 
     const invoices = await db.invoice.findMany({ where: { subscriptionId, tenantId: contexto.tenantId } });
-    expect(invoices).toHaveLength(5);
-    expect(invoices.every((i) => i.status === 'PAID')).toBe(true);
+    // 5 pagas + a fatura SEGUINTE (dez), aberta para ancorar a vigencia paga.
+    expect(invoices).toHaveLength(6);
+    expect(invoices.filter((i) => i.status === 'PAID')).toHaveLength(5);
+    expect(invoices.filter((i) => i.status === 'OPEN')).toHaveLength(1);
 
     const payments = await db.payment.findMany({ where: { tenantId: contexto.tenantId, batchId: resultado.batchId } });
     expect(payments).toHaveLength(5);
@@ -251,6 +265,198 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
 
     const entitlement = await db.entitlement.findFirstOrThrow({ where: { subscriptionId } });
     expect(entitlement.status).toBe('ACTIVE');
+  });
+
+  const MS_DIA = 24 * 60 * 60 * 1000;
+  const diaUtc = (iso: string): Date => new Date(`${iso}T00:00:00Z`);
+
+  async function aluno2MesesAtrasados(): Promise<{ studentId: string; subscriptionId: string; jul: string; ago: string }> {
+    const { studentId, subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
+    const jul = await invoiceEmAberto({ subscriptionId, studentId, competencia: '2026-07-01T00:00:00Z', dueAt: '2026-07-09T00:00:00Z' });
+    const ago = await invoiceEmAberto({ subscriptionId, studentId, competencia: '2026-08-01T00:00:00Z', dueAt: '2026-08-09T00:00:00Z' });
+
+    return { studentId, subscriptionId, jul, ago };
+  }
+
+  it('escolha LIVRE: paga so setembro e julho/agosto continuam em aberto, sem obrigar o mes anterior', async () => {
+    const { subscriptionId, jul, ago } = await aluno2MesesAtrasados();
+    const AGORA = new Date('2026-09-15T12:00:00.000Z');
+
+    const resultado = await registrarLote.executar(
+      contexto,
+      {
+        subscriptionId,
+        competencias: [new Date('2026-09-01T00:00:00Z')],
+        dispensar: [],
+        paidAt: diaUtc('2026-09-15'),
+        channel: 'DINHEIRO',
+        expectedTotalMinor: 10000,
+        idempotencyKey: randomUUID(),
+        agora: AGORA,
+      },
+      'corr-livre',
+    );
+
+    expect(resultado.invoiceIds).toHaveLength(1);
+    const pagas = await db.invoice.findMany({ where: { subscriptionId, status: 'PAID' } });
+    expect(pagas.map((i) => i.billingPeriod.toISOString().slice(0, 7))).toEqual(['2026-09']);
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: jul } })).status).toBe('OVERDUE');
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: ago } })).status).toBe('OVERDUE');
+  });
+
+  it('DISPENSAR: mes anterior nao usado vira CANCELLED e sai da inadimplencia; o outro segue em aberto', async () => {
+    const { subscriptionId, jul, ago } = await aluno2MesesAtrasados();
+
+    await registrarLote.executar(
+      contexto,
+      {
+        subscriptionId,
+        competencias: [new Date('2026-09-01T00:00:00Z')],
+        dispensar: [new Date('2026-07-01T00:00:00Z')],
+        paidAt: diaUtc('2026-09-15'),
+        channel: 'DINHEIRO',
+        expectedTotalMinor: 10000,
+        idempotencyKey: randomUUID(),
+        agora: new Date('2026-09-15T12:00:00.000Z'),
+      },
+      'corr-dispensa',
+    );
+
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: jul } })).status).toBe('CANCELLED');
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: ago } })).status).toBe('OVERDUE');
+    const auditoria = await db.auditLog.count({ where: { tenantId: contexto.tenantId, action: 'billing.invoice.dispensed', targetId: jul } });
+    expect(auditoria).toBe(1);
+  });
+
+  it('DATA DO PAGAMENTO: a proxima fatura vence em data + 30 dias e bloqueia depois da carencia', async () => {
+    const { studentId, subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
+    await invoiceEmAberto({ subscriptionId, studentId, competencia: '2026-09-01T00:00:00Z', dueAt: '2026-09-09T00:00:00Z', status: 'OPEN' });
+
+    await registrarLote.executar(
+      contexto,
+      {
+        subscriptionId,
+        competencias: [new Date('2026-09-01T00:00:00Z')],
+        dispensar: [],
+        paidAt: diaUtc('2026-09-10'),
+        channel: 'DINHEIRO',
+        expectedTotalMinor: 10000,
+        idempotencyKey: randomUUID(),
+        agora: new Date('2026-09-15T12:00:00.000Z'),
+      },
+      'corr-ancora',
+    );
+
+    const pagamento = await db.payment.findFirstOrThrow({ where: { tenantId: contexto.tenantId, invoice: { subscriptionId } } });
+    expect(pagamento.paidAt!.toISOString()).toBe('2026-09-10T12:00:00.000Z');
+
+    const outubro = await db.invoice.findUniqueOrThrow({
+      where: {
+        tenantId_subscriptionId_billingPeriod: {
+          tenantId: contexto.tenantId,
+          subscriptionId,
+          billingPeriod: new Date('2026-10-01T00:00:00Z'),
+        },
+      },
+    });
+    expect(outubro.status).toBe('OPEN');
+    expect(outubro.dueAt.toISOString()).toBe('2026-10-10T00:00:00.000Z');
+    // graceDays = 3 no cenario.
+    expect(outubro.blockAt!.getTime()).toBe(outubro.dueAt.getTime() + 3 * MS_DIA);
+  });
+
+  it('dois meses acumulam 60 dias a partir da data do pagamento', async () => {
+    const { subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
+
+    await registrarLote.executar(
+      contexto,
+      {
+        subscriptionId,
+        competencias: [new Date('2026-09-01T00:00:00Z'), new Date('2026-10-01T00:00:00Z')],
+        dispensar: [],
+        paidAt: diaUtc('2026-09-15'),
+        channel: 'DINHEIRO',
+        expectedTotalMinor: 20000,
+        idempotencyKey: randomUUID(),
+        agora: new Date('2026-09-15T12:00:00.000Z'),
+      },
+      'corr-acumula',
+    );
+
+    const novembro = await db.invoice.findUniqueOrThrow({
+      where: {
+        tenantId_subscriptionId_billingPeriod: {
+          tenantId: contexto.tenantId,
+          subscriptionId,
+          billingPeriod: new Date('2026-11-01T00:00:00Z'),
+        },
+      },
+    });
+    expect(novembro.dueAt.toISOString()).toBe('2026-11-14T00:00:00.000Z');
+  });
+
+  it('mes JA PAGO some da faixa e nao pode ser pago de novo', async () => {
+    const { subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
+    const AGORA = new Date('2026-10-01T15:00:00.000Z');
+    const entrada = {
+      subscriptionId,
+      competencias: [new Date('2026-10-01T00:00:00Z')],
+      dispensar: [] as Date[],
+      paidAt: diaUtc('2026-10-01'),
+      channel: 'DINHEIRO' as const,
+      expectedTotalMinor: 10000,
+      agora: AGORA,
+    };
+
+    await registrarLote.executar(contexto, { ...entrada, idempotencyKey: randomUUID() }, 'corr-pago-1');
+
+    const faixa = await consultarMeses.executar(contexto, subscriptionId, AGORA);
+    expect(faixa.map((m) => m.competencia.toISOString().slice(0, 7))).not.toContain('2026-10');
+
+    await expect(
+      registrarLote.executar(contexto, { ...entrada, idempotencyKey: randomUUID() }, 'corr-pago-2'),
+    ).rejects.toMatchObject({ code: 'BILLING_BATCH_OUT_OF_RANGE' });
+  });
+
+  it('data de pagamento FUTURA e recusada', async () => {
+    const { subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
+
+    await expect(
+      registrarLote.executar(
+        contexto,
+        {
+          subscriptionId,
+          competencias: [new Date('2026-09-01T00:00:00Z')],
+          dispensar: [],
+          paidAt: diaUtc('2026-09-16'),
+          channel: 'DINHEIRO',
+          expectedTotalMinor: 10000,
+          idempotencyKey: randomUUID(),
+          agora: new Date('2026-09-15T12:00:00.000Z'),
+        },
+        'corr-futura',
+      ),
+    ).rejects.toMatchObject({ code: 'BILLING_PAID_AT_IN_FUTURE' });
+  });
+
+  it('mesma Idempotency-Key com DATA diferente e recusada (corpo mudou)', async () => {
+    const { subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
+    const idempotencyKey = randomUUID();
+    const base = {
+      subscriptionId,
+      competencias: [new Date('2026-09-01T00:00:00Z')],
+      dispensar: [] as Date[],
+      channel: 'DINHEIRO' as const,
+      expectedTotalMinor: 10000,
+      idempotencyKey,
+      agora: new Date('2026-09-15T12:00:00.000Z'),
+    };
+
+    await registrarLote.executar(contexto, { ...base, paidAt: diaUtc('2026-09-10') }, 'corr-data-1');
+
+    await expect(
+      registrarLote.executar(contexto, { ...base, paidAt: diaUtc('2026-09-12') }, 'corr-data-2'),
+    ).rejects.toMatchObject({ code: 'BILLING_BATCH_IDEMPOTENCY_MISMATCH' });
   });
 
   it('mesma Idempotency-Key + mesmo corpo repetido: nenhum Payment novo, devolve resultado anterior', async () => {
@@ -280,7 +486,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
 
     const entrada = {
       subscriptionId,
-      ateCompetencia,
+      ...(await pagarAte(subscriptionId, AGORA, ateCompetencia)),
       channel: 'DINHEIRO' as const,
       expectedTotalMinor,
       idempotencyKey,
@@ -323,7 +529,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
       contexto,
       {
         subscriptionId: subscriptionA,
-        ateCompetencia,
+        ...(await pagarAte(subscriptionA, AGORA, ateCompetencia)),
         channel: 'DINHEIRO',
         expectedTotalMinor,
         idempotencyKey,
@@ -332,7 +538,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
       'corr-cruzado-1',
     );
 
-    // MESMA chave, MESMO ateCompetencia/channel/expectedTotalMinor -- so o
+    // MESMA chave, MESMOS meses/channel/expectedTotalMinor -- so o
     // subscriptionId muda. Sem o subscriptionId no hash, isto devolveria o
     // lote do aluno A como se fosse sucesso para o aluno B (achado da
     // revisao, fix round 1).
@@ -341,7 +547,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         contexto,
         {
           subscriptionId: subscriptionB,
-          ateCompetencia,
+          ...(await pagarAte(subscriptionB, AGORA, ateCompetencia)),
           channel: 'DINHEIRO',
           expectedTotalMinor,
           idempotencyKey,
@@ -381,7 +587,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
       contexto,
       {
         subscriptionId,
-        ateCompetencia: setembro,
+        ...(await pagarAte(subscriptionId, AGORA, setembro)),
         channel: 'DINHEIRO',
         expectedTotalMinor: totalSetembro,
         idempotencyKey,
@@ -401,7 +607,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         contexto,
         {
           subscriptionId,
-          ateCompetencia: outubro,
+          ...(await pagarAte(subscriptionId, AGORA, outubro)),
           channel: 'DINHEIRO',
           expectedTotalMinor: totalOutubro,
           idempotencyKey,
@@ -474,7 +680,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
       contexto,
       {
         subscriptionId,
-        ateCompetencia: julho,
+        ...(await pagarAte(subscriptionId, AGORA, julho)),
         channel: 'PIX',
         expectedTotalMinor: totalJulho,
         idempotencyKey: randomUUID(),
@@ -537,7 +743,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         contexto,
         {
           subscriptionId,
-          ateCompetencia: setembro,
+          ...(await pagarAte(subscriptionId, AGORA, setembro)),
           channel: 'DINHEIRO',
           expectedTotalMinor: Math.floor(totalReal / 2),
           idempotencyKey: randomUUID(),
@@ -585,7 +791,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         contexto,
         {
           subscriptionId,
-          ateCompetencia: setembro,
+          ...(await pagarAte(subscriptionId, AGORA, setembro)),
           channel: 'DINHEIRO',
           expectedTotalMinor: totalReal,
           receivedAmountMinor: totalReal - 1,
@@ -640,7 +846,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         contexto,
         {
           subscriptionId,
-          ateCompetencia: novembro,
+          ...(await pagarAte(subscriptionId, AGORA, novembro)),
           channel: 'DINHEIRO',
           expectedTotalMinor: totalEsperado,
           idempotencyKey: randomUUID(),
@@ -677,7 +883,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
       contexto,
       {
         subscriptionId,
-        ateCompetencia: novembro,
+        ...(await pagarAte(subscriptionId, AGORA, novembro)),
         channel: 'DINHEIRO',
         expectedTotalMinor: totalEsperado,
         idempotencyKey: randomUUID(),
@@ -714,7 +920,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
           contextoB,
           {
             subscriptionId,
-            ateCompetencia: new Date('2026-09-01T00:00:00Z'),
+            ...(await pagarAte(subscriptionId, new Date('2026-09-15T12:00:00.000Z'), new Date('2026-09-01T00:00:00Z'))),
             channel: 'DINHEIRO',
             expectedTotalMinor: 10000,
             idempotencyKey: randomUUID(),

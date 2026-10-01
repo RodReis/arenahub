@@ -33,14 +33,13 @@ export class ConsultarMesesPagaveisUseCase {
       throw new ConfiguracaoFinanceiraAusenteError();
     }
 
+    // Todas as invoices da assinatura, em qualquer status: mes ja pago,
+    // cancelado ou estornado nao pode voltar a aparecer como pagavel.
     const invoices = await this.db.invoice.findMany({
-      where: { subscriptionId, tenantId: contexto.tenantId, status: { in: ['OPEN', 'OVERDUE'] } },
+      where: { subscriptionId, tenantId: contexto.tenantId },
     });
 
     return mesesPagaveis({
-      // O `where` ja restringe a OPEN/OVERDUE; o Prisma so nao estreita o
-      // tipo do campo `status` a partir de um filtro `in` (mesmo ajuste do
-      // commit 88a013f na Task 1).
       invoices: invoices as InvoiceParaFaixa[],
       agora,
       endsAt: assinatura.endsAt,

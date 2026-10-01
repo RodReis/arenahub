@@ -311,7 +311,8 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
         .post(`/api/v1/subscriptions/${cenario.subscriptionId}/manual-payment-batch`)
         .set('Cookie', cenario.cookieCaixa)
         .send({
-          ateCompetencia: '2026-09',
+          competencias: ['2026-09'],
+          paidAt: '2026-09-15',
           channel: 'DINHEIRO',
           expectedTotalMinor: PRECO_MINOR,
         });

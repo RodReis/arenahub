@@ -149,7 +149,7 @@ test('a recepcao acha o aluno, cobra e emite recibo', async ({ page }) => {
   /*
    * FaixaDeMeses (F83, Task 7) substituiu o campo "Valor recebido" + o motivo
    * obrigatorio (`SensitiveAction`) -- a cobranca do mes CORRENTE, recem
-   * gerada acima, vem OVERDUE/OPEN e ja chega pre-selecionada (`indiceInicial`,
+   * gerada acima, vem OVERDUE/OPEN e ja chega pre-selecionada (`selecaoInicial`,
    * `faixa-de-meses.tsx`): basta escolher a forma e clicar em "Receber".
    */
   await page.getByTestId('forma-dinheiro').click();

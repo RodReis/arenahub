@@ -79,3 +79,45 @@
   line-height: var(--ah-type-body-lh);
   font-weight: var(--ah-type-body-strong-weight);
 }
+
+/* Meses anteriores em aberto que a recepcao pode dispensar ("pagou usou"). */
+.dispensa {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-sunken);
+}
+
+.dispensa legend {
+  padding-inline: 4px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.dispensaLinha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ah-text-default);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  cursor: pointer;
+}
+
+.data {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 260px;
+}
+
+.vigencia {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}

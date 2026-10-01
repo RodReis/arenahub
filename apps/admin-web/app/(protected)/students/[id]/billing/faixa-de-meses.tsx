@@ -1,11 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { Button, Money, useToast } from '@arenahub/ui';
+import { Button, Field, Money, useToast } from '@arenahub/ui';
 
 import { receberPagamentoEmLote } from '../../../../actions/billing';
-import type { MesPagavelUI } from '../../../../../src/billing/meses-pagaveis';
+import {
+  mesesDispensaveis,
+  selecaoInicial,
+  vigenteAte,
+  type MesPagavelUI,
+} from '../../../../../src/billing/meses-pagaveis';
 import { SeletorDeForma, type FormaDePagamento } from './seletor-de-forma';
 
 import styles from './faixa-de-meses.module.css';
@@ -28,54 +33,79 @@ function formatarMesAno(competencia: string): string {
   return `${nomes[Number(mes) - 1]}/${ano!.slice(2)}`;
 }
 
-/** Indice do ultimo mes que faz parte da selecao inicial: todo OVERDUE + o primeiro OPEN. */
-function indiceInicial(faixa: readonly MesPagavelUI[]): number {
-  let ultimo = -1;
+function formatarData(iso: string): string {
+  const [ano, mes, dia] = iso.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
 
-  for (let i = 0; i < faixa.length; i += 1) {
-    if (faixa[i]!.status === 'OVERDUE' || faixa[i]!.status === 'OPEN') {
-      ultimo = i;
-    } else {
-      break;
-    }
-  }
-
-  return ultimo;
+/** Hoje no relogio do navegador (a recepcao), como 'YYYY-MM-DD'. */
+function hojeLocal(): string {
+  const agora = new Date();
+  const mes = String(agora.getMonth() + 1).padStart(2, '0');
+  const dia = String(agora.getDate()).padStart(2, '0');
+  return `${agora.getFullYear()}-${mes}-${dia}`;
 }
 
 /**
- * Faixa de meses pagaveis -- F83, Task 7.
+ * Receber no balcao -- F83, Task 7, com a escolha LIVRE dos meses.
  *
- * Substitui o "Receber no balcao" de UMA invoice (`painel-de-cobranca.tsx`,
- * pre-F83) por selecao continua de varios meses. A regra de selecao (Decisao
- * 1 do PI): clicar em qualquer mes seleciona o PREFIXO ate ali -- nunca cria
- * buraco. Clicar no ultimo mes ja selecionado recua a selecao em um, porque e
- * o unico jeito de encolher sem um segundo controle.
+ * Decisao do PI (01/10/2026): a academia funciona no modelo "pagou, usou",
+ * sem contrato de 12 meses. A recepcao marca QUAIS meses recebe -- qualquer
+ * combinacao da faixa, sem obrigar o mes anterior --, informa o DIA em que o
+ * aluno pagou e, para cada mes anterior em aberto que ficou de fora, escolhe
+ * dispensar (aluno nao usou) ou deixar em aberto. A vigencia conta da data do
+ * pagamento: 30 dias por mes pago, mais a carencia.
  *
- * O SERVIDOR SEMPRE RECALCULA (`receberPagamentoEmLote` -> `manual-payment-batch`,
- * F83 Task 4): `expectedTotalMinor` e conferencia optimista, nao autoridade.
- * Se o total mudar entre abrir a tela e clicar em "Receber" (outra cobranca
- * emitida, valor reajustado), o servidor recusa com
- * `BILLING_BATCH_TOTAL_CHANGED` e `onPago` recarrega a faixa com os valores
- * atuais -- nunca envia o valor antigo por cima.
+ * O SERVIDOR SEMPRE RECALCULA (`receberPagamentoEmLote` -> `manual-payment-batch`):
+ * `expectedTotalMinor` e conferencia optimista, nao autoridade. Se o total
+ * mudar entre abrir a tela e clicar em "Receber", o servidor recusa com
+ * `BILLING_BATCH_TOTAL_CHANGED` e `onPago` recarrega a faixa.
  */
 export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProps) {
-  const [indiceSelecionado, setIndiceSelecionado] = useState(() => indiceInicial(faixa));
+  const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(() => selecaoInicial(faixa));
+  const [dispensados, setDispensados] = useState<ReadonlySet<string>>(() => new Set());
+  const [dataPagamento, setDataPagamento] = useState('');
   const [forma, setForma] = useState<FormaDePagamento>('DINHEIRO');
   const [enviando, setEnviando] = useState(false);
   const { show } = useToast();
 
-  const selecao = useMemo(() => faixa.slice(0, indiceSelecionado + 1), [faixa, indiceSelecionado]);
-  const total = useMemo(() => selecao.reduce((soma, m) => soma + m.totalMinor, 0), [selecao]);
+  // So no cliente: `hojeLocal()` no render do servidor (UTC) divergiria do
+  // navegador perto da meia-noite e geraria erro de hidratacao.
+  useEffect(() => {
+    setDataPagamento(hojeLocal());
+  }, []);
 
-  function handleClique(indice: number): void {
-    // Clicar no ultimo mes ja selecionado recua a selecao em um; qualquer
-    // outro clique estende ate ali (Decisao 1 do PI: nunca cria buraco).
-    setIndiceSelecionado(indice === indiceSelecionado ? Math.max(indice - 1, -1) : indice);
+  const selecao = useMemo(() => faixa.filter((m) => selecionados.has(m.competencia)), [faixa, selecionados]);
+  const total = useMemo(() => selecao.reduce((soma, m) => soma + m.totalMinor, 0), [selecao]);
+  const dispensaveis = useMemo(() => mesesDispensaveis(faixa, selecionados), [faixa, selecionados]);
+  const dispensadosValidos = useMemo(
+    () => dispensaveis.filter((m) => dispensados.has(m.competencia)).map((m) => m.competencia),
+    [dispensaveis, dispensados],
+  );
+  const dataValida = dataPagamento !== '' && dataPagamento <= hojeLocal();
+
+  function alternar(competencia: string): void {
+    const proximo = new Set(selecionados);
+    if (proximo.has(competencia)) {
+      proximo.delete(competencia);
+    } else {
+      proximo.add(competencia);
+    }
+    setSelecionados(proximo);
+  }
+
+  function alternarDispensa(competencia: string): void {
+    const proximo = new Set(dispensados);
+    if (proximo.has(competencia)) {
+      proximo.delete(competencia);
+    } else {
+      proximo.add(competencia);
+    }
+    setDispensados(proximo);
   }
 
   async function handleReceber(): Promise<void> {
-    if (selecao.length === 0) {
+    if (selecao.length === 0 || !dataValida) {
       return;
     }
 
@@ -83,7 +113,9 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
 
     const resultado = await receberPagamentoEmLote({
       subscriptionId,
-      ateCompetencia: selecao[selecao.length - 1]!.competencia,
+      competencias: selecao.map((m) => m.competencia),
+      dispensar: dispensadosValidos,
+      paidAt: dataPagamento,
       channel: forma,
       expectedTotalMinor: total,
     });
@@ -109,37 +141,79 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
       <h3 id="titulo-faixa">Receber no balcão</h3>
 
       <div className={styles['chips']}>
-        {faixa.map((mes, indice) => (
-          <button
-            key={mes.competencia}
-            type="button"
-            className={styles['chip']}
-            data-selecionado={indice <= indiceSelecionado ? 'true' : undefined}
-            onClick={() => handleClique(indice)}
-            aria-pressed={indice <= indiceSelecionado}
-          >
-            <span className={styles['mesAno']}>{formatarMesAno(mes.competencia)}</span>
-            <span className={styles['status']}>{ROTULO_STATUS[mes.status]}</span>
-            <span className={styles['valor']}>
-              <Money cents={mes.totalMinor} />
-            </span>
-          </button>
-        ))}
+        {faixa.map((mes) => {
+          const marcado = selecionados.has(mes.competencia);
+
+          return (
+            <button
+              key={mes.competencia}
+              type="button"
+              className={styles['chip']}
+              data-selecionado={marcado ? 'true' : undefined}
+              onClick={() => alternar(mes.competencia)}
+              aria-pressed={marcado}
+            >
+              <span className={styles['mesAno']}>{formatarMesAno(mes.competencia)}</span>
+              <span className={styles['status']}>{ROTULO_STATUS[mes.status]}</span>
+              <span className={styles['valor']}>
+                <Money cents={mes.totalMinor} />
+              </span>
+            </button>
+          );
+        })}
       </div>
+
+      {dispensaveis.length > 0 ? (
+        <fieldset className={styles['dispensa']}>
+          <legend>Meses anteriores em aberto — o aluno não usou?</legend>
+          {dispensaveis.map((mes) => (
+            <label key={mes.competencia} className={styles['dispensaLinha']}>
+              <input
+                type="checkbox"
+                checked={dispensados.has(mes.competencia)}
+                onChange={() => alternarDispensa(mes.competencia)}
+              />
+              <span>
+                Dispensar {formatarMesAno(mes.competencia)} (<Money cents={mes.totalMinor} />) — mês não usado
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
 
       {selecao.length > 0 ? (
         <p className={styles['resumo']}>
-          {selecao.length} {selecao.length === 1 ? 'mês' : 'meses'} · {formatarMesAno(selecao[0]!.competencia)} a{' '}
-          {formatarMesAno(selecao[selecao.length - 1]!.competencia)} · Total <Money cents={total} />
+          {selecao.length} {selecao.length === 1 ? 'mês' : 'meses'} · {selecao.map((m) => formatarMesAno(m.competencia)).join(', ')} ·
+          Total <Money cents={total} />
         </p>
       ) : null}
+
+      <div className={styles['data']}>
+        <Field
+          id="data-do-pagamento"
+          type="date"
+          label="Data do pagamento"
+          value={dataPagamento}
+          max={hojeLocal()}
+          onChange={(evento) => setDataPagamento(evento.target.value)}
+          aria-required="true"
+          {...(dataPagamento !== '' && !dataValida
+            ? { invalid: true, error: 'A data do pagamento não pode ser futura.' }
+            : {})}
+        />
+        {selecao.length > 0 && dataValida ? (
+          <p className={styles['vigencia']}>
+            Vigente até {formatarData(vigenteAte(dataPagamento, selecao.length))}, mais a carência.
+          </p>
+        ) : null}
+      </div>
 
       <SeletorDeForma onEscolher={setForma} escolhida={forma} />
 
       <Button
         variant="solid"
         type="button"
-        disabled={selecao.length === 0 || enviando}
+        disabled={selecao.length === 0 || !dataValida || enviando}
         onClick={() => void handleReceber()}
       >
         {enviando ? 'Recebendo…' : 'Receber'}
