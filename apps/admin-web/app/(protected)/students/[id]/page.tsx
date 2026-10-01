@@ -296,6 +296,10 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             subscriptionId: direito.subscriptionId,
             version: direito.subscriptionVersion,
             planName: null,
+            // Vigencia MANTIDA pela troca de plano (achado da revisao de
+            // branch inteiro): o formulario de troca nao pede mais
+            // inicio/fim -- so informa ate quando o acesso atual vale.
+            endsAt: direito.endsAt,
             billingMode: direito.planBillingMode ?? 'AVULSO',
             recorrenciaAtiva: direito.recorrenciaAtiva,
             planCurrentPrice: direito.planCurrentPrice,
@@ -824,6 +828,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                   planos={planos}
                   impedido={bloqueado}
                   vigente={assinaturaVigente}
+                  timezone={timezoneDaUnidade ?? FUSO_PROVISORIO}
                 />
               )}
             </section>

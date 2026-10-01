@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, SelectField, TextareaField, useToastDeErro } from '@arenahub/ui';
+import { Button, Field, SelectField, TenantDateTime, TextareaField, useToastDeErro } from '@arenahub/ui';
 
 import estilos from '../../../formulario.module.css';
 
@@ -26,6 +26,15 @@ export interface AssinaturaVigente {
   subscriptionId: string;
   version: number;
   planName: string | null;
+  /**
+   * Fim da vigência ATUAL, em ISO.
+   *
+   * A troca de plano MANTÉM esta data (`trocarPlanoDaAssinatura` herda
+   * `endsAt` da assinatura antiga) -- o formulário não pede mais
+   * início/fim no modo troca, e este campo é o que a tela mostra no lugar
+   * dos dois inputs (achado da revisão de branch inteiro).
+   */
+  endsAt: string;
 }
 
 interface Props {
@@ -38,6 +47,12 @@ interface Props {
    * é o de atribuição de sempre.
    */
   vigente?: AssinaturaVigente | undefined;
+  /**
+   * Fuso da UNIDADE, para formatar `vigente.endsAt` (regra 5 do DS §11 --
+   * `TenantDateTime` é a única formatação de data autorizada). Mesmo valor
+   * que o `page.tsx` já usa (`FUSO_PROVISORIO`/`timezoneDaUnidade`).
+   */
+  timezone: string;
 }
 
 const ESTADO_INICIAL: EstadoDaAssinatura = {};
@@ -70,7 +85,7 @@ function BotaoDeAtribuicao({ troca }: { troca: boolean }) {
  * humana registrada, e não de um pagamento. No MVP 2 a mesma cadeia passa a
  * ser alimentada por invoice — mas a catraca continua lendo só o entitlement.
  */
-export function AtribuirPlano({ studentId, planos, impedido, vigente }: Props) {
+export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }: Props) {
   /*
    * FECHADO POR PADRÃO (decisão do PI, 24/08/2026).
    *
@@ -109,7 +124,7 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente }: Props) {
       <div role="status" data-testid="plano-atribuido">
         <p>
           {troca
-            ? 'Plano alterado. O plano anterior foi encerrado e o novo direito de acesso já vale a partir do início da vigência.'
+            ? 'Plano trocado. O plano anterior foi encerrado e o novo já vale agora, com a vigência mantida.'
             : 'Plano atribuído. O direito de acesso foi criado e já vale a partir do início da vigência.'}
         </p>
         <p>
@@ -199,28 +214,40 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente }: Props) {
         ))}
       </SelectField>
 
-      {/* Início e fim lado a lado: são a mesma decisão, lida de uma vez. */}
-      <div className={estilos['par']}>
-        <Field
-          id="inicio"
-          name="startsAt"
-          label="Início da vigência"
-          type="datetime-local"
-          defaultValue={estado.valores?.startsAt ?? ''}
-          required
-          data-testid="campo-inicio"
-        />
+      {/*
+        TROCA: a rota atômica herda `endsAt` da assinatura antiga e ignora
+        início/fim -- pedir os dois campos era ruído que a recepção
+        preenchia para nada (achado da revisão de branch inteiro). No lugar,
+        uma linha informativa com a vigência que CONTINUA valendo.
+      */}
+      {troca ? (
+        <p data-testid="vigencia-mantida">
+          Vigência mantida até <TenantDateTime iso={vigente.endsAt} timeZone={timezone} format="date" />.
+        </p>
+      ) : (
+        /* Início e fim lado a lado: são a mesma decisão, lida de uma vez. */
+        <div className={estilos['par']}>
+          <Field
+            id="inicio"
+            name="startsAt"
+            label="Início da vigência"
+            type="datetime-local"
+            defaultValue={estado.valores?.startsAt ?? ''}
+            required
+            data-testid="campo-inicio"
+          />
 
-        <Field
-          id="fim"
-          name="endsAt"
-          label="Fim da vigência"
-          type="datetime-local"
-          defaultValue={estado.valores?.endsAt ?? ''}
-          required
-          data-testid="campo-fim"
-        />
-      </div>
+          <Field
+            id="fim"
+            name="endsAt"
+            label="Fim da vigência"
+            type="datetime-local"
+            defaultValue={estado.valores?.endsAt ?? ''}
+            required
+            data-testid="campo-fim"
+          />
+        </div>
+      )}
 
       <TextareaField
         id="motivo-atribuicao"

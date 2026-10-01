@@ -69,20 +69,13 @@ describe('atribuirPlano', () => {
   /**
    * O CORACAO DESTA FATIA.
    *
-   * `POST /subscriptions` CRIA, nao substitui. Sem o cancelamento antes, o
-   * aluno fica com duas assinaturas e dois entitlements ACTIVE: a lista
-   * mostra o plano novo (le a assinatura mais recente) e a catraca continua
-   * honrando o antigo pela uniao das janelas. A tela mente e o acesso nao
-   * muda.
+   * Uma chamada so, atomica (F82): POST /subscriptions/:id/trocar-plano
+   * substitui as duas chamadas sequenciais (CANCEL depois POST) que existiam
+   * aqui. A troca acontece numa transacao so no backend, entao nao ha mais
+   * janela em que o aluno fique com duas assinaturas ativas nem sem nenhuma.
    */
-  it('com assinatura vigente, CANCELA a anterior ANTES de criar a nova', async () => {
-    vi.mocked(chamarApi)
-      .mockResolvedValueOnce({
-        ok: true,
-        dados: { id: ASSINATURA_ANTIGA, status: 'CANCELLED' },
-        cookiesDaApi: [],
-      })
-      .mockResolvedValueOnce(assinaturaCriada());
+  it('com assinatura vigente, chama a rota atomica de troca -- nao cancela e cria em duas chamadas', async () => {
+    vi.mocked(chamarApi).mockResolvedValueOnce(assinaturaCriada());
 
     const estado = await atribuirPlano(
       {},
@@ -92,24 +85,21 @@ describe('atribuirPlano', () => {
     expect(estado.sucesso).toBeDefined();
 
     const chamadas = vi.mocked(chamarApi).mock.calls;
-    expect(chamadas).toHaveLength(2);
+    expect(chamadas).toHaveLength(1);
 
-    // ORDEM: cancelamento primeiro, criacao depois.
-    expect(chamadas[0]?.[0]).toBe(`/api/v1/subscriptions/${ASSINATURA_ANTIGA}/actions`);
+    expect(chamadas[0]?.[0]).toBe(`/api/v1/subscriptions/${ASSINATURA_ANTIGA}/trocar-plano`);
     expect(chamadas[0]?.[1]).toMatchObject({
-      corpo: { action: 'CANCEL', version: 4 },
+      corpo: { planId: PLANO, version: 4, reason: 'Aluno pediu upgrade do plano' },
     });
-    expect(chamadas[1]?.[0]).toBe('/api/v1/subscriptions');
   });
 
   /**
-   * Cancelamento falhou: NAO cria a nova.
+   * A troca falhou (ex.: conflito de versao): nada foi criado nem encerrado.
    *
-   * Criar assim mesmo deixaria o aluno com o plano antigo vivo E um novo por
-   * cima -- o estado exato que a troca existe para evitar, alcancado por um
-   * caminho de erro.
+   * A rota e atomica -- uma unica chamada, e se ela recusa, nao ha segunda
+   * chamada de criacao para desfazer nem plano antigo para reativar.
    */
-  it('nao cria a nova assinatura quando o cancelamento falha', async () => {
+  it('nao cria assinatura quando a troca falha', async () => {
     vi.mocked(chamarApi).mockResolvedValueOnce({
       ok: false,
       erro: {
@@ -129,7 +119,7 @@ describe('atribuirPlano', () => {
 
     expect(estado.sucesso).toBeUndefined();
     expect(estado.erro).toContain('Alguém alterou esta assinatura');
-    // UMA chamada: a criacao nunca aconteceu.
+    // UMA chamada: a rota atomica recusou e nao ha segunda chamada.
     expect(vi.mocked(chamarApi)).toHaveBeenCalledTimes(1);
   });
 

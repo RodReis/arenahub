@@ -108,6 +108,14 @@ const esquemaDeAlteracao = z
   })
   .strict();
 
+const esquemaDeTrocaDePlano = z
+  .object({
+    planId: z.uuid(),
+    version: z.number().int().min(0),
+    reason: z.string().min(3).max(300),
+  })
+  .strict();
+
 const esquemaDeConvidado = z
   .object({
     guestName: z.string().min(1).max(120),
@@ -461,6 +469,115 @@ export class MembershipController {
     if (!assinatura) throw new ConflitoDeVersaoError();
 
     return { id: assinatura.id, status: assinatura.status };
+  }
+
+  @Post('subscriptions/:id/trocar-plano')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['subscriptionId', 'entitlement'],
+      properties: {
+        subscriptionId: { type: 'string' },
+        entitlement: {
+          type: 'object',
+          required: [
+            'id',
+            'source',
+            'status',
+            'startsAt',
+            'endsAt',
+            'reason',
+            'subscriptionId',
+            'subscriptionVersion',
+            'planBillingMode',
+            'recorrenciaAtiva',
+            'planName',
+            'planCurrentPrice',
+            'janelas',
+          ],
+          properties: {
+            id: { type: 'string' },
+            source: { type: 'string' },
+            status: { type: 'string' },
+            startsAt: { type: 'string' },
+            endsAt: { type: 'string' },
+            reason: { type: 'string', nullable: true },
+            subscriptionId: { type: 'string', nullable: true },
+            subscriptionVersion: { type: 'number', nullable: true },
+            planBillingMode: { type: 'string', nullable: true },
+            recorrenciaAtiva: { type: 'boolean' },
+            planName: { type: 'string', nullable: true },
+            planCurrentPrice: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                amountMinor: { type: 'number' },
+                currency: { type: 'string' },
+                validFrom: { type: 'string' },
+              },
+            },
+            janelas: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  gymUnitId: { type: 'string' },
+                  dayOfWeek: { type: 'number' },
+                  startMinute: { type: 'number' },
+                  endMinute: { type: 'number' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @RequirePermissions('subscription.manage')
+  async trocarPlano(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ subscriptionId: string; entitlement: EntitlementDto }> {
+    const dados = esquemaDeTrocaDePlano.parse(corpo);
+    const contexto = this.contexto.require();
+
+    // Duas etapas, igual a convencao do arquivo de teste (404 "nunca
+    // confirma existencia" de recurso de outro tenant -- ver
+    // `devolve 404 ao detalhar aluno de outro tenant`): 1) confirma que o id
+    // existe no MEU tenant sem revelar mais nada sobre ele -- `encontrarAssinatura`
+    // ja filtra por tenant, entao "nao existe" e "existe em outro tenant" caem
+    // os dois em `null`/404 SUBSCRIPTION_NOT_FOUND, mesmo resultado pratico de
+    // `alterarAssinatura` (equivalente a `assinaturaPertenceAoTenant`, removido
+    // do repository na revisao de branch inteiro por ser redundante com este
+    // metodo). So chegando aqui com o tenant certo e que o `updateMany` de
+    // `trocarPlanoDaAssinatura` (que ja filtra id + tenantId + version +
+    // status no mesmo comando) decide entre sucesso e 409 por
+    // version/status desatualizado.
+    const existente = await this.membership.encontrarAssinatura(contexto, id);
+    if (!existente) throw new NotFoundException({ code: 'SUBSCRIPTION_NOT_FOUND' });
+
+    const resultado = await this.membership.trocarPlanoDaAssinatura(
+      contexto,
+      id,
+      { planId: dados.planId, versaoEsperada: dados.version, reason: dados.reason },
+      requisicao.correlationId ?? 'sem-correlacao',
+      new Date(),
+    );
+
+    if (!resultado) throw new ConflitoDeVersaoError();
+
+    const comJanelas = await this.membership.listarEntitlementsDoAluno(
+      contexto,
+      resultado.subscription.studentId,
+    );
+
+    const criado = comJanelas.find((e) => e.id === resultado.entitlement.id)!;
+
+    return {
+      subscriptionId: resultado.subscription.id,
+      entitlement: this.entitlementParaDto(criado),
+    };
   }
 
   /**

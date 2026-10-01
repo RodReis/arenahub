@@ -197,6 +197,15 @@ export class MembershipRepository {
     private readonly alunos: StudentRepository,
   ) {}
 
+  /**
+   * Sentinela para "sem termino previsto" -- distingue assinatura recorrente
+   * com prazo aberto (endsAt null) de entitlement que exige endsAt nao-nulo
+   * no schema. O valor absurdamente distante evita colisao com datas legais e
+   * torna o intent claro em logs/queries. Mesma pratica em
+   * `operations.repository.ts:escolherVigenciaMaisLonga`.
+   */
+  private readonly SEM_TERMINO_PREVISTO = new Date('9999-12-31T00:00:00.000Z');
+
   // -------------------------------------------------------------------------
   // Planos
   // -------------------------------------------------------------------------
@@ -806,6 +815,47 @@ export class MembershipRepository {
   }
 
   /**
+   * SO a metade de `registrarDerivacao` que fala do ENTITLEMENT: timeline
+   * `ENTITLEMENT_ACTIVATED` + outbox `EntitlementActivated`.
+   *
+   * NAO reaproveita `registrarDerivacao` inteiro (achado da revisao de
+   * branch inteiro): aquele tambem grava `SUBSCRIPTION_ACTIVATED` +
+   * `SubscriptionActivated` + `AuditLog` de `subscription.activated` -- que
+   * aqui seria FALSO. A assinatura desta troca nao foi "ativada", foi criada
+   * por uma substituicao, e ja tem o proprio evento dedicado
+   * (`SUBSCRIPTION_PLAN_CHANGED`/`SubscriptionPlanChanged`, gravado por
+   * `trocarPlanoDaAssinatura`). Duplicar o rotulo de ativacao confundiria
+   * qualquer consumidor de outbox que conte ativacoes de assinatura.
+   */
+  private async registrarEntitlementAtivado(
+    tx: Prisma.TransactionClient,
+    contexto: TenantContext,
+    dados: { studentId: string; entitlementId: string; correlationId: string },
+  ): Promise<void> {
+    await tx.studentTimelineEvent.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId: dados.studentId,
+        type: 'ENTITLEMENT_ACTIVATED',
+        actorType: 'USER',
+        actorId: contexto.actorId,
+        correlationId: dados.correlationId,
+        payload: { entitlementId: dados.entitlementId, source: 'SUBSCRIPTION' },
+      },
+    });
+
+    await tx.outboxEvent.create({
+      data: {
+        tenantId: contexto.tenantId,
+        eventType: 'EntitlementActivated',
+        aggregateType: 'Entitlement',
+        aggregateId: dados.entitlementId,
+        payload: { studentId: dados.studentId, source: 'SUBSCRIPTION' },
+      },
+    });
+  }
+
+  /**
    * Pausa, retoma ou cancela a assinatura, propagando ao entitlement.
    *
    * A propagacao e o ponto: mexer na assinatura sem mexer no direito
@@ -918,6 +968,220 @@ export class MembershipRepository {
       });
 
       return assinatura;
+    });
+  }
+
+  /**
+   * Troca o plano de uma assinatura ACTIVE numa operacao atomica.
+   *
+   * NAO reaproveita `alterarAssinatura`: aquele muda o ESTADO da mesma
+   * assinatura (PAUSE/RESUME/CANCEL); trocar plano CRIA uma assinatura nova
+   * -- `planId` e imutavel numa `Subscription` existente. Substitui a UI
+   * atual (`atribuir-plano.tsx`), que fazia isso como duas chamadas HTTP
+   * separadas (CANCEL depois POST) com risco de falha parcial documentado
+   * em comentario -- ver `apps/admin-web/app/actions/membership.ts:357-404`.
+   *
+   * Trava otimista por `version` (INV-061), mesmo padrao de
+   * `alterarAssinatura`: comando que leu estado antigo devolve `null` em vez
+   * de sobrescrever.
+   */
+  async trocarPlanoDaAssinatura(
+    contexto: TenantContext,
+    subscriptionId: string,
+    entrada: { planId: string; versaoEsperada: number; reason: string },
+    correlationId: string,
+    agora: Date,
+  ): Promise<{ subscription: Subscription; entitlement: Entitlement } | null> {
+    const origem = await this.encontrarAssinatura(contexto, subscriptionId);
+    if (!origem) return null;
+
+    // INV-033, mesma ordem de `ativarAssinatura` (linha 676): falha ANTES da
+    // transacao -- senao a assinatura antiga seria cancelada sem o aluno
+    // poder receber a nova.
+    const aluno = await this.alunos.verificarElegibilidade(contexto, origem.studentId);
+    if (!aluno) throw new ErroDeDominio('STUDENT_NOT_FOUND', 404, 'Aluno nao encontrado');
+    if (!aluno.elegivel) throw new AlunoNaoElegivelError(aluno.status);
+
+    const plano = await this.encontrarPlano(contexto, entrada.planId);
+    if (!plano) throw new PlanoNaoEncontradoError();
+
+    // Falha ANTES da transacao: nao ha o que desfazer. Mesma ordem de
+    // `ativarAssinatura` (linha 680) -- o entitlement nunca nasce sem
+    // janela nenhuma (PlanoSemJanelaError).
+    if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
+
+    const janelas: JanelaDeAcesso[] = plano.accessWindows.map((j) => ({
+      gymUnitId: j.gymUnitId,
+      dayOfWeek: j.dayOfWeek,
+      startMinute: j.startMinute,
+      endMinute: j.endMinute,
+    }));
+
+    const snapshot = montarSnapshotDePolitica(
+      plano.id,
+      plano.name,
+      plano.units.map((u) => u.gymUnitId),
+      janelas,
+    );
+
+    // Competencia CORRENTE apenas (achado da revisao de branch inteiro,
+    // decisao do PI): trocar de plano cancela so a invoice do mes atual, nao
+    // divida vencida de meses anteriores -- trocar de plano nao perdoa
+    // atraso. Mesma funcao pura de normalizacao usada em todo o resto do
+    // modulo de billing (`abrirInvoiceDoPeriodo`, `criarPlano`).
+    const competenciaCorrente = competenciaDe(agora);
+
+    return this.db.$transaction(async (tx) => {
+      await this.travarAlunoElegivel(tx, contexto, origem.studentId);
+
+      const alterados = await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          tenantId: contexto.tenantId,
+          version: entrada.versaoEsperada,
+          status: 'ACTIVE',
+        },
+        data: {
+          status: 'CANCELLED',
+          version: { increment: 1 },
+          lastActorId: contexto.actorId,
+          lastReason: entrada.reason,
+        },
+      });
+
+      if (alterados.count === 0) return null;
+
+      const antiga = await tx.subscription.findFirstOrThrow({
+        where: { id: subscriptionId, tenantId: contexto.tenantId },
+      });
+
+      const nova = await tx.subscription.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: antiga.studentId,
+          planId: entrada.planId,
+          status: 'ACTIVE',
+          startsAt: agora,
+          // Mesma vigencia contratual -- trocar plano nao estende nem
+          // encurta o contrato (spec SEC-082 #6).
+          endsAt: antiga.endsAt,
+          lastActorId: contexto.actorId,
+          lastReason: entrada.reason,
+        },
+      });
+
+      const entitlementNovo = await tx.entitlement.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: antiga.studentId,
+          source: 'SUBSCRIPTION',
+          subscriptionId: nova.id,
+          status: 'ACTIVE',
+          startsAt: agora,
+          endsAt: antiga.endsAt ?? this.SEM_TERMINO_PREVISTO,
+          policySnapshot: snapshot as unknown as Prisma.InputJsonValue,
+          unitWindows: {
+            create: janelas.map((j) => ({ ...j, tenantId: contexto.tenantId })),
+          },
+        },
+      });
+
+      // REVOKED e EXPIRED sao terminais (CONVENTION 3.3) -- mesmo filtro de
+      // `alterarAssinatura` (linha 873).
+      await tx.entitlement.updateMany({
+        where: {
+          tenantId: contexto.tenantId,
+          subscriptionId,
+          status: { notIn: ['REVOKED', 'EXPIRED'] },
+        },
+        data: { status: 'REVOKED', revokedAt: agora },
+      });
+
+      // Sem reemissao automatica -- a proxima cobranca sai do ciclo normal,
+      // ja no plano novo (spec SEC-082 #6, fora de escopo #3). SO a
+      // competencia CORRENTE: divida vencida de mes anterior nao e
+      // perdoada pela troca (achado da revisao de branch inteiro). Caminho
+      // comum tem ZERO invoice pendente: `updateMany` sobre zero linhas nao
+      // e erro, so nao muda nada.
+      const invoicesCanceladas = await tx.invoice.findMany({
+        where: {
+          tenantId: contexto.tenantId,
+          subscriptionId,
+          status: { in: ['OPEN', 'OVERDUE'] },
+          billingPeriod: competenciaCorrente,
+        },
+        select: { id: true },
+      });
+
+      if (invoicesCanceladas.length > 0) {
+        await tx.invoice.updateMany({
+          where: { id: { in: invoicesCanceladas.map((i) => i.id) } },
+          data: { status: 'CANCELLED', version: { increment: 1 } },
+        });
+      }
+
+      await tx.studentTimelineEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          studentId: antiga.studentId,
+          type: 'SUBSCRIPTION_PLAN_CHANGED',
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          correlationId,
+          payload: {
+            fromSubscriptionId: subscriptionId,
+            toSubscriptionId: nova.id,
+            fromPlanId: antiga.planId,
+            toPlanId: entrada.planId,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'subscription.plan_changed',
+          target: 'subscription',
+          targetId: nova.id,
+          correlationId,
+          metadata: {
+            fromSubscriptionId: subscriptionId,
+            toSubscriptionId: nova.id,
+            reason: entrada.reason,
+            cancelledInvoiceIds: invoicesCanceladas.map((i) => i.id),
+          },
+        },
+      });
+
+      await tx.outboxEvent.create({
+        data: {
+          tenantId: contexto.tenantId,
+          eventType: 'SubscriptionPlanChanged',
+          aggregateType: 'Subscription',
+          aggregateId: nova.id,
+          payload: {
+            studentId: antiga.studentId,
+            fromSubscriptionId: subscriptionId,
+            toSubscriptionId: nova.id,
+          },
+        },
+      });
+
+      // MESMO evento de ENTITLEMENT que `ativarAssinatura` gera (achado da
+      // revisao de branch inteiro): qualquer consumidor futuro de outbox que
+      // espera `EntitlementActivated` para conceder/atualizar acesso nao
+      // pode ficar cego so porque o entitlement nasceu de uma troca em vez
+      // de uma ativacao. NAO usa `registrarDerivacao` inteiro -- ver
+      // `registrarEntitlementAtivado`.
+      await this.registrarEntitlementAtivado(tx, contexto, {
+        studentId: antiga.studentId,
+        entitlementId: entitlementNovo.id,
+        correlationId,
+      });
+
+      return { subscription: nova, entitlement: entitlementNovo };
     });
   }
 

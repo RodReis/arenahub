@@ -30,27 +30,46 @@ const esquemaDePlano = z.object({
   billingMode: z.enum(['AVULSO', 'ASSINATURA']).catch('AVULSO'),
 });
 
-const esquemaDeAssinatura = z.object({
-  studentId: z.string().uuid(),
-  planId: z.string().uuid('Selecione o plano'),
-  startsAt: z.string().min(1, 'Informe o início da vigência'),
-  endsAt: z.string().min(1, 'Informe o fim da vigência'),
-  reason: z
-    .string()
-    .trim()
-    .min(3, 'Descreva o motivo — a auditoria depende disso')
-    .max(300, 'Motivo longo demais'),
-  /**
-   * Assinatura vigente a SUBSTITUIR, quando existe.
-   *
-   * Presentes juntos ou ausentes juntos: cancelar exige id e versão, e ter
-   * um sem o outro é sempre erro de montagem da tela, nunca entrada da
-   * recepção. Ausentes = o aluno não tem plano, e isto é uma atribuição
-   * comum.
-   */
-  substituiSubscriptionId: z.string().uuid().optional(),
-  substituiVersion: z.coerce.number().int().min(0).optional(),
-});
+/**
+ * `startsAt`/`endsAt` são OPCIONAIS no schema base e exigidos só no
+ * `.refine()` abaixo, quando `substituiSubscriptionId` está ausente.
+ *
+ * NO MODO TROCA a tela nem renderiza os dois campos (achado da revisão de
+ * branch inteiro): a rota atômica ignora `startsAt`/`endsAt` e sempre herda
+ * `endsAt` da assinatura antiga, então pedir as duas datas era ruído puro.
+ * Exigi-las sempre faria a Server Action recusar um formulário que a própria
+ * tela já não envia mais.
+ */
+const esquemaDeAssinatura = z
+  .object({
+    studentId: z.string().uuid(),
+    planId: z.string().uuid('Selecione o plano'),
+    startsAt: z.string().optional(),
+    endsAt: z.string().optional(),
+    reason: z
+      .string()
+      .trim()
+      .min(3, 'Descreva o motivo — a auditoria depende disso')
+      .max(300, 'Motivo longo demais'),
+    /**
+     * Assinatura vigente a SUBSTITUIR, quando existe.
+     *
+     * Presentes juntos ou ausentes juntos: cancelar exige id e versão, e ter
+     * um sem o outro é sempre erro de montagem da tela, nunca entrada da
+     * recepção. Ausentes = o aluno não tem plano, e isto é uma atribuição
+     * comum.
+     */
+    substituiSubscriptionId: z.string().uuid().optional(),
+    substituiVersion: z.coerce.number().int().min(0).optional(),
+  })
+  .refine((dados) => dados.substituiSubscriptionId !== undefined || (dados.startsAt ?? '') !== '', {
+    message: 'Informe o início da vigência',
+    path: ['startsAt'],
+  })
+  .refine((dados) => dados.substituiSubscriptionId !== undefined || (dados.endsAt ?? '') !== '', {
+    message: 'Informe o fim da vigência',
+    path: ['endsAt'],
+  });
 
 export interface EstadoDoPlano {
   erro?: string;
@@ -343,6 +362,48 @@ export async function atribuirPlano(
     };
   }
 
+  /*
+   * TROCA DE PLANO: uma chamada so, atomica (F82) -- POST
+   * /subscriptions/:id/trocar-plano substitui as duas chamadas sequenciais
+   * (CANCEL depois POST) que existiam aqui. Sem janela de falha parcial: a
+   * troca acontece numa transacao so no backend
+   * (MembershipRepository.trocarPlanoDaAssinatura), entao nao ha mais como
+   * o aluno ficar sem plano no meio do caminho.
+   */
+  if (validado.data.substituiSubscriptionId !== undefined) {
+    if (validado.data.substituiVersion === undefined) {
+      return { erro: 'Não foi possível identificar a assinatura atual. Recarregue a ficha.', valores };
+    }
+
+    const troca = await chamarApi<{
+      subscriptionId: string;
+      entitlement: { id: string };
+    }>(`/api/v1/subscriptions/${validado.data.substituiSubscriptionId}/trocar-plano`, {
+      metodo: 'POST',
+      corpo: {
+        planId: validado.data.planId,
+        version: validado.data.substituiVersion,
+        reason: validado.data.reason,
+      },
+    });
+
+    if (!troca.ok || !troca.dados) {
+      return { erro: frase(troca.erro?.code ?? '', 'Não foi possível trocar o plano'), valores };
+    }
+
+    revalidatePath(`/students/${bruto.studentId}`);
+
+    return {
+      sucesso: {
+        subscriptionId: troca.dados.subscriptionId,
+        entitlementId: troca.dados.entitlement.id,
+      },
+    };
+  }
+
+  // Modo atribuição nova (sem `substituiSubscriptionId`): aqui sim
+  // `startsAt`/`endsAt` são obrigatórios -- o `.refine()` do schema já
+  // garantiu que não vieram vazios.
   const inicio = instanteIso(bruto.startsAt);
   const fim = instanteIso(bruto.endsAt);
 
@@ -352,55 +413,6 @@ export async function atribuirPlano(
 
   if (new Date(fim).getTime() <= new Date(inicio).getTime()) {
     return { erro: 'O fim da vigência precisa ser depois do início.', valores };
-  }
-
-  /*
-   * TROCA DE PLANO: cancela a anterior ANTES de criar a nova.
-   *
-   * `POST /subscriptions` não substitui nada — cria. Atribuir um segundo
-   * plano sem cancelar o primeiro deixa DUAS assinaturas e DOIS entitlements
-   * ativos, e a catraca segue honrando o antigo pela união das janelas: a
-   * tela mostra o plano novo (a lista lê a assinatura mais recente) enquanto
-   * o acesso continua valendo pelo velho. Bug silencioso, no caminho da
-   * catraca.
-   *
-   * A ORDEM não é indiferente. Cancelar depois de criar deixaria os dois
-   * ativos se o cancelamento falhasse — exatamente o estado que este código
-   * existe para impedir. Cancelando antes, a falha inversa (cancelou e a
-   * criação falhou) deixa o aluno SEM plano: visível na hora, na própria
-   * ficha, e corrigível atribuindo de novo. Entre um erro que se vê e um que
-   * some, escolhe-se o que se vê.
-   *
-   * O `CANCEL` revoga o entitlement na mesma transação da API
-   * (`alterarAssinatura`), então não há janela em que a assinatura esteja
-   * cancelada e o direito de acesso continue de pé.
-   */
-  if (validado.data.substituiSubscriptionId !== undefined) {
-    if (validado.data.substituiVersion === undefined) {
-      return { erro: 'Não foi possível identificar a assinatura atual. Recarregue a ficha.', valores };
-    }
-
-    const cancelamento = await chamarApi<{ id: string; status: string }>(
-      `/api/v1/subscriptions/${validado.data.substituiSubscriptionId}/actions`,
-      {
-        metodo: 'POST',
-        corpo: {
-          action: 'CANCEL',
-          version: validado.data.substituiVersion,
-          reason: validado.data.reason,
-        },
-      },
-    );
-
-    if (!cancelamento.ok) {
-      return {
-        erro: frase(
-          cancelamento.erro?.code ?? '',
-          'Não foi possível encerrar o plano atual, e por isso o novo não foi atribuído',
-        ),
-        valores,
-      };
-    }
   }
 
   // ATENÇÃO: esta rota NÃO é idempotente — decisão registrada na issue #7,
