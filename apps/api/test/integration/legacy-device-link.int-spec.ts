@@ -324,9 +324,9 @@ describe('#468 -- vinculo legado do leitor', () => {
   });
 
   /*
-   * Revisao do #468: a importacao NAO pode desfazer a decisao do aluno. Quem
-   * recusou a biometria ou teve a identidade revogada continua com o cadastro
-   * antigo no leitor -- e ele nao pode voltar a abrir a catraca (regra no 7).
+   * ADR-064 (decisao do PI, 01/10/2026): todo aluno da base do leitor entra
+   * com consentimento ACEITO. Recusa registrada ou identidade encerrada nao
+   * barram mais a importacao -- antes barravam (regra no 7, revogada).
    */
   const consentimento = async (studentId: string, decision: 'ACCEPTED' | 'REFUSED') => {
     const documento = await db.consentDocument.findFirstOrThrow({
@@ -346,21 +346,27 @@ describe('#468 -- vinculo legado do leitor', () => {
     });
   };
 
-  it('NAO vincula aluno que recusou a biometria', async () => {
+  it('vincula aluno que tinha recusado, com consentimento ACEITO vigente (ADR-064)', async () => {
     const alunoId = await criarAluno('G', [{ kind: 'TURNSTILE_CARD', externalId: '7007' }]);
-    await consentimento(alunoId, 'REFUSED');
+    const recusa = await consentimento(alunoId, 'REFUSED');
 
     const resposta = await vincular({ deviceSerial: serial, externalUserIds: ['7007'] });
 
-    expect(resposta.body).toMatchObject({ linked: 0, refusedOrRevoked: ['7007'] });
+    expect(resposta.body).toMatchObject({ linked: 1, refusedOrRevoked: [] });
 
-    const recusaSegueVigente = await db.consentRecord.findFirstOrThrow({
-      where: { studentId: alunoId },
+    const vinculo = await db.deviceUser.findUniqueOrThrow({
+      where: { deviceId_externalUserId: { deviceId: ctx.deviceId, externalUserId: '7007' } },
+      include: { identity: { include: { consentRecord: true } } },
     });
-    expect(recusaSegueVigente.supersededAt).toBeNull();
+    expect(vinculo.identity.state).toBe('ACTIVE');
+    expect(vinculo.identity.consentRecord.decision).toBe('ACCEPTED');
+
+    // A recusa nao e apagada: fica no historico, substituida pelo aceite.
+    const recusaAntiga = await db.consentRecord.findUniqueOrThrow({ where: { id: recusa.id } });
+    expect(recusaAntiga.supersededAt).not.toBeNull();
   });
 
-  it('NAO vincula aluno com identidade revogada', async () => {
+  it('vincula aluno com identidade revogada, com identidade nova ATIVA (ADR-064)', async () => {
     const alunoId = await criarAluno('H', [{ kind: 'TURNSTILE_CARD', externalId: '8008' }]);
     const aceito = await consentimento(alunoId, 'ACCEPTED');
     await db.biometricIdentity.create({
@@ -374,7 +380,13 @@ describe('#468 -- vinculo legado do leitor', () => {
 
     const resposta = await vincular({ deviceSerial: serial, externalUserIds: ['8008'] });
 
-    expect(resposta.body).toMatchObject({ linked: 0, refusedOrRevoked: ['8008'] });
+    expect(resposta.body).toMatchObject({ linked: 1, refusedOrRevoked: [] });
+
+    const vinculo = await db.deviceUser.findUniqueOrThrow({
+      where: { deviceId_externalUserId: { deviceId: ctx.deviceId, externalUserId: '8008' } },
+      include: { identity: true },
+    });
+    expect(vinculo.identity.state).toBe('ACTIVE');
   });
 
   it('reusa o consentimento aceito que o aluno ja tem, sem criar o legado', async () => {

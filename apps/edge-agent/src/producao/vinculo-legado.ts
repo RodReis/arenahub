@@ -30,8 +30,14 @@ export const JANELA_DE_CADASTROS_MS = 2_000;
  */
 export const INTERVALO_ENTRE_TENTATIVAS_MS = 60_000;
 
-/** Teto por chamada, o mesmo da API. */
-export const TAMANHO_DO_LOTE = 1_000;
+/**
+ * Numeros por chamada. A API aceita ate 1.000, mas cada aluno novo custa uma
+ * transacao de consentimento e outra de identidade: na Arena Positiva
+ * (01/10/2026), 428 numeros numa chamada so passaram dos 15 s do cliente e o
+ * vinculo voltou `status 0`. Com 50, cada chamada fecha em poucos segundos, e
+ * a que falhar so refaz o proprio lote na tentativa seguinte.
+ */
+export const TAMANHO_DO_LOTE = 50;
 
 const CAMINHO = '/api/v1/edge/device-users/legacy-links';
 
