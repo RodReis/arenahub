@@ -48,6 +48,35 @@ function paraDatetimeLocal(instante: Date, timezone: string): string {
   return `${valor('year')}-${valor('month')}-${valor('day')}T${valor('hour')}:${valor('minute')}`;
 }
 
+/**
+ * O caminho de volta: `YYYY-MM-DDTHH:mm` digitado no fuso da academia vira
+ * instante ISO (UTC). `undefined` para entrada mal-formada.
+ *
+ * `new Date('2026-10-01T10:15')` lê a hora no fuso do PROCESSO -- e o
+ * servidor do painel roda em UTC. O filtro "10:15 a 11:15" de Brasília
+ * virava 07:15 a 08:15, e a passagem das 11:10 sumia da lista (Arena
+ * Positiva, 01/10/2026).
+ *
+ * Técnica: lê o valor como se fosse UTC, mede quanto o fuso difere nesse
+ * instante e desconta. A segunda passada acerta a virada de horário de
+ * verão, quando o deslocamento do palpite e o do resultado diferem.
+ */
+export function instanteNoFuso(valor: string, timezone: string): string | undefined {
+  const comoUtc = Date.parse(`${valor}:00Z`);
+
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(valor) || !Number.isFinite(comoUtc)) {
+    return undefined;
+  }
+
+  const deslocamento = (instante: number): number =>
+    Date.parse(`${paraDatetimeLocal(new Date(instante), timezone)}:00Z`) - instante;
+
+  let instante = comoUtc - deslocamento(comoUtc);
+  instante = comoUtc - deslocamento(instante);
+
+  return new Date(instante).toISOString();
+}
+
 export interface PeriodoPadrao {
   readonly de: string;
   readonly ate: string;

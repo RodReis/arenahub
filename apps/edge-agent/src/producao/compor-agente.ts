@@ -19,6 +19,7 @@ import type { EventoReconhecimento } from '../domain/facial-device.js';
 import { ehPassagemAoVivo } from '../domain/passagem-ao-vivo.js';
 import { registrarPassagemOffline } from './passagem-offline.js';
 import { ligarVinculoLegado } from './vinculo-legado.js';
+import { motivoLegivel } from './motivo-legivel.js';
 
 export interface AgenteComposto {
   /** Exposto para o heartbeat (#461) montar `devices` com o serial real. */
@@ -184,6 +185,7 @@ export async function compor(
             leitor: evento.serialDoDispositivo,
             outcome: r.outcome,
             reason: r.reason,
+            motivo: motivoLegivel(r.reason),
             estado: r.estado,
             latenciaDecisaoMs: r.latenciaDecisaoMs,
             duracaoPassagemMs: r.duracaoPassagemMs,
