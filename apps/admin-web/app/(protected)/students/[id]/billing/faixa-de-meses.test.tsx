@@ -1,16 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ToastProvider } from '@arenahub/ui';
 
+import { receberPagamentoEmLote } from '../../../../actions/billing';
 import { FaixaDeMeses } from './faixa-de-meses';
 import { PainelDeCobranca } from './painel-de-cobranca';
 
 /**
- * Faixa de meses -- F83, Task 7.
+ * Faixa de meses -- F83, Task 7, com a escolha LIVRE dos meses (decisao do PI,
+ * 01/10/2026: "pagou usou", sem contrato de 12 meses).
  *
  * `receberPagamentoEmLote` e mockado: e Server Action (`'use server'`), e o
  * componente so precisa provar que CHAMA com os dados certos, nao que a rota
- * de rede funciona -- isso e teste de integracao (F83, Task 5).
+ * de rede funciona -- isso e teste de integracao.
  *
  * `abrirCobranca` entra aqui so porque `PainelDeCobranca` (usado nos testes
  * de regressao abaixo) importa do mesmo modulo -- sem mocka-la o modulo real
@@ -37,35 +39,51 @@ const FAIXA = [
   { competencia: '2026-10', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-10-09' },
 ];
 
-describe('FaixaDeMeses', () => {
-  it('seleciona do vencido mais antigo ate o mes corrente por padrao', () => {
-    renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
+const chaveDe = (faixa: readonly { competencia: string; status: string }[]) =>
+  faixa.map((m) => `${m.competencia}:${m.status}`).join('|');
 
-    // set (OPEN, mes corrente) e o ultimo selecionado por padrao -- os dois
-    // OVERDUE (jul, ago) tambem estao selecionados.
-    expect(screen.getByText(/3 meses/i)).toBeInTheDocument();
-    expect(screen.getByText(/R\$ 450,00/)).toBeInTheDocument();
+describe('FaixaDeMeses', () => {
+  beforeEach(() => {
+    vi.mocked(receberPagamentoEmLote).mockClear();
   });
 
-  it('clicar num mes adiantado estende a selecao sem criar buraco', () => {
+  it('comeca so com a cobranca em aberto do mes corrente, sem arrastar os meses vencidos', () => {
+    renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+    expect(screen.getByText(/^1 mês/i)).toBeInTheDocument();
+    expect(screen.getByText(/Total/).textContent).toMatch(/R\$\s*150,00/);
+    expect(screen.getByRole('button', { name: /jul\/26/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('escolha livre: marca um mes adiantado sem criar nem exigir os anteriores', () => {
     renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /out\/26/i }));
 
-    expect(screen.getByText(/4 meses/i)).toBeInTheDocument();
-    expect(screen.getByText(/R\$ 600,00/)).toBeInTheDocument();
+    expect(screen.getByText(/^2 meses/i)).toBeInTheDocument();
+    expect(screen.getByText(/Total/).textContent).toMatch(/R\$\s*300,00/);
   });
 
-  it('clicar no ultimo mes selecionado recua a selecao em um', () => {
+  it('pode pagar um vencido SEM pagar o mes corrente (buraco permitido)', () => {
     renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
 
-    // set esta selecionado por padrao (ultimo da selecao inicial)
-    fireEvent.click(screen.getByRole('button', { name: /set\/26/i }));
+    fireEvent.click(screen.getByRole('button', { name: /set\/26/i })); // desmarca o corrente
+    fireEvent.click(screen.getByRole('button', { name: /jul\/26/i }));
 
-    expect(screen.getByText(/2 meses/i)).toBeInTheDocument();
+    expect(screen.getByText(/^1 mês/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /set\/26/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /jul\/26/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('aluno em dia (nenhum mes OVERDUE/OPEN antes do corrente) comeca sem selecao e botao desabilitado', () => {
+  it('clicar num mes marcado desmarca; sem nenhum mes, o botao Receber fica desabilitado', () => {
+    renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /set\/26/i }));
+
+    expect(screen.getByRole('button', { name: /receber/i })).toBeDisabled();
+  });
+
+  it('aluno em dia (nenhum mes OVERDUE/OPEN) comeca sem selecao e botao desabilitado', () => {
     const semAtraso = [{ competencia: '2026-09', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-09-09' }];
 
     renderComToast(<FaixaDeMeses faixa={semAtraso} subscriptionId="sub-1" onPago={vi.fn()} />);
@@ -73,125 +91,112 @@ describe('FaixaDeMeses', () => {
     expect(screen.getByRole('button', { name: /receber/i })).toBeDisabled();
   });
 
+  it('oferece DISPENSAR os meses anteriores em aberto que ficaram de fora', () => {
+    renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+    expect(screen.getByLabelText(/Dispensar jul\/26/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Dispensar ago\/26/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Dispensar out\/26/i)).not.toBeInTheDocument();
+  });
+
+  it('envia os meses escolhidos, os dispensados e a data do pagamento', async () => {
+    const onPago = vi.fn();
+    renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={onPago} />);
+
+    fireEvent.click(screen.getByLabelText(/Dispensar jul\/26/i));
+    fireEvent.change(screen.getByLabelText(/data do pagamento/i), { target: { value: '2026-09-20' } });
+    fireEvent.click(screen.getByRole('button', { name: /receber/i }));
+
+    await waitFor(() => expect(receberPagamentoEmLote).toHaveBeenCalledTimes(1));
+    expect(receberPagamentoEmLote).toHaveBeenCalledWith({
+      subscriptionId: 'sub-1',
+      competencias: ['2026-09'],
+      dispensar: ['2026-07'],
+      paidAt: '2026-09-20',
+      channel: 'DINHEIRO',
+      expectedTotalMinor: 15000,
+    });
+    await waitFor(() => expect(onPago).toHaveBeenCalled());
+  });
+
+  it('mostra ate quando vale o pagamento: data + 30 dias por mes, mais a carencia', () => {
+    renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/data do pagamento/i), { target: { value: '2026-09-15' } });
+    expect(screen.getByText(/Vigente até 15\/10\/2026, mais a carência/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /out\/26/i }));
+    expect(screen.getByText(/Vigente até 14\/11\/2026, mais a carência/i)).toBeInTheDocument();
+  });
+
+  it('data de pagamento futura e recusada: erro na tela e botao desabilitado', () => {
+    renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/data do pagamento/i), { target: { value: '2999-01-01' } });
+
+    expect(screen.getByText(/não pode ser futura/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /receber/i })).toBeDisabled();
+  });
+
   /**
    * Guarda de regressao do bug CRITICO achado na revisao (fix round 2):
-   * `useState(() => indiceInicial(faixa))` so roda no mount -- sem `key`
+   * `useState(() => selecaoInicial(faixa))` so roda no mount -- sem `key`
    * mudando em `painel-de-cobranca.tsx`, `router.refresh()` troca a prop
-   * `faixa` mas a selecao (indices) do ciclo ANTERIOR sobrevive, podendo
-   * marcar como selecionados meses que o aluno nao pediu para pagar.
-   *
-   * O fix e o `key` em `painel-de-cobranca.tsx` (nao algo dentro deste
-   * componente) -- entao o teste precisa provar o comportamento que o
-   * CONSUMIDOR (`painel-de-cobranca.tsx`) obtem: renderizar com uma key,
-   * trocar para uma key diferente (o mesmo padrao de
-   * `mesesPagaveis.map(...).join('|')`) e confirmar que a selecao foi
-   * recalculada a partir da NOVA faixa, nao herdada da antiga.
-   *
-   * Sem o `key` no `rerender` (ou seja, testando so com `rerender` simples),
-   * este teste passaria mesmo ANTES do fix -- porque RTL tambem preserva a
-   * instancia sem uma key que mude. A key mudando e o que faz o React
-   * desmontar/remontar, exatamente o que `painel-de-cobranca.tsx` faz.
+   * `faixa` mas a selecao do ciclo ANTERIOR sobrevive, podendo marcar como
+   * selecionados meses que o aluno nao pediu para pagar.
    */
-  it('troca de faixa com key nova (pagamento anterior) recalcula a selecao, nao herda indices antigos', () => {
-    const antesDoPagamento = FAIXA; // jul/ago OVERDUE, set OPEN, out NOT_OPENED
-
-    // Depois de pagar jul/ago/set em lote: esses 3 meses somem da faixa e
-    // entram novos meses adiantados (nov, dez) -- exatamente como o server
-    // re-fetch devolveria apos `router.refresh()`.
+  it('troca de faixa com key nova (pagamento anterior) recalcula a selecao, nao herda a antiga', () => {
     const depoisDoPagamento = [
       { competencia: '2026-10', status: 'OPEN' as const, invoiceId: 'out', totalMinor: 15000, dueAt: '2026-10-09' },
       { competencia: '2026-11', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-11-09' },
       { competencia: '2026-12', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-12-09' },
     ];
-
-    const chaveDe = (faixa: typeof antesDoPagamento) => faixa.map((m) => `${m.competencia}:${m.status}`).join('|');
-
     const onPago = vi.fn();
 
     const { rerender } = renderComToast(
-      <FaixaDeMeses key={chaveDe(antesDoPagamento)} faixa={antesDoPagamento} subscriptionId="sub-1" onPago={onPago} />,
+      <FaixaDeMeses key={chaveDe(FAIXA)} faixa={FAIXA} subscriptionId="sub-1" onPago={onPago} />,
     );
 
-    // Selecao inicial: 3 meses (jul, ago, set) -- confirma o estado ANTES do pagamento.
-    expect(screen.getByText(/3 meses/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /out\/26/i }));
+    expect(screen.getByText(/^2 meses/i)).toBeInTheDocument();
 
-    // `router.refresh()` troca a prop `faixa` E o `key` (padrao de
-    // `painel-de-cobranca.tsx`) -- simula o ciclo completo de pagamento.
     rerender(
       <ToastProvider>
         <FaixaDeMeses key={chaveDe(depoisDoPagamento)} faixa={depoisDoPagamento} subscriptionId="sub-1" onPago={onPago} />
       </ToastProvider>,
     );
 
-    // A NOVA faixa comeca com "out" OPEN -- indiceInicial deve selecionar
-    // so ele (1 mes), nunca os 3 antigos (que nem existem mais na faixa) nem
-    // um indice desalinhado que aponte para "nov" ou "dez" por engano. O
-    // resumo (unico <p>, "1 mês · out/26 a out/26 · Total R$ 150,00") prova
-    // a contagem E o total sem colidir com o valor repetido em cada chip.
     expect(screen.getByText(/^1 mês/i)).toBeInTheDocument();
     expect(screen.getByText(/Total/).textContent).toMatch(/R\$\s*150,00/);
-
-    // Confirma que "nov" e "dez" (adiantados) NAO estao marcados como
-    // selecionados -- seriam cobrados por engano se a selecao antiga vazasse.
     expect(screen.getByRole('button', { name: /nov\/26/i })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: /dez\/26/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
-  /**
-   * Contraprova do teste acima: quando o pai re-renderiza por um motivo NAO
-   * relacionado (a mesma `faixa`, mesmo `key`), a selecao EM PROGRESSO do
-   * usuario nao pode ser resetada. Prova que o fix (key) nao regride em
-   * over-reset.
-   */
+  /** Contraprova: re-render por motivo nao relacionado NAO reseta a escolha da recepcao. */
   it('re-render com a MESMA faixa (mesma key) preserva a selecao que o usuario escolheu', () => {
-    const chaveDe = (faixa: typeof FAIXA) => faixa.map((m) => `${m.competencia}:${m.status}`).join('|');
-    const onPagoA = vi.fn();
-    const onPagoB = vi.fn(); // prop diferente == re-render "por motivo nao relacionado"
-
     const { rerender } = renderComToast(
-      <FaixaDeMeses key={chaveDe(FAIXA)} faixa={FAIXA} subscriptionId="sub-1" onPago={onPagoA} />,
+      <FaixaDeMeses key={chaveDe(FAIXA)} faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />,
     );
 
-    // Usuario estende a selecao para incluir "out" (adiantado).
     fireEvent.click(screen.getByRole('button', { name: /out\/26/i }));
-    expect(screen.getByText(/4 meses/i)).toBeInTheDocument();
+    expect(screen.getByText(/^2 meses/i)).toBeInTheDocument();
 
-    // Mesma key, mesma faixa, so uma prop nao-relacionada (onPago) mudou --
-    // React NAO remonta, e a selecao do usuario deve sobreviver.
     rerender(
       <ToastProvider>
-        <FaixaDeMeses key={chaveDe(FAIXA)} faixa={FAIXA} subscriptionId="sub-1" onPago={onPagoB} />
+        <FaixaDeMeses key={chaveDe(FAIXA)} faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />
       </ToastProvider>,
     );
 
-    expect(screen.getByText(/4 meses/i)).toBeInTheDocument();
+    expect(screen.getByText(/^2 meses/i)).toBeInTheDocument();
   });
 });
 
 /**
- * Guarda de regressao de verdade do bug CRITICO (fix round 2) -- fix round 3.
- *
- * Os testes acima em `FaixaDeMeses` provam a semantica do `key` do React EM
- * GERAL, com uma copia LOCAL da logica de chave (`chaveDe`) escrita aqui no
- * teste. Isso nao prova que `painel-de-cobranca.tsx` de fato tem a linha
- * `key={mesesPagaveis.map(...).join('|')}` -- se alguem apagar essa linha do
- * arquivo real amanha, a suite acima continua verde, porque ela nunca toca
- * `painel-de-cobranca.tsx`.
- *
- * Estes dois testes renderizam o `PainelDeCobranca` DE VERDADE e provam o
- * comportamento nos dois sentidos.
+ * Guarda de regressao de verdade do bug CRITICO (fix round 2/3): renderiza o
+ * `PainelDeCobranca` DE VERDADE e prova que o `key` de `FaixaDeMeses` la
+ * dentro recalcula a selecao quando o conteudo da faixa muda.
  */
 describe('PainelDeCobranca -- key de FaixaDeMeses (regressao de verdade)', () => {
-  const FAIXA_A = [
-    { competencia: '2026-07', status: 'OVERDUE' as const, invoiceId: 'jul', totalMinor: 15000, dueAt: '2026-07-09' },
-    { competencia: '2026-08', status: 'OVERDUE' as const, invoiceId: 'ago', totalMinor: 15000, dueAt: '2026-08-09' },
-    { competencia: '2026-09', status: 'OPEN' as const, invoiceId: 'set', totalMinor: 15000, dueAt: '2026-09-09' },
-    { competencia: '2026-10', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-10-09' },
-  ];
-
-  // Depois de pagar jul/ago/set em lote: esses 3 somem, entram meses novos
-  // adiantados -- exatamente o que o server re-fetch devolve apos
-  // `router.refresh()` (`onPago` de `FaixaDeMeses`).
   const FAIXA_B = [
     { competencia: '2026-10', status: 'OPEN' as const, invoiceId: 'out', totalMinor: 15000, dueAt: '2026-10-09' },
     { competencia: '2026-11', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-11-09' },
@@ -200,64 +205,39 @@ describe('PainelDeCobranca -- key de FaixaDeMeses (regressao de verdade)', () =>
 
   it('conteudo da faixa muda (pagamento anterior) -> selecao recalcula a partir da faixa NOVA', () => {
     const { rerender } = renderComToast(
-      <PainelDeCobranca
-        subscriptionId="sub-1"
-        subscriptionIdParaPagamento="sub-1"
-        mesesPagaveis={FAIXA_A}
-      />,
+      <PainelDeCobranca subscriptionId="sub-1" subscriptionIdParaPagamento="sub-1" mesesPagaveis={FAIXA} />,
     );
 
-    // Selecao inicial com FAIXA_A: jul+ago (OVERDUE) + set (OPEN) = 3 meses.
-    expect(screen.getByText(/^3 meses/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /out\/26/i }));
+    expect(screen.getByText(/^2 meses/i)).toBeInTheDocument();
 
     rerender(
       <ToastProvider>
-        <PainelDeCobranca
-          subscriptionId="sub-1"
-          subscriptionIdParaPagamento="sub-1"
-          mesesPagaveis={FAIXA_B}
-        />
+        <PainelDeCobranca subscriptionId="sub-1" subscriptionIdParaPagamento="sub-1" mesesPagaveis={FAIXA_B} />
       </ToastProvider>,
     );
 
-    // FAIXA_B comeca com "out" OPEN -- indiceInicial seleciona so ele (1 mes).
-    // Se a selecao antiga (indice 2, apontando para o 3o item) vazasse, o
-    // resumo mostraria "3 meses" ou selecionaria "dez" por engano de indice.
     expect(screen.getByText(/^1 mês/i)).toBeInTheDocument();
     expect(screen.getByText(/Total/).textContent).toMatch(/R\$\s*150,00/);
     expect(screen.getByRole('button', { name: /nov\/26/i })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: /dez\/26/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('re-render com faixa de MESMO conteudo (nova referencia de array) -> preserva a selecao do usuario', () => {
-    // Array reference NOVA, mesmo competencia/status -- a chave calculada em
-    // `painel-de-cobranca.tsx` fica igual, entao NAO deve remontar.
-    const faixaAMesmoConteudo = FAIXA_A.map((m) => ({ ...m }));
+    const faixaMesmoConteudo = FAIXA.map((m) => ({ ...m }));
 
     const { rerender } = renderComToast(
-      <PainelDeCobranca
-        subscriptionId="sub-1"
-        subscriptionIdParaPagamento="sub-1"
-        mesesPagaveis={FAIXA_A}
-      />,
+      <PainelDeCobranca subscriptionId="sub-1" subscriptionIdParaPagamento="sub-1" mesesPagaveis={FAIXA} />,
     );
 
-    // Usuario estende a selecao para incluir "out" (adiantado) -- afasta do
-    // default (3 meses) para 4.
     fireEvent.click(screen.getByRole('button', { name: /out\/26/i }));
-    expect(screen.getByText(/^4 meses/i)).toBeInTheDocument();
+    expect(screen.getByText(/^2 meses/i)).toBeInTheDocument();
 
     rerender(
       <ToastProvider>
-        <PainelDeCobranca
-          subscriptionId="sub-1"
-          subscriptionIdParaPagamento="sub-1"
-          mesesPagaveis={faixaAMesmoConteudo}
-        />
+        <PainelDeCobranca subscriptionId="sub-1" subscriptionIdParaPagamento="sub-1" mesesPagaveis={faixaMesmoConteudo} />
       </ToastProvider>,
     );
 
-    // Mesmo conteudo -> mesma key -> React nao remonta -> selecao do usuario sobrevive.
-    expect(screen.getByText(/^4 meses/i)).toBeInTheDocument();
+    expect(screen.getByText(/^2 meses/i)).toBeInTheDocument();
   });
 });

@@ -216,7 +216,11 @@ const esquemaDeCorrecaoDeValor = z
 const esquemaDePagamentoEmLote = z
   .object({
     /** 'YYYY-MM' -- mesmo formato usado na tela, convertido para Date(UTC, dia 1) no controller. */
-    ateCompetencia: z.string().regex(/^\d{4}-\d{2}$/),
+    competencias: z.array(z.string().regex(/^\d{4}-\d{2}$/)).min(1).max(7),
+    /** Meses anteriores ao ultimo pago que a recepcao dispensa (nao usados). */
+    dispensar: z.array(z.string().regex(/^\d{4}-\d{2}$/)).max(12).default([]),
+    /** Dia em que o aluno pagou ('YYYY-MM-DD'), informado pela recepcao. */
+    paidAt: z.iso.date(),
     channel: z.enum(['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO']),
     expectedTotalMinor: z.number().int().min(0),
     receivedAmountMinor: z.number().int().min(0).optional(),
@@ -643,13 +647,18 @@ export class BillingController {
     }
 
     const dados = esquemaDePagamentoEmLote.parse(corpo);
-    const [ano, mes] = dados.ateCompetencia.split('-').map(Number);
+    const mesDe = (valor: string): Date => {
+      const [ano, mes] = valor.split('-').map(Number);
+      return new Date(Date.UTC(ano!, mes! - 1, 1));
+    };
 
     return this.registrarPagamentoEmLote.executar(
       this.contexto.require(),
       {
         subscriptionId: id,
-        ateCompetencia: new Date(Date.UTC(ano!, mes! - 1, 1)),
+        competencias: dados.competencias.map(mesDe),
+        dispensar: dados.dispensar.map(mesDe),
+        paidAt: new Date(`${dados.paidAt}T00:00:00Z`),
         channel: dados.channel,
         expectedTotalMinor: dados.expectedTotalMinor,
         ...(dados.receivedAmountMinor !== undefined ? { receivedAmountMinor: dados.receivedAmountMinor } : {}),

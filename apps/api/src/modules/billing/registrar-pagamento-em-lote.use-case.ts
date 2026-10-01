@@ -1,14 +1,25 @@
 import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 
 import { AssinaturaNaoEncontradaError, BillingRepository, ConfiguracaoFinanceiraAusenteError } from './billing.repository.js';
-import { mesesPagaveis, resolverLote, type InvoiceParaFaixa } from './domain/meses-pagaveis.js';
+import { instanteDeBloqueio } from './domain/ciclo-de-cobranca.js';
+import {
+  instanteDoPagamento,
+  mesesPagaveis,
+  resolverDispensa,
+  resolverLote,
+  vencimentoAposPagamento,
+  type InvoiceParaFaixa,
+} from './domain/meses-pagaveis.js';
 import { InvoiceInvalidaError } from './domain/invoice.js';
+
+const MESES_A_FRENTE_PARA_ANCORAR = 7;
 
 export class TotalDoLoteDivergenteError extends ErroDeDominio {
   constructor() {
@@ -30,7 +41,14 @@ export interface ResultadoDoLote {
 
 /**
  * Pagamento em lote no balcao (F83, issue #458): quita, numa transacao so,
- * uma faixa continua de meses -- vencidos, corrente e ate 6 adiantados.
+ * os meses que a recepcao escolher da faixa -- vencidos, corrente e ate 6
+ * adiantados, em qualquer combinacao ("pagou usou", decisao do PI 01/10/2026).
+ *
+ * A recepcao informa a DATA do pagamento. A vigencia conta dela: a proxima
+ * fatura em aberto depois do ultimo mes pago passa a vencer em
+ * `data + 30 dias por mes pago`, e o bloqueio continua sendo vencimento +
+ * carencia. Mes anterior nao usado pode ser DISPENSADO na hora (CANCELLED);
+ * o que a recepcao nao dispensa nem paga segue em aberto.
  *
  * Reaproveita `abrirInvoiceDoPeriodo` e `registrarPagamentoManual` do
  * `BillingRepository`, passando o MESMO `tx` para as duas -- e o que faz o
@@ -47,7 +65,10 @@ export class RegistrarPagamentoEmLoteUseCase {
     contexto: TenantContext,
     entrada: {
       subscriptionId: string;
-      ateCompetencia: Date;
+      competencias: Date[];
+      dispensar: Date[];
+      /** So o DIA (meia-noite UTC) informado pela recepcao. */
+      paidAt: Date;
       channel: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
       expectedTotalMinor: number;
       receivedAmountMinor?: number;
@@ -106,22 +127,23 @@ export class RegistrarPagamentoEmLoteUseCase {
       throw new ConfiguracaoFinanceiraAusenteError();
     }
 
-    const invoicesAbertas = await this.db.invoice.findMany({
-      where: { subscriptionId: entrada.subscriptionId, tenantId: contexto.tenantId, status: { in: ['OPEN', 'OVERDUE'] } },
+    // Todas as invoices, em qualquer status: mes ja pago/cancelado/estornado
+    // fica fora da faixa e, portanto, nao pode ser pago de novo.
+    const invoicesDaAssinatura = await this.db.invoice.findMany({
+      where: { subscriptionId: entrada.subscriptionId, tenantId: contexto.tenantId },
     });
 
     const faixa = mesesPagaveis({
-      // O `where` ja restringe a OPEN/OVERDUE; o Prisma so nao estreita o
-      // tipo do campo `status` a partir de um filtro `in` (mesmo ajuste do
-      // commit 88a013f na Task 1).
-      invoices: invoicesAbertas as InvoiceParaFaixa[],
+      invoices: invoicesDaAssinatura as InvoiceParaFaixa[],
       agora: entrada.agora,
       endsAt: assinatura.endsAt,
       prices: assinatura.plan.prices,
       dueDay: configuracao.dueDay,
     });
 
-    const lote = resolverLote(faixa, entrada.ateCompetencia);
+    const lote = resolverLote(faixa, entrada.competencias);
+    const dispensadas = resolverDispensa(faixa, lote, entrada.dispensar);
+    const instanteDoRecebimento = instanteDoPagamento(entrada.paidAt, entrada.agora);
     const totalCalculado = lote.reduce((soma, mes) => soma + mes.totalMinor, 0);
 
     if (totalCalculado !== entrada.expectedTotalMinor) {
@@ -161,8 +183,8 @@ export class RegistrarPagamentoEmLoteUseCase {
           {
             invoiceId: invoice.id,
             amountMinor: mes.totalMinor,
-            reason: `pagamento em lote ate ${entrada.ateCompetencia.toISOString().slice(0, 7)}`,
-            paidAt: entrada.agora,
+            reason: `pagamento em lote: ${lote.map((m) => m.competencia.toISOString().slice(0, 7)).join(', ')}`,
+            paidAt: instanteDoRecebimento,
             receivedVia: entrada.channel,
             batchId: entrada.idempotencyKey,
           },
@@ -181,6 +203,19 @@ export class RegistrarPagamentoEmLoteUseCase {
         }
       }
 
+      for (const mes of dispensadas) {
+        await this.dispensarInvoice(tx, contexto, mes.invoiceId!, correlationId);
+      }
+
+      await this.ancorarProximoVencimento(tx, contexto, {
+        subscriptionId: entrada.subscriptionId,
+        ultimoMesPago: lote[lote.length - 1]!.competencia,
+        vencimento: vencimentoAposPagamento(entrada.paidAt, lote.length),
+        graceDays: configuracao.graceDays,
+        endsAt: assinatura.endsAt,
+        agora: entrada.agora,
+      });
+
       const excedente = (entrada.receivedAmountMinor ?? totalCalculado) - totalCalculado;
 
       if (excedente > 0 && ultimoPagamentoId && ultimaMoeda) {
@@ -198,28 +233,124 @@ export class RegistrarPagamentoEmLoteUseCase {
 
     return { batchId: entrada.idempotencyKey, invoiceIds, totalMinor: totalCalculado };
   }
+
+  /** Mes nao usado: a fatura sai da inadimplencia e fica no historico como CANCELLED. */
+  private async dispensarInvoice(
+    tx: Prisma.TransactionClient,
+    contexto: TenantContext,
+    invoiceId: string,
+    correlationId: string,
+  ): Promise<void> {
+    const { count } = await tx.invoice.updateMany({
+      where: { id: invoiceId, tenantId: contexto.tenantId, status: { in: ['OPEN', 'OVERDUE'] } },
+      data: { status: 'CANCELLED', version: { increment: 1 } },
+    });
+
+    if (count === 0) return;
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: contexto.tenantId,
+        actorType: 'USER',
+        actorId: contexto.actorId,
+        action: 'billing.invoice.dispensed',
+        target: 'Invoice',
+        targetId: invoiceId,
+        correlationId,
+        metadata: { reason: 'mes nao usado (pagou e usou)' },
+      },
+    });
+  }
+
+  /**
+   * A primeira fatura ainda devida DEPOIS do ultimo mes pago passa a vencer no
+   * fim da vigencia paga. Abre a fatura se ainda nao existir. Fatura ja
+   * paga/cancelada e pulada: a vigencia vale para a proxima que ainda deve.
+   */
+  private async ancorarProximoVencimento(
+    tx: Prisma.TransactionClient,
+    contexto: TenantContext,
+    entrada: {
+      subscriptionId: string;
+      ultimoMesPago: Date;
+      vencimento: Date;
+      graceDays: number;
+      endsAt: Date | null;
+      agora: Date;
+    },
+  ): Promise<void> {
+    for (let i = 1; i <= MESES_A_FRENTE_PARA_ANCORAR; i += 1) {
+      const periodo = new Date(
+        Date.UTC(entrada.ultimoMesPago.getUTCFullYear(), entrada.ultimoMesPago.getUTCMonth() + i, 1),
+      );
+
+      if (entrada.endsAt && periodo.getTime() >= entrada.endsAt.getTime()) return;
+
+      const existente = await tx.invoice.findUnique({
+        where: {
+          tenantId_subscriptionId_billingPeriod: {
+            tenantId: contexto.tenantId,
+            subscriptionId: entrada.subscriptionId,
+            billingPeriod: periodo,
+          },
+        },
+      });
+
+      if (existente && existente.status !== 'OPEN' && existente.status !== 'OVERDUE') continue;
+
+      const alvo =
+        existente ??
+        (await this.billing.abrirInvoiceDoPeriodo(
+          contexto,
+          { subscriptionId: entrada.subscriptionId, emQue: periodo },
+          tx,
+        ));
+
+      await tx.invoice.update({
+        where: { id: alvo.id },
+        data: {
+          dueAt: entrada.vencimento,
+          blockAt: instanteDeBloqueio(entrada.vencimento, entrada.graceDays),
+          // Vigencia nova reabre o prazo: OVERDUE com vencimento futuro volta a OPEN.
+          status: entrada.vencimento.getTime() > entrada.agora.getTime() ? 'OPEN' : alvo.status,
+          version: { increment: 1 },
+        },
+      });
+
+      return;
+    }
+  }
 }
 
 /**
  * Inclui `subscriptionId`: sem ele, duas assinaturas DIFERENTES reusando por
- * engano a mesma Idempotency-Key com o mesmo `ateCompetencia`/`channel`/
+ * engano a mesma Idempotency-Key com os mesmos meses/`channel`/
  * `expectedTotalMinor` fariam a segunda chamada devolver o lote da PRIMEIRA
  * como se fosse sucesso -- dinheiro contabilizado no aluno errado, em
  * silencio (issue #458, achado da revisao, fix round 1).
  *
- * Inclui tambem `receivedAmountMinor`: sem ele, o valor efetivamente recebido
- * poderia mudar sob a mesma chave sem re-checagem.
+ * Inclui tambem `receivedAmountMinor`, os meses (ordenados), os dispensados e
+ * a data do pagamento: qualquer um deles mudando sob a mesma chave tem de ser
+ * recusado, nao respondido com o lote antigo.
  */
 function hashDoCorpo(entrada: {
   subscriptionId: string;
-  ateCompetencia: Date;
+  competencias: Date[];
+  dispensar: Date[];
+  paidAt: Date;
   channel: string;
   expectedTotalMinor: number;
   receivedAmountMinor?: number;
 }): string {
+  const meses = (datas: Date[]): string =>
+    datas
+      .map((d) => d.toISOString())
+      .sort()
+      .join(',');
+
   return createHash('sha256')
     .update(
-      `${entrada.subscriptionId}|${entrada.ateCompetencia.toISOString()}|${entrada.channel}|${entrada.expectedTotalMinor}|${entrada.receivedAmountMinor ?? ''}`,
+      `${entrada.subscriptionId}|${meses(entrada.competencias)}|${meses(entrada.dispensar)}|${entrada.paidAt.toISOString()}|${entrada.channel}|${entrada.expectedTotalMinor}|${entrada.receivedAmountMinor ?? ''}`,
     )
     .digest('hex');
 }

@@ -4687,7 +4687,7 @@ perguntas da spec §2 antes da implementação.
 
 | # | pergunta | decisão |
 |---|---|---|
-| 1 | A seleção pode pular mês? | **Não.** Contínua a partir do mês em aberto mais antigo, sem buraco — vale para vencidos e adiantados (INV-162). |
+| 1 | A seleção pode pular mês? | ~~Não. Contínua, sem buraco.~~ **Revogada em 01/10/2026 (ver Emenda abaixo): a escolha dos meses é livre.** |
 | 2 | Adiantar dá benefício? | **Sem desconto.** Cada mês pelo preço vigente da própria competência; o efeito colateral é travar o preço (INV-068). |
 | 3 | Cancelamento com meses futuros pagos? | **Fora desta fatia.** Meses seguem `PAID`; estorno, se houver, é manual. Limitação conhecida. |
 | 4 | Modelagem | **Um `Payment` por invoice, agrupados por `batchId`**, numa transação. Sem tabela de alocação, sem invoice consolidada. |
@@ -4695,6 +4695,27 @@ perguntas da spec §2 antes da implementação.
 | 6 | Teto de meses adiantados? | **Competência corrente + 6.** |
 | 7 | Estorno de mês adiantado pago? | **Usa `EstornarPagamentoUseCase` existente**, aceitando que a `refundAccessPolicy` do tenant pode suspender o acesso mesmo com o mês corrente pago. Nada novo nesta fatia. |
 | 8 | Aviso no app por lote ou por mês? | **Um aviso por mês.** Mantém o comportamento atual: N eventos `InvoicePaid` → N avisos "Pagamento confirmado". |
+
+### Emenda de 01/10/2026 — escolha livre dos meses, data do pagamento e vigência (decisão do PI)
+
+A academia funciona no modelo **"pagou, usou"**, sem contrato de 12 meses (o PI soube disso em
+01/10/2026). Por isso a decisão 1 acima caiu e a tela passou a:
+
+1. **Deixar a recepção escolher livremente os meses** a receber (`competencias[]`, qualquer
+   combinação), sem obrigar o mês anterior. Mês já pago/cancelado/estornado sai da faixa (antes um
+   mês pago continuava aparecendo como "Adiantado").
+2. **Pedir a data do pagamento** (`paidAt`, dia, nunca futura). A vigência conta dela: a próxima
+   invoice devida passa a vencer em `data + 30 dias × meses pagos`, e o bloqueio segue
+   `vencimento + carência` (`graceDays` do tenant) — INV-163.
+3. **Deixar a recepção dispensar, na hora, os meses anteriores não usados** (`dispensar[]`): a
+   invoice vira `CANCELLED`, sai da inadimplência e fica no histórico. O que não é pago nem
+   dispensado segue em aberto (e continua podendo bloquear após a carência).
+
+Contrato da rota: `POST /subscriptions/:id/manual-payment-batch` troca `ateCompetencia` por
+`competencias: ['YYYY-MM']`, `dispensar: ['YYYY-MM']` e `paidAt: 'YYYY-MM-DD'`. Efeito colateral
+conhecido: o lote **abre a invoice seguinte** ao último mês pago para ancorar a vigência, então a
+ficha deixa de mostrar "nenhuma cobrança em aberto" logo após o pagamento (aparece a próxima, com o
+vencimento novo).
 
 ### Consequências
 

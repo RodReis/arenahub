@@ -507,7 +507,12 @@ interface PagamentoEmLoteRetornado {
  */
 export async function receberPagamentoEmLote(input: {
   subscriptionId: string;
-  ateCompetencia: string;
+  /** Meses a quitar ('YYYY-MM'), em qualquer combinacao da faixa. */
+  competencias: string[];
+  /** Meses anteriores nao usados que a recepcao dispensa ('YYYY-MM'). */
+  dispensar: string[];
+  /** Dia em que o aluno pagou ('YYYY-MM-DD'). */
+  paidAt: string;
   channel: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
   expectedTotalMinor: number;
   receivedAmountMinor?: number;
@@ -520,7 +525,9 @@ export async function receberPagamentoEmLote(input: {
       metodo: 'POST',
       cabecalhosExtras: { 'idempotency-key': idempotencyKey },
       corpo: {
-        ateCompetencia: input.ateCompetencia,
+        competencias: input.competencias,
+        dispensar: input.dispensar,
+        paidAt: input.paidAt,
         channel: input.channel,
         expectedTotalMinor: input.expectedTotalMinor,
         ...(input.receivedAmountMinor !== undefined

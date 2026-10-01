@@ -419,11 +419,21 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
   em curso produz `MISSING_EXTERNAL` de pagamento que o provedor ainda não publicou. — *F16*
 - **INV-151** **Divergência resolve por comando de lista fechada**, com razão e ator — nunca por
   edição direta de valor (`M2-AC-010`). — *F16*
-- **INV-162** **Pagamento em lote (F83) é sempre um prefixo contínuo da faixa de meses pagáveis**,
-  a partir do mês em aberto mais antigo, até no máximo competência corrente + 6 — nunca com buraco.
-  Cada mês gera seu próprio `Payment`, todos com o mesmo `batchId`; não existe invoice consolidada
-  nem desconto por antecipação — cada mês cobra o preço vigente da própria competência (INV-068
-  continua valendo mês a mês).
+- **INV-162** **Pagamento em lote (F83): a recepção escolhe QUAIS meses da faixa de meses pagáveis
+  recebe — qualquer combinação, inclusive com buraco —**, até no máximo competência corrente + 6.
+  *(Emenda de 01/10/2026, decisão do PI: a regra anterior era "prefixo contínuo, sem buraco"; a
+  academia funciona no modelo "pagou, usou", sem contrato de 12 meses.)* Mês com invoice `PAID`,
+  `CANCELLED` ou `REFUNDED` **não faz parte da faixa** e não pode ser pago de novo. Cada mês gera
+  seu próprio `Payment`, todos com o mesmo `batchId`; não existe invoice consolidada nem desconto
+  por antecipação — cada mês cobra o preço vigente da própria competência (INV-068 continua
+  valendo mês a mês).
+- **INV-163** **A recepção informa a data do pagamento (dia, nunca futura) e a vigência conta dela:**
+  a primeira invoice ainda devida depois do último mês pago (aberta pelo lote se não existir) passa
+  a vencer em `data do pagamento + 30 dias × meses pagos`, e o bloqueio por inadimplência segue
+  `vencimento + carência` (INV-144). Mês anterior não pago e não usado pode ser **dispensado** na
+  hora pela recepção (invoice `CANCELLED`, com auditoria `billing.invoice.dispensed`); o que a
+  recepção não paga nem dispensa segue em aberto. Data de hoje grava o instante real; dia passado
+  grava meio-dia UTC (nunca meia-noite, que o fuso mostra como o dia anterior).
 
 ### 4.11 Webhooks e idempotência (INV-076 a INV-087)
 

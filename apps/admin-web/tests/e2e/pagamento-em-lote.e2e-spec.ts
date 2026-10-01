@@ -177,12 +177,12 @@ test('aluno com 1 mes vencido paga ate corrente+1 e fica em dia', async ({ page 
    * A FAIXA parte do mes em aberto mais antigo ate corrente+6
    * (`mesesPagaveis`). So a invoice do mes PASSADO esta OPEN -- a cobranca
    * do mes CORRENTE nunca foi gerada (nem pela tela nem por esta chamada de
-   * API) --, entao `indiceInicial` (`faixa-de-meses.tsx`) seleciona so o
+   * API) --, entao `selecaoInicial` (`faixa-de-meses.tsx`) seleciona so o
    * primeiro chip por padrao: o em aberto. Os dois seguintes chegam como
    * NOT_OPENED ("Adiantado") -- setembro/26 e o mes CORRENTE, outubro/26 e
-   * corrente+1. Clicar em cada um ESTENDE a selecao ate ali (Decisao 1 do
-   * PI: nunca cria buraco) -- e o proprio uso do lote que abre a invoice
-   * desses dois meses, ainda inexistentes.
+   * corrente+1. Clicar em cada um o ADICIONA a selecao (escolha livre, decisao
+   * do PI de 01/10/2026) -- e o proprio uso do lote que abre a invoice desses
+   * dois meses, ainda inexistentes.
    */
   await expect(page.getByText(/1 mês/i)).toBeVisible();
 
@@ -197,11 +197,11 @@ test('aluno com 1 mes vencido paga ate corrente+1 e fica em dia', async ({ page 
   const chips = page.getByRole('button', { name: /[a-z]{3}\/\d{2}/ });
   await expect(chips).toHaveCount(8);
 
-  // Estende ate o mes CORRENTE (2º chip).
+  // Marca tambem o mes CORRENTE (2º chip).
   await chips.nth(1).click();
   await expect(page.getByText(/2 meses/i)).toBeVisible();
 
-  // Estende ate corrente+1 (3º chip) -- exatamente os 3 meses do brief:
+  // Marca tambem corrente+1 (3º chip) -- exatamente os 3 meses do brief:
   // vencido + corrente + 1 adiantado.
   await chips.nth(2).click();
   await expect(page.getByText(/3 meses/i)).toBeVisible();
@@ -216,8 +216,9 @@ test('aluno com 1 mes vencido paga ate corrente+1 e fica em dia', async ({ page 
   const linhasPagas = page.getByTestId('tabela-de-cobrancas').getByText('Paga');
   await expect(linhasPagas).toHaveCount(3);
 
-  // "Em dia": nada mais em aberto -- `SituacaoAtual` mostra `sem-pendencia`.
-  await expect(page.getByTestId('sem-pendencia')).toBeVisible();
+  // Mes pago NUNCA reaparece como pagavel: a faixa recomeca na fatura seguinte
+  // (aberta pelo lote para ancorar a vigencia) e vai ate corrente+6 -- 5 chips.
+  await expect(chips).toHaveCount(5);
 });
 
 /**
