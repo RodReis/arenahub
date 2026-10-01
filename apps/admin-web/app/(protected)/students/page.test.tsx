@@ -80,6 +80,24 @@ async function renderizar(alunos: unknown[]) {
 
 describe('grid de alunos', () => {
   /**
+   * #503 -- a foto que veio do leitor facial (ou da ficha) aparece no avatar,
+   * servida pela rota do painel, nunca pela API direto.
+   */
+  it('mostra a foto de quem tem, pela rota do painel', async () => {
+    const { container } = await renderizar([{ ...BASE, temFoto: true }]);
+
+    const foto = container.querySelector('img');
+    expect(foto?.getAttribute('src')).toBe(`/fotos-de-aluno/${BASE.id}`);
+  });
+
+  it('mostra as iniciais de quem nao tem foto', async () => {
+    const { container } = await renderizar([{ ...BASE, temFoto: false }]);
+
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByText('RR')).toBeInTheDocument();
+  });
+
+  /**
    * A GRID DIZIA "BLOQUEADO" E NAO DIZIA POR QUE (issue #241).
    *
    * `PATCH /students/:id/status` gravava so `{ status, version }` -- nem a

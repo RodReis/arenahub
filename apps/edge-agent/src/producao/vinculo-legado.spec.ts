@@ -27,7 +27,11 @@ const RESPOSTA = {
 function montar(
   base: readonly string[] = [],
   janelaMs = 20,
-  extra: { intervaloEntreTentativasMs?: number; agoraMs?: () => number } = {},
+  extra: {
+    intervaloEntreTentativasMs?: number;
+    agoraMs?: () => number;
+    aposVincular?: (serial: string) => void;
+  } = {},
 ) {
   let aoRegistrar: ((serial: string) => void) | undefined;
   let aoInformar: ((c: { serial: string; externalUserId: string }) => void) | undefined;
@@ -211,6 +215,36 @@ describe('ligarVinculoLegado', () => {
     await ate(() => post.mock.calls.length >= 2);
 
     expect(listar).toHaveBeenCalledTimes(2);
+
+    ligado.encerrar();
+  });
+
+  /** #503 -- as fotos so sao pedidas DEPOIS que o vinculo chegou na nuvem. */
+  it('avisa quem importa as fotos depois que a base chegou na nuvem (#503)', async () => {
+    const aposVincular = jest.fn();
+    const { post, registrar, ligado } = montar(['1491'], 20, { aposVincular });
+
+    registrar('AYTI11108174');
+    await ate(() => aposVincular.mock.calls.length === 1);
+
+    expect(aposVincular).toHaveBeenCalledWith('AYTI11108174');
+    expect(post).toHaveBeenCalledTimes(1);
+
+    ligado.encerrar();
+  });
+
+  it('nao pede fotos quando o vinculo nao chegou na nuvem (#503)', async () => {
+    const aposVincular = jest.fn();
+    const { post, registrar, ligado } = montar(['1491'], 20, { aposVincular });
+    (post as jest.Mock).mockImplementationOnce(() =>
+      Promise.resolve({ ok: false, status: 0, body: null, errorCode: null }),
+    );
+
+    registrar('AYTI11108174');
+    await ate(() => post.mock.calls.length >= 1);
+    await esperar(30);
+
+    expect(aposVincular).not.toHaveBeenCalled();
 
     ligado.encerrar();
   });

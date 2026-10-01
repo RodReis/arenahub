@@ -81,6 +81,23 @@ leitor), **não** é sequencial no ArenaHub. A tela de cadastro **sugere o próx
 (#475) — o ArenaHub conhece todos os números que já estão no leitor. Cadastre o aluno **primeiro no
 ArenaHub**, use o número sugerido no leitor, e o vínculo é feito sozinho na próxima conexão do leitor.
 
+## 5.1 Fotos dos alunos vindas do leitor (#503)
+
+Depois de `base do leitor vinculada`, o agente importa a foto de cadastro do leitor para quem está
+vinculado **e ainda não tem foto** no ArenaHub (aluno, professor ou funcionário). No log:
+
+- `importando fotos do leitor` com `pendentes` — começou; uma foto por segundo, então ~365 fotos
+  levam ~10 min. O leitor continua reconhecendo durante a importação (pausa de fração de segundo por
+  foto).
+- `fotos do leitor importadas` com `importadas`, `jaTinhamFoto`, `semFotoNoLeitor`, `falhas` —
+  terminou. Com `falhas` maior que zero, tenta de novo na próxima conexão do leitor, só para quem
+  continua sem foto.
+- `getuserinfo sem foto no record` — o firmware mandou a foto em outro campo: avise o
+  desenvolvimento com a linha (ela traz só os nomes dos campos).
+
+A foto **não sobrescreve** a que a recepção já enviou pela ficha. Aparece no avatar da lista de
+alunos. Cadastro novo feito no leitor ganha foto no próximo reinício do agente.
+
 ## 6. Limitações conhecidas
 
 - **Só sobe quando a conta entra no Windows.** Com o login automático isso acontece no boot; se

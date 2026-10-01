@@ -166,6 +166,17 @@ o que vier primeiro.
 > (`apps/edge-agent/src/producao/vinculo-legado.ts`) e manda só o **número** para a nuvem, sem
 > foto nem nome.
 
+## `getuserinfo` com `backupnum: 50` — a foto de cadastro (#503)
+
+Pedido do PI, 01/10/2026: a foto que o leitor guarda de cada pessoa vira a foto do aluno no
+ArenaHub. O `edge-agent` pede `{"cmd":"getuserinfo","enrollid":N,"backupnum":50}` entre
+`disabledevice` e `enabledevice`, **uma pessoa por vez com 1 s de pausa**, para o leitor seguir
+reconhecendo quem chega à catraca durante a importação. A imagem vem em Base64 no `record`; sem foto
+o leitor responde `result: false` ("have no data"). Se o firmware responder sucesso **sem** foto no
+`record`, o agente avisa uma vez no log (`getuserinfo sem foto no record`) com os **nomes** dos
+campos recebidos — nunca o conteúdo. Código: `apps/edge-agent/src/producao/fotos-do-leitor.ts` e
+`TopdataFacialAdapter.lerFoto`.
+
 ## Porta 7792 disputada com o TopFace
 
 > ⚠️ **Achado de campo, Arena Positiva, 01/10/2026 (issue #504).** O software da própria Topdata

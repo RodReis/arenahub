@@ -16,6 +16,8 @@ import {
   aceitarFotoDoAluno,
   chaveDeFotoPertenceA,
   montarChaveDeFoto,
+  pareceBytesDeJpeg,
+  pareceBytesDePng,
   type ContentTypeDeFoto,
   type MotivoDeRecusaDeFoto,
 } from './domain/foto-do-aluno.js';
@@ -60,7 +62,7 @@ export class StudentPhotoService {
    * mais.
    */
   async substituir(
-    contexto: TenantContext,
+    contexto: Pick<TenantContext, 'tenantId'>,
     studentId: string,
     arquivo: ArquivoDeFoto,
   ): Promise<{ objectKey: string }> {
@@ -128,6 +130,65 @@ export class StudentPhotoService {
     }
 
     return { objectKey };
+  }
+
+  /**
+   * Foto que veio do LEITOR FACIAL -- issue #503.
+   *
+   * NAO SOBRESCREVE: aluno que ja tem foto (enviada pela recepcao, ou
+   * importada antes) fica com a dele. O leitor guarda a foto do cadastro
+   * facial, que pode ser de anos atras; a da recepcao e escolha de alguem.
+   *
+   * O tipo sai dos BYTES, nao de declaracao: o leitor manda Base64 cru, sem
+   * content-type. Passa pelo mesmo `substituir` -- formato, antivirus,
+   * storage --, sem caminho paralelo.
+   */
+  async importarDoLeitor(
+    tenantId: string,
+    studentId: string,
+    conteudo: Uint8Array,
+  ): Promise<'IMPORTED' | 'ALREADY_HAS_PHOTO'> {
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { id: studentId, tenantId },
+        select: { photoObjectKey: true },
+      }),
+    );
+
+    if (!aluno) throw new AlunoNaoEncontradoParaFotoError();
+    if (aluno.photoObjectKey !== null) return 'ALREADY_HAS_PHOTO';
+
+    const contentType = pareceBytesDePng(conteudo)
+      ? 'image/png'
+      : pareceBytesDeJpeg(conteudo)
+        ? 'image/jpeg'
+        : null;
+
+    if (contentType === null) {
+      throw new ErroDeDominio(
+        'FILE_TYPE_NOT_ALLOWED',
+        400,
+        MENSAGEM_DE_RECUSA.FILE_TYPE_NOT_ALLOWED,
+      );
+    }
+
+    await this.substituir({ tenantId }, studentId, { contentType, conteudo });
+
+    return 'IMPORTED';
+  }
+
+  /** Quais destes alunos ainda NAO tem foto -- issue #503. */
+  async semFoto(tenantId: string, studentIds: readonly string[]): Promise<Set<string>> {
+    if (studentIds.length === 0) return new Set();
+
+    const alunos = await this.db.comTenant((tx) =>
+      tx.student.findMany({
+        where: { tenantId, id: { in: [...studentIds] }, photoObjectKey: null },
+        select: { id: true },
+      }),
+    );
+
+    return new Set(alunos.map((a) => a.id));
   }
 
   /**

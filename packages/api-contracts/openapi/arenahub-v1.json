@@ -3986,6 +3986,71 @@
         ]
       }
     },
+    "/api/v1/edge/device-users/photos/pending": {
+      "post": {
+        "operationId": "EdgeLegacyLinkController_fotosPendentes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "externalUserIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "externalUserIds"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EdgeLegacyLink"
+        ]
+      }
+    },
+    "/api/v1/edge/device-users/photos": {
+      "post": {
+        "operationId": "EdgeLegacyLinkController_importarFoto",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "string",
+                      "enum": [
+                        "IMPORTED",
+                        "ALREADY_HAS_PHOTO"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EdgeLegacyLink"
+        ]
+      }
+    },
     "/api/v1/engagement/aliases": {
       "get": {
         "operationId": "EngagementController_listar",

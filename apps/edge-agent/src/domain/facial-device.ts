@@ -114,6 +114,12 @@ export interface FacialDeviceAdapter {
    */
   listar(): Promise<readonly IdentidadeNoDispositivo[]>;
 
+  /**
+   * A foto de cadastro de uma pessoa no leitor, em Base64 -- #503. `null`
+   * quando o cadastro nao tem foto. Opcional: o simulador nao guarda foto.
+   */
+  lerFoto?(externalEnrollId: ExternalEnrollId): Promise<string | null>;
+
   /** Registra quem recebe evento de reconhecimento (`M0-FR-004`). */
   aoReconhecer(ouvinte: (evento: EventoReconhecimento) => void): void;
 

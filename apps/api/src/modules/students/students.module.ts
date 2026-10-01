@@ -35,6 +35,8 @@ import { StudentsController } from './students.controller.js';
   // publico, nunca lendo a tabela do outro modulo (regra de arquitetura 9).
   // `StudentCredentialRepository` -- #468: o vinculo legado do leitor casa o
   // numero do equipamento com o aluno, pela mesma regra.
-  exports: [StudentRepository, StudentCredentialRepository],
+  // `StudentPhotoService` -- #503: a foto que vem do leitor facial entra pela
+  // mesma porta do upload do painel (formato, antivirus, storage).
+  exports: [StudentRepository, StudentCredentialRepository, StudentPhotoService],
 })
 export class StudentsModule {}

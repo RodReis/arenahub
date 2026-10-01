@@ -1,9 +1,10 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
-import { ApiCreatedResponse } from '@nestjs/swagger';
+import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
+import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
 import { EdgeRoute } from '../edge-auth/edge-route.decorator.js';
+import { ImportarFotoDoLeitorUseCase } from './importar-foto-do-leitor.use-case.js';
 import {
   VincularCadastroLegadoUseCase,
   type ResultadoDoVinculoLegado,
@@ -23,6 +24,23 @@ const esquemaDoVinculo = z
   .object({
     deviceSerial: z.string().min(1).max(64),
     externalUserIds: z.array(z.string().min(1).max(64)).min(1).max(1000),
+  })
+  .strict();
+
+const esquemaDosPendentes = z.object({ deviceSerial: z.string().min(1).max(64) }).strict();
+
+/**
+ * Foto do leitor -- #503. UMA por chamada: o corpo JSON da API tem teto de
+ * 1 MB (`bootstrap-http.ts`), e a foto de cadastro do leitor fica na casa
+ * das dezenas de KB. 900.000 caracteres de Base64 sao ~660 KB de imagem.
+ *
+ * Aceita o prefixo `data:image/...;base64,` que alguns firmwares poem.
+ */
+const esquemaDaFoto = z
+  .object({
+    deviceSerial: z.string().min(1).max(64),
+    externalUserId: z.string().min(1).max(64),
+    imageBase64: z.string().min(1).max(900_000),
   })
   .strict();
 
@@ -52,7 +70,10 @@ const ESQUEMA_DO_RESULTADO = {
 
 @Controller('api/v1/edge/device-users')
 export class EdgeLegacyLinkController {
-  constructor(private readonly vincular: VincularCadastroLegadoUseCase) {}
+  constructor(
+    private readonly vincular: VincularCadastroLegadoUseCase,
+    private readonly fotos: ImportarFotoDoLeitorUseCase,
+  ) {}
 
   @Post('legacy-links')
   @EdgeRoute()
@@ -72,5 +93,54 @@ export class EdgeLegacyLinkController {
       requisicao.correlationId ?? 'sem-correlacao',
       new Date(),
     );
+  }
+
+  /** Numeros deste leitor cujo aluno ainda nao tem foto -- #503. */
+  @Post('photos/pending')
+  @HttpCode(200)
+  @EdgeRoute()
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { externalUserIds: listaDeNumeros },
+      required: ['externalUserIds'],
+    },
+  })
+  async fotosPendentes(
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ externalUserIds: string[] }> {
+    const dados = esquemaDosPendentes.parse(corpo);
+
+    return {
+      externalUserIds: await this.fotos.pendentes(requisicao.edgeContext!, dados.deviceSerial),
+    };
+  }
+
+  /** A foto de UM numero do leitor -- #503. Nunca sobrescreve a do aluno. */
+  @Post('photos')
+  @HttpCode(200)
+  @EdgeRoute()
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { result: { type: 'string', enum: ['IMPORTED', 'ALREADY_HAS_PHOTO'] } },
+      required: ['result'],
+    },
+  })
+  async importarFoto(
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ result: 'IMPORTED' | 'ALREADY_HAS_PHOTO' }> {
+    const dados = esquemaDaFoto.parse(corpo);
+    const base64 = dados.imageBase64.replace(/^data:[^,]*,/, '');
+
+    const result = await this.fotos.importar(requisicao.edgeContext!, {
+      deviceSerial: dados.deviceSerial,
+      externalUserId: dados.externalUserId,
+      conteudo: Buffer.from(base64, 'base64'),
+    });
+
+    return { result };
   }
 }

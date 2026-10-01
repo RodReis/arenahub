@@ -153,6 +153,20 @@ export class BiometricIdentityRepository {
     });
   }
 
+  /** O aluno vinculado a este numero do leitor, ou `null` -- #503. */
+  async alunoDoNumero(
+    tenantId: string,
+    deviceId: string,
+    externalUserId: string,
+  ): Promise<string | null> {
+    const vinculo = await this.db.deviceUser.findFirst({
+      where: { tenantId, deviceId, externalUserId },
+      select: { studentId: true },
+    });
+
+    return vinculo?.studentId ?? null;
+  }
+
   /**
    * Vincula um aluno a um cadastro que JA ESTA no leitor -- #468.
    *
