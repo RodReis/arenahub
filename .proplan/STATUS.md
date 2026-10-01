@@ -41,6 +41,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] Regra nº 7 revogada: aluno da base do leitor entra com consentimento aceito (ADR-064) (#493, finalizado em: 2026-10-01)
 - [MVP1][FIX] painel não publica termo biométrico — vínculo legado não vincula ninguém (#491, finalizado em: 2026-10-01)
 - [MVP1][FIX] Leitor cadastrado sem Edge nunca é achado pelo Edge — vínculo e decisão de acesso dão 404/DENY (#488, finalizado em: 2026-10-01)
 - [SPEC-083][F83] Pagamento em lote no balcão — atrasados, mês corrente e adiantados (#458, finalizado em: 2026-10-01)
