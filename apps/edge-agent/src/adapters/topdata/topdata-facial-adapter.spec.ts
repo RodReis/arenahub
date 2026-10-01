@@ -530,6 +530,95 @@ describe('TopdataFacialAdapter -- diagnostico de conexao', () => {
   });
 });
 
+/**
+ * #504 -- Arena Positiva, 01/10/2026: depois de reiniciar o Windows, o
+ * TopFace (servico da Topdata) subiu antes do agente e ficou com o leitor.
+ * O rosto era reconhecido, a catraca nao abria, e o log do agente nao dizia
+ * NADA -- e o heartbeat seguia informando o leitor como ativo, entao o painel
+ * nao alertava.
+ */
+describe('TopdataFacialAdapter -- leitor que nao chega ao agente (#504)', () => {
+  let linhas: Record<string, unknown>[];
+  let adapter: TopdataFacialAdapter;
+  let leitor: LeitorFalso;
+  let porta: number;
+
+  const avisos = (): Record<string, unknown>[] =>
+    linhas.filter((l) => l['msg'] === 'leitor facial nao esta conectado ao agente');
+
+  const subir = async (avisoSemLeitorMs = 60): Promise<void> => {
+    const capturador = pino(
+      { level: 'debug' },
+      { write: (linha: string) => linhas.push(JSON.parse(linha) as Record<string, unknown>) },
+    );
+    porta = proximaPorta += 1;
+    adapter = new TopdataFacialAdapter(capturador, porta, {
+      avisoSemLeitorMs,
+      repetirAvisoMs: 60,
+    });
+    await adapter.iniciar();
+  };
+
+  beforeEach(() => {
+    linhas = [];
+    leitor = new LeitorFalso();
+  });
+
+  afterEach(async () => {
+    leitor.fechar();
+    await adapter.encerrar();
+  });
+
+  it('avisa no log quando o leitor nao se registra no prazo', async () => {
+    await subir();
+
+    await leitor.esperar(() => avisos().length > 0);
+
+    expect(avisos()[0]?.['level']).toBe(40);
+    expect(String(avisos()[0]?.['acao'])).toContain('TopFace');
+  });
+
+  it('repete o aviso enquanto o leitor nao chega', async () => {
+    await subir();
+
+    await leitor.esperar(() => avisos().length >= 2);
+  });
+
+  it('nao avisa quando o leitor se registra a tempo', async () => {
+    // Prazo folgado: com 60 ms, CI carregado podia avisar antes do `reg`.
+    await subir(600);
+    await leitor.conectar(porta);
+    leitor.enviarReg();
+    await leitor.esperar(() => adapter.serie !== null);
+
+    await new Promise((r) => setTimeout(r, 800));
+
+    expect(avisos()).toHaveLength(0);
+  });
+
+  it('serie volta a null quando o leitor desconecta -- o heartbeat para de informa-lo', async () => {
+    await subir();
+    await leitor.conectar(porta);
+    leitor.enviarReg();
+    await leitor.esperar(() => adapter.serie !== null);
+
+    leitor.fechar();
+
+    await leitor.esperar(() => adapter.serie === null);
+  });
+
+  it('volta a avisar quando o leitor cai depois de registrado', async () => {
+    await subir();
+    await leitor.conectar(porta);
+    leitor.enviarReg();
+    await leitor.esperar(() => adapter.serie !== null);
+
+    leitor.fechar();
+
+    await leitor.esperar(() => avisos().length > 0);
+  });
+});
+
 describe('interpretarDataHora', () => {
   it('interpreta como hora local, nao UTC', () => {
     // O equipamento manda hora local sem fuso. Ler como UTC deslocaria todo

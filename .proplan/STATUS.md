@@ -27,11 +27,15 @@ updated: 2026-10-01
 
 ## A Fazer
 
-_(vazio)_
+### Sem épico
+
+- [MVP1] Fotos dos alunos vindas do leitor facial: importar, gravar e mostrar na lista (#503) — pausada a pedido do PI
 
 ## Em Andamento
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][FIX] Leitor facial que não reconecta ao agente fica invisível: log mudo e heartbeat informa o leitor como ativo (#504)
 
 ## Feito
 

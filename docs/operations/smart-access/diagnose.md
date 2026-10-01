@@ -102,6 +102,13 @@ O diagnóstico é **somente leitura** — não envia comando a equipamento nenhu
 2. Cabo de rede
 3. O equipamento aparece no painel → **Dispositivos** com estado *Em manutenção*? Então alguém
    já o marcou assim de propósito, e ele **não** gera alerta.
+4. **Leitor facial ligado e na rede, mas não conectado ao agente.** O rosto aparece na tela do
+   leitor, mas nada chega ao ArenaHub. O log do agente mostra `leitor facial nao esta conectado ao
+   agente`. A causa mais comum é **outro programa com o leitor**: em 01/10/2026 foi o `TopFace.exe`,
+   da Topdata, que escuta a mesma porta 7792 (#504). Confira com `netstat -ano | findstr 7792`: a
+   linha `ESTABLISHED` tem de terminar no PID do `node.exe`. O procedimento e a reversão estão em
+   [`docs/runbooks/operacao-edge-arena-positiva.md`](../../runbooks/operacao-edge-arena-positiva.md)
+   §7.
 
 ---
 
