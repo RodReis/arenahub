@@ -144,24 +144,76 @@ export class DeviceRepository {
   }
 
   /**
-   * O leitor pelo SERIAL, no escopo do Edge que assinou (#468).
+   * O leitor pelo SERIAL, no escopo do Edge que assinou -- #468, #488.
    *
    * O Edge nao conhece o UUID do `Device`, so o `sn` do equipamento. O
-   * escopo e o mesmo da decisao de acesso (`IdentityResolver`): tenant,
-   * unidade e EdgeNode vem da assinatura, nunca do corpo (regra no 2).
+   * escopo e o da decisao de acesso: tenant, unidade e EdgeNode vem da
+   * assinatura, nunca do corpo (regra no 2).
+   *
+   * **ESTA BUSCA TAMBEM REIVINDICA.** Dispositivo cadastrado ANTES de o Edge
+   * existir tem `edgeNodeId` nulo, e nada no produto o liga a um Edge depois
+   * (`PATCH /devices/:id` nao aceita, o painel nao tem o campo). Na Arena
+   * Positiva isso deu 404 no vinculo dos alunos e DENY em todo
+   * reconhecimento (#488). Entao o Edge que apresenta o serial de um
+   * dispositivo SEM DONO, da PROPRIA unidade, passa a ser o dono.
+   *
+   * O limite e o que mantem a regra no 2 de pe:
+   *   - so `edgeNodeId` NULO -- nunca toma dispositivo de outro Edge, nem na
+   *     mesma unidade;
+   *   - so do mesmo tenant E da mesma unidade da assinatura;
+   *   - a escrita e `updateMany` com `edgeNodeId: null` no filtro, entao dois
+   *     Edges disputando o mesmo dispositivo nao sobrescrevem um ao outro --
+   *     o segundo ve `count 0` e confere quem ficou com ele;
+   *   - `AuditLog` com ator `SYSTEM`: a mudanca de dono nao e silenciosa.
    */
-  async encontrarDoEdgePorSerial(
+  async resolverDoEdgePorSerial(
     edge: { tenantId: string; gymUnitId: string; edgeNodeId: string },
     serial: string,
   ): Promise<{ id: string } | null> {
-    return this.db.device.findFirst({
-      where: {
-        serial,
-        tenantId: edge.tenantId,
-        gymUnitId: edge.gymUnitId,
-        edgeNodeId: edge.edgeNodeId,
-      },
+    const escopo = { serial, tenantId: edge.tenantId, gymUnitId: edge.gymUnitId };
+
+    const proprio = await this.db.device.findFirst({
+      where: { ...escopo, edgeNodeId: edge.edgeNodeId },
       select: { id: true },
+    });
+
+    if (proprio) return proprio;
+
+    const semDono = await this.db.device.findFirst({
+      where: { ...escopo, edgeNodeId: null },
+      select: { id: true },
+    });
+
+    if (!semDono) return null;
+
+    return this.db.$transaction(async (tx) => {
+      const reivindicado = await tx.device.updateMany({
+        where: { id: semDono.id, edgeNodeId: null },
+        data: { edgeNodeId: edge.edgeNodeId },
+      });
+
+      if (reivindicado.count === 1) {
+        await tx.auditLog.create({
+          data: {
+            tenantId: edge.tenantId,
+            gymUnitId: edge.gymUnitId,
+            actorType: 'SYSTEM',
+            actorId: null,
+            action: 'device.claimed_by_edge',
+            target: 'device',
+            targetId: semDono.id,
+            correlationId: `claim-${semDono.id}`,
+            // Serial e dado de inventario, nao segredo.
+            metadata: { edgeNodeId: edge.edgeNodeId },
+          },
+        });
+      }
+
+      // `count 0`: outro Edge chegou primeiro. So devolve se o dono for ESTE.
+      return tx.device.findFirst({
+        where: { id: semDono.id, edgeNodeId: edge.edgeNodeId },
+        select: { id: true },
+      });
     });
   }
 

@@ -22,6 +22,14 @@ import type { SignedCloudClient } from '../cloud/signed-client.js';
 /** Espera sem `senduser` novo antes de mandar o lote. */
 export const JANELA_DE_CADASTROS_MS = 2_000;
 
+/**
+ * Intervalo minimo entre duas tentativas de vincular a base do MESMO leitor
+ * -- #488. Cada tentativa faz `listar`, que pausa o leitor (`disabledevice`);
+ * com falha persistente (leitor nao cadastrado no painel) e o leitor
+ * reconectando sozinho, sem isto a base seria listada a cada reconexao.
+ */
+export const INTERVALO_ENTRE_TENTATIVAS_MS = 60_000;
+
 /** Teto por chamada, o mesmo da API. */
 export const TAMANHO_DO_LOTE = 1_000;
 
@@ -42,11 +50,19 @@ export function ligarVinculoLegado(deps: {
   cliente: SignedCloudClient;
   logger: Logger;
   janelaMs?: number;
+  intervaloEntreTentativasMs?: number;
+  /** Relogio injetavel: o 'agora' entra por parametro (CLAUDE.md). */
+  agoraMs?: () => number;
 }): { encerrar: () => void } {
   const { facial, cliente, logger } = deps;
   const janelaMs = deps.janelaMs ?? JANELA_DE_CADASTROS_MS;
+  const intervaloMs = deps.intervaloEntreTentativasMs ?? INTERVALO_ENTRE_TENTATIVAS_MS;
+  const agoraMs = deps.agoraMs ?? Date.now;
 
-  const informar = async (serial: string, numeros: readonly string[]): Promise<void> => {
+  /** `true` quando TODOS os lotes chegaram na nuvem. */
+  const informar = async (serial: string, numeros: readonly string[]): Promise<boolean> => {
+    let todosChegaram = true;
+
     for (let i = 0; i < numeros.length; i += TAMANHO_DO_LOTE) {
       const lote = numeros.slice(i, i + TAMANHO_DO_LOTE);
       const resposta = await cliente.post<RespostaDoVinculo>(CAMINHO, {
@@ -59,6 +75,7 @@ export function ligarVinculoLegado(deps: {
           { leitor: serial, numeros: lote.length, status: resposta.status },
           'vinculo da base do leitor nao chegou na nuvem',
         );
+        todosChegaram = false;
         continue;
       }
 
@@ -80,6 +97,8 @@ export function ligarVinculoLegado(deps: {
         'base do leitor vinculada',
       );
     }
+
+    return todosChegaram;
   };
 
   /*
@@ -94,22 +113,44 @@ export function ligarVinculoLegado(deps: {
     });
   };
 
-  // Uma listagem por leitor por execucao: `listar` pausa o leitor
-  // (`disabledevice`), e a base nao muda por reconectar. Cadastro novo
+  // Uma listagem BEM-SUCEDIDA por leitor por execucao: `listar` pausa o
+  // leitor (`disabledevice`), e a base nao muda por reconectar. Cadastro novo
   // chega pelo `senduser`.
+  //
+  // So conta como feita quando chegou na nuvem (#488): na Arena Positiva a
+  // nuvem respondeu 404 e a base ficou marcada como feita, sem nova tentativa
+  // ate o agente reiniciar. Falha libera a proxima tentativa -- no proximo
+  // registro do leitor.
   const listados = new Set<string>();
+  const ultimaTentativa = new Map<string, number>();
 
   facial.aoRegistrar?.((serial) => {
     if (listados.has(serial)) return;
+
+    // Falha libera a proxima tentativa, mas nao antes do intervalo minimo.
+    const agora = agoraMs();
+    const ultima = ultimaTentativa.get(serial);
+    if (ultima !== undefined && agora - ultima < intervaloMs) {
+      logger.debug({ leitor: serial }, 'vinculo da base do leitor ja tentado ha pouco -- aguardando');
+      return;
+    }
+
+    ultimaTentativa.set(serial, agora);
     listados.add(serial);
 
     enfileirar(
       async () => {
-        const base = await facial.listar();
-        await informar(
-          serial,
-          base.map((i) => i.externalEnrollId),
-        );
+        try {
+          const base = await facial.listar();
+          const chegou = await informar(
+            serial,
+            base.map((i) => i.externalEnrollId),
+          );
+          if (!chegou) listados.delete(serial);
+        } catch (erro: unknown) {
+          listados.delete(serial);
+          throw erro;
+        }
       },
       'nao foi possivel listar a base do leitor',
       serial,
@@ -124,7 +165,13 @@ export function ligarVinculoLegado(deps: {
     temporizador = null;
     for (const [serial, numeros] of pendentes) {
       pendentes.delete(serial);
-      enfileirar(() => informar(serial, [...numeros]), 'vinculo de cadastro novo do leitor falhou', serial);
+      enfileirar(
+        async () => {
+          await informar(serial, [...numeros]);
+        },
+        'vinculo de cadastro novo do leitor falhou',
+        serial,
+      );
     }
   };
 

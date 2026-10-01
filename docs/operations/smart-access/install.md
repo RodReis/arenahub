@@ -113,6 +113,13 @@ Espera-se `[OK]` em todas as linhas. Depois, no painel → **Operação**:
 - [ ] Os dispositivos aparecem como **Respondendo**
 - [ ] Nenhum alerta crítico aberto
 
+> **Dispositivo cadastrado antes do Edge não precisa ser ligado a ele.** O leitor entra no painel
+> sem Edge, e o **primeiro Edge da mesma unidade que apresentar o serial** dele passa a ser o dono,
+> com registro de auditoria (`device.claimed_by_edge`). Dispositivo que já tem outro Edge, ou que é
+> de outra unidade, **nunca** é tomado. O serial cadastrado no painel tem de ser **exatamente** o
+> `sn` que o leitor informa (`sn` na linha `leitor registrado` do log do agente) — serial diferente
+> dá 404 no vínculo dos alunos e todo reconhecimento é negado (#488).
+
 ---
 
 ## 5. Teste de passagem assistido
