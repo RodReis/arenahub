@@ -146,8 +146,32 @@ describe('ligarVinculoLegado', () => {
     await ate(() => linhas.some((l) => l['msg'] === 'base do leitor vinculada'));
 
     expect(linhas).toContainEqual(
-      expect.objectContaining({ msg: 'base do leitor vinculada', leitor: 'AYTI11108174', vinculados: 1 }),
+      expect.objectContaining({
+        msg: 'base do leitor vinculada',
+        leitor: 'AYTI11108174',
+        prontosNaCatraca: 1,
+        novos: 1,
+      }),
     );
+
+    ligado.encerrar();
+  });
+
+  /*
+   * Arena Positiva, 01/10/2026: com lote de 50, a base virava nove linhas
+   * longas no log. Uma linha so, com os totais de todos os lotes.
+   */
+  it('soma os lotes numa linha so de resultado', async () => {
+    const base = Array.from({ length: TAMANHO_DO_LOTE + 5 }, (_, i) => String(i + 1));
+    const { linhas, registrar, ligado } = montar(base);
+
+    registrar('AYTI11108174');
+    await ate(() => linhas.some((l) => l['msg'] === 'base do leitor vinculada'));
+
+    const resultados = linhas.filter((l) => l['msg'] === 'base do leitor vinculada');
+    expect(resultados).toHaveLength(1);
+    // A resposta falsa diz `linked: 1` por chamada: duas chamadas, dois.
+    expect(resultados[0]).toMatchObject({ numeros: TAMANHO_DO_LOTE + 5, prontosNaCatraca: 2 });
 
     ligado.encerrar();
   });

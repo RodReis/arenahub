@@ -19,7 +19,7 @@ import estilos from './access-events.module.css';
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { ROTULO_DE_METODO, ROTULO_DE_MODO, traduzir } from '../../../src/operations/formatar';
-import { periodoPadraoDeEventos } from '../../../src/operations/periodo-padrao';
+import { instanteNoFuso, periodoPadraoDeEventos } from '../../../src/operations/periodo-padrao';
 
 /**
  * Fuso FIXO, preservado de `instanteLegivel` -- mesma divida das outras telas.
@@ -87,11 +87,10 @@ export default async function PaginaDeEventos({
    * Mesmo padrão de `app/actions/membership.ts` (`instanteIso`): teto
    * `Number.isFinite` para entrada mal-formada não travar a consulta.
    */
-  const instanteIso = (valor: string): string | undefined => {
-    const data = new Date(valor);
-
-    return Number.isFinite(data.getTime()) ? data.toISOString() : undefined;
-  };
+  // No fuso da ACADEMIA, nunca no do servidor (UTC no Railway) -- ver
+  // `instanteNoFuso`.
+  const instanteIso = (valor: string): string | undefined =>
+    instanteNoFuso(valor, FUSO_PROVISORIO);
 
   const consulta = new URLSearchParams();
 

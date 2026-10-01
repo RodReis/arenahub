@@ -250,7 +250,52 @@ describe('TopdataFacialAdapter', () => {
 
     await leitor.esperar(() => ids.length === 2);
 
-    expect(ids).toEqual(['90-0', '90-1']);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  /*
+   * Arena Positiva, 01/10/2026: o `logindex` RECOMECA a cada conexao do
+   * leitor. Com o id `logindex-posicao`, a passagem nova repetia o id de uma
+   * antiga, o Edge achava a tentativa no SQLite e devolvia a decisao guardada
+   * (REENTRADA, `latenciaDecisaoMs: 0`) sem perguntar a nuvem -- o 1491, ja
+   * vinculado e com plano, seguiu negado como "nao identificado".
+   */
+  it('passagem nova nao repete o id de uma antiga, mesmo com logindex repetido', async () => {
+    const ids: (string | undefined)[] = [];
+    adapter.aoReconhecer((e) => ids.push(e.idExternoDoEvento));
+
+    for (const time of ['2026-10-01 10:10:28', '2026-10-01 11:10:01']) {
+      leitor.enviar({
+        cmd: 'sendlog',
+        sn: leitor.sn,
+        count: 1,
+        logindex: 1,
+        record: [{ enrollid: 1491, time, mode: 1, inout: 0, event: 0 }],
+      });
+    }
+
+    await leitor.esperar(() => ids.length === 2);
+
+    expect(ids[0]).not.toBe(ids[1]);
+  });
+
+  it('o mesmo registro reenviado pelo leitor mantem o id -- retry nao vira passagem nova', async () => {
+    const ids: (string | undefined)[] = [];
+    adapter.aoReconhecer((e) => ids.push(e.idExternoDoEvento));
+
+    for (const logindex of [5, 6]) {
+      leitor.enviar({
+        cmd: 'sendlog',
+        sn: leitor.sn,
+        count: 1,
+        logindex,
+        record: [{ enrollid: 1491, time: '2026-10-01 11:10:01', mode: 1, inout: 0, event: 0 }],
+      });
+    }
+
+    await leitor.esperar(() => ids.length === 2);
+
+    expect(ids[0]).toBe(ids[1]);
   });
 
   it('carrega o serial do leitor que reconheceu -- e ele que a nuvem conhece (#467)', async () => {

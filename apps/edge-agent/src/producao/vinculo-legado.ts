@@ -68,6 +68,7 @@ export function ligarVinculoLegado(deps: {
   /** `true` quando TODOS os lotes chegaram na nuvem. */
   const informar = async (serial: string, numeros: readonly string[]): Promise<boolean> => {
     let todosChegaram = true;
+    const total = { vinculados: 0, jaVinculados: 0, pendentes: [] as string[] };
 
     for (let i = 0; i < numeros.length; i += TAMANHO_DO_LOTE) {
       const lote = numeros.slice(i, i + TAMANHO_DO_LOTE);
@@ -86,10 +87,21 @@ export function ligarVinculoLegado(deps: {
       }
 
       const r = resposta.body;
-      // Os numeros pendentes vao no log de proposito: e a lista que a
-      // recepcao precisa para corrigir o cadastro. Numero de leitor e chave
-      // de equipamento, nao PII.
-      logger.info(
+      total.vinculados += r.linked;
+      total.jaVinculados += r.alreadyLinked;
+      total.pendentes.push(
+        ...r.withoutStudent,
+        ...r.ambiguous,
+        ...r.studentAlreadyLinked,
+        ...r.withoutConsentDocument,
+        ...r.refusedOrRevoked,
+      );
+
+      // Detalhe por lote so em `debug`: com lote de 50, a base da Arena
+      // Positiva virava nove linhas longas e escondia o resto do log. As
+      // listas sao o que a recepcao usa para corrigir cadastro -- numero de
+      // leitor e chave de equipamento, nao PII.
+      logger.debug(
         {
           leitor: serial,
           vinculados: r.linked,
@@ -100,9 +112,23 @@ export function ligarVinculoLegado(deps: {
           semTermoBiometrico: r.withoutConsentDocument,
           recusouOuRevogado: r.refusedOrRevoked,
         },
-        'base do leitor vinculada',
+        'lote da base do leitor',
       );
     }
+
+    // UMA linha por base, com o que importa no teste de campo: quantos estao
+    // prontos para a catraca e quantos ficaram de fora.
+    logger.info(
+      {
+        leitor: serial,
+        numeros: numeros.length,
+        prontosNaCatraca: total.vinculados + total.jaVinculados,
+        novos: total.vinculados,
+        semVinculo: total.pendentes.length,
+        ...(todosChegaram ? {} : { aviso: 'parte nao chegou na nuvem -- tenta de novo' }),
+      },
+      'base do leitor vinculada',
+    );
 
     return todosChegaram;
   };

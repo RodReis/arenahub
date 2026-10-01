@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { periodoPadraoDeEventos } from './periodo-padrao';
+import { instanteNoFuso, periodoPadraoDeEventos } from './periodo-padrao';
 
 describe('periodoPadraoDeEventos', () => {
   it('as ultimas 24h, no formato que datetime-local aceita', () => {
@@ -41,5 +41,34 @@ describe('periodoPadraoDeEventos', () => {
 
   it('fuso invalido lanca em vez de devolver data incorreta', () => {
     expect(() => periodoPadraoDeEventos(new Date(), 'Fuso/Que/Nao/Existe')).toThrow();
+  });
+});
+
+/*
+ * Arena Positiva, 01/10/2026: o filtro "10:15 a 11:15" era lido em UTC pelo
+ * servidor do painel e a passagem das 11:10 (Brasilia) nao aparecia.
+ */
+describe('instanteNoFuso', () => {
+  it('le a hora digitada no fuso da academia, nao no do servidor', () => {
+    expect(instanteNoFuso('2026-10-01T10:15', 'America/Sao_Paulo')).toBe(
+      '2026-10-01T13:15:00.000Z',
+    );
+  });
+
+  it('volta ao mesmo valor que o periodo padrao preencheu', () => {
+    const periodo = periodoPadraoDeEventos(new Date('2026-09-23T18:00:00.000Z'), 'America/Sao_Paulo');
+
+    expect(instanteNoFuso(periodo.ate, 'America/Sao_Paulo')).toBe('2026-09-23T18:00:00.000Z');
+  });
+
+  it('acerta fuso com horario de verao, nos dois lados da virada', () => {
+    // Nova York: EDT (UTC-4) em julho, EST (UTC-5) em janeiro.
+    expect(instanteNoFuso('2026-07-01T12:00', 'America/New_York')).toBe('2026-07-01T16:00:00.000Z');
+    expect(instanteNoFuso('2026-01-15T12:00', 'America/New_York')).toBe('2026-01-15T17:00:00.000Z');
+  });
+
+  it('entrada mal-formada vira undefined', () => {
+    expect(instanteNoFuso('ontem', 'America/Sao_Paulo')).toBeUndefined();
+    expect(instanteNoFuso('2026-10-01', 'America/Sao_Paulo')).toBeUndefined();
   });
 });

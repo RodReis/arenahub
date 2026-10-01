@@ -227,7 +227,7 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     const log = esquemaSendLog.safeParse(json);
     if (!log.success) return;
 
-    for (const [posicao, registro] of log.data.record.entries()) {
+    for (const registro of log.data.record) {
       if (registro.image !== undefined) {
         // Chegou foto apesar do setdevinfo. DESCARTA sem persistir e sem
         // logar o conteudo -- so o fato, para alguem investigar a config do
@@ -255,12 +255,19 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
         recebidoEm: new Date(),
         metodo: 'facial',
         serialDoDispositivo: log.data.sn,
-        ...(log.data.logindex !== undefined
-          ? // Por REGISTRO, nao por lote: o `logindex` e do sendlog inteiro, e
-            // repeti-lo em todos fazia o segundo em diante virar REENTRADA
-            // (#476). Continua estavel quando o leitor reenvia o mesmo lote.
-            { idExternoDoEvento: `${log.data.logindex}-${posicao}` }
-          : {}),
+        /*
+         * Leitor + pessoa + hora DO REGISTRO. Estavel quando o leitor reenvia
+         * o mesmo registro (retry nao vira passagem nova) e unico entre
+         * passagens diferentes.
+         *
+         * NAO usa `logindex`: ele recomeca a cada conexao do leitor, e o id
+         * `logindex-posicao` fazia a passagem nova repetir o id de uma
+         * antiga -- o Edge devolvia a decisao guardada sem perguntar a nuvem
+         * (Arena Positiva, 01/10/2026). Antes disso, o `logindex` puro, igual
+         * para o lote inteiro, ja tinha virado REENTRADA no segundo registro
+         * (#476) -- `posicao` resolvia aquele caso, nao este.
+         */
+        idExternoDoEvento: `${log.data.sn}-${registro.enrollid}-${registro.time}`,
       };
 
       for (const ouvinte of this.ouvintes) ouvinte(evento);
