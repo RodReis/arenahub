@@ -361,4 +361,115 @@ describe('compor', () => {
 
     await segundaComposicao.encerrar();
   });
+
+  /**
+   * #469 -- Arena Positiva, 30/09/2026. `command-poller.ts` existia com
+   * teste proprio, mas `compor` nunca o chamava: cadastro feito no painel
+   * nao chegava ao leitor em producao.
+   */
+  describe('#469 -- sincronismo ArenaHub -> leitor', () => {
+    it('busca comando pendente e cadastra a identidade no leitor', async () => {
+      dir = mkdtempSync(join(tmpdir(), 'arenahub-compor-agente-469-'));
+
+      const config = carregarConfig({
+        EDGE_AGENT_ID: 'edge-1',
+        TENANT_ID: '11111111-1111-4111-8111-111111111111',
+        GYM_UNIT_ID: '22222222-2222-4222-8222-222222222222',
+        SQLITE_PATH: join(dir, 'teste-469.sqlite'),
+        CLOUD_API_URL: 'https://nuvem.teste',
+        SYNC_POLL_INTERVAL_MS: '1000',
+      });
+      const logger = criarLogger(config);
+
+      const getMock = jest.fn((caminho: string) =>
+        Promise.resolve(
+          caminho.startsWith('/api/v1/edge/commands')
+            ? {
+                ok: true,
+                status: 200,
+                body: {
+                  commands: [
+                    {
+                      id: 'cmd-469',
+                      sequence: '1',
+                      type: 'DEVICE_USER_UPSERT',
+                      payload: {
+                        deviceSerial: 'SIMULADOR-FACIAL',
+                        externalUserId: '1001',
+                        identityId: '11111111-1111-4111-8111-111111111111',
+                      },
+                      correlationId: 'corr-469',
+                    },
+                  ],
+                },
+                errorCode: null,
+              }
+            : { ok: true, status: 200, body: { commands: [] }, errorCode: null },
+        ),
+      );
+      const postMock = jest.fn((caminho: string) =>
+        Promise.resolve(
+          caminho.includes('/lease')
+            ? { ok: true, status: 201, body: { leased: true }, errorCode: null }
+            : { ok: true, status: 201, body: { accepted: 1 }, errorCode: null },
+        ),
+      );
+
+      const facial = new FacialSimulator();
+
+      const composto = await compor(config, logger, {
+        cliente: { get: getMock, post: postMock } as unknown as SignedCloudClient,
+        dispositivos: {
+          facial,
+          catraca: {
+            nome: 'catraca-falsa',
+            liberar: jest.fn(() => Promise.resolve({ desfecho: 'girou' as const, duracaoMs: 10 })),
+            encerrar: jest.fn(() => Promise.resolve()),
+          },
+          encerrar: () => Promise.resolve(),
+        },
+      });
+
+      await ate(() => chamou(postMock, '/api/v1/edge/sync-results/batch'));
+
+      const cadastrados = await facial.listar();
+      expect(cadastrados).toContainEqual(
+        expect.objectContaining({ externalEnrollId: '1001' }),
+      );
+
+      await composto.encerrar();
+    });
+
+    it('nao liga o poller sem CLOUD_API_URL -- modo bancada', async () => {
+      dir = mkdtempSync(join(tmpdir(), 'arenahub-compor-agente-469-bancada-'));
+
+      const config = carregarConfig({
+        EDGE_AGENT_ID: 'edge-1',
+        TENANT_ID: '11111111-1111-4111-8111-111111111111',
+        GYM_UNIT_ID: '22222222-2222-4222-8222-222222222222',
+        SQLITE_PATH: join(dir, 'teste-469-bancada.sqlite'),
+      });
+      const logger = criarLogger(config);
+      const getMock = jest.fn();
+
+      const composto = await compor(config, logger, {
+        cliente: { get: getMock, post: jest.fn() } as unknown as SignedCloudClient,
+        dispositivos: {
+          facial: new FacialSimulator(),
+          catraca: {
+            nome: 'catraca-falsa',
+            liberar: jest.fn(() => Promise.resolve({ desfecho: 'girou' as const, duracaoMs: 10 })),
+            encerrar: jest.fn(() => Promise.resolve()),
+          },
+          encerrar: () => Promise.resolve(),
+        },
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(getMock).not.toHaveBeenCalled();
+
+      await composto.encerrar();
+    });
+  });
 });
