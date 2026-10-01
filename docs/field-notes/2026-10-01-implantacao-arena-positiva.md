@@ -37,8 +37,9 @@ o anterior deixou de mascará-lo.
 | #493 | recusa/revogação antiga barraria o vínculo | regra nº 7 | **decisão do PI: regra revogada** (ADR-064); lote do vínculo de 1.000 → 50 (428 numa chamada passou dos 15 s do cliente) |
 | #495 | tudo negado com `latenciaDecisaoMs: 0` | id do reconhecimento era `logindex-posicao`, e o `logindex` **recomeça a cada conexão**: a passagem nova repetia o id de uma antiga e o Edge devolvia a decisão guardada sem consultar a nuvem | id = `serial-enrollid-hora do registro` |
 | #497 | liberado, mas "Não passou" | a ponte fixava 5 s destravada (`ConfigurarAcionamento1(1, 5)`); o leitor segura a mesma pessoa ~2 min | `CATRACA_TEMPO_LIBERADA_S`, padrão 10 |
+| #504 | **depois de reiniciar o Windows**: rosto reconhecido, catraca parada, nada no painel, Edge "Respondendo" | o `TopFaceService` (software da Topdata, serviço do Windows) **escuta a mesma porta 7792** e, subindo no boot antes do login, ficou com o leitor; o agente esperava calado, e o heartbeat seguia informando o leitor como ativo | TopFace parado e desativado no PC (runbook §7, com a reversão); o agente avisa no log quando o leitor não chega em 2 min e para de informá-lo no heartbeat, o que dispara `DEVICE_OFFLINE` no painel |
 
-**Lição que atravessa os oito defeitos:** nenhum deles aparece em simulador. Quatro dependiam de
+**Lição que atravessa os nove defeitos:** nenhum deles aparece em simulador. Quatro dependiam de
 **ordem de criação no mundo real** (leitor cadastrado antes do Edge), de **reinício do equipamento**
 (`logindex`) e de **tempo físico** (5 s). O E2E verde não os cobria porque o dado de teste nascia já
 na ordem certa — mesma família do buraco do #404.

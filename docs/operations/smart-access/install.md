@@ -43,6 +43,14 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
 
 **Cole um aviso físico na máquina:** *"Este computador não se desliga. Ele controla a catraca."*
 
+> ⚠️ **Desative o TopFace antes de instalar** (#504, Arena Positiva, 01/10/2026). Se o PC tem o
+> software da Topdata (`TopFace.exe`, serviço `TopFaceService`), ele escuta a **mesma porta 7792**
+> do agente e, por subir no boot antes do login, **fica com o leitor a cada reinício** — rosto
+> reconhecido, catraca parada, nada no painel. Confira com `tasklist /svc | findstr /i topface` e,
+> se existir, num PowerShell de administrador: `sc.exe stop TopFaceService` e
+> `sc.exe config TopFaceService start= disabled`. Como voltar: runbook de operação da Arena
+> Positiva §7 (`docs/runbooks/operacao-edge-arena-positiva.md`).
+
 ---
 
 ## 3. Instalação

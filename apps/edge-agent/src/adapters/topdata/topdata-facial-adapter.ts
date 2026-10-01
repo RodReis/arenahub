@@ -42,6 +42,28 @@ const CAMINHO = '/pub/chat';
 /** Prazo para o equipamento responder um comando. */
 const TIMEOUT_COMANDO_MS = 10_000;
 
+/**
+ * Vigia do leitor -- #504. Arena Positiva, 01/10/2026: depois de reiniciar o
+ * Windows, o `TopFaceService` (software da Topdata, servico que sobe no boot,
+ * ANTES do agente) escutava a mesma porta 7792 e ficou com o leitor. O rosto
+ * era reconhecido, a catraca nao abria, e o log do agente nao dizia nada.
+ */
+export interface VigiaDoLeitor {
+  /** Sem `reg` por este tempo (desde a partida ou a queda), avisa. */
+  readonly avisoSemLeitorMs: number;
+  /** Enquanto o leitor nao chega, repete o aviso neste intervalo. */
+  readonly repetirAvisoMs: number;
+}
+
+export const VIGIA_PADRAO: VigiaDoLeitor = {
+  avisoSemLeitorMs: 2 * 60_000,
+  repetirAvisoMs: 5 * 60_000,
+};
+
+const ACAO_SEM_LEITOR =
+  'confira se outro programa esta com o leitor (TopFace: netstat -ano | findstr 7792); ' +
+  'reinicie o leitor na tomada; confira no leitor o IP deste PC e a porta';
+
 type Pendente = {
   resolver: (retorno: Record<string, unknown>) => void;
   rejeitar: (erro: Error) => void;
@@ -73,10 +95,43 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
    */
   private readonly pendentes = new Map<string, Pendente>();
 
+  /** Aviso de leitor ausente agendado -- #504. `null` com o leitor registrado. */
+  private vigia: NodeJS.Timeout | null = null;
+  private ausenteDesde = Date.now();
+
   constructor(
     private readonly logger: Logger,
     private readonly porta: number = PORTA_PADRAO,
+    private readonly prazos: VigiaDoLeitor = VIGIA_PADRAO,
   ) {}
+
+  /**
+   * Agenda o aviso de leitor ausente. Chamado na partida e a cada queda;
+   * cancelado pelo `reg`. Repete enquanto o leitor nao volta: um aviso so,
+   * soterrado no log de horas, nao serviria a quem abre o log depois.
+   */
+  private vigiarLeitor(esperaMs: number): void {
+    if (this.vigia) clearTimeout(this.vigia);
+
+    this.vigia = setTimeout(() => {
+      this.logger.warn(
+        {
+          porta: this.porta,
+          semLeitorHaMin: Math.round((Date.now() - this.ausenteDesde) / 60_000),
+          acao: ACAO_SEM_LEITOR,
+        },
+        'leitor facial nao esta conectado ao agente',
+      );
+      this.vigiarLeitor(this.prazos.repetirAvisoMs);
+    }, esperaMs);
+    // Nao segura o processo vivo so por causa do aviso.
+    this.vigia.unref();
+  }
+
+  private pararVigia(): void {
+    if (this.vigia) clearTimeout(this.vigia);
+    this.vigia = null;
+  }
 
   /** Sobe o servidor e espera o leitor conectar. */
   iniciar(): Promise<void> {
@@ -113,7 +168,15 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
             { codigo, motivo: motivo.toString('utf8') },
             'leitor facial desconectou',
           );
-          if (this.conexao === socket) this.conexao = null;
+          if (this.conexao === socket) {
+            this.conexao = null;
+            // Sem leitor, sem serial: o heartbeat para de informa-lo e a
+            // nuvem levanta DEVICE_OFFLINE (#504). Antes o serial do ultimo
+            // `reg` ficava, e o painel via um leitor ativo que nao estava.
+            this.serieDoEquipamento = null;
+            this.ausenteDesde = Date.now();
+            this.vigiarLeitor(this.prazos.avisoSemLeitorMs);
+          }
         });
 
         socket.on('error', (erro) => this.logger.error({ erro: erro.message }, 'erro no socket'));
@@ -121,6 +184,8 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
 
       servidor.once('listening', () => {
         this.servidor = servidor;
+        this.ausenteDesde = Date.now();
+        this.vigiarLeitor(this.prazos.avisoSemLeitorMs);
         this.logger.info(
           { porta: this.porta, caminho: CAMINHO },
           'servidor do leitor facial no ar, aguardando conexao',
@@ -199,6 +264,7 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     if (!reg.success) return;
 
     this.serieDoEquipamento = reg.data.sn;
+    this.pararVigia();
 
     this.logger.info(
       {
@@ -432,6 +498,8 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
   }
 
   encerrar(): Promise<void> {
+    this.pararVigia();
+
     return new Promise((resolve) => {
       for (const pendente of this.pendentes.values()) {
         clearTimeout(pendente.temporizador);
@@ -457,7 +525,10 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     });
   }
 
-  /** Numero de serie do equipamento conectado, quando ja houve `reg`. */
+  /**
+   * Numero de serie do equipamento CONECTADO, quando ja houve `reg`. Volta a
+   * `null` quando a conexao cai (#504).
+   */
   get serie(): string | null {
     return this.serieDoEquipamento;
   }

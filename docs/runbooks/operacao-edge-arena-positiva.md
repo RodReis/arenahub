@@ -17,6 +17,7 @@ instalação do zero: [`docs/operations/smart-access/install.md`](../operations/
 | log do agente | `C:\ArenaHub\arenahub\apps\edge-agent\data\edge-agent.log` (sem rotação — ver §6) |
 | nuvem | API `arenahubapi-production.up.railway.app`, painel `arenahub.up.railway.app` (deploy automático da `main`, ~5 min) |
 | leitor facial | Topdata AiFace `AYTI11108174`, disca para o PC na porta 7792 |
+| **TopFace** (software da Topdata) | serviço `TopFaceService` **parado e desativado** desde 01/10/2026 — ele escuta a mesma porta 7792 e roubava o leitor do agente a cada boot (#504). Ver §7 |
 | catraca | Topdata EasyInner, porta 3570, sentido invertido, destravada 10 s |
 | `.env` do PC (raiz do repo) | `CATRACA_INVERTIDA=true` · `CATRACA_TEMPO_LIBERADA_S=10` · `LOG_LEVEL=info` · `FACIAL_MODE=real` · `CATRACA_MODE=real` |
 
@@ -47,7 +48,9 @@ Subir sem reinstalar: `schtasks /Run /TN "ArenaHub Edge"`.
 ## 3. Conferir que está tudo certo (30 s)
 
 1. `ver-log-edge.cmd` — procure, nesta ordem: `catraca conectada` → `leitor facial conectou` →
-   **`base do leitor vinculada`** com `prontosNaCatraca` perto de 365.
+   `leitor registrado` → **`base do leitor vinculada`** com `prontosNaCatraca` perto de 365.
+   Para conferir quem está com o leitor: `netstat -ano | findstr 7792` — a linha `ESTABLISHED`
+   tem de terminar no PID do `node.exe` (`tasklist /fi "pid eq NNNN"`).
 2. Passe um aluno com plano. O esperado:
    `decisao de acesso ... outcome: ALLOW ... motivo: Plano válido ... estado: PASSAGE_CONFIRMED`
    com **`latenciaDecisaoMs` maior que zero** (zero = decisão velha repetida, o defeito do #495).
@@ -58,7 +61,8 @@ Subir sem reinstalar: `schtasks /Run /TN "ArenaHub Edge"`.
 | sintoma | causa provável | o que fazer |
 |---|---|---|
 | a recepção vê "Edge sem resposta" | agente parado ou PC fora da rede | `ver-log-edge.cmd`; se o log não anda, `schtasks /Run /TN "ArenaHub Edge"` |
-| reconhece o rosto e mostra a foto, **não libera**, e **não há linha no log** | o leitor **não mandou o registro**: intervalo de ~2 min entre registros da mesma pessoa (config do equipamento) | esperar o intervalo; **não é defeito do ArenaHub** |
+| reconhece o rosto, **não libera**, nada no painel, e o log **nunca mostrou `leitor facial conectou`** desde a partida (ou mostra `leitor facial nao esta conectado ao agente`) | **outro programa está com o leitor** — em 01/10/2026 foi o `TopFace.exe` (serviço `TopFaceService`), que sobe no boot antes do agente e escuta a mesma porta 7792 | `netstat -ano | findstr 7792` → PID da linha `ESTABLISHED` → `tasklist /svc /fi "pid eq NNNN"`. Se for o TopFace: §7. Se não for nada: reiniciar o leitor na tomada e conferir nele o IP do PC |
+| reconhece o rosto e mostra a foto, **não libera**, e **não há linha no log**, com o leitor conectado | o leitor **não mandou o registro**: intervalo de ~2 min entre registros da mesma pessoa (config do equipamento) | esperar o intervalo; **não é defeito do ArenaHub** |
 | `outcome: DENY` + `motivo: Sem plano vigente, ou aluno não identificado` | o aluno **não tem plano ativo**, ou o número do leitor **não está na coluna CATRACA** de nenhum aluno | painel → Eventos de acesso: **com nome** = sem plano (cobrar/atribuir); **"não identificado"** = cadastrar o número na coluna CATRACA do aluno e reiniciar o agente |
 | `ALLOW`, mas `PASSAGE_TIMED_OUT` / "Não passou" | o aluno não girou nos 10 s | aumentar `CATRACA_TEMPO_LIBERADA_S` (máx. 50) no `.env`, `bridge:build` **não** é necessário, reiniciar o agente |
 | `liberacao recusada pelo equipamento — retorno 1 da DLL` logo após a partida | a catraca ainda estava conectando | raro; passar de novo após ~10 s |
@@ -90,3 +94,42 @@ ArenaHub**, use o número sugerido no leitor, e o vínculo é feito sozinho na p
   (ADR-024); distinguir é pelo nome no evento.
 - **Termo biométrico:** versão 1 publicada em Administração → Termo biométrico. Todo aluno do leitor
   entra como consentimento aceito (ADR-064).
+
+## 7. TopFace — desativado, e como voltar
+
+**O que é:** o `TopFace.exe` é o software de gerenciamento da Topdata, instalado no PC junto com o
+leitor (era o que o sistema anterior usava). Roda como **serviço do Windows** (`TopFaceService`),
+sobe **no boot, antes do login** — e escuta a **mesma porta 7792** do agente. Os dois ficam
+escutando; o leitor conecta em quem atender primeiro. Depois de um reinício, quem atende primeiro é
+sempre o TopFace: o rosto é reconhecido no leitor, mas nada chega ao ArenaHub, a catraca não libera e
+o painel não registra (#504, 01/10/2026).
+
+**O que foi feito em 01/10/2026** (PowerShell de administrador):
+
+```
+sc.exe stop TopFaceService
+sc.exe config TopFaceService start= disabled
+```
+
+Conferido: `netstat -ano | findstr 7792` passou a mostrar a conexão do leitor no `node.exe`.
+
+**Sem o TopFace, o que muda:** nada na operação do ArenaHub. Cadastro facial continua no próprio
+leitor (o ArenaHub recebe o número sozinho pelo `senduser`, #468) ou pelo painel do ArenaHub.
+
+**Para voltar ao que estava** (por exemplo, para usar o TopFace numa manutenção). Atenção: com o
+TopFace rodando, **o ArenaHub perde o leitor** — o agente só pega de volta depois de parar o TopFace
+e reiniciar o leitor.
+
+```
+sc.exe config TopFaceService start= auto
+```
+```
+sc.exe start TopFaceService
+```
+
+E para devolver o leitor ao ArenaHub depois da manutenção: `sc.exe stop TopFaceService`,
+`sc.exe config TopFaceService start= disabled`, reiniciar o leitor na tomada, conferir com
+`netstat -ano | findstr 7792`.
+
+> Use `sc.exe`, não `sc`: no PowerShell `sc` é outro comando (`Set-Content`). O espaço depois
+> de `start=` é obrigatório.

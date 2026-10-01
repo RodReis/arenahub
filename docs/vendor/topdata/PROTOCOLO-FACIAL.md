@@ -166,6 +166,16 @@ o que vier primeiro.
 > (`apps/edge-agent/src/producao/vinculo-legado.ts`) e manda só o **número** para a nuvem, sem
 > foto nem nome.
 
+## Porta 7792 disputada com o TopFace
+
+> ⚠️ **Achado de campo, Arena Positiva, 01/10/2026 (issue #504).** O software da própria Topdata
+> (`TopFace.exe`, serviço do Windows `TopFaceService`) também é um **servidor WebSocket na porta
+> 7792**. No Windows os dois processos conseguem escutar a mesma porta ao mesmo tempo, e o leitor
+> conecta em quem atender primeiro. Como o serviço sobe no boot, antes do login, **a cada reinício o
+> leitor ia para o TopFace**. O `netstat -ano | findstr 7792` mostrava a linha `ESTABLISHED` no PID
+> do `TopFace.exe`, não no do `node.exe`. Solução de implantação: desativar o `TopFaceService`
+> (`docs/operations/smart-access/install.md` §2).
+
 ## Requisitos da foto de cadastro
 
 - JPG ou JPEG, **menor que 150 KB**

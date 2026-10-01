@@ -29,6 +29,14 @@ operação em [`docs/runbooks/operacao-edge-arena-positiva.md`](runbooks/operaca
 registro por entrega em `docs/DEVELOPMENT.md` §5. **Aceitas e fechadas pelo PI:** #488, #491, #493,
 #495, #497. **Aberta, baixa prioridade:** #499 (rotação do log e script de serviço quebrado).
 
+⚠️ **01/10/2026, à tarde — o reinício do Windows achou mais um: o TopFace roubava o leitor (#504).**
+Depois do boot o rosto era reconhecido, mas a catraca não abria e nada chegava ao painel. O
+`TopFaceService` (software da Topdata, serviço do Windows) escuta a **mesma porta 7792** do agente e,
+subindo antes do login, ficava com o leitor. **Desativado no PC pelo PI**; a reversão está no
+[runbook de operação](runbooks/operacao-edge-arena-positiva.md) §7. O agente agora avisa no log
+quando o leitor não chega e para de informá-lo no heartbeat, e o painel passa a alertar
+`DEVICE_OFFLINE`. **Pausada:** importação das fotos dos alunos a partir do leitor (#503).
+
 🚀 **02/09/2026 — todas as issues de `admin-web` e `kiosk` fechadas; nasce a implantação.** O PI
 pediu a spec de implantação e, na mesma conversa, tomou seis decisões que viraram o **ADR-051**:
 nuvem inteira na **Railway** (API, painel, Postgres, Redis, Bucket); **totem LOCAL** no PC da
