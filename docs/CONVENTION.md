@@ -315,8 +315,8 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 ### 4.3 Biometria e consentimento (INV-016 a INV-022)
 
 - **INV-016** Identidade biométrica é entidade separada do cadastro administrativo.
-- **INV-017** Ausência de consentimento impede o cadastro biométrico, **não** a matrícula.
-- **INV-018** Revogação produz **bloqueio lógico imediato**, mesmo com exclusão física pendente.
+- **INV-017** Ausência de consentimento impede o cadastro biométrico, **não** a matrícula. *(ADR-064, 01/10/2026: a importação da base do leitor facial **não** exige mais decisão prévia — todo aluno da base entra com consentimento `ACCEPTED` legado, ator SYSTEM, inclusive quem tinha recusa ou identidade encerrada. O registro ainda exige um termo publicado.)*
+- **INV-018** Revogação produz **bloqueio lógico imediato**, mesmo com exclusão física pendente. *(ADR-064: vale para a revogação feita pelo painel; a importação da base do leitor cria identidade nova `ACTIVE` mesmo para aluno revogado antes.)*
 - **INV-019** Revogar dispara, nesta ordem: desativar `BiometricIdentity` → `DeviceSyncJob DELETE` → remover dos leitores → auditar.
 - **INV-020** Não armazenar template bruto quando o dispositivo não exigir.
 - **INV-021** Consentimento é versionado e revogável, com versão, finalidade, ator, IP e dispositivo.

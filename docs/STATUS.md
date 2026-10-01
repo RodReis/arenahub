@@ -7,7 +7,27 @@
 > antes). Se o Code encontrar este arquivo divergente da sua branch, **a versão da `main` vence**
 > e ele reaplica o próprio progresso por cima — nunca desfaz linha do Cowork.
 
-**Última atualização:** 11/09/2026 *(F69 entregue — superfícies contratadas: mobile e totem viraram flag negociável do plano e do contrato. O catálogo traz o padrão, o contrato diverge na negociação, e quem recusa lê o contrato. `DEFAULT true` porque contrato fechado nunca autorizou perder acesso; academia sem contrato ativo passa, senão a implantação pararia a catraca antes de assinar. O PDF imprime também o que NÃO foi contratado. A flag do mobile fica gravada sem executor até o MVP 4. Antes: F64 entregue — fatura da plataforma sobre o tenant: o ArenaHub passou a cobrar a academia. A contagem de alunos é congelada na emissão e nada a recalcula depois; a idempotência mora na chave única do banco, não num `if`. Inativo é contado por complemento, então um status novo cai nele sozinho. A prévia decompõe a conta em vez de mostrar o total, porque 66% dela vem de quem não treina. Antes: F63 entregue — plano SaaS e contrato do tenant)*
+**Última atualização:** 01/10/2026 *(Arena Positiva em produção — o ArenaHub decide a catraca; ver o primeiro parágrafo abaixo. Antes, 11/09/2026: F69 entregue — superfícies contratadas: mobile e totem viraram flag negociável do plano e do contrato. O catálogo traz o padrão, o contrato diverge na negociação, e quem recusa lê o contrato. `DEFAULT true` porque contrato fechado nunca autorizou perder acesso; academia sem contrato ativo passa, senão a implantação pararia a catraca antes de assinar. O PDF imprime também o que NÃO foi contratado. A flag do mobile fica gravada sem executor até o MVP 4. Antes: F64 entregue — fatura da plataforma sobre o tenant: o ArenaHub passou a cobrar a academia. A contagem de alunos é congelada na emissão e nada a recalcula depois; a idempotência mora na chave única do banco, não num `if`. Inativo é contado por complemento, então um status novo cai nele sozinho. A prévia decompõe a conta em vez de mostrar o total, porque 66% dela vem de quem não treina. Antes: F63 entregue — plano SaaS e contrato do tenant)*
+
+🟢 **01/10/2026 — a Arena Positiva operou em produção com o ArenaHub decidindo a catraca.** Primeira
+unidade real; o MVP 1 saiu do simulador e da bancada. Quatro alunos passaram seguidos, `ALLOW` /
+*Plano válido* em 250–600 ms, giro confirmado pelo sensor, evento no painel com nome e **Passou**; o
+Windows foi reiniciado e o agente subiu sozinho. **365 dos 428 números do leitor** estão vinculados
+a aluno.
+
+⚠️ **O que mudou, e contraria linhas mais abaixo neste arquivo:** a restrição 1 do ADR-029 (catraca
+em `acionamento1: 8` até o ADR-028 fechar) e o "Implantado ≠ produção" de 02/09 **foram superados em
+campo** — o modo online com keep-alive (#470) e a decisão da nuvem estão no ar. **Dois pontos de
+decisão do PI desta data:** (1) a **regra de arquitetura nº 7 foi revogada** (ADR-064): aluno da base
+do leitor entra com consentimento aceito, mesmo com recusa anterior; (2) o agente roda como **tarefa
+agendada**, não como serviço do Windows (o `service:install` não sobe — #499).
+
+Oito defeitos só apareceram com a academia real (#467, #476/#477, #470, #488, #491, #493, #495,
+#497) — nenhum existe em simulador. Narrativa e lições em
+[`docs/field-notes/2026-10-01-implantacao-arena-positiva.md`](field-notes/2026-10-01-implantacao-arena-positiva.md);
+operação em [`docs/runbooks/operacao-edge-arena-positiva.md`](runbooks/operacao-edge-arena-positiva.md);
+registro por entrega em `docs/DEVELOPMENT.md` §5. **Aceitas e fechadas pelo PI:** #488, #491, #493,
+#495, #497. **Aberta, baixa prioridade:** #499 (rotação do log e script de serviço quebrado).
 
 🚀 **02/09/2026 — todas as issues de `admin-web` e `kiosk` fechadas; nasce a implantação.** O PI
 pediu a spec de implantação e, na mesma conversa, tomou seis decisões que viraram o **ADR-051**:

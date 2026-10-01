@@ -3,10 +3,10 @@
 **Para quem:** operador técnico, com acesso administrativo ao PC da recepção.
 **Duração:** ~30 min, fora o tempo de rede.
 
-> ⚠️ **Este runbook ainda não foi ensaiado em academia real.** Ele foi escrito a partir do
-> ADR-011 e do que a bancada mostrou, e a Task 6 do plano de F11 exige que **outra pessoa que
-> não o autor** o execute e anote as lacunas. Enquanto isso não acontecer, trate cada passo como
-> hipótese — ver §7.
+> ✅ **Ensaiado em academia real — Arena Positiva, 26/09 a 01/10/2026.** O ensaio achou o que o
+> papel não via: cada passo errado virou correção (§7) e, no fim, o ArenaHub passou a decidir a
+> catraca. Narrativa e defeitos: [`docs/field-notes/2026-10-01-implantacao-arena-positiva.md`](../../field-notes/2026-10-01-implantacao-arena-positiva.md).
+> Ao bater num passo que não fecha, **o passo está errado até prova em contrário**.
 
 ---
 
@@ -30,8 +30,10 @@
 O `edge-agent` roda **no PC compartilhado da recepção** — decisão do PI, sem hardware dedicado no
 piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia em voz alta:
 
-> **A disponibilidade da catraca é o uptime deste PC.** Se alguém desligar a máquina, a catraca
-> não decide nada. Não é modo degradado — é catraca parada.
+> **O plano só é verificado enquanto este PC estiver ligado e o agente rodando.** Se alguém
+> desligar a máquina, em ~10 s a catraca volta ao modo offline e decide **sozinha, pela lista
+> dela**: libera quem estiver nela, **sem consultar plano**, e o que ela guardar entra como
+> frequência quando o agente voltar (ADR-012). Não é catraca parada, mas também não é controle.
 
 **Requisitos:**
 
@@ -45,15 +47,15 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
 
 ## 3. Instalação
 
-> **Conta Windows: use SEMPRE a mesma para pareamento e para instalar o serviço.** A credencial
-> de pareamento é cifrada com DPAPI `CurrentUser` (ADR-011) — só a MESMA conta Windows que a
-> gravou consegue lê-la de volta. O serviço `ArenaHub Edge` é instalado para rodar sob a conta
-> interativa que executa `pnpm service:install` (nunca `LocalSystem` nem conta de serviço
-> dedicada), justamente para que essa conta seja a mesma do pareamento. Numa academia com PC
-> compartilhado e um usuário Windows só (o cenário do ADR-011), isso é automático; se a máquina
-> tiver mais de uma conta, **não alterne entre elas**.
+> **Conta Windows: use SEMPRE a mesma para pareamento e para a tarefa que roda o agente.** A
+> credencial de pareamento é cifrada com DPAPI `CurrentUser` (ADR-011) — só a MESMA conta Windows
+> que a gravou consegue lê-la de volta. A tarefa agendada `ArenaHub Edge` roda sob a conta
+> interativa que executa o `instalar-edge.cmd` (nunca `LocalSystem`), justamente para que essa
+> conta seja a mesma do pareamento. Numa academia com PC compartilhado e um usuário Windows só (o
+> cenário do ADR-011), isso é automático; se a máquina tiver mais de uma conta, **não alterne entre
+> elas**.
 
-1. Logado com a conta Windows que vai rodar o serviço, rode `pnpm build`
+1. Logado com a conta Windows que vai rodar o agente, rode `pnpm install` e `pnpm build`
 2. Preencha o `.env` da **raiz do monorepo** (dois níveis acima de `apps/edge-agent` — é de lá que
    `main.ts` resolve o arquivo, pela mesma convenção usada pelo docker-compose e pela API)
    **antes** de rodar o agente. Não há prompt interativo: o agente lê a variável de
@@ -66,6 +68,9 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
    | `CLOUD_API_URL` | URL **pública** da API. `arenahubapi.railway.internal` **não resolve** do PC da academia (§1 do `docs/DEPLOY.md`) |
    | `EDGE_PAIRING_CODE` | o código gerado no painel, uso único |
    | `FACIAL_MODE` / `CATRACA_MODE` | `real` na academia; `simulador` é o padrão e não gira nada |
+   | `CATRACA_INVERTIDA` | `true` se a catraca gira para o sentido errado. **Só se descobre testando** na bancada (`lab:run --invertido`). Arena Positiva: `true` (#407) |
+   | `CATRACA_TEMPO_LIBERADA_S` | segundos destravada depois de liberar, de 1 a 50. Padrão `10`; era 5 fixo e o aluno não alcançava girar (#497) |
+   | `LOG_LEVEL` | `info` em produção. `debug` só para diagnóstico — lista cada mensagem do leitor |
 
    Rode o agente uma vez (`pnpm start`) — ele troca o código por um segredo próprio, guardado
    cifrado por **DPAPI** (`%LOCALAPPDATA%\ArenaHub\edge-agent\credencial.dat`), nunca em texto
@@ -73,50 +78,42 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
    com `CredencialAusenteError` e sai (exit 1) — nesse caso, confira o `.env`
 3. O código morre no primeiro uso. Para reparear: painel → **Operação** → ação **Parear** na linha
    do Edge → novo código no `.env` → rode o agente de novo
-> ⚠️ **Os passos 4 e 5 (serviço Windows) não funcionam como estão** — [#499](https://github.com/RodReis/arenahub/issues/499):
-> o script registra `node.exe` direto como serviço, e o Node não responde ao Service Control
-> Manager. **Use a tarefa agendada abaixo**, que é o que roda na Arena Positiva desde 01/10/2026.
->
-> Scripts em `apps/edge-agent/scripts/windows/` — dois cliques, sem copiar comando (copiar pelo
-> WhatsApp apagou `_` e `*` e inverteu a ordem de bloco de várias linhas no PC da recepção):
->
-> | arquivo | para quê |
-> |---|---|
-> | `instalar-edge.cmd` | **botão direito → Executar como administrador**, na conta do pareamento. Cria a tarefa `ArenaHub Edge` (sobe no login, **sem janela**) e já inicia |
-> | `parar-edge.cmd` | para o agente — a catraca volta ao modo offline em ~10 s |
-> | `ver-log-edge.cmd` | log ao vivo (`apps/edge-agent/data/edge-agent.log`); fechar não para o agente |
-> | `atualizar-edge.cmd` | para, `git pull`, `pnpm install`, `bridge:build`, build do agente, sobe de novo |
-> | `edge-rodar.cmd` / `edge-rodar-oculto.vbs` | o laço que religa em 5 s e o lançador sem janela — não clicar |
->
-> - **Limitação:** só sobe quando a conta **entra no Windows**. Depois de queda de energia, o PC
->   precisa de login automático nessa conta — até lá a catraca decide sozinha pela lista dela.
-> - O log não tem rotação ainda (#499) — apague o arquivo de vez em quando com o agente parado.
-
-4. Abra PowerShell **como Administrador**, na mesma conta, e rode:
+4. **Compile a ponte da catraca** (o `.exe` não é versionado) e o agente, uma vez:
    ```powershell
-   pnpm service:install
+   pnpm --filter @arenahub/edge-agent bridge:build
+   pnpm exec turbo run build --filter=@arenahub/edge-agent
    ```
-   O script pede a senha da conta Windows atual (necessária para o serviço rodar sob essa
-   conta) e nunca a grava em arquivo, log ou linha de comando do serviço
-5. Inicie o serviço:
-   ```powershell
-   Start-Service "ArenaHub Edge"
-   ```
+5. **Instale a tarefa que mantém o agente de pé.** Em `apps\edge-agent\scripts\windows\`, botão
+   direito em **`instalar-edge.cmd`** → **Executar como administrador**, logado na conta do
+   pareamento. Ele cria a tarefa `ArenaHub Edge` (dispara no login, **sem janela**, religa o agente
+   em 5 s se cair) e já inicia.
 
-**Serviço Windows:**
+> ⚠️ **Não use `pnpm service:install`** — [#499](https://github.com/RodReis/arenahub/issues/499).
+> O script registra `node.exe` direto como serviço do Windows, e o Node não responde ao Service
+> Control Manager (erro 1053 ao iniciar); também exige a senha da conta. Nunca foi executado numa
+> máquina real. O que roda na Arena Positiva é a tarefa agendada, **validada em 01/10/2026 com
+> reinício do Windows**.
 
-- Nome: `ArenaHub Edge`
-- Conta: a mesma conta Windows interativa que rodou o pareamento (ver aviso acima) — **nunca**
-  `LocalSystem`
-- Início: **automático**
-- Recuperação: **reiniciar o serviço** em caso de falha (1ª, 2ª e falhas seguintes), já
-  configurado por `service:install` via `sc.exe failure`
+**Scripts de dois cliques** — em `apps/edge-agent/scripts/windows/`. **Nenhum comando para
+copiar**: copiar pelo WhatsApp apagou `_` e `*` e inverteu a ordem de blocos de várias linhas no PC
+da recepção (01/10/2026).
 
-Para remover o serviço (preserva SQLite e credencial):
+| arquivo | para quê |
+|---|---|
+| `instalar-edge.cmd` | (administrador) cria a tarefa `ArenaHub Edge` e inicia |
+| `parar-edge.cmd` | para o agente — a catraca volta ao modo offline em ~10 s |
+| `ver-log-edge.cmd` | log ao vivo (`apps/edge-agent/data/edge-agent.log`); fechar não para o agente |
+| `atualizar-edge.cmd` | para, `git pull`, `pnpm install`, `bridge:build`, build do agente, sobe de novo |
+| `edge-rodar.cmd` / `edge-rodar-oculto.vbs` | o laço que religa em 5 s e o lançador sem janela — não clicar |
 
-```powershell
-pnpm service:uninstall
-```
+**Limitações da tarefa agendada:**
+
+- Só sobe quando a conta **entra no Windows**. A Arena Positiva faz **login automático sem senha**,
+  então sobe no boot; se alguém ativar senha ou trocar a conta, o agente não sobe até entrar — e
+  nesse tempo a catraca decide sozinha pela lista dela.
+- O log não tem rotação ainda (#499) — apague o arquivo de vez em quando, com o agente parado.
+
+Operação do dia a dia e diagnóstico: [`docs/runbooks/operacao-edge-arena-positiva.md`](../../runbooks/operacao-edge-arena-positiva.md).
 
 ---
 
@@ -177,7 +174,7 @@ Edge sempre inicia a conexão.
 | item | estado |
 |---|---|
 | Execução por pessoa diferente do autor (exigência da Task 6) | ✅ **concluída em 01/10/2026**, pelo PI, na Arena Positiva — catraca liberando pelo ArenaHub; serviço Windows trocado por tarefa agendada (#499) |
-| Tempo real do procedimento | ⬜ não medido |
+| Tempo real do procedimento | ⬜ não medido (a Arena Positiva levou 6 dias, por causa dos defeitos achados) |
 | Comportamento com rede instável durante o pareamento | ⬜ não testado |
 
 ### O que a primeira execução real revelou (26/09/2026)

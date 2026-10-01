@@ -89,7 +89,7 @@ justifique** e ADR (`docs/prd/README.md` §5.1).
 | `admin-web` | Next.js (SSR) | internet | contínua |
 | `mobile` | Expo / RN | internet | loja (ver `M4-DIST-01`) |
 | `kiosk` | Next.js PWA em quiosque | rede da academia | contínua |
-| `edge-agent` | serviço Windows no **PC da recepção** (ADR-011) | rede local | atualização com rollback (`M1-NFR-006`); identidade por **código de pareamento de uso único**, credencial de **segredo por dispositivo** no DPAPI/Credential Manager, rotação automática e revogação no painel (ADR-011) |
+| `edge-agent` | **tarefa agendada** do Windows no **PC da recepção** (ADR-011; o serviço do Windows não funciona, #499) | rede local | atualização com rollback (`M1-NFR-006`); identidade por **código de pareamento de uso único**, credencial de **segredo por dispositivo** no DPAPI/Credential Manager, rotação automática e revogação no painel (ADR-011) |
 
 O `edge-agent` é o componente de missão crítica hospedado em infraestrutura que **não
 controlamos**. Se ele cair, a catraca para. Todo desenho do módulo `edge` parte disso.

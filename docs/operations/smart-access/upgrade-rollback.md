@@ -43,11 +43,16 @@ A recepção precisa saber que vai liberar manualmente durante a janela.
 ## 4. Atualização do Edge
 
 1. Confirme no painel que o Edge está **Respondendo**
-2. Pare o serviço `ArenaHub Edge`
-3. Instale a versão nova
-4. Inicie o serviço
-5. Confirme no painel: **Respondendo**, com a versão nova
-6. Teste uma passagem real (aluno com plano, aluno sem plano)
+2. Clique duas vezes em **`atualizar-edge.cmd`** (`apps\edge-agent\scripts\windows\`). Ele para o
+   agente, faz `git pull`, `pnpm install`, `bridge:build`, o build e sobe de novo — **~2 min com a
+   catraca no modo offline**, decidindo pela lista própria
+3. Confirme no painel: **Respondendo**, com a versão nova
+4. Teste uma passagem real (aluno com plano, aluno sem plano): `latenciaDecisaoMs` maior que zero no
+   log (`ver-log-edge.cmd`)
+
+> O agente **não é um serviço do Windows** (`service:install` não funciona, #499): é a tarefa
+> agendada `ArenaHub Edge`. Mudança só do Edge chega ao PC por `git pull` — **não depende do deploy
+> da nuvem**.
 
 **O SQLite não é apagado.** Ele guarda a fila de eventos que ainda não subiram — apagá-lo
 descarta passagem já registrada.
@@ -58,10 +63,10 @@ descarta passagem já registrada.
 
 **Quando:** a versão nova não sobe, ou sobe e decide errado.
 
-1. Pare o serviço
-2. Reinstale a versão anterior
+1. `parar-edge.cmd`
+2. Volte a versão anterior (`git checkout <commit anterior>`, `bridge:build` se a ponte mudou, build do agente)
 3. **Preserve o SQLite e a credencial** — o rollback não repara identidade
-4. Inicie e confirme no painel
+4. `schtasks /Run /TN "ArenaHub Edge"` e confirme no painel
 5. Confira a fila: eventos gerados durante a janela precisam subir
 
 ### ⬜ O ensaio que falta
