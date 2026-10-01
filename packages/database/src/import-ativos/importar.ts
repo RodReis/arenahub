@@ -66,6 +66,8 @@ import {
  */
 export const MESES_DE_VINCULO = 12;
 
+const MS_POR_DIA = 86_400_000;
+
 /**
  * Data de inicio forcada para quem esta fatia CRIA (nao casa com ninguem).
  *
@@ -195,6 +197,7 @@ export type MotivoDePendencia =
   | 'duplicata dentro do arquivo'
   | 'nascimento implausivel'
   | 'aluno sem periodo de plano'
+  | 'plano vencido no arquivo, direito nao alterado'
   | 'credencial ja pertence a outro aluno'
   | 'bloqueado no ArenaHub, veio como ativo no arquivo'
   | 'arquivado no ArenaHub, veio como ativo no arquivo'
@@ -701,6 +704,7 @@ interface EfeitoDaPessoa {
   email: boolean;
   endereco: boolean;
   semPeriodoDePlano: boolean;
+  planoVencido: boolean;
   direitoDePlanoCriado: boolean;
   direitoDeVinculoCriado: boolean;
 }
@@ -835,6 +839,7 @@ async function gravarPessoa(
     email,
     endereco,
     semPeriodoDePlano: false,
+    planoVencido: false,
     direitoDePlanoCriado: false,
     direitoDeVinculoCriado: false,
   };
@@ -851,6 +856,16 @@ async function gravarPessoa(
     const fimParaCriados = new Date(INICIO_PARA_CRIADOS);
 
     fimParaCriados.setUTCMonth(fimParaCriados.getUTCMonth() + MESES_DE_VINCULO);
+
+    // Data Fim REAL do arquivo ja passou (decisao do PI, 01/10/2026): cadastro
+    // e credencial ja foram gravados acima, mas o acesso segue o que esta no
+    // banco -- a importacao nao concede nem renova direito de plano vencido. O
+    // ultimo dia ainda vale, por isso a comparacao e com o FIM do dia.
+    const fimDoArquivo = parsearDataDoPacto(registro.dataFim);
+
+    if (fimDoArquivo !== null && fimDoArquivo.getTime() + MS_POR_DIA <= agora.getTime()) {
+      return { ...efeito, planoVencido: true };
+    }
 
     const inicio = criadoNestaExecucao ? INICIO_PARA_CRIADOS : parsearDataDoPacto(registro.dataInicio);
     const fim = criadoNestaExecucao ? fimParaCriados : parsearDataDoPacto(registro.dataFim);
@@ -1247,6 +1262,13 @@ export async function importarPessoasAtivas(
 
       if (efeito.semPeriodoDePlano) {
         pendencias.push({ nome: registro.nome, motivo: 'aluno sem periodo de plano' });
+      }
+
+      if (efeito.planoVencido) {
+        pendencias.push({
+          nome: registro.nome,
+          motivo: 'plano vencido no arquivo, direito nao alterado',
+        });
       }
 
       if (efeito.nascimento) preenchimento.nascimento += 1;
