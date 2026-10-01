@@ -22,6 +22,14 @@ import type { SignedCloudClient } from '../cloud/signed-client.js';
 /** Espera sem `senduser` novo antes de mandar o lote. */
 export const JANELA_DE_CADASTROS_MS = 2_000;
 
+/**
+ * Intervalo minimo entre duas tentativas de vincular a base do MESMO leitor
+ * -- #488. Cada tentativa faz `listar`, que pausa o leitor (`disabledevice`);
+ * com falha persistente (leitor nao cadastrado no painel) e o leitor
+ * reconectando sozinho, sem isto a base seria listada a cada reconexao.
+ */
+export const INTERVALO_ENTRE_TENTATIVAS_MS = 60_000;
+
 /** Teto por chamada, o mesmo da API. */
 export const TAMANHO_DO_LOTE = 1_000;
 
@@ -42,9 +50,14 @@ export function ligarVinculoLegado(deps: {
   cliente: SignedCloudClient;
   logger: Logger;
   janelaMs?: number;
+  intervaloEntreTentativasMs?: number;
+  /** Relogio injetavel: o 'agora' entra por parametro (CLAUDE.md). */
+  agoraMs?: () => number;
 }): { encerrar: () => void } {
   const { facial, cliente, logger } = deps;
   const janelaMs = deps.janelaMs ?? JANELA_DE_CADASTROS_MS;
+  const intervaloMs = deps.intervaloEntreTentativasMs ?? INTERVALO_ENTRE_TENTATIVAS_MS;
+  const agoraMs = deps.agoraMs ?? Date.now;
 
   /** `true` quando TODOS os lotes chegaram na nuvem. */
   const informar = async (serial: string, numeros: readonly string[]): Promise<boolean> => {
@@ -109,9 +122,20 @@ export function ligarVinculoLegado(deps: {
   // ate o agente reiniciar. Falha libera a proxima tentativa -- no proximo
   // registro do leitor.
   const listados = new Set<string>();
+  const ultimaTentativa = new Map<string, number>();
 
   facial.aoRegistrar?.((serial) => {
     if (listados.has(serial)) return;
+
+    // Falha libera a proxima tentativa, mas nao antes do intervalo minimo.
+    const agora = agoraMs();
+    const ultima = ultimaTentativa.get(serial);
+    if (ultima !== undefined && agora - ultima < intervaloMs) {
+      logger.debug({ leitor: serial }, 'vinculo da base do leitor ja tentado ha pouco -- aguardando');
+      return;
+    }
+
+    ultimaTentativa.set(serial, agora);
     listados.add(serial);
 
     enfileirar(

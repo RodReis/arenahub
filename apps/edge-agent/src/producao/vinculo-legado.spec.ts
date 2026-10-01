@@ -24,7 +24,11 @@ const RESPOSTA = {
   withoutConsentDocument: [],
 };
 
-function montar(base: readonly string[] = [], janelaMs = 20) {
+function montar(
+  base: readonly string[] = [],
+  janelaMs = 20,
+  extra: { intervaloEntreTentativasMs?: number; agoraMs?: () => number } = {},
+) {
   let aoRegistrar: ((serial: string) => void) | undefined;
   let aoInformar: ((c: { serial: string; externalUserId: string }) => void) | undefined;
 
@@ -53,7 +57,16 @@ function montar(base: readonly string[] = [], janelaMs = 20) {
     { write: (l: string) => linhas.push(JSON.parse(l) as Record<string, unknown>) },
   );
 
-  const ligado = ligarVinculoLegado({ facial, cliente, logger, janelaMs });
+  // Intervalo zero por padrao: os testes de nova tentativa registram o leitor
+  // em seguida, e o intervalo minimo de producao (60 s) os bloquearia.
+  const ligado = ligarVinculoLegado({
+    facial,
+    cliente,
+    logger,
+    janelaMs,
+    intervaloEntreTentativasMs: 0,
+    ...extra,
+  });
 
   return {
     listar,
@@ -189,6 +202,39 @@ describe('ligarVinculoLegado', () => {
     await ate(() => post.mock.calls.length >= 1);
 
     expect(listar).toHaveBeenCalledTimes(2);
+
+    ligado.encerrar();
+  });
+
+  /*
+   * Revisao do #488: falha PERSISTENTE (leitor nao cadastrado no painel, por
+   * exemplo) nao pode virar laco -- cada tentativa faz `listar`, que pausa o
+   * leitor (`disabledevice`), e o leitor reconecta sozinho.
+   */
+  it('falha persistente nao refaz a listagem antes do intervalo minimo, e volta a tentar depois (#488)', async () => {
+    let agora = 1_000_000;
+    const { listar, post, registrar, ligado } = montar(['1491'], 20, {
+      intervaloEntreTentativasMs: 60_000,
+      agoraMs: () => agora,
+    });
+    (post as jest.Mock).mockImplementation(() =>
+      Promise.resolve({ ok: false, status: 404, body: null, errorCode: 'DEVICE_NOT_IN_SCOPE' }),
+    );
+
+    registrar('AYTI11108174');
+    await ate(() => post.mock.calls.length >= 1);
+    await esperar(30);
+
+    // O leitor reconecta 10 s depois: dentro do intervalo, nao lista de novo.
+    agora += 10_000;
+    registrar('AYTI11108174');
+    await esperar(60);
+    expect(listar).toHaveBeenCalledTimes(1);
+
+    // Passado o intervalo, tenta de novo.
+    agora += 61_000;
+    registrar('AYTI11108174');
+    await ate(() => listar.mock.calls.length >= 2);
 
     ligado.encerrar();
   });

@@ -196,6 +196,7 @@ export class DeviceRepository {
         await tx.auditLog.create({
           data: {
             tenantId: edge.tenantId,
+            gymUnitId: edge.gymUnitId,
             actorType: 'SYSTEM',
             actorId: null,
             action: 'device.claimed_by_edge',
@@ -203,7 +204,7 @@ export class DeviceRepository {
             targetId: semDono.id,
             correlationId: `claim-${semDono.id}`,
             // Serial e dado de inventario, nao segredo.
-            metadata: { edgeNodeId: edge.edgeNodeId, gymUnitId: edge.gymUnitId },
+            metadata: { edgeNodeId: edge.edgeNodeId },
           },
         });
       }
