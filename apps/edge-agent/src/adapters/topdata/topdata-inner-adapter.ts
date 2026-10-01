@@ -84,8 +84,8 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
    * A catraca e cliente: apos este comando ela ainda leva alguns segundos
    * para discar de volta. Confirme com `testarConexao()` antes de liberar.
    */
-  async conectar(porta: number, tempo = 10): Promise<boolean> {
-    const r = await this.ponte.executar({ cmd: 'conectar', porta, tempo });
+  async conectar(porta: number, tempo = 10, tempoLiberadaS = 5): Promise<boolean> {
+    const r = await this.ponte.executar({ cmd: 'conectar', porta, tempo, tempoLiberadaS });
     return r.tipo === 'retorno' && r.retorno === 0;
   }
 

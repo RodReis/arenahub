@@ -90,6 +90,13 @@ orientação física da catraca"*. **Isso se verifica na bancada, não se adivin
 > correto. Configurável em produção pela env `CATRACA_INVERTIDA=true` (default `false`) — ver
 > `apps/edge-agent/src/config/env.ts`.
 
+> ⏱️ **Tempo destravado — `CATRACA_TEMPO_LIBERADA_S` (default 10, de 1 a 50).** A ponte passa o
+> valor ao `ConfigurarAcionamento1` na conexão. Era **5 s fixo**: na Arena Positiva (01/10/2026),
+> tirando a latência da decisão, sobravam ~4,5 s, e uma liberação fechou em 4.992 ms sem giro
+> ("Não passou"). O leitor facial ainda segura a mesma pessoa por ~2 min, então perder a janela
+> deixa o aluno travado. O agente espera o giro por `tempo + 3 s`, porque quem decide o fim é a
+> Origem 5 da catraca. **Mudar o `.cs` exige `pnpm --filter @arenahub/edge-agent bridge:build` no PC.**
+
 ⚠️ **Não usar `ConfigurarAcionamento1/2` para girar.** O manual é explícito: *"Estes comandos não
 devem ser utilizados em catracas se a intenção for acionar o mecanismo de giro. Para o giro de
 catracas, utilize os comandos `LiberarCatraca...()`"*.

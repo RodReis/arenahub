@@ -90,6 +90,13 @@ describe('TopdataInnerAdapter', () => {
     expect(conectar).toMatchObject({ cmd: 'conectar', porta: 3570 });
   });
 
+  it('manda o tempo destravado configurado para a ponte', async () => {
+    await adapter.conectar(3570, 10, 12);
+
+    const conectar = ponte.recebidos.find((c) => c.cmd === 'conectar');
+    expect(conectar).toMatchObject({ cmd: 'conectar', tempoLiberadaS: 12 });
+  });
+
   it('libera e confirma o giro pela Origem 6', async () => {
     // O manual: o giro nao vem por callback. Vem por polling de
     // ReceberDadosOnLine, e Origem 6 e o sensor optico confirmando.

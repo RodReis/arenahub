@@ -130,6 +130,9 @@ class EasyInnerBridge {
     static string Conectar(IDictionary<string, object> cmd) {
         int porta = cmd.ContainsKey("porta") ? Convert.ToInt32(cmd["porta"]) : 3570;
         byte tempo = cmd.ContainsKey("tempo") ? Convert.ToByte(cmd["tempo"]) : (byte)10;
+        // Segundos destravada. Era 5 fixo: curto demais em campo (Arena
+        // Positiva, 01/10/2026). Sem o campo, mantem 5 -- agente antigo.
+        byte liberada = cmd.ContainsKey("tempoLiberadaS") ? Convert.ToByte(cmd["tempoLiberadaS"]) : (byte)5;
 
         byte pior = 0;
         pior = Math.Max(pior, DefinirTipoConexao(2));
@@ -137,7 +140,7 @@ class EasyInnerBridge {
         pior = Math.Max(pior, HabilitarMudancaOnLineOffLine(2, tempo));
         pior = Math.Max(pior, DefinirPadraoCartao(0));      // PADRAO_TOPDATA
         pior = Math.Max(pior, ConfigurarInnerOnLine());
-        pior = Math.Max(pior, ConfigurarAcionamento1(1, 5)); // ACIONA_REGISTRO_ENTRADA_OU_SAIDA, 5s
+        pior = Math.Max(pior, ConfigurarAcionamento1(1, liberada)); // ACIONA_REGISTRO_ENTRADA_OU_SAIDA
         pior = Math.Max(pior, ConfigurarLeitor1(3));        // ENTRADA_E_SAIDA
         pior = Math.Max(pior, ConfigurarLeitor2(0));        // DESATIVADO
         return Retorno(pior);
