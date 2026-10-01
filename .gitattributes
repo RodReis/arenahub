@@ -20,6 +20,11 @@
 # PowerShell e nativo do Windows e espera CRLF.
 *.ps1 text eol=crlf
 
+# Lote do Windows e VBScript -- CRLF obrigatorio: em LF o `cmd` erra o
+# `goto` para rotulo (scripts do Edge, issue #499).
+*.cmd text eol=crlf
+*.vbs text eol=crlf
+
 # Binarios -- nunca normalizar. Normalizar corrompe.
 *.png binary
 *.jpg binary

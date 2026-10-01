@@ -77,22 +77,20 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
 > o script registra `node.exe` direto como serviço, e o Node não responde ao Service Control
 > Manager. **Use a tarefa agendada abaixo**, que é o que roda na Arena Positiva desde 01/10/2026.
 >
-> No PowerShell **como Administrador**, na mesma conta do pareamento (comandos de uma linha —
-> colar bloco de várias linhas inverteu a ordem no PC da recepção):
+> Scripts em `apps/edge-agent/scripts/windows/` — dois cliques, sem copiar comando (copiar pelo
+> WhatsApp apagou `_` e `*` e inverteu a ordem de bloco de várias linhas no PC da recepção):
 >
-> ```powershell
-> Set-Content -Encoding ASCII -Path C:\ArenaHub\iniciar-edge.cmd -Value @('@echo off','chcp 65001 >nul','cd /d C:\ArenaHub\arenahub\apps\edge-agent',':loop','node dist\main.js >> C:\ArenaHub\edge-agent.log 2>&1','timeout /t 5 /nobreak >nul','goto loop')
-> schtasks /Create /TN "ArenaHub Edge" /SC ONLOGON /RL HIGHEST /TR "C:\ArenaHub\iniciar-edge.cmd" /F
-> schtasks /Run /TN "ArenaHub Edge"
-> Get-Content C:\ArenaHub\edge-agent.log -Wait -Tail 20
-> ```
+> | arquivo | para quê |
+> |---|---|
+> | `instalar-edge.cmd` | **botão direito → Executar como administrador**, na conta do pareamento. Cria a tarefa `ArenaHub Edge` (sobe no login, **sem janela**) e já inicia |
+> | `parar-edge.cmd` | para o agente — a catraca volta ao modo offline em ~10 s |
+> | `ver-log-edge.cmd` | log ao vivo (`apps/edge-agent/data/edge-agent.log`); fechar não para o agente |
+> | `atualizar-edge.cmd` | para, `git pull`, `pnpm install`, `bridge:build`, build do agente, sobe de novo |
+> | `edge-rodar.cmd` / `edge-rodar-oculto.vbs` | o laço que religa em 5 s e o lançador sem janela — não clicar |
 >
-> - Religa o agente em 5 s se ele cair; log em `C:\ArenaHub\edge-agent.log`.
-> - Parar (catraca volta ao modo offline em 10 s): `schtasks /End /TN "ArenaHub Edge"`.
 > - **Limitação:** só sobe quando a conta **entra no Windows**. Depois de queda de energia, o PC
 >   precisa de login automático nessa conta — até lá a catraca decide sozinha pela lista dela.
-> - Atualizar o agente: `schtasks /End`, `git pull`, `bridge:build` (se a ponte mudou),
->   `pnpm exec turbo run build --filter=@arenahub/edge-agent`, `schtasks /Run`.
+> - O log não tem rotação ainda (#499) — apague o arquivo de vez em quando com o agente parado.
 
 4. Abra PowerShell **como Administrador**, na mesma conta, e rode:
    ```powershell
