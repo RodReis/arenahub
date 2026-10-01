@@ -73,6 +73,27 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
    com `CredencialAusenteError` e sai (exit 1) — nesse caso, confira o `.env`
 3. O código morre no primeiro uso. Para reparear: painel → **Operação** → ação **Parear** na linha
    do Edge → novo código no `.env` → rode o agente de novo
+> ⚠️ **Os passos 4 e 5 (serviço Windows) não funcionam como estão** — [#499](https://github.com/RodReis/arenahub/issues/499):
+> o script registra `node.exe` direto como serviço, e o Node não responde ao Service Control
+> Manager. **Use a tarefa agendada abaixo**, que é o que roda na Arena Positiva desde 01/10/2026.
+>
+> No PowerShell **como Administrador**, na mesma conta do pareamento (comandos de uma linha —
+> colar bloco de várias linhas inverteu a ordem no PC da recepção):
+>
+> ```powershell
+> Set-Content -Encoding ASCII -Path C:\ArenaHub\iniciar-edge.cmd -Value @('@echo off','chcp 65001 >nul','cd /d C:\ArenaHub\arenahub\apps\edge-agent',':loop','node dist\main.js >> C:\ArenaHub\edge-agent.log 2>&1','timeout /t 5 /nobreak >nul','goto loop')
+> schtasks /Create /TN "ArenaHub Edge" /SC ONLOGON /RL HIGHEST /TR "C:\ArenaHub\iniciar-edge.cmd" /F
+> schtasks /Run /TN "ArenaHub Edge"
+> Get-Content C:\ArenaHub\edge-agent.log -Wait -Tail 20
+> ```
+>
+> - Religa o agente em 5 s se ele cair; log em `C:\ArenaHub\edge-agent.log`.
+> - Parar (catraca volta ao modo offline em 10 s): `schtasks /End /TN "ArenaHub Edge"`.
+> - **Limitação:** só sobe quando a conta **entra no Windows**. Depois de queda de energia, o PC
+>   precisa de login automático nessa conta — até lá a catraca decide sozinha pela lista dela.
+> - Atualizar o agente: `schtasks /End`, `git pull`, `bridge:build` (se a ponte mudou),
+>   `pnpm exec turbo run build --filter=@arenahub/edge-agent`, `schtasks /Run`.
+
 4. Abra PowerShell **como Administrador**, na mesma conta, e rode:
    ```powershell
    pnpm service:install
@@ -157,7 +178,7 @@ Edge sempre inicia a conexão.
 
 | item | estado |
 |---|---|
-| Execução por pessoa diferente do autor (exigência da Task 6) | 🚧 **iniciada em 26/09/2026**, pelo PI, na Arena Positiva — parou no passo 1 (ver abaixo) |
+| Execução por pessoa diferente do autor (exigência da Task 6) | ✅ **concluída em 01/10/2026**, pelo PI, na Arena Positiva — catraca liberando pelo ArenaHub; serviço Windows trocado por tarefa agendada (#499) |
 | Tempo real do procedimento | ⬜ não medido |
 | Comportamento com rede instável durante o pareamento | ⬜ não testado |
 
