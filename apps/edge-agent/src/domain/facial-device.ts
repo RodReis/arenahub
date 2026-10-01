@@ -82,6 +82,14 @@ export interface FacialDeviceAdapter {
   readonly nome: string;
 
   /**
+   * Serie do fabricante do leitor conectado -- a mesma que `sendlog` manda
+   * em `serialDoDispositivo` (#467). `null` antes do `reg` acontecer: a
+   * ponte real so sabe o serial depois do handshake do equipamento,
+   * diferente do simulador, que ja nasce com ele.
+   */
+  readonly serie: string | null;
+
+  /**
    * Cadastra uma identidade. `M0-FR-002` exige UMA POR OPERACAO -- lote
    * esconde qual falhou, e o aceite mede identidade por identidade.
    */

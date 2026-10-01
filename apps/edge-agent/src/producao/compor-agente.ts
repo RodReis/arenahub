@@ -21,6 +21,8 @@ import { registrarPassagemOffline } from './passagem-offline.js';
 import { ligarVinculoLegado } from './vinculo-legado.js';
 
 export interface AgenteComposto {
+  /** Exposto para o heartbeat (#461) montar `devices` com o serial real. */
+  dispositivos: DispositivosMontados;
   encerrar: () => Promise<void>;
 }
 
@@ -198,6 +200,7 @@ export async function compor(
   });
 
   return {
+    dispositivos,
     encerrar: async () => {
       pararPoller?.();
       vinculoLegado.encerrar();

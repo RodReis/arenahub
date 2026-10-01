@@ -30,6 +30,7 @@ const { criarLogger, loggerDaTentativa } = await import('./observability/logger.
 const { compor } = await import('./producao/compor-agente.js');
 const { SignedCloudClient } = await import('./cloud/signed-client.js');
 const { iniciarLacoDeHeartbeat } = await import('./producao/laco-de-heartbeat.js');
+const { montarDevicesDoHeartbeat } = await import('./producao/montar-devices-do-heartbeat.js');
 
 /**
  * Ponto de entrada de PRODUCAO do edge-agent (F59).
@@ -169,26 +170,23 @@ async function main(): Promise<void> {
 
   const composto = await compor(config, logger, { cliente: clienteNuvem });
 
-  // DECISAO REGISTRADA (revisao final de branch F59, achado 1): `devices`
-  // vai vazio de proposito. O heartbeat so teria como preencher `serial` real
-  // se `montarDispositivos`/`TopdataInnerAdapter`/`TopdataFacialAdapter`
-  // expusessem o serial do fabricante de volta ate aqui -- hoje eles nao
-  // expoem, e simular um serial sintetico (ex.: `${EDGE_AGENT_ID}-catraca`)
-  // NAO bateria com o `Device.serial` cadastrado no painel, entao nao
-  // resolveria o alerta abaixo, so esconderia que ele nao foi resolvido.
+  // #461 -- o FACIAL manda serial real: `TopdataFacialAdapter.serie` guarda
+  // o `sn` do `reg` desde a F59 (ver facial-device.ts), e e o MESMO serial
+  // cadastrado no `Device.serial` do painel. Sem ele aqui, `avaliarDispositivo`
+  // (apps/api/.../operations/domain/alert-rules.ts) tratava
+  // `Device.lastHeartbeat === null` como silencio infinito e disparava
+  // DEVICE_OFFLINE (CRITICAL) permanente, mesmo com o leitor respondendo.
   //
-  // CONSEQUENCIA CONHECIDA: `avaliarDispositivo`
-  // (apps/api/.../operations/domain/alert-rules.ts) trata
-  // `Device.lastHeartbeat === null` como silencio infinito e dispara
-  // DEVICE_OFFLINE (CRITICAL) permanente para catraca e facial reais, mesmo
-  // com o agente funcionando -- porque `EdgeController.heartbeat` so
-  // atualiza `Device.lastHeartbeat` iterando `dados.devices`. O heartbeat do
-  // proprio Edge (`EdgeNode.lastHeartbeat`) continua correto, entao o Edge
-  // aparece "Respondendo" no painel; so o alerta por DISPOSITIVO fica falso.
+  // `null` ANTES do handshake (`reg`) nao entra no array -- nunca um serial
+  // inventado, que so esconderia o alerta sem corrigi-lo (decisao da
+  // revisao F59 que abriu a #461).
   //
-  // Corrigir de verdade exige threading do serial real dos adapters Topdata
-  // ate aqui (Task futura, fora do escopo desta correcao pontual) ou uma
-  // decisao do PI sobre como popular `Device.serial` a partir do Edge.
+  // A CATRACA continua fora do array: a ponte EasyInner (poucos comandos,
+  // ver easyinner-ponte.ts) nao expoe numero de serie -- so o webserver de
+  // admin (porta 80) o le, canal que o edge-agent de producao nao usa. Um
+  // serial sintetico nao bateria com `Device.serial` do painel. Como
+  // associar o Edge a catraca sem esse dado e decisao do PI (registrada na
+  // issue), fora do escopo desta correcao.
   let primeiroHeartbeat = true;
 
   const pararHeartbeat = iniciarLacoDeHeartbeat({
@@ -198,7 +196,7 @@ async function main(): Promise<void> {
       agentVersion: VERSAO_DO_AGENTE,
       localTimeMs: Date.now(),
       queueDepth: 0,
-      devices: [],
+      devices: montarDevicesDoHeartbeat(composto.dispositivos),
     }),
     aoFalhar: (erro) => {
       loggerDaTentativa(logger).warn({ erro }, 'heartbeat nao chegou na nuvem');
