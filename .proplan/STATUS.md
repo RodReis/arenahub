@@ -9,7 +9,7 @@ updated: 2026-10-01
 
 ### Sem épico
 
-- [SPEC-083][F83] Pagamento em lote no balcão — atrasados, mês corrente e adiantados (#458)
+- [MVP1][FIX] Leitor cadastrado sem Edge nunca é achado pelo Edge — vínculo e decisão de acesso dão 404/DENY (#488)
 - [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
 - [FIX] painel financeiro deve abrir no mes corrente por default (#435)
 - [FIX] Valdivino duplicado no arquivo (confirmado) e Daniel Flavio Cabriny — provável cadastro duplicado (#421)
@@ -41,6 +41,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [SPEC-083][F83] Pagamento em lote no balcão — atrasados, mês corrente e adiantados (#458, finalizado em: 2026-10-01)
 - [MVP1][SPEC-059][FIX] Alerta DEVICE_OFFLINE crítico permanente com catraca e facial conectados — heartbeat manda devices vazio (#461, finalizado em: 2026-10-01)
 - [MVP1][FIX] Edge manda EDGE_AGENT_ID como deviceId — a decisão de acesso nunca chega na nuvem (#467, finalizado em: 2026-10-01)
 - [MVP1][FIX] Sincronismo leitor → ArenaHub: vincular os IDs do leitor aos alunos pela credencial do cadastro (#468, finalizado em: 2026-10-01)
@@ -127,8 +128,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
+- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
