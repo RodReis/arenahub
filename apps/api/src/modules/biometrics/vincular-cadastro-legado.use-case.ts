@@ -40,8 +40,9 @@ export interface ResultadoDoVinculoLegado {
    */
   withoutConsentDocument: string[];
   /**
-   * Numero de aluno que RECUSOU a biometria ou teve a identidade revogada.
-   * Nao vincula: importar por cima desfaria a decisao dele (regra no 7).
+   * SEMPRE VAZIO desde o ADR-064: recusa e identidade encerrada nao barram
+   * mais a importacao. O campo fica porque o Edge ja em campo le esta chave
+   * -- tira-la quebraria o log do vinculo sem ganho nenhum.
    */
   refusedOrRevoked: string[];
 }
@@ -136,19 +137,18 @@ export class VincularCadastroLegadoUseCase {
       if (!ativa) {
         const contexto = { tenantId: edge.tenantId };
 
-        // A decisao do aluno vence a importacao (regra no 7): recusa ou
-        // identidade revogada nao e sobrescrita por consentimento legado.
+        /*
+         * ADR-064 (decisao do PI, 01/10/2026): quem esta na base do leitor
+         * facial e aluno ou professor ja cadastrado pela academia, e entra
+         * com consentimento ACEITO -- inclusive quem tinha recusa registrada
+         * ou identidade encerrada. A importacao nao barra mais por isso; o
+         * consentimento legado aceito passa a ser a decisao vigente.
+         */
         const decisao = await this.consentimentos.encontrarDecisaoVigente(
           contexto,
           studentId,
           'BIOMETRIC',
         );
-        const recusou = decisao?.decision === 'REFUSED' && decisao.supersededAt === null;
-
-        if (recusou || (await this.identidades.temIdentidadeEncerrada(edge.tenantId, studentId))) {
-          resultado.refusedOrRevoked.push(numero);
-          continue;
-        }
 
         // Consentimento aceito e valido ja existe -- inclusive o legado de
         // uma tentativa anterior que caiu antes do vinculo. Reusa: criar

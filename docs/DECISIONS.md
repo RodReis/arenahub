@@ -4756,3 +4756,38 @@ são decisão do PI, registradas para a próxima fatia de billing ou para respos
   pelo processo de desenvolvimento do operador humano durante toda a sessão, e corretamente não
   foram tocadas. O código E2E foi escrito e revisado estaticamente por dois revisores
   independentes, mas falta a confirmação viva antes do merge — ver `docs/TESTING.md`.
+
+---
+
+## ADR-064 — Regra de arquitetura nº 7 revogada: aluno da base do leitor entra com consentimento aceito
+
+**Data:** 01/10/2026
+**Status:** aceito *(decisão do PI em 01/10/2026 — revoga a regra nº 7 do `CLAUDE.md` e emenda o ADR-008)*
+**Decisor:** Rodrigo Reis (PI)
+**Issue:** [#493](https://github.com/RodReis/arenahub/issues/493)
+
+**Contexto:** na implantação da Arena Positiva (01/10/2026), o leitor facial reconhecia os alunos e a
+catraca negava todos. A importação da base do leitor (#468) só criava a identidade biométrica com
+consentimento registrado, e barrava quem tinha recusa registrada ou identidade encerrada. Palavras do
+PI: *"todos os alunos e professores já estão no sistema cadastrados com ids, não faz sentido essa
+regra"* e *"todo com aceito true"*.
+
+### Decisão
+
+1. **A regra nº 7 deixa de ser regra de arquitetura.** Consentimento biométrico não é mais condição
+   para o aluno que já está na base do leitor facial abrir a catraca.
+2. **Todo aluno da base do leitor entra com consentimento `ACCEPTED`** — registro legado, ator
+   `SYSTEM`, evidência `CADASTRO_FACIAL_LEGADO`. Vale também para quem tinha recusa registrada
+   (a recusa fica no histórico, com `supersededAt`, nunca apagada) e para quem tinha identidade
+   encerrada (ganha identidade nova `ACTIVE`).
+
+### Consequências
+
+- `VincularCadastroLegadoUseCase` não barra mais por recusa nem por identidade encerrada;
+  `refusedOrRevoked` continua na resposta, sempre vazio, porque o Edge em campo lê a chave.
+- **Continua existindo:** o registro de consentimento exige um termo publicado (`documentId` é
+  obrigatório). O termo é publicado uma vez, em Administração → Termo biométrico (#491). Tirar essa
+  dependência exige migration (`consent_record_id` opcional) — não feito agora.
+- **Não muda nesta decisão:** a revogação feita pelo painel ainda bloqueia o acesso na hora (o
+  `IdentityResolver` exige identidade `ACTIVE`), e o cadastro biométrico pelo painel ainda pede a
+  decisão do aluno. Se o PI quiser o mesmo "aceito por padrão" ali, é outra entrega.

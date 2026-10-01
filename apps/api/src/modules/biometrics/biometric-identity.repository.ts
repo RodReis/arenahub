@@ -142,22 +142,6 @@ export class BiometricIdentityRepository {
     });
   }
 
-  /**
-   * O aluno ja teve identidade revogada, em exclusao ou excluida (#468).
-   *
-   * Identidade so sai de `ACTIVE` por revogacao (INV-018). Se isso ja
-   * aconteceu, o cadastro que sobrou no leitor NAO pode voltar a abrir a
-   * catraca por importacao -- seria desfazer a revogacao (regra no 7).
-   */
-  async temIdentidadeEncerrada(tenantId: string, studentId: string): Promise<boolean> {
-    const encerrada = await this.db.biometricIdentity.findFirst({
-      where: { tenantId, studentId, state: { not: 'ACTIVE' } },
-      select: { id: true },
-    });
-
-    return encerrada !== null;
-  }
-
   /** Todos os vinculos do leitor: quem ja tem numero nele (#468). */
   async vinculosDoDispositivo(
     tenantId: string,
