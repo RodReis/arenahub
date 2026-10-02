@@ -7,6 +7,7 @@ import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { PasswordService } from '../auth/password.service.js';
+import { ehDono, SoDonoMexeEmDonoError } from './protecao-do-dono.js';
 
 const VALIDO_POR_HORAS = 24;
 const BYTES_DE_TOKEN = 32;
@@ -46,6 +47,11 @@ export class InvitationService {
     // Papel de outro tenant e tratado como inexistente -- 404 nao confirma
     // que o id acertou.
     if (!papel) throw new NotFoundException({ code: 'ROLE_NOT_FOUND' });
+
+    // #523: o gerente convida a equipe, mas so o dono convida outro dono.
+    if (papel.name === 'OWNER' && !(await ehDono(this.db, contexto.tenantId, contexto.actorId))) {
+      throw new SoDonoMexeEmDonoError();
+    }
 
     const token = randomBytes(BYTES_DE_TOKEN).toString('base64url');
 
