@@ -36,16 +36,15 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [MVP1][SPEC-059][FIX] Alerta DEVICE_OFFLINE da catraca é permanente e falso: o Edge nunca informa a catraca no heartbeat (#522)
-- [INFRA] Time e Alunos: coluna Catraca e busca por ID do leitor (#520)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [INFRA] Time e Alunos: coluna Catraca e busca por ID do leitor (#520, finalizado em: 2026-10-02)
+- [MVP1][SPEC-059][FIX] Alerta DEVICE_OFFLINE da catraca é permanente e falso: o Edge nunca informa a catraca no heartbeat (#522, finalizado em: 2026-10-02)
 - [MVP1][FIX] Perfil Recepção não consegue receber no balcão nem ver o Time (#523, finalizado em: 2026-10-02)
 - [MVP1] Dashboard: acessos do dia inteiro com rolagem e recusados na catraca no cartão de bloqueados (#524, finalizado em: 2026-10-02)
 - [MVP1][FIX] Teste do adapter Topdata exige ack do reg antes de ele atravessar o socket (#518, finalizado em: 2026-10-02)
