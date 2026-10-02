@@ -49,9 +49,9 @@ describe('perfis de sistema', () => {
   });
 
   describe('gerente', () => {
-    it('nao gerencia usuario nem papel -- quem decide quem entra e o dono', () => {
-      expect(PERMISSOES_DO_MANAGER).not.toContain('user.manage');
-      expect(PERMISSOES_DO_MANAGER).not.toContain('role.assign');
+    it('gerencia usuario e papel -- decisao do PI, 02/10/2026: a gerente administra a equipe', () => {
+      expect(PERMISSOES_DO_MANAGER).toContain('user.manage');
+      expect(PERMISSOES_DO_MANAGER).toContain('role.assign');
     });
 
     it('nao desliga o scoring de retencao -- afeta a academia inteira', () => {
@@ -66,7 +66,7 @@ describe('perfis de sistema', () => {
        * a divergencia comecaria a existir calada.
        */
       const esperado = PERMISSOES_DO_OWNER.filter(
-        (c) => !['user.manage', 'role.assign', 'retention.kill_switch'].includes(c),
+        (c) => !['retention.kill_switch'].includes(c),
       );
 
       expect(PERMISSOES_DO_MANAGER).toEqual(esperado);
@@ -96,6 +96,19 @@ describe('perfis de sistema', () => {
       // Atos excepcionais: ambos exigem motivo gravado e nao sao de balcao.
       expect(PERMISSOES_DA_RECEPCAO).not.toContain('access.override');
       expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.refund');
+    });
+
+    it('recebe no balcao e emite o recibo -- decisao do PI, 02/10/2026', () => {
+      expect(PERMISSOES_DA_RECEPCAO).toContain('billing.payment.manual');
+      expect(PERMISSOES_DA_RECEPCAO).toContain('receipt.issue');
+      // Receber nao e gerenciar cobranca nem liberar quem deve.
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.manage');
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.override.financial');
+    });
+
+    it('ve o time sem poder trocar perfil -- decisao do PI, 02/10/2026', () => {
+      expect(PERMISSOES_DA_RECEPCAO).toContain('team.read');
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('team.update');
     });
   });
 
@@ -143,17 +156,17 @@ describe('perfis de sistema', () => {
   });
 
   describe('separacao entre perfis', () => {
-    it('so o OWNER gerencia usuarios', () => {
+    it('so o OWNER e o MANAGER gerenciam usuarios', () => {
       /*
-       * A invariante que sustenta a fronteira da F79/F80: o Super Admin
-       * entrega UM Admin, e so ele monta a equipe. Um segundo perfil com
-       * `user.manage` abriria o convite a quem nao responde pela academia.
+       * Era so o OWNER (F79/F80). Decisao do PI, 02/10/2026: a gerente
+       * administra a equipe. Recepcao, financeiro e professor continuam sem
+       * `user.manage` -- convite segue com quem responde pela academia.
        */
       const comUserManage = PAPEIS_DE_SISTEMA.filter((p) =>
         p.permissoes.includes('user.manage'),
       ).map((p) => p.name);
 
-      expect(comUserManage).toEqual(['OWNER']);
+      expect(comUserManage).toEqual(['OWNER', 'MANAGER']);
     });
 
     it('todo perfil enxerga o proprio tenant e as unidades', () => {

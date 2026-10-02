@@ -18,6 +18,8 @@ import {
   UsuarioNaoEncontradoError,
 } from '../../src/modules/iam/revogar-acesso.use-case.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
+import { InvitationService } from '../../src/modules/iam/invitation.service.js';
+import { SoDonoMexeEmDonoError } from '../../src/modules/iam/protecao-do-dono.js';
 
 /**
  * Perfis prontos e revogacao de acesso -- F80.
@@ -45,9 +47,15 @@ describe('perfis de sistema e revogacao de acesso', () => {
       },
     });
 
-    const admin = await db.platformAdmin.create({ data: { userId: usuario.id } });
+    const admin = await db.platformAdmin.create({
+      data: { userId: usuario.id },
+    });
 
-    return { actorId: usuario.id, sessionId: randomUUID(), platformAdminId: admin.id };
+    return {
+      actorId: usuario.id,
+      sessionId: randomUUID(),
+      platformAdminId: admin.id,
+    };
   };
 
   const criarTenantDeTeste = async (contexto: PlatformContext): Promise<string> => {
@@ -61,7 +69,11 @@ describe('perfis de sistema e revogacao de acesso', () => {
         timezone: 'America/Sao_Paulo',
         responsavelNome: 'Fulano',
         responsavelEmail: `dono-${randomUUID().slice(0, 8)}@academia.local`,
-        unidade: { code: 'MATRIZ', name: 'Matriz', timezone: 'America/Sao_Paulo' },
+        unidade: {
+          code: 'MATRIZ',
+          name: 'Matriz',
+          timezone: 'America/Sao_Paulo',
+        },
       },
       `corr-${randomUUID()}`,
     );
@@ -80,11 +92,17 @@ describe('perfis de sistema e revogacao de acesso', () => {
       },
     });
 
-    await db.tenantMembership.create({ data: { tenantId, userId: usuario.id } });
+    await db.tenantMembership.create({
+      data: { tenantId, userId: usuario.id },
+    });
 
-    const role = await db.role.findFirstOrThrow({ where: { tenantId, name: papel } });
+    const role = await db.role.findFirstOrThrow({
+      where: { tenantId, name: papel },
+    });
 
-    await db.userRole.create({ data: { tenantId, userId: usuario.id, roleId: role.id } });
+    await db.userRole.create({
+      data: { tenantId, userId: usuario.id, roleId: role.id },
+    });
 
     return usuario.id;
   };
@@ -98,7 +116,9 @@ describe('perfis de sistema e revogacao de acesso', () => {
   });
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
 
     app = moduleRef.createNestApplication();
     await app.init();
@@ -132,9 +152,7 @@ describe('perfis de sistema e revogacao de acesso', () => {
         select: { name: true, isSystem: true },
       });
 
-      expect(papeis.map((p) => p.name).sort()).toEqual(
-        PAPEIS_DE_SISTEMA.map((p) => p.name).sort(),
-      );
+      expect(papeis.map((p) => p.name).sort()).toEqual(PAPEIS_DE_SISTEMA.map((p) => p.name).sort());
       expect(papeis.every((p) => p.isSystem)).toBe(true);
     });
 
@@ -145,7 +163,9 @@ describe('perfis de sistema e revogacao de acesso', () => {
       for (const doSistema of PAPEIS_DE_SISTEMA) {
         const papel = await db.role.findFirstOrThrow({
           where: { tenantId, name: doSistema.name },
-          select: { permissions: { select: { permission: { select: { code: true } } } } },
+          select: {
+            permissions: { select: { permission: { select: { code: true } } } },
+          },
         });
 
         const gravadas = papel.permissions.map((p) => p.permission.code).sort();
@@ -169,7 +189,9 @@ describe('perfis de sistema e revogacao de acesso', () => {
 
       const recepcao = await db.role.findFirstOrThrow({
         where: { tenantId, name: 'RECEPTION' },
-        select: { permissions: { select: { permission: { select: { code: true } } } } },
+        select: {
+          permissions: { select: { permission: { select: { code: true } } } },
+        },
       });
 
       const codigos = recepcao.permissions.map((p) => p.permission.code);
@@ -201,7 +223,9 @@ describe('perfis de sistema e revogacao de acesso', () => {
         select: { status: true },
       });
 
-      const papeis = await db.userRole.count({ where: { tenantId, userId: recepcao } });
+      const papeis = await db.userRole.count({
+        where: { tenantId, userId: recepcao },
+      });
 
       expect(vinculo?.status).toBe('REVOKED');
       expect(papeis).toBe(0);
@@ -328,9 +352,11 @@ describe('perfis de sistema e revogacao de acesso', () => {
         revogar.executar(contextoDe(tenantId, dono), deOutraCasa, MOTIVO, `corr-${randomUUID()}`),
       ).rejects.toBeInstanceOf(UsuarioNaoEncontradoError);
 
-      expect(await db.userRole.count({ where: { tenantId: outroTenant, userId: deOutraCasa } })).toBe(
-        1,
-      );
+      expect(
+        await db.userRole.count({
+          where: { tenantId: outroTenant, userId: deOutraCasa },
+        }),
+      ).toBe(1);
     });
 
     it('revogar duas vezes recusa a segunda', async () => {
@@ -369,6 +395,108 @@ describe('perfis de sistema e revogacao de acesso', () => {
       expect(JSON.stringify(linha?.metadata)).toContain(MOTIVO);
       // O e-mail do revogado NAO entra: audita-se o ato e o papel perdido.
       expect(JSON.stringify(linha)).not.toContain(email.email);
+    });
+  });
+
+  /**
+   * #523 -- decisao do PI, 02/10/2026: a gerente administra a equipe
+   * (convida e revoga), mas o perfil Dono continua do Dono. Sem esta guarda,
+   * `user.manage` no gerente deixaria convidar alguem como Dono -- ou revogar
+   * um dono enquanto houver outro.
+   */
+  describe('so o dono mexe em dono (#523)', () => {
+    const papelId = (tenantId: string, nome: string) =>
+      db.role.findFirstOrThrow({
+        where: { tenantId, name: nome },
+        select: { id: true },
+      });
+
+    it('gerente convida recepcao', async () => {
+      const tenantId = await criarTenantDeTeste(await criarSuperAdmin());
+      const gerente = await criarMembro(tenantId, 'MANAGER');
+      const { id } = await papelId(tenantId, 'RECEPTION');
+
+      const { convite } = await app
+        .get(InvitationService)
+        .convidar(
+          contextoDe(tenantId, gerente),
+          { email: `rec-${randomUUID()}@exemplo.test`, roleId: id },
+          `corr-${randomUUID()}`,
+        );
+
+      expect(convite.roleId).toBe(id);
+    });
+
+    it('gerente NAO convida ninguem como dono', async () => {
+      const tenantId = await criarTenantDeTeste(await criarSuperAdmin());
+      const gerente = await criarMembro(tenantId, 'MANAGER');
+      const { id } = await papelId(tenantId, 'OWNER');
+      // A criacao do tenant ja convida o primeiro dono -- conta o que muda.
+      const antes = await db.invitation.count({
+        where: { tenantId, roleId: id },
+      });
+
+      await expect(
+        app
+          .get(InvitationService)
+          .convidar(
+            contextoDe(tenantId, gerente),
+            { email: `dono-${randomUUID()}@exemplo.test`, roleId: id },
+            `corr-${randomUUID()}`,
+          ),
+      ).rejects.toBeInstanceOf(SoDonoMexeEmDonoError);
+
+      expect(await db.invitation.count({ where: { tenantId, roleId: id } })).toBe(antes);
+    });
+
+    it('dono convida outro dono', async () => {
+      const tenantId = await criarTenantDeTeste(await criarSuperAdmin());
+      const dono = await criarMembro(tenantId, 'OWNER');
+      const { id } = await papelId(tenantId, 'OWNER');
+
+      const { convite } = await app
+        .get(InvitationService)
+        .convidar(
+          contextoDe(tenantId, dono),
+          { email: `dono2-${randomUUID()}@exemplo.test`, roleId: id },
+          `corr-${randomUUID()}`,
+        );
+
+      expect(convite.roleId).toBe(id);
+    });
+
+    it('gerente NAO revoga um dono, mesmo havendo outro', async () => {
+      const tenantId = await criarTenantDeTeste(await criarSuperAdmin());
+      await criarMembro(tenantId, 'OWNER');
+      const segundoDono = await criarMembro(tenantId, 'OWNER');
+      const gerente = await criarMembro(tenantId, 'MANAGER');
+
+      await expect(
+        revogar.executar(
+          contextoDe(tenantId, gerente),
+          segundoDono,
+          MOTIVO,
+          `corr-${randomUUID()}`,
+        ),
+      ).rejects.toBeInstanceOf(SoDonoMexeEmDonoError);
+
+      expect(await db.userRole.count({ where: { tenantId, userId: segundoDono } })).toBe(1);
+    });
+
+    it('gerente revoga a recepcao', async () => {
+      const tenantId = await criarTenantDeTeste(await criarSuperAdmin());
+      await criarMembro(tenantId, 'OWNER');
+      const gerente = await criarMembro(tenantId, 'MANAGER');
+      const recepcao = await criarMembro(tenantId, 'RECEPTION');
+
+      await revogar.executar(
+        contextoDe(tenantId, gerente),
+        recepcao,
+        MOTIVO,
+        `corr-${randomUUID()}`,
+      );
+
+      expect(await db.userRole.count({ where: { tenantId, userId: recepcao } })).toBe(0);
     });
   });
 });

@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { ehDono, SoDonoMexeEmDonoError } from './protecao-do-dono.js';
 
 /** Mesmo minimo da elevacao de suporte e da F79: nao aceita "ok" nem ".". */
 const MOTIVO_MINIMO = 10;
@@ -107,6 +108,12 @@ export class RevogarAcessoUseCase {
       const donosDistintos = new Set(donos.map((d) => d.userId));
 
       if (donosDistintos.size <= 1) throw new UltimoDonoError();
+
+      // #523: o gerente revoga a equipe, mas nao um dono. DEPOIS da guarda do
+      // ultimo dono, que e a recusa mais especifica quando as duas valem.
+      if (!(await ehDono(this.db, tenantId, contexto.actorId))) {
+        throw new SoDonoMexeEmDonoError();
+      }
     }
 
     await this.db.$transaction(async (tx) => {
