@@ -79,7 +79,7 @@ export default async function PaginaDoAplicativo() {
   const { androidUrl, androidVersion, updatedAt, updatedByEmail, updatedByRole } = resposta.dados;
   const podeSalvar = perfil.dados?.permissions?.includes('user.manage') ?? false;
   const qrSvg = androidUrl
-    ? await QRCode.toString(androidUrl, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' })
+    ? await QRCode.toString(androidUrl, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' })
     : null;
 
   return (
@@ -91,56 +91,72 @@ export default async function PaginaDoAplicativo() {
           <SectionCard
             title="Instalador Android"
             icon="qr-code"
-            summary="Mostre o QR ao aluno ou envie o link."
-            actions={
-              updatedAt ? (
-                <span className={estilos['horario']}>
-                  <Icon name="clock" />
-                  Atualizado às{' '}
-                  <TenantDateTime iso={updatedAt} timeZone={FUSO_PROVISORIO} format="time" />
-                </span>
-              ) : null
-            }
+            summary="Mostre o QR ao aluno no balcão ou envie o link."
           >
             {androidUrl && qrSvg ? (
               <div className={estilos['principal']}>
-                <div
-                  className={estilos['qr']}
-                  data-testid="qr-do-instalador"
-                  role="img"
-                  aria-label="QR do instalador Android"
-                  dangerouslySetInnerHTML={{ __html: qrSvg }}
-                />
+                {/*
+                  O PALCO DO QR: o unico lugar da tela com accent do tenant.
+                  E o artefato que a recepcao vira para o aluno -- o resto da
+                  ficha so o explica. `key` pela URL: trocar o link remonta o
+                  palco e o QR novo "imprime" de cima para baixo (aplicativo
+                  .module.css), que e exatamente o que aconteceu.
+                */}
+                <div className={estilos['palco']} key={androidUrl}>
+                  <div
+                    className={estilos['qr']}
+                    data-testid="qr-do-instalador"
+                    role="img"
+                    aria-label="QR do instalador Android"
+                    dangerouslySetInnerHTML={{ __html: qrSvg }}
+                  />
+                </div>
 
                 <div className={estilos['informacao']}>
-                  <span className={estilos['rotulo']}>Android · APK</span>
+                  <ul className={estilos['chips']} aria-label="Situação do instalador">
+                    <li className={estilos['chipPublicado']} data-testid="instalador-publicado">
+                      <span className={estilos['ponto']} aria-hidden="true" />
+                      No totem
+                    </li>
+                    <li className={estilos['chip']}>Android</li>
+                    <li className={estilos['chip']}>APK</li>
+                  </ul>
+
                   <p className={estilos['versao']} data-testid="versao-do-instalador">
                     {androidVersion ? `Versão ${androidVersion}` : 'Versão não informada'}
                   </p>
                   {updatedAt ? (
                     <p className={estilos['autoria']} data-testid="autoria-do-instalador">
-                      Atualizado em{' '}
-                      <TenantDateTime iso={updatedAt} timeZone={FUSO_PROVISORIO} format="datetime" />
-                      {updatedByEmail
-                        ? ` por ${updatedByEmail}${updatedByRole ? ` (${rotuloDePerfil(updatedByRole)})` : ''}`
-                        : ''}
+                      <Icon name="clock" />
+                      <span>
+                        Atualizado em{' '}
+                        <TenantDateTime iso={updatedAt} timeZone={FUSO_PROVISORIO} format="datetime" />
+                        {updatedByEmail
+                          ? ` por ${updatedByEmail}${updatedByRole ? ` (${rotuloDePerfil(updatedByRole)})` : ''}`
+                          : ''}
+                      </span>
                     </p>
                   ) : null}
 
-                  <span className={estilos['rotulo']}>Link</span>
-                  <div className={estilos['linhaDoLink']}>
-                    <p className={estilos['link']} data-testid="link-do-instalador" title={androidUrl}>
-                      {androidUrl}
+                  <div className={estilos['blocoDoLink']}>
+                    <span className={estilos['rotuloDoLink']} id="rotulo-do-link">
+                      Link do APK
+                    </span>
+                    <div className={estilos['linhaDoLink']}>
+                      <p
+                        className={estilos['link']}
+                        data-testid="link-do-instalador"
+                        title={androidUrl}
+                        aria-labelledby="rotulo-do-link"
+                      >
+                        {androidUrl}
+                      </p>
+                      <CopiarLink url={androidUrl} />
+                    </div>
+                    <p className={estilos['dicaDoLink']}>
+                      O totem mostra o botão “Baixar o app” na tela de espera com este mesmo link.
                     </p>
-                    <CopiarLink url={androidUrl} />
                   </div>
-
-                  <hr className={estilos['divisor']} />
-
-                  <p className={estilos['status']}>
-                    <span className={estilos['ponto']} aria-hidden="true" />
-                    O totem mostra o botão “Baixar o app” na tela de espera.
-                  </p>
                 </div>
               </div>
             ) : (
@@ -160,7 +176,7 @@ export default async function PaginaDoAplicativo() {
             <span className={estilos['avisoIcone']}>
               <Icon name="alert-circle" />
             </span>
-            <p style={{ margin: 0 }}>
+            <p className={estilos['avisoTexto']}>
               Para instalar o APK, o celular do aluno precisa permitir{' '}
               <strong>instalar apps desconhecidos</strong>. O Android pede essa autorização na
               primeira instalação, para o navegador ou gerenciador de arquivos usado.

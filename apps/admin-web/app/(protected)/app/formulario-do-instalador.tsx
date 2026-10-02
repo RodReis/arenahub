@@ -63,7 +63,8 @@ export function FormularioDoInstalador({
           id="instalador-url"
           name="androidUrl"
           label="URL do APK"
-          hint="Precisa começar com https://. O servidor valida antes de salvar."
+          hint="Cole o link do APK gerado pelo EAS. Precisa começar com https://."
+          placeholder="https://expo.dev/artifacts/eas/…apk"
           value={url}
           onChange={(evento) => setUrl(evento.target.value)}
           maxLength={2048}
@@ -76,7 +77,8 @@ export function FormularioDoInstalador({
           id="instalador-versao"
           name="androidVersion"
           label="Versão"
-          hint="Mostrada no painel e no totem, ao lado do QR."
+          hint="Aparece no painel e no totem, ao lado do QR."
+          placeholder="ex.: 0.1.0 (build 8)"
           value={versao}
           onChange={(evento) => setVersao(evento.target.value)}
           maxLength={40}

@@ -23,7 +23,14 @@ export function CopiarLink({ url }: { readonly url: string }) {
   };
 
   return (
-    <Button type="button" variant="outline" onClick={copiar} data-testid="copiar-link">
+    <Button
+      type="button"
+      variant="outline"
+      onClick={copiar}
+      data-testid="copiar-link"
+      data-copiado={copiado ? 'true' : 'false'}
+      aria-live="polite"
+    >
       <Icon name={copiado ? 'check-circle' : 'copy'} />
       {copiado ? 'Copiado' : 'Copiar link'}
     </Button>
