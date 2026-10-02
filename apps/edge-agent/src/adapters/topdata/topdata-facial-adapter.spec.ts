@@ -411,11 +411,16 @@ describe('TopdataFacialAdapter', () => {
 
     leitor.enviarReg();
 
-    await leitor.esperar(() => seriais.length > 0);
+    // Espera o aviso E o ack: o adapter envia o ack antes de avisar, mas o
+    // ack atravessa o socket e o aviso e local -- sob carga (CI) o aviso
+    // chega primeiro, e exigir o ack logo depois dele falhava por relogio.
+    await leitor.esperar(
+      () => seriais.length > 0 && leitor.recebidos.some((m) => m['ret'] === 'reg'),
+    );
 
     expect(seriais).toEqual([leitor.sn]);
-    // O handshake ja fechou quando o aviso sai: quem ouve vai conversar com
-    // o leitor e nao pode atropelar o ack do reg.
+    // O handshake fecha: quem ouve vai conversar com o leitor e nao pode
+    // atropelar o ack do reg.
     expect(leitor.recebidos.some((m) => m['ret'] === 'reg')).toBe(true);
   });
 
