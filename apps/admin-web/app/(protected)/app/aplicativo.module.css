@@ -1,0 +1,204 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.principal {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .principal {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+}
+
+/* O QR sai preto sobre BRANCO em qualquer tema: leitor de camera falha com QR
+   invertido, entao o quadro nao acompanha o tema escuro. */
+.qr {
+  width: 208px;
+  padding: 12px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background-color: var(--ah-surface-raised);
+  animation: subir 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.informacao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.rotulo {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ah-text-label);
+}
+
+.versao {
+  margin: 0;
+  font-size: var(--ah-type-display-size);
+  line-height: var(--ah-type-display-lh);
+  font-weight: var(--ah-type-display-weight);
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.autoria {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.linhaDoLink {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.link {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: var(--ah-radius-control);
+  background-color: var(--ah-surface-sunken);
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+  line-height: var(--ah-type-mono-lh);
+  color: var(--ah-text-default);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.divisor {
+  border: 0;
+  border-top: 1px solid var(--ah-border-subtle);
+  margin: 4px 0;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-secondary);
+}
+
+.ponto {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--ah-state-success);
+}
+
+.aviso {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background-color: var(--ah-surface-raised);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-secondary);
+}
+
+.aviso strong {
+  color: var(--ah-text-strong);
+}
+
+.avisoIcone {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ah-state-info);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.confirmacao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: var(--ah-type-caption-size);
+  color: var(--ah-text-secondary);
+}
+
+.horario {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ah-type-caption-size);
+  color: var(--ah-text-secondary);
+}
+
+@keyframes subir {
+  from {
+    opacity: 0.001;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qr {
+    animation: none;
+  }
+}
