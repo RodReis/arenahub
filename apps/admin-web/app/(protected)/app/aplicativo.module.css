@@ -1,3 +1,11 @@
+/*
+ * Aplicativo (#534). Cor com significado, nunca enfeite:
+ *   accent do tenant -> o palco do QR (o artefato que a recepcao mostra);
+ *   success          -> "No totem" (o instalador esta publicado);
+ *   info             -> o aviso de "apps desconhecidos".
+ * Todo o resto fica no carbono do painel.
+ */
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
@@ -21,8 +29,8 @@
 .principal {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
+  gap: 28px;
+  align-items: center;
 }
 
 @media (max-width: 640px) {
@@ -32,15 +40,34 @@
   }
 }
 
-/* O QR sai preto sobre BRANCO em qualquer tema: leitor de camera falha com QR
-   invertido, entao o quadro nao acompanha o tema escuro. */
-.qr {
-  width: 208px;
-  padding: 12px;
-  border: 1px solid var(--ah-border-default);
+/*
+ * O PALCO: superficie afundada, tingida de accent e com grade de pontos --
+ * a textura de "instrumento" do painel, nao decoracao: delimita a area que a
+ * camera do aluno vai ler e separa o QR do texto que o explica.
+ */
+.palco {
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--ah-accent-500) 30%, var(--ah-border-subtle));
   border-radius: var(--ah-radius-card);
-  background-color: var(--ah-surface-raised);
-  animation: subir 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  background-color: color-mix(in srgb, var(--ah-accent-500) 6%, var(--ah-surface-sunken));
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--ah-accent-500) 22%, transparent) 1px,
+    transparent 1.2px
+  );
+  background-size: 14px 14px;
+}
+
+/* O QR traz a propria margem branca (quiet zone) no SVG: legivel em qualquer
+   tema, sem cor literal aqui. Sombra com deslocamento: o cartao "assenta". */
+.qr {
+  position: relative;
+  width: 240px;
+  overflow: hidden;
+  border-radius: var(--ah-radius-control);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--ah-accent-900) 18%, transparent),
+    0 12px 28px -14px color-mix(in srgb, var(--ah-accent-700) 55%, transparent);
+  animation: imprimir 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .qr svg {
@@ -49,21 +76,90 @@
   height: auto;
 }
 
+/* A faixa de leitura que acompanha a impressao do QR novo -- passa uma vez. */
+.qr::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 44%,
+    color-mix(in srgb, var(--ah-accent-500) 45%, transparent) 50%,
+    transparent 56%
+  );
+  background-size: 100% 220%;
+  animation: varrer 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes imprimir {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes varrer {
+  from {
+    background-position: 0 100%;
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    background-position: 0 0;
+    opacity: 0;
+  }
+}
+
 .informacao {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
   width: 100%;
 }
 
-.rotulo {
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip,
+.chipPublicado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-badge);
+  background-color: var(--ah-surface-raised);
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ah-text-label);
+  color: var(--ah-text-secondary);
+}
+
+.chipPublicado {
+  border-color: color-mix(in srgb, var(--ah-state-success) 40%, var(--ah-border-subtle));
+  background-color: color-mix(in srgb, var(--ah-state-success) 10%, var(--ah-surface-raised));
+  color: color-mix(in srgb, var(--ah-state-success) 72%, var(--ah-text-strong));
+}
+
+.ponto {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--ah-state-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ah-state-success) 22%, transparent);
 }
 
 .versao {
@@ -71,17 +167,42 @@
   font-size: var(--ah-type-display-size);
   line-height: var(--ah-type-display-lh);
   font-weight: var(--ah-type-display-weight);
+  letter-spacing: -0.02em;
   color: var(--ah-text-strong);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
 .autoria {
-  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: -6px 0 0;
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
   overflow-wrap: anywhere;
+}
+
+.autoria > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--ah-text-icon);
+}
+
+.blocoDoLink {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.rotuloDoLink {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  color: var(--ah-text-label);
 }
 
 .linhaDoLink {
@@ -95,6 +216,15 @@
 .linhaDoLink > button {
   flex: none;
   white-space: nowrap;
+  transition:
+    color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+/* "Copiado" confirma com a cor de sucesso, alem do texto e do icone. */
+.linhaDoLink > button[data-copiado='true'] {
+  border-color: color-mix(in srgb, var(--ah-state-success) 45%, var(--ah-border-default));
+  color: color-mix(in srgb, var(--ah-state-success) 72%, var(--ah-text-strong));
 }
 
 .link {
@@ -112,30 +242,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Um clique seleciona o link inteiro -- quem nao confia no botao copia na mao. */
+  user-select: all;
 }
 
-.divisor {
-  border: 0;
-  border-top: 1px solid var(--ah-border-subtle);
-  margin: 4px 0;
+.link::selection {
+  background-color: color-mix(in srgb, var(--ah-accent-500) 30%, transparent);
+  color: var(--ah-text-strong);
 }
 
-.status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.dicaDoLink {
   margin: 0;
-  font-size: var(--ah-type-body-size);
-  line-height: var(--ah-type-body-lh);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
-}
-
-.ponto {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--ah-state-success);
 }
 
 .aviso {
@@ -143,12 +263,17 @@
   gap: 12px;
   align-items: flex-start;
   padding: 12px 16px;
-  border: 1px solid var(--ah-border-default);
+  border: 1px solid color-mix(in srgb, var(--ah-state-info) 30%, var(--ah-border-subtle));
   border-radius: var(--ah-radius-card);
-  background-color: var(--ah-surface-raised);
+  background-color: color-mix(in srgb, var(--ah-state-info) 6%, var(--ah-surface-raised));
   font-size: var(--ah-type-body-size);
   line-height: var(--ah-type-body-lh);
   color: var(--ah-text-secondary);
+}
+
+.avisoTexto {
+  margin: 0;
+  max-width: 75ch;
 }
 
 .aviso strong {
@@ -190,27 +315,24 @@
   color: var(--ah-text-secondary);
 }
 
-.horario {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--ah-type-caption-size);
-  color: var(--ah-text-secondary);
+/* Movimento reduzido: o QR novo aparece sem varrer -- a troca continua
+   legivel pelo fade, so sem deslocamento. */
+@media (prefers-reduced-motion: reduce) {
+  .qr {
+    animation: aparecer 150ms ease-out both;
+  }
+
+  .qr::after {
+    animation: none;
+    opacity: 0;
+  }
 }
 
-@keyframes subir {
+@keyframes aparecer {
   from {
-    opacity: 0.001;
-    transform: translateY(6px);
+    opacity: 0;
   }
   to {
     opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .qr {
-    animation: none;
   }
 }
