@@ -1,23 +1,49 @@
-import { BadRequestException, Body, Controller, Delete, Get, Put } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Delete, Get, Put } from '@nestjs/common';
 import { ApiOkResponse } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
-import { AppDistributionRepository, type InstaladorAndroid } from './app-distribution.repository.js';
-import { LIMITE_DA_VERSAO, urlDeInstaladorValida } from './domain/instalador-android.js';
+import {
+  AppDistributionRepository,
+  SlugDoLinkEmUsoError,
+  type IdentidadeDoApp,
+  type InstaladorAndroid,
+} from './app-distribution.repository.js';
+import {
+  LIMITE_DA_MENSAGEM,
+  LIMITE_DA_VERSAO,
+  slugDoLinkValido,
+  urlDeInstaladorValida,
+} from './domain/instalador-android.js';
 
 const esquemaDoInstalador = z
   .object({
     androidUrl: z.string(),
     androidVersion: z.string().trim().max(LIMITE_DA_VERSAO).nullish(),
+    shortSlug: z.string().refine(slugDoLinkValido).optional(),
+    messageTemplate: z.string().max(LIMITE_DA_MENSAGEM).nullish(),
   })
   .strict();
 
 const ESQUEMA_DA_RESPOSTA = {
   type: 'object',
-  required: ['androidUrl', 'androidVersion', 'updatedAt', 'updatedByEmail', 'updatedByRole'],
+  required: [
+    'androidUrl',
+    'androidVersion',
+    'updatedAt',
+    'updatedByEmail',
+    'updatedByRole',
+    'shortSlug',
+    'messageTemplate',
+    'academia',
+    'slugSugerido',
+  ],
   properties: {
+    shortSlug: { type: 'string', nullable: true },
+    messageTemplate: { type: 'string', nullable: true },
+    academia: { type: 'string' },
+    slugSugerido: { type: 'string', nullable: true },
     androidUrl: { type: 'string', nullable: true },
     androidVersion: { type: 'string', nullable: true },
     updatedAt: { type: 'string', format: 'date-time', nullable: true },
@@ -26,13 +52,17 @@ const ESQUEMA_DA_RESPOSTA = {
   },
 };
 
-function paraDto(linha: InstaladorAndroid | null) {
+function paraDto(linha: InstaladorAndroid | null, identidade: IdentidadeDoApp) {
   return {
     androidUrl: linha?.androidUrl ?? null,
     androidVersion: linha?.androidVersion ?? null,
     updatedAt: linha?.updatedAt.toISOString() ?? null,
     updatedByEmail: linha?.updatedByEmail ?? null,
     updatedByRole: linha?.updatedByRole ?? null,
+    shortSlug: identidade.shortSlug,
+    messageTemplate: linha?.messageTemplate ?? null,
+    academia: identidade.academia,
+    slugSugerido: identidade.slugSugerido,
   };
 }
 
@@ -52,7 +82,13 @@ export class AppDistributionController {
   @RequirePermissions('student.read')
   @ApiOkResponse({ schema: ESQUEMA_DA_RESPOSTA })
   async obter() {
-    return paraDto(await this.instalador.obter(this.contexto.require()));
+    const contexto = this.contexto.require();
+    const [linha, identidade] = await Promise.all([
+      this.instalador.obter(contexto),
+      this.instalador.identidade(contexto),
+    ]);
+
+    return paraDto(linha, identidade);
   }
 
   @Put()
@@ -67,12 +103,26 @@ export class AppDistributionController {
       throw new BadRequestException({ code: 'APP_DISTRIBUTION_URL_INVALID' });
     }
 
-    const salvo = await this.instalador.salvar(this.contexto.require(), {
-      androidUrl: dados.androidUrl,
-      androidVersion: dados.androidVersion ? dados.androidVersion : null,
-    });
+    const contexto = this.contexto.require();
+    let salvo: InstaladorAndroid;
+    try {
+      salvo = await this.instalador.salvar(contexto, {
+        androidUrl: dados.androidUrl,
+        androidVersion: dados.androidVersion ? dados.androidVersion : null,
+        ...(dados.shortSlug !== undefined ? { shortSlug: dados.shortSlug } : {}),
+        // Vazio = volta ao texto padrao do painel.
+        ...(dados.messageTemplate !== undefined
+          ? { messageTemplate: dados.messageTemplate?.trim() ? dados.messageTemplate : null }
+          : {}),
+      });
+    } catch (erro) {
+      if (erro instanceof SlugDoLinkEmUsoError) {
+        throw new ConflictException({ code: 'APP_LINK_SLUG_TAKEN' });
+      }
+      throw erro;
+    }
 
-    return paraDto(salvo);
+    return paraDto(salvo, await this.instalador.identidade(contexto));
   }
 
   /** Idempotente; devolve o estado vazio, o mesmo de um GET depois. */
@@ -80,8 +130,9 @@ export class AppDistributionController {
   @RequirePermissions('user.manage')
   @ApiOkResponse({ schema: ESQUEMA_DA_RESPOSTA })
   async remover() {
-    await this.instalador.remover(this.contexto.require());
+    const contexto = this.contexto.require();
+    await this.instalador.remover(contexto);
 
-    return paraDto(null);
+    return paraDto(null, await this.instalador.identidade(contexto));
   }
 }

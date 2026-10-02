@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { chamarApi } from '../../lib/api/server-client';
 import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
+import { MENSAGEM_PADRAO, normalizarQuebras } from '../(protected)/app/mensagem';
 
 export interface EstadoDoInstalador {
   erro?: string;
@@ -15,11 +16,21 @@ export interface EstadoDoInstalador {
 const esquema = z.object({
   androidUrl: z.string().trim().min(1, 'Informe o link do instalador.'),
   androidVersion: z.string().trim().max(40, 'A versão aceita até 40 caracteres.'),
+  // Vazio = nao mexe no final (a academia pode salvar so o APK).
+  shortSlug: z
+    .string()
+    .trim()
+    .refine((valor) => valor === '' || /^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/.test(valor), {
+      message:
+        'O final do link aceita de 3 a 40 letras minúsculas, números e hífen (sem hífen nas pontas).',
+    }),
+  messageTemplate: z.string().max(1000, 'A mensagem aceita até 1000 caracteres.'),
 });
 
 const MENSAGEM: Record<string, string> = {
   ...MENSAGEM_DE_SESSAO,
   APP_DISTRIBUTION_URL_INVALID: 'O link precisa começar com https://.',
+  APP_LINK_SLUG_TAKEN: 'Esse final de link já é usado por outra academia. Escolha outro.',
   FORBIDDEN: 'Você não tem permissão para alterar o instalador.',
 };
 
@@ -41,6 +52,8 @@ export async function salvarInstaladorAndroid(
   const valores = {
     androidUrl: texto(formulario, 'androidUrl'),
     androidVersion: texto(formulario, 'androidVersion'),
+    shortSlug: texto(formulario, 'shortSlug'),
+    messageTemplate: normalizarQuebras(texto(formulario, 'messageTemplate')),
   };
   const validado = esquema.safeParse(valores);
   if (!validado.success) {
@@ -52,6 +65,13 @@ export async function salvarInstaladorAndroid(
     corpo: {
       androidUrl: validado.data.androidUrl,
       androidVersion: validado.data.androidVersion || null,
+      ...(validado.data.shortSlug ? { shortSlug: validado.data.shortSlug } : {}),
+      // Vazio ou identico ao padrao grava NULO: quem nunca personalizou
+      // recebe as melhorias futuras do texto padrao sem fazer nada.
+      messageTemplate:
+        validado.data.messageTemplate.trim() && validado.data.messageTemplate !== MENSAGEM_PADRAO
+          ? validado.data.messageTemplate
+          : null,
     },
   });
 

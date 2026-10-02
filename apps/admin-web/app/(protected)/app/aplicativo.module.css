@@ -336,3 +336,169 @@
     opacity: 1;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * #538 -- QR ampliavel, link curto e mensagem para o aluno.
+ * ------------------------------------------------------------------------- */
+
+/* O QR e um botao: cursor de lupa e a dica dizem que ele amplia. */
+.qrBotao {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  border-radius: var(--ah-radius-control);
+}
+
+.qrBotao .qr {
+  display: block;
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.qrBotao:hover .qr {
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--ah-accent-900) 18%, transparent),
+    0 18px 34px -16px color-mix(in srgb, var(--ah-accent-700) 60%, transparent);
+}
+
+.qrBotao:focus-visible {
+  outline: 2px solid var(--ah-accent-500);
+  outline-offset: 6px;
+}
+
+.dicaDoQr {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ah-accent-600) 80%, var(--ah-text-strong));
+}
+
+/*
+ * O dialog ampliado. Centralizado EXPLICITAMENTE: o preflight do Tailwind zera
+ * o `margin: auto` do <dialog> nativo e o modal escorrega para o canto.
+ */
+.dialogoQr {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  max-width: min(92vw, 720px);
+  max-height: 92vh;
+  padding: 28px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-modal);
+  background-color: var(--ah-surface-raised);
+  box-shadow: 0 30px 80px -30px color-mix(in srgb, var(--ah-accent-900) 60%, transparent);
+  cursor: zoom-out;
+}
+
+.dialogoQr::backdrop {
+  background-color: color-mix(in srgb, var(--ah-surface-chrome) 72%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.dialogoQr[open] {
+  animation: ampliar 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ampliar {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.conteudoDoDialogo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  cursor: default;
+}
+
+.tituloDoDialogo {
+  margin: 0;
+  font-size: var(--ah-type-title-size);
+  line-height: var(--ah-type-title-lh);
+  font-weight: var(--ah-type-title-weight);
+  color: var(--ah-text-strong);
+}
+
+/* Ocupa a altura disponivel: a camera do aluno le de onde ele estiver. */
+.qrAmpliado {
+  display: block;
+  width: min(72vh, 560px, 80vw);
+}
+
+.qrAmpliado svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.linkDoDialogo {
+  margin: 0;
+  font-family: var(--ah-font-mono);
+  font-size: var(--ah-type-mono-size);
+  color: var(--ah-text-secondary);
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.mensagem {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Balao de conversa: o canto de cima "aponta" para quem manda. */
+.balao {
+  max-width: 62ch;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-success) 26%, var(--ah-border-subtle));
+  border-radius: 4px 16px 16px 16px;
+  background-color: color-mix(in srgb, var(--ah-state-success) 8%, var(--ah-surface-raised));
+  box-shadow: 0 6px 16px -12px color-mix(in srgb, var(--ah-state-success) 60%, transparent);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-default);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.acoesDaMensagem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.acoesDaMensagem > * {
+  white-space: nowrap;
+}
+
+.acoesDaMensagem > button[data-copiado='true'] {
+  border-color: color-mix(in srgb, var(--ah-state-success) 45%, var(--ah-border-default));
+  color: color-mix(in srgb, var(--ah-state-success) 72%, var(--ah-text-strong));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qrBotao .qr,
+  .qrBotao:hover .qr {
+    transition: none;
+    transform: none;
+  }
+
+  .dialogoQr[open] {
+    animation: aparecer 150ms ease-out both;
+  }
+}

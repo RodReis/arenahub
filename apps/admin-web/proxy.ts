@@ -54,7 +54,9 @@ const COOKIE_DE_REFRESH = 'arenahub_refresh';
  * nao chama nada autenticado -- e refresh rotacionado e detectado como
  * reuso se reaparecer.
  */
-const PUBLICAS = ['/login', '/convite', '/marca'];
+// `/baixar/<final>` (#538): o link curto do app que o ALUNO abre pelo QR ou
+// pelo WhatsApp -- nunca tem sessao do painel.
+const PUBLICAS = ['/login', '/convite', '/marca', '/baixar'];
 
 /**
  * `/{slug}/login` — a tela de entrada da academia (F62, ADR-052 §10).

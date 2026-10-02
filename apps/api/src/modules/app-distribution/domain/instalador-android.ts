@@ -19,3 +19,16 @@ export function urlDeInstaladorValida(bruta: unknown): boolean {
     return false;
   }
 }
+
+export const LIMITE_DA_MENSAGEM = 1000;
+
+/**
+ * Final do link curto (`/baixar/<slug>`, #538): 3 a 40 caracteres, minusculas,
+ * numeros e hifen no meio. E o que o aluno digita se o link nao abrir -- sem
+ * acento nem maiuscula, que o teclado do celular trocaria sozinho.
+ */
+const SLUG_DO_LINK = /^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/;
+
+export function slugDoLinkValido(bruto: unknown): boolean {
+  return typeof bruto === 'string' && SLUG_DO_LINK.test(bruto);
+}

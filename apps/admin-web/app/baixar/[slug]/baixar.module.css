@@ -1,0 +1,32 @@
+.pagina {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  background-color: var(--ah-surface-canvas);
+}
+
+.cartao {
+  width: min(100%, 440px);
+  padding: 28px 24px;
+  border: 1px solid var(--ah-border-default);
+  border-top: 3px solid var(--ah-state-warning);
+  border-radius: var(--ah-radius-card);
+  background-color: var(--ah-surface-raised);
+  box-shadow: 0 12px 32px -20px color-mix(in srgb, var(--ah-text-strong) 40%, transparent);
+}
+
+.titulo {
+  margin: 0 0 8px;
+  font-size: var(--ah-type-title-size);
+  line-height: var(--ah-type-title-lh);
+  font-weight: var(--ah-type-title-weight);
+  color: var(--ah-text-strong);
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-secondary);
+}
