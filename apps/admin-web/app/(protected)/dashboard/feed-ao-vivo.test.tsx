@@ -45,7 +45,9 @@ describe('FeedAoVivo — F57 bloco 3', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mudarVisibilidade('visible');
-    vi.mocked(lerFeedDeAcessos).mockResolvedValue({ eventos: [evento('e-2', 'Marina Lopes')] });
+    vi.mocked(lerFeedDeAcessos).mockResolvedValue({
+      eventos: [evento('e-2', 'Marina Lopes')],
+    });
   });
 
   afterEach(() => {
@@ -118,7 +120,10 @@ describe('FeedAoVivo — F57 bloco 3', () => {
    * falhou diria "ninguém passou na catraca", que é o oposto do que houve.
    */
   it('erro de leitura NÃO apaga o que já estava na tela', async () => {
-    vi.mocked(lerFeedDeAcessos).mockResolvedValue({ eventos: [], erro: 'falhou' });
+    vi.mocked(lerFeedDeAcessos).mockResolvedValue({
+      eventos: [],
+      erro: 'falhou',
+    });
 
     render(
       <FeedAoVivo
@@ -144,5 +149,51 @@ describe('FeedAoVivo — F57 bloco 3', () => {
     await vi.advanceTimersByTimeAsync(50_000);
 
     expect(lerFeedDeAcessos).not.toHaveBeenCalled();
+  });
+
+  /** Pedido do PI, 02/10/2026: o DIA inteiro, não as últimas 24 h. */
+  it('pede o feed desde o início do dia da unidade', async () => {
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        inicial={[]}
+        desde="2026-10-02T03:00:00.000Z"
+      />,
+    );
+
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(lerFeedDeAcessos).toHaveBeenCalledWith('u-1', '2026-10-02T03:00:00.000Z');
+  });
+
+  /** Pedido do PI, 02/10/2026: quem a catraca barrou hoje, no cartão de bloqueados. */
+  it('mostra no cartão de bloqueados quem a catraca recusou hoje', () => {
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        situacoes={[]}
+        inicial={[
+          evento('e-1', 'Nanci Santana'),
+          {
+            ...evento('e-2', 'Joao Pedro Ramalho'),
+            outcome: 'DENY',
+            reason: 'NO_ENTITLEMENT',
+          },
+        ]}
+      />,
+    );
+
+    const recusados = screen.getByTestId('recusados-de-hoje');
+    expect(recusados).toHaveTextContent('Joao Pedro');
+    expect(recusados).not.toHaveTextContent('Nanci');
+    expect(screen.getByTestId('contagem-de-recusados')).toHaveTextContent('1 recusado hoje');
+  });
+
+  it('sem situacoes, o feed nao desenha o cartão de bloqueados', () => {
+    render(<FeedAoVivo gymUnitId="u-1" timeZone="America/Sao_Paulo" inicial={[]} />);
+
+    expect(screen.queryByText('Bloqueados e suspensos')).toBeNull();
   });
 });

@@ -5,7 +5,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon, StateBadge, TenantDateTime } from '@arenahub/ui';
 
 import { lerFeedDeAcessos, type EventoDoFeed } from '../../actions/dashboard';
+import { CartaoDeBloqueados, type SituacaoDoDashboard } from './cartao-de-bloqueados';
 import { doisNomes } from './dois-nomes';
+import { recusadosDoDia } from './recusados';
 import estilos from './dashboard.module.css';
 
 /** Decisão do PI: cinco segundos. */
@@ -16,6 +18,15 @@ interface Props {
   readonly timeZone: string;
   /** Primeira página, vinda do servidor — a tela não nasce vazia. */
   readonly inicial: readonly EventoDoFeed[];
+  /** Início do dia da unidade: o feed mostra o DIA, não as últimas 24 h. */
+  readonly desde?: string;
+  /**
+   * Com isto, o feed também desenha o cartão "Bloqueados e suspensos", com
+   * quem a catraca recusou hoje tirado da MESMA leitura -- pedido do PI,
+   * 02/10/2026. Um segundo ciclo de consulta só para as recusas dobraria a
+   * carga na API que atende a catraca.
+   */
+  readonly situacoes?: readonly SituacaoDoDashboard[];
 }
 
 /**
@@ -33,7 +44,7 @@ interface Props {
  * leitura imediata na volta (senão a tela mostraria por até 5 s o estado de
  * quando foi escondida, que pode ser de horas atrás).
  */
-export function FeedAoVivo({ gymUnitId, timeZone, inicial }: Props) {
+export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: Props) {
   const [eventos, setEventos] = useState<readonly EventoDoFeed[]>(inicial);
   const [pausado, setPausado] = useState(false);
 
@@ -45,14 +56,14 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial }: Props) {
   const montado = useRef(true);
 
   const atualizar = useCallback(async () => {
-    const resposta = await lerFeedDeAcessos(gymUnitId);
+    const resposta = await lerFeedDeAcessos(gymUnitId, desde);
 
     // Falha de rede mantém a lista anterior. Zerar o feed porque uma leitura
     // falhou diria "ninguém passou na catraca", que é o oposto do que houve.
     if (montado.current && resposta.erro === undefined) {
       setEventos(resposta.eventos);
     }
-  }, [gymUnitId]);
+  }, [gymUnitId, desde]);
 
   useEffect(() => {
     montado.current = true;
@@ -99,72 +110,85 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial }: Props) {
   }, [atualizar]);
 
   return (
-    <details className={estilos['cartao']} open>
-      <summary className={estilos['cabecalhoDoCartao']}>
-        <h2 className={estilos['tituloDoCartao']}>Acessos em tempo real</h2>
-        <span className={estilos['acoesDoCabecalho']}>
-          <span
-            className={estilos['aoVivo']}
-            data-pausado={pausado}
-            data-testid="estado-do-feed"
-            role="status"
-          >
-            <span className={estilos['pulso']} aria-hidden="true" />
-            {pausado ? 'pausado' : 'ao vivo'}
+    <>
+      <details className={estilos['cartao']} open>
+        <summary className={estilos['cabecalhoDoCartao']}>
+          <h2 className={estilos['tituloDoCartao']}>Acessos em tempo real</h2>
+          <span className={estilos['acoesDoCabecalho']}>
+            <span
+              className={estilos['aoVivo']}
+              data-pausado={pausado}
+              data-testid="estado-do-feed"
+              role="status"
+            >
+              <span className={estilos['pulso']} aria-hidden="true" />
+              {pausado ? 'pausado' : 'ao vivo'}
+            </span>
+            <Icon name="chevron-down" />
           </span>
-          <Icon name="chevron-down" />
-        </span>
-      </summary>
+        </summary>
 
-      <div className={estilos['conteudoDoCartao']}>
-        {eventos.length === 0 ? (
-          <div className={estilos['vazio']}>
-            <span className={estilos['iconeDoVazio']}>
-              <Icon name="clock" />
-            </span>
-            <span className={estilos['textoDoVazio']}>
-              Nenhum acesso ainda hoje.
-              <span className={estilos['saidaDoVazio']}>
-                A lista se preenche sozinha quando alguém passar na catraca.
+        <div className={estilos['conteudoDoCartao']}>
+          {eventos.length === 0 ? (
+            <div className={estilos['vazio']}>
+              <span className={estilos['iconeDoVazio']}>
+                <Icon name="clock" />
               </span>
-            </span>
-          </div>
-        ) : (
-          <ul className={estilos['lista']} data-testid="feed-de-acessos">
-            {eventos.map((evento) => (
-              /*
+              <span className={estilos['textoDoVazio']}>
+                Nenhum acesso ainda hoje.
+                <span className={estilos['saidaDoVazio']}>
+                  A lista se preenche sozinha quando alguém passar na catraca.
+                </span>
+              </span>
+            </div>
+          ) : (
+            <ul
+              className={`${estilos['lista']} ${estilos['listaRolavel']}`}
+              data-testid="feed-de-acessos"
+            >
+              {eventos.map((evento) => (
+                /*
                 `key` é o id do evento, e é o que faz a animação de entrada
                 funcionar: com índice o React reusaria a mesma linha do DOM e
                 só trocaria o texto — a lista mudaria de conteúdo em silêncio,
                 sem nada indicar que alguém acabou de passar na catraca.
               */
-              <li className={`${estilos['linha']} ${estilos['linhaDoFeed']}`} key={evento.id}>
-                <span className={estilos['linhaTexto']}>
-                  <span className={estilos['horaDoFeed']}>
-                    <TenantDateTime iso={evento.occurredAt} timeZone={timeZone} format="time" />
-                  </span>
-                  {/*
+                <li className={`${estilos['linha']} ${estilos['linhaDoFeed']}`} key={evento.id}>
+                  <span className={estilos['linhaTexto']}>
+                    <span className={estilos['horaDoFeed']}>
+                      <TenantDateTime iso={evento.occurredAt} timeZone={timeZone} format="time" />
+                    </span>
+                    {/*
                     DOIS NOMES, não o inteiro: a linha divide espaço com a
                     hora e o badge, e "Bruna Barbara Militao Vi…" truncado
                     esconde justamente o que diferencia duas Brunas.
                   */}
-                  <span className={estilos['nomeDoFeed']}>
-                    {evento.student
-                      ? doisNomes(evento.student.fullName)
-                      : (evento.externalUserId ?? 'Não identificado')}
+                    <span className={estilos['nomeDoFeed']}>
+                      {evento.student
+                        ? doisNomes(evento.student.fullName)
+                        : (evento.externalUserId ?? 'Não identificado')}
+                    </span>
                   </span>
-                </span>
-                {/*
+                  {/*
                   `accessReason` e não `outcome`: a mesma máquina que a tela de
                   eventos já usa, para "Negado" dizer POR QUE foi negado em vez
                   de repetir a coluna ao lado.
                 */}
-                <StateBadge machine="accessReason" state={evento.reason} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </details>
+                  <StateBadge machine="accessReason" state={evento.reason} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </details>
+
+      {situacoes === undefined ? null : (
+        <CartaoDeBloqueados
+          situacoes={situacoes}
+          recusados={recusadosDoDia(eventos)}
+          timeZone={timeZone}
+        />
+      )}
+    </>
   );
 }

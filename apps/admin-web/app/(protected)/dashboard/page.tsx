@@ -16,6 +16,7 @@ import { lerFeedDeAcessos } from '../../actions/dashboard';
 import { chamarApi } from '../../../lib/api/server-client';
 import estilos from './dashboard.module.css';
 import { doisNomes } from './dois-nomes';
+import { CartaoDeBloqueados } from './cartao-de-bloqueados';
 import { FeedAoVivo } from './feed-ao-vivo';
 import { NumeroQueConta } from './numero-que-conta';
 
@@ -56,19 +57,6 @@ interface Dashboard {
   feriados: { data: string; nome: string; origem: string }[];
   aniversariantes: { nome: string; diaEMes: string; hoje: boolean }[];
 }
-
-/** Os quatro motivos da lista fechada da issue #241. */
-const ROTULO_DE_MOTIVO: Record<string, string> = {
-  DELINQUENCY: 'Inadimplência',
-  STUDENT_REQUEST: 'Pedido do aluno',
-  MEDICAL: 'Atestado médico',
-  CONDUCT: 'Conduta',
-};
-
-const ROTULO_DE_SITUACAO: Record<string, string> = {
-  SUSPENDED: 'Suspenso',
-  BLOCKED: 'Bloqueado',
-};
 
 const MES_ABREVIADO = [
   'jan',
@@ -116,21 +104,6 @@ function Vazio({
       </span>
     </div>
   );
-}
-
-function traduzir(mapa: Record<string, string>, chave: string | null): string {
-  /*
-   * `null` acontece de verdade e não é erro: quem foi bloqueado ANTES de o
-   * campo existir (issue #241) não tem razão gravada, e os alunos importados
-   * do Pacto são todos assim. Esconder a linha faria a soma das partes não
-   * bater com o total que a grid de alunos mostra.
-   *
-   * O texto diz o próximo passo em vez de só constatar a ausência: o motivo é
-   * preenchível na ficha, e quem lê o painel é quem pode preencher.
-   */
-  if (chave === null) return 'Motivo não informado';
-
-  return mapa[chave] ?? chave;
 }
 
 /**
@@ -201,7 +174,9 @@ export default async function PaginaDoDashboard({
    * só ganhar conteúdo no primeiro ciclo de 5 s — cinco segundos de "nenhum
    * acesso hoje" numa academia que teve trezentos.
    */
-  const feedInicial = unidade ? (await lerFeedDeAcessos(unidade.id)).eventos : [];
+  const feedInicial = unidade
+    ? (await lerFeedDeAcessos(unidade.id, dados.acessosDeHoje?.desde)).eventos
+    : [];
 
   // Sem unidade não há fuso; o carimbo do topo cai para UTC apenas para não
   // ficar sem hora nenhuma — e nesse estado a tela também não mostra número.
@@ -402,67 +377,22 @@ export default async function PaginaDoDashboard({
       <div className={estilos['corpo']}>
         <div className={estilos['coluna']}>
           {unidade ? (
-            <FeedAoVivo gymUnitId={unidade.id} timeZone={unidade.timezone} inicial={feedInicial} />
+            <FeedAoVivo
+              gymUnitId={unidade.id}
+              timeZone={unidade.timezone}
+              inicial={feedInicial}
+              situacoes={dados.situacoes}
+              {...(dados.acessosDeHoje ? { desde: dados.acessosDeHoje.desde } : {})}
+            />
           ) : null}
 
-          <details className={estilos['cartao']}>
-            <summary className={estilos['cabecalhoDoCartao']}>
-              <h2 className={estilos['tituloDoCartao']}>
-                <Icon name="user-x" />
-                Bloqueados e suspensos
-              </h2>
-              <Icon name="chevron-down" />
-            </summary>
-            <div className={estilos['conteudoDoCartao']}>
-              {dados.situacoes.length === 0 ? (
-                <Vazio icone="check-circle" tom="success">
-                  Ninguém bloqueado ou suspenso — todo mundo com acesso liberado.
-                </Vazio>
-              ) : (
-                <ul className={estilos['lista']} data-testid="lista-de-situacoes">
-                  {dados.situacoes.map((situacao) => (
-                    <li
-                      className={estilos['linhaDeSituacao']}
-                      key={`${situacao.status}-${situacao.motivo}`}
-                    >
-                      <span className={estilos['linha']}>
-                        <span className={estilos['linhaTexto']}>
-                          <Icon name={situacao.status === 'BLOCKED' ? 'ban' : 'user-minus'} />
-                          {traduzir(ROTULO_DE_SITUACAO, situacao.status)} ·{' '}
-                          {traduzir(ROTULO_DE_MOTIVO, situacao.motivo)}
-                        </span>
-                        <span className={estilos['linhaValor']}>{situacao.quantidade}</span>
-                      </span>
-                      {/*
-                        QUEM são, não só quantos. "2 bloqueados" não ajuda quem
-                        está no balcão com o aluno na frente — a pergunta é
-                        "quem?". Cinco nomes cabem; acima disso a contagem ao
-                        lado volta a ser a informação útil.
-                      */}
-                      {situacao.alunos.length > 0 ? (
-                        <span className={estilos['nomesDaSituacao']}>
-                          {situacao.alunos.map(doisNomes).join(' · ')}
-                          {situacao.quantidade > situacao.alunos.length
-                            ? ` e mais ${situacao.quantidade - situacao.alunos.length}`
-                            : ''}
-                        </span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {/*
-                A dica só aparece quando há motivo ausente — texto permanente
-                que explica um caso que não está acontecendo é ruído no balcão.
-              */}
-              {dados.situacoes.some((s) => s.motivo === null) ? (
-                <p className={estilos['apoio']}>
-                  <Icon name="alert-circle" />
-                  Sem motivo são de antes do campo existir. Informe na ficha do aluno.
-                </p>
-              ) : null}
-            </div>
-          </details>
+          {/*
+            Com unidade, quem desenha o cartão é o feed ao vivo: ele junta
+            quem a catraca recusou hoje, tirado da mesma leitura de 5 s.
+          */}
+          {unidade ? null : (
+            <CartaoDeBloqueados situacoes={dados.situacoes} timeZone={fuso} />
+          )}
 
           <details className={estilos['cartao']}>
             <summary className={estilos['cabecalhoDoCartao']}>

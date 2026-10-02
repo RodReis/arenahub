@@ -1,5 +1,5 @@
-import { cookies } from "next/headers";
-import type { NextRequest } from "next/server";
+import { cookies } from 'next/headers';
+import type { NextRequest } from 'next/server';
 
 /**
  * A foto do aluno, servida pelo painel -- #503.
@@ -17,7 +17,7 @@ import type { NextRequest } from "next/server";
  * ir e voltar entre paginas nao precisa baixar tudo de novo. `private` porque
  * e foto de pessoa, atras de sessao -- nenhum cache compartilhado guarda.
  */
-const URL_INTERNA = process.env["API_INTERNAL_URL"] ?? "http://localhost:3344";
+const URL_INTERNA = process.env['API_INTERNAL_URL'] ?? 'http://localhost:3344';
 
 export async function GET(
   _requisicao: NextRequest,
@@ -25,20 +25,17 @@ export async function GET(
 ): Promise<Response> {
   const { id } = await contexto.params;
 
-  const acesso = (await cookies()).get("arenahub_access");
+  const acesso = (await cookies()).get('arenahub_access');
 
   if (!acesso) return new Response(null, { status: 404 });
 
   let resposta: Response;
 
   try {
-    resposta = await fetch(
-      `${URL_INTERNA}/api/v1/students/${encodeURIComponent(id)}/photo`,
-      {
-        cache: "no-store",
-        headers: { cookie: `${acesso.name}=${acesso.value}` },
-      },
-    );
+    resposta = await fetch(`${URL_INTERNA}/api/v1/students/${encodeURIComponent(id)}/photo`, {
+      cache: 'no-store',
+      headers: { cookie: `${acesso.name}=${acesso.value}` },
+    });
   } catch {
     return new Response(null, { status: 404 });
   }
@@ -48,10 +45,9 @@ export async function GET(
   return new Response(await resposta.arrayBuffer(), {
     status: 200,
     headers: {
-      "content-type":
-        resposta.headers.get("content-type") ?? "application/octet-stream",
-      "cache-control": "private, max-age=300",
-      "x-content-type-options": "nosniff",
+      'content-type': resposta.headers.get('content-type') ?? 'application/octet-stream',
+      'cache-control': 'private, max-age=300',
+      'x-content-type-options': 'nosniff',
     },
   });
 }

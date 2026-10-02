@@ -30,8 +30,13 @@ export interface RespostaDoFeed {
   erro?: string;
 }
 
-/** Quantos eventos o feed mostra. Dez cabem sem rolagem no cartão. */
-const LIMITE_DO_FEED = 10;
+/**
+ * Quantos eventos o feed traz: o TETO da rota. Era 10 -- pedido do PI,
+ * 02/10/2026: a recepção quer ver todo mundo que entrou no dia, com rolagem no
+ * cartão. A lista continua SUBSTITUÍDA a cada ciclo (não acumula), então a
+ * memória da aba não cresce com o turno.
+ */
+const LIMITE_DO_FEED = 200;
 
 /**
  * Os últimos acessos da unidade.
@@ -40,10 +45,19 @@ const LIMITE_DO_FEED = 10;
  * mostra "o que está acontecendo agora", não um histórico que cresce. Paginar
  * aqui acumularia memória numa aba que fica aberta o turno inteiro.
  */
-export async function lerFeedDeAcessos(gymUnitId: string): Promise<RespostaDoFeed> {
+export async function lerFeedDeAcessos(
+  gymUnitId: string,
+  /**
+   * Início do dia da unidade (o `desde` do dashboard). Sem ele a rota usa as
+   * últimas 24 h, e o feed misturaria a noite anterior com o dia de hoje.
+   */
+  desde?: string,
+): Promise<RespostaDoFeed> {
   if (gymUnitId === '') return { eventos: [], erro: 'Unidade não informada.' };
 
   const consulta = new URLSearchParams({ gymUnitId, limit: String(LIMITE_DO_FEED) });
+
+  if (desde) consulta.set('from', desde);
 
   const resposta = await chamarApi<{ eventos: EventoDoFeed[] }>(
     `/api/v1/access-events?${consulta.toString()}`,
