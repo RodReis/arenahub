@@ -214,7 +214,7 @@ test.describe('busca de aluno', () => {
     // sozinho 300ms depois de parar de digitar (3+ caracteres). Espera pela
     // troca de URL em vez de um clique que não existe mais.
     const urlAntes = page.url();
-    await page.getByLabel('Buscar por nome, matrícula ou contato').fill(nome);
+    await page.getByLabel('Buscar por nome, matrícula, contato ou ID da catraca').fill(nome);
     await page.waitForFunction((anterior) => window.location.href !== anterior, urlAntes);
 
     await expect(page.getByTestId('tabela-de-alunos')).toBeVisible();
