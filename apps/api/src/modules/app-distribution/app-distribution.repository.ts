@@ -215,10 +215,12 @@ export class AppDistributionRepository {
    * lido JA dentro do contexto dessa academia, sob a politica de
    * `tenant_app_distribution`.
    */
-  async destinoDoLink(slug: string): Promise<string | null> {
+  async destinoDoLink(
+    slug: string,
+  ): Promise<{ tenantSlug: string; androidUrl: string | null } | null> {
     const link = await this.db.appShortLink.findUnique({
       where: { slug },
-      select: { tenantId: true },
+      select: { tenantId: true, tenant: { select: { slug: true } } },
     });
     if (!link) return null;
 
@@ -231,6 +233,9 @@ export class AppDistributionRepository {
       ),
     );
 
-    return instalador?.androidUrl ?? null;
+    // O identificador da academia vai junto: e o que a pagina usa para buscar
+    // nome e icone publicos (mesma rota da tela de login por slug).
+    return { tenantSlug: link.tenant.slug, androidUrl: instalador?.androidUrl ?? null };
   }
+
 }

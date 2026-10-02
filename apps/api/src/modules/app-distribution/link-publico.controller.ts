@@ -24,15 +24,20 @@ export class LinkPublicoController {
   @ApiOkResponse({
     schema: {
       type: 'object',
-      required: ['androidUrl'],
-      properties: { androidUrl: { type: 'string' } },
+      required: ['androidUrl', 'tenantSlug'],
+      properties: {
+        androidUrl: { type: 'string', nullable: true, description: 'Nulo = final reservado, sem APK no momento.' },
+        tenantSlug: { type: 'string' },
+      },
     },
   })
-  async resolver(@Param('slug') slug: string): Promise<{ androidUrl: string }> {
+  async resolver(
+    @Param('slug') slug: string,
+  ): Promise<{ androidUrl: string | null; tenantSlug: string }> {
     // Slug fora do formato nem chega ao banco; 404 igual ao inexistente.
     const destino = slugDoLinkValido(slug) ? await this.instalador.destinoDoLink(slug) : null;
     if (!destino) throw new NotFoundException({ code: 'APP_LINK_NOT_FOUND' });
 
-    return { androidUrl: destino };
+    return destino;
   }
 }
