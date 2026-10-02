@@ -1,14 +1,29 @@
 import type { Metadata } from 'next';
 
-import { Breadcrumb, DataTable, EmptyState, PageHeader, ProblemDetail, SectionCard } from '@arenahub/ui';
+import {
+  Ausente,
+  Breadcrumb,
+  Cpf,
+  DataTable,
+  EmptyState,
+  PageHeader,
+  ProblemDetail,
+  SectionCard,
+  Telefone,
+  TenantDateTime,
+} from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
 import { AlterarPerfil } from '../../../../src/components/alterar-perfil';
 import { diaDaSemana, horaDoMinuto } from '../../../../src/students/formatar';
 import { ROTULO_DE_PERFIL } from '../../../../src/team/formatar';
 import { alterarPerfilDeTime } from '../../../actions/team';
+import { EditarCadastro } from '../../students/[id]/editar-cadastro';
 import { AlterarVinculo } from './alterar-vinculo';
 import estilos from './ficha.module.css';
+
+/** Fuso FIXO, o mesmo da ficha do aluno -- data de nascimento não tem hora. */
+const FUSO_PROVISORIO = 'America/Sao_Paulo';
 
 export const metadata: Metadata = {
   title: 'Ficha do time — ArenaHub',
@@ -24,6 +39,35 @@ interface MembroDeTime {
   gymUnitId: string;
   employmentType: string | null;
   employmentStartedAt: string | null;
+  version: number;
+}
+
+interface CadastroDoMembro {
+  id: string;
+  fullName: string;
+  birthDate: string;
+  cpf: string | null;
+  status: string;
+  statusReason: string | null;
+  statusReasonNote: string | null;
+  rg: string | null;
+  registeredSex: string | null;
+  contacts: {
+    type: string;
+    value: string;
+    isPrimary: boolean;
+    label: string | null;
+    relationship: string | null;
+  }[];
+  address: {
+    postalCode: string;
+    street: string;
+    number: string | null;
+    complement: string | null;
+    district: string | null;
+    city: string;
+    state: string;
+  } | null;
   version: number;
 }
 
@@ -56,9 +100,12 @@ export default async function PaginaDaFichaDeTime({
   const { id } = await params;
 
   // Em paralelo: as duas chamadas não dependem uma da outra.
-  const [respostaDoMembro, respostaDaAgenda] = await Promise.all([
+  const [respostaDoMembro, respostaDaAgenda, respostaDoCadastro] = await Promise.all([
     chamarApi<MembroDeTime>(`/api/v1/team/${id}`),
     chamarApi<OcorrenciaDeAgenda[]>(`/api/v1/team/${id}/agenda`),
+    // O membro do time É um `Student` (ADR-061): o cadastro completo — CPF,
+    // nascimento, contato — vem da mesma rota que a ficha do aluno usa.
+    chamarApi<CadastroDoMembro>(`/api/v1/students/${id}`),
   ]);
 
   if (!respostaDoMembro.ok || !respostaDoMembro.dados) {
@@ -91,6 +138,14 @@ export default async function PaginaDaFichaDeTime({
   }
 
   const membro = respostaDoMembro.dados;
+  const cadastro = respostaDoCadastro.ok ? respostaDoCadastro.dados : undefined;
+  const contatos = cadastro?.contacts ?? [];
+  const telefonePrincipal =
+    contatos.find((contato) => contato.type === 'PHONE' && contato.isPrimary)?.value ??
+    contatos.find((contato) => contato.type === 'PHONE')?.value ??
+    contatos.find((contato) => contato.type === 'WHATSAPP')?.value ??
+    null;
+  const email = contatos.find((contato) => contato.type === 'EMAIL')?.value ?? null;
 
   // A agenda é acessório: falhar não impede ver quem é o membro nem editar o
   // vínculo. O card avisa a própria limitação, como `/students/[id]` já faz
@@ -106,14 +161,72 @@ export default async function PaginaDaFichaDeTime({
         breadcrumb={<Breadcrumb trilha={[{ rotulo: 'Time', href: '/team' }, { rotulo: membro.fullName }]} />}
       />
 
-      <SectionCard title="Dados básicos" testId="dados-do-membro">
+      <SectionCard
+        title="Dados básicos"
+        testId="dados-do-membro"
+        actions={
+          cadastro ? (
+            <EditarCadastro
+              studentId={cadastro.id}
+              nomeDoAluno={cadastro.fullName}
+              status={cadastro.status}
+              statusReason={cadastro.statusReason}
+              statusReasonNote={cadastro.statusReasonNote}
+              version={cadastro.version}
+              fullName={cadastro.fullName}
+              birthDate={cadastro.birthDate}
+              cpf={cadastro.cpf}
+              rg={cadastro.rg}
+              registeredSex={cadastro.registeredSex}
+              contacts={contatos}
+              address={cadastro.address}
+            />
+          ) : null
+        }
+      >
         <dl className={estilos['dados']}>
           <dt>Matrícula</dt>
           <dd data-testid="matricula">{membro.membershipNumber}</dd>
 
           <dt>Perfil</dt>
           <dd data-testid="perfil">{ROTULO_DE_PERFIL[membro.profile] ?? membro.profile}</dd>
+
+          {cadastro ? (
+            <>
+              <dt>Nascimento</dt>
+              <dd>
+                <TenantDateTime iso={cadastro.birthDate} timeZone={FUSO_PROVISORIO} format="date" />
+              </dd>
+
+              <dt>CPF</dt>
+              <dd>{cadastro.cpf ? <Cpf value={cadastro.cpf} /> : 'não informado'}</dd>
+
+              <dt>Telefone</dt>
+              <dd data-testid="telefone-do-membro">
+                <Telefone numero={telefonePrincipal} testId="telefone-principal" />
+              </dd>
+
+              <dt>E-mail</dt>
+              <dd data-testid="email-do-membro">{email ? email : <Ausente />}</dd>
+            </>
+          ) : null}
         </dl>
+
+        {/* Sem a leitura do cadastro a ficha não esconde a falta: diz que ela existe. */}
+        {cadastro ? null : (
+          <ProblemDetail
+            testId="cadastro-indisponivel"
+            problem={{
+              ...(respostaDoCadastro.erro ?? {
+                type: 'about:blank',
+                status: 0,
+                code: 'erro',
+                correlationId: '',
+              }),
+              title: `Não foi possível carregar o cadastro completo deste membro (${respostaDoCadastro.erro?.code ?? 'erro'}). Nascimento, CPF e contato não aparecem, e a edição fica indisponível.`,
+            }}
+          />
+        )}
       </SectionCard>
 
       <SectionCard
