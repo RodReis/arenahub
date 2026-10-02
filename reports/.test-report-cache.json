@@ -9,13 +9,13 @@
     "testes": 1371,
     "pass": 1371,
     "falha": 0,
-    "coberturaPct": 80.96
+    "coberturaPct": 80.99
   },
   "apps/admin-web#test": {
-    "testes": 797,
-    "pass": 797,
+    "testes": 803,
+    "pass": 803,
     "falha": 0,
-    "coberturaPct": 73.87
+    "coberturaPct": 74.3
   },
   "packages/ui#test": {
     "testes": 265,
