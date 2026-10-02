@@ -88,6 +88,14 @@ export const esquemaConfig = z.object({
    * janela deixa o aluno travado na frente da catraca.
    */
   CATRACA_TEMPO_LIBERADA_S: z.coerce.number().int().min(1).max(50).default(10),
+
+  /**
+   * Serial da catraca como esta cadastrado no painel (o display dela mostra
+   * em "Serial") -- #522. Com ele, a catraca entra no heartbeat enquanto
+   * responde ao ping, e o alerta DEVICE_OFFLINE dela passa a ser verdadeiro.
+   * Sem ele, a catraca fica fora do heartbeat, como antes.
+   */
+  CATRACA_SERIAL: z.string().min(1).max(64).optional(),
 });
 
 export type Config = z.infer<typeof esquemaConfig>;

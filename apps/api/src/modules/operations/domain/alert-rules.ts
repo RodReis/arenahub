@@ -346,7 +346,11 @@ export function avaliarDispositivo(
         ? 'Esta catraca nao esta liberando acesso.'
         : 'Este leitor nao esta reconhecendo alunos.',
       acaoRecomendada: ehCatraca
-        ? 'Verifique energia e cabo de rede da catraca. Libere pela tela de liberacao manual.'
+        ? // #522: a causa vista em campo (Arena Positiva, 02/10/2026) entra na
+          // acao -- desligada da tomada, a catraca volta de fabrica.
+          'Verifique energia e cabo de rede da catraca. Libere pela tela de liberacao manual. ' +
+          'Se ela voltou de um desligamento com a entrada livre, reconfigure pela pagina da ' +
+          'catraca (runbook de operacao do Edge, secao 8).'
         : 'Verifique energia e cabo de rede do leitor. Use o caminho alternativo de acesso.',
       evidencia: {
         serial: estado.serial,

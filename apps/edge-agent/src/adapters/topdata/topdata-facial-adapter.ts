@@ -80,6 +80,9 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
   /** Numero de serie do equipamento conectado. Vem do `reg`. */
   private serieDoEquipamento: string | null = null;
 
+  /** Modelo informado no `reg` -- vai no heartbeat (#522). */
+  private modeloDoEquipamento: string | null = null;
+
   private readonly ouvintes: ((evento: EventoReconhecimento) => void)[] = [];
   private readonly ouvintesDeRegistro: ((serial: string) => void)[] = [];
   private readonly ouvintesDeCadastro: ((cadastro: {
@@ -284,6 +287,7 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
     if (!reg.success) return;
 
     this.serieDoEquipamento = reg.data.sn;
+    this.modeloDoEquipamento = reg.data.devinfo.modelname ?? null;
     this.pararVigia();
 
     this.logger.info(
@@ -607,6 +611,10 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
    */
   get serie(): string | null {
     return this.serieDoEquipamento;
+  }
+
+  get modelo(): string | null {
+    return this.modeloDoEquipamento;
   }
 }
 

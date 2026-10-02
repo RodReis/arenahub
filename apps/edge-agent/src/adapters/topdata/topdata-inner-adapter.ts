@@ -54,6 +54,13 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
   /** Laco de `PingOnline` que mantem a catraca online (#470). */
   private keepAlive: NodeJS.Timeout | null = null;
 
+  /** Resultado do ultimo ping do keep-alive -- vai no heartbeat (#522). */
+  private ultimoPingOk = false;
+
+  get respondendo(): boolean {
+    return this.ultimoPingOk;
+  }
+
   constructor(
     private readonly ponte: PonteEasyInner,
     private readonly logger: Logger,
@@ -124,6 +131,8 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
     this.keepAlive = setInterval(() => {
       void this.ping()
         .then((ok) => {
+          this.ultimoPingOk = ok;
+
           // So a TRANSICAO vira log: um aviso a cada 5 s encheria o log da
           // recepcao sem dizer nada novo.
           if (ok !== respondendo) {
@@ -133,6 +142,7 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
           }
         })
         .catch((erro: unknown) => {
+          this.ultimoPingOk = false;
           this.logger.warn(
             { erro: erro instanceof Error ? erro.message : erro },
             'ping da catraca falhou',

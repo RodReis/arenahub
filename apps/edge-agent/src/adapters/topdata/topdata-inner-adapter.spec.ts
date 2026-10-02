@@ -285,4 +285,23 @@ describe('TopdataInnerAdapter -- keep-alive (#470)', () => {
   it('o ritmo padrao fica abaixo dos 10 s em que a catraca cai para offline', () => {
     expect(INTERVALO_KEEP_ALIVE_MS).toBeLessThan(10_000);
   });
+
+  /** #522 -- o resultado do ping decide se a catraca entra no heartbeat. */
+  it('respondendo segue o ultimo ping: sobe com resposta, cai sem ela', async () => {
+    expect(adapter.respondendo).toBe(false);
+
+    adapter.manterOnline(5_000);
+    jest.advanceTimersByTime(5_000);
+    await jest.runOnlyPendingTimersAsync();
+    expect(adapter.respondendo).toBe(true);
+
+    const executar = ponte.executar.bind(ponte);
+    ponte.executar = (c) =>
+      c.cmd === 'ping' ? Promise.resolve({ tipo: 'retorno', retorno: 1 }) : executar(c);
+    jest.advanceTimersByTime(5_000);
+    await jest.runOnlyPendingTimersAsync();
+    expect(adapter.respondendo).toBe(false);
+
+    await adapter.encerrar();
+  });
 });

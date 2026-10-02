@@ -196,7 +196,7 @@ async function main(): Promise<void> {
       agentVersion: VERSAO_DO_AGENTE,
       localTimeMs: Date.now(),
       queueDepth: 0,
-      devices: montarDevicesDoHeartbeat(composto.dispositivos),
+      devices: montarDevicesDoHeartbeat(composto.dispositivos, config.CATRACA_SERIAL),
     }),
     aoFalhar: (erro) => {
       loggerDaTentativa(logger).warn({ erro }, 'heartbeat nao chegou na nuvem');
