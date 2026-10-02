@@ -96,6 +96,24 @@ orientação física da catraca"*. **Isso se verifica na bancada, não se adivin
 > ("Não passou"). O leitor facial ainda segura a mesma pessoa por ~2 min, então perder a janela
 > deixa o aluno travado. O agente espera o giro por `tempo + 3 s`, porque quem decide o fim é a
 > Origem 5 da catraca. **Mudar o `.cs` exige `pnpm --filter @arenahub/edge-agent bridge:build` no PC.**
+>
+> ⚠️ **Achado de 02/10/2026 (#507): isso NÃO chega ao equipamento.** `Configurar*` só monta a
+> configuração na memória da DLL; quem grava na catraca é `EnviarConfiguracoes`, que a ponte não
+> chama. O tempo que vale é o gravado **na catraca** (Configurações de Acesso Avançadas → Tempo de
+> acionamento 1, na página dela, com a catraca offline). E ela **perde a configuração** quando é
+> desligada da tomada — runbook de operação §8.
+
+## Página de configuração da catraca (web server do equipamento)
+
+Achado de 02/10/2026 (#507). `http://<ip da catraca>` — **só atende com a catraca offline**
+(online: "Web server desabilitado"; a API responde 401). Login em `POST /logme` com usuário e senha
+cifrados por XOR no cliente; depois `Authorization: Bearer base64(usuario:senha)` devolvidos;
+configuração de acesso em `GET`/`POST /configuracaoacesso`.
+
+Enums do firmware (lidos do código da página): **Acionamento** 0 desabilitado, 1 libera entrada e
+saída, 2 entrada, 3 saída, 4 sirene, 5 revista, **6 giro de saída liberado**, **7 giro de entrada
+liberado**, 8 os dois livres. **Leitor** 0 desabilitado, 1 só entrada, 2 só saída, 3 entrada e
+saída, **4 entrada e saída invertido**, 5 só entrada invertido, 6 só saída invertido.
 
 ⚠️ **Não usar `ConfigurarAcionamento1/2` para girar.** O manual é explícito: *"Estes comandos não
 devem ser utilizados em catracas se a intenção for acionar o mecanismo de giro. Para o giro de

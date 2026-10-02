@@ -77,7 +77,8 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
    | `EDGE_PAIRING_CODE` | o código gerado no painel, uso único |
    | `FACIAL_MODE` / `CATRACA_MODE` | `real` na academia; `simulador` é o padrão e não gira nada |
    | `CATRACA_INVERTIDA` | `true` se a catraca gira para o sentido errado. **Só se descobre testando** na bancada (`lab:run --invertido`). Arena Positiva: `true` (#407) |
-   | `CATRACA_TEMPO_LIBERADA_S` | segundos destravada depois de liberar, de 1 a 50. Padrão `10`; era 5 fixo e o aluno não alcançava girar (#497) |
+   | `CATRACA_TEMPO_LIBERADA_S` | segundos destravada depois de liberar, de 1 a 50. Padrão `10`. ⚠️ **Hoje não chega ao equipamento (#507)**: o tempo que vale é o **Tempo de acionamento 1** gravado na página da catraca |
+   | `CATRACA_SERIAL` | o serial que o display da catraca mostra (menu → Serial), **igual ao cadastrado no painel**. Sem ele, o alerta de catraca fora fica permanente e falso (#522). Arena Positiva: `247000797` |
    | `LOG_LEVEL` | `info` em produção. `debug` só para diagnóstico — lista cada mensagem do leitor |
 
    Rode o agente uma vez (`pnpm start`) — ele troca o código por um segredo próprio, guardado

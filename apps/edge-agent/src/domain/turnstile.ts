@@ -61,5 +61,11 @@ export interface TurnstileAdapter {
     sentido?: SentidoGiro,
   ): Promise<ResultadoLiberacao>;
 
+  /**
+   * A catraca respondeu ao ultimo `PingOnLine` do keep-alive -- #522. E o
+   * que decide se ela entra no heartbeat. Opcional: o simulador nao pinga.
+   */
+  readonly respondendo?: boolean;
+
   encerrar(): Promise<void>;
 }

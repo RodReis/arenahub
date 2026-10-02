@@ -90,6 +90,12 @@ export interface FacialDeviceAdapter {
   readonly serie: string | null;
 
   /**
+   * Modelo que o leitor informou no `reg` (`devinfo.modelname`) -- #522. E o
+   * que vai no heartbeat; `null` antes do registro.
+   */
+  readonly modelo?: string | null;
+
+  /**
    * Cadastra uma identidade. `M0-FR-002` exige UMA POR OPERACAO -- lote
    * esconde qual falhou, e o aceite mede identidade por identidade.
    */

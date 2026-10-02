@@ -18,8 +18,9 @@ instalação do zero: [`docs/operations/smart-access/install.md`](../operations/
 | nuvem | API `arenahubapi-production.up.railway.app`, painel `arenahub.up.railway.app` (deploy automático da `main`, ~5 min) |
 | leitor facial | Topdata AiFace `AYTI11108174`, disca para o PC na porta 7792 |
 | **TopFace** (software da Topdata) | serviço `TopFaceService` **parado e desativado** desde 01/10/2026 — ele escuta a mesma porta 7792 e roubava o leitor do agente a cada boot (#504). Ver §7 |
-| catraca | Topdata EasyInner, porta 3570, sentido invertido, destravada 10 s |
-| `.env` do PC (raiz do repo) | `CATRACA_INVERTIDA=true` · `CATRACA_TEMPO_LIBERADA_S=10` · `LOG_LEVEL=info` · `FACIAL_MODE=real` · `CATRACA_MODE=real` |
+| catraca | Topdata EasyInner (Inner Fit), **serial 247000797**, firmware 7.05.00, IP **192.168.2.187 por DHCP**, disca para o PC (192.168.2.106) na porta 3570. Configuração de acesso: Leitor 1 **entrada e saída invertido**, Acionamento 1 **giro de saída liberado**, tempo de acionamento **10** — gravada na página da catraca, **perdida se ela for desligada da tomada** (§8) |
+| rede | leitor e catraca apontam para o IP **192.168.2.106** do PC. Se o roteador der outro IP ao PC, os dois param de falar com o agente — **reservar 192.168.2.106 para o PC no roteador** (e 192.168.2.187 para a catraca) |
+| `.env` do PC (raiz do repo) | `CATRACA_INVERTIDA=true` · `CATRACA_TEMPO_LIBERADA_S=10` · `CATRACA_SERIAL=247000797` (#522) · `LOG_LEVEL=info` · `FACIAL_MODE=real` · `CATRACA_MODE=real` |
 
 **Quem decide o acesso:** a **nuvem** (regra de arquitetura nº 1 — entitlement, nunca a catraca).
 O agente pergunta, a nuvem responde `ALLOW`/`DENY`, o agente manda a catraca liberar e confirma o
@@ -64,7 +65,9 @@ Subir sem reinstalar: `schtasks /Run /TN "ArenaHub Edge"`.
 | reconhece o rosto, **não libera**, nada no painel, e o log **nunca mostrou `leitor facial conectou`** desde a partida (ou mostra `leitor facial nao esta conectado ao agente`) | **outro programa está com o leitor** — em 01/10/2026 foi o `TopFace.exe` (serviço `TopFaceService`), que sobe no boot antes do agente e escuta a mesma porta 7792 | `netstat -ano | findstr 7792` → PID da linha `ESTABLISHED` → `tasklist /svc /fi "pid eq NNNN"`. Se for o TopFace: §7. Se não for nada: reiniciar o leitor na tomada e conferir nele o IP do PC |
 | reconhece o rosto e mostra a foto, **não libera**, e **não há linha no log**, com o leitor conectado | o leitor **não mandou o registro**: intervalo de ~2 min entre registros da mesma pessoa (config do equipamento) | esperar o intervalo; **não é defeito do ArenaHub** |
 | `outcome: DENY` + `motivo: Sem plano vigente, ou aluno não identificado` | o aluno **não tem plano ativo**, ou o número do leitor **não está na coluna CATRACA** de nenhum aluno | painel → Eventos de acesso: **com nome** = sem plano (cobrar/atribuir); **"não identificado"** = cadastrar o número na coluna CATRACA do aluno e reiniciar o agente |
-| `ALLOW`, mas `PASSAGE_TIMED_OUT` / "Não passou" | o aluno não girou nos 10 s | aumentar `CATRACA_TEMPO_LIBERADA_S` (máx. 50) no `.env`, `bridge:build` **não** é necessário, reiniciar o agente |
+| `ALLOW`, mas `PASSAGE_TIMED_OUT` / "Não passou", com `duracaoPassagemMs` perto de 5000 | a catraca está com o **tempo de acionamento** gravado nela (5 s de fábrica). O `CATRACA_TEMPO_LIBERADA_S` do `.env` **não chega ao equipamento** (#507) | trocar **Tempo de acionamento 1** na página da catraca (§8) |
+| **entrada livre e saída travada**, ou rosto liberado (verdinho) mas a catraca não deixa passar | a catraca foi **desligada da tomada** e voltou com a configuração de fábrica | §8 |
+| painel → Operação: **"Esta catraca não está liberando acesso"** | a catraca parou de responder ao agente por mais de 90 s (#522). Antes deste ajuste o alerta era permanente e falso | energia e cabo da catraca; `ver-log-edge.cmd` (`catraca nao respondeu ao ping`); se ela voltou desconfigurada, §8 |
 | `liberacao recusada pelo equipamento — retorno 1 da DLL` logo após a partida | a catraca ainda estava conectando | raro; passar de novo após ~10 s |
 | `vinculo da base do leitor nao chegou na nuvem` | nuvem fora ou lenta | o agente tenta de novo na próxima conexão do leitor (intervalo mínimo de 60 s) |
 | `catraca nao respondeu ao ping` seguido de `voltou a responder` em ~5 s | a catraca redisca depois da partida | normal |
@@ -150,3 +153,35 @@ E para devolver o leitor ao ArenaHub depois da manutenção: `sc.exe stop TopFac
 
 > Use `sc.exe`, não `sc`: no PowerShell `sc` é outro comando (`Set-Content`). O espaço depois
 > de `start=` é obrigatório.
+
+## 8. Catraca desconfigurada depois de desligar da tomada
+
+**Sintoma:** depois de uma queda de energia (ou de desligarem a catraca), a **entrada fica livre e a
+saída travada**; o rosto é reconhecido e acende o verde, mas o giro certo não destrava.
+
+**Causa:** a configuração de acesso é gravada **na catraca**, e ela volta de fábrica quando perde
+energia. Quem regravava a cada conexão era o TopFace (desativado, §7); o ArenaHub ainda não grava
+(#507). Achado em 02/10/2026.
+
+**Como corrigir (~3 min, a recepção libera à mão enquanto isso):**
+
+1. `parar-edge.cmd` e esperar **20 s** — a catraca cai para o modo offline. Online, a página dela
+   responde "Web server desabilitado... modo online".
+2. Abrir `http://192.168.2.187` e entrar com o usuário e a senha da catraca (com o PI; **não
+   anotar aqui**).
+3. **Configurações de Acesso Avançadas** — deixar exatamente assim:
+
+   | campo | valor |
+   |---|---|
+   | Leitor 1 | **ENTRADA E SAÍDA INVERTIDO** |
+   | Leitor 2 | DESABILITADO |
+   | Acionamento 1 | **GIRO DE SAÍDA LIBERADO** |
+   | Tempo de acionamento 1 | **10** |
+   | Acionamento 2 | DESABILITADO |
+
+4. **Confirma**, e subir o agente: `schtasks /Run /TN "ArenaHub Edge"`.
+5. Testar: a **saída** gira livre; a **entrada** só gira depois do reconhecimento, com 10 s para
+   passar.
+
+**O que estava de fábrica** (lido em 02/10/2026, para voltar se precisar): Acionamento 1 = **GIRO DE
+ENTRADA LIBERADO**, tempo **5**, demais iguais.
