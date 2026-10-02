@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, TextareaField, useToastDeErro } from '@arenahub/ui';
+import { Button, Field, useToastDeErro } from '@arenahub/ui';
 
 import {
   removerInstaladorAndroid,
@@ -11,7 +11,6 @@ import {
   type EstadoDoInstalador,
 } from '../../actions/instalador-android';
 import estilos from './aplicativo.module.css';
-import { MENSAGEM_PADRAO } from './mensagem';
 
 const ESTADO_INICIAL: EstadoDoInstalador = {};
 
@@ -26,8 +25,11 @@ function BotaoSalvar({ alterado }: { readonly alterado: boolean }) {
 }
 
 /**
- * Atualiza o link do instalador. "Salvar" so acende quando algo mudou: sem
- * isso o botao convida a gravar de novo o que ja esta gravado.
+ * APK, versao e final do link. "Salvar" so acende quando algo mudou -- e o
+ * final SUGERIDO conta como mudanca enquanto nao foi reservado: sem isso o
+ * campo vinha preenchido, o botao apagado, e o link curto nunca existia.
+ *
+ * A mensagem para o aluno se edita no proprio cartao dela, ao lado da previa.
  *
  * "Remover" pede confirmacao no proprio lugar (duas etapas, com o verbo real):
  * apagar o link esconde o botao do totem, e um clique perdido tiraria o
@@ -36,15 +38,16 @@ function BotaoSalvar({ alterado }: { readonly alterado: boolean }) {
 export function FormularioDoInstalador({
   androidUrl,
   androidVersion,
-  shortSlug,
-  messageTemplate,
+  finalSugerido,
+  finalReservado,
   prefixoDoLink,
 }: {
   readonly androidUrl: string | null;
   readonly androidVersion: string | null;
-  /** O final reservado, ou a sugestao (identificador da academia). */
-  readonly shortSlug: string;
-  readonly messageTemplate: string | null;
+  /** O final reservado ou, sem ele, a sugestao (identificador da academia). */
+  readonly finalSugerido: string;
+  /** O que esta gravado de fato. Nulo = o link curto ainda nao existe. */
+  readonly finalReservado: string | null;
   /** `arenahub.up.railway.app/baixar/` -- so para mostrar como o link fica. */
   readonly prefixoDoLink: string;
 }) {
@@ -52,11 +55,7 @@ export function FormularioDoInstalador({
   const [estadoRemocao, acaoRemover] = useActionState(removerInstaladorAndroid, ESTADO_INICIAL);
   const [url, setUrl] = useState(androidUrl ?? '');
   const [versao, setVersao] = useState(androidVersion ?? '');
-  const [final, setFinal] = useState(shortSlug);
-  // O padrao aparece JA escrito: editar parte de um texto e mais facil que
-  // escrever do zero, e o marcador {link} fica a vista.
-  const textoInicial = messageTemplate ?? MENSAGEM_PADRAO;
-  const [texto, setTexto] = useState(textoInicial);
+  const [final, setFinal] = useState(finalSugerido);
   const [confirmando, setConfirmando] = useState(false);
 
   useToastDeErro(estado.erro, 'error', 'erro-do-instalador');
@@ -71,8 +70,8 @@ export function FormularioDoInstalador({
   const alterado =
     url.trim() !== (androidUrl ?? '') ||
     versao.trim() !== (androidVersion ?? '') ||
-    final.trim() !== shortSlug ||
-    texto !== textoInicial;
+    final.trim() !== (finalReservado ?? '');
+  const linkPendente = finalReservado === null && final.trim() !== '';
 
   return (
     <div className={estilos['formulario']} data-testid="formulario-do-instalador">
@@ -108,7 +107,11 @@ export function FormularioDoInstalador({
           id="instalador-final-do-link"
           name="shortSlug"
           label="Final do link"
-          hint={`O aluno recebe ${prefixoDoLink}${final.trim() || '…'} — não muda quando o APK for trocado.`}
+          hint={
+            linkPendente
+              ? `Salve para ativar ${prefixoDoLink}${final.trim()} — o link curto ainda não existe.`
+              : `O aluno recebe ${prefixoDoLink}${final.trim() || '…'} — não muda quando o APK for trocado.`
+          }
           placeholder="ex.: arena"
           value={final}
           onChange={(evento) => setFinal(evento.target.value.toLowerCase())}
@@ -117,18 +120,6 @@ export function FormularioDoInstalador({
           autoComplete="off"
           spellCheck={false}
           data-testid="campo-final-do-link"
-        />
-
-        <TextareaField
-          id="instalador-mensagem"
-          name="messageTemplate"
-          label="Mensagem para o aluno"
-          hint="{link} vira o link curto e {academia}, o nome da academia. Apagar tudo volta ao texto padrão."
-          value={texto}
-          onChange={(evento) => setTexto(evento.target.value)}
-          rows={8}
-          maxLength={1000}
-          data-testid="campo-mensagem-do-instalador"
         />
 
         <div className={estilos['acoes']}>

@@ -200,7 +200,10 @@ describe('AppDistributionController (#534)', () => {
       const resposta = await publico(`arena-${sufixo}`);
 
       expect(resposta.status).toBe(200);
-      expect(resposta.body).toEqual({ androidUrl: 'https://expo.dev/curto.apk' });
+      expect(resposta.body).toEqual({
+        androidUrl: 'https://expo.dev/curto.apk',
+        tenantSlug: `app-dist-a-${sufixo}`,
+      });
     });
 
     it('final inexistente ou invalido responde 404', async () => {
@@ -216,7 +219,7 @@ describe('AppDistributionController (#534)', () => {
 
       expect(resposta.status).toBe(409);
       expect((resposta.body as { code: string }).code).toBe('APP_LINK_SLUG_TAKEN');
-      expect((await publico(`arena-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/curto.apk' });
+      expect((await publico(`arena-${sufixo}`)).body).toMatchObject({ androidUrl: 'https://expo.dev/curto.apk' });
     });
 
     it.each(['ab', 'Arena', 'com espaco', '-arena'])('PUT recusa o final "%s" com 400', async (slug) => {
@@ -225,15 +228,18 @@ describe('AppDistributionController (#534)', () => {
       expect(resposta.status).toBe(400);
     });
 
-    it('remover o instalador mantem o final reservado; o link publico responde 404 ate um APK novo', async () => {
+    it('remover o instalador mantem o final reservado; o link publico responde sem APK ate um novo', async () => {
       await request(servidor()).delete('/api/v1/app-distribution').set('Cookie', gerente.cookie).expect(200);
 
-      expect((await publico(`arena-${sufixo}`)).status).toBe(404);
+      // 200 e nao 404: o final EXISTE (a pagina mostra a academia e "indisponivel").
+      const semApk = await publico(`arena-${sufixo}`);
+      expect(semApk.status).toBe(200);
+      expect(semApk.body).toEqual({ androidUrl: null, tenantSlug: `app-dist-a-${sufixo}` });
       expect((await obter(recepcao.cookie)).body).toMatchObject({ shortSlug: `arena-${sufixo}` });
 
       await salvar(gerente.cookie, { androidUrl: 'https://expo.dev/novo.apk' });
 
-      expect((await publico(`arena-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/novo.apk' });
+      expect((await publico(`arena-${sufixo}`)).body).toMatchObject({ androidUrl: 'https://expo.dev/novo.apk' });
     });
   });
   describe('final antigo vira apelido permanente (#538, revisao)', () => {
@@ -244,8 +250,8 @@ describe('AppDistributionController (#534)', () => {
       await salvar(gerente.cookie, { androidUrl: 'https://expo.dev/a1.apk', shortSlug: `novo-${sufixo}` });
 
       expect((await obter(recepcao.cookie)).body).toMatchObject({ shortSlug: `novo-${sufixo}` });
-      expect((await publico(`novo-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/a1.apk' });
-      expect((await publico(`velho-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/a1.apk' });
+      expect((await publico(`novo-${sufixo}`)).body).toMatchObject({ androidUrl: 'https://expo.dev/a1.apk' });
+      expect((await publico(`velho-${sufixo}`)).body).toMatchObject({ androidUrl: 'https://expo.dev/a1.apk' });
     });
 
     it('outra academia NAO pega o final antigo -- o QR impresso nao muda de dono', async () => {
@@ -255,7 +261,7 @@ describe('AppDistributionController (#534)', () => {
       });
 
       expect(resposta.status).toBe(409);
-      expect((await publico(`velho-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/a1.apk' });
+      expect((await publico(`velho-${sufixo}`)).body).toMatchObject({ androidUrl: 'https://expo.dev/a1.apk' });
     });
 
     it('voltar para um final antigo da propria academia funciona', async () => {

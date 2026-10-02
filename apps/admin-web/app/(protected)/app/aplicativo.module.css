@@ -6,22 +6,29 @@
  * Todo o resto fica no carbono do painel.
  */
 
-.layout {
+/*
+ * Faixas: cada uma fecha no mesmo alinhamento. Na primeira, os dois cartoes
+ * esticam para a mesma altura (`stretch`) -- o app e o cadastro dele lidos
+ * como uma unidade.
+ */
+.faixa {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
-.coluna {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
+.faixaUnica {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.faixaLarga {
+  margin-top: 16px;
 }
 
 @media (max-width: 960px) {
-  .layout {
+  .faixa {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -147,6 +154,18 @@
   color: var(--ah-text-secondary);
 }
 
+.chipEmBreve {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px dashed var(--ah-border-strong);
+  border-radius: var(--ah-radius-badge);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  color: var(--ah-text-secondary);
+}
+
 .chipPublicado {
   border-color: color-mix(in srgb, var(--ah-state-success) 40%, var(--ah-border-subtle));
   background-color: color-mix(in srgb, var(--ah-state-success) 10%, var(--ah-surface-raised));
@@ -249,6 +268,17 @@
 .link::selection {
   background-color: color-mix(in srgb, var(--ah-accent-500) 30%, transparent);
   color: var(--ah-text-strong);
+}
+
+.dicaPendente {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-warning) 32%, var(--ah-border-subtle));
+  border-radius: var(--ah-radius-control);
+  background-color: color-mix(in srgb, var(--ah-state-warning) 8%, var(--ah-surface-raised));
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: color-mix(in srgb, var(--ah-state-warning) 70%, var(--ah-text-strong));
 }
 
 .dicaDoLink {
@@ -459,6 +489,41 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* Previa e editor lado a lado, alinhados pelo topo: o que se escreve a
+   direita aparece a esquerda enquanto se digita. */
+.mensagemComEditor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .mensagemComEditor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.colunaDaPrevia {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.editorDaMensagem {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.acoesDoEditor {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* Balao de conversa: o canto de cima "aponta" para quem manda. */

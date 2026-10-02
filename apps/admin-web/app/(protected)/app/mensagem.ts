@@ -3,13 +3,17 @@
  *
  * Funcao pura: o painel monta a previa e o texto copiado com a MESMA funcao,
  * entao o que a recepcao ve no balao e exatamente o que o aluno recebe.
+ *
+ * O padrao NAO cita sistema: o mesmo link vai servir Android e iPhone (a
+ * pagina /baixar escolhe o botao certo), e a mensagem ja enviada continua
+ * valendo quando o iOS chegar.
  */
 
-export const MENSAGEM_PADRAO = `Olá! Baixe o app da {academia} no seu celular Android:
+export const MENSAGEM_PADRAO = `Olá! Baixe o app da {academia} no seu celular:
 {link}
 
-1. Toque no link e baixe o instalador.
-2. Se o celular pedir, permita instalar apps desta origem.
+1. Toque no link e baixe o app.
+2. No Android, se o celular pedir, permita instalar apps desta origem.
 3. Abra o app e toque em "Primeiro acesso" para entrar com o seu CPF.
 
 Qualquer dúvida, fale com a recepção.`;

@@ -1707,10 +1707,16 @@
                 "schema": {
                   "type": "object",
                   "required": [
-                    "androidUrl"
+                    "androidUrl",
+                    "tenantSlug"
                   ],
                   "properties": {
                     "androidUrl": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Nulo = final reservado, sem APK no momento."
+                    },
+                    "tenantSlug": {
                       "type": "string"
                     }
                   }
