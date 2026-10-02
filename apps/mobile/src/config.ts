@@ -15,18 +15,24 @@ import Constants from 'expo-constants';
 const PORTA_DA_API = 3344;
 
 /**
- * `process.env` chega como `any` aqui: o tsconfig do app NAO inclui
- * `@types/node` de proposito -- o app nao roda em Node, e incluir faria o
- * typecheck aceitar `fs` e `path`, que so quebram no aparelho.
+ * O tsconfig do app NAO inclui `@types/node` de proposito -- o app nao roda em
+ * Node, e incluir faria o typecheck aceitar `fs` e `path`, que so quebram no
+ * aparelho. Daqui sai so o tipo de `process.env`.
  *
- * O Metro injeta as `EXPO_PUBLIC_*` em tempo de bundle, entao a leitura
- * funciona; o que falta e so o tipo.
+ * LEIA `EXPO_PUBLIC_*` SEMPRE ESCRITO `process.env.EXPO_PUBLIC_NOME`. O Metro
+ * troca essa expressao literal pelo valor na hora do build; `env['...']` ou
+ * `globalThis.process.env` funcionam em dev (a variavel existe no processo) e
+ * somem no APK -- foi assim que o build 7 foi parar em `localhost`.
  */
-const ambiente = (globalThis as { process?: { env?: Record<string, string | undefined> } })
-  .process?.env;
+declare const process: {
+  env: {
+    EXPO_PUBLIC_API_URL?: string | undefined;
+    EXPO_PUBLIC_TENANT_SLUG?: string | undefined;
+  };
+};
 
 function derivarBaseUrl(): string {
-  const configurada = ambiente?.['EXPO_PUBLIC_API_URL'];
+  const configurada = process.env.EXPO_PUBLIC_API_URL;
   if (configurada) return configurada.replace(/\/$/, '');
 
   // `Constants` chega sem tipo util na resolucao do Metro; estreitar aqui
@@ -55,7 +61,7 @@ export const API_BASE_URL = derivarBaseUrl();
  * por academia e uma tela de selecao e decisao de produto -- e quando ela
  * vier, o unico ponto a mudar e este.
  */
-export const TENANT_SLUG = ambiente?.['EXPO_PUBLIC_TENANT_SLUG'] ?? 'arena-positiva';
+export const TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? 'arena-positiva';
 
 /**
  * A versao deste build, declarada em toda chamada -- F29, `M4-NFR-008`.
