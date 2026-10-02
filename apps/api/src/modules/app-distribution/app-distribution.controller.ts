@@ -43,7 +43,7 @@ const ESQUEMA_DA_RESPOSTA = {
     shortSlug: { type: 'string', nullable: true },
     messageTemplate: { type: 'string', nullable: true },
     academia: { type: 'string' },
-    slugSugerido: { type: 'string' },
+    slugSugerido: { type: 'string', nullable: true },
     androidUrl: { type: 'string', nullable: true },
     androidVersion: { type: 'string', nullable: true },
     updatedAt: { type: 'string', format: 'date-time', nullable: true },

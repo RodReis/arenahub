@@ -7,9 +7,10 @@ vi.mock('../../../lib/api/server-client', () => ({
   chamarApi: vi.fn(),
 }));
 
+const cabecalhos = { atual: new Headers({ host: 'arenahub.test', 'x-forwarded-proto': 'https' }) };
+
 vi.mock('next/headers', () => ({
-  headers: () =>
-    Promise.resolve(new Headers({ host: 'arenahub.test', 'x-forwarded-proto': 'https' })),
+  headers: () => Promise.resolve(cabecalhos.atual),
 }));
 
 vi.mock('../../actions/instalador-android', () => ({
@@ -140,6 +141,27 @@ describe('pagina do aplicativo (#534)', () => {
 
     expect(screen.getByTestId('ampliar-qr').tagName).toBe('BUTTON');
     expect(screen.getByTestId('dialogo-qr').querySelector('svg')).not.toBeNull();
+  });
+
+  it('atras de varios proxies usa o PRIMEIRO host da lista', async () => {
+    cabecalhos.atual = new Headers({
+      'x-forwarded-host': 'painel.arena.test, interno.railway',
+      'x-forwarded-proto': 'https, http',
+    });
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+    cabecalhos.atual = new Headers({ host: 'arenahub.test', 'x-forwarded-proto': 'https' });
+
+    expect(screen.getByTestId('link-do-instalador').textContent).toBe(
+      'https://painel.arena.test/baixar/arena',
+    );
+  });
+
+  it('sem sugestao valida, o final do link vem vazio e nao trava o salvamento do APK', async () => {
+    responder({ ...VAZIO, slugSugerido: null }, ['student.read', 'user.manage']);
+    await renderizar();
+
+    expect(screen.getByTestId<HTMLInputElement>('campo-final-do-link').value).toBe('');
   });
 
   it('o formulario sugere o identificador da academia como final do link', async () => {

@@ -39,7 +39,7 @@ interface Instalador {
   shortSlug: string | null;
   messageTemplate: string | null;
   academia: string;
-  slugSugerido: string;
+  slugSugerido: string | null;
 }
 
 /**
@@ -49,8 +49,12 @@ interface Instalador {
  */
 async function origemPublica(): Promise<string> {
   const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
-  const protocolo = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
+  // Atras de mais de um proxy o cabecalho vem como lista ("a.com, b.com"):
+  // vale o primeiro, o que o cliente pediu.
+  const primeiro = (valor: string | null): string | undefined => valor?.split(',')[0]?.trim() || undefined;
+  const host = primeiro(h.get('x-forwarded-host')) ?? primeiro(h.get('host')) ?? 'localhost:3000';
+  const protocolo =
+    primeiro(h.get('x-forwarded-proto')) ?? (host.startsWith('localhost') ? 'http' : 'https');
 
   return `${protocolo}://${host}`;
 }
@@ -245,7 +249,7 @@ export default async function PaginaDoAplicativo() {
             <FormularioDoInstalador
               androidUrl={androidUrl}
               androidVersion={androidVersion}
-              shortSlug={shortSlug ?? slugSugerido}
+              shortSlug={shortSlug ?? slugSugerido ?? ''}
               messageTemplate={messageTemplate}
               prefixoDoLink={prefixoDoLink}
             />

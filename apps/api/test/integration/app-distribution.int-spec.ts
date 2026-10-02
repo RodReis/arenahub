@@ -236,4 +236,42 @@ describe('AppDistributionController (#534)', () => {
       expect((await publico(`arena-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/novo.apk' });
     });
   });
+  describe('final antigo vira apelido permanente (#538, revisao)', () => {
+    const publico = (slug: string) => request(servidor()).get(`/api/v1/public/app-links/${slug}`);
+
+    it('trocar o final mantem o antigo levando ao APK da MESMA academia', async () => {
+      await salvar(gerente.cookie, { androidUrl: 'https://expo.dev/a1.apk', shortSlug: `velho-${sufixo}` });
+      await salvar(gerente.cookie, { androidUrl: 'https://expo.dev/a1.apk', shortSlug: `novo-${sufixo}` });
+
+      expect((await obter(recepcao.cookie)).body).toMatchObject({ shortSlug: `novo-${sufixo}` });
+      expect((await publico(`novo-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/a1.apk' });
+      expect((await publico(`velho-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/a1.apk' });
+    });
+
+    it('outra academia NAO pega o final antigo -- o QR impresso nao muda de dono', async () => {
+      const resposta = await salvar(outraAcademia.cookie, {
+        androidUrl: 'https://expo.dev/b1.apk',
+        shortSlug: `velho-${sufixo}`,
+      });
+
+      expect(resposta.status).toBe(409);
+      expect((await publico(`velho-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/a1.apk' });
+    });
+
+    it('voltar para um final antigo da propria academia funciona', async () => {
+      const resposta = await salvar(gerente.cookie, {
+        androidUrl: 'https://expo.dev/a1.apk',
+        shortSlug: `velho-${sufixo}`,
+      });
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body).toMatchObject({ shortSlug: `velho-${sufixo}` });
+    });
+
+    it('PUT sem shortSlug nao mexe no final', async () => {
+      await salvar(gerente.cookie, { androidUrl: 'https://expo.dev/a2.apk' });
+
+      expect((await obter(recepcao.cookie)).body).toMatchObject({ shortSlug: `velho-${sufixo}` });
+    });
+  });
 });

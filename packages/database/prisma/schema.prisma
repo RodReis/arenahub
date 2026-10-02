@@ -714,7 +714,7 @@ model Tenant {
   biometricAccessLogs BiometricAccessLog[]
   privacySettings     TenantPrivacySettings?
   appDistribution     TenantAppDistribution?
-  appShortLink        AppShortLink?
+  appShortLinks       AppShortLink[]
   edgeNodes           EdgeNode[]
   edgeCredentials     EdgeCredential[]
   edgePairingCodes    EdgePairingCode[]
@@ -2364,15 +2364,21 @@ model TenantAppDistribution {
 /// slug -> tenant (nada sensivel); o destino (APK) continua em
 /// `tenant_app_distribution`, sob RLS, lido ja dentro do contexto do tenant.
 ///
-/// Sobrevive a remocao do instalador: um QR impresso com este link volta a
-/// funcionar quando um APK novo for colado.
+/// Sobrevive a remocao do instalador e a troca do final: um QR impresso com
+/// este link volta a funcionar quando um APK novo for colado.
 model AppShortLink {
   slug      String   @id
-  tenantId  String   @unique @map("tenant_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  /// O final que o painel mostra. Os demais da academia sao APELIDOS: finais
+  /// antigos que continuam resolvendo e que nenhuma outra academia pode pegar
+  /// (um QR impresso nao muda de dono). Um so principal por academia, por
+  /// indice unico PARCIAL na migration -- o Prisma nao o declara.
+  isPrimary Boolean  @default(true) @map("is_primary")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId])
   @@map("app_short_links")
 }
 

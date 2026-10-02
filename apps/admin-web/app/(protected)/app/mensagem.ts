@@ -28,6 +28,15 @@ export function montarMensagem(texto: string | null, dados: DadosDaMensagem): st
   return base.includes('{link}') ? montada : `${montada}\n\n${dados.link}`;
 }
 
+/**
+ * O navegador manda o `<textarea>` com CRLF no envio do formulario. Sem
+ * normalizar, o texto padrao nunca bate com `MENSAGEM_PADRAO` e passa a ser
+ * gravado como "personalizado" -- e a academia perde as melhorias do padrao.
+ */
+export function normalizarQuebras(texto: string): string {
+  return texto.replace(/\r\n?/g, '\n');
+}
+
 /** Abre o WhatsApp com a mensagem pronta; o contato a recepcao escolhe la. */
 export function linkDoWhatsApp(mensagem: string): string {
   return `https://wa.me/?text=${encodeURIComponent(mensagem)}`;

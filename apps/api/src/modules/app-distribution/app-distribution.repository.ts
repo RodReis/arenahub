@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { comContexto } from '@arenahub/database';
+import { comContexto, type Prisma } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { slugDoLinkValido } from './domain/instalador-android.js';
 
 export interface InstaladorAndroid {
   androidUrl: string;
@@ -19,7 +20,8 @@ export interface InstaladorAndroid {
 /** O que a tela precisa mesmo sem instalador: nome, sugestao e link reservado. */
 export interface IdentidadeDoApp {
   academia: string;
-  slugSugerido: string;
+  /** Nulo quando o identificador da academia nao cabe na regra do final. */
+  slugSugerido: string | null;
   shortSlug: string | null;
 }
 
@@ -92,13 +94,19 @@ export class AppDistributionRepository {
           where: { id: contexto.tenantId },
           select: { displayName: true, slug: true },
         }),
-        tx.appShortLink.findUnique({
-          where: { tenantId: contexto.tenantId },
+        tx.appShortLink.findFirst({
+          where: { tenantId: contexto.tenantId, isPrimary: true },
           select: { slug: true },
         }),
       ]);
 
-      return { academia: tenant.displayName, slugSugerido: tenant.slug, shortSlug: link?.slug ?? null };
+      return {
+        academia: tenant.displayName,
+        // Sugestao que a propria API recusaria trava o salvamento do APK na
+        // tela -- melhor nao sugerir nada.
+        slugSugerido: slugDoLinkValido(tenant.slug) ? tenant.slug : null,
+        shortSlug: link?.slug ?? null,
+      };
     });
   }
 
@@ -138,17 +146,13 @@ export class AppDistributionRepository {
         });
 
         if (shortSlug !== undefined) {
-          await tx.appShortLink.upsert({
-            where: { tenantId: contexto.tenantId },
-            create: { tenantId: contexto.tenantId, slug: shortSlug },
-            update: { slug: shortSlug },
-            select: { slug: true },
-          });
+          await this.definirFinalPrincipal(tx, contexto.tenantId, shortSlug);
         }
       });
     } catch (erro) {
       // PK do `app_short_links` e o proprio slug: a unica unicidade que um
       // PUT pode violar aqui e o final ja usado por outra academia.
+      if (erro instanceof SlugDoLinkEmUsoError) throw erro;
       if (ehViolacaoDeUnicidade(erro)) throw new SlugDoLinkEmUsoError();
       throw erro;
     }
@@ -158,6 +162,41 @@ export class AppDistributionRepository {
     const salvo = await this.obter(contexto);
     if (!salvo) throw new Error('Instalador salvo e nao encontrado');
     return salvo;
+  }
+
+  /**
+   * Troca o final PRINCIPAL sem soltar o antigo: ele vira apelido da mesma
+   * academia e continua resolvendo -- o QR ja impresso nao muda de dono
+   * (achado da revisao). Final de OUTRA academia (principal ou apelido)
+   * recusa; o PK do slug fecha a corrida de duas academias criando o mesmo.
+   */
+  private async definirFinalPrincipal(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    slug: string,
+  ): Promise<void> {
+    const atual = await tx.appShortLink.findFirst({
+      where: { tenantId, isPrimary: true },
+      select: { slug: true },
+    });
+    if (atual?.slug === slug) return;
+
+    const existente = await tx.appShortLink.findUnique({
+      where: { slug },
+      select: { tenantId: true },
+    });
+    if (existente && existente.tenantId !== tenantId) throw new SlugDoLinkEmUsoError();
+
+    // Rebaixa ANTES de promover: o indice parcial so admite um principal.
+    if (atual) {
+      await tx.appShortLink.update({ where: { slug: atual.slug }, data: { isPrimary: false } });
+    }
+
+    if (existente) {
+      await tx.appShortLink.update({ where: { slug }, data: { isPrimary: true } });
+    } else {
+      await tx.appShortLink.create({ data: { slug, tenantId, isPrimary: true } });
+    }
   }
 
   /**

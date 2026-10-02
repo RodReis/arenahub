@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MENSAGEM_PADRAO, linkDoWhatsApp, montarMensagem } from './mensagem';
+import { MENSAGEM_PADRAO, linkDoWhatsApp, montarMensagem, normalizarQuebras } from './mensagem';
 
 const DADOS = { link: 'https://arenahub.up.railway.app/baixar/arena', academia: 'Arena Positiva' };
 
@@ -41,5 +41,15 @@ describe('linkDoWhatsApp', () => {
 
     expect(url.origin).toBe('https://wa.me');
     expect(url.searchParams.get('text')).toBe('Olá & bem-vindo\nlinha 2');
+  });
+});
+
+describe('normalizarQuebras (#538, revisao)', () => {
+  it('o \r\n que o navegador manda no textarea vira \n', () => {
+    expect(normalizarQuebras('a\r\nb\rc\nd')).toBe('a\nb\nc\nd');
+  });
+
+  it('o padrao enviado pelo formulario (com \r\n) e reconhecido como padrao', () => {
+    expect(normalizarQuebras(MENSAGEM_PADRAO.replaceAll('\n', '\r\n'))).toBe(MENSAGEM_PADRAO);
   });
 });

@@ -1515,7 +1515,8 @@
                       "type": "string"
                     },
                     "slugSugerido": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "androidUrl": {
                       "type": "string",
@@ -1582,7 +1583,8 @@
                       "type": "string"
                     },
                     "slugSugerido": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "androidUrl": {
                       "type": "string",
@@ -1649,7 +1651,8 @@
                       "type": "string"
                     },
                     "slugSugerido": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "androidUrl": {
                       "type": "string",
