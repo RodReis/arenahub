@@ -173,6 +173,14 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
   */
   { href: '/team', label: 'Time', exigePermissao: 'team.read' },
   /*
+    APLICATIVO -- issue #534, pedido do PI em 02/10/2026. Instalador Android
+    (QR e link) que a recepcao entrega ao aluno. Mesmo grupo de Usuarios e
+    Time: configuracao de uso raro. `student.read` porque a recepcao so
+    CONSULTA e entrega o QR; quem troca o link precisa de `user.manage`, que a
+    propria pagina cobra.
+  */
+  { href: '/app', label: 'Aplicativo', exigePermissao: 'student.read' },
+  /*
     TOTEM -- grupo criado por decisao do PI em 28/08/2026: *"vamos colocar o
     que for do totem no Menu Totem"*.
 

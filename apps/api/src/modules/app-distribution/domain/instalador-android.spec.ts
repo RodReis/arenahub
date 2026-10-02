@@ -1,3 +1,5 @@
+import { describe, expect, it } from '@jest/globals';
+
 import { LIMITE_DA_URL, urlDeInstaladorValida } from './instalador-android.js';
 
 describe('urlDeInstaladorValida', () => {
