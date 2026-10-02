@@ -10,11 +10,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Atrator } from '../components/atrator';
 import { IdentificacaoCpf } from '../components/identificacao-cpf';
 import { MinhaArea } from '../components/minha-area';
+import { TelaDoApp } from '../components/tela-do-app';
 import { BarraDeSessao, RodapeDeSessao } from '../components/rodape-de-sessao';
 import { Toast } from '../components/toast';
 import { contrasteEfetivo } from '../lib/aparencia';
 import { tocarAvisoDeRecusa } from '../lib/aviso-sonoro';
-import { abrirSessao, carregarConfig, heartbeat, type SessaoDoAluno } from '../lib/kiosk-client';
+import {
+  abrirSessao,
+  carregarConfig,
+  heartbeat,
+  type InstaladorDoApp,
+  type SessaoDoAluno,
+} from '../lib/kiosk-client';
 import { decidirReinicio } from '../lib/reinicio';
 import { limparEstadoDaSessao, useSessao } from '../lib/use-sessao';
 
@@ -35,11 +42,13 @@ const INTERVALO_DE_HEARTBEAT_MS = 30_000;
  */
 const FALHA_DE_IDENTIFICACAO = 'Não foi possível entrar. Procure a recepção.';
 
-type Etapa = 'atrator' | 'cpf';
+type Etapa = 'atrator' | 'cpf' | 'app';
 
 export default function Totem() {
   const [config, setConfig] = useState<KioskConfig>(CONFIG_PADRAO_DO_TOTEM);
   const [etapa, setEtapa] = useState<Etapa>('atrator');
+  // Instalador Android da academia (#534). `null` = sem link: o botao some.
+  const [appAndroid, setAppAndroid] = useState<InstaladorDoApp | null>(null);
   const [sessao, setSessao] = useState<SessaoDoAluno | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -83,9 +92,10 @@ export default function Totem() {
   // Marca, accent, duracao e modulos vem da config DESDE O PRIMEIRO COMMIT
   // (ADR-042, Decisao 0) -- mesmo que hoje so exista o padrao do seed.
   useEffect(() => {
-    void carregarConfig().then(({ version, config: carregada }) => {
+    void carregarConfig().then(({ version, config: carregada, appAndroid: instalador }) => {
       setConfig(carregada);
       setVersaoDoBoot(version);
+      setAppAndroid(instalador ?? null);
     });
   }, []);
 
@@ -116,6 +126,12 @@ export default function Totem() {
         // nao pode apagar o ultimo valor conhecido.
         if (resposta.indicadores !== undefined) {
           setIndicadores(resposta.indicadores);
+        }
+
+        // Mesma regra para o instalador (#534): trocar o APK nao muda a
+        // `configVersion`, entao o link chega por aqui e nao por reinicio.
+        if (resposta.appAndroid !== undefined) {
+          setAppAndroid(resposta.appAndroid);
         }
 
         const decisao = decidirReinicio({
@@ -249,7 +265,25 @@ export default function Totem() {
 
   return (
     <>
-      {etapa === 'atrator' ? (
+      {etapa === 'cpf' ? (
+        <IdentificacaoCpf
+          ocupado={ocupado}
+          aoConfirmar={(cpf) => {
+            void confirmar(cpf);
+          }}
+          aoVoltar={voltarAoInicio}
+        />
+      ) : etapa === 'app' && appAndroid ? (
+        // `&& appAndroid`: se a academia remover o link com esta tela aberta,
+        // o heartbeat zera o estado e a tela cai na espera -- nunca no CPF.
+        <TelaDoApp
+          url={appAndroid.url}
+          version={appAndroid.version}
+          aoVoltar={() => {
+            setEtapa('atrator');
+          }}
+        />
+      ) : (
         <Atrator
           config={config}
           indicadores={indicadores}
@@ -258,14 +292,13 @@ export default function Totem() {
           aoEntrar={() => {
             setEtapa('cpf');
           }}
-        />
-      ) : (
-        <IdentificacaoCpf
-          ocupado={ocupado}
-          aoConfirmar={(cpf) => {
-            void confirmar(cpf);
-          }}
-          aoVoltar={voltarAoInicio}
+          {...(appAndroid
+            ? {
+                aoBaixarApp: () => {
+                  setEtapa('app');
+                },
+              }
+            : {})}
         />
       )}
       <Toast

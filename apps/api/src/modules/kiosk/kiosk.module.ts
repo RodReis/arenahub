@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AppDistributionModule } from '../app-distribution/app-distribution.module.js';
 import { PersistenceModule } from '../../persistence/persistence.module.js';
 import { AccessQueryModule } from '../access-query/access-query.module.js';
 import { BillingModule } from '../billing/billing.module.js';
@@ -40,6 +41,7 @@ import { KioskController } from './kiosk.controller.js';
 @Module({
   imports: [
     PersistenceModule,
+    AppDistributionModule,
     KioskAuthModule,
     AccessQueryModule,
     BillingModule,

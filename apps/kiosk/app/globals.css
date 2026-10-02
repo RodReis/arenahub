@@ -1634,3 +1634,215 @@ button {
 .blocoDeDesafio > .metadado:last-child {
   margin: auto 0 0;
 }
+
+/* ---------------------------------------------------------------------------
+ * BAIXAR O APP -- issue #534. Barra inferior da tela atratora + tela do QR.
+ * Tokens `--tt-*` e `--ah-totem-*` apenas; o unico branco e o do QR
+ * (`.cartaoDoQr`, DS-TOTEM §5.6).
+ * ------------------------------------------------------------------------- */
+
+/* A dica e o botao dividem a mesma faixa: promessa a esquerda, saida a direita. */
+.barraDeEntrada {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tt-gap-grade);
+  padding: 16px 20px;
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  border-radius: var(--tt-raio-card);
+  background: var(--ah-totem-bg-surface);
+}
+
+.dicaNaBarra {
+  text-align: left;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.botaoBaixarApp {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--tt-alvo-secundario);
+  padding: 0 32px;
+  border: var(--tt-borda) solid var(--ah-totem-brand-500);
+  border-radius: var(--tt-raio-botao);
+  background: color-mix(in srgb, var(--ah-totem-brand-500) 18%, var(--ah-totem-bg-surface));
+  color: var(--ah-totem-text-primary);
+  font-size: var(--tt-corpo);
+  font-weight: 700;
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.botaoBaixarApp:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.telaDoApp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tt-gap-bloco);
+  width: 100%;
+  height: 100dvh;
+  padding: var(--tt-padding-interno);
+  overflow: hidden;
+  background: var(--ah-totem-bg-base);
+}
+
+.cabecalhoDoApp {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  align-self: flex-start;
+}
+
+.iconeDoApp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--tt-raio-icone);
+  background: linear-gradient(135deg, var(--ah-totem-brand-400), var(--ah-totem-brand-600));
+  color: var(--ah-totem-text-primary);
+}
+
+.tituloDoApp {
+  margin: 0;
+  font-size: var(--tt-titulo);
+  line-height: var(--tt-titulo-lh);
+  font-weight: 800;
+  color: var(--ah-totem-text-primary);
+}
+
+.destaqueDoApp {
+  color: var(--ah-totem-brand-400);
+}
+
+.subtituloDoApp {
+  margin: 0;
+  font-size: var(--tt-corpo);
+  line-height: var(--tt-corpo-lh);
+  color: var(--ah-totem-text-secondary);
+}
+
+.quadroDoQr {
+  box-shadow: 0 0 0 var(--tt-borda) var(--ah-totem-brand-500),
+    0 0 64px color-mix(in srgb, var(--ah-totem-brand-500) 45%, transparent);
+}
+
+.quadroDoQr img {
+  width: 420px;
+  height: 420px;
+}
+
+.pilulaDoApp {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 28px;
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  border-radius: var(--tt-raio-pill);
+  background: var(--ah-totem-bg-surface);
+  font-size: var(--tt-metadado);
+  font-weight: 700;
+  color: var(--ah-totem-text-primary);
+}
+
+.pontoDoApp {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ah-totem-state-success);
+}
+
+.passosDoApp {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tt-gap-grade);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.passoDoApp {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  border: var(--tt-borda) solid var(--ah-totem-border-default);
+  border-radius: var(--tt-raio-card);
+  background: var(--ah-totem-bg-surface);
+  font-size: var(--tt-metadado);
+  line-height: 1.3;
+  color: var(--ah-totem-text-secondary);
+}
+
+.passoDoApp strong {
+  font-size: var(--tt-card-titulo);
+  color: var(--ah-totem-text-primary);
+}
+
+.numeroDoPasso {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ah-totem-brand-500) 22%, var(--ah-totem-bg-surface));
+  color: var(--ah-totem-brand-400);
+  font-size: var(--tt-corpo);
+  font-weight: 800;
+}
+
+.rodapeDoApp {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  margin-top: auto;
+}
+
+.contagemDoApp {
+  margin: 0;
+  font-size: var(--tt-metadado);
+  color: var(--ah-totem-text-secondary);
+}
+
+.contagemDoApp strong {
+  color: var(--ah-totem-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.barraDaContagem {
+  height: 8px;
+  border-radius: var(--tt-raio-pill);
+  background: var(--ah-totem-border-hairline);
+  overflow: hidden;
+}
+
+.barraDaContagem > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ah-totem-brand-500);
+  transform-origin: left center;
+  transition: transform 1s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .botaoBaixarApp,
+  .barraDaContagem > span {
+    transition: none;
+  }
+
+  .botaoBaixarApp:active:not(:disabled) {
+    transform: none;
+  }
+}

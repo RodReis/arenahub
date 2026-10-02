@@ -27,9 +27,16 @@ export interface SessaoDoAluno {
   readonly expiraEm: string;
 }
 
+/** Instalador Android da academia (#534). Ausente/`null` = sem link: o botao some. */
+export interface InstaladorDoApp {
+  readonly url: string;
+  readonly version: string | null;
+}
+
 export interface ConfigDoTotem {
   readonly version: number;
   readonly config: KioskConfig;
+  readonly appAndroid?: InstaladorDoApp | null;
 }
 
 /**
@@ -64,6 +71,11 @@ export interface RespostaDeHeartbeat {
    * de "sem numero ainda".
    */
   readonly indicadores?: IndicadoresDaUnidade;
+  /**
+   * Instalador Android (#534). `undefined` = API antiga, que nao manda o campo
+   * (nao apaga o valor conhecido); `null` = a academia removeu o link.
+   */
+  readonly appAndroid?: InstaladorDoApp | null;
 }
 
 /**

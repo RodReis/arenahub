@@ -1,0 +1,80 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
+
+import { chamarApi } from '../../lib/api/server-client';
+import { MENSAGEM_DE_SESSAO } from '../../src/auth/mensagem-de-sessao';
+
+export interface EstadoDoInstalador {
+  erro?: string;
+  valores?: Record<string, string>;
+  sucesso?: 'salvo' | 'removido';
+}
+
+const esquema = z.object({
+  androidUrl: z.string().trim().min(1, 'Informe o link do instalador.'),
+  androidVersion: z.string().trim().max(40, 'A versão aceita até 40 caracteres.'),
+});
+
+const MENSAGEM: Record<string, string> = {
+  ...MENSAGEM_DE_SESSAO,
+  APP_DISTRIBUTION_URL_INVALID: 'O link precisa começar com https://.',
+  FORBIDDEN: 'Você não tem permissão para alterar o instalador.',
+};
+
+/** `FormData.get` devolve `File` ou `null` tambem: so texto interessa aqui. */
+function texto(formulario: FormData, campo: string): string {
+  const valor = formulario.get(campo);
+
+  return typeof valor === 'string' ? valor : '';
+}
+
+function mensagemDeErro(codigo: string, acao: string): string {
+  return MENSAGEM[codigo] ?? `Não foi possível ${acao} (${codigo || 'erro'}).`;
+}
+
+export async function salvarInstaladorAndroid(
+  _anterior: EstadoDoInstalador,
+  formulario: FormData,
+): Promise<EstadoDoInstalador> {
+  const valores = {
+    androidUrl: texto(formulario, 'androidUrl'),
+    androidVersion: texto(formulario, 'androidVersion'),
+  };
+  const validado = esquema.safeParse(valores);
+  if (!validado.success) {
+    return { erro: validado.error.issues[0]?.message ?? 'Confira os dados.', valores };
+  }
+
+  const resposta = await chamarApi('/api/v1/app-distribution', {
+    metodo: 'PUT',
+    corpo: {
+      androidUrl: validado.data.androidUrl,
+      androidVersion: validado.data.androidVersion || null,
+    },
+  });
+
+  if (!resposta.ok) {
+    return { erro: mensagemDeErro(resposta.erro?.code ?? '', 'salvar'), valores };
+  }
+
+  revalidatePath('/app');
+
+  return { sucesso: 'salvo' };
+}
+
+export async function removerInstaladorAndroid(
+  _anterior: EstadoDoInstalador,
+  _formulario: FormData,
+): Promise<EstadoDoInstalador> {
+  const resposta = await chamarApi('/api/v1/app-distribution', { metodo: 'DELETE' });
+
+  if (!resposta.ok) {
+    return { erro: mensagemDeErro(resposta.erro?.code ?? '', 'remover') };
+  }
+
+  revalidatePath('/app');
+
+  return { sucesso: 'removido' };
+}

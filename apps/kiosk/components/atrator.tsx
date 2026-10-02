@@ -8,7 +8,7 @@ import {
   FaixaDePatrocinio,
   haAlgoNaGradePublica,
 } from './blocos-publicos';
-import { IconeEntrar, IconeMarca } from './icones';
+import { IconeCelular, IconeEntrar, IconeMarca } from './icones';
 
 /**
  * Tela publica -- DS-TOTEM.md §4 v2.1 (grade densa, ADR-047 Emenda de
@@ -36,6 +36,7 @@ export function Atrator({
   aoEntrar,
   altoContraste,
   aoAlternarContraste,
+  aoBaixarApp,
 }: {
   readonly config: KioskConfig;
   /** Dois inteiros da unidade. `null` ate o primeiro heartbeat responder. */
@@ -43,6 +44,8 @@ export function Atrator({
   readonly aoEntrar: () => void;
   readonly altoContraste: boolean;
   readonly aoAlternarContraste: () => void;
+  /** #534 -- presente so quando a academia configurou o instalador Android. */
+  readonly aoBaixarApp?: () => void;
 }) {
   const { marca } = config;
   const { kicker, headline } = partirSlogan(marca.slogan, marca.nomeDaAcademia);
@@ -232,10 +235,37 @@ export function Atrator({
         modulo esta LIGADO: prometer pagamento numa unidade que o desligou
         manda o aluno procurar o que nao existe (§11).
       */}
-      <p className="dicaDeEntrada" data-testid="dica-de-entrada">
-        Toque na tela para entrar na sua área
-        {config.modulos.pagamento ? ' — plano, avaliação e pagamentos' : ' — plano e avaliação'}
-      </p>
+      {aoBaixarApp ? (
+        /*
+          BARRA COM "BAIXAR O APP" (#534): a dica fica a esquerda e o botao a
+          direita, na mesma faixa -- a promessa do que ha do outro lado do toque
+          e a saida para quem ainda nao tem o app. `stopPropagation`: a tela
+          inteira e tocavel, e sem ele o clique abriria o CPF em vez do QR.
+        */
+        <div className="barraDeEntrada" data-testid="barra-de-entrada">
+          <p className="dicaDeEntrada dicaNaBarra" data-testid="dica-de-entrada">
+            Toque na tela para entrar na sua área
+            {config.modulos.pagamento ? ' — plano, avaliação e pagamentos' : ' — plano e avaliação'}
+          </p>
+          <button
+            type="button"
+            className="botaoBaixarApp"
+            data-testid="baixar-app"
+            onClick={(evento) => {
+              evento.stopPropagation();
+              aoBaixarApp();
+            }}
+          >
+            <IconeCelular tamanho={34} />
+            Baixar o app
+          </button>
+        </div>
+      ) : (
+        <p className="dicaDeEntrada" data-testid="dica-de-entrada">
+          Toque na tela para entrar na sua área
+          {config.modulos.pagamento ? ' — plano, avaliação e pagamentos' : ' — plano e avaliação'}
+        </p>
+      )}
 
       {/*
         A FAIXA FECHA A TELA, depois do CTA -- e a ordem do protótipo

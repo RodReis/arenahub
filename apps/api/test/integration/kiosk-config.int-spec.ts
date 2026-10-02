@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { assinar } from '@arenahub/api-contracts';
@@ -402,5 +402,69 @@ describe('F49 -- heartbeat e config do totem', () => {
 
     expect((respostaConfig.body as RespostaConfig).version).toBe(1);
     expect(JSON.stringify(respostaConfig.body)).not.toContain('CONFIG EXCLUSIVA DO TENANT B');
+  });
+  // #534 -- instalador Android da academia, anexado ao `kiosk/config`.
+  describe('appAndroid', () => {
+    const lerConfig = async (totem: Totem) =>
+      request(servidor())
+        .get('/api/v1/kiosk/config')
+        .set(assinarPedido(totem, '', '/api/v1/kiosk/config', 'GET'))
+        .expect(200);
+
+    type ComAppAndroid = { appAndroid: { url: string; version: string | null } | null };
+
+    afterEach(async () => {
+      await db.tenantAppDistribution.deleteMany({
+        where: { tenantId: { in: [totemA.tenantId, totemB.tenantId] } },
+      });
+    });
+
+    it('e null quando a academia nao configurou', async () => {
+      const resposta = await lerConfig(totemA);
+
+      expect((resposta.body as ComAppAndroid).appAndroid).toBeNull();
+    });
+
+    it('devolve o link da propria academia', async () => {
+      await db.tenantAppDistribution.create({
+        data: { tenantId: totemA.tenantId, androidUrl: 'https://expo.dev/a.apk', androidVersion: '0.1.0' },
+      });
+
+      const resposta = await lerConfig(totemA);
+
+      expect((resposta.body as ComAppAndroid).appAndroid).toEqual({
+        url: 'https://expo.dev/a.apk',
+        version: '0.1.0',
+      });
+    });
+
+    it('o heartbeat tambem leva o link: trocar o instalador chega ao totem sem recarregar', async () => {
+      const lerHeartbeat = async () =>
+        request(servidor())
+          .post('/api/v1/kiosk/heartbeat')
+          .set(assinarPedido(totemA, CORPO, '/api/v1/kiosk/heartbeat'))
+          .send(CORPO)
+          .expect(200);
+
+      expect((await lerHeartbeat()).body).toMatchObject({ appAndroid: null });
+
+      await db.tenantAppDistribution.create({
+        data: { tenantId: totemA.tenantId, androidUrl: 'https://expo.dev/novo.apk', androidVersion: '0.2.0' },
+      });
+
+      expect((await lerHeartbeat()).body).toMatchObject({
+        appAndroid: { url: 'https://expo.dev/novo.apk', version: '0.2.0' },
+      });
+    });
+
+    it('o link da academia B NAO aparece no totem da A', async () => {
+      await db.tenantAppDistribution.create({
+        data: { tenantId: totemB.tenantId, androidUrl: 'https://expo.dev/b.apk' },
+      });
+
+      const resposta = await lerConfig(totemA);
+
+      expect((resposta.body as ComAppAndroid).appAndroid).toBeNull();
+    });
   });
 });

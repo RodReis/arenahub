@@ -274,6 +274,8 @@ describe('contrato OpenAPI', () => {
         // #475 -- sugestao de proximo numero de catraca livre, so sugestao,
         // nao reserva (a confirmacao continua em PUT /students/{id}/credentials).
         '/api/v1/students/credentials/next-available',
+        // #534 -- instalador Android da academia (QR no painel e no totem).
+        '/api/v1/app-distribution',
       ]),
     );
   });

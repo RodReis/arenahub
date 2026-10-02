@@ -1480,6 +1480,155 @@
         ]
       }
     },
+    "/api/v1/app-distribution": {
+      "get": {
+        "operationId": "AppDistributionController_obter",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "androidUrl",
+                    "androidVersion",
+                    "updatedAt",
+                    "updatedByEmail",
+                    "updatedByRole"
+                  ],
+                  "properties": {
+                    "androidUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "androidVersion": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "updatedByEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "updatedByRole": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AppDistribution"
+        ]
+      },
+      "put": {
+        "operationId": "AppDistributionController_salvar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "androidUrl",
+                    "androidVersion",
+                    "updatedAt",
+                    "updatedByEmail",
+                    "updatedByRole"
+                  ],
+                  "properties": {
+                    "androidUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "androidVersion": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "updatedByEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "updatedByRole": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AppDistribution"
+        ]
+      },
+      "delete": {
+        "operationId": "AppDistributionController_remover",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "androidUrl",
+                    "androidVersion",
+                    "updatedAt",
+                    "updatedByEmail",
+                    "updatedByRole"
+                  ],
+                  "properties": {
+                    "androidUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "androidVersion": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "updatedByEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "updatedByRole": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AppDistribution"
+        ]
+      }
+    },
     "/api/v1/units/{unitId}/classes": {
       "get": {
         "operationId": "ClassController_listar",
@@ -5951,6 +6100,24 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "appAndroid": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "Instalador Android da academia (#534). Pega carona aqui para o totem acompanhar a troca do link sem recarregar.",
+                      "required": [
+                        "url",
+                        "version"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
+                    },
                     "indicadores": {
                       "type": "object",
                       "required": [
@@ -6044,6 +6211,23 @@
                         },
                         "modulos": {
                           "type": "object"
+                        }
+                      }
+                    },
+                    "appAndroid": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "url",
+                        "version"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     }
