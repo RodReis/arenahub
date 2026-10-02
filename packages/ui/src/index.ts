@@ -51,6 +51,7 @@ export { SelectField } from './components/SelectField.js';
 export { SensitiveAction } from './components/SensitiveAction.js';
 export { StateBadge } from './components/StateBadge.js';
 export { TextareaField } from './components/TextareaField.js';
+export { IconeWhatsApp } from './components/IconeWhatsApp.js';
 export { ToastProvider, useToast, type ToastKind } from './components/Toast.js';
 export { useToastDeErro } from './components/useToastDeErro.js';
 
@@ -105,6 +106,7 @@ export {
 
 export {
   ACCENT_SEED_DEFAULT,
+  BRAND,
   BREAKPOINT,
   CARBON,
   CONTRAST_REPORT,

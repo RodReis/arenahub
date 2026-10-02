@@ -1,133 +1,33 @@
 /*
- * Aplicativo (#534). Cor com significado, nunca enfeite:
+ * Aplicativo (#534, #538). Cor com significado, nunca enfeite:
  *   accent do tenant -> o palco do QR (o artefato que a recepcao mostra);
- *   success          -> "No totem" (o instalador esta publicado);
- *   info             -> o aviso de "apps desconhecidos".
+ *   verde do WhatsApp -> tudo que e ENVIAR (conversa e botao) -- vem do token
+ *     de marca em JS, como `--cor-whatsapp`, setado no proprio elemento;
+ *   success -> "No totem" e "Copiada!"; info -> a nota do Android.
  * Todo o resto fica no carbono do painel.
  */
 
-/*
- * Faixas: cada uma fecha no mesmo alinhamento. Na primeira, os dois cartoes
- * esticam para a mesma altura (`stretch`) -- o app e o cadastro dele lidos
- * como uma unidade.
- */
-.faixa {
+/* Dois cartoes, mesma altura, sem rolagem em 1440x900. */
+.painel {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   gap: 16px;
   align-items: stretch;
 }
 
-.faixaUnica {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.faixaLarga {
-  margin-top: 16px;
-}
-
-@media (max-width: 960px) {
-  .faixa {
+@media (max-width: 1100px) {
+  .painel {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------------------------------------------------------------- O app -- */
 
 .principal {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 28px;
-  align-items: center;
-}
-
-@media (max-width: 640px) {
-  .principal {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: center;
-  }
-}
-
-/*
- * O PALCO: superficie afundada, tingida de accent e com grade de pontos --
- * a textura de "instrumento" do painel, nao decoracao: delimita a area que a
- * camera do aluno vai ler e separa o QR do texto que o explica.
- */
-.palco {
-  padding: 20px;
-  border: 1px solid color-mix(in srgb, var(--ah-accent-500) 30%, var(--ah-border-subtle));
-  border-radius: var(--ah-radius-card);
-  background-color: color-mix(in srgb, var(--ah-accent-500) 6%, var(--ah-surface-sunken));
-  background-image: radial-gradient(
-    color-mix(in srgb, var(--ah-accent-500) 22%, transparent) 1px,
-    transparent 1.2px
-  );
-  background-size: 14px 14px;
-}
-
-/* O QR traz a propria margem branca (quiet zone) no SVG: legivel em qualquer
-   tema, sem cor literal aqui. Sombra com deslocamento: o cartao "assenta". */
-.qr {
-  position: relative;
-  width: 240px;
-  overflow: hidden;
-  border-radius: var(--ah-radius-control);
-  box-shadow:
-    0 1px 2px color-mix(in srgb, var(--ah-accent-900) 18%, transparent),
-    0 12px 28px -14px color-mix(in srgb, var(--ah-accent-700) 55%, transparent);
-  animation: imprimir 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.qr svg {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-/* A faixa de leitura que acompanha a impressao do QR novo -- passa uma vez. */
-.qr::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    transparent 44%,
-    color-mix(in srgb, var(--ah-accent-500) 45%, transparent) 50%,
-    transparent 56%
-  );
-  background-size: 100% 220%;
-  animation: varrer 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes imprimir {
-  from {
-    clip-path: inset(0 0 100% 0);
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
-
-@keyframes varrer {
-  from {
-    background-position: 0 100%;
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  to {
-    background-position: 0 0;
-    opacity: 0;
-  }
-}
-
-.informacao {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-width: 0;
-  width: 100%;
+  height: 100%;
 }
 
 .chips {
@@ -140,7 +40,8 @@
 }
 
 .chip,
-.chipPublicado {
+.chipPublicado,
+.chipEmBreve {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -154,22 +55,16 @@
   color: var(--ah-text-secondary);
 }
 
-.chipEmBreve {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border: 1px dashed var(--ah-border-strong);
-  border-radius: var(--ah-radius-badge);
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
-  font-weight: 600;
-  color: var(--ah-text-secondary);
-}
-
 .chipPublicado {
   border-color: color-mix(in srgb, var(--ah-state-success) 40%, var(--ah-border-subtle));
   background-color: color-mix(in srgb, var(--ah-state-success) 10%, var(--ah-surface-raised));
   color: color-mix(in srgb, var(--ah-state-success) 72%, var(--ah-text-strong));
+}
+
+.chipEmBreve {
+  border-style: dashed;
+  border-color: var(--ah-border-strong);
+  background-color: transparent;
 }
 
 .ponto {
@@ -179,6 +74,46 @@
   border-radius: 50%;
   background-color: var(--ah-state-success);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ah-state-success) 22%, transparent);
+}
+
+/* QR a esquerda, o que ele leva a direita. */
+.vitrine {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+  /* Ocupa a sobra do cartao e fica no meio dela. */
+  flex: 1 1 auto;
+  align-content: center;
+}
+
+@media (max-width: 640px) {
+  .vitrine {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+}
+
+/* O palco: tingido do accent, com grade de pontos -- delimita o que a camera
+   do aluno vai ler. */
+.palco {
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--ah-accent-500) 30%, var(--ah-border-subtle));
+  border-radius: var(--ah-radius-card);
+  background-color: color-mix(in srgb, var(--ah-accent-500) 6%, var(--ah-surface-sunken));
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--ah-accent-500) 22%, transparent) 1px,
+    transparent 1.2px
+  );
+  background-size: 14px 14px;
+}
+
+.informacao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 .versao {
@@ -196,7 +131,7 @@
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  margin: -6px 0 0;
+  margin: -4px 0 0;
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
@@ -213,7 +148,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--ah-border-subtle);
 }
 
@@ -240,7 +175,6 @@
     border-color 150ms ease-out;
 }
 
-/* "Copiado" confirma com a cor de sucesso, alem do texto e do icone. */
 .linhaDoLink > button[data-copiado='true'] {
   border-color: color-mix(in srgb, var(--ah-state-success) 45%, var(--ah-border-default));
   color: color-mix(in srgb, var(--ah-state-success) 72%, var(--ah-text-strong));
@@ -258,9 +192,8 @@
   font-size: var(--ah-type-mono-size);
   line-height: var(--ah-type-mono-lh);
   color: var(--ah-text-default);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Quebra, nunca corta: o FINAL personalizado e a parte que importa. */
+  overflow-wrap: anywhere;
   /* Um clique seleciona o link inteiro -- quem nao confia no botao copia na mao. */
   user-select: all;
 }
@@ -281,102 +214,39 @@
   color: color-mix(in srgb, var(--ah-state-warning) 70%, var(--ah-text-strong));
 }
 
-.dicaDoLink {
-  margin: 0;
+/* O aviso do Android em uma linha, dentro do cartao: era uma faixa inteira. */
+.notaAndroid {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  /* Rodape do cartao: alinha com os botoes do cartao vizinho. */
+  margin: auto 0 0;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-info) 26%, var(--ah-border-subtle));
+  border-radius: var(--ah-radius-control);
+  background-color: color-mix(in srgb, var(--ah-state-info) 6%, var(--ah-surface-raised));
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
 }
 
-.aviso {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 12px 16px;
-  border: 1px solid color-mix(in srgb, var(--ah-state-info) 30%, var(--ah-border-subtle));
-  border-radius: var(--ah-radius-card);
-  background-color: color-mix(in srgb, var(--ah-state-info) 6%, var(--ah-surface-raised));
-  font-size: var(--ah-type-body-size);
-  line-height: var(--ah-type-body-lh);
-  color: var(--ah-text-secondary);
-}
-
-.avisoTexto {
-  margin: 0;
-  max-width: 75ch;
-}
-
-.aviso strong {
-  color: var(--ah-text-strong);
-}
-
-.avisoIcone {
+.notaAndroid > svg {
   flex: none;
-  margin-top: 2px;
+  margin-top: 1px;
   color: var(--ah-state-info);
 }
 
-.formulario {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.notaAndroid strong {
+  color: var(--ah-text-strong);
 }
 
-.acoes {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  padding-top: 16px;
-  border-top: 1px solid var(--ah-border-subtle);
-}
+/* ---------------------------------------------------------- QR ampliavel -- */
 
-.acoes > button {
-  white-space: nowrap;
-}
-
-/* A pergunta ocupa a linha inteira; os botoes descem para a linha de baixo. */
-.confirmacao {
-  flex: 1 1 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--ah-type-caption-size);
-  color: var(--ah-text-secondary);
-}
-
-/* Movimento reduzido: o QR novo aparece sem varrer -- a troca continua
-   legivel pelo fade, so sem deslocamento. */
-@media (prefers-reduced-motion: reduce) {
-  .qr {
-    animation: aparecer 150ms ease-out both;
-  }
-
-  .qr::after {
-    animation: none;
-    opacity: 0;
-  }
-}
-
-@keyframes aparecer {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* ---------------------------------------------------------------------------
- * #538 -- QR ampliavel, link curto e mensagem para o aluno.
- * ------------------------------------------------------------------------- */
-
-/* O QR e um botao: cursor de lupa e a dica dizem que ele amplia. */
 .qrBotao {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 0;
   border: 0;
   background: none;
@@ -384,11 +254,44 @@
   border-radius: var(--ah-radius-control);
 }
 
-.qrBotao .qr {
+/* O QR traz a propria margem branca (quiet zone) no SVG: legivel em qualquer
+   tema, sem cor literal aqui. */
+.qr {
+  position: relative;
   display: block;
+  /* Cresce em tela larga, onde sobraria vazio; 196px cabe em 1440x900. */
+  width: clamp(196px, 14vw, 240px);
+  overflow: hidden;
+  border-radius: var(--ah-radius-control);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--ah-accent-900) 18%, transparent),
+    0 12px 28px -14px color-mix(in srgb, var(--ah-accent-700) 55%, transparent);
+  animation: imprimir 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
   transition:
     transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* A faixa de leitura que acompanha a impressao do QR novo -- passa uma vez. */
+.qr::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 44%,
+    color-mix(in srgb, var(--ah-accent-500) 45%, transparent) 50%,
+    transparent 56%
+  );
+  background-size: 100% 220%;
+  animation: varrer 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .qrBotao:hover .qr {
@@ -410,10 +313,8 @@
   color: color-mix(in srgb, var(--ah-accent-600) 80%, var(--ah-text-strong));
 }
 
-/*
- * O dialog ampliado. Centralizado EXPLICITAMENTE: o preflight do Tailwind zera
- * o `margin: auto` do <dialog> nativo e o modal escorrega para o canto.
- */
+/* Centralizado EXPLICITAMENTE: o preflight do Tailwind zera o `margin: auto`
+   do <dialog> nativo e o modal escorrega para o canto. */
 .dialogoQr {
   position: fixed;
   inset: 0;
@@ -435,17 +336,6 @@
 
 .dialogoQr[open] {
   animation: ampliar 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes ampliar {
-  from {
-    opacity: 0;
-    transform: scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 .conteudoDoDialogo {
@@ -485,60 +375,160 @@
   text-align: center;
 }
 
-.mensagem {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* -------------------------------------------------------- Enviar (abas) -- */
+
+.painelDeAbas [role='tabpanel'] {
+  padding-top: 14px;
 }
 
-/* Previa e editor lado a lado, alinhados pelo topo: o que se escreve a
-   direita aparece a esquerda enquanto se digita. */
-.mensagemComEditor {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-@media (max-width: 960px) {
-  .mensagemComEditor {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.colunaDaPrevia {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-
-.editorDaMensagem {
+.abaMensagem {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-width: 0;
 }
 
-.acoesDoEditor {
+/* A conversa do WhatsApp: o que o aluno vai ver, antes de mandar. */
+.conversa {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--cor-whatsapp) 28%, var(--ah-border-subtle));
+  border-radius: var(--ah-radius-card);
+}
+
+.topoDaConversa {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background-color: color-mix(in srgb, var(--cor-whatsapp) 62%, var(--ah-carbon-900));
+  color: var(--ah-carbon-50);
 }
 
-/* Balao de conversa: o canto de cima "aponta" para quem manda. */
+.avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: var(--ah-carbon-50);
+  color: color-mix(in srgb, var(--cor-whatsapp) 55%, var(--ah-carbon-900));
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.nomeNaConversa {
+  font-size: var(--ah-type-body-strong-size);
+  font-weight: 700;
+}
+
+/* O "papel de parede": pontos verdes sobre o afundado do painel. */
+.fundoDaConversa {
+  display: flex;
+  padding: 14px;
+  background-color: color-mix(in srgb, var(--cor-whatsapp) 7%, var(--ah-surface-sunken));
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--cor-whatsapp) 16%, transparent) 1px,
+    transparent 1.3px
+  );
+  background-size: 16px 16px;
+}
+
+/* Balao ENVIADO: alinhado a direita, cauda no canto de cima. */
 .balao {
-  max-width: 62ch;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--ah-state-success) 26%, var(--ah-border-subtle));
-  border-radius: 4px 16px 16px 16px;
-  background-color: color-mix(in srgb, var(--ah-state-success) 8%, var(--ah-surface-raised));
-  box-shadow: 0 6px 16px -12px color-mix(in srgb, var(--ah-state-success) 60%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 92%;
+  margin-left: auto;
+  padding: 6px;
+  border-radius: 12px 3px 12px 12px;
+  background-color: color-mix(in srgb, var(--cor-whatsapp) 20%, var(--ah-surface-raised));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ah-carbon-900) 18%, transparent);
+  transition: box-shadow 200ms ease-out;
+}
+
+/* "Copiada!" -- o balao acende no verde: e ESTA mensagem que foi copiada. */
+.balao[data-destaque='true'] {
+  box-shadow:
+    0 0 0 2px var(--cor-whatsapp),
+    0 8px 20px -10px color-mix(in srgb, var(--cor-whatsapp) 80%, transparent);
+}
+
+.cartaoDoLink {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 8px;
+  background-color: color-mix(in srgb, var(--ah-carbon-900) 6%, var(--ah-surface-raised));
+  color: var(--ah-text-default);
+  text-decoration: none;
+}
+
+.cartaoDoLink:hover {
+  background-color: color-mix(in srgb, var(--ah-carbon-900) 10%, var(--ah-surface-raised));
+}
+
+.iconeDoCartao {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-image: linear-gradient(135deg, var(--ah-accent-400), var(--ah-accent-700));
+  color: var(--ah-carbon-50);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.textoDoCartao {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.textoDoCartao > strong {
+  color: var(--ah-text-strong);
+}
+
+.textoDoCartao > span {
+  color: var(--ah-text-secondary);
+}
+
+.textoDoBalao {
+  margin: 0 4px;
   font-size: var(--ah-type-body-size);
   line-height: var(--ah-type-body-lh);
   color: var(--ah-text-default);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* O link como o WhatsApp o mostra: azul, sublinhado e clicavel. */
+.linkNoBalao {
+  color: var(--ah-state-info);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.horaDoBalao {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 4px 2px;
+  font-size: 11px;
+  color: var(--ah-text-secondary);
+}
+
+/* Os dois tiques azuis: entregue e lida. */
+.horaDoBalao > svg {
+  color: var(--ah-state-info);
 }
 
 .acoesDaMensagem {
@@ -556,14 +546,170 @@
   color: color-mix(in srgb, var(--ah-state-success) 72%, var(--ah-text-strong));
 }
 
+.acoesDaMensagem > button[data-copiado='true'] svg {
+  animation: estalo 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* O botao de ENVIAR no verde do WhatsApp. Texto ESCURO: branco sobre esse
+   verde nao passa no contraste minimo. */
+.botaoWhatsApp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--ah-radius-control);
+  background-color: var(--cor-whatsapp);
+  color: var(--ah-carbon-900);
+  font-size: var(--ah-type-body-size);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--cor-whatsapp) 90%, transparent);
+  transition:
+    transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.botaoWhatsApp:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--cor-whatsapp) 95%, transparent);
+}
+
+.botaoWhatsApp:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.botaoWhatsApp:focus-visible {
+  outline: 2px solid var(--ah-carbon-900);
+  outline-offset: 2px;
+}
+
+.editorDaMensagem {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.acoesDoEditor {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ------------------------------------------------- Formulario instalador -- */
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.acoes > button {
+  white-space: nowrap;
+}
+
+/* A pergunta ocupa a linha inteira; os botoes descem para a linha de baixo. */
+.confirmacao {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--ah-type-caption-size);
+  color: var(--ah-text-secondary);
+}
+
+/* ------------------------------------------------------------- Movimento -- */
+
+@keyframes imprimir {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes varrer {
+  from {
+    background-position: 0 100%;
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    background-position: 0 0;
+    opacity: 0;
+  }
+}
+
+@keyframes ampliar {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes estalo {
+  from {
+    transform: scale(0.6);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Movimento reduzido: tudo aparece sem deslocar; o feedback de estado
+   (cor, borda) continua. */
 @media (prefers-reduced-motion: reduce) {
-  .qrBotao .qr,
-  .qrBotao:hover .qr {
+  .qr {
+    animation: aparecer 150ms ease-out both;
     transition: none;
+  }
+
+  .qr::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .qrBotao:hover .qr,
+  .botaoWhatsApp:hover,
+  .botaoWhatsApp:active {
     transform: none;
+  }
+
+  .botaoWhatsApp {
+    transition: none;
   }
 
   .dialogoQr[open] {
     animation: aparecer 150ms ease-out both;
+  }
+
+  .acoesDaMensagem > button[data-copiado='true'] svg {
+    animation: none;
   }
 }

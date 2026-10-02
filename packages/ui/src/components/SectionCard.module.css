@@ -94,7 +94,10 @@
   gap: 8px;
 }
 
+/* Cresce quando o card e esticado (grade com cards lado a lado de mesma
+   altura): o conteudo pode empurrar um rodape para baixo. */
 .corpo {
+  flex: 1 1 auto;
   padding: 16px;
 }
 

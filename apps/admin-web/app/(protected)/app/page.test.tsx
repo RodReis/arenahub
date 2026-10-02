@@ -196,4 +196,30 @@ describe('pagina do aplicativo (#534)', () => {
     expect(screen.queryByTestId('campo-mensagem-do-instalador')).toBeNull();
     expect(screen.getByTestId('previa-da-mensagem')).toBeTruthy();
   });
+
+  it('envio em abas: quem administra ve tres, a recepcao nenhuma -- a pagina cabe sem rolagem', async () => {
+    responder(CONFIGURADO, ['student.read', 'user.manage']);
+    const { unmount } = await renderizar();
+    expect(screen.getAllByRole('tab').map((aba) => aba.textContent)).toEqual([
+      'Mensagem ao aluno',
+      'Editar texto',
+      'Instalador',
+    ]);
+    unmount();
+
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+  });
+
+  it('o link no balao e clicavel e abre em aba nova', async () => {
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+
+    const links = screen.getByTestId('previa-da-mensagem').querySelectorAll('a');
+    const doTexto = [...links].find((a) => a.textContent === 'https://arenahub.test/baixar/arena');
+
+    expect(doTexto?.getAttribute('href')).toBe('https://arenahub.test/baixar/arena');
+    expect(doTexto?.getAttribute('target')).toBe('_blank');
+  });
 });

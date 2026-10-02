@@ -17,7 +17,7 @@ import { rotuloDePerfil } from '../../../src/iam/rotulos';
 import estilos from './aplicativo.module.css';
 import { CopiarLink } from './copiar-link';
 import { FormularioDoInstalador } from './formulario-do-instalador';
-import { MensagemParaAluno } from './mensagem-para-aluno';
+import { PainelDeEnvio } from './painel-de-envio';
 import { QrAmpliavel } from './qr-ampliavel';
 
 export const metadata: Metadata = {
@@ -108,85 +108,104 @@ export default async function PaginaDoAplicativo() {
   const qrSvg = linkDoAluno
     ? await QRCode.toString(linkDoAluno, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' })
     : null;
+  const configuracao = podeSalvar ? (
+    <FormularioDoInstalador
+      androidUrl={androidUrl}
+      androidVersion={androidVersion}
+      finalSugerido={shortSlug ?? slugSugerido ?? ''}
+      finalReservado={shortSlug}
+      prefixoDoLink={prefixoDoLink}
+    />
+  ) : null;
+
   return (
     <section aria-labelledby="titulo-aplicativo">
       {cabecalho}
 
       {/*
-        TRES FAIXAS, cada uma fechando no mesmo alinhamento: (1) o app e o
-        cadastro dele lado a lado, com a mesma altura; (2) a mensagem em
-        largura total, previa e editor no mesmo cartao; (3) o aviso.
+        DOIS CARTOES, MESMA ALTURA, SEM ROLAGEM em 1440x900: a esquerda o que
+        se MOSTRA (QR e link), a direita o que se ENVIA e se configura, em abas.
+        A recepcao, que so mostra e envia, nao ve aba de configuracao.
       */}
-      <div className={podeSalvar ? estilos['faixa'] : estilos['faixaUnica']}>
+      <div className={estilos['painel']}>
         <SectionCard
           title="Aplicativo do aluno"
           icon="qr-code"
-          summary="Mostre o QR no balcão ou envie o link."
+          summary="Mostre o QR no balcão ou copie o link."
         >
           {androidUrl && qrSvg && linkDoAluno ? (
             <div className={estilos['principal']}>
-              {/*
-                O PALCO DO QR: o unico lugar da tela com accent do tenant.
-                E o artefato que a recepcao vira para o aluno -- o resto do
-                cartao so o explica. `key` pelo link: trocar o link remonta o
-                palco e o QR novo "imprime" de cima para baixo.
-              */}
-              <div className={estilos['palco']} key={linkDoAluno}>
-                <QrAmpliavel svg={qrSvg} link={linkDoAluno} />
-              </div>
+              <ul className={estilos['chips']} aria-label="Plataformas e situação">
+                <li className={estilos['chipPublicado']} data-testid="instalador-publicado">
+                  <span className={estilos['ponto']} aria-hidden="true" />
+                  No totem
+                </li>
+                <li className={estilos['chip']}>Android</li>
+                {/* O mesmo link vai servir o iPhone: a pagina /baixar ja
+                    reserva o lugar dele. */}
+                <li className={estilos['chipEmBreve']} data-testid="ios-em-breve">
+                  iPhone · em breve
+                </li>
+              </ul>
 
-              <div className={estilos['informacao']}>
-                <ul className={estilos['chips']} aria-label="Plataformas e situação">
-                  <li className={estilos['chipPublicado']} data-testid="instalador-publicado">
-                    <span className={estilos['ponto']} aria-hidden="true" />
-                    No totem
-                  </li>
-                  <li className={estilos['chip']}>Android</li>
-                  {/* O mesmo link vai servir o iPhone: a pagina /baixar ja
-                      reserva o lugar dele. */}
-                  <li className={estilos['chipEmBreve']} data-testid="ios-em-breve">
-                    iPhone · em breve
-                  </li>
-                </ul>
+              <div className={estilos['vitrine']}>
+                {/*
+                  O PALCO DO QR: o unico lugar da tela com accent do tenant --
+                  e o artefato que a recepcao vira para o aluno. `key` pelo
+                  link: trocar o link remonta o palco e o QR novo "imprime".
+                */}
+                <div className={estilos['palco']} key={linkDoAluno}>
+                  <QrAmpliavel svg={qrSvg} link={linkDoAluno} />
+                </div>
 
-                <p className={estilos['versao']} data-testid="versao-do-instalador">
-                  {androidVersion ? `Versão ${androidVersion}` : 'Versão não informada'}
-                </p>
-                {updatedAt ? (
-                  <p className={estilos['autoria']} data-testid="autoria-do-instalador">
-                    <Icon name="clock" />
-                    <span>
-                      Atualizado em{' '}
-                      <TenantDateTime iso={updatedAt} timeZone={FUSO_PROVISORIO} format="datetime" />
-                      {updatedByEmail
-                        ? ` por ${updatedByEmail}${updatedByRole ? ` (${rotuloDePerfil(updatedByRole)})` : ''}`
-                        : ''}
-                    </span>
+                <div className={estilos['informacao']}>
+                  <p className={estilos['versao']} data-testid="versao-do-instalador">
+                    {androidVersion ? `Versão ${androidVersion}` : 'Versão não informada'}
                   </p>
-                ) : null}
-
-                <div className={estilos['blocoDoLink']}>
-                  <span className={estilos['rotuloDoLink']} id="rotulo-do-link">
-                    {linkCurto ? 'Link para o aluno' : 'Link do APK'}
-                  </span>
-                  <div className={estilos['linhaDoLink']}>
-                    <p
-                      className={estilos['link']}
-                      data-testid="link-do-instalador"
-                      title={linkDoAluno}
-                      aria-labelledby="rotulo-do-link"
-                    >
-                      {linkDoAluno}
+                  {updatedAt ? (
+                    <p className={estilos['autoria']} data-testid="autoria-do-instalador">
+                      <Icon name="clock" />
+                      <span>
+                        Atualizado em{' '}
+                        <TenantDateTime iso={updatedAt} timeZone={FUSO_PROVISORIO} format="datetime" />
+                        {updatedByEmail
+                          ? ` por ${updatedByEmail}${updatedByRole ? ` (${rotuloDePerfil(updatedByRole)})` : ''}`
+                          : ''}
+                      </span>
                     </p>
-                    <CopiarLink url={linkDoAluno} />
+                  ) : null}
+
+                  <div className={estilos['blocoDoLink']}>
+                    <span className={estilos['rotuloDoLink']} id="rotulo-do-link">
+                      {linkCurto ? 'Link para o aluno' : 'Link do APK'}
+                    </span>
+                    <div className={estilos['linhaDoLink']}>
+                      <p
+                        className={estilos['link']}
+                        data-testid="link-do-instalador"
+                        title={linkDoAluno}
+                        aria-labelledby="rotulo-do-link"
+                      >
+                        {linkDoAluno}
+                      </p>
+                      <CopiarLink url={linkDoAluno} />
+                    </div>
+                    {linkCurto ? null : (
+                      <p className={estilos['dicaPendente']}>
+                        Ainda sem link curto: salve o final do link na aba “Instalador”.
+                      </p>
+                    )}
                   </div>
-                  <p className={linkCurto ? estilos['dicaDoLink'] : estilos['dicaPendente']}>
-                    {linkCurto
-                      ? 'Abre a página da academia com o botão de baixar — o QR e a mensagem não mudam quando o APK for trocado.'
-                      : 'Ainda sem link curto: salve o final do link para o QR e a mensagem usarem a página da academia.'}
-                  </p>
                 </div>
               </div>
+
+              <p className={estilos['notaAndroid']} role="note">
+                <Icon name="alert-circle" />
+                <span>
+                  No Android, na primeira instalação o celular pede para{' '}
+                  <strong>permitir apps desta origem</strong>.
+                </span>
+              </p>
             </div>
           ) : (
             <EmptyState
@@ -194,62 +213,42 @@ export default async function PaginaDoAplicativo() {
               title="Nenhum instalador configurado."
               hint={
                 podeSalvar
-                  ? 'Cole ao lado o link do build atual. Enquanto não houver link, o totem não mostra o botão “Baixar o app”.'
+                  ? 'Cole o link do build atual ao lado. Enquanto não houver link, o totem não mostra o botão “Baixar o app”.'
                   : 'Peça a quem administra a equipe para colar o link do build atual.'
               }
             />
           )}
         </SectionCard>
 
-        {podeSalvar ? (
+        {androidUrl && linkDoAluno ? (
           <SectionCard
-            title="Atualizar link"
-            icon="pencil"
-            summary="Só Dono e Gerente alteram. A recepção vê o QR e copia o link."
-          >
-            <FormularioDoInstalador
-              androidUrl={androidUrl}
-              androidVersion={androidVersion}
-              finalSugerido={shortSlug ?? slugSugerido ?? ''}
-              finalReservado={shortSlug}
-              prefixoDoLink={prefixoDoLink}
-            />
-          </SectionCard>
-        ) : null}
-      </div>
-
-      {androidUrl && linkDoAluno ? (
-        <div className={estilos['faixaLarga']}>
-          <SectionCard
-            title="Mensagem para o aluno"
+            title="Enviar ao aluno"
             icon="message-circle"
             summary={
               podeSalvar
-                ? 'Edite o texto ao lado; a prévia mostra exatamente o que o aluno recebe.'
-                : 'Copie e envie, ou abra direto no WhatsApp.'
+                ? 'A mensagem como o aluno vai ver. Ajuste o texto ou o instalador nas outras abas.'
+                : 'A mensagem como o aluno vai ver, pronta para copiar ou abrir no WhatsApp.'
             }
           >
-            <MensagemParaAluno
+            <PainelDeEnvio
               modelo={messageTemplate}
               link={linkDoAluno}
               academia={academia}
               podeEditar={podeSalvar}
               androidUrl={androidUrl}
               androidVersion={androidVersion}
+              configuracao={configuracao}
             />
           </SectionCard>
-        </div>
-      ) : null}
-
-      <div className={`${estilos['aviso']} ${estilos['faixaLarga']}`} role="note">
-        <span className={estilos['avisoIcone']}>
-          <Icon name="alert-circle" />
-        </span>
-        <p className={estilos['avisoTexto']}>
-          Para instalar o APK, o celular Android do aluno precisa permitir{' '}
-          <strong>instalar apps desconhecidos</strong>. O Android pede essa autorização na primeira
-          instalação, para o navegador ou gerenciador de arquivos usado.
-        </p>
+        ) : configuracao ? (
+          <SectionCard
+            title="Instalador"
+            icon="pencil"
+            summary="Só Dono e Gerente alteram. Cole o link do APK para começar."
+          >
+            {configuracao}
+          </SectionCard>
+        ) : null}
       </div>
     </section>
   );
