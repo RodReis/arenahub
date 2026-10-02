@@ -1,5 +1,5 @@
-import { ErroDeDominio } from "../../common/http/erro-de-dominio.js";
-import type { PrismaService } from "../../persistence/prisma.service.js";
+import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
+import type { PrismaService } from '../../persistence/prisma.service.js';
 
 /**
  * So o DONO da academia mexe no perfil Dono -- #523.
@@ -12,9 +12,9 @@ import type { PrismaService } from "../../persistence/prisma.service.js";
 export class SoDonoMexeEmDonoError extends ErroDeDominio {
   constructor() {
     super(
-      "SO_DONO_MEXE_EM_DONO",
+      'SO_DONO_MEXE_EM_DONO',
       403,
-      "Só o dono da academia pode convidar ou revogar alguém com o perfil Dono",
+      'Só o dono da academia pode convidar ou revogar alguém com o perfil Dono',
     );
   }
 }
@@ -26,7 +26,7 @@ export async function ehDono(
   userId: string,
 ): Promise<boolean> {
   const papel = await db.userRole.findFirst({
-    where: { tenantId, userId, role: { name: "OWNER" } },
+    where: { tenantId, userId, role: { name: 'OWNER' } },
     select: { roleId: true },
   });
 
