@@ -1,21 +1,21 @@
 {
   "apps/api#test": {
-    "testes": 2068,
-    "pass": 2068,
+    "testes": 2081,
+    "pass": 2081,
     "falha": 0,
-    "coberturaPct": 67.48
+    "coberturaPct": 67.49
   },
   "apps/api#test:integration": {
-    "testes": 1358,
-    "pass": 1358,
+    "testes": 1371,
+    "pass": 1371,
     "falha": 0,
-    "coberturaPct": 80.9
+    "coberturaPct": 80.96
   },
   "apps/admin-web#test": {
-    "testes": 781,
-    "pass": 781,
+    "testes": 797,
+    "pass": 797,
     "falha": 0,
-    "coberturaPct": 73.74
+    "coberturaPct": 73.87
   },
   "packages/ui#test": {
     "testes": 265,
@@ -33,7 +33,7 @@
     "testes": 82,
     "pass": 82,
     "falha": 0,
-    "coberturaPct": 93.95
+    "coberturaPct": 93.96
   },
   "packages/access-policy#test": {
     "testes": 77,
