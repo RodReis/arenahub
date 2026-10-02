@@ -714,6 +714,7 @@ model Tenant {
   biometricAccessLogs BiometricAccessLog[]
   privacySettings     TenantPrivacySettings?
   appDistribution     TenantAppDistribution?
+  appShortLink        AppShortLink?
   edgeNodes           EdgeNode[]
   edgeCredentials     EdgeCredential[]
   edgePairingCodes    EdgePairingCode[]
@@ -2346,11 +2347,33 @@ model TenantAppDistribution {
   androidVersion  String?  @map("android_version")
   /// Quem salvou. Sem FK de proposito: o link sobrevive a saida do usuario.
   updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  /// Texto da mensagem para o aluno (#538). Nulo = o texto padrao do painel.
+  /// Marcadores `{link}` e `{academia}` sao trocados na hora de copiar.
+  messageTemplate String?  @map("message_template")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_app_distribution")
+}
+
+/// Final do link curto do app (#538): `<painel>/baixar/<slug>`.
+///
+/// TABELA PROPRIA E SEM RLS, de proposito: a pagina publica do link resolve o
+/// slug ANTES de saber a academia -- e o slug que diz qual e. Guarda so o par
+/// slug -> tenant (nada sensivel); o destino (APK) continua em
+/// `tenant_app_distribution`, sob RLS, lido ja dentro do contexto do tenant.
+///
+/// Sobrevive a remocao do instalador: um QR impresso com este link volta a
+/// funcionar quando um APK novo for colado.
+model AppShortLink {
+  slug      String   @id
+  tenantId  String   @unique @map("tenant_id") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("app_short_links")
 }
 
 // ---------------------------------------------------------------------------

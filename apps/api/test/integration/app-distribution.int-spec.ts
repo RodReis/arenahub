@@ -109,6 +109,10 @@ describe('AppDistributionController (#534)', () => {
       updatedAt: null,
       updatedByEmail: null,
       updatedByRole: null,
+      shortSlug: null,
+      messageTemplate: null,
+      academia: `A ${sufixo}`,
+      slugSugerido: `app-dist-a-${sufixo}`,
     });
   });
 
@@ -174,5 +178,62 @@ describe('AppDistributionController (#534)', () => {
 
     const depois = await obter(recepcao.cookie);
     expect((depois.body as { androidUrl: string | null }).androidUrl).toBeNull();
+  });
+  describe('link curto e mensagem (#538)', () => {
+    const publico = (slug: string) => request(servidor()).get(`/api/v1/public/app-links/${slug}`);
+
+    it('PUT grava final do link e mensagem; GET devolve os dois', async () => {
+      const put = await salvar(gerente.cookie, {
+        androidUrl: 'https://expo.dev/curto.apk',
+        shortSlug: `arena-${sufixo}`,
+        messageTemplate: 'Baixe o app da {academia}: {link}',
+      });
+
+      expect(put.status).toBe(200);
+      expect(put.body).toMatchObject({
+        shortSlug: `arena-${sufixo}`,
+        messageTemplate: 'Baixe o app da {academia}: {link}',
+      });
+    });
+
+    it('a rota publica resolve o final do link para o APK atual, sem login', async () => {
+      const resposta = await publico(`arena-${sufixo}`);
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body).toEqual({ androidUrl: 'https://expo.dev/curto.apk' });
+    });
+
+    it('final inexistente ou invalido responde 404', async () => {
+      expect((await publico(`nao-existe-${sufixo}`)).status).toBe(404);
+      expect((await publico('X')).status).toBe(404);
+    });
+
+    it('final ja usado por OUTRA academia responde 409 e nao rouba o link', async () => {
+      const resposta = await salvar(outraAcademia.cookie, {
+        androidUrl: 'https://expo.dev/outra.apk',
+        shortSlug: `arena-${sufixo}`,
+      });
+
+      expect(resposta.status).toBe(409);
+      expect((resposta.body as { code: string }).code).toBe('APP_LINK_SLUG_TAKEN');
+      expect((await publico(`arena-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/curto.apk' });
+    });
+
+    it.each(['ab', 'Arena', 'com espaco', '-arena'])('PUT recusa o final "%s" com 400', async (slug) => {
+      const resposta = await salvar(gerente.cookie, { androidUrl: 'https://expo.dev/curto.apk', shortSlug: slug });
+
+      expect(resposta.status).toBe(400);
+    });
+
+    it('remover o instalador mantem o final reservado; o link publico responde 404 ate um APK novo', async () => {
+      await request(servidor()).delete('/api/v1/app-distribution').set('Cookie', gerente.cookie).expect(200);
+
+      expect((await publico(`arena-${sufixo}`)).status).toBe(404);
+      expect((await obter(recepcao.cookie)).body).toMatchObject({ shortSlug: `arena-${sufixo}` });
+
+      await salvar(gerente.cookie, { androidUrl: 'https://expo.dev/novo.apk' });
+
+      expect((await publico(`arena-${sufixo}`)).body).toEqual({ androidUrl: 'https://expo.dev/novo.apk' });
+    });
   });
 });

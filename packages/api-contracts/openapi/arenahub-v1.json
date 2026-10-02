@@ -1496,9 +1496,27 @@
                     "androidVersion",
                     "updatedAt",
                     "updatedByEmail",
-                    "updatedByRole"
+                    "updatedByRole",
+                    "shortSlug",
+                    "messageTemplate",
+                    "academia",
+                    "slugSugerido"
                   ],
                   "properties": {
+                    "shortSlug": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "messageTemplate": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "academia": {
+                      "type": "string"
+                    },
+                    "slugSugerido": {
+                      "type": "string"
+                    },
                     "androidUrl": {
                       "type": "string",
                       "nullable": true
@@ -1545,9 +1563,27 @@
                     "androidVersion",
                     "updatedAt",
                     "updatedByEmail",
-                    "updatedByRole"
+                    "updatedByRole",
+                    "shortSlug",
+                    "messageTemplate",
+                    "academia",
+                    "slugSugerido"
                   ],
                   "properties": {
+                    "shortSlug": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "messageTemplate": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "academia": {
+                      "type": "string"
+                    },
+                    "slugSugerido": {
+                      "type": "string"
+                    },
                     "androidUrl": {
                       "type": "string",
                       "nullable": true
@@ -1594,9 +1630,27 @@
                     "androidVersion",
                     "updatedAt",
                     "updatedByEmail",
-                    "updatedByRole"
+                    "updatedByRole",
+                    "shortSlug",
+                    "messageTemplate",
+                    "academia",
+                    "slugSugerido"
                   ],
                   "properties": {
+                    "shortSlug": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "messageTemplate": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "academia": {
+                      "type": "string"
+                    },
+                    "slugSugerido": {
+                      "type": "string"
+                    },
                     "androidUrl": {
                       "type": "string",
                       "nullable": true
@@ -1626,6 +1680,44 @@
         },
         "tags": [
           "AppDistribution"
+        ]
+      }
+    },
+    "/api/v1/public/app-links/{slug}": {
+      "get": {
+        "operationId": "LinkPublicoController_resolver",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "androidUrl"
+                  ],
+                  "properties": {
+                    "androidUrl": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "LinkPublico"
         ]
       }
     },

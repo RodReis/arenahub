@@ -276,6 +276,8 @@ describe('contrato OpenAPI', () => {
         '/api/v1/students/credentials/next-available',
         // #534 -- instalador Android da academia (QR no painel e no totem).
         '/api/v1/app-distribution',
+        // #538 -- link curto publico do app (`<painel>/baixar/<slug>`).
+        '/api/v1/public/app-links/{slug}',
       ]),
     );
   });
