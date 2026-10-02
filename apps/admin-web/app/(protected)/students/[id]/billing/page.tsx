@@ -11,11 +11,15 @@ import {
   TenantDateTime,
 } from '@arenahub/ui';
 
-import { faturaEmDestaque } from '../../../../../src/billing/vencimento';
+import { formatarMesAno } from '../../../../../src/billing/meses-pagaveis';
+import { estadoExibido, faturaEmDestaque } from '../../../../../src/billing/vencimento';
 import { chamarApi } from '../../../../../lib/api/server-client';
 import { consultarMesesPagaveis } from '../../../../actions/billing';
 import { PainelDeCobranca } from './painel-de-cobranca';
+import { Recebimento } from './recebimento';
 import { SituacaoAtual } from './situacao-atual';
+
+import estilos from './financeiro.module.css';
 
 export const metadata: Metadata = {
   title: 'Financeiro do aluno — ArenaHub',
@@ -68,28 +72,6 @@ interface Aluno {
 interface InvoicesDoAluno {
   timezone: string;
   invoices: Invoice[];
-}
-
-/**
- * Texto da coluna Recebimento. F-painel-financeiro.
- *
- * Todo recebimento e `MANUAL` (maquininha fisica, nao integrada) -- o que
- * distingue e o canal (`receivedVia`). Pagamento anterior a esta fatia nao
- * tem canal registrado; cai no rotulo generico que ja existia.
- */
-function rotuloDoRecebimento(pagamento: Pagamento): string {
-  switch (pagamento.receivedVia) {
-    case 'DINHEIRO':
-      return 'Dinheiro no balcão';
-    case 'PIX':
-      return 'PIX na maquininha';
-    case 'DEBITO':
-      return 'Débito na maquininha';
-    case 'CREDITO':
-      return 'Crédito na maquininha';
-    default:
-      return pagamento.method === 'MANUAL' ? 'Dinheiro no balcão' : pagamento.method;
-  }
 }
 
 /**
@@ -160,6 +142,7 @@ export default async function PaginaFinanceiroDoAluno({
   // para America/Sao_Paulo: sem o dado, nao ha fuso confiavel para exibir.
   const timezoneDaUnidade = respostaDasInvoices.dados?.timezone ?? 'UTC';
   const aluno = respostaDoAluno.dados;
+  const agora = new Date();
 
   /*
    * A cobrança nasce da assinatura, não do aluno: é o par
@@ -209,7 +192,9 @@ export default async function PaginaFinanceiroDoAluno({
         title={aluno ? `Financeiro — ${aluno.fullName}` : 'Financeiro'}
       />
 
-      <SituacaoAtual invoice={invoiceEmDestaque} timezone={timezoneDaUnidade} agora={new Date()} />
+      <SituacaoAtual invoice={invoiceEmDestaque} timezone={timezoneDaUnidade} agora={agora} />
+
+      <div className={estilos['historico']}>
 
       <DataTable
         testId="tabela-de-cobrancas"
@@ -237,13 +222,21 @@ export default async function PaginaFinanceiroDoAluno({
             key: 'competencia',
             header: 'Competência',
             role: 'moment',
-            render: (invoice) => <TenantDateTime iso={invoice.billingPeriod} timeZone={timezoneDaUnidade} />,
+            /* Competencia e MES, nao instante: "01/07/2026, 00:00" sugeria uma
+             * hora que o dado nao tem. Mesmo rotulo dos chips do balcao. */
+            render: (invoice) => (
+              <span className={estilos['competencia']}>{formatarMesAno(invoice.billingPeriod.slice(0, 7))}</span>
+            ),
           },
           {
             key: 'situacao',
             header: 'Situação',
             role: 'state',
-            render: (invoice) => <StateBadge machine="invoice" state={invoice.status} />,
+            /* `estadoExibido`: OPEN com vencimento passado aparece Vencida antes
+             * de o job de inadimplencia gravar OVERDUE. */
+            render: (invoice) => (
+              <StateBadge machine="invoice" state={estadoExibido(invoice, agora, timezoneDaUnidade)} />
+            ),
           },
           {
             key: 'valor',
@@ -259,7 +252,12 @@ export default async function PaginaFinanceiroDoAluno({
             key: 'vencimento',
             header: 'Vence em',
             role: 'moment',
-            render: (invoice) => <TenantDateTime iso={invoice.dueAt} timeZone={timezoneDaUnidade} />,
+            /* `dueAt` e DATA guardada como meia-noite UTC (`vencimento.ts`):
+             * a parte `YYYY-MM-DD` mostra o dia certo, sem a "21:00" que a
+             * conversao de fuso inventava. */
+            render: (invoice) => (
+              <TenantDateTime iso={invoice.dueAt.slice(0, 10)} timeZone={timezoneDaUnidade} format="date" />
+            ),
           },
           {
             key: 'recebimento',
@@ -284,16 +282,10 @@ export default async function PaginaFinanceiroDoAluno({
                  */
                 <AusenteDeAcao />
               ) : (
-                <ul>
+                <ul className={estilos['recebimentos']}>
                   {invoice.payments.map((pagamento) => (
                     <li key={pagamento.id}>
-                      {rotuloDoRecebimento(pagamento)}
-                      {pagamento.paidAt ? (
-                        <>
-                          {' — '}
-                          <TenantDateTime iso={pagamento.paidAt} timeZone={timezoneDaUnidade} format="datetime" />
-                        </>
-                      ) : null}
+                      <Recebimento pagamento={pagamento} timezone={timezoneDaUnidade} />
                     </li>
                   ))}
                 </ul>
@@ -308,6 +300,7 @@ export default async function PaginaFinanceiroDoAluno({
           />
         }
       />
+      </div>
 
       <PainelDeCobranca
         subscriptionId={assinaturaAtiva}

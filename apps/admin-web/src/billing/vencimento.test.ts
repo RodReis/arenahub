@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { diasDeAtraso, faturaEmDestaque, fraseDeVencimento, situacaoDeVencimento } from './vencimento';
+import { diasDeAtraso, estadoExibido, faturaEmDestaque, fraseDeVencimento, situacaoDeVencimento } from './vencimento';
 
 describe('situacaoDeVencimento', () => {
   it('vencida quando o vencimento ja passou e a invoice segue aberta', () => {
@@ -285,5 +285,22 @@ describe('fraseDeVencimento', () => {
         tz,
       ),
     ).toBe('Mensalidade vencida há 7 dias');
+  });
+});
+
+describe('estadoExibido', () => {
+  const tz = 'America/Sao_Paulo';
+  const agora = new Date('2026-10-01T15:00:00Z');
+
+  it('OPEN com vencimento no passado aparece como OVERDUE', () => {
+    expect(estadoExibido({ status: 'OPEN', dueAt: '2026-09-09T00:00:00.000Z' }, agora, tz)).toBe('OVERDUE');
+  });
+
+  it('OPEN que vence hoje continua OPEN', () => {
+    expect(estadoExibido({ status: 'OPEN', dueAt: '2026-10-01T00:00:00.000Z' }, agora, tz)).toBe('OPEN');
+  });
+
+  it('PAID com vencimento no passado continua PAID', () => {
+    expect(estadoExibido({ status: 'PAID', dueAt: '2026-07-09T00:00:00.000Z' }, agora, tz)).toBe('PAID');
   });
 });

@@ -36,65 +36,72 @@
 }
 
 /*
- * O ALVO E O BOTAO INTEIRO, nao o rotulo.
- *
- * Escolher o canal e a acao mais repetida do balcao. 56 px de altura da um
- * alvo confortavel para quem clica rapido com a pessoa esperando, e deixa o
- * icone respirar acima do rotulo sem virar um bloco de anuncio.
+ * O ALVO E O BOTAO INTEIRO, nao o rotulo -- 64 px, icone sobre o rotulo.
  *
  * Estiliza por seletor de descendente porque o `Button` do design system nao
- * encaminha `className` -- ele fixa a propria classe. Mexer na assinatura do
- * componente para esta tela seria mudar o contrato de trinta chamadas por
- * causa de uma.
+ * encaminha `className`.
+ *
+ * CADA CANAL TEM COR PROPRIA (`--ah-channel-*`, DS-PAINEL §2.3b, decisao do
+ * PI em 01/10/2026). A cor identifica o canal -- a mesma da coluna
+ * Recebimento --, nao comunica estado. `--canal` e resolvido por botao e o
+ * resto da regra so le a variavel.
  */
-.opcoes button {
+.opcoes button[data-canal] {
+  --canal: var(--ah-text-secondary);
   flex-direction: column;
   gap: 6px;
   height: auto;
-  min-height: 56px;
-  padding: 10px 12px;
+  min-height: 64px;
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--canal) 28%, var(--ah-border-default));
+  border-top: 3px solid var(--canal);
+  background: color-mix(in srgb, var(--canal) 4%, var(--ah-surface-raised));
+  color: var(--ah-text-default);
+  font-weight: var(--ah-type-body-strong-weight);
+  transition:
+    transform var(--ah-motion-control) var(--ah-motion-easing),
+    box-shadow var(--ah-motion-control) var(--ah-motion-easing),
+    background-color var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.opcoes button[data-canal='cash'] { --canal: var(--ah-channel-cash); }
+.opcoes button[data-canal='pix'] { --canal: var(--ah-channel-pix); }
+.opcoes button[data-canal='debit'] { --canal: var(--ah-channel-debit); }
+.opcoes button[data-canal='credit'] { --canal: var(--ah-channel-credit); }
+
+.opcoes button[data-canal] svg {
+  width: 20px;
+  height: 20px;
+  color: var(--canal);
+}
+
+/* Hover: superficie tingida E sombra -- dois canais, nao so cor. */
+.opcoes button[data-canal]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--canal) 9%, var(--ah-surface-raised));
+  box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--canal) 55%, transparent);
+  transform: translateY(-1px);
 }
 
 /*
- * O hover traz DOIS canais -- borda E superficie. Realce so por cor some para
- * quem opera com brilho baixo, que e o caso do balcao sob luz fluorescente.
+ * A FORMA ESCOLHIDA: fundo no tom do canal, anel de 2 px e rotulo na cor do
+ * canal. `aria-pressed` diz o mesmo ao leitor de tela. Anel `inset` para a
+ * caixa nao pular ao escolher.
  */
-.opcoes button:hover:not(:disabled) {
-  background: var(--ah-surface-sunken);
+.opcoes button[data-canal][data-escolhida] {
+  background: color-mix(in srgb, var(--canal) 10%, var(--ah-surface-raised)); /* 10%: o tint que o gate de contraste mede */
+  border-color: var(--canal);
+  box-shadow:
+    inset 0 0 0 1px var(--canal),
+    0 6px 16px -8px color-mix(in srgb, var(--canal) 70%, transparent);
+  color: var(--canal);
 }
 
-/*
- * O glifo fica em `text-icon` e nao no accent: escolher o canal e navegacao
- * dentro do fluxo, nao o ato de cobrar. O accent pertence ao "Gerar cobranca
- * do mes", que e o unico primario da tela (regra 5 do PRODUCT.md).
- */
-.opcoes button svg {
-  color: var(--ah-text-icon);
-}
+@media (prefers-reduced-motion: reduce) {
+  .opcoes button[data-canal] {
+    transition: none;
+  }
 
-.opcoes button:hover:not(:disabled) svg {
-  color: var(--ah-text-strong);
-}
-
-/*
- * A FORMA ESCOLHIDA -- accent, e aqui ele e legitimo: escolher o canal E a
- * acao em curso, nao navegacao (regra 5 do PRODUCT.md, accent e acao).
- *
- * Antes da reforma a unica marca era o fundo cinza que sobrava do hover --
- * indistinguivel de "o ponteiro passou por aqui" e invisivel depois de tirar
- * a mao do mouse. O botao carrega `aria-pressed`, entao o estado ja existia
- * para o leitor de tela; faltava existir para quem enxerga.
- *
- * Borda de 2 px com `inset` em vez de `border-width`: trocar a espessura da
- * borda mexeria na caixa e faria o botao pular 1 px ao ser escolhido.
- */
-.opcoes button[data-escolhida] {
-  background: color-mix(in srgb, var(--ah-action-solid) 10%, var(--ah-surface-raised));
-  border-color: var(--ah-action-solid);
-  box-shadow: inset 0 0 0 1px var(--ah-action-solid);
-  color: var(--ah-text-strong);
-}
-
-.opcoes button[data-escolhida] svg {
-  color: var(--ah-action-solid);
+  .opcoes button[data-canal]:hover:not(:disabled) {
+    transform: none;
+  }
 }

@@ -225,17 +225,19 @@ if (disabledText && !disabledText.$exempt) {
  * O tint e mais claro que o solido, entao medir sobre branco e sempre
  * OTIMISTA: nenhuma cor passa aqui e falha la, e o inverso acontecia.
  */
-for (const [name, def] of Object.entries(semantic.state ?? {})) {
-  if (name.startsWith('$')) continue;
-  const fg = resolveRef(def.ref, `semantic.state.${name}`);
-  if (!fg) continue;
-  const fundo = mix(fg, WHITE, TINT_DO_BADGE);
-  const value = round2(contrast(fg, fundo));
-  contrastReport.push({ role: `state.${name}`, fg, bg: fundo, value, exempt: null });
-  if (value < 4.5) {
-    errors.push(
-      `contraste reprovado: state.${name} (${fg}) sobre o proprio tint de 10% (${fundo}) = ${value}, alvo 4.5.`,
-    );
+for (const grupo of ['state', 'channel']) {
+  for (const [name, def] of Object.entries(semantic[grupo] ?? {})) {
+    if (name.startsWith('$')) continue;
+    const fg = resolveRef(def.ref, `semantic.${grupo}.${name}`);
+    if (!fg) continue;
+    const fundo = mix(fg, WHITE, TINT_DO_BADGE);
+    const value = round2(contrast(fg, fundo));
+    contrastReport.push({ role: `${grupo}.${name}`, fg, bg: fundo, value, exempt: null });
+    if (value < 4.5) {
+      errors.push(
+        `contraste reprovado: ${grupo}.${name} (${fg}) sobre o proprio tint de 10% (${fundo}) = ${value}, alvo 4.5.`,
+      );
+    }
   }
 }
 

@@ -172,6 +172,34 @@ export const CONTRAST_REPORT = [
     "exempt": null
   },
   {
+    "role": "channel.cash",
+    "fg": "#0E6F4E",
+    "bg": "#e7f1ed",
+    "value": 5.35,
+    "exempt": null
+  },
+  {
+    "role": "channel.pix",
+    "fg": "#0A7480",
+    "bg": "#e7f1f2",
+    "value": 4.78,
+    "exempt": null
+  },
+  {
+    "role": "channel.debit",
+    "fg": "#3B4CCA",
+    "bg": "#ebedfa",
+    "value": 5.87,
+    "exempt": null
+  },
+  {
+    "role": "channel.credit",
+    "fg": "#7B3FC4",
+    "bg": "#f2ecf9",
+    "value": 5.41,
+    "exempt": null
+  },
+  {
     "role": "totem.text.primary",
     "fg": "#FFFFFF",
     "bg": "bg.surface",

@@ -1,0 +1,59 @@
+/**
+ * Historico de cobrancas -- distribuicao das colunas SO desta tela.
+ *
+ * O `DataTable` encolhe toda coluna que nao e `support` a 1% e entrega o resto
+ * ao Recebimento: com seis colunas curtas, tudo embolava na esquerda e sobrava
+ * um vao vazio. Aqui as colunas repartem a largura. Seletor com `table` para
+ * vencer a especificidade do `DataTable.module.css` sem depender da ordem de
+ * carga do CSS; as outras treze tabelas continuam com a regra do DS.
+ */
+.historico {
+  margin-block: 20px 8px;
+}
+
+.historico table th,
+.historico table td {
+  padding-inline: 20px;
+}
+
+.historico table th[data-role='code'],
+.historico table td[data-role='code'] {
+  width: 7%;
+}
+
+.historico table th[data-role='moment'],
+.historico table td[data-role='moment'] {
+  width: 15%;
+}
+
+.historico table th[data-role='state'],
+.historico table td[data-role='state'] {
+  width: 15%;
+}
+
+.historico table th[data-role='value'],
+.historico table td[data-role='value'] {
+  width: 13%;
+}
+
+/* Recebimento e a coluna de controle (ADR-027): o resto da largura, e em
+ * destaque -- texto forte em vez do cinza de apoio. */
+.historico table th[data-role='support'],
+.historico table td[data-role='support'] {
+  width: auto;
+  color: var(--ah-text-strong);
+}
+
+.competencia {
+  color: var(--ah-text-strong);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+.recebimentos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -83,6 +83,29 @@ Chamada no código: `bdg(tone, icon, label, prefixo)` → devolve `{ bC, bBg, bB
 
 **Regras.** `risk` é a cor da ação sensível — desbloqueio de catraca, sessão elevada, churn. `err` é falha e destruição. Nunca usar verde como cor de botão. Nunca comunicar estado só por cor: badge sempre tem ícone e texto.
 
+### 2.3b Cor — canal de recebimento
+
+**Emenda de 01/10/2026, decisão do PI.** As quatro formas de pagamento do balcão eram retângulos cinza iguais, diferenciados só pela palavra. O PI pediu cor, efeito e borda nelas e mandou **ampliar a paleta do DS**, em vez de improvisar cor na tela.
+
+| Canal | Token | Hex | Contraste sobre branco | Sobre o próprio tint de 10% |
+|---|---|---|---|---|
+| Dinheiro | `--ah-channel-cash` | `#0E6F4E` | 6,17 | 5,35 |
+| PIX | `--ah-channel-pix` | `#0A7480` | 5,49 | 4,78 |
+| Débito | `--ah-channel-debit` | `#3B4CCA` | 6,83 | 5,87 |
+| Crédito | `--ah-channel-credit` | `#7B3FC4` | 6,27 | 5,41 |
+
+Fonte: `packages/ui/tokens/primitive.json` (`channel`) → `semantic.json` (`channel`). O build de tokens aplica a esses quatro **o mesmo gate de contraste de `state`** (texto sobre o tint de 10%, alvo 4,5): uma cor nova que reprove derruba o build.
+
+**Regras.**
+
+- A cor do canal **identifica o canal, não comunica estado.** Nunca pintar pago, vencido ou falha com `channel-*`; estado é da §2.3.
+- A mesma cor aparece no **seletor de forma** e no **selo da coluna Recebimento** da grid, para quem olha a grid reconhecer o canal sem ler.
+- Cor nunca sozinha: o selo e o botão sempre trazem ícone e rótulo.
+- Fixos e **não configuráveis pelo tenant**, pela mesma razão da semântica.
+- Débito e crédito dividem o glifo do cartão (é o mesmo plástico na mão); a cor é o que os separa de relance, e o rótulo é o que os separa de verdade.
+
+**Tratamento no seletor:** aresta superior de 3 px na cor do canal, borda e fundo tingidos (28% e 4%), ícone de 20 px na cor. Hover: fundo a 9%, sombra tingida e subida de 1 px. Escolhido: fundo a 10% (o tint que o gate mede), anel `inset` e rótulo na cor do canal. `prefers-reduced-motion: reduce` desliga a subida e a transição.
+
 ### 2.4 Tipografia
 
 **Inter** na interface. **JetBrains Mono** em identificador técnico: CPF, matrícula, IP, serial, firmware, referência de fatura, versão.
@@ -301,6 +324,8 @@ O que muda:
 - Os três helpers privados de `billing/page.tsx` (`estiloDoKpi`, `SeloDoTom`, `CabecalhoDoKpi`) têm agora um equivalente público: **`PainelDeEstado`**, em `packages/ui`. A razão é concreta — cópia foi como o painel financeiro e a inadimplência acabaram com **dois vermelhos diferentes** para a mesma faixa de atraso (ver o comentário de `COR_DA_FAIXA`). Um componente só tem um vermelho só.
 - **Qualquer tela pode usá-lo**, não só o dashboard. O que continua valendo é a regra de conteúdo: o tom é o do **estado que o número descreve**, e some quando não há estado. Tela de trabalho não ganha cor por enfeite — ganha quando tem estado a comunicar.
 - A intensidade de **alerta** exige que o próprio número seja o problema. Cobrança em aberto do mês corrente é o caso **normal** do balcão: pinta em repouso. Vencida pinta em alerta.
+
+**Emenda de 01/10/2026, decisão do PI:** fatura **em aberto passa a ser `danger`**, no badge (`state-labels.ts`, `invoice.OPEN`), no `PainelDeEstado` do financeiro e no chip do balcão. Também `invoice.OVERDUE` sai de `warning` para `danger`. A diferença entre as duas passa a estar na **intensidade** (vencida liga `emAlerta`), no **ícone** (relógio × alerta) e no **rótulo** ("Em aberto" × "Vencida", com os dias de atraso). E a tela **não espera o job de inadimplência**: `OPEN` com vencimento já passado aparece "Vencida" (`estadoExibido`, `apps/admin-web/src/billing/vencimento.ts`).
 
 Contrato do componente:
 

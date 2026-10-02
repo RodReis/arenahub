@@ -47,3 +47,11 @@ export function vigenteAte(dataPagamento: string, mesesPagos: number): string {
 
   return new Date(base + mesesPagos * DIAS_POR_MES_PAGO * MS_POR_DIA).toISOString().slice(0, 10);
 }
+
+const NOMES_DOS_MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/** 'YYYY-MM' -> 'jul/26'. Mesmo rotulo nos chips do balcao e na grid. */
+export function formatarMesAno(competencia: string): string {
+  const [ano, mes] = competencia.split('-');
+  return `${NOMES_DOS_MESES[Number(mes) - 1]}/${ano!.slice(2)}`;
+}

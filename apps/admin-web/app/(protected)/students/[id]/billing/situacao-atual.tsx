@@ -7,7 +7,7 @@ import {
   type TomDeEstado,
 } from '@arenahub/ui';
 
-import { diasDeAtraso } from '../../../../../src/billing/vencimento';
+import { diasDeAtraso, estadoExibido } from '../../../../../src/billing/vencimento';
 import estilos from './situacao-atual.module.css';
 
 interface InvoiceEmDestaque {
@@ -59,7 +59,8 @@ export function SituacaoAtual({ invoice, timezone, agora }: Props) {
    * antes -- marca atraso de um dia as 00:01 do proprio vencimento, e faz o
    * numero aqui discordar da faixa que a ficha do aluno mostra.
    */
-  const estaVencida = invoice.status === 'OVERDUE';
+  const estado = estadoExibido(invoice, agora, timezone);
+  const estaVencida = estado === 'OVERDUE';
   const atraso = estaVencida ? diasDeAtraso(invoice, agora, timezone) : 0;
 
   /*
@@ -68,7 +69,9 @@ export function SituacaoAtual({ invoice, timezone, agora }: Props) {
    * realmente venceu nao teria como gritar mais alto. A fatura do mes corrente
    * e o caso NORMAL do balcao -- ela informa, nao alarma.
    */
-  const tom: TomDeEstado = estaVencida ? 'danger' : 'warning';
+  // Em aberto tambem e `danger` (decisao do PI, 01/10/2026); a vencida se
+  // distingue pela intensidade de alerta, pelo icone e pelos dias de atraso.
+  const tom: TomDeEstado = 'danger';
   const icone: IconName = estaVencida ? 'alert-triangle' : 'clock';
 
   return (
@@ -82,7 +85,7 @@ export function SituacaoAtual({ invoice, timezone, agora }: Props) {
         <>
           <span>
             Cobrança nº <span className={estilos['numero']}>{invoice.number}</span> · vence em{' '}
-            <TenantDateTime iso={invoice.dueAt} timeZone={timezone} format="date" />
+            <TenantDateTime iso={invoice.dueAt.slice(0, 10)} timeZone={timezone} format="date" />
           </span>
           {/*
             `<strong>` e nao `<span>`: o design system pinta o tom cheio no
@@ -98,7 +101,7 @@ export function SituacaoAtual({ invoice, timezone, agora }: Props) {
       }
     >
       <Money cents={invoice.totalMinor} currency={invoice.currency} />
-      <StateBadge machine="invoice" state={invoice.status} />
+      <StateBadge machine="invoice" state={estado} />
     </PainelDeEstado>
   );
 }

@@ -1,0 +1,40 @@
+/* Celula de recebimento -- so camada semantica (regra 2 de lint). */
+.recebimento {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.canal {
+  --canal: var(--ah-state-neutral);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--canal) 32%, transparent);
+  border-radius: var(--ah-radius-badge);
+  background: color-mix(in srgb, var(--canal) 10%, var(--ah-surface-raised));
+  color: var(--canal);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.canal svg {
+  width: 14px;
+  height: 14px;
+}
+
+.canal[data-canal='cash'] { --canal: var(--ah-channel-cash); }
+.canal[data-canal='pix'] { --canal: var(--ah-channel-pix); }
+.canal[data-canal='debit'] { --canal: var(--ah-channel-debit); }
+.canal[data-canal='credit'] { --canal: var(--ah-channel-credit); }
+
+.quando {
+  color: var(--ah-text-default);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

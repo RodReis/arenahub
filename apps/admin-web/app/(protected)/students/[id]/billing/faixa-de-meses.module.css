@@ -10,47 +10,100 @@
 .faixa {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
-  padding-top: 16px;
-  border-top: 1px solid var(--ah-border-subtle);
+  gap: 16px;
 }
 
-.chips {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-block: 4px;
-}
-
-.chip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-  min-width: 88px;
-  padding: 10px 12px;
-  border-radius: var(--ah-radius-card);
-  border: 1px solid var(--ah-border-subtle);
-  background: var(--ah-surface-sunken);
-  cursor: pointer;
-}
-
-.chip:hover:not(:disabled) {
-  border-color: var(--ah-border-hover);
+.faixa h3 {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
 }
 
 /*
- * O mes selecionado -- accent, porque escolher ate onde receber E a acao em
- * curso (DS-PAINEL §4.8, accent e acao). Borda `inset` para nao mudar a
- * caixa do chip ao ser selecionado (mesma tecnica de
- * `seletor-de-forma.module.css`).
+ * Os chips REPARTEM a largura (`auto-fill`), em vez de empilhar na esquerda
+ * com um vao vazio a direita. Minimo de 104 px cabe "Mês atual" + "R$ 150,00".
+ */
+.chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 10px;
+}
+
+/*
+ * O tom do chip vem de `data-tom` (vencido/aberto/adiantado) e so ele decide
+ * `--tom`. Vencido e em aberto em `danger` (decisao do PI, 01/10/2026);
+ * adiantado em neutro. Cor nunca sozinha: o rotulo diz o mesmo por escrito.
+ */
+.chip {
+  --tom: var(--ah-state-neutral);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 10px 10px;
+  border-radius: var(--ah-radius-card);
+  border: 1px solid color-mix(in srgb, var(--tom) 24%, var(--ah-border-subtle));
+  border-top: 3px solid color-mix(in srgb, var(--tom) 70%, transparent);
+  background: color-mix(in srgb, var(--tom) 5%, var(--ah-surface-raised));
+  cursor: pointer;
+  transition:
+    transform var(--ah-motion-control) var(--ah-motion-easing),
+    box-shadow var(--ah-motion-control) var(--ah-motion-easing),
+    background-color var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.chip[data-tom='vencido'] { --tom: var(--ah-state-danger); }
+.chip[data-tom='aberto'] { --tom: var(--ah-state-danger); }
+
+.chip:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tom) 10%, var(--ah-surface-raised));
+  box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--tom) 55%, transparent);
+  transform: translateY(-1px);
+}
+
+.chips .chip:focus-visible {
+  outline: 2px solid var(--ah-focus-ring);
+  outline-style: solid;
+  outline-offset: 2px;
+}
+
+/*
+ * Selecionado -- accent, porque marcar o mes E a acao em curso (DS-PAINEL
+ * §4.8). Anel `inset` para a caixa nao pular. O tom continua na aresta de
+ * cima: um vencido selecionado segue dizendo que esta vencido.
  */
 .chip[data-selecionado] {
   border-color: var(--ah-action-solid);
+  border-top-color: color-mix(in srgb, var(--tom) 70%, transparent);
   background: color-mix(in srgb, var(--ah-action-solid) 10%, var(--ah-surface-raised));
-  box-shadow: inset 0 0 0 1px var(--ah-action-solid);
+  box-shadow:
+    inset 0 0 0 1px var(--ah-action-solid),
+    0 6px 16px -8px color-mix(in srgb, var(--ah-action-solid) 70%, transparent);
+}
+
+/* Mes corrente: anel externo tracejado + selo -- referencia de onde estamos. */
+.chip[data-mes-atual] {
+  outline: 2px dashed color-mix(in srgb, var(--ah-action-solid) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.marcaAtual {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--ah-action-solid);
+  color: var(--ah-action-on-solid);
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .mesAno {
@@ -66,6 +119,14 @@
   line-height: var(--ah-type-caption-lh);
 }
 
+/* Vencido e em aberto escrevem o status no proprio tom (texto sobre tint
+ * de <=10%, o par que o gate de contraste mede). */
+.chip[data-tom='vencido'] .status,
+.chip[data-tom='aberto'] .status {
+  color: var(--tom);
+  font-weight: 600;
+}
+
 .valor {
   color: var(--ah-text-default);
   font-size: var(--ah-type-caption-size);
@@ -73,7 +134,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
+
+  .chip:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
 .resumo {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--ah-radius-control);
+  background: color-mix(in srgb, var(--ah-action-solid) 6%, var(--ah-surface-raised));
+  border-left: 3px solid var(--ah-action-solid);
   color: var(--ah-text-strong);
   font-size: var(--ah-type-body-size);
   line-height: var(--ah-type-body-lh);
