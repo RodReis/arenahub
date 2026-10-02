@@ -66,12 +66,18 @@ export async function salvarInstaladorAndroid(
       androidUrl: validado.data.androidUrl,
       androidVersion: validado.data.androidVersion || null,
       ...(validado.data.shortSlug ? { shortSlug: validado.data.shortSlug } : {}),
-      // Vazio ou identico ao padrao grava NULO: quem nunca personalizou
-      // recebe as melhorias futuras do texto padrao sem fazer nada.
-      messageTemplate:
-        validado.data.messageTemplate.trim() && validado.data.messageTemplate !== MENSAGEM_PADRAO
-          ? validado.data.messageTemplate
-          : null,
+      // So mexe na mensagem quando o formulario a trouxe: salvar o APK nao
+      // pode apagar o texto que alguem personalizou em outro cartao.
+      ...(formulario.has('messageTemplate')
+        ? {
+            // Vazio ou identico ao padrao grava NULO: quem nunca personalizou
+            // recebe as melhorias futuras do texto padrao sem fazer nada.
+            messageTemplate:
+              validado.data.messageTemplate.trim() && validado.data.messageTemplate !== MENSAGEM_PADRAO
+                ? validado.data.messageTemplate
+                : null,
+          }
+        : {}),
     },
   });
 

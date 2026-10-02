@@ -170,4 +170,30 @@ describe('pagina do aplicativo (#534)', () => {
 
     expect(screen.getByTestId<HTMLInputElement>('campo-final-do-link').value).toBe('arena-positiva');
   });
+  it('o iPhone ja tem lugar reservado: chip "em breve"', async () => {
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+
+    expect(screen.getByTestId('ios-em-breve').textContent).toContain('iPhone');
+  });
+
+  it('final SUGERIDO ainda nao reservado acende o Salvar -- senao o link curto nunca nascia', async () => {
+    responder({ ...CONFIGURADO, shortSlug: null }, ['student.read', 'user.manage']);
+    await renderizar();
+
+    expect(screen.getByTestId<HTMLInputElement>('campo-final-do-link').value).toBe('arena-positiva');
+    expect(screen.getByTestId<HTMLButtonElement>('salvar-instalador').disabled).toBe(false);
+  });
+
+  it('quem administra edita a mensagem ao lado da previa; a recepcao so ve a previa', async () => {
+    responder(CONFIGURADO, ['student.read', 'user.manage']);
+    const { unmount } = await renderizar();
+    expect(screen.getByTestId('campo-mensagem-do-instalador')).toBeTruthy();
+    unmount();
+
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+    expect(screen.queryByTestId('campo-mensagem-do-instalador')).toBeNull();
+    expect(screen.getByTestId('previa-da-mensagem')).toBeTruthy();
+  });
 });
