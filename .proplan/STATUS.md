@@ -32,10 +32,7 @@ _(vazio)_
 
 ## Em Andamento
 
-### Sem épico
-
-- [MVP1][FIX] Teste do adapter Topdata exige ack do reg antes de ele atravessar o socket (#518)
-- [MVP2][FIX] Financeiro do aluno: fatura vencida aparece "Em aberto", Receber fica mudo em erro e balcão sem destaque (#516)
+_(vazio)_
 
 ## Feito
 
@@ -46,6 +43,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] Teste do adapter Topdata exige ack do reg antes de ele atravessar o socket (#518, finalizado em: 2026-10-02)
+- [MVP2][FIX] Financeiro do aluno: fatura vencida aparece "Em aberto", Receber fica mudo em erro e balcão sem destaque (#516, finalizado em: 2026-10-02)
 - [MVP1][FIX] import-ativos ignora Telefone e Celular separados e não distingue plano já vencido no arquivo (Pessoas-0110) (#508, finalizado em: 2026-10-02)
 - [MVP1][FIX] Reconciliar pagamentos de setembro (01 a 30/09): plano pelo valor pago e baixa das faturas faltantes (#510, finalizado em: 2026-10-02)
 - [MVP2][FIX] Receber no balcão: escolha livre dos meses e data do pagamento informada pela recepção (#512, finalizado em: 2026-10-02)
