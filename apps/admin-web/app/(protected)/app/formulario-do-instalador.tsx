@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, useToastDeErro } from '@arenahub/ui';
+import { Button, Field, TextareaField, useToastDeErro } from '@arenahub/ui';
 
 import {
   removerInstaladorAndroid,
@@ -11,6 +11,7 @@ import {
   type EstadoDoInstalador,
 } from '../../actions/instalador-android';
 import estilos from './aplicativo.module.css';
+import { MENSAGEM_PADRAO } from './mensagem';
 
 const ESTADO_INICIAL: EstadoDoInstalador = {};
 
@@ -35,14 +36,27 @@ function BotaoSalvar({ alterado }: { readonly alterado: boolean }) {
 export function FormularioDoInstalador({
   androidUrl,
   androidVersion,
+  shortSlug,
+  messageTemplate,
+  prefixoDoLink,
 }: {
   readonly androidUrl: string | null;
   readonly androidVersion: string | null;
+  /** O final reservado, ou a sugestao (identificador da academia). */
+  readonly shortSlug: string;
+  readonly messageTemplate: string | null;
+  /** `arenahub.up.railway.app/baixar/` -- so para mostrar como o link fica. */
+  readonly prefixoDoLink: string;
 }) {
   const [estado, acaoSalvar] = useActionState(salvarInstaladorAndroid, ESTADO_INICIAL);
   const [estadoRemocao, acaoRemover] = useActionState(removerInstaladorAndroid, ESTADO_INICIAL);
   const [url, setUrl] = useState(androidUrl ?? '');
   const [versao, setVersao] = useState(androidVersion ?? '');
+  const [final, setFinal] = useState(shortSlug);
+  // O padrao aparece JA escrito: editar parte de um texto e mais facil que
+  // escrever do zero, e o marcador {link} fica a vista.
+  const textoInicial = messageTemplate ?? MENSAGEM_PADRAO;
+  const [texto, setTexto] = useState(textoInicial);
   const [confirmando, setConfirmando] = useState(false);
 
   useToastDeErro(estado.erro, 'error', 'erro-do-instalador');
@@ -54,7 +68,11 @@ export function FormularioDoInstalador({
     'sucesso-ao-remover-instalador',
   );
 
-  const alterado = url.trim() !== (androidUrl ?? '') || versao.trim() !== (androidVersion ?? '');
+  const alterado =
+    url.trim() !== (androidUrl ?? '') ||
+    versao.trim() !== (androidVersion ?? '') ||
+    final.trim() !== shortSlug ||
+    texto !== textoInicial;
 
   return (
     <div className={estilos['formulario']} data-testid="formulario-do-instalador">
@@ -84,6 +102,33 @@ export function FormularioDoInstalador({
           maxLength={40}
           autoComplete="off"
           data-testid="campo-versao-do-instalador"
+        />
+
+        <Field
+          id="instalador-final-do-link"
+          name="shortSlug"
+          label="Final do link"
+          hint={`O aluno recebe ${prefixoDoLink}${final.trim() || '…'} — não muda quando o APK for trocado.`}
+          placeholder="ex.: arena"
+          value={final}
+          onChange={(evento) => setFinal(evento.target.value.toLowerCase())}
+          minLength={3}
+          maxLength={40}
+          autoComplete="off"
+          spellCheck={false}
+          data-testid="campo-final-do-link"
+        />
+
+        <TextareaField
+          id="instalador-mensagem"
+          name="messageTemplate"
+          label="Mensagem para o aluno"
+          hint="{link} vira o link curto e {academia}, o nome da academia. Apagar tudo volta ao texto padrão."
+          value={texto}
+          onChange={(evento) => setTexto(evento.target.value)}
+          rows={8}
+          maxLength={1000}
+          data-testid="campo-mensagem-do-instalador"
         />
 
         <div className={estilos['acoes']}>

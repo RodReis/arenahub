@@ -7,6 +7,11 @@ vi.mock('../../../lib/api/server-client', () => ({
   chamarApi: vi.fn(),
 }));
 
+vi.mock('next/headers', () => ({
+  headers: () =>
+    Promise.resolve(new Headers({ host: 'arenahub.test', 'x-forwarded-proto': 'https' })),
+}));
+
 vi.mock('../../actions/instalador-android', () => ({
   salvarInstaladorAndroid: vi.fn(),
   removerInstaladorAndroid: vi.fn(),
@@ -21,6 +26,10 @@ const CONFIGURADO = {
   updatedAt: '2026-10-02T17:42:00.000Z',
   updatedByEmail: 'ana@arena.test',
   updatedByRole: 'MANAGER',
+  shortSlug: 'arena',
+  messageTemplate: null,
+  academia: 'Arena Positiva',
+  slugSugerido: 'arena-positiva',
 };
 
 const VAZIO = {
@@ -29,6 +38,10 @@ const VAZIO = {
   updatedAt: null,
   updatedByEmail: null,
   updatedByRole: null,
+  shortSlug: null,
+  messageTemplate: null,
+  academia: 'Arena Positiva',
+  slugSugerido: 'arena-positiva',
 };
 
 function responder(instalador: object, permissoes: string[]) {
@@ -52,7 +65,8 @@ describe('pagina do aplicativo (#534)', () => {
 
     expect(screen.getByTestId('qr-do-instalador').querySelector('svg')).not.toBeNull();
     expect(screen.getByTestId('versao-do-instalador').textContent).toBe('Versão 0.1.0 (build 8)');
-    expect(screen.getByTestId('link-do-instalador').textContent).toBe(CONFIGURADO.androidUrl);
+    // Com final reservado, o aluno recebe o LINK CURTO, nao o APK direto.
+    expect(screen.getByTestId('link-do-instalador').textContent).toBe('https://arenahub.test/baixar/arena');
     expect(screen.getByTestId('copiar-link')).toBeTruthy();
     expect(screen.getByTestId('autoria-do-instalador').textContent).toContain(
       'por ana@arena.test (Gerente)',
@@ -101,5 +115,37 @@ describe('pagina do aplicativo (#534)', () => {
     await renderizar();
 
     expect(screen.getByTestId('erro-do-instalador')).toBeTruthy();
+  });
+  it('mensagem pronta usa o link curto e o nome da academia', async () => {
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+
+    const previa = screen.getByTestId('previa-da-mensagem').textContent ?? '';
+
+    expect(previa).toContain('https://arenahub.test/baixar/arena');
+    expect(previa).toContain('Arena Positiva');
+    expect(screen.getByTestId('abrir-no-whatsapp')).toBeTruthy();
+  });
+
+  it('sem final reservado, link e mensagem caem no APK direto', async () => {
+    responder({ ...CONFIGURADO, shortSlug: null }, ['student.read']);
+    await renderizar();
+
+    expect(screen.getByTestId('link-do-instalador').textContent).toBe(CONFIGURADO.androidUrl);
+  });
+
+  it('o QR e um botao que abre a versao ampliada', async () => {
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+
+    expect(screen.getByTestId('ampliar-qr').tagName).toBe('BUTTON');
+    expect(screen.getByTestId('dialogo-qr').querySelector('svg')).not.toBeNull();
+  });
+
+  it('o formulario sugere o identificador da academia como final do link', async () => {
+    responder({ ...VAZIO }, ['student.read', 'user.manage']);
+    await renderizar();
+
+    expect(screen.getByTestId<HTMLInputElement>('campo-final-do-link').value).toBe('arena-positiva');
   });
 });

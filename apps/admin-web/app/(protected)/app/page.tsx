@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import QRCode from 'qrcode';
 
 import {
@@ -16,6 +17,9 @@ import { rotuloDePerfil } from '../../../src/iam/rotulos';
 import estilos from './aplicativo.module.css';
 import { CopiarLink } from './copiar-link';
 import { FormularioDoInstalador } from './formulario-do-instalador';
+import { montarMensagem } from './mensagem';
+import { MensagemParaAluno } from './mensagem-para-aluno';
+import { QrAmpliavel } from './qr-ampliavel';
 
 export const metadata: Metadata = {
   title: 'Aplicativo — ArenaHub',
@@ -32,6 +36,23 @@ interface Instalador {
   updatedAt: string | null;
   updatedByEmail: string | null;
   updatedByRole: string | null;
+  shortSlug: string | null;
+  messageTemplate: string | null;
+  academia: string;
+  slugSugerido: string;
+}
+
+/**
+ * Endereco publico do painel, de onde o aluno abre o link curto. Vem do
+ * proprio pedido (o proxy da Railway manda `x-forwarded-*`): o mesmo codigo
+ * monta `localhost:3000` em dev e o dominio de producao la, sem variavel nova.
+ */
+async function origemPublica(): Promise<string> {
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
+  const protocolo = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
+
+  return `${protocolo}://${host}`;
 }
 
 /**
@@ -76,11 +97,31 @@ export default async function PaginaDoAplicativo() {
     );
   }
 
-  const { androidUrl, androidVersion, updatedAt, updatedByEmail, updatedByRole } = resposta.dados;
+  const {
+    androidUrl,
+    androidVersion,
+    updatedAt,
+    updatedByEmail,
+    updatedByRole,
+    shortSlug,
+    messageTemplate,
+    academia,
+    slugSugerido,
+  } = resposta.dados;
   const podeSalvar = perfil.dados?.permissions?.includes('user.manage') ?? false;
-  const qrSvg = androidUrl
-    ? await QRCode.toString(androidUrl, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' })
+  const origem = await origemPublica();
+  const prefixoDoLink = `${origem.replace(/^https?:\/\//, '')}/baixar/`;
+  /*
+   * O QR e a mensagem usam o LINK CURTO quando existe: menos denso (a camera
+   * le de mais longe) e nao muda entre builds -- um QR impresso no balcao
+   * continua valendo. Sem final reservado ainda, cai no APK direto.
+   */
+  const linkCurto = shortSlug ? `${origem}/baixar/${shortSlug}` : null;
+  const linkDoAluno = linkCurto ?? androidUrl;
+  const qrSvg = linkDoAluno
+    ? await QRCode.toString(linkDoAluno, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' })
     : null;
+  const mensagem = linkDoAluno ? montarMensagem(messageTemplate, { link: linkDoAluno, academia }) : null;
 
   return (
     <section aria-labelledby="titulo-aplicativo">
@@ -93,7 +134,7 @@ export default async function PaginaDoAplicativo() {
             icon="qr-code"
             summary="Mostre o QR ao aluno no balcão ou envie o link."
           >
-            {androidUrl && qrSvg ? (
+            {androidUrl && qrSvg && linkDoAluno ? (
               <div className={estilos['principal']}>
                 {/*
                   O PALCO DO QR: o unico lugar da tela com accent do tenant.
@@ -102,14 +143,8 @@ export default async function PaginaDoAplicativo() {
                   palco e o QR novo "imprime" de cima para baixo (aplicativo
                   .module.css), que e exatamente o que aconteceu.
                 */}
-                <div className={estilos['palco']} key={androidUrl}>
-                  <div
-                    className={estilos['qr']}
-                    data-testid="qr-do-instalador"
-                    role="img"
-                    aria-label="QR do instalador Android"
-                    dangerouslySetInnerHTML={{ __html: qrSvg }}
-                  />
+                <div className={estilos['palco']} key={linkDoAluno}>
+                  <QrAmpliavel svg={qrSvg} link={linkDoAluno} />
                 </div>
 
                 <div className={estilos['informacao']}>
@@ -140,21 +175,28 @@ export default async function PaginaDoAplicativo() {
 
                   <div className={estilos['blocoDoLink']}>
                     <span className={estilos['rotuloDoLink']} id="rotulo-do-link">
-                      Link do APK
+                      {linkCurto ? 'Link para o aluno' : 'Link do APK'}
                     </span>
                     <div className={estilos['linhaDoLink']}>
                       <p
                         className={estilos['link']}
                         data-testid="link-do-instalador"
-                        title={androidUrl}
+                        title={linkDoAluno}
                         aria-labelledby="rotulo-do-link"
                       >
-                        {androidUrl}
+                        {linkDoAluno}
                       </p>
-                      <CopiarLink url={androidUrl} />
+                      <CopiarLink url={linkDoAluno} />
                     </div>
                     <p className={estilos['dicaDoLink']}>
-                      O totem mostra o botão “Baixar o app” na tela de espera com este mesmo link.
+                      {linkCurto ? (
+                        <>
+                          Leva sempre ao APK atual — o QR e a mensagem não mudam quando o build for
+                          trocado.
+                        </>
+                      ) : (
+                        <>Defina o final do link ao lado para ter um link curto que não muda.</>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -171,6 +213,16 @@ export default async function PaginaDoAplicativo() {
               />
             )}
           </SectionCard>
+
+          {mensagem ? (
+            <SectionCard
+              title="Mensagem para o aluno"
+              icon="message-circle"
+              summary="Copie e envie, ou abra direto no WhatsApp."
+            >
+              <MensagemParaAluno mensagem={mensagem} />
+            </SectionCard>
+          ) : null}
 
           <div className={estilos['aviso']} role="note">
             <span className={estilos['avisoIcone']}>
@@ -190,7 +242,13 @@ export default async function PaginaDoAplicativo() {
             icon="pencil"
             summary="Só Dono e Gerente alteram. A recepção vê o QR e copia o link."
           >
-            <FormularioDoInstalador androidUrl={androidUrl} androidVersion={androidVersion} />
+            <FormularioDoInstalador
+              androidUrl={androidUrl}
+              androidVersion={androidVersion}
+              shortSlug={shortSlug ?? slugSugerido}
+              messageTemplate={messageTemplate}
+              prefixoDoLink={prefixoDoLink}
+            />
           </SectionCard>
         ) : null}
       </div>
