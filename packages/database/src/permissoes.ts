@@ -176,12 +176,14 @@ export const PERMISSOES_DO_OWNER = [
 /**
  * O que o gerente NAO tem, e a razao de cada ausencia:
  *
- * - `user.manage`/`role.assign`: quem gerencia a operacao nao decide quem
- *   entra no sistema. Isso fica com o dono.
  * - `retention.kill_switch`: desligar o scoring afeta a academia inteira --
  *   `decisao de operacao, nao de consulta`, como o proprio catalogo registra.
+ *
+ * `user.manage`/`role.assign` ERAM negadas ao gerente ("quem decide quem
+ * entra e o dono"). Decisao do PI, 02/10/2026: na Arena Positiva quem
+ * administra a equipe e a gerente -- ela convida, revoga e troca perfil.
  */
-const NEGADAS_AO_MANAGER = ['user.manage', 'role.assign', 'retention.kill_switch'];
+const NEGADAS_AO_MANAGER = ['retention.kill_switch'];
 
 export const PERMISSOES_DO_MANAGER = PERMISSOES_DO_OWNER.filter(
   (codigo) => !NEGADAS_AO_MANAGER.includes(codigo),
