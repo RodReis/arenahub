@@ -36,13 +36,18 @@ _(vazio)_
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][SPEC-059][FIX] Alerta DEVICE_OFFLINE da catraca é permanente e falso: o Edge nunca informa a catraca no heartbeat (#522)
+- [INFRA] Time e Alunos: coluna Catraca e busca por ID do leitor (#520)
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] Perfil Recepção não consegue receber no balcão nem ver o Time (#523, finalizado em: 2026-10-02)
+- [MVP1] Dashboard: acessos do dia inteiro com rolagem e recusados na catraca no cartão de bloqueados (#524, finalizado em: 2026-10-02)
 - [MVP1][FIX] Teste do adapter Topdata exige ack do reg antes de ele atravessar o socket (#518, finalizado em: 2026-10-02)
 - [MVP2][FIX] Financeiro do aluno: fatura vencida aparece "Em aberto", Receber fica mudo em erro e balcão sem destaque (#516, finalizado em: 2026-10-02)
 - [MVP1][FIX] import-ativos ignora Telefone e Celular separados e não distingue plano já vencido no arquivo (Pessoas-0110) (#508, finalizado em: 2026-10-02)
@@ -143,8 +148,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
+- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
