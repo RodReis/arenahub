@@ -716,6 +716,40 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
 }
 
 /*
+ * Lista que ROLA dentro do cartão -- pedido do PI, 02/10/2026: o feed mostrava
+ * só os dez últimos acessos, e a recepção queria ver todo mundo que entrou no
+ * dia. A altura fica perto dos dez itens de antes, então a tela não muda de
+ * tamanho; o resto do dia está a uma rolagem.
+ */
+.listaRolavel {
+  max-height: 480px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Contagem de recusas no cabeçalho do cartão de bloqueados. */
+.contagemDeRecusas {
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  color: var(--ah-state-danger);
+}
+
+/* Subseção dentro de um cartão: "Recusados na catraca hoje". */
+.subtituloDoCartao {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ah-border-subtle);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--ah-text-strong);
+}
+
+/*
  * Linhas separadas por divisor INTERNO (`:not(:last-child)`), não por gap: em
  * densidade alta o divisor lê como tabela, e o gap lê como cartões soltos.
  */
