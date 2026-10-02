@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@arenahub/ui';
@@ -195,5 +195,73 @@ describe('pagina do aplicativo (#534)', () => {
     await renderizar();
     expect(screen.queryByTestId('campo-mensagem-do-instalador')).toBeNull();
     expect(screen.getByTestId('previa-da-mensagem')).toBeTruthy();
+  });
+
+  it('envio em abas: quem administra ve tres, a recepcao nenhuma -- a pagina cabe sem rolagem', async () => {
+    responder(CONFIGURADO, ['student.read', 'user.manage']);
+    const { unmount } = await renderizar();
+    expect(screen.getAllByRole('tab').map((aba) => aba.textContent)).toEqual([
+      'Mensagem ao aluno',
+      'Editar texto',
+      'Instalador',
+    ]);
+    unmount();
+
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+  });
+
+  it('apagar o texto equivale ao padrao: Salvar nao fica aceso para sempre', async () => {
+    responder(CONFIGURADO, ['student.read', 'user.manage']);
+    await renderizar();
+
+    const campo = screen.getByTestId<HTMLTextAreaElement>('campo-mensagem-do-instalador');
+    fireEvent.change(campo, { target: { value: '   ' } });
+
+    expect(screen.getByTestId<HTMLButtonElement>('salvar-mensagem').disabled).toBe(true);
+
+    fireEvent.change(campo, { target: { value: 'Oi {link}' } });
+    expect(screen.getByTestId<HTMLButtonElement>('salvar-mensagem').disabled).toBe(false);
+  });
+
+  it('copiar sem HTTPS (sem clipboard) nao lanca no clique', async () => {
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+
+    // O React 19 nao relanca erro de handler no `fireEvent`: ele vai para o
+    // `error` da janela. E la que o clique quebrado aparece.
+    const erros: unknown[] = [];
+    const ouvir = (evento: ErrorEvent): void => {
+      erros.push(evento.error);
+      evento.preventDefault();
+    };
+    window.addEventListener('error', ouvir);
+
+    try {
+      fireEvent.click(screen.getByTestId('copiar-mensagem'));
+      fireEvent.click(screen.getByTestId('copiar-link'));
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(erros).toEqual([]);
+      expect(screen.getByTestId('copiar-mensagem').dataset['copiado']).toBe('false');
+    } finally {
+      window.removeEventListener('error', ouvir);
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else delete (navigator as { clipboard?: unknown }).clipboard;
+    }
+  });
+
+  it('o link no balao e clicavel e abre em aba nova', async () => {
+    responder(CONFIGURADO, ['student.read']);
+    await renderizar();
+
+    const links = screen.getByTestId('previa-da-mensagem').querySelectorAll('a');
+    const doTexto = [...links].find((a) => a.textContent === 'https://arenahub.test/baixar/arena');
+
+    expect(doTexto?.getAttribute('href')).toBe('https://arenahub.test/baixar/arena');
+    expect(doTexto?.getAttribute('target')).toBe('_blank');
   });
 });

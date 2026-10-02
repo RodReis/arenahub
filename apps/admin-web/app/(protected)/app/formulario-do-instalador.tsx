@@ -5,6 +5,8 @@ import { useFormStatus } from 'react-dom';
 
 import { Button, Field, useToastDeErro } from '@arenahub/ui';
 
+import { useToastDeSucesso } from './toast-de-sucesso';
+
 import {
   removerInstaladorAndroid,
   salvarInstaladorAndroid,
@@ -60,12 +62,8 @@ export function FormularioDoInstalador({
 
   useToastDeErro(estado.erro, 'error', 'erro-do-instalador');
   useToastDeErro(estadoRemocao.erro, 'error', 'erro-ao-remover-instalador');
-  useToastDeErro(estado.sucesso ? 'Instalador atualizado.' : undefined, 'info', 'sucesso-do-instalador');
-  useToastDeErro(
-    estadoRemocao.sucesso ? 'Instalador removido.' : undefined,
-    'info',
-    'sucesso-ao-remover-instalador',
-  );
+  useToastDeSucesso(estado, 'salvo', 'Instalador atualizado.', 'sucesso-do-instalador');
+  useToastDeSucesso(estadoRemocao, 'removido', 'Instalador removido.', 'sucesso-ao-remover-instalador');
 
   const alterado =
     url.trim() !== (androidUrl ?? '') ||

@@ -13,8 +13,9 @@ export function CopiarLink({ url }: { readonly url: string }) {
   const [copiado, setCopiado] = useState(false);
 
   const copiar = (): void => {
-    void navigator.clipboard
-      .writeText(url)
+    // Sem HTTPS `navigator.clipboard` nao existe: vira rejeicao tratada.
+    void Promise.resolve()
+      .then(() => navigator.clipboard.writeText(url))
       .then(() => {
         setCopiado(true);
         setTimeout(() => setCopiado(false), 2000);
