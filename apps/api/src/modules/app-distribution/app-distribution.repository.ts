@@ -24,7 +24,7 @@ const SELECAO = {
 export class AppDistributionRepository {
   constructor(private readonly db: PrismaService) {}
 
-  obter(contexto: TenantContext): Promise<InstaladorAndroid | null> {
+  obter(contexto: Pick<TenantContext, 'tenantId'>): Promise<InstaladorAndroid | null> {
     return this.db.comTenant(async (tx) => {
       const linha = await tx.tenantAppDistribution.findUnique({
         where: { tenantId: contexto.tenantId },

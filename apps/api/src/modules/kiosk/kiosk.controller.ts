@@ -25,7 +25,13 @@ import {
 import { KioskRoute } from '../kiosk-auth/kiosk-route.decorator.js';
 import type { ContextoDoKiosk } from '../kiosk-auth/kiosk-auth.service.js';
 import { KioskAreaDoAlunoService } from './kiosk-area-do-aluno.service.js';
+import { AppDistributionRepository } from '../app-distribution/app-distribution.repository.js';
 import { KioskConfigService, type ConfiguracaoResolvida } from './kiosk-config.service.js';
+
+/** Resposta de `GET /config`: a config resolvida mais o instalador Android (#534). */
+type ConfiguracaoDoTotem = ConfiguracaoResolvida & {
+  readonly appAndroid: { readonly url: string; readonly version: string | null } | null;
+};
 import { KioskEngajamentoService } from './kiosk-engajamento.service.js';
 import { KioskMediaLinkService } from './kiosk-media-link.service.js';
 import { KioskPagamentoService, type CobrancaDoTotem } from './kiosk-pagamento.service.js';
@@ -66,6 +72,7 @@ export class KioskController {
   constructor(
     private readonly config: KioskConfigService,
     private readonly midia: KioskMediaLinkService,
+    private readonly instalador: AppDistributionRepository,
     private readonly sessions: KioskSessionService,
     private readonly area: KioskAreaDoAlunoService,
     private readonly pagamento: KioskPagamentoService,
@@ -153,17 +160,38 @@ export class KioskController {
             modulos: { type: 'object' },
           },
         },
+        appAndroid: {
+          type: 'object',
+          nullable: true,
+          required: ['url', 'version'],
+          properties: {
+            url: { type: 'string' },
+            version: { type: 'string', nullable: true },
+          },
+        },
       },
     },
   })
-  async obterConfig(@Req() requisicao: Request): Promise<ConfiguracaoResolvida> {
+  async obterConfig(@Req() requisicao: Request): Promise<ConfiguracaoDoTotem> {
     const contexto = this.contexto(requisicao);
     const resolvida = await this.config.resolverParaDispositivo(contexto);
 
     // As URLs de midia sao assinadas AQUI, no boot -- nunca pela tela. E o
     // que sustenta `M3.5-FR-005`: o totem recebe endereco pronto, baixa uma
     // vez e serve do cache; a tela publica em si nunca fala com a rede.
-    return this.midia.resolverMidias(contexto, resolvida);
+    const comMidias = await this.midia.resolverMidias(contexto, resolvida);
+
+    // Instalador Android (#534) anexado FORA do `resolverMidias`: ele
+    // reconstroi `{ version, config }` e descartaria qualquer campo de topo
+    // acrescentado antes dele.
+    const instalador = await this.instalador.obter(contexto);
+
+    return {
+      ...comMidias,
+      appAndroid: instalador
+        ? { url: instalador.androidUrl, version: instalador.androidVersion }
+        : null,
+    };
   }
 
   // Login por CPF sozinho (issue #364): o totem fica atras de UM IP na

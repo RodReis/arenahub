@@ -6195,6 +6195,23 @@
                           "type": "object"
                         }
                       }
+                    },
+                    "appAndroid": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "url",
+                        "version"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
                     }
                   }
                 }
