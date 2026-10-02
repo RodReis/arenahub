@@ -36,16 +36,15 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [MVP1][FIX] Ficha do Time: professor sem nascimento, CPF e contato nem edicao de cadastro (#530)
-- [MVP1][SPEC-071][FIX] Primeiro acesso diz 'cadastro nao encontrado' quando a falha e de rede ou 5xx (#528)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][SPEC-071][FIX] Primeiro acesso diz 'cadastro nao encontrado' quando a falha e de rede ou 5xx (#528, finalizado em: 2026-10-02)
+- [MVP1][FIX] Ficha do Time: professor sem nascimento, CPF e contato nem edicao de cadastro (#530, finalizado em: 2026-10-02)
 - [MVP1][FIX] App mobile de producao aponta para localhost: EXPO_PUBLIC_API_URL nao e embutida no build (#532, finalizado em: 2026-10-02)
 - [MVP1] Area do instalador Android: QR no painel e no totem (#534, finalizado em: 2026-10-02)
 - [INFRA] Time e Alunos: coluna Catraca e busca por ID do leitor (#520, finalizado em: 2026-10-02)
