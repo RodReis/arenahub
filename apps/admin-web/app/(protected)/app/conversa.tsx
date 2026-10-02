@@ -24,11 +24,13 @@ export function Conversa({
   readonly destaque?: boolean;
 }) {
   const host = hostDe(link);
+  // Array.from, nao slice: nome que comeca com emoji nao vira meio caractere.
+  const inicial = Array.from(academia)[0] ?? '';
 
   return (
     <div className={estilos['conversa']} data-testid="previa-da-mensagem-conversa">
       <div className={estilos['topoDaConversa']} aria-hidden="true">
-        <span className={estilos['avatar']}>{academia.slice(0, 1)}</span>
+        <span className={estilos['avatar']}>{inicial}</span>
         <span className={estilos['nomeNaConversa']}>{academia}</span>
       </div>
 
@@ -38,9 +40,16 @@ export function Conversa({
           data-destaque={destaque ? 'true' : 'false'}
           data-testid="previa-da-mensagem"
         >
-          <a className={estilos['cartaoDoLink']} href={link} target="_blank" rel="noopener noreferrer">
+          {/* Fora do Tab: o mesmo link esta no texto logo abaixo. */}
+          <a
+            className={estilos['cartaoDoLink']}
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            tabIndex={-1}
+          >
             <span className={estilos['iconeDoCartao']} aria-hidden="true">
-              {academia.slice(0, 1)}
+              {inicial}
             </span>
             <span className={estilos['textoDoCartao']}>
               <strong>Baixe o app da {academia}</strong>

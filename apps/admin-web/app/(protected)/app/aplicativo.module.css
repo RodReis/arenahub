@@ -581,7 +581,7 @@
 }
 
 .botaoWhatsApp:focus-visible {
-  outline: 2px solid var(--ah-carbon-900);
+  outline: 2px solid var(--ah-text-strong);
   outline-offset: 2px;
 }
 

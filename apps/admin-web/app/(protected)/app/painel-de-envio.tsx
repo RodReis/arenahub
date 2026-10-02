@@ -9,6 +9,7 @@ import { salvarInstaladorAndroid, type EstadoDoInstalador } from '../../actions/
 import { Abas, type Aba } from '../../../src/components/abas';
 import estilos from './aplicativo.module.css';
 import { Conversa } from './conversa';
+import { useToastDeSucesso } from './toast-de-sucesso';
 import { MENSAGEM_PADRAO, linkDoWhatsApp, montarMensagem } from './mensagem';
 
 const ESTADO_INICIAL: EstadoDoInstalador = {};
@@ -63,13 +64,18 @@ export function PainelDeEnvio({
   const [estado, acao] = useActionState(salvarInstaladorAndroid, ESTADO_INICIAL);
 
   useToastDeErro(estado.erro, 'error', 'erro-da-mensagem');
-  useToastDeErro(estado.sucesso ? 'Mensagem salva.' : undefined, 'info', 'sucesso-da-mensagem');
+  useToastDeSucesso(estado, 'salvo', 'Mensagem salva.', 'sucesso-da-mensagem');
 
   const mensagem = montarMensagem(texto, { link, academia });
+  // Texto vazio grava o padrao: comparar como o servidor vai gravar, senao o
+  // Salvar fica aceso para sempre depois de gravar o campo em branco.
+  const alterada = (texto.trim() ? texto : MENSAGEM_PADRAO) !== textoGravado;
 
   const copiar = (): void => {
-    void navigator.clipboard
-      .writeText(mensagem)
+    // Sem HTTPS (painel aberto pelo IP da rede) `navigator.clipboard` nao
+    // existe: o erro vira rejeicao tratada em vez de excecao no clique.
+    void Promise.resolve()
+      .then(() => navigator.clipboard.writeText(mensagem))
       .then(() => {
         setCopiada(true);
         setTimeout(() => setCopiada(false), 1800);
@@ -141,7 +147,7 @@ export function PainelDeEnvio({
           >
             Restaurar padrão
           </Button>
-          <BotaoSalvarMensagem alterada={texto !== textoGravado} />
+          <BotaoSalvarMensagem alterada={alterada} />
         </div>
       </form>
     ),
