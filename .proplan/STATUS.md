@@ -39,15 +39,14 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [MVP1][FIX] import-ativos ignora Telefone e Celular separados e não distingue plano já vencido no arquivo (Pessoas-0110) (#508)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] import-ativos ignora Telefone e Celular separados e não distingue plano já vencido no arquivo (Pessoas-0110) (#508, finalizado em: 2026-10-02)
 - [MVP1][FIX] Reconciliar pagamentos de setembro (01 a 30/09): plano pelo valor pago e baixa das faturas faltantes (#510, finalizado em: 2026-10-02)
 - [MVP2][FIX] Receber no balcão: escolha livre dos meses e data do pagamento informada pela recepção (#512, finalizado em: 2026-10-02)
 - [MVP2][FIX] Receber no balcão não mostra mês em aberto preso a assinatura cancelada (set/2026, 7 alunos) (#514, finalizado em: 2026-10-02)
