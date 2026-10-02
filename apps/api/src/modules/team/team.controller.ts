@@ -17,6 +17,8 @@ interface MembroDeTimeDto {
   employmentType: string | null;
   employmentStartedAt: string | null;
   version: number;
+  /** Numeros que o leitor (cartao ou facial) reconhece -- mesmo campo de `/students`. */
+  deviceIds: string[];
 }
 
 interface AgendaDoProfessorDto {
@@ -40,6 +42,7 @@ const SCHEMA_MEMBRO_DE_TIME = {
     employmentType: { type: 'string', nullable: true },
     employmentStartedAt: { type: 'string', nullable: true },
     version: { type: 'number' },
+    deviceIds: { type: 'array', items: { type: 'string' } },
   },
 };
 
@@ -86,6 +89,7 @@ export class TeamController {
       employmentType: membro.employmentType,
       employmentStartedAt: membro.employmentStartedAt?.toISOString().slice(0, 10) ?? null,
       version: membro.version,
+      deviceIds: membro.deviceIds,
     };
   }
 

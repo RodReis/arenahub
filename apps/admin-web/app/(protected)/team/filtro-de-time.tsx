@@ -64,10 +64,10 @@ export function FiltroDeTime({ termoInicial }: Props) {
           id="busca"
           name="q"
           type="search"
-          label="Buscar por nome"
+          label="Buscar por nome ou ID da catraca"
           value={termo}
           onChange={(evento) => setTermo(evento.target.value)}
-          placeholder="Ex.: Fernanda Costa"
+          placeholder="Ex.: Fernanda Costa, 1042"
           data-testid="busca-de-time"
         />
       </div>

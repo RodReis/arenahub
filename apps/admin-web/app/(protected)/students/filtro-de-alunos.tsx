@@ -175,10 +175,10 @@ export function FiltroDeAlunos({
           id="busca"
           name="q"
           type="search"
-          label="Buscar por nome, matrícula ou contato"
+          label="Buscar por nome, matrícula, contato ou ID da catraca"
           value={termo}
           onChange={(evento) => setTermo(evento.target.value)}
-          placeholder="Ex.: Maria, AP-2026-00000001, (41) 99999-0000"
+          placeholder="Ex.: Maria, AP-2026-00000001, (41) 99999-0000, 1042"
           data-testid="busca-de-alunos"
         />
       </div>

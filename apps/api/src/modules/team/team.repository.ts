@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { EmploymentType, StudentProfile } from '@arenahub/database';
+import type { EmploymentType, Prisma, StudentProfile } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -15,7 +15,15 @@ export interface MembroDeTimeRow {
   employmentStartedAt: Date | null;
   archivedAt: Date | null;
   version: number;
+  /** Numeros que o leitor reconhece para este membro -- mesmo campo de `/students`. */
+  deviceIds: string[];
 }
+
+/** `include` de credenciais compartilhado entre `buscar` e `encontrar` -- mesmo padrao de `StudentRepository`. */
+const SELECT_CREDENCIAIS = {
+  orderBy: { createdAt: 'asc' as const },
+  select: { externalId: true },
+};
 
 /** Ocorrencia de grade em que este professor da a aula -- F81, le F77. */
 export interface AgendaDoProfessorRow {
@@ -49,7 +57,7 @@ export class TeamRepository {
         where: {
           tenantId: contexto.tenantId,
           profile: { not: 'STUDENT' },
-          ...(filtro.termo ? { fullName: { contains: filtro.termo, mode: 'insensitive' } } : {}),
+          ...condicaoDeBusca(filtro.termo),
         },
         select: {
           id: true,
@@ -61,12 +69,13 @@ export class TeamRepository {
           employmentStartedAt: true,
           archivedAt: true,
           version: true,
+          credentials: SELECT_CREDENCIAIS,
         },
         orderBy: { fullName: 'asc' },
         take: filtro.limite,
         ...(filtro.cursor ? { skip: 1, cursor: { id: filtro.cursor } } : {}),
       }),
-    ) as Promise<MembroDeTimeRow[]>;
+    ).then((linhas) => linhas.map(paraLinhaDeTime));
   }
 
   async contar(contexto: TenantContext, filtro: { termo?: string | undefined }): Promise<number> {
@@ -75,7 +84,7 @@ export class TeamRepository {
         where: {
           tenantId: contexto.tenantId,
           profile: { not: 'STUDENT' },
-          ...(filtro.termo ? { fullName: { contains: filtro.termo, mode: 'insensitive' } } : {}),
+          ...condicaoDeBusca(filtro.termo),
         },
       }),
     );
@@ -95,9 +104,10 @@ export class TeamRepository {
           employmentStartedAt: true,
           archivedAt: true,
           version: true,
+          credentials: SELECT_CREDENCIAIS,
         },
       }),
-    ) as Promise<MembroDeTimeRow | null>;
+    ).then((linha) => (linha ? paraLinhaDeTime(linha) : null));
   }
 
   /**
@@ -166,7 +176,7 @@ export class TeamRepository {
         },
       });
 
-      return tx.student.findFirst({
+      const atualizado = await tx.student.findFirst({
         where: { id, tenantId: contexto.tenantId },
         select: {
           id: true,
@@ -178,8 +188,11 @@ export class TeamRepository {
           employmentStartedAt: true,
           archivedAt: true,
           version: true,
+          credentials: SELECT_CREDENCIAIS,
         },
-      }) as Promise<MembroDeTimeRow | null>;
+      });
+
+      return atualizado ? paraLinhaDeTime(atualizado) : null;
     });
   }
 
@@ -285,7 +298,7 @@ export class TeamRepository {
         },
       });
 
-      return tx.student.findFirst({
+      const atualizado = await tx.student.findFirst({
         where: { id, tenantId: contexto.tenantId },
         select: {
           id: true,
@@ -297,8 +310,11 @@ export class TeamRepository {
           employmentStartedAt: true,
           archivedAt: true,
           version: true,
+          credentials: SELECT_CREDENCIAIS,
         },
-      }) as Promise<MembroDeTimeRow | null>;
+      });
+
+      return atualizado ? paraLinhaDeTime(atualizado) : null;
     });
   }
 
@@ -325,4 +341,52 @@ export class TeamRepository {
       })),
     );
   }
+}
+
+/**
+ * O `where` de busca -- nome, matricula ou ID da catraca. Mesmo criterio de
+ * `StudentRepository.condicoesDaListagem`: nome por `contains`, matricula e
+ * ID de equipamento por igualdade exata.
+ */
+function condicaoDeBusca(termoBruto?: string): Prisma.StudentWhereInput {
+  const termo = termoBruto?.trim();
+
+  if (!termo) return {};
+
+  return {
+    OR: [
+      { fullName: { contains: termo, mode: 'insensitive' } },
+      { membershipNumber: termo },
+      { credentials: { some: { externalId: termo } } },
+    ],
+  };
+}
+
+/** Linha do Prisma (com `credentials`) -> `MembroDeTimeRow`, numeros de equipamento sem repetidos. */
+function paraLinhaDeTime(linha: {
+  id: string;
+  membershipNumber: string;
+  fullName: string;
+  profile: StudentProfile;
+  gymUnitId: string;
+  employmentType: EmploymentType | null;
+  employmentStartedAt: Date | null;
+  archivedAt: Date | null;
+  version: number;
+  credentials: { externalId: string }[];
+}): MembroDeTimeRow {
+  return {
+    id: linha.id,
+    membershipNumber: linha.membershipNumber,
+    fullName: linha.fullName,
+    // `where` ja filtra `profile != STUDENT` (ou a troca acabou de sair dele,
+    // em `alterarPerfil`) -- o `as` so estreita o tipo que o `where` ja garante.
+    profile: linha.profile as Exclude<StudentProfile, 'STUDENT'>,
+    gymUnitId: linha.gymUnitId,
+    employmentType: linha.employmentType,
+    employmentStartedAt: linha.employmentStartedAt,
+    archivedAt: linha.archivedAt,
+    version: linha.version,
+    deviceIds: [...new Set(linha.credentials.map((c) => c.externalId))],
+  };
 }

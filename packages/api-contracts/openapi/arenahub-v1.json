@@ -1129,6 +1129,12 @@
                       },
                       "version": {
                         "type": "number"
+                      },
+                      "deviceIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
                       }
                     }
                   }
@@ -1188,6 +1194,12 @@
                     },
                     "version": {
                       "type": "number"
+                    },
+                    "deviceIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -1299,6 +1311,12 @@
                     },
                     "version": {
                       "type": "number"
+                    },
+                    "deviceIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -1357,6 +1375,12 @@
                     },
                     "version": {
                       "type": "number"
+                    },
+                    "deviceIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }

@@ -22,6 +22,7 @@ interface MembroDeTime {
   employmentType: string | null;
   employmentStartedAt: string | null;
   version: number;
+  deviceIds: string[];
 }
 
 const POR_PAGINA = 20;
@@ -143,6 +144,14 @@ export default async function PaginaDeTime({
             header: 'Perfil',
             role: 'label',
             render: (membro) => ROTULO_DE_PERFIL[membro.profile] ?? membro.profile,
+          },
+          {
+            key: 'catraca',
+            header: 'Catraca',
+            role: 'code',
+            /** Numero que o leitor reconhece -- mesmo padrao de `/students` (`page.tsx`). */
+            render: (membro) =>
+              membro.deviceIds.length === 0 ? <Ausente /> : membro.deviceIds.join(', '),
           },
           {
             key: 'vinculo',
