@@ -27,19 +27,16 @@ interface Props {
 const ESTADO_DA_INVOICE: EstadoDaInvoice = {};
 
 /**
- * O UNICO PRIMARIO DA TELA (DS-PAINEL §4.8).
- *
- * Era um `<button>` cru, sem classe -- renderizava como texto sublinhado
- * colado na propria nota de rodape, indistinguivel de um link. O `Button` do
- * design system traz o gradiente de acao, a altura de 36 px e o estado
- * `disabled` que o `useFormStatus` precisa mostrar durante o envio.
- *
+ * SECUNDARIO desde 01/10/2026. O primario da tela passou a ser "Receber": o
+ * lote abre a cobranca do mes sozinho, entao gerar sem receber virou o caso
+ * raro -- deixar a fatura aberta para cobrar depois. Um botao cheio de
+ * largura total acima do recebimento disputava o olho com a acao real.
  */
 function BotaoDeGerar() {
   const { pending } = useFormStatus();
 
   return (
-    <Button variant="solid" type="submit" disabled={pending} data-testid="gerar-cobranca">
+    <Button variant="outline" type="submit" disabled={pending} data-testid="gerar-cobranca">
       <Icon name="receipt" />
       {pending ? 'Gerando…' : 'Gerar cobrança do mês'}
     </Button>
@@ -78,8 +75,22 @@ export function PainelDeCobranca({ subscriptionId, subscriptionIdParaPagamento, 
   useToastDeErro(estadoDaInvoice.erro, 'error', 'erro-ao-gerar');
 
   return (
-    <section aria-labelledby="titulo-cobranca">
-      <h2 id="titulo-cobranca">Cobrança</h2>
+    <section aria-labelledby="titulo-cobranca" className={estilos['painel']}>
+      <header className={estilos['cabecalho']}>
+        <h2 id="titulo-cobranca">Cobrança</h2>
+
+        {subscriptionId !== null ? (
+          /*
+            Gerar cobranca e idempotente no servidor (INV-066); a nota fica
+            junto do botao para quem opera saber disso ANTES de clicar de novo.
+          */
+          <form action={gerar} className={estilos['gerar']}>
+            <input type="hidden" name="subscriptionId" value={subscriptionId} />
+            <BotaoDeGerar />
+            <small className={estilos['nota']}>Gerar de novo no mesmo mês não duplica.</small>
+          </form>
+        ) : null}
+      </header>
 
       {subscriptionId === null && subscriptionIdParaPagamento === null ? (
         <EmptyState
@@ -87,45 +98,20 @@ export function PainelDeCobranca({ subscriptionId, subscriptionIdParaPagamento, 
           title="Este aluno não tem assinatura ativa."
           hint="A cobrança nasce da assinatura — atribua um plano antes de gerar."
         />
-      ) : (
-        <>
-          {subscriptionId !== null ? (
-            /*
-              O botao e a nota ficam EMPILHADOS, nao lado a lado. Eram irmaos
-              diretos de um `<form>` sem estilo: o `<small>` colava no rotulo do
-              botao e a frase lia como parte dele ("Gerar cobranca do mesGerar de
-              novo no mesmo mes nao duplica").
-            */
-            <form action={gerar} className={estilos['gerar']}>
-              <input type="hidden" name="subscriptionId" value={subscriptionId} />
-              <BotaoDeGerar />
-              {/*
-                A idempotência é do servidor, mas quem opera precisa saber disso
-                ANTES de clicar de novo — senão evita o clique com medo de cobrar
-                duas vezes, e liga para o suporte.
-              */}
-              <small className={estilos['nota']}>
-                Gerar de novo no mesmo mês não duplica: devolve a mesma cobrança.
-              </small>
-            </form>
-          ) : null}
-
-          {subscriptionIdParaPagamento !== null && mesesPagaveis.length > 0 ? (
-            <FaixaDeMeses
-              // `key` muda sempre que o CONTEUDO da faixa muda (mes pago some,
-              // mes novo aparece, status muda) -- forca remontar o componente
-              // para que `useState(() => selecaoInicial(faixa))` rode de novo.
-              // Sem isso, `router.refresh()` troca a prop mas a selecao antiga
-              // (indices de ANTES do pagamento) sobrevive por cima dos dados
-              // novos -- risco de cobrar mes que o aluno nao pediu.
-              key={mesesPagaveis.map((m) => `${m.competencia}:${m.status}`).join('|')}
-              faixa={mesesPagaveis}
-              subscriptionId={subscriptionIdParaPagamento}
-              onPago={() => router.refresh()}
-            />
-          ) : null}
-        </>
-      )}
+      ) : subscriptionIdParaPagamento !== null && mesesPagaveis.length > 0 ? (
+        <FaixaDeMeses
+          // `key` muda sempre que o CONTEUDO da faixa muda (mes pago some,
+          // mes novo aparece, status muda) -- forca remontar o componente
+          // para que `useState(() => selecaoInicial(faixa))` rode de novo.
+          // Sem isso, `router.refresh()` troca a prop mas a selecao antiga
+          // (indices de ANTES do pagamento) sobrevive por cima dos dados
+          // novos -- risco de cobrar mes que o aluno nao pediu.
+          key={mesesPagaveis.map((m) => `${m.competencia}:${m.status}`).join('|')}
+          faixa={mesesPagaveis}
+          subscriptionId={subscriptionIdParaPagamento}
+          onPago={() => router.refresh()}
+        />
+      ) : null}
     </section>
   );
 }

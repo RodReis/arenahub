@@ -85,6 +85,27 @@ export function diasDeAtraso(
 }
 
 /**
+ * O estado da invoice PARA EXIBIR: `OPEN` cujo dia de vencimento ja passou
+ * vira `OVERDUE`.
+ *
+ * O status gravado so muda quando o job de inadimplencia roda; ate la a
+ * fatura de 09/07 aparecia "Em aberto" em 01/10. A tela nao espera o job:
+ * deriva do `dueAt` em dia civil no fuso da unidade, a mesma conta de
+ * `diasDeAtraso`. Qualquer outro status passa intacto.
+ */
+export function estadoExibido(
+  invoice: { readonly status: string; readonly dueAt: string },
+  agora: Date,
+  timezone: string,
+): string {
+  if (invoice.status === 'OPEN' && diasDeAtraso(invoice, agora, timezone) > 0) {
+    return 'OVERDUE';
+  }
+
+  return invoice.status;
+}
+
+/**
  * A situacao de vencimento da invoice, para exibir sem clicar em nada.
  *
  * TRES REGRAS que decidem tudo aqui:

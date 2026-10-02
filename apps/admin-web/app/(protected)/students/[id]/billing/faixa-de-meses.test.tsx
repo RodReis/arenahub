@@ -119,6 +119,27 @@ describe('FaixaDeMeses', () => {
     await waitFor(() => expect(onPago).toHaveBeenCalled());
   });
 
+  it('action que LANCA (500) mostra toast de erro, destrava o botao e recarrega a faixa', async () => {
+    vi.mocked(receberPagamentoEmLote).mockRejectedValueOnce(new Error('500'));
+    const onPago = vi.fn();
+    renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={onPago} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^receber$/i }));
+
+    expect(await screen.findByTestId('erro-lote')).toHaveTextContent(/não foi possível confirmar/i);
+    expect(screen.getByRole('button', { name: /^receber$/i })).toBeEnabled();
+    expect(onPago).toHaveBeenCalledTimes(1);
+  });
+
+  it('OPEN com vencimento no passado aparece Vencido no chip, mesmo sem o job ter gravado OVERDUE', () => {
+    // set/26 vence em 09/09; o relogio do navegador do teste esta depois disso.
+    renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+    const setembro = screen.getByRole('button', { name: /set\/26/i });
+    expect(setembro).toHaveAttribute('data-tom', 'vencido');
+    expect(setembro).toHaveTextContent('Vencido');
+  });
+
   it('mostra ate quando vale o pagamento: data + 30 dias por mes, mais a carencia', () => {
     renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
 

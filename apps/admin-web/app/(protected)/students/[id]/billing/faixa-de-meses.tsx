@@ -6,6 +6,7 @@ import { Button, Field, Money, useToast } from '@arenahub/ui';
 
 import { receberPagamentoEmLote } from '../../../../actions/billing';
 import {
+  formatarMesAno,
   mesesDispensaveis,
   selecaoInicial,
   vigenteAte,
@@ -21,18 +22,6 @@ interface FaixaDeMesesProps {
   readonly onPago: () => void;
 }
 
-const ROTULO_STATUS: Record<MesPagavelUI['status'], string> = {
-  OVERDUE: 'Vencido',
-  OPEN: 'Em aberto',
-  NOT_OPENED: 'Adiantado',
-};
-
-function formatarMesAno(competencia: string): string {
-  const [ano, mes] = competencia.split('-');
-  const nomes = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-  return `${nomes[Number(mes) - 1]}/${ano!.slice(2)}`;
-}
-
 function formatarData(iso: string): string {
   const [ano, mes, dia] = iso.split('-');
   return `${dia}/${mes}/${ano}`;
@@ -45,6 +34,26 @@ function hojeLocal(): string {
   const dia = String(agora.getDate()).padStart(2, '0');
   return `${agora.getFullYear()}-${mes}-${dia}`;
 }
+
+type TomDoMes = 'vencido' | 'aberto' | 'adiantado';
+
+/**
+ * O tom do chip. VENCIDO pelo `dueAt` tambem, nao so pelo status: o job de
+ * inadimplencia pode nao ter rodado, e `OPEN` de setembro em outubro e
+ * atraso de verdade (mesma regra de `estadoExibido` na grid). `hoje` vazio
+ * (antes de montar no cliente) nao marca nada como vencido.
+ */
+function tomDoMes(mes: MesPagavelUI, hoje: string): TomDoMes {
+  if (mes.status === 'OVERDUE') return 'vencido';
+  if (hoje !== '' && mes.status === 'OPEN' && mes.dueAt.slice(0, 10) < hoje) return 'vencido';
+  return mes.status === 'OPEN' ? 'aberto' : 'adiantado';
+}
+
+const ROTULO_DO_TOM: Record<TomDoMes, string> = {
+  vencido: 'Vencido',
+  aberto: 'Em aberto',
+  adiantado: 'Adiantado',
+};
 
 /**
  * Receber no balcao -- F83, Task 7, com a escolha LIVRE dos meses.
@@ -67,12 +76,14 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
   const [dataPagamento, setDataPagamento] = useState('');
   const [forma, setForma] = useState<FormaDePagamento>('DINHEIRO');
   const [enviando, setEnviando] = useState(false);
+  const [hoje, setHoje] = useState('');
   const { show } = useToast();
 
   // So no cliente: `hojeLocal()` no render do servidor (UTC) divergiria do
   // navegador perto da meia-noite e geraria erro de hidratacao.
   useEffect(() => {
     setDataPagamento(hojeLocal());
+    setHoje(hojeLocal());
   }, []);
 
   const selecao = useMemo(() => faixa.filter((m) => selecionados.has(m.competencia)), [faixa, selecionados]);
@@ -111,29 +122,40 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
 
     setEnviando(true);
 
-    const resultado = await receberPagamentoEmLote({
-      subscriptionId,
-      competencias: selecao.map((m) => m.competencia),
-      dispensar: dispensadosValidos,
-      paidAt: dataPagamento,
-      channel: forma,
-      expectedTotalMinor: total,
-    });
+    /*
+     * `try/finally`: se a action LANCAR (500, rede), sem isto o botao ficava
+     * preso em "Recebendo…" e a tela muda -- nenhum toast, nenhum refresh.
+     * Quem estava no balcao nao sabia se o dinheiro tinha entrado.
+     */
+    try {
+      const resultado = await receberPagamentoEmLote({
+        subscriptionId,
+        competencias: selecao.map((m) => m.competencia),
+        dispensar: dispensadosValidos,
+        paidAt: dataPagamento,
+        channel: forma,
+        expectedTotalMinor: total,
+      });
 
-    setEnviando(false);
-
-    if (!resultado.ok) {
-      show('warn', resultado.error, 'erro-lote');
-      onPago(); // forca recarregar a faixa com os valores atuais
-      return;
+      if (resultado.ok) {
+        show(
+          'info',
+          `${selecao.length} ${selecao.length === 1 ? 'mês recebido' : 'meses recebidos'}`,
+          'lote-recebido',
+        );
+      } else {
+        show('warn', resultado.error, 'erro-lote');
+      }
+    } catch {
+      show(
+        'error',
+        'Não foi possível confirmar o recebimento. Confira a grid antes de cobrar de novo.',
+        'erro-lote',
+      );
+    } finally {
+      setEnviando(false);
+      onPago(); // recarrega a faixa e a grid com o estado do servidor
     }
-
-    show(
-      'info',
-      `${selecao.length} ${selecao.length === 1 ? 'mês recebido' : 'meses recebidos'}`,
-      'lote-recebido',
-    );
-    onPago();
   }
 
   return (
@@ -143,6 +165,8 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
       <div className={styles['chips']}>
         {faixa.map((mes) => {
           const marcado = selecionados.has(mes.competencia);
+          const tom = tomDoMes(mes, hoje);
+          const ehMesAtual = hoje !== '' && mes.competencia === hoje.slice(0, 7);
 
           return (
             <button
@@ -150,11 +174,14 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
               type="button"
               className={styles['chip']}
               data-selecionado={marcado ? 'true' : undefined}
+              data-tom={tom}
+              data-mes-atual={ehMesAtual ? 'true' : undefined}
               onClick={() => alternar(mes.competencia)}
               aria-pressed={marcado}
             >
               <span className={styles['mesAno']}>{formatarMesAno(mes.competencia)}</span>
-              <span className={styles['status']}>{ROTULO_STATUS[mes.status]}</span>
+              {ehMesAtual ? <span className={styles['marcaAtual']}>Mês atual</span> : null}
+              <span className={styles['status']}>{ROTULO_DO_TOM[tom]}</span>
               <span className={styles['valor']}>
                 <Money cents={mes.totalMinor} />
               </span>

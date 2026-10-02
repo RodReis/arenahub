@@ -36,6 +36,14 @@
     "neutral": { "ref": "carbon.500",       "bgAlpha": 0.10, "borderAlpha": 0.32 }
   },
 
+  "channel": {
+    "$comment": "Canal de recebimento (DS-PAINEL.md §2.3b). Identidade do canal, NAO estado -- o gate de contraste e o mesmo de `state` (texto sobre o proprio tint de 10%).",
+    "cash":   { "ref": "channel.cash" },
+    "pix":    { "ref": "channel.pix" },
+    "debit":  { "ref": "channel.debit" },
+    "credit": { "ref": "channel.credit" }
+  },
+
   "action": {
     "$comment": "RESOLVIDO POR CONTRASTE, nunca por numero fixo de tom -- DS-PAINEL.md §2.3. O resolvedor varre a rampa e escolhe o MENOR tom que atinge o alvo. Trocar o seed do tenant re-resolve; nao ha numero magico a manter.",
     "solid":    { "resolve": "minToneWithContrast", "against": "#FFFFFF", "target": 4.5, "$expected": "accent.600" },

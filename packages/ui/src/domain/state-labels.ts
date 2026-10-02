@@ -288,9 +288,14 @@ export const STATE_LABELS: Dictionary = {
 
   invoice: {
     DRAFT: { label: 'Rascunho', tone: 'neutral', icon: 'minus' },
-    OPEN: { label: 'Em aberto', tone: 'info', icon: 'clock' },
+    // `danger` (decisao do PI, 01/10/2026): fatura em aberto e dinheiro que
+    // ainda nao entrou. Vencida se distingue pelo rotulo e pelo icone.
+    OPEN: { label: 'Em aberto', tone: 'danger', icon: 'clock' },
     PAID: { label: 'Paga', tone: 'success', icon: 'check-circle' },
-    OVERDUE: { label: 'Vencida', tone: 'warning', icon: 'alert-circle' },
+    // `danger`, nao `warning` (decisao do PI, 01/10/2026): vencida e o problema
+    // que a recepcao precisa resolver, e o painel `SituacaoAtual` ja a pinta
+    // em `danger` -- badge ambar ao lado de painel vermelho dizia duas coisas.
+    OVERDUE: { label: 'Vencida', tone: 'danger', icon: 'alert-circle' },
     CANCELLED: { label: 'Cancelada', tone: 'neutral', icon: 'x-circle' },
     REFUNDED: { label: 'Estornada', tone: 'neutral', icon: 'refresh-cw' },
   },

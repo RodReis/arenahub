@@ -1,21 +1,47 @@
 /**
- * Painel de cobranca -- F-painel-financeiro, reformado em 29/09/2026.
- * O bloco de recebimento migrou para `faixa-de-meses.module.css` na F83
- * (Task 7) -- so sobra aqui o que pertence ao "Gerar cobranca do mes".
+ * Painel de cobranca -- reformado em 01/10/2026. So camada semantica (regra 2
+ * de lint).
  *
- * So camada semantica (regra 2 de lint).
+ * O painel e um CARD com respiro: antes, o recebimento encostava na borda
+ * esquerda da pagina e os chips pareciam cortados.
  */
+.painel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 24px;
+  padding: 20px 24px 24px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+}
+
+.cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+}
+
+.cabecalho h2 {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-heading-size);
+  line-height: var(--ah-type-heading-lh);
+  font-weight: var(--ah-type-heading-weight);
+}
 
 .gerar {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
 }
 
 .nota {
   color: var(--ah-text-secondary);
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
-  /* Medida de leitura: a frase explica uma regra do servidor, nao um rotulo. */
-  max-inline-size: 60ch;
 }

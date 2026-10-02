@@ -29,16 +29,19 @@ export type FormaDePagamento = 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
  * fisico na mao de quem paga, e inventar dois desenhos diferentes para o
  * mesmo plastico ensinaria uma distincao que nao existe no balcao.
  */
-const FORMAS: readonly {
+/* `canal` aponta para `--ah-channel-*` (DS-PAINEL §2.3b): a mesma cor
+ * identifica o canal aqui e na coluna Recebimento da grid. */
+export const FORMAS: readonly {
   readonly forma: FormaDePagamento;
   readonly rotulo: string;
   readonly icone: IconName;
   readonly testId: string;
+  readonly canal: 'cash' | 'pix' | 'debit' | 'credit';
 }[] = [
-  { forma: 'DINHEIRO', rotulo: 'Dinheiro', icone: 'banknote', testId: 'forma-dinheiro' },
-  { forma: 'PIX', rotulo: 'PIX', icone: 'qr-code', testId: 'forma-pix' },
-  { forma: 'DEBITO', rotulo: 'Débito', icone: 'credit-card', testId: 'forma-debito' },
-  { forma: 'CREDITO', rotulo: 'Crédito', icone: 'credit-card', testId: 'forma-credito' },
+  { forma: 'DINHEIRO', rotulo: 'Dinheiro', icone: 'banknote', testId: 'forma-dinheiro', canal: 'cash' },
+  { forma: 'PIX', rotulo: 'PIX', icone: 'qr-code', testId: 'forma-pix', canal: 'pix' },
+  { forma: 'DEBITO', rotulo: 'Débito', icone: 'credit-card', testId: 'forma-debito', canal: 'debit' },
+  { forma: 'CREDITO', rotulo: 'Crédito', icone: 'credit-card', testId: 'forma-credito', canal: 'credit' },
 ];
 
 interface Props {
@@ -53,7 +56,7 @@ export function SeletorDeForma({ onEscolher, escolhida = null }: Props) {
       <legend className={estilos['legenda']}>Forma de pagamento</legend>
 
       <div className={estilos['opcoes']}>
-        {FORMAS.map(({ forma, rotulo, icone, testId }) => {
+        {FORMAS.map(({ forma, rotulo, icone, testId, canal }) => {
           const estaEscolhida = escolhida === forma;
 
           return (
@@ -78,6 +81,7 @@ export function SeletorDeForma({ onEscolher, escolhida = null }: Props) {
                */
               aria-pressed={estaEscolhida}
               data-escolhida={estaEscolhida ? 'true' : undefined}
+              data-canal={canal}
               onClick={() => onEscolher(forma)}
             >
               <Icon name={icone} />
