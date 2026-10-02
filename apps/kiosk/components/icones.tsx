@@ -84,3 +84,13 @@ export function IconeInstagram(props: PropsDeIcone) {
     </Base>
   );
 }
+
+/** Celular: o "Baixar o app" da barra inferior e o cabecalho da tela do QR (#534). */
+export function IconeCelular(props: PropsDeIcone) {
+  return (
+    <Base {...props}>
+      <rect x="6" y="2.5" width="12" height="19" rx="2.5" />
+      <path d="M11 18.5h2" />
+    </Base>
+  );
+}

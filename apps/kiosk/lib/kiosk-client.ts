@@ -27,9 +27,16 @@ export interface SessaoDoAluno {
   readonly expiraEm: string;
 }
 
+/** Instalador Android da academia (#534). Ausente/`null` = sem link: o botao some. */
+export interface InstaladorDoApp {
+  readonly url: string;
+  readonly version: string | null;
+}
+
 export interface ConfigDoTotem {
   readonly version: number;
   readonly config: KioskConfig;
+  readonly appAndroid?: InstaladorDoApp | null;
 }
 
 /**
