@@ -97,6 +97,19 @@ describe('perfis de sistema', () => {
       expect(PERMISSOES_DA_RECEPCAO).not.toContain('access.override');
       expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.refund');
     });
+
+    it('recebe no balcao e emite o recibo -- decisao do PI, 02/10/2026', () => {
+      expect(PERMISSOES_DA_RECEPCAO).toContain('billing.payment.manual');
+      expect(PERMISSOES_DA_RECEPCAO).toContain('receipt.issue');
+      // Receber nao e gerenciar cobranca nem liberar quem deve.
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.manage');
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.override.financial');
+    });
+
+    it('ve o time sem poder trocar perfil -- decisao do PI, 02/10/2026', () => {
+      expect(PERMISSOES_DA_RECEPCAO).toContain('team.read');
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('team.update');
+    });
   });
 
   describe('financeiro', () => {

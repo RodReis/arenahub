@@ -211,7 +211,14 @@ export const PERMISSOES_DA_RECEPCAO = [
   'student.update',
   'plan.read',
   'billing.read',
+  // RECEBER NO BALCAO -- decisao do PI, 02/10/2026: a recepcao da Arena
+  // Positiva recebia "Seu perfil nao tem permissao" ao registrar o
+  // pagamento (dinheiro, PIX, debito, credito na maquininha). Recebe e emite
+  // o recibo do que recebeu; estorno (`billing.refund`), liberacao
+  // financeira e o painel gerencial continuam fora.
+  'billing.payment.manual',
   'receipt.read',
+  'receipt.issue',
   'consent.manage',
   'consent.read',
   'biometric.enroll',
@@ -220,6 +227,10 @@ export const PERMISSOES_DA_RECEPCAO = [
   'class.read',
   'health.upload',
   'engagement.read',
+  // VER O TIME -- decisao do PI, 02/10/2026: a recepcao consulta quem e
+  // professor e funcionario. So leitura: trocar perfil (`team.update`) segue
+  // com dono e gerente.
+  'team.read',
 ];
 
 /**
