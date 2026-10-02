@@ -183,5 +183,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-30 | #458 | SPEC-083 | integração | 1351 | 1351 | 0 | 81.1 | [#472](https://github.com/RodReis/arenahub/pull/472) — CI verde nos dois jobs (integração+E2E, lint/typecheck/guardas); E2E não confirmado ao vivo nesta sessão de desenvolvimento (porta ocupada), mas passou no CI |
 | 2026-10-02 | #534 | — | unitário | 4077 | 4077 | 0 | 74.5 | #535 |
 | 2026-10-02 | #534 | — | integração | 1440 | 1440 | 0 | 81.6 | #535 |
-| 2026-10-02 | #538 | — | unitário | 4106 | 4106 | 0 | 74.5 | — |
-| 2026-10-02 | #538 | — | integração | 1453 | 1453 | 0 | 81.7 | — |
+| 2026-10-02 | #538 | — | unitário | 4106 | 4106 | 0 | 74.5 | #539 |
+| 2026-10-02 | #538 | — | integração | 1453 | 1453 | 0 | 81.7 | #539 |
