@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,6 +9,7 @@ updated: 2026-10-01
 
 ### Sem épico
 
+- [MVP1][FIX] Catraca continua destravada só 5 s: a ponte não chama EnviarConfiguracoes e o CATRACA_TEMPO_LIBERADA_S não chega ao equipamento (#507)
 - [MVP1][FIX] service:install registra node.exe direto como serviço Windows — não sobe (#499)
 - [MVP1][FIX] Reatribuir o Edge de um dispositivo — hoje não há como desfazer a reivindicação automática (#488) (#490)
 - [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
@@ -31,17 +32,25 @@ _(vazio)_
 
 ## Em Andamento
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][FIX] Teste do adapter Topdata exige ack do reg antes de ele atravessar o socket (#518)
+- [MVP2][FIX] Financeiro do aluno: fatura vencida aparece "Em aberto", Receber fica mudo em erro e balcão sem destaque (#516)
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][FIX] import-ativos ignora Telefone e Celular separados e não distingue plano já vencido no arquivo (Pessoas-0110) (#508)
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] Reconciliar pagamentos de setembro (01 a 30/09): plano pelo valor pago e baixa das faturas faltantes (#510, finalizado em: 2026-10-02)
+- [MVP2][FIX] Receber no balcão: escolha livre dos meses e data do pagamento informada pela recepção (#512, finalizado em: 2026-10-02)
+- [MVP2][FIX] Receber no balcão não mostra mês em aberto preso a assinatura cancelada (set/2026, 7 alunos) (#514, finalizado em: 2026-10-02)
 - [MVP1] Fotos dos alunos vindas do leitor facial: importar, gravar e mostrar na lista (#503, finalizado em: 2026-10-01)
 - [MVP1][FIX] Leitor facial que não reconecta ao agente fica invisível: log mudo e heartbeat informa o leitor como ativo (#504, finalizado em: 2026-10-01)
 - [MVP1][FIX] Catraca destravada só 5 s (fixo na ponte) — liberado e "Não passou" (#497, finalizado em: 2026-10-01)
