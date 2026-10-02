@@ -438,6 +438,25 @@ describe('F49 -- heartbeat e config do totem', () => {
       });
     });
 
+    it('o heartbeat tambem leva o link: trocar o instalador chega ao totem sem recarregar', async () => {
+      const lerHeartbeat = async () =>
+        request(servidor())
+          .post('/api/v1/kiosk/heartbeat')
+          .set(assinarPedido(totemA, CORPO, '/api/v1/kiosk/heartbeat'))
+          .send(CORPO)
+          .expect(200);
+
+      expect((await lerHeartbeat()).body).toMatchObject({ appAndroid: null });
+
+      await db.tenantAppDistribution.create({
+        data: { tenantId: totemA.tenantId, androidUrl: 'https://expo.dev/novo.apk', androidVersion: '0.2.0' },
+      });
+
+      expect((await lerHeartbeat()).body).toMatchObject({
+        appAndroid: { url: 'https://expo.dev/novo.apk', version: '0.2.0' },
+      });
+    });
+
     it('o link da academia B NAO aparece no totem da A', async () => {
       await db.tenantAppDistribution.create({
         data: { tenantId: totemB.tenantId, androidUrl: 'https://expo.dev/b.apk' },

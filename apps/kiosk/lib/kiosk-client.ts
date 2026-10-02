@@ -71,6 +71,11 @@ export interface RespostaDeHeartbeat {
    * de "sem numero ainda".
    */
   readonly indicadores?: IndicadoresDaUnidade;
+  /**
+   * Instalador Android (#534). `undefined` = API antiga, que nao manda o campo
+   * (nao apaga o valor conhecido); `null` = a academia removeu o link.
+   */
+  readonly appAndroid?: InstaladorDoApp | null;
 }
 
 /**

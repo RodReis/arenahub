@@ -86,29 +86,41 @@ export function FormularioDoInstalador({
 
         <div className={estilos['acoes']}>
           {androidUrl && confirmando ? (
-            <span className={estilos['confirmacao']}>Tirar o instalador do ar?</span>
-          ) : null}
-          {androidUrl ? (
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => setConfirmando((atual) => !atual)}
-              data-testid="remover-instalador"
-            >
-              {confirmando ? 'Cancelar' : 'Remover'}
-            </Button>
-          ) : null}
-          <BotaoSalvar alterado={alterado} />
+            <>
+              <span className={estilos['confirmacao']}>Tirar o instalador do ar?</span>
+              <Button type="button" variant="outline" onClick={() => setConfirmando(false)}>
+                Cancelar
+              </Button>
+              {/* Envia o OUTRO formulario (abaixo, invisivel): dois formularios
+                  nao se aninham, e o `form=` liga o botao a ele. */}
+              <Button
+                type="submit"
+                form="form-remover-instalador"
+                variant="destructive"
+                data-testid="confirmar-remocao-do-instalador"
+              >
+                Remover o instalador
+              </Button>
+            </>
+          ) : (
+            <>
+              {androidUrl ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setConfirmando(true)}
+                  data-testid="remover-instalador"
+                >
+                  Remover
+                </Button>
+              ) : null}
+              <BotaoSalvar alterado={alterado} />
+            </>
+          )}
         </div>
       </form>
 
-      {androidUrl && confirmando ? (
-        <form action={acaoRemover} className={estilos['acoes']}>
-          <Button type="submit" variant="destructive" data-testid="confirmar-remocao-do-instalador">
-            Remover o instalador
-          </Button>
-        </form>
-      ) : null}
+      <form id="form-remover-instalador" action={acaoRemover} hidden />
     </div>
   );
 }

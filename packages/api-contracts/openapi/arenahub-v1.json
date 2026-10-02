@@ -6100,6 +6100,24 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "appAndroid": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "Instalador Android da academia (#534). Pega carona aqui para o totem acompanhar a troca do link sem recarregar.",
+                      "required": [
+                        "url",
+                        "version"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
+                    },
                     "indicadores": {
                       "type": "object",
                       "required": [

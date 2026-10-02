@@ -91,6 +91,16 @@ export class KioskController {
       properties: {
         configVersion: { type: 'integer' },
         serverTime: { type: 'string', format: 'date-time' },
+        appAndroid: {
+          type: 'object',
+          nullable: true,
+          description: 'Instalador Android da academia (#534). Pega carona aqui para o totem acompanhar a troca do link sem recarregar.',
+          required: ['url', 'version'],
+          properties: {
+            url: { type: 'string' },
+            version: { type: 'string', nullable: true },
+          },
+        },
         indicadores: {
           type: 'object',
           required: ['checkinsDeHoje', 'treinandoAgora', 'placar'],
@@ -122,6 +132,7 @@ export class KioskController {
     configVersion: number;
     serverTime: string;
     indicadores: IndicadoresDaUnidade;
+    appAndroid: { url: string; version: string | null } | null;
   }> {
     const contexto = this.contexto(requisicao);
     const dados = heartbeatSchema.parse(corpo);
@@ -139,7 +150,19 @@ export class KioskController {
 
     // `configVersion` nasce AQUI, na F49: a F50 declara este endpoint como
     // pre-existente e compara este numero com o do boot (ADR-042, Decisao 3).
-    return { configVersion: version, serverTime: agora.toISOString(), indicadores };
+    // O link do instalador (#534) pega a mesma carona: so a `configVersion`
+    // reinicia o totem, e trocar o APK nao a muda -- sem isto o QR ficaria
+    // velho ate alguem recarregar a tela.
+    const instalador = await this.instalador.obter(contexto);
+
+    return {
+      configVersion: version,
+      serverTime: agora.toISOString(),
+      indicadores,
+      appAndroid: instalador
+        ? { url: instalador.androidUrl, version: instalador.androidVersion }
+        : null,
+    };
   }
 
   @Get('config')

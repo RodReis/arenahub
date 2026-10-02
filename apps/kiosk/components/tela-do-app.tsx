@@ -45,9 +45,15 @@ export function TelaDoApp({
   useEffect(() => {
     let ativo = true;
 
-    void QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then((svg) => {
-      if (ativo) setQr(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
-    });
+    void QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' })
+      .then((svg) => {
+        if (ativo) setQr(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+      })
+      // URL que nao cabe no QR: a tela segue de pe, sem imagem, e o link
+      // continua no painel. Rejeicao solta nao pode virar erro nao tratado.
+      .catch(() => {
+        if (ativo) setQr(null);
+      });
 
     return () => {
       ativo = false;

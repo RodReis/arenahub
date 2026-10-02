@@ -128,6 +128,12 @@ export default function Totem() {
           setIndicadores(resposta.indicadores);
         }
 
+        // Mesma regra para o instalador (#534): trocar o APK nao muda a
+        // `configVersion`, entao o link chega por aqui e nao por reinicio.
+        if (resposta.appAndroid !== undefined) {
+          setAppAndroid(resposta.appAndroid);
+        }
+
         const decisao = decidirReinicio({
           versaoDoBoot: versaoDoBootRef.current,
           versaoAtual: resposta.configVersion,
@@ -259,7 +265,25 @@ export default function Totem() {
 
   return (
     <>
-      {etapa === 'atrator' ? (
+      {etapa === 'cpf' ? (
+        <IdentificacaoCpf
+          ocupado={ocupado}
+          aoConfirmar={(cpf) => {
+            void confirmar(cpf);
+          }}
+          aoVoltar={voltarAoInicio}
+        />
+      ) : etapa === 'app' && appAndroid ? (
+        // `&& appAndroid`: se a academia remover o link com esta tela aberta,
+        // o heartbeat zera o estado e a tela cai na espera -- nunca no CPF.
+        <TelaDoApp
+          url={appAndroid.url}
+          version={appAndroid.version}
+          aoVoltar={() => {
+            setEtapa('atrator');
+          }}
+        />
+      ) : (
         <Atrator
           config={config}
           indicadores={indicadores}
@@ -275,22 +299,6 @@ export default function Totem() {
                 },
               }
             : {})}
-        />
-      ) : etapa === 'app' && appAndroid ? (
-        <TelaDoApp
-          url={appAndroid.url}
-          version={appAndroid.version}
-          aoVoltar={() => {
-            setEtapa('atrator');
-          }}
-        />
-      ) : (
-        <IdentificacaoCpf
-          ocupado={ocupado}
-          aoConfirmar={(cpf) => {
-            void confirmar(cpf);
-          }}
-          aoVoltar={voltarAoInicio}
         />
       )}
       <Toast

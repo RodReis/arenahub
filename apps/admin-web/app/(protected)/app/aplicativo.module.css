@@ -91,6 +91,12 @@
   min-width: 0;
 }
 
+/* O botao nunca quebra o rotulo: o link cede (reticencias), o botao nao. */
+.linhaDoLink > button {
+  flex: none;
+  white-space: nowrap;
+}
+
 .link {
   flex: 1 1 auto;
   min-width: 0;
@@ -163,17 +169,23 @@
 
 .acoes {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   padding-top: 16px;
   border-top: 1px solid var(--ah-border-subtle);
 }
 
+.acoes > button {
+  white-space: nowrap;
+}
+
+/* A pergunta ocupa a linha inteira; os botoes descem para a linha de baixo. */
 .confirmacao {
+  flex: 1 1 100%;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-right: auto;
   font-size: var(--ah-type-caption-size);
   color: var(--ah-text-secondary);
 }

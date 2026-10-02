@@ -14,6 +14,7 @@ describe('urlDeInstaladorValida', () => {
     ['vazia', ''],
     ['sem esquema', 'expo.dev/a.apk'],
     ['nao string', 42],
+    ['com usuario e senha na URL', 'https://usuario:senha@expo.dev/a.apk'],
     ['gigante', `https://expo.dev/${'a'.repeat(LIMITE_DA_URL)}`],
   ])('recusa %s', (_caso, valor) => {
     expect(urlDeInstaladorValida(valor)).toBe(false);

@@ -10,7 +10,11 @@ export function urlDeInstaladorValida(bruta: unknown): boolean {
   if (typeof bruta !== 'string' || bruta === '' || bruta.length > LIMITE_DA_URL) return false;
 
   try {
-    return new URL(bruta).protocol === 'https:';
+    const url = new URL(bruta);
+
+    // `https://usuario:senha@host`: credencial na URL vai parar no QR, no
+    // log do proxy e no historico do navegador do aluno.
+    return url.protocol === 'https:' && url.username === '' && url.password === '';
   } catch {
     return false;
   }
