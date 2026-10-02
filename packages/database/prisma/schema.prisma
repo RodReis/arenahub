@@ -713,6 +713,7 @@ model Tenant {
   biometricIdentities BiometricIdentity[]
   biometricAccessLogs BiometricAccessLog[]
   privacySettings     TenantPrivacySettings?
+  appDistribution     TenantAppDistribution?
   edgeNodes           EdgeNode[]
   edgeCredentials     EdgeCredential[]
   edgePairingCodes    EdgePairingCode[]
@@ -2335,6 +2336,21 @@ model TenantPrivacySettings {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_privacy_settings")
+}
+
+/// Instalador Android da academia -- issue #534. Uma linha por academia; o
+/// proprio tenant e a PK (mesmo molde de `TenantPrivacySettings`).
+model TenantAppDistribution {
+  tenantId        String   @id @map("tenant_id") @db.Uuid
+  androidUrl      String   @map("android_url")
+  androidVersion  String?  @map("android_version")
+  /// Quem salvou. Sem FK de proposito: o link sobrevive a saida do usuario.
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_app_distribution")
 }
 
 // ---------------------------------------------------------------------------
