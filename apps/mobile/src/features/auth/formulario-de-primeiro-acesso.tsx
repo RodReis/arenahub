@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
+import { ErroDeApi } from '../../api/cliente.js';
 import { Badge } from '../../ui/Badge.js';
 import { Botao } from '../../ui/Botao.js';
 import { Campo } from '../../ui/Campo.js';
@@ -17,6 +18,16 @@ export interface AtivacaoEncontrada {
   readonly local: string;
   readonly dataInicio: string;
   readonly activationRef: string;
+}
+
+/**
+ * So uma RESPOSTA da API que recusa o pedido (4xx, fora o limite de tentativas)
+ * diz "nao encontrado". Rede fora, 5xx e 429 nao dizem nada sobre o cadastro --
+ * afirmar o contrario fez o aluno procurar a administracao por um problema de
+ * conexao.
+ */
+function cadastroNaoEncontrado(erro: unknown): boolean {
+  return erro instanceof ErroDeApi && erro.status < 500 && erro.status !== 429;
 }
 
 /** `2026-01-05` -> `05/01/2026`. So para exibicao -- o corpo da API usa ISO. */
@@ -72,8 +83,12 @@ export function FormularioDePrimeiroAcesso({
 
     void onConsultar({ cpf, dataNascimento: dataIso })
       .then(setEncontrado)
-      .catch(() => {
-        setErroDaConsulta('Não encontramos seu cadastro. Procure a administração da academia.');
+      .catch((erro: unknown) => {
+        setErroDaConsulta(
+          cadastroNaoEncontrado(erro)
+            ? 'Não encontramos seu cadastro. Procure a administração da academia.'
+            : 'Não foi possível consultar agora. Confira sua conexão e tente de novo.',
+        );
       })
       .finally(() => setConsultando(false));
   };

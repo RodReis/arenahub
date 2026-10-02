@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 
+import { ErroDeApi } from '../../api/cliente.js';
 import { ProvedorDeTema } from '../../ui/theme.js';
 import { FormularioDePrimeiroAcesso, type AtivacaoEncontrada } from './formulario-de-primeiro-acesso.js';
 
@@ -63,7 +64,9 @@ describe('FormularioDePrimeiroAcesso', () => {
   });
 
   it('nao encontrado mostra mensagem unica pedindo para procurar a administracao', async () => {
-    const onConsultar = jest.fn(() => Promise.reject(new Error('AUTH_INVALID_CREDENTIALS')));
+    const onConsultar = jest.fn(() =>
+      Promise.reject(new ErroDeApi(401, 'AUTH_INVALID_CREDENTIALS', null)),
+    );
     renderizar(onConsultar);
 
     preencherConsulta();
@@ -71,6 +74,21 @@ describe('FormularioDePrimeiroAcesso', () => {
 
     expect(await screen.findByText(/procure a administração/i)).toBeTruthy();
     expect(screen.queryByTestId('campo-nova-senha')).toBeNull();
+  });
+
+  it.each([
+    ['sem rede', new TypeError('Network request failed')],
+    ['erro 500 do servidor', new ErroDeApi(500, undefined, null)],
+    ['limite de tentativas', new ErroDeApi(429, undefined, null)],
+  ])('%s nao diz que o cadastro nao existe', async (_caso, erro) => {
+    const onConsultar = jest.fn(() => Promise.reject(erro));
+    renderizar(onConsultar);
+
+    preencherConsulta();
+    fireEvent.press(screen.getByTestId('botao-consultar-primeiro-acesso'));
+
+    expect(await screen.findByText(/não foi possível consultar agora/i)).toBeTruthy();
+    expect(screen.queryByText(/procure a administração/i)).toBeNull();
   });
 
   it('recusa senha curta antes de chamar onCriarSenha', async () => {
