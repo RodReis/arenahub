@@ -30,6 +30,7 @@ const PROFESSOR = {
   employmentType: 'CLT',
   employmentStartedAt: '2024-01-10',
   version: 0,
+  deviceIds: ['1042'],
 };
 
 const FUNCIONARIO_SEM_VINCULO = {
@@ -41,6 +42,7 @@ const FUNCIONARIO_SEM_VINCULO = {
   employmentType: null,
   employmentStartedAt: null,
   version: 0,
+  deviceIds: [],
 };
 
 function responder(membros: unknown[]) {

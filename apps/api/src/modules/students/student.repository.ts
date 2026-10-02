@@ -1322,6 +1322,9 @@ async function condicoesDaListagem(
         ? [{ id: { in: idsSemAcento } } satisfies Prisma.StudentWhereInput]
         : []),
       { membershipNumber: termo },
+      // ID da catraca (cartao ou facial) -- igualdade exata, mesmo criterio
+      // de `membershipNumber`: e um numero de equipamento, nao texto livre.
+      { credentials: { some: { externalId: termo } } },
       ...(pareceTelefone
         ? [{ contacts: { some: { value: { contains: digitos } } } } satisfies Prisma.StudentWhereInput]
         : []),
