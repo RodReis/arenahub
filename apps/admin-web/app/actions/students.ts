@@ -721,6 +721,7 @@ export async function editarAluno(
   }
 
   revalidatePath(`/students/${studentId}`);
+  revalidatePath(`/team/${studentId}`);
   revalidatePath('/students');
 
   return { sucesso: { version: resposta.dados.version } };
