@@ -20,7 +20,7 @@ Tabela `tenant_app_distribution`, uma linha por academia:
 
 | coluna | tipo | nota |
 |---|---|---|
-| `tenant_id` | uuid, unico | regra 2; RLS como as demais tabelas |
+| `tenant_id` | uuid, PK | regra 2; RLS com a politica da F66 (hoje so `students` e `audit_logs` tem; esta seria a 3a) |
 | `android_url` | text | `https`, ate 2048 caracteres |
 | `android_version` | text | texto livre curto (ate 40), ex.: `0.1.0 (build 8)` |
 | `updated_at` | timestamptz | |
