@@ -33,8 +33,6 @@ _(vazio)_
 
 ### Sem épico
 
-- [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
-- [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417)
 - [FIX] painel financeiro deve abrir no mes corrente por default (#435)
 
 ## Finalizado
@@ -42,6 +40,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417, finalizado em: 2026-10-03)
+- [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451, finalizado em: 2026-10-03)
 - [MVP1][FIX] service:install registra node.exe direto como serviço Windows — não sobe (#499, finalizado em: 2026-10-03)
 - [MVP1][FIX] Catraca continua destravada só 5 s: a ponte não chama EnviarConfiguracoes e o CATRACA_TEMPO_LIBERADA_S não chega ao equipamento (#507, finalizado em: 2026-10-03)
 - [MVP1] Aplicativo: link curto proprio, mensagem pronta para o aluno e QR ampliavel (#538, finalizado em: 2026-10-02)
@@ -153,8 +153,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
+- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
