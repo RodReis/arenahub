@@ -576,6 +576,14 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
   gap: 10px;
 }
 
+/* Diz por que a linha some da lista: a saída é giro livre, só há horário de entrada. */
+.janelaDoFeed {
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 500;
+  color: var(--ah-text-secondary);
+}
+
 /*
  * O ÍCONE do título ganha a cor de ação -- é o único ponto de accent do
  * cartão, e o que distingue "Placar do mês" de "Feriados do mês" antes de a
@@ -693,6 +701,16 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
   font-weight: 600;
   color: var(--ah-text-secondary);
   font-variant-numeric: tabular-nums;
+}
+
+/* Link do nome: a cor do texto, sublinhado só ao apontar (o `a` global é azul e sublinhado). */
+.linkDoNome {
+  color: inherit;
+  text-decoration: none;
+}
+.linkDoNome:hover {
+  color: var(--ah-action-text);
+  text-decoration: underline;
 }
 
 .nomeDoFeed {

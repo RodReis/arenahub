@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Icon, StateBadge, TenantDateTime } from '@arenahub/ui';
@@ -7,6 +8,7 @@ import { Icon, StateBadge, TenantDateTime } from '@arenahub/ui';
 import { lerFeedDeAcessos, type EventoDoFeed } from '../../actions/dashboard';
 import { CartaoDeBloqueados, type SituacaoDoDashboard } from './cartao-de-bloqueados';
 import { doisNomes } from './dois-nomes';
+import { JANELA_DE_PERMANENCIA_MIN, naJanelaDePermanencia } from './permanencia';
 import { recusadosDoDia } from './recusados';
 import estilos from './dashboard.module.css';
 
@@ -47,6 +49,8 @@ interface Props {
 export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: Props) {
   const [eventos, setEventos] = useState<readonly EventoDoFeed[]>(inicial);
   const [pausado, setPausado] = useState(false);
+  /** Relógio da janela de permanência: avança a cada leitura, não a cada render. */
+  const [agora, setAgora] = useState(() => Date.now());
 
   /*
    * `useRef` para o estado de "ainda montado": a resposta de uma leitura em
@@ -60,9 +64,12 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: P
 
     // Falha de rede mantém a lista anterior. Zerar o feed porque uma leitura
     // falhou diria "ninguém passou na catraca", que é o oposto do que houve.
-    if (montado.current && resposta.erro === undefined) {
-      setEventos(resposta.eventos);
-    }
+    if (!montado.current) return;
+
+    // O relógio anda mesmo se a leitura falhou: a lista antiga continua na
+    // tela, mas quem passou da janela de permanência sai dela.
+    setAgora(Date.now());
+    if (resposta.erro === undefined) setEventos(resposta.eventos);
   }, [gymUnitId, desde]);
 
   useEffect(() => {
@@ -109,12 +116,19 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: P
     };
   }, [atualizar]);
 
+  // A lista mostra quem provavelmente ainda está na academia; o cartão de
+  // bloqueados segue lendo o DIA inteiro (`eventos`).
+  const naAcademia = naJanelaDePermanencia(eventos, agora);
+
   return (
     <>
       <details className={estilos['cartao']} open>
         <summary className={estilos['cabecalhoDoCartao']}>
           <h2 className={estilos['tituloDoCartao']}>Acessos em tempo real</h2>
           <span className={estilos['acoesDoCabecalho']}>
+            <span className={estilos['janelaDoFeed']} data-testid="janela-do-feed">
+              últimos {JANELA_DE_PERMANENCIA_MIN} min
+            </span>
             <span
               className={estilos['aoVivo']}
               data-pausado={pausado}
@@ -129,13 +143,13 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: P
         </summary>
 
         <div className={estilos['conteudoDoCartao']}>
-          {eventos.length === 0 ? (
+          {naAcademia.length === 0 ? (
             <div className={estilos['vazio']}>
               <span className={estilos['iconeDoVazio']}>
                 <Icon name="clock" />
               </span>
               <span className={estilos['textoDoVazio']}>
-                Nenhum acesso ainda hoje.
+                Ninguém passou na catraca nos últimos {JANELA_DE_PERMANENCIA_MIN} min.
                 <span className={estilos['saidaDoVazio']}>
                   A lista se preenche sozinha quando alguém passar na catraca.
                 </span>
@@ -146,7 +160,7 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: P
               className={`${estilos['lista']} ${estilos['listaRolavel']}`}
               data-testid="feed-de-acessos"
             >
-              {eventos.map((evento) => (
+              {naAcademia.map((evento) => (
                 /*
                 `key` é o id do evento, e é o que faz a animação de entrada
                 funcionar: com índice o React reusaria a mesma linha do DOM e
@@ -164,9 +178,16 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: P
                     esconde justamente o que diferencia duas Brunas.
                   */}
                     <span className={estilos['nomeDoFeed']}>
-                      {evento.student
-                        ? doisNomes(evento.student.fullName)
-                        : (evento.externalUserId ?? 'Não identificado')}
+                      {evento.student ? (
+                        <Link
+                          className={estilos['linkDoNome']}
+                          href={`/students/${evento.student.id}`}
+                        >
+                          {doisNomes(evento.student.fullName)}
+                        </Link>
+                      ) : (
+                        (evento.externalUserId ?? 'Não identificado')
+                      )}
                     </span>
                   </span>
                   {/*

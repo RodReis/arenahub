@@ -20,7 +20,7 @@ export interface EventoDoFeed {
   outcome: string;
   reason: string;
   method: string;
-  student: { fullName: string } | null;
+  student: { id: string; fullName: string } | null;
   externalUserId: string | null;
 }
 
