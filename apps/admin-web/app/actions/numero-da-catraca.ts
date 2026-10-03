@@ -46,9 +46,18 @@ export async function gerarNumeroDaCatraca(
   formulario: FormData,
 ): Promise<EstadoDoNumero> {
   const bruto = formulario.get('externalId');
+  const temNumero = typeof bruto === 'string' && bruto.trim() !== '';
+
+  // Defesa em profundidade: o formulario "Do leitor" sem numero escolhido
+  // NUNCA pode cair no corpo vazio -- isso GERARIA um numero novo quando a
+  // recepcao escolheu o do leitor, e ela cadastraria a face duas vezes.
+  if (formulario.get('origem') === 'leitor' && !temNumero) {
+    return { erro: 'Escolha um número do leitor.' };
+  }
+
   const validado = esquema.safeParse({
     studentId: formulario.get('studentId'),
-    externalId: typeof bruto === 'string' && bruto.trim() !== '' ? bruto : undefined,
+    externalId: temNumero ? bruto : undefined,
   });
 
   if (!validado.success) {
@@ -72,8 +81,14 @@ export async function gerarNumeroDaCatraca(
   return { numero: resposta.dados.externalId, vinculado: resposta.dados.linkedReaders > 0 };
 }
 
-export async function listarNumerosDoLeitorSemAluno(): Promise<NumeroDoLeitor[]> {
+/**
+ * `{ ok: false }` e diferente de lista vazia: "nenhum numero livre" manda a
+ * recepcao gerar um novo, e falha de rede nao pode dar esse conselho.
+ */
+export type ListaDoLeitor = { ok: true; itens: NumeroDoLeitor[] } | { ok: false };
+
+export async function listarNumerosDoLeitorSemAluno(): Promise<ListaDoLeitor> {
   const resposta = await chamarApi<NumeroDoLeitor[]>('/api/v1/device-reader-numbers/unlinked');
 
-  return resposta.ok && resposta.dados ? resposta.dados : [];
+  return resposta.ok && resposta.dados ? { ok: true, itens: resposta.dados } : { ok: false };
 }

@@ -12,13 +12,16 @@ import type { EstadoDoNumero } from '../../actions/numero-da-catraca';
  * `useActionState`, que e o unico ponto onde o resultado chega a tela. O
  * envio de verdade e do E2E (Task 7).
  */
-const controle: { estado: EstadoDoNumero } = vi.hoisted(() => ({ estado: {} }));
+const controle: { estado: EstadoDoNumero; despachar: ReturnType<typeof vi.fn> } = vi.hoisted(() => ({
+  estado: {},
+  despachar: vi.fn(),
+}));
 
 vi.mock('react', async (original) => {
   const real = await original<typeof import('react')>();
   return {
     ...real,
-    useActionState: () => [controle.estado, vi.fn(), false],
+    useActionState: () => [controle.estado, controle.despachar, false],
   };
 });
 
@@ -42,6 +45,16 @@ beforeAll(() => {
 
 const ALUNO = '11111111-1111-4111-8111-111111111111';
 
+const DOIS = [
+  { externalId: '100000000123', readerName: 'MARIA S', deviceSerial: 'AYTI1' },
+  { externalId: '100000000124', readerName: null, deviceSerial: 'AYTI1' },
+];
+
+async function abrirAbaDoLeitor(usuario: ReturnType<typeof userEvent.setup>) {
+  await usuario.click(screen.getByRole('button', { name: 'Número da catraca' }));
+  await usuario.click(screen.getByRole('tab', { name: 'Do leitor' }));
+}
+
 function renderizar() {
   return render(
     <ToastProvider>
@@ -53,7 +66,9 @@ function renderizar() {
 describe('NumeroDaCatraca', () => {
   beforeEach(() => {
     controle.estado = {};
-    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue([]);
+    controle.despachar = vi.fn();
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockReset();
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue({ ok: true, itens: [] });
   });
 
   it('abre o dialogo ao clicar no icone', async () => {
@@ -81,10 +96,7 @@ describe('NumeroDaCatraca', () => {
   });
 
   it('aba "Do leitor" lista numero com nome e numero sem nome, valor so com digitos', async () => {
-    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue([
-      { externalId: '100000000123', readerName: 'MARIA S', deviceSerial: 'AYTI1' },
-      { externalId: '100000000124', readerName: null, deviceSerial: 'AYTI1' },
-    ]);
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue({ ok: true, itens: DOIS });
     const usuario = userEvent.setup();
     renderizar();
 
@@ -101,10 +113,13 @@ describe('NumeroDaCatraca', () => {
   });
 
   it('a busca filtra por nome', async () => {
-    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue([
-      { externalId: '100000000123', readerName: 'MARIA S', deviceSerial: 'AYTI1' },
-      { externalId: '100000000124', readerName: 'JOAO', deviceSerial: 'AYTI1' },
-    ]);
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue({
+      ok: true,
+      itens: [
+        { externalId: '100000000123', readerName: 'MARIA S', deviceSerial: 'AYTI1' },
+        { externalId: '100000000124', readerName: 'JOAO', deviceSerial: 'AYTI1' },
+      ],
+    });
     const usuario = userEvent.setup();
     renderizar();
 
@@ -114,6 +129,107 @@ describe('NumeroDaCatraca', () => {
     await usuario.type(screen.getByTestId('busca-numero-leitor'), 'maria');
 
     expect(screen.getAllByRole('radio')).toHaveLength(1);
+  });
+});
+
+describe('NumeroDaCatraca -- aba Do leitor nunca gera numero novo', () => {
+  beforeEach(() => {
+    controle.estado = {};
+    controle.despachar = vi.fn();
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockReset();
+  });
+
+  it('nao busca a lista antes de abrir o dialogo', () => {
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue({ ok: true, itens: DOIS });
+    renderizar();
+    expect(listarNumerosDoLeitorSemAluno).not.toHaveBeenCalled();
+  });
+
+  it('lista vazia: mensagem de vazio e envio desabilitado', async () => {
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue({ ok: true, itens: [] });
+    const usuario = userEvent.setup();
+    renderizar();
+    await abrirAbaDoLeitor(usuario);
+
+    expect(await screen.findByTestId('sem-numeros-do-leitor')).toHaveTextContent('Nenhum número do leitor está livre');
+    expect(screen.getByTestId('usar-numero-do-leitor')).toBeDisabled();
+  });
+
+  it('sem escolha fica desabilitado; escolher habilita; busca que esconde a escolha desfaz', async () => {
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue({ ok: true, itens: DOIS });
+    const usuario = userEvent.setup();
+    renderizar();
+    await abrirAbaDoLeitor(usuario);
+    await screen.findByTestId('numeros-do-leitor');
+
+    const enviar = screen.getByTestId('usar-numero-do-leitor');
+    expect(enviar).toBeDisabled();
+
+    await usuario.click(screen.getByRole('radio', { name: '100000000123 — MARIA S' }));
+    expect(enviar).toBeEnabled();
+
+    await usuario.type(screen.getByTestId('busca-numero-leitor'), '124');
+    expect(enviar).toBeDisabled();
+
+    await usuario.clear(screen.getByTestId('busca-numero-leitor'));
+    expect(screen.getByRole('radio', { name: '100000000123 — MARIA S' })).not.toBeChecked();
+    expect(enviar).toBeDisabled();
+  });
+
+  it('Enter na busca sem escolha nao chama a action', async () => {
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue({ ok: true, itens: DOIS });
+    const usuario = userEvent.setup();
+    renderizar();
+    await abrirAbaDoLeitor(usuario);
+    await screen.findByTestId('numeros-do-leitor');
+
+    await usuario.type(screen.getByTestId('busca-numero-leitor'), 'zzz{Enter}');
+    await usuario.clear(screen.getByTestId('busca-numero-leitor'));
+    await usuario.type(screen.getByTestId('busca-numero-leitor'), '{Enter}');
+
+    expect(controle.despachar).not.toHaveBeenCalled();
+  });
+
+  it('o formulario do leitor leva origem=leitor', async () => {
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue({ ok: true, itens: DOIS });
+    const usuario = userEvent.setup();
+    renderizar();
+    await abrirAbaDoLeitor(usuario);
+
+    const painel = screen.getByTestId('painel-leitor');
+    expect(painel.querySelector('input[name="origem"]')).toHaveValue('leitor');
+    expect(screen.getByTestId('painel-gerar').querySelector('input[name="origem"]')).toBeNull();
+  });
+
+  it('falha ao carregar: aviso proprio, toast, sem estourar a pagina; tentar de novo recarrega', async () => {
+    vi.mocked(listarNumerosDoLeitorSemAluno)
+      .mockRejectedValueOnce(new Error('rede'))
+      .mockResolvedValueOnce({ ok: true, itens: DOIS });
+    const usuario = userEvent.setup();
+    renderizar();
+    await abrirAbaDoLeitor(usuario);
+
+    expect(await screen.findByTestId('falha-lista-do-leitor')).toBeInTheDocument();
+    expect(screen.getByTestId('erro-lista-do-leitor')).toHaveTextContent(
+      'Não foi possível carregar os números do leitor.',
+    );
+    expect(screen.queryByTestId('sem-numeros-do-leitor')).not.toBeInTheDocument();
+    expect(screen.getByTestId('usar-numero-do-leitor')).toBeDisabled();
+
+    await usuario.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByTestId('numeros-do-leitor')).toBeInTheDocument();
+    expect(screen.queryByTestId('falha-lista-do-leitor')).not.toBeInTheDocument();
+  });
+
+  it('API respondendo erro (ok: false) tambem e falha, nao lista vazia', async () => {
+    vi.mocked(listarNumerosDoLeitorSemAluno).mockResolvedValue({ ok: false });
+    const usuario = userEvent.setup();
+    renderizar();
+    await abrirAbaDoLeitor(usuario);
+
+    expect(await screen.findByTestId('falha-lista-do-leitor')).toBeInTheDocument();
+    expect(screen.queryByTestId('sem-numeros-do-leitor')).not.toBeInTheDocument();
   });
 });
 

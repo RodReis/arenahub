@@ -8,10 +8,11 @@ import { gerarNumeroDaCatraca, listarNumerosDoLeitorSemAluno } from './numero-da
 
 const ALUNO = '11111111-1111-4111-8111-111111111111';
 
-function formulario(externalId?: string): FormData {
+function formulario(externalId?: string, origem?: string): FormData {
   const dados = new FormData();
   dados.set('studentId', ALUNO);
   if (externalId !== undefined) dados.set('externalId', externalId);
+  if (origem !== undefined) dados.set('origem', origem);
   return dados;
 }
 
@@ -68,6 +69,31 @@ describe('gerarNumeroDaCatraca', () => {
     expect(r.erro).toBe('Este número já está vinculado a outro aluno.');
   });
 
+  it('origem leitor sem numero escolhido NAO gera numero novo', async () => {
+    expect(await gerarNumeroDaCatraca({}, formulario(undefined, 'leitor'))).toEqual({
+      erro: 'Escolha um número do leitor.',
+    });
+    expect(await gerarNumeroDaCatraca({}, formulario('  ', 'leitor'))).toEqual({
+      erro: 'Escolha um número do leitor.',
+    });
+    expect(chamarApi).not.toHaveBeenCalled();
+  });
+
+  it('origem leitor com numero manda o numero', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({
+      ok: true,
+      dados: { externalId: '100000000123', linkedReaders: 0 },
+      cookiesDaApi: [],
+    });
+
+    await gerarNumeroDaCatraca({}, formulario('100000000123', 'leitor'));
+
+    expect(chamarApi).toHaveBeenCalledWith(`/api/v1/students/${ALUNO}/turnstile-number`, {
+      metodo: 'POST',
+      corpo: { externalId: '100000000123' },
+    });
+  });
+
   it('numero com letra ou longo demais nem chega na API', async () => {
     expect((await gerarNumeroDaCatraca({}, formulario('12a'))).erro).toBe('Número inválido');
     expect((await gerarNumeroDaCatraca({}, formulario('1234567890123'))).erro).toBe('Número inválido');
@@ -78,14 +104,17 @@ describe('gerarNumeroDaCatraca', () => {
 describe('listarNumerosDoLeitorSemAluno', () => {
   beforeEach(() => vi.mocked(chamarApi).mockReset());
 
-  it('devolve a lista da API e vazio quando ela falha', async () => {
+  it('devolve a lista da API e distingue falha de lista vazia', async () => {
     const lista = [{ externalId: '100000000123', readerName: 'MARIA S', deviceSerial: 'AYTI1' }];
     vi.mocked(chamarApi).mockResolvedValueOnce({ ok: true, dados: lista, cookiesDaApi: [] });
 
-    expect(await listarNumerosDoLeitorSemAluno()).toEqual(lista);
+    expect(await listarNumerosDoLeitorSemAluno()).toEqual({ ok: true, itens: lista });
     expect(chamarApi).toHaveBeenCalledWith('/api/v1/device-reader-numbers/unlinked');
 
+    vi.mocked(chamarApi).mockResolvedValueOnce({ ok: true, dados: [], cookiesDaApi: [] });
+    expect(await listarNumerosDoLeitorSemAluno()).toEqual({ ok: true, itens: [] });
+
     vi.mocked(chamarApi).mockResolvedValueOnce({ ok: false, cookiesDaApi: [] });
-    expect(await listarNumerosDoLeitorSemAluno()).toEqual([]);
+    expect(await listarNumerosDoLeitorSemAluno()).toEqual({ ok: false });
   });
 });

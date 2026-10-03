@@ -30,11 +30,26 @@ function emBlocos(numero: string): string[] {
 export function NumeroEmDestaque({ numero, vinculado }: Props) {
   const { show } = useToast();
 
-  const copiar = (): void => {
-    navigator.clipboard
-      .writeText(numero)
-      .then(() => show('info', 'Número copiado', 'numero-copiado'))
-      .catch(() => show('warn', 'Não foi possível copiar. Selecione o número e copie à mão.'));
+  const avisarFalha = (): void =>
+    show('warn', 'Não foi possível copiar. Selecione o número e copie manualmente.');
+
+  /*
+   * Painel aberto por http://192.168.x.x no balcao NAO e contexto seguro:
+   * `navigator.clipboard` e `undefined` e `.writeText` estouraria FORA do
+   * `.catch` da promise -- clique mudo. Por isso o try e o `?.`.
+   */
+  const copiar = async (): Promise<void> => {
+    try {
+      const escrever = navigator.clipboard?.writeText.bind(navigator.clipboard);
+      if (escrever === undefined) {
+        avisarFalha();
+        return;
+      }
+      await escrever(numero);
+      show('info', 'Número copiado', 'numero-copiado');
+    } catch {
+      avisarFalha();
+    }
   };
 
   return (
@@ -48,19 +63,18 @@ export function NumeroEmDestaque({ numero, vinculado }: Props) {
         ))}
       </output>
 
-      <div className={estilos['copiar']}>
-        <Button type="button" variant="outline" onClick={copiar}>
+      <div className={estilos['rodape']}>
+        {vinculado === undefined ? null : (
+          <p className={estilos['situacao']} data-vinculado={vinculado}>
+            {vinculado
+              ? 'Este número já está vinculado ao leitor.'
+              : 'Agora cadastre a face no leitor com este número.'}
+          </p>
+        )}
+        <Button type="button" variant="outline" onClick={() => void copiar()}>
           Copiar número
         </Button>
       </div>
-
-      {vinculado === undefined ? null : (
-        <p className={estilos['situacao']} data-vinculado={vinculado}>
-          {vinculado
-            ? 'Este número já está vinculado ao leitor.'
-            : 'Agora cadastre a face no leitor com este número.'}
-        </p>
-      )}
     </div>
   );
 }

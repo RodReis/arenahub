@@ -33,6 +33,33 @@ describe('NumeroEmDestaque', () => {
     await waitFor(() => expect(screen.getByText('Número copiado')).toBeInTheDocument());
   });
 
+  it('sem Clipboard API (http na rede local) avisa por toast e nao estoura', async () => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+
+    renderizar();
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar número' }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('Não foi possível copiar. Selecione o número e copie manualmente.'),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it('writeText recusado avisa por toast', async () => {
+    const writeText = vi.fn(() => Promise.reject(new Error('negado')));
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+    renderizar();
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar número' }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('Não foi possível copiar. Selecione o número e copie manualmente.'),
+      ).toBeInTheDocument(),
+    );
+  });
+
   it('vinculado diz que o leitor ja tem o numero', () => {
     renderizar(true);
     expect(screen.getByText(/já está vinculado ao leitor/)).toBeInTheDocument();

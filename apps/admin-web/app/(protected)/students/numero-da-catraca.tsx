@@ -1,10 +1,10 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { FcKey } from 'react-icons/fc';
 
-import { Button, Field, Tabs, useToastDeErro } from '@arenahub/ui';
+import { Button, Field, Tabs, useToast, useToastDeErro } from '@arenahub/ui';
 
 import { NumeroEmDestaque } from '@/components/numero-em-destaque';
 
@@ -58,11 +58,19 @@ export function opcoesDoLeitor(lista: readonly NumeroDoLeitor[]): OpcaoDoLeitor[
   return [...porNumero.values()];
 }
 
-function BotaoDeEnvio({ children, testId }: { readonly children: string; readonly testId: string }) {
+function BotaoDeEnvio({
+  children,
+  testId,
+  bloqueado = false,
+}: {
+  readonly children: string;
+  readonly testId: string;
+  readonly bloqueado?: boolean;
+}) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" disabled={pending} data-testid={testId}>
+    <Button type="submit" disabled={pending || bloqueado} data-testid={testId}>
       {pending ? 'Aguarde…' : children}
     </Button>
   );
@@ -79,8 +87,11 @@ export function NumeroDaCatraca({ studentId }: { readonly studentId: string }) {
   const [aberto, setAberto] = useState(false);
   const [estado, acao] = useActionState(gerarNumeroDaCatraca, ESTADO_INICIAL);
   const [numeros, setNumeros] = useState<OpcaoDoLeitor[] | null>(null);
+  const [falhouLista, setFalhouLista] = useState(false);
   const [carregando, iniciar] = useTransition();
   const [busca, setBusca] = useState('');
+  const [escolhido, setEscolhido] = useState<string | null>(null);
+  const { show } = useToast();
   const elemento = useRef<HTMLDialogElement>(null);
 
   useToastDeErro(estado.erro, 'error', 'erro-numero-catraca');
@@ -105,18 +116,54 @@ export function NumeroDaCatraca({ studentId }: { readonly studentId: string }) {
 
   // Carrega a lista do leitor a cada abertura: outro aluno pode ter levado
   // um numero desde a ultima vez.
-  useEffect(() => {
-    if (!aberto) return;
-
+  //
+  // A falha NAO pode escapar da transicao: Server Action rejeitada dentro de
+  // transicao async do React 19 sobe ao error boundary e troca a lista de
+  // alunos inteira pela tela de erro. E falha nao pode virar "nenhum numero
+  // livre", que manda gerar outro e duplica o cadastro da face.
+  const carregar = useCallback((): void => {
     iniciar(async () => {
-      setNumeros(opcoesDoLeitor(await listarNumerosDoLeitorSemAluno()));
-    });
-  }, [aberto]);
+      let lista: Awaited<ReturnType<typeof listarNumerosDoLeitorSemAluno>> = { ok: false };
+      try {
+        lista = await listarNumerosDoLeitorSemAluno();
+      } catch {
+        // cai no aviso abaixo
+      }
 
-  const termo = busca.trim().toLowerCase();
-  const filtrados = (numeros ?? []).filter(
-    (o) => termo === '' || o.numero.includes(termo) || (o.nome?.toLowerCase().includes(termo) ?? false),
-  );
+      if (lista.ok) {
+        setNumeros(opcoesDoLeitor(lista.itens));
+        setFalhouLista(false);
+        return;
+      }
+
+      setFalhouLista(true);
+      show('error', 'Não foi possível carregar os números do leitor.', 'erro-lista-do-leitor');
+    });
+  }, [show]);
+
+  useEffect(() => {
+    if (aberto) carregar();
+  }, [aberto, carregar]);
+
+  const filtrar = (lista: readonly OpcaoDoLeitor[], texto: string): OpcaoDoLeitor[] => {
+    const termo = texto.trim().toLowerCase();
+    return lista.filter(
+      (o) => termo === '' || o.numero.includes(termo) || (o.nome?.toLowerCase().includes(termo) ?? false),
+    );
+  };
+
+  const filtrados = filtrar(numeros ?? [], busca);
+  // So conta a escolha que esta NA TELA: escolha escondida pela busca ou
+  // sumida no recarregamento nao habilita o envio.
+  const escolhaVisivel =
+    escolhido !== null && filtrados.some((o) => o.numero === escolhido) ? escolhido : null;
+
+  const aoBuscar = (texto: string): void => {
+    setBusca(texto);
+    if (escolhido !== null && !filtrar(numeros ?? [], texto).some((o) => o.numero === escolhido)) {
+      setEscolhido(null);
+    }
+  };
 
   const abaGerar = (
     <form action={acao} className={estilos['aba']}>
@@ -131,19 +178,40 @@ export function NumeroDaCatraca({ studentId }: { readonly studentId: string }) {
   );
 
   const abaLeitor = (
-    <form action={acao} className={estilos['aba']}>
+    <form
+      action={acao}
+      className={estilos['aba']}
+      onSubmit={(evento) => {
+        // Sem numero visivel escolhido, envio nenhum: o corpo sairia vazio e
+        // a API GERARIA um numero novo. A action tambem recusa (`origem`).
+        if (escolhaVisivel === null) evento.preventDefault();
+      }}
+    >
       <input type="hidden" name="studentId" value={studentId} />
+      <input type="hidden" name="origem" value="leitor" />
       <Field
         id={`busca-numero-leitor-${studentId}`}
         type="search"
         label="Buscar número ou nome"
         value={busca}
-        onChange={(evento) => setBusca(evento.target.value)}
+        onChange={(evento) => aoBuscar(evento.target.value)}
+        onKeyDown={(evento) => {
+          if (evento.key === 'Enter' && escolhaVisivel === null) evento.preventDefault();
+        }}
         autoComplete="off"
         data-testid="busca-numero-leitor"
       />
 
-      {numeros === null || carregando ? (
+      {falhouLista && !carregando ? (
+        <div className={estilos['falha']} data-testid="falha-lista-do-leitor">
+          <p className={dialogo['notaDoDialogo']}>Não foi possível carregar os números do leitor.</p>
+          <div>
+            <Button type="button" variant="outline" onClick={carregar}>
+              Tentar de novo
+            </Button>
+          </div>
+        </div>
+      ) : numeros === null || carregando ? (
         <p className={dialogo['notaDoDialogo']}>Carregando números do leitor…</p>
       ) : filtrados.length === 0 ? (
         <p className={dialogo['notaDoDialogo']} data-testid="sem-numeros-do-leitor">
@@ -156,7 +224,13 @@ export function NumeroDaCatraca({ studentId }: { readonly studentId: string }) {
           <legend className={estilos['legenda']}>Números no leitor sem aluno</legend>
           {filtrados.map((opcao) => (
             <label key={opcao.chave} className={estilos['opcao']}>
-              <input type="radio" name="externalId" value={opcao.numero} required />
+              <input
+                type="radio"
+                name="externalId"
+                value={opcao.numero}
+                checked={escolhaVisivel === opcao.numero}
+                onChange={() => setEscolhido(opcao.numero)}
+              />
               <span className={estilos['numeroDaOpcao']}>{opcao.numero}</span>{' '}
               {opcao.nome === null ? null : (
                 <span className={estilos['nomeDaOpcao']} title={opcao.nome}>
@@ -169,7 +243,9 @@ export function NumeroDaCatraca({ studentId }: { readonly studentId: string }) {
       )}
 
       <div>
-        <BotaoDeEnvio testId="usar-numero-do-leitor">Usar este número</BotaoDeEnvio>
+        <BotaoDeEnvio testId="usar-numero-do-leitor" bloqueado={escolhaVisivel === null}>
+          Usar este número
+        </BotaoDeEnvio>
       </div>
     </form>
   );

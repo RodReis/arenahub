@@ -11,19 +11,19 @@
  * e solta um anel de brilho no accent que assenta na sombra de elevacao.
  * Desligado em `prefers-reduced-motion`.
  *
+ * O NUMERO NUNCA QUEBRA. "100 000" sobre "000 007" se le como dois numeros.
+ * Ele mora numa linha so, e o tamanho segue a LARGURA DA PLACA (container
+ * query, `cqi`), nao a da janela: no modal de 460 px a janela e larga e a
+ * placa e estreita, e media query de viewport nunca dispararia ali.
+ *
  * So camada semantica `--ah-*`; tintos por `color-mix` sobre token (a guarda
  * `check-css-tokens` aceita composicao sobre token).
  */
 .placa {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    'rotulo copiar'
-    'numero copiar'
-    'situacao situacao';
-  align-items: center;
-  column-gap: 16px;
-  row-gap: 2px;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding: 14px 20px 16px;
   border: 2px solid var(--ah-action-solid);
   border-radius: 10px;
@@ -33,7 +33,6 @@
 }
 
 .rotulo {
-  grid-area: rotulo;
   margin: 0;
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
@@ -42,13 +41,22 @@
 }
 
 .numero {
-  grid-area: numero;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   column-gap: 0.45ch;
+  white-space: nowrap;
   font-family: var(--ah-font-mono);
-  /* ~40 px: um degrau acima do display (28 px) -- le-se a um passo do balcao. */
-  font-size: calc(var(--ah-type-display-size) * 1.43);
+  /*
+    Doze digitos mono + tres vaos de .45ch + tracking ocupam ~8,25em. Com
+    11cqi a linha usa ~91% da placa em qualquer largura; o teto (~40 px) vale
+    na ficha larga, o piso (20 px) no celular. Conta no relatorio da Task 6.
+  */
+  font-size: var(--ah-type-display-size);
+  font-size: clamp(
+    var(--ah-type-title-size),
+    11cqi,
+    calc(var(--ah-type-display-size) * 1.43)
+  );
   line-height: 1.15;
   font-weight: var(--ah-type-display-weight);
   font-variant-numeric: tabular-nums;
@@ -58,15 +66,25 @@
   user-select: all;
 }
 
-.copiar {
-  grid-area: copiar;
+/* Situacao a esquerda, copiar a direita; sem espaco, o botao desce. */
+.rodape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--ah-action-solid) 25%, transparent);
+}
+
+.rodape > :last-child {
+  margin-left: auto;
 }
 
 .situacao {
-  grid-area: situacao;
-  margin: 8px 0 0;
-  padding-top: 8px;
-  border-top: 1px solid color-mix(in srgb, var(--ah-action-solid) 25%, transparent);
+  flex: 1 1 12rem;
+  margin: 0;
   font-size: var(--ah-type-body-size);
   line-height: var(--ah-type-body-lh);
   color: var(--ah-text-default);
@@ -100,14 +118,5 @@
 @media (prefers-reduced-motion: reduce) {
   .placa {
     animation: none;
-  }
-}
-
-/* Celular / janela estreita: o botao desce para baixo do numero. */
-@media (max-width: 480px) {
-  .placa {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'rotulo' 'numero' 'copiar' 'situacao';
-    row-gap: 8px;
   }
 }
