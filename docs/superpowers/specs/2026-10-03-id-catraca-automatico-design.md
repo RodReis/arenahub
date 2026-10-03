@@ -34,13 +34,16 @@ vínculo só nasce quando o leitor informa o número à nuvem **e** o número j�
    `@@unique([tenantId, kind, externalId])`; em conflito, recalcula e tenta **uma** vez;
    persistindo, `409 CREDENTIAL_ALREADY_ASSIGNED`. Aluno que já tem credencial
    `FACIAL_ENROLL_ID` recebe o número existente (idempotente — não troca).
-2. **`POST /students`** gera a credencial `FACIAL_ENROLL_ID` na mesma transação da criação e
-   devolve o número na resposta.
+2. **`POST /students`** gera a credencial `FACIAL_ENROLL_ID` logo após a criação (transação
+   própria — se falhar, o aluno existe sem número e a ação da lista cobre). A ficha exibe o
+   número; a resposta do `POST` não muda de contrato.
 3. **Vínculo imediato ao gravar credencial** (gerada, escolhida ou digitada via
    `PUT /students/:id/credentials`): se algum leitor do tenant tem o número em
    `DeviceReaderNumber`, cria o `DeviceUser` na hora reaproveitando
-   `VincularCadastroLegadoUseCase` — sem esperar reinício do Edge. Troca de número desativa o
-   `DeviceUser` do número antigo.
+   `VincularCadastroLegadoUseCase` — sem esperar reinício do Edge. Troca de número **reaponta**
+   o `DeviceUser` existente para o número novo (`@@unique([deviceId, identityId])` impede um
+   segundo vínculo do mesmo aluno no leitor) quando o número antigo não é mais credencial do
+   aluno; vale tanto no vínculo imediato quanto no que chega pelo Edge.
 4. **`GET /device-reader-numbers?unlinked=true`** — números do leitor sem aluno, com
    `readerName` e leitor/unidade. Isolado por tenant (regra 2).
 
