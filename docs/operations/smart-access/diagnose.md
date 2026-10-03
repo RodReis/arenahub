@@ -72,8 +72,7 @@ estiver nela, sem consultar plano, e o que guardar entra como frequência quando
 
 1. O PC da recepção está ligado?
 2. Ele está na rede? (o cabo pode ter sido esbarrado)
-3. O agente está rodando? **Não é um serviço do Windows** — é a tarefa agendada `ArenaHub Edge`
-   (`pnpm service:install` não funciona, #499).
+3. O agente está rodando? **Não é um serviço do Windows** — é a tarefa agendada `ArenaHub Edge` (#499).
    - Clique duas vezes em `apps\edge-agent\scripts\windows\ver-log-edge.cmd`: o log deve andar.
    - Se não anda: `schtasks /Run /TN "ArenaHub Edge"` (sozinho, uma linha por vez).
 4. Depois de iniciar, volte ao painel. O Edge reaparece como *Respondendo* em até 30 s.

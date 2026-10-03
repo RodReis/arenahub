@@ -13,6 +13,14 @@ import { z } from 'zod';
 /** Marca um valor como segredo, para o mascaramento nao depender do nome. */
 const segredo = z.string().min(1).brand<'Segredo'>();
 
+/** Inteiro de 0 a `max`; ausente ou vazio (`VAR=`) vira `undefined`, nunca 0. */
+function numeroOpcional(max: number) {
+  return z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(0).max(max).optional(),
+  );
+}
+
 export const esquemaConfig = z.object({
   /**
    * Identidade deste agente na bancada. `M0-FR-001` exige identificar
@@ -96,6 +104,23 @@ export const esquemaConfig = z.object({
    * Sem ele, a catraca fica fora do heartbeat, como antes.
    */
   CATRACA_SERIAL: z.string().min(1).max(64).optional(),
+
+  /**
+   * Modo de acesso gravado NA CATRACA a cada conexao -- #507. Os tres juntos
+   * ou nenhum (`carregarConfig` recusa parcial). Sem eles o agente nao grava
+   * nada e a catraca segue com o que tem: ela perde a configuracao quando e
+   * desligada da tomada (o TopFace regravava; foi desativado em #504).
+   *
+   * Arena Positiva: 4 / 0 / 6. Leitor: 0 desabilitado, 1 so entrada, 2 so
+   * saida, 3 entrada e saida, 4 entrada e saida invertido, 5 so entrada
+   * invertido, 6 so saida invertido. Acionamento: 0 desabilitado, 1 libera
+   * entrada e saida, 2 entrada, 3 saida, 4 sirene, 5 revista, 6 giro de
+   * saida livre, 7 giro de entrada livre, 8 ambos livres. O tempo do
+   * acionamento vem de `CATRACA_TEMPO_LIBERADA_S`.
+   */
+  CATRACA_LEITOR1: numeroOpcional(6),
+  CATRACA_LEITOR2: numeroOpcional(6),
+  CATRACA_ACIONAMENTO1: numeroOpcional(8),
 });
 
 export type Config = z.infer<typeof esquemaConfig>;
@@ -133,7 +158,19 @@ export function carregarConfig(bruto: unknown = process.env): Config {
     );
   }
 
-  return resultado.data;
+  const config = resultado.data;
+  const definidos = [
+    config.CATRACA_LEITOR1,
+    config.CATRACA_LEITOR2,
+    config.CATRACA_ACIONAMENTO1,
+  ].filter((v) => v !== undefined).length;
+  if (definidos !== 0 && definidos !== 3) {
+    throw new ConfigInvalidaError([
+      'CATRACA_LEITOR1, CATRACA_LEITOR2 e CATRACA_ACIONAMENTO1: defina os tres ou nenhum',
+    ]);
+  }
+
+  return config;
 }
 
 /**

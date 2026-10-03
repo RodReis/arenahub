@@ -7,6 +7,7 @@ import type { FacialDeviceAdapter } from '../domain/facial-device.js';
 import type { TurnstileAdapter } from '../domain/turnstile.js';
 import { FacialSimulator } from '../adapters/facial-simulator.js';
 import { TurnstileSimulator } from '../adapters/turnstile-simulator.js';
+import type { ConfiguracaoAcesso } from '../adapters/topdata/easyinner-ponte.js';
 import { TopdataFacialAdapter } from '../adapters/topdata/topdata-facial-adapter.js';
 import {
   INTERVALO_KEEP_ALIVE_MS,
@@ -66,7 +67,12 @@ export async function montarDispositivos(
   const catraca: TurnstileAdapter =
     config.CATRACA_MODE === 'simulador'
       ? new TurnstileSimulator()
-      : await montarCatracaReal(logger, config.CATRACA_INVERTIDA, config.CATRACA_TEMPO_LIBERADA_S);
+      : await montarCatracaReal(
+          logger,
+          config.CATRACA_INVERTIDA,
+          config.CATRACA_TEMPO_LIBERADA_S,
+          configuracaoDeAcesso(config),
+        );
 
   const facial: FacialDeviceAdapter =
     config.FACIAL_MODE === 'simulador' ? new FacialSimulator() : await montarFacialReal(logger);
@@ -82,13 +88,24 @@ export async function montarDispositivos(
   };
 }
 
+/** Os tres campos vem juntos ou nenhum -- `carregarConfig` ja garante (#507). */
+function configuracaoDeAcesso(config: Config): ConfiguracaoAcesso | undefined {
+  const { CATRACA_LEITOR1: leitor1, CATRACA_LEITOR2: leitor2, CATRACA_ACIONAMENTO1: acionamento1 } =
+    config;
+  if (leitor1 === undefined || leitor2 === undefined || acionamento1 === undefined) {
+    return undefined;
+  }
+  return { leitor1, leitor2, acionamento1 };
+}
+
 async function montarCatracaReal(
   logger: Logger,
   invertida: boolean,
   tempoLiberadaS: number,
+  configuracao: ConfiguracaoAcesso | undefined,
 ): Promise<TurnstileAdapter> {
   const ponte = PonteEasyInnerProcesso.lancar({ comando: CAMINHO_PONTE });
-  const adapter = new TopdataInnerAdapter(ponte, logger, INNER_PADRAO, invertida);
+  const adapter = new TopdataInnerAdapter(ponte, logger, INNER_PADRAO, invertida, configuracao);
 
   await conectarComRetry({
     dispositivo: 'catraca',
@@ -106,6 +123,10 @@ async function montarCatracaReal(
   // O sucesso tambem vira log (#406): na Arena Positiva a catraca conectou e
   // nada disse -- so dava para deduzir pelo facial ter subido depois dela.
   logger.info({ porta: PORTA_CATRACA }, 'catraca conectada');
+
+  // Grava o modo de acesso no equipamento (#507) -- so se o .env pediu. Nao
+  // derruba a partida: sem a gravacao a catraca segue com o que tinha.
+  if (configuracao) await adapter.gravarConfiguracao();
 
   // A PARTIR DAQUI A CATRACA OBEDECE O ARENAHUB (#470). Sem o ping ela caia
   // para offline em 10 s e liberava pela lista propria. Parar o agente para

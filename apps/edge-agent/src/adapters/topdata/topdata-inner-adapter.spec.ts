@@ -305,3 +305,65 @@ describe('TopdataInnerAdapter -- keep-alive (#470)', () => {
     await adapter.encerrar();
   });
 });
+
+describe('TopdataInnerAdapter -- gravar configuracao na catraca (#507)', () => {
+  const configuracao = { leitor1: 4, leitor2: 0, acionamento1: 6 };
+
+  class PonteQueSoAceitaDepois extends PonteFalsa {
+    pingsAteResponder = 0;
+    retornoDeGravar = 0;
+
+    override executar(comando: ComandoPonte): Promise<RespostaPonte> {
+      if (comando.cmd === 'ping' && this.pingsAteResponder > 0) {
+        this.recebidos.push(comando);
+        this.pingsAteResponder -= 1;
+        return Promise.resolve({ tipo: 'retorno', retorno: 1 });
+      }
+      if (comando.cmd === 'gravar-configuracao') {
+        this.recebidos.push(comando);
+        return Promise.resolve({ tipo: 'retorno', retorno: this.retornoDeGravar });
+      }
+      return super.executar(comando);
+    }
+  }
+
+  const gravacoes = (p: PonteFalsa) => p.recebidos.filter((c) => c.cmd === 'gravar-configuracao');
+
+  it('manda a configuracao na conexao para a ponte montar na DLL', async () => {
+    const ponte = new PonteFalsa();
+    await new TopdataInnerAdapter(ponte, logger, 1, false, configuracao).conectar(3570, 10, 10);
+
+    expect(ponte.recebidos.find((c) => c.cmd === 'conectar')).toMatchObject({ configuracao });
+  });
+
+  it('sem configuracao nao grava nada no equipamento', async () => {
+    const ponte = new PonteFalsa();
+    const gravou = await new TopdataInnerAdapter(ponte, logger, 1).gravarConfiguracao(3, 0);
+
+    expect(gravou).toBe(false);
+    expect(gravacoes(ponte)).toHaveLength(0);
+  });
+
+  it('espera a catraca discar (ping 0) antes de gravar', async () => {
+    const ponte = new PonteQueSoAceitaDepois();
+    ponte.pingsAteResponder = 2;
+    const adapter = new TopdataInnerAdapter(ponte, logger, 1, false, configuracao);
+
+    const gravou = await adapter.gravarConfiguracao(5, 0);
+
+    expect(gravou).toBe(true);
+    expect(gravacoes(ponte)).toHaveLength(1);
+    expect(ponte.recebidos.map((c) => c.cmd)).toEqual(['ping', 'ping', 'ping', 'gravar-configuracao']);
+  });
+
+  it('desiste depois das tentativas se a catraca nunca aceita', async () => {
+    const ponte = new PonteQueSoAceitaDepois();
+    ponte.retornoDeGravar = 1;
+    const adapter = new TopdataInnerAdapter(ponte, logger, 1, false, configuracao);
+
+    const gravou = await adapter.gravarConfiguracao(3, 0);
+
+    expect(gravou).toBe(false);
+    expect(gravacoes(ponte)).toHaveLength(3);
+  });
+});
