@@ -225,8 +225,10 @@ describe('FeedAoVivo — F57 bloco 3', () => {
     );
     expect(screen.getByText(/Rodrigo Ramires/)).toBeInTheDocument();
 
-    // 14:32:08 + 90 min = 16:02:08. Avança até 16:05.
-    await vi.advanceTimersByTimeAsync(85 * 60_000 + 5_000);
+    // 14:32:08 + 90 min = 16:02:08. Pula o relógio para 16:05 e roda UM ciclo:
+    // avançar 85 min em ciclos de 5 s estourava o limite do teste no CI.
+    vi.setSystemTime(new Date('2026-09-01T16:05:00.000Z'));
+    await vi.advanceTimersByTimeAsync(5_000);
 
     await waitFor(() => expect(screen.queryByText(/Rodrigo Ramires/)).not.toBeInTheDocument());
     expect(screen.getByText(/Ninguém passou na catraca/)).toBeInTheDocument();
