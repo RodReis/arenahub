@@ -14,7 +14,7 @@ vi.mock('next/cache', () => ({
 }));
 
 import { chamarApi } from '../../lib/api/server-client';
-import { atribuirPlano } from './membership';
+import { atribuirPlano, definirCredencial } from './membership';
 
 /*
  * UUIDs VALIDOS: o digito de versao (13o) e a variante (17o) nao sao livres.
@@ -145,5 +145,69 @@ describe('atribuirPlano', () => {
     expect(estado.sucesso).toBeUndefined();
     expect(estado.valores?.planId).toBe(PLANO);
     expect(vi.mocked(chamarApi)).not.toHaveBeenCalled();
+  });
+});
+
+describe('definirCredencial', () => {
+  beforeEach(() => {
+    vi.mocked(chamarApi).mockReset();
+  });
+
+  function credencial(kind: string, externalId: string): FormData {
+    const dados = new FormData();
+    dados.set('studentId', ALUNO);
+    dados.set('kind', kind);
+    dados.set('externalId', externalId);
+    return dados;
+  }
+
+  it('facial vai pela rota do numero da catraca, que vincula ao leitor na hora', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({
+      ok: true,
+      dados: { externalId: '100000000123', linkedReaders: 1 },
+      cookiesDaApi: [],
+    });
+
+    const r = await definirCredencial({}, credencial('FACIAL_ENROLL_ID', '100000000123'));
+
+    expect(chamarApi).toHaveBeenCalledWith(`/api/v1/students/${ALUNO}/turnstile-number`, {
+      metodo: 'POST',
+      corpo: { externalId: '100000000123' },
+    });
+    expect(r).toEqual({ sucesso: { kind: 'FACIAL_ENROLL_ID', externalId: '100000000123' } });
+  });
+
+  it('cartao continua no PUT de credenciais', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({
+      ok: true,
+      dados: { kind: 'TURNSTILE_CARD', externalId: 'ABC-9' },
+      cookiesDaApi: [],
+    });
+
+    await definirCredencial({}, credencial('TURNSTILE_CARD', 'ABC-9'));
+
+    expect(chamarApi).toHaveBeenCalledWith(`/api/v1/students/${ALUNO}/credentials`, {
+      metodo: 'PUT',
+      corpo: { kind: 'TURNSTILE_CARD', externalId: 'ABC-9' },
+    });
+  });
+
+  it('facial fora de 1-12 digitos nem chega na API', async () => {
+    const r = await definirCredencial({}, credencial('FACIAL_ENROLL_ID', '12a'));
+
+    expect(r.erro).toBe('O identificador facial tem de 1 a 12 dígitos.');
+    expect(chamarApi).not.toHaveBeenCalled();
+  });
+
+  it('409 da rota nova vira frase de numero ocupado', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({
+      ok: false,
+      erro: { type: 'about:blank', title: 'Conflict', status: 409, code: 'CREDENTIAL_ALREADY_ASSIGNED', correlationId: '' },
+      cookiesDaApi: [],
+    });
+
+    const r = await definirCredencial({}, credencial('FACIAL_ENROLL_ID', '100000000001'));
+
+    expect(r.erro).toBe('Este número já está vinculado a outro aluno.');
   });
 });
