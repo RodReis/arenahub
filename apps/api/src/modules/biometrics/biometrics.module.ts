@@ -8,6 +8,7 @@ import { BiometricIdentityRepository } from './biometric-identity.repository.js'
 import { BiometricsController } from './biometrics.controller.js';
 import { EdgeLegacyLinkController } from './edge-legacy-link.controller.js';
 import { ImportarFotoDoLeitorUseCase } from './importar-foto-do-leitor.use-case.js';
+import { StudentTurnstileNumberController } from './student-turnstile-number.controller.js';
 import { VincularCadastroLegadoUseCase } from './vincular-cadastro-legado.use-case.js';
 
 /**
@@ -20,7 +21,7 @@ import { VincularCadastroLegadoUseCase } from './vincular-cadastro-legado.use-ca
  */
 @Module({
   imports: [PrivacyModule, StudentsModule, DevicesModule],
-  controllers: [BiometricsController, EdgeLegacyLinkController],
+  controllers: [BiometricsController, EdgeLegacyLinkController, StudentTurnstileNumberController],
   providers: [
     BiometricIdentityRepository,
     TenantContextService,

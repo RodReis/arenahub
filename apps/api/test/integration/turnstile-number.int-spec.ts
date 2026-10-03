@@ -24,6 +24,10 @@ describe('numero de catraca automatico', () => {
   const SENHA = 'senha-de-teste-correta';
 
   const conta = { email: `tn-${sufixo}@exemplo.test`, tenantId: '', unidadeId: '', cookie: '' };
+  const vizinha = { email: `tn-viz-${sufixo}@exemplo.test`, tenantId: '', unidadeId: '', cookie: '' };
+  // Numeros do leitor deste run: o sufixo evita colisao entre execucoes.
+  const numeroDoLeitor = (n: number): string => `${parseInt(sufixo, 16) % 1_000_000}${String(n).padStart(6, '0')}`;
+  let leitorId = '';
 
   const PERMISSOES = ['student.create', 'student.read', 'student.update'];
 
@@ -145,14 +149,45 @@ describe('numero de catraca automatico', () => {
     db = app.get(PrismaService);
 
     await montarAcademia(conta, `tn-${sufixo}`);
+    await montarAcademia(vizinha, `tn-viz-${sufixo}`);
+
+    const node = await db.edgeNode.create({
+      data: { tenantId: conta.tenantId, gymUnitId: conta.unidadeId, code: `EDGE-TN-${sufixo}` },
+    });
+    const leitor = await db.device.create({
+      data: {
+        tenantId: conta.tenantId,
+        gymUnitId: conta.unidadeId,
+        edgeNodeId: node.id,
+        kind: 'FACIAL_READER',
+        model: 'AiFace',
+        serial: `TN-${sufixo}`,
+      },
+    });
+    leitorId = leitor.id;
+
+    // Sem termo biometrico vigente o vinculo imediato nao nasce.
+    await db.consentDocument.create({
+      data: {
+        tenantId: conta.tenantId,
+        type: 'BIOMETRIC',
+        version: 1,
+        purpose: 'Identificacao facial para controle de acesso',
+        content: 'Termo biometrico. '.repeat(5),
+        contentSha256: 'c'.repeat(64),
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    });
   });
 
   afterAll(async () => {
     // Suite que cria tenant apaga o tenant: o cascade leva alunos e credenciais.
-    if (conta.tenantId) {
-      await db.tenant.delete({ where: { id: conta.tenantId } }).catch(() => undefined);
+    for (const c of [conta, vizinha]) {
+      if (c.tenantId) {
+        await db.tenant.delete({ where: { id: c.tenantId } }).catch(() => undefined);
+      }
     }
-    await db.user.deleteMany({ where: { email: conta.email } });
+    await db.user.deleteMany({ where: { email: { in: [conta.email, vizinha.email] } } });
     await app?.close();
   });
 
@@ -228,5 +263,94 @@ describe('numero de catraca automatico', () => {
     } finally {
       espiao.mockRestore();
     }
+  });
+
+  describe('rotas da acao da lista', () => {
+    const postar = (id: string, corpo: object, c = conta): request.Test =>
+      request(servidor())
+        .post(`/api/v1/students/${id}/turnstile-number`)
+        .set('Cookie', c.cookie)
+        .send(corpo);
+
+    it('POST sem numero gera e devolve o numero do aluno', async () => {
+      const id = await criarAluno(conta);
+      await db.studentCredential.deleteMany({ where: { studentId: id } });
+      const r = await postar(id, {});
+      expect(r.status).toBe(200);
+      const corpo = r.body as { externalId: string; linkedReaders: number };
+      expect(Number(corpo.externalId)).toBeGreaterThanOrEqual(100_000_000_000);
+      expect(corpo.linkedReaders).toBe(0);
+    });
+
+    it('POST com numero do leitor grava e vincula na hora', async () => {
+      const numero = numeroDoLeitor(1);
+      await db.deviceReaderNumber.create({
+        data: { tenantId: conta.tenantId, deviceId: leitorId, externalUserId: numero, seenAt: new Date(), readerName: 'MARIA S' },
+      });
+      const id = await criarAluno(conta);
+      const r = await postar(id, { externalId: numero });
+      expect(r.status).toBe(200);
+      expect(r.body).toEqual({ externalId: numero, linkedReaders: 1 });
+    });
+
+    it('POST com numero que ja e de outro aluno da 409', async () => {
+      const dono = await criarAluno(conta);
+      const credenciais = await request(servidor())
+        .get(`/api/v1/students/${dono}/credentials`)
+        .set('Cookie', conta.cookie);
+      const ocupado = (credenciais.body as { externalId: string }[])[0]!.externalId;
+      const outro = await criarAluno(conta);
+      const r = await postar(outro, { externalId: ocupado });
+      expect(r.status).toBe(409);
+      expect((r.body as { code: string }).code).toBe('CREDENTIAL_ALREADY_ASSIGNED');
+    });
+
+    it('POST de aluno inexistente da 404', async () => {
+      const r = await postar(randomUUID(), {});
+      expect(r.status).toBe(404);
+      expect((r.body as { code: string }).code).toBe('STUDENT_NOT_FOUND');
+    });
+
+    it('POST recusa campo extra e numero malformado (tenant nunca vem do corpo)', async () => {
+      const id = await criarAluno(conta);
+      expect((await postar(id, { tenantId: vizinha.tenantId })).status).toBe(400);
+      expect((await postar(id, { externalId: '12ab' })).status).toBe(400);
+      expect((await postar(id, { externalId: '1234567890123' })).status).toBe(400);
+    });
+
+    it('GET unlinked lista so numero de leitor sem aluno, com nome, ordenado', async () => {
+      const livreB = numeroDoLeitor(99);
+      const livreA = numeroDoLeitor(98);
+      for (const [numero, nome] of [[livreB, 'JOAO P'], [livreA, null]] as const) {
+        await db.deviceReaderNumber.create({
+          data: { tenantId: conta.tenantId, deviceId: leitorId, externalUserId: numero, seenAt: new Date(), readerName: nome },
+        });
+      }
+      const r = await request(servidor())
+        .get('/api/v1/device-reader-numbers/unlinked')
+        .set('Cookie', conta.cookie);
+      expect(r.status).toBe(200);
+      const lista = r.body as { externalId: string; readerName: string | null; deviceSerial: string }[];
+      expect(lista).toContainEqual({ externalId: livreB, readerName: 'JOAO P', deviceSerial: `TN-${sufixo}` });
+      expect(lista).toContainEqual({ externalId: livreA, readerName: null, deviceSerial: `TN-${sufixo}` });
+      // Vinculado ao aluno no teste anterior: nao e mais "sem aluno".
+      expect(lista.map((l) => l.externalId)).not.toContain(numeroDoLeitor(1));
+      const ids = lista.map((l) => l.externalId);
+      expect(ids).toEqual([...ids].sort());
+    });
+
+    it('GET unlinked nao mostra numero de leitor de outro tenant', async () => {
+      // Garante que o vazio abaixo nao e por falta de dado: o dono tem numeros.
+      const doDono = await request(servidor())
+        .get('/api/v1/device-reader-numbers/unlinked')
+        .set('Cookie', conta.cookie);
+      expect((doDono.body as unknown[]).length).toBeGreaterThan(0);
+
+      const r = await request(servidor())
+        .get('/api/v1/device-reader-numbers/unlinked')
+        .set('Cookie', vizinha.cookie);
+      expect(r.status).toBe(200);
+      expect(r.body).toEqual([]);
+    });
   });
 });

@@ -82,4 +82,28 @@ export class DeviceReaderNumberRepository {
 
     return linhas.map((l) => l.externalUserId);
   }
+
+  /**
+   * Todos os numeros dos leitores do tenant, com o nome gravado no leitor e o
+   * serial -- a aba "Do leitor" da acao da lista (spec 2026-10-03).
+   *
+   * Nao filtra por aluno: `devices` nao le `student_credentials` (regra de
+   * arquitetura no 9). Quem chama cruza com `listarNumerosDoTenant` das
+   * credenciais para achar o que esta sem aluno.
+   */
+  async listarComNome(
+    tenantId: string,
+  ): Promise<{ externalId: string; readerName: string | null; deviceSerial: string }[]> {
+    const linhas = await this.db.deviceReaderNumber.findMany({
+      where: { tenantId },
+      select: { externalUserId: true, readerName: true, device: { select: { serial: true } } },
+      orderBy: { externalUserId: 'asc' },
+    });
+
+    return linhas.map((l) => ({
+      externalId: l.externalUserId,
+      readerName: l.readerName,
+      deviceSerial: l.device.serial,
+    }));
+  }
 }
