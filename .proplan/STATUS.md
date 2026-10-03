@@ -31,15 +31,14 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [FIX] painel financeiro deve abrir no mes corrente por default (#435)
+_(vazio)_
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [FIX] painel financeiro deve abrir no mes corrente por default (#435, finalizado em: 2026-10-03)
 - [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417, finalizado em: 2026-10-03)
 - [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451, finalizado em: 2026-10-03)
 - [MVP1][FIX] service:install registra node.exe direto como serviço Windows — não sobe (#499, finalizado em: 2026-10-03)
