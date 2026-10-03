@@ -10,7 +10,6 @@ updated: 2026-10-03
 ### Sem épico
 
 - [MVP1][FIX] Reatribuir o Edge de um dispositivo — hoje não há como desfazer a reivindicação automática (#488) (#490)
-- [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
 - [MVP2][INFRA] Decisão: só existe plano mensal — os ciclos da §33 (trimestral, semestral, anual) nunca foram discutidos (#338)
@@ -37,6 +36,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347, finalizado em: 2026-10-03)
 - [FIX] Valdivino duplicado no arquivo (confirmado) e Daniel Flavio Cabriny — provável cadastro duplicado (#421, finalizado em: 2026-10-03)
 - [FIX] painel financeiro deve abrir no mes corrente por default (#435, finalizado em: 2026-10-03)
 - [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417, finalizado em: 2026-10-03)
