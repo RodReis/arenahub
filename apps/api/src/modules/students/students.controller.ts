@@ -5,6 +5,7 @@ import {
   Controller,
   Get,
   Header,
+  Logger,
   NotFoundException,
   Param,
   Patch,
@@ -414,6 +415,8 @@ interface AlunoCriadoDto extends AlunoDto {
 
 @Controller('api/v1/students')
 export class StudentsController {
+  private readonly logger = new Logger(StudentsController.name);
+
   constructor(
     private readonly alunos: StudentRepository,
     private readonly unidades: GymUnitRepository,
@@ -612,9 +615,16 @@ export class StudentsController {
     );
 
     // Numero de catraca automatico (spec 2026-10-03). Transacao propria: se
-    // falhar, o aluno existe sem numero e a acao da lista gera depois -- nao
-    // vale derrubar o cadastro inteiro por isso.
-    await this.numeroDaCatraca.gerar(contexto, aluno.id);
+    // falhar, o aluno JA existe e responder 500 faria o cliente repetir o
+    // cadastro (caindo em duplicata). Fica sem numero e a acao da lista gera
+    // depois. Log so com o id -- nunca CPF, nome ou outro dado pessoal.
+    try {
+      await this.numeroDaCatraca.gerar(contexto, aluno.id);
+    } catch (erro: unknown) {
+      this.logger.error(
+        `Falha ao gerar numero de catraca do aluno ${aluno.id}: ${erro instanceof Error ? erro.message : 'erro desconhecido'}`,
+      );
+    }
 
     return { ...this.paraDto(aluno), duplicateCandidates: candidatos };
   }

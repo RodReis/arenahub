@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -179,6 +179,8 @@ describe('numero de catraca automatico', () => {
 
   it('duas geracoes em paralelo para alunos diferentes nao repetem numero', async () => {
     const [a, b] = await Promise.all([criarAluno(conta), criarAluno(conta)]);
+    // O cadastro ja gerou numero; limpa para o `gerar` abaixo ser a primeira
+    // geracao dos dois e disputar de fato o mesmo menor numero livre.
     await db.studentCredential.deleteMany({ where: { studentId: { in: [a, b] } } });
     const servico = app.get(TurnstileNumberService);
     const ctx = contextoDe(conta.tenantId);
@@ -187,5 +189,44 @@ describe('numero de catraca automatico', () => {
       como(() => servico.gerar(ctx, b)),
     ]);
     expect(ra.externalId).not.toBe(rb.externalId);
+  });
+
+  it('cinco geracoes em paralelo para alunos diferentes: todas criam, distintas, na faixa e persistidas', async () => {
+    const ids = await Promise.all(Array.from({ length: 5 }, () => criarAluno(conta)));
+    // Limpa o numero do cadastro para as cinco disputarem o mesmo menor livre.
+    await db.studentCredential.deleteMany({ where: { studentId: { in: ids } } });
+    const servico = app.get(TurnstileNumberService);
+    const ctx = contextoDe(conta.tenantId);
+
+    const resultados = await Promise.all(ids.map((id) => como(() => servico.gerar(ctx, id))));
+
+    expect(resultados.every((r) => r.created)).toBe(true);
+    const numeros = resultados.map((r) => r.externalId);
+    expect(new Set(numeros).size).toBe(5);
+    for (const n of numeros) {
+      expect(Number(n)).toBeGreaterThanOrEqual(100_000_000_000);
+      expect(Number(n)).toBeLessThanOrEqual(999_999_999_999);
+    }
+    const gravadas = await db.studentCredential.findMany({
+      where: { studentId: { in: ids }, kind: 'FACIAL_ENROLL_ID' },
+    });
+    expect(gravadas.map((c) => c.externalId).sort()).toEqual([...numeros].sort());
+  });
+
+  it('se a geracao do numero falha, o cadastro ainda responde 201 e o aluno fica sem numero', async () => {
+    const servico = app.get(TurnstileNumberService);
+    const espiao = jest.spyOn(servico, 'gerar').mockRejectedValue(new Error('falha simulada'));
+    try {
+      const id = await criarAluno(conta); // criarAluno ja afirma 201
+      const existe = await db.student.findUnique({ where: { id } });
+      expect(existe).not.toBeNull();
+      const creds = await db.studentCredential.findMany({
+        where: { studentId: id, kind: 'FACIAL_ENROLL_ID' },
+      });
+      expect(creds).toHaveLength(0);
+      expect(espiao).toHaveBeenCalledTimes(1);
+    } finally {
+      espiao.mockRestore();
+    }
   });
 });

@@ -9,6 +9,8 @@ import {
   StudentCredentialRepository,
 } from './student-credential.repository.js';
 
+const MAXIMO_DE_TENTATIVAS = 5;
+
 /**
  * Numero de catraca automatico -- o aluno nasce com ele e a recepcao so
  * digita no leitor o que a tela mostra (spec 2026-10-03).
@@ -17,8 +19,11 @@ import {
  * numero. Trocar em silencio deixaria a face ja cadastrada no leitor sob o
  * numero antigo -- a catraca passaria a recusar a pessoa.
  *
- * Corrida entre duas geracoes e decidida pelo UNIQUE do banco: a perdedora
- * recalcula UMA vez. Persistindo, sobe o erro de credencial ocupada.
+ * Corrida entre geracoes e decidida pelo UNIQUE do banco: a perdedora
+ * recalcula. O calculo e deterministico (menor numero livre), entao N
+ * chamadas simultaneas disputam o MESMO numero e a ultima precisa de ate N
+ * tentativas -- por isso o teto e `MAXIMO_DE_TENTATIVAS`, nao uma so.
+ * Esgotadas, sobe o erro de credencial ocupada.
  */
 @Injectable()
 export class TurnstileNumberService {
@@ -60,7 +65,7 @@ export class TurnstileNumberService {
         const colidiu =
           erro instanceof CredencialJaAtribuidaError ||
           (typeof erro === 'object' && erro !== null && 'code' in erro && erro.code === 'P2002');
-        if (!colidiu || tentativa >= 1) throw erro;
+        if (!colidiu || tentativa >= MAXIMO_DE_TENTATIVAS - 1) throw erro;
       }
     }
   }
