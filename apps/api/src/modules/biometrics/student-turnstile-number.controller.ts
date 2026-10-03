@@ -79,6 +79,10 @@ export class StudentTurnstileNumberController {
       throw new NotFoundException({ code: 'STUDENT_NOT_FOUND' });
     }
 
+    if (dados.externalId !== undefined) {
+      await this.recusarSeDeOutroAluno(contexto.tenantId, id, dados.externalId);
+    }
+
     let externalId: string;
     try {
       externalId =
@@ -91,10 +95,7 @@ export class StudentTurnstileNumberController {
       // `CredencialJaAtribuidaError` carrega `code: 'P2002'`, igual ao UNIQUE do Prisma.
       if (!ehViolacaoDeUnicidade(erro)) throw erro;
 
-      throw new ConflictException({
-        code: 'CREDENTIAL_ALREADY_ASSIGNED',
-        title: 'Este número já está vinculado a outro aluno.',
-      });
+      throw numeroJaVinculado();
     }
 
     const { linkedReaders } = await this.vincular.vincularNumero(
@@ -105,6 +106,22 @@ export class StudentTurnstileNumberController {
     );
 
     return { externalId, linkedReaders };
+  }
+
+  /**
+   * A unicidade do banco e por `kind`: o numero que e CARTAO de outro aluno
+   * passaria como facial deste. Cartao e facial dividem o espaco de numero do
+   * leitor, entao a recusa cobre qualquer `kind`. Linha do proprio aluno
+   * (ex.: o cartao dele com o mesmo numero) nao e conflito.
+   */
+  private async recusarSeDeOutroAluno(
+    tenantId: string,
+    studentId: string,
+    externalId: string,
+  ): Promise<void> {
+    const donos = await this.credenciais.encontrarPorNumeros(tenantId, [externalId]);
+
+    if (donos.some((d) => d.studentId !== studentId)) throw numeroJaVinculado();
   }
 
   /**
@@ -127,6 +144,13 @@ export class StudentTurnstileNumberController {
 
     return doLeitor.filter((n) => !comAluno.has(n.externalId));
   }
+}
+
+function numeroJaVinculado(): ConflictException {
+  return new ConflictException({
+    code: 'CREDENTIAL_ALREADY_ASSIGNED',
+    title: 'Este número já está vinculado a outro aluno.',
+  });
 }
 
 function ehViolacaoDeUnicidade(erro: unknown): boolean {

@@ -305,6 +305,71 @@ describe('numero de catraca automatico', () => {
       expect((r.body as { code: string }).code).toBe('CREDENTIAL_ALREADY_ASSIGNED');
     });
 
+    it('POST com numero ocupado no leitor da 409 sem vincular e sem gravar nada', async () => {
+      const ocupado = numeroDoLeitor(50);
+      await db.deviceReaderNumber.create({
+        data: { tenantId: conta.tenantId, deviceId: leitorId, externalUserId: ocupado, seenAt: new Date() },
+      });
+      const dono = await criarAluno(conta);
+      await db.studentCredential.deleteMany({ where: { studentId: dono } });
+      await db.studentCredential.create({
+        data: { tenantId: conta.tenantId, studentId: dono, kind: 'FACIAL_ENROLL_ID', externalId: ocupado },
+      });
+      const outro = await criarAluno(conta);
+      await db.studentCredential.deleteMany({ where: { studentId: outro } });
+
+      const r = await postar(outro, { externalId: ocupado });
+
+      expect(r.status).toBe(409);
+      expect((r.body as { code: string }).code).toBe('CREDENTIAL_ALREADY_ASSIGNED');
+      expect(await db.deviceUser.count({ where: { deviceId: leitorId, externalUserId: ocupado } })).toBe(0);
+      expect(await db.studentCredential.count({ where: { studentId: outro } })).toBe(0);
+    });
+
+    it('POST com numero que e CARTAO de outro aluno da 409 e nao grava o facial', async () => {
+      const cartao = numeroDoLeitor(51);
+      const dono = await criarAluno(conta);
+      await db.studentCredential.create({
+        data: { tenantId: conta.tenantId, studentId: dono, kind: 'TURNSTILE_CARD', externalId: cartao },
+      });
+      const outro = await criarAluno(conta);
+      const antes = await db.studentCredential.findMany({ where: { studentId: outro } });
+
+      const r = await postar(outro, { externalId: cartao });
+
+      expect(r.status).toBe(409);
+      expect((r.body as { code: string }).code).toBe('CREDENTIAL_ALREADY_ASSIGNED');
+      expect(await db.studentCredential.count({ where: { studentId: outro, externalId: cartao } })).toBe(0);
+      expect(await db.studentCredential.findMany({ where: { studentId: outro } })).toEqual(antes);
+    });
+
+    it('POST com numero igual ao proprio cartao do aluno nao e conflito', async () => {
+      const cartao = numeroDoLeitor(52);
+      const id = await criarAluno(conta);
+      await db.studentCredential.create({
+        data: { tenantId: conta.tenantId, studentId: id, kind: 'TURNSTILE_CARD', externalId: cartao },
+      });
+
+      const r = await postar(id, { externalId: cartao });
+
+      expect(r.status).toBe(200);
+      expect((r.body as { externalId: string }).externalId).toBe(cartao);
+    });
+
+    it('POST sem numero duas vezes devolve o mesmo numero', async () => {
+      const id = await criarAluno(conta);
+      await db.studentCredential.deleteMany({ where: { studentId: id } });
+
+      const primeira = await postar(id, {});
+      const segunda = await postar(id, {});
+
+      expect(primeira.status).toBe(200);
+      expect(segunda.status).toBe(200);
+      expect((segunda.body as { externalId: string }).externalId).toBe(
+        (primeira.body as { externalId: string }).externalId,
+      );
+    });
+
     it('POST de aluno inexistente da 404', async () => {
       const r = await postar(randomUUID(), {});
       expect(r.status).toBe(404);
