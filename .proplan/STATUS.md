@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,13 +9,8 @@ updated: 2026-10-02
 
 ### Sem épico
 
-- [MVP1][FIX] Catraca continua destravada só 5 s: a ponte não chama EnviarConfiguracoes e o CATRACA_TEMPO_LIBERADA_S não chega ao equipamento (#507)
-- [MVP1][FIX] service:install registra node.exe direto como serviço Windows — não sobe (#499)
 - [MVP1][FIX] Reatribuir o Edge de um dispositivo — hoje não há como desfazer a reivindicação automática (#488) (#490)
-- [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
-- [FIX] painel financeiro deve abrir no mes corrente por default (#435)
 - [FIX] Valdivino duplicado no arquivo (confirmado) e Daniel Flavio Cabriny — provável cadastro duplicado (#421)
-- [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347)
 - [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
@@ -36,13 +31,19 @@ _(vazio)_
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [FIX] teste da grid de alunos falha das 21h a meia-noite (hoje em UTC x fuso do tenant) (#451)
+- [INFRA][FIX] estatisticas-publicas abre uma transacao por tenant em paralelo e estoura no CI (#417)
+- [FIX] painel financeiro deve abrir no mes corrente por default (#435)
 
 ## Finalizado
 
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] service:install registra node.exe direto como serviço Windows — não sobe (#499, finalizado em: 2026-10-03)
+- [MVP1][FIX] Catraca continua destravada só 5 s: a ponte não chama EnviarConfiguracoes e o CATRACA_TEMPO_LIBERADA_S não chega ao equipamento (#507, finalizado em: 2026-10-03)
 - [MVP1] Aplicativo: link curto proprio, mensagem pronta para o aluno e QR ampliavel (#538, finalizado em: 2026-10-02)
 - [MVP1][SPEC-071][FIX] Primeiro acesso diz 'cadastro nao encontrado' quando a falha e de rede ou 5xx (#528, finalizado em: 2026-10-02)
 - [MVP1][FIX] Ficha do Time: professor sem nascimento, CPF e contato nem edicao de cadastro (#530, finalizado em: 2026-10-02)
