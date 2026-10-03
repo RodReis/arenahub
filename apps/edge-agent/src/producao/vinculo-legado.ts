@@ -46,6 +46,14 @@ export const TAMANHO_DO_LOTE = 50;
 /** Teto de leituras de nome por base -- cada uma e um comando ao leitor. */
 export const MAXIMO_DE_NOMES = 500;
 
+/**
+ * Leituras de nome SEGUIDAS sem resultado que abortam o laco. Cobre dois
+ * casos: leitor pendurado (cada leitura que falha custa um timeout de 10 s) e
+ * firmware que nao devolve nome (para apos 3 leituras, nao 500). O que sobrou
+ * e tentado de novo no proximo registro do leitor.
+ */
+export const MAXIMO_DE_FALHAS_SEGUIDAS = 3;
+
 const CAMINHO = '/api/v1/edge/device-users/legacy-links';
 const CAMINHO_NOMES = '/api/v1/edge/device-users/reader-names';
 
@@ -158,6 +166,10 @@ export function ligarVinculoLegado(deps: {
    * Le no leitor o nome de cada numero sem aluno e manda para a nuvem
    * reconhecer o cadastro. Melhor esforco: nenhuma falha daqui muda o
    * resultado do vinculo. Nome de pessoa NAO vai para log -- so contagem.
+   *
+   * Roda DESTACADO da `fila`: com o leitor pendurado, ate 500 leituras de 10 s
+   * travariam o vinculo do `senduser` atras dela. O acesso ao leitor continua
+   * serializado pela fila de operacoes do adapter.
    */
   const enviarNomes = async (serial: string, numeros: readonly string[]): Promise<void> => {
     const lerNome = facial.lerNome?.bind(facial);
@@ -165,9 +177,30 @@ export function ligarVinculoLegado(deps: {
 
     try {
       const names: { externalUserId: string; name: string }[] = [];
+      let lidos = 0;
+      let falhasSeguidas = 0;
+      let abortou = false;
       for (const numero of numeros.slice(0, MAXIMO_DE_NOMES)) {
+        if (encerrado) return;
+        lidos += 1;
         const nome = await lerNome(numero).catch(() => null);
-        if (nome) names.push({ externalUserId: numero, name: nome.slice(0, 100) });
+        if (nome) {
+          names.push({ externalUserId: numero, name: nome.slice(0, 100) });
+          falhasSeguidas = 0;
+          continue;
+        }
+        falhasSeguidas += 1;
+        if (falhasSeguidas >= MAXIMO_DE_FALHAS_SEGUIDAS) {
+          abortou = true;
+          break;
+        }
+      }
+      if (encerrado) return;
+      if (abortou) {
+        logger.warn(
+          { leitor: serial, lidos, coletados: names.length, abortou: true },
+          'leitura de nomes do leitor interrompida -- o resto fica para o proximo registro',
+        );
       }
       if (names.length === 0) return;
 
@@ -195,6 +228,8 @@ export function ligarVinculoLegado(deps: {
       );
     }
   };
+
+  let encerrado = false;
 
   /*
    * UM envio por vez. A listagem do registro e o lote de `senduser` da
@@ -243,8 +278,10 @@ export function ligarVinculoLegado(deps: {
           );
           if (!chegou) listados.delete(serial);
           else deps.aposVincular?.(serial);
-          // Fora do try/catch de `listados`: falha de nome nao reabre a listagem.
-          await enviarNomes(serial, semAluno);
+          // DESTACADO: nem espera da fila, nem entra no try/catch de `listados`
+          // -- falha ou demora de nome nao trava nem reabre o vinculo.
+          // `enviarNomes` tem catch proprio: nao ha rejeicao sem tratamento.
+          void enviarNomes(serial, semAluno);
         } catch (erro: unknown) {
           listados.delete(serial);
           throw erro;
@@ -290,6 +327,7 @@ export function ligarVinculoLegado(deps: {
 
   return {
     encerrar: () => {
+      encerrado = true;
       if (temporizador) clearTimeout(temporizador);
       temporizador = null;
       pendentes.clear();

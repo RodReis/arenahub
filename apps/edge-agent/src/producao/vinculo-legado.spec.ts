@@ -3,7 +3,12 @@ import pino from 'pino';
 
 import type { SignedCloudClient } from '../cloud/signed-client.js';
 import type { FacialDeviceAdapter, IdentidadeNoDispositivo } from '../domain/facial-device.js';
-import { ligarVinculoLegado, MAXIMO_DE_NOMES, TAMANHO_DO_LOTE } from './vinculo-legado.js';
+import {
+  ligarVinculoLegado,
+  MAXIMO_DE_FALHAS_SEGUIDAS,
+  MAXIMO_DE_NOMES,
+  TAMANHO_DO_LOTE,
+} from './vinculo-legado.js';
 
 /**
  * #468 -- a base do leitor vai para a nuvem vincular os alunos legados.
@@ -355,6 +360,11 @@ describe('ligarVinculoLegado', () => {
       });
     }
 
+    const lotesDe99 = (post: jest.Mock) =>
+      post.mock.calls.filter(
+        (c) => (c[1] as { externalUserIds?: string[] } | undefined)?.externalUserIds?.[0] === '99',
+      );
+
     const chamadasDeNomes = (post: jest.Mock) =>
       post.mock.calls.filter((c) => c[0] === CAMINHO_NOMES);
 
@@ -434,6 +444,104 @@ describe('ligarVinculoLegado', () => {
       });
 
       ligado.encerrar();
+    });
+
+    it('aborta apos 3 leituras seguidas sem nome e nao chama reader-names', async () => {
+      const base = Array.from({ length: 10 }, (_, i) => String(i + 1));
+      const lerNome = jest.fn(() => Promise.resolve(null));
+      const { post, linhas, registrar, ligado } = montar(base, 20, { lerNome });
+      responderComSemAluno(post, base);
+
+      registrar('SER');
+      await ate(() => linhas.some((l) => l['abortou'] === true));
+      await esperar(40);
+
+      expect(lerNome).toHaveBeenCalledTimes(MAXIMO_DE_FALHAS_SEGUIDAS);
+      expect(chamadasDeNomes(post)).toHaveLength(0);
+      expect(linhas).toContainEqual(
+        expect.objectContaining({ lidos: 3, coletados: 0, abortou: true }),
+      );
+
+      ligado.encerrar();
+    });
+
+    it('duas falhas seguidas e depois um nome: continua lendo e envia o nome', async () => {
+      const respostas: (string | null)[] = [null, null, 'ANA'];
+      const lerNome = jest.fn(() => Promise.resolve(respostas.shift() ?? null));
+      const { post, registrar, ligado } = montar(['1', '2', '3'], 20, { lerNome });
+      responderComSemAluno(post, ['1', '2', '3']);
+
+      registrar('SER');
+      await ate(() => chamadasDeNomes(post).length > 0);
+
+      expect(lerNome).toHaveBeenCalledTimes(3);
+      expect(chamadasDeNomes(post)[0]![1]).toEqual({
+        deviceSerial: 'SER',
+        names: [{ externalUserId: '3', name: 'ANA' }],
+      });
+
+      ligado.encerrar();
+    });
+
+    it('3 falhas seguidas depois de 2 nomes: aborta e envia os 2 coletados, sem nomes no log', async () => {
+      const respostas: (string | null)[] = ['ANA', 'BIA', null, null, null];
+      const base = ['1', '2', '3', '4', '5', '6', '7'];
+      const lerNome = jest.fn(() => Promise.resolve(respostas.length > 0 ? respostas.shift()! : 'NUNCA-LIDO'));
+      const { post, linhas, registrar, ligado } = montar(base, 20, { lerNome });
+      responderComSemAluno(post, base);
+
+      registrar('SER');
+      await ate(() => chamadasDeNomes(post).length > 0);
+
+      expect(lerNome).toHaveBeenCalledTimes(5);
+      expect(chamadasDeNomes(post)[0]![1]).toEqual({
+        deviceSerial: 'SER',
+        names: [
+          { externalUserId: '1', name: 'ANA' },
+          { externalUserId: '2', name: 'BIA' },
+        ],
+      });
+      expect(linhas).toContainEqual(
+        expect.objectContaining({ lidos: 5, coletados: 2, abortou: true }),
+      );
+      expect(JSON.stringify(linhas)).not.toMatch(/ANA|BIA/);
+
+      ligado.encerrar();
+    });
+
+    it('leitor pendurado na leitura de nome nao trava o vinculo do senduser', async () => {
+      let soltar: (nome: string | null) => void = () => undefined;
+      const lerNome = jest.fn(() => new Promise<string | null>((r) => (soltar = r)));
+      const { post, registrar, informar, ligado } = montar(['1'], 20, { lerNome });
+      responderComSemAluno(post, ['1']);
+
+      registrar('SER');
+      await ate(() => lerNome.mock.calls.length === 1);
+      // A leitura de nome segue pendente; um cadastro novo no leitor chega.
+      informar('SER', '99');
+      await ate(() => lotesDe99(post).length > 0);
+
+      expect(chamadasDeNomes(post)).toHaveLength(0);
+
+      soltar(null);
+      ligado.encerrar();
+    });
+
+    it('encerrar interrompe a leitura de nomes entre uma leitura e outra', async () => {
+      const base = ['1', '2', '3'];
+      let soltar: (nome: string | null) => void = () => undefined;
+      const lerNome = jest.fn(() => new Promise<string | null>((r) => (soltar = r)));
+      const { post, registrar, ligado } = montar(base, 20, { lerNome });
+      responderComSemAluno(post, base);
+
+      registrar('SER');
+      await ate(() => lerNome.mock.calls.length === 1);
+      ligado.encerrar();
+      soltar('ANA');
+      await esperar(40);
+
+      expect(lerNome).toHaveBeenCalledTimes(1);
+      expect(chamadasDeNomes(post)).toHaveLength(0);
     });
 
     it('limita as leituras ao teto por base', async () => {
