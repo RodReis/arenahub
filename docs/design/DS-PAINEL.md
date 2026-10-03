@@ -207,6 +207,8 @@ Praticamente nenhum. `@keyframes ah-pulse` (opacidade 1 → .3) marca indicador 
 
 **Emenda de 28/09/2026 (decisão do PI), só nas grades de KPI:** entrada `ah-entrar` (opacidade 0 → 1 e `translateY(6px)` → 0, 360 ms, `cubic-bezier(.16,1,.3,1)`, escalonada em 45 ms por card via `--ordem`) e subida de 2 px no hover (`hover:-translate-y-0.5`). Card de tabela e de formulário não sobe — só a sombra muda. `prefers-reduced-motion: reduce` desliga as duas coisas. Nada mais anima.
 
+**Emenda de 03/10/2026 (decisão do PI), cartão de presença (§4.5d):** entrada `ah-chega` (opacidade 0 → 1, `translateY(8px) scale(.97)` → 0, 260 ms, `cubic-bezier(.16,1,.3,1)`) quando a pessoa passa na catraca; subida de 2 px no hover; halo `ah-halo` no ponto de presença nos primeiros 2 min. As três comunicam estado ("acabou de passar"). `prefers-reduced-motion: reduce` desliga as três; o tom e o texto continuam.
+
 ---
 
 ## 3. Grids e layout
@@ -305,7 +307,29 @@ Ordem fixa, do que muda a cada minuto para o que muda por semana:
 2. **Fluxo de hoje.** Card ao lado: total de acessos e recusas do dia, barras por hora (a hora de pico em gradiente, as demais em `border/default`) com o rótulo da hora embaixo, nota de contexto.
 3. **Grade de KPI** (§3.3): recebido no mês, inadimplência, avaliações pendentes, matrículas líquidas.
 4. **Alunos em risco de evasão.** Tabela compacta — nome/matrícula, badge de risco, motivo em uma linha, botão "Criar tarefa" — com atalho para a tela de Retenção.
-5. **Acessos em tempo real** (feed existente) na coluna principal; **Avaliações pendentes**, **Dispositivos** e **Sincronização de cadastros** na coluna lateral de 372 px.
+5. **Acessos em tempo real** (cartões de presença, §4.5d) na coluna principal; **Avaliações pendentes**, **Dispositivos** e **Sincronização de cadastros** na coluna lateral de 372 px.
+
+### 4.5d Cartão de presença — "Acessos em tempo real"
+
+**Decisão do PI, 03/10/2026.** A lista de linhas (hora · nome · badge) virou **grade de cartões de pessoa lado a lado**, na receita do cartão de perfil: faixa colorida no topo, avatar sobreposto, nome, dois números embaixo. Pouca informação por cartão, de propósito: **quem** (foto e nome), **como foi** (faixa) e **quando** (horário e há quanto tempo). O resto está a um clique, na ficha.
+
+**Janela.** Mostra só quem passou nos **últimos 90 min** (`JANELA_DE_PERMANENCIA_MIN`, a permanência média na Arena Positiva). A saída da catraca é giro livre, sem leitura, então não existe horário de saída: passado o prazo, o cartão sai da grade sozinho, sem precisar de evento novo. O cabeçalho diz "últimos 90 min" ao lado do "ao vivo". O cartão de bloqueados continua lendo o **dia inteiro**.
+
+**Grade.** `repeat(auto-fill, minmax(168px, 1fr))`, gap 12 px, rolagem interna com teto de 520 px (4 a 5 cartões por linha a 1280 px; 1 por linha no celular). Ordem: o mais recente primeiro.
+
+**Anatomia do cartão** (raio 14 px, borda `border/subtle`, `surface/raised`, sombra `elev/1`):
+
+| parte | regra |
+|---|---|
+| Faixa (46 px) | Tom da **razão** (`stateLabel('accessReason')`) a 8% sobre a superfície; ícone 14 px + rótulo 11 px/600 no tom cheio; borda inferior no tom a 22%. Rótulo longo trunca com reticências e guarda o texto no `title`. |
+| Avatar | 56 px, sobe 26 px sobre a faixa; borda de 3 px da superfície e **anel de 2 px no tom** a 55%. Foto da ficha (`/fotos-de-aluno/:id`, quando `temFoto`) ou iniciais 16 px/600. |
+| Ponto de presença | 13 px no tom, canto inferior direito do avatar, borda de 2 px da superfície. **Pulsa** (`ah-halo`) enquanto a passagem tem menos de 2 min. |
+| Nome | 14 px/600 `text/strong`, **dois nomes** (`doisNomes`), trunca. |
+| Rodapé | Duas colunas com divisor: "Entrada" (ou "Tentativa" na recusa) com a hora, e "Há" com o tempo decorrido ("agora", "12 min", "1h05"). Rótulo 11 px `text/secondary`, valor 13 px/600 tabular. |
+
+**Interação.** O cartão inteiro leva à ficha do aluno: o link do nome estica um `::after` sobre o cartão (sem aninhar interativo). Foco: anel de 2 px no **cartão** (`:has(:focus-visible)`). Hover: sobe 2 px, sombra `elev/2`, borda puxa o tom a 35%, nome na cor de ação. Quem não foi identificado mostra o número do leitor, sem link.
+
+**Tom.** `success` (liberado), `danger`/`risk` (recusa), `warning`, `info`, `neutral` vêm do rótulo da razão — nunca da tela. Três canais sempre: cor da faixa, ícone e texto da razão.
 
 ### 4.6 Card de KPI
 
@@ -493,7 +517,7 @@ Dentro do card: 32 px de padding vertical, centralizado. Ícone 24 px `text/plac
 
 ### 4.19 Avatar
 
-Circular, 24 px (topbar) ou 36 px (grade de alunos). Iniciais 10–13 px/700 em branco sobre tom derivado do nome. Na grade de alunos ganha anel de 2 px na cor do status. Foto substitui as iniciais quando existir.
+Circular, 24 px (topbar), 36 px (grade de alunos) ou **56 px (cartão de presença, §4.5d)**. Iniciais 10–16 px em carbono. Na grade de alunos e no cartão de presença ganha anel de 2 px na cor do estado. Foto substitui as iniciais quando existir. **Com presença** (§4.5d): ponto de 13 px no tom, canto inferior direito, que pulsa nos primeiros 2 min.
 
 ### 4.20 Miniatura de frequência
 

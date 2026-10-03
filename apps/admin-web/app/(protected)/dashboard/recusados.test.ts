@@ -15,7 +15,7 @@ const evento = (
   outcome,
   reason,
   method: 'FACIAL',
-  student: quem.nome ? { fullName: quem.nome } : null,
+  student: quem.nome ? { id: `aluno-${quem.nome}`, fullName: quem.nome } : null,
   externalUserId: quem.numero ?? null,
 });
 

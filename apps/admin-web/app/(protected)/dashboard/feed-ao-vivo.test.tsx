@@ -19,7 +19,7 @@ const evento = (id: string, nome: string): EventoDoFeed => ({
   outcome: 'ALLOW',
   reason: 'ACESSO_LIBERADO',
   method: 'FACIAL',
-  student: { fullName: nome },
+  student: { id: `aluno-${id}`, fullName: nome },
   externalUserId: null,
 });
 
@@ -44,6 +44,8 @@ function mudarVisibilidade(estado: 'visible' | 'hidden') {
 describe('FeedAoVivo — F57 bloco 3', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    // 8 min depois dos eventos da fixture: dentro da janela de permanência.
+    vi.setSystemTime(new Date('2026-09-01T14:40:00.000Z'));
     mudarVisibilidade('visible');
     vi.mocked(lerFeedDeAcessos).mockResolvedValue({
       eventos: [evento('e-2', 'Marina Lopes')],
@@ -189,6 +191,130 @@ describe('FeedAoVivo — F57 bloco 3', () => {
     expect(recusados).toHaveTextContent('Joao Pedro');
     expect(recusados).not.toHaveTextContent('Nanci');
     expect(screen.getByTestId('contagem-de-recusados')).toHaveTextContent('1 recusado hoje');
+  });
+
+  /** Pedido do PI, 03/10/2026: saída é giro livre, então a lista mostra só quem entrou há até 90 min. */
+  it('a lista só mostra quem passou nos últimos 90 min', () => {
+    const antigo: EventoDoFeed = {
+      ...evento('e-0', 'Entrou Cedo'),
+      occurredAt: '2026-09-01T13:00:00.000Z',
+    };
+
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        inicial={[evento('e-1', 'Rodrigo Ramires'), antigo]}
+      />,
+    );
+
+    expect(screen.getByText(/Rodrigo Ramires/)).toBeInTheDocument();
+    expect(screen.queryByText(/Entrou Cedo/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('janela-do-feed')).toHaveTextContent('últimos 90 min');
+  });
+
+  it('a linha sai da lista quando o relógio passa da janela, sem evento novo', async () => {
+    vi.mocked(lerFeedDeAcessos).mockResolvedValue({ eventos: [evento('e-1', 'Rodrigo Ramires')] });
+
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        inicial={[evento('e-1', 'Rodrigo Ramires')]}
+      />,
+    );
+    expect(screen.getByText(/Rodrigo Ramires/)).toBeInTheDocument();
+
+    // 14:32:08 + 90 min = 16:02:08. Pula o relógio para 16:05 e roda UM ciclo:
+    // avançar 85 min em ciclos de 5 s estourava o limite do teste no CI.
+    vi.setSystemTime(new Date('2026-09-01T16:05:00.000Z'));
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    await waitFor(() => expect(screen.queryByText(/Rodrigo Ramires/)).not.toBeInTheDocument());
+    expect(screen.getByText(/Ninguém passou na catraca/)).toBeInTheDocument();
+  });
+
+  it('o cartão de recusados continua lendo o dia inteiro, fora da janela', () => {
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        situacoes={[]}
+        inicial={[
+          {
+            ...evento('e-2', 'Joao Pedro Ramalho'),
+            outcome: 'DENY',
+            reason: 'NO_ENTITLEMENT',
+            occurredAt: '2026-09-01T11:00:00.000Z',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId('recusados-de-hoje')).toHaveTextContent('Joao Pedro');
+    expect(screen.queryByTestId('feed-de-acessos')).toBeNull();
+  });
+
+  /** Pedido do PI, 03/10/2026: o nome leva à tela de detalhe do aluno. */
+  it('o nome do aluno é um link para o detalhe dele', () => {
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        inicial={[evento('e-1', 'Rodrigo Ramires')]}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Rodrigo Ramires' })).toHaveAttribute(
+      'href',
+      '/students/aluno-e-1',
+    );
+  });
+
+  it('quem não foi identificado aparece sem link', () => {
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        inicial={[{ ...evento('e-1', 'x'), student: null, externalUserId: '1558' }]}
+      />,
+    );
+
+    expect(screen.getByText('1558')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  /** Pedido do PI, 03/10/2026: cartão de pessoa com foto, faixa no tom da razão. */
+  it('com foto na ficha, o cartão mostra a foto; sem foto, as iniciais', () => {
+    const comFoto: EventoDoFeed = {
+      ...evento('e-1', 'Rodrigo Ramires'),
+      student: { id: 'aluno-1', fullName: 'Rodrigo Ramires', temFoto: true },
+    };
+
+    const { container } = render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        inicial={[comFoto, evento('e-2', 'Marina Lopes')]}
+      />,
+    );
+
+    expect(container.querySelector('img')).toHaveAttribute('src', '/fotos-de-aluno/aluno-1');
+    expect(screen.getByText('ML')).toBeInTheDocument();
+  });
+
+  it('o cartão diz a razão por escrito e leva o tom dela', () => {
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        inicial={[{ ...evento('e-1', 'Joao Pedro'), outcome: 'DENY', reason: 'NO_ENTITLEMENT' }]}
+      />,
+    );
+
+    const cartao = screen.getByText('Sem plano vigente').closest('li');
+    expect(cartao).toHaveAttribute('data-tom', 'danger');
+    expect(cartao).toHaveTextContent('Tentativa');
   });
 
   it('sem situacoes, o feed nao desenha o cartão de bloqueados', () => {

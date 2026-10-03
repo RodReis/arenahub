@@ -576,6 +576,14 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
   gap: 10px;
 }
 
+/* Diz por que a linha some da lista: a saída é giro livre, só há horário de entrada. */
+.janelaDoFeed {
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 500;
+  color: var(--ah-text-secondary);
+}
+
 /*
  * O ÍCONE do título ganha a cor de ação -- é o único ponto de accent do
  * cartão, e o que distingue "Placar do mês" de "Feriados do mês" antes de a
@@ -662,18 +670,6 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
     opacity: 0;
     transform: scale(1.5);
   }
-}
-
-/*
- * A LINHA NOVA do feed entra deslizando de cima — a única animação de entrada
- * da tela, e ela comunica estado: "isto acabou de acontecer". Sem ela, a
- * lista troca de conteúdo em silêncio e quem estava olhando não percebe que
- * alguém passou na catraca.
- *
- * 220 ms com ease-out-expo: rápido o bastante para não atrasar a leitura.
- */
-.linhaDoFeed {
-  animation: ah-entra 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes ah-entra {
@@ -1064,7 +1060,7 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
     opacity: 0;
   }
 
-  .linhaDoFeed,
+  .cartaoDePresenca,
   .proporcaoLiberado,
   .proporcaoNegado,
   .kpi[data-mudou='true']::after {
@@ -1088,5 +1084,250 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
 
   .cartao:hover {
     transform: none;
+  }
+}
+
+/* ─── Acessos em tempo real: cartões de presença ─────────────────────── */
+
+/*
+ * Pedido do PI, 03/10/2026: quem passou na catraca vira CARTÃO DE PESSOA lado a
+ * lado (faixa no tom da razão, avatar sobreposto, nome, horário). DS-PAINEL
+ * §4.5d. `auto-fill` com mínimo de 168 px: 4 a 5 por linha a 1280 px, e a
+ * grade nunca estoura a coluna.
+ */
+.gradeDePresenca {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+  max-height: 520px;
+  margin: 0;
+  /* Espaço para a sombra e o anel de foco não serem cortados pela rolagem. */
+  padding: 4px 4px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ah-border-default) transparent;
+}
+
+/* O tom vem da RAZÃO (`stateLabel`), nunca do enfeite: liberado é verde, recusa é a cor da recusa. */
+.cartaoDePresenca {
+  --tom: var(--ah-state-info);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: 14px;
+  background: var(--ah-surface-raised);
+  box-shadow: var(--ah-elev-1);
+  text-align: center;
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms ease-out;
+  /* A entrada comunica estado: "alguém acabou de passar". 260 ms, ease-out-expo. */
+  animation: ah-chega 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.cartaoDePresenca[data-tom='success'] {
+  --tom: var(--ah-state-success);
+}
+.cartaoDePresenca[data-tom='warning'] {
+  --tom: var(--ah-state-warning);
+}
+.cartaoDePresenca[data-tom='danger'],
+.cartaoDePresenca[data-tom='risk'] {
+  --tom: var(--ah-state-danger);
+}
+.cartaoDePresenca[data-tom='neutral'] {
+  --tom: var(--ah-text-secondary);
+}
+
+.cartaoDePresenca:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--tom) 35%, var(--ah-border-subtle));
+  box-shadow: var(--ah-elev-2);
+}
+
+/* O link cobre o cartão (`::after`); o anel de foco vai no cartão, não num retângulo do nome. */
+.cartaoDePresenca:has(.linkDoCartao:focus-visible) {
+  outline: 2px solid var(--ah-action-text);
+  outline-offset: 2px;
+}
+
+@keyframes ah-chega {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * A FAIXA: o tom a 8% sobre a superfície, texto e ícone no tom cheio -- a
+ * mesma receita medida AA do `PainelDeEstado` (DS-PAINEL §4.6b). Cor, ícone e
+ * texto: os três canais.
+ */
+.faixaDePresenca {
+  display: flex;
+  align-self: stretch;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  height: 46px;
+  padding: 8px 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--tom) 22%, transparent);
+  background: color-mix(in srgb, var(--tom) 8%, var(--ah-surface-raised));
+  color: var(--tom);
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Razão longa ("Liberado manualmente pela recepção") trunca; o `title` guarda o texto inteiro. */
+.rotuloDaFaixa {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.faixaDePresenca svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.molduraDoAvatar {
+  position: relative;
+  margin-top: -26px;
+}
+
+/* Anel de 2 px no tom (DS-PAINEL §4.19) separado da faixa por 3 px de superfície. */
+.avatarDePresenca {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border: 3px solid var(--ah-surface-raised);
+  border-radius: 50%;
+  background: var(--ah-surface-sunken);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tom) 55%, transparent);
+  color: var(--ah-text-secondary);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  user-select: none;
+}
+
+.avatarDePresenca img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* O ponto de presença; pulsa enquanto a passagem tem menos de 2 min. */
+.pontoDePresenca {
+  position: absolute;
+  right: 1px;
+  bottom: 3px;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--ah-surface-raised);
+  border-radius: 50%;
+  background: var(--tom);
+}
+
+.cartaoDePresenca[data-recente='true'] .pontoDePresenca::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: var(--tom);
+  animation: ah-halo 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.nomeDePresenca {
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 19px;
+  font-weight: 600;
+  color: var(--ah-text-strong);
+}
+
+.linkDoCartao {
+  color: inherit;
+  text-decoration: none;
+}
+
+.linkDoCartao::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.cartaoDePresenca:hover .linkDoCartao {
+  color: var(--ah-action-text);
+}
+
+.linkDoCartao:focus-visible {
+  outline: none;
+}
+
+.rodapeDePresenca {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-self: stretch;
+  margin: 10px 0 0;
+  padding: 8px 4px 10px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.rodapeDePresenca > div + div {
+  border-left: 1px solid var(--ah-border-subtle);
+}
+
+.rodapeDePresenca dt {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--ah-text-secondary);
+}
+
+.rodapeDePresenca dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 17px;
+  font-weight: 600;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartaoDePresenca {
+    transition: none;
+  }
+
+  .cartaoDePresenca:hover {
+    transform: none;
+  }
+
+  .cartaoDePresenca[data-recente='true'] .pontoDePresenca::after {
+    animation: none;
+    opacity: 0;
   }
 }
