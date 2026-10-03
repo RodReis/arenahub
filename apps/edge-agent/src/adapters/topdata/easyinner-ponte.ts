@@ -111,6 +111,33 @@ export const esquemaComandoPonte = z.discriminatedUnion('cmd', [
     tempo: z.number().int().positive().default(10),
     /** Segundos destravada (`ConfigurarAcionamento1`), 1 a 50. */
     tempoLiberadaS: z.number().int().min(1).max(50).default(5),
+    /**
+     * Modo de acesso a montar na DLL (#507). Sem ele a ponte mantem os valores
+     * antigos, que nunca chegaram ao equipamento (so `gravar-configuracao`
+     * grava) e sao errados para a Arena Positiva.
+     */
+    configuracao: z
+      .object({
+        leitor1: z.number().int().min(0).max(6),
+        leitor2: z.number().int().min(0).max(6),
+        acionamento1: z.number().int().min(0).max(8),
+      })
+      .optional(),
+  }),
+
+  /**
+   * Grava no EQUIPAMENTO a configuracao montada pelo `conectar`
+   * (`EnviarConfiguracoes`) -- #507. `Configurar*` so mexe na memoria da
+   * DLL; sem este comando a catraca segue com o que ja tinha, e volta de
+   * fabrica quando perde energia.
+   *
+   * ⚠️ Grava o BLOCO inteiro (leitor, padrao de cartao etc.), nao so os tres
+   * campos: pode sobrescrever o que o modo offline usa. Por isso so e
+   * chamado quando a instalacao pede (`CATRACA_LEITOR1/2` + `CATRACA_ACIONAMENTO1`).
+   */
+  z.object({
+    cmd: z.literal('gravar-configuracao'),
+    inner: z.number().int().min(1).max(99),
   }),
 
   /** Testa se a catraca esta conectada. `TestarConexaoInner`. */
@@ -161,6 +188,11 @@ export const esquemaComandoPonte = z.discriminatedUnion('cmd', [
 ]);
 
 export type ComandoPonte = z.infer<typeof esquemaComandoPonte>;
+
+/** Modo de acesso que o agente grava na catraca -- #507. */
+export type ConfiguracaoAcesso = NonNullable<
+  Extract<ComandoPonte, { cmd: 'conectar' }>['configuracao']
+>;
 
 // --- o que a ponte DEVOLVE ------------------------------------------------
 

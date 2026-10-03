@@ -77,7 +77,8 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
    | `EDGE_PAIRING_CODE` | o código gerado no painel, uso único |
    | `FACIAL_MODE` / `CATRACA_MODE` | `real` na academia; `simulador` é o padrão e não gira nada |
    | `CATRACA_INVERTIDA` | `true` se a catraca gira para o sentido errado. **Só se descobre testando** na bancada (`lab:run --invertido`). Arena Positiva: `true` (#407) |
-   | `CATRACA_TEMPO_LIBERADA_S` | segundos destravada depois de liberar, de 1 a 50. Padrão `10`. ⚠️ **Hoje não chega ao equipamento (#507)**: o tempo que vale é o **Tempo de acionamento 1** gravado na página da catraca |
+   | `CATRACA_TEMPO_LIBERADA_S` | segundos destravada depois de liberar, de 1 a 50. Padrão `10`. ⚠️ **Só chega ao equipamento com os três `CATRACA_LEITOR1/LEITOR2/ACIONAMENTO1` abaixo definidos (#507)**; sem eles, vale o **Tempo de acionamento 1** gravado na página da catraca |
+   | `CATRACA_LEITOR1` / `CATRACA_LEITOR2` / `CATRACA_ACIONAMENTO1` | **opcionais, os três juntos ou nenhum** (#507). Com eles, o agente **grava esse modo de acesso na catraca** a cada conexão e quando ela volta de uma queda de energia. Leitor: 0 desabilitado, 1 só entrada, 2 só saída, 3 entrada e saída, **4 entrada e saída invertido**, 5/6 só entrada/saída invertido. Acionamento: 0 desabilitado, 1 libera entrada e saída, 2 entrada, 3 saída, 4 sirene, 5 revista, **6 giro de saída livre**, 7 giro de entrada livre, 8 ambos livres. Arena Positiva: `4` / `0` / `6`. ⚠️ Grava o bloco inteiro de configuração do equipamento — confira o modo offline depois de ligar |
    | `CATRACA_SERIAL` | o serial que o display da catraca mostra (menu → Serial), **igual ao cadastrado no painel**. Sem ele, o alerta de catraca fora fica permanente e falso (#522). Arena Positiva: `247000797` |
    | `LOG_LEVEL` | `info` em produção. `debug` só para diagnóstico — lista cada mensagem do leitor |
 
@@ -97,11 +98,10 @@ piloto. A consequência está escrita no ADR-011 e precisa ser dita à academia 
    pareamento. Ele cria a tarefa `ArenaHub Edge` (dispara no login, **sem janela**, religa o agente
    em 5 s se cair) e já inicia.
 
-> ⚠️ **Não use `pnpm service:install`** — [#499](https://github.com/RodReis/arenahub/issues/499).
-> O script registra `node.exe` direto como serviço do Windows, e o Node não responde ao Service
-> Control Manager (erro 1053 ao iniciar); também exige a senha da conta. Nunca foi executado numa
-> máquina real. O que roda na Arena Positiva é a tarefa agendada, **validada em 01/10/2026 com
-> reinício do Windows**.
+> O agente **não roda como serviço do Windows**: o Node não responde ao Service Control Manager
+> (erro 1053), e o serviço exigiria a senha da conta. Os scripts `service:install`/`service:uninstall`
+> foram removidos ([#499](https://github.com/RodReis/arenahub/issues/499)). O que roda na Arena
+> Positiva é a tarefa agendada, **validada em 01/10/2026 com reinício do Windows**.
 
 **Scripts de dois cliques** — em `apps/edge-agent/scripts/windows/`. **Nenhum comando para
 copiar**: copiar pelo WhatsApp apagou `_` e `*` e inverteu a ordem de blocos de várias linhas no PC
@@ -209,10 +209,9 @@ apontar `CLOUD_API_URL` do Edge para a nuvem — `railway.internal` não resolve
 bater num que não fecha, **o passo está errado até prova em contrário** — não é você que não
 entendeu.
 
-**Instalação real do serviço (F59, Task 13):** os scripts `install-service.ps1` /
-`uninstall-service.ps1` existem e foram revisados manualmente (`.superpowers/sdd/2026-09-16-f59-composicao-edge-agent/task-13-report.md`),
-mas **não foram ensaiados numa máquina Windows real**. `AC-9` continua pendente até esse ensaio
-presencial acontecer.
+**Instalação real (F59, AC-9):** ensaiada na Arena Positiva em 01/10/2026 — não como serviço do
+Windows (os scripts `install-service.ps1`/`uninstall-service.ps1` foram removidos, #499), e sim pela
+tarefa agendada `ArenaHub Edge` do `instalar-edge.cmd`, validada com reinício do Windows.
 
 **Quem executar pela primeira vez: anote o que divergiu e corrija este arquivo.** Runbook que
 ninguém rodou é hipótese escrita com confiança.

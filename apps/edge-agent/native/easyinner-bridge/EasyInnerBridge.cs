@@ -40,6 +40,8 @@ class EasyInnerBridge {
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte ConfigurarLeitor2(byte Operacao);
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
+    static extern byte EnviarConfiguracoes(int Inner);
+    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte AcionarRele1(int Inner);
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte ReceberVersaoFirmware(int Inner, ref byte Linha, ref short Variacao, ref byte VersaoAlta, ref byte VersaoBaixa, ref byte VersaoSufixo, ref byte InnerAcessoBio);
@@ -107,6 +109,7 @@ class EasyInnerBridge {
 
         switch (nome) {
             case "conectar":       return Conectar(cmd);
+            case "gravar-configuracao": return Retorno(EnviarConfiguracoes(inner));
             case "testar-conexao": return Retorno(ConfigurarInnerOnLine());
             case "ping":           return Retorno(PingOnLine(inner));
             case "liberar":        return Liberar(cmd, inner);
@@ -134,15 +137,28 @@ class EasyInnerBridge {
         // Positiva, 01/10/2026). Sem o campo, mantem 5 -- agente antigo.
         byte liberada = cmd.ContainsKey("tempoLiberadaS") ? Convert.ToByte(cmd["tempoLiberadaS"]) : (byte)5;
 
+        // Modo de acesso (#507). Sem "configuracao" ficam os valores antigos --
+        // que so existem na memoria da DLL e nao sao gravados sem o comando
+        // "gravar-configuracao" (EnviarConfiguracoes).
+        byte acionamento1 = 1; // ACIONA_REGISTRO_ENTRADA_OU_SAIDA
+        byte leitor1 = 3;      // ENTRADA_E_SAIDA
+        byte leitor2 = 0;      // DESATIVADO
+        if (cmd.ContainsKey("configuracao") && cmd["configuracao"] != null) {
+            var cfg = (IDictionary<string, object>)cmd["configuracao"];
+            acionamento1 = Convert.ToByte(cfg["acionamento1"]);
+            leitor1 = Convert.ToByte(cfg["leitor1"]);
+            leitor2 = Convert.ToByte(cfg["leitor2"]);
+        }
+
         byte pior = 0;
         pior = Math.Max(pior, DefinirTipoConexao(2));
         pior = Math.Max(pior, AbrirPortaComunicacao(porta));
         pior = Math.Max(pior, HabilitarMudancaOnLineOffLine(2, tempo));
         pior = Math.Max(pior, DefinirPadraoCartao(0));      // PADRAO_TOPDATA
         pior = Math.Max(pior, ConfigurarInnerOnLine());
-        pior = Math.Max(pior, ConfigurarAcionamento1(1, liberada)); // ACIONA_REGISTRO_ENTRADA_OU_SAIDA
-        pior = Math.Max(pior, ConfigurarLeitor1(3));        // ENTRADA_E_SAIDA
-        pior = Math.Max(pior, ConfigurarLeitor2(0));        // DESATIVADO
+        pior = Math.Max(pior, ConfigurarAcionamento1(acionamento1, liberada));
+        pior = Math.Max(pior, ConfigurarLeitor1(leitor1));
+        pior = Math.Max(pior, ConfigurarLeitor2(leitor2));
         return Retorno(pior);
     }
 

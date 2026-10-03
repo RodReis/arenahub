@@ -103,6 +103,41 @@ describe('CATRACA_INVERTIDA', () => {
   });
 });
 
+/** #507 -- modo de acesso gravado na catraca: os tres juntos ou nenhum. */
+describe('CATRACA_LEITOR1 / CATRACA_LEITOR2 / CATRACA_ACIONAMENTO1', () => {
+  const COMPLETO = { CATRACA_LEITOR1: '4', CATRACA_LEITOR2: '0', CATRACA_ACIONAMENTO1: '6' };
+
+  it('ficam indefinidos por padrao -- o agente nao grava nada', () => {
+    const config = carregarConfig(VALIDO);
+    expect(config.CATRACA_LEITOR1).toBeUndefined();
+    expect(config.CATRACA_ACIONAMENTO1).toBeUndefined();
+  });
+
+  it('aceitam os tres definidos (Arena Positiva: 4 / 0 / 6)', () => {
+    const config = carregarConfig({ ...VALIDO, ...COMPLETO });
+    expect([config.CATRACA_LEITOR1, config.CATRACA_LEITOR2, config.CATRACA_ACIONAMENTO1]).toEqual([
+      4, 0, 6,
+    ]);
+  });
+
+  it('recusam so um ou dois dos tres', () => {
+    expect(() => carregarConfig({ ...VALIDO, CATRACA_LEITOR1: '4' })).toThrow(/tres ou nenhum/);
+    expect(() =>
+      carregarConfig({ ...VALIDO, CATRACA_LEITOR1: '4', CATRACA_ACIONAMENTO1: '6' }),
+    ).toThrow(/tres ou nenhum/);
+  });
+
+  it('variavel vazia (VAR=) conta como ausente, nunca como 0', () => {
+    const config = carregarConfig({ ...VALIDO, CATRACA_LEITOR1: '', CATRACA_LEITOR2: '' });
+    expect(config.CATRACA_LEITOR1).toBeUndefined();
+  });
+
+  it('recusam valor fora do enum do firmware', () => {
+    expect(() => carregarConfig({ ...VALIDO, ...COMPLETO, CATRACA_LEITOR1: '7' })).toThrow();
+    expect(() => carregarConfig({ ...VALIDO, ...COMPLETO, CATRACA_ACIONAMENTO1: '9' })).toThrow();
+  });
+});
+
 describe('descreverConfig', () => {
   it('mascara segredo presente', () => {
     const config = carregarConfig({

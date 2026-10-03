@@ -35,6 +35,7 @@ de `easyinner-ponte.ts`. Comandos:
 | comando | efeito | perigo |
 |---|---|---|
 | `{"cmd":"conectar","porta":3570,"tempo":10}` | setup: tipo de conexão, abre porta, modo online | conecta, não gira |
+| `{"cmd":"gravar-configuracao","inner":1}` | `EnviarConfiguracoes`: grava no equipamento o modo de acesso montado pelo `conectar` (`configuracao`). Bloco inteiro, pode sobrescrever o que o modo offline usa (#507) | ⚠️ escreve na catraca |
 | `{"cmd":"testar-conexao"}` | `ConfigurarInnerOnLine` (0 = catraca respondeu) | leitura |
 | `{"cmd":"ping","inner":1}` | `PingOnLine` (keep-alive) | leitura |
 | `{"cmd":"receber-evento","inner":1,"timeoutMs":2000}` | lê evento (origem 6 = giro, 5 = timeout) | leitura |

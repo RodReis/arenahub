@@ -5,7 +5,7 @@ import {
   type SentidoGiro,
   type TurnstileAdapter,
 } from '../../domain/turnstile.js';
-import { ORIGEM, type PonteEasyInner } from './easyinner-ponte.js';
+import { ORIGEM, type ConfiguracaoAcesso, type PonteEasyInner } from './easyinner-ponte.js';
 
 /**
  * Adapter da catraca Topdata, sobre a ponte com a EasyInner.dll.
@@ -36,6 +36,10 @@ const JANELA_POLLING_MS = 500;
  */
 export const INTERVALO_KEEP_ALIVE_MS = 5_000;
 
+/** Tentativas de gravar a configuracao e espera entre elas: a catraca leva segundos para discar (#507). */
+const TENTATIVAS_GRAVAR = 10;
+const ESPERA_GRAVAR_MS = 2_000;
+
 export class TopdataInnerAdapter implements TurnstileAdapter {
   readonly nome = 'topdata-inner';
 
@@ -56,6 +60,8 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
 
   /** Resultado do ultimo ping do keep-alive -- vai no heartbeat (#522). */
   private ultimoPingOk = false;
+
+  private gravando = false;
 
   get respondendo(): boolean {
     return this.ultimoPingOk;
@@ -78,6 +84,11 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
      * constante.
      */
     private readonly invertido = false,
+    /**
+     * Modo de acesso a gravar NA catraca (#507). Sem ele o agente nao grava
+     * nada -- a catraca fica com o que ja tem.
+     */
+    private readonly configuracao?: ConfiguracaoAcesso,
   ) {}
 
   /**
@@ -92,8 +103,47 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
    * para discar de volta. Confirme com `testarConexao()` antes de liberar.
    */
   async conectar(porta: number, tempo = 10, tempoLiberadaS = 5): Promise<boolean> {
-    const r = await this.ponte.executar({ cmd: 'conectar', porta, tempo, tempoLiberadaS });
+    const r = await this.ponte.executar({
+      cmd: 'conectar',
+      porta,
+      tempo,
+      tempoLiberadaS,
+      configuracao: this.configuracao,
+    });
     return r.tipo === 'retorno' && r.retorno === 0;
+  }
+
+  /**
+   * Grava o modo de acesso na catraca (`EnviarConfiguracoes`) -- #507.
+   * Espera a catraca discar (primeiro ping com retorno 0) e tenta de novo
+   * se ela ainda nao aceitou. Sem `configuracao`, nao faz nada.
+   *
+   * ⚠️ Grava o bloco inteiro de configuracao do equipamento, nao so os tres
+   * campos. Confira o plano B (modo offline) depois de ligar isto numa
+   * instalacao nova.
+   */
+  async gravarConfiguracao(
+    tentativas = TENTATIVAS_GRAVAR,
+    esperaMs = ESPERA_GRAVAR_MS,
+  ): Promise<boolean> {
+    if (!this.configuracao || this.gravando) return false;
+    this.gravando = true;
+    try {
+      for (let i = 1; i <= tentativas; i += 1) {
+        if (await this.ping()) {
+          const r = await this.ponte.executar({ cmd: 'gravar-configuracao', inner: this.inner });
+          if (r.tipo === 'retorno' && r.retorno === 0) {
+            this.logger.info({ ...this.configuracao }, 'configuracao de acesso gravada na catraca');
+            return true;
+          }
+        }
+        if (i < tentativas) await new Promise((resolve) => setTimeout(resolve, esperaMs));
+      }
+      this.logger.warn({ tentativas }, 'catraca nao aceitou a configuracao de acesso');
+      return false;
+    } finally {
+      this.gravando = false;
+    }
   }
 
   /** A catraca responde? `TestarConexaoInner`. */
@@ -137,7 +187,16 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
           // recepcao sem dizer nada novo.
           if (ok !== respondendo) {
             respondendo = ok;
-            if (ok) this.logger.info('catraca voltou a responder ao ping');
+            if (ok) {
+              this.logger.info('catraca voltou a responder ao ping');
+              // Voltou depois de cair: se foi queda de energia, perdeu a configuracao (#507).
+              void this.gravarConfiguracao().catch((erro: unknown) => {
+                this.logger.warn(
+                  { erro: erro instanceof Error ? erro.message : erro },
+                  'falha ao regravar a configuracao da catraca',
+                );
+              });
+            }
             else this.logger.warn('catraca nao respondeu ao ping -- pode cair para offline');
           }
         })

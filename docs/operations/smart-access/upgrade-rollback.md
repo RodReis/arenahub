@@ -50,7 +50,7 @@ A recepção precisa saber que vai liberar manualmente durante a janela.
 4. Teste uma passagem real (aluno com plano, aluno sem plano): `latenciaDecisaoMs` maior que zero no
    log (`ver-log-edge.cmd`)
 
-> O agente **não é um serviço do Windows** (`service:install` não funciona, #499): é a tarefa
+> O agente **não é um serviço do Windows** (#499): é a tarefa
 > agendada `ArenaHub Edge`. Mudança só do Edge chega ao PC por `git pull` — **não depende do deploy
 > da nuvem**.
 

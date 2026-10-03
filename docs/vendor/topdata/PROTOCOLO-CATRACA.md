@@ -97,11 +97,17 @@ orientação física da catraca"*. **Isso se verifica na bancada, não se adivin
 > deixa o aluno travado. O agente espera o giro por `tempo + 3 s`, porque quem decide o fim é a
 > Origem 5 da catraca. **Mudar o `.cs` exige `pnpm --filter @arenahub/edge-agent bridge:build` no PC.**
 >
-> ⚠️ **Achado de 02/10/2026 (#507): isso NÃO chega ao equipamento.** `Configurar*` só monta a
-> configuração na memória da DLL; quem grava na catraca é `EnviarConfiguracoes`, que a ponte não
-> chama. O tempo que vale é o gravado **na catraca** (Configurações de Acesso Avançadas → Tempo de
-> acionamento 1, na página dela, com a catraca offline). E ela **perde a configuração** quando é
-> desligada da tomada — runbook de operação §8.
+> ⚠️ **Achado de 02/10/2026 (#507): `Configurar*` sozinho NÃO chega ao equipamento.** Só monta a
+> configuração na memória da DLL; quem grava na catraca é `EnviarConfiguracoes`. A ponte agora tem o
+> comando `gravar-configuracao`, que o agente chama depois que a catraca disca (primeiro ping com
+> retorno 0) — **mas só se o `.env` definir `CATRACA_LEITOR1`, `CATRACA_LEITOR2` e
+> `CATRACA_ACIONAMENTO1`** (os três juntos, Arena Positiva: `4`/`0`/`6`; o tempo vem de
+> `CATRACA_TEMPO_LIBERADA_S`). Sem eles nada é gravado e vale o que está **na catraca** (Configurações
+> de Acesso Avançadas → Tempo de acionamento 1, na página dela, com a catraca offline). Ela **perde a
+> configuração** quando é desligada da tomada — o agente regrava quando o ping volta depois de
+> falhar. ⚠️ `EnviarConfiguracoes` grava o **bloco inteiro**; pode sobrescrever o que o modo offline
+> (plano B) usa para o leitor facial. **Não validado no equipamento ainda** — conferir na bancada e o
+> modo offline antes de ligar no PC da recepção. Runbook de operação §8.
 
 ## Página de configuração da catraca (web server do equipamento)
 
