@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { CABECALHOS, assinar } from '@arenahub/api-contracts';
@@ -9,6 +9,7 @@ import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
 import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
+import { BiometricIdentityRepository } from '../../src/modules/biometrics/biometric-identity.repository.js';
 import { VincularCadastroLegadoUseCase } from '../../src/modules/biometrics/vincular-cadastro-legado.use-case.js';
 import { DeviceRepository } from '../../src/modules/devices/device.repository.js';
 import { EdgeAuthService } from '../../src/modules/edge-auth/edge-auth.service.js';
@@ -425,6 +426,8 @@ describe('#468 -- vinculo legado do leitor', () => {
     expect(resposta.status).toBe(400);
   });
 
+  const ESTADOS_NAO_REAPONTAVEIS = ['PENDING', 'REMOVAL_PENDING', 'FAILED', 'REMOVED'] as const;
+
   describe('vinculo imediato e troca de numero', () => {
     it('numero ja no leitor vincula na hora pelo caso de uso, sem o Edge reenviar', async () => {
       const numero = `7${sufixo.replace(/\D/g, '').padEnd(11, '1').slice(0, 11)}`;
@@ -458,6 +461,163 @@ describe('#468 -- vinculo legado do leitor', () => {
         where: { deviceId: ctx.deviceId, studentId: aluno },
       });
       expect(doAluno.map((d) => d.externalUserId)).toEqual([novo]);
+
+      const auditorias = await db.auditLog.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          action: 'biometric.number_repointed',
+          targetId: doAluno[0]!.id,
+        },
+      });
+      expect(auditorias).toHaveLength(1);
+      expect(auditorias[0]!.metadata).toMatchObject({ deviceId: ctx.deviceId, from: antigo, to: novo });
+    });
+
+    it.each(ESTADOS_NAO_REAPONTAVEIS)(
+      'troca de numero NAO reaponta vinculo %s -- devolve para a recepcao',
+      async (estado) => {
+        const antigo = `4${ESTADOS_NAO_REAPONTAVEIS.indexOf(estado)}${sufixo.replace(/\D/g, '').padEnd(10, '6').slice(0, 10)}`;
+        const novo = `3${ESTADOS_NAO_REAPONTAVEIS.indexOf(estado)}${sufixo.replace(/\D/g, '').padEnd(10, '7').slice(0, 10)}`;
+        const aluno = await criarAluno(`E-${estado}`, [
+          { kind: 'FACIAL_ENROLL_ID', externalId: antigo },
+        ]);
+        await vincular({ deviceSerial: serial, externalUserIds: [antigo] });
+        await db.deviceUser.updateMany({
+          where: { deviceId: ctx.deviceId, studentId: aluno },
+          data: { state: estado },
+        });
+
+        await db.studentCredential.updateMany({
+          where: { studentId: aluno },
+          data: { externalId: novo },
+        });
+        const r = await vincular({ deviceSerial: serial, externalUserIds: [novo] });
+
+        expect(r.status).toBe(201);
+        expect((r.body as { studentAlreadyLinked: string[] }).studentAlreadyLinked).toEqual([novo]);
+        const linhas = await db.deviceUser.findMany({
+          where: { deviceId: ctx.deviceId, studentId: aluno },
+        });
+        expect(linhas.map((d) => [d.externalUserId, d.state])).toEqual([[antigo, estado]]);
+      },
+    );
+
+    it('aluno com linha morta e linha viva no mesmo leitor: troca nao reaponta e nao da 500', async () => {
+      const antigo = `2${sufixo.replace(/\D/g, '').padEnd(11, '8').slice(0, 11)}`;
+      const morto = `1${sufixo.replace(/\D/g, '').padEnd(11, '9').slice(0, 11)}`;
+      const novo = `0${sufixo.replace(/\D/g, '').padEnd(11, '1').slice(0, 11)}`;
+      const aluno = await criarAluno('MORTA', [{ kind: 'FACIAL_ENROLL_ID', externalId: antigo }]);
+      await vincular({ deviceSerial: serial, externalUserIds: [antigo] });
+
+      const viva = await db.deviceUser.findFirstOrThrow({
+        where: { deviceId: ctx.deviceId, studentId: aluno },
+      });
+      const identidadeViva = await db.biometricIdentity.findUniqueOrThrow({
+        where: { id: viva.identityId },
+      });
+      const identidadeMorta = await db.biometricIdentity.create({
+        data: {
+          tenantId: ctx.tenantId,
+          studentId: aluno,
+          consentRecordId: identidadeViva.consentRecordId,
+          state: 'REVOKED',
+        },
+      });
+      await db.deviceUser.create({
+        data: {
+          tenantId: ctx.tenantId,
+          deviceId: ctx.deviceId,
+          studentId: aluno,
+          identityId: identidadeMorta.id,
+          externalUserId: morto,
+          state: 'REMOVED',
+        },
+      });
+
+      await db.studentCredential.updateMany({
+        where: { studentId: aluno },
+        data: { externalId: novo },
+      });
+      const r = await vincular({ deviceSerial: serial, externalUserIds: [novo] });
+
+      expect(r.status).toBe(201);
+      expect((r.body as { studentAlreadyLinked: string[] }).studentAlreadyLinked).toEqual([novo]);
+      const linhas = await db.deviceUser.findMany({
+        where: { deviceId: ctx.deviceId, studentId: aluno },
+        orderBy: { externalUserId: 'asc' },
+      });
+      expect(linhas.map((d) => [d.externalUserId, d.state])).toEqual([
+        [morto, 'REMOVED'],
+        [antigo, 'SYNCED'],
+      ]);
+    });
+
+    it('colisao de unicidade ao reapontar conta como ja vinculado e nao derruba o lote', async () => {
+      const antigo = `1${sufixo.replace(/\D/g, '').padEnd(11, '2').slice(0, 11)}`;
+      const novo = `2${sufixo.replace(/\D/g, '').padEnd(11, '3').slice(0, 11)}`;
+      const aluno = await criarAluno('CORRIDA', [{ kind: 'FACIAL_ENROLL_ID', externalId: antigo }]);
+      await vincular({ deviceSerial: serial, externalUserIds: [antigo] });
+      await db.studentCredential.updateMany({
+        where: { studentId: aluno },
+        data: { externalId: novo },
+      });
+
+      const espiao = jest
+        .spyOn(app.get(BiometricIdentityRepository), 'reapontarNumero')
+        .mockRejectedValue(Object.assign(new Error('unique'), { code: 'P2002' }));
+      try {
+        const r = await vincular({ deviceSerial: serial, externalUserIds: [novo] });
+
+        expect(r.status).toBe(201);
+        expect(r.body).toMatchObject({ linked: 0, alreadyLinked: 1, studentAlreadyLinked: [] });
+        expect(espiao).toHaveBeenCalledTimes(1);
+      } finally {
+        espiao.mockRestore();
+      }
+      const linhas = await db.deviceUser.findMany({
+        where: { deviceId: ctx.deviceId, studentId: aluno },
+      });
+      expect(linhas.map((d) => d.externalUserId)).toEqual([antigo]);
+    });
+
+    it('vincularNumero NAO conta o leitor quando o numero esta vinculado a OUTRO aluno', async () => {
+      const numero = `3${sufixo.replace(/\D/g, '').padEnd(11, '4').slice(0, 11)}`;
+      const outroNumero = `4${sufixo.replace(/\D/g, '').padEnd(11, '5').slice(0, 11)}`;
+      const b = await criarAluno('B-DEIXOU', [{ kind: 'FACIAL_ENROLL_ID', externalId: numero }]);
+      await vincular({ deviceSerial: serial, externalUserIds: [numero] });
+      // B perdeu o numero sem ninguem reapontar o vinculo dele.
+      await db.studentCredential.updateMany({
+        where: { studentId: b },
+        data: { externalId: outroNumero },
+      });
+      const a = await criarAluno('A-RECEBEU', [{ kind: 'FACIAL_ENROLL_ID', externalId: numero }]);
+
+      const r = await comContexto({ kind: 'tenant', tenantId: ctx.tenantId }, () =>
+        app
+          .get(VincularCadastroLegadoUseCase)
+          .vincularNumero(ctx.tenantId, numero, 'teste', new Date()),
+      );
+
+      expect(r.linkedReaders).toBe(0);
+      const du = await db.deviceUser.findMany({
+        where: { deviceId: ctx.deviceId, externalUserId: numero },
+      });
+      expect(du.map((d) => d.studentId)).toEqual([b]);
+      expect(await db.deviceUser.count({ where: { deviceId: ctx.deviceId, studentId: a } })).toBe(0);
+    });
+
+    it('vincularNumero com numero que nenhum leitor tem: zero e nada criado', async () => {
+      const numero = `5${sufixo.replace(/\D/g, '').padEnd(11, '6').slice(0, 11)}`;
+      const aluno = await criarAluno('SEM-LEITOR', [{ kind: 'FACIAL_ENROLL_ID', externalId: numero }]);
+
+      const r = await comContexto({ kind: 'tenant', tenantId: ctx.tenantId }, () =>
+        app
+          .get(VincularCadastroLegadoUseCase)
+          .vincularNumero(ctx.tenantId, numero, 'teste', new Date()),
+      );
+
+      expect(r.linkedReaders).toBe(0);
+      expect(await db.deviceUser.count({ where: { studentId: aluno } })).toBe(0);
     });
 
     it('aluno com cartao e facial de numeros diferentes continua studentAlreadyLinked', async () => {

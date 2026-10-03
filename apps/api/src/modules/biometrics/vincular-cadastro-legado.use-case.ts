@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
+import type { DeviceUserState } from '@arenahub/database';
+
 import type { ContextoDoEdge } from '../edge-auth/edge-auth.service.js';
 import { DeviceRepository } from '../devices/device.repository.js';
 import { DeviceReaderNumberRepository } from '../devices/device-reader-number.repository.js';
@@ -101,18 +103,30 @@ export class VincularCadastroLegadoUseCase {
     correlationId: string,
     agora: Date,
   ): Promise<{ linkedReaders: number }> {
+    // Dono do numero: so UM aluno. Zero ou varios -> nao toca em leitor.
+    const donos = new Set(
+      (await this.credenciais.encontrarPorNumeros(tenantId, [numero])).map((l) => l.studentId),
+    );
+    const [dono] = [...donos];
+
+    if (donos.size !== 1 || dono === undefined) return { linkedReaders: 0 };
+
     const leitores = await this.numerosDoLeitor.leitoresComNumero(tenantId, numero);
     let linkedReaders = 0;
 
     for (const leitor of leitores) {
-      const r = await this.vincularNoLeitor(
+      await this.vincularNoLeitor(
         tenantId,
         { id: leitor.deviceId, serial: leitor.serial },
         [numero],
         correlationId,
         agora,
       );
-      linkedReaders += r.linked + r.alreadyLinked;
+
+      // `alreadyLinked` so diz que o numero tem ALGUM DeviceUser no leitor --
+      // pode ser de outro aluno. Conta o leitor so se o numero resolve para o dono.
+      const vinculado = await this.identidades.alunoDoNumero(tenantId, leitor.deviceId, numero);
+      if (vinculado === dono) linkedReaders += 1;
     }
 
     return { linkedReaders };
@@ -139,7 +153,12 @@ export class VincularCadastroLegadoUseCase {
     const numerosVinculados = new Set(vinculos.map((v) => v.externalUserId));
     // Aluno ja com numero neste leitor: um segundo numero violaria
     // `@@unique([deviceId, identityId])` -- e seria cadastro duplicado.
-    const numeroDoAluno = new Map(vinculos.map((v) => [v.studentId, v.externalUserId]));
+    const linhasDoAluno = new Map<string, { externalUserId: string; state: DeviceUserState }[]>();
+    for (const v of vinculos) {
+      linhasDoAluno.set(v.studentId, [...(linhasDoAluno.get(v.studentId) ?? []), v]);
+    }
+    // Estado desconhecido (outra chamada vinculou na corrida): nunca reapontavel.
+    const vinculoDesconhecido = (numero: string) => [{ externalUserId: numero, state: 'PENDING' as const }];
 
     const pendentes: string[] = [];
     for (const numero of new Set(numeros)) {
@@ -173,19 +192,49 @@ export class VincularCadastroLegadoUseCase {
 
       const [[studentId, birthDate]] = [...alunos.entries()] as [[string, Date]];
 
-      const numeroAtual = numeroDoAluno.get(studentId);
-      if (numeroAtual !== undefined) {
-        // Troca de numero: o antigo nao e mais credencial do aluno, entao o
-        // vinculo antigo esta morto -- reaponta. Se o antigo AINDA e
-        // credencial (cartao + facial com numeros diferentes), sao dois
-        // cadastros vivos e o leitor so aceita um: devolve para a recepcao.
-        const credenciaisDoAluno = await this.credenciais.listarNumerosDoAluno(tenantId, studentId);
-        if (!credenciaisDoAluno.includes(numeroAtual)) {
-          await this.identidades.reapontarNumero(tenantId, leitor.id, studentId, numero);
-          numeroDoAluno.set(studentId, numero);
-          resultado.linked += 1;
-          continue;
+      const linhas = linhasDoAluno.get(studentId);
+      if (linhas !== undefined) {
+        // Troca de numero: so quando o aluno tem UM vinculo neste leitor, ele
+        // esta SYNCED e o numero dele nao e mais credencial -- o vinculo antigo
+        // esta morto, reaponta. Se o antigo AINDA e credencial (cartao + facial
+        // com numeros diferentes), sao dois cadastros vivos e o leitor so aceita
+        // um. Qualquer outro caso (PENDING, REMOVAL_PENDING, REMOVED, varias
+        // linhas) volta para a recepcao: reapontar mudaria o alvo de um
+        // senduser/deluser futuro.
+        const [unica] = linhas;
+        if (linhas.length === 1 && unica !== undefined && unica.state === 'SYNCED') {
+          const credenciaisDoAluno = await this.credenciais.listarNumerosDoAluno(
+            tenantId,
+            studentId,
+          );
+
+          if (!credenciaisDoAluno.includes(unica.externalUserId)) {
+            try {
+              const reapontou = await this.identidades.reapontarNumero(
+                tenantId,
+                leitor.id,
+                studentId,
+                numero,
+                correlationId,
+              );
+
+              if (reapontou) {
+                linhasDoAluno.set(studentId, [{ externalUserId: numero, state: 'SYNCED' }]);
+                resultado.linked += 1;
+                continue;
+              }
+            } catch (erro: unknown) {
+              // Outra chamada tomou este numero entre a leitura e a escrita:
+              // a constraint unica decidiu. Mesmo tratamento do vincularLegado.
+              if (!violouUnicidade(erro)) throw erro;
+
+              linhasDoAluno.set(studentId, vinculoDesconhecido(numero));
+              resultado.alreadyLinked += 1;
+              continue;
+            }
+          }
         }
+
         resultado.studentAlreadyLinked.push(numero);
         continue;
       }
@@ -270,11 +319,11 @@ export class VincularCadastroLegadoUseCase {
         if (!violouUnicidade(erro)) throw erro;
 
         resultado.alreadyLinked += 1;
-        numeroDoAluno.set(studentId, numero);
+        linhasDoAluno.set(studentId, vinculoDesconhecido(numero));
         continue;
       }
 
-      numeroDoAluno.set(studentId, numero);
+      linhasDoAluno.set(studentId, [{ externalUserId: numero, state: 'SYNCED' }]);
       resultado.linked += 1;
     }
 
