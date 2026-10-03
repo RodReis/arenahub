@@ -1,13 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Icon, StateBadge, TenantDateTime } from '@arenahub/ui';
+import { Icon } from '@arenahub/ui';
 
 import { lerFeedDeAcessos, type EventoDoFeed } from '../../actions/dashboard';
+import { CartaoDePresenca } from './cartao-de-presenca';
 import { CartaoDeBloqueados, type SituacaoDoDashboard } from './cartao-de-bloqueados';
-import { doisNomes } from './dois-nomes';
 import { JANELA_DE_PERMANENCIA_MIN, naJanelaDePermanencia } from './permanencia';
 import { recusadosDoDia } from './recusados';
 import estilos from './dashboard.module.css';
@@ -156,47 +155,14 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: P
               </span>
             </div>
           ) : (
-            <ul
-              className={`${estilos['lista']} ${estilos['listaRolavel']}`}
-              data-testid="feed-de-acessos"
-            >
-              {naAcademia.map((evento) => (
-                /*
+            <ul className={estilos['gradeDePresenca']} data-testid="feed-de-acessos">
+              {/*
                 `key` é o id do evento, e é o que faz a animação de entrada
-                funcionar: com índice o React reusaria a mesma linha do DOM e
-                só trocaria o texto — a lista mudaria de conteúdo em silêncio,
-                sem nada indicar que alguém acabou de passar na catraca.
-              */
-                <li className={`${estilos['linha']} ${estilos['linhaDoFeed']}`} key={evento.id}>
-                  <span className={estilos['linhaTexto']}>
-                    <span className={estilos['horaDoFeed']}>
-                      <TenantDateTime iso={evento.occurredAt} timeZone={timeZone} format="time" />
-                    </span>
-                    {/*
-                    DOIS NOMES, não o inteiro: a linha divide espaço com a
-                    hora e o badge, e "Bruna Barbara Militao Vi…" truncado
-                    esconde justamente o que diferencia duas Brunas.
-                  */}
-                    <span className={estilos['nomeDoFeed']}>
-                      {evento.student ? (
-                        <Link
-                          className={estilos['linkDoNome']}
-                          href={`/students/${evento.student.id}`}
-                        >
-                          {doisNomes(evento.student.fullName)}
-                        </Link>
-                      ) : (
-                        (evento.externalUserId ?? 'Não identificado')
-                      )}
-                    </span>
-                  </span>
-                  {/*
-                  `accessReason` e não `outcome`: a mesma máquina que a tela de
-                  eventos já usa, para "Negado" dizer POR QUE foi negado em vez
-                  de repetir a coluna ao lado.
-                */}
-                  <StateBadge machine="accessReason" state={evento.reason} />
-                </li>
+                funcionar: com índice o React reusaria o mesmo cartão e só
+                trocaria o texto, sem nada indicar que alguém acabou de passar.
+              */}
+              {naAcademia.map((evento) => (
+                <CartaoDePresenca key={evento.id} evento={evento} agora={agora} timeZone={timeZone} />
               ))}
             </ul>
           )}

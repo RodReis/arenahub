@@ -35,8 +35,8 @@ export interface EventoResumido {
   reason: string;
   mode: string;
   method: string;
-  /** Resumo do aluno. NUNCA CPF, foto ou divida. */
-  student: { id: string; fullName: string; membershipNumber: string } | null;
+  /** Resumo do aluno. NUNCA CPF, divida ou a foto em si -- so se ela existe (`temFoto`). */
+  student: { id: string; fullName: string; membershipNumber: string; temFoto: boolean } | null;
   /** O que o leitor informou, quando nao resolveu para aluno nenhum. */
   externalUserId: string | null;
   deviceId: string | null;
@@ -109,7 +109,9 @@ export class AccessQueryRepository {
           externalUserId: true,
           deviceId: true,
           correlationId: true,
-          student: { select: { id: true, fullName: true, membershipNumber: true } },
+          student: {
+            select: { id: true, fullName: true, membershipNumber: true, photoObjectKey: true },
+          },
           passage: { select: { state: true } },
         },
       }),
@@ -129,7 +131,7 @@ export class AccessQueryRepository {
         reason: e.reason,
         mode: e.mode,
         method: e.method,
-        student: e.student,
+        student: resumoDoAluno(e.student),
         externalUserId: e.externalUserId,
         deviceId: e.deviceId,
         passageState: e.passage?.state ?? null,
@@ -182,7 +184,9 @@ export class AccessQueryRepository {
           policyVersion: true,
           validUntil: true,
           detail: true,
-          student: { select: { id: true, fullName: true, membershipNumber: true } },
+          student: {
+            select: { id: true, fullName: true, membershipNumber: true, photoObjectKey: true },
+          },
           passage: { select: { state: true } },
           corrections: {
             select: { id: true, reason: true, createdAt: true, correctingEventId: true },
@@ -204,7 +208,7 @@ export class AccessQueryRepository {
         reason: evento.reason,
         mode: evento.mode,
         method: evento.method,
-        student: evento.student,
+        student: resumoDoAluno(evento.student),
         externalUserId: evento.externalUserId,
         deviceId: evento.deviceId,
         passageState: evento.passage?.state ?? null,
@@ -364,4 +368,13 @@ export class AccessQueryRepository {
       OR: [{ occurredAt: { lt: quando } }, { occurredAt: quando, id: { lt: id } }],
     };
   }
+}
+
+/** A chave do objeto da foto fica no servidor; o painel so precisa saber se ela existe. */
+function resumoDoAluno(
+  aluno: { id: string; fullName: string; membershipNumber: string; photoObjectKey: string | null } | null,
+): EventoResumido['student'] {
+  if (!aluno) return null;
+  const { photoObjectKey, ...resto } = aluno;
+  return { ...resto, temFoto: photoObjectKey !== null };
 }

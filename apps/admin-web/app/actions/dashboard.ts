@@ -20,7 +20,8 @@ export interface EventoDoFeed {
   outcome: string;
   reason: string;
   method: string;
-  student: { id: string; fullName: string } | null;
+  /** `temFoto`: a ficha tem foto, servida por `/fotos-de-aluno/:id`. */
+  student: { id: string; fullName: string; temFoto?: boolean } | null;
   externalUserId: string | null;
 }
 

@@ -284,6 +284,39 @@ describe('FeedAoVivo — F57 bloco 3', () => {
     expect(screen.queryByRole('link')).toBeNull();
   });
 
+  /** Pedido do PI, 03/10/2026: cartão de pessoa com foto, faixa no tom da razão. */
+  it('com foto na ficha, o cartão mostra a foto; sem foto, as iniciais', () => {
+    const comFoto: EventoDoFeed = {
+      ...evento('e-1', 'Rodrigo Ramires'),
+      student: { id: 'aluno-1', fullName: 'Rodrigo Ramires', temFoto: true },
+    };
+
+    const { container } = render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        inicial={[comFoto, evento('e-2', 'Marina Lopes')]}
+      />,
+    );
+
+    expect(container.querySelector('img')).toHaveAttribute('src', '/fotos-de-aluno/aluno-1');
+    expect(screen.getByText('ML')).toBeInTheDocument();
+  });
+
+  it('o cartão diz a razão por escrito e leva o tom dela', () => {
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        inicial={[{ ...evento('e-1', 'Joao Pedro'), outcome: 'DENY', reason: 'NO_ENTITLEMENT' }]}
+      />,
+    );
+
+    const cartao = screen.getByText('Sem plano vigente').closest('li');
+    expect(cartao).toHaveAttribute('data-tom', 'danger');
+    expect(cartao).toHaveTextContent('Tentativa');
+  });
+
   it('sem situacoes, o feed nao desenha o cartão de bloqueados', () => {
     render(<FeedAoVivo gymUnitId="u-1" timeZone="America/Sao_Paulo" inicial={[]} />);
 

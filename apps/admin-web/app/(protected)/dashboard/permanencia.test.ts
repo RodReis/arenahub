@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { EventoDoFeed } from '../../actions/dashboard';
-import { JANELA_DE_PERMANENCIA_MIN, naJanelaDePermanencia } from './permanencia';
+import { JANELA_DE_PERMANENCIA_MIN, naJanelaDePermanencia, tempoDesde } from './permanencia';
 
 const AGORA = Date.parse('2026-10-02T23:00:00.000Z');
 
@@ -44,5 +44,26 @@ describe('naJanelaDePermanencia', () => {
     const negado: EventoDoFeed = { ...evento('negado', 2), outcome: 'DENY', reason: 'NO_ENTITLEMENT' };
 
     expect(naJanelaDePermanencia([negado], AGORA)).toHaveLength(1);
+  });
+});
+
+describe('tempoDesde', () => {
+  const ha = (ms: number) => new Date(AGORA - ms).toISOString();
+
+  it.each([
+    [0, 'agora'],
+    [59_000, 'agora'],
+    [60_000, '1 min'],
+    [12 * 60_000 + 30_000, '12 min'],
+    [59 * 60_000, '59 min'],
+    [60 * 60_000, '1h'],
+    [65 * 60_000, '1h05'],
+    [89 * 60_000, '1h29'],
+  ])('%i ms atrás vira "%s"', (ms, esperado) => {
+    expect(tempoDesde(ha(ms), AGORA)).toBe(esperado);
+  });
+
+  it('relógio do equipamento adiantado não vira tempo negativo', () => {
+    expect(tempoDesde(ha(-30_000), AGORA)).toBe('agora');
   });
 });
