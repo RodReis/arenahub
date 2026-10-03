@@ -37,6 +37,19 @@ export class DeviceReaderNumberRepository {
     );
   }
 
+  /** Leitores do tenant que TEM este numero -- vinculo imediato (spec 2026-10-03). */
+  async leitoresComNumero(
+    tenantId: string,
+    externalUserId: string,
+  ): Promise<{ deviceId: string; serial: string }[]> {
+    const linhas = await this.db.deviceReaderNumber.findMany({
+      where: { tenantId, externalUserId },
+      select: { deviceId: true, device: { select: { serial: true } } },
+    });
+
+    return linhas.map((l) => ({ deviceId: l.deviceId, serial: l.device.serial }));
+  }
+
   /** Todos os numeros que algum leitor do tenant ja teve. */
   async listarNumerosDoTenant(tenantId: string): Promise<string[]> {
     const linhas = await this.db.deviceReaderNumber.findMany({

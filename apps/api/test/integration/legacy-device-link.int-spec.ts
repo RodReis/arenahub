@@ -4,10 +4,12 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { CABECALHOS, assinar } from '@arenahub/api-contracts';
+import { comContexto } from '@arenahub/database';
 import request from 'supertest';
 
 import { AppModule } from '../../src/app.module.js';
 import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.js';
+import { VincularCadastroLegadoUseCase } from '../../src/modules/biometrics/vincular-cadastro-legado.use-case.js';
 import { DeviceRepository } from '../../src/modules/devices/device.repository.js';
 import { EdgeAuthService } from '../../src/modules/edge-auth/edge-auth.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
@@ -421,5 +423,54 @@ describe('#468 -- vinculo legado do leitor', () => {
     });
 
     expect(resposta.status).toBe(400);
+  });
+
+  describe('vinculo imediato e troca de numero', () => {
+    it('numero ja no leitor vincula na hora pelo caso de uso, sem o Edge reenviar', async () => {
+      const numero = `7${sufixo.replace(/\D/g, '').padEnd(11, '1').slice(0, 11)}`;
+      await vincular({ deviceSerial: serial, externalUserIds: [numero] }); // leitor informa: sem aluno
+      const aluno = await criarAluno('IMEDIATO', [{ kind: 'FACIAL_ENROLL_ID', externalId: numero }]);
+
+      // Chamada direta, fora de requisicao: abre o escopo de RLS.
+      const r = await comContexto({ kind: 'tenant', tenantId: ctx.tenantId }, () =>
+        app.get(VincularCadastroLegadoUseCase).vincularNumero(ctx.tenantId, numero, 'teste', new Date()),
+      );
+
+      expect(r.linkedReaders).toBe(1);
+      const du = await db.deviceUser.findFirst({
+        where: { deviceId: ctx.deviceId, externalUserId: numero },
+      });
+      expect(du?.studentId).toBe(aluno);
+    });
+
+    it('troca de numero reaponta o DeviceUser em vez de recusar', async () => {
+      const antigo = `8${sufixo.replace(/\D/g, '').padEnd(11, '2').slice(0, 11)}`;
+      const novo = `9${sufixo.replace(/\D/g, '').padEnd(11, '3').slice(0, 11)}`;
+      const aluno = await criarAluno('TROCA', [{ kind: 'FACIAL_ENROLL_ID', externalId: antigo }]);
+      await vincular({ deviceSerial: serial, externalUserIds: [antigo] });
+
+      await db.studentCredential.updateMany({ where: { studentId: aluno }, data: { externalId: novo } });
+      const r = await vincular({ deviceSerial: serial, externalUserIds: [novo] });
+
+      expect(r.status).toBe(201);
+      expect((r.body as { studentAlreadyLinked: string[] }).studentAlreadyLinked).toEqual([]);
+      const doAluno = await db.deviceUser.findMany({
+        where: { deviceId: ctx.deviceId, studentId: aluno },
+      });
+      expect(doAluno.map((d) => d.externalUserId)).toEqual([novo]);
+    });
+
+    it('aluno com cartao e facial de numeros diferentes continua studentAlreadyLinked', async () => {
+      const facial = `6${sufixo.replace(/\D/g, '').padEnd(11, '4').slice(0, 11)}`;
+      const cartao = `5${sufixo.replace(/\D/g, '').padEnd(11, '5').slice(0, 11)}`;
+      await criarAluno('DOIS', [
+        { kind: 'FACIAL_ENROLL_ID', externalId: facial },
+        { kind: 'TURNSTILE_CARD', externalId: cartao },
+      ]);
+      await vincular({ deviceSerial: serial, externalUserIds: [facial] });
+      const r = await vincular({ deviceSerial: serial, externalUserIds: [cartao] });
+
+      expect((r.body as { studentAlreadyLinked: string[] }).studentAlreadyLinked).toEqual([cartao]);
+    });
   });
 });

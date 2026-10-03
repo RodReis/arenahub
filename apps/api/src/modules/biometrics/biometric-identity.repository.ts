@@ -153,6 +153,23 @@ export class BiometricIdentityRepository {
     });
   }
 
+  /**
+   * Troca de numero do aluno -- o vinculo dele NESTE leitor passa a apontar
+   * para o numero novo. `@@unique([deviceId, identityId])` impede um segundo
+   * `DeviceUser`; reapontar e a unica forma de a catraca reconhecer o novo.
+   */
+  async reapontarNumero(
+    tenantId: string,
+    deviceId: string,
+    studentId: string,
+    novoNumero: string,
+  ): Promise<void> {
+    await this.db.deviceUser.updateMany({
+      where: { tenantId, deviceId, studentId },
+      data: { externalUserId: novoNumero },
+    });
+  }
+
   /** O aluno vinculado a este numero do leitor, ou `null` -- #503. */
   async alunoDoNumero(
     tenantId: string,

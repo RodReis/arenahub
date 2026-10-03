@@ -119,6 +119,18 @@ export class StudentCredentialRepository {
     }));
   }
 
+  /** Todos os numeros que o aluno tem hoje, de qualquer `kind`. */
+  async listarNumerosDoAluno(tenantId: string, studentId: string): Promise<string[]> {
+    const linhas = await this.db.comTenant((tx) =>
+      tx.studentCredential.findMany({
+        where: { tenantId, studentId },
+        select: { externalId: true },
+      }),
+    );
+
+    return linhas.map((l) => l.externalId);
+  }
+
   async listarPorAluno(
     contexto: TenantContext,
     studentId: string,
