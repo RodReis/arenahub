@@ -1,8 +1,10 @@
-import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
+import { Body, Controller, HttpCode, NotFoundException, Post, Req } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
+import { DeviceRepository } from '../devices/device.repository.js';
+import { DeviceReaderNumberRepository } from '../devices/device-reader-number.repository.js';
 import { EdgeRoute } from '../edge-auth/edge-route.decorator.js';
 import { ImportarFotoDoLeitorUseCase } from './importar-foto-do-leitor.use-case.js';
 import {
@@ -44,6 +46,24 @@ const esquemaDaFoto = z
   })
   .strict();
 
+/**
+ * Nome que o leitor guarda para cada numero (`getuserinfo`) -- so para a
+ * recepcao reconhecer um cadastro sem aluno. Teto de 500 por chamada.
+ */
+const esquemaDosNomes = z
+  .object({
+    deviceSerial: z.string().min(1).max(64),
+    names: z
+      .array(
+        z
+          .object({ externalUserId: z.string().min(1).max(64), name: z.string().min(1).max(100) })
+          .strict(),
+      )
+      .min(1)
+      .max(500),
+  })
+  .strict();
+
 const listaDeNumeros = { type: 'array', items: { type: 'string' } };
 
 const ESQUEMA_DO_RESULTADO = {
@@ -73,6 +93,8 @@ export class EdgeLegacyLinkController {
   constructor(
     private readonly vincular: VincularCadastroLegadoUseCase,
     private readonly fotos: ImportarFotoDoLeitorUseCase,
+    private readonly dispositivos: DeviceRepository,
+    private readonly numerosDoLeitor: DeviceReaderNumberRepository,
   ) {}
 
   @Post('legacy-links')
@@ -142,5 +164,35 @@ export class EdgeLegacyLinkController {
     });
 
     return { result };
+  }
+
+  /** Nome que o leitor guarda -- so de numero que ele ja informou. */
+  @Post('reader-names')
+  @HttpCode(200)
+  @EdgeRoute()
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { updated: { type: 'integer' } },
+      required: ['updated'],
+    },
+  })
+  async nomesDoLeitor(
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{ updated: number }> {
+    const dados = esquemaDosNomes.parse(corpo);
+    const edge = requisicao.edgeContext!;
+    const leitor = await this.dispositivos.resolverDoEdgePorSerial(edge, dados.deviceSerial);
+
+    if (!leitor) throw new NotFoundException({ code: 'DEVICE_NOT_IN_SCOPE' });
+
+    const updated = await this.numerosDoLeitor.registrarNomes(
+      edge.tenantId,
+      leitor.id,
+      dados.names,
+    );
+
+    return { updated };
   }
 }

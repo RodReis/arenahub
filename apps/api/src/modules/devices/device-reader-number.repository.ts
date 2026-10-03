@@ -37,6 +37,29 @@ export class DeviceReaderNumberRepository {
     );
   }
 
+  /**
+   * Nome que o leitor guarda -- so atualiza numero ja registrado (nao cria).
+   * Devolve quantos numeros atualizou.
+   */
+  async registrarNomes(
+    tenantId: string,
+    deviceId: string,
+    nomes: readonly { externalUserId: string; name: string }[],
+  ): Promise<number> {
+    if (nomes.length === 0) return 0;
+
+    const resultados = await this.db.$transaction(
+      nomes.map((n) =>
+        this.db.deviceReaderNumber.updateMany({
+          where: { tenantId, deviceId, externalUserId: n.externalUserId },
+          data: { readerName: n.name.trim().slice(0, 100) },
+        }),
+      ),
+    );
+
+    return resultados.reduce((total, r) => total + r.count, 0);
+  }
+
   /** Leitores do tenant que TEM este numero -- vinculo imediato (spec 2026-10-03). */
   async leitoresComNumero(
     tenantId: string,

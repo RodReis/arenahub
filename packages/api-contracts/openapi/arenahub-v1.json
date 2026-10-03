@@ -4325,6 +4325,35 @@
         ]
       }
     },
+    "/api/v1/edge/device-users/reader-names": {
+      "post": {
+        "operationId": "EdgeLegacyLinkController_nomesDoLeitor",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "updated"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EdgeLegacyLink"
+        ]
+      }
+    },
     "/api/v1/engagement/aliases": {
       "get": {
         "operationId": "EngagementController_listar",

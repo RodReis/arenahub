@@ -49,8 +49,10 @@ describe('#468 -- vinculo legado do leitor', () => {
   const servidor = (): Parameters<typeof request>[0] =>
     app.getHttpServer() as Parameters<typeof request>[0];
 
-  const vincular = (corpo: Record<string, unknown>): Promise<request.Response> => {
-    const caminho = '/api/v1/edge/device-users/legacy-links';
+  const postarAssinado = (
+    caminho: string,
+    corpo: Record<string, unknown>,
+  ): Promise<request.Response> => {
     const texto = JSON.stringify(corpo);
     const timestamp = Math.floor(Date.now() / 1000);
     const nonce = randomBytes(16).toString('base64url');
@@ -68,6 +70,12 @@ describe('#468 -- vinculo legado do leitor', () => {
       .set('Content-Type', 'application/json')
       .send(texto);
   };
+
+  const vincular = (corpo: Record<string, unknown>): Promise<request.Response> =>
+    postarAssinado('/api/v1/edge/device-users/legacy-links', corpo);
+
+  const enviarNomes = (corpo: Record<string, unknown>): Promise<request.Response> =>
+    postarAssinado('/api/v1/edge/device-users/reader-names', corpo);
 
   const criarAluno = async (
     rotulo: string,
@@ -424,6 +432,51 @@ describe('#468 -- vinculo legado do leitor', () => {
     });
 
     expect(resposta.status).toBe(400);
+  });
+
+  describe('nome gravado no leitor', () => {
+    it('grava o nome do leitor so para numero que o leitor ja informou', async () => {
+      const numero = '223450000001';
+      await vincular({ deviceSerial: serial, externalUserIds: [numero] });
+
+      const r = await enviarNomes({
+        deviceSerial: serial,
+        names: [
+          { externalUserId: numero, name: 'ANA C' },
+          { externalUserId: '223450009999', name: 'FANTASMA' },
+        ],
+      });
+
+      expect(r.status).toBe(200);
+      expect(r.body).toEqual({ updated: 1 });
+      const linha = await db.deviceReaderNumber.findFirst({
+        where: { deviceId: ctx.deviceId, externalUserId: numero },
+      });
+      expect(linha?.readerName).toBe('ANA C');
+      expect(await db.deviceReaderNumber.count({ where: { externalUserId: '223450009999' } })).toBe(
+        0,
+      );
+    });
+
+    it('recusa tenantId no corpo', async () => {
+      const r = await enviarNomes({
+        deviceSerial: serial,
+        names: [{ externalUserId: '1', name: 'X' }],
+        tenantId: ctx.tenantId,
+      });
+
+      expect(r.status).toBe(400);
+    });
+
+    it('nao acha leitor de outro tenant pelo serial -- 404', async () => {
+      const r = await enviarNomes({
+        deviceSerial: vizinho.serial,
+        names: [{ externalUserId: '1', name: 'X' }],
+      });
+
+      expect(r.status).toBe(404);
+      expect(r.body).toMatchObject({ code: 'DEVICE_NOT_IN_SCOPE' });
+    });
   });
 
   const ESTADOS_NAO_REAPONTAVEIS = ['PENDING', 'REMOVAL_PENDING', 'FAILED', 'REMOVED'] as const;
