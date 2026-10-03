@@ -679,6 +679,46 @@ describe('TopdataFacialAdapter -- foto do leitor (#503)', () => {
     expect(foto).not.toBeNull();
     expect(base).toEqual([]);
   });
+
+  /*
+   * Nome que o leitor guarda do numero (spec 2026-10-03). Leitura pura: o
+   * unico comando novo e `getuserinfo`, nada e gravado no leitor.
+   */
+  it('lerNome devolve o name do getuserinfo, no corpo da resposta', async () => {
+    leitor.responderCom('getuserinfo', {
+      result: true,
+      enrollid: 100000000123,
+      name: ' MARIA S ',
+      backupnum: 50,
+    });
+
+    expect(await adapter.lerNome('100000000123')).toBe('MARIA S');
+    expect(leitor.recebidos.find((m) => m['cmd'] === 'getuserinfo')).toMatchObject({
+      enrollid: 100000000123,
+    });
+  });
+
+  it('lerNome devolve o name que vem dentro do record', async () => {
+    leitor.responderCom('getuserinfo', { result: true, record: { name: 'ANA' } });
+
+    expect(await adapter.lerNome('1491')).toBe('ANA');
+  });
+
+  it('lerNome devolve null quando o firmware nao manda name', async () => {
+    leitor.responderCom('getuserinfo', { result: true, enrollid: 1491, backupnum: 50, record: '/9j/4AAQ' });
+
+    expect(await adapter.lerNome('1491')).toBeNull();
+  });
+
+  it('lerNome devolve null (sem lancar) quando o leitor responde que nao ha dado', async () => {
+    leitor.responderCom('getuserinfo', { result: false, msg: 'have no data', name: 'FANTASMA' });
+
+    expect(await adapter.lerNome('1491')).toBeNull();
+  });
+
+  it('lerNome devolve null (sem lancar) quando o numero nao e um enrollid valido', async () => {
+    expect(await adapter.lerNome('nao-e-numero')).toBeNull();
+  });
 });
 
 describe('interpretarDataHora', () => {

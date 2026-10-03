@@ -114,6 +114,7 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
 
   /** `getuserinfo` respondeu sucesso sem foto no `record` -- avisado (#503). */
   private avisouFotoForaDoRecord = false;
+  private avisouNomeAusente = false;
 
   private exclusivo<T>(operacao: () => Promise<T>): Promise<T> {
     const vez = this.filaDeOperacoes.then(operacao, operacao);
@@ -518,6 +519,56 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
         return record;
       } finally {
         await this.comandar(comandos.enableDevice(), 'enabledevice').catch(() => undefined);
+      }
+    });
+  }
+
+  /**
+   * O nome que o leitor guarda para o numero, ou `null` -- spec 2026-10-03.
+   * Leitura pura: o unico comando novo e `getuserinfo`; nada e gravado.
+   *
+   * NAO VERIFICADO NA BANCADA (leitor AYTI11108174): nao se sabe se o firmware
+   * devolve `name` no `getuserinfo`, nem onde -- no corpo ou dentro do
+   * `record`. Os dois sao aceitos, e nome AUSENTE e um resultado suportado
+   * (`null`), nao erro. Qualquer falha de leitura tambem vira `null`: ler nome
+   * nunca pode derrubar nem atrasar o vinculo.
+   *
+   * O nome NUNCA vai para o log (e PII); so os NOMES dos campos, uma vez por
+   * execucao, para ajustar o adapter quando o firmware esconder o nome.
+   */
+  lerNome(externalEnrollId: ExternalEnrollId): Promise<string | null> {
+    return this.exclusivo(async () => {
+      try {
+        const enrollid = paraEnrollId(externalEnrollId);
+
+        await this.comandar(comandos.disableDevice(), 'disabledevice');
+
+        try {
+          const retorno = await this.comandar(
+            comandos.getUserInfo(enrollid, BACKUPNUM.FOTO),
+            'getuserinfo',
+          );
+          if (retorno['result'] !== true) return null;
+
+          const record = retorno['record'];
+          const candidato =
+            retorno['name'] ??
+            (typeof record === 'object' && record !== null
+              ? (record as Record<string, unknown>)['name']
+              : undefined);
+          const nome = typeof candidato === 'string' ? candidato.trim() : '';
+
+          if (nome === '' && !this.avisouNomeAusente) {
+            this.avisouNomeAusente = true;
+            this.logger.warn({ campos: Object.keys(retorno) }, 'getuserinfo sem nome');
+          }
+
+          return nome === '' ? null : nome;
+        } finally {
+          await this.comandar(comandos.enableDevice(), 'enabledevice').catch(() => undefined);
+        }
+      } catch {
+        return null;
       }
     });
   }
