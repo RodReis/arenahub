@@ -331,6 +331,35 @@ Ordem fixa, do que muda a cada minuto para o que muda por semana:
 
 **Tom.** `success` (liberado), `danger`/`risk` (recusa), `warning`, `info`, `neutral` vêm do rótulo da razão — nunca da tela. Três canais sempre: cor da faixa, ícone e texto da razão.
 
+### 4.5e Painel de operação (`/operations`)
+
+**Pedido do PI, 04/10/2026:** destacar o que importa, com cor, efeito e borda, e fazer a tela funcionar de verdade. Ordem fixa, de cima para baixo: **faixa de situação → Alertas → Edge → Dispositivos → Sincronização de biometria → Acesso 24 h**.
+
+**Ao vivo.** A tela recarrega os dados do servidor a cada **30 s** (o ciclo do avaliador de alertas) por `router.refresh()`, que preserva o estado dos formulários abertos (o código de pareamento não some). Para com a aba oculta e lê uma vez ao voltar, como o feed do dashboard. No cabeçalho ficam o selo "ao vivo"/"pausado" (pulso `halo`, por escrito quando pausa), o carimbo "Atualizado às HH:mm" no fuso da unidade e o botão de ícone "Atualizar agora", que gira enquanto lê.
+
+**Faixa de situação** (`resumirOperacao`, `src/operations/situacao.ts`). É a mesma receita do `PainelDeEstado` (aresta superior de 3 px, degradê a 165°), com selo **sólido** de 44 px (glifo na cor da superfície, o que inverte junto com o tema). Quatro níveis:
+
+| Nível | Tom | Quando |
+|---|---|---|
+| `critico` | `danger`, intensidade de alerta | há alerta `CRITICAL` aberto ou reconhecido; o apoio diz a idade do mais antigo e quantos já foram reconhecidos |
+| `indisponivel` | `danger`, intensidade de alerta | a leitura de `/operations/alerts` falhou |
+| `atencao` | `warning` | equipamento mudo sem alerta aberto ainda, nenhum Edge cadastrado, ou só alertas não críticos |
+| `ok` | `success` | leu tudo e está tudo respondendo |
+
+**Regra:** a faixa **nunca afirma "nenhum problema" sem ter lido tudo**. Antes, uma falha na leitura dos alertas caía no estado vazio e dizia "Edge e dispositivos respondendo".
+
+**Seções.** Cada título leva ao lado o estado da seção num `EstadoSimples` ("5 abertos", "1 sem resposta", "Todos respondendo"). A **linha** de tabela é tingida a 6% pelo estado (`DataTable` → `rowTom`): alerta crítico e equipamento mudo em `danger`, alerta de atenção em `warning`. É só fundo, **sem faixa lateral**: o estado já está no badge.
+
+**Estado do equipamento** (`situacaoDoEdge`, `situacaoDoDispositivo`): "Respondendo" e "Sem resposta" levam o glifo de rede (`wifi`/`wifi-off`). **Edge suspenso** aparece como "Suspenso" (neutro), não "Sem resposta", porque o servidor só avalia Edge `ACTIVE`. **Manutenção** e **aposentado** têm rótulos próprios, e nenhum dos dois conta como fora do ar.
+
+**Sincronização e acesso** em `SummaryStrip`. Só ganha tom o que é estado: "Falhadas" (`risco` quando > 0, com link para a fila em `/operations/devices`; `positivo` quando zero) e "Liberações manuais" (`atencao` quando > 0). Pendente, em processamento, liberados e negados são fluxo e ficam sem tom. Taxa do dia sem volume mostra `—` com "sem sincronizações hoje", nunca "0%".
+
+**Unidade** (decisão do PI, issue #549). A escolha vive em `?unidade=`, a mesma da topbar. Com uma unidade ativa o cabeçalho mostra o nome; com várias, o `SeletorDeUnidade` em `superficie="pagina"` (campo do painel, não o vidro da topbar) com **"Todas as unidades"** como opção real: num painel de alarme, ninguém ter escolhido não pode esconder o crítico de nenhuma unidade. Panorama e alertas recebem `?gymUnitId=`; alertas do tenant inteiro aparecem em qualquer unidade.
+
+**Dia operacional.** "Taxa do dia" conta a partir das **23h** no fuso da unidade (quando a academia fecha), e a célula diz o corte que a contagem usou ("33 de 40 desde 23:00", de `sync.desde`), em vez de repetir a regra na tela.
+
+**Movimento:** só o pulso do "ao vivo" e o giro do botão enquanto lê. `prefers-reduced-motion: reduce` desliga os dois, e o estado continua por texto.
+
 ### 4.6 Card de KPI
 
 Overline 11 px uppercase → valor 26/32 px 700 tabular (margem `6px 0 8px`) → badge ou sublinha 12 px. Valor pode assumir cor semântica quando o próprio número é o alerta.
@@ -380,7 +409,7 @@ Contrato:
 | `celulas` | Lista de `CelulaDeResumo`: `id`, `label`, `icon`, `value`, `hint?`, `tom?` |
 | `tom` | Um dos quatro tons curtos — `positivo` / `atencao` / `risco`, e ausência de tom quando a célula não descreve estado |
 
-Cada célula é um par rótulo/valor em `<dl>`, não uma grade de `<div>` — é o que faz o leitor de tela anunciar o par como tal em vez de números soltos. O tom pinta o fundo a 7% e uma aresta superior de 3 px na cor cheia, igual à §4.6; o glifo herda o tom, o rótulo segue em `text/secondary`. `hint` aceita nó React, não só texto — é o que permite a célula de financeiro embutir `Money` e `TenantDateTime` na mesma frase, sem duplicar formatação.
+Cada célula é um par rótulo/valor em `<dl>`, não uma grade de `<div>` — é o que faz o leitor de tela anunciar o par como tal em vez de números soltos. O tom pinta o fundo a 7% e uma aresta superior de 3 px na cor cheia, igual à §4.6; o glifo herda o tom, o rótulo segue em `text/secondary`. `hint` aceita nó React, não só texto — é o que permite a célula de financeiro embutir `Money` e `TenantDateTime` na mesma frase, sem duplicar formatação. **Altura igual (04/10/2026):** a faixa declara `align-items: stretch`, porque o `globals.css` põe `baseline` em todo `<dl>` e as células com `hint` ficavam mais altas que as sem.
 
 **A regra de conteúdo não muda entre §4.6, §4.6b e aqui**: o tom é o do estado que o valor descreve, nunca decoração; cor nunca é canal único (rótulo e ícone sempre presentes); alerta (`risco`) exige que o valor seja o problema — financeiro "Em dia" pinta `positivo`, "Vencida" pinta `risco`, e sem cobrança vencida a faixa não força alarme onde não há um.
 

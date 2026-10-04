@@ -17,6 +17,13 @@ import {
   type EstadoDoDispositivo,
   type EstadoDoEdge,
 } from './domain/alert-rules.js';
+import { inicioDoDiaOperacional } from './domain/dia-operacional.js';
+
+/** Unidade que o operador pode ver, com o fuso que corta o "dia" dela. */
+export interface UnidadeVisivel {
+  id: string;
+  timezone: string;
+}
 
 /**
  * Leitura operacional e ciclo de vida dos alertas -- F11.
@@ -69,6 +76,12 @@ export interface PanoramaOperacional {
     /** Do dia corrente, em UTC. */
     totalDoDia: number;
     sucessosDoDia: number;
+    /**
+     * Início do "dia" das duas contagens acima: a última virada das 23h no
+     * fuso da unidade (`inicioDoDiaOperacional`). A tela mostra este instante
+     * em vez de repetir a regra.
+     */
+    desde: string;
   };
   acesso: {
     /** Ultimas 24 h. */
@@ -83,21 +96,65 @@ export class OperationsRepository {
   constructor(private readonly db: PrismaService) {}
 
   /**
+   * Unidades dentro do escopo de quem pergunta, a mais antiga primeiro.
+   *
+   * Base da checagem de `?gymUnitId=`: pedir uma unidade fora desta lista da o
+   * mesmo 404 de pedir uma que nao existe (ver o controller).
+   */
+  async unidadesVisiveis(contexto: TenantContext): Promise<UnidadeVisivel[]> {
+    return this.db.gymUnit.findMany({
+      where: {
+        tenantId: contexto.tenantId,
+        ...(contexto.allowedUnitIds === 'ALL' ? {} : { id: { in: [...contexto.allowedUnitIds] } }),
+      },
+      select: { id: true, timezone: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
    * Tudo que o painel mostra, numa consulta por recurso.
    *
    * Escopo de unidade aplicado aqui: um operador restrito a unidade A nao ve
-   * o Edge da unidade B nem sabendo o UUID.
+   * o Edge da unidade B nem sabendo o UUID. Com `unidade` (ja validada pelo
+   * controller contra `unidadesVisiveis`), o panorama fica SO nela.
+   *
+   * A FILA DE SINCRONIZACAO FILTRA PELA UNIDADE DO DISPOSITIVO (issue #549).
+   * Antes ela contava o tenant inteiro: o operador restrito a uma unidade via
+   * as falhas de todas, e escolher unidade nao mudava o numero.
    */
-  async panorama(contexto: TenantContext): Promise<PanoramaOperacional> {
-    const filtroDeUnidade =
-      contexto.allowedUnitIds === 'ALL'
-        ? {}
-        : { gymUnitId: { in: [...contexto.allowedUnitIds] } };
+  async panorama(
+    contexto: TenantContext,
+    opcoes: { unidade?: UnidadeVisivel; agora?: Date } = {},
+  ): Promise<PanoramaOperacional> {
+    const agora = opcoes.agora ?? new Date();
 
-    const inicioDoDia = new Date();
-    inicioDoDia.setUTCHours(0, 0, 0, 0);
+    const idsDeUnidade: string[] | null = opcoes.unidade
+      ? [opcoes.unidade.id]
+      : contexto.allowedUnitIds === 'ALL'
+        ? null
+        : [...contexto.allowedUnitIds];
 
-    const ultimas24h = new Date(Date.now() - 86_400_000);
+    const filtroDeUnidade = idsDeUnidade === null ? {} : { gymUnitId: { in: idsDeUnidade } };
+    const filtroDeJob =
+      idsDeUnidade === null ? {} : { device: { gymUnitId: { in: idsDeUnidade } } };
+
+    /*
+     * O "dia" vira as 23h no fuso da unidade (decisao do PI, issue #549).
+     * Sem unidade escolhida, usa o fuso da mais antiga visivel.
+     *
+     * ponytail: tenant com unidades em fusos diferentes, sem unidade
+     * escolhida, corta o dia agregado pelo fuso de uma delas; somar dias de
+     * fusos distintos exigiria uma contagem por unidade.
+     *
+     * Sem unidade nenhuma nao ha fuso -- e tambem nao ha dispositivo nem job
+     * para contar. O corte vira o proprio `agora`: zero honesto, nunca um
+     * fuso chutado (ADR-019).
+     */
+    const fuso = (opcoes.unidade ?? (await this.unidadesVisiveis(contexto))[0])?.timezone;
+    const inicioDoDia = fuso === undefined ? agora : inicioDoDiaOperacional(agora, fuso);
+
+    const ultimas24h = new Date(agora.getTime() - 86_400_000);
 
     const [edges, dispositivos, syncPorEstado, syncDoDia, acessoPorResultado, overrides] =
       await Promise.all([
@@ -130,13 +187,13 @@ export class OperationsRepository {
 
         this.db.deviceSyncJob.groupBy({
           by: ['state'],
-          where: { tenantId: contexto.tenantId },
+          where: { tenantId: contexto.tenantId, ...filtroDeJob },
           _count: true,
         }),
 
         this.db.deviceSyncJob.groupBy({
           by: ['state'],
-          where: { tenantId: contexto.tenantId, createdAt: { gte: inicioDoDia } },
+          where: { tenantId: contexto.tenantId, createdAt: { gte: inicioDoDia }, ...filtroDeJob },
           _count: true,
         }),
 
@@ -197,6 +254,7 @@ export class OperationsRepository {
         deadLetters: contarPorEstado(syncPorEstado, ['FAILED']),
         totalDoDia,
         sucessosDoDia: contarPorEstado(syncDoDia, ['SYNCED', 'REMOVED']),
+        desde: inicioDoDia.toISOString(),
       },
       acesso: {
         allow: acessoPorResultado.find((g) => g.outcome === 'ALLOW')?._count ?? 0,
@@ -222,8 +280,6 @@ export class OperationsRepository {
     saude: EstadoDaSaude;
   }> {
     const agora = new Date();
-    const inicioDoDia = new Date(agora);
-    inicioDoDia.setUTCHours(0, 0, 0, 0);
 
     const [edges, dispositivos, unidades] = await Promise.all([
       this.db.edgeNode.findMany({
@@ -253,17 +309,26 @@ export class OperationsRepository {
         },
       }),
 
-      this.db.gymUnit.findMany({ where: { tenantId }, select: { id: true } }),
+      this.db.gymUnit.findMany({ where: { tenantId }, select: { id: true, timezone: true } }),
     ]);
 
+    /*
+     * POR UNIDADE DE VERDADE (issue #549): cada unidade recebia a contagem do
+     * tenant inteiro -- com duas unidades, a falha de uma alarmava nas duas.
+     * O dia de cada uma vira as 23h no fuso dela, o mesmo corte do painel:
+     * alerta e tela olhando dias diferentes discordariam sobre a mesma taxa.
+     */
     const sync = await Promise.all(
-      unidades.map(async ({ id }) => {
+      unidades.map(async ({ id, timezone }) => {
+        const daUnidade = { tenantId, device: { gymUnitId: id } };
+        const inicioDoDia = inicioDoDiaOperacional(agora, timezone);
+
         const [falhas, doDia, sucessos] = await Promise.all([
-          this.db.deviceSyncJob.count({ where: { tenantId, state: 'FAILED' } }),
-          this.db.deviceSyncJob.count({ where: { tenantId, createdAt: { gte: inicioDoDia } } }),
+          this.db.deviceSyncJob.count({ where: { ...daUnidade, state: 'FAILED' } }),
+          this.db.deviceSyncJob.count({ where: { ...daUnidade, createdAt: { gte: inicioDoDia } } }),
           this.db.deviceSyncJob.count({
             where: {
-              tenantId,
+              ...daUnidade,
               createdAt: { gte: inicioDoDia },
               state: { in: ['SYNCED', 'REMOVED'] },
             },
@@ -417,12 +482,19 @@ export class OperationsRepository {
 
   async listar(
     contexto: TenantContext,
-    filtro: { apenasAbertos: boolean; limite: number },
+    filtro: { apenasAbertos: boolean; limite: number; gymUnitId?: string },
   ): Promise<OperationalAlert[]> {
+    /*
+     * Com unidade escolhida (ja validada no controller): os alertas DELA e os
+     * do tenant inteiro (`gymUnitId` nulo -- webhook, conciliacao, saude), que
+     * valem para toda unidade.
+     */
     const filtroDeUnidade =
-      contexto.allowedUnitIds === 'ALL'
-        ? {}
-        : { gymUnitId: { in: [...contexto.allowedUnitIds] } };
+      filtro.gymUnitId !== undefined
+        ? { OR: [{ gymUnitId: filtro.gymUnitId }, { gymUnitId: null }] }
+        : contexto.allowedUnitIds === 'ALL'
+          ? {}
+          : { gymUnitId: { in: [...contexto.allowedUnitIds] } };
 
     return this.db.operationalAlert.findMany({
       where: {

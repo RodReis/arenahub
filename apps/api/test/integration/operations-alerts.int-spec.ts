@@ -551,4 +551,212 @@ describe('F11 -- alertas operacionais', () => {
       expect(await alertasDe(a.tenantId, 'EDGE_OFFLINE', isolado)).toHaveLength(1);
     });
   });
+
+  /**
+   * Issue #549 -- decisões do PI de 04/10/2026: o painel filtra por unidade, e
+   * o "dia" da taxa de sincronização vira às 23h no fuso da unidade.
+   *
+   * O defeito que estes testes existem para pegar: a fila de sincronização
+   * contava o TENANT inteiro, no painel e no avaliador de alertas -- com duas
+   * unidades, a falha de uma aparecia (e alarmava) nas duas.
+   */
+  describe('filtro por unidade e dia de 23h (issue #549)', () => {
+    const filial = { gymUnitId: '', deviceId: '' };
+    const alerta = { doTenant: '', doCentro: '', daFilial: '' };
+
+    const criarJob = async (
+      deviceId: string,
+      identityId: string,
+      state: 'FAILED' | 'SYNCED',
+      createdAt: Date = new Date(),
+    ): Promise<void> => {
+      await db.deviceSyncJob.create({
+        data: {
+          tenantId: a.tenantId,
+          deviceId,
+          identityId,
+          operation: 'UPSERT',
+          state,
+          idempotencyKey: `f549-${randomUUID()}`,
+          correlationId: `f549-${sufixo}`,
+          createdAt,
+        },
+      });
+    };
+
+    const criarAlerta = async (gymUnitId: string | null, rotulo: string): Promise<string> => {
+      const criado = await db.operationalAlert.create({
+        data: {
+          tenantId: a.tenantId,
+          gymUnitId,
+          fingerprint: `f549-${rotulo}-${randomUUID()}`,
+          code: `F549_${rotulo}`,
+          severity: 'WARNING',
+          state: 'OPEN',
+          resource: 'TESTE',
+          resourceId: randomUUID(),
+          impact: 'Impacto de teste da issue 549, longo o bastante.',
+          recommendedAction: 'Acao de teste.',
+          evidence: {},
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date(),
+        },
+      });
+
+      return criado.id;
+    };
+
+    interface PanoramaDeTeste {
+      dispositivos: { id: string }[];
+      sync: { falhados: number; totalDoDia: number; sucessosDoDia: number; desde: string };
+    }
+
+    const panoramaDe = async (consulta = ''): Promise<request.Response> =>
+      request(servidor()).get(`/api/v1/operations/overview${consulta}`).set('Cookie', a.cookie);
+
+    beforeAll(async () => {
+      const unidade = await db.gymUnit.create({
+        data: {
+          tenantId: a.tenantId,
+          code: `FILIAL-${sufixo}`,
+          name: 'Filial',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+
+      filial.gymUnitId = unidade.id;
+
+      const leitor = await db.device.create({
+        data: {
+          tenantId: a.tenantId,
+          gymUnitId: unidade.id,
+          kind: 'FACIAL_READER',
+          model: 'Inner Fit',
+          serial: `SER-F549-${sufixo}`,
+          lastHeartbeat: new Date(),
+        },
+      });
+
+      filial.deviceId = leitor.id;
+
+      const documento = await db.consentDocument.create({
+        data: {
+          tenantId: a.tenantId,
+          type: 'BIOMETRIC',
+          version: 549,
+          purpose: 'Identificacao facial para controle de acesso',
+          content: 'Termo biometrico. '.repeat(5),
+          contentSha256: 'c'.repeat(64),
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      });
+
+      const aluno = await db.student.create({
+        data: {
+          tenantId: a.tenantId,
+          gymUnitId: a.gymUnitId,
+          membershipNumber: `M-F549-${sufixo}`,
+          fullName: 'Aluna Sincronizacao',
+          birthDate: new Date('1996-05-10T00:00:00.000Z'),
+          status: 'ACTIVE',
+        },
+      });
+
+      const consentimento = await db.consentRecord.create({
+        data: {
+          tenantId: a.tenantId,
+          studentId: aluno.id,
+          documentId: documento.id,
+          subjectKind: 'STUDENT',
+          decision: 'ACCEPTED',
+          subjectAgeYears: 30,
+          occurredAt: new Date(),
+        },
+      });
+
+      const identidade = await db.biometricIdentity.create({
+        data: {
+          tenantId: a.tenantId,
+          studentId: aluno.id,
+          consentRecordId: consentimento.id,
+          state: 'ACTIVE',
+        },
+      });
+
+      // Centro: 1 falha. Filial: 2 falhas e 1 sucesso hoje.
+      await criarJob(a.deviceId, identidade.id, 'FAILED');
+      await criarJob(filial.deviceId, identidade.id, 'FAILED');
+      await criarJob(filial.deviceId, identidade.id, 'FAILED');
+      await criarJob(filial.deviceId, identidade.id, 'SYNCED');
+
+      // Um sucesso ANTES da virada das 23h: não pode entrar no "hoje".
+      const resposta = await panoramaDe(`?gymUnitId=${filial.gymUnitId}`);
+      const desde = new Date((resposta.body as PanoramaDeTeste).sync.desde);
+
+      await criarJob(filial.deviceId, identidade.id, 'SYNCED', new Date(desde.getTime() - 60_000));
+
+      alerta.doTenant = await criarAlerta(null, 'TENANT');
+      alerta.doCentro = await criarAlerta(a.gymUnitId, 'CENTRO');
+      alerta.daFilial = await criarAlerta(filial.gymUnitId, 'FILIAL');
+    });
+
+    it('sem unidade, o panorama soma as unidades do escopo', async () => {
+      const resposta = await panoramaDe();
+
+      expect(resposta.status).toBe(200);
+      expect((resposta.body as PanoramaDeTeste).sync.falhados).toBe(3);
+    });
+
+    it('com unidade, a fila de sincronização conta SÓ os dispositivos dela', async () => {
+      const resposta = await panoramaDe(`?gymUnitId=${filial.gymUnitId}`);
+      const corpo = resposta.body as PanoramaDeTeste;
+
+      expect(resposta.status).toBe(200);
+      expect(corpo.sync.falhados).toBe(2);
+      expect(corpo.dispositivos.map((d) => d.id)).toEqual([filial.deviceId]);
+    });
+
+    it('o dia começa às 23h da unidade, e o que veio antes não conta como hoje', async () => {
+      const corpo = (await panoramaDe(`?gymUnitId=${filial.gymUnitId}`)).body as PanoramaDeTeste;
+
+      // 23h em São Paulo = 02h UTC.
+      expect(new Date(corpo.sync.desde).getUTCHours()).toBe(2);
+      expect(Date.now() - new Date(corpo.sync.desde).getTime()).toBeLessThan(86_400_000);
+      // 2 falhas + 1 sucesso de hoje; o sucesso de antes das 23h fica fora.
+      expect(corpo.sync.totalDoDia).toBe(3);
+      expect(corpo.sync.sucessosDoDia).toBe(1);
+    });
+
+    it('unidade de outro tenant dá 404, igual à inexistente', async () => {
+      const deOutro = await panoramaDe(`?gymUnitId=${b.gymUnitId}`);
+      const inexistente = await panoramaDe(`?gymUnitId=${randomUUID()}`);
+
+      expect(deOutro.status).toBe(404);
+      expect(inexistente.status).toBe(404);
+      expect((deOutro.body as { code: string }).code).toBe('UNIT_NOT_FOUND');
+    });
+
+    it('alertas da unidade trazem os dela e os do tenant inteiro, nunca os da outra', async () => {
+      const resposta = await request(servidor())
+        .get(`/api/v1/operations/alerts?open=true&limit=200&gymUnitId=${filial.gymUnitId}`)
+        .set('Cookie', a.cookie);
+
+      const ids = (resposta.body as { id: string }[]).map((item) => item.id);
+
+      expect(resposta.status).toBe(200);
+      expect(ids).toEqual(expect.arrayContaining([alerta.daFilial, alerta.doTenant]));
+      expect(ids).not.toContain(alerta.doCentro);
+    });
+
+    it('o alerta de sincronização de cada unidade conta só as falhas dela', async () => {
+      await operacoes.avaliarTenant(a.tenantId, new Date());
+
+      const [daFilial] = await alertasDe(a.tenantId, 'SYNC_FAILED', filial.gymUnitId);
+      const [doCentro] = await alertasDe(a.tenantId, 'SYNC_FAILED', a.gymUnitId);
+
+      expect(daFilial?.evidence).toEqual({ falhasPermanentes: 2 });
+      expect(doCentro?.evidence).toEqual({ falhasPermanentes: 1 });
+    });
+  });
 });

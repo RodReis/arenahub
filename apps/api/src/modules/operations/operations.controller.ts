@@ -5,13 +5,27 @@ import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
-import { OperationsRepository, type PanoramaOperacional } from './operations.repository.js';
+import type { TenantContext } from '../../common/tenant/tenant-context.js';
+import {
+  OperationsRepository,
+  type PanoramaOperacional,
+  type UnidadeVisivel,
+} from './operations.repository.js';
 
 const esquemaDeListagem = z
   .object({
     /** `true` esconde os resolvidos. Padrao do painel. */
     open: z.enum(['true', 'false']).default('true'),
     limit: z.coerce.number().int().min(1).max(200).default(50),
+    /** So os alertas desta unidade e os do tenant inteiro. Issue #549. */
+    gymUnitId: z.string().uuid().optional(),
+  })
+  .strict();
+
+const esquemaDoPanorama = z
+  .object({
+    /** Restringe o panorama a uma unidade dentro do escopo. Issue #549. */
+    gymUnitId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -55,21 +69,49 @@ export class OperationsController {
    */
   @Get('overview')
   @RequirePermissions('access.read')
-  async panorama(): Promise<PanoramaOperacional> {
-    return this.operacoes.panorama(this.contexto.require());
+  async panorama(@Query() consulta: unknown): Promise<PanoramaOperacional> {
+    const { gymUnitId } = esquemaDoPanorama.parse(consulta);
+    const contexto = this.contexto.require();
+    const unidade = await this.unidadeNoEscopo(contexto, gymUnitId);
+
+    return this.operacoes.panorama(contexto, unidade ? { unidade } : {});
   }
 
   @Get('alerts')
   @RequirePermissions('access.read')
   async listarAlertas(@Query() consulta: unknown): Promise<AlertaDto[]> {
     const filtro = esquemaDeListagem.parse(consulta);
+    const contexto = this.contexto.require();
+    const unidade = await this.unidadeNoEscopo(contexto, filtro.gymUnitId);
 
-    const alertas = await this.operacoes.listar(this.contexto.require(), {
+    const alertas = await this.operacoes.listar(contexto, {
       apenasAbertos: filtro.open === 'true',
       limite: filtro.limit,
+      ...(unidade ? { gymUnitId: unidade.id } : {}),
     });
 
     return alertas.map((a) => this.paraDto(a));
+  }
+
+  /**
+   * A unidade pedida, se estiver no escopo de quem pede.
+   *
+   * Inexistente e fora do escopo dao o MESMO 404, como no dashboard: a
+   * diferenca revelaria que a unidade existe em algum lugar.
+   */
+  private async unidadeNoEscopo(
+    contexto: TenantContext,
+    gymUnitId: string | undefined,
+  ): Promise<UnidadeVisivel | undefined> {
+    if (gymUnitId === undefined) return undefined;
+
+    const unidade = (await this.operacoes.unidadesVisiveis(contexto)).find(
+      (u) => u.id === gymUnitId,
+    );
+
+    if (!unidade) throw new NotFoundException({ code: 'UNIT_NOT_FOUND' });
+
+    return unidade;
   }
 
   /**

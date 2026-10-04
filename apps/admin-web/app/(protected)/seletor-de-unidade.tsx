@@ -14,6 +14,19 @@ interface Props {
   readonly unidades: readonly Unidade[];
   /** Rótulo de fallback quando não há o que selecionar. */
   readonly vazio: string;
+  /**
+   * Rótulo de uma opção REAL que tira a unidade da URL e mostra todas.
+   *
+   * Existe para o painel de operação (issue #549): lá, "nenhuma escolhida"
+   * não pode esconder nada -- um alerta crítico de qualquer unidade precisa
+   * aparecer antes de alguém escolher. No dashboard fica ausente, e a opção
+   * vazia continua sendo o "Selecione a unidade" desabilitado.
+   */
+  readonly todas?: string;
+  /** Padrão `unidade-ativa`, o da topbar. Outra instância na mesma tela precisa de outro. */
+  readonly testId?: string;
+  /** Onde o seletor está desenhado. Padrão: a topbar escura. */
+  readonly superficie?: 'chrome' | 'pagina';
 }
 
 /**
@@ -38,7 +51,13 @@ interface Props {
  * componente vira rótulo — um `<select>` de uma opção só é um botão que não
  * faz nada.
  */
-export function SeletorDeUnidade({ unidades, vazio }: Props) {
+export function SeletorDeUnidade({
+  unidades,
+  vazio,
+  todas,
+  testId = 'unidade-ativa',
+  superficie = 'chrome',
+}: Props) {
   const router = useRouter();
   const caminho = usePathname();
   const parametros = useSearchParams();
@@ -47,7 +66,7 @@ export function SeletorDeUnidade({ unidades, vazio }: Props) {
 
   if (unidades.length === 0) {
     return (
-      <span className={estilos['rotulo']} data-testid="unidade-ativa">
+      <span className={estilos['rotulo']} data-superficie={superficie} data-testid={testId}>
         {vazio}
       </span>
     );
@@ -55,7 +74,7 @@ export function SeletorDeUnidade({ unidades, vazio }: Props) {
 
   if (unidades.length === 1) {
     return (
-      <span className={estilos['rotulo']} data-testid="unidade-ativa">
+      <span className={estilos['rotulo']} data-superficie={superficie} data-testid={testId}>
         {unidades[0]?.name ?? vazio}
       </span>
     );
@@ -76,7 +95,9 @@ export function SeletorDeUnidade({ unidades, vazio }: Props) {
 
   const trocar = (proximaUnidade: string) => {
     const proximos = new URLSearchParams(parametros.toString());
-    proximos.set('unidade', proximaUnidade);
+    // "Todas" tira o parâmetro: URL sem unidade é o estado agregado.
+    if (proximaUnidade === '') proximos.delete('unidade');
+    else proximos.set('unidade', proximaUnidade);
 
     iniciarNavegacao(() => {
       router.push(`${caminho}?${proximos.toString()}`);
@@ -84,7 +105,7 @@ export function SeletorDeUnidade({ unidades, vazio }: Props) {
   };
 
   return (
-    <span className={estilos['caixa']} data-navegando={navegando}>
+    <span className={estilos['caixa']} data-superficie={superficie} data-navegando={navegando}>
       {/*
         Rótulo visualmente escondido e não `aria-label`: leitor de tela
         anuncia os dois igual, mas o rótulo real sobrevive a tradução
@@ -102,12 +123,14 @@ export function SeletorDeUnidade({ unidades, vazio }: Props) {
       */}
       <select
         className={estilos['select']}
-        data-testid="unidade-ativa"
+        data-testid={testId}
         id={id}
         onChange={(evento) => trocar(evento.target.value)}
         value={atual}
       >
-        {atual === '' ? (
+        {todas !== undefined ? (
+          <option value="">{todas}</option>
+        ) : atual === '' ? (
           <option disabled value="">
             Selecione a unidade
           </option>
