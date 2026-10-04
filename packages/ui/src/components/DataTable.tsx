@@ -123,6 +123,14 @@ interface Props<T> {
   /** `data-testid` por linha, ex.: `aluno-${id}`. */
   readonly rowTestId?: (row: T) => string;
   /**
+   * Tinge a LINHA pelo estado que ela descreve (`atencao` | `negativo`).
+   *
+   * So onde ha estado a comunicar -- alerta critico, equipamento mudo -- e
+   * `undefined` deixa a linha plana. E reforco, nunca canal unico: a linha
+   * ja carrega badge com icone e rotulo (PRODUCT.md, emenda de 30/09/2026).
+   */
+  readonly rowTom?: (row: T) => 'atencao' | 'negativo' | undefined;
+  /**
    * Ordenação vigente e como mudá-la.
    *
    * `href` recebe a chave e a direção, e devolve o link — quem monta a URL é a
@@ -181,6 +189,7 @@ export function DataTable<T>({
   total,
   testId,
   rowTestId,
+  rowTom,
   sort,
 }: Props<T>) {
   if (rows.length === 0) return <>{empty}</>;
@@ -273,6 +282,7 @@ export function DataTable<T>({
             <tr
               key={rowKey(linha)}
               {...(rowTestId !== undefined ? { 'data-testid': rowTestId(linha) } : {})}
+              {...(rowTom?.(linha) !== undefined ? { 'data-tom': rowTom(linha) } : {})}
             >
               {columns.map((coluna) => {
                 const atributos = {

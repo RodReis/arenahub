@@ -18,6 +18,12 @@
     carteira crescer.
   */
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  /*
+    `stretch` EXPLICITO: o `globals.css` do painel poe `align-items: baseline`
+    em todo `dl`, e a faixa herdava -- celulas com `hint` ficavam mais altas
+    que as sem, e a linha de tiles saia desigual.
+  */
+  align-items: stretch;
   gap: 12px;
   margin-bottom: 20px;
 }

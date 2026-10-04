@@ -5,12 +5,27 @@
  * semântica (regra 2 de lint): `--ah-text-on-chrome`, nunca `--ah-carbon-*`.
  */
 
+/*
+ * A TINTA É UMA VARIÁVEL LOCAL, para o mesmo seletor servir à topbar (carbono)
+ * e ao cabeçalho de página (superfície clara) -- issue #549. Na topbar ela é
+ * `--ah-text-on-chrome`; na página, o texto comum do tema.
+ */
+.rotulo,
+.caixa {
+  --tinta: var(--ah-text-on-chrome);
+}
+
+.rotulo[data-superficie='pagina'],
+.caixa[data-superficie='pagina'] {
+  --tinta: var(--ah-text-default);
+}
+
 /* Indicador estático — uma unidade só, ou nenhuma. Não é controle. */
 .rotulo {
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   font-weight: 500;
-  color: var(--ah-text-on-chrome);
+  color: var(--tinta);
 }
 
 .caixa {
@@ -31,10 +46,10 @@
   /* 34px -- DS-PAINEL.md v2 §4.1 (era 30px). */
   height: 34px;
   padding: 0 30px 0 12px;
-  border: 1px solid color-mix(in srgb, var(--ah-text-on-chrome) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tinta) 22%, transparent);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--ah-text-on-chrome) 8%, transparent);
-  color: var(--ah-text-on-chrome);
+  background: color-mix(in srgb, var(--tinta) 8%, transparent);
+  color: var(--tinta);
   font-family: inherit;
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
@@ -46,8 +61,8 @@
 }
 
 .select:hover {
-  background: color-mix(in srgb, var(--ah-text-on-chrome) 14%, transparent);
-  border-color: color-mix(in srgb, var(--ah-text-on-chrome) 36%, transparent);
+  background: color-mix(in srgb, var(--tinta) 14%, transparent);
+  border-color: color-mix(in srgb, var(--tinta) 36%, transparent);
 }
 
 /*
@@ -56,7 +71,7 @@
  * fundos escuros de alguns tenants.
  */
 .select:focus-visible {
-  outline: 2px solid var(--ah-text-on-chrome);
+  outline: 2px solid var(--tinta);
   outline-offset: 2px;
 }
 
@@ -79,7 +94,7 @@
   height: 8px;
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
-  color: var(--ah-text-on-chrome);
+  color: var(--tinta);
   transform: translateY(-2px) rotate(45deg);
   pointer-events: none;
   opacity: 0.7;
@@ -93,6 +108,31 @@
 .caixa[data-navegando='true'] .select {
   opacity: 0.6;
   cursor: progress;
+}
+
+/*
+ * NA PÁGINA, o controle é um campo do painel: borda `border/default`, fundo da
+ * superfície e foco na cor de ação (DS-PAINEL §4.10), não o vidro da topbar.
+ */
+.rotulo[data-superficie='pagina'] {
+  color: var(--ah-text-strong);
+  font-weight: 600;
+}
+
+.caixa[data-superficie='pagina'] .select {
+  height: 36px;
+  border-color: var(--ah-border-default);
+  background: var(--ah-surface-raised);
+  font-weight: 600;
+}
+
+.caixa[data-superficie='pagina'] .select:hover {
+  border-color: var(--ah-border-default);
+  background: var(--ah-surface-sunken);
+}
+
+.caixa[data-superficie='pagina'] .select:focus-visible {
+  outline-color: var(--ah-action-text);
 }
 
 @media (prefers-reduced-motion: reduce) {

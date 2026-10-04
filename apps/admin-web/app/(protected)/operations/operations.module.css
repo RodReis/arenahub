@@ -1,0 +1,232 @@
+/**
+ * Painel de operacao -- DS-PAINEL §4.5e.
+ *
+ * Le so a camada semantica (regra 2 do DS §11): `--ah-state-*` para tom,
+ * `--ah-text-*` para texto, nunca hex nem `--ah-carbon-*`. O tom e o do ESTADO
+ * que a superficie descreve (PRODUCT.md, emendas de 01/09 e 30/09/2026) e some
+ * quando nao ha estado; texto principal e apoio ficam em `text-strong` e
+ * `text-secondary` nos quatro niveis -- o contraste nao cede para a cor entrar.
+ */
+
+/* ---------------------------------------------------------------------------
+ * FAIXA DE SITUACAO -- a unica frase que se le entre dois atendimentos.
+ * ------------------------------------------------------------------------- */
+.faixa {
+  --tomCheio: var(--ah-state-neutral);
+
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 16px;
+  margin: 4px 0 20px;
+  padding: 16px 20px;
+  border: 1px solid var(--ah-border-default);
+  /* A aresta entra por cima da borda neutra, como no PainelDeEstado. */
+  border-top: 3px solid var(--tomCheio);
+  border-radius: var(--ah-radius-card);
+  background-color: var(--ah-surface-raised);
+  background-image: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--tomCheio) 9%, transparent) 0%,
+    transparent 60%
+  );
+  box-shadow: var(--ah-card-shadow);
+}
+
+.faixa[data-nivel='ok'] {
+  --tomCheio: var(--ah-state-success);
+}
+
+.faixa[data-nivel='atencao'] {
+  --tomCheio: var(--ah-state-warning);
+}
+
+/*
+ * CRITICO e INDISPONIVEL sobem para a segunda intensidade (fundo inteiro a 7%,
+ * degrade a 14%): o problema e o proprio assunto da faixa. Em repouso a
+ * faixa cede contraste para quem esta em alarme poder gritar.
+ */
+.faixa[data-nivel='critico'],
+.faixa[data-nivel='indisponivel'] {
+  --tomCheio: var(--ah-state-danger);
+
+  background-color: color-mix(in srgb, var(--tomCheio) 7%, var(--ah-surface-raised));
+  background-image: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--tomCheio) 14%, transparent) 0%,
+    transparent 60%
+  );
+}
+
+.selo {
+  grid-row: span 3;
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: var(--ah-radius-control);
+  /*
+    SOLIDO, com o glifo na cor da superficie: em tema claro e branco sobre o
+    tom escuro, em tema escuro e carbono sobre o tom claro -- o contraste do
+    glifo se inverte junto com o tom, sem hex.
+  */
+  color: var(--ah-surface-raised);
+  background: var(--tomCheio);
+}
+
+.selo svg {
+  inline-size: 24px;
+  block-size: 24px;
+}
+
+/*
+ * O titulo e `text-strong`, NUNCA o tom: o tom ja esta na aresta, no fundo e
+ * no selo. Pintar tambem o texto derrubaria o contraste sem acrescentar canal.
+ */
+.titulo {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.apoio {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+}
+
+.contagem {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+ * CABECALHO DE SECAO -- titulo + o estado da secao, na mesma linha.
+ * ------------------------------------------------------------------------- */
+.secao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  /* Mais espaco acima do titulo que abaixo: o titulo pertence ao que segue. */
+  margin: 28px 0 8px;
+}
+
+/* A primeira secao nao precisa de respiro: a faixa de situacao ja separa. */
+.secaoAbertura {
+  composes: secao;
+  margin-top: 0;
+}
+
+.secao h2,
+.secaoAbertura h2 {
+  margin: 0;
+}
+
+.secao a {
+  margin-inline-start: auto;
+  color: var(--ah-action-text);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+  text-underline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * INDICADOR AO VIVO -- a mesma receita do dashboard (`aoVivo`), no cabecalho.
+ * ------------------------------------------------------------------------- */
+.aoVivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selinho {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--ah-state-success) 32%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ah-state-success) 10%, transparent);
+  color: var(--ah-state-success);
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.selinho[data-pausado='true'] {
+  border-color: var(--ah-border-default);
+  background: none;
+  color: var(--ah-text-secondary);
+}
+
+.pulso {
+  position: relative;
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.selinho:not([data-pausado='true']) .pulso::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: halo 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@keyframes halo {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.6);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+.carimbo {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* O giro comunica "lendo agora"; sem ele o botao parece travado. */
+.recarregar[data-pendente='true'] svg {
+  animation: girar 800ms linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Estado continua legivel por texto e icone; so o movimento sai. */
+@media (prefers-reduced-motion: reduce) {
+  .selinho:not([data-pausado='true']) .pulso::after {
+    opacity: 0;
+    animation: none;
+  }
+
+  .recarregar[data-pendente='true'] svg {
+    animation: none;
+  }
+}

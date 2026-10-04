@@ -83,6 +83,33 @@
   background: var(--ah-surface-sunken);
 }
 
+/*
+ * LINHA TINGIDA PELO ESTADO (`rowTom`) -- fundo a 6%, sem aresta lateral.
+ *
+ * So fundo: uma faixa colorida de mais de 1 px na lateral da linha e o
+ * antipadrao de "alerta de blog", e aqui ela nem e necessaria -- o estado ja
+ * esta no badge (icone + texto), a cor so ajuda o olho a achar a linha ao
+ * varrer a coluna. O hover sobe para 10% para a marca de rastreamento
+ * continuar visivel em cima do tom.
+ */
+.tabela tbody tr[data-tom='negativo'] {
+  background: color-mix(in srgb, var(--ah-state-danger) 6%, var(--ah-surface-raised));
+}
+
+.tabela tbody tr[data-tom='atencao'] {
+  background: color-mix(in srgb, var(--ah-state-warning) 6%, var(--ah-surface-raised));
+}
+
+.tabela tbody tr[data-tom='negativo']:hover,
+.tabela tbody tr[data-tom='negativo']:focus-within {
+  background: color-mix(in srgb, var(--ah-state-danger) 10%, var(--ah-surface-raised));
+}
+
+.tabela tbody tr[data-tom='atencao']:hover,
+.tabela tbody tr[data-tom='atencao']:focus-within {
+  background: color-mix(in srgb, var(--ah-state-warning) 10%, var(--ah-surface-raised));
+}
+
 /**
  * Sem transicao para quem pediu menos movimento. A marca CONTINUA -- ela e
  * informacao, nao decoracao; o que sai e a interpolacao.

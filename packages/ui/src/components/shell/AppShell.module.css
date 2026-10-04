@@ -243,8 +243,9 @@
 
 .linha-titulo {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 12px 16px;
 }
 
 .titulo {
@@ -255,9 +256,17 @@
   font-weight: var(--ah-type-title-weight);
 }
 
+/*
+ * `flex-wrap` nas acoes (issue #549): com seletor, indicador ao vivo e botao
+ * na mesma linha, a 1024 px elas empurravam a pagina para o lado em vez de
+ * descer -- o modo degradado do painel precisa caber, mesmo apertado.
+ */
 .acoes {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 

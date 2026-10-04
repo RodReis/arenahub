@@ -43,6 +43,13 @@ describe('DataTable', () => {
     expect(screen.getByRole('columnheader', { name: 'Nome' })).toHaveAttribute('scope', 'col');
   });
 
+  it('tinge so a linha que descreve estado (rowTom) e deixa as outras planas', () => {
+    render(tabela({ rowTom: (linha) => (linha.id === '1' ? 'negativo' : undefined) }));
+
+    expect(screen.getByText('Maria').closest('tr')).toHaveAttribute('data-tom', 'negativo');
+    expect(screen.getByText('João').closest('tr')).not.toHaveAttribute('data-tom');
+  });
+
   it('renderiza uma linha por item', () => {
     render(tabela());
 
