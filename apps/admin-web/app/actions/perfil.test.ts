@@ -83,7 +83,7 @@ describe('alterarSenha', () => {
     ['AUTH_PASSWORD_CHANGE_IN_SUPPORT', 'Em sessão de suporte não é possível trocar a senha.'],
     ['QUALQUER_OUTRO', 'Não foi possível trocar a senha. Tente de novo.'],
   ])('traduz %s', async (code, mensagem) => {
-    vi.mocked(chamarApi).mockResolvedValue(recusa(code) as never);
+    vi.mocked(chamarApi).mockResolvedValue(recusa(code));
 
     expect((await alterarSenha({}, formulario())).erro).toBe(mensagem);
   });
@@ -97,7 +97,7 @@ describe('alterarSenha', () => {
   });
 
   it('nunca devolve senha no estado', async () => {
-    vi.mocked(chamarApi).mockResolvedValue(recusa('AUTH_CURRENT_PASSWORD_INVALID') as never);
+    vi.mocked(chamarApi).mockResolvedValue(recusa('AUTH_CURRENT_PASSWORD_INVALID'));
 
     const estado = await alterarSenha({}, formulario());
 
