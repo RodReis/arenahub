@@ -14,7 +14,6 @@ updated: 2026-10-04
 - [MVP1][INFRA] Decisão: QR, cartão e PIN como caminho de acesso — a regra de arquitetura nº 7 não tem implementação (#336)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
-- [MVP0][SPEC-002][F2] Ciclo de vida facial (#2)
 
 ## A Fazer
 
@@ -33,6 +32,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP0][SPEC-002][F2] Ciclo de vida facial (#2, finalizado em: 2026-10-04)
 - [MVP1][FIX] refresh em voo escapa da revogação de sessões (troca de senha e logout) (#558, finalizado em: 2026-10-04)
 - [MVP1][SPEC-084][F84] Perfil do usuário e troca da própria senha (#557, finalizado em: 2026-10-04)
 - [SPEC-054][FIX] painel financeiro: chip de competência futura dá BILLING_SUMMARY_INVALID_WINDOW (#555, finalizado em: 2026-10-04)
