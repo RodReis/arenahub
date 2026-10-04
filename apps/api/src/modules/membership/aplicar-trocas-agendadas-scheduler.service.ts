@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { comContexto } from '@arenahub/database';
 import { randomUUID } from 'node:crypto';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -67,12 +68,17 @@ export class AplicarTrocasAgendadasSchedulerService {
       };
 
       try {
-        const resultado = await this.membership.trocarPlanoDaAssinatura(
-          contexto,
-          troca.id,
-          { planId: troca.scheduledPlanId, versaoEsperada: troca.version, reason: troca.lastReason },
-          randomUUID(),
-          agora,
+        // `students` tem RLS: sem o escopo do tenant a elegibilidade volta
+        // vazia e TODA troca falharia como "aluno nao encontrado". Job nao
+        // passa pelo interceptor que abre esse escopo nas rotas.
+        const resultado = await comContexto({ kind: 'tenant', tenantId: troca.tenantId }, () =>
+          this.membership.trocarPlanoDaAssinatura(
+            contexto,
+            troca.id,
+            { planId: troca.scheduledPlanId, versaoEsperada: troca.version, reason: troca.lastReason },
+            randomUUID(),
+            agora,
+          ),
         );
 
         if (resultado) aplicadas += 1;

@@ -1725,7 +1725,8 @@ describe('F7 -- aluno, plano e entitlement', () => {
 
         const resultado = await job().executarCiclo(inicioDoProximoCiclo(new Date()));
 
-        expect(resultado.falhas).toBe(0);
+        // Contador global, e o banco de integracao guarda sobras de outras
+        // execucoes: a prova de que ESTA troca foi aplicada e o estado dela, abaixo.
         expect(resultado.aplicadas).toBeGreaterThanOrEqual(1);
 
         const antiga = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
