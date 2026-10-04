@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, useToast, useToastDeErro } from '@arenahub/ui';
+import { Button, Field, useToast } from '@arenahub/ui';
 
 import { alterarSenha, type EstadoDaSenha } from '../../actions/perfil';
 import estilos from './perfil.module.css';
@@ -28,15 +28,21 @@ function BotaoDeSalvar() {
  * acabou de trocar nao deve ver a senha velha ainda digitada.
  *
  * SEM `required` NATIVO: a validacao e da action, com a frase certa em toast.
- * O erro vai por `useToastDeErro`, que compara a MENSAGEM -- reenviar e
- * receber o mesmo erro tem de avisar de novo.
+ *
+ * O ERRO NAO USA `useToastDeErro`: o hook compara a MENSAGEM, e aqui o erro
+ * REPETIDO e o caso comum -- errar a senha atual duas vezes. Com a mensagem
+ * igual o efeito nao reexecuta, e quem dispensou o primeiro toast fica diante
+ * de um botao que parece morto. A action devolve um objeto NOVO a cada envio,
+ * entao o efeito depende do `estado` inteiro.
  */
 export function FormularioDeSenha() {
   const [estado, acao] = useActionState(alterarSenha, ESTADO_INICIAL);
   const formulario = useRef<HTMLFormElement>(null);
   const { show } = useToast();
 
-  useToastDeErro(estado.erro, 'error', 'erro-da-senha');
+  useEffect(() => {
+    if (estado.erro) show('error', estado.erro, 'erro-da-senha');
+  }, [estado, show]);
 
   useEffect(() => {
     if (!estado.sucesso) return;
