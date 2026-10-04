@@ -287,4 +287,39 @@ describe('troca de senha e perfil', () => {
       expect(resposta.status).toBe(401);
     });
   });
+
+  describe('GET /api/v1/auth/profile', () => {
+    it('devolve e-mail, papeis, academia e data de criacao', async () => {
+      const { email, tenantId } = await criarUsuario();
+      const sessao = await logar(email);
+
+      const resposta = await request(servidor())
+        .get('/api/v1/auth/profile')
+        .set('Cookie', sessao.acesso);
+
+      expect(resposta.status).toBe(200);
+      const tenant = await db.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+      expect(resposta.body).toEqual({
+        email,
+        createdAt: expect.any(String),
+        roles: ['OWNER'],
+        tenant: { displayName: tenant.displayName, timezone: 'America/Sao_Paulo' },
+      });
+    });
+
+    it('nunca devolve hash nem segredo de MFA', async () => {
+      const { email } = await criarUsuario();
+      const sessao = await logar(email);
+
+      const corpo = JSON.stringify(
+        (await request(servidor()).get('/api/v1/auth/profile').set('Cookie', sessao.acesso)).body,
+      );
+
+      expect(corpo).not.toMatch(/scrypt|passwordHash|mfaSecret/i);
+    });
+
+    it('recusa sem sessao', async () => {
+      expect((await request(servidor()).get('/api/v1/auth/profile')).status).toBe(401);
+    });
+  });
 });

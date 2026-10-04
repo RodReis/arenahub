@@ -44,6 +44,16 @@ const JANELA_DE_FORCA_BRUTA_MFA_MS = minutes(1);
 const LIMITE_DE_TENTATIVAS_ERRADAS_MFA = 5;
 const BLOQUEIO_APOS_LIMITE_MFA_MS = seconds(60);
 
+/** O que a pagina `/perfil` le -- SPEC-XXX. So leitura. */
+export interface PerfilDaConta {
+  email: string;
+  createdAt: Date;
+  /** Nomes de papel distintos neste tenant (`OWNER`, ...); o painel traduz. */
+  roles: string[];
+  /** `timezone` segue o fallback Tenant -> primeira unidade de `cobranca()`. */
+  tenant: { displayName: string; timezone: string | null };
+}
+
 export interface ParDeTokens {
   accessToken: string;
   refreshToken: string;
@@ -447,6 +457,42 @@ export class AuthService {
     if (!usuario) throw new NaoAutenticadoError();
 
     return usuario;
+  }
+
+  async perfilDaConta(userId: string, tenantId: string): Promise<PerfilDaConta> {
+    const [usuario, papeis, tenant] = await Promise.all([
+      this.db.user.findUnique({
+        where: { id: userId },
+        // `select` explicito: o objeto inteiro traria `passwordHash` e o
+        // segredo do MFA para uma resposta HTTP.
+        select: { email: true, createdAt: true },
+      }),
+      this.db.userRole.findMany({
+        where: { userId, tenantId },
+        select: { role: { select: { name: true } } },
+      }),
+      this.db.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          displayName: true,
+          timezone: true,
+          gymUnits: { take: 1, orderBy: { createdAt: 'asc' }, select: { timezone: true } },
+        },
+      }),
+    ]);
+
+    if (!usuario || !tenant) throw new NaoAutenticadoError();
+
+    return {
+      email: usuario.email,
+      createdAt: usuario.createdAt,
+      // `Set`: o mesmo papel em duas unidades e uma linha por unidade.
+      roles: [...new Set(papeis.map((p) => p.role.name))].sort(),
+      tenant: {
+        displayName: tenant.displayName,
+        timezone: tenant.timezone ?? tenant.gymUnits[0]?.timezone ?? null,
+      },
+    };
   }
 
   /**

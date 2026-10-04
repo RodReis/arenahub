@@ -75,6 +75,24 @@ const ESQUEMA_DA_INSCRICAO = {
   required: ['uri', 'base32'],
 };
 
+const ESQUEMA_DO_PERFIL = {
+  type: 'object',
+  properties: {
+    email: { type: 'string' },
+    createdAt: { type: 'string', format: 'date-time' },
+    roles: { type: 'array', items: { type: 'string' } },
+    tenant: {
+      type: 'object',
+      properties: {
+        displayName: { type: 'string' },
+        timezone: { type: 'string', nullable: true },
+      },
+      required: ['displayName', 'timezone'],
+    },
+  },
+  required: ['email', 'createdAt', 'roles', 'tenant'],
+};
+
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(
@@ -259,6 +277,21 @@ export class AuthController {
       dados.currentPassword,
       dados.newPassword,
     );
+  }
+
+  /**
+   * Dados da propria conta para a pagina `/perfil` -- SPEC-XXX.
+   *
+   * Rota PROPRIA, e nao `/me`: o layout chama `/me` em toda navegacao, e
+   * papeis e academia so interessam a uma pagina.
+   */
+  @Get('profile')
+  @ApiOkResponse({ schema: ESQUEMA_DO_PERFIL })
+  async perfilDaConta() {
+    const contexto = this.contexto.require();
+    const perfil = await this.auth.perfilDaConta(contexto.actorId, contexto.tenantId);
+
+    return { ...perfil, createdAt: perfil.createdAt.toISOString() };
   }
 
   @Get('me')
