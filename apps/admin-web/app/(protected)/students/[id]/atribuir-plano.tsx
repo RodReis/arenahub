@@ -35,6 +35,11 @@ export interface AssinaturaVigente {
    * dos dois inputs (achado da revisão de branch inteiro).
    */
   endsAt: string;
+  /**
+   * Troca de plano JA agendada para o proximo ciclo (#337), se houver. O
+   * nome vem da lista de planos; `null` quando o plano agendado saiu da lista.
+   */
+  trocaAgendada?: { planName: string | null; effectiveFrom: string } | undefined;
 }
 
 interface Props {
@@ -123,9 +128,19 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }
     return (
       <div role="status" data-testid="plano-atribuido">
         <p>
-          {troca
-            ? 'Plano trocado. O plano anterior foi encerrado e o novo já vale agora, com a vigência mantida.'
-            : 'Plano atribuído. O direito de acesso foi criado e já vale a partir do início da vigência.'}
+          {troca ? (
+            <>
+              Troca agendada. O plano atual segue valendo e o novo passa a valer em{' '}
+              {estado.sucesso.vigenteApartirDe ? (
+                <TenantDateTime iso={estado.sucesso.vigenteApartirDe} timeZone={timezone} format="date" />
+              ) : (
+                'o próximo ciclo'
+              )}
+              , com a vigência mantida.
+            </>
+          ) : (
+            'Plano atribuído. O direito de acesso foi criado e já vale a partir do início da vigência.'
+          )}
         </p>
         <p>
           <a href={`/students/${studentId}`}>Atualizar a ficha</a>
@@ -167,14 +182,23 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }
       ) : null}
 
       {/*
-        TROCA: a recepção precisa saber que o plano atual TERMINA, e não que
-        um segundo se soma ao primeiro. Sem esta frase, "alterar plano" e
-        "adicionar plano" são a mesma tela para quem opera.
+        TROCA: a recepção precisa saber QUANDO o plano muda, e que não há
+        proração nem crédito (decisão do PI, 04/10/2026, #337). Sem esta frase,
+        "alterar plano" parece trocar na hora.
       */}
       {troca ? (
         <p role="note" className={estilos['nota']} data-testid="aviso-de-troca">
-          O plano{vigente.planName ? ` ${vigente.planName}` : ''} será encerrado e o direito de
-          acesso dele, revogado. O acesso passa a valer pelo plano novo.
+          A troca vale no próximo ciclo: o plano{vigente.planName ? ` ${vigente.planName}` : ''}{' '}
+          segue até lá, sem proração e sem crédito.
+        </p>
+      ) : null}
+
+      {troca && vigente.trocaAgendada ? (
+        <p role="status" className={estilos['nota']} data-testid="troca-ja-agendada">
+          Já há uma troca agendada
+          {vigente.trocaAgendada.planName ? ` para ${vigente.trocaAgendada.planName}` : ''} em{' '}
+          <TenantDateTime iso={vigente.trocaAgendada.effectiveFrom} timeZone={timezone} format="date" />.
+          Agendar de novo substitui essa troca.
         </p>
       ) : null}
 

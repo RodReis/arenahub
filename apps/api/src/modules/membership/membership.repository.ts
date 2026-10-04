@@ -11,7 +11,7 @@ import type {
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
-import { competenciaDe } from '../billing/domain/ciclo-de-cobranca.js';
+import { competenciaDe, inicioDoProximoCiclo } from '../billing/domain/ciclo-de-cobranca.js';
 import { validarValorMonetario } from '../billing/domain/dinheiro.js';
 import { cpfEhValido, normalizarCpf } from '../students/domain/identificacao.js';
 import { alunoRecebeAcessoNormal, type StatusDeAluno } from '../students/domain/student.js';
@@ -113,6 +113,32 @@ export class PlanoSemJanelaError extends ErroDeDominio {
       'PLAN_HAS_NO_ACCESS_WINDOW',
       422,
       'Plano nao tem janela de acesso e por isso nao libera a catraca; cadastre o horario do plano',
+    );
+  }
+}
+
+/**
+ * Troca agendada para o plano que a assinatura ja tem -- nao ha o que trocar.
+ * Recusar aqui e melhor que agendar uma troca que o job aplicaria como no-op
+ * e que ainda cancelaria a invoice do mes.
+ */
+export class TrocaParaOMesmoPlanoError extends ErroDeDominio {
+  constructor() {
+    super('SUBSCRIPTION_PLAN_UNCHANGED', 422, 'A assinatura ja esta neste plano');
+  }
+}
+
+/**
+ * Vigencia da assinatura acaba antes do proximo ciclo: a troca nunca valeria.
+ * Quem quer o plano novo depois disso renova -- e outro ato, com outro
+ * periodo.
+ */
+export class TrocaAposOFimDaVigenciaError extends ErroDeDominio {
+  constructor() {
+    super(
+      'SUBSCRIPTION_ENDS_BEFORE_NEXT_CYCLE',
+      422,
+      'A vigencia termina antes do proximo ciclo; renove no plano novo em vez de agendar a troca',
     );
   }
 }
@@ -1186,6 +1212,128 @@ export class MembershipRepository {
   }
 
   /**
+   * AGENDA a troca de plano para o proximo ciclo (#337, decisao do PI de
+   * 04/10/2026): sem proracao, sem credito, a assinatura vigente segue como
+   * esta ate la. Agendar de novo SUBSTITUI o agendamento anterior.
+   *
+   * Nada de acesso muda agora -- nenhuma assinatura nasce, nenhum entitlement
+   * e tocado. Quem aplica e `aplicarTrocaAgendada`, via job diario.
+   *
+   * Mesma trava otimista por `version` de `alterarAssinatura`: `null` = a
+   * assinatura mudou (ou deixou de ser ACTIVE) desde a leitura.
+   */
+  async agendarTrocaDePlano(
+    contexto: TenantContext,
+    subscriptionId: string,
+    entrada: { planId: string; versaoEsperada: number; reason: string },
+    correlationId: string,
+    agora: Date,
+  ): Promise<Subscription | null> {
+    const origem = await this.encontrarAssinatura(contexto, subscriptionId);
+    if (!origem) return null;
+
+    if (origem.planId === entrada.planId) throw new TrocaParaOMesmoPlanoError();
+
+    const vigenteApartirDe = inicioDoProximoCiclo(agora);
+    if (origem.endsAt !== null && origem.endsAt.getTime() < vigenteApartirDe.getTime()) {
+      throw new TrocaAposOFimDaVigenciaError();
+    }
+
+    // Mesmas guardas de `trocarPlanoDaAssinatura`, ANTES de gravar: erro que a
+    // recepcao ve agora, e nao um job que falha em silencio no dia 1.
+    const aluno = await this.alunos.verificarElegibilidade(contexto, origem.studentId);
+    if (!aluno) throw new ErroDeDominio('STUDENT_NOT_FOUND', 404, 'Aluno nao encontrado');
+    if (!aluno.elegivel) throw new AlunoNaoElegivelError(aluno.status);
+
+    const plano = await this.encontrarPlano(contexto, entrada.planId);
+    if (!plano) throw new PlanoNaoEncontradoError();
+    if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
+
+    return this.db.$transaction(async (tx) => {
+      const alterados = await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          tenantId: contexto.tenantId,
+          version: entrada.versaoEsperada,
+          status: 'ACTIVE',
+        },
+        data: {
+          scheduledPlanId: entrada.planId,
+          scheduledPlanFrom: vigenteApartirDe,
+          version: { increment: 1 },
+          // Quem agenda e o ator que o job usa ao aplicar (nao ha usuario no
+          // job), e a razao e a da troca.
+          lastActorId: contexto.actorId,
+          lastReason: entrada.reason,
+        },
+      });
+
+      if (alterados.count === 0) return null;
+
+      const agendada = await tx.subscription.findFirstOrThrow({
+        where: { id: subscriptionId, tenantId: contexto.tenantId },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: contexto.tenantId,
+          actorType: 'USER',
+          actorId: contexto.actorId,
+          action: 'subscription.plan_change_scheduled',
+          target: 'subscription',
+          targetId: subscriptionId,
+          correlationId,
+          metadata: {
+            fromPlanId: origem.planId,
+            toPlanId: entrada.planId,
+            effectiveFrom: vigenteApartirDe.toISOString(),
+            reason: entrada.reason,
+          },
+        },
+      });
+
+      return agendada;
+    });
+  }
+
+  /**
+   * Assinaturas ACTIVE cuja troca agendada ja venceu, de TODOS os tenants --
+   * insumo do job diario. Cada uma e aplicada com o contexto do proprio tenant.
+   */
+  async listarTrocasAgendadasVencidas(
+    agora: Date,
+  ): Promise<
+    readonly {
+      id: string;
+      tenantId: string;
+      version: number;
+      scheduledPlanId: string;
+      lastActorId: string;
+      lastReason: string;
+    }[]
+  > {
+    const linhas = await this.db.subscription.findMany({
+      where: {
+        status: 'ACTIVE',
+        scheduledPlanId: { not: null },
+        scheduledPlanFrom: { lte: agora },
+        lastActorId: { not: null },
+        lastReason: { not: null },
+      },
+      orderBy: [{ scheduledPlanFrom: 'asc' }, { id: 'asc' }],
+    });
+
+    return linhas.map((l) => ({
+      id: l.id,
+      tenantId: l.tenantId,
+      version: l.version,
+      scheduledPlanId: l.scheduledPlanId!,
+      lastActorId: l.lastActorId!,
+      lastReason: l.lastReason!,
+    }));
+  }
+
+  /**
    * Concede cortesia (INV-063): razao, responsavel e validade obrigatorios.
    *
    * `subscriptionId` fica nulo -- cortesia nao nasce de assinatura. Um
@@ -1424,6 +1572,8 @@ export class MembershipRepository {
           select: {
             version: true,
             externalSubscriptionId: true,
+            scheduledPlanId: true,
+            scheduledPlanFrom: true,
             plan: { select: { billingMode: true, name: true, prices: true } },
           },
         },
@@ -1619,6 +1769,8 @@ export type EntitlementComJanelas = Prisma.EntitlementGetPayload<{
       select: {
         version: true;
         externalSubscriptionId: true;
+        scheduledPlanId: true;
+        scheduledPlanFrom: true;
         plan: { select: { billingMode: true; name: true; prices: true } };
       };
     };

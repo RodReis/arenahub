@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { StudentsModule } from '../students/students.module.js';
+import { AplicarTrocasAgendadasSchedulerService } from './aplicar-trocas-agendadas-scheduler.service.js';
 import { MembershipController } from './membership.controller.js';
 import { MembershipRepository } from './membership.repository.js';
 
@@ -10,7 +11,7 @@ import { MembershipRepository } from './membership.repository.js';
   // que decide o que expoe (regra de arquitetura no 9).
   imports: [StudentsModule],
   controllers: [MembershipController],
-  providers: [MembershipRepository, TenantContextService],
+  providers: [MembershipRepository, TenantContextService, AplicarTrocasAgendadasSchedulerService],
   exports: [MembershipRepository],
 })
 export class MembershipModule {}

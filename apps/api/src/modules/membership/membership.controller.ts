@@ -202,6 +202,11 @@ interface EntitlementDto {
   /** Nome do plano da assinatura. Nulo em cortesia. */
   planName: string | null;
   /**
+   * Troca de plano agendada para o proximo ciclo (#337), ou `null`. A tela
+   * mostra "passa para <plano> em <data>" e resolve o nome pelo `planId`.
+   */
+  scheduledPlanChange: { planId: string; effectiveFrom: string } | null;
+  /**
    * Preco vigente HOJE do plano, para a tela mostrar QUANTO sera cobrado antes
    * do aceite -- sem isso o aceite seria em branco (`SPEC-056` 2.2). Nulo
    * quando o plano perdeu a vigencia, e a tela recusa a adesao com essa frase.
@@ -471,65 +476,20 @@ export class MembershipController {
     return { id: assinatura.id, status: assinatura.status };
   }
 
+  /**
+   * AGENDA a troca de plano para o proximo ciclo (#337, decisao do PI de
+   * 04/10/2026): sem proracao, sem credito, a assinatura vigente segue como
+   * esta. A troca imediata da F82 virou o que o job diario aplica no dia 1.
+   */
   @Post('subscriptions/:id/trocar-plano')
   @ApiOkResponse({
     schema: {
       type: 'object',
-      required: ['subscriptionId', 'entitlement'],
+      required: ['subscriptionId', 'scheduledPlanId', 'effectiveFrom'],
       properties: {
         subscriptionId: { type: 'string' },
-        entitlement: {
-          type: 'object',
-          required: [
-            'id',
-            'source',
-            'status',
-            'startsAt',
-            'endsAt',
-            'reason',
-            'subscriptionId',
-            'subscriptionVersion',
-            'planBillingMode',
-            'recorrenciaAtiva',
-            'planName',
-            'planCurrentPrice',
-            'janelas',
-          ],
-          properties: {
-            id: { type: 'string' },
-            source: { type: 'string' },
-            status: { type: 'string' },
-            startsAt: { type: 'string' },
-            endsAt: { type: 'string' },
-            reason: { type: 'string', nullable: true },
-            subscriptionId: { type: 'string', nullable: true },
-            subscriptionVersion: { type: 'number', nullable: true },
-            planBillingMode: { type: 'string', nullable: true },
-            recorrenciaAtiva: { type: 'boolean' },
-            planName: { type: 'string', nullable: true },
-            planCurrentPrice: {
-              type: 'object',
-              nullable: true,
-              properties: {
-                amountMinor: { type: 'number' },
-                currency: { type: 'string' },
-                validFrom: { type: 'string' },
-              },
-            },
-            janelas: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  gymUnitId: { type: 'string' },
-                  dayOfWeek: { type: 'number' },
-                  startMinute: { type: 'number' },
-                  endMinute: { type: 'number' },
-                },
-              },
-            },
-          },
-        },
+        scheduledPlanId: { type: 'string' },
+        effectiveFrom: { type: 'string' },
       },
     },
   })
@@ -538,26 +498,19 @@ export class MembershipController {
     @Param('id') id: string,
     @Body() corpo: unknown,
     @Req() requisicao: Request,
-  ): Promise<{ subscriptionId: string; entitlement: EntitlementDto }> {
+  ): Promise<{ subscriptionId: string; scheduledPlanId: string; effectiveFrom: string }> {
     const dados = esquemaDeTrocaDePlano.parse(corpo);
     const contexto = this.contexto.require();
 
-    // Duas etapas, igual a convencao do arquivo de teste (404 "nunca
-    // confirma existencia" de recurso de outro tenant -- ver
-    // `devolve 404 ao detalhar aluno de outro tenant`): 1) confirma que o id
-    // existe no MEU tenant sem revelar mais nada sobre ele -- `encontrarAssinatura`
-    // ja filtra por tenant, entao "nao existe" e "existe em outro tenant" caem
-    // os dois em `null`/404 SUBSCRIPTION_NOT_FOUND, mesmo resultado pratico de
-    // `alterarAssinatura` (equivalente a `assinaturaPertenceAoTenant`, removido
-    // do repository na revisao de branch inteiro por ser redundante com este
-    // metodo). So chegando aqui com o tenant certo e que o `updateMany` de
-    // `trocarPlanoDaAssinatura` (que ja filtra id + tenantId + version +
-    // status no mesmo comando) decide entre sucesso e 409 por
+    // 404 "nunca confirma existencia" de recurso de outro tenant:
+    // `encontrarAssinatura` ja filtra por tenant, entao "nao existe" e "existe
+    // em outro tenant" caem os dois em SUBSCRIPTION_NOT_FOUND. So depois disso
+    // o `updateMany` de `agendarTrocaDePlano` decide entre sucesso e 409 por
     // version/status desatualizado.
     const existente = await this.membership.encontrarAssinatura(contexto, id);
     if (!existente) throw new NotFoundException({ code: 'SUBSCRIPTION_NOT_FOUND' });
 
-    const resultado = await this.membership.trocarPlanoDaAssinatura(
+    const agendada = await this.membership.agendarTrocaDePlano(
       contexto,
       id,
       { planId: dados.planId, versaoEsperada: dados.version, reason: dados.reason },
@@ -565,18 +518,14 @@ export class MembershipController {
       new Date(),
     );
 
-    if (!resultado) throw new ConflitoDeVersaoError();
-
-    const comJanelas = await this.membership.listarEntitlementsDoAluno(
-      contexto,
-      resultado.subscription.studentId,
-    );
-
-    const criado = comJanelas.find((e) => e.id === resultado.entitlement.id)!;
+    if (!agendada || !agendada.scheduledPlanId || !agendada.scheduledPlanFrom) {
+      throw new ConflitoDeVersaoError();
+    }
 
     return {
-      subscriptionId: resultado.subscription.id,
-      entitlement: this.entitlementParaDto(criado),
+      subscriptionId: agendada.id,
+      scheduledPlanId: agendada.scheduledPlanId,
+      effectiveFrom: agendada.scheduledPlanFrom.toISOString(),
     };
   }
 
@@ -819,6 +768,13 @@ export class MembershipController {
       planBillingMode: entitlement.subscription?.plan.billingMode ?? null,
       recorrenciaAtiva: entitlement.subscription?.externalSubscriptionId != null,
       planName: entitlement.subscription?.plan.name ?? null,
+      scheduledPlanChange:
+        entitlement.subscription?.scheduledPlanId && entitlement.subscription.scheduledPlanFrom
+          ? {
+              planId: entitlement.subscription.scheduledPlanId,
+              effectiveFrom: entitlement.subscription.scheduledPlanFrom.toISOString(),
+            }
+          : null,
       planCurrentPrice: precoVigenteDoPlano(entitlement.subscription?.plan.prices),
       janelas: entitlement.unitWindows.map((j) => ({
         gymUnitId: j.gymUnitId,

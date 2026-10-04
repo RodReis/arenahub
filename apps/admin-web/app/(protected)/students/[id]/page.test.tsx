@@ -175,6 +175,36 @@ describe('ficha do aluno', () => {
   });
 
   /**
+   * #337: com troca ja agendada, a recepcao ve para qual plano e quando --
+   * e que agendar de novo substitui.
+   */
+  it('mostra a troca ja agendada dentro do formulario de troca', async () => {
+    const usuario = userEvent.setup();
+
+    responder([
+      entitlement({
+        scheduledPlanChange: { planId: 'plano-1', effectiveFrom: '2026-11-01T00:00:00.000Z' },
+      }),
+    ]);
+
+    await renderizar();
+    await usuario.click(screen.getByTestId(`abrir-plano-${ALUNO_ID}`));
+
+    expect(screen.getByTestId('troca-ja-agendada')).toBeInTheDocument();
+  });
+
+  it('sem troca agendada, nao mostra o aviso de agendamento', async () => {
+    const usuario = userEvent.setup();
+
+    responder([entitlement()]);
+
+    await renderizar();
+    await usuario.click(screen.getByTestId(`abrir-plano-${ALUNO_ID}`));
+
+    expect(screen.queryByTestId('troca-ja-agendada')).not.toBeInTheDocument();
+  });
+
+  /**
    * CORTESIA nao e plano que se substitui: nasce sem assinatura
    * (`subscriptionId` nulo), e tratar como troca faria a tela tentar cancelar
    * uma assinatura que nao existe.

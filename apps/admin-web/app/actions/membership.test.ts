@@ -74,15 +74,27 @@ describe('atribuirPlano', () => {
    * aqui. A troca acontece numa transacao so no backend, entao nao ha mais
    * janela em que o aluno fique com duas assinaturas ativas nem sem nenhuma.
    */
-  it('com assinatura vigente, chama a rota atomica de troca -- nao cancela e cria em duas chamadas', async () => {
-    vi.mocked(chamarApi).mockResolvedValueOnce(assinaturaCriada());
+  it('com assinatura vigente, chama a rota de troca -- nao cancela e cria em duas chamadas', async () => {
+    // #337: a troca e AGENDADA para o proximo ciclo; nao ha direito novo.
+    vi.mocked(chamarApi).mockResolvedValueOnce({
+      ok: true,
+      dados: {
+        subscriptionId: ASSINATURA_ANTIGA,
+        scheduledPlanId: PLANO,
+        effectiveFrom: '2026-11-01T00:00:00.000Z',
+      },
+      cookiesDaApi: [],
+    });
 
     const estado = await atribuirPlano(
       {},
       formulario({ substituiSubscriptionId: ASSINATURA_ANTIGA, substituiVersion: '4' }),
     );
 
-    expect(estado.sucesso).toBeDefined();
+    expect(estado.sucesso).toEqual({
+      subscriptionId: ASSINATURA_ANTIGA,
+      vigenteApartirDe: '2026-11-01T00:00:00.000Z',
+    });
 
     const chamadas = vi.mocked(chamarApi).mock.calls;
     expect(chamadas).toHaveLength(1);
