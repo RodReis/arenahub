@@ -342,7 +342,8 @@ export function periodosDisponiveis(
     .filter((competencia) => {
       const [ano, mes] = competencia.split('-').map(Number);
 
-      return Date.UTC(ano ?? 0, (mes ?? 1) - 1, 1) <= agoraMs;
+      // Estrito: no instante exato da virada `de == ate` e a API tambem recusa.
+      return Date.UTC(ano ?? 0, (mes ?? 1) - 1, 1) < agoraMs;
     })
     .sort()
     .reverse()
