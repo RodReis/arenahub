@@ -423,14 +423,7 @@ export class AuthService {
       if (trocou.count === 0) throw new SenhaAtualInvalidaError();
 
       // Todas as familias do usuario, em QUALQUER tenant: a senha e global.
-      await tx.session.updateMany({
-        where: {
-          userId: sessao.userId,
-          familyId: { not: atual.familyId },
-          status: { in: ['ACTIVE', 'ROTATED'] },
-        },
-        data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: 'password_changed' },
-      });
+      await this.sessoes.revogarOutrasFamilias(tx, sessao.userId, atual.familyId, 'password_changed');
 
       await tx.auditLog.create({
         data: {
