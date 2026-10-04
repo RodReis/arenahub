@@ -8,6 +8,19 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Virou link (SPEC-084): sem sublinhado, e o hover/foco sao do chip todo. */
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 2px 8px 2px 2px;
+}
+
+.chip:hover {
+  background: color-mix(in srgb, var(--ah-text-on-chrome) 10%, transparent);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--ah-accent-400);
+  outline-offset: 2px;
 }
 
 .avatar {

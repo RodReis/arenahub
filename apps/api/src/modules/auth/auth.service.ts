@@ -9,6 +9,9 @@ import {
   MfaBloqueadoPorTentativasError,
   NaoAutenticadoError,
   RefreshReutilizadoError,
+  SenhaAtualInvalidaError,
+  SenhaNovaIgualAAtualError,
+  TrocaDeSenhaBloqueadaPorTentativasError,
 } from '../../common/http/erro-de-dominio.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { MfaService } from './mfa.service.js';
@@ -40,6 +43,16 @@ const BLOQUEIO_APOS_LIMITE_MS = seconds(60);
 const JANELA_DE_FORCA_BRUTA_MFA_MS = minutes(1);
 const LIMITE_DE_TENTATIVAS_ERRADAS_MFA = 5;
 const BLOQUEIO_APOS_LIMITE_MFA_MS = seconds(60);
+
+/** O que a pagina `/perfil` le -- SPEC-084. So leitura. */
+export interface PerfilDaConta {
+  email: string;
+  createdAt: Date;
+  /** Nomes de papel distintos neste tenant (`OWNER`, ...); o painel traduz. */
+  roles: string[];
+  /** `timezone` segue o fallback Tenant -> primeira unidade de `cobranca()`. */
+  tenant: { displayName: string; timezone: string | null };
+}
 
 export interface ParDeTokens {
   accessToken: string;
@@ -349,6 +362,90 @@ export class AuthService {
     if (sessao) await this.sessoes.revogarFamilia(sessao.familyId, 'logout');
   }
 
+  /**
+   * Troca a propria senha e derruba as OUTRAS sessoes -- SPEC-084.
+   *
+   * A FAMILIA MANTIDA vem do elo do `sessionId` do access token, qualquer que
+   * seja o status dele: o painel renova em paralelo, e o elo do token pode ja
+   * estar `ROTATED` enquanto a familia segue viva.
+   *
+   * A ESCRITA E CONDICIONADA AO HASH LIDO (`updateMany ... passwordHash`):
+   * duas trocas simultaneas com a mesma senha atual conferem as duas, e so a
+   * primeira a gravar vence. Sem a condicao, a segunda sobrescreveria a
+   * primeira e as duas responderiam sucesso.
+   */
+  async trocarSenha(
+    sessao: { userId: string; tenantId: string; sessionId: string; correlationId: string },
+    senhaAtual: string,
+    novaSenha: string,
+  ): Promise<void> {
+    // Soma TODA tentativa, molde do MFA: um contador que so soma em erro nunca
+    // travaria o acerto depois do limite -- e quem tem o cookie roubado
+    // acertaria a senha na tentativa que funciona.
+    const registro = await this.forcaBruta.increment(
+      `senha:${sessao.userId}`,
+      JANELA_DE_FORCA_BRUTA_MS,
+      LIMITE_DE_TENTATIVAS_ERRADAS,
+      BLOQUEIO_APOS_LIMITE_MS,
+      'password-change-bruteforce',
+    );
+
+    if (registro.isBlocked) throw new TrocaDeSenhaBloqueadaPorTentativasError();
+
+    const usuario = await this.db.user.findUnique({
+      where: { id: sessao.userId },
+      select: { passwordHash: true },
+    });
+
+    if (!usuario) throw new NaoAutenticadoError();
+
+    if (!(await this.senhas.conferir(senhaAtual, usuario.passwordHash))) {
+      throw new SenhaAtualInvalidaError();
+    }
+
+    if (senhaAtual === novaSenha) throw new SenhaNovaIgualAAtualError();
+
+    const atual = await this.db.session.findUnique({
+      where: { id: sessao.sessionId },
+      select: { familyId: true },
+    });
+
+    if (!atual) throw new NaoAutenticadoError();
+
+    const novoHash = await this.senhas.gerarHash(novaSenha);
+
+    await this.db.$transaction(async (tx) => {
+      const trocou = await tx.user.updateMany({
+        where: { id: sessao.userId, passwordHash: usuario.passwordHash },
+        data: { passwordHash: novoHash },
+      });
+
+      if (trocou.count === 0) throw new SenhaAtualInvalidaError();
+
+      // Todas as familias do usuario, em QUALQUER tenant: a senha e global.
+      await tx.session.updateMany({
+        where: {
+          userId: sessao.userId,
+          familyId: { not: atual.familyId },
+          status: { in: ['ACTIVE', 'ROTATED'] },
+        },
+        data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: 'password_changed' },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: sessao.tenantId,
+          actorType: 'USER',
+          actorId: sessao.userId,
+          action: 'user.password_changed',
+          target: 'user',
+          targetId: sessao.userId,
+          correlationId: sessao.correlationId,
+        },
+      });
+    });
+  }
+
   async perfil(userId: string): Promise<{ id: string; email: string }> {
     const usuario = await this.db.user.findUnique({
       where: { id: userId },
@@ -360,6 +457,42 @@ export class AuthService {
     if (!usuario) throw new NaoAutenticadoError();
 
     return usuario;
+  }
+
+  async perfilDaConta(userId: string, tenantId: string): Promise<PerfilDaConta> {
+    const [usuario, papeis, tenant] = await Promise.all([
+      this.db.user.findUnique({
+        where: { id: userId },
+        // `select` explicito: o objeto inteiro traria `passwordHash` e o
+        // segredo do MFA para uma resposta HTTP.
+        select: { email: true, createdAt: true },
+      }),
+      this.db.userRole.findMany({
+        where: { userId, tenantId },
+        select: { role: { select: { name: true } } },
+      }),
+      this.db.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          displayName: true,
+          timezone: true,
+          gymUnits: { take: 1, orderBy: { createdAt: 'asc' }, select: { timezone: true } },
+        },
+      }),
+    ]);
+
+    if (!usuario || !tenant) throw new NaoAutenticadoError();
+
+    return {
+      email: usuario.email,
+      createdAt: usuario.createdAt,
+      // `Set`: o mesmo papel em duas unidades e uma linha por unidade.
+      roles: [...new Set(papeis.map((p) => p.role.name))].sort(),
+      tenant: {
+        displayName: tenant.displayName,
+        timezone: tenant.timezone ?? tenant.gymUnits[0]?.timezone ?? null,
+      },
+    };
   }
 
   /**

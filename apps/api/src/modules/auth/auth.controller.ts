@@ -1,9 +1,12 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
-import { ApiOkResponse } from '@nestjs/swagger';
+import { ApiNoContentResponse, ApiOkResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 
-import { NaoAutenticadoError } from '../../common/http/erro-de-dominio.js';
+import {
+  NaoAutenticadoError,
+  TrocaDeSenhaEmSuporteError,
+} from '../../common/http/erro-de-dominio.js';
 import { Public } from '../../common/security/public.decorator.js';
 import { COOKIE_DE_ACESSO, COOKIE_DE_REFRESH, lerCookie } from './cookies.js';
 import {
@@ -39,6 +42,20 @@ const esquemaDeLogin = z
 /** Seis digitos: o TOTP do `TotpService`. */
 const esquemaDeVerificacaoDeMfa = z.object({ code: z.string().regex(/^\d{6}$/) }).strict();
 
+/*
+ * 8 a 1024 -- o MESMO numero do `esquemaDeAceite` (iam.controller.ts) e de
+ * `MINIMO_DE_SENHA` no painel (actions/usuarios.ts e actions/perfil.ts).
+ * Decisao do PI em 05/09/2026 (#281). Mudou la, muda aqui.
+ *
+ * Sem campo de confirmacao: ela e so da tela, como no aceite de convite.
+ */
+const esquemaDeTrocaDeSenha = z
+  .object({
+    currentPassword: z.string().min(1).max(1024),
+    newPassword: z.string().min(8).max(1024),
+  })
+  .strict();
+
 /** O que a inscricao devolve -- ver `mfa/enroll`. */
 interface InscricaoDeMfa {
   /** URI `otpauth://` -- o celular a entrega ao autenticador. */
@@ -56,6 +73,24 @@ const ESQUEMA_DA_INSCRICAO = {
   type: 'object',
   properties: { uri: { type: 'string' }, base32: { type: 'string' } },
   required: ['uri', 'base32'],
+};
+
+const ESQUEMA_DO_PERFIL = {
+  type: 'object',
+  properties: {
+    email: { type: 'string' },
+    createdAt: { type: 'string', format: 'date-time' },
+    roles: { type: 'array', items: { type: 'string' } },
+    tenant: {
+      type: 'object',
+      properties: {
+        displayName: { type: 'string' },
+        timezone: { type: 'string', nullable: true },
+      },
+      required: ['displayName', 'timezone'],
+    },
+  },
+  required: ['email', 'createdAt', 'roles', 'tenant'],
 };
 
 @Controller('api/v1/auth')
@@ -214,6 +249,49 @@ export class AuthController {
 
     resposta.clearCookie(COOKIE_DE_ACESSO, this.opcoesDeCookie());
     resposta.clearCookie(COOKIE_DE_REFRESH, this.opcoesDeCookie());
+  }
+
+  /**
+   * Troca a propria senha -- SPEC-084. Encerra as outras sessoes, mantem esta.
+   *
+   * SO SESSAO DE TENANT: `require()` recusa a de plataforma. E a de SUPORTE e
+   * recusada explicitamente -- ver `TrocaDeSenhaEmSuporteError`.
+   */
+  @Post('password')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: 'Senha trocada; as outras sessoes foram encerradas' })
+  async trocarSenha(@Body() corpo: unknown, @Req() requisicao: Request): Promise<void> {
+    const contexto = this.contexto.require();
+
+    if (contexto.supportElevation) throw new TrocaDeSenhaEmSuporteError();
+
+    const dados = esquemaDeTrocaDeSenha.parse(corpo);
+
+    await this.auth.trocarSenha(
+      {
+        userId: contexto.actorId,
+        tenantId: contexto.tenantId,
+        sessionId: contexto.sessionId,
+        correlationId: requisicao.correlationId ?? 'sem-correlacao',
+      },
+      dados.currentPassword,
+      dados.newPassword,
+    );
+  }
+
+  /**
+   * Dados da propria conta para a pagina `/perfil` -- SPEC-084.
+   *
+   * Rota PROPRIA, e nao `/me`: o layout chama `/me` em toda navegacao, e
+   * papeis e academia so interessam a uma pagina.
+   */
+  @Get('profile')
+  @ApiOkResponse({ schema: ESQUEMA_DO_PERFIL })
+  async perfilDaConta() {
+    const contexto = this.contexto.require();
+    const perfil = await this.auth.perfilDaConta(contexto.actorId, contexto.tenantId);
+
+    return { ...perfil, createdAt: perfil.createdAt.toISOString() };
   }
 
   @Get('me')
