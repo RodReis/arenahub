@@ -40,6 +40,12 @@ export class EdgeNodeRepository {
     }
   }
 
+  async listar(contexto: TenantContext, gymUnitId?: string): Promise<EdgeNode[]> {
+    return this.db.edgeNode.findMany({
+      where: { tenantId: contexto.tenantId, ...(gymUnitId ? { gymUnitId } : {}) },
+      orderBy: [{ code: 'asc' }],
+    });
+  }
 }
 
 /**

@@ -36,6 +36,8 @@ const esquemaDeEdicaoDeDispositivo = z.object({
   deviceId: z.string().uuid(),
   status: z.enum(['ACTIVE', 'MAINTENANCE', 'RETIRED']),
   firmware: z.string().trim().max(40, 'Firmware longo demais').optional(),
+  /** Ausente: não mexe. Vazio: limpa o dono. UUID: passa para esse Edge (#490). */
+  edgeNodeId: z.union([z.literal(''), z.string().uuid('Edge inválido')]).optional(),
 });
 
 export interface EstadoDoDispositivo {
@@ -60,6 +62,7 @@ const MENSAGEM: Record<string, string> = {
   DEVICE_UNSUPPORTED_HARDWARE:
     'Este modelo ainda não é homologado. Só os equipamentos testados na bancada são aceitos — os demais dependem do gate de hardware.',
   DEVICE_SERIAL_TAKEN: 'Já existe um dispositivo com este número de série.',
+  EDGE_NODE_NOT_FOUND: 'Edge não encontrado nesta unidade.',
 };
 
 function texto(formulario: FormData, campo: string): string {
@@ -137,6 +140,7 @@ export async function editarDispositivo(
     deviceId: texto(formulario, 'deviceId'),
     status: texto(formulario, 'status'),
     firmware: texto(formulario, 'firmware'),
+    ...(formulario.has('edgeNodeId') ? { edgeNodeId: texto(formulario, 'edgeNodeId') } : {}),
   };
 
   const validado = esquemaDeEdicaoDeDispositivo.safeParse(valores);
@@ -168,6 +172,9 @@ export async function editarDispositivo(
          * informado -- apagando o firmware de quem tinha um.
          */
         ...(validado.data.firmware ? { firmware: validado.data.firmware } : {}),
+        ...(validado.data.edgeNodeId === undefined
+          ? {}
+          : { edgeNodeId: validado.data.edgeNodeId || null }),
       },
     },
   );

@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 4200 | 4200 | 0 | 74.7 |
+| unitário | 4209 | 4209 | 0 | 74.7 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 1483 | 1483 | 0 | 81.9 |
+| integração | 1497 | 1497 | 0 | 81.9 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -189,3 +189,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-02 | #538 | — | integração | 1453 | 1453 | 0 | 81.7 | #541 |
 | 2026-10-02 | #538 | — | unitário | 4116 | 4116 | 0 | 74.6 | #542 |
 | 2026-10-02 | #538 | — | integração | 1453 | 1453 | 0 | 81.7 | #542 |
+| 2026-10-04 | #490 | — | unitário | 4209 | 4209 | 0 | 74.7 | *(preencher após o merge)* — números do CI (soma dos 9 pacotes); cobertura herdada da entrega anterior, o CI não a imprime |
+| 2026-10-04 | #490 | — | integração | 1497 | 1497 | 0 | 81.9 | *(preencher após o merge)* — **corrigido à mão, número do CI** (API 1415 + database 82): a integração completa local não serve de evidência nesta máquina (Postgres estourou `max_connections`, 110/34/6 falhas em suítes diferentes a cada rodada; as suítes que caíram passam isoladas); cobertura herdada da entrega anterior |

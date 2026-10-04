@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Device } from '@arenahub/database';
 
+import { EdgeNodeNaoEncontradoError } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 
@@ -102,6 +103,8 @@ export class DeviceRepository {
     dados: {
       status?: 'ACTIVE' | 'MAINTENANCE' | 'RETIRED' | undefined;
       firmware?: string | undefined;
+      /** `null` limpa o dono; `undefined` nao mexe. */
+      edgeNodeId?: string | null | undefined;
     },
     correlationId: string,
     /*
@@ -113,15 +116,46 @@ export class DeviceRepository {
     motivo?: string,
   ): Promise<Device | null> {
     return this.db.$transaction(async (tx) => {
-      const alterados = await tx.device.updateMany({
+      const atual = await tx.device.findFirst({
+        where: { id, tenantId: contexto.tenantId },
+        select: { gymUnitId: true, edgeNodeId: true },
+      });
+
+      if (!atual) return null;
+
+      /*
+       * O Edge novo tem de ser do MESMO tenant e da MESMA unidade do
+       * dispositivo (regra no 2): `Device.edgeNodeId` tem FK, mas a FK nao
+       * sabe de tenant nem de unidade. 404, como o resto: distinguir "nao
+       * existe" de "e de outro tenant" confirmaria o UUID a quem o tentou.
+       *
+       * So Edge `ACTIVE`: o guard do Edge recusa o suspenso (`EDGE_KEY_REVOKED`)
+       * e o leitor ficaria mudo sem aviso. Reenviar o dono ATUAL nao e troca --
+       * o formulario do painel manda o campo em toda edicao, e editar firmware
+       * de um leitor cujo Edge foi suspenso nao pode falhar por isso.
+       */
+      if (dados.edgeNodeId && dados.edgeNodeId !== atual.edgeNodeId) {
+        const edge = await tx.edgeNode.findFirst({
+          where: {
+            id: dados.edgeNodeId,
+            tenantId: contexto.tenantId,
+            gymUnitId: atual.gymUnitId,
+            status: 'ACTIVE',
+          },
+          select: { id: true },
+        });
+
+        if (!edge) throw new EdgeNodeNaoEncontradoError();
+      }
+
+      await tx.device.updateMany({
         where: { id, tenantId: contexto.tenantId },
         data: {
           ...(dados.status ? { status: dados.status } : {}),
           ...(dados.firmware !== undefined ? { firmware: dados.firmware } : {}),
+          ...(dados.edgeNodeId !== undefined ? { edgeNodeId: dados.edgeNodeId } : {}),
         },
       });
-
-      if (alterados.count === 0) return null;
 
       await tx.auditLog.create({
         data: {
@@ -134,6 +168,9 @@ export class DeviceRepository {
           correlationId,
           metadata: {
             status: dados.status ?? null,
+            ...(dados.edgeNodeId === undefined
+              ? {}
+              : { edgeNodeId: dados.edgeNodeId, edgeNodeAnterior: atual.edgeNodeId }),
             ...(motivo === undefined ? {} : { motivo }),
           },
         },

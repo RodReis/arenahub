@@ -19,6 +19,10 @@ interface Props {
   readonly model: string;
   readonly status: string;
   readonly firmware: string | null;
+  /** Dono atual do leitor; `null` quando nenhum Edge o reivindicou. */
+  readonly edgeNodeId: string | null;
+  /** Edges da MESMA unidade do leitor. Vazio esconde o campo. */
+  readonly edges: readonly { readonly id: string; readonly code: string }[];
 }
 
 const ESTADO_INICIAL: EstadoDoDispositivo = {};
@@ -106,7 +110,15 @@ function useDialogo(aberto: boolean, fechar: () => void, sucesso: unknown) {
  * `AccessEvent` referencia o dispositivo, e apagá-lo levaria o histórico de
  * quem passou na catraca).
  */
-export function AcoesDoDispositivo({ deviceId, serial, model, status, firmware }: Props) {
+export function AcoesDoDispositivo({
+  deviceId,
+  serial,
+  model,
+  status,
+  firmware,
+  edgeNodeId,
+  edges,
+}: Props) {
   const [editando, setEditando] = useState(false);
   const [aposentando, setAposentando] = useState(false);
 
@@ -210,6 +222,29 @@ export function AcoesDoDispositivo({ deviceId, serial, model, status, firmware }
               maxLength={40}
               data-testid={`campo-firmware-do-dispositivo-${deviceId}`}
             />
+
+            {/*
+              Dono do leitor (#490): desfaz a reivindicação automática do Edge
+              sem `UPDATE` no banco. Só há campo quando a unidade tem Edge
+              cadastrado -- sem lista, o formulário nem envia a chave.
+            */}
+            {edges.length > 0 && (
+              <SelectField
+                id={`edicao-edge-dispositivo-${deviceId}`}
+                name="edgeNodeId"
+                label="Edge"
+                defaultValue={estadoDaEdicao.valores?.['edgeNodeId'] ?? edgeNodeId ?? ''}
+                hint="Quem reconhece rostos e decide a catraca deste leitor."
+                data-testid={`campo-edge-do-dispositivo-${deviceId}`}
+              >
+                <option value="">Sem Edge</option>
+                {edges.map((edge) => (
+                  <option key={edge.id} value={edge.id}>
+                    {edge.code}
+                  </option>
+                ))}
+              </SelectField>
+            )}
 
             {/*
               O QUE NÃO SE EDITA, e por quê -- em vez de só omitir os campos.
