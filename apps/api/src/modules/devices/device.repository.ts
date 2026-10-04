@@ -253,4 +253,19 @@ export class DeviceRepository {
 
     return linhas.map((l) => l.externalUserId);
   }
+
+  /**
+   * O numero com que o aluno esta VIVO no leitor (`DeviceUser` SYNCED), ou
+   * `null` -- aluno legado pode estar vinculado sem credencial facial.
+   * Varios leitores: o vinculo mais antigo, desempate pelo numero.
+   */
+  async numeroVinculadoDoAluno(tenantId: string, studentId: string): Promise<string | null> {
+    const vinculo = await this.db.deviceUser.findFirst({
+      where: { tenantId, studentId, state: 'SYNCED' },
+      orderBy: [{ createdAt: 'asc' }, { externalUserId: 'asc' }],
+      select: { externalUserId: true },
+    });
+
+    return vinculo?.externalUserId ?? null;
+  }
 }

@@ -370,6 +370,78 @@ describe('numero de catraca automatico', () => {
       );
     });
 
+    it('numero que ainda abre a catraca para A nao aparece sem aluno e da 409 para B', async () => {
+      // A troca X -> Y; Y ainda nao esta no leitor, entao o vinculo de A fica
+      // em X. X sem credencial nao pode virar "livre": cadastrar B em X
+      // sobrescreveria a face de A e B passaria como A.
+      const x = numeroDoLeitor(60);
+      const y = numeroDoLeitor(61);
+      await db.deviceReaderNumber.create({
+        data: { tenantId: conta.tenantId, deviceId: leitorId, externalUserId: x, seenAt: new Date() },
+      });
+      const a = await criarAluno(conta);
+      expect((await postar(a, { externalId: x })).body).toEqual({ externalId: x, linkedReaders: 1 });
+
+      const troca = await request(servidor())
+        .put(`/api/v1/students/${a}/credentials`)
+        .set('Cookie', conta.cookie)
+        .send({ kind: 'FACIAL_ENROLL_ID', externalId: y });
+      expect(troca.status).toBe(200);
+      expect(
+        await db.deviceUser.findFirst({ where: { deviceId: leitorId, externalUserId: x } }),
+      ).toMatchObject({ studentId: a, state: 'SYNCED' });
+
+      const semAluno = await request(servidor())
+        .get('/api/v1/device-reader-numbers/unlinked')
+        .set('Cookie', conta.cookie);
+      expect((semAluno.body as { externalId: string }[]).map((l) => l.externalId)).not.toContain(x);
+
+      const b = await criarAluno(conta);
+      const r = await postar(b, { externalId: x });
+
+      expect(r.status).toBe(409);
+      expect((r.body as { code: string }).code).toBe('CREDENTIAL_ALREADY_ASSIGNED');
+      expect(await db.studentCredential.count({ where: { studentId: b, externalId: x } })).toBe(0);
+      expect(await db.deviceUser.count({ where: { studentId: b } })).toBe(0);
+    });
+
+    it('POST sem numero de aluno legado (vinculo no leitor, so cartao) mostra o numero do vinculo', async () => {
+      const lido = numeroDoLeitor(70);
+      const cartao = numeroDoLeitor(71);
+      await db.deviceReaderNumber.create({
+        data: { tenantId: conta.tenantId, deviceId: leitorId, externalUserId: lido, seenAt: new Date() },
+      });
+      const id = await criarAluno(conta);
+      expect((await postar(id, { externalId: lido })).body).toEqual({ externalId: lido, linkedReaders: 1 });
+      // Legado: o import grava cartao e facial separados; este so tem o cartao.
+      await db.studentCredential.deleteMany({ where: { studentId: id } });
+      await db.studentCredential.create({
+        data: { tenantId: conta.tenantId, studentId: id, kind: 'TURNSTILE_CARD', externalId: cartao },
+      });
+
+      const r = await postar(id, {});
+
+      expect(r.status).toBe(200);
+      expect((r.body as { externalId: string }).externalId).toBe(lido);
+      expect(
+        await db.studentCredential.count({ where: { studentId: id, kind: 'FACIAL_ENROLL_ID' } }),
+      ).toBe(0);
+    });
+
+    it('POST sem numero de aluno com facial devolve o facial sem criar outro', async () => {
+      const id = await criarAluno(conta);
+      const facial = (
+        await db.studentCredential.findFirstOrThrow({
+          where: { studentId: id, kind: 'FACIAL_ENROLL_ID' },
+        })
+      ).externalId;
+
+      const r = await postar(id, {});
+
+      expect(r.status).toBe(200);
+      expect((r.body as { externalId: string }).externalId).toBe(facial);
+    });
+
     it('POST de aluno inexistente da 404', async () => {
       const r = await postar(randomUUID(), {});
       expect(r.status).toBe(404);

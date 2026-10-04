@@ -15,9 +15,16 @@ const MAXIMO_DE_TENTATIVAS = 5;
  * Numero de catraca automatico -- o aluno nasce com ele e a recepcao so
  * digita no leitor o que a tela mostra (spec 2026-10-03).
  *
- * IDEMPOTENTE POR ALUNO: quem ja tem `FACIAL_ENROLL_ID` recebe o mesmo
- * numero. Trocar em silencio deixaria a face ja cadastrada no leitor sob o
- * numero antigo -- a catraca passaria a recusar a pessoa.
+ * IDEMPOTENTE POR ALUNO, nesta ordem:
+ *   1. quem ja tem `FACIAL_ENROLL_ID` recebe o mesmo numero;
+ *   2. senao, quem ja esta vivo no leitor (`DeviceUser` SYNCED -- aluno
+ *      legado, vinculado sem credencial facial) recebe o numero do vinculo,
+ *      e NADA e gravado;
+ *   3. senao, gera.
+ * Trocar em silencio deixaria a face ja cadastrada no leitor sob o numero
+ * antigo -- a catraca passaria a recusar a pessoa, ou a recepcao cadastraria
+ * uma segunda face. Cartao (`TURNSTILE_CARD`) NAO conta como numero do
+ * leitor: numero de cartao RFID pode nao ser um enrollid.
  *
  * Corrida entre geracoes e decidida pelo UNIQUE do banco: a perdedora
  * recalcula. O calculo e deterministico (menor numero livre), entao N
@@ -50,6 +57,9 @@ export class TurnstileNumberService {
     const atuais = await this.credenciais.listarPorAluno(contexto, studentId);
     const facial = atuais.find((c) => c.kind === 'FACIAL_ENROLL_ID');
     if (facial) return { externalId: facial.externalId, created: false };
+
+    const vinculado = await this.dispositivos.numeroVinculadoDoAluno(contexto.tenantId, studentId);
+    if (vinculado !== null) return { externalId: vinculado, created: false };
 
     for (let tentativa = 0; ; tentativa += 1) {
       const numero = await this.proximoLivre(contexto.tenantId);

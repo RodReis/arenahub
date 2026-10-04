@@ -16,9 +16,11 @@ import { z } from 'zod';
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { DeviceReaderNumberRepository } from '../devices/device-reader-number.repository.js';
+import { DeviceRepository } from '../devices/device.repository.js';
 import { StudentCredentialRepository } from '../students/student-credential.repository.js';
 import { StudentRepository } from '../students/student.repository.js';
 import { TurnstileNumberService } from '../students/turnstile-number.service.js';
+import { BiometricIdentityRepository } from './biometric-identity.repository.js';
 import { VincularCadastroLegadoUseCase } from './vincular-cadastro-legado.use-case.js';
 
 /** Corpo recusa campo extra: o tenant vem da identidade autenticada (regra no 2). */
@@ -59,6 +61,8 @@ export class StudentTurnstileNumberController {
     private readonly credenciais: StudentCredentialRepository,
     private readonly numeroDaCatraca: TurnstileNumberService,
     private readonly numerosDoLeitor: DeviceReaderNumberRepository,
+    private readonly dispositivos: DeviceRepository,
+    private readonly identidades: BiometricIdentityRepository,
     private readonly vincular: VincularCadastroLegadoUseCase,
   ) {}
 
@@ -113,6 +117,11 @@ export class StudentTurnstileNumberController {
    * passaria como facial deste. Cartao e facial dividem o espaco de numero do
    * leitor, entao a recusa cobre qualquer `kind`. Linha do proprio aluno
    * (ex.: o cartao dele com o mesmo numero) nao e conflito.
+   *
+   * Credencial nao basta: quem trocou X -> Y com Y ainda fora do leitor
+   * continua vinculado em X (`DeviceUser`). X sem credencial ainda abre a
+   * catraca para essa pessoa -- cadastrar outro aluno em X sobrescreveria a
+   * face dela. Vinculo de outro aluno em qualquer leitor tambem recusa.
    */
   private async recusarSeDeOutroAluno(
     tenantId: string,
@@ -122,12 +131,19 @@ export class StudentTurnstileNumberController {
     const donos = await this.credenciais.encontrarPorNumeros(tenantId, [externalId]);
 
     if (donos.some((d) => d.studentId !== studentId)) throw numeroJaVinculado();
+
+    for (const leitor of await this.numerosDoLeitor.leitoresComNumero(tenantId, externalId)) {
+      const vinculado = await this.identidades.alunoDoNumero(tenantId, leitor.deviceId, externalId);
+      if (vinculado !== null && vinculado !== studentId) throw numeroJaVinculado();
+    }
   }
 
   /**
-   * Numeros que o leitor tem e nenhum aluno do tenant tem como credencial.
-   * Credencial de QUALQUER kind conta: cartao e facial dividem o espaco de
-   * numero do leitor. O cruzamento e aqui, nao em `devices` (regra no 9).
+   * Numeros que o leitor tem e nenhum aluno do tenant tem como credencial
+   * NEM como vinculo (`DeviceUser`). Credencial de QUALQUER kind conta: cartao
+   * e facial dividem o espaco de numero do leitor. O vinculo conta porque quem
+   * trocou de numero continua no leitor sob o antigo ate o novo chegar. O
+   * cruzamento e aqui, nao em `devices` (regra no 9).
    */
   @Get('device-reader-numbers/unlinked')
   @RequirePermissions('student.read')
@@ -136,11 +152,12 @@ export class StudentTurnstileNumberController {
     { externalId: string; readerName: string | null; deviceSerial: string }[]
   > {
     const { tenantId } = this.contexto.require();
-    const [doLeitor, ocupados] = await Promise.all([
+    const [doLeitor, ocupados, vinculados] = await Promise.all([
       this.numerosDoLeitor.listarComNome(tenantId),
       this.credenciais.listarNumerosDoTenant(tenantId),
+      this.dispositivos.listarNumerosVinculadosDoTenant(tenantId),
     ]);
-    const comAluno = new Set(ocupados);
+    const comAluno = new Set([...ocupados, ...vinculados]);
 
     return doLeitor.filter((n) => !comAluno.has(n.externalId));
   }
