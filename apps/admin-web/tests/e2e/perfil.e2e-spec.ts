@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Perfil e troca de senha -- SPEC-XXX.
+ * Perfil e troca de senha -- SPEC-084.
  *
  * USUARIO PROPRIO, criado por convite: trocar a senha do dono semeado
  * quebraria todas as outras suites, que entram com ela.

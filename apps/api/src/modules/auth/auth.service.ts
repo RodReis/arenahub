@@ -44,7 +44,7 @@ const JANELA_DE_FORCA_BRUTA_MFA_MS = minutes(1);
 const LIMITE_DE_TENTATIVAS_ERRADAS_MFA = 5;
 const BLOQUEIO_APOS_LIMITE_MFA_MS = seconds(60);
 
-/** O que a pagina `/perfil` le -- SPEC-XXX. So leitura. */
+/** O que a pagina `/perfil` le -- SPEC-084. So leitura. */
 export interface PerfilDaConta {
   email: string;
   createdAt: Date;
@@ -363,7 +363,7 @@ export class AuthService {
   }
 
   /**
-   * Troca a propria senha e derruba as OUTRAS sessoes -- SPEC-XXX.
+   * Troca a propria senha e derruba as OUTRAS sessoes -- SPEC-084.
    *
    * A FAMILIA MANTIDA vem do elo do `sessionId` do access token, qualquer que
    * seja o status dele: o painel renova em paralelo, e o elo do token pode ja

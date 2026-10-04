@@ -20,7 +20,7 @@ interface PerfilDaConta {
 }
 
 /**
- * Perfil do usuario logado -- SPEC-XXX.
+ * Perfil do usuario logado -- SPEC-084.
  *
  * SO LEITURA, alem da senha (decisao do PI em 04/10/2026). Avatar com
  * iniciais: a foto do leitor mora em `Student` e nao ha vinculo com `User`.

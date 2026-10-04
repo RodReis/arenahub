@@ -26,7 +26,7 @@ export function iniciais(email: string): string {
  * o que a spec pede como piso, e o círculo acompanha o accent do tenant como
  * qualquer outro uso de `--ah-accent-*`.
  *
- * O chip leva a `/perfil` (SPEC-XXX): é o único lugar do painel onde a pessoa
+ * O chip leva a `/perfil` (SPEC-084): é o único lugar do painel onde a pessoa
  * se vê, e o caminho natural de quem procura "minha conta".
  */
 export function Usuario({ email }: Props) {

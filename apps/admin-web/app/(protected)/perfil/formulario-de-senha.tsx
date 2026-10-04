@@ -21,7 +21,7 @@ function BotaoDeSalvar() {
 }
 
 /**
- * Troca da propria senha -- SPEC-XXX.
+ * Troca da propria senha -- SPEC-084.
  *
  * CAMPOS NAO CONTROLADOS, e por isso o sucesso limpa pelo `form.reset()`: a
  * action nao devolve senha nenhuma (prop serializada volta no HTML), e quem

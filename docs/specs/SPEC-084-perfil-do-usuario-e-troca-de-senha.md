@@ -1,20 +1,16 @@
-# SPEC-XXX — Perfil do usuário logado e troca de senha
-
-> **Número provisório.** `F<n>` e `SPEC-<nnn>` são alocados pelo Cowork no Índice Fatia ↔ SPEC do
-> `docs/STATUS.md` (nunca reaproveitados). O Code não espera a alocação: renomeia este arquivo e
-> acerta o título quando o número chegar.
+# SPEC-084 — Perfil do usuário logado e troca de senha
 
 | campo | valor |
 |---|---|
-| **Fatia** | F? *(a alocar)* |
+| **Fatia** | F84 |
 | **Slice do PRD** | não há. Nasce de pedido do PI em 04/10/2026 |
-| **MVP** | — *(a alocar junto com o card)* |
+| **MVP** | 1 *(posição na fila)* — decisão do PI, não Slice de PRD |
 | **Superfície** | `apps/api` (`auth`) e `apps/admin-web` (rota nova `/perfil`, topbar) |
 | **Plano de apoio** | [`2026-10-04-perfil-do-usuario-e-troca-de-senha.md`](../superpowers/plans/2026-10-04-perfil-do-usuario-e-troca-de-senha.md) |
 | **Status** | `aprovada-pi` |
 | **Criada em** | 2026-10-04 |
 | **Aprovada pelo PI em** | 04/10/2026 (design em chat e spec revisada); revisão técnica pós-leitura do código em §3 #5–#8 |
-| **Card** | — *(Cowork cria)* |
+| **Card** | [#557](https://github.com/RodReis/arenahub/issues/557) |
 
 ---
 

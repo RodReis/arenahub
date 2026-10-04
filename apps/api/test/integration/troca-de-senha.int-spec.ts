@@ -10,7 +10,7 @@ import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
- * Troca da propria senha e leitura do perfil -- SPEC-XXX.
+ * Troca da propria senha e leitura do perfil -- SPEC-084.
  *
  * Cada usuario nasce no proprio teste: a troca muda a senha e conta
  * tentativas por usuario, e um usuario compartilhado faria um teste herdar

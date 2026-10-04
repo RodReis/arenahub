@@ -119,7 +119,7 @@ describe('contrato OpenAPI', () => {
         // F61 -- segundo fator do Super Admin (INV-007). Troca o pre-auth
         // pela sessao de plataforma; nenhum outro papel passa por aqui.
         '/api/v1/auth/mfa/verify',
-        // SPEC-XXX -- perfil do usuario e troca da propria senha.
+        // SPEC-084 -- perfil do usuario e troca da propria senha.
         '/api/v1/auth/profile',
         '/api/v1/auth/password',
         '/api/v1/units',

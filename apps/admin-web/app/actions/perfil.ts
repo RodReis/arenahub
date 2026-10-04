@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { chamarApi } from '../../lib/api/server-client';
 
 /**
- * Troca da propria senha -- SPEC-XXX.
+ * Troca da propria senha -- SPEC-084.
  *
  * MINIMO 8: o mesmo numero de `actions/usuarios.ts`, do `esquemaDeAceite` e
  * do `esquemaDeTrocaDeSenha` na API (decisao do PI em 05/09/2026, #281).

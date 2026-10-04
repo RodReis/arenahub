@@ -252,7 +252,7 @@ export class AuthController {
   }
 
   /**
-   * Troca a propria senha -- SPEC-XXX. Encerra as outras sessoes, mantem esta.
+   * Troca a propria senha -- SPEC-084. Encerra as outras sessoes, mantem esta.
    *
    * SO SESSAO DE TENANT: `require()` recusa a de plataforma. E a de SUPORTE e
    * recusada explicitamente -- ver `TrocaDeSenhaEmSuporteError`.
@@ -280,7 +280,7 @@ export class AuthController {
   }
 
   /**
-   * Dados da propria conta para a pagina `/perfil` -- SPEC-XXX.
+   * Dados da propria conta para a pagina `/perfil` -- SPEC-084.
    *
    * Rota PROPRIA, e nao `/me`: o layout chama `/me` em toda navegacao, e
    * papeis e academia so interessam a uma pagina.

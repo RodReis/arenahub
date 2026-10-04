@@ -72,7 +72,7 @@ export class MfaBloqueadoPorTentativasError extends ErroDeDominio {
 }
 
 /**
- * Troca da propria senha -- SPEC-XXX.
+ * Troca da propria senha -- SPEC-084.
  *
  * `422` e nao `401`: no resto da API `401` quer dizer "sem sessao", e quem
  * troca a senha esta logado. O que falhou foi a conferencia de um campo.

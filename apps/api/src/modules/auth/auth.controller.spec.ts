@@ -5,7 +5,7 @@ import { AuthController } from './auth.controller.js';
 import type { AuthService } from './auth.service.js';
 
 /**
- * Sessao de suporte nao troca senha -- SPEC-XXX AC-8.
+ * Sessao de suporte nao troca senha -- SPEC-084 AC-8.
  *
  * Unitario e nao integracao: montar uma elevacao viva pela rota exige Super
  * Admin, tenant e `ElevarUseCase` (ver `platform-elevacao.int-spec.ts`), e a

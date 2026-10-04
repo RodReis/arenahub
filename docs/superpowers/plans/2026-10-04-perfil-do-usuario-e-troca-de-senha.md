@@ -8,7 +8,7 @@
 
 **Tech Stack:** NestJS + Prisma 7 + Zod (api, Jest + supertest); Next.js 16 App Router + Vitest + Testing Library (admin-web); Playwright (E2E).
 
-**Spec:** [`docs/specs/SPEC-XXX-perfil-do-usuario-e-troca-de-senha.md`](../../specs/SPEC-XXX-perfil-do-usuario-e-troca-de-senha.md)
+**Spec:** [`docs/specs/SPEC-084-perfil-do-usuario-e-troca-de-senha.md`](../../specs/SPEC-084-perfil-do-usuario-e-troca-de-senha.md)
 
 ## Global Constraints
 
@@ -82,7 +82,7 @@ import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
- * Troca da propria senha e leitura do perfil -- SPEC-XXX.
+ * Troca da propria senha e leitura do perfil -- SPEC-084.
  *
  * Cada usuario nasce no proprio teste: a troca muda a senha e conta
  * tentativas por usuario, e um usuario compartilhado faria um teste herdar
@@ -352,7 +352,7 @@ Em `apps/api/src/common/http/erro-de-dominio.ts`, depois de `MfaBloqueadoPorTent
 
 ```ts
 /**
- * Troca da propria senha -- SPEC-XXX.
+ * Troca da propria senha -- SPEC-084.
  *
  * `422` e nao `401`: no resto da API `401` quer dizer "sem sessao", e quem
  * troca a senha esta logado. O que falhou foi a conferencia de um campo.
@@ -394,7 +394,7 @@ Em `auth.service.ts`, acrescentar os três erros novos ao import de `erro-de-dom
 
 ```ts
   /**
-   * Troca a propria senha e derruba as OUTRAS sessoes -- SPEC-XXX.
+   * Troca a propria senha e derruba as OUTRAS sessoes -- SPEC-084.
    *
    * A FAMILIA MANTIDA vem do elo do `sessionId` do access token, qualquer que
    * seja o status dele: o painel renova em paralelo, e o elo do token pode ja
@@ -502,7 +502,7 @@ Método depois de `logout`:
 
 ```ts
   /**
-   * Troca a propria senha -- SPEC-XXX. Encerra as outras sessoes, mantem esta.
+   * Troca a propria senha -- SPEC-084. Encerra as outras sessoes, mantem esta.
    *
    * SO SESSAO DE TENANT: `require()` recusa a de plataforma. E a de SUPORTE e
    * recusada explicitamente -- ver `TrocaDeSenhaEmSuporteError`.
@@ -547,7 +547,7 @@ import { AuthController } from './auth.controller.js';
 import type { AuthService } from './auth.service.js';
 
 /**
- * Sessao de suporte nao troca senha -- SPEC-XXX AC-8.
+ * Sessao de suporte nao troca senha -- SPEC-084 AC-8.
  *
  * Unitario e nao integracao: montar uma elevacao viva pela rota exige Super
  * Admin, tenant e `ElevarUseCase` (ver `platform-elevacao.int-spec.ts`), e a
@@ -658,7 +658,7 @@ Run: comando do Task 1 Step 2. Expected: FAIL (`404`).
 Em `auth.service.ts`, exportar o tipo perto de `ParDeTokens` e o método depois de `perfil`:
 
 ```ts
-/** O que a pagina `/perfil` le -- SPEC-XXX. So leitura. */
+/** O que a pagina `/perfil` le -- SPEC-084. So leitura. */
 export interface PerfilDaConta {
   email: string;
   createdAt: Date;
@@ -735,7 +735,7 @@ Método depois de `me`:
 
 ```ts
   /**
-   * Dados da propria conta para a pagina `/perfil` -- SPEC-XXX.
+   * Dados da propria conta para a pagina `/perfil` -- SPEC-084.
    *
    * Rota PROPRIA, e nao `/me`: o layout chama `/me` em toda navegacao, e
    * papeis e academia so interessam a uma pagina.
@@ -755,7 +755,7 @@ Método depois de `me`:
 Em `openapi.int-spec.ts`, no `arrayContaining` de `publica as rotas que a fatia entrega`, depois de `'/api/v1/auth/mfa/verify',`:
 
 ```ts
-        // SPEC-XXX -- perfil do usuario e troca da propria senha.
+        // SPEC-084 -- perfil do usuario e troca da propria senha.
         '/api/v1/auth/profile',
         '/api/v1/auth/password',
 ```
@@ -881,7 +881,7 @@ import { z } from 'zod';
 import { chamarApi } from '../../lib/api/server-client';
 
 /**
- * Troca da propria senha -- SPEC-XXX.
+ * Troca da propria senha -- SPEC-084.
  *
  * MINIMO 8: o mesmo numero de `actions/usuarios.ts`, do `esquemaDeAceite` e
  * do `esquemaDeTrocaDeSenha` na API (decisao do PI em 05/09/2026, #281).
@@ -1085,7 +1085,7 @@ Em `usuario.tsx`: `function iniciais` vira `export function iniciais`; importar 
     </Link>
 ```
 
-Atualizar o comentário do componente: "O chip leva a `/perfil` (SPEC-XXX)". Em `usuario.module.css`, acrescentar ao `.chip` `text-decoration: none; border-radius: 999px; padding: 2px 8px 2px 2px;` e:
+Atualizar o comentário do componente: "O chip leva a `/perfil` (SPEC-084)". Em `usuario.module.css`, acrescentar ao `.chip` `text-decoration: none; border-radius: 999px; padding: 2px 8px 2px 2px;` e:
 
 ```css
 .chip:hover {
@@ -1128,7 +1128,7 @@ function BotaoDeSalvar() {
 }
 
 /**
- * Troca da propria senha -- SPEC-XXX.
+ * Troca da propria senha -- SPEC-084.
  *
  * CAMPOS NAO CONTROLADOS, e por isso o sucesso limpa pelo `form.reset()`: a
  * action nao devolve senha nenhuma (prop serializada volta no HTML), e quem
@@ -1217,7 +1217,7 @@ interface PerfilDaConta {
 }
 
 /**
- * Perfil do usuario logado -- SPEC-XXX.
+ * Perfil do usuario logado -- SPEC-084.
  *
  * SO LEITURA, alem da senha (decisao do PI em 04/10/2026). Avatar com
  * iniciais: a foto do leitor mora em `Student` e nao ha vinculo com `User`.
@@ -1297,7 +1297,7 @@ export default async function PaginaDePerfil() {
 `apps/admin-web/app/(protected)/perfil/perfil.module.css` — tokens do DS-PAINEL, sem hex. Conferir os nomes de token usados em `users/convite.module.css` e `dialogo.module.css` e reusar os mesmos (superfície elevada, borda, raio, espaçamento, tipografia):
 
 ```css
-/* Perfil do usuario -- SPEC-XXX. Duas colunas no desktop, uma no estreito. */
+/* Perfil do usuario -- SPEC-084. Duas colunas no desktop, uma no estreito. */
 .pagina {
   display: flex;
   flex-direction: column;
@@ -1428,7 +1428,7 @@ git commit -m "feat: pagina de perfil com troca de senha no painel"
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Perfil e troca de senha -- SPEC-XXX.
+ * Perfil e troca de senha -- SPEC-084.
  *
  * USUARIO PROPRIO, criado por convite: trocar a senha do dono semeado
  * quebraria todas as outras suites, que entram com ela.
@@ -1521,7 +1521,7 @@ git commit -m "test: jornada e2e do perfil e troca de senha"
 
 **Files:**
 - Modify: `docs/DEVELOPMENT.md`, `docs/TESTS.md` (linha da entrega, PR preenchido depois do merge)
-- Modify: `docs/specs/SPEC-XXX-perfil-do-usuario-e-troca-de-senha.md` (status `entregue` ao fim)
+- Modify: `docs/specs/SPEC-084-perfil-do-usuario-e-troca-de-senha.md` (status `entregue` ao fim)
 
 - [ ] **Step 1: Gate local** (raiz, `--force` para o cache do turbo não esconder lint vermelho)
 
