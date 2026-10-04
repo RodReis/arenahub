@@ -72,6 +72,46 @@ export class MfaBloqueadoPorTentativasError extends ErroDeDominio {
 }
 
 /**
+ * Troca da propria senha -- SPEC-XXX.
+ *
+ * `422` e nao `401`: no resto da API `401` quer dizer "sem sessao", e quem
+ * troca a senha esta logado. O que falhou foi a conferencia de um campo.
+ */
+export class SenhaAtualInvalidaError extends ErroDeDominio {
+  constructor() {
+    super('AUTH_CURRENT_PASSWORD_INVALID', 422, 'Senha atual incorreta');
+  }
+}
+
+export class SenhaNovaIgualAAtualError extends ErroDeDominio {
+  constructor() {
+    super('AUTH_PASSWORD_UNCHANGED', 422, 'A nova senha precisa ser diferente da atual');
+  }
+}
+
+/** Codigo proprio: nao e login, e quem le o log precisa saber qual rota travou. */
+export class TrocaDeSenhaBloqueadaPorTentativasError extends ErroDeDominio {
+  constructor() {
+    super(
+      'AUTH_PASSWORD_CHANGE_RATE_LIMITED',
+      429,
+      'Muitas tentativas. Tente novamente em instantes',
+    );
+  }
+}
+
+/**
+ * Na elevacao de suporte o usuario da sessao e o Super Admin. Trocar a senha
+ * de plataforma pelo painel do cliente, sem segundo fator, contornaria o
+ * INV-007.
+ */
+export class TrocaDeSenhaEmSuporteError extends ErroDeDominio {
+  constructor() {
+    super('AUTH_PASSWORD_CHANGE_IN_SUPPORT', 403, 'Sessao de suporte nao troca senha');
+  }
+}
+
+/**
  * Codigo de pareamento do Edge recusado (F59, ADR-011).
  *
  * UM erro para codigo inexistente, expirado OU ja usado, de proposito --
