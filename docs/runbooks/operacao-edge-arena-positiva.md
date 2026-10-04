@@ -64,7 +64,7 @@ Subir sem reinstalar: `schtasks /Run /TN "ArenaHub Edge"`.
 | a recepção vê "Edge sem resposta" | agente parado ou PC fora da rede | `ver-log-edge.cmd`; se o log não anda, `schtasks /Run /TN "ArenaHub Edge"` |
 | reconhece o rosto, **não libera**, nada no painel, e o log **nunca mostrou `leitor facial conectou`** desde a partida (ou mostra `leitor facial nao esta conectado ao agente`) | **outro programa está com o leitor** — em 01/10/2026 foi o `TopFace.exe` (serviço `TopFaceService`), que sobe no boot antes do agente e escuta a mesma porta 7792 | `netstat -ano | findstr 7792` → PID da linha `ESTABLISHED` → `tasklist /svc /fi "pid eq NNNN"`. Se for o TopFace: §7. Se não for nada: reiniciar o leitor na tomada e conferir nele o IP do PC |
 | reconhece o rosto e mostra a foto, **não libera**, e **não há linha no log**, com o leitor conectado | o leitor **não mandou o registro**: intervalo de ~2 min entre registros da mesma pessoa (config do equipamento) | esperar o intervalo; **não é defeito do ArenaHub** |
-| `outcome: DENY` + `motivo: Sem plano vigente, ou aluno não identificado` | o aluno **não tem plano ativo**, ou o número do leitor **não está na coluna CATRACA** de nenhum aluno | painel → Eventos de acesso: **com nome** = sem plano (cobrar/atribuir); **"não identificado"** = vincular o número ao aluno (lista de alunos → "Número da catraca" → "Do leitor", §5); o vínculo é imediato, sem reiniciar o agente |
+| `outcome: DENY` + `motivo: Sem plano vigente, ou aluno não identificado` | o aluno **não tem plano ativo**, ou o número do leitor **não está na coluna CATRACA** de nenhum aluno | painel → Eventos de acesso: **com nome** = sem plano (cobrar/atribuir); **"não identificado"** = vincular o número ao aluno (lista de alunos → "Número da catraca" → "Do leitor", §5); com o número já no leitor o vínculo é imediato, sem reiniciar o agente |
 | `ALLOW`, mas `PASSAGE_TIMED_OUT` / "Não passou", com `duracaoPassagemMs` perto de 5000 | a catraca está com o **tempo de acionamento** gravado nela (5 s de fábrica). O `CATRACA_TEMPO_LIBERADA_S` do `.env` **só chega ao equipamento** com `CATRACA_LEITOR1/LEITOR2/ACIONAMENTO1` definidos (#507) | trocar **Tempo de acionamento 1** na página da catraca (§8), ou definir as três variáveis (§8) |
 | **entrada livre e saída travada**, ou rosto liberado (verdinho) mas a catraca não deixa passar | a catraca foi **desligada da tomada** e voltou com a configuração de fábrica | §8 |
 | painel → Operação: **"Esta catraca não está liberando acesso"** | a catraca parou de responder ao agente por mais de 90 s (#522). Antes deste ajuste o alerta era permanente e falso | energia e cabo da catraca; `ver-log-edge.cmd` (`catraca nao respondeu ao ping`); se ela voltou desconfigurada, §8 |
@@ -80,7 +80,12 @@ própria. Para a recepção liberar à mão, use o caminho alternativo de acesso
 ## 5. Cadastro de aluno novo
 
 O número que o leitor facial reconhece (o "número da catraca", 12 dígitos) é **gerado pelo ArenaHub**
-(não é sequencial do leitor). O vínculo com o leitor é **imediato** — não precisa reiniciar o agente.
+(não é sequencial do leitor). Nunca é preciso reiniciar o agente para vincular:
+
+- número gravado no painel que o leitor **já tem** (aluno legado, aba "Do leitor") → o vínculo é
+  **imediato**, no momento em que o número é salvo;
+- aluno **novo** → o vínculo nasce quando o leitor informa a face nova, normalmente **alguns
+  segundos** depois do cadastro no leitor.
 
 **Aluno novo**
 
@@ -95,9 +100,17 @@ O número que o leitor facial reconhece (o "número da catraca", 12 dígitos) é
 
 Lista de alunos → ação da linha **"Número da catraca"** (ícone de chave) → aba **"Do leitor"** →
 escolha o número pelo **nome guardado no leitor** (há busca por número ou nome) → "Usar este número".
-O vínculo é feito na hora. Se o firmware do leitor não informar o nome, a lista mostra só o número —
-nesse caso confira pelo número impresso na lista do leitor. A aba "Gerar novo" mostra o número que o
-aluno já tem; se não tiver, gera um (nunca cria um segundo).
+O vínculo é feito na hora. Se o leitor não informar o nome, a lista mostra **só o número** — nesse
+caso confirme com quem cadastrou a face, ou peça ao aluno para passar no leitor e veja qual registro é
+o dele. **Nunca escolha um número que você não consegue ligar a uma pessoa.**
+
+A aba "Gerar novo" tem o botão **"Mostrar ou gerar número"**: ele **mostra** o número que o aluno já
+tem. Não cria outro quando o aluno já tem número facial ou já está vinculado no leitor; só gera um
+número novo quando não há nenhum dos dois.
+
+**Segurança:** um número que ainda pertence a um aluno — mesmo que o número dele no painel tenha sido
+trocado — **não aparece** em "Do leitor" e é **recusado** pelo sistema (409). Se a tela disser "Este número
+já está vinculado a outro aluno", **não insista**: cadastre a face com outro número.
 
 **Confirmar na bancada** (leitor AYTI11108174): a leitura do nome guardado no leitor (`getuserinfo`)
 ainda **não foi verificada** nesse equipamento. Conferir, após a primeira conexão do leitor com o
