@@ -22,6 +22,17 @@ describe('NumeroEmDestaque', () => {
     expect(saida.querySelectorAll('span')).toHaveLength(4);
   });
 
+  it('agrupa a partir da direita: numero legado curto le 1 491', () => {
+    render(
+      <ToastProvider>
+        <NumeroEmDestaque numero="1491" />
+      </ToastProvider>,
+    );
+
+    const blocos = screen.getByTestId('numero-em-destaque-valor').querySelectorAll('span');
+    expect([...blocos].map((b) => b.textContent)).toEqual(['1', '491']);
+  });
+
   it('copiar escreve os digitos sem espaco e avisa por toast', async () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });

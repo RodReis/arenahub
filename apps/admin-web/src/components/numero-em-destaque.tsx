@@ -13,9 +13,9 @@ interface Props {
   readonly vinculado?: boolean;
 }
 
-/** Blocos de 3 a partir da esquerda: 100 000 000 007. */
+/** Blocos de 3 a partir da DIREITA: 100 000 000 007, e o legado curto 1 491. */
 function emBlocos(numero: string): string[] {
-  return numero.match(/.{1,3}/g) ?? [numero];
+  return numero.match(/.{1,3}(?=(.{3})*$)/g) ?? [numero];
 }
 
 /**

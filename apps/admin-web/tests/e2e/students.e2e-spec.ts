@@ -552,8 +552,9 @@ test.describe('navegação da recepção', () => {
  * semeado e e coberta pelos testes de integracao da API.
  *
  * Test ids da lista sao DUPLICADOS por linha (`dialogo-numero-catraca`,
- * `gerar-numero-catraca`): o botao da linha e o por aluno e o dialogo e
- * escopado ao `<dialog>` aberto.
+ * `gerar-numero-catraca`). Por isso o clique usa o botao da linha, que e
+ * por aluno (`acao-numero-catraca-<id>`), e o dialogo e escopado a
+ * `dialog[open]`.
  */
 test.describe('numero da catraca automatico', () => {
   /** Os 12 digitos do visor, depois de provar que vem em quatro blocos de tres. */
@@ -576,6 +577,7 @@ test.describe('numero da catraca automatico', () => {
 
     await cadastrarAluno(page, { nome, nascimento: '1990-02-10' });
     await page.getByTestId('abrir-ficha').click();
+    await expect(page).toHaveURL(/\/students\/[0-9a-f-]{36}/);
 
     const studentId = new URL(page.url()).pathname.split('/').pop() ?? '';
 
