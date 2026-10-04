@@ -37,6 +37,11 @@ const esquemaDeAtualizacao = z
     status: z.enum(['ACTIVE', 'MAINTENANCE', 'RETIRED']).optional(),
     firmware: z.string().max(40).optional(),
     /*
+     * Dono do leitor: `uuid` define, `null` limpa (#490). Quem tem
+     * `device.manage` desfaz a reivindicacao automatica sem `UPDATE` no banco.
+     */
+    edgeNodeId: z.string().uuid().nullable().optional(),
+    /*
      * Motivo do ATO, nao do dispositivo: vai para o `metadata` do
      * `AuditLog`, nao vira coluna. Minimo de 10 caracteres pelo mesmo
      * criterio de `ManualAccessOverride.reason` -- "ok" nao e motivo.

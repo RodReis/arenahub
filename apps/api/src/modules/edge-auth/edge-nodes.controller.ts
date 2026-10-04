@@ -1,5 +1,13 @@
-import { BadRequestException, Body, Controller, NotFoundException, Post } from '@nestjs/common';
-import { ApiCreatedResponse } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import type { EdgeNode, EdgeNodeStatus } from '@arenahub/database';
 import { z } from 'zod';
 
@@ -60,6 +68,16 @@ export class EdgeNodesController {
     private readonly unidades: GymUnitRepository,
     private readonly contexto: TenantContextService,
   ) {}
+
+  /** Alimenta o seletor de dono do leitor no painel (#490). */
+  @Get()
+  @RequirePermissions('device.read')
+  @ApiOkResponse({ schema: { type: 'array', items: SCHEMA_DO_EDGE_NODE } })
+  async listar(@Query('gymUnitId') gymUnitId?: string): Promise<EdgeNodeDto[]> {
+    const encontrados = await this.edgeNodes.listar(this.contexto.require(), gymUnitId);
+
+    return encontrados.map((e) => this.paraDto(e));
+  }
 
   @Post()
   @RequirePermissions('device.manage')

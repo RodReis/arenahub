@@ -34,6 +34,8 @@ interface JobDeSync {
 
 interface Dispositivo {
   id: string;
+  gymUnitId: string;
+  edgeNodeId: string | null;
   model: string;
   serial: string;
   status: string;
@@ -41,6 +43,13 @@ interface Dispositivo {
   firmware: string | null;
   lastHeartbeat: string | null;
   lastSyncAt: string | null;
+}
+
+interface EdgeNode {
+  id: string;
+  gymUnitId: string;
+  code: string;
+  status: string;
 }
 
 /*
@@ -84,9 +93,10 @@ const FUSO_PROVISORIO = 'America/Sao_Paulo';
  * operação descobrir o problema pelo aluno reclamando na catraca.
  */
 export default async function PaginaDeSincronizacao() {
-  const [jobs, dispositivos] = await Promise.all([
+  const [jobs, dispositivos, edgeNodes] = await Promise.all([
     chamarApi<JobDeSync[]>('/api/v1/device-sync-jobs?limit=100'),
     chamarApi<Dispositivo[]>('/api/v1/devices'),
+    chamarApi<EdgeNode[]>('/api/v1/edge-nodes'),
   ]);
 
   if (!jobs.ok) {
@@ -111,6 +121,7 @@ export default async function PaginaDeSincronizacao() {
 
   const lista = jobs.dados ?? [];
   const equipamentos = dispositivos.dados ?? [];
+  const edges = edgeNodes.dados ?? [];
 
   const comFalha = lista.filter((job) => job.state === 'FAILED');
 
@@ -225,6 +236,17 @@ export default async function PaginaDeSincronizacao() {
                 model={d.model}
                 status={d.status}
                 firmware={d.firmware}
+                edgeNodeId={d.edgeNodeId}
+                /*
+                  Os Edges ATIVOS da unidade do leitor (a API recusa o resto) MAIS
+                  o dono atual, seja qual for: sem ele o seletor mostraria "Sem
+                  Edge" e qualquer edição de firmware apagaria o dono.
+                */
+                edges={edges.filter(
+                  (e) =>
+                    e.id === d.edgeNodeId ||
+                    (e.gymUnitId === d.gymUnitId && e.status === 'ACTIVE'),
+                )}
               />
             ),
           },

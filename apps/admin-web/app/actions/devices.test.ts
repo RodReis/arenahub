@@ -9,7 +9,7 @@ vi.mock('next/cache', () => ({
 }));
 
 import { chamarApi } from '../../lib/api/server-client';
-import { cadastrarDispositivo } from './devices';
+import { cadastrarDispositivo, editarDispositivo } from './devices';
 
 const UNIDADE = '11111111-1111-4111-8111-111111111111';
 
@@ -120,5 +120,61 @@ describe('cadastrarDispositivo', () => {
     const corpo = vi.mocked(chamarApi).mock.calls[0]?.[1]?.corpo as Record<string, unknown>;
     expect(corpo['kind']).toBe('TURNSTILE');
     expect(corpo['model']).toBe('Inner');
+  });
+});
+
+describe('editarDispositivo -- dono do leitor (#490)', () => {
+  const DEVICE = '22222222-2222-4222-8222-222222222222';
+  const EDGE = '33333333-3333-4333-8333-333333333333';
+
+  function edicao(extras: Record<string, string> = {}): FormData {
+    const dados = new FormData();
+
+    dados.set('deviceId', DEVICE);
+    dados.set('status', 'ACTIVE');
+
+    for (const [chave, valor] of Object.entries(extras)) {
+      dados.set(chave, valor);
+    }
+
+    return dados;
+  }
+
+  const corpoEnviado = () =>
+    vi.mocked(chamarApi).mock.calls[0]?.[1]?.corpo as Record<string, unknown>;
+
+  beforeEach(() => {
+    vi.mocked(chamarApi).mockReset();
+    vi.mocked(chamarApi).mockResolvedValue(criado());
+  });
+
+  it('manda o Edge escolhido', async () => {
+    await editarDispositivo({}, edicao({ edgeNodeId: EDGE }));
+
+    expect(corpoEnviado()['edgeNodeId']).toBe(EDGE);
+  });
+
+  it('manda null quando o campo vem vazio (Sem Edge)', async () => {
+    await editarDispositivo({}, edicao({ edgeNodeId: '' }));
+
+    expect(corpoEnviado()).toHaveProperty('edgeNodeId', null);
+  });
+
+  it('nao manda a chave quando o formulario nao tem o campo', async () => {
+    await editarDispositivo({}, edicao());
+
+    expect(corpoEnviado()).not.toHaveProperty('edgeNodeId');
+  });
+
+  it('traduz EDGE_NODE_NOT_FOUND em frase acionavel', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({
+      ok: false,
+      erro: { type: 'about:blank', status: 404, code: 'EDGE_NODE_NOT_FOUND', correlationId: 'c' },
+      cookiesDaApi: [],
+    } as never);
+
+    const estado = await editarDispositivo({}, edicao({ edgeNodeId: EDGE }));
+
+    expect(estado.erro).toBe('Edge não encontrado nesta unidade.');
   });
 });
