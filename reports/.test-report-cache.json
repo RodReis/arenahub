@@ -3,19 +3,19 @@
     "testes": 2081,
     "pass": 2081,
     "falha": 0,
-    "coberturaPct": 67.49
+    "coberturaPct": 66.94
   },
   "apps/api#test:integration": {
-    "testes": 1371,
-    "pass": 1371,
+    "testes": 1401,
+    "pass": 1401,
     "falha": 0,
-    "coberturaPct": 81
+    "coberturaPct": 81.24
   },
   "apps/admin-web#test": {
-    "testes": 807,
-    "pass": 807,
+    "testes": 862,
+    "pass": 862,
     "falha": 0,
-    "coberturaPct": 74.58
+    "coberturaPct": 75.8
   },
   "packages/ui#test": {
     "testes": 265,
@@ -42,8 +42,8 @@
     "coberturaPct": 86.44
   },
   "apps/edge-agent#test": {
-    "testes": 323,
-    "pass": 323,
+    "testes": 352,
+    "pass": 352,
     "falha": 0,
     "coberturaPct": 90.87
   },
