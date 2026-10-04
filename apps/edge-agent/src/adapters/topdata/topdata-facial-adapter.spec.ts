@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import pino from 'pino';
 import { WebSocket } from 'ws';
 
@@ -20,10 +20,17 @@ class LeitorFalso {
   /** Respostas programadas por comando. */
   private readonly respostas = new Map<string, Record<string, unknown>>();
 
+  /** Comandos que o leitor recebe e nunca responde -- ack perdido. */
+  private readonly mudos = new Set<string>();
+
   constructor(readonly sn = 'AYTI11108174') {}
 
   responderCom(cmd: string, resposta: Record<string, unknown>): void {
     this.respostas.set(cmd, resposta);
+  }
+
+  silenciar(cmd: string): void {
+    this.mudos.add(cmd);
   }
 
   conectar(porta: number): Promise<void> {
@@ -41,6 +48,8 @@ class LeitorFalso {
 
         const bruto = msg['cmd'];
         const cmd = typeof bruto === 'string' ? bruto : '';
+        if (this.mudos.has(cmd)) return;
+
         const programada = this.respostas.get(cmd);
 
         if (programada) {
@@ -718,6 +727,32 @@ describe('TopdataFacialAdapter -- foto do leitor (#503)', () => {
 
   it('lerNome devolve null (sem lancar) quando o numero nao e um enrollid valido', async () => {
     expect(await adapter.lerNome('nao-e-numero')).toBeNull();
+  });
+
+  it('lerNome reabilita o leitor mesmo quando o ack do disabledevice nao chega', async () => {
+    // O leitor pode ter aplicado o disable e so o ack se perdeu: sem o
+    // enabledevice, ninguem mais e reconhecido na catraca.
+    leitor.silenciar('disabledevice');
+    const chegou = async (cmd: string): Promise<void> => {
+      // `setImmediate` e real: so o `setTimeout` (o prazo do comando) e falso.
+      for (let i = 0; i < 1000 && !leitor.recebidos.some((m) => m['cmd'] === cmd); i += 1) {
+        await new Promise((r) => setImmediate(r));
+      }
+      expect(leitor.recebidos.map((m) => m['cmd'])).toContain(cmd);
+    };
+
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask', 'Date'] });
+    try {
+      const nome = adapter.lerNome('1491');
+      await chegou('disabledevice');
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      expect(await nome).toBeNull();
+      await chegou('enabledevice');
+      expect(leitor.recebidos.map((m) => m['cmd'])).not.toContain('getuserinfo');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

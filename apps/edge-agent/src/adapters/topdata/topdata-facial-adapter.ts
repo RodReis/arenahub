@@ -541,9 +541,12 @@ export class TopdataFacialAdapter implements FacialDeviceAdapter {
       try {
         const enrollid = paraEnrollId(externalEnrollId);
 
-        await this.comandar(comandos.disableDevice(), 'disabledevice');
-
+        // O disable DENTRO do try: se o leitor aplicou e so o ack se perdeu,
+        // o enable ainda e tentado -- leitor desabilitado nao reconhece
+        // ninguem na catraca. Habilitar quem ja esta habilitado e inocuo.
         try {
+          await this.comandar(comandos.disableDevice(), 'disabledevice');
+
           const retorno = await this.comandar(
             comandos.getUserInfo(enrollid, BACKUPNUM.FOTO),
             'getuserinfo',
