@@ -333,7 +333,17 @@ export function periodosDisponiveis(
   limite = 6,
   agora: Date = new Date(),
 ): readonly OpcaoDePeriodo[] {
-  return [...competencias]
+  // Competencia futura (fatura emitida adiantada) nao tem janela apuravel:
+  // `de` cairia depois de `ate = agora` e a API recusa. Sai ANTES do corte
+  // do limite para nao ocupar vaga de mes real.
+  const agoraMs = agora.getTime();
+
+  return competencias
+    .filter((competencia) => {
+      const [ano, mes] = competencia.split('-').map(Number);
+
+      return Date.UTC(ano ?? 0, (mes ?? 1) - 1, 1) <= agoraMs;
+    })
     .sort()
     .reverse()
     .slice(0, limite)

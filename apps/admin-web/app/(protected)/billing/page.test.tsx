@@ -801,4 +801,20 @@ describe('periodosDisponiveis', () => {
     expect(periodos.map((p) => p.rotulo)).toEqual(['ago/2026']);
     expect(periodos[0]?.parcial).toBe(false);
   });
+
+  /**
+   * O SEGUNDO BUG DO PI (04/10/2026): "nov/2026 (parcial)" dava
+   * `BILLING_SUMMARY_INVALID_WINDOW`. Fatura ja emitida para o mes que vem
+   * (troca de plano agendada, F#337) faz a competencia futura aparecer na
+   * serie. O chip montava `de = 01/11` com `ate = agora` -- fim ANTES do
+   * inicio, que a API recusa. Competencia que ainda nao comecou nao tem
+   * janela apuravel: sem chip.
+   */
+  it('nao oferece chip para competencia futura, e ela nao ocupa vaga do limite', () => {
+    const agora = new Date('2026-10-04T12:00:00.000Z');
+    const periodos = periodosDisponiveis(['2026-09', '2026-10', '2026-11'], JANELA, 2, agora);
+
+    expect(periodos.map((p) => p.rotulo)).toEqual(['set/2026', 'out/2026']);
+    expect(periodos.every((p) => new Date(p.de) < new Date(p.ate))).toBe(true);
+  });
 });
