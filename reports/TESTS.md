@@ -193,3 +193,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-04 | #490 | — | integração | 1497 | 1497 | 0 | 81.9 | [#547](https://github.com/RodReis/arenahub/pull/547) — **corrigido à mão, número do CI** (API 1415 + database 82): a integração completa local não serve de evidência nesta máquina (Postgres estourou `max_connections`, 110/34/6 falhas em suítes diferentes a cada rodada; as suítes que caíram passam isoladas); cobertura herdada da entrega anterior |
 | 2026-10-04 | #549 | SPEC-011 | unitário | 4251 | 4251 | 0 | 74.9 | #550 |
 | 2026-10-04 | #549 | SPEC-011 | integração | 1503 | 1503 | 0 | 81.9 | #550 |
+| 2026-10-04 | #337 | — | unitário | 4256 | 4256 | 0 | 74.9 | [#552](https://github.com/RodReis/arenahub/pull/552) — número local do `test:report`; CI verde nos dois jobs |
+| 2026-10-04 | #337 | — | integração | 1511 | 1511 | 0 | 82.0 | [#552](https://github.com/RodReis/arenahub/pull/552) — número local do `test:report`; CI verde nos dois jobs |
