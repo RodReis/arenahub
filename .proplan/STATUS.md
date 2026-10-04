@@ -9,10 +9,8 @@ updated: 2026-10-04
 
 ### Sem épico
 
-- [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
 - [MVP2][INFRA] Decisão: só existe plano mensal — os ciclos da §33 (trimestral, semestral, anual) nunca foram discutidos (#338)
-- [MVP2][INFRA] Decisão: upgrade e downgrade de plano — não existe regra de proração (#337)
 - [MVP1][INFRA] Decisão: QR, cartão e PIN como caminho de acesso — a regra de arquitetura nº 7 não tem implementação (#336)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
@@ -35,6 +33,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][INFRA] Decisão: upgrade e downgrade de plano — não existe regra de proração (#337, finalizado em: 2026-10-04)
+- [INFRA] Decisão: rate limiting fora do login — a F71 expõe consulta por CPF + data de nascimento sem throttle (#335, finalizado em: 2026-10-04)
 - [MVP1][SPEC-011][FIX] Painel de operação: ao vivo, falsa tranquilidade, filtro por unidade e dia de 23h (#549, finalizado em: 2026-10-04)
 - [MVP1][FIX] Reatribuir o Edge de um dispositivo — hoje não há como desfazer a reivindicação automática (#488) (#490, finalizado em: 2026-10-04)
 - [MVP1][INFRA] Decisão: a catraca não registra saída — `direction` (ENTRY/EXIT) não existe no schema (#347, finalizado em: 2026-10-03)
