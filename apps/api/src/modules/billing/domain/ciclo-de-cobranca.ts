@@ -25,6 +25,17 @@ export function competenciaDe(momento: Date): Date {
 }
 
 /**
+ * Primeiro instante do PROXIMO ciclo: dia 1 do mes seguinte, 00:00 UTC.
+ *
+ * E quando uma troca de plano agendada passa a valer (decisao do PI em
+ * 04/10/2026, #337: sem proracao, "a mudanca vale no proximo ciclo"). Mesmo
+ * calendario da competencia -- nenhum "ciclo" novo.
+ */
+export function inicioDoProximoCiclo(momento: Date): Date {
+  return new Date(Date.UTC(momento.getUTCFullYear(), momento.getUTCMonth() + 1, 1));
+}
+
+/**
  * Vencimento a partir da competencia e do dia configurado no tenant.
  *
  * DIA LIMITADO A 28: 29, 30 e 31 nao existem em todo mes, e a alternativa

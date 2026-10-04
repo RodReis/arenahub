@@ -3,6 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   CicloInvalidoError,
   competenciaDe,
+  inicioDoProximoCiclo,
   proximoVencimento,
   instanteDeBloqueio,
 } from './ciclo-de-cobranca.js';
@@ -71,5 +72,19 @@ describe('instanteDeBloqueio', () => {
     expect(() => instanteDeBloqueio(new Date('2026-08-10T00:00:00Z'), -1)).toThrow(
       CicloInvalidoError,
     );
+  });
+});
+
+describe('inicioDoProximoCiclo', () => {
+  it('devolve o dia 1 do mes seguinte, a meia-noite UTC', () => {
+    expect(inicioDoProximoCiclo(new Date('2026-08-18T13:45:00Z'))).toEqual(new Date('2026-09-01T00:00:00Z'));
+  });
+
+  it('no primeiro dia do mes ainda aponta para o mes seguinte, nunca para hoje', () => {
+    expect(inicioDoProximoCiclo(new Date('2026-08-01T00:00:00Z'))).toEqual(new Date('2026-09-01T00:00:00Z'));
+  });
+
+  it('vira o ano em dezembro', () => {
+    expect(inicioDoProximoCiclo(new Date('2026-12-31T23:59:59Z'))).toEqual(new Date('2027-01-01T00:00:00Z'));
   });
 });

@@ -85,7 +85,11 @@ export interface EstadoDoReajuste {
 
 export interface EstadoDaAssinatura {
   erro?: string;
-  sucesso?: { subscriptionId: string; entitlementId: string };
+  /**
+   * `vigenteApartirDe` so existe na TROCA de plano (#337): ela e agendada para o
+   * proximo ciclo, entao nao ha direito novo (`entitlementId`) a devolver.
+   */
+  sucesso?: { subscriptionId: string; entitlementId?: string; vigenteApartirDe?: string };
   valores?: { planId?: string; startsAt?: string; endsAt?: string; reason?: string };
 }
 
@@ -101,6 +105,9 @@ const MENSAGEM: Record<string, string> = {
   STUDENT_NOT_FOUND: 'Aluno não encontrado nesta academia.',
   // A recepção precisa saber POR QUE não pode: bloqueado, cancelado ou
   // arquivado. Suspenso NÃO entra aqui — continua elegível (INV-033).
+  SUBSCRIPTION_PLAN_UNCHANGED: 'A assinatura já está neste plano. Escolha outro plano.',
+  SUBSCRIPTION_ENDS_BEFORE_NEXT_CYCLE:
+    'A vigência termina antes do próximo ciclo. Atribua o plano novo na renovação em vez de agendar a troca.',
   STUDENT_NOT_ELIGIBLE:
     'Este aluno está bloqueado, cancelado ou arquivado — regularize a situação antes de atribuir o plano.',
   SUBSCRIPTION_NOT_FOUND: 'Assinatura não encontrada.',
@@ -363,12 +370,10 @@ export async function atribuirPlano(
   }
 
   /*
-   * TROCA DE PLANO: uma chamada so, atomica (F82) -- POST
-   * /subscriptions/:id/trocar-plano substitui as duas chamadas sequenciais
-   * (CANCEL depois POST) que existiam aqui. Sem janela de falha parcial: a
-   * troca acontece numa transacao so no backend
-   * (MembershipRepository.trocarPlanoDaAssinatura), entao nao ha mais como
-   * o aluno ficar sem plano no meio do caminho.
+   * TROCA DE PLANO: uma chamada so (F82) -- POST /subscriptions/:id/trocar-plano.
+   * Desde o #337 ela AGENDA a troca para o proximo ciclo (sem proracao, sem
+   * credito): nada muda no acesso agora, e o job do backend aplica a troca
+   * atomica no dia 1. Sem janela de falha parcial do lado da tela.
    */
   if (validado.data.substituiSubscriptionId !== undefined) {
     if (validado.data.substituiVersion === undefined) {
@@ -377,7 +382,8 @@ export async function atribuirPlano(
 
     const troca = await chamarApi<{
       subscriptionId: string;
-      entitlement: { id: string };
+      scheduledPlanId: string;
+      effectiveFrom: string;
     }>(`/api/v1/subscriptions/${validado.data.substituiSubscriptionId}/trocar-plano`, {
       metodo: 'POST',
       corpo: {
@@ -396,7 +402,7 @@ export async function atribuirPlano(
     return {
       sucesso: {
         subscriptionId: troca.dados.subscriptionId,
-        entitlementId: troca.dados.entitlement.id,
+        vigenteApartirDe: troca.dados.effectiveFrom,
       },
     };
   }

@@ -115,8 +115,10 @@ interface Entitlement {
   subscriptionId: string | null;
   /** Nome do plano vigente na assinatura -- nulo em direito por vinculo (cortesia etc). */
   planName: string | null;
-  /** Versão da assinatura de origem — o que a troca de plano precisa para cancelar. */
+  /** Versão da assinatura de origem — o que a troca de plano precisa para agendar. */
   subscriptionVersion: number | null;
+  /** #337: troca de plano já agendada para o próximo ciclo, ou nula/ausente. */
+  scheduledPlanChange?: { planId: string; effectiveFrom: string } | null;
   /** F56: modalidade do plano da assinatura. Nulo em cortesia. */
   planBillingMode: 'AVULSO' | 'ASSINATURA' | null;
   /** F56: já existe recorrência instalada no provedor? */
@@ -300,6 +302,13 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             // branch inteiro): o formulario de troca nao pede mais
             // inicio/fim -- so informa ate quando o acesso atual vale.
             endsAt: direito.endsAt,
+            trocaAgendada: direito.scheduledPlanChange
+              ? {
+                  planName:
+                    planos.find((p) => p.id === direito.scheduledPlanChange?.planId)?.name ?? null,
+                  effectiveFrom: direito.scheduledPlanChange.effectiveFrom,
+                }
+              : undefined,
             billingMode: direito.planBillingMode ?? 'AVULSO',
             recorrenciaAtiva: direito.recorrenciaAtiva,
             planCurrentPrice: direito.planCurrentPrice,

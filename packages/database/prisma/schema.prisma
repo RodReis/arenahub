@@ -1989,6 +1989,14 @@ model Subscription {
   /// caminho que nasce na F25/F52, nao aqui.
   recurrenceConsentActorId String?   @map("recurrence_consent_actor_id") @db.Uuid
 
+  /// Troca de plano AGENDADA (#337, decisao do PI de 04/10/2026): sem
+  /// proracao e sem credito, a mudanca vale no PROXIMO ciclo. Os dois campos
+  /// nascem e morrem juntos (CHECK na migration). Quem aplica e o job diario
+  /// `AplicarTrocasAgendadasSchedulerService`, reaproveitando a troca imediata
+  /// da F82; a assinatura nova nasce com os dois nulos.
+  scheduledPlanId   String?   @map("scheduled_plan_id") @db.Uuid
+  scheduledPlanFrom DateTime? @map("scheduled_plan_from")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   version   Int      @default(0)

@@ -8,6 +8,8 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { BillingRepository } from '../../src/modules/billing/billing.repository.js';
+import { inicioDoProximoCiclo } from '../../src/modules/billing/domain/ciclo-de-cobranca.js';
+import { AplicarTrocasAgendadasSchedulerService } from '../../src/modules/membership/aplicar-trocas-agendadas-scheduler.service.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { StudentRepository } from '../../src/modules/students/student.repository.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
@@ -1550,8 +1552,21 @@ describe('F7 -- aluno, plano e entitlement', () => {
       expect(resposta.status).toBe(400);
     });
 
-    it('troca o plano preservando historico, numa transacao so', async () => {
-      const criado = await criarAluno(contas.a, { fullName: 'Troca De Plano' });
+    /**
+     * #337, decisao do PI de 04/10/2026: sem proracao e sem credito, a troca
+     * vale no PROXIMO ciclo. A rota so AGENDA; a troca atomica da F82 e o que
+     * o job aplica no dia 1.
+     */
+    const assinarComPlano = async (
+      nome: string,
+    ): Promise<{
+      alunoId: string;
+      subscriptionId: string;
+      entitlementId: string;
+      planAntigoId: string;
+      planNovoId: string;
+    }> => {
+      const criado = await criarAluno(contas.a, { fullName: nome });
       const alunoId = (criado.body as { id: string }).id;
       const planAntigoId = await criarPlano(contas.a);
       const planNovoId = await criarPlano(contas.a);
@@ -1567,82 +1582,237 @@ describe('F7 -- aluno, plano e entitlement', () => {
           reason: 'assinatura inicial',
         });
 
-      const subscriptionAntigaId = (assinatura.body as { subscriptionId: string }).subscriptionId;
-      const entitlementAntigoId = (assinatura.body as { entitlement: { id: string } })
-        .entitlement.id;
+      const corpo = assinatura.body as { subscriptionId: string; entitlement: { id: string } };
 
-      const resposta = await request(servidor())
-        .post(`/api/v1/subscriptions/${subscriptionAntigaId}/trocar-plano`)
+      return {
+        alunoId,
+        subscriptionId: corpo.subscriptionId,
+        entitlementId: corpo.entitlement.id,
+        planAntigoId,
+        planNovoId,
+      };
+    };
+
+    const agendarTroca = (subscriptionId: string, planId: string, version = 0): request.Test =>
+      request(servidor())
+        .post(`/api/v1/subscriptions/${subscriptionId}/trocar-plano`)
         .set('Cookie', contas.a.cookie)
-        .send({ planId: planNovoId, version: 0, reason: 'plano cadastrado errado' });
+        .send({ planId, version, reason: 'plano cadastrado errado' });
+
+    it('agenda a troca para o proximo ciclo sem mexer na assinatura nem no acesso', async () => {
+      const { subscriptionId, entitlementId, planAntigoId, planNovoId } =
+        await assinarComPlano('Troca Agendada');
+
+      const resposta = await agendarTroca(subscriptionId, planNovoId);
 
       expect(resposta.status).toBe(201);
 
       const corpo = resposta.body as {
         subscriptionId: string;
-        entitlement: { id: string; status: string; janelas: unknown[] };
+        scheduledPlanId: string;
+        effectiveFrom: string;
       };
 
-      expect(corpo.subscriptionId).not.toBe(subscriptionAntigaId);
-      expect(corpo.entitlement.status).toBe('ACTIVE');
-      expect(corpo.entitlement.janelas).toHaveLength(5);
+      expect(corpo.subscriptionId).toBe(subscriptionId);
+      expect(corpo.scheduledPlanId).toBe(planNovoId);
+      expect(corpo.effectiveFrom).toBe(inicioDoProximoCiclo(new Date()).toISOString());
 
-      const antiga = await db.subscription.findUniqueOrThrow({
-        where: { id: subscriptionAntigaId },
-      });
-      expect(antiga.status).toBe('CANCELLED');
+      // Nada vale ainda: mesma assinatura, mesmo plano, mesmo direito.
+      const assinatura = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
+      expect(assinatura.status).toBe('ACTIVE');
+      expect(assinatura.planId).toBe(planAntigoId);
+      expect(assinatura.scheduledPlanId).toBe(planNovoId);
+      expect(assinatura.version).toBe(1);
 
-      const entitlementAntigo = await db.entitlement.findUniqueOrThrow({
-        where: { id: entitlementAntigoId },
-      });
-      expect(entitlementAntigo.status).toBe('REVOKED');
-      expect(entitlementAntigo.revokedAt).not.toBeNull();
+      const entitlement = await db.entitlement.findUniqueOrThrow({ where: { id: entitlementId } });
+      expect(entitlement.status).toBe('ACTIVE');
 
-      const nova = await db.subscription.findUniqueOrThrow({ where: { id: corpo.subscriptionId } });
-      expect(nova.planId).toBe(planNovoId);
-      expect(nova.status).toBe('ACTIVE');
-      // Mesma vigencia contratual -- so o plano mudou.
-      // endsAt e nullable no schema, mas o setup do teste sempre envia um valor.
-      expect(nova.endsAt?.toISOString()).toBe(antiga.endsAt?.toISOString());
+      const auditoria = await db.auditLog.findFirst({
+        where: {
+          tenantId: contas.a.tenantId,
+          action: 'subscription.plan_change_scheduled',
+          targetId: subscriptionId,
+        },
+      });
+      expect(auditoria?.metadata).toMatchObject({ fromPlanId: planAntigoId, toPlanId: planNovoId });
+    });
 
-      const timeline = await db.studentTimelineEvent.findMany({
-        where: { studentId: alunoId, type: 'SUBSCRIPTION_PLAN_CHANGED' },
-      });
-      expect(timeline).toHaveLength(1);
-      expect(timeline[0]?.payload).toMatchObject({
-        fromSubscriptionId: subscriptionAntigaId,
-        toSubscriptionId: corpo.subscriptionId,
-        fromPlanId: planAntigoId,
-        toPlanId: planNovoId,
+    it('agendar de novo substitui o agendamento anterior', async () => {
+      const { subscriptionId, planNovoId } = await assinarComPlano('Reagenda');
+      const outroPlanoId = await criarPlano(contas.a);
+
+      await agendarTroca(subscriptionId, planNovoId, 0);
+      const segunda = await agendarTroca(subscriptionId, outroPlanoId, 1);
+
+      expect(segunda.status).toBe(201);
+
+      const assinatura = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
+      expect(assinatura.scheduledPlanId).toBe(outroPlanoId);
+    });
+
+    it('recusa agendar troca para o plano que a assinatura ja tem', async () => {
+      const { subscriptionId, planAntigoId } = await assinarComPlano('Mesmo Plano');
+
+      const resposta = await agendarTroca(subscriptionId, planAntigoId);
+
+      expect(resposta.status).toBe(422);
+      expect((resposta.body as { code: string }).code).toBe('SUBSCRIPTION_PLAN_UNCHANGED');
+    });
+
+    it('recusa agendar quando a vigencia acaba antes do proximo ciclo', async () => {
+      const criado = await criarAluno(contas.a, { fullName: 'Vence Antes' });
+      const alunoId = (criado.body as { id: string }).id;
+      const planAntigoId = await criarPlano(contas.a);
+      const planNovoId = await criarPlano(contas.a);
+
+      const agora = new Date();
+      const fimNoMesCorrente = new Date(inicioDoProximoCiclo(agora).getTime() - 60_000);
+
+      const assinatura = await request(servidor())
+        .post('/api/v1/subscriptions')
+        .set('Cookie', contas.a.cookie)
+        .send({
+          studentId: alunoId,
+          planId: planAntigoId,
+          startsAt: new Date(agora.getTime() - 86_400_000).toISOString(),
+          endsAt: fimNoMesCorrente.toISOString(),
+          reason: 'assinatura inicial',
+        });
+
+      const resposta = await agendarTroca(
+        (assinatura.body as { subscriptionId: string }).subscriptionId,
+        planNovoId,
+      );
+
+      expect(resposta.status).toBe(422);
+      expect((resposta.body as { code: string }).code).toBe('SUBSCRIPTION_ENDS_BEFORE_NEXT_CYCLE');
+    });
+
+    it('expoe a troca agendada na ficha do aluno', async () => {
+      const { alunoId, subscriptionId, planNovoId } = await assinarComPlano('Ficha Com Troca');
+
+      await agendarTroca(subscriptionId, planNovoId);
+
+      const ficha = await request(servidor())
+        .get(`/api/v1/students/${alunoId}/entitlements`)
+        .set('Cookie', contas.a.cookie);
+
+      expect(ficha.status).toBe(200);
+
+      const lista = ficha.body as { scheduledPlanChange: { planId: string } | null }[];
+      expect(lista[0]?.scheduledPlanChange?.planId).toBe(planNovoId);
+    });
+
+    describe('job que aplica a troca agendada', () => {
+      const job = (): AplicarTrocasAgendadasSchedulerService =>
+        app.get(AplicarTrocasAgendadasSchedulerService);
+
+      it('antes do proximo ciclo nao aplica nada', async () => {
+        const { subscriptionId, planAntigoId, planNovoId } = await assinarComPlano('Job Cedo');
+        await agendarTroca(subscriptionId, planNovoId);
+
+        await job().executarCiclo(new Date());
+
+        const assinatura = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
+        expect(assinatura.status).toBe('ACTIVE');
+        expect(assinatura.planId).toBe(planAntigoId);
       });
 
-      const eventos = await db.outboxEvent.findMany({
-        where: { aggregateId: corpo.subscriptionId, eventType: 'SubscriptionPlanChanged' },
-      });
-      expect(eventos).toHaveLength(1);
+      it('no proximo ciclo troca o plano preservando historico, numa transacao so', async () => {
+        const { alunoId, subscriptionId, entitlementId, planAntigoId, planNovoId } =
+          await assinarComPlano('Job Aplica');
+        await agendarTroca(subscriptionId, planNovoId);
 
-      // Achado da revisao de branch inteiro: o entitlement criado pela
-      // troca gera o MESMO evento `EntitlementActivated` que
-      // `ativarAssinatura` gera -- qualquer consumidor de outbox que
-      // espera por esse evento para conceder/atualizar acesso nao pode
-      // ficar cego so porque o entitlement nasceu de uma troca.
-      const eventosDeEntitlement = await db.outboxEvent.findMany({
-        where: { aggregateId: corpo.entitlement.id, eventType: 'EntitlementActivated' },
-      });
-      expect(eventosDeEntitlement).toHaveLength(1);
+        const resultado = await job().executarCiclo(inicioDoProximoCiclo(new Date()));
 
-      // Filtra pelo `payload.entitlementId` do entitlement da TROCA -- o
-      // aluno ja tem um `ENTITLEMENT_ACTIVATED` da assinatura ORIGINAL
-      // (criada por `POST /subscriptions` no inicio deste teste), entao
-      // contar so por `studentId` contaria os dois.
-      const timelineDeEntitlement = await db.studentTimelineEvent.findMany({
-        where: { studentId: alunoId, type: 'ENTITLEMENT_ACTIVATED' },
+        // Contador global, e o banco de integracao guarda sobras de outras
+        // execucoes: a prova de que ESTA troca foi aplicada e o estado dela, abaixo.
+        expect(resultado.aplicadas).toBeGreaterThanOrEqual(1);
+
+        const antiga = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
+        expect(antiga.status).toBe('CANCELLED');
+
+        const entitlementAntigo = await db.entitlement.findUniqueOrThrow({
+          where: { id: entitlementId },
+        });
+        expect(entitlementAntigo.status).toBe('REVOKED');
+        expect(entitlementAntigo.revokedAt).not.toBeNull();
+
+        const nova = await db.subscription.findFirstOrThrow({
+          where: { tenantId: contas.a.tenantId, studentId: alunoId, status: 'ACTIVE' },
+        });
+        expect(nova.planId).toBe(planNovoId);
+        // A nova nao herda o agendamento (a antiga ja foi cancelada).
+        expect(nova.scheduledPlanId).toBeNull();
+        // Mesma vigencia contratual -- so o plano mudou.
+        expect(nova.endsAt?.toISOString()).toBe(antiga.endsAt?.toISOString());
+
+        const entitlementNovo = await db.entitlement.findFirstOrThrow({
+          where: { subscriptionId: nova.id },
+          include: { unitWindows: true },
+        });
+        expect(entitlementNovo.status).toBe('ACTIVE');
+        expect(entitlementNovo.unitWindows).toHaveLength(5);
+
+        const timeline = await db.studentTimelineEvent.findMany({
+          where: { studentId: alunoId, type: 'SUBSCRIPTION_PLAN_CHANGED' },
+        });
+        expect(timeline).toHaveLength(1);
+        expect(timeline[0]?.payload).toMatchObject({
+          fromSubscriptionId: subscriptionId,
+          toSubscriptionId: nova.id,
+          fromPlanId: planAntigoId,
+          toPlanId: planNovoId,
+        });
+
+        // O entitlement da troca gera o MESMO evento que `ativarAssinatura`
+        // gera -- consumidor de outbox nao pode ficar cego por causa da troca.
+        const eventosDeEntitlement = await db.outboxEvent.findMany({
+          where: { aggregateId: entitlementNovo.id, eventType: 'EntitlementActivated' },
+        });
+        expect(eventosDeEntitlement).toHaveLength(1);
       });
-      expect(
-        timelineDeEntitlement.filter(
-          (e) => (e.payload as { entitlementId?: string }).entitlementId === corpo.entitlement.id,
-        ),
-      ).toHaveLength(1);
+
+      it('rodar de novo nao troca outra vez', async () => {
+        const { alunoId, subscriptionId, planNovoId } = await assinarComPlano('Job Idempotente');
+        await agendarTroca(subscriptionId, planNovoId);
+
+        const proximoCiclo = inicioDoProximoCiclo(new Date());
+        await job().executarCiclo(proximoCiclo);
+        await job().executarCiclo(proximoCiclo);
+
+        const timeline = await db.studentTimelineEvent.findMany({
+          where: { studentId: alunoId, type: 'SUBSCRIPTION_PLAN_CHANGED' },
+        });
+        expect(timeline).toHaveLength(1);
+      });
+
+      it('falha de uma troca nao derruba as outras e deixa a falha agendada', async () => {
+        const quebrada = await assinarComPlano('Job Plano Sem Janela');
+        const boa = await assinarComPlano('Job Boa');
+        await agendarTroca(quebrada.subscriptionId, quebrada.planNovoId);
+        await agendarTroca(boa.subscriptionId, boa.planNovoId);
+
+        // Plano ficou sem janela depois do agendamento: so escrita direta no
+        // banco produz esse estado (a API recusa), mas e o que o job precisa
+        // sobreviver.
+        await db.planAccessWindow.deleteMany({ where: { planId: quebrada.planNovoId } });
+
+        const resultado = await job().executarCiclo(inicioDoProximoCiclo(new Date()));
+
+        expect(resultado.falhas).toBeGreaterThanOrEqual(1);
+
+        const aindaAgendada = await db.subscription.findUniqueOrThrow({
+          where: { id: quebrada.subscriptionId },
+        });
+        expect(aindaAgendada.status).toBe('ACTIVE');
+        expect(aindaAgendada.scheduledPlanId).toBe(quebrada.planNovoId);
+
+        const aplicada = await db.subscription.findUniqueOrThrow({
+          where: { id: boa.subscriptionId },
+        });
+        expect(aplicada.status).toBe('CANCELLED');
+      });
     });
 
     /**
@@ -1764,7 +1934,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
       expect(inalterada.planId).toBe(planAntigoId);
     });
 
-    it('cancela a invoice pendente da assinatura antiga ao trocar de plano', async () => {
+    it('cancela a invoice pendente da assinatura antiga quando a troca agendada e aplicada', async () => {
       const criado = await criarAluno(contas.a, { fullName: 'Troca Com Invoice Aberta' });
       const alunoId = (criado.body as { id: string }).id;
       const planAntigoId = await criarPlano(contas.a);
@@ -1799,8 +1969,10 @@ describe('F7 -- aluno, plano e entitlement', () => {
       // faria este teste comecar a falhar em qualquer mes diferente de
       // agosto/2026, porque a invoice nao estaria mais na competencia
       // corrente no dia em que o teste roda.
-      const agora = new Date();
-      const competenciaCorrente = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), 1));
+      // A troca agendada vale no PROXIMO ciclo (#337): a competencia
+      // "corrente" para o cancelamento e a do instante em que o job aplica.
+      const proximoCiclo = inicioDoProximoCiclo(new Date());
+      const competenciaCorrente = proximoCiclo;
       const invoicePendente = await db.invoice.create({
         data: {
           tenantId: contas.a.tenantId,
@@ -1820,6 +1992,12 @@ describe('F7 -- aluno, plano e entitlement', () => {
         .post(`/api/v1/subscriptions/${subscriptionAntigaId}/trocar-plano`)
         .set('Cookie', contas.a.cookie)
         .send({ planId: planNovoId, version: 0, reason: 'plano cadastrado errado' });
+
+      // Agendar nao toca na invoice -- so a aplicacao, no proximo ciclo.
+      const antesDoCiclo = await db.invoice.findUniqueOrThrow({ where: { id: invoicePendente.id } });
+      expect(antesDoCiclo.status).toBe('OPEN');
+
+      await app.get(AplicarTrocasAgendadasSchedulerService).executarCiclo(proximoCiclo);
 
       const invoiceDepois = await db.invoice.findUniqueOrThrow({ where: { id: invoicePendente.id } });
       expect(invoiceDepois.status).toBe('CANCELLED');
@@ -1849,7 +2027,7 @@ describe('F7 -- aluno, plano e entitlement', () => {
      * invoice de mes ANTERIOR (ja vencida, dinheiro que a academia ja
      * deveria ter recebido) precisa continuar cobravel depois da troca.
      */
-    it('NAO cancela invoice de competencia anterior (divida vencida) ao trocar de plano', async () => {
+    it('NAO cancela invoice de competencia anterior (divida vencida) quando a troca agendada e aplicada', async () => {
       const criado = await criarAluno(contas.a, { fullName: 'Troca Com Divida Vencida' });
       const alunoId = (criado.body as { id: string }).id;
       const planAntigoId = await criarPlano(contas.a);
@@ -1894,6 +2072,10 @@ describe('F7 -- aluno, plano e entitlement', () => {
         .post(`/api/v1/subscriptions/${subscriptionAntigaId}/trocar-plano`)
         .set('Cookie', contas.a.cookie)
         .send({ planId: planNovoId, version: 0, reason: 'plano cadastrado errado' });
+
+      await app
+        .get(AplicarTrocasAgendadasSchedulerService)
+        .executarCiclo(inicioDoProximoCiclo(new Date()));
 
       const invoiceDepois = await db.invoice.findUniqueOrThrow({ where: { id: invoiceVencida.id } });
       // Continua OVERDUE -- a troca de plano nao perdoa atraso.
